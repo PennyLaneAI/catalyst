@@ -277,11 +277,10 @@ template <typename OpType> void traceOriginQubit(OpType &op, QubitOriginMap<OpTy
 template <typename OpType> QubitOriginMap<OpType> traceTopEdgeOperations(scf::ForOp forOp)
 {
     QubitOriginMap<OpType> qubitOriginMap;
-    auto initArgs = forOp.getInitArgs();
     auto regionIterArgs = forOp.getRegionIterArgs();
 
-    for (auto [initArg, regionArg] : llvm::zip(initArgs, regionIterArgs)) {
-        mlir::Type argType = initArg.getType();
+    for (auto regionArg : regionIterArgs) {
+        mlir::Type argType = regionArg.getType();
 
         if (isa<quantum::QuregType>(argType)) {
             for (Operation *userOp : regionArg.getUsers()) {
