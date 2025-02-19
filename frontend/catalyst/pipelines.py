@@ -104,7 +104,7 @@ class CompileOptions:
         if self.async_qnodes and self.seed != None:
             raise CompileError(
                 """
-                Seeding has no effect on asyncronous qnodes,
+                Seeding has no effect on asynchronous QNodes,
                 as the execution order of parallel runs is not guaranteed.
                 As such, seeding an asynchronous run is not supported.
                 """
