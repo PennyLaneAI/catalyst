@@ -121,7 +121,7 @@ class TestCond:
         assert circuit(-3) == -34
 
     def test_simple_cond_multiple_args(self, backend):
-        """Test basic function with conditional, with the branch function having multiple arguments."""
+        """Test function with conditional, with the branch function having multiple arguments."""
 
         @qjit
         @qml.qnode(qml.device(backend, wires=1))
