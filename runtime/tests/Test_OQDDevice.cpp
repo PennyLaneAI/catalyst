@@ -93,8 +93,18 @@ TEST_CASE("Test OpenAPL Program generation", "[oqd]")
     "modes":[
       {
         "class_": "Phonon",
-        "eigenvector": [0.0,0.0,1.0],
+        "eigenvector": [1.0,0.0,0.0],
         "energy": 3.3
+      },
+      {
+        "class_": "Phonon",
+        "eigenvector": [0.0,1.0,0.0],
+        "energy": 4.4
+      },
+      {
+        "class_": "Phonon",
+        "eigenvector": [0.0,0.0,1.0],
+        "energy": 5.5
       }
     ],
     "ions": [
@@ -893,8 +903,18 @@ TEST_CASE("Test OpenAPL Program generation", "[oqd]")
       }PHONON:
       {
         "class_": "Phonon",
-        "eigenvector": [0.0,0.0,1.0],
+        "eigenvector": [1.0,0.0,0.0],
         "energy": 3.3
+      }PHONON:
+      {
+        "class_": "Phonon",
+        "eigenvector": [0.0,1.0,0.0],
+        "energy": 4.4
+      }PHONON:
+      {
+        "class_": "Phonon",
+        "eigenvector": [0.0,0.0,1.0],
+        "energy": 4.4
       })"};
 
     size_t num_qubits = 2;
