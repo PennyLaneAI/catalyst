@@ -18,9 +18,9 @@ from textwrap import dedent
 import numpy as np
 import pennylane as qml
 import pytest
+from utils import qjit_for_tests as qjit
 
 from catalyst import api_extensions, for_loop, measure, while_loop
-from catalyst.debug.helpers import qjit_for_tests as qjit
 
 # pylint: disable=no-value-for-parameter,unused-argument
 

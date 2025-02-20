@@ -28,9 +28,9 @@ from conftest import CONFIG_CUSTOM_DEVICE
 from pennylane.devices import Device
 from pennylane.devices.capabilities import OperatorProperties
 from pennylane.transforms import split_non_commuting, split_to_single_terms
+from utils import qjit_for_tests as qjit_cleanup
 
 from catalyst.compiler import get_lib_path
-from catalyst.debug.helpers import qjit_for_tests as qjit_cleanup
 from catalyst.device import QJITDevice, get_device_capabilities
 from catalyst.device.decomposition import (
     measurements_from_counts,

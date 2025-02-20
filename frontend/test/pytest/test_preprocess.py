@@ -22,6 +22,7 @@ from conftest import CONFIG_CUSTOM_DEVICE
 from pennylane.devices import Device, NullQubit
 from pennylane.devices.capabilities import DeviceCapabilities, OperatorProperties
 from pennylane.tape import QuantumScript
+from utils import qjit_for_tests as qjit_clean
 
 from catalyst import CompileError, ctrl
 from catalyst.api_extensions.control_flow import (
@@ -34,7 +35,6 @@ from catalyst.api_extensions.control_flow import (
 )
 from catalyst.api_extensions.quantum_operators import HybridAdjoint, adjoint
 from catalyst.compiler import get_lib_path
-from catalyst.debug.helpers import qjit_for_tests as qjit_clean
 from catalyst.device.decomposition import catalyst_decompose, decompose_ops_to_unitary
 from catalyst.jax_tracer import HybridOpRegion
 from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
