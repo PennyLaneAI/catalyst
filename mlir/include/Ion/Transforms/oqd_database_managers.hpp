@@ -107,7 +107,7 @@ class OQDDatabaseManager {
     }
 
     void loadPhononParams(size_t n_qubits)
-    {   
+    {
         std::string phonon_str = "phonons" + std::to_string(n_qubits);
         toml::node_view<toml::node> phononsToml = sourceTomlGateDecomposition[phonon_str];
         size_t numPhonons = phononsToml.as_array()->size();
@@ -160,7 +160,8 @@ class OQDDatabaseManager {
 
             std::set<std::string> levelEncodings{"downstate", "upstate", "estate", "estate2"};
             assert((levelEncodings.count(level1) & levelEncodings.count(level2)) &&
-                   "Only \"downstate\", \"upstate\", \"estate\" and \"estate2\" are allowed in the atom's "
+                   "Only \"downstate\", \"upstate\", \"estate\" and \"estate2\" are allowed in the "
+                   "atom's "
                    "transition levels.");
 
             return Transition(level1, level2, multipole, einstein_a);
