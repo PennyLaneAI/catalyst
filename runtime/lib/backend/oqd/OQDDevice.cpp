@@ -81,7 +81,7 @@ void OQDDevice::NamedOperation(const std::string &name, const std::vector<double
 void OQDDevice::PartialCounts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts,
                               const std::vector<QubitIdType> &wires, size_t shots)
 {
-    return;
+    RT_FAIL("Unsupported functionality");
 }
 
 void OQDDevice::PrintState() { RT_FAIL("Unsupported functionality"); }
