@@ -680,14 +680,16 @@ class QJIT(CatalystCallable):
         # Inject Runtime Library-specific functions (e.g. setup/teardown).
         inject_functions(mlir_module, ctx, self.compile_options.seed)
 
-        # Canonicalize the MLIR since there can be a lot of redundancy coming from JAX.
-        options = copy.deepcopy(self.compile_options)
-        options.pipelines = [("0_canonicalize", ["canonicalize"])]
-        options.lower_to_llvm = False
-        canonicalizer = Compiler(options)
+        mlir_string = None
+        if self.compile_options.keep_intermediate:
+            # Canonicalize the MLIR since there can be a lot of redundancy coming from JAX.
+            options = copy.deepcopy(self.compile_options)
+            options.pipelines = [("0_canonicalize", ["canonicalize"])]
+            options.lower_to_llvm = False
+            canonicalizer = Compiler(options)
 
-        # TODO: the in-memory and textual form are different after this, consider unification
-        _, mlir_string = canonicalizer.run(mlir_module, self.workspace)
+            # TODO: the in-memory and textual form are different after this, consider unification
+            _, mlir_string = canonicalizer.run(mlir_module, self.workspace)
 
         return mlir_module, mlir_string
 
