@@ -763,8 +763,8 @@ class CondCallableArgumentsHandler(CondCallable):
     the usual CondCallable class, which expects the conditional body function to have no arguments,
     cannot be used.
 
-    This class inherits from base CondCallable, but wraps the branch function in a function with no arguments,
-    and sends that function to CondCallable.
+    This class inherits from base CondCallable, but wraps the branch function in a function with
+    no arguments, and sends that function to CondCallable.
     This allows us to perform the conditional branch function with arguments.
     """
 
@@ -774,7 +774,7 @@ class CondCallableArgumentsHandler(CondCallable):
         self.ccah_otherwise_fn = None
 
     def __call__(self, *args, **kwargs):
-        def argless_true_fn():
+        def argless_true_fn():  # pylint:disable=inconsistent-return-statements
             # Special treatment if conditional function body is a single pennylane gate
             # In such cases, the gate function should only be called, but not returned.
             # Note: The qml.operation.Operation base class represents things that
@@ -791,7 +791,7 @@ class CondCallableArgumentsHandler(CondCallable):
 
         if self.ccah_otherwise_fn is not None:
 
-            def argless_otherwise_fn():
+            def argless_otherwise_fn():  # pylint:disable=inconsistent-return-statements
                 if isinstance(self.ccah_otherwise_fn, type) and issubclass(
                     self.ccah_otherwise_fn, qml.operation.Operation
                 ):
@@ -803,7 +803,8 @@ class CondCallableArgumentsHandler(CondCallable):
 
         for i in range(1, len(self.ccah_branch_fns)):
 
-            def argless_elseif_fn(i=i):  # i=i to work around late binding
+            def argless_elseif_fn(i=i):  # pylint:disable=inconsistent-return-statements
+                # i=i to work around late binding
                 if isinstance(self.ccah_branch_fns[i], type) and issubclass(
                     self.ccah_branch_fns[i], qml.operation.Operation
                 ):
