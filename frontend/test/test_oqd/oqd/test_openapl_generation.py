@@ -29,7 +29,7 @@ class TestOpenAPL:
 
     oqd_pipelines = [
         (
-            "device-agnoistic-pipeline",
+            "device-agnostic-pipeline",
             [
                 "enforce-runtime-invariants-pipeline",
                 "hlo-lowering-pipeline",

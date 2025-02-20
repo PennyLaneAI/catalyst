@@ -133,7 +133,7 @@ int64_t getTwoQubitCombinationIndex(int64_t nQubits, int64_t idx1, int64_t idx2)
     return (idx1 * nQubits) - (idx1 * (idx1 + 1) / 2) + (idx2 - idx1 - 1);
 }
 
-mlir::Value CreateNormalizAngle(mlir::PatternRewriter &rewriter, mlir::Location loc,
+mlir::Value CreateNormalizedAngle(mlir::PatternRewriter &rewriter, mlir::Location loc,
                                 mlir::Value angle)
 {
     constexpr double PI = llvm::numbers::pi;
@@ -189,7 +189,7 @@ mlir::Value CreateNormalizAngle(mlir::PatternRewriter &rewriter, mlir::Location 
 mlir::Value computePulseDuration(mlir::PatternRewriter &rewriter, mlir::Location &loc,
                                  const mlir::Value &angle, double rabi)
 {
-    auto normalizedAngle = CreateNormalizAngle(rewriter, loc, angle);
+    auto normalizedAngle = CreateNormalizedAngle(rewriter, loc, angle);
     TypedAttr rabiAttr = rewriter.getF64FloatAttr(rabi);
     mlir::Value rabiValue = rewriter.create<arith::ConstantOp>(loc, rabiAttr).getResult();
     return rewriter.create<arith::DivFOp>(loc, normalizedAngle, rabiValue).getResult();
