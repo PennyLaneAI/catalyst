@@ -67,6 +67,7 @@
 #include "Ion/IR/IonDialect.h"
 #include "Mitigation/IR/MitigationDialect.h"
 #include "Mitigation/Transforms/Passes.h"
+#include "QEC/IR/QECDialect.h"
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/Transforms/Passes.h"
 
@@ -295,6 +296,7 @@ void registerAllCatalystDialects(DialectRegistry &registry)
     // Catalyst
     registry.insert<CatalystDialect>();
     registry.insert<quantum::QuantumDialect>();
+    registry.insert<qec::QECDialect>();
     registry.insert<ion::IonDialect>();
     registry.insert<gradient::GradientDialect>();
     registry.insert<mitigation::MitigationDialect>();
@@ -645,6 +647,12 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
     // TODO: FIXME:
     // Let's try to enable multithreading. Do not forget to protect the printing.
     ctx.disableMultithreading();
+
+    // TODO: FIXME:
+    // We need to load the QEC dialect here because the lowering pass depends on it.
+    // This is a hack and we need to find a better way to do this.
+    ctx.loadDialect<catalyst::qec::QECDialect>();
+
     ScopedDiagnosticHandler scopedHandler(
         &ctx, [&](Diagnostic &diag) { diag.print(options.diagnosticStream); });
 
