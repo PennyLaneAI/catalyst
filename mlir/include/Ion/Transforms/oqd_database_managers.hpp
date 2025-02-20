@@ -107,7 +107,7 @@ class OQDDatabaseManager {
     }
 
     void loadPhononParams(size_t n_qubits)
-    {   
+    {
         // TODO: The fact that loading phonons depend on the number of qubits is a bit of a hack.
         // This is not ideal since we want to support dynamic number of qubits in the future.
         // We should find a better way to handle this in the database.
