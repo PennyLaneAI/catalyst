@@ -16,8 +16,9 @@
 
 import jax.numpy as jnp
 import pennylane as qml
+from utils import qjit_for_tests as qjit
 
-from catalyst import measure, qjit
+from catalyst import measure
 
 
 @qjit(target="mlir")
