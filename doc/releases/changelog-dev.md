@@ -43,6 +43,8 @@
 
   - Turn off MLIR's verifier.
     [(#1513)](https://github.com/PennyLaneAI/catalyst/pull/1513)
+  - Remove unnecessary I/O.
+    [(#1514)](https://github.com/PennyLaneAI/catalyst/pull/1514)
 
 <h3>Breaking changes 💔</h3>
 
