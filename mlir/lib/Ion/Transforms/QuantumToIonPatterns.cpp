@@ -136,7 +136,6 @@ int64_t getTwoQubitCombinationIndex(int64_t nQubits, int64_t idx1, int64_t idx2)
 mlir::Value CreateNormalizAngle(mlir::PatternRewriter &rewriter, mlir::Location loc,
                                 mlir::Value angle)
 {
-
     constexpr double PI = llvm::numbers::pi;
     constexpr double FOUR_PI = 4.0 * PI;
 
