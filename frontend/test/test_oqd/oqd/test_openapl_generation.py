@@ -26,6 +26,7 @@ from catalyst.third_party.oqd import OQDDevice
 
 class TestOpenAPL:
     """Test that the OQD device correctly generates an OpenAPL program."""
+
     toml_path = os.path.join(os.path.dirname(__file__), "calibration_data/")
     oqd_pipelines = [
         (
@@ -42,9 +43,15 @@ class TestOpenAPL:
             [
                 "func.func(ions-decomposition)",
                 "func.func(quantum-to-ion{"
-                + "device-toml-loc=" + toml_path + "device.toml "
-                + "qubit-toml-loc=" + toml_path + "qubit.toml "
-                + "gate-to-pulse-toml-loc=" + toml_path + "gate.toml"
+                + "device-toml-loc="
+                + toml_path
+                + "device.toml "
+                + "qubit-toml-loc="
+                + toml_path
+                + "qubit.toml "
+                + "gate-to-pulse-toml-loc="
+                + toml_path
+                + "gate.toml"
                 + "})",
                 "convert-ion-to-llvm",
             ],
@@ -62,6 +69,7 @@ class TestOpenAPL:
     def test_RX_gate(self):
         """Test OpenAPL generation for a circuit with a single RX Gate."""
         oqd_dev = OQDDevice(backend="default", shots=4, wires=1)
+
         @qjit(pipelines=self.oqd_pipelines)
         @qml.qnode(oqd_dev)
         def circuit(x):
