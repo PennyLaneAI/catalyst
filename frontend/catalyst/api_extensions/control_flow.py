@@ -98,9 +98,6 @@ def cond(pred: DynamicJaxprTracer):
     Returns:
         A callable decorator that wraps the first 'if' branch of the conditional.
 
-    Raises:
-        AssertionError: Branch functions cannot have arguments.
-
     **Example**
 
     .. code-block:: python
