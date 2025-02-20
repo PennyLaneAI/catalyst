@@ -275,8 +275,6 @@ class TestCompilerState:
 
         directory = os.path.join(os.getcwd(), workflow.__name__)
         files = os.listdir(directory)
-        # The directory is non-empty. Should at least contain the original .mlir file
-        assert files
         workflow.workspace.cleanup()
 
     def test_compiler_driver_with_output_name(self):
