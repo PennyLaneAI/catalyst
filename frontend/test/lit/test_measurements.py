@@ -17,8 +17,9 @@
 import jax
 import numpy as np
 import pennylane as qml
+from utils import qjit_for_tests as qjit
 
-from catalyst import CompileError, qjit
+from catalyst import CompileError
 from catalyst.jax_extras.tracing import bind_flexible_primitive
 from catalyst.jax_primitives import compbasis_p, counts_p, sample_p
 

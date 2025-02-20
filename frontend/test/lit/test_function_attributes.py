@@ -15,8 +15,7 @@
 # RUN: %PYTHON %s | FileCheck %s
 
 import pennylane as qml
-
-from catalyst import qjit
+from utils import qjit_for_tests as qjit
 
 # pylint: disable=line-too-long
 
