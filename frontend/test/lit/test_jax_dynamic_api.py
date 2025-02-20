@@ -19,9 +19,8 @@
 import jax.numpy as jnp
 import pennylane as qml
 from jax.core import ShapedArray
-from lit_util_printers import print_jaxpr, print_mlir
-
-from catalyst.debug.helpers import qjit_for_tests as qjit
+from utils import print_jaxpr, print_mlir
+from utils import qjit_for_tests as qjit
 
 
 # CHECK-LABEL: test_qjit_dynamic_argument

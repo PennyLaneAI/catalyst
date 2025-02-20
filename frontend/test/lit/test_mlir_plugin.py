@@ -64,10 +64,10 @@ import platform
 from pathlib import Path
 
 import pennylane as qml
+from utils import qjit_for_tests as qjit_cleanup
 
 import catalyst
 from catalyst.compiler import CompileOptions, Compiler
-from catalyst.debug.helpers import qjit_for_tests as qjit_cleanup
 from catalyst.utils.filesystem import WorkspaceManager
 from catalyst.utils.runtime_environment import get_bin_path
 

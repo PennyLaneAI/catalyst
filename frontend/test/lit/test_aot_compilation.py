@@ -17,9 +17,9 @@
 import jax
 import pennylane as qml
 from jax.core import ShapedArray
+from utils import qjit_for_tests as qjit
 
 from catalyst import measure
-from catalyst.debug.helpers import qjit_for_tests as qjit
 
 """
 Currently unsupported:
