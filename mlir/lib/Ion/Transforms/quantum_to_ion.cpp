@@ -84,11 +84,12 @@ struct QuantumToIonPass : impl::QuantumToIonPassBase<QuantumToIonPass> {
         target.addIllegalOp<catalyst::quantum::CustomOp>();
         target.addLegalDialect<IonDialect>();
         target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });
-        
+
         auto allocOp = *op.getOps<quantum::AllocOp>().begin();
         auto nQubits = allocOp.getNqubitsAttr().value();
 
-        OQDDatabaseManager dataManager(DeviceTomlLoc, QubitTomlLoc, Gate2PulseDecompTomlLoc, nQubits);
+        OQDDatabaseManager dataManager(DeviceTomlLoc, QubitTomlLoc, Gate2PulseDecompTomlLoc,
+                                       nQubits);
 
         if (LoadIon) {
             // FIXME(?): we only load Yb171 ion since the hardware ion species is unlikely to change
@@ -114,7 +115,9 @@ struct QuantumToIonPass : impl::QuantumToIonPassBase<QuantumToIonPass> {
             for (const Phonon &phonon : dataManager.getPhononParams()) {
                 phonons.push_back(cast<Attribute>(getPhononAttr(ctx, builder, phonon)));
             }
-            builder.create<ion::ModesOp>(op->getLoc(), builder.getArrayAttr(phonons));
+            // TODO: For now, we only print one phonon to be consistent with TriCal examples,
+            // but we should print all of them eventually
+            builder.create<ion::ModesOp>(op->getLoc(), builder.getArrayAttr(phonons[0]));
         }
 
         RewritePatternSet ionPatterns(&getContext());

@@ -56,20 +56,20 @@ wavevector = [0,1,0]
 [[beams2]]
 rabi = 31.4159
 detuning = 157.0796
-polarization = [7,8,9]
-wavevector = [9,10,11]
+polarization = [0,1,0]
+wavevector = [-1, 0, 0]
 
 [[beams2]]
 rabi = 31.4159
 detuning = 7.89
-polarization = [1,2,3]
-wavevector = [-3,4,5]
+polarization = [0,1,0]
+wavevector = [1, 0, 0]
 
 [[beams2]]
 rabi = 31.4159
 detuning = 157.0796
-polarization = [37,42,43]
-wavevector = [-42,-37,-43]
+polarization = [0,1,0]
+wavevector = [1, 0, 0]
 
 
 # Phonon modes
@@ -84,7 +84,35 @@ wavevector = [-42,-37,-43]
 energy = 0.1
 eigenvector = [1.0, 0.0, 0.0]
 
+[[phonons1]]
+energy = 0.1
+eigenvector = [1.0, 0.0, 0.0]
+
+[[phonons1]]
+energy = 0.1
+eigenvector = [1.0, 0.0, 0.0]
+
 
 [[phonons2]]
 energy = 0.1
-eigenvector = [0.7071, 0.0, 0.0, 0.7071, 0, 0]
+eigenvector = [0.1, 0.0, 0.0, 0.1, 0.0, 0.0]
+
+[[phonons2]]
+energy = 0.1
+eigenvector = [0.0, 0.1, 0.0, 0.0, 0.1, 0.0]
+
+[[phonons2]]
+energy = 0.1
+eigenvector = [0.0, 0.0, 0.1, 0.0, 0.0, 0.1]
+
+[[phonons2]]
+energy = 0.1
+eigenvector = [0.1, 0.0, 0.0, 0.1, 0.0, 0.0]
+
+[[phonons2]]
+energy = 0.1
+eigenvector = [0.0, 0.1, 0.0, 0.0, 0.1, 0.0]
+
+[[phonons2]]
+energy = 0.1
+eigenvector = [0.0, 0.0, 0.1, 0.0, 0.0, 0.1]
