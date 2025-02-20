@@ -264,7 +264,6 @@ class TestCompilerState:
             workflow.compiler.get_output_of("None-existing-pipeline", workflow.workspace)
         workflow.workspace.cleanup()
 
-
     def test_compiler_driver_with_output_name(self):
         """Test with non-default output name."""
         with tempfile.TemporaryDirectory() as workspace:
