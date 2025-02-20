@@ -152,7 +152,7 @@ class CompileOptions:
         """Returns all stages in order for compilation"""
         # Dictionaries in python are ordered
         stages = {}
-        stages["EnforeRuntimeInvariantsPass"] = get_enforce_runtime_invariants_stage(self)
+        stages["EnforceRuntimeInvariantsPass"] = get_enforce_runtime_invariants_stage(self)
         stages["HLOLoweringPass"] = get_hlo_lowering_stage(self)
         stages["QuantumCompilationPass"] = get_quantum_compilation_stage(self)
         stages["BufferizationPass"] = get_bufferization_stage(self)
@@ -312,7 +312,7 @@ def get_stages(options):
     """Returns all stages in order for compilation"""
     # Dictionaries in python are ordered
     stages = {}
-    stages["EnforeRuntimeInvariantsPass"] = get_enforce_runtime_invariants_stage(options)
+    stages["EnforceRuntimeInvariantsPass"] = get_enforce_runtime_invariants_stage(options)
     stages["HLOLoweringPass"] = get_hlo_lowering_stage(options)
     stages["QuantumCompilationPass"] = get_quantum_compilation_stage(options)
     stages["BufferizationPass"] = get_bufferization_stage(options)
