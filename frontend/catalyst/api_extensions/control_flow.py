@@ -240,14 +240,8 @@ def cond(pred: DynamicJaxprTracer):
     def _decorator(true_fn: Callable):
 
         if len(inspect.signature(true_fn).parameters):
-            if isinstance(true_fn, type) and issubclass(true_fn, qml.operation.Operation):
-                # Special treatment if conditional function body is a single pennylane gate
-                # The qml.operation.Operation base class represents things that
-                # can reasonably be considered as a gate,
-                # e.g. qml.Hadamard, qml.RX, etc.
-                return CondCallableSingleGateHandler(pred, true_fn)
-            else:
-                raise TypeError("Conditional 'True' function is not allowed to have any arguments")
+            # Special treatment if conditional function body has arguments
+            return CondCallableArgumentsHandler(pred, true_fn)
 
         return CondCallable(pred, true_fn)
 
@@ -761,45 +755,66 @@ class CondCallable:
             return self._call_during_interpretation()
 
 
-class CondCallableSingleGateHandler(CondCallable):
+class CondCallableArgumentsHandler(CondCallable):
     """
-    Special CondCallable when the conditional body function is a single pennylane gate.
+    Special CondCallable when the conditional body function has arguments.
 
-    A usual pennylane conditional call for a gate looks like
+    For example, a usual pennylane conditional call for a gate looks like
     `qml.cond(x == 42, qml.RX)(theta, wires=0)`
 
     Since gates are guaranteed to take in arguments (at the very least the wire argument),
     the usual CondCallable class, which expects the conditional body function to have no arguments,
     cannot be used.
-    This class inherits from base CondCallable, but wraps the gate in a function with no arguments,
+
+    This class inherits from base CondCallable, but wraps the branch function in a function with no arguments,
     and sends that function to CondCallable.
-    This allows us to perform the conditional branch gate function with arguments.
+    This allows us to perform the conditional branch function with arguments.
     """
 
     def __init__(self, pred, true_fn):  # pylint:disable=super-init-not-called
-        self.sgh_preds = [pred]
-        self.sgh_branch_fns = [true_fn]
-        self.sgh_otherwise_fn = None
+        self.ccah_preds = [pred]
+        self.ccah_branch_fns = [true_fn]
+        self.ccah_otherwise_fn = None
 
     def __call__(self, *args, **kwargs):
         def argless_true_fn():
-            self.sgh_branch_fns[0](*args, **kwargs)
+            # Special treatment if conditional function body is a single pennylane gate
+            # In such cases, the gate function should only be called, but not returned.
+            # Note: The qml.operation.Operation base class represents things that
+            # can reasonably be considered as a gate,
+            # e.g. qml.Hadamard, qml.RX, etc.
+            if isinstance(self.ccah_branch_fns[0], type) and issubclass(
+                self.ccah_branch_fns[0], qml.operation.Operation
+            ):
+                self.ccah_branch_fns[0](*args, **kwargs)
+            else:
+                return self.ccah_branch_fns[0](*args, **kwargs)
 
-        super().__init__(self.sgh_preds[0], argless_true_fn)
+        super().__init__(self.ccah_preds[0], argless_true_fn)
 
-        if self.sgh_otherwise_fn is not None:
+        if self.ccah_otherwise_fn is not None:
 
             def argless_otherwise_fn():
-                self.sgh_otherwise_fn(*args, **kwargs)
+                if isinstance(self.ccah_otherwise_fn, type) and issubclass(
+                    self.ccah_otherwise_fn, qml.operation.Operation
+                ):
+                    self.ccah_otherwise_fn(*args, **kwargs)
+                else:
+                    return self.ccah_otherwise_fn(*args, **kwargs)
 
             super().set_otherwise_fn(argless_otherwise_fn)
 
-        for i in range(1, len(self.sgh_branch_fns)):
+        for i in range(1, len(self.ccah_branch_fns)):
 
             def argless_elseif_fn(i=i):  # i=i to work around late binding
-                self.sgh_branch_fns[i](*args, **kwargs)
+                if isinstance(self.ccah_branch_fns[i], type) and issubclass(
+                    self.ccah_branch_fns[i], qml.operation.Operation
+                ):
+                    self.ccah_branch_fns[i](*args, **kwargs)
+                else:
+                    return self.ccah_branch_fns[i](*args, **kwargs)
 
-            super().add_pred(self.sgh_preds[i])
+            super().add_pred(self.ccah_preds[i])
             super().add_branch_fn(argless_elseif_fn)
 
         return super().__call__()
@@ -810,14 +825,9 @@ class CondCallableSingleGateHandler(CondCallable):
         """
 
         def decorator(branch_fn):
-            if isinstance(branch_fn, type) and issubclass(branch_fn, qml.operation.Operation):
-                self.sgh_preds.append(_pred)
-                self.sgh_branch_fns.append(branch_fn)
-                return self
-            else:  # pylint:disable=line-too-long
-                raise TypeError(
-                    "Conditional 'else if' function can have arguments only if it is a PennyLane gate."
-                )
+            self.ccah_preds.append(_pred)
+            self.ccah_branch_fns.append(branch_fn)
+            return self
 
         return decorator
 
@@ -825,12 +835,7 @@ class CondCallableSingleGateHandler(CondCallable):
         """
         Override the "can't have arguments" check in the original CondCallable's `otherwise`
         """
-        if isinstance(otherwise_fn, type) and issubclass(otherwise_fn, qml.operation.Operation):
-            self.sgh_otherwise_fn = otherwise_fn
-        else:
-            raise TypeError(
-                "Conditional 'False' function can have arguments only if it is a PennyLane gate."
-            )
+        self.ccah_otherwise_fn = otherwise_fn
 
 
 class ForLoopCallable:

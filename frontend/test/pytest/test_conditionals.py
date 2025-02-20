@@ -90,6 +90,54 @@ class TestCond:
         assert circuit(5) == 25
         assert circuit(6) == 36
 
+    def test_simple_cond_with_args(self, backend):
+        """Test basic function with conditional, with the branch functions having arguments."""
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=1))
+        def circuit(x):
+            @cond(x > 4.8)
+            def cond_fn(multiplier):
+                return x * multiplier
+
+            @cond_fn.else_if(x > 2.7)
+            def cond_elif(multiplier):
+                return x * multiplier + 1
+
+            @cond_fn.else_if(x > 1.4)
+            def cond_elif2(multiplier):
+                return x * multiplier + 2
+
+            @cond_fn.otherwise
+            def cond_else(multiplier):
+                return x
+
+            return cond_fn(8)
+
+        assert circuit(5) == 40
+        assert circuit(3) == 25
+        assert circuit(2) == 18
+        assert circuit(-3) == -3
+
+    def test_simple_cond_with_multiple_args(self, backend):
+        """Test basic function with conditional, with the branch function having multiple arguments."""
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=1))
+        def circuit(x):
+            @cond(x > 4.8)
+            def cond_fn(multiplier, adder):
+                return x * multiplier + adder
+
+            @cond_fn.otherwise
+            def cond_else(multiplier, adder):
+                return x
+
+            return cond_fn(8, 42)
+
+        assert circuit(5) == 82
+        assert circuit(-3) == -3
+
     def test_cond_one_else_if(self, backend):
         """Test a cond with one else_if branch"""
 
@@ -415,42 +463,6 @@ class TestCond:
         assert circuit(False) == 0
         assert circuit(True) == 1
 
-    def test_argument_error_with_callables(self):
-        """Test for the error when arguments are supplied and the target is not a function."""
-
-        def f(x: int):
-
-            res = qml.cond(x < 5, lambda z: z + 1)(0)
-
-            return res
-
-        with pytest.raises(TypeError, match="not allowed to have any arguments"):
-            qjit(f)
-
-        def g(x: int):
-
-            res = qml.cond(x < 5, qml.Hadamard, lambda z: z + 1)(0)
-
-            return res
-
-        with pytest.raises(
-            TypeError,
-            match="Conditional 'False' function can have arguments only if it is a PennyLane gate.",
-        ):
-            qjit(g)
-
-        def h(x: int):
-
-            res = qml.cond(x < 5, qml.Hadamard, qml.Hadamard, ((x < 6, lambda z: z + 1),))(0)
-
-            return res
-
-        with pytest.raises(
-            TypeError,
-            match="Conditional 'else if' function can have arguments only if it is a PennyLane gate.",  # pylint:disable=line-too-long
-        ):
-            qjit(h)
-
 
 class TestInterpretationConditional:
     """Test that the conditional operation's execution is semantically equivalent
@@ -572,37 +584,6 @@ class TestClassicalCompilation:
                     return x // y
 
         assert arithi(x, y, op1, op2) == arithc(x, y, op1, op2)
-
-    def test_no_true_false_parameters(self):
-        """Test non-empty parameter detection in conditionals"""
-
-        def arithc2():
-            @cond(True)
-            def branch(_):
-                return 1
-
-            @branch.otherwise
-            def branch():
-                return 0
-
-            return branch()
-
-        with pytest.raises(TypeError, match="Conditional 'True'"):
-            qjit(arithc2)
-
-        def arithc1():
-            @cond(True)
-            def branch():
-                return 1
-
-            @branch.otherwise
-            def branch(_):
-                return 0
-
-            return branch()  # pylint: disable=no-value-for-parameter
-
-        with pytest.raises(TypeError, match="Conditional 'False'"):
-            qjit(arithc1)
 
 
 class TestCondOperatorAccess:
@@ -740,6 +721,33 @@ class TestCondOperatorAccess:
         assert np.allclose(expected_1, observed_1)
         assert np.allclose(expected_2, observed_2)
         assert np.allclose(expected_3, observed_3)
+
+    def test_cond_measurement(self, backend):
+        """
+        Test conditionals with measurements being the predicate.
+        """
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=2))
+        def func():
+            qml.PauliX(wires=1)  # |01>
+            m0 = measure(0)  # will measure 0
+
+            @cond(m0 == 1)
+            def conditional(wire):  # should not be triggered
+                qml.RX(1.23, wires=wire + 1)
+
+            @conditional.otherwise
+            def false_fn(wire):  # will come here
+                qml.PauliX(wires=wire + 1)
+
+            conditional(0)
+
+            return qml.probs()
+
+        observed = func()
+
+        assert np.allclose(observed, np.array([1, 0, 0, 0]))
 
 
 class TestCondPredicateConversion:
