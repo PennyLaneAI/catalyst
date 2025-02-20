@@ -46,6 +46,8 @@
     [(#1513)](https://github.com/PennyLaneAI/catalyst/pull/1513)
   - Remove unnecessary I/O.
     [(#1514)](https://github.com/PennyLaneAI/catalyst/pull/1514)
+  - Lazily canonicalize the IR.
+    [(#1530)](https://github.com/PennyLaneAI/catalyst/pull/1530)
 
 <h3>Breaking changes 💔</h3>
 
