@@ -91,7 +91,7 @@ class TestOpenAPL:
         """Test OpenAPL generation for a circuit with a single CNOT circuit."""
         oqd_dev = OQDDevice(backend="default", shots=4, wires=2)
 
-        @qjit(pipelines=self.oqd_pipelines, keep_intermediate=True)
+        @qjit(pipelines=self.oqd_pipelines)
         @qml.qnode(oqd_dev)
         def circuit(x):
             qml.CNOT(wires=[0, 1])
