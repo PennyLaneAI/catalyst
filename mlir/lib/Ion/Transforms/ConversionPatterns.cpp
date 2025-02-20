@@ -201,7 +201,6 @@ struct ModesOpPattern : public OpConversionPattern<catalyst::ion::ModesOp> {
 
             json phonon_json = R"({
                             "class_": "Phonon",
-                            "energy": [],
                             "eigenvector" : []
                         })"_json;
             phonon_json["energy"] = phononAttr.getEnergy().getValue().convertToDouble();
