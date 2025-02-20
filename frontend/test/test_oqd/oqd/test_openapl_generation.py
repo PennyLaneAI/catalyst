@@ -94,18 +94,16 @@ class TestOpenAPL:
 
         @qjit(pipelines=self.oqd_pipelines)
         @qml.qnode(oqd_dev)
-        def circuit(x):
+        def circuit():
             qml.CNOT(wires=[0, 1])
             return qml.counts()
 
-        circuit(1.5708)
+        circuit()
 
         with open(self.output_f, "r", encoding="utf-8") as f:
             catalyst_json = json.load(f)
 
-        expected_f = (
-            "frontend/test/test_oqd/oqd/test_single_CNOT.json"
-        )
+        expected_f = "frontend/test/test_oqd/oqd/test_single_CNOT.json"
         with open(expected_f, "r", encoding="utf-8") as f:
             expected_json = json.load(f)
 
