@@ -18,6 +18,7 @@
 
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Transforms/DialectConversion.h"
 
@@ -132,6 +133,44 @@ int64_t getTwoQubitCombinationIndex(int64_t nQubits, int64_t idx1, int64_t idx2)
     return (idx1 * nQubits) - (idx1 * (idx1 + 1) / 2) + (idx2 - idx1 - 1);
 }
 
+mlir::Value CreateNormalizAngle(mlir::PatternRewriter &rewriter, mlir::Location loc,
+                                mlir::Value angle)
+{
+
+    constexpr double PI = llvm::numbers::pi;
+    constexpr double FOUR_PI = 4.0 * PI;
+
+    auto four_pi_attr = rewriter.getF64FloatAttr(FOUR_PI);
+    auto four_pi_const = rewriter.create<arith::ConstantOp>(loc, angle.getType(), four_pi_attr);
+
+    // Find angle fmod 4pi.
+    mlir::Value remainder =
+        rewriter.create<arith::RemFOp>(loc, angle.getType(), angle, four_pi_const);
+
+    // Find if the remainder is less than 0.
+    auto zero_attr = rewriter.getZeroAttr(angle.getType());
+    auto zero_const = rewriter.create<arith::ConstantOp>(loc, angle.getType(), zero_attr);
+    auto less_than_zero = rewriter.create<arith::CmpFOp>(loc, arith::CmpFPredicate::OLT, remainder,
+                                                         zero_const); // Signed less than
+
+    // Create a conditional add (if remainder < 0, add 4*PI)
+    auto normalized_angle =
+        rewriter
+            .create<scf::IfOp>(
+                loc, less_than_zero,
+                [&](OpBuilder &builder, Location loc) { // then
+                    mlir::Value add_op = rewriter.create<arith::AddFOp>(
+                        loc, angle.getType(), remainder, four_pi_const); // or AddIOp for integers
+                    builder.create<scf::YieldOp>(loc, add_op);
+                },
+                [&](OpBuilder &builder, Location loc) { // else
+                    builder.create<scf::YieldOp>(loc, remainder);
+                })
+            .getResult(0);
+
+    return normalized_angle;
+}
+
 /**
  * @brief Computes the pulse duration given the rotation angle and the Rabi frequency.
  *
@@ -151,9 +190,10 @@ int64_t getTwoQubitCombinationIndex(int64_t nQubits, int64_t idx1, int64_t idx2)
 mlir::Value computePulseDuration(mlir::PatternRewriter &rewriter, mlir::Location &loc,
                                  const mlir::Value &angle, double rabi)
 {
+    auto normalizedAngle = CreateNormalizAngle(rewriter, loc, angle);
     TypedAttr rabiAttr = rewriter.getF64FloatAttr(rabi);
     mlir::Value rabiValue = rewriter.create<arith::ConstantOp>(loc, rabiAttr).getResult();
-    return rewriter.create<arith::DivFOp>(loc, angle, rabiValue).getResult();
+    return rewriter.create<arith::DivFOp>(loc, normalizedAngle, rabiValue).getResult();
 }
 
 mlir::LogicalResult oneQubitGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter, double phase1,
