@@ -11,8 +11,9 @@
 * Extend `merge-rotations` peephole optimization pass to also merge compatible rotation gates (either both controlled, or both uncontrolled) where rotation angles are any combination of static constants or dynamic values.
   [(#1489)](https://github.com/PennyLaneAI/catalyst/pull/1489)
 
-* Catalyst now supports experimental capture of `cond` control flow.
+* Catalyst now supports experimental capture of `cond` and `for_loop` control flow.
   [(#1468)](https://github.com/PennyLaneAI/catalyst/pull/1468)
+  [(#1509)](https://github.com/PennyLaneAI/catalyst/pull/1509)
   
   To trigger the PennyLane pipeline for capturing the program as a Jaxpr, simply set
   `experimental_capture=True` in the qjit decorator.
@@ -88,11 +89,11 @@
 
   - Add a new pass `convert-ion-to-llvm` which lowers the Ion dialect to llvm dialect. This pass 
     introduces oqd device specific stubs that will be implemented in oqd runtime including: 
-    `@__catalyst__oqd__ion`, `@ __catalyst__oqd__pulse`, `@ __catalyst__oqd__ParallelProtocol`.
+    `@ __catalyst__oqd__pulse`, `@ __catalyst__oqd__ParallelProtocol`.
     [(#1466)](https://github.com/PennyLaneAI/catalyst/pull/1466)
 
   - The OQD device can now generate OpenAPL JSON specs during runtime. The oqd stubs
-  `@__catalyst__oqd__ion`, `@ __catalyst__oqd__pulse`, and `@ __catalyst__oqd__ParallelProtocol`, which
+  `@ __catalyst__oqd__pulse`, and `@ __catalyst__oqd__ParallelProtocol`, which
   are called in the llvm dialect after the aforementioned lowering ([(#1466)](https://github.com/PennyLaneAI/catalyst/pull/1466)), are defined to produce JSON specs that OpenAPL expects.
     [(#1516)](https://github.com/PennyLaneAI/catalyst/pull/1516)
 

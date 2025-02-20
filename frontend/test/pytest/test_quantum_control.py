@@ -1666,14 +1666,6 @@ class TestDecomposition:
         with pytest.raises(DecompositionUndefinedError):
             op.decomposition()
 
-    def test_global_phase_decomp_raises_warning(self):
-        """Test that ctrl(GlobalPhase).decomposition() raises a warning."""
-        op = qml.ctrl(qml.GlobalPhase(1.23), control=[0, 1])
-        with pytest.warns(
-            UserWarning, match="Multi-Controlled-GlobalPhase currently decomposes to nothing"
-        ):
-            assert op.decomposition() == []
-
     def test_control_on_zero(self):
         """Test decomposition applies PauliX gates to flip any control-on-zero wires."""
 

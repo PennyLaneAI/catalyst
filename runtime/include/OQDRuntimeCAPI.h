@@ -19,6 +19,7 @@
 #include <array>
 #include <cstdint>
 
+#include "Exception.hpp"
 #include "Types.h"
 
 #ifdef __cplusplus

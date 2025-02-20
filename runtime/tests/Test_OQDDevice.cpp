@@ -57,6 +57,32 @@ TEST_CASE("Test the OQDDevice qubit allocation and release", "[oqd]")
     std::filesystem::remove("__openapl__output.json");
 }
 
+TEST_CASE("Test the OQDDevice ion index out of range", "[oqd]")
+{
+    auto device = OQDDevice(R"({shots : 100}ION:{"name":"Yb171"})");
+    std::vector<QubitIdType> allocaedQubits = device.AllocateQubits(3);
+
+    Beam beam = {0, 1.1, 2.2, {1, 0, 0}, {0, 1, 0}};
+    Pulse p = {&beam, /*target=*/100, 1.5, 3.14};
+    Pulse *pulses[] = {&p, &p};
+
+    REQUIRE_THROWS_WITH(__catalyst__oqd__ParallelProtocol(pulses, 2),
+                        Catch::Contains("ion index out of range"));
+}
+
+TEST_CASE("Test the OQDDevice transition index out of range", "[oqd]")
+{
+    auto device = OQDDevice(R"({shots : 100}ION:{"transitions":[]})");
+    std::vector<QubitIdType> allocaedQubits = device.AllocateQubits(1);
+
+    Beam beam = {/*transition_index=*/100, 1.1, 2.2, {1, 0, 0}, {0, 1, 0}};
+    Pulse p = {&beam, 0, 1.5, 3.14};
+    Pulse *pulses[] = {&p, &p};
+
+    REQUIRE_THROWS_WITH(__catalyst__oqd__ParallelProtocol(pulses, 2),
+                        Catch::Contains("transition index out of range"));
+}
+
 TEST_CASE("Test OpenAPL Program generation", "[oqd]")
 {
     json expected = json::parse(R"(
