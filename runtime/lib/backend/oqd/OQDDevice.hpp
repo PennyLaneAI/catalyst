@@ -58,6 +58,16 @@ class OQDDevice final : public Catalyst::Runtime::QuantumDevice {
         return res;
     }
 
+    void collectPhonons(const std::string &source, const std::string &token,
+                        std::vector<std::string> &phonon_specs)
+    {
+        std::string::size_type lpos = source.rfind(token);
+        if (lpos != std::string::npos) {
+            collectPhonons(source.substr(0, lpos), token, phonon_specs);
+            phonon_specs.push_back(source.substr(lpos + token.length()));
+        }
+    }
+
   public:
     explicit OQDDevice(const std::string &kwargs = "{device_type : oqd, backend : default}")
     {
@@ -79,13 +89,7 @@ class OQDDevice final : public Catalyst::Runtime::QuantumDevice {
         }
 
         phonon_specs.clear();
-        size_t phonon_token_pos = kwargs.find(phonon_token);
-        while (phonon_token_pos != std::string::npos) {
-            size_t phonon_start_pos = phonon_token_pos + phonon_token.length();
-            phonon_token_pos = kwargs.find(phonon_token, phonon_start_pos);
-            phonon_specs.push_back(
-                kwargs.substr(phonon_start_pos, phonon_token_pos - phonon_start_pos));
-        }
+        collectPhonons(kwargs, phonon_token, phonon_specs);
 
         device_kwargs = Catalyst::Runtime::parse_kwargs(kwargs.substr(0, ion_token_pos));
         device_shots = device_kwargs.contains("shots")
