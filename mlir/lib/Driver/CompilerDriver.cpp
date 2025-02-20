@@ -711,7 +711,9 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
             return failure();
         }
         output.outIR.clear();
-        outIRStream << *mlirModule;
+        if (options.keepIntermediate) {
+            outIRStream << *mlirModule;
+        }
         optTiming.stop();
     }
 
@@ -736,7 +738,9 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
             dumpToFile(options, outFile, tmp);
         }
         output.outIR.clear();
-        outIRStream << *llvmModule;
+        if (options.keepIntermediate) {
+            outIRStream << *llvmModule;
+        }
         translateTiming.stop();
     }
 
@@ -792,7 +796,9 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
 
         TimingScope outputTiming = llcTiming.nest("compileObject");
         output.outIR.clear();
-        outIRStream << *llvmModule;
+        if (options.keepIntermediate) {
+            outIRStream << *llvmModule;
+        }
 
         if (failed(timer::timer(compileObjectFile, "compileObjFile", /* add_endl */ true, options,
                                 std::move(llvmModule), targetMachine, options.getObjectFile()))) {
