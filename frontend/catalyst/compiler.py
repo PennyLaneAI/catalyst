@@ -307,14 +307,13 @@ class Compiler:
         if self.options.checkpoint_stage:
             cmd += ["--checkpoint-stage", self.options.checkpoint_stage]
 
-        cmd += ["-verify-each=false"]
-
-        pipeline_str = ""
         for pipeline in self.options.get_pipelines():
             pipeline_name, passes = pipeline
-            passes_str = ";".join(passes)
-            pipeline_str += f"{pipeline_name}({passes_str}),"
-        cmd += ["--catalyst-pipeline", pipeline_str]
+            passes_str = ",".join(passes)
+            pipeline_str = f"{pipeline_name};{passes_str}"
+            cmd += ["--catalyst-pipeline", pipeline_str]
+
+        cmd += ["-verify-each=false"]
 
         return cmd
 
