@@ -680,7 +680,7 @@ class QJIT(CatalystCallable):
 
         return jaxpr, out_type, treedef, dynamic_sig
 
-    @instrument(has_finegrained=True)
+    @instrument(size_from=0, has_finegrained=True)
     @debug_logger
     def generate_ir(self):
         """Generate Catalyst's intermediate representation (IR) as an MLIR module.
