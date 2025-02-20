@@ -155,11 +155,6 @@ def replace_ir(fn, stage, new_ir):
 
     .. seealso:: :doc:`/dev/debugging`, :func:`~.get_compilation_stage`.
 
-    .. note::
-
-        In order to use this function, ``keep_intermediate=True`` must be
-        set in the :func:`~.qjit` decorator of the input function.
-
     **Example**
 
     >>> from catalyst.debug import get_compilation_stage, replace_ir
