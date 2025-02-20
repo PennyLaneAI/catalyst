@@ -17,8 +17,9 @@
 # pylint: disable=missing-function-docstring
 
 import pennylane as qml
+from utils import qjit_for_tests as qjit
 
-from catalyst import cond, measure, qjit
+from catalyst import cond, measure
 
 
 # CHECK-NOT: Verification failed
