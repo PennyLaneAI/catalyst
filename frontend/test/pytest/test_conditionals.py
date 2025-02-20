@@ -111,14 +111,14 @@ class TestCond:
 
             @cond_fn.otherwise
             def cond_else(multiplier):
-                return x
+                return x * multiplier - 10
 
             return cond_fn(8)
 
         assert circuit(5) == 40
         assert circuit(3) == 25
         assert circuit(2) == 18
-        assert circuit(-3) == -3
+        assert circuit(-3) == -34
 
     def test_simple_cond_with_multiple_args(self, backend):
         """Test basic function with conditional, with the branch function having multiple arguments."""
@@ -132,12 +132,12 @@ class TestCond:
 
             @cond_fn.otherwise
             def cond_else(multiplier, adder):
-                return x
+                return (x * multiplier + adder) * 0
 
             return cond_fn(8, 42)
 
         assert circuit(5) == 82
-        assert circuit(-3) == -3
+        assert circuit(-3) == 0
 
     def test_cond_one_else_if(self, backend):
         """Test a cond with one else_if branch"""
