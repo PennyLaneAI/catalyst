@@ -120,7 +120,7 @@ class TestCond:
         assert circuit(2) == 18
         assert circuit(-3) == -34
 
-    def test_simple_cond_with_multiple_args(self, backend):
+    def test_simple_cond_multiple_args(self, backend):
         """Test basic function with conditional, with the branch function having multiple arguments."""
 
         @qjit
