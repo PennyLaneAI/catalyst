@@ -20,7 +20,6 @@ import pennylane as qml
 import pytest
 from jax import numpy as jnp
 from jax.tree_util import tree_all, tree_flatten, tree_map, tree_structure
-from utils import qjit_for_tests
 
 import catalyst.utils.calculate_grad_shape as infer
 from catalyst import (
@@ -76,7 +75,7 @@ def test_gradient_generate_once():
     def identity(x):
         return x
 
-    @qjit_for_tests
+    @qml.qjit
     def wrap(x: float):
         diff = grad(identity)
         return diff(x) + diff(x)
