@@ -914,7 +914,7 @@ TEST_CASE("Test OpenAPL Program generation", "[oqd]")
       {
         "class_": "Phonon",
         "eigenvector": [0.0,0.0,1.0],
-        "energy": 4.4
+        "energy": 5.5
       })"};
 
     size_t num_qubits = 2;
