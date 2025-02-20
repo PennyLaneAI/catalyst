@@ -274,7 +274,6 @@ class TestCompilerState:
             return qml.state()
 
         directory = os.path.join(os.getcwd(), workflow.__name__)
-        files = os.listdir(directory)
         workflow.workspace.cleanup()
 
     def test_compiler_driver_with_output_name(self):

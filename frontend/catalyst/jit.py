@@ -509,6 +509,7 @@ class QJIT(CatalystCallable):
 
     @property
     def mlir(self):
+        """obtain the MLIR representation after canonicalization"""
         # Canonicalize the MLIR since there can be a lot of redundancy coming from JAX.
         if not self.mlir_module:
             return None
