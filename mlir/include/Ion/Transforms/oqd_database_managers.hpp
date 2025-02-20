@@ -107,12 +107,15 @@ class OQDDatabaseManager {
     }
 
     void loadPhononParams(size_t n_qubits)
-    {
+    {   
+        // TODO: The fact that loading phonons depend on the number of qubits is a bit of a hack.
+        // This is not ideal since we want to support dynamic number of qubits in the future.
+        // We should find a better way to handle this in the database.
         std::string phonon_str = "phonons" + std::to_string(n_qubits);
         toml::node_view<toml::node> phononsToml = sourceTomlGateDecomposition[phonon_str];
         size_t numPhonons = phononsToml.as_array()->size();
 
-        auto parseSingleDirection = [](auto direction) {
+        auto parseSinglePhonon = [](auto direction) {
             double energy = direction["energy"].as_floating_point()->get();
             std::vector<double> eigenvector =
                 tomlArray2StdVector<double>(*(direction["eigenvector"].as_array()));
@@ -120,7 +123,7 @@ class OQDDatabaseManager {
         };
 
         for (size_t i = 0; i < numPhonons; i++) {
-            Phonon phonon = parseSingleDirection(phononsToml[i]);
+            Phonon phonon = parseSinglePhonon(phononsToml[i]);
             phonons.push_back(phonon);
         }
     }
