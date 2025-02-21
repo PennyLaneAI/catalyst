@@ -19,6 +19,7 @@ This file contains tests for measurement primitives when the return shape is dyn
 
 import jax
 import pennylane as qml
+import pytest
 
 import catalyst
 from catalyst.debug import get_compilation_stage, replace_ir
@@ -105,7 +106,8 @@ def test_dynamic_counts_backend_functionality():
     workflow_dyn_counts.workspace.cleanup()
 
 
-def test_dynamic_wires_expval(backend, capfd):
+@pytest.mark.parametrize("readout", [qml.expval, qml.var])
+def test_dynamic_wires_scalar_readouts(readout, backend, capfd):
     def ref(num_qubits):
         print("compiling...")
         dev = qml.device(backend, wires=num_qubits)
@@ -113,7 +115,7 @@ def test_dynamic_wires_expval(backend, capfd):
         @qml.qnode(dev)
         def circ():
             qml.RX(1.23, wires=num_qubits-1)
-            return qml.expval(qml.Z(wires=num_qubits-1))
+            return readout(qml.Z(wires=num_qubits-1))
             #return qml.probs()
         return circ()
 
