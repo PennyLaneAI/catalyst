@@ -42,7 +42,12 @@ TEST_CASE("Test the OQDDevice constructor", "[oqd]")
 
 TEST_CASE("Test the OQDDevice qubit allocation and release", "[oqd]")
 {
-    auto device = OQDDevice(R"({shots : 100}ION:{"name":"Yb171"})");
+    auto device = OQDDevice(R"({shots : 100}ION:{"name":"Yb171"}PHONON:
+      {
+        "class_": "Phonon",
+        "eigenvector": [1.0,0.0,0.0],
+        "energy": 3.3
+      })");
 
     CHECK(device.getIonSpecs() == "{\"name\":\"Yb171\"}");
 
