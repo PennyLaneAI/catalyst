@@ -42,14 +42,10 @@ TEST_CASE("Test the OQDDevice constructor", "[oqd]")
 
 TEST_CASE("Test the OQDDevice qubit allocation and release", "[oqd]")
 {
-    auto device = OQDDevice(R"({shots : 100}ION:{"name":"Yb171"}PHONON:
-      {
-        "class_": "Phonon",
-        "eigenvector": [1.0,0.0,0.0],
-        "energy": 3.3
-      })");
+    auto device = OQDDevice(R"({shots : 100}ION:{"name":"Yb171"}PHONON:{"class_":"Phonon"})");
 
     CHECK(device.getIonSpecs() == "{\"name\":\"Yb171\"}");
+    CHECK(device.getPhononSpecs()[0] == "{\"class_\":\"Phonon\"}");
 
     std::vector<QubitIdType> allocaedQubits = device.AllocateQubits(3);
     CHECK(allocaedQubits[0] == 0);
@@ -58,6 +54,7 @@ TEST_CASE("Test the OQDDevice qubit allocation and release", "[oqd]")
 
     device.ReleaseAllQubits();
     CHECK(device.getIonSpecs() == "");
+    CHECK(device.getPhononSpecs().empty());
 
     std::filesystem::remove("__openapl__output.json");
 }
