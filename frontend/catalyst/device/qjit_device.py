@@ -46,7 +46,7 @@ from catalyst.device.verification import (
     verify_no_state_variance_returns,
     verify_operations,
 )
-from catalyst.jax_extras.tracing import DynamicJaxprTracer
+from catalyst.jax_extras.tracing import is_dynamic_wires
 from catalyst.logging import debug_logger, debug_logger_init
 from catalyst.third_party.cuda import SoftwareQQPP
 from catalyst.utils.exceptions import CompileError
@@ -310,8 +310,7 @@ class QJITDevice(qml.devices.Device):
         for key, value in original_device.__dict__.items():
             self.__setattr__(key, value)
 
-        # TODO: add dyn wires comment
-        if not (len(original_device.wires) == 1) and (isinstance(original_device.wires[0], DynamicJaxprTracer)):
+        if not is_dynamic_wires(original_device.wires):
             check_device_wires(original_device.wires)
 
         super().__init__(wires=original_device.wires, shots=original_device.shots)
