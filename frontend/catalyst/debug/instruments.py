@@ -22,6 +22,7 @@ import os
 import platform
 import sys
 import time
+import typing
 from contextlib import contextmanager
 
 # pylint: disable=f-string-without-interpolation,line-too-long
@@ -191,6 +192,9 @@ def measure_program_size(results, size_from):
     """
     if size_from is None:
         return None
+
+    if not isinstance(results, typing.Sequence):
+        results = (results,)
 
     return str(results[size_from]).count("\n")
 
