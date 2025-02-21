@@ -217,9 +217,6 @@ def stable_toposort(end_nodes: list) -> list:
         return []
     # end_nodes = _remove_duplicates(end_nodes)
 
-    def key(n):
-        return n.id
-
     child_counts = {}
     stack = list(end_nodes)
     while stack:
@@ -239,7 +236,7 @@ def stable_toposort(end_nodes: list) -> list:
         node = childless_nodes.pop()
         sorted_nodes.append(node)
         # pylint: disable=unnecessary-lambda
-        node.parents.sort(key=key)
+        node.parents.sort()
         for parent in node.parents:
             if child_counts[parent.id] == 1:
                 childless_nodes.append(parent)
@@ -271,6 +268,9 @@ def sort_eqns(eqns: List[JaxprEqn], forced_order_primitives: Set[JaxprPrimitive]
             self.id: int = boxid
             self.e: JaxprEqn = e
             self.parents: List["Box"] = []  # to be filled later
+
+        def __lt__(self, other):
+            return self.id < other.id
 
     boxes = [Box(i, e) for i, e in enumerate(eqns)]
     fixedorder = [(i, b) for (i, b) in enumerate(boxes) if b.e.primitive in forced_order_primitives]
