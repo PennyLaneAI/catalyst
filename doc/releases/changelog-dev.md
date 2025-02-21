@@ -4,6 +4,34 @@
 
 <h3>Improvements 🛠</h3>
 
+* `catalyst.cond` can accept branch functions with arguments, e.g
+
+  ```python
+  @qjit
+  @qml.qnode(qml.device("lightning.qubit", wires=2))
+  def func():
+      qml.PauliX(wires=1) # |01>
+      m0 = catalyst.measure(0)  # will measure 0
+
+      @catalyst.cond(m0 == 1)
+      def conditional(wire):
+          qml.PauliX(wires=wire)
+
+      @conditional.otherwise
+      def false_fn(wire): # will come here
+          qml.RX(1.23, wires=wire+1)
+
+      conditional(0)
+
+      return qml.probs()
+
+  print(func())
+  ```
+  ```
+  [0.33288114 0.66711886 0.         0.        ]
+  ```
+  [(#1531)](https://github.com/PennyLaneAI/catalyst/pull/1531)
+
 * Changed pattern rewritting in `quantum-to-ion` lowering pass to use MLIR's dialect conversion
   infrastracture.
   [(#1442)](https://github.com/PennyLaneAI/catalyst/pull/1442)
