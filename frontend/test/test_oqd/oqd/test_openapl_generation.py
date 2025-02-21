@@ -27,7 +27,8 @@ from catalyst.third_party.oqd import OQDDevice
 class TestOpenAPL:
     """Test that the OQD device correctly generates an OpenAPL program."""
 
-    toml_path = os.path.join(os.path.dirname(__file__), "calibration_data/")
+    test_path = os.path.dirname(__file__)
+    toml_path = os.path.join(test_path, "calibration_data/")
     oqd_pipelines = [
         (
             "device-agnostic-pipeline",
@@ -78,7 +79,7 @@ class TestOpenAPL:
 
         circuit(1.5708)
 
-        expected_f = "frontend/test/test_oqd/oqd/test_single_RX.json"
+        expected_f = os.path.join(self.test_path, "test_single_RX.json")
         with open(self.output_f, "r", encoding="utf-8") as f:
             catalyst_json = json.load(f)
 
@@ -107,7 +108,7 @@ class TestOpenAPL:
         with open(self.output_f, "r", encoding="utf-8") as f:
             catalyst_json = json.load(f)
 
-        expected_f = "frontend/test/test_oqd/oqd/test_single_CNOT.json"
+        expected_f = os.path.join(self.test_path, "test_single_CNOT.json")
         with open(expected_f, "r", encoding="utf-8") as f:
             expected_json = json.load(f)
 
