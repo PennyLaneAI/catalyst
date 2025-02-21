@@ -81,6 +81,10 @@ void OQDDevice::NamedOperation(const std::string &name, const std::vector<double
 void OQDDevice::PartialCounts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts,
                               const std::vector<QubitIdType> &wires, size_t shots)
 {
+    // Note that we do not support this in OQD device.
+    // This is a just a fake readout method for testing purposes.
+    // TODO: change this back to unsupported functionality once null measurements
+    // is supported in catalyst.
     return;
 }
 
