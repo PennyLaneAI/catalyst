@@ -105,8 +105,9 @@ def test_dynamic_counts_backend_functionality():
     workflow_dyn_counts.workspace.cleanup()
 
 
-def test_dynamic_wires_expval(backend):
+def test_dynamic_wires_expval(backend, capfd):
     def ref(num_qubits):
+        print("compiling...")
         dev = qml.device(backend, wires=num_qubits)
 
         @qml.qnode(dev)
@@ -119,6 +120,9 @@ def test_dynamic_wires_expval(backend):
     cat = catalyst.qjit(ref)
 
     assert ref(10) == cat(10)
+    assert ref(4) == cat(4)
+    out, err = capfd.readouterr()
+    assert out.count("compiling...") == 3
 
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
