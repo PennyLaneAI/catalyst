@@ -154,6 +154,7 @@ struct IonOpPattern : public OpConversionPattern<catalyst::ion::IonOp> {
         for (size_t i = 0; i < transitionsAttr.size(); i++) {
             auto transitionAttr = cast<TransitionAttr>(transitionsAttr[i]);
 
+            std::string multipole = transitionAttr.getMultipole().getValue().str();
             std::string level0_label = transitionAttr.getLevel_0().getValue().str();
             std::string level1_label = transitionAttr.getLevel_1().getValue().str();
 
@@ -169,12 +170,47 @@ struct IonOpPattern : public OpConversionPattern<catalyst::ion::IonOp> {
                      {"einsteinA", transitionAttr.getEinsteinA().getValue().convertToDouble()},
                      {"level1", level1},
                      {"level2", level2},
-                     {"label", level0_label + "->" + level1_label}};
+                     {"label", level0_label + "->" + level1_label},
+                     {"multipole", multipole}};
             ion_json["transitions"].push_back(this_transition);
         }
         deviceInitOp.setKwargs(deviceKwargs.str() + "ION:" + std::string(ion_json.dump()));
 
         deviceInitOp.setLib("oqd.qubit");
+
+        rewriter.eraseOp(op);
+        return success();
+    }
+};
+
+struct ModesOpPattern : public OpConversionPattern<catalyst::ion::ModesOp> {
+    using OpConversionPattern<catalyst::ion::ModesOp>::OpConversionPattern;
+
+    // Create the modes JSON and pass it into the device kwargs as a JSON string
+    LogicalResult matchAndRewrite(catalyst::ion::ModesOp op, catalyst::ion::ModesOpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+        func::FuncOp funcOp = op->getParentOfType<func::FuncOp>();
+
+        DeviceInitOp deviceInitOp = *funcOp.getOps<DeviceInitOp>().begin();
+
+        auto modesAttr = op.getModes();
+        for (size_t i = 0; i < modesAttr.size(); i++) {
+            StringRef deviceKwargs = deviceInitOp.getKwargs();
+            auto phononAttr = cast<PhononAttr>(modesAttr[i]);
+
+            json phonon_json = R"({
+                            "class_": "Phonon",
+                            "eigenvector" : []
+                        })"_json;
+            phonon_json["energy"] = phononAttr.getEnergy().getValue().convertToDouble();
+            auto eigenvector = phononAttr.getEigenvector();
+            for (int j = 0; j < eigenvector.size(); j++) {
+                phonon_json["eigenvector"].push_back(eigenvector[j]);
+            }
+            deviceInitOp.setKwargs(deviceKwargs.str() +
+                                   "PHONON:" + std::string(phonon_json.dump()));
+        }
 
         rewriter.eraseOp(op);
         return success();
@@ -305,6 +341,7 @@ namespace ion {
 void populateConversionPatterns(LLVMTypeConverter &typeConverter, RewritePatternSet &patterns)
 {
     patterns.add<IonOpPattern>(typeConverter, patterns.getContext());
+    patterns.add<ModesOpPattern>(typeConverter, patterns.getContext());
     patterns.add<PulseOpPattern>(typeConverter, patterns.getContext());
     patterns.add<ParallelProtocolOpPattern>(typeConverter, patterns.getContext());
 }

@@ -37,84 +37,125 @@ oqd_config_schema = "v0.1"
 [[beams1]]
 rabi = 1.1
 detuning = 2.2
-polarization = [0,1]
-wavevector = [-2,3]
+polarization = [0,1,2]
+wavevector = [-2,3,4]
 
 [[beams1]]
 rabi = 4.4
 detuning = 5.5
-polarization = [6,7]
-wavevector = [8,9]
+polarization = [6,7,8]
+wavevector = [8,9,10]
 
 [[beams1]]
 rabi = 10.10
 detuning = 11.11
-polarization = [12,13]
-wavevector = [14,15]
+polarization = [12,13,14]
+wavevector = [14,15,16]
 
 
 [[beams2]]
 rabi = 1.23
 detuning = 4.56
-polarization = [7,8]
-wavevector = [9,10]
+polarization = [7,8,9]
+wavevector = [9,10,11]
 
 [[beams2]]
 rabi = 4.56
 detuning = 7.89
-polarization = [1,2]
-wavevector = [-3,4]
+polarization = [1,2,3]
+wavevector = [-3,4,5]
 
 [[beams2]]
 rabi = 99.99
 detuning = 100.100
-polarization = [37,42]
-wavevector = [-42,-37]
+polarization = [37,42,43]
+wavevector = [-42,-37,-43]
 
 
-# Phonons
+# Phonon modes
 # Each qubit has a phonon triplet (x,y,z)
 # A list of phonon triplets, one triplet per qubit, is stored here
 # On a single direction, a phonon has a calibrated energy.
+# phonons1 are the phonons modes of a single-ion system.
+# phonons2 are the phonons modes of a two-ion system.
+# phonons3 are the phonons modes of a three-ion system.
 # -------
 
-[[phonons]]
-[phonons.COM_x]
+[[phonons1]]
 energy = 1.1
-eigenvector = [1, 0, 0]
+eigenvector = [1.0, 0.0, 0.0]
 
-[phonons.COM_y]
+[[phonons1]]
 energy = 2.2
-eigenvector = [0, 1, 0]
+eigenvector = [0.0, 1.0, 0.0]
 
-[phonons.COM_z]
+[[phonons1]]
 energy = 3.3
-eigenvector = [0, 0, 1]
+eigenvector = [0.0, 0.0, 1.0]
 
 
-[[phonons]]
-[phonons.COM_x]
+
+[[phonons2]]
+energy = 1.1
+eigenvector = [1.0, 0.0, 0.0, 1.0, 0.0, 0.0]
+
+[[phonons2]]
+energy = 2.2
+eigenvector = [0.0, 1.0, 0.0, 0.0, 1.0, 0.0]
+
+[[phonons2]]
+energy = 3.3
+eigenvector = [0.0, 0.0, 1.0, 0.0, 0.0, 1.0]
+
+
+[[phonons2]]
 energy = 4.4
-eigenvector = [1, 0, 0]
+eigenvector = [1.0, 0.0, 0.0, 1.0, 0.0, 0.0]
 
-[phonons.COM_y]
+[[phonons2]]
 energy = 5.5
-eigenvector = [0, 1, 0]
+eigenvector = [0.0, 1.0, 0.0, 0.0, 1.0, 0.0]
 
-[phonons.COM_z]
+[[phonons2]]
 energy = 6.6
-eigenvector = [0, 0, 1]
+eigenvector = [0.0, 0.0, 1.0, 0.0, 0.0, 1.0]
 
 
-[[phonons]]
-[phonons.COM_x]
+
+[[phonons3]]
+energy = 1.1
+eigenvector = [1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0]
+
+[[phonons3]]
+energy = 2.2
+eigenvector = [0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0]
+
+[[phonons3]]
+energy = 3.3
+eigenvector = [0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0]
+
+
+[[phonons3]]
+energy = 4.4
+eigenvector = [1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0]
+
+[[phonons3]]
+energy = 5.5
+eigenvector = [0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0]
+
+[[phonons3]]
+energy = 6.6
+eigenvector = [0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0]
+
+
+[[phonons3]]
 energy = 7.7
-eigenvector = [1, 0, 0]
+eigenvector = [1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0]
 
-[phonons.COM_y]
+[[phonons3]]
 energy = 8.8
-eigenvector = [0, 1, 0]
+eigenvector = [0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0]
 
-[phonons.COM_z]
+[[phonons3]]
 energy = 9.9
-eigenvector = [0, 0, 1]
+eigenvector = [0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0]

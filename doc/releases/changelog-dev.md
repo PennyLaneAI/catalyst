@@ -103,6 +103,15 @@
   - The OQD device is moved from `frontend/catalyst/third_party/oqd` to `runtime/lib/backend/oqd`. An overall switch, `ENABLE_OQD`, is added to control the OQD build system from a single entry point. The switch is `OFF` by default, and OQD can be built from source via `make all ENABLE_OQD=ON`, or `make runtime ENABLE_OQD=ON`.
     [(#1508)](https://github.com/PennyLaneAI/catalyst/pull/1508)
 
+  - Ion dialect now supports phonon modes using `ion.modes` operation.
+    [(#1517)](https://github.com/PennyLaneAI/catalyst/pull/1517)
+
+  - Rotation angles are normalized to avoid negative duration for pulses during ion dialect lowering.
+    [(#1517)](https://github.com/PennyLaneAI/catalyst/pull/1517)
+
+  - Catalyst now generates OpenAPL programs for Pennylane circuits of up to two qubits using the OQD device.
+    [(#1517)](https://github.com/PennyLaneAI/catalyst/pull/1517)
+
 * Update source code to comply with changes requested by black v25.1.0
   [(#1490)](https://github.com/PennyLaneAI/catalyst/pull/1490)
 
