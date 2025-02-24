@@ -756,7 +756,8 @@ def trace_observables(
     qubits = None
     if obs is None:
         qubits = qrp.extract(wires, allow_reuse=True)
-        obs_tracers = compbasis_p.bind(*qubits)
+        obs_tracers = compbasis_p.bind(len(qubits), *qubits)
+        #breakpoint()
     elif isinstance(obs, KNOWN_NAMED_OBS):
         qubits = qrp.extract(wires, allow_reuse=True)
         obs_tracers = namedobs_p.bind(qubits[0], kind=type(obs).__name__)

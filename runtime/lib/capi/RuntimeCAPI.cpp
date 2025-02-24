@@ -920,18 +920,33 @@ void __catalyst__qis__State(MemRefT_CplxT_double_1d *result, int64_t numQubits, 
     }
 }
 
-void __catalyst__qis__Probs(MemRefT_double_1d *result, int64_t numQubits, ...)
+void __catalyst__qis__Probs(MemRefT_double_1d *result, bool explicit_qubits, int64_t numQubits,  ...)
 {
     RT_ASSERT(numQubits >= 0);
     MemRefT<double, 1> *result_p = (MemRefT<double, 1> *)result;
 
-    va_list args;
-    va_start(args, numQubits);
     std::vector<QubitIdType> wires(numQubits);
-    for (int64_t i = 0; i < numQubits; i++) {
-        wires[i] = va_arg(args, QubitIdType);
+
+    if (explicit_qubits){
+        va_list args;
+        va_start(args, numQubits);
+
+        for (int64_t i = 0; i < numQubits; i++) {
+            QubitIdType this_qubit = va_arg(args, QubitIdType);
+            std::cout << "i: " << i << ", va_arg: " << this_qubit << "\n";
+            wires[i] = this_qubit;
+        }
+        va_end(args);
     }
-    va_end(args);
+
+    std::cout << "rt, numqubits: " << numQubits << "\n";
+
+    if (!explicit_qubits){
+        std::cout << "wires is empty!\n";
+        for (int64_t i = 0; i < numQubits; i++) {
+            wires[i] = i;
+        }
+    }
 
     DataView<double, 1> view(result_p->data_aligned, result_p->offset, result_p->sizes,
                              result_p->strides);

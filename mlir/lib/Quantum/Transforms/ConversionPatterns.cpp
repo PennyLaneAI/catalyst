@@ -528,8 +528,15 @@ struct ComputationalBasisOpPattern : public OpConversionPattern<ComputationalBas
         MLIRContext *ctx = getContext();
         const TypeConverter *conv = getTypeConverter();
 
+        //SmallVector<Value> args = {adaptor.getQubits(), adaptor.getNumQubits()};
+        SmallVector<Value> args = adaptor.getQubits();
+        //if (adaptor.getNumQubits()){
+            args.insert(args.end(),
+                        adaptor.getNumQubits());
+        //}
+
         rewriter.replaceOpWithNewOp<UnrealizedConversionCastOp>(
-            op, conv->convertType(ObservableType::get(ctx)), adaptor.getQubits());
+            op, conv->convertType(ObservableType::get(ctx)), args);
 
         return success();
     }
@@ -859,7 +866,7 @@ template <typename T> struct StateBasedPattern : public OpConversionPattern<T> {
 
         Type qirSignature = LLVM::LLVMFunctionType::get(
             LLVM::LLVMVoidType::get(ctx),
-            {LLVM::LLVMPointerType::get(rewriter.getContext()), IntegerType::get(ctx, 64)},
+            {LLVM::LLVMPointerType::get(rewriter.getContext()), IntegerType::get(ctx, 1), IntegerType::get(ctx, 64)},
             /*isVarArg=*/true);
 
         LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
@@ -873,14 +880,32 @@ template <typename T> struct StateBasedPattern : public OpConversionPattern<T> {
         // ComputationalBasisOp lowering. Improve this once the runtime interface changes to
         // accept observables for sample.
         assert(isa<UnrealizedConversionCastOp>(adaptor.getObs().getDefiningOp()));
-        ValueRange qubits = adaptor.getObs().getDefiningOp()->getOperands();
+        SmallVector<Value> qubits = adaptor.getObs().getDefiningOp()->getOperands();
+        // operands are either:
+        // {%q0, %q1, ..., %num_qubits}, for explicit qubits
+        // or:
+        // {%num_qubits}, for non-explicit qubits
 
         SmallVector<Value> args = {structPtr};
         if constexpr (std::is_same_v<T, ProbsOp>) {
-            Value numQubits =
-                rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(qubits.size()));
-            args.push_back(numQubits);
-            args.insert(args.end(), qubits.begin(), qubits.end());
+            if (qubits.size() != 1){
+                // with explicit qubits
+                qubits.pop_back(); // remove the num_qubits argument
+                Value numQubits =
+                    rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(qubits.size()));
+                Value true_value =
+                    rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI1Type(), rewriter.getBoolAttr(true));
+                args.push_back(true_value);
+                args.push_back(numQubits);
+                args.insert(args.end(), qubits.begin(), qubits.end());
+            } else {
+                // without explcit qubits
+                Value numQubits = qubits[0];
+                Value false_value =
+                    rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI1Type(), rewriter.getBoolAttr(false));
+                args.push_back(false_value);
+                args.push_back(numQubits);
+            }
         }
         else {
             // __catalyst__qis__State does not support individual qubit measurements yet, so it must

@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Index/IR/IndexDialect.h"
@@ -129,7 +130,26 @@ struct BufferizeProbsOp : public OpConversionPattern<ProbsOp> {
         Type tensorType = op.getType(0);
         MemRefType resultType = cast<MemRefType>(getTypeConverter()->convertType(tensorType));
         Location loc = op.getLoc();
-        Value allocVal = rewriter.replaceOpWithNewOp<memref::AllocOp>(op, resultType);
+
+        auto shape = cast<mlir::RankedTensorType>(tensorType).getShape();
+        SmallVector<Value> allocSizes;
+
+        if (shape[0] == ShapedType::kDynamic) {
+            //func::FuncOp funcOp = op->getParentOfType<func::FuncOp>();
+            //AllocOp allocOp = *funcOp.getOps<AllocOp>().begin();
+            //auto allocSize = allocOp.getNqubits();  // alloc op size
+
+            auto one = rewriter.create<arith::ConstantOp>(loc, rewriter.getI64Type(), rewriter.getIntegerAttr(rewriter.getI64Type(),1));
+            auto twoToN = rewriter.create<arith::ShLIOp>(loc, rewriter.getI64Type(),
+                one, cast<ComputationalBasisOp>(op.getObs().getDefiningOp()).getNumQubits());
+            auto allocSize = rewriter.create<index::CastSOp>(loc, rewriter.getIndexType(),
+                                                         twoToN);
+
+            allocSizes.push_back(allocSize);
+        }
+
+        //Value allocVal = rewriter.replaceOpWithNewOp<memref::AllocOp>(op, resultType);
+        Value allocVal = rewriter.replaceOpWithNewOp<memref::AllocOp>(op, resultType, allocSizes);
         rewriter.create<ProbsOp>(loc, TypeRange{}, ValueRange{adaptor.getObs(), allocVal});
         return success();
     }
