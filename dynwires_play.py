@@ -29,7 +29,7 @@ def f(num_qubits):
     def circ():
         qml.RX(1.23, wires=2)
         #return qml.expval(qml.Z(wires=num_qubits-1))
-        #return qml.probs(wires=[0,num_qubits-1])  # if not running manual IR
+        #return qml.state(wires=[0,num_qubits-1])  # if not running manual IR
         return qml.probs()  # if running manual IR
 
     return circ()

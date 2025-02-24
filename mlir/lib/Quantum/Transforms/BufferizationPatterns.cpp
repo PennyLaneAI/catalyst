@@ -115,7 +115,26 @@ struct BufferizeStateOp : public OpConversionPattern<StateOp> {
         Type tensorType = op.getType(0);
         MemRefType resultType = cast<MemRefType>(getTypeConverter()->convertType(tensorType));
         Location loc = op.getLoc();
-        Value allocVal = rewriter.replaceOpWithNewOp<memref::AllocOp>(op, resultType);
+
+        auto shape = cast<mlir::RankedTensorType>(tensorType).getShape();
+        SmallVector<Value> allocSizes;
+
+        // The result of probs is 1DTensorOf<[F64]>
+        // The size of the result might be dynamic, i.e. <?xf64>
+        // if the number of wires is dynamic
+        // In such cases, we need to allocate dynamically as well.
+        // The size is 2^num_qubits, or integer 1 left shifted by num_qubits.
+        if (shape[0] == ShapedType::kDynamic) {
+            auto one = rewriter.create<arith::ConstantOp>(loc, rewriter.getI64Type(), rewriter.getIntegerAttr(rewriter.getI64Type(),1));
+            auto twoToN = rewriter.create<arith::ShLIOp>(loc, rewriter.getI64Type(),
+                one, cast<ComputationalBasisOp>(op.getObs().getDefiningOp()).getNumQubits());
+            auto allocSize = rewriter.create<index::CastSOp>(loc, rewriter.getIndexType(),
+                                                         twoToN);
+
+            allocSizes.push_back(allocSize);
+        }
+
+        Value allocVal = rewriter.replaceOpWithNewOp<memref::AllocOp>(op, resultType, allocSizes);
         rewriter.create<StateOp>(loc, TypeRange{}, ValueRange{adaptor.getObs(), allocVal});
         return success();
     }
