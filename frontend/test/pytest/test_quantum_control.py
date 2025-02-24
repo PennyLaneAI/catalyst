@@ -1369,7 +1369,8 @@ class TestMatrix:
         assert qml.math.allclose(op.sparse_matrix().toarray(), op.matrix())
 
     def test_sparse_matrix_wire_order(self):
-        """Check if the user requests specific wire order, sparse_matrix() returns the same as matrix()."""
+        """Check if the user requests specific wire order, sparse_matrix() returns the 
+        same as matrix()."""
         control_wires = (0, 1, 2)
         base = qml.U2(1.234, -3.2, wires=3)
         op = Controlled(base, control_wires)
