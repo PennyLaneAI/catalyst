@@ -738,7 +738,10 @@ template <typename T> class SampleBasedPattern : public OpConversionPattern<T> {
         // ComputationalBasisOp lowering. Improve this once the runtime interface changes to
         // accept observables for sample.
         assert(isa<UnrealizedConversionCastOp>(adaptor.getObs().getDefiningOp()));
-        ValueRange qubits = adaptor.getObs().getDefiningOp()->getOperands();
+        SmallVector<Value> qubits = adaptor.getObs().getDefiningOp()->getOperands();
+
+        // TODO: handle qubits_and_numqubits for sample and counts
+        qubits.pop_back();
 
         Value numQubits =
             rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(qubits.size()));
@@ -910,6 +913,9 @@ template <typename T> struct StateBasedPattern : public OpConversionPattern<T> {
             // __catalyst__qis__State does not support individual qubit measurements yet, so it must
             // be invoked without specific specific qubits (i.e. measure the whole register).
             Value numQubits = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(0));
+                Value false_value =
+                    rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI1Type(), rewriter.getBoolAttr(false));
+                args.push_back(false_value);
             args.push_back(numQubits);
         }
 

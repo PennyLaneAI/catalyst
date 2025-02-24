@@ -894,7 +894,7 @@ double __catalyst__qis__Expval(ObsIdType obsKey) { return getQuantumDevicePtr()-
 
 double __catalyst__qis__Variance(ObsIdType obsKey) { return getQuantumDevicePtr()->Var(obsKey); }
 
-void __catalyst__qis__State(MemRefT_CplxT_double_1d *result, int64_t numQubits, ...)
+void __catalyst__qis__State(MemRefT_CplxT_double_1d *result, bool explicit_qubits, int64_t numQubits, ...)
 {
     RT_ASSERT(numQubits >= 0);
     MemRefT<std::complex<double>, 1> *result_p = (MemRefT<std::complex<double>, 1> *)result;
