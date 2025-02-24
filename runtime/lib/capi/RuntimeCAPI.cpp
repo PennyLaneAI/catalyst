@@ -932,17 +932,10 @@ void __catalyst__qis__Probs(MemRefT_double_1d *result, bool explicit_qubits, int
         va_start(args, numQubits);
 
         for (int64_t i = 0; i < numQubits; i++) {
-            QubitIdType this_qubit = va_arg(args, QubitIdType);
-            std::cout << "i: " << i << ", va_arg: " << this_qubit << "\n";
-            wires[i] = this_qubit;
+            wires[i] = va_arg(args, QubitIdType);
         }
         va_end(args);
-    }
-
-    std::cout << "rt, numqubits: " << numQubits << "\n";
-
-    if (!explicit_qubits){
-        std::cout << "wires is empty!\n";
+    } else {
         for (int64_t i = 0; i < numQubits; i++) {
             wires[i] = i;
         }

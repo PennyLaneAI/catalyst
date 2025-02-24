@@ -134,11 +134,12 @@ struct BufferizeProbsOp : public OpConversionPattern<ProbsOp> {
         auto shape = cast<mlir::RankedTensorType>(tensorType).getShape();
         SmallVector<Value> allocSizes;
 
+        // The result of probs is 1DTensorOf<[F64]>
+        // The size of the result might be dynamic, i.e. <?xf64>
+        // if the number of wires is dynamic
+        // In such cases, we need to allocate dynamically as well.
+        // The size is 2^num_qubits, or integer 1 left shifted by num_qubits.
         if (shape[0] == ShapedType::kDynamic) {
-            //func::FuncOp funcOp = op->getParentOfType<func::FuncOp>();
-            //AllocOp allocOp = *funcOp.getOps<AllocOp>().begin();
-            //auto allocSize = allocOp.getNqubits();  // alloc op size
-
             auto one = rewriter.create<arith::ConstantOp>(loc, rewriter.getI64Type(), rewriter.getIntegerAttr(rewriter.getI64Type(),1));
             auto twoToN = rewriter.create<arith::ShLIOp>(loc, rewriter.getI64Type(),
                 one, cast<ComputationalBasisOp>(op.getObs().getDefiningOp()).getNumQubits());
@@ -148,7 +149,6 @@ struct BufferizeProbsOp : public OpConversionPattern<ProbsOp> {
             allocSizes.push_back(allocSize);
         }
 
-        //Value allocVal = rewriter.replaceOpWithNewOp<memref::AllocOp>(op, resultType);
         Value allocVal = rewriter.replaceOpWithNewOp<memref::AllocOp>(op, resultType, allocSizes);
         rewriter.create<ProbsOp>(loc, TypeRange{}, ValueRange{adaptor.getObs(), allocVal});
         return success();

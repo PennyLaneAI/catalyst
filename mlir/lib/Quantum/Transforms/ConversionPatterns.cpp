@@ -528,7 +528,6 @@ struct ComputationalBasisOpPattern : public OpConversionPattern<ComputationalBas
         MLIRContext *ctx = getContext();
         const TypeConverter *conv = getTypeConverter();
 
-        //SmallVector<Value> args = {adaptor.getQubits(), adaptor.getNumQubits()};
         SmallVector<Value> args = adaptor.getQubits();
         //if (adaptor.getNumQubits()){
             args.insert(args.end(),
@@ -880,7 +879,7 @@ template <typename T> struct StateBasedPattern : public OpConversionPattern<T> {
         // ComputationalBasisOp lowering. Improve this once the runtime interface changes to
         // accept observables for sample.
         assert(isa<UnrealizedConversionCastOp>(adaptor.getObs().getDefiningOp()));
-        SmallVector<Value> qubits = adaptor.getObs().getDefiningOp()->getOperands();
+        SmallVector<Value> qubits_and_numQubits = adaptor.getObs().getDefiningOp()->getOperands();
         // operands are either:
         // {%q0, %q1, ..., %num_qubits}, for explicit qubits
         // or:
@@ -888,19 +887,19 @@ template <typename T> struct StateBasedPattern : public OpConversionPattern<T> {
 
         SmallVector<Value> args = {structPtr};
         if constexpr (std::is_same_v<T, ProbsOp>) {
-            if (qubits.size() != 1){
+            if (qubits_and_numQubits.size() > 1){
                 // with explicit qubits
-                qubits.pop_back(); // remove the num_qubits argument
+                qubits_and_numQubits.pop_back(); // remove the num_qubits argument
                 Value numQubits =
-                    rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(qubits.size()));
+                    rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(qubits_and_numQubits.size()));
                 Value true_value =
                     rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI1Type(), rewriter.getBoolAttr(true));
                 args.push_back(true_value);
                 args.push_back(numQubits);
-                args.insert(args.end(), qubits.begin(), qubits.end());
+                args.insert(args.end(), qubits_and_numQubits.begin(), qubits_and_numQubits.end());
             } else {
                 // without explcit qubits
-                Value numQubits = qubits[0];
+                Value numQubits = qubits_and_numQubits[0];
                 Value false_value =
                     rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI1Type(), rewriter.getBoolAttr(false));
                 args.push_back(false_value);
