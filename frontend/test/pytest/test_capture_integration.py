@@ -250,6 +250,94 @@ class TestCapture:
         assert jnp.allclose(default_capture_result, jnp.eye(2**4)[0])
         assert jnp.allclose(experimental_capture_result, default_capture_result)
 
+    def test_while_loop_workflow(self, backend):
+        """Test the integration for a circuit with a while_loop primitive."""
+
+        @qml.qnode(qml.device(backend, wires=1))
+        def circuit(x: float):
+
+            def while_cond(i):
+                return i < 10
+
+            @qml.while_loop(while_cond)
+            def loop_rx(a):
+                # perform some work and update (some of) the arguments
+                qml.RX(a, wires=0)
+                return a + 1
+
+            # apply the while loop
+            loop_rx(x)
+
+            return qml.expval(qml.Z(0))
+
+        default_capture_result_10_iterations = qml.qjit(circuit)(0)
+        experimental_capture_result_10_iterations = qml.qjit(circuit, experimental_capture=True)(0)
+        assert default_capture_result_10_iterations == experimental_capture_result_10_iterations
+
+        default_capture_result_1_iteration = qml.qjit(circuit)(9)
+        experimental_capture_result_1_iteration = qml.qjit(circuit, experimental_capture=True)(9)
+        assert default_capture_result_1_iteration == experimental_capture_result_1_iteration
+
+        default_capture_result_0_iterations = qml.qjit(circuit)(11)
+        experimental_capture_result_0_iterations = qml.qjit(circuit, experimental_capture=True)(11)
+        assert default_capture_result_0_iterations == experimental_capture_result_0_iterations
+
+    def test_while_loop_workflow_closure(self, backend):
+        """Test the integration for a circuit with a while_loop primitive using
+        a closure variable."""
+
+        @qml.qnode(qml.device(backend, wires=1))
+        def circuit(x: float, step: float):
+
+            def while_cond(i):
+                return i < 10
+
+            @qml.while_loop(while_cond)
+            def loop_rx(a):
+                # perform some work and update (some of) the arguments
+                qml.RX(a, wires=0)
+                return a + step
+
+            # apply the while loop
+            loop_rx(x)
+
+            return qml.expval(qml.Z(0))
+
+        default_capture_result = qml.qjit(circuit)(0, 2)
+        experimental_capture_result = qml.qjit(circuit, experimental_capture=True)(0, 2)
+        assert default_capture_result == experimental_capture_result
+
+    def test_while_loop_workflow_nested(self, backend):
+        """Test the integration for a circuit with a nested while_loop primitive."""
+
+        @qml.qnode(qml.device(backend, wires=1))
+        def circuit(x: float, y: float):
+
+            def while_cond(i):
+                return i < 10
+
+            @qml.while_loop(while_cond)
+            def outer_loop(a):
+
+                @qml.while_loop(while_cond)
+                def inner_loop(b):
+                    qml.RX(b, wires=0)
+                    return b + 1
+
+                # apply the inner loop
+                inner_loop(y)
+                qml.RX(a, wires=0)
+                return a + 1
+
+            # apply the outer loop
+            outer_loop(x)
+
+            return qml.expval(qml.Z(0))
+
+        default_capture_result = qml.qjit(circuit)(0, 0)
+        experimental_capture_result = qml.qjit(circuit, experimental_capture=True)(0, 0)
+        assert default_capture_result == experimental_capture_result
+
     def test_cond_workflow_if_else(self, backend):
         """Test the integration for a circuit with a cond primitive with true and false branches."""
 

@@ -18,6 +18,7 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
 
@@ -64,6 +65,7 @@ struct IonConversionPass : impl::IonConversionPassBase<IonConversionPass> {
         target.addLegalDialect<catalyst::quantum::QuantumDialect>();
         target.addLegalDialect<mlir::func::FuncDialect>();
         target.addLegalDialect<arith::ArithDialect>();
+        target.addLegalDialect<scf::SCFDialect>();
 
         if (failed(applyPartialConversion(getOperation(), target, std::move(patterns)))) {
             signalPassFailure();

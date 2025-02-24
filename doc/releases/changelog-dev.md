@@ -11,9 +11,10 @@
 * Extend `merge-rotations` peephole optimization pass to also merge compatible rotation gates (either both controlled, or both uncontrolled) where rotation angles are any combination of static constants or dynamic values.
   [(#1489)](https://github.com/PennyLaneAI/catalyst/pull/1489)
 
-* Catalyst now supports experimental capture of `cond` and `for_loop` control flow.
+* Catalyst now supports experimental capture of `cond`, `for_loop` and `while_loop` control flow.
   [(#1468)](https://github.com/PennyLaneAI/catalyst/pull/1468)
   [(#1509)](https://github.com/PennyLaneAI/catalyst/pull/1509)
+  [(#1521)](https://github.com/PennyLaneAI/catalyst/pull/1521)
   
   To trigger the PennyLane pipeline for capturing the program as a Jaxpr, simply set
   `experimental_capture=True` in the qjit decorator.
@@ -46,6 +47,8 @@
     [(#1513)](https://github.com/PennyLaneAI/catalyst/pull/1513)
   - Remove unnecessary I/O.
     [(#1514)](https://github.com/PennyLaneAI/catalyst/pull/1514)
+  - Sort improvements to reduce complexity and memory.
+    [(#1524)](https://github.com/PennyLaneAI/catalyst/pull/1524)
   - Lazily canonicalize the IR.
     [(#1530)](https://github.com/PennyLaneAI/catalyst/pull/1530)
 
@@ -104,6 +107,15 @@
   - The OQD device is moved from `frontend/catalyst/third_party/oqd` to `runtime/lib/backend/oqd`. An overall switch, `ENABLE_OQD`, is added to control the OQD build system from a single entry point. The switch is `OFF` by default, and OQD can be built from source via `make all ENABLE_OQD=ON`, or `make runtime ENABLE_OQD=ON`.
     [(#1508)](https://github.com/PennyLaneAI/catalyst/pull/1508)
 
+  - Ion dialect now supports phonon modes using `ion.modes` operation.
+    [(#1517)](https://github.com/PennyLaneAI/catalyst/pull/1517)
+
+  - Rotation angles are normalized to avoid negative duration for pulses during ion dialect lowering.
+    [(#1517)](https://github.com/PennyLaneAI/catalyst/pull/1517)
+
+  - Catalyst now generates OpenAPL programs for Pennylane circuits of up to two qubits using the OQD device.
+    [(#1517)](https://github.com/PennyLaneAI/catalyst/pull/1517)
+
 * Update source code to comply with changes requested by black v25.1.0
   [(#1490)](https://github.com/PennyLaneAI/catalyst/pull/1490)
 
@@ -120,6 +132,7 @@ Sengthai Heng,
 Rohan Nolan Lasrado,
 Christina Lee,
 Mehrdad Malekmohammadi,
+Erick Ochoa Lopez,
 Andrija Paurevic,
 Raul Torres,
 Paul Haochen Wang.

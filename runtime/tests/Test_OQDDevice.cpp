@@ -42,9 +42,10 @@ TEST_CASE("Test the OQDDevice constructor", "[oqd]")
 
 TEST_CASE("Test the OQDDevice qubit allocation and release", "[oqd]")
 {
-    auto device = OQDDevice(R"({shots : 100}ION:{"name":"Yb171"})");
+    auto device = OQDDevice(R"({shots : 100}ION:{"name":"Yb171"}PHONON:{"class_":"Phonon"})");
 
     CHECK(device.getIonSpecs() == "{\"name\":\"Yb171\"}");
+    CHECK(device.getPhononSpecs()[0] == "{\"class_\":\"Phonon\"}");
 
     std::vector<QubitIdType> allocaedQubits = device.AllocateQubits(3);
     CHECK(allocaedQubits[0] == 0);
@@ -53,6 +54,7 @@ TEST_CASE("Test the OQDDevice qubit allocation and release", "[oqd]")
 
     device.ReleaseAllQubits();
     CHECK(device.getIonSpecs() == "");
+    CHECK(device.getPhononSpecs().empty());
 
     std::filesystem::remove("__openapl__output.json");
 }
@@ -90,6 +92,23 @@ TEST_CASE("Test OpenAPL Program generation", "[oqd]")
   "class_": "AtomicCircuit",
   "system": {
     "class_": "System",
+    "modes":[
+      {
+        "class_": "Phonon",
+        "eigenvector": [1.0,0.0,0.0],
+        "energy": 3.3
+      },
+      {
+        "class_": "Phonon",
+        "eigenvector": [0.0,1.0,0.0],
+        "energy": 4.4
+      },
+      {
+        "class_": "Phonon",
+        "eigenvector": [0.0,0.0,1.0],
+        "energy": 5.5
+      }
+    ],
     "ions": [
       {
         "class_": "Ion",
@@ -883,6 +902,21 @@ TEST_CASE("Test OpenAPL Program generation", "[oqd]")
           0.0,
           0.0
         ]
+      }PHONON:
+      {
+        "class_": "Phonon",
+        "eigenvector": [1.0,0.0,0.0],
+        "energy": 3.3
+      }PHONON:
+      {
+        "class_": "Phonon",
+        "eigenvector": [0.0,1.0,0.0],
+        "energy": 4.4
+      }PHONON:
+      {
+        "class_": "Phonon",
+        "eigenvector": [0.0,0.0,1.0],
+        "energy": 5.5
       })"};
 
     size_t num_qubits = 2;
