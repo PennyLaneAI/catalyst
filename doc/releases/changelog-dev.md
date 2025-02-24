@@ -63,6 +63,9 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Update outdated test suite for `Controlled` in alignment with the latest changes in PennyLane.
+  [(#1536)](https://github.com/PennyLaneAI/catalyst/pull/1536)
+
 * Update deprecated access to `QNode.execute_kwargs["mcm_config"]`.
   Instead `postselect_mode` and `mcm_method` should be accessed instead.
   [(#1452)](https://github.com/PennyLaneAI/catalyst/pull/1452)
