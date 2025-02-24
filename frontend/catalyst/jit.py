@@ -486,7 +486,6 @@ class QJIT(CatalystCallable):
         # IRs are only available for the most recently traced function.
         self.jaxpr = None
         self.mlir_module = None
-        self.qir = None
         self.out_type = None
         self.overwrite_ir = None
 
@@ -563,10 +562,21 @@ class QJIT(CatalystCallable):
             self.mlir_module = self.generate_ir()
 
         if self.compile_options.target in ("binary",):
-            self.compiled_function, self.qir = self.compile()
+            self.compiled_function, _ = self.compile()
             self.fn_cache.insert(
                 self.compiled_function, self.user_sig, self.out_treedef, self.workspace
             )
+
+    @property
+    def qir(self):
+        if not self.mlir_module:
+            return None
+
+        orig = copy.deepcopy(self.compile_options)
+        self.compile_options.keep_intermediate = True
+        _, _qir = self.compile()
+        self.compile_options = orig
+        return _qir
 
     @debug_logger
     def jit_compile(self, args, **kwargs):
@@ -599,7 +609,7 @@ class QJIT(CatalystCallable):
             self.jaxpr, self.out_type, self.out_treedef, self.c_sig = self.capture(args, **kwargs)
 
             self.mlir_module = self.generate_ir()
-            self.compiled_function, self.qir = self.compile()
+            self.compiled_function, _ = self.compile()
 
             self.fn_cache.insert(self.compiled_function, args, self.out_treedef, self.workspace)
 
