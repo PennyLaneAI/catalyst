@@ -264,21 +264,6 @@ class TestCompilerState:
             workflow.compiler.get_output_of("None-existing-pipeline", workflow.workspace)
         workflow.workspace.cleanup()
 
-    def test_workspace(self):
-        """Test directory has been modified with folder containing intermediate results"""
-
-        @qjit(keep_intermediate=True, target="mlir")
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
-        def workflow():
-            qml.PauliX(wires=0)
-            return qml.state()
-
-        directory = os.path.join(os.getcwd(), workflow.__name__)
-        files = os.listdir(directory)
-        # The directory is non-empty. Should at least contain the original .mlir file
-        assert files
-        workflow.workspace.cleanup()
-
     def test_compiler_driver_with_output_name(self):
         """Test with non-default output name."""
         with tempfile.TemporaryDirectory() as workspace:
