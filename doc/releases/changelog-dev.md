@@ -47,6 +47,8 @@
     [(#1513)](https://github.com/PennyLaneAI/catalyst/pull/1513)
   - Remove unnecessary I/O.
     [(#1514)](https://github.com/PennyLaneAI/catalyst/pull/1514)
+  - Sort improvements to reduce complexity and memory.
+    [(#1524)](https://github.com/PennyLaneAI/catalyst/pull/1524)
 
 <h3>Breaking changes 💔</h3>
 
@@ -128,6 +130,7 @@ Sengthai Heng,
 Rohan Nolan Lasrado,
 Christina Lee,
 Mehrdad Malekmohammadi,
+Erick Ochoa Lopez,
 Andrija Paurevic,
 Raul Torres,
 Paul Haochen Wang.
