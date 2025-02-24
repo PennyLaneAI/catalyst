@@ -31,6 +31,7 @@ set(LIBS
     MLIRQuantum
     quantum-transforms
     MLIRQEC
+    qec-transforms
     MLIRGradient
     gradient-transforms
     MLIRMitigation
