@@ -46,7 +46,8 @@ func.func private @workflow_plain() -> tensor<4xcomplex<f64>> attributes {} {
   // CHECK:        RY
   %6 = quantum.custom "RY"(%cst) %5 : !quantum.bit
   %7 = quantum.extract %4[%val] : !quantum.reg -> !quantum.bit
-  %8 = quantum.compbasis %6, %7 : !quantum.obs
+  %c2 = arith.constant 2 : i64
+  %8 = quantum.compbasis %6, %7 num_qubits %c2 : !quantum.obs
   %9 = quantum.state %8 : tensor<4xcomplex<f64>>
   quantum.dealloc %0 : !quantum.reg
   return %9 : tensor<4xcomplex<f64>>
@@ -95,7 +96,8 @@ func.func private @workflow_nested() -> tensor<4xcomplex<f64>> attributes {} {
   }
   %2 = quantum.extract %1[%c0_i64] : !quantum.reg -> !quantum.bit
   %3 = quantum.extract %1[%c1_i64] : !quantum.reg -> !quantum.bit
-  %4 = quantum.compbasis %2, %3 : !quantum.obs
+  %c2 = arith.constant 2 : i64
+  %4 = quantum.compbasis %2, %3 num_qubits %c2 : !quantum.obs
   %5 = quantum.state %4 : tensor<4xcomplex<f64>>
   quantum.dealloc %0 : !quantum.reg
   return %5 : tensor<4xcomplex<f64>>
@@ -162,7 +164,8 @@ func.func private @qubit_unitary_test(%arg0: tensor<4x4xcomplex<f64>>) -> tensor
     }
     %2 = quantum.extract %1[ 0] : !quantum.reg -> !quantum.bit
     %3 = quantum.extract %1[ 1] : !quantum.reg -> !quantum.bit
-    %4 = quantum.compbasis %2, %3 : !quantum.obs
+    %c2 = arith.constant 2 : i64
+    %4 = quantum.compbasis %2, %3 num_qubits %c2 : !quantum.obs
     %5 = quantum.state %4 : tensor<4xcomplex<f64>>
     quantum.dealloc %0 : !quantum.reg
     return %5 : tensor<4xcomplex<f64>>
@@ -220,7 +223,8 @@ func.func private @workflow_adjoint(%arg0: f64) -> tensor<4xcomplex<f64>> attrib
   %6 = quantum.extract %4[%c0_i64] : !quantum.reg -> !quantum.bit
   %7 = quantum.custom "RY"(%cst) %6 : !quantum.bit
   %8 = quantum.extract %4[%c1_i64] : !quantum.reg -> !quantum.bit
-  %9 = quantum.compbasis %8, %7 : !quantum.obs
+  %c2 = arith.constant 2 : i64
+  %9 = quantum.compbasis %8, %7 num_qubits %c2 : !quantum.obs
   %10 = quantum.state %9 : tensor<4xcomplex<f64>>
   quantum.dealloc %0 : !quantum.reg
   return %10 : tensor<4xcomplex<f64>>

@@ -70,7 +70,7 @@ from catalyst.jax_extras import (
     tree_unflatten,
     wrap_init,
 )
-from catalyst.jax_extras.tracing import bind_flexible_primitive
+from catalyst.jax_extras.tracing import bind_flexible_primitive, is_dynamic_wires
 from catalyst.jax_primitives import (
     AbstractQreg,
     compbasis_p,
@@ -756,7 +756,8 @@ def trace_observables(
     qubits = None
     if obs is None:
         qubits = qrp.extract(wires, allow_reuse=True)
-        obs_tracers = compbasis_p.bind(*qubits)
+        obs_tracers = compbasis_p.bind(len(qubits), *qubits)
+        #breakpoint()
     elif isinstance(obs, KNOWN_NAMED_OBS):
         qubits = qrp.extract(wires, allow_reuse=True)
         obs_tracers = namedobs_p.bind(qubits[0], kind=type(obs).__name__)
@@ -1216,7 +1217,11 @@ def trace_quantum_function(
                     rtd_name=device.backend_name,
                     rtd_kwargs=str(device.backend_kwargs),
                 )
-                qreg_in = qalloc_p.bind(len(device.wires))
+                if is_dynamic_wires(device.wires):
+                    qreg_in = qalloc_p.bind(device.wires[0])
+                else:
+                    qreg_in = qalloc_p.bind(len(device.wires))
+
 
                 # If the program is batched, that means that it was transformed.
                 # If it was transformed, that means that the program might have

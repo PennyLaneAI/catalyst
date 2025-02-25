@@ -805,16 +805,21 @@ def _qalloc_lowering(jax_ctx: mlir.LoweringRuleContext, size_value: ir.Value):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
+    '''
     assert size_value.owner.name == "stablehlo.constant"
     size_value_attr = size_value.owner.attributes["value"]
     assert ir.DenseIntElementsAttr.isinstance(size_value_attr)
     size = ir.DenseIntElementsAttr(size_value_attr)[0]
+    '''
 
     qreg_type = ir.OpaqueType.get("quantum", "reg", ctx)
-    i64_type = ir.IntegerType.get_signless(64, ctx)
-    size_attr = ir.IntegerAttr.get(i64_type, size)
+    #i64_type = ir.IntegerType.get_signless(64, ctx)
+    #size_attr = ir.IntegerAttr.get(i64_type, size)
 
-    return AllocOp(qreg_type, nqubits_attr=size_attr).results
+    #return AllocOp(qreg_type, nqubits_attr=size_attr).results
+
+    size_value = extract_scalar(size_value, "blah")
+    return AllocOp(qreg_type, nqubits=size_value).results
 
 
 #
@@ -1249,18 +1254,18 @@ def _qmeasure_lowering(jax_ctx: mlir.LoweringRuleContext, qubit: ir.Value, posts
 # compbasis observable
 #
 @compbasis_p.def_abstract_eval
-def _compbasis_abstract_eval(*qubits):
+def _compbasis_abstract_eval(num_qubits, *qubits):
     for qubit in qubits:
         assert isinstance(qubit, AbstractQbit)
     return AbstractObs(len(qubits), compbasis_p)
 
 
 @compbasis_p.def_impl
-def _compbasis_def_impl(ctx, *qubits):  # pragma: no cover
+def _compbasis_def_impl(ctx, num_qubits, *qubits):  # pragma: no cover
     raise NotImplementedError()
 
 
-def _compbasis_lowering(jax_ctx: mlir.LoweringRuleContext, *qubits: tuple):
+def _compbasis_lowering(jax_ctx: mlir.LoweringRuleContext, num_qubits, *qubits: tuple):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
@@ -1271,7 +1276,9 @@ def _compbasis_lowering(jax_ctx: mlir.LoweringRuleContext, *qubits: tuple):
 
     result_type = ir.OpaqueType.get("quantum", "obs")
 
-    return ComputationalBasisOp(result_type, qubits).results
+    num_qubits = extract_scalar(num_qubits, "blah")
+
+    return ComputationalBasisOp(result_type, qubits, num_qubits).results
 
 
 #
