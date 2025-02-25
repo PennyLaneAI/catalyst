@@ -1,4 +1,4 @@
-// Copyright 2023 Xanadu Quantum Technologies Inc.
+// Copyright 2025 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,22 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#define DEBUG_TYPE "remove-chained-self-inverse"
-
-#include <memory>
-#include <vector>
-
-#include "llvm/Support/Debug.h"
-#include "llvm/Support/Errc.h"
+#define DEBUG_TYPE "loop-boundary"
 
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
-#include "mlir/IR/BuiltinOps.h"
-#include "mlir/IR/SymbolTable.h"
+#include "mlir/IR/Operation.h"
+#include "mlir/IR/RegionKindInterface.h"
+#include "mlir/Interfaces/ControlFlowInterfaces.h"
+#include "mlir/Interfaces/LoopLikeInterface.h"
 #include "mlir/Pass/Pass.h"
-#include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-#include "mlir/Transforms/Passes.h"
+#include "llvm/Support/Debug.h"
 
 #include "Catalyst/IR/CatalystDialect.h"
 #include "Quantum/IR/QuantumOps.h"
@@ -40,34 +35,23 @@ using namespace catalyst::quantum;
 namespace catalyst {
 namespace quantum {
 
-#define GEN_PASS_DEF_REMOVECHAINEDSELFINVERSEPASS
-#define GEN_PASS_DECL_REMOVECHAINEDSELFINVERSEPASS
+#define GEN_PASS_DEF_LOOPBOUNDARYOPTIMIZATIONPASS
+#define GEN_PASS_DECL_LOOPBOUNDARYOPTIMIZATIONPASS
 #include "Quantum/Transforms/Passes.h.inc"
 
-struct RemoveChainedSelfInversePass
-    : impl::RemoveChainedSelfInversePassBase<RemoveChainedSelfInversePass> {
-    using RemoveChainedSelfInversePassBase::RemoveChainedSelfInversePassBase;
+struct LoopBoundaryOptimizationPass
+    : impl::LoopBoundaryOptimizationPassBase<LoopBoundaryOptimizationPass> {
+    using LoopBoundaryOptimizationPassBase::LoopBoundaryOptimizationPassBase;
 
     void runOnOperation() final
     {
-        LLVM_DEBUG(dbgs() << "remove chained self inverse pass"
+        LLVM_DEBUG(dbgs() << "loop boundary optimization pass"
                           << "\n");
-
-        // Run cse pass before running remove-chained-self-inverse,
-        // to aid identifying equivalent SSA values when verifying
-        // the gates have the same params
-        MLIRContext *ctx = &getContext();
-        auto earlyCSEpm = PassManager::on<ModuleOp>(ctx);
-        earlyCSEpm.addPass(mlir::createCSEPass());
-        if (failed(runPipeline(earlyCSEpm, getOperation()))) {
-            return signalPassFailure();
-        }
 
         Operation *module = getOperation();
 
         RewritePatternSet patterns(&getContext());
-        populateLoopBoundaryPatterns(patterns, 2);
-        populateSelfInversePatterns(patterns);
+        populateLoopBoundaryPatterns(patterns, 0);
 
         if (failed(applyPatternsAndFoldGreedily(module, std::move(patterns)))) {
             return signalPassFailure();
@@ -77,9 +61,9 @@ struct RemoveChainedSelfInversePass
 
 } // namespace quantum
 
-std::unique_ptr<Pass> createRemoveChainedSelfInversePass()
+std::unique_ptr<Pass> createLoopBoundaryOptimizationPass()
 {
-    return std::make_unique<quantum::RemoveChainedSelfInversePass>();
+    return std::make_unique<quantum::LoopBoundaryOptimizationPass>();
 }
 
 } // namespace catalyst
