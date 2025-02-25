@@ -910,7 +910,7 @@ template <typename T> struct StateBasedPattern : public OpConversionPattern<T> {
             }
         }
         else {
-            // __catalyst__qis__State does not support individual qubit measurements yet, so it must
+            // __catalyst__qis__State does not support individual qubit measurements, so it must
             // be invoked without specific specific qubits (i.e. measure the whole register).
             Value numQubits = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(0));
                 Value false_value =

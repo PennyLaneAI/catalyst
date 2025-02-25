@@ -346,12 +346,12 @@ LogicalResult ProbsOp::verify()
 
 LogicalResult StateOp::verify()
 {
-    std::optional<size_t> numQubits;
-    if (failed(verifyObservable(getObs(), numQubits))) {
+    std::optional<size_t> qubitListLength;
+    if (failed(verifyObservable(getObs(), qubitListLength))) {
         return emitOpError("observable must be locally defined");
     }
 
-    if (!numQubits.has_value()) {
+    if (!qubitListLength.has_value()) {
         return emitOpError("only computational basis observables are supported");
     }
 
@@ -359,10 +359,14 @@ LogicalResult StateOp::verify()
         return emitOpError("either tensors must be returned or memrefs must be used as inputs");
     }
 
-    Type toVerify = getState() ? (Type)getState().getType() : (Type)getStateIn().getType();
-    size_t dim = std::pow(2, numQubits.value());
-    if (failed(verifyTensorResult(cast<ShapedType>(toVerify), dim))) {
-        return emitOpError("return tensor must have static length equal to 2^(number of qubits)");
+    if (qubitListLength.value() != 0){
+        // If list of qubits is present in obs, state shape will be static
+        // Hence need to verify shape
+        Type toVerify = getState() ? (Type)getState().getType() : (Type)getStateIn().getType();
+        size_t dim = std::pow(2, qubitListLength.value());
+        if (failed(verifyTensorResult(cast<ShapedType>(toVerify), dim))) {
+            return emitOpError("return tensor must have static length equal to 2^(number of qubits)");
+        }
     }
 
     return success();

@@ -899,13 +899,22 @@ void __catalyst__qis__State(MemRefT_CplxT_double_1d *result, bool explicit_qubit
     RT_ASSERT(numQubits >= 0);
     MemRefT<std::complex<double>, 1> *result_p = (MemRefT<std::complex<double>, 1> *)result;
 
-    va_list args;
-    va_start(args, numQubits);
     std::vector<QubitIdType> wires(numQubits);
-    for (int64_t i = 0; i < numQubits; i++) {
-        wires[i] = va_arg(args, QubitIdType);
+
+    if (explicit_qubits){
+        va_list args;
+        va_start(args, numQubits);
+
+        for (int64_t i = 0; i < numQubits; i++) {
+            wires[i] = va_arg(args, QubitIdType);
+        }
+        va_end(args);
+    } else {
+        for (int64_t i = 0; i < numQubits; i++) {
+            std::cout << i << "\n";
+            wires[i] = i;
+        }
     }
-    va_end(args);
 
     DataView<std::complex<double>, 1> view(result_p->data_aligned, result_p->offset,
                                            result_p->sizes, result_p->strides);
