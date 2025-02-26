@@ -570,6 +570,7 @@ class QJIT(CatalystCallable):
 
     @property
     def qir(self):
+        """LLVMIR textual representation."""
         if not self.mlir_module:
             return None
 
