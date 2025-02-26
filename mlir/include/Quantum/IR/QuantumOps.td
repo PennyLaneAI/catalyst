@@ -651,15 +651,14 @@ def YieldOp : Quantum_Op<"yield", [Pure, ReturnLike, Terminator, ParentOneOf<["A
 class Observable_Op<string mnemonic, list<Trait> traits = []> :
         Quantum_Op<mnemonic, traits # [Pure]>;
 
-def ComputationalBasisOp : Observable_Op<"compbasis"
-    , [AttrSizedOperandSegments]
-    > {
+def ComputationalBasisOp : Observable_Op<"compbasis", [AttrSizedOperandSegments]> {
     let summary = "Define a pseudo-obeservable of the computational basis for use in measurements";
     let description = [{
         The `quantum.compbasis` operation defines a quantum observable to be used by other
         operations such as measurement processes. The specific observable defined here is a
         "pseudo" observable to represent measurements in the computational basis.
         The only arguments are the list of qubits to measure.
+        //TODO: edit description!
 
         Example:
 
@@ -674,7 +673,6 @@ def ComputationalBasisOp : Observable_Op<"compbasis"
 
     let arguments = (ins
         Variadic<QubitType>:$qubits,
-        //I64:$num_qubits
         Optional<QuregType>:$qreg
     );
 

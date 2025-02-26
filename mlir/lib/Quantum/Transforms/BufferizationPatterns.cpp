@@ -119,8 +119,8 @@ struct BufferizeStateOp : public OpConversionPattern<StateOp> {
         auto shape = cast<mlir::RankedTensorType>(tensorType).getShape();
         SmallVector<Value> allocSizes;
 
-        // The result of probs is 1DTensorOf<[F64]>
-        // The size of the result might be dynamic, i.e. <?xf64>
+        // The result of state is 1DTensorOf<[Complex<F64>]>
+        // The size of the result might be dynamic, i.e. <?xcomplex<f64>>
         // if the number of wires is dynamic
         // In such cases, we need to allocate dynamically as well.
         // The size is 2^num_qubits, or integer 1 left shifted by num_qubits.

@@ -530,16 +530,16 @@ struct ComputationalBasisOpPattern : public OpConversionPattern<ComputationalBas
         // TODO: upstream mode attr into compbasis op itself?
         StringRef mode;
 
-        SmallVector<Value> args;// = adaptor.getQubits();
+        SmallVector<Value> args;
         if (adaptor.getQubits().size() != 0){
             for (const Value &qubit : adaptor.getQubits()){
-                //args.insert(args.end(),
-                //       adaptor.getQubits());
                 args.push_back(qubit);
             }
            mode = "qubits";
         }
         else if (adaptor.getQreg()){
+           // For qreg case, we also let the unrealized cast op carry
+           // the num_qubits SSA value for convenience
            args.insert(args.end(),
                        adaptor.getQreg());
            mode = "qreg";
@@ -563,10 +563,6 @@ struct ComputationalBasisOpPattern : public OpConversionPattern<ComputationalBas
             args.insert(args.end(),
                        allocOp.getNqubits());
         }
-        //if (adaptor.getNumQubits()){
-        //    args.insert(args.end(),
-        //                adaptor.getNumQubits());
-        //}
 
         auto ucc = rewriter.create<UnrealizedConversionCastOp>(
             op.getLoc(), conv->convertType(ObservableType::get(ctx)), args);
@@ -920,17 +916,11 @@ template <typename T> struct StateBasedPattern : public OpConversionPattern<T> {
         Operation *ucc = adaptor.getObs().getDefiningOp();
         assert(isa<UnrealizedConversionCastOp>(ucc));
         StringRef mode = cast<StringAttr>(ucc->getAttr("mode")).strref();
-        //SmallVector<Value> qubits_and_numQubits = adaptor.getObs().getDefiningOp()->getOperands();
-        // operands are either:
-        // {%q0, %q1, ..., %num_qubits}, for explicit qubits
-        // or:
-        // {%num_qubits}, for non-explicit qubits
 
         SmallVector<Value> args = {structPtr};
         if constexpr (std::is_same_v<T, ProbsOp>) {
             if (mode == "qubits"){
                 // with explicit qubits
-                //qubits_and_numQubits.pop_back(); // remove the num_qubits argument
                 SmallVector<Value> qubits = ucc->getOperands();
                 Value numQubits =
                     rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(qubits.size()));
@@ -941,7 +931,6 @@ template <typename T> struct StateBasedPattern : public OpConversionPattern<T> {
                 args.insert(args.end(), qubits.begin(), qubits.end());
             } else if (mode == "qreg"){
                 // without explcit qubits
-                //Value numQubits = qubits_and_numQubits[0];
                 Value numQubits = ucc->getOperands()[1];
                 Value false_value =
                     rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI1Type(), rewriter.getBoolAttr(false));
