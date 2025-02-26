@@ -584,6 +584,30 @@ func.func @probs(%q : !quantum.bit) {
 }
 
 // -----
+// CHECK-LABEL: @probs_qreg
+func.func @probs_qreg(%c : i64) {
+    // CHECK: [[r:%.+]] = llvm.call @__catalyst__rt__qubit_allocate_array(%arg0)
+    // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
+    // CHECK: [[ptr:%.+]] = llvm.alloca [[c1]] x !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
+    // CHECK: builtin.unrealized_conversion_cast [[r]], %arg0
+    // CHECK-SAME: {mode = "qreg"}
+    %r = quantum.alloc(%c) : !quantum.reg
+    %o = quantum.compbasis qreg %r : !quantum.obs
+
+
+    // COM: while the actual allocated space should be 2^num_qubits,
+    // COM: since the probs runtime capi only cares about num_qubits,
+    // COM: we just provide an unmeaningful allocated size here
+    %_ = llvm.mlir.constant(42 : i64) : i64
+    %index = index.casts %_ : i64 to index
+    %alloc = memref.alloc(%index) : memref<?xf64>
+    // CHECK: [[false:%.+]] = llvm.mlir.constant(false) : i1
+    // CHECK: llvm.call @__catalyst__qis__Probs([[ptr]], [[false]], %arg0)
+    quantum.probs %o in(%alloc : memref<?xf64>)
+    return
+}
+
+// -----
 
 // CHECK: llvm.func @__catalyst__qis__State(!llvm.ptr, i1, i64, ...)
 
