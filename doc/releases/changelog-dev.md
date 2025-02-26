@@ -47,6 +47,8 @@
     [(#1514)](https://github.com/PennyLaneAI/catalyst/pull/1514)
   - Sort improvements to reduce complexity and memory.
     [(#1524)](https://github.com/PennyLaneAI/catalyst/pull/1524)
+  - Lazy IR canonicalization and LLVMIR textual generation.
+    [(#1530)](https://github.com/PennyLaneAI/catalyst/pull/1530)
 
 <h3>Breaking changes 💔</h3>
 
