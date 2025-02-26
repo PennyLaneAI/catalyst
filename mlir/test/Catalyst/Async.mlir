@@ -170,14 +170,12 @@ module @bar {
   }
   func.func private @foo() -> tensor<2xcomplex<f64>> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode} {
     quantum.device["/home/ubuntu/code/catalyst/frontend/catalyst/utils/../../../runtime/build/lib/librtd_lightning.so", "LightningSimulator", "{'shots': 0, 'mcmc': False}"]
-    %c1 = arith.constant 1 : i64
-    %0 = quantum.alloc( %c1) : !quantum.reg
+    %0 = quantum.alloc( 1) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
-    %2 = quantum.compbasis %1 num_qubits %c1 : !quantum.obs
+    %2 = quantum.compbasis %1 : !quantum.obs
     %3 = quantum.state %2 : tensor<2xcomplex<f64>>
     quantum.dealloc %0 : !quantum.reg
     quantum.device_release
     return %3 : tensor<2xcomplex<f64>>
   }
 }
-

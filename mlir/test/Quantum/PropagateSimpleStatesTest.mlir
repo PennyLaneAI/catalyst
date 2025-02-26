@@ -48,8 +48,7 @@
     %out_qubits_8 = quantum.custom "PauliX"() %3 : !quantum.bit
 // expected-remark@above {{ONE}}
     %out_qubits_10:2 = quantum.custom "CNOT"() %out_qubits_7#1, %out_qubits_8 : !quantum.bit, !quantum.bit
-    %c3 = arith.constant 3 : i64
-    %4 = quantum.compbasis %out_qubits_7#0, %out_qubits_10#0, %out_qubits_10#1 num_qubits %c3: !quantum.obs
+    %4 = quantum.compbasis %out_qubits_7#0, %out_qubits_10#0, %out_qubits_10#1 : !quantum.obs
     %5 = quantum.state %4 : tensor<8xcomplex<f64>>
     return %5 : tensor<8xcomplex<f64>>
   }

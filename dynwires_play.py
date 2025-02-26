@@ -29,8 +29,8 @@ def f(num_qubits):
     def circ():
         qml.RX(1.23, wires=2)
         #return qml.expval(qml.Z(wires=num_qubits-1))
-        return qml.probs(wires=[0,num_qubits-1])  # if not running manual IR
-        #return qml.state()  # if running manual IR
+        #return qml.probs(wires=[0,num_qubits-1])  # if not running manual IR
+        return qml.probs()  # if running manual IR
 
     return circ()
 print("ref with 3: ", f(3))
@@ -38,10 +38,10 @@ print("ref with 5: ", f(5))
 
 f = qjit(keep_intermediate=True)(f)
 
-manual = "0_state.mlir"
-#with open(manual, "r") as file:
-#    ir = file.read()
-#replace_ir(f, "mlir", ir)
+manual = "0_probs.mlir"
+with open(manual, "r") as file:
+    ir = file.read()
+replace_ir(f, "mlir", ir)
 
 print("dynamic alloc with 3: ", f(3))
 print("dynamic alloc again with 5: ", f(5))
