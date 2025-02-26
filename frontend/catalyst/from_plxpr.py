@@ -155,7 +155,7 @@ class WorkflowInterpreter(PlxprInterpreter):
 
 # pylint: disable=unused-argument, too-many-arguments
 @WorkflowInterpreter.register_primitive(qnode_prim)
-def _(self, *args, qnode, shots, device, qnode_kwargs, qfunc_jaxpr, n_consts, batch_dims=None):
+def _(self, *args, qnode, shots, device, execution_config, qfunc_jaxpr, n_consts, batch_dims=None):
     consts = args[:n_consts]
     non_const_args = args[n_consts:]
 
