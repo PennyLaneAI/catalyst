@@ -18,6 +18,7 @@ This file contains tests for measurement primitives when the return shape is dyn
 # pylint: disable=line-too-long
 
 import jax
+import numpy as np
 import pennylane as qml
 import pytest
 
@@ -116,13 +117,35 @@ def test_dynamic_wires_scalar_readouts(readout, backend, capfd):
         def circ():
             qml.RX(1.23, wires=num_qubits-1)
             return readout(qml.Z(wires=num_qubits-1))
-            #return qml.probs()
+
         return circ()
 
     cat = catalyst.qjit(ref)
 
     assert ref(10) == cat(10)
     assert ref(4) == cat(4)
+    out, err = capfd.readouterr()
+    assert out.count("compiling...") == 3
+
+
+def test_dynamic_wires_probs_with_wires(backend, capfd):
+    def ref(num_qubits):
+        print("compiling...")
+        dev = qml.device(backend, wires=num_qubits)
+
+        @qml.qnode(dev)
+        def circ():
+            qml.RX(1.23, wires=num_qubits-1)
+            qml.RZ(3.45, wires=0)
+            qml.CNOT(wires=[num_qubits-2, 1])
+            return qml.probs(wires=[0, num_qubits-2])
+
+        return circ()
+
+    cat = catalyst.qjit(ref)
+
+    assert np.allclose(ref(10), cat(10))
+    assert np.allclose(ref(4), cat(4))
     out, err = capfd.readouterr()
     assert out.count("compiling...") == 3
 
