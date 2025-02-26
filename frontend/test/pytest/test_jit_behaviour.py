@@ -861,7 +861,7 @@ class TestDefaultAvailableIR:
     def test_mlir(self):
         """Test mlir."""
 
-        @qjit
+        @qml.qjit  # Note that we are using the default qjit
         def f():
             return 1
 
@@ -875,7 +875,7 @@ class TestDefaultAvailableIR:
             qml.RX(x, wires=0)
             return qml.state()
 
-        @qjit
+        @qml.qjit  # Note that we are using the default qjit
         def g(x: float):
             return f(x)
 
