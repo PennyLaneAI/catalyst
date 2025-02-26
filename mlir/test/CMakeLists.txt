@@ -18,6 +18,7 @@ set(TEST_SUITES
     Catalyst
     Ion
     cli
+    QEC
     )
 
 
