@@ -645,6 +645,34 @@ func.func @state(%q : !quantum.bit) {
 
 // -----
 
+// CHECK-LABEL: @state_qreg
+func.func @state_qreg(%c : i64) {
+    // CHECK: [[r:%.+]] = llvm.call @__catalyst__rt__qubit_allocate_array(%arg0)
+    // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
+    // CHECK: [[ptr:%.+]] = llvm.alloca [[c1]] x !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
+    // CHECK: builtin.unrealized_conversion_cast [[r]], %arg0
+    // CHECK-SAME: {mode = "qreg"}
+    %r = quantum.alloc(%c) : !quantum.reg
+    %o = quantum.compbasis qreg %r : !quantum.obs
+
+
+    // COM: while the actual allocated space should be 2^num_qubits,
+    // COM: since the state runtime capi only cares about num_qubits,
+    // COM: we just provide an unmeaningful allocated size here
+    // COM: Moreover, num_qubits for state is always zero, as qml.state
+    // COM: only takes in entire resgisters and a subset of wires is not allowed.
+    %_ = llvm.mlir.constant(42 : i64) : i64
+    %index = index.casts %_ : i64 to index
+    %alloc = memref.alloc(%index) : memref<?xcomplex<f64>>
+    // CHECK: [[zero:%.+]] = llvm.mlir.constant(0 : i64)
+    // CHECK: [[false:%.+]] = llvm.mlir.constant(false) : i1
+    // CHECK: llvm.call @__catalyst__qis__State([[ptr]], [[false]], [[zero]])
+    quantum.state %o in(%alloc : memref<?xcomplex<f64>>)
+    return
+}
+
+// -----
+
 // CHECK-LABEL: @controlled_circuit
 func.func @controlled_circuit(%1 : !quantum.bit, %2 : !quantum.bit, %3 : !quantum.bit) {
 
