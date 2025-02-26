@@ -67,6 +67,9 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Updated the call signature for the PLXPR `qnode_prim` primitive.
+  [(#1538)](https://github.com/PennyLaneAI/catalyst/pull/1538)
+
 * Update deprecated access to `QNode.execute_kwargs["mcm_config"]`.
   Instead `postselect_mode` and `mcm_method` should be accessed instead.
   [(#1452)](https://github.com/PennyLaneAI/catalyst/pull/1452)
