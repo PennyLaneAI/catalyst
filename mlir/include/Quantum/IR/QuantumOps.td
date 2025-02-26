@@ -683,6 +683,8 @@ def ComputationalBasisOp : Observable_Op<"compbasis", [AttrSizedOperandSegments]
     let assemblyFormat = [{
         (`qubits` $qubits^)? (`qreg` $qreg^)?  attr-dict `:` type(results)
     }];
+
+    let hasVerifier = 1;
 }
 
 def NamedObsOp : Observable_Op<"namedobs"> {
