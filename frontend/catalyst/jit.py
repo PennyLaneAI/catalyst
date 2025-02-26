@@ -488,6 +488,7 @@ class QJIT(CatalystCallable):
         self.mlir_module = None
         self.out_type = None
         self.overwrite_ir = None
+        self.use_cwd_for_workspace = self.compile_options.keep_intermediate
 
         self.user_sig = get_type_annotations(fn)
         self._validate_configuration()
@@ -780,7 +781,7 @@ class QJIT(CatalystCallable):
         """Get or create a workspace to use for compilation."""
 
         workspace_name = self.__name__
-        preferred_workspace_dir = os.getcwd() if self.compile_options.keep_intermediate else None
+        preferred_workspace_dir = os.getcwd() if self.use_cwd_for_workspace else None
 
         return WorkspaceManager.get_or_create_workspace(workspace_name, preferred_workspace_dir)
 
