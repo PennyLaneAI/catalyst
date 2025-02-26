@@ -115,6 +115,11 @@ def test_dynamic_wires_scalar_readouts(readout, backend, capfd):
 
         @qml.qnode(dev)
         def circ():
+            @catalyst.for_loop(0, num_qubits, 1)
+            def loop_0(i):
+                qml.RY(2.2, wires=i)
+
+            loop_0()
             qml.RX(1.23, wires=num_qubits-1)
             return readout(qml.Z(wires=num_qubits-1))
 
