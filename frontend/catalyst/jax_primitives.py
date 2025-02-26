@@ -1254,18 +1254,18 @@ def _qmeasure_lowering(jax_ctx: mlir.LoweringRuleContext, qubit: ir.Value, posts
 # compbasis observable
 #
 @compbasis_p.def_abstract_eval
-def _compbasis_abstract_eval(num_qubits, *qubits):
+def _compbasis_abstract_eval(*qubits):
     for qubit in qubits:
         assert isinstance(qubit, AbstractQbit)
     return AbstractObs(len(qubits), compbasis_p)
 
 
 @compbasis_p.def_impl
-def _compbasis_def_impl(ctx, num_qubits, *qubits):  # pragma: no cover
+def _compbasis_def_impl(ctx, *qubits):  # pragma: no cover
     raise NotImplementedError()
 
 
-def _compbasis_lowering(jax_ctx: mlir.LoweringRuleContext, num_qubits, *qubits: tuple):
+def _compbasis_lowering(jax_ctx: mlir.LoweringRuleContext, *qubits: tuple):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
@@ -1276,9 +1276,9 @@ def _compbasis_lowering(jax_ctx: mlir.LoweringRuleContext, num_qubits, *qubits: 
 
     result_type = ir.OpaqueType.get("quantum", "obs")
 
-    num_qubits = extract_scalar(num_qubits, "blah")
+    #num_qubits = extract_scalar(num_qubits, "blah")
 
-    return ComputationalBasisOp(result_type, qubits, num_qubits).results
+    return ComputationalBasisOp(result_type, qubits).results
 
 
 #

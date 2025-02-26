@@ -19,19 +19,21 @@ module @f {
       %extracted_2 = tensor.extract %c_1[] : tensor<i64>
       %1 = quantum.extract %0[%extracted_2] : !quantum.reg -> !quantum.bit
       %out_qubits = quantum.static_custom "RX" [1.230000e+00] %1 : !quantum.bit
-      %c_3 = stablehlo.constant dense<0> : tensor<i64>
+      //%c_3 = stablehlo.constant dense<0> : tensor<i64>
       //%extracted_4 = tensor.extract %c_3[] : tensor<i64>
       //%2 = quantum.extract %0[%extracted_4] : !quantum.reg -> !quantum.bit
-      %c_5_probs = stablehlo.constant dense<2> : tensor<i64>
-      %extracted_6_probs = tensor.extract %c_5_probs[] : tensor<i64>
-      %probs_5 = quantum.insert %0[%extracted_6_probs], %out_qubits : !quantum.reg, !quantum.bit
-      %3 = quantum.compbasis num_qubits %extracted_0 : !quantum.obs
+      //%c_5_probs = stablehlo.constant dense<2> : tensor<i64>
+      //%extracted_6_probs = tensor.extract %c_5_probs[] : tensor<i64>
+      //%probs_5 = quantum.insert %0[%extracted_6_probs], %out_qubits : !quantum.reg, !quantum.bit
+      //%3 = quantum.compbasis num_qubits %extracted_0 : !quantum.obs
       //%3 = quantum.compbasis %out_qubits: !quantum.obs
-      %4 = quantum.probs %3 : tensor<?xf64>
+      //%4 = quantum.probs %3 : tensor<?xf64>
 
-      %c_5 = stablehlo.constant dense<5> : tensor<i64>
+      %c_5 = stablehlo.constant dense<2> : tensor<i64>
       %extracted_6 = tensor.extract %c_5[] : tensor<i64>
       %5 = quantum.insert %0[%extracted_6], %out_qubits : !quantum.reg, !quantum.bit
+      %3 = quantum.compbasis qreg %5: !quantum.obs
+      %4 = quantum.probs %3 : tensor<?xf64>
       quantum.dealloc %5 : !quantum.reg
       quantum.device_release
       return %4 : tensor<?xf64>

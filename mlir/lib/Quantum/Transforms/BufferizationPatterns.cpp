@@ -126,8 +126,26 @@ struct BufferizeStateOp : public OpConversionPattern<StateOp> {
         // The size is 2^num_qubits, or integer 1 left shifted by num_qubits.
         if (shape[0] == ShapedType::kDynamic) {
             auto one = rewriter.create<arith::ConstantOp>(loc, rewriter.getI64Type(), rewriter.getIntegerAttr(rewriter.getI64Type(),1));
+            auto compbasisOp = cast<ComputationalBasisOp>(op.getObs().getDefiningOp());
+
+            Value reg_value = compbasisOp.getQreg();
+            Operation *reg_def = reg_value.getDefiningOp();
+            // Walk back to the original alloc of the register
+            // Only Alloc, Adjoint and Insert could have qreg as outputs
+            while (!isa<AllocOp>(reg_def)){
+                // TODO: switch case?
+                if (isa<AdjointOp>(reg_def)){
+                    reg_value = cast<AdjointOp>(reg_def).getQreg();
+                }
+                else if (isa<InsertOp>(reg_def)){
+                    reg_value = cast<InsertOp>(reg_def).getInQreg();
+                }
+                reg_def = reg_value.getDefiningOp();
+            }
+
+            auto allocOp = cast<AllocOp>(reg_def);
             auto twoToN = rewriter.create<arith::ShLIOp>(loc, rewriter.getI64Type(),
-                one, cast<ComputationalBasisOp>(op.getObs().getDefiningOp()).getNumQubits());
+                one, allocOp.getNqubits());
             auto allocSize = rewriter.create<index::CastSOp>(loc, rewriter.getIndexType(),
                                                          twoToN);
 
@@ -160,8 +178,26 @@ struct BufferizeProbsOp : public OpConversionPattern<ProbsOp> {
         // The size is 2^num_qubits, or integer 1 left shifted by num_qubits.
         if (shape[0] == ShapedType::kDynamic) {
             auto one = rewriter.create<arith::ConstantOp>(loc, rewriter.getI64Type(), rewriter.getIntegerAttr(rewriter.getI64Type(),1));
+            auto compbasisOp = cast<ComputationalBasisOp>(op.getObs().getDefiningOp());
+
+            Value reg_value = compbasisOp.getQreg();
+            Operation *reg_def = reg_value.getDefiningOp();
+            // Walk back to the original alloc of the register
+            // Only Alloc, Adjoint and Insert could have qreg as outputs
+            while (!isa<AllocOp>(reg_def)){
+                // TODO: switch case?
+                if (isa<AdjointOp>(reg_def)){
+                    reg_value = cast<AdjointOp>(reg_def).getQreg();
+                }
+                else if (isa<InsertOp>(reg_def)){
+                    reg_value = cast<InsertOp>(reg_def).getInQreg();
+                }
+                reg_def = reg_value.getDefiningOp();
+            }
+
+            auto allocOp = cast<AllocOp>(reg_def);
             auto twoToN = rewriter.create<arith::ShLIOp>(loc, rewriter.getI64Type(),
-                one, cast<ComputationalBasisOp>(op.getObs().getDefiningOp()).getNumQubits());
+                one, allocOp.getNqubits());
             auto allocSize = rewriter.create<index::CastSOp>(loc, rewriter.getIndexType(),
                                                          twoToN);
 
