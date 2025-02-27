@@ -22,6 +22,7 @@
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/PatternMatch.h"
 
+#include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Transforms/Patterns.h"
 
@@ -36,7 +37,7 @@ namespace {
 // TODO: Add and test CRX, CRY, CRZ, ControlledPhaseShift, PhaseShift
 static const mlir::StringSet<> rotationsSet = {"RX", "RY", "RZ"};
 static const mlir::StringSet<> hermitianSet = {"Hadamard", "PauliX", "PauliY", "PauliZ",
-                                                 "H",        "X",      "Y",      "Z"};
+                                               "H",        "X",      "Y",      "Z"};
 static const mlir::StringSet<> multiQubitSet = {"CNOT", "CZ", "SWAP"};
 
 // This mode is used to determine which gates are allowed at the loop boundary.
@@ -88,10 +89,10 @@ struct QuantumOpInfo {
 };
 
 // Map the operation to the list of qubit origins
-template <typename OpType> using QubitOriginMap = std::map<OpType, std::vector<QubitOrigin>>;
+using QubitOriginMap = std::map<CustomOp, std::vector<QubitOrigin>>;
 
 // Checks if the given operation is a valid quantum operation based on its gate name.
-template <typename OpType> bool isValidQuantumOperation(OpType &op, Mode mode)
+bool isValidQuantumOperation(CustomOp &op, Mode mode)
 {
     auto gateName = op.getGateName();
 
@@ -99,17 +100,17 @@ template <typename OpType> bool isValidQuantumOperation(OpType &op, Mode mode)
     case Mode::Rotation:
         return rotationsSet.contains(gateName);
     case Mode::NonRotation:
-        return hamiltonianSet.contains(gateName) || multiQubitSet.contains(gateName);
+        return hermitianSet.contains(gateName) || multiQubitSet.contains(gateName);
     case Mode::All:
-        return hamiltonianSet.contains(gateName) || rotationsSet.contains(gateName) ||
+        return hermitianSet.contains(gateName) || rotationsSet.contains(gateName) ||
                multiQubitSet.contains(gateName);
     }
 }
 
 // Determines if the given operation has any successors that are quantum CustomOps.
-template <typename OpType> bool hasQuantumCustomSuccessor(OpType &op)
+bool hasQuantumCustomSuccessor(const CustomOp &op)
 {
-    return llvm::any_of(op->getUsers(), [](Operation *user) { return isa<OpType>(user); });
+    return llvm::any_of(op->getUsers(), [](Operation *user) { return isa<CustomOp>(user); });
 }
 
 // Verifies that two sets of qubit origins are equivalent.
@@ -123,7 +124,7 @@ bool verifyQubitOrigins(const std::vector<QubitOrigin> &topOrigins,
 }
 
 // Checks if the top operation has any quantum CustomOp predecessors.
-template <typename OpType> bool hasQuantumCustomPredecessor(OpType &op)
+bool hasQuantumCustomPredecessor(CustomOp &op)
 {
     for (auto operand : op.getInQubits()) {
         if (auto definingOp = operand.getDefiningOp()) {
@@ -136,9 +137,8 @@ template <typename OpType> bool hasQuantumCustomPredecessor(OpType &op)
 }
 
 // Helper function to determine if a pair of operations can be optimized.
-template <typename OpType>
-bool isValidEdgePair(OpType &bottomOp, std::vector<QubitOrigin> &bottomQubitOrigins, OpType &topOp,
-                     std::vector<QubitOrigin> &topQubitOrigins)
+bool isValidEdgePair(const CustomOp &bottomOp, std::vector<QubitOrigin> &bottomQubitOrigins,
+                     const CustomOp &topOp, std::vector<QubitOrigin> &topQubitOrigins)
 {
     auto bottomOpNonConst = bottomOp;
     auto topOpNonConst = topOp;
@@ -150,10 +150,8 @@ bool isValidEdgePair(OpType &bottomOp, std::vector<QubitOrigin> &bottomQubitOrig
     return true;
 }
 
-template <typename OpType>
 std::vector<std::pair<QuantumOpInfo, QuantumOpInfo>>
-getVerifyEdgeOperationSet(QubitOriginMap<OpType> bottomEdgeOpSet,
-                          QubitOriginMap<OpType> topEdgeOpSet)
+getVerifyEdgeOperationSet(QubitOriginMap bottomEdgeOpSet, QubitOriginMap topEdgeOpSet)
 {
     std::vector<std::pair<QuantumOpInfo, QuantumOpInfo>> edgeOperationSet;
 
@@ -231,10 +229,10 @@ mlir::Value findResultForOpByQubit(mlir::Value qubit, scf::ForOp forOp)
 //===----------------------------------------------------------------------===//
 
 // Finds the root qubit by traversing backward through defining operations.
-template <typename OpType> mlir::Value findRootQubit(mlir::Value qubit)
+mlir::Value findRootQubit(mlir::Value qubit)
 {
     mlir::Value rootQubit = qubit;
-    while (auto definingOp = dyn_cast_or_null<OpType>(rootQubit.getDefiningOp())) {
+    while (auto definingOp = dyn_cast_or_null<CustomOp>(rootQubit.getDefiningOp())) {
         for (auto [idx, outQubit] : llvm::enumerate(definingOp.getOutQubits())) {
             if (outQubit == rootQubit) {
                 rootQubit = definingOp.getInQubits()[idx];
@@ -249,24 +247,25 @@ template <typename OpType> mlir::Value findRootQubit(mlir::Value qubit)
 QubitOrigin determineQubitOrigin(mlir::Value qubit)
 {
     if (auto extractOp = qubit.getDefiningOp<quantum::ExtractOp>()) {
-        unsigned long position = 0;
-        if (extractOp.getIdxAttr().has_value()) {
-            position = extractOp.getIdxAttr().value();
-        }
+        unsigned long position = extractOp.getIdxAttr().value();
         return QubitOrigin(extractOp.getQreg(), position, true);
     }
     return QubitOrigin(qubit, 0, false);
 }
 
 // Traces the origin of qubits for the given operation and populates the qubitOriginMap.
-template <typename OpType> void traceOriginQubit(OpType &op, QubitOriginMap<OpType> &qubitOriginMap)
+void traceOriginQubit(CustomOp &op, QubitOriginMap &qubitOriginMap, Mode mode)
 {
     if (qubitOriginMap.count(op))
         return;
 
+    if (!isValidQuantumOperation(op, mode)) {
+        return;
+    }
+
     std::vector<QubitOrigin> qubitOrigins;
     for (auto qubit : op.getInQubits()) {
-        auto rootQubit = findRootQubit<OpType>(qubit);
+        auto rootQubit = findRootQubit(qubit);
         qubitOrigins.push_back(determineQubitOrigin(rootQubit));
     }
     qubitOriginMap[op] = qubitOrigins;
@@ -274,9 +273,9 @@ template <typename OpType> void traceOriginQubit(OpType &op, QubitOriginMap<OpTy
 
 // Traces quantum operations at the top edge of a loop to identify candidates for hoisting.
 // Returns a map from quantum operations to the origins of their input qubits.
-template <typename OpType> QubitOriginMap<OpType> traceTopEdgeOperations(scf::ForOp forOp)
+QubitOriginMap traceTopEdgeOperations(scf::ForOp forOp, Mode mode)
 {
-    QubitOriginMap<OpType> qubitOriginMap;
+    QubitOriginMap qubitOriginMap;
     auto regionIterArgs = forOp.getRegionIterArgs();
 
     for (auto regionArg : regionIterArgs) {
@@ -285,15 +284,15 @@ template <typename OpType> QubitOriginMap<OpType> traceTopEdgeOperations(scf::Fo
         if (isa<quantum::QuregType>(argType)) {
             for (Operation *userOp : regionArg.getUsers()) {
                 if (auto extractOp = dyn_cast<quantum::ExtractOp>(userOp)) {
-                    unsigned long position = 0;
-                    if (extractOp.getIdxAttr().has_value()) {
-                        position = extractOp.getIdxAttr().value();
-                    }
+                    unsigned long position = extractOp.getIdxAttr().value();
 
                     QubitOrigin qubitOrigin(regionArg, position, true);
 
                     for (Operation *extractUserOp : extractOp.getResult().getUsers()) {
                         if (auto quantumOp = dyn_cast<CustomOp>(extractUserOp)) {
+                            if (!isValidQuantumOperation(quantumOp, mode)) {
+                                continue;
+                            }
                             // Find the index of the extracted qubit in the
                             //  operation's input qubits.
                             auto inQubits = quantumOp.getInQubits();
@@ -319,12 +318,10 @@ template <typename OpType> QubitOriginMap<OpType> traceTopEdgeOperations(scf::Fo
             QubitOrigin qubitOrigin(regionArg, 0, false);
             for (Operation *userOp : regionArg.getUsers()) {
                 if (auto quantumOp = dyn_cast<CustomOp>(userOp)) {
-                    // Ensure the vector is properly sized.
-                    if (qubitOriginMap.count(quantumOp) && qubitOriginMap[quantumOp].size() <= 0) {
-                        qubitOriginMap[quantumOp].resize(1);
+                    if (!isValidQuantumOperation(quantumOp, mode)) {
+                        continue;
                     }
-                    auto &origins = qubitOriginMap[quantumOp];
-                    origins.push_back(qubitOrigin);
+                    qubitOriginMap[quantumOp].push_back(qubitOrigin);
                 }
             }
         }
@@ -335,35 +332,34 @@ template <typename OpType> QubitOriginMap<OpType> traceTopEdgeOperations(scf::Fo
 
 // Traces quantum operations at the bottom edge of a loop to identify candidates for hoisting.
 // Returns a map from quantum operations to the origins of their input qubits.
-template <typename OpType> QubitOriginMap<OpType> traceBottomEdgeOperations(scf::ForOp forOp)
+QubitOriginMap traceBottomEdgeOperations(scf::ForOp forOp, Mode mode)
 {
-    QubitOriginMap<OpType> qubitOriginMap;
+    QubitOriginMap qubitOriginMap;
     Operation *terminator = forOp.getBody()->getTerminator();
 
     for (auto operand : terminator->getOperands()) {
         Operation *definingOp = operand.getDefiningOp();
         while (InsertOp insertOp = dyn_cast_or_null<quantum::InsertOp>(definingOp)) {
             operand = insertOp.getQubit();
-            auto operation = dyn_cast_or_null<OpType>(operand.getDefiningOp());
+            auto operation = dyn_cast_or_null<CustomOp>(operand.getDefiningOp());
             if (!operation) {
                 continue;
             }
-            traceOriginQubit(operation, qubitOriginMap);
+            traceOriginQubit(operation, qubitOriginMap, mode);
             definingOp = insertOp.getInQreg().getDefiningOp();
         }
 
-        auto operation = dyn_cast_or_null<OpType>(operand.getDefiningOp());
+        auto operation = dyn_cast_or_null<CustomOp>(operand.getDefiningOp());
 
         if (!operation) {
             continue;
         }
-        traceOriginQubit(operation, qubitOriginMap);
+        traceOriginQubit(operation, qubitOriginMap, mode);
     }
     return qubitOriginMap;
 }
 
 // Hoists a quantum operation from the top edge of a loop to the top of the loop.
-template <typename OpType>
 void hoistTopEdgeOperation(QuantumOpInfo topOpInfo, scf::ForOp forOp,
                            mlir::PatternRewriter &rewriter)
 {
@@ -435,10 +431,8 @@ void hoistTopEdgeOperation(QuantumOpInfo topOpInfo, scf::ForOp forOp,
 };
 
 // Hoists a quantum operation from the bottom edge of a loop to the bottom of the loop.
-template <typename OpType>
 void hoistBottomEdgeOperation(QuantumOpInfo bottomOpInfo, scf::ForOp forOp,
-                              QubitOriginMap<CustomOp> bottomEdgeOpSet,
-                              mlir::PatternRewriter &rewriter)
+                              QubitOriginMap bottomEdgeOpSet, mlir::PatternRewriter &rewriter)
 {
 
     // Config the successor
@@ -596,18 +590,16 @@ struct LoopBoundaryForLoopRewritePattern : public mlir::OpRewritePattern<scf::Fo
     {
         LLVM_DEBUG(dbgs() << "Simplifying the following operation:\n" << forOp << "\n");
 
-        QubitOriginMap<CustomOp> topEdgeOpSet = traceTopEdgeOperations<CustomOp>(forOp);
-        QubitOriginMap<CustomOp> bottomEdgeOpSet = traceBottomEdgeOperations<CustomOp>(forOp);
+        QubitOriginMap topEdgeOpSet = traceTopEdgeOperations(forOp, mode);
+        QubitOriginMap bottomEdgeOpSet = traceBottomEdgeOperations(forOp, mode);
 
-        auto edgeOperationSet = getVerifyEdgeOperationSet<CustomOp>(bottomEdgeOpSet, topEdgeOpSet);
+        auto edgeOperationSet = getVerifyEdgeOperationSet(bottomEdgeOpSet, topEdgeOpSet);
 
         for (auto [topEdgeOp, bottomEdgeOp] : edgeOperationSet) {
-            if (isValidQuantumOperation<CustomOp>(topEdgeOp.op, mode)) {
-                hoistTopEdgeOperation<CustomOp>(topEdgeOp, forOp, rewriter);
-                handleParams(topEdgeOp, bottomEdgeOp, forOp, rewriter);
-                hoistBottomEdgeOperation<CustomOp>(bottomEdgeOp, forOp, bottomEdgeOpSet, rewriter);
-                return mlir::success();
-            }
+            hoistTopEdgeOperation(topEdgeOp, forOp, rewriter);
+            handleParams(topEdgeOp, bottomEdgeOp, forOp, rewriter);
+            hoistBottomEdgeOperation(bottomEdgeOp, forOp, bottomEdgeOpSet, rewriter);
+            return mlir::success();
         }
 
         return mlir::failure();
