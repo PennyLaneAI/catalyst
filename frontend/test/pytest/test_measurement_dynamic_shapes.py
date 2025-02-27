@@ -159,5 +159,33 @@ def test_dynamic_wires_probs_with_wires(backend, capfd):
     out, err = capfd.readouterr()
     assert out.count("compiling...") == 3
 
+
+def test_dynamic_wires_probs_without_wires(backend, capfd):
+    def ref(num_qubits):
+        print("compiling...")
+        dev = qml.device(backend, wires=num_qubits)
+
+        @qml.qnode(dev)
+        def circ():
+            @catalyst.for_loop(0, num_qubits, 1)
+            def loop_0(i):
+                qml.RY(2.2, wires=i)
+
+            #loop_0()
+            qml.RX(1.23, wires=num_qubits-1)
+            qml.RZ(3.45, wires=0)
+            qml.CNOT(wires=[num_qubits-2, 1])
+            return qml.probs()
+
+        return circ()
+
+    cat = catalyst.qjit(ref)
+
+    assert np.allclose(ref(10), cat(10))
+    assert np.allclose(ref(4), cat(4))
+    out, err = capfd.readouterr()
+    assert out.count("compiling...") == 3
+
+
 if __name__ == "__main__":
     pytest.main(["-x", __file__])

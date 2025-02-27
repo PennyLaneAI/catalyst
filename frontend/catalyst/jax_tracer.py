@@ -70,7 +70,7 @@ from catalyst.jax_extras import (
     tree_unflatten,
     wrap_init,
 )
-from catalyst.jax_extras.tracing import bind_flexible_primitive, is_dynamic_wires
+from catalyst.jax_extras.tracing import bind_flexible_primitive, is_dynamic_wires, DynamicJaxprTracer
 from catalyst.jax_primitives import (
     AbstractQreg,
     compbasis_p,
@@ -755,10 +755,12 @@ def trace_observables(
     wires = obs.wires if (obs and len(obs.wires) > 0) else m_wires
     qubits = None
     if obs is None:
-        qubits = qrp.extract(wires, allow_reuse=True)
-        #obs_tracers = compbasis_p.bind(len(qubits), *qubits)
-        obs_tracers = compbasis_p.bind(*qubits)
-        #breakpoint()
+        if isinstance(wires, DynamicJaxprTracer):
+            qreg_out = qrp.actualize()
+            obs_tracers = compbasis_p.bind(qreg_out, qreg_available=True)
+        else:
+            qubits = qrp.extract(wires, allow_reuse=True)
+            obs_tracers = compbasis_p.bind(*qubits)
     elif isinstance(obs, KNOWN_NAMED_OBS):
         qubits = qrp.extract(wires, allow_reuse=True)
         obs_tracers = namedobs_p.bind(qubits[0], kind=type(obs).__name__)
@@ -788,7 +790,8 @@ def trace_observables(
         raise NotImplementedError(
             f"Observable {obs} (of type {type(obs)}) is not implemented"
         )  # pragma: no cover
-    return obs_tracers, (len(qubits) if qubits else 0)
+
+    return obs_tracers, (len(qubits) if qubits else m_wires)
 
 
 @debug_logger
@@ -876,11 +879,15 @@ def trace_quantum_measurements(
                     f"Measurement {type(o).__name__} is not supported a shot-vector. "
                     "Use qml.sample() instead."
                 )
-
-            m_wires = o.wires if o.wires else range(len(device.wires))
+            dev_wires = None
+            if is_dynamic_wires(device.wires):
+                dev_wires = device.wires[0]
+            else:
+                dev_wires = range(len(device.wires))
+            #dev_wires = range(len(device.wires))
+            m_wires = o.wires if o.wires else dev_wires
 
             obs_tracers, nqubits = trace_observables(o.obs, qrp, m_wires)
-
             using_compbasis = obs_tracers.primitive == compbasis_p
 
             if isinstance(o, qml.measurements.SampleMP):
@@ -920,8 +927,10 @@ def trace_quantum_measurements(
                 out_classical_tracers.append(var_p.bind(obs_tracers))
             elif type(o) is ProbabilityMP:
                 assert using_compbasis
-                shape = (2**nqubits,)
-                out_classical_tracers.append(probs_p.bind(obs_tracers, shape=shape))
+                if not isinstance(nqubits, DynamicJaxprTracer):
+                    out_classical_tracers.append(probs_p.bind(obs_tracers, num_qubits=nqubits))
+                else:
+                    out_classical_tracers.append(probs_p.bind(obs_tracers, nqubits))
             elif type(o) is CountsMP:
                 if shots is None:  # needed for old device API only
                     raise ValueError(
