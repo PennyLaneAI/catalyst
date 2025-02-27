@@ -556,14 +556,14 @@ def probs_dynamic_with_wires(num_qubits):
 # CHECK-DAG: [[nSub2:%.+]] = stablehlo.subtract %arg0, [[c2]] : tensor<i64>
 
 # CHECK: [[extracted:%.+]] = tensor.extract %arg0[] : tensor<i64>
-# CHECK: [[alloced_reg:%.+]] = quantum.alloc([[extracted]]) : !quantum.reg
+# CHECK: [[allocedReg:%.+]] = quantum.alloc([[extracted]]) : !quantum.reg
 
 # CHECK: [[detensorize:%.+]] = tensor.extract [[nSub1]][] : tensor<i64>
-# CHECK: [[inQubit:%.+]] = quantum.extract [[alloced_reg]][[[detensorize]]] : !quantum.reg -> !quantum.bit
+# CHECK: [[inQubit:%.+]] = quantum.extract [[allocedReg]][[[detensorize]]] : !quantum.reg -> !quantum.bit
 # CHECK: [[outQubit:%.+]] = quantum.custom "Hadamard"() [[inQubit]] : !quantum.bit
 
 # CHECK: [[detensorize:%.+]] = tensor.extract [[nSub1]][] : tensor<i64>
-# CHECK: [[resultReg:%.+]] = quantum.insert [[alloced_reg]][[[detensorize]]], [[outQubit]] : !quantum.reg, !quantum.bit
+# CHECK: [[resultReg:%.+]] = quantum.insert [[allocedReg]][[[detensorize]]], [[outQubit]] : !quantum.reg, !quantum.bit
 
 # CHECK: [[probsBit0:%.+]] = quantum.extract [[resultReg]][ 0] : !quantum.reg -> !quantum.bit
 # CHECK: [[detensorize:%.+]] = tensor.extract [[nSub2]][] : tensor<i64>
@@ -575,6 +575,40 @@ def probs_dynamic_with_wires(num_qubits):
 
 probs_dynamic_with_wires(10)
 print(probs_dynamic_with_wires.mlir)
+
+
+# CHECK-LABEL: @probs_dynamic_without_wires
+@qjit(target="mlir")
+def probs_dynamic_without_wires(num_qubits):
+    @qml.qnode(qml.device("lightning.qubit", wires=num_qubits))
+    def circ():
+        qml.Hadamard(wires=num_qubits-1)
+        return qml.probs()
+
+    return circ()
+
+# CHECK: func.func public @circ(%arg0: tensor<i64>) -> tensor<?xf64>
+
+# CHECK-DAG: [[c1:%.+]] = stablehlo.constant dense<1> : tensor<i64>
+# CHECK-DAG: [[nSub1:%.+]] = stablehlo.subtract %arg0, [[c1]] : tensor<i64>
+
+# CHECK: [[extracted:%.+]] = tensor.extract %arg0[] : tensor<i64>
+# CHECK: [[allocedReg:%.+]] = quantum.alloc([[extracted]]) : !quantum.reg
+
+# CHECK: [[detensorize:%.+]] = tensor.extract [[nSub1]][] : tensor<i64>
+# CHECK: [[inQubit:%.+]] = quantum.extract [[allocedReg]][[[detensorize]]] : !quantum.reg -> !quantum.bit
+# CHECK: [[outQubit:%.+]] = quantum.custom "Hadamard"() [[inQubit]] : !quantum.bit
+
+# CHECK: [[detensorize:%.+]] = tensor.extract [[nSub1]][] : tensor<i64>
+# CHECK: [[resultReg:%.+]] = quantum.insert [[allocedReg]][[[detensorize]]], [[outQubit]] : !quantum.reg, !quantum.bit
+
+# CHECK: [[obs:%.+]] = quantum.compbasis qreg [[resultReg]] : !quantum.obs
+# CHECK: [[probs:%.+]] = quantum.probs [[obs]] : tensor<?xf64>
+# CHECK: quantum.dealloc [[resultReg]] : !quantum.reg
+# CHECK: return [[probs]] : tensor<?xf64>
+
+probs_dynamic_without_wires(10)
+print(probs_dynamic_without_wires.mlir)
 
 
 # CHECK-LABEL: public @state1(
