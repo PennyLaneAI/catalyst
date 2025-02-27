@@ -53,7 +53,8 @@ def test_static_params():
 
 
 # CHECK-LABEL: public @jit_circuit
-# CHECK: %[[REG:.*]] = quantum.alloc( 4) : !quantum.reg
+# CHECK: %[[c4:.*]] = arith.constant 4 : i64
+# CHECK: %[[REG:.*]] = quantum.alloc(%[[c4]]) : !quantum.reg
 # CHECK: %[[BIT2:.*]] = quantum.extract %[[REG]][ 2]
 # CHECK: %[[RZ:.*]] = quantum.static_custom "RZ"
 # CHECK: %[[BIT0:.*]] = quantum.extract %[[REG]][ 0] : !quantum.reg -> !quantum.bit
