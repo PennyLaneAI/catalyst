@@ -140,6 +140,11 @@ def test_dynamic_wires_probs_with_wires(backend, capfd):
 
         @qml.qnode(dev)
         def circ():
+            @catalyst.for_loop(0, num_qubits, 1)
+            def loop_0(i):
+                qml.RY(2.2, wires=i)
+
+            loop_0()
             qml.RX(1.23, wires=num_qubits-1)
             qml.RZ(3.45, wires=0)
             qml.CNOT(wires=[num_qubits-2, 1])
