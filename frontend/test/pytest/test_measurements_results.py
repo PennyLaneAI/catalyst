@@ -34,14 +34,12 @@ class TestSample:
     def test_sample_on_0qbits(self):
         """Test sample on 0 qubits."""
 
-        @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=0, shots=10))
-        def sample_0qbit():
-            return qml.sample()
-
-        expected = np.empty(shape=(10, 0), dtype=int)
-        observed = sample_0qbit()
-        assert np.array_equal(observed, expected)
+        err_msg = "A device must have at least one wire."
+        with pytest.raises(CompileError, match=err_msg):
+            @qjit
+            @qml.qnode(qml.device("lightning.qubit", wires=0, shots=10))
+            def sample_0qbit():
+                return qml.sample()
 
     def test_sample_on_1qbit(self, backend):
         """Test sample on 1 qubit."""
@@ -84,14 +82,12 @@ class TestCounts:
     def test_counts_on_0qbits(self):
         """Test counts on 0 qubits."""
 
-        @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=0, shots=10))
-        def counts_0qbit():
-            return qml.counts()
-
-        expected = [np.array([0]), np.array([10])]
-        observed = counts_0qbit()
-        assert np.array_equal(observed, expected)
+        err_msg = "A device must have at least one wire."
+        with pytest.raises(CompileError, match=err_msg):
+            @qjit
+            @qml.qnode(qml.device("lightning.qubit", wires=0, shots=10))
+            def counts_0qbit():
+                return qml.counts()
 
     def test_count_on_1qbit(self, backend):
         """Test counts on 1 qubits."""
@@ -682,14 +678,12 @@ class TestState:
     def test_state_on_0qbits(self):
         """Test state on 0 qubits."""
 
-        @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=0))
-        def state_0qbit():
-            return qml.state()
-
-        expected = np.array([complex(1.0, 0.0)])
-        observed = state_0qbit()
-        assert np.array_equal(observed, expected)
+        err_msg = "A device must have at least one wire."
+        with pytest.raises(CompileError, match=err_msg):
+            @qjit
+            @qml.qnode(qml.device("lightning.qubit", wires=0))
+            def state_0qbit():
+                return qml.state()
 
     def test_state_on_1qubit(self, backend):
         """Test state on 1 qubit."""
@@ -711,14 +705,12 @@ class TestProbs:
     def test_probs_on_0qbits(self):
         """Test probs on 0 qubits."""
 
-        @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=0))
-        def probs_0qbit():
-            return qml.probs()
-
-        expected = np.array([1.0])
-        observed = probs_0qbit()
-        assert np.array_equal(observed, expected)
+        err_msg = "A device must have at least one wire."
+        with pytest.raises(CompileError, match=err_msg):
+            @qjit
+            @qml.qnode(qml.device("lightning.qubit", wires=0))
+            def probs_0qbit():
+                return qml.probs()
 
     def test_probs_on_1qubit(self, backend):
         """Test probs on 1 qubit."""

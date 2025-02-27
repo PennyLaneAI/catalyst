@@ -791,7 +791,7 @@ def trace_observables(
             f"Observable {obs} (of type {type(obs)}) is not implemented"
         )  # pragma: no cover
 
-    # record the number of qubits for the observable in the return value
+    # Record the number of qubits for the observable in the return value
     # If no qubits were explicitly extracted from the qreg, return the number
     # of wires on the device
     return obs_tracers, (len(qubits) if qubits else m_wires)
@@ -1231,8 +1231,15 @@ def trace_quantum_function(
                     rtd_kwargs=str(device.backend_kwargs),
                 )
                 if is_dynamic_wires(device.wires):
+                    # When device has dynamic wires, the device.wires iterable object
+                    # has a single value, which is the tracer for the number of wires
                     qreg_in = qalloc_p.bind(device.wires[0])
                 else:
+                    if len(device.wires) == 0:
+                        msg = (
+                            "A device must have at least one wire."
+                        )
+                        raise CompileError(msg)
                     qreg_in = qalloc_p.bind(len(device.wires))
 
 
