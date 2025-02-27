@@ -739,7 +739,7 @@ def trace_quantum_operations(
 
 @debug_logger
 def trace_observables(
-    obs: Operator, qrp: QRegPromise, m_wires: int
+    obs: Operator, qrp: QRegPromise, m_wires: int | DynamicJaxprTracer
 ) -> Tuple[List[DynamicJaxprTracer], Optional[int]]:
     """Trace observables.
 
@@ -791,6 +791,9 @@ def trace_observables(
             f"Observable {obs} (of type {type(obs)}) is not implemented"
         )  # pragma: no cover
 
+    # record the number of qubits for the observable in the return value
+    # If no qubits were explicitly extracted from the qreg, return the number
+    # of wires on the device
     return obs_tracers, (len(qubits) if qubits else m_wires)
 
 
@@ -879,12 +882,14 @@ def trace_quantum_measurements(
                     f"Measurement {type(o).__name__} is not supported a shot-vector. "
                     "Use qml.sample() instead."
                 )
+
+            # Check if the measurement has wires specified
+            # If not, the measurement occurs on all wires of the device
             dev_wires = None
             if is_dynamic_wires(device.wires):
                 dev_wires = device.wires[0]
             else:
                 dev_wires = range(len(device.wires))
-            #dev_wires = range(len(device.wires))
             m_wires = o.wires if o.wires else dev_wires
 
             obs_tracers, nqubits = trace_observables(o.obs, qrp, m_wires)
@@ -927,10 +932,8 @@ def trace_quantum_measurements(
                 out_classical_tracers.append(var_p.bind(obs_tracers))
             elif type(o) is ProbabilityMP:
                 assert using_compbasis
-                if not isinstance(nqubits, DynamicJaxprTracer):
-                    out_classical_tracers.append(probs_p.bind(obs_tracers, num_qubits=nqubits))
-                else:
-                    out_classical_tracers.append(probs_p.bind(obs_tracers, nqubits))
+                result = bind_flexible_primitive(probs_p, {"num_qubits":nqubits}, obs_tracers)
+                out_classical_tracers.append(result)
             elif type(o) is CountsMP:
                 if shots is None:  # needed for old device API only
                     raise ValueError(
