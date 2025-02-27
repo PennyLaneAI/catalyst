@@ -19,7 +19,7 @@
 //////////////////
 
 func.func @counts(%q0: !quantum.bit, %q1: !quantum.bit) {
-    %obs = quantum.compbasis %q0, %q1 : !quantum.obs
+    %obs = quantum.compbasis qubits %q0, %q1 : !quantum.obs
 
     // CHECK: [[eigval_alloc:%.+]] = memref.alloc() : memref<4xf64>
     // CHECK: [[counts_alloc:%.+]] = memref.alloc() : memref<4xi64>
@@ -39,7 +39,7 @@ func.func @counts(%q0: !quantum.bit, %q1: !quantum.bit) {
 func.func @sample(%q0: !quantum.bit, %q1: !quantum.bit, %dyn_shots: i64) {
     // CHECK: quantum.device shots([[shots:%.+]]) ["", "", ""]
     quantum.device shots(%dyn_shots) ["", "", ""]
-    %obs = quantum.compbasis %q0, %q1 : !quantum.obs
+    %obs = quantum.compbasis qubits %q0, %q1 : !quantum.obs
 
     // CHECK: [[idx:%.+]] = index.casts [[shots]] : i64 to index
     // CHECK: [[alloc:%.+]] = memref.alloc([[idx]]) : memref<?x2xf64>
@@ -56,7 +56,7 @@ func.func @sample(%q0: !quantum.bit, %q1: !quantum.bit, %dyn_shots: i64) {
 // -----
 
 func.func @probs(%q0: !quantum.bit, %q1: !quantum.bit) {
-    %obs = quantum.compbasis %q0, %q1 : !quantum.obs
+    %obs = quantum.compbasis qubits %q0, %q1 : !quantum.obs
     // CHECK: [[alloc:%.+]] = memref.alloc() : memref<4xf64>
     // CHECK: quantum.probs {{.*}} in([[alloc]] : memref<4xf64>)
     %probs = quantum.probs %obs : tensor<4xf64>
@@ -65,11 +65,69 @@ func.func @probs(%q0: !quantum.bit, %q1: !quantum.bit) {
 
 // -----
 
+func.func @probs_dynwires(%c : i64) {
+    %r = quantum.alloc(%c) : !quantum.reg
+    %obs = quantum.compbasis qreg %r : !quantum.obs
+    // CHECK: [[one:%.+]] = arith.constant 1 : i64
+    // CHECK: [[TwoToN:%.+]] = arith.shli [[one]], %arg0 : i64
+    // CHECK: [[index:%.+]] = index.casts [[TwoToN]] : i64 to index
+    // CHECK: [[alloc:%.+]] = memref.alloc([[index]]) : memref<?xf64>
+    // CHECK: quantum.probs {{.*}} in([[alloc]] : memref<?xf64>)
+    %probs = quantum.probs %obs : tensor<?xf64>
+    func.return
+}
+
+// -----
+
+func.func @probs_dynwires_with_insert(%c : i64, %q: !quantum.bit) {
+    %r = quantum.alloc(%c) : !quantum.reg
+    %ri = quantum.insert %r[ 0], %q : !quantum.reg, !quantum.bit
+    %obs = quantum.compbasis qreg %ri : !quantum.obs
+    // CHECK: [[one:%.+]] = arith.constant 1 : i64
+    // CHECK: [[TwoToN:%.+]] = arith.shli [[one]], %arg0 : i64
+    // CHECK: [[index:%.+]] = index.casts [[TwoToN]] : i64 to index
+    // CHECK: [[alloc:%.+]] = memref.alloc([[index]]) : memref<?xf64>
+    // CHECK: quantum.probs {{.*}} in([[alloc]] : memref<?xf64>)
+    %probs = quantum.probs %obs : tensor<?xf64>
+    func.return
+}
+
+// -----
+
 func.func @state(%q0: !quantum.bit, %q1: !quantum.bit) {
-    %obs = quantum.compbasis %q0, %q1 : !quantum.obs
+    %obs = quantum.compbasis qubits %q0, %q1 : !quantum.obs
     // CHECK: [[alloc:%.+]] = memref.alloc() : memref<4xcomplex<f64>>
     // CHECK: quantum.state {{.*}} in([[alloc]] : memref<4xcomplex<f64>>)
     %state = quantum.state %obs : tensor<4xcomplex<f64>>
+    func.return
+}
+
+// -----
+
+func.func @state_dynwires(%c : i64) {
+    %r = quantum.alloc(%c) : !quantum.reg
+    %obs = quantum.compbasis qreg %r : !quantum.obs
+    // CHECK: [[one:%.+]] = arith.constant 1 : i64
+    // CHECK: [[TwoToN:%.+]] = arith.shli [[one]], %arg0 : i64
+    // CHECK: [[index:%.+]] = index.casts [[TwoToN]] : i64 to index
+    // CHECK: [[alloc:%.+]] = memref.alloc([[index]]) : memref<?xcomplex<f64>>
+    // CHECK: quantum.state {{.*}} in([[alloc]] : memref<?xcomplex<f64>>)
+    %state = quantum.state %obs : tensor<?xcomplex<f64>>
+    func.return
+}
+
+// -----
+
+func.func @state_dynwires_with_insert(%c : i64, %q: !quantum.bit) {
+    %r = quantum.alloc(%c) : !quantum.reg
+    %ri = quantum.insert %r[ 0], %q : !quantum.reg, !quantum.bit
+    %obs = quantum.compbasis qreg %ri : !quantum.obs
+    // CHECK: [[one:%.+]] = arith.constant 1 : i64
+    // CHECK: [[TwoToN:%.+]] = arith.shli [[one]], %arg0 : i64
+    // CHECK: [[index:%.+]] = index.casts [[TwoToN]] : i64 to index
+    // CHECK: [[alloc:%.+]] = memref.alloc([[index]]) : memref<?xcomplex<f64>>
+    // CHECK: quantum.state {{.*}} in([[alloc]] : memref<?xcomplex<f64>>)
+    %state = quantum.state %obs : tensor<?xcomplex<f64>>
     func.return
 }
 
@@ -94,4 +152,3 @@ module @set_basis_state {
     return
   }
 }
-

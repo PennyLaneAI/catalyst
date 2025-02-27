@@ -999,3 +999,7 @@ def bind_flexible_primitive(primitive, flexible_args: dict[str, Any], *dyn_args,
             dyn_args += (flex_arg_value,)
 
     return primitive.bind(*dyn_args, **static_args)
+
+def is_dynamic_wires(wires: pennylane.wires.Wires):
+    # TODO: add dyn wires comment
+    return ((len(wires) == 1) and (isinstance(wires[0], DynamicJaxprTracer)))

@@ -70,7 +70,7 @@ from catalyst.jax_extras import (
     tree_unflatten,
     wrap_init,
 )
-from catalyst.jax_extras.tracing import bind_flexible_primitive
+from catalyst.jax_extras.tracing import bind_flexible_primitive, is_dynamic_wires, DynamicJaxprTracer
 from catalyst.jax_primitives import (
     AbstractQreg,
     compbasis_p,
@@ -739,7 +739,7 @@ def trace_quantum_operations(
 
 @debug_logger
 def trace_observables(
-    obs: Operator, qrp: QRegPromise, m_wires: int
+    obs: Operator, qrp: QRegPromise, m_wires: int | DynamicJaxprTracer
 ) -> Tuple[List[DynamicJaxprTracer], Optional[int]]:
     """Trace observables.
 
@@ -755,8 +755,12 @@ def trace_observables(
     wires = obs.wires if (obs and len(obs.wires) > 0) else m_wires
     qubits = None
     if obs is None:
-        qubits = qrp.extract(wires, allow_reuse=True)
-        obs_tracers = compbasis_p.bind(*qubits)
+        if isinstance(wires, DynamicJaxprTracer):
+            qreg_out = qrp.actualize()
+            obs_tracers = compbasis_p.bind(qreg_out, qreg_available=True)
+        else:
+            qubits = qrp.extract(wires, allow_reuse=True)
+            obs_tracers = compbasis_p.bind(*qubits)
     elif isinstance(obs, KNOWN_NAMED_OBS):
         qubits = qrp.extract(wires, allow_reuse=True)
         obs_tracers = namedobs_p.bind(qubits[0], kind=type(obs).__name__)
@@ -786,7 +790,11 @@ def trace_observables(
         raise NotImplementedError(
             f"Observable {obs} (of type {type(obs)}) is not implemented"
         )  # pragma: no cover
-    return obs_tracers, (len(qubits) if qubits else 0)
+
+    # record the number of qubits for the observable in the return value
+    # If no qubits were explicitly extracted from the qreg, return the number
+    # of wires on the device
+    return obs_tracers, (len(qubits) if qubits else m_wires)
 
 
 @debug_logger
@@ -875,10 +883,16 @@ def trace_quantum_measurements(
                     "Use qml.sample() instead."
                 )
 
-            m_wires = o.wires if o.wires else range(len(device.wires))
+            # Check if the measurement has wires specified
+            # If not, the measurement occurs on all wires of the device
+            dev_wires = None
+            if is_dynamic_wires(device.wires):
+                dev_wires = device.wires[0]
+            else:
+                dev_wires = range(len(device.wires))
+            m_wires = o.wires if o.wires else dev_wires
 
             obs_tracers, nqubits = trace_observables(o.obs, qrp, m_wires)
-
             using_compbasis = obs_tracers.primitive == compbasis_p
 
             if isinstance(o, qml.measurements.SampleMP):
@@ -918,8 +932,8 @@ def trace_quantum_measurements(
                 out_classical_tracers.append(var_p.bind(obs_tracers))
             elif type(o) is ProbabilityMP:
                 assert using_compbasis
-                shape = (2**nqubits,)
-                out_classical_tracers.append(probs_p.bind(obs_tracers, shape=shape))
+                result = bind_flexible_primitive(probs_p, {"num_qubits":nqubits}, obs_tracers)
+                out_classical_tracers.append(result)
             elif type(o) is CountsMP:
                 if shots is None:  # needed for old device API only
                     raise ValueError(
@@ -1216,7 +1230,11 @@ def trace_quantum_function(
                     rtd_name=device.backend_name,
                     rtd_kwargs=str(device.backend_kwargs),
                 )
-                qreg_in = qalloc_p.bind(len(device.wires))
+                if is_dynamic_wires(device.wires):
+                    qreg_in = qalloc_p.bind(device.wires[0])
+                else:
+                    qreg_in = qalloc_p.bind(len(device.wires))
+
 
                 # If the program is batched, that means that it was transformed.
                 # If it was transformed, that means that the program might have
