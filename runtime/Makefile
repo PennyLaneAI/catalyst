@@ -27,7 +27,7 @@ ifeq ($(ENABLE_OPENQASM), ON)
 endif
 
 ifeq ($(ENABLE_OQD), ON)
-	BUILD_TARGETS += rtd_oqd_device
+	BUILD_TARGETS += rt_OQD_capi rtd_oqd_device
 	TEST_TARGETS += runner_tests_oqd
 endif
 

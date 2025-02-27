@@ -29,7 +29,7 @@ namespace ion {
 class OQDDatabaseManager {
   public:
     OQDDatabaseManager(const std::string &DeviceTomlLoc, const std::string &QubitTomlLoc,
-                       const std::string &Gate2PulseDecompTomlLoc)
+                       const std::string &Gate2PulseDecompTomlLoc, size_t n_qubits)
     {
         sourceTomlDevice = toml::parse_file(DeviceTomlLoc);
         sourceTomlQubit = toml::parse_file(QubitTomlLoc);
@@ -42,7 +42,7 @@ class OQDDatabaseManager {
         loadBeams1Params();
         loadBeams2Params();
 
-        loadPhononParams();
+        loadPhononParams(n_qubits);
 
         loadIonParams();
     }
@@ -50,7 +50,7 @@ class OQDDatabaseManager {
     const std::vector<Beam> &getBeams1Params() const { return beams1; }
     const std::vector<Beam> &getBeams2Params() const { return beams2; }
 
-    const std::vector<PhononMode> &getPhononParams() const { return phonons; }
+    const std::vector<Phonon> &getPhononParams() const { return phonons; }
 
     const std::map<std::string, Ion> &getIonParams() const { return ions; }
 
@@ -62,7 +62,7 @@ class OQDDatabaseManager {
     std::vector<Beam> beams1;
     std::vector<Beam> beams2;
 
-    std::vector<PhononMode> phonons;
+    std::vector<Phonon> phonons;
 
     std::map<std::string, Ion> ions;
 
@@ -106,26 +106,25 @@ class OQDDatabaseManager {
         }
     }
 
-    void loadPhononParams()
+    void loadPhononParams(size_t n_qubits)
     {
-        toml::node_view<toml::node> phononsToml = sourceTomlGateDecomposition["phonons"];
-        size_t numPhononModes = phononsToml.as_array()->size();
+        // TODO: The fact that loading phonons depend on the number of qubits is a bit of a hack.
+        // This is not ideal since we want to support dynamic number of qubits in the future.
+        // We should find a better way to handle this in the database.
+        std::string phonon_str = "phonons" + std::to_string(n_qubits);
+        toml::node_view<toml::node> phononsToml = sourceTomlGateDecomposition[phonon_str];
+        size_t numPhonons = phononsToml.as_array()->size();
 
-        auto parseSingleDirection = [](auto direction) {
+        auto parseSinglePhonon = [](auto direction) {
             double energy = direction["energy"].as_floating_point()->get();
-            std::vector<int64_t> eigenvector =
-                tomlArray2StdVector<int64_t>(*(direction["eigenvector"].as_array()));
+            std::vector<double> eigenvector =
+                tomlArray2StdVector<double>(*(direction["eigenvector"].as_array()));
             return Phonon(energy, eigenvector);
         };
 
-        for (size_t i = 0; i < numPhononModes; i++) {
-            auto phononMode = phononsToml[i];
-
-            Phonon COM_x = parseSingleDirection(phononMode["COM_x"]);
-            Phonon COM_y = parseSingleDirection(phononMode["COM_y"]);
-            Phonon COM_z = parseSingleDirection(phononMode["COM_z"]);
-
-            phonons.push_back(PhononMode(COM_x, COM_y, COM_z));
+        for (size_t i = 0; i < numPhonons; i++) {
+            Phonon phonon = parseSinglePhonon(phononsToml[i]);
+            phonons.push_back(phonon);
         }
     }
 
@@ -160,13 +159,15 @@ class OQDDatabaseManager {
             double einstein_a = transition_entry["einstein_a"].as_floating_point()->get();
             std::string level1 = transition_entry["level1"].as_string()->get();
             std::string level2 = transition_entry["level2"].as_string()->get();
+            std::string multipole = transition_entry["multipole"].as_string()->get();
 
-            std::set<std::string> levelEncodings{"downstate", "upstate", "estate"};
+            std::set<std::string> levelEncodings{"downstate", "upstate", "estate", "estate2"};
             assert((levelEncodings.count(level1) & levelEncodings.count(level2)) &&
-                   "Only \"downstate\", \"upstate\" and \"estate\" are allowed in the atom's "
+                   "Only \"downstate\", \"upstate\", \"estate\" and \"estate2\" are allowed in the "
+                   "atom's "
                    "transition levels.");
 
-            return Transition(level1, level2, einstein_a);
+            return Transition(level1, level2, multipole, einstein_a);
         };
 
         for (auto &ion_it : *(ionsToml.as_table())) {
@@ -182,7 +183,8 @@ class OQDDatabaseManager {
             Level downstate = parseSingleLevel(data->at_path("levels")["downstate"]);
             Level upstate = parseSingleLevel(data->at_path("levels")["upstate"]);
             Level estate = parseSingleLevel(data->at_path("levels")["estate"]);
-            std::vector<Level> levels{downstate, upstate, estate};
+            Level estate2 = parseSingleLevel(data->at_path("levels")["estate2"]);
+            std::vector<Level> levels{downstate, upstate, estate, estate2};
 
             std::vector<Transition> transitions;
             auto *transitionsTable = data->at_path("transitions").as_table();

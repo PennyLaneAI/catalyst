@@ -86,14 +86,16 @@ def TransitionAttr : Ion_Attr<"Transition", "transition"> {
   let parameters = (ins
     "mlir::StringAttr":$level_0,
     "mlir::StringAttr":$level_1,
-    "mlir::FloatAttr":$einstein_a
+    "mlir::FloatAttr":$einstein_a,
+    "mlir::StringAttr":$multipole
   );
 
   let builders = [
     AttrBuilderWithInferredContext<(ins "mlir::StringAttr":$level_0,
                                         "mlir::StringAttr":$level_1,
-                                        "mlir::FloatAttr":$einstein_a), [{
-      return $_get(einstein_a.getContext(), level_0, level_1, einstein_a);
+                                        "mlir::FloatAttr":$einstein_a,
+                                        "mlir::StringAttr":$multipole), [{
+      return $_get(einstein_a.getContext(), level_0, level_1, einstein_a, multipole);
     }]>
   ];
 
@@ -113,6 +115,22 @@ def BeamAttr : Ion_Attr<"Beam", "beam"> {
 
 
   let assemblyFormat = "`<` struct(params) `>`";
+}
+
+def PhononAttr : Ion_Attr<"Phonon", "phonon"> {
+  let summary = "A class to represent a Phonon mode.";
+
+  let parameters = (ins
+    "mlir::FloatAttr":$energy,
+    "mlir::DenseF64ArrayAttr": $eigenvector
+  );
+
+  let assemblyFormat = "`<` struct(params) `>`";
+}
+
+def PhononArrayAttr : TypedArrayAttrBase<PhononAttr,
+                         PhononAttr.summary # " array"> {
+  let constBuilderCall = ?;
 }
 
 def LevelArrayAttr : TypedArrayAttrBase<LevelAttr,
@@ -148,6 +166,18 @@ def IonOp : Ion_Op<"ion"> {
 
   let assemblyFormat = [{
     attr-dict `:` type($out_ion)
+  }];
+}
+
+def ModesOp : Ion_Op<"mode"> {
+  let summary = "A class to represent an Phonon modes of the system.";
+
+  let arguments = (ins
+    PhononArrayAttr: $modes
+  );
+
+  let assemblyFormat = [{
+    attr-dict
   }];
 }
 

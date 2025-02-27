@@ -485,11 +485,10 @@ class QJIT(CatalystCallable):
         self.jaxed_function = None
         # IRs are only available for the most recently traced function.
         self.jaxpr = None
-        self.mlir = None  # string form (historic presence)
         self.mlir_module = None
-        self.qir = None
         self.out_type = None
         self.overwrite_ir = None
+        self.use_cwd_for_workspace = self.compile_options.keep_intermediate
 
         self.user_sig = get_type_annotations(fn)
         self._validate_configuration()
@@ -507,6 +506,22 @@ class QJIT(CatalystCallable):
             self.aot_compile()
 
         super().__init__("user_function")
+
+    @property
+    def mlir(self):
+        """obtain the MLIR representation after canonicalization"""
+        # Canonicalize the MLIR since there can be a lot of redundancy coming from JAX.
+        if not self.mlir_module:
+            return None
+        options = copy.deepcopy(self.compile_options)
+        options.pipelines = [("0_canonicalize", ["canonicalize"])]
+        options.lower_to_llvm = False
+        options.keep_intermediate = True
+        canonicalizer = Compiler(options)
+
+        # TODO: the in-memory and textual form are different after this, consider unification
+        _, mlir_string = canonicalizer.run(self.mlir_module, self.workspace)
+        return mlir_string
 
     @debug_logger
     def __call__(self, *args, **kwargs):
@@ -545,13 +560,25 @@ class QJIT(CatalystCallable):
             )
 
         if self.compile_options.target in ("mlir", "binary"):
-            self.mlir_module, self.mlir = self.generate_ir()
+            self.mlir_module = self.generate_ir()
 
         if self.compile_options.target in ("binary",):
-            self.compiled_function, self.qir = self.compile()
+            self.compiled_function, _ = self.compile()
             self.fn_cache.insert(
                 self.compiled_function, self.user_sig, self.out_treedef, self.workspace
             )
+
+    @property
+    def qir(self):
+        """LLVMIR textual representation."""
+        if not self.mlir_module:
+            return None
+
+        orig = copy.deepcopy(self.compile_options)
+        self.compile_options.keep_intermediate = True
+        _, _qir = self.compile()
+        self.compile_options = orig
+        return _qir
 
     @debug_logger
     def jit_compile(self, args, **kwargs):
@@ -583,8 +610,8 @@ class QJIT(CatalystCallable):
 
             self.jaxpr, self.out_type, self.out_treedef, self.c_sig = self.capture(args, **kwargs)
 
-            self.mlir_module, self.mlir = self.generate_ir()
-            self.compiled_function, self.qir = self.compile()
+            self.mlir_module = self.generate_ir()
+            self.compiled_function, _ = self.compile()
 
             self.fn_cache.insert(self.compiled_function, args, self.out_treedef, self.workspace)
 
@@ -680,16 +707,7 @@ class QJIT(CatalystCallable):
         # Inject Runtime Library-specific functions (e.g. setup/teardown).
         inject_functions(mlir_module, ctx, self.compile_options.seed)
 
-        # Canonicalize the MLIR since there can be a lot of redundancy coming from JAX.
-        options = copy.deepcopy(self.compile_options)
-        options.pipelines = [("0_canonicalize", ["canonicalize"])]
-        options.lower_to_llvm = False
-        canonicalizer = Compiler(options)
-
-        # TODO: the in-memory and textual form are different after this, consider unification
-        _, mlir_string = canonicalizer.run(mlir_module, self.workspace)
-
-        return mlir_module, mlir_string
+        return mlir_module
 
     @instrument(size_from=1, has_finegrained=True)
     @debug_logger
@@ -764,7 +782,7 @@ class QJIT(CatalystCallable):
         """Get or create a workspace to use for compilation."""
 
         workspace_name = self.__name__
-        preferred_workspace_dir = os.getcwd() if self.compile_options.keep_intermediate else None
+        preferred_workspace_dir = os.getcwd() if self.use_cwd_for_workspace else None
 
         return WorkspaceManager.get_or_create_workspace(workspace_name, preferred_workspace_dir)
 

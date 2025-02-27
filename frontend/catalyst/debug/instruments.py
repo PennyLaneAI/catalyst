@@ -16,12 +16,14 @@
 Instrumentation module to report Catalyst & program performance.
 """
 
+import copy
 import datetime
 import functools
 import os
 import platform
 import sys
 import time
+import typing
 from contextlib import contextmanager
 
 # pylint: disable=f-string-without-interpolation,line-too-long
@@ -143,9 +145,13 @@ def instrument(fn=None, *, size_from=None, has_finegrained=False):
             return fn(*args, **kwargs)
 
         with ResultReporter(stage_name, has_finegrained) as reporter:
+            self = args[0]
+            orig = copy.deepcopy(self.compile_options)
+            self.compile_options.keep_intermediate = True
             fn_results, wall_time, cpu_time = time_function(fn, args, kwargs)
             program_size = measure_program_size(fn_results, size_from)
             reporter.commit_results(wall_time, cpu_time, program_size)
+            self.compile_options = orig
 
         return fn_results
 
@@ -191,6 +197,9 @@ def measure_program_size(results, size_from):
     """
     if size_from is None:
         return None
+
+    if not isinstance(results, typing.Sequence):
+        results = (results,)
 
     return str(results[size_from]).count("\n")
 

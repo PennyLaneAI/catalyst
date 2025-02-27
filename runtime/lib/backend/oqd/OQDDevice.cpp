@@ -12,16 +12,35 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <algorithm>
+
 #include "OQDDevice.hpp"
+#include "OQDRuntimeCAPI.h"
 
 namespace Catalyst::Runtime::Device {
 
+auto OQDDevice::AllocateQubit() -> QubitIdType { RT_FAIL("Unsupported functionality"); }
+
 auto OQDDevice::AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType>
 {
-    RT_FAIL("Unsupported functionality");
+    for (size_t i = 0; i < num_qubits; i++) {
+        __catalyst__oqd__ion(this->ion_specs);
+    }
+    __catalyst__oqd__modes(this->phonon_specs);
+
+    // need to return a vector from 0 to num_qubits
+    std::vector<QubitIdType> result(num_qubits);
+    std::generate_n(result.begin(), num_qubits,
+                    [&]() { return this->qubit_manager.Allocate(num_qubits); });
+    return result;
 }
 
-void OQDDevice::ReleaseAllQubits() { RT_FAIL("Unsupported functionality"); }
+void OQDDevice::ReleaseAllQubits()
+{
+    this->ion_specs = "";
+    this->phonon_specs.clear();
+    this->qubit_manager.ReleaseAll();
+}
 
 void OQDDevice::ReleaseQubit([[maybe_unused]] QubitIdType q)
 {
@@ -62,10 +81,13 @@ void OQDDevice::NamedOperation(const std::string &name, const std::vector<double
 void OQDDevice::PartialCounts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts,
                               const std::vector<QubitIdType> &wires, size_t shots)
 {
-    RT_FAIL("Unsupported functionality");
+    // Note that we do not support this in OQD device.
+    // This is a just a fake readout method for testing purposes.
+    // TODO: change this back to unsupported functionality once null measurements
+    // is supported in catalyst.
+    return;
 }
 
-auto OQDDevice::AllocateQubit() -> QubitIdType { RT_FAIL("Unsupported functionality"); }
 void OQDDevice::PrintState() { RT_FAIL("Unsupported functionality"); }
 
 void OQDDevice::Counts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts, size_t shots)
