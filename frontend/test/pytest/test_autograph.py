@@ -27,6 +27,7 @@ from numpy.testing import assert_allclose
 
 from catalyst import *
 from catalyst.autograph.transformer import TRANSFORMER
+from catalyst.passes import merge_rotations
 from catalyst.utils.dummy import dummy_func
 from catalyst.utils.exceptions import CompileError
 
@@ -406,6 +407,18 @@ class TestIntegration:
 
         # If transforms are missed, the output will be all ones.
         assert not np.all(func(0.9) == 1)
+
+    def test_passes(self):
+        dev = qml.device("lightning.qubit", wires=1)
+
+        @qml.qjit(autograph=True)
+        @merge_rotations
+        @qml.qnode(dev)
+        def func():
+            qml.Hadamard(0)
+            return qml.expval(qml.Z(0))
+
+        assert np.allclose(func(), 0.0)
 
 
 class TestCodePrinting:

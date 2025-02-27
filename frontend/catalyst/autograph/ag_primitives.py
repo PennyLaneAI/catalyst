@@ -577,6 +577,10 @@ def converted_call(fn, args, kwargs, caller_fn_scope=None, options=None):
         # For QNode calls, since the class is not part of the Catalyst package, we manually add a
         # wrapper to correctly forward the quantum function call to autograph.
         if isinstance(fn, qml.QNode):
+            pass_pipeline = kwargs.pop("pass_pipeline", []) if kwargs is not None else []
+            new_kwargs = {}
+            if pass_pipeline:
+                new_kwargs["pass_pipeline"] = pass_pipeline
 
             @functools.wraps(fn.func)
             def qnode_call_wrapper():
@@ -585,7 +589,7 @@ def converted_call(fn, args, kwargs, caller_fn_scope=None, options=None):
             # Copy the original qnode but replace its function.
             new_qnode = copy.copy(fn)
             new_qnode.func = qnode_call_wrapper
-            return new_qnode()
+            return new_qnode(**new_kwargs)
 
         return ag_converted_call(fn, args, kwargs, caller_fn_scope, options)
 
