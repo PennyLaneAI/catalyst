@@ -1583,11 +1583,19 @@ def _var_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shape=None):
 def probs_staging_rule(jaxpr_trace, obs, num_qubits, shots=None):
     """
     The result shape of `probs_p` is (2^num_qubits,).
+
+    Custom staging rule for probs.
+    See the documentation for `sample_staging_rule()` function for more details
+    on custom staging rules.
     """
 
     if isinstance(num_qubits, int):
         out_shape = core.DShapedArray((2**num_qubits,), jax.numpy.dtype("float64"))
-    else: # create a dynamic output shape from a tracer
+    else:
+        # We just need to create a dynamic output shape from a tracer
+        # Therefore no need to raise to power of 2, since 2^? = ?
+        # The actual memory allocation of the return shape for probs op
+        # occurs during bufferization pass
         out_shape = core.DShapedArray((num_qubits,), jax.numpy.dtype("float64"))
     out_tracer = pe.DynamicJaxprTracer(jaxpr_trace, out_shape)
 
@@ -1612,25 +1620,13 @@ def probs_staging_rule(jaxpr_trace, obs, num_qubits, shots=None):
 
 pe.custom_staging_rules[probs_p] = probs_staging_rule
 
-# @probs_p.def_abstract_eval
-# def _probs_abstract_eval(obs, shape, shots=None, dynamic_shape=False):
-#     assert isinstance(obs, AbstractObs)
-
-#     if not dynamic_shape:
-#         if obs.primitive is compbasis_p:
-#             assert shape == (2**obs.num_qubits,)
-#         else:
-#             raise TypeError("probs only supports computational basis")
-
-#     return core.ShapedArray(shape, jax.numpy.float64)
-
 
 @probs_p.def_impl
 def _probs_def_impl(ctx, obs, num_qubits, shots=None):  # pragma: no cover
     raise NotImplementedError()
 
 
-def _probs_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, num_qubits: Union[int, ir.Value], shots=None):
+def _probs_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, num_qubits: int | ir.Value, shots=None):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
