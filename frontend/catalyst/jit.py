@@ -38,7 +38,7 @@ from catalyst.from_plxpr import trace_from_pennylane
 from catalyst.jax_tracer import lower_jaxpr_to_mlir, trace_to_jaxpr
 from catalyst.logging import debug_logger, debug_logger_init
 from catalyst.qfunc import QFunc
-from catalyst.tracing.contexts import EvaluationContext
+from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
 from catalyst.tracing.type_signatures import (
     filter_static_args,
     get_abstract_signature,
@@ -660,9 +660,10 @@ class QJIT(CatalystCallable):
         full_sig = merge_static_args(dynamic_sig, args, static_argnums)
 
         if self.compile_options.experimental_capture:
-            return trace_from_pennylane(
-                self.user_function, static_argnums, abstracted_axes, full_sig, kwargs
-            )
+            with EvaluationContext(EvaluationMode.CLASSICAL_COMPILATION):
+                return trace_from_pennylane(
+                    self.user_function, static_argnums, abstracted_axes, full_sig, kwargs
+                )
 
         def closure(qnode, *args, **kwargs):
             params = {}
