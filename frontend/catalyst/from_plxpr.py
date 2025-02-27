@@ -289,6 +289,9 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
             mval = bind_flexible_primitive(counts_p, {"shots": self._shots}, shape=shape)
         elif prim in {expval_p, var_p}:
             mval = prim.bind(obs, shape=shape)
+        elif prim is probs_p:
+            num_qubits = len(measurement.wires) or len(self._device.wires)
+            mval = bind_flexible_primitive(probs_p, {"num_qubits":num_qubits}, obs)
         else:
             mval = prim.bind(obs, shape=shape, shots=self._shots)
 
