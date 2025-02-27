@@ -1590,7 +1590,7 @@ def probs_staging_rule(jaxpr_trace, obs, num_qubits, shots=None):
     """
 
     if isinstance(num_qubits, int):
-        out_shape = core.DShapedArray((2**num_qubits,), jax.numpy.dtype("float64"))
+        out_shape = core.ShapedArray((2**num_qubits,), jax.numpy.dtype("float64"))
     else:
         # We just need to create a dynamic output shape from a tracer
         # Therefore no need to raise to power of 2, since 2^? = ?
