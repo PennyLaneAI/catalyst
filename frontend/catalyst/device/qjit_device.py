@@ -310,6 +310,9 @@ class QJITDevice(qml.devices.Device):
         for key, value in original_device.__dict__.items():
             self.__setattr__(key, value)
 
+        if original_device.wires is None:
+            raise AttributeError("Catalyst does not support device instances without set wires.")
+
         if not is_dynamic_wires(original_device.wires):
             check_device_wires(original_device.wires)
 
@@ -536,9 +539,6 @@ def get_device_capabilities(device) -> DeviceCapabilities:
 
 def check_device_wires(wires):
     """Validate requirements Catalyst imposes on device wires."""
-
-    if wires is None:
-        raise AttributeError("Catalyst does not support device instances without set wires.")
 
     assert isinstance(wires, qml.wires.Wires)
 
