@@ -1601,10 +1601,10 @@ def probs_staging_rule(jaxpr_trace, obs, num_qubits, shots=None):
 
     if isinstance(num_qubits, int):
         invars = [jaxpr_trace.getvar(obs)]
-        params = {"num_qubits": num_qubits}
+        params = {"num_qubits": num_qubits, "shots": shots}
     else:
         invars = [jaxpr_trace.getvar(obs), jaxpr_trace.getvar(num_qubits)]
-        params = {}
+        params = {"shots": shots}
 
     eqn = pe.new_jaxpr_eqn(
         invars,

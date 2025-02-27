@@ -56,11 +56,11 @@ def test_probs():
 
     def f():
         obs = compbasis_p.bind()
-        return probs_p.bind(obs, shots=5, shape=(1,))
+        return probs_p.bind(obs, shots=5, num_qubits=0)
 
     jaxpr = jax.make_jaxpr(f)()
     assert jaxpr.eqns[1].primitive == probs_p
-    assert jaxpr.eqns[1].params == {"shape": (1,), "shots": 5}
+    assert jaxpr.eqns[1].params == {"num_qubits": 0, "shots": 5}
     assert jaxpr.eqns[1].outvars[0].aval.shape == (1,)
 
 
