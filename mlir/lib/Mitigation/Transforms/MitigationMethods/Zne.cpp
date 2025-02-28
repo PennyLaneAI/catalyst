@@ -18,6 +18,7 @@
 #include <deque>
 #include <iostream>
 #include <sstream>
+#include <variant>
 #include <vector>
 
 #include "llvm/ADT/SmallPtrSet.h"
@@ -231,9 +232,10 @@ void ZneLowering::rewrite(mitigation::ZneOp op, PatternRewriter &rewriter) const
 // In *.cpp module only, to keep extraneous headers out of *.hpp
 FlatSymbolRefAttr globalFolding(Location loc, PatternRewriter &rewriter, std::string fnFoldedName,
                                 Operation *shots, StringAttr lib, StringAttr name,
-                                StringAttr kwargs, Operation *numberQubits, FunctionType fnFoldedType,
-                                SmallVector<Type> typesFolded, func::FuncOp fnFoldedOp,
-                                func::FuncOp fnAllocOp, func::FuncOp fnWithoutMeasurementsOp,
+                                StringAttr kwargs, std::variant<int64_t, Operation *> numberQubits,
+                                FunctionType fnFoldedType, SmallVector<Type> typesFolded,
+                                func::FuncOp fnFoldedOp, func::FuncOp fnAllocOp,
+                                func::FuncOp fnWithoutMeasurementsOp,
                                 func::FuncOp fnWithMeasurementsOp)
 {
     // Function folded: Create the folded circuit (withoutMeasurement *
@@ -244,8 +246,6 @@ FlatSymbolRefAttr globalFolding(Location loc, PatternRewriter &rewriter, std::st
     // Loop control variables
     Value c0 = rewriter.create<index::ConstantOp>(loc, 0);
     Value c1 = rewriter.create<index::ConstantOp>(loc, 1);
-    //TypedAttr numberQubitsAttr = rewriter.getI64IntegerAttr(numberQubits);
-    //Value numberQubitsValue = rewriter.create<arith::ConstantOp>(loc, numberQubitsAttr);
 
     // TODO: in the frontend, calculation of shots will happen outside of the qnode,
     // before qml.device(..., shots = <some value computed earlier>) is called,
@@ -253,13 +253,21 @@ FlatSymbolRefAttr globalFolding(Location loc, PatternRewriter &rewriter, std::st
     // For now, we simply create a single arith.constant SSA shots value for the ZNE tests.
     // Revisit when discussing the frontend design of dynamic shots/device/qnode interaction.
     Operation *shotsLocal = shots->clone();
-    Operation *numberQubitsLocal = numberQubits->clone();
-
     rewriter.insert(shotsLocal);
-    rewriter.insert(numberQubitsLocal);
     rewriter.create<quantum::DeviceInitOp>(loc, shotsLocal->getResult(0), lib, name, kwargs);
 
-    Value allocQreg = rewriter.create<func::CallOp>(loc, fnAllocOp, numberQubitsLocal->getResult(0)).getResult(0);
+    Value allocQreg;
+    if (numberQubits.index() == 1) {
+        Operation *numberQubitsLocal = std::get<Operation *>(numberQubits)->clone();
+        rewriter.insert(numberQubitsLocal);
+        allocQreg = rewriter.create<func::CallOp>(loc, fnAllocOp, numberQubitsLocal->getResult(0))
+                        .getResult(0);
+    }
+    else if (numberQubits.index() == 0) {
+        TypedAttr numberQubitsAttr = rewriter.getI64IntegerAttr(std::get<int64_t>(numberQubits));
+        Value numberQubitsValue = rewriter.create<arith::ConstantOp>(loc, numberQubitsAttr);
+        allocQreg = rewriter.create<func::CallOp>(loc, fnAllocOp, numberQubitsValue).getResult(0);
+    }
 
     int64_t sizeArgs = fnFoldedOp.getArguments().size();
     Value size = fnFoldedOp.getArgument(sizeArgs - 1);
@@ -386,9 +394,14 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
     rewriter.setInsertionPointToStart(moduleOp.getBody());
 
     // Get the number of qubits
-    Operation *numberQubits =
-        //(*fnOp.getOps<quantum::AllocOp>().begin()).getNqubitsAttr().value_or(0);
-        (*fnOp.getOps<quantum::AllocOp>().begin()).getNqubits().getDefiningOp();
+    std::variant<int64_t, Operation *> numberQubits;
+    quantum::AllocOp originalAllocOp = *fnOp.getOps<quantum::AllocOp>().begin();
+    if (originalAllocOp.isStaticSize()) {
+        numberQubits = static_cast<int64_t>(originalAllocOp.getNqubitsAttr().value_or(0));
+    }
+    else {
+        numberQubits = originalAllocOp.getNqubits().getDefiningOp();
+    }
     // Get the device
     quantum::DeviceInitOp deviceInitOp = *fnOp.getOps<quantum::DeviceInitOp>().begin();
 

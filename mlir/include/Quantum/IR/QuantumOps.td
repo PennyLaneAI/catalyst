@@ -126,6 +126,12 @@ def AllocOp : Memory_Op<"alloc", [NoMemoryEffect]> {
     let assemblyFormat = [{
         `(` ($nqubits^):($nqubits_attr)? `)` attr-dict `:` type(results)
     }];
+
+    let extraClassDeclaration = [{
+        bool isStaticSize() {
+            return (this->getNqubits() == nullptr);
+        }
+    }];
 }
 
 
