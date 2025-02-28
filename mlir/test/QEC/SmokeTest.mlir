@@ -15,7 +15,6 @@
 // RUN: quantum-opt %s
 
 func.func @foo(%q1 : !quantum.bit, %q2 : !quantum.bit) {
-    %theta = arith.constant 4 : i16 // denominator
-    qec.ppr ["X", "Z"] (%theta) %q1, %q2 : !quantum.bit, !quantum.bit
+    qec.ppr ["X", "Z"] (4) %q1, %q2 : !quantum.bit, !quantum.bit
     func.return
 }
