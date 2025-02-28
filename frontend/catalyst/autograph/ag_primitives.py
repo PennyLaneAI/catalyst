@@ -578,9 +578,7 @@ def converted_call(fn, args, kwargs, caller_fn_scope=None, options=None):
         # wrapper to correctly forward the quantum function call to autograph.
         if isinstance(fn, qml.QNode):
             pass_pipeline = kwargs.pop("pass_pipeline", []) if kwargs is not None else []
-            new_kwargs = {}
-            if pass_pipeline:
-                new_kwargs["pass_pipeline"] = pass_pipeline
+            new_kwargs = {"pass_pipeline": pass_pipeline} if pass_pipeline else {}
 
             @functools.wraps(fn.func)
             def qnode_call_wrapper():
