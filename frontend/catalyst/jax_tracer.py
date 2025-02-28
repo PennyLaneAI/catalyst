@@ -889,10 +889,12 @@ def trace_quantum_measurements(
             if is_dynamic_wires(device.wires):
                 dev_wires = device.wires[0]
             else:
-                dev_wires = range(len(device.wires))
+                dev_wires = range(len(device.wires)) if len(device.wires) else 0
             m_wires = o.wires if o.wires else dev_wires
 
+            breakpoint()
             obs_tracers, nqubits = trace_observables(o.obs, qrp, m_wires)
+            breakpoint()
             using_compbasis = obs_tracers.primitive == compbasis_p
 
             if isinstance(o, qml.measurements.SampleMP):
@@ -1235,11 +1237,12 @@ def trace_quantum_function(
                     # has a single value, which is the tracer for the number of wires
                     qreg_in = qalloc_p.bind(device.wires[0])
                 else:
-                    if len(device.wires) == 0:
-                        msg = (
-                            "A device must have at least one wire."
-                        )
-                        raise CompileError(msg)
+                    #if len(device.wires) == 0:
+                    #    msg = (
+                    #        "A device must have at least one wire."
+                    #    )
+                    #    raise CompileError(msg)
+                    breakpoint()
                     qreg_in = qalloc_p.bind(len(device.wires))
 
 
