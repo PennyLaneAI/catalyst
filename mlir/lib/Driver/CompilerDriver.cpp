@@ -648,11 +648,6 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
     // Let's try to enable multithreading. Do not forget to protect the printing.
     ctx.disableMultithreading();
 
-    // TODO: FIXME:
-    // We need to load the QEC dialect here because the lowering pass depends on it.
-    // This is a hack and we need to find a better way to do this.
-    ctx.loadDialect<catalyst::qec::QECDialect>();
-
     ScopedDiagnosticHandler scopedHandler(
         &ctx, [&](Diagnostic &diag) { diag.print(options.diagnosticStream); });
 
