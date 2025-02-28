@@ -6,12 +6,12 @@ from catalyst import qjit
 from catalyst.debug import get_compilation_stage, replace_ir
 from catalyst.third_party.oqd import OQDDevice
 
-device = qml.device("default.qubit", wires=1)
-@qml.qnode(device, shots=1000)
-def circuit():
-    return qml.counts(qml.PauliX(0))
-breakpoint()
 
+# @qjit
+# @qml.qnode(qml.device("lightning.qubit", wires=0))
+# def prob_0qbit():
+#     return qml.probs()
+# print(prob_0qbit())
 
 def ref():
     dev = qml.device("default.qubit", wires=10)
@@ -57,5 +57,3 @@ f = qjit(keep_intermediate=False)(f)
 
 print("dynamic alloc with 3: ", f(3))
 print("dynamic alloc again with 5: ", f(5))
-
-breakpoint()
