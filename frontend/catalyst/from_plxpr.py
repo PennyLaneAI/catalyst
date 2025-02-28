@@ -59,6 +59,9 @@ from catalyst.jax_primitives import (
     var_p,
     while_p,
 )
+from catalyst.passes import cancel_inverses
+from catalyst.qfunc import QFunc
+from catalyst.utils.patching import Patcher
 
 measurement_map = {
     qml.measurements.SampleMP: sample_p,
@@ -607,8 +610,31 @@ def trace_from_pennylane(fn, static_argnums, abstracted_axes, sig, kwargs):
 
         args = sig
         try:
-            plxpr, out_type, out_treedef = make_jaxpr2(fn, **make_jaxpr_kwargs)(*args, **kwargs)
-            jaxpr = from_plxpr(plxpr)(*args, **kwargs)
+
+            def closure(qnode, *args, **kwargs):
+                params = {}
+                params["static_argnums"] = kwargs.pop("static_argnums", static_argnums)
+                params["_out_tree_expected"] = []
+                pass_pipeline = params.get("pass_pipeline", None)
+                params["pass_pipeline"] = pass_pipeline
+                return QFunc.__call__(
+                    qnode,
+                    *args,
+                    **dict(params, **kwargs),
+                )
+
+            # Apply the corresponding Catalyst transforms
+            with Patcher(
+                (qml.QNode, "__call__", closure),
+            ):
+                for transform in fn.transform_program._transform_program:
+                    if transform._transform == qml.transforms.cancel_inverses.transform:
+                        fn = cancel_inverses(fn)
+                    else:
+                        raise NotImplementedError("This transformed is not supported yet")
+
+                plxpr, out_type, out_treedef = make_jaxpr2(fn, **make_jaxpr_kwargs)(*args, **kwargs)
+                jaxpr = from_plxpr(plxpr)(*args, **kwargs)
         finally:
             if not capture_on:
                 disable()
