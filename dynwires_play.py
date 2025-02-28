@@ -6,13 +6,6 @@ from catalyst import qjit
 from catalyst.debug import get_compilation_stage, replace_ir
 from catalyst.third_party.oqd import OQDDevice
 
-
-@qjit
-@qml.qnode(qml.device("lightning.qubit", wires=0))
-def prob_0qbit():
-    return qml.probs()
-print(prob_0qbit())
-
 def ref():
     dev = qml.device("default.qubit", wires=10)
 
