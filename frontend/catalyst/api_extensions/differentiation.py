@@ -44,6 +44,7 @@ from catalyst.jax_primitives import (
 )
 from catalyst.jax_tracer import Function, mark_gradient_tracing
 from catalyst.tracing.contexts import EvaluationContext, GradContext
+from catalyst.tracing.interpreters import trace_diffargs
 from catalyst.utils.callables import CatalystCallable
 from catalyst.utils.exceptions import DifferentiableCompileError
 
@@ -806,8 +807,10 @@ def _make_jaxpr_check_differentiable(
     """Gets the jaxpr of a differentiable function. Perform the required additional checks and
     return the output tree."""
     method = grad_params.method
+    argnums = grad_params.argnums
+    f_tagged = trace_diffargs(f, argnums)
     with mark_gradient_tracing(method):
-        jaxpr, shape = jax.make_jaxpr(f, return_shape=True)(*args, **kwargs)
+        jaxpr, shape = jax.make_jaxpr(f_tagged, return_shape=True)(*args, **kwargs)
     _, out_tree = tree_flatten(shape)
 
     for pos, arg in enumerate(jaxpr.in_avals):
