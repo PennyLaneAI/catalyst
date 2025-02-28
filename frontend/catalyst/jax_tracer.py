@@ -546,6 +546,8 @@ def trace_to_jaxpr(func, static_argnums, abstracted_axes, args, kwargs):
             "static_argnums": static_argnums,
             "abstracted_axes": abstracted_axes,
         }
+        # This generates two entries in the trace stack, one from the EvaluationContext,
+        # the other in make_jaxpr. (TODO: deduplicate?)
         with EvaluationContext(EvaluationMode.CLASSICAL_COMPILATION):
             jaxpr, out_type, out_treedef = make_jaxpr2(func, **make_jaxpr_kwargs)(*args, **kwargs)
             plugins = EvaluationContext.get_plugins()
@@ -1150,6 +1152,8 @@ def trace_quantum_function(
         out_tree: PyTree shapen of the result
     """
 
+    # This generates a new base main (level 0) upon entering, which is separate from the existing
+    # stack? (TODO: deduplicate?)
     with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
         # (1) - Classical tracing
         quantum_tape = QuantumTape(shots=device.shots)

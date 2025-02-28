@@ -38,6 +38,7 @@ from pennylane.tape import QuantumTape
 from catalyst.api_extensions import HybridAdjoint, HybridCtrl, MidCircuitMeasure
 from catalyst.jax_tracer import HybridOp, has_nested_tapes, nested_quantum_regions
 from catalyst.tracing.contexts import EvaluationContext
+from catalyst.tracing.interpreters import ADTracer
 from catalyst.utils.exceptions import CompileError, DifferentiableCompileError
 
 
@@ -211,7 +212,8 @@ def verify_operations(tape: QuantumTape, grad_method, qjit_device):
         in_control = _ctrl_op_checker(op, in_control)
 
         # check validity based on grad method if using
-        if grad_method is not None:
+        has_active_args = any(isinstance(arg, ADTracer) and arg.active for arg in op.data)
+        if grad_method is not None and has_active_args:
             _mcm_op_checker(op)
             if grad_method == "adjoint":
                 _adj_diff_op_checker(op)

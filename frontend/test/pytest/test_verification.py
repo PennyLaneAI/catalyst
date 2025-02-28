@@ -18,6 +18,7 @@ import platform
 from copy import deepcopy
 from unittest.mock import patch
 
+import jax.numpy as jnp
 import pennylane as qml
 import pytest
 from pennylane.devices.capabilities import OperatorProperties
@@ -32,6 +33,7 @@ from catalyst import (
     ctrl,
     for_loop,
     grad,
+    qjit,
     while_loop,
 )
 from catalyst.api_extensions import HybridAdjoint, HybridCtrl
@@ -873,8 +875,8 @@ class TestParameterShiftMethodVerification:
         operation that doesn't support analytic differentiation raises an error."""
 
         @qml.qnode(qml.device("lightning.qubit", wires=1), diff_method="parameter-shift")
-        def f(_):
-            qml.RX(1.23, 0)
+        def f(x):
+            qml.RX(x, 0)
             return qml.expval(qml.PauliX(0))
 
         with pytest.raises(
@@ -892,10 +894,10 @@ class TestParameterShiftMethodVerification:
         an error."""
 
         @qml.qnode(qml.device("lightning.qubit", wires=1), diff_method="parameter-shift")
-        def f(_):
+        def f(x):
             @while_loop(lambda s: s > 0)
             def loop(s):
-                qml.RX(1.23, 0)
+                qml.RX(x, 0)
                 return s + 1
 
             loop(0)
@@ -908,6 +910,48 @@ class TestParameterShiftMethodVerification:
             @qml.qjit
             def cir(x: float):
                 return grad(f)(x)
+
+
+class TestGradientActivityAnalysis:
+    """Test the verification of operators is skipped for constant operation and performed for
+    ops with active arguments."""
+
+    @pytest.mark.parametrize("argnums", (0, 1, [0, 2], [1, 2]))
+    def test_active_argument_verification(self, argnums):
+        """Test that activity is correctly determined for operator arguments, and propagated
+        correctly through classical instructions, and that verification is triggered."""
+
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def circ(x, y, z):
+
+            psi = jnp.sin(y + 1)
+
+            qml.Rot(x, psi, 0.1, wires=0)
+
+            return {"hi": qml.expval(qml.Z(0))}
+
+        def main(x: float, y: float, z: float):
+            return grad(circ, argnums=argnums)(x, y, z)
+
+        with pytest.raises(DifferentiableCompileError, match="Rot is non-differentiable"):
+            qjit(target="mlir")(main)
+
+    @pytest.mark.parametrize("argnums", (2,))
+    def test_inactive_argument_verification(self, argnums):
+        """Test that verification is skipped correctly if all arguments are inactive."""
+
+        @qml.qnode(qml.device("lightning.qubit", wires=0))
+        def circ(x, y, z):
+
+            psi = jnp.sin(y + 1)
+
+            qml.Rot(x, psi, 0.1, wires=0)
+
+            return {"hi": qml.expval(qml.Z(0))}
+
+        @qjit(target="mlir")
+        def main(x: float, y: float, z: float):
+            return grad(circ, argnums=argnums)(x, y, z)
 
 
 def test_no_state_returns():
