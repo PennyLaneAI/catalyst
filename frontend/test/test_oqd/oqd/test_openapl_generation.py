@@ -21,7 +21,7 @@ import pennylane as qml
 import pytest
 
 from catalyst import qjit
-from catalyst.third_party.oqd import OQDDevice
+from catalyst.third_party.oqd import OQDDevice, OQDDevicePipeline
 
 
 class TestOpenAPL:
@@ -29,41 +29,9 @@ class TestOpenAPL:
 
     test_path = os.path.dirname(__file__)
     toml_path = os.path.join(test_path, "calibration_data/")
-    oqd_pipelines = [
-        (
-            "device-agnostic-pipeline",
-            [
-                "enforce-runtime-invariants-pipeline",
-                "hlo-lowering-pipeline",
-                "quantum-compilation-pipeline",
-                "bufferization-pipeline",
-            ],
-        ),
-        (
-            "oqd_pipeline",
-            [
-                "func.func(ions-decomposition)",
-                "func.func(quantum-to-ion{"
-                + "device-toml-loc="
-                + toml_path
-                + "device.toml "
-                + "qubit-toml-loc="
-                + toml_path
-                + "qubit.toml "
-                + "gate-to-pulse-toml-loc="
-                + toml_path
-                + "gate.toml"
-                + "})",
-                "convert-ion-to-llvm",
-            ],
-        ),
-        (
-            "llvm-dialect-lowering-pipeline",
-            [
-                "llvm-dialect-lowering-pipeline",
-            ],
-        ),
-    ]
+    oqd_pipelines = OQDDevicePipeline(
+        toml_path + "device.toml", toml_path + "qubit.toml", toml_path + "gate.toml"
+    )
 
     output_f = "__openapl__output.json"
 

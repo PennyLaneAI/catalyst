@@ -15,6 +15,6 @@
 This submodule contains classes for the OQD device and its properties.
 """
 
-from .oqd_device import OQDDevice
+from .oqd_device import OQDDevice, OQDDevicePipeline
 
-__all__ = ["OQDDevice"]
+__all__ = ["OQDDevice", "OQDDevicePipeline"]
