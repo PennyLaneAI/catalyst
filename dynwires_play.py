@@ -6,6 +6,13 @@ from catalyst import qjit
 from catalyst.debug import get_compilation_stage, replace_ir
 from catalyst.third_party.oqd import OQDDevice
 
+device = qml.device("default.qubit", wires=1)
+@qml.qnode(device, shots=1000)
+def circuit():
+    return qml.counts(qml.PauliX(0))
+breakpoint()
+
+
 def ref():
     dev = qml.device("default.qubit", wires=10)
 
@@ -27,6 +34,11 @@ def f(num_qubits):
 
     @qml.qnode(dev)
     def circ():
+        @catalyst.for_loop(0, num_qubits, 1)
+        def loop_0(i):
+            qml.RY(2.2, wires=i)
+        #loop_0()
+
         qml.RX(1.23, wires=2)
         #return qml.expval(qml.Z(wires=num_qubits-1))
         #return qml.probs(wires=[0,num_qubits-1])  # if not running manual IR
@@ -36,12 +48,14 @@ def f(num_qubits):
 print("ref with 3: ", f(3))
 print("ref with 5: ", f(5))
 
-f = qjit(keep_intermediate=True)(f)
+f = qjit(keep_intermediate=False)(f)
 
-manual = "0_probs.mlir"
-with open(manual, "r") as file:
-    ir = file.read()
-replace_ir(f, "mlir", ir)
+#manual = "0_probs.mlir"
+#with open(manual, "r") as file:
+#    ir = file.read()
+#replace_ir(f, "mlir", ir)
 
 print("dynamic alloc with 3: ", f(3))
 print("dynamic alloc again with 5: ", f(5))
+
+breakpoint()
