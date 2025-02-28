@@ -65,7 +65,7 @@ def PPRotationOp : QEC_Op<"ppr"> {
 
     let arguments = (ins
         PauliWord:$pauli_product,
-        I16:$denominator, // Denominator
+        I16Attr:$rotation_kind,  // in fractions of pi
         Variadic<QubitType>:$in_qubits
     );
 
