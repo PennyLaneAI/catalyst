@@ -119,6 +119,9 @@
   - Catalyst now generates OpenAPL programs for Pennylane circuits of up to two qubits using the OQD device.
     [(#1517)](https://github.com/PennyLaneAI/catalyst/pull/1517)
 
+  - The end-to-end compilation pipeline for OQD devices is available as an API function.
+    [(#1545)](https://github.com/PennyLaneAI/catalyst/pull/1545)
+
 * Update source code to comply with changes requested by black v25.1.0
   [(#1490)](https://github.com/PennyLaneAI/catalyst/pull/1490)
 
