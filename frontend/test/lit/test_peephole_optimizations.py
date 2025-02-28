@@ -272,6 +272,32 @@ def test_pipeline_lowering_globloc_override():
 
 test_pipeline_lowering_globloc_override()
 
+#
+# autograph
+#
+
+
+def test_single_pass_with_autograph():
+    """
+    Test tha peephole optimization work with autograph
+    """
+
+    @qjit(autograph=True, target="mlir")
+    @merge_rotations
+    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    def f(x: float):
+        qml.RX(x, wires=0)
+        qml.RX(x, wires=0)
+        qml.Hadamard(wires=0)
+        return qml.expval(qml.PauliZ(0))
+
+    # CHECK: transform.named_sequence @__transform_main(
+    # CHECK-NEXT: transform.apply_registered_pass "merge-rotations" to {{%.+}}
+    # CHECK-NEXT: transform.yield
+    print(f.mlir)
+
+
+test_single_pass_with_autograph()
 
 #
 # cancel_inverses
