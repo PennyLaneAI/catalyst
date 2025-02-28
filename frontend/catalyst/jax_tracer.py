@@ -1237,11 +1237,11 @@ def trace_quantum_function(
                     # has a single value, which is the tracer for the number of wires
                     qreg_in = qalloc_p.bind(device.wires[0])
                 else:
-                    #if len(device.wires) == 0:
-                    #    msg = (
-                    #        "A device must have at least one wire."
-                    #    )
-                    #    raise CompileError(msg)
+                    if len(device.wires) == 0:
+                       msg = (
+                           "A device must have at least one wire."
+                       )
+                       raise CompileError(msg)
                     breakpoint()
                     qreg_in = qalloc_p.bind(len(device.wires))
 
