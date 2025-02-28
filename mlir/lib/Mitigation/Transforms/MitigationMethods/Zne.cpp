@@ -231,7 +231,7 @@ void ZneLowering::rewrite(mitigation::ZneOp op, PatternRewriter &rewriter) const
 // In *.cpp module only, to keep extraneous headers out of *.hpp
 FlatSymbolRefAttr globalFolding(Location loc, PatternRewriter &rewriter, std::string fnFoldedName,
                                 Operation *shots, StringAttr lib, StringAttr name,
-                                StringAttr kwargs, int64_t numberQubits, FunctionType fnFoldedType,
+                                StringAttr kwargs, Operation *numberQubits, FunctionType fnFoldedType,
                                 SmallVector<Type> typesFolded, func::FuncOp fnFoldedOp,
                                 func::FuncOp fnAllocOp, func::FuncOp fnWithoutMeasurementsOp,
                                 func::FuncOp fnWithMeasurementsOp)
@@ -244,8 +244,8 @@ FlatSymbolRefAttr globalFolding(Location loc, PatternRewriter &rewriter, std::st
     // Loop control variables
     Value c0 = rewriter.create<index::ConstantOp>(loc, 0);
     Value c1 = rewriter.create<index::ConstantOp>(loc, 1);
-    TypedAttr numberQubitsAttr = rewriter.getI64IntegerAttr(numberQubits);
-    Value numberQubitsValue = rewriter.create<arith::ConstantOp>(loc, numberQubitsAttr);
+    //TypedAttr numberQubitsAttr = rewriter.getI64IntegerAttr(numberQubits);
+    //Value numberQubitsValue = rewriter.create<arith::ConstantOp>(loc, numberQubitsAttr);
 
     // TODO: in the frontend, calculation of shots will happen outside of the qnode,
     // before qml.device(..., shots = <some value computed earlier>) is called,
@@ -253,11 +253,13 @@ FlatSymbolRefAttr globalFolding(Location loc, PatternRewriter &rewriter, std::st
     // For now, we simply create a single arith.constant SSA shots value for the ZNE tests.
     // Revisit when discussing the frontend design of dynamic shots/device/qnode interaction.
     Operation *shotsLocal = shots->clone();
+    Operation *numberQubitsLocal = numberQubits->clone();
 
     rewriter.insert(shotsLocal);
+    rewriter.insert(numberQubitsLocal);
     rewriter.create<quantum::DeviceInitOp>(loc, shotsLocal->getResult(0), lib, name, kwargs);
 
-    Value allocQreg = rewriter.create<func::CallOp>(loc, fnAllocOp, numberQubitsValue).getResult(0);
+    Value allocQreg = rewriter.create<func::CallOp>(loc, fnAllocOp, numberQubitsLocal->getResult(0)).getResult(0);
 
     int64_t sizeArgs = fnFoldedOp.getArguments().size();
     Value size = fnFoldedOp.getArgument(sizeArgs - 1);
@@ -384,8 +386,9 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
     rewriter.setInsertionPointToStart(moduleOp.getBody());
 
     // Get the number of qubits
-    const int64_t numberQubits =
-        (*fnOp.getOps<quantum::AllocOp>().begin()).getNqubitsAttr().value_or(0);
+    Operation *numberQubits =
+        //(*fnOp.getOps<quantum::AllocOp>().begin()).getNqubitsAttr().value_or(0);
+        (*fnOp.getOps<quantum::AllocOp>().begin()).getNqubits().getDefiningOp();
     // Get the device
     quantum::DeviceInitOp deviceInitOp = *fnOp.getOps<quantum::DeviceInitOp>().begin();
 
