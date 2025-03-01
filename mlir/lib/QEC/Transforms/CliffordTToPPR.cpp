@@ -51,19 +51,13 @@ GateEnum hashGate(CustomOp op)
 // Structure to define gate conversion rules
 struct GateConversion {
     SmallVector<StringRef> pauliOperators;
-    double theta;
-    GateConversion(SmallVector<StringRef> pauliOperators, double theta)
-        : pauliOperators(pauliOperators), theta(theta)
+    int64_t rotationKind;
+    GateConversion(SmallVector<StringRef> pauliOperators, int64_t rotationKind)
+        : pauliOperators(pauliOperators), rotationKind(rotationKind)
     {
     }
-    GateConversion() : pauliOperators(), theta(0.0) {}
+    GateConversion() : pauliOperators(), rotationKind(0) {}
 };
-
-Value getTheta(Location loc, GateConversion gateConversion, ConversionPatternRewriter &rewriter)
-{
-    return rewriter.create<arith::ConstantOp>(loc, rewriter.getF64Type(),
-                                              rewriter.getF64FloatAttr(gateConversion.theta));
-}
 
 std::pair<ValueRange, TypeRange> getInQubitsAndOutQubits(CustomOp op)
 {
@@ -78,17 +72,17 @@ std::pair<ValueRange, TypeRange> getInQubitsAndOutQubits(CustomOp op)
 //===----------------------------------------------------------------------===//
 
 // C(P) = G(Angle)
-PPRotationOp singleQubitConversion(CustomOp op, GateConversion gateConversion,
+PPRotationOp singleQubitConversion(CustomOp &op, GateConversion gateConversion,
                                    ConversionPatternRewriter &rewriter)
 {
     auto loc = op->getLoc();
 
     auto pauliProduct = rewriter.getStrArrayAttr(gateConversion.pauliOperators);
-    auto thetaValue = getTheta(loc, gateConversion, rewriter);
+    // auto denValue = getrotationKind(loc, gateConversion, rewriter);
     auto [inQubits, outQubitsTypes] = getInQubitsAndOutQubits(op);
 
-    auto pprOp =
-        rewriter.create<PPRotationOp>(loc, outQubitsTypes, pauliProduct, thetaValue, inQubits);
+    auto pprOp = rewriter.create<PPRotationOp>(loc, outQubitsTypes, pauliProduct,
+                                               gateConversion.rotationKind, inQubits);
 
     return pprOp;
 }
@@ -98,7 +92,7 @@ PPRotationOp singleQubitConversion(CustomOp op, GateConversion gateConversion,
 // G0 = (P1 ⊗ P2)π/4
 // G1 = (P1 ⊗ 1)−π/4
 // G2 = (1 ⊗ P2)−π/4
-LogicalResult multiQubitConversion(CustomOp op, StringRef P1, StringRef P2,
+LogicalResult controlledConversion(CustomOp op, StringRef P1, StringRef P2,
                                    ConversionPatternRewriter &rewriter)
 {
     auto loc = op->getLoc();
@@ -111,24 +105,22 @@ LogicalResult multiQubitConversion(CustomOp op, StringRef P1, StringRef P2,
 
     // G0 = (P1 ⊗ P2)π/4
     auto pauliProduct = rewriter.getStrArrayAttr(g0.pauliOperators);
-    auto thetaValue = getTheta(loc, g0, rewriter);
     auto [inQubits, outQubitsTypes] = getInQubitsAndOutQubits(op);
     auto G0 =
-        rewriter.create<PPRotationOp>(loc, outQubitsTypes, pauliProduct, thetaValue, inQubits);
+        rewriter.create<PPRotationOp>(loc, outQubitsTypes, pauliProduct, g0.rotationKind, inQubits);
 
     // G1 = (P1 ⊗ 1)−π/4
     pauliProduct = rewriter.getStrArrayAttr(g1.pauliOperators);
-    thetaValue = getTheta(loc, g1, rewriter);
     SmallVector<Value> inQubitsValues{G0.getOutQubits()[0]};
     SmallVector<Type> outQubitsTypesList{G0.getOutQubits()[0].getType()};
-    auto G1 = rewriter.create<PPRotationOp>(loc, outQubitsTypesList, pauliProduct, thetaValue,
+    auto G1 = rewriter.create<PPRotationOp>(loc, outQubitsTypesList, pauliProduct, g1.rotationKind,
                                             inQubitsValues);
 
     // G2 = (1 ⊗ P2)−π/4
     pauliProduct = rewriter.getStrArrayAttr(g2.pauliOperators);
     SmallVector<Value> inQubitsValues2{G0.getOutQubits()[1]};
     SmallVector<Type> inQubitsTypesList2{G0.getOutQubits()[1].getType()};
-    auto G2 = rewriter.create<PPRotationOp>(loc, inQubitsTypesList2, pauliProduct, thetaValue,
+    auto G2 = rewriter.create<PPRotationOp>(loc, inQubitsTypesList2, pauliProduct, g1.rotationKind,
                                             inQubitsValues2);
 
     rewriter.replaceOp(op, {G1.getOutQubits()[0], G2.getOutQubits()[0]});
@@ -164,7 +156,7 @@ LogicalResult convertTGate(CustomOp op, ConversionPatternRewriter &rewriter)
 
 LogicalResult convertCNOTGate(CustomOp op, ConversionPatternRewriter &rewriter)
 {
-    return multiQubitConversion(op, "Z", "X", rewriter);
+    return controlledConversion(op, "Z", "X", rewriter);
 }
 
 // Convert a MeasureOp to a PPMeasurementOp

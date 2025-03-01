@@ -40,11 +40,13 @@ struct CliffordTToPPRPass : impl::CliffordTToPPRPassBase<CliffordTToPPRPass> {
         auto ctx = &getContext();
         ConversionTarget target(*ctx);
 
-        target.addIllegalOp<quantum::CustomOp, quantum::MeasureOp>();
+        target.addIllegalDialect<quantum::QuantumDialect>();
 
-        target.markUnknownOpDynamicallyLegal([](Operation *op) {
-            return !isa<quantum::CustomOp>(op) && !isa<quantum::MeasureOp>(op);
-        });
+        target.addLegalOp<quantum::InitializeOp, quantum::FinalizeOp>();
+        target.addLegalOp<quantum::DeviceInitOp, quantum::DeviceReleaseOp>();
+        target.addLegalOp<quantum::AllocOp, quantum::DeallocOp>();
+        target.addLegalOp<quantum::InsertOp, quantum::ExtractOp>();
+        target.addLegalDialect<qec::QECDialect>();
 
         RewritePatternSet patterns(ctx);
         populateCliffordTToPPRPatterns(patterns);

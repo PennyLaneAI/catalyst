@@ -65,7 +65,7 @@ def PPRotationOp : QEC_Op<"ppr"> {
 
     let arguments = (ins
         PauliWord:$pauli_product,
-        F64:$theta,
+        I16Attr:$rotation_kind,  // in fractions of pi
         Variadic<QubitType>:$in_qubits
     );
 
@@ -74,7 +74,7 @@ def PPRotationOp : QEC_Op<"ppr"> {
     );
 
     let assemblyFormat = [{
-      $pauli_product `(` $theta `)` $in_qubits attr-dict `:` type($out_qubits)
+      $pauli_product `(` $rotation_kind `)` $in_qubits attr-dict `:` type($out_qubits)
     }];
 }
 
