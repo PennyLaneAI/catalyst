@@ -17,14 +17,11 @@ This file contains tests for measurement primitives when the return shape is dyn
 
 # pylint: disable=line-too-long
 
-import jax
-import numpy as np
 import pennylane as qml
 import pytest
 
 import catalyst
 from catalyst.debug import get_compilation_stage, replace_ir
-from catalyst.jax_primitives import compbasis_p, expval_p, probs_p, state_p, var_p
 
 
 def test_dynamic_sample_backend_functionality():
@@ -109,6 +106,12 @@ def test_dynamic_counts_backend_functionality():
 
 @pytest.mark.parametrize("readout", [qml.expval, qml.var])
 def test_dynamic_wires_scalar_readouts(readout, backend, capfd):
+    """
+    Test that a circuit with dynamic number of wires can be executed correctly.
+
+    As a unit test for allocating a dynamic number of wires, we use measurements
+    whose shape do not depend on the number of wires, i.e. expval and var
+    """
     def ref(num_qubits):
         print("compiling...")
         dev = qml.device(backend, wires=num_qubits)
@@ -129,7 +132,7 @@ def test_dynamic_wires_scalar_readouts(readout, backend, capfd):
 
     assert ref(10) == cat(10)
     assert ref(4) == cat(4)
-    out, err = capfd.readouterr()
+    out, _ = capfd.readouterr()
     assert out.count("compiling...") == 3
 
 

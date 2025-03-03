@@ -18,10 +18,7 @@ This file contains a couple of tests for the capture of measurement primitives i
 # pylint: disable=line-too-long
 
 import jax
-import pennylane as qml
 
-import catalyst
-from catalyst.debug import get_compilation_stage, replace_ir
 from catalyst.jax_primitives import compbasis_p, expval_p, probs_p, state_p, var_p
 
 
