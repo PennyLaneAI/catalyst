@@ -46,6 +46,7 @@ from catalyst.device.verification import (
     verify_no_state_variance_returns,
     verify_operations,
 )
+from catalyst.jax_extras.tracing import is_dynamic_wires
 from catalyst.logging import debug_logger, debug_logger_init
 from catalyst.third_party.cuda import SoftwareQQPP
 from catalyst.utils.exceptions import CompileError
@@ -309,7 +310,11 @@ class QJITDevice(qml.devices.Device):
         for key, value in original_device.__dict__.items():
             self.__setattr__(key, value)
 
-        check_device_wires(original_device.wires)
+        if original_device.wires is None:
+            raise AttributeError("Catalyst does not support device instances without set wires.")
+
+        if not is_dynamic_wires(original_device.wires):
+            check_device_wires(original_device.wires)
 
         super().__init__(wires=original_device.wires, shots=original_device.shots)
 
@@ -534,9 +539,6 @@ def get_device_capabilities(device) -> DeviceCapabilities:
 
 def check_device_wires(wires):
     """Validate requirements Catalyst imposes on device wires."""
-
-    if wires is None:
-        raise AttributeError("Catalyst does not support device instances without set wires.")
 
     assert isinstance(wires, qml.wires.Wires)
 
