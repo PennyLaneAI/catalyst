@@ -18,9 +18,8 @@ This file contains tests for measurement primitives when the return shape is dyn
 # pylint: disable=line-too-long
 
 import numpy as np
-import pytest
-
 import pennylane as qml
+import pytest
 
 import catalyst
 from catalyst.debug import get_compilation_stage, replace_ir
