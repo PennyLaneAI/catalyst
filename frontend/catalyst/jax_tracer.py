@@ -1221,7 +1221,6 @@ def trace_quantum_function(
                     # has a single value, which is the tracer for the number of wires
                     qreg_in = qalloc_p.bind(device.wires[0])
                 else:
-                    breakpoint()
                     qreg_in = qalloc_p.bind(len(device.wires))
 
                 # If the program is batched, that means that it was transformed.

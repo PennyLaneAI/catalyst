@@ -806,11 +806,7 @@ def _qalloc_lowering(jax_ctx: mlir.LoweringRuleContext, size_value: int | ir.Val
     ctx.allow_unregistered_dialects = True
 
     qreg_type = ir.OpaqueType.get("quantum", "reg", ctx)
-    breakpoint()
-    #if isinstance(size_value, int):
-    if size_value.owner.name == "stablehlo.constant":
-        breakpoint()
-        #assert size_value.owner.name == "stablehlo.constant"
+    if isinstance(size_value.owner, ir.Operation) and size_value.owner.name == "stablehlo.constant":
         size_value_attr = size_value.owner.attributes["value"]
         assert ir.DenseIntElementsAttr.isinstance(size_value_attr)
         size = ir.DenseIntElementsAttr(size_value_attr)[0]
