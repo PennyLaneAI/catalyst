@@ -471,6 +471,38 @@ def expval10(x: float, y: float):
 print(expval10.mlir)
 
 
+# CHECK-LABEL: @expval11
+@qjit(target="mlir")
+def expval11(num_qubits):
+    # CHECK: func.func public @circ(%arg0: tensor<i64>) -> tensor<f64>
+
+    # CHECK-DAG: [[one:%.+]] = stablehlo.constant dense<1> : tensor<i64>
+    # CHECK-DAG: [[two:%.+]] = stablehlo.constant dense<2> : tensor<i64>
+    # CHECK-DAG: [[nSub1:%.+]] = stablehlo.subtract %arg0, [[one]] : tensor<i64>
+    # CHECK-DAG: [[nSub2:%.+]] = stablehlo.subtract %arg0, [[two]] : tensor<i64>
+
+    # CHECK: [[deten_nQubits:%.+]] = tensor.extract %arg0[] : tensor<i64>
+    # CHECK: [[reg:%.+]] = quantum.alloc([[deten_nQubits]]) : !quantum.reg
+    @qml.qnode(qml.device("lightning.qubit", wires=num_qubits))
+    def circ():
+        # CHECK: [[detensorize:%.+]] = tensor.extract [[nSub1]][] : tensor<i64>
+        # CHECK: [[qubit:%.+]] = quantum.extract %2[[[detensorize]]] : !quantum.reg -> !quantum.bit
+        # CHECK: [[q0:%.+]] = quantum.static_custom "RZ" [1.000000e-01] [[qubit]]
+        qml.RZ(0.1, wires=num_qubits - 1)
+
+        # CHECK: [[detensorize:%.+]] = tensor.extract [[nSub2]][] : tensor<i64>
+        # CHECK: [[expvalBit:%.+]] = quantum.extract {{%.+}}[[[detensorize]]] : !quantum.reg -> !quantum.bit
+        # CHECK: [[obs:%.+]] = quantum.namedobs [[expvalBit]][ PauliX] : !quantum.obs
+        # CHECK: {{%.+}} = quantum.expval [[obs]] : f64
+        return qml.expval(qml.PauliX(num_qubits - 2))
+
+    return circ()
+
+
+_ = expval11(10)
+print(expval11.mlir)
+
+
 # CHECK-LABEL: public @var1(
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2))
