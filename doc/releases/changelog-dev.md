@@ -107,6 +107,10 @@
   give incorrect results for circuits containing `qml.StatePrep`.
   [(#1491)](https://github.com/PennyLaneAI/catalyst/pull/1491)
 
+* Fixes an issue ([(#1501)](https://github.com/PennyLaneAI/catalyst/issues/1501)) where using 
+  autograph in conjunction with catalyst passes causes a crash.
+  [(#1541)](https://github.com/PennyLaneAI/catalyst/pull/1541)
+
 <h3>Internal changes ⚙️</h3>
 
 * Updated the call signature for the PLXPR `qnode_prim` primitive.
