@@ -17,8 +17,10 @@ This file contains tests for measurement primitives when the return shape is dyn
 
 # pylint: disable=line-too-long
 
-import pennylane as qml
+import numpy as np
 import pytest
+
+import pennylane as qml
 
 import catalyst
 from catalyst.debug import get_compilation_stage, replace_ir
@@ -131,8 +133,8 @@ def test_dynamic_wires_scalar_readouts(readout, backend, capfd):
 
     cat = catalyst.qjit(ref)
 
-    assert ref(10) == cat(10)
-    assert ref(4) == cat(4)
+    assert np.allclose(ref(10), cat(10))
+    assert np.allclose(ref(4), cat(4))
     out, _ = capfd.readouterr()
     assert out.count("compiling...") == 3
 
