@@ -167,13 +167,14 @@ LogicalResult convertMeasureOpToPPM(MeasureOp op, StringRef axis,
 
     ArrayAttr pauliProduct = rewriter.getStrArrayAttr({axis});
     auto inQubits = op.getInQubit();
-    TypeRange outQubitsTypes = op.getOutQubit().getType();
+    Type qubitType = op.getOutQubit().getType();
     Type mresType = op.getMres().getType();
+    SmallVector<Type> outQubitTypes({qubitType});
 
     auto ppmOp =
-        rewriter.create<PPMeasurementOp>(loc, mresType, outQubitsTypes, pauliProduct, inQubits);
+        rewriter.create<PPMeasurementOp>(loc, mresType, outQubitTypes, pauliProduct, inQubits);
 
-    rewriter.replaceOp(op, ppmOp.getResults());
+    rewriter.replaceOp(op, ppmOp);
     return success();
 }
 
@@ -196,8 +197,6 @@ struct QECOpLowering : public ConversionPattern {
     LogicalResult matchAndRewrite(Operation *op, ArrayRef<Value> operands,
                                   ConversionPatternRewriter &rewriter) const final
     {
-        Operation *loweredOp = nullptr;
-
         // cast to OriginOp
         if (auto originOp = dyn_cast_or_null<CustomOp>(op)) {
             switch (hashGate(originOp)) {
@@ -218,13 +217,8 @@ struct QECOpLowering : public ConversionPattern {
         else if (auto originOp = dyn_cast_or_null<MeasureOp>(op)) {
             return convertMeasureZ(originOp, rewriter);
         }
-        else {
-            op->emitError("Unsupported operation. Supported operations: CustomOp, MeasureOp");
-            return failure();
-        }
-
-        rewriter.replaceOp(op, loweredOp);
-        return success();
+        op->emitError("Unsupported operation. Supported operations: CustomOp, MeasureOp");
+        return failure();
     }
 };
 
