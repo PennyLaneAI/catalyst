@@ -15,10 +15,8 @@
 #ifndef QEC_DIALECT
 #define QEC_DIALECT
 
-// include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/AttrTypeBase.td"
 include "mlir/IR/DialectBase.td"
-include "mlir/IR/EnumAttr.td"
 include "mlir/IR/OpBase.td"
 
 include "Quantum/IR/QuantumDialect.td"
@@ -47,33 +45,14 @@ def QECDialect : Dialect {
     /// This is the C++ namespace that the dialect, and all sub-components, get placed in.
     let cppNamespace = "::catalyst::qec";
 
-    /// Use the default type printing/parsing hooks, otherwise we would explicitly define them.
-    // let useDefaultTypePrinterParser = 1;
-    let useDefaultAttributePrinterParser = 1;
-}
-
-//===----------------------------------------------------------------------===//
-// QEC dialect enums.
-//===----------------------------------------------------------------------===//
-
-def PauliEnum : I32EnumAttr<"Pauli",
-    "Kinds of Pauli operators",
-    [
-        I32EnumAttrCase<"I", 0>,
-        I32EnumAttrCase<"X", 1>,
-        I32EnumAttrCase<"Y", 2>,
-        I32EnumAttrCase<"Z", 3>,
-    ]> {
-    let cppNamespace = "catalyst::qec";
-    let genSpecializedAttr = 0;
 }
 
 //===----------------------------------------------------------------------===//
 // QEC dialect attributes.
 //===----------------------------------------------------------------------===//
 
-def PauliLetter : EnumAttr<QECDialect, PauliEnum, "Single Pauli operator.">;
-def PauliWord : TypedArrayAttrBase<PauliLetter, "A product of Pauli operators, aka a Pauli word.">;
+def PauliWord : TypedArrayAttrBase<StrAttr, "A product of Pauli operators, aka a Pauli word.">;
+
 
 //===----------------------------------------------------------------------===//
 // QEC dialect operations.
@@ -86,7 +65,7 @@ def PPRotationOp : QEC_Op<"ppr"> {
 
     let arguments = (ins
         PauliWord:$pauli_product,
-        F64:$theta,
+        I16Attr:$rotation_kind,  // in fractions of pi
         Variadic<QubitType>:$in_qubits
     );
 
@@ -95,7 +74,7 @@ def PPRotationOp : QEC_Op<"ppr"> {
     );
 
     let assemblyFormat = [{
-      $pauli_product `(` $theta `)` $in_qubits attr-dict `:` type($out_qubits)
+      $pauli_product `(` $rotation_kind `)` $in_qubits attr-dict `:` type($out_qubits)
     }];
 }
 

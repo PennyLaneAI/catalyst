@@ -357,3 +357,70 @@ def ions_decomposition(qnode):  # pragma: nocover
         return qnode(*args, **kwargs)
 
     return wrapper
+
+
+def clifford_t_ppr(qnode):
+    """
+    Specify that the ``-convert-clifford-t-to-ppr`` MLIR compiler pass
+    for converting clifford+T gates into Pauli product rotations will be applied.
+
+    The full list of supported gates are as follows:
+
+    :class:`qml.H <pennylane.H>`,
+    :class:`qml.S <pennylane.S>`,
+    :class:`qml.T <pennylane.T>`,
+    :class:`qml.CNOT <pennylane.CNOT>`,
+    Args:
+        fn (QNode): QNode to apply the pass to
+
+    Returns:
+        ~.QNode
+
+    **Example**
+
+    In this example the Clifford+T gates will be converted into PPRs.
+
+    .. code-block:: python
+
+        from catalyst.passes import clifford_t_ppr
+        from catalyst.debug import get_compilation_stage
+
+        dev = qml.device("lightning.qubit", wires=2)
+
+        @qjit
+        @clifford_t_ppr
+        @qml.qnode(dev)
+        def circuit():
+            qml.H(0)
+            qml.S(1)
+            qml.T(0)
+            qml.CNOT([0, 1])
+            return qml.expval(qml.PauliZ(0))
+
+    Example MLIR Representation:
+    .. code-block:: mlir
+         . . .
+        %q0_0 = qec.ppr ["Z", "X", "Z"](%pi4) %qreg_0 : !quantum.bit
+        %q1_0 = qec.ppr ["Z"](%pi4) %qreg_1 : !quantum.bit
+        %q0_1 = qec.ppr ["Z"](%pi8) %q0_0 : !quantum.bit
+        %01_0 = qec.ppr ["Z", "X"](%pi4) %5, %2 : !quantum.bit, !quantum.bit
+        %q0_1 = qec.ppr ["Z"](%n_pi4) %01#0 : !quantum.bit
+        %q1_2 = qec.ppr ["X"](%n_pi4) %01#1 : !quantum.bit
+        %m1, %q0_3 = qec.ppm ["Z"] %q0_1 : !quantum.bit
+        %m2, %q1_3 = qec.ppm ["Z"] %q1_2 : !quantum.bit
+        . . .
+    """
+    if not isinstance(qnode, qml.QNode):
+        raise TypeError(f"A QNode is expected, got the classical function {qnode}")
+
+    clone = copy.copy(qnode)
+    clone.__name__ += "_clifford_t_ppr"
+
+    @functools.wraps(clone)
+    def wrapper(*args, **kwargs):
+        pass_pipeline = kwargs.pop("pass_pipeline", [])
+        pass_pipeline.append(Pass("convert-clifford-t-to-ppr"))
+        kwargs["pass_pipeline"] = pass_pipeline
+        return clone(*args, **kwargs)
+
+    return wrapper
