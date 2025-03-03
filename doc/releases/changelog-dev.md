@@ -4,6 +4,7 @@
 
 * Conversion Clifford+T gates to Pauli Product Rotation (PPR) and measurement to Pauli Product Measurement (PPM) are now available through the `clifford_t_ppr` pass transform.
   [(#1499)](https://github.com/PennyLaneAI/catalyst/pull/1499)
+  [(#1551)](https://github.com/PennyLaneAI/catalyst/pull/1551)
 
   Supported gate conversions:
     - H gate → PPR with (Z · X · Z)π/4
