@@ -801,7 +801,7 @@ def _qalloc_abstract_eval(size):
     return AbstractQreg()
 
 
-def _qalloc_lowering(jax_ctx: mlir.LoweringRuleContext, size_value: int | ir.Value):
+def _qalloc_lowering(jax_ctx: mlir.LoweringRuleContext, size_value: ir.Value):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
