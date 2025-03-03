@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "mlir/IR/Operation.h"
+#include "llvm/Support/Casting.h"
 #define DEBUG_TYPE "commute-clifford-t-ppr"
 
 
@@ -27,7 +29,22 @@ namespace {
         using OpRewritePattern::OpRewritePattern;
 
         LogicalResult matchAndRewrite(PPRotationOp op, PatternRewriter &rewriter) const override {
+            // check if next gate is commuteed or not
             
+             // TESTING
+            auto name = op.getPauliProduct();
+
+            for (Operation *nextOp: op->getUsers()){
+                if (PPRotationOp nextPPROp = dyn_cast_or_null<PPRotationOp>(nextOp)){
+                    if (name == nextPPROp.getPauliProductAttrName()){
+                        llvm::errs() << "name work here";
+                    }
+                    if (op.isCommuted(nextPPROp)){
+                        llvm::errs() << "IT work";
+                    }
+                }
+            }
+
             return failure();
         }
     };
