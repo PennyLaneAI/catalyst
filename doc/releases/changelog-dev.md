@@ -52,9 +52,10 @@
 * Extend `merge-rotations` peephole optimization pass to also merge compatible rotation gates (either both controlled, or both uncontrolled) where rotation angles are any combination of static constants or dynamic values.
   [(#1489)](https://github.com/PennyLaneAI/catalyst/pull/1489)
 
-* Catalyst now supports experimental capture of `cond` and `for_loop` control flow.
+* Catalyst now supports experimental capture of `cond`, `for_loop` and `while_loop` control flow.
   [(#1468)](https://github.com/PennyLaneAI/catalyst/pull/1468)
   [(#1509)](https://github.com/PennyLaneAI/catalyst/pull/1509)
+  [(#1521)](https://github.com/PennyLaneAI/catalyst/pull/1521)
   
   To trigger the PennyLane pipeline for capturing the program as a Jaxpr, simply set
   `experimental_capture=True` in the qjit decorator.
@@ -85,6 +86,12 @@
 
   - Turn off MLIR's verifier.
     [(#1513)](https://github.com/PennyLaneAI/catalyst/pull/1513)
+  - Remove unnecessary I/O.
+    [(#1514)](https://github.com/PennyLaneAI/catalyst/pull/1514)
+  - Sort improvements to reduce complexity and memory.
+    [(#1524)](https://github.com/PennyLaneAI/catalyst/pull/1524)
+  - Lazy IR canonicalization and LLVMIR textual generation.
+    [(#1530)](https://github.com/PennyLaneAI/catalyst/pull/1530)
 
 <h3>Breaking changes 💔</h3>
 
@@ -100,6 +107,9 @@
   [(#1491)](https://github.com/PennyLaneAI/catalyst/pull/1491)
 
 <h3>Internal changes ⚙️</h3>
+
+* Updated the call signature for the PLXPR `qnode_prim` primitive.
+  [(#1538)](https://github.com/PennyLaneAI/catalyst/pull/1538)
 
 * Update deprecated access to `QNode.execute_kwargs["mcm_config"]`.
   Instead `postselect_mode` and `mcm_method` should be accessed instead.
@@ -130,11 +140,28 @@
 
   - Add a new pass `convert-ion-to-llvm` which lowers the Ion dialect to llvm dialect. This pass 
     introduces oqd device specific stubs that will be implemented in oqd runtime including: 
-    `@__catalyst_ion`, `@ __catalyst_pulse_op`, `@ __catalyst_parallel_protocol`.
+    `@ __catalyst__oqd__pulse`, `@ __catalyst__oqd__ParallelProtocol`.
     [(#1466)](https://github.com/PennyLaneAI/catalyst/pull/1466)
+
+  - The OQD device can now generate OpenAPL JSON specs during runtime. The oqd stubs
+  `@ __catalyst__oqd__pulse`, and `@ __catalyst__oqd__ParallelProtocol`, which
+  are called in the llvm dialect after the aforementioned lowering ([(#1466)](https://github.com/PennyLaneAI/catalyst/pull/1466)), are defined to produce JSON specs that OpenAPL expects.
+    [(#1516)](https://github.com/PennyLaneAI/catalyst/pull/1516)
 
   - The OQD device is moved from `frontend/catalyst/third_party/oqd` to `runtime/lib/backend/oqd`. An overall switch, `ENABLE_OQD`, is added to control the OQD build system from a single entry point. The switch is `OFF` by default, and OQD can be built from source via `make all ENABLE_OQD=ON`, or `make runtime ENABLE_OQD=ON`.
     [(#1508)](https://github.com/PennyLaneAI/catalyst/pull/1508)
+
+  - Ion dialect now supports phonon modes using `ion.modes` operation.
+    [(#1517)](https://github.com/PennyLaneAI/catalyst/pull/1517)
+
+  - Rotation angles are normalized to avoid negative duration for pulses during ion dialect lowering.
+    [(#1517)](https://github.com/PennyLaneAI/catalyst/pull/1517)
+
+  - Catalyst now generates OpenAPL programs for Pennylane circuits of up to two qubits using the OQD device.
+    [(#1517)](https://github.com/PennyLaneAI/catalyst/pull/1517)
+
+  - The end-to-end compilation pipeline for OQD devices is available as an API function.
+    [(#1545)](https://github.com/PennyLaneAI/catalyst/pull/1545)
 
 * Update source code to comply with changes requested by black v25.1.0
   [(#1490)](https://github.com/PennyLaneAI/catalyst/pull/1490)
@@ -153,6 +180,7 @@ David Ittah,
 Rohan Nolan Lasrado,
 Christina Lee,
 Mehrdad Malekmohammadi,
+Erick Ochoa Lopez,
 Andrija Paurevic,
 Raul Torres,
 Paul Haochen Wang.

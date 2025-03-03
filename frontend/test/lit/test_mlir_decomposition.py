@@ -30,8 +30,8 @@ import platform
 import shutil
 
 import pennylane as qml
-from lit_util_printers import print_jaxpr
 from pennylane.devices import NullQubit
+from utils import print_jaxpr
 
 import catalyst
 from catalyst import qjit

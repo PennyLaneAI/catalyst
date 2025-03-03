@@ -19,8 +19,9 @@
 import jax
 import numpy as np
 import pennylane as qml
+from utils import qjit_for_tests as qjit
 
-from catalyst import grad, jacobian, qjit
+from catalyst import grad, jacobian
 
 
 # CHECK-LABEL: public @jit_grad_default

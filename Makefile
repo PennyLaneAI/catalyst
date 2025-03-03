@@ -159,6 +159,9 @@ endif
 	@echo "check the Catalyst PyTest suite"
 	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/pytest --tb=native --backend=$(TEST_BACKEND) --runbraket=$(TEST_BRAKET) $(PARALLELIZE)
 	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/test_oqc/oqc
+ifeq ($(ENABLE_OQD), ON)
+	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/test_oqd/oqd
+endif
 ifeq ($(TEST_BRAKET), NONE)
 	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/async_tests --tb=native --backend=$(TEST_BACKEND)
 endif
@@ -263,6 +266,9 @@ coverage-frontend:
 	@echo "Generating coverage report for the frontend"
 	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/pytest $(PARALLELIZE) --cov=catalyst --tb=native --cov-report=$(COVERAGE_REPORT)
 	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/test_oqc/oqc $(PARALLELIZE) --cov=catalyst --cov-append --tb=native --cov-report=$(COVERAGE_REPORT)
+ifeq ($(ENABLE_OQD), ON)
+	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/test_oqd/oqd $(PARALLELIZE) --cov=catalyst --cov-append --tb=native --cov-report=$(COVERAGE_REPORT)
+endif
 ifeq ($(TEST_BRAKET), NONE)
 	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/async_tests --tb=native --backend=$(TEST_BACKEND) --tb=native
 endif

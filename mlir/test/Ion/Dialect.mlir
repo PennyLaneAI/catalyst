@@ -183,12 +183,14 @@ func.func @example_ion() -> !ion.ion {
             #ion.transition<
                 level_0 = "downstate",
                 level_1 = "upstate",
-                einstein_a=10.10
+                einstein_a=10.10, 
+                multipole="M1"
             >,
             #ion.transition<
                 level_0 = "upstate",
                 level_1 = "downstate",
-                einstein_a=10.10
+                einstein_a=10.10,
+                multipole="E1"
             >
         ]
     }: !ion.ion
