@@ -143,19 +143,9 @@ bool isValidEdgePair(const CustomOp &bottomOp, std::vector<QubitOrigin> &bottomQ
     auto bottomOpNonConst = bottomOp;
     auto topOpNonConst = topOp;
 
-    if (hasQuantumCustomSuccessor(bottomOp)) {
-        LLVM_DEBUG(llvm::dbgs() << "Warning: Unexpected quantum successor for bottomOp: "
-                                << bottomOp->getName() << "\n");
-        return false;
-    }
-    if (hasQuantumCustomPredecessor(topOpNonConst)) {
-        LLVM_DEBUG(llvm::dbgs() << "Warning: Unexpected quantum predecessor for topOpNonConst: "
-                                << topOpNonConst->getName() << "\n");
-        return false;
-    }
-
     if (bottomOpNonConst.getGateName() != topOpNonConst.getGateName() || topOp == bottomOp ||
-        !verifyQubitOrigins(topQubitOrigins, bottomQubitOrigins)) {
+        !verifyQubitOrigins(topQubitOrigins, bottomQubitOrigins) ||
+        hasQuantumCustomSuccessor(bottomOp) || hasQuantumCustomPredecessor(topOpNonConst)) {
         return false;
     }
     return true;
