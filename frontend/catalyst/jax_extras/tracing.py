@@ -1000,7 +1000,8 @@ def bind_flexible_primitive(primitive, flexible_args: dict[str, Any], *dyn_args,
 
     return primitive.bind(*dyn_args, **static_args)
 
-def is_dynamic_wires(wires: pennylane.wires.Wires): # pylint: disable=undefined-variable
+
+def is_dynamic_wires(wires: pennylane.wires.Wires):  # pylint: disable=undefined-variable
     """
     Checks if a pennylane Wires object corresponds to a concrete number
     of wires or a dynamic number of wires.
@@ -1010,4 +1011,4 @@ def is_dynamic_wires(wires: pennylane.wires.Wires): # pylint: disable=undefined-
     If the number of wires is dynamic, the Wires object contains a single tracer that
     represents the number of wires.
     """
-    return ((len(wires) == 1) and (isinstance(wires[0], DynamicJaxprTracer)))
+    return (len(wires) == 1) and (isinstance(wires[0], DynamicJaxprTracer))

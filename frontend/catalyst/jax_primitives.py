@@ -814,8 +814,9 @@ def _qalloc_lowering(jax_ctx: mlir.LoweringRuleContext, size_value: ir.Value):
         size_attr = ir.IntegerAttr.get(ir.IntegerType.get_signless(64, ctx), size)
         return AllocOp(qreg_type, nqubits_attr=size_attr).results
     else:
-        size_value = extract_scalar(size_value, "blah")
+        size_value = extract_scalar(size_value, "qalloc")
         return AllocOp(qreg_type, nqubits=size_value).results
+
 
 #
 # qdealloc

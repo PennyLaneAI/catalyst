@@ -112,6 +112,7 @@ def test_dynamic_wires_scalar_readouts(readout, backend, capfd):
     As a unit test for allocating a dynamic number of wires, we use measurements
     whose shape do not depend on the number of wires, i.e. expval and var
     """
+
     def ref(num_qubits):
         print("compiling...")
         dev = qml.device(backend, wires=num_qubits)
@@ -123,8 +124,8 @@ def test_dynamic_wires_scalar_readouts(readout, backend, capfd):
                 qml.RY(2.2, wires=i)
 
             loop_0()
-            qml.RX(1.23, wires=num_qubits-1)
-            return readout(qml.Z(wires=num_qubits-1))
+            qml.RX(1.23, wires=num_qubits - 1)
+            return readout(qml.Z(wires=num_qubits - 1))
 
         return circ()
 
