@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "mlir/Support/LogicalResult.h"
 #define DEBUG_TYPE "loop-boundary"
 
 #include "llvm/ADT/StringSet.h"
@@ -596,14 +597,17 @@ struct LoopBoundaryForLoopRewritePattern : public mlir::OpRewritePattern<scf::Fo
 
         auto edgeOperationSet = getVerifyEdgeOperationSet(bottomEdgeOpSet, topEdgeOpSet);
 
+        if (edgeOperationSet.empty()) {
+            return mlir::failure();
+        }
+
         for (auto [topEdgeOp, bottomEdgeOp] : edgeOperationSet) {
             hoistTopEdgeOperation(topEdgeOp, forOp, rewriter);
             handleParams(topEdgeOp, bottomEdgeOp, forOp, rewriter);
             hoistBottomEdgeOperation(bottomEdgeOp, forOp, bottomEdgeOpSet, rewriter);
-            return mlir::success();
         }
 
-        return mlir::failure();
+        return mlir::success();
     }
 };
 
