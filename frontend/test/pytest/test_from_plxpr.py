@@ -562,6 +562,28 @@ class TestHybridPrograms:
 
         assert qml.math.allclose(results, expected)
 
+    def test_pennylane_catalyst_detection_program_capture(self, disable_capture):
+        """Test that the compiler can be detected as active when using qjit with
+        program capture."""
+        dev = qml.device("lightning.qubit", wires=2)
+
+        @qml.qjit(experimental_capture=True)
+        @qml.qnode(dev)
+        def f(x):
+            if qml.compiler.active():
+                # We should always execute this branch
+                # <Z> will be cos(x)
+                qml.RX(x, 0)
+            else:
+                # <Z> will be 1.0
+                qml.RZ(x, 0)
+
+            return qml.expval(qml.Z(0))
+
+        res = f(1.5)
+        expected = np.cos(1.5)
+        assert np.allclose(res, expected)
+
 
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
