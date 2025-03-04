@@ -810,6 +810,7 @@ def _qalloc_lowering(jax_ctx: mlir.LoweringRuleContext, size_value: ir.Value):
         size_value_attr = size_value.owner.attributes["value"]
         assert ir.DenseIntElementsAttr.isinstance(size_value_attr)
         size = ir.DenseIntElementsAttr(size_value_attr)[0]
+        assert size >= 0
 
         size_attr = ir.IntegerAttr.get(ir.IntegerType.get_signless(64, ctx), size)
         return AllocOp(qreg_type, nqubits_attr=size_attr).results
