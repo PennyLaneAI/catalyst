@@ -547,6 +547,7 @@ struct ComputationalBasisOpPattern : public OpConversionPattern<ComputationalBas
             Operation *reg_def = reg_value.getDefiningOp();
             // Walk back to the original alloc of the register
             // Only Alloc, Adjoint and Insert could have qreg as outputs
+            // TODO: what if the qreg SSA value is an argument?
             while (!isa<AllocOp>(reg_def)) {
                 // TODO: switch case?
                 if (isa<AdjointOp>(reg_def)) {
