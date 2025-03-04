@@ -233,16 +233,14 @@ mlir::Value findResultForOpByQubit(mlir::Value qubit, scf::ForOp forOp)
 // Finds the root qubit by traversing backward through defining operations.
 mlir::Value findRootQubit(mlir::Value qubit)
 {
-    mlir::Value rootQubit = qubit;
-    while (auto definingOp = dyn_cast_or_null<CustomOp>(rootQubit.getDefiningOp())) {
+    if (auto definingOp = dyn_cast_or_null<CustomOp>(qubit.getDefiningOp())) {
         for (auto [idx, outQubit] : llvm::enumerate(definingOp.getOutQubits())) {
-            if (outQubit == rootQubit) {
-                rootQubit = definingOp.getInQubits()[idx];
-                break;
+            if (outQubit == qubit) {
+                return findRootQubit(definingOp.getInQubits()[idx]);
             }
         }
     }
-    return rootQubit;
+    return qubit;
 }
 
 // Determines the origin of a qubit, considering whether it's from a register.
@@ -342,12 +340,12 @@ QubitOriginMap traceBottomEdgeOperations(scf::ForOp forOp, Mode mode)
     for (auto operand : terminator->getOperands()) {
         Operation *definingOp = operand.getDefiningOp();
         while (InsertOp insertOp = dyn_cast_or_null<quantum::InsertOp>(definingOp)) {
-            operand = insertOp.getQubit();
-            auto operation = dyn_cast_or_null<CustomOp>(operand.getDefiningOp());
+            auto operation = dyn_cast_or_null<CustomOp>(insertOp.getQubit().getDefiningOp());
             if (!operation) {
-                continue;
+                break;
             }
             traceOriginQubit(operation, qubitOriginMap, mode);
+            operand = insertOp.getQubit();
             definingOp = insertOp.getInQreg().getDefiningOp();
         }
 
