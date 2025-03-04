@@ -15,6 +15,7 @@
 This submodule defines a utility for converting plxpr into Catalyst jaxpr.
 """
 # pylint: disable=protected-access
+from copy import copy
 from functools import partial
 from typing import Callable, Sequence
 
@@ -618,7 +619,7 @@ def trace_from_pennylane(fn, static_argnums, abstracted_axes, sig, kwargs):
             ):
                 # The original PL transform program has to be removed before applying the
                 # Catalyst transforms
-                transform_program = fn.transform_program._transform_program
+                transform_program = copy(fn.transform_program._transform_program)
                 fn.transform_program._transform_program.clear()
 
                 for transform in transform_program:
