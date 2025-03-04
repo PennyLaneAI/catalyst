@@ -475,16 +475,16 @@ print(expval10.mlir)
 @qjit(target="mlir")
 def expval11(num_qubits):
     # CHECK: func.func public @circ(%arg0: tensor<i64>) -> tensor<f64>
-
-    # CHECK-DAG: [[one:%.+]] = stablehlo.constant dense<1> : tensor<i64>
-    # CHECK-DAG: [[two:%.+]] = stablehlo.constant dense<2> : tensor<i64>
-    # CHECK-DAG: [[nSub1:%.+]] = stablehlo.subtract %arg0, [[one]] : tensor<i64>
-    # CHECK-DAG: [[nSub2:%.+]] = stablehlo.subtract %arg0, [[two]] : tensor<i64>
-
-    # CHECK: [[deten_nQubits:%.+]] = tensor.extract %arg0[] : tensor<i64>
-    # CHECK: [[reg:%.+]] = quantum.alloc([[deten_nQubits]]) : !quantum.reg
     @qml.qnode(qml.device("lightning.qubit", wires=num_qubits))
     def circ():
+        # CHECK-DAG: [[one:%.+]] = stablehlo.constant dense<1> : tensor<i64>
+        # CHECK-DAG: [[two:%.+]] = stablehlo.constant dense<2> : tensor<i64>
+        # CHECK-DAG: [[nSub1:%.+]] = stablehlo.subtract %arg0, [[one]] : tensor<i64>
+        # CHECK-DAG: [[nSub2:%.+]] = stablehlo.subtract %arg0, [[two]] : tensor<i64>
+
+        # CHECK: [[deten_nQubits:%.+]] = tensor.extract %arg0[] : tensor<i64>
+        # CHECK: [[reg:%.+]] = quantum.alloc([[deten_nQubits]]) : !quantum.reg
+
         # CHECK: [[detensorize:%.+]] = tensor.extract [[nSub1]][] : tensor<i64>
         # CHECK: [[qubit:%.+]] = quantum.extract %2[[[detensorize]]] : !quantum.reg -> !quantum.bit
         # CHECK: [[q0:%.+]] = quantum.static_custom "RZ" [1.000000e-01] [[qubit]]
