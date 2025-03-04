@@ -567,8 +567,8 @@ class TestHybridPrograms:
         program capture."""
         dev = qml.device("lightning.qubit", wires=2)
 
-        @qml.qjit(experimental_capture=True)
-        @qml.qnode(dev)
+        @qml.qjit(experimental_capture=True, autograph=False)
+        @qml.qnode(dev, autograph=False)
         def f(x):
             if qml.compiler.active():
                 # We should always execute this branch
