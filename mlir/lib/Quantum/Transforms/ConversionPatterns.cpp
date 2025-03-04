@@ -531,37 +531,35 @@ struct ComputationalBasisOpPattern : public OpConversionPattern<ComputationalBas
         StringRef mode;
 
         SmallVector<Value> args;
-        if (adaptor.getQubits().size() != 0){
-            for (const Value &qubit : adaptor.getQubits()){
+        if (adaptor.getQubits().size() != 0) {
+            for (const Value &qubit : adaptor.getQubits()) {
                 args.push_back(qubit);
             }
-           mode = "qubits";
+            mode = "qubits";
         }
-        else if (adaptor.getQreg()){
-           // For qreg case, we also let the unrealized cast op carry
-           // the num_qubits SSA value for convenience
-           args.insert(args.end(),
-                       adaptor.getQreg());
-           mode = "qreg";
+        else if (adaptor.getQreg()) {
+            // For qreg case, we also let the unrealized cast op carry
+            // the num_qubits SSA value for convenience
+            args.insert(args.end(), adaptor.getQreg());
+            mode = "qreg";
 
             Value reg_value = op.getQreg();
             Operation *reg_def = reg_value.getDefiningOp();
             // Walk back to the original alloc of the register
             // Only Alloc, Adjoint and Insert could have qreg as outputs
-            while (!isa<AllocOp>(reg_def)){
+            while (!isa<AllocOp>(reg_def)) {
                 // TODO: switch case?
-                if (isa<AdjointOp>(reg_def)){
+                if (isa<AdjointOp>(reg_def)) {
                     reg_value = cast<AdjointOp>(reg_def).getQreg();
                 }
-                else if (isa<InsertOp>(reg_def)){
+                else if (isa<InsertOp>(reg_def)) {
                     reg_value = cast<InsertOp>(reg_def).getInQreg();
                 }
                 reg_def = reg_value.getDefiningOp();
             }
 
             auto allocOp = cast<AllocOp>(reg_def);
-            args.insert(args.end(),
-                       allocOp.getNqubits());
+            args.insert(args.end(), allocOp.getNqubits());
         }
 
         auto ucc = rewriter.create<UnrealizedConversionCastOp>(
