@@ -616,7 +616,12 @@ def trace_from_pennylane(fn, static_argnums, abstracted_axes, sig, kwargs):
                 and hasattr(fn.transform_program, "_transform_program")
                 and len(fn.transform_program._transform_program) > 0
             ):
-                for transform in fn.transform_program._transform_program:
+                # The original PL transform program has to be removed before applying the
+                # Catalyst transforms
+                transform_program = fn.transform_program._transform_program
+                fn.transform_program._transform_program.clear()
+
+                for transform in transform_program:
                     if transform._transform == qml.transforms.cancel_inverses.transform:
                         fn = cancel_inverses(fn)
                     else:
