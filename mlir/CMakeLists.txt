@@ -46,6 +46,7 @@ set(ALL_MHLO_PASSES
 list(APPEND CMAKE_MODULE_PATH "${MLIR_CMAKE_DIR}")
 list(APPEND CMAKE_MODULE_PATH "${LLVM_CMAKE_DIR}")
 list(APPEND CMAKE_MODULE_PATH "${MHLO_CMAKE_DIR}")
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
 include(TableGen)
 include(AddLLVM)
 include(AddMLIR)
@@ -59,15 +60,20 @@ endif()
 list(GET MHLO_INCLUDE_DIRS 1 MLIRHLO_DIR)
 list(GET MHLO_INCLUDE_DIRS 2 MLIRHLO_BUILD_DIR)
 
+set(CATALYST_MAIN_INCLUDE_DIR ${PROJECT_SOURCE_DIR}/include)
+set(CATALYST_GEN_INCLUDE_DIR ${PROJECT_BINARY_DIR}/include)
+set(CATALYST_LIB_DIR ${CMAKE_CURRENT_BINARY_DIR})
+
 include_directories(${LLVM_INCLUDE_DIRS}
                     ${MLIR_INCLUDE_DIRS}
                     ${MHLO_INCLUDE_DIRS}
                     ${MLIRHLO_DIR}/stablehlo
                     ${MLIRHLO_BUILD_DIR}/stablehlo
-                    ${PROJECT_SOURCE_DIR}/include
-                    ${PROJECT_BINARY_DIR}/include)
+		    ${CATALYST_MAIN_INCLUDE_DIR}
+		    ${CATALYST_GEN_INCLUDE_DIR})
 link_directories(${LLVM_BUILD_LIBRARY_DIR})
 add_definitions(${LLVM_DEFINITIONS})
+
 
 add_subdirectory(include)
 add_subdirectory(lib)
@@ -78,3 +84,5 @@ if(QUANTUM_ENABLE_BINDINGS_PYTHON)
   message(STATUS "Enabling Python API")
   add_subdirectory(python)
 endif()
+
+add_subdirectory(cmake/modules)
