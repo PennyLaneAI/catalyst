@@ -536,10 +536,10 @@ def get_device_capabilities(device) -> DeviceCapabilities:
 def check_device_wires(wires):
     """Validate requirements Catalyst imposes on device wires."""
 
-    if not is_dynamic_wires(wires):
-        if wires is None:
-            raise AttributeError("Catalyst does not support device instances without set wires.")
+    if wires is None:
+        raise AttributeError("Catalyst does not support device instances without set wires.")
 
+    if not is_dynamic_wires(wires):
         assert isinstance(wires, qml.wires.Wires)
 
         if not all(isinstance(wire, int) for wire in wires.labels):
