@@ -25,9 +25,10 @@ from copy import deepcopy
 from dataclasses import dataclass, replace
 from typing import Any, Dict, Optional
 
+import pennylane as qml
+
 from jax.interpreters.partial_eval import DynamicJaxprTracer
 
-import pennylane as qml
 from pennylane.devices.capabilities import DeviceCapabilities, OperatorProperties
 from pennylane.transforms import (
     diagonalize_measurements,
