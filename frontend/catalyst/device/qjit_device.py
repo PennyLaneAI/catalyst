@@ -25,6 +25,8 @@ from copy import deepcopy
 from dataclasses import dataclass, replace
 from typing import Any, Dict, Optional
 
+from jax.interpreters.partial_eval import DynamicJaxprTracer
+
 import pennylane as qml
 from pennylane.devices.capabilities import DeviceCapabilities, OperatorProperties
 from pennylane.transforms import (
@@ -46,7 +48,6 @@ from catalyst.device.verification import (
     verify_no_state_variance_returns,
     verify_operations,
 )
-from catalyst.jax_extras.tracing import is_dynamic_wires
 from catalyst.logging import debug_logger, debug_logger_init
 from catalyst.third_party.cuda import SoftwareQQPP
 from catalyst.utils.exceptions import CompileError
@@ -531,6 +532,19 @@ def get_device_capabilities(device) -> DeviceCapabilities:
     device_capabilities = _load_device_capabilities(device)
 
     return device_capabilities.filter(finite_shots=shots_present)
+
+
+def is_dynamic_wires(wires: qml.wires.Wires):
+    """
+    Checks if a pennylane Wires object corresponds to a concrete number
+    of wires or a dynamic number of wires.
+
+    If the number of wires is static, the Wires object contains a list of wire labels,
+    one label for each wires.
+    If the number of wires is dynamic, the Wires object contains a single tracer that
+    represents the number of wires.
+    """
+    return (len(wires) == 1) and (isinstance(wires[0], DynamicJaxprTracer))
 
 
 def check_device_wires(wires):

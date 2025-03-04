@@ -70,7 +70,7 @@ from catalyst.jax_extras import (
     tree_unflatten,
     wrap_init,
 )
-from catalyst.jax_extras.tracing import bind_flexible_primitive, is_dynamic_wires
+from catalyst.jax_extras.tracing import bind_flexible_primitive
 from catalyst.jax_primitives import (
     AbstractQreg,
     compbasis_p,
@@ -1216,7 +1216,7 @@ def trace_quantum_function(
                     rtd_name=device.backend_name,
                     rtd_kwargs=str(device.backend_kwargs),
                 )
-                if is_dynamic_wires(device.wires):
+                if catalyst.device.qjit_device.is_dynamic_wires(device.wires):
                     # When device has dynamic wires, the device.wires iterable object
                     # has a single value, which is the tracer for the number of wires
                     qreg_in = qalloc_p.bind(device.wires[0])
