@@ -539,7 +539,7 @@ def check_device_wires(wires):
     if wires is None:
         raise AttributeError("Catalyst does not support device instances without set wires.")
 
-    if not is_dynamic_wires(wires):
+    if len(wires) >= 2 or (not is_dynamic_wires(wires)):
         assert isinstance(wires, qml.wires.Wires)
 
         if not all(isinstance(wire, int) for wire in wires.labels):
