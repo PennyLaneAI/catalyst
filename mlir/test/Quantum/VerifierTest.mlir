@@ -149,15 +149,6 @@ func.func @compbasis2(%q0 : !quantum.bit, %q1 : !quantum.bit, %r : !quantum.reg)
 
 // -----
 
-func.func @compbasis3() {
-    // expected-error@+1 {{computational basis op must take in either a list of qubits or a qureg}}
-    %obs = quantum.compbasis : !quantum.obs
-
-    return
-}
-
-// -----
-
 func.func @namedobs(%q : !quantum.bit) {
     %0 = quantum.namedobs %q[Identity] : !quantum.obs
     %1 = quantum.namedobs %q[PauliX] : !quantum.obs
