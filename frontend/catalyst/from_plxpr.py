@@ -59,6 +59,7 @@ from catalyst.jax_primitives import (
     var_p,
     while_p,
 )
+from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
 
 measurement_map = {
     qml.measurements.SampleMP: sample_p,
@@ -607,7 +608,8 @@ def trace_from_pennylane(fn, static_argnums, abstracted_axes, sig, kwargs):
 
         args = sig
         try:
-            plxpr, out_type, out_treedef = make_jaxpr2(fn, **make_jaxpr_kwargs)(*args, **kwargs)
+            with EvaluationContext(EvaluationMode.CLASSICAL_COMPILATION):
+                plxpr, out_type, out_treedef = make_jaxpr2(fn, **make_jaxpr_kwargs)(*args, **kwargs)
             jaxpr = from_plxpr(plxpr)(*args, **kwargs)
         finally:
             if not capture_on:
