@@ -2,6 +2,48 @@
 
 <h3>New features since last release</h3>
 
+* Conversion Clifford+T gates to Pauli Product Rotation (PPR) and measurement to Pauli Product Measurement (PPM) are now available through the `clifford_t_ppr` pass transform.
+  [(#1499)](https://github.com/PennyLaneAI/catalyst/pull/1499)
+  [(#1551)](https://github.com/PennyLaneAI/catalyst/pull/1551)
+
+  Supported gate conversions:
+    - H gate → PPR with (Z · X · Z)π/4
+    - S gate → PPR with (Z)π/4
+    - T gate → PPR with (Z)π/8
+    - CNOT → PPR with (Z ⊗ X)π/4 · (Z ⊗ 1)−π/4 · (1 ⊗ X)−π/4
+
+    Example: 
+    ```python
+        @qjit(keep_intermediate=True)
+        @clifford_t_ppr
+        @qml.qnode(dev)
+        def circuit():
+            qml.H(0)
+            qml.S(1)
+            qml.T(0)
+            qml.CNOT([0, 1])
+            m1 = catalyst.measure(wires=0)
+            m2 = catalyst.measure(wires=1)
+            return m1, m2
+        circuit()
+    ```
+
+    The PPRs and PPMs are currently only represented symbolically. However, these operations are not yet executable on any backend since they exist purely as intermediate representations for analysis and potential future execution when a suitable backend is available.
+    
+    Example MLIR Representation:
+    ```mlir
+      . . .
+      %q0_0 = qec.ppr ["Z", "X", "Z"](%pi4) %qreg_0 : !quantum.bit
+      %q1_0 = qec.ppr ["Z"](%pi4) %qreg_1 : !quantum.bit
+      %q0_1 = qec.ppr ["Z"](%pi8) %q0_0 : !quantum.bit
+      %01_0 = qec.ppr ["Z", "X"](%pi4) %5, %2 : !quantum.bit, !quantum.bit
+      %q0_1 = qec.ppr ["Z"](%n_pi4) %01#0 : !quantum.bit
+      %q1_2 = qec.ppr ["X"](%n_pi4) %01#1 : !quantum.bit
+      %mres_1, %q0_3 = qec.ppm ["Z"] %q0_1 : !quantum.bit
+      %mres_2, %q1_3 = qec.ppm ["Z"] %q1_2 : !quantum.bit
+      . . . 
+    ```
+
 <h3>Improvements 🛠</h3>
 
 * Changed pattern rewritting in `quantum-to-ion` lowering pass to use MLIR's dialect conversion
@@ -65,6 +107,10 @@
   give incorrect results for circuits containing `qml.StatePrep`.
   [(#1491)](https://github.com/PennyLaneAI/catalyst/pull/1491)
 
+* Fixes an issue ([(#1501)](https://github.com/PennyLaneAI/catalyst/issues/1501)) where using 
+  autograph in conjunction with catalyst passes causes a crash.
+  [(#1541)](https://github.com/PennyLaneAI/catalyst/pull/1541)
+
 <h3>Internal changes ⚙️</h3>
 
 * Updated the call signature for the PLXPR `qnode_prim` primitive.
@@ -119,6 +165,9 @@
   - Catalyst now generates OpenAPL programs for Pennylane circuits of up to two qubits using the OQD device.
     [(#1517)](https://github.com/PennyLaneAI/catalyst/pull/1517)
 
+  - The end-to-end compilation pipeline for OQD devices is available as an API function.
+    [(#1545)](https://github.com/PennyLaneAI/catalyst/pull/1545)
+
 * Update source code to comply with changes requested by black v25.1.0
   [(#1490)](https://github.com/PennyLaneAI/catalyst/pull/1490)
 
@@ -132,6 +181,7 @@ Joey Carter,
 Yushao Chen,
 Zach Goldthorpe,
 Sengthai Heng,
+David Ittah,
 Rohan Nolan Lasrado,
 Christina Lee,
 Mehrdad Malekmohammadi,

@@ -6,5 +6,4 @@ add_mlir_library(MLIRQEC
 
     DEPENDS
     MLIRQECDialectIncGen
-    MLIRQECEnumsIncGen
 )
