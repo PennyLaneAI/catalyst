@@ -1,4 +1,4 @@
-// Copyright 2022-2023 Xanadu Quantum Technologies Inc.
+// Copyright 2025 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,19 +14,14 @@
 
 #pragma once
 
-#include "mlir/CAPI/Registration.h"
+#include "mlir/Conversion/LLVMCommon/TypeConverter.h"
+#include "mlir/IR/PatternMatch.h"
+#include "mlir/Transforms/DialectConversion.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+namespace catalyst {
+namespace qec {
 
-MLIR_DECLARE_CAPI_DIALECT_REGISTRATION(Quantum, quantum);
-MLIR_DECLARE_CAPI_DIALECT_REGISTRATION(Gradient, gradient);
-MLIR_DECLARE_CAPI_DIALECT_REGISTRATION(Mitigation, mitigation);
-MLIR_DECLARE_CAPI_DIALECT_REGISTRATION(Catalyst, catalyst);
-MLIR_DECLARE_CAPI_DIALECT_REGISTRATION(Ion, ion);
-MLIR_DECLARE_CAPI_DIALECT_REGISTRATION(QEC, qec);
+void populateCliffordTToPPRPatterns(mlir::RewritePatternSet &);
 
-#ifdef __cplusplus
-}
-#endif
+} // namespace qec
+} // namespace catalyst

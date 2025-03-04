@@ -27,6 +27,7 @@ from numpy.testing import assert_allclose
 
 from catalyst import *
 from catalyst.autograph.transformer import TRANSFORMER
+from catalyst.passes import merge_rotations
 from catalyst.utils.dummy import dummy_func
 from catalyst.utils.exceptions import CompileError
 
