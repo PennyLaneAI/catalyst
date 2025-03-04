@@ -1006,7 +1006,7 @@ def is_dynamic_wires(wires: pennylane.wires.Wires):  # pylint: disable=undefined
     Checks if a pennylane Wires object corresponds to a concrete number
     of wires or a dynamic number of wires.
 
-    If the number of wires is concrete, the Wires object contains a list of wire labels,
+    If the number of wires is static, the Wires object contains a list of wire labels,
     one label for each wires.
     If the number of wires is dynamic, the Wires object contains a single tracer that
     represents the number of wires.
