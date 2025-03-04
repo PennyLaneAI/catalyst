@@ -310,11 +310,7 @@ class QJITDevice(qml.devices.Device):
         for key, value in original_device.__dict__.items():
             self.__setattr__(key, value)
 
-        if original_device.wires is None:
-            raise AttributeError("Catalyst does not support device instances without set wires.")
-
-        if not is_dynamic_wires(original_device.wires):
-            check_device_wires(original_device.wires)
+        check_device_wires(original_device.wires)
 
         super().__init__(wires=original_device.wires, shots=original_device.shots)
 
@@ -540,10 +536,17 @@ def get_device_capabilities(device) -> DeviceCapabilities:
 def check_device_wires(wires):
     """Validate requirements Catalyst imposes on device wires."""
 
-    assert isinstance(wires, qml.wires.Wires)
+    if not is_dynamic_wires(wires):
+        if wires is None:
+            raise AttributeError("Catalyst does not support device instances without set wires.")
 
-    if not all(isinstance(wire, int) for wire in wires.labels):
-        raise AttributeError("Catalyst requires continuous integer wire labels starting at 0.")
+        assert isinstance(wires, qml.wires.Wires)
 
-    if not wires.labels == tuple(range(len(wires))):
-        raise AttributeError("Catalyst requires continuous integer wire labels starting at 0.")
+        if not all(isinstance(wire, int) for wire in wires.labels):
+            raise AttributeError("Catalyst requires continuous integer wire labels starting at 0.")
+
+        if not wires.labels == tuple(range(len(wires))):
+            raise AttributeError("Catalyst requires continuous integer wire labels starting at 0.")
+    else:
+        assert wires[0].shape == ()
+        assert wires[0].dtype == "int64"
