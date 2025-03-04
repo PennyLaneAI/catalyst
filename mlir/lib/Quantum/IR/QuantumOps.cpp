@@ -251,6 +251,19 @@ LogicalResult QubitUnitaryOp::verify()
 
 // ----- measurements
 
+LogicalResult ComputationalBasisOp::verify()
+{
+    if ((getQubits().size() != 0) && (getQreg() != nullptr)) {
+        return emitOpError() << "computational basis op cannot simultaneously take in both qubits and quregs";
+    }
+
+    if ((getQubits().size() == 0) && (getQreg() == nullptr)) {
+        return emitOpError() << "computational basis op must take in either a list of qubits or a qureg";
+    }
+
+    return success();
+}
+
 LogicalResult HermitianOp::verify()
 {
     size_t dim = std::pow(2, getQubits().size());
