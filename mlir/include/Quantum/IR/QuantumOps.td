@@ -657,14 +657,17 @@ def ComputationalBasisOp : Observable_Op<"compbasis", [AttrSizedOperandSegments]
         The `quantum.compbasis` operation defines a quantum observable to be used by other
         operations such as measurement processes. The specific observable defined here is a
         "pseudo" observable to represent measurements in the computational basis.
-        The only arguments are the list of qubits to measure.
+        The only arguments are either the list of qubits to measure, or the quantum register
+        to measure. When the argument is a register, the measurement occurs on all qubits in
+        the register.
 
         Example:
 
         ```mlir
-        func.func @foo(%q0: !quantum.bit, %q1: !quantum.bit)
+        func.func @foo(%q0: !quantum.bit, %q1: !quantum.bit, %r: !quantum.reg)
         {
-            %res = quantum.compbasis %q0, %q1 : !quantum.obs
+            %obs_q = quantum.compbasis qubits %q0, %q1 : !quantum.obs
+            %obs_r = quantum.compbasis qreg %r : !quantum.obs
             func.return
         }
         ```
