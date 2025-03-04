@@ -623,15 +623,20 @@ def trace_from_pennylane(fn, static_argnums, abstracted_axes, sig, kwargs):
                     **dict(params, **kwargs),
                 )
 
-            # Apply the corresponding Catalyst transforms
             with Patcher(
                 (qml.QNode, "__call__", closure),
             ):
-                for transform in fn.transform_program._transform_program:
-                    if transform._transform == qml.transforms.cancel_inverses.transform:
-                        fn = cancel_inverses(fn)
-                    else:
-                        raise NotImplementedError("This transformed is not supported yet")
+                # Apply the corresponding Catalyst transforms, if found
+                if (
+                    hasattr(fn, "transform_program")
+                    and hasattr(fn.transform_program, "_transform_program")
+                    and len(fn.transform_program._transform_program) > 0
+                ):
+                    for transform in fn.transform_program._transform_program:
+                        if transform._transform == qml.transforms.cancel_inverses.transform:
+                            fn = cancel_inverses(fn)
+                        else:
+                            raise NotImplementedError("This transformed is not supported yet")
 
                 plxpr, out_type, out_treedef = make_jaxpr2(fn, **make_jaxpr_kwargs)(*args, **kwargs)
                 jaxpr = from_plxpr(plxpr)(*args, **kwargs)
