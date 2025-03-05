@@ -41,7 +41,7 @@ def f(num_qubits):
 print("ref with 3: ", f(3))
 print("ref with 5: ", f(5))
 
-f = qjit(keep_intermediate=False)(f)
+f = qjit(keep_intermediate=True)(f)
 
 #manual = "0_probs.mlir"
 #with open(manual, "r") as file:
