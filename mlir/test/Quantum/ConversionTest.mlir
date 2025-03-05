@@ -303,9 +303,19 @@ func.func @qubit_unitary(%q0 : !quantum.bit, %p1 : memref<2x2xcomplex<f64>>,  %p
 func.func @compbasis(%q : !quantum.bit) {
 
     // CHECK: builtin.unrealized_conversion_cast %arg0
-    quantum.compbasis %q : !quantum.obs
+    // CHECK-SAME: {mode = "qubits"}
+    quantum.compbasis qubits %q : !quantum.obs
     // CHECK: builtin.unrealized_conversion_cast %arg0, %arg0
-    quantum.compbasis %q, %q : !quantum.obs
+    // CHECK-SAME: {mode = "qubits"}
+    quantum.compbasis qubits %q, %q : !quantum.obs
+
+    // CHECK: [[c:%.+]] = llvm.mlir.constant(42 : i64) : i64
+    // CHECK: [[r:%.+]] = llvm.call @__catalyst__rt__qubit_allocate_array([[c]])
+    // CHECK: builtin.unrealized_conversion_cast [[r]], [[c]]
+    // CHECK-SAME: {mode = "qreg"}
+    %c = llvm.mlir.constant(42 : i64) : i64
+    %r = quantum.alloc(%c) : !quantum.reg
+    quantum.compbasis qreg %r : !quantum.obs
 
     return
 }
@@ -450,7 +460,7 @@ func.func @measure(%q : !quantum.bit) -> !quantum.bit {
 // CHECK-LABEL: @sample
 func.func @sample(%q : !quantum.bit, %dyn_shots: i64) {
 
-    %o1 = quantum.compbasis %q : !quantum.obs
+    %o1 = quantum.compbasis qubits %q : !quantum.obs
 
     %idx1 = index.casts %dyn_shots : i64 to index
     %dyn_alloc1 = memref.alloc(%idx1) : memref<?x1xf64>
@@ -471,7 +481,7 @@ func.func @sample(%q : !quantum.bit, %dyn_shots: i64) {
     // CHECK: [[ptr:%.+]] = llvm.alloca [[c1]] x !llvm.struct<(ptr, ptr, i64, array<2 x i64>, array<2 x i64>)>
     // CHECK: [[c2:%.+]] = llvm.mlir.constant(2 : i64)
     // CHECK: llvm.call @__catalyst__qis__Sample([[ptr]], [[c2]], %arg0, %arg0)
-    %o2 = quantum.compbasis %q, %q : !quantum.obs
+    %o2 = quantum.compbasis qubits %q, %q : !quantum.obs
     %idx2 = index.casts %dyn_shots : i64 to index
     %dyn_alloc2 = memref.alloc(%idx2) : memref<?x2xf64>
     quantum.sample %o2 in(%dyn_alloc2 : memref<?x2xf64>)
@@ -485,7 +495,7 @@ func.func @sample(%q : !quantum.bit, %dyn_shots: i64) {
 // CHECK-LABEL: @counts
 func.func @counts(%q : !quantum.bit) {
 
-    %o1 = quantum.compbasis %q : !quantum.obs
+    %o1 = quantum.compbasis qubits %q : !quantum.obs
     // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
     // CHECK: [[ptr:%.+]] = llvm.alloca [[c1]] x !llvm.struct<(struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>, struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
     // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
@@ -502,7 +512,7 @@ func.func @counts(%q : !quantum.bit) {
 
 // CHECK-LABEL: @counts
 func.func @counts(%q : !quantum.bit) {
-    %o2 = quantum.compbasis %q, %q : !quantum.obs
+    %o2 = quantum.compbasis qubits %q, %q : !quantum.obs
     // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
     // CHECK: [[ptr:%.+]] = llvm.alloca [[c1]] x !llvm.struct<(struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>, struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
     // CHECK: [[c2:%.+]] = llvm.mlir.constant(2 : i64)
@@ -541,17 +551,18 @@ func.func @var(%obs : !quantum.obs) {
 
 // -----
 
-// CHECK: llvm.func @__catalyst__qis__Probs(!llvm.ptr, i64, ...)
+// CHECK: llvm.func @__catalyst__qis__Probs(!llvm.ptr, i1, i64, ...)
 
 // CHECK-LABEL: @probs
 func.func @probs(%q : !quantum.bit) {
 
-    %o1 = quantum.compbasis %q : !quantum.obs
+    %o1 = quantum.compbasis qubits %q : !quantum.obs
 
     // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
     // CHECK: [[ptr:%.+]] = llvm.alloca [[c1]] x !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
     // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
-    // CHECK: llvm.call @__catalyst__qis__Probs([[ptr]], [[c1]], %arg0)
+    // CHECK: [[true:%.+]] = llvm.mlir.constant(true) : i1
+    // CHECK: llvm.call @__catalyst__qis__Probs([[ptr]], [[true]], [[c1]], %arg0)
     %alloc1 = memref.alloc() : memref<2xf64>
     quantum.probs %o1 in(%alloc1 : memref<2xf64>)
 
@@ -561,30 +572,56 @@ func.func @probs(%q : !quantum.bit) {
 // -----
 // CHECK-LABEL: @probs
 func.func @probs(%q : !quantum.bit) {
-    %o2 = quantum.compbasis %q, %q, %q, %q : !quantum.obs
+    %o2 = quantum.compbasis qubits %q, %q, %q, %q : !quantum.obs
     // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
     // CHECK: [[ptr:%.+]] = llvm.alloca [[c1]] x !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
     // CHECK: [[c4:%.+]] = llvm.mlir.constant(4 : i64)
-    // CHECK: llvm.call @__catalyst__qis__Probs([[ptr]], [[c4]], %arg0, %arg0, %arg0, %arg0)
+    // CHECK: [[true:%.+]] = llvm.mlir.constant(true) : i1
+    // CHECK: llvm.call @__catalyst__qis__Probs([[ptr]], [[true]], [[c4]], %arg0, %arg0, %arg0, %arg0)
     %alloc2 = memref.alloc() : memref<16xf64>
     quantum.probs %o2 in(%alloc2 : memref<16xf64>)
     return
 }
 
 // -----
+// CHECK-LABEL: @probs_qreg
+func.func @probs_qreg(%c : i64) {
+    // CHECK: [[r:%.+]] = llvm.call @__catalyst__rt__qubit_allocate_array(%arg0)
+    // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
+    // CHECK: [[ptr:%.+]] = llvm.alloca [[c1]] x !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
+    // CHECK: builtin.unrealized_conversion_cast [[r]], %arg0
+    // CHECK-SAME: {mode = "qreg"}
+    %r = quantum.alloc(%c) : !quantum.reg
+    %o = quantum.compbasis qreg %r : !quantum.obs
 
-// CHECK: llvm.func @__catalyst__qis__State(!llvm.ptr, i64, ...)
+
+    // COM: while the actual allocated space should be 2^num_qubits,
+    // COM: since the probs runtime capi only cares about num_qubits,
+    // COM: we just provide an unmeaningful allocated size here
+    %_ = llvm.mlir.constant(42 : i64) : i64
+    %index = index.casts %_ : i64 to index
+    %alloc = memref.alloc(%index) : memref<?xf64>
+    // CHECK: [[false:%.+]] = llvm.mlir.constant(false) : i1
+    // CHECK: llvm.call @__catalyst__qis__Probs([[ptr]], [[false]], %arg0)
+    quantum.probs %o in(%alloc : memref<?xf64>)
+    return
+}
+
+// -----
+
+// CHECK: llvm.func @__catalyst__qis__State(!llvm.ptr, i1, i64, ...)
 
 // CHECK-LABEL: @state
 func.func @state(%q : !quantum.bit) {
     // CHECK: [[qb:%.+]] = builtin.unrealized_conversion_cast %arg0
 
-    %o1 = quantum.compbasis %q : !quantum.obs
+    %o1 = quantum.compbasis qubits %q : !quantum.obs
 
     // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
     // CHECK: [[ptr:%.+]] = llvm.alloca [[c1]] x !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
     // CHECK: [[c0:%.+]] = llvm.mlir.constant(0 : i64)
-    // CHECK: llvm.call @__catalyst__qis__State([[ptr]], [[c0]])
+    // CHECK: [[false:%.+]] = llvm.mlir.constant(false) : i1
+    // CHECK: llvm.call @__catalyst__qis__State([[ptr]], [[false]], [[c0]])
     %alloc1 = memref.alloc() : memref<2xcomplex<f64>>
     quantum.state %o1 in(%alloc1 : memref<2xcomplex<f64>>)
 
@@ -595,13 +632,42 @@ func.func @state(%q : !quantum.bit) {
 
 // CHECK-LABEL: @state
 func.func @state(%q : !quantum.bit) {
-    %o2 = quantum.compbasis %q, %q, %q, %q : !quantum.obs
+    %o2 = quantum.compbasis qubits %q, %q, %q, %q : !quantum.obs
     // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
     // CHECK: [[ptr:%.+]] = llvm.alloca [[c1]] x !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
     // CHECK: [[c0:%.+]] = llvm.mlir.constant(0 : i64)
-    // CHECK: llvm.call @__catalyst__qis__State([[ptr]], [[c0]])
+    // CHECK: [[false:%.+]] = llvm.mlir.constant(false) : i1
+    // CHECK: llvm.call @__catalyst__qis__State([[ptr]], [[false]], [[c0]])
     %alloc2 = memref.alloc() : memref<16xcomplex<f64>>
     quantum.state %o2 in(%alloc2: memref<16xcomplex<f64>>)
+    return
+}
+
+// -----
+
+// CHECK-LABEL: @state_qreg
+func.func @state_qreg(%c : i64) {
+    // CHECK: [[r:%.+]] = llvm.call @__catalyst__rt__qubit_allocate_array(%arg0)
+    // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
+    // CHECK: [[ptr:%.+]] = llvm.alloca [[c1]] x !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
+    // CHECK: builtin.unrealized_conversion_cast [[r]], %arg0
+    // CHECK-SAME: {mode = "qreg"}
+    %r = quantum.alloc(%c) : !quantum.reg
+    %o = quantum.compbasis qreg %r : !quantum.obs
+
+
+    // COM: while the actual allocated space should be 2^num_qubits,
+    // COM: since the state runtime capi only cares about num_qubits,
+    // COM: we just provide an unmeaningful allocated size here
+    // COM: Moreover, num_qubits for state is always zero, as qml.state
+    // COM: only takes in entire resgisters and a subset of wires is not allowed.
+    %_ = llvm.mlir.constant(42 : i64) : i64
+    %index = index.casts %_ : i64 to index
+    %alloc = memref.alloc(%index) : memref<?xcomplex<f64>>
+    // CHECK: [[zero:%.+]] = llvm.mlir.constant(0 : i64)
+    // CHECK: [[false:%.+]] = llvm.mlir.constant(false) : i1
+    // CHECK: llvm.call @__catalyst__qis__State([[ptr]], [[false]], [[zero]])
+    quantum.state %o in(%alloc : memref<?xcomplex<f64>>)
     return
 }
 

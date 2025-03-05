@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Index/IR/IndexDialect.h"
@@ -114,7 +115,44 @@ struct BufferizeStateOp : public OpConversionPattern<StateOp> {
         Type tensorType = op.getType(0);
         MemRefType resultType = cast<MemRefType>(getTypeConverter()->convertType(tensorType));
         Location loc = op.getLoc();
-        Value allocVal = rewriter.replaceOpWithNewOp<memref::AllocOp>(op, resultType);
+
+        auto shape = cast<mlir::RankedTensorType>(tensorType).getShape();
+        SmallVector<Value> allocSizes;
+
+        // The result of state is 1DTensorOf<[Complex<F64>]>
+        // The size of the result might be dynamic, i.e. <?xcomplex<f64>>
+        // if the number of wires is dynamic
+        // In such cases, we need to allocate dynamically as well.
+        // The size is 2^num_qubits, or integer 1 left shifted by num_qubits.
+        if (shape[0] == ShapedType::kDynamic) {
+            auto one = rewriter.create<arith::ConstantOp>(loc, rewriter.getI64Type(), rewriter.getIntegerAttr(rewriter.getI64Type(),1));
+            auto compbasisOp = cast<ComputationalBasisOp>(op.getObs().getDefiningOp());
+
+            Value reg_value = compbasisOp.getQreg();
+            Operation *reg_def = reg_value.getDefiningOp();
+            // Walk back to the original alloc of the register
+            // Only Alloc, Adjoint and Insert could have qreg as outputs
+            while (!isa<AllocOp>(reg_def)){
+                // TODO: switch case?
+                if (isa<AdjointOp>(reg_def)){
+                    reg_value = cast<AdjointOp>(reg_def).getQreg();
+                }
+                else if (isa<InsertOp>(reg_def)){
+                    reg_value = cast<InsertOp>(reg_def).getInQreg();
+                }
+                reg_def = reg_value.getDefiningOp();
+            }
+
+            auto allocOp = cast<AllocOp>(reg_def);
+            auto twoToN = rewriter.create<arith::ShLIOp>(loc, rewriter.getI64Type(),
+                one, allocOp.getNqubits());
+            auto allocSize = rewriter.create<index::CastSOp>(loc, rewriter.getIndexType(),
+                                                         twoToN);
+
+            allocSizes.push_back(allocSize);
+        }
+
+        Value allocVal = rewriter.replaceOpWithNewOp<memref::AllocOp>(op, resultType, allocSizes);
         rewriter.create<StateOp>(loc, TypeRange{}, ValueRange{adaptor.getObs(), allocVal});
         return success();
     }
@@ -129,7 +167,44 @@ struct BufferizeProbsOp : public OpConversionPattern<ProbsOp> {
         Type tensorType = op.getType(0);
         MemRefType resultType = cast<MemRefType>(getTypeConverter()->convertType(tensorType));
         Location loc = op.getLoc();
-        Value allocVal = rewriter.replaceOpWithNewOp<memref::AllocOp>(op, resultType);
+
+        auto shape = cast<mlir::RankedTensorType>(tensorType).getShape();
+        SmallVector<Value> allocSizes;
+
+        // The result of probs is 1DTensorOf<[F64]>
+        // The size of the result might be dynamic, i.e. <?xf64>
+        // if the number of wires is dynamic
+        // In such cases, we need to allocate dynamically as well.
+        // The size is 2^num_qubits, or integer 1 left shifted by num_qubits.
+        if (shape[0] == ShapedType::kDynamic) {
+            auto one = rewriter.create<arith::ConstantOp>(loc, rewriter.getI64Type(), rewriter.getIntegerAttr(rewriter.getI64Type(),1));
+            auto compbasisOp = cast<ComputationalBasisOp>(op.getObs().getDefiningOp());
+
+            Value reg_value = compbasisOp.getQreg();
+            Operation *reg_def = reg_value.getDefiningOp();
+            // Walk back to the original alloc of the register
+            // Only Alloc, Adjoint and Insert could have qreg as outputs
+            while (!isa<AllocOp>(reg_def)){
+                // TODO: switch case?
+                if (isa<AdjointOp>(reg_def)){
+                    reg_value = cast<AdjointOp>(reg_def).getQreg();
+                }
+                else if (isa<InsertOp>(reg_def)){
+                    reg_value = cast<InsertOp>(reg_def).getInQreg();
+                }
+                reg_def = reg_value.getDefiningOp();
+            }
+
+            auto allocOp = cast<AllocOp>(reg_def);
+            auto twoToN = rewriter.create<arith::ShLIOp>(loc, rewriter.getI64Type(),
+                one, allocOp.getNqubits());
+            auto allocSize = rewriter.create<index::CastSOp>(loc, rewriter.getIndexType(),
+                                                         twoToN);
+
+            allocSizes.push_back(allocSize);
+        }
+
+        Value allocVal = rewriter.replaceOpWithNewOp<memref::AllocOp>(op, resultType, allocSizes);
         rewriter.create<ProbsOp>(loc, TypeRange{}, ValueRange{adaptor.getObs(), allocVal});
         return success();
     }
