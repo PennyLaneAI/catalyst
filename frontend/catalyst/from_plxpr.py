@@ -61,8 +61,6 @@ from catalyst.jax_primitives import (
     while_p,
 )
 from catalyst.passes.pass_api import Pass
-from catalyst.qfunc import QFunc
-from catalyst.utils.patching import Patcher
 
 measurement_map = {
     qml.measurements.SampleMP: sample_p,
@@ -634,9 +632,10 @@ def trace_from_pennylane(fn, static_argnums, abstracted_axes, sig, kwargs):
 
                 for transform in transform_program:
                     if transform._transform == qml.transforms.cancel_inverses.transform:
+                        # Found PL 'cancel_inverses' transform, replace with its Catalyst counterpart
                         pass_pipeline.append(Pass("remove-chained-self-inverse"))
                     else:
-                        raise NotImplementedError("This transformed is not supported yet")
+                        raise NotImplementedError("This transform is not supported yet")
 
             plxpr, out_type, out_treedef = make_jaxpr2(fn, **make_jaxpr_kwargs)(*args, **kwargs)
             jaxpr = from_plxpr(plxpr, pass_pipeline)(*args, **kwargs)
