@@ -553,6 +553,8 @@ def check_device_wires(wires):
         raise AttributeError("Catalyst does not support device instances without set wires.")
 
     if len(wires) >= 2 or (not is_dynamic_wires(wires)):
+        # A dynamic number of wires correspond to a single tracer for the number
+        # Thus if more than one entry, must be static wires
         assert isinstance(wires, qml.wires.Wires)
 
         if not all(isinstance(wire, int) for wire in wires.labels):
@@ -561,5 +563,7 @@ def check_device_wires(wires):
         if not wires.labels == tuple(range(len(wires))):
             raise AttributeError("Catalyst requires continuous integer wire labels starting at 0.")
     else:
-        assert wires[0].shape == ()
-        assert wires[0].dtype == "int64"
+        assert len(wires) == 1
+        assert wires[0].shape in ((), (1,))
+        if not wires[0].dtype == "int64":
+            raise AttributeError("Number of wires on the device should be a scalar integer.")

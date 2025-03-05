@@ -138,5 +138,28 @@ def test_dynamic_wires_scalar_readouts(readout, backend, capfd):
     assert out.count("compiling...") == 3
 
 
+@pytest.mark.parametrize("wires", [1.1, (1.1)])
+def test_wrong_wires_argument(backend, wires):
+    """
+    Test that a circuit with a wrongly typed and shaped dynamic wire argument
+    is correctly caught.
+    """
+
+    @catalyst.qjit
+    def func(num_qubits):
+        dev = qml.device(backend, wires=num_qubits)
+
+        @qml.qnode(dev)
+        def circ():
+            return qml.expval(qml.Z(wires=num_qubits - 1))
+
+        return circ()
+
+    with pytest.raises(
+        AttributeError, match="Number of wires on the device should be a scalar integer."
+    ):
+        func(wires)
+
+
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
