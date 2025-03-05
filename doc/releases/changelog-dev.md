@@ -94,6 +94,11 @@
   - Lazy IR canonicalization and LLVMIR textual generation.
     [(#1530)](https://github.com/PennyLaneAI/catalyst/pull/1530)
 
+* Changes to support a dynamic wire of qubits:
+
+  - `ComputationalBasisOp` can now take in a quantum register in mlir, instead of an explicit, fixed-size list of qubits.
+    [(#1553)](https://github.com/PennyLaneAI/catalyst/pull/1553)
+
 <h3>Breaking changes 💔</h3>
 
 <h3>Deprecations 👋</h3>

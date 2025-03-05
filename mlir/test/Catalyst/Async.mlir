@@ -172,7 +172,7 @@ module @bar {
     quantum.device["/home/ubuntu/code/catalyst/frontend/catalyst/utils/../../../runtime/build/lib/librtd_lightning.so", "LightningSimulator", "{'shots': 0, 'mcmc': False}"]
     %0 = quantum.alloc( 1) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
-    %2 = quantum.compbasis %1 : !quantum.obs
+    %2 = quantum.compbasis qubits %1 : !quantum.obs
     %3 = quantum.state %2 : tensor<2xcomplex<f64>>
     quantum.dealloc %0 : !quantum.reg
     quantum.device_release
