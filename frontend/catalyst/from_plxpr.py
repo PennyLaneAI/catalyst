@@ -618,7 +618,7 @@ def trace_from_pennylane(fn, static_argnums, abstracted_axes, sig, kwargs):
         try:
             pass_pipeline = []
 
-            # Apply the corresponding Catalyst transforms, if found
+            # Collect the corresponding Catalyst transforms
             if (
                 hasattr(fn, "transform_program")
                 and hasattr(fn.transform_program, "_transform_program")
