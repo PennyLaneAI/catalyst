@@ -168,6 +168,15 @@ def _(self, *args, qnode, shots, device, execution_config, qfunc_jaxpr, n_consts
     return quantum_kernel_p.bind(wrap_init(f), *non_const_args, qnode=qnode)
 
 
+# pylint: disable=unused-argument, too-many-arguments
+@WorkflowInterpreter.register_primitive(quantum_kernel_p)
+def _(self, *args, qnode, batch_dims=None, pipeline, call_jaxpr):
+
+    f = partial(QFuncPlxprInterpreter(qnode.device, qnode.device.shots).eval, call_jaxpr, [])
+
+    return quantum_kernel_p.bind(wrap_init(f), *args, qnode=qnode, pipeline=pipeline)
+
+
 class QFuncPlxprInterpreter(PlxprInterpreter):
     """An interpreter that converts plxpr into catalyst-variant jaxpr.
 
