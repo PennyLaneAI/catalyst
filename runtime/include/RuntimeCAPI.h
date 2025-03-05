@@ -97,7 +97,7 @@ ObsIdType __catalyst__qis__HamiltonianObs(MemRefT_double_1d *, int64_t, /*obsKey
 RESULT *__catalyst__qis__Measure(QUBIT *, int32_t);
 double __catalyst__qis__Expval(ObsIdType);
 double __catalyst__qis__Variance(ObsIdType);
-void __catalyst__qis__Probs(MemRefT_double_1d *, bool, int64_t, /*qubits*/...);
+void __catalyst__qis__Probs(MemRefT_double_1d *, int64_t, /*qubits*/...);
 void __catalyst__qis__Sample(MemRefT_double_2d *, int64_t, /*qubits*/...);
 void __catalyst__qis__Counts(PairT_MemRefT_double_int64_1d *, int64_t, /*qubits*/...);
 void __catalyst__qis__State(MemRefT_CplxT_double_1d *, bool, int64_t, /*qubits*/...);

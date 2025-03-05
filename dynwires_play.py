@@ -41,12 +41,12 @@ def f(num_qubits):
 print("ref with 3: ", f(3))
 print("ref with 5: ", f(5))
 
-f = qjit(keep_intermediate=True)(f)
+f = qjit(keep_intermediate=False)(f)
 
-#manual = "0_probs.mlir"
+#manual = "f_2/5_MLIRToLLVMDialect.mlir"
 #with open(manual, "r") as file:
 #    ir = file.read()
-#replace_ir(f, "mlir", ir)
+#replace_ir(f, "MLIRToLLVMDialect", ir)
 
 print("dynamic alloc with 3: ", f(3))
 print("dynamic alloc again with 5: ", f(5))

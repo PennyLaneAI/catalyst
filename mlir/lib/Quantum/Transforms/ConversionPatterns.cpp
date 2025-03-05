@@ -538,30 +538,32 @@ struct ComputationalBasisOpPattern : public OpConversionPattern<ComputationalBas
            mode = "qubits";
         }
         else if (adaptor.getQreg()){
-           // For qreg case, we also let the unrealized cast op carry
-           // the num_qubits SSA value for convenience
-           args.insert(args.end(),
-                       adaptor.getQreg());
-           mode = "qreg";
+           // // For qreg case, we also let the unrealized cast op carry
+           // // the num_qubits SSA value for convenience
+           // args.insert(args.end(),
+           //             adaptor.getQreg());
+           // mode = "qreg";
 
-            Value reg_value = op.getQreg();
-            Operation *reg_def = reg_value.getDefiningOp();
-            // Walk back to the original alloc of the register
-            // Only Alloc, Adjoint and Insert could have qreg as outputs
-            while (!isa<AllocOp>(reg_def)){
-                // TODO: switch case?
-                if (isa<AdjointOp>(reg_def)){
-                    reg_value = cast<AdjointOp>(reg_def).getQreg();
-                }
-                else if (isa<InsertOp>(reg_def)){
-                    reg_value = cast<InsertOp>(reg_def).getInQreg();
-                }
-                reg_def = reg_value.getDefiningOp();
-            }
+           //  Value reg_value = op.getQreg();
+           //  Operation *reg_def = reg_value.getDefiningOp();
+           //  // Walk back to the original alloc of the register
+           //  // Only Alloc, Adjoint and Insert could have qreg as outputs
+           //  while (!isa<AllocOp>(reg_def)){
+           //      // TODO: switch case?
+           //      if (isa<AdjointOp>(reg_def)){
+           //          reg_value = cast<AdjointOp>(reg_def).getQreg();
+           //      }
+           //      else if (isa<InsertOp>(reg_def)){
+           //          reg_value = cast<InsertOp>(reg_def).getInQreg();
+           //      }
+           //      reg_def = reg_value.getDefiningOp();
+           //  }
 
-            auto allocOp = cast<AllocOp>(reg_def);
-            args.insert(args.end(),
-                       allocOp.getNqubits());
+           //  auto allocOp = cast<AllocOp>(reg_def);
+           //  args.insert(args.end(),
+           //             allocOp.getNqubits());
+
+        // create ucc op with no args
         }
 
         auto ucc = rewriter.create<UnrealizedConversionCastOp>(
@@ -900,7 +902,7 @@ template <typename T> struct StateBasedPattern : public OpConversionPattern<T> {
 
         Type qirSignature = LLVM::LLVMFunctionType::get(
             LLVM::LLVMVoidType::get(ctx),
-            {LLVM::LLVMPointerType::get(rewriter.getContext()), IntegerType::get(ctx, 1), IntegerType::get(ctx, 64)},
+            {LLVM::LLVMPointerType::get(rewriter.getContext()), IntegerType::get(ctx, 64)},
             /*isVarArg=*/true);
 
         LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
@@ -915,26 +917,24 @@ template <typename T> struct StateBasedPattern : public OpConversionPattern<T> {
         // accept observables for sample.
         Operation *ucc = adaptor.getObs().getDefiningOp();
         assert(isa<UnrealizedConversionCastOp>(ucc));
-        StringRef mode = cast<StringAttr>(ucc->getAttr("mode")).strref();
+        //StringRef mode = cast<StringAttr>(ucc->getAttr("mode")).strref();
+        SmallVector<Value> qubits = ucc->getOperands();
 
         SmallVector<Value> args = {structPtr};
         if constexpr (std::is_same_v<T, ProbsOp>) {
-            if (mode == "qubits"){
+            //if (mode == "qubits"){
+            if (qubits.size() > 0){
                 // with explicit qubits
                 SmallVector<Value> qubits = ucc->getOperands();
                 Value numQubits =
                     rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(qubits.size()));
-                Value true_value =
-                    rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI1Type(), rewriter.getBoolAttr(true));
-                args.push_back(true_value);
                 args.push_back(numQubits);
                 args.insert(args.end(), qubits.begin(), qubits.end());
-            } else if (mode == "qreg"){
+            //} else if (mode == "qreg"){
+            } else if (qubits.size() == 0){
                 // without explcit qubits
-                Value numQubits = ucc->getOperands()[1];
-                Value false_value =
-                    rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI1Type(), rewriter.getBoolAttr(false));
-                args.push_back(false_value);
+                //Value numQubits = ucc->getOperands()[1];
+                Value numQubits = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(0));
                 args.push_back(numQubits);
             }
         }
