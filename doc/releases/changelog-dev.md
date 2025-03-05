@@ -83,6 +83,30 @@
       return qml.expval(qml.Z(0))
   ```
 
+* Catalyst now supports experimental capture of `qml.transforms.cancel_inverses` transform.
+  [(#1544)](https://github.com/PennyLaneAI/catalyst/pull/1544)
+   
+  To trigger the PennyLane pipeline for capturing the `qml.transforms.cancel_inverses`
+  transform, simply set `experimental_capture=True` in the qjit decorator. Catalyst will
+  then apply its own `cancel inverses` pass in replacement of the original transform
+  provided by PennyLane.
+
+  ```python
+  import pennylane as qml
+  from catalyst import qjit
+
+  dev = qml.device("lightning.qubit", wires=1)
+
+  @qjit(experimental_capture=True)
+  @qml.transforms.cancel_inverses
+  @qml.qnode(dev)
+  def circuit(x: float):
+      qml.RX(x, wires=0)
+      qml.Hadamard(wires=0)
+      qml.Hadamard(wires=0)
+      return qml.expval(qml.PauliZ(0))
+  ```
+
 * Changes to reduce compile time:
 
   - Turn off MLIR's verifier.

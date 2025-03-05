@@ -59,6 +59,7 @@ from catalyst.jax_primitives import (
     var_p,
     while_p,
 )
+from catalyst.passes.pass_api import Pass
 
 measurement_map = {
     qml.measurements.SampleMP: sample_p,
@@ -85,7 +86,7 @@ def _get_device_kwargs(device) -> dict:
 
 # code example has long lines
 # pylint: disable=line-too-long
-def from_plxpr(plxpr: jax.core.ClosedJaxpr) -> Callable[..., jax.core.Jaxpr]:
+def from_plxpr(plxpr: jax.core.ClosedJaxpr, pass_pipeline=None) -> Callable[..., jax.core.Jaxpr]:
     """Convert PennyLane variant jaxpr to Catalyst variant jaxpr.
 
     Args:
@@ -146,11 +147,17 @@ def from_plxpr(plxpr: jax.core.ClosedJaxpr) -> Callable[..., jax.core.Jaxpr]:
         in (b,) }
 
     """
-    return jax.make_jaxpr(partial(WorkflowInterpreter().eval, plxpr.jaxpr, plxpr.consts))
+    return jax.make_jaxpr(
+        partial(WorkflowInterpreter(pass_pipeline).eval, plxpr.jaxpr, plxpr.consts)
+    )
 
 
 class WorkflowInterpreter(PlxprInterpreter):
     """An interpreter that converts a qnode primitive from a plxpr variant to a catalxpr variant."""
+
+    def __init__(self, pass_pipeline):
+        self._pass_pipeline = pass_pipeline
+        super().__init__()
 
 
 # pylint: disable=unused-argument, too-many-arguments
@@ -161,7 +168,9 @@ def _(self, *args, qnode, shots, device, execution_config, qfunc_jaxpr, n_consts
 
     f = partial(QFuncPlxprInterpreter(device, shots).eval, qfunc_jaxpr, consts)
 
-    return quantum_kernel_p.bind(wrap_init(f), *non_const_args, qnode=qnode)
+    return quantum_kernel_p.bind(
+        wrap_init(f), *non_const_args, qnode=qnode, pipeline=self._pass_pipeline
+    )
 
 
 class QFuncPlxprInterpreter(PlxprInterpreter):
@@ -607,8 +616,26 @@ def trace_from_pennylane(fn, static_argnums, abstracted_axes, sig, kwargs):
 
         args = sig
         try:
+            pass_pipeline = []
+
+            # Collect the corresponding Catalyst transforms
+            if (
+                hasattr(fn, "transform_program")
+                and hasattr(fn.transform_program, "_transform_program")
+                and len(fn.transform_program._transform_program) > 0
+            ):
+                for transform in fn.transform_program._transform_program:
+                    if transform._transform == qml.transforms.cancel_inverses.transform:
+                        # Found PL 'cancel_inverses' transform, replace with its Catalyst counterpart
+                        pass_pipeline.append(Pass("remove-chained-self-inverse"))
+                    else:
+                        raise NotImplementedError("This transform is not supported yet")
+
+                # The original PL transform program has to be removed before tracing
+                fn.transform_program._transform_program.clear()
+
             plxpr, out_type, out_treedef = make_jaxpr2(fn, **make_jaxpr_kwargs)(*args, **kwargs)
-            jaxpr = from_plxpr(plxpr)(*args, **kwargs)
+            jaxpr = from_plxpr(plxpr, pass_pipeline)(*args, **kwargs)
         finally:
             if not capture_on:
                 disable()
