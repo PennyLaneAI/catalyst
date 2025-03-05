@@ -86,7 +86,7 @@ def _get_device_kwargs(device) -> dict:
 
 # code example has long lines
 # pylint: disable=line-too-long
-def from_plxpr(plxpr: jax.core.ClosedJaxpr, pass_pipeline) -> Callable[..., jax.core.Jaxpr]:
+def from_plxpr(plxpr: jax.core.ClosedJaxpr, pass_pipeline=None) -> Callable[..., jax.core.Jaxpr]:
     """Convert PennyLane variant jaxpr to Catalyst variant jaxpr.
 
     Args:
