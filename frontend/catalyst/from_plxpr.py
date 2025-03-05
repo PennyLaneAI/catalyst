@@ -639,9 +639,7 @@ def trace_from_pennylane(fn, static_argnums, abstracted_axes, sig, kwargs):
                         raise NotImplementedError("This transformed is not supported yet")
 
             plxpr, out_type, out_treedef = make_jaxpr2(fn, **make_jaxpr_kwargs)(*args, **kwargs)
-            print(plxpr)
             jaxpr = from_plxpr(plxpr, pass_pipeline)(*args, **kwargs)
-            print(jaxpr)
         finally:
             if not capture_on:
                 disable()
