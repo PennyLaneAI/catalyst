@@ -60,7 +60,7 @@ from catalyst.jax_primitives import (
     var_p,
     while_p,
 )
-from catalyst.passes import cancel_inverses
+from catalyst.passes.pass_api import Pass
 from catalyst.qfunc import QFunc
 from catalyst.utils.patching import Patcher
 
@@ -89,7 +89,7 @@ def _get_device_kwargs(device) -> dict:
 
 # code example has long lines
 # pylint: disable=line-too-long
-def from_plxpr(plxpr: jax.core.ClosedJaxpr) -> Callable[..., jax.core.Jaxpr]:
+def from_plxpr(plxpr: jax.core.ClosedJaxpr, pass_pipeline) -> Callable[..., jax.core.Jaxpr]:
     """Convert PennyLane variant jaxpr to Catalyst variant jaxpr.
 
     Args:
@@ -150,11 +150,17 @@ def from_plxpr(plxpr: jax.core.ClosedJaxpr) -> Callable[..., jax.core.Jaxpr]:
         in (b,) }
 
     """
-    return jax.make_jaxpr(partial(WorkflowInterpreter().eval, plxpr.jaxpr, plxpr.consts))
+    return jax.make_jaxpr(
+        partial(WorkflowInterpreter(pass_pipeline).eval, plxpr.jaxpr, plxpr.consts)
+    )
 
 
 class WorkflowInterpreter(PlxprInterpreter):
     """An interpreter that converts a qnode primitive from a plxpr variant to a catalxpr variant."""
+
+    def __init__(self, pass_pipeline):
+        self._pass_pipeline = pass_pipeline
+        super().__init__()
 
 
 # pylint: disable=unused-argument, too-many-arguments
@@ -165,16 +171,9 @@ def _(self, *args, qnode, shots, device, execution_config, qfunc_jaxpr, n_consts
 
     f = partial(QFuncPlxprInterpreter(device, shots).eval, qfunc_jaxpr, consts)
 
-    return quantum_kernel_p.bind(wrap_init(f), *non_const_args, qnode=qnode)
-
-
-# pylint: disable=unused-argument, too-many-arguments
-@WorkflowInterpreter.register_primitive(quantum_kernel_p)
-def _(self, *args, qnode, batch_dims=None, pipeline, call_jaxpr):
-
-    f = partial(QFuncPlxprInterpreter(qnode.device, qnode.device.shots).eval, call_jaxpr, [])
-
-    return quantum_kernel_p.bind(wrap_init(f), *args, qnode=qnode, pipeline=pipeline)
+    return quantum_kernel_p.bind(
+        wrap_init(f), *non_const_args, qnode=qnode, pipeline=self._pass_pipeline
+    )
 
 
 class QFuncPlxprInterpreter(PlxprInterpreter):
@@ -620,6 +619,8 @@ def trace_from_pennylane(fn, static_argnums, abstracted_axes, sig, kwargs):
 
         args = sig
         try:
+            pass_pipeline = []
+
             # Apply the corresponding Catalyst transforms, if found
             if (
                 hasattr(fn, "transform_program")
@@ -633,32 +634,14 @@ def trace_from_pennylane(fn, static_argnums, abstracted_axes, sig, kwargs):
 
                 for transform in transform_program:
                     if transform._transform == qml.transforms.cancel_inverses.transform:
-                        fn = cancel_inverses(fn)
+                        pass_pipeline.append(Pass("remove-chained-self-inverse"))
                     else:
                         raise NotImplementedError("This transformed is not supported yet")
 
-                def closure(qnode, *args, **kwargs):
-                    params = {}
-                    params["static_argnums"] = kwargs.pop("static_argnums", static_argnums)
-                    params["_out_tree_expected"] = []
-                    pass_pipeline = params.get("pass_pipeline", None)
-                    params["pass_pipeline"] = pass_pipeline
-                    return QFunc.__call__(
-                        qnode,
-                        *args,
-                        **dict(params, **kwargs),
-                    )
-
-                with Patcher(
-                    (qml.QNode, "__call__", closure),
-                ):
-                    plxpr, out_type, out_treedef = make_jaxpr2(fn, **make_jaxpr_kwargs)(
-                        *args, **kwargs
-                    )
-                    jaxpr = from_plxpr(plxpr)(*args, **kwargs)
-            else:
-                plxpr, out_type, out_treedef = make_jaxpr2(fn, **make_jaxpr_kwargs)(*args, **kwargs)
-                jaxpr = from_plxpr(plxpr)(*args, **kwargs)
+            plxpr, out_type, out_treedef = make_jaxpr2(fn, **make_jaxpr_kwargs)(*args, **kwargs)
+            print(plxpr)
+            jaxpr = from_plxpr(plxpr, pass_pipeline)(*args, **kwargs)
+            print(jaxpr)
         finally:
             if not capture_on:
                 disable()
