@@ -453,6 +453,30 @@ def CustomOp : UnitaryGate_Op<"custom", [DifferentiableGate, NoMemoryEffect,
         mlir::ValueRange getAllParams() {
             return getParams();
         }
+
+        bool isStatic() {
+            for (mlir::Value param : getParams()) {
+                if (!param.getDefiningOp() || !param.getDefiningOp()->hasTrait<mlir::OpTrait::ConstantLike>()) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        std::vector<double> getStaticParams() {
+            std::vector<double> staticValues;
+            if (!isStatic()) {
+                return staticValues;
+            }
+            
+            for (mlir::Value param : getParams()) {
+                auto constOp = param.getDefiningOp();
+                if (auto floatAttr = constOp->getAttrOfType<mlir::FloatAttr>("value")) {
+                    staticValues.push_back(floatAttr.getValueAsDouble());
+                }
+            }
+            return staticValues;
+        }
     }];
     let hasCanonicalizeMethod = 1;
 }
