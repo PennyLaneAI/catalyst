@@ -19,6 +19,7 @@
 #include <bitset>
 #include <stdexcept>
 
+#include <map>
 #include <memory>
 #include <ostream>
 #include <string_view>
@@ -45,6 +46,8 @@ static std::unique_ptr<ExecutionContext> CTX = nullptr;
  * @brief Thread local device pointer with internal linkage.
  */
 thread_local static RTDevice *RTD_PTR = nullptr;
+
+static std::map<QubitIdType, QubitIdType> on_the_fly_alloc_qubits;
 
 bool getModifiersAdjoint(const Modifiers *modifiers)
 {
@@ -544,6 +547,8 @@ void __catalyst__qis__PhaseShift(double theta, QUBIT *qubit, const Modifiers *mo
 
 void __catalyst__qis__RX(double theta, QUBIT *qubit, const Modifiers *modifiers)
 {
+    __catalyst__rt__qubit_allocate();
+    std::cout << "rx on qubit " << qubit << "\n";
     getQuantumDevicePtr()->NamedOperation("RX", {theta}, {reinterpret_cast<QubitIdType>(qubit)},
                                           MODIFIERS_ARGS(modifiers));
 }
@@ -1012,8 +1017,13 @@ int8_t *__catalyst__rt__array_get_element_ptr_1d(QirArray *ptr, int64_t idx)
     RT_ASSERT(idx >= 0);
     std::string error_msg = "The qubit register does not contain the requested wire: ";
     error_msg += std::to_string(idx);
-    RT_FAIL_IF(static_cast<size_t>(idx) >= qubit_vector_ptr->size(), error_msg.c_str());
-
+    //RT_FAIL_IF(static_cast<size_t>(idx) >= qubit_vector_ptr->size(), error_msg.c_str());
+    if (static_cast<size_t>(idx) >= qubit_vector_ptr->size()){
+        QubitIdType good_label = on_the_fly_alloc_qubits.size();
+        on_the_fly_alloc_qubits.insert({idx, good_label});
+        std::cout << "inserted " << idx << ", " << good_label << "\n";
+        return (int8_t *)&on_the_fly_alloc_qubits[idx];
+    }
     QubitIdType *data = qubit_vector_ptr->data();
     return (int8_t *)&data[idx];
 }
