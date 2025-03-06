@@ -47,8 +47,6 @@ static std::unique_ptr<ExecutionContext> CTX = nullptr;
  */
 thread_local static RTDevice *RTD_PTR = nullptr;
 
-static std::map<QubitIdType, QubitIdType> on_the_fly_alloc_qubits;
-
 bool getModifiersAdjoint(const Modifiers *modifiers)
 {
     return !modifiers ? false : modifiers->adjoint;
@@ -547,7 +545,6 @@ void __catalyst__qis__PhaseShift(double theta, QUBIT *qubit, const Modifiers *mo
 
 void __catalyst__qis__RX(double theta, QUBIT *qubit, const Modifiers *modifiers)
 {
-    __catalyst__rt__qubit_allocate();
     std::cout << "rx on qubit " << qubit << "\n";
     getQuantumDevicePtr()->NamedOperation("RX", {theta}, {reinterpret_cast<QubitIdType>(qubit)},
                                           MODIFIERS_ARGS(modifiers));
@@ -1019,10 +1016,8 @@ int8_t *__catalyst__rt__array_get_element_ptr_1d(QirArray *ptr, int64_t idx)
     error_msg += std::to_string(idx);
     //RT_FAIL_IF(static_cast<size_t>(idx) >= qubit_vector_ptr->size(), error_msg.c_str());
     if (static_cast<size_t>(idx) >= qubit_vector_ptr->size()){
-        QubitIdType good_label = on_the_fly_alloc_qubits.size();
-        on_the_fly_alloc_qubits.insert({idx, good_label});
-        std::cout << "inserted " << idx << ", " << good_label << "\n";
-        return (int8_t *)&on_the_fly_alloc_qubits[idx];
+        qubit_vector_ptr->push_back(reinterpret_cast<QubitIdType>(__catalyst__rt__qubit_allocate()));
+        return (int8_t *)&(qubit_vector_ptr->back());
     }
     QubitIdType *data = qubit_vector_ptr->data();
     return (int8_t *)&data[idx];

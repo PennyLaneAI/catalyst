@@ -20,7 +20,7 @@ def f():
 
 print("reference: ", f())
 
-@qjit
+@qjit(keep_intermediate=False)
 def f_cat():
     dev = qml.device("lightning.qubit", wires=0)
     # explcit wires=0 for now since I don't want to do tracing in runtime prototype
@@ -29,9 +29,9 @@ def f_cat():
     @qml.qnode(dev)
     def circ():
         qml.RX(1.23, wires=2)
-        qml.RX(4.56, wires=3)
+        qml.RX(4.56, wires=4)
         #return qml.expval(qml.Z(wires=2)) # scalar return fine
-        return qml.probs(wires=[2,3])  # static ret shape, fine
+        return qml.probs(wires=[2,4])  # static ret shape, fine
         #return qml.probs()  # dynamic ret shape, need to update?
 
     return circ()
