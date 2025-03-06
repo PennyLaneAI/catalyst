@@ -614,7 +614,7 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
                                                  pipeline, clHasManualPipeline, moduleOp))) {
             return failure();
         }
-        catalyst::utils::LinesCount::ModuleOp(moduleOp);
+        //catalyst::utils::LinesCount::ModuleOp(moduleOp);
     }
     return success();
 }
@@ -672,7 +672,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
     enum InputType inType = InputType::OTHER;
     if (mlirModule) {
         inType = InputType::MLIR;
-        catalyst::utils::LinesCount::ModuleOp(*mlirModule);
+        //catalyst::utils::LinesCount::ModuleOp(*mlirModule);
         output.isCheckpointFound = options.checkpointStage == "mlir";
     }
     else {
@@ -687,7 +687,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         }
         inType = InputType::LLVMIR;
         output.isCheckpointFound = options.checkpointStage == "llvm_ir";
-        catalyst::utils::LinesCount::Module(*llvmModule);
+        //catalyst::utils::LinesCount::Module(*llvmModule);
     }
     if (failed(verifyInputType(options, inType))) {
         return failure();
@@ -731,7 +731,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         }
 
         inType = InputType::LLVMIR;
-        catalyst::utils::LinesCount::Module(*llvmModule);
+        //catalyst::utils::LinesCount::Module(*llvmModule);
 
         if (options.keepIntermediate) {
             std::string tmp;
@@ -776,7 +776,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
                 return failure();
             }
             coroLLVMPassesTiming.stop();
-            catalyst::utils::LinesCount::Module(*llvmModule.get());
+            //catalyst::utils::LinesCount::Module(*llvmModule.get());
         }
 
         if (enzymeRun) {
@@ -786,7 +786,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
                 return failure();
             }
             o2PassesTiming.stop();
-            catalyst::utils::LinesCount::Module(*llvmModule.get());
+            //catalyst::utils::LinesCount::Module(*llvmModule.get());
 
             TimingScope enzymePassesTiming = llcTiming.nest("Enzyme passes");
             if (failed(timer::timer(runEnzymePasses, "runEnzymePasses", /* add_endl */ false,
@@ -794,7 +794,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
                 return failure();
             }
             enzymePassesTiming.stop();
-            catalyst::utils::LinesCount::Module(*llvmModule.get());
+            //catalyst::utils::LinesCount::Module(*llvmModule.get());
         }
 
         TimingScope outputTiming = llcTiming.nest("compileObject");
