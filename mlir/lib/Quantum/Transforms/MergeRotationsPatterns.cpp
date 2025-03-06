@@ -108,48 +108,6 @@ struct MergeRotationsRewritePattern : public mlir::OpRewritePattern<OpType> {
     }
 };
 
-struct MergeRotationsStaticRewritePattern : public mlir::OpRewritePattern<StaticCustomOp> {
-    // Merge rotation patterns where all operands are static
-    using mlir::OpRewritePattern<StaticCustomOp>::OpRewritePattern;
-
-    mlir::LogicalResult matchAndRewrite(StaticCustomOp op,
-                                        mlir::PatternRewriter &rewriter) const override
-    {
-        LLVM_DEBUG(dbgs() << "Simplifying the following operation:\n" << op << "\n");
-        auto loc = op.getLoc();
-        StringRef opGateName = op.getGateName();
-        if (!rotationsSet.contains(opGateName))
-            return failure();
-        ValueRange inQubits = op.getInQubits();
-        auto parentOp = dyn_cast_or_null<StaticCustomOp>(inQubits[0].getDefiningOp());
-
-        VerifyParentGateAndNameAnalysis<StaticCustomOp> vpga(op);
-        if (!vpga.getVerifierResult()) {
-            return failure();
-        }
-
-        TypeRange outQubitsTypes = op.getOutQubits().getTypes();
-        TypeRange outQubitsCtrlTypes = op.getOutCtrlQubits().getTypes();
-        ValueRange parentInQubits = parentOp.getInQubits();
-        ValueRange parentInCtrlQubits = parentOp.getInCtrlQubits();
-        ValueRange parentInCtrlValues = parentOp.getInCtrlValues();
-
-        auto parentParams = parentOp.getStaticParams();
-        auto params = op.getStaticParams();
-        SmallVector<double> sumParams;
-        for (auto [param, parentParam] : llvm::zip(params, parentParams)) {
-            sumParams.push_back(parentParam + param);
-        };
-        auto mergeOp = rewriter.create<StaticCustomOp>(
-            loc, outQubitsTypes, outQubitsCtrlTypes, sumParams, parentInQubits, opGateName, nullptr,
-            parentInCtrlQubits, parentInCtrlValues);
-
-        op.replaceAllUsesWith(mergeOp);
-
-        return success();
-    }
-};
-
 struct MergeMultiRZRewritePattern : public mlir::OpRewritePattern<MultiRZOp> {
     using mlir::OpRewritePattern<MultiRZOp>::OpRewritePattern;
 
@@ -194,7 +152,6 @@ namespace quantum {
 
 void populateMergeRotationsPatterns(RewritePatternSet &patterns)
 {
-    patterns.add<MergeRotationsStaticRewritePattern>(patterns.getContext(), 1);
     patterns.add<MergeRotationsRewritePattern<CustomOp, StaticCustomOp>>(patterns.getContext(), 1);
     patterns.add<MergeRotationsRewritePattern<StaticCustomOp, CustomOp>>(patterns.getContext(), 1);
     patterns.add<MergeRotationsRewritePattern<CustomOp, CustomOp>>(patterns.getContext(), 1);
