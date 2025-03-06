@@ -15,6 +15,7 @@
 This submodule defines a utility for converting plxpr into Catalyst jaxpr.
 """
 # pylint: disable=protected-access
+from copy import copy
 from functools import partial
 from typing import Callable, Sequence
 
@@ -618,22 +619,26 @@ def trace_from_pennylane(fn, static_argnums, abstracted_axes, sig, kwargs):
         try:
             pass_pipeline = []
 
-            # Collect the corresponding Catalyst transforms
-            if (
-                hasattr(fn, "transform_program")
-                and hasattr(fn.transform_program, "_transform_program")
-                and len(fn.transform_program._transform_program) > 0
-            ):
-                for transform in fn.transform_program._transform_program:
-                    if transform._transform == qml.transforms.cancel_inverses.transform:
-                        # Found PL 'cancel_inverses' transform, replace with its Catalyst counterpart
+            # Handle a QNode with a transform program
+            if isinstance(fn, qml.QNode) and len(fn.transform_program) > 0:
+
+                # Work on a copy to avoid affecting subsequent code using the same QNode
+                fn = copy(fn)
+
+                # Convert PL transforms into their corresponding Catalyst counterparts
+                for transform in fn.transform_program:
+                    if transform.transform == qml.transforms.cancel_inverses.transform:
                         pass_pipeline.append(Pass("remove-chained-self-inverse"))
                     else:
+                        # TODO: Handle all other PL transforms with Catalyst counterparts
                         raise NotImplementedError("This transform is not supported yet")
+
+                # TODO: Handle PL transforms with no Catalyst counterparts
 
                 # The original PL transform program has to be removed before tracing
                 fn.transform_program._transform_program.clear()
 
+            # Trace the QNode
             plxpr, out_type, out_treedef = make_jaxpr2(fn, **make_jaxpr_kwargs)(*args, **kwargs)
             jaxpr = from_plxpr(plxpr, pass_pipeline)(*args, **kwargs)
         finally:
