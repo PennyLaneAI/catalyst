@@ -31,32 +31,13 @@ static const mlir::StringSet<> rotationsSet = {"RX",  "RY",  "RZ",  "PhaseShift"
 
 namespace {
 
-// convertOpParamsToValues: helper function for extracting static or non-static CustomOp parameters
-// as mlir::Values
+// convertOpParamsToValues: helper function for extracting CustomOp parameters as mlir::Values
 SmallVector<mlir::Value> convertOpParamsToValues(CustomOp &op, mlir::PatternRewriter &rewriter)
 {
-    // In the case of a (non-static) CustomOp, the parameters are already mlir::Values, so we just
-    // collect them into a vector.
-
     SmallVector<mlir::Value> values;
     auto params = op.getParams();
     for (auto param : params) {
         values.push_back(param);
-    }
-    return values;
-}
-
-SmallVector<mlir::Value> convertOpParamsToValues(StaticCustomOp &op,
-                                                 mlir::PatternRewriter &rewriter)
-{
-    // In the case of a StaticCustomOp, the parameters are doubles, so we need to introduce arith
-    // ops to "convert" them into mlir::Values.
-
-    SmallVector<mlir::Value> values;
-    auto params = op.getStaticParams();
-    for (auto param : params) {
-        auto paramAttr = rewriter.getF64FloatAttr(param);
-        values.emplace_back(rewriter.create<arith::ConstantOp>(op.getLoc(), paramAttr));
     }
     return values;
 }
@@ -152,8 +133,6 @@ namespace quantum {
 
 void populateMergeRotationsPatterns(RewritePatternSet &patterns)
 {
-    patterns.add<MergeRotationsRewritePattern<CustomOp, StaticCustomOp>>(patterns.getContext(), 1);
-    patterns.add<MergeRotationsRewritePattern<StaticCustomOp, CustomOp>>(patterns.getContext(), 1);
     patterns.add<MergeRotationsRewritePattern<CustomOp, CustomOp>>(patterns.getContext(), 1);
     patterns.add<MergeMultiRZRewritePattern>(patterns.getContext(), 1);
 }
