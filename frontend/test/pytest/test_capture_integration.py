@@ -495,14 +495,17 @@ class TestCapture:
     def test_transform_cancel_inverses_workflow(self, backend):
         """Test the integration for a circuit with a 'cancel_inverses' transform."""
 
-        @qml.transforms.cancel_inverses
-        @qml.qnode(qml.device(backend, wires=1))
-        def circuit(x: float):
-            qml.RX(x, wires=0)
-            qml.Hadamard(wires=0)
-            qml.Hadamard(wires=0)
-            return qml.expval(qml.PauliZ(0))
+        def func(x: float):
+            @qml.transforms.cancel_inverses
+            @qml.qnode(qml.device(backend, wires=1))
+            def circuit(x: float):
+                qml.RX(x, wires=0)
+                qml.Hadamard(wires=0)
+                qml.Hadamard(wires=0)
+                return qml.expval(qml.PauliZ(0))
 
-        default_capture_result = qml.qjit(circuit)(0.1)
-        experimental_capture_result = qml.qjit(circuit, experimental_capture=True)(0.1)
+            return circuit(x)
+
+        default_capture_result = qml.qjit(func)(0.1)
+        experimental_capture_result = qml.qjit(func, experimental_capture=True)(0.1)
         assert default_capture_result == experimental_capture_result
