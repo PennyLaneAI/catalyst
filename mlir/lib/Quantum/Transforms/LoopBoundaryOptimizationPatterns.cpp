@@ -247,6 +247,10 @@ mlir::Value findRootQubit(mlir::Value qubit)
 QubitOrigin determineQubitOrigin(mlir::Value qubit)
 {
     if (auto extractOp = qubit.getDefiningOp<quantum::ExtractOp>()) {
+        if (!extractOp.getIdxAttr().has_value()) {
+            // TODO: This is a hack to handle the case where the qubit is not from a register.
+            return QubitOrigin(extractOp.getQreg(), 0, true);
+        }
         unsigned long position = extractOp.getIdxAttr().value();
         return QubitOrigin(extractOp.getQreg(), position, true);
     }
@@ -284,6 +288,9 @@ QubitOriginMap traceTopEdgeOperations(scf::ForOp forOp, Mode mode)
         if (isa<quantum::QuregType>(argType)) {
             for (Operation *userOp : regionArg.getUsers()) {
                 if (auto extractOp = dyn_cast<quantum::ExtractOp>(userOp)) {
+                    if (!extractOp.getIdxAttr().has_value()) {
+                        continue;
+                    }
                     unsigned long position = extractOp.getIdxAttr().value();
 
                     QubitOrigin qubitOrigin(regionArg, position, true);
