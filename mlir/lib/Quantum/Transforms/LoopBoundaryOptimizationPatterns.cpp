@@ -288,26 +288,24 @@ QubitOriginMap traceTopEdgeOperations(scf::ForOp forOp, Mode mode)
         if (isa<quantum::QuregType>(argType)) {
             for (Operation *userOp : regionArg.getUsers()) {
                 if (auto extractOp = dyn_cast<quantum::ExtractOp>(userOp)) {
-                    if (!extractOp.getIdxAttr().has_value()) {
+                    if (!extractOp.getIdxAttr().has_value())
                         continue;
-                    }
-                    unsigned long position = extractOp.getIdxAttr().value();
 
+                    unsigned long position = extractOp.getIdxAttr().value();
                     QubitOrigin qubitOrigin(regionArg, position, true);
 
                     for (Operation *extractUserOp : extractOp.getResult().getUsers()) {
                         if (auto quantumOp = dyn_cast<CustomOp>(extractUserOp)) {
-                            if (!isValidQuantumOperation(quantumOp, mode)) {
+                            if (!isValidQuantumOperation(quantumOp, mode))
                                 continue;
-                            }
+
                             // Find the index of the extracted qubit in the
                             //  operation's input qubits.
                             auto inQubits = quantumOp.getInQubits();
                             unsigned long index = 0;
                             for (; index < inQubits.size(); ++index) {
-                                if (inQubits[index] == extractOp.getResult()) {
+                                if (inQubits[index] == extractOp.getResult())
                                     break;
-                                }
                             }
                             assert(index < inQubits.size() &&
                                    "Extracted qubit not found in input qubits.");
@@ -325,15 +323,14 @@ QubitOriginMap traceTopEdgeOperations(scf::ForOp forOp, Mode mode)
             QubitOrigin qubitOrigin(regionArg, 0, false);
             for (Operation *userOp : regionArg.getUsers()) {
                 if (auto quantumOp = dyn_cast<CustomOp>(userOp)) {
-                    if (!isValidQuantumOperation(quantumOp, mode)) {
+                    if (!isValidQuantumOperation(quantumOp, mode))
                         continue;
-                    }
+
                     qubitOriginMap[quantumOp].push_back(qubitOrigin);
                 }
             }
         }
     }
-
     return qubitOriginMap;
 }
 
@@ -441,7 +438,6 @@ void hoistTopEdgeOperation(QuantumOpInfo topOpInfo, scf::ForOp forOp,
 void hoistBottomEdgeOperation(QuantumOpInfo bottomOpInfo, scf::ForOp forOp,
                               QubitOriginMap bottomEdgeOpSet, mlir::PatternRewriter &rewriter)
 {
-
     // Config the successor
     bottomOpInfo.op.getOutQubits().replaceAllUsesWith(bottomOpInfo.op.getInQubits());
 
