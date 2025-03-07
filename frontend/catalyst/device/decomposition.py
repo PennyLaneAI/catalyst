@@ -23,7 +23,7 @@ from functools import partial
 import jax
 import pennylane as qml
 from pennylane import transform
-from pennylane.devices.capabilities import DeviceCapabilities
+from pennylane.devices.capabilities import DeviceCapabilities, OperatorProperties
 from pennylane.devices.preprocess import decompose
 from pennylane.measurements import (
     CountsMP,
@@ -82,7 +82,9 @@ def catalyst_decomposer(op, capabilities: DeviceCapabilities):
 
 @transform
 @debug_logger
-def catalyst_decompose(tape: qml.tape.QuantumTape, ctx, capabilities: DeviceCapabilities):
+def catalyst_decompose(
+    tape: qml.tape.QuantumTape, ctx, capabilities: DeviceCapabilities, grad_method: str
+):
     """Decompose operations until the stopping condition is met.
 
     In a single call of the catalyst_decompose function, the PennyLane operations are decomposed
@@ -101,14 +103,15 @@ def catalyst_decompose(tape: qml.tape.QuantumTape, ctx, capabilities: DeviceCapa
     # are compatible with Catalyst's handling of initial state preparation. Currently, Catalyst
     # only supports qml.StatePrep and qml.BasisState. A default strategy for handling any PennyLane
     # operator of type qml.StatePrepBase will be needed before this conditional can be removed.
-    if len(tape) == 0 or type(tape[0]) in (qml.StatePrep, qml.BasisState):
+    if grad_method is None and (len(tape) == 0 or type(tape[0]) in (qml.StatePrep, qml.BasisState)):
         skip_initial_state_prep = capabilities.initial_state_prep
     else:
         skip_initial_state_prep = False
 
     (toplevel_tape,), _ = decompose(
         tape,
-        stopping_condition=lambda op: bool(catalyst_acceptance(op, capabilities)),
+        stopping_condition=lambda op: bool(catalyst_acceptance(op, capabilities))
+        and not non_diff_in_grad_method(op, grad_method, capabilities),
         skip_initial_state_prep=skip_initial_state_prep,
         decomposer=partial(catalyst_decomposer, capabilities=capabilities),
         name="catalyst on this device",
@@ -219,6 +222,23 @@ def catalyst_acceptance(op: qml.operation.Operator, capabilities: DeviceCapabili
         return op.name
 
     return None
+
+
+def differentiable(op: qml.operation.Operator, capabilities: DeviceCapabilities) -> bool:
+    """Check whether an Operator is differentiable."""
+    if type(op) in (qml.ops.Controlled, qml.ops.ControlledOp) or isinstance(op, qml.ops.Adjoint):
+        op_name = op.base.name
+    else:
+        op_name = op.name
+    supported_ops = capabilities.operations
+    return supported_ops.get(op_name, OperatorProperties()).differentiable
+
+
+def non_diff_in_grad_method(
+    op: qml.operation.Operator, grad_method: str, capabilities: DeviceCapabilities
+) -> bool:
+    """Check whether an Operator is non-differentiable but in a gradient method."""
+    return not differentiable(op, capabilities) and grad_method is not None
 
 
 @transform
