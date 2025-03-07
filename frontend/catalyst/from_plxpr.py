@@ -190,6 +190,22 @@ def handle_cancel_inverses(
     return self.eval(inner_jaxpr, consts, *non_const_args)
 
 
+# pylint: disable=unused-argument, too-many-arguments
+@WorkflowInterpreter.register_primitive(qml.transforms.merge_rotations._primitive)
+def handle_merge_rotations(
+    self, *args, args_slice, consts_slice, inner_jaxpr, targs_slice, tkwargs
+):
+    """Handle the conversion from plxpr to Catalyst jaxpr for the
+    PL 'merge_rotations_transform', which gets replaced with Catalyst
+    'merge-rotations' pass"""
+    self._pass_pipeline.append(Pass("merge-rotations"))
+
+    consts = args[consts_slice]
+    non_const_args = args[args_slice]
+
+    return self.eval(inner_jaxpr, consts, *non_const_args)
+
+
 class QFuncPlxprInterpreter(PlxprInterpreter):
     """An interpreter that converts plxpr into catalyst-variant jaxpr.
 
