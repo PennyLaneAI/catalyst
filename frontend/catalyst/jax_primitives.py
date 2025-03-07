@@ -804,16 +804,18 @@ def _qalloc_lowering(jax_ctx: mlir.LoweringRuleContext, size_value: ir.Value):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
-    assert size_value.owner.name == "stablehlo.constant"
-    size_value_attr = size_value.owner.attributes["value"]
-    assert ir.DenseIntElementsAttr.isinstance(size_value_attr)
-    size = ir.DenseIntElementsAttr(size_value_attr)[0]
-
     qreg_type = ir.OpaqueType.get("quantum", "reg", ctx)
-    i64_type = ir.IntegerType.get_signless(64, ctx)
-    size_attr = ir.IntegerAttr.get(i64_type, size)
+    if isinstance(size_value.owner, ir.Operation) and size_value.owner.name == "stablehlo.constant":
+        size_value_attr = size_value.owner.attributes["value"]
+        assert ir.DenseIntElementsAttr.isinstance(size_value_attr)
+        size = ir.DenseIntElementsAttr(size_value_attr)[0]
+        assert size >= 0
 
-    return AllocOp(qreg_type, nqubits_attr=size_attr).results
+        size_attr = ir.IntegerAttr.get(ir.IntegerType.get_signless(64, ctx), size)
+        return AllocOp(qreg_type, nqubits_attr=size_attr).results
+    else:
+        size_value = extract_scalar(size_value, "qalloc")
+        return AllocOp(qreg_type, nqubits=size_value).results
 
 
 #
