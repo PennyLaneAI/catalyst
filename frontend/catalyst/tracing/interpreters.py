@@ -94,7 +94,7 @@ def trace_diffargs(fun, argnums):
 
     @functools.wraps(fun)
     def diffargs_transform_wrapper(*args, **kwargs):
-        args_flat, args_tree = jax.tree_flatten(args)
+        args_flat, args_tree = jax.tree_flatten((args, kwargs))
         fun_flat, res_tree = flatten_fun(fun, args_tree)
 
         with jax.core.new_main(ADTrace) as main:
@@ -117,8 +117,8 @@ def flatten_fun(f, in_tree):
     store = Store()
 
     def flat_fun(*args_flat):
-        pytree_args = jax.tree_unflatten(in_tree, args_flat)
-        out = f(*pytree_args)
+        pytree_args, pytree_kwargs = jax.tree_unflatten(in_tree, args_flat)
+        out = f(*pytree_args, **pytree_kwargs)
         out_flat, out_tree = jax.tree_flatten(out)
         store.set_value(out_tree)
         return out_flat
