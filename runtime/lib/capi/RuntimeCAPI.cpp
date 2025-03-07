@@ -894,18 +894,27 @@ double __catalyst__qis__Expval(ObsIdType obsKey) { return getQuantumDevicePtr()-
 
 double __catalyst__qis__Variance(ObsIdType obsKey) { return getQuantumDevicePtr()->Var(obsKey); }
 
-void __catalyst__qis__State(MemRefT_CplxT_double_1d *result, int64_t numQubits, ...)
+void __catalyst__qis__State(MemRefT_CplxT_double_1d *result, bool explicit_qubits, int64_t numQubits, ...)
 {
     RT_ASSERT(numQubits >= 0);
     MemRefT<std::complex<double>, 1> *result_p = (MemRefT<std::complex<double>, 1> *)result;
 
-    va_list args;
-    va_start(args, numQubits);
     std::vector<QubitIdType> wires(numQubits);
-    for (int64_t i = 0; i < numQubits; i++) {
-        wires[i] = va_arg(args, QubitIdType);
+
+    if (explicit_qubits){
+        va_list args;
+        va_start(args, numQubits);
+
+        for (int64_t i = 0; i < numQubits; i++) {
+            wires[i] = va_arg(args, QubitIdType);
+        }
+        va_end(args);
+    } else {
+        for (int64_t i = 0; i < numQubits; i++) {
+            std::cout << i << "\n";
+            wires[i] = i;
+        }
     }
-    va_end(args);
 
     DataView<std::complex<double>, 1> view(result_p->data_aligned, result_p->offset,
                                            result_p->sizes, result_p->strides);
@@ -920,23 +929,28 @@ void __catalyst__qis__State(MemRefT_CplxT_double_1d *result, int64_t numQubits, 
     }
 }
 
-void __catalyst__qis__Probs(MemRefT_double_1d *result, int64_t numQubits, ...)
+void __catalyst__qis__Probs(MemRefT_double_1d *result, int64_t numQubits,  ...)
 {
     RT_ASSERT(numQubits >= 0);
     MemRefT<double, 1> *result_p = (MemRefT<double, 1> *)result;
 
-    va_list args;
-    va_start(args, numQubits);
     std::vector<QubitIdType> wires(numQubits);
-    for (int64_t i = 0; i < numQubits; i++) {
-        wires[i] = va_arg(args, QubitIdType);
-    }
-    va_end(args);
+
+
+        va_list args;
+        va_start(args, numQubits);
+
+        for (int64_t i = 0; i < numQubits; i++) {
+            wires[i] = va_arg(args, QubitIdType);
+        }
+        va_end(args);
+
 
     DataView<double, 1> view(result_p->data_aligned, result_p->offset, result_p->sizes,
                              result_p->strides);
 
     if (wires.empty()) {
+        std::cout << "hi, nonpartial probs\n";
         getQuantumDevicePtr()->Probs(view);
     }
     else {

@@ -142,7 +142,7 @@ def circuit_single_gate(n: int):
     )(wires=0)
 
     # CHECK:       [[qreg_ret:%.+]] = quantum.extract [[qreg_out2]][ 0]
-    # CHECK:       [[qobs:%.+]] = quantum.compbasis [[qreg_ret]] : !quantum.obs
+    # CHECK:       [[qobs:%.+]] = quantum.compbasis qubits [[qreg_ret]] : !quantum.obs
     # CHECK:       [[ret:%.+]] = quantum.probs [[qobs]]
     # CHECK:       return [[ret]]
     return qml.probs()

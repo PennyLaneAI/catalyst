@@ -126,6 +126,12 @@ def AllocOp : Memory_Op<"alloc", [NoMemoryEffect]> {
     let assemblyFormat = [{
         `(` ($nqubits^):($nqubits_attr)? `)` attr-dict `:` type(results)
     }];
+
+    let extraClassDeclaration = [{
+        bool isStaticSize() {
+            return (this->getNqubits() == nullptr);
+        }
+    }];
 }
 
 
@@ -675,13 +681,14 @@ def YieldOp : Quantum_Op<"yield", [Pure, ReturnLike, Terminator, ParentOneOf<["A
 class Observable_Op<string mnemonic, list<Trait> traits = []> :
         Quantum_Op<mnemonic, traits # [Pure]>;
 
-def ComputationalBasisOp : Observable_Op<"compbasis"> {
+def ComputationalBasisOp : Observable_Op<"compbasis", [AttrSizedOperandSegments]> {
     let summary = "Define a pseudo-obeservable of the computational basis for use in measurements";
     let description = [{
         The `quantum.compbasis` operation defines a quantum observable to be used by other
         operations such as measurement processes. The specific observable defined here is a
         "pseudo" observable to represent measurements in the computational basis.
         The only arguments are the list of qubits to measure.
+        //TODO: edit description!
 
         Example:
 
@@ -695,7 +702,8 @@ def ComputationalBasisOp : Observable_Op<"compbasis"> {
     }];
 
     let arguments = (ins
-        Variadic<QubitType>:$qubits
+        Variadic<QubitType>:$qubits,
+        Optional<QuregType>:$qreg
     );
 
     let results = (outs
@@ -703,8 +711,10 @@ def ComputationalBasisOp : Observable_Op<"compbasis"> {
     );
 
     let assemblyFormat = [{
-        $qubits attr-dict `:` type(results)
+        (`qubits` $qubits^)? (`qreg` $qreg^)?  attr-dict `:` type(results)
     }];
+
+    let hasVerifier = 1;
 }
 
 def NamedObsOp : Observable_Op<"namedobs"> {
