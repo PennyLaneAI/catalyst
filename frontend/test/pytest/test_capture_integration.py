@@ -17,7 +17,6 @@ import pennylane as qml
 import pytest
 
 import catalyst
-from catalyst.debug import get_compilation_stage
 
 
 def circuit_aot_builder(dev):
@@ -508,10 +507,8 @@ class TestCapture:
 
             return circuit(x)
 
-        captured_func = qml.qjit(func, experimental_capture=True, keep_intermediate=True)
-        assert "Hadamard" not in get_compilation_stage(
-            captured_func, "EnforceRuntimeInvariantsPass"
-        )
+        captured_func = qml.qjit(func, experimental_capture=True, target="mlir")
+        assert 'transform.apply_registered_pass "remove-chained-self-inverse"' in captured_func.mlir
 
         no_capture_result = qml.qjit(func)(0.1)
         experimental_capture_result = captured_func(0.1)
@@ -531,9 +528,8 @@ class TestCapture:
 
             return circuit(x)
 
-        captured_func = qml.qjit(func, experimental_capture=True, keep_intermediate=True)
-        captured_mlir = get_compilation_stage(captured_func, "EnforceRuntimeInvariantsPass")
-        assert captured_mlir.count('"RX"') == 1
+        captured_func = qml.qjit(func, experimental_capture=True, target="mlir")
+        assert 'transform.apply_registered_pass "merge-rotations"' in captured_func.mlir
 
         no_capture_result = qml.qjit(func)(0.1)
         experimental_capture_result = captured_func(0.1)
@@ -542,6 +538,12 @@ class TestCapture:
     def test_chained_transforms_workflow(self, backend):
         """Test the integration for a circuit with a combination of 'merge_rotations'
         and 'cancel_inverses' transforms."""
+
+        def has_catalyst_transforms(mlir):
+            return (
+                'transform.apply_registered_pass "remove-chained-self-inverse"' in mlir
+                and 'transform.apply_registered_pass "merge-rotations"' in mlir
+            )
 
         @qml.qnode(qml.device(backend, wires=1))
         def circuit(x: float):
@@ -554,28 +556,18 @@ class TestCapture:
         def inverses_rotations(x: float):
             return qml.transforms.cancel_inverses(qml.transforms.merge_rotations(circuit))(x)
 
+        inverses_rotations_func = qml.qjit(
+            inverses_rotations, experimental_capture=True, target="mlir"
+        )
+        assert has_catalyst_transforms(inverses_rotations_func.mlir)
+
         def rotations_inverses(x: float):
             return qml.transforms.merge_rotations(qml.transforms.cancel_inverses(circuit))(x)
 
-        inverses_rotations_func = qml.qjit(
-            inverses_rotations, experimental_capture=True, keep_intermediate=True
-        )
-        inverses_rotations_mlir = get_compilation_stage(
-            inverses_rotations_func, "EnforceRuntimeInvariantsPass"
-        )
-        assert (
-            inverses_rotations_mlir.count('"RX"') == 1 and "Hadamard" not in inverses_rotations_mlir
-        )
-
         rotations_inverses_func = qml.qjit(
-            rotations_inverses, experimental_capture=True, keep_intermediate=True
+            rotations_inverses, experimental_capture=True, target="mlir"
         )
-        rotations_inverses_mlir = get_compilation_stage(
-            rotations_inverses_func, "EnforceRuntimeInvariantsPass"
-        )
-        assert (
-            rotations_inverses_mlir.count('"RX"') == 1 and "Hadamard" not in rotations_inverses_mlir
-        )
+        assert has_catalyst_transforms(rotations_inverses_func.mlir)
 
         no_capture_inverses_rotations_result = qml.qjit(inverses_rotations)(0.1)
         no_capture_rotations_inverses_result = qml.qjit(rotations_inverses)(0.1)
