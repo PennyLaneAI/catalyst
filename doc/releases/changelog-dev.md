@@ -171,6 +171,12 @@
 * Update source code to comply with changes requested by black v25.1.0
   [(#1490)](https://github.com/PennyLaneAI/catalyst/pull/1490)
 
+* Revert `StaticCustomOp` in favour of adding helper functions (`isStatic()`, `getStaticParams()` 
+  to the `CustomOp` which preserves the same functionality. More specifically, this reverts
+  [#1387] and [#1396], modifies [#1484]. 
+  [(#1558)](https://github.com/PennyLaneAI/catalyst/pull/1558)
+  [(#1555)](https://github.com/PennyLaneAI/catalyst/pull/1555)
+
 <h3>Documentation 📝</h3>
 
 <h3>Contributors ✍️</h3>
