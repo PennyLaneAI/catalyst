@@ -71,6 +71,7 @@ from jax.core import (
     Var,
     eval_jaxpr,
     find_top_trace,
+    full_lower,
     gensym,
     new_jaxpr_eqn,
     thread_local_state,
@@ -944,8 +945,15 @@ class DynshapePrimitive(JaxprPrimitive):
 
         trace = find_top_trace(args)
         tracers = map(trace.full_raise, args)
+
+        # Dispatch to other traces first if we are not generating JAXPR yet.
+        if not isinstance(trace, DynamicJaxprTrace):
+            out = trace.process_primitive(self, tracers, params)
+            return map(full_lower, out) if self.multiple_results else full_lower(out)
+
         source_info = jax_current()
 
+        ## TODO: in_type not used by any of our cf primitives -> remove?
         in_type = infer_lambda_input_type(None, tracers)
         out_type, effects = self.abstract_eval(*in_type, **params)
         assert len(effects) == 0, f"Jax effects are not supported, got ({effects})"
@@ -956,7 +964,6 @@ class DynshapePrimitive(JaxprPrimitive):
             # `abstract_eval` returned `out_type` calculated for empty constants.
             [],
             tracers,
-            # TODO: does not work with ADTrace since it assumes what the top_trace is
             maker=lambda a: DynamicJaxprTracer(trace, a, source_info),
         )
 
