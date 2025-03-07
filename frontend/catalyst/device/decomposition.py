@@ -83,7 +83,7 @@ def catalyst_decomposer(op, capabilities: DeviceCapabilities):
 @transform
 @debug_logger
 def catalyst_decompose(
-    tape: qml.tape.QuantumTape, ctx, capabilities: DeviceCapabilities, grad_method: str
+    tape: qml.tape.QuantumTape, ctx, capabilities: DeviceCapabilities, grad_method: str = None
 ):
     """Decompose operations until the stopping condition is met.
 
