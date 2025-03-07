@@ -36,6 +36,7 @@ def circuit_aot_builder(dev):
     return catalyst_circuit_aot
 
 
+# pylint: disable=too-many-public-methods
 class TestCapture:
     """Integration tests for Catalyst adjoint functionality."""
 
