@@ -811,6 +811,17 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         llcTiming.stop();
     }
 
+    std::string errorMessage;
+    auto outfile = openOutputFile(output.outputFilename, &errorMessage);
+    if (options.loweringAction == Action::OPT) {
+        outfile->os() << *mlirModule;
+        outfile->keep();
+    }
+    if (!outfile) {
+        llvm::errs() << errorMessage << "\n";
+        return failure();
+    }
+
     return success();
 }
 
@@ -967,15 +978,6 @@ int QuantumDriverMainFromCL(int argc, char **argv)
         return 1;
     }
 
-    // If not creating object file, output the IR to the specified file.
-    std::string errorMessage;
-    auto outfile = openOutputFile(outputFilename, &errorMessage);
-    if (!outfile) {
-        llvm::errs() << errorMessage << "\n";
-        return 1;
-    }
-    outfile->os() << output->outIR;
-    outfile->keep();
     if (Verbose)
         llvm::outs() << "Compilation successful:\n" << output->diagnosticMessages << "\n";
     return 0;
