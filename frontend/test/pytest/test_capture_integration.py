@@ -515,3 +515,74 @@ class TestCapture:
         no_capture_result = qml.qjit(func)(0.1)
         experimental_capture_result = captured_func(0.1)
         assert no_capture_result == experimental_capture_result
+
+    def test_transform_merge_rotations_workflow(self, backend):
+        """Test the integration for a circuit with a 'merge_rotations' transform."""
+
+        def func(x: float):
+            @qml.transforms.merge_rotations
+            @qml.qnode(qml.device(backend, wires=1))
+            def circuit(x: float):
+                qml.RX(x, wires=0)
+                qml.RX(x, wires=0)
+                qml.Hadamard(wires=0)
+                return qml.expval(qml.PauliZ(0))
+
+            return circuit(x)
+
+        captured_func = qml.qjit(func, experimental_capture=True, keep_intermediate=True)
+        captured_mlir = get_compilation_stage(captured_func, "EnforceRuntimeInvariantsPass")
+        assert captured_mlir.count('"RX"') == 1
+
+        no_capture_result = qml.qjit(func)(0.1)
+        experimental_capture_result = captured_func(0.1)
+        assert no_capture_result == experimental_capture_result
+
+    def test_chained_transforms_workflow(self, backend):
+        """Test the integration for a circuit with a combination of 'merge_rotations'
+        and 'cancel_inverses' transforms."""
+
+        @qml.qnode(qml.device(backend, wires=1))
+        def circuit(x: float):
+            qml.RX(x, wires=0)
+            qml.RX(x, wires=0)
+            qml.Hadamard(wires=0)
+            qml.Hadamard(wires=0)
+            return qml.expval(qml.PauliZ(0))
+
+        def inverses_rotations(x: float):
+            return qml.transforms.cancel_inverses(qml.transforms.merge_rotations(circuit))(x)
+
+        def rotations_inverses(x: float):
+            return qml.transforms.merge_rotations(qml.transforms.cancel_inverses(circuit))(x)
+
+        inverses_rotations_func = qml.qjit(
+            inverses_rotations, experimental_capture=True, keep_intermediate=True
+        )
+        inverses_rotations_mlir = get_compilation_stage(
+            inverses_rotations_func, "EnforceRuntimeInvariantsPass"
+        )
+        assert (
+            inverses_rotations_mlir.count('"RX"') == 1 and "Hadamard" not in inverses_rotations_mlir
+        )
+
+        rotations_inverses_func = qml.qjit(
+            rotations_inverses, experimental_capture=True, keep_intermediate=True
+        )
+        rotations_inverses_mlir = get_compilation_stage(
+            rotations_inverses_func, "EnforceRuntimeInvariantsPass"
+        )
+        assert (
+            rotations_inverses_mlir.count('"RX"') == 1 and "Hadamard" not in rotations_inverses_mlir
+        )
+
+        no_capture_inverses_rotations_result = qml.qjit(inverses_rotations)(0.1)
+        no_capture_rotations_inverses_result = qml.qjit(rotations_inverses)(0.1)
+        inverses_rotations_result = inverses_rotations_func(0.1)
+        rotations_inverses_result = rotations_inverses_func(0.1)
+        assert (
+            no_capture_inverses_rotations_result
+            == no_capture_rotations_inverses_result
+            == inverses_rotations_result
+            == rotations_inverses_result
+        )
