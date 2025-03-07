@@ -51,6 +51,7 @@ from catalyst.jax_tracer import Function, trace_quantum_function
 from catalyst.logging import debug_logger
 from catalyst.passes.pass_api import dictionary_to_list_of_passes
 from catalyst.tracing.contexts import EvaluationContext
+from catalyst.tracing.interpreters import ADTracer, trace_diffargs
 from catalyst.tracing.type_signatures import filter_static_args
 from catalyst.utils.exceptions import CompileError
 
@@ -129,9 +130,15 @@ class QFunc:
         static_argnums = kwargs.pop("static_argnums", ())
         out_tree_expected = kwargs.pop("_out_tree_expected", [])
 
+        # TODO: can we eliminate the double tracing performed first by quantum_kernel_p.bind
+        #       (= CallPrimitive.bind) and then manually by trace_quantum_function?
         def _eval_quantum(*args, **kwargs):
+            # This is required due to the custom tracing going on inside, normally the ADTrace
+            # will handle nesting from CallPrimitives automatically.
+            argnums = [idx for idx, x in enumerate(args) if isinstance(x, ADTracer) and x.active]
+            f_tagged = trace_diffargs(self.func, argnums)
             closed_jaxpr, out_type, out_tree, out_tree_exp = trace_quantum_function(
-                self.func,
+                f_tagged,
                 qjit_device,
                 args,
                 kwargs,
