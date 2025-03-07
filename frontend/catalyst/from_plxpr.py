@@ -223,12 +223,11 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
 
         in_qubits = [self.get_wire(w) for w in op.wires]
         out_qubits = qinst_p.bind(
-            *in_qubits,
-            *op.data,
+            *[*in_qubits, *op.data],
             op=op.name,
-            ctrl_value_len=0,
-            ctrl_len=0,
             qubits_len=len(op.wires),
+            params_len=len(op.data),
+            ctrl_len=0,
             adjoint=False,
         )
         for wire_values, new_wire in zip(op.wires, out_qubits):
