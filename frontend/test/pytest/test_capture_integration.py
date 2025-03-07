@@ -17,6 +17,7 @@ import pennylane as qml
 import pytest
 
 import catalyst
+from catalyst.debug import get_compilation_stage
 
 
 def circuit_aot_builder(dev):
@@ -506,6 +507,11 @@ class TestCapture:
 
             return circuit(x)
 
-        default_capture_result = qml.qjit(func)(0.1)
-        experimental_capture_result = qml.qjit(func, experimental_capture=True)(0.1)
-        assert default_capture_result == experimental_capture_result
+        captured_func = qml.qjit(func, experimental_capture=True, keep_intermediate=True)
+        assert "Hadamard" not in get_compilation_stage(
+            captured_func, "EnforceRuntimeInvariantsPass"
+        )
+
+        no_capture_result = qml.qjit(func)(0.1)
+        experimental_capture_result = captured_func(0.1)
+        assert no_capture_result == experimental_capture_result
