@@ -937,6 +937,15 @@ void __catalyst__qis__Probs(MemRefT_double_1d *result, int64_t numQubits, ...)
 
     DataView<double, 1> view(result_p->data_aligned, result_p->offset, result_p->sizes,
                              result_p->strides);
+    // HACK to partial probs
+    // TODO: Add actual branching check later
+    if (wires.empty()) {
+        for (int64_t i = 0; i < __catalyst__rt__num_qubits(); i++) {
+            wires.push_back(i);
+        }
+        getQuantumDevicePtr()->PartialProbs(view, wires);
+        return;
+    }
 
     if (wires.empty()) {
         getQuantumDevicePtr()->Probs(view);

@@ -13,8 +13,8 @@ def f():
         qml.RX(1.23, wires=2)
         qml.RX(4.56, wires=3)
         #return qml.expval(qml.Z(wires=2)) # scalar return fine
-        return qml.probs(wires=[2,3])  # static ret shape, fine
-        #return qml.probs()  # dynamic ret shape, need to update?
+        #return qml.probs(wires=[2,3])  # static ret shape, fine
+        return qml.probs()  # dynamic ret shape, need to update?
 
     return circ()
 
@@ -31,10 +31,18 @@ def f_cat():
         qml.RX(1.23, wires=2)
         qml.RX(4.56, wires=4)
         #return qml.expval(qml.Z(wires=2)) # scalar return fine
-        return qml.probs(wires=[2,4])  # static ret shape, fine
-        #return qml.probs()  # dynamic ret shape, need to update?
+        #return qml.probs(wires=[2,4])  # static ret shape, fine
+        return qml.probs()  # dynamic ret shape, need to update?
 
     return circ()
 
-print("cat: ", f_cat())
 
+replace = 1
+if replace:
+    manual = "f_cat_1/4_BufferizationPass.mlir"
+    with open(manual, "r") as file:
+       ir = file.read()
+    replace_ir(f_cat, "BufferizationPass", ir)
+
+
+print("cat: ", f_cat())
