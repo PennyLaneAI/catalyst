@@ -14,9 +14,14 @@
 
 """Utility functions for handling quantum operations."""
 
+from typing import Union
+
 import pennylane as qml
 from pennylane.devices.capabilities import DeviceCapabilities, OperatorProperties
 from pennylane.operation import Operator
+
+from catalyst.jax_tracer import HybridOp, MidCircuitMeasure
+from catalyst.utils.exceptions import DifferentiableCompileError
 
 EMPTY_PROPERTIES = OperatorProperties()
 
@@ -34,10 +39,34 @@ def is_supported(op: Operator, capabilities: DeviceCapabilities) -> bool:
     return op_name in capabilities.operations
 
 
-def is_differentiable(op: Operator, capabilities: DeviceCapabilities) -> bool:
-    """Check whether an operation is differentiable."""
+def _paramshift_op_checker(op):
+    if not isinstance(op, HybridOp):
+        if op.grad_method not in {"A", None}:
+            raise DifferentiableCompileError(f"{op.name} does not support analytic differentiation")
+    return True
+
+
+def is_differentiable(
+    op: Operator, capabilities: DeviceCapabilities, grad_method: Union[str, None] = None
+) -> bool:
+    """Check whether an operation is differentiable on the given device.
+
+    For controlled operations (e.g., CNOT) or adjoint operations (e.g., Adjoint(H)),
+    this checks the differentiability of the base operation.
+    """
+    if grad_method is None:
+        return True  # If no gradient method specified, operation is considered differentiable
+
+    if isinstance(op, MidCircuitMeasure):
+        raise DifferentiableCompileError(f"{op.name} is not allowed in gradients")
+
     op_name = get_operation_name(op)
-    return capabilities.operations.get(op_name, EMPTY_PROPERTIES).differentiable
+    props = capabilities.operations.get(op_name, EMPTY_PROPERTIES)
+
+    if grad_method == "parameter-shift":
+        return _paramshift_op_checker(op)
+    else:
+        return props.differentiable
 
 
 def is_controllable(op: Operator, capabilities: DeviceCapabilities) -> bool:

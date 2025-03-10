@@ -36,16 +36,16 @@ from pennylane.measurements import (
 )
 
 from catalyst.api_extensions import HybridCtrl
-from catalyst.jax_tracer import HybridOpRegion, has_nested_tapes
-from catalyst.logging import debug_logger
-from catalyst.tracing.contexts import EvaluationContext
-from catalyst.utils.exceptions import CompileError
 from catalyst.device.op_support import (
     is_controllable,
     is_differentiable,
     is_invertible,
     is_supported,
 )
+from catalyst.jax_tracer import HybridOpRegion, has_nested_tapes
+from catalyst.logging import debug_logger
+from catalyst.tracing.contexts import EvaluationContext
+from catalyst.utils.exceptions import CompileError
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -209,8 +209,7 @@ def decompose_ops_to_unitary(tape, convert_to_matrix_ops):
 def catalyst_acceptance(
     op: qml.operation.Operator, capabilities: DeviceCapabilities, grad_method: Union[str, None]
 ) -> Union[str, None]:
-    """Check whether an Operator is supported and returns the name of the operation or None.
-    """
+    """Check whether an Operator is supported and returns the name of the operation or None."""
     if isinstance(op, qml.ops.Adjoint):
         match = catalyst_acceptance(op.base, capabilities, grad_method)
         if match and is_invertible(op.base, capabilities):
@@ -224,20 +223,13 @@ def catalyst_acceptance(
         if match and is_controllable(op.base, capabilities):
             return match
 
-    elif non_diff_in_grad_method(op, grad_method, capabilities) and op.has_decomposition:
+    elif not is_differentiable(op, capabilities, grad_method) and op.has_decomposition:
         return None
 
     if is_supported(op, capabilities):
         return op.name
 
     return None
-
-
-def non_diff_in_grad_method(
-    op: qml.operation.Operator, grad_method: str, capabilities: DeviceCapabilities
-) -> bool:
-    """Check whether an Operator is non-differentiable but in a gradient method."""
-    return not is_differentiable(op, capabilities) and grad_method is not None
 
 
 @transform
