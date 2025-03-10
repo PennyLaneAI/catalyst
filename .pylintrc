@@ -3,6 +3,7 @@
 # be loaded. Extensions are loading into the active Python interpreter and may
 # run arbitrary code
 extension-pkg-allow-list=catalyst.utils.wrapper
+ignore-patterns=.*lit.cfg.*
 
 [TYPECHECK]
 
