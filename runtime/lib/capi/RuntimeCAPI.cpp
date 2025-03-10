@@ -19,6 +19,7 @@
 #include <bitset>
 #include <stdexcept>
 
+#include <map>
 #include <memory>
 #include <ostream>
 #include <string_view>
@@ -544,6 +545,7 @@ void __catalyst__qis__PhaseShift(double theta, QUBIT *qubit, const Modifiers *mo
 
 void __catalyst__qis__RX(double theta, QUBIT *qubit, const Modifiers *modifiers)
 {
+    std::cout << "rx on qubit " << qubit << "\n";
     getQuantumDevicePtr()->NamedOperation("RX", {theta}, {reinterpret_cast<QubitIdType>(qubit)},
                                           MODIFIERS_ARGS(modifiers));
 }
@@ -935,6 +937,15 @@ void __catalyst__qis__Probs(MemRefT_double_1d *result, int64_t numQubits, ...)
 
     DataView<double, 1> view(result_p->data_aligned, result_p->offset, result_p->sizes,
                              result_p->strides);
+    // HACK to partial probs
+    // TODO: Add actual branching check later
+    if (wires.empty()) {
+        for (int64_t i = 0; i < __catalyst__rt__num_qubits(); i++) {
+            wires.push_back(i);
+        }
+        getQuantumDevicePtr()->PartialProbs(view, wires);
+        return;
+    }
 
     if (wires.empty()) {
         getQuantumDevicePtr()->Probs(view);
@@ -1012,8 +1023,11 @@ int8_t *__catalyst__rt__array_get_element_ptr_1d(QirArray *ptr, int64_t idx)
     RT_ASSERT(idx >= 0);
     std::string error_msg = "The qubit register does not contain the requested wire: ";
     error_msg += std::to_string(idx);
-    RT_FAIL_IF(static_cast<size_t>(idx) >= qubit_vector_ptr->size(), error_msg.c_str());
-
+    //RT_FAIL_IF(static_cast<size_t>(idx) >= qubit_vector_ptr->size(), error_msg.c_str());
+    if (static_cast<size_t>(idx) >= qubit_vector_ptr->size()){
+        qubit_vector_ptr->push_back(reinterpret_cast<QubitIdType>(__catalyst__rt__qubit_allocate()));
+        return (int8_t *)&(qubit_vector_ptr->back());
+    }
     QubitIdType *data = qubit_vector_ptr->data();
     return (int8_t *)&data[idx];
 }
