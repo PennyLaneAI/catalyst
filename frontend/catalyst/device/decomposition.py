@@ -24,7 +24,7 @@ from typing import Union
 import jax
 import pennylane as qml
 from pennylane import transform
-from pennylane.devices.capabilities import DeviceCapabilities, OperatorProperties
+from pennylane.devices.capabilities import DeviceCapabilities
 from pennylane.devices.preprocess import decompose
 from pennylane.measurements import (
     CountsMP,
