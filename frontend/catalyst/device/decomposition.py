@@ -40,7 +40,7 @@ from catalyst.jax_tracer import HybridOpRegion, has_nested_tapes
 from catalyst.logging import debug_logger
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.utils.exceptions import CompileError
-from catalyst.utils.operation_utils import (
+from catalyst.device.op_support import (
     is_controllable,
     is_differentiable,
     is_invertible,

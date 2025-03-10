@@ -39,7 +39,7 @@ from catalyst.api_extensions import HybridAdjoint, HybridCtrl, MidCircuitMeasure
 from catalyst.jax_tracer import HybridOp, has_nested_tapes, nested_quantum_regions
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.utils.exceptions import CompileError, DifferentiableCompileError
-from catalyst.utils.operation_utils import (
+from catalyst.device.op_support import (
     EMPTY_PROPERTIES,
     is_controllable,
     is_differentiable,
