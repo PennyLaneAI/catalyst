@@ -17,8 +17,7 @@
 import functools
 
 import jax
-import jax._src.api_util as au
-import jax._src.linear_util as lu
+import jax.extend.linear_util as lu
 import jax.flatten_util
 
 from catalyst.jax_primitives import AbstractQbit, AbstractQreg
@@ -56,9 +55,28 @@ class ADTrace(jax.core.Trace):
     def process_call(self, call_primitive, f: lu.WrappedFun, in_tracers, params):
         # Wrap the callee to inject our ADTrace. Note f is a JAX WrappedFun.
         argnums = [idx for idx, x in enumerate(in_tracers) if x.active]
-        f_wrapped = lu.WrappedFun(
-            trace_diffargs(f.f, argnums), f.transforms, f.stores, f.params, f.in_type, f.debug_info
-        )
+
+        # The problem with `eval_jaxpr` is that has additional arguments like the JAXPR which are
+        # injected into the arglist before invocation. Wrapping the JAXPR into a tracer by the
+        # trace_diffargs transform will lead to failure.
+        # For most other functions we transform the wrapped function directly, but this extra layer
+        # ensures we are not wrapping the JAXPR argument into a tracer.
+        if f.f is jax.core.eval_jaxpr:
+
+            @lu.wrap_init
+            @functools.partial(trace_diffargs, argnums=argnums)
+            def f_wrapped(*args, **kwargs):
+                return f.call_wrapped(*args, **kwargs)
+
+        else:
+            f_wrapped = lu.WrappedFun(
+                trace_diffargs(f.f, argnums),
+                f.transforms,
+                f.stores,
+                f.params,
+                f.in_type,
+                f.debug_info,
+            )
 
         lowered_tracers = [tracer.value for tracer in in_tracers]
         out_tracers = call_primitive.bind(f_wrapped, *lowered_tracers, **params)
