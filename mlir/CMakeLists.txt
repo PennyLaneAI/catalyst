@@ -4,7 +4,9 @@ project(catalyst LANGUAGES CXX C)
 set(CMAKE_BUILD_WITH_INSTALL_NAME_DIR ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 20 CACHE STRING "C++ standard to conform to")
+# LLVM source code triggers a cpp20 warning
+add_compile_options(-Wno-ambiguous-reversed-operator)
 
 find_package(MLIR REQUIRED CONFIG)
 find_package(MHLO REQUIRED CONFIG)
