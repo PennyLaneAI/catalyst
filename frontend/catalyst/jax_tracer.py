@@ -1212,7 +1212,12 @@ def trace_quantum_function(
                     rtd_name=device.backend_name,
                     rtd_kwargs=str(device.backend_kwargs),
                 )
-                qreg_in = qalloc_p.bind(len(device.wires))
+                if catalyst.device.qjit_device.is_dynamic_wires(device.wires):
+                    # When device has dynamic wires, the device.wires iterable object
+                    # has a single value, which is the tracer for the number of wires
+                    qreg_in = qalloc_p.bind(device.wires[0])
+                else:
+                    qreg_in = qalloc_p.bind(len(device.wires))
 
                 # If the program is batched, that means that it was transformed.
                 # If it was transformed, that means that the program might have
