@@ -19,8 +19,8 @@ from typing import Union
 import pennylane as qml
 from pennylane.devices.capabilities import DeviceCapabilities, OperatorProperties
 from pennylane.operation import Operator
-
-from catalyst.jax_tracer import HybridOp, MidCircuitMeasure
+from catalyst.api_extensions import MidCircuitMeasure
+from catalyst.jax_tracer import HybridOp
 from catalyst.utils.exceptions import DifferentiableCompileError
 
 EMPTY_PROPERTIES = OperatorProperties()
