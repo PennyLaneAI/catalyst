@@ -208,25 +208,29 @@ def decompose_ops_to_unitary(tape, convert_to_matrix_ops):
 
 def catalyst_acceptance(
     op: qml.operation.Operator, capabilities: DeviceCapabilities, grad_method: Union[str, None]
-) -> bool:
-    """Check whether an Operator is supported."""
+) -> Union[str, None]:
+    """Check whether an Operator is supported and returns the name of the operation or None.
+    """
     if isinstance(op, qml.ops.Adjoint):
-        return catalyst_acceptance(op.base, capabilities, grad_method) and is_invertible(
-            op.base, capabilities
-        )
+        match = catalyst_acceptance(op.base, capabilities, grad_method)
+        if match and is_invertible(op.base, capabilities):
+            return match
 
     # There are cases where a custom controlled gate, e.g., CH, is supported, but its
     # base, i.e., H, is not labeled controllable. In this case, we don't want to use
     # this branch to check the support for this operation.
     elif type(op) is qml.ops.ControlledOp:
-        return catalyst_acceptance(op.base, capabilities, grad_method) and is_controllable(
-            op.base, capabilities
-        )
+        match = catalyst_acceptance(op.base, capabilities, grad_method)
+        if match and is_controllable(op.base, capabilities):
+            return match
 
     elif non_diff_in_grad_method(op, grad_method, capabilities) and op.has_decomposition:
-        return False
+        return None
 
-    return is_supported(op, capabilities)
+    if is_supported(op, capabilities):
+        return op.name
+
+    return None
 
 
 def non_diff_in_grad_method(
