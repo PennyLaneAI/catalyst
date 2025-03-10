@@ -70,7 +70,7 @@ struct CompilerOptions {
     std::vector<Pipeline> pipelinesCfg;
     /// Specify that the compiler should start after reaching the given pass.
     std::string checkpointStage;
-    /// Specify the loweting action to perform
+    /// Specify the lowering action to perform
     Action loweringAction;
     /// If true, the compiler will dump the pass pipeline that will be run.
     bool dumpPassPipeline;
@@ -79,7 +79,7 @@ struct CompilerOptions {
     std::string getObjectFile() const
     {
         using path = std::filesystem::path;
-        return path(workspace.str()) / path(moduleName.str()).replace_extension(".o");
+        return path(workspace.str()) / path(moduleName.str() + ".o");
     }
 };
 

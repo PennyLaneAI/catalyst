@@ -33,7 +33,7 @@ BASE_ARGS = f"-assume-filename={CLANG_FMT_CNFG_PATH}"
 
 
 def parse_version(version_string):
-    version_rgx = "version (\d+)"
+    version_rgx = r"version (\d+)"
 
     m = re.search(version_rgx, version_string)
     return int(m.group(1))

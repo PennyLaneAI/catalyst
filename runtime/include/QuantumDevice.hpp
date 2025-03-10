@@ -165,7 +165,8 @@ struct QuantumDevice {
      * @param state A state vector of size 2**len(wires)
      * @param wires The wire(s) the operation acts on
      */
-    virtual void SetState(DataView<std::complex<double>, 1> &, std::vector<QubitIdType> &)
+    virtual void SetState([[maybe_unused]] DataView<std::complex<double>, 1> &state,
+                          [[maybe_unused]] std::vector<QubitIdType> &wires)
     {
         RT_FAIL("Unsupported functionality");
     }
@@ -176,7 +177,8 @@ struct QuantumDevice {
      * @param n Prepares the basis state |n>, where n is an array of integers from the set {0, 1}
      * @param wires The wire(s) the operation acts on
      */
-    virtual void SetBasisState(DataView<int8_t, 1> &, std::vector<QubitIdType> &)
+    virtual void SetBasisState([[maybe_unused]] DataView<int8_t, 1> &n,
+                               [[maybe_unused]] std::vector<QubitIdType> &wires)
     {
         RT_FAIL("Unsupported functionality");
     }

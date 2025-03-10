@@ -16,8 +16,9 @@
 
 import numpy as np
 import pennylane as qml
+from utils import qjit_for_tests as qjit
 
-from catalyst import measure, qjit
+from catalyst import measure
 
 
 # CHECK-LABEL: public @jit_circuit
@@ -62,6 +63,14 @@ def circuit():
 
 
 print(circuit.mlir)
+
+"""
+# TODO: The only reason we are using the braket.local.qubit device here
+# is because this test was developed before having support for custom devices.
+# We should replace instead create a custom device that has support for ISWAP
+# and PSWAP (which I think are unsupported in lightning.qubit and hence why they
+# would be decomposed.
+"""
 
 
 # CHECK-LABEL: public @jit_circuit

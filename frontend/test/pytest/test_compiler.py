@@ -30,7 +30,8 @@ import pennylane as qml
 import pytest
 
 from catalyst import qjit
-from catalyst.compiler import DEFAULT_PIPELINES, CompileOptions, Compiler, LinkerDriver
+from catalyst.compiler import CompileOptions, Compiler, LinkerDriver
+from catalyst.debug import instrumentation
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.filesystem import Directory
 
@@ -76,6 +77,20 @@ class TestCompilerOptions:
         assert ("[LIB]" in capture) if verbose else ("[LIB]" not in capture)
         assert ("Dumping" in capture) if (verbose and keep_intermediate) else True
         workflow.workspace.cleanup()
+
+    def test_compilation_with_instrumentation(self, capsys, backend):
+        """Test compilation with instrumentation"""
+
+        @qml.qnode(qml.device(backend, wires=1))
+        def circuit():
+            return qml.state()
+
+        with instrumentation(circuit.__name__, filename=None, detailed=True):
+            qjit(circuit)()
+
+        capture_result = capsys.readouterr()
+        capture = capture_result.out + capture_result.err
+        assert "[DIAGNOSTICS]" in capture
 
 
 class TestCompilerWarnings:
@@ -211,9 +226,12 @@ class TestCompilerState:
     def test_print_stages(self, backend):
         """Test that after compiling the intermediate files exist."""
 
+        options = CompileOptions()
+        pipelines = options.get_stages()
+
         @qjit(
             keep_intermediate=True,
-            pipelines=[("EmptyPipeline1", [])] + DEFAULT_PIPELINES + [("EmptyPipeline2", [])],
+            pipelines=[("EmptyPipeline1", [])] + pipelines + [("EmptyPipeline2", [])],
         )
         @qml.qnode(qml.device(backend, wires=1))
         def workflow():
@@ -244,21 +262,6 @@ class TestCompilerState:
 
         with pytest.raises(CompileError, match="Attempting to get output for pipeline"):
             workflow.compiler.get_output_of("None-existing-pipeline", workflow.workspace)
-        workflow.workspace.cleanup()
-
-    def test_workspace(self):
-        """Test directory has been modified with folder containing intermediate results"""
-
-        @qjit(keep_intermediate=True, target="mlir")
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
-        def workflow():
-            qml.PauliX(wires=0)
-            return qml.state()
-
-        directory = os.path.join(os.getcwd(), workflow.__name__)
-        files = os.listdir(directory)
-        # The directory is non-empty. Should at least contain the original .mlir file
-        assert files
         workflow.workspace.cleanup()
 
     def test_compiler_driver_with_output_name(self):
@@ -304,16 +307,18 @@ class TestCompilerState:
             )
             compiled.compile()
 
+        stack_trace_pattern = "diagnostic emitted with trace"
+
         assert "Failed to lower MLIR module" in e.value.args[0]
         assert "While processing 'TestPass' pass " in e.value.args[0]
-        assert "Trace" not in e.value.args[0]
+        assert stack_trace_pattern not in e.value.args[0]
         assert isfile(os.path.join(str(compiled.workspace), "2_TestPass_FAILED.mlir"))
         compiled.workspace.cleanup()
 
         with pytest.raises(CompileError) as e:
             qjit(circuit, pipelines=test_pipelines, verbose=True)()
 
-        assert "Trace" in e.value.args[0]
+        assert stack_trace_pattern in e.value.args[0]
 
 
 class TestCustomCall:

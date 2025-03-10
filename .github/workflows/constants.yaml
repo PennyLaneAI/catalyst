@@ -83,7 +83,7 @@ jobs:
 
       - name: Runtime Backend Devices
         id: rt_backends
-        run: echo 'rt_backends=["lightning", "lightning-kokkos", "openqasm", "oqc"]' >> $GITHUB_OUTPUT
+        run: echo 'rt_backends=["lightning", "lightning-kokkos", "openqasm", "oqc", "oqd"]' >> $GITHUB_OUTPUT
 
       - name: Compilers (All)
         id: compilers

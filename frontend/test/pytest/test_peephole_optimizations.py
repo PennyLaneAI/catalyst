@@ -18,8 +18,8 @@ import numpy as np
 import pennylane as qml
 import pytest
 
-from catalyst import qjit
-from catalyst.passes import cancel_inverses, merge_rotations, pipeline
+from catalyst import pipeline, qjit
+from catalyst.passes import cancel_inverses, merge_rotations
 
 # pylint: disable=missing-function-docstring
 
@@ -33,74 +33,31 @@ from catalyst.passes import cancel_inverses, merge_rotations, pipeline
 @pytest.mark.parametrize("theta", [42.42])
 def test_cancel_inverses_functionality(theta, backend):
 
-    @qjit
-    def workflow():
-        @qml.qnode(qml.device(backend, wires=1))
-        def f(x):
-            qml.RX(x, wires=0)
-            qml.Hadamard(wires=0)
-            qml.Hadamard(wires=0)
-            return qml.probs()
-
-        @cancel_inverses
-        @qml.qnode(qml.device(backend, wires=1))
-        def g(x):
-            qml.RX(x, wires=0)
-            qml.Hadamard(wires=0)
-            qml.Hadamard(wires=0)
-            return qml.probs()
-
-        return f(theta), g(theta)
-
-    @qml.qnode(qml.device("default.qubit", wires=1))
-    def reference(x):
+    def circuit(x):
         qml.RX(x, wires=0)
         qml.Hadamard(wires=0)
         qml.Hadamard(wires=0)
         return qml.probs()
 
-    assert np.allclose(workflow()[0], workflow()[1])
-    assert np.allclose(workflow()[1], reference(theta))
+    reference_workflow = qml.QNode(circuit, qml.device("default.qubit", wires=1))
+
+    customized_device = qml.device(backend, wires=1)
+    qjitted_workflow = qjit(qml.QNode(circuit, customized_device))
+    optimized_workflow = qjit(cancel_inverses(qml.QNode(circuit, customized_device)))
+
+    assert np.allclose(reference_workflow(theta), qjitted_workflow(theta))
+    assert np.allclose(reference_workflow(theta), optimized_workflow(theta))
+
+
+#
+# merge_rotations
+#
 
 
 @pytest.mark.parametrize("theta", [42.42])
 def test_merge_rotation_functionality(theta, backend):
 
-    @qjit
-    def workflow():
-        @qml.qnode(qml.device(backend, wires=1))
-        def f(x):
-            qml.RX(x, wires=0)
-            qml.RX(x, wires=0)
-            qml.RZ(x, wires=0)
-            qml.adjoint(qml.RZ)(x, wires=0)
-            qml.Rot(x, x, x, wires=0)
-            qml.Rot(x, x, x, wires=0)
-            qml.PhaseShift(x, wires=0)
-            qml.PhaseShift(x, wires=0)
-            qml.Hadamard(wires=0)
-            qml.Hadamard(wires=0)
-            return qml.probs()
-
-        @merge_rotations
-        @qml.qnode(qml.device(backend, wires=1))
-        def g(x):
-            qml.RX(x, wires=0)
-            qml.RX(x, wires=0)
-            qml.RZ(x, wires=0)
-            qml.adjoint(qml.RZ)(x, wires=0)
-            qml.Rot(x, x, x, wires=0)
-            qml.Rot(x, x, x, wires=0)
-            qml.PhaseShift(x, wires=0)
-            qml.PhaseShift(x, wires=0)
-            qml.Hadamard(wires=0)
-            qml.Hadamard(wires=0)
-            return qml.probs()
-
-        return f(theta), g(theta)
-
-    @qml.qnode(qml.device("default.qubit", wires=1))
-    def reference(x):
+    def circuit(x):
         qml.RX(x, wires=0)
         qml.RX(x, wires=0)
         qml.RZ(x, wires=0)
@@ -113,8 +70,14 @@ def test_merge_rotation_functionality(theta, backend):
         qml.Hadamard(wires=0)
         return qml.probs()
 
-    assert np.allclose(workflow()[0], workflow()[1])
-    assert np.allclose(workflow()[1], reference(theta))
+    reference_workflow = qml.QNode(circuit, qml.device("default.qubit", wires=1))
+
+    customized_device = qml.device(backend, wires=1)
+    qjitted_workflow = qjit(qml.QNode(circuit, customized_device))
+    optimized_workflow = qjit(merge_rotations(qml.QNode(circuit, customized_device)))
+
+    assert np.allclose(reference_workflow(theta), qjitted_workflow(theta))
+    assert np.allclose(reference_workflow(theta), optimized_workflow(theta))
 
 
 @pytest.mark.parametrize("theta", [42.42])
@@ -167,7 +130,7 @@ def test_pipeline_functionality(theta, backend):
             return qml.expval(qml.PauliY(wires=0))
 
         no_pipeline_result = f(theta)
-        pipeline_result = pipeline(pass_pipeline=my_pipeline)(f)(theta)
+        pipeline_result = pipeline(my_pipeline)(f)(theta)
 
         return no_pipeline_result, pipeline_result
 
@@ -189,7 +152,7 @@ def test_cancel_inverses_bad_usages():
             TypeError,
             match="A QNode is expected, got the classical function",
         ):
-            pipeline(classical_func)
+            pipeline({})(classical_func)
 
         with pytest.raises(
             TypeError,

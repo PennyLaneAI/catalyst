@@ -25,9 +25,8 @@ from typing import Callable, Sequence
 
 import numpy as np
 import pennylane as qml
-from lit_util_printers import print_jaxpr, print_mlir
-
-from catalyst import qjit
+from utils import print_jaxpr, print_mlir
+from utils import qjit_for_tests as qjit
 
 
 def test_multiple_tape_transforms():
@@ -64,20 +63,20 @@ def test_multiple_tape_transforms():
 
     # CHECK: circuit_twotapes
     # CHECK: call_jaxpr={ lambda ;
-    # CHECK-NEXT: qdevice[
+    # CHECK: qdevice[
     # CHECK: ]
     # CHECK: qdealloc
-    # CHECK-NEXT: qdevice[
+    # CHECK: qdevice[
     # CHECK: ]
     # CHECK: qdealloc
     # CHECK-NEXT: {{.+}}:f64[] = add {{.+}} {{.+}}
     print_jaxpr(circuit_twotapes, [0.1, 0.2])
 
     # CHECK: circuit_twotapes
-    # CHECK: quantum.device[
+    # CHECK: quantum.device
     # CHECK: quantum.dealloc
     # CHECK-NEXT: quantum.device_release
-    # CHECK-NEXT: quantum.device[
+    # CHECK: quantum.device
     # CHECK: quantum.dealloc
     # CHECK-NEXT: quantum.device_release
     # CHECK-NEXT: {{%.+}} = stablehlo.add {{%.+}}, {{%.+}} : tensor<f64>

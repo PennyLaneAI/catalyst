@@ -19,6 +19,7 @@ from catalyst.debug.compiler_functions import (
     compile_executable,
     get_cmain,
     get_compilation_stage,
+    get_compilation_stages_groups,
     replace_ir,
 )
 from catalyst.debug.instruments import instrumentation
@@ -32,6 +33,7 @@ __all__ = (
     "print",
     "print_memref",
     "get_compilation_stage",
+    "get_compilation_stages_groups",
     "get_cmain",
     "instrumentation",
     "replace_ir",

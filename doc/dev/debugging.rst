@@ -120,33 +120,8 @@ Pass Pipelines
 
 The compilation steps which take MLIR as an input and lower it to binary are broken into MLIR pass
 pipelines.  The ``pipelines`` argument of the ``qjit`` function may be used to alter the steps used
-for compilation. The default set of pipelines is defined via the ``catalyst.compiler.DEFAULT_PIPELINES``
-list. Its structure is shown below.
-
-.. code-block:: python
-
-    DEFAULT_PIPELINES = [
-        (
-            "HLOLoweringPass",
-            [
-                "canonicalize",
-                "func.func(chlo-legalize-to-hlo)",
-                "stablehlo-legalize-to-hlo",
-                "func.func(mhlo-legalize-control-flow)",
-                ...
-            ],
-        ),
-        (
-            "QuantumCompilationPass",
-            [
-                "lower-gradients",
-                "adjoint-lowering",
-                "convert-arraylist-to-memref",
-            ],
-        ),
-        ...
-        ]
-
+for compilation. The default set of pipelines is defined via the :func:`~catalyst.debug.compiler_functions`
+list.
 
 One could customize what compilation passes are executed. A good use case of this would be if you
 are debugging Catalyst itself or you want to enable or disable passes within a specific pipeline.
@@ -193,6 +168,7 @@ specific pass pipeline.
 To do so, simply use the :func:`~.debug.get_compilation_stage` function and print the return value out.
 For example, if one wishes to inspect the output of the ``BufferizationPass`` pipeline, simply run
 the following command.
+One also needs to have used the ``keep_intermediate=True`` option in the ``@qjit`` decorator.
 
 .. code-block:: python
 

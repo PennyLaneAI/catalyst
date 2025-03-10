@@ -54,11 +54,11 @@ Catalyst
 
 .. mdinclude:: ../README.md
   :start-line: 20
-  :end-line: 73
+  :end-line: 72
 
 .. mdinclude:: ../README.md
-  :start-line: 142
-  :end-line: 163
+  :start-line: 134
+  :end-line: 155
 
 .. toctree::
    :maxdepth: 2
@@ -84,6 +84,7 @@ Catalyst
    Compiler Core <modules/mlir>
    MLIR Dialects <dev/dialects>
    Compiler Passes <dev/transforms>
+   Compiler Plugins <dev/plugins>
    Quantum Runtime <modules/runtime>
    dev/debugging
    dev/custom_devices
@@ -105,5 +106,6 @@ Catalyst
    :hidden:
 
    code/__init__
+   catalyst-cli/catalyst-cli.rst
    Runtime Device Interface <api/file_runtime_include_QuantumDevice.hpp>
    QIR C-API <api/file_runtime_include_RuntimeCAPI.h>

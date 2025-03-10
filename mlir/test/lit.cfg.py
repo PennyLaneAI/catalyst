@@ -1,3 +1,4 @@
+# pylint: disable=undefined-variable
 import os
 
 import lit.formats
@@ -53,6 +54,8 @@ try:
             os.path.join(config.quantum_build_dir, "python_packages", "quantum"),
             os.path.join(config.quantum_build_dir, "python_packages", "gradient"),
             os.path.join(config.quantum_build_dir, "python_packages", "catalyst"),
+            os.path.join(config.quantum_build_dir, "python_packages", "mitigation"),
+            os.path.join(config.quantum_build_dir, "python_packages", "ion"),
         ],
         append_path=True,
     )

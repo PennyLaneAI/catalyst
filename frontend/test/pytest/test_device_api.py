@@ -11,19 +11,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Test for the device API.
-"""
+"""Test for the device API."""
+import platform
+
 import pennylane as qml
 import pytest
 from pennylane.devices import NullQubit
+from utils import qjit_for_tests as qjit
 
-from catalyst import qjit
-from catalyst.device import (
-    QJITDevice,
-    get_device_capabilities,
-    get_device_toml_config,
-    qjit_device,
-)
+from catalyst.device import QJITDevice, get_device_capabilities, qjit_device
 from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
 
 # pylint:disable = protected-access,attribute-defined-outside-init
@@ -99,14 +95,8 @@ def test_qjit_device_measurements(shots, mocker):
     spy = mocker.spy(qjit_device, "get_device_capabilities")
 
     dev = qml.device("lightning.qubit", wires=2, shots=shots)
-    state_measurements = {"State"}
-    finite_shot_measurements = {"Counts", "Sample"}
-
-    config = get_device_toml_config(dev)
-    all_measurements = set(config["measurement_processes"])
-
-    assert state_measurements.issubset(all_measurements)
-    assert finite_shot_measurements.issubset(all_measurements)
+    state_measurements = {"StateMP"}
+    finite_shot_measurements = {"CountsMP", "SampleMP"}
 
     dev_capabilities = get_device_capabilities(dev)
     expected_measurements = dev_capabilities.measurement_processes

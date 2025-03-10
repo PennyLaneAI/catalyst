@@ -1,8 +1,25 @@
-schema = 2
+schema = 3
 
-# The union of all gate types listed in this section must match what
-# the device considers "supported" through PennyLane's device API.
-[operators.gates.native]
+# The set of all gate types supported at the runtime execution interface of the
+# device, i.e., what is supported by the `execute` method of the Device API.
+# The gate definition has the following format:
+#
+#   GATE = { properties = [ PROPS ], conditions = [ CONDS ] }
+#
+# where PROPS and CONS are zero or more comma separated quoted strings.
+#
+# PROPS: zero or more comma-separated quoted strings:
+#        - "controllable": if a controlled version of this gate is supported.
+#        - "invertible": if the adjoint of this operation is supported.
+#        - "differentiable": if device gradient is supported for this gate.
+# CONDS: zero or more comma-separated quoted strings:
+#        - "analytic" or "finiteshots": if this operation is only supported in
+#          either analytic execution or with shots, respectively.
+#        - "terms-commute": if this composite operator is only supported
+#          given that its terms commute. Only relevant for Prod, SProd, Sum,
+#          LinearCombination, and Hamiltonian.
+#
+[operators.gates]
 
 PRx = { }
 ISWAP = { }
@@ -40,47 +57,41 @@ IsingZZ = { }
 Toffoli = { }
 ControlledPhaseShift = { }
 
-# Operators that should be decomposed according to the algorithm used
-# by PennyLane's device API.
-# Optional, since gates not listed in this list will typically be decomposed by
-# default, but can be useful to express a deviation from this device's regular
-# strategy in PennyLane.
-[operators.gates.decomp]
-
-# Gates which should be translated to QubitUnitary
-[operators.gates.matrix]
-
-[operators.observables]
 # Observables supported by the device
-PauliX = {}
-PauliY = {}
-PauliZ = {}
-Hadamard = {}
-Hermitian = {}
-# Tensor,
-Projector = {}
-SProd = {}
-Hamiltonian = { condition = [ "analytic" ] }
-Sum = {}
-Prod = {}
+[operators.observables]
+
+PauliX = { }
+PauliY = { }
+PauliZ = { }
+Hadamard = { }
+Hermitian = { }
+Projector = { }
+SProd = { }
+Hamiltonian = { conditions = ["analytic"] }
+Sum = { }
+Prod = { }
 
 [measurement_processes]
 
-Expval = {}
-Var = {}
-Probs = {}
-State = { condition = [ "analytic" ] }
-Sample = { condition = [ "finiteshots" ] }
-Counts = { condition = [ "finiteshots" ] }
+ExpectationMP = { }
+VarianceMP = { }
+ProbabilityMP = { }
+StateMP = { conditions = ["analytic"] }
+SampleMP = { conditions = ["finiteshots"] }
+CountsMP = { conditions = ["finiteshots"] }
 
+# Additional support that the device may provide. All accepted fields and their
+# default values are listed below. Any fields missing from the TOML file will be
+# set to their default values.
 [compilation]
-# If the device is compatible with qjit
-qjit_compatible = true
-# If the device requires run time generation of the quantum circuit.
-runtime_code_generation = true
-# If the device supports mid circuit measurements natively
-mid_circuit_measurement = false
 
-# This field is currently unchecked but it is reserved for the purpose of
-# determining if the device supports dynamic qubit allocation/deallocation.
+# Whether the device is compatible with qjit.
+qjit_compatible = true
+# Whether the device requires run time generation of the quantum circuit.
+runtime_code_generation = true
+# Whether the device supports dynamic qubit allocation/deallocation.
 dynamic_qubit_management = false
+# The methods of handling mid-circuit measurements that the device supports, e.g.,
+# "one-shot", "device", "tree-traversal", etc. An empty list indicates that the device
+# does not support mid-circuit measurements.
+supported_mcm_methods = [ ]

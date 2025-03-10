@@ -30,10 +30,14 @@ set(LIBS
     MLIRCatalystTransforms
     MLIRQuantum
     quantum-transforms
+    MLIRQEC
+    qec-transforms
     MLIRGradient
     gradient-transforms
     MLIRMitigation
     mitigation-transforms
+    MLIRIon
+    ion-transforms
     MhloRegisterDialects
     StablehloRegister
     MLIRCatalystTest

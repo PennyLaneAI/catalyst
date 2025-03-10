@@ -270,7 +270,8 @@ class CVariable(Variable):
 
     @staticmethod
     def _get_strides(array):
-        strides = [str(stride // 8) for stride in array.strides]
+        # Numpy uses units of bytes for their strides, but memrefs use number of elements.
+        strides = [str(stride // array.itemsize) for stride in array.strides]
         strides_str = ",".join(strides)
         return strides_str
 

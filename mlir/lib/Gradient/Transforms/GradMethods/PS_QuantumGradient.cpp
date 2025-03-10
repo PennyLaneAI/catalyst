@@ -25,6 +25,7 @@
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 
+#include "Catalyst/Utils/StaticAllocas.h"
 #include "Gradient/Utils/GradientShape.h"
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/IR/QuantumOps.h"
@@ -56,7 +57,7 @@ static std::vector<Value> computePartialDerivative(PatternRewriter &rewriter, Lo
                                                    Value selectorBuffer, func::FuncOp shiftedFn,
                                                    std::vector<Value> callArgs)
 {
-    constexpr double shift = PI / 2;
+    constexpr double shift = llvm::numbers::pi / 2;
     ShapedType shiftVectorType = RankedTensorType::get({numShifts}, rewriter.getF64Type());
     Value selectorVector = rewriter.create<bufferization::ToTensorOp>(loc, selectorBuffer);
 
@@ -223,10 +224,10 @@ func::FuncOp ParameterShiftLowering::genQGradFunction(PatternRewriter &rewriter,
             cOne = rewriter.create<index::ConstantOp>(loc, 1);
 
             // Use stack allocation for selector vector as it's not expected to be too big.
-            selectorBuffer = rewriter.create<memref::AllocaOp>(loc, selectorBufferType);
+            selectorBuffer = getStaticMemrefAlloca(loc, rewriter, selectorBufferType);
+            auto gradientsProcessedTy = MemRefType::get({}, rewriter.getIndexType());
+            gradientsProcessed = getStaticMemrefAlloca(loc, rewriter, gradientsProcessedTy);
 
-            gradientsProcessed = rewriter.create<memref::AllocaOp>(
-                loc, MemRefType::get({}, rewriter.getIndexType()));
             rewriter.create<memref::StoreOp>(loc, cZero, gradientsProcessed);
 
             for (Type gradType : gradResTypes) {

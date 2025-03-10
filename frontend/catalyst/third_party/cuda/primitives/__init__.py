@@ -29,6 +29,7 @@ from jax import numpy as jnp
 
 class AbsCudaQState(jax.core.AbstractValue):
     "Abstract CUDA-quantum State."
+
     hash_value = hash("AbsCudaQState")
 
     def __eq__(self, other):
@@ -40,11 +41,13 @@ class AbsCudaQState(jax.core.AbstractValue):
 
 class CudaQState(cudaq.State):
     "Concrete CUDA-quantum state."
+
     aval = AbsCudaQState
 
 
 class AbsCudaQbit(jax.core.AbstractValue):
     "Abstract CUDA-quantum qbit."
+
     hash_value = hash("AbsCudaQbit")
 
     def __eq__(self, other):
@@ -56,11 +59,13 @@ class AbsCudaQbit(jax.core.AbstractValue):
 
 class CudaQbit(cudaq._pycudaq.QuakeValue):
     "Concrete CUDA-quantum qbit."
+
     aval = AbsCudaQbit
 
 
 class AbsCudaQReg(jax.core.AbstractValue):
     "Abstract CUDA-quantum quantum register."
+
     hash_value = hash("AbsCudaQReg")
 
     def __eq__(self, other):
@@ -72,11 +77,13 @@ class AbsCudaQReg(jax.core.AbstractValue):
 
 class CudaQReg(cudaq._pycudaq.QuakeValue):
     "Concrete CUDA-quantum quantum register."
+
     aval = AbsCudaQReg
 
 
 class AbsCudaValue(jax.core.AbstractValue):
     "Abstract CUDA-quantum value."
+
     hash_value = hash("AbsCudaValue")
 
     def __eq__(self, other):
@@ -88,11 +95,13 @@ class AbsCudaValue(jax.core.AbstractValue):
 
 class CudaValue(cudaq._pycudaq.QuakeValue):
     "Concrete CUDA-quantum value."
+
     aval = AbsCudaValue
 
 
 class AbsCudaKernel(jax.core.AbstractValue):
     "Abstract CUDA-quantum kernel."
+
     hash_value = hash("AbsCudaKernel")
 
     def __eq__(self, other):
@@ -104,11 +113,13 @@ class AbsCudaKernel(jax.core.AbstractValue):
 
 class CudaKernel(cudaq._pycudaq.QuakeValue):
     "Concrete CUDA-quantum kernel."
+
     aval = AbsCudaKernel
 
 
 class AbsCudaSampleResult(jax.core.AbstractValue):
     "Abstract CUDA-quantum kernel."
+
     hash_value = hash("AbsCudaSampleResult")
 
     def __eq__(self, other):
@@ -120,6 +131,7 @@ class AbsCudaSampleResult(jax.core.AbstractValue):
 
 class CudaSampleResult(cudaq.SampleResult):
     "Concrete CUDA-quantum kernel."
+
     aval = AbsCudaSampleResult
 
 
@@ -137,6 +149,7 @@ class AbsCudaSpinOperator(jax.core.AbstractValue):
 
 class CudaSpinOperator(cudaq.SpinOperator):
     "Concrete CUDA-quantum spin operator."
+
     aval = AbsCudaSpinOperator
 
 
@@ -154,6 +167,7 @@ class AbsCudaQObserveResult(jax.core.AbstractValue):
 
 class CudaQObserveResult(cudaq.ObserveResult):
     "Concrete CUDA-quantum observe result."
+
     aval = AbsCudaQObserveResult
 
 

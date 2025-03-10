@@ -91,30 +91,44 @@ def SplitMultipleTapesPass : Pass<"split-multiple-tapes"> {
 // ----- Quantum circuit transformation passes begin ----- //
 // For example, automatic compiler peephole opts, etc.
 
-class QuantumCircuitTransformationPassBase {
-    list<Option> options = [];
-}
+def IonsDecompositionPass : Pass<"ions-decomposition"> {
+    let summary = "Decompose the gates to the set {RX, RY, MS}";
 
-def QuantumCircuitTransformationPass: QuantumCircuitTransformationPassBase {
-    let options = [
-    Option<"FuncNameOpt", "func-name",
-           "std::string", /*default=*/"\"\"",
-           "The name of the function (or qnode) to run the quantum circuit transformation pass on.">,
-    ];
+    let constructor = "catalyst::createIonsDecompositionPass()";
 }
 
 def RemoveChainedSelfInversePass : Pass<"remove-chained-self-inverse"> {
     let summary = "Perform removal of chained operations that are self inverses.";
 
     let constructor = "catalyst::createRemoveChainedSelfInversePass()";
-    let options = QuantumCircuitTransformationPass.options;
 }
 
 def MergeRotationsPass : Pass<"merge-rotations"> {
-    let summary = "merge rotation boilerplate words";
+    let summary = "Perform merging of chained rotation gates about the same axis.";
 
     let constructor = "catalyst::createMergeRotationsPass()";
-    let options = QuantumCircuitTransformationPass.options;
+}
+
+def DisentangleCNOTPass : Pass<"disentangle-CNOT"> {
+    let summary = "Replace a CNOT gate with two single qubit gates whenever possible.";
+
+    let constructor = "catalyst::createDisentangleCNOTPass()";
+    let options = [
+    Option<"EmitFSMStateRemark", "emit-FSM-state-remark",
+           "bool", /*default=*/"false",
+           "Whether to emit the state analysis result from the simple states propagation FSM onto the gate operations.">,
+    ];
+}
+
+def DisentangleSWAPPass : Pass<"disentangle-SWAP"> {
+    let summary = "Replace a SWAP gate with single qubit gates and a shorter SWAPZ gates whenever possible.";
+
+    let constructor = "catalyst::createDisentangleSWAPPass()";
+    let options = [
+    Option<"EmitFSMStateRemark", "emit-FSM-state-remark",
+           "bool", /*default=*/"false",
+           "Whether to emit the state analysis result from the simple states propagation FSM onto the gate operations.">,
+    ];
 }
 
 // ----- Quantum circuit transformation passes end ----- //

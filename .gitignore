@@ -3,6 +3,7 @@ build
 __pycache__
 pennylane_catalyst.egg-info
 *.so
+*.dylib
 .dylibs
 
 # Testing files and directories
@@ -11,7 +12,7 @@ pennylane_catalyst.egg-info
 
 # Packaging directories
 dist
-frontend/catalyst/bin
+frontend/bin
 frontend/catalyst/lib
 frontend/catalyst/_revision.py
 frontend/mlir_quantum
@@ -30,3 +31,6 @@ venv
 
 # Cache files
 .cache
+
+# Standalone-plugin example
+mlir/standalone

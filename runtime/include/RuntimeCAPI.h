@@ -25,7 +25,7 @@ extern "C" {
 // Quantum Runtime Instructions
 void __catalyst__rt__fail_cstr(const char *);
 void __catalyst__rt__initialize(uint32_t *seed);
-void __catalyst__rt__device_init(int8_t *, int8_t *, int8_t *);
+void __catalyst__rt__device_init(int8_t *, int8_t *, int8_t *, int64_t shots);
 void __catalyst__rt__device_release();
 void __catalyst__rt__finalize();
 void __catalyst__rt__toggle_recorder(bool);
@@ -74,6 +74,7 @@ void __catalyst__qis__ControlledPhaseShift(double, QUBIT *, QUBIT *, const Modif
 void __catalyst__qis__CRX(double, QUBIT *, QUBIT *, const Modifiers *);
 void __catalyst__qis__CRY(double, QUBIT *, QUBIT *, const Modifiers *);
 void __catalyst__qis__CRZ(double, QUBIT *, QUBIT *, const Modifiers *);
+void __catalyst__qis__MS(double, QUBIT *, QUBIT *, const Modifiers *);
 void __catalyst__qis__CRot(double, double, double, QUBIT *, QUBIT *, const Modifiers *);
 void __catalyst__qis__CSWAP(QUBIT *, QUBIT *, QUBIT *, const Modifiers *);
 void __catalyst__qis__Toffoli(QUBIT *, QUBIT *, QUBIT *, const Modifiers *);
@@ -97,8 +98,8 @@ RESULT *__catalyst__qis__Measure(QUBIT *, int32_t);
 double __catalyst__qis__Expval(ObsIdType);
 double __catalyst__qis__Variance(ObsIdType);
 void __catalyst__qis__Probs(MemRefT_double_1d *, int64_t, /*qubits*/...);
-void __catalyst__qis__Sample(MemRefT_double_2d *, int64_t, int64_t, /*qubits*/...);
-void __catalyst__qis__Counts(PairT_MemRefT_double_int64_1d *, int64_t, int64_t, /*qubits*/...);
+void __catalyst__qis__Sample(MemRefT_double_2d *, int64_t, /*qubits*/...);
+void __catalyst__qis__Counts(PairT_MemRefT_double_int64_1d *, int64_t, /*qubits*/...);
 void __catalyst__qis__State(MemRefT_CplxT_double_1d *, int64_t, /*qubits*/...);
 void __catalyst__qis__Gradient(int64_t, /*results*/...);
 void __catalyst__qis__Gradient_params(MemRefT_int64_1d *, int64_t, /*results*/...);

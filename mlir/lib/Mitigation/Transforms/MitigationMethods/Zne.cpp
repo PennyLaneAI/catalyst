@@ -230,8 +230,8 @@ void ZneLowering::rewrite(mitigation::ZneOp op, PatternRewriter &rewriter) const
 
 // In *.cpp module only, to keep extraneous headers out of *.hpp
 FlatSymbolRefAttr globalFolding(Location loc, PatternRewriter &rewriter, std::string fnFoldedName,
-                                StringAttr lib, StringAttr name, StringAttr kwargs,
-                                int64_t numberQubits, FunctionType fnFoldedType,
+                                Operation *shots, StringAttr lib, StringAttr name,
+                                StringAttr kwargs, int64_t numberQubits, FunctionType fnFoldedType,
                                 SmallVector<Type> typesFolded, func::FuncOp fnFoldedOp,
                                 func::FuncOp fnAllocOp, func::FuncOp fnWithoutMeasurementsOp,
                                 func::FuncOp fnWithMeasurementsOp)
@@ -246,7 +246,16 @@ FlatSymbolRefAttr globalFolding(Location loc, PatternRewriter &rewriter, std::st
     Value c1 = rewriter.create<index::ConstantOp>(loc, 1);
     TypedAttr numberQubitsAttr = rewriter.getI64IntegerAttr(numberQubits);
     Value numberQubitsValue = rewriter.create<arith::ConstantOp>(loc, numberQubitsAttr);
-    rewriter.create<quantum::DeviceInitOp>(loc, lib, name, kwargs);
+
+    // TODO: in the frontend, calculation of shots will happen outside of the qnode,
+    // before qml.device(..., shots = <some value computed earlier>) is called,
+    // so the SSA def-use computation chain of the shots will actually not be inside the qnode
+    // For now, we simply create a single arith.constant SSA shots value for the ZNE tests.
+    // Revisit when discussing the frontend design of dynamic shots/device/qnode interaction.
+    Operation *shotsLocal = shots->clone();
+
+    rewriter.insert(shotsLocal);
+    rewriter.create<quantum::DeviceInitOp>(loc, shotsLocal->getResult(0), lib, name, kwargs);
 
     Value allocQreg = rewriter.create<func::CallOp>(loc, fnAllocOp, numberQubitsValue).getResult(0);
 
@@ -380,6 +389,7 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
     // Get the device
     quantum::DeviceInitOp deviceInitOp = *fnOp.getOps<quantum::DeviceInitOp>().begin();
 
+    Operation *shots = deviceInitOp.getShots().getDefiningOp();
     StringAttr lib = deviceInitOp.getLibAttr();
     StringAttr name = deviceInitOp.getNameAttr();
     StringAttr kwargs = deviceInitOp.getKwargsAttr();
@@ -417,7 +427,7 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
         func::FuncOp fnWithMeasurementsOp =
             SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, fnWithMeasurementsRefAttr);
 
-        return globalFolding(loc, rewriter, fnFoldedName, lib, name, kwargs, numberQubits,
+        return globalFolding(loc, rewriter, fnFoldedName, shots, lib, name, kwargs, numberQubits,
                              fnFoldedType, typesFolded, fnFoldedOp, fnAllocOp,
                              fnWithoutMeasurementsOp, fnWithMeasurementsOp);
     }

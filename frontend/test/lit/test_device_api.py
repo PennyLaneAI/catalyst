@@ -14,8 +14,9 @@
 
 # RUN: %PYTHON %s | FileCheck %s
 
-"""Test for the device API.
-"""
+# pylint: disable=line-too-long
+
+"""Test for the device API."""
 import os
 import pathlib
 import platform
@@ -25,8 +26,8 @@ import pennylane as qml
 from pennylane.devices import Device
 from pennylane.devices.execution_config import ExecutionConfig
 from pennylane.transforms.core import TransformProgram
+from utils import qjit_for_tests as qjit
 
-from catalyst import qjit
 from catalyst.compiler import get_lib_path
 
 TEST_PATH = os.path.dirname(__file__)
@@ -36,7 +37,7 @@ CONFIG_CUSTOM_DEVICE = pathlib.Path(f"{TEST_PATH}/../custom_device/custom_device
 class CustomDevice(Device):
     """A custom device that does nothing."""
 
-    config = CONFIG_CUSTOM_DEVICE
+    config_filepath = CONFIG_CUSTOM_DEVICE
 
     def __init__(self, wires, shots=1024):
         super().__init__(wires=wires, shots=shots)
@@ -70,7 +71,8 @@ class CustomDevice(Device):
 def test_circuit():
     """Test a circuit compilation to MLIR when using the new device API."""
 
-    # CHECK:    quantum.device["[[PATH:.*]]librtd_null_qubit.{{so|dylib}}", "Custom", "{'shots': 2048}"]
+    # CHECK:   [[shots:%.+]] = arith.constant 2048 : i64
+    # CHECK:   quantum.device shots([[shots]]) ["[[PATH:.*]]librtd_null_qubit.{{so|dylib}}", "Custom", "{'shots': 2048}"]
     dev = CustomDevice(wires=2, shots=2048)
 
     @qjit(target="mlir")
@@ -95,7 +97,8 @@ def test_preprocess():
     using the new device API.
     TODO: we need to readd the two check-not once we accept the device preprocessing."""
 
-    # CHECK:    quantum.device["[[PATH:.*]]librtd_null_qubit.{{so|dylib}}", "Custom", "{'shots': 2048}"]
+    # CHECK:   [[shots:%.+]] = arith.constant 2048 : i64
+    # CHECK:   quantum.device shots([[shots]]) ["[[PATH:.*]]librtd_null_qubit.{{so|dylib}}", "Custom", "{'shots': 2048}"]
     dev = CustomDevice(wires=2, shots=2048)
 
     @qjit(target="mlir")

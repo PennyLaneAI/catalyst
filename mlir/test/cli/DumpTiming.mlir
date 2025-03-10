@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: catalyst-cli %s --mlir-timing --verify-diagnostics 2>&1 | FileCheck %s
+// RUN: catalyst %s --mlir-timing --verify-diagnostics 2>&1 | FileCheck %s
 
 func.func @foo() {
     return

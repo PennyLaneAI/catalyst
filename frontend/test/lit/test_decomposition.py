@@ -1,4 +1,17 @@
 # Copyright 2022-2023 Xanadu Quantum Technologies Inc.
+import os
+import pathlib
+import platform
+from copy import deepcopy
+
+import jax
+import pennylane as qml
+from pennylane.devices.capabilities import OperatorProperties
+from utils import qjit_for_tests as qjit
+
+from catalyst import measure
+from catalyst.compiler import get_lib_path
+from catalyst.device import get_device_capabilities
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,16 +28,9 @@
 # RUN: %PYTHON %s | FileCheck %s
 # pylint: disable=line-too-long
 
-import platform
-from copy import deepcopy
 
-import jax
-import pennylane as qml
-
-from catalyst import measure, qjit
-from catalyst.compiler import get_lib_path
-from catalyst.device import get_device_capabilities
-from catalyst.utils.toml import OperationProperties
+TEST_PATH = os.path.dirname(__file__)
+CONFIG_CUSTOM_DEVICE = pathlib.Path(f"{TEST_PATH}/../custom_device/custom_device.toml")
 
 
 def get_custom_device_without(num_wires, discards=frozenset(), force_matrix=frozenset()):
@@ -34,30 +40,18 @@ def get_custom_device_without(num_wires, discards=frozenset(), force_matrix=froz
         """Custom Gate Set Device"""
 
         name = "Custom Device"
-        pennylane_requires = "0.35.0"
-        version = "0.0.2"
-        author = "Tester"
+        config_filepath = CONFIG_CUSTOM_DEVICE
 
-        lightning_device = qml.device("lightning.qubit", wires=0)
-
-        config = None
-        backend_name = "default"
-        backend_lib = "default"
-        backend_kwargs = {}
+        _to_matrix_ops = {}
 
         def __init__(self, shots=None, wires=None):
             super().__init__(wires=wires, shots=shots)
-            lightning_capabilities = get_device_capabilities(self.lightning_device)
-            custom_capabilities = deepcopy(lightning_capabilities)
+            self.qjit_capabilities = deepcopy(get_device_capabilities(self))
             for gate in discards:
-                custom_capabilities.native_ops.pop(gate, None)
-                custom_capabilities.to_decomp_ops.pop(gate, None)
-                custom_capabilities.to_matrix_ops.pop(gate, None)
+                self.qjit_capabilities.operations.pop(gate, None)
             for gate in force_matrix:
-                custom_capabilities.native_ops.pop(gate, None)
-                custom_capabilities.to_decomp_ops.pop(gate, None)
-                custom_capabilities.to_matrix_ops[gate] = OperationProperties(False, False, False)
-            self.qjit_capabilities = custom_capabilities
+                self.qjit_capabilities.operations.pop(gate, None)
+                self._to_matrix_ops[gate] = OperatorProperties(False, False, False)
 
         def apply(self, operations, **kwargs):
             """Unused"""
@@ -187,11 +181,13 @@ def test_decompose_singleexcitationplus():
         # CHECK-NOT: name = "SingleExcitationPlus"
         # CHECK: [[a_scalar_tensor_float_2:%.+]] = stablehlo.constant dense<2.{{[0]+}}e+00>
         # CHECK-NOT: name = "SingleExcitationPlus"
-        # CHECK: [[s0q1:%.+]] = quantum.custom "PauliX"
+        # CHECK: [[b_theta_div_2:%.+]] = stablehlo.divide %arg0, [[a_scalar_tensor_float_2]]
+        # CHECK-NOT: name = "SingleExcitationPlus"
+        # CHECK: [[a_theta_div_2:%.+]] = stablehlo.divide %arg0, [[a_scalar_tensor_float_2]]
         # CHECK-NOT: name = "SingleExcitationPlus"
         # CHECK: [[s0q0:%.+]] = quantum.custom "PauliX"
         # CHECK-NOT: name = "SingleExcitationPlus"
-        # CHECK: [[a_theta_div_2:%.+]] = stablehlo.divide %arg0, [[a_scalar_tensor_float_2]]
+        # CHECK: [[s0q1:%.+]] = quantum.custom "PauliX"
         # CHECK-NOT: name = "SingleExcitationPlus"
         # CHECK: [[a_theta_div_2_scalar:%.+]] = tensor.extract [[a_theta_div_2]]
         # CHECK-NOT: name = "SingleExcitationPlus"
@@ -200,8 +196,6 @@ def test_decompose_singleexcitationplus():
         # CHECK: [[s2q1:%.+]] = quantum.custom "PauliX"() [[s1]]#1
         # CHECK-NOT: name = "SingleExcitationPlus"
         # CHECK: [[s2q0:%.+]] = quantum.custom "PauliX"() [[s1]]#0
-        # CHECK-NOT: name = "SingleExcitationPlus"
-        # CHECK: [[b_theta_div_2:%.+]] = stablehlo.divide %arg0, [[a_scalar_tensor_float_2]]
         # CHECK-NOT: name = "SingleExcitationPlus"
         # CHECK: [[b_theta_div_2_scalar:%.+]] = tensor.extract [[b_theta_div_2]]
         # CHECK-NOT: name = "SingleExcitationPlus"

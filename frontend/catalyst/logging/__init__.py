@@ -13,7 +13,7 @@
 # limitations under the License.
 
 """
-Wrapper for PennyLane logging module. 
+Wrapper for PennyLane logging module.
 """
 from pennylane.logging import debug_logger, debug_logger_init
 

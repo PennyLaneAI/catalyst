@@ -42,17 +42,6 @@ declare_mlir_dialect_python_bindings(
   dialects/mitigation.py
   DIALECT_NAME mitigation)
 
-declare_mlir_python_extension(QuantumPythonSources.Extension
-  MODULE_NAME _quantumDialects
-  ADD_TO_PARENT QuantumPythonSources
-  SOURCES
-    QuantumExtension.cpp
-  PRIVATE_LINK_LIBS
-    LLVMSupport
-    MLIRIR
-  EMBED_CAPI_LINK_LIBS
-    QuantumCAPI
-)
 
 ################################################################################
 # Common CAPI
@@ -69,13 +58,6 @@ add_mlir_python_common_capi_library(QuantumPythonCAPI
     MLIRPythonExtension.RegisterEverything
     MLIRPythonSources.Core
 )
-
-add_library(compiler_driver MODULE PyCompilerDriver.cpp)
-set_target_properties(compiler_driver PROPERTIES PREFIX "")
-
-target_link_libraries(compiler_driver PRIVATE pybind11::module CatalystCompilerDriver)
-
-set_target_properties(compiler_driver PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${MLIR_BINARY_DIR}/python_packages/quantum/mlir_quantum)
 
 ################################################################################
 # Instantiation of all Python modules

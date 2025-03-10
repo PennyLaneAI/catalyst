@@ -297,7 +297,8 @@ class TestMidCircuitMeasurement:
             return qml.expval(qml.PauliZ(0))
 
         _ = circuit(1.8)
-        assert circuit.execute_kwargs["mcm_config"] == original_config
+        assert circuit.execute_kwargs["postselect_mode"] == original_config.postselect_mode
+        assert circuit.execute_kwargs["mcm_method"] == original_config.mcm_method
 
     @pytest.mark.parametrize("postselect_mode", [None, "fill-shots", "hw-like"])
     def test_default_mcm_method(self, backend, postselect_mode, mocker):
@@ -646,7 +647,7 @@ class TestDynamicOneShotIntegration:
     ):
         """Tests that Catalyst yields the same results as PennyLane's DefaultQubit for a simple
         circuit with a mid-circuit measurement and several terminal measurements."""
-        if backend == "lightning.kokkos":
+        if backend in ("lightning.kokkos", "lightning.gpu"):
             obs = qml.PauliZ(0)
         else:
             obs = qml.PauliY(0)

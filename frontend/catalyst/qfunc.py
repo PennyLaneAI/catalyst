@@ -49,7 +49,7 @@ from catalyst.jax_extras import (
 from catalyst.jax_primitives import quantum_kernel_p
 from catalyst.jax_tracer import Function, trace_quantum_function
 from catalyst.logging import debug_logger
-from catalyst.passes import pipeline
+from catalyst.passes.pass_api import dictionary_to_list_of_passes
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.tracing.type_signatures import filter_static_args
 from catalyst.utils.exceptions import CompileError
@@ -105,16 +105,18 @@ class QFunc:
         assert isinstance(self, qml.QNode)
 
         # Update the qnode with peephole pipeline
-        if "pass_pipeline" in kwargs.keys():
-            pass_pipeline = kwargs["pass_pipeline"]
-            if not hasattr(self, "_peephole_transformed"):
-                self = pipeline(pass_pipeline=pass_pipeline)(self)
-            kwargs.pop("pass_pipeline")
+        pass_pipeline = kwargs.pop("pass_pipeline", [])
+        pass_pipeline = dictionary_to_list_of_passes(pass_pipeline)
 
         # Mid-circuit measurement configuration/execution
         dynamic_one_shot_called = getattr(self, "_dynamic_one_shot_called", False)
         if not dynamic_one_shot_called:
-            mcm_config = copy(self.execute_kwargs["mcm_config"])
+            mcm_config = copy(
+                qml.devices.MCMConfig(
+                    postselect_mode=self.execute_kwargs["postselect_mode"],
+                    mcm_method=self.execute_kwargs["mcm_method"],
+                )
+            )
             total_shots = get_device_shots(self.device)
             _validate_mcm_config(mcm_config, total_shots)
 
@@ -150,7 +152,9 @@ class QFunc:
         )
         dynamic_args = filter_static_args(args, static_argnums)
         args_flat = tree_flatten((dynamic_args, kwargs))[0]
-        res_flat = quantum_kernel_p.bind(flattened_fun, *args_flat, qnode=self)
+        res_flat = quantum_kernel_p.bind(
+            flattened_fun, *args_flat, qnode=self, pipeline=tuple(pass_pipeline)
+        )
         return tree_unflatten(out_tree_promise(), res_flat)[0]
 
 
@@ -239,7 +243,8 @@ def dynamic_one_shot(qnode, **kwargs):
 
     single_shot_qnode = transform_to_single_shot(qnode)
     if mcm_config is not None:
-        single_shot_qnode.execute_kwargs["mcm_config"] = mcm_config
+        single_shot_qnode.execute_kwargs["postselect_mode"] = mcm_config.postselect_mode
+        single_shot_qnode.execute_kwargs["mcm_method"] = mcm_config.mcm_method
     single_shot_qnode._dynamic_one_shot_called = True
     dev = qnode.device
     total_shots = get_device_shots(dev)

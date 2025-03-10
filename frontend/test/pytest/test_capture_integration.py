@@ -11,13 +11,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Integration tests for the the PL capture in Catalyst.
-"""
+"""Integration tests for the the PL capture in Catalyst."""
 import jax.numpy as jnp
 import pennylane as qml
 import pytest
 
 import catalyst
+from catalyst.debug import get_compilation_stage
 
 
 def circuit_aot_builder(dev):
@@ -169,7 +169,6 @@ class TestCapture:
         desired = pl_circuit(theta)
         assert jnp.allclose(actual, desired)
 
-    @pytest.mark.xfail(reason="For not supported.")
     @pytest.mark.parametrize("theta", (jnp.pi, 0.1, 0.0))
     def test_forloop(self, backend, theta):
         """Test the integration for a circuit with a for loop."""
@@ -178,7 +177,7 @@ class TestCapture:
         @qml.qnode(qml.device(backend, wires=4))
         def catalyst_capture_circuit(x):
 
-            @qml.for_loop(1, 1, 4)
+            @qml.for_loop(1, 4, 1)
             def loop(i):
                 qml.CNOT(wires=[0, i])
                 qml.RX(x, wires=i)
@@ -199,3 +198,320 @@ class TestCapture:
         actual = catalyst_capture_circuit(theta)
         desired = pl_circuit(theta)
         assert jnp.allclose(actual, desired)
+
+    def test_forloop_workflow(self, backend):
+        """Test the integration for a circuit with a for loop primitive."""
+
+        @qml.qnode(qml.device(backend, wires=1))
+        def circuit(n, x):
+
+            @qml.for_loop(1, n, 1)
+            def loop_rx(_, x):
+                qml.RX(x, wires=0)
+                return jnp.sin(x)
+
+            # apply the for loop
+            loop_rx(x)
+
+            return qml.expval(qml.Z(0))
+
+        default_capture_result = qml.qjit(circuit)(10, 0.3)
+        experimental_capture_result = qml.qjit(circuit, experimental_capture=True)(10, 0.3)
+        assert default_capture_result == experimental_capture_result
+
+    def test_nested_loops(self, backend):
+        """Test the integration for a circuit with a nested for loop primitive."""
+
+        @qml.qnode(qml.device(backend, wires=4))
+        def circuit(n):
+            # Input state: equal superposition
+            @qml.for_loop(0, n, 1)
+            def init(i):
+                qml.Hadamard(wires=i)
+
+            # QFT
+            @qml.for_loop(0, n, 1)
+            def qft(i):
+                qml.Hadamard(wires=i)
+
+                @qml.for_loop(i + 1, n, 1)
+                def inner(j):
+                    qml.ControlledPhaseShift(jnp.pi / 2 ** (n - j + 1), [i, j])
+
+                inner()
+
+            init()
+            qft()
+
+            # Expected output: |100...>
+            return qml.state()
+
+        default_capture_result = qml.qjit(circuit)(4)
+        experimental_capture_result = qml.qjit(circuit, experimental_capture=True)(4)
+        assert jnp.allclose(default_capture_result, jnp.eye(2**4)[0])
+        assert jnp.allclose(experimental_capture_result, default_capture_result)
+
+    def test_while_loop_workflow(self, backend):
+        """Test the integration for a circuit with a while_loop primitive."""
+
+        @qml.qnode(qml.device(backend, wires=1))
+        def circuit(x: float):
+
+            def while_cond(i):
+                return i < 10
+
+            @qml.while_loop(while_cond)
+            def loop_rx(a):
+                # perform some work and update (some of) the arguments
+                qml.RX(a, wires=0)
+                return a + 1
+
+            # apply the while loop
+            loop_rx(x)
+
+            return qml.expval(qml.Z(0))
+
+        default_capture_result_10_iterations = qml.qjit(circuit)(0)
+        experimental_capture_result_10_iterations = qml.qjit(circuit, experimental_capture=True)(0)
+        assert default_capture_result_10_iterations == experimental_capture_result_10_iterations
+
+        default_capture_result_1_iteration = qml.qjit(circuit)(9)
+        experimental_capture_result_1_iteration = qml.qjit(circuit, experimental_capture=True)(9)
+        assert default_capture_result_1_iteration == experimental_capture_result_1_iteration
+
+        default_capture_result_0_iterations = qml.qjit(circuit)(11)
+        experimental_capture_result_0_iterations = qml.qjit(circuit, experimental_capture=True)(11)
+        assert default_capture_result_0_iterations == experimental_capture_result_0_iterations
+
+    def test_while_loop_workflow_closure(self, backend):
+        """Test the integration for a circuit with a while_loop primitive using
+        a closure variable."""
+
+        @qml.qnode(qml.device(backend, wires=1))
+        def circuit(x: float, step: float):
+
+            def while_cond(i):
+                return i < 10
+
+            @qml.while_loop(while_cond)
+            def loop_rx(a):
+                # perform some work and update (some of) the arguments
+                qml.RX(a, wires=0)
+                return a + step
+
+            # apply the while loop
+            loop_rx(x)
+
+            return qml.expval(qml.Z(0))
+
+        default_capture_result = qml.qjit(circuit)(0, 2)
+        experimental_capture_result = qml.qjit(circuit, experimental_capture=True)(0, 2)
+        assert default_capture_result == experimental_capture_result
+
+    def test_while_loop_workflow_nested(self, backend):
+        """Test the integration for a circuit with a nested while_loop primitive."""
+
+        @qml.qnode(qml.device(backend, wires=1))
+        def circuit(x: float, y: float):
+
+            def while_cond(i):
+                return i < 10
+
+            @qml.while_loop(while_cond)
+            def outer_loop(a):
+
+                @qml.while_loop(while_cond)
+                def inner_loop(b):
+                    qml.RX(b, wires=0)
+                    return b + 1
+
+                # apply the inner loop
+                inner_loop(y)
+                qml.RX(a, wires=0)
+                return a + 1
+
+            # apply the outer loop
+            outer_loop(x)
+
+            return qml.expval(qml.Z(0))
+
+        default_capture_result = qml.qjit(circuit)(0, 0)
+        experimental_capture_result = qml.qjit(circuit, experimental_capture=True)(0, 0)
+        assert default_capture_result == experimental_capture_result
+
+    def test_cond_workflow_if_else(self, backend):
+        """Test the integration for a circuit with a cond primitive with true and false branches."""
+
+        @qml.qnode(qml.device(backend, wires=1))
+        def circuit(x: float):
+
+            def ansatz_true():
+                qml.RX(x, wires=0)
+                qml.Hadamard(wires=0)
+
+            def ansatz_false():
+                qml.RY(x, wires=0)
+
+            qml.cond(x > 1.4, ansatz_true, ansatz_false)()
+
+            return qml.expval(qml.Z(0))
+
+        default_capture_result = qml.qjit(circuit)(0.1)
+        experimental_capture_result = qml.qjit(circuit, experimental_capture=True)(0.1)
+        assert default_capture_result == experimental_capture_result
+
+    def test_cond_workflow_if(self, backend):
+        """Test the integration for a circuit with a cond primitive with a true branch only."""
+
+        @qml.qnode(qml.device(backend, wires=1))
+        def circuit(x: float):
+
+            def ansatz_true():
+                qml.RX(x, wires=0)
+                qml.Hadamard(wires=0)
+
+            qml.cond(x > 1.4, ansatz_true)()
+
+            return qml.expval(qml.Z(0))
+
+        default_capture_result = qml.qjit(circuit)(1.5)
+        experimental_capture_result = qml.qjit(circuit, experimental_capture=True)(1.5)
+        assert default_capture_result == experimental_capture_result
+
+    def test_cond_workflow_with_custom_primitive(self, backend):
+        """Test the integration for a circuit with a cond primitive containing a custom
+        primitive."""
+
+        @qml.qnode(qml.device(backend, wires=1))
+        def circuit(x: float):
+
+            def ansatz_true():
+                qml.RX(x, wires=0)
+                qml.Hadamard(wires=0)
+                qml.GlobalPhase(jnp.pi / 4)  # Custom primitive
+
+            def ansatz_false():
+                qml.RY(x, wires=0)
+                qml.GlobalPhase(jnp.pi / 2)  # Custom primitive
+
+            qml.cond(x > 1.4, ansatz_true, ansatz_false)()
+
+            return qml.expval(qml.Z(0))
+
+        default_capture_result = qml.qjit(circuit)(0.1)
+        experimental_capture_result = qml.qjit(circuit, experimental_capture=True)(0.1)
+        assert default_capture_result == experimental_capture_result
+
+    def test_cond_workflow_with_abstract_measurement(self, backend):
+        """Test the integration for a circuit with a cond primitive containing an
+        abstract measurement."""
+
+        @qml.qnode(qml.device(backend, wires=1))
+        def circuit(x: float):
+
+            def ansatz_true():
+                qml.RX(x, wires=0)
+                qml.Hadamard(wires=0)
+                qml.state()  # Abstract measurement
+
+            def ansatz_false():
+                qml.RY(x, wires=0)
+                qml.state()  # Abstract measurement
+
+            qml.cond(x > 1.4, ansatz_true, ansatz_false)()
+
+            return qml.expval(qml.Z(0))
+
+        default_capture_result = qml.qjit(circuit)(0.1)
+        experimental_capture_result = qml.qjit(circuit, experimental_capture=True)(0.1)
+        assert default_capture_result == experimental_capture_result
+
+    def test_cond_workflow_with_simple_primitive(self, backend):
+        """Test the integration for a circuit with a cond primitive containing an
+        simple primitive."""
+
+        @qml.qnode(qml.device(backend, wires=1))
+        def circuit(x: float):
+
+            def ansatz_true():
+                qml.RX(x, wires=0)
+                qml.Hadamard(wires=0)
+                return x + 1  # simple primitive
+
+            def ansatz_false():
+                qml.RY(x, wires=0)
+                return x + 1  # simple primitive
+
+            qml.cond(x > 1.4, ansatz_true, ansatz_false)()
+
+            return qml.expval(qml.Z(0))
+
+        default_capture_result = qml.qjit(circuit)(0.1)
+        experimental_capture_result = qml.qjit(circuit, experimental_capture=True)(0.1)
+        assert default_capture_result == experimental_capture_result
+
+    def test_cond_workflow_nested(self, backend):
+        """Test the integration for a circuit with a nested cond primitive."""
+
+        @qml.qnode(qml.device(backend, wires=1))
+        def circuit(x: float, y: float):
+
+            def ansatz_true():
+                qml.RX(x, wires=0)
+                qml.Hadamard(wires=0)
+
+            def ansatz_false():
+
+                def branch_true():
+                    qml.RY(y, wires=0)
+
+                def branch_false():
+                    qml.RZ(y, wires=0)
+
+                qml.cond(y > 1.4, branch_true, branch_false)()
+
+            qml.cond(x > 1.4, ansatz_true, ansatz_false)()
+
+            return qml.expval(qml.Z(0))
+
+        default_capture_result = qml.qjit(circuit)(0.1, 1.5)
+        experimental_capture_result = qml.qjit(circuit, experimental_capture=True)(0.1, 1.5)
+        assert default_capture_result == experimental_capture_result
+
+    def test_cond_workflow_operator(self, backend):
+        """Test the integration for a circuit with a cond primitive returning
+        an Operator."""
+
+        @qml.qnode(qml.device(backend, wires=1))
+        def circuit(x: float):
+
+            qml.cond(x > 1.4, qml.RX, qml.RY)(x, wires=0)
+
+            return qml.expval(qml.Z(0))
+
+        default_capture_result = qml.qjit(circuit)(0.1)
+        experimental_capture_result = qml.qjit(circuit, experimental_capture=True)(0.1)
+        assert default_capture_result == experimental_capture_result
+
+    def test_transform_cancel_inverses_workflow(self, backend):
+        """Test the integration for a circuit with a 'cancel_inverses' transform."""
+
+        def func(x: float):
+            @qml.transforms.cancel_inverses
+            @qml.qnode(qml.device(backend, wires=1))
+            def circuit(x: float):
+                qml.RX(x, wires=0)
+                qml.Hadamard(wires=0)
+                qml.Hadamard(wires=0)
+                return qml.expval(qml.PauliZ(0))
+
+            return circuit(x)
+
+        captured_func = qml.qjit(func, experimental_capture=True, keep_intermediate=True)
+        assert "Hadamard" not in get_compilation_stage(
+            captured_func, "EnforceRuntimeInvariantsPass"
+        )
+
+        no_capture_result = qml.qjit(func)(0.1)
+        experimental_capture_result = captured_func(0.1)
+        assert no_capture_result == experimental_capture_result

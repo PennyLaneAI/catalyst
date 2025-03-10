@@ -15,7 +15,6 @@
 of quantum operations, measurements, and observables to JAXPR.
 """
 
-import copy
 import sys
 from dataclasses import dataclass
 from enum import Enum
@@ -26,6 +25,7 @@ import jax
 import numpy as np
 import pennylane as qml
 from jax._src import api_util, core, source_info_util, util
+from jax._src.interpreters import partial_eval as pe
 from jax._src.lax.lax import _nary_lower_hlo, cos_p, sin_p
 from jax._src.lib.mlir import ir
 from jax._src.lib.mlir.dialects import hlo
@@ -42,21 +42,14 @@ from jaxlib.mlir.dialects.arith import (
     MulIOp,
     SubIOp,
 )
-from jaxlib.mlir.dialects.builtin import ModuleOp
-from jaxlib.mlir.dialects.func import CallOp, FunctionType
+from jaxlib.mlir.dialects.func import FunctionType
 from jaxlib.mlir.dialects.scf import ConditionOp, ForOp, IfOp, WhileOp, YieldOp
 from jaxlib.mlir.dialects.stablehlo import ConstantOp as StableHLOConstantOp
 from jaxlib.mlir.dialects.stablehlo import ConvertOp as StableHLOConvertOp
-from mlir_quantum.dialects._transform_ops_gen import (
-    ApplyRegisteredPassOp,
-    NamedSequenceOp,
-)
-from mlir_quantum.dialects._transform_ops_gen import YieldOp as TransformYieldOp
 from mlir_quantum.dialects.catalyst import (
     AssertionOp,
     CallbackCallOp,
     CallbackOp,
-    LaunchKernelOp,
     PrintOp,
 )
 from mlir_quantum.dialects.gradient import (
@@ -106,6 +99,15 @@ from catalyst.jax_extras import (
     for_loop_expansion_strategy,
     infer_output_type_jaxpr,
     while_loop_expansion_strategy,
+)
+from catalyst.jax_primitives_utils import (
+    cache,
+    create_call_op,
+    get_cached,
+    get_call_jaxpr,
+    get_symbolref,
+    lower_callable,
+    lower_jaxpr,
 )
 from catalyst.utils.calculate_grad_shape import Signature, calculate_grad_shape
 from catalyst.utils.extra_bindings import FromElementsOp, TensorExtractOp
@@ -196,18 +198,6 @@ def _obs_lowering(aval):
 
 
 #
-# Transform Module Type
-#
-class AbstractTransformMod(AbstractValue):
-    """Abstract transform module type."""
-
-
-def _transform_mod_lowering(aval):
-    assert isinstance(aval, AbstractTransformMod)
-    return (ir.OpaqueType.get("transform", 'op<"builtin.module">'),)
-
-
-#
 # registration
 #
 core.raise_to_shaped_mappings[AbstractQbit] = lambda aval, _: aval
@@ -218,9 +208,6 @@ mlir.ir_type_handlers[AbstractQreg] = _qreg_lowering
 
 core.raise_to_shaped_mappings[AbstractObs] = lambda aval, _: aval
 mlir.ir_type_handlers[AbstractObs] = _obs_lowering
-
-core.raise_to_shaped_mappings[AbstractTransformMod] = lambda aval, _: aval
-mlir.ir_type_handlers[AbstractTransformMod] = _transform_mod_lowering
 
 
 class Folding(Enum):
@@ -289,9 +276,6 @@ value_and_grad_p = core.Primitive("value_and_grad")
 value_and_grad_p.multiple_results = True
 assert_p = core.Primitive("assert")
 assert_p.multiple_results = True
-apply_registered_pass_p = core.Primitive("apply_registered_pass")
-transform_named_sequence_p = core.Primitive("transform_named_sequence")
-transform_named_sequence_p.multiple_results = True
 set_state_p = jax.core.Primitive("state_prep")
 set_state_p.multiple_results = True
 set_basis_state_p = jax.core.Primitive("set_basis_state")
@@ -334,8 +318,7 @@ def _python_callback_lowering(
     fn_ty = FunctionType.get(inputs=params_ty, results=results_ty)
     fn_ty_attr = ir.TypeAttr.get(fn_ty)
     cache_key = (callback_id, *params_ty, *results_ty)
-    if cache_key in jax_ctx.module_context.cached_primitive_lowerings:
-        callbackOp = jax_ctx.module_context.cached_primitive_lowerings[cache_key]
+    if callbackOp := get_cached(jax_ctx, cache_key):
         symbol = callbackOp.sym_name.value
         symbol_attr = ir.FlatSymbolRefAttr.get(symbol)
         return CallbackCallOp(results_ty, symbol_attr, args).results
@@ -347,7 +330,8 @@ def _python_callback_lowering(
         # TODO: Name mangling for callbacks
         name = callback.__name__
         callbackOp = CallbackOp(f"callback_{name}_{callback_id}", *attrs)
-    jax_ctx.module_context.cached_primitive_lowerings[cache_key] = callbackOp
+
+    cache(jax_ctx, cache_key, callbackOp)
     symbol = callbackOp.sym_name.value
     symbol_attr = ir.FlatSymbolRefAttr.get(symbol)
     retval = CallbackCallOp(results_ty, symbol_attr, args).results
@@ -360,8 +344,8 @@ def _python_callback_lowering(
     rev = custom_grad._bwd
     fwd_jaxpr = custom_grad._fwd_jaxpr
     rev_jaxpr = custom_grad._bwd_jaxpr
-    mlir_fwd = get_or_create_funcop(jax_ctx, fwd, fwd_jaxpr)
-    mlir_rev = get_or_create_funcop(jax_ctx, rev, rev_jaxpr)
+    mlir_fwd = lower_callable(jax_ctx, fwd, fwd_jaxpr)
+    mlir_rev = lower_callable(jax_ctx, rev, rev_jaxpr)
     sym_fwd = mlir_fwd.sym_name.value + ".fwd"
 
     argc = len(args)
@@ -413,330 +397,14 @@ def _print_lowering(jax_ctx: mlir.LoweringRuleContext, *args, string=None, memre
 
 
 #
-# transform dialect lowering
-#
-
-
-def get_named_sequence_in_module(mod):
-    for op in mod.body.operations:
-        if op.operation.name == "transform.named_sequence":
-            return op.operation
-    return None
-
-
-#
-# transform_named_sequence
-#
-@transform_named_sequence_p.def_abstract_eval
-def _transform_named_sequence_p_abstract_eval(*args):
-    return ()
-
-
-@transform_named_sequence_p.def_impl
-def _transform_named_sequence_p_def_impl(*args):  # pragma: no cover
-    raise NotImplementedError()
-
-
-def _transform_named_sequence_lowering(jax_ctx: mlir.LoweringRuleContext, *args):
-    transform_mod_type = ir.OpaqueType.get("transform", 'op<"builtin.module">')
-    module = jax_ctx.module_context.module
-
-    # We wish to generate the transformer module, and place it in the top-level module
-    # The transformer module must be marked with the "transform.with_named_sequence" attribute
-    # The transformer module has a single block, and the block contains the
-    # "transform.named_sequence @__transform_main" operation
-
-    with ir.InsertionPoint(module.body):
-        transformer_module = ModuleOp()
-        with_named_sequence_attr = ir.UnitAttr.get(jax_ctx.module_context.context)
-        transformer_module.operation.attributes["transform.with_named_sequence"] = (
-            with_named_sequence_attr
-        )
-        bb_transformer = transformer_module.body
-
-    functype = ir.FunctionType.get(inputs=[transform_mod_type], results=[])
-    functype_attr = ir.TypeAttr.get(functype)
-
-    # Insert the transform.named_sequence op into the transformer module
-    # Note that InsertionPoint(Block) inserts after the last operation but still inside the block.
-    with ir.InsertionPoint(bb_transformer):
-        named_sequence_op = NamedSequenceOp(
-            sym_name="__transform_main",
-            function_type=functype_attr,
-        )
-
-        # transform.named_sequence op is the "main function" of the transform dialect
-        # and thus needs an entry block (which also should be its only block)
-        # The argument of the block is the payload module
-        bb_named_sequence = ir.Block.create_at_start(
-            named_sequence_op.body, arg_types=[transform_mod_type]
-        )
-
-        # The transform.named_sequence needs a terminator called "transform.yield"
-        with ir.InsertionPoint(bb_named_sequence):
-            transform_yield_op = TransformYieldOp(operands_=[])  # pylint: disable=unused-variable
-
-    return named_sequence_op.results
-
-
-#
-# apply_registered_pass
-#
-@apply_registered_pass_p.def_abstract_eval
-def _apply_registered_pass_abstract_eval(*args, pass_name, options=None):
-    return AbstractTransformMod()
-
-
-@apply_registered_pass_p.def_impl
-def _apply_registered_pass_def_impl(*args, pass_name, options=None):  # pragma: no cover
-    raise NotImplementedError()
-
-
-def _apply_registered_pass_lowering(
-    jax_ctx: mlir.LoweringRuleContext, *args, pass_name, options=None
-):
-    transform_mod_type = ir.OpaqueType.get("transform", 'op<"builtin.module">')
-    module = jax_ctx.module_context.module
-    named_sequence_op = None
-    # module is a nested module
-    # parent_module is the root module
-    # E.g.,
-    #
-    # ```mlir/pseudocode
-    # module @root {
-    #   module @inner {
-    #     func.func @qnode
-    #   }
-    #   module @transform {
-    #   }
-    # }
-    # ```
-    #
-    # When this function is executed we are likely
-    # somewhere around func.func @qnode.
-    #
-    # jax_ctx.module_context.module holds a reference to @inner
-    #
-    # This means that it's parent is @root.
-    parent_module = module.parent
-    for op in reversed(parent_module.regions[0].blocks[0].operations):
-        # Look for the module @transform that holds the transformation schedule
-        # TODO: Find a better way to search for the module with the transform schedule.
-        if op.operation.name == "builtin.module":
-            named_sequence_op = get_named_sequence_in_module(op)
-            if named_sequence_op:
-                break
-    assert (
-        named_sequence_op is not None
-    ), """
-            transform.apply_registered_pass must be placed in a transform.named_sequence,
-            but none exist in the module.
-            """
-
-    # If there already is a apply_registered_pass,
-    # insert after the last pass in the existing pass sequence.
-    # Note that ir.InsertionPoint(op) sets the insertion point to immediately BEFORE the op
-    named_sequence_op_block = named_sequence_op.regions[0].blocks[0]
-    first_op_in_block = named_sequence_op_block.operations[0].operation
-
-    assert first_op_in_block.name in (
-        "transform.apply_registered_pass",
-        "transform.yield",
-    ), """
-            Unexpected operation in transform.named_sequence!
-            Only transform.apply_registered_pass and transform.yield are allowed.
-        """
-
-    if first_op_in_block.name == "transform.apply_registered_pass":
-        _ = len(named_sequence_op_block.operations)
-        yield_op = named_sequence_op_block.operations[_ - 1].operation
-        current_last_pass = named_sequence_op_block.operations[_ - 2].operation
-        with ir.InsertionPoint(yield_op):
-            apply_registered_pass_op = ApplyRegisteredPassOp(
-                result=transform_mod_type,
-                target=current_last_pass.result,
-                pass_name=pass_name,
-                options=options,
-            )
-
-    # otherwise it's the first pass, i.e. only a yield op is in the block
-    # so insert right before the yield op
-    else:
-        ip = named_sequence_op.regions[0].blocks[0]
-        with ir.InsertionPoint(ip.operations[len(ip.operations) - 1]):
-            apply_registered_pass_op = ApplyRegisteredPassOp(
-                result=transform_mod_type,
-                target=ip.arguments[0],
-                pass_name=pass_name,
-                options=options,
-            )
-
-    return apply_registered_pass_op.results
-
-
-#
 # module
 #
-def lower_callable_to_funcop(ctx, callable_, call_jaxpr):
-    """Lower callable to either a FuncOp"""
-    if isinstance(call_jaxpr, core.Jaxpr):
-        call_jaxpr = core.ClosedJaxpr(call_jaxpr, ())
-
-    kwargs = {}
-    kwargs["ctx"] = ctx.module_context
-    kwargs["name"] = callable_.__name__
-    kwargs["jaxpr"] = call_jaxpr
-    kwargs["effects"] = []
-    kwargs["name_stack"] = ctx.name_stack
-    func_op = mlir.lower_jaxpr_to_fun(**kwargs)
-
-    if isinstance(callable_, qml.QNode):
-        func_op.attributes["qnode"] = ir.UnitAttr.get()
-        # "best", the default option in PennyLane, chooses backprop on the device
-        # if supported and parameter-shift otherwise. Emulating the same behaviour
-        # would require generating code to query the device.
-        # For simplicity, Catalyst instead defaults to parameter-shift.
-        diff_method = (
-            "parameter-shift" if callable_.diff_method == "best" else str(callable_.diff_method)
-        )
-        func_op.attributes["diff_method"] = ir.StringAttr.get(diff_method)
-
-    return func_op
-
-
-def get_or_create_funcop(ctx, callable_, call_jaxpr):
-    """Get funcOp from cache, or create it from scratch"""
-    if func_op := ctx.module_context.cached_primitive_lowerings.get(callable_):
-        return func_op
-    func_op = lower_callable_to_funcop(ctx, callable_, call_jaxpr)
-    ctx.module_context.cached_primitive_lowerings[callable_] = func_op
-    return func_op
-
-
-def get_symbolref(ctx, func_op):
-    """Get symbolref by deciding whether to constructo a symbolref or flatsymbolref"""
-    is_call_same_module = ctx.module_context.module.operation == func_op.parent
-    if is_call_same_module:
-        return ir.FlatSymbolRefAttr.get(func_op.name.value)
-    parent = func_op.parent
-    parent_name = parent.operation.attributes["sym_name"].value
-    child_name = func_op.name.value
-    return ir.SymbolRefAttr.get([parent_name, child_name])
-
-
-def create_call_op(ctx, func_op, *args):
-    """Create a func::CallOp from JAXPR."""
-    output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
-    flat_output_types = util.flatten(output_types)
-    mlir_args = mlir.flatten_lowering_ir_args(args)
-    symbol_ref = get_symbolref(ctx, func_op)
-    is_call_same_module = ctx.module_context.module.operation == func_op.parent
-    constructor = CallOp if is_call_same_module else LaunchKernelOp
-    return constructor(flat_output_types, symbol_ref, mlir_args)
-
-
-def create_module_op(ctx, name):
-    """Create a module with name name"""
-
-    symbol_table = ctx.module_context.symbol_table
-    parent = ctx.module_context.module
-    with ir.InsertionPoint(parent.body):
-        module = ModuleOp()
-        symbol_attr = ir._symbolNameAttr(name, ctx.module_context.context)
-        module.operation.attributes["sym_name"] = symbol_attr
-        symbol_table.insert(module)
-
-    return module
-
-
-class NestedModule:
-    """Context manager for the nested module"""
-
-    def __init__(self, ctx, name):
-        self.ctx = ctx
-        self.moduleOp = create_module_op(ctx, name)
-        self.old_module_context = ctx.module_context
-
-    def __enter__(self):
-        self.ctx.module_context = copy.copy(self.ctx.module_context)
-        self.ctx.module_context.module = self.moduleOp
-        self.ctx.module_context.cached_primitive_lowerings = {}
-        return self.moduleOp
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.ctx.module_context = self.old_module_context
-
-
 @quantum_kernel_p.def_impl
-def _quantum_kernel_def_impl(*args, call_jaxpr, qnode):  # pragma: no cover
+def _quantum_kernel_def_impl(*args, call_jaxpr, qnode, pipeline=None):  # pragma: no cover
     raise NotImplementedError()
 
 
-def lower_callable(ctx, callable_, call_jaxpr):
-    """Lowers _callable to MLIR.
-
-    If callable_ is a qnode, then we will first create a module, then
-    create a FuncOp corresponding to call_jaxpr. Otherwise, a FuncOp
-    will be created in the current module. This function might
-    add more than one FuncOps. This depends on the contents of call_jaxpr.
-
-    Args:
-      ctx: LoweringRuleContext
-      callable_: python function
-      call_jaxpr: jaxpr representing callable_
-    Returns:
-      FuncOp
-    """
-    if not isinstance(callable_, qml.QNode):
-        return get_or_create_funcop(ctx, callable_, call_jaxpr)
-
-    return get_or_create_qnode_funcop(ctx, callable_, call_jaxpr)
-
-
-def lower_qnode_to_funcop(ctx, callable_, call_jaxpr):
-    """Lowers callable_ to MLIR.
-
-    Will create ModuleOp and then lower the callable_ to a
-    FuncOp inside the ModuleOp. The ModuleOp may have more
-    than one FuncOp. This depends on the contents of call_jaxpr.
-
-    Args:
-      ctx: LoweringRuleContext
-      callable_: qml.Qnode
-      call_jaxpr: jaxpr representing callable_
-    Returns:
-      FuncOp
-    """
-    assert isinstance(callable_, qml.QNode), "This function expects qnodes"
-
-    name = "module_" + callable_.__name__
-    # pylint: disable-next=no-member
-    with NestedModule(ctx, name) as module, ir.InsertionPoint(module.regions[0].blocks[0]) as ip:
-        ctx.module_context.ip = ip
-        func_op = get_or_create_funcop(ctx, callable_, call_jaxpr)
-        func_op.sym_visibility = ir.StringAttr.get("public")
-
-    return func_op
-
-
-def get_or_create_qnode_funcop(ctx, callable_, call_jaxpr):
-    """A wrapper around lower_qnode_to_funcop that will cache the FuncOp.
-
-    Args:
-      ctx: LoweringRuleContext
-      callable_: qml.Qnode
-      call_jaxpr: jaxpr representing callable_
-    Returns:
-      FuncOp
-    """
-    if func_op := ctx.module_context.cached_primitive_lowerings.get(callable_):
-        return func_op
-    func_op = lower_qnode_to_funcop(ctx, callable_, call_jaxpr)
-    ctx.module_context.cached_primitive_lowerings[callable_] = func_op
-    return func_op
-
-
-def _quantum_kernel_lowering(ctx, *args, call_jaxpr, qnode):
+def _quantum_kernel_lowering(ctx, *args, call_jaxpr, qnode, pipeline=None):
     """Lower's qnodes to moduleOp
 
     Args:
@@ -747,9 +415,11 @@ def _quantum_kernel_lowering(ctx, *args, call_jaxpr, qnode):
     Returns:
       List[mlir.Value] corresponding
     """
-
     assert isinstance(qnode, qml.QNode), "This function expects qnodes"
-    func_op = get_or_create_qnode_funcop(ctx, qnode, call_jaxpr)
+    if pipeline is None:
+        pipeline = tuple()
+
+    func_op = lower_callable(ctx, qnode, call_jaxpr, pipeline)
     call_op = create_call_op(ctx, func_op, *args)
     return call_op.results
 
@@ -771,7 +441,7 @@ def _func_lowering(ctx, *args, call_jaxpr, fn):
       call_jaxpr: the jaxpr representation of the fn
       fn: the function being compiled
     """
-    func_op = get_or_create_funcop(ctx, fn, call_jaxpr)
+    func_op = lower_callable(ctx, fn, call_jaxpr)
     call_op = create_call_op(ctx, func_op, *args)
     return call_op.results
 
@@ -808,15 +478,6 @@ def _grad_abstract(*args, jaxpr, fn, grad_params):
     return tuple(transformed_signature.get_results())
 
 
-def _get_call_jaxpr(jaxpr):
-    """Extracts the `call_jaxpr` from a JAXPR if it exists.""" ""
-    for eqn in jaxpr.eqns:
-        primitive = eqn.primitive
-        if primitive in {func_p, quantum_kernel_p}:
-            return eqn.params["call_jaxpr"]
-    raise AssertionError("No call_jaxpr found in the JAXPR.")
-
-
 def _grad_lowering(ctx, *args, jaxpr, fn, grad_params):
     """Lowering function to gradient.
     Args:
@@ -839,9 +500,7 @@ def _grad_lowering(ctx, *args, jaxpr, fn, grad_params):
     new_argnums = [num + offset for num in argnums]
     argnum_numpy = np.array(new_argnums)
     diffArgIndices = ir.DenseIntElementsAttr.get(argnum_numpy)
-    func_call_jaxpr = _get_call_jaxpr(jaxpr)
-    lower_callable(ctx, fn, func_call_jaxpr)
-    func_op = ctx.module_context.cached_primitive_lowerings[fn]
+    func_op = lower_jaxpr(ctx, jaxpr)
 
     symbol_ref = get_symbolref(ctx, func_op)
     output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
@@ -911,14 +570,13 @@ def _value_and_grad_lowering(ctx, *args, jaxpr, fn, grad_params):
         constants.append(constantVals)
 
     consts_and_args = constants + args
-    func_call_jaxpr = _get_call_jaxpr(jaxpr)
+    func_call_jaxpr = get_call_jaxpr(jaxpr)
     func_args = consts_and_args[: len(func_call_jaxpr.invars)]
     val_result_types = flat_output_types[: len(flat_output_types) - len(argnums)]
     gradient_result_types = flat_output_types[len(flat_output_types) - len(argnums) :]
 
-    lower_callable(ctx, fn, func_call_jaxpr)
+    func_op = lower_jaxpr(ctx, jaxpr)
 
-    func_op = ctx.module_context.cached_primitive_lowerings[fn]
     symbol_ref = get_symbolref(ctx, func_op)
     return ValueAndGradOp(
         val_result_types,
@@ -963,16 +621,15 @@ def _jvp_lowering(ctx, *args, jaxpr, fn, grad_params):
         for const in jaxpr.consts
     ]
     consts_and_args = constants + args
-    func_call_jaxpr = _get_call_jaxpr(jaxpr)
+    func_call_jaxpr = get_call_jaxpr(jaxpr)
     func_args = consts_and_args[: len(func_call_jaxpr.invars)]
     tang_args = consts_and_args[len(func_call_jaxpr.invars) :]
 
-    lower_callable(ctx, fn, func_call_jaxpr)
+    func_op = lower_jaxpr(ctx, jaxpr)
 
     assert (
         len(flat_output_types) % 2 == 0
     ), f"The total number of result tensors is expected to be even, not {len(flat_output_types)}"
-    func_op = ctx.module_context.cached_primitive_lowerings[fn]
     symbol_ref = get_symbolref(ctx, func_op)
     return JVPOp(
         flat_output_types[: len(flat_output_types) // 2],
@@ -1015,15 +672,14 @@ def _vjp_lowering(ctx, *args, jaxpr, fn, grad_params):
         for const in jaxpr.consts
     ]
     consts_and_args = constants + args
-    func_call_jaxpr = _get_call_jaxpr(jaxpr)
+    func_call_jaxpr = get_call_jaxpr(jaxpr)
     func_args = consts_and_args[: len(func_call_jaxpr.invars)]
     cotang_args = consts_and_args[len(func_call_jaxpr.invars) :]
     func_result_types = flat_output_types[: len(flat_output_types) - len(argnums)]
     vjp_result_types = flat_output_types[len(flat_output_types) - len(argnums) :]
 
-    lower_callable(ctx, fn, func_call_jaxpr)
+    func_op = lower_jaxpr(ctx, jaxpr)
 
-    func_op = ctx.module_context.cached_primitive_lowerings[fn]
     symbol_ref = get_symbolref(ctx, func_op)
     return VJPOp(
         func_result_types,
@@ -1073,10 +729,7 @@ def _zne_lowering(ctx, *args, folding, jaxpr, fn):
         jaxpr: the jaxpr representation of the circuit
         fn: the function to be mitigated
     """
-    func_call_jaxpr = _get_call_jaxpr(jaxpr)
-
-    lower_callable(ctx, fn, func_call_jaxpr)
-    func_op = ctx.module_context.cached_primitive_lowerings[fn]
+    func_op = lower_jaxpr(ctx, jaxpr)
     symbol_ref = get_symbolref(ctx, func_op)
     output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
     flat_output_types = util.flatten(output_types)
@@ -1107,20 +760,27 @@ def _zne_lowering(ctx, *args, folding, jaxpr, fn):
 # qdevice
 #
 @qdevice_p.def_impl
-def _qdevice_def_impl(ctx, rtd_lib, rtd_name, rtd_kwargs):  # pragma: no cover
+def _qdevice_def_impl(ctx, shots, rtd_lib, rtd_name, rtd_kwargs):  # pragma: no cover
     raise NotImplementedError()
 
 
 @qdevice_p.def_abstract_eval
-def _qdevice_abstract_eval(rtd_lib, rtd_name, rtd_kwargs):
+def _qdevice_abstract_eval(shots, rtd_lib, rtd_name, rtd_kwargs):
     return ()
 
 
-def _qdevice_lowering(jax_ctx: mlir.LoweringRuleContext, rtd_lib, rtd_name, rtd_kwargs):
+def _qdevice_lowering(
+    jax_ctx: mlir.LoweringRuleContext, shots: ir.Value, rtd_lib, rtd_name, rtd_kwargs
+):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
+
+    shots_value = TensorExtractOp(ir.IntegerType.get_signless(64, ctx), shots, []).result
     DeviceInitOp(
-        ir.StringAttr.get(rtd_lib), ir.StringAttr.get(rtd_name), ir.StringAttr.get(rtd_kwargs)
+        ir.StringAttr.get(rtd_lib),
+        ir.StringAttr.get(rtd_name),
+        ir.StringAttr.get(rtd_kwargs),
+        shots=shots_value,
     )
 
     return ()
@@ -1653,33 +1313,78 @@ def _hamiltonian_lowering(jax_ctx: mlir.LoweringRuleContext, coeffs: ir.Value, *
 #
 # sample measurement
 #
-@sample_p.def_abstract_eval
-def _sample_abstract_eval(obs, shots, shape):
-    assert isinstance(obs, AbstractObs)
+def sample_staging_rule(jaxpr_trace, obs, shots, num_qubits):
+    """
+    The result shape of `sample_p` is (shots, num_qubits).
 
+    In jax, the default `def_abstract_eval` method for binding primitives keeps the abstract aval in
+    the dynamic shape dimension, instead of the SSA value for the shape, i.e.
+
+    c:i64[] = ...
+    d:AbstractObs = ...
+    e:f64[ShapedArray(int64[], weak_type=True),1] = sample[num_qubits=1] d c
+
+    To ensure that the result DShapedArray is actually constructed with the tracer value,
+    we need to provide a custom staging rule for the primitive, where we manually link
+    the tracer to the output shape. This will now correctly produce
+
+    e:f64[c,1] = sample[num_qubits=1] d c
+
+    This works because when jax processes a primitive during making jaxprs, the default
+    is to only look at the abstract avals of the primitive. Providing a custom staging rule
+    circumvents the above default logic.
+
+    See jax._src.interpreters.partial_eval.process_primitive and default_process_primitive,
+    https://github.com/jax-ml/jax/blob/a54319ec1886ed920d50cacf10e147a743888464/jax/_src/interpreters/partial_eval.py#L1881C7-L1881C24
+    """
     if obs.primitive is compbasis_p:
-        assert shape == (shots, obs.num_qubits)
-    else:
-        assert shape == (shots,)
+        assert num_qubits == obs.num_qubits
 
-    return core.ShapedArray(shape, jax.numpy.float64)
+    out_shape = core.DShapedArray((shots, num_qubits), jax.numpy.dtype("float64"))
+    out_tracer = pe.DynamicJaxprTracer(jaxpr_trace, out_shape)
+
+    if isinstance(shots, int):
+        invars = [jaxpr_trace.getvar(obs)]
+        params = {"shots": shots, "num_qubits": num_qubits}
+    else:
+        invars = [jaxpr_trace.getvar(obs), jaxpr_trace.getvar(shots)]
+        params = {"num_qubits": num_qubits}
+
+    eqn = pe.new_jaxpr_eqn(
+        invars,
+        [jaxpr_trace.makevar(out_tracer)],
+        sample_p,
+        params,
+        jax.core.no_effects,
+    )
+    jaxpr_trace.frame.add_eqn(eqn)
+    return out_tracer
+
+
+pe.custom_staging_rules[sample_p] = sample_staging_rule
 
 
 @sample_p.def_impl
-def _sample_def_impl(ctx, obs, shots, shape):  # pragma: no cover
+def _sample_def_impl(ctx, obs, shots, num_qubits):  # pragma: no cover
     raise NotImplementedError()
 
 
-def _sample_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: int, shape: tuple):
+def _sample_lowering(
+    jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: Union[int, ir.Value], num_qubits: int
+):
+    # Note: result shape of sample op is (shots, number_of_qubits)
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
-    i64_type = ir.IntegerType.get_signless(64, ctx)
-    shots_attr = ir.IntegerAttr.get(i64_type, shots)
     f64_type = ir.F64Type.get()
-    result_type = ir.RankedTensorType.get(shape, f64_type)
+    result_shape = (
+        (shots, num_qubits)
+        if isinstance(shots, int)
+        else (ir.ShapedType.get_dynamic_size(), num_qubits)
+    )
+    result_type = ir.RankedTensorType.get(result_shape, f64_type)
 
-    return SampleOp(result_type, obs, shots_attr).results
+    return SampleOp(result_type, obs).results
 
 
 #
@@ -1699,37 +1404,43 @@ def _counts_abstract_eval(obs, shots, shape):
     else:
         assert shape == (2,)
 
-    return core.ShapedArray(shape, jax.numpy.float64), core.ShapedArray(shape, jax.numpy.int64)
+    return core.ShapedArray(shape, jax.numpy.dtype("float64")), core.ShapedArray(
+        shape, jax.numpy.dtype("int64")
+    )
 
 
-def _counts_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: int, shape: tuple):
+def _counts_lowering(
+    jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: Union[int, ir.Value], shape: tuple
+):
+    # Note: result shape of counts op is (tensor<Nxf64>, tensor<Nxi64>)
+    # where N = 2**number_of_qubits
+    # This means even with dynamic shots, result shape is still static.
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
     i64_type = ir.IntegerType.get_signless(64, ctx)
-    shots_attr = ir.IntegerAttr.get(i64_type, shots)
     f64_type = ir.F64Type.get()
     eigvals_type = ir.RankedTensorType.get(shape, f64_type)
     counts_type = ir.RankedTensorType.get(shape, i64_type)
 
-    return CountsOp(eigvals_type, counts_type, obs, shots_attr).results
+    return CountsOp(eigvals_type, counts_type, obs).results
 
 
 #
 # expval measurement
 #
 @expval_p.def_abstract_eval
-def _expval_abstract_eval(obs, shots, shape=None):
+def _expval_abstract_eval(obs, shape=None):
     assert isinstance(obs, AbstractObs)
     return core.ShapedArray((), jax.numpy.float64)
 
 
 @expval_p.def_impl
-def _expval_def_impl(ctx, obs, shots, shape=None):  # pragma: no cover
+def _expval_def_impl(ctx, obs, shape=None):  # pragma: no cover
     raise NotImplementedError()
 
 
-def _expval_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: int, shape=None):
+def _expval_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shape=None):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
@@ -1737,11 +1448,9 @@ def _expval_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: in
     assert ir.OpaqueType(obs.type).dialect_namespace == "quantum"
     assert ir.OpaqueType(obs.type).data == "obs"
 
-    i64_type = ir.IntegerType.get_signless(64, ctx)
-    shots_attr = ir.IntegerAttr.get(i64_type, shots) if shots is not None else None
     result_type = ir.F64Type.get()
 
-    mres = ExpvalOp(result_type, obs, shots=shots_attr).result
+    mres = ExpvalOp(result_type, obs).result
     result_from_elements_op = ir.RankedTensorType.get((), result_type)
     from_elements_op = FromElementsOp(result_from_elements_op, mres)
     return from_elements_op.results
@@ -1751,17 +1460,17 @@ def _expval_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: in
 # var measurement
 #
 @var_p.def_abstract_eval
-def _var_abstract_eval(obs, shots, shape=None):
+def _var_abstract_eval(obs, shape=None):
     assert isinstance(obs, AbstractObs)
     return core.ShapedArray((), jax.numpy.float64)
 
 
 @var_p.def_impl
-def _var_def_impl(ctx, obs, shots, shape=None):  # pragma: no cover
+def _var_def_impl(ctx, obs, shape=None):  # pragma: no cover
     raise NotImplementedError()
 
 
-def _var_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: int, shape=None):
+def _var_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shape=None):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
@@ -1769,11 +1478,9 @@ def _var_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: int, 
     assert ir.OpaqueType(obs.type).dialect_namespace == "quantum"
     assert ir.OpaqueType(obs.type).data == "obs"
 
-    i64_type = ir.IntegerType.get_signless(64, ctx)
-    shots_attr = ir.IntegerAttr.get(i64_type, shots) if shots is not None else None
     result_type = ir.F64Type.get()
 
-    mres = VarianceOp(result_type, obs, shots=shots_attr).result
+    mres = VarianceOp(result_type, obs).result
     result_from_elements_op = ir.RankedTensorType.get((), result_type)
     from_elements_op = FromElementsOp(result_from_elements_op, mres)
     return from_elements_op.results
@@ -2385,8 +2092,6 @@ CUSTOM_LOWERING_RULES = (
     (assert_p, _assert_lowering),
     (python_callback_p, _python_callback_lowering),
     (value_and_grad_p, _value_and_grad_lowering),
-    (apply_registered_pass_p, _apply_registered_pass_lowering),
-    (transform_named_sequence_p, _transform_named_sequence_lowering),
     (set_state_p, _set_state_lowering),
     (set_basis_state_p, _set_basis_state_lowering),
     (sin_p, _sin_lowering2),

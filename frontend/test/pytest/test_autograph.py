@@ -27,6 +27,7 @@ from numpy.testing import assert_allclose
 
 from catalyst import *
 from catalyst.autograph.transformer import TRANSFORMER
+from catalyst.passes import merge_rotations
 from catalyst.utils.dummy import dummy_func
 from catalyst.utils.exceptions import CompileError
 
@@ -2182,7 +2183,7 @@ class TestJaxIndexOperatorUpdate:
             expected = g(x)
             return result, expected
 
-        result, expected = workflow(np.array([5, 3, 4]))
+        result, expected = workflow(np.array([5.0, 3.0, 4.0]))
         assert jnp.allclose(result, jnp.array([2.5, 1.5, 2]))
         assert jnp.allclose(result, expected)
 
