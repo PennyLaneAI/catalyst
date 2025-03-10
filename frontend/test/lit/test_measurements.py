@@ -487,7 +487,7 @@ def expval11(num_qubits):
 
         # CHECK: [[detensorize:%.+]] = tensor.extract [[nSub1]][] : tensor<i64>
         # CHECK: [[qubit:%.+]] = quantum.extract %2[[[detensorize]]] : !quantum.reg -> !quantum.bit
-        # CHECK: [[q0:%.+]] = quantum.static_custom "RZ" [1.000000e-01] [[qubit]]
+        # CHECK: [[q0:%.+]] = quantum.custom "RZ"({{%.+}}) [[qubit]]
         qml.RZ(0.1, wires=num_qubits - 1)
 
         # CHECK: [[detensorize:%.+]] = tensor.extract [[nSub2]][] : tensor<i64>
