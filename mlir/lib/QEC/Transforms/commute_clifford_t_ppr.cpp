@@ -18,8 +18,8 @@
 
 #include "llvm/Support/Debug.h"
 
-#include "mlir/Pass/Pass.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include "QEC/IR/QECDialect.h"
@@ -30,9 +30,8 @@ using namespace mlir;
 using namespace catalyst;
 using namespace catalyst::qec;
 
-namespace catalyst{
-namespace qec{
-
+namespace catalyst {
+namespace qec {
 
 #define GEN_PASS_DEF_COMMUTECLIFFORDTPPRPASS
 #define GEN_PASS_DECL_COMMUTECLIFFORDTPPRPASS
@@ -41,13 +40,13 @@ namespace qec{
 struct CommuteCliffordTPPRPass : public impl::CommuteCliffordTPPRPassBase<CommuteCliffordTPPRPass> {
     using CommuteCliffordTPPRPassBase::CommuteCliffordTPPRPassBase;
 
-    void runOnOperation() final 
+    void runOnOperation() final
     {
-        RewritePatternSet patterns( &getContext());
-        
+        RewritePatternSet patterns(&getContext());
+
         populateCommuteCliffordTPPRPatterns(patterns);
 
-        if (failed(applyPatternsAndFoldGreedily( getOperation(), std::move(patterns)))) {
+        if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
             return signalPassFailure();
         }
     }
@@ -55,7 +54,8 @@ struct CommuteCliffordTPPRPass : public impl::CommuteCliffordTPPRPassBase<Commut
 
 } // namespace qec
 
-std::unique_ptr<Pass> createCommuteCliffordTPPRPass() {
+std::unique_ptr<Pass> createCommuteCliffordTPPRPass()
+{
     return std::make_unique<CommuteCliffordTPPRPass>();
 }
 
