@@ -17,6 +17,7 @@ import pennylane as qml
 import pytest
 
 import catalyst
+from catalyst.debug import get_compilation_stage
 
 
 def circuit_aot_builder(dev):
@@ -491,3 +492,26 @@ class TestCapture:
         default_capture_result = qml.qjit(circuit)(0.1)
         experimental_capture_result = qml.qjit(circuit, experimental_capture=True)(0.1)
         assert default_capture_result == experimental_capture_result
+
+    def test_transform_cancel_inverses_workflow(self, backend):
+        """Test the integration for a circuit with a 'cancel_inverses' transform."""
+
+        def func(x: float):
+            @qml.transforms.cancel_inverses
+            @qml.qnode(qml.device(backend, wires=1))
+            def circuit(x: float):
+                qml.RX(x, wires=0)
+                qml.Hadamard(wires=0)
+                qml.Hadamard(wires=0)
+                return qml.expval(qml.PauliZ(0))
+
+            return circuit(x)
+
+        captured_func = qml.qjit(func, experimental_capture=True, keep_intermediate=True)
+        assert "Hadamard" not in get_compilation_stage(
+            captured_func, "EnforceRuntimeInvariantsPass"
+        )
+
+        no_capture_result = qml.qjit(func)(0.1)
+        experimental_capture_result = captured_func(0.1)
+        assert no_capture_result == experimental_capture_result

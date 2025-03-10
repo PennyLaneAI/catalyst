@@ -59,6 +59,7 @@ from catalyst.jax_primitives import (
     var_p,
     while_p,
 )
+from catalyst.passes.pass_api import Pass
 
 measurement_map = {
     qml.measurements.SampleMP: sample_p,
@@ -152,16 +153,41 @@ def from_plxpr(plxpr: jax.core.ClosedJaxpr) -> Callable[..., jax.core.Jaxpr]:
 class WorkflowInterpreter(PlxprInterpreter):
     """An interpreter that converts a qnode primitive from a plxpr variant to a catalxpr variant."""
 
+    def __init__(self):
+        self._pass_pipeline = []
+        super().__init__()
+
 
 # pylint: disable=unused-argument, too-many-arguments
 @WorkflowInterpreter.register_primitive(qnode_prim)
-def _(self, *args, qnode, shots, device, execution_config, qfunc_jaxpr, n_consts, batch_dims=None):
+def handle_qnode(
+    self, *args, qnode, shots, device, execution_config, qfunc_jaxpr, n_consts, batch_dims=None
+):
+    """Handle the conversion from plxpr to Catalyst jaxpr for the qnode primitive"""
     consts = args[:n_consts]
     non_const_args = args[n_consts:]
 
     f = partial(QFuncPlxprInterpreter(device, shots).eval, qfunc_jaxpr, consts)
 
-    return quantum_kernel_p.bind(wrap_init(f), *non_const_args, qnode=qnode)
+    return quantum_kernel_p.bind(
+        wrap_init(f), *non_const_args, qnode=qnode, pipeline=self._pass_pipeline
+    )
+
+
+# pylint: disable=unused-argument, too-many-arguments
+@WorkflowInterpreter.register_primitive(qml.transforms.cancel_inverses._primitive)
+def handle_cancel_inverses(
+    self, *args, args_slice, consts_slice, inner_jaxpr, targs_slice, tkwargs
+):
+    """Handle the conversion from plxpr to Catalyst jaxpr for the
+    PL 'cancel_inverses_transform', which gets replaced with Catalyst
+    'remove-chained-self-inverse' pass"""
+    self._pass_pipeline.append(Pass("remove-chained-self-inverse"))
+
+    consts = args[consts_slice]
+    non_const_args = args[args_slice]
+
+    return self.eval(inner_jaxpr, consts, *non_const_args)
 
 
 class QFuncPlxprInterpreter(PlxprInterpreter):
@@ -223,12 +249,11 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
 
         in_qubits = [self.get_wire(w) for w in op.wires]
         out_qubits = qinst_p.bind(
-            *in_qubits,
-            *op.data,
+            *[*in_qubits, *op.data],
             op=op.name,
-            ctrl_value_len=0,
-            ctrl_len=0,
             qubits_len=len(op.wires),
+            params_len=len(op.data),
+            ctrl_len=0,
             adjoint=False,
         )
         for wire_values, new_wire in zip(op.wires, out_qubits):
