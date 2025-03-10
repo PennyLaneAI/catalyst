@@ -19,6 +19,7 @@ compilation & execution on devices.
 import copy
 import logging
 from functools import partial
+from typing import Union
 
 import jax
 import pennylane as qml
@@ -39,6 +40,12 @@ from catalyst.jax_tracer import HybridOpRegion, has_nested_tapes
 from catalyst.logging import debug_logger
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.utils.exceptions import CompileError
+from catalyst.utils.operation_utils import (
+    is_controllable,
+    is_differentiable,
+    is_invertible,
+    is_supported,
+)
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -110,8 +117,7 @@ def catalyst_decompose(
 
     (toplevel_tape,), _ = decompose(
         tape,
-        stopping_condition=lambda op: bool(catalyst_acceptance(op, capabilities))
-        and not non_diff_in_grad_method(op, grad_method, capabilities),
+        stopping_condition=lambda op: catalyst_acceptance(op, capabilities, grad_method),
         skip_initial_state_prep=skip_initial_state_prep,
         decomposer=partial(catalyst_decomposer, capabilities=capabilities),
         name="catalyst on this device",
@@ -200,45 +206,34 @@ def decompose_ops_to_unitary(tape, convert_to_matrix_ops):
     return [new_tape], null_postprocessing
 
 
-def catalyst_acceptance(op: qml.operation.Operator, capabilities: DeviceCapabilities) -> str | None:
-    """Check whether an Operator is supported and returns the name of the operation or None."""
-
-    op_support = capabilities.operations
-
+def catalyst_acceptance(
+    op: qml.operation.Operator, capabilities: DeviceCapabilities, grad_method: Union[str, None]
+) -> bool:
+    """Check whether an Operator is supported."""
     if isinstance(op, qml.ops.Adjoint):
-        match = catalyst_acceptance(op.base, capabilities)
-        if match and op_support[match].invertible:
-            return match
+        return catalyst_acceptance(op.base, capabilities, grad_method) and is_invertible(
+            op.base, capabilities
+        )
 
     # There are cases where a custom controlled gate, e.g., CH, is supported, but its
     # base, i.e., H, is not labeled controllable. In this case, we don't want to use
     # this branch to check the support for this operation.
     elif type(op) is qml.ops.ControlledOp:
-        match = catalyst_acceptance(op.base, capabilities)
-        if match and op_support[match].controllable:
-            return match
+        return catalyst_acceptance(op.base, capabilities, grad_method) and is_controllable(
+            op.base, capabilities
+        )
 
-    elif op.name in op_support:
-        return op.name
+    elif non_diff_in_grad_method(op, grad_method, capabilities) and op.has_decomposition:
+        return False
 
-    return None
-
-
-def differentiable(op: qml.operation.Operator, capabilities: DeviceCapabilities) -> bool:
-    """Check whether an Operator is differentiable."""
-    if type(op) in (qml.ops.Controlled, qml.ops.ControlledOp) or isinstance(op, qml.ops.Adjoint):
-        op_name = op.base.name
-    else:
-        op_name = op.name
-    supported_ops = capabilities.operations
-    return supported_ops.get(op_name, OperatorProperties()).differentiable
+    return is_supported(op, capabilities)
 
 
 def non_diff_in_grad_method(
     op: qml.operation.Operator, grad_method: str, capabilities: DeviceCapabilities
 ) -> bool:
     """Check whether an Operator is non-differentiable but in a gradient method."""
-    return not differentiable(op, capabilities) and grad_method is not None
+    return not is_differentiable(op, capabilities) and grad_method is not None
 
 
 @transform

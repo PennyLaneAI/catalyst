@@ -39,6 +39,12 @@ from catalyst.api_extensions import HybridAdjoint, HybridCtrl, MidCircuitMeasure
 from catalyst.jax_tracer import HybridOp, has_nested_tapes, nested_quantum_regions
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.utils.exceptions import CompileError, DifferentiableCompileError
+from catalyst.utils.operation_utils import (
+    EMPTY_PROPERTIES,
+    is_controllable,
+    is_differentiable,
+    is_invertible,
+)
 
 
 def _verify_nested(
@@ -129,11 +135,7 @@ def verify_operations(tape: QuantumTape, grad_method, qjit_device):
             raise DifferentiableCompileError(f"{op.name} is not allowed in gradients")
 
     def _adj_diff_op_checker(op):
-        if type(op) in (Controlled, ControlledOp) or isinstance(op, Adjoint):
-            op_name = op.base.name
-        else:
-            op_name = op.name
-        if not supported_ops.get(op_name, EMPTY_PROPERTIES).differentiable:
+        if not is_differentiable(op, qjit_device.capabilities):
             raise DifferentiableCompileError(
                 f"{op.name} is non-differentiable on '{qjit_device.original_device.name}' device"
             )
@@ -156,7 +158,7 @@ def verify_operations(tape: QuantumTape, grad_method, qjit_device):
         elif not in_control:
             return isinstance(op, HybridCtrl)
 
-        if not supported_ops.get(op.name, EMPTY_PROPERTIES).controllable:
+        if not is_controllable(op, qjit_device.capabilities):
             raise CompileError(
                 f"{op.name} is not controllable on '{qjit_device.original_device.name}' device"
             )
@@ -181,7 +183,7 @@ def verify_operations(tape: QuantumTape, grad_method, qjit_device):
         elif not in_inverse:
             return isinstance(op, HybridAdjoint)
 
-        if not supported_ops.get(op.name, EMPTY_PROPERTIES).invertible:
+        if not is_invertible(op, qjit_device.capabilities):
             raise CompileError(
                 f"{op.name} is not invertible on '{qjit_device.original_device.name}' device"
             )
