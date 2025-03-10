@@ -114,7 +114,7 @@ struct PauliStringWrapper {
                 continue;
             if (c == '+')
                 continue;
-            if (c == '_'){
+            if (c == '_') {
                 pauliWords.push_back("I");
                 continue;
             }
@@ -183,7 +183,8 @@ PauliWordsPair normalizePPROps(PPRotationOp &lhs, PPRotationOp &rhs)
 
         if (lhs == nullptr) {
             lhs = rhs;
-        }else {
+        }
+        else {
             rhs = lhs;
         }
     }
@@ -221,10 +222,10 @@ LogicalResult visitPPRotationOp(PPRotationOp op,
                                 std::function<LogicalResult(PPRotationOp)> callback)
 {
     if (isNonClifford(op)) {
-        llvm::outs() << "Initial operation is non-Clifford, returning failure.\n";
         return failure();
     }
 
+    // TODO: Consider arbitrary gate
     Operation *nextOp = op->getNextNode();
     if (PPRotationOp nextPPROp = dyn_cast_or_null<PPRotationOp>(nextOp)) {
         if (isNonClifford(nextPPROp)) {
@@ -246,82 +247,72 @@ void printPauliWords(const PauliWords &pauliWords)
 void updatePauliProduct(PPRotationOp op, PauliStringWrapper pauli, PatternRewriter &rewriter)
 {
     auto pauliProductArray = pauli.get_pauli_words();
-    SmallVector<StringRef> pauliProductArrayAttr(pauliProductArray.begin(), pauliProductArray.end());
+    SmallVector<StringRef> pauliProductArrayAttr(pauliProductArray.begin(),
+                                                 pauliProductArray.end());
     auto pauliProduct = rewriter.getStrArrayAttr(pauliProductArrayAttr);
     op.setPauliProductAttr(pauliProduct);
 }
 
-void moveCliffordPastNonClifford(PPRotationOp lhs, PPRotationOp rhs,
-                                 PauliStringWrapper lhsPauli,
-                                 PauliStringWrapper rhsPauli,
-                                 PauliStringWrapper *result,
+void moveCliffordPastNonClifford(PPRotationOp lhs, PPRotationOp rhs, PauliStringWrapper lhsPauli,
+                                 PauliStringWrapper rhsPauli, PauliStringWrapper *result,
                                  PatternRewriter &rewriter)
 {
     assert(!isNonClifford(lhs) && "LHS Operation is not Clifford");
     assert(isNonClifford(rhs) && "RHS Operation is not non-Clifford");
 
-    // Update Pauli words of LHS
-    updatePauliProduct(lhs, *result, rewriter);
-
     // Update Pauli words of RHS
-    updatePauliProduct(rhs, rhsPauli, rewriter);
+    if (result != nullptr) {
+        updatePauliProduct(rhs, *result, rewriter);
+    }
+    else {
+        updatePauliProduct(rhs, rhsPauli, rewriter);
+    }
 
     // TODO: Update sign of LHS
-    // <...>
+    if (result != nullptr) {
+        uint16_t negated = result->negated ? -1 : 1;
+        lhs.setRotationKindAttr(rewriter.getI16IntegerAttr(lhs.getRotationKind() * negated));
+    }
 
     // Update Operands of RHS
-    SmallVector<Value> newRHSOperands(rhsPauli.correspondingQubits.size(), nullptr);
-    // for (unsigned i = 0; i < rhsPauli.correspondingQubits.size(); i++) {
-    //     for (unsigned j = 0; j < rhs.getInQubits().size(); j++) {
-    //         if (rhs.getInQubits()[j] == rhsPauli.correspondingQubits[i]) {
-    //             newRHSOperands[i] = rhs.getInQubits()[j];
-    //         }
-    //     }
-    //     if (newRHSOperands[i]) continue;
-    //     for (unsigned j = 0; j < lhs.getOutQubits().size(); j++) {
-    //         if (lhs.getOutQubits()[j] == rhsPauli.correspondingQubits[i]) {
-    //             newRHSOperands[i] = lhs.getInQubits()[j];
-    //         }
-    //     }
-    // }    
-
-    for (unsigned i = 0; i < rhs.getInQubits().size(); i++) {
-        for (unsigned j = 0; j < lhs.getOutQubits().size(); j++) {
-            if (lhs.getOutQubits()[j] == rhs.getInQubits()[i]) {
-              newRHSOperands[i] = lhs.getInQubits()[j];
-              rhs.setOperand(i, lhs.getInQubits()[j]);
-            }
-        }
-    }
-    // rhs->setOperands(newRHSOperands);
-
-    // Update Operands of LHS
     // lhsPauli.correspondingQubits consists of:
     //    - OutQubit: initilized qubit
     //    - InQubit: new qubits from RHS op
-    // 
-    SmallVector<Value> newLHSOperands(lhsPauli.correspondingQubits.size(), nullptr);
-    for (unsigned i = 0; i < lhsPauli.correspondingQubits.size(); i++) {
-        for (unsigned j = 0; j < lhs.getOutQubits().size(); j++) {
-            if (lhs.getOutQubits()[j] == lhsPauli.correspondingQubits[i]) {
-                newLHSOperands[i] = lhs.getInQubits()[j];
-                llvm::outs() << "newLHSOperands[" << i << "]: " << newLHSOperands[i] << "\n";
-                continue;
+    //
+    SmallVector<Value> newRHSOperands(rhsPauli.correspondingQubits.size(), nullptr);
+    for (unsigned i = 0; i < rhsPauli.correspondingQubits.size(); i++) {
+        for (unsigned j = 0; j < rhs.getInQubits().size(); j++) {
+            if (rhs.getInQubits()[j] == rhsPauli.correspondingQubits[i]) {
+                newRHSOperands[i] = rhs.getInQubits()[j];
             }
         }
-        for (unsigned j = 0; j < rhs.getInQubits().size(); j++) {
-            if (rhs.getInQubits()[j] == lhsPauli.correspondingQubits[i]) {
-                if (newLHSOperands[i]) continue;
-                newLHSOperands[i] = rhs.getOutQubits()[j];
-                llvm::outs() << "newLHSOperands[" << i << "]: " << newLHSOperands[i] << "\n";
-                continue;
+        for (unsigned j = 0; j < lhs.getOutQubits().size(); j++) {
+            if (lhs.getOutQubits()[j] == rhsPauli.correspondingQubits[i]) {
+                newRHSOperands[i] = lhs.getInQubits()[j];
             }
         }
     }
-    lhs->setOperands(newLHSOperands);
 
-    rewriter.moveOpAfter(lhs, rhs);
-    llvm::outs() << "moveOpAfter\n";
+    SmallVector<Type> outQubitsTypesList;
+    for (auto qubit : newRHSOperands) {
+        outQubitsTypesList.push_back(qubit.getType());
+    }
+
+    auto nonCliffordOp =
+        rewriter.create<PPRotationOp>(rhs->getLoc(), outQubitsTypesList, rhs.getPauliProduct(),
+                                      rhs.getRotationKindAttr(), newRHSOperands);
+
+    // update the use of value in newRHSOperands
+    for (unsigned i = 0; i < newRHSOperands.size(); i++) {
+        newRHSOperands[i].replaceAllUsesExcept(nonCliffordOp.getOutQubits()[i], nonCliffordOp);
+    }
+
+    rewriter.moveOpBefore(nonCliffordOp, lhs);
+
+    for (auto [outQubit, inQubit] : llvm::zip(rhs.getOutQubits(), rhs.getInQubits())) {
+        rewriter.replaceAllUsesWith(outQubit, inQubit);
+    }
+    rewriter.eraseOp(rhs);
 }
 
 struct CommuteCliffordTPPR : public OpRewritePattern<PPRotationOp> {
@@ -340,14 +331,15 @@ struct CommuteCliffordTPPR : public OpRewritePattern<PPRotationOp> {
             printPauliWords(rhsPauliWords);
 
             if (isCommute(normOps.first, normOps.second)) {
-                moveCliffordPastNonClifford(op, nextPPROp, normOps.first, normOps.second, nullptr, rewriter);
+                moveCliffordPastNonClifford(op, nextPPROp, normOps.first, normOps.second, nullptr,
+                                            rewriter);
                 return success();
             }
             else {
                 auto resultStr = computeCommutationRules(lhsPauliWords, rhsPauliWords);
                 llvm::outs() << resultStr.str() << "\n";
-                llvm::outs() << "anti-commute\n";
-                moveCliffordPastNonClifford(op, nextPPROp, normOps.first, normOps.second, &resultStr, rewriter);
+                moveCliffordPastNonClifford(op, nextPPROp, normOps.first, normOps.second,
+                                            &resultStr, rewriter);
                 llvm::outs() << resultStr.str() << "\n";
                 return success();
             }
