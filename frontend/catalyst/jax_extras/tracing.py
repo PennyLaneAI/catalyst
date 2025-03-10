@@ -956,6 +956,7 @@ class DynshapePrimitive(JaxprPrimitive):
             # `abstract_eval` returned `out_type` calculated for empty constants.
             [],
             tracers,
+            # TODO: does not work with ADTrace since it assumes what the top_trace is
             maker=lambda a: DynamicJaxprTracer(trace, a, source_info),
         )
 
