@@ -35,7 +35,7 @@ from pennylane.operation import Operation, StatePrepBase
 from pennylane.ops import Adjoint, CompositeOp, Controlled, ControlledOp, SymbolicOp
 from pennylane.tape import QuantumTape
 
-from catalyst.api_extensions import HybridAdjoint, HybridCtrl, MidCircuitMeasure
+from catalyst.api_extensions import HybridAdjoint, HybridCtrl
 from catalyst.device.op_support import (
     EMPTY_PROPERTIES,
     is_controllable,
