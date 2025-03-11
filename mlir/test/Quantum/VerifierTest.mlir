@@ -143,6 +143,7 @@ func.func @compbasis1(%q0 : !quantum.bit, %q1 : !quantum.bit, %q2 : !quantum.bit
 func.func @compbasis2(%q0 : !quantum.bit, %q1 : !quantum.bit, %r : !quantum.reg) {
     // expected-error@+1 {{computational basis op cannot simultaneously take in both qubits and quregs}}
     %obs = quantum.compbasis qubits %q0, %q1 qreg %r : !quantum.obs
+
     return
 }
 
