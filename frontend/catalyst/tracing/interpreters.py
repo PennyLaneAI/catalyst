@@ -109,6 +109,8 @@ ADTracer.__module__ = ADTracer.__module__.replace("catalyst", "jax", 1)
 
 
 def trace_diffargs(fun, argnums):
+    if not argnums:
+        return fun
 
     @functools.wraps(fun)
     def diffargs_transform_wrapper(*args, **kwargs):
