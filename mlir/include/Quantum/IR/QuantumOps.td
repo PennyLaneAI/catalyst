@@ -636,27 +636,31 @@ def YieldOp : Quantum_Op<"yield", [Pure, ReturnLike, Terminator, ParentOneOf<["A
 class Observable_Op<string mnemonic, list<Trait> traits = []> :
         Quantum_Op<mnemonic, traits # [Pure]>;
 
-def ComputationalBasisOp : Observable_Op<"compbasis"> {
+def ComputationalBasisOp : Observable_Op<"compbasis", [AttrSizedOperandSegments]> {
     let summary = "Define a pseudo-obeservable of the computational basis for use in measurements";
     let description = [{
         The `quantum.compbasis` operation defines a quantum observable to be used by other
         operations such as measurement processes. The specific observable defined here is a
         "pseudo" observable to represent measurements in the computational basis.
-        The only arguments are the list of qubits to measure.
+        The only arguments are either the list of qubits to measure, or the quantum register
+        to measure. When the argument is a register, the measurement occurs on all qubits in
+        the register.
 
         Example:
 
         ```mlir
-        func.func @foo(%q0: !quantum.bit, %q1: !quantum.bit)
+        func.func @foo(%q0: !quantum.bit, %q1: !quantum.bit, %r: !quantum.reg)
         {
-            %res = quantum.compbasis %q0, %q1 : !quantum.obs
+            %obs_q = quantum.compbasis qubits %q0, %q1 : !quantum.obs
+            %obs_r = quantum.compbasis qreg %r : !quantum.obs
             func.return
         }
         ```
     }];
 
     let arguments = (ins
-        Variadic<QubitType>:$qubits
+        Variadic<QubitType>:$qubits,
+        Optional<QuregType>:$qreg
     );
 
     let results = (outs
@@ -664,8 +668,10 @@ def ComputationalBasisOp : Observable_Op<"compbasis"> {
     );
 
     let assemblyFormat = [{
-        $qubits attr-dict `:` type(results)
+        (`qubits` $qubits^)? (`qreg` $qreg^)? attr-dict `:` type(results)
     }];
+
+    let hasVerifier = 1;
 }
 
 def NamedObsOp : Observable_Op<"namedobs"> {
