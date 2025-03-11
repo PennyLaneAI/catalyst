@@ -24,8 +24,7 @@ from catalyst import measure
 @qml.qnode(qml.device("lightning.qubit", wires=2))
 # CHECK-LABEL @f.jit
 def f(arg0: float, arg1: int, arg2: int):
-    # CHECK:   [[c2:%.+]] = arith.constant 2 : i64
-    # CHECK:   [[reg0:%.+]] = quantum.alloc([[c2]])
+    # CHECK:   [[reg0:%.+]] = quantum.alloc( 2)
     # CHECK:   [[w0_0:%.+]] = tensor.extract %arg1
     # CHECK:   [[q_w0_0:%.+]] = quantum.extract [[reg0]][[[w0_0]]]
     # CHECK:   [[q_w0_1:%.+]] = quantum.custom "RZ"({{%.+}}) [[q_w0_0]]
