@@ -49,7 +49,7 @@ struct ChainedNamedHermitianOpRewritePattern : public mlir::OpRewritePattern<Cus
             return failure();
         }
 
-        VerifyParentGateAndNameAnalysis vpga(op);
+        VerifyParentGateAndNameAnalysis<CustomOp> vpga(op);
         if (!vpga.getVerifierResult()) {
             return failure();
         }
@@ -109,7 +109,7 @@ struct ChainedUUadjOpRewritePattern : public mlir::OpRewritePattern<OpType> {
         LLVM_DEBUG(dbgs() << "Simplifying the following operation:\n" << op << "\n");
 
         if (isa<CustomOp>(op)) {
-            VerifyParentGateAndNameAnalysis vpga(cast<CustomOp>(op));
+            VerifyParentGateAndNameAnalysis<CustomOp> vpga(cast<CustomOp>(op));
             if (!vpga.getVerifierResult()) {
                 return failure();
             }

@@ -211,6 +211,9 @@
   [(#1558)](https://github.com/PennyLaneAI/catalyst/pull/1558)
   [(#1555)](https://github.com/PennyLaneAI/catalyst/pull/1555)
 
+* Updated the c++ standard in mlir layer from 17 to 20.
+  [(#1229)](https://github.com/PennyLaneAI/catalyst/pull/1229)
+
 <h3>Documentation 📝</h3>
 
 <h3>Contributors ✍️</h3>
