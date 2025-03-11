@@ -14,6 +14,8 @@
 
 # RUN: %PYTHON %s | FileCheck %s
 
+# pylint: disable=missing-function-docstring, line-too-long
+
 import jax
 import numpy as np
 import pennylane as qml
@@ -81,7 +83,7 @@ def sample3(x: float, y: float):
     # CHECK: [[q0:%.+]] = quantum.custom "RZ"
     qml.RZ(0.1, wires=0)
 
-    # CHECK: [[obs:%.+]] = quantum.compbasis [[q0]], [[q1]]
+    # CHECK: [[obs:%.+]] = quantum.compbasis qubits [[q0]], [[q1]]
     # CHECK: quantum.sample [[obs]] : tensor<1000x2xf64>
     return qml.sample()
 
@@ -187,7 +189,7 @@ def counts3(x: float, y: float):
     # CHECK: [[q0:%.+]] = quantum.custom "RZ"
     qml.RZ(0.1, wires=0)
 
-    # CHECK: [[obs:%.+]] = quantum.compbasis [[q0]], [[q1]]
+    # CHECK: [[obs:%.+]] = quantum.compbasis qubits [[q0]], [[q1]]
     # CHECK: quantum.counts [[obs]] : tensor<4xf64>, tensor<4xi64>
     return qml.counts()
 
@@ -558,7 +560,7 @@ def probs1(x: float, y: float):
     # qml.probs()  # unsupported by PennyLane
     # qml.probs(op=qml.PauliX(0))  # unsupported by the compiler
 
-    # CHECK: [[obs:%.+]] = quantum.compbasis [[q0]], [[q1]]
+    # CHECK: [[obs:%.+]] = quantum.compbasis qubits [[q0]], [[q1]]
     # CHECK: quantum.probs [[obs]] : tensor<4xf64>
     return qml.probs(wires=[0, 1])
 
@@ -578,7 +580,7 @@ def state1(x: float, y: float):
 
     # qml.state(wires=[0])  # unsupported by PennyLane
 
-    # CHECK: [[obs:%.+]] = quantum.compbasis [[q0]], [[q1]]
+    # CHECK: [[obs:%.+]] = quantum.compbasis qubits [[q0]], [[q1]]
     # CHECK: quantum.state [[obs]] : tensor<4xcomplex<f64>>
     return qml.state()
 
