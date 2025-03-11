@@ -83,6 +83,7 @@ def get_custom_device(
             self.qjit_capabilities = custom_capabilities
 
         def preprocess(self, execution_config=None):
+            """Device preprocessing function."""
             return lightning_device.preprocess(execution_config)
 
         @staticmethod
