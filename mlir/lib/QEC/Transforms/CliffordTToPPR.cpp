@@ -72,19 +72,22 @@ std::pair<ValueRange, TypeRange> getInQubitsAndOutQubits(CustomOp op)
 //===----------------------------------------------------------------------===//
 
 // C(P) = G(Angle)
-PPRotationOp singleQubitConversion(CustomOp &op, GateConversion gateConversion,
+PPRotationOp singleQubitConversion(Location loc, mlir::TypeRange outQubits,
+                                   mlir::ValueRange inQubits, GateConversion gateConversion,
                                    ConversionPatternRewriter &rewriter)
 {
-    auto loc = op->getLoc();
-
     auto pauliProduct = rewriter.getStrArrayAttr(gateConversion.pauliOperators);
-    // auto denValue = getrotationKind(loc, gateConversion, rewriter);
-    auto [inQubits, outQubitsTypes] = getInQubitsAndOutQubits(op);
-
-    auto pprOp = rewriter.create<PPRotationOp>(loc, outQubitsTypes, pauliProduct,
+    auto pprOp = rewriter.create<PPRotationOp>(loc, outQubits, pauliProduct,
                                                gateConversion.rotationKind, inQubits);
-
     return pprOp;
+}
+
+PPRotationOp singleQubitConversion(CustomOp op, GateConversion gateConversion,
+                                   ConversionPatternRewriter &rewriter)
+{
+    auto [inQubits, outQubitsTypes] = getInQubitsAndOutQubits(op);
+    auto loc = op->getLoc();
+    return singleQubitConversion(loc, outQubitsTypes, inQubits, gateConversion, rewriter);
 }
 
 // Ref: Fig. 5 in [A Game of Surface Codes](https://doi.org/10.22331/q-2019-03-05-128)
@@ -130,9 +133,16 @@ LogicalResult controlledConversion(CustomOp op, StringRef P1, StringRef P2,
 // H = (Z · X · Z)π/4
 LogicalResult convertHGate(CustomOp op, ConversionPatternRewriter &rewriter)
 {
-    auto gate = GateConversion({"Z", "X", "Z"}, 4);
-    auto singleQubitOp = singleQubitConversion(op, gate, rewriter);
-    rewriter.replaceOp(op, singleQubitOp);
+    auto Z0 = GateConversion({"Z"}, 4);
+    auto X1 = GateConversion({"X"}, 4);
+    auto Z2 = GateConversion({"Z"}, 4);
+
+    auto types = op.getOutQubits().getType();
+    auto Zppr = singleQubitConversion(op, Z0, rewriter);
+    auto Xppr = singleQubitConversion(Zppr->getLoc(), types, Zppr.getOutQubits(), X1, rewriter);
+    auto Zppr2 = singleQubitConversion(Xppr->getLoc(), types, Xppr.getOutQubits(), Z2, rewriter);
+
+    rewriter.replaceOp(op, Zppr2);
     return success();
 }
 

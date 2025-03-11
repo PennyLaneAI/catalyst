@@ -19,8 +19,10 @@ func.func @test_clifford_t_to_ppr(%q1 : !quantum.bit, %q2 : !quantum.bit){
     // pi / 8 = 826990
     // CHECK-NOT: quantum.custom
     // CHECK: ([[q1:%.+]]: !quantum.bit, [[q2:%.+]]: !quantum.bit)
-    // CHECK: [[q1_0:%.+]] = qec.ppr ["Z", "X", "Z"](4) [[q1]]
-    // CHECK: [[q1_1:%.+]] = qec.ppr ["Z"](4) [[q1_0]]
+    // CHECK: [[q1_0_0:%.+]] = qec.ppr ["Z"](4) [[q1]]
+    // CHECK: [[q1_0_1:%.+]] = qec.ppr ["X"](4) [[q1_0_0]]
+    // CHECK: [[q1_0_2:%.+]] = qec.ppr ["Z"](4) [[q1_0_1]]
+    // CHECK: [[q1_1:%.+]] = qec.ppr ["Z"](4) [[q1_0_2]]
     // CHECK: [[q1_2:%.+]] = qec.ppr ["Z"](8) [[q1_1]]
     // CHECK: [[q1_3:%.+]]:2 = qec.ppr ["Z", "X"](4) [[q1_2]], [[q2]]
     %q1_0 = quantum.custom "H"() %q1 : !quantum.bit
@@ -45,9 +47,11 @@ func.func public @test_clifford_t_to_ppr_1() -> (tensor<i1>, tensor<i1>) {
     %out_qubits = quantum.custom "S"() %1 : !quantum.bit
     // CHECK: [[q0_0:%.+]] = quantum.extract [[q0]][ 0]
     %2 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
-    // CHECK: [[q0_1:%.+]] = qec.ppr ["Z", "X", "Z"](4) [[q0_0]]
+    // CHECK: [[q0_1_0:%.+]] = qec.ppr ["Z"](4) [[q0_0]]
+    // CHECK: [[q0_1_1:%.+]] = qec.ppr ["X"](4) [[q0_1_0]]
+    // CHECK: [[q0_1_2:%.+]] = qec.ppr ["Z"](4) [[q0_1_1]]
     %out_qubits_0 = quantum.custom "Hadamard"() %2 : !quantum.bit
-    // CHECK: [[q0_2:%.+]] = qec.ppr ["Z"](8) [[q0_1]]
+    // CHECK: [[q0_2:%.+]] = qec.ppr ["Z"](8) [[q0_1_2]]
     %out_qubits_1 = quantum.custom "T"() %out_qubits_0 : !quantum.bit
     // CHECK: [[q_3:%.+]]:2 = qec.ppr ["Z", "X"](4) [[q0_2]], [[q1_1]]
     // CHECK: [[q_4:%.+]] = qec.ppr ["Z"](-4) [[q_3]]#0

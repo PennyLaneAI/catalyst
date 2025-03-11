@@ -46,6 +46,8 @@ struct CliffordTToPPRPass : impl::CliffordTToPPRPassBase<CliffordTToPPRPass> {
         target.addLegalOp<quantum::DeviceInitOp, quantum::DeviceReleaseOp>();
         target.addLegalOp<quantum::AllocOp, quantum::DeallocOp>();
         target.addLegalOp<quantum::InsertOp, quantum::ExtractOp>();
+        target.addLegalOp<quantum::NamedObsOp>();
+        target.addLegalOp<quantum::ExpvalOp>();
         target.addLegalDialect<qec::QECDialect>();
 
         RewritePatternSet patterns(ctx);
@@ -60,7 +62,7 @@ struct CliffordTToPPRPass : impl::CliffordTToPPRPassBase<CliffordTToPPRPass> {
 } // namespace qec
 
 /// Create a pass for lowering operations in the `QECDialect`.
-std::unique_ptr<mlir::Pass> createLowerToQECPass()
+std::unique_ptr<mlir::Pass> createCliffordTToPPRPass()
 {
     return std::make_unique<qec::CliffordTToPPRPass>();
 }
