@@ -24,6 +24,7 @@ import pennylane as qml
 from jax.extend.linear_util import wrap_init
 from jax.interpreters.partial_eval import convert_constvars_jaxpr
 from pennylane.capture import PlxprInterpreter, disable, enable, enabled, qnode_prim
+from pennylane.capture.expand_transforms import ExpandTransformsInterpreter
 from pennylane.capture.primitives import cond_prim as plxpr_cond_prim
 from pennylane.capture.primitives import for_loop_prim as plxpr_for_loop_prim
 from pennylane.capture.primitives import while_loop_prim as plxpr_while_loop_prim
@@ -206,6 +207,34 @@ for pl_transform, pass_name in transforms_to_passes.items():
         non_const_args = args[args_slice]
 
         return self.eval(inner_jaxpr, consts, *non_const_args)
+
+
+# pylint: disable=unused-argument, too-many-arguments
+@WorkflowInterpreter.register_primitive(qml.transforms.unitary_to_rot._primitive)
+def handle_unitary_to_rot(
+    self,
+    *args,
+    args_slice,
+    consts_slice,
+    inner_jaxpr,
+    targs_slice,
+    tkwargs,
+):
+    """Handle the conversion from plxpr to Catalyst jaxpr for a
+    PL transform."""
+
+    consts = args[consts_slice]
+    non_const_args = args[args_slice]
+    targs = args[targs_slice]
+
+    def wrapper(*args):
+        return ExpandTransformsInterpreter().eval(inner_jaxpr, consts, *args)
+
+    unravelled_jaxpr = jax.make_jaxpr(wrapper)(*non_const_args)
+    final_jaxpr = qml.transforms.unitary_to_rot._plxpr_transform(
+        unravelled_jaxpr.jaxpr, unravelled_jaxpr.consts, targs, tkwargs, *non_const_args
+    )
+    return self.eval(final_jaxpr.jaxpr, final_jaxpr.consts, *non_const_args)
 
 
 class QFuncPlxprInterpreter(PlxprInterpreter):
