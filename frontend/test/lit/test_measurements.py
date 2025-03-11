@@ -14,6 +14,8 @@
 
 # RUN: %PYTHON %s | FileCheck %s
 
+# pylint: disable=missing-function-docstring, line-too-long
+
 import jax
 import numpy as np
 import pennylane as qml
