@@ -77,13 +77,18 @@ except CompileError:
 # CHECK: [[shots:%.+]] = arith.constant 1000 : i64
 # CHECK: quantum.device shots([[shots]]) [{{.+}}]
 def sample3(x: float, y: float):
+    # CHECK: [[reg:%.+]] = quantum.alloc( 2) : !quantum.reg
+
     qml.RX(x, wires=0)
     # CHECK: [[q1:%.+]] = quantum.custom "RY"
     qml.RY(y, wires=1)
     # CHECK: [[q0:%.+]] = quantum.custom "RZ"
     qml.RZ(0.1, wires=0)
 
-    # CHECK: [[obs:%.+]] = quantum.compbasis qubits [[q0]], [[q1]]
+    # CHECK: [[reg0:%.+]] = quantum.insert [[reg]][ 0], [[q0]] : !quantum.reg, !quantum.bit
+    # CHECK: [[regObs:%.+]] = quantum.insert [[reg0]][ 1], [[q1]] : !quantum.reg, !quantum.bit
+
+    # CHECK: [[obs:%.+]] = quantum.compbasis qreg [[regObs]]
     # CHECK: quantum.sample [[obs]] : tensor<1000x2xf64>
     return qml.sample()
 
@@ -183,13 +188,18 @@ except:
 # CHECK: [[shots:%.+]] = arith.constant 1000 : i64
 # CHECK: quantum.device shots([[shots]]) [{{.+}}]
 def counts3(x: float, y: float):
+    # CHECK: [[reg:%.+]] = quantum.alloc( 2) : !quantum.reg
+
     qml.RX(x, wires=0)
     # CHECK: [[q1:%.+]] = quantum.custom "RY"
     qml.RY(y, wires=1)
     # CHECK: [[q0:%.+]] = quantum.custom "RZ"
     qml.RZ(0.1, wires=0)
 
-    # CHECK: [[obs:%.+]] = quantum.compbasis qubits [[q0]], [[q1]]
+    # CHECK: [[reg0:%.+]] = quantum.insert [[reg]][ 0], [[q0]] : !quantum.reg, !quantum.bit
+    # CHECK: [[regObs:%.+]] = quantum.insert [[reg0]][ 1], [[q1]] : !quantum.reg, !quantum.bit
+
+    # CHECK: [[obs:%.+]] = quantum.compbasis qreg [[regObs]]
     # CHECK: quantum.counts [[obs]] : tensor<4xf64>, tensor<4xi64>
     return qml.counts()
 
@@ -572,6 +582,8 @@ print(probs1.mlir)
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2))
 def state1(x: float, y: float):
+    # CHECK: [[reg:%.+]] = quantum.alloc( 2) : !quantum.reg
+
     qml.RX(x, wires=0)
     # CHECK: [[q1:%.+]] = quantum.custom "RY"
     qml.RY(y, wires=1)
@@ -580,7 +592,10 @@ def state1(x: float, y: float):
 
     # qml.state(wires=[0])  # unsupported by PennyLane
 
-    # CHECK: [[obs:%.+]] = quantum.compbasis qubits [[q0]], [[q1]]
+    # CHECK: [[reg0:%.+]] = quantum.insert [[reg]][ 0], [[q0]] : !quantum.reg, !quantum.bit
+    # CHECK: [[regObs:%.+]] = quantum.insert [[reg0]][ 1], [[q1]] : !quantum.reg, !quantum.bit
+
+    # CHECK: [[obs:%.+]] = quantum.compbasis qreg [[regObs]]
     # CHECK: quantum.state [[obs]] : tensor<4xcomplex<f64>>
     return qml.state()
 
