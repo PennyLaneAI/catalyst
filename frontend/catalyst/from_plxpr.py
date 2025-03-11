@@ -174,20 +174,38 @@ def handle_qnode(
     )
 
 
-# pylint: disable=unused-argument, too-many-arguments
-@WorkflowInterpreter.register_primitive(qml.transforms.cancel_inverses._primitive)
-def handle_cancel_inverses(
-    self, *args, args_slice, consts_slice, inner_jaxpr, targs_slice, tkwargs
-):
-    """Handle the conversion from plxpr to Catalyst jaxpr for the
-    PL 'cancel_inverses_transform', which gets replaced with Catalyst
-    'remove-chained-self-inverse' pass"""
-    self._pass_pipeline.append(Pass("remove-chained-self-inverse"))
+transforms_to_passes = {
+    qml.transforms.cancel_inverses: "remove-chained-self-inverse",
+    qml.transforms.merge_rotations: "merge-rotations",
+}
 
-    consts = args[consts_slice]
-    non_const_args = args[args_slice]
 
-    return self.eval(inner_jaxpr, consts, *non_const_args)
+# This is our registration factory for those PL transforms having a Catalyst
+# pass counterpart. The map above describes the parity between PL and Catalyst,
+# whereas the loop below iterates across that map and generates a custom handler
+# for each transform. In order to ensure early binding, we make the Catalyst
+# pass an argument whose default value is set by the loop.
+for pl_transform, pass_name in transforms_to_passes.items():
+    # pylint: disable=unused-argument, too-many-arguments, cell-var-from-loop
+    @WorkflowInterpreter.register_primitive(pl_transform._primitive)
+    def handle_transform(
+        self,
+        *args,
+        args_slice,
+        consts_slice,
+        inner_jaxpr,
+        targs_slice,
+        tkwargs,
+        catalyst_pass_name=pass_name,
+    ):
+        """Handle the conversion from plxpr to Catalyst jaxpr for a
+        PL transform."""
+        self._pass_pipeline.append(Pass(catalyst_pass_name))
+
+        consts = args[consts_slice]
+        non_const_args = args[args_slice]
+
+        return self.eval(inner_jaxpr, consts, *non_const_args)
 
 
 class QFuncPlxprInterpreter(PlxprInterpreter):
