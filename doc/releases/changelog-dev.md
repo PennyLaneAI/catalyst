@@ -131,6 +131,8 @@
   - `ComputationalBasisOp` can now take in a quantum register in mlir, instead of an explicit, fixed-size list of qubits.
     [(#1553)](https://github.com/PennyLaneAI/catalyst/pull/1553)
 
+  - placeholder
+
 <h3>Breaking changes 💔</h3>
 
 <h3>Deprecations 👋</h3>
