@@ -70,7 +70,7 @@ from catalyst.jax_extras import (
     tree_unflatten,
     wrap_init,
 )
-from catalyst.jax_extras.tracing import bind_flexible_primitive, is_dynamic_wires, DynamicJaxprTracer
+from catalyst.jax_extras.tracing import bind_flexible_primitive, DynamicJaxprTracer
 from catalyst.jax_primitives import (
     AbstractQreg,
     compbasis_p,
@@ -882,7 +882,7 @@ def trace_quantum_measurements(
             # Check if the measurement has wires specified
             # If not, the measurement occurs on all wires of the device
             dev_wires = None
-            if is_dynamic_wires(device.wires):
+            if catalyst.device.qjit_device.is_dynamic_wires(device.wires):
                 dev_wires = device.wires[0]
             else:
                 dev_wires = range(len(device.wires))
