@@ -543,6 +543,8 @@ struct ComputationalBasisOpPattern : public OpConversionPattern<ComputationalBas
 
         rewriter.replaceOpWithNewOp<UnrealizedConversionCastOp>(
             op, conv->convertType(ObservableType::get(ctx)), args);
+
+        return success();
     }
 };
 
