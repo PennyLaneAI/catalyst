@@ -45,10 +45,10 @@ class ADTrace(jax.core.Trace):
         # Excluding these values from being boxed up in ADTracers will prevent such leaks.
         results = []
         for tracer in out_tracers:
-            if isinstance(jax.core.get_aval(tracer), (AbstractQreg, AbstractQbit)):
-                results.append(tracer)
-            else:
+            if isinstance(getattr(tracer, "dtype", None), jax.numpy.floating):
                 results.append(ADTracer(self, tracer, is_active))
+            else:
+                results.append(tracer)
 
         return results if primitive.multiple_results else results[0]
 
