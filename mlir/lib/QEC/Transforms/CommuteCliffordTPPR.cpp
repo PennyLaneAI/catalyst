@@ -12,20 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "mlir/Support/LogicalResult.h"
-#include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/STLExtras.h"
-#include "llvm/Support/ScopedPrinter.h"
-#include <cstdint>
 #define DEBUG_TYPE "commute-clifford-t-ppr"
 
 #include "stim.h"
 
-#include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/Support/Debug.h"
 
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/Operation.h"
-#include "llvm/Support/Casting.h"
+#include "mlir/Support/LogicalResult.h"
 
 #include "QEC/IR/QECDialect.h"
 #include "QEC/Transforms/Patterns.h"
@@ -172,24 +168,19 @@ PauliWordsPair normalizePPROps(PPRotationOp &lhs, PPRotationOp &rhs)
     qubits.insert(lhsQubits.begin(), lhsQubits.end());
     qubits.insert(rhsQubits.begin(), rhsQubits.end());
 
-    PauliStringWrapper lhsPauliStringWrapper = computePauliWords(qubits, lhsQubits, lhs);
-    PauliStringWrapper rhsPauliStringWrapper = computePauliWords(qubits, rhsQubits, rhs);
+    PauliStringWrapper lhsPSWrapper = computePauliWords(qubits, lhsQubits, lhs);
+    PauliStringWrapper rhsPSWrapper = computePauliWords(qubits, rhsQubits, rhs);
 
     // normalize the qubits
-    for (auto [lhs, rhs] : llvm::zip(lhsPauliStringWrapper.correspondingQubits,
-                                     rhsPauliStringWrapper.correspondingQubits)) {
-        if (lhs == rhs)
-            continue;
-
-        if (lhs == nullptr) {
+    for (auto [lhs, rhs] :
+         llvm::zip(lhsPSWrapper.correspondingQubits, rhsPSWrapper.correspondingQubits)) {
+        if (lhs != rhs) {
+            rhs = (lhs != nullptr) ? lhs : rhs;
             lhs = rhs;
-        }
-        else {
-            rhs = lhs;
         }
     }
 
-    return std::make_pair(lhsPauliStringWrapper, rhsPauliStringWrapper);
+    return std::make_pair(lhsPSWrapper, rhsPSWrapper);
 }
 
 // check if two Pauli words commute or anti-commute
@@ -253,9 +244,8 @@ void updatePauliProduct(PPRotationOp op, PauliStringWrapper pauli, PatternRewrit
     op.setPauliProductAttr(pauliProduct);
 }
 
-void moveCliffordPastNonClifford(PauliStringWrapper lhsPauli,
-                                 PauliStringWrapper rhsPauli, PauliStringWrapper *result,
-                                 PatternRewriter &rewriter)
+void moveCliffordPastNonClifford(PauliStringWrapper lhsPauli, PauliStringWrapper rhsPauli,
+                                 PauliStringWrapper *result, PatternRewriter &rewriter)
 {
 
     assert(lhsPauli.op != nullptr && "LHS Operation is not found");
@@ -278,7 +268,6 @@ void moveCliffordPastNonClifford(PauliStringWrapper lhsPauli,
     else {
         updatePauliProduct(rhs, rhsPauli, rewriter);
     }
-
 
     // Update Operands of RHS
     // lhsPauli.correspondingQubits consists of:
@@ -303,15 +292,32 @@ void moveCliffordPastNonClifford(PauliStringWrapper lhsPauli,
         outQubitsTypesList.push_back(qubit.getType());
     }
 
-    auto nonCliffordOp =
-        rewriter.create<PPRotationOp>(rhs->getLoc(), outQubitsTypesList, rhs.getPauliProduct(),
-                                      rhs.getRotationKindAttr(), newRHSOperands);
+    // Remove the Identity gate in the Pauli product
+    auto pauliProduct = rhs.getPauliProduct();
+    SmallVector<StringRef> pauliProductArrayRef;
 
+    for (auto [i, pauli] : llvm::enumerate(pauliProduct)) {
+        auto pauliStr = mlir::cast<mlir::StringAttr>(pauli).getValue();
+        if (pauliStr == "I" || pauliStr == "i") {
+            // Remove the corresponding qubit
+            newRHSOperands.erase(newRHSOperands.begin() + i);
+            continue;
+        }
+        pauliProductArrayRef.push_back(pauliStr);
+    }
+    pauliProduct = rewriter.getStrArrayAttr(pauliProductArrayRef);
+
+    // Create the new PPRotationOp
+    auto nonCliffordOp = rewriter.create<PPRotationOp>(
+        rhs->getLoc(), outQubitsTypesList, pauliProduct, rhs.getRotationKindAttr(), newRHSOperands);
+
+    // Update the rotation kind of nonCliffordOp
     if (result != nullptr) {
         uint16_t negated = result->negated ? -1 : 1;
-        nonCliffordOp.setRotationKindAttr(rewriter.getI16IntegerAttr(rhs.getRotationKind() * negated));
+        nonCliffordOp.setRotationKindAttr(
+            rewriter.getI16IntegerAttr(rhs.getRotationKind() * negated));
     }
-    
+
     // update the use of value in newRHSOperands
     for (unsigned i = 0; i < newRHSOperands.size(); i++) {
         newRHSOperands[i].replaceAllUsesExcept(nonCliffordOp.getOutQubits()[i], nonCliffordOp);

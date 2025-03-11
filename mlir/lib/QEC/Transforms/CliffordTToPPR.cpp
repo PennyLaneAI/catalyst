@@ -167,7 +167,7 @@ LogicalResult convertMeasureOpToPPM(MeasureOp op, StringRef axis,
 
     ArrayAttr pauliProduct = rewriter.getStrArrayAttr({axis});
     auto inQubits = op.getInQubit();
-  
+
     Type qubitType = op.getOutQubit().getType();
     Type mresType = op.getMres().getType();
     SmallVector<Type> outQubitTypes({qubitType});

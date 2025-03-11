@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "mlir/IR/Operation.h"
-#include "mlir/Support/LogicalResult.h"
 #define DEBUG_TYPE "commute-clifford-t-ppr"
 
 #include "llvm/Support/Debug.h"
