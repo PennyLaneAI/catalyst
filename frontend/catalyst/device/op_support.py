@@ -27,18 +27,21 @@ from catalyst.utils.exceptions import DifferentiableCompileError
 EMPTY_PROPERTIES = OperatorProperties()
 
 
-def get_operation_name(op: Operator) -> str:
+def get_base_operation_name(op: Operator) -> str:
     """Get the base operation name, handling controlled and adjoint operations."""
     if type(op) in (qml.ops.Controlled, qml.ops.ControlledOp) or isinstance(op, qml.ops.Adjoint):
         return op.base.name
     return op.name
 
 
-def is_supported(op: Operator, capabilities: DeviceCapabilities) -> bool:
-    """Check whether an operation is supported by the device."""
-    op_name = get_operation_name(op)
+def is_base_supported(op: Operator, capabilities: DeviceCapabilities) -> bool:
+    """Check whether the base operation is supported by the device."""
+    op_name = get_base_operation_name(op)
     return op_name in capabilities.operations
 
+def is_supported(op: Operator, capabilities: DeviceCapabilities) -> bool:
+    """Check whether an operation is supported by the device."""
+    return op.name in capabilities.operations
 
 def _paramshift_op_checker(op):
     if not isinstance(op, HybridOp):
@@ -61,7 +64,7 @@ def is_differentiable(
     if isinstance(op, MidCircuitMeasure):
         raise DifferentiableCompileError(f"{op.name} is not allowed in gradients")
 
-    op_name = get_operation_name(op)
+    op_name = get_base_operation_name(op)
     props = capabilities.operations.get(op_name, EMPTY_PROPERTIES)
 
     if grad_method == "parameter-shift":
@@ -72,11 +75,11 @@ def is_differentiable(
 
 def is_controllable(op: Operator, capabilities: DeviceCapabilities) -> bool:
     """Check whether an operation is controllable."""
-    op_name = get_operation_name(op)
+    op_name = get_base_operation_name(op)
     return capabilities.operations.get(op_name, EMPTY_PROPERTIES).controllable
 
 
 def is_invertible(op: Operator, capabilities: DeviceCapabilities) -> bool:
     """Check whether an operation is invertible."""
-    op_name = get_operation_name(op)
+    op_name = get_base_operation_name(op)
     return capabilities.operations.get(op_name, EMPTY_PROPERTIES).invertible

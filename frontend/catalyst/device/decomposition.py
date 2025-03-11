@@ -226,7 +226,7 @@ def catalyst_acceptance(
     elif not is_differentiable(op, capabilities, grad_method) and op.has_decomposition:
         return None
 
-    if is_supported(op, capabilities):
+    elif is_supported(op, capabilities):
         return op.name
 
     return None
