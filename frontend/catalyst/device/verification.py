@@ -212,12 +212,13 @@ def verify_operations(tape: QuantumTape, grad_method, qjit_device):
         in_control = _ctrl_op_checker(op, in_control)
 
         # check validity based on grad method if using
-        has_active_args = any(isinstance(arg, ADTracer) and arg.active for arg in op.data)
-        if grad_method is not None and has_active_args:
+        if grad_method is not None:
             _mcm_op_checker(op)
-            if grad_method == "adjoint":
+
+            has_active_args = any(isinstance(arg, ADTracer) and arg.active for arg in op.data)
+            if grad_method == "adjoint" and has_active_args:
                 _adj_diff_op_checker(op)
-            elif grad_method == "parameter-shift":
+            elif grad_method == "parameter-shift" and has_active_args:
                 _paramshift_op_checker(op)
 
         return (in_inverse, in_control)
