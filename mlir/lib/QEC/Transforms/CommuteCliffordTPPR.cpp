@@ -266,6 +266,10 @@ void moveCliffordPastNonClifford(PauliStringWrapper lhsPauli,
 
     assert(!isNonClifford(lhs) && "LHS Operation is not Clifford");
     assert(isNonClifford(rhs) && "RHS Operation is not non-Clifford");
+    assert(lhs.getPauliProduct().size() == lhs.getOutQubits().size() &&
+           "LHS Pauli product size mismatch before commutation.");
+    assert(rhs.getPauliProduct().size() == rhs.getInQubits().size() &&
+           "RHS Pauli product size mismatch before commutation.");
 
     // Update Pauli words of RHS
     if (result != nullptr) {
@@ -275,10 +279,6 @@ void moveCliffordPastNonClifford(PauliStringWrapper lhsPauli,
         updatePauliProduct(rhs, rhsPauli, rewriter);
     }
 
-    if (result != nullptr) {
-        uint16_t negated = result->negated ? -1 : 1;
-        lhs.setRotationKindAttr(rewriter.getI16IntegerAttr(lhs.getRotationKind() * negated));
-    }
 
     // Update Operands of RHS
     // lhsPauli.correspondingQubits consists of:
@@ -307,6 +307,11 @@ void moveCliffordPastNonClifford(PauliStringWrapper lhsPauli,
         rewriter.create<PPRotationOp>(rhs->getLoc(), outQubitsTypesList, rhs.getPauliProduct(),
                                       rhs.getRotationKindAttr(), newRHSOperands);
 
+    if (result != nullptr) {
+        uint16_t negated = result->negated ? -1 : 1;
+        nonCliffordOp.setRotationKindAttr(rewriter.getI16IntegerAttr(rhs.getRotationKind() * negated));
+    }
+    
     // update the use of value in newRHSOperands
     for (unsigned i = 0; i < newRHSOperands.size(); i++) {
         newRHSOperands[i].replaceAllUsesExcept(nonCliffordOp.getOutQubits()[i], nonCliffordOp);
@@ -318,6 +323,9 @@ void moveCliffordPastNonClifford(PauliStringWrapper lhsPauli,
         rewriter.replaceAllUsesWith(outQubit, inQubit);
     }
     rewriter.eraseOp(rhs);
+
+    assert(nonCliffordOp.getPauliProduct().size() == nonCliffordOp.getInQubits().size() &&
+           "Non-Clifford Pauli product size mismatch after commutation.");
 }
 
 struct CommuteCliffordTPPR : public OpRewritePattern<PPRotationOp> {
