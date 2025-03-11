@@ -83,6 +83,34 @@
       return qml.expval(qml.Z(0))
   ```
 
+* Catalyst now supports experimental capture of `qml.transforms.cancel_inverses` and `qml.transforms.merge_rotations` transforms.
+  [(#1544)](https://github.com/PennyLaneAI/catalyst/pull/1544)
+  [(#1561)](https://github.com/PennyLaneAI/catalyst/pull/1561)
+
+  To trigger the PennyLane pipeline for capturing the mentioned transforms,
+  simply set `experimental_capture=True` in the qjit decorator. Catalyst will
+  then apply its own pass in replacement of the original transform
+  provided by PennyLane.
+
+  ```python
+  import pennylane as qml
+  from catalyst import qjit
+
+  dev = qml.device("lightning.qubit", wires=1)
+
+  @qjit(experimental_capture=True)
+  def func(x: float):
+      @qml.transforms.cancel_inverses
+      @qml.qnode(dev)
+      def circuit(x: float):
+          qml.RX(x, wires=0)
+          qml.Hadamard(wires=0)
+          qml.Hadamard(wires=0)
+          return qml.expval(qml.PauliZ(0))
+
+      return circuit(x)
+  ```
+
 * Changes to reduce compile time:
 
   - Turn off MLIR's verifier.
@@ -95,6 +123,10 @@
     [(#1530)](https://github.com/PennyLaneAI/catalyst/pull/1530)
 
 * Changes to support a dynamic wire of qubits:
+
+  - The `qalloc_p` custom JAX primitive can now take in a dynamic number of qubits as a tracer
+    and lower it to mlir.
+    [(#1549)](https://github.com/PennyLaneAI/catalyst/pull/1549)
 
   - `ComputationalBasisOp` can now take in a quantum register in mlir, instead of an explicit, fixed-size list of qubits.
     [(#1553)](https://github.com/PennyLaneAI/catalyst/pull/1553)
@@ -175,6 +207,15 @@
 
 * Update source code to comply with changes requested by black v25.1.0
   [(#1490)](https://github.com/PennyLaneAI/catalyst/pull/1490)
+
+* Revert `StaticCustomOp` in favour of adding helper functions (`isStatic()`, `getStaticParams()`
+  to the `CustomOp` which preserves the same functionality. More specifically, this reverts
+  [#1387] and [#1396], modifies [#1484].
+  [(#1558)](https://github.com/PennyLaneAI/catalyst/pull/1558)
+  [(#1555)](https://github.com/PennyLaneAI/catalyst/pull/1555)
+
+* Updated the c++ standard in mlir layer from 17 to 20.
+  [(#1229)](https://github.com/PennyLaneAI/catalyst/pull/1229)
 
 <h3>Documentation 📝</h3>
 
