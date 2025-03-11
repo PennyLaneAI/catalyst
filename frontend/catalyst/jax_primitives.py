@@ -174,18 +174,19 @@ def _qreg_lowering(aval):
 class AbstractObs(AbstractValue):
     """Abstract observable."""
 
-    def __init__(self, num_qubits=None, primitive=None):
+    def __init__(self, num_qubits=None, qreg=None, primitive=None):
         self.num_qubits = num_qubits
+        self.qreg = qreg
         self.primitive = primitive
 
     def __eq__(self, other):  # pragma: nocover
         if not isinstance(other, AbstractObs):
             return False
 
-        return self.num_qubits == other.num_qubits and self.primitive == other.primitive
+        return self.num_qubits == other.num_qubits and self.qreg == other.qreg and self.primitive == other.primitive
 
     def __hash__(self):  # pragma: nocover
-        return hash(self.primitive) + self.num_qubits
+        return hash(self.primitive) + self.num_qubits + hash(self.qreg)
 
 
 class ConcreteObs(AbstractObs):
@@ -1179,29 +1180,40 @@ def _qmeasure_lowering(jax_ctx: mlir.LoweringRuleContext, qubit: ir.Value, posts
 # compbasis observable
 #
 @compbasis_p.def_abstract_eval
-def _compbasis_abstract_eval(*qubits):
-    for qubit in qubits:
-        assert isinstance(qubit, AbstractQbit)
-    return AbstractObs(len(qubits), compbasis_p)
+def _compbasis_abstract_eval(*qubits_or_qreg, qreg_available=False):
+    if qreg_available:
+        qreg = qubits_or_qreg[0]
+        return AbstractObs(None, qreg, compbasis_p)
+    else:
+        qubits = qubits_or_qreg
+        for qubit in qubits:
+            assert isinstance(qubit, AbstractQbit)
+        return AbstractObs(len(qubits), None, compbasis_p)
 
 
 @compbasis_p.def_impl
-def _compbasis_def_impl(ctx, *qubits):  # pragma: no cover
+def _compbasis_def_impl(ctx, *qubits_or_qreg, qreg_available):  # pragma: no cover
     raise NotImplementedError()
 
 
-def _compbasis_lowering(jax_ctx: mlir.LoweringRuleContext, *qubits: tuple):
+def _compbasis_lowering(jax_ctx: mlir.LoweringRuleContext, *qubits_or_qreg: tuple, qreg_available=False):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
-    for qubit in qubits:
-        assert ir.OpaqueType.isinstance(qubit.type)
-        assert ir.OpaqueType(qubit.type).dialect_namespace == "quantum"
-        assert ir.OpaqueType(qubit.type).data == "bit"
-
     result_type = ir.OpaqueType.get("quantum", "obs")
 
-    return ComputationalBasisOp(result_type, qubits).results
+    if qreg_available:
+        qreg = qubits_or_qreg[0]
+        return ComputationalBasisOp(result_type, [], qreg=qreg).results
+
+    else:
+        qubits = qubits_or_qreg
+        for qubit in qubits:
+            assert ir.OpaqueType.isinstance(qubit.type)
+            assert ir.OpaqueType(qubit.type).dialect_namespace == "quantum"
+            assert ir.OpaqueType(qubit.type).data == "bit"
+
+        return ComputationalBasisOp(result_type, qubits).results
 
 
 #
@@ -1339,8 +1351,6 @@ def sample_staging_rule(jaxpr_trace, obs, shots, num_qubits):
     See jax._src.interpreters.partial_eval.process_primitive and default_process_primitive,
     https://github.com/jax-ml/jax/blob/a54319ec1886ed920d50cacf10e147a743888464/jax/_src/interpreters/partial_eval.py#L1881C7-L1881C24
     """
-    if obs.primitive is compbasis_p:
-        assert num_qubits == obs.num_qubits
 
     out_shape = core.DShapedArray((shots, num_qubits), jax.numpy.dtype("float64"))
     out_tracer = pe.DynamicJaxprTracer(jaxpr_trace, out_shape)
@@ -1400,11 +1410,6 @@ def _counts_def_impl(ctx, obs, shots, shape):  # pragma: no cover
 @counts_p.def_abstract_eval
 def _counts_abstract_eval(obs, shots, shape):
     assert isinstance(obs, AbstractObs)
-
-    if obs.primitive is compbasis_p:
-        assert shape == (2**obs.num_qubits,)
-    else:
-        assert shape == (2,)
 
     return core.ShapedArray(shape, jax.numpy.dtype("float64")), core.ShapedArray(
         shape, jax.numpy.dtype("int64")
@@ -1496,9 +1501,10 @@ def _probs_abstract_eval(obs, shape, shots=None):
     assert isinstance(obs, AbstractObs)
 
     if obs.primitive is compbasis_p:
-        assert shape == (2**obs.num_qubits,)
+        if obs.num_qubits:
+            assert shape == (2**obs.num_qubits,)
     else:
-        raise TypeError("probs only supports computational basis")
+       raise TypeError("probs only supports computational basis")
 
     return core.ShapedArray(shape, jax.numpy.float64)
 
@@ -1525,7 +1531,8 @@ def _state_abstract_eval(obs, shape, shots=None):
     assert isinstance(obs, AbstractObs)
 
     if obs.primitive is compbasis_p:
-        assert shape == (2**obs.num_qubits,)
+        if obs.num_qubits:
+            assert shape == (2**obs.num_qubits,)
     else:
         raise TypeError("state only supports computational basis")
 

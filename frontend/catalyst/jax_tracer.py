@@ -751,8 +751,16 @@ def trace_observables(
     wires = obs.wires if (obs and len(obs.wires) > 0) else m_wires
     qubits = None
     if obs is None:
-        qubits = qrp.extract(wires, allow_reuse=True)
-        obs_tracers = compbasis_p.bind(*qubits)
+        # If measuring all wires on the device, pass in the qreg to compbasis op
+        # TODO: "all wires on the device" is a `range` when static, but a tracer when dynamic
+        # Update to handle dynamic case.
+        if isinstance(wires, range):
+            qreg_out = qrp.actualize()
+            obs_tracers = compbasis_p.bind(qreg_out, qreg_available=True)
+            qubits = wires
+        else:
+            qubits = qrp.extract(wires, allow_reuse=True)
+            obs_tracers = compbasis_p.bind(*qubits)
     elif isinstance(obs, KNOWN_NAMED_OBS):
         qubits = qrp.extract(wires, allow_reuse=True)
         obs_tracers = namedobs_p.bind(qubits[0], kind=type(obs).__name__)
