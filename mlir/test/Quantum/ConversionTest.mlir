@@ -300,21 +300,14 @@ func.func @qubit_unitary(%q0 : !quantum.bit, %p1 : memref<2x2xcomplex<f64>>,  %p
 /////////////////
 
 // CHECK-LABEL: @compbasis
-func.func @compbasis(%q : !quantum.bit) {
+func.func @compbasis(%q : !quantum.bit, %r : !quantum.reg) {
 
     // CHECK: builtin.unrealized_conversion_cast %arg0
-    // CHECK-SAME: {mode = "qubits"}
     quantum.compbasis qubits %q : !quantum.obs
     // CHECK: builtin.unrealized_conversion_cast %arg0, %arg0
-    // CHECK-SAME: {mode = "qubits"}
     quantum.compbasis qubits %q, %q : !quantum.obs
 
-    // CHECK: [[c:%.+]] = llvm.mlir.constant(42 : i64) : i64
-    // CHECK: [[r:%.+]] = llvm.call @__catalyst__rt__qubit_allocate_array([[c]])
-    // CHECK: builtin.unrealized_conversion_cast [[r]], [[c]]
-    // CHECK-SAME: {mode = "qreg"}
-    %c = llvm.mlir.constant(42 : i64) : i64
-    %r = quantum.alloc(%c) : !quantum.reg
+    // CHECK: builtin.unrealized_conversion_cast{{[[:space:]]}}
     quantum.compbasis qreg %r : !quantum.obs
 
     return

@@ -122,7 +122,7 @@
   - Lazy IR canonicalization and LLVMIR textual generation.
     [(#1530)](https://github.com/PennyLaneAI/catalyst/pull/1530)
 
-* Changes to support a dynamic wire of qubits:
+* Changes to support a dynamic number of qubits:
 
   - The `qalloc_p` custom JAX primitive can now take in a dynamic number of qubits as a tracer
     and lower it to mlir.
