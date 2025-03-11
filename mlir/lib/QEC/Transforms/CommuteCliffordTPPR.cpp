@@ -253,10 +253,17 @@ void updatePauliProduct(PPRotationOp op, PauliStringWrapper pauli, PatternRewrit
     op.setPauliProductAttr(pauliProduct);
 }
 
-void moveCliffordPastNonClifford(PPRotationOp lhs, PPRotationOp rhs, PauliStringWrapper lhsPauli,
+void moveCliffordPastNonClifford(PauliStringWrapper lhsPauli,
                                  PauliStringWrapper rhsPauli, PauliStringWrapper *result,
                                  PatternRewriter &rewriter)
 {
+
+    assert(lhsPauli.op != nullptr && "LHS Operation is not found");
+    assert(rhsPauli.op != nullptr && "RHS Operation is not found");
+
+    auto lhs = *lhsPauli.op;
+    auto rhs = *rhsPauli.op;
+
     assert(!isNonClifford(lhs) && "LHS Operation is not Clifford");
     assert(isNonClifford(rhs) && "RHS Operation is not non-Clifford");
 
@@ -268,7 +275,6 @@ void moveCliffordPastNonClifford(PPRotationOp lhs, PPRotationOp rhs, PauliString
         updatePauliProduct(rhs, rhsPauli, rewriter);
     }
 
-    // TODO: Update sign of LHS
     if (result != nullptr) {
         uint16_t negated = result->negated ? -1 : 1;
         lhs.setRotationKindAttr(rewriter.getI16IntegerAttr(lhs.getRotationKind() * negated));
@@ -278,7 +284,6 @@ void moveCliffordPastNonClifford(PPRotationOp lhs, PPRotationOp rhs, PauliString
     // lhsPauli.correspondingQubits consists of:
     //    - OutQubit: initilized qubit
     //    - InQubit: new qubits from RHS op
-    //
     SmallVector<Value> newRHSOperands(rhsPauli.correspondingQubits.size(), nullptr);
     for (unsigned i = 0; i < rhsPauli.correspondingQubits.size(); i++) {
         for (unsigned j = 0; j < rhs.getInQubits().size(); j++) {
@@ -327,20 +332,17 @@ struct CommuteCliffordTPPR : public OpRewritePattern<PPRotationOp> {
             auto rhsPauliWords = normOps.second.get_pauli_words();
 
             // DEBUG: print the Pauli words
-            printPauliWords(lhsPauliWords);
-            printPauliWords(rhsPauliWords);
+            LLVM_DEBUG(printPauliWords(lhsPauliWords));
+            LLVM_DEBUG(printPauliWords(rhsPauliWords));
 
             if (isCommute(normOps.first, normOps.second)) {
-                moveCliffordPastNonClifford(op, nextPPROp, normOps.first, normOps.second, nullptr,
-                                            rewriter);
+                moveCliffordPastNonClifford(normOps.first, normOps.second, nullptr, rewriter);
                 return success();
             }
             else {
                 auto resultStr = computeCommutationRules(lhsPauliWords, rhsPauliWords);
-                llvm::outs() << resultStr.str() << "\n";
-                moveCliffordPastNonClifford(op, nextPPROp, normOps.first, normOps.second,
-                                            &resultStr, rewriter);
-                llvm::outs() << resultStr.str() << "\n";
+                LLVM_DEBUG(llvm::outs() << resultStr.str() << "\n");
+                moveCliffordPastNonClifford(normOps.first, normOps.second, &resultStr, rewriter);
                 return success();
             }
         });

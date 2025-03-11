@@ -424,3 +424,47 @@ def clifford_t_ppr(qnode):
         return clone(*args, **kwargs)
 
     return wrapper
+
+def commute_ppr(qnode):
+    """
+    Specify that the ``-commute-ppr`` MLIR compiler pass
+    for commuting Clifford gates past non-Clifford gates will be applied.
+
+    The full list of supported gates are as follows:
+
+    :class:`qml.H <pennylane.H>`,
+    :class:`qml.S <pennylane.S>`,
+    :class:`qml.T <pennylane.T>`,
+    :class:`qml.CNOT <pennylane.CNOT>`,
+    Args:
+        fn (QNode): QNode to apply the pass to
+
+    Returns:
+        ~.QNode
+
+    **Example**
+
+    In this example the Clifford+T gates will be converted into PPRs.
+
+    .. code-block:: python
+
+       
+
+    Example MLIR Representation:
+    .. code-block:: mlir
+        
+    """
+    if not isinstance(qnode, qml.QNode):
+        raise TypeError(f"A QNode is expected, got the classical function {qnode}")
+
+    clone = copy.copy(qnode)
+    clone.__name__ += "_commute_ppr"
+
+    @functools.wraps(clone)
+    def wrapper(*args, **kwargs):
+        pass_pipeline = kwargs.pop("pass_pipeline", [])
+        pass_pipeline.append(Pass("commute-clifford-t-ppr"))
+        kwargs["pass_pipeline"] = pass_pipeline
+        return clone(*args, **kwargs)
+
+    return wrapper
