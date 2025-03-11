@@ -68,7 +68,8 @@ void __catalyst__oqd__rt__initialize()
 
     json system = R"({
   "class_": "System",
-  "ions": []
+  "ions": [],
+  "modes": []
 })"_json;
     (*JSON)["system"] = system;
 
@@ -95,6 +96,13 @@ void __catalyst__oqd__rt__finalize()
 void __catalyst__oqd__ion(const std::string &ion_specs)
 {
     (*JSON)["system"]["ions"].push_back(json::parse(ion_specs));
+}
+
+void __catalyst__oqd__modes(const std::vector<std::string> &phonon_specs)
+{
+    for (auto phonon_spec : phonon_specs) {
+        (*JSON)["system"]["modes"].push_back(json::parse(phonon_spec));
+    }
 }
 
 Pulse *__catalyst__oqd__pulse(QUBIT *qubit, double duration, double phase, Beam *beam)

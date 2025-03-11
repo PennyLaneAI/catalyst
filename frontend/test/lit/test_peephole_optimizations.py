@@ -24,12 +24,11 @@ running -apply-transform-sequence.
 
 # pylint: disable=line-too-long
 
-import shutil
-
 import pennylane as qml
-from lit_util_printers import print_jaxpr, print_mlir
+from utils import print_jaxpr, print_mlir
+from utils import qjit_for_tests as qjit
 
-from catalyst import pipeline, qjit
+from catalyst import pipeline
 from catalyst.debug import get_compilation_stage
 from catalyst.passes import cancel_inverses, merge_rotations
 
@@ -43,7 +42,6 @@ def flush_peephole_opted_mlir_to_iostream(QJIT):
     Then we delete the kept intermediates to avoid pollution of the workspace
     """
     print(get_compilation_stage(QJIT, "QuantumCompilationPass"))
-    shutil.rmtree(QJIT.__name__)
 
 
 #
@@ -274,6 +272,32 @@ def test_pipeline_lowering_globloc_override():
 
 test_pipeline_lowering_globloc_override()
 
+#
+# autograph
+#
+
+
+def test_single_pass_with_autograph():
+    """
+    Test tha peephole optimization work with autograph
+    """
+
+    @qjit(autograph=True, target="mlir")
+    @merge_rotations
+    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    def f(x: float):
+        qml.RX(x, wires=0)
+        qml.RX(x, wires=0)
+        qml.Hadamard(wires=0)
+        return qml.expval(qml.PauliZ(0))
+
+    # CHECK: transform.named_sequence @__transform_main(
+    # CHECK-NEXT: transform.apply_registered_pass "merge-rotations" to {{%.+}}
+    # CHECK-NEXT: transform.yield
+    print(f.mlir)
+
+
+test_single_pass_with_autograph()
 
 #
 # cancel_inverses

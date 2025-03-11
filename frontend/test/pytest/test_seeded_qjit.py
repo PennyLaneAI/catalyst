@@ -22,7 +22,7 @@ from catalyst import CompileError, cond, measure, qjit
 
 def test_seeded_async():
     """Test that seeding and async cannot be simultaneously used"""
-    with pytest.raises(CompileError, match="Seeding has no effect on asyncronous qnodes"):
+    with pytest.raises(CompileError, match="Seeding has no effect on asynchronous QNodes"):
 
         @qjit(async_qnodes=True, seed=37)
         def _():

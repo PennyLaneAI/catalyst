@@ -17,14 +17,12 @@ This file contains tests for measurement primitives when the return shape is dyn
 
 # pylint: disable=line-too-long
 
-import jax
 import numpy as np
 import pennylane as qml
 import pytest
 
 import catalyst
 from catalyst.debug import get_compilation_stage, replace_ir
-from catalyst.jax_primitives import compbasis_p, expval_p, probs_p, state_p, var_p
 
 
 def test_dynamic_sample_backend_functionality():
@@ -109,6 +107,13 @@ def test_dynamic_counts_backend_functionality():
 
 @pytest.mark.parametrize("readout", [qml.expval, qml.var])
 def test_dynamic_wires_scalar_readouts(readout, backend, capfd):
+    """
+    Test that a circuit with dynamic number of wires can be executed correctly.
+
+    As a unit test for allocating a dynamic number of wires, we use measurements
+    whose shape do not depend on the number of wires, i.e. expval and var
+    """
+
     def ref(num_qubits):
         print("compiling...")
         dev = qml.device(backend, wires=num_qubits)
@@ -120,16 +125,16 @@ def test_dynamic_wires_scalar_readouts(readout, backend, capfd):
                 qml.RY(2.2, wires=i)
 
             loop_0()
-            qml.RX(1.23, wires=num_qubits-1)
-            return readout(qml.Z(wires=num_qubits-1))
+            qml.RX(1.23, wires=num_qubits - 1)
+            return readout(qml.Z(wires=num_qubits - 1))
 
         return circ()
 
     cat = catalyst.qjit(ref)
 
-    assert ref(10) == cat(10)
-    assert ref(4) == cat(4)
-    out, err = capfd.readouterr()
+    assert np.allclose(ref(10), cat(10))
+    assert np.allclose(ref(4), cat(4))
+    out, _ = capfd.readouterr()
     assert out.count("compiling...") == 3
 
 
@@ -185,6 +190,29 @@ def test_dynamic_wires_probs_without_wires(backend, capfd):
     assert np.allclose(ref(4), cat(4))
     out, err = capfd.readouterr()
     assert out.count("compiling...") == 3
+
+
+@pytest.mark.parametrize("wires", [1.1, (1.1)])
+def test_wrong_wires_argument(backend, wires):
+    """
+    Test that a circuit with a wrongly typed and shaped dynamic wire argument
+    is correctly caught.
+    """
+
+    @catalyst.qjit
+    def func(num_qubits):
+        dev = qml.device(backend, wires=num_qubits)
+
+        @qml.qnode(dev)
+        def circ():
+            return qml.expval(qml.Z(wires=num_qubits - 1))
+
+        return circ()
+
+    with pytest.raises(
+        AttributeError, match="Number of wires on the device should be a scalar integer."
+    ):
+        func(wires)
 
 
 if __name__ == "__main__":

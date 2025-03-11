@@ -678,10 +678,8 @@ def trace_quantum_operations(
             qrp.insert(controlled_wires, qubits2[len(qubits) :])
         elif isinstance(op, qml.GlobalPhase):
             controlled_qubits = qrp.extract(controlled_wires)
-            qubits2 = bind_flexible_primitive(
-                gphase_p,
-                {"static_params": op.parameters},
-                *[*controlled_qubits, *controlled_values],
+            qubits2 = gphase_p.bind(
+                *[*op.parameters, *controlled_qubits, *controlled_values],
                 ctrl_len=len(controlled_qubits),
                 adjoint=adjoint,
             )
@@ -693,14 +691,12 @@ def trace_quantum_operations(
         else:
             qubits = qrp.extract(op.wires)
             controlled_qubits = qrp.extract(controlled_wires)
-            qubits2 = bind_flexible_primitive(
-                qinst_p,
-                {"static_params": op.parameters},
-                *[*qubits, *controlled_qubits, *controlled_values],
+            qubits2 = qinst_p.bind(
+                *[*qubits, *op.parameters, *controlled_qubits, *controlled_values],
                 op=op.name,
                 qubits_len=len(qubits),
+                params_len=len(op.parameters),
                 ctrl_len=len(controlled_qubits),
-                ctrl_value_len=len(controlled_values),
                 adjoint=adjoint,
             )
             qrp.insert(op.wires, qubits2[: len(qubits)])
@@ -1230,18 +1226,12 @@ def trace_quantum_function(
                     rtd_name=device.backend_name,
                     rtd_kwargs=str(device.backend_kwargs),
                 )
-                if is_dynamic_wires(device.wires):
+                if catalyst.device.qjit_device.is_dynamic_wires(device.wires):
                     # When device has dynamic wires, the device.wires iterable object
                     # has a single value, which is the tracer for the number of wires
                     qreg_in = qalloc_p.bind(device.wires[0])
                 else:
-                    if len(device.wires) == 0:
-                       msg = (
-                           "A device must have at least one wire."
-                       )
-                       raise CompileError(msg)
                     qreg_in = qalloc_p.bind(len(device.wires))
-
 
                 # If the program is batched, that means that it was transformed.
                 # If it was transformed, that means that the program might have

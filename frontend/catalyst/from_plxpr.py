@@ -26,6 +26,7 @@ from jax.interpreters.partial_eval import convert_constvars_jaxpr
 from pennylane.capture import PlxprInterpreter, disable, enable, enabled, qnode_prim
 from pennylane.capture.primitives import cond_prim as plxpr_cond_prim
 from pennylane.capture.primitives import for_loop_prim as plxpr_for_loop_prim
+from pennylane.capture.primitives import while_loop_prim as plxpr_while_loop_prim
 
 from catalyst.device import (
     extract_backend_info,
@@ -33,10 +34,7 @@ from catalyst.device import (
     get_device_shots,
 )
 from catalyst.jax_extras import jaxpr_pad_consts, make_jaxpr2, transient_jax_config
-from catalyst.jax_extras.tracing import (
-    bind_flexible_primitive,
-    for_loop_expansion_strategy,
-)
+from catalyst.jax_extras.tracing import bind_flexible_primitive
 from catalyst.jax_primitives import (
     AbstractQbit,
     AbstractQreg,
@@ -59,7 +57,9 @@ from catalyst.jax_primitives import (
     sample_p,
     state_p,
     var_p,
+    while_p,
 )
+from catalyst.passes.pass_api import Pass
 
 measurement_map = {
     qml.measurements.SampleMP: sample_p,
@@ -153,16 +153,59 @@ def from_plxpr(plxpr: jax.core.ClosedJaxpr) -> Callable[..., jax.core.Jaxpr]:
 class WorkflowInterpreter(PlxprInterpreter):
     """An interpreter that converts a qnode primitive from a plxpr variant to a catalxpr variant."""
 
+    def __init__(self):
+        self._pass_pipeline = []
+        super().__init__()
+
 
 # pylint: disable=unused-argument, too-many-arguments
 @WorkflowInterpreter.register_primitive(qnode_prim)
-def _(self, *args, qnode, shots, device, qnode_kwargs, qfunc_jaxpr, n_consts, batch_dims=None):
+def handle_qnode(
+    self, *args, qnode, shots, device, execution_config, qfunc_jaxpr, n_consts, batch_dims=None
+):
+    """Handle the conversion from plxpr to Catalyst jaxpr for the qnode primitive"""
     consts = args[:n_consts]
     non_const_args = args[n_consts:]
 
     f = partial(QFuncPlxprInterpreter(device, shots).eval, qfunc_jaxpr, consts)
 
-    return quantum_kernel_p.bind(wrap_init(f), *non_const_args, qnode=qnode)
+    return quantum_kernel_p.bind(
+        wrap_init(f), *non_const_args, qnode=qnode, pipeline=self._pass_pipeline
+    )
+
+
+transforms_to_passes = {
+    qml.transforms.cancel_inverses: "remove-chained-self-inverse",
+    qml.transforms.merge_rotations: "merge-rotations",
+}
+
+
+# This is our registration factory for those PL transforms having a Catalyst
+# pass counterpart. The map above describes the parity between PL and Catalyst,
+# whereas the loop below iterates across that map and generates a custom handler
+# for each transform. In order to ensure early binding, we make the Catalyst
+# pass an argument whose default value is set by the loop.
+for pl_transform, pass_name in transforms_to_passes.items():
+    # pylint: disable=unused-argument, too-many-arguments, cell-var-from-loop
+    @WorkflowInterpreter.register_primitive(pl_transform._primitive)
+    def handle_transform(
+        self,
+        *args,
+        args_slice,
+        consts_slice,
+        inner_jaxpr,
+        targs_slice,
+        tkwargs,
+        catalyst_pass_name=pass_name,
+    ):
+        """Handle the conversion from plxpr to Catalyst jaxpr for a
+        PL transform."""
+        self._pass_pipeline.append(Pass(catalyst_pass_name))
+
+        consts = args[consts_slice]
+        non_const_args = args[args_slice]
+
+        return self.eval(inner_jaxpr, consts, *non_const_args)
 
 
 class QFuncPlxprInterpreter(PlxprInterpreter):
@@ -224,12 +267,11 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
 
         in_qubits = [self.get_wire(w) for w in op.wires]
         out_qubits = qinst_p.bind(
-            *in_qubits,
-            *op.data,
+            *[*in_qubits, *op.data],
             op=op.name,
-            ctrl_value_len=0,
-            ctrl_len=0,
             qubits_len=len(op.wires),
+            params_len=len(op.data),
+            ctrl_len=0,
             adjoint=False,
         )
         for wire_values, new_wire in zip(op.wires, out_qubits):
@@ -416,7 +458,6 @@ def handle_for_loop(
 
     # Config additional for loop settings
     apply_reverse_transform = isinstance(step, int) and step < 0
-    expansion_strategy = for_loop_expansion_strategy(False)
 
     # Perform the binding
     outvals = for_p.bind(
@@ -425,7 +466,69 @@ def handle_for_loop(
         body_nconsts=len(consts),
         apply_reverse_transform=apply_reverse_transform,
         nimplicit=0,
-        preserve_dimensions=not expansion_strategy.input_unshare_variables,
+        preserve_dimensions=True,
+    )
+
+    # We assume the last output value is the returned qreg.
+    # Update the current qreg and remove it from the output values.
+    self.qreg = outvals.pop()
+
+    # Return only the output values that match the plxpr output values
+    return outvals
+
+
+# pylint: disable=unused-argument, too-many-arguments
+@QFuncPlxprInterpreter.register_primitive(plxpr_while_loop_prim)
+def handle_while_loop(
+    self,
+    *plxpr_invals,
+    jaxpr_body_fn,
+    jaxpr_cond_fn,
+    body_slice,
+    cond_slice,
+    args_slice,
+    abstract_shapes_slice,
+):
+    """Handle the conversion from plxpr to Catalyst jaxpr for the while loop primitive"""
+    consts_body = plxpr_invals[body_slice]
+    consts_cond = plxpr_invals[cond_slice]
+    args = plxpr_invals[args_slice]
+    args_plus_qreg = [*args, self.qreg]  # Add the qreg to the args
+
+    # Convert for while body from plxpr to Catalyst jaxpr
+    converted_body_func = partial(
+        BranchPlxprInterpreter(self._device, self._shots).eval,
+        jaxpr_body_fn,
+        consts_body,
+    )
+    converted_body_jaxpr_branch = jax.make_jaxpr(converted_body_func)(*args_plus_qreg).jaxpr
+    converted_body_closed_jaxpr_branch = jax.core.ClosedJaxpr(
+        convert_constvars_jaxpr(converted_body_jaxpr_branch), ()
+    )
+
+    # Convert for condition from plxpr to Catalyst jaxpr
+    converted_cond_func = partial(
+        PredicatePlxprInterpreter().eval,
+        jaxpr_cond_fn,
+        consts_cond,
+    )
+    converted_cond_jaxpr_branch = jax.make_jaxpr(converted_cond_func)(*args_plus_qreg).jaxpr
+    converted_cond_closed_jaxpr_branch = jax.core.ClosedJaxpr(
+        convert_constvars_jaxpr(converted_cond_jaxpr_branch), ()
+    )
+
+    # Build Catalyst compatible input values
+    while_loop_invals = [*consts_cond, *consts_body, *args_plus_qreg]
+
+    # Perform the binding
+    outvals = while_p.bind(
+        *while_loop_invals,
+        cond_jaxpr=converted_cond_closed_jaxpr_branch,
+        body_jaxpr=converted_body_closed_jaxpr_branch,
+        cond_nconsts=len(consts_cond),
+        body_nconsts=len(consts_body),
+        nimplicit=0,
+        preserve_dimensions=True,
     )
 
     # We assume the last output value is the returned qreg.
@@ -477,21 +580,47 @@ class BranchPlxprInterpreter(QFuncPlxprInterpreter):
             list[TensorLike]: the results of the execution.
 
         """
-        # We assume the last argument is the qreg
-        num_args = len(args)
-        assert num_args > 0
-        qreg_pos = num_args - 1
-        self._parent_qreg = args[qreg_pos]
 
-        # Retrive the original args (without the qreg)
-        args = args[:qreg_pos]
+        # We assume we have at least one argument (the qreg)
+        assert len(args) > 0
 
-        outvals = super().eval(jaxpr, consts, *args)
+        self._parent_qreg = args[-1]
+
+        # Send the original args (without the qreg)
+        outvals = super().eval(jaxpr, consts, *args[:-1])
 
         # Add the qreg to the output values
         outvals = [*outvals, self.qreg]
 
         self.stateref = None
+
+        return outvals
+
+
+class PredicatePlxprInterpreter(PlxprInterpreter):
+    """An interpreter that converts a plxpr predicate into catalyst-variant jaxpr branch."""
+
+    # pylint: disable=too-many-branches
+    def eval(self, jaxpr: "jax.core.Jaxpr", consts: Sequence, *args) -> list:
+        """Evaluate a jaxpr.
+
+        Args:
+            jaxpr (jax.core.Jaxpr): the jaxpr to evaluate
+            consts (list[TensorLike]): the constant variables for the jaxpr
+            *args (tuple[TensorLike]): The arguments for the jaxpr.
+
+        Returns:
+            list[TensorLike]: the results of the execution.
+
+        In order to comply with the Catalyst jaxpr, the input vars include the qreg
+        although it is not used.
+        """
+
+        # We assume we have at least one argument (the qreg)
+        assert len(args) > 0
+
+        # Send the original args (without the qreg)
+        outvals = super().eval(jaxpr, consts, *args[:-1])
 
         return outvals
 

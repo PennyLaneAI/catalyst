@@ -16,6 +16,7 @@
 #include "Gradient/Transforms/Passes.h"
 #include "Ion/Transforms/Passes.h"
 #include "Mitigation/Transforms/Passes.h"
+#include "QEC/Transforms/Passes.h"
 #include "Quantum/Transforms/Passes.h"
 #include "Test/Transforms/Passes.h"
 
@@ -54,8 +55,8 @@ void catalyst::registerAllCatalystPasses()
     mlir::registerPass(catalyst::createMergeRotationsPass);
     mlir::registerPass(catalyst::createScatterLoweringPass);
     mlir::registerPass(catalyst::createSplitMultipleTapesPass);
-    mlir::registerPass(catalyst::createStaticCustomLoweringPass);
     mlir::registerPass(catalyst::createTestPass);
     mlir::registerPass(catalyst::createIonsDecompositionPass);
     mlir::registerPass(catalyst::createQuantumToIonPass);
+    mlir::registerPass(catalyst::createLowerToQECPass);
 }
