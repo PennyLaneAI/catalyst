@@ -46,8 +46,6 @@ struct CliffordTToPPRPass : impl::CliffordTToPPRPassBase<CliffordTToPPRPass> {
         target.addLegalOp<quantum::DeviceInitOp, quantum::DeviceReleaseOp>();
         target.addLegalOp<quantum::AllocOp, quantum::DeallocOp>();
         target.addLegalOp<quantum::InsertOp, quantum::ExtractOp>();
-        target.addLegalOp<quantum::NamedObsOp>();
-        target.addLegalOp<quantum::ExpvalOp>();
         target.addLegalDialect<qec::QECDialect>();
 
         RewritePatternSet patterns(ctx);
