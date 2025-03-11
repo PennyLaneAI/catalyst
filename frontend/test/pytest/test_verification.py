@@ -82,6 +82,9 @@ def get_custom_device(
                 custom_capabilities.observables[obs].differentiable = False
             self.qjit_capabilities = custom_capabilities
 
+        def preprocess(self, execution_config=None):
+            return lightning_device.preprocess(execution_config)
+
         @staticmethod
         def get_c_interface():
             """Returns a tuple consisting of the device name, and
