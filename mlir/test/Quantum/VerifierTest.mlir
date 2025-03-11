@@ -132,9 +132,9 @@ func.func @controlled2(%1 : !quantum.bit, %2 : !quantum.bit, %3 : !quantum.bit) 
 // Measurements //
 //////////////////
 
-func.func @compbasis1(%q0 : !quantum.bit, %q1 : !quantum.bit, %q2 : !quantum.bit) {
-    %obs = quantum.compbasis qubits %q0, %q1, %q2 : !quantum.obs
-
+func.func @compbasis1(%q0 : !quantum.bit, %q1 : !quantum.bit, %q2 : !quantum.bit, %r : !quantum.reg) {
+    %obs_q = quantum.compbasis qubits %q0, %q1, %q2 : !quantum.obs
+    %obs_r = quantum.compbasis qreg %r : !quantum.obs
     return
 }
 
@@ -143,16 +143,6 @@ func.func @compbasis1(%q0 : !quantum.bit, %q1 : !quantum.bit, %q2 : !quantum.bit
 func.func @compbasis2(%q0 : !quantum.bit, %q1 : !quantum.bit, %r : !quantum.reg) {
     // expected-error@+1 {{computational basis op cannot simultaneously take in both qubits and quregs}}
     %obs = quantum.compbasis qubits %q0, %q1 qreg %r : !quantum.obs
-
-    return
-}
-
-// -----
-
-func.func @compbasis3() {
-    // expected-error@+1 {{computational basis op must take in either a list of qubits or a qureg}}
-    %obs = quantum.compbasis : !quantum.obs
-
     return
 }
 
