@@ -541,9 +541,8 @@ struct ComputationalBasisOpPattern : public OpConversionPattern<ComputationalBas
             args.insert(args.end(), qubits.begin(), qubits.end());
         }
 
-        auto ucc = rewriter.create<UnrealizedConversionCastOp>(
-            op.getLoc(), conv->convertType(ObservableType::get(ctx)), args);
-        rewriter.replaceOp(op, ucc);
+        rewriter.replaceOpWithNewOp<UnrealizedConversionCastOp>(
+            op, conv->convertType(ObservableType::get(ctx)), args);
 
         return success();
     }
