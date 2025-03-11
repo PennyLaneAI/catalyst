@@ -20,7 +20,7 @@ set(DEPENDS
 )
 
 add_mlir_library(${LIBRARY_NAME} STATIC ${SRC} LINK_LIBS PRIVATE ${LIBS} DEPENDS ${DEPENDS})
-target_compile_features(${LIBRARY_NAME} PUBLIC cxx_std_17)
+target_compile_features(${LIBRARY_NAME} PUBLIC cxx_std_20)
 target_include_directories(${LIBRARY_NAME} PUBLIC
                            .
                            ${PROJECT_SOURCE_DIR}/include
@@ -33,6 +33,17 @@ FetchContent_Declare(
     GIT_TAG v3.4.0
 )
 FetchContent_MakeAvailable(tomlplusplus)
+
+# Fetch json utilities
+FetchContent_Declare(
+   json
+   URL https://github.com/nlohmann/json/releases/download/v3.11.3/json.tar.xz
+   URL_HASH  SHA256=d6c65aca6b1ed68e7a182f4757257b107ae403032760ed6ef121c9d55e81757d
+)
+FetchContent_MakeAvailable(json)
+target_link_libraries(ion-transforms
+    PRIVATE nlohmann_json::nlohmann_json
+)
 
 target_link_libraries(${LIBRARY_NAME} PRIVATE tomlplusplus::tomlplusplus)
 

@@ -23,8 +23,9 @@ import pennylane as qml
 import pytest
 from jax import numpy as jnp
 from numpy import pi
+from utils import qjit_for_tests as qjit
 
-from catalyst import for_loop, grad, measure, qjit
+from catalyst import for_loop, grad, measure
 from catalyst.jax_primitives import _scalar_abstractify
 from catalyst.tracing.type_signatures import (
     TypeCompatibility,
@@ -860,7 +861,7 @@ class TestDefaultAvailableIR:
     def test_mlir(self):
         """Test mlir."""
 
-        @qjit
+        @qml.qjit  # Note that we are using the default qjit
         def f():
             return 1
 
@@ -874,7 +875,7 @@ class TestDefaultAvailableIR:
             qml.RX(x, wires=0)
             return qml.state()
 
-        @qjit
+        @qml.qjit  # Note that we are using the default qjit
         def g(x: float):
             return f(x)
 

@@ -18,6 +18,7 @@
 
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Transforms/DialectConversion.h"
 
@@ -37,7 +38,9 @@ enum LevelTransition {
     // Encoding of level transitions for a pulse
     // For example, "DOWN_E" means the transition from downstate to estate
     DOWN_E = 0,
-    UP_E = 1,
+    DOWN_E2 = 1,
+    UP_E = 2,
+    UP_E2 = 3,
 };
 
 /**
@@ -130,6 +133,43 @@ int64_t getTwoQubitCombinationIndex(int64_t nQubits, int64_t idx1, int64_t idx2)
     return (idx1 * nQubits) - (idx1 * (idx1 + 1) / 2) + (idx2 - idx1 - 1);
 }
 
+mlir::Value CreateNormalizedAngle(mlir::PatternRewriter &rewriter, mlir::Location loc,
+                                  mlir::Value angle)
+{
+    constexpr double PI = llvm::numbers::pi;
+    constexpr double FOUR_PI = 4.0 * PI;
+
+    auto four_pi_attr = rewriter.getF64FloatAttr(FOUR_PI);
+    auto four_pi_const = rewriter.create<arith::ConstantOp>(loc, angle.getType(), four_pi_attr);
+
+    // Find angle fmod 4pi.
+    mlir::Value remainder =
+        rewriter.create<arith::RemFOp>(loc, angle.getType(), angle, four_pi_const);
+
+    // Find if the remainder is less than 0.
+    auto zero_attr = rewriter.getZeroAttr(angle.getType());
+    auto zero_const = rewriter.create<arith::ConstantOp>(loc, angle.getType(), zero_attr);
+    auto less_than_zero = rewriter.create<arith::CmpFOp>(loc, arith::CmpFPredicate::OLT, remainder,
+                                                         zero_const); // Signed less than
+
+    // Create a conditional add (if remainder < 0, add 4*PI)
+    auto normalized_angle =
+        rewriter
+            .create<scf::IfOp>(
+                loc, less_than_zero,
+                [&](OpBuilder &builder, Location loc) { // then
+                    mlir::Value add_op = rewriter.create<arith::AddFOp>(
+                        loc, angle.getType(), remainder, four_pi_const); // or AddIOp for integers
+                    builder.create<scf::YieldOp>(loc, add_op);
+                },
+                [&](OpBuilder &builder, Location loc) { // else
+                    builder.create<scf::YieldOp>(loc, remainder);
+                })
+            .getResult(0);
+
+    return normalized_angle;
+}
+
 /**
  * @brief Computes the pulse duration given the rotation angle and the Rabi frequency.
  *
@@ -149,9 +189,10 @@ int64_t getTwoQubitCombinationIndex(int64_t nQubits, int64_t idx1, int64_t idx2)
 mlir::Value computePulseDuration(mlir::PatternRewriter &rewriter, mlir::Location &loc,
                                  const mlir::Value &angle, double rabi)
 {
+    auto normalizedAngle = CreateNormalizedAngle(rewriter, loc, angle);
     TypedAttr rabiAttr = rewriter.getF64FloatAttr(rabi);
     mlir::Value rabiValue = rewriter.create<arith::ConstantOp>(loc, rabiAttr).getResult();
-    return rewriter.create<arith::DivFOp>(loc, angle, rabiValue).getResult();
+    return rewriter.create<arith::DivFOp>(loc, normalizedAngle, rabiValue).getResult();
 }
 
 mlir::LogicalResult oneQubitGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter, double phase1,
@@ -205,7 +246,7 @@ mlir::LogicalResult oneQubitGateToPulse(CustomOp op, mlir::PatternRewriter &rewr
 
 mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
                                   const std::vector<Beam> &beams2,
-                                  const std::vector<PhononMode> &phonons)
+                                  const std::vector<Phonon> &phonons)
 {
     auto qnode = op->getParentOfType<func::FuncOp>();
     MLIRContext *ctx = op.getContext();
@@ -223,7 +264,7 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
         auto qubitIndex1Value = qubitIndex1.value();
         auto nQubits = allocOp.getNqubitsAttr();
         if (nQubits.has_value()) {
-            if (static_cast<size_t>(qubitIndex0Value) >= phonons.size()) {
+            if (static_cast<size_t>(qubitIndex0Value) * 3 >= phonons.size()) {
                 op.emitError() << "Missing phonon parameters for qubit " << qubitIndex0Value
                                << " used as input to MS gate; there are only " << phonons.size()
                                << " phonon parameters in the database."
@@ -232,7 +273,7 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
                 return failure();
             }
 
-            if (static_cast<size_t>(qubitIndex1Value) >= phonons.size()) {
+            if (static_cast<size_t>(qubitIndex1Value) * 3 >= phonons.size()) {
                 op.emitError() << "Missing phonon parameters for qubit " << qubitIndex1Value
                                << " used as input to MS gate; there are only " << phonons.size()
                                << " phonon parameters in the database."
@@ -241,9 +282,8 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
                 return failure();
             }
 
-            // Assume that each ion has 3 phonons (x, y, z)
-            const Phonon &phonon0ComX = phonons[qubitIndex0Value].COM_x;
-            const Phonon &phonon1ComX = phonons[qubitIndex1Value].COM_x;
+            const Phonon &phonon0ComX = phonons[qubitIndex0Value * 3];
+            const Phonon &phonon1ComX = phonons[qubitIndex1Value * 3];
 
             auto twoQubitComboIndex =
                 getTwoQubitCombinationIndex(nQubits.value(), qubitIndex0Value, qubitIndex1Value);
@@ -438,7 +478,7 @@ struct QuantumToIonRewritePattern : public mlir::OpConversionPattern<CustomOp> {
 
     std::vector<Beam> beams1;
     std::vector<Beam> beams2;
-    std::vector<PhononMode> phonons;
+    std::vector<Phonon> phonons;
 
     QuantumToIonRewritePattern(mlir::MLIRContext *ctx, const OQDDatabaseManager &dataManager)
         : mlir::OpConversionPattern<CustomOp>::OpConversionPattern(ctx)

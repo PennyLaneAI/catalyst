@@ -23,8 +23,8 @@ from copy import deepcopy
 import jax.numpy as jnp
 import pennylane as qml
 from pennylane.devices.capabilities import OperatorProperties
+from utils import qjit_for_tests as qjit
 
-from catalyst import qjit
 from catalyst.compiler import get_lib_path
 from catalyst.device import get_device_capabilities
 
@@ -98,7 +98,7 @@ def test_native_controlled_custom():
     @qml.qnode(dev)
     # CHECK-LABEL: public @jit_native_controlled
     def native_controlled():
-        # CHECK: [[out:%.+]], [[out_ctrl:%.+]]:2 = quantum.static_custom "Rot"
+        # CHECK: [[out:%.+]], [[out_ctrl:%.+]]:2 = quantum.custom "Rot"
         # CHECK-SAME: ctrls
         # CHECK-SAME: ctrlvals(%true, %true)
         qml.ctrl(qml.Rot(0.3, 0.4, 0.5, wires=[0]), control=[1, 2])
@@ -148,7 +148,7 @@ def test_native_controlled_multirz():
     @qml.qnode(dev)
     # CHECK-LABEL: public @jit_native_controlled_multirz
     def native_controlled_multirz():
-        # CHECK: [[out:%.+]]:2, [[out_ctrl:%.+]] = quantum.static_custom "MultiRZ"
+        # CHECK: [[out:%.+]]:2, [[out_ctrl:%.+]] = quantum.multirz
         # CHECK-SAME: ctrls
         # CHECK-SAME: ctrlvals(%true)
         qml.ctrl(qml.MultiRZ(0.6, wires=[0, 2]), control=[1])

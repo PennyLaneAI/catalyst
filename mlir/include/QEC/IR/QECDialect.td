@@ -76,16 +76,6 @@ def PPRotationOp : QEC_Op<"ppr"> {
     let assemblyFormat = [{
       $pauli_product `(` $rotation_kind `)` $in_qubits attr-dict `:` type($out_qubits)
     }];
-
-    // TESTING
-    let extraClassDeclaration = [{
-        bool isCommuted(PPRotationOp op) {
-            return false;
-        }
-        bool isCommuted(PPMeasurementOp op){
-            return false;
-        }
-    }];
 }
 
 def PPMeasurementOp : QEC_Op<"ppm"> {

@@ -7,8 +7,9 @@ from copy import deepcopy
 import jax
 import pennylane as qml
 from pennylane.devices.capabilities import OperatorProperties
+from utils import qjit_for_tests as qjit
 
-from catalyst import measure, qjit
+from catalyst import measure
 from catalyst.compiler import get_lib_path
 from catalyst.device import get_device_capabilities
 
@@ -133,8 +134,10 @@ def test_decompose_s():
     @qml.qnode(dev)
     # CHECK-LABEL: public @jit_decompose_s
     def decompose_s():
+        # CHECK-NOT: name="S"
+        # CHECK: [[pi_div_2:%.+]] = arith.constant 1.57079{{.+}} : f64
         # CHECK-NOT: name = "S"
-        # CHECK: {{%.+}} = quantum.static_custom "PhaseShift" [1.570796e+00]
+        # CHECK: {{%.+}} = quantum.custom "PhaseShift"([[pi_div_2]])
         # CHECK-NOT: name = "S"
         qml.S(wires=0)
         return measure(wires=0)

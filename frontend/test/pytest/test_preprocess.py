@@ -22,6 +22,7 @@ from conftest import CONFIG_CUSTOM_DEVICE
 from pennylane.devices import Device, NullQubit
 from pennylane.devices.capabilities import DeviceCapabilities, OperatorProperties
 from pennylane.tape import QuantumScript
+from utils import qjit_for_tests as qjit_clean
 
 from catalyst import CompileError, ctrl
 from catalyst.api_extensions.control_flow import (
@@ -119,7 +120,7 @@ class TestDecomposition:
             qml.SingleExcitationPlus(theta, wires=[0, 1])
             return qml.state()
 
-        mlir = qml.qjit(circuit, target="mlir").mlir
+        mlir = qjit_clean(circuit, target="mlir").mlir
         assert "PauliX" in mlir
         assert "CNOT" in mlir
         assert "ControlledPhaseShift" in mlir
@@ -146,7 +147,7 @@ class TestDecomposition:
             qml.BlockEncode(np.array([[1, 1, 1], [0, 1, 0]]), wires=[0, 1, 2])
             return qml.state()
 
-        mlir = qml.qjit(circuit, target="mlir").mlir
+        mlir = qjit_clean(circuit, target="mlir").mlir
         assert "quantum.unitary" in mlir
         assert "BlockEncode" not in mlir
 
@@ -278,7 +279,7 @@ class TestPreprocessHybridOp:
             adjoint(lambda: OtherRX(x, 0))()
             return qml.expval(qml.PauliZ(0))
 
-        mlir = qml.qjit(circuit, target="mlir").mlir
+        mlir = qjit_clean(circuit, target="mlir").mlir
 
         assert "quantum.adjoint" in mlir
         assert "RX" in mlir
@@ -313,7 +314,7 @@ class TestPreprocessHybridOp:
             return qml.state()
 
         # mlir contains expected gate names, and not the unsupported gate names
-        mlir = qml.qjit(circuit, target="mlir").mlir
+        mlir = qjit_clean(circuit, target="mlir").mlir
         assert "RX" in mlir
         assert "CNOT" in mlir
         assert "PhaseShift" in mlir
