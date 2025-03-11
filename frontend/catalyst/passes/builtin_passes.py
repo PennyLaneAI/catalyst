@@ -370,6 +370,7 @@ def to_ppr(qnode):
     :class:`qml.S <pennylane.S>`,
     :class:`qml.T <pennylane.T>`,
     :class:`qml.CNOT <pennylane.CNOT>`,
+    :class:`qml.measure() <pennylane.measure>`,
     Args:
         fn (QNode): QNode to apply the pass to
 
@@ -382,37 +383,39 @@ def to_ppr(qnode):
 
     .. code-block:: python
 
+        from catalyst import *
         from catalyst.passes import to_ppr
         from catalyst.debug import get_compilation_stage
 
-        dev = qml.device("lightning.qubit", wires=2)
-
-        @qjit
+        @qjit(keep_intermediate=True)
         @to_ppr
-        @qml.qnode(dev)
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
         def circuit():
             qml.H(0)
-            qml.S(0)
+            qml.S(1)
             qml.T(0)
             qml.CNOT([0, 1])
-            return qml.expval(qml.PauliZ(0))
+            m1 = measure(wires=0)
+            m2 = measure(wires=1)
+
+        get_compilation_stage(circuit, "EnforceRuntimeInvariantsPass")
 
     Example MLIR Representation:
     .. code-block:: mlir
          . . .
-        // H gate
+        %0 = quantum.alloc( 2) : !quantum.reg
+        %1 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
         %2 = qec.ppr ["Z"](4) %1 : !quantum.bit
-        %3 = qec.ppr ["X"](4) %2 : !quantum.bit
+        %3 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
         %4 = qec.ppr ["Z"](4) %3 : !quantum.bit
-        // S gate
-        %5 = qec.ppr ["Z"](4) %4 : !quantum.bit
-        // T gate
-        %6 = qec.ppr ["Z"](8) %5 : !quantum.bit
-        // CNOT gate
-        %7 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
-        %8:2 = qec.ppr ["Z", "X"](4) %6, %7 : !quantum.bit, !quantum.bit
+        %5 = qec.ppr ["X"](4) %4 : !quantum.bit
+        %6 = qec.ppr ["Z"](4) %5 : !quantum.bit
+        %7 = qec.ppr ["Z"](8) %6 : !quantum.bit
+        %8:2 = qec.ppr ["Z", "X"](4) %7, %2 : !quantum.bit, !quantum.bit
         %9 = qec.ppr ["Z"](-4) %8#0 : !quantum.bit
         %10 = qec.ppr ["X"](-4) %8#1 : !quantum.bit
+        %mres, %out_qubits = qec.ppm ["Z"] %9 : !quantum.bit
+        %mres_0, %out_qubits_1 = qec.ppm ["Z"] %10 : !quantum.bit
         . . .
     """
     if not isinstance(qnode, qml.QNode):
