@@ -175,17 +175,20 @@ def handle_qnode(
     )
 
 
+# The map below describes the parity between PL transforms and Catalyst passes.
+# PL transforms having a Catalyst pass counterpart will have a name as value,
+# otherwise their value will be None.
 transforms_to_passes = {
     qml.transforms.cancel_inverses: "remove-chained-self-inverse",
     qml.transforms.merge_rotations: "merge-rotations",
+    qml.transforms.unitary_to_rot: None,
 }
 
 
-# This is our registration factory for those PL transforms having a Catalyst
-# pass counterpart. The map above describes the parity between PL and Catalyst,
-# whereas the loop below iterates across that map and generates a custom handler
-# for each transform. In order to ensure early binding, we make the Catalyst
-# pass an argument whose default value is set by the loop.
+# This is our registration factory for PL transforms. The loop below iterates
+# across the map above and generates a custom handler for each transform.
+# In order to ensure early binding, we make the Catalyst pass an argument
+# whose default value is set by the loop.
 for pl_transform, pass_name in transforms_to_passes.items():
     # pylint: disable=unused-argument, too-many-arguments, cell-var-from-loop
     @WorkflowInterpreter.register_primitive(pl_transform._primitive)
@@ -201,40 +204,27 @@ for pl_transform, pass_name in transforms_to_passes.items():
     ):
         """Handle the conversion from plxpr to Catalyst jaxpr for a
         PL transform."""
-        self._pass_pipeline.append(Pass(catalyst_pass_name))
-
         consts = args[consts_slice]
         non_const_args = args[args_slice]
+        targs = args[targs_slice]
 
-        return self.eval(inner_jaxpr, consts, *non_const_args)
+        if catalyst_pass_name is None:
+            # Use PL's ExpandTransformsInterpreter to expand this and any embedded
+            # transform according to PL rules. It works by overriding the primitive
+            # registration, making all embedded transforms follow the PL rules
+            # from now on, hence ignoring the Catalyst pass conversion
+            def wrapper(*args):
+                return ExpandTransformsInterpreter().eval(inner_jaxpr, consts, *args)
 
-
-# pylint: disable=unused-argument, too-many-arguments
-@WorkflowInterpreter.register_primitive(qml.transforms.unitary_to_rot._primitive)
-def handle_unitary_to_rot(
-    self,
-    *args,
-    args_slice,
-    consts_slice,
-    inner_jaxpr,
-    targs_slice,
-    tkwargs,
-):
-    """Handle the conversion from plxpr to Catalyst jaxpr for a
-    PL transform."""
-
-    consts = args[consts_slice]
-    non_const_args = args[args_slice]
-    targs = args[targs_slice]
-
-    def wrapper(*args):
-        return ExpandTransformsInterpreter().eval(inner_jaxpr, consts, *args)
-
-    unravelled_jaxpr = jax.make_jaxpr(wrapper)(*non_const_args)
-    final_jaxpr = qml.transforms.unitary_to_rot._plxpr_transform(
-        unravelled_jaxpr.jaxpr, unravelled_jaxpr.consts, targs, tkwargs, *non_const_args
-    )
-    return self.eval(final_jaxpr.jaxpr, final_jaxpr.consts, *non_const_args)
+            unravelled_jaxpr = jax.make_jaxpr(wrapper)(*non_const_args)
+            final_jaxpr = qml.transforms.unitary_to_rot._plxpr_transform(
+                unravelled_jaxpr.jaxpr, unravelled_jaxpr.consts, targs, tkwargs, *non_const_args
+            )
+            return self.eval(final_jaxpr.jaxpr, final_jaxpr.consts, *non_const_args)
+        else:
+            # Apply the corresponding Catalyst pass counterpart
+            self._pass_pipeline.append(Pass(catalyst_pass_name))
+            return self.eval(inner_jaxpr, consts, *non_const_args)
 
 
 class QFuncPlxprInterpreter(PlxprInterpreter):
