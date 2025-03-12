@@ -1875,7 +1875,9 @@ class TestGradientMethodErrors:
             qml.RX(x, wires=0)
             return qml.expval(qml.PauliY(0))
 
-        with pytest.raises(ValueError, match="finite-diff gradient method is not supported"):
+        with pytest.raises(
+            ValueError, match="Finite differences at the QNode level is not supported"
+        ):
             qjit(grad(f))
 
     def test_invalid_grad_method_error(self):

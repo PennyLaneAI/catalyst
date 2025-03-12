@@ -47,6 +47,12 @@ def _paramshift_op_checker(op):
     return True
 
 
+def _adjoint_diff_op_checker(op, capabilities):
+    op_name = get_base_operation_name(op)
+    props = capabilities.operations.get(op_name, EMPTY_PROPERTIES)
+    return props.differentiable
+
+
 def is_differentiable(
     op: Operator, capabilities: DeviceCapabilities, grad_method: Union[str, None] = None
 ) -> bool:
@@ -65,21 +71,21 @@ def is_differentiable(
         return True
 
     if grad_method == "adjoint":
-        return props.differentiable
+        return _adjoint_diff_op_checker(op, capabilities)
     elif grad_method == "parameter-shift":
         return _paramshift_op_checker(op)
     elif grad_method == "fd":
         return True
     elif grad_method == "device":
         raise ValueError(
-            "The device does not provide a catalyst compatible gradient method. \
-                         Please specify a valid gradient method to the grad method argument. \
-                         (e.g. grad_method='adjoint' or grad_method='parameter-shift')"
+            "The device does not provide a catalyst compatible gradient method. "
+            "Please specify either 'adjoint' or 'parameter-shift' in the QNode's diff_method."
         )
     elif grad_method == "finite-diff":
         raise ValueError(
-            "finite-diff gradient method is not supported. Please specify fd to the \
-                         grad method argument. e.g. grad(g, method='fd')"
+            "Finite differences at the QNode level is not supported in Catalyst. "
+            "Please specify 'fd' directly in the Catalyst gradient function, "
+            "i.e. grad(f, method='fd')."
         )
     else:
         raise ValueError(f"Invalid gradient method: {grad_method}")
