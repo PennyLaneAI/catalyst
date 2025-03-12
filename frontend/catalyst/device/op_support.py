@@ -34,12 +34,6 @@ def get_base_operation_name(op: Operator) -> str:
     return op.name
 
 
-def is_base_supported(op: Operator, capabilities: DeviceCapabilities) -> bool:
-    """Check whether the base operation is supported by the device."""
-    op_name = get_base_operation_name(op)
-    return op_name in capabilities.operations
-
-
 def is_supported(op: Operator, capabilities: DeviceCapabilities) -> bool:
     """Check whether an operation is supported by the device."""
     return op.name in capabilities.operations
