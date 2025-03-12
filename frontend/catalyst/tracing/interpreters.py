@@ -23,6 +23,8 @@ import jax.flatten_util
 from catalyst.jax_primitives import AbstractQbit, AbstractQreg
 
 
+# TODO: consider pytrees for argnums
+# TODO: check whether any other primitive process methods need to be implemented
 class ADTrace(jax.core.Trace):
     def pure(self, x):
         return ADTracer(self, x, active=False)
