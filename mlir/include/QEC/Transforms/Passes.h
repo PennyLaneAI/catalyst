@@ -22,5 +22,6 @@ namespace catalyst {
 
 std::unique_ptr<mlir::Pass> createLowerToQECPass();
 std::unique_ptr<mlir::Pass> createCommuteCliffordTPPRPass();
+std::unique_ptr<mlir::Pass> createCliffordTToPPRPass();
 
 } // namespace catalyst
