@@ -280,7 +280,7 @@ LogicalResult CountsOp::verify()
         return emitOpError("either tensors must be returned or memrefs must be used as inputs");
     }
 
-    if (numQubits.value() != 0){
+    if (getObs().getDefiningOp<NamedObsOp>() || numQubits.value() != 0){
         Type eigvalsToVerify =
             getEigvals() ? (Type)getEigvals().getType() : (Type)getInEigvals().getType();
         Type countsToVerify = getCounts() ? (Type)getCounts().getType() : (Type)getInCounts().getType();

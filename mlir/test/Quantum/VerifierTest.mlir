@@ -215,6 +215,9 @@ func.func @counts1(%q0 : !quantum.bit, %q1 : !quantum.bit) {
 
     %counts:2 = quantum.counts %obs : tensor<2xf64>, tensor<2xi64>
 
+    // expected-error@+1 {{number of eigenvalues or counts did not match observable}}
+    %err:2 = quantum.counts %obs : tensor<4xf64>, tensor<4xi64>
+
     return
 }
 
@@ -242,6 +245,9 @@ func.func @counts3(%q0 : !quantum.bit, %q1 : !quantum.bit) {
     %in_eigvals_2 = memref.alloc() : memref<2xf64>
     %in_counts_2 = memref.alloc() : memref<2xi64>
     quantum.counts %obs in(%in_eigvals_2 : memref<2xf64>, %in_counts_2 : memref<2xi64>)
+
+    // expected-error@+1 {{number of eigenvalues or counts did not match observable}}
+    quantum.counts %obs in(%in_eigvals_1 : memref<4xf64>, %in_counts_1 : memref<4xi64>)
 
     return
 }
