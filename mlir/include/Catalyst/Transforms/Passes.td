@@ -184,6 +184,10 @@ def MemrefToLLVMWithTBAAPass : Pass<"memref-to-llvm-tbaa", "mlir::ModuleOp"> {
 def ApplyTransformSequencePass : Pass<"apply-transform-sequence"> {
     let summary = "Apply the passes scheduled with the transform dialect.";
 
+    let dependentDialects = [
+        "qec::QECDialect"
+    ];
+
     let constructor = "catalyst::createApplyTransformSequencePass()";
 }
 
