@@ -1367,6 +1367,10 @@ def sample_staging_rule(jaxpr_trace, obs, shots, num_qubits):
     https://github.com/jax-ml/jax/blob/a54319ec1886ed920d50cacf10e147a743888464/jax/_src/interpreters/partial_eval.py#L1881C7-L1881C24
     """
 
+    if obs.primitive is compbasis_p:
+        if obs.num_qubits:
+            assert num_qubits == obs.num_qubits
+
     out_shape = core.DShapedArray((shots, num_qubits), jax.numpy.dtype("float64"))
     out_tracer = pe.DynamicJaxprTracer(jaxpr_trace, out_shape)
 
@@ -1425,6 +1429,12 @@ def _counts_def_impl(ctx, obs, shots, shape):  # pragma: no cover
 @counts_p.def_abstract_eval
 def _counts_abstract_eval(obs, shots, shape):
     assert isinstance(obs, AbstractObs)
+
+    if obs.primitive is compbasis_p:
+        if obs.num_qubits:
+            assert shape == (2**obs.num_qubits,)
+    else:
+        assert shape == (2,)
 
     return core.ShapedArray(shape, jax.numpy.dtype("float64")), core.ShapedArray(
         shape, jax.numpy.dtype("int64")
