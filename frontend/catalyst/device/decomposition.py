@@ -37,6 +37,7 @@ from pennylane.measurements import (
 
 from catalyst.api_extensions import HybridCtrl
 from catalyst.device.op_support import (
+    is_active,
     is_controllable,
     is_differentiable,
     is_invertible,
@@ -110,10 +111,10 @@ def catalyst_decompose(
     # are compatible with Catalyst's handling of initial state preparation. Currently, Catalyst
     # only supports qml.StatePrep and qml.BasisState. A default strategy for handling any PennyLane
     # operator of type qml.StatePrepBase will be needed before this conditional can be removed.
-    if grad_method is None and (len(tape) == 0 or type(tape[0]) in (qml.StatePrep, qml.BasisState)):
-        skip_initial_state_prep = capabilities.initial_state_prep
-    else:
-        skip_initial_state_prep = False
+    skip_initial_state_prep = False
+    if len(tape) > 0 and type(tape[0]) in (qml.StatePrep, qml.BasisState):
+        if grad_method is None or not is_active(tape[0]):
+            skip_initial_state_prep = capabilities.initial_state_prep
 
     (toplevel_tape,), _ = decompose(
         tape,
