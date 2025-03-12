@@ -83,14 +83,16 @@
       return qml.expval(qml.Z(0))
   ```
 
-* Catalyst now supports experimental capture of `qml.transforms.cancel_inverses` and `qml.transforms.merge_rotations` transforms.
+* Catalyst now supports experimental capture of `qml.transforms.cancel_inverses`, `qml.transforms.merge_rotations` and `qml.transforms.unitary_to_rot` transforms.
   [(#1544)](https://github.com/PennyLaneAI/catalyst/pull/1544)
   [(#1561)](https://github.com/PennyLaneAI/catalyst/pull/1561)
+  [(#1567)](https://github.com/PennyLaneAI/catalyst/pull/1567)
 
   To trigger the PennyLane pipeline for capturing the mentioned transforms,
-  simply set `experimental_capture=True` in the qjit decorator. Catalyst will
-  then apply its own pass in replacement of the original transform
-  provided by PennyLane.
+  simply set `experimental_capture=True` in the qjit decorator. If available,
+  Catalyst will apply its own pass in replacement of the original transform
+  provided by PennyLane. Otherwise, the transform will be expanded according
+  to PennyLane rules.
 
   ```python
   import pennylane as qml
