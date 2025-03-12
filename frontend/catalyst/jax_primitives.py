@@ -174,10 +174,15 @@ def _qreg_lowering(aval):
 class AbstractObs(AbstractValue):
     """Abstract observable."""
 
-    def __init__(self, num_qubits=None, qreg=None, primitive=None):
-        self.num_qubits = num_qubits
-        self.qreg = qreg
+    def __init__(self, num_qubits_or_qreg=None, primitive=None):
+        self.num_qubits = None
+        self.qreg = None
         self.primitive = primitive
+
+        if isinstance(num_qubits_or_qreg, int):
+            self.num_qubits = num_qubits_or_qreg
+        elif isinstance(num_qubits_or_qreg, AbstractQreg):
+            self.qreg = num_qubits_or_qreg
 
     def __eq__(self, other):  # pragma: nocover
         if not isinstance(other, AbstractObs):
@@ -1183,12 +1188,12 @@ def _qmeasure_lowering(jax_ctx: mlir.LoweringRuleContext, qubit: ir.Value, posts
 def _compbasis_abstract_eval(*qubits_or_qreg, qreg_available=False):
     if qreg_available:
         qreg = qubits_or_qreg[0]
-        return AbstractObs(None, qreg, compbasis_p)
+        return AbstractObs(qreg, compbasis_p)
     else:
         qubits = qubits_or_qreg
         for qubit in qubits:
             assert isinstance(qubit, AbstractQbit)
-        return AbstractObs(len(qubits), None, compbasis_p)
+        return AbstractObs(len(qubits), compbasis_p)
 
 
 @compbasis_p.def_impl
