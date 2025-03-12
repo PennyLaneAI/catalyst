@@ -897,6 +897,16 @@ double __catalyst__qis__Variance(ObsIdType obsKey) { return getQuantumDevicePtr(
 void __catalyst__qis__State(MemRefT_CplxT_double_1d *result, int64_t numQubits, ...)
 {
     RT_ASSERT(numQubits >= 0);
+    std::string error_msg = "return tensor must have static length equal to 2^(number of qubits)";
+    if (numQubits == 0) {
+        // measurement on all wires on the device
+        RT_FAIL_IF(result->sizes[0] != 1u << __catalyst__rt__num_qubits(), error_msg.c_str());
+    }
+    else {
+        RT_FAIL("Partial State-Vector not supported yet");
+        // RT_FAIL_IF(result->sizes[0] != 1u << numQubits, error_msg.c_str());
+    }
+
     MemRefT<std::complex<double>, 1> *result_p = (MemRefT<std::complex<double>, 1> *)result;
 
     va_list args;
@@ -923,6 +933,15 @@ void __catalyst__qis__State(MemRefT_CplxT_double_1d *result, int64_t numQubits, 
 void __catalyst__qis__Probs(MemRefT_double_1d *result, int64_t numQubits, ...)
 {
     RT_ASSERT(numQubits >= 0);
+    std::string error_msg = "return tensor must have static length equal to 2^(number of qubits)";
+    if (numQubits == 0) {
+        // measurement on all wires on the device
+        RT_FAIL_IF(result->sizes[0] != 1u << __catalyst__rt__num_qubits(), error_msg.c_str());
+    }
+    else {
+        RT_FAIL_IF(result->sizes[0] != 1u << numQubits, error_msg.c_str());
+    }
+
     MemRefT<double, 1> *result_p = (MemRefT<double, 1> *)result;
 
     va_list args;
@@ -975,6 +994,17 @@ void __catalyst__qis__Counts(PairT_MemRefT_double_int64_1d *result, int64_t numQ
     int64_t shots = getQuantumDevicePtr()->GetDeviceShots();
     RT_ASSERT(shots >= 0);
     RT_ASSERT(numQubits >= 0);
+    RT_ASSERT(result->first.sizes[0] == result->second.sizes[0]);
+    std::string error_msg = "number of eigenvalues or counts did not match observable";
+    if (numQubits == 0) {
+        // measurement on all wires on the device
+        RT_FAIL_IF(result->first.sizes[0] != 1u << __catalyst__rt__num_qubits(), error_msg.c_str());
+    }
+    else {
+        RT_FAIL("Counts with named observables not supported yet");
+        // RT_FAIL_IF(result->first.sizes[0] != 1u << numQubits, error_msg.c_str());
+    }
+
     MemRefT<double, 1> *result_eigvals_p = (MemRefT<double, 1> *)&result->first;
     MemRefT<int64_t, 1> *result_counts_p = (MemRefT<int64_t, 1> *)&result->second;
 
