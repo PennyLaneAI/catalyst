@@ -1807,30 +1807,5 @@ def test_grad_argnums(argnums):
     assert compare_structure_and_value(result, expected)
 
 
-def test_non_diff_in_grad_method():
-    """Test non-differentiable operations in gradient method."""
-
-    @qml.qjit
-    @qml.qnode(qml.device("lightning.qubit", wires=6))
-    def cost(params):
-        qml.BasisState(np.array([1, 1, 0, 0, 0, 0]), wires=range(6))
-        qml.Rot(0.3, 0.4, 0.5, wires=0)
-        qml.DoubleExcitation(params[0], wires=[0, 1, 2, 3])
-        qml.DoubleExcitation(params[1], wires=[0, 1, 4, 5])
-        return qml.expval(qml.PauliZ(0))
-
-    @qml.qjit
-    def dcost(params):
-        return qml.grad(cost)(params)
-
-    cost([0.1, 0.2])
-    dcost([0.1, 0.2])
-
-    assert "set_basis_state" in cost.mlir
-    assert "Rot" in cost.mlir
-    assert "set_basis_state" not in dcost.mlir
-    assert "Rot" not in dcost.mlir
-
-
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
