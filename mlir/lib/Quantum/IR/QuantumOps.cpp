@@ -280,10 +280,11 @@ LogicalResult CountsOp::verify()
         return emitOpError("either tensors must be returned or memrefs must be used as inputs");
     }
 
-    if (getObs().getDefiningOp<NamedObsOp>() || numQubits.value() != 0){
+    if (getObs().getDefiningOp<NamedObsOp>() || numQubits.value() != 0) {
         Type eigvalsToVerify =
             getEigvals() ? (Type)getEigvals().getType() : (Type)getInEigvals().getType();
-        Type countsToVerify = getCounts() ? (Type)getCounts().getType() : (Type)getInCounts().getType();
+        Type countsToVerify =
+            getCounts() ? (Type)getCounts().getType() : (Type)getInCounts().getType();
 
         if (failed(verifyTensorResult(eigvalsToVerify, numEigvals)) ||
             failed(verifyTensorResult(countsToVerify, numEigvals))) {
@@ -309,12 +310,13 @@ LogicalResult ProbsOp::verify()
         return emitOpError("either tensors must be returned or memrefs must be used as inputs");
     }
 
-    if (numQubits.value() != 0){
+    if (numQubits.value() != 0) {
         Type toVerify =
             getProbabilities() ? (Type)getProbabilities().getType() : (Type)getStateIn().getType();
         size_t dim = std::pow(2, numQubits.value());
         if (failed(verifyTensorResult(cast<ShapedType>(toVerify), dim))) {
-            return emitOpError("return tensor must have static length equal to 2^(number of qubits)");
+            return emitOpError(
+                "return tensor must have static length equal to 2^(number of qubits)");
         }
     }
 
@@ -336,11 +338,12 @@ LogicalResult StateOp::verify()
         return emitOpError("either tensors must be returned or memrefs must be used as inputs");
     }
 
-    if (numQubits.value() != 0){
+    if (numQubits.value() != 0) {
         Type toVerify = getState() ? (Type)getState().getType() : (Type)getStateIn().getType();
         size_t dim = std::pow(2, numQubits.value());
         if (failed(verifyTensorResult(cast<ShapedType>(toVerify), dim))) {
-            return emitOpError("return tensor must have static length equal to 2^(number of qubits)");
+            return emitOpError(
+                "return tensor must have static length equal to 2^(number of qubits)");
         }
     }
 

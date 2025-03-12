@@ -188,7 +188,11 @@ class AbstractObs(AbstractValue):
         if not isinstance(other, AbstractObs):
             return False
 
-        return self.num_qubits == other.num_qubits and self.qreg == other.qreg and self.primitive == other.primitive
+        return (
+            self.num_qubits == other.num_qubits
+            and self.qreg == other.qreg
+            and self.primitive == other.primitive
+        )
 
     def __hash__(self):  # pragma: nocover
         return hash(self.primitive) + self.num_qubits + hash(self.qreg)
@@ -1201,7 +1205,9 @@ def _compbasis_def_impl(ctx, *qubits_or_qreg, qreg_available):  # pragma: no cov
     raise NotImplementedError()
 
 
-def _compbasis_lowering(jax_ctx: mlir.LoweringRuleContext, *qubits_or_qreg: tuple, qreg_available=False):
+def _compbasis_lowering(
+    jax_ctx: mlir.LoweringRuleContext, *qubits_or_qreg: tuple, qreg_available=False
+):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
@@ -1509,7 +1515,7 @@ def _probs_abstract_eval(obs, shape, shots=None):
         if obs.num_qubits:
             assert shape == (2**obs.num_qubits,)
     else:
-       raise TypeError("probs only supports computational basis")
+        raise TypeError("probs only supports computational basis")
 
     return core.ShapedArray(shape, jax.numpy.float64)
 
