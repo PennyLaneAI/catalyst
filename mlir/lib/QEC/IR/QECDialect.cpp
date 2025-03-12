@@ -54,3 +54,23 @@ void QECDialect::initialize()
 
 #define GET_OP_CLASSES
 #include "QEC/IR/QECDialect.cpp.inc"
+
+//===----------------------------------------------------------------------===//
+// QEC op verifiers.
+//===----------------------------------------------------------------------===//
+
+LogicalResult PPRotationOp::verify()
+{
+    if (getInQubits().size() != getPauliProduct().size()) {
+        return emitOpError("Number of qubits must match number of pauli operators");
+    }
+    return mlir::success();
+}
+
+LogicalResult PPMeasurementOp::verify()
+{
+    if (getInQubits().size() != getPauliProduct().size()) {
+        return emitOpError("Number of qubits must match number of pauli operators");
+    }
+    return mlir::success();
+}

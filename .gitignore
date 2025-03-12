@@ -34,3 +34,6 @@ venv
 
 # Standalone-plugin example
 mlir/standalone
+
+# macOS
+.DS_Store
