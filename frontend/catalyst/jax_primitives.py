@@ -1192,6 +1192,7 @@ def _qmeasure_lowering(jax_ctx: mlir.LoweringRuleContext, qubit: ir.Value, posts
 def _compbasis_abstract_eval(*qubits_or_qreg, qreg_available=False):
     if qreg_available:
         qreg = qubits_or_qreg[0]
+        assert isinstance(qreg, AbstractQreg)
         return AbstractObs(qreg, compbasis_p)
     else:
         qubits = qubits_or_qreg
@@ -1215,6 +1216,9 @@ def _compbasis_lowering(
 
     if qreg_available:
         qreg = qubits_or_qreg[0]
+        assert ir.OpaqueType.isinstance(qreg.type)
+        assert ir.OpaqueType(qreg.type).dialect_namespace == "quantum"
+        assert ir.OpaqueType(qreg.type).data == "reg"
         return ComputationalBasisOp(result_type, [], qreg=qreg).results
 
     else:
