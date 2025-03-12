@@ -2,9 +2,10 @@
 
 <h3>New features since last release</h3>
 
-* Conversion Clifford+T gates to Pauli Product Rotation (PPR) and measurement to Pauli Product Measurement (PPM) are now available through the `clifford_t_ppr` pass transform.
+* Conversion Clifford+T gates to Pauli Product Rotation (PPR) and measurement to Pauli Product Measurement (PPM) are now available through the `to_ppr` pass transform.
   [(#1499)](https://github.com/PennyLaneAI/catalyst/pull/1499)
   [(#1551)](https://github.com/PennyLaneAI/catalyst/pull/1551)
+  [(#1564)](https://github.com/PennyLaneAI/catalyst/pull/1564)
 
   Supported gate conversions:
     - H gate → PPR with (Z · X · Z)π/4
@@ -15,7 +16,7 @@
     Example: 
     ```python
         @qjit(keep_intermediate=True)
-        @clifford_t_ppr
+        @to_ppr
         @qml.qnode(dev)
         def circuit():
             qml.H(0)
@@ -33,14 +34,19 @@
     Example MLIR Representation:
     ```mlir
       . . .
-      %q0_0 = qec.ppr ["Z", "X", "Z"](%pi4) %qreg_0 : !quantum.bit
-      %q1_0 = qec.ppr ["Z"](%pi4) %qreg_1 : !quantum.bit
-      %q0_1 = qec.ppr ["Z"](%pi8) %q0_0 : !quantum.bit
-      %01_0 = qec.ppr ["Z", "X"](%pi4) %5, %2 : !quantum.bit, !quantum.bit
-      %q0_1 = qec.ppr ["Z"](%n_pi4) %01#0 : !quantum.bit
-      %q1_2 = qec.ppr ["X"](%n_pi4) %01#1 : !quantum.bit
-      %mres_1, %q0_3 = qec.ppm ["Z"] %q0_1 : !quantum.bit
-      %mres_2, %q1_3 = qec.ppm ["Z"] %q1_2 : !quantum.bit
+        %0 = quantum.alloc( 2) : !quantum.reg
+        %1 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+        %2 = qec.ppr ["Z"](4) %1 : !quantum.bit
+        %3 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+        %4 = qec.ppr ["Z"](4) %3 : !quantum.bit
+        %5 = qec.ppr ["X"](4) %4 : !quantum.bit
+        %6 = qec.ppr ["Z"](4) %5 : !quantum.bit
+        %7 = qec.ppr ["Z"](8) %6 : !quantum.bit
+        %8:2 = qec.ppr ["Z", "X"](4) %7, %2 : !quantum.bit, !quantum.bit
+        %9 = qec.ppr ["Z"](-4) %8#0 : !quantum.bit
+        %10 = qec.ppr ["X"](-4) %8#1 : !quantum.bit
+        %mres, %out_qubits = qec.ppm ["Z"] %9 : !quantum.bit
+        %mres_0, %out_qubits_1 = qec.ppm ["Z"] %10 : !quantum.bit
       . . . 
     ```
 
