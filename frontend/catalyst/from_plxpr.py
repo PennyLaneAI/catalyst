@@ -187,8 +187,8 @@ transforms_to_passes = {
 
 # This is our registration factory for PL transforms. The loop below iterates
 # across the map above and generates a custom handler for each transform.
-# In order to ensure early binding, we make the Catalyst pass an argument
-# whose default value is set by the loop.
+# In order to ensure early binding, we pass the PL plxpr transform and the
+# Catalyst pass as arguments whose default values are set by the loop.
 for pl_transform, pass_name in transforms_to_passes.items():
     # pylint: disable=unused-argument, too-many-arguments, cell-var-from-loop
     @WorkflowInterpreter.register_primitive(pl_transform._primitive)
@@ -201,6 +201,7 @@ for pl_transform, pass_name in transforms_to_passes.items():
         targs_slice,
         tkwargs,
         catalyst_pass_name=pass_name,
+        pl_plxpr_transform=pl_transform._plxpr_transform,
     ):
         """Handle the conversion from plxpr to Catalyst jaxpr for a
         PL transform."""
@@ -217,7 +218,7 @@ for pl_transform, pass_name in transforms_to_passes.items():
                 return ExpandTransformsInterpreter().eval(inner_jaxpr, consts, *args)
 
             unravelled_jaxpr = jax.make_jaxpr(wrapper)(*non_const_args)
-            final_jaxpr = qml.transforms.unitary_to_rot._plxpr_transform(
+            final_jaxpr = pl_plxpr_transform(
                 unravelled_jaxpr.jaxpr, unravelled_jaxpr.consts, targs, tkwargs, *non_const_args
             )
             return self.eval(final_jaxpr.jaxpr, final_jaxpr.consts, *non_const_args)
