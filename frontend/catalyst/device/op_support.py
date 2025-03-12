@@ -16,9 +16,10 @@
 
 from typing import Union
 
+import jax
 import pennylane as qml
 from pennylane.devices.capabilities import DeviceCapabilities, OperatorProperties
-from pennylane.operation import Operator
+from pennylane.operation import Operation, Operator
 
 from catalyst.api_extensions import MidCircuitMeasure
 from catalyst.jax_tracer import HybridOp
@@ -60,8 +61,8 @@ def is_differentiable(
     if isinstance(op, MidCircuitMeasure):
         raise DifferentiableCompileError(f"{op.name} is not allowed in gradients")
 
-    op_name = get_base_operation_name(op)
-    props = capabilities.operations.get(op_name, EMPTY_PROPERTIES)
+    if not is_active(op):  # ops with constant parameters can be ignored
+        return True
 
     if grad_method == "adjoint":
         return props.differentiable
@@ -92,3 +93,23 @@ def is_controllable(op: Operator, capabilities: DeviceCapabilities) -> bool:
 def is_invertible(op: Operator, capabilities: DeviceCapabilities) -> bool:
     """Check whether an operation is invertible."""
     return capabilities.operations.get(op.name, EMPTY_PROPERTIES).invertible
+
+
+def is_active(op: Operation) -> bool:
+    """Verify whether a gate is considered active for differentiation purposes.
+
+    A gate is considered inactive if all (float) parameters are constant, that is none of them are
+    JAX tracers. The restriction to float values facilitates the process without knowing the
+    semantics of each parameter, since generally (in Catalyst) only real numbers can be
+    differentiated with respect to.
+    """
+
+    for param in op.data:
+        if isinstance(param, jax.core.Tracer) and param.dtype.kind == "f":
+            return True
+        else:
+            assert not isinstance(
+                param, (list, tuple)
+            ), "Operator converts any list/tuple parameters to NumPy arrays."
+
+    return False
