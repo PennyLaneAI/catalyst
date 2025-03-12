@@ -1001,8 +1001,7 @@ void __catalyst__qis__Counts(PairT_MemRefT_double_int64_1d *result, int64_t numQ
         RT_FAIL_IF(result->first.sizes[0] != 1u << __catalyst__rt__num_qubits(), error_msg.c_str());
     }
     else {
-        RT_FAIL("Counts with named observables not supported yet");
-        // RT_FAIL_IF(result->first.sizes[0] != 1u << numQubits, error_msg.c_str());
+        RT_FAIL_IF(result->first.sizes[0] != 1u << numQubits, error_msg.c_str());
     }
 
     MemRefT<double, 1> *result_eigvals_p = (MemRefT<double, 1> *)&result->first;
