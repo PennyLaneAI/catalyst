@@ -903,7 +903,9 @@ class ForLoopCallable:
 
     def _call_with_quantum_ctx(self, ctx: JaxTracingContext, *init_state):
         quantum_tape = QuantumTape()
-        outer_trace = ctx.trace
+        outer_trace = find_top_trace([self.lower_bound, self.upper_bound, self.step])
+        if outer_trace.level < ctx.trace.level:
+            outer_trace = ctx.trace
         aux_classical_tracers = [
             outer_trace.full_raise(t) for t in [self.lower_bound, self.upper_bound, self.step]
         ]
