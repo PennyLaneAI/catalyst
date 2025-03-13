@@ -366,8 +366,11 @@ class Compiler:
         except subprocess.CalledProcessError as e:  # pragma: nocover
             raise CompileError(f"catalyst failed with error code {e.returncode}: {e.stderr}") from e
 
-        with open(output_ir_name, "r", encoding="utf-8") as f:
-            out_IR = f.read()
+        if os.path.exists(output_ir_name):
+            with open(output_ir_name, "r", encoding="utf-8") as f:
+                out_IR = f.read()
+        else:
+            out_IR = None
 
         if lower_to_llvm:
             output = LinkerDriver.run(output_object_name, options=self.options)
