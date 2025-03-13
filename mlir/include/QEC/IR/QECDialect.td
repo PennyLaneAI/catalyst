@@ -76,6 +76,8 @@ def PPRotationOp : QEC_Op<"ppr"> {
     let assemblyFormat = [{
       $pauli_product `(` $rotation_kind `)` $in_qubits attr-dict `:` type($out_qubits)
     }];
+
+    let hasVerifier = 1;
 }
 
 def PPMeasurementOp : QEC_Op<"ppm"> {
@@ -94,6 +96,8 @@ def PPMeasurementOp : QEC_Op<"ppm"> {
     let assemblyFormat = [{
       $pauli_product $in_qubits attr-dict `:` type($out_qubits)
     }];
+
+    let hasVerifier = 1;
 }
 
 #endif // QEC_DIALECT

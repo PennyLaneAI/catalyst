@@ -2,9 +2,10 @@
 
 <h3>New features since last release</h3>
 
-* Conversion Clifford+T gates to Pauli Product Rotation (PPR) and measurement to Pauli Product Measurement (PPM) are now available through the `clifford_t_ppr` pass transform.
+* Conversion Clifford+T gates to Pauli Product Rotation (PPR) and measurement to Pauli Product Measurement (PPM) are now available through the `to_ppr` pass transform.
   [(#1499)](https://github.com/PennyLaneAI/catalyst/pull/1499)
   [(#1551)](https://github.com/PennyLaneAI/catalyst/pull/1551)
+  [(#1564)](https://github.com/PennyLaneAI/catalyst/pull/1564)
 
   Supported gate conversions:
     - H gate → PPR with (Z · X · Z)π/4
@@ -15,7 +16,7 @@
     Example: 
     ```python
         @qjit(keep_intermediate=True)
-        @clifford_t_ppr
+        @to_ppr
         @qml.qnode(dev)
         def circuit():
             qml.H(0)
@@ -33,14 +34,19 @@
     Example MLIR Representation:
     ```mlir
       . . .
-      %q0_0 = qec.ppr ["Z", "X", "Z"](%pi4) %qreg_0 : !quantum.bit
-      %q1_0 = qec.ppr ["Z"](%pi4) %qreg_1 : !quantum.bit
-      %q0_1 = qec.ppr ["Z"](%pi8) %q0_0 : !quantum.bit
-      %01_0 = qec.ppr ["Z", "X"](%pi4) %5, %2 : !quantum.bit, !quantum.bit
-      %q0_1 = qec.ppr ["Z"](%n_pi4) %01#0 : !quantum.bit
-      %q1_2 = qec.ppr ["X"](%n_pi4) %01#1 : !quantum.bit
-      %mres_1, %q0_3 = qec.ppm ["Z"] %q0_1 : !quantum.bit
-      %mres_2, %q1_3 = qec.ppm ["Z"] %q1_2 : !quantum.bit
+        %0 = quantum.alloc( 2) : !quantum.reg
+        %1 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+        %2 = qec.ppr ["Z"](4) %1 : !quantum.bit
+        %3 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+        %4 = qec.ppr ["Z"](4) %3 : !quantum.bit
+        %5 = qec.ppr ["X"](4) %4 : !quantum.bit
+        %6 = qec.ppr ["Z"](4) %5 : !quantum.bit
+        %7 = qec.ppr ["Z"](8) %6 : !quantum.bit
+        %8:2 = qec.ppr ["Z", "X"](4) %7, %2 : !quantum.bit, !quantum.bit
+        %9 = qec.ppr ["Z"](-4) %8#0 : !quantum.bit
+        %10 = qec.ppr ["X"](-4) %8#1 : !quantum.bit
+        %mres, %out_qubits = qec.ppm ["Z"] %9 : !quantum.bit
+        %mres_0, %out_qubits_1 = qec.ppm ["Z"] %10 : !quantum.bit
       . . . 
     ```
 
@@ -83,6 +89,34 @@
       return qml.expval(qml.Z(0))
   ```
 
+* Catalyst now supports experimental capture of `qml.transforms.cancel_inverses` and `qml.transforms.merge_rotations` transforms.
+  [(#1544)](https://github.com/PennyLaneAI/catalyst/pull/1544)
+  [(#1561)](https://github.com/PennyLaneAI/catalyst/pull/1561)
+
+  To trigger the PennyLane pipeline for capturing the mentioned transforms,
+  simply set `experimental_capture=True` in the qjit decorator. Catalyst will
+  then apply its own pass in replacement of the original transform
+  provided by PennyLane.
+
+  ```python
+  import pennylane as qml
+  from catalyst import qjit
+
+  dev = qml.device("lightning.qubit", wires=1)
+
+  @qjit(experimental_capture=True)
+  def func(x: float):
+      @qml.transforms.cancel_inverses
+      @qml.qnode(dev)
+      def circuit(x: float):
+          qml.RX(x, wires=0)
+          qml.Hadamard(wires=0)
+          qml.Hadamard(wires=0)
+          return qml.expval(qml.PauliZ(0))
+
+      return circuit(x)
+  ```
+
 * Changes to reduce compile time:
 
   - Turn off MLIR's verifier.
@@ -96,6 +130,15 @@
 
 * Catalyst now decomposes non-differentiable gates when in a gradient method.
   [(#1562)](https://github.com/PennyLaneAI/catalyst/pull/1562)
+
+* Changes to support a dynamic number of qubits:
+
+  - The `qalloc_p` custom JAX primitive can now take in a dynamic number of qubits as a tracer
+    and lower it to mlir.
+    [(#1549)](https://github.com/PennyLaneAI/catalyst/pull/1549)
+
+  - `ComputationalBasisOp` can now take in a quantum register in mlir, instead of an explicit, fixed-size list of qubits.
+    [(#1553)](https://github.com/PennyLaneAI/catalyst/pull/1553)
 
 <h3>Breaking changes 💔</h3>
 
@@ -174,11 +217,14 @@
 * Update source code to comply with changes requested by black v25.1.0
   [(#1490)](https://github.com/PennyLaneAI/catalyst/pull/1490)
 
-* Revert `StaticCustomOp` in favour of adding helper functions (`isStatic()`, `getStaticParams()` 
+* Revert `StaticCustomOp` in favour of adding helper functions (`isStatic()`, `getStaticParams()`
   to the `CustomOp` which preserves the same functionality. More specifically, this reverts
-  [#1387] and [#1396], modifies [#1484]. 
+  [#1387] and [#1396], modifies [#1484].
   [(#1558)](https://github.com/PennyLaneAI/catalyst/pull/1558)
   [(#1555)](https://github.com/PennyLaneAI/catalyst/pull/1555)
+
+* Updated the c++ standard in mlir layer from 17 to 20.
+  [(#1229)](https://github.com/PennyLaneAI/catalyst/pull/1229)
 
 <h3>Documentation 📝</h3>
 
