@@ -261,6 +261,7 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
         """Get the ``AbstractQbit`` corresponding to a wire value."""
         if wire_value in self.wire_map:
             return self.wire_map[wire_value]
+        self.actualized = False
         return qextract_p.bind(self.qreg, wire_value)
 
     def actualize_qreg(self):
