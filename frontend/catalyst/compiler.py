@@ -264,19 +264,30 @@ class LinkerDriver:
         raise CompileError(msg)
 
 
-def opt(*args, input=None, **kwargs):
-    """catalyst --tool=opt *args, **kwargs - < ${input}"""
+def opt(*args, input=None):
+    """echo ${input} | catalyst --tool=opt *args -
+
+    Raw interface to opt.
+    """
     cli_path = get_cli_path()
     if not path.isfile(cli_path):
         raise FileNotFoundError("catalyst executable was not found.")  # pragma: nocover
     cmd = [cli_path]
     cmd += ["--tool=opt"]
-    cmd += [str(arg) for arg in args]
-    cmd += [str(k).replace("_", "-") + "=" + str(v) for k, v in kwargs.items()]
+    for arg in args:
+        if isinstance(arg, tuple):
+            cmd += [str(arg[0]) + "=" + str(arg[1])]
+        else:
+            cmd += [str(arg)]
     if input:
         cmd += ["-"]
     result = subprocess.run(cmd, input=input, check=True, capture_output=True, text=True)
     return result.stdout
+
+
+def canonicalize(*args, input=None):
+    """echo ${input} | catalyst --tool=opt --catalyst-pipeline='builtin.module(canonicalize)' *args -"""
+    return opt(("--pass-pipeline", "builtin.module(canonicalize)"), *args, input=input)
 
 
 class Compiler:

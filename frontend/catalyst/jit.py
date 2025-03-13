@@ -32,7 +32,7 @@ from jax.tree_util import tree_flatten, tree_unflatten
 import catalyst
 from catalyst.autograph import run_autograph
 from catalyst.compiled_functions import CompilationCache, CompiledFunction
-from catalyst.compiler import CompileOptions, Compiler
+from catalyst.compiler import CompileOptions, Compiler, canonicalize
 from catalyst.debug.instruments import instrument
 from catalyst.from_plxpr import trace_from_pennylane
 from catalyst.jax_tracer import lower_jaxpr_to_mlir, trace_to_jaxpr
@@ -513,15 +513,8 @@ class QJIT(CatalystCallable):
         # Canonicalize the MLIR since there can be a lot of redundancy coming from JAX.
         if not self.mlir_module:
             return None
-        options = copy.deepcopy(self.compile_options)
-        options.pipelines = [("0_canonicalize", ["canonicalize"])]
-        options.lower_to_llvm = False
-        options.keep_intermediate = True
-        canonicalizer = Compiler(options)
 
-        # TODO: the in-memory and textual form are different after this, consider unification
-        _, mlir_string = canonicalizer.run(self.mlir_module, self.workspace)
-        return mlir_string
+        return canonicalize(input=str(self.mlir_module))
 
     @debug_logger
     def __call__(self, *args, **kwargs):
