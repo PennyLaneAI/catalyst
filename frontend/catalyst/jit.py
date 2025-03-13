@@ -32,7 +32,7 @@ from jax.tree_util import tree_flatten, tree_unflatten
 import catalyst
 from catalyst.autograph import run_autograph
 from catalyst.compiled_functions import CompilationCache, CompiledFunction
-from catalyst.compiler import CompileOptions, Compiler, canonicalize
+from catalyst.compiler import CompileOptions, Compiler, _canonicalize, _to_llvmir
 from catalyst.debug.instruments import instrument
 from catalyst.from_plxpr import trace_from_pennylane
 from catalyst.jax_tracer import lower_jaxpr_to_mlir, trace_to_jaxpr
@@ -514,7 +514,7 @@ class QJIT(CatalystCallable):
         if not self.mlir_module:
             return None
 
-        return canonicalize(input=str(self.mlir_module))
+        return _canonicalize(input=str(self.mlir_module))
 
     @debug_logger
     def __call__(self, *args, **kwargs):
@@ -565,13 +565,11 @@ class QJIT(CatalystCallable):
     def qir(self):
         """LLVMIR textual representation."""
         if not self.mlir_module:
+            # TODO: Should we go through the translation?
             return None
 
-        orig = copy.deepcopy(self.compile_options)
-        self.compile_options.keep_intermediate = True
-        _, _qir = self.compile()
-        self.compile_options = orig
-        return _qir
+        mlir = str(self.mlir_module)
+        return _to_llvmir(input=mlir, options=self.compile_options)
 
     @debug_logger
     def jit_compile(self, args, **kwargs):

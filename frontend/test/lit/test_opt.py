@@ -18,7 +18,7 @@
 
 from textwrap import dedent
 
-from catalyst.compiler import _canonicalize, _opt
+from catalyst.compiler import _canonicalize, _opt, _to_llvmir
 
 
 def test_opt_happy_path():
@@ -52,3 +52,19 @@ def test_opt_canonicalize():
 
 
 test_opt_canonicalize()
+
+
+def test_to_llvmir():
+    mlir = """
+    module {
+        // CHECK: define void @foo
+        func.func @foo() {
+            return
+        }
+    }
+    """
+    output = _to_llvmir(input=mlir)
+    print(output)
+
+
+test_to_llvmir()

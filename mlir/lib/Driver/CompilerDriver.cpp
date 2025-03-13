@@ -810,7 +810,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         }
 
         if (failed(timer::timer(compileObjectFile, "compileObjFile", /* add_endl */ true, options,
-                                std::move(llvmModule), targetMachine, options.getObjectFile()))) {
+                                llvmModule, targetMachine, options.getObjectFile()))) {
             return failure();
         }
         outputTiming.stop();
@@ -819,12 +819,12 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
 
     std::string errorMessage;
     auto outfile = openOutputFile(output.outputFilename, &errorMessage);
-    if (options.loweringAction == Action::OPT) {
-        outfile->os() << *mlirModule;
+    if (output.outputFilename == "-" && llvmModule) {
+        outfile->os() << *llvmModule;
         outfile->keep();
     }
-    else if (options.keepIntermediate) {
-        outfile->os() << output.outIR;
+    else if (output.outputFilename == "-" && mlirModule) {
+        outfile->os() << *mlirModule;
         outfile->keep();
     }
     if (!outfile) {

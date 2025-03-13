@@ -264,30 +264,67 @@ class LinkerDriver:
         raise CompileError(msg)
 
 
-def opt(*args, input=None):
-    """echo ${input} | catalyst --tool=opt *args -
+def _catalyst(*args, input=None):
+    """echo ${input} | catalyst *args -
 
-    Raw interface to opt.
+    Raw interface to catalyst
     """
     cli_path = get_cli_path()
     if not path.isfile(cli_path):
         raise FileNotFoundError("catalyst executable was not found.")  # pragma: nocover
+
     cmd = [cli_path]
-    cmd += ["--tool=opt"]
     for arg in args:
         if isinstance(arg, tuple):
             cmd += [str(arg[0]) + "=" + str(arg[1])]
         else:
             cmd += [str(arg)]
+
     if input:
         cmd += ["-"]
+
     result = subprocess.run(cmd, input=input, check=True, capture_output=True, text=True)
     return result.stdout
 
 
-def canonicalize(*args, input=None):
+def _opt(*args, input=None):
+    """echo ${input} | catalyst --tool=opt *args -
+
+    Raw interface to opt.
+    """
+    return _catalyst(("--tool", "opt"), *args, input=input)
+
+
+def _canonicalize(*args, input=None):
     """echo ${input} | catalyst --tool=opt --catalyst-pipeline='builtin.module(canonicalize)' *args -"""
-    return opt(("--pass-pipeline", "builtin.module(canonicalize)"), *args, input=input)
+    return _opt(("--pass-pipeline", "builtin.module(canonicalize)"), *args, input=input)
+
+
+def _to_llvmir(*args, input=None, options: Optional[CompileOptions] = None):
+    """echo ${input} | catalyst *args -"""
+    # These are the options that may affect compilation
+    if not options:
+        return _catalyst(*args, input=input)
+
+    extra_args = []
+
+    pipelines = options.get_pipelines()
+    pipeline_str = ""
+
+    for pipeline in options.get_pipelines():
+        pipeline_name, passes = pipeline
+        passes_str = ";".join(passes)
+        pipeline_str += f"{pipeline_name}({passes_str}),"
+    extra_args += ["--catalyst-pipeline", pipeline_str]
+
+    for plugin in options.pass_plugins:
+        extra_args += [("--load-pass-plugin", plugin)]
+    for plugin in options.dialect_plugins:
+        extra_args += [("--load-dialect-plugin", plugin)]
+    if options.checkpoint_stage:
+        extra_args += [("--checkpoint-stage", options.checkpoint_stage)]
+
+    return _catalyst(*extra_args, *args, input=input)
 
 
 class Compiler:
