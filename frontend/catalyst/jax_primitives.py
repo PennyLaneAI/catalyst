@@ -1556,8 +1556,8 @@ def _state_abstract_eval(obs, shape, shots=None):
     assert isinstance(obs, AbstractObs)
 
     if obs.primitive is compbasis_p:
-        if obs.num_qubits:
-            assert shape == (2**obs.num_qubits,)
+        # qml.state() never has wires
+        assert obs.qreg
     else:
         raise TypeError("state only supports computational basis")
 
