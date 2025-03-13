@@ -376,7 +376,12 @@ class QJITDevice(qml.devices.Device):
         program = program + measurement_transforms
 
         # decomposition to supported ops/measurements
-        program.add_transform(catalyst_decompose, ctx=ctx, capabilities=self.capabilities)
+        program.add_transform(
+            catalyst_decompose,
+            ctx=ctx,
+            capabilities=self.capabilities,
+            grad_method=config.gradient_method,
+        )
 
         # Catalyst program verification and validation
         program.add_transform(

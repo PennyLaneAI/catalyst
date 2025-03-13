@@ -130,6 +130,9 @@
   - Lazy IR canonicalization and LLVMIR textual generation.
     [(#1530)](https://github.com/PennyLaneAI/catalyst/pull/1530)
 
+* Catalyst now decomposes non-differentiable gates when in a gradient method.
+  [(#1562)](https://github.com/PennyLaneAI/catalyst/pull/1562)
+
 * Changes to support a dynamic number of qubits:
 
   - The `qalloc_p` custom JAX primitive can now take in a dynamic number of qubits as a tracer
