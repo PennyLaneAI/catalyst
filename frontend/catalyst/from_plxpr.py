@@ -268,7 +268,7 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
         Insert all end qubits back into a qreg,
         and produce the product qreg jaxpr variable.
         """
-        self.actualized |= True
+        self.actualized = True
         for orig_wire, wire in self.wire_map.items():
             self.qreg = qinsert_p.bind(self.qreg, orig_wire, wire)
 
