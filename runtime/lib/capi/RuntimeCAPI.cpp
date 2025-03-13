@@ -968,6 +968,16 @@ void __catalyst__qis__Sample(MemRefT_double_2d *result, int64_t numQubits, ...)
     int64_t shots = getQuantumDevicePtr()->GetDeviceShots();
     RT_ASSERT(shots >= 0);
     RT_ASSERT(numQubits >= 0);
+    std::string error_msg = "return tensor must have 2D static shape equal to (number of shots, "
+                            "number of qubits in observable)";
+    RT_FAIL_IF(result->sizes[0] != shots, error_msg.c_str());
+    if (numQubits == 0) {
+        // measurement on all wires on the device
+        RT_FAIL_IF(result->sizes[1] != __catalyst__rt__num_qubits(), error_msg.c_str());
+    }
+    else {
+        RT_FAIL_IF(result->sizes[1] != numQubits, error_msg.c_str());
+    }
     MemRefT<double, 2> *result_p = (MemRefT<double, 2> *)result;
 
     va_list args;
