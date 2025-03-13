@@ -17,6 +17,7 @@
 # pylint: disable=line-too-long
 
 import jax
+import jax.numpy as jnp
 import numpy as np
 import pennylane as qml
 from utils import qjit_for_tests as qjit
@@ -233,13 +234,13 @@ def test_non_diff_in_grad_method(params: jax.core.ShapedArray([2], float)):
     @qml.qnode(qml.device("lightning.qubit", wires=6))
     def cost(params: jax.core.ShapedArray([2], float)):
         """Test non-differentiable operations are not decomposed."""
-        qml.BasisState(np.array([1, 1, 0, 0, 0, 0]), wires=range(6))
-        qml.Rot(0.3, 0.4, 0.5, wires=0)
+        qml.StatePrep(jnp.ones((2**2,), dtype=float) / 2, wires=range(2))
+        qml.Rot(*params, 0.5, wires=0)
         qml.DoubleExcitation(params[0], wires=[0, 1, 2, 3])
         qml.DoubleExcitation(params[1], wires=[0, 1, 4, 5])
         return qml.expval(qml.PauliZ(0))
 
-    # CHECK-NOT: set_basis_state
+    # CHECK-NOT: set_state
     # CHECK-NOT: Rot
     return grad(cost)(params)
 
@@ -255,18 +256,18 @@ def test_non_diff_ops_in_cost_and_grad(params: jax.core.ShapedArray([2], float))
     @qml.qnode(qml.device("lightning.qubit", wires=6))
     def cost(params: jax.core.ShapedArray([2], float)):
         """Test non-differentiable operations are not decomposed."""
-        qml.BasisState(np.array([1, 1, 0, 0, 0, 0]), wires=range(6))
-        qml.Rot(0.3, 0.4, 0.5, wires=0)
+        qml.StatePrep(jnp.ones((2**2,), dtype=float) / 2, wires=range(2))
+        qml.Rot(*params, 0.5, wires=0)
         qml.DoubleExcitation(params[0], wires=[0, 1, 2, 3])
         qml.DoubleExcitation(params[1], wires=[0, 1, 4, 5])
         return qml.expval(qml.PauliZ(0))
 
     # CHECK func.func public @cost
-    # CHECK: set_basis_state
+    # CHECK: set_state
     # CHECK: Rot
 
     # CHECK func.func public @cost_1
-    # CHECK-NOT: set_basis_state
+    # CHECK-NOT: set_state
     # CHECK-NOT: Rot
     return cost(params), grad(cost)(params)
 
