@@ -35,7 +35,13 @@ from pennylane.operation import Operation, StatePrepBase
 from pennylane.ops import Adjoint, CompositeOp, Controlled, ControlledOp, SymbolicOp
 from pennylane.tape import QuantumTape
 
-from catalyst.api_extensions import HybridAdjoint, HybridCtrl, MidCircuitMeasure
+from catalyst.api_extensions import HybridAdjoint, HybridCtrl
+from catalyst.device.op_support import (
+    EMPTY_PROPERTIES,
+    is_controllable,
+    is_differentiable,
+    is_invertible,
+)
 from catalyst.jax_tracer import HybridOp, has_nested_tapes, nested_quantum_regions
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.utils.exceptions import CompileError, DifferentiableCompileError
@@ -117,23 +123,9 @@ def verify_operations(tape: QuantumTape, grad_method, qjit_device):
 
     supported_ops = qjit_device.capabilities.operations
 
-    def _paramshift_op_checker(op):
-        if not isinstance(op, HybridOp):
-            if op.grad_method not in {"A", None}:
-                raise DifferentiableCompileError(
-                    f"{op.name} does not support analytic differentiation"
-                )
-
-    def _mcm_op_checker(op):
-        if isinstance(op, MidCircuitMeasure):
-            raise DifferentiableCompileError(f"{op.name} is not allowed in gradients")
-
-    def _adj_diff_op_checker(op):
-        if type(op) in (Controlled, ControlledOp) or isinstance(op, Adjoint):
-            op_name = op.base.name
-        else:
-            op_name = op.name
-        if not supported_ops.get(op_name, EMPTY_PROPERTIES).differentiable:
+    def _grad_method_op_checker(op, grad_method):
+        """Check if an operation supports the specified gradient method."""
+        if not is_differentiable(op, qjit_device.capabilities, grad_method):
             raise DifferentiableCompileError(
                 f"{op.name} is non-differentiable on '{qjit_device.original_device.name}' device"
             )
@@ -156,7 +148,7 @@ def verify_operations(tape: QuantumTape, grad_method, qjit_device):
         elif not in_control:
             return isinstance(op, HybridCtrl)
 
-        if not supported_ops.get(op.name, EMPTY_PROPERTIES).controllable:
+        if not is_controllable(op, qjit_device.capabilities):
             raise CompileError(
                 f"{op.name} is not controllable on '{qjit_device.original_device.name}' device"
             )
@@ -181,7 +173,7 @@ def verify_operations(tape: QuantumTape, grad_method, qjit_device):
         elif not in_inverse:
             return isinstance(op, HybridAdjoint)
 
-        if not supported_ops.get(op.name, EMPTY_PROPERTIES).invertible:
+        if not is_invertible(op, qjit_device.capabilities):
             raise CompileError(
                 f"{op.name} is not invertible on '{qjit_device.original_device.name}' device"
             )
@@ -212,11 +204,7 @@ def verify_operations(tape: QuantumTape, grad_method, qjit_device):
 
         # check validity based on grad method if using
         if grad_method is not None:
-            _mcm_op_checker(op)
-            if grad_method == "adjoint":
-                _adj_diff_op_checker(op)
-            elif grad_method == "parameter-shift":
-                _paramshift_op_checker(op)
+            _grad_method_op_checker(op, grad_method)
 
         return (in_inverse, in_control)
 

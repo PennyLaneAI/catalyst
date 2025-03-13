@@ -14,6 +14,8 @@
 
 """Test built-in differentiation support in Catalyst."""
 
+import platform
+
 import jax
 import numpy as np
 import pennylane as qml
@@ -36,6 +38,7 @@ from catalyst import (
     value_and_grad,
     vmap,
 )
+from catalyst.compiler import get_lib_path
 
 # pylint: disable=too-many-lines
 
@@ -1805,6 +1808,86 @@ def test_grad_argnums(argnums):
     _, result = value_and_grad(circuit, argnums=argnums)(weights, inputs)
     _, expected = jax.value_and_grad(circuit.original_function, argnums=argnums)(weights, inputs)
     assert compare_structure_and_value(result, expected)
+
+
+class TestGradientMethodErrors:
+    """Test errors for different gradient methods."""
+
+    @staticmethod
+    def get_custom_device(grad_method="fd", **kwargs):
+        """Generate a custom device with specified gradient method."""
+        lightning_device = qml.device("lightning.qubit", wires=0)
+
+        class CustomDevice(qml.devices.Device):
+            """Custom Gate Set Device"""
+
+            def __init__(self, shots=None, wires=None):
+                super().__init__(wires=wires, shots=shots)
+                self.qjit_capabilities = lightning_device.capabilities
+
+            def preprocess(self, execution_config=None):
+                """Device preprocessing function."""
+                program, config = lightning_device.preprocess(execution_config)
+                config.gradient_method = grad_method
+                return program, config
+
+            @staticmethod
+            def get_c_interface():
+                """Returns a tuple consisting of the device name, and
+                the location to the shared object with the C/C++ device implementation.
+                """
+                system_extension = ".dylib" if platform.system() == "Darwin" else ".so"
+                lib_path = (
+                    get_lib_path("runtime", "RUNTIME_LIB_DIR")
+                    + "/librtd_null_qubit"
+                    + system_extension
+                )
+                return "NullQubit", lib_path
+
+            def execute(self, _circuits, _execution_config):
+                """Raises: RuntimeError"""
+                raise RuntimeError("QJIT devices cannot execute tapes.")
+
+            def supports_derivatives(self, config, circuit=None):  # pylint: disable=unused-argument
+                """Pretend we support any derivatives"""
+                return True
+
+        return CustomDevice(**kwargs)
+
+    def test_device_grad_method_error(self):
+        """Test that using 'device' grad method raises appropriate error."""
+
+        @qml.qnode(self.get_custom_device(grad_method="device", wires=1))
+        def f(x: float):
+            qml.RX(x, wires=0)
+            return qml.expval(qml.PauliY(0))
+
+        with pytest.raises(
+            ValueError, match="The device does not provide a catalyst compatible gradient method"
+        ):
+            qjit(grad(f))
+
+    def test_finite_diff_grad_method_error(self):
+        """Test that using 'finite-diff' grad method raises appropriate error."""
+
+        @qml.qnode(self.get_custom_device(grad_method="finite-diff", wires=1))
+        def f(x: float):
+            qml.RX(x, wires=0)
+            return qml.expval(qml.PauliY(0))
+
+        with pytest.raises(ValueError, match="finite-diff gradient method is not supported"):
+            qjit(grad(f))
+
+    def test_invalid_grad_method_error(self):
+        """Test that using an invalid grad method raises appropriate error."""
+
+        @qml.qnode(self.get_custom_device(grad_method="invalid_method", wires=1))
+        def f(x: float):
+            qml.RX(x, wires=0)
+            return qml.expval(qml.PauliY(0))
+
+        with pytest.raises(ValueError, match="Invalid gradient method: invalid_method"):
+            qjit(grad(f))
 
 
 if __name__ == "__main__":

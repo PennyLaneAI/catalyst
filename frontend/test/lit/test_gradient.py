@@ -201,3 +201,74 @@ def test_higher_order_used_twice(x: float):
 
 
 print(test_higher_order_used_twice.mlir)
+
+
+# CHECK-LABEL: @test_non_diff
+@qjit(target="mlir")
+def test_non_diff(params: jax.core.ShapedArray([2], float)):
+    """Test non-differentiable operations are not decomposed."""
+
+    @qml.qnode(qml.device("lightning.qubit", wires=6))
+    def cost(params: jax.core.ShapedArray([2], float)):
+        """Test non-differentiable operations are not decomposed."""
+        qml.BasisState(np.array([1, 1, 0, 0, 0, 0]), wires=range(6))
+        qml.Rot(0.3, 0.4, 0.5, wires=0)
+        qml.DoubleExcitation(params[0], wires=[0, 1, 2, 3])
+        qml.DoubleExcitation(params[1], wires=[0, 1, 4, 5])
+        return qml.expval(qml.PauliZ(0))
+
+    # CHECK: set_basis_state
+    # CHECK: Rot
+    return cost(params)
+
+
+print(test_non_diff.mlir)
+
+
+# CHECK-LABEL: @test_non_diff_in_grad_method
+@qjit(target="mlir")
+def test_non_diff_in_grad_method(params: jax.core.ShapedArray([2], float)):
+    """Test non-differentiable operations are not decomposed."""
+
+    @qml.qnode(qml.device("lightning.qubit", wires=6))
+    def cost(params: jax.core.ShapedArray([2], float)):
+        """Test non-differentiable operations are not decomposed."""
+        qml.BasisState(np.array([1, 1, 0, 0, 0, 0]), wires=range(6))
+        qml.Rot(0.3, 0.4, 0.5, wires=0)
+        qml.DoubleExcitation(params[0], wires=[0, 1, 2, 3])
+        qml.DoubleExcitation(params[1], wires=[0, 1, 4, 5])
+        return qml.expval(qml.PauliZ(0))
+
+    # CHECK-NOT: set_basis_state
+    # CHECK-NOT: Rot
+    return grad(cost)(params)
+
+
+print(test_non_diff_in_grad_method.mlir)
+
+
+# CHECK-LABEL: @test_non_diff_ops_in_cost_and_grad
+@qjit(target="mlir")
+def test_non_diff_ops_in_cost_and_grad(params: jax.core.ShapedArray([2], float)):
+    """Test non-differentiable operations are not decomposed."""
+
+    @qml.qnode(qml.device("lightning.qubit", wires=6))
+    def cost(params: jax.core.ShapedArray([2], float)):
+        """Test non-differentiable operations are not decomposed."""
+        qml.BasisState(np.array([1, 1, 0, 0, 0, 0]), wires=range(6))
+        qml.Rot(0.3, 0.4, 0.5, wires=0)
+        qml.DoubleExcitation(params[0], wires=[0, 1, 2, 3])
+        qml.DoubleExcitation(params[1], wires=[0, 1, 4, 5])
+        return qml.expval(qml.PauliZ(0))
+
+    # CHECK func.func public @cost
+    # CHECK: set_basis_state
+    # CHECK: Rot
+
+    # CHECK func.func public @cost_1
+    # CHECK-NOT: set_basis_state
+    # CHECK-NOT: Rot
+    return cost(params), grad(cost)(params)
+
+
+print(test_non_diff_ops_in_cost_and_grad.mlir)
