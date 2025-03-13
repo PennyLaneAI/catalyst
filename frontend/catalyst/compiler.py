@@ -302,14 +302,10 @@ def _canonicalize(*args, stdin=None):
     return _opt(("--pass-pipeline", "builtin.module(canonicalize)"), *args, stdin=stdin)
 
 
-def _to_llvmir(*args, stdin=None, options: Optional[CompileOptions] = None):
-    """echo ${input} | catalyst *args -"""
-    # These are the options that may affect compilation
-    if not options:
-        return _catalyst(*args, stdin=stdin)
+def _options_to_opts(options):
+    """CompileOptions -> list[str|Tuple[str, str]]"""
 
     extra_args = []
-
     pipelines = options.get_pipelines()
     pipeline_str = ""
 
@@ -326,7 +322,17 @@ def _to_llvmir(*args, stdin=None, options: Optional[CompileOptions] = None):
     if options.checkpoint_stage:
         extra_args += [("--checkpoint-stage", options.checkpoint_stage)]
 
-    return _catalyst(*extra_args, *args, stdin=stdin)
+    return extra_args
+
+
+def _to_llvmir(*args, stdin=None, options: Optional[CompileOptions] = None):
+    """echo ${input} | catalyst *args -"""
+    # These are the options that may affect compilation
+    if not options:
+        return _catalyst(*args, stdin=stdin)
+
+    opts = _options_to_opts(options)
+    return _catalyst(*opts, *args, stdin=stdin)
 
 
 class Compiler:
