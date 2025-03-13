@@ -15,6 +15,7 @@
 import jax.numpy as jnp
 import pennylane as qml
 import pytest
+from jax.core import ShapedArray
 
 import catalyst
 
@@ -33,6 +34,15 @@ def circuit_aot_builder(dev):
         return qml.expval(qml.PauliY(wires=0))
 
     return catalyst_circuit_aot
+
+
+def is_unitary_rotated(mlir):
+    """Check in the MLIR if a unitary was rotated"""
+    return (
+        "quantum.unitary" not in mlir
+        and mlir.count('quantum.custom "RZ"') == 2
+        and mlir.count('quantum.custom "RY"') == 1
+    )
 
 
 # pylint: disable=too-many-public-methods
@@ -535,7 +545,7 @@ class TestCapture:
         experimental_capture_result = captured_func(0.1)
         assert no_capture_result == experimental_capture_result
 
-    def test_chained_transforms_workflow(self, backend):
+    def test_chained_catalyst_transforms_workflow(self, backend):
         """Test the integration for a circuit with a combination of 'merge_rotations'
         and 'cancel_inverses' transforms."""
 
@@ -578,4 +588,84 @@ class TestCapture:
             == no_capture_rotations_inverses_result
             == inverses_rotations_result
             == rotations_inverses_result
+        )
+
+    def test_transform_unitary_to_rot_workflow(self, backend):
+        """Test the integration for a circuit with a 'unitary_to_rot' transform."""
+
+        def func(U: ShapedArray([2, 2], float)):
+            @qml.transforms.unitary_to_rot
+            @qml.qnode(qml.device(backend, wires=1))
+            def circuit(U: ShapedArray([2, 2], float)):
+                qml.QubitUnitary(U, 0)
+                return qml.expval(qml.Z(0))
+
+            return circuit(U)
+
+        captured_func = qml.qjit(func, experimental_capture=True, target="mlir")
+        assert is_unitary_rotated(captured_func.mlir)
+
+        U = qml.Rot(1.0, 2.0, 3.0, wires=0)
+
+        no_capture_result = qml.qjit(func)(U.matrix())
+        experimental_capture_result = captured_func(U.matrix())
+        assert no_capture_result == experimental_capture_result
+
+    def test_mixed_transforms_workflow(self, backend):
+        """Test the integration for a circuit with a combination of 'unitary_to_rot'
+        and 'cancel_inverses' transforms."""
+
+        @qml.qnode(qml.device(backend, wires=1))
+        def circuit(U: ShapedArray([2, 2], float)):
+            qml.QubitUnitary(U, 0)
+            qml.Hadamard(wires=0)
+            qml.Hadamard(wires=0)
+            return qml.expval(qml.PauliZ(0))
+
+        # Case 1: During plxpr interpretation, first comes the PL transform
+        # with Catalyst counterpart, second comes the PL transform without it
+
+        def inverses_unitary(U: ShapedArray([2, 2], float)):
+            return qml.transforms.cancel_inverses(qml.transforms.unitary_to_rot(circuit))(U)
+
+        inverses_unitary_func = qml.qjit(inverses_unitary, experimental_capture=True, target="mlir")
+
+        # Catalyst 'cancel_inverses' should have been scheduled as a pass
+        # whereas PL 'unitary_to_rot' should have been expanded
+        assert (
+            'transform.apply_registered_pass "remove-chained-self-inverse"'
+            in inverses_unitary_func.mlir
+        )
+        assert is_unitary_rotated(inverses_unitary_func.mlir)
+
+        # Case 2: During plxpr interpretation, first comes the PL transform
+        # without Catalyst counterpart, second comes the PL transform with it
+
+        def unitary_inverses(U: ShapedArray([2, 2], float)):
+            return qml.transforms.unitary_to_rot(qml.transforms.cancel_inverses(circuit))(U)
+
+        unitary_inverses_func = qml.qjit(unitary_inverses, experimental_capture=True, target="mlir")
+
+        # Both PL transforms should have been expaned and no Catalyst pass should have been
+        # scheduled
+        assert (
+            'transform.apply_registered_pass "remove-chained-self-inverse"'
+            not in unitary_inverses_func.mlir
+        )
+        assert 'quantum.custom "Hadamard"' not in unitary_inverses_func.mlir
+        assert is_unitary_rotated(unitary_inverses_func.mlir)
+
+        # Correctness assertions
+
+        U = qml.Rot(1.0, 2.0, 3.0, wires=0)
+
+        no_capture_inverses_unitary_result = qml.qjit(inverses_unitary)(U.matrix())
+        no_capture_unitary_inverses_result = qml.qjit(unitary_inverses)(U.matrix())
+        inverses_unitary_result = inverses_unitary_func(U.matrix())
+        unitary_inverses_result = unitary_inverses_func(U.matrix())
+        assert (
+            no_capture_inverses_unitary_result
+            == no_capture_unitary_inverses_result
+            == inverses_unitary_result
+            == unitary_inverses_result
         )
