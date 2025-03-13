@@ -433,6 +433,28 @@ def qjit(
 
         the ``sum_abstracted`` function would only compile once and its definition would be
         reused for subsequent function calls.
+
+    .. details::
+        :title: Qubit-invariant compilation
+
+        A powerful feature of Catalyst is that the same compiled qnode can be evoked with
+        different number of qubits. The syntax to do this is just how you would expect:
+
+        .. code-block:: python
+
+            @qjit
+            def workflow(num_qubits):
+                @qml.qnode(qml.device("lightning.qubit", wires=num_qubits))
+                def circuit():
+                    qml.Hadamard(wires=0)
+                    qml.RX(1.1, wires=num_qubits-1)
+                    return qml.probs()
+                return circuit()
+
+        >>> workflow(3)  # the first call, compilation occurs here
+        Array(0., dtype=float64)
+        >>> workflow(4)  # the precompiled quantum function is called
+        Array(0., dtype=float64)
     """
     kwargs = copy.copy(locals())
     kwargs.pop("fn")
