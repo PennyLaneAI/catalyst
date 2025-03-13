@@ -264,12 +264,8 @@ class LinkerDriver:
         raise CompileError(msg)
 
 
-def _catalyst(*args, stdin=None):
-    """Raw interface to catalyst
-
-    echo ${stdin} | catalyst *args -
-    catalyst *args
-    """
+def _get_cmd(*args, stdin=None):
+    """Just get the command, do not run it"""
     cli_path = get_cli_path()
     if not path.isfile(cli_path):
         raise FileNotFoundError("catalyst executable was not found.")  # pragma: nocover
@@ -277,13 +273,23 @@ def _catalyst(*args, stdin=None):
     cmd = [cli_path]
     for arg in args:
         if isinstance(arg, tuple):
-            cmd += [str(arg[0]) + "=" + str(arg[1])]
+            cmd += [str(arg[0]), str(arg[1])]
         else:
             cmd += [str(arg)]
 
     if stdin:
         cmd += ["-"]
 
+    return cmd
+
+
+def _catalyst(*args, stdin=None):
+    """Raw interface to catalyst
+
+    echo ${stdin} | catalyst *args -
+    catalyst *args
+    """
+    cmd = _get_cmd(*args, stdin=stdin)
     result = subprocess.run(cmd, input=stdin, check=True, capture_output=True, text=True)
     return result.stdout
 
@@ -322,6 +328,15 @@ def _options_to_opts(options):
     if options.checkpoint_stage:
         extra_args += [("--checkpoint-stage", options.checkpoint_stage)]
 
+    if not options.lower_to_llvm:
+        extra_args += [("--tool", "opt")]
+
+    if options.keep_intermediate:
+        extra_args += ["--keep-intermediate"]
+
+    if options.verbose:
+        extra_args += ["--verbose"]
+
     return extra_args
 
 
@@ -352,38 +367,15 @@ class Compiler:
         Returns:
             cmd (str): The command to be executed.
         """
-        cli_build_path = get_cli_path()
-        if not path.isfile(cli_build_path):
-            raise FileNotFoundError("catalyst executable was not found.")  # pragma: nocover
-        cmd = [cli_build_path]
-        cmd += [tmp_infile_name, "-o", output_ir_name]
-        cmd += ["--module-name", module_name, "--workspace", str(workspace)]
-        if not self.options.lower_to_llvm:
-            cmd += ["--tool", "opt"]
-        if self.options.pass_plugins:
-            plugins = self.options.pass_plugins
-            for plugin in plugins:
-                cmd += ["--load-pass-plugin", str(plugin)]
-        if self.options.dialect_plugins:
-            plugins = self.options.dialect_plugins
-            for plugin in plugins:
-                cmd += ["--load-dialect-plugin", str(plugin)]
-        if self.options.keep_intermediate:
-            cmd += ["--keep-intermediate"]
-        if self.options.verbose:
-            cmd += ["--verbose"]
-        if self.options.checkpoint_stage:
-            cmd += ["--checkpoint-stage", self.options.checkpoint_stage]
-
-        cmd += ["-verify-each=false"]
-
-        pipeline_str = ""
-        for pipeline in self.options.get_pipelines():
-            pipeline_name, passes = pipeline
-            passes_str = ";".join(passes)
-            pipeline_str += f"{pipeline_name}({passes_str}),"
-        cmd += ["--catalyst-pipeline", pipeline_str]
-
+        opts = _options_to_opts(self.options)
+        cmd = _get_cmd(
+            ("-o", output_ir_name),
+            ("--module-name", module_name),
+            ("--workspace", str(workspace)),
+            "-verify-each=false",
+            *opts,
+            tmp_infile_name,
+        )
         return cmd
 
     @debug_logger
