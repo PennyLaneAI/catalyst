@@ -126,6 +126,12 @@ def AllocOp : Memory_Op<"alloc", [NoMemoryEffect]> {
     let assemblyFormat = [{
         `(` ($nqubits^):($nqubits_attr)? `)` attr-dict `:` type(results)
     }];
+
+    let extraClassDeclaration = [{
+        bool isStaticSize() {
+            return (this->getNqubits() == nullptr);
+        }
+    }];
 }
 
 
@@ -642,6 +648,7 @@ def ComputationalBasisOp : Observable_Op<"compbasis", [AttrSizedOperandSegments]
         The `quantum.compbasis` operation defines a quantum observable to be used by other
         operations such as measurement processes. The specific observable defined here is a
         "pseudo" observable to represent measurements in the computational basis.
+
         The only arguments are either the list of qubits to measure, or the quantum register
         to measure. When the argument is a register, the measurement occurs on all qubits in
         the register.

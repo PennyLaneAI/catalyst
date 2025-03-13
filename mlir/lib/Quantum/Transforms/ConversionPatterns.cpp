@@ -527,6 +527,7 @@ struct ComputationalBasisOpPattern : public OpConversionPattern<ComputationalBas
     {
         // We use a temporary unrealized conversion op to send the SSA values
         // of the compbasis op to the measurement ops
+
         // This is because as a full dialect conversion pass, we cannot simply
         // keep the original compbasis op in the quantum dialect
 
@@ -539,8 +540,14 @@ struct ComputationalBasisOpPattern : public OpConversionPattern<ComputationalBas
         MLIRContext *ctx = getContext();
         const TypeConverter *conv = getTypeConverter();
 
+        SmallVector<Value> args;
+        if (adaptor.getQubits().size() != 0) {
+            ValueRange qubits = adaptor.getQubits();
+            args.insert(args.end(), qubits.begin(), qubits.end());
+        }
+
         rewriter.replaceOpWithNewOp<UnrealizedConversionCastOp>(
-            op, conv->convertType(ObservableType::get(ctx)), adaptor.getQubits());
+            op, conv->convertType(ObservableType::get(ctx)), args);
 
         return success();
     }
@@ -743,7 +750,10 @@ template <typename T> class SampleBasedPattern : public OpConversionPattern<T> {
         // ComputationalBasisOp lowering. Improve this once the runtime interface changes to
         // accept observables for sample.
         assert(isa<UnrealizedConversionCastOp>(adaptor.getObs().getDefiningOp()));
-        ValueRange qubits = adaptor.getObs().getDefiningOp()->getOperands();
+        SmallVector<Value> qubits = adaptor.getObs().getDefiningOp()->getOperands();
+
+        // TODO: handle qubits_and_numqubits for sample and counts
+        //qubits.pop_back();
 
         Value numQubits =
             rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(qubits.size()));
@@ -883,20 +893,36 @@ template <typename T> struct StateBasedPattern : public OpConversionPattern<T> {
         // For now obtain the qubit values from an unrealized cast created by the
         // ComputationalBasisOp lowering. Improve this once the runtime interface changes to
         // accept observables for sample.
-        assert(isa<UnrealizedConversionCastOp>(adaptor.getObs().getDefiningOp()));
-        ValueRange qubits = adaptor.getObs().getDefiningOp()->getOperands();
+        Operation *ucc = adaptor.getObs().getDefiningOp();
+        assert(isa<UnrealizedConversionCastOp>(ucc));
+        //StringRef mode = cast<StringAttr>(ucc->getAttr("mode")).strref();
+        SmallVector<Value> qubits = ucc->getOperands();
 
         SmallVector<Value> args = {structPtr};
         if constexpr (std::is_same_v<T, ProbsOp>) {
-            Value numQubits =
-                rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(qubits.size()));
-            args.push_back(numQubits);
-            args.insert(args.end(), qubits.begin(), qubits.end());
+            //if (mode == "qubits"){
+            if (qubits.size() > 0){
+                // with explicit qubits
+                SmallVector<Value> qubits = ucc->getOperands();
+                Value numQubits =
+                    rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(qubits.size()));
+                args.push_back(numQubits);
+                args.insert(args.end(), qubits.begin(), qubits.end());
+            //} else if (mode == "qreg"){
+            } else if (qubits.size() == 0){
+                // without explcit qubits
+                //Value numQubits = ucc->getOperands()[1];
+                Value numQubits = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(0));
+                args.push_back(numQubits);
+            }
         }
         else {
-            // __catalyst__qis__State does not support individual qubit measurements yet, so it must
+            // __catalyst__qis__State does not support individual qubit measurements, so it must
             // be invoked without specific specific qubits (i.e. measure the whole register).
             Value numQubits = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(0));
+                Value false_value =
+                    rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI1Type(), rewriter.getBoolAttr(false));
+                args.push_back(false_value);
             args.push_back(numQubits);
         }
 

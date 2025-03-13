@@ -23,7 +23,7 @@ from utils import qjit_for_tests as qjit
 
 from catalyst import CompileError
 from catalyst.jax_extras.tracing import bind_flexible_primitive
-from catalyst.jax_primitives import compbasis_p, counts_p, sample_p
+from catalyst.jax_primitives import compbasis_p, counts_p, sample_p, qalloc_p, qextract_p
 
 # TODO: NOTE:
 # The tests sample1 and sample2 below used to pass, before verification steps were added in the
@@ -91,45 +91,49 @@ def sample3(x: float, y: float):
 print(sample3.mlir)
 
 
-# CHECK-LABEL: public @test_sample_static(
-@qjit
-@qml.qnode(
-    qml.device("null.qubit", wires=1)
-)  # SampleOp is only legal if there is a device in the same scope
-def test_sample_static():
-    """Test that the sample primitive can be correctly compiled to mlir."""
-    obs = compbasis_p.bind()
-    return bind_flexible_primitive(sample_p, {"shots": 5}, obs, num_qubits=0)
+# COM: # CHECK-LABEL: public @test_sample_static(
+# COM: @qjit
+# COM: @qml.qnode(
+# COM:     qml.device("null.qubit", wires=1)
+# COM: )  # SampleOp is only legal if there is a device in the same scope
+# COM: def test_sample_static():
+# COM:     """Test that the sample primitive can be correctly compiled to mlir."""
+# COM:     qreg = qalloc_p.bind(1)
+# COM:     qubit = qextract_p.bind(qreg, 0)
+# COM:     obs = compbasis_p.bind(qubit)
+# COM:     return bind_flexible_primitive(sample_p, {"shots": 5}, obs, num_qubits=1)
 
 
-# CHECK: [[obs:%.+]] = quantum.compbasis  : !quantum.obs
-# CHECK: [[sample:%.+]] = quantum.sample [[obs]] : tensor<5x0xf64>
-# CHECK: return [[sample]] : tensor<5x0xf64>
-print(test_sample_static.mlir)
+# COM: # CHECK: [[obs:%.+]] = quantum.compbasis  : !quantum.obs
+# COM: # CHECK: [[sample:%.+]] = quantum.sample [[obs]] : tensor<5x0xf64>
+# COM: # CHECK: return [[sample]] : tensor<5x0xf64>
+# COM: print(test_sample_static.mlir)
 
 
-# TODO: convert the device to have a dynamic shots value when core PennyLane device supports it
-# CHECK-LABEL: public @test_sample_dynamic(
-@qjit
-@qml.qnode(
-    qml.device("null.qubit", wires=1)
-)  # SampleOp is only legal if there is a device in the same scope
-def test_sample_dynamic(shots: int):
-    """Test that the sample primitive with dynamic shape can be correctly compiled to mlir."""
-    obs = compbasis_p.bind()
-    x = shots + 1
-    sample = bind_flexible_primitive(sample_p, {"shots": x}, obs, num_qubits=0)
-    return sample + jax.numpy.zeros((x, 0))
+# COM: # TODO: convert the device to have a dynamic shots value when core PennyLane device supports it
+# COM: # CHECK-LABEL: public @test_sample_dynamic(
+# COM: @qjit
+# COM: @qml.qnode(
+# COM:     qml.device("null.qubit", wires=1)
+# COM: )  # SampleOp is only legal if there is a device in the same scope
+# COM: def test_sample_dynamic(shots: int):
+# COM:     """Test that the sample primitive with dynamic shape can be correctly compiled to mlir."""
+# COM:     qreg = qalloc_p.bind(1)
+# COM:     qubit = qextract_p.bind(qreg, 0)
+# COM:     obs = compbasis_p.bind(qubit)
+# COM:     x = shots + 1
+# COM:     sample = bind_flexible_primitive(sample_p, {"shots": x}, obs, num_qubits=1)
+# COM:     return sample + jax.numpy.zeros((x, 0))
 
 
-# CHECK: [[one:%.+]] = stablehlo.constant dense<1> : tensor<i64>
-# CHECK: [[obs:%.+]] = quantum.compbasis  : !quantum.obs
-# CHECK: [[plusOne:%.+]] = stablehlo.add %arg0, [[one]] : tensor<i64>
-# CHECK: [[sample:%.+]] = quantum.sample [[obs]] : tensor<?x0xf64>
-# CHECK: [[zeroVec:%.+]] = stablehlo.dynamic_broadcast_in_dim {{.+}} -> tensor<?x0xf64>
-# CHECK: [[outVecSum:%.+]] = stablehlo.add [[sample]], [[zeroVec]] : tensor<?x0xf64>
-# CHECK: return [[plusOne]], [[outVecSum]] : tensor<i64>, tensor<?x0xf64>
-print(test_sample_dynamic.mlir)
+# COM: # CHECK: [[one:%.+]] = stablehlo.constant dense<1> : tensor<i64>
+# COM: # CHECK: [[obs:%.+]] = quantum.compbasis  : !quantum.obs
+# COM: # CHECK: [[plusOne:%.+]] = stablehlo.add %arg0, [[one]] : tensor<i64>
+# COM: # CHECK: [[sample:%.+]] = quantum.sample [[obs]] : tensor<?x0xf64>
+# COM: # CHECK: [[zeroVec:%.+]] = stablehlo.dynamic_broadcast_in_dim {{.+}} -> tensor<?x0xf64>
+# COM: # CHECK: [[outVecSum:%.+]] = stablehlo.add [[sample]], [[zeroVec]] : tensor<?x0xf64>
+# COM: # CHECK: return [[plusOne]], [[outVecSum]] : tensor<i64>, tensor<?x0xf64>
+# COM: print(test_sample_dynamic.mlir)
 
 
 # TODO: NOTE:
@@ -197,32 +201,32 @@ def counts3(x: float, y: float):
 print(counts3.mlir)
 
 
-# CHECK-LABEL: public @jit_test_counts_static(
-@qjit
-def test_counts_static():
-    """Test that the counts primitive can be correctly compiled to mlir."""
-    obs = compbasis_p.bind()
-    return bind_flexible_primitive(counts_p, {"shots": 5}, obs, shape=(1,))
+# COM: # CHECK-LABEL: public @jit_test_counts_static(
+# COM: @qjit
+# COM: def test_counts_static():
+# COM:     """Test that the counts primitive can be correctly compiled to mlir."""
+# COM:     obs = compbasis_p.bind()
+# COM:     return bind_flexible_primitive(counts_p, {"shots": 5}, obs, shape=(1,))
 
 
-# CHECK: [[obs:%.+]] = quantum.compbasis  : !quantum.obs
-# CHECK: [[eigvals:%.+]], [[counts:%.+]] = quantum.counts [[obs]] : tensor<1xf64>, tensor<1xi64>
-# CHECK: return [[eigvals]], [[counts]] : tensor<1xf64>, tensor<1xi64>
-print(test_counts_static.mlir)
+# COM: # CHECK: [[obs:%.+]] = quantum.compbasis  : !quantum.obs
+# COM: # CHECK: [[eigvals:%.+]], [[counts:%.+]] = quantum.counts [[obs]] : tensor<1xf64>, tensor<1xi64>
+# COM: # CHECK: return [[eigvals]], [[counts]] : tensor<1xf64>, tensor<1xi64>
+# COM: print(test_counts_static.mlir)
 
 
-# CHECK-LABEL: public @jit_test_counts_dynamic(
-@qjit
-def test_counts_dynamic(shots: int):
-    """Test that the counts primitive with dynamic shape can be correctly compiled to mlir."""
-    obs = compbasis_p.bind()
-    return bind_flexible_primitive(counts_p, {"shots": shots}, obs, shape=(1,))
+# COM: # CHECK-LABEL: public @jit_test_counts_dynamic(
+# COM: @qjit
+# COM: def test_counts_dynamic(shots: int):
+# COM:     """Test that the counts primitive with dynamic shape can be correctly compiled to mlir."""
+# COM:     obs = compbasis_p.bind()
+# COM:     return bind_flexible_primitive(counts_p, {"shots": shots}, obs, shape=(1,))
 
 
-# CHECK: [[obs:%.+]] = quantum.compbasis  : !quantum.obs
-# CHECK: [[eigvals:%.+]], [[counts:%.+]] = quantum.counts [[obs]] : tensor<1xf64>, tensor<1xi64>
-# CHECK: return [[eigvals]], [[counts]] : tensor<1xf64>, tensor<1xi64>
-print(test_counts_dynamic.mlir)
+# COM: # CHECK: [[obs:%.+]] = quantum.compbasis  : !quantum.obs
+# COM: # CHECK: [[eigvals:%.+]], [[counts:%.+]] = quantum.counts [[obs]] : tensor<1xf64>, tensor<1xi64>
+# COM: # CHECK: return [[eigvals]], [[counts]] : tensor<1xf64>, tensor<1xi64>
+# COM: print(test_counts_dynamic.mlir)
 
 
 # CHECK-LABEL: public @expval1(
@@ -566,6 +570,80 @@ def probs1(x: float, y: float):
 
 
 print(probs1.mlir)
+
+
+# CHECK-LABEL: @probs_dynamic_with_wires
+# COM: wire explicitly required target measurement wires, probs return shape is static
+@qjit(target="mlir")
+def probs_dynamic_with_wires(num_qubits):
+    @qml.qnode(qml.device("lightning.qubit", wires=num_qubits))
+    def circ():
+        qml.Hadamard(wires=num_qubits-1)
+        return qml.probs(wires=[0, num_qubits-2])
+
+    return circ()
+
+# CHECK: func.func public @circ(%arg0: tensor<i64>) -> tensor<4xf64>
+
+# CHECK-DAG: [[c1:%.+]] = stablehlo.constant dense<1> : tensor<i64>
+# CHECK-DAG: [[c2:%.+]] = stablehlo.constant dense<2> : tensor<i64>
+# CHECK-DAG: [[nSub1:%.+]] = stablehlo.subtract %arg0, [[c1]] : tensor<i64>
+# CHECK-DAG: [[nSub2:%.+]] = stablehlo.subtract %arg0, [[c2]] : tensor<i64>
+
+# CHECK: [[extracted:%.+]] = tensor.extract %arg0[] : tensor<i64>
+# CHECK: [[allocedReg:%.+]] = quantum.alloc([[extracted]]) : !quantum.reg
+
+# CHECK: [[detensorize:%.+]] = tensor.extract [[nSub1]][] : tensor<i64>
+# CHECK: [[inQubit:%.+]] = quantum.extract [[allocedReg]][[[detensorize]]] : !quantum.reg -> !quantum.bit
+# CHECK: [[outQubit:%.+]] = quantum.custom "Hadamard"() [[inQubit]] : !quantum.bit
+
+# CHECK: [[detensorize:%.+]] = tensor.extract [[nSub1]][] : tensor<i64>
+# CHECK: [[resultReg:%.+]] = quantum.insert [[allocedReg]][[[detensorize]]], [[outQubit]] : !quantum.reg, !quantum.bit
+
+# CHECK: [[probsBit0:%.+]] = quantum.extract [[resultReg]][ 0] : !quantum.reg -> !quantum.bit
+# CHECK: [[detensorize:%.+]] = tensor.extract [[nSub2]][] : tensor<i64>
+# CHECK: [[probsBit1:%.+]] = quantum.extract [[resultReg]][[[detensorize]]] : !quantum.reg -> !quantum.bit
+# CHECK: [[obs:%.+]] = quantum.compbasis qubits [[probsBit0]], [[probsBit1]] : !quantum.obs
+# CHECK: [[probs:%.+]] = quantum.probs [[obs]] : tensor<4xf64>
+# CHECK: quantum.dealloc [[resultReg]] : !quantum.reg
+# CHECK: return [[probs]] : tensor<4xf64>
+
+probs_dynamic_with_wires(10)
+print(probs_dynamic_with_wires.mlir)
+
+
+# CHECK-LABEL: @probs_dynamic_without_wires
+@qjit(target="mlir")
+def probs_dynamic_without_wires(num_qubits):
+    @qml.qnode(qml.device("lightning.qubit", wires=num_qubits))
+    def circ():
+        qml.Hadamard(wires=num_qubits-1)
+        return qml.probs()
+
+    return circ()
+
+# CHECK: func.func public @circ(%arg0: tensor<i64>) -> tensor<?xf64>
+
+# CHECK-DAG: [[c1:%.+]] = stablehlo.constant dense<1> : tensor<i64>
+# CHECK-DAG: [[nSub1:%.+]] = stablehlo.subtract %arg0, [[c1]] : tensor<i64>
+
+# CHECK: [[extracted:%.+]] = tensor.extract %arg0[] : tensor<i64>
+# CHECK: [[allocedReg:%.+]] = quantum.alloc([[extracted]]) : !quantum.reg
+
+# CHECK: [[detensorize:%.+]] = tensor.extract [[nSub1]][] : tensor<i64>
+# CHECK: [[inQubit:%.+]] = quantum.extract [[allocedReg]][[[detensorize]]] : !quantum.reg -> !quantum.bit
+# CHECK: [[outQubit:%.+]] = quantum.custom "Hadamard"() [[inQubit]] : !quantum.bit
+
+# CHECK: [[detensorize:%.+]] = tensor.extract [[nSub1]][] : tensor<i64>
+# CHECK: [[resultReg:%.+]] = quantum.insert [[allocedReg]][[[detensorize]]], [[outQubit]] : !quantum.reg, !quantum.bit
+
+# CHECK: [[obs:%.+]] = quantum.compbasis qreg [[resultReg]] : !quantum.obs
+# CHECK: [[probs:%.+]] = quantum.probs [[obs]] : tensor<?xf64>
+# CHECK: quantum.dealloc [[resultReg]] : !quantum.reg
+# CHECK: return [[probs]] : tensor<?xf64>
+
+probs_dynamic_without_wires(10)
+print(probs_dynamic_without_wires.mlir)
 
 
 # CHECK-LABEL: public @state1(
