@@ -827,6 +827,12 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         outfile->os() << *mlirModule;
         outfile->keep();
     }
+
+    if (options.keepIntermediate and output.outputFilename != "-") {
+        outfile->os() << output.outIR;
+        outfile->keep();
+    }
+
     if (!outfile) {
         llvm::errs() << errorMessage << "\n";
         return failure();
