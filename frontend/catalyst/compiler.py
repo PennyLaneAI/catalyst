@@ -264,6 +264,21 @@ class LinkerDriver:
         raise CompileError(msg)
 
 
+def opt(*args, input=None, **kwargs):
+    """catalyst --tool=opt *args, **kwargs - < ${input}"""
+    cli_path = get_cli_path()
+    if not path.isfile(cli_path):
+        raise FileNotFoundError("catalyst executable was not found.")  # pragma: nocover
+    cmd = [cli_path]
+    cmd += ["--tool=opt"]
+    cmd += [str(arg) for arg in args]
+    cmd += [str(k).replace("_", "-") + "=" + str(v) for k, v in kwargs.items()]
+    if input:
+        cmd += ["-"]
+    result = subprocess.run(cmd, input=input, check=True, capture_output=True, text=True)
+    return result.stdout
+
+
 class Compiler:
     """Compiles MLIR modules to shared objects by executing the Catalyst compiler driver library."""
 

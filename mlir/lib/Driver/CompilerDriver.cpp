@@ -462,6 +462,12 @@ LogicalResult runEnzymePasses(const CompilerOptions &options,
 
 std::string readInputFile(const std::string &filename)
 {
+    if (filename == "-") {
+        std::stringstream buffer;
+        std::istreambuf_iterator<char> begin(std::cin), end;
+        buffer << std::string(begin, end);
+        return buffer.str();
+    }
     std::ifstream file(filename);
     if (!file.is_open()) {
         return "";
@@ -816,7 +822,8 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
     if (options.loweringAction == Action::OPT) {
         outfile->os() << *mlirModule;
         outfile->keep();
-    } else if (options.keepIntermediate) {
+    }
+    else if (options.keepIntermediate) {
         outfile->os() << output.outIR;
         outfile->keep();
     }
