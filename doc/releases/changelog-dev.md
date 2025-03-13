@@ -94,6 +94,9 @@
   - Lazy IR canonicalization and LLVMIR textual generation.
     [(#1530)](https://github.com/PennyLaneAI/catalyst/pull/1530)
 
+* Catalyst now decomposes non-differentiable gates when in a gradient method.
+  [(#1562)](https://github.com/PennyLaneAI/catalyst/pull/1562)
+
 <h3>Breaking changes 💔</h3>
 
 <h3>Deprecations 👋</h3>
