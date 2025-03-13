@@ -438,23 +438,34 @@ def qjit(
         :title: Qubit-invariant compilation
 
         A powerful feature of Catalyst is that the same compiled qnode can be evoked with
-        different number of qubits. The syntax to do this is just how you would expect:
+        different number of qubits. This is especially helpful for workflows where you would
+        like to, for example, iterate through the wires without knowing how many of them
+        there are in advance.
+
+        The syntax to do this is exactly what you would expect: you can pass an argument to the
+        qjitted function to represent the number of wires.
 
         .. code-block:: python
 
             @qjit
             def workflow(num_qubits):
-                @qml.qnode(qml.device("lightning.qubit", wires=num_qubits))
+                dev = qml.device("lightning.qubit", wires=num_qubits)
+
+                @qml.qnode(dev)
                 def circuit():
-                    qml.Hadamard(wires=0)
-                    qml.RX(1.1, wires=num_qubits-1)
+                    @catalyst.for_loop(0, num_qubits, 1)
+                    def entangle_all_qubits(i):
+                        qml.Hadamard(wires=i)
+                    entangle_all_qubits()
+
                     return qml.probs()
+
                 return circuit()
 
-        >>> workflow(3)  # the first call, compilation occurs here
-        Array(0., dtype=float64)
-        >>> workflow(4)  # the precompiled quantum function is called
-        Array(0., dtype=float64)
+        >>> workflow(2)  # the first call, compilation occurs here
+        [0.25 0.25 0.25 0.25]
+        >>> workflow(3)  # the precompiled quantum function is called
+        [0.125 0.125 0.125 0.125 0.125 0.125 0.125 0.125]
     """
     kwargs = copy.copy(locals())
     kwargs.pop("fn")
