@@ -898,11 +898,7 @@ void __catalyst__qis__State(MemRefT_CplxT_double_1d *result, int64_t numQubits, 
 {
     RT_ASSERT(numQubits >= 0);
     std::string error_msg = "return tensor must have static length equal to 2^(number of qubits)";
-    if (numQubits == 0) {
-        // measurement on all wires on the device
-        RT_FAIL_IF(result->sizes[0] != 1u << __catalyst__rt__num_qubits(), error_msg.c_str());
-    }
-    else {
+    if (numQubits != 0) {
         RT_FAIL("Partial State-Vector not supported yet");
         // RT_FAIL_IF(result->sizes[0] != 1u << numQubits, error_msg.c_str());
     }
@@ -934,11 +930,7 @@ void __catalyst__qis__Probs(MemRefT_double_1d *result, int64_t numQubits, ...)
 {
     RT_ASSERT(numQubits >= 0);
     std::string error_msg = "return tensor must have static length equal to 2^(number of qubits)";
-    if (numQubits == 0) {
-        // measurement on all wires on the device
-        RT_FAIL_IF(result->sizes[0] != 1u << __catalyst__rt__num_qubits(), error_msg.c_str());
-    }
-    else {
+    if (numQubits != 0) {
         RT_FAIL_IF(result->sizes[0] != 1u << numQubits, error_msg.c_str());
     }
 
@@ -970,12 +962,7 @@ void __catalyst__qis__Sample(MemRefT_double_2d *result, int64_t numQubits, ...)
     RT_ASSERT(numQubits >= 0);
     std::string error_msg = "return tensor must have 2D static shape equal to (number of shots, "
                             "number of qubits in observable)";
-    RT_FAIL_IF(result->sizes[0] != shots, error_msg.c_str());
-    if (numQubits == 0) {
-        // measurement on all wires on the device
-        RT_FAIL_IF(result->sizes[1] != __catalyst__rt__num_qubits(), error_msg.c_str());
-    }
-    else {
+    if (numQubits != 0) {
         RT_FAIL_IF(result->sizes[1] != numQubits, error_msg.c_str());
     }
     MemRefT<double, 2> *result_p = (MemRefT<double, 2> *)result;
@@ -1006,11 +993,7 @@ void __catalyst__qis__Counts(PairT_MemRefT_double_int64_1d *result, int64_t numQ
     RT_ASSERT(numQubits >= 0);
     RT_ASSERT(result->first.sizes[0] == result->second.sizes[0]);
     std::string error_msg = "number of eigenvalues or counts did not match observable";
-    if (numQubits == 0) {
-        // measurement on all wires on the device
-        RT_FAIL_IF(result->first.sizes[0] != 1u << __catalyst__rt__num_qubits(), error_msg.c_str());
-    }
-    else {
+    if (numQubits != 0) {
         RT_FAIL_IF(result->first.sizes[0] != 1u << numQubits, error_msg.c_str());
     }
 
