@@ -223,7 +223,7 @@ def catalyst_acceptance(
         if match and is_controllable(op.base, capabilities):
             return match
 
-    elif not is_differentiable(op, capabilities, grad_method) and op.has_decomposition:
+    elif not is_differentiable(op, capabilities, grad_method):
         return None
 
     elif is_supported(op, capabilities):
