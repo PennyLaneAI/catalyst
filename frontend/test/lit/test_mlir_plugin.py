@@ -67,8 +67,7 @@ import pennylane as qml
 from utils import qjit_for_tests as qjit_cleanup
 
 import catalyst
-from catalyst.compiler import CompileOptions, Compiler, _opt
-from catalyst.utils.filesystem import WorkspaceManager
+from catalyst.compiler import _opt
 from catalyst.utils.runtime_environment import get_bin_path
 
 mlir_module = """

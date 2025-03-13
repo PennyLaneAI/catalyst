@@ -16,13 +16,12 @@
 
 # RUN: %PYTHON %s | FileCheck %s
 
-from textwrap import dedent
-
 from catalyst.compiler import _canonicalize, _opt, _to_llvmir
 
 
 def test_opt_happy_path():
     """Test functionality of opt-tool"""
+
     mlir = """
     module {
         // CHECK: llvm.func @foo
@@ -39,6 +38,8 @@ test_opt_happy_path()
 
 
 def test_opt_canonicalize():
+    """Test functionality of canonicalization"""
+
     mlir = """
     module {
         // CHECK: func.func @foo
@@ -55,6 +56,8 @@ test_opt_canonicalize()
 
 
 def test_to_llvmir():
+    """Test functionality of lowering to llvm"""
+
     mlir = """
     module {
         // CHECK: define void @foo

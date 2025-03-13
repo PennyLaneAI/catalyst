@@ -297,14 +297,20 @@ def _catalyst(*args, stdin=None):
 def _opt(*args, stdin=None):
     """Raw interface to opt
 
-    echo ${input} | catalyst --tool=opt *args -
+    echo ${stdin} | catalyst --tool=opt *args -
     catalyst --tool=opt *args
     """
     return _catalyst(("--tool", "opt"), *args, stdin=stdin)
 
 
 def _canonicalize(*args, stdin=None):
-    """echo ${input} | catalyst --tool=opt --catalyst-pipeline='builtin.module(canonicalize)' *args -"""
+    """Run opt with canonicalization
+
+    echo ${stdin} | catalyst --tool=opt \
+            --catalyst-pipeline='builtin.module(canonicalize)' *args -
+    catalyst --tool=opt \
+            --catalyst-pipeline='builtin.module(canonicalize)' *args
+    """
     return _opt(("--pass-pipeline", "builtin.module(canonicalize)"), *args, stdin=stdin)
 
 

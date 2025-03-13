@@ -568,8 +568,8 @@ class QJIT(CatalystCallable):
             # TODO: Should we go through the translation?
             return None
 
-        mlir = str(self.mlir_module)
-        return _to_llvmir(stdin=mlir, options=self.compile_options)
+        _mlir = str(self.mlir_module)
+        return _to_llvmir(stdin=_mlir, options=self.compile_options)
 
     @debug_logger
     def jit_compile(self, args, **kwargs):
