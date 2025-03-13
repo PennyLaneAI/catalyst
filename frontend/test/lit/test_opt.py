@@ -31,7 +31,7 @@ def test_opt_happy_path():
         }
     }
     """
-    output = _opt(input=mlir)
+    output = _opt(stdin=mlir)
     print(output)
 
 
@@ -47,7 +47,7 @@ def test_opt_canonicalize():
         }
     }
     """
-    output = _canonicalize(input=mlir)
+    output = _canonicalize(stdin=mlir)
     print(output)
 
 
@@ -63,7 +63,7 @@ def test_to_llvmir():
         }
     }
     """
-    output = _to_llvmir(input=mlir)
+    output = _to_llvmir(stdin=mlir)
     print(output)
 
 

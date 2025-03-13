@@ -264,10 +264,11 @@ class LinkerDriver:
         raise CompileError(msg)
 
 
-def _catalyst(*args, input=None):
-    """echo ${input} | catalyst *args -
+def _catalyst(*args, stdin=None):
+    """Raw interface to catalyst
 
-    Raw interface to catalyst
+    echo ${stdin} | catalyst *args -
+    catalyst *args
     """
     cli_path = get_cli_path()
     if not path.isfile(cli_path):
@@ -280,38 +281,39 @@ def _catalyst(*args, input=None):
         else:
             cmd += [str(arg)]
 
-    if input:
+    if stdin:
         cmd += ["-"]
 
-    result = subprocess.run(cmd, input=input, check=True, capture_output=True, text=True)
+    result = subprocess.run(cmd, input=stdin, check=True, capture_output=True, text=True)
     return result.stdout
 
 
-def _opt(*args, input=None):
-    """echo ${input} | catalyst --tool=opt *args -
+def _opt(*args, stdin=None):
+    """Raw interface to opt
 
-    Raw interface to opt.
+    echo ${input} | catalyst --tool=opt *args -
+    catalyst --tool=opt *args
     """
-    return _catalyst(("--tool", "opt"), *args, input=input)
+    return _catalyst(("--tool", "opt"), *args, stdin=stdin)
 
 
-def _canonicalize(*args, input=None):
+def _canonicalize(*args, stdin=None):
     """echo ${input} | catalyst --tool=opt --catalyst-pipeline='builtin.module(canonicalize)' *args -"""
-    return _opt(("--pass-pipeline", "builtin.module(canonicalize)"), *args, input=input)
+    return _opt(("--pass-pipeline", "builtin.module(canonicalize)"), *args, stdin=stdin)
 
 
-def _to_llvmir(*args, input=None, options: Optional[CompileOptions] = None):
+def _to_llvmir(*args, stdin=None, options: Optional[CompileOptions] = None):
     """echo ${input} | catalyst *args -"""
     # These are the options that may affect compilation
     if not options:
-        return _catalyst(*args, input=input)
+        return _catalyst(*args, stdin=stdin)
 
     extra_args = []
 
     pipelines = options.get_pipelines()
     pipeline_str = ""
 
-    for pipeline in options.get_pipelines():
+    for pipeline in pipelines:
         pipeline_name, passes = pipeline
         passes_str = ";".join(passes)
         pipeline_str += f"{pipeline_name}({passes_str}),"
@@ -324,7 +326,7 @@ def _to_llvmir(*args, input=None, options: Optional[CompileOptions] = None):
     if options.checkpoint_stage:
         extra_args += [("--checkpoint-stage", options.checkpoint_stage)]
 
-    return _catalyst(*extra_args, *args, input=input)
+    return _catalyst(*extra_args, *args, stdin=stdin)
 
 
 class Compiler:

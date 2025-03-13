@@ -514,7 +514,7 @@ class QJIT(CatalystCallable):
         if not self.mlir_module:
             return None
 
-        return _canonicalize(input=str(self.mlir_module))
+        return _canonicalize(stdin=str(self.mlir_module))
 
     @debug_logger
     def __call__(self, *args, **kwargs):
@@ -569,7 +569,7 @@ class QJIT(CatalystCallable):
             return None
 
         mlir = str(self.mlir_module)
-        return _to_llvmir(input=mlir, options=self.compile_options)
+        return _to_llvmir(stdin=mlir, options=self.compile_options)
 
     @debug_logger
     def jit_compile(self, args, **kwargs):
