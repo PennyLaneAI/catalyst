@@ -877,8 +877,8 @@ class TestParameterShiftMethodVerification:
         operation that doesn't support analytic differentiation raises an error."""
 
         @qml.qnode(qml.device("lightning.qubit", wires=1), diff_method="parameter-shift")
-        def f(_):
-            qml.RX(1.23, 0)
+        def f(x):
+            qml.RX(x, 0)
             return qml.expval(qml.PauliX(0))
 
         with pytest.raises(
@@ -896,10 +896,10 @@ class TestParameterShiftMethodVerification:
         an error."""
 
         @qml.qnode(qml.device("lightning.qubit", wires=1), diff_method="parameter-shift")
-        def f(_):
+        def f(x):
             @while_loop(lambda s: s > 0)
             def loop(s):
-                qml.RX(1.23, 0)
+                qml.RX(x, 0)
                 return s + 1
 
             loop(0)

@@ -16,9 +16,10 @@
 
 from typing import Union
 
+import jax
 import pennylane as qml
 from pennylane.devices.capabilities import DeviceCapabilities, OperatorProperties
-from pennylane.operation import Operator
+from pennylane.operation import Operation, Operator
 
 from catalyst.api_extensions import MidCircuitMeasure
 from catalyst.jax_tracer import HybridOp
@@ -46,6 +47,12 @@ def _paramshift_op_checker(op):
     return True
 
 
+def _adjoint_diff_op_checker(op, capabilities):
+    op_name = get_base_operation_name(op)
+    props = capabilities.operations.get(op_name, EMPTY_PROPERTIES)
+    return props.differentiable
+
+
 def is_differentiable(
     op: Operator, capabilities: DeviceCapabilities, grad_method: Union[str, None] = None
 ) -> bool:
@@ -60,25 +67,39 @@ def is_differentiable(
     if isinstance(op, MidCircuitMeasure):
         raise DifferentiableCompileError(f"{op.name} is not allowed in gradients")
 
-    op_name = get_base_operation_name(op)
-    props = capabilities.operations.get(op_name, EMPTY_PROPERTIES)
+    # Note: Ops with constant parameters generally need not be differentiated. However, the Catalyst
+    # compiler will presently consider all real parametrized gates (not including QubitUnitary and
+    # StatePrep for example) as part of the hybrid autodiff boundary, and as such will schedule
+    # them for differentiation.
+    # For the parameter-shift rule, this means partial derivatives of unsupported ops may be wrong.
+    # However, given that their parameters are constant, in the final computation of the hybrid
+    # Jacobian these partial derivatives will be discarded, and so we can safely consider such
+    # operations as inactive.
+    # For the adjoint method, most operations present in the program, with the exception of state
+    # preparation ops and unitaries, must be considered differentiable, even when acting on
+    # constant or integer parameters. For this reason, we cannot skip the validation there.
 
     if grad_method == "adjoint":
-        return props.differentiable
+        # lightning will accept constant unitaries
+        if isinstance(op, qml.QubitUnitary) and not is_active(op):
+            return True
+        return _adjoint_diff_op_checker(op, capabilities)
     elif grad_method == "parameter-shift":
+        if not is_active(op):
+            return True
         return _paramshift_op_checker(op)
     elif grad_method == "fd":
         return True
     elif grad_method == "device":
         raise ValueError(
-            "The device does not provide a catalyst compatible gradient method. \
-                         Please specify a valid gradient method to the grad method argument. \
-                         (e.g. grad_method='adjoint' or grad_method='parameter-shift')"
+            "The device does not provide a catalyst compatible gradient method. "
+            "Please specify either 'adjoint' or 'parameter-shift' in the QNode's diff_method."
         )
     elif grad_method == "finite-diff":
         raise ValueError(
-            "finite-diff gradient method is not supported. Please specify fd to the \
-                         grad method argument. e.g. grad(g, method='fd')"
+            "Finite differences at the QNode level is not supported in Catalyst. "
+            "Please specify 'fd' directly in the Catalyst gradient function, "
+            "i.e. grad(f, method='fd')."
         )
     else:
         raise ValueError(f"Invalid gradient method: {grad_method}")
@@ -92,3 +113,21 @@ def is_controllable(op: Operator, capabilities: DeviceCapabilities) -> bool:
 def is_invertible(op: Operator, capabilities: DeviceCapabilities) -> bool:
     """Check whether an operation is invertible."""
     return capabilities.operations.get(op.name, EMPTY_PROPERTIES).invertible
+
+
+def is_active(op: Operation) -> bool:
+    """Verify whether a gate is considered active for differentiation purposes.
+
+    A gate is considered inactive if all (float) parameters are constant, that is none of them are
+    JAX tracers.
+    """
+
+    for param in op.data:
+        if isinstance(param, jax.core.Tracer):
+            return True
+        else:
+            assert not isinstance(
+                param, (list, tuple)
+            ), "Operator converts any list/tuple parameters to NumPy arrays."
+
+    return False
