@@ -786,6 +786,28 @@ def test_ps_probs(backend):
     assert np.allclose(result, reference)
 
 
+@pytest.mark.xfail(reason="should pass once #1568 is merged")
+@pytest.mark.parametrize("gate_n_inputs", [(qml.CRX, [1]), (qml.CRot, [1, 2, 3])])
+def test_ps_four_term_rule(backend, gate_n_inputs):
+    """Operations with the 4-term shift rule need to be decomposed to be differentiated."""
+    gate, inputs = gate_n_inputs
+
+    @qml.qnode(qml.device(backend, wires=2), diff_method="parameter-shift")
+    def f(x):
+        qml.RY(0.321, wires=0)
+        gate(*(x * i for i in inputs), wires=[0, 1])
+        return qml.expval(0.5 * qml.Z(1) @ qml.X(0) - 0.4 * qml.Y(1) @ qml.H(0))
+
+    @qjit
+    def main(x: float):
+        return qml.grad(f)(x)
+
+    result = main(0.1)
+    reference = main.original_function(qml.numpy.array(0.1))
+
+    assert np.allclose(result, reference)
+
+
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
 def test_finite_diff_h(inp, backend):
     """Test finite diff."""
