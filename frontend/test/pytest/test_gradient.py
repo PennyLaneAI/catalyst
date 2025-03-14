@@ -2112,7 +2112,7 @@ class TestParameterShiftVerificationIntegrationTests:
                 return qml.expval(qml.PauliZ(wires=0))
 
     def test_parameter_frequencies_not_one(self):
-        """When there is an op without parameter_frequencies, parameter-shift gradient should fail"""
+        """When there is an op without parameter_frequencies, ps gradient should fail"""
         device = qml.device("lightning.qubit", wires=1)
 
         class RX(qml.RX):
