@@ -221,6 +221,7 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
         self._device = device
         self._shots = shots.total_shots if shots else 0
         self.stateref = None
+        self.actualized = False
         super().__init__()
 
     def __getattr__(self, key):
@@ -251,8 +252,8 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
         For conversion to calayst, this reinserts extracted qubits and
         deallocates the register.
         """
-        for orig_wire, wire in self.wire_map.items():
-            self.qreg = qinsert_p.bind(self.qreg, orig_wire, wire)
+        if not self.actualized:
+            self.actualize_qreg()
         qdealloc_p.bind(self.qreg)
         self.stateref = None
 
@@ -260,7 +261,17 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
         """Get the ``AbstractQbit`` corresponding to a wire value."""
         if wire_value in self.wire_map:
             return self.wire_map[wire_value]
+        self.actualized = False
         return qextract_p.bind(self.qreg, wire_value)
+
+    def actualize_qreg(self):
+        """
+        Insert all end qubits back into a qreg,
+        and produce the product qreg jaxpr variable.
+        """
+        self.actualized = True
+        for orig_wire, wire in self.wire_map.items():
+            self.qreg = qinsert_p.bind(self.qreg, orig_wire, wire)
 
     def interpret_operation(self, op):
         """Re-bind a pennylane operation as a catalyst instruction."""
@@ -288,9 +299,12 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
 
     def _compbasis_obs(self, *wires):
         """Add a computational basis sampling observable."""
-        wires = wires or self._device.wires  # broadcast across all wires
-        qubits = [self.get_wire(w) for w in wires]
-        return compbasis_p.bind(*qubits)
+        if wires:
+            qubits = [self.get_wire(w) for w in wires]
+            return compbasis_p.bind(*qubits)
+        else:
+            self.actualize_qreg()
+            return compbasis_p.bind(self.qreg, qreg_available=True)
 
     def interpret_measurement(self, measurement):
         """Rebind a measurement as a catalyst instruction."""

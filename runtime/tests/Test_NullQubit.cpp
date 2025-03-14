@@ -164,7 +164,7 @@ TEST_CASE("Test __catalyst__qis__Sample with num_qubits=2 and PartialSample call
     constexpr size_t n = 1;
     constexpr size_t shots = 1000;
 
-    double *buffer = new double[shots * n];
+    double buffer[shots * n];
     MemRefT_double_2d result = {buffer, buffer, 0, {shots, n}, {n, 1}};
     __catalyst__qis__Sample(&result, 1, ctrls[0]);
 
@@ -173,8 +173,6 @@ TEST_CASE("Test __catalyst__qis__Sample with num_qubits=2 and PartialSample call
     auto obs = __catalyst__qis__NamedObs(ObsId::PauliZ, *ctrls);
 
     CHECK(__catalyst__qis__Variance(obs) == Approx(0.0).margin(1e-5));
-
-    delete[] buffer;
 
     __catalyst__rt__qubit_release_array(qs);
     __catalyst__rt__device_release();
