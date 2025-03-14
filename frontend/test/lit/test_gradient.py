@@ -334,7 +334,7 @@ print(test_diff_dynamic_adjoint.mlir)
 # CHECK-LABEL: @test_non_diff_ops_in_cost_and_grad
 @qjit(target="mlir")
 def test_non_diff_ops_in_cost_and_grad(params: jax.core.ShapedArray([2], float)):
-    """Test non-differentiable operations are decomposed when active with adjoint."""
+    """Test decomposition when invoking both the function and its derivative."""
 
     @qml.qnode(qml.device("lightning.qubit", wires=4), diff_method="adjoint")
     def cost(params: jax.core.ShapedArray([2], float)):
