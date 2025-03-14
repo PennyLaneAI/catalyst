@@ -17,6 +17,7 @@
 from typing import Union
 
 import jax
+import jax.numpy as jnp
 import pennylane as qml
 from pennylane.devices.capabilities import DeviceCapabilities, OperatorProperties
 from pennylane.operation import Operation, Operator
@@ -40,7 +41,65 @@ def is_supported(op: Operator, capabilities: DeviceCapabilities) -> bool:
     return op.name in capabilities.operations
 
 
+def _is_grad_recipe_same_as_catalyst(op):
+    """Checks that the grad_recipe for the op matches the hard coded one in Catalyst."""
+    if not hasattr(op, "grad_recipe"):
+        return True
+
+    if not any(map(lambda x: x, op.grad_recipe)):
+        return True
+
+    for _, grad_recipe in zip(op.data, op.grad_recipe, strict=True):
+        left, right = grad_recipe
+        try:
+            with jax.ensure_compile_time_eval():
+                # exp_param_shift_rule_{left,right} are constants in Catalyst
+                # we must ensure that the rules seen in the op match Catalyst's implementation.
+                exp_param_shift_rule_left = jnp.array([0.5, 1.0, jnp.pi / 2])
+                exp_param_shift_rule_right = jnp.array([-0.5, 1.0, -jnp.pi / 2])
+                obs_param_shift_rule_left = jnp.array(left)
+                obs_param_shift_rule_right = jnp.array(right)
+                is_left_valid = jnp.allclose(obs_param_shift_rule_left, exp_param_shift_rule_left)
+                is_right_valid = jnp.allclose(
+                    obs_param_shift_rule_right, exp_param_shift_rule_right
+                )
+            return bool(is_left_valid and is_right_valid)
+        except jax.errors.TracerBoolConversionError:
+            return False
+
+
+def _are_param_frequencies_same_as_catalyst(op):
+    """Check if the parameter frequencies are all close to 1."""
+
+    if not hasattr(op, "parameter_frequencies"):
+        return True
+
+    is_valid_len = len(op.data) == len(op.parameter_frequencies)
+    if not is_valid_len:
+        return False
+
+    with jax.ensure_compile_time_eval():
+        # We use jax.ensure_compile_time_eval
+        # to evaluate op.parameter_frequencies (which we expect to always be known at compile time
+        # and concrete) and compare with 1.0. Otherwise, jax may generate stablehlo
+        # operations for the jnp.allclose
+        # This is a purely stylistic choice and one may have also chosen to avoid jax and use
+        # numpy instead.
+        valid_frequencies = all(
+            map(lambda x: jnp.allclose(jnp.array(x), 1.0), op.parameter_frequencies)
+        )
+
+    return valid_frequencies
+
+
 def _paramshift_op_checker(op):
+
+    if not _is_grad_recipe_same_as_catalyst(op):
+        return False
+
+    if not _are_param_frequencies_same_as_catalyst(op):
+        return False
+
     if not isinstance(op, HybridOp):
         if op.grad_method not in {"A", None}:
             raise DifferentiableCompileError(f"{op.name} does not support analytic differentiation")
