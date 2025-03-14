@@ -442,8 +442,9 @@ def qjit(
         like to, for example, iterate through the wires without knowing how many of them
         there are in advance.
 
-        The syntax to do this is exactly what you would expect: you can pass an argument to the
-        qjitted function to represent the number of wires.
+        To use this feature the PennyLane device needs to be instantiated within the qjitted
+        function, or another function within its call graph. The `wires` parameter can then be
+        any (integer) program value, for example one of the function arguments.
 
         .. code-block:: python
 
