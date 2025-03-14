@@ -51,7 +51,6 @@ def _is_grad_recipe_same_as_catalyst(op):
 
     for _, grad_recipe in zip(op.data, op.grad_recipe, strict=True):
         left, right = grad_recipe
-        msg = f"{op.name} has incompatible grad_recipe {op.grad_recipe}"
         try:
             with jax.ensure_compile_time_eval():
                 # exp_param_shift_rule_{left,right} are constants in Catalyst
@@ -65,7 +64,7 @@ def _is_grad_recipe_same_as_catalyst(op):
                     obs_param_shift_rule_right, exp_param_shift_rule_right
                 )
             return bool(is_left_valid and is_right_valid)
-        except jax.errors.TracerBoolConversionError as exc:
+        except jax.errors.TracerBoolConversionError:
             return False
 
 
