@@ -39,6 +39,7 @@ from catalyst import (
     vmap,
 )
 from catalyst.compiler import get_lib_path
+from catalyst.device.op_support import _check_grad_recipe, _check_param_frequencies
 
 # pylint: disable=too-many-lines
 
@@ -1912,6 +1913,232 @@ class TestGradientMethodErrors:
 
         with pytest.raises(ValueError, match="Invalid gradient method: invalid_method"):
             qjit(grad(f))
+
+
+class TestParameterShiftVerificationUnitTests:
+    """Unit tests for parameter shift verification"""
+
+    def test_check_grad_recipe_no_grad_recipe(self):
+        """Check that if grad recipe is not defined, no exception gets triggered"""
+
+        # a family of ops that do not have grad recipe are control flow ops
+        class DummyOp(qml.operation.Operator): ...
+
+        _check_grad_recipe(DummyOp(wires=[0]))
+
+    def test_check_grad_recipe_empty(self):
+        """Some grad recipes are defined but are filled with Nones"""
+
+        class DummyOp(qml.operation.Operator):
+            @property
+            def grad_recipe(self):
+                return [None]
+
+        _check_grad_recipe(DummyOp(wires=[0]))
+
+    def test_check_grad_recipe_different(self):
+        """Check exception is raised when invalid grad_recipe is found"""
+
+        class DummyOp(qml.operation.Operator):
+            def __init__(self, wires=None):
+                param = 0.0
+                super().__init__(param, wires=wires)
+
+            @property
+            def num_params(self):
+                return 1
+
+            @property
+            def grad_recipe(self):
+                return ([[0.0, 0.0, 0.0], [0.0, 0.0, 0.0]],)
+
+        with pytest.raises(DifferentiableCompileError, match=".* incompatible grad_recipe.*"):
+            _check_grad_recipe(DummyOp(wires=[0]))
+
+    def test_check_grad_recipe_dynamic(self):
+        """Check exception is raised when dynamic grad recipe is found"""
+
+        class DummyOp(qml.operation.Operator):
+            def __init__(self, param, wires=None):
+                self.param = param
+                super().__init__(param, wires=wires)
+
+            @property
+            def num_params(self):
+                return 1
+
+            @property
+            def grad_recipe(self):
+                return ([[0.5, self.param, jnp.pi / 2], [-0.5, 1.0, -jnp.pi / 2]],)
+
+        def program(x):
+            _check_grad_recipe(DummyOp(x, wires=[0]))
+
+        with pytest.raises(DifferentiableCompileError, match=".* incompatible grad_recipe.*"):
+            jax.make_jaxpr(program)(0.0)
+
+    def test_check_param_frequencies(self):
+        """No param frequencies attr"""
+
+        class DummyOp(qml.operation.Operator): ...
+
+        assert not hasattr(DummyOp, "parameter_frequencies")
+        _check_param_frequencies(DummyOp(wires=[0]))
+
+    def test_check_param_frequencies_different_length(self):
+        """Check exception is raised when frequencies length mismatches parameter length"""
+
+        class DummyOp(qml.operation.Operator):
+            def __init__(self, wires=None):
+                super().__init__(0.0, wires=wires)
+
+            @property
+            def num_params(self):
+                return 1
+
+            @property
+            def parameter_frequencies(self):
+                return [1.0, 1.0]
+
+        with pytest.raises(
+            DifferentiableCompileError,
+            match=".* different number of parameters.* and frequencies.*",
+        ):
+            _check_param_frequencies(DummyOp(wires=[0]))
+
+    def test_check_invalid_frequencies(self):
+        """Check exception is raised when invalid frequencies are found"""
+
+        class DummyOp(qml.operation.Operator):
+            def __init__(self, wires=None):
+                super().__init__(0.0, wires=wires)
+
+            @property
+            def num_params(self):
+                return 1
+
+            @property
+            def parameter_frequencies(self):
+                return [0.0]
+
+        with pytest.raises(DifferentiableCompileError, match=".* invalid parameter_frequencies.*"):
+            _check_param_frequencies(DummyOp(wires=[0]))
+
+
+class TestParameterShiftVerificationIntegrationTests:
+    """Test to verify operations / observables / measurements when doing parameter shift.
+
+    Source of truth obtained from shortcut story: 84819
+    """
+
+    def test_is_mcm(self):
+        """No mcm"""
+
+        device = qml.device("lightning.qubit", wires=1)
+
+        with pytest.raises(DifferentiableCompileError, match="MidCircuitMeasure is not allowed"):
+
+            @qml.qjit
+            @grad
+            @qml.qnode(device, diff_method="parameter-shift")
+            def circuit(_: float):
+                measure(0)
+                return qml.expval(qml.PauliZ(wires=0))
+
+    def test_all_arguments_are_constant(self):
+        """When all arguments are constant they do not contribute to the gradient"""
+        device = qml.device("lightning.qubit", wires=1)
+
+        # Yes, this test does not have an assertion.
+        # The test is that this does not produce an assertion.
+
+        @qml.qjit
+        @grad
+        @qml.qnode(device, diff_method="parameter-shift")
+        def circuit(_: float):
+            qml.RX(0.0, wires=[0])
+            return qml.expval(qml.PauliZ(wires=0))
+
+    def test_grad_recipe_dynamic(self):
+        """Raise exception when there is an op with a grad_recipe that's dynamic"""
+        device = qml.device("lightning.qubit", wires=1)
+
+        class RX(qml.RX):
+            @property
+            def grad_recipe(self):
+                x = self.data[0]
+                c = 0.5 / jnp.sin(x)
+                return ([[c, 0.0, 2 * x], [-c, 0.0, 0.0]],)
+
+        with pytest.raises(DifferentiableCompileError, match=".*incompatible grad_recipe.*"):
+
+            @qml.qjit
+            @grad
+            @qml.qnode(device, diff_method="parameter-shift")
+            def circuit(x: float):
+                RX(x, wires=[0])
+                return qml.expval(qml.PauliZ(wires=0))
+
+    def test_grad_recipe_static(self):
+        """Raise exception when there is an op with a mismatching grad_recipe"""
+        device = qml.device("lightning.qubit", wires=1)
+
+        class RX(qml.RX):
+            @property
+            def grad_recipe(self):
+                return ([[0.0, 0.0, 0.0], [0.0, 0.0, 0.0]],)
+
+        with pytest.raises(DifferentiableCompileError, match=".*incompatible grad_recipe.*"):
+
+            @qml.qjit
+            @grad
+            @qml.qnode(device, diff_method="parameter-shift")
+            def circuit(x: float):
+                RX(x, wires=[0])
+                return qml.expval(qml.PauliZ(wires=0))
+
+    def test_parameter_frequencies(self):
+        """Raise exception when when there is an lengths are mismatched."""
+        device = qml.device("lightning.qubit", wires=1)
+
+        class RX(qml.RX):
+            @property
+            def parameter_frequencies(self):
+                # Only one parameter but two frequencies is an error
+                return (1.0, 1.0)
+
+        with pytest.raises(
+            DifferentiableCompileError,
+            match=".* different number of parameters.* and frequencies.*",
+        ):
+
+            @qml.qjit
+            @grad
+            @qml.qnode(device, diff_method="parameter-shift")
+            def circuit(x: float):
+                RX(x, wires=[0])
+                return qml.expval(qml.PauliZ(wires=0))
+
+    def test_parameter_frequencies_not_one(self):
+        """When there is an op without parameter_frequencies, parameter-shift gradient should fail"""
+        device = qml.device("lightning.qubit", wires=1)
+
+        class RX(qml.RX):
+            @property
+            def parameter_frequencies(self):
+                # Only one parameter but two frequencies is an error
+                return (2.0,)
+
+        with pytest.raises(
+            DifferentiableCompileError, match=".*invalid parameter_frequencies values.*"
+        ):
+
+            @qml.qjit
+            @grad
+            @qml.qnode(device, diff_method="parameter-shift")
+            def circuit(x: float):
+                RX(x, wires=[0])
+                return qml.expval(qml.PauliZ(wires=0))
 
 
 if __name__ == "__main__":
