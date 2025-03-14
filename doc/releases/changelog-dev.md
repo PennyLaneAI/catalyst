@@ -13,7 +13,7 @@
     - T gate → PPR with (Z)π/8
     - CNOT → PPR with (Z ⊗ X)π/4 · (Z ⊗ 1)−π/4 · (1 ⊗ X)−π/4
 
-    Example: 
+    Example:
     ```python
         @qjit(keep_intermediate=True)
         @to_ppr
@@ -30,7 +30,7 @@
     ```
 
     The PPRs and PPMs are currently only represented symbolically. However, these operations are not yet executable on any backend since they exist purely as intermediate representations for analysis and potential future execution when a suitable backend is available.
-    
+
     Example MLIR Representation:
     ```mlir
       . . .
@@ -47,7 +47,7 @@
         %10 = qec.ppr ["X"](-4) %8#1 : !quantum.bit
         %mres, %out_qubits = qec.ppm ["Z"] %9 : !quantum.bit
         %mres_0, %out_qubits_1 = qec.ppm ["Z"] %10 : !quantum.bit
-      . . . 
+      . . .
     ```
 
 <h3>Improvements 🛠</h3>
@@ -63,7 +63,7 @@
   [(#1468)](https://github.com/PennyLaneAI/catalyst/pull/1468)
   [(#1509)](https://github.com/PennyLaneAI/catalyst/pull/1509)
   [(#1521)](https://github.com/PennyLaneAI/catalyst/pull/1521)
-  
+
   To trigger the PennyLane pipeline for capturing the program as a Jaxpr, simply set
   `experimental_capture=True` in the qjit decorator.
 
@@ -130,6 +130,12 @@
 
 * Catalyst now decomposes non-differentiable gates when in a gradient method.
   [(#1562)](https://github.com/PennyLaneAI/catalyst/pull/1562)
+  [(#1569)](https://github.com/PennyLaneAI/catalyst/pull/1569)
+
+  Gates that are constant, such as when all parameters are Python or NumPy data types, are not
+  decomposed when this is allowable. For the adjoint differentiation method, this is allowable
+  for the `StatePrep`, `BasisState`, and `QubitUnitary` operations. For the parameter-shift method,
+  this is allowable for all operations.
 
 * Changes to support a dynamic number of qubits:
 
@@ -158,7 +164,7 @@
   give incorrect results for circuits containing `qml.StatePrep`.
   [(#1491)](https://github.com/PennyLaneAI/catalyst/pull/1491)
 
-* Fixes an issue ([(#1501)](https://github.com/PennyLaneAI/catalyst/issues/1501)) where using 
+* Fixes an issue ([(#1501)](https://github.com/PennyLaneAI/catalyst/issues/1501)) where using
   autograph in conjunction with catalyst passes causes a crash.
   [(#1541)](https://github.com/PennyLaneAI/catalyst/pull/1541)
 
@@ -194,8 +200,8 @@
   - The region of a `ParallelProtocolOp` is now always terminated with a `ion::YieldOp` with explicitly yielded SSA values. This ensures the op is well-formed, and improves readability.
     [(#1475)](https://github.com/PennyLaneAI/catalyst/pull/1475)
 
-  - Add a new pass `convert-ion-to-llvm` which lowers the Ion dialect to llvm dialect. This pass 
-    introduces oqd device specific stubs that will be implemented in oqd runtime including: 
+  - Add a new pass `convert-ion-to-llvm` which lowers the Ion dialect to llvm dialect. This pass
+    introduces oqd device specific stubs that will be implemented in oqd runtime including:
     `@ __catalyst__oqd__pulse`, `@ __catalyst__oqd__ParallelProtocol`.
     [(#1466)](https://github.com/PennyLaneAI/catalyst/pull/1466)
 
