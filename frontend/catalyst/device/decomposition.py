@@ -55,7 +55,7 @@ logger.addHandler(logging.NullHandler())
 def check_alternative_support(op, capabilities: DeviceCapabilities):
     """Verify that aliased operations aren't supported via alternative definitions."""
 
-    if isinstance(op, qml.ops.Controlled):
+    if isinstance(op, qml.ops.Controlled) and type(op) is not qml.ops.ControlledOp:
         # "Cast" away the specialized class for gates like Toffoli, ControlledQubitUnitary, etc.
         supported = capabilities.operations.get(op.base.name)
         if supported and supported.controllable:
