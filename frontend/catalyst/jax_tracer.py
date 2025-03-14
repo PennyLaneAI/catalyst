@@ -735,14 +735,14 @@ def trace_quantum_operations(
 
 @debug_logger
 def trace_observables(
-    obs: Operator, qrp: QRegPromise, m_wires: int
+    obs: Operator, qrp: QRegPromise, m_wires: Optional[qml.wires.Wires]
 ) -> Tuple[List[DynamicJaxprTracer], Optional[int]]:
     """Trace observables.
 
     Args:
         obs (Operator): an observable operator
         qrp (QRegPromise): Quantum register tracer with cached qubits
-        m_wires (int): the default number of wires to use for this measurement process
+        m_wires (Optional[qml.wires.Wires]): the default wires to use for this measurement process
 
     Returns:
         out_classical_tracers: a list of classical tracers corresponding to the measured values.
@@ -751,13 +751,12 @@ def trace_observables(
     wires = obs.wires if (obs and len(obs.wires) > 0) else m_wires
     qubits = None
     if obs is None:
-        # If measuring all wires on the device, pass in the qreg to compbasis op
-        # TODO: "all wires on the device" is a `range` when static, but a tracer when dynamic
-        # Update to handle dynamic case.
-        if isinstance(wires, range):
+        if wires is None:
+            # If measuring all wires on the device, pass in the qreg to compbasis op
+            # TODO: "all wires on the device" is None when number of wires is static,
+            # but a tracer when dynamic. Update to handle dynamic case.
             qreg_out = qrp.actualize()
             obs_tracers = compbasis_p.bind(qreg_out, qreg_available=True)
-            qubits = wires
         else:
             qubits = qrp.extract(wires, allow_reuse=True)
             obs_tracers = compbasis_p.bind(*qubits)
@@ -879,9 +878,9 @@ def trace_quantum_measurements(
                     "Use qml.sample() instead."
                 )
 
-            m_wires = o.wires if o.wires else range(len(device.wires))
-
+            m_wires = o.wires if o.wires else None
             obs_tracers, nqubits = trace_observables(o.obs, qrp, m_wires)
+            nqubits = len(device.wires) if nqubits == 0 else nqubits
 
             using_compbasis = obs_tracers.primitive == compbasis_p
 
