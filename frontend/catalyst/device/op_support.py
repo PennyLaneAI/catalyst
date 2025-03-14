@@ -67,12 +67,26 @@ def is_differentiable(
     if isinstance(op, MidCircuitMeasure):
         raise DifferentiableCompileError(f"{op.name} is not allowed in gradients")
 
-    if not is_active(op):  # ops with constant parameters can be ignored
-        return True
+    # Note: Ops with constant parameters generally need not be differentiated. However, the Catalyst
+    # compiler will presently consider all real parametrized gates (not including QubitUnitary and
+    # StatePrep for example) as part of the hybrid autodiff boundary, and as such will schedule
+    # them for differentiation.
+    # For the parameter-shift rule, this means partial derivatives of unsupported ops may be wrong.
+    # However, given that their parameters are constant, in the final computation of the hybrid
+    # Jacobian these partial derivatives will be discarded, and so we can safely consider such
+    # operations as inactive.
+    # For the adjoint method, most operations present in the program, with the exception of state
+    # preparation ops and unitaries, must be considered differentiable, even when acting on
+    # constant or integer parameters. For this reason, we cannot skip the validation there.
 
     if grad_method == "adjoint":
+        # lightning will accept constant unitaries
+        if isinstance(op, qml.QubitUnitary) and not is_active(op):
+            return True
         return _adjoint_diff_op_checker(op, capabilities)
     elif grad_method == "parameter-shift":
+        if not is_active(op):
+            return True
         return _paramshift_op_checker(op)
     elif grad_method == "fd":
         return True
@@ -105,13 +119,11 @@ def is_active(op: Operation) -> bool:
     """Verify whether a gate is considered active for differentiation purposes.
 
     A gate is considered inactive if all (float) parameters are constant, that is none of them are
-    JAX tracers. The restriction to float values facilitates the process without knowing the
-    semantics of each parameter, since generally (in Catalyst) only real numbers can be
-    differentiated with respect to.
+    JAX tracers.
     """
 
     for param in op.data:
-        if isinstance(param, jax.core.Tracer) and param.dtype.kind == "f":
+        if isinstance(param, jax.core.Tracer):
             return True
         else:
             assert not isinstance(
