@@ -39,7 +39,10 @@ from catalyst import (
     vmap,
 )
 from catalyst.compiler import get_lib_path
-from catalyst.device.op_support import _check_grad_recipe, _check_param_frequencies
+from catalyst.device.op_support import (
+    _are_param_frequencies_same_as_catalyst,
+    _is_grad_recipe_same_as_catalyst,
+)
 
 # pylint: disable=too-many-lines
 
@@ -1924,7 +1927,7 @@ class TestParameterShiftVerificationUnitTests:
         # a family of ops that do not have grad recipe are control flow ops
         class DummyOp(qml.operation.Operator): ...
 
-        _check_grad_recipe(DummyOp(wires=[0]))
+        assert _is_grad_recipe_same_as_catalyst(DummyOp(wires=[0]))
 
     def test_check_grad_recipe_empty(self):
         """Some grad recipes are defined but are filled with Nones"""
@@ -1934,7 +1937,7 @@ class TestParameterShiftVerificationUnitTests:
             def grad_recipe(self):
                 return [None]
 
-        _check_grad_recipe(DummyOp(wires=[0]))
+        assert _is_grad_recipe_same_as_catalyst(DummyOp(wires=[0]))
 
     def test_check_grad_recipe_different(self):
         """Check exception is raised when invalid grad_recipe is found"""
@@ -1952,8 +1955,7 @@ class TestParameterShiftVerificationUnitTests:
             def grad_recipe(self):
                 return ([[0.0, 0.0, 0.0], [0.0, 0.0, 0.0]],)
 
-        with pytest.raises(DifferentiableCompileError, match=".* incompatible grad_recipe.*"):
-            _check_grad_recipe(DummyOp(wires=[0]))
+        assert not _is_grad_recipe_same_as_catalyst(DummyOp(wires=[0]))
 
     def test_check_grad_recipe_dynamic(self):
         """Check exception is raised when dynamic grad recipe is found"""
@@ -1972,10 +1974,9 @@ class TestParameterShiftVerificationUnitTests:
                 return ([[0.5, self.param, jnp.pi / 2], [-0.5, 1.0, -jnp.pi / 2]],)
 
         def program(x):
-            _check_grad_recipe(DummyOp(x, wires=[0]))
+            assert not _is_grad_recipe_same_as_catalyst(DummyOp(x, wires=[0]))
 
-        with pytest.raises(DifferentiableCompileError, match=".* incompatible grad_recipe.*"):
-            jax.make_jaxpr(program)(0.0)
+        jax.make_jaxpr(program)(0.0)
 
     def test_check_param_frequencies(self):
         """No param frequencies attr"""
@@ -1983,7 +1984,7 @@ class TestParameterShiftVerificationUnitTests:
         class DummyOp(qml.operation.Operator): ...
 
         assert not hasattr(DummyOp, "parameter_frequencies")
-        _check_param_frequencies(DummyOp(wires=[0]))
+        assert _are_param_frequencies_same_as_catalyst(DummyOp(wires=[0]))
 
     def test_check_param_frequencies_different_length(self):
         """Check exception is raised when frequencies length mismatches parameter length"""
@@ -2000,11 +2001,7 @@ class TestParameterShiftVerificationUnitTests:
             def parameter_frequencies(self):
                 return [1.0, 1.0]
 
-        with pytest.raises(
-            DifferentiableCompileError,
-            match=".* different number of parameters.* and frequencies.*",
-        ):
-            _check_param_frequencies(DummyOp(wires=[0]))
+        assert not _are_param_frequencies_same_as_catalyst(DummyOp(wires=[0]))
 
     def test_check_invalid_frequencies(self):
         """Check exception is raised when invalid frequencies are found"""
@@ -2021,8 +2018,7 @@ class TestParameterShiftVerificationUnitTests:
             def parameter_frequencies(self):
                 return [0.0]
 
-        with pytest.raises(DifferentiableCompileError, match=".* invalid parameter_frequencies.*"):
-            _check_param_frequencies(DummyOp(wires=[0]))
+        assert not _are_param_frequencies_same_as_catalyst(DummyOp(wires=[0]))
 
 
 class TestParameterShiftVerificationIntegrationTests:
@@ -2070,7 +2066,7 @@ class TestParameterShiftVerificationIntegrationTests:
                 c = 0.5 / jnp.sin(x)
                 return ([[c, 0.0, 2 * x], [-c, 0.0, 0.0]],)
 
-        with pytest.raises(DifferentiableCompileError, match=".*incompatible grad_recipe.*"):
+        with pytest.raises(CompileError):
 
             @qml.qjit
             @grad
@@ -2088,7 +2084,7 @@ class TestParameterShiftVerificationIntegrationTests:
             def grad_recipe(self):
                 return ([[0.0, 0.0, 0.0], [0.0, 0.0, 0.0]],)
 
-        with pytest.raises(DifferentiableCompileError, match=".*incompatible grad_recipe.*"):
+        with pytest.raises(CompileError):
 
             @qml.qjit
             @grad
@@ -2107,10 +2103,7 @@ class TestParameterShiftVerificationIntegrationTests:
                 # Only one parameter but two frequencies is an error
                 return (1.0, 1.0)
 
-        with pytest.raises(
-            DifferentiableCompileError,
-            match=".* different number of parameters.* and frequencies.*",
-        ):
+        with pytest.raises(CompileError):
 
             @qml.qjit
             @grad
@@ -2129,9 +2122,7 @@ class TestParameterShiftVerificationIntegrationTests:
                 # Only one parameter but two frequencies is an error
                 return (2.0,)
 
-        with pytest.raises(
-            DifferentiableCompileError, match=".*invalid parameter_frequencies values.*"
-        ):
+        with pytest.raises(CompileError):
 
             @qml.qjit
             @grad

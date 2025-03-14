@@ -41,13 +41,13 @@ def is_supported(op: Operator, capabilities: DeviceCapabilities) -> bool:
     return op.name in capabilities.operations
 
 
-def _check_grad_recipe(op):
+def _is_grad_recipe_same_as_catalyst(op):
     """Checks that the grad_recipe for the op matches the hard coded one in Catalyst."""
     if not hasattr(op, "grad_recipe"):
-        return
+        return True
 
     if not any(map(lambda x: x, op.grad_recipe)):
-        return
+        return True
 
     for _, grad_recipe in zip(op.data, op.grad_recipe, strict=True):
         left, right = grad_recipe
@@ -64,24 +64,20 @@ def _check_grad_recipe(op):
                 is_right_valid = jnp.allclose(
                     obs_param_shift_rule_right, exp_param_shift_rule_right
                 )
-            if not (is_left_valid and is_right_valid):
-                raise DifferentiableCompileError(msg)
+            return bool(is_left_valid and is_right_valid)
         except jax.errors.TracerBoolConversionError as exc:
-            raise DifferentiableCompileError(msg) from exc
+            return False
 
 
-def _check_param_frequencies(op):
+def _are_param_frequencies_same_as_catalyst(op):
     """Check if the parameter frequencies are all close to 1."""
+
     if not hasattr(op, "parameter_frequencies"):
-        return
+        return True
 
     is_valid_len = len(op.data) == len(op.parameter_frequencies)
     if not is_valid_len:
-        name = op.name
-        len_data = len(op.data)
-        len_freq = len(op.parameter_frequencies)
-        msg = f"{name} has different number of parameters {len_data} and frequencies {len_freq}"
-        raise DifferentiableCompileError(msg)
+        return False
 
     with jax.ensure_compile_time_eval():
         # We use jax.ensure_compile_time_eval
@@ -94,17 +90,16 @@ def _check_param_frequencies(op):
             map(lambda x: jnp.allclose(jnp.array(x), 1.0), op.parameter_frequencies)
         )
 
-    if not valid_frequencies:
-        raise DifferentiableCompileError(
-            f"{op.name} has invalid parameter_frequencies values {op.parameter_frequencies}"
-        )
+    return valid_frequencies
 
 
 def _paramshift_op_checker(op):
 
-    _check_grad_recipe(op)
+    if not _is_grad_recipe_same_as_catalyst(op):
+        return False
 
-    _check_param_frequencies(op)
+    if not _are_param_frequencies_same_as_catalyst(op):
+        return False
 
     if not isinstance(op, HybridOp):
         if op.grad_method not in {"A", None}:
