@@ -868,31 +868,31 @@ def trace_quantum_measurements(
     shots = get_device_shots(device)
     out_classical_tracers = []
 
-    for i, o in enumerate(outputs):
-        if isinstance(o, MeasurementProcess):
+    for i, output in enumerate(outputs):
+        if isinstance(output, MeasurementProcess):
 
             # Check if the measurement is supported shot-vector where num_of_total_copies > 1
-            if device.shots.num_copies > 1 and not isinstance(o, qml.measurements.SampleMP):
+            if device.shots.num_copies > 1 and not isinstance(output, qml.measurements.SampleMP):
                 raise NotImplementedError(
-                    f"Measurement {type(o).__name__} is not supported a shot-vector. "
+                    f"Measurement {type(output).__name__} is not supported a shot-vector. "
                     "Use qml.sample() instead."
                 )
 
-            m_wires = o.wires if o.wires else None
-            obs_tracers, nqubits = trace_observables(o.obs, qrp, m_wires)
+            m_wires = output.wires if output.wires else None
+            obs_tracers, nqubits = trace_observables(output.obs, qrp, m_wires)
             nqubits = len(device.wires) if nqubits == 0 else nqubits
 
             using_compbasis = obs_tracers.primitive == compbasis_p
 
-            if isinstance(o, qml.measurements.SampleMP):
+            if isinstance(output, qml.measurements.SampleMP):
 
                 if shots is None:  # needed for old device API only
                     raise ValueError(
                         "qml.sample cannot work with shots=None. "
                         "Please specify a finite number of shots."
                     )
-                if o.mv is not None:  # qml.sample(m)
-                    out_classical_tracers.append(o.mv)
+                if output.mv is not None:  # qml.sample(m)
+                    out_classical_tracers.append(output.mv)
                 else:
                     shape = (shots, nqubits) if using_compbasis else (shots,)
                     result = bind_flexible_primitive(
@@ -915,15 +915,15 @@ def trace_quantum_measurements(
 
                     out_classical_tracers.append(reshaped_result)
 
-            elif type(o) is ExpectationMP:
+            elif type(output) is ExpectationMP:
                 out_classical_tracers.append(expval_p.bind(obs_tracers))
-            elif type(o) is VarianceMP:
+            elif type(output) is VarianceMP:
                 out_classical_tracers.append(var_p.bind(obs_tracers))
-            elif type(o) is ProbabilityMP:
+            elif type(output) is ProbabilityMP:
                 assert using_compbasis
                 shape = (2**nqubits,)
                 out_classical_tracers.append(probs_p.bind(obs_tracers, shape=shape))
-            elif type(o) is CountsMP:
+            elif type(output) is CountsMP:
                 if shots is None:  # needed for old device API only
                     raise ValueError(
                         "qml.sample cannot work with shots=None. "
@@ -947,19 +947,19 @@ def trace_quantum_measurements(
                     )
                 else:
                     out_tree = counts_tree
-            elif type(o) is StateMP:
+            elif type(output) is StateMP:
                 assert using_compbasis
                 shape = (2**nqubits,)
                 out_classical_tracers.append(state_p.bind(obs_tracers, shape=shape))
             else:
                 raise NotImplementedError(
-                    f"Measurement {type(o)} is not implemented"
+                    f"Measurement {type(output)} is not implemented"
                 )  # pragma: no cover
-        elif isinstance(o, DynamicJaxprTracer):
-            out_classical_tracers.append(o)
+        elif isinstance(output, DynamicJaxprTracer):
+            out_classical_tracers.append(output)
         else:
-            assert not isinstance(o, (list, dict)), f"Expected a tracer or a measurement, got {o}"
-            out_classical_tracers.append(o)
+            assert not isinstance(output, (list, dict)), f"Expected a tracer or a measurement, got {output}"
+            out_classical_tracers.append(output)
 
     return out_classical_tracers, out_tree
 
