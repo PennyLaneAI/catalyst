@@ -44,7 +44,7 @@ from catalyst.device.op_support import (
     _is_grad_recipe_same_as_catalyst,
 )
 
-# pylint: disable=too-many-lines
+# pylint: disable=too-many-lines,missing-function-docstring,missing-class-docstring
 
 
 class TestGradShape:
@@ -790,7 +790,6 @@ def test_ps_probs(backend):
     assert np.allclose(result, reference)
 
 
-@pytest.mark.xfail(reason="should pass once #1568 is merged")
 @pytest.mark.parametrize("gate_n_inputs", [(qml.CRX, [1]), (qml.CRot, [1, 2, 3])])
 def test_ps_four_term_rule(backend, gate_n_inputs):
     """Operations with the 4-term shift rule need to be decomposed to be differentiated."""
