@@ -958,7 +958,9 @@ def trace_quantum_measurements(
         elif isinstance(output, DynamicJaxprTracer):
             out_classical_tracers.append(output)
         else:
-            assert not isinstance(output, (list, dict)), f"Expected a tracer or a measurement, got {output}"
+            assert not isinstance(
+                output, (list, dict)
+            ), f"Expected a tracer or a measurement, got {output}"
             out_classical_tracers.append(output)
 
     return out_classical_tracers, out_tree
