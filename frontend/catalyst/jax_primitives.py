@@ -195,7 +195,7 @@ class AbstractObs(AbstractValue):
         )
 
     def __hash__(self):  # pragma: nocover
-        return hash(self.primitive) + self.num_qubits + hash(self.qreg)
+        return hash(self.primitive) + hash(self.num_qubits) + hash(self.qreg)
 
 
 class ConcreteObs(AbstractObs):
