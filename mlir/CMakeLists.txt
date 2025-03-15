@@ -5,6 +5,8 @@ set(CMAKE_BUILD_WITH_INSTALL_NAME_DIR ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 set(CMAKE_CXX_STANDARD 20 CACHE STRING "C++ standard to conform to")
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
 # LLVM source code triggers a cpp20 warning
 add_compile_options(-Wno-ambiguous-reversed-operator)
 

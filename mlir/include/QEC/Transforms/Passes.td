@@ -27,4 +27,14 @@ def CliffordTToPPRPass : Pass<"convert-clifford-t-to-ppr"> {
     let constructor = "catalyst::createLowerToQECPass()";
 }
 
+def CommuteCliffordTPPRPass : Pass<"commute-clifford-t-ppr"> {
+    let summary = "Commutate CliffordT operations to PPRotation operations.";
+    
+    let dependentDialects = [
+        "catalyst::qec::QECDialect",
+    ];
+    
+    let constructor = "catalyst::createCommuteCliffordTPPRPass()";
+}
+
 #endif // QEC_PASSES
