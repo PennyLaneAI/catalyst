@@ -13,6 +13,11 @@
 // limitations under the License.
 
 #define DEBUG_TYPE "commute-clifford-t-ppr"
+#include "mlir/Support/LLVM.h"
+#include "mlir/Transforms/TopologicalSortUtils.h"
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/Casting.h"
+#include "llvm/Support/raw_ostream.h"
 
 #include "stim.h"
 
@@ -95,7 +100,7 @@ struct PauliStringWrapper {
 
     stim::PauliStringRef<MAX_BITWORD> ref() { return pauliString.ref(); }
 
-    std::string str() { return pauliString.str(); }
+    std::string str() const { return pauliString.str(); }
 
     stim::FlexPauliString flex() { return stim::FlexPauliString(pauliString.ref(), imaginary); }
 
@@ -153,6 +158,8 @@ PauliStringWrapper computePauliWords(const llvm::SetVector<Value> &qubits, const
     auto pauliStringWrapper = PauliStringWrapper::from_pauli_words(pauliWords);
     pauliStringWrapper.correspondingQubits = correspondingQubits;
     pauliStringWrapper.op = &op;
+    pauliStringWrapper.negated = (int16_t)op.getRotationKind() < 0;
+    pauliStringWrapper.pauliString.sign = pauliStringWrapper.negated;
     return pauliStringWrapper;
 }
 
@@ -198,15 +205,51 @@ bool isNonClifford(PPRotationOp op)
 // P is Clifford, P' is non-Clifford
 // if P commutes with P' then PP' = P'P
 // if P anti-commutes with P' then PP' = -iPP' P
-PauliStringWrapper computeCommutationRules(PauliWords &lhs, PauliWords &rhs)
+// In here, P and P' are lhs and rhs, respectively.
+PauliStringWrapper computeCommutationRules(PauliStringWrapper &lhs, PauliStringWrapper &rhs)
 {
-    auto lhsPauliStringFlex = PauliStringWrapper::from_pauli_words(lhs).flex();
-    auto rhsPauliStringFlex = PauliStringWrapper::from_pauli_words(rhs).flex();
-    auto imagFlex = FlexPauliString::from_text("i");
-
     // P * P' * i
-    FlexPauliString result = lhsPauliStringFlex * rhsPauliStringFlex * imagFlex;
+    FlexPauliString result = lhs.flex() * rhs.flex() * FlexPauliString::from_text("i");
     return PauliStringWrapper(result);
+}
+
+bool verifyPrevNonClifford(PPRotationOp op, Operation *prevOp)
+{
+    if (prevOp == nullptr)
+        return true;
+
+    if (prevOp == op)
+        return false;
+
+    if (prevOp->isBeforeInBlock(op))
+        return true;
+
+    for (auto userOp : prevOp->getOperands()) {
+        if (!verifyPrevNonClifford(op, userOp.getDefiningOp()))
+            return false;
+    }
+    return true;
+}
+
+bool verifyNextNonClifford(PPRotationOp op, PPRotationOp nextOp)
+{
+    if (!isNonClifford(nextOp))
+        return false;
+
+    if (nextOp == nullptr)
+        return false;
+
+    for (auto userOp : nextOp.getOperands()) {
+        auto defOp = userOp.getDefiningOp();
+
+        if (defOp == op)
+            continue;
+
+        if (!verifyPrevNonClifford(op, defOp))
+            return false;
+    }
+
+    return true;
 }
 
 LogicalResult visitPPRotationOp(PPRotationOp op,
@@ -216,11 +259,11 @@ LogicalResult visitPPRotationOp(PPRotationOp op,
         return failure();
     }
 
-    // TODO: Consider arbitrary gate
-    Operation *nextOp = op->getNextNode();
-    if (PPRotationOp nextPPROp = dyn_cast_or_null<PPRotationOp>(nextOp)) {
-        if (isNonClifford(nextPPROp)) {
-            return callback(nextPPROp);
+    for (auto userOp : op->getUsers()) {
+        if (auto pprOp = llvm::dyn_cast<PPRotationOp>(userOp)) {
+            if (verifyNextNonClifford(op, pprOp)) {
+                return callback(pprOp);
+            }
         }
     }
 
@@ -242,12 +285,32 @@ void updatePauliProduct(PPRotationOp op, PauliStringWrapper pauli, PatternRewrit
                                                  pauliProductArray.end());
     auto pauliProduct = rewriter.getStrArrayAttr(pauliProductArrayAttr);
     op.setPauliProductAttr(pauliProduct);
+
+    // Handle rotation kind separately
+    // Instead, use the negated flag directly
+    int16_t rotationKind = static_cast<int16_t>(op.getRotationKind());
+    int16_t sign = pauli.negated ? -1 : 1;
+
+    // Preserve the absolute value but apply the correct sign
+    rotationKind = (rotationKind < 0 ? -rotationKind : rotationKind) * sign;
+    op.setRotationKindAttr(rewriter.getI16IntegerAttr(rotationKind));
+}
+
+void replaceIdentityPauli(PauliStringWrapper &rhsPauli, PauliStringWrapper &lhsPauli)
+{
+    auto rhsPauliStr = rhsPauli.str();
+    auto lhsPauliStr = lhsPauli.str();
+    for (unsigned i = 0; i < rhsPauliStr.size(); i++) {
+        if (rhsPauliStr[i] == 'I' || rhsPauliStr[i] == '_') {
+            rhsPauliStr[i] = lhsPauliStr[i];
+        }
+    }
+    rhsPauli.pauliString = stim::PauliString<MAX_BITWORD>::from_str(rhsPauliStr.c_str());
 }
 
 void moveCliffordPastNonClifford(PauliStringWrapper lhsPauli, PauliStringWrapper rhsPauli,
                                  PauliStringWrapper *result, PatternRewriter &rewriter)
 {
-
     assert(lhsPauli.op != nullptr && "LHS Operation is not found");
     assert(rhsPauli.op != nullptr && "RHS Operation is not found");
 
@@ -266,6 +329,7 @@ void moveCliffordPastNonClifford(PauliStringWrapper lhsPauli, PauliStringWrapper
         updatePauliProduct(rhs, *result, rewriter);
     }
     else {
+        replaceIdentityPauli(rhsPauli, lhsPauli);
         updatePauliProduct(rhs, rhsPauli, rewriter);
     }
 
@@ -296,9 +360,10 @@ void moveCliffordPastNonClifford(PauliStringWrapper lhsPauli, PauliStringWrapper
     auto pauliProduct = rhs.getPauliProduct();
     SmallVector<StringRef> pauliProductArrayRef;
 
+    // Remove the Identity gate in the Pauli product
     for (auto [i, pauli] : llvm::enumerate(pauliProduct)) {
         auto pauliStr = mlir::cast<mlir::StringAttr>(pauli).getValue();
-        if (pauliStr == "I" || pauliStr == "i") {
+        if (pauliStr == "I" || pauliStr == "_") {
             // Remove the corresponding qubit
             newRHSOperands.erase(newRHSOperands.begin() + i);
             continue;
@@ -307,28 +372,31 @@ void moveCliffordPastNonClifford(PauliStringWrapper lhsPauli, PauliStringWrapper
     }
     pauliProduct = rewriter.getStrArrayAttr(pauliProductArrayRef);
 
+    SmallVector<Type> newOutQubitsTypesList;
+    for (auto qubit : newRHSOperands) {
+        newOutQubitsTypesList.push_back(qubit.getType());
+    }
+
     // Create the new PPRotationOp
-    auto nonCliffordOp = rewriter.create<PPRotationOp>(
-        rhs->getLoc(), outQubitsTypesList, pauliProduct, rhs.getRotationKindAttr(), newRHSOperands);
+    auto nonCliffordOp =
+        rewriter.create<PPRotationOp>(rhs->getLoc(), newOutQubitsTypesList, pauliProduct,
+                                      rhs.getRotationKindAttr(), newRHSOperands);
+
+    rewriter.moveOpBefore(nonCliffordOp, rhs);
 
     // Update the rotation kind of nonCliffordOp
-    if (result != nullptr) {
-        uint16_t negated = result->negated ? -1 : 1;
-        nonCliffordOp.setRotationKindAttr(
-            rewriter.getI16IntegerAttr(rhs.getRotationKind() * negated));
-    }
+    // if (result != nullptr) {
+    //     uint16_t negated = result->negated ? -1 : 1;
+    //     nonCliffordOp.setRotationKindAttr(
+    //         rewriter.getI16IntegerAttr(rhs.getRotationKind() * negated));
+    // }
 
     // update the use of value in newRHSOperands
     for (unsigned i = 0; i < newRHSOperands.size(); i++) {
         newRHSOperands[i].replaceAllUsesExcept(nonCliffordOp.getOutQubits()[i], nonCliffordOp);
     }
 
-    rewriter.moveOpBefore(nonCliffordOp, lhs);
-
-    for (auto [outQubit, inQubit] : llvm::zip(rhs.getOutQubits(), rhs.getInQubits())) {
-        rewriter.replaceAllUsesWith(outQubit, inQubit);
-    }
-    rewriter.eraseOp(rhs);
+    rewriter.replaceOp(rhs, rhs.getInQubits());
 
     assert(nonCliffordOp.getPauliProduct().size() == nonCliffordOp.getInQubits().size() &&
            "Non-Clifford Pauli product size mismatch after commutation.");
@@ -350,13 +418,22 @@ struct CommuteCliffordTPPR : public OpRewritePattern<PPRotationOp> {
             LLVM_DEBUG(printPauliWords(rhsPauliWords));
 
             if (isCommute(normOps.first, normOps.second)) {
+                LLVM_DEBUG(llvm::outs() << "Before commutation\n");
+                LLVM_DEBUG(op->getParentOp()->dump());
                 moveCliffordPastNonClifford(normOps.first, normOps.second, nullptr, rewriter);
+                sortTopologically(op->getBlock());
+                LLVM_DEBUG(llvm::outs() << "After commutation\n");
+                LLVM_DEBUG(op->getParentOp()->dump());
                 return success();
             }
             else {
-                auto resultStr = computeCommutationRules(lhsPauliWords, rhsPauliWords);
-                LLVM_DEBUG(llvm::outs() << resultStr.str() << "\n");
+                auto resultStr = computeCommutationRules(normOps.first, normOps.second);
+                LLVM_DEBUG(llvm::outs() << "Before commutation\n");
+                LLVM_DEBUG(op->getParentOp()->dump());
                 moveCliffordPastNonClifford(normOps.first, normOps.second, &resultStr, rewriter);
+                sortTopologically(op->getBlock());
+                LLVM_DEBUG(llvm::outs() << "After commutation\n");
+                LLVM_DEBUG(op->getParentOp()->dump());
                 return success();
             }
         });

@@ -433,6 +433,7 @@ def to_ppr(qnode):
 
     return wrapper
 
+
 def commute_ppr(qnode):
     """
     Specify that the ``-commute-ppr`` MLIR compiler pass
@@ -456,11 +457,11 @@ def commute_ppr(qnode):
 
     .. code-block:: python
 
-       
+
 
     Example MLIR Representation:
     .. code-block:: mlir
-        
+
     """
     if not isinstance(qnode, qml.QNode):
         raise TypeError(f"A QNode is expected, got the classical function {qnode}")
