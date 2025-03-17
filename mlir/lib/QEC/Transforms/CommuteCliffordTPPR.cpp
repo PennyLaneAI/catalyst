@@ -36,26 +36,24 @@ using PauliWords = llvm::SmallVector<std::string>;
 struct PauliStringWrapper {
     stim::PauliString<MAX_BITWORD> pauliString;
     std::vector<Value> correspondingQubits;
-    PPRotationOp *op;
+    PPRotationOp op;
     bool imaginary; // 0 for real, 1 for imaginary
-    bool negated;   // 0 for positive, 1 for negative
 
     PauliStringWrapper(std::string text, bool imag, bool sign)
-        : pauliString(stim::PauliString<MAX_BITWORD>::from_str(text.c_str())), imaginary(imag),
-          negated(sign)
+        : pauliString(stim::PauliString<MAX_BITWORD>::from_str(text.c_str())), imaginary(imag)
     {
         // allocated nullptr for correspondingQubits
         correspondingQubits.resize(pauliString.num_qubits, nullptr);
     }
     PauliStringWrapper(stim::PauliString<MAX_BITWORD> &pauliString) : pauliString(pauliString) {}
     PauliStringWrapper(stim::PauliString<MAX_BITWORD> &pauliString, bool imag, bool sign)
-        : pauliString(pauliString), imaginary(imag), negated(sign)
+        : pauliString(pauliString), imaginary(imag)
     {
         // allocated nullptr for correspondingQubits
         correspondingQubits.resize(pauliString.num_qubits, nullptr);
     }
     PauliStringWrapper(stim::FlexPauliString &fps)
-        : pauliString(fps.str()), imaginary(fps.imag), negated(fps.value.sign)
+        : pauliString(fps.str()), imaginary(fps.imag)
     {
         // allocated nullptr for correspondingQubits
         correspondingQubits.resize(pauliString.num_qubits, nullptr);
@@ -123,22 +121,20 @@ PauliStringWrapper computePauliWords(const llvm::SetVector<Value> &qubits, const
     PauliWords pauliWords(qubits.size(), "I");
     std::vector<Value> correspondingQubits;
     correspondingQubits.resize(qubits.size(), nullptr);
-    for (auto [position, value] : llvm::enumerate(llvm::zip(inOutQubits, op.getPauliProduct()))) {
-        auto qubit = std::get<0>(value);
+        for (auto [qubit, pauli] : llvm::zip(inOutQubits, op.getPauliProduct())) {
         // Find the position of the qubit in array of qubits
         auto it = std::find(qubits.begin(), qubits.end(), qubit);
         if (it != qubits.end()) {
-            position = std::distance(qubits.begin(), it);
-            auto pauli = mlir::cast<mlir::StringAttr>(std::get<1>(value)).getValue();
-            pauliWords[position] = pauli;
+            auto position = std::distance(qubits.begin(), it);
+            auto pauliStr = mlir::cast<mlir::StringAttr>(pauli).getValue();
+            pauliWords[position] = pauliStr;
             correspondingQubits[position] = qubit;
         }
     }
     auto pauliStringWrapper = PauliStringWrapper::from_pauli_words(pauliWords);
     pauliStringWrapper.correspondingQubits = correspondingQubits;
-    pauliStringWrapper.op = &op;
-    pauliStringWrapper.negated = (int16_t)op.getRotationKind() < 0;
-    pauliStringWrapper.pauliString.sign = pauliStringWrapper.negated;
+    pauliStringWrapper.op = op;
+    pauliStringWrapper.pauliString.sign = (int16_t)op.getRotationKind() < 0;
     return pauliStringWrapper;
 }
 
@@ -188,6 +184,7 @@ PauliStringWrapper computeCommutationRules(PauliStringWrapper &lhs, PauliStringW
 {
     // P * P' * i
     FlexPauliString result = lhs.flex() * rhs.flex() * FlexPauliString::from_text("i");
+    assert(!result.imag && "Resulting Pauli string should be real");
     return PauliStringWrapper(result);
 }
 
@@ -202,8 +199,8 @@ bool verifyPrevNonClifford(PPRotationOp op, Operation *prevOp)
     if (prevOp->isBeforeInBlock(op))
         return true;
 
-    for (auto userOp : prevOp->getOperands()) {
-        if (!verifyPrevNonClifford(op, userOp.getDefiningOp()))
+    for (auto operandValue : prevOp->getOperands()) {
+        if (!verifyPrevNonClifford(op, operandValue.getDefiningOp()))
             return false;
     }
     return true;
@@ -217,8 +214,8 @@ bool verifyNextNonClifford(PPRotationOp op, PPRotationOp nextOp)
     if (nextOp == nullptr)
         return false;
 
-    for (auto userOp : nextOp.getOperands()) {
-        auto defOp = userOp.getDefiningOp();
+    for (auto operandValue : nextOp.getOperands()) {
+        auto defOp = operandValue.getDefiningOp();
 
         if (defOp == op)
             continue;
@@ -258,7 +255,7 @@ void updatePauliProduct(PPRotationOp rhsOp, PauliStringWrapper pauli, PatternRew
     // Handle rotation kind separately
     // Instead, use the negated flag directly
     int16_t rotationKind = static_cast<int16_t>(rhsOp.getRotationKind());
-    int16_t sign = pauli.negated ? -1 : 1;
+    int16_t sign = pauli.pauliString.sign ? -1 : 1;
 
     // Preserve the absolute value but apply the correct sign
     rotationKind = (rotationKind < 0 ? -rotationKind : rotationKind) * sign;
@@ -280,8 +277,8 @@ void replaceIdentityPauli(PauliStringWrapper &rhsPauli, PauliStringWrapper &lhsP
 SmallVector<Value> fullfillOperands(PauliStringWrapper lhsPauliWrapper,
                                     PauliStringWrapper rhsPauliWrapper)
 {
-    auto lhs = *lhsPauliWrapper.op;
-    auto rhs = *rhsPauliWrapper.op;
+    auto lhs = lhsPauliWrapper.op;
+    auto rhs = rhsPauliWrapper.op;
     auto rhsPauliSize = rhsPauliWrapper.correspondingQubits.size();
 
     // Fullfill Operands of RHS
@@ -327,8 +324,8 @@ void moveCliffordPastNonClifford(PauliStringWrapper lhsPauli, PauliStringWrapper
     assert(lhsPauli.op != nullptr && "LHS Operation is not found");
     assert(rhsPauli.op != nullptr && "RHS Operation is not found");
 
-    auto lhs = *lhsPauli.op;
-    auto rhs = *rhsPauli.op;
+    auto lhs = lhsPauli.op;
+    auto rhs = rhsPauli.op;
 
     assert(!isNonClifford(lhs) && "LHS Operation is not Clifford");
     assert(isNonClifford(rhs) && "RHS Operation is not non-Clifford");
