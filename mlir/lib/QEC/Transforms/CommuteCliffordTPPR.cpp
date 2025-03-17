@@ -134,7 +134,7 @@ PauliStringWrapper computePauliWords(const llvm::SetVector<Value> &qubits, const
         }
     }
     auto pauliStringWrapper = PauliStringWrapper::from_pauli_words(pauliWords);
-    pauliStringWrapper.correspondingQubits = correspondingQubits;
+    pauliStringWrapper.correspondingQubits = std::move(correspondingQubits);
     pauliStringWrapper.op = &op;
     pauliStringWrapper.negated = (int16_t)op.getRotationKind() < 0;
     pauliStringWrapper.pauliString.sign = pauliStringWrapper.negated;
