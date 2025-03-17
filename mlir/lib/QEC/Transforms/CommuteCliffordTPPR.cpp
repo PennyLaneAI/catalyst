@@ -121,8 +121,7 @@ PauliStringWrapper computePauliWords(const llvm::SetVector<Value> &qubits, const
 {
     // PauliNames initializes with "I" for each qubit
     PauliWords pauliWords(qubits.size(), "I");
-    std::vector<Value> correspondingQubits;
-    correspondingQubits.resize(qubits.size(), nullptr);
+    std::vector<Value> correspondingQubits(qubits.size(), nullptr);
     for (auto [position, value] : llvm::enumerate(llvm::zip(inOutQubits, op.getPauliProduct()))) {
         auto qubit = std::get<0>(value);
         // Find the position of the qubit in array of qubits
