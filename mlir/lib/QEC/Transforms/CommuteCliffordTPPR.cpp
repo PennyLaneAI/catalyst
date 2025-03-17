@@ -31,7 +31,7 @@ namespace {
 
 constexpr static size_t MAX_BITWORD = stim::MAX_BITWORD_WIDTH;
 
-using PauliWords = llvm::SmallVector<std::string>;
+using PauliWord = llvm::SmallVector<std::string>;
 
 struct PauliStringWrapper {
     stim::PauliString<MAX_BITWORD> pauliString;
