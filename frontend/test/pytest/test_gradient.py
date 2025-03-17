@@ -2020,6 +2020,12 @@ class TestParameterShiftVerificationUnitTests:
 
         assert not _are_param_frequencies_same_as_catalyst(DummyOp(wires=[0]))
 
+    def test_undefined_frequencies(self):
+        """Test ParameterFrequenciesUndefinedError"""
+
+        op = qml.ops.op_math.Exp(qml.PauliX(0), 1)
+        assert _are_param_frequencies_same_as_catalyst(op)
+
 
 class TestParameterShiftVerificationIntegrationTests:
     """Test to verify operations / observables / measurements when doing parameter shift.
