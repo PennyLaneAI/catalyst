@@ -101,11 +101,7 @@ struct PauliStringWrapper {
         PauliWords pauliWords;
         auto str = pauliString.str();
         for (char c : str) {
-            if (c == 'i')
-                continue;
-            if (c == '-')
-                continue;
-            if (c == '+')
+            if (c == 'i' || c == '-' || c == '+')
                 continue;
             if (c == '_') {
                 pauliWords.push_back("I");
@@ -118,15 +114,6 @@ struct PauliStringWrapper {
 
     bool commutes(PauliStringWrapper &other) { return ref().commutes(other.ref()); }
 };
-
-// Track the Pauli words of the PPRotationOps
-// The key is the Pauli word, the value is the qubits
-// e.g:
-// %qa:3 = qec.ppr ["X","Z","Y"](8) %q0, %q1, %q2 : !quantum.bit, !quantum.bit, !quantum.bit
-// %qb = qec.ppr ["Z","Y"](8) %qa#0, %qa#2 : !quantum.bit, !quantum.bit, !quantum.bit
-// TrackedPauliWord of %qb is:
-// [("Z", %qa#0), ("I", %qa#1), ("Y", %qa#2)]
-using TrackedPauliWord = llvm::SmallVector<std::pair<StringRef, Value>>;
 
 template <typename T>
 PauliStringWrapper computePauliWords(const llvm::SetVector<Value> &qubits, const T &inOutQubits,
