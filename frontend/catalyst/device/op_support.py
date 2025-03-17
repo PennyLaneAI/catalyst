@@ -101,6 +101,15 @@ def _are_param_frequencies_same_as_catalyst(op):
 
 def _paramshift_op_checker(op):
 
+    if isinstance(op, qml.QubitUnitary):
+        # Cannot take param shift of qubit unitary.
+        return False
+
+    if type(op) in (qml.ops.Controlled, qml.ops.ControlledOp):
+        # Cannot take param shift of controlled ops.
+        # It will always be four term shift rule.
+        return False
+
     if not _is_grad_recipe_same_as_catalyst(op):
         return False
 
@@ -110,6 +119,7 @@ def _paramshift_op_checker(op):
     if not isinstance(op, HybridOp):
         if op.grad_method not in {"A", None}:
             raise DifferentiableCompileError(f"{op.name} does not support analytic differentiation")
+
     return True
 
 
