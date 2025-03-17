@@ -500,7 +500,7 @@ struct QuantumToIonRewritePattern : public mlir::OpConversionPattern<CustomOp> {
         }
         // RY case -> PP(P1, P2)
         else if (op.getGateName() == "RY") {
-            auto result = oneQubitGateToPulse(op, rewriter, 0.0, llvm::numbers::pi, beams1);
+            auto result = oneQubitGateToPulse(op, rewriter, llvm::numbers::pi / 2, 0, beams1);
             return result;
         }
         // MS case -> PP(P1, P2, P3, P4, P5, P6)
