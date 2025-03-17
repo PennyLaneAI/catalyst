@@ -28,6 +28,16 @@ from pennylane.capture.expand_transforms import ExpandTransformsInterpreter
 from pennylane.capture.primitives import cond_prim as plxpr_cond_prim
 from pennylane.capture.primitives import for_loop_prim as plxpr_for_loop_prim
 from pennylane.capture.primitives import while_loop_prim as plxpr_while_loop_prim
+from pennylane.ops.functions.map_wires import _map_wires_transform as pl_map_wires
+from pennylane.transforms import cancel_inverses as pl_cancel_inverses
+from pennylane.transforms import commute_controlled as pl_commute_controlled
+from pennylane.transforms import decompose as pl_decompose
+from pennylane.transforms import (
+    merge_amplitude_embedding as pl_merge_amplitude_embedding,
+)
+from pennylane.transforms import merge_rotations as pl_merge_rotations
+from pennylane.transforms import single_qubit_fusion as pl_single_qubit_fusion
+from pennylane.transforms import unitary_to_rot as pl_unitary_to_rot
 
 from catalyst.device import (
     extract_backend_info,
@@ -179,9 +189,14 @@ def handle_qnode(
 # PL transforms having a Catalyst pass counterpart will have a name as value,
 # otherwise their value will be None.
 transforms_to_passes = {
-    qml.transforms.cancel_inverses: "remove-chained-self-inverse",
-    qml.transforms.merge_rotations: "merge-rotations",
-    qml.transforms.unitary_to_rot: None,
+    pl_cancel_inverses: "remove-chained-self-inverse",
+    pl_commute_controlled: None,
+    pl_decompose: None,
+    pl_map_wires: None,
+    pl_merge_amplitude_embedding: None,
+    pl_merge_rotations: "merge-rotations",
+    pl_single_qubit_fusion: None,
+    pl_unitary_to_rot: None,
 }
 
 
