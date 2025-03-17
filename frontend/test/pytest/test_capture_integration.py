@@ -45,6 +45,15 @@ def is_unitary_rotated(mlir):
     )
 
 
+def is_rot_decomposed(mlir):
+    """Check in the MLIR if a rot was decomposed"""
+    return (
+        'quantum.custom "Rot"' not in mlir
+        and mlir.count('quantum.custom "RZ"') == 2
+        and mlir.count('quantum.custom "RY"') == 1
+    )
+
+
 # pylint: disable=too-many-public-methods
 class TestCapture:
     """Integration tests for Catalyst adjoint functionality."""
@@ -669,3 +678,23 @@ class TestCapture:
             == inverses_unitary_result
             == unitary_inverses_result
         )
+
+    def test_transform_decompose_workflow(self, backend):
+        """Test the integration for a circuit with a 'decompose' transform."""
+
+        def func(x: float, y: float, z: float):
+
+            @qml.qnode(qml.device(backend, wires=2))
+            def circuit(x: float, y: float, z: float):
+                qml.Rot(x, y, z, 0)
+                return qml.expval(qml.PauliZ(0))
+
+            return qml.transforms.decompose(circuit, gate_set=[qml.RX, qml.RY, qml.RZ])(x, y, z)
+
+        captured_func = qml.qjit(func, experimental_capture=True, target="mlir")
+
+        assert is_rot_decomposed(captured_func.mlir)
+
+        no_capture_result = qml.qjit(func)(1.5, 2.5, 3.5)
+        experimental_capture_result = captured_func(1.5, 2.5, 3.5)
+        assert no_capture_result == experimental_capture_result, no_capture_result
