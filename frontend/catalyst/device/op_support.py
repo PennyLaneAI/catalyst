@@ -71,12 +71,19 @@ def _is_grad_recipe_same_as_catalyst(op):
 def _are_param_frequencies_same_as_catalyst(op):
     """Check if the parameter frequencies are all close to 1."""
 
-    if not hasattr(op, "parameter_frequencies"):
-        return True
+    try:
+        if not hasattr(op, "parameter_frequencies"):
+            return True
 
-    is_valid_len = len(op.data) == len(op.parameter_frequencies)
-    if not is_valid_len:
-        return False
+        is_valid_len = len(op.data) == len(op.parameter_frequencies)
+        if not is_valid_len:
+            return False
+    except qml.operation.ParameterFrequenciesUndefinedError:
+        # This is a little bit counter intuitive.
+        # op.parameter_frequencies failed because there were no parameter frequencies defined.
+        # and since one of our conditions was that if there are no parameter frequencies
+        # defined this check should succeed, well then we return true.
+        return True
 
     with jax.ensure_compile_time_eval():
         # We use jax.ensure_compile_time_eval
