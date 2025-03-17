@@ -1016,19 +1016,46 @@ int64_t __catalyst__rt__array_get_size_1d(QirArray *ptr)
     return qubit_vector_ptr->size();
 }
 
+void printvec(std::vector<QubitIdType> *qubit_vector_ptr ){
+    std::cout << "vector size: " << qubit_vector_ptr->size() << "\n";
+    for (auto _ : *qubit_vector_ptr){
+        std::cout << _ << "\n";
+    }
+}
+
+static std::map<int64_t/*user_idx*/, int64_t/*alloced_idx*/> user_idx_to_alloced_idx_map;
+
 int8_t *__catalyst__rt__array_get_element_ptr_1d(QirArray *ptr, int64_t idx)
 {
+
+    std::cout << "getlement, ptr: " << ptr << ", idx: " << idx << "\n";
     std::vector<QubitIdType> *qubit_vector_ptr = reinterpret_cast<std::vector<QubitIdType> *>(ptr);
+
+    printvec(qubit_vector_ptr);
 
     RT_ASSERT(idx >= 0);
     std::string error_msg = "The qubit register does not contain the requested wire: ";
     error_msg += std::to_string(idx);
     //RT_FAIL_IF(static_cast<size_t>(idx) >= qubit_vector_ptr->size(), error_msg.c_str());
     if (static_cast<size_t>(idx) >= qubit_vector_ptr->size()){
-        qubit_vector_ptr->push_back(reinterpret_cast<QubitIdType>(__catalyst__rt__qubit_allocate()));
-        return (int8_t *)&(qubit_vector_ptr->back());
+        if (user_idx_to_alloced_idx_map.count(idx) == 0){
+            // not in map, aka new user idx
+            auto new_alloced_id = reinterpret_cast<QubitIdType>(__catalyst__rt__qubit_allocate());
+            std::cout << "new alloced id is " << new_alloced_id << "\n";
+            qubit_vector_ptr->push_back(new_alloced_id);
+            user_idx_to_alloced_idx_map.insert({idx,qubit_vector_ptr->size()-1});
+            printvec(qubit_vector_ptr);
+            return (int8_t *)&(qubit_vector_ptr->back());
+        }
+        else {
+            // in map, aka a seen user idx
+            printvec(qubit_vector_ptr);
+            std::cout << "retreiving from map: " << (user_idx_to_alloced_idx_map[idx]) << "\n";
+            return (int8_t *)&((*qubit_vector_ptr)[user_idx_to_alloced_idx_map[idx]]);
+        }
     }
     QubitIdType *data = qubit_vector_ptr->data();
+    printvec(qubit_vector_ptr);
     return (int8_t *)&data[idx];
 }
 }
