@@ -195,11 +195,13 @@ mlir::Value computePulseDuration(mlir::PatternRewriter &rewriter, mlir::Location
     TypedAttr rabiAttr = rewriter.getF64FloatAttr(rabi);
     mlir::Value rabiValue = rewriter.create<arith::ConstantOp>(loc, rabiAttr).getResult();
     TypedAttr detuningTimesTwoAttr = rewriter.getF64FloatAttr(detuning * 2);
-    mlir::Value detuningTimesTwoValue = rewriter.create<arith::ConstantOp>(loc, detuningTimesTwoAttr).getResult();
+    mlir::Value detuningTimesTwoValue =
+        rewriter.create<arith::ConstantOp>(loc, detuningTimesTwoAttr).getResult();
     mlir::Value detuningTimesTwoTimesAngle =
         rewriter.create<arith::MulFOp>(loc, normalizedAngle, detuningTimesTwoValue);
     mlir::Value rabiSquared = rewriter.create<arith::MulFOp>(loc, rabiValue, rabiValue);
-    mlir::Value duration = rewriter.create<arith::DivFOp>(loc, detuningTimesTwoTimesAngle, rabiSquared);
+    mlir::Value duration =
+        rewriter.create<arith::DivFOp>(loc, detuningTimesTwoTimesAngle, rabiSquared);
     return duration;
 }
 
