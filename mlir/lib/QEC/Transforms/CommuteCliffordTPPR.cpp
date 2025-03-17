@@ -31,7 +31,7 @@ namespace {
 
 constexpr static size_t MAX_BITWORD = stim::MAX_BITWORD_WIDTH;
 
-using PauliWords = llvm::SmallVector<std::string>;
+using PauliWord = llvm::SmallVector<std::string>;
 
 struct PauliStringWrapper {
     stim::PauliString<MAX_BITWORD> pauliString;
@@ -79,7 +79,7 @@ struct PauliStringWrapper {
         return PauliStringWrapper(std::string(text), imaginary, negated);
     }
 
-    static PauliStringWrapper from_pauli_words(PauliWords &pauliWords)
+    static PauliStringWrapper from_pauli_words(PauliWord &pauliWords)
     {
         std::string pauliStringStr;
         for (auto pauli : pauliWords) {
@@ -94,9 +94,9 @@ struct PauliStringWrapper {
 
     stim::FlexPauliString flex() { return stim::FlexPauliString(pauliString.ref(), imaginary); }
 
-    PauliWords get_pauli_words()
+    PauliWord get_pauli_words()
     {
-        PauliWords pauliWords;
+        PauliWord pauliWords;
         auto str = pauliString.str();
         for (char c : str) {
             if (c == 'i' || c == '-' || c == '+')
@@ -118,7 +118,7 @@ PauliStringWrapper computePauliWords(const llvm::SetVector<Value> &qubits, const
                                      PPRotationOp &op)
 {
     // PauliNames initializes with "I" for each qubit
-    PauliWords pauliWords(qubits.size(), "I");
+    PauliWord pauliWords(qubits.size(), "I");
     std::vector<Value> correspondingQubits;
     correspondingQubits.resize(qubits.size(), nullptr);
         for (auto [qubit, pauli] : llvm::zip(inOutQubits, op.getPauliProduct())) {
@@ -138,10 +138,10 @@ PauliStringWrapper computePauliWords(const llvm::SetVector<Value> &qubits, const
     return pauliStringWrapper;
 }
 
-using PauliWordsPair = std::pair<PauliStringWrapper, PauliStringWrapper>;
+using PauliWordPair = std::pair<PauliStringWrapper, PauliStringWrapper>;
 
 // normalize the Pauli product of two PPRotationOps
-PauliWordsPair normalizePPROps(PPRotationOp &lhs, PPRotationOp &rhs)
+PauliWordPair normalizePPROps(PPRotationOp &lhs, PPRotationOp &rhs)
 {
     auto lhsQubits = lhs.getOutQubits();
     auto rhsQubits = rhs.getInQubits();
@@ -376,7 +376,7 @@ struct CommuteCliffordTPPR : public OpRewritePattern<PPRotationOp> {
     LogicalResult matchAndRewrite(PPRotationOp op, PatternRewriter &rewriter) const override
     {
         return visitPPRotationOp(op, [&](PPRotationOp nextPPROp) {
-            PauliWordsPair normOps = normalizePPROps(op, nextPPROp);
+            PauliWordPair normOps = normalizePPROps(op, nextPPROp);
 
             if (isCommute(normOps.first, normOps.second)) {
                 moveCliffordPastNonClifford(normOps.first, normOps.second, nullptr, rewriter);
