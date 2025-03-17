@@ -17,7 +17,7 @@ This module contains the functions to verify quantum tapes are fully compatible
 with the compiler and device.
 """
 
-from typing import Any, Callable, Sequence, Union
+from typing import Any, Callable, List, Sequence, Union
 
 from pennylane import transform
 from pennylane.devices.capabilities import DeviceCapabilities, OperatorProperties
@@ -31,13 +31,22 @@ from pennylane.measurements import (
     VnEntropyMP,
 )
 from pennylane.measurements.shots import Shots
-from pennylane.operation import Operation, StatePrepBase
-from pennylane.ops import Adjoint, CompositeOp, Controlled, ControlledOp, SymbolicOp
+from pennylane.operation import Operation
+from pennylane.ops import (
+    Adjoint,
+    BasisState,
+    CompositeOp,
+    Controlled,
+    ControlledOp,
+    StatePrep,
+    SymbolicOp,
+)
 from pennylane.tape import QuantumTape
 
 from catalyst.api_extensions import HybridAdjoint, HybridCtrl
 from catalyst.device.op_support import (
     EMPTY_PROPERTIES,
+    is_active,
     is_controllable,
     is_differentiable,
     is_invertible,
@@ -48,24 +57,26 @@ from catalyst.utils.exceptions import CompileError, DifferentiableCompileError
 
 
 def _verify_nested(
-    tape: QuantumTape,
+    operations: List[Operation],
     state: Any,
     op_checker_fn: Callable[[Operation, Any], Any],
 ) -> Any:
     """Traverse the nested quantum tape, carry a caller-defined state."""
 
     ctx = EvaluationContext.get_main_tracing_context()
-    for op in tape.operations:
+    for op in operations:
         inner_state = op_checker_fn(op, state)
         if has_nested_tapes(op):
             for region in nested_quantum_regions(op):
                 if region.trace is not None:
                     with EvaluationContext.frame_tracing_context(ctx, region.trace):
                         inner_state = _verify_nested(
-                            region.quantum_tape, inner_state, op_checker_fn
+                            region.quantum_tape.operations, inner_state, op_checker_fn
                         )
                 else:
-                    inner_state = _verify_nested(region.quantum_tape, inner_state, op_checker_fn)
+                    inner_state = _verify_nested(
+                        region.quantum_tape.operations, inner_state, op_checker_fn
+                    )
     return state
 
 
@@ -184,13 +195,9 @@ def verify_operations(tape: QuantumTape, grad_method, qjit_device):
         # Don't check PennyLane Adjoint / Controlled instances directly since the compound name
         # (e.g. "Adjoint(Hadamard)") will not show up in the device capabilities. Instead the check
         # is handled in _inv_op_checker and _ctrl_op_checker.
-        # Specialed control op classes (e.g. CRZ) should be checked directly though, which is why we
-        # can't use isinstance(op, Controlled).
+        # Specialized control op classes (e.g. CRZ) should be checked directly though, which is why
+        # we can't use isinstance(op, Controlled).
         if type(op) in (Controlled, ControlledOp) or isinstance(op, (Adjoint)):
-            pass
-        # Don't check StatePrep since StatePrep is not in the list of device capabilities.
-        # It is only valid when the TOML file has the initial_state_prep_flag.
-        elif isinstance(op, StatePrepBase) and qjit_device.capabilities.initial_state_prep:
             pass
         elif not op.name in supported_ops:
             raise CompileError(
@@ -208,7 +215,16 @@ def verify_operations(tape: QuantumTape, grad_method, qjit_device):
 
         return (in_inverse, in_control)
 
-    _verify_nested(tape, (False, False), _op_checker)
+    ops_to_verify = tape.operations
+    # state prep support only at the beginning of the program has a special flag
+    if qjit_device.capabilities.initial_state_prep:
+        # Catalyst only supports two types of state prep ops (see also comment in decomposition)
+        if len(ops_to_verify) > 0 and type(ops_to_verify[0]) in (StatePrep, BasisState):
+            # inactive state prep ops can also be allowed in differentiated programs
+            if grad_method is None or not is_active(tape[0]):
+                ops_to_verify = ops_to_verify[1:]
+
+    _verify_nested(ops_to_verify, (False, False), _op_checker)
 
     return (tape,), lambda x: x[0]
 
