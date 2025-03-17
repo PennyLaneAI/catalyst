@@ -790,6 +790,7 @@ def test_ps_probs(backend):
     assert np.allclose(result, reference)
 
 
+@pytest.mark.xfail(reason="Issue #1571 https://github.com/PennyLaneAI/catalyst/issues/1571")
 @pytest.mark.parametrize("gate_n_inputs", [(qml.CRX, [1]), (qml.CRot, [1, 2, 3])])
 def test_ps_four_term_rule(backend, gate_n_inputs):
     """Operations with the 4-term shift rule need to be decomposed to be differentiated."""
