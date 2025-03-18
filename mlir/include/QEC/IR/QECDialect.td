@@ -71,7 +71,7 @@ def PPRotationOp : QEC_Op<"ppr", [QECOpInterface]> {
         - θ is the rotation angle (specified by rotation_kind in fractions of π)
         
         The operation is characterized by:
-        1. A Pauli product (e.g., "XIZ") specifying which Pauli operators to apply
+        1. A Pauli product (e.g., ["X", "I", "Z"]) specifying which Pauli operators to apply
         2. A rotation kind (in fractions of π) specifying the angle
         3. A list of input qubits to apply the rotation to
         
@@ -79,19 +79,19 @@ def PPRotationOp : QEC_Op<"ppr", [QECOpInterface]> {
         
         Example:
         ```mlir
-        %result = qec.ppr "XIZ"(4) %q0, %q1, %q2 : (qreg, qreg, qreg) -> (qreg, qreg, qreg)
+        %result = qec.ppr ["X", "I", "Z"](4) %q0, %q1, %q2 : (qreg, qreg, qreg) -> (qreg, qreg, qreg)
         ```
-        This applies exp(iπ/2 * X⊗I⊗Z) to the three qubits.
+        This applies exp(iπ/4 * X⊗I⊗Z) to the three qubits.
     }];
 
     let arguments = (ins
-        PauliWord:$pauli_product,  // The Pauli product to apply (e.g., "XIZ")
+        PauliWord:$pauli_product,  // The Pauli product to apply (e.g., ["X", "I", "Z"])
         I16Attr:$rotation_kind,    // Rotation angle in fractions of π (e.g., 4 for π/2)
         Variadic<QubitType>:$in_qubits  // The qubits to apply the rotation to
     );
 
     let results = (outs
-        Variadic<QubitType>:$out_qubits  // The rotated qubits
+        Variadic<QubitType>:$out_qubits
     );
 
     let assemblyFormat = [{
@@ -101,16 +101,13 @@ def PPRotationOp : QEC_Op<"ppr", [QECOpInterface]> {
     let hasVerifier = 1;
 
     code extraBaseClassDeclaration = [{
-        bool hasRotationKind(){
-            return true;
-        };
         bool isNonClifford(){
             int16_t rotationKind = static_cast<int16_t>(getRotationKind());
-            return rotationKind == 8 || rotationKind == -8;  // π/4 rotations are non-Clifford
+            return rotationKind == 8 || rotationKind == -8;  // π/8 rotations are non-Clifford
         };
         bool isClifford(){
             int16_t rotationKind = static_cast<int16_t>(getRotationKind());
-            return rotationKind == 4 || rotationKind == -4;  // π/2 rotations are Clifford
+            return rotationKind == 4 || rotationKind == -4;  // π/4 rotations are Clifford
         };
     }];
     let extraClassDeclaration = extraBaseClassDeclaration;
@@ -155,9 +152,6 @@ def PPMeasurementOp : QEC_Op<"ppm", [QECOpInterface]> {
     let hasVerifier = 1;
 
     code extraBaseClassDeclaration = [{
-        bool hasRotationKind(){
-            return false;  // Measurements don't have rotation angles
-        };
         uint16_t getRotationKind(){
             return 0;  // Default value for measurements
         };
