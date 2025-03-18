@@ -85,18 +85,6 @@ LogicalResult visitPPRotationOp(PPRotationOp op,
     return failure();
 }
 
-void replaceIdentityPauli(PauliStringWrapper &rhsPauli, PauliStringWrapper &lhsPauli)
-{
-    auto rhsPauliStr = rhsPauli.str();
-    auto lhsPauliStr = lhsPauli.str();
-    for (unsigned i = 0; i < rhsPauliStr.size(); i++) {
-        if (rhsPauliStr[i] == 'I' || rhsPauliStr[i] == '_') {
-            rhsPauliStr[i] = lhsPauliStr[i];
-        }
-    }
-    rhsPauli.pauliString = stim::PauliString<MAX_BITWORD>::from_str(rhsPauliStr.c_str());
-}
-
 void moveCliffordPastNonClifford(PauliStringWrapper lhsPauli, PauliStringWrapper rhsPauli,
                                  PauliStringWrapper *result, PatternRewriter &rewriter)
 {

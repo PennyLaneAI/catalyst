@@ -93,7 +93,7 @@ struct PauliStringWrapper {
         return PauliStringWrapper(std::string(text), imaginary, negated);
     }
 
-    static PauliStringWrapper from_pauli_words(PauliWord &pauliWord)
+    static PauliStringWrapper from_pauli_word(PauliWord &pauliWord)
     {
         std::string pauliStringStr;
         for (auto pauli : pauliWord) {
@@ -133,6 +133,11 @@ struct PauliStringWrapper {
     // In here, P and P' are lhs and rhs, respectively.
     PauliStringWrapper computeCommutationRulesWith(PauliStringWrapper &rhs);
 };
+
+
+////////////////////////////////////////////////////////////
+//                  QEC Helper functions
+////////////////////////////////////////////////////////////
 
 using PauliWordPair = std::pair<PauliStringWrapper, PauliStringWrapper>;
 

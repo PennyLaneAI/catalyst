@@ -258,18 +258,18 @@ func.func public @game_of_surface_code(%q1: !quantum.bit, %q2: !quantum.bit, %q3
     // Z(8) q1
     // Y(-8) q4
     // YX(8) q3, q2
-    // CHECK-DAG: %0 = qec.ppr ["Z"](8) %arg0 : !quantum.bit
+    // CHECK: %0 = qec.ppr ["Z"](8) %arg0 : !quantum.bit
     // CHECK-DAG: %1 = qec.ppr ["Y"](-8) %arg3 : !quantum.bit
     // CHECK-DAG: %2:2 = qec.ppr ["Y", "X"](8) %arg2, %arg1 : !quantum.bit, !quantum.bit
 
     // ZZZY(-8) q3, q2, q4, q1
-    // CHECK-DAG: %3:4 = qec.ppr ["Z", "Z", "Y", "Z"](-8) %2#0, %2#1, %1, %0 :
+    // CHECK: %3:4 = qec.ppr ["Z", "Z", "Y", "Z"](-8) %2#0, %2#1, %1, %0 :
 
     // X(-4) q4
     // CNOT(q3, q2) -> ZX(4) q3, q2 * X(-4) q2 * Z(-4) q3
-    // CHECK-DAG: %4 = qec.ppr ["X"](-4) %3#2 : !quantum.bit
-    // CHECK-DAG: %5:2 = qec.ppr ["Z", "X"](4) %3#0, %3#1 : !quantum.bit, !quantum.bit
-    // CHECK-DAG: %6 = qec.ppr ["X"](-4) %5#1 : !quantum.bit
+    // CHECK: %4 = qec.ppr ["X"](-4) %3#2 : !quantum.bit
+    // CHECK: %5:2 = qec.ppr ["Z", "X"](4) %3#0, %3#1 : !quantum.bit, !quantum.bit
+    // CHECK: %6 = qec.ppr ["X"](-4) %5#1 : !quantum.bit
     // CHECK-DAG: %18 = qec.ppr ["Z"](-4) %5#0 : !quantum.bit
 
     // CNOT(q2, q1)

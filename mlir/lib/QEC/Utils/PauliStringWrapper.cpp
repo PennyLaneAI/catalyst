@@ -54,8 +54,8 @@ PauliWordPair normalizePPROps(QECOpInterface lhs, QECOpInterface rhs)
     PauliWord lhsPauliWord = expandPauliWord(allOperands, lhsQubits, lhs);
     PauliWord rhsPauliWord = expandPauliWord(allOperands, rhsQubits, rhs);
 
-    PauliStringWrapper lhsPSWrapper = PauliStringWrapper::from_pauli_words(lhsPauliWord);
-    PauliStringWrapper rhsPSWrapper = PauliStringWrapper::from_pauli_words(rhsPauliWord);
+    PauliStringWrapper lhsPSWrapper = PauliStringWrapper::from_pauli_word(lhsPauliWord);
+    PauliStringWrapper rhsPSWrapper = PauliStringWrapper::from_pauli_word(rhsPauliWord);
 
     lhsPSWrapper.correspondingQubits = std::vector<Value>(allOperands.begin(), allOperands.end());
     rhsPSWrapper.correspondingQubits = lhsPSWrapper.correspondingQubits;
