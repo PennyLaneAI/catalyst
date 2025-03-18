@@ -134,6 +134,24 @@ def pipeline(pass_pipeline: PipelineDict):
     return _decorator
 
 
+class QnodeCaller:
+    """A wrapper class for QNodes that preserves the pass pipeline when called.
+
+    This class is used internally by pass decorators to ensure that compiler passes
+    are properly applied when the QNode is called.
+
+    Args:
+        qnode (QNode or callable): The QNode or wrapped QNode function to call
+
+    """
+
+    def __init__(self, qnode):
+        self.qnode = qnode
+
+    def __call__(self, *args, **kwargs):
+        return self.qnode(*args, **kwargs)
+
+
 def apply_pass(pass_name: str, *flags, **valued_options):
     """Applies a single pass to the QNode, where the pass is from Catalyst or a third-party
     if `entry_points` has been implemented. See
@@ -161,8 +179,7 @@ def apply_pass(pass_name: str, *flags, **valued_options):
     """
 
     def decorator(qnode):
-
-        if not isinstance(qnode, qml.QNode):
+        if not (isinstance(qnode, qml.QNode) or isinstance(qnode, QnodeCaller)):
             # Technically, this apply pass is general enough that it can apply to
             # classical functions too. However, since we lack the current infrastructure
             # to denote a function, let's limit it to qnodes
@@ -175,7 +192,7 @@ def apply_pass(pass_name: str, *flags, **valued_options):
             kwargs["pass_pipeline"] = pass_pipeline
             return qnode(*args, **kwargs)
 
-        return qnode_call
+        return QnodeCaller(qnode_call)
 
     return decorator
 
@@ -215,7 +232,7 @@ def apply_pass_plugin(path_to_plugin: str | Path, pass_name: str, *flags, **valu
         raise FileNotFoundError(f"File '{path_to_plugin}' does not exist.")
 
     def decorator(qnode):
-        if not isinstance(qnode, qml.QNode):
+        if not (isinstance(qnode, qml.QNode) or isinstance(qnode, QnodeCaller)):
             # Technically, this apply pass is general enough that it can apply to
             # classical functions too. However, since we lack the current infrastructure
             # to denote a function, let's limit it to qnodes
@@ -228,7 +245,7 @@ def apply_pass_plugin(path_to_plugin: str | Path, pass_name: str, *flags, **valu
             kwargs["pass_pipeline"] = pass_pipeline
             return qnode(*args, **kwargs)
 
-        return qnode_call
+        return QnodeCaller(qnode_call)
 
     return decorator
 
