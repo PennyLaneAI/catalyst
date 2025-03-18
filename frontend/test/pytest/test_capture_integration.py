@@ -61,6 +61,15 @@ def is_wire_mapped(mlir):
     return "quantum.extract %0[ 0]" not in mlir and "quantum.extract %0[ 1]" in mlir
 
 
+def is_single_qubit_fusion_applied(mlir):
+    """Check in the MLIR if 'single_qubit_fusion' was applied"""
+    return (
+        mlir.count('quantum.custom "Rot"') == 1
+        and 'quantum.custom "Hadamard"' not in mlir
+        and 'quantum.custom "RZ"' not in mlir
+    )
+
+
 # pylint: disable=too-many-public-methods
 class TestCapture:
     """Integration tests for Catalyst adjoint functionality."""
@@ -703,7 +712,7 @@ class TestCapture:
 
         no_capture_result = qml.qjit(func)(1.5, 2.5, 3.5)
         experimental_capture_result = captured_func(1.5, 2.5, 3.5)
-        assert no_capture_result == experimental_capture_result, no_capture_result
+        assert no_capture_result == experimental_capture_result
 
     def test_transform_map_wires_workflow(self, backend):
         """Test the integration for a circuit with a 'map_wires' transform."""
@@ -723,4 +732,28 @@ class TestCapture:
 
         no_capture_result = qml.qjit(func)(1.5)
         experimental_capture_result = captured_func(1.5)
-        assert no_capture_result == experimental_capture_result, no_capture_result
+        assert no_capture_result == experimental_capture_result
+
+    def test_transform_single_qubit_fusion_workflow(self, backend):
+        """Test the integration for a circuit with a 'single_qubit_fusion' transform."""
+
+        def func():
+            @qml.transforms.optimization.single_qubit_fusion
+            @qml.qnode(qml.device(backend, wires=1))
+            def circuit():
+                qml.Hadamard(wires=0)
+                qml.Rot(0.1, 0.2, 0.3, wires=0)
+                qml.Rot(0.4, 0.5, 0.6, wires=0)
+                qml.RZ(0.1, wires=0)
+                qml.RZ(0.4, wires=0)
+                return qml.expval(qml.PauliZ(0))
+
+            return circuit()
+
+        captured_func = qml.qjit(func, experimental_capture=True, target="mlir")
+
+        assert is_single_qubit_fusion_applied(captured_func.mlir)
+
+        no_capture_result = qml.qjit(func)()
+        experimental_capture_result = captured_func()
+        assert no_capture_result == experimental_capture_result
