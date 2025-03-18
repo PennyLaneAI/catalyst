@@ -49,11 +49,6 @@ def QECOpInterface : OpInterface<"QECOpInterface"> {
             /*methodName=*/"getPauliProductAttr"
         >,
         InterfaceMethod<
-            /*desc=*/"Check if the rotation kind is set for this operation.",
-            /*retTy=*/"bool",
-            /*methodName=*/"hasRotationKind"
-        >,
-        InterfaceMethod<
             /*desc=*/"Get the rotation kind for this operation.",
             /*retTy=*/"uint16_t",
             /*methodName=*/"getRotationKind"
