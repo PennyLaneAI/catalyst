@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Integration tests for the the PL capture in Catalyst."""
+from functools import partial
+
 import jax.numpy as jnp
 import pennylane as qml
 import pytest
@@ -52,6 +54,11 @@ def is_rot_decomposed(mlir):
         and mlir.count('quantum.custom "RZ"') == 2
         and mlir.count('quantum.custom "RY"') == 1
     )
+
+
+def is_wire_mapped(mlir):
+    """Check in the MLIR if a wire was mapped"""
+    return "quantum.extract %0[ 0]" not in mlir and "quantum.extract %0[ 1]" in mlir
 
 
 # pylint: disable=too-many-public-methods
@@ -683,7 +690,6 @@ class TestCapture:
         """Test the integration for a circuit with a 'decompose' transform."""
 
         def func(x: float, y: float, z: float):
-
             @qml.qnode(qml.device(backend, wires=2))
             def circuit(x: float, y: float, z: float):
                 qml.Rot(x, y, z, 0)
@@ -697,4 +703,24 @@ class TestCapture:
 
         no_capture_result = qml.qjit(func)(1.5, 2.5, 3.5)
         experimental_capture_result = captured_func(1.5, 2.5, 3.5)
+        assert no_capture_result == experimental_capture_result, no_capture_result
+
+    def test_transform_map_wires_workflow(self, backend):
+        """Test the integration for a circuit with a 'map_wires' transform."""
+
+        def func(x: float):
+            @partial(qml.map_wires, wire_map={0: 1})
+            @qml.qnode(qml.device(backend, wires=2))
+            def circuit(x):
+                qml.RX(x, 0)
+                return qml.expval(qml.PauliZ(0))
+
+            return circuit(x)
+
+        captured_func = qml.qjit(func, experimental_capture=True, target="mlir")
+
+        assert is_wire_mapped(captured_func.mlir)
+
+        no_capture_result = qml.qjit(func)(1.5)
+        experimental_capture_result = captured_func(1.5)
         assert no_capture_result == experimental_capture_result, no_capture_result
