@@ -921,7 +921,7 @@ void __catalyst__qis__State(MemRefT_CplxT_double_1d *result, int64_t numQubits, 
 void __catalyst__qis__Probs(MemRefT_double_1d *result, int64_t numQubits, ...)
 {
     RT_ASSERT(numQubits >= 0);
-    std::string error_msg = "return tensor must have static length equal to 2^(number of qubits)";
+    std::string error_msg = "return tensor must have length equal to 2^(number of qubits)";
     if (numQubits != 0) {
         RT_FAIL_IF(result->sizes[0] != 1u << numQubits, error_msg.c_str());
     }
@@ -952,7 +952,7 @@ void __catalyst__qis__Sample(MemRefT_double_2d *result, int64_t numQubits, ...)
     int64_t shots = getQuantumDevicePtr()->GetDeviceShots();
     RT_ASSERT(shots >= 0);
     RT_ASSERT(numQubits >= 0);
-    std::string error_msg = "return tensor must have 2D static shape equal to (number of shots, "
+    std::string error_msg = "return tensor must have 2D shape equal to (number of shots, "
                             "number of qubits in observable)";
     if (numQubits != 0) {
         RT_FAIL_IF(result->sizes[1] != numQubits, error_msg.c_str());
