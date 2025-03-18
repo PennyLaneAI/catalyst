@@ -42,6 +42,7 @@ from catalyst.compiler import get_lib_path
 from catalyst.device.op_support import (
     _are_param_frequencies_same_as_catalyst,
     _is_grad_recipe_same_as_catalyst,
+    _paramshift_op_checker,
 )
 
 # pylint: disable=too-many-lines,missing-function-docstring,missing-class-docstring
@@ -2025,6 +2026,11 @@ class TestParameterShiftVerificationUnitTests:
 
         op = qml.ops.op_math.Exp(qml.PauliX(0), 1)
         assert _are_param_frequencies_same_as_catalyst(op)
+
+    def test_qubit_unitary(self):
+        """QubitUnitary is not a differentiable gate in Catalyst"""
+        op = qml.QubitUnitary(jnp.array([[1, 1], [1, -1]]), wires=0)
+        assert not _paramshift_op_checker(op)
 
 
 class TestParameterShiftVerificationIntegrationTests:
