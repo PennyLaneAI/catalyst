@@ -47,17 +47,17 @@ PauliWordPair normalizePPROps(QECOpInterface lhs, QECOpInterface rhs)
     auto lhsQubits = lhs.getOutQubits();
     auto rhsQubits = rhs.getInQubits();
 
-    llvm::SetVector<Value> allOperands;
-    allOperands.insert(lhsQubits.begin(), lhsQubits.end());
-    allOperands.insert(rhsQubits.begin(), rhsQubits.end());
+    llvm::SetVector<Value> qubits;
+    qubits.insert(lhsQubits.begin(), lhsQubits.end());
+    qubits.insert(rhsQubits.begin(), rhsQubits.end());
 
-    PauliWord lhsPauliWord = expandPauliWord(allOperands, lhsQubits, lhs);
-    PauliWord rhsPauliWord = expandPauliWord(allOperands, rhsQubits, rhs);
+    PauliWord lhsPauliWord = expandPauliWord(qubits, lhsQubits, lhs);
+    PauliWord rhsPauliWord = expandPauliWord(qubits, rhsQubits, rhs);
 
     PauliStringWrapper lhsPSWrapper = PauliStringWrapper::from_pauli_word(lhsPauliWord);
     PauliStringWrapper rhsPSWrapper = PauliStringWrapper::from_pauli_word(rhsPauliWord);
 
-    lhsPSWrapper.correspondingQubits = std::vector<Value>(allOperands.begin(), allOperands.end());
+    lhsPSWrapper.correspondingQubits = std::vector<Value>(qubits.begin(), qubits.end());
     rhsPSWrapper.correspondingQubits = lhsPSWrapper.correspondingQubits;
 
     lhsPSWrapper.op = lhs;
