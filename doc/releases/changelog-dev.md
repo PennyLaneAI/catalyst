@@ -50,17 +50,17 @@
       . . . 
     ```
 
-* Commuting Clifford PPR operations to the end of a circuit past Non-Clifford PPR is now availible through the `commute_ppr` pass transform.
+* Commuting Clifford PPR operations to the end of a circuit past Non-Clifford PPR is now available through the `commute_ppr` pass transform.
   [(#1563)](https://github.com/PennyLaneAI/catalyst/pull/1563)
   
-  - Commuting Clifford past Non-Clifford based on 2 rules which are represented in ["A Game of Surface Codes"](https://doi.org/10.22331/q-2019-03-05-128):
+  - Commuting Clifford past Non-Clifford based on two rules, which are represented in ["A Game of Surface Codes"](https://doi.org/10.22331/q-2019-03-05-128):
     - If they are commuting:  `P P' -> P' P` 
     - If they are anti-commute: `P P' -> iPP' P`
     (`P` Clifford, `P'` Non-Clifford, `i` Imaginary number)
   -  We used [stim](https://github.com/quantumlib/Stim) to determine if both operations are commutes and compute the `iPP'`.
   -  Supported gates:
-    - `qec.ppr`: Pauli product rotation and it can be Clifford and Non-Clifford gate.
-      - Clifford gate determined by the rotation kind with value 4, while value 8 for Non-Clifford gates.  e.g: `qec.ppr  ["X"](4) %reg` and `qec.ppr ["X"] (8) %reg`
+    - `qec.ppr`: Pauli product rotation can be Clifford and Non-Clifford gate.
+      - Clifford gate determined by the rotation kind with value 4, while value 8 for Non-Clifford gates.  e.g.: `qec.ppr  ["X"](4) %reg` and `qec.ppr ["X"] (8) %reg`
   
   Example:
   ```python
