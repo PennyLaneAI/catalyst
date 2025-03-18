@@ -897,12 +897,6 @@ double __catalyst__qis__Variance(ObsIdType obsKey) { return getQuantumDevicePtr(
 void __catalyst__qis__State(MemRefT_CplxT_double_1d *result, int64_t numQubits, ...)
 {
     RT_ASSERT(numQubits >= 0);
-    std::string error_msg = "return tensor must have static length equal to 2^(number of qubits)";
-    if (numQubits != 0) {
-        RT_FAIL("Partial State-Vector not supported yet");
-        // RT_FAIL_IF(result->sizes[0] != 1u << numQubits, error_msg.c_str());
-    }
-
     MemRefT<std::complex<double>, 1> *result_p = (MemRefT<std::complex<double>, 1> *)result;
 
     va_list args;
@@ -920,9 +914,7 @@ void __catalyst__qis__State(MemRefT_CplxT_double_1d *result, int64_t numQubits, 
         getQuantumDevicePtr()->State(view);
     }
     else {
-        RT_FAIL("Partial State-Vector not supported yet");
-        // getQuantumDevicePtr()->PartialState(stateVec,
-        // numElements, wires);
+        RT_FAIL("Partial State-Vector not supported.");
     }
 }
 
