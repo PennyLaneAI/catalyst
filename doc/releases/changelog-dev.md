@@ -151,6 +151,9 @@
   This includes `probs(), state(), sample(), counts()`.
     [(#1565)](https://github.com/PennyLaneAI/catalyst/pull/1565)
 
+  - placeholder
+    [(#???)](https://github.com/PennyLaneAI/catalyst/pull/???)
+
 <h3>Breaking changes 💔</h3>
 
 <h3>Deprecations 👋</h3>
