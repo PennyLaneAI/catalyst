@@ -89,7 +89,7 @@
       return qml.expval(qml.Z(0))
   ```
 
-* Catalyst now supports experimental capture of `qml.transforms.cancel_inverses`, `qml.transforms.merge_rotations` and `qml.transforms.unitary_to_rot` transforms.
+* Catalyst now supports experimental capture of PennyLane transforms.
   [(#1544)](https://github.com/PennyLaneAI/catalyst/pull/1544)
   [(#1561)](https://github.com/PennyLaneAI/catalyst/pull/1561)
   [(#1567)](https://github.com/PennyLaneAI/catalyst/pull/1567)
