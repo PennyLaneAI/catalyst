@@ -59,11 +59,11 @@ func.func @test_commute_3(%q1 : !quantum.bit, %q2 : !quantum.bit){
     // X0(pi/4) * X0X1(pi/4) * X0(pi/8) * X0X1(pi/4) * X0(pi/8) * X1(pi/8) 
     // -> X0(pi/8) * X0(pi/8) * X0(pi/8) * X0(pi/4) * X0X1(pi/4) * X0X1(pi/4)
 
-    // CHECK: [[q1_0:%.+]]:2 = qec.ppr ["X", "X"](8) %arg0, %arg1
-    // CHECK: [[q1_1:%.+]]:2 = qec.ppr ["X", "X"](8) [[q1_0]]#0, [[q1_0]]#1
-    // CHECK: [[q1_2:%.+]]:2 = qec.ppr ["X", "X"](8) [[q1_1]]#0, [[q1_1]]#1
-    // CHECK: [[q1_3:%.+]] = qec.ppr ["X"](4) [[q1_2]]#0
-    // CHECK: [[q1_4:%.+]]:2 = qec.ppr ["X", "X"](4) [[q1_3]], [[q1_2]]#1
+    // CHECK: [[q1_0:%.+]] = qec.ppr ["X"](8) %arg0
+    // CHECK: [[q1_1:%.+]] = qec.ppr ["X"](8) [[q1_0]] 
+    // CHECK: [[q1_2:%.+]] = qec.ppr ["X"](8) [[q1_1]]
+    // CHECK: [[q1_3:%.+]] = qec.ppr ["X"](4) [[q1_2]]
+    // CHECK: [[q1_4:%.+]]:2 = qec.ppr ["X", "X"](4) [[q1_3]], %arg1
     // CHECK: [[q1_5:%.+]]:2 = qec.ppr ["X", "X"](4) [[q1_4]]#0, [[q1_4]]#1
     %a = qec.ppr ["X"](4) %q1 : !quantum.bit // q1
     %0:2 = qec.ppr ["X", "X"](4) %a, %q2 : !quantum.bit, !quantum.bit // q1, q2
@@ -174,8 +174,8 @@ func.func @test_anticommute_9(%q1 : !quantum.bit, %q2 : !quantum.bit, %q3 : !qua
 
     // XYZ(4) * Y1(4) * Z0X1(8) * X3(8)
 
-    // CHECK: [[q1_0:%.+]]:3 = qec.ppr ["Z", "Z", "Z"](8) %arg0, %arg1, %arg2
-    // CHECK: [[q1_1:%.+]]:3 = qec.ppr ["X", "Y", "Y"](-8) [[q1_0]]#0, [[q1_0]]#1, [[q1_0]]#2
+    // CHECK: [[q1_0:%.+]]:2 = qec.ppr ["Z", "Z"](8) %arg0, %arg1
+    // CHECK: [[q1_1:%.+]]:3 = qec.ppr ["X", "Y", "Y"](-8) [[q1_0]]#0, [[q1_0]]#1, %arg2
     // CHECK: [[q1_2:%.+]]:3 = qec.ppr ["X", "Y", "Z"](4) [[q1_1]]#0, [[q1_1]]#1, [[q1_1]]#2
     // CHECK: [[q1_3:%.+]] = qec.ppr ["Y"](4) [[q1_2]]#1
     %1:3 = qec.ppr ["X", "Y", "Z"](4) %q1, %q2, %q3 : !quantum.bit, !quantum.bit, !quantum.bit

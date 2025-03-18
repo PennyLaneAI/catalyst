@@ -15,6 +15,7 @@ set(LIBS
     ${dialect_libs}
     ${conversion_libs}
     MLIRQEC
+    QECUtils
 )
 
 set(DEPENDS

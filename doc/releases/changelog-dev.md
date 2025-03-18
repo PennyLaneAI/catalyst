@@ -50,6 +50,9 @@
       . . . 
     ```
 
+* Commuting Clifford PPR operations to the end of a circuit past Non-Clifford PPR is now availible through the `commute_ppr` pass transform.
+  [(#1563)](https://github.com/PennyLaneAI/catalyst/pull/1563)
+  
 <h3>Improvements 🛠</h3>
 
 * Changed pattern rewritting in `quantum-to-ion` lowering pass to use MLIR's dialect conversion

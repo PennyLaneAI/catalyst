@@ -438,29 +438,43 @@ def commute_ppr(qnode):
     """
     Specify that the ``-commute-ppr`` MLIR compiler pass
     for commuting Clifford gates past non-Clifford gates will be applied.
+    Notice that this pass is applied after the ``-convert-clifford-t-to-ppr`` pass.
 
-    The full list of supported gates are as follows:
-
-    :class:`qml.H <pennylane.H>`,
-    :class:`qml.S <pennylane.S>`,
-    :class:`qml.T <pennylane.T>`,
-    :class:`qml.CNOT <pennylane.CNOT>`,
     Args:
         fn (QNode): QNode to apply the pass to
 
     Returns:
         ~.QNode
-
     **Example**
 
     In this example the Clifford+T gates will be converted into PPRs.
 
     .. code-block:: python
+        ppm_passes = {
+            "to_ppr": {},
+            "commute_ppr": {},
+        }
 
-
+        @qjit(keep_intermediate=True)
+        @pipeline(ppm_passes)
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def circuit():
+            qml.H(0)
+            qml.CNOT([0, 1])
+            qml.T(1)
 
     Example MLIR Representation:
     .. code-block:: mlir
+        . . .
+        %3:2 = qec.ppr ["X", "Z"](8) %1, %2 : !quantum.bit, !quantum.bit
+        %4 = qec.ppr ["Z"](4) %3#0 : !quantum.bit
+        %5 = qec.ppr ["X"](4) %4 : !quantum.bit
+        %6 = qec.ppr ["Z"](4) %5 : !quantum.bit
+        %7:2 = qec.ppr ["Z", "X"](4) %6, %3#1 : !quantum.bit, !quantum.bit
+        %8 = qec.ppr ["Z"](-4) %7#0 : !quantum.bit
+        %9 = quantum.insert %0[ 0], %8 : !quantum.reg, !quantum.bit
+        %10 = qec.ppr ["X"](-4) %7#1 : !quantum.bit
+        . . .
 
     """
     if not isinstance(qnode, qml.QNode):
