@@ -105,7 +105,7 @@ struct PauliStringWrapper {
                 pauliWords.push_back("I");
                 continue;
             }
-            pauliWords.push_back(std::string(1, c));
+            pauliWords.emplace_back(1, c);
         }
         return pauliWords;
     }
