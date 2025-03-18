@@ -70,6 +70,15 @@ def is_single_qubit_fusion_applied(mlir):
     )
 
 
+def is_controlled_pushed_back(mlir, non_controlled_string, controlled_string):
+    """Check in the MLIR if the controlled gate got pushed after the non-controlled one"""
+    non_controlled_pos = mlir.find(non_controlled_string)
+    assert non_controlled_pos > 0
+
+    remaining_mlir = mlir[non_controlled_pos + len(non_controlled_string) :]
+    return controlled_string in remaining_mlir
+
+
 # pylint: disable=too-many-public-methods
 class TestCapture:
     """Integration tests for Catalyst adjoint functionality."""
@@ -738,7 +747,7 @@ class TestCapture:
         """Test the integration for a circuit with a 'single_qubit_fusion' transform."""
 
         def func():
-            @qml.transforms.optimization.single_qubit_fusion
+            @qml.transforms.single_qubit_fusion
             @qml.qnode(qml.device(backend, wires=1))
             def circuit():
                 qml.Hadamard(wires=0)
@@ -753,6 +762,35 @@ class TestCapture:
         captured_func = qml.qjit(func, experimental_capture=True, target="mlir")
 
         assert is_single_qubit_fusion_applied(captured_func.mlir)
+
+        no_capture_result = qml.qjit(func)()
+        experimental_capture_result = captured_func()
+        assert no_capture_result == experimental_capture_result
+
+    def test_transform_commute_controlled_workflow(self, backend):
+        """Test the integration for a circuit with a 'commute_controlled' transform."""
+
+        def func():
+            @qml.qnode(qml.device(backend, wires=3))
+            def circuit():
+                qml.CNOT(wires=[0, 2])
+                qml.PauliX(wires=2)
+                qml.RX(0.2, wires=2)
+                qml.Toffoli(wires=[0, 1, 2])
+                qml.CRX(0.1, wires=[0, 1])
+                qml.PauliX(wires=1)
+                return qml.expval(qml.PauliZ(0))
+
+            return qml.transforms.commute_controlled(circuit, direction="left")()
+
+        captured_func = qml.qjit(func, experimental_capture=True, target="mlir")
+
+        assert is_controlled_pushed_back(
+            captured_func.mlir, 'quantum.custom "RX"', 'quantum.custom "CNOT"'
+        )
+        assert is_controlled_pushed_back(
+            captured_func.mlir, 'quantum.custom "PauliX"', 'quantum.custom "CRX"'
+        )
 
         no_capture_result = qml.qjit(func)()
         experimental_capture_result = captured_func()
