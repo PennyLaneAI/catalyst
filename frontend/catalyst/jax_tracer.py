@@ -789,7 +789,7 @@ def trace_observables(
         raise NotImplementedError(
             f"Observable {obs} (of type {type(obs)}) is not implemented"
         )  # pragma: no cover
-    return obs_tracers, (len(qubits) if qubits else 0)
+    return obs_tracers, (len(qubits) if qubits else None)
 
 
 @debug_logger
@@ -880,7 +880,7 @@ def trace_quantum_measurements(
 
             m_wires = output.wires if output.wires else None
             obs_tracers, nqubits = trace_observables(output.obs, qrp, m_wires)
-            nqubits = len(device.wires) if nqubits == 0 else nqubits
+            nqubits = len(device.wires) if nqubits is None else nqubits
 
             using_compbasis = obs_tracers.primitive == compbasis_p
 
