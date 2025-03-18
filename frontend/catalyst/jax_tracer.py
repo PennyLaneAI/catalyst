@@ -735,14 +735,14 @@ def trace_quantum_operations(
 
 @debug_logger
 def trace_observables(
-    obs: Operator, qrp: QRegPromise, m_wires: int
+    obs: Operator, qrp: QRegPromise, m_wires: Optional[qml.wires.Wires]
 ) -> Tuple[List[DynamicJaxprTracer], Optional[int]]:
     """Trace observables.
 
     Args:
         obs (Operator): an observable operator
         qrp (QRegPromise): Quantum register tracer with cached qubits
-        m_wires (int): the default number of wires to use for this measurement process
+        m_wires (Optional[qml.wires.Wires]): the default wires to use for this measurement process
 
     Returns:
         out_classical_tracers: a list of classical tracers corresponding to the measured values.
@@ -751,8 +751,15 @@ def trace_observables(
     wires = obs.wires if (obs and len(obs.wires) > 0) else m_wires
     qubits = None
     if obs is None:
-        qubits = qrp.extract(wires, allow_reuse=True)
-        obs_tracers = compbasis_p.bind(*qubits)
+        if wires is None:
+            # If measuring all wires on the device, pass in the qreg to compbasis op
+            # TODO: "all wires on the device" is None when number of wires is static,
+            # but a tracer when dynamic. Update to handle dynamic case.
+            qreg_out = qrp.actualize()
+            obs_tracers = compbasis_p.bind(qreg_out, qreg_available=True)
+        else:
+            qubits = qrp.extract(wires, allow_reuse=True)
+            obs_tracers = compbasis_p.bind(*qubits)
     elif isinstance(obs, KNOWN_NAMED_OBS):
         qubits = qrp.extract(wires, allow_reuse=True)
         obs_tracers = namedobs_p.bind(qubits[0], kind=type(obs).__name__)
@@ -782,7 +789,7 @@ def trace_observables(
         raise NotImplementedError(
             f"Observable {obs} (of type {type(obs)}) is not implemented"
         )  # pragma: no cover
-    return obs_tracers, (len(qubits) if qubits else 0)
+    return obs_tracers, (len(qubits) if qubits else None)
 
 
 @debug_logger
@@ -861,31 +868,31 @@ def trace_quantum_measurements(
     shots = get_device_shots(device)
     out_classical_tracers = []
 
-    for i, o in enumerate(outputs):
-        if isinstance(o, MeasurementProcess):
+    for i, output in enumerate(outputs):
+        if isinstance(output, MeasurementProcess):
 
             # Check if the measurement is supported shot-vector where num_of_total_copies > 1
-            if device.shots.num_copies > 1 and not isinstance(o, qml.measurements.SampleMP):
+            if device.shots.num_copies > 1 and not isinstance(output, qml.measurements.SampleMP):
                 raise NotImplementedError(
-                    f"Measurement {type(o).__name__} is not supported a shot-vector. "
+                    f"Measurement {type(output).__name__} is not supported a shot-vector. "
                     "Use qml.sample() instead."
                 )
 
-            m_wires = o.wires if o.wires else range(len(device.wires))
-
-            obs_tracers, nqubits = trace_observables(o.obs, qrp, m_wires)
+            m_wires = output.wires if output.wires else None
+            obs_tracers, nqubits = trace_observables(output.obs, qrp, m_wires)
+            nqubits = len(device.wires) if nqubits is None else nqubits
 
             using_compbasis = obs_tracers.primitive == compbasis_p
 
-            if isinstance(o, qml.measurements.SampleMP):
+            if isinstance(output, qml.measurements.SampleMP):
 
                 if shots is None:  # needed for old device API only
                     raise ValueError(
                         "qml.sample cannot work with shots=None. "
                         "Please specify a finite number of shots."
                     )
-                if o.mv is not None:  # qml.sample(m)
-                    out_classical_tracers.append(o.mv)
+                if output.mv is not None:  # qml.sample(m)
+                    out_classical_tracers.append(output.mv)
                 else:
                     shape = (shots, nqubits) if using_compbasis else (shots,)
                     result = bind_flexible_primitive(
@@ -908,15 +915,15 @@ def trace_quantum_measurements(
 
                     out_classical_tracers.append(reshaped_result)
 
-            elif type(o) is ExpectationMP:
+            elif type(output) is ExpectationMP:
                 out_classical_tracers.append(expval_p.bind(obs_tracers))
-            elif type(o) is VarianceMP:
+            elif type(output) is VarianceMP:
                 out_classical_tracers.append(var_p.bind(obs_tracers))
-            elif type(o) is ProbabilityMP:
+            elif type(output) is ProbabilityMP:
                 assert using_compbasis
                 shape = (2**nqubits,)
                 out_classical_tracers.append(probs_p.bind(obs_tracers, shape=shape))
-            elif type(o) is CountsMP:
+            elif type(output) is CountsMP:
                 if shots is None:  # needed for old device API only
                     raise ValueError(
                         "qml.sample cannot work with shots=None. "
@@ -940,19 +947,21 @@ def trace_quantum_measurements(
                     )
                 else:
                     out_tree = counts_tree
-            elif type(o) is StateMP:
+            elif type(output) is StateMP:
                 assert using_compbasis
                 shape = (2**nqubits,)
                 out_classical_tracers.append(state_p.bind(obs_tracers, shape=shape))
             else:
                 raise NotImplementedError(
-                    f"Measurement {type(o)} is not implemented"
+                    f"Measurement {type(output)} is not implemented"
                 )  # pragma: no cover
-        elif isinstance(o, DynamicJaxprTracer):
-            out_classical_tracers.append(o)
+        elif isinstance(output, DynamicJaxprTracer):
+            out_classical_tracers.append(output)
         else:
-            assert not isinstance(o, (list, dict)), f"Expected a tracer or a measurement, got {o}"
-            out_classical_tracers.append(o)
+            assert not isinstance(
+                output, (list, dict)
+            ), f"Expected a tracer or a measurement, got {output}"
+            out_classical_tracers.append(output)
 
     return out_classical_tracers, out_tree
 
