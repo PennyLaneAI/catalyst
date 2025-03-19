@@ -14,9 +14,7 @@
 
 """This module exposes built-in Catalyst MLIR passes to the frontend."""
 
-import pennylane as qml
-
-from catalyst.passes.pass_api import PassPipelineWrapper, QNodeWrapper
+from catalyst.passes.pass_api import PassPipelineWrapper
 
 
 ## API ##
