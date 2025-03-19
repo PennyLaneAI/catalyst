@@ -506,6 +506,35 @@ def test_single_pass_with_autograph():
 
 test_single_pass_with_autograph()
 
+
+def test_pipeline_with_autograph():
+    """
+    Test that pipeline works with autograph
+    """
+
+    my_pipeline = {
+        "cancel_inverses": {},
+        "merge_rotations": {},
+    }
+
+    @qjit(autograph=True, target="mlir")
+    @pipeline(my_pipeline)
+    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    def f(x: float):
+        qml.RX(x, wires=0)
+        qml.RX(x, wires=0)
+        qml.Hadamard(wires=0)
+        return qml.expval(qml.PauliZ(0))
+
+    # CHECK: transform.named_sequence @__transform_main(
+    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "remove-chained-self-inverse" to {{%.+}}
+    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "merge-rotations" to {{%.+}}
+    # CHECK-NEXT: transform.yield
+    print(f.mlir)
+
+
+test_pipeline_with_autograph()
+
 #
 # cancel_inverses
 #
