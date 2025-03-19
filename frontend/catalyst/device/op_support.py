@@ -68,7 +68,7 @@ def _is_grad_recipe_same_as_catalyst(op):
         return False
 
     valid = True
-    for _, grad_recipe in zip(op.data, op.grad_recipe, strict=True):
+    for grad_recipe in op.grad_recipe:
         left, right = grad_recipe
         # exp_param_shift_rule_{left,right} are constants in Catalyst
         # we must ensure that the rules seen in the op match Catalyst's implementation.
