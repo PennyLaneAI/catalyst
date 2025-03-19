@@ -2068,6 +2068,7 @@ class TestParameterShiftVerificationUnitTests:
 
     def test_no_grad_recipe_no_param_frequencies(self):
         """No grad recipe, no param shift, not hybrid op => no grad"""
+
         class DummyOp(qml.operation.Operator):
             def __init__(self, wires=None):
                 super().__init__(0.0, wires=wires)
