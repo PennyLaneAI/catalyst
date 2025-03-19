@@ -130,10 +130,7 @@ def _paramshift_op_checker(op):
     if _has_parameter_frequencies(op):
         return _are_param_frequencies_same_as_catalyst(op)
 
-    if isinstance(op, HybridOp):
-        return True
-
-    return False
+    return isinstance(op, HybridOp)
 
 
 def _adjoint_diff_op_checker(op, capabilities):

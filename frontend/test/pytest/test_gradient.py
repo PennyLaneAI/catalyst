@@ -46,6 +46,7 @@ from catalyst.device.op_support import (
     _is_grad_recipe_same_as_catalyst,
     _paramshift_op_checker,
 )
+from catalyst.jax_tracer import HybridOp
 
 # pylint: disable=too-many-lines,missing-function-docstring,missing-class-docstring
 
@@ -2078,6 +2079,15 @@ class TestParameterShiftVerificationUnitTests:
                 return 1
 
         assert not _paramshift_op_checker(DummyOp(wires=[0]))
+
+    def test_hybrid_op(self):
+        """HybridOp => grad"""
+
+        class DummyOp(HybridOp):
+            def __init__(self):
+                super().__init__([], [], [])
+
+        assert _paramshift_op_checker(DummyOp())
 
 
 class TestParameterShiftVerificationIntegrationTests:
