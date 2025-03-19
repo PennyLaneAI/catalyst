@@ -88,26 +88,28 @@ def _has_grad_recipe(op):
     return True
 
 
-def _are_param_frequencies_same_as_catalyst(op):
-    """Check if the parameter frequencies are all close to 1."""
-
+def _has_parameter_frequencies(op):
     try:
         if not hasattr(op, "parameter_frequencies"):
-            return True
-
-        is_valid_len = len(op.data) == len(op.parameter_frequencies)
-        if not is_valid_len:
             return False
     except qml.operation.ParameterFrequenciesUndefinedError:
-        # This is a little bit counter intuitive.
-        # op.parameter_frequencies failed because there were no parameter frequencies defined.
-        # and since one of our conditions was that if there are no parameter frequencies
-        # defined this check should succeed, well then we return true.
-        return True
+        return False
+    return True
 
-    valid_frequencies = all(map(lambda x: np.allclose(np.array(x), 1.0), op.parameter_frequencies))
 
-    return valid_frequencies
+def _are_param_frequencies_same_as_catalyst(op):
+    """Check if the parameter frequencies are all close to 1."""
+    freqs = op.parameter_frequencies
+    if len(freqs) != len(op.data):
+        return False
+
+    valid = True
+    for freqs in op.parameter_frequencies:
+        if len(freqs) != 1:
+            return False
+        valid &= np.allclose(freqs[0], 1.0)
+
+    return valid
 
 
 def _paramshift_op_checker(op):
@@ -124,8 +126,8 @@ def _paramshift_op_checker(op):
     if _has_grad_recipe(op):
         return _is_grad_recipe_same_as_catalyst(op)
 
-    if not _are_param_frequencies_same_as_catalyst(op):
-        return False
+    if _has_parameter_frequencies(op):
+        return _are_param_frequencies_same_as_catalyst(op)
 
     if not isinstance(op, HybridOp):
         if op.grad_method not in {"A", None}:

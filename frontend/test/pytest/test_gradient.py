@@ -42,6 +42,7 @@ from catalyst.compiler import get_lib_path
 from catalyst.device.op_support import (
     _are_param_frequencies_same_as_catalyst,
     _has_grad_recipe,
+    _has_parameter_frequencies,
     _is_grad_recipe_same_as_catalyst,
     _paramshift_op_checker,
 )
@@ -1986,7 +1987,7 @@ class TestParameterShiftVerificationUnitTests:
         class DummyOp(qml.operation.Operator): ...
 
         assert not hasattr(DummyOp, "parameter_frequencies")
-        assert _are_param_frequencies_same_as_catalyst(DummyOp(wires=[0]))
+        assert not _has_parameter_frequencies(DummyOp(wires=[0]))
 
     def test_check_param_frequencies_different_length(self):
         """Check exception is raised when frequencies length mismatches parameter length"""
@@ -2018,15 +2019,26 @@ class TestParameterShiftVerificationUnitTests:
 
             @property
             def parameter_frequencies(self):
-                return [0.0]
+                return [(0.0,)]
 
         assert not _are_param_frequencies_same_as_catalyst(DummyOp(wires=[0]))
 
     def test_undefined_frequencies(self):
         """Test ParameterFrequenciesUndefinedError"""
 
-        op = qml.ops.op_math.Exp(qml.PauliX(0), 1)
-        assert _are_param_frequencies_same_as_catalyst(op)
+        class DummyOp(qml.operation.Operator):
+            def __init__(self, wires=None):
+                super().__init__(0.0, wires=wires)
+
+            @property
+            def num_params(self):
+                return 1
+
+            @property
+            def parameter_frequencies(self):
+                raise qml.operation.ParameterFrequenciesUndefinedError()
+
+        assert not _has_parameter_frequencies(DummyOp(wires=[0]))
 
     def test_qubit_unitary(self):
         """QubitUnitary is not a differentiable gate in Catalyst"""
@@ -2133,7 +2145,7 @@ class TestParameterShiftVerificationIntegrationTests:
             @property
             def parameter_frequencies(self):
                 # Only one parameter but two frequencies is an error
-                return (2.0,)
+                return [(2.0,)]
 
         with pytest.raises(CompileError):
 
