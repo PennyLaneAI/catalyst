@@ -1942,6 +1942,24 @@ class TestParameterShiftVerificationUnitTests:
 
         assert not _has_grad_recipe(DummyOp(wires=[0]))
 
+    def test_check_grad_recipe_different_size(self):
+        """len(grad_recipe) != len(op.data)"""
+
+        class DummyOp(qml.operation.Operator):
+            def __init__(self, wires=None):
+                param = 0.0
+                super().__init__(param, wires=wires)
+
+            @property
+            def num_params(self):
+                return 1
+
+            @property
+            def grad_recipe(self):
+                return ([[0.5, 1.0, np.pi / 2], [-0.5, 1.0, -np.pi / 2]], [[0.5, 1.0, np.pi / 2], [-0.5, 1.0, -np.pi / 2]])
+
+        assert not _is_grad_recipe_same_as_catalyst(DummyOp(wires=[0]))
+
     def test_check_grad_recipe_different(self):
         """Check exception is raised when invalid grad_recipe is found"""
 
