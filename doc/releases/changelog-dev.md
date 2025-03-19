@@ -130,6 +130,7 @@
 
 * Catalyst now decomposes non-differentiable gates when in a gradient method.
   [(#1562)](https://github.com/PennyLaneAI/catalyst/pull/1562)
+  [(#1568)](https://github.com/PennyLaneAI/catalyst/pull/1568)
   [(#1569)](https://github.com/PennyLaneAI/catalyst/pull/1569)
 
   Gates that are constant, such as when all parameters are Python or NumPy data types, are not
