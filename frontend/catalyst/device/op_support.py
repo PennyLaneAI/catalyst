@@ -17,14 +17,12 @@
 from typing import Union
 
 import jax
-import jax.numpy as jnp
 import numpy as np
 import pennylane as qml
 from pennylane.devices.capabilities import DeviceCapabilities, OperatorProperties
 from pennylane.operation import Operation, Operator
 
 from catalyst.api_extensions import MidCircuitMeasure
-from catalyst.jax_tracer import HybridOp
 from catalyst.utils.exceptions import DifferentiableCompileError
 
 EMPTY_PROPERTIES = OperatorProperties()
@@ -44,7 +42,9 @@ def is_supported(op: Operator, capabilities: DeviceCapabilities) -> bool:
 
 def _is_grad_recipe_same_as_catalyst(op):
     """Checks that the grad_recipe for the op matches the hard coded one in Catalyst."""
-    _is_active = lambda x: isinstance(x, jax.core.Tracer)
+
+    def _is_active(maybe_tracer):
+        return isinstance(maybe_tracer, jax.core.Tracer)
 
     def _is_grad_recipe_active(grad_recipe):
         active = False

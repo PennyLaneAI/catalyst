@@ -32,7 +32,6 @@ from catalyst import (
     ctrl,
     for_loop,
     grad,
-    while_loop,
 )
 from catalyst.api_extensions import HybridAdjoint, HybridCtrl
 from catalyst.compiler import get_lib_path
