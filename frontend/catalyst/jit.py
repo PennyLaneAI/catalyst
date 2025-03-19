@@ -37,7 +37,6 @@ from catalyst.debug.instruments import instrument
 from catalyst.from_plxpr import trace_from_pennylane
 from catalyst.jax_tracer import lower_jaxpr_to_mlir, trace_to_jaxpr
 from catalyst.logging import debug_logger, debug_logger_init
-from catalyst.passes.pass_api import QnodeCaller
 from catalyst.qfunc import QFunc
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.tracing.type_signatures import (
@@ -471,8 +470,6 @@ class QJIT(CatalystCallable):
     @debug_logger_init
     def __init__(self, fn, compile_options):
         # If the function is a QnodeCaller, we need to unwrap it to get the original QNode.
-        if isinstance(fn, QnodeCaller):
-            fn = fn.qnode
         functools.update_wrapper(self, fn)
         self.original_function = fn
         self.compile_options = compile_options
