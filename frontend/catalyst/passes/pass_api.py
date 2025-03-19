@@ -184,6 +184,8 @@ def apply_pass(pass_name: str, *flags, **valued_options):
             # classical functions too. However, since we lack the current infrastructure
             # to denote a function, let's limit it to qnodes
             raise TypeError(f"A QNode is expected, got the classical function {qnode}")
+        elif isinstance(qnode, QnodeCaller):
+            qnode = qnode.qnode
 
         @functools.wraps(qnode)
         def qnode_call(*args, **kwargs):
