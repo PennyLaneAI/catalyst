@@ -23,6 +23,7 @@ from pennylane.devices.capabilities import DeviceCapabilities, OperatorPropertie
 from pennylane.operation import Operation, Operator
 
 from catalyst.api_extensions import MidCircuitMeasure
+from catalyst.jax_tracer import HybridOp
 from catalyst.utils.exceptions import DifferentiableCompileError
 
 EMPTY_PROPERTIES = OperatorProperties()
@@ -129,7 +130,10 @@ def _paramshift_op_checker(op):
     if _has_parameter_frequencies(op):
         return _are_param_frequencies_same_as_catalyst(op)
 
-    return True
+    if isinstance(op, HybridOp):
+        return True
+
+    return False
 
 
 def _adjoint_diff_op_checker(op, capabilities):
