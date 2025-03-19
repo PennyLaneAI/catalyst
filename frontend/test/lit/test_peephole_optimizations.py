@@ -486,7 +486,7 @@ test_chained_peephole_passes_keep_original()
 
 def test_single_pass_with_autograph():
     """
-    Test tha peephole optimization work with autograph
+    Test that peephole optimization works with autograph
     """
 
     @qjit(autograph=True, target="mlir")
