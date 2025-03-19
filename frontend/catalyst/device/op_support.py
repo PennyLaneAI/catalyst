@@ -64,6 +64,9 @@ def _is_grad_recipe_same_as_catalyst(op):
     if _is_grad_recipe_active(op.grad_recipe):
         return False
 
+    if len(op.data) != len(op.grad_recipe):
+        return False
+
     valid = True
     for _, grad_recipe in zip(op.data, op.grad_recipe, strict=True):
         left, right = grad_recipe
