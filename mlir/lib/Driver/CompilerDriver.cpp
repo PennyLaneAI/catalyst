@@ -918,6 +918,8 @@ int QuantumDriverMainFromCL(int argc, char **argv)
         "keep-intermediate", cl::desc("Keep intermediate files"), cl::init(false),
         cl::callback([&](const bool &) { SaveAfterEach.setValue(SaveTemps::AfterPipeline); }),
         cl::cat(CatalystCat));
+    cl::opt<bool> AsyncQNodes("async-qnodes", cl::desc("Enable asynchronous QNodes"),
+                              cl::init(false), cl::cat(CatalystCat));
     cl::opt<bool> Verbose("verbose", cl::desc("Set verbose"), cl::init(false),
                           cl::cat(CatalystCat));
     cl::list<std::string> CatalystPipeline(
@@ -976,6 +978,7 @@ int QuantumDriverMainFromCL(int argc, char **argv)
                             .moduleName = ModuleName,
                             .diagnosticStream = errStream,
                             .keepIntermediate = SaveAfterEach,
+                            .asyncQnodes = AsyncQNodes,
                             .verbosity = Verbose ? Verbosity::All : Verbosity::Urgent,
                             .pipelinesCfg = parsePipelines(CatalystPipeline),
                             .checkpointStage = CheckpointStage,

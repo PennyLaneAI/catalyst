@@ -343,6 +343,9 @@ def _options_to_opts(options):
     if options.verbose:
         extra_args += ["--verbose"]
 
+    if options.async_qnodes:  # pragma: nocover
+        extra_args += ["--async-qnodes"]
+
     return extra_args
 
 
