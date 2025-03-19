@@ -14,19 +14,19 @@
 
 #pragma once
 
-#include "stim.h"
-
 #include "QEC/IR/QECDialect.h"
 #include "QEC/Transforms/Patterns.h"
 #include "llvm/ADT/SetVector.h"
 
-using namespace stim;
 using namespace mlir;
+
+// forward declare stim member classes to encapsulate dependencies
+namespace stim {
+struct FlexPauliString;
+} // namespace stim
 
 namespace catalyst {
 namespace qec {
-
-constexpr static size_t MAX_BITWORD = stim::MAX_BITWORD_WIDTH;
 
 /// A PauliWord is a vector of strings representing Pauli string ("I", "X", "Y", "Z").
 using PauliWord = llvm::SmallVector<std::string>;
@@ -47,91 +47,36 @@ using PauliWord = llvm::SmallVector<std::string>;
 /// - Converting between different Pauli string formats
 /// - Tracking sign and imaginary components
 struct PauliStringWrapper {
-    stim::PauliString<MAX_BITWORD> pauliString;
+  public:
     std::vector<Value> correspondingQubits;
     QECOpInterface op;
-    bool imaginary; // 0 for real, 1 for imaginary
 
-    PauliStringWrapper(std::string text, bool imag, bool sign)
-        : pauliString(stim::PauliString<MAX_BITWORD>::from_str(text.c_str())), imaginary(imag)
-    {
-        // allocated nullptr for correspondingQubits
-        correspondingQubits.resize(pauliString.num_qubits, nullptr);
-        pauliString.sign = sign;
-    }
-    PauliStringWrapper(stim::PauliString<MAX_BITWORD> &pauliString) : pauliString(pauliString) {}
-    PauliStringWrapper(stim::PauliString<MAX_BITWORD> &pauliString, bool imag, bool sign)
-        : pauliString(pauliString), imaginary(imag)
-    {
-        // allocated nullptr for correspondingQubits
-        correspondingQubits.resize(pauliString.num_qubits, nullptr);
-        pauliString.sign = sign;
-    }
-    PauliStringWrapper(stim::FlexPauliString &fps) : pauliString(fps.str()), imaginary(fps.imag)
-    {
-        // allocated nullptr for correspondingQubits
-        correspondingQubits.resize(pauliString.num_qubits, nullptr);
-    }
+  private:
+    std::unique_ptr<stim::FlexPauliString> pauliString;
 
-    static PauliStringWrapper from_text(std::string_view text)
-    {
-        // check if pauliString contain + or -
-        bool negated = 0;
-        bool imaginary = 0;
-        if (text.starts_with("-")) {
-            negated = true;
-            text = text.substr(1);
-        }
-        else if (text.starts_with("+")) {
-            text = text.substr(1);
-        }
-        if (text.starts_with("i")) {
-            imaginary = true;
-            text = text.substr(1);
-        }
-        auto str = std::string(text);
-        return PauliStringWrapper(std::string(text), imaginary, negated);
-    }
+  public:
+    PauliStringWrapper(std::string_view text);
+    PauliStringWrapper(const stim::FlexPauliString &fps);
+    PauliStringWrapper(const PauliStringWrapper &other); // needed for std::pair compatibility
+    ~PauliStringWrapper();
 
-    static PauliStringWrapper from_pauli_word(PauliWord &pauliWord)
-    {
-        std::string pauliStringStr;
-        for (auto pauli : pauliWord) {
-            pauliStringStr += pauli;
-        }
-        return PauliStringWrapper::from_text(pauliStringStr);
-    }
+    static PauliStringWrapper from_pauli_word(const PauliWord &pauliWord);
 
-    stim::PauliStringRef<MAX_BITWORD> ref() { return pauliString.ref(); }
+    bool isNegative() const;
+    bool isImaginary() const;
 
-    std::string str() const { return pauliString.str(); }
+    void updateSign(bool sign);
 
-    stim::FlexPauliString flex() { return stim::FlexPauliString(pauliString.ref(), imaginary); }
+    PauliWord get_pauli_word() const;
 
-    PauliWord get_pauli_words()
-    {
-        PauliWord pauliWord;
-        auto str = pauliString.str();
-        for (char c : str) {
-            if (c == 'i' || c == '-' || c == '+')
-                continue;
-            if (c == '_') {
-                pauliWord.push_back("I");
-                continue;
-            }
-            pauliWord.emplace_back(1, c);
-        }
-        return pauliWord;
-    }
-
-    bool commutes(PauliStringWrapper &other) { return ref().commutes(other.ref()); }
+    bool commutes(const PauliStringWrapper &other) const;
 
     // Commutation Rules
     // P is Clifford, P' is non-Clifford
     // if P commutes with P' then PP' = P'P
     // if P anti-commutes with P' then PP' = -iPP' P
     // In here, P and P' are lhs and rhs, respectively.
-    PauliStringWrapper computeCommutationRulesWith(PauliStringWrapper &rhs);
+    PauliStringWrapper computeCommutationRulesWith(const PauliStringWrapper &rhs) const;
 };
 
 ////////////////////////////////////////////////////////////
@@ -156,19 +101,19 @@ using PauliWordPair = std::pair<PauliStringWrapper, PauliStringWrapper>;
  */
 template <typename T>
 PauliWord expandPauliWord(const llvm::SetVector<Value> &operands, const T &inOutOperands,
-                          QECOpInterface &op);
+                          QECOpInterface op);
 
 /**
  * @brief Normalize the qubits of the two operations.
- *        The goal is to normalize the operations of the two operaitons to the same order and number
- of qubits.
+ *        The goal is to normalize the operations of the two operations to the same order and
+ *        number of qubits.
  *        - Find the common qubits between the two operations.
  *        - Assign the common qubits to the corresponding qubits of the other operation.
  *
  *        e.g: lhs.getOutQubits() = [q0, q1] with PauliProduct = ["X", "Y"],
  *             rhs.getInQubits() = [q1, q2] with PauliProduct = ["Y", "Z"]
- *        -> lhs.correspondingQubits = [q0, q1, nullptr], rhs.correspondingQubits = [nullptr, q1,
- q2]
+ *        -> lhs.correspondingQubits = [q0, q1, nullptr], rhs.correspondingQubits = [nullptr,
+ *           q1, q2]
  *        -> lhs.pauliString = ["X", "Y", "I"], rhs.pauliString = ["I", "Y", "Z"]
 
  * @param lhs QECOpInterface of the left hand side
@@ -190,8 +135,8 @@ SmallVector<StringRef> removeIdentityPauli(QECOpInterface rhs, SmallVector<Value
  * @param rhsPauliWrapper PauliStringWrapper of the right hand side
  * @return SmallVector<Value> of the replaced qubits
  */
-SmallVector<Value> replaceValueWithOperands(PauliStringWrapper lhsPauliWrapper,
-                                            PauliStringWrapper rhsPauliWrapper);
+SmallVector<Value> replaceValueWithOperands(const PauliStringWrapper &lhsPauliWrapper,
+                                            const PauliStringWrapper &rhsPauliWrapper);
 
 /**
  * @brief Update the pauliWord of the right hand side operation.
@@ -200,7 +145,7 @@ SmallVector<Value> replaceValueWithOperands(PauliStringWrapper lhsPauliWrapper,
  * @param newPauliWord PauliWord of the new pauliWord
  * @param rewriter PatternRewriter
  */
-void updatePauliWord(QECOpInterface op, PauliWord newPauliWord, PatternRewriter &rewriter);
+void updatePauliWord(QECOpInterface op, const PauliWord &newPauliWord, PatternRewriter &rewriter);
 
 // Update the sign of the operation.
 // TODO: Using QECOpInterface instead of PPRotationOp
