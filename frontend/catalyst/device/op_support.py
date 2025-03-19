@@ -50,24 +50,32 @@ def _is_grad_recipe_same_as_catalyst(op):
     if not any(map(lambda x: x, op.grad_recipe)):
         return True
 
+    _is_active = lambda x: isinstance(x, jax.core.Tracer)
+
+    def _is_grad_recipe_active(grad_recipe):
+        active = False
+        for recipe in grad_recipe:
+            left, right = recipe
+            active_left = any(map(_is_active, left))
+            active_right = any(map(_is_active, right))
+            active |= active_left or active_right
+        return active
+
+    if _is_grad_recipe_active(op.grad_recipe):
+        return False
+
     valid = True
     for _, grad_recipe in zip(op.data, op.grad_recipe, strict=True):
         left, right = grad_recipe
-        try:
-            with jax.ensure_compile_time_eval():
-                # exp_param_shift_rule_{left,right} are constants in Catalyst
-                # we must ensure that the rules seen in the op match Catalyst's implementation.
-                exp_param_shift_rule_left = jnp.array([0.5, 1.0, jnp.pi / 2])
-                exp_param_shift_rule_right = jnp.array([-0.5, 1.0, -jnp.pi / 2])
-                obs_param_shift_rule_left = jnp.array(left)
-                obs_param_shift_rule_right = jnp.array(right)
-                is_left_valid = jnp.allclose(obs_param_shift_rule_left, exp_param_shift_rule_left)
-                is_right_valid = jnp.allclose(
-                    obs_param_shift_rule_right, exp_param_shift_rule_right
-                )
-                valid &= is_left_valid and is_right_valid
-        except jax.errors.TracerBoolConversionError:
-            return False
+        # exp_param_shift_rule_{left,right} are constants in Catalyst
+        # we must ensure that the rules seen in the op match Catalyst's implementation.
+        exp_param_shift_rule_left = np.array([0.5, 1.0, np.pi / 2])
+        exp_param_shift_rule_right = np.array([-0.5, 1.0, -np.pi / 2])
+        obs_param_shift_rule_left = np.array(left)
+        obs_param_shift_rule_right = np.array(right)
+        is_left_valid = np.allclose(obs_param_shift_rule_left, exp_param_shift_rule_left)
+        is_right_valid = np.allclose(obs_param_shift_rule_right, exp_param_shift_rule_right)
+        valid &= is_left_valid and is_right_valid
     return valid
 
 
