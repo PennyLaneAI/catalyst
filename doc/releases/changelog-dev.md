@@ -130,6 +130,7 @@
 
 * Catalyst now decomposes non-differentiable gates when in a gradient method.
   [(#1562)](https://github.com/PennyLaneAI/catalyst/pull/1562)
+  [(#1568)](https://github.com/PennyLaneAI/catalyst/pull/1568)
   [(#1569)](https://github.com/PennyLaneAI/catalyst/pull/1569)
 
   Gates that are constant, such as when all parameters are Python or NumPy data types, are not
@@ -145,6 +146,11 @@
 
   - `ComputationalBasisOp` can now take in a quantum register in mlir, instead of an explicit, fixed-size list of qubits.
     [(#1553)](https://github.com/PennyLaneAI/catalyst/pull/1553)
+
+  - Non-observable measurements without explicit wires will now compile to `ComputationalBasisOp` with a quantum register, instead of the explicit list of all qubits on the device.
+  This means the same compiled IR can be reused even if the device changes its number of qubits across runs.
+  This includes `probs(), state(), sample(), counts()`.
+    [(#1565)](https://github.com/PennyLaneAI/catalyst/pull/1565)
 
 <h3>Breaking changes 💔</h3>
 

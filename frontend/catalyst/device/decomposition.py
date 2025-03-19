@@ -211,6 +211,10 @@ def catalyst_acceptance(
     op: qml.operation.Operator, capabilities: DeviceCapabilities, grad_method: Union[str, None]
 ) -> Union[str, None]:
     """Check whether an Operator is supported and returns the name of the operation or None."""
+
+    if not is_differentiable(op, capabilities, grad_method):
+        return None
+
     if isinstance(op, qml.ops.Adjoint):
         match = catalyst_acceptance(op.base, capabilities, grad_method)
         if match and is_invertible(op.base, capabilities):
@@ -223,9 +227,6 @@ def catalyst_acceptance(
         match = catalyst_acceptance(op.base, capabilities, grad_method)
         if match and is_controllable(op.base, capabilities):
             return match
-
-    elif not is_differentiable(op, capabilities, grad_method):
-        return None
 
     elif is_supported(op, capabilities):
         return op.name
