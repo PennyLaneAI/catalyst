@@ -26,6 +26,61 @@ PipelineDict: TypeAlias = dict[str, dict[str, str]]
 
 
 ## API ##
+class QNodeWrapper:
+    """A wrapper class for QNodes that preserves the pass pipeline when called.
+
+    This class is used internally by pass decorators to ensure that compiler passes
+    are properly applied when the QNode is called.
+
+    Args:
+        qnode (QNode or callable): The QNode or wrapped QNode function to call
+    """
+
+    def __init__(self, qnode):
+        self.qnode = qnode
+        if isinstance(qnode, QNodeWrapper):
+            self.original_qnode = qnode.original_qnode
+            self.func = qnode.func
+        elif isinstance(qnode, qml.QNode):
+            self.original_qnode = qnode
+            self.func = qnode.func
+        else:
+            raise TypeError(f"A QNode is expected, got the classical function {qnode}")
+
+        functools.update_wrapper(self, self.func)
+
+    def __call__(self, *args, **kwargs):
+        return self.qnode(*args, **kwargs)
+
+
+class PassPipelineWrapper(QNodeWrapper):
+    """A QNodeWrapper subclass that adds passes to the pipeline when called.
+
+    This class can handle both single passes and multiple passes in a pipeline.
+    For single passes, it takes a pass name and optional flags/options.
+    For multiple passes, it takes a dictionary of pass configurations.
+    """
+
+    def __init__(self, qnode, pass_name_or_pipeline, *flags, **valued_options):
+        super().__init__(qnode)
+        self.pass_name_or_pipeline = pass_name_or_pipeline
+        self.flags = flags
+        self.valued_options = valued_options
+
+    def __call__(self, *args, **kwargs):
+        if not EvaluationContext.is_tracing():
+            return self.qnode(*args, **kwargs)
+
+        pass_pipeline = kwargs.pop("pass_pipeline", [])
+        pass_pipeline += dictionary_to_list_of_passes(
+            self.pass_name_or_pipeline, *self.flags, **self.valued_options
+        )
+        kwargs["pass_pipeline"] = pass_pipeline
+        return self.qnode(*args, **kwargs)
+
+
+
+
 def pipeline(pass_pipeline: PipelineDict):
     """Configures the Catalyst MLIR pass pipeline for quantum circuit transformations for a QNode
     within a qjit-compiled program.
