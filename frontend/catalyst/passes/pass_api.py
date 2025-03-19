@@ -46,8 +46,9 @@ class QNodeWrapper:
         else:
             raise TypeError(f"A QNode is expected, got the classical function {qnode}")
 
-        # Update the wrapper to preserve the original function's metadata (signature, annotations, etc.)
-        # This is crucial for qjit to properly inspect the function signature and make compilation decisions.
+        # Update the wrapper to preserve the original function's metadata (signature, annotations,
+        # etc.) This is crucial for qjit to properly inspect the function signature and make
+        # compilation decisions.
         functools.update_wrapper(self, self.func)
 
     def __call__(self, *args, **kwargs):
@@ -78,6 +79,8 @@ class PassPipelineWrapper(QNodeWrapper):
         )
         kwargs["pass_pipeline"] = pass_pipeline
         return self.qnode(*args, **kwargs)
+
+
 
 
 def pipeline(pass_pipeline: PipelineDict):
@@ -172,6 +175,7 @@ def pipeline(pass_pipeline: PipelineDict):
         return PassPipelineWrapper(qnode, pass_pipeline)
 
     return _decorator
+
 
 
 def apply_pass(pass_name: str, *flags, **valued_options):
@@ -368,7 +372,6 @@ def dictionary_to_list_of_passes(pass_pipeline: PipelineDict | str, *flags, **va
         return passes
 
     return pass_pipeline
-
 
 def _API_name_to_pass_name():
     return {
