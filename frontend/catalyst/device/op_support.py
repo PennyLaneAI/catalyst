@@ -44,12 +44,6 @@ def is_supported(op: Operator, capabilities: DeviceCapabilities) -> bool:
 
 def _is_grad_recipe_same_as_catalyst(op):
     """Checks that the grad_recipe for the op matches the hard coded one in Catalyst."""
-    if not hasattr(op, "grad_recipe"):
-        return True
-
-    if not any(map(lambda x: x, op.grad_recipe)):
-        return True
-
     _is_active = lambda x: isinstance(x, jax.core.Tracer)
 
     def _is_grad_recipe_active(grad_recipe):
@@ -62,6 +56,7 @@ def _is_grad_recipe_same_as_catalyst(op):
         return active
 
     if _is_grad_recipe_active(op.grad_recipe):
+        # An active grad recipe is never the same as the one in catalyst
         return False
 
     if len(op.data) != len(op.grad_recipe):
@@ -80,6 +75,17 @@ def _is_grad_recipe_same_as_catalyst(op):
         is_right_valid = np.allclose(obs_param_shift_rule_right, exp_param_shift_rule_right)
         valid &= is_left_valid and is_right_valid
     return valid
+
+
+def _has_grad_recipe(op):
+    """Checks whether grad_recipe is defined"""
+    if not hasattr(op, "grad_recipe"):
+        return False
+
+    if not any(map(lambda x: x, op.grad_recipe)):
+        return False
+
+    return True
 
 
 def _are_param_frequencies_same_as_catalyst(op):
@@ -115,8 +121,8 @@ def _paramshift_op_checker(op):
         # It will always be four term shift rule.
         return False
 
-    if not _is_grad_recipe_same_as_catalyst(op):
-        return False
+    if _has_grad_recipe(op):
+        return _is_grad_recipe_same_as_catalyst(op)
 
     if not _are_param_frequencies_same_as_catalyst(op):
         return False

@@ -41,6 +41,7 @@ from catalyst import (
 from catalyst.compiler import get_lib_path
 from catalyst.device.op_support import (
     _are_param_frequencies_same_as_catalyst,
+    _has_grad_recipe,
     _is_grad_recipe_same_as_catalyst,
     _paramshift_op_checker,
 )
@@ -1928,7 +1929,7 @@ class TestParameterShiftVerificationUnitTests:
         # a family of ops that do not have grad recipe are control flow ops
         class DummyOp(qml.operation.Operator): ...
 
-        assert _is_grad_recipe_same_as_catalyst(DummyOp(wires=[0]))
+        assert not _has_grad_recipe(DummyOp(wires=[0]))
 
     def test_check_grad_recipe_empty(self):
         """Some grad recipes are defined but are filled with Nones"""
@@ -1938,7 +1939,7 @@ class TestParameterShiftVerificationUnitTests:
             def grad_recipe(self):
                 return [None]
 
-        assert _is_grad_recipe_same_as_catalyst(DummyOp(wires=[0]))
+        assert not _has_grad_recipe(DummyOp(wires=[0]))
 
     def test_check_grad_recipe_different(self):
         """Check exception is raised when invalid grad_recipe is found"""
