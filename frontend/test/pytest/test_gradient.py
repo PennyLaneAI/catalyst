@@ -2066,6 +2066,18 @@ class TestParameterShiftVerificationUnitTests:
         op = qml.QubitUnitary(jnp.array([[1, 1], [1, -1]]), wires=0)
         assert not _paramshift_op_checker(op)
 
+    def test_no_grad_recipe_no_param_frequencies(self):
+        """No grad recipe, no param shift, not hybrid op => no grad"""
+        class DummyOp(qml.operation.Operator):
+            def __init__(self, wires=None):
+                super().__init__(0.0, wires=wires)
+
+            @property
+            def num_params(self):
+                return 1
+
+        assert not _paramshift_op_checker(DummyOp(wires=[0]))
+
 
 class TestParameterShiftVerificationIntegrationTests:
     """Test to verify operations / observables / measurements when doing parameter shift.
