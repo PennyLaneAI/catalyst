@@ -18,6 +18,7 @@ from typing import Union
 
 import jax
 import jax.numpy as jnp
+import numpy as np
 import pennylane as qml
 from pennylane.devices.capabilities import DeviceCapabilities, OperatorProperties
 from pennylane.operation import Operation, Operator
@@ -85,16 +86,7 @@ def _are_param_frequencies_same_as_catalyst(op):
         # defined this check should succeed, well then we return true.
         return True
 
-    with jax.ensure_compile_time_eval():
-        # We use jax.ensure_compile_time_eval
-        # to evaluate op.parameter_frequencies (which we expect to always be known at compile time
-        # and concrete) and compare with 1.0. Otherwise, jax may generate stablehlo
-        # operations for the jnp.allclose
-        # This is a purely stylistic choice and one may have also chosen to avoid jax and use
-        # numpy instead.
-        valid_frequencies = all(
-            map(lambda x: jnp.allclose(jnp.array(x), 1.0), op.parameter_frequencies)
-        )
+    valid_frequencies = all(map(lambda x: np.allclose(np.array(x), 1.0), op.parameter_frequencies))
 
     return valid_frequencies
 
