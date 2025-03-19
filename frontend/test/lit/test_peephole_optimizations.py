@@ -76,8 +76,8 @@ def test_pipeline_lowering():
     # CHECK-NEXT: transform.yield
     print_mlir(test_pipeline_lowering_workflow, 1.2)
 
-    # CHECK: {{%.+}} = call @test_pipeline_lowering_workflow_transformed_0(
-    # CHECK: func.func public @test_pipeline_lowering_workflow_transformed_0(
+    # CHECK: {{%.+}} = call @test_pipeline_lowering_workflow_0(
+    # CHECK: func.func public @test_pipeline_lowering_workflow_0(
     # CHECK: {{%.+}} = quantum.custom "RX"({{%.+}}) {{%.+}} : !quantum.bit
     # CHECK-NOT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
     # CHECK-NOT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
@@ -130,12 +130,12 @@ def test_pipeline_lowering_keep_original():
 
     # CHECK: func.func public @jit_test_pipeline_lowering_keep_original_workflow
     # CHECK: {{%.+}} = call @f_0(
-    # CHECK: {{%.+}} = call @f_transformed_0(
+    # CHECK: {{%.+}} = call @f_1_0(
     # CHECK: func.func public @f_0(
     # CHECK: {{%.+}} = quantum.custom "RX"({{%.+}}) {{%.+}} : !quantum.bit
     # CHECK: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
     # CHECK: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
-    # CHECK: func.func public @f_transformed_0(
+    # CHECK: func.func public @f_1_0(
     # CHECK: {{%.+}} = quantum.custom "RX"({{%.+}}) {{%.+}} : !quantum.bit
     # CHECK-NOT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
     # CHECK-NOT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
@@ -256,13 +256,13 @@ def test_pipeline_lowering_globloc_override():
     print_mlir(global_wf)
 
     # CHECK: func.func public @jit_global_wf()
-    # CHECK {{%.+}} = call @g(
-    # CHECK {{%.+}} = call @h_transformed(
-    # CHECK: func.func public @g_0
+    # CHECK {{%.+}} = call @g_0(
+    # CHECK {{%.+}} = call @h_0(
+    # CHECK: func.func public @g_0(
     # CHECK: {{%.+}} = quantum.custom "RX"({{%.+}}) {{%.+}} : !quantum.bit
     # CHECK-NOT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
     # CHECK-NOT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
-    # CHECK: func.func public @h_transformed_0
+    # CHECK: func.func public @h_0
     # CHECK: {{%.+}} = quantum.custom "RX"({{%.+}}) {{%.+}} : !quantum.bit
     # CHECK: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
     # CHECK: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
