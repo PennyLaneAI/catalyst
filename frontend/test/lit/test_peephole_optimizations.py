@@ -30,7 +30,7 @@ from utils import qjit_for_tests as qjit
 
 from catalyst import pipeline
 from catalyst.debug import get_compilation_stage
-from catalyst.passes import cancel_inverses, merge_rotations
+from catalyst.passes import apply_pass, cancel_inverses, merge_rotations
 
 
 def flush_peephole_opted_mlir_to_iostream(QJIT):
@@ -271,6 +271,213 @@ def test_pipeline_lowering_globloc_override():
 
 
 test_pipeline_lowering_globloc_override()
+
+
+def test_chained_pipeline_lowering():
+    """
+    Test that chained pipelines are correctly lowered.
+    """
+    pipeline1 = {
+        "cancel_inverses": {},
+        "merge_rotations": {},
+    }
+    pipeline2 = {
+        "cancel_inverses": {},
+    }
+
+    @qjit()
+    @pipeline(pipeline1)
+    @pipeline(pipeline2)
+    @qml.qnode(qml.device("lightning.qubit", wires=2))
+    def test_chained_pipeline_lowering_workflow(x: float):
+        qml.Hadamard(wires=[1])
+        qml.RX(x, wires=[0])
+        qml.RX(-x, wires=[0])
+        qml.Hadamard(wires=[1])
+        return qml.expval(qml.PauliY(wires=0))
+
+    print(test_chained_pipeline_lowering_workflow.mlir)
+
+    # # CHECK: transform.named_sequence @__transform_main
+    # # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "remove-chained-self-inverse" to {{%.+}}
+    # # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "merge-rotations" to {{%.+}}
+    # # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "remove-chained-self-inverse" to {{%.+}}
+    # # CHECK-NEXT: transform.yield
+
+
+test_chained_pipeline_lowering()
+
+
+def test_chained_pipeline_lowering_keep_original():
+    """
+    Test when the chained pipeline and the original qnode are both used,
+    and the original is correctly kept and untransformed.
+    """
+    pipeline1 = {
+        "cancel_inverses": {},
+        "merge_rotations": {},
+    }
+    pipeline2 = {
+        "cancel_inverses": {},
+    }
+
+    @qml.qnode(qml.device("lightning.qubit", wires=2))
+    def f(x: float):
+        qml.RX(x, wires=[0])
+        qml.Hadamard(wires=[1])
+        qml.Hadamard(wires=[1])
+        return qml.expval(qml.PauliY(wires=0))
+
+    f_pipeline1 = pipeline(pipeline1)(f)
+    f_pipeline2 = pipeline(pipeline2)(f_pipeline1)
+
+    @qjit()
+    def test_chained_pipeline_lowering_keep_original_workflow(x: float):
+        return f(x), f_pipeline1(x), f_pipeline2(x)
+
+    # COM: The unchanged qnode
+    # CHECK: transform.named_sequence @__transform_main
+    # COM: The qnode after pipeline1
+    # CHECK: transform.named_sequence @__transform_main
+    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "remove-chained-self-inverse" to {{%.+}}
+    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "merge-rotations" to {{%.+}}
+    # COM: The qnode after pipeline2
+    # CHECK: transform.named_sequence @__transform_main
+    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "remove-chained-self-inverse" to {{%.+}}
+    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "remove-chained-self-inverse" to {{%.+}}
+    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "merge-rotations" to {{%.+}}
+    # CHECK-NEXT: transform.yield
+    print(test_chained_pipeline_lowering_keep_original_workflow.mlir)
+
+
+test_chained_pipeline_lowering_keep_original()
+
+
+def test_chained_apply_passes():
+    """
+    Test that chained passes are correctly applied in sequence using apply_pass.
+    """
+
+    @qjit()
+    @apply_pass("remove-chained-self-inverse")
+    @apply_pass("merge-rotations")
+    @qml.qnode(qml.device("lightning.qubit", wires=2))
+    def test_chained_apply_passes_workflow(x: float):
+        qml.Hadamard(wires=[1])
+        qml.RX(x, wires=[0])
+        qml.RX(-x, wires=[0])
+        qml.Hadamard(wires=[1])
+        return qml.expval(qml.PauliY(wires=0))
+
+    print(test_chained_apply_passes_workflow.mlir)
+
+    # CHECK: transform.named_sequence @__transform_main
+    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "remove-chained-self-inverse" to {{%.+}}
+    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "merge-rotations" to {{%.+}}
+    # CHECK-NEXT: transform.yield
+
+
+test_chained_apply_passes()
+
+
+def test_chained_apply_passes_keep_original():
+    """
+    Test when the chained apply passes and the original qnode are both used,
+    and the original is correctly kept and untransformed.
+    """
+
+    @qml.qnode(qml.device("lightning.qubit", wires=2))
+    def f(x: float):
+        qml.RX(x, wires=[0])
+        qml.Hadamard(wires=[1])
+        qml.Hadamard(wires=[1])
+        return qml.expval(qml.PauliY(wires=0))
+
+    f_pass1 = apply_pass("remove-chained-self-inverse")(f)
+    f_pass2 = apply_pass("merge-rotations")(f_pass1)
+
+    @qjit()
+    def test_chained_apply_passes_keep_original_workflow(x: float):
+        return f(x), f_pass1(x), f_pass2(x)
+
+    # COM: The unchanged qnode
+    # CHECK: transform.named_sequence @__transform_main
+    # COM: The qnode after pipeline1
+    # CHECK: transform.named_sequence @__transform_main
+    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "remove-chained-self-inverse" to {{%.+}}
+    # COM: The qnode after merge_rotations
+    # CHECK: transform.named_sequence @__transform_main
+    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "merge-rotations" to {{%.+}}
+    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "remove-chained-self-inverse" to {{%.+}}
+    # CHECK-NEXT: transform.yield
+    print(test_chained_apply_passes_keep_original_workflow.mlir)
+
+
+test_chained_apply_passes_keep_original()
+
+
+def test_chained_peephole_passes():
+    """
+    Test that chained peephole passes are correctly applied in sequence.
+    """
+
+    @qjit()
+    @cancel_inverses
+    @merge_rotations
+    @qml.qnode(qml.device("lightning.qubit", wires=2))
+    def test_chained_peephole_passes_workflow(x: float):
+        qml.Hadamard(wires=[1])
+        qml.RX(x, wires=[0])
+        qml.RX(-x, wires=[0])
+        qml.Hadamard(wires=[1])
+        return qml.expval(qml.PauliY(wires=0))
+
+    print(test_chained_peephole_passes_workflow.mlir)
+
+    # CHECK: transform.named_sequence @__transform_main
+    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "remove-chained-self-inverse" to {{%.+}}
+    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "merge-rotations" to {{%.+}}
+    # CHECK-NEXT: transform.yield
+
+
+test_chained_peephole_passes()
+
+
+def test_chained_peephole_passes_keep_original():
+    """
+    Test when the chained peephole passes and the original qnode are both used,
+    and the original is correctly kept and untransformed.
+    """
+
+    @qml.qnode(qml.device("lightning.qubit", wires=2))
+    def f(x: float):
+        qml.RX(x, wires=[0])
+        qml.Hadamard(wires=[1])
+        qml.Hadamard(wires=[1])
+        return qml.expval(qml.PauliY(wires=0))
+
+    f_pass1 = cancel_inverses(f)
+    f_pass2 = merge_rotations(f_pass1)
+
+    @qjit()
+    def test_chained_peephole_passes_keep_original_workflow(x: float):
+        return f(x), f_pass1(x), f_pass2(x)
+
+    # COM: The unchanged qnode
+    # CHECK: transform.named_sequence @__transform_main
+    # COM: The qnode after cancel_inverses
+    # CHECK: transform.named_sequence @__transform_main
+    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "remove-chained-self-inverse" to {{%.+}}
+    # COM: The qnode after merge_rotations
+    # CHECK: transform.named_sequence @__transform_main
+    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "merge-rotations" to {{%.+}}
+    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "remove-chained-self-inverse" to {{%.+}}
+    # CHECK-NEXT: transform.yield
+    print(test_chained_peephole_passes_keep_original_workflow.mlir)
+
+
+test_chained_peephole_passes_keep_original()
+
 
 #
 # autograph
