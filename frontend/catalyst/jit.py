@@ -469,7 +469,6 @@ class QJIT(CatalystCallable):
 
     @debug_logger_init
     def __init__(self, fn, compile_options):
-        # If the function is a QnodeCaller, we need to unwrap it to get the original QNode.
         functools.update_wrapper(self, fn)
         self.original_function = fn
         self.compile_options = compile_options
