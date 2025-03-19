@@ -1956,7 +1956,10 @@ class TestParameterShiftVerificationUnitTests:
 
             @property
             def grad_recipe(self):
-                return ([[0.5, 1.0, np.pi / 2], [-0.5, 1.0, -np.pi / 2]], [[0.5, 1.0, np.pi / 2], [-0.5, 1.0, -np.pi / 2]])
+                return (
+                    [[0.5, 1.0, np.pi / 2], [-0.5, 1.0, -np.pi / 2]],
+                    [[0.5, 1.0, np.pi / 2], [-0.5, 1.0, -np.pi / 2]],
+                )
 
         assert not _is_grad_recipe_same_as_catalyst(DummyOp(wires=[0]))
 
@@ -2070,10 +2073,10 @@ class TestParameterShiftVerificationIntegrationTests:
     Source of truth obtained from shortcut story: 84819
     """
 
-    def test_is_mcm(self):
+    def test_is_mcm(self, backend):
         """No mcm"""
 
-        device = qml.device("lightning.qubit", wires=1)
+        device = qml.device(backend, wires=1)
 
         with pytest.raises(DifferentiableCompileError, match="MidCircuitMeasure is not allowed"):
 
@@ -2084,9 +2087,9 @@ class TestParameterShiftVerificationIntegrationTests:
                 measure(0)
                 return qml.expval(qml.PauliZ(wires=0))
 
-    def test_all_arguments_are_constant(self):
+    def test_all_arguments_are_constant(self, backend):
         """When all arguments are constant they do not contribute to the gradient"""
-        device = qml.device("lightning.qubit", wires=1)
+        device = qml.device(backend, wires=1)
 
         # Yes, this test does not have an assertion.
         # The test is that this does not produce an assertion.
@@ -2098,9 +2101,9 @@ class TestParameterShiftVerificationIntegrationTests:
             qml.RX(0.0, wires=[0])
             return qml.expval(qml.PauliZ(wires=0))
 
-    def test_grad_recipe_dynamic(self):
+    def test_grad_recipe_dynamic(self, backend):
         """Raise exception when there is an op with a grad_recipe that's dynamic"""
-        device = qml.device("lightning.qubit", wires=1)
+        device = qml.device(backend, wires=1)
 
         class RX(qml.RX):
             @property
@@ -2118,9 +2121,9 @@ class TestParameterShiftVerificationIntegrationTests:
                 RX(x, wires=[0])
                 return qml.expval(qml.PauliZ(wires=0))
 
-    def test_grad_recipe_static(self):
+    def test_grad_recipe_static(self, backend):
         """Raise exception when there is an op with a mismatching grad_recipe"""
-        device = qml.device("lightning.qubit", wires=1)
+        device = qml.device(backend, wires=1)
 
         class RX(qml.RX):
             @property
@@ -2136,9 +2139,9 @@ class TestParameterShiftVerificationIntegrationTests:
                 RX(x, wires=[0])
                 return qml.expval(qml.PauliZ(wires=0))
 
-    def test_parameter_frequencies(self):
+    def test_parameter_frequencies(self, backend):
         """Raise exception when when there is an lengths are mismatched."""
-        device = qml.device("lightning.qubit", wires=1)
+        device = qml.device(backend, wires=1)
 
         class RX(qml.RX):
             @property
@@ -2155,9 +2158,9 @@ class TestParameterShiftVerificationIntegrationTests:
                 RX(x, wires=[0])
                 return qml.expval(qml.PauliZ(wires=0))
 
-    def test_parameter_frequencies_not_one(self):
+    def test_parameter_frequencies_not_one(self, backend):
         """When there is an op without parameter_frequencies, ps gradient should fail"""
-        device = qml.device("lightning.qubit", wires=1)
+        device = qml.device(backend, wires=1)
 
         class RX(qml.RX):
             @property
