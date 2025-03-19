@@ -81,8 +81,6 @@ class PassPipelineWrapper(QNodeWrapper):
         return self.qnode(*args, **kwargs)
 
 
-
-
 def pipeline(pass_pipeline: PipelineDict):
     """Configures the Catalyst MLIR pass pipeline for quantum circuit transformations for a QNode
     within a qjit-compiled program.
@@ -175,7 +173,6 @@ def pipeline(pass_pipeline: PipelineDict):
         return PassPipelineWrapper(qnode, pass_pipeline)
 
     return _decorator
-
 
 
 def apply_pass(pass_name: str, *flags, **valued_options):
@@ -372,6 +369,7 @@ def dictionary_to_list_of_passes(pass_pipeline: PipelineDict | str, *flags, **va
         return passes
 
     return pass_pipeline
+
 
 def _API_name_to_pass_name():
     return {
