@@ -120,7 +120,7 @@ def _paramshift_op_checker(op):
 
     if type(op) in (qml.ops.Controlled, qml.ops.ControlledOp):
         # Cannot take param shift of controlled ops.
-        # It will always be four term shift rule.
+        # It will always be at least a four term shift rule.
         return False
 
     if _has_grad_recipe(op):
