@@ -50,6 +50,7 @@ def _is_grad_recipe_same_as_catalyst(op):
     if not any(map(lambda x: x, op.grad_recipe)):
         return True
 
+    valid = True
     for _, grad_recipe in zip(op.data, op.grad_recipe, strict=True):
         left, right = grad_recipe
         try:
@@ -64,9 +65,10 @@ def _is_grad_recipe_same_as_catalyst(op):
                 is_right_valid = jnp.allclose(
                     obs_param_shift_rule_right, exp_param_shift_rule_right
                 )
-            return bool(is_left_valid and is_right_valid)
+                valid &= is_left_valid and is_right_valid
         except jax.errors.TracerBoolConversionError:
             return False
+    return valid
 
 
 def _are_param_frequencies_same_as_catalyst(op):
