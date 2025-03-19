@@ -135,6 +135,8 @@ def cancel_inverses(qnode):
     """
     if not (isinstance(qnode, qml.QNode) or isinstance(qnode, QnodeCaller)):
         raise TypeError(f"A QNode is expected, got the classical function {qnode}")
+    elif isinstance(qnode, QnodeCaller):
+        qnode = qnode.qnode
 
     @functools.wraps(qnode)
     def wrapper(*args, **kwargs):
@@ -209,6 +211,8 @@ def merge_rotations(qnode):
     """
     if not (isinstance(qnode, qml.QNode) or isinstance(qnode, QnodeCaller)):
         raise TypeError(f"A QNode is expected, got the classical function {qnode}")
+    elif isinstance(qnode, QnodeCaller):
+        qnode = qnode.qnode
 
     @functools.wraps(qnode)
     def wrapper(*args, **kwargs):
@@ -342,6 +346,8 @@ def ions_decomposition(qnode):  # pragma: nocover
 
     if not (isinstance(qnode, qml.QNode) or isinstance(qnode, QnodeCaller)):
         raise TypeError(f"A QNode is expected, got the classical function {qnode}")
+    elif isinstance(qnode, QnodeCaller):
+        qnode = qnode.qnode
 
     @functools.wraps(qnode)
     def wrapper(*args, **kwargs):
@@ -414,6 +420,8 @@ def to_ppr(qnode):
     """
     if not (isinstance(qnode, qml.QNode) or isinstance(qnode, QnodeCaller)):
         raise TypeError(f"A QNode is expected, got the classical function {qnode}")
+    elif isinstance(qnode, QnodeCaller):
+        qnode = qnode.qnode
 
     @functools.wraps(qnode)
     def wrapper(*args, **kwargs):
