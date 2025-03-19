@@ -871,48 +871,6 @@ class TestParameterShiftMethodVerification:
             def cir(x: float):
                 return grad(f)(x)
 
-    @patch.object(qml.RX, "grad_method", "F")
-    def test_paramshift_gate_simple(self):
-        """Test that taking a parameter-shift gradient of a tape containing a parameterized
-        operation that doesn't support analytic differentiation raises an error."""
-
-        @qml.qnode(qml.device("lightning.qubit", wires=1), diff_method="parameter-shift")
-        def f(x):
-            qml.RX(x, 0)
-            return qml.expval(qml.PauliX(0))
-
-        with pytest.raises(
-            DifferentiableCompileError, match="RX does not support analytic differentiation"
-        ):
-
-            @qml.qjit
-            def cir(x: float):
-                return grad(f)(x)
-
-    @patch.object(qml.RX, "grad_method", "F")
-    def test_paramshift_gate_while(self):
-        """Test that taking a parameter-shift gradient of a tape containing a WhileLoop HybridOp
-        containing a parameterized operation that doesn't support analytic differentiation raises
-        an error."""
-
-        @qml.qnode(qml.device("lightning.qubit", wires=1), diff_method="parameter-shift")
-        def f(x):
-            @while_loop(lambda s: s > 0)
-            def loop(s):
-                qml.RX(x, 0)
-                return s + 1
-
-            loop(0)
-            return qml.expval(qml.PauliX(0))
-
-        with pytest.raises(
-            DifferentiableCompileError, match="RX does not support analytic differentiation"
-        ):
-
-            @qml.qjit
-            def cir(x: float):
-                return grad(f)(x)
-
 
 def test_no_state_returns():
     """Test state returns are rejected in gradients."""

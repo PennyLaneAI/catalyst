@@ -129,10 +129,6 @@ def _paramshift_op_checker(op):
     if _has_parameter_frequencies(op):
         return _are_param_frequencies_same_as_catalyst(op)
 
-    if not isinstance(op, HybridOp):
-        if op.grad_method not in {"A", None}:
-            raise DifferentiableCompileError(f"{op.name} does not support analytic differentiation")
-
     return True
 
 
