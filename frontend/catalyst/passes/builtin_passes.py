@@ -441,13 +441,15 @@ def commute_ppr(qnode):
     Notice that this pass is applied after the ``-convert-clifford-t-to-ppr`` pass.
 
     Args:
-        fn (QNode): QNode to apply the pass to
+        fn (QNode): QNode to apply the pass to.
 
     Returns:
         ~.QNode
     **Example**
 
-    In this example the Clifford+T gates will be converted into PPRs.
+    The ``commute_ppr`` pass is often used in conjunction with :func:`~.passes.to_ppr` to first convert 
+    gates into PPRs. In this example, the Clifford+T gates in the circuit will be converted into PPRs first, 
+    then the Clifford PPRs will be commuted past the non-Clifford PPR.
 
     .. code-block:: python
         ppm_passes = {
