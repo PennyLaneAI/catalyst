@@ -469,12 +469,12 @@ def test_cancel_inverses_keep_original():
 
     # CHECK-LABEL: public @jit_test_cancel_inverses_keep_original_workflow0
     # CHECK: {{%.+}} = call @f_0({{%.+}})
-    # CHECK-NOT: {{%.+}} = call @f_cancel_inverses_0({{%.+}})
+    # CHECK-NOT: {{%.+}} = call @f_0({{%.+}})
     # CHECK-LABEL: public @f_0({{%.+}})
     # CHECK: {{%.+}} = quantum.custom "RX"({{%.+}}) {{%.+}} : !quantum.bit
     # CHECK-NEXT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
     # CHECK-NEXT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
-    # CHECK-NOT: public @f_cancel_inverses_0
+    # CHECK-NOT: public @f_0
     @qjit(keep_intermediate=True)
     def test_cancel_inverses_keep_original_workflow0():
         return f(1.0)
@@ -483,9 +483,9 @@ def test_cancel_inverses_keep_original():
     flush_peephole_opted_mlir_to_iostream(test_cancel_inverses_keep_original_workflow0)
 
     # CHECK-LABEL: public @jit_test_cancel_inverses_keep_original_workflow1
-    # CHECK: {{%.+}} = call @f_cancel_inverses_0({{%.+}})
+    # CHECK: {{%.+}} = call @f_0({{%.+}})
     # CHECK-NOT: {{%.+}} = call @f_0({{%.+}})
-    # CHECK-LABEL: public @f_cancel_inverses_0({{%.+}})
+    # CHECK-LABEL: public @f_0({{%.+}})
     # CHECK: {{%.+}} = quantum.custom "RX"({{%.+}}) {{%.+}} : !quantum.bit
     # CHECK-NOT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
     # CHECK-NOT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
@@ -499,12 +499,12 @@ def test_cancel_inverses_keep_original():
 
     # CHECK-LABEL: public @jit_test_cancel_inverses_keep_original_workflow2
     # CHECK: {{%.+}} = call @f_0({{%.+}})
-    # CHECK: {{%.+}} = call @f_cancel_inverses_0({{%.+}})
+    # CHECK: {{%.+}} = call @f_1_0({{%.+}})
     # CHECK-LABEL: public @f_0({{%.+}})
     # CHECK: {{%.+}} = quantum.custom "RX"({{%.+}}) {{%.+}} : !quantum.bit
     # CHECK-NEXT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
     # CHECK-NEXT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
-    # CHECK-LABEL: public @f_cancel_inverses_0({{%.+}})
+    # CHECK-LABEL: public @f_1_0({{%.+}})
     # CHECK: {{%.+}} = quantum.custom "RX"({{%.+}}) {{%.+}} : !quantum.bit
     # CHECK-NOT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
     # CHECK-NOT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
