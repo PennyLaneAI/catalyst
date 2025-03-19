@@ -1,5 +1,4 @@
 set(LIBRARY_NAME qec-transforms)
-set(LLVM_REQUIRES_EH ON)
 
 
 file(GLOB SRC
@@ -28,14 +27,3 @@ target_include_directories(${LIBRARY_NAME} PUBLIC
                            .
                            ${PROJECT_SOURCE_DIR}/include
                            ${CMAKE_BINARY_DIR}/include)
-include(FetchContent)
-FetchContent_Declare(stim
-        GIT_REPOSITORY https://github.com/quantumlib/stim.git
-        GIT_TAG v1.14.0)
-FetchContent_GetProperties(stim)
-if(NOT stim_POPULATED)
-  FetchContent_Populate(stim)
-  add_subdirectory(${stim_SOURCE_DIR} ${CMAKE_BINARY_DIR}/_deps/stim-build)
-endif()
-
-target_link_libraries(${LIBRARY_NAME} PRIVATE libstim)

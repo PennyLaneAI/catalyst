@@ -1,17 +1,19 @@
-set(LLVM_REQUIRES_EH ON)
+include(FetchContent)
 
-add_mlir_library(QECUtils
+FetchContent_Declare(stim
+    GIT_REPOSITORY https://github.com/quantumlib/stim.git
+    GIT_TAG v1.14.0
+)
+
+FetchContent_MakeAvailable(stim)
+
+add_library(QECUtils
     PauliStringWrapper.cpp
 )
 
-include(FetchContent)
-FetchContent_Declare(stim
-        GIT_REPOSITORY https://github.com/quantumlib/stim.git
-        GIT_TAG v1.14.0)
-FetchContent_GetProperties(stim)
-if(NOT stim_POPULATED)
-    FetchContent_Populate(stim)
-    add_subdirectory(${stim_SOURCE_DIR} ${CMAKE_BINARY_DIR}/_deps/stim-build)
-endif()
+target_compile_options(QECUtils PRIVATE
+    -frtti           # Enable RTTI
+    -fexceptions     # Enable exceptions
+)
 
 target_link_libraries(QECUtils PRIVATE libstim)
