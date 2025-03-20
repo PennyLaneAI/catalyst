@@ -37,4 +37,14 @@ def CommuteCliffordTPPRPass : Pass<"commute_ppr"> {
     let constructor = "catalyst::createCommuteCliffordTPPRPass()";
 }
 
+def AbsorbCliffordToPPMPass : Pass<"absorb-ppr-to-ppm"> {
+    let summary = "Absorb Clifford operations into Pauli Product Measurement operations.";
+    
+    let dependentDialects = [
+        "catalyst::qec::QECDialect",
+    ];
+    
+    let constructor = "catalyst::createAbsorbCliffordToPPMPass()";
+}
+
 #endif // QEC_PASSES

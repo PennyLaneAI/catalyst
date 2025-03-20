@@ -61,4 +61,5 @@ void catalyst::registerAllCatalystPasses()
     mlir::registerPass(catalyst::createQuantumToIonPass);
     mlir::registerPass(catalyst::createCommuteCliffordTPPRPass);
     mlir::registerPass(catalyst::createCliffordTToPPRPass);
+    mlir::registerPass(catalyst::createAbsorbCliffordToPPMPass);
 }
