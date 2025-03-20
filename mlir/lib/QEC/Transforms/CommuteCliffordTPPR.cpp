@@ -85,8 +85,9 @@ LogicalResult visitPPRotationOp(PPRotationOp op,
     return failure();
 }
 
-void moveCliffordPastNonClifford(PauliStringWrapper lhsPauli, PauliStringWrapper rhsPauli,
-                                 PauliStringWrapper *result, PatternRewriter &rewriter)
+void moveCliffordPastNonClifford(const PauliStringWrapper &lhsPauli,
+                                 const PauliStringWrapper &rhsPauli, PauliStringWrapper *result,
+                                 PatternRewriter &rewriter)
 {
     assert(lhsPauli.op != nullptr && "LHS Operation is not found");
     assert(rhsPauli.op != nullptr && "RHS Operation is not found");
@@ -105,12 +106,12 @@ void moveCliffordPastNonClifford(PauliStringWrapper lhsPauli, PauliStringWrapper
 
     // Update Pauli words of RHS
     if (result != nullptr) {
-        updatePauliWord(rhs, result->get_pauli_words(), rewriter);
-        updatePauliWordSign(rhs, result->pauliString.sign, rewriter);
+        updatePauliWord(rhs, result->get_pauli_word(), rewriter);
+        updatePauliWordSign(rhs, result->isNegative(), rewriter);
     }
     else {
-        updatePauliWord(rhs, rhsPauli.get_pauli_words(), rewriter);
-        updatePauliWordSign(rhs, rhsPauli.pauliString.sign, rewriter);
+        updatePauliWord(rhs, rhsPauli.get_pauli_word(), rewriter);
+        updatePauliWordSign(rhs, rhsPauli.isNegative(), rewriter);
     }
 
     // Fullfill Operands of RHS

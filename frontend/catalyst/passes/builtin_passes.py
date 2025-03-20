@@ -436,44 +436,39 @@ def to_ppr(qnode):
 
 def commute_ppr(qnode):
     """
-    Specify that the ``-commute-ppr`` MLIR compiler pass
-    for commuting Clifford gates past non-Clifford gates will be applied.
-    Notice that this pass is applied after the ``-convert-clifford-t-to-ppr`` pass.
+    Specify that the MLIR compiler pass for commuting Clifford Pauli Product Rotation (PPR) gates, :math:`\exp{iP\tfrac{\pi}{4}}`, past non-Clifford PPRs gates, :math:`\exp{iP\tfrac{\pi}{8}}` will be applied, where :math:`P` is a Pauli word.
+    
+    For more information regarding to PPM, please refer to [(Pauli Product Measurement)](https://pennylane.ai/compilation/pauli-product-measurement)
 
     Args:
-        fn (QNode): QNode to apply the pass to
+        fn (QNode): QNode to apply the pass to.
 
     Returns:
         ~.QNode
+        
     **Example**
 
-    In this example the Clifford+T gates will be converted into PPRs.
+    The ``commute_ppr`` pass is often used in conjunction with :func:`~.passes.to_ppr` to first convert 
+    gates into PPRs. In this example, the Clifford+T gates in the circuit will be converted into PPRs first, 
+    then the Clifford PPRs will be commuted past the non-Clifford PPR.
 
     .. code-block:: python
-        ppm_passes = {
-            "to_ppr": {},
-            "commute_ppr": {},
-        }
-
-        @qjit(keep_intermediate=True)
-        @pipeline(ppm_passes)
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
-        def circuit():
-            qml.H(0)
-            qml.CNOT([0, 1])
-            qml.T(1)
+    @qjit(keep_intermediate=True)
+    @pipeline({"to_ppr": {}, "commute_ppr": {}})
+    @qml.qnode(qml.device("null.qubit", wires=1))
+    def circuit():
+        qml.H(0)
+        qml.T(0)
+        return catalyst.measure(0)
 
     Example MLIR Representation:
     .. code-block:: mlir
         . . .
-        %3:2 = qec.ppr ["X", "Z"](8) %1, %2 : !quantum.bit, !quantum.bit
-        %4 = qec.ppr ["Z"](4) %3#0 : !quantum.bit
-        %5 = qec.ppr ["X"](4) %4 : !quantum.bit
-        %6 = qec.ppr ["Z"](4) %5 : !quantum.bit
-        %7:2 = qec.ppr ["Z", "X"](4) %6, %3#1 : !quantum.bit, !quantum.bit
-        %8 = qec.ppr ["Z"](-4) %7#0 : !quantum.bit
-        %9 = quantum.insert %0[ 0], %8 : !quantum.reg, !quantum.bit
-        %10 = qec.ppr ["X"](-4) %7#1 : !quantum.bit
+        %2 = qec.ppr ["X"](8) %1 : !quantum.bit
+        %3 = qec.ppr ["Z"](4) %2 : !quantum.bit
+        %4 = qec.ppr ["X"](4) %3 : !quantum.bit
+        %5 = qec.ppr ["Z"](4) %4 : !quantum.bit
+        %mres, %out_qubits = qec.ppm ["Z"] %5 : !quantum.bit
         . . .
 
     """
