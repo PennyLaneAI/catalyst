@@ -24,9 +24,20 @@ import pennylane as qml
 from jax.extend.linear_util import wrap_init
 from jax.interpreters.partial_eval import convert_constvars_jaxpr
 from pennylane.capture import PlxprInterpreter, disable, enable, enabled, qnode_prim
+from pennylane.capture.expand_transforms import ExpandTransformsInterpreter
 from pennylane.capture.primitives import cond_prim as plxpr_cond_prim
 from pennylane.capture.primitives import for_loop_prim as plxpr_for_loop_prim
 from pennylane.capture.primitives import while_loop_prim as plxpr_while_loop_prim
+from pennylane.ops.functions.map_wires import _map_wires_transform as pl_map_wires
+from pennylane.transforms import cancel_inverses as pl_cancel_inverses
+from pennylane.transforms import commute_controlled as pl_commute_controlled
+from pennylane.transforms import decompose as pl_decompose
+from pennylane.transforms import (
+    merge_amplitude_embedding as pl_merge_amplitude_embedding,
+)
+from pennylane.transforms import merge_rotations as pl_merge_rotations
+from pennylane.transforms import single_qubit_fusion as pl_single_qubit_fusion
+from pennylane.transforms import unitary_to_rot as pl_unitary_to_rot
 
 from catalyst.device import (
     extract_backend_info,
@@ -174,18 +185,27 @@ def handle_qnode(
     )
 
 
+# The map below describes the parity between PL transforms and Catalyst passes.
+# PL transforms having a Catalyst pass counterpart will have a name as value,
+# otherwise their value will be None. The second value indicates if the transform
+# requires decomposition to be supported by Catalyst.
 transforms_to_passes = {
-    qml.transforms.cancel_inverses: "remove-chained-self-inverse",
-    qml.transforms.merge_rotations: "merge-rotations",
+    pl_cancel_inverses: ("remove-chained-self-inverse", False),
+    pl_commute_controlled: (None, False),
+    pl_decompose: (None, False),
+    pl_map_wires: (None, False),
+    pl_merge_amplitude_embedding: (None, True),
+    pl_merge_rotations: ("merge-rotations", False),
+    pl_single_qubit_fusion: (None, False),
+    pl_unitary_to_rot: (None, False),
 }
 
 
-# This is our registration factory for those PL transforms having a Catalyst
-# pass counterpart. The map above describes the parity between PL and Catalyst,
-# whereas the loop below iterates across that map and generates a custom handler
-# for each transform. In order to ensure early binding, we make the Catalyst
-# pass an argument whose default value is set by the loop.
-for pl_transform, pass_name in transforms_to_passes.items():
+# This is our registration factory for PL transforms. The loop below iterates
+# across the map above and generates a custom handler for each transform.
+# In order to ensure early binding, we pass the PL plxpr transform and the
+# Catalyst pass as arguments whose default values are set by the loop.
+for pl_transform, (pass_name, decomposition) in transforms_to_passes.items():
     # pylint: disable=unused-argument, too-many-arguments, cell-var-from-loop
     @WorkflowInterpreter.register_primitive(pl_transform._primitive)
     def handle_transform(
@@ -197,15 +217,38 @@ for pl_transform, pass_name in transforms_to_passes.items():
         targs_slice,
         tkwargs,
         catalyst_pass_name=pass_name,
+        requires_decomposition=decomposition,
+        pl_plxpr_transform=pl_transform._plxpr_transform,
     ):
         """Handle the conversion from plxpr to Catalyst jaxpr for a
         PL transform."""
-        self._pass_pipeline.append(Pass(catalyst_pass_name))
-
         consts = args[consts_slice]
         non_const_args = args[args_slice]
+        targs = args[targs_slice]
 
-        return self.eval(inner_jaxpr, consts, *non_const_args)
+        if catalyst_pass_name is None:
+            # Use PL's ExpandTransformsInterpreter to expand this and any embedded
+            # transform according to PL rules. It works by overriding the primitive
+            # registration, making all embedded transforms follow the PL rules
+            # from now on, hence ignoring the Catalyst pass conversion
+            def wrapper(*args):
+                return ExpandTransformsInterpreter().eval(inner_jaxpr, consts, *args)
+
+            unravelled_jaxpr = jax.make_jaxpr(wrapper)(*non_const_args)
+            final_jaxpr = pl_plxpr_transform(
+                unravelled_jaxpr.jaxpr, unravelled_jaxpr.consts, targs, tkwargs, *non_const_args
+            )
+
+            if requires_decomposition:
+                final_jaxpr = pl_decompose._plxpr_transform(
+                    final_jaxpr.jaxpr, final_jaxpr.consts, targs, tkwargs, *non_const_args
+                )
+
+            return self.eval(final_jaxpr.jaxpr, final_jaxpr.consts, *non_const_args)
+        else:
+            # Apply the corresponding Catalyst pass counterpart
+            self._pass_pipeline.append(Pass(catalyst_pass_name))
+            return self.eval(inner_jaxpr, consts, *non_const_args)
 
 
 class QFuncPlxprInterpreter(PlxprInterpreter):
