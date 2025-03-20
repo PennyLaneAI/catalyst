@@ -127,8 +127,11 @@ func.func @example_ion_two_qubit(%arg0: f64) -> !quantum.bit  attributes {qnode}
     // CHECK-NEXT:  } else {
     // CHECK-NEXT:    scf.yield [[remainder:%.+]] : f64
     // CHECK-NEXT:  }
-    // CHECK-NEXT: [[rabi1:%.+]] = arith.constant 1.100000e+00 : f64
-    // CHECK-NEXT: [[timerx1:%.+]] = arith.divf [[normalized_angle:%.+]], [[rabi1]] : f64
+    // CHECK-NEXT: [[cst_1:%.+]] = arith.constant 1.100000e+00 : f64
+    // CHECK-NEXT: [[cst_2:%.+]] = arith.constant 4.400000e+00 : f64
+    // CHECK-NEXT: [[mult:%.+]] = arith.mulf [[normalized_angle:%.+]], [[cst_2:%.+]] : f64
+    // CHECK-NEXT: [[square:%.+]] = arith.mulf [[cst_1:%.+]], [[cst_1:%.+]] : f64
+    // CHECK-NEXT: [[timerx1:%.+]] = arith.divf [[mult:%.+]], [[square:%.+]] : f64
     // CHECK-NEXT: ion.pulse([[timerx1]] : f64) %arg1 {
     // CHECK-SAME:     beam = #ion.beam<
     // CHECK-SAME:         transition_index = 0 : i64,
@@ -161,8 +164,11 @@ func.func @example_ion_two_qubit(%arg0: f64) -> !quantum.bit  attributes {qnode}
     // CHECK-NEXT:  } else {
     // CHECK-NEXT:    scf.yield [[remainder:%.+]] : f64
     // CHECK-NEXT:  }
-    // CHECK-NEXT: [[rabi1:%.+]] = arith.constant 1.100000e+00 : f64
-    // CHECK-NEXT: [[timery1:%.+]] = arith.divf [[normalized_angle:%.+]], [[rabi1]] : f64
+    // CHECK-NEXT: [[cst_1:%.+]] = arith.constant 1.100000e+00 : f64
+    // CHECK-NEXT: [[cst_2:%.+]] = arith.constant 4.400000e+00 : f64
+    // CHECK-NEXT: [[mult:%.+]] = arith.mulf [[normalized_angle:%.+]], [[cst_2:%.+]] : f64
+    // CHECK-NEXT: [[square:%.+]] = arith.mulf [[cst_1:%.+]], [[cst_1:%.+]] : f64
+    // CHECK-NEXT: [[timery1:%.+]] = arith.divf [[mult:%.+]], [[square:%.+]] : f64
     // CHECK-NEXT: ion.pulse([[timery1]] : f64) %arg1 {
     // CHECK-SAME:     beam = #ion.beam<
     // CHECK-SAME:         transition_index = 0 : i64,
@@ -170,7 +176,7 @@ func.func @example_ion_two_qubit(%arg0: f64) -> !quantum.bit  attributes {qnode}
     // CHECK-SAME:         detuning = 2.200000e+00 : f64,
     // CHECK-SAME:         polarization = [0, 1, 2],
     // CHECK-SAME:         wavevector = [-2, 3, 4]>,
-    // CHECK-SAME:     phase = 0.000000e+00 : f64}
+    // CHECK-SAME:     phase = 1.5707963267{{[0-9]*}} : f64}
     // CHECK-NEXT: ion.pulse([[timery1]] : f64) %arg1 {
     // CHECK-SAME:     beam = #ion.beam<
     // CHECK-SAME:         transition_index = 2 : i64,
@@ -178,7 +184,7 @@ func.func @example_ion_two_qubit(%arg0: f64) -> !quantum.bit  attributes {qnode}
     // CHECK-SAME:         detuning = 2.200000e+00 : f64,
     // CHECK-SAME:         polarization = [0, 1, 2],
     // CHECK-SAME:         wavevector = [-2, 3, 4]>,
-    // CHECK-SAME:     phase = 3.1415926535{{[0-9]*}} : f64}
+    // CHECK-SAME:     phase = 0.000000e+00 : f64}
     // CHECK-NEXT:   ion.yield %arg1 : !quantum.bit
     // CHECK-NEXT: }
     %5 = quantum.custom "RY"(%arg0) %4 : !quantum.bit
@@ -195,8 +201,11 @@ func.func @example_ion_two_qubit(%arg0: f64) -> !quantum.bit  attributes {qnode}
     // CHECK-NEXT:  } else {
     // CHECK-NEXT:    scf.yield [[remainder:%.+]] : f64
     // CHECK-NEXT:  }
-    // CHECK-NEXT: [[rabi1:%.+]] = arith.constant 1.100000e+00 : f64
-    // CHECK-NEXT: [[timerx2:%.+]] = arith.divf [[normalized_angle:%.+]], [[rabi1]] : f64
+    // CHECK-NEXT: [[cst_1:%.+]] = arith.constant 1.100000e+00 : f64
+    // CHECK-NEXT: [[cst_2:%.+]] = arith.constant 4.400000e+00 : f64
+    // CHECK-NEXT: [[mult:%.+]] = arith.mulf [[normalized_angle:%.+]], [[cst_2:%.+]] : f64
+    // CHECK-NEXT: [[square:%.+]] = arith.mulf [[cst_1:%.+]], [[cst_1:%.+]] : f64
+    // CHECK-NEXT: [[timerx2:%.+]] = arith.divf [[mult:%.+]], [[square:%.+]] : f64
     // CHECK-NEXT: ion.pulse([[timerx2]] : f64) %arg1 {
     // CHECK-SAME:     beam = #ion.beam<
     // CHECK-SAME:         transition_index = 0 : i64,
@@ -229,8 +238,11 @@ func.func @example_ion_two_qubit(%arg0: f64) -> !quantum.bit  attributes {qnode}
     // CHECK-NEXT:  } else {
     // CHECK-NEXT:    scf.yield [[remainder:%.+]] : f64
     // CHECK-NEXT:  }
-    // CHECK-NEXT: [[rabi2:%.+]] = arith.constant 1.230000e+00 : f64
-    // CHECK-NEXT: [[timems:%.+]] = arith.divf [[normalized_angle:%.+]], [[rabi2]] : f64
+    // CHECK-NEXT: [[cst_1:%.+]] = arith.constant 1.230000e+00 : f64
+    // CHECK-NEXT: [[cst_2:%.+]] = arith.constant 9.120000e+00 : f64
+    // CHECK-NEXT: [[mult:%.+]] = arith.mulf [[normalized_angle:%.+]], [[cst_2:%.+]] : f64
+    // CHECK-NEXT: [[square:%.+]] = arith.mulf [[cst_1:%.+]], [[cst_1:%.+]] : f64
+    // CHECK-NEXT: [[timems:%.+]] = arith.divf [[mult:%.+]], [[square:%.+]] : f64
     // CHECK-NEXT: ion.pulse([[timems]] : f64) %arg1 {
     // CHECK-SAME:     beam = #ion.beam<
     // CHECK-SAME:         transition_index = 0 : i64,
@@ -316,8 +328,11 @@ func.func @example_ion_three_qubit(%arg0: f64) -> (!quantum.bit, !quantum.bit, !
     // CHECK-NEXT:  } else {
     // CHECK-NEXT:    scf.yield [[remainder:%.+]] : f64
     // CHECK-NEXT:  }
-    // CHECK-NEXT: [[rabi1:%.+]] = arith.constant 1.230000e+00 : f64
-    // CHECK-NEXT: [[timems1:%.+]] = arith.divf [[normalized_angle:%.+]], [[rabi1]] : f64
+    // CHECK-NEXT: [[cst_1:%.+]] = arith.constant 1.230000e+00 : f64
+    // CHECK-NEXT: [[cst_2:%.+]] = arith.constant 9.120000e+00 : f64
+    // CHECK-NEXT: [[mult:%.+]] = arith.mulf [[normalized_angle:%.+]], [[cst_2:%.+]] : f64
+    // CHECK-NEXT: [[square:%.+]] = arith.mulf [[cst_1:%.+]], [[cst_1:%.+]] : f64
+    // CHECK-NEXT: [[timems1:%.+]] = arith.divf [[mult:%.+]], [[square:%.+]] : f64
     // CHECK-NEXT: ion.pulse([[timems1]] : f64) %arg1 {
     // CHECK-SAME:     beam = #ion.beam<
     // CHECK-SAME:         transition_index = 0 : i64,
@@ -382,8 +397,11 @@ func.func @example_ion_three_qubit(%arg0: f64) -> (!quantum.bit, !quantum.bit, !
     // CHECK-NEXT:  } else {
     // CHECK-NEXT:    scf.yield [[remainder:%.+]] : f64
     // CHECK-NEXT:  }
-    // CHECK-NEXT: [[rabi2:%.+]] = arith.constant 4.560000e+00 : f64
-    // CHECK-NEXT: [[timems2:%.+]] = arith.divf [[normalized_angle:%.+]], [[rabi2]] : f64
+    // CHECK-NEXT: [[cst_1:%.+]] = arith.constant 4.560000e+00 : f64
+    // CHECK-NEXT: [[cst_2:%.+]] = arith.constant 1.578000e+01 : f64
+    // CHECK-NEXT: [[mult:%.+]] = arith.mulf [[normalized_angle:%.+]], [[cst_2:%.+]] : f64
+    // CHECK-NEXT: [[square:%.+]] = arith.mulf [[cst_1:%.+]], [[cst_1:%.+]] : f64
+    // CHECK-NEXT: [[timems2:%.+]] = arith.divf [[mult:%.+]], [[square:%.+]] : f64
     // CHECK-NEXT: ion.pulse([[timems2]] : f64) %arg1 {
     // CHECK-SAME:     beam = #ion.beam<
     // CHECK-SAME:         transition_index = 0 : i64,
@@ -448,8 +466,11 @@ func.func @example_ion_three_qubit(%arg0: f64) -> (!quantum.bit, !quantum.bit, !
     // CHECK-NEXT:  } else {
     // CHECK-NEXT:    scf.yield [[remainder:%.+]] : f64
     // CHECK-NEXT:  }
-    // CHECK-NEXT: [[rabi3:%.+]] = arith.constant 99.989999999999994 : f64
-    // CHECK-NEXT: [[timems3:%.+]] = arith.divf [[normalized_angle:%.+]], [[rabi3]] : f64
+    // CHECK-NEXT: [[cst_1:%.+]] = arith.constant 99.989999999999994 : f64
+    // CHECK-NEXT: [[cst_2:%.+]] = arith.constant 2.002000e+02 : f64
+    // CHECK-NEXT: [[mult:%.+]] = arith.mulf [[normalized_angle:%.+]], [[cst_2:%.+]] : f64
+    // CHECK-NEXT: [[square:%.+]] = arith.mulf [[cst_1:%.+]], [[cst_1:%.+]] : f64
+    // CHECK-NEXT: [[timems3:%.+]] = arith.divf [[mult:%.+]], [[square:%.+]] : f64
     // CHECK-NEXT: [[p1:%.+]] = ion.pulse([[timems3]] : f64) %arg1 {
     // CHECK-SAME:     beam = #ion.beam<
     // CHECK-SAME:         transition_index = 0 : i64,
