@@ -445,6 +445,7 @@ def commute_ppr(qnode):
 
     Returns:
         ~.QNode
+        
     **Example**
 
     The ``commute_ppr`` pass is often used in conjunction with :func:`~.passes.to_ppr` to first convert 
