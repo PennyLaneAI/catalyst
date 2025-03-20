@@ -187,16 +187,17 @@ def handle_qnode(
 
 # The map below describes the parity between PL transforms and Catalyst passes.
 # PL transforms having a Catalyst pass counterpart will have a name as value,
-# otherwise their value will be None.
+# otherwise their value will be None. The second value indicates if the transform
+# requires decomposition to be supported by Catalyst
 transforms_to_passes = {
-    pl_cancel_inverses: "remove-chained-self-inverse",
-    pl_commute_controlled: None,
-    pl_decompose: None,
-    pl_map_wires: None,
-    pl_merge_amplitude_embedding: None,
-    pl_merge_rotations: "merge-rotations",
-    pl_single_qubit_fusion: None,
-    pl_unitary_to_rot: None,
+    pl_cancel_inverses: ("remove-chained-self-inverse", False),
+    pl_commute_controlled: (None, False),
+    pl_decompose: (None, False),
+    pl_map_wires: (None, False),
+    pl_merge_amplitude_embedding: (None, True),
+    pl_merge_rotations: ("merge-rotations", False),
+    pl_single_qubit_fusion: (None, False),
+    pl_unitary_to_rot: (None, False),
 }
 
 
@@ -204,7 +205,7 @@ transforms_to_passes = {
 # across the map above and generates a custom handler for each transform.
 # In order to ensure early binding, we pass the PL plxpr transform and the
 # Catalyst pass as arguments whose default values are set by the loop.
-for pl_transform, pass_name in transforms_to_passes.items():
+for pl_transform, (pass_name, decomposition) in transforms_to_passes.items():
     # pylint: disable=unused-argument, too-many-arguments, cell-var-from-loop
     @WorkflowInterpreter.register_primitive(pl_transform._primitive)
     def handle_transform(
@@ -216,6 +217,7 @@ for pl_transform, pass_name in transforms_to_passes.items():
         targs_slice,
         tkwargs,
         catalyst_pass_name=pass_name,
+        requires_decomposition=decomposition,
         pl_plxpr_transform=pl_transform._plxpr_transform,
     ):
         """Handle the conversion from plxpr to Catalyst jaxpr for a
@@ -237,10 +239,11 @@ for pl_transform, pass_name in transforms_to_passes.items():
                 unravelled_jaxpr.jaxpr, unravelled_jaxpr.consts, targs, tkwargs, *non_const_args
             )
 
-            if pl_plxpr_transform == pl_merge_amplitude_embedding._plxpr_transform:
+            if requires_decomposition:
                 final_jaxpr = pl_decompose._plxpr_transform(
                     final_jaxpr.jaxpr, final_jaxpr.consts, targs, tkwargs, *non_const_args
                 )
+
             return self.eval(final_jaxpr.jaxpr, final_jaxpr.consts, *non_const_args)
         else:
             # Apply the corresponding Catalyst pass counterpart
