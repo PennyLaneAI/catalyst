@@ -53,48 +53,21 @@
 * Commuting Clifford Pauli Product Rotation (PPR) operations to the end of a circuit, past non-Clifford PPRs, is now available through the :func:`~.catalyst.passes.commute_ppr` pass transform.
   [(#1563)](https://github.com/PennyLaneAI/catalyst/pull/1563)
   
-  A PPR is a rotation gate of the form :math:`\exp{iP\tfrac{\theta}{2}}`, where :math:`P` is a Pauli word (a product of Pauli operators). Clifford PPRs refer to PPRs with :math:`\theta = \tfrac{\pi}{2}`, while non-Clifford PPRs have :math:`\theta = \tfrac{\pi}{4}`.
-  
-  - Commuting Clifford past Non-Clifford based on two rules, which are represented in ["A Game of Surface Codes"](https://doi.org/10.22331/q-2019-03-05-128):
-    - If they are commuting:  `P P' -> P' P` 
-    - If they are anti-commute: `P P' -> iPP' P`
-    (`P` Clifford, `P'` Non-Clifford, `i` Imaginary number)
-  -  We used [stim](https://github.com/quantumlib/Stim) to determine if both operations are commutes and compute the `iPP'`.
-  -  Supported gates:
-    - `qec.ppr`: Pauli product rotation can be Clifford and Non-Clifford gate.
-      - Clifford gate determined by the rotation kind with value 4, while value 8 for Non-Clifford gates.  e.g.: `qec.ppr  ["X"](4) %reg` and `qec.ppr ["X"] (8) %reg`
+  A PPR is a rotation gate of the form :math:`\exp{iP \theta}`, where :math:`P` is a Pauli word (a product of Pauli operators). Clifford PPRs refer to PPRs with :math:`\theta = \tfrac{\pi}{4}`, while non-Clifford PPRs have :math:`\theta = \tfrac{\pi}{8}`.
+
   
   Example:
   ```python
-    ppm_passes = {
-        "to_ppr": {},
-        "commute_ppr": {},
-    }
-
     @qjit(keep_intermediate=True)
-    @pipeline(ppm_passes)
-    @qml.qnode(qml.device("lightning.qubit", wires=2))
+    @pipeline({"to_ppr": {}, "commute_ppr": {}})
+    @qml.qnode(qml.device("null.qubit", wires=1))
     def circuit():
         qml.H(0)
-        qml.CNOT([0, 1])
-        qml.T(1)
+        qml.T(0)
+        return measure(0)
     ```
   
-  The PPRs and PPMs are represented symbolically and not executable on any backend. They serve as intermediate representations for analysis and potential future execution.
-
-  Output:
-  ```mlir
-  . . .
-      %3:2 = qec.ppr ["X", "Z"](8) %1, %2 : !quantum.bit, !quantum.bit
-      %4 = qec.ppr ["Z"](4) %3#0 : !quantum.bit
-      %5 = qec.ppr ["X"](4) %4 : !quantum.bit
-      %6 = qec.ppr ["Z"](4) %5 : !quantum.bit
-      %7:2 = qec.ppr ["Z", "X"](4) %6, %3#1 : !quantum.bit, !quantum.bit
-      %8 = qec.ppr ["Z"](-4) %7#0 : !quantum.bit
-      %9 = quantum.insert %0[ 0], %8 : !quantum.reg, !quantum.bit
-      %10 = qec.ppr ["X"](-4) %7#1 : !quantum.bit
-  . . .
-  ```
+  The circuit program that generated from this pass is currrently not executable on any backend. For more information regarding to PPM, please refer to [(Pauli Product Measurement)](https://pennylane.ai/compilation/pauli-product-measurement)
 
 <h3>Improvements 🛠</h3>
 
