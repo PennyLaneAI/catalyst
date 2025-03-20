@@ -491,3 +491,49 @@ def commute_ppr(qnode):
         return clone(*args, **kwargs)
 
     return wrapper
+
+
+def ppr_to_ppm(qnode):
+    """
+    // TODO: Add details about the pass
+    Specify that the ``-ppr-to-ppm`` MLIR compiler pass
+    for absorbing PPRs into Pauli Product Measurements will be applied.
+
+    Args:
+        fn (QNode): QNode to apply the pass to
+
+    Returns:
+        ~.QNode
+    **Example**
+
+    In this example the PPRs will be absorbed into the Pauli Product Measurements.
+
+    .. code-block:: python
+
+        @qjit(keep_intermediate=True)
+        @ppr_to_ppm
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def circuit():
+            qml.H(0)
+            qml.CNOT([0, 1])
+            qml.T(1)
+
+    Example MLIR Representation:
+    .. code-block:: mlir
+        . . .
+    """
+
+    if not isinstance(qnode, qml.QNode):
+        raise TypeError(f"A QNode is expected, got the classical function {qnode}")
+
+    clone = copy.copy(qnode)
+    clone.__name__ += "_absorb_ppr_to_ppm"
+
+    @functools.wraps(clone)
+    def wrapper(*args, **kwargs):
+        pass_pipeline = kwargs.pop("pass_pipeline", [])
+        pass_pipeline.append(Pass("absorb-ppr-to-ppm"))
+        kwargs["pass_pipeline"] = pass_pipeline
+        return clone(*args, **kwargs)
+
+    return wrapper

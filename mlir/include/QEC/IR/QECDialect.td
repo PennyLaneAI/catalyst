@@ -113,7 +113,7 @@ def PPRotationOp : QEC_Op<"ppr", [QECOpInterface]> {
     let extraClassDeclaration = extraBaseClassDeclaration;
 }
 
-def PPMeasurementOp : QEC_Op<"ppm", [QECOpInterface]> {
+def PPMeasurementOp : QEC_Op<"ppm", [QECOpInterface, SameVariadicOperandSize]> {
     let summary = "Pauli Product Measurement on qubits.";
 
     let description = [{
@@ -137,6 +137,7 @@ def PPMeasurementOp : QEC_Op<"ppm", [QECOpInterface]> {
 
     let arguments = (ins
         PauliWord:$pauli_product,  // The Pauli product specifying the measurement basis
+        DefaultValuedAttr<I16Attr, "1">:$rotation_sign, 
         Variadic<QubitType>:$in_qubits  // The qubits to measure
     );
 
@@ -146,15 +147,18 @@ def PPMeasurementOp : QEC_Op<"ppm", [QECOpInterface]> {
     );
 
     let assemblyFormat = [{
-      $pauli_product $in_qubits attr-dict `:` type($out_qubits)
+      $pauli_product (`(` $rotation_sign^ `)`)? $in_qubits attr-dict `:` type($out_qubits)
     }];
 
     let hasVerifier = 1;
 
     code extraBaseClassDeclaration = [{
         uint16_t getRotationKind(){
-            return 0;  // Default value for measurements
+            return getRotationSign();
         };
+        void setRotationKind(uint16_t attrValue){
+            setRotationSign(static_cast<int16_t>(attrValue) < 0 ? -1 : 1);
+        }
     }];
     let extraClassDeclaration = extraBaseClassDeclaration;
 }
