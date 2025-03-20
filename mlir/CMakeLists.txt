@@ -4,7 +4,9 @@ project(catalyst LANGUAGES CXX C)
 set(CMAKE_BUILD_WITH_INSTALL_NAME_DIR ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-set(CMAKE_CXX_STANDARD 17 CACHE STRING "C++ standard to conform to")
+set(CMAKE_CXX_STANDARD 20 CACHE STRING "C++ standard to conform to")
+# LLVM source code triggers a cpp20 warning
+add_compile_options(-Wno-ambiguous-reversed-operator)
 
 find_package(MLIR REQUIRED CONFIG)
 find_package(MHLO REQUIRED CONFIG)
@@ -72,6 +74,72 @@ add_definitions(${LLVM_DEFINITIONS})
 add_subdirectory(include)
 add_subdirectory(lib)
 add_subdirectory(tools)
+
+##############################################################################
+# The following subsection of code                                           #
+# was taken from the CIRCT project: https://github.com/llvm/circt            #
+# Small alteration were made for Catalyst                                    #
+# The CIRCT project has the following license:                               #
+#                                                                            #
+#   The LLVM Project is under the Apache License v2.0 with LLVM Exceptions:  #
+#   As an incubator project with ambition to become part of the LLVM Project,#
+#   CIRCT is under the same license.                                         #
+#                                                                            #
+# https://github.com/llvm/circt/blob/                                        #
+#  930aabe70fe78965a153f6e936c5853e948873eb/CMakeLists.txt#L85-L126          #
+##############################################################################
+
+# Handle unittests when building out-of-tree against an installed version of
+# LLVM/MLIR (not a build tree). Adapted from `llvm/flang/CMakeLists.txt`.
+set(CATALYST_GTEST_AVAILABLE 0)
+if (TARGET llvm_gtest)
+  # Installed gtest, via LLVM_INSTALL_GTEST.  Preferred.
+  message(STATUS "LLVM GTest found, enabling unittests")
+  set(CATALYST_GTEST_AVAILABLE 1)
+else()
+    find_package(Threads REQUIRED)
+    set(LLVM_THIRD_PARTY_DIR llvm-project/third-party)
+    set(UNITTEST_DIR ${LLVM_THIRD_PARTY_DIR}/unittest)
+    if (NOT EXISTS ${UNITTEST_DIR}/googletest/include/gtest/gtest.h)
+      set(UNITTEST_DIR ${CMAKE_CURRENT_SOURCE_DIR}/llvm/third-party/unittest)
+    endif()
+    if (EXISTS ${UNITTEST_DIR}/googletest/include/gtest/gtest.h)
+      add_llvm_library(llvm_gtest
+        ${UNITTEST_DIR}/googletest/src/gtest-all.cc
+        ${UNITTEST_DIR}/googlemock/src/gmock-all.cc
+        LINK_COMPONENTS Support # llvm::raw_ostream
+        BUILDTREE_ONLY
+      )
+      target_include_directories(llvm_gtest
+        PUBLIC
+        "${UNITTEST_DIR}/googletest/include"
+        "${UNITTEST_DIR}/googlemock/include"
+        PRIVATE
+        "${UNITTEST_DIR}/googletest"
+        "${UNITTEST_DIR}/googlemock"
+      )
+      target_link_libraries(llvm_gtest PUBLIC Threads::Threads)
+      add_llvm_library(llvm_gtest_main
+        ${UNITTEST_DIR}/UnitTestMain/TestMain.cpp
+        LINK_LIBS llvm_gtest
+        LINK_COMPONENTS Support # llvm::cl
+        BUILDTREE_ONLY
+      )
+      set(CATALYST_GTEST_AVAILABLE 1)
+    else()
+      message(WARNING "Skipping unittests since LLVM install does not include \
+        gtest headers and libraries")
+      set(CATALYST_GTEST_AVAILABLE 0)
+    endif()
+endif()
+if (CATALYST_GTEST_AVAILABLE)
+  add_subdirectory(unittests)
+endif()
+
+######################
+# End of CIRCT code  #
+######################
+
 add_subdirectory(test)
 
 if(QUANTUM_ENABLE_BINDINGS_PYTHON)

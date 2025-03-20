@@ -453,48 +453,33 @@ def CustomOp : UnitaryGate_Op<"custom", [DifferentiableGate, NoMemoryEffect,
         mlir::ValueRange getAllParams() {
             return getParams();
         }
-    }];
-    let hasCanonicalizeMethod = 1;
-}
 
-def StaticCustomOp : UnitaryGate_Op<"static_custom", [NoMemoryEffect,
-                                                      AttrSizedOperandSegments, 
-                                                      AttrSizedResultSegments]> {
-    let summary = "A generic quantum gate with static parameters in form of a DenseF64ArrayAttr.";
-    let description = [{
-        This operation represents a quantum gate with parameters defined statically as a
-        DenseF64ArrayAttr, rather than passed dynamically as operands. This is useful for gates
-        with parameters known at compile-time.
-    }];
+        bool isStatic() {
+            for (mlir::Value param : getParams()) {
+                if (!param.getDefiningOp() || !param.getDefiningOp()->hasTrait<mlir::OpTrait::ConstantLike>()) {
+                    return false;
+                }
+            }
+            return true;
+        }
 
-    let arguments = (ins
-        DenseF64ArrayAttr:$static_params,
-        Variadic<QubitType>:$in_qubits,
-        StrAttr:$gate_name,
-        OptionalAttr<UnitAttr>:$adjoint,
-        Variadic<QubitType>:$in_ctrl_qubits,
-        Variadic<I1>:$in_ctrl_values
-    );
-
-    let results = (outs
-        Variadic<QubitType>:$out_qubits,
-        Variadic<QubitType>:$out_ctrl_qubits
-    );
-
-    let assemblyFormat = [{
-        $gate_name $static_params $in_qubits attr-dict ( `ctrls` `(` $in_ctrl_qubits^ `)` )?  
-        ( `ctrlvals` `(` $in_ctrl_values^ `)` )? `:` type($out_qubits) 
-        (`ctrls` type($out_ctrl_qubits)^ )?
-    }];
-
-    let extraClassDeclaration = extraBaseClassDeclaration # [{
-        llvm::ArrayRef<double> getAllParams() {
-            return getStaticParams();
+        std::vector<double> getStaticParams() {
+            std::vector<double> staticValues;
+            if (!isStatic()) {
+                return staticValues;
+            }
+            
+            for (mlir::Value param : getParams()) {
+                auto constOp = param.getDefiningOp();
+                if (auto floatAttr = constOp->getAttrOfType<mlir::FloatAttr>("value")) {
+                    staticValues.push_back(floatAttr.getValueAsDouble());
+                }
+            }
+            return staticValues;
         }
     }];
     let hasCanonicalizeMethod = 1;
 }
-
 
 def GlobalPhaseOp : UnitaryGate_Op<"gphase", [DifferentiableGate, AttrSizedOperandSegments]> {
     let summary = "Global Phase.";
@@ -651,27 +636,31 @@ def YieldOp : Quantum_Op<"yield", [Pure, ReturnLike, Terminator, ParentOneOf<["A
 class Observable_Op<string mnemonic, list<Trait> traits = []> :
         Quantum_Op<mnemonic, traits # [Pure]>;
 
-def ComputationalBasisOp : Observable_Op<"compbasis"> {
+def ComputationalBasisOp : Observable_Op<"compbasis", [AttrSizedOperandSegments]> {
     let summary = "Define a pseudo-obeservable of the computational basis for use in measurements";
     let description = [{
         The `quantum.compbasis` operation defines a quantum observable to be used by other
         operations such as measurement processes. The specific observable defined here is a
         "pseudo" observable to represent measurements in the computational basis.
-        The only arguments are the list of qubits to measure.
+        The only arguments are either the list of qubits to measure, or the quantum register
+        to measure. When the argument is a register, the measurement occurs on all qubits in
+        the register.
 
         Example:
 
         ```mlir
-        func.func @foo(%q0: !quantum.bit, %q1: !quantum.bit)
+        func.func @foo(%q0: !quantum.bit, %q1: !quantum.bit, %r: !quantum.reg)
         {
-            %res = quantum.compbasis %q0, %q1 : !quantum.obs
+            %obs_q = quantum.compbasis qubits %q0, %q1 : !quantum.obs
+            %obs_r = quantum.compbasis qreg %r : !quantum.obs
             func.return
         }
         ```
     }];
 
     let arguments = (ins
-        Variadic<QubitType>:$qubits
+        Variadic<QubitType>:$qubits,
+        Optional<QuregType>:$qreg
     );
 
     let results = (outs
@@ -679,8 +668,10 @@ def ComputationalBasisOp : Observable_Op<"compbasis"> {
     );
 
     let assemblyFormat = [{
-        $qubits attr-dict `:` type(results)
+        (`qubits` $qubits^)? (`qreg` $qreg^)? attr-dict `:` type(results)
     }];
+
+    let hasVerifier = 1;
 }
 
 def NamedObsOp : Observable_Op<"namedobs"> {

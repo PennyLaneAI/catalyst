@@ -17,13 +17,16 @@
 
 #define DEBUG_TYPE "applytransformsequence"
 
-#include "Catalyst/IR/CatalystDialect.h"
+#include <cassert>
+
+#include "llvm/Support/Debug.h"
+
 #include "mlir/Dialect/Transform/Interfaces/TransformInterfaces.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
-#include "llvm/Support/Debug.h"
 
-#include <cassert>
+#include "Catalyst/IR/CatalystDialect.h"
+#include "QEC/IR/QECDialect.h"
 
 using namespace llvm;
 using namespace mlir;
