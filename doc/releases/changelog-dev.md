@@ -53,6 +53,8 @@
 * Commuting Clifford Pauli Product Rotation (PPR) operations to the end of a circuit, past non-Clifford PPRs, is now available through the :func:`~.catalyst.passes.commute_ppr` pass transform.
   [(#1563)](https://github.com/PennyLaneAI/catalyst/pull/1563)
   
+  A PPR is a rotation gate of the form :math:`\exp{iP\tfrac{\theta}{2}}`, where :math:`P` is a Pauli word (a product of Pauli operators). Clifford PPRs refer to PPRs with :math:`\theta = \tfrac{\pi}{2}`, while non-Clifford PPRs have :math:`\theta = \tfrac{\pi}{4}`.
+  
   A PPR is a rotation gate of the form :math:`\exp{iP \theta}`, where :math:`P` is a Pauli word (a product of Pauli operators). Clifford PPRs refer to PPRs with :math:`\theta = \tfrac{\pi}{4}`, while non-Clifford PPRs have :math:`\theta = \tfrac{\pi}{8}`.
 
   
