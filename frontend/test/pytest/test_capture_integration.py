@@ -79,6 +79,15 @@ def is_controlled_pushed_back(mlir, non_controlled_string, controlled_string):
     return controlled_string in remaining_mlir
 
 
+def is_amplitude_embedding_merged_and_decomposed(mlir):
+    """Check in the MLIR if the amplitude embeddings got merged and decomposed"""
+    return (
+        "AmplitudeEmbedding" not in mlir
+        and mlir.count('quantum.custom "RY"') == 3
+        and mlir.count('quantum.custom "CNOT"') == 2
+    )
+
+
 # pylint: disable=too-many-public-methods
 class TestCapture:
     """Integration tests for Catalyst adjoint functionality."""
@@ -791,6 +800,27 @@ class TestCapture:
         assert is_controlled_pushed_back(
             captured_func.mlir, 'quantum.custom "PauliX"', 'quantum.custom "CRX"'
         )
+
+        no_capture_result = qml.qjit(func)()
+        experimental_capture_result = captured_func()
+        assert no_capture_result == experimental_capture_result
+
+    def test_transform_merge_amplitude_embedding_workflow(self, backend):
+        """Test the integration for a circuit with a 'merge_amplitude_embedding' transform."""
+
+        def func():
+            @qml.transforms.merge_amplitude_embedding
+            @qml.qnode(qml.device(backend, wires=2))
+            def circuit():
+                qml.AmplitudeEmbedding(jnp.array([0.0, 1.0]), wires=0)
+                qml.AmplitudeEmbedding(jnp.array([0.0, 1.0]), wires=1)
+                return qml.expval(qml.PauliZ(0))
+
+            return circuit()
+
+        captured_func = qml.qjit(func, experimental_capture=True, target="mlir")
+
+        assert is_amplitude_embedding_merged_and_decomposed(captured_func.mlir)
 
         no_capture_result = qml.qjit(func)()
         experimental_capture_result = captured_func()
