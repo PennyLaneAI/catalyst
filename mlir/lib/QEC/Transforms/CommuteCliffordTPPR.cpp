@@ -23,7 +23,6 @@
 #include "QEC/Transforms/Patterns.h"
 #include "QEC/Utils/PauliStringWrapper.h"
 
-using namespace stim;
 using namespace mlir;
 using namespace catalyst::qec;
 

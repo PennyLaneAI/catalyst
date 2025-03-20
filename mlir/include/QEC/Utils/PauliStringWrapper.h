@@ -55,10 +55,20 @@ struct PauliStringWrapper {
     std::unique_ptr<stim::FlexPauliString> pauliString;
 
   public:
-    PauliStringWrapper(std::string_view text);
-    PauliStringWrapper(const stim::FlexPauliString &fps);
-    PauliStringWrapper(const PauliStringWrapper &other); // needed for std::pair compatibility
+    PauliStringWrapper(stim::FlexPauliString &&fps);
+
+    // needed for use in std::pair (copy or move)
+    PauliStringWrapper(PauliStringWrapper &&other);
+
+    // If we omit the destructor declaration the default one will be "part of the header",
+    // which doesn't have the concrete member types for Stim classes, and thus fails to compile.
+    // So we declare it here and define the default destructor in the source file.
     ~PauliStringWrapper();
+
+    // delete everything we don't need, in the future just define more as needed
+    PauliStringWrapper(const PauliStringWrapper &other) = delete;
+    PauliStringWrapper &operator=(const PauliStringWrapper &data) = delete;
+    PauliStringWrapper &operator=(PauliStringWrapper &&data) = delete;
 
     static PauliStringWrapper from_pauli_word(const PauliWord &pauliWord);
 
@@ -122,8 +132,9 @@ PauliWord expandPauliWord(const llvm::SetVector<Value> &operands, const T &inOut
  */
 PauliWordPair normalizePPROps(QECOpInterface lhs, QECOpInterface rhs);
 
-// Remove the value of newRHSOperands that based on index of 'rhs' where the value is 'I' or '_'
-SmallVector<StringRef> removeIdentityPauli(QECOpInterface rhs, SmallVector<Value> &newRHSOperands);
+// Remove Identity from the op's Pauli product and corresponding qubits from the list/
+// The size of op.pauliProduct and qubits is assumed to be the same.
+SmallVector<StringRef> removeIdentityPauli(QECOpInterface op, SmallVector<Value> &qubits);
 
 /**
  * @brief Replace the value with the corresponding qubits.
