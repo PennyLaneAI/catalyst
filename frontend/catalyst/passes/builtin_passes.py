@@ -437,7 +437,7 @@ def to_ppr(qnode):
 def commute_ppr(qnode):
     """
     Specify that the MLIR compiler pass for commuting Clifford Pauli Product Rotation (PPR) gates, :math:`\exp{iP\tfrac{\pi}{4}}`, past non-Clifford PPRs gates, :math:`\exp{iP\tfrac{\pi}{8}}` will be applied, where :math:`P` is a Pauli word.
-    
+
     For more information regarding to PPM, please refer to [(Pauli Product Measurement)](https://pennylane.ai/compilation/pauli-product-measurement)
 
     Args:
@@ -445,11 +445,11 @@ def commute_ppr(qnode):
 
     Returns:
         ~.QNode
-        
+
     **Example**
 
-    The ``commute_ppr`` pass is often used in conjunction with :func:`~.passes.to_ppr` to first convert 
-    gates into PPRs. In this example, the Clifford+T gates in the circuit will be converted into PPRs first, 
+    The ``commute_ppr`` pass is often used in conjunction with :func:`~.passes.to_ppr` to first convert
+    gates into PPRs. In this example, the Clifford+T gates in the circuit will be converted into PPRs first,
     then the Clifford PPRs will be commuted past the non-Clifford PPR.
 
     .. code-block:: python

@@ -100,11 +100,11 @@ void moveCliffordPastNonClifford(PauliStringWrapper lhsPauli, PauliStringWrapper
 
     // Update Pauli words of RHS
     if (result != nullptr) {
-        updatePauliWord(rhs, result->get_pauli_words(), rewriter);
-        updatePauliWordSign(rhs, result->pauliString.sign, rewriter);
+        updatePauliWord(rhs, result->get_pauli_word(), rewriter);
+        updatePauliWordSign(rhs, result->isNegative(), rewriter);
     }
     else {
-        updatePauliWord(rhs, rhsPauli.get_pauli_words(), rewriter);
+        updatePauliWord(rhs, rhsPauli.get_pauli_word(), rewriter);
     }
 
     SmallVector<Value> newRHSOperands = replaceValueWithOperands(lhsPauli, rhsPauli);
