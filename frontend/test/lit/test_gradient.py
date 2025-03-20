@@ -297,8 +297,7 @@ def test_diff_dynamic_paramshift(params: jax.core.ShapedArray([2], float)):
     # CHECK-NOT: set_state
     # COM: Rot is supported by the two-term shift rule
     # CHECK: "Rot"
-    # COM: TODO: this should be a CHECK-NOT after PS rules are implemented in #1568
-    # CHECK: unitary
+    # CHECK-NOT: unitary
     return grad(cost)(params)
 
 
