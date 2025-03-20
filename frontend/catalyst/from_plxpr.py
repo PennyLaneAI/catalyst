@@ -32,6 +32,9 @@ from pennylane.ops.functions.map_wires import _map_wires_transform as pl_map_wir
 from pennylane.transforms import cancel_inverses as pl_cancel_inverses
 from pennylane.transforms import commute_controlled as pl_commute_controlled
 from pennylane.transforms import decompose as pl_decompose
+from pennylane.transforms import (
+    merge_amplitude_embedding as pl_merge_amplitude_embedding,
+)
 from pennylane.transforms import merge_rotations as pl_merge_rotations
 from pennylane.transforms import single_qubit_fusion as pl_single_qubit_fusion
 from pennylane.transforms import unitary_to_rot as pl_unitary_to_rot
@@ -190,6 +193,7 @@ transforms_to_passes = {
     pl_commute_controlled: None,
     pl_decompose: None,
     pl_map_wires: None,
+    pl_merge_amplitude_embedding: None,
     pl_merge_rotations: "merge-rotations",
     pl_single_qubit_fusion: None,
     pl_unitary_to_rot: None,
@@ -232,6 +236,11 @@ for pl_transform, pass_name in transforms_to_passes.items():
             final_jaxpr = pl_plxpr_transform(
                 unravelled_jaxpr.jaxpr, unravelled_jaxpr.consts, targs, tkwargs, *non_const_args
             )
+
+            if pl_plxpr_transform == pl_merge_amplitude_embedding._plxpr_transform:
+                final_jaxpr = pl_decompose._plxpr_transform(
+                    final_jaxpr.jaxpr, final_jaxpr.consts, targs, tkwargs, *non_const_args
+                )
             return self.eval(final_jaxpr.jaxpr, final_jaxpr.consts, *non_const_args)
         else:
             # Apply the corresponding Catalyst pass counterpart
