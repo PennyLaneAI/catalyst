@@ -188,7 +188,7 @@ def handle_qnode(
 # The map below describes the parity between PL transforms and Catalyst passes.
 # PL transforms having a Catalyst pass counterpart will have a name as value,
 # otherwise their value will be None. The second value indicates if the transform
-# requires decomposition to be supported by Catalyst
+# requires decomposition to be supported by Catalyst.
 transforms_to_passes = {
     pl_cancel_inverses: ("remove-chained-self-inverse", False),
     pl_commute_controlled: (None, False),
