@@ -444,6 +444,9 @@ class Compiler:
         if lower_to_llvm:
             output = LinkerDriver.run(output_object_name, options=self.options)
             output_object_name = str(pathlib.Path(output).absolute())
+        else:
+            # When not lowering to LLVM, we don't need to return a file path
+            output_object_name = None
 
         # Clean up temporary files
         if os.path.exists(tmp_infile_name):

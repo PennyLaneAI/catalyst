@@ -65,7 +65,8 @@ class SharedObjectManager:
         self.setup = None
         self.teardown = None
         self.mem_transfer = None
-        self.open()
+        if self.shared_object_file:
+            self.open()
 
     def open(self):
         """Open the sharead object and load symbols."""
@@ -160,6 +161,8 @@ class CompiledFunction:
         Returns:
             the return values computed by the function or None if the function has no results
         """
+        if shared_object is None:
+            return None
 
         with shared_object as lib:
             result_desc = type(args[0].contents) if has_return else None

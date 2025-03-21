@@ -114,8 +114,8 @@ def qjit(
         target (str): the compilation target
         keep_intermediate (bool): Whether or not to store the intermediate files throughout the
             compilation. If ``True``, intermediate representations are available via the
-            :attr:`~.QJIT.mlir`, :attr:`~.QJIT.jaxpr`, and :attr:`~.QJIT.qir`, representing
-            different stages in the optimization process.
+            :attr:`~.QJIT.mlir`, :attr:`~.QJIT.mlir_opt`, :attr:`~.QJIT.jaxpr`,
+            and :attr:`~.QJIT.qir`, representing different stages in the optimization process.
         verbose (bool): If ``True``, the tools and flags used by Catalyst behind the scenes are
             printed out.
         logfile (Optional[TextIOWrapper]): File object to write verbose messages to (default -
@@ -515,6 +515,13 @@ class QJIT(CatalystCallable):
             return None
 
         return _canonicalize(stdin=str(self.mlir_module))
+
+    @property
+    def mlir_opt(self):
+        """obtain the MLIR representation after optimization"""
+        self.compile_options.lower_to_llvm = False
+        _, llvm_ir = self.compile()
+        return llvm_ir
 
     @debug_logger
     def __call__(self, *args, **kwargs):
