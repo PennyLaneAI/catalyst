@@ -175,24 +175,34 @@ mlir::Value CreateNormalizedAngle(mlir::PatternRewriter &rewriter, mlir::Locatio
  *
  *        The pulse duration t is given by:
  *
- *            t = angle / rabi.
+ *            t = angle * 2 * detuning / rabi**2
  *
  *        This function returns the pulse duration as an mlir::Value by creating an arith::DivFOp.
- *        In order to do so, it must also create an arith::ConstantOp for the Rabi frequency.
+ *        In order to do so, it must also create an arith::ConstantOp for the Rabi frequency, and
+ *        an arith::MulFOp for the detuning times two.
  *
  * @param rewriter MLIR PatternRewriter
  * @param loc      MLIR Location
  * @param angle    Rotation angle as mlir::Value
  * @param rabi     Rabi frequency
+ * @param detuning Detuning
  * @return mlir::Value The pulse duration.
  */
 mlir::Value computePulseDuration(mlir::PatternRewriter &rewriter, mlir::Location &loc,
-                                 const mlir::Value &angle, double rabi)
+                                 const mlir::Value &angle, double rabi, double detuning)
 {
     auto normalizedAngle = CreateNormalizedAngle(rewriter, loc, angle);
     TypedAttr rabiAttr = rewriter.getF64FloatAttr(rabi);
     mlir::Value rabiValue = rewriter.create<arith::ConstantOp>(loc, rabiAttr).getResult();
-    return rewriter.create<arith::DivFOp>(loc, normalizedAngle, rabiValue).getResult();
+    TypedAttr detuningTimesTwoAttr = rewriter.getF64FloatAttr(detuning * 2);
+    mlir::Value detuningTimesTwoValue =
+        rewriter.create<arith::ConstantOp>(loc, detuningTimesTwoAttr).getResult();
+    mlir::Value detuningTimesTwoTimesAngle =
+        rewriter.create<arith::MulFOp>(loc, normalizedAngle, detuningTimesTwoValue);
+    mlir::Value rabiSquared = rewriter.create<arith::MulFOp>(loc, rabiValue, rabiValue);
+    mlir::Value duration =
+        rewriter.create<arith::DivFOp>(loc, detuningTimesTwoTimesAngle, rabiSquared);
+    return duration;
 }
 
 mlir::LogicalResult oneQubitGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter, double phase1,
@@ -228,7 +238,7 @@ mlir::LogicalResult oneQubitGateToPulse(CustomOp op, mlir::PatternRewriter &rewr
                 mlir::FloatAttr phase1Attr = builder.getF64FloatAttr(phase1);
                 mlir::FloatAttr phase2Attr = builder.getF64FloatAttr(phase2);
                 auto angle = op.getParams().front();
-                auto time = computePulseDuration(rewriter, loc, angle, beam.rabi);
+                auto time = computePulseDuration(rewriter, loc, angle, beam.rabi, beam.detuning);
                 auto qubit = qubits.front();
                 builder.create<ion::PulseOp>(loc, PulseType::get(ctx), time, qubit, beam0toEAttr,
                                              phase1Attr);
@@ -317,7 +327,8 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
                 loc, qubits, [&](OpBuilder &builder, Location loc, ValueRange qubits) {
                     mlir::FloatAttr phase0Attr = builder.getF64FloatAttr(0.0);
                     auto angle = op.getParams().front();
-                    auto time = computePulseDuration(rewriter, loc, angle, beam.rabi);
+                    auto time =
+                        computePulseDuration(rewriter, loc, angle, beam.rabi, beam.detuning);
                     auto qubit0 = qubits.front();
                     auto qubit1 = qubits.back();
 
@@ -500,7 +511,7 @@ struct QuantumToIonRewritePattern : public mlir::OpConversionPattern<CustomOp> {
         }
         // RY case -> PP(P1, P2)
         else if (op.getGateName() == "RY") {
-            auto result = oneQubitGateToPulse(op, rewriter, 0.0, llvm::numbers::pi, beams1);
+            auto result = oneQubitGateToPulse(op, rewriter, llvm::numbers::pi / 2, 0, beams1);
             return result;
         }
         // MS case -> PP(P1, P2, P3, P4, P5, P6)

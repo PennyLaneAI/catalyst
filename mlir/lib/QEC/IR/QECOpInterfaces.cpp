@@ -12,31 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#pragma once
-
-#include "mlir/Bytecode/BytecodeOpInterface.h"
-#include "mlir/IR/BuiltinTypes.h"
-#include "mlir/IR/Dialect.h"
-#include "mlir/IR/OpDefinition.h"
-
 #include "QEC/IR/QECOpInterfaces.h"
 
-//===----------------------------------------------------------------------===//
-// QEC dialect declarations.
-//===----------------------------------------------------------------------===//
-
-#include "QEC/IR/QECDialectDialect.h.inc"
+using namespace mlir;
+using namespace catalyst::qec;
 
 //===----------------------------------------------------------------------===//
-// QEC type declarations.
+// QEC interface definitions.
 //===----------------------------------------------------------------------===//
 
-#define GET_TYPEDEF_CLASSES
-#include "QEC/IR/QECDialectTypes.h.inc"
-
-//===----------------------------------------------------------------------===//
-// QEC ops declarations.
-//===----------------------------------------------------------------------===//
-
-#define GET_OP_CLASSES
-#include "QEC/IR/QECDialect.h.inc"
+#include "QEC/IR/QECOpInterfaces.cpp.inc"
