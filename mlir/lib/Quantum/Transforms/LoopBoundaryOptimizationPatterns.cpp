@@ -56,20 +56,23 @@ enum class Mode {
 // Represents the origin of a qubit, including its source register,
 // position within the register, and whether it's part of a register.
 struct QubitOrigin {
-    Value sourceRegister;
+    Value qubitOrRegister;
     unsigned long position;
     bool isRegister;
 
-    QubitOrigin() : sourceRegister(nullptr), position(0), isRegister(false) {}
+    QubitOrigin() : qubitOrRegister(nullptr), position(0), isRegister(false) {}
 
-    QubitOrigin(Value reg, unsigned long pos, bool isReg)
-        : sourceRegister(reg), position(pos), isRegister(isReg)
+    QubitOrigin(Value val, unsigned long pos, bool isReg)
+        : qubitOrRegister(val), position(pos), isRegister(isReg)
     {
     }
 
     bool operator==(const QubitOrigin &other) const
     {
-        return sourceRegister == other.sourceRegister && position == other.position;
+        if (this->qubitOrRegister == nullptr || other.qubitOrRegister == nullptr) {
+            return false;
+        }
+        return qubitOrRegister == other.qubitOrRegister && position == other.position;
     }
 };
 
@@ -169,7 +172,7 @@ getVerifyEdgeOperationSet(QubitOriginMap bottomEdgeOpSet, QubitOriginMap topEdge
 // Creates a quantum.extract operation.
 quantum::ExtractOp createExtractOp(Value qreg, const QubitOrigin &qubit, PatternRewriter &rewriter)
 {
-    auto loc = qubit.sourceRegister.getLoc();
+    auto loc = qubit.qubitOrRegister.getLoc();
     auto idxAttr = rewriter.getI64IntegerAttr(qubit.position);
     auto type = rewriter.getType<quantum::QubitType>();
     return rewriter.create<quantum::ExtractOp>(loc, type, qreg, nullptr, idxAttr);
@@ -180,7 +183,7 @@ quantum::InsertOp createInsertOp(Value qreg, const QubitOrigin &qubit, Value ele
                                  PatternRewriter &rewriter)
 {
     assert(element && "InsertOp requires an element value!");
-    auto loc = qubit.sourceRegister.getLoc();
+    auto loc = qubit.qubitOrRegister.getLoc();
     auto idxAttr = rewriter.getI64IntegerAttr(qubit.position);
     return rewriter.create<quantum::InsertOp>(loc, qreg.getType(), qreg, nullptr, idxAttr, element);
 }
@@ -243,13 +246,15 @@ Value findRootQubit(Value qubit)
 QubitOrigin determineQubitOrigin(Value qubit)
 {
     if (auto extractOp = qubit.getDefiningOp<quantum::ExtractOp>()) {
+        // Dynamic register indices are unknown and should not match against other qubit origins.
         if (!extractOp.getIdxAttr().has_value()) {
-            // TODO: This is a hack to handle the case where the qubit is not from a register.
-            return QubitOrigin(extractOp.getQreg(), 0, true);
+            return QubitOrigin();
         }
+
         unsigned long position = extractOp.getIdxAttr().value();
         return QubitOrigin(extractOp.getQreg(), position, true);
     }
+
     return QubitOrigin(qubit, 0, false);
 }
 
@@ -368,7 +373,7 @@ void hoistTopEdgeOperation(QuantumOpInfo topOpInfo, scf::ForOp forOp, PatternRew
     // hoist the extract operations
     std::vector<Value> operandOps;
     for (auto qubit : topOpInfo.inQubits) {
-        Value initValue = findInitValue(forOp, qubit.sourceRegister);
+        Value initValue = findInitValue(forOp, qubit.qubitOrRegister);
         if (!initValue) {
             assert(false && "Register not found in loop arguments");
         }
@@ -414,16 +419,16 @@ void hoistTopEdgeOperation(QuantumOpInfo topOpInfo, scf::ForOp forOp, PatternRew
     // Create insert operations for the topOpInfo.op
     for (auto [idx, qubit] : llvm::enumerate(topOpInfo.inQubits)) {
         if (qubit.isRegister) {
-            Value reg = findInitValue(forOp, qubit.sourceRegister);
+            Value reg = findInitValue(forOp, qubit.qubitOrRegister);
             auto insertOp = createInsertOp(reg, qubit, topOpInfo.op.getOutQubits()[idx], rewriter);
             // Find the matching init arg index and update it
-            updateForLoopInitArg(forOp, qubit.sourceRegister, insertOp.getResult(), rewriter);
+            updateForLoopInitArg(forOp, qubit.qubitOrRegister, insertOp.getResult(), rewriter);
             rewriter.moveOpBefore(insertOp, forOp);
         }
         else {
             // if it is not a register, it is a qubit. so don't need to create vector operation
             // just need to find the matching init arg index and update it
-            updateForLoopInitArg(forOp, qubit.sourceRegister, topOpInfo.op.getOutQubits()[idx],
+            updateForLoopInitArg(forOp, qubit.qubitOrRegister, topOpInfo.op.getOutQubits()[idx],
                                  rewriter);
         }
     }
@@ -466,7 +471,7 @@ void hoistBottomEdgeOperation(QuantumOpInfo bottomOpInfo, scf::ForOp forOp,
     // Create the insert operations
     for (auto [idx, qubit] : llvm::enumerate(bottomOpInfo.inQubits)) {
         Value reg;
-        reg = findResultForOpByQubit(qubit.sourceRegister, forOp);
+        reg = findResultForOpByQubit(qubit.qubitOrRegister, forOp);
 
         auto outQubit = bottomOpInfo.op.getOutQubits()[idx];
         if (qubit.isRegister) {
@@ -483,7 +488,7 @@ void hoistBottomEdgeOperation(QuantumOpInfo bottomOpInfo, scf::ForOp forOp,
     std::vector<Value> operandOps;
     for (auto qubit : bottomOpInfo.inQubits) {
         // inint value should be forOp result
-        Value reg = findResultForOpByQubit(qubit.sourceRegister, forOp);
+        Value reg = findResultForOpByQubit(qubit.qubitOrRegister, forOp);
 
         if (!reg) {
             assert(false && "Register not found in loop arguments");
