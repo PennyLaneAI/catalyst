@@ -356,5 +356,5 @@ def _API_name_to_pass_name():
         "ions_decomposition": "ions-decomposition",
         "to_ppr": "convert-clifford-t-to-ppr",
         "commute_ppr": "commute-clifford-t-ppr",
-        "ppr_to_ppm": "absorb-ppr-to-ppm",
+        "ppr_to_ppm": "ppr_to_ppm",
     }

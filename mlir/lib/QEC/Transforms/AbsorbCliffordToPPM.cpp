@@ -12,16 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#define DEBUG_TYPE "absorb-ppr-to-ppm"
+#define DEBUG_TYPE "ppr_to_ppm"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/Debug.h"
 
+#include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Transforms/TopologicalSortUtils.h"
 
 #include "QEC/IR/QECDialect.h"
 #include "QEC/IR/QECOpInterfaces.h"
 #include "QEC/Transforms/Patterns.h"
 #include "QEC/Utils/PauliStringWrapper.h"
+#include "Quantum/IR/QuantumOps.h"
 
 using namespace stim;
 using namespace mlir;
@@ -139,36 +141,24 @@ void moveCliffordPastNonClifford(PauliStringWrapper lhsPauli, PauliStringWrapper
     sortTopologically(lhs->getBlock());
 }
 
-// Verify if the operation or any of its users is a PPM
-bool isPPM(Operation *op)
-{
-
-    if (isa<PPMeasurementOp>(op))
-        return true;
-
-    for (auto userOp : op->getUsers()) {
-        if (userOp == nullptr)
-            continue;
-
-        if (isPPM(userOp))
-            return true;
-    }
-    return false;
-}
-
 bool shouldRemovePPR(PPRotationOp op)
 {
-
-    if (op.isNonClifford())
-        return false;
-
     if (op->getUsers().empty())
         return true;
 
-    if (isPPM(op))
-        return false;
+    SetVector<Operation *> slice;
+    getForwardSlice(op, &slice);
 
-    return true;
+    for (auto op : slice) {
+
+        if (isa<PPMeasurementOp>(op))
+            return false;
+
+        if (isa<catalyst::quantum::DeallocOp>(op))
+            return true;
+    }
+
+    return false;
 }
 
 struct AbsorbCliffordToPPM : public OpRewritePattern<PPMeasurementOp> {

@@ -489,10 +489,13 @@ def commute_ppr(qnode):
 
 
 def ppr_to_ppm(qnode):
-    """
-    Specify that the MLIR compiler pass for absorbing Clifford Pauli Product Rotation (PPR) operations, :math:`\exp{iP\tfrac{\pi}{4}}`, into the final Pauli Product Measurement (PPM) will be applied.
+    R"""
+    Specify that the MLIR compiler pass for absorbing Clifford Pauli 
+    Product Rotation (PPR) operations, :math:`\exp{iP\tfrac{\pi}{4}}`, 
+    into the final Pauli Product Measurement (PPM) will be applied.
 
-    For more information regarding to PPM, please refer to [(Pauli Product Measurement)](https://pennylane.ai/compilation/pauli-product-measurement)
+    For more information regarding to PPM, 
+    see this <https://pennylane.ai/compilation/pauli-product-measurement>
 
     Args:
         fn (QNode): QNode to apply the pass to
@@ -507,9 +510,10 @@ def ppr_to_ppm(qnode):
     and finally the Clifford PPRs will be absorbed into the Pauli Product Measurements.
 
     .. code-block:: python
+    
+        ppm_passes = [("PPM",["to_ppr", "commute_ppr","ppr_to_ppm",])]
 
-        @qjit(keep_intermediate=True)
-        @pipeline({"to_ppr": {}, "commute_ppr": {}, "ppr_to_ppm": {}})
+        @qjit(pipelines=ppm_passes, keep_intermediate=True)
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def circuit():
             qml.H(0)
@@ -517,6 +521,7 @@ def ppr_to_ppm(qnode):
             return measure(0)
 
     Example MLIR Representation:
+
     .. code-block:: mlir
         . . .
         %2 = qec.ppr ["X"](8) %1 : !quantum.bit
@@ -534,7 +539,7 @@ def ppr_to_ppm(qnode):
     @functools.wraps(clone)
     def wrapper(*args, **kwargs):
         pass_pipeline = kwargs.pop("pass_pipeline", [])
-        pass_pipeline.append(Pass("absorb-ppr-to-ppm"))
+        pass_pipeline.append(Pass("ppr_to_ppm"))
         kwargs["pass_pipeline"] = pass_pipeline
         return clone(*args, **kwargs)
 
