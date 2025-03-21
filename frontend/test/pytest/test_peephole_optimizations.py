@@ -194,9 +194,9 @@ def test_convert_clifford_to_ppr():
     """
     Test convert_clifford_to_ppr
     """
-    pipeline = [("pipe", ["convert-clifford-t-to-ppr"])]
+    pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
 
-    @qjit(pipelines=pipeline, keep_intermediate=True, target="mlir")
+    @qjit(pipelines=pipe, keep_intermediate=True, target="mlir")
     def test_convert_clifford_to_ppr_workflow():
 
         @to_ppr
