@@ -32,14 +32,13 @@ namespace qec {
 using PauliWord = llvm::SmallVector<std::string>;
 
 /// A PauliStringWrapper provides a convenient interface for manipulating Pauli strings,
-/// tracking corresponding qubits, and handling operations. It wraps the stim::PauliString
+/// tracking corresponding qubits, and handling operations. It wraps the stim::FlexPauliString
 /// class and adds additional functionality specific to the QEC dialect.
 ///
 /// Key components:
-/// - pauliString: The underlying stim::PauliString representation
+/// - pauliString: The underlying stim::FlexPauliString representation
 /// - correspondingQubits: Maps each Pauli operator to its associated MLIR Value
 /// - op: The QEC operation this Pauli string is associated with
-/// - imaginary: Tracks whether the Pauli string has an imaginary component
 ///
 /// The wrapper provides methods for:
 /// - Construction from text representations and PauliWords
@@ -139,7 +138,7 @@ SmallVector<StringRef> removeIdentityPauli(QECOpInterface op, SmallVector<Value>
 /**
  * @brief Replace the value with the corresponding qubits.
  *        Corresponding qubits are the qubits that are the same in both operations.
- *        Those qubits are commbination of OutQubit and InQubit.
+ *        Those qubits are combination of OutQubit and InQubit.
  *        The goal is to replace the value with OutQubit with InQubit.
  *
  * @param lhsPauliWrapper PauliStringWrapper of the left hand side

@@ -23,7 +23,7 @@ namespace qec {
 
 PauliStringWrapper::PauliStringWrapper(stim::FlexPauliString &&fps)
 {
-    pauliString = std::make_unique<stim::FlexPauliString>(fps);
+    pauliString = std::make_unique<stim::FlexPauliString>(std::move(fps));
 
     // allocated nullptr for correspondingQubits
     correspondingQubits.resize(pauliString->value.num_qubits, nullptr);
