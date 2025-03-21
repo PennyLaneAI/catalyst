@@ -18,8 +18,8 @@ import numpy as np
 import pennylane as qml
 import pytest
 
-from catalyst import pipeline, qjit
-from catalyst.passes import cancel_inverses, merge_rotations
+from catalyst import measure, pipeline, qjit
+from catalyst.passes import cancel_inverses, merge_rotations, to_ppr
 
 # pylint: disable=missing-function-docstring
 
@@ -168,7 +168,6 @@ def test_cancel_inverses_bad_usages():
 
     test_cancel_inverses_not_on_qnode()
 
-
 def test_chained_passes():
     """
     Test that chained passes are present in the transform passes.
@@ -190,6 +189,32 @@ def test_chained_passes():
 
 
 test_chained_passes()
+
+def test_convert_clifford_to_ppr():
+    """
+    Test convert_clifford_to_ppr
+    """
+    pipeline = [("pipe", ["convert-clifford-t-to-ppr"])]
+
+    @qjit(pipelines=pipeline, keep_intermediate=True, target="mlir")
+    def test_convert_clifford_to_ppr_workflow():
+
+        @to_ppr
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def f():
+            qml.H(0)
+            qml.S(1)
+            qml.T(0)
+            qml.CNOT([0, 1])
+            m1 = measure(wires=0)
+            m2 = measure(wires=1)
+
+        return f()
+
+    assert "convert-clifford-t-to-ppr" in test_convert_clifford_to_ppr_workflow.mlir_opt
+
+
+test_convert_clifford_to_ppr()
 
 
 if __name__ == "__main__":
