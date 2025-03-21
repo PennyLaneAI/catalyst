@@ -16,7 +16,7 @@ This submodule defines a utility for converting plxpr into Catalyst jaxpr.
 """
 # pylint: disable=protected-access
 from functools import partial
-from typing import Callable, Sequence, Union
+from typing import Callable, Sequence
 
 import jax
 import jax.core
