@@ -2,7 +2,31 @@
 
 <h3>New features since last release</h3>
 
+* Add loop boundary optimization pass that identifies and optimizes redundant quantum operations that occur at loop iteration boundaries, where operations at iteration boundaries often cancel each other out. 
+  [(#1476)](https://github.com/PennyLaneAI/catalyst/pull/1476)
+
+  This optimization help to eliminates redundant operations that aims to reduce quantum circuit depth and gate count.This pass is supported into `cancel_inverses` and `merge_rotations`.
+
+  For example,
+
+  ```python
+  dev = qml.device("lightning.qubit", wires=2)
+
+  @qml.qjit
+  @catalyst.passes.cancel_inverses
+  @qml.qnode(dev)
+  def circuit():
+      for i in range(3):
+          qml.Hadamard(0)
+          qml.CNOT([0, 1])
+          qml.Hadamard(0)
+      return qml.expval(qml.Z(0))
+  ```
+
+  Note that this optimization specifically targets operations that are exact inverses of each other when applied in sequence. For example, consecutive Hadamard gates (H†H = I) pairs will be identified and eliminated.
+
 * Conversion Clifford+T gates to Pauli Product Rotation (PPR) and measurement to Pauli Product Measurement (PPM) are now available through the `to_ppr` pass transform.
+
   [(#1499)](https://github.com/PennyLaneAI/catalyst/pull/1499)
   [(#1551)](https://github.com/PennyLaneAI/catalyst/pull/1551)
   [(#1564)](https://github.com/PennyLaneAI/catalyst/pull/1564)

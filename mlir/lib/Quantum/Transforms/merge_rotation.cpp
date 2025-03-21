@@ -14,13 +14,16 @@
 
 #define DEBUG_TYPE "merge-rotation"
 
+#include "llvm/Support/Debug.h"
+
+#include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Pass/Pass.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+
 #include "Catalyst/IR/CatalystDialect.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Transforms/Patterns.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/Pass/Pass.h"
-#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-#include "llvm/Support/Debug.h"
 
 using namespace llvm;
 using namespace mlir;
@@ -44,6 +47,7 @@ struct MergeRotationsPass : impl::MergeRotationsPassBase<MergeRotationsPass> {
         Operation *module = getOperation();
 
         RewritePatternSet patternsCanonicalization(&getContext());
+
         catalyst::quantum::CustomOp::getCanonicalizationPatterns(patternsCanonicalization,
                                                                  &getContext());
         catalyst::quantum::MultiRZOp::getCanonicalizationPatterns(patternsCanonicalization,
@@ -53,6 +57,7 @@ struct MergeRotationsPass : impl::MergeRotationsPassBase<MergeRotationsPass> {
         }
 
         RewritePatternSet patterns(&getContext());
+        populateLoopBoundaryPatterns(patterns, 1);
         populateMergeRotationsPatterns(patterns);
 
         if (failed(applyPatternsAndFoldGreedily(module, std::move(patterns)))) {
