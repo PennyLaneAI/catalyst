@@ -53,7 +53,7 @@
 * Commuting Clifford Pauli Product Rotation (PPR) operations to the end of a circuit, past non-Clifford PPRs, is now available through the :func:`~.catalyst.passes.commute_ppr` pass transform.
   [(#1563)](https://github.com/PennyLaneAI/catalyst/pull/1563)
   
-  A PPR is a rotation gate of the form :math:`\exp{iP \theta}`, where :math:`P` is a Pauli word (a product of Pauli operators). Clifford PPRs refer to PPRs with :math:`\theta = \tfrac{\pi}{4}`, while non-Clifford PPRs have :math:`\theta = \tfrac{\pi}{8}`.
+  A PPR is a rotation gate of the form $\`\exp{iP \theta}\`$, where :math:`P` is a Pauli word (a product of Pauli operators). Clifford PPRs refer to PPRs with :math:`\theta = \tfrac{\pi}{4}`, while non-Clifford PPRs have :math:`\theta = \tfrac{\pi}{8}`.
 
   
   Example:
@@ -69,7 +69,7 @@
   
   The circuit program that generated from this pass is currrently not executable on any backend. For more information regarding to PPM, please refer to [(Pauli Product Measurement)](https://pennylane.ai/compilation/pauli-product-measurement)
 
-* Absorbing Clifford Pauli Product Rotation (PPR) operations into the final Pauli Product Measurement (PPM) is not availble through the :func:`~.catalyst.passes.ppr_to_ppm` pass transform. The output from this pass consists of non-Clifford PPRs and PPMs.
+* Absorbing Clifford Pauli Product Rotation (PPR) operations into the final Pauli Product Measurement (PPM) is now available through the :func:`~.catalyst.passes.ppr_to_ppm` compilation pass transform. The output from this pass consists of non-Clifford PPRs and PPMs.
   [(#1577)](https://github.com/PennyLaneAI/catalyst/pull/1577)
 
   Example:

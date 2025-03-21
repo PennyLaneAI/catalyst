@@ -494,8 +494,8 @@ def ppr_to_ppm(qnode):
     Product Rotation (PPR) operations, :math:`\exp{iP\tfrac{\pi}{4}}`,
     into the final Pauli Product Measurement (PPM) will be applied.
 
-    For more information regarding to PPM,
-    see this <https://pennylane.ai/compilation/pauli-product-measurement>
+    For more information on the PPM compilation pass,
+    check out the `compilation hub <https://pennylane.ai/compilation/pauli-product-measurement>`__.
 
     Args:
         fn (QNode): QNode to apply the pass to
