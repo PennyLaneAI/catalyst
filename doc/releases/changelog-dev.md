@@ -190,6 +190,14 @@
   autograph in conjunction with catalyst passes causes a crash.
   [(#1541)](https://github.com/PennyLaneAI/catalyst/pull/1541)
 
+* Fixes an issue ([(#1548)](https://github.com/PennyLaneAI/catalyst/issues/1548)) where using
+  autograph in conjunction with catalyst pipeline causes a crash.
+  [(#1576)](https://github.com/PennyLaneAI/catalyst/pull/1576)
+
+* Fixes an issue ([(#1547)](https://github.com/PennyLaneAI/catalyst/issues/1547)) where using
+  chained catalyst passe decorators causes a crash.
+  [(#1576)](https://github.com/PennyLaneAI/catalyst/pull/1576)
+
 <h3>Internal changes ⚙️</h3>
 
 * Updated the call signature for the PLXPR `qnode_prim` primitive.

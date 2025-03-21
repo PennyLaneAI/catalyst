@@ -14,12 +14,7 @@
 
 """This module exposes built-in Catalyst MLIR passes to the frontend."""
 
-import copy
-import functools
-
-import pennylane as qml
-
-from catalyst.passes.pass_api import Pass
+from catalyst.passes.pass_api import PassPipelineWrapper
 
 
 ## API ##
@@ -133,20 +128,7 @@ def cancel_inverses(qnode):
         %2 = quantum.namedobs %out_qubits[ PauliZ] : !quantum.obs
         %3 = quantum.expval %2 : f64
     """
-    if not isinstance(qnode, qml.QNode):
-        raise TypeError(f"A QNode is expected, got the classical function {qnode}")
-
-    clone = copy.copy(qnode)
-    clone.__name__ += "_cancel_inverses"
-
-    @functools.wraps(clone)
-    def wrapper(*args, **kwargs):
-        pass_pipeline = kwargs.pop("pass_pipeline", [])
-        pass_pipeline.append(Pass("remove-chained-self-inverse"))
-        kwargs["pass_pipeline"] = pass_pipeline
-        return clone(*args, **kwargs)
-
-    return wrapper
+    return PassPipelineWrapper(qnode, "remove-chained-self-inverse")
 
 
 def merge_rotations(qnode):
@@ -210,20 +192,7 @@ def merge_rotations(qnode):
     >>> circuit(0.54)
     Array(0.5965506257017892, dtype=float64)
     """
-    if not isinstance(qnode, qml.QNode):
-        raise TypeError(f"A QNode is expected, got the classical function {qnode}")
-
-    clone = copy.copy(qnode)
-    clone.__name__ += "_merge_rotations"
-
-    @functools.wraps(clone)
-    def wrapper(*args, **kwargs):
-        pass_pipeline = kwargs.pop("pass_pipeline", [])
-        pass_pipeline.append(Pass("merge-rotations"))
-        kwargs["pass_pipeline"] = pass_pipeline
-        return clone(*args, **kwargs)
-
-    return wrapper
+    return PassPipelineWrapper(qnode, "merge-rotations")
 
 
 def ions_decomposition(qnode):  # pragma: nocover
@@ -345,18 +314,7 @@ def ions_decomposition(qnode):  # pragma: nocover
         %out_qubits_8 = quantum.custom "RY"(%cst_2) %out_qubits_6#1 : !quantum.bit
         %out_qubits_9 = quantum.custom "RY"(%cst_2) %out_qubits_7 : !quantum.bit
     """
-
-    if not isinstance(qnode, qml.QNode):
-        raise TypeError(f"A QNode is expected, got the classical function {qnode}")
-
-    @functools.wraps(qnode)
-    def wrapper(*args, **kwargs):
-        pass_pipeline = kwargs.pop("pass_pipeline", [])
-        pass_pipeline.append(Pass("ions-decomposition"))
-        kwargs["pass_pipeline"] = pass_pipeline
-        return qnode(*args, **kwargs)
-
-    return wrapper
+    return PassPipelineWrapper(qnode, "ions-decomposition")
 
 
 def to_ppr(qnode):
@@ -431,20 +389,7 @@ def to_ppr(qnode):
         . . .
 
     """
-    if not isinstance(qnode, qml.QNode):
-        raise TypeError(f"A QNode is expected, got the classical function {qnode}")
-
-    clone = copy.copy(qnode)
-    clone.__name__ += "_to_ppr"
-
-    @functools.wraps(clone)
-    def wrapper(*args, **kwargs):
-        pass_pipeline = kwargs.pop("pass_pipeline", [])
-        pass_pipeline.append(Pass("to_ppr"))
-        kwargs["pass_pipeline"] = pass_pipeline
-        return clone(*args, **kwargs)
-
-    return wrapper
+    return PassPipelineWrapper(qnode, "to_ppr")
 
 
 def commute_ppr(qnode):
@@ -502,17 +447,4 @@ def commute_ppr(qnode):
             . . .
 
     """
-    if not isinstance(qnode, qml.QNode):
-        raise TypeError(f"A QNode is expected, got the classical function {qnode}")
-
-    clone = copy.copy(qnode)
-    clone.__name__ += "_commute_ppr"
-
-    @functools.wraps(clone)
-    def wrapper(*args, **kwargs):
-        pass_pipeline = kwargs.pop("pass_pipeline", [])
-        pass_pipeline.append(Pass("commute_ppr"))
-        kwargs["pass_pipeline"] = pass_pipeline
-        return clone(*args, **kwargs)
-
-    return wrapper
+    return PassPipelineWrapper(qnode, "commute_ppr")
