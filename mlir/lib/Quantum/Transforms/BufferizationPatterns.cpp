@@ -143,10 +143,12 @@ struct BufferizeProbsOp : public OpConversionPattern<ProbsOp> {
             auto one = rewriter.create<arith::ConstantOp>(loc, rewriter.getI64Type(), rewriter.getIntegerAttr(rewriter.getI64Type(),1));
             auto compbasisOp = cast<ComputationalBasisOp>(op.getObs().getDefiningOp());
 
+            assert(compbasisOp.getQreg() != nullptr &&
+                   "ProbsOp with dynamic return shape must take in inputs of qreg type");
             Value reg_value = compbasisOp.getQreg();
             Operation *reg_def = reg_value.getDefiningOp();
+
             // Walk back to the original alloc of the register
-            // Only Alloc, Adjoint and Insert could have qreg as outputs
             while (!isa<AllocOp>(reg_def)){
                 // TODO: switch case?
                 if (isa<AdjointOp>(reg_def)){
