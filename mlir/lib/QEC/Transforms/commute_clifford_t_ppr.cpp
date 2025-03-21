@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#define DEBUG_TYPE "commute-clifford-t-ppr"
+#define DEBUG_TYPE "commute_ppr"
 
 #include "llvm/Support/Debug.h"
 
