@@ -490,11 +490,11 @@ def commute_ppr(qnode):
 
 def ppr_to_ppm(qnode):
     R"""
-    Specify that the MLIR compiler pass for absorbing Clifford Pauli 
-    Product Rotation (PPR) operations, :math:`\exp{iP\tfrac{\pi}{4}}`, 
+    Specify that the MLIR compiler pass for absorbing Clifford Pauli
+    Product Rotation (PPR) operations, :math:`\exp{iP\tfrac{\pi}{4}}`,
     into the final Pauli Product Measurement (PPM) will be applied.
 
-    For more information regarding to PPM, 
+    For more information regarding to PPM,
     see this <https://pennylane.ai/compilation/pauli-product-measurement>
 
     Args:
@@ -510,7 +510,7 @@ def ppr_to_ppm(qnode):
     and finally the Clifford PPRs will be absorbed into the Pauli Product Measurements.
 
     .. code-block:: python
-    
+
         ppm_passes = [("PPM",["to_ppr", "commute_ppr","ppr_to_ppm",])]
 
         @qjit(pipelines=ppm_passes, keep_intermediate=True)
