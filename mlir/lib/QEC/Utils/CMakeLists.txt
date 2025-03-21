@@ -11,6 +11,8 @@ add_library(QECUtils
     PauliStringWrapper.cpp
 )
 
+# features required by Stim
+target_compile_features(QECUtils PRIVATE cxx_std_20)
 target_compile_options(QECUtils PRIVATE
     -frtti           # Enable RTTI
     -fexceptions     # Enable exceptions

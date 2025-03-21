@@ -21,15 +21,7 @@
 namespace catalyst {
 namespace qec {
 
-PauliStringWrapper::PauliStringWrapper(std::string_view text)
-{
-    pauliString = std::make_unique<stim::FlexPauliString>(stim::FlexPauliString::from_text(text));
-
-    // allocated nullptr for correspondingQubits
-    correspondingQubits.resize(pauliString->value.num_qubits, nullptr);
-}
-
-PauliStringWrapper::PauliStringWrapper(const stim::FlexPauliString &fps)
+PauliStringWrapper::PauliStringWrapper(stim::FlexPauliString &&fps)
 {
     pauliString = std::make_unique<stim::FlexPauliString>(fps);
 
@@ -37,10 +29,10 @@ PauliStringWrapper::PauliStringWrapper(const stim::FlexPauliString &fps)
     correspondingQubits.resize(pauliString->value.num_qubits, nullptr);
 }
 
-PauliStringWrapper::PauliStringWrapper(const PauliStringWrapper &other)
+PauliStringWrapper::PauliStringWrapper(PauliStringWrapper &&other)
 {
-    pauliString = std::make_unique<stim::FlexPauliString>(*other.pauliString);
-    correspondingQubits = other.correspondingQubits;
+    pauliString.reset(other.pauliString.release());
+    correspondingQubits = std::move(other.correspondingQubits);
     op = other.op;
 }
 
@@ -52,7 +44,7 @@ PauliStringWrapper PauliStringWrapper::from_pauli_word(const PauliWord &pauliWor
     for (auto pauli : pauliWord) {
         pauliStringStr += pauli;
     }
-    return PauliStringWrapper(pauliStringStr);
+    return PauliStringWrapper(stim::FlexPauliString::from_text(pauliStringStr));
 }
 
 bool PauliStringWrapper::isNegative() const { return pauliString->value.sign; }
@@ -91,7 +83,7 @@ PauliStringWrapper::computeCommutationRulesWith(const PauliStringWrapper &rhs) c
 
     assert(!result.imag && "Resulting Pauli string should be real");
 
-    return PauliStringWrapper(result);
+    return PauliStringWrapper(std::move(result));
 }
 
 template <typename T>
@@ -135,18 +127,20 @@ PauliWordPair normalizePPROps(QECOpInterface lhs, QECOpInterface rhs)
     lhsPSWrapper.updateSign((int16_t)lhs.getRotationKind() < 0);
     rhsPSWrapper.updateSign((int16_t)rhs.getRotationKind() < 0);
 
-    return std::make_pair(lhsPSWrapper, rhsPSWrapper);
+    return std::make_pair(std::move(lhsPSWrapper), std::move(rhsPSWrapper));
 }
 
-SmallVector<StringRef> removeIdentityPauli(QECOpInterface rhs, SmallVector<Value> &newRHSOperands)
+SmallVector<StringRef> removeIdentityPauli(QECOpInterface op, SmallVector<Value> &qubits)
 {
-    auto pauliProduct = rhs.getPauliProduct();
+    assert(op.getPauliProduct().size() == qubits.size());
+
+    auto pauliProduct = op.getPauliProduct();
     SmallVector<StringRef> pauliProductArrayRef;
 
     for (auto [i, pauli] : llvm::enumerate(pauliProduct)) {
         auto pauliStr = mlir::cast<mlir::StringAttr>(pauli).getValue();
         if (pauliStr == "I" || pauliStr == "_") {
-            newRHSOperands.erase(newRHSOperands.begin() + i);
+            qubits.erase(qubits.begin() + i);
             continue;
         }
         pauliProductArrayRef.push_back(pauliStr);
@@ -163,7 +157,7 @@ SmallVector<Value> replaceValueWithOperands(const PauliStringWrapper &lhsPauliWr
     auto rhsPauliSize = rhsPauliWrapper.correspondingQubits.size();
 
     // lhsPauli.correspondingQubits consists of:
-    //    - OutQubit: initilized qubit
+    //    - OutQubit: initialized qubit
     //    - InQubit: new qubits from RHS op
     SmallVector<Value> newRHSOperands(rhsPauliSize, nullptr);
     for (unsigned i = 0; i < rhsPauliSize; i++) {
