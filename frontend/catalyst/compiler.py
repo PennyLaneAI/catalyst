@@ -406,9 +406,9 @@ class Compiler:
             workspace, Directory
         ), f"Compiler expects a Directory type, got {type(workspace)}."
         assert workspace.is_dir(), f"Compiler expects an existing directory, got {workspace}."
-
-        lower_to_llvm = self.options.lower_to_llvm or False
-        output_ir_ext = ".ll" if lower_to_llvm else ".mlir"
+        assert self.options.lower_to_llvm, (
+            "lower_to_llvm must be set to True in order to compile to a shared object"
+        )
 
         if self.options.verbose:
             print(f"[LIB] Running compiler driver in {workspace}", file=self.options.logfile)
@@ -420,7 +420,7 @@ class Compiler:
             tmp_infile.write(ir)
 
         output_object_name = os.path.join(str(workspace), f"{module_name}.o")
-        output_ir_name = os.path.join(str(workspace), f"{module_name}{output_ir_ext}")
+        output_ir_name = os.path.join(str(workspace), f"{module_name}.ll")
 
         cmd = self.get_cli_command(tmp_infile_name, output_ir_name, module_name, workspace)
         try:
@@ -441,12 +441,8 @@ class Compiler:
         else:
             out_IR = None
 
-        if lower_to_llvm:
-            output = LinkerDriver.run(output_object_name, options=self.options)
-            output_object_name = str(pathlib.Path(output).absolute())
-        else:
-            # When not lowering to LLVM, we don't need to return a file path
-            output_object_name = None
+        output = LinkerDriver.run(output_object_name, options=self.options)
+        output_object_name = str(pathlib.Path(output).absolute())
 
         # Clean up temporary files
         if os.path.exists(tmp_infile_name):

@@ -65,8 +65,7 @@ class SharedObjectManager:
         self.setup = None
         self.teardown = None
         self.mem_transfer = None
-        if self.shared_object_file:
-            self.open()
+        self.open()
 
     def open(self):
         """Open the sharead object and load symbols."""
