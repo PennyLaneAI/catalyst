@@ -76,7 +76,7 @@ class PassPipelineWrapper(QNodeWrapper):
                 self.pass_name_or_pipeline, *self.flags, **self.valued_options
             )
             kwargs["pass_pipeline"] = pass_pipeline
-        return self.qnode(*args, **kwargs)
+        return super().__call__(*args, **kwargs)
 
 
 def pipeline(pass_pipeline: PipelineDict):
