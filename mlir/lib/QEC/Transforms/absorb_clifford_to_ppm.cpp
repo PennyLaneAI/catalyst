@@ -47,14 +47,6 @@ struct AbsorbCliffordToPPMPass : public impl::AbsorbCliffordToPPMPassBase<Absorb
         if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
             return signalPassFailure();
         }
-
-        RewritePatternSet removeDeadPPRPatterns(&getContext());
-        populateRemoveDeadPPRPatterns(removeDeadPPRPatterns);
-
-        if (failed(
-                applyPatternsAndFoldGreedily(getOperation(), std::move(removeDeadPPRPatterns)))) {
-            return signalPassFailure();
-        }
     }
 };
 

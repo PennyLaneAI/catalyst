@@ -87,9 +87,8 @@ LogicalResult visitPPMeasurementOp(PPMeasurementOp op,
     return failure();
 }
 
-void moveCliffordPastPPM(const PauliStringWrapper &lhsPauli,
-                                 const PauliStringWrapper &rhsPauli, PauliStringWrapper *result,
-                                 PatternRewriter &rewriter)
+void moveCliffordPastPPM(const PauliStringWrapper &lhsPauli, const PauliStringWrapper &rhsPauli,
+                         PauliStringWrapper *result, PatternRewriter &rewriter)
 {
     assert(lhsPauli.op != nullptr && "LHS Operation is not found");
     assert(rhsPauli.op != nullptr && "RHS Operation is not found");
@@ -201,10 +200,6 @@ namespace qec {
 void populateAbsorbCliffordToPPMPatterns(RewritePatternSet &patterns)
 {
     patterns.add<AbsorbCliffordToPPM>(patterns.getContext(), 1);
-}
-
-void populateRemoveDeadPPRPatterns(RewritePatternSet &patterns)
-{
     patterns.add<RemoveDeadPPR>(patterns.getContext(), 1);
 }
 
