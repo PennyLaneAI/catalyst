@@ -17,6 +17,7 @@
 from typing import Union
 
 import jax
+import numpy as np
 import pennylane as qml
 from pennylane.devices.capabilities import DeviceCapabilities, OperatorProperties
 from pennylane.operation import Operation, Operator
@@ -40,11 +41,96 @@ def is_supported(op: Operator, capabilities: DeviceCapabilities) -> bool:
     return op.name in capabilities.operations
 
 
-def _paramshift_op_checker(op):
-    if not isinstance(op, HybridOp):
-        if op.grad_method not in {"A", None}:
-            raise DifferentiableCompileError(f"{op.name} does not support analytic differentiation")
+def _is_grad_recipe_same_as_catalyst(op):
+    """Checks that the grad_recipe for the op matches the hard coded one in Catalyst."""
+
+    def _is_active(maybe_tracer):
+        return isinstance(maybe_tracer, jax.core.Tracer)
+
+    def _is_grad_recipe_active(grad_recipe):
+        active = False
+        for recipe in grad_recipe:
+            left, right = recipe
+            active_left = any(map(_is_active, left))
+            active_right = any(map(_is_active, right))
+            active |= active_left or active_right
+        return active
+
+    if _is_grad_recipe_active(op.grad_recipe):
+        # An active grad recipe is never the same as the one in catalyst
+        return False
+
+    if len(op.data) != len(op.grad_recipe):
+        return False
+
+    valid = True
+    for grad_recipe in op.grad_recipe:
+        left, right = grad_recipe
+        # exp_param_shift_rule_{left,right} are constants in Catalyst
+        # we must ensure that the rules seen in the op match Catalyst's implementation.
+        exp_param_shift_rule_left = np.array([0.5, 1.0, np.pi / 2])
+        exp_param_shift_rule_right = np.array([-0.5, 1.0, -np.pi / 2])
+        obs_param_shift_rule_left = np.array(left)
+        obs_param_shift_rule_right = np.array(right)
+        is_left_valid = np.allclose(obs_param_shift_rule_left, exp_param_shift_rule_left)
+        is_right_valid = np.allclose(obs_param_shift_rule_right, exp_param_shift_rule_right)
+        valid &= is_left_valid and is_right_valid
+    return valid
+
+
+def _has_grad_recipe(op):
+    """Checks whether grad_recipe is defined"""
+    if not hasattr(op, "grad_recipe"):
+        return False
+
+    if not any(map(lambda x: x, op.grad_recipe)):
+        return False
+
     return True
+
+
+def _has_parameter_frequencies(op):
+    try:
+        if not hasattr(op, "parameter_frequencies"):
+            return False
+    except qml.operation.ParameterFrequenciesUndefinedError:
+        return False
+    return True
+
+
+def _are_param_frequencies_same_as_catalyst(op):
+    """Check if the parameter frequencies are all close to 1."""
+    freqs = op.parameter_frequencies
+    if len(freqs) != len(op.data):
+        return False
+
+    valid = True
+    for freqs in op.parameter_frequencies:
+        if len(freqs) != 1:
+            return False
+        valid &= np.allclose(freqs[0], 1.0)
+
+    return valid
+
+
+def _paramshift_op_checker(op):
+
+    if isinstance(op, qml.QubitUnitary):
+        # Cannot take param shift of qubit unitary.
+        return False
+
+    if type(op) in (qml.ops.Controlled, qml.ops.ControlledOp):
+        # Cannot take param shift of controlled ops.
+        # It will always be at least a four term shift rule.
+        return False
+
+    if _has_grad_recipe(op):
+        return _is_grad_recipe_same_as_catalyst(op)
+
+    if _has_parameter_frequencies(op):
+        return _are_param_frequencies_same_as_catalyst(op)
+
+    return isinstance(op, HybridOp)
 
 
 def _adjoint_diff_op_checker(op, capabilities):
