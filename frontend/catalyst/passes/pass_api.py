@@ -354,7 +354,7 @@ def _API_name_to_pass_name():
         "cancel_inverses": "remove-chained-self-inverse",
         "merge_rotations": "merge-rotations",
         "ions_decomposition": "ions-decomposition",
-        "to_ppr": "convert-clifford-t-to-ppr",
-        "commute_ppr": "commute-clifford-t-ppr",
+        "to_ppr": "to_ppr",
+        "commute_ppr": "commute_ppr",
         "ppr_to_ppm": "ppr_to_ppm",
     }
