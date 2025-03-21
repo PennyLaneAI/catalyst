@@ -50,6 +50,25 @@
       . . .
     ```
 
+* Commuting Clifford Pauli Product Rotation (PPR) operations to the end of a circuit, past non-Clifford PPRs, is now available through the :func:`~.catalyst.passes.commute_ppr` pass transform.
+  [(#1563)](https://github.com/PennyLaneAI/catalyst/pull/1563)
+  
+  A PPR is a rotation gate of the form :math:`\exp{iP \theta}`, where :math:`P` is a Pauli word (a product of Pauli operators). Clifford PPRs refer to PPRs with :math:`\theta = \tfrac{\pi}{4}`, while non-Clifford PPRs have :math:`\theta = \tfrac{\pi}{8}`.
+
+  
+  Example:
+  ```python
+    @qjit(keep_intermediate=True)
+    @pipeline({"to_ppr": {}, "commute_ppr": {}})
+    @qml.qnode(qml.device("null.qubit", wires=1))
+    def circuit():
+        qml.H(0)
+        qml.T(0)
+        return measure(0)
+    ```
+  
+  The circuit program that generated from this pass is currrently not executable on any backend. For more information regarding to PPM, please refer to [(Pauli Product Measurement)](https://pennylane.ai/compilation/pauli-product-measurement)
+
 <h3>Improvements 🛠</h3>
 
 * Changed pattern rewritting in `quantum-to-ion` lowering pass to use MLIR's dialect conversion
@@ -89,14 +108,16 @@
       return qml.expval(qml.Z(0))
   ```
 
-* Catalyst now supports experimental capture of `qml.transforms.cancel_inverses` and `qml.transforms.merge_rotations` transforms.
+* Catalyst now supports experimental capture of PennyLane transforms.
   [(#1544)](https://github.com/PennyLaneAI/catalyst/pull/1544)
   [(#1561)](https://github.com/PennyLaneAI/catalyst/pull/1561)
+  [(#1567)](https://github.com/PennyLaneAI/catalyst/pull/1567)
 
   To trigger the PennyLane pipeline for capturing the mentioned transforms,
-  simply set `experimental_capture=True` in the qjit decorator. Catalyst will
-  then apply its own pass in replacement of the original transform
-  provided by PennyLane.
+  simply set `experimental_capture=True` in the qjit decorator. If available,
+  Catalyst will apply its own pass in replacement of the original transform
+  provided by PennyLane. Otherwise, the transform will be expanded according
+  to PennyLane rules.
 
   ```python
   import pennylane as qml
