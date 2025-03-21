@@ -260,9 +260,9 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
 
     """
 
-    def __init__(self, device, shots: qml.measurements.Shots):
+    def __init__(self, device, shots: qml.measurements.Shots | int):
         self._device = device
-        self._shots = shots.total_shots if shots else 0
+        self._shots = self._extract_shots_value(shots)
         self.stateref = None
         self.actualized = False
         super().__init__()
@@ -395,6 +395,15 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
         if dtype != mval.dtype:
             return jax.lax.convert_element_type(mval, dtype)
         return mval
+
+    def _extract_shots_value(self, shots: qml.measurements.Shots | int):
+        """Extract the shots value according to the type"""
+        if isinstance(shots, int):
+            return shots
+
+        assert isinstance(shots, qml.measurements.Shots)
+
+        return shots.total_shots if shots else 0
 
 
 @QFuncPlxprInterpreter.register_primitive(qml.QubitUnitary._primitive)

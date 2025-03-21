@@ -112,6 +112,7 @@
   [(#1544)](https://github.com/PennyLaneAI/catalyst/pull/1544)
   [(#1561)](https://github.com/PennyLaneAI/catalyst/pull/1561)
   [(#1567)](https://github.com/PennyLaneAI/catalyst/pull/1567)
+  [(#1578)](https://github.com/PennyLaneAI/catalyst/pull/1578)
 
   To trigger the PennyLane pipeline for capturing the mentioned transforms,
   simply set `experimental_capture=True` in the qjit decorator. If available,
