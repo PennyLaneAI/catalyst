@@ -361,20 +361,20 @@ def ions_decomposition(qnode):  # pragma: nocover
 
 def to_ppr(qnode):
     R"""
-    Specify that the ``-to_ppr`` MLIR compiler pass for converting 
+    Specify that the ``-to_ppr`` MLIR compiler pass for converting
     clifford+T gates into Pauli Product Rotation (PPR) gates will be applied.
 
-    Clifford gates are defined as :math:`\exp({iP\tfrac{\pi}{4}})`, 
-    where :math:`P` is a Pauli word. Non-Clifford gates are defined 
+    Clifford gates are defined as :math:`\exp({iP\tfrac{\pi}{4}})`,
+    where :math:`P` is a Pauli word. Non-Clifford gates are defined
     as :math:`\exp({iP\tfrac{\pi}{8}})`.
 
-    For more information regarding to PPM, 
+    For more information regarding to PPM,
     see here <https://pennylane.ai/compilation/pauli-product-measurement>
 
     .. note::
 
-        The circuit that generated from this pass are currently 
-        only not executable in any backend. This pass is only for analysis 
+        The circuit that generated from this pass are currently
+        only not executable in any backend. This pass is only for analysis
         and potential future execution when a suitable backend is available.
 
 
@@ -449,12 +449,12 @@ def to_ppr(qnode):
 
 def commute_ppr(qnode):
     R"""
-    Specify that the ``-commute_ppr`` MLIR compiler pass for commuting 
-    Clifford Pauli Product Rotation (PPR) gates, :math:`\exp({iP\tfrac{\pi}{4}})`, 
+    Specify that the ``-commute_ppr`` MLIR compiler pass for commuting
+    Clifford Pauli Product Rotation (PPR) gates, :math:`\exp({iP\tfrac{\pi}{4}})`,
     past non-Clifford PPRs gates, :math:`\exp({iP\tfrac{\pi}{8}})` will be applied,
     where :math:`P` is a Pauli word.
 
-    For more information regarding to PPM, 
+    For more information regarding to PPM,
     see here <https://pennylane.ai/compilation/pauli-product-measurement>
 
     Args:
