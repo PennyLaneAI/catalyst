@@ -368,8 +368,8 @@ def to_ppr(qnode):
     where :math:`P` is a Pauli word. Non-Clifford gates are defined
     as :math:`\exp({iP\tfrac{\pi}{8}})`.
 
-    For more information regarding to PPM,
-    see here <https://pennylane.ai/compilation/pauli-product-measurement>
+    For more information on the PPM compilation pass,
+    check out the `compilation hub <https://pennylane.ai/compilation/pauli-product-measurement>`__.
 
     .. note::
 
