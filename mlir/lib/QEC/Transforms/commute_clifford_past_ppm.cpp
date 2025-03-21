@@ -30,19 +30,19 @@ using namespace catalyst::qec;
 
 namespace catalyst {
 namespace qec {
-
-#define GEN_PASS_DEF_ABSORBCLIFFORDTOPPMPASS
-#define GEN_PASS_DECL_ABSORBCLIFFORDTOPPMPASS
+#define GEN_PASS_DEF_COMMUTECLIFFORDPASTPPMPASS
+#define GEN_PASS_DECL_COMMUTECLIFFORDPASTPPMPASS
 #include "QEC/Transforms/Passes.h.inc"
 
-struct AbsorbCliffordToPPMPass : public impl::AbsorbCliffordToPPMPassBase<AbsorbCliffordToPPMPass> {
-    using AbsorbCliffordToPPMPassBase::AbsorbCliffordToPPMPassBase;
+struct CommuteCliffordPastPPMPass
+    : public impl::CommuteCliffordPastPPMPassBase<CommuteCliffordPastPPMPass> {
+    using CommuteCliffordPastPPMPassBase::CommuteCliffordPastPPMPassBase;
 
     void runOnOperation() final
     {
         RewritePatternSet patterns(&getContext());
 
-        populateAbsorbCliffordToPPMPatterns(patterns);
+        populateCommuteCliffordPastPPMPatterns(patterns);
 
         if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
             return signalPassFailure();
@@ -52,9 +52,9 @@ struct AbsorbCliffordToPPMPass : public impl::AbsorbCliffordToPPMPassBase<Absorb
 
 } // namespace qec
 
-std::unique_ptr<Pass> createAbsorbCliffordToPPMPass()
+std::unique_ptr<Pass> createCommuteCliffordPastPPMPass()
 {
-    return std::make_unique<AbsorbCliffordToPPMPass>();
+    return std::make_unique<CommuteCliffordPastPPMPass>();
 }
 
 } // namespace catalyst

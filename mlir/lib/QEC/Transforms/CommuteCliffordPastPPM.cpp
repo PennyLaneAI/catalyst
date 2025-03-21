@@ -139,28 +139,6 @@ void moveCliffordPastPPM(const PauliStringWrapper &lhsPauli, const PauliStringWr
     sortTopologically(lhs->getBlock());
 }
 
-bool hasDeadend(Operation *op)
-{
-    if (op == nullptr)
-        return false;
-
-    if (isa<catalyst::quantum::DeallocOp>(op))
-        return true;
-
-    if (isa<catalyst::quantum::YieldOp>(op))
-        return true;
-
-    if (isa<catalyst::quantum::InsertOp>(op))
-        return true;
-
-    for (auto user : op->getUsers()) {
-        if (hasDeadend(user))
-            return true;
-    }
-
-    return false;
-}
-
 bool shouldRemovePPR(PPRotationOp op)
 {
     if (op->getUsers().empty())
@@ -170,22 +148,20 @@ bool shouldRemovePPR(PPRotationOp op)
     ForwardSliceOptions options;
     getForwardSlice(op, &slice);
 
-    for (auto forwardOp : slice) {
+    for (Operation *forwardOp : slice) {
+
         if (isa<PPMeasurementOp>(forwardOp))
             return false;
-    }
 
-    // Make sure all users are end up with
-    // dealloc op or insert op or yield op or no users
-    for (auto user : op->getUsers()) {
-        if (!hasDeadend(user))
+        if (!isa<catalyst::quantum::InsertOp>(forwardOp) &&
+            !isa<catalyst::quantum::DeallocOp>(forwardOp))
             return false;
     }
 
     return true;
 }
 
-struct AbsorbCliffordToPPM : public OpRewritePattern<PPMeasurementOp> {
+struct CommuteCliffordPastPPM : public OpRewritePattern<PPMeasurementOp> {
     using OpRewritePattern::OpRewritePattern;
 
     LogicalResult matchAndRewrite(PPMeasurementOp op, PatternRewriter &rewriter) const override
@@ -223,9 +199,9 @@ struct RemoveDeadPPR : public OpRewritePattern<PPRotationOp> {
 namespace catalyst {
 namespace qec {
 
-void populateAbsorbCliffordToPPMPatterns(RewritePatternSet &patterns)
+void populateCommuteCliffordPastPPMPatterns(RewritePatternSet &patterns)
 {
-    patterns.add<AbsorbCliffordToPPM>(patterns.getContext(), 1);
+    patterns.add<CommuteCliffordPastPPM>(patterns.getContext(), 1);
     patterns.add<RemoveDeadPPR>(patterns.getContext(), 1);
 }
 

@@ -23,7 +23,7 @@ namespace qec {
 
 void populateCliffordTToPPRPatterns(mlir::RewritePatternSet &);
 void populateCommuteCliffordTPPRPatterns(mlir::RewritePatternSet &);
-void populateAbsorbCliffordToPPMPatterns(mlir::RewritePatternSet &);
+void populateCommuteCliffordPastPPMPatterns(mlir::RewritePatternSet &);
 
 } // namespace qec
 } // namespace catalyst
