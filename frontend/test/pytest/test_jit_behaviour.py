@@ -882,6 +882,21 @@ class TestDefaultAvailableIR:
         assert g.qir
         assert "__catalyst__qis" in g.qir
 
+    def test_mlir_opt(self, backend):
+        """Test mlir opt."""
+
+        @qml.qnode(qml.device(backend, wires=1))
+        def f(x: float):
+            qml.RX(x, wires=0)
+            return qml.state()
+
+        @qml.qjit  # Note that we are using the default qjit
+        def g(x: float):
+            return f(x)
+
+        assert g.mlir_opt
+        assert "__catalyst__qis" in g.mlir_opt
+
 
 class TestAvoidVerification:
     def test_no_verification(self, capfd, backend):
