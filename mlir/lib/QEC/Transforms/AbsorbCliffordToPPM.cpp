@@ -139,24 +139,50 @@ void moveCliffordPastPPM(const PauliStringWrapper &lhsPauli, const PauliStringWr
     sortTopologically(lhs->getBlock());
 }
 
+bool hasDeadend(Operation *op)
+{
+    if (op == nullptr)
+        return false;
+
+    if (isa<catalyst::quantum::DeallocOp>(op))
+        return true;
+
+    if (isa<catalyst::quantum::YieldOp>(op))
+        return true;
+
+    if (isa<catalyst::quantum::InsertOp>(op))
+        return true;
+
+    for (auto user : op->getUsers()) {
+        if (hasDeadend(user))
+            return true;
+    }
+
+    return false;
+}
+
 bool shouldRemovePPR(PPRotationOp op)
 {
     if (op->getUsers().empty())
         return true;
 
     SetVector<Operation *> slice;
+    ForwardSliceOptions options;
     getForwardSlice(op, &slice);
 
-    for (auto op : slice) {
-
-        if (isa<PPMeasurementOp>(op))
+    for (auto forwardOp : slice) {
+        if (isa<PPMeasurementOp>(forwardOp))
             return false;
-
-        if (isa<catalyst::quantum::DeallocOp>(op))
-            return true;
     }
 
-    return false;
+    // Make sure all users are end up with
+    // dealloc op or insert op or yield op or no users
+    for (auto user : op->getUsers()) {
+        if (!hasDeadend(user))
+            return false;
+    }
+
+    return true;
 }
 
 struct AbsorbCliffordToPPM : public OpRewritePattern<PPMeasurementOp> {
