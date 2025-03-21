@@ -168,6 +168,27 @@ def test_cancel_inverses_bad_usages():
 
     test_cancel_inverses_not_on_qnode()
 
+def test_chained_passes():
+    """
+    Test that chained passes are present in the transform passes.
+    """
+
+    @qjit()
+    @cancel_inverses
+    @merge_rotations
+    @qml.qnode(qml.device("lightning.qubit", wires=2))
+    def test_chained_apply_passes_workflow(x: float):
+        qml.Hadamard(wires=[1])
+        qml.RX(x, wires=[0])
+        qml.RX(-x, wires=[0])
+        qml.Hadamard(wires=[1])
+        return qml.expval(qml.PauliY(wires=0))
+
+    assert "remove-chained-self-inverse" in test_chained_apply_passes_workflow.mlir
+    assert "merge-rotations" in test_chained_apply_passes_workflow.mlir
+
+test_chained_passes()
+
 
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
