@@ -200,7 +200,7 @@ def test_convert_clifford_to_ppr():
     def test_convert_clifford_to_ppr_workflow():
 
         @to_ppr
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
         def f():
             qml.H(0)
             qml.S(1)
