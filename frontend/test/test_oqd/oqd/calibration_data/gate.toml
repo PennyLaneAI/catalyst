@@ -35,40 +35,40 @@ oqd_config_schema = "v0.1"
 # -------
 
 [[beams1]]
-rabi = 31.4159
-detuning = 157.0796
-polarization = [1,0,0]
-wavevector = [0,1,0]
+rabi = 62831853071.79586
+detuning = 208570336271826.38
+polarization = [1, 0, 0]
+wavevector = [0, 1, 0]
 
 [[beams1]]
-rabi = 31.4159
-detuning = 157.0796
-polarization = [1,0,0]
-wavevector = [0,1,0]
+rabi = 62831853071.79586
+detuning = 208570336271826.38
+polarization = [1, 0, 0]
+wavevector = [0, 1, 0]
 
 [[beams1]]
-rabi = 31.4159
-detuning = 157.0796
-polarization = [1,0,0]
-wavevector = [0,1,0]
+rabi = 62831853071.79586
+detuning = 208570336271826.38
+polarization = [1, 0, 0]
+wavevector = [0, 1, 0]
 
 
 [[beams2]]
-rabi = 31.4159
-detuning = 157.0796
-polarization = [0,1,0]
+rabi = 8885765876.316732
+detuning = 208570336271826.38
+polarization = [0, 1, 0]
 wavevector = [-1, 0, 0]
 
 [[beams2]]
-rabi = 31.4159
-detuning = 7.89
-polarization = [0,1,0]
+rabi = 6283185307.179586
+detuning = 208570329925809.22
+polarization = [0, 1, 0]
 wavevector = [1, 0, 0]
 
 [[beams2]]
-rabi = 31.4159
-detuning = 157.0796
-polarization = [0,1,0]
+rabi = 6283185307.179586
+detuning = 208570342617843.53
+polarization = [0, 1, 0]
 wavevector = [1, 0, 0]
 
 
@@ -81,38 +81,38 @@ wavevector = [1, 0, 0]
 # -------
 
 [[phonons1]]
-energy = 0.1
+energy = 6283185.307179586
 eigenvector = [1.0, 0.0, 0.0]
 
 [[phonons1]]
-energy = 0.1
-eigenvector = [1.0, 0.0, 0.0]
+energy = 5026548.245743669
+eigenvector = [0.0, 1.0, 0.0]
 
 [[phonons1]]
-energy = 0.1
-eigenvector = [1.0, 0.0, 0.0]
+energy = 1256637.0614359172
+eigenvector = [0.0, 0.0, 1.0]
 
 
 [[phonons2]]
-energy = 0.1
-eigenvector = [0.1, 0.0, 0.0, 0.1, 0.0, 0.0]
+energy = 6283185.307179586
+eigenvector = [0.7071067811865475, 0.0, 0.0, 0.7071067811865475, 0.0, 0.0]
 
 [[phonons2]]
-energy = 0.1
-eigenvector = [0.0, 0.1, 0.0, 0.0, 0.1, 0.0]
+energy = 5026548.245743669
+eigenvector = [0.0, 0.7071067811865475, 0.0, 0.0, 0.7071067811865475, 0.0]
 
 [[phonons2]]
-energy = 0.1
-eigenvector = [0.0, 0.0, 0.1, 0.0, 0.0, 0.1]
+energy = 1256637.0614359172
+eigenvector = [0.0, 0.0, 0.7071067811865475, 0.0, 0.0, 0.7071067811865475]
 
 [[phonons2]]
-energy = 0.1
-eigenvector = [0.1, 0.0, 0.0, 0.1, 0.0, 0.0]
+energy = 5654866.776461627
+eigenvector = [0.7071067811865475, 0.0, 0.0, -0.7071067811865475, 0.0, 0.0]
 
 [[phonons2]]
-energy = 0.1
-eigenvector = [0.0, 0.1, 0.0, 0.0, 0.1, 0.0]
+energy = 4398229.71502571
+eigenvector = [0.0, 0.7071067811865475, 0.0, 0.0, -0.7071067811865475, 0.0]
 
 [[phonons2]]
-energy = 0.1
-eigenvector = [0.0, 0.0, 0.1, 0.0, 0.0, 0.1]
+energy = 2513274.1228718343
+eigenvector = [0.0, 0.0, 0.7071067811865475, 0.0, 0.0, -0.7071067811865475]

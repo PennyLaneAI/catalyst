@@ -17,6 +17,7 @@
 # pylint: disable=line-too-long
 
 import jax
+import jax.numpy as jnp
 import numpy as np
 import pennylane as qml
 from utils import qjit_for_tests as qjit
@@ -202,72 +203,155 @@ def test_higher_order_used_twice(x: float):
 
 print(test_higher_order_used_twice.mlir)
 
+# ---
+
 
 # CHECK-LABEL: @test_non_diff
 @qjit(target="mlir")
 def test_non_diff(params: jax.core.ShapedArray([2], float)):
-    """Test non-differentiable operations are not decomposed."""
+    """Test non-differentiable operations are not decomposed when grad is not used."""
 
-    @qml.qnode(qml.device("lightning.qubit", wires=6))
+    @qml.qnode(qml.device("lightning.qubit", wires=4), diff_method="adjoint")
     def cost(params: jax.core.ShapedArray([2], float)):
-        """Test non-differentiable operations are not decomposed."""
-        qml.BasisState(np.array([1, 1, 0, 0, 0, 0]), wires=range(6))
-        qml.Rot(0.3, 0.4, 0.5, wires=0)
-        qml.DoubleExcitation(params[0], wires=[0, 1, 2, 3])
-        qml.DoubleExcitation(params[1], wires=[0, 1, 4, 5])
+        qml.StatePrep(jnp.ones((2**2,), dtype=float) / 2, wires=range(2))
+        qml.Rot(*params, 0.5, wires=0)
+        qml.QubitUnitary(jnp.stack([params, params]), wires=[1])
+        qml.DoubleExcitation(params[1], wires=[0, 1, 2, 3])
         return qml.expval(qml.PauliZ(0))
 
-    # CHECK: set_basis_state
-    # CHECK: Rot
+    # CHECK: set_state
+    # CHECK: "Rot"
+    # CHECK: unitary
     return cost(params)
 
 
 print(test_non_diff.mlir)
 
 
-# CHECK-LABEL: @test_non_diff_in_grad_method
-@qjit(target="mlir")
-def test_non_diff_in_grad_method(params: jax.core.ShapedArray([2], float)):
-    """Test non-differentiable operations are not decomposed."""
+# ---
 
-    @qml.qnode(qml.device("lightning.qubit", wires=6))
+
+# CHECK-LABEL: @test_diff_const_paramshift
+@qjit(target="mlir")
+def test_diff_const_paramshift(params: jax.core.ShapedArray([2], float)):
+    """Test non-differentiable operations are not decomposed when constant with param-shift."""
+
+    @qml.qnode(qml.device("lightning.qubit", wires=4), diff_method="parameter-shift")
     def cost(params: jax.core.ShapedArray([2], float)):
-        """Test non-differentiable operations are not decomposed."""
-        qml.BasisState(np.array([1, 1, 0, 0, 0, 0]), wires=range(6))
+        qml.StatePrep(np.ones((2**2,), dtype=float) / 2, wires=range(2))
         qml.Rot(0.3, 0.4, 0.5, wires=0)
-        qml.DoubleExcitation(params[0], wires=[0, 1, 2, 3])
-        qml.DoubleExcitation(params[1], wires=[0, 1, 4, 5])
+        qml.QubitUnitary(np.ones((2, 2)), wires=[1])
+        qml.DoubleExcitation(params[1], wires=[0, 1, 2, 3])
         return qml.expval(qml.PauliZ(0))
 
-    # CHECK-NOT: set_basis_state
-    # CHECK-NOT: Rot
+    # CHECK: set_state
+    # CHECK: "Rot"
+    # CHECK: unitary
     return grad(cost)(params)
 
 
-print(test_non_diff_in_grad_method.mlir)
+print(test_diff_const_paramshift.mlir)
+
+# ---
+
+
+# CHECK-LABEL: @test_diff_const_adjoint
+@qjit(target="mlir")
+def test_diff_const_adjoint(params: jax.core.ShapedArray([2], float)):
+    """Test non-differentiable operations *are* decomposed even when constant with adjoint.
+    State preparations & unitaries are exempted from this and can be skipped if constant.
+    """
+
+    @qml.qnode(qml.device("lightning.qubit", wires=4), diff_method="adjoint")
+    def cost(params: jax.core.ShapedArray([2], float)):
+        qml.StatePrep(np.ones((2**2,), dtype=float) / 2, wires=range(2))
+        qml.Rot(0.3, 0.4, 0.5, wires=0)
+        qml.QubitUnitary(np.ones((2, 2)), wires=[1])
+        qml.DoubleExcitation(params[1], wires=[0, 1, 2, 3])
+        return qml.expval(qml.PauliZ(0))
+
+    # CHECK: set_state
+    # CHECK-NOT: "Rot"
+    # CHECK: unitary
+    return grad(cost)(params)
+
+
+print(test_diff_const_adjoint.mlir)
+
+# ---
+
+
+# CHECK-LABEL: @test_diff_dynamic_paramshift
+@qjit(target="mlir")
+def test_diff_dynamic_paramshift(params: jax.core.ShapedArray([2], float)):
+    """Test non-differentiable operations are decomposed when active with param-shift."""
+
+    @qml.qnode(qml.device("lightning.qubit", wires=4), diff_method="parameter-shift")
+    def cost(params: jax.core.ShapedArray([2], float)):
+        qml.StatePrep(jnp.ones((2**2,), dtype=float) / 2, wires=range(2))
+        qml.Rot(*params, 0.5, wires=0)
+        qml.QubitUnitary(jnp.ones((2, 2)), wires=[1])
+        qml.DoubleExcitation(params[1], wires=[0, 1, 2, 3])
+        return qml.expval(qml.PauliZ(0))
+
+    # CHECK-NOT: set_state
+    # COM: Rot is supported by the two-term shift rule
+    # CHECK: "Rot"
+    # CHECK-NOT: unitary
+    return grad(cost)(params)
+
+
+print(test_diff_dynamic_paramshift.mlir)
+
+# ---
+
+
+# CHECK-LABEL: @test_diff_dynamic_adjoint
+@qjit(target="mlir")
+def test_diff_dynamic_adjoint(params: jax.core.ShapedArray([2], float)):
+    """Test non-differentiable operations are decomposed when active with adjoint."""
+
+    @qml.qnode(qml.device("lightning.qubit", wires=4), diff_method="adjoint")
+    def cost(params: jax.core.ShapedArray([2], float)):
+        qml.StatePrep(jnp.ones((2**2,), dtype=float) / 2, wires=range(2))
+        qml.Rot(*params, 0.5, wires=0)
+        qml.QubitUnitary(jnp.ones((2, 2)), wires=[1])
+        qml.DoubleExcitation(params[1], wires=[0, 1, 2, 3])
+        return qml.expval(qml.PauliZ(0))
+
+    # CHECK-NOT: set_state
+    # CHECK-NOT: "Rot"
+    # CHECK-NOT: unitary
+    return grad(cost)(params)
+
+
+print(test_diff_dynamic_adjoint.mlir)
+
+# ---
 
 
 # CHECK-LABEL: @test_non_diff_ops_in_cost_and_grad
 @qjit(target="mlir")
 def test_non_diff_ops_in_cost_and_grad(params: jax.core.ShapedArray([2], float)):
-    """Test non-differentiable operations are not decomposed."""
+    """Test decomposition when invoking both the function and its derivative."""
 
-    @qml.qnode(qml.device("lightning.qubit", wires=6))
+    @qml.qnode(qml.device("lightning.qubit", wires=4), diff_method="adjoint")
     def cost(params: jax.core.ShapedArray([2], float)):
-        """Test non-differentiable operations are not decomposed."""
-        qml.BasisState(np.array([1, 1, 0, 0, 0, 0]), wires=range(6))
-        qml.Rot(0.3, 0.4, 0.5, wires=0)
-        qml.DoubleExcitation(params[0], wires=[0, 1, 2, 3])
-        qml.DoubleExcitation(params[1], wires=[0, 1, 4, 5])
+        qml.StatePrep(jnp.ones((2**2,), dtype=float) / 2, wires=range(2))
+        qml.Rot(*params, 0.5, wires=0)
+        qml.QubitUnitary(jnp.ones((2, 2)), wires=[1])
+        qml.DoubleExcitation(params[1], wires=[0, 1, 3, 4])
         return qml.expval(qml.PauliZ(0))
 
     # CHECK func.func public @cost
-    # CHECK: set_basis_state
-    # CHECK: Rot
+    # CHECK: set_state
+    # CHECK: "Rot"
+    # CHECK: unitary
 
     # CHECK func.func public @cost_1
-    # CHECK-NOT: set_basis_state
-    # CHECK-NOT: Rot
+    # CHECK-NOT: set_state
+    # CHECK-NOT: "Rot"
+    # CHECK-NOT: unitary
     return cost(params), grad(cost)(params)
 
 

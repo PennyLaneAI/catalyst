@@ -37,6 +37,7 @@ from pennylane.measurements import (
 
 from catalyst.api_extensions import HybridCtrl
 from catalyst.device.op_support import (
+    is_active,
     is_controllable,
     is_differentiable,
     is_invertible,
@@ -54,7 +55,7 @@ logger.addHandler(logging.NullHandler())
 def check_alternative_support(op, capabilities: DeviceCapabilities):
     """Verify that aliased operations aren't supported via alternative definitions."""
 
-    if isinstance(op, qml.ops.Controlled):
+    if isinstance(op, qml.ops.Controlled) and type(op) is not qml.ops.ControlledOp:
         # "Cast" away the specialized class for gates like Toffoli, ControlledQubitUnitary, etc.
         supported = capabilities.operations.get(op.base.name)
         if supported and supported.controllable:
@@ -110,10 +111,10 @@ def catalyst_decompose(
     # are compatible with Catalyst's handling of initial state preparation. Currently, Catalyst
     # only supports qml.StatePrep and qml.BasisState. A default strategy for handling any PennyLane
     # operator of type qml.StatePrepBase will be needed before this conditional can be removed.
-    if grad_method is None and (len(tape) == 0 or type(tape[0]) in (qml.StatePrep, qml.BasisState)):
-        skip_initial_state_prep = capabilities.initial_state_prep
-    else:
-        skip_initial_state_prep = False
+    skip_initial_state_prep = False
+    if len(tape) > 0 and type(tape[0]) in (qml.StatePrep, qml.BasisState):
+        if grad_method is None or not is_active(tape[0]):
+            skip_initial_state_prep = capabilities.initial_state_prep
 
     (toplevel_tape,), _ = decompose(
         tape,
@@ -210,6 +211,10 @@ def catalyst_acceptance(
     op: qml.operation.Operator, capabilities: DeviceCapabilities, grad_method: Union[str, None]
 ) -> Union[str, None]:
     """Check whether an Operator is supported and returns the name of the operation or None."""
+
+    if not is_differentiable(op, capabilities, grad_method):
+        return None
+
     if isinstance(op, qml.ops.Adjoint):
         match = catalyst_acceptance(op.base, capabilities, grad_method)
         if match and is_invertible(op.base, capabilities):
@@ -222,9 +227,6 @@ def catalyst_acceptance(
         match = catalyst_acceptance(op.base, capabilities, grad_method)
         if match and is_controllable(op.base, capabilities):
             return match
-
-    elif not is_differentiable(op, capabilities, grad_method):
-        return None
 
     elif is_supported(op, capabilities):
         return op.name
