@@ -168,6 +168,7 @@ def test_cancel_inverses_bad_usages():
 
     test_cancel_inverses_not_on_qnode()
 
+
 def test_chained_passes():
     """
     Test that chained passes are present in the transform passes.
@@ -186,6 +187,7 @@ def test_chained_passes():
 
     assert "remove-chained-self-inverse" in test_chained_apply_passes_workflow.mlir
     assert "merge-rotations" in test_chained_apply_passes_workflow.mlir
+
 
 test_chained_passes()
 
