@@ -145,11 +145,9 @@ bool shouldRemovePPR(PPRotationOp op)
         return true;
 
     SetVector<Operation *> slice;
-    ForwardSliceOptions options;
     getForwardSlice(op, &slice);
 
     for (Operation *forwardOp : slice) {
-
         if (isa<PPMeasurementOp>(forwardOp))
             return false;
 
