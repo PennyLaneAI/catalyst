@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#define DEBUG_TYPE "convert-clifford-t-to-ppr"
+#define DEBUG_TYPE "to_ppr"
 
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
