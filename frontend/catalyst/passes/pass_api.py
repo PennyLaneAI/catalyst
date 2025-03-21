@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import copy
 import functools
 from importlib.metadata import entry_points
 from pathlib import Path
@@ -26,6 +25,60 @@ PipelineDict: TypeAlias = dict[str, dict[str, str]]
 
 
 ## API ##
+class QNodeWrapper:
+    """A wrapper class for QNodes that preserves the pass pipeline when called.
+
+    This class is used internally by pass decorators to ensure that compiler passes
+    are properly applied when the QNode is called.
+
+    Args:
+        qnode (QNode or callable): The QNode or wrapped QNode function to call
+    """
+
+    def __init__(self, qnode):
+        self.qnode = qnode
+        if isinstance(qnode, QNodeWrapper):
+            self.original_qnode = qnode.original_qnode
+            self.func = qnode.func
+        elif isinstance(qnode, qml.QNode):
+            self.original_qnode = qnode
+            self.func = qnode.func
+        else:
+            raise TypeError(f"A QNode is expected, got the classical function {qnode}")
+
+        # Update the wrapper to preserve the original function's metadata (signature, annotations,
+        # etc.) This is crucial for qjit to properly inspect the function signature and make
+        # compilation decisions.
+        functools.update_wrapper(self, self.func)
+
+    def __call__(self, *args, **kwargs):
+        return self.qnode(*args, **kwargs)
+
+
+class PassPipelineWrapper(QNodeWrapper):
+    """A QNodeWrapper subclass that adds passes to the pipeline when called.
+
+    This class can handle both single passes and multiple passes in a pipeline.
+    For single passes, it takes a pass name and optional flags/options.
+    For multiple passes, it takes a dictionary of pass configurations.
+    """
+
+    def __init__(self, qnode, pass_name_or_pipeline, *flags, **valued_options):
+        super().__init__(qnode)
+        self.pass_name_or_pipeline = pass_name_or_pipeline
+        self.flags = flags
+        self.valued_options = valued_options
+
+    def __call__(self, *args, **kwargs):
+        if EvaluationContext.is_tracing():
+            pass_pipeline = kwargs.pop("pass_pipeline", [])
+            pass_pipeline += dictionary_to_list_of_passes(
+                self.pass_name_or_pipeline, *self.flags, **self.valued_options
+            )
+            kwargs["pass_pipeline"] = pass_pipeline
+        return super().__call__(*args, **kwargs)
+
+
 def pipeline(pass_pipeline: PipelineDict):
     """Configures the Catalyst MLIR pass pipeline for quantum circuit transformations for a QNode
     within a qjit-compiled program.
@@ -114,22 +167,8 @@ def pipeline(pass_pipeline: PipelineDict):
     will always take precedence over global pass pipelines.
     """
 
-    def _decorator(qnode=None):
-        if not isinstance(qnode, qml.QNode):
-            raise TypeError(f"A QNode is expected, got the classical function {qnode}")
-
-        clone = copy.copy(qnode)
-        clone.__name__ += "_transformed"
-
-        @functools.wraps(clone)
-        def wrapper(*args, **kwargs):
-            if EvaluationContext.is_tracing():
-                passes = kwargs.pop("pass_pipeline", [])
-                passes += dictionary_to_list_of_passes(pass_pipeline)
-                kwargs["pass_pipeline"] = passes
-            return clone(*args, **kwargs)
-
-        return wrapper
+    def _decorator(qnode):
+        return PassPipelineWrapper(qnode, pass_pipeline)
 
     return _decorator
 
@@ -161,21 +200,7 @@ def apply_pass(pass_name: str, *flags, **valued_options):
     """
 
     def decorator(qnode):
-
-        if not isinstance(qnode, qml.QNode):
-            # Technically, this apply pass is general enough that it can apply to
-            # classical functions too. However, since we lack the current infrastructure
-            # to denote a function, let's limit it to qnodes
-            raise TypeError(f"A QNode is expected, got the classical function {qnode}")
-
-        @functools.wraps(qnode)
-        def qnode_call(*args, **kwargs):
-            pass_pipeline = kwargs.get("pass_pipeline", [])
-            pass_pipeline.append(Pass(pass_name, *flags, **valued_options))
-            kwargs["pass_pipeline"] = pass_pipeline
-            return qnode(*args, **kwargs)
-
-        return qnode_call
+        return PassPipelineWrapper(qnode, pass_name, *flags, **valued_options)
 
     return decorator
 
@@ -215,20 +240,7 @@ def apply_pass_plugin(path_to_plugin: str | Path, pass_name: str, *flags, **valu
         raise FileNotFoundError(f"File '{path_to_plugin}' does not exist.")
 
     def decorator(qnode):
-        if not isinstance(qnode, qml.QNode):
-            # Technically, this apply pass is general enough that it can apply to
-            # classical functions too. However, since we lack the current infrastructure
-            # to denote a function, let's limit it to qnodes
-            raise TypeError(f"A QNode is expected, got the classical function {qnode}")
-
-        @functools.wraps(qnode)
-        def qnode_call(*args, **kwargs):
-            pass_pipeline = kwargs.get("pass_pipeline", [])
-            pass_pipeline.append(PassPlugin(path_to_plugin, pass_name, *flags, **valued_options))
-            kwargs["pass_pipeline"] = pass_pipeline
-            return qnode(*args, **kwargs)
-
-        return qnode_call
+        return PassPipelineWrapper(qnode, pass_name, *flags, **valued_options)
 
     return decorator
 
@@ -332,21 +344,29 @@ class PassPlugin(Pass):
 
 
 ## PRIVATE ##
-def dictionary_to_list_of_passes(pass_pipeline: PipelineDict):
-    """Convert dictionary of passes into list of passes."""
+def dictionary_to_list_of_passes(pass_pipeline: PipelineDict | str, *flags, **valued_options):
+    """Convert dictionary of passes or single pass name into list of passes.
 
-    if pass_pipeline == None:
+    Args:
+        pass_pipeline: Either a dictionary of pass configurations or a single pass name.
+        *flags: Optional flags for single pass
+        **valued_options: Optional valued options for single pass
+    """
+    if pass_pipeline is None:
         return []
 
-    if type(pass_pipeline) != dict:
-        return pass_pipeline
+    if isinstance(pass_pipeline, str):
+        return [Pass(pass_pipeline, *flags, **valued_options)]
 
-    passes = []
-    pass_names = _API_name_to_pass_name()
-    for API_name, pass_options in pass_pipeline.items():
-        name = pass_names.get(API_name, API_name)
-        passes.append(Pass(name, **pass_options))
-    return passes
+    if isinstance(pass_pipeline, dict):
+        passes = []
+        pass_names = _API_name_to_pass_name()
+        for API_name, pass_options in pass_pipeline.items():
+            name = pass_names.get(API_name, API_name)
+            passes.append(Pass(name, **pass_options))
+        return passes
+
+    return pass_pipeline
 
 
 def _API_name_to_pass_name():

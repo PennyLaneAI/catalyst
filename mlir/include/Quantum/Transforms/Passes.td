@@ -131,6 +131,11 @@ def DisentangleSWAPPass : Pass<"disentangle-SWAP"> {
     ];
 }
 
+def LoopBoundaryOptimizationPass : Pass<"loop-boundary"> {
+    let summary = "Perform loop boundary optimization to eliminate the redundancy of operations on loop boundary.";
+
+    let constructor = "catalyst::createLoopBoundaryOptimizationPass()";
+}
 // ----- Quantum circuit transformation passes end ----- //
 
 #endif // QUANTUM_PASSES

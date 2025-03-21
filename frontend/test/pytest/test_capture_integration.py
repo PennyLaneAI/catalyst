@@ -825,3 +825,25 @@ class TestCapture:
         no_capture_result = qml.qjit(func)()
         experimental_capture_result = captured_func()
         assert no_capture_result == experimental_capture_result
+
+    def test_shots_usage(self, backend):
+        """Test the integration for a circuit using shots explicitly."""
+
+        @qml.qnode(qml.device(backend, wires=2, shots=10))
+        def circuit():
+            @qml.for_loop(0, 2, 1)
+            def loop_0(i):
+                qml.RX(0, wires=i)
+
+            loop_0()
+
+            qml.RX(0, wires=0)
+            return qml.sample()
+
+        captured_func = qml.qjit(circuit, experimental_capture=False, target="mlir")
+
+        assert "'shots': 10" in captured_func.mlir
+
+        no_capture_result = qml.qjit(circuit)()
+        experimental_capture_result = captured_func()
+        assert jnp.allclose(no_capture_result, experimental_capture_result)
