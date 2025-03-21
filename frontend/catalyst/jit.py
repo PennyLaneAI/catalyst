@@ -519,8 +519,11 @@ class QJIT(CatalystCallable):
     @property
     def mlir_opt(self):
         """obtain the MLIR representation after optimization"""
-        self.compile_options.lower_to_llvm = False
-        _, mlir_ir = self.compile()
+        options = copy.deepcopy(self.compile_options)
+        options.lower_to_llvm = False
+        options.keep_intermediate = True
+        compiler = Compiler(options)
+        _, mlir_ir = compiler.run(self.mlir_module, self.workspace)
         return mlir_ir
 
     @debug_logger
