@@ -25,7 +25,6 @@
 #include "QEC/Utils/PauliStringWrapper.h"
 #include "Quantum/IR/QuantumOps.h"
 
-using namespace stim;
 using namespace mlir;
 using namespace catalyst::qec;
 
@@ -92,7 +91,6 @@ void moveCliffordPastPPM(const PauliStringWrapper &lhsPauli,
                                  const PauliStringWrapper &rhsPauli, PauliStringWrapper *result,
                                  PatternRewriter &rewriter)
 {
-
     assert(lhsPauli.op != nullptr && "LHS Operation is not found");
     assert(rhsPauli.op != nullptr && "RHS Operation is not found");
     assert(llvm::isa<PPRotationOp>(lhsPauli.op) && "LHS Operation is not PPRotationOp");
@@ -200,12 +198,12 @@ struct RemoveDeadPPR : public OpRewritePattern<PPRotationOp> {
 namespace catalyst {
 namespace qec {
 
-void populateAbsorbCliffordToPPMPatterns(mlir::RewritePatternSet &patterns)
+void populateAbsorbCliffordToPPMPatterns(RewritePatternSet &patterns)
 {
     patterns.add<AbsorbCliffordToPPM>(patterns.getContext(), 1);
 }
 
-void populateRemoveDeadPPRPatterns(mlir::RewritePatternSet &patterns)
+void populateRemoveDeadPPRPatterns(RewritePatternSet &patterns)
 {
     patterns.add<RemoveDeadPPR>(patterns.getContext(), 1);
 }
