@@ -12,23 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "mlir/Support/LogicalResult.h"
 #define DEBUG_TYPE "loop-boundary"
-
-#include "llvm/ADT/StringSet.h"
-#include "llvm/Support/Debug.h"
 
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/Support/LogicalResult.h"
+#include "llvm/ADT/StringSet.h"
+#include "llvm/Support/Debug.h"
 
 #include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Transforms/Patterns.h"
 
-using llvm::dbgs;
-using namespace llvm;
 using namespace mlir;
 using namespace catalyst;
 using namespace catalyst::quantum;
@@ -36,10 +33,10 @@ using namespace catalyst::quantum;
 namespace {
 
 // TODO: Add and test CRX, CRY, CRZ, ControlledPhaseShift, PhaseShift
-static const mlir::StringSet<> rotationsSet = {"RX", "RY", "RZ"};
-static const mlir::StringSet<> hermitianSet = {"Hadamard", "PauliX", "PauliY", "PauliZ",
-                                               "H",        "X",      "Y",      "Z"};
-static const mlir::StringSet<> multiQubitSet = {"CNOT", "CZ", "SWAP"};
+static const StringSet<> rotationsSet = {"RX", "RY", "RZ"};
+static const StringSet<> hermitianSet = {"Hadamard", "PauliX", "PauliY", "PauliZ",
+                                         "H",        "X",      "Y",      "Z"};
+static const StringSet<> multiQubitSet = {"CNOT", "CZ", "SWAP"};
 
 // This mode is used to determine which gates are allowed at the loop boundary.
 // All: All gates are allowed
@@ -59,13 +56,13 @@ enum class Mode {
 // Represents the origin of a qubit, including its source register,
 // position within the register, and whether it's part of a register.
 struct QubitOrigin {
-    mlir::Value sourceRegister;
+    Value sourceRegister;
     unsigned long position;
     bool isRegister;
 
     QubitOrigin() : sourceRegister(nullptr), position(0), isRegister(false) {}
 
-    QubitOrigin(mlir::Value reg, unsigned long pos, bool isReg)
+    QubitOrigin(Value reg, unsigned long pos, bool isReg)
         : sourceRegister(reg), position(pos), isRegister(isReg)
     {
     }
@@ -170,8 +167,7 @@ getVerifyEdgeOperationSet(QubitOriginMap bottomEdgeOpSet, QubitOriginMap topEdge
 }
 
 // Creates a quantum.extract operation.
-quantum::ExtractOp createExtractOp(mlir::Value qreg, const QubitOrigin &qubit,
-                                   PatternRewriter &rewriter)
+quantum::ExtractOp createExtractOp(Value qreg, const QubitOrigin &qubit, PatternRewriter &rewriter)
 {
     auto loc = qubit.sourceRegister.getLoc();
     auto idxAttr = rewriter.getI64IntegerAttr(qubit.position);
@@ -180,7 +176,7 @@ quantum::ExtractOp createExtractOp(mlir::Value qreg, const QubitOrigin &qubit,
 }
 
 // Creates a quantum.insert operation.
-quantum::InsertOp createInsertOp(mlir::Value qreg, const QubitOrigin &qubit, mlir::Value element,
+quantum::InsertOp createInsertOp(Value qreg, const QubitOrigin &qubit, Value element,
                                  PatternRewriter &rewriter)
 {
     assert(element && "InsertOp requires an element value!");
@@ -190,7 +186,7 @@ quantum::InsertOp createInsertOp(mlir::Value qreg, const QubitOrigin &qubit, mli
 }
 
 // Finds the initial value of a quantum register in the for loop.
-mlir::Value findInitValue(scf::ForOp forOp, mlir::Value qReg)
+Value findInitValue(scf::ForOp forOp, Value qReg)
 {
     for (auto [arg, regionArg] : llvm::zip(forOp.getInitArgs(), forOp.getRegionIterArgs())) {
         if (qReg == regionArg) {
@@ -201,8 +197,8 @@ mlir::Value findInitValue(scf::ForOp forOp, mlir::Value qReg)
 }
 
 // Updates the initial arguments of the for loop with a new value.
-void updateForLoopInitArg(mlir::scf::ForOp forOp, mlir::Value sourceRegister, mlir::Value newValue,
-                          mlir::PatternRewriter &rewriter)
+void updateForLoopInitArg(scf::ForOp forOp, Value sourceRegister, Value newValue,
+                          PatternRewriter &rewriter)
 {
     for (auto [idx, arg] : llvm::enumerate(forOp.getRegionIterArgs())) {
         if (arg == sourceRegister) {
@@ -214,9 +210,9 @@ void updateForLoopInitArg(mlir::scf::ForOp forOp, mlir::Value sourceRegister, ml
 }
 
 // Finds the result for an operation by qubit where the qubit is a region argument.
-mlir::Value findResultForOpByQubit(mlir::Value qubit, scf::ForOp forOp)
+Value findResultForOpByQubit(Value qubit, scf::ForOp forOp)
 {
-    mlir::Value result;
+    Value result;
     for (auto [idx, arg] : llvm::enumerate(forOp.getRegionIterArgs())) {
         if (arg == qubit) {
             result = forOp.getResult(idx);
@@ -231,7 +227,7 @@ mlir::Value findResultForOpByQubit(mlir::Value qubit, scf::ForOp forOp)
 //===----------------------------------------------------------------------===//
 
 // Finds the root qubit by traversing backward through defining operations.
-mlir::Value findRootQubit(mlir::Value qubit)
+Value findRootQubit(Value qubit)
 {
     if (auto definingOp = dyn_cast_or_null<CustomOp>(qubit.getDefiningOp())) {
         for (auto [idx, outQubit] : llvm::enumerate(definingOp.getOutQubits())) {
@@ -244,7 +240,7 @@ mlir::Value findRootQubit(mlir::Value qubit)
 }
 
 // Determines the origin of a qubit, considering whether it's from a register.
-QubitOrigin determineQubitOrigin(mlir::Value qubit)
+QubitOrigin determineQubitOrigin(Value qubit)
 {
     if (auto extractOp = qubit.getDefiningOp<quantum::ExtractOp>()) {
         if (!extractOp.getIdxAttr().has_value()) {
@@ -283,7 +279,7 @@ QubitOriginMap traceTopEdgeOperations(scf::ForOp forOp, Mode mode)
     auto regionIterArgs = forOp.getRegionIterArgs();
 
     for (auto regionArg : regionIterArgs) {
-        mlir::Type argType = regionArg.getType();
+        Type argType = regionArg.getType();
 
         if (isa<quantum::QuregType>(argType)) {
             for (Operation *userOp : regionArg.getUsers()) {
@@ -364,16 +360,15 @@ QubitOriginMap traceBottomEdgeOperations(scf::ForOp forOp, Mode mode)
 }
 
 // Hoists a quantum operation from the top edge of a loop to the top of the loop.
-void hoistTopEdgeOperation(QuantumOpInfo topOpInfo, scf::ForOp forOp,
-                           mlir::PatternRewriter &rewriter)
+void hoistTopEdgeOperation(QuantumOpInfo topOpInfo, scf::ForOp forOp, PatternRewriter &rewriter)
 {
     rewriter.moveOpBefore(topOpInfo.op, forOp);
     topOpInfo.op.getOutQubits().replaceAllUsesWith(topOpInfo.op.getInQubits()); // config successor
 
     // hoist the extract operations
-    std::vector<mlir::Value> operandOps;
+    std::vector<Value> operandOps;
     for (auto qubit : topOpInfo.inQubits) {
-        mlir::Value initValue = findInitValue(forOp, qubit.sourceRegister);
+        Value initValue = findInitValue(forOp, qubit.sourceRegister);
         if (!initValue) {
             assert(false && "Register not found in loop arguments");
         }
@@ -419,7 +414,7 @@ void hoistTopEdgeOperation(QuantumOpInfo topOpInfo, scf::ForOp forOp,
     // Create insert operations for the topOpInfo.op
     for (auto [idx, qubit] : llvm::enumerate(topOpInfo.inQubits)) {
         if (qubit.isRegister) {
-            mlir::Value reg = findInitValue(forOp, qubit.sourceRegister);
+            Value reg = findInitValue(forOp, qubit.sourceRegister);
             auto insertOp = createInsertOp(reg, qubit, topOpInfo.op.getOutQubits()[idx], rewriter);
             // Find the matching init arg index and update it
             updateForLoopInitArg(forOp, qubit.sourceRegister, insertOp.getResult(), rewriter);
@@ -436,7 +431,7 @@ void hoistTopEdgeOperation(QuantumOpInfo topOpInfo, scf::ForOp forOp,
 
 // Hoists a quantum operation from the bottom edge of a loop to the bottom of the loop.
 void hoistBottomEdgeOperation(QuantumOpInfo bottomOpInfo, scf::ForOp forOp,
-                              QubitOriginMap bottomEdgeOpSet, mlir::PatternRewriter &rewriter)
+                              QubitOriginMap bottomEdgeOpSet, PatternRewriter &rewriter)
 {
     // Config the successor
     bottomOpInfo.op.getOutQubits().replaceAllUsesWith(bottomOpInfo.op.getInQubits());
@@ -452,7 +447,7 @@ void hoistBottomEdgeOperation(QuantumOpInfo bottomOpInfo, scf::ForOp forOp,
             bottomOpInfo.op.setOperand(idx, param);
             continue;
         }
-        if (auto op = dyn_cast_or_null<mlir::Operation *>(param.getDefiningOp())) {
+        if (auto op = dyn_cast_or_null<Operation *>(param.getDefiningOp())) {
             auto opClone = op->clone();
             opClone->setOperands(op->getOperands());
             bottomOpInfo.op.setOperand(idx, opClone->getResult(0));
@@ -470,8 +465,7 @@ void hoistBottomEdgeOperation(QuantumOpInfo bottomOpInfo, scf::ForOp forOp,
 
     // Create the insert operations
     for (auto [idx, qubit] : llvm::enumerate(bottomOpInfo.inQubits)) {
-
-        mlir::Value reg;
+        Value reg;
         reg = findResultForOpByQubit(qubit.sourceRegister, forOp);
 
         auto outQubit = bottomOpInfo.op.getOutQubits()[idx];
@@ -486,10 +480,10 @@ void hoistBottomEdgeOperation(QuantumOpInfo bottomOpInfo, scf::ForOp forOp,
     }
 
     // Create the extract operations
-    std::vector<mlir::Value> operandOps;
+    std::vector<Value> operandOps;
     for (auto qubit : bottomOpInfo.inQubits) {
         // inint value should be forOp result
-        mlir::Value reg = findResultForOpByQubit(qubit.sourceRegister, forOp);
+        Value reg = findResultForOpByQubit(qubit.sourceRegister, forOp);
 
         if (!reg) {
             assert(false && "Register not found in loop arguments");
@@ -512,8 +506,8 @@ void hoistBottomEdgeOperation(QuantumOpInfo bottomOpInfo, scf::ForOp forOp,
 };
 
 // This function aims to set the operands of the cloneOp with paramOp's params.
-void setParamOperation(mlir::Operation &cloneOp, QuantumOpInfo paramOp, QuantumOpInfo bottomEdgeOp,
-                       scf::ForOp forOp, mlir::PatternRewriter &rewriter)
+void setParamOperation(Operation &cloneOp, QuantumOpInfo paramOp, QuantumOpInfo bottomEdgeOp,
+                       scf::ForOp forOp, PatternRewriter &rewriter)
 {
     for (auto [idx, param] : llvm::enumerate(paramOp.op.getParams())) {
         auto regionIterArgs = forOp.getRegionIterArgs();
@@ -541,7 +535,7 @@ void setParamOperation(mlir::Operation &cloneOp, QuantumOpInfo paramOp, QuantumO
 
 // Handles parameter adjustments when moving operations across loop boundaries.
 void handleParams(QuantumOpInfo topEdgeOp, QuantumOpInfo bottomEdgeOp, scf::ForOp forOp,
-                  mlir::PatternRewriter &rewriter)
+                  PatternRewriter &rewriter)
 {
     auto topEdgeParams = topEdgeOp.op.getParams();
     auto bottomEdgeParams = bottomEdgeOp.op.getParams();
@@ -565,8 +559,7 @@ void handleParams(QuantumOpInfo topEdgeOp, QuantumOpInfo bottomEdgeOp, scf::ForO
 
         // Update the param of topEdgeOp to negative value
         for (auto [idx, param] : llvm::enumerate(topEdgeParams)) {
-            mlir::Value negParam =
-                rewriter.create<arith::NegFOp>(cloneTopOp.getLoc(), param).getResult();
+            Value negParam = rewriter.create<arith::NegFOp>(cloneTopOp.getLoc(), param).getResult();
             rewriter.moveOpBefore(negParam.getDefiningOp(), cloneTopOp);
             bottomEdgeOp.op.setOperand(idx, negParam);
         }
@@ -577,21 +570,18 @@ void handleParams(QuantumOpInfo topEdgeOp, QuantumOpInfo bottomEdgeOp, scf::ForO
 //                   Loop Boundary Optimization Patterns
 //===----------------------------------------------------------------------===//
 
-struct LoopBoundaryForLoopRewritePattern : public mlir::OpRewritePattern<scf::ForOp> {
-    // using mlir::OpRewritePattern<scf::ForOp>::OpRewritePattern;
-
+struct LoopBoundaryForLoopRewritePattern : public OpRewritePattern<scf::ForOp> {
     Mode mode;
 
-    LoopBoundaryForLoopRewritePattern(mlir::MLIRContext *context, Mode loopBoundaryMode,
-                                      mlir::PatternBenefit benefit = 1)
-        : mlir::OpRewritePattern<scf::ForOp>(context, benefit), mode(loopBoundaryMode)
+    LoopBoundaryForLoopRewritePattern(MLIRContext *context, Mode loopBoundaryMode,
+                                      PatternBenefit benefit = 1)
+        : OpRewritePattern<scf::ForOp>(context, benefit), mode(loopBoundaryMode)
     {
     }
 
-    mlir::LogicalResult matchAndRewrite(scf::ForOp forOp,
-                                        mlir::PatternRewriter &rewriter) const override
+    LogicalResult matchAndRewrite(scf::ForOp forOp, PatternRewriter &rewriter) const override
     {
-        LLVM_DEBUG(dbgs() << "Simplifying the following operation:\n" << forOp << "\n");
+        LLVM_DEBUG(llvm::dbgs() << "Simplifying the following operation:\n" << forOp << "\n");
 
         QubitOriginMap topEdgeOpSet = traceTopEdgeOperations(forOp, mode);
         QubitOriginMap bottomEdgeOpSet = traceBottomEdgeOperations(forOp, mode);
@@ -599,7 +589,7 @@ struct LoopBoundaryForLoopRewritePattern : public mlir::OpRewritePattern<scf::Fo
         auto edgeOperationSet = getVerifyEdgeOperationSet(bottomEdgeOpSet, topEdgeOpSet);
 
         if (edgeOperationSet.empty()) {
-            return mlir::failure();
+            return failure();
         }
 
         for (auto [topEdgeOp, bottomEdgeOp] : edgeOperationSet) {
@@ -608,7 +598,7 @@ struct LoopBoundaryForLoopRewritePattern : public mlir::OpRewritePattern<scf::Fo
             hoistBottomEdgeOperation(bottomEdgeOp, forOp, bottomEdgeOpSet, rewriter);
         }
 
-        return mlir::success();
+        return success();
     }
 };
 
@@ -617,12 +607,13 @@ struct LoopBoundaryForLoopRewritePattern : public mlir::OpRewritePattern<scf::Fo
 namespace catalyst {
 namespace quantum {
 
-void populateLoopBoundaryPatterns(mlir::RewritePatternSet &patterns, unsigned int mode)
+void populateLoopBoundaryPatterns(RewritePatternSet &patterns, unsigned int mode)
 {
     if (mode > static_cast<unsigned int>(Mode::NonRotation)) {
         llvm::errs() << "Invalid mode value: " << mode << ". Defaulting to Mode::All.\n";
         mode = static_cast<unsigned int>(Mode::All);
     }
+
     Mode loopBoundaryMode = static_cast<Mode>(mode);
     patterns.add<LoopBoundaryForLoopRewritePattern>(patterns.getContext(), loopBoundaryMode, 1);
 }
