@@ -260,7 +260,7 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
 
     """
 
-    def __init__(self, device, shots: Union[qml.measurements.Shots, int]):
+    def __init__(self, device, shots: qml.measurements.Shots | int):
         self._device = device
         self._shots = self._extract_shots_value(shots)
         self.stateref = None
@@ -396,7 +396,7 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
             return jax.lax.convert_element_type(mval, dtype)
         return mval
 
-    def _extract_shots_value(self, shots: Union[qml.measurements.Shots, int]):
+    def _extract_shots_value(self, shots: qml.measurements.Shots | int):
         """Extract the shots value according to the type"""
         if isinstance(shots, int):
             return shots
