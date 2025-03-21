@@ -209,7 +209,9 @@ def test_convert_clifford_to_ppr():
 
         return f()
 
-    assert "convert-clifford-t-to-ppr" in test_convert_clifford_to_ppr_workflow.mlir_opt
+    assert "convert-clifford-t-to-ppr" in test_convert_clifford_to_ppr_workflow.mlir
+    assert "convert-clifford-t-to-ppr" not in test_convert_clifford_to_ppr_workflow.mlir_opt
+    assert "qec.ppr" in test_convert_clifford_to_ppr_workflow.mlir_opt
 
 
 test_convert_clifford_to_ppr()
