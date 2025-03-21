@@ -361,7 +361,7 @@ def ions_decomposition(qnode):  # pragma: nocover
 
 def to_ppr(qnode):
     R"""
-    Specify that the ``-to_ppr`` MLIR compiler pass for converting
+    Specify that the MLIR compiler pass for converting
     clifford+T gates into Pauli Product Rotation (PPR) gates will be applied.
 
     Clifford gates are defined as :math:`\exp({iP\tfrac{\pi}{4}})`,
@@ -449,7 +449,7 @@ def to_ppr(qnode):
 
 def commute_ppr(qnode):
     R"""
-    Specify that the ``-commute_ppr`` MLIR compiler pass for commuting
+    Specify that the MLIR compiler pass for commuting
     Clifford Pauli Product Rotation (PPR) gates, :math:`\exp({iP\tfrac{\pi}{4}})`,
     past non-Clifford PPRs gates, :math:`\exp({iP\tfrac{\pi}{8}})` will be applied,
     where :math:`P` is a Pauli word.
