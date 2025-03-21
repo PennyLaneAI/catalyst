@@ -206,8 +206,6 @@ def test_convert_clifford_to_ppr():
             qml.S(1)
             qml.T(0)
             qml.CNOT([0, 1])
-            m1 = measure(wires=0)
-            m2 = measure(wires=1)
 
         return f()
 
