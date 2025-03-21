@@ -19,7 +19,7 @@ import pennylane as qml
 import pytest
 
 from catalyst import pipeline, qjit
-from catalyst.passes import cancel_inverses, merge_rotations
+from catalyst.passes import cancel_inverses, merge_rotations, to_ppr
 
 # pylint: disable=missing-function-docstring
 
@@ -190,6 +190,37 @@ def test_chained_passes():
 
 
 test_chained_passes()
+
+#
+# to_ppr
+#
+
+
+def test_convert_clifford_to_ppr():
+    """
+    Test convert_clifford_to_ppr
+    """
+    pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+
+    @qjit(pipelines=pipe, keep_intermediate=True, target="mlir")
+    def test_convert_clifford_to_ppr_workflow():
+
+        @to_ppr
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def f():
+            qml.H(0)
+            qml.S(1)
+            qml.T(0)
+            qml.CNOT([0, 1])
+
+        return f()
+
+    assert "convert-clifford-t-to-ppr" in test_convert_clifford_to_ppr_workflow.mlir
+    assert "convert-clifford-t-to-ppr" not in test_convert_clifford_to_ppr_workflow.mlir_opt
+    assert "qec.ppr" in test_convert_clifford_to_ppr_workflow.mlir_opt
+
+
+test_convert_clifford_to_ppr()
 
 
 if __name__ == "__main__":
