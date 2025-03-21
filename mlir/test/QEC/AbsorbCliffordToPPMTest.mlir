@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt --absorb-ppr-to-ppm --split-input-file -verify-diagnostics %s | FileCheck %s
+// RUN: quantum-opt --ppr_to_ppm --split-input-file -verify-diagnostics %s | FileCheck %s
 
 func.func public @ppr_to_ppm_test_1(%q1: !quantum.bit) -> tensor<i1> {
 
@@ -80,11 +80,10 @@ func.func public @ppr_to_ppm_test_5(%q1: !quantum.bit, %q2: !quantum.bit) -> (te
 func.func public @ppr_to_ppm_test_6(%q1: !quantum.bit, %q2: !quantum.bit) -> (tensor<i1>, !quantum.bit) {
 
     // CHECK: [[q1:%.+]]:2 = qec.ppr ["X", "X"](8) %arg0, %arg1
-    // CHECK-NOT: qec.ppr["Y", "X"](4)
     // CHECK: [[m1:%.+]], [[o1:%.+]]:2 = qec.ppm ["X", "Z"] [[q1]]#0, [[q1]]#1
-    // CHECK-NOT: qec.ppr["Y", "X"](4)
     // CHECK: [[f1:%.+]] = tensor.from_elements [[m1]] : tensor<i1>
-    // CHECK: return [[f1]], [[o1]]#0 : tensor<i1>, !quantum.bit
+    // CHECK: [[q2:%.+]]:2 = qec.ppr ["Y", "X"](4) [[o1]]#0, [[o1]]#1
+    // CHECK: return [[f1]], [[q2]]#0 : tensor<i1>, !quantum.bit
     %0:2 = qec.ppr ["X", "X"](8) %q1, %q2 : !quantum.bit, !quantum.bit
     %1:2 = qec.ppr ["Y", "X"](4) %0#0, %0#1 : !quantum.bit, !quantum.bit
     %m, %out_qubits:2 = qec.ppm ["X", "Z"] %1#0, %1#1 : !quantum.bit, !quantum.bit
