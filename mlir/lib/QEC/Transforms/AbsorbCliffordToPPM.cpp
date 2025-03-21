@@ -88,8 +88,9 @@ LogicalResult visitPPMeasurementOp(PPMeasurementOp op,
     return failure();
 }
 
-void moveCliffordPastNonClifford(PauliStringWrapper lhsPauli, PauliStringWrapper rhsPauli,
-                                 PauliStringWrapper *result, PatternRewriter &rewriter)
+void moveCliffordPastPPM(const PauliStringWrapper &lhsPauli,
+                                 const PauliStringWrapper &rhsPauli, PauliStringWrapper *result,
+                                 PatternRewriter &rewriter)
 {
 
     assert(lhsPauli.op != nullptr && "LHS Operation is not found");
@@ -170,11 +171,11 @@ struct AbsorbCliffordToPPM : public OpRewritePattern<PPMeasurementOp> {
             PauliWordPair normOps = normalizePPROps(pprOp, op);
 
             if (normOps.first.commutes(normOps.second)) {
-                moveCliffordPastNonClifford(normOps.first, normOps.second, nullptr, rewriter);
+                moveCliffordPastPPM(normOps.first, normOps.second, nullptr, rewriter);
             }
             else {
                 auto resultStr = normOps.first.computeCommutationRulesWith(normOps.second);
-                moveCliffordPastNonClifford(normOps.first, normOps.second, &resultStr, rewriter);
+                moveCliffordPastPPM(normOps.first, normOps.second, &resultStr, rewriter);
             }
             return success();
         });
