@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <algorithm>
+
+#include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Index/IR/IndexDialect.h"
@@ -129,7 +132,7 @@ struct BufferizeProbsOp : public OpConversionPattern<ProbsOp> {
         Type tensorType = op.getType(0);
         MemRefType resultType = cast<MemRefType>(getTypeConverter()->convertType(tensorType));
         Location loc = op.getLoc();
-        //Value allocVal = rewriter.replaceOpWithNewOp<memref::AllocOp>(op, resultType);
+        // Value allocVal = rewriter.replaceOpWithNewOp<memref::AllocOp>(op, resultType);
 
         auto shape = cast<mlir::RankedTensorType>(tensorType).getShape();
         SmallVector<Value> allocSizes;
@@ -140,37 +143,39 @@ struct BufferizeProbsOp : public OpConversionPattern<ProbsOp> {
         // In such cases, we need to allocate dynamically as well.
         // The size is 2^num_qubits, or integer 1 left shifted by num_qubits.
         if (shape[0] == ShapedType::kDynamic) {
-            auto one = rewriter.create<arith::ConstantOp>(loc, rewriter.getI64Type(), rewriter.getIntegerAttr(rewriter.getI64Type(),1));
+            auto one = rewriter.create<arith::ConstantOp>(
+                loc, rewriter.getI64Type(), rewriter.getIntegerAttr(rewriter.getI64Type(), 1));
             auto compbasisOp = cast<ComputationalBasisOp>(op.getObs().getDefiningOp());
 
             assert(compbasisOp.getQreg() != nullptr &&
-                   "ProbsOp with dynamic return shape must take in inputs of qreg type");
+                   "ProbsOp with dynamic return shape must take in CompbasisOps with inputs of "
+                   "qreg type");
             Value reg_value = compbasisOp.getQreg();
-            Operation *reg_def = reg_value.getDefiningOp();
 
-            // Walk back to the original alloc of the register
-            while (!isa<AllocOp>(reg_def)){
-                // TODO: switch case?
-                if (isa<AdjointOp>(reg_def)){
-                    reg_value = cast<AdjointOp>(reg_def).getQreg();
-                }
-                else if (isa<InsertOp>(reg_def)){
-                    reg_value = cast<InsertOp>(reg_def).getInQreg();
-                }
-                reg_def = reg_value.getDefiningOp();
-            }
+            // Walk back to the alloc op for the qreg value and get the number of qubits
+            llvm::SetVector<Operation *> slice;
+            BackwardSliceOptions sliceOptions;
+            // Include the register on the compbasis op since it can be an alloc itself
+            sliceOptions.inclusive = true;
+            // Include qreg values captured by closure, for example via scf regions
+            // This mlir feature is available once we update our mlir to track
+            // https://github.com/llvm/llvm-project/pull/114452
+            // sliceOptions.omitUsesFromAbove = true;
+            getBackwardSlice(reg_value, &slice, sliceOptions);
 
-            auto allocOp = cast<AllocOp>(reg_def);
-            auto twoToN = rewriter.create<arith::ShLIOp>(loc, rewriter.getI64Type(),
-                one, allocOp.getNqubits());
-            auto allocSize = rewriter.create<index::CastSOp>(loc, rewriter.getIndexType(),
-                                                         twoToN);
+            auto isAllocOp = [](Operation *op) { return isa<AllocOp>(op); };
+            assert(std::count_if(slice.begin(), slice.end(), isAllocOp) == 1 &&
+                   "A quantum register value can only be allocated once");
+            auto allocOp = cast<AllocOp>(*std::find_if(slice.begin(), slice.end(), isAllocOp));
+
+            auto twoToN = rewriter.create<arith::ShLIOp>(loc, rewriter.getI64Type(), one,
+                                                         allocOp.getNqubits());
+            auto allocSize = rewriter.create<index::CastSOp>(loc, rewriter.getIndexType(), twoToN);
 
             allocSizes.push_back(allocSize);
         }
 
         Value allocVal = rewriter.replaceOpWithNewOp<memref::AllocOp>(op, resultType, allocSizes);
-
 
         rewriter.create<ProbsOp>(loc, TypeRange{}, ValueRange{adaptor.getObs(), allocVal});
         return success();
