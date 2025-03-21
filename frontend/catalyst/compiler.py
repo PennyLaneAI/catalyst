@@ -406,9 +406,9 @@ class Compiler:
             workspace, Directory
         ), f"Compiler expects a Directory type, got {type(workspace)}."
         assert workspace.is_dir(), f"Compiler expects an existing directory, got {workspace}."
-        assert self.options.lower_to_llvm, (
-            "lower_to_llvm must be set to True in order to compile to a shared object"
-        )
+        assert (
+            self.options.lower_to_llvm
+        ), "lower_to_llvm must be set to True in order to compile to a shared object"
 
         if self.options.verbose:
             print(f"[LIB] Running compiler driver in {workspace}", file=self.options.logfile)

@@ -168,6 +168,7 @@ def test_cancel_inverses_bad_usages():
 
     test_cancel_inverses_not_on_qnode()
 
+
 def test_chained_passes():
     """
     Test that chained passes are present in the transform passes.
