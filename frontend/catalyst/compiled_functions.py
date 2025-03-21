@@ -161,8 +161,6 @@ class CompiledFunction:
         Returns:
             the return values computed by the function or None if the function has no results
         """
-        if shared_object is None:
-            return None
 
         with shared_object as lib:
             result_desc = type(args[0].contents) if has_return else None
