@@ -138,6 +138,67 @@ def test_dynamic_wires_scalar_readouts(readout, backend, capfd):
     assert out.count("compiling...") == 3
 
 
+def test_dynamic_wires_probs_with_wires(backend, capfd):
+    def ref(num_qubits):
+        print("compiling...")
+        dev = qml.device(backend, wires=num_qubits)
+
+        @qml.qnode(dev)
+        def circ():
+            @catalyst.for_loop(0, num_qubits, 1)
+            def loop_0(i):
+                qml.RY(2.2, wires=i)
+
+            loop_0()
+            qml.RX(1.23, wires=num_qubits - 1)
+            qml.RZ(3.45, wires=0)
+            qml.CNOT(wires=[num_qubits - 2, 1])
+            return qml.probs(wires=[0, num_qubits - 2])
+
+        return circ()
+
+    cat = catalyst.qjit(ref)
+
+    assert np.allclose(ref(10), cat(10))
+    assert np.allclose(ref(4), cat(4))
+    out, err = capfd.readouterr()
+    assert out.count("compiling...") == 3
+
+
+def test_dynamic_wires_probs_without_wires(backend, capfd):
+    def ref(num_qubits):
+        print("compiling...")
+        dev = qml.device(backend, wires=num_qubits)
+
+        @qml.qnode(dev)
+        def circ(x):
+            @catalyst.for_loop(0, num_qubits, 1)
+            def loop_0(i):
+                qml.RY(2.2, wires=i)
+
+            loop_0()
+            qml.RX(1.23, wires=num_qubits - 1)
+            # scf.if op only has the boolean predicate value as an operand
+            # As such, closure values, including the qreg, cannot be detected
+            # via the mlir backward slice analysis
+            # This means we fail to walk back from the probs op to the alloc op in such cases
+            # This will be supported once we track
+            # https://github.com/llvm/llvm-project/pull/114452
+            # where backward slice can now include closure values
+            # qml.cond(x == 42, qml.RZ)(3.45, wires=0)
+            qml.CNOT(wires=[num_qubits - 2, 1])
+            return qml.probs()
+
+        return circ(42)
+
+    cat = catalyst.qjit(ref)
+
+    assert np.allclose(ref(10), cat(10))
+    assert np.allclose(ref(4), cat(4))
+    out, err = capfd.readouterr()
+    assert out.count("compiling...") == 3
+
+
 @pytest.mark.parametrize("wires", [1.1, (1.1)])
 def test_wrong_wires_argument(backend, wires):
     """

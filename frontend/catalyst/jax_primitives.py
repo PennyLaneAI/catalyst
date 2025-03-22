@@ -1521,29 +1521,82 @@ def _var_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shape=None):
 #
 # probs measurement
 #
-@probs_p.def_abstract_eval
-def _probs_abstract_eval(obs, shape, shots=None):
-    assert isinstance(obs, AbstractObs)
+# @probs_p.def_abstract_eval
+# def _probs_abstract_eval(obs, shape, shots=None):
+#     assert isinstance(obs, AbstractObs)
 
-    if obs.primitive is compbasis_p:
-        if obs.num_qubits:
-            assert shape == (2**obs.num_qubits,)
+#     if obs.primitive is compbasis_p:
+#         if obs.num_qubits:
+#             assert shape == (2**obs.num_qubits,)
+#     else:
+#         raise TypeError("probs only supports computational basis")
+
+#     return core.ShapedArray(shape, jax.numpy.float64)
+
+
+def probs_staging_rule(jaxpr_trace, obs, num_qubits, shots=None):
+    """
+    The result shape of `probs_p` is (2^num_qubits,).
+    Custom staging rule for probs.
+    See the documentation for `sample_staging_rule()` function for more details
+    on custom staging rules.
+    """
+
+    if isinstance(num_qubits, int):
+        out_shape = core.ShapedArray((2**num_qubits,), jax.numpy.dtype("float64"))
+        invars = [jaxpr_trace.getvar(obs)]
+        params = {"num_qubits": num_qubits, "shots": shots}
     else:
-        raise TypeError("probs only supports computational basis")
+        # We just need to create a dynamic output shape from a tracer
+        # Therefore no need to raise to power of 2, since 2^? = ?
+        # The actual memory allocation of the return shape for probs op
+        # occurs during bufferization stage in mlir
+        out_shape = core.DShapedArray((num_qubits,), jax.numpy.dtype("float64"))
+        invars = [jaxpr_trace.getvar(obs), jaxpr_trace.getvar(num_qubits)]
+        params = {"shots": shots}
 
-    return core.ShapedArray(shape, jax.numpy.float64)
+    out_tracer = pe.DynamicJaxprTracer(jaxpr_trace, out_shape)
+
+    # if isinstance(num_qubits, int):
+    #     invars = [jaxpr_trace.getvar(obs)]
+    #     params = {"num_qubits": num_qubits, "shots": shots}
+    # else:
+    #     invars = [jaxpr_trace.getvar(obs), jaxpr_trace.getvar(num_qubits)]
+    #     params = {"shots": shots}
+
+    eqn = pe.new_jaxpr_eqn(
+        invars,
+        [jaxpr_trace.makevar(out_tracer)],
+        probs_p,
+        params,
+        jax.core.no_effects,
+    )
+
+    jaxpr_trace.frame.add_eqn(eqn)
+    return out_tracer
+
+
+pe.custom_staging_rules[probs_p] = probs_staging_rule
 
 
 @probs_p.def_impl
-def _probs_def_impl(ctx, obs, shape, shots=None):  # pragma: no cover
+def _probs_def_impl(ctx, obs, num_qubits, shots=None):  # pragma: no cover
     raise NotImplementedError()
 
 
-def _probs_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shape: tuple, shots=None):
+def _probs_lowering(
+    jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, num_qubits: int | ir.Value, shots=None
+):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
-    result_type = ir.RankedTensorType.get(shape, ir.F64Type.get())
+    # result_type = ir.RankedTensorType.get(shape, ir.F64Type.get())
+
+    if isinstance(num_qubits, int):
+        result_type = ir.RankedTensorType.get((2**num_qubits,), ir.F64Type.get())
+    else:
+        shape = (ir.ShapedType.get_dynamic_size(),)
+        result_type = ir.RankedTensorType.get(shape, ir.F64Type.get())
 
     return ProbsOp(result_type, obs).results
 
