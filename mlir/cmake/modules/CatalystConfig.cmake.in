@@ -1,0 +1,16 @@
+# This file allows users to call find_package(CATALYST) and pick up mlir-hlo targets.
+
+@CATALYST_CONFIG_CODE@
+
+# MLIR is needed for this setup to be usable.
+find_package(MLIR REQUIRED CONFIG)
+
+# Set variables needed by dependent projects.
+set(CATALYST_BUILD_LIBRARY_DIR "@CATALYST_LIB_DIR@")
+set(CATALYST_CMAKE_DIR "@CATALYST_CONFIG_CMAKE_DIR@")
+set(QUANTUM_ENABLE_BINDINGS_PYTHON "@QUANTUM_ENABLE_BINDINGS_PYTHON@")
+set(CATALYST_EXPORTED_TARGETS "@MLIR_EXPORTS@")
+set(CATALYST_INCLUDE_DIRS "@CATALYST_CONFIG_INCLUDE_DIRS@")
+
+# Provide all our library targets to users.
+@CATALYST_CONFIG_INCLUDE_EXPORTS@
