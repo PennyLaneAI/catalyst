@@ -457,7 +457,7 @@ def ppr_to_ppm(qnode):
     into the final Pauli Product Measurement (PPM) will be applied.
 
     For more information regarding to PPM,
-    see this <https://pennylane.ai/compilation/pauli-product-measurement>
+    check out the `compilation hub <https://pennylane.ai/compilation/pauli-product-measurement>`__.
 
     Args:
         fn (QNode): QNode to apply the pass to
