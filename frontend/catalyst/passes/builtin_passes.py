@@ -405,7 +405,7 @@ def commute_ppr(qnode):
     .. note::
 
         The `commute_ppr` compilation pass requires that :func:`~.passes.to_ppr` be applied first.
-        
+
     Args:
         fn (QNode): QNode to apply the pass to.
 
