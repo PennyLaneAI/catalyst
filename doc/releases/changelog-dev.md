@@ -93,6 +93,20 @@
   
   The circuit program that generated from this pass is currrently not executable on any backend. For more information regarding to PPM, please refer to [(Pauli Product Measurement)](https://pennylane.ai/compilation/pauli-product-measurement)
 
+* Absorbing Clifford Pauli Product Rotation (PPR) operations into the final Pauli Product Measurement (PPM) is not availble through the :func:`~.catalyst.passes.ppr_to_ppm` pass transform. The output from this pass consists of non-Clifford PPRs and PPMs.
+  [(#1577)](https://github.com/PennyLaneAI/catalyst/pull/1577)
+
+  Example:
+  ```python
+    @qjit(keep_intermediate=True)
+    @pipeline({"to_ppr": {}, "commute_ppr": {}, "ppr_to_ppm": {}})
+    @qml.qnode(qml.device("null.qubit", wires=1))
+    def circuit():
+        qml.H(0)
+        qml.T(0)
+        return measure(0)
+  ```
+
 <h3>Improvements 🛠</h3>
 
 * Changed pattern rewritting in `quantum-to-ion` lowering pass to use MLIR's dialect conversion

@@ -62,4 +62,5 @@ void catalyst::registerAllCatalystPasses()
     mlir::registerPass(catalyst::createLoopBoundaryOptimizationPass);
     mlir::registerPass(catalyst::createCommuteCliffordTPPRPass);
     mlir::registerPass(catalyst::createCliffordTToPPRPass);
+    mlir::registerPass(catalyst::createCommuteCliffordPastPPMPass);
 }
