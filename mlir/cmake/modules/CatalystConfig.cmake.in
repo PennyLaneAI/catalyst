@@ -1,4 +1,14 @@
-# This file allows users to call find_package(CATALYST) and pick up mlir-hlo targets.
+##############################################################################
+# The following file                                                         #
+# was taken from the openxla/xla project:https://github.com/openxla/xla      #
+# Small alteration were made for Catalyst                                    #
+# The XLA project has the following license: Apache License v2.0             #
+#                                                                            #
+# https://github.com/openxla/xla/blob/main/xla/mlir_hlo/                     #
+#            cmake/modules/MHLOConfig.cmake.in                               #
+##############################################################################
+
+# This file allows users to call find_package(CATALYST) and pick up catalyst targets.
 
 @CATALYST_CONFIG_CODE@
 
