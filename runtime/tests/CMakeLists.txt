@@ -6,6 +6,11 @@ FetchContent_Declare(
     GIT_TAG        v2.13.9
 )
 
+# Raised by Catch2 with GCC-13, so we disable it here before including their project.
+if(RUNTIME_ENABLE_WARNINGS AND (CMAKE_CXX_COMPILER_ID STREQUAL "GNU"))
+    add_compile_options("-Wno-maybe-uninitialized")
+endif()
+
 FetchContent_MakeAvailable(Catch2)
 
 # Locate PyBind11

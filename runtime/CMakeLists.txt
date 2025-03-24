@@ -11,6 +11,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 option(ENABLE_CODE_COVERAGE "Enable code coverage" OFF)
 option(ENABLE_ADDRESS_SANITIZER "Enable address sanitizer" OFF)
 option(RUNTIME_CLANG_TIDY "Enable Clang Tidy" OFF)
+option(RUNTIME_ENABLE_WARNINGS "Enable -Wall and -Werror" ON)
 
 option(ENABLE_OPENQASM "Build OpenQasm backend device" OFF)
 option(ENABLE_OQD "Build OQD backend device" OFF)
@@ -52,7 +53,8 @@ find_package(Python REQUIRED
 
 if(RUNTIME_ENABLE_WARNINGS)
     message(STATUS "Building with compiler warnings as errors enabled.")
-    add_compile_options(-Werror -Wall)
+    set(CMAKE_COMPILE_WARNING_AS_ERROR ON)
+    add_compile_options(-Wall)
 endif()
 
 message(STATUS "ENABLE_OPENQASM is ${ENABLE_OPENQASM}.")
