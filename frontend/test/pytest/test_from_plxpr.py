@@ -189,7 +189,7 @@ class TestErrors:
         qml.capture.enable()
         jaxpr = jax.make_jaxpr(circuit)(2)
         with pytest.raises(NotImplementedError, match=r"does not yet support dynamic shapes"):
-            from_plxpr(jaxpr)()
+            from_plxpr(jaxpr)(2)
         qml.capture.disable()
         jax.config.update("jax_dynamic_shapes", False)
 
