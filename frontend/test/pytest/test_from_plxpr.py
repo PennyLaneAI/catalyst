@@ -173,7 +173,7 @@ class TestErrors:
     def test_for_loop_dynamic_shapes(self, disable_capture):
         """Test that a NotImplementedError is raised if a dynamic shape is passed to a for_loop."""
         jax.config.update("jax_dynamic_shapes", True)
-        dev = qml.device('lightning.qubit', wires=2)
+        dev = qml.device("lightning.qubit", wires=2)
 
         @qml.qnode(dev)
         def circuit(i):
@@ -182,10 +182,10 @@ class TestErrors:
             @qml.for_loop(3)
             def f(j, y):
                 return y + 1
-            
+
             _ = f(x)
             return qml.state()
-        
+
         qml.capture.enable()
         jaxpr = jax.make_jaxpr(circuit)(2)
         with pytest.raises(NotImplementedError, match=r"does not yet support dynamic shapes"):
