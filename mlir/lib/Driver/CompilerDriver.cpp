@@ -653,6 +653,9 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
     // TODO: FIXME:
     // Let's try to enable multithreading. Do not forget to protect the printing.
     ctx.disableMultithreading();
+    // The transform dialect doesn't appear to load dependent dialects
+    // fpr named passes.
+    ctx.loadAllAvailableDialects();
 
     ScopedDiagnosticHandler scopedHandler(
         &ctx, [&](Diagnostic &diag) { diag.print(options.diagnosticStream); });
