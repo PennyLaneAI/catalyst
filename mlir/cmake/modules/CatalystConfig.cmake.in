@@ -1,0 +1,24 @@
+##############################################################################
+# The following file                                                         #
+# was taken from the openxla/xla project:https://github.com/openxla/xla      #
+# Small alteration were made for Catalyst                                    #
+# The XLA project has the following license: Apache License v2.0             #
+#                                                                            #
+# https://github.com/openxla/xla/blob/main/xla/mlir_hlo/                     #
+#            cmake/modules/MHLOConfig.cmake.in                               #
+##############################################################################
+
+# This file allows users to call find_package(CATALYST) and pick up catalyst targets.
+
+# MLIR is needed for this setup to be usable.
+find_package(MLIR REQUIRED CONFIG)
+
+# Set variables needed by dependent projects.
+set(CATALYST_BUILD_LIBRARY_DIR "@CATALYST_LIB_DIR@")
+set(CATALYST_CMAKE_DIR "@CATALYST_CONFIG_CMAKE_DIR@")
+set(QUANTUM_ENABLE_BINDINGS_PYTHON "@QUANTUM_ENABLE_BINDINGS_PYTHON@")
+set(CATALYST_EXPORTED_TARGETS "@MLIR_EXPORTS@")
+set(CATALYST_INCLUDE_DIRS "@CATALYST_CONFIG_INCLUDE_DIRS@")
+
+# Provide all our library targets to users.
+@CATALYST_CONFIG_INCLUDE_EXPORTS@
