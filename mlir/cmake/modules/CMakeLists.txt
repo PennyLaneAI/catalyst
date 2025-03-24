@@ -27,6 +27,10 @@ set(llvm_cmake_builddir "${LLVM_BINARY_DIR}/${LLVM_INSTALL_PACKAGE_DIR}")
 # Since we just use MLIR's cmake functions (add_mlir_library, etc.),
 # MLIR_EXPORTS would have the necessary targets to export.
 get_property(MLIR_EXPORTS GLOBAL PROPERTY MLIR_EXPORTS)
+# JSON for Modern C++ (nlohmann/json) https://github.com/nlohmann/json
+# tomlplusplus https://github.com/marzer/tomlplusplus
+# are used in Catalyst acknowledged here https://github.com/PennyLaneAI/catalyst?tab=readme-ov-file#acknowledgements
+# and both have MIT licenses.
 export(TARGETS ${MLIR_EXPORTS} nlohmann_json tomlplusplus_tomlplusplus FILE ${catalyst_cmake_builddir}/CatalystTargets.cmake)
 
 # Generate MlirConfig.cmake for the build tree.
