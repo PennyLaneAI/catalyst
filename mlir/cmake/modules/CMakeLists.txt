@@ -55,14 +55,14 @@ set(CATALYST_CONFIG_INCLUDE_DIRS)
 # Generate CatalystConfig.cmake for the install tree.
 set(CATALYST_CONFIG_CODE "
 # Compute the installation prefix from this CatalystConfig.cmake file location.
-get_filename_component(CATALYST_INSTALL_PREFIX \"\${CMAKE_CURRENT_LIST_FILE}\" PATH)")
+cmake_path(GET \"\${CMAKE_CURRENT_LIST_FILE}\" FILENAME CATALYST_INSTALL_PREFIX)")
 
 # Construct the proper number of get_filename_component(... PATH)
 # calls to compute the installation prefix.
 string(REGEX REPLACE "/" ";" _count "${CATALYST_INSTALL_PACKAGE_DIR}")
 foreach(p ${_count})
   set(CATALYST_CONFIG_CODE "${CATALYST_CONFIG_CODE}
-  get_filename_component(CATALYST_INSTALL_PREFIX \"\${CATALYST_INSTALL_PREFIX}\" PATH)")
+  cmake_path(GET \"\${CATALYST_INSTALL_PREFIX}\" FILENAME CATALYST_INSTALL_PREFIX)")
 endforeach(p)
 set(CATALYST_CONFIG_CMAKE_DIR "\${CATALYST_INSTALL_PREFIX}/${CATALYST_INSTALL_PACKAGE_DIR}")
 set(CATALYST_CONFIG_LLVM_CMAKE_DIR "\${CATALYST_INSTALL_PREFIX}/${CATALYST_INSTALL_PACKAGE_DIR}")
