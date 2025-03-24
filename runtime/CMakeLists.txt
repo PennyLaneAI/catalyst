@@ -114,6 +114,9 @@ if(NOT EXISTS ${CMAKE_BINARY_DIR}/lib/liblapacke.3.dylib)
                    "-DCMAKE_INSTALL_PREFIX=${CMAKE_BINARY_DIR}/_lapacke-accelerate/install"
         INSTALL_COMMAND ${CMAKE_COMMAND} --build . --target install
         COMMAND cp ${CMAKE_BINARY_DIR}/_lapacke-accelerate/install/lib/liblapacke.3.dylib ${CMAKE_BINARY_DIR}/lib
+        LOG_CONFIGURE ON
+        LOG_INSTALL ON
+        LOG_BUILD ON
     )
     add_dependencies(rt_capi lapacke-accelerate)  # automatically build with the runtime
 endif()
