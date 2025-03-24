@@ -5,6 +5,16 @@
 # (llvm-project:mlir/cmake/modules) and from StableHLO's project
 # https://github.com/llvm/llvm-project/blob/main/mlir/cmake/modules/CMakeLists.txt
 
+##############################################################################
+# The following file                                                         #
+# was taken from the openxla/xla project:https://github.com/openxla/xla      #
+# Small alteration were made for Catalyst                                    #
+# The XLA project has the following license: Apache License v2.0             #
+#                                                                            #
+# https://github.com/openxla/xla/blob/main/xla/mlir_hlo/                     #
+#            cmake/modules/CMakeLists.txt                                    #
+##############################################################################
+
 include(LLVMDistributionSupport)
 
 set(CATALYST_INSTALL_PACKAGE_DIR lib${LLVM_LIBDIR_SUFFIX}/cmake/catalyst)
