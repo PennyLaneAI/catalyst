@@ -493,8 +493,6 @@ def handle_for_loop(
 ):
     """Handle the conversion from plxpr to Catalyst jaxpr for the for loop primitive"""
     assert jaxpr_body_fn is not None
-    if abstract_shapes_slice.stop != abstract_shapes_slice.start:
-        raise NotImplementedError("from_plxpr does not yet support dynamic shapes with for_loop.")
     args = plxpr_invals[args_slice]
 
     # Add the iteration start and the qreg to the args

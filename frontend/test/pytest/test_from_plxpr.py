@@ -170,29 +170,6 @@ class TestErrors:
             from_plxpr(jaxpr)()
         qml.capture.disable()
 
-    def test_for_loop_dynamic_shapes(self, disable_capture):
-        """Test that a NotImplementedError is raised if a dynamic shape is passed to a for_loop."""
-        jax.config.update("jax_dynamic_shapes", True)
-        dev = qml.device("lightning.qubit", wires=2)
-
-        @qml.qnode(dev)
-        def circuit(i):
-            x = jax.numpy.arange(i)
-
-            @qml.for_loop(3)
-            def f(j, y):
-                return y + 1
-
-            _ = f(x)
-            return qml.state()
-
-        qml.capture.enable()
-        jaxpr = jax.make_jaxpr(circuit)(2)
-        with pytest.raises(NotImplementedError, match=r"does not yet support dynamic shapes"):
-            from_plxpr(jaxpr)(2)
-        qml.capture.disable()
-        jax.config.update("jax_dynamic_shapes", False)
-
 
 class TestCatalystCompareJaxpr:
     """Test comparing catalyst and pennylane jaxpr for a variety of situations."""
