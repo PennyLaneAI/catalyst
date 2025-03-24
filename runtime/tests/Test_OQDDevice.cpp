@@ -1,4 +1,4 @@
-// Copyright 2023 Xanadu Quantum Technologies Inc.
+// Copyright 2023-2025 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,7 +15,8 @@
 #include <filesystem>
 #include <fstream>
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_string.hpp>
 #include <nlohmann/json.hpp>
 
 #include "RuntimeCAPI.h"
@@ -24,20 +25,21 @@
 #include "OQDDevice.cpp"
 #include "OQDRuntimeCAPI.h"
 
-using json = nlohmann::json;
-
+using namespace Catch::Matchers;
 using namespace Catalyst::Runtime::Device;
+
+using json = nlohmann::json;
 
 TEST_CASE("Test the OQDDevice constructor", "[oqd]")
 {
     auto device = OQDDevice("{shots : 100}");
 
-    REQUIRE_THROWS_WITH(device.GetNumQubits(), Catch::Contains("Unsupported functionality"));
-    REQUIRE_THROWS_WITH(device.PrintState(), Catch::Contains("Unsupported functionality"));
-    REQUIRE_THROWS_WITH(device.AllocateQubit(), Catch::Contains("Unsupported functionality"));
-    REQUIRE_THROWS_WITH(device.Measure(0), Catch::Contains("Unsupported functionality"));
-    REQUIRE_THROWS_WITH(device.Expval(0), Catch::Contains("Unsupported functionality"));
-    REQUIRE_THROWS_WITH(device.Var(0), Catch::Contains("Unsupported functionality"));
+    REQUIRE_THROWS_WITH(device.GetNumQubits(), ContainsSubstring("Unsupported functionality"));
+    REQUIRE_THROWS_WITH(device.PrintState(), ContainsSubstring("Unsupported functionality"));
+    REQUIRE_THROWS_WITH(device.AllocateQubit(), ContainsSubstring("Unsupported functionality"));
+    REQUIRE_THROWS_WITH(device.Measure(0), ContainsSubstring("Unsupported functionality"));
+    REQUIRE_THROWS_WITH(device.Expval(0), ContainsSubstring("Unsupported functionality"));
+    REQUIRE_THROWS_WITH(device.Var(0), ContainsSubstring("Unsupported functionality"));
 }
 
 TEST_CASE("Test the OQDDevice qubit allocation and release", "[oqd]")
@@ -69,7 +71,7 @@ TEST_CASE("Test the OQDDevice ion index out of range", "[oqd]")
     Pulse *pulses[] = {&p, &p};
 
     REQUIRE_THROWS_WITH(__catalyst__oqd__ParallelProtocol(pulses, 2),
-                        Catch::Contains("ion index out of range"));
+                        ContainsSubstring("ion index out of range"));
 }
 
 TEST_CASE("Test the OQDDevice transition index out of range", "[oqd]")
@@ -82,7 +84,7 @@ TEST_CASE("Test the OQDDevice transition index out of range", "[oqd]")
     Pulse *pulses[] = {&p, &p};
 
     REQUIRE_THROWS_WITH(__catalyst__oqd__ParallelProtocol(pulses, 2),
-                        Catch::Contains("transition index out of range"));
+                        ContainsSubstring("transition index out of range"));
 }
 
 TEST_CASE("Test OpenAPL Program generation", "[oqd]")
