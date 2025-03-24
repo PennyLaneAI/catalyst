@@ -2,9 +2,34 @@
 
 <h3>New features since last release</h3>
 
-* Conversion Clifford+T gates to Pauli Product Rotation (PPR) and measurement to Pauli Product Measurement (PPM) are now available through the `clifford_t_ppr` pass transform.
+* Add loop boundary optimization pass that identifies and optimizes redundant quantum operations that occur at loop iteration boundaries, where operations at iteration boundaries often cancel each other out. 
+  [(#1476)](https://github.com/PennyLaneAI/catalyst/pull/1476)
+
+  This optimization help to eliminates redundant operations that aims to reduce quantum circuit depth and gate count.This pass is supported into `cancel_inverses` and `merge_rotations`.
+
+  For example,
+
+  ```python
+  dev = qml.device("lightning.qubit", wires=2)
+
+  @qml.qjit
+  @catalyst.passes.cancel_inverses
+  @qml.qnode(dev)
+  def circuit():
+      for i in range(3):
+          qml.Hadamard(0)
+          qml.CNOT([0, 1])
+          qml.Hadamard(0)
+      return qml.expval(qml.Z(0))
+  ```
+
+  Note that this optimization specifically targets operations that are exact inverses of each other when applied in sequence. For example, consecutive Hadamard gates (H†H = I) pairs will be identified and eliminated.
+
+* Conversion Clifford+T gates to Pauli Product Rotation (PPR) and measurement to Pauli Product Measurement (PPM) are now available through the `to_ppr` pass transform.
+
   [(#1499)](https://github.com/PennyLaneAI/catalyst/pull/1499)
   [(#1551)](https://github.com/PennyLaneAI/catalyst/pull/1551)
+  [(#1564)](https://github.com/PennyLaneAI/catalyst/pull/1564)
 
   Supported gate conversions:
     - H gate → PPR with (Z · X · Z)π/4
@@ -12,10 +37,10 @@
     - T gate → PPR with (Z)π/8
     - CNOT → PPR with (Z ⊗ X)π/4 · (Z ⊗ 1)−π/4 · (1 ⊗ X)−π/4
 
-    Example: 
+    Example:
     ```python
         @qjit(keep_intermediate=True)
-        @clifford_t_ppr
+        @to_ppr
         @qml.qnode(dev)
         def circuit():
             qml.H(0)
@@ -29,20 +54,58 @@
     ```
 
     The PPRs and PPMs are currently only represented symbolically. However, these operations are not yet executable on any backend since they exist purely as intermediate representations for analysis and potential future execution when a suitable backend is available.
-    
+
     Example MLIR Representation:
     ```mlir
       . . .
-      %q0_0 = qec.ppr ["Z", "X", "Z"](%pi4) %qreg_0 : !quantum.bit
-      %q1_0 = qec.ppr ["Z"](%pi4) %qreg_1 : !quantum.bit
-      %q0_1 = qec.ppr ["Z"](%pi8) %q0_0 : !quantum.bit
-      %01_0 = qec.ppr ["Z", "X"](%pi4) %5, %2 : !quantum.bit, !quantum.bit
-      %q0_1 = qec.ppr ["Z"](%n_pi4) %01#0 : !quantum.bit
-      %q1_2 = qec.ppr ["X"](%n_pi4) %01#1 : !quantum.bit
-      %mres_1, %q0_3 = qec.ppm ["Z"] %q0_1 : !quantum.bit
-      %mres_2, %q1_3 = qec.ppm ["Z"] %q1_2 : !quantum.bit
-      . . . 
+        %0 = quantum.alloc( 2) : !quantum.reg
+        %1 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+        %2 = qec.ppr ["Z"](4) %1 : !quantum.bit
+        %3 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+        %4 = qec.ppr ["Z"](4) %3 : !quantum.bit
+        %5 = qec.ppr ["X"](4) %4 : !quantum.bit
+        %6 = qec.ppr ["Z"](4) %5 : !quantum.bit
+        %7 = qec.ppr ["Z"](8) %6 : !quantum.bit
+        %8:2 = qec.ppr ["Z", "X"](4) %7, %2 : !quantum.bit, !quantum.bit
+        %9 = qec.ppr ["Z"](-4) %8#0 : !quantum.bit
+        %10 = qec.ppr ["X"](-4) %8#1 : !quantum.bit
+        %mres, %out_qubits = qec.ppm ["Z"] %9 : !quantum.bit
+        %mres_0, %out_qubits_1 = qec.ppm ["Z"] %10 : !quantum.bit
+      . . .
     ```
+
+* Commuting Clifford Pauli Product Rotation (PPR) operations to the end of a circuit, past non-Clifford PPRs, is now available through the :func:`~.catalyst.passes.commute_ppr` pass transform.
+  [(#1563)](https://github.com/PennyLaneAI/catalyst/pull/1563)
+  
+  A PPR is a rotation gate of the form :math:`\exp{iP \theta}`, where :math:`P` is a Pauli word (a product of Pauli operators). Clifford PPRs refer to PPRs with :math:`\theta = \tfrac{\pi}{4}`, while non-Clifford PPRs have :math:`\theta = \tfrac{\pi}{8}`.
+
+  
+  Example:
+  ```python
+    @qjit(keep_intermediate=True)
+    @pipeline({"to_ppr": {}, "commute_ppr": {}})
+    @qml.qnode(qml.device("null.qubit", wires=1))
+    def circuit():
+        qml.H(0)
+        qml.T(0)
+        return measure(0)
+    ```
+  
+  The circuit program that generated from this pass is currrently not executable on any backend. For more information regarding to PPM, please refer to [(Pauli Product Measurement)](https://pennylane.ai/compilation/pauli-product-measurement)
+
+* Absorbing Clifford Pauli Product Rotation (PPR) operations into the final Pauli Product Measurement (PPM) is not availble through the :func:`~.catalyst.passes.ppr_to_ppm` pass transform. The output from this pass consists of non-Clifford PPRs and PPMs.
+  [(#1577)](https://github.com/PennyLaneAI/catalyst/pull/1577)
+
+  Example:
+  ```python
+    @qjit(keep_intermediate=True)
+    @pipeline({"to_ppr": {}, "commute_ppr": {}, "ppr_to_ppm": {}})
+    @qml.qnode(qml.device("null.qubit", wires=1))
+    def circuit():
+        qml.H(0)
+        qml.T(0)
+        return measure(0)
+  ```
 
 <h3>Improvements 🛠</h3>
 
@@ -57,7 +120,7 @@
   [(#1468)](https://github.com/PennyLaneAI/catalyst/pull/1468)
   [(#1509)](https://github.com/PennyLaneAI/catalyst/pull/1509)
   [(#1521)](https://github.com/PennyLaneAI/catalyst/pull/1521)
-  
+
   To trigger the PennyLane pipeline for capturing the program as a Jaxpr, simply set
   `experimental_capture=True` in the qjit decorator.
 
@@ -83,6 +146,37 @@
       return qml.expval(qml.Z(0))
   ```
 
+* Catalyst now supports experimental capture of PennyLane transforms.
+  [(#1544)](https://github.com/PennyLaneAI/catalyst/pull/1544)
+  [(#1561)](https://github.com/PennyLaneAI/catalyst/pull/1561)
+  [(#1567)](https://github.com/PennyLaneAI/catalyst/pull/1567)
+  [(#1578)](https://github.com/PennyLaneAI/catalyst/pull/1578)
+
+  To trigger the PennyLane pipeline for capturing the mentioned transforms,
+  simply set `experimental_capture=True` in the qjit decorator. If available,
+  Catalyst will apply its own pass in replacement of the original transform
+  provided by PennyLane. Otherwise, the transform will be expanded according
+  to PennyLane rules.
+
+  ```python
+  import pennylane as qml
+  from catalyst import qjit
+
+  dev = qml.device("lightning.qubit", wires=1)
+
+  @qjit(experimental_capture=True)
+  def func(x: float):
+      @qml.transforms.cancel_inverses
+      @qml.qnode(dev)
+      def circuit(x: float):
+          qml.RX(x, wires=0)
+          qml.Hadamard(wires=0)
+          qml.Hadamard(wires=0)
+          return qml.expval(qml.PauliZ(0))
+
+      return circuit(x)
+  ```
+
 * Changes to reduce compile time:
 
   - Turn off MLIR's verifier.
@@ -93,6 +187,30 @@
     [(#1524)](https://github.com/PennyLaneAI/catalyst/pull/1524)
   - Lazy IR canonicalization and LLVMIR textual generation.
     [(#1530)](https://github.com/PennyLaneAI/catalyst/pull/1530)
+
+* Catalyst now decomposes non-differentiable gates when in a gradient method.
+  [(#1562)](https://github.com/PennyLaneAI/catalyst/pull/1562)
+  [(#1568)](https://github.com/PennyLaneAI/catalyst/pull/1568)
+  [(#1569)](https://github.com/PennyLaneAI/catalyst/pull/1569)
+
+  Gates that are constant, such as when all parameters are Python or NumPy data types, are not
+  decomposed when this is allowable. For the adjoint differentiation method, this is allowable
+  for the `StatePrep`, `BasisState`, and `QubitUnitary` operations. For the parameter-shift method,
+  this is allowable for all operations.
+
+* Changes to support a dynamic number of qubits:
+
+  - The `qalloc_p` custom JAX primitive can now take in a dynamic number of qubits as a tracer
+    and lower it to mlir.
+    [(#1549)](https://github.com/PennyLaneAI/catalyst/pull/1549)
+
+  - `ComputationalBasisOp` can now take in a quantum register in mlir, instead of an explicit, fixed-size list of qubits.
+    [(#1553)](https://github.com/PennyLaneAI/catalyst/pull/1553)
+
+  - Non-observable measurements without explicit wires will now compile to `ComputationalBasisOp` with a quantum register, instead of the explicit list of all qubits on the device.
+  This means the same compiled IR can be reused even if the device changes its number of qubits across runs.
+  This includes `probs(), state(), sample(), counts()`.
+    [(#1565)](https://github.com/PennyLaneAI/catalyst/pull/1565)
 
 <h3>Breaking changes 💔</h3>
 
@@ -107,9 +225,17 @@
   give incorrect results for circuits containing `qml.StatePrep`.
   [(#1491)](https://github.com/PennyLaneAI/catalyst/pull/1491)
 
-* Fixes an issue ([(#1501)](https://github.com/PennyLaneAI/catalyst/issues/1501)) where using 
+* Fixes an issue ([(#1501)](https://github.com/PennyLaneAI/catalyst/issues/1501)) where using
   autograph in conjunction with catalyst passes causes a crash.
   [(#1541)](https://github.com/PennyLaneAI/catalyst/pull/1541)
+
+* Fixes an issue ([(#1548)](https://github.com/PennyLaneAI/catalyst/issues/1548)) where using
+  autograph in conjunction with catalyst pipeline causes a crash.
+  [(#1576)](https://github.com/PennyLaneAI/catalyst/pull/1576)
+
+* Fixes an issue ([(#1547)](https://github.com/PennyLaneAI/catalyst/issues/1547)) where using
+  chained catalyst passe decorators causes a crash.
+  [(#1576)](https://github.com/PennyLaneAI/catalyst/pull/1576)
 
 <h3>Internal changes ⚙️</h3>
 
@@ -143,8 +269,8 @@
   - The region of a `ParallelProtocolOp` is now always terminated with a `ion::YieldOp` with explicitly yielded SSA values. This ensures the op is well-formed, and improves readability.
     [(#1475)](https://github.com/PennyLaneAI/catalyst/pull/1475)
 
-  - Add a new pass `convert-ion-to-llvm` which lowers the Ion dialect to llvm dialect. This pass 
-    introduces oqd device specific stubs that will be implemented in oqd runtime including: 
+  - Add a new pass `convert-ion-to-llvm` which lowers the Ion dialect to llvm dialect. This pass
+    introduces oqd device specific stubs that will be implemented in oqd runtime including:
     `@ __catalyst__oqd__pulse`, `@ __catalyst__oqd__ParallelProtocol`.
     [(#1466)](https://github.com/PennyLaneAI/catalyst/pull/1466)
 
@@ -170,6 +296,15 @@
 
 * Update source code to comply with changes requested by black v25.1.0
   [(#1490)](https://github.com/PennyLaneAI/catalyst/pull/1490)
+
+* Revert `StaticCustomOp` in favour of adding helper functions (`isStatic()`, `getStaticParams()`
+  to the `CustomOp` which preserves the same functionality. More specifically, this reverts
+  [#1387] and [#1396], modifies [#1484].
+  [(#1558)](https://github.com/PennyLaneAI/catalyst/pull/1558)
+  [(#1555)](https://github.com/PennyLaneAI/catalyst/pull/1555)
+
+* Updated the c++ standard in mlir layer from 17 to 20.
+  [(#1229)](https://github.com/PennyLaneAI/catalyst/pull/1229)
 
 <h3>Documentation 📝</h3>
 

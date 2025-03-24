@@ -17,7 +17,7 @@
 
 include "mlir/Pass/PassBase.td"
 
-def CliffordTToPPRPass : Pass<"convert-clifford-t-to-ppr"> {
+def CliffordTToPPRPass : Pass<"to_ppr"> {
     let summary = "Convert quantum dialects to the QEC dialect.";
 
     let dependentDialects = [
@@ -25,6 +25,26 @@ def CliffordTToPPRPass : Pass<"convert-clifford-t-to-ppr"> {
     ];
 
     let constructor = "catalyst::createLowerToQECPass()";
+}
+
+def CommuteCliffordTPPRPass : Pass<"commute_ppr"> {
+    let summary = "Commutate CliffordT operations to PPRotation operations.";
+    
+    let dependentDialects = [
+        "catalyst::qec::QECDialect",
+    ];
+    
+    let constructor = "catalyst::createCommuteCliffordTPPRPass()";
+}
+
+def CommuteCliffordPastPPMPass : Pass<"ppr_to_ppm"> {
+    let summary = "Absorb Clifford operations into Pauli Product Measurement operations.";
+    
+    let dependentDialects = [
+        "catalyst::qec::QECDialect",
+    ];
+    
+    let constructor = "catalyst::createCommuteCliffordPastPPMPass()";
 }
 
 #endif // QEC_PASSES

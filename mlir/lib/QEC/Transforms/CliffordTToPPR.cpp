@@ -59,31 +59,39 @@ struct GateConversion {
     GateConversion() : pauliOperators(), rotationKind(0) {}
 };
 
-std::pair<ValueRange, TypeRange> getInQubitsAndOutQubits(CustomOp op)
-{
-    ValueRange inQubits = op.getInQubits();
-    TypeRange outQubitsTypes = op.getOutQubits().getType();
-
-    return std::make_pair(inQubits, outQubitsTypes);
-}
-
 //===----------------------------------------------------------------------===//
 //                       Gate conversion functions
 //===----------------------------------------------------------------------===//
 
 // C(P) = G(Angle)
-PPRotationOp singleQubitConversion(CustomOp &op, GateConversion gateConversion,
+PPRotationOp singleQubitConversion(CustomOp op, GateConversion gateConversion,
                                    ConversionPatternRewriter &rewriter)
 {
     auto loc = op->getLoc();
+    auto types = op.getOutQubits().getType();
+    auto inQubits = op.getInQubits();
 
     auto pauliProduct = rewriter.getStrArrayAttr(gateConversion.pauliOperators);
-    // auto denValue = getrotationKind(loc, gateConversion, rewriter);
-    auto [inQubits, outQubitsTypes] = getInQubitsAndOutQubits(op);
-
-    auto pprOp = rewriter.create<PPRotationOp>(loc, outQubitsTypes, pauliProduct,
+    auto pprOp = rewriter.create<PPRotationOp>(loc, types, pauliProduct,
                                                gateConversion.rotationKind, inQubits);
+    return pprOp;
+}
 
+PPRotationOp singleQubitConversion(CustomOp op, SmallVector<GateConversion> gateConversions,
+                                   ConversionPatternRewriter &rewriter)
+{
+    auto loc = op->getLoc();
+    auto types = op.getOutQubits().getType();
+    SmallVector<Value> inQubits = op.getInQubits();
+    PPRotationOp pprOp;
+
+    for (auto gateConversion : gateConversions) {
+        auto pauliProduct = rewriter.getStrArrayAttr(gateConversion.pauliOperators);
+        pprOp = rewriter.create<PPRotationOp>(loc, types, pauliProduct, gateConversion.rotationKind,
+                                              inQubits);
+        inQubits = pprOp.getOutQubits();
+        types = pprOp.getOutQubits().getType();
+    }
     return pprOp;
 }
 
@@ -105,21 +113,25 @@ LogicalResult controlledConversion(CustomOp op, StringRef P1, StringRef P2,
 
     // G0 = (P1 ⊗ P2)π/4
     auto pauliProduct = rewriter.getStrArrayAttr(g0.pauliOperators);
-    auto [inQubits, outQubitsTypes] = getInQubitsAndOutQubits(op);
-    auto G0 =
-        rewriter.create<PPRotationOp>(loc, outQubitsTypes, pauliProduct, g0.rotationKind, inQubits);
+    auto inQubitsValues = op.getInQubits();
+    auto outQubitsTypesList = op.getOutQubits().getType();
+
+    auto G0 = rewriter.create<PPRotationOp>(loc, outQubitsTypesList, pauliProduct, g0.rotationKind,
+                                            inQubitsValues);
 
     // G1 = (P1 ⊗ 1)−π/4
     pauliProduct = rewriter.getStrArrayAttr(g1.pauliOperators);
-    SmallVector<Value> inQubitsValues{G0.getOutQubits()[0]};
-    SmallVector<Type> outQubitsTypesList{G0.getOutQubits()[0].getType()};
-    auto G1 = rewriter.create<PPRotationOp>(loc, outQubitsTypesList, pauliProduct, g1.rotationKind,
-                                            inQubitsValues);
+    SmallVector<Value> inQubitsValues1{G0.getOutQubits()[0]};
+    SmallVector<Type> outQubitsTypesList1{G0.getOutQubits()[0].getType()};
+
+    auto G1 = rewriter.create<PPRotationOp>(loc, outQubitsTypesList1, pauliProduct, g1.rotationKind,
+                                            inQubitsValues1);
 
     // G2 = (1 ⊗ P2)−π/4
     pauliProduct = rewriter.getStrArrayAttr(g2.pauliOperators);
     SmallVector<Value> inQubitsValues2{G0.getOutQubits()[1]};
     SmallVector<Type> inQubitsTypesList2{G0.getOutQubits()[1].getType()};
+
     auto G2 = rewriter.create<PPRotationOp>(loc, inQubitsTypesList2, pauliProduct, g1.rotationKind,
                                             inQubitsValues2);
 
@@ -130,9 +142,13 @@ LogicalResult controlledConversion(CustomOp op, StringRef P1, StringRef P2,
 // H = (Z · X · Z)π/4
 LogicalResult convertHGate(CustomOp op, ConversionPatternRewriter &rewriter)
 {
-    auto gate = GateConversion({"Z", "X", "Z"}, 4);
-    auto singleQubitOp = singleQubitConversion(op, gate, rewriter);
-    rewriter.replaceOp(op, singleQubitOp);
+    auto Z0 = GateConversion({"Z"}, 4);
+    auto X1 = GateConversion({"X"}, 4);
+    auto Z2 = GateConversion({"Z"}, 4);
+
+    SmallVector<GateConversion> gateConversions = {Z0, X1, Z2};
+    auto pprOp = singleQubitConversion(op, gateConversions, rewriter);
+    rewriter.replaceOp(op, pprOp);
     return success();
 }
 
@@ -167,12 +183,13 @@ LogicalResult convertMeasureOpToPPM(MeasureOp op, StringRef axis,
 
     ArrayAttr pauliProduct = rewriter.getStrArrayAttr({axis});
     auto inQubits = op.getInQubit();
+
     Type qubitType = op.getOutQubit().getType();
     Type mresType = op.getMres().getType();
     SmallVector<Type> outQubitTypes({qubitType});
 
-    auto ppmOp =
-        rewriter.create<PPMeasurementOp>(loc, mresType, outQubitTypes, pauliProduct, inQubits);
+    auto ppmOp = rewriter.create<PPMeasurementOp>(loc, mresType, outQubitTypes, pauliProduct,
+                                                  nullptr, inQubits);
 
     rewriter.replaceOp(op, ppmOp);
     return success();

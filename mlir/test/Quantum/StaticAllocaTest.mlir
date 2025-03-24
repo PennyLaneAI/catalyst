@@ -98,7 +98,7 @@ module @static_alloca_sample {
     // CHECK: ^bb1:
     cf.br ^bb1
   ^bb1:
-    %obs = quantum.compbasis %arg0 : !quantum.obs
+    %obs = quantum.compbasis qubits %arg0 : !quantum.obs
     quantum.sample %obs in(%alloc : memref<1x1xf64>)
     return
   }
@@ -116,7 +116,7 @@ module @static_alloca_state {
     // CHECK-NEXT: llvm.alloca [[one]] x !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
     // CHECK: ^bb1:
   ^bb1:
-    %obs = quantum.compbasis %arg0 : !quantum.obs
+    %obs = quantum.compbasis qubits %arg0 : !quantum.obs
     quantum.state %obs in(%alloc : memref<2xcomplex<f64>>)
     return
   }

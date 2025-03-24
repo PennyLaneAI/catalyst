@@ -84,7 +84,7 @@ def lower_callable(ctx, callable_, call_jaxpr, pipeline=None):
 
 def get_or_create_funcop(ctx, callable_, call_jaxpr, pipeline):
     """Get funcOp from cache, or create it from scratch"""
-    key = (callable_, *pipeline)
+    key = (str(call_jaxpr), *pipeline)
     if func_op := get_cached(ctx, key):
         return func_op
     func_op = lower_callable_to_funcop(ctx, callable_, call_jaxpr)
@@ -133,7 +133,7 @@ def get_or_create_qnode_funcop(ctx, callable_, call_jaxpr, pipeline):
     Returns:
       FuncOp
     """
-    key = (callable_, *pipeline)
+    key = (str(call_jaxpr), *pipeline)
     if func_op := get_cached(ctx, key):
         return func_op
     func_op = lower_qnode_to_funcop(ctx, callable_, call_jaxpr, pipeline)
