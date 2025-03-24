@@ -493,7 +493,6 @@ def handle_for_loop(
 ):
     """Handle the conversion from plxpr to Catalyst jaxpr for the for loop primitive"""
     assert jaxpr_body_fn is not None
-
     args = plxpr_invals[args_slice]
 
     # Add the iteration start and the qreg to the args
@@ -550,7 +549,6 @@ def handle_while_loop(
     body_slice,
     cond_slice,
     args_slice,
-    abstract_shapes_slice,
 ):
     """Handle the conversion from plxpr to Catalyst jaxpr for the while loop primitive"""
     consts_body = plxpr_invals[body_slice]
