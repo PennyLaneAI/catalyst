@@ -10,7 +10,6 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Compiler options
 option(ENABLE_CODE_COVERAGE "Enable code coverage" OFF)
 option(ENABLE_ADDRESS_SANITIZER "Enable address sanitizer" OFF)
-option(RUNTIME_CLANG_TIDY "Enable Clang Tidy" OFF)
 
 option(ENABLE_OPENQASM "Build OpenQasm backend device" OFF)
 option(ENABLE_OQD "Build OQD backend device" OFF)

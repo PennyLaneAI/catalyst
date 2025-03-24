@@ -40,7 +40,6 @@ help:
 	@echo "  test               to run the Catalyst runtime test suite"
 	@echo "  format [check=1]   to apply C++ formatter; use with 'check=1' to check instead of modify (requires clang-format)"
 	@echo "  format [version=?] to apply C++ formatter; use with 'version={version}' to run clang-format-{version} instead of clang-format"
-	@echo "  check-tidy         to build Catalyst Runtime with RUNTIME_CLANG_TIDY=ON (requires clang-tidy)"
 
 .PHONY: configure
 configure:
@@ -115,7 +114,7 @@ endif
 .PHONY: clean
 clean:
 	@echo "clean build files"
-	rm -rf $(RT_BUILD_DIR) $(RT_BUILD_DIR)_cov cov coverage.info $(MK_DIR)/BuildTidy
+	rm -rf $(RT_BUILD_DIR) $(RT_BUILD_DIR)_cov cov coverage.info
 
 .PHONY: format
 format:
@@ -124,14 +123,3 @@ ifdef check
 else
 	$(PYTHON) ../bin/format.py $(if $(version:-=),--cfversion $(version)) .
 endif
-
-.PHONY: check-tidy
-check-tidy:
-	@echo "build Catalyst Runtime with RUNTIME_CLANG_TIDY=ON"
-	cmake -G Ninja -B $(MK_DIR)/BuildTidy . \
-		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
-		-DCMAKE_C_COMPILER=$(C_COMPILER) \
-		-DCMAKE_CXX_COMPILER=$(CXX_COMPILER) \
-		-DRUNTIME_CLANG_TIDY=ON
-
-	cmake --build $(MK_DIR)/BuildTidy --target rt_capi -j$(NPROC)
