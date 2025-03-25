@@ -158,8 +158,7 @@ SmallVector<Value> replaceValueWithOperands(const PauliStringWrapper &lhsPauliWr
 void updatePauliWord(QECOpInterface op, const PauliWord &newPauliWord, PatternRewriter &rewriter);
 
 // Update the sign of the operation.
-// TODO: Using QECOpInterface instead of PPRotationOp
-void updatePauliWordSign(PPRotationOp op, bool isNegated, PatternRewriter &rewriter);
+void updatePauliWordSign(QECOpInterface op, bool isNegated, PatternRewriter &rewriter);
 
 } // namespace qec
 } // namespace catalyst
