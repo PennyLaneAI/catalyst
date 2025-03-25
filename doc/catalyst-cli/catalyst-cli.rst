@@ -115,22 +115,36 @@ name. Currently, the following pipelines are available:
 ``default-catalyst-pipeline`` which encompasses all the above as the default pipeline used by the
 Catalyst CLI tool if no pass option is specified.
 
-``--catalyst-pipeline=<pipeline1(pass1[;pass2[;...]])[,pipeline2(...)]>``
+``--catalyst-pipeline=pipeline1;builtin.module(pass1,pass2,...,passN)``
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
 Specify the Catalyst compilation pass pipelines.
 
-A pipeline is composed of a semicolon-delimited sequence of one or more transformation or
-optimization passes. Multiple pass pipelines can be specified and input as a comma-delimited
-sequence of pipelines.
+One difference between opt-like tools and Catalyst is that Catalyst supports named pipelines.
+Named pipelines are preceeded by a name (in the case above ``pipeline``) and the name is separated from the passes via a semicolon.
+The pipelines' names will be used for the intermediate files saved when using the ``--keep-intermediate`` option.
+The same syntax used for opt-like tools can be used for the actual pipeline passes.
 
-For example, if we wanted to specify two pass pipelines, ``pipe1`` and ``pipe2``, where ``pipe1``
+.. code-block::
+   # Syntax example
+   builtin.module(foo,func.func(bar))
+
+Catalyst allows for multiple pipelines.
+In this case, the order is important.
+For example, in the case below, the pipeline named ``before`` will run before the pipeline ``after``.
+
+.. code-block::
+
+    --catalyst-pipeline=before;builtin.module(foo) --catalyst.pipeline=after;builtin.module(bar)
+
+If we wanted to specify two pass pipelines, ``pipe1`` and ``pipe2``, where ``pipe1``
 applies the passes ``split-multiple-tapes`` and ``apply-transform-sequence``, and where ``pipe2``
 applies the pass ``inline-nested-module``, we would specify this pipeline configuration as:
 
 .. code-block::
 
-    --catalyst-pipeline="pipe1(split-multiple-tapes;apply-transform-sequence),pipe2(inline-nested-module)"
+    --catalyst-pipeline='pipe1;builtin-module(split-multiple-tapes,apply-transform-sequence)'
+    --catalyst-pipeline='pipe2;builtin-module(inline-nested-module)'
 
 ``--workspace=<path>``
 """"""""""""""""""""""
