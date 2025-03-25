@@ -115,13 +115,13 @@ name. Currently, the following pipelines are available:
 ``default-catalyst-pipeline`` which encompasses all the above as the default pipeline used by the
 Catalyst CLI tool if no pass option is specified.
 
-``--catalyst-pipeline=pipeline1;builtin.module(pass1,pass2,...,passN)``
+``--catalyst-pipeline=pipeline1:builtin.module(pass1,pass2,...,passN)``
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
 Specify the Catalyst compilation pass pipelines.
 
 One difference between opt-like tools and Catalyst is that Catalyst supports named pipelines.
-Named pipelines are preceeded by a name (in the case above ``pipeline``) and the name is separated from the passes via a semicolon.
+Named pipelines are preceeded by a name (in the case above ``pipeline``) and the name is separated from the passes via a colon.
 The pipelines' names will be used for the intermediate files saved when using the ``--keep-intermediate`` option.
 The same syntax used for opt-like tools can be used for the actual pipeline passes.
 
@@ -135,7 +135,7 @@ For example, in the case below, the pipeline named ``before`` will run before th
 
 .. code-block::
 
-    --catalyst-pipeline=before;builtin.module(foo) --catalyst.pipeline=after;builtin.module(bar)
+    --catalyst-pipeline=before:builtin.module(foo) --catalyst.pipeline=after:builtin.module(bar)
 
 If we wanted to specify two pass pipelines, ``pipe1`` and ``pipe2``, where ``pipe1``
 applies the passes ``split-multiple-tapes`` and ``apply-transform-sequence``, and where ``pipe2``
@@ -143,8 +143,8 @@ applies the pass ``inline-nested-module``, we would specify this pipeline config
 
 .. code-block::
 
-    --catalyst-pipeline='pipe1;builtin-module(split-multiple-tapes,apply-transform-sequence)'
-    --catalyst-pipeline='pipe2;builtin-module(inline-nested-module)'
+    --catalyst-pipeline='pipe1:builtin-module(split-multiple-tapes,apply-transform-sequence)'
+    --catalyst-pipeline='pipe2:builtin-module(inline-nested-module)'
 
 ``--workspace=<path>``
 """"""""""""""""""""""
@@ -168,7 +168,7 @@ given stage. The stages that are currently available are:
 
 * MLIR: ``mlir`` (start with first MLIR stage), ``{pipeline}`` such as any of the built-in pipeline
   names described under the ``--{passname}`` option, OR any custom pipeline names if the
-  ``--catalyst-pipeline={pipeline(...),...}`` option is used.
+  ``--catalyst-pipeline={pipeline:(...),...}`` option is used.
 * LLVM: ``llvm_ir`` (start with first LLVM stage), ``CoroOpt``, ``O2Opt``, ``Enzyme``.
   Note that ``CoroOpt`` (Coroutine lowering), ``O2Opt`` (O2 optimization), and ``Enzyme``
   (automatic differentiation) passes are only run conditionally as needed.
@@ -221,7 +221,7 @@ pass that is applied, and the ``-o`` option to set the name of the output IR fil
 
     catalyst my_circuit.mlir \
         --tool=opt \
-        --catalyst-pipeline="pipe(remove-chained-self-inverse;merge-rotations)" \
+        --catalyst-pipeline="pipe:builtin(remove-chained-self-inverse,merge-rotations)" \
         --mlir-print-ir-after-all \
         -o my_circuit-llvm.mlir
 

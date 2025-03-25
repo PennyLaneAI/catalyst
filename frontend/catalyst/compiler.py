@@ -307,7 +307,7 @@ class Compiler:
         for pipeline in self.options.get_pipelines():
             pipeline_name, passes = pipeline
             passes_str = ",".join(passes)
-            pipeline_str = f"{pipeline_name};{passes_str}"
+            pipeline_str = f"{pipeline_name}:{passes_str}"
             cmd += ["--catalyst-pipeline", pipeline_str]
 
         cmd += ["-verify-each=false"]

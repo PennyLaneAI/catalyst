@@ -831,7 +831,7 @@ std::vector<Pipeline> parsePipelines(const cl::list<std::string> &catalystPipeli
             continue;
         }
 
-        size_t delim = pipelineRef.find(';');
+        size_t delim = pipelineRef.find(':');
 
         // Extract pipeline name
         llvm::StringRef pipelineName = pipelineRef.slice(0, delim).trim();
