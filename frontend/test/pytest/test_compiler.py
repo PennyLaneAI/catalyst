@@ -239,14 +239,13 @@ class TestCompilerState:
             return qml.state()
 
         compiler = workflow.compiler
-        with pytest.raises(CompileError, match="Attempting to get output for pipeline"):
-            compiler.get_output_of("EmptyPipeline1", workflow.workspace)
+        # Empty pipelines are identity
+        assert compiler.get_output_of("EmptyPipeline1", workflow.workspace)
         assert compiler.get_output_of("HLOLoweringPass", workflow.workspace)
         assert compiler.get_output_of("QuantumCompilationPass", workflow.workspace)
-        with pytest.raises(CompileError, match="Attempting to get output for pipeline"):
-            compiler.get_output_of("EmptyPipeline2", workflow.workspace)
         assert compiler.get_output_of("BufferizationPass", workflow.workspace)
         assert compiler.get_output_of("MLIRToLLVMDialect", workflow.workspace)
+        assert compiler.get_output_of("EmptyPipeline2", workflow.workspace)
         with pytest.raises(CompileError, match="Attempting to get output for pipeline"):
             compiler.get_output_of("None-existing-pipeline", workflow.workspace)
         workflow.workspace.cleanup()
