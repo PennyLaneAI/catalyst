@@ -16,7 +16,7 @@
 
 # RUN: %PYTHON %s | FileCheck %s
 
-from catalyst.compiler import _canonicalize, _opt, _to_llvmir
+from catalyst.compiler import _opt, _to_llvmir, canonicalize
 
 
 def test_opt_happy_path():
@@ -48,7 +48,7 @@ def test_opt_canonicalize():
         }
     }
     """
-    output = _canonicalize(stdin=mlir)
+    output = canonicalize(stdin=mlir)
     print(output)
 
 

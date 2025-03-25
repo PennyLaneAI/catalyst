@@ -303,13 +303,15 @@ def _opt(*args, stdin=None):
     return _catalyst(("--tool", "opt"), *args, stdin=stdin)
 
 
-def _canonicalize(*args, stdin=None):
+def canonicalize(*args, stdin=None):
     """Run opt with canonicalization
 
     echo ${stdin} | catalyst --tool=opt \
             --catalyst-pipeline='builtin.module(canonicalize)' *args -
     catalyst --tool=opt \
             --catalyst-pipeline='builtin.module(canonicalize)' *args
+
+    Returns stdout string
     """
     return _opt(("--pass-pipeline", "builtin.module(canonicalize)"), *args, stdin=stdin)
 
