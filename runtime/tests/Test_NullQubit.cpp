@@ -61,7 +61,7 @@ TEST_CASE("Test a NullQubit circuit with num_qubits=2 ", "[NullQubit]")
     Qs.reserve(n);
 
     for (size_t i = 0; i < n; i++) {
-        Qs[i] = sim->AllocateQubit();
+        Qs.push_back(sim->AllocateQubit());
     }
 
     sim->StartTapeRecording();
@@ -85,16 +85,16 @@ TEST_CASE("Test a NullQubit circuit with num_qubits=4", "[NullQubit]")
     Qs.reserve(n);
 
     sim->StartTapeRecording();
-    Qs[0] = sim->AllocateQubit();
+    Qs.push_back(sim->AllocateQubit());
     sim->NamedOperation("Hadamard", {}, {Qs[0]}, false);
 
-    Qs[1] = sim->AllocateQubit();
+    Qs.push_back(sim->AllocateQubit());
     sim->NamedOperation("CRX", {0.123}, {Qs[0], Qs[1]}, false);
 
-    Qs[2] = sim->AllocateQubit();
+    Qs.push_back(sim->AllocateQubit());
     sim->NamedOperation("CRY", {0.456}, {Qs[0], Qs[2]}, false);
 
-    Qs[3] = sim->AllocateQubit();
+    Qs.push_back(sim->AllocateQubit());
     sim->NamedOperation("CRZ", {0.789}, {Qs[0], Qs[3]}, false);
     sim->StopTapeRecording();
 
@@ -114,7 +114,7 @@ TEST_CASE("Test a NullQubit circuit with num_qubits=4 and observables", "[NullQu
     std::vector<QubitIdType> Qs;
     Qs.reserve(n);
     for (size_t i = 0; i < n; i++) {
-        Qs[i] = sim->AllocateQubit();
+        Qs.push_back(sim->AllocateQubit());
     }
 
     sim->StartTapeRecording();
