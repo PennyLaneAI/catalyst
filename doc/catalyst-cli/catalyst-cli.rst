@@ -160,11 +160,6 @@ Note that the workspace directory must exist before running ``catalyst`` with th
 The module name used in naming the output file(s). The default is ``"catalyst_module"``. Using the
 ``-o`` option to specify the output filename overrides this option.
 
-``--async-qnodes[=<true|false>]``
-"""""""""""""""""""""""""""""""""
-
-Enable asynchronous QNodes.
-
 ``--checkpoint-stage=<stage name>``
 """""""""""""""""""""""""""""""""""
 

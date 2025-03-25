@@ -641,6 +641,13 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
 {
     using timer = catalyst::utils::Timer;
 
+    bool hasAsync = false;
+    for (auto pipeline : options.pipelinesCfg) {
+        for (auto passes : pipeline.getPasses()) {
+            hasAsync |= passes.find("qnode-to-async-lowering") != std::string::npos;
+        }
+    }
+
     MLIRContext ctx(registry);
     ctx.printOpOnDiagnostic(true);
     ctx.printStackTraceOnDiagnostic(options.verbosity >= Verbosity::Debug);
@@ -769,7 +776,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         llvmModule->setDataLayout(targetMachine->createDataLayout());
         llvmModule->setTargetTriple(targetTriple);
 
-        if (options.asyncQnodes) {
+        if (hasAsync) {
             TimingScope coroLLVMPassesTiming = llcTiming.nest("LLVM coroutine passes");
             if (failed(timer::timer(runCoroLLVMPasses, "runCoroLLVMPasses", /* add_endl */ false,
                                     options, llvmModule, output))) {
@@ -924,7 +931,6 @@ int QuantumDriverMainFromCL(int argc, char **argv)
                             .moduleName = ModuleName,
                             .diagnosticStream = errStream,
                             .keepIntermediate = SaveAfterEach,
-                            .asyncQnodes = AsyncQNodes,
                             .verbosity = Verbose ? Verbosity::All : Verbosity::Urgent,
                             .pipelinesCfg = parsePipelines(CatalystPipeline),
                             .checkpointStage = CheckpointStage,
