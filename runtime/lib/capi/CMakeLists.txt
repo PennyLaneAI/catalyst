@@ -38,8 +38,8 @@ target_include_directories(rt_capi PUBLIC .
 )
 
 set_property(TARGET rt_capi PROPERTY POSITION_INDEPENDENT_CODE ON)
-set_property(TARGET rt_capi APPEND PROPERTY BUILD_RPATH "$<TARGET_FILE_DIR:catalyst_callback_registry>")
 
+# The catalyst_callback_registry.so will be located in the same directory as the CAPI library:
 if(NOT APPLE)
     set_property(TARGET rt_capi APPEND PROPERTY BUILD_RPATH $ORIGIN)
 else()

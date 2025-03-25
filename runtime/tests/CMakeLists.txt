@@ -49,8 +49,6 @@ if(ENABLE_OPENQASM)
         Test_OpenQasmDevice.cpp
     )
 
-    add_dependencies(runner_tests_openqasm openqasm_python_module)
-    set_property(TARGET runner_tests_openqasm APPEND PROPERTY BUILD_RPATH "$<TARGET_FILE_DIR:openqasm_python_module>")
     if(NOT APPLE)
         set_property(TARGET runner_tests_openqasm APPEND PROPERTY BUILD_RPATH $ORIGIN)
         set_property(TARGET runner_tests_openqasm APPEND PROPERTY BUILD_RPATH $ORIGIN/../lib)
