@@ -37,9 +37,12 @@ set_target_properties(openqasm_python_module PROPERTIES SUFFIX ".so")
 
 add_library(rtd_openqasm SHARED OpenQasmDevice.cpp)
 
-target_include_directories(rtd_openqasm PRIVATE .
+target_include_directories(rtd_openqasm
+    PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    PRIVATE
     ${runtime_includes}
-    ${backend_includes}
+    ${backend_utils_includes}
 )
 
 set_property(TARGET rtd_openqasm PROPERTY POSITION_INDEPENDENT_CODE ON)

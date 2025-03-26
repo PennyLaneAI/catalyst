@@ -27,6 +27,31 @@ list(APPEND CMAKE_MODULE_PATH ${catch2_SOURCE_DIR}/contrib)
 include(CTest)
 include(Catch)
 
+# Set up targets for testing.
+add_library(catalyst_runtime_testing INTERFACE)
+
+target_include_directories(catalyst_runtime_testing INTERFACE
+    ${runtime_includes}
+    ${capi_utils_includes}
+    ${backend_utils_includes}
+)
+
+target_link_libraries(catalyst_runtime_testing INTERFACE
+    ${CMAKE_DL_LIBS}  # dlopen from ExecutionContext.h
+    ${devices_list}
+    rt_capi
+)
+
+if(ENABLE_CODE_COVERAGE)
+    if(APPLE)
+        target_compile_options(catalyst_runtime_testing INTERFACE -fprofile-instr-generate -fcoverage-mapping)
+        target_link_options(catalyst_runtime_testing INTERFACE -fprofile-instr-generate -fcoverage-mapping)
+    else()
+        target_compile_options(catalyst_runtime_testing INTERFACE -fprofile-arcs -ftest-coverage)
+        target_link_libraries(catalyst_runtime_testing INTERFACE gcov)
+    endif()
+endif()
+
 add_executable(runner_tests_qir_runtime)
 target_sources(runner_tests_qir_runtime PRIVATE
     Test_NullQubit.cpp
@@ -36,7 +61,7 @@ target_sources(runner_tests_qir_runtime PRIVATE
 target_link_libraries(runner_tests_qir_runtime PRIVATE
     Catch2WithMain
     pybind11::embed
-    catalyst_qir_runtime
+    catalyst_runtime_testing
     rtd_null_qubit
 )
 
@@ -60,7 +85,8 @@ if(ENABLE_OPENQASM)
     target_link_libraries(runner_tests_openqasm PRIVATE
         Catch2WithMain
         pybind11::embed
-        catalyst_qir_runtime
+        catalyst_runtime_testing
+        rtd_openqasm
     )
 
     catch_discover_tests(runner_tests_openqasm)
@@ -82,9 +108,10 @@ if(ENABLE_OQD)
 
     target_link_libraries(runner_tests_oqd PRIVATE
         Catch2WithMain
-        catalyst_qir_runtime
+        catalyst_runtime_testing
         rt_OQD_capi
-        PRIVATE nlohmann_json::nlohmann_json
+        rtd_oqd_device
+        nlohmann_json::nlohmann_json
     )
 
     catch_discover_tests(runner_tests_oqd)

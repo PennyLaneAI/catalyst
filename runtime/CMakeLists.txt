@@ -19,10 +19,12 @@ option(ENABLE_OQD "Build OQD backend device" OFF)
 set(CMAKE_VERBOSE_MAKEFILE ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-set(runtime_includes "${PROJECT_SOURCE_DIR}/include")
-set(capi_utils_includes "${PROJECT_SOURCE_DIR}/lib/capi")
-set(backend_includes "${PROJECT_SOURCE_DIR}/lib/backend/common")
-
+set(runtime_includes ${PROJECT_SOURCE_DIR}/include)
+set(capi_utils_includes ${PROJECT_SOURCE_DIR}/lib/capi)
+set(backend_utils_includes
+    ${PROJECT_SOURCE_DIR}/lib/backend/common
+    ${MLIR_INCLUDE_DIRS}                      # RunnerUtils.h
+)
 
 # Get LLVM hash to target from source tree.
 file(READ ../.dep-versions DEPENDENCY_VERSIONS)
@@ -51,55 +53,21 @@ find_package(Python REQUIRED
     OPTIONAL_COMPONENTS Development.Embed Development.SABIModule
 )
 
-if(RUNTIME_ENABLE_WARNINGS)
-    message(STATUS "Building with compiler warnings as errors enabled.")
-    set(CMAKE_COMPILE_WARNING_AS_ERROR ON)
-    add_compile_options(-Wall)
-endif()
-
 message(STATUS "ENABLE_OPENQASM is ${ENABLE_OPENQASM}.")
 message(STATUS "ENABLE_OQD is ${ENABLE_OQD}.")
 
-set(devices_list)
-list(APPEND devices_list rtd_null_qubit)
-list(APPEND backend_includes "${PROJECT_SOURCE_DIR}/lib/backend/null_qubit")
-
-if(ENABLE_OPENQASM)
-    list(APPEND backend_includes "${PROJECT_SOURCE_DIR}/lib/backend/openqasm")
-    list(APPEND devices_list rtd_openqasm)
-endif()
-
-if(ENABLE_OQD)
-    list(APPEND backend_includes "${PROJECT_SOURCE_DIR}/lib/backend/oqd")
-    list(APPEND devices_list rtd_oqd_device)
-endif()
-
-add_library(catalyst_qir_runtime INTERFACE)
-
-target_link_libraries(catalyst_qir_runtime INTERFACE ${devices_list} rt_capi)
-
-target_include_directories(catalyst_qir_runtime INTERFACE
-    ${runtime_includes}
-    ${backend_includes}
-    ${MLIR_INCLUDE_DIRS}
-)
-
-if(ENABLE_CODE_COVERAGE)
-    message(STATUS "ENABLE_CODE_COVERAGE is ON.")
-    if(APPLE)
-        target_compile_options(catalyst_qir_runtime INTERFACE -fprofile-instr-generate -fcoverage-mapping)
-        target_link_options(catalyst_qir_runtime INTERFACE -fprofile-instr-generate -fcoverage-mapping)
-    else()
-        target_compile_options(catalyst_qir_runtime INTERFACE -fprofile-arcs -ftest-coverage)
-        target_link_libraries(catalyst_qir_runtime INTERFACE gcov)
-    endif()
-endif()
-
+message(STATUS "ENABLE_CODE_COVERAGE is ${ENABLE_CODE_COVERAGE}.")
+message(STATUS "ENABLE_ADDRESS_SANITIZER is ${ENABLE_ADDRESS_SANITIZER}.")
+message(STATUS "RUNTIME_ENABLE_WARNINGS is ${RUNTIME_ENABLE_WARNINGS}.")
 
 if(ENABLE_ADDRESS_SANITIZER)
-    message(STATUS "ENABLE_ADDRESS_SANITIZER is ON.")
     add_compile_options(-fsanitize=address)
     add_link_options(-fsanitize=address)
+endif()
+
+if(RUNTIME_ENABLE_WARNINGS)
+    set(CMAKE_COMPILE_WARNING_AS_ERROR ON)
+    add_compile_options(-Wall)
 endif()
 
 add_subdirectory(lib)
