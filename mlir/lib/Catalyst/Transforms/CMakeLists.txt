@@ -1,7 +1,6 @@
-set(LIBRARY_NAME MLIRCatalystTransforms)
+set(LIBRARY_NAME catalyst-transforms)
 
 file(GLOB SRC
-
     ApplyTransformSequencePass.cpp
     ArrayListToMemRefPass.cpp
     AsyncUtils.cpp

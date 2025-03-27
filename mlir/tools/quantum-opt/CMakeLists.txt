@@ -7,7 +7,7 @@ set(LIBS
     ${extension_libs}
     MLIROptLib
     MLIRCatalyst
-    MLIRCatalystTransforms
+    catalyst-transforms
     MLIRQuantum
     quantum-transforms
     MLIRQEC
