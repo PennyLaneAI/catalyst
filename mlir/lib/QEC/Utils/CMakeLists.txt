@@ -6,6 +6,9 @@ FetchContent_Declare(stim
     SYSTEM  # ignore warnings from headers
 )
 
+# Set a more portable vectorization instruction set than whatever is available on the build machine.
+set(SIMD_WIDTH 128)
+
 FetchContent_MakeAvailable(stim)
 
 # Ignore all warnings from Stim library sources.
