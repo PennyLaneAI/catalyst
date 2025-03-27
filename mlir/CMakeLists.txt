@@ -7,9 +7,6 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_CXX_STANDARD 20 CACHE STRING "C++ standard to conform to")
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# LLVM source code triggers a cpp20 warning
-add_compile_options(-Wno-ambiguous-reversed-operator)
-
 find_package(MLIR REQUIRED CONFIG)
 find_package(MHLO REQUIRED CONFIG)
 
@@ -63,13 +60,17 @@ endif()
 list(GET MHLO_INCLUDE_DIRS 1 MLIRHLO_DIR)
 list(GET MHLO_INCLUDE_DIRS 2 MLIRHLO_BUILD_DIR)
 
-include_directories(${LLVM_INCLUDE_DIRS}
-                    ${MLIR_INCLUDE_DIRS}
-                    ${MHLO_INCLUDE_DIRS}
-                    ${MLIRHLO_DIR}/stablehlo
-                    ${MLIRHLO_BUILD_DIR}/stablehlo
-                    ${PROJECT_SOURCE_DIR}/include
-                    ${PROJECT_BINARY_DIR}/include)
+include_directories(SYSTEM
+  ${LLVM_INCLUDE_DIRS}
+  ${MLIR_INCLUDE_DIRS}
+  ${MHLO_INCLUDE_DIRS}
+  ${MLIRHLO_DIR}/stablehlo
+  ${MLIRHLO_BUILD_DIR}/stablehlo
+)
+include_directories(
+  ${PROJECT_SOURCE_DIR}/include
+  ${PROJECT_BINARY_DIR}/include
+)
 link_directories(${LLVM_BUILD_LIBRARY_DIR})
 add_definitions(${LLVM_DEFINITIONS})
 
@@ -112,7 +113,7 @@ else()
         LINK_COMPONENTS Support # llvm::raw_ostream
         BUILDTREE_ONLY
       )
-      target_include_directories(llvm_gtest
+      target_include_directories(llvm_gtest SYSTEM
         PUBLIC
         "${UNITTEST_DIR}/googletest/include"
         "${UNITTEST_DIR}/googlemock/include"
