@@ -154,7 +154,7 @@ test-oqc:
 lit:
 ifeq ($(ENABLE_ASAN),ON)
 ifneq ($(findstring clang,$(C_COMPILER)),clang)
-	@echo "Build and Test with Address Sanitizer are only supported by Clang, but provided $(C_COMPILER)"
+	@echo "Running Python tests with Address Sanitizer is only supported with Clang, but provided $(C_COMPILER)"
 	@exit 1
 endif
 endif
@@ -164,7 +164,7 @@ endif
 pytest:
 ifeq ($(ENABLE_ASAN),ON)
 ifneq ($(findstring clang,$(C_COMPILER)),clang)
-	@echo "Build and Test with Address Sanitizer are only supported by Clang, but provided $(C_COMPILER)"
+	@echo "Running Python tests with Address Sanitizer is only supported with Clang, but provided $(C_COMPILER)"
 	@exit 1
 endif
 endif
@@ -275,6 +275,12 @@ clean-oqc:
 coverage: coverage-frontend coverage-runtime
 
 coverage-frontend:
+ifeq ($(ENABLE_ASAN),ON)
+ifneq ($(findstring clang,$(C_COMPILER)),clang)
+	@echo "Running Python tests with Address Sanitizer is only supported with Clang, but provided $(C_COMPILER)"
+	@exit 1
+endif
+endif
 	@echo "Generating coverage report for the frontend"
 	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/pytest $(PYTEST_FLAGS) --cov=catalyst --tb=native --cov-report=$(COVERAGE_REPORT)
 	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/test_oqc/oqc $(PYTEST_FLAGS) --cov=catalyst --cov-append --tb=native --cov-report=$(COVERAGE_REPORT)

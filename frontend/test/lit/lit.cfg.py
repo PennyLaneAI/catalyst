@@ -45,7 +45,7 @@ if (
     or os.environ.get("ENABLE_ASAN", None) == "ON"
 ):
     # With sanitized builds, Python tests require some preloading magic to run.
-    if "Linux" in config.host_os:
+    if "Linux" in config.host_os and "clang" in config.host_cxx:
         python_executable = f"LD_PRELOAD=$({config.host_cxx} -print-file-name=libclang_rt.asan-{config.host_arch}.so) {python_executable}"
     elif "Darwin" in config.host_os:
         # It's important that the python executable discovered by CMake is the true interpreter
