@@ -27,7 +27,7 @@ set(LIBS
     ${translation_libs}
     MLIROptLib
     MLIRCatalyst
-    MLIRCatalystTransforms
+    catalyst-transforms
     MLIRQuantum
     quantum-transforms
     MLIRQEC
