@@ -22,7 +22,7 @@
 #include "RuntimeCAPI.h"
 #include "TestUtils.hpp"
 
-#include "OQDDevice.cpp"
+#include "OQDDevice.hpp"
 #include "OQDRuntimeCAPI.h"
 
 using namespace Catch::Matchers;
