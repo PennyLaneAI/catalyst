@@ -53,6 +53,13 @@ include(AddLLVM)
 include(AddMLIR)
 include(HandleLLVMOptions)
 
+# LLVM's CMake options generate linker warnings on macOS when building modules (e.g. the Python
+# bindings). We need to filter out those linker flags for now. TODO: remove once we update past
+# https://github.com/llvm/llvm-project/commit/1f0e0da3af783fd2bb5e23bc2b97141abac68926
+if(APPLE)
+string(REPLACE "-Wl,-undefined -Wl,suppress" "" CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS}")
+endif()
+
 if(QUANTUM_ENABLE_BINDINGS_PYTHON)
   include(MLIRDetectPythonEnv)
   mlir_configure_python_dev_packages()
