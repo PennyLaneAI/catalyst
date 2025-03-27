@@ -113,7 +113,7 @@ Value getModifiersPtr(Location loc, RewriterBase &rewriter, const TypeConverter 
             catalyst::getStaticAlloca(loc, rewriter, ptrType, controlledQubits.size()).getResult();
         valuePtr =
             catalyst::getStaticAlloca(loc, rewriter, boolType, controlledQubits.size()).getResult();
-        for (size_t i = 0; i < controlledQubits.size(); i++) {
+        for (int i = 0; static_cast<size_t>(i) < controlledQubits.size(); i++) {
             {
                 auto itemPtr = rewriter.create<LLVM::GEPOp>(loc, ptrType, ptrType, ctrlPtr,
                                                             llvm::ArrayRef<LLVM::GEPArg>{i}, true);
