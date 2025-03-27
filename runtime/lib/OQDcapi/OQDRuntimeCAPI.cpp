@@ -40,7 +40,9 @@ void to_json(json &j, const Pulse &p)
     RT_FAIL_IF(p.target >= (*JSON)["system"]["ions"].size(), "ion index out of range");
 
     const auto &transitions = (*JSON)["system"]["ions"][p.target]["transitions"];
-    RT_FAIL_IF(p.beam->transition_index >= transitions.size(), "transition index out of range");
+    RT_FAIL_IF(p.beam->transition_index < 0 ||
+                   (size_t)p.beam->transition_index >= transitions.size(),
+               "transition index out of range");
 
     j = json{{"class_", "Pulse"}, {"duration", p.duration}};
 
