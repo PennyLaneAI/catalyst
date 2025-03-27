@@ -106,6 +106,8 @@ bool isValidQuantumOperation(CustomOp &op, Mode mode)
         return hermitianSet.contains(gateName) || rotationsSet.contains(gateName) ||
                multiQubitSet.contains(gateName);
     }
+
+    assert(false && "Invalid Enum value for `Mode`");
 }
 
 // Determines if the given operation has any successors that are quantum CustomOps.
