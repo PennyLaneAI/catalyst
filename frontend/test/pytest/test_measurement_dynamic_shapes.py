@@ -138,10 +138,13 @@ def test_dynamic_wires_scalar_readouts(readout, backend, capfd):
     assert out.count("compiling...") == 3
 
 
-def test_dynamic_wires_probs_with_wires(backend, capfd):
+@pytest.mark.parametrize("readout", [qml.probs])
+def test_dynamic_wires_probs_with_wires(readout, backend, capfd):
     """
     Test that a circuit with dynamic number of wires can be executed correctly
-    with probs with wires specified.
+    with state based measurements with wires specified.
+
+    Note that qml.state() cannot have wires.
     """
     def ref(num_qubits):
         print("compiling...")
@@ -169,10 +172,11 @@ def test_dynamic_wires_probs_with_wires(backend, capfd):
     assert out.count("compiling...") == 3
 
 
-def test_dynamic_wires_probs_without_wires(backend, capfd):
+@pytest.mark.parametrize("readout", [qml.probs, qml.state])
+def test_dynamic_wires_statebased_without_wires(readout, backend, capfd):
     """
     Test that a circuit with dynamic number of wires can be executed correctly
-    with probs without wires specified.
+    with state based measurements without wires specified.
     """
     def ref(num_qubits):
         print("compiling...")
@@ -195,7 +199,7 @@ def test_dynamic_wires_probs_without_wires(backend, capfd):
             # where backward slice can now include closure values
             # qml.cond(x == 42, qml.RZ)(3.45, wires=0)
             qml.CNOT(wires=[num_qubits - 2, 1])
-            return qml.probs()
+            return readout()
 
         return circ(42)
 

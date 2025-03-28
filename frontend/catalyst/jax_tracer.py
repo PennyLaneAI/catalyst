@@ -956,9 +956,12 @@ def trace_quantum_measurements(
                 else:
                     out_tree = counts_tree
             elif type(output) is StateMP:
-                assert using_compbasis
-                shape = (2**nqubits,)
-                out_classical_tracers.append(state_p.bind(obs_tracers, shape=shape))
+                #assert using_compbasis
+                #shape = (2**nqubits,)
+                #out_classical_tracers.append(state_p.bind(obs_tracers, shape=shape))
+                #breakpoint()
+                result = bind_flexible_primitive(state_p, {"num_qubits":nqubits}, obs_tracers)
+                out_classical_tracers.append(result)
             else:
                 raise NotImplementedError(
                     f"Measurement {type(output)} is not implemented"

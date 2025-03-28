@@ -121,6 +121,21 @@ func.func @state(%q0: !quantum.bit, %q1: !quantum.bit) {
     func.return
 }
 
+
+// -----
+
+func.func @state_dynwires(%c : i64) {
+    %r = quantum.alloc(%c) : !quantum.reg
+    %obs = quantum.compbasis qreg %r : !quantum.obs
+    // CHECK: [[one:%.+]] = arith.constant 1 : i64
+    // CHECK: [[TwoToN:%.+]] = arith.shli [[one]], %arg0 : i64
+    // CHECK: [[index:%.+]] = index.casts [[TwoToN]] : i64 to index
+    // CHECK: [[alloc:%.+]] = memref.alloc([[index]]) : memref<?xcomplex<f64>>
+    // CHECK: quantum.state {{.*}} in([[alloc]] : memref<?xcomplex<f64>>)
+    %probs = quantum.state %obs : tensor<?xcomplex<f64>>
+    func.return
+}
+
 // -----
 
 // CHECK-LABEL: @set_state
