@@ -4,6 +4,10 @@ file(GLOB SRC
     GradMethods/*.cpp
     BufferizationPatterns.cpp
     gradient_bufferize.cpp
+    PreprocessingPatterns.cpp
+    gradient_preprocess.cpp
+    PostprocessingPatterns.cpp
+    gradient_postprocess.cpp
     LoweringPatterns.cpp
     gradient_lowering.cpp
     ConversionPatterns.cpp
@@ -28,7 +32,7 @@ set(DEPENDS
 )
 
 add_mlir_library(${LIBRARY_NAME} STATIC ${SRC} LINK_LIBS PRIVATE ${LIBS} DEPENDS ${DEPENDS})
-target_compile_features(${LIBRARY_NAME} PUBLIC cxx_std_17)
+target_compile_features(${LIBRARY_NAME} PUBLIC cxx_std_20)
 target_include_directories(${LIBRARY_NAME} PUBLIC
                            .
                            ${PROJECT_SOURCE_DIR}/include

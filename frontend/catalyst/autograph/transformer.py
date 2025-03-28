@@ -21,16 +21,18 @@ Python control flow and other imperative expressions rather than the functional 
 by Catalyst.
 """
 import copy
+import functools
 import inspect
 from contextlib import ContextDecorator
 
 import pennylane as qml
-from malt.core import ag_ctx, converter
+from malt.core import ag_ctx, config, converter
 from malt.impl.api import PyToPy
 
 import catalyst
-from catalyst.autograph import ag_primitives
+from catalyst.autograph import ag_primitives, operator_update
 from catalyst.utils.exceptions import AutoGraphError
+from catalyst.utils.patching import Patcher
 
 
 class CatalystTransformer(PyToPy):
@@ -116,18 +118,42 @@ class CatalystTransformer(PyToPy):
 
         return new_fn
 
+    def transform_ast(self, node, ctx):
+        """Overload of PyToPy.transform_ast from DiastaticMalt
 
-def run_autograph(fn):
+        .. note::
+            Once the operator_update interface has been migrated to the
+            DiastaticMalt project, this overload can be deleted."""
+        # The operator_update transform would be more correct if placed with
+        # slices.transform in PyToPy.transform_ast in DiastaticMalt rather than
+        # at the beginning of the transformation. operator_update.transform
+        # should come after the unsupported features check and intial analysis,
+        # but it fails if it does not come before variables.transform.
+        node = operator_update.transform(node, ctx)
+        node = super().transform_ast(node, ctx)
+        return node
+
+
+def run_autograph(fn, *modules):
     """Decorator that converts the given function into graph form."""
 
-    user_context = converter.ProgramContext(TOPLEVEL_OPTIONS)
+    allowed_modules = tuple(config.Convert(module) for module in modules)
+    allowed_modules += ag_primitives.module_allowlist
 
+    user_context = converter.ProgramContext(TOPLEVEL_OPTIONS)
     new_fn, module, source_map = TRANSFORMER.transform(fn, user_context)
     new_fn.ag_module = module
     new_fn.ag_source_map = source_map
     new_fn.ag_unconverted = fn
 
-    return new_fn
+    @functools.wraps(new_fn)
+    def wrapper(*args, **kwargs):
+        with Patcher(
+            (ag_primitives, "module_allowlist", allowed_modules),
+        ):
+            return new_fn(*args, **kwargs)
+
+    return wrapper
 
 
 def autograph_source(fn):

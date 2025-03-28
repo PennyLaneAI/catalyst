@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-""" Jax extras module containing functions related to the Python program tracing  """
+"""Jax extras module containing functions related to the Python program tracing"""
 
 # pylint: disable=line-too-long
 
@@ -44,8 +44,8 @@ from jax._src.interpreters.partial_eval import (
     trace_to_jaxpr_dynamic2,
 )
 from jax._src.lax.control_flow import _initial_style_jaxpr
-from jax._src.lax.lax import _abstractify, cos_p, sin_p
-from jax._src.lax.slicing import _gather_lower
+from jax._src.lax.lax import _abstractify
+from jax._src.lax.slicing import _gather_lower, gather_p
 from jax._src.linear_util import annotate
 from jax._src.pjit import _extract_implicit_args, _flat_axes_specs
 from jax._src.source_info_util import current as jax_current
@@ -92,12 +92,7 @@ from jax.tree_util import (
 )
 from jaxlib.xla_extension import PyTreeRegistry
 
-from catalyst.jax_extras.patches import (
-    _cos_lowering2,
-    _sin_lowering2,
-    gather2_p,
-    get_aval2,
-)
+from catalyst.jax_extras.patches import gather2_p, get_aval2
 from catalyst.logging import debug_logger
 from catalyst.tracing.type_signatures import verify_static_argnums_type
 from catalyst.utils.patching import Patcher
@@ -240,6 +235,8 @@ def stable_toposort(end_nodes: list) -> list:
     while childless_nodes:
         node = childless_nodes.pop()
         sorted_nodes.append(node)
+        # pylint: disable=unnecessary-lambda
+        node.parents.sort()
         for parent in node.parents:
             if child_counts[parent.id] == 1:
                 childless_nodes.append(parent)
@@ -271,6 +268,9 @@ def sort_eqns(eqns: List[JaxprEqn], forced_order_primitives: Set[JaxprPrimitive]
             self.id: int = boxid
             self.e: JaxprEqn = e
             self.parents: List["Box"] = []  # to be filled later
+
+        def __lt__(self, other):
+            return self.id < other.id
 
     boxes = [Box(i, e) for i, e in enumerate(eqns)]
     fixedorder = [(i, b) for (i, b) in enumerate(boxes) if b.e.primitive in forced_order_primitives]
@@ -511,15 +511,9 @@ def make_jaxpr2(
 
     register_lowering(gather2_p, _gather_lower)
 
-    # TBD
-    register_lowering(sin_p, _sin_lowering2)
-    register_lowering(cos_p, _cos_lowering2)
-
-    primitive_batchers2 = jax._src.interpreters.batching.primitive_batchers.copy()
-    for primitive in jax._src.interpreters.batching.primitive_batchers.keys():
-        if primitive.name == "gather":
-            gather_batching_rule = jax._src.interpreters.batching.primitive_batchers[primitive]
-            primitive_batchers2[gather2_p] = gather_batching_rule
+    jax._src.interpreters.batching.primitive_batchers[gather2_p] = (
+        jax._src.interpreters.batching.primitive_batchers[gather_p]
+    )
 
     @wraps(fun)
     def make_jaxpr_f(*args, **kwargs):
@@ -527,9 +521,6 @@ def make_jaxpr2(
         with Patcher(
             (jax._src.interpreters.partial_eval, "get_aval", get_aval2),
             (jax._src.lax.slicing, "gather_p", gather2_p),
-            (jax._src.interpreters.batching, "primitive_batchers", primitive_batchers2),
-            (jax._src.lax.lax, "_sin_lowering", _sin_lowering2),
-            (jax._src.lax.lax, "_cos_lowering", _cos_lowering2),
         ), ExitStack():
             f = wrap_init(fun)
             if static_argnums:
@@ -670,14 +661,14 @@ def infer_output_type(
     expansion_strategy: ExpansionStrategy,
     num_implicit_inputs: int | None = None,
 ) -> Tuple[List[TracerLike], OutputType]:
-    """Deduce the Jax ``OutputType`` of a part of program (typically, a function) given its
+    """Deduce the Jax ``OutputType`` of a part of a program (typically, a function) given its
     constants, input and ouput tracers or variables. Return the expanded outputs along with the
     output type calculated.
 
     The core task of this function is to find out which tracers have dynamic dimensions and
     translate this information into the language of the De Brujin indices residing in Jax types. In
     order to do this, we scan the outputs and mind what dimensions are already known (from the
-    intputs) and what are not known. The known dimensions are marked with InDBIdx and the unknown
+    inputs) and what are not known. The known dimensions are marked with InDBIdx and the unknown
     dimensions are treated as calculated and marked using OutDBIdx.
 
 
@@ -974,3 +965,37 @@ class DynshapePrimitive(JaxprPrimitive):
         eqn = new_jaxpr_eqn(invars, outvars, self, params, [], source_info)
         trace.frame.add_eqn(eqn)
         return out_tracers if self.multiple_results else out_tracers.pop()
+
+
+def bind_flexible_primitive(primitive, flexible_args: dict[str, Any], *dyn_args, **static_args):
+    """
+    Calls the primitive.bind() method with dyn_args being positional arguments to the bind,
+    and static_args being keyword arguments.
+
+    The flexible_args is a dictionary containing the flexible arguments.
+    These are the arguments that can either be static or dynamic. This method
+    will bind a flexible argument as static only if it is a single or a list of only integer, float,
+    or boolean literals. In the static case, the binded primitive's param name is the flexible arg's
+    key, and the jaxpr param value is the flexible arg's value.
+
+    If a flexible argument is received as a tracer, it will be binded dynamically with
+    the flexible arg's value.
+
+    This ensures that in the jaxpr, dynamic args become SSA arguments to the primitive,
+    and static args become literal-valued parameters of the jaxpr.
+    """
+
+    static_literal_pool = (int, float, bool)
+
+    for flex_arg_name, flex_arg_value in flexible_args.items():
+        if type(flex_arg_value) in static_literal_pool:
+            static_args[flex_arg_name] = flex_arg_value
+        elif isinstance(flex_arg_value, list):
+            if flex_arg_value and all(type(arg) in static_literal_pool for arg in flex_arg_value):
+                static_args[flex_arg_name] = flex_arg_value
+            else:
+                dyn_args += (*flex_arg_value,)
+        else:
+            dyn_args += (flex_arg_value,)
+
+    return primitive.bind(*dyn_args, **static_args)

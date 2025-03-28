@@ -14,35 +14,53 @@
 
 #include "Catalyst/Transforms/Passes.h"
 #include "Gradient/Transforms/Passes.h"
+#include "Ion/Transforms/Passes.h"
 #include "Mitigation/Transforms/Passes.h"
+#include "QEC/Transforms/Passes.h"
 #include "Quantum/Transforms/Passes.h"
 #include "Test/Transforms/Passes.h"
+#include "mlir/Pass/PassRegistry.h"
 
 void catalyst::registerAllCatalystPasses()
 {
+    mlir::registerPass(catalyst::createAddExceptionHandlingPass);
+    mlir::registerPass(catalyst::createAdjointLoweringPass);
+    mlir::registerPass(catalyst::createAnnotateFunctionPass);
+    mlir::registerPass(catalyst::createApplyTransformSequencePass);
     mlir::registerPass(catalyst::createArrayListToMemRefPass);
     mlir::registerPass(catalyst::createCatalystBufferizationPass);
+    mlir::registerPass(catalyst::createCatalystConversionPass);
+    mlir::registerPass(catalyst::createCopyGlobalMemRefPass);
+    mlir::registerPass(catalyst::createDetensorizeSCFPass);
+    mlir::registerPass(catalyst::createDisableAssertionPass);
+    mlir::registerPass(catalyst::createDisentangleCNOTPass);
+    mlir::registerPass(catalyst::createDisentangleSWAPPass);
+    mlir::registerPass(catalyst::createEmitCatalystPyInterfacePass);
+    mlir::registerPass(catalyst::createGEPInboundsPass);
     mlir::registerPass(catalyst::createGradientBufferizationPass);
-    mlir::registerPass(catalyst::createGradientLoweringPass);
     mlir::registerPass(catalyst::createGradientConversionPass);
-    mlir::registerPass(catalyst::createScatterLoweringPass);
-    mlir::registerPass(catalyst::createAdjointLoweringPass);
+    mlir::registerPass(catalyst::createGradientPreprocessingPass);
+    mlir::registerPass(catalyst::createGradientPostprocessingPass);
+    mlir::registerPass(catalyst::createGradientLoweringPass);
+    mlir::registerPass(catalyst::createHloCustomCallLoweringPass);
+    mlir::registerPass(catalyst::createInlineNestedModulePass);
+    mlir::registerPass(catalyst::createIonConversionPass);
+    mlir::registerPass(catalyst::createMemrefCopyToLinalgCopyPass);
+    mlir::registerPass(catalyst::createMemrefToLLVMWithTBAAPass);
+    mlir::registerPass(catalyst::createMitigationLoweringPass);
+    mlir::registerPass(catalyst::createQnodeToAsyncLoweringPass);
     mlir::registerPass(catalyst::createQuantumBufferizationPass);
     mlir::registerPass(catalyst::createQuantumConversionPass);
-    mlir::registerPass(catalyst::createMitigationLoweringPass);
-    mlir::registerPass(catalyst::createEmitCatalystPyInterfacePass);
-    mlir::registerPass(catalyst::createCopyGlobalMemRefPass);
-    mlir::registerPass(catalyst::createCatalystConversionPass);
-    mlir::registerPass(catalyst::createQnodeToAsyncLoweringPass);
-    mlir::registerPass(catalyst::createDisableAssertionPass);
-    mlir::registerPass(catalyst::createTestPass);
-    mlir::registerPass(catalyst::createHloCustomCallLoweringPass);
-    mlir::registerPass(catalyst::createAddExceptionHandlingPass);
-    mlir::registerPass(catalyst::createGEPInboundsPass);
-    mlir::registerPass(catalyst::createRemoveChainedSelfInversePass);
-    mlir::registerPass(catalyst::createAnnotateFunctionPass);
     mlir::registerPass(catalyst::createRegisterInactiveCallbackPass);
-    mlir::registerPass(catalyst::createMemrefCopyToLinalgCopyPass);
-    mlir::registerPass(catalyst::createApplyTransformSequencePass);
+    mlir::registerPass(catalyst::createRemoveChainedSelfInversePass);
+    mlir::registerPass(catalyst::createMergeRotationsPass);
+    mlir::registerPass(catalyst::createScatterLoweringPass);
     mlir::registerPass(catalyst::createSplitMultipleTapesPass);
+    mlir::registerPass(catalyst::createTestPass);
+    mlir::registerPass(catalyst::createIonsDecompositionPass);
+    mlir::registerPass(catalyst::createQuantumToIonPass);
+    mlir::registerPass(catalyst::createLoopBoundaryOptimizationPass);
+    mlir::registerPass(catalyst::createCommuteCliffordTPPRPass);
+    mlir::registerPass(catalyst::createCliffordTToPPRPass);
+    mlir::registerPass(catalyst::createCommuteCliffordPastPPMPass);
 }

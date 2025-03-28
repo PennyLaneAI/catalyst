@@ -18,6 +18,7 @@ Test the jax linear algebra functions for full quantum-circuit workflows compile
 
 import numpy as np
 import pennylane as qml
+import pytest
 from jax import numpy as jnp
 from jax import scipy as jsp
 
@@ -46,3 +47,7 @@ class TestExpmInCircuit:
         res = circuit_expm()
         expected = circuit_rot()  # expected = [0,1]
         assert np.allclose(res, expected)
+
+
+if __name__ == "__main__":
+    pytest.main(["-x", __file__])

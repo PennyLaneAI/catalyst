@@ -24,6 +24,7 @@ namespace AsyncUtilsConstants {
 
 static constexpr llvm::StringRef qnodeAttr = "qnode";
 static constexpr llvm::StringRef abortName = "abort";
+static constexpr llvm::StringRef putsName = "puts";
 static constexpr llvm::StringRef unrecoverableErrorName =
     "__catalyst__host__rt__unrecoverable_error";
 static constexpr llvm::StringRef scheduleInvokeAttr = "catalyst.preInvoke";
@@ -76,6 +77,13 @@ bool AsyncUtils::hasAbortInBlock(Block *block)
 {
     bool returnVal = false;
     block->walk([&](LLVM::CallOp op) { returnVal |= AsyncUtils::callsAbort(op); });
+    return returnVal;
+}
+
+bool AsyncUtils::hasPutsInBlock(Block *block)
+{
+    bool returnVal = false;
+    block->walk([&](LLVM::CallOp op) { returnVal |= AsyncUtils::callsPuts(op); });
     return returnVal;
 }
 
@@ -311,6 +319,11 @@ bool AsyncUtils::isAbort(LLVM::LLVMFuncOp funcOp)
     return AsyncUtils::isFunctionNamed(funcOp, AsyncUtilsConstants::abortName);
 }
 
+bool AsyncUtils::isPuts(LLVM::LLVMFuncOp funcOp)
+{
+    return AsyncUtils::isFunctionNamed(funcOp, AsyncUtilsConstants::putsName);
+}
+
 bool AsyncUtils::callsAbort(LLVM::CallOp callOp)
 {
     auto maybeCallee = AsyncUtils::getCalleeSafe(callOp);
@@ -319,6 +332,16 @@ bool AsyncUtils::callsAbort(LLVM::CallOp callOp)
 
     auto callee = maybeCallee.value();
     return AsyncUtils::isAbort(callee);
+}
+
+bool AsyncUtils::callsPuts(LLVM::CallOp callOp)
+{
+    auto maybeCallee = AsyncUtils::getCalleeSafe(callOp);
+    if (!maybeCallee)
+        return false;
+
+    auto callee = maybeCallee.value();
+    return AsyncUtils::isPuts(callee);
 }
 
 bool AsyncUtils::callsAbort(Operation *possibleCall)

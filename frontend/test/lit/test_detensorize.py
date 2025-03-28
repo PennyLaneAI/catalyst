@@ -28,7 +28,6 @@ def a_plus_b_times_2(a, b):
     # CHECK: arith.addf
     # CHECK-NOT: linalg.generic
     c = a + b
-    # CHECK: tensor.from_elements
     return c + c
 
 
@@ -57,7 +56,6 @@ def f_with_cond(a, b):
         # CHECK: arith.subf
         b = b - 2.0
         c = a + b
-    # CHECK: tensor.from_elements
     return c * 2.0
 
 
@@ -72,7 +70,6 @@ def f_with_for_loop(a, b):
     # CHECK: %extracted
     # CHECK: tensor.extract
     # CHECK-NOT: linalg.generic
-    # CHECK: arith.addf
     b = a + b
     for _ in range(10):
         if b % 2:
@@ -80,7 +77,6 @@ def f_with_for_loop(a, b):
             b = b - b
         else:
             b = b + 1
-    # CHECK: tensor.from_elements
     # CHECK: arith.mulf
     c = a * b
     return c
@@ -89,3 +85,49 @@ def f_with_for_loop(a, b):
 f_with_for_loop(1.0, 2.0)
 print(get_compilation_stage(f_with_for_loop, "HLOLoweringPass"))
 f_with_for_loop.workspace.cleanup()
+
+
+# CHECK-LABEL: public @jit_f_with_loop_over_list
+@qjit(autograph=True, keep_intermediate=True)
+def f_with_loop_over_list(a, b):
+    # CHECK: %extracted
+    # CHECK: tensor.extract
+    # CHECK-NOT: linalg.generic
+    b = a + b
+    for i in list(range(10)):
+        if i < 5:
+            # CHECK: arith.addf
+            a = a + i
+        else:
+            b = b + i
+    # CHECK: arith.mulf
+    c = a * b
+    return c
+
+
+f_with_loop_over_list(1.0, 2.0)
+print(get_compilation_stage(f_with_loop_over_list, "HLOLoweringPass"))
+f_with_loop_over_list.workspace.cleanup()
+
+
+# CHECK-LABEL: public @jit_f_with_enumerate
+@qjit(autograph=True, keep_intermediate=True)
+def f_with_enumerate(a, b):
+    # CHECK: %extracted
+    # CHECK: tensor.extract
+    # CHECK-NOT: linalg.generic
+    b = a + b
+    for i, j in enumerate([5, 4, 3, 2, 1]):
+        if i < 2:
+            # CHECK: arith.addf
+            a = a + j
+        else:
+            b = b + j
+    # CHECK: arith.mulf
+    c = a * b
+    return c
+
+
+f_with_enumerate(1.0, 2.0)
+print(get_compilation_stage(f_with_enumerate, "HLOLoweringPass"))
+f_with_enumerate.workspace.cleanup()

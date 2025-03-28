@@ -11,8 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Test integration for catalyst.mitigate_with_zne."""
+
+from functools import partial
 
 import jax
 import numpy as np
@@ -142,20 +143,6 @@ def test_scale_factors_error(scale_factors):
         return catalyst.mitigate_with_zne(circuit, scale_factors=scale_factors)(args)
 
     with pytest.raises(ValueError, match="The scale factors must be positive odd integers:"):
-        mitigated_function(0.1)
-
-
-def test_not_qnode_error():
-    """Test that when applied not on a QNode the transform raises an error."""
-
-    def circuit(x):
-        return jax.numpy.sin(x)
-
-    @catalyst.qjit
-    def mitigated_function(args):
-        return catalyst.mitigate_with_zne(circuit, scale_factors=[1, 3, 5, 7])(args)
-
-    with pytest.raises(TypeError, match="A QNode is expected, got the classical function"):
         mitigated_function(0.1)
 
 
@@ -376,6 +363,143 @@ def test_exponential_extrapolation_with_kwargs():
         )()
 
     assert np.allclose(mitigated_qnode(), circuit())
+
+
+def test_jaxpr_with_const():
+    """test mitigate_with_zne with a circuit that generates arguments in MLIR"""
+    dev = qml.device("lightning.qubit", wires=2)
+
+    @qml.qnode(device=dev)
+    def circuit():
+        a = jax.numpy.array([0.1, 0.2, 0.3, 0.4])
+        b = jax.numpy.take(a, 2)
+        qml.Hadamard(wires=0)
+        qml.RZ(0.1, wires=0)
+        qml.RZ(b, wires=0)
+        qml.CNOT(wires=[1, 0])
+        qml.Hadamard(wires=1)
+        return qml.expval(qml.PauliY(wires=0))
+
+    @catalyst.qjit
+    def mitigated_qnode():
+        return catalyst.mitigate_with_zne(
+            circuit,
+            scale_factors=[1, 3, 5, 7],
+            extrapolate=quadratic_extrapolation,
+        )()
+
+    assert np.allclose(mitigated_qnode(), circuit())
+
+
+def test_mcm_method_with_zne(backend):
+    """Test that the dynamic_one_shot works with ZNE."""
+    dev = qml.device(backend, wires=1, shots=5)
+
+    def circuit():
+        return qml.expval(qml.PauliZ(0))
+
+    s = [1, 3]
+
+    @catalyst.qjit
+    def mitigated_circuit_1():
+        s = [1, 3]
+        g = qml.QNode(circuit, dev, mcm_method="one-shot")
+        return catalyst.mitigate_with_zne(g, scale_factors=s)()
+
+    @catalyst.qjit
+    def mitigated_circuit_2():
+        g = qml.QNode(circuit, dev)
+        return catalyst.mitigate_with_zne(g, scale_factors=s)()
+
+    observed = mitigated_circuit_1()
+    expected = mitigated_circuit_2()
+
+    assert np.allclose(expected, observed)
+
+
+@pytest.mark.parametrize("params", [0.2])
+@pytest.mark.parametrize("extrapolation", [quadratic_extrapolation])
+@pytest.mark.parametrize("scale_factors", [[1, 3, 5, 7]])
+@pytest.mark.parametrize("folding", ["global", "local-all"])
+def test_on_classical_function_with_qnodes(params, extrapolation, folding, scale_factors):
+    """Test that without noise the same results are returned for qnode calls inside a classical
+    function."""
+
+    dev = qml.device("lightning.qubit", wires=2)
+
+    @qml.qnode(device=dev)
+    def circuit1(x):
+        qml.Hadamard(wires=0)
+        qml.RZ(x, wires=0)
+        qml.RZ(x, wires=0)
+        qml.CNOT(wires=[1, 0])
+        qml.Hadamard(wires=1)
+        return qml.expval(qml.PauliY(wires=0))
+
+    @qml.qnode(device=dev)
+    def circuit2(x):
+        qml.Hadamard(wires=0)
+        qml.RX(x, wires=0)
+        qml.RX(x, wires=0)
+        qml.CNOT(wires=[1, 0])
+        qml.Hadamard(wires=1)
+        return qml.expval(qml.PauliY(wires=0))
+
+    @catalyst.qjit
+    @partial(
+        catalyst.mitigate_with_zne,
+        scale_factors=scale_factors,
+        extrapolate=extrapolation,
+        folding=folding,
+    )
+    def mitigated_qnode(args):
+        return circuit1(args) + circuit2(args)
+
+    assert np.allclose(mitigated_qnode(params), circuit1(params) + circuit2(params))
+
+
+@pytest.mark.parametrize("params", [0.2])
+@pytest.mark.parametrize("extrapolation", [quadratic_extrapolation])
+@pytest.mark.parametrize("scale_factors", [[1, 3, 5, 7]])
+@pytest.mark.parametrize("folding", ["global", "local-all"])
+def test_multiple_qnodes_sinked(params, extrapolation, folding, scale_factors):
+    """Test that without noise the same results are returned for sinked qnode calls."""
+
+    dev = qml.device("lightning.qubit", wires=2)
+
+    @qml.qnode(device=dev)
+    def circuit1(x):
+        qml.Hadamard(wires=0)
+        qml.RZ(x, wires=0)
+        qml.RZ(x, wires=0)
+        qml.CNOT(wires=[1, 0])
+        qml.Hadamard(wires=1)
+        return qml.expval(qml.PauliY(wires=0))
+
+    def g(x):
+        a = circuit1(x)
+        return a**2
+
+    @qml.qnode(device=dev)
+    def circuit2(x):
+        qml.Hadamard(wires=0)
+        qml.RX(x, wires=0)
+        qml.RX(x, wires=0)
+        qml.CNOT(wires=[1, 0])
+        qml.Hadamard(wires=1)
+        return qml.expval(qml.PauliY(wires=0))
+
+    @catalyst.qjit
+    @partial(
+        catalyst.mitigate_with_zne,
+        scale_factors=scale_factors,
+        extrapolate=extrapolation,
+        folding=folding,
+    )
+    def mitigated_qnode(args):
+        return g(args) + circuit2(args)
+
+    assert np.allclose(mitigated_qnode(params), circuit1(params) ** 2 + circuit2(params))
 
 
 if __name__ == "__main__":

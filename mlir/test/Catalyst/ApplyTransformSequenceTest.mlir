@@ -24,30 +24,19 @@ module @workflow {
 
   module attributes {transform.with_named_sequence} {
     transform.named_sequence @__transform_main(%arg0: !transform.op<"builtin.module">) {
-      %0 = transform.apply_registered_pass "remove-chained-self-inverse" to %arg0 {options = "func-name=f"} : (!transform.op<"builtin.module">) -> !transform.op<"builtin.module">
+      %0 = transform.apply_registered_pass "remove-chained-self-inverse" to %arg0 : (!transform.op<"builtin.module">) -> !transform.op<"builtin.module">
       transform.yield
     }
   }
 
-  func.func private @f(%arg0: tensor<f64>) -> tensor<f64> {
+  func.func private @f(%arg0: tensor<f64>) -> !quantum.bit {
     %c_0 = stablehlo.constant dense<0> : tensor<i64>
     %extracted = tensor.extract %c_0[] : tensor<i64>
     %0 = quantum.alloc( 1) : !quantum.reg
     %1 = quantum.extract %0[%extracted] : !quantum.reg -> !quantum.bit
     %out_qubits = quantum.custom "Hadamard"() %1 : !quantum.bit
     %out_qubits_1 = quantum.custom "Hadamard"() %out_qubits : !quantum.bit
-    return %arg0 : tensor<f64>
-  }
-
-
-  func.func private @g(%arg0: tensor<f64>) -> tensor<f64> {
-    %c_0 = stablehlo.constant dense<0> : tensor<i64>
-    %extracted = tensor.extract %c_0[] : tensor<i64>
-    %0 = quantum.alloc( 1) : !quantum.reg
-    %1 = quantum.extract %0[%extracted] : !quantum.reg -> !quantum.bit
-    %out_qubits = quantum.custom "Hadamard"() %1 : !quantum.bit
-    %out_qubits_1 = quantum.custom "Hadamard"() %out_qubits : !quantum.bit
-    return %arg0 : tensor<f64>
+    return %out_qubits_1 : !quantum.bit
   }
 
 }
@@ -55,15 +44,11 @@ module @workflow {
 // CHECK-LABEL: workflow
 // CHECK-NOT: module attributes {transform.with_named_sequence}
 // CHECK-NOT: transform.named_sequence @__transform_main
-// CHECK-NOT: {{%.+}} = transform.apply_registered_pass "remove-chained-self-inverse" to {{%.+}} {options = "func-name=f"}
+// CHECK-NOT: {{%.+}} = transform.apply_registered_pass "remove-chained-self-inverse" to {{%.+}} 
 // CHECK-NOT: transform.yield
 
 // CHECK-LABEL: f
 // CHECK-NOT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
-
-// CHECK-LABEL: g
-// CHECK: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
-// CHECK-NEXT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
 
 // -----
 

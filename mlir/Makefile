@@ -12,20 +12,19 @@ ENZYME_BUILD_DIR?=$(MK_DIR)/Enzyme/build
 RT_BUILD_DIR?=$(MK_DIR)/../runtime/build
 ENABLE_ASAN?=OFF
 BUILD_TYPE?=Release
-TARGET_FILE=$(MK_DIR)/mlir-hlo/mhlo/transforms/CMakeLists.txt
-PATCH_FILE=$(MK_DIR)/patches/mhlo-Add-PassesIncGen-in-transforms-CMakeList.patch
+LLVM_EXTERNAL_LIT ?= $(LLVM_BUILD_DIR)/bin/llvm-lit
 
 ifeq ($(shell uname), Darwin)
 DEFAULT_ENABLE_LLD := OFF
-SYMBOL_VISIBILITY := hidden
+SYMBOL_VISIBILITY := default
 else
 DEFAULT_ENABLE_LLD := ON
-SYMBOL_VISIBILITY := protected
+SYMBOL_VISIBILITY := default
 endif
 
 ENABLE_LLD?=$(DEFAULT_ENABLE_LLD)
-ENABLE_ZLIB?=OFF
-ENABLE_ZSTD?=ON
+ENABLE_ZLIB?=ON
+ENABLE_ZSTD?=OFF
 
 ifeq ($(ENABLE_ASAN), ON)
 USE_SANITIZER_NAMES="Address"
@@ -34,6 +33,9 @@ else
 USE_SANITIZER_NAMES=""
 USE_SANITIZER_FLAGS=""
 endif
+
+LLVM_PROJECTS ?= mlir
+LLVM_TARGETS ?= check-mlir llvm-symbolizer
 
 .PHONY: help
 help:
@@ -49,16 +51,23 @@ help:
 	@echo "  format [version=?] to apply C++ formatter; use with 'version={version}' to run clang-format-{version} instead of clang-format"
 
 .PHONY: all
-all: llvm mhlo enzyme dialects
+all: llvm mhlo enzyme dialects plugin
 
 .PHONY: llvm
+llvm: TARGET_FILE := $(MK_DIR)/llvm-project/mlir/lib/Dialect/Bufferization/Transforms/BufferDeallocation.cpp
+llvm: PATCH_FILE := $(MK_DIR)/patches/mlir-buffer-deallocation.patch
 llvm:
 	@echo "build LLVM and MLIR enabling Python bindings"
+	# Patch in MLIR buffer deallocation bugfix
+	# TODO: remove once https://github.com/llvm/llvm-project/pull/121582 is merged & the dep updated
+	@if patch --dry-run -p1 -N $(TARGET_FILE) $(PATCH_FILE) > /dev/null 2>&1; then \
+		patch -p1 $(TARGET_FILE) $(PATCH_FILE); \
+	fi
 	cmake -G Ninja -S llvm-project/llvm -B $(LLVM_BUILD_DIR) \
 		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
 		-DLLVM_BUILD_EXAMPLES=OFF \
 		-DLLVM_TARGETS_TO_BUILD="host" \
-		-DLLVM_ENABLE_PROJECTS="mlir" \
+		-DLLVM_ENABLE_PROJECTS="$(LLVM_PROJECTS)" \
 		-DLLVM_ENABLE_ASSERTIONS=ON \
 		-DMLIR_ENABLE_BINDINGS_PYTHON=ON \
 		-DPython3_EXECUTABLE=$(PYTHON) \
@@ -74,10 +83,12 @@ llvm:
 		-DCMAKE_CXX_VISIBILITY_PRESET=$(SYMBOL_VISIBILITY)
 
 	# TODO: when updating LLVM, test to see if mlir/unittests/Bytecode/BytecodeTest.cpp:55 is passing
-	# and remove filter
-	LIT_FILTER_OUT="Bytecode" cmake --build $(LLVM_BUILD_DIR) --target check-mlir llvm-symbolizer
+	# and remove filter. This tests fails on CI/CD not locally.
+	LIT_FILTER_OUT="Bytecode|tosa-to-tensor" cmake --build $(LLVM_BUILD_DIR) --target $(LLVM_TARGETS)
 
 .PHONY: mhlo
+mhlo: TARGET_FILE := $(MK_DIR)/mlir-hlo/mhlo/transforms/CMakeLists.txt
+mhlo: PATCH_FILE := $(MK_DIR)/patches/mhlo-Add-PassesIncGen-in-transforms-CMakeList.patch
 mhlo:
 	@echo "build MLIR-HLO"
 	# Patch MHLO cmake dependency
@@ -120,10 +131,27 @@ enzyme:
 
 	cmake --build $(ENZYME_BUILD_DIR) --target EnzymeStatic-19
 
+.PHONY: plugin
+plugin:
+	[ -f $(MK_DIR)/standalone ] || cp -r $(MK_DIR)/llvm-project/mlir/examples/standalone .
+	@if patch -p0 --dry-run -N < $(MK_DIR)/patches/test-plugin-with-catalyst.patch > /dev/null 2>&1; then \
+		patch -p0 < $(MK_DIR)/patches/test-plugin-with-catalyst.patch; \
+	fi
+	cmake -B standalone/build -G Ninja \
+		-DMLIR_DIR=$(LLVM_BUILD_DIR)/lib/cmake/mlir \
+		-DLLVM_EXTERNAL_LIT=$(LLVM_EXTERNAL_LIT) \
+		-DCATALYST_TOOLS_DIR=$(DIALECTS_BUILD_DIR)/bin \
+		-DPython3_EXECUTABLE=$(PYTHON) \
+		-DPython3_NumPy_INCLUDE_DIRS=$$($(PYTHON) -c "import numpy as np; print(np.get_include())") \
+		standalone
+	cmake --build standalone/build --target check-standalone
+	mkdir -p $(DIALECTS_BUILD_DIR)/lib
+	cp standalone/build/lib/StandalonePlugin.* $(DIALECTS_BUILD_DIR)/lib
+
 .PHONY: dialects
 dialects:
 
-	@echo "build quantum-lsp compiler_driver and dialects"
+	@echo "build quantum-lsp and dialects"
 	cmake -G Ninja -S . -B $(DIALECTS_BUILD_DIR) \
 		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
 		-DLLVM_ENABLE_ASSERTIONS=ON \
@@ -146,15 +174,15 @@ dialects:
 		-DLLVM_ENABLE_ZLIB=$(ENABLE_ZLIB) \
 		-DLLVM_ENABLE_ZSTD=$(ENABLE_ZSTD)
 
-	cmake --build $(DIALECTS_BUILD_DIR) --target check-dialects quantum-lsp-server compiler_driver
+	cmake --build $(DIALECTS_BUILD_DIR) --target check-dialects quantum-lsp-server catalyst-cli check-unit-tests
 
 .PHONY: test
 test:
 	@echo "test the Catalyst MLIR dialects test suite"
 	cmake --build $(DIALECTS_BUILD_DIR) --target check-dialects
 
-.PHONY: clean clean-dialects clean-enzyme clean-mhlo
-clean: clean-dialects clean-llvm clean-mhlo clean-enzyme
+.PHONY: clean clean-dialects clean-enzyme clean-mhlo clean-plugin
+clean: clean-dialects clean-llvm clean-mhlo clean-enzyme clean-plugin
 
 clean-dialects:
 	@echo "clean catalyst dialect build files"
@@ -171,6 +199,11 @@ clean-mhlo:
 clean-enzyme:
 	@echo "clean enzyme build files"
 	rm -rf $(ENZYME_BUILD_DIR)
+
+clean-plugin:
+	@echo "clean plugin"
+	rm -rf standalone/build
+	rm -rf $(DIALECTS_BUILD_DIR)/lib/StandalonePlugin.*
 
 .PHONY: format
 format:

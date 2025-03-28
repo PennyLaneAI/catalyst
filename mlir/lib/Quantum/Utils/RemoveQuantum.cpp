@@ -16,10 +16,13 @@
 
 #include "llvm/ADT/SmallPtrSet.h"
 
+#include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/IR/PatternMatch.h"
+
 #include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Utils/RemoveQuantum.h"
-#include "mlir/IR/PatternMatch.h"
 
 using namespace mlir;
 
@@ -57,6 +60,40 @@ void removeQuantumMeasurements(func::FuncOp &function, PatternRewriter &rewriter
             opsToDelete.push_back(currentOp);
         }
     }
+}
+
+void replaceQuantumMeasurements(func::FuncOp &function, PatternRewriter &rewriter)
+{
+    function.walk([&](MeasurementProcess op) {
+        auto types = op->getResults().getTypes();
+        auto loc = op.getLoc();
+        SmallVector<Value> results;
+
+        for (auto type : types) {
+            if (auto tensorType = dyn_cast<RankedTensorType>(type)) {
+                auto shape = tensorType.getShape();
+                auto elemType = tensorType.getElementType();
+                auto res = rewriter.create<tensor::EmptyOp>(loc, shape, elemType);
+                results.push_back(res);
+            }
+            else {
+                if (type.isInteger()) {
+                    auto res = rewriter.create<arith::ConstantOp>(loc, type,
+                                                                  rewriter.getIntegerAttr(type, 0));
+                    results.push_back(res);
+                }
+                else if (type.isIntOrFloat()) {
+                    auto res = rewriter.create<arith::ConstantOp>(loc, type,
+                                                                  rewriter.getFloatAttr(type, 0.0));
+                    results.push_back(res);
+                }
+                else {
+                    op.emitError() << "Unexpected measurement type " << *op;
+                }
+            }
+        }
+        rewriter.replaceOp(op, results);
+    });
 }
 
 LogicalResult verifyQuantumFree(func::FuncOp function)

@@ -1,27 +1,33 @@
 set(LIBRARY_NAME MLIRCatalystTransforms)
 
 file(GLOB SRC
+
+    ApplyTransformSequencePass.cpp
     ArrayListToMemRefPass.cpp
-    scatter_lowering.cpp
-    ScatterPatterns.cpp
-    qnode_to_async_lowering.cpp
-    QnodeToAsyncPatterns.cpp
-    RegisterAllPasses.cpp
+    AsyncUtils.cpp
     BufferizationPatterns.cpp
     catalyst_bufferize.cpp
     catalyst_to_llvm.cpp
-    hlo_custom_call_lowering.cpp
-    HloCustomCallPatterns.cpp
     DetectQNodes.cpp
-    AsyncUtils.cpp
-    GEPInboundsPatterns.cpp
-    GEPInboundsPass.cpp
-    MemrefCopyToLinalgCopyPatterns.cpp
-    MemrefCopyToLinalgCopyPass.cpp
-    RegisterInactiveCallbackPass.cpp
+    DetensorizeSCFPass.cpp
     disable_assertion.cpp
     DisableAssertionPatterns.cpp
-    ApplyTransformSequencePass.cpp
+    GEPInboundsPass.cpp
+    GEPInboundsPatterns.cpp
+    hlo_custom_call_lowering.cpp
+    HloCustomCallPatterns.cpp
+    InlineNestedModules.cpp
+    MemrefCopyToLinalgCopyPass.cpp
+    MemrefCopyToLinalgCopyPatterns.cpp
+    qnode_to_async_lowering.cpp
+    QnodeToAsyncPatterns.cpp
+    RegisterAllPasses.cpp
+    RegisterInactiveCallbackPass.cpp
+    scatter_lowering.cpp
+    ScatterPatterns.cpp
+    SplitMultipleTapes.cpp
+    TBAAPatterns.cpp
+    TBAATagsPass.cpp
 )
 
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)
@@ -36,7 +42,7 @@ set(DEPENDS
 )
 
 add_mlir_library(${LIBRARY_NAME} STATIC ${SRC} LINK_LIBS PRIVATE ${LIBS} DEPENDS ${DEPENDS})
-target_compile_features(${LIBRARY_NAME} PUBLIC cxx_std_17)
+target_compile_features(${LIBRARY_NAME} PUBLIC cxx_std_20)
 target_include_directories(${LIBRARY_NAME} PUBLIC
                            .
                            ${PROJECT_SOURCE_DIR}/include

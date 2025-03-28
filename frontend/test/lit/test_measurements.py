@@ -14,10 +14,16 @@
 
 # RUN: %PYTHON %s | FileCheck %s
 
+# pylint: disable=missing-function-docstring, line-too-long
+
+import jax
 import numpy as np
 import pennylane as qml
+from utils import qjit_for_tests as qjit
 
-from catalyst import CompileError, qjit
+from catalyst import CompileError
+from catalyst.jax_extras.tracing import bind_flexible_primitive
+from catalyst.jax_primitives import compbasis_p, counts_p, sample_p
 
 # TODO: NOTE:
 # The tests sample1 and sample2 below used to pass, before verification steps were added in the
@@ -29,7 +35,7 @@ from catalyst import CompileError, qjit
 # comments (COM:).
 
 try:
-    # COM: CHECK-LABEL: private @sample1(
+    # COM: CHECK-LABEL: public @sample1(
     @qjit(target="mlir")
     @qml.qnode(qml.device("lightning.qubit", wires=2, shots=1000))
     def sample1(x: float, y: float):
@@ -44,7 +50,7 @@ try:
 
     print(sample1.mlir)
 
-    # COM: CHECK-LABEL: private @sample2(
+    # COM: CHECK-LABEL: public @sample2(
     @qjit(target="mlir")
     @qml.qnode(qml.device("lightning.qubit", wires=2, shots=1000))
     def sample2(x: float, y: float):
@@ -65,22 +71,71 @@ except CompileError:
     ...
 
 
-# CHECK-LABEL: private @sample3(
+# CHECK-LABEL: public @sample3(
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2, shots=1000))
+# CHECK: [[shots:%.+]] = arith.constant 1000 : i64
+# CHECK: quantum.device shots([[shots]]) [{{.+}}]
 def sample3(x: float, y: float):
+    # CHECK: [[reg:%.+]] = quantum.alloc( 2) : !quantum.reg
+
     qml.RX(x, wires=0)
     # CHECK: [[q1:%.+]] = quantum.custom "RY"
     qml.RY(y, wires=1)
     # CHECK: [[q0:%.+]] = quantum.custom "RZ"
     qml.RZ(0.1, wires=0)
 
-    # CHECK: [[obs:%.+]] = quantum.compbasis [[q0]], [[q1]]
-    # CHECK: quantum.sample [[obs]] {shots = 1000 : i64} : tensor<1000x2xf64>
+    # CHECK: [[reg0:%.+]] = quantum.insert [[reg]][ 0], [[q0]] : !quantum.reg, !quantum.bit
+    # CHECK: [[regObs:%.+]] = quantum.insert [[reg0]][ 1], [[q1]] : !quantum.reg, !quantum.bit
+
+    # CHECK: [[obs:%.+]] = quantum.compbasis qreg [[regObs]]
+    # CHECK: quantum.sample [[obs]] : tensor<1000x2xf64>
     return qml.sample()
 
 
 print(sample3.mlir)
+
+
+# CHECK-LABEL: public @test_sample_static(
+@qjit
+@qml.qnode(
+    qml.device("null.qubit", wires=1)
+)  # SampleOp is only legal if there is a device in the same scope
+def test_sample_static():
+    """Test that the sample primitive can be correctly compiled to mlir."""
+    obs = compbasis_p.bind()
+    return bind_flexible_primitive(sample_p, {"shots": 5}, obs, num_qubits=0)
+
+
+# CHECK: [[obs:%.+]] = quantum.compbasis  : !quantum.obs
+# CHECK: [[sample:%.+]] = quantum.sample [[obs]] : tensor<5x0xf64>
+# CHECK: return [[sample]] : tensor<5x0xf64>
+print(test_sample_static.mlir)
+
+
+# TODO: convert the device to have a dynamic shots value when core PennyLane device supports it
+# CHECK-LABEL: public @test_sample_dynamic(
+@qjit
+@qml.qnode(
+    qml.device("null.qubit", wires=1)
+)  # SampleOp is only legal if there is a device in the same scope
+def test_sample_dynamic(shots: int):
+    """Test that the sample primitive with dynamic shape can be correctly compiled to mlir."""
+    obs = compbasis_p.bind()
+    x = shots + 1
+    sample = bind_flexible_primitive(sample_p, {"shots": x}, obs, num_qubits=0)
+    return sample + jax.numpy.zeros((x, 0))
+
+
+# CHECK: [[one:%.+]] = stablehlo.constant dense<1> : tensor<i64>
+# CHECK: [[obs:%.+]] = quantum.compbasis  : !quantum.obs
+# CHECK: [[plusOne:%.+]] = stablehlo.add %arg0, [[one]] : tensor<i64>
+# CHECK: [[sample:%.+]] = quantum.sample [[obs]] : tensor<?x0xf64>
+# CHECK: [[zeroVec:%.+]] = stablehlo.dynamic_broadcast_in_dim {{.+}} -> tensor<?x0xf64>
+# CHECK: [[outVecSum:%.+]] = stablehlo.add [[sample]], [[zeroVec]] : tensor<?x0xf64>
+# CHECK: return [[plusOne]], [[outVecSum]] : tensor<i64>, tensor<?x0xf64>
+print(test_sample_dynamic.mlir)
+
 
 # TODO: NOTE:
 # The tests below used to pass before the compiler driver (in the case of counts2) and device
@@ -92,7 +147,7 @@ print(sample3.mlir)
 #
 try:
 
-    # COM: CHECK-LABEL: private @counts1(
+    # COM: CHECK-LABEL: public @counts1(
     @qjit(target="mlir")
     @qml.qnode(qml.device("lightning.qubit", wires=2, shots=1000))
     def counts1(x: float, y: float):
@@ -127,25 +182,60 @@ except:
     ...
 
 
-# CHECK-LABEL: private @counts3(
+# CHECK-LABEL: public @counts3(
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2, shots=1000))
+# CHECK: [[shots:%.+]] = arith.constant 1000 : i64
+# CHECK: quantum.device shots([[shots]]) [{{.+}}]
 def counts3(x: float, y: float):
+    # CHECK: [[reg:%.+]] = quantum.alloc( 2) : !quantum.reg
+
     qml.RX(x, wires=0)
     # CHECK: [[q1:%.+]] = quantum.custom "RY"
     qml.RY(y, wires=1)
     # CHECK: [[q0:%.+]] = quantum.custom "RZ"
     qml.RZ(0.1, wires=0)
 
-    # CHECK: [[obs:%.+]] = quantum.compbasis [[q0]], [[q1]]
-    # CHECK: quantum.counts [[obs]] {shots = 1000 : i64} : tensor<4xf64>, tensor<4xi64>
+    # CHECK: [[reg0:%.+]] = quantum.insert [[reg]][ 0], [[q0]] : !quantum.reg, !quantum.bit
+    # CHECK: [[regObs:%.+]] = quantum.insert [[reg0]][ 1], [[q1]] : !quantum.reg, !quantum.bit
+
+    # CHECK: [[obs:%.+]] = quantum.compbasis qreg [[regObs]]
+    # CHECK: quantum.counts [[obs]] : tensor<4xf64>, tensor<4xi64>
     return qml.counts()
 
 
 print(counts3.mlir)
 
 
-# CHECK-LABEL: private @expval1(
+# CHECK-LABEL: public @jit_test_counts_static(
+@qjit
+def test_counts_static():
+    """Test that the counts primitive can be correctly compiled to mlir."""
+    obs = compbasis_p.bind()
+    return bind_flexible_primitive(counts_p, {"shots": 5}, obs, shape=(1,))
+
+
+# CHECK: [[obs:%.+]] = quantum.compbasis  : !quantum.obs
+# CHECK: [[eigvals:%.+]], [[counts:%.+]] = quantum.counts [[obs]] : tensor<1xf64>, tensor<1xi64>
+# CHECK: return [[eigvals]], [[counts]] : tensor<1xf64>, tensor<1xi64>
+print(test_counts_static.mlir)
+
+
+# CHECK-LABEL: public @jit_test_counts_dynamic(
+@qjit
+def test_counts_dynamic(shots: int):
+    """Test that the counts primitive with dynamic shape can be correctly compiled to mlir."""
+    obs = compbasis_p.bind()
+    return bind_flexible_primitive(counts_p, {"shots": shots}, obs, shape=(1,))
+
+
+# CHECK: [[obs:%.+]] = quantum.compbasis  : !quantum.obs
+# CHECK: [[eigvals:%.+]], [[counts:%.+]] = quantum.counts [[obs]] : tensor<1xf64>, tensor<1xi64>
+# CHECK: return [[eigvals]], [[counts]] : tensor<1xf64>, tensor<1xi64>
+print(test_counts_dynamic.mlir)
+
+
+# CHECK-LABEL: public @expval1(
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2))
 def expval1(x: float, y: float):
@@ -162,7 +252,7 @@ def expval1(x: float, y: float):
 print(expval1.mlir)
 
 
-# CHECK-LABEL: private @expval2(
+# CHECK-LABEL: public @expval2(
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=3))
 def expval2(x: float, y: float):
@@ -184,7 +274,7 @@ def expval2(x: float, y: float):
 print(expval2.mlir)
 
 
-# CHECK-LABEL: private @expval3(
+# CHECK-LABEL: public @expval3(
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2))
 def expval3():
@@ -198,7 +288,7 @@ def expval3():
 print(expval3.mlir)
 
 
-# CHECK-LABEL: private @expval4(
+# CHECK-LABEL: public @expval4(
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2))
 def expval4():
@@ -219,7 +309,7 @@ def expval4():
 print(expval4.mlir)
 
 
-# CHECK-LABEL: private @expval5(
+# CHECK-LABEL: public @expval5(
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=3))
 def expval5(x: float, y: float):
@@ -249,7 +339,7 @@ def expval5(x: float, y: float):
 print(expval5.mlir)
 
 
-# CHECK-LABEL: private @expval5(
+# CHECK-LABEL: public @expval5(
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=3))
 def expval5(x: float, y: float):
@@ -277,7 +367,7 @@ def expval5(x: float, y: float):
 print(expval5.mlir)
 
 
-# CHECK-LABEL: private @expval6(
+# CHECK-LABEL: public @expval6(
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2))
 def expval6(x: float):
@@ -306,7 +396,7 @@ def expval6(x: float):
 print(expval6.mlir)
 
 
-# CHECK-LABEL: private @expval7(
+# CHECK-LABEL: public @expval7(
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2))
 def expval7():
@@ -320,7 +410,7 @@ def expval7():
 print(expval7.mlir)
 
 
-# CHECK-LABEL: private @expval8(
+# CHECK-LABEL: public @expval8(
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2))
 def expval8():
@@ -341,7 +431,7 @@ def expval8():
 print(expval8.mlir)
 
 
-# CHECK-LABEL: private @expval9(
+# CHECK-LABEL: public @expval9(
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=3))
 def expval9(x: float, y: float):
@@ -363,7 +453,7 @@ def expval9(x: float, y: float):
 print(expval9.mlir)
 
 
-# CHECK-LABEL: private @expval10(
+# CHECK-LABEL: public @expval10(
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=3))
 def expval10(x: float, y: float):
@@ -393,7 +483,39 @@ def expval10(x: float, y: float):
 print(expval10.mlir)
 
 
-# CHECK-LABEL: private @var1(
+# CHECK-LABEL: @expval11
+@qjit(target="mlir")
+def expval11(num_qubits):
+    # CHECK: func.func public @circ(%arg0: tensor<i64>) -> tensor<f64>
+    @qml.qnode(qml.device("lightning.qubit", wires=num_qubits))
+    def circ():
+        # CHECK-DAG: [[one:%.+]] = stablehlo.constant dense<1> : tensor<i64>
+        # CHECK-DAG: [[two:%.+]] = stablehlo.constant dense<2> : tensor<i64>
+        # CHECK-DAG: [[nSub1:%.+]] = stablehlo.subtract %arg0, [[one]] : tensor<i64>
+        # CHECK-DAG: [[nSub2:%.+]] = stablehlo.subtract %arg0, [[two]] : tensor<i64>
+
+        # CHECK: [[deten_nQubits:%.+]] = tensor.extract %arg0[] : tensor<i64>
+        # CHECK: [[reg:%.+]] = quantum.alloc([[deten_nQubits]]) : !quantum.reg
+
+        # CHECK: [[detensorize:%.+]] = tensor.extract [[nSub1]][] : tensor<i64>
+        # CHECK: [[qubit:%.+]] = quantum.extract %2[[[detensorize]]] : !quantum.reg -> !quantum.bit
+        # CHECK: [[q0:%.+]] = quantum.custom "RZ"({{%.+}}) [[qubit]]
+        qml.RZ(0.1, wires=num_qubits - 1)
+
+        # CHECK: [[detensorize:%.+]] = tensor.extract [[nSub2]][] : tensor<i64>
+        # CHECK: [[expvalBit:%.+]] = quantum.extract {{%.+}}[[[detensorize]]] : !quantum.reg -> !quantum.bit
+        # CHECK: [[obs:%.+]] = quantum.namedobs [[expvalBit]][ PauliX] : !quantum.obs
+        # CHECK: {{%.+}} = quantum.expval [[obs]] : f64
+        return qml.expval(qml.PauliX(num_qubits - 2))
+
+    return circ()
+
+
+_ = expval11(10)
+print(expval11.mlir)
+
+
+# CHECK-LABEL: public @var1(
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2))
 def var1(x: float, y: float):
@@ -410,7 +532,7 @@ def var1(x: float, y: float):
 print(var1.mlir)
 
 
-# CHECK-LABEL: private @var2(
+# CHECK-LABEL: public @var2(
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=3))
 def var2(x: float, y: float):
@@ -435,7 +557,7 @@ def var2(x: float, y: float):
 print(var2.mlir)
 
 
-# CHECK-LABEL: private @probs1(
+# CHECK-LABEL: public @probs1(
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2))
 def probs1(x: float, y: float):
@@ -448,7 +570,7 @@ def probs1(x: float, y: float):
     # qml.probs()  # unsupported by PennyLane
     # qml.probs(op=qml.PauliX(0))  # unsupported by the compiler
 
-    # CHECK: [[obs:%.+]] = quantum.compbasis [[q0]], [[q1]]
+    # CHECK: [[obs:%.+]] = quantum.compbasis qubits [[q0]], [[q1]]
     # CHECK: quantum.probs [[obs]] : tensor<4xf64>
     return qml.probs(wires=[0, 1])
 
@@ -456,10 +578,12 @@ def probs1(x: float, y: float):
 print(probs1.mlir)
 
 
-# CHECK-LABEL: private @state1(
+# CHECK-LABEL: public @state1(
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2))
 def state1(x: float, y: float):
+    # CHECK: [[reg:%.+]] = quantum.alloc( 2) : !quantum.reg
+
     qml.RX(x, wires=0)
     # CHECK: [[q1:%.+]] = quantum.custom "RY"
     qml.RY(y, wires=1)
@@ -468,7 +592,10 @@ def state1(x: float, y: float):
 
     # qml.state(wires=[0])  # unsupported by PennyLane
 
-    # CHECK: [[obs:%.+]] = quantum.compbasis [[q0]], [[q1]]
+    # CHECK: [[reg0:%.+]] = quantum.insert [[reg]][ 0], [[q0]] : !quantum.reg, !quantum.bit
+    # CHECK: [[regObs:%.+]] = quantum.insert [[reg0]][ 1], [[q1]] : !quantum.reg, !quantum.bit
+
+    # CHECK: [[obs:%.+]] = quantum.compbasis qreg [[regObs]]
     # CHECK: quantum.state [[obs]] : tensor<4xcomplex<f64>>
     return qml.state()
 

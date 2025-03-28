@@ -19,7 +19,7 @@ jobs:
   # This workflow contains a single job to sync the main branch with changes from the rc
   sync:
     # The type of runner that the job will run on
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
@@ -82,4 +82,4 @@ jobs:
           pr_body: "Automatic sync from the release candidate to main during a feature freeze."
           pr_allow_empty: false
           pr_draft: false
-          pr_reviewer: "dime10,rauletorresc"
+          pr_reviewer: "dime10,joeycarter"

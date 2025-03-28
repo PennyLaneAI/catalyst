@@ -1,0 +1,1256 @@
+{
+  "class_": "AtomicCircuit",
+  "protocol": {
+    "class_": "SequentialProtocol",
+    "sequence": [
+      {
+        "class_": "ParallelProtocol",
+        "sequence": [
+          {
+            "beam": {
+              "class_": "Beam",
+              "detuning": {
+                "class_": "MathNum",
+                "value": 208570336271826.38
+              },
+              "phase": {
+                "class_": "MathNum",
+                "value": 1.5707963267948966
+              },
+              "polarization": [
+                1,
+                0,
+                0
+              ],
+              "rabi": {
+                "class_": "MathNum",
+                "value": 62831853071.79586
+              },
+              "target": 0,
+              "transition": {
+                "class_": "Transition",
+                "einsteinA": 1.0,
+                "label": "downstate->estate",
+                "level1": {
+                  "class_": "Level",
+                  "energy": 0.0,
+                  "label": "downstate",
+                  "nuclear": 0.5,
+                  "orbital": 0.0,
+                  "principal": 6,
+                  "spin": 0.5,
+                  "spin_orbital": 0.5,
+                  "spin_orbital_nuclear": 0.0,
+                  "spin_orbital_nuclear_magnetization": 0.0
+                },
+                "level2": {
+                  "class_": "Level",
+                  "energy": 5.097485407861727e+15,
+                  "label": "estate",
+                  "nuclear": 0.5,
+                  "orbital": 1.0,
+                  "principal": 6,
+                  "spin": 0.5,
+                  "spin_orbital": 0.5,
+                  "spin_orbital_nuclear": 1.0,
+                  "spin_orbital_nuclear_magnetization": -1.0
+                },
+                "multipole": "E1"
+              },
+              "wavevector": [
+                0,
+                1,
+                0
+              ]
+            },
+            "class_": "Pulse",
+            "duration": 1.6597500000000003e-07
+          },
+          {
+            "beam": {
+              "class_": "Beam",
+              "detuning": {
+                "class_": "MathNum",
+                "value": 208570336271826.38
+              },
+              "phase": {
+                "class_": "MathNum",
+                "value": 0.0
+              },
+              "polarization": [
+                1,
+                0,
+                0
+              ],
+              "rabi": {
+                "class_": "MathNum",
+                "value": 62831853071.79586
+              },
+              "target": 0,
+              "transition": {
+                "class_": "Transition",
+                "einsteinA": 1.0,
+                "label": "upstate->estate",
+                "level1": {
+                  "class_": "Level",
+                  "energy": 79438311838.67151,
+                  "label": "upstate",
+                  "nuclear": 0.5,
+                  "orbital": 0.0,
+                  "principal": 6,
+                  "spin": 0.5,
+                  "spin_orbital": 0.5,
+                  "spin_orbital_nuclear": 1.0,
+                  "spin_orbital_nuclear_magnetization": 0.0
+                },
+                "level2": {
+                  "class_": "Level",
+                  "energy": 5.097485407861727e+15,
+                  "label": "estate",
+                  "nuclear": 0.5,
+                  "orbital": 1.0,
+                  "principal": 6,
+                  "spin": 0.5,
+                  "spin_orbital": 0.5,
+                  "spin_orbital_nuclear": 1.0,
+                  "spin_orbital_nuclear_magnetization": -1.0
+                },
+                "multipole": "E1"
+              },
+              "wavevector": [
+                0,
+                1,
+                0
+              ]
+            },
+            "class_": "Pulse",
+            "duration": 1.6597500000000003e-07
+          }
+        ]
+      },
+      {
+        "class_": "ParallelProtocol",
+        "sequence": [
+          {
+            "beam": {
+              "class_": "Beam",
+              "detuning": {
+                "class_": "MathNum",
+                "value": 208570336271826.38
+              },
+              "phase": {
+                "class_": "MathNum",
+                "value": 0.0
+              },
+              "polarization": [
+                0,
+                1,
+                0
+              ],
+              "rabi": {
+                "class_": "MathNum",
+                "value": 8885765876.316732
+              },
+              "target": 0,
+              "transition": {
+                "class_": "Transition",
+                "einsteinA": 1.0,
+                "label": "downstate->estate",
+                "level1": {
+                  "class_": "Level",
+                  "energy": 0.0,
+                  "label": "downstate",
+                  "nuclear": 0.5,
+                  "orbital": 0.0,
+                  "principal": 6,
+                  "spin": 0.5,
+                  "spin_orbital": 0.5,
+                  "spin_orbital_nuclear": 0.0,
+                  "spin_orbital_nuclear_magnetization": 0.0
+                },
+                "level2": {
+                  "class_": "Level",
+                  "energy": 5.097485407861727e+15,
+                  "label": "estate",
+                  "nuclear": 0.5,
+                  "orbital": 1.0,
+                  "principal": 6,
+                  "spin": 0.5,
+                  "spin_orbital": 0.5,
+                  "spin_orbital_nuclear": 1.0,
+                  "spin_orbital_nuclear_magnetization": -1.0
+                },
+                "multipole": "E1"
+              },
+              "wavevector": [
+                -1,
+                0,
+                0
+              ]
+            },
+            "class_": "Pulse",
+            "duration": 8.29875e-06
+          },
+          {
+            "beam": {
+              "class_": "Beam",
+              "detuning": {
+                "class_": "MathNum",
+                "value": 208570342555011.7
+              },
+              "phase": {
+                "class_": "MathNum",
+                "value": 0.0
+              },
+              "polarization": [
+                0,
+                1,
+                0
+              ],
+              "rabi": {
+                "class_": "MathNum",
+                "value": 8885765876.316732
+              },
+              "target": 0,
+              "transition": {
+                "class_": "Transition",
+                "einsteinA": 1.0,
+                "label": "upstate->estate",
+                "level1": {
+                  "class_": "Level",
+                  "energy": 79438311838.67151,
+                  "label": "upstate",
+                  "nuclear": 0.5,
+                  "orbital": 0.0,
+                  "principal": 6,
+                  "spin": 0.5,
+                  "spin_orbital": 0.5,
+                  "spin_orbital_nuclear": 1.0,
+                  "spin_orbital_nuclear_magnetization": 0.0
+                },
+                "level2": {
+                  "class_": "Level",
+                  "energy": 5.097485407861727e+15,
+                  "label": "estate",
+                  "nuclear": 0.5,
+                  "orbital": 1.0,
+                  "principal": 6,
+                  "spin": 0.5,
+                  "spin_orbital": 0.5,
+                  "spin_orbital_nuclear": 1.0,
+                  "spin_orbital_nuclear_magnetization": -1.0
+                },
+                "multipole": "E1"
+              },
+              "wavevector": [
+                1,
+                0,
+                0
+              ]
+            },
+            "class_": "Pulse",
+            "duration": 8.29875e-06
+          },
+          {
+            "beam": {
+              "class_": "Beam",
+              "detuning": {
+                "class_": "MathNum",
+                "value": 208570329988641.06
+              },
+              "phase": {
+                "class_": "MathNum",
+                "value": 0.0
+              },
+              "polarization": [
+                0,
+                1,
+                0
+              ],
+              "rabi": {
+                "class_": "MathNum",
+                "value": 8885765876.316732
+              },
+              "target": 0,
+              "transition": {
+                "class_": "Transition",
+                "einsteinA": 1.0,
+                "label": "upstate->estate",
+                "level1": {
+                  "class_": "Level",
+                  "energy": 79438311838.67151,
+                  "label": "upstate",
+                  "nuclear": 0.5,
+                  "orbital": 0.0,
+                  "principal": 6,
+                  "spin": 0.5,
+                  "spin_orbital": 0.5,
+                  "spin_orbital_nuclear": 1.0,
+                  "spin_orbital_nuclear_magnetization": 0.0
+                },
+                "level2": {
+                  "class_": "Level",
+                  "energy": 5.097485407861727e+15,
+                  "label": "estate",
+                  "nuclear": 0.5,
+                  "orbital": 1.0,
+                  "principal": 6,
+                  "spin": 0.5,
+                  "spin_orbital": 0.5,
+                  "spin_orbital_nuclear": 1.0,
+                  "spin_orbital_nuclear_magnetization": -1.0
+                },
+                "multipole": "E1"
+              },
+              "wavevector": [
+                1,
+                0,
+                0
+              ]
+            },
+            "class_": "Pulse",
+            "duration": 8.29875e-06
+          },
+          {
+            "beam": {
+              "class_": "Beam",
+              "detuning": {
+                "class_": "MathNum",
+                "value": 208570336271826.38
+              },
+              "phase": {
+                "class_": "MathNum",
+                "value": 0.0
+              },
+              "polarization": [
+                0,
+                1,
+                0
+              ],
+              "rabi": {
+                "class_": "MathNum",
+                "value": 8885765876.316732
+              },
+              "target": 1,
+              "transition": {
+                "class_": "Transition",
+                "einsteinA": 1.0,
+                "label": "downstate->estate",
+                "level1": {
+                  "class_": "Level",
+                  "energy": 0.0,
+                  "label": "downstate",
+                  "nuclear": 0.5,
+                  "orbital": 0.0,
+                  "principal": 6,
+                  "spin": 0.5,
+                  "spin_orbital": 0.5,
+                  "spin_orbital_nuclear": 0.0,
+                  "spin_orbital_nuclear_magnetization": 0.0
+                },
+                "level2": {
+                  "class_": "Level",
+                  "energy": 5.097485407861727e+15,
+                  "label": "estate",
+                  "nuclear": 0.5,
+                  "orbital": 1.0,
+                  "principal": 6,
+                  "spin": 0.5,
+                  "spin_orbital": 0.5,
+                  "spin_orbital_nuclear": 1.0,
+                  "spin_orbital_nuclear_magnetization": -1.0
+                },
+                "multipole": "E1"
+              },
+              "wavevector": [
+                -1,
+                0,
+                0
+              ]
+            },
+            "class_": "Pulse",
+            "duration": 8.29875e-06
+          },
+          {
+            "beam": {
+              "class_": "Beam",
+              "detuning": {
+                "class_": "MathNum",
+                "value": 208570341926693.16
+              },
+              "phase": {
+                "class_": "MathNum",
+                "value": 0.0
+              },
+              "polarization": [
+                0,
+                1,
+                0
+              ],
+              "rabi": {
+                "class_": "MathNum",
+                "value": 8885765876.316732
+              },
+              "target": 1,
+              "transition": {
+                "class_": "Transition",
+                "einsteinA": 1.0,
+                "label": "upstate->estate",
+                "level1": {
+                  "class_": "Level",
+                  "energy": 79438311838.67151,
+                  "label": "upstate",
+                  "nuclear": 0.5,
+                  "orbital": 0.0,
+                  "principal": 6,
+                  "spin": 0.5,
+                  "spin_orbital": 0.5,
+                  "spin_orbital_nuclear": 1.0,
+                  "spin_orbital_nuclear_magnetization": 0.0
+                },
+                "level2": {
+                  "class_": "Level",
+                  "energy": 5.097485407861727e+15,
+                  "label": "estate",
+                  "nuclear": 0.5,
+                  "orbital": 1.0,
+                  "principal": 6,
+                  "spin": 0.5,
+                  "spin_orbital": 0.5,
+                  "spin_orbital_nuclear": 1.0,
+                  "spin_orbital_nuclear_magnetization": -1.0
+                },
+                "multipole": "E1"
+              },
+              "wavevector": [
+                1,
+                0,
+                0
+              ]
+            },
+            "class_": "Pulse",
+            "duration": 8.29875e-06
+          },
+          {
+            "beam": {
+              "class_": "Beam",
+              "detuning": {
+                "class_": "MathNum",
+                "value": 208570330616959.6
+              },
+              "phase": {
+                "class_": "MathNum",
+                "value": 0.0
+              },
+              "polarization": [
+                0,
+                1,
+                0
+              ],
+              "rabi": {
+                "class_": "MathNum",
+                "value": 8885765876.316732
+              },
+              "target": 1,
+              "transition": {
+                "class_": "Transition",
+                "einsteinA": 1.0,
+                "label": "upstate->estate",
+                "level1": {
+                  "class_": "Level",
+                  "energy": 79438311838.67151,
+                  "label": "upstate",
+                  "nuclear": 0.5,
+                  "orbital": 0.0,
+                  "principal": 6,
+                  "spin": 0.5,
+                  "spin_orbital": 0.5,
+                  "spin_orbital_nuclear": 1.0,
+                  "spin_orbital_nuclear_magnetization": 0.0
+                },
+                "level2": {
+                  "class_": "Level",
+                  "energy": 5.097485407861727e+15,
+                  "label": "estate",
+                  "nuclear": 0.5,
+                  "orbital": 1.0,
+                  "principal": 6,
+                  "spin": 0.5,
+                  "spin_orbital": 0.5,
+                  "spin_orbital_nuclear": 1.0,
+                  "spin_orbital_nuclear_magnetization": -1.0
+                },
+                "multipole": "E1"
+              },
+              "wavevector": [
+                1,
+                0,
+                0
+              ]
+            },
+            "class_": "Pulse",
+            "duration": 8.29875e-06
+          }
+        ]
+      },
+      {
+        "class_": "ParallelProtocol",
+        "sequence": [
+          {
+            "beam": {
+              "class_": "Beam",
+              "detuning": {
+                "class_": "MathNum",
+                "value": 208570336271826.38
+              },
+              "phase": {
+                "class_": "MathNum",
+                "value": 0.0
+              },
+              "polarization": [
+                1,
+                0,
+                0
+              ],
+              "rabi": {
+                "class_": "MathNum",
+                "value": 62831853071.79586
+              },
+              "target": 0,
+              "transition": {
+                "class_": "Transition",
+                "einsteinA": 1.0,
+                "label": "downstate->estate",
+                "level1": {
+                  "class_": "Level",
+                  "energy": 0.0,
+                  "label": "downstate",
+                  "nuclear": 0.5,
+                  "orbital": 0.0,
+                  "principal": 6,
+                  "spin": 0.5,
+                  "spin_orbital": 0.5,
+                  "spin_orbital_nuclear": 0.0,
+                  "spin_orbital_nuclear_magnetization": 0.0
+                },
+                "level2": {
+                  "class_": "Level",
+                  "energy": 5.097485407861727e+15,
+                  "label": "estate",
+                  "nuclear": 0.5,
+                  "orbital": 1.0,
+                  "principal": 6,
+                  "spin": 0.5,
+                  "spin_orbital": 0.5,
+                  "spin_orbital_nuclear": 1.0,
+                  "spin_orbital_nuclear_magnetization": -1.0
+                },
+                "multipole": "E1"
+              },
+              "wavevector": [
+                0,
+                1,
+                0
+              ]
+            },
+            "class_": "Pulse",
+            "duration": 1.161825e-06
+          },
+          {
+            "beam": {
+              "class_": "Beam",
+              "detuning": {
+                "class_": "MathNum",
+                "value": 208570336271826.38
+              },
+              "phase": {
+                "class_": "MathNum",
+                "value": 0.0
+              },
+              "polarization": [
+                1,
+                0,
+                0
+              ],
+              "rabi": {
+                "class_": "MathNum",
+                "value": 62831853071.79586
+              },
+              "target": 0,
+              "transition": {
+                "class_": "Transition",
+                "einsteinA": 1.0,
+                "label": "upstate->estate",
+                "level1": {
+                  "class_": "Level",
+                  "energy": 79438311838.67151,
+                  "label": "upstate",
+                  "nuclear": 0.5,
+                  "orbital": 0.0,
+                  "principal": 6,
+                  "spin": 0.5,
+                  "spin_orbital": 0.5,
+                  "spin_orbital_nuclear": 1.0,
+                  "spin_orbital_nuclear_magnetization": 0.0
+                },
+                "level2": {
+                  "class_": "Level",
+                  "energy": 5.097485407861727e+15,
+                  "label": "estate",
+                  "nuclear": 0.5,
+                  "orbital": 1.0,
+                  "principal": 6,
+                  "spin": 0.5,
+                  "spin_orbital": 0.5,
+                  "spin_orbital_nuclear": 1.0,
+                  "spin_orbital_nuclear_magnetization": -1.0
+                },
+                "multipole": "E1"
+              },
+              "wavevector": [
+                0,
+                1,
+                0
+              ]
+            },
+            "class_": "Pulse",
+            "duration": 1.161825e-06
+          }
+        ]
+      },
+      {
+        "class_": "ParallelProtocol",
+        "sequence": [
+          {
+            "beam": {
+              "class_": "Beam",
+              "detuning": {
+                "class_": "MathNum",
+                "value": 208570336271826.38
+              },
+              "phase": {
+                "class_": "MathNum",
+                "value": 1.5707963267948966
+              },
+              "polarization": [
+                1,
+                0,
+                0
+              ],
+              "rabi": {
+                "class_": "MathNum",
+                "value": 62831853071.79586
+              },
+              "target": 1,
+              "transition": {
+                "class_": "Transition",
+                "einsteinA": 1.0,
+                "label": "downstate->estate",
+                "level1": {
+                  "class_": "Level",
+                  "energy": 0.0,
+                  "label": "downstate",
+                  "nuclear": 0.5,
+                  "orbital": 0.0,
+                  "principal": 6,
+                  "spin": 0.5,
+                  "spin_orbital": 0.5,
+                  "spin_orbital_nuclear": 0.0,
+                  "spin_orbital_nuclear_magnetization": 0.0
+                },
+                "level2": {
+                  "class_": "Level",
+                  "energy": 5.097485407861727e+15,
+                  "label": "estate",
+                  "nuclear": 0.5,
+                  "orbital": 1.0,
+                  "principal": 6,
+                  "spin": 0.5,
+                  "spin_orbital": 0.5,
+                  "spin_orbital_nuclear": 1.0,
+                  "spin_orbital_nuclear_magnetization": -1.0
+                },
+                "multipole": "E1"
+              },
+              "wavevector": [
+                0,
+                1,
+                0
+              ]
+            },
+            "class_": "Pulse",
+            "duration": 1.161825e-06
+          },
+          {
+            "beam": {
+              "class_": "Beam",
+              "detuning": {
+                "class_": "MathNum",
+                "value": 208570336271826.38
+              },
+              "phase": {
+                "class_": "MathNum",
+                "value": 0.0
+              },
+              "polarization": [
+                1,
+                0,
+                0
+              ],
+              "rabi": {
+                "class_": "MathNum",
+                "value": 62831853071.79586
+              },
+              "target": 1,
+              "transition": {
+                "class_": "Transition",
+                "einsteinA": 1.0,
+                "label": "upstate->estate",
+                "level1": {
+                  "class_": "Level",
+                  "energy": 79438311838.67151,
+                  "label": "upstate",
+                  "nuclear": 0.5,
+                  "orbital": 0.0,
+                  "principal": 6,
+                  "spin": 0.5,
+                  "spin_orbital": 0.5,
+                  "spin_orbital_nuclear": 1.0,
+                  "spin_orbital_nuclear_magnetization": 0.0
+                },
+                "level2": {
+                  "class_": "Level",
+                  "energy": 5.097485407861727e+15,
+                  "label": "estate",
+                  "nuclear": 0.5,
+                  "orbital": 1.0,
+                  "principal": 6,
+                  "spin": 0.5,
+                  "spin_orbital": 0.5,
+                  "spin_orbital_nuclear": 1.0,
+                  "spin_orbital_nuclear_magnetization": -1.0
+                },
+                "multipole": "E1"
+              },
+              "wavevector": [
+                0,
+                1,
+                0
+              ]
+            },
+            "class_": "Pulse",
+            "duration": 1.161825e-06
+          }
+        ]
+      },
+      {
+        "class_": "ParallelProtocol",
+        "sequence": [
+          {
+            "beam": {
+              "class_": "Beam",
+              "detuning": {
+                "class_": "MathNum",
+                "value": 208570336271826.38
+              },
+              "phase": {
+                "class_": "MathNum",
+                "value": 1.5707963267948966
+              },
+              "polarization": [
+                1,
+                0,
+                0
+              ],
+              "rabi": {
+                "class_": "MathNum",
+                "value": 62831853071.79586
+              },
+              "target": 0,
+              "transition": {
+                "class_": "Transition",
+                "einsteinA": 1.0,
+                "label": "downstate->estate",
+                "level1": {
+                  "class_": "Level",
+                  "energy": 0.0,
+                  "label": "downstate",
+                  "nuclear": 0.5,
+                  "orbital": 0.0,
+                  "principal": 6,
+                  "spin": 0.5,
+                  "spin_orbital": 0.5,
+                  "spin_orbital_nuclear": 0.0,
+                  "spin_orbital_nuclear_magnetization": 0.0
+                },
+                "level2": {
+                  "class_": "Level",
+                  "energy": 5.097485407861727e+15,
+                  "label": "estate",
+                  "nuclear": 0.5,
+                  "orbital": 1.0,
+                  "principal": 6,
+                  "spin": 0.5,
+                  "spin_orbital": 0.5,
+                  "spin_orbital_nuclear": 1.0,
+                  "spin_orbital_nuclear_magnetization": -1.0
+                },
+                "multipole": "E1"
+              },
+              "wavevector": [
+                0,
+                1,
+                0
+              ]
+            },
+            "class_": "Pulse",
+            "duration": 1.161825e-06
+          },
+          {
+            "beam": {
+              "class_": "Beam",
+              "detuning": {
+                "class_": "MathNum",
+                "value": 208570336271826.38
+              },
+              "phase": {
+                "class_": "MathNum",
+                "value": 0.0
+              },
+              "polarization": [
+                1,
+                0,
+                0
+              ],
+              "rabi": {
+                "class_": "MathNum",
+                "value": 62831853071.79586
+              },
+              "target": 0,
+              "transition": {
+                "class_": "Transition",
+                "einsteinA": 1.0,
+                "label": "upstate->estate",
+                "level1": {
+                  "class_": "Level",
+                  "energy": 79438311838.67151,
+                  "label": "upstate",
+                  "nuclear": 0.5,
+                  "orbital": 0.0,
+                  "principal": 6,
+                  "spin": 0.5,
+                  "spin_orbital": 0.5,
+                  "spin_orbital_nuclear": 1.0,
+                  "spin_orbital_nuclear_magnetization": 0.0
+                },
+                "level2": {
+                  "class_": "Level",
+                  "energy": 5.097485407861727e+15,
+                  "label": "estate",
+                  "nuclear": 0.5,
+                  "orbital": 1.0,
+                  "principal": 6,
+                  "spin": 0.5,
+                  "spin_orbital": 0.5,
+                  "spin_orbital_nuclear": 1.0,
+                  "spin_orbital_nuclear_magnetization": -1.0
+                },
+                "multipole": "E1"
+              },
+              "wavevector": [
+                0,
+                1,
+                0
+              ]
+            },
+            "class_": "Pulse",
+            "duration": 1.161825e-06
+          }
+        ]
+      }
+    ]
+  },
+  "system": {
+    "class_": "System",
+    "ions": [
+      {
+        "charge": -1.0,
+        "class_": "Ion",
+        "levels": [
+          {
+            "class_": "Level",
+            "energy": 0.0,
+            "label": "downstate",
+            "nuclear": 0.5,
+            "orbital": 0.0,
+            "principal": 6,
+            "spin": 0.5,
+            "spin_orbital": 0.5,
+            "spin_orbital_nuclear": 0.0,
+            "spin_orbital_nuclear_magnetization": 0.0
+          },
+          {
+            "class_": "Level",
+            "energy": 79438311838.67151,
+            "label": "upstate",
+            "nuclear": 0.5,
+            "orbital": 0.0,
+            "principal": 6,
+            "spin": 0.5,
+            "spin_orbital": 0.5,
+            "spin_orbital_nuclear": 1.0,
+            "spin_orbital_nuclear_magnetization": 0.0
+          },
+          {
+            "class_": "Level",
+            "energy": 5.097485407861727e+15,
+            "label": "estate",
+            "nuclear": 0.5,
+            "orbital": 1.0,
+            "principal": 6,
+            "spin": 0.5,
+            "spin_orbital": 0.5,
+            "spin_orbital_nuclear": 1.0,
+            "spin_orbital_nuclear_magnetization": -1.0
+          },
+          {
+            "class_": "Level",
+            "energy": 5.724861460783608e+15,
+            "label": "estate2",
+            "nuclear": 0.5,
+            "orbital": 1.0,
+            "principal": 6,
+            "spin": 0.5,
+            "spin_orbital": 0.5,
+            "spin_orbital_nuclear": 1.0,
+            "spin_orbital_nuclear_magnetization": 1.0
+          }
+        ],
+        "mass": 171.0,
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "transitions": [
+          {
+            "class_": "Transition",
+            "einsteinA": 1.0,
+            "label": "downstate->estate",
+            "level1": {
+              "class_": "Level",
+              "energy": 0.0,
+              "label": "downstate",
+              "nuclear": 0.5,
+              "orbital": 0.0,
+              "principal": 6,
+              "spin": 0.5,
+              "spin_orbital": 0.5,
+              "spin_orbital_nuclear": 0.0,
+              "spin_orbital_nuclear_magnetization": 0.0
+            },
+            "level2": {
+              "class_": "Level",
+              "energy": 5.097485407861727e+15,
+              "label": "estate",
+              "nuclear": 0.5,
+              "orbital": 1.0,
+              "principal": 6,
+              "spin": 0.5,
+              "spin_orbital": 0.5,
+              "spin_orbital_nuclear": 1.0,
+              "spin_orbital_nuclear_magnetization": -1.0
+            },
+            "multipole": "E1"
+          },
+          {
+            "class_": "Transition",
+            "einsteinA": 1.0,
+            "label": "downstate->estate2",
+            "level1": {
+              "class_": "Level",
+              "energy": 0.0,
+              "label": "downstate",
+              "nuclear": 0.5,
+              "orbital": 0.0,
+              "principal": 6,
+              "spin": 0.5,
+              "spin_orbital": 0.5,
+              "spin_orbital_nuclear": 0.0,
+              "spin_orbital_nuclear_magnetization": 0.0
+            },
+            "level2": {
+              "class_": "Level",
+              "energy": 5.724861460783608e+15,
+              "label": "estate2",
+              "nuclear": 0.5,
+              "orbital": 1.0,
+              "principal": 6,
+              "spin": 0.5,
+              "spin_orbital": 0.5,
+              "spin_orbital_nuclear": 1.0,
+              "spin_orbital_nuclear_magnetization": 1.0
+            },
+            "multipole": "E1"
+          },
+          {
+            "class_": "Transition",
+            "einsteinA": 1.0,
+            "label": "upstate->estate",
+            "level1": {
+              "class_": "Level",
+              "energy": 79438311838.67151,
+              "label": "upstate",
+              "nuclear": 0.5,
+              "orbital": 0.0,
+              "principal": 6,
+              "spin": 0.5,
+              "spin_orbital": 0.5,
+              "spin_orbital_nuclear": 1.0,
+              "spin_orbital_nuclear_magnetization": 0.0
+            },
+            "level2": {
+              "class_": "Level",
+              "energy": 5.097485407861727e+15,
+              "label": "estate",
+              "nuclear": 0.5,
+              "orbital": 1.0,
+              "principal": 6,
+              "spin": 0.5,
+              "spin_orbital": 0.5,
+              "spin_orbital_nuclear": 1.0,
+              "spin_orbital_nuclear_magnetization": -1.0
+            },
+            "multipole": "E1"
+          },
+          {
+            "class_": "Transition",
+            "einsteinA": 1.0,
+            "label": "upstate->estate2",
+            "level1": {
+              "class_": "Level",
+              "energy": 79438311838.67151,
+              "label": "upstate",
+              "nuclear": 0.5,
+              "orbital": 0.0,
+              "principal": 6,
+              "spin": 0.5,
+              "spin_orbital": 0.5,
+              "spin_orbital_nuclear": 1.0,
+              "spin_orbital_nuclear_magnetization": 0.0
+            },
+            "level2": {
+              "class_": "Level",
+              "energy": 5.724861460783608e+15,
+              "label": "estate2",
+              "nuclear": 0.5,
+              "orbital": 1.0,
+              "principal": 6,
+              "spin": 0.5,
+              "spin_orbital": 0.5,
+              "spin_orbital_nuclear": 1.0,
+              "spin_orbital_nuclear_magnetization": 1.0
+            },
+            "multipole": "E1"
+          }
+        ]
+      },
+      {
+        "charge": -1.0,
+        "class_": "Ion",
+        "levels": [
+          {
+            "class_": "Level",
+            "energy": 0.0,
+            "label": "downstate",
+            "nuclear": 0.5,
+            "orbital": 0.0,
+            "principal": 6,
+            "spin": 0.5,
+            "spin_orbital": 0.5,
+            "spin_orbital_nuclear": 0.0,
+            "spin_orbital_nuclear_magnetization": 0.0
+          },
+          {
+            "class_": "Level",
+            "energy": 79438311838.67151,
+            "label": "upstate",
+            "nuclear": 0.5,
+            "orbital": 0.0,
+            "principal": 6,
+            "spin": 0.5,
+            "spin_orbital": 0.5,
+            "spin_orbital_nuclear": 1.0,
+            "spin_orbital_nuclear_magnetization": 0.0
+          },
+          {
+            "class_": "Level",
+            "energy": 5.097485407861727e+15,
+            "label": "estate",
+            "nuclear": 0.5,
+            "orbital": 1.0,
+            "principal": 6,
+            "spin": 0.5,
+            "spin_orbital": 0.5,
+            "spin_orbital_nuclear": 1.0,
+            "spin_orbital_nuclear_magnetization": -1.0
+          },
+          {
+            "class_": "Level",
+            "energy": 5.724861460783608e+15,
+            "label": "estate2",
+            "nuclear": 0.5,
+            "orbital": 1.0,
+            "principal": 6,
+            "spin": 0.5,
+            "spin_orbital": 0.5,
+            "spin_orbital_nuclear": 1.0,
+            "spin_orbital_nuclear_magnetization": 1.0
+          }
+        ],
+        "mass": 171.0,
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "transitions": [
+          {
+            "class_": "Transition",
+            "einsteinA": 1.0,
+            "label": "downstate->estate",
+            "level1": {
+              "class_": "Level",
+              "energy": 0.0,
+              "label": "downstate",
+              "nuclear": 0.5,
+              "orbital": 0.0,
+              "principal": 6,
+              "spin": 0.5,
+              "spin_orbital": 0.5,
+              "spin_orbital_nuclear": 0.0,
+              "spin_orbital_nuclear_magnetization": 0.0
+            },
+            "level2": {
+              "class_": "Level",
+              "energy": 5.097485407861727e+15,
+              "label": "estate",
+              "nuclear": 0.5,
+              "orbital": 1.0,
+              "principal": 6,
+              "spin": 0.5,
+              "spin_orbital": 0.5,
+              "spin_orbital_nuclear": 1.0,
+              "spin_orbital_nuclear_magnetization": -1.0
+            },
+            "multipole": "E1"
+          },
+          {
+            "class_": "Transition",
+            "einsteinA": 1.0,
+            "label": "downstate->estate2",
+            "level1": {
+              "class_": "Level",
+              "energy": 0.0,
+              "label": "downstate",
+              "nuclear": 0.5,
+              "orbital": 0.0,
+              "principal": 6,
+              "spin": 0.5,
+              "spin_orbital": 0.5,
+              "spin_orbital_nuclear": 0.0,
+              "spin_orbital_nuclear_magnetization": 0.0
+            },
+            "level2": {
+              "class_": "Level",
+              "energy": 5.724861460783608e+15,
+              "label": "estate2",
+              "nuclear": 0.5,
+              "orbital": 1.0,
+              "principal": 6,
+              "spin": 0.5,
+              "spin_orbital": 0.5,
+              "spin_orbital_nuclear": 1.0,
+              "spin_orbital_nuclear_magnetization": 1.0
+            },
+            "multipole": "E1"
+          },
+          {
+            "class_": "Transition",
+            "einsteinA": 1.0,
+            "label": "upstate->estate",
+            "level1": {
+              "class_": "Level",
+              "energy": 79438311838.67151,
+              "label": "upstate",
+              "nuclear": 0.5,
+              "orbital": 0.0,
+              "principal": 6,
+              "spin": 0.5,
+              "spin_orbital": 0.5,
+              "spin_orbital_nuclear": 1.0,
+              "spin_orbital_nuclear_magnetization": 0.0
+            },
+            "level2": {
+              "class_": "Level",
+              "energy": 5.097485407861727e+15,
+              "label": "estate",
+              "nuclear": 0.5,
+              "orbital": 1.0,
+              "principal": 6,
+              "spin": 0.5,
+              "spin_orbital": 0.5,
+              "spin_orbital_nuclear": 1.0,
+              "spin_orbital_nuclear_magnetization": -1.0
+            },
+            "multipole": "E1"
+          },
+          {
+            "class_": "Transition",
+            "einsteinA": 1.0,
+            "label": "upstate->estate2",
+            "level1": {
+              "class_": "Level",
+              "energy": 79438311838.67151,
+              "label": "upstate",
+              "nuclear": 0.5,
+              "orbital": 0.0,
+              "principal": 6,
+              "spin": 0.5,
+              "spin_orbital": 0.5,
+              "spin_orbital_nuclear": 1.0,
+              "spin_orbital_nuclear_magnetization": 0.0
+            },
+            "level2": {
+              "class_": "Level",
+              "energy": 5.724861460783608e+15,
+              "label": "estate2",
+              "nuclear": 0.5,
+              "orbital": 1.0,
+              "principal": 6,
+              "spin": 0.5,
+              "spin_orbital": 0.5,
+              "spin_orbital_nuclear": 1.0,
+              "spin_orbital_nuclear_magnetization": 1.0
+            },
+            "multipole": "E1"
+          }
+        ]
+      }
+    ],
+    "modes": [
+      {
+        "class_": "Phonon",
+        "eigenvector": [
+          0.7071067811865475,
+          0.0,
+          0.0,
+          0.7071067811865475,
+          0.0,
+          0.0
+        ],
+        "energy": 6283185.307179586
+      }
+    ]
+  }
+}

@@ -712,14 +712,15 @@ def ctrl_distribute(
 def _check_no_measurements(tape: QuantumTape) -> None:
     """Check the nested quantum tape for the absense of quantum measurements of any kind"""
 
-    msg = "Quantum measurements are not allowed"
-
     if len(tape.measurements) > 0:
-        raise ValueError(msg)
+        raise ValueError("Measurement process cannot be used within an adjoint() or ctrl() region.")
     for op in tape.operations:
         if has_nested_tapes(op):
             for r in [r for r in op.regions if r.quantum_tape is not None]:
                 _check_no_measurements(r.quantum_tape)
         else:
             if isinstance(op, MidCircuitMeasure):
-                raise ValueError(msg)
+                raise ValueError(
+                    "Mid-circuit measurements cannot be used "
+                    "within an adjoint() or ctrl() region."
+                )

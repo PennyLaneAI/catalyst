@@ -28,27 +28,28 @@ import jax.numpy as jnp
 import pennylane as qml
 from jax.interpreters import mlir
 from jax.tree_util import tree_flatten, tree_unflatten
-from malt.core import config as ag_config
 
 import catalyst
-from catalyst.autograph import ag_primitives, run_autograph
+from catalyst.autograph import run_autograph
 from catalyst.compiled_functions import CompilationCache, CompiledFunction
 from catalyst.compiler import CompileOptions, Compiler
 from catalyst.debug.instruments import instrument
+from catalyst.from_plxpr import trace_from_pennylane
 from catalyst.jax_tracer import lower_jaxpr_to_mlir, trace_to_jaxpr
 from catalyst.logging import debug_logger, debug_logger_init
-from catalyst.passes import _inject_transform_named_sequence
 from catalyst.qfunc import QFunc
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.tracing.type_signatures import (
     filter_static_args,
     get_abstract_signature,
     get_type_annotations,
+    merge_static_argname_into_argnum,
     merge_static_args,
     promote_arguments,
     verify_static_argnums,
 )
 from catalyst.utils.c_template import mlir_type_to_numpy_type
+from catalyst.utils.callables import CatalystCallable
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.filesystem import WorkspaceManager
 from catalyst.utils.gen_mlir import inject_functions
@@ -80,9 +81,14 @@ def qjit(
     logfile=None,
     pipelines=None,
     static_argnums=None,
+    static_argnames=None,
     abstracted_axes=None,
     disable_assertions=False,
     seed=None,
+    experimental_capture=False,
+    circuit_transform_pipeline=None,
+    pass_plugins=None,
+    dialect_plugins=None,
 ):  # pylint: disable=too-many-arguments,unused-argument
     """A just-in-time decorator for PennyLane and JAX programs using Catalyst.
 
@@ -92,7 +98,7 @@ def qjit(
     .. note::
 
         Not all PennyLane devices currently work with Catalyst. Supported backend devices include
-        ``lightning.qubit``, ``lightning.kokkos``, and ``braket.aws.qubit``. For
+        ``lightning.qubit``, ``lightning.kokkos``, ``lightning.gpu``, and ``braket.aws.qubit``. For
         a full of supported devices, please see :doc:`/dev/devices`.
 
     Args:
@@ -110,7 +116,7 @@ def qjit(
             compilation. If ``True``, intermediate representations are available via the
             :attr:`~.QJIT.mlir`, :attr:`~.QJIT.jaxpr`, and :attr:`~.QJIT.qir`, representing
             different stages in the optimization process.
-        verbosity (bool): If ``True``, the tools and flags used by Catalyst behind the scenes are
+        verbose (bool): If ``True``, the tools and flags used by Catalyst behind the scenes are
             printed out.
         logfile (Optional[TextIOWrapper]): File object to write verbose messages to (default -
             ``sys.stderr``).
@@ -120,6 +126,8 @@ def qjit(
             considered to be used by advanced users for low-level debugging purposes.
         static_argnums(int or Seqence[Int]): an index or a sequence of indices that specifies the
             positions of static arguments.
+        static_argnames(str or Seqence[str]): a string or a sequence of strings that specifies the
+            names of static arguments.
         abstracted_axes (Sequence[Sequence[str]] or Dict[int, str] or Sequence[Dict[int, str]]):
             An experimental option to specify dynamic tensor shapes.
             This option affects the compilation of the annotated function.
@@ -129,13 +137,28 @@ def qjit(
         disable_assertions (bool): If set to ``True``, runtime assertions included in
             ``fn`` via :func:`~.debug_assert` will be disabled during compilation.
         seed (Optional[Int]):
-            The seed for mid-circuit measurement results when the qjit-compiled function is executed
-            on simulator devices including ``lightning.qubit`` and ``lightning.kokkos``.
-            The default value is None, which means no seeding is performed, and all processes
-            are random. A seed is expected to be an unsigned 32-bit integer.
-            Note that seeding samples on simulator devices is not yet supported. As such,
-            shot-noise stochasticity in terminal measurement statistics such as ``sample`` or
-            ``expval`` will remain.
+            The seed for circuit readout results when the qjit-compiled function is executed
+            on simulator devices including ``lightning.qubit``, ``lightning.kokkos``, and
+            ``lightning.gpu``. The default value is None, which means no seeding is performed,
+            and all processes are random. A seed is expected to be an unsigned 32-bit integer.
+            Currently, the following measurement processes are seeded: :func:`~.measure`,
+            :func:`qml.sample() <pennylane.sample>`, :func:`qml.counts() <pennylane.counts>`,
+            :func:`qml.probs() <pennylane.probs>`, :func:`qml.expval() <pennylane.expval>`,
+            :func:`qml.var() <pennylane.var>`.
+        experimental_capture (bool): If set to ``True``, the qjit decorator
+            will use PennyLane's experimental program capture capabilities
+            to capture the decorated function for compilation.
+        circuit_transform_pipeline (Optional[dict[str, dict[str, str]]]):
+            A dictionary that specifies the quantum circuit transformation pass pipeline order,
+            and optionally arguments for each pass in the pipeline. Keys of this dictionary
+            should correspond to names of passes found in the `catalyst.passes <https://docs.
+            pennylane.ai/projects/catalyst/en/stable/code/__init__.html#module-catalyst.passes>`_
+            module, values should either be empty dictionaries (for default pass options) or
+            dictionaries of valid keyword arguments and values for the specific pass.
+            The order of keys in this dictionary will determine the pass pipeline.
+            If not specified, the default pass pipeline will be applied.
+        pass_plugins (Optional[List[Path]]): List of paths to pass plugins.
+        dialect_plugins (Optional[List[Path]]): List of paths to dialect plugins.
 
     Returns:
         QJIT object.
@@ -225,12 +248,55 @@ def qjit(
         appearing as is.
 
     .. details::
+        :title: In-place JAX array updates with Autograph
+
+        To update array values when using JAX, the JAX syntax for array modification
+        (which uses methods like ``at``, ``set``, ``multiply``, etc) must be used:
+
+        .. code-block:: python
+
+            @qjit(autograph=True)
+            def f(x):
+                first_dim = x.shape[0]
+                result = jnp.empty((first_dim,), dtype=x.dtype)
+                for i in range(first_dim):
+                    result = result.at[i].set(x[i])
+                    result = result.at[i].multiply(10)
+                    result = result.at[i].add(5)
+
+                return result
+
+        However, if updating a single index or slice of the array, Autograph supports conversion of
+        Python's standard arithmatic array assignment operators to the equivalent in-place
+        expressions listed in the JAX documentation for ``jax.numpy.ndarray.at``:
+
+        .. code-block:: python
+
+            @qjit(autograph=True)
+            def f(x):
+                first_dim = x.shape[0]
+                result = jnp.empty((first_dim,), dtype=x.dtype)
+                for i in range(first_dim):
+                    result[i] = x[i]
+                    result[i] *= 10
+                    result[i] += 5
+
+                return result
+
+        Under the hood, Catalyst converts anything coming in the latter notation into the
+        former one.
+
+        The list of supported operators includes: ``=``, ``+=``, ``-=``, ``*=``, ``/=``, and ``**=``.
+
+    .. details::
         :title: Static arguments
 
-        ``static_argnums`` defines which elements should be treated as static. If it takes an
-        integer, it means the argument whose index is equal to the integer is static. If it takes
-        an iterable of integers, arguments whose index is contained in the iterable are static.
-        Changing static arguments will introduce re-compilation.
+        - ``static_argnums`` defines which positional arguments should be treated as static. If it
+          takes an integer, it means the argument whose index is equal to the integer is static. If
+          it takes an iterable of integers, arguments whose index is contained in the iterable are
+          static. Changing static arguments will introduce re-compilation.
+
+        - ``static_argnames`` defines which named function arguments should be treated as static.
 
         A valid static argument must be hashable and its ``__hash__`` method must be able to
         reflect any changes of its attributes.
@@ -381,7 +447,7 @@ def qjit(
 
 
 # pylint: disable=too-many-instance-attributes
-class QJIT:
+class QJIT(CatalystCallable):
     """Class representing a just-in-time compiled hybrid quantum-classical function.
 
     .. note::
@@ -403,6 +469,7 @@ class QJIT:
 
     @debug_logger_init
     def __init__(self, fn, compile_options):
+        functools.update_wrapper(self, fn)
         self.original_function = fn
         self.compile_options = compile_options
         self.compiler = Compiler(compile_options)
@@ -418,31 +485,43 @@ class QJIT:
         self.jaxed_function = None
         # IRs are only available for the most recently traced function.
         self.jaxpr = None
-        self.mlir = None  # string form (historic presence)
         self.mlir_module = None
-        self.qir = None
         self.out_type = None
         self.overwrite_ir = None
+        self.use_cwd_for_workspace = self.compile_options.keep_intermediate
 
-        functools.update_wrapper(self, fn)
         self.user_sig = get_type_annotations(fn)
         self._validate_configuration()
 
-        # Patch the conversion rules by adding the included modules before the block list
-        include_convertlist = tuple(
-            ag_config.Convert(rule) for rule in self.compile_options.autograph_include
-        )
-        self.patched_module_allowlist = include_convertlist + ag_primitives.module_allowlist
+        # If static_argnames are present, convert them to static_argnums
+        if compile_options.static_argnames is not None:
+            compile_options.static_argnums = merge_static_argname_into_argnum(
+                fn, compile_options.static_argnames, compile_options.static_argnums
+            )
 
-        # Pre-compile with the patched conversion rules
-        with Patcher(
-            (ag_primitives, "module_allowlist", self.patched_module_allowlist),
-        ):
-            self.user_function = self.pre_compilation()
+        self.user_function = self.pre_compilation()
 
         # Static arguments require values, so we cannot AOT compile.
         if self.user_sig is not None and not self.compile_options.static_argnums:
             self.aot_compile()
+
+        super().__init__("user_function")
+
+    @property
+    def mlir(self):
+        """obtain the MLIR representation after canonicalization"""
+        # Canonicalize the MLIR since there can be a lot of redundancy coming from JAX.
+        if not self.mlir_module:
+            return None
+        options = copy.deepcopy(self.compile_options)
+        options.pipelines = [("0_canonicalize", ["canonicalize"])]
+        options.lower_to_llvm = False
+        options.keep_intermediate = True
+        canonicalizer = Compiler(options)
+
+        # TODO: the in-memory and textual form are different after this, consider unification
+        _, mlir_string = canonicalizer.run(self.mlir_module, self.workspace)
+        return mlir_string
 
     @debug_logger
     def __call__(self, *args, **kwargs):
@@ -476,22 +555,30 @@ class QJIT:
 
         # TODO: awkward, refactor or redesign the target feature
         if self.compile_options.target in ("jaxpr", "mlir", "binary"):
-            # Capture with the patched conversion rules
-            with Patcher(
-                (ag_primitives, "module_allowlist", self.patched_module_allowlist),
-            ):
-                self.jaxpr, self.out_type, self.out_treedef, self.c_sig = self.capture(
-                    self.user_sig or ()
-                )
+            self.jaxpr, self.out_type, self.out_treedef, self.c_sig = self.capture(
+                self.user_sig or ()
+            )
 
         if self.compile_options.target in ("mlir", "binary"):
-            self.mlir_module, self.mlir = self.generate_ir()
+            self.mlir_module = self.generate_ir()
 
         if self.compile_options.target in ("binary",):
-            self.compiled_function, self.qir = self.compile()
+            self.compiled_function, _ = self.compile()
             self.fn_cache.insert(
                 self.compiled_function, self.user_sig, self.out_treedef, self.workspace
             )
+
+    @property
+    def qir(self):
+        """LLVMIR textual representation."""
+        if not self.mlir_module:
+            return None
+
+        orig = copy.deepcopy(self.compile_options)
+        self.compile_options.keep_intermediate = True
+        _, _qir = self.compile()
+        self.compile_options = orig
+        return _qir
 
     @debug_logger
     def jit_compile(self, args, **kwargs):
@@ -521,16 +608,10 @@ class QJIT:
             if self.compiled_function and self.compiled_function.shared_object:
                 self.compiled_function.shared_object.close()
 
-            # Capture with the patched conversion rules
-            with Patcher(
-                (ag_primitives, "module_allowlist", self.patched_module_allowlist),
-            ):
-                self.jaxpr, self.out_type, self.out_treedef, self.c_sig = self.capture(
-                    args, **kwargs
-                )
+            self.jaxpr, self.out_type, self.out_treedef, self.c_sig = self.capture(args, **kwargs)
 
-            self.mlir_module, self.mlir = self.generate_ir()
-            self.compiled_function, self.qir = self.compile()
+            self.mlir_module = self.generate_ir()
+            self.compiled_function, _ = self.compile()
 
             self.fn_cache.insert(self.compiled_function, args, self.out_treedef, self.workspace)
 
@@ -552,12 +633,10 @@ class QJIT:
     @debug_logger
     def pre_compilation(self):
         """Perform pre-processing tasks on the Python function, such as AST transformations."""
-        processed_fn = self.original_function
-
         if self.compile_options.autograph:
-            processed_fn = run_autograph(self.original_function)
+            return run_autograph(self.original_function, *self.compile_options.autograph_include)
 
-        return processed_fn
+        return self.original_function
 
     @instrument(size_from=0)
     @debug_logger
@@ -572,7 +651,6 @@ class QJIT:
             PyTreeDef: PyTree metadata of the function output
             Tuple[Any]: the dynamic argument signature
         """
-
         verify_static_argnums(args, self.compile_options.static_argnums)
         static_argnums = self.compile_options.static_argnums
         abstracted_axes = self.compile_options.abstracted_axes
@@ -581,35 +659,37 @@ class QJIT:
         dynamic_sig = get_abstract_signature(dynamic_args)
         full_sig = merge_static_args(dynamic_sig, args, static_argnums)
 
+        if self.compile_options.experimental_capture:
+            return trace_from_pennylane(
+                self.user_function, static_argnums, abstracted_axes, full_sig, kwargs
+            )
+
         def closure(qnode, *args, **kwargs):
             params = {}
             params["static_argnums"] = kwargs.pop("static_argnums", static_argnums)
             params["_out_tree_expected"] = []
-            return QFunc.__call__(qnode, *args, **dict(params, **kwargs))
+            default_pass_pipeline = self.compile_options.circuit_transform_pipeline
+            pass_pipeline = params.get("pass_pipeline", default_pass_pipeline)
+            params["pass_pipeline"] = pass_pipeline
+            return QFunc.__call__(
+                qnode,
+                *args,
+                **dict(params, **kwargs),
+            )
 
         with Patcher(
             (qml.QNode, "__call__", closure),
         ):
             # TODO: improve PyTree handling
-
-            def fn_with_transform_named_sequence(*args, **kwargs):
-                """
-                This function behaves exactly like the user function being jitted,
-                taking in the same arguments and producing the same results, except
-                it injects a transform_named_sequence jax primitive at the beginning
-                of the jaxpr when being traced.
-
-                Note that we do not overwrite self.original_function and self.user_function;
-                this fn_with_transform_named_sequence is ONLY used here to produce tracing
-                results with a transform_named_sequence primitive at the beginning of the
-                jaxpr. It is never executed or used anywhere, except being traced here.
-                """
-                _inject_transform_named_sequence()
-                return self.user_function(*args, **kwargs)
-
-            jaxpr, out_type, treedef = trace_to_jaxpr(
-                fn_with_transform_named_sequence, static_argnums, abstracted_axes, full_sig, kwargs
+            jaxpr, out_type, treedef, plugins = trace_to_jaxpr(
+                self.user_function,
+                static_argnums,
+                abstracted_axes,
+                full_sig,
+                kwargs,
             )
+            self.compile_options.pass_plugins.update(plugins)
+            self.compile_options.dialect_plugins.update(plugins)
 
         return jaxpr, out_type, treedef, dynamic_sig
 
@@ -627,16 +707,7 @@ class QJIT:
         # Inject Runtime Library-specific functions (e.g. setup/teardown).
         inject_functions(mlir_module, ctx, self.compile_options.seed)
 
-        # Canonicalize the MLIR since there can be a lot of redundancy coming from JAX.
-        options = copy.deepcopy(self.compile_options)
-        options.pipelines = [("0_canonicalize", ["canonicalize"])]
-        options.lower_to_llvm = False
-        canonicalizer = Compiler(options)
-
-        # TODO: the in-memory and textual form are different after this, consider unification
-        _, mlir_string, _ = canonicalizer.run(mlir_module, self.workspace)
-
-        return mlir_module, mlir_string
+        return mlir_module
 
     @instrument(size_from=1, has_finegrained=True)
     @debug_logger
@@ -663,13 +734,13 @@ class QJIT:
         # `replace` method, so we need to get a regular Python string out of it.
         func_name = str(self.mlir_module.body.operations[0].name).replace('"', "")
         if self.overwrite_ir:
-            shared_object, llvm_ir, _ = self.compiler.run_from_ir(
+            shared_object, llvm_ir = self.compiler.run_from_ir(
                 self.overwrite_ir,
                 str(self.mlir_module.operation.attributes["sym_name"]).replace('"', ""),
                 self.workspace,
             )
         else:
-            shared_object, llvm_ir, _ = self.compiler.run(self.mlir_module, self.workspace)
+            shared_object, llvm_ir = self.compiler.run(self.mlir_module, self.workspace)
 
         compiled_fn = CompiledFunction(
             shared_object, func_name, restype, self.out_type, self.compile_options
@@ -711,7 +782,7 @@ class QJIT:
         """Get or create a workspace to use for compilation."""
 
         workspace_name = self.__name__
-        preferred_workspace_dir = os.getcwd() if self.compile_options.keep_intermediate else None
+        preferred_workspace_dir = os.getcwd() if self.use_cwd_for_workspace else None
 
         return WorkspaceManager.get_or_create_workspace(workspace_name, preferred_workspace_dir)
 

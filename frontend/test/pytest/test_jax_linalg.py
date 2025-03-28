@@ -1070,3 +1070,7 @@ class TestSVD:
         assert jnp.allclose(U_obs, U_exp)
         assert jnp.allclose(S_obs, S_exp)
         assert jnp.allclose(Vt_obs, Vt_exp)
+
+
+if __name__ == "__main__":
+    pytest.main(["-x", __file__])

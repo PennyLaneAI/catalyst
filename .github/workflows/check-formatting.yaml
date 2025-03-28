@@ -11,7 +11,7 @@ concurrency:
 jobs:
   format-python:
     name: Python Formatting & Linting
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
 
     steps:
       - name: Install dependencies
@@ -31,7 +31,7 @@ jobs:
 
   format-cpp:
     name: C++ Formatting
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
 
     steps:
       - name: Install dependencies

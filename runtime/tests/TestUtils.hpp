@@ -24,16 +24,22 @@
 
 #include "catch2/catch.hpp"
 
-#include "LightningSimulator.hpp"
+#include "ExecutionContext.hpp"
+#include "QuantumDevice.hpp"
+
+#include <iostream>
+
+/// @cond DEV
+namespace {
+using namespace Catalyst::Runtime;
+} // namespace
+/// @endcond
 
 /**
  * A tuple of available backend devices to be tested using TEMPLATE_LIST_TEST_CASE in Catch2
  */
-#if __has_include("LightningKokkosSimulator.hpp")
-#include "LightningKokkosSimulator.hpp"
-using SimTypes = std::tuple<Catalyst::Runtime::Simulator::LightningSimulator,
-                            Catalyst::Runtime::Simulator::LightningKokkosSimulator>;
-#else
+#if __has_include("LightningSimulator.hpp")
+#include "LightningSimulator.hpp"
 using SimTypes = std::tuple<Catalyst::Runtime::Simulator::LightningSimulator>;
 #endif
 
@@ -48,9 +54,6 @@ static inline auto getDevices() -> std::vector<std::tuple<std::string, std::stri
 {
     std::vector<std::tuple<std::string, std::string, std::string>> devices{
         {"lightning.qubit", "lightning.qubit", "{shots: 0}"}};
-#ifdef __device_lightning_kokkos
-    devices.emplace_back("lightning.kokkos", "lightning.kokkos", "{shots: 0}");
-#endif
     return devices;
 }
 
@@ -67,9 +70,22 @@ inline auto get_dylib_ext() -> std::string
 
 static inline MemRefT_CplxT_double_1d getState(size_t buffer_len)
 {
-    CplxT_double *buffer = new CplxT_double[buffer_len];
+    auto *buffer = new CplxT_double[buffer_len];
     MemRefT_CplxT_double_1d result = {buffer, buffer, 0, {buffer_len}, {1}};
     return result;
 }
 
 static inline void freeState(MemRefT_CplxT_double_1d &result) { delete[] result.data_allocated; }
+
+static inline QuantumDevice *loadDevice(const std::string &device_name, const std::string &filename)
+{
+    std::unique_ptr<SharedLibraryManager> init_rtd_dylib =
+        std::make_unique<SharedLibraryManager>(filename);
+    std::string factory_name{device_name + "Factory"};
+    void *f_ptr = init_rtd_dylib->getSymbol(factory_name);
+
+    // LCOV_EXCL_START
+    return (f_ptr != nullptr) ? reinterpret_cast<decltype(GenericDeviceFactory) *>(f_ptr)("")
+                              : nullptr;
+    // LCOV_EXCL_STOP
+}

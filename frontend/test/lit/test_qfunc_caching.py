@@ -16,15 +16,16 @@
 
 import jax.numpy as jnp
 import pennylane as qml
+from utils import qjit_for_tests as qjit
 
-from catalyst import measure, qjit
+from catalyst import measure
 
 
 @qjit(target="mlir")
 def workflow(n: int):
     @qml.qnode(qml.device("lightning.qubit", wires=1))
-    # CHECK-LABEL: private @f
-    # CHECK-NOT: private @f
+    # CHECK-LABEL: public @f
+    # CHECK-NOT: public @f
     def f(x: float):
         qml.RX(x, wires=n)
         return measure(wires=n)

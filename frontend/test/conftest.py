@@ -23,9 +23,6 @@ os.environ["OMP_NUM_THREADS"] = "2"
 
 # pylint: disable=unused-import,wrong-import-position
 import platform
-
-import numpy as np
-import pennylane as qml
 import pytest
 
 
@@ -106,7 +103,7 @@ def skip_cuda_tests(config, items):
     """Skip cuda tests according to the following logic:
     By default: RUN
       except: if apple
-      except: if kokkos
+      except: if lightning.kokkos or lightning.gpu
       except: is cuda-quantum not installed
 
     Important! We should only check if cuda-quantum is installed
@@ -114,18 +111,18 @@ def skip_cuda_tests(config, items):
     installed at all when we are running kokkos.
     """
     skipper = pytest.mark.skip()
-    is_kokkos = config.getoption("backend") == "lightning.kokkos"
+    is_kokkos_or_gpu = config.getoption("backend") in ("lightning.kokkos", "lightning.gpu")
     is_apple = platform.system() == "Darwin"
     # CUDA quantum is not supported in apple silicon.
     # CUDA quantum cannot run with kokkos
-    skip_cuda_tests = is_kokkos or is_apple
-    if not skip_cuda_tests and not is_cuda_available():
+    skip_cuda_tests_val = is_kokkos_or_gpu or is_apple
+    if not skip_cuda_tests_val and not is_cuda_available():
         # Only check this conditionally as it imports cudaq.
         # And we don't even want to succeed with kokkos.
-        skip_cuda_tests = True
+        skip_cuda_tests_val = True
     for item in items:
         is_cuda_test = "cuda" in item.keywords
-        skip_cuda = is_cuda_test and skip_cuda_tests
+        skip_cuda = is_cuda_test and skip_cuda_tests_val
         if skip_cuda:
             item.add_marker(skipper)
 

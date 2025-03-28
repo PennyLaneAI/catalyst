@@ -20,7 +20,10 @@
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/IR/Location.h"
 #include "mlir/IR/SymbolTable.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
+#include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 #include "Gradient/IR/GradientOps.h"
@@ -351,6 +354,45 @@ struct BufferizeReverseOp : public OpConversionPattern<ReverseOp> {
     }
 };
 
+class BufferizeReturnOp : public OpConversionPattern<ReturnOp> {
+  public:
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(ReturnOp op, OpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+        if (!llvm::any_of(op->getOperands().getType(),
+                          [](Type argType) { return isa<TensorType>(argType); })) {
+            return failure();
+        }
+
+        auto outTypes = op->getParentOfType<FunctionOpInterface>().getResultTypes();
+
+        if (llvm::any_of(outTypes, [](Type argType) { return isa<TensorType>(argType); })) {
+            return failure();
+        }
+
+        Location loc = op->getLoc();
+        auto returnOperands = op->getOpOperands();
+        SmallVector<Value> returnValues;
+        for (auto [outType, returnOperand] : llvm::zip(outTypes, returnOperands)) {
+            Value returnVal = returnOperand.get();
+            auto tensorType = dyn_cast<TensorType>(returnVal.getType());
+
+            if (!tensorType) {
+                returnValues.push_back(returnVal);
+                continue;
+            }
+            Value toMemrefOp = rewriter.create<bufferization::ToMemrefOp>(loc, outType, returnVal);
+            returnValues.push_back(toMemrefOp);
+        }
+
+        rewriter.modifyOpInPlace(op, [&] { op->setOperands(returnValues); });
+
+        return success();
+    }
+};
+
 } // namespace
 
 namespace catalyst {
@@ -360,6 +402,7 @@ void populateBufferizationPatterns(TypeConverter &typeConverter, RewritePatternS
 {
     patterns.add<BufferizeAdjointOp>(typeConverter, patterns.getContext());
     patterns.add<BufferizeBackpropOp>(typeConverter, patterns.getContext());
+    patterns.add<BufferizeReturnOp>(typeConverter, patterns.getContext());
     patterns.add<BufferizeForwardOp>(typeConverter, patterns.getContext());
     patterns.add<BufferizeReverseOp>(typeConverter, patterns.getContext());
 }

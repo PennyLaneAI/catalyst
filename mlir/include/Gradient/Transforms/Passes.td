@@ -29,6 +29,28 @@ def GradientBufferizationPass : Pass<"gradient-bufferize"> {
     let constructor = "catalyst::createGradientBufferizationPass()";
 }
 
+def GradientPreprocessingPass : Pass<"gradient-preprocess"> {
+    let summary = "Insert Func.CallOp for ForwardOp and ReverseOp.";
+
+    let dependentDialects = [
+        "index::IndexDialect"
+    ];
+
+    let constructor = "catalyst::createGradientPreprocessingPass()";
+}
+
+def GradientPostprocessingPass : Pass<"gradient-postprocess"> {
+    let summary = "Make the signatures of ForwardOp and ReverseOp compatible"
+        "to Enzyme.";
+
+    let dependentDialects = [
+        "memref::MemRefDialect",
+        "index::IndexDialect"
+    ];
+
+    let constructor = "catalyst::createGradientPostprocessingPass()";
+}
+
 def GradientLoweringPass : Pass<"lower-gradients"> {
     let summary = "Lower operations in the gradient dialect to core MLIR dialects.";
 

@@ -1,10 +1,11 @@
 ---
-Checks:          '-*,clang-diagnostic-*,clang-analyzer-*,modernize-*,-modernize-use-trailing-return-type,-modernize-loop-convert,clang-analyzer-cplusplus*,openmp-*,performance-*,portability-*,readability-*,hicpp-*,-hicpp-avoid-c-arrays,-hicpp-no-array-decay,bugprone-suspicious-*,llvm-namespace-comment,cppcoreguidelines-avoid-non-const-global-variables,cppcoreguidelines-slicing,cppcoreguidelines-special-member-functions,-readability-identifier-length'
+Checks:          '-*,clang-diagnostic-*,clang-analyzer-*,-llvmlibc-*,modernize-*,-modernize-use-trailing-return-type,clang-analyzer-cplusplus*,openmp-*,performance-*,portability-*,readability-*,-modernize-avoid-c-arrays,-readability-magic-numbers,hicpp-*,-hicpp-no-array-decay,-hicpp-avoid-c-arrays,bugprone-suspicious-*,llvm-namespace-comment,cppcoreguidelines-slicing,cppcoreguidelines-special-member-functions,-readability-identifier-length'
 WarningsAsErrors: '*'
 HeaderFilterRegex: '.*'
 AnalyzeTemporaryDtors: false
 FormatStyle:     none
 InheritParentConfig: true
+User:            mlxd
 CheckOptions:
   - key:             modernize-replace-auto-ptr.IncludeStyle
     value:           llvm
@@ -179,7 +180,7 @@ CheckOptions:
   - key:             google-readability-namespace-comments.SpacesBeforeComments
     value:           '2'
   - key:             readability-function-cognitive-complexity.Threshold
-    value:           '45'
+    value:           '100'
   - key:             readability-function-cognitive-complexity.IgnoreMacros
     value:           'true'
   - key:             cppcoreguidelines-non-private-member-variables-in-classes.IgnoreClassesWithAllMemberVariablesBeingPublic

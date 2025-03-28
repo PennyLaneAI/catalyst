@@ -3,6 +3,9 @@
 # Python environment path
 PYTHON_ENV_PATH=$1
 
+# Branch to switch to
+BRANCH=$2
+
 # Exit on any error
 set -e
 
@@ -69,6 +72,11 @@ checkout_nightly_build(){
 
 link_repo_to_wheel(){
     echo "Linking Catalyst repository to Catalyst Wheel..."
+    
+    # switch to branch if given
+    if [ ! -z "${BRANCH}" ]; then
+        git switch $BRANCH
+    fi
 
     export SITEPKGS=$(python3 -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')
     export CATALYST_WHEEL=$SITEPKGS/catalyst
@@ -81,7 +89,7 @@ restore_catalyst_config(){
     # After linking the Wheel sources, _configuration.py will contain the entry: 'INSTALLED=True'.
     # Hence, we restore the file from the repository.
     cd $CATALYST_DIR
-    git checkout frontend/catalyst/_configuration.py
+    git checkout frontend/catalyst/_configuration.py frontend/catalyst/_version.py
 }
 
 report_changed_files(){

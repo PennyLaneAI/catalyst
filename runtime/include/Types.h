@@ -26,13 +26,13 @@ extern "C" {
 
 // Qubit, Result and Observable types
 struct QUBIT;
-typedef intptr_t QubitIdType;
+using QubitIdType = intptr_t;
 
-typedef bool RESULT;
-typedef RESULT *Result;
-typedef void *QirArray;
+using RESULT = bool;
+using Result = RESULT *;
+using QirArray = void *;
 
-typedef intptr_t ObsIdType;
+using ObsIdType = intptr_t;
 
 enum ObsId : int8_t {
     Identity = 0,
@@ -149,14 +149,14 @@ struct Modifiers {
     bool *controlled_values;
 };
 
-typedef struct CplxT_double CplxT_double;
-typedef struct MemRefT_CplxT_double_1d MemRefT_CplxT_double_1d;
-typedef struct MemRefT_CplxT_double_2d MemRefT_CplxT_double_2d;
-typedef struct MemRefT_double_1d MemRefT_double_1d;
-typedef struct MemRefT_double_2d MemRefT_double_2d;
-typedef struct MemRefT_int64_1d MemRefT_int64_1d;
-typedef struct PairT_MemRefT_double_int64_1d PairT_MemRefT_double_int64_1d;
-typedef struct Modifiers Modifiers;
+using CplxT_double = struct CplxT_double;
+using MemRefT_CplxT_double_1d = struct MemRefT_CplxT_double_1d;
+using MemRefT_CplxT_double_2d = struct MemRefT_CplxT_double_2d;
+using MemRefT_double_1d = struct MemRefT_double_1d;
+using MemRefT_double_2d = struct MemRefT_double_2d;
+using MemRefT_int64_1d = struct MemRefT_int64_1d;
+using PairT_MemRefT_double_int64_1d = struct PairT_MemRefT_double_int64_1d;
+using Modifiers = struct Modifiers;
 
 #ifdef __cplusplus
 } // extern "C"

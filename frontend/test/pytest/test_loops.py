@@ -18,8 +18,9 @@ from textwrap import dedent
 import numpy as np
 import pennylane as qml
 import pytest
+from utils import qjit_for_tests as qjit
 
-from catalyst import api_extensions, for_loop, measure, qjit, while_loop
+from catalyst import api_extensions, for_loop, measure, while_loop
 
 # pylint: disable=no-value-for-parameter,unused-argument
 
@@ -33,7 +34,6 @@ class TestLoopToJaxpr:
         expected = dedent(
             """
             { lambda ; a:f64[]. let
-                transform_named_sequence 
                 b:i64[] c:f64[] = while_loop[
                   body_jaxpr={ lambda ; d:i64[] e:f64[]. let f:i64[] = add d 1 in (f, e) }
                   body_nconsts=0
@@ -62,7 +62,6 @@ class TestLoopToJaxpr:
         expected = dedent(
             """
             { lambda ; a:f64[] b:i64[]. let
-                transform_named_sequence 
                 c:i64[] d:f64[] = for_loop[
                   apply_reverse_transform=False
                   body_jaxpr={ lambda ; e:i64[] f:i64[] g:f64[]. let

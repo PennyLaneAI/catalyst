@@ -12,13 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-""" Test program verification routines """
+"""Test program verification routines"""
 
+import platform
 from copy import deepcopy
 from unittest.mock import patch
 
 import pennylane as qml
 import pytest
+from pennylane.devices.capabilities import OperatorProperties
 from pennylane.measurements import ExpectationMP, VarianceMP
 from pennylane.ops import Adjoint, Controlled
 
@@ -30,17 +32,12 @@ from catalyst import (
     ctrl,
     for_loop,
     grad,
-    while_loop,
 )
 from catalyst.api_extensions import HybridAdjoint, HybridCtrl
+from catalyst.compiler import get_lib_path
 from catalyst.device import get_device_capabilities
 from catalyst.device.qjit_device import RUNTIME_OPERATIONS, get_qjit_device_capabilities
 from catalyst.device.verification import validate_measurements
-from catalyst.utils.toml import (
-    OperationProperties,
-    ProgramFeatures,
-    pennylane_operation_set,
-)
 
 # pylint: disable = unused-argument, unnecessary-lambda-assignment, unnecessary-lambda
 
@@ -70,40 +67,42 @@ def get_custom_device(
 
         def __init__(self, shots=None, wires=None):
             super().__init__(wires=wires, shots=shots)
-            program_features = ProgramFeatures(shots_present=bool(kwargs.get("shots")))
-            lightning_capabilities = get_device_capabilities(lightning_device, program_features)
+            lightning_capabilities = get_device_capabilities(lightning_device)
             custom_capabilities = deepcopy(lightning_capabilities)
             for gate in native_gates:
-                custom_capabilities.native_ops[gate] = OperationProperties(True, True, True)
+                custom_capabilities.operations[gate] = OperatorProperties(True, True, True)
             for gate in non_differentiable_gates:
-                custom_capabilities.native_ops[gate].differentiable = False
+                custom_capabilities.operations[gate].differentiable = False
             for gate in non_invertible_gates:
-                custom_capabilities.native_ops[gate].invertible = False
+                custom_capabilities.operations[gate].invertible = False
             for gate in non_controllable_gates:
-                custom_capabilities.native_ops[gate].controllable = False
+                custom_capabilities.operations[gate].controllable = False
             for obs in non_differentiable_obs:
-                custom_capabilities.native_obs[obs].differentiable = False
+                custom_capabilities.observables[obs].differentiable = False
             self.qjit_capabilities = custom_capabilities
+
+        def preprocess(self, execution_config=None):
+            """Device preprocessing function."""
+            return lightning_device.preprocess(execution_config)
+
+        @staticmethod
+        def get_c_interface():
+            """Returns a tuple consisting of the device name, and
+            the location to the shared object with the C/C++ device implementation.
+            """
+
+            system_extension = ".dylib" if platform.system() == "Darwin" else ".so"
+            # Borrowing the NullQubit library:
+            lib_path = (
+                get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_null_qubit" + system_extension
+            )
+            return "NullQubit", lib_path
 
         def execute(self, _circuits, _execution_config):
             """
             Raises: RuntimeError
             """
             raise RuntimeError("QJIT devices cannot execute tapes.")
-
-        @property
-        def operations(self):
-            """Return operations using PennyLane's C(.) syntax"""
-            return (
-                pennylane_operation_set(self.qjit_capabilities.native_ops)
-                | pennylane_operation_set(self.qjit_capabilities.to_decomp_ops)
-                | pennylane_operation_set(self.qjit_capabilities.to_matrix_ops)
-            )
-
-        @property
-        def observables(self):
-            """Return PennyLane observables"""
-            return pennylane_operation_set(self.qjit_capabilities.native_obs)
 
         def supports_derivatives(self, config, circuit=None):  # pylint: disable=unused-argument
             """Pretend we support any derivatives"""
@@ -303,7 +302,7 @@ class TestHybridOpVerification:
             return qml.expval(qml.PauliX(0))
 
         runtime_ops_with_qctrl = deepcopy(RUNTIME_OPERATIONS)
-        runtime_ops_with_qctrl["HybridCtrl"] = OperationProperties(
+        runtime_ops_with_qctrl["HybridCtrl"] = OperatorProperties(
             invertible=True, controllable=True, differentiable=True
         )
 
@@ -411,7 +410,7 @@ class TestHybridOpVerification:
             return qml.expval(qml.PauliX(0))
 
         runtime_ops_with_qctrl = deepcopy(RUNTIME_OPERATIONS)
-        runtime_ops_with_qctrl["HybridCtrl"] = OperationProperties(
+        runtime_ops_with_qctrl["HybridCtrl"] = OperatorProperties(
             invertible=True, controllable=True, differentiable=True
         )
 
@@ -454,7 +453,7 @@ class TestHybridOpVerification:
             return qml.expval(qml.PauliX(0))
 
         runtime_ops_with_qctrl = deepcopy(RUNTIME_OPERATIONS)
-        runtime_ops_with_qctrl["HybridCtrl"] = OperationProperties(
+        runtime_ops_with_qctrl["HybridCtrl"] = OperatorProperties(
             invertible=True, controllable=True, differentiable=True
         )
 
@@ -539,8 +538,6 @@ class TestObservableValidation:
             ),  # nested prod+sprod
             ([qml.var((2 * qml.X(0) @ qml.Y(2)) @ (2 * qml.RY(1.2, 3)) @ qml.Y(1))], "RY"),
             ([qml.var((2 * qml.X(0) @ qml.RY(1.2, 2)) @ (2 * qml.X(3)) @ qml.Y(1))], "RY"),
-            ([qml.var(qml.operation.Tensor(qml.X(0), qml.Y(2)))], None),  # tensor
-            ([qml.var(qml.operation.Tensor(qml.X(0), PauliX2(2)))], "PauliX2"),
             ([qml.var(qml.X(1) + qml.Y(2))], None),  # sum
             ([qml.var(qml.RX(1.23, 1) + qml.Y(2))], "RX"),
             ([qml.expval(2 * qml.Z(1))], None),  # sprod
@@ -600,7 +597,7 @@ class TestObservableValidation:
         # all good
         validate_measurements(tape, qjit_capabilities, dev.name, dev.shots)
 
-        del qjit_capabilities.native_obs[obs_type]
+        del qjit_capabilities.observables[obs_type]
         with pytest.raises(CompileError, match="not supported as an observable"):
             validate_measurements(tape, qjit_capabilities, dev.name, dev.shots)
 
@@ -611,12 +608,8 @@ class TestObservableValidation:
         dev = qml.device(backend, wires=1)
         dev_capabilities = get_device_capabilities(dev)
 
-        dev_capabilities.native_obs.update(
-            {
-                "PauliX2": OperationProperties(
-                    invertible=True, controllable=True, differentiable=True
-                )
-            }
+        dev_capabilities.observables.update(
+            {"PauliX2": OperatorProperties(invertible=True, controllable=True, differentiable=True)}
         )
 
         qjit_capabilities = get_qjit_device_capabilities(dev_capabilities)
@@ -670,7 +663,7 @@ class TestMeasurementTypeValidation:
         tape = qml.tape.QuantumScript([], measurements=[measurement])
 
         qjit_capabilities = get_device_capabilities(dev)
-        qjit_capabilities.measurement_processes.remove("Expval")
+        qjit_capabilities.measurement_processes.pop("ExpectationMP")
 
         with pytest.raises(CompileError, match=msg):
             validate_measurements(tape, qjit_capabilities, dev.name, dev.shots)
@@ -761,9 +754,8 @@ class TestAdjointMethodVerification:
         [
             qml.PauliX(0),  # single observable
             qml.PauliX(0) @ qml.PauliZ(1),  # prod
-            qml.operation.Tensor(qml.X(0), qml.Z(1)),  # tensor
             qml.PauliX(0) + qml.PauliY(1),  # sum
-            qml.Hamiltonian([2, 3], [qml.X(0), qml.Y(1)]),  # hamiltonian
+            qml.Hamiltonian([2, 3], [qml.X(0), qml.Y(1)]),  # linearcombination
             2 * qml.PauliX(0),  # sprod
             (2 * qml.X(0) @ qml.Y(2)) @ (2 * qml.X(3)) @ qml.Y(1),  # nested prod+sprod
         ],
@@ -854,7 +846,6 @@ class TestParameterShiftMethodVerification:
         [
             qml.PauliX(0),
             # qml.PauliX(0) @ qml.PauliZ(1),
-            qml.operation.Tensor(qml.X(0), qml.Z(1)),
             # qml.PauliX(0)+qml.PauliY(1)
         ],
     )
@@ -873,48 +864,6 @@ class TestParameterShiftMethodVerification:
 
         with pytest.raises(
             DifferentiableCompileError, match="PauliX does not support analytic differentiation"
-        ):
-
-            @qml.qjit
-            def cir(x: float):
-                return grad(f)(x)
-
-    @patch.object(qml.RX, "grad_method", "F")
-    def test_paramshift_gate_simple(self):
-        """Test that taking a parameter-shift gradient of a tape containing a parameterized
-        operation that doesn't support analytic differentiation raises an error."""
-
-        @qml.qnode(qml.device("lightning.qubit", wires=1), diff_method="parameter-shift")
-        def f(_):
-            qml.RX(1.23, 0)
-            return qml.expval(qml.PauliX(0))
-
-        with pytest.raises(
-            DifferentiableCompileError, match="RX does not support analytic differentiation"
-        ):
-
-            @qml.qjit
-            def cir(x: float):
-                return grad(f)(x)
-
-    @patch.object(qml.RX, "grad_method", "F")
-    def test_paramshift_gate_while(self):
-        """Test that taking a parameter-shift gradient of a tape containing a WhileLoop HybridOp
-        containing a parameterized operation that doesn't support analytic differentiation raises
-        an error."""
-
-        @qml.qnode(qml.device("lightning.qubit", wires=1), diff_method="parameter-shift")
-        def f(_):
-            @while_loop(lambda s: s > 0)
-            def loop(s):
-                qml.RX(1.23, 0)
-                return s + 1
-
-            loop(0)
-            return qml.expval(qml.PauliX(0))
-
-        with pytest.raises(
-            DifferentiableCompileError, match="RX does not support analytic differentiation"
         ):
 
             @qml.qjit

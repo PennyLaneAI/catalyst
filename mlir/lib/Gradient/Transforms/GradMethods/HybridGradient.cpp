@@ -23,6 +23,7 @@
 #include "HybridGradient.hpp"
 
 #include "Catalyst/Utils/CallGraph.h"
+#include "Catalyst/Utils/StaticAllocas.h"
 #include "Gradient/Utils/DifferentialQNode.h"
 #include "Gradient/Utils/GradientShape.h"
 #include "Quantum/IR/QuantumInterfaces.h"
@@ -307,7 +308,7 @@ static func::FuncOp genQNodeQuantumOnly(PatternRewriter &rewriter, Location loc,
     rewriter.setInsertionPointToStart(&modifiedCallee.getFunctionBody().front());
 
     MemRefType paramsProcessedType = MemRefType::get({}, rewriter.getIndexType());
-    Value paramCounter = rewriter.create<memref::AllocaOp>(loc, paramsProcessedType);
+    Value paramCounter = getStaticMemrefAlloca(loc, rewriter, paramsProcessedType);
     Value cZero = rewriter.create<index::ConstantOp>(loc, 0);
     rewriter.create<memref::StoreOp>(loc, cZero, paramCounter);
     Value cOne = rewriter.create<index::ConstantOp>(loc, 1);
@@ -368,7 +369,7 @@ static func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc,
     const std::vector<size_t> &diffArgIndices = computeDiffArgIndices(op.getDiffArgIndices());
     std::stringstream uniquer;
     std::copy(diffArgIndices.begin(), diffArgIndices.end(), std::ostream_iterator<int>(uniquer));
-    std::string fnName = op.getCallee().str() + ".fullgrad" + uniquer.str();
+    std::string fnName = op.getCallee().getLeafReference().str() + ".fullgrad" + uniquer.str();
 
     func::FuncOp fullGradFn =
         SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, rewriter.getStringAttr(fnName));
@@ -413,7 +414,7 @@ static func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc,
 
                         auto backpropOp = rewriter.create<gradient::BackpropOp>(
                             loc, valTypes, computeBackpropTypes(callee, diffArgIndices),
-                            callee.getName(), entryBlock->getArguments(),
+                            SymbolRefAttr::get(callee), entryBlock->getArguments(),
                             /*arg_shadows=*/ValueRange{},
                             /*primal results=*/ValueRange{}, cotangents, diffArgIndicesAttr,
                             keepValueResults);
@@ -483,8 +484,8 @@ static func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc,
                                      loc, cotangents);
 
                 auto backpropOp = rewriter.create<gradient::BackpropOp>(
-                    loc, valTypes, computeBackpropTypes(callee, diffArgIndices), callee.getName(),
-                    entryBlock->getArguments(),
+                    loc, valTypes, computeBackpropTypes(callee, diffArgIndices),
+                    SymbolRefAttr::get(callee), entryBlock->getArguments(),
                     /*arg_shadows=*/ValueRange{}, /*primal results=*/ValueRange{}, cotangents,
                     diffArgIndicesAttr, keepValueResults);
 

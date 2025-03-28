@@ -9,7 +9,7 @@ name: Changelog Reminder
 jobs:
   remind:
     name: Changelog Reminder
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
     - uses: actions/checkout@master
     - name: Changelog Reminder

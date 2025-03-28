@@ -95,9 +95,9 @@ static inline auto parse_kwargs(std::string kwargs) -> std::unordered_map<std::s
     std::unordered_map<std::string, std::string> map;
     size_t s3_pos = kwargs.find("\'s3_destination_folder\'");
     if (s3_pos != std::string::npos) {
-        auto opening_pos = kwargs.find("(", s3_pos);
+        auto opening_pos = kwargs.find('(', s3_pos);
         RT_ASSERT(opening_pos != std::string::npos);
-        auto closing_pos = kwargs.find(")", opening_pos);
+        auto closing_pos = kwargs.find(')', opening_pos);
         RT_ASSERT(closing_pos != std::string::npos);
         map["s3_destination_folder"] = kwargs.substr(opening_pos, closing_pos - opening_pos + 1);
     }
@@ -271,14 +271,16 @@ constexpr auto has_gate(const SimulatorGateInfoDataT<size> &arr, const std::stri
     return false;
 }
 
-static inline auto simulateDraw(const std::vector<double> &probs, std::optional<int32_t> postselect,
-                                std::mt19937 *gen = nullptr) -> bool
+static inline auto
+simulateDraw(const std::vector<double> &probs, std::optional<int32_t> postselect,
+             std::mt19937 *gen = nullptr) // NOLINT(readability-non-const-parameter)
+    -> bool
 {
     if (postselect) {
         auto postselect_value = postselect.value();
         RT_FAIL_IF(postselect_value < 0 || postselect_value > 1, "Invalid postselect value");
         RT_FAIL_IF(probs[postselect_value] == 0, "Probability of postselect value is 0");
-        return postselect_value == 1 ? true : false;
+        return static_cast<bool>(postselect_value == 1);
     }
 
     // Normal flow, no post-selection
@@ -286,7 +288,7 @@ static inline auto simulateDraw(const std::vector<double> &probs, std::optional<
     std::uniform_real_distribution<> dis(0., 1.);
 
     float draw;
-    if (gen) {
+    if (gen != nullptr) {
         draw = dis(*gen);
         (*gen)();
     }

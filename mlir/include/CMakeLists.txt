@@ -1,5 +1,7 @@
 add_subdirectory(Catalyst)
 add_subdirectory(Quantum)
+add_subdirectory(QEC)
 add_subdirectory(Gradient)
+add_subdirectory(Ion)
 add_subdirectory(Mitigation)
 add_subdirectory(Test)

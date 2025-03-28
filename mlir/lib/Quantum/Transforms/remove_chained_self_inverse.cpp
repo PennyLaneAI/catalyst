@@ -21,10 +21,13 @@
 #include "llvm/Support/Errc.h"
 
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "mlir/Transforms/Passes.h"
 
 #include "Catalyst/IR/CatalystDialect.h"
 #include "Quantum/IR/QuantumOps.h"
@@ -50,30 +53,23 @@ struct RemoveChainedSelfInversePass
         LLVM_DEBUG(dbgs() << "remove chained self inverse pass"
                           << "\n");
 
-        Operation *module = getOperation();
-        Operation *targetfunc;
-
-        WalkResult result = module->walk([&](func::FuncOp op) {
-            StringRef funcName = op.getSymName();
-
-            if (funcName != FuncNameOpt) {
-                // not the function to run the pass on, visit the next function
-                return WalkResult::advance();
-            }
-            targetfunc = op;
-            return WalkResult::interrupt();
-        });
-
-        if (!result.wasInterrupted()) {
-            // Never met a target function
-            // Do nothing and exit!
-            return;
+        // Run cse pass before running remove-chained-self-inverse,
+        // to aid identifying equivalent SSA values when verifying
+        // the gates have the same params
+        MLIRContext *ctx = &getContext();
+        auto earlyCSEpm = PassManager::on<ModuleOp>(ctx);
+        earlyCSEpm.addPass(mlir::createCSEPass());
+        if (failed(runPipeline(earlyCSEpm, getOperation()))) {
+            return signalPassFailure();
         }
 
+        Operation *module = getOperation();
+
         RewritePatternSet patterns(&getContext());
+        populateLoopBoundaryPatterns(patterns, 2);
         populateSelfInversePatterns(patterns);
 
-        if (failed(applyPatternsAndFoldGreedily(targetfunc, std::move(patterns)))) {
+        if (failed(applyPatternsAndFoldGreedily(module, std::move(patterns)))) {
             return signalPassFailure();
         }
     }

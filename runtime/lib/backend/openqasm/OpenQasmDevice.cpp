@@ -14,10 +14,6 @@
 
 #include "OpenQasmDevice.hpp"
 
-namespace Catalyst::Runtime::Device::OpenQasm {
-
-} // namespace Catalyst::Runtime::Device::OpenQasm
-
 namespace Catalyst::Runtime::Device {
 
 auto OpenQasmDevice::AllocateQubit() -> QubitIdType

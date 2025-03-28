@@ -104,3 +104,35 @@ module {
     llvm.return
   }
 }
+
+// -----
+
+// CHECK-LABEL: @remove_puts
+module @remove_puts {
+
+  // Check that puts is deleted
+  llvm.func internal @async_execute_fn() -> !llvm.ptr attributes { catalyst.preHandleError } {
+    %0 = llvm.mlir.zero : !llvm.ptr
+    llvm.return %0 : !llvm.ptr
+  }
+
+  llvm.func @mlirAsyncRuntimeIsTokenError(!llvm.ptr) -> i1
+  llvm.func @abort() -> ()
+  llvm.func @puts(!llvm.ptr) -> ()
+
+  llvm.func @caller() {
+    %0 = llvm.call @async_execute_fn() : () -> (!llvm.ptr)
+    %1 = llvm.call @mlirAsyncRuntimeIsTokenError(%0) : (!llvm.ptr) -> i1
+    %2 = llvm.mlir.constant(1 : i64) : i1
+    %3 = llvm.xor %1, %2: i1
+    llvm.cond_br %3, ^fail, ^success
+    ^fail:
+    // CHECK-NOT: llvm.call @puts
+    %message = "test.op"() : () -> (!llvm.ptr)
+    llvm.call @puts(%message) : (!llvm.ptr) -> ()
+    llvm.call @abort() : () -> ()
+    llvm.unreachable
+    ^success:
+    llvm.return
+  }
+}

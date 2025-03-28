@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-""" Catalyst additions to the Jax library """
+"""Catalyst additions to the Jax library"""
 
 from catalyst.jax_extras.lowering import custom_lower_jaxpr_to_module, jaxpr_to_mlir
 from catalyst.jax_extras.patches import (

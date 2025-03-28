@@ -58,9 +58,6 @@ LogicalResult ZneOp::verifySymbolUses(SymbolTableCollection &symbolTable)
     if (!fn) {
         return this->emitOpError("invalid function name specified: ") << callee;
     }
-    if (!fn->hasAttrOfType<UnitAttr>("qnode")) {
-        return this->emitOpError("ZNE can only be applied on QNodes: ") << callee;
-    }
     return success();
 }
 

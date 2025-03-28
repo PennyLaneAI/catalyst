@@ -110,10 +110,6 @@ using timer = catalyst::utils::Timer;
 
 void __catalyst_inactive_callback(int64_t identifier, int64_t argc, int64_t retc, ...)
 {
-    // We need to guard calls to callback.
-    // These are implemented in Python.
-    std::lock_guard<std::mutex> lock(getPythonMutex());
-
     // LIBREGISTRY is a compile time macro. It is defined based on the output
     // name of the callback library. And since it is stored in the same location
     // as this library, it shares the ORIGIN variable. Do a `git grep LIBREGISTRY`
@@ -243,7 +239,8 @@ void __catalyst__rt__finalize()
     CTX.reset(nullptr);
 }
 
-static int __catalyst__rt__device_init__impl(int8_t *rtd_lib, int8_t *rtd_name, int8_t *rtd_kwargs)
+static int __catalyst__rt__device_init__impl(int8_t *rtd_lib, int8_t *rtd_name, int8_t *rtd_kwargs,
+                                             int64_t shots)
 {
     // Device library cannot be a nullptr
     RT_FAIL_IF(!rtd_lib, "Invalid device library");
@@ -256,16 +253,18 @@ static int __catalyst__rt__device_init__impl(int8_t *rtd_lib, int8_t *rtd_name, 
         (rtd_kwargs ? reinterpret_cast<char *>(rtd_kwargs) : "")};
     RT_FAIL_IF(!initRTDevicePtr(args[0], args[1], args[2]),
                "Failed initialization of the backend device");
+    getQuantumDevicePtr()->SetDeviceShots(shots);
     if (CTX->getDeviceRecorderStatus()) {
         getQuantumDevicePtr()->StartTapeRecording();
     }
     return 0;
 }
 
-void __catalyst__rt__device_init(int8_t *rtd_lib, int8_t *rtd_name, int8_t *rtd_kwargs)
+void __catalyst__rt__device_init(int8_t *rtd_lib, int8_t *rtd_name, int8_t *rtd_kwargs,
+                                 int64_t shots)
 {
     timer::timer(__catalyst__rt__device_init__impl, "device_init", /* add_endl */ true, rtd_lib,
-                 rtd_name, rtd_kwargs);
+                 rtd_name, rtd_kwargs, shots);
 }
 
 static int __catalyst__rt__device_release__impl()
@@ -672,6 +671,14 @@ void __catalyst__qis__CRZ(double theta, QUBIT *control, QUBIT *target, const Mod
                                           /* modifiers */ MODIFIERS_ARGS(modifiers));
 }
 
+void __catalyst__qis__MS(double theta, QUBIT *control, QUBIT *target, const Modifiers *modifiers)
+{
+    getQuantumDevicePtr()->NamedOperation("MS", {theta},
+                                          {/* control = */ reinterpret_cast<QubitIdType>(control),
+                                           /* target = */ reinterpret_cast<QubitIdType>(target)},
+                                          /* modifiers */ MODIFIERS_ARGS(modifiers));
+}
+
 void __catalyst__qis__CRot(double phi, double theta, double omega, QUBIT *control, QUBIT *target,
                            const Modifiers *modifiers)
 {
@@ -907,15 +914,18 @@ void __catalyst__qis__State(MemRefT_CplxT_double_1d *result, int64_t numQubits, 
         getQuantumDevicePtr()->State(view);
     }
     else {
-        RT_FAIL("Partial State-Vector not supported yet");
-        // getQuantumDevicePtr()->PartialState(stateVec,
-        // numElements, wires);
+        RT_FAIL("Partial State-Vector not supported.");
     }
 }
 
 void __catalyst__qis__Probs(MemRefT_double_1d *result, int64_t numQubits, ...)
 {
     RT_ASSERT(numQubits >= 0);
+    std::string error_msg = "return tensor must have length equal to 2^(number of qubits)";
+    if (numQubits != 0) {
+        RT_FAIL_IF(result->sizes[0] != 1u << numQubits, error_msg.c_str());
+    }
+
     MemRefT<double, 1> *result_p = (MemRefT<double, 1> *)result;
 
     va_list args;
@@ -937,10 +947,16 @@ void __catalyst__qis__Probs(MemRefT_double_1d *result, int64_t numQubits, ...)
     }
 }
 
-void __catalyst__qis__Sample(MemRefT_double_2d *result, int64_t shots, int64_t numQubits, ...)
+void __catalyst__qis__Sample(MemRefT_double_2d *result, int64_t numQubits, ...)
 {
+    int64_t shots = getQuantumDevicePtr()->GetDeviceShots();
     RT_ASSERT(shots >= 0);
     RT_ASSERT(numQubits >= 0);
+    std::string error_msg = "return tensor must have 2D shape equal to (number of shots, "
+                            "number of qubits in observable)";
+    if (numQubits != 0) {
+        RT_FAIL_IF(result->sizes[1] != numQubits, error_msg.c_str());
+    }
     MemRefT<double, 2> *result_p = (MemRefT<double, 2> *)result;
 
     va_list args;
@@ -962,11 +978,17 @@ void __catalyst__qis__Sample(MemRefT_double_2d *result, int64_t shots, int64_t n
     }
 }
 
-void __catalyst__qis__Counts(PairT_MemRefT_double_int64_1d *result, int64_t shots,
-                             int64_t numQubits, ...)
+void __catalyst__qis__Counts(PairT_MemRefT_double_int64_1d *result, int64_t numQubits, ...)
 {
+    int64_t shots = getQuantumDevicePtr()->GetDeviceShots();
     RT_ASSERT(shots >= 0);
     RT_ASSERT(numQubits >= 0);
+    RT_ASSERT(result->first.sizes[0] == result->second.sizes[0]);
+    std::string error_msg = "number of eigenvalues or counts did not match observable";
+    if (numQubits != 0) {
+        RT_FAIL_IF(result->first.sizes[0] != 1u << numQubits, error_msg.c_str());
+    }
+
     MemRefT<double, 1> *result_eigvals_p = (MemRefT<double, 1> *)&result->first;
     MemRefT<int64_t, 1> *result_counts_p = (MemRefT<int64_t, 1> *)&result->second;
 

@@ -138,15 +138,13 @@ class TestGradContextIntegration:
 
         msg = "verified fail"
 
-        @qjit
         @grad
         def identity(x: float):
             assert not GradContext.am_inside_grad(), msg
             return x
 
         with pytest.raises(AssertionError, match=msg):
-
-            identity(1.0)
+            qjit(identity)
 
 
 class TestEvaluationModes:
