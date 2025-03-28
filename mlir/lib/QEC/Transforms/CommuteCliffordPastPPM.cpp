@@ -36,7 +36,6 @@ bool verifyNextNonClifford(PPMeasurementOp op, Operation *nextOp)
         return true;
 
     for (auto userOp : nextOp->getUsers()) {
-
         if (userOp == op)
             return false;
 
@@ -59,7 +58,6 @@ bool verifyPrevNonClifford(PPMeasurementOp op, PPRotationOp prevOp)
         return false;
 
     for (auto opUser : prevOp->getUsers()) {
-
         if (opUser == op)
             continue;
 
