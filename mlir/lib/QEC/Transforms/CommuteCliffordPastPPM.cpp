@@ -35,13 +35,14 @@ bool verifyNextNonClifford(PPMeasurementOp op, Operation *nextOp)
     if (nextOp == nullptr)
         return true;
 
-    if (nextOp == op)
-        return false;
-
-    if (nextOp->isBeforeInBlock(op))
-        return true;
-
     for (auto userOp : nextOp->getUsers()) {
+
+        if (userOp == op)
+            return false;
+
+        if (!userOp->isBeforeInBlock(op))
+            continue;
+
         if (!verifyNextNonClifford(op, userOp))
             return false;
     }
@@ -57,13 +58,12 @@ bool verifyPrevNonClifford(PPMeasurementOp op, PPRotationOp prevOp)
     if (prevOp.isNonClifford())
         return false;
 
-    for (auto qubit : prevOp->getOperands()) {
-        auto defOp = qubit.getDefiningOp();
+    for (auto opUser : prevOp->getUsers()) {
 
-        if (defOp == prevOp)
+        if (opUser == op)
             continue;
 
-        if (!verifyNextNonClifford(op, defOp))
+        if (!verifyNextNonClifford(op, opUser))
             return false;
     }
 
@@ -148,9 +148,6 @@ bool shouldRemovePPR(PPRotationOp op)
     getForwardSlice(op, &slice);
 
     for (Operation *forwardOp : slice) {
-        if (isa<PPMeasurementOp>(forwardOp))
-            return false;
-
         if (!isa<catalyst::quantum::InsertOp>(forwardOp) &&
             !isa<catalyst::quantum::DeallocOp>(forwardOp))
             return false;

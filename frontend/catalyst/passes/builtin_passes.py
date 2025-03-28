@@ -485,6 +485,7 @@ def ppr_to_ppm(qnode):
     Example MLIR Representation:
 
     .. code-block:: mlir
+
         . . .
         %2 = qec.ppr ["X"](8) %1 : !quantum.bit
         %mres, %out_qubits = qec.ppm ["X"] %2 : !quantum.bit
