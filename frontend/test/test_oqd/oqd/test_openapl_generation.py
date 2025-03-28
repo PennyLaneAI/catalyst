@@ -17,6 +17,7 @@
 import json
 import os
 
+import numpy as np
 import pennylane as qml
 import pytest
 
@@ -45,7 +46,7 @@ class TestOpenAPL:
             qml.RX(x, wires=0)
             return qml.counts()
 
-        circuit(1.5708)
+        circuit(np.pi / 2)
 
         expected_f = os.path.join(self.test_path, "test_single_RX.json")
         with open(self.output_f, "r", encoding="utf-8") as f:

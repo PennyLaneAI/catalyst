@@ -2,7 +2,31 @@
 
 <h3>New features since last release</h3>
 
+* Add loop boundary optimization pass that identifies and optimizes redundant quantum operations that occur at loop iteration boundaries, where operations at iteration boundaries often cancel each other out. 
+  [(#1476)](https://github.com/PennyLaneAI/catalyst/pull/1476)
+
+  This optimization help to eliminates redundant operations that aims to reduce quantum circuit depth and gate count.This pass is supported into `cancel_inverses` and `merge_rotations`.
+
+  For example,
+
+  ```python
+  dev = qml.device("lightning.qubit", wires=2)
+
+  @qml.qjit
+  @catalyst.passes.cancel_inverses
+  @qml.qnode(dev)
+  def circuit():
+      for i in range(3):
+          qml.Hadamard(0)
+          qml.CNOT([0, 1])
+          qml.Hadamard(0)
+      return qml.expval(qml.Z(0))
+  ```
+
+  Note that this optimization specifically targets operations that are exact inverses of each other when applied in sequence. For example, consecutive Hadamard gates (H†H = I) pairs will be identified and eliminated.
+
 * Conversion Clifford+T gates to Pauli Product Rotation (PPR) and measurement to Pauli Product Measurement (PPM) are now available through the `to_ppr` pass transform.
+
   [(#1499)](https://github.com/PennyLaneAI/catalyst/pull/1499)
   [(#1551)](https://github.com/PennyLaneAI/catalyst/pull/1551)
   [(#1564)](https://github.com/PennyLaneAI/catalyst/pull/1564)
@@ -50,6 +74,39 @@
       . . .
     ```
 
+* Commuting Clifford Pauli Product Rotation (PPR) operations to the end of a circuit, past non-Clifford PPRs, is now available through the :func:`~.catalyst.passes.commute_ppr` pass transform.
+  [(#1563)](https://github.com/PennyLaneAI/catalyst/pull/1563)
+  
+  A PPR is a rotation gate of the form :math:`\exp{iP \theta}`, where :math:`P` is a Pauli word (a product of Pauli operators). Clifford PPRs refer to PPRs with :math:`\theta = \tfrac{\pi}{4}`, while non-Clifford PPRs have :math:`\theta = \tfrac{\pi}{8}`.
+
+  
+  Example:
+  ```python
+    @qjit(keep_intermediate=True)
+    @pipeline({"to_ppr": {}, "commute_ppr": {}})
+    @qml.qnode(qml.device("null.qubit", wires=1))
+    def circuit():
+        qml.H(0)
+        qml.T(0)
+        return measure(0)
+    ```
+  
+  The circuit program that generated from this pass is currrently not executable on any backend. For more information regarding to PPM, please refer to [(Pauli Product Measurement)](https://pennylane.ai/compilation/pauli-product-measurement)
+
+* Absorbing Clifford Pauli Product Rotation (PPR) operations into the final Pauli Product Measurement (PPM) is not availble through the :func:`~.catalyst.passes.ppr_to_ppm` pass transform. The output from this pass consists of non-Clifford PPRs and PPMs.
+  [(#1577)](https://github.com/PennyLaneAI/catalyst/pull/1577)
+
+  Example:
+  ```python
+    @qjit(keep_intermediate=True)
+    @pipeline({"to_ppr": {}, "commute_ppr": {}, "ppr_to_ppm": {}})
+    @qml.qnode(qml.device("null.qubit", wires=1))
+    def circuit():
+        qml.H(0)
+        qml.T(0)
+        return measure(0)
+  ```
+
 <h3>Improvements 🛠</h3>
 
 * Changed pattern rewritting in `quantum-to-ion` lowering pass to use MLIR's dialect conversion
@@ -93,6 +150,7 @@
   [(#1544)](https://github.com/PennyLaneAI/catalyst/pull/1544)
   [(#1561)](https://github.com/PennyLaneAI/catalyst/pull/1561)
   [(#1567)](https://github.com/PennyLaneAI/catalyst/pull/1567)
+  [(#1578)](https://github.com/PennyLaneAI/catalyst/pull/1578)
 
   To trigger the PennyLane pipeline for capturing the mentioned transforms,
   simply set `experimental_capture=True` in the qjit decorator. If available,
@@ -173,6 +231,14 @@
 * Fixes an issue ([(#1501)](https://github.com/PennyLaneAI/catalyst/issues/1501)) where using
   autograph in conjunction with catalyst passes causes a crash.
   [(#1541)](https://github.com/PennyLaneAI/catalyst/pull/1541)
+
+* Fixes an issue ([(#1548)](https://github.com/PennyLaneAI/catalyst/issues/1548)) where using
+  autograph in conjunction with catalyst pipeline causes a crash.
+  [(#1576)](https://github.com/PennyLaneAI/catalyst/pull/1576)
+
+* Fixes an issue ([(#1547)](https://github.com/PennyLaneAI/catalyst/issues/1547)) where using
+  chained catalyst passe decorators causes a crash.
+  [(#1576)](https://github.com/PennyLaneAI/catalyst/pull/1576)
 
 <h3>Internal changes ⚙️</h3>
 

@@ -19,6 +19,7 @@
 #include "QEC/Transforms/Passes.h"
 #include "Quantum/Transforms/Passes.h"
 #include "Test/Transforms/Passes.h"
+#include "mlir/Pass/PassRegistry.h"
 
 void catalyst::registerAllCatalystPasses()
 {
@@ -58,5 +59,8 @@ void catalyst::registerAllCatalystPasses()
     mlir::registerPass(catalyst::createTestPass);
     mlir::registerPass(catalyst::createIonsDecompositionPass);
     mlir::registerPass(catalyst::createQuantumToIonPass);
+    mlir::registerPass(catalyst::createLoopBoundaryOptimizationPass);
+    mlir::registerPass(catalyst::createCommuteCliffordTPPRPass);
     mlir::registerPass(catalyst::createCliffordTToPPRPass);
+    mlir::registerPass(catalyst::createCommuteCliffordPastPPMPass);
 }
