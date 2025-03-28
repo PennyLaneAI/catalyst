@@ -18,7 +18,8 @@
 #include <string>
 #include <vector>
 
-namespace {
+namespace catalyst {
+namespace ion {
 
 //
 // Calibrated parameters
@@ -99,4 +100,5 @@ struct Ion {
     }
 };
 
-} // namespace
+} // namespace ion
+} // namespace catalyst
