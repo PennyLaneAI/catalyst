@@ -955,7 +955,7 @@ void __catalyst__qis__Sample(MemRefT_double_2d *result, int64_t numQubits, ...)
     std::string error_msg = "return tensor must have 2D shape equal to (number of shots, "
                             "number of qubits in observable)";
     if (numQubits != 0) {
-        RT_FAIL_IF(result->sizes[1] != (size_t)numQubits, error_msg.c_str());
+        RT_FAIL_IF(result->sizes[1] != static_cast<size_t>(numQubits), error_msg.c_str());
     }
     MemRefT<double, 2> *result_p = (MemRefT<double, 2> *)result;
 

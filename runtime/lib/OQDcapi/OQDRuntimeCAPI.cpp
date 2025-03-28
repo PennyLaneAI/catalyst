@@ -41,7 +41,7 @@ void to_json(json &j, const Pulse &p)
 
     const auto &transitions = (*JSON)["system"]["ions"][p.target]["transitions"];
     RT_FAIL_IF(p.beam->transition_index < 0 ||
-                   (size_t)p.beam->transition_index >= transitions.size(),
+                   static_cast<size_t>(p.beam->transition_index) >= transitions.size(),
                "transition index out of range");
 
     j = json{{"class_", "Pulse"}, {"duration", p.duration}};
