@@ -240,9 +240,12 @@ jobs:
       run: |
         echo /Library/Frameworks/Python.framework/Versions/${{ matrix.python_version }}/bin >> $GITHUB_PATH
 
+    # CMake four has dropped compatibility for CMake 3.5, which is the minimum specified by the
+    # LAPACKE reference implementation. TODO: Look into how to upgrade beyond this limit.
     - name: Install Dependencies (Python)
       run: |
-        python${{ matrix.python_version }} -m pip install numpy nanobind pybind11 PyYAML cmake ninja delocate
+        python${{ matrix.python_version }} -m pip install numpy nanobind pybind11 PyYAML ninja delocate
+        python${{ matrix.python_version }} -m pip install cmake'<4'
 
     - name: Get Cached LLVM Source
       id: cache-llvm-source
