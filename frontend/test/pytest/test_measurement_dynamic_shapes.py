@@ -139,6 +139,10 @@ def test_dynamic_wires_scalar_readouts(readout, backend, capfd):
 
 
 def test_dynamic_wires_probs_with_wires(backend, capfd):
+    """
+    Test that a circuit with dynamic number of wires can be executed correctly
+    with probs with wires specified.
+    """
     def ref(num_qubits):
         print("compiling...")
         dev = qml.device(backend, wires=num_qubits)
@@ -161,11 +165,15 @@ def test_dynamic_wires_probs_with_wires(backend, capfd):
 
     assert np.allclose(ref(10), cat(10))
     assert np.allclose(ref(4), cat(4))
-    out, err = capfd.readouterr()
+    out, _ = capfd.readouterr()
     assert out.count("compiling...") == 3
 
 
 def test_dynamic_wires_probs_without_wires(backend, capfd):
+    """
+    Test that a circuit with dynamic number of wires can be executed correctly
+    with probs without wires specified.
+    """
     def ref(num_qubits):
         print("compiling...")
         dev = qml.device(backend, wires=num_qubits)
@@ -195,7 +203,7 @@ def test_dynamic_wires_probs_without_wires(backend, capfd):
 
     assert np.allclose(ref(10), cat(10))
     assert np.allclose(ref(4), cat(4))
-    out, err = capfd.readouterr()
+    out, _ = capfd.readouterr()
     assert out.count("compiling...") == 3
 
 
