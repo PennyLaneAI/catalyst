@@ -30,7 +30,6 @@
 #include "Quantum/IR/QuantumOps.h"
 
 using namespace mlir;
-using namespace catalyst::ion;
 
 namespace catalyst {
 namespace ion {

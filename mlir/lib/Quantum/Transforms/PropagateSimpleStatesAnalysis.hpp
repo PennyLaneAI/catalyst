@@ -208,6 +208,8 @@ class PropagateSimpleStatesAnalysis {
         case QubitState::NOT_A_BASIS:
             return "NOT_A_BASIS";
         }
+
+        assert(false && "Invalid Enum value for `QubitState`");
     }
 
     bool isZero(QubitState qs) { return qs == QubitState::ZERO; }
