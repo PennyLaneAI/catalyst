@@ -139,7 +139,7 @@ def test_dynamic_wires_scalar_readouts(readout, backend, capfd):
 
 
 @pytest.mark.parametrize("readout", [qml.probs])
-def test_dynamic_wires_probs_with_wires(readout, backend, capfd):
+def test_dynamic_wires_statebased_with_wires(readout, backend, capfd):
     """
     Test that a circuit with dynamic number of wires can be executed correctly
     with state based measurements with wires specified.
@@ -160,7 +160,7 @@ def test_dynamic_wires_probs_with_wires(readout, backend, capfd):
             qml.RX(1.23, wires=num_qubits - 1)
             qml.RZ(3.45, wires=0)
             qml.CNOT(wires=[num_qubits - 2, 1])
-            return qml.probs(wires=[0, num_qubits - 2])
+            return readout(wires=[0, num_qubits - 2])
 
         return circ()
 
