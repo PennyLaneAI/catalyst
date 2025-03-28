@@ -297,6 +297,7 @@ jobs:
 
     # Build Catalyst-Runtime
     - name: Build Catalyst-Runtime
+      id: runtime-build
       run: |
         # On GH images, gfortran is only available as a specific version.
         export FC=gfortran-14
@@ -309,6 +310,11 @@ jobs:
               -DMLIR_INCLUDE_DIRS="$GITHUB_WORKSPACE/mlir/llvm-project/mlir/include"
 
         cmake --build $GITHUB_WORKSPACE/runtime-build --target rt_capi rtd_openqasm rtd_null_qubit
+
+    - name: Error log on failure
+      if: failure() && steps.runtime-build.outcome == 'failure'
+      run: |
+        cat $GITHUB_WORKSPACE/runtime-build/_lapacke-accelerate/src/lapacke-accelerate-stamp/*-err.log 2>/dev/null || True
 
     - name: Test Catalyst-Runtime
       run: |
