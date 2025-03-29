@@ -13,7 +13,7 @@
 # limitations under the License.
 
 # pylint: disable=undefined-variable
-from os import path
+import os
 
 import lit.formats
 from lit.llvm import llvm_config
@@ -26,7 +26,7 @@ config.suffixes = [".py"]
 config.excludes = ["lit.cfg.py", "utils.py"]
 
 # Define the root path of where to look for tests.
-config.test_source_root = path.dirname(__file__)
+config.test_source_root = os.path.dirname(__file__)
 
 # Define where to execute tests (and produce the output).
 config.test_exec_root = getattr(config, "frontend_test_dir", ".lit")
@@ -38,9 +38,14 @@ config.environment["ASAN_OPTIONS"] = "detect_leaks=0,detect_container_overflow=0
 # Define substitutions used at the top of lit test files, e.g. %PYTHON.
 python_executable = getattr(config, "python_executable", "python3.10")
 
-if "Address" in getattr(config, "llvm_use_sanitizer", ""):
+# Preload ASAN runtime if either the MLIR is sanitized, or the user explicitly indicates it
+# via env var, for example when only the runtime was sanitized.
+if (
+    "Address" in getattr(config, "llvm_use_sanitizer", "")
+    or os.environ.get("ENABLE_ASAN", None) == "ON"
+):
     # With sanitized builds, Python tests require some preloading magic to run.
-    if "Linux" in config.host_os:
+    if "Linux" in config.host_os and "clang" in config.host_cxx:
         python_executable = f"LD_PRELOAD=$({config.host_cxx} -print-file-name=libclang_rt.asan-{config.host_arch}.so) {python_executable}"
     elif "Darwin" in config.host_os:
         # It's important that the python executable discovered by CMake is the true interpreter

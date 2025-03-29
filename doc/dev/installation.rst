@@ -71,7 +71,7 @@ you are encoutering issues, please consult the detailed guide
 
         # Install XCode Command Line Tools and common requirements
         xcode-select --install
-        pip install cmake ninja
+        pip install cmake'<4' ninja
 
         # If not present yet, install Homebrew (https://brew.sh/)
         brew install libomp ccache gfortran
@@ -163,7 +163,7 @@ They can be installed via:
       .. code-block:: console
 
         xcode-select --install
-        pip install cmake ninja
+        pip install cmake'<4' ninja
         brew install libomp ccache gfortran
         export PATH=/usr/local/opt/ccache/libexec:$PATH
 

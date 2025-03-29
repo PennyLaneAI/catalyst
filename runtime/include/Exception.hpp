@@ -78,7 +78,7 @@ class RuntimeException : public std::exception {
                                 const char *function_name)
 {
     std::stringstream sstream;
-    sstream << "[" << file_name << "][Line:" << line << "][Function:" << function_name
+    sstream << "[" << file_name << ":" << line << "][Function:" << function_name
             << "] Error in Catalyst Runtime: " << message;
 
     throw RuntimeException(sstream.str());

@@ -1,25 +1,47 @@
-PYTHON?=$(shell which python3)
-PYTHON_PREFIX:=$(shell $(PYTHON) -c "import sys; print(sys.prefix)")
-PYTHON_VERSION:=$(shell $(PYTHON) -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
-C_COMPILER?=$(shell which clang)
-CXX_COMPILER?=$(shell which clang++)
-COMPILER_LAUNCHER?=$(shell which ccache)
-NPROC?=$(shell python3 -c "import os; print(os.cpu_count())")
+PYTHON ?= $(shell which python3)
+PYTHON_PREFIX := $(shell $(PYTHON) -c "import sys; print(sys.prefix)")
+PYTHON_VERSION := $(shell $(PYTHON) -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
+C_COMPILER ?= $(shell which clang)
+CXX_COMPILER ?= $(shell which clang++)
+COMPILER_LAUNCHER ?= $(shell which ccache)
+NPROC ?= $(shell python3 -c "import os; print(os.cpu_count())")
 
 MK_ABSPATH := $(abspath $(lastword $(MAKEFILE_LIST)))
 MK_DIR := $(dir $(MK_ABSPATH))
-RT_BUILD_DIR?=$(MK_DIR)/build
-CODE_COVERAGE?=OFF
-BUILD_TYPE?=RelWithDebInfo
-ENABLE_OPENQASM?=ON
-ENABLE_OQD?=OFF
-ENABLE_ASAN?=OFF
-LLVM_DIR?=$(MK_DIR)/../mlir/llvm-project/
+RT_BUILD_DIR ?= $(MK_DIR)/build
+CODE_COVERAGE ?= OFF
+BUILD_TYPE ?= RelWithDebInfo
+ENABLE_OPENQASM ?= ON
+ENABLE_OQD ?= OFF
+ENABLE_ASAN ?= ON
+STRICT_WARNINGS ?= ON
+LLVM_DIR ?= $(MK_DIR)/../mlir/llvm-project/
+
+PLATFORM := $(shell uname -s)
+
+# Since we build executables for all test targets in this file, there is no reason to preload.
+# Preloading while the ASAN RT is already embedded in the executable can lead to the "incompatible
+# ASAN runtimes detected" error, at least on Linux (macOS seemed okay with it).
+# If necessary, add ASAN flags here to fine-tune behaviour (e.g. ASAN_OPTIONS="...").
+ASAN_COMMAND :=
+
+# Note: ASAN replaces dlopen calls, which means that when we open other libraries via dlopen that
+#       relied on the parent's library's RPATH, these libraries are no longer found.
+#         e.g. `dlopen(openqasm_python_module.so)` from OpenQASMRunner.hpp
+#       We can fix this using LD_LIBRARY_PATH (for dev builds).
+ifeq ($(PLATFORM), Linux)
+ASAN_FLAGS = LD_LIBRARY_PATH="$(RT_BUILD_DIR)/lib:$(LD_LIBRARY_PATH)"
+# Python tests can generally produce leaks, here observed on Linux. OpenQASM tests call into Python.
+PY_ASAN_OPTIONS := ASAN_OPTIONS="detect_leaks=0"
+endif
+
+# Deferred assignment since RT_BUILD_DIR can be modified by the targets.
+ifeq ($(ENABLE_ASAN), ON)
+ASAN_COMMAND = $(ASAN_FLAGS)
+endif
 
 BUILD_TARGETS := rt_capi rtd_null_qubit
 TEST_TARGETS := runner_tests_qir_runtime
-
-PLATFORM := $(shell uname -s)
 
 ifeq ($(ENABLE_OPENQASM), ON)
 	BUILD_TARGETS += rtd_openqasm
@@ -58,7 +80,8 @@ configure:
 		-DENABLE_OQD=$(ENABLE_OQD) \
 		-DENABLE_CODE_COVERAGE=$(CODE_COVERAGE) \
 		-DPython_EXECUTABLE=$(PYTHON) \
-		-DENABLE_ADDRESS_SANITIZER=$(ENABLE_ASAN)
+		-DENABLE_ADDRESS_SANITIZER=$(ENABLE_ASAN) \
+		-DRUNTIME_ENABLE_WARNINGS=$(STRICT_WARNINGS)
 
 .PHONY: runtime
 runtime: configure
@@ -76,7 +99,7 @@ test: test_runner
 	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_qir_runtime
 ifeq ($(ENABLE_OPENQASM), ON)
 	# Test the OpenQasm devices C++ tests
-	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_openqasm
+	$(ASAN_COMMAND) $(PY_ASAN_OPTIONS) $(RT_BUILD_DIR)/tests/runner_tests_openqasm
 endif
 ifeq ($(ENABLE_OQD), ON)
 	# Test the OQD devices C++ tests
@@ -92,17 +115,17 @@ coverage: CXX_COMPILER=$(shell which g++)
 coverage: export LLVM_PROFILE_FILE := $(RT_BUILD_DIR)/tests/%m.profraw
 coverage: test_runner
 	@echo "check C++ code coverage"
-	$(RT_BUILD_DIR)/tests/runner_tests_qir_runtime
+	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_qir_runtime
 ifeq ($(ENABLE_OPENQASM), ON)
-	$(RT_BUILD_DIR)/tests/runner_tests_openqasm
+	$(ASAN_COMMAND) $(PY_ASAN_OPTIONS) $(RT_BUILD_DIR)/tests/runner_tests_openqasm
 endif
 ifeq ($(ENABLE_OQD), ON)
-	$(RT_BUILD_DIR)/tests/runner_tests_oqd
+	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_oqd
 endif
 ifeq ($(PLATFORM),Linux)
 	lcov --directory $(RT_BUILD_DIR) -b $(MK_DIR)/lib --capture --output-file $(RT_BUILD_DIR)/coverage.info
-	lcov --remove $(RT_BUILD_DIR)/coverage.info '/usr/*' '*/_deps/*' '*/envs/*' '*/mlir/*' --output-file $(RT_BUILD_DIR)/coverage.info
-	genhtml $(RT_BUILD_DIR)/coverage.info --output-directory $(RT_BUILD_DIR)/cov -t "Catalyst Runtime C++ Coverage" --num-spaces 4
+	lcov --remove $(RT_BUILD_DIR)/coverage.info '/usr/*' '*/_deps/*' '*/envs/*' '*/mlir/*' --output-file $(RT_BUILD_DIR)/coverage.info -q
+	genhtml $(RT_BUILD_DIR)/coverage.info --output-directory $(RT_BUILD_DIR)/cov -t "Catalyst Runtime C++ Coverage" --num-spaces 4  -q
 else
 	xcrun llvm-profdata merge $(RT_BUILD_DIR)/tests/*.profraw -o $(RT_BUILD_DIR)/tests/rt_test_coverage.profdata
 	xcrun llvm-cov show -instr-profile $(RT_BUILD_DIR)/tests/rt_test_coverage.profdata \
