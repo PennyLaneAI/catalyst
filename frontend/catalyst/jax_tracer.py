@@ -878,9 +878,14 @@ def trace_quantum_measurements(
                     "Use qml.sample() instead."
                 )
 
+            d_wires = (
+                device.wires[0]
+                if catalyst.device.qjit_device.is_dynamic_wires(device.wires)
+                else len(device.wires)
+            )
             m_wires = output.wires if output.wires else None
             obs_tracers, nqubits = trace_observables(output.obs, qrp, m_wires)
-            nqubits = len(device.wires) if nqubits is None else nqubits
+            nqubits = d_wires if nqubits is None else nqubits
 
             using_compbasis = obs_tracers.primitive == compbasis_p
 
@@ -921,8 +926,11 @@ def trace_quantum_measurements(
                 out_classical_tracers.append(var_p.bind(obs_tracers))
             elif type(output) is ProbabilityMP:
                 assert using_compbasis
-                shape = (2**nqubits,)
-                out_classical_tracers.append(probs_p.bind(obs_tracers, shape=shape))
+                #shape = (2**nqubits,)
+                #breakpoint()
+                #out_classical_tracers.append(probs_p.bind(obs_tracers, shape=shape))
+                result = bind_flexible_primitive(probs_p, {"num_qubits":nqubits}, obs_tracers)
+                out_classical_tracers.append(result)
             elif type(output) is CountsMP:
                 if shots is None:  # needed for old device API only
                     raise ValueError(
@@ -948,9 +956,12 @@ def trace_quantum_measurements(
                 else:
                     out_tree = counts_tree
             elif type(output) is StateMP:
-                assert using_compbasis
-                shape = (2**nqubits,)
-                out_classical_tracers.append(state_p.bind(obs_tracers, shape=shape))
+                #assert using_compbasis
+                #shape = (2**nqubits,)
+                #out_classical_tracers.append(state_p.bind(obs_tracers, shape=shape))
+                #breakpoint()
+                result = bind_flexible_primitive(state_p, {"num_qubits":nqubits}, obs_tracers)
+                out_classical_tracers.append(result)
             else:
                 raise NotImplementedError(
                     f"Measurement {type(output)} is not implemented"
