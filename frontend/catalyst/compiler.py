@@ -299,22 +299,18 @@ class Compiler:
                 cmd += ["--load-dialect-plugin", str(plugin)]
         if self.options.keep_intermediate:
             cmd += ["--keep-intermediate"]
-        # The async tests are not included as part of coverage.
-        if self.options.async_qnodes:  # pragma: nocover
-            cmd += ["--async-qnodes"]
         if self.options.verbose:
             cmd += ["--verbose"]
         if self.options.checkpoint_stage:
             cmd += ["--checkpoint-stage", self.options.checkpoint_stage]
 
-        cmd += ["-verify-each=false"]
-
-        pipeline_str = ""
         for pipeline in self.options.get_pipelines():
             pipeline_name, passes = pipeline
-            passes_str = ";".join(passes)
-            pipeline_str += f"{pipeline_name}({passes_str}),"
-        cmd += ["--catalyst-pipeline", pipeline_str]
+            passes_str = ",".join(passes)
+            pipeline_str = f"{pipeline_name}:{passes_str}"
+            cmd += ["--catalyst-pipeline", pipeline_str]
+
+        cmd += ["-verify-each=false"]
 
         return cmd
 

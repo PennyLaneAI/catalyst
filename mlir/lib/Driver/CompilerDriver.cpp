@@ -641,6 +641,13 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
 {
     using timer = catalyst::utils::Timer;
 
+    bool hasAsync = false;
+    for (auto pipeline : options.pipelinesCfg) {
+        for (auto passes : pipeline.getPasses()) {
+            hasAsync |= passes.find("qnode-to-async-lowering") != std::string::npos;
+        }
+    }
+
     MLIRContext ctx(registry);
     ctx.printOpOnDiagnostic(true);
     ctx.printStackTraceOnDiagnostic(options.verbosity >= Verbosity::Debug);
@@ -769,7 +776,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         llvmModule->setDataLayout(targetMachine->createDataLayout());
         llvmModule->setTargetTriple(targetTriple);
 
-        if (options.asyncQnodes) {
+        if (hasAsync) {
             TimingScope coroLLVMPassesTiming = llcTiming.nest("LLVM coroutine passes");
             if (failed(timer::timer(runCoroLLVMPasses, "runCoroLLVMPasses", /* add_endl */ false,
                                     options, llvmModule, output))) {
@@ -814,23 +821,6 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
     return success();
 }
 
-size_t findMatchingClosingParen(llvm::StringRef str, size_t openParenPos)
-{
-    int parenCount = 1;
-    for (size_t pos = openParenPos + 1; pos < str.size(); pos++) {
-        if (str[pos] == '(') {
-            parenCount++;
-        }
-        else if (str[pos] == ')') {
-            parenCount--;
-            if (parenCount == 0) {
-                return pos;
-            }
-        }
-    }
-    return llvm::StringRef::npos;
-}
-
 std::vector<Pipeline> parsePipelines(const cl::list<std::string> &catalystPipeline)
 {
     std::vector<Pipeline> allPipelines;
@@ -841,28 +831,18 @@ std::vector<Pipeline> parsePipelines(const cl::list<std::string> &catalystPipeli
             continue;
         }
 
-        size_t openParenPos = pipelineRef.find('(');
-        size_t closeParenPos = findMatchingClosingParen(pipelineRef, openParenPos);
-
-        if (openParenPos == llvm::StringRef::npos || closeParenPos == llvm::StringRef::npos) {
-            llvm::errs() << "Error: Invalid pipeline format: " << pipelineStr << "\n";
-            continue;
-        }
+        size_t delim = pipelineRef.find(':');
 
         // Extract pipeline name
-        llvm::StringRef pipelineName = pipelineRef.slice(0, openParenPos).trim();
-        llvm::StringRef passesStr = pipelineRef.slice(openParenPos + 1, closeParenPos).trim();
-        llvm::SmallVector<llvm::StringRef, 8> passList;
-        passesStr.split(passList, ';', /*MaxSplit=*/-1, /*KeepEmpty=*/false);
-
-        llvm::SmallVector<std::string> passes;
-        for (auto &pass : passList) {
-            passes.push_back(pass.trim().str());
-        }
+        llvm::StringRef pipelineName = pipelineRef.slice(0, delim).trim();
+        llvm::StringRef passesStr = pipelineRef.slice(delim + 1, pipelineRef.size()).trim();
 
         Pipeline pipeline;
+
+        llvm::SmallVector<std::string> _pipelines;
+        _pipelines.push_back(passesStr.str());
         pipeline.setName(pipelineName.str());
-        pipeline.setPasses(passes);
+        pipeline.setPasses(_pipelines);
         allPipelines.push_back(std::move(pipeline));
     }
     return allPipelines;
@@ -895,9 +875,9 @@ int QuantumDriverMainFromCL(int argc, char **argv)
                               cl::init(false), cl::cat(CatalystCat));
     cl::opt<bool> Verbose("verbose", cl::desc("Set verbose"), cl::init(false),
                           cl::cat(CatalystCat));
-    cl::list<std::string> CatalystPipeline(
-        "catalyst-pipeline", cl::desc("Catalyst Compiler pass pipelines"), cl::ZeroOrMore,
-        cl::CommaSeparated, cl::cat(CatalystCat));
+    cl::list<std::string> CatalystPipeline("catalyst-pipeline",
+                                           cl::desc("Catalyst Compiler pass pipelines"),
+                                           cl::ZeroOrMore, cl::cat(CatalystCat));
     cl::opt<std::string> CheckpointStage("checkpoint-stage", cl::desc("Checkpoint stage"),
                                          cl::init(""), cl::cat(CatalystCat));
     cl::opt<enum Action> LoweringAction(
@@ -951,7 +931,6 @@ int QuantumDriverMainFromCL(int argc, char **argv)
                             .moduleName = ModuleName,
                             .diagnosticStream = errStream,
                             .keepIntermediate = SaveAfterEach,
-                            .asyncQnodes = AsyncQNodes,
                             .verbosity = Verbose ? Verbosity::All : Verbosity::Urgent,
                             .pipelinesCfg = parsePipelines(CatalystPipeline),
                             .checkpointStage = CheckpointStage,
