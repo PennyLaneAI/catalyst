@@ -30,8 +30,10 @@ using namespace catalyst::qec;
 
 namespace {
 
+/// recursively check if the next users of the NextOp are not PPMeasurementOp
 bool verifyNextNonClifford(PPMeasurementOp op, Operation *nextOp)
 {
+    // Avoid segmentation fault (should not happen)
     if (nextOp == nullptr)
         return true;
 
@@ -49,8 +51,18 @@ bool verifyNextNonClifford(PPMeasurementOp op, Operation *nextOp)
     return true;
 }
 
+/// The prevOp is valid when:
+/// 1. prevOp is non-Clifford. (We want to absorb the Clifford PPR into PPM)
+/// 2. prevOp's users of users are not PPMeasurementOp.
+/// For example, PPRotationOp is Z⊗Z, prevOp is X⊗X.
+/// ---| X |---------| Z |
+///    |   |         |   |
+/// ---| X |--| Y |--| Z |
+/// Users of prevOp can be PPMeasurementOp,
+/// but the users of Y of prevOp should not be PPMeasurementOp.
 bool verifyPrevNonClifford(PPMeasurementOp op, PPRotationOp prevOp)
 {
+    // Avoid segmentation fault (should not happen)
     if (prevOp == nullptr)
         return false;
 
