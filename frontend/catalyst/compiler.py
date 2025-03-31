@@ -264,7 +264,7 @@ class LinkerDriver:
         raise CompileError(msg)
 
 
-def _get_cmd(*args, stdin=None):
+def _get_catalyst_cli_cmd(*args, stdin=None):
     """Just get the command, do not run it"""
     cli_path = get_cli_path()
     if not path.isfile(cli_path):
@@ -289,7 +289,7 @@ def _catalyst(*args, stdin=None):
     echo ${stdin} | catalyst *args -
     catalyst *args
     """
-    cmd = _get_cmd(*args, stdin=stdin)
+    cmd = _get_catalyst_cli_cmd(*args, stdin=stdin)
     result = subprocess.run(cmd, input=stdin, check=True, capture_output=True, text=True)
     return result.stdout
 
@@ -379,7 +379,7 @@ class Compiler:
             cmd (str): The command to be executed.
         """
         opts = _options_to_opts(self.options)
-        cmd = _get_cmd(
+        cmd = _get_catalyst_cli_cmd(
             ("-o", output_ir_name),
             ("--module-name", module_name),
             ("--workspace", str(workspace)),
