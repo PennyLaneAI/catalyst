@@ -10,9 +10,11 @@
 # limitations under the License.
 
 import os
+import pathlib
 import re
 import shutil
 import subprocess
+import textwrap
 
 import jax.numpy as jnp
 import numpy as np
@@ -21,12 +23,14 @@ import pytest
 from jax.tree_util import register_pytree_node_class
 
 from catalyst import debug, for_loop, qjit, value_and_grad
+from catalyst.compiler import _options_to_cli_flags, to_llvmir
 from catalyst.debug import (
     compile_executable,
     get_cmain,
     get_compilation_stage,
     replace_ir,
 )
+from catalyst.pipelines import CompileOptions
 from catalyst.utils.exceptions import CompileError
 
 
@@ -484,6 +488,58 @@ class TestCProgramGeneration:
         os.remove(directory_path + "/main.c")
 
         assert str(arg) in result.stdout.replace(" ", "").replace("\n", "")
+
+
+class TestOptionsToCliFlags:
+    """Unit tests compiler interface"""
+
+    def test_option_pass_plugin(self):
+        """Test pass plugin option"""
+
+        path = pathlib.Path("/path/to/plugin")
+        options = CompileOptions(pass_plugins={path})
+        flags = _options_to_cli_flags(options)
+        assert ("--load-pass-plugin", path) in flags
+
+    def test_option_dialect_plugin(self):
+        """Test dialect plugin option"""
+        path = pathlib.Path("/path/to/plugin")
+        options = CompileOptions(dialect_plugins={path})
+        flags = _options_to_cli_flags(options)
+        assert ("--load-dialect-plugin", path) in flags
+
+    def test_option_not_lower_to_llvm(self):
+        """Test not lower to llvm"""
+        options = CompileOptions(lower_to_llvm=False)
+        flags = _options_to_cli_flags(options)
+        assert ("--tool", "opt") in flags
+
+    def test_no_options_to_llvmir(self):
+        mlir = """
+        module {
+            func.func @foo() {
+                return
+            }
+        }
+        """
+        observed = to_llvmir(stdin=mlir)
+        expected = textwrap.dedent(
+            """
+        ; ModuleID = 'LLVMDialectModule'
+        source_filename = "LLVMDialectModule"
+        target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128"
+        target triple = "x86_64-unknown-linux-gnu"
+
+        define void @foo() {
+          ret void
+        }
+
+        !llvm.module.flags = !{!0}
+
+        !0 = !{i32 2, !"Debug Info Version", i32 3}
+        """
+        ).lstrip()
+        assert expected == observed
 
 
 if __name__ == "__main__":
