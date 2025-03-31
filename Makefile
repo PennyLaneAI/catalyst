@@ -14,8 +14,8 @@ RT_BUILD_DIR ?= $(MK_DIR)/runtime/build
 OQC_BUILD_DIR ?= $(MK_DIR)/frontend/catalyst/third_party/oqc/src/build
 ENZYME_BUILD_DIR ?= $(MK_DIR)/mlir/Enzyme/build
 COVERAGE_REPORT ?= term-missing
-ENABLE_OPENQASM?=ON
-ENABLE_OQD?=OFF
+ENABLE_OPENQASM ?= ON
+ENABLE_OQD ?= OFF
 TEST_BACKEND ?= "lightning.qubit"
 TEST_BRAKET ?= NONE
 ENABLE_ASAN ?= OFF
@@ -26,19 +26,34 @@ ifeq ($(PLATFORM),Linux)
 COPY_FLAGS := --dereference
 endif
 
+# Note: ASAN replaces dlopen calls, which means that when we open other libraries via dlopen that
+#       relied on the parent's library's RPATH, these libraries are no longer found.
+#         e.g. `dlopen(catalyst_callback_registry.so)` from RuntimeCAPI.cpp
+#              `dlopen(libscipy_openblas.dylib)` from lightning's BLASLibLoaderManager.hpp
+#       We can fix this using LD_LIBRARY_PATH (for dev builds).
 ifeq ($(PLATFORM) $(findstring clang,$(C_COMPILER)),Linux clang)
 ASAN_FLAGS := LD_PRELOAD="$(shell clang  -print-file-name=libclang_rt.asan-x86_64.so)"
+ASAN_FLAGS += LD_LIBRARY_PATH="$(RT_BUILD_DIR)/lib:$(LD_LIBRARY_PATH)"
 else ifeq ($(PLATFORM) $(findstring gcc,$(C_COMPILER)),Linux gcc)
 ASAN_FLAGS := LD_PRELOAD="$(shell gcc  -print-file-name=libasan.so)"
+ASAN_FLAGS += LD_LIBRARY_PATH="$(RT_BUILD_DIR)/lib:$(LD_LIBRARY_PATH)"
 else ifeq ($(PLATFORM),Darwin)
 ASAN_FLAGS := DYLD_INSERT_LIBRARIES="$(shell clang -print-file-name=libclang_rt.asan_osx_dynamic.dylib)"
+SCIPY_DIR := $(shell python -c 'import os, scipy_openblas32; print(os.path.dirname(scipy_openblas32.__file__))')
+ASAN_FLAGS += DYLD_LIBRARY_PATH="$(RT_BUILD_DIR)/lib:$(SCIPY_DIR)/lib:$(DYLD_LIBRARY_PATH)"
 endif
 
 PARALLELIZE := -n auto
-ifeq ($(ENABLE_ASAN) $(PLATFORM),ON Darwin)
+ifeq ($(ENABLE_ASAN),ON)
+ifeq ($(PLATFORM),Darwin)
 # Launching subprocesses with ASAN on macOS is not supported (see https://stackoverflow.com/a/47853433).
 PARALLELIZE :=
 endif
+# These tests build a standalone executable from the Python frontend, which would have to be built
+# with the ASAN runtime. Since we don't exert much control over the "user" compiler, skip them.
+TEST_EXCLUDES := -k "not test_executable_generation"
+endif
+PYTEST_FLAGS := $(PARALLELIZE) $(TEST_EXCLUDES)
 
 # TODO: Find out why we have container overflow on macOS.
 ASAN_OPTIONS := ASAN_OPTIONS="detect_leaks=0,detect_container_overflow=0"
@@ -55,9 +70,6 @@ ASAN_COMMAND := $(ASAN_OPTIONS) $(ASAN_FLAGS)
 else
 ASAN_COMMAND :=
 endif
-
-# Export variables so that they can be set here without needing to also set them in sub-make files.
-export ENABLE_ASAN ASAN_COMMAND
 
 # Flag for verbose pip install output
 PIP_VERBOSE_FLAG :=
@@ -142,7 +154,7 @@ test-oqc:
 lit:
 ifeq ($(ENABLE_ASAN),ON)
 ifneq ($(findstring clang,$(C_COMPILER)),clang)
-	@echo "Build and Test with Address Sanitizer are only supported by Clang, but provided $(C_COMPILER)"
+	@echo "Running Python tests with Address Sanitizer is only supported with Clang, but provided $(C_COMPILER)"
 	@exit 1
 endif
 endif
@@ -152,12 +164,12 @@ endif
 pytest:
 ifeq ($(ENABLE_ASAN),ON)
 ifneq ($(findstring clang,$(C_COMPILER)),clang)
-	@echo "Build and Test with Address Sanitizer are only supported by Clang, but provided $(C_COMPILER)"
+	@echo "Running Python tests with Address Sanitizer is only supported with Clang, but provided $(C_COMPILER)"
 	@exit 1
 endif
 endif
 	@echo "check the Catalyst PyTest suite"
-	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/pytest --tb=native --backend=$(TEST_BACKEND) --runbraket=$(TEST_BRAKET) $(PARALLELIZE)
+	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/pytest --tb=native --backend=$(TEST_BACKEND) --runbraket=$(TEST_BRAKET) $(PYTEST_FLAGS)
 	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/test_oqc/oqc
 ifeq ($(ENABLE_OQD), ON)
 	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/test_oqd/oqd
@@ -173,7 +185,7 @@ ifeq ($(ENABLE_ASAN) $(PLATFORM),ON Darwin)
 endif
 	@echo "check the Catalyst demos"
 	MDD_BENCHMARK_PRECISION=1 \
-	$(ASAN_COMMAND) $(PYTHON) -m pytest demos --nbmake $(PARALLELIZE)
+	$(ASAN_COMMAND) $(PYTHON) -m pytest demos --nbmake $(PYTEST_FLAGS)
 
 wheel:
 	echo "INSTALLED = True" > $(MK_DIR)/frontend/catalyst/_configuration.py
@@ -263,11 +275,17 @@ clean-oqc:
 coverage: coverage-frontend coverage-runtime
 
 coverage-frontend:
+ifeq ($(ENABLE_ASAN),ON)
+ifneq ($(findstring clang,$(C_COMPILER)),clang)
+	@echo "Running Python tests with Address Sanitizer is only supported with Clang, but provided $(C_COMPILER)"
+	@exit 1
+endif
+endif
 	@echo "Generating coverage report for the frontend"
-	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/pytest $(PARALLELIZE) --cov=catalyst --tb=native --cov-report=$(COVERAGE_REPORT)
-	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/test_oqc/oqc $(PARALLELIZE) --cov=catalyst --cov-append --tb=native --cov-report=$(COVERAGE_REPORT)
+	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/pytest $(PYTEST_FLAGS) --cov=catalyst --tb=native --cov-report=$(COVERAGE_REPORT)
+	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/test_oqc/oqc $(PYTEST_FLAGS) --cov=catalyst --cov-append --tb=native --cov-report=$(COVERAGE_REPORT)
 ifeq ($(ENABLE_OQD), ON)
-	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/test_oqd/oqd $(PARALLELIZE) --cov=catalyst --cov-append --tb=native --cov-report=$(COVERAGE_REPORT)
+	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/test_oqd/oqd $(PYTEST_FLAGS) --cov=catalyst --cov-append --tb=native --cov-report=$(COVERAGE_REPORT)
 endif
 ifeq ($(TEST_BRAKET), NONE)
 	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/async_tests --tb=native --backend=$(TEST_BACKEND) --tb=native
