@@ -272,8 +272,8 @@ def _get_catalyst_cli_cmd(*args, stdin=None):
 
     cmd = [cli_path]
     for arg in args:
-        if isinstance(arg, tuple):
-            cmd += [str(arg[0]), str(arg[1])]
+        if not isinstance(arg, str):
+            cmd += [str(x) for x in arg]
         else:
             cmd += [str(arg)]
 
