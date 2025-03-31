@@ -524,7 +524,7 @@ class TestOptionsToCliFlags:
         }
         """
         observed = to_llvmir(stdin=mlir)
-        # pylint: disable-next=line-too-long
+        # pylint: disable=line-too-long
         expected = textwrap.dedent(
             """
         ; ModuleID = 'LLVMDialectModule'
@@ -541,6 +541,7 @@ class TestOptionsToCliFlags:
         !0 = !{i32 2, !"Debug Info Version", i32 3}
         """
         ).lstrip()
+        # pylint: enable=line-too-long
         assert expected == observed
 
 
