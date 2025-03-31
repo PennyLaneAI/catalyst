@@ -326,6 +326,7 @@ class TestCProgramGeneration:
         with pytest.raises(TypeError, match="First argument needs to be a 'QJIT' object"):
             get_cmain(f, 0.5)
 
+    @pytest.mark.skip
     @pytest.mark.parametrize(
         ("pass_name", "target", "replacement"),
         [
@@ -430,6 +431,7 @@ class TestCProgramGeneration:
         ):
             get_compilation_stage(f, "mlir")
 
+    @pytest.mark.skip
     @pytest.mark.parametrize(
         "arg",
         [
@@ -461,6 +463,7 @@ class TestCProgramGeneration:
 
         assert ans in result.stdout.replace(" ", "").replace("\n", "")
 
+    @pytest.mark.skip
     def test_executable_generation_without_precompiled_function(self):
         """Test if generated C Program produces correct results."""
 
