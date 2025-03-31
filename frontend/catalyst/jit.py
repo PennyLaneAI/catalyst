@@ -32,7 +32,7 @@ from jax.tree_util import tree_flatten, tree_unflatten
 import catalyst
 from catalyst.autograph import run_autograph
 from catalyst.compiled_functions import CompilationCache, CompiledFunction
-from catalyst.compiler import CompileOptions, Compiler, _to_llvmir, canonicalize
+from catalyst.compiler import CompileOptions, Compiler, canonicalize, to_llvmir
 from catalyst.debug.instruments import instrument
 from catalyst.from_plxpr import trace_from_pennylane
 from catalyst.jax_tracer import lower_jaxpr_to_mlir, trace_to_jaxpr
@@ -569,7 +569,7 @@ class QJIT(CatalystCallable):
             return None
 
         _mlir = str(self.mlir_module)
-        return _to_llvmir(stdin=_mlir, options=self.compile_options)
+        return to_llvmir(stdin=_mlir, options=self.compile_options)
 
     @debug_logger
     def jit_compile(self, args, **kwargs):

@@ -351,7 +351,7 @@ def _options_to_opts(options):
     return extra_args
 
 
-def _to_llvmir(*args, stdin=None, options: Optional[CompileOptions] = None):
+def to_llvmir(*args, stdin=None, options: Optional[CompileOptions] = None):
     """echo ${input} | catalyst *args -"""
     # These are the options that may affect compilation
     if not options:
