@@ -52,14 +52,17 @@ bool verifyNextNonClifford(PPMeasurementOp op, Operation *nextOp)
 }
 
 /// The prevOp is valid when:
-/// 1. prevOp is non-Clifford. (We want to absorb the Clifford PPR into PPM)
-/// 2. prevOp's users of users are not PPMeasurementOp.
-/// For example, PPRotationOp is Z⊗Z, prevOp is X⊗X.
+/// 1. prevOp is a non-Clifford operation. (We want to absorb the Clifford PPR into PPM)
+/// 2. The users of the users of prevOp are not PPMeasurementOp.
+///
+/// For example, if PPRotationOp is Z⊗Z and prevOp is X⊗X:
+///
 /// ---| X |---------| Z |
 ///    |   |         |   |
 /// ---| X |--| Y |--| Z |
+///
 /// Users of prevOp can be PPMeasurementOp,
-/// but the users of Y of prevOp should not be PPMeasurementOp.
+/// but the users of Y (a user of prevOp) should not be PPMeasurementOp.
 bool verifyPrevNonClifford(PPMeasurementOp op, PPRotationOp prevOp)
 {
     // Avoid segmentation fault (should not happen)
