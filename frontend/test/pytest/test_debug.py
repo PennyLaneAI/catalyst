@@ -515,6 +515,7 @@ class TestOptionsToCliFlags:
         assert ("--tool", "opt") in flags
 
     def test_no_options_to_llvmir(self):
+        """Test that we can lower to llvmir without needing any options"""
         mlir = """
         module {
             func.func @foo() {
@@ -523,6 +524,7 @@ class TestOptionsToCliFlags:
         }
         """
         observed = to_llvmir(stdin=mlir)
+        # pylint: disable-next=line-too-long
         expected = textwrap.dedent(
             """
         ; ModuleID = 'LLVMDialectModule'
