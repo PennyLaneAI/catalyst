@@ -294,8 +294,8 @@ def _catalyst(*args, stdin=None):
     return result.stdout
 
 
-def _opt(*args, stdin=None):
-    """Raw interface to opt
+def _quantum_opt(*args, stdin=None):
+    """Raw interface to quantum-opt
 
     echo ${stdin} | catalyst --tool=opt *args -
     catalyst --tool=opt *args
@@ -313,7 +313,7 @@ def canonicalize(*args, stdin=None):
 
     Returns stdout string
     """
-    return _opt(("--pass-pipeline", "builtin.module(canonicalize)"), *args, stdin=stdin)
+    return _quantum_opt(("--pass-pipeline", "builtin.module(canonicalize)"), *args, stdin=stdin)
 
 
 def _options_to_opts(options):
