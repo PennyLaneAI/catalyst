@@ -31,6 +31,7 @@ from malt.impl.api import PyToPy
 
 import catalyst
 from catalyst.autograph import ag_primitives, operator_update
+from catalyst.passes.pass_api import PassPipelineWrapper
 from catalyst.utils.exceptions import AutoGraphError
 from catalyst.utils.patching import Patcher
 
@@ -53,7 +54,7 @@ class CatalystTransformer(PyToPy):
         # way to handle these in the future.
         # We may also need to check how this interacts with other common function decorators.
         fn = obj
-        if isinstance(obj, qml.QNode):
+        if isinstance(obj, (qml.QNode, PassPipelineWrapper)):
             fn = obj.func
         elif inspect.isfunction(fn) or inspect.ismethod(fn):
             pass
@@ -68,6 +69,9 @@ class CatalystTransformer(PyToPy):
 
         if isinstance(obj, qml.QNode):
             new_obj = copy.copy(obj)
+            new_obj.func = new_fn
+        elif isinstance(obj, PassPipelineWrapper):
+            new_obj = copy.copy(obj.qnode)
             new_obj.func = new_fn
 
         return new_obj, module, source_map
@@ -218,7 +222,7 @@ def autograph_source(fn):
     # Unwrap known objects to get the function actually transformed by autograph.
     if isinstance(fn, catalyst.QJIT):
         fn = fn.original_function
-    if isinstance(fn, qml.QNode):
+    if isinstance(fn, (qml.QNode, PassPipelineWrapper)):
         fn = fn.func
 
     if TRANSFORMER.has_cache(fn):
