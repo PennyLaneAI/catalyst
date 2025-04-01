@@ -78,7 +78,7 @@ func.func @probs_dynamic(%q0: !quantum.bit, %q1: !quantum.bit) {
 
 // -----
 
-func.func @state(%q0: !quantum.bit, %q1: !quantum.bit) {
+func.func @state_static(%q0: !quantum.bit, %q1: !quantum.bit) {
     %obs = quantum.compbasis qubits %q0, %q1 : !quantum.obs
     // CHECK: [[alloc:%.+]] = memref.alloc() : memref<4xcomplex<f64>>
     // CHECK: quantum.state {{.*}} in([[alloc]] : memref<4xcomplex<f64>>)
