@@ -67,8 +67,7 @@ import pennylane as qml
 from utils import qjit_for_tests as qjit_cleanup
 
 import catalyst
-from catalyst.compiler import CompileOptions, Compiler
-from catalyst.utils.filesystem import WorkspaceManager
+from catalyst.compiler import _quantum_opt
 from catalyst.utils.runtime_environment import get_bin_path
 
 mlir_module = """
@@ -93,16 +92,12 @@ ext = "so" if platform.system() == "Linux" else "dylib"
 plugin_path = get_bin_path("cli", "CATALYST_BIN_DIR") + f"/../lib/StandalonePlugin.{ext}"
 plugin = Path(plugin_path)
 custom_pipeline = [("run_only_plugin", ["builtin.module(apply-transform-sequence)"])]
-options = CompileOptions(
-    pipelines=custom_pipeline,
-    lower_to_llvm=False,
-    pass_plugins=[plugin],
-    dialect_plugins=[plugin],
-    keep_intermediate=True,
+mlir_string = _quantum_opt(
+    ("--load-pass-plugin", plugin),
+    ("--load-dialect-plugin", plugin),
+    ("--pass-pipeline", "builtin.module(apply-transform-sequence)"),
+    stdin=mlir_module,
 )
-workspace = WorkspaceManager.get_or_create_workspace("test", None)
-custom_compiler = Compiler(options)
-xxx, mlir_string = custom_compiler.run_from_ir(mlir_module, "test", workspace)
 print(mlir_string)
 
 
