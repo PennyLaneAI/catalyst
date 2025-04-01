@@ -152,7 +152,7 @@ void __catalyst__host__rt__unrecoverable_error()
 
 void *_mlir_memref_to_llvm_alloc(size_t size)
 {
-    void *ptr = malloc(size, sizeof(char));
+    void *ptr = calloc(size, sizeof(char));
     CTX->getMemoryManager()->insert(ptr);
     return ptr;
 }
