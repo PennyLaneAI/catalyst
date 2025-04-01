@@ -30,18 +30,20 @@ using namespace catalyst::qec;
 
 namespace {
 
+/// recursively check if the next users of the NextOp are not PPMeasurementOp
 bool verifyNextNonClifford(PPMeasurementOp op, Operation *nextOp)
 {
+    // Avoid segmentation fault (should not happen)
     if (nextOp == nullptr)
         return true;
 
-    if (nextOp == op)
-        return false;
-
-    if (nextOp->isBeforeInBlock(op))
-        return true;
-
     for (auto userOp : nextOp->getUsers()) {
+        if (userOp == op)
+            return false;
+
+        if (!userOp->isBeforeInBlock(op))
+            continue;
+
         if (!verifyNextNonClifford(op, userOp))
             return false;
     }
@@ -49,21 +51,32 @@ bool verifyNextNonClifford(PPMeasurementOp op, Operation *nextOp)
     return true;
 }
 
+/// The prevOp is valid when:
+/// 1. prevOp is a non-Clifford operation. (We want to absorb the Clifford PPR into PPM)
+/// 2. The users of the users of prevOp are not PPMeasurementOp.
+///
+/// For example, if PPRotationOp is Z⊗Z and prevOp is X⊗X:
+///
+/// ---| X |---------| Z |
+///    |   |         |   |
+/// ---| X |--| Y |--| Z |
+///
+/// Users of prevOp can be PPMeasurementOp,
+/// but the users of Y (a user of prevOp) should not be PPMeasurementOp.
 bool verifyPrevNonClifford(PPMeasurementOp op, PPRotationOp prevOp)
 {
+    // Avoid segmentation fault (should not happen)
     if (prevOp == nullptr)
         return false;
 
     if (prevOp.isNonClifford())
         return false;
 
-    for (auto qubit : prevOp->getOperands()) {
-        auto defOp = qubit.getDefiningOp();
-
-        if (defOp == prevOp)
+    for (auto opUser : prevOp->getUsers()) {
+        if (opUser == op)
             continue;
 
-        if (!verifyNextNonClifford(op, defOp))
+        if (!verifyNextNonClifford(op, opUser))
             return false;
     }
 
@@ -148,9 +161,6 @@ bool shouldRemovePPR(PPRotationOp op)
     getForwardSlice(op, &slice);
 
     for (Operation *forwardOp : slice) {
-        if (isa<PPMeasurementOp>(forwardOp))
-            return false;
-
         if (!isa<catalyst::quantum::InsertOp>(forwardOp) &&
             !isa<catalyst::quantum::DeallocOp>(forwardOp))
             return false;
