@@ -299,7 +299,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      */
     auto Measure(QubitIdType, std::optional<int32_t>) -> Result
     {
-        bool *ret = (bool *)malloc(sizeof(bool));
+        bool *ret = (bool *)calloc(1, sizeof(bool));
         *ret = true;
         return ret;
     }
