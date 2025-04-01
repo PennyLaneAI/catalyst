@@ -210,6 +210,54 @@ func.func @sample2(%q : !quantum.bit) {
 
 // -----
 
+func.func @sample3(%q0 : !quantum.bit, %q1 : !quantum.bit, %c : i64) {
+    %obs = quantum.compbasis qubits %q0, %q1 : !quantum.obs
+
+    // expected-error@+1 {{with static return shapes should not specify state vector length in arguments}}
+    quantum.sample %obs num_qubits %c : tensor<2x2xf64>
+
+    return
+}
+
+// -----
+
+func.func @sample3(%q0 : !quantum.bit, %q1 : !quantum.bit, %c : i64) {
+    %obs = quantum.compbasis qubits %q0, %q1 : !quantum.obs
+
+    // expected-error@+1 {{with static return shapes should not specify state vector length in arguments}}
+    quantum.sample %obs num_qubits %c : tensor<?x2xf64>
+
+    return
+}
+
+// -----
+
+func.func @sample4(%q0 : !quantum.bit, %q1 : !quantum.bit) {
+    %obs = quantum.compbasis qubits %q0, %q1 : !quantum.obs
+
+    // expected-error@+1 {{with dynamic return shapes must specify state vector length in arguments}}
+    quantum.sample %obs : tensor<4x?xf64>
+
+    return
+}
+
+// -----
+
+func.func @sample_good(%q0 : !quantum.bit, %q1 : !quantum.bit, %c : i64, %in_sample1 : memref<1x?xf64>, %in_sample2 : memref<1x4xf64>) {
+    %obs = quantum.compbasis qubits %q0, %q1 : !quantum.obs
+
+    // smoke test for good cases
+    quantum.sample %obs num_qubits %c in(%in_sample1 : memref<1x?xf64>)
+    quantum.sample %obs in(%in_sample1 : memref<1x?xf64>)
+    quantum.sample %obs in(%in_sample2 : memref<1x4xf64>)
+    quantum.sample %obs : tensor<1x4xf64>
+    quantum.sample %obs num_qubits %c : tensor<1x?xf64>
+    quantum.sample %obs num_qubits %c : tensor<?x?xf64>
+    return
+}
+
+// -----
+
 func.func @counts1(%q0 : !quantum.bit, %q1 : !quantum.bit) {
     %obs = quantum.namedobs %q0[PauliX] : !quantum.obs
 

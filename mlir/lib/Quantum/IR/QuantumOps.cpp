@@ -220,6 +220,53 @@ LogicalResult QubitUnitaryOp::verify()
 
 // ----- measurements
 
+template <typename T>
+static LogicalResult verifyMeasurementOpDynamism(T *op, bool hasObs, bool hasLen, bool hasBufferIn, bool hasOutTensor){
+    // `obs` operand must always be present
+    if (!hasObs) {
+        return (*op)->emitOpError("must take an observale");
+    }
+
+    // If a tensor is returned, must be unbufferized.
+    // Two cases are allowed here.
+    // 1. Either return shape is completely static, and no length is specified in argument,
+    // 2. Or return shape is dynamic and a length argument is specified.
+    if (hasOutTensor) {
+        if (hasBufferIn) {
+            return (*op)->emitOpError("either tensors must be returned or memrefs must be used as inputs");
+        }
+
+        ShapedType outTensor;
+        size_t numQubitsDimIdx;
+        if constexpr (std::is_same_v<T, ProbsOp>){
+            outTensor = cast<ShapedType>(op->getProbabilities().getType());
+            numQubitsDimIdx = 0;
+        }
+        else if constexpr (std::is_same_v<T, StateOp>){
+            outTensor = cast<ShapedType>(op->getState().getType());
+            numQubitsDimIdx = 0;
+        }
+        else if constexpr (std::is_same_v<T, SampleOp>){
+            outTensor = cast<ShapedType>(op->getSamples().getType());
+            numQubitsDimIdx = 1;
+        }
+
+        if (!outTensor.isDynamicDim(numQubitsDimIdx) && hasLen){
+            return (*op)->emitOpError("with static return shapes should not specify state vector length in arguments");
+        }
+        if (outTensor.isDynamicDim(numQubitsDimIdx) && !hasLen){
+            return (*op)->emitOpError("with dynamic return shapes must specify state vector length in arguments");
+        }
+    }
+
+    // If a tensor is not returned, must be bufferized.
+    if (!hasOutTensor && !hasBufferIn) {
+        return (*op)->emitOpError("either tensors must be returned or memrefs must be used as inputs");
+    }
+
+    return success();
+}
+
 LogicalResult ComputationalBasisOp::verify()
 {
     if ((getQubits().size() != 0) && (getQreg() != nullptr)) {
@@ -251,7 +298,11 @@ LogicalResult SampleOp::verify()
         return emitOpError("either tensors must be returned or memrefs must be used as inputs");
     }
 
-    return success();
+    bool hasObs = (bool)getObs();
+    bool hasNumQubits = (bool)getNumQubits();
+    bool hasBufferIn = (bool)getInData();
+    bool hasOutTensor = (bool)getSamples();
+    return verifyMeasurementOpDynamism<SampleOp>(this, hasObs, hasNumQubits, hasBufferIn, hasOutTensor);
 }
 
 LogicalResult CountsOp::verify()
@@ -297,46 +348,6 @@ LogicalResult CountsOp::verify()
     return success();
 }
 
-template <typename T>
-static LogicalResult verifyStateBasedOpDynamism(T *op, bool hasObs, bool hasSVLen, bool hasStateIn, bool hasOutTensor){
-    // `obs` operand must always be present on ProbsOp and StateOp.
-    if (!hasObs) {
-        return (*op)->emitOpError("ProbsOp must take an observale");
-    }
-
-    // If a tensor is returned, must be unbufferized.
-    // Two cases are allowed here.
-    // 1. Either return shape is completely static, and no sv_length is specified,
-    // 2. Or return shape is dynamic and a sv_length argument is specified.
-    if (hasOutTensor) {
-        if (hasStateIn) {
-            return (*op)->emitOpError("either tensors must be returned or memrefs must be used as inputs");
-        }
-
-        ShapedType outTensor;
-        if constexpr (std::is_same_v<T, ProbsOp>){
-            outTensor = cast<ShapedType>(op->getProbabilities().getType());
-        }
-        else if constexpr (std::is_same_v<T, StateOp>){
-            outTensor = cast<ShapedType>(op->getState().getType());
-        }
-
-        if (outTensor.hasStaticShape() && hasSVLen){
-            return (*op)->emitOpError("with static return shapes should not specify state vector length in arguments");
-        }
-        if (!outTensor.hasStaticShape() && !hasSVLen){
-            return (*op)->emitOpError("with dynamic return shapes must specify state vector length in arguments");
-        }
-    }
-
-    // If a tensor is not returned, must be bufferized.
-    if (!hasOutTensor && !hasStateIn) {
-        return (*op)->emitOpError("either tensors must be returned or memrefs must be used as inputs");
-    }
-
-    return success();
-}
-
 LogicalResult ProbsOp::verify()
 {
     std::optional<size_t> numQubits;
@@ -352,7 +363,7 @@ LogicalResult ProbsOp::verify()
     bool hasSVLen = (bool)getStateVectorLength();
     bool hasStateIn = (bool)getStateIn();
     bool hasOutTensor = (bool)getProbabilities();
-    return verifyStateBasedOpDynamism<ProbsOp>(this, hasObs, hasSVLen, hasStateIn, hasOutTensor);
+    return verifyMeasurementOpDynamism<ProbsOp>(this, hasObs, hasSVLen, hasStateIn, hasOutTensor);
 }
 
 LogicalResult StateOp::verify()
@@ -370,7 +381,7 @@ LogicalResult StateOp::verify()
     bool hasSVLen = (bool)getStateVectorLength();
     bool hasStateIn = (bool)getStateIn();
     bool hasOutTensor = (bool)getState();
-    return verifyStateBasedOpDynamism<StateOp>(this, hasObs, hasSVLen, hasStateIn, hasOutTensor);
+    return verifyMeasurementOpDynamism<StateOp>(this, hasObs, hasSVLen, hasStateIn, hasOutTensor);
 }
 
 LogicalResult AdjointOp::verify()
