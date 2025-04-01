@@ -59,6 +59,17 @@ list(APPEND CMAKE_MODULE_PATH "${MLIR_CMAKE_DIR}")
 list(APPEND CMAKE_MODULE_PATH "${LLVM_CMAKE_DIR}")
 list(APPEND CMAKE_MODULE_PATH "${MHLO_CMAKE_DIR}")
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake/modules")
+
+# Policy CMP0175 was introduced in CMake 4.31 and raises warnings in the upstream CMake modules.
+# Policy CMP0177 was introduced in CMake 4.31 and raises warnings in the upstream CMake modules.
+# TODO: Remove once they (and us) have updated their code to deal with it.
+if(POLICY CMP0175)
+  cmake_policy(SET CMP0175 OLD)
+endif()
+if(POLICY CMP0177)
+  cmake_policy(SET CMP0177 OLD)
+endif()
+
 include(TableGen)
 include(AddLLVM)
 include(AddMLIR)
