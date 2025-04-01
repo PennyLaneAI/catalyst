@@ -502,7 +502,7 @@ LogicalResult preparePassManager(PassManager &pm, const CompilerOptions &options
             s << *op;
             std::string fileName = pipelineName.str();
             if (auto funcOp = dyn_cast<mlir::func::FuncOp>(op)) {
-                fileName += "_" + funcOp.getName().str();
+                fileName += std::string("_") + funcOp.getName().str();
             }
             dumpToFile(options, output.nextPipelineDumpFilename(fileName), tmp);
         }
