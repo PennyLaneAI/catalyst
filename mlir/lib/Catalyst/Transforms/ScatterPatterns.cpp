@@ -160,9 +160,15 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
         // Add checks for supported cases (assumptions: no update windows dim, unique indices and
         // sorted indices)
         if (!op.getUniqueIndices() || !op.getIndicesAreSorted()) {
-            op.emitError() << "Indices are not unique and/or not sorted, unique boolean: "
-                           << op.getUniqueIndices()
-                           << ", sorted boolean :" << op.getIndicesAreSorted();
+            op.emitError() << "Indices are not unique and/or not sorted."
+                           << "Note that if you are using multiple indices with the "
+                           << "``jax.numpy.ndarray.at`` method, the indices must be sorted and "
+                           << "unique. These requirements cannot be checked at compile time and "
+                           << "one must explicitly provide these guarantees using the "
+                           << "``jax.numpy.ndarray.at`` method parameters ``indices_are_sorted`` "
+                           << "and ``unique_indices``\n"
+                           << "Current state - unique: " << op.getUniqueIndices()
+                           << ", sorted: " << op.getIndicesAreSorted();
             return failure();
         }
 
@@ -297,9 +303,15 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
         // Add checks for supported cases (assumptions: no update windows dim, unique indices and
         // sorted indices)
         if (!op.getUniqueIndices() || !op.getIndicesAreSorted()) {
-            op.emitError() << "Indices are not unique and/or not sorted, unique boolean: "
-                           << op.getUniqueIndices()
-                           << ", sorted boolean :" << op.getIndicesAreSorted();
+            op.emitError() << "Indices are not unique and/or not sorted."
+                           << "Note that if you are using multiple indices with the "
+                           << "``jax.numpy.ndarray.at`` method, the indices must be sorted and "
+                           << "unique. These requirements cannot be checked at compile time and "
+                           << "one must explicitly provide these guarantees using the "
+                           << "``jax.numpy.ndarray.at`` method parameters ``indices_are_sorted`` "
+                           << "and ``unique_indices``\n"
+                           << "Current state - unique: " << op.getUniqueIndices()
+                           << ", sorted: " << op.getIndicesAreSorted();
             return failure();
         }
 
