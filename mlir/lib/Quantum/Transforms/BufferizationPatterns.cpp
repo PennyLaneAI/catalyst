@@ -178,10 +178,16 @@ struct BufferizeProbsOp : public OpConversionPattern<ProbsOp> {
         MemRefType resultType = cast<MemRefType>(getTypeConverter()->convertType(tensorType));
         Location loc = op.getLoc();
 
-        auto allocSize = rewriter.create<index::CastSOp>(loc, rewriter.getIndexType(), op.getStateVectorLength());
-        Value allocVal = rewriter.replaceOpWithNewOp<memref::AllocOp>(op, resultType, ValueRange{allocSize});
+        Value buffer;
+        auto shape = cast<mlir::RankedTensorType>(tensorType).getShape();
+        if (shape[0] == ShapedType::kDynamic) {
+            auto indexCastOp = rewriter.create<index::CastSOp>(loc, rewriter.getIndexType(), op.getStateVectorLength());
+            buffer = rewriter.replaceOpWithNewOp<memref::AllocOp>(op, resultType, ValueRange{indexCastOp});
+        } else {
+            buffer = rewriter.replaceOpWithNewOp<memref::AllocOp>(op, resultType);
+        }
 
-        auto allocedProbsOp = rewriter.create<ProbsOp>(loc, TypeRange{}, ValueRange{adaptor.getObs(), allocVal});
+        auto allocedProbsOp = rewriter.create<ProbsOp>(loc, TypeRange{}, ValueRange{adaptor.getObs(), buffer});
         allocedProbsOp->setAttr("operandSegmentSizes", rewriter.getDenseI32ArrayAttr({1, 0, 1}));
         return success();
     }

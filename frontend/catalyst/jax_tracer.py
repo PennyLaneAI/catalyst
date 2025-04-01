@@ -928,7 +928,14 @@ def trace_quantum_measurements(
                 out_classical_tracers.append(var_p.bind(obs_tracers))
             elif type(output) is ProbabilityMP:
                 assert using_compbasis
-                result = probs_p.bind(obs_tracers, jnp.left_shift(1, nqubits))
+                if isinstance(nqubits, DynamicJaxprTracer):
+                    shape = (jnp.left_shift(1, nqubits),)
+                else:
+                    shape = (2**nqubits,)
+                dyn_dims, static_shape = jax._src.lax.lax._extract_tracers_dyn_shape(shape)
+                result = probs_p.bind(obs_tracers, *dyn_dims, static_shape=tuple(static_shape))
+                # assert using_compbasis
+                # result = probs_p.bind(obs_tracers, jnp.left_shift(1, nqubits))
                 out_classical_tracers.append(result)
             elif type(output) is CountsMP:
                 if shots is None:  # needed for old device API only

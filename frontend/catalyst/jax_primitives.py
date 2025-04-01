@@ -1397,7 +1397,7 @@ pe.custom_staging_rules[sample_p] = sample_staging_rule
 
 
 @sample_p.def_impl
-def _sample_def_impl(ctx, obs, shots, num_qubits):  # pragma: no cover
+def _sample_def_impl(ctx, obs, *dynamic_shape, static_shape):  # pragma: no cover
     raise NotImplementedError()
 
 
@@ -1522,7 +1522,7 @@ def _var_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shape=None):
 #
 # probs measurement
 #
-def probs_staging_rule(jaxpr_trace, obs, sv_length, shots=None):
+def probs_staging_rule(jaxpr_trace, obs, *dynamic_shape, static_shape, shots=None):
     """
     Custom staging rule for probs to avoid escaped tracers.
     See the documentation for `sample_staging_rule()` function for more details
@@ -1531,12 +1531,22 @@ def probs_staging_rule(jaxpr_trace, obs, sv_length, shots=None):
     The result shape of probs_p is (2^num_qubits,).
     In this primitive, sv_length stands for 2^num_qubits.
     """
+    #breakpoint()
 
-    out_shape = core.DShapedArray((sv_length,), jax.numpy.dtype("float64"))
-    invars = [jaxpr_trace.getvar(obs), jaxpr_trace.getvar(sv_length)]
-    params = {"shots": shots}
+    shape = jax._src.lax.lax._merge_dyn_shape(static_shape, dynamic_shape)
 
+    out_shape = core.DShapedArray(shape, jax.numpy.dtype("float64"))
+    invars = [jaxpr_trace.getvar(obs)]
+    for dyn_dim in dynamic_shape:
+        invars.append(jaxpr_trace.getvar(dyn_dim))
+    params = {"static_shape" : static_shape, "shots": shots}
     out_tracer = pe.DynamicJaxprTracer(jaxpr_trace, out_shape)
+
+    # out_shape = core.DShapedArray((sv_length,), jax.numpy.dtype("float64"))
+    # invars = [jaxpr_trace.getvar(obs), jaxpr_trace.getvar(sv_length)]
+    # params = {"shots": shots}
+
+    # out_tracer = pe.DynamicJaxprTracer(jaxpr_trace, out_shape)
 
     eqn = pe.new_jaxpr_eqn(
         invars,
@@ -1554,24 +1564,41 @@ pe.custom_staging_rules[probs_p] = probs_staging_rule
 
 
 @probs_p.def_impl
-def _probs_def_impl(ctx, obs, sv_length, shots=None):  # pragma: no cover
+def _probs_def_impl(ctx, obs, *dynamic_shape, static_shape, shots=None):  # pragma: no cover
     raise NotImplementedError()
 
 
 def _probs_lowering(
-    jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, sv_length: ir.Value, shots=None
+    jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, *dynamic_shape, static_shape, shots=None
 ):
+    # ctx = jax_ctx.module_context.context
+    # ctx.allow_unregistered_dialects = True
+
+    # out_shape = (ir.ShapedType.get_dynamic_size(),)
+    # result_type = ir.RankedTensorType.get(out_shape, ir.F64Type.get())
+
+    # sv_length_value = extract_scalar(sv_length, "probs")
+    # return ProbsOp(result_type, obs, state_vector_length=sv_length_value).results
+
+    # result shape of sample op is (shots, number_of_qubits)
+    # The static_shape argument contains the static dimensions, and None for dynamic dimensions
+
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
-    # During lowering, fix probs return shape to be tensor<?xf64>
-    # We allocate memref according to the state vector length passed in
-    # on the op during bufferization pass
-    out_shape = (ir.ShapedType.get_dynamic_size(),)
-    result_type = ir.RankedTensorType.get(out_shape, ir.F64Type.get())
+    f64_type = ir.F64Type.get()
 
-    sv_length_value = extract_scalar(sv_length, "probs")
-    return ProbsOp(result_type, obs, state_vector_length=sv_length_value).results
+    # Replace Nones in static_shape with dynamic mlir dimensions
+    result_shape = tuple(ir.ShapedType.get_dynamic_size() if d is None else d for d in static_shape)
+    result_type = ir.RankedTensorType.get(result_shape, f64_type)
+
+    if static_shape[0] is None:
+        # dynamic sv_length, pass the SSA value to the op
+        sv_length = extract_scalar(dynamic_shape[0], "probs_sv_length")
+    else:
+        # static sv_length already in the shape, no need to pass another operand
+        sv_length = None
+    return ProbsOp(result_type, obs, state_vector_length=sv_length).results
 
 
 #

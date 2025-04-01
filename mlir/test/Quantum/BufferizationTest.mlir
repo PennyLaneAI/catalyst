@@ -55,7 +55,17 @@ func.func @sample(%q0: !quantum.bit, %q1: !quantum.bit, %dyn_shots: i64) {
 
 // -----
 
-func.func @probs(%q0: !quantum.bit, %q1: !quantum.bit) {
+func.func @probs_static(%q0: !quantum.bit, %q1: !quantum.bit) {
+    %obs = quantum.compbasis qubits %q0, %q1 : !quantum.obs
+    // CHECK: [[alloc:%.+]] = memref.alloc() : memref<4xf64>
+    // CHECK: quantum.probs {{.*}} in([[alloc]] : memref<4xf64>)
+    %probs = quantum.probs %obs : tensor<4xf64>
+    func.return
+}
+
+// -----
+
+func.func @probs_dynamic(%q0: !quantum.bit, %q1: !quantum.bit) {
     %obs = quantum.compbasis qubits %q0, %q1 : !quantum.obs
     %c4 = arith.constant 4 : i64
     // CHECK: [[four:%.+]] = arith.constant 4

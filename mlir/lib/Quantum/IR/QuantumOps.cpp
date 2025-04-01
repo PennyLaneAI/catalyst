@@ -306,20 +306,34 @@ LogicalResult ProbsOp::verify()
         return emitOpError("only computational basis observables are supported");
     }
 
-    // `obs` operand must always be present on ProbsOp.
-    // On top of this, two cases are allowed:
-    // 1. state_vector_size available, buffered state unavailable. This case returns a tensor.
-    // 2. state_vector_size unavailable, buffered state available. This case does not return a tensor.
     bool hasObs = (bool)getObs();
     bool hasSVLen = (bool)getStateVectorLength();
     bool hasStateIn = (bool)getStateIn();
     bool hasOutTensor = (bool)getProbabilities();
 
-    bool unbufferedGoodCase = hasObs && hasSVLen && !hasStateIn && hasOutTensor;
-    bool bufferedGoodCase = hasObs && !hasSVLen && hasStateIn && !hasOutTensor;
+    // `obs` operand must always be present on ProbsOp.
+    if (!hasObs) {
+        return emitOpError("ProbsOp must take an observale");
+    }
 
-    if (!unbufferedGoodCase && !bufferedGoodCase) {
-        return emitOpError("either tensors must be returned with observables and a state vector length provided, or memrefs must be used as inputs");
+    // If a tensor is returned, must be unbufferized.
+    // Two cases are allowed here.
+    // 1. Either return shape is completely static, and no sv_length is specified,
+    // 2. Or, number of dynamic dimensions in return shape must be one (for state vector length)
+    if (hasOutTensor) {
+        if (hasStateIn) {
+            return emitOpError("either tensors must be returned or memrefs must be used as inputs");
+        }
+
+        ShapedType outTensor = cast<ShapedType>(getProbabilities().getType());
+        if (outTensor.hasStaticShape() && hasSVLen){
+            return emitOpError("ProbsOp with static return shapes should not specify state vector length in arguments");
+        }
+    }
+
+    // If a tensor is not returned, must be bufferized.
+    if (!hasOutTensor && !hasStateIn) {
+        return emitOpError("either tensors must be returned or memrefs must be used as inputs");
     }
 
     return success();

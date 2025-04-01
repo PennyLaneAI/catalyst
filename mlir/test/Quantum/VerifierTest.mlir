@@ -284,7 +284,7 @@ func.func @probs1(%q0 : !quantum.bit, %q1 : !quantum.bit) {
     %c4 = arith.constant 4 : i64
     %c4i = index.casts %c4 : i64 to index
     %in_probs1 = memref.alloc(%c4i) : memref<?xf64>
-    // expected-error@+1 {{either tensors must be returned with observables and a state vector length provided, or memrefs must be used as inputs}}
+    // expected-error@+1 {{either tensors must be returned or memrefs must be used as inputs}}
     quantum.probs %obs in(%in_probs1 : memref<?xf64>) : tensor<?xf64>
 
     return
@@ -295,7 +295,7 @@ func.func @probs1(%q0 : !quantum.bit, %q1 : !quantum.bit) {
 func.func @probs2(%q0 : !quantum.bit, %q1 : !quantum.bit) {
     %obs = quantum.compbasis qubits %q0, %q1 : !quantum.obs
 
-    // expected-error@+1 {{either tensors must be returned with observables and a state vector length provided, or memrefs must be used as inputs}}
+    // expected-error@+1 {{either tensors must be returned or memrefs must be used as inputs}}
     quantum.probs %obs
 
     return
@@ -303,12 +303,26 @@ func.func @probs2(%q0 : !quantum.bit, %q1 : !quantum.bit) {
 
 // -----
 
-func.func @probs3(%q0 : !quantum.bit, %q1 : !quantum.bit, %c : i64, %in_probs1 : memref<?xf64>) {
+func.func @probs3(%q0 : !quantum.bit, %q1 : !quantum.bit, %c : i64, %in_probs1 : memref<4xf64>) {
     %obs = quantum.compbasis qubits %q0, %q1 : !quantum.obs
 
-    // expected-error@+1 {{either tensors must be returned with observables and a state vector length provided, or memrefs must be used as inputs}}
-    quantum.probs %obs shape %c in(%in_probs1 : memref<?xf64>)
+    // expected-error@+1 {{ProbsOp with static return shapes should not specify state vector length in arguments}}
+    quantum.probs %obs shape %c : tensor<4xf64>
 
+    return
+}
+
+// -----
+
+func.func @probs_good(%q0 : !quantum.bit, %q1 : !quantum.bit, %c : i64, %in_probs1 : memref<?xf64>, %in_probs2 : memref<4xf64>) {
+    %obs = quantum.compbasis qubits %q0, %q1 : !quantum.obs
+
+    // smoke test for good cases
+    quantum.probs %obs shape %c in(%in_probs1 : memref<?xf64>)
+    quantum.probs %obs in(%in_probs1 : memref<?xf64>)
+    quantum.probs %obs in(%in_probs2 : memref<4xf64>)
+    quantum.probs %obs : tensor<4xf64>
+    quantum.probs %obs shape %c : tensor<?xf64>
     return
 }
 
