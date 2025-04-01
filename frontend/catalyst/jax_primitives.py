@@ -1409,14 +1409,23 @@ def _sample_lowering(
 
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
-
     f64_type = ir.F64Type.get()
 
     # Replace Nones in static_shape with dynamic mlir dimensions
     result_shape = tuple(ir.ShapedType.get_dynamic_size() if d is None else d for d in static_shape)
     result_type = ir.RankedTensorType.get(result_shape, f64_type)
 
-    return SampleOp(result_type, obs).results
+    shape_dims_values = jax._src.lax.lax._merge_dyn_shape(static_shape, dynamic_shape)
+    # At this point, both shape_dims_values and static_shape are tuples of two entries,
+    # representing (shots, num_qubits)
+    if static_shape[1] is None:
+        # dynamic num_qubits, pass the SSA value to the op
+        num_qubits = extract_scalar(shape_dims_values[1], "sample_num_qubits")
+    else:
+        # static num_qubits already in the shape, no need to pass another operand
+        num_qubits = None
+
+    return SampleOp(result_type, obs, num_qubits=num_qubits).results
 
 
 #
