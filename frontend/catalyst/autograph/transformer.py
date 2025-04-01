@@ -71,8 +71,11 @@ class CatalystTransformer(PyToPy):
             new_obj = copy.copy(obj)
             new_obj.func = new_fn
         elif isinstance(obj, PassPipelineWrapper):
-            new_obj = copy.copy(obj.qnode)
-            new_obj.func = new_fn
+            new_qnode = copy.copy(obj.qnode)
+            new_qnode.func = new_fn
+            new_obj = PassPipelineWrapper(
+                new_qnode, obj.pass_name_or_pipeline, *obj.flags, **obj.valued_options
+            )
 
         return new_obj, module, source_map
 
