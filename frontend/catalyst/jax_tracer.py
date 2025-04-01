@@ -910,6 +910,8 @@ def trace_quantum_measurements(
                     reshaped_result = ()
                     shot_vector = get_device_shot_vector(device)
                     start_idx = 0  # Start index for slicing
+                    # TODO: shots still can only be static in PL frontend
+                    # TODO: Update to dynamic shots
                     for shot, copies in shot_vector:
                         for _ in range(copies):
                             #sliced_result = result[start_idx : start_idx + shot]
