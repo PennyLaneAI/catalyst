@@ -1583,30 +1583,14 @@ def _probs_lowering(
 #
 # state measurement
 #
-# @state_p.def_abstract_eval
-# def _state_abstract_eval(obs, shape, shots=None):
-#     assert isinstance(obs, AbstractObs)
-
-#     if obs.primitive is compbasis_p:
-#         assert not obs.num_qubits, """
-#         A "wires" argument should not be provided since state() always
-#         returns a pure state describing all wires in the device.
-#         """
-#     else:
-#         raise TypeError("state only supports computational basis")
-
-#     return core.ShapedArray(shape, jax.numpy.complex128)
-
-
-def state_staging_rule(jaxpr_trace, obs, num_qubits, shots=None):
+def state_staging_rule(jaxpr_trace, obs, *dynamic_shape, static_shape, shots=None):
     """
-    The result shape of `state_p` is (2^num_qubits,).
-    Custom staging rule for state.
+    Custom staging rule for state to avoid escaped tracers.
     See the documentation for `sample_staging_rule()` function for more details
     on custom staging rules.
-    """
-    #breakpoint()
 
+    The result shape of state_p is (2^num_qubits,).
+    """
     if obs.primitive is compbasis_p:
         assert not obs.num_qubits, """
         A "wires" argument should not be provided since state() always
@@ -1615,28 +1599,14 @@ def state_staging_rule(jaxpr_trace, obs, num_qubits, shots=None):
     else:
         raise TypeError("state only supports computational basis")
 
-    if isinstance(num_qubits, int):
-        out_shape = core.ShapedArray((2**num_qubits,), jax.numpy.dtype("complex128"))
-        invars = [jaxpr_trace.getvar(obs)]
-        params = {"num_qubits": num_qubits, "shots": shots}
-    else:
-        # breakpoint()
-        # We just need to create a dynamic output shape from a tracer
-        # Therefore no need to raise to power of 2, since 2^? = ?
-        # The actual memory allocation of the return shape for probs op
-        # occurs during bufferization stage in mlir
-        out_shape = core.DShapedArray((num_qubits,), jax.numpy.dtype("complex128"))
-        invars = [jaxpr_trace.getvar(obs), jaxpr_trace.getvar(num_qubits)]
-        params = {"shots": shots}
+    shape = jax._src.lax.lax._merge_dyn_shape(static_shape, dynamic_shape)
 
+    out_shape = core.DShapedArray(shape, jax.numpy.dtype("complex128"))
+    invars = [jaxpr_trace.getvar(obs)]
+    for dyn_dim in dynamic_shape:
+        invars.append(jaxpr_trace.getvar(dyn_dim))
+    params = {"static_shape" : static_shape, "shots": shots}
     out_tracer = pe.DynamicJaxprTracer(jaxpr_trace, out_shape)
-
-    # if isinstance(num_qubits, int):
-    #     invars = [jaxpr_trace.getvar(obs)]
-    #     params = {"num_qubits": num_qubits, "shots": shots}
-    # else:
-    #     invars = [jaxpr_trace.getvar(obs), jaxpr_trace.getvar(num_qubits)]
-    #     params = {"shots": shots}
 
     eqn = pe.new_jaxpr_eqn(
         invars,
@@ -1654,24 +1624,27 @@ pe.custom_staging_rules[state_p] = state_staging_rule
 
 
 @state_p.def_impl
-def _state_def_impl(ctx, obs, num_qubits, shots=None):  # pragma: no cover
+def _state_def_impl(ctx, obs, *dynamic_shape, static_shape, shots=None):  # pragma: no cover
     raise NotImplementedError()
 
 
-def _state_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, num_qubits: int | ir.Value, shots=None):
+def _state_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, *dynamic_shape, static_shape, shots=None):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
     c64_type = ir.ComplexType.get(ir.F64Type.get())
-    # result_type = ir.RankedTensorType.get(shape, c64_type)
 
-    if isinstance(num_qubits, int):
-        result_type = ir.RankedTensorType.get((2**num_qubits,), c64_type)
+    # Replace Nones in static_shape with dynamic mlir dimensions
+    result_shape = tuple(ir.ShapedType.get_dynamic_size() if d is None else d for d in static_shape)
+    result_type = ir.RankedTensorType.get(result_shape, c64_type)
+
+    if static_shape[0] is None:
+        # dynamic sv_length, pass the SSA value to the op
+        sv_length = extract_scalar(dynamic_shape[0], "state_sv_length")
     else:
-        shape = (ir.ShapedType.get_dynamic_size(),)
-        result_type = ir.RankedTensorType.get(shape, c64_type)
-
-    return StateOp(result_type, obs).results
+        # static sv_length already in the shape, no need to pass another operand
+        sv_length = None
+    return StateOp(result_type, obs, state_vector_length=sv_length).results
 
 
 #

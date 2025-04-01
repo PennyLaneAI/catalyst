@@ -12,12 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <optional>
+#include <type_traits>
+
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/OpImplementation.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/ADT/TypeSwitch.h"
-#include <optional>
 
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/IR/QuantumOps.h"
@@ -295,6 +297,46 @@ LogicalResult CountsOp::verify()
     return success();
 }
 
+template <typename T>
+static LogicalResult verifyStateBasedOpDynamism(T *op, bool hasObs, bool hasSVLen, bool hasStateIn, bool hasOutTensor){
+    // `obs` operand must always be present on ProbsOp and StateOp.
+    if (!hasObs) {
+        return (*op)->emitOpError("ProbsOp must take an observale");
+    }
+
+    // If a tensor is returned, must be unbufferized.
+    // Two cases are allowed here.
+    // 1. Either return shape is completely static, and no sv_length is specified,
+    // 2. Or return shape is dynamic and a sv_length argument is specified.
+    if (hasOutTensor) {
+        if (hasStateIn) {
+            return (*op)->emitOpError("either tensors must be returned or memrefs must be used as inputs");
+        }
+
+        ShapedType outTensor;
+        if constexpr (std::is_same_v<T, ProbsOp>){
+            outTensor = cast<ShapedType>(op->getProbabilities().getType());
+        }
+        else if constexpr (std::is_same_v<T, StateOp>){
+            outTensor = cast<ShapedType>(op->getState().getType());
+        }
+
+        if (outTensor.hasStaticShape() && hasSVLen){
+            return (*op)->emitOpError("with static return shapes should not specify state vector length in arguments");
+        }
+        if (!outTensor.hasStaticShape() && !hasSVLen){
+            return (*op)->emitOpError("with dynamic return shapes must specify state vector length in arguments");
+        }
+    }
+
+    // If a tensor is not returned, must be bufferized.
+    if (!hasOutTensor && !hasStateIn) {
+        return (*op)->emitOpError("either tensors must be returned or memrefs must be used as inputs");
+    }
+
+    return success();
+}
+
 LogicalResult ProbsOp::verify()
 {
     std::optional<size_t> numQubits;
@@ -310,33 +352,7 @@ LogicalResult ProbsOp::verify()
     bool hasSVLen = (bool)getStateVectorLength();
     bool hasStateIn = (bool)getStateIn();
     bool hasOutTensor = (bool)getProbabilities();
-
-    // `obs` operand must always be present on ProbsOp.
-    if (!hasObs) {
-        return emitOpError("ProbsOp must take an observale");
-    }
-
-    // If a tensor is returned, must be unbufferized.
-    // Two cases are allowed here.
-    // 1. Either return shape is completely static, and no sv_length is specified,
-    // 2. Or, number of dynamic dimensions in return shape must be one (for state vector length)
-    if (hasOutTensor) {
-        if (hasStateIn) {
-            return emitOpError("either tensors must be returned or memrefs must be used as inputs");
-        }
-
-        ShapedType outTensor = cast<ShapedType>(getProbabilities().getType());
-        if (outTensor.hasStaticShape() && hasSVLen){
-            return emitOpError("ProbsOp with static return shapes should not specify state vector length in arguments");
-        }
-    }
-
-    // If a tensor is not returned, must be bufferized.
-    if (!hasOutTensor && !hasStateIn) {
-        return emitOpError("either tensors must be returned or memrefs must be used as inputs");
-    }
-
-    return success();
+    return verifyStateBasedOpDynamism<ProbsOp>(this, hasObs, hasSVLen, hasStateIn, hasOutTensor);
 }
 
 LogicalResult StateOp::verify()
@@ -350,20 +366,11 @@ LogicalResult StateOp::verify()
         return emitOpError("only computational basis observables are supported");
     }
 
-    if (!(bool)getState() ^ (bool)getStateIn()) {
-        return emitOpError("either tensors must be returned or memrefs must be used as inputs");
-    }
-
-    if (numQubits.value() != 0) {
-        Type toVerify = getState() ? (Type)getState().getType() : (Type)getStateIn().getType();
-        size_t dim = std::pow(2, numQubits.value());
-        if (failed(verifyTensorResult(cast<ShapedType>(toVerify), dim))) {
-            return emitOpError(
-                "return tensor must have static length equal to 2^(number of qubits)");
-        }
-    }
-
-    return success();
+    bool hasObs = (bool)getObs();
+    bool hasSVLen = (bool)getStateVectorLength();
+    bool hasStateIn = (bool)getStateIn();
+    bool hasOutTensor = (bool)getState();
+    return verifyStateBasedOpDynamism<StateOp>(this, hasObs, hasSVLen, hasStateIn, hasOutTensor);
 }
 
 LogicalResult AdjointOp::verify()

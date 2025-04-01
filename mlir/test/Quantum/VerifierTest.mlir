@@ -303,11 +303,22 @@ func.func @probs2(%q0 : !quantum.bit, %q1 : !quantum.bit) {
 
 // -----
 
-func.func @probs3(%q0 : !quantum.bit, %q1 : !quantum.bit, %c : i64, %in_probs1 : memref<4xf64>) {
+func.func @probs3(%q0 : !quantum.bit, %q1 : !quantum.bit, %c : i64) {
     %obs = quantum.compbasis qubits %q0, %q1 : !quantum.obs
 
-    // expected-error@+1 {{ProbsOp with static return shapes should not specify state vector length in arguments}}
+    // expected-error@+1 {{with static return shapes should not specify state vector length in arguments}}
     quantum.probs %obs shape %c : tensor<4xf64>
+
+    return
+}
+
+// -----
+
+func.func @probs4(%q0 : !quantum.bit, %q1 : !quantum.bit) {
+    %obs = quantum.compbasis qubits %q0, %q1 : !quantum.obs
+
+    // expected-error@+1 {{with dynamic return shapes must specify state vector length in arguments}}
+    quantum.probs %obs : tensor<?xf64>
 
     return
 }
@@ -331,10 +342,11 @@ func.func @probs_good(%q0 : !quantum.bit, %q1 : !quantum.bit, %c : i64, %in_prob
 func.func @state1(%q0 : !quantum.bit, %q1 : !quantum.bit) {
     %obs = quantum.compbasis qubits %q0, %q1 : !quantum.obs
 
-    // expected-error@+1 {{return tensor must have static length equal to 2^(number of qubits)}}
-    %err = quantum.state %obs : tensor<?xcomplex<f64>>
-
-    %state = quantum.state %obs : tensor<4xcomplex<f64>>
+    %c4 = arith.constant 4 : i64
+    %c4i = index.casts %c4 : i64 to index
+    %in_state1 = memref.alloc(%c4i) : memref<?xcomplex<f64>>
+    // expected-error@+1 {{either tensors must be returned or memrefs must be used as inputs}}
+    quantum.state %obs in(%in_state1 : memref<?xcomplex<f64>>) : tensor<?xcomplex<f64>>
 
     return
 }
@@ -344,35 +356,44 @@ func.func @state1(%q0 : !quantum.bit, %q1 : !quantum.bit) {
 func.func @state2(%q0 : !quantum.bit, %q1 : !quantum.bit) {
     %obs = quantum.compbasis qubits %q0, %q1 : !quantum.obs
 
-    %alloc1 = memref.alloc() : memref<2xcomplex<f64>>
-    // expected-error@+1 {{return tensor must have static length equal to 2^(number of qubits)}}
-    quantum.state %obs in(%alloc1 : memref<2xcomplex<f64>>)
-
-    %alloc2 = memref.alloc() : memref<4xcomplex<f64>>
-    quantum.state %obs in(%alloc2 : memref<4xcomplex<f64>>)
-
-    return
-}
-
-// -----
-
-func.func @state3(%q0 : !quantum.bit, %q1 : !quantum.bit) {
-    %obs = quantum.compbasis qubits %q0, %q1 : !quantum.obs
-
-    %alloc1 = memref.alloc() : memref<4xcomplex<f64>>
-    // expected-error@+1 {{either tensors must be returned or memrefs must be used as inputs}}
-    quantum.state %obs in(%alloc1 : memref<4xcomplex<f64>>) : tensor<4xcomplex<f64>>
-
-    return
-}
-
-// -----
-
-func.func @state3(%q0 : !quantum.bit, %q1 : !quantum.bit) {
-    %obs = quantum.compbasis qubits %q0, %q1 : !quantum.obs
-
     // expected-error@+1 {{either tensors must be returned or memrefs must be used as inputs}}
     quantum.state %obs
 
+    return
+}
+
+// -----
+
+func.func @state3(%q0 : !quantum.bit, %q1 : !quantum.bit, %c : i64) {
+    %obs = quantum.compbasis qubits %q0, %q1 : !quantum.obs
+
+    // expected-error@+1 {{with static return shapes should not specify state vector length in arguments}}
+    quantum.state %obs shape %c : tensor<4xcomplex<f64>>
+
+    return
+}
+
+// -----
+
+func.func @state4(%q0 : !quantum.bit, %q1 : !quantum.bit) {
+    %obs = quantum.compbasis qubits %q0, %q1 : !quantum.obs
+
+    // expected-error@+1 {{with dynamic return shapes must specify state vector length in arguments}}
+    quantum.state %obs : tensor<?xcomplex<f64>>
+
+    return
+}
+
+// -----
+
+func.func @state_good(%q0 : !quantum.bit, %q1 : !quantum.bit, %c : i64, %in_state1 : memref<?xcomplex<f64>>, %in_state2 : memref<4xcomplex<f64>>) {
+    %obs = quantum.compbasis qubits %q0, %q1 : !quantum.obs
+
+    // smoke test for good cases
+    quantum.state %obs shape %c in(%in_state1 : memref<?xcomplex<f64>>)
+    quantum.state %obs in(%in_state1 : memref<?xcomplex<f64>>)
+    quantum.state %obs in(%in_state2 : memref<4xcomplex<f64>>)
+    quantum.state %obs : tensor<4xcomplex<f64>>
+    quantum.state %obs shape %c : tensor<?xcomplex<f64>>
     return
 }

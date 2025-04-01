@@ -117,53 +117,18 @@ struct BufferizeStateOp : public OpConversionPattern<StateOp> {
         Type tensorType = op.getType(0);
         MemRefType resultType = cast<MemRefType>(getTypeConverter()->convertType(tensorType));
         Location loc = op.getLoc();
-        //Value allocVal = rewriter.replaceOpWithNewOp<memref::AllocOp>(op, resultType);
 
+        Value buffer;
         auto shape = cast<mlir::RankedTensorType>(tensorType).getShape();
-        SmallVector<Value> allocSizes;
-
-        // The result of probs is 1DTensorOf<[F64]>
-        // The size of the result might be dynamic, i.e. <?xf64>
-        // if the number of wires is dynamic
-        // In such cases, we need to allocate dynamically as well.
-        // The size is 2^num_qubits, or integer 1 left shifted by num_qubits.
         if (shape[0] == ShapedType::kDynamic) {
-            auto one = rewriter.create<arith::ConstantOp>(
-                loc, rewriter.getI64Type(), rewriter.getIntegerAttr(rewriter.getI64Type(), 1));
-            auto compbasisOp = cast<ComputationalBasisOp>(op.getObs().getDefiningOp());
-
-            assert(compbasisOp.getQreg() != nullptr &&
-                   "ProbsOp with dynamic return shape must take in CompbasisOps with inputs of "
-                   "qreg type");
-            Value reg_value = compbasisOp.getQreg();
-
-            // Walk back to the alloc op for the qreg value and get the number of qubits
-            llvm::SetVector<Operation *> slice;
-            BackwardSliceOptions sliceOptions;
-            // Include the register on the compbasis op since it can be an alloc itself
-            sliceOptions.inclusive = true;
-            // Include qreg values captured by closure, for example via scf regions
-            // This mlir feature is available once we update our mlir to track
-            // https://github.com/llvm/llvm-project/pull/114452
-            // sliceOptions.omitUsesFromAbove = true;
-            getBackwardSlice(reg_value, &slice, sliceOptions);
-
-            auto isAllocOp = [](Operation *op) { return isa<AllocOp>(op); };
-            assert(std::count_if(slice.begin(), slice.end(), isAllocOp) == 1 &&
-                   "A quantum register value can only be allocated once");
-            auto allocOp = cast<AllocOp>(*std::find_if(slice.begin(), slice.end(), isAllocOp));
-
-            auto twoToN = rewriter.create<arith::ShLIOp>(loc, rewriter.getI64Type(), one,
-                                                         allocOp.getNqubits());
-            auto allocSize = rewriter.create<index::CastSOp>(loc, rewriter.getIndexType(), twoToN);
-
-            allocSizes.push_back(allocSize);
+            auto indexCastOp = rewriter.create<index::CastSOp>(loc, rewriter.getIndexType(), op.getStateVectorLength());
+            buffer = rewriter.replaceOpWithNewOp<memref::AllocOp>(op, resultType, ValueRange{indexCastOp});
+        } else {
+            buffer = rewriter.replaceOpWithNewOp<memref::AllocOp>(op, resultType);
         }
 
-        Value allocVal = rewriter.replaceOpWithNewOp<memref::AllocOp>(op, resultType, allocSizes);
-
-
-        rewriter.create<StateOp>(loc, TypeRange{}, ValueRange{adaptor.getObs(), allocVal});
+        auto allocedProbsOp = rewriter.create<StateOp>(loc, TypeRange{}, ValueRange{adaptor.getObs(), buffer});
+        allocedProbsOp->setAttr("operandSegmentSizes", rewriter.getDenseI32ArrayAttr({1, 0, 1}));
         return success();
     }
 };

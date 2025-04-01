@@ -960,12 +960,19 @@ def trace_quantum_measurements(
                 else:
                     out_tree = counts_tree
             elif type(output) is StateMP:
-                #assert using_compbasis
+                assert using_compbasis
+                if isinstance(nqubits, DynamicJaxprTracer):
+                    shape = (jnp.left_shift(1, nqubits),)
+                else:
+                    shape = (2**nqubits,)
+                dyn_dims, static_shape = jax._src.lax.lax._extract_tracers_dyn_shape(shape)
+                result = state_p.bind(obs_tracers, *dyn_dims, static_shape=tuple(static_shape))
+                out_classical_tracers.append(result)
                 #shape = (2**nqubits,)
                 #out_classical_tracers.append(state_p.bind(obs_tracers, shape=shape))
                 #breakpoint()
-                result = bind_flexible_primitive(state_p, {"num_qubits":nqubits}, obs_tracers)
-                out_classical_tracers.append(result)
+                # result = bind_flexible_primitive(state_p, {"num_qubits":nqubits}, obs_tracers)
+                # out_classical_tracers.append(result)
             else:
                 raise NotImplementedError(
                     f"Measurement {type(output)} is not implemented"

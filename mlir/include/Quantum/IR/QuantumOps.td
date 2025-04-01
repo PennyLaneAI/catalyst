@@ -1069,7 +1069,7 @@ def ProbsOp : Measurement_Op<"probs", [AttrSizedOperandSegments]> {
     let hasVerifier = 1;
 }
 
-def StateOp : Measurement_Op<"state"> {
+def StateOp : Measurement_Op<"state", [AttrSizedOperandSegments]> {
     let summary = "Return the current statevector";
     let description = [{
         The `quantum.state` operation represents the measurement process of returning the current
@@ -1093,6 +1093,7 @@ def StateOp : Measurement_Op<"state"> {
 
     let arguments = (ins
         ObservableType:$obs,
+        Optional<I64>:$state_vector_length,
         Optional<MemRefRankOf<[Complex<F64>], [1]>>:$state_in
     );
 
@@ -1107,7 +1108,9 @@ def StateOp : Measurement_Op<"state"> {
     }];
 
     let assemblyFormat = [{
-        $obs ( `in` `(` $state_in^ `:` type($state_in) `)` )? attr-dict ( `:` type($state)^ )?
+        $obs ( `shape` $state_vector_length^ )?
+        ( `in` `(` $state_in^ `:` type($state_in) `)` )?
+        attr-dict ( `:` type($state)^ )?
     }];
 
     let hasVerifier = 1;
