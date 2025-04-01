@@ -819,6 +819,10 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
 
     std::string errorMessage;
     auto outfile = openOutputFile(output.outputFilename, &errorMessage);
+    if (!outfile) {
+        llvm::errs() << errorMessage << "\n";
+        return failure();
+    }
     if (output.outputFilename == "-" && llvmModule) {
         outfile->os() << *llvmModule;
         outfile->keep();
@@ -831,11 +835,6 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
     if (options.keepIntermediate and output.outputFilename != "-") {
         outfile->os() << output.outIR;
         outfile->keep();
-    }
-
-    if (!outfile) {
-        llvm::errs() << errorMessage << "\n";
-        return failure();
     }
 
     return success();
