@@ -143,6 +143,30 @@ TEST_CASE("Test a NullQubit circuit with num_qubits=4 and observables", "[NullQu
     CHECK(obs_keys.empty());
 }
 
+TEST_CASE("Test a NullQubit circuit with num_qubits=1 that performs a measurement", "[NullQubit]")
+{
+    std::unique_ptr<NullQubit> sim = std::make_unique<NullQubit>();
+
+    // state-vector with #qubits = n
+    constexpr size_t n = 1;
+    std::vector<QubitIdType> Qs;
+    Qs.reserve(n);
+    Qs.push_back(sim->AllocateQubit());
+
+    sim->StartTapeRecording();
+    sim->NamedOperation("Hadamard", {}, {Qs[0]}, false);
+
+    auto m = sim->Measure(Qs[0], {} /*postselect*/);
+
+    auto &&[num_ops, num_obs, num_params, op_names, obs_keys] = sim->CacheManagerInfo();
+    CHECK(num_ops == 0);
+    CHECK(num_obs == 0);
+    CHECK(num_params == 0);
+    CHECK(op_names.empty());
+    CHECK(obs_keys.empty());
+    CHECK(*m == false); // Measurement of NullQubit should always return 0 (false)
+}
+
 TEST_CASE("Test __catalyst__qis__Sample with num_qubits=2 and PartialSample calling Hadamard, "
           "ControlledPhaseShift, IsingYY, and CRX quantum operations",
           "[CoreQIS]")

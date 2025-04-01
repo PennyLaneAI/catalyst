@@ -156,14 +156,20 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      *
      * @return `Result`
      */
-    [[nodiscard]] auto Zero() const -> Result { return NULL; }
+    [[nodiscard]] auto Zero() const -> Result
+    {
+        return const_cast<Result>(&GLOBAL_RESULT_FALSE_CONST);
+    }
 
     /**
      * @brief Not the Result value for "One"  used in the measurement process.
      *
      * @return `Result`
      */
-    [[nodiscard]] auto One() const -> Result { return NULL; }
+    [[nodiscard]] auto One() const -> Result
+    {
+        return const_cast<Result>(&GLOBAL_RESULT_TRUE_CONST);
+    }
 
     /**
      * @brief Not A helper method to print the state vector of a device.
@@ -297,12 +303,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      *
      * @return `Result` The measurement result
      */
-    auto Measure(QubitIdType, std::optional<int32_t>) -> Result
-    {
-        bool *ret = (bool *)calloc(1, sizeof(bool));
-        *ret = true;
-        return ret;
-    }
+    auto Measure(QubitIdType, std::optional<int32_t>) -> Result { return this->Zero(); }
 
     /**
      * @brief Doesn't Compute the gradient of a quantum tape, that is cached using
@@ -320,5 +321,9 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
   private:
     std::size_t num_qubits_{0};
     Catalyst::Runtime::QubitManager<QubitIdType, size_t> qubit_manager{};
+
+    // static constants for RESULT values
+    static constexpr bool GLOBAL_RESULT_TRUE_CONST = true;
+    static constexpr bool GLOBAL_RESULT_FALSE_CONST = false;
 };
 } // namespace Catalyst::Runtime::Devices
