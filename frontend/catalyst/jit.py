@@ -36,6 +36,7 @@ from catalyst.compiler import (
     CompileOptions,
     Compiler,
     canonicalize,
+    options_to_cli_flags,
     quantum_opt,
     to_llvmir,
 )
@@ -528,7 +529,8 @@ class QJIT(CatalystCallable):
         if not self.mlir_module:
             return None
 
-        return quantum_opt(stdin=str(self.mlir_module))
+        opts = options_to_cli_flags(self.compile_options)
+        return quantum_opt(*opts, stdin=str(self.mlir_module))
 
     @debug_logger
     def __call__(self, *args, **kwargs):

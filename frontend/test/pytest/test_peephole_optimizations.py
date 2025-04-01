@@ -202,7 +202,7 @@ def test_convert_clifford_to_ppr():
     """
     pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
 
-    @qjit(pipelines=pipe, keep_intermediate=True, target="mlir")
+    @qjit(pipelines=pipe, target="mlir")
     def test_convert_clifford_to_ppr_workflow():
 
         @to_ppr
@@ -215,8 +215,11 @@ def test_convert_clifford_to_ppr():
 
         return f()
 
-    assert "convert-clifford-t-to-ppr" in test_convert_clifford_to_ppr_workflow.mlir
-    assert "convert-clifford-t-to-ppr" not in test_convert_clifford_to_ppr_workflow.mlir_opt
+    assert 'transform.apply_registered_pass "to_ppr"' in test_convert_clifford_to_ppr_workflow.mlir
+    assert (
+        'transform.apply_registered_pass "to_ppr"'
+        not in test_convert_clifford_to_ppr_workflow.mlir_opt
+    )
     assert "qec.ppr" in test_convert_clifford_to_ppr_workflow.mlir_opt
 
 
