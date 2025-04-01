@@ -306,18 +306,20 @@ LogicalResult ProbsOp::verify()
         return emitOpError("only computational basis observables are supported");
     }
 
-    if (!(bool)getProbabilities() ^ (bool)getStateIn()) {
-        return emitOpError("either tensors must be returned or memrefs must be used as inputs");
-    }
+    // `obs` operand must always be present on ProbsOp.
+    // On top of this, two cases are allowed:
+    // 1. state_vector_size available, buffered state unavailable. This case returns a tensor.
+    // 2. state_vector_size unavailable, buffered state available. This case does not return a tensor.
+    bool hasObs = (bool)getObs();
+    bool hasSVLen = (bool)getStateVectorLength();
+    bool hasStateIn = (bool)getStateIn();
+    bool hasOutTensor = (bool)getProbabilities();
 
-    if (numQubits.value() != 0) {
-        Type toVerify =
-            getProbabilities() ? (Type)getProbabilities().getType() : (Type)getStateIn().getType();
-        size_t dim = std::pow(2, numQubits.value());
-        if (failed(verifyTensorResult(cast<ShapedType>(toVerify), dim))) {
-            return emitOpError(
-                "return tensor must have static length equal to 2^(number of qubits)");
-        }
+    bool unbufferedGoodCase = hasObs && hasSVLen && !hasStateIn && hasOutTensor;
+    bool bufferedGoodCase = hasObs && !hasSVLen && hasStateIn && !hasOutTensor;
+
+    if (!unbufferedGoodCase && !bufferedGoodCase) {
+        return emitOpError("either tensors must be returned with observables and a state vector length provided, or memrefs must be used as inputs");
     }
 
     return success();

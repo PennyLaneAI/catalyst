@@ -1023,7 +1023,7 @@ def VarianceOp : Measurement_Op<"var"> {
     }];
 }
 
-def ProbsOp : Measurement_Op<"probs"> {
+def ProbsOp : Measurement_Op<"probs", [AttrSizedOperandSegments]> {
     let summary = "Compute computational basis probabilities for the current state";
     let description = [{
         The `quantum.probs` operation represents the measurement process of computing probabilities
@@ -1046,6 +1046,7 @@ def ProbsOp : Measurement_Op<"probs"> {
 
     let arguments = (ins
         ObservableType:$obs,
+        Optional<I64>:$state_vector_length,
         Optional<MemRefRankOf<[F64], [1]>>:$state_in
     );
 
@@ -1054,7 +1055,9 @@ def ProbsOp : Measurement_Op<"probs"> {
     );
 
     let assemblyFormat = [{
-        $obs ( `in` `(` $state_in^ `:` type($state_in) `)` )? attr-dict ( `:` type($probabilities)^ )?
+        $obs ( `shape` $state_vector_length^ )?
+        ( `in` `(` $state_in^ `:` type($state_in) `)` )?
+        attr-dict ( `:` type($probabilities)^ )?
     }];
 
     let extraClassDeclaration = [{

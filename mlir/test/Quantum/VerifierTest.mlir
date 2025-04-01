@@ -281,10 +281,11 @@ func.func @counts5(%q0 : !quantum.bit, %q1 : !quantum.bit) {
 func.func @probs1(%q0 : !quantum.bit, %q1 : !quantum.bit) {
     %obs = quantum.compbasis qubits %q0, %q1 : !quantum.obs
 
-    // expected-error@+1 {{return tensor must have static length equal to 2^(number of qubits)}}
-    %err = quantum.probs %obs : tensor<2xf64>
-
-    %probs = quantum.probs %obs : tensor<4xf64>
+    %c4 = arith.constant 4 : i64
+    %c4i = index.casts %c4 : i64 to index
+    %in_probs1 = memref.alloc(%c4i) : memref<?xf64>
+    // expected-error@+1 {{either tensors must be returned with observables and a state vector length provided, or memrefs must be used as inputs}}
+    quantum.probs %obs in(%in_probs1 : memref<?xf64>) : tensor<?xf64>
 
     return
 }
@@ -294,35 +295,19 @@ func.func @probs1(%q0 : !quantum.bit, %q1 : !quantum.bit) {
 func.func @probs2(%q0 : !quantum.bit, %q1 : !quantum.bit) {
     %obs = quantum.compbasis qubits %q0, %q1 : !quantum.obs
 
-    %in_probs1 = memref.alloc() : memref<2xf64>
-    // expected-error@+1 {{return tensor must have static length equal to 2^(number of qubits)}}
-    quantum.probs %obs in(%in_probs1 : memref<2xf64>)
-
-    %in_probs2 = memref.alloc() : memref<4xf64>
-    quantum.probs %obs in(%in_probs2 : memref<4xf64>)
-
-    return
-}
-
-// -----
-
-func.func @probs3(%q0 : !quantum.bit, %q1 : !quantum.bit) {
-    %obs = quantum.compbasis qubits %q0, %q1 : !quantum.obs
-
-    %in_probs1 = memref.alloc() : memref<4xf64>
-    // expected-error@+1 {{either tensors must be returned or memrefs must be used as inputs}}
-    quantum.probs %obs in(%in_probs1 : memref<4xf64>) : tensor<4xf64>
-
-    return
-}
-
-// -----
-
-func.func @probs4(%q0 : !quantum.bit, %q1 : !quantum.bit) {
-    %obs = quantum.compbasis qubits %q0, %q1 : !quantum.obs
-
-    // expected-error@+1 {{either tensors must be returned or memrefs must be used as inputs}}
+    // expected-error@+1 {{either tensors must be returned with observables and a state vector length provided, or memrefs must be used as inputs}}
     quantum.probs %obs
+
+    return
+}
+
+// -----
+
+func.func @probs3(%q0 : !quantum.bit, %q1 : !quantum.bit, %c : i64, %in_probs1 : memref<?xf64>) {
+    %obs = quantum.compbasis qubits %q0, %q1 : !quantum.obs
+
+    // expected-error@+1 {{either tensors must be returned with observables and a state vector length provided, or memrefs must be used as inputs}}
+    quantum.probs %obs shape %c in(%in_probs1 : memref<?xf64>)
 
     return
 }

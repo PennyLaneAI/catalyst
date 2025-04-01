@@ -928,10 +928,7 @@ def trace_quantum_measurements(
                 out_classical_tracers.append(var_p.bind(obs_tracers))
             elif type(output) is ProbabilityMP:
                 assert using_compbasis
-                #shape = (2**nqubits,)
-                #breakpoint()
-                #out_classical_tracers.append(probs_p.bind(obs_tracers, shape=shape))
-                result = bind_flexible_primitive(probs_p, {"num_qubits":nqubits}, obs_tracers)
+                result = probs_p.bind(obs_tracers, jnp.left_shift(1, nqubits))
                 out_classical_tracers.append(result)
             elif type(output) is CountsMP:
                 if shots is None:  # needed for old device API only

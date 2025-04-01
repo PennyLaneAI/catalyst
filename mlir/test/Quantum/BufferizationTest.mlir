@@ -57,57 +57,12 @@ func.func @sample(%q0: !quantum.bit, %q1: !quantum.bit, %dyn_shots: i64) {
 
 func.func @probs(%q0: !quantum.bit, %q1: !quantum.bit) {
     %obs = quantum.compbasis qubits %q0, %q1 : !quantum.obs
-    // CHECK: [[alloc:%.+]] = memref.alloc() : memref<4xf64>
-    // CHECK: quantum.probs {{.*}} in([[alloc]] : memref<4xf64>)
-    %probs = quantum.probs %obs : tensor<4xf64>
-    func.return
-}
-
-// -----
-
-func.func @probs_dynwires(%c : i64) {
-    %r = quantum.alloc(%c) : !quantum.reg
-    %obs = quantum.compbasis qreg %r : !quantum.obs
-    // CHECK: [[one:%.+]] = arith.constant 1 : i64
-    // CHECK: [[TwoToN:%.+]] = arith.shli [[one]], %arg0 : i64
-    // CHECK: [[index:%.+]] = index.casts [[TwoToN]] : i64 to index
+    %c4 = arith.constant 4 : i64
+    // CHECK: [[four:%.+]] = arith.constant 4
+    // CHECK: [[index:%.+]] = index.casts [[four]] : i64 to index
     // CHECK: [[alloc:%.+]] = memref.alloc([[index]]) : memref<?xf64>
     // CHECK: quantum.probs {{.*}} in([[alloc]] : memref<?xf64>)
-    %probs = quantum.probs %obs : tensor<?xf64>
-    func.return
-}
-
-// -----
-
-func.func @probs_dynwires_with_inbetween_ops(%c : i64, %q: !quantum.bit) {
-    // Test that the walkback from probs to the dynamic number of qubits
-    // allocated is possible with long def-use chains of the qreg value
-
-    %r = quantum.alloc(%c) : !quantum.reg
-
-    // An in-between insert op
-    %ri = quantum.insert %r[ 0], %q : !quantum.reg, !quantum.bit
-
-    // A generic in-betwwen op with no semantics
-    %rAny = builtin.unrealized_conversion_cast %ri : !quantum.reg to !quantum.reg
-
-    // A generic in-between op with regions
-    %ind = arith.index_cast %c : i64 to index
-    %rfor = scf.for %arg1 = %ind to %ind step %ind iter_args(%arg2 = %rAny) -> (!quantum.reg) {
-      %int = arith.index_cast %arg1 : index to i64
-      %qubit_in = quantum.extract %arg2[%int] : !quantum.reg -> !quantum.bit
-      %qubit_out = quantum.custom "PauliY"() %qubit_in : !quantum.bit
-      %yield_qreg = quantum.insert %arg2[%int], %qubit_out : !quantum.reg, !quantum.bit
-      scf.yield %yield_qreg : !quantum.reg
-    }
-
-    %obs = quantum.compbasis qreg %rfor : !quantum.obs
-    // CHECK: [[one:%.+]] = arith.constant 1 : i64
-    // CHECK: [[TwoToN:%.+]] = arith.shli [[one]], %arg0 : i64
-    // CHECK: [[index:%.+]] = index.casts [[TwoToN]] : i64 to index
-    // CHECK: [[alloc:%.+]] = memref.alloc([[index]]) : memref<?xf64>
-    // CHECK: quantum.probs {{.*}} in([[alloc]] : memref<?xf64>)
-    %probs = quantum.probs %obs : tensor<?xf64>
+    %probs = quantum.probs %obs shape %c4 : tensor<?xf64>
     func.return
 }
 
