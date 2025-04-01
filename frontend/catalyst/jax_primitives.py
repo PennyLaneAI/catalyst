@@ -1529,10 +1529,7 @@ def probs_staging_rule(jaxpr_trace, obs, *dynamic_shape, static_shape, shots=Non
     on custom staging rules.
 
     The result shape of probs_p is (2^num_qubits,).
-    In this primitive, sv_length stands for 2^num_qubits.
     """
-    #breakpoint()
-
     shape = jax._src.lax.lax._merge_dyn_shape(static_shape, dynamic_shape)
 
     out_shape = core.DShapedArray(shape, jax.numpy.dtype("float64"))
@@ -1541,12 +1538,6 @@ def probs_staging_rule(jaxpr_trace, obs, *dynamic_shape, static_shape, shots=Non
         invars.append(jaxpr_trace.getvar(dyn_dim))
     params = {"static_shape" : static_shape, "shots": shots}
     out_tracer = pe.DynamicJaxprTracer(jaxpr_trace, out_shape)
-
-    # out_shape = core.DShapedArray((sv_length,), jax.numpy.dtype("float64"))
-    # invars = [jaxpr_trace.getvar(obs), jaxpr_trace.getvar(sv_length)]
-    # params = {"shots": shots}
-
-    # out_tracer = pe.DynamicJaxprTracer(jaxpr_trace, out_shape)
 
     eqn = pe.new_jaxpr_eqn(
         invars,
@@ -1571,18 +1562,6 @@ def _probs_def_impl(ctx, obs, *dynamic_shape, static_shape, shots=None):  # prag
 def _probs_lowering(
     jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, *dynamic_shape, static_shape, shots=None
 ):
-    # ctx = jax_ctx.module_context.context
-    # ctx.allow_unregistered_dialects = True
-
-    # out_shape = (ir.ShapedType.get_dynamic_size(),)
-    # result_type = ir.RankedTensorType.get(out_shape, ir.F64Type.get())
-
-    # sv_length_value = extract_scalar(sv_length, "probs")
-    # return ProbsOp(result_type, obs, state_vector_length=sv_length_value).results
-
-    # result shape of sample op is (shots, number_of_qubits)
-    # The static_shape argument contains the static dimensions, and None for dynamic dimensions
-
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
