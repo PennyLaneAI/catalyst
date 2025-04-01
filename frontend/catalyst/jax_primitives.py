@@ -1342,7 +1342,7 @@ def _hamiltonian_lowering(jax_ctx: mlir.LoweringRuleContext, coeffs: ir.Value, *
 #
 # sample measurement
 #
-def sample_staging_rule(jaxpr_trace, obs, shots, num_qubits):
+def sample_staging_rule(jaxpr_trace, obs, *dynamic_shape, static_shape):
     """
     The result shape of `sample_p` is (shots, num_qubits).
 
@@ -1367,19 +1367,19 @@ def sample_staging_rule(jaxpr_trace, obs, shots, num_qubits):
     https://github.com/jax-ml/jax/blob/a54319ec1886ed920d50cacf10e147a743888464/jax/_src/interpreters/partial_eval.py#L1881C7-L1881C24
     """
 
+    # unfortunately there are three "lax"s at different levels, so we need to use the full path
+    shape = jax._src.lax.lax._merge_dyn_shape(static_shape, dynamic_shape)
     if obs.primitive is compbasis_p:
         if obs.num_qubits:
-            assert num_qubits == obs.num_qubits
+            if isinstance(shape[1], int):
+                assert shape[1] == obs.num_qubits
 
-    out_shape = core.DShapedArray((shots, num_qubits), jax.numpy.dtype("float64"))
+    out_shape = core.DShapedArray(shape, jax.numpy.dtype("float64"))
+    invars = [jaxpr_trace.getvar(obs)]
+    for dyn_dim in dynamic_shape:
+        invars.append(jaxpr_trace.getvar(dyn_dim))
+    params = {"static_shape" : static_shape}
     out_tracer = pe.DynamicJaxprTracer(jaxpr_trace, out_shape)
-
-    if isinstance(shots, int):
-        invars = [jaxpr_trace.getvar(obs)]
-        params = {"shots": shots, "num_qubits": num_qubits}
-    else:
-        invars = [jaxpr_trace.getvar(obs), jaxpr_trace.getvar(shots)]
-        params = {"num_qubits": num_qubits}
 
     eqn = pe.new_jaxpr_eqn(
         invars,
@@ -1389,6 +1389,7 @@ def sample_staging_rule(jaxpr_trace, obs, shots, num_qubits):
         jax.core.no_effects,
     )
     jaxpr_trace.frame.add_eqn(eqn)
+
     return out_tracer
 
 
@@ -1401,18 +1402,18 @@ def _sample_def_impl(ctx, obs, shots, num_qubits):  # pragma: no cover
 
 
 def _sample_lowering(
-    jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: Union[int, ir.Value], num_qubits: int
+    jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, *dynamic_shape, static_shape
 ):
-    # Note: result shape of sample op is (shots, number_of_qubits)
+    # result shape of sample op is (shots, number_of_qubits)
+    # The static_shape argument contains the static dimensions, and None for dynamic dimensions
+
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
     f64_type = ir.F64Type.get()
-    result_shape = (
-        (shots, num_qubits)
-        if isinstance(shots, int)
-        else (ir.ShapedType.get_dynamic_size(), num_qubits)
-    )
+
+    # Replace Nones in static_shape with dynamic mlir dimensions
+    result_shape = tuple(ir.ShapedType.get_dynamic_size() if d is None else d for d in static_shape)
     result_type = ir.RankedTensorType.get(result_shape, f64_type)
 
     return SampleOp(result_type, obs).results

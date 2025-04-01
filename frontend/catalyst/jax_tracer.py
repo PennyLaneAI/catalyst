@@ -899,10 +899,11 @@ def trace_quantum_measurements(
                 if output.mv is not None:  # qml.sample(m)
                     out_classical_tracers.append(output.mv)
                 else:
-                    shape = (shots, nqubits) if using_compbasis else (shots,)
-                    result = bind_flexible_primitive(
-                        sample_p, {"shots": shots}, obs_tracers, num_qubits=nqubits
-                    )
+                    shape = (shots, nqubits)
+                    # unfortunately there are three "lax"s at different levels, so we need to use the full path
+                    dyn_dims, static_shape = jax._src.lax.lax._extract_tracers_dyn_shape(shape)
+                    result = sample_p.bind(obs_tracers, *dyn_dims, static_shape=tuple(static_shape))
+
                     if using_compbasis:
                         result = jnp.astype(result, jnp.int64)
 
@@ -911,7 +912,8 @@ def trace_quantum_measurements(
                     start_idx = 0  # Start index for slicing
                     for shot, copies in shot_vector:
                         for _ in range(copies):
-                            sliced_result = result[start_idx : start_idx + shot]
+                            #sliced_result = result[start_idx : start_idx + shot]
+                            sliced_result = jax.lax.dynamic_slice(result, (start_idx, 0), (start_idx + shot, nqubits))
                             reshaped_result += (sliced_result.reshape(shot, nqubits),)
                             start_idx += shot
 

@@ -211,6 +211,66 @@ def test_dynamic_wires_statebased_without_wires(readout, backend, capfd):
     assert out.count("compiling...") == 3
 
 
+@pytest.mark.parametrize("readout", [qml.sample])
+def test_dynamic_wires_samplebased_with_wires(readout, backend, capfd):
+    """
+    Test that a circuit with dynamic number of wires can be executed correctly
+    with sample based measurements with wires specified.
+    """
+    def ref(num_qubits):
+        print("compiling...")
+        dev = qml.device(backend, wires=num_qubits, shots=3)
+
+        @qml.qnode(dev)
+        def circ():
+            @catalyst.for_loop(0, num_qubits, 1)
+            def loop_0(i):
+                qml.RY(0.0, wires=i)
+
+            loop_0()
+            qml.RX(0.0, wires=num_qubits - 1)
+            return readout(wires=[0, num_qubits - 1])
+
+        return circ()
+
+    cat = catalyst.qjit(ref)
+
+    assert np.allclose(ref(10), cat(10))
+    assert np.allclose(ref(4), cat(4))
+    out, _ = capfd.readouterr()
+    assert out.count("compiling...") == 3
+
+
+@pytest.mark.parametrize("readout", [qml.sample])
+def test_dynamic_wires_samplebased_without_wires(readout, backend, capfd):
+    """
+    Test that a circuit with dynamic number of wires can be executed correctly
+    with sample based measurements without wires specified.
+    """
+    def ref(num_qubits):
+        print("compiling...")
+        dev = qml.device(backend, wires=num_qubits, shots=3)
+
+        @qml.qnode(dev)
+        def circ():
+            @catalyst.for_loop(0, num_qubits, 1)
+            def loop_0(i):
+                qml.RY(0.0, wires=i)
+
+            loop_0()
+            qml.RX(0.0, wires=num_qubits - 1)
+            return readout()
+
+        return circ()
+
+    cat = catalyst.qjit(ref)
+
+    assert np.allclose(ref(10), cat(10))
+    assert np.allclose(ref(4), cat(4))
+    out, _ = capfd.readouterr()
+    assert out.count("compiling...") == 3
+
+
 @pytest.mark.parametrize("wires", [1.1, (1.1)])
 def test_wrong_wires_argument(backend, wires):
     """
