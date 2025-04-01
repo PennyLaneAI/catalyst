@@ -13,6 +13,8 @@ the many functions accessible in ``jax`` and ``jax.numpy`` to write code that su
 Here, we aim to provide an overview of the JAX integration, including the existing support
 and limitations.
 
+.. _jax-sharp-bits:
+
 JAX 'sharp bits'
 ----------------
 
