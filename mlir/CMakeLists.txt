@@ -7,6 +7,27 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_CXX_STANDARD 20 CACHE STRING "C++ standard to conform to")
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Required so as not to always use the cached option from the mlir build.
+option(QUANTUM_ENABLE_BINDINGS_PYTHON "Enable quantum dialect python bindings" OFF)
+option(CATALYST_ENABLE_WARNINGS "Enable -Wall and -Werror" ON)
+
+message(STATUS "LLVM_USE_SANITIZER is ${LLVM_USE_SANITIZER}.")
+message(STATUS "CATALYST_ENABLE_WARNINGS is ${CATALYST_ENABLE_WARNINGS}.")
+
+if ("${LLVM_USE_SANITIZER}" STREQUAL "Address")
+  add_compile_options(-fsanitize=address)
+  add_link_options(-fsanitize=address)
+endif()
+
+if(CATALYST_ENABLE_WARNINGS)
+    set(CMAKE_COMPILE_WARNING_AS_ERROR ON)
+    add_compile_options(-Wall)
+endif()
+
+#########################
+## Handle Dependencies ##
+#########################
+
 find_package(MLIR REQUIRED CONFIG)
 find_package(MHLO REQUIRED CONFIG)
 
@@ -17,25 +38,6 @@ message(STATUS "Using MHLOConfig.cmake in: ${MHLO_DIR}")
 set(LLVM_RUNTIME_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/bin)
 set(LLVM_LIBRARY_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/lib)
 set(MLIR_BINARY_DIR ${CMAKE_BINARY_DIR})
-
-# Required so as not to always use the cached option from the mlir build.
-option(QUANTUM_ENABLE_BINDINGS_PYTHON "Enable quantum dialect python bindings" OFF)
-option(CATALYST_ENABLE_WARNINGS "Enable -Wall and -Werror" ON)
-
-message(STATUS "LLVM_USE_SANITIZER is ${LLVM_USE_SANITIZER}.")
-message(STATUS "CATALYST_ENABLE_WARNINGS is ${CATALYST_ENABLE_WARNINGS}.")
-
-if(LLVM_USE_SANITIZER)
-  if ("${LLVM_USE_SANITIZER}" STREQUAL "Address")
-    add_compile_options(-fsanitize=address)
-    add_link_options(-fsanitize=address)
-  endif()
-endif()
-
-if(CATALYST_ENABLE_WARNINGS)
-    set(CMAKE_COMPILE_WARNING_AS_ERROR ON)
-    add_compile_options(-Wall)
-endif()
 
 # Taken from mlir-hlo/mhlo/transforms/CMakeLists.txt.
 # Unfortunately, AllMhloPasses doesn't appear to be exported.
@@ -66,7 +68,7 @@ include(HandleLLVMOptions)
 # bindings). We need to filter out those linker flags for now. TODO: remove once we update past
 # https://github.com/llvm/llvm-project/commit/1f0e0da3af783fd2bb5e23bc2b97141abac68926
 if(APPLE)
-string(REPLACE "-Wl,-undefined -Wl,suppress" "" CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS}")
+  string(REPLACE "-Wl,-undefined -Wl,suppress" "" CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS}")
 endif()
 
 if(QUANTUM_ENABLE_BINDINGS_PYTHON)
@@ -88,17 +90,32 @@ include_directories(SYSTEM
   ${MLIRHLO_DIR}/stablehlo
   ${MLIRHLO_BUILD_DIR}/stablehlo
 )
+link_directories(${LLVM_BUILD_LIBRARY_DIR})
+add_definitions(${LLVM_DEFINITIONS})
+
+######################
+## Catalyst Sources ##
+######################
+
 include_directories(
   ${CATALYST_MAIN_INCLUDE_DIR}
   ${CATALYST_GEN_INCLUDE_DIR}
 )
-link_directories(${LLVM_BUILD_LIBRARY_DIR})
-add_definitions(${LLVM_DEFINITIONS})
-
 
 add_subdirectory(include)
 add_subdirectory(lib)
 add_subdirectory(tools)
+
+if(QUANTUM_ENABLE_BINDINGS_PYTHON)
+  message(STATUS "Enabling Python API")
+  add_subdirectory(python)
+endif()
+
+add_subdirectory(cmake/modules)
+
+####################
+## Catalyst Tests ##
+####################
 
 ##############################################################################
 # The following subsection of code                                           #
@@ -166,10 +183,3 @@ endif()
 ######################
 
 add_subdirectory(test)
-
-if(QUANTUM_ENABLE_BINDINGS_PYTHON)
-  message(STATUS "Enabling Python API")
-  add_subdirectory(python)
-endif()
-
-add_subdirectory(cmake/modules)
