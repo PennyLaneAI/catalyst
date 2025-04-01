@@ -26,6 +26,7 @@ from jax.errors import TracerBoolConversionError
 from numpy.testing import assert_allclose
 
 from catalyst import *
+from catalyst import passes
 from catalyst.autograph.transformer import TRANSFORMER
 from catalyst.utils.dummy import dummy_func
 from catalyst.utils.exceptions import CompileError
@@ -2299,10 +2300,12 @@ class TestJaxIndexOperatorUpdate:
 
 
 class TestWithPassPipelineWrapper:
+    """Test with passes"""
+
     def test_with_pass_pipeline_wrapper(self):
         """this test should work. So there are no asserts"""
 
-        @qjit(autograph=True)
+        @qml.qjit(autograph=True)
         @passes.merge_rotations
         @qml.qnode(qml.device("null.qubit", wires=1))
         def circuit(n_iter: int):
