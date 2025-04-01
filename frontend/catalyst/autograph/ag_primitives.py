@@ -35,6 +35,7 @@ from pennylane.queuing import AnnotatedQueue
 
 import catalyst
 from catalyst.jax_extras import DynamicJaxprTracer, ShapedArray
+from catalyst.passes.pass_api import PassPipelineWrapper
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.utils.callables import CatalystCallable
 from catalyst.utils.exceptions import AutoGraphError
@@ -488,6 +489,9 @@ def get_source_code_info(tb_frame):
                 obj = frame.frame.f_locals["self"]
                 if isinstance(obj, qml.QNode):
                     ag_source_map = obj.ag_source_map
+                    break
+                if isinstance(obj, PassPipelineWrapper):
+                    ag_source_map = obj.qnode.ag_source_map
                     break
                 if isinstance(obj, catalyst.QJIT):
                     ag_source_map = obj.user_function.ag_source_map
