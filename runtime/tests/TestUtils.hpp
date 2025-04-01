@@ -1,4 +1,4 @@
-// Copyright 2022-2023 Xanadu Quantum Technologies Inc.
+// Copyright 2022-2025 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,48 +14,16 @@
 
 /**
  * @file TestUtils.hpp
- * Helper methods for C++ Tests
+ * Helper methods for C++ Runtime Tests
  */
 #pragma once
 
 #include <string>
-#include <tuple>
-#include <vector>
-
-#include "catch2/catch.hpp"
 
 #include "ExecutionContext.hpp"
 #include "QuantumDevice.hpp"
 
-#include <iostream>
-
-/// @cond DEV
-namespace {
-using namespace Catalyst::Runtime;
-} // namespace
-/// @endcond
-
-/**
- * A tuple of available backend devices to be tested using TEMPLATE_LIST_TEST_CASE in Catch2
- */
-#if __has_include("LightningSimulator.hpp")
-#include "LightningSimulator.hpp"
-using SimTypes = std::tuple<Catalyst::Runtime::Simulator::LightningSimulator>;
-#endif
-
-/**
- * Get available device names in the compatible format for `__catalyst__rt__device`
- *
- * This is a utility function used in Catch2 tests.
- *
- * @return `std::vector<std::pair<std::string, std::string>>`
- */
-static inline auto getDevices() -> std::vector<std::tuple<std::string, std::string, std::string>>
-{
-    std::vector<std::tuple<std::string, std::string, std::string>> devices{
-        {"lightning.qubit", "lightning.qubit", "{shots: 0}"}};
-    return devices;
-}
+#define NO_MODIFIERS ((const Modifiers *)NULL)
 
 inline auto get_dylib_ext() -> std::string
 {
@@ -66,26 +34,16 @@ inline auto get_dylib_ext() -> std::string
 #endif
 }
 
-#define NO_MODIFIERS ((const Modifiers *)NULL)
-
-static inline MemRefT_CplxT_double_1d getState(size_t buffer_len)
+static inline Catalyst::Runtime::QuantumDevice *loadDevice(const std::string &device_name,
+                                                           const std::string &filename)
 {
-    auto *buffer = new CplxT_double[buffer_len];
-    MemRefT_CplxT_double_1d result = {buffer, buffer, 0, {buffer_len}, {1}};
-    return result;
-}
-
-static inline void freeState(MemRefT_CplxT_double_1d &result) { delete[] result.data_allocated; }
-
-static inline QuantumDevice *loadDevice(const std::string &device_name, const std::string &filename)
-{
-    std::unique_ptr<SharedLibraryManager> init_rtd_dylib =
-        std::make_unique<SharedLibraryManager>(filename);
+    auto init_rtd_dylib = std::make_unique<Catalyst::Runtime::SharedLibraryManager>(filename);
     std::string factory_name{device_name + "Factory"};
     void *f_ptr = init_rtd_dylib->getSymbol(factory_name);
 
     // LCOV_EXCL_START
-    return (f_ptr != nullptr) ? reinterpret_cast<decltype(GenericDeviceFactory) *>(f_ptr)("")
-                              : nullptr;
+    return (f_ptr != nullptr)
+               ? reinterpret_cast<decltype(Catalyst::Runtime::GenericDeviceFactory) *>(f_ptr)("")
+               : nullptr;
     // LCOV_EXCL_STOP
 }

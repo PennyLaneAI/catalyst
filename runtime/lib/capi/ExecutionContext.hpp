@@ -31,8 +31,6 @@
 #include "QuantumDevice.hpp"
 #include "Types.h"
 
-extern void callbackCall(int64_t, int64_t, int64_t, va_list);
-
 namespace Catalyst::Runtime {
 
 extern "C" void __catalyst_inactive_callback(int64_t identifier, int64_t argc, int64_t retc, ...);

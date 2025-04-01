@@ -264,7 +264,7 @@ class LinkerDriver:
         raise CompileError(msg)
 
 
-def _get_cmd(*args, stdin=None):
+def _get_catalyst_cli_cmd(*args, stdin=None):
     """Just get the command, do not run it"""
     cli_path = get_cli_path()
     if not path.isfile(cli_path):
@@ -272,8 +272,8 @@ def _get_cmd(*args, stdin=None):
 
     cmd = [cli_path]
     for arg in args:
-        if isinstance(arg, tuple):
-            cmd += [str(arg[0]), str(arg[1])]
+        if not isinstance(arg, str):
+            cmd += [str(x) for x in arg]
         else:
             cmd += [str(arg)]
 
@@ -289,13 +289,13 @@ def _catalyst(*args, stdin=None):
     echo ${stdin} | catalyst *args -
     catalyst *args
     """
-    cmd = _get_cmd(*args, stdin=stdin)
+    cmd = _get_catalyst_cli_cmd(*args, stdin=stdin)
     result = subprocess.run(cmd, input=stdin, check=True, capture_output=True, text=True)
     return result.stdout
 
 
-def _opt(*args, stdin=None):
-    """Raw interface to opt
+def quantum_opt(*args, stdin=None):
+    """Raw interface to quantum-opt
 
     echo ${stdin} | catalyst --tool=opt *args -
     catalyst --tool=opt *args
@@ -303,18 +303,20 @@ def _opt(*args, stdin=None):
     return _catalyst(("--tool", "opt"), *args, stdin=stdin)
 
 
-def _canonicalize(*args, stdin=None):
+def canonicalize(*args, stdin=None):
     """Run opt with canonicalization
 
     echo ${stdin} | catalyst --tool=opt \
             --catalyst-pipeline='builtin.module(canonicalize)' *args -
     catalyst --tool=opt \
             --catalyst-pipeline='builtin.module(canonicalize)' *args
+
+    Returns stdout string
     """
-    return _opt(("--pass-pipeline", "builtin.module(canonicalize)"), *args, stdin=stdin)
+    return quantum_opt(("--pass-pipeline", "builtin.module(canonicalize)"), *args, stdin=stdin)
 
 
-def _options_to_opts(options):
+def _options_to_cli_flags(options):
     """CompileOptions -> list[str|Tuple[str, str]]"""
 
     extra_args = []
@@ -349,13 +351,13 @@ def _options_to_opts(options):
     return extra_args
 
 
-def _to_llvmir(*args, stdin=None, options: Optional[CompileOptions] = None):
+def to_llvmir(*args, stdin=None, options: Optional[CompileOptions] = None):
     """echo ${input} | catalyst *args -"""
     # These are the options that may affect compilation
     if not options:
         return _catalyst(*args, stdin=stdin)
 
-    opts = _options_to_opts(options)
+    opts = _options_to_cli_flags(options)
     return _catalyst(*opts, *args, stdin=stdin)
 
 
@@ -376,8 +378,8 @@ class Compiler:
         Returns:
             cmd (str): The command to be executed.
         """
-        opts = _options_to_opts(self.options)
-        cmd = _get_cmd(
+        opts = _options_to_cli_flags(self.options)
+        cmd = _get_catalyst_cli_cmd(
             ("-o", output_ir_name),
             ("--module-name", module_name),
             ("--workspace", str(workspace)),

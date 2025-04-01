@@ -182,12 +182,12 @@ void updatePauliWord(QECOpInterface op, const PauliWord &newPauliWord, PatternRe
     op.setPauliProductAttr(pauliProduct);
 }
 
-void updatePauliWordSign(PPRotationOp op, bool isNegated, PatternRewriter &rewriter)
+void updatePauliWordSign(QECOpInterface op, bool isNegated, PatternRewriter &rewriter)
 {
     int16_t rotationKind = static_cast<int16_t>(op.getRotationKind());
     int16_t sign = isNegated ? -1 : 1;
     rotationKind = (rotationKind < 0 ? -rotationKind : rotationKind) * sign;
-    op.setRotationKindAttr(rewriter.getI16IntegerAttr(rotationKind));
+    op.setRotationKind(rotationKind);
 }
 
 } // namespace qec

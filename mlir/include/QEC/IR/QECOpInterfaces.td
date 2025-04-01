@@ -57,6 +57,11 @@ def QECOpInterface : OpInterface<"QECOpInterface"> {
             /*desc=*/"Set the Pauli product for this operation.",
             /*retTy=*/"void",
             /*methodName=*/"setPauliProductAttr", (ins " ::mlir::ArrayAttr":$attr)
+        >,
+        InterfaceMethod<
+            /*desc=*/"Set the rotation kind for this operation.",
+            /*retTy=*/"void",
+            /*methodName=*/"setRotationKind", (ins "uint16_t":$attrValue)
         >
     ];
 

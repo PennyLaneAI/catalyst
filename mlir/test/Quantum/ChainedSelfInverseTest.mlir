@@ -657,3 +657,51 @@ func.func @test_chained_self_inverse() -> (!quantum.bit, !quantum.bit, !quantum.
     // CHECK: quantum.custom "Hadamard"
     return %out_qubits_1, %out_ctrl_qubits_1#0, %out_ctrl_qubits_1#1 : !quantum.bit, !quantum.bit, !quantum.bit
 }
+
+// -----
+
+func.func @test_loop_boundary_rotation(%q0: !quantum.bit, %q1: !quantum.bit) -> (!quantum.bit, !quantum.bit) {
+
+    %stop = arith.constant 10 : index
+    %one = arith.constant 1 : index
+    %theta = arith.constant 0.2 : f64
+    %beta = arith.constant 0.3 : f64
+
+    // Quantum circuit:           // Expected output:
+    // RX(theta) Q0               // RX(theta) Q0
+    //                            // X Q1
+    // for _ in range(n)          // for _ in range(n):
+    //    RX(theta) Q0      ->    //    RX(theta) Q0
+    //    X Q1                    //
+    //    CNOT Q0, Q1             //    CNOT Q0, Q1
+    //    RX(theta) Q0            //    RX(theta) Q0
+    //    X Q1                    // X Q1
+
+    // CHECK-LABEL: func.func @test_loop_boundary_rotation(
+    // CHECK-SAME: [[q0:%.+]]: !quantum.bit,
+    // CHECK-SAME: [[q1:%.+]]: !quantum.bit
+    // CHECK: [[cst:%.+]] = {{.*}} 2.000000e-01 : f64
+    // CHECK: [[cst_0:%.+]] = {{.*}} 3.000000e-01 : f64
+
+    // CHECK: [[qubit_0:%.+]] = {{.*}} "RX"([[cst_0]]) [[q0]]
+    %q_00 = quantum.custom "RX"(%beta) %q0 : !quantum.bit
+    // CHECK: [[qubit_1:%.+]] = {{.*}} "X"() [[q1]]
+    // CHECK: [[scf:%.+]]:2 = scf.for {{.*}} iter_args([[arg0:%.+]] = [[qubit_0]], [[arg1:%.+]] = [[qubit_1]])
+    %scf:2 = scf.for %i = %one to %stop step %one iter_args(%q_arg0 = %q_00, %q_arg1 = %q1) -> (!quantum.bit, !quantum.bit) {
+        // CHECK-NOT: "X"
+        // CHECK: [[qubit_a:%.+]] = {{.*}} "RX"([[cst]]) [[arg0]]
+        %q_0 = quantum.custom "RX"(%theta) %q_arg0 : !quantum.bit
+        %q_1 = quantum.custom "X"() %q_arg1 : !quantum.bit
+        // CHECK: [[qubit_2:%.+]]:2 = {{.*}} "CNOT"() [[qubit_a]], [[arg1]]
+        %q_2:2 = quantum.custom "CNOT"() %q_0, %q_1 : !quantum.bit, !quantum.bit
+        // CHECK: [[qubit_3:%.+]] = {{.*}} "RX"([[cst]]) [[qubit_2]]#0
+        %q_3 = quantum.custom "RX"(%theta) %q_2#0 : !quantum.bit
+        // CHECK-NOT: "X"
+        %q_4 = quantum.custom "X"() %q_2#1 : !quantum.bit
+        scf.yield %q_3, %q_4 : !quantum.bit, !quantum.bit
+    }
+
+    // CHECK: [[qubit_6:%.+]] = {{.*}} "X"() [[scf]]#1
+    // CHECK: return [[scf]]#0, [[qubit_6]]
+    func.return %scf#0, %scf#1 : !quantum.bit, !quantum.bit
+}
