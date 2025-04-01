@@ -97,10 +97,15 @@ struct BufferizeSampleOp : public OpConversionPattern<SampleOp> {
             allocSizes.push_back(shots);
         }
 
-        Value allocVal = rewriter.replaceOpWithNewOp<memref::AllocOp>(op, resultType, allocSizes);
-        rewriter.create<SampleOp>(loc, TypeRange{}, ValueRange{adaptor.getObs(), allocVal},
-                                  op->getAttrs());
+        if (shape[1] == ShapedType::kDynamic) {
+            auto nQubits = rewriter.create<index::CastSOp>(loc, rewriter.getIndexType(), op.getNumQubits());
+            allocSizes.push_back(nQubits);
+        }
 
+        Value allocVal = rewriter.replaceOpWithNewOp<memref::AllocOp>(op, resultType, allocSizes);
+        auto allocedSampleOp = rewriter.create<SampleOp>(loc, TypeRange{}, ValueRange{adaptor.getObs(), allocVal},
+                                  op->getAttrs());
+        allocedSampleOp->setAttr("operandSegmentSizes", rewriter.getDenseI32ArrayAttr({1, 0, 1}));
         return success();
     }
 };
@@ -124,8 +129,8 @@ struct BufferizeStateOp : public OpConversionPattern<StateOp> {
             buffer = rewriter.replaceOpWithNewOp<memref::AllocOp>(op, resultType);
         }
 
-        auto allocedProbsOp = rewriter.create<StateOp>(loc, TypeRange{}, ValueRange{adaptor.getObs(), buffer});
-        allocedProbsOp->setAttr("operandSegmentSizes", rewriter.getDenseI32ArrayAttr({1, 0, 1}));
+        auto allocedStateOp = rewriter.create<StateOp>(loc, TypeRange{}, ValueRange{adaptor.getObs(), buffer});
+        allocedStateOp->setAttr("operandSegmentSizes", rewriter.getDenseI32ArrayAttr({1, 0, 1}));
         return success();
     }
 };

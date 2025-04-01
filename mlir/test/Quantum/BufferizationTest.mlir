@@ -36,7 +36,7 @@ func.func @counts(%q0: !quantum.bit, %q1: !quantum.bit) {
 
 // -----
 
-func.func @sample(%q0: !quantum.bit, %q1: !quantum.bit, %dyn_shots: i64) {
+func.func @sample(%c : i64, %q0: !quantum.bit, %q1: !quantum.bit, %dyn_shots: i64) {
     // CHECK: quantum.device shots([[shots:%.+]]) ["", "", ""]
     quantum.device shots(%dyn_shots) ["", "", ""]
     %obs = quantum.compbasis qubits %q0, %q1 : !quantum.obs
@@ -44,11 +44,22 @@ func.func @sample(%q0: !quantum.bit, %q1: !quantum.bit, %dyn_shots: i64) {
     // CHECK: [[idx:%.+]] = index.casts [[shots]] : i64 to index
     // CHECK: [[alloc:%.+]] = memref.alloc([[idx]]) : memref<?x2xf64>
     // CHECK: quantum.sample {{.*}} in([[alloc]] : memref<?x2xf64>)
-    %samples = quantum.sample %obs : tensor<?x2xf64>
+    %samples_dynShots = quantum.sample %obs : tensor<?x2xf64>
+
+    // CHECK: [[idx1:%.+]] = index.casts %arg0 : i64 to index
+    // CHECK: [[alloc1:%.+]] = memref.alloc([[idx1]]) : memref<42x?xf64>
+    // CHECK: quantum.sample {{.*}} in([[alloc1]] : memref<42x?xf64>)
+    %samples_dynQubits = quantum.sample %obs num_qubits %c : tensor<42x?xf64>
 
     // CHECK: [[alloc_static:%.+]] = memref.alloc() : memref<10x2xf64>
     // CHECK: quantum.sample {{.*}} in([[alloc_static]] : memref<10x2xf64>)
     %samples_static = quantum.sample %obs : tensor<10x2xf64>
+
+    // CHECK: [[shots2:%.+]] = index.casts [[shots]] : i64 to index
+    // CHECK: [[idx2:%.+]] = index.casts %arg0 : i64 to index
+    // CHECK: [[alloc2:%.+]] = memref.alloc([[shots2]], [[idx2]]) : memref<?x?xf64>
+    // CHECK: quantum.sample {{.*}} in([[alloc2]] : memref<?x?xf64>)
+    %samples_dynAll = quantum.sample %obs num_qubits %c : tensor<?x?xf64>
 
     func.return
 }

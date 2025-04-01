@@ -829,7 +829,7 @@ def MeasureOp : Quantum_Op<"measure"> {
     }];
 }
 
-def SampleOp : Measurement_Op<"sample"> {
+def SampleOp : Measurement_Op<"sample", [AttrSizedOperandSegments]> {
     let summary = "Sample eigenvalues from the given observable for the current state";
     let description = [{
         The `quantum.sample` operation represents the measurement process of sampling eigenvalues
@@ -862,6 +862,7 @@ def SampleOp : Measurement_Op<"sample"> {
 
     let arguments = (ins
         ObservableType:$obs,
+        Optional<I64>:$num_qubits,
         Optional<
            AnyTypeOf<[
             MemRefRankOf<[F64], [1]>,
@@ -880,7 +881,9 @@ def SampleOp : Measurement_Op<"sample"> {
     );
 
     let assemblyFormat = [{
-        $obs ( `in` `(` $in_data^ `:` type($in_data) `)` )? attr-dict ( `:` type($samples)^ )?
+        $obs ( `num_qubits` $num_qubits^ )?
+        ( `in` `(` $in_data^ `:` type($in_data) `)` )?
+        attr-dict ( `:` type($samples)^ )?
     }];
 
     let extraClassDeclaration = [{
