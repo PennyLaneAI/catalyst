@@ -108,10 +108,9 @@ that doesn't work with Catalyst includes:
 
 - ``jax.numpy.polyfit``
 - ``jax.numpy.fft``
-- ``jax.numpy.ndarray.at[index]`` when ``index`` corresponds to multiple
-  indices. Note that updating multiple indices is supported as long as the
-  indices are sorted and unique, and the appropriate parameters are provided
-  (see the :ref:`jax-sharp-bits` section for details).
+- ``jax.numpy.ndarray.at[index]``  when ``index`` contains multiple indices
+  *and* the indices overlap, or are not sorted in ascending order (see the
+  :ref:`jax-sharp-bits` section for details).
 
 If you come across any other JAX functions that don't work with Catalyst
 (and don't already have a Catalyst equivalent), please let us know by opening
