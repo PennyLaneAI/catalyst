@@ -308,6 +308,9 @@
 
 <h3>Documentation 📝</h3>
 
+* Added more details to Jax integration documentation regarding the use of `.at` with multiple indices.
+  [(#1595)](https://github.com/PennyLaneAI/catalyst/pull/1595)
+
 <h3>Contributors ✍️</h3>
 
 This release contains contributions from (in alphabetical order):
