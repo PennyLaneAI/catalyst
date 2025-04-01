@@ -16,7 +16,7 @@
 
 # RUN: %PYTHON %s | FileCheck %s
 
-from catalyst.compiler import quantum_opt, canonicalize, to_llvmir
+from catalyst.compiler import canonicalize, quantum_opt, to_llvmir
 
 
 def test_opt_happy_path():
