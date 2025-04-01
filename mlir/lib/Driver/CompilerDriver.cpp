@@ -462,6 +462,12 @@ LogicalResult runEnzymePasses(const CompilerOptions &options,
 
 std::string readInputFile(const std::string &filename)
 {
+    if (filename == "-") {
+        std::stringstream buffer;
+        std::istreambuf_iterator<char> begin(std::cin), end;
+        buffer << std::string(begin, end);
+        return buffer.str();
+    }
     std::ifstream file(filename);
     if (!file.is_open()) {
         return "";
@@ -804,11 +810,31 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         }
 
         if (failed(timer::timer(compileObjectFile, "compileObjFile", /* add_endl */ true, options,
-                                std::move(llvmModule), targetMachine, options.getObjectFile()))) {
+                                llvmModule, targetMachine, options.getObjectFile()))) {
             return failure();
         }
         outputTiming.stop();
         llcTiming.stop();
+    }
+
+    std::string errorMessage;
+    auto outfile = openOutputFile(output.outputFilename, &errorMessage);
+    if (!outfile) {
+        llvm::errs() << errorMessage << "\n";
+        return failure();
+    }
+    if (output.outputFilename == "-" && llvmModule) {
+        outfile->os() << *llvmModule;
+        outfile->keep();
+    }
+    else if (output.outputFilename == "-" && mlirModule) {
+        outfile->os() << *mlirModule;
+        outfile->keep();
+    }
+
+    if (options.keepIntermediate and output.outputFilename != "-") {
+        outfile->os() << output.outIR;
+        outfile->keep();
     }
 
     return success();
@@ -967,15 +993,6 @@ int QuantumDriverMainFromCL(int argc, char **argv)
         return 1;
     }
 
-    // If not creating object file, output the IR to the specified file.
-    std::string errorMessage;
-    auto outfile = openOutputFile(outputFilename, &errorMessage);
-    if (!outfile) {
-        llvm::errs() << errorMessage << "\n";
-        return 1;
-    }
-    outfile->os() << output->outIR;
-    outfile->keep();
     if (Verbose)
         llvm::outs() << "Compilation successful:\n" << output->diagnosticMessages << "\n";
     return 0;
