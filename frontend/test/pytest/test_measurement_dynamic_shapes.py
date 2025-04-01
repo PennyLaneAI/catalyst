@@ -189,16 +189,7 @@ def test_dynamic_wires_statebased_without_wires(readout, backend, capfd):
                 qml.RY(2.2, wires=i)
 
             loop_0()
-            qml.RX(1.23, wires=num_qubits - 1)
-            # scf.if op only has the boolean predicate value as an operand
-            # As such, closure values, including the qreg, cannot be detected
-            # via the mlir backward slice analysis
-            # This means we fail to walk back from the probs op to the alloc op in such cases
-            # This will be supported once we track
-            # https://github.com/llvm/llvm-project/pull/114452
-            # where backward slice can now include closure values
-            # qml.cond(x == 42, qml.RZ)(3.45, wires=0)
-            qml.CNOT(wires=[num_qubits - 2, 1])
+            qml.cond(x == 42, qml.RZ)(3.45, wires=0)
             return readout()
 
         return circ(42)
