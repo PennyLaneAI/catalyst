@@ -213,6 +213,10 @@
   This includes `probs(), state(), sample(), counts()`.
     [(#1565)](https://github.com/PennyLaneAI/catalyst/pull/1565)
 
+* Improve error message for ZNE.
+  [(#1603)](https://github.com/PennyLaneAI/catalyst/pull/1603)
+
+
 <h3>Breaking changes 💔</h3>
 
 <h3>Deprecations 👋</h3>
