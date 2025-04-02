@@ -343,3 +343,17 @@ TEST_CASE("Test __catalyst__qis__Gradient_params Op=[Hadamard,RZ,RY,RZ,S,T,Param
     delete[] buffer;
     delete[] buffer_tp;
 }
+
+TEST_CASE("Test NullQubit::Zero()", "[NullQubit]")
+{
+    std::unique_ptr<NullQubit> sim = std::make_unique<NullQubit>();
+
+    CHECK(*sim->Zero() == false);
+}
+
+TEST_CASE("Test NullQubit::One()", "[NullQubit]")
+{
+    std::unique_ptr<NullQubit> sim = std::make_unique<NullQubit>();
+
+    CHECK(*sim->One() == true);
+}
