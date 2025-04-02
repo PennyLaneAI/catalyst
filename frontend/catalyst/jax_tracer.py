@@ -911,13 +911,17 @@ def trace_quantum_measurements(
                     start_idx = 0  # Start index for slicing
                     # TODO: shots still can only be static in PL frontend
                     # TODO: Update to dynamic shots
-                    for shot, copies in shot_vector:
-                        for _ in range(copies):
-                            sliced_result = jax.lax.dynamic_slice(
-                                result, (start_idx, 0), (shot, nqubits)
-                            )
-                            reshaped_result += (sliced_result.reshape(shot, nqubits),)
-                            start_idx += shot
+                    has_shot_vector = shot_vector[0][1] != 1
+                    if has_shot_vector:
+                        for shot, copies in shot_vector:
+                            for _ in range(copies):
+                                sliced_result = jax.lax.dynamic_slice(
+                                    result, (start_idx, 0), (shot, nqubits)
+                                )
+                                reshaped_result += (sliced_result.reshape(shot, nqubits),)
+                                start_idx += shot
+                    else:
+                        reshaped_result += (result,)
 
                     if len(reshaped_result) == 1:
                         reshaped_result = reshaped_result[0]
