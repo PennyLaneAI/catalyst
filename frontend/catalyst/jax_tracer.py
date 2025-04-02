@@ -910,7 +910,7 @@ def trace_quantum_measurements(
                     start_idx = 0  # Start index for slicing
                     # TODO: shots still can only be static in PL frontend
                     # TODO: Update to dynamic shots
-                    has_shot_vector = shot_vector[0][1] != 1
+                    has_shot_vector = len(shot_vector) > 1 or any(copies > 1 for _, copies in shot_vector)
                     if has_shot_vector:
                         for shot, copies in shot_vector:
                             for _ in range(copies):

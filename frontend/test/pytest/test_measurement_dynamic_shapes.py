@@ -240,7 +240,7 @@ def test_dynamic_wires_sample_with_wires(shots, backend, capfd):
     assert out.count("compiling...") == 3
 
 
-@pytest.mark.parametrize("shots", [3, (3, 4, 5)])
+@pytest.mark.parametrize("shots", [3, (3, 4, 5), (7, )*3])
 def test_dynamic_wires_sample_without_wires(shots, backend, capfd):
     """
     Test that a circuit with dynamic number of wires can be executed correctly
@@ -249,7 +249,7 @@ def test_dynamic_wires_sample_without_wires(shots, backend, capfd):
 
     def ref(num_qubits):
         print("compiling...")
-        dev = qml.device(backend, wires=num_qubits, shots=3)
+        dev = qml.device(backend, wires=num_qubits, shots=shots)
 
         @qml.qnode(dev)
         def circ():
