@@ -36,7 +36,6 @@ from catalyst.compiler import (
     CompileOptions,
     Compiler,
     canonicalize,
-    quantum_opt,
     to_llvmir,
     to_mlir_opt,
 )

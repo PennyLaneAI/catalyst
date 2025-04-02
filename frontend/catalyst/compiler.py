@@ -294,7 +294,7 @@ def _catalyst(*args, stdin=None):
     return result.stdout
 
 
-def quantum_opt(*args, stdin=None):
+def _quantum_opt(*args, stdin=None):
     """Raw interface to quantum-opt
 
     echo ${stdin} | catalyst --tool=opt *args -
@@ -313,7 +313,7 @@ def canonicalize(*args, stdin=None):
 
     Returns stdout string
     """
-    return quantum_opt(("--pass-pipeline", "builtin.module(canonicalize)"), *args, stdin=stdin)
+    return _quantum_opt(("--pass-pipeline", "builtin.module(canonicalize)"), *args, stdin=stdin)
 
 
 def _options_to_cli_flags(options):
@@ -365,10 +365,10 @@ def to_mlir_opt(*args, stdin=None, options: Optional[CompileOptions] = None):
     """echo ${input} | catalyst --tool=opt *args *opts -"""
     # These are the options that may affect compilation
     if not options:
-        return quantum_opt(*args, stdin=stdin)
+        return _quantum_opt(*args, stdin=stdin)
 
     opts = _options_to_cli_flags(options)
-    return quantum_opt(*opts, *args, stdin=stdin)
+    return _quantum_opt(*opts, *args, stdin=stdin)
 
 
 class Compiler:
