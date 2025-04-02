@@ -26,9 +26,8 @@ running -apply-transform-sequence.
 
 import pennylane as qml
 from utils import print_jaxpr, print_mlir
-from utils import qjit_for_tests as qjit
 
-from catalyst import pipeline
+from catalyst import pipeline, qjit
 from catalyst.debug import get_compilation_stage
 from catalyst.passes import apply_pass, cancel_inverses, merge_rotations
 
