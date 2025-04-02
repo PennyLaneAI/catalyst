@@ -35,7 +35,6 @@ from pennylane.queuing import AnnotatedQueue
 
 import catalyst
 from catalyst.jax_extras import DynamicJaxprTracer, ShapedArray
-from catalyst.passes.pass_api import PassPipelineWrapper
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.utils.callables import CatalystCallable
 from catalyst.utils.exceptions import AutoGraphError
