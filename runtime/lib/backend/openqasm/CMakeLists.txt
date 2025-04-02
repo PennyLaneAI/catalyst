@@ -37,16 +37,21 @@ set_target_properties(openqasm_python_module PROPERTIES SUFFIX ".so")
 
 add_library(rtd_openqasm SHARED OpenQasmDevice.cpp)
 
-target_include_directories(rtd_openqasm PRIVATE .
+target_include_directories(rtd_openqasm
+    PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    PRIVATE
     ${runtime_includes}
-    ${backend_includes}
+    ${backend_utils_includes}
 )
 
+set_property(TARGET rtd_openqasm PROPERTY POSITION_INDEPENDENT_CODE ON)
 
+# We don't directly link against the OQ Python module, but we do dlopen it so make dep explicit.
 add_dependencies(rtd_openqasm openqasm_python_module)
 target_compile_definitions(rtd_openqasm PUBLIC -DOPENQASM_PY=\"$<TARGET_FILE_NAME:openqasm_python_module>\")
-set_property(TARGET rtd_openqasm PROPERTY POSITION_INDEPENDENT_CODE ON)
-set_property(TARGET rtd_openqasm APPEND PROPERTY BUILD_RPATH "$<TARGET_FILE_DIR:openqasm_python_module>")
+
+# The openqasm_python_module.so will be in the same directory as the device library:
 if(NOT APPLE)
     set_property(TARGET rtd_openqasm APPEND PROPERTY BUILD_RPATH $ORIGIN)
 else()

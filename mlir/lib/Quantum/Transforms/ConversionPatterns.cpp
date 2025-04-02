@@ -525,6 +525,17 @@ struct ComputationalBasisOpPattern : public OpConversionPattern<ComputationalBas
     LogicalResult matchAndRewrite(ComputationalBasisOp op, ComputationalBasisOpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
+        // We use a temporary unrealized conversion op to send the SSA values
+        // of the compbasis op to the measurement ops
+        // This is because as a full dialect conversion pass, we cannot simply
+        // keep the original compbasis op in the quantum dialect
+
+        // In runtime capi, the measurement stubs can take in one of two things:
+        // 1. An explicit list of qubits, for partial measurements
+        // 2. No qubits, to measure all qubits on the device
+        // Therefore, for the qubit case, let the unrealized cast op carry the list of qubits
+        // and for qreg case, let the unrealized cast op carry no arguments
+
         MLIRContext *ctx = getContext();
         const TypeConverter *conv = getTypeConverter();
 

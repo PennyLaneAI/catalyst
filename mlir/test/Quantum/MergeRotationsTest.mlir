@@ -296,22 +296,6 @@ func.func @test_merge_rotations(%arg0: f64, %arg1: f64) -> !quantum.bit {
 // -----
 
 
-func.func @test_merge_rotations(%arg0: f64, %arg1: f64) -> !quantum.bit {
-    %0 = quantum.alloc( 1) : !quantum.reg
-    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
-    // CHECK: [[reg:%.+]] = quantum.alloc( 1) : !quantum.reg
-    // CHECK: [[qubit:%.+]] = quantum.extract [[reg]][ 0] : !quantum.reg -> !quantum.bit
-    // CHECK: [[ret:%.+]] = quantum.static_custom "RX" [-5.000000e-01] [[qubit]] : !quantum.bit
-    %2 = quantum.static_custom "RX" [2.000000e-01] %1 {adjoint}: !quantum.bit
-    %3 = quantum.static_custom "RX" [3.000000e-01] %2 {adjoint}: !quantum.bit
-
-    // CHECK:  return [[ret]]
-    return %3 : !quantum.bit
-}
-
-// -----
-
-
 func.func @test_merge_rotations(%arg0: f64, %arg1: f64, %arg2: f64) -> (!quantum.bit, !quantum.bit) {
     // CHECK: [[reg:%.+]] = quantum.alloc( 2) : !quantum.reg
     // CHECK: [[qubit1:%.+]] = quantum.extract [[reg]][ 0] : !quantum.reg -> !quantum.bit
@@ -344,8 +328,9 @@ func.func @test_merge_rotations(%arg0: f64) -> !quantum.bit {
     // CHECK: [[sum1:%.+]] = arith.addf [[x2]], [[cst]] : f64
     // CHECK: [[sum2:%.+]] = arith.addf %arg0, [[sum1]] : f64
     // CHECK: [[ret:%.+]] = quantum.custom "RX"([[sum2]]) [[qubit]] : !quantum.bit
+    %cst = arith.constant 1.000000e-01 : f64
     %2 = quantum.custom "RX"(%arg0) %1 : !quantum.bit
-    %3 = quantum.static_custom "RX" [1.000000e-01] %2 : !quantum.bit
+    %3 = quantum.custom "RX" (%cst) %2 : !quantum.bit
     %4 = quantum.custom "RX"(%x2) %3 : !quantum.bit
 
     // CHECK: return [[ret]]
@@ -372,10 +357,60 @@ func.func @test_merge_rotations(%arg0: f64, %arg1: i1, %arg2: i1) -> (!quantum.b
     // CHECK: [[sum1:%.+]] = arith.addf [[x2]], [[cst]] : f64
     // CHECK: [[sum2:%.+]] = arith.addf %arg0, [[sum1]] : f64
     // CHECK: [[ret:%.+]], [[ctrl_ret:%.+]]:2 = quantum.custom "RX"([[sum2]]) [[qubit]] ctrls([[ctrl0]], [[ctrl1]]) ctrlvals(%arg1, %arg2) : !quantum.bit ctrls !quantum.bit, !quantum.bit
+    %cst = arith.constant 1.000000e-01 : f64
     %out_0, %ctrl_out_0:2 = quantum.custom "RX"(%arg0) %0 ctrls(%1, %2) ctrlvals(%arg1, %arg2) : !quantum.bit ctrls !quantum.bit, !quantum.bit
-    %out_1, %ctrl_out_1:2 = quantum.static_custom "RX" [1.000000e-01] %out_0 ctrls(%ctrl_out_0#0, %ctrl_out_0#1) ctrlvals(%arg1, %arg2) : !quantum.bit ctrls !quantum.bit, !quantum.bit
+    %out_1, %ctrl_out_1:2 = quantum.custom "RX" (%cst) %out_0 ctrls(%ctrl_out_0#0, %ctrl_out_0#1) ctrlvals(%arg1, %arg2) : !quantum.bit ctrls !quantum.bit, !quantum.bit
     %out_2, %ctrl_out_2:2 = quantum.custom "RX"(%x2) %out_1 ctrls(%ctrl_out_1#0, %ctrl_out_1#1) ctrlvals(%arg1, %arg2) : !quantum.bit ctrls !quantum.bit, !quantum.bit
 
     // CHECK: return [[ret]], [[ctrl_ret]]#0, [[ctrl_ret]]#1
     return %out_2, %ctrl_out_2#0, %ctrl_out_2#1 : !quantum.bit, !quantum.bit, !quantum.bit
+}
+
+// -----
+
+func.func @test_loop_boundary_rotation(%q0: !quantum.bit, %q1: !quantum.bit) -> (!quantum.bit, !quantum.bit) {
+
+    %stop = arith.constant 10 : index
+    %one = arith.constant 1 : index
+    %theta = arith.constant 0.2 : f64
+    %beta = arith.constant 0.3 : f64
+
+    // Quantum circuit:           // Expected output:
+    // RX(beta) Q0               // RX(beta+theta) Q0
+    //                            // 
+    // for _ in range(n)          // for _ in range(n):
+    //    RX(theta) Q0      ->    //
+    //    X Q1                    //    X Q1
+    //    CNOT Q0, Q1             //    CNOT Q0, Q1
+    //    RX(theta) Q0            //    RX(theta+theta) Q0
+    //    X Q1                    //    X Q1
+    //                            // RX(-theta) Q0
+
+    // CHECK-LABEL: func.func @test_loop_boundary_rotation(
+    // CHECK-SAME: [[q0:%.+]]: !quantum.bit,
+    // CHECK-SAME: [[q1:%.+]]: !quantum.bit
+    // CHECK: [[cst:%.+]] = {{.*}} -2.000000e-01 : f64
+    // CHECK: [[cst_0:%.+]] = {{.*}} 4.000000e-01 : f64
+    // CHECK: [[cst_1:%.+]] = {{.*}} 5.000000e-01 : f64
+
+    // CHECK: [[qubit_0:%.+]] = {{.*}} "RX"([[cst_1]]) [[q0]]
+    %q_00 = quantum.custom "RX"(%beta) %q0 : !quantum.bit
+
+    // CHECK: [[scf:%.+]]:2 = scf.for {{.*}} iter_args([[arg0:%.+]] = [[qubit_0]], [[arg1:%.+]] = [[q1]])
+    %scf:2 = scf.for %i = %one to %stop step %one iter_args(%q_arg0 = %q_00, %q_arg1 = %q1) -> (!quantum.bit, !quantum.bit) {
+        // CHECK-NOT: "RX"
+        %q_0 = quantum.custom "RX"(%theta) %q_arg0 : !quantum.bit
+        // CHECK: [[qubit_1:%.+]] = {{.*}} "X"() [[arg1]]
+        %q_1 = quantum.custom "X"() %q_arg1 : !quantum.bit
+        // CHECK: [[qubit_2:%.+]]:2 = {{.*}} "CNOT"() [[arg0]], [[qubit_1]]
+        %q_2:2 = quantum.custom "CNOT"() %q_0, %q_1 : !quantum.bit, !quantum.bit
+        // CHECK: [[qubit_3:%.+]] = {{.*}} "RX"([[cst_0]]) [[qubit_2]]#0
+        %q_3 = quantum.custom "RX"(%theta) %q_2#0 : !quantum.bit
+        // CHECK: "X"
+        %q_4 = quantum.custom "X"() %q_2#1 : !quantum.bit
+        scf.yield %q_3, %q_4 : !quantum.bit, !quantum.bit
+    }
+
+    // CHECK: [[qubit_6:%.+]] = {{.*}} "RX"([[cst]]) [[scf]]#0
+    func.return %scf#0, %scf#1 : !quantum.bit, !quantum.bit
 }

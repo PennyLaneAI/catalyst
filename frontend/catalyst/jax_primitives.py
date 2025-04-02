@@ -86,7 +86,6 @@ from mlir_quantum.dialects.quantum import (
     SetBasisStateOp,
     SetStateOp,
     StateOp,
-    StaticCustomOp,
     TensorOp,
     VarianceOp,
 )
@@ -175,18 +174,28 @@ def _qreg_lowering(aval):
 class AbstractObs(AbstractValue):
     """Abstract observable."""
 
-    def __init__(self, num_qubits=None, primitive=None):
-        self.num_qubits = num_qubits
+    def __init__(self, num_qubits_or_qreg=None, primitive=None):
+        self.num_qubits = None
+        self.qreg = None
         self.primitive = primitive
+
+        if isinstance(num_qubits_or_qreg, int):
+            self.num_qubits = num_qubits_or_qreg
+        elif isinstance(num_qubits_or_qreg, AbstractQreg):
+            self.qreg = num_qubits_or_qreg
 
     def __eq__(self, other):  # pragma: nocover
         if not isinstance(other, AbstractObs):
             return False
 
-        return self.num_qubits == other.num_qubits and self.primitive == other.primitive
+        return (
+            self.num_qubits == other.num_qubits
+            and self.qreg == other.qreg
+            and self.primitive == other.primitive
+        )
 
     def __hash__(self):  # pragma: nocover
-        return hash(self.primitive) + self.num_qubits
+        return hash(self.primitive) + hash(self.num_qubits) + hash(self.qreg)
 
 
 class ConcreteObs(AbstractObs):
@@ -805,16 +814,18 @@ def _qalloc_lowering(jax_ctx: mlir.LoweringRuleContext, size_value: ir.Value):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
-    assert size_value.owner.name == "stablehlo.constant"
-    size_value_attr = size_value.owner.attributes["value"]
-    assert ir.DenseIntElementsAttr.isinstance(size_value_attr)
-    size = ir.DenseIntElementsAttr(size_value_attr)[0]
-
     qreg_type = ir.OpaqueType.get("quantum", "reg", ctx)
-    i64_type = ir.IntegerType.get_signless(64, ctx)
-    size_attr = ir.IntegerAttr.get(i64_type, size)
+    if isinstance(size_value.owner, ir.Operation) and size_value.owner.name == "stablehlo.constant":
+        size_value_attr = size_value.owner.attributes["value"]
+        assert ir.DenseIntElementsAttr.isinstance(size_value_attr)
+        size = ir.DenseIntElementsAttr(size_value_attr)[0]
+        assert size >= 0
 
-    return AllocOp(qreg_type, nqubits_attr=size_attr).results
+        size_attr = ir.IntegerAttr.get(ir.IntegerType.get_signless(64, ctx), size)
+        return AllocOp(qreg_type, nqubits_attr=size_attr).results
+    else:
+        size_value = extract_scalar(size_value, "qalloc")
+        return AllocOp(qreg_type, nqubits=size_value).results
 
 
 #
@@ -917,21 +928,13 @@ def _qinsert_lowering(
 # gphase
 #
 @gphase_p.def_abstract_eval
-def _gphase_abstract_eval(
-    *qubits_or_params,
-    ctrl_len=0,
-    adjoint=False,
-    static_params=None,
-):
+def _gphase_abstract_eval(*qubits_or_params, ctrl_len=0, adjoint=False):
     # The signature here is: (using * to denote zero or more)
     # param, ctrl_qubits*, ctrl_values*
     # since gphase has no target qubits.
-    if static_params is None:
-        param = qubits_or_params[-1]
-    else:
-        param = static_params[0]
+    param = qubits_or_params[0]
     assert not isinstance(param, AbstractQbit)
-    ctrl_qubits = qubits_or_params[:ctrl_len]
+    ctrl_qubits = qubits_or_params[-2 * ctrl_len : -ctrl_len]
     for idx in range(ctrl_len):
         qubit = ctrl_qubits[idx]
         assert isinstance(qubit, AbstractQbit)
@@ -945,63 +948,34 @@ def _gphase_def_impl(*args, **kwargs):
 
 
 def _gphase_lowering(
-    jax_ctx: mlir.LoweringRuleContext,
-    *qubits_or_params,
-    ctrl_len=0,
-    adjoint=False,
-    static_params=None,
+    jax_ctx: mlir.LoweringRuleContext, *qubits_or_params, ctrl_len=0, adjoint=False
 ):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
-    param = None if static_params else qubits_or_params[-1]
-    ctrl_qubits = qubits_or_params[:ctrl_len]
-    ctrl_values = qubits_or_params[ctrl_len:-1] if param else qubits_or_params[ctrl_len:]
+    param = qubits_or_params[0]
+    ctrl_qubits = qubits_or_params[1 : 1 + ctrl_len]
+    ctrl_values = qubits_or_params[1 + ctrl_len :]
 
-    assert (
-        not static_params or len(static_params) == 1
-    ), "GlobalPhase only takes one static float parameter"
+    param = safe_cast_to_f64(param, "GlobalPhase")
+    param = extract_scalar(param, "GlobalPhase")
 
-    param_attr = (
-        None
-        if static_params is None
-        else ir.DenseF64ArrayAttr.get([ir.FloatAttr.get_f64(static_params[0])])
-    )
-
-    assert bool(param_attr) != bool(param)
-
-    if param_attr is None:
-        param = safe_cast_to_f64(param, "GlobalPhase")
-        param = extract_scalar(param, "GlobalPhase")
-
-        assert ir.F64Type.isinstance(
-            param.type
-        ), "Only scalar double parameters are allowed for quantum gates!"
+    assert ir.F64Type.isinstance(
+        param.type
+    ), "Only scalar double parameters are allowed for quantum gates!"
 
     ctrl_values_i1 = []
     for v in ctrl_values:
         p = TensorExtractOp(ir.IntegerType.get_signless(1), v, []).result
         ctrl_values_i1.append(p)
 
-    if static_params:
-        StaticCustomOp(
-            out_qubits=[],
-            out_ctrl_qubits=[qubit.type for qubit in ctrl_qubits],
-            static_params=param_attr,
-            in_qubits=[],
-            gate_name="GlobalPhase",
-            in_ctrl_qubits=ctrl_qubits,
-            in_ctrl_values=ctrl_values_i1,
-            adjoint=adjoint,
-        )
-    else:
-        GlobalPhaseOp(
-            params=param,
-            out_ctrl_qubits=[qubit.type for qubit in ctrl_qubits],
-            in_ctrl_qubits=ctrl_qubits,
-            in_ctrl_values=ctrl_values_i1,
-            adjoint=adjoint,
-        )
+    GlobalPhaseOp(
+        params=param,
+        out_ctrl_qubits=[qubit.type for qubit in ctrl_qubits],
+        in_ctrl_qubits=ctrl_qubits,
+        in_ctrl_values=ctrl_values_i1,
+        adjoint=adjoint,
+    )
     return ctrl_qubits
 
 
@@ -1010,17 +984,13 @@ def _gphase_lowering(
 #
 @qinst_p.def_abstract_eval
 def _qinst_abstract_eval(
-    *qubits_or_params,
-    op=None,
-    qubits_len=0,
-    ctrl_len=0,
-    ctrl_value_len=0,
-    adjoint=False,
-    static_params=None,
+    *qubits_or_params, op=None, qubits_len=0, params_len=0, ctrl_len=0, adjoint=False
 ):
     # The signature here is: (using * to denote zero or more)
-    # qubits*, ctrl_qubits*, ctrl_values*, params*
-    all_qubits = qubits_or_params[: qubits_len + ctrl_len]
+    # qubits*, params*, ctrl_qubits*, ctrl_values*
+    qubits = qubits_or_params[:qubits_len]
+    ctrl_qubits = qubits_or_params[-2 * ctrl_len : -ctrl_len]
+    all_qubits = qubits + ctrl_qubits
     for idx in range(qubits_len + ctrl_len):
         qubit = all_qubits[idx]
         assert isinstance(qubit, AbstractQbit)
@@ -1038,19 +1008,17 @@ def _qinst_lowering(
     *qubits_or_params,
     op=None,
     qubits_len=0,
+    params_len=0,
     ctrl_len=0,
-    ctrl_value_len=0,
     adjoint=False,
-    static_params=None,
 ):
-    assert ctrl_value_len == ctrl_len, "Control values must be the same length as control qubits"
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
     qubits = qubits_or_params[:qubits_len]
-    ctrl_qubits = qubits_or_params[qubits_len : qubits_len + ctrl_len]
-    ctrl_values = qubits_or_params[qubits_len + ctrl_len : qubits_len + ctrl_len + ctrl_value_len]
-    params = qubits_or_params[qubits_len + ctrl_len + ctrl_value_len :]
+    params = qubits_or_params[qubits_len : qubits_len + params_len]
+    ctrl_qubits = qubits_or_params[qubits_len + params_len : qubits_len + params_len + ctrl_len]
+    ctrl_values = qubits_or_params[qubits_len + params_len + ctrl_len :]
 
     for qubit in qubits:
         assert ir.OpaqueType.isinstance(qubit.type)
@@ -1073,42 +1041,13 @@ def _qinst_lowering(
         p = TensorExtractOp(ir.IntegerType.get_signless(1), v, []).result
         ctrl_values_i1.append(p)
 
-    params_attr = (
-        None
-        if static_params is None
-        else ir.DenseF64ArrayAttr.get([ir.FloatAttr.get_f64(val) for val in static_params])
-    )
-    if len(float_params) > 0:
-        assert (
-            params_attr is None
-        ), "Static parameters are not allowed when having dynamic parameters"
-
     name_attr = ir.StringAttr.get(op)
     name_str = str(name_attr)
     name_str = name_str.replace('"', "")
 
-    if static_params:
-        return StaticCustomOp(
-            out_qubits=[qubit.type for qubit in qubits],
-            out_ctrl_qubits=[qubit.type for qubit in ctrl_qubits],
-            static_params=params_attr,
-            in_qubits=qubits,
-            gate_name=name_attr,
-            in_ctrl_qubits=ctrl_qubits,
-            in_ctrl_values=ctrl_values_i1,
-            adjoint=adjoint,
-        ).results
-
     if name_str == "MultiRZ":
-        assert len(float_params) <= 1, "MultiRZ takes at most one dynamic float parameter"
-        assert (
-            not static_params or len(static_params) <= 1
-        ), "MultiRZ takes at most one static float parameter"
-        float_param = (
-            TensorExtractOp(ir.F64Type.get(), mlir.ir_constant(static_params[0]), [])
-            if len(float_params) == 0
-            else float_params[0]
-        )
+        assert len(float_params) == 1, "MultiRZ takes one float parameter"
+        float_param = float_params[0]
         return MultiRZOp(
             out_qubits=[qubit.type for qubit in qubits],
             out_ctrl_qubits=[qubit.type for qubit in ctrl_qubits],
@@ -1118,6 +1057,7 @@ def _qinst_lowering(
             in_ctrl_values=ctrl_values_i1,
             adjoint=adjoint,
         ).results
+
     return CustomOp(
         out_qubits=[qubit.type for qubit in qubits],
         out_ctrl_qubits=[qubit.type for qubit in ctrl_qubits],
@@ -1249,29 +1189,46 @@ def _qmeasure_lowering(jax_ctx: mlir.LoweringRuleContext, qubit: ir.Value, posts
 # compbasis observable
 #
 @compbasis_p.def_abstract_eval
-def _compbasis_abstract_eval(*qubits):
-    for qubit in qubits:
-        assert isinstance(qubit, AbstractQbit)
-    return AbstractObs(len(qubits), compbasis_p)
+def _compbasis_abstract_eval(*qubits_or_qreg, qreg_available=False):
+    if qreg_available:
+        qreg = qubits_or_qreg[0]
+        assert isinstance(qreg, AbstractQreg)
+        return AbstractObs(qreg, compbasis_p)
+    else:
+        qubits = qubits_or_qreg
+        for qubit in qubits:
+            assert isinstance(qubit, AbstractQbit)
+        return AbstractObs(len(qubits), compbasis_p)
 
 
 @compbasis_p.def_impl
-def _compbasis_def_impl(ctx, *qubits):  # pragma: no cover
+def _compbasis_def_impl(ctx, *qubits_or_qreg, qreg_available):  # pragma: no cover
     raise NotImplementedError()
 
 
-def _compbasis_lowering(jax_ctx: mlir.LoweringRuleContext, *qubits: tuple):
+def _compbasis_lowering(
+    jax_ctx: mlir.LoweringRuleContext, *qubits_or_qreg: tuple, qreg_available=False
+):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
-    for qubit in qubits:
-        assert ir.OpaqueType.isinstance(qubit.type)
-        assert ir.OpaqueType(qubit.type).dialect_namespace == "quantum"
-        assert ir.OpaqueType(qubit.type).data == "bit"
-
     result_type = ir.OpaqueType.get("quantum", "obs")
 
-    return ComputationalBasisOp(result_type, qubits).results
+    if qreg_available:
+        qreg = qubits_or_qreg[0]
+        assert ir.OpaqueType.isinstance(qreg.type)
+        assert ir.OpaqueType(qreg.type).dialect_namespace == "quantum"
+        assert ir.OpaqueType(qreg.type).data == "reg"
+        return ComputationalBasisOp(result_type, [], qreg=qreg).results
+
+    else:
+        qubits = qubits_or_qreg
+        for qubit in qubits:
+            assert ir.OpaqueType.isinstance(qubit.type)
+            assert ir.OpaqueType(qubit.type).dialect_namespace == "quantum"
+            assert ir.OpaqueType(qubit.type).data == "bit"
+
+        return ComputationalBasisOp(result_type, qubits).results
 
 
 #
@@ -1409,8 +1366,10 @@ def sample_staging_rule(jaxpr_trace, obs, shots, num_qubits):
     See jax._src.interpreters.partial_eval.process_primitive and default_process_primitive,
     https://github.com/jax-ml/jax/blob/a54319ec1886ed920d50cacf10e147a743888464/jax/_src/interpreters/partial_eval.py#L1881C7-L1881C24
     """
+
     if obs.primitive is compbasis_p:
-        assert num_qubits == obs.num_qubits
+        if obs.num_qubits:
+            assert num_qubits == obs.num_qubits
 
     out_shape = core.DShapedArray((shots, num_qubits), jax.numpy.dtype("float64"))
     out_tracer = pe.DynamicJaxprTracer(jaxpr_trace, out_shape)
@@ -1472,7 +1431,8 @@ def _counts_abstract_eval(obs, shots, shape):
     assert isinstance(obs, AbstractObs)
 
     if obs.primitive is compbasis_p:
-        assert shape == (2**obs.num_qubits,)
+        if obs.num_qubits:
+            assert shape == (2**obs.num_qubits,)
     else:
         assert shape == (2,)
 
@@ -1566,7 +1526,8 @@ def _probs_abstract_eval(obs, shape, shots=None):
     assert isinstance(obs, AbstractObs)
 
     if obs.primitive is compbasis_p:
-        assert shape == (2**obs.num_qubits,)
+        if obs.num_qubits:
+            assert shape == (2**obs.num_qubits,)
     else:
         raise TypeError("probs only supports computational basis")
 
@@ -1595,7 +1556,10 @@ def _state_abstract_eval(obs, shape, shots=None):
     assert isinstance(obs, AbstractObs)
 
     if obs.primitive is compbasis_p:
-        assert shape == (2**obs.num_qubits,)
+        assert not obs.num_qubits, """
+        A "wires" argument should not be provided since state() always
+        returns a pure state describing all wires in the device.
+        """
     else:
         raise TypeError("state only supports computational basis")
 

@@ -26,6 +26,7 @@ from dataclasses import dataclass, replace
 from typing import Any, Dict, Optional
 
 import pennylane as qml
+from jax.interpreters.partial_eval import DynamicJaxprTracer
 from pennylane.devices.capabilities import DeviceCapabilities, OperatorProperties
 from pennylane.transforms import (
     diagonalize_measurements,
@@ -375,7 +376,12 @@ class QJITDevice(qml.devices.Device):
         program = program + measurement_transforms
 
         # decomposition to supported ops/measurements
-        program.add_transform(catalyst_decompose, ctx=ctx, capabilities=self.capabilities)
+        program.add_transform(
+            catalyst_decompose,
+            ctx=ctx,
+            capabilities=self.capabilities,
+            grad_method=config.gradient_method,
+        )
 
         # Catalyst program verification and validation
         program.add_transform(
@@ -532,16 +538,37 @@ def get_device_capabilities(device) -> DeviceCapabilities:
     return device_capabilities.filter(finite_shots=shots_present)
 
 
+def is_dynamic_wires(wires: qml.wires.Wires):
+    """
+    Checks if a pennylane Wires object corresponds to a concrete number
+    of wires or a dynamic number of wires.
+
+    If the number of wires is static, the Wires object contains a list of wire labels,
+    one label for each wires.
+    If the number of wires is dynamic, the Wires object contains a single tracer that
+    represents the number of wires.
+    """
+    return (len(wires) == 1) and (isinstance(wires[0], DynamicJaxprTracer))
+
+
 def check_device_wires(wires):
     """Validate requirements Catalyst imposes on device wires."""
 
     if wires is None:
         raise AttributeError("Catalyst does not support device instances without set wires.")
 
-    assert isinstance(wires, qml.wires.Wires)
+    if len(wires) >= 2 or (not is_dynamic_wires(wires)):
+        # A dynamic number of wires correspond to a single tracer for the number
+        # Thus if more than one entry, must be static wires
+        assert isinstance(wires, qml.wires.Wires)
 
-    if not all(isinstance(wire, int) for wire in wires.labels):
-        raise AttributeError("Catalyst requires continuous integer wire labels starting at 0.")
+        if not all(isinstance(wire, int) for wire in wires.labels):
+            raise AttributeError("Catalyst requires continuous integer wire labels starting at 0.")
 
-    if not wires.labels == tuple(range(len(wires))):
-        raise AttributeError("Catalyst requires continuous integer wire labels starting at 0.")
+        if not wires.labels == tuple(range(len(wires))):
+            raise AttributeError("Catalyst requires continuous integer wire labels starting at 0.")
+    else:
+        assert len(wires) == 1
+        assert wires[0].shape in ((), (1,))
+        if not wires[0].dtype == "int64":
+            raise AttributeError("Number of wires on the device should be a scalar integer.")
