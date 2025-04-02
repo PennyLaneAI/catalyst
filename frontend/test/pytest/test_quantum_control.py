@@ -34,12 +34,11 @@ from pennylane import ctrl as PL_ctrl
 from pennylane.operation import DecompositionUndefinedError, Operation, Operator, Wires
 from pennylane.ops.op_math.controlled import Controlled
 from pennylane.tape import QuantumTape
-from utils import qjit_for_tests as qjit
 
 from catalyst import adjoint as C_adjoint
 from catalyst import cond
 from catalyst import ctrl as C_ctrl
-from catalyst import for_loop, measure, while_loop
+from catalyst import for_loop, measure, while_loop, qjit
 from catalyst.api_extensions.quantum_operators import HybridCtrl
 from catalyst.jax_tracer import HybridOpRegion
 

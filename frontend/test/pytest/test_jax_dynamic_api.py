@@ -22,9 +22,8 @@ import pytest
 from jax import numpy as jnp
 from numpy import array_equal
 from numpy.testing import assert_allclose
-from utils import qjit_for_tests as qjit
 
-from catalyst import cond, for_loop, while_loop
+from catalyst import cond, for_loop, while_loop, qjit
 from catalyst.jax_extras import DShapedArray, ShapedArray
 from catalyst.jax_extras.tracing import trace_to_jaxpr
 from catalyst.tracing.contexts import EvaluationContext

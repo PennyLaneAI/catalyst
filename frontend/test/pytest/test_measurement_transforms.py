@@ -28,8 +28,8 @@ from conftest import CONFIG_CUSTOM_DEVICE
 from pennylane.devices import Device
 from pennylane.devices.capabilities import OperatorProperties
 from pennylane.transforms import split_non_commuting, split_to_single_terms
-from utils import qjit_for_tests as qjit_cleanup
 
+from catalyst import qjit
 from catalyst.compiler import get_lib_path
 from catalyst.device import QJITDevice, get_device_capabilities
 from catalyst.device.decomposition import (
@@ -153,7 +153,7 @@ class TestMeasurementTransforms:
 
         transformed_circuit = measurements_from_counts(basic_circuit, dev.wires)
 
-        mlir = qjit_cleanup(transformed_circuit, target="mlir").mlir
+        mlir = qjit(transformed_circuit, target="mlir").mlir
         assert "expval" not in mlir
         assert "quantum.var" not in mlir
         assert "counts" in mlir
@@ -206,7 +206,7 @@ class TestMeasurementTransforms:
 
         transformed_circuit = measurements_from_samples(basic_circuit, dev.wires)
 
-        mlir = qjit_cleanup(transformed_circuit, target="mlir").mlir
+        mlir = qjit(transformed_circuit, target="mlir").mlir
         assert "expval" not in mlir
         assert "quantum.var" not in mlir
         assert "sample" in mlir
@@ -278,7 +278,7 @@ class TestMeasurementTransforms:
                     qml.probs(wires=[3, 4]),
                 )
 
-            mlir = qjit_cleanup(circuit, target="mlir").mlir
+            mlir = qjit(circuit, target="mlir").mlir
 
         assert "expval" not in mlir
         assert "quantum.var" not in mlir
@@ -330,7 +330,7 @@ class TestMeasurementTransforms:
                     qml.probs(wires=[3, 4]),
                 )
 
-            mlir = qjit_cleanup(circuit, target="mlir").mlir
+            mlir = qjit(circuit, target="mlir").mlir
 
         assert "expval" not in mlir
         assert "quantum.var" not in mlir
@@ -493,7 +493,7 @@ class TestMeasurementTransforms:
             qml.RX(theta / 2, 1)
             return input_measurement()
 
-        mlir = qjit_cleanup(circuit, target="mlir").mlir
+        mlir = qjit(circuit, target="mlir").mlir
         assert "expval" not in mlir
         assert "sample" in mlir
 
@@ -547,7 +547,7 @@ class TestMeasurementTransforms:
             qml.RX(theta / 2, 1)
             return input_measurement()
 
-        mlir = qjit_cleanup(circuit, target="mlir").mlir
+        mlir = qjit(circuit, target="mlir").mlir
         assert "expval" not in mlir
         assert "counts" in mlir
 
@@ -662,7 +662,7 @@ class TestMeasurementTransforms:
         def circuit():
             return qml.expval(qml.X(0)), qml.var(qml.Y(1)), qml.expval(qml.Hadamard(2))
 
-        mlir = qjit_cleanup(circuit, target="mlir").mlir
+        mlir = qjit(circuit, target="mlir").mlir
         for obs in unsupported_obs:
             assert f"{obs}] : !quantum.obs" in mlir
 
@@ -674,7 +674,7 @@ class TestMeasurementTransforms:
         with patch(
             "catalyst.device.qjit_device.get_device_capabilities", Mock(return_value=config)
         ):
-            mlir = qjit_cleanup(circuit, target="mlir").mlir
+            mlir = qjit(circuit, target="mlir").mlir
 
             for obs in unsupported_obs:
                 assert f"{obs}] : !quantum.obs" not in mlir
