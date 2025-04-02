@@ -151,7 +151,15 @@ def test_scale_factors_value_error(scale_factors):
         mitigated_function(0.1)
 
 
-@pytest.mark.parametrize("scale_factors", [[jax.numpy.array([1, 3])], jax.numpy.array([1, 3]), [1.0, 3.0], [complex(1, 0), complex(3, 0)]])
+@pytest.mark.parametrize(
+    "scale_factors",
+    [
+        [jax.numpy.array([1, 3])],
+        jax.numpy.array([1, 3]),
+        [1.0, 3.0],
+        [complex(1, 0), complex(3, 0)],
+    ],
+)
 def test_scale_factors_type_error(scale_factors):
     """Test that when using non-integer, it raises a TypeError."""
 
