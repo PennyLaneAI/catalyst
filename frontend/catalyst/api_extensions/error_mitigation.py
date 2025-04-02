@@ -141,7 +141,7 @@ def mitigate_with_zne(
         extrapolate = functools.partial(extrapolate, **extrapolate_kwargs)
 
     if not _is_odd_positive(scale_factors):
-        raise ValueError("The scale factors must be positive odd integers: {scale_factors}")
+        raise ValueError(f"The scale factors must be positive odd integers: {scale_factors}")
 
     return ZNECallable(fn, scale_factors, extrapolate, folding)
 
