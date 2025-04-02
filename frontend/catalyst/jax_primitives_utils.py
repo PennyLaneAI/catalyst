@@ -47,7 +47,7 @@ def get_call_equation(jaxpr):
     raise AssertionError("No call_jaxpr found in the JAXPR.")
 
 
-def lower_jaxpr(ctx, jaxpr):
+def lower_jaxpr(ctx, jaxpr, context=None):
     """Lowers a call primitive jaxpr, may be either func_p or quantum_kernel_p"""
     equation = get_call_equation(jaxpr)
     call_jaxpr = equation.params["call_jaxpr"]
@@ -55,10 +55,10 @@ def lower_jaxpr(ctx, jaxpr):
     if callable_ is None:
         callable_ = equation.params.get("qnode")
     pipeline = equation.params.get("pipeline")
-    return lower_callable(ctx, callable_, call_jaxpr, pipeline=pipeline)
+    return lower_callable(ctx, callable_, call_jaxpr, pipeline=pipeline, context=context)
 
 
-def lower_callable(ctx, callable_, call_jaxpr, pipeline=None):
+def lower_callable(ctx, callable_, call_jaxpr, pipeline=None, context=None):
     """Lowers _callable to MLIR.
 
     If callable_ is a qnode, then we will first create a module, then
@@ -77,14 +77,16 @@ def lower_callable(ctx, callable_, call_jaxpr, pipeline=None):
         pipeline = tuple()
 
     if not isinstance(callable_, qml.QNode):
-        return get_or_create_funcop(ctx, callable_, call_jaxpr, pipeline)
+        return get_or_create_funcop(ctx, callable_, call_jaxpr, pipeline, context=context)
 
-    return get_or_create_qnode_funcop(ctx, callable_, call_jaxpr, pipeline)
+    return get_or_create_qnode_funcop(ctx, callable_, call_jaxpr, pipeline, context=context)
 
 
-def get_or_create_funcop(ctx, callable_, call_jaxpr, pipeline):
+def get_or_create_funcop(ctx, callable_, call_jaxpr, pipeline, context=None):
     """Get funcOp from cache, or create it from scratch"""
-    key = (str(call_jaxpr), *pipeline)
+    if context is None:
+        context = tuple()
+    key = (callable_, *context, *pipeline)
     if func_op := get_cached(ctx, key):
         return func_op
     func_op = lower_callable_to_funcop(ctx, callable_, call_jaxpr)
@@ -123,7 +125,7 @@ def lower_callable_to_funcop(ctx, callable_, call_jaxpr):
     return func_op
 
 
-def get_or_create_qnode_funcop(ctx, callable_, call_jaxpr, pipeline):
+def get_or_create_qnode_funcop(ctx, callable_, call_jaxpr, pipeline, context):
     """A wrapper around lower_qnode_to_funcop that will cache the FuncOp.
 
     Args:
@@ -133,7 +135,9 @@ def get_or_create_qnode_funcop(ctx, callable_, call_jaxpr, pipeline):
     Returns:
       FuncOp
     """
-    key = (str(call_jaxpr), *pipeline)
+    if context is None:
+        context = tuple()
+    key = (callable_, *context, *pipeline)
     if func_op := get_cached(ctx, key):
         return func_op
     func_op = lower_qnode_to_funcop(ctx, callable_, call_jaxpr, pipeline)
