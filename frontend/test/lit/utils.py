@@ -14,13 +14,6 @@
 
 """Module useful for writing tests which inspect mlir"""
 
-import copy
-import functools
-
-from catalyst.compiler import CompileOptions
-from catalyst.jit import QJIT
-from catalyst.utils.filesystem import WorkspaceManager
-
 # pylint: disable=unused-argument,too-many-arguments
 
 
