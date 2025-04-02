@@ -32,6 +32,14 @@ namespace catalyst {
 struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> {
     using mlir::OpRewritePattern<mhlo::ScatterOp>::OpRewritePattern;
 
+    void emitIndicesError(mhlo::ScatterOp op) const {
+        op.emitError() << "Indices are not unique and/or not sorted. Note that when using multiple indices with "
+                      << "``jax.numpy.ndarray.at``, the indices must be sorted and unique. These requirements "
+                      << "cannot be checked at compile time and must be explicitly provided using the "
+                      << "``jax.numpy.ndarray.at`` method parameters ``indices_are_sorted`` and ``unique_indices`` "
+                      << "(current state - unique: " << op.getUniqueIndices() << ", sorted: " << op.getIndicesAreSorted() << ")";
+    }
+
     mlir::LogicalResult onlyOneInputUpdateAndResult(mhlo::ScatterOp op) const
     {
         // Semantics of scatter:
@@ -160,15 +168,7 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
         // Add checks for supported cases (assumptions: no update windows dim, unique indices and
         // sorted indices)
         if (!op.getUniqueIndices() || !op.getIndicesAreSorted()) {
-            op.emitError() << "Indices are not unique and/or not sorted."
-                           << "Note that if you are using multiple indices with the "
-                           << "``jax.numpy.ndarray.at`` method, the indices must be sorted and "
-                           << "unique. These requirements cannot be checked at compile time and "
-                           << "one must explicitly provide these guarantees using the "
-                           << "``jax.numpy.ndarray.at`` method parameters ``indices_are_sorted`` "
-                           << "and ``unique_indices``\n"
-                           << "Current state - unique: " << op.getUniqueIndices()
-                           << ", sorted: " << op.getIndicesAreSorted();
+            emitIndicesError(op);
             return failure();
         }
 
@@ -303,15 +303,7 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
         // Add checks for supported cases (assumptions: no update windows dim, unique indices and
         // sorted indices)
         if (!op.getUniqueIndices() || !op.getIndicesAreSorted()) {
-            op.emitError() << "Indices are not unique and/or not sorted."
-                           << "Note that if you are using multiple indices with the "
-                           << "``jax.numpy.ndarray.at`` method, the indices must be sorted and "
-                           << "unique. These requirements cannot be checked at compile time and "
-                           << "one must explicitly provide these guarantees using the "
-                           << "``jax.numpy.ndarray.at`` method parameters ``indices_are_sorted`` "
-                           << "and ``unique_indices``\n"
-                           << "Current state - unique: " << op.getUniqueIndices()
-                           << ", sorted: " << op.getIndicesAreSorted();
+            emitIndicesError(op);
             return failure();
         }
 
