@@ -474,18 +474,24 @@ def ppr_to_ppm(qnode):
 
     .. code-block:: python
 
+        import pennylane as qml
+        from catalyst import qjit, measure
+
         ppm_passes = [("PPM",["to_ppr", "commute_ppr","ppr_to_ppm",])]
 
-        @qjit(pipelines=ppm_passes, keep_intermediate=True)
+        @qjit(pipelines=ppm_passes, keep_intermediate=True, target="mlir")
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def circuit():
             qml.H(0)
             qml.T(0)
             return measure(0)
 
+        print(circuit.mlir_opt)
+
     Example MLIR Representation:
 
     .. code-block:: mlir
+
         . . .
         %2 = qec.ppr ["X"](8) %1 : !quantum.bit
         %mres, %out_qubits = qec.ppm ["X"] %2 : !quantum.bit

@@ -16,9 +16,7 @@
 
 # RUN: %PYTHON %s | FileCheck %s
 
-from utils import qjit_for_tests as qjit
-
-from catalyst import pure_callback
+from catalyst import pure_callback, qjit
 
 
 def i(x):

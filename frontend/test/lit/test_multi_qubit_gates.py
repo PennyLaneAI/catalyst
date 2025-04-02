@@ -16,9 +16,8 @@
 
 import numpy as np
 import pennylane as qml
-from utils import qjit_for_tests as qjit
 
-from catalyst import measure
+from catalyst import measure, qjit
 
 
 # CHECK-LABEL: public @jit_circuit
