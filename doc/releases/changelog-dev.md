@@ -183,6 +183,7 @@
     [(#1513)](https://github.com/PennyLaneAI/catalyst/pull/1513)
   - Remove unnecessary I/O.
     [(#1514)](https://github.com/PennyLaneAI/catalyst/pull/1514)
+    [(#1602)](https://github.com/PennyLaneAI/catalyst/pull/1602)
   - Sort improvements to reduce complexity and memory.
     [(#1524)](https://github.com/PennyLaneAI/catalyst/pull/1524)
   - Lazy IR canonicalization and LLVMIR textual generation.
@@ -239,6 +240,9 @@
 * Fixes an issue ([(#1547)](https://github.com/PennyLaneAI/catalyst/issues/1547)) where using
   chained catalyst passe decorators causes a crash.
   [(#1576)](https://github.com/PennyLaneAI/catalyst/pull/1576)
+
+* Autographs and catalyst pipeline fix.
+  [(#1599)](https://github.com/PennyLaneAI/catalyst/pull/1599)
 
 <h3>Internal changes ⚙️</h3>
 
@@ -310,6 +314,9 @@
   [(#1229)](https://github.com/PennyLaneAI/catalyst/pull/1229)
 
 <h3>Documentation 📝</h3>
+
+* Added more details to Jax integration documentation regarding the use of `.at` with multiple indices.
+  [(#1595)](https://github.com/PennyLaneAI/catalyst/pull/1595)
 
 <h3>Contributors ✍️</h3>
 

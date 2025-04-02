@@ -20,9 +20,8 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import pennylane as qml
-from utils import qjit_for_tests as qjit
 
-from catalyst import grad, jacobian
+from catalyst import grad, jacobian, qjit
 
 
 # CHECK-LABEL: public @jit_grad_default

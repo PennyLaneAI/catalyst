@@ -18,9 +18,8 @@ import jax.numpy as jnp
 import numpy as np
 import pennylane as qml
 import pytest
-from utils import qjit_for_tests as qjit
 
-from catalyst import api_extensions, cond, measure
+from catalyst import api_extensions, cond, measure, qjit
 
 # pylint: disable=missing-function-docstring
 

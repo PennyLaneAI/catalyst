@@ -26,7 +26,8 @@ from typing import Callable, Sequence
 import numpy as np
 import pennylane as qml
 from utils import print_jaxpr, print_mlir
-from utils import qjit_for_tests as qjit
+
+from catalyst import qjit
 
 
 def test_multiple_tape_transforms():
