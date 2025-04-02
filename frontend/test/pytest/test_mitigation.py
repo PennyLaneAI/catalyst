@@ -22,7 +22,10 @@ import pytest
 from pennylane.transforms import exponential_extrapolate
 
 import catalyst
-from catalyst.api_extensions.error_mitigation import polynomial_extrapolation
+from catalyst.api_extensions.error_mitigation import (
+    _check_is_odd_positive,
+    polynomial_extrapolation,
+)
 
 quadratic_extrapolation = polynomial_extrapolation(2)
 
@@ -131,8 +134,8 @@ def test_single_measurement_control_flow(params, folding):
     assert np.allclose(mitigated_qnode(params, 3), catalyst.qjit(circuit)(params, 3))
 
 
-@pytest.mark.parametrize("scale_factors", [[1.0, 3, 5, 7], [-1, 3, 5, 7], [1, 2, 5, 7]])
-def test_scale_factors_error(scale_factors):
+@pytest.mark.parametrize("scale_factors", [[-1, 3, 5, 7], [1, 2, 5, 7]])
+def test_scale_factors_value_error(scale_factors):
     """Test that when scale factors are not positive odd integer, it raises an error."""
 
     def circuit(x):
@@ -142,8 +145,20 @@ def test_scale_factors_error(scale_factors):
     def mitigated_function(args):
         return catalyst.mitigate_with_zne(circuit, scale_factors=scale_factors)(args)
 
-    with pytest.raises(ValueError, match="The scale factors must be positive odd integers:"):
+    with pytest.raises(
+        ValueError, match=".*Only odd positive integers are allowed in scale_factors"
+    ):
         mitigated_function(0.1)
+
+
+@pytest.mark.parametrize("scale_factors", [[1.0, 3.0], [complex(1, 0), complex(3, 0)]])
+def test_scale_factors_type_error(scale_factors):
+    """Test that when using non-integer, it raises a TypeError."""
+
+    with pytest.raises(
+        TypeError, match=".*Only odd positive integers are allowed in scale_factors"
+    ):
+        _check_is_odd_positive(scale_factors)
 
 
 @pytest.mark.parametrize("extrapolation", [quadratic_extrapolation, exponential_extrapolate])

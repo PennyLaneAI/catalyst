@@ -32,8 +32,20 @@ from catalyst.jax_tracer import Function
 from catalyst.utils.callables import CatalystCallable
 
 
-def _is_odd_positive(numbers_list):
-    return all(isinstance(i, int) and i > 0 and i % 2 != 0 for i in numbers_list)
+def _check_is_odd_positive(numbers_list):
+    for n in numbers_list:
+        if not isinstance(n, int):
+            msg = f"Found non-integer {n} in scale_factors {numbers_list}.\n"
+            msg += "Only odd positive integers are allowed in scale_factors"
+            raise TypeError(msg)
+        if n < 0:
+            msg = "Found negative number {n} in scale_factors {numbers_list}.\n"
+            msg += "Only odd positive integers are allowed in scale_factors"
+            raise ValueError(msg)
+        if n % 2 == 0:
+            msg = f"Found even positive {n} in scale_factors {numbers_list}.\n"
+            msg += "Only odd positive integers are allowed in scale_factors"
+            raise ValueError(msg)
 
 
 ## API ##
@@ -140,8 +152,7 @@ def mitigate_with_zne(
     elif extrapolate_kwargs is not None:
         extrapolate = functools.partial(extrapolate, **extrapolate_kwargs)
 
-    if not _is_odd_positive(scale_factors):
-        raise ValueError(f"The scale factors must be positive odd integers: {scale_factors}")
+    _check_is_odd_positive(scale_factors)
 
     return ZNECallable(fn, scale_factors, extrapolate, folding)
 
