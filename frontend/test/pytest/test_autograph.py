@@ -371,7 +371,7 @@ class TestIntegration:
         assert np.allclose(fn(3)[0], tuple([jnp.array(6.0), jnp.array(9.0)]))
         assert np.allclose(fn(3)[1], tuple([jnp.array(2.0), jnp.array(6.0)]))
 
-    def test_ctrl_with_autograph(self):
+    def test_ctrl_with_operation_as_argument(self):
         """Test that qml.ctrl works when an operation is passed as argument."""
         dev = qml.device("lightning.qubit", wires=2)
 
