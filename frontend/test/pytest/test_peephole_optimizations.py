@@ -216,11 +216,9 @@ def test_convert_clifford_to_ppr():
         return f()
 
     assert 'transform.apply_registered_pass "to_ppr"' in test_convert_clifford_to_ppr_workflow.mlir
-    assert (
-        'transform.apply_registered_pass "to_ppr"'
-        not in test_convert_clifford_to_ppr_workflow.mlir_opt
-    )
-    assert "qec.ppr" in test_convert_clifford_to_ppr_workflow.mlir_opt
+    optimized_ir = test_convert_clifford_to_ppr_workflow.mlir_opt
+    assert 'transform.apply_registered_pass "to_ppr"' not in optimized_ir
+    assert "qec.ppr" in optimized_ir
 
 
 test_convert_clifford_to_ppr()
