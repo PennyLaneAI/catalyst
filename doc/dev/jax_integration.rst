@@ -39,7 +39,7 @@ This includes:
   .. note::
 
       When using multiple indices with the `.at` method, the indices must be sorted and unique.
-      However, these requirements cannot be checked at compile time, and one must explicitly provide
+      However, these requirements cannot be checked at compile time, therefore you must explicitly provide
       these guarantees using the parameters ``indices_are_sorted=True`` and ``unique_indices=True``.
 
       For example in the following code, even though the indices ``idx_array`` are sorted, the
