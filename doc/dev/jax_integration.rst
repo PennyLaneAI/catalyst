@@ -13,6 +13,8 @@ the many functions accessible in ``jax`` and ``jax.numpy`` to write code that su
 Here, we aim to provide an overview of the JAX integration, including the existing support
 and limitations.
 
+.. _jax-sharp-bits:
+
 JAX 'sharp bits'
 ----------------
 
@@ -33,6 +35,26 @@ This includes:
   syntax ``new_array = jax_array.at[index].set(value)`` should be used. For
   more details, see `jax.numpy.ndarray.at
   <https://jax.readthedocs.io/en/latest/_autosummary/jax.numpy.ndarray.at.html>`__.
+
+  .. note::
+
+      When using multiple indices with the `.at` method, the indices must be sorted and unique.
+      However, these requirements cannot be checked at compile time, therefore you must explicitly provide
+      these guarantees using the parameters ``indices_are_sorted=True`` and ``unique_indices=True``.
+
+      For example in the following code, even though the indices ``idx_array`` are sorted, the
+      compilation will fail unless the ``indices_are_sorted`` and ``unique_indices`` parameters
+      are provided:
+
+      .. code-block:: python
+
+        @qjit
+        def test_function():
+            N = 10
+            jax_array = jnp.zeros(N, dtype=jnp.int64)
+            idx_array = jnp.arange(N, dtype=jnp.int64)
+            init_val = jnp.ones(N, dtype=jnp.int64)
+            return jax_array.at[idx_array].set(init_val, indices_are_sorted=True, unique_indices=True)
 
   .. note::
 
@@ -88,8 +110,9 @@ that doesn't work with Catalyst includes:
 
 - ``jax.numpy.polyfit``
 - ``jax.numpy.fft``
-- ``jax.numpy.ndarray.at[index]`` when ``index`` corresponds to all array
-  indices.
+- ``jax.numpy.ndarray.at[index]``  when ``index`` contains multiple indices
+  *and* the indices overlap, or are not sorted in ascending order (see the
+  :ref:`jax-sharp-bits` section for details).
 
 If you come across any other JAX functions that don't work with Catalyst
 (and don't already have a Catalyst equivalent), please let us know by opening
