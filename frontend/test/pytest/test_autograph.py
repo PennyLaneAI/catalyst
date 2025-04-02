@@ -2274,6 +2274,7 @@ class TestJaxIndexOperatorUpdate:
 
         @qjit(autograph=True)
         def fn(x):
+            # pylint: disable=unused-variable
             for i in range(4):
                 x = updateList(x)
             return x
@@ -2284,6 +2285,7 @@ class TestJaxIndexOperatorUpdate:
             )
             try:
                 assert jnp.allclose(jnp.array(fn([1, 2])), jnp.array([5, 10]))
+            # pylint: disable=bare-except
             except:
                 assert False, "This warning should not show up again"
 
