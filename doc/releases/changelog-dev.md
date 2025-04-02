@@ -237,6 +237,9 @@
   chained catalyst passe decorators causes a crash.
   [(#1576)](https://github.com/PennyLaneAI/catalyst/pull/1576)
 
+* Autographs and catalyst pipeline fix.
+  [(#1599)](https://github.com/PennyLaneAI/catalyst/pull/1599)
+
 <h3>Internal changes ⚙️</h3>
 
 * Updated the call signature for the PLXPR `qnode_prim` primitive.
