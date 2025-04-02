@@ -1340,22 +1340,24 @@ def _hamiltonian_lowering(jax_ctx: mlir.LoweringRuleContext, coeffs: ir.Value, *
 
 
 #
-# sample measurement
+# measurements
 #
-def sample_staging_rule(jaxpr_trace, obs, *dynamic_shape, static_shape):
+def custom_measurement_staging_rule(
+    primitive, jaxpr_trace, obs, *dynamic_shape, static_shape, shots=None, complex_type=False
+):
     """
-    The result shape of `sample_p` is (shots, num_qubits).
-
     In jax, the default `def_abstract_eval` method for binding primitives keeps the abstract aval in
     the dynamic shape dimension, instead of the SSA value for the shape, i.e.
 
-    c:i64[] = ...
+    c:i64[] = ...  # to be used as the 0th dimension of value `e`
     d:AbstractObs = ...
     e:f64[ShapedArray(int64[], weak_type=True),1] = sample[num_qubits=1] d c
 
+    which contains escaped tracers.
+
     To ensure that the result DShapedArray is actually constructed with the tracer value,
     we need to provide a custom staging rule for the primitive, where we manually link
-    the tracer to the output shape. This will now correctly produce
+    the tracer's value to the output shape. This will now correctly produce
 
     e:f64[c,1] = sample[num_qubits=1] d c
 
@@ -1367,30 +1369,49 @@ def sample_staging_rule(jaxpr_trace, obs, *dynamic_shape, static_shape):
     https://github.com/jax-ml/jax/blob/a54319ec1886ed920d50cacf10e147a743888464/jax/_src/interpreters/partial_eval.py#L1881C7-L1881C24
     """
 
-    # unfortunately there are three "lax"s at different levels, so we need to use the full path
     shape = jax._src.lax.lax._merge_dyn_shape(static_shape, dynamic_shape)
-    if obs.primitive is compbasis_p:
-        if obs.num_qubits:
-            if isinstance(shape[1], int):
-                assert shape[1] == obs.num_qubits
+    dtype = "float64" if not complex_type else "complex128"
+    if not dynamic_shape:
+        # Some PL transforms, like @qml.batch_params, do not support dynamic shapes yet
+        # Therefore we still keep static shapes when possible
+        # This can be removed, and all avals turned into DShapedArrays, when
+        # dynamic program capture in PL is complete
+        out_shape = core.ShapedArray(shape, jax.numpy.dtype(dtype))
+    else:
+        out_shape = core.DShapedArray(shape, jax.numpy.dtype(dtype))
 
-    out_shape = core.DShapedArray(shape, jax.numpy.dtype("float64"))
     invars = [jaxpr_trace.getvar(obs)]
     for dyn_dim in dynamic_shape:
         invars.append(jaxpr_trace.getvar(dyn_dim))
-    params = {"static_shape" : static_shape}
+
+    params = {"static_shape": static_shape}
+    if shots:
+        params["shots"] = shots
+
     out_tracer = pe.DynamicJaxprTracer(jaxpr_trace, out_shape)
 
     eqn = pe.new_jaxpr_eqn(
         invars,
         [jaxpr_trace.makevar(out_tracer)],
-        sample_p,
+        primitive,
         params,
         jax.core.no_effects,
     )
-    jaxpr_trace.frame.add_eqn(eqn)
 
+    jaxpr_trace.frame.add_eqn(eqn)
     return out_tracer
+
+
+#
+# sample measurement
+#
+def sample_staging_rule(jaxpr_trace, obs, *dynamic_shape, static_shape):
+    """
+    The result shape of `sample_p` is (shots, num_qubits).
+    """
+    return custom_measurement_staging_rule(
+        sample_p, jaxpr_trace, obs, *dynamic_shape, static_shape=static_shape
+    )
 
 
 pe.custom_staging_rules[sample_p] = sample_staging_rule
@@ -1533,31 +1554,11 @@ def _var_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shape=None):
 #
 def probs_staging_rule(jaxpr_trace, obs, *dynamic_shape, static_shape, shots=None):
     """
-    Custom staging rule for probs to avoid escaped tracers.
-    See the documentation for `sample_staging_rule()` function for more details
-    on custom staging rules.
-
     The result shape of probs_p is (2^num_qubits,).
     """
-    shape = jax._src.lax.lax._merge_dyn_shape(static_shape, dynamic_shape)
-
-    out_shape = core.DShapedArray(shape, jax.numpy.dtype("float64"))
-    invars = [jaxpr_trace.getvar(obs)]
-    for dyn_dim in dynamic_shape:
-        invars.append(jaxpr_trace.getvar(dyn_dim))
-    params = {"static_shape" : static_shape, "shots": shots}
-    out_tracer = pe.DynamicJaxprTracer(jaxpr_trace, out_shape)
-
-    eqn = pe.new_jaxpr_eqn(
-        invars,
-        [jaxpr_trace.makevar(out_tracer)],
-        probs_p,
-        params,
-        jax.core.no_effects,
+    return custom_measurement_staging_rule(
+        probs_p, jaxpr_trace, obs, *dynamic_shape, static_shape=static_shape, shots=shots
     )
-
-    jaxpr_trace.frame.add_eqn(eqn)
-    return out_tracer
 
 
 pe.custom_staging_rules[probs_p] = probs_staging_rule
@@ -1594,10 +1595,6 @@ def _probs_lowering(
 #
 def state_staging_rule(jaxpr_trace, obs, *dynamic_shape, static_shape, shots=None):
     """
-    Custom staging rule for state to avoid escaped tracers.
-    See the documentation for `sample_staging_rule()` function for more details
-    on custom staging rules.
-
     The result shape of state_p is (2^num_qubits,).
     """
     if obs.primitive is compbasis_p:
@@ -1608,25 +1605,15 @@ def state_staging_rule(jaxpr_trace, obs, *dynamic_shape, static_shape, shots=Non
     else:
         raise TypeError("state only supports computational basis")
 
-    shape = jax._src.lax.lax._merge_dyn_shape(static_shape, dynamic_shape)
-
-    out_shape = core.DShapedArray(shape, jax.numpy.dtype("complex128"))
-    invars = [jaxpr_trace.getvar(obs)]
-    for dyn_dim in dynamic_shape:
-        invars.append(jaxpr_trace.getvar(dyn_dim))
-    params = {"static_shape" : static_shape, "shots": shots}
-    out_tracer = pe.DynamicJaxprTracer(jaxpr_trace, out_shape)
-
-    eqn = pe.new_jaxpr_eqn(
-        invars,
-        [jaxpr_trace.makevar(out_tracer)],
+    return custom_measurement_staging_rule(
         state_p,
-        params,
-        jax.core.no_effects,
+        jaxpr_trace,
+        obs,
+        *dynamic_shape,
+        static_shape=static_shape,
+        shots=shots,
+        complex_type=True,
     )
-
-    jaxpr_trace.frame.add_eqn(eqn)
-    return out_tracer
 
 
 pe.custom_staging_rules[state_p] = state_staging_rule
@@ -1637,7 +1624,9 @@ def _state_def_impl(ctx, obs, *dynamic_shape, static_shape, shots=None):  # prag
     raise NotImplementedError()
 
 
-def _state_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, *dynamic_shape, static_shape, shots=None):
+def _state_lowering(
+    jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, *dynamic_shape, static_shape, shots=None
+):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
