@@ -897,6 +897,18 @@ class TestDefaultAvailableIR:
         assert g.mlir_opt
         assert "__catalyst__qis" in g.mlir_opt
 
+    def test_jaxpr_target(self, backend):
+        """Test no mlir is generated for jaxpr target."""
+
+        @qml.qjit(target="jaxpr")
+        @qml.qnode(qml.device(backend, wires=1))
+        def f(x: float):
+            qml.RX(x, wires=0)
+            return qml.state()
+
+        assert f.mlir_opt is None
+        assert f.mlir is None
+
 
 class TestAvoidVerification:
     def test_no_verification(self, capfd, backend):
