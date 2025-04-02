@@ -23,7 +23,7 @@ import pytest
 from jax.tree_util import register_pytree_node_class
 
 from catalyst import debug, for_loop, qjit, value_and_grad
-from catalyst.compiler import options_to_cli_flags, to_llvmir
+from catalyst.compiler import _options_to_cli_flags, to_llvmir
 from catalyst.debug import (
     compile_executable,
     get_cmain,
@@ -498,20 +498,20 @@ class TestOptionsToCliFlags:
 
         path = pathlib.Path("/path/to/plugin")
         options = CompileOptions(pass_plugins={path})
-        flags = options_to_cli_flags(options)
+        flags = _options_to_cli_flags(options)
         assert ("--load-pass-plugin", path) in flags
 
     def test_option_dialect_plugin(self):
         """Test dialect plugin option"""
         path = pathlib.Path("/path/to/plugin")
         options = CompileOptions(dialect_plugins={path})
-        flags = options_to_cli_flags(options)
+        flags = _options_to_cli_flags(options)
         assert ("--load-dialect-plugin", path) in flags
 
     def test_option_not_lower_to_llvm(self):
         """Test not lower to llvm"""
         options = CompileOptions(lower_to_llvm=False)
-        flags = options_to_cli_flags(options)
+        flags = _options_to_cli_flags(options)
         assert ("--tool", "opt") in flags
 
     def test_no_options_to_llvmir(self):

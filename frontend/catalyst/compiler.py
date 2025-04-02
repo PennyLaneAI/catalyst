@@ -316,7 +316,7 @@ def canonicalize(*args, stdin=None):
     return quantum_opt(("--pass-pipeline", "builtin.module(canonicalize)"), *args, stdin=stdin)
 
 
-def options_to_cli_flags(options):
+def _options_to_cli_flags(options):
     """CompileOptions -> list[str|Tuple[str, str]]"""
 
     extra_args = []
@@ -357,8 +357,18 @@ def to_llvmir(*args, stdin=None, options: Optional[CompileOptions] = None):
     if not options:
         return _catalyst(*args, stdin=stdin)
 
-    opts = options_to_cli_flags(options)
+    opts = _options_to_cli_flags(options)
     return _catalyst(*opts, *args, stdin=stdin)
+
+
+def to_mlir_opt(*args, stdin=None, options: Optional[CompileOptions] = None):
+    """echo ${input} | catalyst --tool=opt *args *opts -"""
+    # These are the options that may affect compilation
+    if not options:
+        return quantum_opt(*args, stdin=stdin)
+
+    opts = _options_to_cli_flags(options)
+    return quantum_opt(*opts, *args, stdin=stdin)
 
 
 class Compiler:
@@ -378,7 +388,7 @@ class Compiler:
         Returns:
             cmd (str): The command to be executed.
         """
-        opts = options_to_cli_flags(self.options)
+        opts = _options_to_cli_flags(self.options)
         cmd = _get_catalyst_cli_cmd(
             ("-o", output_ir_name),
             ("--module-name", module_name),

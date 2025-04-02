@@ -36,9 +36,9 @@ from catalyst.compiler import (
     CompileOptions,
     Compiler,
     canonicalize,
-    options_to_cli_flags,
     quantum_opt,
     to_llvmir,
+    to_mlir_opt,
 )
 from catalyst.debug.instruments import instrument
 from catalyst.from_plxpr import trace_from_pennylane
@@ -529,8 +529,7 @@ class QJIT(CatalystCallable):
         if not self.mlir_module:
             return None
 
-        opts = options_to_cli_flags(self.compile_options)
-        return quantum_opt(*opts, stdin=str(self.mlir_module))
+        return to_mlir_opt(stdin=str(self.mlir_module), options=self.compile_options)
 
     @debug_logger
     def __call__(self, *args, **kwargs):
