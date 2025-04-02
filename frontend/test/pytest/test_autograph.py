@@ -378,7 +378,7 @@ class TestIntegration:
         @qml.qjit(autograph=True)
         @qml.qnode(dev)
         def circuit():
-            qml.ctrl(qml.PauliX, control=1)(0)
+            qml.ctrl(qml.PauliX(0), control=1)
             return qml.probs(wires=0)
 
         assert hasattr(circuit.user_function, "ag_unconverted")
