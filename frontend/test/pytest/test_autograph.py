@@ -15,6 +15,7 @@
 """PyTests for the AutoGraph source-to-source transformation feature."""
 
 import traceback
+import warnings
 from collections import defaultdict
 
 import jax
@@ -2264,6 +2265,27 @@ class TestJaxIndexOperatorUpdate:
         result, expected = workflow(jnp.array([5, 4, 3, 2, 1]))
         assert jnp.allclose(result, jnp.array([10, 4, 6, 2, 2]))
         assert jnp.allclose(result, expected)
+
+    def test_iterating_lists_inside_a_loop(self):
+        """Test support for iterating lists inside a loop."""
+
+        def updateList(x):
+            return [x[0] + 1, x[1] + 2]
+
+        @qjit(autograph=True)
+        def fn(x):
+            for i in range(4):
+                x = updateList(x)
+            return x
+
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "error", "Tracing of an AutoGraph converted for loop failed with an exception"
+            )
+            try:
+                assert jnp.allclose(jnp.array(fn([1, 2])), jnp.array([5, 10]))
+            except:
+                assert False, "This warning should not show up again"
 
     def test_unsopported_cases(self):
         """Test that TypeError is raised in unsopported cases."""

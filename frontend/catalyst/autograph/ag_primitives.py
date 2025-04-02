@@ -159,6 +159,10 @@ def assert_iteration_inputs(inputs, symbol_names):
                 f"Please ensure '{inp}' is initialized with a value before entering the loop."
             )
 
+        # Convert lists to numpy arrays so they can be "abstractified" by Jax
+        if type(inp) == list:
+            inp = jnp.array(inp)
+
         try:
             jax.api_util.shaped_abstractify(inp)
         except TypeError as e:
@@ -179,6 +183,12 @@ def assert_iteration_results(inputs, outputs, symbol_names):
     """
 
     for i, (inp, out) in enumerate(zip(inputs, outputs)):
+        # Convert lists to numpy arrays so they can be "abstractified" by Jax
+        if type(inp) == list:
+            inp = jnp.array(inp)
+        if type(out) == list:
+            out = jnp.array(out)
+
         inp_t, out_t = jax.api_util.shaped_abstractify(inp), jax.api_util.shaped_abstractify(out)
         if inp_t.dtype != out_t.dtype or inp_t.shape != out_t.shape:
             raise AutoGraphError(
