@@ -7,9 +7,8 @@ from copy import deepcopy
 import jax
 import pennylane as qml
 from pennylane.devices.capabilities import OperatorProperties
-from utils import qjit_for_tests as qjit
 
-from catalyst import measure
+from catalyst import measure, qjit
 from catalyst.compiler import get_lib_path
 from catalyst.device import get_device_capabilities
 

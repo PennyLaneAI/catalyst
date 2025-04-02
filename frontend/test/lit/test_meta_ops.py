@@ -15,11 +15,10 @@
 # RUN: %PYTHON %s | FileCheck %s
 
 import pennylane as qml
-from utils import qjit_for_tests as qjit
 
 
 # CHECK-LABEL: @adjoint_adjoint
-@qjit(target="mlir")
+@qml.qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=1))
 def adjoint_adjoint():
     qml.adjoint(qml.adjoint(qml.S(0)))
@@ -34,7 +33,7 @@ print(adjoint_adjoint.mlir)
 
 
 # CHECK-LABEL: @adjoint_ctrl_adjoint
-@qjit(target="mlir")
+@qml.qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2))
 def adjoint_ctrl_adjoint():
     qml.adjoint(qml.ctrl(qml.adjoint(qml.S(0)), control=1))

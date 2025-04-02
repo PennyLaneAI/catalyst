@@ -15,12 +15,11 @@
 # RUN: %PYTHON %s | FileCheck %s
 
 import pennylane as qml
-from utils import qjit_for_tests as qjit
 
 from catalyst import measure
 
 
-@qjit(target="mlir")
+@qml.qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=1))
 def circuit(x: float):
     qml.RX(x, wires=0)

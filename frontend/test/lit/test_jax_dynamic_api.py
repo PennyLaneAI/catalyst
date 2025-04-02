@@ -20,7 +20,8 @@ import jax.numpy as jnp
 import pennylane as qml
 from jax.core import ShapedArray
 from utils import print_jaxpr, print_mlir
-from utils import qjit_for_tests as qjit
+
+from catalyst import qjit
 
 
 # CHECK-LABEL: test_qjit_dynamic_argument
