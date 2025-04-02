@@ -153,7 +153,6 @@ class TestSourceCodeInfo:
                 return 0
 
         except RuntimeError as e:
-            breakpoint()
             result = get_source_code_info(traceback.extract_tb(e.__traceback__, limit=1)[0])
 
 
