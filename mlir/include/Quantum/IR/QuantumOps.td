@@ -895,7 +895,7 @@ def SampleOp : Measurement_Op<"sample", [AttrSizedOperandSegments]> {
     let hasVerifier = 1;
 }
 
-def CountsOp : Measurement_Op<"counts", [SameVariadicOperandSize, SameVariadicResultSize]> {
+def CountsOp : Measurement_Op<"counts", [AttrSizedOperandSegments, SameVariadicResultSize]> {
     let summary = "Compute sample counts for the given observable for the current state";
     let description = [{
         The `quantum.counts` operation represents the measurement process of sampling eigenvalues
@@ -929,6 +929,7 @@ def CountsOp : Measurement_Op<"counts", [SameVariadicOperandSize, SameVariadicRe
 
     let arguments = (ins
         ObservableType:$obs,
+        Optional<I64>:$size,
         Optional<MemRefRankOf<[F64], [1]>>:$in_eigvals,
         Optional<MemRefRankOf<[I64], [1]>>:$in_counts
     );
@@ -939,7 +940,7 @@ def CountsOp : Measurement_Op<"counts", [SameVariadicOperandSize, SameVariadicRe
     );
 
     let assemblyFormat = [{
-        $obs
+        $obs ( `size` $size^ )?
         ( `in` `(` $in_eigvals^ `:` type($in_eigvals) `,` $in_counts `:` type($in_counts) `)` )?
         attr-dict ( `:` type($eigvals)^ `,` type($counts) )?
     }];

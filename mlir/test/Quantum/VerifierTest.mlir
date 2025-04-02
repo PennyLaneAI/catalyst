@@ -326,6 +326,28 @@ func.func @counts5(%q0 : !quantum.bit, %q1 : !quantum.bit) {
 
 // -----
 
+func.func @counts6(%q0 : !quantum.bit, %q1 : !quantum.bit, %c : i64) {
+    %obs = quantum.compbasis qubits %q0, %q1 : !quantum.obs
+
+    // expected-error@+1 {{with static return shapes should not specify state vector length in arguments}}
+    quantum.counts %obs size %c : tensor<4xf64>, tensor<4xi64>
+
+    return
+}
+
+// -----
+
+func.func @counts7(%q0 : !quantum.bit, %q1 : !quantum.bit) {
+    %obs = quantum.compbasis qubits %q0, %q1 : !quantum.obs
+
+    // expected-error@+1 {{with dynamic return shapes must specify state vector length in arguments}}
+    quantum.counts %obs : tensor<?xf64>, tensor<?xi64>
+
+    return
+}
+
+// -----
+
 func.func @probs1(%q0 : !quantum.bit, %q1 : !quantum.bit) {
     %obs = quantum.compbasis qubits %q0, %q1 : !quantum.obs
 

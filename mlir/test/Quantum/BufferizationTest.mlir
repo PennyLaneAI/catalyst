@@ -18,18 +18,20 @@
 // Measurements //
 //////////////////
 
-func.func @counts(%q0: !quantum.bit, %q1: !quantum.bit) {
+func.func @counts(%q0: !quantum.bit, %q1: !quantum.bit, %c : i64) {
     %obs = quantum.compbasis qubits %q0, %q1 : !quantum.obs
 
     // CHECK: [[eigval_alloc:%.+]] = memref.alloc() : memref<4xf64>
     // CHECK: [[counts_alloc:%.+]] = memref.alloc() : memref<4xi64>
     // CHECK: quantum.counts {{.*}} in([[eigval_alloc]] : memref<4xf64>, [[counts_alloc]] : memref<4xi64>)
-    %samples:2 = quantum.counts %obs : tensor<4xf64>, tensor<4xi64>
+    %static_counts:2 = quantum.counts %obs : tensor<4xf64>, tensor<4xi64>
 
-    // CHECK: [[dyn_eigval_alloc:%.+]] = memref.alloc() : memref<4xf64>
-    // CHECK: [[dyn_counts_alloc:%.+]] = memref.alloc() : memref<4xi64>
-    // CHECK: quantum.counts {{.*}} in([[dyn_eigval_alloc]] : memref<4xf64>, [[dyn_counts_alloc]] : memref<4xi64>)
-    %dyn_samples:2 = quantum.counts %obs : tensor<4xf64>, tensor<4xi64>
+    // CHECK: [[idx1:%.+]] = index.casts %arg2 : i64 to index
+    // CHECK: [[alloc1:%.+]] = memref.alloc([[idx1]]) : memref<?xf64>
+    // CHECK: [[idx2:%.+]] = index.casts %arg2 : i64 to index
+    // CHECK: [[alloc2:%.+]] = memref.alloc([[idx2]]) : memref<?xi64>
+    // CHECK: quantum.counts {{.*}} in([[alloc1]] : memref<?xf64>, [[alloc2]] : memref<?xi64>)
+    %dyn_samples:2 = quantum.counts %obs size %c : tensor<?xf64>, tensor<?xi64>
 
     func.return
 }

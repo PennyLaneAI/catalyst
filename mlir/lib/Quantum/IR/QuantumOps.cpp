@@ -221,7 +221,9 @@ LogicalResult QubitUnitaryOp::verify()
 // ----- measurements
 
 template <typename T>
-static LogicalResult verifyMeasurementOpDynamism(T *op, bool hasObs, bool hasLen, bool hasBufferIn, bool hasOutTensor){
+static LogicalResult verifyMeasurementOpDynamism(T *op, bool hasObs, bool hasLen, bool hasBufferIn,
+                                                 bool hasOutTensor)
+{
     // `obs` operand must always be present
     if (!hasObs) {
         return (*op)->emitOpError("must take an observale");
@@ -233,35 +235,43 @@ static LogicalResult verifyMeasurementOpDynamism(T *op, bool hasObs, bool hasLen
     // 2. Or return shape is dynamic and a length argument is specified.
     if (hasOutTensor) {
         if (hasBufferIn) {
-            return (*op)->emitOpError("either tensors must be returned or memrefs must be used as inputs");
+            return (*op)->emitOpError(
+                "either tensors must be returned or memrefs must be used as inputs");
         }
 
         ShapedType outTensor;
         size_t numQubitsDimIdx;
-        if constexpr (std::is_same_v<T, ProbsOp>){
+        if constexpr (std::is_same_v<T, ProbsOp>) {
             outTensor = cast<ShapedType>(op->getProbabilities().getType());
             numQubitsDimIdx = 0;
         }
-        else if constexpr (std::is_same_v<T, StateOp>){
+        else if constexpr (std::is_same_v<T, StateOp>) {
             outTensor = cast<ShapedType>(op->getState().getType());
             numQubitsDimIdx = 0;
         }
-        else if constexpr (std::is_same_v<T, SampleOp>){
+        else if constexpr (std::is_same_v<T, SampleOp>) {
             outTensor = cast<ShapedType>(op->getSamples().getType());
             numQubitsDimIdx = 1;
         }
-
-        if (!outTensor.isDynamicDim(numQubitsDimIdx) && hasLen){
-            return (*op)->emitOpError("with static return shapes should not specify state vector length in arguments");
+        else if constexpr (std::is_same_v<T, CountsOp>) {
+            outTensor = cast<ShapedType>(op->getCounts().getType());
+            numQubitsDimIdx = 0;
         }
-        if (outTensor.isDynamicDim(numQubitsDimIdx) && !hasLen){
-            return (*op)->emitOpError("with dynamic return shapes must specify state vector length in arguments");
+
+        if (!outTensor.isDynamicDim(numQubitsDimIdx) && hasLen) {
+            return (*op)->emitOpError(
+                "with static return shapes should not specify state vector length in arguments");
+        }
+        if (outTensor.isDynamicDim(numQubitsDimIdx) && !hasLen) {
+            return (*op)->emitOpError(
+                "with dynamic return shapes must specify state vector length in arguments");
         }
     }
 
     // If a tensor is not returned, must be bufferized.
     if (!hasOutTensor && !hasBufferIn) {
-        return (*op)->emitOpError("either tensors must be returned or memrefs must be used as inputs");
+        return (*op)->emitOpError(
+            "either tensors must be returned or memrefs must be used as inputs");
     }
 
     return success();
@@ -302,7 +312,8 @@ LogicalResult SampleOp::verify()
     bool hasNumQubits = (bool)getNumQubits();
     bool hasBufferIn = (bool)getInData();
     bool hasOutTensor = (bool)getSamples();
-    return verifyMeasurementOpDynamism<SampleOp>(this, hasObs, hasNumQubits, hasBufferIn, hasOutTensor);
+    return verifyMeasurementOpDynamism<SampleOp>(this, hasObs, hasNumQubits, hasBufferIn,
+                                                 hasOutTensor);
 }
 
 LogicalResult CountsOp::verify()
@@ -311,6 +322,15 @@ LogicalResult CountsOp::verify()
 
     if (failed(verifyObservable(getObs(), numQubits))) {
         return emitOpError("observable must be locally defined");
+    }
+
+    bool hasObs = (bool)getObs();
+    bool hasSize = (bool)getSize();
+    bool hasBufferIn = (bool)getInCounts();
+    bool hasOutTensor = (bool)getCounts();
+    if (failed(verifyMeasurementOpDynamism<CountsOp>(this, hasObs, hasSize, hasBufferIn,
+                                                     hasOutTensor))) {
+        return failure();
     }
 
     size_t numEigvals = 0;
@@ -326,22 +346,19 @@ LogicalResult CountsOp::verify()
         return emitOpError("cannot determine the number of eigenvalues for general observable");
     }
 
-    bool xor_eigvals = (bool)getEigvals() ^ (bool)getInEigvals();
-    bool xor_counts = (bool)getCounts() ^ (bool)getInCounts();
-    bool is_valid = xor_eigvals && xor_counts;
-    if (!is_valid) {
-        return emitOpError("either tensors must be returned or memrefs must be used as inputs");
-    }
+    ShapedType outTensor = getEigvals() ? cast<ShapedType>(getEigvals().getType())
+                                        : cast<ShapedType>(getInEigvals().getType());
+    if (!outTensor.isDynamicDim(0)) {
+        if (getObs().getDefiningOp<NamedObsOp>() || numQubits.value() != 0) {
+            Type eigvalsToVerify =
+                getEigvals() ? (Type)getEigvals().getType() : (Type)getInEigvals().getType();
+            Type countsToVerify =
+                getCounts() ? (Type)getCounts().getType() : (Type)getInCounts().getType();
 
-    if (getObs().getDefiningOp<NamedObsOp>() || numQubits.value() != 0) {
-        Type eigvalsToVerify =
-            getEigvals() ? (Type)getEigvals().getType() : (Type)getInEigvals().getType();
-        Type countsToVerify =
-            getCounts() ? (Type)getCounts().getType() : (Type)getInCounts().getType();
-
-        if (failed(verifyTensorResult(eigvalsToVerify, numEigvals)) ||
-            failed(verifyTensorResult(countsToVerify, numEigvals))) {
-            return emitOpError("number of eigenvalues or counts did not match observable");
+            if (failed(verifyTensorResult(eigvalsToVerify, numEigvals)) ||
+                failed(verifyTensorResult(countsToVerify, numEigvals))) {
+                return emitOpError("number of eigenvalues or counts did not match observable");
+            }
         }
     }
 
