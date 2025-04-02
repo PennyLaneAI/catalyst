@@ -45,7 +45,6 @@ from catalyst.device import (
     get_device_shots,
 )
 from catalyst.jax_extras import jaxpr_pad_consts, make_jaxpr2, transient_jax_config
-from catalyst.jax_extras.tracing import bind_flexible_primitive
 from catalyst.jax_primitives import (
     AbstractQbit,
     AbstractQreg,
