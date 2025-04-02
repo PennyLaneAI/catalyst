@@ -233,8 +233,10 @@ def autograph_source(fn):
     # Unwrap known objects to get the function actually transformed by autograph.
     if isinstance(fn, catalyst.QJIT):
         fn = fn.original_function
-    if isinstance(fn, (qml.QNode, PassPipelineWrapper)):
+    if isinstance(fn, qml.QNode):
         fn = fn.func
+    if isinstance(fn, QNodeWrapper):
+        fn = fn.original_qnode
 
     if TRANSFORMER.has_cache(fn):
         new_fn = TRANSFORMER.get_cached_function(fn)
