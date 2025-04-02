@@ -138,6 +138,24 @@ class TestSourceCodeInfo:
             except RuntimeError as e:
                 assert e.args == ("Test failure",)
 
+    def test_qnode_with_pass(self):
+        """Test source info retrieval for a qnode decorated with a pass."""
+        from catalyst.autograph.ag_primitives import get_source_code_info
+
+        try:
+
+            @qml.qjit(autograph=True)
+            @passes.merge_rotations
+            @qml.qnode(qml.device("null.qubit", wires=1))
+            def circuit(n: int):
+                for _ in range(5):
+                    raise RuntimeError("Test failure")
+                return 0
+
+        except RuntimeError as e:
+            breakpoint()
+            result = get_source_code_info(traceback.extract_tb(e.__traceback__, limit=1)[0])
+
 
 class TestIntegration:
     """Test that the autograph transformations trigger correctly in different settings."""

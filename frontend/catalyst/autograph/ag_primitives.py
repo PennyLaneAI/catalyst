@@ -490,9 +490,6 @@ def get_source_code_info(tb_frame):
                 if isinstance(obj, qml.QNode):
                     ag_source_map = obj.ag_source_map
                     break
-                if isinstance(obj, PassPipelineWrapper):
-                    ag_source_map = obj.qnode.ag_source_map
-                    break
                 if isinstance(obj, catalyst.QJIT):
                     ag_source_map = obj.user_function.ag_source_map
                     break
