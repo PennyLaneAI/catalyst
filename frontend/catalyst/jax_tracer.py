@@ -70,7 +70,6 @@ from catalyst.jax_extras import (
     tree_unflatten,
     wrap_init,
 )
-from catalyst.jax_extras.tracing import bind_flexible_primitive
 from catalyst.jax_primitives import (
     AbstractQreg,
     compbasis_p,

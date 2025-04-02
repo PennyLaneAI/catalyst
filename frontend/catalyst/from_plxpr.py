@@ -381,15 +381,20 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
         prim = measurement_map[type(measurement)]
         if prim is sample_p:
             num_qubits = len(measurement.wires) or len(self._device.wires)
-            mval = bind_flexible_primitive(
-                sample_p, {"shots": self._shots}, obs, num_qubits=num_qubits
-            )
+            shape = (self._shots, num_qubits)
+            dyn_dims, static_shape = jax._src.lax.lax._extract_tracers_dyn_shape(shape)
+            mval = sample_p.bind(obs, *dyn_dims, static_shape=tuple(static_shape))
         elif prim is counts_p:
-            mval = bind_flexible_primitive(counts_p, {"shots": self._shots}, shape=shape)
+            # dyn_dims, static_shape = jax._src.lax.lax._extract_tracers_dyn_shape(shape)
+            # results = counts_p.bind(obs_tracers, *dyn_dims, static_shape=tuple(static_shape))
+            raise CompileError(
+                "CountsMP returns a dictionary, which is not compatible with capture"
+            )
         elif prim in {expval_p, var_p}:
             mval = prim.bind(obs, shape=shape)
         else:
-            mval = prim.bind(obs, shape=shape, shots=self._shots)
+            dyn_dims, static_shape = jax._src.lax.lax._extract_tracers_dyn_shape(shape)
+            mval = prim.bind(obs, *dyn_dims, static_shape=tuple(static_shape))
 
         # sample_p returns floats, so we need to converted it back to the expected integers here
         if dtype != mval.dtype:
