@@ -940,13 +940,21 @@ def trace_quantum_measurements(
             elif type(output) is CountsMP:
                 if shots is None:  # needed for old device API only
                     raise ValueError(
-                        "qml.sample cannot work with shots=None. "
+                        "qml.counts cannot work with shots=None. "
                         "Please specify a finite number of shots."
                     )
-                shape = (2**nqubits,) if using_compbasis else (2,)
-                results = bind_flexible_primitive(
-                    counts_p, {"shots": shots}, obs_tracers, shape=shape
-                )
+
+                if using_compbasis:
+                    if isinstance(nqubits, DynamicJaxprTracer):
+                        shape = (jnp.left_shift(1, nqubits),)
+                    else:
+                        shape = (2**nqubits,)
+                else:
+                    shape = (2,)
+
+                dyn_dims, static_shape = jax._src.lax.lax._extract_tracers_dyn_shape(shape)
+                results = counts_p.bind(obs_tracers, *dyn_dims, static_shape=tuple(static_shape))
+
                 if using_compbasis:
                     results = (jnp.asarray(results[0], jnp.int64), results[1])
                 out_classical_tracers.extend(results)

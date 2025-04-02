@@ -1409,6 +1409,12 @@ def sample_staging_rule(jaxpr_trace, obs, *dynamic_shape, static_shape):
     """
     The result shape of `sample_p` is (shots, num_qubits).
     """
+    shape = jax._src.lax.lax._merge_dyn_shape(static_shape, dynamic_shape)
+    if obs.primitive is compbasis_p:
+        if obs.num_qubits:
+            if isinstance(shape[1], int):
+                assert shape[1] == obs.num_qubits
+
     return custom_measurement_staging_rule(
         sample_p, jaxpr_trace, obs, *dynamic_shape, static_shape=static_shape
     )
@@ -1452,28 +1458,64 @@ def _sample_lowering(
 #
 # counts measurement
 #
-@counts_p.def_impl
-def _counts_def_impl(ctx, obs, shots, shape):  # pragma: no cover
-    raise NotImplementedError()
+def counts_staging_rule(jaxpr_trace, obs, *dynamic_shape, static_shape):
+    """
+    The result shape of `counts_p` is (tensor<Nxf64>, tensor<Nxi64>)
+    where N = 2**number_of_qubits.
+    """
 
-
-@counts_p.def_abstract_eval
-def _counts_abstract_eval(obs, shots, shape):
-    assert isinstance(obs, AbstractObs)
-
+    shape = jax._src.lax.lax._merge_dyn_shape(static_shape, dynamic_shape)
     if obs.primitive is compbasis_p:
         if obs.num_qubits:
-            assert shape == (2**obs.num_qubits,)
+            if isinstance(shape[0], int):
+                assert shape == (2**obs.num_qubits,)
     else:
         assert shape == (2,)
 
-    return core.ShapedArray(shape, jax.numpy.dtype("float64")), core.ShapedArray(
-        shape, jax.numpy.dtype("int64")
+    if not dynamic_shape:
+        out_shapes = (
+            core.ShapedArray(shape, jax.numpy.dtype("float64")),
+            core.ShapedArray(shape, jax.numpy.dtype("int64")),
+        )
+    else:
+        out_shapes = (
+            core.DShapedArray(shape, jax.numpy.dtype("float64")),
+            core.DShapedArray(shape, jax.numpy.dtype("int64")),
+        )
+
+    invars = [jaxpr_trace.getvar(obs)]
+    for dyn_dim in dynamic_shape:
+        invars.append(jaxpr_trace.getvar(dyn_dim))
+
+    params = {"static_shape": static_shape}
+
+    out_tracers = (
+        pe.DynamicJaxprTracer(jaxpr_trace, out_shapes[0]),
+        pe.DynamicJaxprTracer(jaxpr_trace, out_shapes[1]),
     )
+
+    eqn = pe.new_jaxpr_eqn(
+        invars,
+        [jaxpr_trace.makevar(out_tracer) for out_tracer in out_tracers],
+        counts_p,
+        params,
+        jax.core.no_effects,
+    )
+
+    jaxpr_trace.frame.add_eqn(eqn)
+    return out_tracers
+
+
+pe.custom_staging_rules[counts_p] = counts_staging_rule
+
+
+@counts_p.def_impl
+def _counts_def_impl(ctx, obs, *dynamic_shape, static_shape):  # pragma: no cover
+    raise NotImplementedError()
 
 
 def _counts_lowering(
-    jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: Union[int, ir.Value], shape: tuple
+    jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, *dynamic_shape, static_shape
 ):
     # Note: result shape of counts op is (tensor<Nxf64>, tensor<Nxi64>)
     # where N = 2**number_of_qubits
@@ -1483,10 +1525,20 @@ def _counts_lowering(
 
     i64_type = ir.IntegerType.get_signless(64, ctx)
     f64_type = ir.F64Type.get()
+
+    # Replace Nones in static_shape with dynamic mlir dimensions
+    shape = tuple(ir.ShapedType.get_dynamic_size() if d is None else d for d in static_shape)
     eigvals_type = ir.RankedTensorType.get(shape, f64_type)
     counts_type = ir.RankedTensorType.get(shape, i64_type)
 
-    return CountsOp(eigvals_type, counts_type, obs).results
+    if static_shape[0] is None:
+        # dynamic num_qubits, pass the SSA value to the op
+        size = extract_scalar(dynamic_shape[0], "counts_size")
+    else:
+        # static num_qubits already in the shape, no need to pass another operand
+        size = None
+
+    return CountsOp(eigvals_type, counts_type, obs, size=size).results
 
 
 #
