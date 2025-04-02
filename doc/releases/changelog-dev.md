@@ -183,6 +183,7 @@
     [(#1513)](https://github.com/PennyLaneAI/catalyst/pull/1513)
   - Remove unnecessary I/O.
     [(#1514)](https://github.com/PennyLaneAI/catalyst/pull/1514)
+    [(#1602)](https://github.com/PennyLaneAI/catalyst/pull/1602)
   - Sort improvements to reduce complexity and memory.
     [(#1524)](https://github.com/PennyLaneAI/catalyst/pull/1524)
   - Lazy IR canonicalization and LLVMIR textual generation.
