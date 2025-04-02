@@ -903,7 +903,6 @@ def trace_quantum_measurements(
                     # unfortunately there are three "lax"s at different levels, so we need to use the full path
                     dyn_dims, static_shape = jax._src.lax.lax._extract_tracers_dyn_shape(shape)
                     result = sample_p.bind(obs_tracers, *dyn_dims, static_shape=tuple(static_shape))
-
                     if using_compbasis:
                         result = jnp.astype(result, jnp.int64)
 
@@ -914,8 +913,9 @@ def trace_quantum_measurements(
                     # TODO: Update to dynamic shots
                     for shot, copies in shot_vector:
                         for _ in range(copies):
-                            #sliced_result = result[start_idx : start_idx + shot]
-                            sliced_result = jax.lax.dynamic_slice(result, (start_idx, 0), (start_idx + shot, nqubits))
+                            sliced_result = jax.lax.dynamic_slice(
+                                result, (start_idx, 0), (shot, nqubits)
+                            )
                             reshaped_result += (sliced_result.reshape(shot, nqubits),)
                             start_idx += shot
 
