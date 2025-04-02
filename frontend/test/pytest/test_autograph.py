@@ -371,6 +371,19 @@ class TestIntegration:
         assert np.allclose(fn(3)[0], tuple([jnp.array(6.0), jnp.array(9.0)]))
         assert np.allclose(fn(3)[1], tuple([jnp.array(2.0), jnp.array(6.0)]))
 
+    def test_ctrl_with_autograph(self):
+        """Test that qml.ctrl works when an operation is passed as argument."""
+        dev = qml.device("lightning.qubit", wires=2)
+
+        @qml.qjit(autograph=True)
+        @qml.qnode(dev)
+        def circuit():
+            qml.ctrl(qml.PauliX, control=1)(0)
+            return qml.probs(wires=0)
+
+        assert hasattr(circuit.user_function, "ag_unconverted")
+        assert jnp.allclose(circuit(), jnp.array([1.0, 0.0]))
+
     def test_tape_transform(self):
         """Test if tape transform is applied when autograph is on."""
 
