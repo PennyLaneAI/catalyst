@@ -19,7 +19,7 @@ import numpy as np
 import pennylane as qml
 import pytest
 
-from catalyst import api_extensions, for_loop, measure, while_loop, qjit
+from catalyst import api_extensions, for_loop, measure, qjit, while_loop
 
 # pylint: disable=no-value-for-parameter,unused-argument
 

@@ -38,7 +38,7 @@ from pennylane.tape import QuantumTape
 from catalyst import adjoint as C_adjoint
 from catalyst import cond
 from catalyst import ctrl as C_ctrl
-from catalyst import for_loop, measure, while_loop, qjit
+from catalyst import for_loop, measure, qjit, while_loop
 from catalyst.api_extensions.quantum_operators import HybridCtrl
 from catalyst.jax_tracer import HybridOpRegion
 
