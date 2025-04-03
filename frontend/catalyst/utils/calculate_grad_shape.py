@@ -107,7 +107,7 @@ def calculate_grad_shape(signature, indices) -> Signature:
     inputs = signature.get_inputs()
 
     if not all(Signature.is_tensor(result) for result in results) and not all(
-        Signature.is_tensor(inpute) for inpute in inputs
+        Signature.is_tensor(_input) for _input in inputs
     ):
         raise TypeError("Inputs and results must be tensor type.")
 
