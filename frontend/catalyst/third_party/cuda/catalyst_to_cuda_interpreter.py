@@ -157,7 +157,7 @@ def get_instruction(jaxpr, primitive):
     return next((eqn for eqn in jaxpr.eqns if eqn.primitive == primitive), None)  # pragma: no cover
 
 
-class InterpreterContext:
+class InterpreterContext:  # pylint: disable=too-many-instance-attributes
     """This class keeps some state that is useful for interpreting Catalyst's JAXPR and evaluating
     it in CUDA-quantum primitives.
 
@@ -263,9 +263,6 @@ def change_device_to_cuda_device(ctx):
     json_like_string = json_like_string.replace("'", '"')
     json_like_string = json_like_string.replace("True", "true")
     json_string = json_like_string.replace("False", "false")
-
-    # Finally, we load it
-    parameters = json.loads(json_string)
 
     # Now we have the number of shots.
     # Shots are specified in PL at the very beginning, but in cuda
@@ -503,7 +500,6 @@ def change_sample_or_counts(ctx, eqn):
     # And parameters...
     # * shots
     # * shape
-    params = eqn.params
     shots = ctx.shots
 
     # We will deal with compbasis in the same way as

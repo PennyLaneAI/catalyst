@@ -70,6 +70,7 @@ from catalyst.jax_primitives import (
     while_p,
 )
 from catalyst.passes.pass_api import Pass
+from catalyst.utils.exceptions import CompileError
 
 measurement_map = {
     qml.measurements.SampleMP: sample_p,

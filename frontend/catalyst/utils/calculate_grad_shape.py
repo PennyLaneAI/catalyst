@@ -84,7 +84,7 @@ class Signature:
         Returns:
             bool: Whether the type ``x`` is a ``jax.core.(D)ShapedArray``
         """
-        return isinstance(x, ShapedArray) or isinstance(x, DShapedArray)
+        return isinstance(x, (DShapedArray, ShapedArray))
 
     def __eq__(self, other):
         return self.xs == other.xs and self.ys == other.ys
