@@ -128,7 +128,8 @@ def test_sample_dynamic(shots: int):
 # CHECK: [[one:%.+]] = stablehlo.constant dense<1> : tensor<i64>
 # CHECK: [[obs:%.+]] = quantum.compbasis  : !quantum.obs
 # CHECK: [[plusOne:%.+]] = stablehlo.add %arg0, [[one]] : tensor<i64>
-# CHECK: [[sample:%.+]] = quantum.sample [[obs]] : tensor<?x0xf64>
+# CHECK: [[deTen:%.+]] = tensor.extract [[plusOne]][]
+# CHECK: [[sample:%.+]] = quantum.sample [[obs]] shape [[deTen]] : tensor<?x0xf64>
 # CHECK: [[zeroVec:%.+]] = stablehlo.dynamic_broadcast_in_dim {{.+}} -> tensor<?x0xf64>
 # CHECK: [[outVecSum:%.+]] = stablehlo.add [[sample]], [[zeroVec]] : tensor<?x0xf64>
 # CHECK: return [[plusOne]], [[outVecSum]] : tensor<i64>, tensor<?x0xf64>
@@ -142,7 +143,7 @@ def sample_dynamic_qubits(num_qubits):
     def circ():
         # CHECK: quantum.compbasis
         # CHECK: [[deTen:%.+]] = tensor.extract %arg0[] : tensor<i64>
-        # CHECK: {{%.+}} = quantum.sample {{%.+}} num_qubits [[deTen]] : tensor<37x?xf64>
+        # CHECK: {{%.+}} = quantum.sample {{%.+}} shape [[deTen]] : tensor<37x?xf64>
         return qml.sample()
 
     return circ()
@@ -244,7 +245,7 @@ def counts_dynamic_qubits(num_qubits):
         # CHECK: [[one:%.+]] = stablehlo.constant dense<1> : tensor<i64>
         # CHECK: [[shape:%.+]] = stablehlo.shift_left [[one]], %arg0 : tensor<i64>
         # CHECK: [[deTen:%.+]] = tensor.extract [[shape]][] : tensor<i64>
-        # CHECK: {{%.+}}, {{%.+}} = quantum.counts {{%.+}} size [[deTen]] : tensor<?xf64>, tensor<?xi64>
+        # CHECK: {{%.+}}, {{%.+}} = quantum.counts {{%.+}} shape [[deTen]] : tensor<?xf64>, tensor<?xi64>
         return qml.counts()
 
     return circ()
