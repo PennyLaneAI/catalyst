@@ -213,19 +213,8 @@ func.func @sample2(%q : !quantum.bit) {
 func.func @sample3(%q0 : !quantum.bit, %q1 : !quantum.bit, %c : i64) {
     %obs = quantum.compbasis qubits %q0, %q1 : !quantum.obs
 
-    // expected-error@+1 {{with static return shapes should not specify state vector length in arguments}}
-    quantum.sample %obs num_qubits %c : tensor<2x2xf64>
-
-    return
-}
-
-// -----
-
-func.func @sample3(%q0 : !quantum.bit, %q1 : !quantum.bit, %c : i64) {
-    %obs = quantum.compbasis qubits %q0, %q1 : !quantum.obs
-
-    // expected-error@+1 {{with static return shapes should not specify state vector length in arguments}}
-    quantum.sample %obs num_qubits %c : tensor<?x2xf64>
+    // expected-error@+1 {{with static return shapes should not specify dynamic shape in arguments}}
+    quantum.sample %obs shape %c : tensor<2x2xf64>
 
     return
 }
@@ -235,7 +224,7 @@ func.func @sample3(%q0 : !quantum.bit, %q1 : !quantum.bit, %c : i64) {
 func.func @sample4(%q0 : !quantum.bit, %q1 : !quantum.bit) {
     %obs = quantum.compbasis qubits %q0, %q1 : !quantum.obs
 
-    // expected-error@+1 {{with dynamic return shapes must specify state vector length in arguments}}
+    // expected-error@+1 {{with dynamic return shapes must specify dynamic shape in arguments}}
     quantum.sample %obs : tensor<4x?xf64>
 
     return
@@ -247,12 +236,12 @@ func.func @sample_good(%q0 : !quantum.bit, %q1 : !quantum.bit, %c : i64, %in_sam
     %obs = quantum.compbasis qubits %q0, %q1 : !quantum.obs
 
     // smoke test for good cases
-    quantum.sample %obs num_qubits %c in(%in_sample1 : memref<1x?xf64>)
+    quantum.sample %obs shape %c in(%in_sample1 : memref<1x?xf64>)
     quantum.sample %obs in(%in_sample1 : memref<1x?xf64>)
     quantum.sample %obs in(%in_sample2 : memref<1x4xf64>)
     quantum.sample %obs : tensor<1x4xf64>
-    quantum.sample %obs num_qubits %c : tensor<1x?xf64>
-    quantum.sample %obs num_qubits %c : tensor<?x?xf64>
+    quantum.sample %obs shape %c : tensor<1x?xf64>
+    quantum.sample %obs shape %c : tensor<?x?xf64>
     return
 }
 
@@ -329,8 +318,8 @@ func.func @counts5(%q0 : !quantum.bit, %q1 : !quantum.bit) {
 func.func @counts6(%q0 : !quantum.bit, %q1 : !quantum.bit, %c : i64) {
     %obs = quantum.compbasis qubits %q0, %q1 : !quantum.obs
 
-    // expected-error@+1 {{with static return shapes should not specify state vector length in arguments}}
-    quantum.counts %obs size %c : tensor<4xf64>, tensor<4xi64>
+    // expected-error@+1 {{with static return shapes should not specify dynamic shape in arguments}}
+    quantum.counts %obs shape %c : tensor<4xf64>, tensor<4xi64>
 
     return
 }
@@ -340,7 +329,7 @@ func.func @counts6(%q0 : !quantum.bit, %q1 : !quantum.bit, %c : i64) {
 func.func @counts7(%q0 : !quantum.bit, %q1 : !quantum.bit) {
     %obs = quantum.compbasis qubits %q0, %q1 : !quantum.obs
 
-    // expected-error@+1 {{with dynamic return shapes must specify state vector length in arguments}}
+    // expected-error@+1 {{with dynamic return shapes must specify dynamic shape in arguments}}
     quantum.counts %obs : tensor<?xf64>, tensor<?xi64>
 
     return
@@ -376,7 +365,7 @@ func.func @probs2(%q0 : !quantum.bit, %q1 : !quantum.bit) {
 func.func @probs3(%q0 : !quantum.bit, %q1 : !quantum.bit, %c : i64) {
     %obs = quantum.compbasis qubits %q0, %q1 : !quantum.obs
 
-    // expected-error@+1 {{with static return shapes should not specify state vector length in arguments}}
+    // expected-error@+1 {{with static return shapes should not specify dynamic shape in arguments}}
     quantum.probs %obs shape %c : tensor<4xf64>
 
     return
@@ -387,7 +376,7 @@ func.func @probs3(%q0 : !quantum.bit, %q1 : !quantum.bit, %c : i64) {
 func.func @probs4(%q0 : !quantum.bit, %q1 : !quantum.bit) {
     %obs = quantum.compbasis qubits %q0, %q1 : !quantum.obs
 
-    // expected-error@+1 {{with dynamic return shapes must specify state vector length in arguments}}
+    // expected-error@+1 {{with dynamic return shapes must specify dynamic shape in arguments}}
     quantum.probs %obs : tensor<?xf64>
 
     return
@@ -437,7 +426,7 @@ func.func @state2(%q0 : !quantum.bit, %q1 : !quantum.bit) {
 func.func @state3(%q0 : !quantum.bit, %q1 : !quantum.bit, %c : i64) {
     %obs = quantum.compbasis qubits %q0, %q1 : !quantum.obs
 
-    // expected-error@+1 {{with static return shapes should not specify state vector length in arguments}}
+    // expected-error@+1 {{with static return shapes should not specify dynamic shape in arguments}}
     quantum.state %obs shape %c : tensor<4xcomplex<f64>>
 
     return
@@ -448,7 +437,7 @@ func.func @state3(%q0 : !quantum.bit, %q1 : !quantum.bit, %c : i64) {
 func.func @state4(%q0 : !quantum.bit, %q1 : !quantum.bit) {
     %obs = quantum.compbasis qubits %q0, %q1 : !quantum.obs
 
-    // expected-error@+1 {{with dynamic return shapes must specify state vector length in arguments}}
+    // expected-error@+1 {{with dynamic return shapes must specify dynamic shape in arguments}}
     quantum.state %obs : tensor<?xcomplex<f64>>
 
     return

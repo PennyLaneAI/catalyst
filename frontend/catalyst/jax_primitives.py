@@ -1444,17 +1444,11 @@ def _sample_lowering(
     result_shape = tuple(ir.ShapedType.get_dynamic_size() if d is None else d for d in static_shape)
     result_type = ir.RankedTensorType.get(result_shape, f64_type)
 
-    shape_dims_values = _merge_dyn_shape(static_shape, dynamic_shape)
-    # At this point, both shape_dims_values and static_shape are tuples of two entries,
-    # representing (shots, num_qubits)
-    if static_shape[1] is None:
-        # dynamic num_qubits, pass the SSA value to the op
-        num_qubits = extract_scalar(shape_dims_values[1], "sample_num_qubits")
-    else:
-        # static num_qubits already in the shape, no need to pass another operand
-        num_qubits = None
+    dynamic_shape = list(dynamic_shape)
+    for i, dyn_dim in enumerate(dynamic_shape):
+        dynamic_shape[i] = extract_scalar(dyn_dim, f"sample_dyn_dim_{i}")
 
-    return SampleOp(result_type, obs, num_qubits=num_qubits).results
+    return SampleOp(result_type, obs, dynamic_shape=dynamic_shape).results
 
 
 #
@@ -1535,12 +1529,12 @@ def _counts_lowering(
 
     if static_shape[0] is None:
         # dynamic num_qubits, pass the SSA value to the op
-        size = extract_scalar(dynamic_shape[0], "counts_size")
+        dyn_shape = extract_scalar(dynamic_shape[0], "counts_size")
     else:
         # static num_qubits already in the shape, no need to pass another operand
-        size = None
+        dyn_shape = None
 
-    return CountsOp(eigvals_type, counts_type, obs, size=size).results
+    return CountsOp(eigvals_type, counts_type, obs, dynamic_shape=dyn_shape).results
 
 
 #
@@ -1616,7 +1610,7 @@ def probs_staging_rule(jaxpr_trace, obs, *dynamic_shape, static_shape):
         obs,
         jax.numpy.dtype("float64"),
         *dynamic_shape,
-        static_shape=static_shape
+        static_shape=static_shape,
     )
 
 
@@ -1628,9 +1622,7 @@ def _probs_def_impl(ctx, obs, *dynamic_shape, static_shape):  # pragma: no cover
     raise NotImplementedError()
 
 
-def _probs_lowering(
-    jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, *dynamic_shape, static_shape
-):
+def _probs_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, *dynamic_shape, static_shape):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
@@ -1642,11 +1634,11 @@ def _probs_lowering(
 
     if static_shape[0] is None:
         # dynamic sv_length, pass the SSA value to the op
-        sv_length = extract_scalar(dynamic_shape[0], "probs_sv_length")
+        dyn_shape = extract_scalar(dynamic_shape[0], "probs_sv_length")
     else:
         # static sv_length already in the shape, no need to pass another operand
-        sv_length = None
-    return ProbsOp(result_type, obs, state_vector_length=sv_length).results
+        dyn_shape = None
+    return ProbsOp(result_type, obs, dynamic_shape=dyn_shape).results
 
 
 #
@@ -1670,7 +1662,7 @@ def state_staging_rule(jaxpr_trace, obs, *dynamic_shape, static_shape):
         obs,
         jax.numpy.dtype("complex128"),
         *dynamic_shape,
-        static_shape=static_shape
+        static_shape=static_shape,
     )
 
 
@@ -1682,9 +1674,7 @@ def _state_def_impl(ctx, obs, *dynamic_shape, static_shape):  # pragma: no cover
     raise NotImplementedError()
 
 
-def _state_lowering(
-    jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, *dynamic_shape, static_shape
-):
+def _state_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, *dynamic_shape, static_shape):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
@@ -1696,11 +1686,11 @@ def _state_lowering(
 
     if static_shape[0] is None:
         # dynamic sv_length, pass the SSA value to the op
-        sv_length = extract_scalar(dynamic_shape[0], "state_sv_length")
+        dyn_shape = extract_scalar(dynamic_shape[0], "state_sv_length")
     else:
         # static sv_length already in the shape, no need to pass another operand
-        sv_length = None
-    return StateOp(result_type, obs, state_vector_length=sv_length).results
+        dyn_shape = None
+    return StateOp(result_type, obs, dynamic_shape=dyn_shape).results
 
 
 #

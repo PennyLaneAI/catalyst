@@ -221,8 +221,8 @@ LogicalResult QubitUnitaryOp::verify()
 // ----- measurements
 
 template <typename T>
-static LogicalResult verifyMeasurementOpDynamism(T *op, bool hasObs, bool hasLen, bool hasBufferIn,
-                                                 bool hasOutTensor)
+static LogicalResult verifyMeasurementOpDynamism(T *op, bool hasObs, bool hasDynShape,
+                                                 bool hasBufferIn, bool hasOutTensor)
 {
     // `obs` operand must always be present
     if (!hasObs) {
@@ -240,31 +240,26 @@ static LogicalResult verifyMeasurementOpDynamism(T *op, bool hasObs, bool hasLen
         }
 
         ShapedType outTensor;
-        size_t numQubitsDimIdx;
         if constexpr (std::is_same_v<T, ProbsOp>) {
             outTensor = cast<ShapedType>(op->getProbabilities().getType());
-            numQubitsDimIdx = 0;
         }
         else if constexpr (std::is_same_v<T, StateOp>) {
             outTensor = cast<ShapedType>(op->getState().getType());
-            numQubitsDimIdx = 0;
         }
         else if constexpr (std::is_same_v<T, SampleOp>) {
             outTensor = cast<ShapedType>(op->getSamples().getType());
-            numQubitsDimIdx = 1;
         }
         else if constexpr (std::is_same_v<T, CountsOp>) {
             outTensor = cast<ShapedType>(op->getCounts().getType());
-            numQubitsDimIdx = 0;
         }
 
-        if (!outTensor.isDynamicDim(numQubitsDimIdx) && hasLen) {
+        if (outTensor.hasStaticShape() && hasDynShape) {
             return (*op)->emitOpError(
-                "with static return shapes should not specify state vector length in arguments");
+                "with static return shapes should not specify dynamic shape in arguments");
         }
-        if (outTensor.isDynamicDim(numQubitsDimIdx) && !hasLen) {
+        if (!outTensor.hasStaticShape() && !hasDynShape) {
             return (*op)->emitOpError(
-                "with dynamic return shapes must specify state vector length in arguments");
+                "with dynamic return shapes must specify dynamic shape in arguments");
         }
     }
 
@@ -309,10 +304,10 @@ LogicalResult SampleOp::verify()
     }
 
     bool hasObs = (bool)getObs();
-    bool hasNumQubits = (bool)getNumQubits();
+    bool hasDynShape = (bool)(getDynamicShape().size());
     bool hasBufferIn = (bool)getInData();
     bool hasOutTensor = (bool)getSamples();
-    return verifyMeasurementOpDynamism<SampleOp>(this, hasObs, hasNumQubits, hasBufferIn,
+    return verifyMeasurementOpDynamism<SampleOp>(this, hasObs, hasDynShape, hasBufferIn,
                                                  hasOutTensor);
 }
 
@@ -325,10 +320,10 @@ LogicalResult CountsOp::verify()
     }
 
     bool hasObs = (bool)getObs();
-    bool hasSize = (bool)getSize();
+    bool hasDynShape = (bool)getDynamicShape();
     bool hasBufferIn = (bool)getInCounts();
     bool hasOutTensor = (bool)getCounts();
-    if (failed(verifyMeasurementOpDynamism<CountsOp>(this, hasObs, hasSize, hasBufferIn,
+    if (failed(verifyMeasurementOpDynamism<CountsOp>(this, hasObs, hasDynShape, hasBufferIn,
                                                      hasOutTensor))) {
         return failure();
     }
@@ -377,10 +372,11 @@ LogicalResult ProbsOp::verify()
     }
 
     bool hasObs = (bool)getObs();
-    bool hasSVLen = (bool)getStateVectorLength();
+    bool hasDynShape = (bool)getDynamicShape();
     bool hasStateIn = (bool)getStateIn();
     bool hasOutTensor = (bool)getProbabilities();
-    return verifyMeasurementOpDynamism<ProbsOp>(this, hasObs, hasSVLen, hasStateIn, hasOutTensor);
+    return verifyMeasurementOpDynamism<ProbsOp>(this, hasObs, hasDynShape, hasStateIn,
+                                                hasOutTensor);
 }
 
 LogicalResult StateOp::verify()
@@ -395,10 +391,11 @@ LogicalResult StateOp::verify()
     }
 
     bool hasObs = (bool)getObs();
-    bool hasSVLen = (bool)getStateVectorLength();
+    bool hasDynShape = (bool)getDynamicShape();
     bool hasStateIn = (bool)getStateIn();
     bool hasOutTensor = (bool)getState();
-    return verifyMeasurementOpDynamism<StateOp>(this, hasObs, hasSVLen, hasStateIn, hasOutTensor);
+    return verifyMeasurementOpDynamism<StateOp>(this, hasObs, hasDynShape, hasStateIn,
+                                                hasOutTensor);
 }
 
 LogicalResult AdjointOp::verify()

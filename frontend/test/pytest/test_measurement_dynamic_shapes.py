@@ -61,6 +61,7 @@ def test_dynamic_sample_backend_functionality():
     # TODO: shots still can only be static in PL frontend
     # TODO: Before updating to dynamic shots, the shots in dynamic_slice is still static
     new_ir = new_ir.replace("sizes = [10", "sizes = [37")
+    new_ir = new_ir.replace("quantum.sample %3 :", "quantum.sample %3 shape %shots:")
     replace_ir(workflow_dyn_sample, "mlir", new_ir)
     res = workflow_dyn_sample(37)
     assert len(res) == 37
@@ -240,7 +241,7 @@ def test_dynamic_wires_sample_with_wires(shots, backend, capfd):
     assert out.count("compiling...") == 3
 
 
-@pytest.mark.parametrize("shots", [3, (3, 4, 5), (7, )*3])
+@pytest.mark.parametrize("shots", [3, (3, 4, 5), (7,) * 3])
 def test_dynamic_wires_sample_without_wires(shots, backend, capfd):
     """
     Test that a circuit with dynamic number of wires can be executed correctly

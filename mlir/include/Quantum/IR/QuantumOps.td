@@ -862,7 +862,7 @@ def SampleOp : Measurement_Op<"sample", [AttrSizedOperandSegments]> {
 
     let arguments = (ins
         ObservableType:$obs,
-        Optional<I64>:$num_qubits,
+        Variadic<I64>:$dynamic_shape,
         Optional<
            AnyTypeOf<[
             MemRefRankOf<[F64], [1]>,
@@ -881,7 +881,7 @@ def SampleOp : Measurement_Op<"sample", [AttrSizedOperandSegments]> {
     );
 
     let assemblyFormat = [{
-        $obs ( `num_qubits` $num_qubits^ )?
+        $obs ( `shape` $dynamic_shape^ )?
         ( `in` `(` $in_data^ `:` type($in_data) `)` )?
         attr-dict ( `:` type($samples)^ )?
     }];
@@ -929,7 +929,7 @@ def CountsOp : Measurement_Op<"counts", [AttrSizedOperandSegments, SameVariadicR
 
     let arguments = (ins
         ObservableType:$obs,
-        Optional<I64>:$size,
+        Optional<I64>:$dynamic_shape,
         Optional<MemRefRankOf<[F64], [1]>>:$in_eigvals,
         Optional<MemRefRankOf<[I64], [1]>>:$in_counts
     );
@@ -940,7 +940,7 @@ def CountsOp : Measurement_Op<"counts", [AttrSizedOperandSegments, SameVariadicR
     );
 
     let assemblyFormat = [{
-        $obs ( `size` $size^ )?
+        $obs ( `shape` $dynamic_shape^ )?
         ( `in` `(` $in_eigvals^ `:` type($in_eigvals) `,` $in_counts `:` type($in_counts) `)` )?
         attr-dict ( `:` type($eigvals)^ `,` type($counts) )?
     }];
@@ -1050,7 +1050,7 @@ def ProbsOp : Measurement_Op<"probs", [AttrSizedOperandSegments]> {
 
     let arguments = (ins
         ObservableType:$obs,
-        Optional<I64>:$state_vector_length,
+        Optional<I64>:$dynamic_shape,
         Optional<MemRefRankOf<[F64], [1]>>:$state_in
     );
 
@@ -1059,7 +1059,7 @@ def ProbsOp : Measurement_Op<"probs", [AttrSizedOperandSegments]> {
     );
 
     let assemblyFormat = [{
-        $obs ( `shape` $state_vector_length^ )?
+        $obs ( `shape` $dynamic_shape^ )?
         ( `in` `(` $state_in^ `:` type($state_in) `)` )?
         attr-dict ( `:` type($probabilities)^ )?
     }];
@@ -1097,7 +1097,7 @@ def StateOp : Measurement_Op<"state", [AttrSizedOperandSegments]> {
 
     let arguments = (ins
         ObservableType:$obs,
-        Optional<I64>:$state_vector_length,
+        Optional<I64>:$dynamic_shape,
         Optional<MemRefRankOf<[Complex<F64>], [1]>>:$state_in
     );
 
@@ -1112,7 +1112,7 @@ def StateOp : Measurement_Op<"state", [AttrSizedOperandSegments]> {
     }];
 
     let assemblyFormat = [{
-        $obs ( `shape` $state_vector_length^ )?
+        $obs ( `shape` $dynamic_shape^ )?
         ( `in` `(` $state_in^ `:` type($state_in) `)` )?
         attr-dict ( `:` type($state)^ )?
     }];
