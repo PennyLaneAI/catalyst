@@ -1375,9 +1375,9 @@ def custom_measurement_staging_rule(
         # Therefore we still keep static shapes when possible
         # This can be removed, and all avals turned into DShapedArrays, when
         # dynamic program capture in PL is complete
-        out_shapes = tuple([core.ShapedArray(shape, dtype) for dtype in dtypes])
+        out_shapes = tuple(core.ShapedArray(shape, dtype) for dtype in dtypes)
     else:
-        out_shapes = tuple([core.DShapedArray(shape, dtype) for dtype in dtypes])
+        out_shapes = tuple(core.DShapedArray(shape, dtype) for dtype in dtypes)
 
     invars = [jaxpr_trace.getvar(obs)]
     for dyn_dim in dynamic_shape:
@@ -1385,7 +1385,7 @@ def custom_measurement_staging_rule(
 
     params = {"static_shape": static_shape}
 
-    out_tracers = tuple([pe.DynamicJaxprTracer(jaxpr_trace, out_shape) for out_shape in out_shapes])
+    out_tracers = tuple(pe.DynamicJaxprTracer(jaxpr_trace, out_shape) for out_shape in out_shapes)
 
     eqn = pe.new_jaxpr_eqn(
         invars,
