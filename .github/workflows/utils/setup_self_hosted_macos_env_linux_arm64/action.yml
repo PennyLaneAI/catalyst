@@ -95,6 +95,7 @@ runs:
     #     python-version: '${{ inputs.python_version }}'    
 
     - name: Display Python-Path
+      shell: bash
       run: |
         which python
         which pip
