@@ -1343,7 +1343,7 @@ def _hamiltonian_lowering(jax_ctx: mlir.LoweringRuleContext, coeffs: ir.Value, *
 # measurements
 #
 def custom_measurement_staging_rule(
-    primitive, jaxpr_trace, obs, dtype, *dynamic_shape, static_shape
+    primitive, jaxpr_trace, obs, dtypes, *dynamic_shape, static_shape
 ):
     """
     In jax, the default `def_abstract_eval` method for binding primitives keeps the abstract aval in
@@ -1375,9 +1375,9 @@ def custom_measurement_staging_rule(
         # Therefore we still keep static shapes when possible
         # This can be removed, and all avals turned into DShapedArrays, when
         # dynamic program capture in PL is complete
-        out_shape = core.ShapedArray(shape, dtype)
+        out_shapes = tuple([core.ShapedArray(shape, dtype) for dtype in dtypes])
     else:
-        out_shape = core.DShapedArray(shape, dtype)
+        out_shapes = tuple([core.DShapedArray(shape, dtype) for dtype in dtypes])
 
     invars = [jaxpr_trace.getvar(obs)]
     for dyn_dim in dynamic_shape:
@@ -1385,18 +1385,18 @@ def custom_measurement_staging_rule(
 
     params = {"static_shape": static_shape}
 
-    out_tracer = pe.DynamicJaxprTracer(jaxpr_trace, out_shape)
+    out_tracers = tuple([pe.DynamicJaxprTracer(jaxpr_trace, out_shape) for out_shape in out_shapes])
 
     eqn = pe.new_jaxpr_eqn(
         invars,
-        [jaxpr_trace.makevar(out_tracer)],
+        [jaxpr_trace.makevar(out_tracer) for out_tracer in out_tracers],
         primitive,
         params,
         jax.core.no_effects,
     )
 
     jaxpr_trace.frame.add_eqn(eqn)
-    return out_tracer
+    return out_tracers if len(out_tracers) > 1 else out_tracers[0]
 
 
 #
@@ -1416,7 +1416,7 @@ def sample_staging_rule(jaxpr_trace, obs, *dynamic_shape, static_shape):
         sample_p,
         jaxpr_trace,
         obs,
-        jax.numpy.dtype("float64"),
+        [jax.numpy.dtype("float64")],
         *dynamic_shape,
         static_shape=static_shape,
     )
@@ -1468,38 +1468,14 @@ def counts_staging_rule(jaxpr_trace, obs, *dynamic_shape, static_shape):
     else:
         assert shape == (2,)
 
-    if not dynamic_shape:
-        out_shapes = (
-            core.ShapedArray(shape, jax.numpy.dtype("float64")),
-            core.ShapedArray(shape, jax.numpy.dtype("int64")),
-        )
-    else:
-        out_shapes = (
-            core.DShapedArray(shape, jax.numpy.dtype("float64")),
-            core.DShapedArray(shape, jax.numpy.dtype("int64")),
-        )
-
-    invars = [jaxpr_trace.getvar(obs)]
-    for dyn_dim in dynamic_shape:
-        invars.append(jaxpr_trace.getvar(dyn_dim))
-
-    params = {"static_shape": static_shape}
-
-    out_tracers = (
-        pe.DynamicJaxprTracer(jaxpr_trace, out_shapes[0]),
-        pe.DynamicJaxprTracer(jaxpr_trace, out_shapes[1]),
-    )
-
-    eqn = pe.new_jaxpr_eqn(
-        invars,
-        [jaxpr_trace.makevar(out_tracer) for out_tracer in out_tracers],
+    return custom_measurement_staging_rule(
         counts_p,
-        params,
-        jax.core.no_effects,
+        jaxpr_trace,
+        obs,
+        [jax.numpy.dtype("float64"), jax.numpy.dtype("int64")],
+        *dynamic_shape,
+        static_shape=static_shape,
     )
-
-    jaxpr_trace.frame.add_eqn(eqn)
-    return out_tracers
 
 
 pe.custom_staging_rules[counts_p] = counts_staging_rule
@@ -1608,7 +1584,7 @@ def probs_staging_rule(jaxpr_trace, obs, *dynamic_shape, static_shape):
         probs_p,
         jaxpr_trace,
         obs,
-        jax.numpy.dtype("float64"),
+        [jax.numpy.dtype("float64")],
         *dynamic_shape,
         static_shape=static_shape,
     )
@@ -1660,7 +1636,7 @@ def state_staging_rule(jaxpr_trace, obs, *dynamic_shape, static_shape):
         state_p,
         jaxpr_trace,
         obs,
-        jax.numpy.dtype("complex128"),
+        [jax.numpy.dtype("complex128")],
         *dynamic_shape,
         static_shape=static_shape,
     )
