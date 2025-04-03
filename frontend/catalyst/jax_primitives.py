@@ -1343,7 +1343,7 @@ def _hamiltonian_lowering(jax_ctx: mlir.LoweringRuleContext, coeffs: ir.Value, *
 # measurements
 #
 def custom_measurement_staging_rule(
-    primitive, jaxpr_trace, obs, dtype, *dynamic_shape, static_shape, shots=None
+    primitive, jaxpr_trace, obs, dtype, *dynamic_shape, static_shape
 ):
     """
     In jax, the default `def_abstract_eval` method for binding primitives keeps the abstract aval in
@@ -1384,8 +1384,6 @@ def custom_measurement_staging_rule(
         invars.append(jaxpr_trace.getvar(dyn_dim))
 
     params = {"static_shape": static_shape}
-    if shots:
-        params["shots"] = shots
 
     out_tracer = pe.DynamicJaxprTracer(jaxpr_trace, out_shape)
 
@@ -1462,7 +1460,7 @@ def _sample_lowering(
 #
 # counts measurement
 #
-def counts_staging_rule(jaxpr_trace, obs, *dynamic_shape, static_shape, shots=None):
+def counts_staging_rule(jaxpr_trace, obs, *dynamic_shape, static_shape):
     """
     The result shape of `counts_p` is (tensor<Nxf64>, tensor<Nxi64>)
     where N = 2**number_of_qubits.
@@ -1491,7 +1489,7 @@ def counts_staging_rule(jaxpr_trace, obs, *dynamic_shape, static_shape, shots=No
     for dyn_dim in dynamic_shape:
         invars.append(jaxpr_trace.getvar(dyn_dim))
 
-    params = {"static_shape": static_shape, "shots": shots}
+    params = {"static_shape": static_shape}
 
     out_tracers = (
         pe.DynamicJaxprTracer(jaxpr_trace, out_shapes[0]),
@@ -1514,12 +1512,12 @@ pe.custom_staging_rules[counts_p] = counts_staging_rule
 
 
 @counts_p.def_impl
-def _counts_def_impl(ctx, obs, *dynamic_shape, static_shape, shots=None):  # pragma: no cover
+def _counts_def_impl(ctx, obs, *dynamic_shape, static_shape):  # pragma: no cover
     raise NotImplementedError()
 
 
 def _counts_lowering(
-    jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, *dynamic_shape, static_shape, shots=None
+    jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, *dynamic_shape, static_shape
 ):
     # Note: result shape of counts op is (tensor<Nxf64>, tensor<Nxi64>)
     # where N = 2**number_of_qubits
@@ -1608,7 +1606,7 @@ def _var_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shape=None):
 #
 # probs measurement
 #
-def probs_staging_rule(jaxpr_trace, obs, *dynamic_shape, static_shape, shots=None):
+def probs_staging_rule(jaxpr_trace, obs, *dynamic_shape, static_shape):
     """
     The result shape of probs_p is (2^num_qubits,).
     """
@@ -1618,8 +1616,7 @@ def probs_staging_rule(jaxpr_trace, obs, *dynamic_shape, static_shape, shots=Non
         obs,
         jax.numpy.dtype("float64"),
         *dynamic_shape,
-        static_shape=static_shape,
-        shots=shots,
+        static_shape=static_shape
     )
 
 
@@ -1627,12 +1624,12 @@ pe.custom_staging_rules[probs_p] = probs_staging_rule
 
 
 @probs_p.def_impl
-def _probs_def_impl(ctx, obs, *dynamic_shape, static_shape, shots=None):  # pragma: no cover
+def _probs_def_impl(ctx, obs, *dynamic_shape, static_shape):  # pragma: no cover
     raise NotImplementedError()
 
 
 def _probs_lowering(
-    jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, *dynamic_shape, static_shape, shots=None
+    jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, *dynamic_shape, static_shape
 ):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
@@ -1655,7 +1652,7 @@ def _probs_lowering(
 #
 # state measurement
 #
-def state_staging_rule(jaxpr_trace, obs, *dynamic_shape, static_shape, shots=None):
+def state_staging_rule(jaxpr_trace, obs, *dynamic_shape, static_shape):
     """
     The result shape of state_p is (2^num_qubits,).
     """
@@ -1673,8 +1670,7 @@ def state_staging_rule(jaxpr_trace, obs, *dynamic_shape, static_shape, shots=Non
         obs,
         jax.numpy.dtype("complex128"),
         *dynamic_shape,
-        static_shape=static_shape,
-        shots=shots,
+        static_shape=static_shape
     )
 
 
@@ -1682,12 +1678,12 @@ pe.custom_staging_rules[state_p] = state_staging_rule
 
 
 @state_p.def_impl
-def _state_def_impl(ctx, obs, *dynamic_shape, static_shape, shots=None):  # pragma: no cover
+def _state_def_impl(ctx, obs, *dynamic_shape, static_shape):  # pragma: no cover
     raise NotImplementedError()
 
 
 def _state_lowering(
-    jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, *dynamic_shape, static_shape, shots=None
+    jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, *dynamic_shape, static_shape
 ):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True

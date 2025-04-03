@@ -959,7 +959,7 @@ def trace_quantum_measurements(
 
                 dyn_dims, static_shape = _extract_tracers_dyn_shape(shape)
                 results = counts_p.bind(
-                    obs_tracers, *dyn_dims, static_shape=tuple(static_shape), shots=shots
+                    obs_tracers, *dyn_dims, static_shape=tuple(static_shape)
                 )
 
                 if using_compbasis:

@@ -182,7 +182,7 @@ class InterpreterContext:
         if kernel is None:
             # TODO: Do we need these shots?
             # It looks like measurement operations already come with their own shots value.
-            self.kernel, _shots = change_device_to_cuda_device(self)
+            self.kernel, self.shots = change_device_to_cuda_device(self)
             change_alloc_to_cuda_alloc(self, self.kernel)
         else:
             # This is equivalent to passing a qreg into a function.
@@ -272,7 +272,8 @@ def change_device_to_cuda_device(ctx):
     # shots are not needed until the very end.
     # So, we will just return this variable
     # and it is the responsibility of the caller to propagate this information.
-    shots = parameters.get("shots")
+    assert isinstance(qdevice_eqn.invars[0], jax._src.core.Literal)
+    shots = qdevice_eqn.invars[0].val
 
     device_name = qdevice_eqn.params.get("rtd_name")
 
@@ -503,10 +504,7 @@ def change_sample_or_counts(ctx, eqn):
     # * shots
     # * shape
     params = eqn.params
-    if is_sample:
-        shots = params["static_shape"][0]
-    if is_counts:
-        shots = params["shots"]
+    shots = ctx.shots
 
     # We will deal with compbasis in the same way as
     # when we deal with the state
