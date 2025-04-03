@@ -28,8 +28,8 @@ import jax.numpy as jnp
 import numpy as np
 from jax._src.tree_util import tree_flatten, tree_leaves, tree_structure, tree_unflatten
 
-from catalyst.jax_extras import make_jaxpr2
 from catalyst.api_extensions.control_flow import for_loop
+from catalyst.jax_extras import make_jaxpr2
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.tracing.type_signatures import get_stripped_signature
 from catalyst.utils.callables import CatalystCallable

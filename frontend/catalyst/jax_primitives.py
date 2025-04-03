@@ -26,7 +26,7 @@ import numpy as np
 import pennylane as qml
 from jax._src import api_util, core, source_info_util, util
 from jax._src.interpreters import partial_eval as pe
-from jax._src.lax.lax import _nary_lower_hlo, cos_p, sin_p, _merge_dyn_shape
+from jax._src.lax.lax import _merge_dyn_shape, _nary_lower_hlo, cos_p, sin_p
 from jax._src.lib.mlir import ir
 from jax._src.lib.mlir.dialects import hlo
 from jax.core import AbstractValue

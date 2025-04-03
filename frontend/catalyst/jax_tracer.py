@@ -25,8 +25,8 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import jax
 import jax.numpy as jnp
-from jax._src.lax.lax import _extract_tracers_dyn_shape
 import pennylane as qml
+from jax._src.lax.lax import _extract_tracers_dyn_shape
 from pennylane import QubitUnitary, QueuingManager
 from pennylane.devices import QubitDevice
 from pennylane.measurements import (
