@@ -1411,8 +1411,8 @@ def sample_staging_rule(jaxpr_trace, obs, *dynamic_shape, static_shape):
     shape = _merge_dyn_shape(static_shape, dynamic_shape)
     if obs.primitive is compbasis_p:
         if obs.num_qubits:
-            if isinstance(shape[1], int):
-                assert shape[1] == obs.num_qubits
+            assert isinstance(shape[1], int)
+            assert shape[1] == obs.num_qubits
 
     return custom_measurement_staging_rule(
         sample_p,
