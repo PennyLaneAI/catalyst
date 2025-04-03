@@ -30,6 +30,13 @@ runs:
 
     # These environment variables ensure multi-threading workloads (ex: pytest-xdist)
     # work without any issues. Without them, the tests take hours to complete.
+
+    - name: libomp
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cmake ninja-build clang lld libomp-dev
+
     - name: Setup MacOS Env Vars
       shell: bash
       run: |

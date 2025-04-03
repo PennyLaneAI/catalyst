@@ -24,6 +24,7 @@ export CXX_COMPILER=/opt/rh/gcc-toolset-${GCC_VERSION}/root/usr/bin/g++
 
 # Set the right Python interpreter
 rm -rf /usr/bin/python3
+ls /opt/_internal/
 ln -s /opt/_internal/cpython-${PYTHON_VERSION}.${PYTHON_SUBVERSION}/bin/python3 /usr/bin/python3
 export PYTHON=/usr/bin/python3
 
