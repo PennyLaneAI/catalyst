@@ -380,8 +380,8 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
         prim = measurement_map[type(measurement)]
         if prim is sample_p:
             num_qubits = len(measurement.wires) or len(self._device.wires)
-            shape = (self._shots, num_qubits)
-            dyn_dims, static_shape = jax._src.lax.lax._extract_tracers_dyn_shape(shape)
+            sample_shape = (self._shots, num_qubits)
+            dyn_dims, static_shape = jax._src.lax.lax._extract_tracers_dyn_shape(sample_shape)
             mval = sample_p.bind(obs, *dyn_dims, static_shape=tuple(static_shape))
         elif prim is counts_p:
             # dyn_dims, static_shape = jax._src.lax.lax._extract_tracers_dyn_shape(shape)
