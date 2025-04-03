@@ -226,19 +226,20 @@ static LogicalResult verifyMeasurementOpDynamism(T *op, bool hasObs, bool hasDyn
 {
     // `obs` operand must always be present
     if (!hasObs) {
-        return (*op)->emitOpError("must take an observale");
+        return (*op)->emitOpError("must take an observable");
     }
 
+    // If a tensor is not returned, must be bufferized.
     // If a tensor is returned, must be unbufferized.
-    // Two cases are allowed here.
+    if (!hasOutTensor ^ hasBufferIn) {
+        return (*op)->emitOpError(
+            "either tensors must be returned or memrefs must be used as inputs");
+    }
+
+    // Two cases are allowed when a tensor is returned.
     // 1. Either return shape is completely static, and no length is specified in argument,
     // 2. Or return shape is dynamic and a length argument is specified.
     if (hasOutTensor) {
-        if (hasBufferIn) {
-            return (*op)->emitOpError(
-                "either tensors must be returned or memrefs must be used as inputs");
-        }
-
         ShapedType outTensor;
         if constexpr (std::is_same_v<T, ProbsOp>) {
             outTensor = cast<ShapedType>(op->getProbabilities().getType());
@@ -261,12 +262,6 @@ static LogicalResult verifyMeasurementOpDynamism(T *op, bool hasObs, bool hasDyn
             return (*op)->emitOpError(
                 "with dynamic return shapes must specify dynamic shape in arguments");
         }
-    }
-
-    // If a tensor is not returned, must be bufferized.
-    if (!hasOutTensor && !hasBufferIn) {
-        return (*op)->emitOpError(
-            "either tensors must be returned or memrefs must be used as inputs");
     }
 
     return success();
