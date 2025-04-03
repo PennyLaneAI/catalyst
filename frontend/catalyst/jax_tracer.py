@@ -25,6 +25,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import jax
 import jax.numpy as jnp
+from jax._src.lax.lax import _extract_tracers_dyn_shape
 import pennylane as qml
 from pennylane import QubitUnitary, QueuingManager
 from pennylane.devices import QubitDevice
@@ -899,8 +900,7 @@ def trace_quantum_measurements(
                     out_classical_tracers.append(output.mv)
                 else:
                     shape = (shots, nqubits)
-                    # unfortunately there are three "lax"s at different levels, so we need to use the full path
-                    dyn_dims, static_shape = jax._src.lax.lax._extract_tracers_dyn_shape(shape)
+                    dyn_dims, static_shape = _extract_tracers_dyn_shape(shape)
                     result = sample_p.bind(obs_tracers, *dyn_dims, static_shape=tuple(static_shape))
                     if using_compbasis:
                         result = jnp.astype(result, jnp.int64)
@@ -937,7 +937,7 @@ def trace_quantum_measurements(
                     shape = (jnp.left_shift(1, nqubits),)
                 else:
                     shape = (2**nqubits,)
-                dyn_dims, static_shape = jax._src.lax.lax._extract_tracers_dyn_shape(shape)
+                dyn_dims, static_shape = _extract_tracers_dyn_shape(shape)
                 result = probs_p.bind(obs_tracers, *dyn_dims, static_shape=tuple(static_shape))
                 out_classical_tracers.append(result)
             elif type(output) is CountsMP:
@@ -955,7 +955,7 @@ def trace_quantum_measurements(
                 else:
                     shape = (2,)
 
-                dyn_dims, static_shape = jax._src.lax.lax._extract_tracers_dyn_shape(shape)
+                dyn_dims, static_shape = _extract_tracers_dyn_shape(shape)
                 results = counts_p.bind(obs_tracers, *dyn_dims, static_shape=tuple(static_shape))
 
                 if using_compbasis:
@@ -978,7 +978,7 @@ def trace_quantum_measurements(
                     shape = (jnp.left_shift(1, nqubits),)
                 else:
                     shape = (2**nqubits,)
-                dyn_dims, static_shape = jax._src.lax.lax._extract_tracers_dyn_shape(shape)
+                dyn_dims, static_shape = _extract_tracers_dyn_shape(shape)
                 result = state_p.bind(obs_tracers, *dyn_dims, static_shape=tuple(static_shape))
                 out_classical_tracers.append(result)
             else:

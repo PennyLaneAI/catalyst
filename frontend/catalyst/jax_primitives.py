@@ -26,7 +26,7 @@ import numpy as np
 import pennylane as qml
 from jax._src import api_util, core, source_info_util, util
 from jax._src.interpreters import partial_eval as pe
-from jax._src.lax.lax import _nary_lower_hlo, cos_p, sin_p
+from jax._src.lax.lax import _nary_lower_hlo, cos_p, sin_p, _merge_dyn_shape
 from jax._src.lib.mlir import ir
 from jax._src.lib.mlir.dialects import hlo
 from jax.core import AbstractValue
@@ -1369,7 +1369,7 @@ def custom_measurement_staging_rule(
     https://github.com/jax-ml/jax/blob/a54319ec1886ed920d50cacf10e147a743888464/jax/_src/interpreters/partial_eval.py#L1881C7-L1881C24
     """
 
-    shape = jax._src.lax.lax._merge_dyn_shape(static_shape, dynamic_shape)
+    shape = _merge_dyn_shape(static_shape, dynamic_shape)
     dtype = "float64" if not complex_type else "complex128"
     if not dynamic_shape:
         # Some PL transforms, like @qml.batch_params, do not support dynamic shapes yet
@@ -1409,7 +1409,7 @@ def sample_staging_rule(jaxpr_trace, obs, *dynamic_shape, static_shape):
     """
     The result shape of `sample_p` is (shots, num_qubits).
     """
-    shape = jax._src.lax.lax._merge_dyn_shape(static_shape, dynamic_shape)
+    shape = _merge_dyn_shape(static_shape, dynamic_shape)
     if obs.primitive is compbasis_p:
         if obs.num_qubits:
             if isinstance(shape[1], int):
@@ -1442,7 +1442,7 @@ def _sample_lowering(
     result_shape = tuple(ir.ShapedType.get_dynamic_size() if d is None else d for d in static_shape)
     result_type = ir.RankedTensorType.get(result_shape, f64_type)
 
-    shape_dims_values = jax._src.lax.lax._merge_dyn_shape(static_shape, dynamic_shape)
+    shape_dims_values = _merge_dyn_shape(static_shape, dynamic_shape)
     # At this point, both shape_dims_values and static_shape are tuples of two entries,
     # representing (shots, num_qubits)
     if static_shape[1] is None:
@@ -1464,7 +1464,7 @@ def counts_staging_rule(jaxpr_trace, obs, *dynamic_shape, static_shape):
     where N = 2**number_of_qubits.
     """
 
-    shape = jax._src.lax.lax._merge_dyn_shape(static_shape, dynamic_shape)
+    shape = _merge_dyn_shape(static_shape, dynamic_shape)
     if obs.primitive is compbasis_p:
         if obs.num_qubits:
             if isinstance(shape[0], int):
