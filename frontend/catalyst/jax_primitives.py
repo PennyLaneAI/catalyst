@@ -1343,7 +1343,7 @@ def _hamiltonian_lowering(jax_ctx: mlir.LoweringRuleContext, coeffs: ir.Value, *
 # measurements
 #
 def custom_measurement_staging_rule(
-    primitive, jaxpr_trace, obs, *dynamic_shape, static_shape, shots=None, complex_type=False
+    primitive, jaxpr_trace, obs, dtype, *dynamic_shape, static_shape, shots=None
 ):
     """
     In jax, the default `def_abstract_eval` method for binding primitives keeps the abstract aval in
@@ -1370,15 +1370,14 @@ def custom_measurement_staging_rule(
     """
 
     shape = _merge_dyn_shape(static_shape, dynamic_shape)
-    dtype = "float64" if not complex_type else "complex128"
     if not dynamic_shape:
         # Some PL transforms, like @qml.batch_params, do not support dynamic shapes yet
         # Therefore we still keep static shapes when possible
         # This can be removed, and all avals turned into DShapedArrays, when
         # dynamic program capture in PL is complete
-        out_shape = core.ShapedArray(shape, jax.numpy.dtype(dtype))
+        out_shape = core.ShapedArray(shape, dtype)
     else:
-        out_shape = core.DShapedArray(shape, jax.numpy.dtype(dtype))
+        out_shape = core.DShapedArray(shape, dtype)
 
     invars = [jaxpr_trace.getvar(obs)]
     for dyn_dim in dynamic_shape:
@@ -1416,7 +1415,12 @@ def sample_staging_rule(jaxpr_trace, obs, *dynamic_shape, static_shape):
                 assert shape[1] == obs.num_qubits
 
     return custom_measurement_staging_rule(
-        sample_p, jaxpr_trace, obs, *dynamic_shape, static_shape=static_shape
+        sample_p,
+        jaxpr_trace,
+        obs,
+        jax.numpy.dtype("float64"),
+        *dynamic_shape,
+        static_shape=static_shape,
     )
 
 
@@ -1609,7 +1613,13 @@ def probs_staging_rule(jaxpr_trace, obs, *dynamic_shape, static_shape, shots=Non
     The result shape of probs_p is (2^num_qubits,).
     """
     return custom_measurement_staging_rule(
-        probs_p, jaxpr_trace, obs, *dynamic_shape, static_shape=static_shape, shots=shots
+        probs_p,
+        jaxpr_trace,
+        obs,
+        jax.numpy.dtype("float64"),
+        *dynamic_shape,
+        static_shape=static_shape,
+        shots=shots,
     )
 
 
@@ -1661,10 +1671,10 @@ def state_staging_rule(jaxpr_trace, obs, *dynamic_shape, static_shape, shots=Non
         state_p,
         jaxpr_trace,
         obs,
+        jax.numpy.dtype("complex128"),
         *dynamic_shape,
         static_shape=static_shape,
         shots=shots,
-        complex_type=True,
     )
 
 
