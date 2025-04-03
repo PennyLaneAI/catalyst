@@ -45,50 +45,59 @@ runs:
 
 
     # These binaries are added to PATH as there were issues adding them by default on job start
-    - name: Add additional binaries to PATH
-      shell: bash
-      run: |
-        additional_paths=("/opt/homebrew/bin" "$HOME/.pyenv/shims" "$HOME/.cargo/bin")
-        for _path in ${additional_paths[@]};
-        do
-          [[ ":$PATH:" != *":$_path:"* ]] && echo "$_path" >> $GITHUB_PATH
-        done
-        echo "PYENV_ROOT=$HOME/.pyenv" >> $GITHUB_ENV
+    # - name: Add additional binaries to PATH
+    #   shell: bash
+    #   run: |
+    #     additional_paths=("/opt/homebrew/bin" "$HOME/.pyenv/shims" "$HOME/.cargo/bin")
+    #     for _path in ${additional_paths[@]};
+    #     do
+    #       [[ ":$PATH:" != *":$_path:"* ]] && echo "$_path" >> $GITHUB_PATH
+    #     done
+    #     echo "PYENV_ROOT=$HOME/.pyenv" >> $GITHUB_ENV
 
-    - name: Setup Python ${{ inputs.python_version }}
-      id: python_setup
-      shell: bash
-      env:
-        input_python_version: ${{ inputs.python_version }}
-      run: |
-        # Check if the requested Python version exists on the runner
-        pyenv versions | grep "$input_python_version"
+    # - name: Setup Python ${{ inputs.python_version }}
+    #   id: python_setup
+    #   shell: bash
+    #   env:
+    #     input_python_version: ${{ inputs.python_version }}
+    #   run: |
+    #     # Check if the requested Python version exists on the runner
+    #     pyenv versions | grep "$input_python_version"
         
-        if [ $? -ne 0 ]; then
-          echo "Installing Python $input_python_version"
-          pyenv install "$input_python_version"
-        fi
+    #     if [ $? -ne 0 ]; then
+    #       echo "Installing Python $input_python_version"
+    #       pyenv install "$input_python_version"
+    #     fi
 
-    - name: Setup Python venv
-      id: python_venv
-      shell: bash
-      env:
-        input_python_version: ${{ inputs.python_version }}
-        venv_name: py_venv_${{ inputs.python_version }}_${{ github.sha }}
+    # - name: Setup Python venv
+    #   id: python_venv
+    #   shell: bash
+    #   env:
+    #     input_python_version: ${{ inputs.python_version }}
+    #     venv_name: py_venv_${{ inputs.python_version }}_${{ github.sha }}
+    #   run: |
+    #     rm -rf "$venv_name"
+        
+    #     echo "$input_python_version" > "$GITHUB_WORKSPACE/.python-version"
+        
+    #     python -m venv "$venv_name"
+        
+    #     echo "$GITHUB_WORKSPACE/$venv_name/bin" >> $GITHUB_PATH
+    #     echo "venv_location=$GITHUB_WORKSPACE/$venv_name" >> $GITHUB_OUTPUT
+        
+    #     PY_PATH="$GITHUB_WORKSPACE/$venv_name/bin/python"
+    #     PY_VERSION=$(python --version)
+    #     echo "python_path=$PY_PATH" >> $GITHUB_OUTPUT
+    #     echo "python_version=$PY_VERSION" >> $GITHUB_OUTPUT
+    # - name: Setup Python
+    #   uses: actions/setup-python@v5
+    #   with:
+    #     python-version: '${{ inputs.python_version }}'    
+
+    - name: Display Python-Path
       run: |
-        rm -rf "$venv_name"
-        
-        echo "$input_python_version" > "$GITHUB_WORKSPACE/.python-version"
-        
-        python -m venv "$venv_name"
-        
-        echo "$GITHUB_WORKSPACE/$venv_name/bin" >> $GITHUB_PATH
-        echo "venv_location=$GITHUB_WORKSPACE/$venv_name" >> $GITHUB_OUTPUT
-        
-        PY_PATH="$GITHUB_WORKSPACE/$venv_name/bin/python"
-        PY_VERSION=$(python --version)
-        echo "python_path=$PY_PATH" >> $GITHUB_OUTPUT
-        echo "python_version=$PY_VERSION" >> $GITHUB_OUTPUT
+        which python
+        which pip
 
     - name: Get site-packages path
       id: site_packages
