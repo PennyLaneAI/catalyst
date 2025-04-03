@@ -385,8 +385,6 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
             dyn_dims, static_shape = jax._src.lax.lax._extract_tracers_dyn_shape(sample_shape)
             mval = sample_p.bind(obs, *dyn_dims, static_shape=tuple(static_shape))
         elif prim is counts_p:
-            # dyn_dims, static_shape = jax._src.lax.lax._extract_tracers_dyn_shape(shape)
-            # results = counts_p.bind(obs_tracers, *dyn_dims, static_shape=tuple(static_shape))
             raise CompileError(
                 "CountsMP returns a dictionary, which is not compatible with capture"
             )
