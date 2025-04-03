@@ -24,9 +24,20 @@ import pennylane as qml
 from jax.extend.linear_util import wrap_init
 from jax.interpreters.partial_eval import convert_constvars_jaxpr
 from pennylane.capture import PlxprInterpreter, disable, enable, enabled, qnode_prim
+from pennylane.capture.expand_transforms import ExpandTransformsInterpreter
 from pennylane.capture.primitives import cond_prim as plxpr_cond_prim
 from pennylane.capture.primitives import for_loop_prim as plxpr_for_loop_prim
 from pennylane.capture.primitives import while_loop_prim as plxpr_while_loop_prim
+from pennylane.ops.functions.map_wires import _map_wires_transform as pl_map_wires
+from pennylane.transforms import cancel_inverses as pl_cancel_inverses
+from pennylane.transforms import commute_controlled as pl_commute_controlled
+from pennylane.transforms import decompose as pl_decompose
+from pennylane.transforms import (
+    merge_amplitude_embedding as pl_merge_amplitude_embedding,
+)
+from pennylane.transforms import merge_rotations as pl_merge_rotations
+from pennylane.transforms import single_qubit_fusion as pl_single_qubit_fusion
+from pennylane.transforms import unitary_to_rot as pl_unitary_to_rot
 
 from catalyst.device import (
     extract_backend_info,
@@ -34,7 +45,6 @@ from catalyst.device import (
     get_device_shots,
 )
 from catalyst.jax_extras import jaxpr_pad_consts, make_jaxpr2, transient_jax_config
-from catalyst.jax_extras.tracing import bind_flexible_primitive
 from catalyst.jax_primitives import (
     AbstractQbit,
     AbstractQreg,
@@ -174,18 +184,27 @@ def handle_qnode(
     )
 
 
+# The map below describes the parity between PL transforms and Catalyst passes.
+# PL transforms having a Catalyst pass counterpart will have a name as value,
+# otherwise their value will be None. The second value indicates if the transform
+# requires decomposition to be supported by Catalyst.
 transforms_to_passes = {
-    qml.transforms.cancel_inverses: "remove-chained-self-inverse",
-    qml.transforms.merge_rotations: "merge-rotations",
+    pl_cancel_inverses: ("remove-chained-self-inverse", False),
+    pl_commute_controlled: (None, False),
+    pl_decompose: (None, False),
+    pl_map_wires: (None, False),
+    pl_merge_amplitude_embedding: (None, True),
+    pl_merge_rotations: ("merge-rotations", False),
+    pl_single_qubit_fusion: (None, False),
+    pl_unitary_to_rot: (None, False),
 }
 
 
-# This is our registration factory for those PL transforms having a Catalyst
-# pass counterpart. The map above describes the parity between PL and Catalyst,
-# whereas the loop below iterates across that map and generates a custom handler
-# for each transform. In order to ensure early binding, we make the Catalyst
-# pass an argument whose default value is set by the loop.
-for pl_transform, pass_name in transforms_to_passes.items():
+# This is our registration factory for PL transforms. The loop below iterates
+# across the map above and generates a custom handler for each transform.
+# In order to ensure early binding, we pass the PL plxpr transform and the
+# Catalyst pass as arguments whose default values are set by the loop.
+for pl_transform, (pass_name, decomposition) in transforms_to_passes.items():
     # pylint: disable=unused-argument, too-many-arguments, cell-var-from-loop
     @WorkflowInterpreter.register_primitive(pl_transform._primitive)
     def handle_transform(
@@ -197,15 +216,38 @@ for pl_transform, pass_name in transforms_to_passes.items():
         targs_slice,
         tkwargs,
         catalyst_pass_name=pass_name,
+        requires_decomposition=decomposition,
+        pl_plxpr_transform=pl_transform._plxpr_transform,
     ):
         """Handle the conversion from plxpr to Catalyst jaxpr for a
         PL transform."""
-        self._pass_pipeline.append(Pass(catalyst_pass_name))
-
         consts = args[consts_slice]
         non_const_args = args[args_slice]
+        targs = args[targs_slice]
 
-        return self.eval(inner_jaxpr, consts, *non_const_args)
+        if catalyst_pass_name is None:
+            # Use PL's ExpandTransformsInterpreter to expand this and any embedded
+            # transform according to PL rules. It works by overriding the primitive
+            # registration, making all embedded transforms follow the PL rules
+            # from now on, hence ignoring the Catalyst pass conversion
+            def wrapper(*args):
+                return ExpandTransformsInterpreter().eval(inner_jaxpr, consts, *args)
+
+            unravelled_jaxpr = jax.make_jaxpr(wrapper)(*non_const_args)
+            final_jaxpr = pl_plxpr_transform(
+                unravelled_jaxpr.jaxpr, unravelled_jaxpr.consts, targs, tkwargs, *non_const_args
+            )
+
+            if requires_decomposition:
+                final_jaxpr = pl_decompose._plxpr_transform(
+                    final_jaxpr.jaxpr, final_jaxpr.consts, targs, tkwargs, *non_const_args
+                )
+
+            return self.eval(final_jaxpr.jaxpr, final_jaxpr.consts, *non_const_args)
+        else:
+            # Apply the corresponding Catalyst pass counterpart
+            self._pass_pipeline.append(Pass(catalyst_pass_name))
+            return self.eval(inner_jaxpr, consts, *non_const_args)
 
 
 class QFuncPlxprInterpreter(PlxprInterpreter):
@@ -217,10 +259,11 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
 
     """
 
-    def __init__(self, device, shots: qml.measurements.Shots):
+    def __init__(self, device, shots: qml.measurements.Shots | int):
         self._device = device
-        self._shots = shots.total_shots if shots else 0
+        self._shots = self._extract_shots_value(shots)
         self.stateref = None
+        self.actualized = False
         super().__init__()
 
     def __getattr__(self, key):
@@ -251,8 +294,8 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
         For conversion to calayst, this reinserts extracted qubits and
         deallocates the register.
         """
-        for orig_wire, wire in self.wire_map.items():
-            self.qreg = qinsert_p.bind(self.qreg, orig_wire, wire)
+        if not self.actualized:
+            self.actualize_qreg()
         qdealloc_p.bind(self.qreg)
         self.stateref = None
 
@@ -260,7 +303,17 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
         """Get the ``AbstractQbit`` corresponding to a wire value."""
         if wire_value in self.wire_map:
             return self.wire_map[wire_value]
+        self.actualized = False
         return qextract_p.bind(self.qreg, wire_value)
+
+    def actualize_qreg(self):
+        """
+        Insert all end qubits back into a qreg,
+        and produce the product qreg jaxpr variable.
+        """
+        self.actualized = True
+        for orig_wire, wire in self.wire_map.items():
+            self.qreg = qinsert_p.bind(self.qreg, orig_wire, wire)
 
     def interpret_operation(self, op):
         """Re-bind a pennylane operation as a catalyst instruction."""
@@ -288,9 +341,12 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
 
     def _compbasis_obs(self, *wires):
         """Add a computational basis sampling observable."""
-        wires = wires or self._device.wires  # broadcast across all wires
-        qubits = [self.get_wire(w) for w in wires]
-        return compbasis_p.bind(*qubits)
+        if wires:
+            qubits = [self.get_wire(w) for w in wires]
+            return compbasis_p.bind(*qubits)
+        else:
+            self.actualize_qreg()
+            return compbasis_p.bind(self.qreg, qreg_available=True)
 
     def interpret_measurement(self, measurement):
         """Rebind a measurement as a catalyst instruction."""
@@ -322,22 +378,33 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
         )
 
         prim = measurement_map[type(measurement)]
+        assert (
+            prim is not counts_p
+        ), "CountsMP returns a dictionary, which is not compatible with capture"
         if prim is sample_p:
             num_qubits = len(measurement.wires) or len(self._device.wires)
-            mval = bind_flexible_primitive(
-                sample_p, {"shots": self._shots}, obs, num_qubits=num_qubits
-            )
-        elif prim is counts_p:
-            mval = bind_flexible_primitive(counts_p, {"shots": self._shots}, shape=shape)
+            sample_shape = (self._shots, num_qubits)
+            dyn_dims, static_shape = jax._src.lax.lax._extract_tracers_dyn_shape(sample_shape)
+            mval = sample_p.bind(obs, *dyn_dims, static_shape=tuple(static_shape))
         elif prim in {expval_p, var_p}:
             mval = prim.bind(obs, shape=shape)
         else:
-            mval = prim.bind(obs, shape=shape, shots=self._shots)
+            dyn_dims, static_shape = jax._src.lax.lax._extract_tracers_dyn_shape(shape)
+            mval = prim.bind(obs, *dyn_dims, static_shape=tuple(static_shape))
 
         # sample_p returns floats, so we need to converted it back to the expected integers here
         if dtype != mval.dtype:
             return jax.lax.convert_element_type(mval, dtype)
         return mval
+
+    def _extract_shots_value(self, shots: qml.measurements.Shots | int):
+        """Extract the shots value according to the type"""
+        if isinstance(shots, int):
+            return shots
+
+        assert isinstance(shots, qml.measurements.Shots)
+
+        return shots.total_shots if shots else 0
 
 
 @QFuncPlxprInterpreter.register_primitive(qml.QubitUnitary._primitive)
@@ -427,7 +494,6 @@ def handle_for_loop(
 ):
     """Handle the conversion from plxpr to Catalyst jaxpr for the for loop primitive"""
     assert jaxpr_body_fn is not None
-
     args = plxpr_invals[args_slice]
 
     # Add the iteration start and the qreg to the args
@@ -484,7 +550,6 @@ def handle_while_loop(
     body_slice,
     cond_slice,
     args_slice,
-    abstract_shapes_slice,
 ):
     """Handle the conversion from plxpr to Catalyst jaxpr for the while loop primitive"""
     consts_body = plxpr_invals[body_slice]

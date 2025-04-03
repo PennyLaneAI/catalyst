@@ -1,5 +1,5 @@
 
-// Copyright 2023 Xanadu Quantum Technologies Inc.
+// Copyright 2023-2025 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -13,12 +13,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <catch2/catch_approx.hpp>
+#include <catch2/catch_test_macros.hpp>
+
 #include "ExecutionContext.hpp"
-#include "NullQubit.hpp"
 #include "QuantumDevice.hpp"
 #include "QubitManager.hpp"
 #include "RuntimeCAPI.h"
 
+#include "NullQubit.hpp"
 #include "TestUtils.hpp"
 
 using namespace Catalyst::Runtime;
@@ -27,7 +30,10 @@ using namespace Catalyst::Runtime::Devices;
 TEST_CASE("Test success of loading a device", "[NullQubit]")
 {
     std::unique_ptr<ExecutionContext> driver = std::make_unique<ExecutionContext>();
-    CHECK(loadDevice("NullQubit", "librtd_null_qubit" + get_dylib_ext()));
+    std::unique_ptr<QuantumDevice> device(
+        loadDevice("NullQubit", "librtd_null_qubit" + get_dylib_ext()));
+
+    CHECK(device);
 }
 
 TEST_CASE("Test __catalyst__rt__device_init registering device=null.qubit", "[NullQubit]")
@@ -58,7 +64,7 @@ TEST_CASE("Test a NullQubit circuit with num_qubits=2 ", "[NullQubit]")
     Qs.reserve(n);
 
     for (size_t i = 0; i < n; i++) {
-        Qs[i] = sim->AllocateQubit();
+        Qs.push_back(sim->AllocateQubit());
     }
 
     sim->StartTapeRecording();
@@ -82,16 +88,16 @@ TEST_CASE("Test a NullQubit circuit with num_qubits=4", "[NullQubit]")
     Qs.reserve(n);
 
     sim->StartTapeRecording();
-    Qs[0] = sim->AllocateQubit();
+    Qs.push_back(sim->AllocateQubit());
     sim->NamedOperation("Hadamard", {}, {Qs[0]}, false);
 
-    Qs[1] = sim->AllocateQubit();
+    Qs.push_back(sim->AllocateQubit());
     sim->NamedOperation("CRX", {0.123}, {Qs[0], Qs[1]}, false);
 
-    Qs[2] = sim->AllocateQubit();
+    Qs.push_back(sim->AllocateQubit());
     sim->NamedOperation("CRY", {0.456}, {Qs[0], Qs[2]}, false);
 
-    Qs[3] = sim->AllocateQubit();
+    Qs.push_back(sim->AllocateQubit());
     sim->NamedOperation("CRZ", {0.789}, {Qs[0], Qs[3]}, false);
     sim->StopTapeRecording();
 
@@ -111,7 +117,7 @@ TEST_CASE("Test a NullQubit circuit with num_qubits=4 and observables", "[NullQu
     std::vector<QubitIdType> Qs;
     Qs.reserve(n);
     for (size_t i = 0; i < n; i++) {
-        Qs[i] = sim->AllocateQubit();
+        Qs.push_back(sim->AllocateQubit());
     }
 
     sim->StartTapeRecording();
@@ -164,7 +170,7 @@ TEST_CASE("Test __catalyst__qis__Sample with num_qubits=2 and PartialSample call
     constexpr size_t n = 1;
     constexpr size_t shots = 1000;
 
-    double *buffer = new double[shots * n];
+    double buffer[shots * n];
     MemRefT_double_2d result = {buffer, buffer, 0, {shots, n}, {n, 1}};
     __catalyst__qis__Sample(&result, 1, ctrls[0]);
 
@@ -172,9 +178,7 @@ TEST_CASE("Test __catalyst__qis__Sample with num_qubits=2 and PartialSample call
 
     auto obs = __catalyst__qis__NamedObs(ObsId::PauliZ, *ctrls);
 
-    CHECK(__catalyst__qis__Variance(obs) == Approx(0.0).margin(1e-5));
-
-    delete[] buffer;
+    CHECK(__catalyst__qis__Variance(obs) == Catch::Approx(0.0).margin(1e-5));
 
     __catalyst__rt__qubit_release_array(qs);
     __catalyst__rt__device_release();
@@ -196,8 +200,8 @@ TEST_CASE("NullQubit (no) Basis vector", "[NullQubit]")
     sim->State(view);
 
     CHECK(view.size() == 8);
-    CHECK(view(0).real() == Approx(0.0).epsilon(1e-5));
-    CHECK(view(0).imag() == Approx(0.0).epsilon(1e-5));
+    CHECK(view(0).real() == Catch::Approx(0.0).epsilon(1e-5));
+    CHECK(view(0).imag() == Catch::Approx(0.0).epsilon(1e-5));
 }
 
 TEST_CASE("test AllocateQubits", "[NullQubit]")
@@ -215,8 +219,8 @@ TEST_CASE("test AllocateQubits", "[NullQubit]")
     sim->State(view);
 
     CHECK(state.size() == 4);
-    CHECK(state[0].real() == Approx(0.0).epsilon(1e-5));
-    CHECK(state[0].imag() == Approx(0.0).epsilon(1e-5));
+    CHECK(state[0].real() == Catch::Approx(0.0).epsilon(1e-5));
+    CHECK(state[0].imag() == Catch::Approx(0.0).epsilon(1e-5));
 }
 
 TEST_CASE("test AllocateQubits generates a proper std::vector<QubitIdType>", "[NullQubit]")
@@ -254,8 +258,8 @@ TEST_CASE("Mix Gate test R(X,Y,Z) num_qubits=4", "[NullQubit]")
     sim->State(view);
 
     CHECK(view.size() == 16);
-    CHECK(view(0).real() == Approx(0.0).epsilon(1e-5));
-    CHECK(view(0).imag() == Approx(0.0).epsilon(1e-5));
+    CHECK(view(0).real() == Catch::Approx(0.0).epsilon(1e-5));
+    CHECK(view(0).imag() == Catch::Approx(0.0).epsilon(1e-5));
 }
 
 TEST_CASE("Test __catalyst__qis__Gradient_params Op=[Hadamard,RZ,RY,RZ,S,T,ParamShift], "
@@ -303,9 +307,9 @@ TEST_CASE("Test __catalyst__qis__Gradient_params Op=[Hadamard,RZ,RY,RZ,S,T,Param
 
     __catalyst__rt__toggle_recorder(/* activate_cm */ false);
 
-    CHECK(result_tp.data_aligned[0] == Approx(0.0).margin(1e-5));
-    CHECK(result_tp.data_aligned[1] == Approx(0.0).margin(1e-5));
-    CHECK(result_tp.data_aligned[2] == Approx(0.0).margin(1e-5));
+    CHECK(result_tp.data_aligned[0] == Catch::Approx(0.0).margin(1e-5));
+    CHECK(result_tp.data_aligned[1] == Catch::Approx(0.0).margin(1e-5));
+    CHECK(result_tp.data_aligned[2] == Catch::Approx(0.0).margin(1e-5));
 
     __catalyst__rt__qubit_release(q1);
     __catalyst__rt__qubit_release(q0);

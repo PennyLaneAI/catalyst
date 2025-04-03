@@ -19,6 +19,8 @@
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/OpDefinition.h"
 
+#include "QEC/IR/QECOpInterfaces.h"
+
 //===----------------------------------------------------------------------===//
 // QEC dialect declarations.
 //===----------------------------------------------------------------------===//

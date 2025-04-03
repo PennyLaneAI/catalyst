@@ -43,9 +43,8 @@ except:  # pylint: disable=bare-except
     from pennylane.transforms import qcut
 
 from pennylane.transforms import merge_rotations
-from utils import qjit_for_tests as qjit
 
-from catalyst import measure
+from catalyst import measure, qjit
 from catalyst.utils.exceptions import CompileError
 
 # pylint: disable=too-many-lines,line-too-long

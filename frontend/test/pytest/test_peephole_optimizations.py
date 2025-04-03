@@ -19,7 +19,7 @@ import pennylane as qml
 import pytest
 
 from catalyst import pipeline, qjit
-from catalyst.passes import cancel_inverses, merge_rotations
+from catalyst.passes import cancel_inverses, merge_rotations, to_ppr
 
 # pylint: disable=missing-function-docstring
 
@@ -167,6 +167,61 @@ def test_cancel_inverses_bad_usages():
             merge_rotations(classical_func)
 
     test_cancel_inverses_not_on_qnode()
+
+
+def test_chained_passes():
+    """
+    Test that chained passes are present in the transform passes.
+    """
+
+    @qjit()
+    @cancel_inverses
+    @merge_rotations
+    @qml.qnode(qml.device("lightning.qubit", wires=2))
+    def test_chained_apply_passes_workflow(x: float):
+        qml.Hadamard(wires=[1])
+        qml.RX(x, wires=[0])
+        qml.RX(-x, wires=[0])
+        qml.Hadamard(wires=[1])
+        return qml.expval(qml.PauliY(wires=0))
+
+    assert "remove-chained-self-inverse" in test_chained_apply_passes_workflow.mlir
+    assert "merge-rotations" in test_chained_apply_passes_workflow.mlir
+
+
+test_chained_passes()
+
+#
+# to_ppr
+#
+
+
+def test_convert_clifford_to_ppr():
+    """
+    Test convert_clifford_to_ppr
+    """
+    pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+
+    @qjit(pipelines=pipe, target="mlir")
+    def test_convert_clifford_to_ppr_workflow():
+
+        @to_ppr
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def f():
+            qml.H(0)
+            qml.S(1)
+            qml.T(0)
+            qml.CNOT([0, 1])
+
+        return f()
+
+    assert 'transform.apply_registered_pass "to_ppr"' in test_convert_clifford_to_ppr_workflow.mlir
+    optimized_ir = test_convert_clifford_to_ppr_workflow.mlir_opt
+    assert 'transform.apply_registered_pass "to_ppr"' not in optimized_ir
+    assert "qec.ppr" in optimized_ir
+
+
+test_convert_clifford_to_ppr()
 
 
 if __name__ == "__main__":

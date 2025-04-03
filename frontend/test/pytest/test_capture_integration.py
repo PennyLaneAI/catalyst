@@ -12,9 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Integration tests for the the PL capture in Catalyst."""
+from functools import partial
+
 import jax.numpy as jnp
 import pennylane as qml
 import pytest
+from jax.core import ShapedArray
 
 import catalyst
 
@@ -33,6 +36,56 @@ def circuit_aot_builder(dev):
         return qml.expval(qml.PauliY(wires=0))
 
     return catalyst_circuit_aot
+
+
+def is_unitary_rotated(mlir):
+    """Check in the MLIR if a unitary was rotated"""
+    return (
+        "quantum.unitary" not in mlir
+        and mlir.count('quantum.custom "RZ"') == 2
+        and mlir.count('quantum.custom "RY"') == 1
+    )
+
+
+def is_rot_decomposed(mlir):
+    """Check in the MLIR if a rot was decomposed"""
+    return (
+        'quantum.custom "Rot"' not in mlir
+        and mlir.count('quantum.custom "RZ"') == 2
+        and mlir.count('quantum.custom "RY"') == 1
+    )
+
+
+def is_wire_mapped(mlir):
+    """Check in the MLIR if a wire was mapped"""
+    return "quantum.extract %0[ 0]" not in mlir and "quantum.extract %0[ 1]" in mlir
+
+
+def is_single_qubit_fusion_applied(mlir):
+    """Check in the MLIR if 'single_qubit_fusion' was applied"""
+    return (
+        mlir.count('quantum.custom "Rot"') == 1
+        and 'quantum.custom "Hadamard"' not in mlir
+        and 'quantum.custom "RZ"' not in mlir
+    )
+
+
+def is_controlled_pushed_back(mlir, non_controlled_string, controlled_string):
+    """Check in the MLIR if the controlled gate got pushed after the non-controlled one"""
+    non_controlled_pos = mlir.find(non_controlled_string)
+    assert non_controlled_pos > 0
+
+    remaining_mlir = mlir[non_controlled_pos + len(non_controlled_string) :]
+    return controlled_string in remaining_mlir
+
+
+def is_amplitude_embedding_merged_and_decomposed(mlir):
+    """Check in the MLIR if the amplitude embeddings got merged and decomposed"""
+    return (
+        "AmplitudeEmbedding" not in mlir
+        and mlir.count('quantum.custom "RY"') == 3
+        and mlir.count('quantum.custom "CNOT"') == 2
+    )
 
 
 # pylint: disable=too-many-public-methods
@@ -535,7 +588,7 @@ class TestCapture:
         experimental_capture_result = captured_func(0.1)
         assert no_capture_result == experimental_capture_result
 
-    def test_chained_transforms_workflow(self, backend):
+    def test_chained_catalyst_transforms_workflow(self, backend):
         """Test the integration for a circuit with a combination of 'merge_rotations'
         and 'cancel_inverses' transforms."""
 
@@ -579,3 +632,218 @@ class TestCapture:
             == inverses_rotations_result
             == rotations_inverses_result
         )
+
+    def test_transform_unitary_to_rot_workflow(self, backend):
+        """Test the integration for a circuit with a 'unitary_to_rot' transform."""
+
+        def func(U: ShapedArray([2, 2], float)):
+            @qml.transforms.unitary_to_rot
+            @qml.qnode(qml.device(backend, wires=1))
+            def circuit(U: ShapedArray([2, 2], float)):
+                qml.QubitUnitary(U, 0)
+                return qml.expval(qml.Z(0))
+
+            return circuit(U)
+
+        captured_func = qml.qjit(func, experimental_capture=True, target="mlir")
+        assert is_unitary_rotated(captured_func.mlir)
+
+        U = qml.Rot(1.0, 2.0, 3.0, wires=0)
+
+        no_capture_result = qml.qjit(func)(U.matrix())
+        experimental_capture_result = captured_func(U.matrix())
+        assert no_capture_result == experimental_capture_result
+
+    def test_mixed_transforms_workflow(self, backend):
+        """Test the integration for a circuit with a combination of 'unitary_to_rot'
+        and 'cancel_inverses' transforms."""
+
+        @qml.qnode(qml.device(backend, wires=1))
+        def circuit(U: ShapedArray([2, 2], float)):
+            qml.QubitUnitary(U, 0)
+            qml.Hadamard(wires=0)
+            qml.Hadamard(wires=0)
+            return qml.expval(qml.PauliZ(0))
+
+        # Case 1: During plxpr interpretation, first comes the PL transform
+        # with Catalyst counterpart, second comes the PL transform without it
+
+        def inverses_unitary(U: ShapedArray([2, 2], float)):
+            return qml.transforms.cancel_inverses(qml.transforms.unitary_to_rot(circuit))(U)
+
+        inverses_unitary_func = qml.qjit(inverses_unitary, experimental_capture=True, target="mlir")
+
+        # Catalyst 'cancel_inverses' should have been scheduled as a pass
+        # whereas PL 'unitary_to_rot' should have been expanded
+        assert (
+            'transform.apply_registered_pass "remove-chained-self-inverse"'
+            in inverses_unitary_func.mlir
+        )
+        assert is_unitary_rotated(inverses_unitary_func.mlir)
+
+        # Case 2: During plxpr interpretation, first comes the PL transform
+        # without Catalyst counterpart, second comes the PL transform with it
+
+        def unitary_inverses(U: ShapedArray([2, 2], float)):
+            return qml.transforms.unitary_to_rot(qml.transforms.cancel_inverses(circuit))(U)
+
+        unitary_inverses_func = qml.qjit(unitary_inverses, experimental_capture=True, target="mlir")
+
+        # Both PL transforms should have been expaned and no Catalyst pass should have been
+        # scheduled
+        assert (
+            'transform.apply_registered_pass "remove-chained-self-inverse"'
+            not in unitary_inverses_func.mlir
+        )
+        assert 'quantum.custom "Hadamard"' not in unitary_inverses_func.mlir
+        assert is_unitary_rotated(unitary_inverses_func.mlir)
+
+        # Correctness assertions
+
+        U = qml.Rot(1.0, 2.0, 3.0, wires=0)
+
+        no_capture_inverses_unitary_result = qml.qjit(inverses_unitary)(U.matrix())
+        no_capture_unitary_inverses_result = qml.qjit(unitary_inverses)(U.matrix())
+        inverses_unitary_result = inverses_unitary_func(U.matrix())
+        unitary_inverses_result = unitary_inverses_func(U.matrix())
+        assert (
+            no_capture_inverses_unitary_result
+            == no_capture_unitary_inverses_result
+            == inverses_unitary_result
+            == unitary_inverses_result
+        )
+
+    def test_transform_decompose_workflow(self, backend):
+        """Test the integration for a circuit with a 'decompose' transform."""
+
+        def func(x: float, y: float, z: float):
+            @qml.qnode(qml.device(backend, wires=2))
+            def circuit(x: float, y: float, z: float):
+                qml.Rot(x, y, z, 0)
+                return qml.expval(qml.PauliZ(0))
+
+            return qml.transforms.decompose(circuit, gate_set=[qml.RX, qml.RY, qml.RZ])(x, y, z)
+
+        captured_func = qml.qjit(func, experimental_capture=True, target="mlir")
+
+        assert is_rot_decomposed(captured_func.mlir)
+
+        no_capture_result = qml.qjit(func)(1.5, 2.5, 3.5)
+        experimental_capture_result = captured_func(1.5, 2.5, 3.5)
+        assert no_capture_result == experimental_capture_result
+
+    def test_transform_map_wires_workflow(self, backend):
+        """Test the integration for a circuit with a 'map_wires' transform."""
+
+        def func(x: float):
+            @partial(qml.map_wires, wire_map={0: 1})
+            @qml.qnode(qml.device(backend, wires=2))
+            def circuit(x):
+                qml.RX(x, 0)
+                return qml.expval(qml.PauliZ(0))
+
+            return circuit(x)
+
+        captured_func = qml.qjit(func, experimental_capture=True, target="mlir")
+
+        assert is_wire_mapped(captured_func.mlir)
+
+        no_capture_result = qml.qjit(func)(1.5)
+        experimental_capture_result = captured_func(1.5)
+        assert no_capture_result == experimental_capture_result
+
+    def test_transform_single_qubit_fusion_workflow(self, backend):
+        """Test the integration for a circuit with a 'single_qubit_fusion' transform."""
+
+        def func():
+            @qml.transforms.single_qubit_fusion
+            @qml.qnode(qml.device(backend, wires=1))
+            def circuit():
+                qml.Hadamard(wires=0)
+                qml.Rot(0.1, 0.2, 0.3, wires=0)
+                qml.Rot(0.4, 0.5, 0.6, wires=0)
+                qml.RZ(0.1, wires=0)
+                qml.RZ(0.4, wires=0)
+                return qml.expval(qml.PauliZ(0))
+
+            return circuit()
+
+        captured_func = qml.qjit(func, experimental_capture=True, target="mlir")
+
+        assert is_single_qubit_fusion_applied(captured_func.mlir)
+
+        no_capture_result = qml.qjit(func)()
+        experimental_capture_result = captured_func()
+        assert no_capture_result == experimental_capture_result
+
+    def test_transform_commute_controlled_workflow(self, backend):
+        """Test the integration for a circuit with a 'commute_controlled' transform."""
+
+        def func():
+            @qml.qnode(qml.device(backend, wires=3))
+            def circuit():
+                qml.CNOT(wires=[0, 2])
+                qml.PauliX(wires=2)
+                qml.RX(0.2, wires=2)
+                qml.Toffoli(wires=[0, 1, 2])
+                qml.CRX(0.1, wires=[0, 1])
+                qml.PauliX(wires=1)
+                return qml.expval(qml.PauliZ(0))
+
+            return qml.transforms.commute_controlled(circuit, direction="left")()
+
+        captured_func = qml.qjit(func, experimental_capture=True, target="mlir")
+
+        assert is_controlled_pushed_back(
+            captured_func.mlir, 'quantum.custom "RX"', 'quantum.custom "CNOT"'
+        )
+        assert is_controlled_pushed_back(
+            captured_func.mlir, 'quantum.custom "PauliX"', 'quantum.custom "CRX"'
+        )
+
+        no_capture_result = qml.qjit(func)()
+        experimental_capture_result = captured_func()
+        assert no_capture_result == experimental_capture_result
+
+    def test_transform_merge_amplitude_embedding_workflow(self, backend):
+        """Test the integration for a circuit with a 'merge_amplitude_embedding' transform."""
+
+        def func():
+            @qml.transforms.merge_amplitude_embedding
+            @qml.qnode(qml.device(backend, wires=2))
+            def circuit():
+                qml.AmplitudeEmbedding(jnp.array([0.0, 1.0]), wires=0)
+                qml.AmplitudeEmbedding(jnp.array([0.0, 1.0]), wires=1)
+                return qml.expval(qml.PauliZ(0))
+
+            return circuit()
+
+        captured_func = qml.qjit(func, experimental_capture=True, target="mlir")
+
+        assert is_amplitude_embedding_merged_and_decomposed(captured_func.mlir)
+
+        no_capture_result = qml.qjit(func)()
+        experimental_capture_result = captured_func()
+        assert no_capture_result == experimental_capture_result
+
+    def test_shots_usage(self, backend):
+        """Test the integration for a circuit using shots explicitly."""
+
+        @qml.qnode(qml.device(backend, wires=2, shots=10))
+        def circuit():
+            @qml.for_loop(0, 2, 1)
+            def loop_0(i):
+                qml.RX(0, wires=i)
+
+            loop_0()
+
+            qml.RX(0, wires=0)
+            return qml.sample()
+
+        captured_func = qml.qjit(circuit, experimental_capture=False, target="mlir")
+
+        assert "'shots': 10" in captured_func.mlir
+
+        no_capture_result = qml.qjit(circuit)()
+        experimental_capture_result = captured_func()
+        assert jnp.allclose(no_capture_result, experimental_capture_result)

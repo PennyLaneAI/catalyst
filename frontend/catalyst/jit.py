@@ -32,7 +32,13 @@ from jax.tree_util import tree_flatten, tree_unflatten
 import catalyst
 from catalyst.autograph import run_autograph
 from catalyst.compiled_functions import CompilationCache, CompiledFunction
-from catalyst.compiler import CompileOptions, Compiler
+from catalyst.compiler import (
+    CompileOptions,
+    Compiler,
+    canonicalize,
+    to_llvmir,
+    to_mlir_opt,
+)
 from catalyst.debug.instruments import instrument
 from catalyst.from_plxpr import trace_from_pennylane
 from catalyst.jax_tracer import lower_jaxpr_to_mlir, trace_to_jaxpr
@@ -114,8 +120,8 @@ def qjit(
         target (str): the compilation target
         keep_intermediate (bool): Whether or not to store the intermediate files throughout the
             compilation. If ``True``, intermediate representations are available via the
-            :attr:`~.QJIT.mlir`, :attr:`~.QJIT.jaxpr`, and :attr:`~.QJIT.qir`, representing
-            different stages in the optimization process.
+            :attr:`~.QJIT.mlir`, :attr:`~.QJIT.mlir_opt`, :attr:`~.QJIT.jaxpr`,
+            and :attr:`~.QJIT.qir`, representing different stages in the optimization process.
         verbose (bool): If ``True``, the tools and flags used by Catalyst behind the scenes are
             printed out.
         logfile (Optional[TextIOWrapper]): File object to write verbose messages to (default -
@@ -549,15 +555,16 @@ class QJIT(CatalystCallable):
         # Canonicalize the MLIR since there can be a lot of redundancy coming from JAX.
         if not self.mlir_module:
             return None
-        options = copy.deepcopy(self.compile_options)
-        options.pipelines = [("0_canonicalize", ["canonicalize"])]
-        options.lower_to_llvm = False
-        options.keep_intermediate = True
-        canonicalizer = Compiler(options)
 
-        # TODO: the in-memory and textual form are different after this, consider unification
-        _, mlir_string = canonicalizer.run(self.mlir_module, self.workspace)
-        return mlir_string
+        return canonicalize(stdin=str(self.mlir_module))
+
+    @property
+    def mlir_opt(self):
+        """obtain the MLIR representation after optimization"""
+        if not self.mlir_module:
+            return None
+
+        return to_mlir_opt(stdin=str(self.mlir_module), options=self.compile_options)
 
     @debug_logger
     def __call__(self, *args, **kwargs):
@@ -608,13 +615,11 @@ class QJIT(CatalystCallable):
     def qir(self):
         """LLVMIR textual representation."""
         if not self.mlir_module:
+            # TODO: Should we go through the translation?
             return None
 
-        orig = copy.deepcopy(self.compile_options)
-        self.compile_options.keep_intermediate = True
-        _, _qir = self.compile()
-        self.compile_options = orig
-        return _qir
+        _mlir = str(self.mlir_module)
+        return to_llvmir(stdin=_mlir, options=self.compile_options)
 
     @debug_logger
     def jit_compile(self, args, **kwargs):

@@ -19,9 +19,9 @@ from tempfile import NamedTemporaryFile
 
 import pennylane as qml
 import pytest
-from utils import qjit_for_tests as qjit
 
 import catalyst
+from catalyst import qjit
 
 
 def test_path_does_not_exists():

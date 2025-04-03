@@ -21,6 +21,7 @@
 #include "llvm/Support/Errc.h"
 
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Pass/Pass.h"
@@ -65,6 +66,7 @@ struct RemoveChainedSelfInversePass
         Operation *module = getOperation();
 
         RewritePatternSet patterns(&getContext());
+        populateLoopBoundaryPatterns(patterns, 2);
         populateSelfInversePatterns(patterns);
 
         if (failed(applyPatternsAndFoldGreedily(module, std::move(patterns)))) {

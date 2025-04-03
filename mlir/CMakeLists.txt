@@ -1,12 +1,32 @@
 cmake_minimum_required(VERSION 3.20)
-project(catalyst LANGUAGES CXX C)
+project(Catalyst LANGUAGES CXX C)
 
 set(CMAKE_BUILD_WITH_INSTALL_NAME_DIR ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 set(CMAKE_CXX_STANDARD 20 CACHE STRING "C++ standard to conform to")
-# LLVM source code triggers a cpp20 warning
-add_compile_options(-Wno-ambiguous-reversed-operator)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# Required so as not to always use the cached option from the mlir build.
+option(QUANTUM_ENABLE_BINDINGS_PYTHON "Enable quantum dialect python bindings" OFF)
+option(CATALYST_ENABLE_WARNINGS "Enable -Wall and -Werror" ON)
+
+message(STATUS "LLVM_USE_SANITIZER is ${LLVM_USE_SANITIZER}.")
+message(STATUS "CATALYST_ENABLE_WARNINGS is ${CATALYST_ENABLE_WARNINGS}.")
+
+if ("${LLVM_USE_SANITIZER}" STREQUAL "Address")
+  add_compile_options(-fsanitize=address)
+  add_link_options(-fsanitize=address)
+endif()
+
+if(CATALYST_ENABLE_WARNINGS)
+    set(CMAKE_COMPILE_WARNING_AS_ERROR ON)
+    add_compile_options(-Wall)
+endif()
+
+#########################
+## Handle Dependencies ##
+#########################
 
 find_package(MLIR REQUIRED CONFIG)
 find_package(MHLO REQUIRED CONFIG)
@@ -15,19 +35,9 @@ message(STATUS "Using MLIRConfig.cmake in: ${MLIR_DIR}")
 message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
 message(STATUS "Using MHLOConfig.cmake in: ${MHLO_DIR}")
 
-# Required so as not to always use the cached option from the mlir build.
-option(QUANTUM_ENABLE_BINDINGS_PYTHON "Enable quantum dialect python bindings" OFF)
-
 set(LLVM_RUNTIME_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/bin)
 set(LLVM_LIBRARY_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/lib)
 set(MLIR_BINARY_DIR ${CMAKE_BINARY_DIR})
-
-if(LLVM_USE_SANITIZER)
-  if ("${LLVM_USE_SANITIZER}" STREQUAL "Address")
-    add_compile_options(-fsanitize=address)
-    add_link_options(-fsanitize=address)
-  endif()
-endif()
 
 # Taken from mlir-hlo/mhlo/transforms/CMakeLists.txt.
 # Unfortunately, AllMhloPasses doesn't appear to be exported.
@@ -48,10 +58,29 @@ set(ALL_MHLO_PASSES
 list(APPEND CMAKE_MODULE_PATH "${MLIR_CMAKE_DIR}")
 list(APPEND CMAKE_MODULE_PATH "${LLVM_CMAKE_DIR}")
 list(APPEND CMAKE_MODULE_PATH "${MHLO_CMAKE_DIR}")
+list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake/modules")
+
+# Policy CMP0175 was introduced in CMake 4.31 and raises warnings in the upstream CMake modules.
+# Policy CMP0177 was introduced in CMake 4.31 and raises warnings in the upstream CMake modules.
+# TODO: Remove once they (and us) have updated their code to deal with it.
+if(POLICY CMP0175)
+  cmake_policy(SET CMP0175 OLD)
+endif()
+if(POLICY CMP0177)
+  cmake_policy(SET CMP0177 OLD)
+endif()
+
 include(TableGen)
 include(AddLLVM)
 include(AddMLIR)
 include(HandleLLVMOptions)
+
+# LLVM's CMake options generate linker warnings on macOS when building modules (e.g. the Python
+# bindings). We need to filter out those linker flags for now. TODO: remove once we update past
+# https://github.com/llvm/llvm-project/commit/1f0e0da3af783fd2bb5e23bc2b97141abac68926
+if(APPLE)
+  string(REPLACE "-Wl,-undefined -Wl,suppress" "" CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS}")
+endif()
 
 if(QUANTUM_ENABLE_BINDINGS_PYTHON)
   include(MLIRDetectPythonEnv)
@@ -61,19 +90,43 @@ endif()
 list(GET MHLO_INCLUDE_DIRS 1 MLIRHLO_DIR)
 list(GET MHLO_INCLUDE_DIRS 2 MLIRHLO_BUILD_DIR)
 
-include_directories(${LLVM_INCLUDE_DIRS}
-                    ${MLIR_INCLUDE_DIRS}
-                    ${MHLO_INCLUDE_DIRS}
-                    ${MLIRHLO_DIR}/stablehlo
-                    ${MLIRHLO_BUILD_DIR}/stablehlo
-                    ${PROJECT_SOURCE_DIR}/include
-                    ${PROJECT_BINARY_DIR}/include)
+set(CATALYST_MAIN_INCLUDE_DIR ${PROJECT_SOURCE_DIR}/include)
+set(CATALYST_GEN_INCLUDE_DIR ${PROJECT_BINARY_DIR}/include)
+set(CATALYST_LIB_DIR ${PROJECT_BINARY_DIR})
+
+include_directories(SYSTEM
+  ${LLVM_INCLUDE_DIRS}
+  ${MLIR_INCLUDE_DIRS}
+  ${MHLO_INCLUDE_DIRS}
+  ${MLIRHLO_DIR}/stablehlo
+  ${MLIRHLO_BUILD_DIR}/stablehlo
+)
 link_directories(${LLVM_BUILD_LIBRARY_DIR})
 add_definitions(${LLVM_DEFINITIONS})
+
+######################
+## Catalyst Sources ##
+######################
+
+include_directories(
+  ${CATALYST_MAIN_INCLUDE_DIR}
+  ${CATALYST_GEN_INCLUDE_DIR}
+)
 
 add_subdirectory(include)
 add_subdirectory(lib)
 add_subdirectory(tools)
+
+if(QUANTUM_ENABLE_BINDINGS_PYTHON)
+  message(STATUS "Enabling Python API")
+  add_subdirectory(python)
+endif()
+
+add_subdirectory(cmake/modules)
+
+####################
+## Catalyst Tests ##
+####################
 
 ##############################################################################
 # The following subsection of code                                           #
@@ -110,7 +163,7 @@ else()
         LINK_COMPONENTS Support # llvm::raw_ostream
         BUILDTREE_ONLY
       )
-      target_include_directories(llvm_gtest
+      target_include_directories(llvm_gtest SYSTEM
         PUBLIC
         "${UNITTEST_DIR}/googletest/include"
         "${UNITTEST_DIR}/googlemock/include"
@@ -141,8 +194,3 @@ endif()
 ######################
 
 add_subdirectory(test)
-
-if(QUANTUM_ENABLE_BINDINGS_PYTHON)
-  message(STATUS "Enabling Python API")
-  add_subdirectory(python)
-endif()

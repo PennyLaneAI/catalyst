@@ -14,12 +14,7 @@
 
 """This module exposes built-in Catalyst MLIR passes to the frontend."""
 
-import copy
-import functools
-
-import pennylane as qml
-
-from catalyst.passes.pass_api import Pass
+from catalyst.passes.pass_api import PassPipelineWrapper
 
 
 ## API ##
@@ -133,20 +128,7 @@ def cancel_inverses(qnode):
         %2 = quantum.namedobs %out_qubits[ PauliZ] : !quantum.obs
         %3 = quantum.expval %2 : f64
     """
-    if not isinstance(qnode, qml.QNode):
-        raise TypeError(f"A QNode is expected, got the classical function {qnode}")
-
-    clone = copy.copy(qnode)
-    clone.__name__ += "_cancel_inverses"
-
-    @functools.wraps(clone)
-    def wrapper(*args, **kwargs):
-        pass_pipeline = kwargs.pop("pass_pipeline", [])
-        pass_pipeline.append(Pass("remove-chained-self-inverse"))
-        kwargs["pass_pipeline"] = pass_pipeline
-        return clone(*args, **kwargs)
-
-    return wrapper
+    return PassPipelineWrapper(qnode, "remove-chained-self-inverse")
 
 
 def merge_rotations(qnode):
@@ -210,20 +192,7 @@ def merge_rotations(qnode):
     >>> circuit(0.54)
     Array(0.5965506257017892, dtype=float64)
     """
-    if not isinstance(qnode, qml.QNode):
-        raise TypeError(f"A QNode is expected, got the classical function {qnode}")
-
-    clone = copy.copy(qnode)
-    clone.__name__ += "_merge_rotations"
-
-    @functools.wraps(clone)
-    def wrapper(*args, **kwargs):
-        pass_pipeline = kwargs.pop("pass_pipeline", [])
-        pass_pipeline.append(Pass("merge-rotations"))
-        kwargs["pass_pipeline"] = pass_pipeline
-        return clone(*args, **kwargs)
-
-    return wrapper
+    return PassPipelineWrapper(qnode, "merge-rotations")
 
 
 def ions_decomposition(qnode):  # pragma: nocover
@@ -345,32 +314,35 @@ def ions_decomposition(qnode):  # pragma: nocover
         %out_qubits_8 = quantum.custom "RY"(%cst_2) %out_qubits_6#1 : !quantum.bit
         %out_qubits_9 = quantum.custom "RY"(%cst_2) %out_qubits_7 : !quantum.bit
     """
-
-    if not isinstance(qnode, qml.QNode):
-        raise TypeError(f"A QNode is expected, got the classical function {qnode}")
-
-    @functools.wraps(qnode)
-    def wrapper(*args, **kwargs):
-        pass_pipeline = kwargs.pop("pass_pipeline", [])
-        pass_pipeline.append(Pass("ions-decomposition"))
-        kwargs["pass_pipeline"] = pass_pipeline
-        return qnode(*args, **kwargs)
-
-    return wrapper
+    return PassPipelineWrapper(qnode, "ions-decomposition")
 
 
 def to_ppr(qnode):
-    """
-    Specify that the ``-convert-clifford-t-to-ppr`` MLIR compiler pass
-    for converting clifford+T gates into Pauli product rotations will be applied.
+    R"""
+    Specify that the MLIR compiler pass for converting
+    clifford+T gates into Pauli Product Rotation (PPR) gates will be applied.
+
+    Clifford gates are defined as :math:`\exp({iP\tfrac{\pi}{4}})`,
+    where :math:`P` is a Pauli word. Non-Clifford gates are defined
+    as :math:`\exp({iP\tfrac{\pi}{8}})`.
+
+    For more information on the PPM compilation pass,
+    check out the `compilation hub <https://pennylane.ai/compilation/pauli-product-measurement>`__.
+
+    .. note::
+
+        The circuit that generated from this pass are currently
+        only not executable in any backend. This pass is only for analysis
+        and potential future execution when a suitable backend is available.
+
 
     The full list of supported gates are as follows:
-
     :class:`qml.H <pennylane.H>`,
     :class:`qml.S <pennylane.S>`,
     :class:`qml.T <pennylane.T>`,
     :class:`qml.CNOT <pennylane.CNOT>`,
-    :class:`qml.measure() <pennylane.measure>`,
+    :class:`qml.measure() <pennylane.measure>`
+
     Args:
         fn (QNode): QNode to apply the pass to
 
@@ -383,52 +355,147 @@ def to_ppr(qnode):
 
     .. code-block:: python
 
-        from catalyst import *
-        from catalyst.passes import to_ppr
-        from catalyst.debug import get_compilation_stage
+        import pennylane as qml
+        from catalyst import qjit, measure
 
-        @qjit(keep_intermediate=True)
-        @to_ppr
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        ppm_passes = [("PPM", ["to_ppr"])]
+
+        @qjit(pipelines=ppm_passes, keep_intermediate=True, target="mlir")
+        @qml.qnode(qml.device("null.qubit", wires=2))
         def circuit():
             qml.H(0)
-            qml.S(1)
-            qml.T(0)
             qml.CNOT([0, 1])
-            m1 = measure(wires=0)
-            m2 = measure(wires=1)
+            qml.T(0)
+            return measure(1)
 
-        get_compilation_stage(circuit, "EnforceRuntimeInvariantsPass")
+        print(circuit.mlir_opt)
 
     Example MLIR Representation:
+
     .. code-block:: mlir
-         . . .
-        %0 = quantum.alloc( 2) : !quantum.reg
-        %1 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
-        %2 = qec.ppr ["Z"](4) %1 : !quantum.bit
-        %3 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
-        %4 = qec.ppr ["Z"](4) %3 : !quantum.bit
-        %5 = qec.ppr ["X"](4) %4 : !quantum.bit
-        %6 = qec.ppr ["Z"](4) %5 : !quantum.bit
-        %7 = qec.ppr ["Z"](8) %6 : !quantum.bit
-        %8:2 = qec.ppr ["Z", "X"](4) %7, %2 : !quantum.bit, !quantum.bit
-        %9 = qec.ppr ["Z"](-4) %8#0 : !quantum.bit
-        %10 = qec.ppr ["X"](-4) %8#1 : !quantum.bit
-        %mres, %out_qubits = qec.ppm ["Z"] %9 : !quantum.bit
-        %mres_0, %out_qubits_1 = qec.ppm ["Z"] %10 : !quantum.bit
+
         . . .
+        %2 = qec.ppr ["Z"](4) %1 : !quantum.bit
+        %3 = qec.ppr ["X"](4) %2 : !quantum.bit
+        %4 = qec.ppr ["Z"](4) %3 : !quantum.bit
+        %c_3 = stablehlo.constant dense<1> : tensor<i64>
+        %extracted_4 = tensor.extract %c_3[] : tensor<i64>
+        %5 = quantum.extract %0[%extracted_4] : !quantum.reg -> !quantum.bit
+        %6:2 = qec.ppr ["Z", "X"](4) %4, %5 : !quantum.bit, !quantum.bit
+        %7 = qec.ppr ["Z"](-4) %6#0 : !quantum.bit
+        %8 = qec.ppr ["X"](-4) %6#1 : !quantum.bit
+        %9 = qec.ppr ["Z"](8) %7 : !quantum.bit
+        %mres, %out_qubits = qec.ppm ["Z"] %8 : !quantum.bit
+        . . .
+
     """
-    if not isinstance(qnode, qml.QNode):
-        raise TypeError(f"A QNode is expected, got the classical function {qnode}")
+    return PassPipelineWrapper(qnode, "to_ppr")
 
-    clone = copy.copy(qnode)
-    clone.__name__ += "_to_ppr"
 
-    @functools.wraps(clone)
-    def wrapper(*args, **kwargs):
-        pass_pipeline = kwargs.pop("pass_pipeline", [])
-        pass_pipeline.append(Pass("convert-clifford-t-to-ppr"))
-        kwargs["pass_pipeline"] = pass_pipeline
-        return clone(*args, **kwargs)
+def commute_ppr(qnode):
+    R"""
+    Specify that the MLIR compiler pass for commuting
+    Clifford Pauli Product Rotation (PPR) gates, :math:`\exp({iP\tfrac{\pi}{4}})`,
+    past non-Clifford PPRs gates, :math:`\exp({iP\tfrac{\pi}{8}})` will be applied,
+    where :math:`P` is a Pauli word.
 
-    return wrapper
+    For more information regarding to PPM,
+    see here <https://pennylane.ai/compilation/pauli-product-measurement>
+
+    .. note::
+
+        The `commute_ppr` compilation pass requires that :func:`~.passes.to_ppr` be applied first.
+
+    Args:
+        fn (QNode): QNode to apply the pass to.
+
+    Returns:
+        ~.QNode
+
+    **Example**
+
+    The ``commute_ppr`` pass must be used in conjunction with :func:`~.passes.to_ppr`
+    to first convert gates into PPRs. In this example, the Clifford+T gates in the
+    circuit will be converted into PPRs first, then the Clifford PPRs will be
+    commuted past the non-Clifford PPR.
+
+    .. code-block:: python
+
+        import pennylane as qml
+        from catalyst import qjit, measure
+
+        ppm_passes = [("PPM", ["to_ppr", "commute_ppr"])]
+
+        @qjit(pipelines=ppm_passes, keep_intermediate=True, target="mlir")
+        @qml.qnode(qml.device("null.qubit", wires=0))
+        def circuit():
+            qml.H(0)
+            qml.T(0)
+            return measure(0)
+
+        print(circuit.mlir_opt)
+
+    Example MLIR Representation:
+
+    .. code-block:: mlir
+
+        . . .
+        %2 = qec.ppr ["X"](8) %1 : !quantum.bit
+        %3 = qec.ppr ["Z"](4) %2 : !quantum.bit
+        %4 = qec.ppr ["X"](4) %3 : !quantum.bit
+        %5 = qec.ppr ["Z"](4) %4 : !quantum.bit
+        %mres, %out_qubits = qec.ppm ["Z"] %5 : !quantum.bit
+        . . .
+
+    """
+    return PassPipelineWrapper(qnode, "commute_ppr")
+
+
+def ppr_to_ppm(qnode):
+    R"""
+    Specify that the MLIR compiler pass for absorbing Clifford Pauli
+    Product Rotation (PPR) operations, :math:`\exp{iP\tfrac{\pi}{4}}`,
+    into the final Pauli Product Measurement (PPM) will be applied.
+
+    For more information regarding to PPM,
+    check out the `compilation hub <https://pennylane.ai/compilation/pauli-product-measurement>`__.
+
+    Args:
+        fn (QNode): QNode to apply the pass to
+
+    Returns:
+        ~.QNode
+
+    **Example**
+
+    In this example, the Clifford+T gates will be converted into PPRs first,
+    then the Clifford PPRs will be commuted past the non-Clifford PPR,
+    and finally the Clifford PPRs will be absorbed into the Pauli Product Measurements.
+
+    .. code-block:: python
+
+        import pennylane as qml
+        from catalyst import qjit, measure
+
+        ppm_passes = [("PPM",["to_ppr", "commute_ppr","ppr_to_ppm",])]
+
+        @qjit(pipelines=ppm_passes, keep_intermediate=True, target="mlir")
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def circuit():
+            qml.H(0)
+            qml.T(0)
+            return measure(0)
+
+        print(circuit.mlir_opt)
+
+    Example MLIR Representation:
+
+    .. code-block:: mlir
+
+        . . .
+        %2 = qec.ppr ["X"](8) %1 : !quantum.bit
+        %mres, %out_qubits = qec.ppm ["X"] %2 : !quantum.bit
+        . . .
+
+    """
+    return PassPipelineWrapper(qnode, "ppr_to_ppm")
