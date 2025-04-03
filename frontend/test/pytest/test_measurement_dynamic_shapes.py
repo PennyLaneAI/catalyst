@@ -58,9 +58,6 @@ def test_dynamic_sample_backend_functionality():
       quantum.device shots(%shots) [""",
     )
     new_ir = new_ir.replace("tensor<10x1x", "tensor<?x1x")
-    # TODO: shots still can only be static in PL frontend
-    # TODO: Before updating to dynamic shots, the shots in dynamic_slice is still static
-    new_ir = new_ir.replace("sizes = [10", "sizes = [37")
     new_ir = new_ir.replace("quantum.sample %3 :", "quantum.sample %3 shape %shots:")
     replace_ir(workflow_dyn_sample, "mlir", new_ir)
     res = workflow_dyn_sample(37)
