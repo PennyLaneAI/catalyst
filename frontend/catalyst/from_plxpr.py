@@ -70,7 +70,6 @@ from catalyst.jax_primitives import (
     while_p,
 )
 from catalyst.passes.pass_api import Pass
-from catalyst.utils.exceptions import CompileError
 
 measurement_map = {
     qml.measurements.SampleMP: sample_p,
@@ -379,15 +378,14 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
         )
 
         prim = measurement_map[type(measurement)]
+        assert (
+            prim is not counts_p
+        ), "CountsMP returns a dictionary, which is not compatible with capture"
         if prim is sample_p:
             num_qubits = len(measurement.wires) or len(self._device.wires)
             sample_shape = (self._shots, num_qubits)
             dyn_dims, static_shape = jax._src.lax.lax._extract_tracers_dyn_shape(sample_shape)
             mval = sample_p.bind(obs, *dyn_dims, static_shape=tuple(static_shape))
-        elif prim is counts_p:
-            raise CompileError(
-                "CountsMP returns a dictionary, which is not compatible with capture"
-            )
         elif prim in {expval_p, var_p}:
             mval = prim.bind(obs, shape=shape)
         else:
