@@ -42,8 +42,7 @@ jobs:
         container_name: ["manylinux_2_28_aarch64"]
 
     name: Build Dependencies (Python ${{ matrix.python_version.major_minor }})
-    runs-on:
-      group: 'Office 24th floor M2 Mac'
+    runs-on: ubuntu-22.04-arm
 
     if: needs.check_if_wheel_build_required.outputs.build-wheels == 'true'
 
@@ -201,8 +200,7 @@ jobs:
         container_name: ["manylinux_2_28_aarch64"]
 
     name: Build Wheels (Python ${{ matrix.python_version.major_minor }})
-    runs-on:
-      group: 'Office 24th floor M2 Mac'
+    runs-on: ubuntu-22.04-arm
 
     steps:
     - name: Checkout Catalyst repo
@@ -297,8 +295,7 @@ jobs:
 
     # To check all wheels for supported python3 versions
     name: Test Wheels (Python ${{ matrix.python_version.major_minor }})
-    runs-on:
-      group: 'Office 24th floor M2 Mac'
+    runs-on: ubuntu-22.04-arm
 
     steps:
     - name: Checkout Catalyst repo
