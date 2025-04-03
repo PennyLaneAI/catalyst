@@ -361,6 +361,16 @@ def to_llvmir(*args, stdin=None, options: Optional[CompileOptions] = None):
     return _catalyst(*opts, *args, stdin=stdin)
 
 
+def to_mlir_opt(*args, stdin=None, options: Optional[CompileOptions] = None):
+    """echo ${input} | catalyst --tool=opt *args *opts -"""
+    # These are the options that may affect compilation
+    if not options:
+        return _quantum_opt(*args, stdin=stdin)
+
+    opts = _options_to_cli_flags(options)
+    return _quantum_opt(*opts, *args, stdin=stdin)
+
+
 class Compiler:
     """Compiles MLIR modules to shared objects by executing the Catalyst compiler driver library."""
 
@@ -408,9 +418,9 @@ class Compiler:
             workspace, Directory
         ), f"Compiler expects a Directory type, got {type(workspace)}."
         assert workspace.is_dir(), f"Compiler expects an existing directory, got {workspace}."
-
-        lower_to_llvm = self.options.lower_to_llvm or False
-        output_ir_ext = ".ll" if lower_to_llvm else ".mlir"
+        assert (
+            self.options.lower_to_llvm
+        ), "lower_to_llvm must be set to True in order to compile to a shared object"
 
         if self.options.verbose:
             print(f"[LIB] Running compiler driver in {workspace}", file=self.options.logfile)
@@ -422,7 +432,7 @@ class Compiler:
             tmp_infile.write(ir)
 
         output_object_name = os.path.join(str(workspace), f"{module_name}.o")
-        output_ir_name = os.path.join(str(workspace), f"{module_name}{output_ir_ext}")
+        output_ir_name = os.path.join(str(workspace), f"{module_name}.ll")
 
         cmd = self.get_cli_command(tmp_infile_name, output_ir_name, module_name, workspace)
         try:
@@ -443,9 +453,8 @@ class Compiler:
         else:
             out_IR = None
 
-        if lower_to_llvm:
-            output = LinkerDriver.run(output_object_name, options=self.options)
-            output_object_name = str(pathlib.Path(output).absolute())
+        output = LinkerDriver.run(output_object_name, options=self.options)
+        output_object_name = str(pathlib.Path(output).absolute())
 
         # Clean up temporary files
         if os.path.exists(tmp_infile_name):

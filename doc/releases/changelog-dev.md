@@ -213,6 +213,9 @@
   This includes `probs(), state(), sample(), counts()`.
     [(#1565)](https://github.com/PennyLaneAI/catalyst/pull/1565)
 
+* Added `qjit.mlir_opt` property to access the optimized MLIR representation of a compiled function.
+  [(#1579)](https://github.com/PennyLaneAI/catalyst/pull/1579)
+
 * Improve error message for ZNE.
   [(#1603)](https://github.com/PennyLaneAI/catalyst/pull/1603)
 
