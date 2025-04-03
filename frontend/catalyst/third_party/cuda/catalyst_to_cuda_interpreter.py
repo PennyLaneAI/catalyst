@@ -29,7 +29,6 @@ This module also uses the CUDA-quantum API. Here is the reference:
 """
 
 import functools
-import json
 import operator
 from functools import reduce, wraps
 from typing import Hashable
@@ -256,13 +255,6 @@ def change_device_to_cuda_device(ctx):
     # us. For example, the number of shots.
 
     qdevice_eqn = get_instruction(ctx.jaxpr, qdevice_p)
-
-    # These parameters are stored in a json-like string.
-    # We first convert the string to json.
-    json_like_string = qdevice_eqn.params["rtd_kwargs"]
-    json_like_string = json_like_string.replace("'", '"')
-    json_like_string = json_like_string.replace("True", "true")
-    json_string = json_like_string.replace("False", "false")
 
     # Now we have the number of shots.
     # Shots are specified in PL at the very beginning, but in cuda
