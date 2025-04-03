@@ -503,7 +503,10 @@ def change_sample_or_counts(ctx, eqn):
     # * shots
     # * shape
     params = eqn.params
-    shots = params["shots"]
+    if is_sample:
+        shots = params["static_shape"][0]
+    if is_counts:
+        shots = params["shots"]
 
     # We will deal with compbasis in the same way as
     # when we deal with the state

@@ -910,7 +910,9 @@ def trace_quantum_measurements(
                     start_idx = 0  # Start index for slicing
                     # TODO: shots still can only be static in PL frontend
                     # TODO: Update to dynamic shots
-                    has_shot_vector = len(shot_vector) > 1 or any(copies > 1 for _, copies in shot_vector)
+                    has_shot_vector = len(shot_vector) > 1 or any(
+                        copies > 1 for _, copies in shot_vector
+                    )
                     if has_shot_vector:
                         for shot, copies in shot_vector:
                             for _ in range(copies):
@@ -956,7 +958,9 @@ def trace_quantum_measurements(
                     shape = (2,)
 
                 dyn_dims, static_shape = _extract_tracers_dyn_shape(shape)
-                results = counts_p.bind(obs_tracers, *dyn_dims, static_shape=tuple(static_shape))
+                results = counts_p.bind(
+                    obs_tracers, *dyn_dims, static_shape=tuple(static_shape), shots=shots
+                )
 
                 if using_compbasis:
                     results = (jnp.asarray(results[0], jnp.int64), results[1])

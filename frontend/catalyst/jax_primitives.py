@@ -1462,7 +1462,7 @@ def _sample_lowering(
 #
 # counts measurement
 #
-def counts_staging_rule(jaxpr_trace, obs, *dynamic_shape, static_shape):
+def counts_staging_rule(jaxpr_trace, obs, *dynamic_shape, static_shape, shots=None):
     """
     The result shape of `counts_p` is (tensor<Nxf64>, tensor<Nxi64>)
     where N = 2**number_of_qubits.
@@ -1491,7 +1491,7 @@ def counts_staging_rule(jaxpr_trace, obs, *dynamic_shape, static_shape):
     for dyn_dim in dynamic_shape:
         invars.append(jaxpr_trace.getvar(dyn_dim))
 
-    params = {"static_shape": static_shape}
+    params = {"static_shape": static_shape, "shots": shots}
 
     out_tracers = (
         pe.DynamicJaxprTracer(jaxpr_trace, out_shapes[0]),
@@ -1514,12 +1514,12 @@ pe.custom_staging_rules[counts_p] = counts_staging_rule
 
 
 @counts_p.def_impl
-def _counts_def_impl(ctx, obs, *dynamic_shape, static_shape):  # pragma: no cover
+def _counts_def_impl(ctx, obs, *dynamic_shape, static_shape, shots=None):  # pragma: no cover
     raise NotImplementedError()
 
 
 def _counts_lowering(
-    jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, *dynamic_shape, static_shape
+    jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, *dynamic_shape, static_shape, shots=None
 ):
     # Note: result shape of counts op is (tensor<Nxf64>, tensor<Nxi64>)
     # where N = 2**number_of_qubits
