@@ -31,7 +31,7 @@ func.func @counts(%q0: !quantum.bit, %q1: !quantum.bit, %c : i64) {
     // CHECK: [[idx2:%.+]] = index.casts %arg2 : i64 to index
     // CHECK: [[alloc2:%.+]] = memref.alloc([[idx2]]) : memref<?xi64>
     // CHECK: quantum.counts {{.*}} in([[alloc1]] : memref<?xf64>, [[alloc2]] : memref<?xi64>)
-    %dyn_samples:2 = quantum.counts %obs size %c : tensor<?xf64>, tensor<?xi64>
+    %dyn_counts:2 = quantum.counts %obs size %c : tensor<?xf64>, tensor<?xi64>
 
     func.return
 }

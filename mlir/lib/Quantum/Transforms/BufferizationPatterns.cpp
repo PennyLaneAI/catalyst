@@ -176,39 +176,28 @@ struct BufferizeCountsOp : public OpConversionPattern<CountsOp> {
                                   ConversionPatternRewriter &rewriter) const override
     {
         Location loc = op.getLoc();
-        Type tensorType0 = op.getType(0);
-        Type tensorType1 = op.getType(1);
-        MemRefType resultType0 = cast<MemRefType>(getTypeConverter()->convertType(tensorType0));
-        MemRefType resultType1 = cast<MemRefType>(getTypeConverter()->convertType(tensorType1));
+        SmallVector<Value> buffers;
+        for (size_t i : {0, 1}) {
+            Type tensorType = op.getType(i);
+            MemRefType resultType = cast<MemRefType>(getTypeConverter()->convertType(tensorType));
+            auto shape = cast<mlir::RankedTensorType>(tensorType).getShape();
 
-        auto shape0 = cast<mlir::RankedTensorType>(tensorType0).getShape();
-        auto shape1 = cast<mlir::RankedTensorType>(tensorType1).getShape();
+            Value allocVal;
+            if (shape[0] == ShapedType::kDynamic) {
+                auto indexCastOp =
+                    rewriter.create<index::CastSOp>(loc, rewriter.getIndexType(), op.getSize());
+                allocVal =
+                    rewriter.create<memref::AllocOp>(loc, resultType, ValueRange{indexCastOp});
+            }
+            else {
+                allocVal = rewriter.create<memref::AllocOp>(loc, resultType);
+            }
+            buffers.push_back(allocVal);
+        }
+        rewriter.replaceOp(op, buffers);
 
-        Value allocVal0;
-        Value allocVal1;
-        if (shape0[0] == ShapedType::kDynamic) {
-            auto indexCastOp0 =
-                rewriter.create<index::CastSOp>(loc, rewriter.getIndexType(), op.getSize());
-            allocVal0 =
-                rewriter.create<memref::AllocOp>(loc, resultType0, ValueRange{indexCastOp0});
-        }
-        else {
-            allocVal0 = rewriter.create<memref::AllocOp>(loc, resultType0);
-        }
-
-        if (shape1[0] == ShapedType::kDynamic) {
-            auto indexCastOp1 =
-                rewriter.create<index::CastSOp>(loc, rewriter.getIndexType(), op.getSize());
-            allocVal1 =
-                rewriter.create<memref::AllocOp>(loc, resultType1, ValueRange{indexCastOp1});
-        }
-        else {
-            allocVal1 = rewriter.create<memref::AllocOp>(loc, resultType1);
-        }
-
-        rewriter.replaceOp(op, ValueRange{allocVal0, allocVal1});
-        rewriter.create<CountsOp>(loc, nullptr, nullptr, adaptor.getObs(), nullptr, allocVal0,
-                                  allocVal1);
+        rewriter.create<CountsOp>(loc, nullptr, nullptr, adaptor.getObs(), nullptr, buffers[0],
+                                  buffers[1]);
 
         return success();
     }
