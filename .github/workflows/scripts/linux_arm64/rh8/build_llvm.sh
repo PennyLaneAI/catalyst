@@ -23,16 +23,17 @@ export C_COMPILER=/opt/rh/gcc-toolset-${GCC_VERSION}/root/usr/bin/gcc
 export CXX_COMPILER=/opt/rh/gcc-toolset-${GCC_VERSION}/root/usr/bin/g++
 
 # Set the right Python interpreter
-rm -rf /usr/bin/python3
-ls /opt/_internal/
-ln -s /opt/_internal/cpython-${PYTHON_VERSION}.${PYTHON_SUBVERSION}/bin/python3 /usr/bin/python3
-export PYTHON=/usr/bin/python3
+# rm -rf /usr/bin/python3
+# ls /opt/_internal/
+# ln -s /opt/_internal/cpython-${PYTHON_VERSION}.${PYTHON_SUBVERSION}/bin/python3 /usr/bin/python3
+# export PYTHON=/usr/bin/python3
 
 # Add Python and GCC to the PATH env var
 export PATH=/opt/_internal/cpython-${PYTHON_VERSION}.${PYTHON_SUBVERSION}/bin:/opt/rh/gcc-toolset-${GCC_VERSION}/root/usr/bin:/catalyst/llvm-build/bin:$PATH
 
+
 # Install python dependencies
-/usr/bin/python3 -m pip install numpy pybind11 PyYAML cmake ninja
+/usr/bin/python -m pip install numpy pybind11 PyYAML cmake ninja
 
 # Build LLVM
 export LLVM_BUILD_DIR="/catalyst/llvm-build"
