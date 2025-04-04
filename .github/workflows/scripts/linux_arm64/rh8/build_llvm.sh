@@ -33,7 +33,7 @@ export PATH=/opt/_internal/cpython-${PYTHON_VERSION}.${PYTHON_SUBVERSION}/bin:/o
 
 
 # Install python dependencies
-/usr/bin/python -m pip install numpy pybind11 PyYAML cmake ninja
+python -m pip install numpy pybind11 PyYAML cmake ninja
 
 # Build LLVM
 export LLVM_BUILD_DIR="/catalyst/llvm-build"
