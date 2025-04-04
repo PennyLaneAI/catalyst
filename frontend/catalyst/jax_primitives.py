@@ -501,7 +501,10 @@ def _grad_lowering(ctx, *args, jaxpr, fn, grad_params):
             differentiate.
     """
     consts_len = len(jaxpr.consts)
-    consts = args[-consts_len:]
+    if consts_len:
+        consts = args[-consts_len:]
+    else:
+        consts = tuple()
     method, h, argnums = grad_params.method, grad_params.h, grad_params.expanded_argnums
     mlir_ctx = ctx.module_context.context
     finiteDiffParam = None
@@ -523,7 +526,9 @@ def _grad_lowering(ctx, *args, jaxpr, fn, grad_params):
     # such constants to numpy array types.
 
     constants = list(consts)
-    args_and_consts = constants + list(args[:consts_len])
+    len_args = len(args)
+    index = len_args - consts_len
+    args_and_consts = constants + list(args[:index])
 
     return GradOp(
         flat_output_types,
@@ -560,8 +565,13 @@ def _value_and_grad_lowering(ctx, *args, jaxpr, fn, grad_params):
         MLIR results
     """
     consts_len = len(jaxpr.consts)
-    consts = list(args[-consts_len:])
-    args = list(args[:consts_len])
+    if consts_len:
+        consts = list(args[-consts_len:])
+    else:
+        consts = list()
+    len_args = len(args)
+    index = len_args - consts_len
+    args = list(args[0:index])
     method, h, argnums = grad_params.method, grad_params.h, grad_params.expanded_argnums
     mlir_ctx = ctx.module_context.context
     new_argnums = np.array([len(jaxpr.consts) + num for num in argnums])
