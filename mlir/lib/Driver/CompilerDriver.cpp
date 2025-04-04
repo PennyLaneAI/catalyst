@@ -502,7 +502,7 @@ LogicalResult preparePassManager(PassManager &pm, const CompilerOptions &options
             s << *op;
             std::string fileName = pipelineName.str();
             if (auto funcOp = dyn_cast<mlir::func::FuncOp>(op)) {
-                fileName += "_" + funcOp.getName().str();
+                fileName += std::string("_") + funcOp.getName().str();
             }
             dumpToFile(options, output.nextPipelineDumpFilename(fileName), tmp);
         }
@@ -803,6 +803,16 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
             catalyst::utils::LinesCount::Module(*llvmModule.get());
         }
 
+        std::string errorMessage;
+        auto outfile = openOutputFile(output.outputFilename, &errorMessage);
+        if (output.outputFilename == "-" && llvmModule) {
+            // Do not generate file if outputting to stdout.
+            outfile->os() << *llvmModule;
+            outfile->keep();
+            // early exit
+            return success();
+        }
+
         TimingScope outputTiming = llcTiming.nest("compileObject");
         output.outIR.clear();
         if (options.keepIntermediate) {
@@ -823,9 +833,8 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         llvm::errs() << errorMessage << "\n";
         return failure();
     }
-    if (output.outputFilename == "-" && llvmModule) {
-        outfile->os() << *llvmModule;
-        outfile->keep();
+    else if (output.outputFilename == "-" && llvmModule) {
+        // already handled
     }
     else if (output.outputFilename == "-" && mlirModule) {
         outfile->os() << *mlirModule;

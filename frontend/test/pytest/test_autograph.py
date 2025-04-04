@@ -27,6 +27,7 @@ from jax.errors import TracerBoolConversionError
 from numpy.testing import assert_allclose
 
 from catalyst import *
+from catalyst import passes
 from catalyst.autograph.transformer import TRANSFORMER
 from catalyst.utils.dummy import dummy_func
 from catalyst.utils.exceptions import CompileError
@@ -2289,8 +2290,8 @@ class TestJaxIndexOperatorUpdate:
             except:
                 assert False, "This warning should not show up again"
 
-    def test_unsopported_cases(self):
-        """Test that TypeError is raised in unsopported cases."""
+    def test_unsupported_cases(self):
+        """Test that TypeError is raised in unsupported cases."""
 
         @qjit(autograph=True)
         def workflow(x):
@@ -2320,6 +2321,25 @@ class TestJaxIndexOperatorUpdate:
 
             with pytest.raises(TypeError, match="JAX arrays are immutable"):
                 test_array_index(x)
+
+
+class TestWithPassPipelineWrapper:
+    """Test with passes"""
+
+    def test_with_pass_pipeline_wrapper(self):
+        """this test should work. So there are no asserts"""
+
+        @qml.qjit(autograph=True)
+        @passes.merge_rotations
+        @qml.qnode(qml.device("null.qubit", wires=1))
+        def circuit(n_iter: int):
+            for _ in range(n_iter):
+                qml.RX(0.1, wires=0)
+                qml.T(0)
+                qml.RX(0.2, wires=0)
+            return qml.expval(qml.PauliZ(0))
+
+        circuit(10)
 
 
 if __name__ == "__main__":

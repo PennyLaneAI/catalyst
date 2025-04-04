@@ -26,6 +26,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 import jax
 import jax.numpy as jnp
 import pennylane as qml
+from jax._src.lax.lax import _extract_tracers_dyn_shape
 from pennylane import QubitUnitary, QueuingManager
 from pennylane.devices import QubitDevice
 from pennylane.measurements import (
@@ -70,7 +71,6 @@ from catalyst.jax_extras import (
     tree_unflatten,
     wrap_init,
 )
-from catalyst.jax_extras.tracing import bind_flexible_primitive
 from catalyst.jax_primitives import (
     AbstractQreg,
     compbasis_p,
@@ -878,9 +878,14 @@ def trace_quantum_measurements(
                     "Use qml.sample() instead."
                 )
 
+            d_wires = (
+                device.wires[0]
+                if catalyst.device.qjit_device.is_dynamic_wires(device.wires)
+                else len(device.wires)
+            )
             m_wires = output.wires if output.wires else None
             obs_tracers, nqubits = trace_observables(output.obs, qrp, m_wires)
-            nqubits = len(device.wires) if nqubits is None else nqubits
+            nqubits = d_wires if nqubits is None else nqubits
 
             using_compbasis = obs_tracers.primitive == compbasis_p
 
@@ -894,21 +899,30 @@ def trace_quantum_measurements(
                 if output.mv is not None:  # qml.sample(m)
                     out_classical_tracers.append(output.mv)
                 else:
-                    shape = (shots, nqubits) if using_compbasis else (shots,)
-                    result = bind_flexible_primitive(
-                        sample_p, {"shots": shots}, obs_tracers, num_qubits=nqubits
-                    )
+                    shape = (shots, nqubits)
+                    dyn_dims, static_shape = _extract_tracers_dyn_shape(shape)
+                    result = sample_p.bind(obs_tracers, *dyn_dims, static_shape=tuple(static_shape))
                     if using_compbasis:
                         result = jnp.astype(result, jnp.int64)
 
                     reshaped_result = ()
                     shot_vector = get_device_shot_vector(device)
                     start_idx = 0  # Start index for slicing
-                    for shot, copies in shot_vector:
-                        for _ in range(copies):
-                            sliced_result = result[start_idx : start_idx + shot]
-                            reshaped_result += (sliced_result.reshape(shot, nqubits),)
-                            start_idx += shot
+                    # TODO: shots still can only be static in PL frontend
+                    # TODO: Update to dynamic shots
+                    has_shot_vector = len(shot_vector) > 1 or any(
+                        copies > 1 for _, copies in shot_vector
+                    )
+                    if has_shot_vector:
+                        for shot, copies in shot_vector:
+                            for _ in range(copies):
+                                sliced_result = jax.lax.dynamic_slice(
+                                    result, (start_idx, 0), (shot, nqubits)
+                                )
+                                reshaped_result += (sliced_result.reshape(shot, nqubits),)
+                                start_idx += shot
+                    else:
+                        reshaped_result += (result,)
 
                     if len(reshaped_result) == 1:
                         reshaped_result = reshaped_result[0]
@@ -921,18 +935,31 @@ def trace_quantum_measurements(
                 out_classical_tracers.append(var_p.bind(obs_tracers))
             elif type(output) is ProbabilityMP:
                 assert using_compbasis
-                shape = (2**nqubits,)
-                out_classical_tracers.append(probs_p.bind(obs_tracers, shape=shape))
+                if isinstance(nqubits, DynamicJaxprTracer):
+                    shape = (jnp.left_shift(1, nqubits),)
+                else:
+                    shape = (2**nqubits,)
+                dyn_dims, static_shape = _extract_tracers_dyn_shape(shape)
+                result = probs_p.bind(obs_tracers, *dyn_dims, static_shape=tuple(static_shape))
+                out_classical_tracers.append(result)
             elif type(output) is CountsMP:
                 if shots is None:  # needed for old device API only
                     raise ValueError(
-                        "qml.sample cannot work with shots=None. "
+                        "qml.counts cannot work with shots=None. "
                         "Please specify a finite number of shots."
                     )
-                shape = (2**nqubits,) if using_compbasis else (2,)
-                results = bind_flexible_primitive(
-                    counts_p, {"shots": shots}, obs_tracers, shape=shape
-                )
+
+                if using_compbasis:
+                    if isinstance(nqubits, DynamicJaxprTracer):
+                        shape = (jnp.left_shift(1, nqubits),)
+                    else:
+                        shape = (2**nqubits,)
+                else:
+                    shape = (2,)
+
+                dyn_dims, static_shape = _extract_tracers_dyn_shape(shape)
+                results = counts_p.bind(obs_tracers, *dyn_dims, static_shape=tuple(static_shape))
+
                 if using_compbasis:
                     results = (jnp.asarray(results[0], jnp.int64), results[1])
                 out_classical_tracers.extend(results)
@@ -949,8 +976,13 @@ def trace_quantum_measurements(
                     out_tree = counts_tree
             elif type(output) is StateMP:
                 assert using_compbasis
-                shape = (2**nqubits,)
-                out_classical_tracers.append(state_p.bind(obs_tracers, shape=shape))
+                if isinstance(nqubits, DynamicJaxprTracer):
+                    shape = (jnp.left_shift(1, nqubits),)
+                else:
+                    shape = (2**nqubits,)
+                dyn_dims, static_shape = _extract_tracers_dyn_shape(shape)
+                result = state_p.bind(obs_tracers, *dyn_dims, static_shape=tuple(static_shape))
+                out_classical_tracers.append(result)
             else:
                 raise NotImplementedError(
                     f"Measurement {type(output)} is not implemented"

@@ -26,8 +26,8 @@ import pennylane as qml
 from pennylane.devices import Device
 from pennylane.devices.execution_config import ExecutionConfig
 from pennylane.transforms.core import TransformProgram
-from utils import qjit_for_tests as qjit
 
+from catalyst import qjit
 from catalyst.compiler import get_lib_path
 
 TEST_PATH = os.path.dirname(__file__)
