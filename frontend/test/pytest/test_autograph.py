@@ -397,6 +397,34 @@ class TestIntegration:
         assert hasattr(circuit.user_function, "ag_unconverted")
         assert jnp.allclose(circuit(), jnp.array([0.0, 1.0]))
 
+    def test_adjoint_no_argument(self):
+        """Test that passing no argument to qml.adjoint raises an error."""
+        with pytest.raises(ValueError, match="adjoint requires at least one argument"):
+            dev = qml.device("lightning.qubit", wires=2)
+
+            @qml.qjit(autograph=True)
+            @qml.qnode(dev)
+            def circuit():
+                qml.adjoint()
+                return qml.probs(wires=0)
+
+            circuit()
+
+    def test_adjoint_wrong_argument_type(self):
+        """Test that passing a non-callable/non-Operation to qml.adjoint raises an error."""
+        with pytest.raises(
+            ValueError, match="First argument to adjoint must be callable or an Operation"
+        ):
+            dev = qml.device("lightning.qubit", wires=2)
+
+            @qml.qjit(autograph=True)
+            @qml.qnode(dev)
+            def circuit():
+                qml.adjoint(3)
+                return qml.probs(wires=0)
+
+            circuit()
+
     def test_tape_transform(self):
         """Test if tape transform is applied when autograph is on."""
 
