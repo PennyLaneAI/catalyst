@@ -213,6 +213,11 @@
   This includes `probs(), state(), sample(), counts()`.
     [(#1565)](https://github.com/PennyLaneAI/catalyst/pull/1565)
 
+  - In mlir, `ProbsOp, StateOp, SampleOp, CountsOp` ops now carry an optional new SSA operand for their return shapes.
+    This operand is used during bufferization pass to allocate result memrefs dynamically.
+    A new verification is added to check that this new operand and static return shapes cannot coexist.
+    [(#1574)](https://github.com/PennyLaneAI/catalyst/pull/1574)
+
 * Added `qjit.mlir_opt` property to access the optimized MLIR representation of a compiled function.
   [(#1579)](https://github.com/PennyLaneAI/catalyst/pull/1579)
 

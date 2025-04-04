@@ -1,17 +1,18 @@
-PYTHON?=$(shell which python3)
-C_COMPILER?=$(shell which clang)
-CXX_COMPILER?=$(shell which clang++)
-COMPILER_LAUNCHER?=$(shell which ccache)
+PYTHON ?= $(shell which python3)
+C_COMPILER ?= $(shell which clang)
+CXX_COMPILER ?= $(shell which clang++)
+COMPILER_LAUNCHER ?= $(shell which ccache)
 
 MK_ABSPATH := $(abspath $(lastword $(MAKEFILE_LIST)))
 MK_DIR := $(dir $(MK_ABSPATH))
-DIALECTS_BUILD_DIR?=$(MK_DIR)/build
-LLVM_BUILD_DIR?=$(MK_DIR)/llvm-project/build
-MHLO_BUILD_DIR?=$(MK_DIR)/mlir-hlo/bazel-build
-ENZYME_BUILD_DIR?=$(MK_DIR)/Enzyme/build
-RT_BUILD_DIR?=$(MK_DIR)/../runtime/build
-ENABLE_ASAN?=OFF
-BUILD_TYPE?=Release
+DIALECTS_BUILD_DIR ?= $(MK_DIR)/build
+LLVM_BUILD_DIR ?= $(MK_DIR)/llvm-project/build
+MHLO_BUILD_DIR ?= $(MK_DIR)/mlir-hlo/bazel-build
+ENZYME_BUILD_DIR ?= $(MK_DIR)/Enzyme/build
+RT_BUILD_DIR ?= $(MK_DIR)/../runtime/build
+ENABLE_ASAN ?= OFF
+STRICT_WARNINGS ?= ON
+BUILD_TYPE ?= Release
 LLVM_EXTERNAL_LIT ?= $(LLVM_BUILD_DIR)/bin/llvm-lit
 
 ifeq ($(shell uname), Darwin)
@@ -22,9 +23,9 @@ DEFAULT_ENABLE_LLD := ON
 SYMBOL_VISIBILITY := default
 endif
 
-ENABLE_LLD?=$(DEFAULT_ENABLE_LLD)
-ENABLE_ZLIB?=ON
-ENABLE_ZSTD?=OFF
+ENABLE_LLD ?= $(DEFAULT_ENABLE_LLD)
+ENABLE_ZLIB ?= ON
+ENABLE_ZSTD ?= OFF
 
 ifeq ($(ENABLE_ASAN), ON)
 USE_SANITIZER_NAMES="Address"
@@ -172,7 +173,8 @@ dialects:
 		-DLLVM_USE_SANITIZER=$(USE_SANITIZER_NAMES) \
 		-DLLVM_ENABLE_LLD=$(ENABLE_LLD) \
 		-DLLVM_ENABLE_ZLIB=$(ENABLE_ZLIB) \
-		-DLLVM_ENABLE_ZSTD=$(ENABLE_ZSTD)
+		-DLLVM_ENABLE_ZSTD=$(ENABLE_ZSTD) \
+		-DCATALYST_ENABLE_WARNINGS=$(STRICT_WARNINGS)
 
 	cmake --build $(DIALECTS_BUILD_DIR) --target check-dialects quantum-lsp-server catalyst-cli check-unit-tests
 
