@@ -20,11 +20,13 @@ import copy
 import functools
 import operator
 import warnings
+from collections.abc import Iterable
 from typing import Any, Callable, Iterator, SupportsIndex, Tuple, Union
 
 import jax
 import jax.numpy as jnp
 import pennylane as qml
+from jax.tree_util import all_leaves, tree_flatten
 from malt.core import config as ag_config
 from malt.impl import api as ag_api
 from malt.impl.api import converted_call as ag_converted_call
@@ -52,7 +54,27 @@ __all__ = [
     "update_item_with_op",
 ]
 
-_pytree_types = [list, tuple, dict]
+
+def is_pytree(args):
+    """Check if the arguments constitute a Pytree
+
+    Args:
+        args (Iterable): arguments to check
+
+    Returns:
+        True or False
+    """
+
+    if type(args) not in [list, tuple, dict]:
+        return False
+
+    flat_args, _ = tree_flatten(args)
+    try:
+        _ = [jax.api_util.shaped_abstractify(arg) for arg in flat_args]
+        return True
+    # pylint: disable=bare-except
+    except:
+        return False
 
 
 def get_program_length(reference_tracers):
@@ -162,7 +184,7 @@ def assert_iteration_inputs(inputs, symbol_names):
             )
 
         # Skip check for Pytree objects
-        if type(inp) not in _pytree_types:
+        if not is_pytree(inp):
             try:
                 jax.api_util.shaped_abstractify(inp)
             except TypeError as e:
@@ -184,7 +206,7 @@ def assert_iteration_results(inputs, outputs, symbol_names):
 
     for i, (inp, out) in enumerate(zip(inputs, outputs)):
         # Skip check for Pytree objects
-        if type(inp) not in _pytree_types and type(out) not in _pytree_types:
+        if not is_pytree(inp) and not is_pytree(out):
             inp_t, out_t = jax.api_util.shaped_abstractify(inp), jax.api_util.shaped_abstractify(
                 out
             )
