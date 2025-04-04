@@ -439,6 +439,42 @@ def qjit(
 
         the ``sum_abstracted`` function would only compile once and its definition would be
         reused for subsequent function calls.
+
+    .. details::
+        :title: Qubit-invariant compilation
+
+        A powerful feature of Catalyst is that the same compiled qnode can be evoked with
+        different number of qubits. This is especially helpful for workflows where you would
+        like to, for example, iterate through the wires without knowing how many of them
+        there are in advance. For instance, many workflows (such as `Grover's algorithm
+        <https://pennylane.ai/qml/demos/tutorial_grovers_algorithm>`_) have
+        an entangling layer at the beginning, where a Hadamard gate is applied to every wire.
+
+        To use this feature the PennyLane device needs to be instantiated within the qjitted
+        function, or another function within its call graph. The `wires` parameter can then be
+        any (integer) program value, for example one of the function arguments.
+
+        .. code-block:: python
+
+            @qjit
+            def workflow(num_qubits):
+                dev = qml.device("lightning.qubit", wires=num_qubits)
+
+                @qml.qnode(dev)
+                def circuit():
+                    @catalyst.for_loop(0, num_qubits, 1)
+                    def entangle_all_qubits(i):
+                        qml.Hadamard(wires=i)
+                    entangle_all_qubits()
+
+                    return qml.probs()
+
+                return circuit()
+
+        >>> workflow(2)  # the first call, compilation occurs here
+        [0.25 0.25 0.25 0.25]
+        >>> workflow(3)  # the precompiled quantum function is called
+        [0.125 0.125 0.125 0.125 0.125 0.125 0.125 0.125]
     """
     kwargs = copy.copy(locals())
     kwargs.pop("fn")
