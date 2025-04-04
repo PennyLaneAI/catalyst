@@ -245,6 +245,10 @@
 * Autographs and catalyst pipeline fix.
   [(#1599)](https://github.com/PennyLaneAI/catalyst/pull/1599)
 
+* Fixes an issue ([(#1339)](https://github.com/PennyLaneAI/catalyst/issues/1339)) where using
+  autograph with control/adjoint functions used on operator objects causes a crash.
+  [(#1605)](https://github.com/PennyLaneAI/catalyst/pull/1605)
+
 <h3>Internal changes ⚙️</h3>
 
 * Updated the call signature for the PLXPR `qnode_prim` primitive.
