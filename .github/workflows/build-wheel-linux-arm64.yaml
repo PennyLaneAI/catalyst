@@ -137,18 +137,50 @@ jobs:
         key: ${{ matrix.container_name }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-wheel-build
         lookup-only: True
 
+    - name: Install dependencies (AlmaLinux)
+      if: |
+        steps.cache-llvm-build.outputs.cache-hit != 'true' ||
+        steps.cache-mhlo-build.outputs.cache-hit != 'true' ||
+        steps.cache-enzyme-build.outputs.cache-hit != 'true'
+      run: |
+        # Reduce wait time for repos not responding
+        cat /etc/dnf.conf | sed "s/\[main\]/\[main\]\ntimeout=5/g" > /etc/dnf.conf
+        dnf update -y && dnf install -y libzstd-devel gcc-toolset-12
+        # Update env vars valid for all tasks of this job
+        echo '/opt/rh/gcc-toolset-12/root/usr/bin' >> $GITHUB_PATH
+
+    - name: Install Dependencies (Python)
+      run: |
+        python${{ matrix.python_version }} -m pip install numpy nanobind pybind11 PyYAML cmake ninja
+        # Add cmake and ninja to the PATH env var
+        PYTHON_BINS=$(find /opt/_internal/cpython-${{ matrix.python_version }}.*/bin -maxdepth 1 -type d | tr '\n' ':' | sed 's/:$//')
+        echo $PYTHON_BINS >> $GITHUB_PATH
+
+    # - name: Build LLVM / MLIR
+    #   if: steps.cache-llvm-build.outputs.cache-hit != 'true'
+    #   run: |
+    #     set -x
+    #     # With GCC 13, LLVM fails some tests, then we use GCC 12 instead
+    #     export GCC_VERSION=12
+    #     docker run --rm --platform linux/aarch64 \
+    #         -v /var/run/docker.sock:/var/run/docker.sock \
+    #         -v `pwd`:/catalyst \
+    #         -i ${{ matrix.container_img }} \
+    #         bash /catalyst/.github/workflows/scripts/linux_arm64/rh8/build_llvm.sh $GCC_VERSION ${{ matrix.python_version.major_minor }} ${{ matrix.python_version.patch }} ${{ matrix.python_version.package }}
     - name: Build LLVM / MLIR
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
       run: |
-        set -x
-        # With GCC 13, LLVM fails some tests, then we use GCC 12 instead
-        export GCC_VERSION=12
-        docker run --rm --platform linux/aarch64 \
-            -v /var/run/docker.sock:/var/run/docker.sock \
-            -v `pwd`:/catalyst \
-            -i ${{ matrix.container_img }} \
-            bash /catalyst/.github/workflows/scripts/linux_arm64/rh8/build_llvm.sh $GCC_VERSION ${{ matrix.python_version.major_minor }} ${{ matrix.python_version.patch }} ${{ matrix.python_version.package }}
-
+        export PATH=$GITHUB_WORKSPACE/llvm-build/bin:$PATH
+        PYTHON=$(which python${{ matrix.python_version }}) \
+        C_COMPILER=$(which gcc) \
+        CXX_COMPILER=$(which g++) \
+        LLVM_BUILD_DIR="$GITHUB_WORKSPACE/llvm-build" \
+        LLVM_PROJECTS="lld;mlir" \
+        LLVM_TARGETS="lld check-mlir" \
+        ENABLE_ZLIB=FORCE_ON \
+        ENABLE_LLD=OFF \
+        make llvm
+        
     - name: Save LLVM Build
       id: save-llvm-build
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
