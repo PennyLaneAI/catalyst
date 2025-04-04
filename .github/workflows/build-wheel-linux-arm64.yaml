@@ -150,9 +150,9 @@ jobs:
 
     - name: Install Dependencies (Python)
       run: |
-        python${{ matrix.python_version }} -m pip install numpy nanobind pybind11 PyYAML cmake ninja
+        ${{ matrix.python_version.major_minor }} -m pip install numpy nanobind pybind11 PyYAML cmake ninja
         # Add cmake and ninja to the PATH env var
-        PYTHON_BINS=$(find /opt/_internal/cpython-${{ matrix.python_version }}.*/bin -maxdepth 1 -type d | tr '\n' ':' | sed 's/:$//')
+        PYTHON_BINS=$(find /opt/_internal/cpython-${{ matrix.python_version.major_minor }}.*/bin -maxdepth 1 -type d | tr '\n' ':' | sed 's/:$//')
         echo $PYTHON_BINS >> $GITHUB_PATH
 
     # - name: Build LLVM / MLIR
@@ -170,7 +170,7 @@ jobs:
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
       run: |
         export PATH=$GITHUB_WORKSPACE/llvm-build/bin:$PATH
-        PYTHON=$(which python${{ matrix.python_version }}) \
+        PYTHON=$(which ${{ matrix.python_version.major_minor }}) \
         C_COMPILER=$(which gcc) \
         CXX_COMPILER=$(which g++) \
         LLVM_BUILD_DIR="$GITHUB_WORKSPACE/llvm-build" \
