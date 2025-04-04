@@ -14,15 +14,16 @@
 
 #define DEBUG_TYPE "loop-boundary"
 
-#include "mlir/Dialect/SCF/IR/SCF.h"
-#include "mlir/Dialect/Tensor/IR/Tensor.h"
-#include "mlir/IR/Operation.h"
-#include "mlir/IR/PatternMatch.h"
-#include "mlir/Support/LogicalResult.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Debug.h"
 
-#include "Quantum/IR/QuantumInterfaces.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/IR/Dominance.h"
+#include "mlir/IR/Operation.h"
+#include "mlir/IR/PatternMatch.h"
+#include "mlir/Support/LogicalResult.h"
+
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Transforms/Patterns.h"
 
@@ -139,6 +140,17 @@ bool hasQuantumCustomPredecessor(CustomOp &op)
     return false;
 }
 
+// Return true if all operands of topOp are dominated by the bottomOp
+bool verifyDominance(CustomOp topOp, CustomOp bottomOp)
+{
+    for (auto [outQubit, inQubit] : llvm::zip(topOp.getOutQubits(), bottomOp.getInQubits())) {
+        if (outQubit != inQubit) {
+            return false;
+        }
+    }
+    return true;
+}
+
 // Helper function to determine if a pair of operations can be optimized.
 bool isValidEdgePair(const CustomOp &bottomOp, std::vector<QubitOrigin> &bottomQubitOrigins,
                      const CustomOp &topOp, std::vector<QubitOrigin> &topQubitOrigins)
@@ -148,7 +160,8 @@ bool isValidEdgePair(const CustomOp &bottomOp, std::vector<QubitOrigin> &bottomQ
 
     if (bottomOpNonConst.getGateName() != topOpNonConst.getGateName() || topOp == bottomOp ||
         !verifyQubitOrigins(topQubitOrigins, bottomQubitOrigins) ||
-        hasQuantumCustomSuccessor(bottomOp) || hasQuantumCustomPredecessor(topOpNonConst)) {
+        verifyDominance(topOpNonConst, bottomOpNonConst) || hasQuantumCustomSuccessor(bottomOp) ||
+        hasQuantumCustomPredecessor(topOpNonConst)) {
         return false;
     }
     return true;
@@ -254,7 +267,12 @@ QubitOrigin determineQubitOrigin(Value qubit)
         }
 
         unsigned long position = extractOp.getIdxAttr().value();
-        return QubitOrigin(extractOp.getQreg(), position, true);
+        auto regType = extractOp.getQreg();
+        while (InsertOp insertOp = regType.getDefiningOp<quantum::InsertOp>()) {
+            regType = insertOp.getInQreg();
+        }
+
+        return QubitOrigin(regType, position, true);
     }
 
     return QubitOrigin(qubit, 0, false);
