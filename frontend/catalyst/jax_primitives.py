@@ -568,7 +568,7 @@ def _value_and_grad_lowering(ctx, *args, jaxpr, fn, grad_params):
     if consts_len:
         consts = list(args[-consts_len:])
     else:
-        consts = list()
+        consts = []
     len_args = len(args)
     index = len_args - consts_len
     args = list(args[0:index])
