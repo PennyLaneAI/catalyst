@@ -340,16 +340,74 @@ jobs:
         key: ${{ matrix.container_name }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-wheel-build
         fail-on-cache-miss: True
 
-    # Build Catalyst Wheel
-    - name: Build Catalyst Wheel
+    # # Build Catalyst Wheel
+    # - name: Build Catalyst Wheel
+    #   run: |
+    #     set -x
+    #     export GCC_VERSION=13
+    #     docker run --rm --platform linux/aarch64 \
+    #         -v /var/run/docker.sock:/var/run/docker.sock \
+    #         -v `pwd`:/catalyst \
+    #         -i ${{ matrix.container_img }} \
+    #         bash /catalyst/.github/workflows/scripts/linux_arm64/rh8/build_catalyst.sh $GCC_VERSION ${{ matrix.python_version.major_minor }} ${{ matrix.python_version.patch }} ${{ matrix.python_version.package }} ${{ matrix.python_version.alternative }}
+# Build Catalyst runtime
+
+    - name: Build Dependencies
       run: |
-        set -x
-        export GCC_VERSION=13
-        docker run --rm --platform linux/aarch64 \
-            -v /var/run/docker.sock:/var/run/docker.sock \
-            -v `pwd`:/catalyst \
-            -i ${{ matrix.container_img }} \
-            bash /catalyst/.github/workflows/scripts/linux_arm64/rh8/build_catalyst.sh $GCC_VERSION ${{ matrix.python_version.major_minor }} ${{ matrix.python_version.patch }} ${{ matrix.python_version.package }} ${{ matrix.python_version.alternative }}
+        python${{ matrix.python_version.major_minor }} -m pip install pennylane nanobind pybind11 PyYAML cmake ninja delocate 'amazon-braket-pennylane-plugin>1.27.1'
+       
+    - name: Build Catalyst Runtime
+      run: |
+        cmake -S runtime -B runtime-build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=runtime-build/lib \
+            -DPython_EXECUTABLE=python${{ matrix.python_version.major_minor }} \
+            -DENABLE_OPENQASM=ON \
+            -DENABLE_OQD=OFF \
+            -DMLIR_INCLUDE_DIRS="/catalyst/mlir/llvm-project/mlir/include"
+        cmake --build runtime-build --target rt_capi rtd_openqasm rtd_null_qubit
+
+    - name: Build OQC
+      env:
+        OQC_BUILD_DIR: "/catalyst/oqc-build"
+        RT_BUILD_DIR: "/catalyst/runtime-build"
+      run:
+        make oqc
+
+    - name: Build Catalyst dialects
+      run:
+        cmake -S mlir -B /catalyst/quantum-build -G Ninja \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DLLVM_ENABLE_ASSERTIONS=ON \
+          -DQUANTUM_ENABLE_BINDINGS_PYTHON=ON \
+          -DPython3_EXECUTABLE=/usr/bin/python3 \
+          -DPython3_NumPy_INCLUDE_DIRS=/opt/_internal/cpython${{ matrix.python_version.major_minor }}/lib/python${{ matrix.python_version.major_minor }}/site-packages/numpy/core/include \
+          -DMLIR_DIR=/catalyst/llvm-build/lib/cmake/mlir \
+          -DMHLO_DIR=/catalyst/mhlo-build/lib/cmake/mlir-hlo \
+          -DMHLO_BINARY_DIR=/catalyst/mhlo-build/bin \
+          -DEnzyme_DIR=/catalyst/enzyme-build \
+          -DENZYME_SRC_DIR=/catalyst/mlir/Enzyme \
+          -DLLVM_ENABLE_ZLIB=FORCE_ON \
+          -DLLVM_ENABLE_ZSTD=OFF \
+          -DLLVM_ENABLE_LLD=ON \
+          -DLLVM_DIR=/catalyst/llvm-build/lib/cmake/llvm
+        cmake --build /catalyst/quantum-build --target check-dialects catalyst-cli
+
+    - name: Build wheel
+      run: |
+        PYTHON=python${{ matrix.python_version }} \
+        LLVM_BUILD_DIR="$GITHUB_WORKSPACE/llvm-build" \
+        MHLO_BUILD_DIR="$GITHUB_WORKSPACE/mhlo-build" \
+        DIALECTS_BUILD_DIR="$GITHUB_WORKSPACE/quantum-build" \
+        RT_BUILD_DIR="$GITHUB_WORKSPACE/runtime-build" \
+        OQC_BUILD_DIR="$GITHUB_WORKSPACE/oqc-build" \
+        ENZYME_BUILD_DIR="$GITHUB_WORKSPACE/enzyme-build" \
+        make wheel
+
+    - name: Repair wheel using auditwheel
+      run: |
+        # exclude libopenblas as we rely on the openblas/lapack library shipped by scipy
+        auditwheel repair dist/*.whl -w ./wheel --no-update-tags --exclude libopenblasp-r0-23e5df77.3.21.dev.so
 
     - name: Upload Wheel Artifact
       uses: actions/upload-artifact@v4
