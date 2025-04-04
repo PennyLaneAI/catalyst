@@ -247,7 +247,7 @@ jobs:
       if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
       run: |
         export PATH=$GITHUB_WORKSPACE/llvm-build/bin:$PATH
-        cmake -S /mlir/Enzyme/enzyme -B $GITHUB_WORKSPACE/enzyme-build -G Ninja \
+        cmake -S /mlir/Enzyme -B $GITHUB_WORKSPACE/enzyme-build -G Ninja \
           -DCMAKE_BUILD_TYPE=Release \
           -DLLVM_DIR=$GITHUB_WORKSPACE/llvm-build/lib/cmake/llvm \
           -DENZYME_STATIC_LIB=ON \
