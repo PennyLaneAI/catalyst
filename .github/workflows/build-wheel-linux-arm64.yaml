@@ -155,7 +155,7 @@ jobs:
         PYTHON_BINS=$(find /opt/_internal/cpython-${{ matrix.python_version.major_minor }}.*/bin -maxdepth 1 -type d | tr '\n' ':' | sed 's/:$//')
         echo $PYTHON_BINS >> $GITHUB_PATH
 
-    # - name: Build LLVM / MLIR
+    # - name: Build LLVM / MLIR old
     #   if: steps.cache-llvm-build.outputs.cache-hit != 'true'
     #   run: |
     #     set -x
@@ -166,38 +166,64 @@ jobs:
     #         -v `pwd`:/catalyst \
     #         -i ${{ matrix.container_img }} \
     #         bash /catalyst/.github/workflows/scripts/linux_arm64/rh8/build_llvm.sh $GCC_VERSION ${{ matrix.python_version.major_minor }} ${{ matrix.python_version.patch }} ${{ matrix.python_version.package }}
-    - name: Build LLVM / MLIR
-      if: steps.cache-llvm-build.outputs.cache-hit != 'true'
-      run: |
-        export PATH=$GITHUB_WORKSPACE/llvm-build/bin:$PATH
-        PYTHON=$(which python${{ matrix.python_version.major_minor }}) \
-        C_COMPILER=$(which gcc) \
-        CXX_COMPILER=$(which g++) \
-        LLVM_BUILD_DIR="$GITHUB_WORKSPACE/llvm-build" \
-        LLVM_PROJECTS="lld;mlir" \
-        LLVM_TARGETS="lld check-mlir" \
-        ENABLE_ZLIB=FORCE_ON \
-        ENABLE_LLD=OFF \
-        make llvm
+    ################ UNCOMMENT ######################
+    # - name: Build LLVM / MLIR
+    #   if: steps.cache-llvm-build.outputs.cache-hit != 'true'
+    #   run: |
+    #     export PATH=$GITHUB_WORKSPACE/llvm-build/bin:$PATH
+    #     PYTHON=$(which python${{ matrix.python_version.major_minor }}) \
+    #     C_COMPILER=$(which gcc) \
+    #     CXX_COMPILER=$(which g++) \
+    #     LLVM_BUILD_DIR="$GITHUB_WORKSPACE/llvm-build" \
+    #     LLVM_PROJECTS="lld;mlir" \
+    #     LLVM_TARGETS="lld check-mlir" \
+    #     ENABLE_ZLIB=FORCE_ON \
+    #     ENABLE_LLD=OFF \
+    #     make llvm
 
-    - name: Save LLVM Build
-      id: save-llvm-build
-      if: steps.cache-llvm-build.outputs.cache-hit != 'true'
-      uses: actions/cache/save@v4
-      with:
-        path: ${{ github.workspace }}/llvm-build
-        key: ${{ matrix.container_name }}-llvm-${{ needs.constants.outputs.llvm_version }}-wheel-build
+    # - name: Save LLVM Build
+    #   id: save-llvm-build
+    #   if: steps.cache-llvm-build.outputs.cache-hit != 'true'
+    #   uses: actions/cache/save@v4
+    #   with:
+    #     path: ${{ github.workspace }}/llvm-build
+    #     key: ${{ matrix.container_name }}-llvm-${{ needs.constants.outputs.llvm_version }}-wheel-build
+
+    # - name: Build MHLO Dialect
+    #   if: steps.cache-mhlo-build.outputs.cache-hit != 'true'
+    #   run: |
+    #     set -x
+    #     export GCC_VERSION=13
+    #     docker run --rm --platform linux/aarch64 \
+    #         -v /var/run/docker.sock:/var/run/docker.sock \
+    #         -v `pwd`:/catalyst \
+    #         -i ${{ matrix.container_img }} \
+    #         bash /catalyst/.github/workflows/scripts/linux_arm64/rh8/build_mhlo.sh $GCC_VERSION ${{ matrix.python_version.major_minor }} ${{ matrix.python_version.patch }} ${{ matrix.python_version.package }}
 
     - name: Build MHLO Dialect
       if: steps.cache-mhlo-build.outputs.cache-hit != 'true'
+      # building with LLD is a strong requirement for mhlo
+      env:
+        GCC_VERSION: "13"
       run: |
-        set -x
-        export GCC_VERSION=13
-        docker run --rm --platform linux/aarch64 \
-            -v /var/run/docker.sock:/var/run/docker.sock \
-            -v `pwd`:/catalyst \
-            -i ${{ matrix.container_img }} \
-            bash /catalyst/.github/workflows/scripts/linux_arm64/rh8/build_mhlo.sh $GCC_VERSION ${{ matrix.python_version.major_minor }} ${{ matrix.python_version.patch }} ${{ matrix.python_version.package }}
+        export PATH=$GITHUB_WORKSPACE/llvm-build/bin:$PATH
+
+        export TARGET_FILE=mlir/mlir-hlo/mhlo/transforms/CMakeLists.txt
+        export PATCH_FILE=mlir/patches/mhlo-Add-PassesIncGen-in-transforms-CMakeList.patch
+        if patch --dry-run -p1 -N $TARGET_FILE $PATCH_FILE > /dev/null 2>&1; then patch -p1 $TARGET_FILE $PATCH_FILE; fi
+
+        cmake -S mlir/mlir-hlo -B $GITHUB_WORKSPACE/mhlo-build -G Ninja \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DLLVM_ENABLE_ASSERTIONS=ON \
+              -DMLIR_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir" \
+              -DPython3_EXECUTABLE=$(which python${{ matrix.python_version.major_minor }}) \
+              -DLLVM_ENABLE_ZLIB=FORCE_ON \
+              -DLLVM_ENABLE_ZSTD=OFF \
+              -DCMAKE_CXX_VISIBILITY_PRESET=default \
+              -DLLVM_ENABLE_LLD=ON
+
+        LIT_FILTER_OUT="chlo_legalize_to_mhlo" cmake --build $GITHUB_WORKSPACE/mhlo-build --target check-mlir-hlo
+
 
     - name: Save MHLO Build
       id: save-mhlo-build
@@ -207,16 +233,29 @@ jobs:
         path: ${{ github.workspace }}/mhlo-build
         key: ${{ matrix.container_name }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-wheel-build
 
+    # - name: Build Enzyme
+    #   if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
+    #   run: |
+    #     set -x
+    #     export GCC_VERSION=13
+    #     docker run --rm --platform linux/aarch64 \
+    #         -v /var/run/docker.sock:/var/run/docker.sock \
+    #         -v `pwd`:/catalyst \
+    #         -i ${{ matrix.container_img }} \
+    #         bash /catalyst/.github/workflows/scripts/linux_arm64/rh8/build_enzyme.sh $GCC_VERSION ${{ matrix.python_version.major_minor }} ${{ matrix.python_version.patch }} ${{ matrix.python_version.package }}
     - name: Build Enzyme
       if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
       run: |
-        set -x
-        export GCC_VERSION=13
-        docker run --rm --platform linux/aarch64 \
-            -v /var/run/docker.sock:/var/run/docker.sock \
-            -v `pwd`:/catalyst \
-            -i ${{ matrix.container_img }} \
-            bash /catalyst/.github/workflows/scripts/linux_arm64/rh8/build_enzyme.sh $GCC_VERSION ${{ matrix.python_version.major_minor }} ${{ matrix.python_version.patch }} ${{ matrix.python_version.package }}
+        export PATH=$GITHUB_WORKSPACE/llvm-build/bin:$PATH
+        cmake -S /catalyst/mlir/Enzyme/enzyme -B $GITHUB_WORKSPACE/enzyme-build -G Ninja \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DLLVM_DIR=$GITHUB_WORKSPACE/llvm-build/lib/cmake/llvm \
+          -DENZYME_STATIC_LIB=ON \
+          -DCMAKE_CXX_VISIBILITY_PRESET=default \
+          -DCMAKE_CXX_FLAGS="-fuse-ld=lld"
+
+        cmake --build /catalyst/enzyme-build --target EnzymeStatic-19
+
 
     - name: Save Enzyme Build
       id: save-enzyme-build
