@@ -384,6 +384,19 @@ class TestIntegration:
         assert hasattr(circuit.user_function, "ag_unconverted")
         assert jnp.allclose(circuit(), jnp.array([1.0, 0.0]))
 
+    def test_adjoint_with_operation_as_argument(self):
+        """Test that qml.adjoint works when an operation is passed as argument."""
+        dev = qml.device("lightning.qubit", wires=2)
+
+        @qml.qjit(autograph=True)
+        @qml.qnode(dev)
+        def circuit():
+            qml.adjoint(qml.PauliX(0))
+            return qml.probs(wires=0)
+
+        assert hasattr(circuit.user_function, "ag_unconverted")
+        assert jnp.allclose(circuit(), jnp.array([0.0, 1.0]))
+
     def test_tape_transform(self):
         """Test if tape transform is applied when autograph is on."""
 
