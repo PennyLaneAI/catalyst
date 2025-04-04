@@ -20,13 +20,12 @@ import copy
 import functools
 import operator
 import warnings
-from collections.abc import Iterable
 from typing import Any, Callable, Iterator, SupportsIndex, Tuple, Union
 
 import jax
 import jax.numpy as jnp
 import pennylane as qml
-from jax.tree_util import all_leaves, tree_flatten
+from jax.tree_util import tree_flatten
 from malt.core import config as ag_config
 from malt.impl import api as ag_api
 from malt.impl.api import converted_call as ag_converted_call
