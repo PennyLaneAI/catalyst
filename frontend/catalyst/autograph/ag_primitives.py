@@ -52,6 +52,8 @@ __all__ = [
     "update_item_with_op",
 ]
 
+_pytree_types = [list, tuple, dict]
+
 
 def get_program_length(reference_tracers):
     """Get the current number of instructions of the quantum and classical program."""
@@ -159,21 +161,19 @@ def assert_iteration_inputs(inputs, symbol_names):
                 f"Please ensure '{inp}' is initialized with a value before entering the loop."
             )
 
-        # Convert lists to numpy arrays so they can be "abstractified" by Jax
-        if type(inp) == list:
-            inp = jnp.array(inp)
-
-        try:
-            jax.api_util.shaped_abstractify(inp)
-        except TypeError as e:
-            raise AutoGraphError(
-                f"The variable '{symbol_names[i]}' was initialized with type {type(inp)}, "
-                "which is not compatible with JAX. Typically, this is the case for non-numeric "
-                "values.\n"
-                "You may still use such a variable as a constant inside a loop, but it cannot "
-                "be updated from one iteration to the next, or accessed outside the loop scope "
-                "if it was defined inside of it."
-            ) from e
+        # Skip check for Pytree objects
+        if type(inp) not in _pytree_types:
+            try:
+                jax.api_util.shaped_abstractify(inp)
+            except TypeError as e:
+                raise AutoGraphError(
+                    f"The variable '{symbol_names[i]}' was initialized with type {type(inp)}, "
+                    "which is not compatible with JAX. Typically, this is the case for non-numeric "
+                    "values.\n"
+                    "You may still use such a variable as a constant inside a loop, but it cannot "
+                    "be updated from one iteration to the next, or accessed outside the loop scope "
+                    "if it was defined inside of it."
+                ) from e
 
 
 def assert_iteration_results(inputs, outputs, symbol_names):
@@ -183,19 +183,17 @@ def assert_iteration_results(inputs, outputs, symbol_names):
     """
 
     for i, (inp, out) in enumerate(zip(inputs, outputs)):
-        # Convert lists to numpy arrays so they can be "abstractified" by Jax
-        if type(inp) == list:
-            inp = jnp.array(inp)
-        if type(out) == list:
-            out = jnp.array(out)
-
-        inp_t, out_t = jax.api_util.shaped_abstractify(inp), jax.api_util.shaped_abstractify(out)
-        if inp_t.dtype != out_t.dtype or inp_t.shape != out_t.shape:
-            raise AutoGraphError(
-                f"The variable '{symbol_names[i]}' was initialized with the wrong type, or you may "
-                f"be trying to change its type from one iteration to the next. "
-                f"Expected: {out_t}, Got: {inp_t}"
+        # Skip check for Pytree objects
+        if type(inp) not in _pytree_types and type(out) not in _pytree_types:
+            inp_t, out_t = jax.api_util.shaped_abstractify(inp), jax.api_util.shaped_abstractify(
+                out
             )
+            if inp_t.dtype != out_t.dtype or inp_t.shape != out_t.shape:
+                raise AutoGraphError(
+                    f"The variable '{symbol_names[i]}' was initialized with the wrong type, or you may "
+                    f"be trying to change its type from one iteration to the next. "
+                    f"Expected: {out_t}, Got: {inp_t}"
+                )
 
 
 def _call_catalyst_for(

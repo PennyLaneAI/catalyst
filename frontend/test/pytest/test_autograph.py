@@ -2290,6 +2290,70 @@ class TestJaxIndexOperatorUpdate:
             except:
                 assert False, "This warning should not show up again"
 
+    def test_iterating_tuples_inside_a_loop(self):
+        """Test support for iterating tuples inside a loop."""
+
+        def updateTuple(x):
+            return (x[0] + 1, x[1] + 2)
+
+        @qjit(autograph=True)
+        def fn(x):
+            # pylint: disable=unused-variable
+            for i in range(4):
+                x = updateTuple(x)
+            return x
+
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "error", "Tracing of an AutoGraph converted for loop failed with an exception"
+            )
+            try:
+                assert jnp.allclose(jnp.array(fn([1, 2])), jnp.array([5, 10]))
+            # pylint: disable=bare-except
+            except:
+                assert False, "This warning should not show up again"
+
+    def test_iterating_dictionaries_inside_a_loop(self):
+        """Test support for iterating dictionaries inside a loop."""
+
+        def updateDict(x):
+            return {0: x[0] + 1, 1: x[1] + 2}
+
+        @qjit(autograph=True)
+        def fn(x):
+            # pylint: disable=unused-variable
+            for i in range(4):
+                x = updateDict(x)
+            return x
+
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "error", "Tracing of an AutoGraph converted for loop failed with an exception"
+            )
+            try:
+                assert jnp.allclose(jnp.array(list(fn({0: 1, 1: 2}).values())), jnp.array([5, 10]))
+            # pylint: disable=bare-except
+            except:
+                assert False, "This warning should not show up again"
+
+    def test_unsupported_iterating_sets_inside_a_loop(self):
+        """Test unsupported case for iterating sets inside a loop.
+        Sets cannot be properly flattened.
+        """
+
+        def updateSet(x):
+            return {x[0] + 1, x[1] + 2}
+
+        @qjit(autograph=True)
+        def fn(x):
+            # pylint: disable=unused-variable
+            for i in range(4):
+                x = updateSet(x)
+            return x
+
+        with pytest.raises(TypeError, match="Cannot interpret value of type"):
+            fn({1, 2})
+
     def test_unsupported_cases(self):
         """Test that TypeError is raised in unsupported cases."""
 

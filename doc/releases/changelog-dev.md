@@ -254,7 +254,7 @@
   [(#1599)](https://github.com/PennyLaneAI/catalyst/pull/1599)
 
 * Fixes an issue ([(#896)](https://github.com/PennyLaneAI/catalyst/issues/896)) where using
-  lists inside a loop with autograph causes falling back to python.
+  lists, tuples or dictionaries inside a loop with autograph causes falling back to python.
   [(#1601)](https://github.com/PennyLaneAI/catalyst/pull/1601)
 
 <h3>Internal changes ⚙️</h3>
