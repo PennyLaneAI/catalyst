@@ -20,6 +20,7 @@ from typing import Iterable, Sequence
 import jax.numpy as jnp
 import numpy as np
 import pennylane as qml
+import pennylane.errors
 import pytest
 from jax.tree_util import tree_flatten
 from pennylane.transforms.dynamic_one_shot import fill_in_value
@@ -496,7 +497,7 @@ class TestDynamicOneShotIntegration:
         dev = qml.device(backend, wires=1, shots=None)
 
         with pytest.raises(
-            qml.QuantumFunctionError,
+            pennylane.errors.QuantumFunctionError,
             match="dynamic_one_shot is only supported with finite shots.",
         ):
 
