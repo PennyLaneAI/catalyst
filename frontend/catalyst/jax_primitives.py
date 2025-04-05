@@ -510,7 +510,7 @@ def _grad_lowering(ctx, *args, jaxpr, fn, grad_params):
     new_argnums = [num + offset for num in argnums]
     argnum_numpy = np.array(new_argnums)
     diffArgIndices = ir.DenseIntElementsAttr.get(argnum_numpy)
-    func_op = lower_jaxpr(ctx, jaxpr)
+    func_op = lower_jaxpr(ctx, jaxpr, (method, h, *argnums))
 
     symbol_ref = get_symbolref(ctx, func_op)
     output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
@@ -585,7 +585,7 @@ def _value_and_grad_lowering(ctx, *args, jaxpr, fn, grad_params):
     val_result_types = flat_output_types[: len(flat_output_types) - len(argnums)]
     gradient_result_types = flat_output_types[len(flat_output_types) - len(argnums) :]
 
-    func_op = lower_jaxpr(ctx, jaxpr)
+    func_op = lower_jaxpr(ctx, jaxpr, (method, h, *argnums))
 
     symbol_ref = get_symbolref(ctx, func_op)
     return ValueAndGradOp(
@@ -635,7 +635,7 @@ def _jvp_lowering(ctx, *args, jaxpr, fn, grad_params):
     func_args = consts_and_args[: len(func_call_jaxpr.invars)]
     tang_args = consts_and_args[len(func_call_jaxpr.invars) :]
 
-    func_op = lower_jaxpr(ctx, jaxpr)
+    func_op = lower_jaxpr(ctx, jaxpr, (method, h, *argnums))
 
     assert (
         len(flat_output_types) % 2 == 0
@@ -688,7 +688,7 @@ def _vjp_lowering(ctx, *args, jaxpr, fn, grad_params):
     func_result_types = flat_output_types[: len(flat_output_types) - len(argnums)]
     vjp_result_types = flat_output_types[len(flat_output_types) - len(argnums) :]
 
-    func_op = lower_jaxpr(ctx, jaxpr)
+    func_op = lower_jaxpr(ctx, jaxpr, (method, h, *argnums))
 
     symbol_ref = get_symbolref(ctx, func_op)
     return VJPOp(
