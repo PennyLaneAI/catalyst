@@ -32,7 +32,13 @@ from jax.tree_util import tree_flatten, tree_unflatten
 import catalyst
 from catalyst.autograph import run_autograph
 from catalyst.compiled_functions import CompilationCache, CompiledFunction
-from catalyst.compiler import CompileOptions, Compiler, canonicalize, to_llvmir
+from catalyst.compiler import (
+    CompileOptions,
+    Compiler,
+    canonicalize,
+    to_llvmir,
+    to_mlir_opt,
+)
 from catalyst.debug.instruments import instrument
 from catalyst.from_plxpr import trace_from_pennylane
 from catalyst.jax_tracer import lower_jaxpr_to_mlir, trace_to_jaxpr
@@ -114,8 +120,8 @@ def qjit(
         target (str): the compilation target
         keep_intermediate (bool): Whether or not to store the intermediate files throughout the
             compilation. If ``True``, intermediate representations are available via the
-            :attr:`~.QJIT.mlir`, :attr:`~.QJIT.jaxpr`, and :attr:`~.QJIT.qir`, representing
-            different stages in the optimization process.
+            :attr:`~.QJIT.mlir`, :attr:`~.QJIT.mlir_opt`, :attr:`~.QJIT.jaxpr`,
+            and :attr:`~.QJIT.qir`, representing different stages in the optimization process.
         verbose (bool): If ``True``, the tools and flags used by Catalyst behind the scenes are
             printed out.
         logfile (Optional[TextIOWrapper]): File object to write verbose messages to (default -
@@ -515,6 +521,14 @@ class QJIT(CatalystCallable):
             return None
 
         return canonicalize(stdin=str(self.mlir_module))
+
+    @property
+    def mlir_opt(self):
+        """obtain the MLIR representation after optimization"""
+        if not self.mlir_module:
+            return None
+
+        return to_mlir_opt(stdin=str(self.mlir_module), options=self.compile_options)
 
     @debug_logger
     def __call__(self, *args, **kwargs):

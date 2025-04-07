@@ -183,6 +183,7 @@
     [(#1513)](https://github.com/PennyLaneAI/catalyst/pull/1513)
   - Remove unnecessary I/O.
     [(#1514)](https://github.com/PennyLaneAI/catalyst/pull/1514)
+    [(#1602)](https://github.com/PennyLaneAI/catalyst/pull/1602)
   - Sort improvements to reduce complexity and memory.
     [(#1524)](https://github.com/PennyLaneAI/catalyst/pull/1524)
   - Lazy IR canonicalization and LLVMIR textual generation.
@@ -212,6 +213,18 @@
   This includes `probs(), state(), sample(), counts()`.
     [(#1565)](https://github.com/PennyLaneAI/catalyst/pull/1565)
 
+  - In mlir, `ProbsOp, StateOp, SampleOp, CountsOp` ops now carry an optional new SSA operand for their return shapes.
+    This operand is used during bufferization pass to allocate result memrefs dynamically.
+    A new verification is added to check that this new operand and static return shapes cannot coexist.
+    [(#1574)](https://github.com/PennyLaneAI/catalyst/pull/1574)
+
+* Added `qjit.mlir_opt` property to access the optimized MLIR representation of a compiled function.
+  [(#1579)](https://github.com/PennyLaneAI/catalyst/pull/1579)
+
+* Improve error message for ZNE.
+  [(#1603)](https://github.com/PennyLaneAI/catalyst/pull/1603)
+
+
 <h3>Breaking changes 💔</h3>
 
 <h3>Deprecations 👋</h3>
@@ -236,6 +249,9 @@
 * Fixes an issue ([(#1547)](https://github.com/PennyLaneAI/catalyst/issues/1547)) where using
   chained catalyst passe decorators causes a crash.
   [(#1576)](https://github.com/PennyLaneAI/catalyst/pull/1576)
+
+* Autographs and catalyst pipeline fix.
+  [(#1599)](https://github.com/PennyLaneAI/catalyst/pull/1599)
 
 <h3>Internal changes ⚙️</h3>
 
@@ -307,6 +323,9 @@
   [(#1229)](https://github.com/PennyLaneAI/catalyst/pull/1229)
 
 <h3>Documentation 📝</h3>
+
+* Added more details to Jax integration documentation regarding the use of `.at` with multiple indices.
+  [(#1595)](https://github.com/PennyLaneAI/catalyst/pull/1595)
 
 <h3>Contributors ✍️</h3>
 

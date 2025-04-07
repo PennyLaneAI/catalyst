@@ -23,7 +23,7 @@ import pytest
 from jax.tree_util import register_pytree_node_class
 
 from catalyst import debug, for_loop, qjit, value_and_grad
-from catalyst.compiler import _options_to_cli_flags, to_llvmir
+from catalyst.compiler import _options_to_cli_flags, to_llvmir, to_mlir_opt
 from catalyst.debug import (
     compile_executable,
     get_cmain,
@@ -533,6 +533,29 @@ class TestOptionsToCliFlags:
         """
         ).strip()
         # pylint: enable=line-too-long
+        assert expected in observed
+
+    def test_no_options_to_mlir_opt(self):
+        """Test that we can lower to mlir opt"""
+        mlir = """
+        module {
+            func.func @foo() {
+                %c = stablehlo.constant dense<0> : tensor<i64>
+                return 
+            }
+        }
+        """
+
+        observed = to_mlir_opt(stdin=mlir)
+        expected = textwrap.dedent(
+            """
+        module {
+          llvm.func @foo() {
+            llvm.return
+          }
+        }
+        """
+        ).strip()
         assert expected in observed
 
 

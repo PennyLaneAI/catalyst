@@ -26,9 +26,8 @@ running -apply-transform-sequence.
 
 import pennylane as qml
 from utils import print_jaxpr, print_mlir
-from utils import qjit_for_tests as qjit
 
-from catalyst import pipeline
+from catalyst import pipeline, qjit
 from catalyst.debug import get_compilation_stage
 from catalyst.passes import apply_pass, cancel_inverses, merge_rotations
 
@@ -534,6 +533,56 @@ def test_pipeline_with_autograph():
 
 
 test_pipeline_with_autograph()
+
+
+def test_single_pass_for_loop_autograph():
+    """
+    Test a peephole optimization where the code is transformed
+    """
+
+    @qjit(autograph=True, target="mlir")
+    # CHECK: transform.named_sequence @__transform_main
+    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "merge-rotations" to {{%.+}}
+    # CHECK-NEXT: transform.yield
+    @merge_rotations
+    @qml.qnode(qml.device("null.qubit", wires=1))
+    def circuit(n_iter: int):
+        for _ in range(n_iter):
+            qml.RX(0.1, wires=0)
+            qml.T(0)
+            qml.RX(0.2, wires=0)
+        return qml.expval(qml.PauliZ(0))
+
+    print(circuit.mlir)
+
+
+test_single_pass_for_loop_autograph()
+
+
+def test_stacked_pass_for_loop_autograph():
+    """
+    Test a peephole optimization where the code is transformed
+    """
+
+    @qjit(autograph=True, target="mlir")
+    # CHECK: transform.named_sequence @__transform_main
+    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "remove-chained-self-inverse" to {{%.+}}
+    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "merge-rotations" to {{%.+}}
+    # CHECK-NEXT: transform.yield
+    @cancel_inverses
+    @merge_rotations
+    @qml.qnode(qml.device("null.qubit", wires=1))
+    def circuit(n_iter: int):
+        for _ in range(n_iter):
+            qml.RX(0.1, wires=0)
+            qml.T(0)
+            qml.RX(0.2, wires=0)
+        return qml.expval(qml.PauliZ(0))
+
+    print(circuit.mlir)
+
+
+test_stacked_pass_for_loop_autograph()
 
 #
 # cancel_inverses

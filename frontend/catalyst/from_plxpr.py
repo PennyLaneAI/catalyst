@@ -45,7 +45,6 @@ from catalyst.device import (
     get_device_shots,
 )
 from catalyst.jax_extras import jaxpr_pad_consts, make_jaxpr2, transient_jax_config
-from catalyst.jax_extras.tracing import bind_flexible_primitive
 from catalyst.jax_primitives import (
     AbstractQbit,
     AbstractQreg,
@@ -379,17 +378,19 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
         )
 
         prim = measurement_map[type(measurement)]
+        assert (
+            prim is not counts_p
+        ), "CountsMP returns a dictionary, which is not compatible with capture"
         if prim is sample_p:
             num_qubits = len(measurement.wires) or len(self._device.wires)
-            mval = bind_flexible_primitive(
-                sample_p, {"shots": self._shots}, obs, num_qubits=num_qubits
-            )
-        elif prim is counts_p:
-            mval = bind_flexible_primitive(counts_p, {"shots": self._shots}, shape=shape)
+            sample_shape = (self._shots, num_qubits)
+            dyn_dims, static_shape = jax._src.lax.lax._extract_tracers_dyn_shape(sample_shape)
+            mval = sample_p.bind(obs, *dyn_dims, static_shape=tuple(static_shape))
         elif prim in {expval_p, var_p}:
             mval = prim.bind(obs, shape=shape)
         else:
-            mval = prim.bind(obs, shape=shape, shots=self._shots)
+            dyn_dims, static_shape = jax._src.lax.lax._extract_tracers_dyn_shape(shape)
+            mval = prim.bind(obs, *dyn_dims, static_shape=tuple(static_shape))
 
         # sample_p returns floats, so we need to converted it back to the expected integers here
         if dtype != mval.dtype:

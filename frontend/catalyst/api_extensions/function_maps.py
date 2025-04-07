@@ -29,6 +29,7 @@ import numpy as np
 from jax._src.tree_util import tree_flatten, tree_leaves, tree_structure, tree_unflatten
 
 from catalyst.api_extensions.control_flow import for_loop
+from catalyst.jax_extras import make_jaxpr2
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.tracing.type_signatures import get_stripped_signature
 from catalyst.utils.callables import CatalystCallable
@@ -226,9 +227,9 @@ class VmapCallable(CatalystCallable):
         fn_args = tree_unflatten(args_tree, fn_args_flat)
 
         # Run 'fn' one time to get output-shape
-        _, shape = jax.make_jaxpr(self.fn, return_shape=True)(*fn_args, **kwargs)
-        shapes, init_result_tree = tree_flatten(shape)
-        init_result_flat = [jnp.zeros(shape=shape.shape, dtype=shape.dtype) for shape in shapes]
+        _, shapes, init_result_tree = make_jaxpr2(self.fn)(*fn_args, **kwargs)
+
+        init_result_flat = [jnp.zeros(shape=shape.shape, dtype=shape.dtype) for shape, _ in shapes]
         init_result = tree_unflatten(init_result_tree, init_result_flat)
 
         # Check the validity of the output w.r.t. out_axes
