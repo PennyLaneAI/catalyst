@@ -137,7 +137,7 @@ jobs:
         key: ${{ matrix.container_name }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-wheel-build
         lookup-only: True
 
-    - name: Install dependencies (AlmaLinux)
+    - name: Install dependencies
       if: |
         steps.cache-llvm-build.outputs.cache-hit != 'true' ||
         steps.cache-mhlo-build.outputs.cache-hit != 'true' ||
@@ -283,6 +283,18 @@ jobs:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
 
+    - name: Install Dependencies
+      run: |
+        sudo apt-get install -y cmake ninja-build clang lld libomp-dev
+        echo "site_packages_dir=$(python -c 'import sysconfig; print(sysconfig.get_path("platlib"))')" >> $GITHUB_OUTPUT         
+
+    - name: Install Dependencies (Python)
+      run: |
+        python${{ matrix.python_version.major_minor }} -m pip install numpy nanobind pybind11 PyYAML cmake ninja
+        # Add cmake and ninja to the PATH env var
+        PYTHON_BINS=$(find /opt/_internal/cpython-${{ matrix.python_version.major_minor }}.*/bin -maxdepth 1 -type d | tr '\n' ':' | sed 's/:$//')
+        echo $PYTHON_BINS >> $GITHUB_PATH
+        
     - name: Setup Runner Environment
       id: setup_env
       uses: ./.github/workflows/utils/setup_self_hosted_macos_env_linux_arm64
@@ -350,7 +362,7 @@ jobs:
     #         -v `pwd`:/catalyst \
     #         -i ${{ matrix.container_img }} \
     #         bash /catalyst/.github/workflows/scripts/linux_arm64/rh8/build_catalyst.sh $GCC_VERSION ${{ matrix.python_version.major_minor }} ${{ matrix.python_version.patch }} ${{ matrix.python_version.package }} ${{ matrix.python_version.alternative }}
-# Build Catalyst runtime
+    # Build Catalyst runtime
 
     # - name: Build Dependencies
     #   run: |
