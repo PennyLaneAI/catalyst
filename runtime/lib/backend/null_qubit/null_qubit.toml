@@ -46,8 +46,9 @@ PauliX                 = { properties = [ "invertible", "controllable", "differe
 PauliY                 = { properties = [ "invertible", "controllable", "differentiable" ] }
 PauliZ                 = { properties = [ "invertible", "controllable", "differentiable" ] }
 PhaseShift             = { properties = [ "invertible", "controllable", "differentiable" ] }
-QubitUnitary           = { properties = [ "invertible", "controllable"                   ] }
-Rot                    = { properties = [ "invertible", "controllable"                   ] }
+PSWAP                  = { properties = [ "invertible", "controllable", "differentiable" ] }
+QubitUnitary           = { properties = [ "invertible", "controllable",                  ] }
+Rot                    = { properties = [ "invertible", "controllable",                  ] }
 RX                     = { properties = [ "invertible", "controllable", "differentiable" ] }
 RY                     = { properties = [ "invertible", "controllable", "differentiable" ] }
 RZ                     = { properties = [ "invertible", "controllable", "differentiable" ] }
@@ -58,6 +59,8 @@ S                      = { properties = [ "invertible", "controllable", "differe
 SWAP                   = { properties = [ "invertible", "controllable", "differentiable" ] }
 Toffoli                = { properties = [ "invertible",                 "differentiable" ] }
 T                      = { properties = [ "invertible", "controllable", "differentiable" ] }
+SX                     = { properties = [ "invertible", "controllable", "differentiable" ] }
+PCPhase                = { properties = [ "invertible", "controllable"                   ] }
 
 # Observables supported by the device
 [operators.observables]
@@ -68,7 +71,6 @@ PauliY                 = { properties = [ "differentiable" ] }
 PauliZ                 = { properties = [ "differentiable" ] }
 Hadamard               = { properties = [ "differentiable" ] }
 Hermitian              = { properties = [ "differentiable" ] }
-Hamiltonian            = { properties = [ "differentiable" ] }
 SparseHamiltonian      = { properties = [ "differentiable" ] }
 Projector              = { properties = [ "differentiable" ] }
 Sum                    = { properties = [ "differentiable" ] }
@@ -86,19 +88,22 @@ StateMP                = { conditions = [ "analytic" ] }
 SampleMP               = { conditions = [ "finiteshots" ] }
 CountsMP               = { conditions = [ "finiteshots" ] }
 
+# Additional support that the device may provide. All accepted fields and their
+# default values are listed below. Any fields missing from the TOML file will be
+# set to their default values.
 [compilation]
 
-# If the device is compatible with qjit
+# Whether the device is compatible with qjit.
 qjit_compatible = true
-# If the device requires run time generation of the quantum circuit.
+# Whether the device requires run time generation of the quantum circuit.
 runtime_code_generation = false
-# If the device supports mid-circuit measurements natively
+# The methods of handling mid-circuit measurements that the device supports, e.g.,
+# "one-shot", "device", "tree-traversal", etc. An empty list indicates that the device
+# does not support mid-circuit measurements.
 supported_mcm_methods = [ "device", "one-shot" ]
-# This field is currently unchecked, but it is reserved for the purpose of
-# determining if the device supports dynamic qubit allocation/deallocation.
+# Whether the device supports dynamic qubit allocation/deallocation.
 dynamic_qubit_management = false
-# whether the device can support non-commuting measurements together
-# in a single execution
+# Whether simultaneous measurements of non-commuting observables is supported.
 non_commuting_observables = true
-# Whether the device supports (arbitrary) initial state preparation.
+# Whether the device supports initial state preparation.
 initial_state_prep = true
