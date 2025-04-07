@@ -285,7 +285,7 @@ jobs:
 
     - name: Install Dependencies
       run: |
-        sudo apt-get install -y cmake ninja-build clang lld libomp-dev
+        sudo apt-get install -y cmake ninja-build clang lld libomp-dev openmpi-devel libzstd-devel gcc-toolset-12
         echo "site_packages_dir=$(python -c 'import sysconfig; print(sysconfig.get_path("platlib"))')" >> $GITHUB_OUTPUT         
 
     - name: Install Dependencies (Python)
@@ -294,7 +294,7 @@ jobs:
         # Add cmake and ninja to the PATH env var
         PYTHON_BINS=$(find /opt/_internal/cpython-${{ matrix.python_version.major_minor }}.*/bin -maxdepth 1 -type d | tr '\n' ':' | sed 's/:$//')
         echo $PYTHON_BINS >> $GITHUB_PATH
-        
+
     - name: Setup Runner Environment
       id: setup_env
       uses: ./.github/workflows/utils/setup_self_hosted_macos_env_linux_arm64
