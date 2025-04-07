@@ -285,7 +285,7 @@ jobs:
 
     - name: Install Dependencies
       run: |
-        sudo apt-get install -y cmake ninja-build clang lld libomp-dev openmpi-devel libzstd-devel gcc-toolset-12
+        sudo apt-get install -y cmake ninja-build clang lld libomp-dev 
         echo "site_packages_dir=$(python -c 'import sysconfig; print(sysconfig.get_path("platlib"))')" >> $GITHUB_OUTPUT         
 
     - name: Install Dependencies (Python)
