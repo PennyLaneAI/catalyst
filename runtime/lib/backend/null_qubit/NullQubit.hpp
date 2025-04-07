@@ -19,6 +19,7 @@
 #include <memory>
 #include <optional>
 #include <random>
+#include <unordered_map>
 #include <vector>
 
 #include "DataView.hpp"
@@ -26,7 +27,31 @@
 #include "QubitManager.hpp"
 #include "Types.h"
 
+// The delimited to print before and after the JSON representing resource usage.
+//   This is intended to make parsing the output easier.
+//   Ideally, at some point resource usage would be passed back through as an object, and printing at all would be unneeded.
+#define RESOURCE_PRINT_DELIMETER "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+
 namespace Catalyst::Runtime::Devices {
+
+// TODO: For PR reviewers: Is this a good place to put this function?
+// It is used to print the resource usage of the device in a pretty format.
+// It is not used anywhere else in the codebase, but it feels like more of a utils type function than anything that has to do with the device itself.
+template<class K, class V>
+void prettyPrint(const std::unordered_map<K, V> &map, size_t leadingSpaces = 0) {
+    std::cout << "{\n";
+    auto maplen = map.size();
+    for (const auto &pair : map) {
+        for (size_t i = 0; i < leadingSpaces + 2; ++i) {
+            std::cout << " ";
+        }
+        std::cout << "\"" << pair.first << "\": " << pair.second << (--maplen > 0? "," : "") << "\n";
+    }
+    for (size_t i = 0; i < leadingSpaces; ++i) {
+        std::cout << " ";
+    }
+    std::cout << "}";
+}
 
 /**
  * @brief struct API for a null backend quantum device.
@@ -40,13 +65,40 @@ namespace Catalyst::Runtime::Devices {
  *   of the device; these are used to implement Quantum Instruction Set (QIS) instructions.
  */
 struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
-    NullQubit(const std::string &kwargs = "{}") {}
-    ~NullQubit() = default; // LCOV_EXCL_LINE
+    NullQubit(const std::string &kwargs = "{}") {
+        auto device_kwargs = Catalyst::Runtime::parse_kwargs(kwargs);
+        if (device_kwargs.find("track_resources") != device_kwargs.end()) {
+            track_resources_ = device_kwargs["track_resources"] == "True";
+        }
+    }
+    ~NullQubit() {
+        if (this->track_resources_) {
+            PrintResourceUsage();
+        }
+    } // LCOV_EXCL_LINE
 
     NullQubit &operator=(const NullQubit &) = delete;
     NullQubit(const NullQubit &) = delete;
     NullQubit(NullQubit &&) = delete;
     NullQubit &operator=(NullQubit &&) = delete;
+
+
+    /**
+     * @brief Prints resources that would be used to execute this circuit as a JSON
+     */
+    void PrintResourceUsage()
+    {
+        std::cout << RESOURCE_PRINT_DELIMETER << std::endl;
+        std::cout << "{" << std::endl;
+        std::cout << "  \"num_qubits\": " << resource_data_["num_qubits"] << ",\n";
+        std::cout << "  \"num_gates\": " << resource_data_["num_gates"] << ",\n";
+        std::cout << "  \"gate_types\": ";
+        resource_data_.erase("num_gates");
+        resource_data_.erase("num_qubits");
+        prettyPrint(resource_data_, 2);
+        std::cout << "\n}" << std::endl;
+        std::cout << RESOURCE_PRINT_DELIMETER << std::endl;
+    }
 
     /**
      * @brief Doesn't Allocate a qubit.
@@ -56,6 +108,10 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     auto AllocateQubit() -> QubitIdType
     {
         num_qubits_++; // next_id
+        if (this->track_resources_) {
+            // Store the highest number of qubits allocated at any time since device creation
+            resource_data_["num_qubits"] = std::max(num_qubits_, resource_data_["num_qubits"]);
+        }
         return this->qubit_manager.Allocate(num_qubits_);
     }
 
@@ -189,6 +245,10 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
                         const std::vector<QubitIdType> &controlled_wires = {},
                         const std::vector<bool> &controlled_values = {})
     {
+        if (this->track_resources_) {
+            resource_data_["num_gates"]++;
+            resource_data_[name]++;
+        }
     }
 
     /**
@@ -200,6 +260,10 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
                          const std::vector<QubitIdType> &controlled_wires = {},
                          const std::vector<bool> &controlled_values = {})
     {
+        if (this->track_resources_) {
+            resource_data_["num_gates"]++;
+            resource_data_["QubitUnitary"]++;
+        }
     }
 
     /**
@@ -318,7 +382,9 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     }
 
   private:
+    bool track_resources_{false};
     std::size_t num_qubits_{0};
+    std::unordered_map<std::string, size_t> resource_data_;
     Catalyst::Runtime::QubitManager<QubitIdType, size_t> qubit_manager{};
 };
 } // namespace Catalyst::Runtime::Devices
