@@ -1162,7 +1162,7 @@ class TestNullQubitMeasurements:
 
     n_shots = 100
 
-    @pytest.mark.parametrize("n_qubits", [1, 2])
+    @pytest.mark.parametrize("n_qubits", [0, 1, 2])
     def test_nullq_sample(self, n_qubits):
         """Test qml.sample() on null.qubit device."""
 
@@ -1177,7 +1177,22 @@ class TestNullQubitMeasurements:
         observed = circuit_sample()
         assert np.array_equal(observed, expected)
 
-    @pytest.mark.parametrize("n_qubits", [1, 2])
+    def test_nullq_sample_per_wire(self):
+        """Test qml.sample() on null.qubit device, returning results per wire."""
+
+        @qjit
+        @qml.qnode(qml.device("null.qubit", wires=2, shots=self.n_shots))
+        def circuit_sample():
+            qml.Hadamard(wires=0)
+            qml.Hadamard(wires=1)
+            return qml.sample(wires=0), qml.sample(wires=1)
+
+        expected = np.zeros(shape=(self.n_shots, 1), dtype=np.int64)
+        observed_0, observed_1 = circuit_sample()
+        assert np.array_equal(observed_0, expected)
+        assert np.array_equal(observed_1, expected)
+
+    @pytest.mark.parametrize("n_qubits", [0, 1, 2])
     def test_nullq_counts(self, n_qubits):
         """Test qml.counts() on null.qubit device."""
 
@@ -1189,13 +1204,33 @@ class TestNullQubitMeasurements:
             return qml.counts()
 
         expected = [
-            np.zeros(shape=2**n_qubits, dtype=np.int64),
+            np.arange(0, 2**n_qubits, dtype=np.int64),
             np.zeros(shape=2**n_qubits, dtype=np.int64),
         ]
+        expected[1][0] = self.n_shots
         observed = circuit_counts()
         assert np.array_equal(observed, expected)
 
-    @pytest.mark.parametrize("n_qubits", [1, 2])
+    def test_nullq_counts_per_wire(self):
+        """Test qml.counts() on null.qubit device, returning results per wire."""
+
+        @qjit
+        @qml.qnode(qml.device("null.qubit", wires=2, shots=self.n_shots))
+        def circuit_counts():
+            qml.Hadamard(wires=0)
+            qml.Hadamard(wires=1)
+            return qml.counts(wires=0), qml.counts(wires=1)
+
+        expected = [
+            np.arange(0, 2, dtype=np.int64),
+            np.zeros(shape=2, dtype=np.int64),
+        ]
+        expected[1][0] = self.n_shots
+        observed_0, observed_1 = circuit_counts()
+        assert np.array_equal(observed_0, expected)
+        assert np.array_equal(observed_1, expected)
+
+    @pytest.mark.parametrize("n_qubits", [0, 1, 2])
     def test_nullq_probs(self, n_qubits):
         """Test qml.probs() on null.qubit device."""
 
@@ -1207,10 +1242,27 @@ class TestNullQubitMeasurements:
             return qml.probs()
 
         expected = np.zeros(shape=2**n_qubits, dtype=np.float64)
+        expected[0] = 1
         observed = circuit_probs()
         assert np.array_equal(observed, expected)
 
-    @pytest.mark.parametrize("n_qubits", [1, 2])
+    def test_nullq_probs_per_wire(self):
+        """Test qml.probs() on null.qubit device, returning results per wire."""
+
+        @qjit
+        @qml.qnode(qml.device("null.qubit", wires=2, shots=self.n_shots))
+        def circuit_probs():
+            qml.Hadamard(wires=0)
+            qml.Hadamard(wires=1)
+            return qml.probs(wires=0), qml.probs(wires=1)
+
+        expected = np.zeros(shape=2, dtype=np.float64)
+        expected[0] = 1
+        observed_0, observed_1 = circuit_probs()
+        assert np.array_equal(observed_0, expected)
+        assert np.array_equal(observed_1, expected)
+
+    @pytest.mark.parametrize("n_qubits", [0, 1, 2])
     def test_nullq_state(self, n_qubits):
         """Test qml.state() on null.qubit device."""
 
@@ -1222,6 +1274,7 @@ class TestNullQubitMeasurements:
             return qml.state()
 
         expected = np.zeros(shape=2**n_qubits, dtype=np.complex128)
+        expected[0] = 1.0 + 0.0j
         observed = circuit_state()
         assert np.array_equal(observed, expected)
 

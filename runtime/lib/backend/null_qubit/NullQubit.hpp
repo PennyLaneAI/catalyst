@@ -49,7 +49,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     NullQubit &operator=(NullQubit &&) = delete;
 
     /**
-     * @brief Doesn't Allocate a qubit.
+     * @brief Allocate a "null" qubit.
      *
      * @return `QubitIdType`
      */
@@ -60,7 +60,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     }
 
     /**
-     * @brief Allocate a vector of qubits.
+     * @brief Allocate a vector of "null" qubits.
      *
      * @param num_qubits The number of qubits to allocate.
      *
@@ -77,7 +77,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     }
 
     /**
-     * @brief Doesn't Release a qubit.
+     * @brief Release a qubit.
      */
     void ReleaseQubit(QubitIdType q)
     {
@@ -88,7 +88,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     }
 
     /**
-     * @brief Doesn't Release all qubits.
+     * @brief Release all qubits.
      */
     void ReleaseAllQubits()
     {
@@ -97,28 +97,28 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     }
 
     /**
-     * @brief Doesn't Get the number of allocated qubits.
+     * @brief Get the number of allocated qubits.
      *
      * @return `size_t`
      */
     [[nodiscard]] auto GetNumQubits() const -> size_t { return num_qubits_; }
 
     /**
-     * @brief Doesn't Set the number of device shots.
+     * @brief Set the number of device shots.
      *
      * @param shots The number of noise shots
      */
-    void SetDeviceShots(size_t shots) {}
+    void SetDeviceShots(size_t shots) { device_shots_ = shots; }
 
     /**
-     * @brief Doesn't Get the number of device shots.
+     * @brief Get the number of device shots.
      *
      * @return `size_t`
      */
-    [[nodiscard]] auto GetDeviceShots() const -> size_t { return 0; }
+    [[nodiscard]] auto GetDeviceShots() const -> size_t { return device_shots_; }
 
     /**
-     * @brief Doesn't Set the PRNG of the device.
+     * @brief Doesn't set the PRNG of the device.
      *
      * The Catalyst runtime enables seeded program execution on non-hardware devices.
      * A random number generator instance is managed by the runtime to predictably
@@ -136,7 +136,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     void SetDevicePRNG([[maybe_unused]] std::mt19937 *gen) {}
 
     /**
-     * @brief Doesn't Start recording a quantum tape if provided.
+     * @brief Doesn't start recording a quantum tape if provided.
      *
      * @note This is backed by the `Catalyst::Runtime::CacheManager<ComplexT>` property in
      * the device implementation.
@@ -144,7 +144,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     void StartTapeRecording() {}
 
     /**
-     * @brief Doesn't Stop recording a quantum tape if provided.
+     * @brief Doesn't stop recording a quantum tape if provided.
      *
      * @note This is backed by the `Catalyst::Runtime::CacheManager<ComplexT>` property in
      * the device implementation.
@@ -152,7 +152,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     void StopTapeRecording() {}
 
     /**
-     * @brief Not the Result value for "Zero" used in the measurement process.
+     * @brief Not the result value for "Zero" used in the measurement process.
      *
      * @return `Result`
      */
@@ -162,7 +162,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     }
 
     /**
-     * @brief Not the Result value for "One"  used in the measurement process.
+     * @brief Not the result value for "One"  used in the measurement process.
      *
      * @return `Result`
      */
@@ -172,22 +172,22 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     }
 
     /**
-     * @brief Not A helper method to print the state vector of a device.
+     * @brief Not a helper method to print the state vector of a device.
      */
     void PrintState() {}
 
     /**
-     * @brief Doesn't Prepare subsystems using the given ket vector in the computational basis.
+     * @brief Doesn't prepare subsystems using the given ket vector in the computational basis.
      */
     void SetState(DataView<std::complex<double>, 1> &, std::vector<QubitIdType> &) {}
 
     /**
-     * @brief Doesn't Prepare a single computational basis state.
+     * @brief Doesn't prepare a single computational basis state.
      */
     void SetBasisState(DataView<int8_t, 1> &, std::vector<QubitIdType> &) {}
 
     /**
-     * @brief Doesn't Apply a single gate to the state vector of a device with its name if this is
+     * @brief Doesn't apply a single gate to the state vector of a device with its name if this is
      * supported.
      */
     void NamedOperation(const std::string &name, const std::vector<double> &params,
@@ -198,7 +198,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     }
 
     /**
-     * @brief Doesn't Apply a given matrix directly to the state vector of a device.
+     * @brief Doesn't apply a given matrix directly to the state vector of a device.
      *
      */
     void MatrixOperation(const std::vector<std::complex<double>> &,
@@ -209,7 +209,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     }
 
     /**
-     * @brief Doesn't Construct a named (Identity, PauliX, PauliY, PauliZ, and Hadamard)
+     * @brief Doesn't construct a named (Identity, PauliX, PauliY, PauliZ, and Hadamard)
      * or Hermitian observable.
      *
      * @return `ObsIdType` Index of the constructed observable
@@ -221,14 +221,14 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     }
 
     /**
-     * @brief Doesn't Construct a tensor product of observables.
+     * @brief Doesn't construct a tensor product of observables.
      *
      * @return `ObsIdType` Index of the constructed observable
      */
     auto TensorObservable(const std::vector<ObsIdType> &) -> ObsIdType { return 0.0; }
 
     /**
-     * @brief Doesn't Construct a Hamiltonian observable.
+     * @brief Doesn't construct a Hamiltonian observable.
      *
      * @return `ObsIdType` Index of the constructed observable
      */
@@ -239,55 +239,74 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     }
 
     /**
-     * @brief Doesn't Compute the expected value of an observable.
+     * @brief Doesn't compute the expected value of an observable.
+     *
+     * Always return 0.
      *
      * @return `double` The expected value
      */
     auto Expval(ObsIdType) -> double { return 0.0; }
 
     /**
-     * @brief Doesn't Compute the variance of an observable.
+     * @brief Doesn't compute the variance of an observable.
+     *
+     * Always return 0.
      *
      * @return `double` The variance
      */
     auto Var(ObsIdType) -> double { return 0.0; }
 
     /**
-     * @brief Doesn't Get the state-vector of a device.
+     * @brief Doesn't get the state-vector of a device.
+     *
+     * Always fills the state vector corresponding to the pure ground state, e.g. [1, 0] for a
+     * one-qubit system, [1, 0, 0, 0] for a two-qubit system, etc.
      */
     void State(DataView<std::complex<double>, 1> &state)
     {
+        auto iter = state.begin();
+        *iter = 1.0;
         if (num_qubits_ > 0) {
-            std::fill(state.begin(), state.end(), 0.0);
+            ++iter;
+            std::fill(iter, state.end(), 0.0);
         }
     }
 
     /**
-     * @brief Doesn't Compute the probabilities of each computational basis state.
+     * @brief Doesn't compute the probabilities of each computational basis state.
+     *
+     * Always fills a probability of 1 for the ground basis state, and 0 for all other basis states,
+     * e.g. [1, 0] for a one-qubit system, [1, 0, 0, 0] for a two-qubit system, etc.
      */
     void Probs(DataView<double, 1> &probs)
     {
+        auto iter = probs.begin();
+        *iter = 1.0;
         if (num_qubits_ > 0) {
-            std::fill(probs.begin(), probs.end(), 0.0);
+            ++iter;
+            std::fill(iter, probs.end(), 0.0);
         }
     }
 
     /**
-     * @brief Doesn't Compute the probabilities for a subset of the full system.
+     * @brief Doesn't compute the probabilities for a subset of the full system.
+     *
+     * Same behaviour as Probs().
      */
     void PartialProbs(DataView<double, 1> &probs, const std::vector<QubitIdType> &)
     {
-        if (num_qubits_ > 0) {
-            std::fill(probs.begin(), probs.end(), 0.0);
-        }
+        Probs(probs);
     }
 
     /**
-     * @brief Doesn't Compute samples with the number of shots on the entire wires,
-     * returing raw samples.
+     * @brief Doesn't compute samples with the number of shots on the entire wires,
+     * returning raw samples.
+     *
+     * Always fills array of samples with 0.
      */
     void Sample(DataView<double, 2> &samples, size_t)
     {
+        // If num_qubits == 0, the samples array is unallocated (shape=(shots, 0)), so don't fill
         if (num_qubits_ > 0) {
             std::fill(samples.begin(), samples.end(), 0.0);
         }
@@ -297,40 +316,50 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      * @brief Doesn't Compute partial samples with the number of shots on `wires`,
      * returing raw samples.
      *
+     * Same behaviour as Sample().
+     *
      * @param samples The pre-allocated `DataView<double, 2>`representing a matrix of
      * shape `shots * numWires`. The built-in iterator in `DataView<double, 2>`
      * iterates over all elements of `samples` row-wise.
      */
     void PartialSample(DataView<double, 2> &samples, const std::vector<QubitIdType> &, size_t)
     {
-        if (num_qubits_ > 0) {
-            std::fill(samples.begin(), samples.end(), 0.0);
-        }
+        Sample(samples, 0U);
     }
 
     /**
-     * @brief Doesn't Sample with the number of shots on the entire wires, returning the
+     * @brief Doesn't sample with the number of shots on the entire wires, returning the
      * number of counts for each sample.
+     *
+     * Always fills eigenvalues with integers ranging from 0, 1, ..., 2**num_qubits
+     * Always sets the first element of counts to `shots` and fills the rest with 0.
      */
     void Counts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts, size_t shots)
     {
+        auto iter_eigvals = eigvals.begin();
+        *iter_eigvals = 0.0;
+        ++iter_eigvals;
+
+        auto iter_counts = counts.begin();
+        *iter_counts = shots;
+        ++iter_counts;
+
         if (num_qubits_ > 0) {
-            std::fill(eigvals.begin(), eigvals.end(), 0.0);
-            std::fill(counts.begin(), counts.end(), 0);
+            std::iota(iter_eigvals, eigvals.end(), 1.0);
+            std::fill(iter_counts, counts.end(), 0);
         }
     }
 
     /**
      * @brief Doesn't Partial sample with the number of shots on `wires`, returning the
      * number of counts for each sample.
+     *
+     * Same behaviour as Counts().
      */
     void PartialCounts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts,
-                       const std::vector<QubitIdType> &, size_t)
+                       const std::vector<QubitIdType> &, size_t shots)
     {
-        if (num_qubits_ > 0) {
-            std::fill(eigvals.begin(), eigvals.end(), 0.0);
-            std::fill(counts.begin(), counts.end(), 0);
-        }
+        Counts(eigvals, counts, shots);
     }
 
     /**
@@ -355,6 +384,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
 
   private:
     std::size_t num_qubits_{0};
+    std::size_t device_shots_{0};
     Catalyst::Runtime::QubitManager<QubitIdType, size_t> qubit_manager{};
 
     // static constants for RESULT values
