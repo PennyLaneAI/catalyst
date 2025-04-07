@@ -25,7 +25,6 @@ from typing import Any, Callable, Iterator, SupportsIndex, Tuple, Union
 import jax
 import jax.numpy as jnp
 import pennylane as qml
-from jax.tree_util import tree_flatten
 from malt.core import config as ag_config
 from malt.impl import api as ag_api
 from malt.impl.api import converted_call as ag_converted_call
@@ -52,13 +51,6 @@ __all__ = [
     "set_item",
     "update_item_with_op",
 ]
-
-
-_must_abstractify_types = (
-    float,
-    str,
-    DynamicJaxprTracer,
-)
 
 
 def get_program_length(reference_tracers):
@@ -167,18 +159,17 @@ def assert_iteration_inputs(inputs, symbol_names):
                 f"Please ensure '{inp}' is initialized with a value before entering the loop."
             )
 
-        if isinstance(inp, _must_abstractify_types):
-            try:
-                jax.api_util.shaped_abstractify(inp)
-            except TypeError as e:
-                raise AutoGraphError(
-                    f"The variable '{symbol_names[i]}' was initialized with type {type(inp)}, "
-                    "which is not compatible with JAX. Typically, this is the case for non-numeric "
-                    "values.\n"
-                    "You may still use such a variable as a constant inside a loop, but it cannot "
-                    "be updated from one iteration to the next, or accessed outside the loop scope "
-                    "if it was defined inside of it."
-                ) from e
+        try:
+            jax.api_util.shaped_abstractify(inp)
+        except TypeError as e:
+            raise AutoGraphError(
+                f"The variable '{symbol_names[i]}' was initialized with type {type(inp)}, "
+                "which is not compatible with JAX. Typically, this is the case for non-numeric "
+                "values.\n"
+                "You may still use such a variable as a constant inside a loop, but it cannot "
+                "be updated from one iteration to the next, or accessed outside the loop scope "
+                "if it was defined inside of it."
+            ) from e
 
 
 def assert_iteration_results(inputs, outputs, symbol_names):
@@ -188,16 +179,13 @@ def assert_iteration_results(inputs, outputs, symbol_names):
     """
 
     for i, (inp, out) in enumerate(zip(jax.tree.leaves(inputs), jax.tree.leaves(outputs))):
-        if isinstance(inp, _must_abstractify_types) and isinstance(out, _must_abstractify_types):
-            inp_t, out_t = jax.api_util.shaped_abstractify(inp), jax.api_util.shaped_abstractify(
-                out
+        inp_t, out_t = jax.api_util.shaped_abstractify(inp), jax.api_util.shaped_abstractify(out)
+        if inp_t.dtype != out_t.dtype or inp_t.shape != out_t.shape:
+            raise AutoGraphError(
+                f"The variable '{symbol_names[i]}' was initialized with the wrong type, or you may "
+                f"be trying to change its type from one iteration to the next. "
+                f"Expected: {out_t}, Got: {inp_t}"
             )
-            if inp_t.dtype != out_t.dtype or inp_t.shape != out_t.shape:
-                raise AutoGraphError(
-                    f"The variable '{symbol_names[i]}' was initialized with the wrong type, or you may "
-                    f"be trying to change its type from one iteration to the next. "
-                    f"Expected: {out_t}, Got: {inp_t}"
-                )
 
 
 def _call_catalyst_for(
