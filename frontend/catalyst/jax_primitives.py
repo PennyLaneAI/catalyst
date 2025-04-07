@@ -507,8 +507,8 @@ def _grad_lowering(ctx, *args, jaxpr, fn, grad_params):
             jax_array_or_tracer, jax._src.interpreters.partial_eval.DynamicJaxprTracer
         ):
             # ``ir.DenseElementsAttr.get()`` constructs a dense elements attribute from an array of
-            # element values. This doesn't support ``jaxlib.xla_extension.Array``, so we have to cast
-            # such constants to numpy array types.
+            # element values. This doesn't support ``jaxlib.xla_extension.Array``, so we have to
+            # cast such constants to numpy array types.
             const = jax_array_or_tracer
             const_type = shape_dtype_to_ir_type(const.shape, const.dtype)
             nparray = np.asarray(const)
@@ -582,8 +582,8 @@ def _value_and_grad_lowering(ctx, *args, jaxpr, fn, grad_params):
             jax_array_or_tracer, jax._src.interpreters.partial_eval.DynamicJaxprTracer
         ):
             # ``ir.DenseElementsAttr.get()`` constructs a dense elements attribute from an array of
-            # element values. This doesn't support ``jaxlib.xla_extension.Array``, so we have to cast
-            # such constants to numpy array types.
+            # element values. This doesn't support ``jaxlib.xla_extension.Array``, so we have to
+            # cast such constants to numpy array types.
             const = jax_array_or_tracer
             const_type = shape_dtype_to_ir_type(const.shape, const.dtype)
             nparray = np.asarray(const)
