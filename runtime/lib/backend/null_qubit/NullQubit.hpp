@@ -29,23 +29,27 @@
 
 // The delimited to print before and after the JSON representing resource usage.
 //   This is intended to make parsing the output easier.
-//   Ideally, at some point resource usage would be passed back through as an object, and printing at all would be unneeded.
+//   Ideally, at some point resource usage would be passed back through as an object, and printing
+//   at all would be unneeded.
 #define RESOURCE_PRINT_DELIMETER "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
 
 namespace Catalyst::Runtime::Devices {
 
 // TODO: For PR reviewers: Is this a good place to put this function?
 // It is used to print the resource usage of the device in a pretty format.
-// It is not used anywhere else in the codebase, but it feels like more of a utils type function than anything that has to do with the device itself.
-template<class K, class V>
-void prettyPrint(const std::unordered_map<K, V> &map, size_t leadingSpaces = 0) {
+// It is not used anywhere else in the codebase, but it feels like more of a utils type function
+// than anything that has to do with the device itself.
+template <class K, class V>
+void prettyPrint(const std::unordered_map<K, V> &map, size_t leadingSpaces = 0)
+{
     std::cout << "{\n";
     auto maplen = map.size();
     for (const auto &pair : map) {
         for (size_t i = 0; i < leadingSpaces + 2; ++i) {
             std::cout << " ";
         }
-        std::cout << "\"" << pair.first << "\": " << pair.second << (--maplen > 0? "," : "") << "\n";
+        std::cout << "\"" << pair.first << "\": " << pair.second << (--maplen > 0 ? "," : "")
+                  << "\n";
     }
     for (size_t i = 0; i < leadingSpaces; ++i) {
         std::cout << " ";
@@ -65,13 +69,15 @@ void prettyPrint(const std::unordered_map<K, V> &map, size_t leadingSpaces = 0) 
  *   of the device; these are used to implement Quantum Instruction Set (QIS) instructions.
  */
 struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
-    NullQubit(const std::string &kwargs = "{}") {
+    NullQubit(const std::string &kwargs = "{}")
+    {
         auto device_kwargs = Catalyst::Runtime::parse_kwargs(kwargs);
         if (device_kwargs.find("track_resources") != device_kwargs.end()) {
             track_resources_ = device_kwargs["track_resources"] == "True";
         }
     }
-    ~NullQubit() {
+    ~NullQubit()
+    {
         if (this->track_resources_) {
             PrintResourceUsage();
         }
@@ -81,7 +87,6 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     NullQubit(const NullQubit &) = delete;
     NullQubit(NullQubit &&) = delete;
     NullQubit &operator=(NullQubit &&) = delete;
-
 
     /**
      * @brief Prints resources that would be used to execute this circuit as a JSON
