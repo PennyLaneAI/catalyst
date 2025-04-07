@@ -352,15 +352,15 @@ jobs:
     #         bash /catalyst/.github/workflows/scripts/linux_arm64/rh8/build_catalyst.sh $GCC_VERSION ${{ matrix.python_version.major_minor }} ${{ matrix.python_version.patch }} ${{ matrix.python_version.package }} ${{ matrix.python_version.alternative }}
 # Build Catalyst runtime
 
-    - name: Build Dependencies
-      run: |
-        python${{ matrix.python_version.major_minor }} -m pip install pennylane nanobind pybind11 PyYAML cmake ninja delocate 'amazon-braket-pennylane-plugin>1.27.1'
+    # - name: Build Dependencies
+    #   run: |
+    #     python${{ matrix.python_version.major_minor }} -m pip install pennylane nanobind pybind11 PyYAML cmake ninja delocate 'amazon-braket-pennylane-plugin>1.27.1'
        
     - name: Build Catalyst Runtime
       run: |
         cmake -S runtime -B $GITHUB_WORKSPACE/runtime-build -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=runtime-build/lib \
+            -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=$GITHUB_WORKSPACE/runtime-build/lib \
             -DPython_EXECUTABLE=python${{ matrix.python_version.major_minor }} \
             -DENABLE_OPENQASM=ON \
             -DENABLE_OQD=OFF \
