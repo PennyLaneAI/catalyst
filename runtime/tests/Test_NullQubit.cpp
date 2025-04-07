@@ -549,3 +549,13 @@ TEST_CASE("Test NullQubit::One()", "[NullQubit]")
 
     CHECK(*sim->One() == true);
 }
+
+TEST_CASE("Test NullQubit device shots methods", "[NullQubit]")
+{
+    std::unique_ptr<NullQubit> sim = std::make_unique<NullQubit>();
+
+    for (size_t i=0; i<3; i++) {
+        sim->SetDeviceShots(i);
+        CHECK(sim->GetDeviceShots() == i);
+    }
+}
