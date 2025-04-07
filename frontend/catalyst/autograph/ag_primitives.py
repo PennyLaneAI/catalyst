@@ -54,26 +54,11 @@ __all__ = [
 ]
 
 
-def is_pytree(args):
-    """Check if the arguments constitute a Pytree
-
-    Args:
-        args (Iterable): arguments to check
-
-    Returns:
-        True or False
-    """
-
-    if type(args) not in [list, tuple, dict]:
-        return False
-
-    flat_args, _ = tree_flatten(args)
-    try:
-        _ = [jax.api_util.shaped_abstractify(arg) for arg in flat_args]
-        return True
-    # pylint: disable=bare-except
-    except:
-        return False
+_must_abstractify_types = (
+    float,
+    str,
+    DynamicJaxprTracer,
+)
 
 
 def get_program_length(reference_tracers):
@@ -171,7 +156,7 @@ def assert_iteration_inputs(inputs, symbol_names):
     Additionally, these types need to be valid JAX types.
     """
 
-    for i, inp in enumerate(inputs):
+    for i, inp in enumerate(jax.tree.leaves(inputs)):
         if isinstance(inp, Undefined):
             raise AutoGraphError(
                 f"The variable '{inp}' is potentially uninitialized:\n"
@@ -182,8 +167,7 @@ def assert_iteration_inputs(inputs, symbol_names):
                 f"Please ensure '{inp}' is initialized with a value before entering the loop."
             )
 
-        # Skip check for Pytree objects
-        if not is_pytree(inp):
+        if isinstance(inp, _must_abstractify_types):
             try:
                 jax.api_util.shaped_abstractify(inp)
             except TypeError as e:
@@ -203,9 +187,8 @@ def assert_iteration_results(inputs, outputs, symbol_names):
     variable was initialized with wrong type.
     """
 
-    for i, (inp, out) in enumerate(zip(inputs, outputs)):
-        # Skip check for Pytree objects
-        if not is_pytree(inp) and not is_pytree(out):
+    for i, (inp, out) in enumerate(zip(jax.tree.leaves(inputs), jax.tree.leaves(outputs))):
+        if isinstance(inp, _must_abstractify_types) and isinstance(out, _must_abstractify_types):
             inp_t, out_t = jax.api_util.shaped_abstractify(inp), jax.api_util.shaped_abstractify(
                 out
             )
