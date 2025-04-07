@@ -1142,7 +1142,7 @@ def test_trace_to_jaxpr():
 def test_abstracted_axis_no_recompilation():
     """Test that a function that does not need recompilation can be executed a second time"""
 
-    @qml.qjit(abstracted_axes=(("n",), ()))
+    @qjit(abstracted_axes=(("n",), ()))
     @qml.qnode(qml.device("lightning.qubit", wires=2))
     def circuit(x1, x2):
 

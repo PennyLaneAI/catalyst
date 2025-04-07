@@ -16,10 +16,10 @@
 
 import pennylane as qml
 
-from catalyst import measure
+from catalyst import measure, qjit
 
 
-@qml.qjit(target="mlir")
+@qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=1))
 def circuit(x: float):
     qml.RX(x, wires=0)
