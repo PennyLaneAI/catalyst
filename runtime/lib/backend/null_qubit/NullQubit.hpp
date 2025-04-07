@@ -108,7 +108,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      *
      * @param shots The number of noise shots
      */
-    void SetDeviceShots(size_t shots) { }
+    void SetDeviceShots(size_t shots) {}
 
     /**
      * @brief Doesn't get the number of device shots.
