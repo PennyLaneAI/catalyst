@@ -104,18 +104,18 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     [[nodiscard]] auto GetNumQubits() const -> size_t { return num_qubits_; }
 
     /**
-     * @brief Set the number of device shots.
+     * @brief Doesn't set the number of device shots.
      *
      * @param shots The number of noise shots
      */
-    void SetDeviceShots(size_t shots) { device_shots_ = shots; }
+    void SetDeviceShots(size_t shots) { }
 
     /**
-     * @brief Get the number of device shots.
+     * @brief Doesn't get the number of device shots.
      *
      * @return `size_t`
      */
-    [[nodiscard]] auto GetDeviceShots() const -> size_t { return device_shots_; }
+    [[nodiscard]] auto GetDeviceShots() const -> size_t { return 0; }
 
     /**
      * @brief Doesn't set the PRNG of the device.
@@ -384,7 +384,6 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
 
   private:
     std::size_t num_qubits_{0};
-    std::size_t device_shots_{0};
     Catalyst::Runtime::QubitManager<QubitIdType, size_t> qubit_manager{};
 
     // static constants for RESULT values
