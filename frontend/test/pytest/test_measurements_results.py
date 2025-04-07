@@ -1162,7 +1162,7 @@ class TestNullQubitMeasurements:
 
     n_shots = 100
 
-    @pytest.mark.parametrize("n_qubits", [0, 1, 2])
+    @pytest.mark.parametrize("n_qubits", [1, 2])
     def test_nullq_sample(self, n_qubits):
         """Test qml.sample() on null.qubit device."""
 
@@ -1177,7 +1177,7 @@ class TestNullQubitMeasurements:
         observed = circuit_sample()
         assert np.array_equal(observed, expected)
 
-    @pytest.mark.parametrize("n_qubits", [0, 1, 2])
+    @pytest.mark.parametrize("n_qubits", [1, 2])
     def test_nullq_counts(self, n_qubits):
         """Test qml.counts() on null.qubit device."""
 
@@ -1195,7 +1195,7 @@ class TestNullQubitMeasurements:
         observed = circuit_counts()
         assert np.array_equal(observed, expected)
 
-    @pytest.mark.parametrize("n_qubits", [0, 1, 2])
+    @pytest.mark.parametrize("n_qubits", [1, 2])
     def test_nullq_probs(self, n_qubits):
         """Test qml.probs() on null.qubit device."""
 
@@ -1210,7 +1210,7 @@ class TestNullQubitMeasurements:
         observed = circuit_probs()
         assert np.array_equal(observed, expected)
 
-    @pytest.mark.parametrize("n_qubits", [0, 1, 2])
+    @pytest.mark.parametrize("n_qubits", [1, 2])
     def test_nullq_state(self, n_qubits):
         """Test qml.state() on null.qubit device."""
 

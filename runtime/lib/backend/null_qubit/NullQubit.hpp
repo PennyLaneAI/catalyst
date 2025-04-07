@@ -255,23 +255,43 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     /**
      * @brief Doesn't Get the state-vector of a device.
      */
-    void State(DataView<std::complex<double>, 1> &) {}
+    void State(DataView<std::complex<double>, 1> &state)
+    {
+        if (num_qubits_ > 0) {
+            std::fill(state.begin(), state.end(), 0.0);
+        }
+    }
 
     /**
      * @brief Doesn't Compute the probabilities of each computational basis state.
      */
-    void Probs(DataView<double, 1> &) {}
+    void Probs(DataView<double, 1> &probs)
+    {
+        if (num_qubits_ > 0) {
+            std::fill(probs.begin(), probs.end(), 0.0);
+        }
+    }
 
     /**
      * @brief Doesn't Compute the probabilities for a subset of the full system.
      */
-    void PartialProbs(DataView<double, 1> &, const std::vector<QubitIdType> &) {}
+    void PartialProbs(DataView<double, 1> &probs, const std::vector<QubitIdType> &)
+    {
+        if (num_qubits_ > 0) {
+            std::fill(probs.begin(), probs.end(), 0.0);
+        }
+    }
 
     /**
      * @brief Doesn't Compute samples with the number of shots on the entire wires,
      * returing raw samples.
      */
-    void Sample(DataView<double, 2> &, size_t) {}
+    void Sample(DataView<double, 2> &samples, size_t)
+    {
+        if (num_qubits_ > 0) {
+            std::fill(samples.begin(), samples.end(), 0.0);
+        }
+    }
 
     /**
      * @brief Doesn't Compute partial samples with the number of shots on `wires`,
@@ -281,21 +301,36 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      * shape `shots * numWires`. The built-in iterator in `DataView<double, 2>`
      * iterates over all elements of `samples` row-wise.
      */
-    void PartialSample(DataView<double, 2> &, const std::vector<QubitIdType> &, size_t) {}
+    void PartialSample(DataView<double, 2> &samples, const std::vector<QubitIdType> &, size_t)
+    {
+        if (num_qubits_ > 0) {
+            std::fill(samples.begin(), samples.end(), 0.0);
+        }
+    }
 
     /**
      * @brief Doesn't Sample with the number of shots on the entire wires, returning the
      * number of counts for each sample.
      */
-    void Counts(DataView<double, 1> &, DataView<int64_t, 1> &, size_t) {}
+    void Counts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts, size_t shots)
+    {
+        if (num_qubits_ > 0) {
+            std::fill(eigvals.begin(), eigvals.end(), 0.0);
+            std::fill(counts.begin(), counts.end(), 0);
+        }
+    }
 
     /**
      * @brief Doesn't Partial sample with the number of shots on `wires`, returning the
      * number of counts for each sample.
      */
-    void PartialCounts(DataView<double, 1> &, DataView<int64_t, 1> &,
+    void PartialCounts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts,
                        const std::vector<QubitIdType> &, size_t)
     {
+        if (num_qubits_ > 0) {
+            std::fill(eigvals.begin(), eigvals.end(), 0.0);
+            std::fill(counts.begin(), counts.end(), 0);
+        }
     }
 
     /**
