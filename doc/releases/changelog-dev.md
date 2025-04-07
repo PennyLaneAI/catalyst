@@ -222,6 +222,10 @@
 * Fixed `argnums` parameter of `grad` and `value_and_grad` being ignored.
   [(#1478)](https://github.com/PennyLaneAI/catalyst/pull/1478)
 
+* All dialects are loaded preemptively.
+  This allows third-party plugins to load their dialects.
+  [(#1584)](https://github.com/PennyLaneAI/catalyst/pull/1584)
+
 * Fixed an issue ([(#1488)](https://github.com/PennyLaneAI/catalyst/pull/1488)) where Catalyst could
   give incorrect results for circuits containing `qml.StatePrep`.
   [(#1491)](https://github.com/PennyLaneAI/catalyst/pull/1491)
