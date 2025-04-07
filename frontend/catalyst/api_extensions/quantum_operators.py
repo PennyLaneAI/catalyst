@@ -426,10 +426,11 @@ class AdjointCallable:
         ctx = EvaluationContext.get_main_tracing_context()
         with EvaluationContext.frame_tracing_context(ctx) as inner_trace:
             in_classical_tracers, _ = tree_flatten((args, kwargs))
-            wffa, in_avals, _, _ = deduce_avals(self.target, args, kwargs)
+            wffa, in_avals, keep_inputs, _ = deduce_avals(self.target, args, kwargs)
             arg_classical_tracers = _input_type_to_tracers(inner_trace.new_arg, in_avals)
             with QueuingManager.stop_recording(), QuantumTape() as quantum_tape:
                 # FIXME: move all full_raise calls into a separate function
+                arg_classical_tracers = [t for t, k in zip(arg_classical_tracers, keep_inputs) if k]
                 res_classical_tracers = [
                     inner_trace.full_raise(t)
                     for t in wffa.call_wrapped(*arg_classical_tracers)
