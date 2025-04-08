@@ -70,12 +70,10 @@ def test_custom_device_load():
     @qjit
     @qml.qnode(device)
     def f():
-        """This function would normally return False.
-        However, NullQubit as defined in librtd_null_qubit.so
-        has been implemented to always return True."""
+        """Measurements on a NullQubit device always return false (i.e. 0)"""
         return measure(0)
 
-    assert f() == True
+    assert f() == False
 
 
 def test_custom_device_bad_directory():
