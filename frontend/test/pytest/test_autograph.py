@@ -372,6 +372,60 @@ class TestIntegration:
         assert np.allclose(fn(3)[0], tuple([jnp.array(6.0), jnp.array(9.0)]))
         assert np.allclose(fn(3)[1], tuple([jnp.array(2.0), jnp.array(6.0)]))
 
+    def test_ctrl_with_operation_as_argument(self):
+        """Test that qml.ctrl works when an operation is passed as argument."""
+        dev = qml.device("lightning.qubit", wires=2)
+
+        @qml.qjit(autograph=True)
+        @qml.qnode(dev)
+        def circuit():
+            qml.ctrl(qml.PauliX(0), control=1)
+            return qml.probs(wires=0)
+
+        assert hasattr(circuit.user_function, "ag_unconverted")
+        assert jnp.allclose(circuit(), jnp.array([1.0, 0.0]))
+
+    def test_adjoint_with_operation_as_argument(self):
+        """Test that qml.adjoint works when an operation is passed as argument."""
+        dev = qml.device("lightning.qubit", wires=2)
+
+        @qml.qjit(autograph=True)
+        @qml.qnode(dev)
+        def circuit():
+            qml.adjoint(qml.PauliX(0))
+            return qml.probs(wires=0)
+
+        assert hasattr(circuit.user_function, "ag_unconverted")
+        assert jnp.allclose(circuit(), jnp.array([0.0, 1.0]))
+
+    def test_adjoint_no_argument(self):
+        """Test that passing no argument to qml.adjoint raises an error."""
+        with pytest.raises(ValueError, match="adjoint requires at least one argument"):
+            dev = qml.device("lightning.qubit", wires=2)
+
+            @qml.qjit(autograph=True)
+            @qml.qnode(dev)
+            def circuit():
+                qml.adjoint()
+                return qml.probs(wires=0)
+
+            circuit()
+
+    def test_adjoint_wrong_argument_type(self):
+        """Test that passing a non-callable/non-Operation to qml.adjoint raises an error."""
+        with pytest.raises(
+            ValueError, match="First argument to adjoint must be callable or an Operation"
+        ):
+            dev = qml.device("lightning.qubit", wires=2)
+
+            @qml.qjit(autograph=True)
+            @qml.qnode(dev)
+            def circuit():
+                qml.adjoint(3)
+                return qml.probs(wires=0)
+
+            circuit()
+
     def test_tape_transform(self):
         """Test if tape transform is applied when autograph is on."""
 

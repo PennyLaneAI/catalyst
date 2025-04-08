@@ -548,8 +548,19 @@ def converted_call(fn, args, kwargs, caller_fn_scope=None, options=None):
             catalyst.vmap,
             catalyst.mitigate_with_zne,
         ):
-            assert args and callable(args[0])
+            if not args:
+                raise ValueError(f"{fn.__name__} requires at least one argument")
+
+            # If first argument is already an operation, pass it through directly
+            if isinstance(args[0], qml.operation.Operation):
+                return ag_converted_call(fn, args, kwargs, caller_fn_scope, options)
+
+            # Otherwise, handle the callable case
             wrapped_fn = args[0]
+            if not callable(wrapped_fn):
+                raise ValueError(
+                    f"First argument to {fn.__name__} must be callable or an Operation"
+                )
 
             def passthrough_wrapper(*args, **kwargs):
                 return converted_call(wrapped_fn, args, kwargs, caller_fn_scope, options)
