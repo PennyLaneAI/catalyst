@@ -10,8 +10,8 @@
 
   Previously, measurement processes like `qml.sample()`, `qml.counts()`, `qml.probs()`, etc.
   returned values from uninitialized memory when executed on `null.qubit` with QJIT. This change
-  ensures that measurement processes on `null.qubit` always return the result corresponding to the
-  '0' state.
+  ensures that measurement processes on `null.qubit` always return the value 0 or the result
+  corresponding to the '0' state, depending on the context.
 
 <h3>Breaking changes 💔</h3>
 
