@@ -22,6 +22,8 @@ import pytest
 catalyst = pytest.importorskip("catalyst")
 jax = pytest.importorskip("jax")
 
+from catalyst import qjit
+
 # needs to be below the importorskip calls
 # pylint: disable=wrong-import-position,unused-argument
 from catalyst.from_plxpr import QFuncPlxprInterpreter, from_plxpr
@@ -194,7 +196,7 @@ class TestCatalystCompareJaxpr:
         assert len(catalyst_res) == 1
         assert qml.math.allclose(catalyst_res[0], -1)
 
-        qjit_obj = qml.qjit(circuit)
+        qjit_obj = qjit(circuit)
         qjit_obj(x)
         catalxpr = qjit_obj.jaxpr
         call_jaxpr_pl = get_call_jaxpr(converted)
@@ -219,7 +221,7 @@ class TestCatalystCompareJaxpr:
         catalyst_res = catalyst_execute_jaxpr(converted)(phi)
         assert qml.math.allclose(catalyst_res, np.exp(-0.5j) * np.array([1.0, 0.0]))
 
-        qjit_obj = qml.qjit(circuit)
+        qjit_obj = qjit(circuit)
         qjit_obj(0.5)
 
         catalxpr = qjit_obj.jaxpr
@@ -248,7 +250,7 @@ class TestCatalystCompareJaxpr:
         assert len(catalyst_res) == 1
         assert qml.math.allclose(catalyst_res[0], jax.numpy.cos(0.5))
 
-        qjit_obj = qml.qjit(circuit)
+        qjit_obj = qjit(circuit)
         qjit_obj(0.5)
         catalxpr = qjit_obj.jaxpr
         call_jaxpr_pl = get_call_jaxpr(converted)
@@ -280,7 +282,7 @@ class TestCatalystCompareJaxpr:
         expected = np.array([np.cos(0.5 / 2) ** 2, np.sin(0.5 / 2) ** 2])
         assert qml.math.allclose(catalyst_res[0], expected)
 
-        qjit_obj = qml.qjit(circuit)
+        qjit_obj = qjit(circuit)
         qjit_obj(0.5)
         catalxpr = qjit_obj.jaxpr
         call_jaxpr_pl = get_call_jaxpr(converted)
@@ -319,7 +321,7 @@ class TestCatalystCompareJaxpr:
 
         assert qml.math.allclose(catalyst_res[0], expected)
 
-        qjit_obj = qml.qjit(circuit)
+        qjit_obj = qjit(circuit)
         qjit_obj(phi)
         catalxpr = qjit_obj.jaxpr
         call_jaxpr_pl = get_call_jaxpr(converted)
@@ -354,7 +356,7 @@ class TestCatalystCompareJaxpr:
         expected = 1 - np.sin(x) ** 2
         assert qml.math.allclose(catalyst_res[0], expected)
 
-        qjit_obj = qml.qjit(circuit)
+        qjit_obj = qjit(circuit)
         qjit_obj(x)
         catalxpr = qjit_obj.jaxpr
         call_jaxpr_pl = get_call_jaxpr(converted)
@@ -386,7 +388,7 @@ class TestCatalystCompareJaxpr:
         expected = np.transpose(np.vstack([np.ones(50), np.zeros(50)]))
         assert qml.math.allclose(catalyst_res[0], expected)
 
-        qjit_obj = qml.qjit(circuit)
+        qjit_obj = qjit(circuit)
         qjit_obj()
         catalxpr = qjit_obj.jaxpr
         call_jaxpr_pl = get_call_jaxpr(converted)
@@ -418,7 +420,7 @@ class TestCatalystCompareJaxpr:
         expected = np.transpose(np.vstack([np.ones(50), np.zeros(50)]))
         assert qml.math.allclose(catalyst_res[0], expected)
 
-        qjit_obj = qml.qjit(circuit)
+        qjit_obj = qjit(circuit)
         qjit_obj()
         catalxpr = qjit_obj.jaxpr
         call_jaxpr_pl = converted.eqns[0].params["call_jaxpr"]
@@ -460,7 +462,7 @@ class TestCatalystCompareJaxpr:
         assert qml.math.allclose(catalyst_res[1], expected_expval_y)
         assert qml.math.allclose(catalyst_res[2], expected_probs)
 
-        qjit_obj = qml.qjit(circuit)
+        qjit_obj = qjit(circuit)
         qjit_obj(x, y, z)
         catalxpr = qjit_obj.jaxpr
         call_jaxpr_pl = get_call_jaxpr(converted)
@@ -527,7 +529,7 @@ class TestHybridPrograms:
 
         assert qml.math.allclose(expected, res[0])
 
-        qjit_obj = qml.qjit(workflow)
+        qjit_obj = qjit(workflow)
         qjit_obj(0.5)
 
         call_jaxpr_pl = get_call_jaxpr(converted)

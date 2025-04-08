@@ -1,4 +1,4 @@
-# Release 0.11.0 (development release)
+# Release 0.11.0 (current release)
 
 <h3>New features since last release</h3>
 
@@ -193,6 +193,7 @@
   [(#1562)](https://github.com/PennyLaneAI/catalyst/pull/1562)
   [(#1568)](https://github.com/PennyLaneAI/catalyst/pull/1568)
   [(#1569)](https://github.com/PennyLaneAI/catalyst/pull/1569)
+  [(#1604)](https://github.com/PennyLaneAI/catalyst/pull/1604)
 
   Gates that are constant, such as when all parameters are Python or NumPy data types, are not
   decomposed when this is allowable. For the adjoint differentiation method, this is allowable
@@ -234,6 +235,10 @@
 * Fixed `argnums` parameter of `grad` and `value_and_grad` being ignored.
   [(#1478)](https://github.com/PennyLaneAI/catalyst/pull/1478)
 
+* All dialects are loaded preemptively.
+  This allows third-party plugins to load their dialects.
+  [(#1584)](https://github.com/PennyLaneAI/catalyst/pull/1584)
+
 * Fixed an issue ([(#1488)](https://github.com/PennyLaneAI/catalyst/pull/1488)) where Catalyst could
   give incorrect results for circuits containing `qml.StatePrep`.
   [(#1491)](https://github.com/PennyLaneAI/catalyst/pull/1491)
@@ -247,11 +252,19 @@
   [(#1576)](https://github.com/PennyLaneAI/catalyst/pull/1576)
 
 * Fixes an issue ([(#1547)](https://github.com/PennyLaneAI/catalyst/issues/1547)) where using
-  chained catalyst passe decorators causes a crash.
+  chained catalyst passes decorators causes a crash.
   [(#1576)](https://github.com/PennyLaneAI/catalyst/pull/1576)
 
 * Autographs and catalyst pipeline fix.
   [(#1599)](https://github.com/PennyLaneAI/catalyst/pull/1599)
+
+* Fixes an issue ([(#1339)](https://github.com/PennyLaneAI/catalyst/issues/1339)) where using
+  autograph with control/adjoint functions used on operator objects causes a crash.
+  [(#1605)](https://github.com/PennyLaneAI/catalyst/pull/1605)
+
+* Fixes an issue ([(#896)](https://github.com/PennyLaneAI/catalyst/issues/896)) where using
+  pytrees inside a loop with autograph causes falling back to python.
+  [(#1601)](https://github.com/PennyLaneAI/catalyst/pull/1601)
 
 <h3>Internal changes ⚙️</h3>
 

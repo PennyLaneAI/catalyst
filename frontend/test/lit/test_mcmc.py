@@ -19,8 +19,10 @@ Test that mcmc, num_burnin, and kernel_name are set in MLIR
 
 import pennylane as qml
 
+from catalyst import qjit
 
-@qml.qjit
+
+@qjit
 @qml.qnode(
     qml.device(
         "lightning.qubit",

@@ -310,7 +310,7 @@ class TestCatalystControlled:
     def test_qctrl_wires(self, backend):
         """Test the wires property of HybridCtrl"""
 
-        @qml.qjit
+        @qjit
         @qml.qnode(qml.device(backend, wires=3))
         def circuit(theta):
             def func(theta):
@@ -327,7 +327,7 @@ class TestCatalystControlled:
     def test_qctrl_wires_arg_fun(self, backend):
         """Test the wires property of HybridCtrl with argument wires"""
 
-        @qml.qjit
+        @qjit
         @qml.qnode(qml.device(backend, wires=4))
         def circuit():
             def func(anc, wires):
@@ -344,7 +344,7 @@ class TestCatalystControlled:
     def test_qctrl_var_wires(self, backend):
         """Test the wires property of HybridCtrl with variable wires"""
 
-        @qml.qjit
+        @qjit
         @qml.qnode(qml.device(backend, wires=4))
         def circuit(anc, wires):
             def func(anc, wires):
@@ -361,7 +361,7 @@ class TestCatalystControlled:
     def test_qctrl_wires_nested(self, backend):
         """Test the wires property of HybridCtrl with nested branches"""
 
-        @qml.qjit
+        @qjit
         @qml.qnode(qml.device(backend, wires=4))
         def circuit(theta, w1, w2, cw1, cw2):
             def _func1():
@@ -382,7 +382,7 @@ class TestCatalystControlled:
     def test_qctrl_work_wires(self, backend):
         """Test the wires property of HybridCtrl with work-wires"""
 
-        @qml.qjit
+        @qjit
         @qml.qnode(qml.device(backend, wires=5))
         def circuit(theta):
             def _func1():
@@ -404,7 +404,7 @@ class TestCatalystControlled:
     def test_qctrl_wires_controlflow(self, backend):
         """Test the wires property of HybridCtrl with control flow branches"""
 
-        @qml.qjit
+        @qjit
         @qml.qnode(qml.device(backend, wires=3))
         def circuit(theta, w1, w2, cw):
             def _func():
@@ -510,7 +510,7 @@ class TestCatalystControlled:
             qml.ControlledSequence(qml.TrotterProduct(H, time=2.4, order=2), control=[1])
             return qml.expval(qml.PauliZ(0))
 
-        assert qml.math.allclose(qml.qjit(circuit)(), circuit())
+        assert qml.math.allclose(qjit(circuit)(), circuit())
 
     def test_distribute_controlled_with_adj(self):
         """Test that the distribute_controlled function with a PennyLane Adjoint,
