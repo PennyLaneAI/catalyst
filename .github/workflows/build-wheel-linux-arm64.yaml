@@ -40,7 +40,7 @@ jobs:
     name: Build Dependencies (Python ${{ matrix.python_version }})
     container: quay.io/pypa/${{ matrix.container_img }}        
 
-    if: needs.check_if_wheel_build_required.outputs.build-wheels == 'true'
+    # if: needs.check_if_wheel_build_required.outputs.build-wheels == 'true'
 
     steps:
       - name: Checkout Catalyst
