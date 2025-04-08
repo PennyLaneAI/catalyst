@@ -167,27 +167,27 @@ jobs:
     #         -i ${{ matrix.container_img }} \
     #         bash /catalyst/.github/workflows/scripts/linux_arm64/rh8/build_llvm.sh $GCC_VERSION ${{ matrix.python_version.major_minor }} ${{ matrix.python_version.patch }} ${{ matrix.python_version.package }}
     ################ UNCOMMENT ######################
-    # - name: Build LLVM / MLIR
-    #   if: steps.cache-llvm-build.outputs.cache-hit != 'true'
-    #   run: |
-    #     export PATH=$GITHUB_WORKSPACE/llvm-build/bin:$PATH
-    #     PYTHON=$(which python${{ matrix.python_version.major_minor }}) \
-    #     C_COMPILER=$(which gcc) \
-    #     CXX_COMPILER=$(which g++) \
-    #     LLVM_BUILD_DIR="$GITHUB_WORKSPACE/llvm-build" \
-    #     LLVM_PROJECTS="lld;mlir" \
-    #     LLVM_TARGETS="lld check-mlir" \
-    #     ENABLE_ZLIB=FORCE_ON \
-    #     ENABLE_LLD=OFF \
-    #     make llvm
+    - name: Build LLVM / MLIR
+      if: steps.cache-llvm-build.outputs.cache-hit != 'true'
+      run: |
+        export PATH=$GITHUB_WORKSPACE/llvm-build/bin:$PATH
+        PYTHON=$(which python${{ matrix.python_version.major_minor }}) \
+        C_COMPILER=$(which gcc) \
+        CXX_COMPILER=$(which g++) \
+        LLVM_BUILD_DIR="$GITHUB_WORKSPACE/llvm-build" \
+        LLVM_PROJECTS="lld;mlir" \
+        LLVM_TARGETS="lld check-mlir" \
+        ENABLE_ZLIB=FORCE_ON \
+        ENABLE_LLD=OFF \
+        make llvm
 
-    # - name: Save LLVM Build
-    #   id: save-llvm-build
-    #   if: steps.cache-llvm-build.outputs.cache-hit != 'true'
-    #   uses: actions/cache/save@v4
-    #   with:
-    #     path: ${{ github.workspace }}/llvm-build
-    #     key: ${{ matrix.container_name }}-llvm-${{ needs.constants.outputs.llvm_version }}-wheel-build
+    - name: Save LLVM Build
+      id: save-llvm-build
+      if: steps.cache-llvm-build.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: ${{ github.workspace }}/llvm-build
+        key: ${{ matrix.container_name }}-llvm-${{ needs.constants.outputs.llvm_version }}-wheel-build
 
     # - name: Build MHLO Dialect
     #   if: steps.cache-mhlo-build.outputs.cache-hit != 'true'
