@@ -144,7 +144,7 @@ jobs:
         steps.cache-enzyme-build.outputs.cache-hit != 'true'
       run: |
         # Reduce wait time for repos not responding
-        apt-get update -y && apt-get install -y libzstd-dev gcc-12 g++-12
+        sudo apt-get update -y && sudo apt-get install -y libzstd-dev gcc-12 g++-12
 
     - name: Install Dependencies (Python)
       run: |
@@ -153,18 +153,6 @@ jobs:
         PYTHON_BINS=$(find /opt/_internal/cpython-${{ matrix.python_version.major_minor }}.*/bin -maxdepth 1 -type d | tr '\n' ':' | sed 's/:$//')
         echo $PYTHON_BINS >> $GITHUB_PATH
 
-    # - name: Build LLVM / MLIR old
-    #   if: steps.cache-llvm-build.outputs.cache-hit != 'true'
-    #   run: |
-    #     set -x
-    #     # With GCC 13, LLVM fails some tests, then we use GCC 12 instead
-    #     export GCC_VERSION=12
-    #     docker run --rm --platform linux/aarch64 \
-    #         -v /var/run/docker.sock:/var/run/docker.sock \
-    #         -v `pwd`:/catalyst \
-    #         -i ${{ matrix.container_img }} \
-    #         bash /catalyst/.github/workflows/scripts/linux_arm64/rh8/build_llvm.sh $GCC_VERSION ${{ matrix.python_version.major_minor }} ${{ matrix.python_version.patch }} ${{ matrix.python_version.package }}
-    ################ UNCOMMENT ######################
     - name: Build LLVM / MLIR
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
       run: |
