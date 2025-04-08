@@ -252,7 +252,7 @@
   [(#1576)](https://github.com/PennyLaneAI/catalyst/pull/1576)
 
 * Fixes an issue ([(#1547)](https://github.com/PennyLaneAI/catalyst/issues/1547)) where using
-  chained catalyst passe decorators causes a crash.
+  chained catalyst passes decorators causes a crash.
   [(#1576)](https://github.com/PennyLaneAI/catalyst/pull/1576)
 
 * Autographs and catalyst pipeline fix.
@@ -261,6 +261,10 @@
 * Fixes an issue ([(#1339)](https://github.com/PennyLaneAI/catalyst/issues/1339)) where using
   autograph with control/adjoint functions used on operator objects causes a crash.
   [(#1605)](https://github.com/PennyLaneAI/catalyst/pull/1605)
+
+* Fixes an issue ([(#896)](https://github.com/PennyLaneAI/catalyst/issues/896)) where using
+  pytrees inside a loop with autograph causes falling back to python.
+  [(#1601)](https://github.com/PennyLaneAI/catalyst/pull/1601)
 
 <h3>Internal changes ⚙️</h3>
 
