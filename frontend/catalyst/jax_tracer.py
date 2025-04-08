@@ -491,7 +491,7 @@ class HybridOp(Operator):
                 *ctx.frames[trace].constvar_to_val.keys(),
             ]
         )
-        for i, t in zip(range(len(eqn.outvars[:-1])), out_expanded_tracers):
+        for i, t in enumerate(out_expanded_tracers):
             if trace.getvar(t) in jaxpr_variables:
                 # Do not re-assign vars from other equations
                 continue
