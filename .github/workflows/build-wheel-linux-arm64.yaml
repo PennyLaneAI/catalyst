@@ -119,14 +119,14 @@ jobs:
       uses: actions/cache/restore@v4
       with:
         path: ${{ github.workspace }}/llvm-build
-        key: ${{ matrix.container_name }}-llvm-${{ needs.constants.outputs.llvm_version }}-wheel-build
+        key: ${{ matrix.container_img }}-llvm-${{ needs.constants.outputs.llvm_version }}-wheel-build
 
     - name: Restore MHLO Build
       id: cache-mhlo-build
       uses: actions/cache/restore@v4
       with:
         path: ${{ github.workspace }}/mhlo-build
-        key: ${{ matrix.container_name }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-wheel-build
+        key: ${{ matrix.container_img }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-wheel-build
         lookup-only: True
 
     - name: Restore Enzyme Build
@@ -145,8 +145,6 @@ jobs:
       run: |
         # Reduce wait time for repos not responding
         apt-get update -y && apt-get install -y libzstd-dev gcc-12 g++-12
-        # Update env vars valid for all tasks of this job
-        echo '/opt/rh/gcc-toolset-12/root/usr/bin' >> $GITHUB_PATH
 
     - name: Install Dependencies (Python)
       run: |
@@ -174,6 +172,7 @@ jobs:
         PYTHON=$(which python${{ matrix.python_version.major_minor }}) \
         C_COMPILER=$(which gcc) \
         CXX_COMPILER=$(which g++) \
+        GCC_VERSION=12 \
         LLVM_BUILD_DIR="$GITHUB_WORKSPACE/llvm-build" \
         LLVM_PROJECTS="lld;mlir" \
         LLVM_TARGETS="lld check-mlir" \
@@ -292,8 +291,8 @@ jobs:
       run: |
         python${{ matrix.python_version.major_minor }} -m pip install numpy nanobind pybind11 PyYAML cmake ninja
         # Add cmake and ninja to the PATH env var
-        PYTHON_BINS=$(find /opt/_internal/cpython-${{ matrix.python_version.major_minor }}.*/bin -maxdepth 1 -type d | tr '\n' ':' | sed 's/:$//')
-        echo $PYTHON_BINS >> $GITHUB_PATH
+        # PYTHON_BINS=$(find /opt/_internal/cpython-${{ matrix.python_version.major_minor }}.*/bin -maxdepth 1 -type d | tr '\n' ':' | sed 's/:$//')
+        # echo $PYTHON_BINS >> $GITHUB_PATH
 
     - name: Setup Runner Environment
       id: setup_env
@@ -364,9 +363,9 @@ jobs:
     #         bash /catalyst/.github/workflows/scripts/linux_arm64/rh8/build_catalyst.sh $GCC_VERSION ${{ matrix.python_version.major_minor }} ${{ matrix.python_version.patch }} ${{ matrix.python_version.package }} ${{ matrix.python_version.alternative }}
     # Build Catalyst runtime
 
-    # - name: Build Dependencies
-    #   run: |
-    #     python${{ matrix.python_version.major_minor }} -m pip install pennylane nanobind pybind11 PyYAML cmake ninja delocate 'amazon-braket-pennylane-plugin>1.27.1'
+    - name: Build Dependencies
+      run: |
+        python${{ matrix.python_version.major_minor }} -m pip install pennylane nanobind pybind11 PyYAML cmake ninja delocate 'amazon-braket-pennylane-plugin>1.27.1'
        
     - name: Build Catalyst Runtime
       run: |
