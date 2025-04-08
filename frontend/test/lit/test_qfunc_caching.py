@@ -17,10 +17,10 @@
 import jax.numpy as jnp
 import pennylane as qml
 
-from catalyst import measure
+from catalyst import measure, qjit
 
 
-@qml.qjit(target="mlir")
+@qjit(target="mlir")
 def workflow(n: int):
     @qml.qnode(qml.device("lightning.qubit", wires=1))
     # CHECK-LABEL: public @f

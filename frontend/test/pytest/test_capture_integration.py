@@ -20,6 +20,7 @@ import pytest
 from jax.core import ShapedArray
 
 import catalyst
+from catalyst import qjit
 
 
 def circuit_aot_builder(dev):
@@ -182,7 +183,7 @@ class TestCapture:
         """Test the integration for a circuit with adjoint."""
         device = qml.device(backend, wires=2)
 
-        @qml.qjit(experimental_capture=True)
+        @qjit(experimental_capture=True)
         @qml.qnode(device)
         def catalyst_circuit(theta, val):
             qml.adjoint(qml.RY)(jnp.pi, val)
@@ -205,7 +206,7 @@ class TestCapture:
         """Test the integration for a circuit with control."""
         device = qml.device(backend, wires=3)
 
-        @qml.qjit(experimental_capture=True)
+        @qjit(experimental_capture=True)
         @qml.qnode(device)
         def catalyst_circuit(theta):
             qml.ctrl(qml.RX(theta, wires=0), control=[1], control_values=[False])
@@ -226,7 +227,7 @@ class TestCapture:
     def test_forloop(self, backend, theta):
         """Test the integration for a circuit with a for loop."""
 
-        @qml.qjit(experimental_capture=True)
+        @qjit(experimental_capture=True)
         @qml.qnode(qml.device(backend, wires=4))
         def catalyst_capture_circuit(x):
 
@@ -268,8 +269,8 @@ class TestCapture:
 
             return qml.expval(qml.Z(0))
 
-        default_capture_result = qml.qjit(circuit)(10, 0.3)
-        experimental_capture_result = qml.qjit(circuit, experimental_capture=True)(10, 0.3)
+        default_capture_result = qjit(circuit)(10, 0.3)
+        experimental_capture_result = qjit(circuit, experimental_capture=True)(10, 0.3)
         assert default_capture_result == experimental_capture_result
 
     def test_nested_loops(self, backend):
@@ -299,8 +300,8 @@ class TestCapture:
             # Expected output: |100...>
             return qml.state()
 
-        default_capture_result = qml.qjit(circuit)(4)
-        experimental_capture_result = qml.qjit(circuit, experimental_capture=True)(4)
+        default_capture_result = qjit(circuit)(4)
+        experimental_capture_result = qjit(circuit, experimental_capture=True)(4)
         assert jnp.allclose(default_capture_result, jnp.eye(2**4)[0])
         assert jnp.allclose(experimental_capture_result, default_capture_result)
 
@@ -324,16 +325,16 @@ class TestCapture:
 
             return qml.expval(qml.Z(0))
 
-        default_capture_result_10_iterations = qml.qjit(circuit)(0)
-        experimental_capture_result_10_iterations = qml.qjit(circuit, experimental_capture=True)(0)
+        default_capture_result_10_iterations = qjit(circuit)(0)
+        experimental_capture_result_10_iterations = qjit(circuit, experimental_capture=True)(0)
         assert default_capture_result_10_iterations == experimental_capture_result_10_iterations
 
-        default_capture_result_1_iteration = qml.qjit(circuit)(9)
-        experimental_capture_result_1_iteration = qml.qjit(circuit, experimental_capture=True)(9)
+        default_capture_result_1_iteration = qjit(circuit)(9)
+        experimental_capture_result_1_iteration = qjit(circuit, experimental_capture=True)(9)
         assert default_capture_result_1_iteration == experimental_capture_result_1_iteration
 
-        default_capture_result_0_iterations = qml.qjit(circuit)(11)
-        experimental_capture_result_0_iterations = qml.qjit(circuit, experimental_capture=True)(11)
+        default_capture_result_0_iterations = qjit(circuit)(11)
+        experimental_capture_result_0_iterations = qjit(circuit, experimental_capture=True)(11)
         assert default_capture_result_0_iterations == experimental_capture_result_0_iterations
 
     def test_while_loop_workflow_closure(self, backend):
@@ -357,8 +358,8 @@ class TestCapture:
 
             return qml.expval(qml.Z(0))
 
-        default_capture_result = qml.qjit(circuit)(0, 2)
-        experimental_capture_result = qml.qjit(circuit, experimental_capture=True)(0, 2)
+        default_capture_result = qjit(circuit)(0, 2)
+        experimental_capture_result = qjit(circuit, experimental_capture=True)(0, 2)
         assert default_capture_result == experimental_capture_result
 
     def test_while_loop_workflow_nested(self, backend):
@@ -388,8 +389,8 @@ class TestCapture:
 
             return qml.expval(qml.Z(0))
 
-        default_capture_result = qml.qjit(circuit)(0, 0)
-        experimental_capture_result = qml.qjit(circuit, experimental_capture=True)(0, 0)
+        default_capture_result = qjit(circuit)(0, 0)
+        experimental_capture_result = qjit(circuit, experimental_capture=True)(0, 0)
         assert default_capture_result == experimental_capture_result
 
     def test_cond_workflow_if_else(self, backend):
@@ -409,8 +410,8 @@ class TestCapture:
 
             return qml.expval(qml.Z(0))
 
-        default_capture_result = qml.qjit(circuit)(0.1)
-        experimental_capture_result = qml.qjit(circuit, experimental_capture=True)(0.1)
+        default_capture_result = qjit(circuit)(0.1)
+        experimental_capture_result = qjit(circuit, experimental_capture=True)(0.1)
         assert default_capture_result == experimental_capture_result
 
     def test_cond_workflow_if(self, backend):
@@ -427,8 +428,8 @@ class TestCapture:
 
             return qml.expval(qml.Z(0))
 
-        default_capture_result = qml.qjit(circuit)(1.5)
-        experimental_capture_result = qml.qjit(circuit, experimental_capture=True)(1.5)
+        default_capture_result = qjit(circuit)(1.5)
+        experimental_capture_result = qjit(circuit, experimental_capture=True)(1.5)
         assert default_capture_result == experimental_capture_result
 
     def test_cond_workflow_with_custom_primitive(self, backend):
@@ -451,8 +452,8 @@ class TestCapture:
 
             return qml.expval(qml.Z(0))
 
-        default_capture_result = qml.qjit(circuit)(0.1)
-        experimental_capture_result = qml.qjit(circuit, experimental_capture=True)(0.1)
+        default_capture_result = qjit(circuit)(0.1)
+        experimental_capture_result = qjit(circuit, experimental_capture=True)(0.1)
         assert default_capture_result == experimental_capture_result
 
     def test_cond_workflow_with_abstract_measurement(self, backend):
@@ -475,8 +476,8 @@ class TestCapture:
 
             return qml.expval(qml.Z(0))
 
-        default_capture_result = qml.qjit(circuit)(0.1)
-        experimental_capture_result = qml.qjit(circuit, experimental_capture=True)(0.1)
+        default_capture_result = qjit(circuit)(0.1)
+        experimental_capture_result = qjit(circuit, experimental_capture=True)(0.1)
         assert default_capture_result == experimental_capture_result
 
     def test_cond_workflow_with_simple_primitive(self, backend):
@@ -499,8 +500,8 @@ class TestCapture:
 
             return qml.expval(qml.Z(0))
 
-        default_capture_result = qml.qjit(circuit)(0.1)
-        experimental_capture_result = qml.qjit(circuit, experimental_capture=True)(0.1)
+        default_capture_result = qjit(circuit)(0.1)
+        experimental_capture_result = qjit(circuit, experimental_capture=True)(0.1)
         assert default_capture_result == experimental_capture_result
 
     def test_cond_workflow_nested(self, backend):
@@ -527,8 +528,8 @@ class TestCapture:
 
             return qml.expval(qml.Z(0))
 
-        default_capture_result = qml.qjit(circuit)(0.1, 1.5)
-        experimental_capture_result = qml.qjit(circuit, experimental_capture=True)(0.1, 1.5)
+        default_capture_result = qjit(circuit)(0.1, 1.5)
+        experimental_capture_result = qjit(circuit, experimental_capture=True)(0.1, 1.5)
         assert default_capture_result == experimental_capture_result
 
     def test_cond_workflow_operator(self, backend):
@@ -542,8 +543,8 @@ class TestCapture:
 
             return qml.expval(qml.Z(0))
 
-        default_capture_result = qml.qjit(circuit)(0.1)
-        experimental_capture_result = qml.qjit(circuit, experimental_capture=True)(0.1)
+        default_capture_result = qjit(circuit)(0.1)
+        experimental_capture_result = qjit(circuit, experimental_capture=True)(0.1)
         assert default_capture_result == experimental_capture_result
 
     def test_transform_cancel_inverses_workflow(self, backend):
@@ -560,10 +561,10 @@ class TestCapture:
 
             return circuit(x)
 
-        captured_func = qml.qjit(func, experimental_capture=True, target="mlir")
+        captured_func = qjit(func, experimental_capture=True, target="mlir")
         assert 'transform.apply_registered_pass "remove-chained-self-inverse"' in captured_func.mlir
 
-        no_capture_result = qml.qjit(func)(0.1)
+        no_capture_result = qjit(func)(0.1)
         experimental_capture_result = captured_func(0.1)
         assert no_capture_result == experimental_capture_result
 
@@ -581,10 +582,10 @@ class TestCapture:
 
             return circuit(x)
 
-        captured_func = qml.qjit(func, experimental_capture=True, target="mlir")
+        captured_func = qjit(func, experimental_capture=True, target="mlir")
         assert 'transform.apply_registered_pass "merge-rotations"' in captured_func.mlir
 
-        no_capture_result = qml.qjit(func)(0.1)
+        no_capture_result = qjit(func)(0.1)
         experimental_capture_result = captured_func(0.1)
         assert no_capture_result == experimental_capture_result
 
@@ -609,21 +610,17 @@ class TestCapture:
         def inverses_rotations(x: float):
             return qml.transforms.cancel_inverses(qml.transforms.merge_rotations(circuit))(x)
 
-        inverses_rotations_func = qml.qjit(
-            inverses_rotations, experimental_capture=True, target="mlir"
-        )
+        inverses_rotations_func = qjit(inverses_rotations, experimental_capture=True, target="mlir")
         assert has_catalyst_transforms(inverses_rotations_func.mlir)
 
         def rotations_inverses(x: float):
             return qml.transforms.merge_rotations(qml.transforms.cancel_inverses(circuit))(x)
 
-        rotations_inverses_func = qml.qjit(
-            rotations_inverses, experimental_capture=True, target="mlir"
-        )
+        rotations_inverses_func = qjit(rotations_inverses, experimental_capture=True, target="mlir")
         assert has_catalyst_transforms(rotations_inverses_func.mlir)
 
-        no_capture_inverses_rotations_result = qml.qjit(inverses_rotations)(0.1)
-        no_capture_rotations_inverses_result = qml.qjit(rotations_inverses)(0.1)
+        no_capture_inverses_rotations_result = qjit(inverses_rotations)(0.1)
+        no_capture_rotations_inverses_result = qjit(rotations_inverses)(0.1)
         inverses_rotations_result = inverses_rotations_func(0.1)
         rotations_inverses_result = rotations_inverses_func(0.1)
         assert (
@@ -645,12 +642,12 @@ class TestCapture:
 
             return circuit(U)
 
-        captured_func = qml.qjit(func, experimental_capture=True, target="mlir")
+        captured_func = qjit(func, experimental_capture=True, target="mlir")
         assert is_unitary_rotated(captured_func.mlir)
 
         U = qml.Rot(1.0, 2.0, 3.0, wires=0)
 
-        no_capture_result = qml.qjit(func)(U.matrix())
+        no_capture_result = qjit(func)(U.matrix())
         experimental_capture_result = captured_func(U.matrix())
         assert no_capture_result == experimental_capture_result
 
@@ -671,7 +668,7 @@ class TestCapture:
         def inverses_unitary(U: ShapedArray([2, 2], float)):
             return qml.transforms.cancel_inverses(qml.transforms.unitary_to_rot(circuit))(U)
 
-        inverses_unitary_func = qml.qjit(inverses_unitary, experimental_capture=True, target="mlir")
+        inverses_unitary_func = qjit(inverses_unitary, experimental_capture=True, target="mlir")
 
         # Catalyst 'cancel_inverses' should have been scheduled as a pass
         # whereas PL 'unitary_to_rot' should have been expanded
@@ -687,7 +684,7 @@ class TestCapture:
         def unitary_inverses(U: ShapedArray([2, 2], float)):
             return qml.transforms.unitary_to_rot(qml.transforms.cancel_inverses(circuit))(U)
 
-        unitary_inverses_func = qml.qjit(unitary_inverses, experimental_capture=True, target="mlir")
+        unitary_inverses_func = qjit(unitary_inverses, experimental_capture=True, target="mlir")
 
         # Both PL transforms should have been expaned and no Catalyst pass should have been
         # scheduled
@@ -702,8 +699,8 @@ class TestCapture:
 
         U = qml.Rot(1.0, 2.0, 3.0, wires=0)
 
-        no_capture_inverses_unitary_result = qml.qjit(inverses_unitary)(U.matrix())
-        no_capture_unitary_inverses_result = qml.qjit(unitary_inverses)(U.matrix())
+        no_capture_inverses_unitary_result = qjit(inverses_unitary)(U.matrix())
+        no_capture_unitary_inverses_result = qjit(unitary_inverses)(U.matrix())
         inverses_unitary_result = inverses_unitary_func(U.matrix())
         unitary_inverses_result = unitary_inverses_func(U.matrix())
         assert (
@@ -724,11 +721,11 @@ class TestCapture:
 
             return qml.transforms.decompose(circuit, gate_set=[qml.RX, qml.RY, qml.RZ])(x, y, z)
 
-        captured_func = qml.qjit(func, experimental_capture=True, target="mlir")
+        captured_func = qjit(func, experimental_capture=True, target="mlir")
 
         assert is_rot_decomposed(captured_func.mlir)
 
-        no_capture_result = qml.qjit(func)(1.5, 2.5, 3.5)
+        no_capture_result = qjit(func)(1.5, 2.5, 3.5)
         experimental_capture_result = captured_func(1.5, 2.5, 3.5)
         assert no_capture_result == experimental_capture_result
 
@@ -744,11 +741,11 @@ class TestCapture:
 
             return circuit(x)
 
-        captured_func = qml.qjit(func, experimental_capture=True, target="mlir")
+        captured_func = qjit(func, experimental_capture=True, target="mlir")
 
         assert is_wire_mapped(captured_func.mlir)
 
-        no_capture_result = qml.qjit(func)(1.5)
+        no_capture_result = qjit(func)(1.5)
         experimental_capture_result = captured_func(1.5)
         assert no_capture_result == experimental_capture_result
 
@@ -768,11 +765,11 @@ class TestCapture:
 
             return circuit()
 
-        captured_func = qml.qjit(func, experimental_capture=True, target="mlir")
+        captured_func = qjit(func, experimental_capture=True, target="mlir")
 
         assert is_single_qubit_fusion_applied(captured_func.mlir)
 
-        no_capture_result = qml.qjit(func)()
+        no_capture_result = qjit(func)()
         experimental_capture_result = captured_func()
         assert no_capture_result == experimental_capture_result
 
@@ -792,7 +789,7 @@ class TestCapture:
 
             return qml.transforms.commute_controlled(circuit, direction="left")()
 
-        captured_func = qml.qjit(func, experimental_capture=True, target="mlir")
+        captured_func = qjit(func, experimental_capture=True, target="mlir")
 
         assert is_controlled_pushed_back(
             captured_func.mlir, 'quantum.custom "RX"', 'quantum.custom "CNOT"'
@@ -801,7 +798,7 @@ class TestCapture:
             captured_func.mlir, 'quantum.custom "PauliX"', 'quantum.custom "CRX"'
         )
 
-        no_capture_result = qml.qjit(func)()
+        no_capture_result = qjit(func)()
         experimental_capture_result = captured_func()
         assert no_capture_result == experimental_capture_result
 
@@ -818,11 +815,11 @@ class TestCapture:
 
             return circuit()
 
-        captured_func = qml.qjit(func, experimental_capture=True, target="mlir")
+        captured_func = qjit(func, experimental_capture=True, target="mlir")
 
         assert is_amplitude_embedding_merged_and_decomposed(captured_func.mlir)
 
-        no_capture_result = qml.qjit(func)()
+        no_capture_result = qjit(func)()
         experimental_capture_result = captured_func()
         assert no_capture_result == experimental_capture_result
 
@@ -840,10 +837,10 @@ class TestCapture:
             qml.RX(0, wires=0)
             return qml.sample()
 
-        captured_func = qml.qjit(circuit, experimental_capture=False, target="mlir")
+        captured_func = qjit(circuit, experimental_capture=False, target="mlir")
 
         assert "'shots': 10" in captured_func.mlir
 
-        no_capture_result = qml.qjit(circuit)()
+        no_capture_result = qjit(circuit)()
         experimental_capture_result = captured_func()
         assert jnp.allclose(no_capture_result, experimental_capture_result)

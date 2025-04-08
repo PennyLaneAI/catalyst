@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Test that numerical jax functions produce correct results when compiled with qml.qjit"""
+"""Test that numerical jax functions produce correct results when compiled with catalyst.qjit"""
 
 import numpy as np
 import pennylane as qml

@@ -860,7 +860,7 @@ class TestDefaultAvailableIR:
     def test_mlir(self):
         """Test mlir."""
 
-        @qml.qjit  # Note that we are using the default qjit
+        @qjit  # Note that we are using the default qjit
         def f():
             return 1
 
@@ -874,7 +874,7 @@ class TestDefaultAvailableIR:
             qml.RX(x, wires=0)
             return qml.state()
 
-        @qml.qjit  # Note that we are using the default qjit
+        @qjit  # Note that we are using the default qjit
         def g(x: float):
             return f(x)
 
@@ -889,7 +889,7 @@ class TestDefaultAvailableIR:
             qml.RX(x, wires=0)
             return qml.state()
 
-        @qml.qjit  # Note that we are using the default qjit
+        @qjit  # Note that we are using the default qjit
         def g(x: float):
             return f(x)
 
@@ -899,7 +899,7 @@ class TestDefaultAvailableIR:
     def test_jaxpr_target(self, backend):
         """Test no mlir is generated for jaxpr target."""
 
-        @qml.qjit(target="jaxpr")
+        @qjit(target="jaxpr")
         @qml.qnode(qml.device(backend, wires=1))
         def f(x: float):
             qml.RX(x, wires=0)
