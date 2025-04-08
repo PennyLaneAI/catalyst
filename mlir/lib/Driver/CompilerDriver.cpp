@@ -502,7 +502,7 @@ LogicalResult preparePassManager(PassManager &pm, const CompilerOptions &options
             s << *op;
             std::string fileName = pipelineName.str();
             if (auto funcOp = dyn_cast<mlir::func::FuncOp>(op)) {
-                fileName += "_" + funcOp.getName().str();
+                fileName += std::string("_") + funcOp.getName().str();
             }
             dumpToFile(options, output.nextPipelineDumpFilename(fileName), tmp);
         }
@@ -653,6 +653,9 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
     // TODO: FIXME:
     // Let's try to enable multithreading. Do not forget to protect the printing.
     ctx.disableMultithreading();
+    // The transform dialect doesn't appear to load dependent dialects
+    // fpr named passes.
+    ctx.loadAllAvailableDialects();
 
     ScopedDiagnosticHandler scopedHandler(
         &ctx, [&](Diagnostic &diag) { diag.print(options.diagnosticStream); });

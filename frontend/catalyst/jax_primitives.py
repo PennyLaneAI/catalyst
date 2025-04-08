@@ -26,7 +26,7 @@ import numpy as np
 import pennylane as qml
 from jax._src import api_util, core, source_info_util, util
 from jax._src.interpreters import partial_eval as pe
-from jax._src.lax.lax import _nary_lower_hlo, cos_p, sin_p
+from jax._src.lax.lax import _merge_dyn_shape, _nary_lower_hlo, cos_p, sin_p
 from jax._src.lib.mlir import ir
 from jax._src.lib.mlir.dialects import hlo
 from jax.core import AbstractValue
@@ -1340,22 +1340,24 @@ def _hamiltonian_lowering(jax_ctx: mlir.LoweringRuleContext, coeffs: ir.Value, *
 
 
 #
-# sample measurement
+# measurements
 #
-def sample_staging_rule(jaxpr_trace, obs, shots, num_qubits):
+def custom_measurement_staging_rule(
+    primitive, jaxpr_trace, obs, dtypes, *dynamic_shape, static_shape
+):
     """
-    The result shape of `sample_p` is (shots, num_qubits).
-
     In jax, the default `def_abstract_eval` method for binding primitives keeps the abstract aval in
     the dynamic shape dimension, instead of the SSA value for the shape, i.e.
 
-    c:i64[] = ...
+    c:i64[] = ...  # to be used as the 0th dimension of value `e`
     d:AbstractObs = ...
     e:f64[ShapedArray(int64[], weak_type=True),1] = sample[num_qubits=1] d c
 
+    which contains escaped tracers.
+
     To ensure that the result DShapedArray is actually constructed with the tracer value,
     we need to provide a custom staging rule for the primitive, where we manually link
-    the tracer to the output shape. This will now correctly produce
+    the tracer's value to the output shape. This will now correctly produce
 
     e:f64[c,1] = sample[num_qubits=1] d c
 
@@ -1367,82 +1369,125 @@ def sample_staging_rule(jaxpr_trace, obs, shots, num_qubits):
     https://github.com/jax-ml/jax/blob/a54319ec1886ed920d50cacf10e147a743888464/jax/_src/interpreters/partial_eval.py#L1881C7-L1881C24
     """
 
-    if obs.primitive is compbasis_p:
-        if obs.num_qubits:
-            assert num_qubits == obs.num_qubits
-
-    out_shape = core.DShapedArray((shots, num_qubits), jax.numpy.dtype("float64"))
-    out_tracer = pe.DynamicJaxprTracer(jaxpr_trace, out_shape)
-
-    if isinstance(shots, int):
-        invars = [jaxpr_trace.getvar(obs)]
-        params = {"shots": shots, "num_qubits": num_qubits}
+    shape = _merge_dyn_shape(static_shape, dynamic_shape)
+    if not dynamic_shape:
+        # Some PL transforms, like @qml.batch_params, do not support dynamic shapes yet
+        # Therefore we still keep static shapes when possible
+        # This can be removed, and all avals turned into DShapedArrays, when
+        # dynamic program capture in PL is complete
+        out_shapes = tuple(core.ShapedArray(shape, dtype) for dtype in dtypes)
     else:
-        invars = [jaxpr_trace.getvar(obs), jaxpr_trace.getvar(shots)]
-        params = {"num_qubits": num_qubits}
+        out_shapes = tuple(core.DShapedArray(shape, dtype) for dtype in dtypes)
+
+    invars = [jaxpr_trace.getvar(obs)]
+    for dyn_dim in dynamic_shape:
+        invars.append(jaxpr_trace.getvar(dyn_dim))
+
+    params = {"static_shape": static_shape}
+
+    out_tracers = tuple(pe.DynamicJaxprTracer(jaxpr_trace, out_shape) for out_shape in out_shapes)
 
     eqn = pe.new_jaxpr_eqn(
         invars,
-        [jaxpr_trace.makevar(out_tracer)],
-        sample_p,
+        [jaxpr_trace.makevar(out_tracer) for out_tracer in out_tracers],
+        primitive,
         params,
         jax.core.no_effects,
     )
+
     jaxpr_trace.frame.add_eqn(eqn)
-    return out_tracer
+    return out_tracers if len(out_tracers) > 1 else out_tracers[0]
+
+
+#
+# sample measurement
+#
+def sample_staging_rule(jaxpr_trace, obs, *dynamic_shape, static_shape):
+    """
+    The result shape of `sample_p` is (shots, num_qubits).
+    """
+    shape = _merge_dyn_shape(static_shape, dynamic_shape)
+    if obs.primitive is compbasis_p:
+        if obs.num_qubits:
+            assert isinstance(shape[1], int)
+            assert shape[1] == obs.num_qubits
+
+    return custom_measurement_staging_rule(
+        sample_p,
+        jaxpr_trace,
+        obs,
+        [jax.numpy.dtype("float64")],
+        *dynamic_shape,
+        static_shape=static_shape,
+    )
 
 
 pe.custom_staging_rules[sample_p] = sample_staging_rule
 
 
 @sample_p.def_impl
-def _sample_def_impl(ctx, obs, shots, num_qubits):  # pragma: no cover
+def _sample_def_impl(ctx, obs, *dynamic_shape, static_shape):  # pragma: no cover
     raise NotImplementedError()
 
 
 def _sample_lowering(
-    jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: Union[int, ir.Value], num_qubits: int
+    jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, *dynamic_shape, static_shape
 ):
-    # Note: result shape of sample op is (shots, number_of_qubits)
+    # result shape of sample op is (shots, number_of_qubits)
+    # The static_shape argument contains the static dimensions, and None for dynamic dimensions
+
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
-
     f64_type = ir.F64Type.get()
-    result_shape = (
-        (shots, num_qubits)
-        if isinstance(shots, int)
-        else (ir.ShapedType.get_dynamic_size(), num_qubits)
-    )
+
+    # Replace Nones in static_shape with dynamic mlir dimensions
+    result_shape = tuple(ir.ShapedType.get_dynamic_size() if d is None else d for d in static_shape)
     result_type = ir.RankedTensorType.get(result_shape, f64_type)
 
-    return SampleOp(result_type, obs).results
+    dynamic_shape = list(dynamic_shape)
+    for i, dyn_dim in enumerate(dynamic_shape):
+        dynamic_shape[i] = extract_scalar(dyn_dim, f"sample_dyn_dim_{i}")
+
+    return SampleOp(result_type, obs, dynamic_shape=dynamic_shape).results
 
 
 #
 # counts measurement
 #
-@counts_p.def_impl
-def _counts_def_impl(ctx, obs, shots, shape):  # pragma: no cover
-    raise NotImplementedError()
+def counts_staging_rule(jaxpr_trace, obs, *dynamic_shape, static_shape):
+    """
+    The result shape of `counts_p` is (tensor<Nxf64>, tensor<Nxi64>)
+    where N = 2**number_of_qubits.
+    """
 
-
-@counts_p.def_abstract_eval
-def _counts_abstract_eval(obs, shots, shape):
-    assert isinstance(obs, AbstractObs)
-
+    shape = _merge_dyn_shape(static_shape, dynamic_shape)
     if obs.primitive is compbasis_p:
         if obs.num_qubits:
-            assert shape == (2**obs.num_qubits,)
+            if isinstance(shape[0], int):
+                assert shape == (2**obs.num_qubits,)
     else:
         assert shape == (2,)
 
-    return core.ShapedArray(shape, jax.numpy.dtype("float64")), core.ShapedArray(
-        shape, jax.numpy.dtype("int64")
+    return custom_measurement_staging_rule(
+        counts_p,
+        jaxpr_trace,
+        obs,
+        [jax.numpy.dtype("float64"), jax.numpy.dtype("int64")],
+        *dynamic_shape,
+        static_shape=static_shape,
     )
 
 
+pe.custom_staging_rules[counts_p] = counts_staging_rule
+
+
+@counts_p.def_impl
+def _counts_def_impl(ctx, obs, *dynamic_shape, static_shape):  # pragma: no cover
+    raise NotImplementedError()
+
+
 def _counts_lowering(
-    jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: Union[int, ir.Value], shape: tuple
+    jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, *dynamic_shape, static_shape
 ):
     # Note: result shape of counts op is (tensor<Nxf64>, tensor<Nxi64>)
     # where N = 2**number_of_qubits
@@ -1452,10 +1497,20 @@ def _counts_lowering(
 
     i64_type = ir.IntegerType.get_signless(64, ctx)
     f64_type = ir.F64Type.get()
+
+    # Replace Nones in static_shape with dynamic mlir dimensions
+    shape = tuple(ir.ShapedType.get_dynamic_size() if d is None else d for d in static_shape)
     eigvals_type = ir.RankedTensorType.get(shape, f64_type)
     counts_type = ir.RankedTensorType.get(shape, i64_type)
 
-    return CountsOp(eigvals_type, counts_type, obs).results
+    if static_shape[0] is None:
+        # dynamic num_qubits, pass the SSA value to the op
+        dyn_shape = extract_scalar(dynamic_shape[0], "counts_size")
+    else:
+        # static num_qubits already in the shape, no need to pass another operand
+        dyn_shape = None
+
+    return CountsOp(eigvals_type, counts_type, obs, dynamic_shape=dyn_shape).results
 
 
 #
@@ -1521,40 +1576,54 @@ def _var_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shape=None):
 #
 # probs measurement
 #
-@probs_p.def_abstract_eval
-def _probs_abstract_eval(obs, shape, shots=None):
-    assert isinstance(obs, AbstractObs)
+def probs_staging_rule(jaxpr_trace, obs, *dynamic_shape, static_shape):
+    """
+    The result shape of probs_p is (2^num_qubits,).
+    """
+    return custom_measurement_staging_rule(
+        probs_p,
+        jaxpr_trace,
+        obs,
+        [jax.numpy.dtype("float64")],
+        *dynamic_shape,
+        static_shape=static_shape,
+    )
 
-    if obs.primitive is compbasis_p:
-        if obs.num_qubits:
-            assert shape == (2**obs.num_qubits,)
-    else:
-        raise TypeError("probs only supports computational basis")
 
-    return core.ShapedArray(shape, jax.numpy.float64)
+pe.custom_staging_rules[probs_p] = probs_staging_rule
 
 
 @probs_p.def_impl
-def _probs_def_impl(ctx, obs, shape, shots=None):  # pragma: no cover
+def _probs_def_impl(ctx, obs, *dynamic_shape, static_shape):  # pragma: no cover
     raise NotImplementedError()
 
 
-def _probs_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shape: tuple, shots=None):
+def _probs_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, *dynamic_shape, static_shape):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
-    result_type = ir.RankedTensorType.get(shape, ir.F64Type.get())
+    f64_type = ir.F64Type.get()
 
-    return ProbsOp(result_type, obs).results
+    # Replace Nones in static_shape with dynamic mlir dimensions
+    result_shape = tuple(ir.ShapedType.get_dynamic_size() if d is None else d for d in static_shape)
+    result_type = ir.RankedTensorType.get(result_shape, f64_type)
+
+    if static_shape[0] is None:
+        # dynamic sv_length, pass the SSA value to the op
+        dyn_shape = extract_scalar(dynamic_shape[0], "probs_sv_length")
+    else:
+        # static sv_length already in the shape, no need to pass another operand
+        dyn_shape = None
+    return ProbsOp(result_type, obs, dynamic_shape=dyn_shape).results
 
 
 #
 # state measurement
 #
-@state_p.def_abstract_eval
-def _state_abstract_eval(obs, shape, shots=None):
-    assert isinstance(obs, AbstractObs)
-
+def state_staging_rule(jaxpr_trace, obs, *dynamic_shape, static_shape):
+    """
+    The result shape of state_p is (2^num_qubits,).
+    """
     if obs.primitive is compbasis_p:
         assert not obs.num_qubits, """
         A "wires" argument should not be provided since state() always
@@ -1563,22 +1632,41 @@ def _state_abstract_eval(obs, shape, shots=None):
     else:
         raise TypeError("state only supports computational basis")
 
-    return core.ShapedArray(shape, jax.numpy.complex128)
+    return custom_measurement_staging_rule(
+        state_p,
+        jaxpr_trace,
+        obs,
+        [jax.numpy.dtype("complex128")],
+        *dynamic_shape,
+        static_shape=static_shape,
+    )
+
+
+pe.custom_staging_rules[state_p] = state_staging_rule
 
 
 @state_p.def_impl
-def _state_def_impl(ctx, obs, shape, shots=None):  # pragma: no cover
+def _state_def_impl(ctx, obs, *dynamic_shape, static_shape):  # pragma: no cover
     raise NotImplementedError()
 
 
-def _state_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shape: tuple, shots=None):
+def _state_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, *dynamic_shape, static_shape):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
     c64_type = ir.ComplexType.get(ir.F64Type.get())
-    result_type = ir.RankedTensorType.get(shape, c64_type)
 
-    return StateOp(result_type, obs).results
+    # Replace Nones in static_shape with dynamic mlir dimensions
+    result_shape = tuple(ir.ShapedType.get_dynamic_size() if d is None else d for d in static_shape)
+    result_type = ir.RankedTensorType.get(result_shape, c64_type)
+
+    if static_shape[0] is None:
+        # dynamic sv_length, pass the SSA value to the op
+        dyn_shape = extract_scalar(dynamic_shape[0], "state_sv_length")
+    else:
+        # static sv_length already in the shape, no need to pass another operand
+        dyn_shape = None
+    return StateOp(result_type, obs, dynamic_shape=dyn_shape).results
 
 
 #

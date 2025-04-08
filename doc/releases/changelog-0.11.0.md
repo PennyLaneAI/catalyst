@@ -1,4 +1,4 @@
-# Release 0.11.0 (development release)
+# Release 0.11.0 (current release)
 
 <h3>New features since last release</h3>
 
@@ -213,6 +213,14 @@
   This includes `probs(), state(), sample(), counts()`.
     [(#1565)](https://github.com/PennyLaneAI/catalyst/pull/1565)
 
+  - In mlir, `ProbsOp, StateOp, SampleOp, CountsOp` ops now carry an optional new SSA operand for their return shapes.
+    This operand is used during bufferization pass to allocate result memrefs dynamically.
+    A new verification is added to check that this new operand and static return shapes cannot coexist.
+    [(#1574)](https://github.com/PennyLaneAI/catalyst/pull/1574)
+
+* Added `qjit.mlir_opt` property to access the optimized MLIR representation of a compiled function.
+  [(#1579)](https://github.com/PennyLaneAI/catalyst/pull/1579)
+
 * Improve error message for ZNE.
   [(#1603)](https://github.com/PennyLaneAI/catalyst/pull/1603)
 
@@ -225,6 +233,10 @@
 
 * Fixed `argnums` parameter of `grad` and `value_and_grad` being ignored.
   [(#1478)](https://github.com/PennyLaneAI/catalyst/pull/1478)
+
+* All dialects are loaded preemptively.
+  This allows third-party plugins to load their dialects.
+  [(#1584)](https://github.com/PennyLaneAI/catalyst/pull/1584)
 
 * Fixed an issue ([(#1488)](https://github.com/PennyLaneAI/catalyst/pull/1488)) where Catalyst could
   give incorrect results for circuits containing `qml.StatePrep`.
