@@ -18,6 +18,7 @@ This module contains functions tracing and lowering JAX code to MLIR.
 
 import itertools
 import logging
+import weakref
 from collections.abc import Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -417,6 +418,9 @@ class HybridOpRegion:
     res_classical_tracers: List[DynamicJaxprTracer]
 
 
+cached_vars = weakref.WeakKeyDictionary()
+
+
 class HybridOp(Operator):
     """A base class for operations carrying nested regions. The class stores the information
     obtained in the process of classical tracing and required for the completion of the quantum
@@ -483,19 +487,26 @@ class HybridOp(Operator):
             out_expanded_tracers
         ), f"{eqn.outvars=}\n{out_expanded_tracers=}"
 
-        outvars = itertools.chain.from_iterable([e.outvars for e in ctx.frames[trace].eqns[:-1]])
-        jaxpr_variables = set(
-            [
-                *outvars,
-                *ctx.frames[trace].invars,
-                *ctx.frames[trace].constvar_to_val.keys(),
-            ]
-        )
+        frame = ctx.frames[trace]
+        jaxpr_variables = cached_vars.get(frame, set())
+        if not jaxpr_variables:
+            outvars = itertools.chain.from_iterable([e.outvars for e in frame.eqns])
+            jaxpr_variables = set(outvars)
+            jaxpr_variables.update(frame.invars)
+            jaxpr_variables.update(frame.constvar_to_val.keys())
+            cached_vars[frame] = jaxpr_variables
+
+        for outvar in frame.eqns[-1].outvars:
+            jaxpr_variables.discard(outvar)
+
         for i, t in enumerate(out_expanded_tracers):
             if trace.getvar(t) in jaxpr_variables:
                 # Do not re-assign vars from other equations
                 continue
+
             eqn.outvars[i] = trace.getvar(t)
+
+        jaxpr_variables.update(eqn.outvars)
         return out_quantum_tracer
 
     @debug_logger
