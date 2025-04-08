@@ -16,6 +16,7 @@
 This module contains functions tracing and lowering JAX code to MLIR.
 """
 
+import itertools
 import logging
 from collections.abc import Sequence
 from contextlib import contextmanager
@@ -481,14 +482,17 @@ class HybridOp(Operator):
         assert len(eqn.outvars[:-1]) == len(
             out_expanded_tracers
         ), f"{eqn.outvars=}\n{out_expanded_tracers=}"
+
+        outvars = itertools.chain.from_iterable([e.outvars for e in ctx.frames[trace].eqns[:-1]])
+        jaxpr_variables = set(
+            [
+                *outvars,
+                *ctx.frames[trace].invars,
+                *ctx.frames[trace].constvar_to_val.keys(),
+            ]
+        )
         for i, t in zip(range(len(eqn.outvars[:-1])), out_expanded_tracers):
-            if trace.getvar(t) in set(
-                [
-                    *sum([e.outvars for e in ctx.frames[trace].eqns[:-1]], []),
-                    *ctx.frames[trace].invars,
-                    *ctx.frames[trace].constvar_to_val.keys(),
-                ]
-            ):
+            if trace.getvar(t) in jaxpr_variables:
                 # Do not re-assign vars from other equations
                 continue
             eqn.outvars[i] = trace.getvar(t)
