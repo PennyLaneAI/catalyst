@@ -19,7 +19,6 @@
 
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
-#include "mlir/IR/Dominance.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Support/LogicalResult.h"
@@ -140,8 +139,8 @@ bool hasQuantumCustomPredecessor(CustomOp &op)
     return false;
 }
 
-// Return true if all operands of topOp are dominated by the bottomOp
-bool verifyDominance(CustomOp topOp, CustomOp bottomOp)
+// Return true if all operands of topOp are immediately after bottomOp in the IR
+bool verifyImmediatelyAfterwards(CustomOp topOp, CustomOp bottomOp)
 {
     for (auto [outQubit, inQubit] : llvm::zip(topOp.getOutQubits(), bottomOp.getInQubits())) {
         if (outQubit != inQubit) {
@@ -160,7 +159,7 @@ bool isValidEdgePair(const CustomOp &bottomOp, std::vector<QubitOrigin> &bottomQ
 
     if (bottomOpNonConst.getGateName() != topOpNonConst.getGateName() || topOp == bottomOp ||
         !verifyQubitOrigins(topQubitOrigins, bottomQubitOrigins) ||
-        verifyDominance(topOpNonConst, bottomOpNonConst) || hasQuantumCustomSuccessor(bottomOp) ||
+        verifyImmediatelyAfterwards(topOpNonConst, bottomOpNonConst) || hasQuantumCustomSuccessor(bottomOp) ||
         hasQuantumCustomPredecessor(topOpNonConst)) {
         return false;
     }
