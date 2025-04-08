@@ -326,7 +326,7 @@ class TestMidCircuitMeasurement:
         """Test that the correct default mcm_method is chosen based on postselect_mode"""
         dev = qml.device(backend, wires=1, shots=20)
 
-        @qml.qjit
+        @qjit
         @qml.qnode(dev, mcm_method=mcm_method, postselect_mode=postselect_mode)
         def circuit(x):
             qml.RX(x, wires=0)
@@ -343,7 +343,7 @@ class TestMidCircuitMeasurement:
         """Test that the correct default mcm_method is chosen based on postselect_mode"""
         dev = qml.device(backend, wires=1, shots=20)
 
-        @qml.qjit
+        @qjit
         @qml.qnode(dev, mcm_method=mcm_method, postselect_mode=postselect_mode)
         def circuit(x):
             qml.RX(x, wires=0)
@@ -368,7 +368,7 @@ class TestMidCircuitMeasurement:
         """Test that the correct default mcm_method is chosen based on postselect_mode"""
         dev = qml.device(backend, wires=1, shots=5)
 
-        @qml.qjit
+        @qjit
         @qml.qnode(dev, mcm_method=mcm_method, postselect_mode=postselect_mode)
         def circuit(x):
             qml.RX(x, wires=0)
@@ -740,7 +740,7 @@ class TestDynamicOneShotIntegration:
         shots = 10
         dev = qml.device(backend, wires=qubits, shots=shots)
 
-        @qml.qjit
+        @qjit
         @qml.qnode(dev, mcm_method="one-shot")
         def cost():
             qml.Hadamard(0)
