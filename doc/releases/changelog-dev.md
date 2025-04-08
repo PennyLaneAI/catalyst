@@ -27,3 +27,5 @@
 
 This release contains contributions from (in alphabetical order):
 
+Joey Carter,
+Erick Ochoa Lopez.
