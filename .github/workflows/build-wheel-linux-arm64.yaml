@@ -208,26 +208,26 @@ jobs:
           path: ${{ github.workspace }}/enzyme-build
           key: ${{ matrix.container_img }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-wheel-build
 
-  catalyst-linux-wheels-x86-64:
-    needs: [constants, build-dependencies, determine_runner]
-    strategy:
-      fail-fast: false
-      matrix:
-        python_version: ${{ fromJSON(needs.constants.outputs.python_versions) }}
-        container_img: ["manylinux_2_31_armv7l"]
+  # catalyst-linux-wheels-arm-64:
+  #   needs: [constants, build-dependencies, determine_runner]
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       python_version: ${{ fromJSON(needs.constants.outputs.python_versions) }}
+  #       container_img: ["manylinux_2_31_armv7l"]
 
-    name: Build Wheels (Python ${{ matrix.python_version }})
-    runs-on: ${{ needs.determine_runner.outputs.runner_group }}
-    container: quay.io/pypa/${{ matrix.container_img }}
+  #   name: Build Wheels (Python ${{ matrix.python_version }})
+  #   runs-on: ${{ needs.determine_runner.outputs.runner_group }}
+  #   container: quay.io/pypa/${{ matrix.container_img }}
 
-    steps:
-      - name: Checkout Catalyst repo
-        uses: actions/checkout@v4
+  #   steps:
+  #     - name: Checkout Catalyst repo
+  #       uses: actions/checkout@v4
 
-      - name: Set up Python ${{ matrix.python_version }}
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python_version }}
+  #     - name: Set up Python ${{ matrix.python_version }}
+  #       uses: actions/setup-python@v5
+  #       with:
+  #         python-version: ${{ matrix.python_version }}
 
       # - name: Get Cached LLVM Source
       #   id: cache-llvm-source
