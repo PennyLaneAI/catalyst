@@ -47,11 +47,6 @@ jobs:
       - name: Checkout Catalyst
         uses: actions/checkout@v4
 
-      - name: Set Ownership in Container
-        run: |
-          # To fix the git issue with the owner of the checkout dir
-          chown -R $(id -u):$(id -g) $PWD
-
       - name: Cache LLVM Source
         id: cache-llvm-source
         uses: actions/cache@v4
