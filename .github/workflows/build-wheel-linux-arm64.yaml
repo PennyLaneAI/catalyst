@@ -35,7 +35,7 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ["3.10"]
-        container_img: ["manylinux_2_31_armv7l"]
+        container_img: ["manylinux_2_28_x86_64"]
 
     name: Build Dependencies (Python ${{ matrix.python_version }})
     runs-on: ubuntu-22.04-arm
