@@ -153,3 +153,57 @@ jobs:
         with:
           path: ${{ github.workspace }}/llvm-build
           key: ${{ matrix.container_img }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{matrix.python_version}}-wheel-build
+
+      - name: Build MHLO Dialect
+        if: steps.cache-mhlo-build.outputs.cache-hit != 'true'
+        # building with LLD is a strong requirement for mhlo
+        run: |
+          export PATH=$GITHUB_WORKSPACE/llvm-build/bin:$PATH
+
+          export TARGET_FILE=mlir/mlir-hlo/mhlo/transforms/CMakeLists.txt
+          export PATCH_FILE=mlir/patches/mhlo-Add-PassesIncGen-in-transforms-CMakeList.patch
+          if patch --dry-run -p1 -N $TARGET_FILE $PATCH_FILE > /dev/null 2>&1; then patch -p1 $TARGET_FILE $PATCH_FILE; fi
+
+          cmake -S mlir/mlir-hlo -B $GITHUB_WORKSPACE/mhlo-build -G Ninja \
+                -DCMAKE_BUILD_TYPE=Release \
+                -DLLVM_ENABLE_ASSERTIONS=ON \
+                -DMLIR_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir" \
+                -DPython3_EXECUTABLE=$(which python${{ matrix.python_version }}) \
+                -DLLVM_ENABLE_ZLIB=FORCE_ON \
+                -DLLVM_ENABLE_ZSTD=OFF \
+                -DCMAKE_CXX_VISIBILITY_PRESET=default \
+                -DLLVM_ENABLE_LLD=ON
+
+          LIT_FILTER_OUT="chlo_legalize_to_mhlo" cmake --build $GITHUB_WORKSPACE/mhlo-build --target check-mlir-hlo
+          LIT_FILTER_OUT="chlo_legalize_to_mhlo" cmake --build $GITHUB_WORKSPACE/mhlo-build --target check-mlir-hlo
+          LIT_FILTER_OUT="chlo_legalize_to_mhlo" cmake --build $GITHUB_WORKSPACE/mhlo-build --target check-mlir-hlo        
+
+      - name: Save MHLO Build
+        id: save-mhlo-build
+        if: steps.cache-mhlo-build.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ github.workspace }}/mhlo-build
+          key: ${{ matrix.container_img }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-wheel-build
+
+
+      - name: Build Enzyme
+        if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
+        run: |
+          export PATH=$GITHUB_WORKSPACE/llvm-build/bin:$PATH
+          cmake -S mlir/Enzyme/enzyme -B $GITHUB_WORKSPACE/enzyme-build -G Ninja \
+                -DCMAKE_BUILD_TYPE=Release \
+                -DLLVM_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/llvm" \
+                -DENZYME_STATIC_LIB=ON \
+                -DCMAKE_CXX_VISIBILITY_PRESET=default \
+                -DCMAKE_CXX_FLAGS="-fuse-ld=lld"
+
+          cmake --build $GITHUB_WORKSPACE/enzyme-build --target EnzymeStatic-19
+
+      - name: Save Enzyme Build
+        id: save-enzyme-build
+        if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ github.workspace }}/enzyme-build
+          key: ${{ matrix.container_img }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-wheel-build
