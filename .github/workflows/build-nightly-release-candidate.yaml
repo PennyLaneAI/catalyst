@@ -1,0 +1,86 @@
+name: Build Release Branch Nightly for TestPyPI
+
+on:
+  schedule:
+    # Run from April 8th to April 13th at 02:00 UTC (10:00 PM EDT)
+    - cron: "0 2 8-13 4 *"
+  workflow_dispatch:
+
+jobs:
+  setup:
+    name: Setup the release
+    runs-on: ubuntu-22.04
+    steps:
+    - name: Checkout Catalyst repo release branch
+      uses: actions/checkout@v4
+      with:
+        ref: v0.11.0-rc
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install requests
+
+    - name: Bump RC version
+      id: set_rc_version
+      run: |
+        python $GITHUB_WORKSPACE/.github/workflows/set_rc_version.py
+
+
+  # Only build the most popular configurations on a nightly schedule to save PyPI storage.
+
+  linux-x86:
+    name: Build on Linux x86-64
+    needs: [setup]
+    uses: ./.github/workflows/build-wheel-linux-x86_64.yaml
+
+  linux-aarch:
+    name: Build on Linux aarch64
+    needs: [setup]
+    uses: ./.github/workflows/build-wheel-linux-arm64.yaml
+
+  macos-arm:
+    name: Build on macOS arm64
+    needs: [setup]
+    uses: ./.github/workflows/build-wheel-macos-arm64.yaml
+
+  upload:
+    name: Prepare & Upload wheels to TestPyPI
+    needs: [linux-x86, macos-arm, linux-aarch]
+    runs-on: ubuntu-22.04
+    permissions:
+      id-token: write  # IMPORTANT: mandatory for trusted publishing
+
+    steps:
+    - name: Restore _version.py
+      run: |
+        mv frontend/catalyst/_version.py.bak frontend/catalyst/_version.py
+
+    - name: Download wheels
+      uses: actions/download-artifact@v4
+      with:
+        merge-multiple: true
+        path: dist
+
+    - name: Install rename
+      run: |
+        sudo apt install rename
+
+    - name: Prepare wheels
+      run: |
+        # Adjust renaming based on actual filenames produced by build jobs if necessary
+        rename "s/linux/manylinux_2_28/" dist/PennyLane_Catalyst-* || echo "No linux x86_64 files to rename"
+        rename "s/linux/manylinux_2_28/" dist/pennylane_catalyst-* || echo "No linux x86_64 files to rename"
+        rename "s/macosx_13_0_universal2/macosx_13_0_x86_64/" dist/PennyLane_Catalyst-* || echo "No macos universal files to rename"
+        rename "s/macosx_13_0_universal2/macosx_13_0_x86_64/" dist/pennylane_catalyst-* || echo "No macos universal files to rename"
+        rename "s/macosx_14_0_universal2/macosx_13_0_arm64/" dist/PennyLane_Catalyst-* || echo "No macos universal files to rename"
+        rename "s/macosx_14_0_universal2/macosx_13_0_arm64/" dist/pennylane_catalyst-* || echo "No macos universal files to rename"
+        rename "s/macosx_14/macosx_13/" dist/PennyLane_Catalyst-* || echo "No macos 14 files to rename"
+        rename "s/macosx_14/macosx_13/" dist/pennylane_catalyst-* || echo "No macos 14 files to rename"
+
+    - name: Upload wheels
+      uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        repository-url: https://test.pypi.org/legacy/
+        packages-dir: dist
+        verbose: true 
