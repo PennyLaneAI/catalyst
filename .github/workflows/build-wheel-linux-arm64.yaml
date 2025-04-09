@@ -44,9 +44,8 @@ jobs:
     # if: needs.check_if_wheel_build_required.outputs.build-wheels == 'true'
 
     steps:
-
       - name: Set up Node
-        uses: actions/setup-node
+        uses: actions/setup-node@v4
         
       - name: Checkout Catalyst
         uses: actions/checkout@v4
