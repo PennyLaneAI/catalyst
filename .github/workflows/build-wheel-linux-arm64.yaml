@@ -38,7 +38,7 @@ jobs:
         container_img: ["manylinux_2_31_armv7l"]
 
     name: Build Dependencies (Python ${{ matrix.python_version }})
-    runs-on: ubuntu-22.04-arm
+    runs-on: ubuntu-24.04-arm
     container: quay.io/pypa/${{ matrix.container_img }}        
 
     # if: needs.check_if_wheel_build_required.outputs.build-wheels == 'true'
