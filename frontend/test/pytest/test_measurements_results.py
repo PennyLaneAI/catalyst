@@ -1048,7 +1048,7 @@ class TestDensityMatrixMP:
         err_msg = "DensityMatrixMP is not a supported measurement process"
         with pytest.raises(CompileError, match=err_msg):
 
-            @qml.qjit
+            @qjit
             @qml.qnode(CustomDevice(wires=1))
             def circuit():
                 return qml.density_matrix([0])

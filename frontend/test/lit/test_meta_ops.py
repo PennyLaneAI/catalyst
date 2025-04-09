@@ -16,9 +16,11 @@
 
 import pennylane as qml
 
+from catalyst import qjit
+
 
 # CHECK-LABEL: @adjoint_adjoint
-@qml.qjit(target="mlir")
+@qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=1))
 def adjoint_adjoint():
     qml.adjoint(qml.adjoint(qml.S(0)))
@@ -33,7 +35,7 @@ print(adjoint_adjoint.mlir)
 
 
 # CHECK-LABEL: @adjoint_ctrl_adjoint
-@qml.qjit(target="mlir")
+@qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2))
 def adjoint_ctrl_adjoint():
     qml.adjoint(qml.ctrl(qml.adjoint(qml.S(0)), control=1))
