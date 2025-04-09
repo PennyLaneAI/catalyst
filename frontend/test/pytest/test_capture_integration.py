@@ -177,6 +177,22 @@ class TestCapture:
 
         assert jnp.allclose(actual, desired)
 
+    def test_state_prep(self, backend):
+        """Test the integration for a circuit with StatePrep."""
+        dev = qml.device(backend, wires=1)
+
+        @qml.qnode(dev)
+        def circuit(init_state):
+            qml.StatePrep(init_state, wires=0)
+            return qml.state()
+
+        init_state = jnp.array([1.0 + 0.0j, 1.0 + 0.0j], dtype="complex") / jnp.sqrt(2)
+
+        desired = circuit(init_state)
+        actual = qjit(circuit, experimental_capture=True)(init_state)
+
+        assert jnp.allclose(actual, desired)
+
     @pytest.mark.xfail(reason="Adjoint not supported.")
     @pytest.mark.parametrize("theta, val", [(jnp.pi, 0), (-100.0, 1)])
     def test_adjoint(self, backend, theta, val):

@@ -65,6 +65,7 @@ from catalyst.jax_primitives import (
     quantum_kernel_p,
     qunitary_p,
     sample_p,
+    set_state_p,
     state_p,
     var_p,
     while_p,
@@ -319,14 +320,20 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
         """Re-bind a pennylane operation as a catalyst instruction."""
 
         in_qubits = [self.get_wire(w) for w in op.wires]
-        out_qubits = qinst_p.bind(
-            *[*in_qubits, *op.data],
-            op=op.name,
-            qubits_len=len(op.wires),
-            params_len=len(op.data),
-            ctrl_len=0,
-            adjoint=False,
-        )
+
+        if isinstance(op, qml.StatePrep):
+            out_qubits = set_state_p.bind(*[*in_qubits, *op.data])
+
+        else:
+            out_qubits = qinst_p.bind(
+                *[*in_qubits, *op.data],
+                op=op.name,
+                qubits_len=len(op.wires),
+                params_len=len(op.data),
+                ctrl_len=0,
+                adjoint=False,
+            )
+
         for wire_values, new_wire in zip(op.wires, out_qubits):
             self.wire_map[wire_values] = new_wire
 
