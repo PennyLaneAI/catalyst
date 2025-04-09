@@ -110,12 +110,6 @@ frontend:
 	# versions of a package with the same version tag (e.g. 0.38-dev0).
 	$(PYTHON) -m pip uninstall -y pennylane
 	$(PYTHON) -m pip install -e . --extra-index-url https://test.pypi.org/simple $(PIP_VERBOSE_FLAG)
-	# TODO: ------------ remove before merging to main --------------------- #
-	# Install pennylane and pennylane-lightning rc versions for the testing during feature freeze
-	$(PYTHON) -m pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@v0.41.0-rc0
-	$(PYTHON) -m pip install -i https://test.pypi.org/simple/ PennyLane-Lightning-Kokkos==0.41.0rc0
-	$(PYTHON) -m pip install -i https://test.pypi.org/simple/ PennyLane-Lightning==0.41.0rc0
-	# ------------------------------------------------------------------- #
 	rm -r frontend/PennyLane_Catalyst.egg-info
 
 .PHONY: mlir llvm mhlo enzyme dialects runtime oqc
