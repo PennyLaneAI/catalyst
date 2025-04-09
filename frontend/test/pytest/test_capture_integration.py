@@ -808,21 +808,18 @@ class TestCapture:
     def test_transform_merge_amplitude_embedding_workflow(self, backend):
         """Test the integration for a circuit with a 'merge_amplitude_embedding' transform."""
 
-        def func():
-            @qml.transforms.merge_amplitude_embedding
-            @qml.qnode(qml.device(backend, wires=2))
-            def circuit():
-                qml.AmplitudeEmbedding(jnp.array([0.0, 1.0]), wires=0)
-                qml.AmplitudeEmbedding(jnp.array([0.0, 1.0]), wires=1)
-                return qml.expval(qml.PauliZ(0))
+        @qml.transforms.merge_amplitude_embedding
+        @qml.qnode(qml.device(backend, wires=2))
+        def circuit():
+            qml.AmplitudeEmbedding(jnp.array([0.0, 1.0]), wires=0)
+            qml.AmplitudeEmbedding(jnp.array([0.0, 1.0]), wires=1)
+            return qml.expval(qml.PauliZ(0))
 
-            return circuit()
-
-        captured_func = qml.qjit(func, experimental_capture=True, target="mlir")
+        captured_func = qml.qjit(circuit, experimental_capture=True, target="mlir")
 
         assert is_amplitude_embedding_merged_and_decomposed(captured_func.mlir)
 
-        no_capture_result = qml.qjit(func)()
+        no_capture_result = qml.qjit(circuit)()
         experimental_capture_result = captured_func()
         assert no_capture_result == experimental_capture_result
 
