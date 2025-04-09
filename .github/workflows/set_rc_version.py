@@ -1,11 +1,13 @@
-import re
 import os
+import re
 import sys
+
 import requests
 
 version_file_path = os.path.join(os.path.dirname(__file__), "../../frontend/catalyst/_version.py")
 
 assert os.path.isfile(version_file_path)
+
 
 def get_base_version():
     with open(version_file_path, "r") as f:
@@ -27,7 +29,7 @@ def get_latest_rc_version(base_version):
     # Query TestPyPI for all versions of the package
     package_name = "PennyLane-Catalyst"  # Adjust if needed
     url = f"https://test.pypi.org/pypi/{package_name}/json"
-    
+
     try:
         response = requests.get(url, timeout=10)
         response.raise_for_status()  # Raise an exception for bad status codes
@@ -60,12 +62,16 @@ def get_latest_rc_version(base_version):
     new_version = f"{base_version}.rc{new_rc_number}"
     return new_version
 
+
 def backup_version_file():
     """Create a backup of the version file."""
     backup_path = f"{version_file_path}.bak"
-    with open(version_file_path, "r", encoding="UTF-8") as src, open(backup_path, "w", encoding="UTF-8") as dst:
+    with open(version_file_path, "r", encoding="UTF-8") as src, open(
+        backup_path, "w", encoding="UTF-8"
+    ) as dst:
         dst.write(src.read())
     return backup_path
+
 
 def update_version_file(new_version):
     """Update the version file with the new version."""
@@ -77,18 +83,20 @@ def update_version_file(new_version):
     with open(version_file_path, "w", encoding="UTF-8") as f:
         f.writelines(lines)
 
+
 def main():
     base_version = get_base_version()
     next_rc_version = get_latest_rc_version(base_version)
-    
+
     # Note that we only want to update the version file temporarily,
     # and we want to be able to revert to the original version after the
     # release candidate build is finished.
     backup_path = backup_version_file()
     update_version_file(next_rc_version)
-    
+
     print(f"Backed up version file to: {backup_path}")
     print(f"Updated version to: {next_rc_version}")
 
+
 if __name__ == "__main__":
-    main() 
+    main()
