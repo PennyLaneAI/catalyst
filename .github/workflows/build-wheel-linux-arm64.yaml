@@ -1,15 +1,15 @@
 name: Build Catalyst Wheel on Linux (arm64)
 
 on:
-  pull_request: {}
-    # types:
-    #   - opened
-    #   - reopened
-    #   - synchronize
-    #   - labeled
-    #   - ready_for_review
-  # push:
-  #   branches: [ main ]
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - labeled
+      - ready_for_review
+  push:
+    branches: [ main ]
   workflow_dispatch:
   workflow_call:
 
@@ -18,18 +18,18 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # check_if_wheel_build_required:
-  #   # if: github.event.pull_request.draft == false
-  #   uses: ./.github/workflows/check-for-wheel-build.yml
+  check_if_wheel_build_required:
+    # if: github.event.pull_request.draft == false
+    uses: ./.github/workflows/check-for-wheel-build.yml
 
   constants:
-    # needs: [check_if_wheel_build_required]
+    needs: [check_if_wheel_build_required]
     # if: needs.check_if_wheel_build_required.outputs.build-wheels == 'true'
     name: "Set build matrix"
     uses: ./.github/workflows/constants.yaml
 
   build-dependencies:
-    needs: [constants] #, check_if_wheel_build_required]
+    needs: [constants, check_if_wheel_build_required]
 
     strategy:
       fail-fast: false
