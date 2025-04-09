@@ -2201,7 +2201,7 @@ class TestParameterShiftVerificationIntegrationTests:
                 return qml.expval(qml.PauliZ(wires=0))
 
 
-def test_closure_variable():
+def test_closure_variable_grad():
     """Test that grad can take closure variables"""
 
     @qml.qjit
@@ -2234,6 +2234,43 @@ def test_closure_variable():
 
     expected = workflow_no_closure(1.0, 0.25)
     observed = workflow_closure(1.0, 0.25)
+    assert np.allclose(expected, observed)
+
+
+def test_closure_variable_jacobian():
+    """Test that jacobian can take closure variables"""
+
+    @qml.qjit
+    def workflow_closure(x, y):
+
+        dev = qml.device("lightning.qubit", wires=1)
+
+        @qml.qnode(dev)
+        def circuit(x):
+            qml.RX(jnp.pi * x[0], wires=0)
+            qml.RX(jnp.pi * y[0], wires=0)
+            return qml.expval(qml.PauliY(0))
+
+        g = jacobian(circuit)
+        return g(x)
+
+    @qml.qjit
+    def workflow_no_closure(x, y):
+
+        dev = qml.device("lightning.qubit", wires=1)
+
+        @qml.qnode(dev)
+        def circuit(x, y):
+            qml.RX(jnp.pi * x[0], wires=0)
+            qml.RX(jnp.pi * y[0], wires=0)
+            return qml.expval(qml.PauliY(0))
+
+        g = jacobian(circuit)
+        return g(x, y)
+
+    x, y = jnp.array([1.0]), jnp.array([0.25])
+    expected = workflow_no_closure(x, y)
+    observed = workflow_closure(x, y)
     assert np.allclose(expected, observed)
 
 
