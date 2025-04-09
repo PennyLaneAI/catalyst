@@ -2237,8 +2237,8 @@ def test_closure_variable_grad():
     assert np.allclose(expected, observed)
 
 
-def test_closure_variable_jacobian():
-    """Test that jacobian can take closure variables"""
+def test_closure_variable_value_and_grad():
+    """Test that value and grad can take closure variables"""
 
     @qml.qjit
     def workflow_closure(x, y):
@@ -2247,11 +2247,11 @@ def test_closure_variable_jacobian():
 
         @qml.qnode(dev)
         def circuit(x):
-            qml.RX(jnp.pi * x[0], wires=0)
-            qml.RX(jnp.pi * y[0], wires=0)
+            qml.RX(jnp.pi * x, wires=0)
+            qml.RX(jnp.pi * y, wires=0)
             return qml.expval(qml.PauliY(0))
 
-        g = jacobian(circuit)
+        g = value_and_grad(circuit)
         return g(x)
 
     @qml.qjit
@@ -2261,14 +2261,14 @@ def test_closure_variable_jacobian():
 
         @qml.qnode(dev)
         def circuit(x, y):
-            qml.RX(jnp.pi * x[0], wires=0)
-            qml.RX(jnp.pi * y[0], wires=0)
+            qml.RX(jnp.pi * x, wires=0)
+            qml.RX(jnp.pi * y, wires=0)
             return qml.expval(qml.PauliY(0))
 
-        g = jacobian(circuit)
+        g = value_and_grad(circuit)
         return g(x, y)
 
-    x, y = jnp.array([1.0]), jnp.array([0.25])
+    x, y = 1.0, 0.25
     expected = workflow_no_closure(x, y)
     observed = workflow_closure(x, y)
     assert np.allclose(expected, observed)
