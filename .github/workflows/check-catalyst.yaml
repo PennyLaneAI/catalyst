@@ -445,8 +445,6 @@ jobs:
         python3 -m pip install oqc-qcaas-client
         make frontend
 
-    # TODO: ------------ remove before merging to main --------------------- #
-    # Install pennylane and pennylane-lightning rc versions for the testing during feature freeze
     - name: Install PennyLane release candidate
       if: github.event.pull_request.base.ref == 'v0.11.0-rc'
       run: |
@@ -467,7 +465,6 @@ jobs:
         pip install --no-deps --force .
         PL_BACKEND=lightning_kokkos python scripts/configure_pyproject_toml.py
         pip install --no-deps --force .
-    # ------------------------------------------------------------------- #
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
@@ -546,8 +543,6 @@ jobs:
         python3 -m pip install -r requirements.txt
         make frontend
 
-    # TODO: ------------ remove before merging to main --------------------- #
-    # Install pennylane and pennylane-lightning rc versions for the testing during feature freeze
     - name: Install PennyLane release candidate
       if: github.event.pull_request.base.ref == 'v0.11.0-rc'
       run: |
@@ -568,7 +563,6 @@ jobs:
         pip install --no-deps --force .
         PL_BACKEND=lightning_kokkos python scripts/configure_pyproject_toml.py
         pip install --no-deps --force .
-    # ------------------------------------------------------------------- #
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
@@ -627,8 +621,6 @@ jobs:
         python3 -m pip install -r requirements.txt
         make frontend
 
-    # TODO: ------------ remove before merging to main --------------------- #
-    # Install pennylane and pennylane-lightning rc versions for the testing during feature freeze
     - name: Install PennyLane release candidate
       if: github.event.pull_request.base.ref == 'v0.11.0-rc'
       run: |
@@ -649,7 +641,6 @@ jobs:
         pip install --no-deps --force .
         PL_BACKEND=lightning_kokkos python scripts/configure_pyproject_toml.py
         pip install --no-deps --force .
-    # ------------------------------------------------------------------- #
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
