@@ -2,6 +2,7 @@
 
 <h3>New features since last release</h3>
 
+
 * Add loop boundary optimization pass that identifies and optimizes redundant quantum operations that occur at loop iteration boundaries, where operations at iteration boundaries often cancel each other out. 
   [(#1476)](https://github.com/PennyLaneAI/catalyst/pull/1476)
 
