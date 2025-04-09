@@ -463,6 +463,7 @@ jobs:
       run: |
         # Lightning-Kokkos can no longer be installed with pip from git
         cd lightning_build
+        pip install -r requirements.txt
         pip install --no-deps --force .
         PL_BACKEND=lightning_kokkos python scripts/configure_pyproject_toml.py
         pip install --no-deps --force .
@@ -563,6 +564,7 @@ jobs:
       run: |
         # Lightning-Kokkos can no longer be installed with pip from git
         cd lightning_build
+        pip install -r requirements.txt
         pip install --no-deps --force .
         PL_BACKEND=lightning_kokkos python scripts/configure_pyproject_toml.py
         pip install --no-deps --force .
@@ -643,6 +645,7 @@ jobs:
       run: |
         # Lightning-Kokkos can no longer be installed with pip from git
         cd lightning_build
+        pip install -r requirements.txt
         pip install --no-deps --force .
         PL_BACKEND=lightning_kokkos python scripts/configure_pyproject_toml.py
         pip install --no-deps --force .
