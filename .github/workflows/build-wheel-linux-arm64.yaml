@@ -44,12 +44,10 @@ jobs:
     # if: needs.check_if_wheel_build_required.outputs.build-wheels == 'true'
 
     steps:
-      - name: Prepare Node20
-        run: |
-          cd $RUNNER_HOME/actions-runner/externals
-          mv node20 node20.bak
-          ln -s node16 node20
-          
+
+      - name: Set up Node
+        uses: actions/setup-node
+        
       - name: Checkout Catalyst
         uses: actions/checkout@v4
 
