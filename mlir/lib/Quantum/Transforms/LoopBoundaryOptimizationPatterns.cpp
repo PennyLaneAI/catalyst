@@ -140,7 +140,7 @@ bool hasQuantumCustomPredecessor(CustomOp &op)
 }
 
 // Return true if all operands of topOp are immediately after bottomOp in the IR
-bool verifyImmediatelyAfterwards(CustomOp topOp, CustomOp bottomOp)
+bool isSourceAndSink(CustomOp topOp, CustomOp bottomOp)
 {
     for (auto [outQubit, inQubit] : llvm::zip(topOp.getOutQubits(), bottomOp.getInQubits())) {
         if (outQubit != inQubit) {
@@ -159,7 +159,7 @@ bool isValidEdgePair(const CustomOp &bottomOp, std::vector<QubitOrigin> &bottomQ
 
     if (bottomOpNonConst.getGateName() != topOpNonConst.getGateName() || topOp == bottomOp ||
         !verifyQubitOrigins(topQubitOrigins, bottomQubitOrigins) ||
-        verifyImmediatelyAfterwards(topOpNonConst, bottomOpNonConst) || hasQuantumCustomSuccessor(bottomOp) ||
+        isSourceAndSink(topOpNonConst, bottomOpNonConst) || hasQuantumCustomSuccessor(bottomOp) ||
         hasQuantumCustomPredecessor(topOpNonConst)) {
         return false;
     }
