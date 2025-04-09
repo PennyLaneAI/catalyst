@@ -448,7 +448,7 @@ class TestCatalyst:
     def test_adjoint_wires(self, backend):
         """Test the wires property of Adjoint"""
 
-        @qml.qjit
+        @qjit
         @qml.qnode(qml.device(backend, wires=3))
         def circuit(theta):
             def func(theta):
@@ -465,7 +465,7 @@ class TestCatalyst:
     def test_adjoint_wires_qubitunitary(self, backend):
         """Test the wires property of nested Adjoint with QubitUnitary"""
 
-        @qml.qjit
+        @qjit
         @qml.qnode(qml.device(backend, wires=3))
         def circuit():
             def func():
@@ -498,7 +498,7 @@ class TestCatalyst:
             qml.RY(theta / 2, wires=w1)
             qml.RZ(theta, wires=2)
 
-        @qml.qjit
+        @qjit
         @qml.qnode(device)
         def C_workflow(w0, w1, theta):
             qml.PauliX(wires=0)
@@ -517,7 +517,7 @@ class TestCatalyst:
     def test_adjoint_wires_controlflow(self, backend):
         """Test the wires property of Adjoint  in a conditional branch"""
 
-        @qml.qjit
+        @qjit
         @qml.qnode(qml.device(backend, wires=3))
         def circuit():
             def func(pred, theta):
@@ -1646,7 +1646,7 @@ class TestMidCircuitMeasurementAfterAdjoint:
         def subroutine():
             qml.Hadamard(wires=1)
 
-        @qml.qjit()
+        @qjit()
         @qml.qnode(qml.device("lightning.qubit", wires=2))
         def circuit():
             # Comment/uncomment to toggle bug

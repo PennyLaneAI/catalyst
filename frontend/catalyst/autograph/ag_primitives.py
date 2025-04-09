@@ -148,7 +148,7 @@ def assert_iteration_inputs(inputs, symbol_names):
     Additionally, these types need to be valid JAX types.
     """
 
-    for i, inp in enumerate(inputs):
+    for i, inp in enumerate(jax.tree.leaves(inputs)):
         if isinstance(inp, Undefined):
             raise AutoGraphError(
                 f"The variable '{inp}' is potentially uninitialized:\n"
@@ -178,7 +178,7 @@ def assert_iteration_results(inputs, outputs, symbol_names):
     variable was initialized with wrong type.
     """
 
-    for i, (inp, out) in enumerate(zip(inputs, outputs)):
+    for i, (inp, out) in enumerate(zip(jax.tree.leaves(inputs), jax.tree.leaves(outputs))):
         inp_t, out_t = jax.api_util.shaped_abstractify(inp), jax.api_util.shaped_abstractify(out)
         if inp_t.dtype != out_t.dtype or inp_t.shape != out_t.shape:
             raise AutoGraphError(
@@ -548,8 +548,19 @@ def converted_call(fn, args, kwargs, caller_fn_scope=None, options=None):
             catalyst.vmap,
             catalyst.mitigate_with_zne,
         ):
-            assert args and callable(args[0])
+            if not args:
+                raise ValueError(f"{fn.__name__} requires at least one argument")
+
+            # If first argument is already an operation, pass it through directly
+            if isinstance(args[0], qml.operation.Operation):
+                return ag_converted_call(fn, args, kwargs, caller_fn_scope, options)
+
+            # Otherwise, handle the callable case
             wrapped_fn = args[0]
+            if not callable(wrapped_fn):
+                raise ValueError(
+                    f"First argument to {fn.__name__} must be callable or an Operation"
+                )
 
             def passthrough_wrapper(*args, **kwargs):
                 return converted_call(wrapped_fn, args, kwargs, caller_fn_scope, options)

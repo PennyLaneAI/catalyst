@@ -32,6 +32,7 @@ something like the following:
 
   ```python
   import pennylane as qml
+  from catalyst import qjit
   from pathlib import Path
 
   from catalyst.passes import apply_pass
@@ -43,7 +44,7 @@ something like the following:
   def bar():
     return qml.state()
 
-  @qml.qjit(keep_intermediate=True, verbose=True, pass_plugins=[plugin], dialect_plugins=[plugin])
+  @qjit(keep_intermediate=True, verbose=True, pass_plugins=[plugin], dialect_plugins=[plugin])
   def module():
     return bar()
 
