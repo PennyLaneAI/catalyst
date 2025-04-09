@@ -32,7 +32,7 @@ with open(version_file_path, "r+", encoding="UTF-8") as f:
     # Try to match version with RC suffix first
     pattern = r"(\d+).(\d+).(\d+)-rc(\d+)"
     match = re.search(pattern, version_line)
-    
+
     if match:
         # Case 1: Version has RC suffix
         major, minor, bug, rc = match.groups()
