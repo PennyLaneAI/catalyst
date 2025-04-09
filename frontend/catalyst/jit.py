@@ -440,11 +440,25 @@ def qjit(
         the ``sum_abstracted`` function would only compile once and its definition would be
         reused for subsequent function calls.
 
+    .. _qubit_invariant_compilation:
     .. details::
         :title: Qubit-invariant compilation
 
-        A powerful feature of Catalyst is that the same compiled QNode can be invoked with
-        different number of qubits. This is especially helpful for workflows where you would
+        In general, the inputs and outputs to the function being qjitted must have static types
+        and shapes. Otherwise, recompilation would be triggered.
+
+        Out of all the :ref:`Catalyst-supported terminal measurements <measurements>`, there are
+        four that have a return shape that depend on the number of qubits. Namely, the return shape
+        of :func:`qml.probs() <pennylane.probs>` and :func:`qml.state() <pennylane.state>` is a 1D
+        array of size ``(2**num_qubits)``, return shape of :func:`qml.sample() <pennylane.sample>`
+        is a 2D array of size ``(shots, num_qubits)``, and return shape of
+        :func:`qml.counts() <pennylane.counts>` is two 1D arrays of size ``(2**num_qubits)``.
+        The general rule of recompilation mentioned above means that when changing the number of qubits
+        in a workflow that returns these 4 measurements, recompilation would necessarily occur.
+
+        However, despite the general recompilation rule, Catalyst presents the powerful feature of
+        qubit-invariant compilation: the same compiled QNode can be invoked with a
+        different number of qubits! This is especially helpful for workflows where you would
         like to, for example, iterate through the wires without knowing how many of them
         there are in advance. For instance, many workflows (such as `Grover's algorithm
         <https://pennylane.ai/qml/demos/tutorial_grovers_algorithm>`_) have
@@ -458,6 +472,7 @@ def qjit(
 
             @qjit
             def workflow(num_qubits):
+                print("compiling...")
                 dev = qml.device("lightning.qubit", wires=num_qubits)
 
                 @qml.qnode(dev)
@@ -472,6 +487,7 @@ def qjit(
                 return circuit()
 
         >>> workflow(2)  # the first call, compilation occurs here
+        compiling...
         [0.25 0.25 0.25 0.25]
         >>> workflow(3)  # the precompiled quantum function is called
         [0.125 0.125 0.125 0.125 0.125 0.125 0.125 0.125]

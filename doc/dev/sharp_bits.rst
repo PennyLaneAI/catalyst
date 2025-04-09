@@ -321,6 +321,11 @@ UserWarning: Provided arguments did not match declared signature, recompiling...
 Tracing occurring
 Array(0.16996714, dtype=float64)
 
+.. note::
+
+    An exception to the above rule regarding recompilation is when the dynamically-shaped output array is a :ref:`Catalyst-supported terminal measurement <measurements>`, and the output shape depends on the number of qubits. Recompilation is not triggered in these cases.
+    See :ref:`qubit-invariant compilation <qubit_invariant_compilation>`.
+
 Specifying compile-time constants
 ---------------------------------
 
