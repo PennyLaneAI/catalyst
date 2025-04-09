@@ -148,7 +148,7 @@ def assert_iteration_inputs(inputs, symbol_names):
     Additionally, these types need to be valid JAX types.
     """
 
-    for i, inp in enumerate(inputs):
+    for i, inp in enumerate(jax.tree.leaves(inputs)):
         if isinstance(inp, Undefined):
             raise AutoGraphError(
                 f"The variable '{inp}' is potentially uninitialized:\n"
@@ -178,7 +178,7 @@ def assert_iteration_results(inputs, outputs, symbol_names):
     variable was initialized with wrong type.
     """
 
-    for i, (inp, out) in enumerate(zip(inputs, outputs)):
+    for i, (inp, out) in enumerate(zip(jax.tree.leaves(inputs), jax.tree.leaves(outputs))):
         inp_t, out_t = jax.api_util.shaped_abstractify(inp), jax.api_util.shaped_abstractify(out)
         if inp_t.dtype != out_t.dtype or inp_t.shape != out_t.shape:
             raise AutoGraphError(

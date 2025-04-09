@@ -86,7 +86,7 @@ def test_gradient_generate_once():
     def identity(x):
         return x
 
-    @qml.qjit
+    @qjit
     def wrap(x: float):
         diff = grad(identity)
         return diff(x) + diff(x)
@@ -1725,7 +1725,7 @@ class TestGradientErrors:
 
         with pytest.raises(DifferentiableCompileError, match="MidCircuitMeasure is not allowed"):
 
-            @qml.qjit
+            @qjit
             def cir(x: float):
                 return grad(f)(x)
 
@@ -1740,7 +1740,7 @@ class TestGradientErrors:
 
         with pytest.raises(CompileError, match=".*Compilation failed.*"):
 
-            @qml.qjit
+            @qjit
             def cir(x: float):
                 return grad(f)(x)
 
@@ -1757,7 +1757,7 @@ class TestGradientErrors:
 
         with pytest.raises(CompileError, match=".*Compilation failed.*"):
 
-            @qml.qjit
+            @qjit
             def cir(x: float):
                 return grad(g)(x)
 
@@ -2103,7 +2103,7 @@ class TestParameterShiftVerificationIntegrationTests:
 
         with pytest.raises(DifferentiableCompileError, match="MidCircuitMeasure is not allowed"):
 
-            @qml.qjit
+            @qjit
             @grad
             @qml.qnode(device, diff_method="parameter-shift")
             def circuit(_: float):
@@ -2117,7 +2117,7 @@ class TestParameterShiftVerificationIntegrationTests:
         # Yes, this test does not have an assertion.
         # The test is that this does not produce an assertion.
 
-        @qml.qjit
+        @qjit
         @grad
         @qml.qnode(device, diff_method="parameter-shift")
         def circuit(_: float):
@@ -2137,7 +2137,7 @@ class TestParameterShiftVerificationIntegrationTests:
 
         with pytest.raises(CompileError):
 
-            @qml.qjit
+            @qjit
             @grad
             @qml.qnode(device, diff_method="parameter-shift")
             def circuit(x: float):
@@ -2155,7 +2155,7 @@ class TestParameterShiftVerificationIntegrationTests:
 
         with pytest.raises(CompileError):
 
-            @qml.qjit
+            @qjit
             @grad
             @qml.qnode(device, diff_method="parameter-shift")
             def circuit(x: float):
@@ -2174,7 +2174,7 @@ class TestParameterShiftVerificationIntegrationTests:
 
         with pytest.raises(CompileError):
 
-            @qml.qjit
+            @qjit
             @grad
             @qml.qnode(device, diff_method="parameter-shift")
             def circuit(x: float):
@@ -2193,7 +2193,7 @@ class TestParameterShiftVerificationIntegrationTests:
 
         with pytest.raises(CompileError):
 
-            @qml.qjit
+            @qjit
             @grad
             @qml.qnode(device, diff_method="parameter-shift")
             def circuit(x: float):
