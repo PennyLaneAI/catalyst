@@ -139,7 +139,9 @@ bool hasQuantumCustomPredecessor(CustomOp &op)
     return false;
 }
 
-// Return true if all operands of topOp are immediately after bottomOp in the IR
+// Return true if bottomOp is the immediate successor of topOp.
+// In this case, we don't want to perform loop boundary commutation,
+// as it would prevent a fix-point from being reached by the rewrite driver.
 bool isSourceAndSink(CustomOp topOp, CustomOp bottomOp)
 {
     for (auto [outQubit, inQubit] : llvm::zip(topOp.getOutQubits(), bottomOp.getInQubits())) {
