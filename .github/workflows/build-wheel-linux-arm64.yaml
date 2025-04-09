@@ -217,7 +217,7 @@ jobs:
 
     name: Build Wheels (Python ${{ matrix.python_version }})
     runs-on: ubuntu-22.04-arm
-    container: quay.io/pypa/${{ matrix.container_img }}
+    # container: quay.io/pypa/${{ matrix.container_img }}
 
     steps:
       - name: Checkout Catalyst repo
