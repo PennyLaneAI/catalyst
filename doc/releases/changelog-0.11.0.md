@@ -2,11 +2,13 @@
 
 <h3>New features since last release</h3>
 
-
-* Add loop boundary optimization pass that identifies and optimizes redundant quantum operations that occur at loop iteration boundaries, where operations at iteration boundaries often cancel each other out. 
+* The `cancel_inverses` and `merge_rotations` compilation passes are now more efficient when control 
+  flow is present.
   [(#1476)](https://github.com/PennyLaneAI/catalyst/pull/1476)
 
-  This optimization help to eliminates redundant operations that aims to reduce quantum circuit depth and gate count.This pass is supported into `cancel_inverses` and `merge_rotations`.
+  Loop boundary optimizations have been implemented to identify and optimize redundant quantum operations 
+  that occur at loop iteration boundaries, where operations at iteration boundaries often cancel each 
+  other out. This eliminates redundant operations and aims to reduce quantum circuit depth. 
 
   For example,
 
@@ -24,89 +26,92 @@
       return qml.expval(qml.Z(0))
   ```
 
-  Note that this optimization specifically targets operations that are exact inverses of each other when applied in sequence. For example, consecutive Hadamard gates (H†H = I) pairs will be identified and eliminated.
+  Note that this optimization specifically targets operations that are exact inverses of each other 
+  when applied in sequence. For example, consecutive Hadamard gates pairs will be identified and eliminated.
 
-* Conversion Clifford+T gates to Pauli Product Rotation (PPR) and measurement to Pauli Product Measurement (PPM) are now available through the `to_ppr` pass transform.
-
+* Three new compilation passes have been added to help convert Clifford + T gates to Pauli product measurements 
+  (PPMs) as prescribed in [arXiv:1808.02892](https://arxiv.org/abs/1808.02892v3). 
   [(#1499)](https://github.com/PennyLaneAI/catalyst/pull/1499)
   [(#1551)](https://github.com/PennyLaneAI/catalyst/pull/1551)
-  [(#1564)](https://github.com/PennyLaneAI/catalyst/pull/1564)
-
-  Supported gate conversions:
-    - H gate → PPR with (Z · X · Z)π/4
-    - S gate → PPR with (Z)π/4
-    - T gate → PPR with (Z)π/8
-    - CNOT → PPR with (Z ⊗ X)π/4 · (Z ⊗ 1)−π/4 · (1 ⊗ X)−π/4
-
-    Example:
-    ```python
-        @qjit(keep_intermediate=True)
-        @to_ppr
-        @qml.qnode(dev)
-        def circuit():
-            qml.H(0)
-            qml.S(1)
-            qml.T(0)
-            qml.CNOT([0, 1])
-            m1 = catalyst.measure(wires=0)
-            m2 = catalyst.measure(wires=1)
-            return m1, m2
-        circuit()
-    ```
-
-    The PPRs and PPMs are currently only represented symbolically. However, these operations are not yet executable on any backend since they exist purely as intermediate representations for analysis and potential future execution when a suitable backend is available.
-
-    Example MLIR Representation:
-    ```mlir
-      . . .
-        %0 = quantum.alloc( 2) : !quantum.reg
-        %1 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
-        %2 = qec.ppr ["Z"](4) %1 : !quantum.bit
-        %3 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
-        %4 = qec.ppr ["Z"](4) %3 : !quantum.bit
-        %5 = qec.ppr ["X"](4) %4 : !quantum.bit
-        %6 = qec.ppr ["Z"](4) %5 : !quantum.bit
-        %7 = qec.ppr ["Z"](8) %6 : !quantum.bit
-        %8:2 = qec.ppr ["Z", "X"](4) %7, %2 : !quantum.bit, !quantum.bit
-        %9 = qec.ppr ["Z"](-4) %8#0 : !quantum.bit
-        %10 = qec.ppr ["X"](-4) %8#1 : !quantum.bit
-        %mres, %out_qubits = qec.ppm ["Z"] %9 : !quantum.bit
-        %mres_0, %out_qubits_1 = qec.ppm ["Z"] %10 : !quantum.bit
-      . . .
-    ```
-
-* Commuting Clifford Pauli Product Rotation (PPR) operations to the end of a circuit, past non-Clifford PPRs, is now available through the :func:`~.catalyst.passes.commute_ppr` pass transform.
   [(#1563)](https://github.com/PennyLaneAI/catalyst/pull/1563)
-  
-  A PPR is a rotation gate of the form :math:`\exp{iP \theta}`, where :math:`P` is a Pauli word (a product of Pauli operators). Clifford PPRs refer to PPRs with :math:`\theta = \tfrac{\pi}{4}`, while non-Clifford PPRs have :math:`\theta = \tfrac{\pi}{8}`.
-
-  
-  Example:
-  ```python
-    @qjit(keep_intermediate=True)
-    @pipeline({"to_ppr": {}, "commute_ppr": {}})
-    @qml.qnode(qml.device("null.qubit", wires=1))
-    def circuit():
-        qml.H(0)
-        qml.T(0)
-        return measure(0)
-    ```
-  
-  The circuit program that generated from this pass is currrently not executable on any backend. For more information regarding to PPM, please refer to [(Pauli Product Measurement)](https://pennylane.ai/compilation/pauli-product-measurement)
-
-* Absorbing Clifford Pauli Product Rotation (PPR) operations into the final Pauli Product Measurement (PPM) is not availble through the :func:`~.catalyst.passes.ppr_to_ppm` pass transform. The output from this pass consists of non-Clifford PPRs and PPMs.
+  [(#1564)](https://github.com/PennyLaneAI/catalyst/pull/1564)
   [(#1577)](https://github.com/PennyLaneAI/catalyst/pull/1577)
+  
+  These new compilation passes are currently only represented symbolically. However, these operations 
+  are not yet executable on any backend, since they exist purely as intermediate representations for 
+  analysis and potential future execution when a suitable backend is available.
+
+  The following new compilation passes have been added in the `passes` module:
+
+  * `catalyst.passes.to_ppr`: Clifford + T gates are converted into Pauli product rotations (PPRs) 
+    (:math:`\exp{iP \theta}`, where :math:`P` is a Pauli word (a product of Pauli operators)):
+    * `H` gate → :math:`P = ZXZ` and :math:`\theta = \tfrac{\pi}{4}` 
+    * `S` gate → :math:`P = Z` and :math:`\theta = \tfrac{\pi}{4}` 
+    * `T` gate → :math:`P = Z` and :math:`\theta = \tfrac{\pi}{8}` 
+    * `CNOT` gate → :math:`P = (Z \otimes X)(-Z \otimes \mathbb{1})(-\mathbb{1} \otimes X)` and :math:`\theta = \tfrac{\pi}{4}` 
+
+  ```python
+  import catalyst
+
+  @catalyst.qjit(keep_intermediate=True)
+  @catalyst.passes.to_ppr
+  @qml.qnode(dev)
+  def circuit():
+      qml.H(0)
+      qml.S(1)
+      qml.T(0)
+      qml.CNOT([0, 1])
+      m1 = catalyst.measure(wires=0)
+      m2 = catalyst.measure(wires=1)
+      return m1, m2
+  ```
+
+  This circuit has the following representation in MLIR:
+  ```mlir
+    . . .
+      %0 = quantum.alloc( 2) : !quantum.reg
+      %1 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+      %2 = qec.ppr ["Z"](4) %1 : !quantum.bit
+      %3 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+      %4 = qec.ppr ["Z"](4) %3 : !quantum.bit
+      %5 = qec.ppr ["X"](4) %4 : !quantum.bit
+      %6 = qec.ppr ["Z"](4) %5 : !quantum.bit
+      %7 = qec.ppr ["Z"](8) %6 : !quantum.bit
+      %8:2 = qec.ppr ["Z", "X"](4) %7, %2 : !quantum.bit, !quantum.bit
+      %9 = qec.ppr ["Z"](-4) %8#0 : !quantum.bit
+      %10 = qec.ppr ["X"](-4) %8#1 : !quantum.bit
+      %mres, %out_qubits = qec.ppm ["Z"] %9 : !quantum.bit
+      %mres_0, %out_qubits_1 = qec.ppm ["Z"] %10 : !quantum.bit
+    . . .
+  ```
+
+  * `catalyst.passes.commute_ppr`: Commuting Clifford PPR operations (PPRs with :math:`\theta = \tfrac{\pi}{4}`) to the end of a circuit, past non-Clifford 
+    PPRs (PPRs with :math:`\theta = \tfrac{\pi}{8}`)
+  
+  ```python
+  @catalyst.qjit(keep_intermediate=True)
+  @catalyst.pipeline({"to_ppr": {}, "commute_ppr": {}})
+  @qml.qnode(qml.device("null.qubit", wires=1))
+  def circuit():
+      qml.H(0)
+      qml.T(0)
+      return measure(0)
+  ```
+
+  * `catalyst.passes.ppr_to_ppm`: Absorbing Clifford PPRs into terminal Pauli product measurements (PPMs).
 
   Example:
   ```python
-    @qjit(keep_intermediate=True)
-    @pipeline({"to_ppr": {}, "commute_ppr": {}, "ppr_to_ppm": {}})
-    @qml.qnode(qml.device("null.qubit", wires=1))
-    def circuit():
-        qml.H(0)
-        qml.T(0)
-        return measure(0)
+  @catalyst.qjit(keep_intermediate=True)
+  @catalyst.pipeline({"to_ppr": {}, "commute_ppr": {}, "ppr_to_ppm": {}})
+  @qml.qnode(qml.device("null.qubit", wires=1))
+  def circuit():
+      qml.H(0)
+      qml.T(0)
+      return measure(0)
   ```
+
+  For more information on PPMs, please refer to our [PPM documentation page](https://pennylane.ai/compilation/pauli-product-measurement).
 
 <h3>Improvements 🛠</h3>
 
