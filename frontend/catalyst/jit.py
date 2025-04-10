@@ -453,8 +453,8 @@ def qjit(
         array of size ``(2**num_qubits)``, return shape of :func:`qml.sample() <pennylane.sample>`
         is a 2D array of size ``(shots, num_qubits)``, and return shape of
         :func:`qml.counts() <pennylane.counts>` is two 1D arrays of size ``(2**num_qubits)``.
-        The general rule of recompilation mentioned above means that when changing the number of qubits
-        in a workflow that returns these 4 measurements, recompilation would necessarily occur.
+        The general rule of recompilation mentioned above would imply that changing the number of qubits
+        in a workflow that returns any of these four measurements triggers recompilation.
 
         However, despite the general recompilation rule, Catalyst presents the powerful feature of
         qubit-invariant compilation: the same compiled QNode can be invoked with a
