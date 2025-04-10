@@ -450,6 +450,21 @@ jobs:
       run: |
         pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@v0.41.0-rc0
 
+    - name: Install PennyLane-Lightning release candidate
+      if: github.event.pull_request.base.ref == 'v0.11.0-rc'
+      uses: actions/checkout@v4
+      with:
+        repository: PennyLaneAI/pennylane-lightning
+        ref: v0.41.0_rc
+        path: lightning_build
+        fetch-depth: 0
+      run: |
+        cd lightning_build
+        pip install -r requirements.txt
+        pip install --no-deps --force .
+        PL_BACKEND=lightning_kokkos python scripts/configure_pyproject_toml.py
+        pip install --no-deps --force .
+
     - name: Get Cached LLVM Build
       id: cache-llvm-build
       uses: actions/cache@v4
