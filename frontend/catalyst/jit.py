@@ -445,7 +445,7 @@ def qjit(
         :title: Qubit-invariant compilation
 
         In general, the inputs and outputs of the function being qjitted must have static types
-        and shapes. Otherwise, recompilation would be triggered.
+        and shapes. Otherwise, recompilation is triggered.
 
         Out of all the :ref:`Catalyst-supported terminal measurements <measurements>`, there are
         four that have a return shape that depend on the number of qubits. Namely, the return shape
