@@ -31,30 +31,28 @@ jobs:
 
   # Only build the most popular configurations on a nightly schedule to save PyPI storage.
 
-  linux-x86:
-    name: Build on Linux x86-64
+  build-wheels:
+    name: Build wheels
     needs: [setup]
-    uses: ./.github/workflows/build-wheel-linux-x86_64.yaml
+    runs-on: ubuntu-22.04
+    steps:
+    - name: Checkout Catalyst repo release branch
+      uses: actions/checkout@v4
+      with:
+        ref: v0.11.0-rc
 
-  linux-aarch:
-    name: Build on Linux aarch64
-    needs: [setup]
-    uses: ./.github/workflows/build-wheel-linux-arm64.yaml
+    - name: linux-x86
+      uses: ./.github/workflows/build-wheel-linux-x86_64.yaml
 
-  macos-arm:
-    name: Build on macOS arm64
-    needs: [setup]
-    uses: ./.github/workflows/build-wheel-macos-arm64.yaml
+    - name: linux-aarch
+      uses: ./.github/workflows/build-wheel-linux-arm64.yaml
 
-  # macos-x86:
-  #   name: Build on macOS x86-64
-  #   needs: [setup]
-  #   uses: ./.github/workflows/build-wheel-macos-x86_64.yaml
-
+    - name: macos-arm
+      uses: ./.github/workflows/build-wheel-macos-arm64.yaml
 
   upload:
     name: Prepare & Upload wheels to TestPyPI
-    needs: [linux-x86, macos-arm, linux-aarch]  #, macos-x86
+    needs: [build-wheels]
     runs-on: ubuntu-22.04
     permissions:
       id-token: write  # IMPORTANT: mandatory for trusted publishing
