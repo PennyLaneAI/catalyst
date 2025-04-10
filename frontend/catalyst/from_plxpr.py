@@ -20,6 +20,7 @@ from typing import Callable, Sequence
 
 import jax
 import jax.core
+import jax.numpy as jnp
 import pennylane as qml
 from jax.extend.linear_util import wrap_init
 from jax.interpreters.partial_eval import convert_constvars_jaxpr
@@ -65,6 +66,7 @@ from catalyst.jax_primitives import (
     quantum_kernel_p,
     qunitary_p,
     sample_p,
+    set_basis_state_p,
     set_state_p,
     state_p,
     var_p,
@@ -321,8 +323,19 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
 
         in_qubits = [self.get_wire(w) for w in op.wires]
 
-        if isinstance(op, qml.StatePrep):
-            out_qubits = set_state_p.bind(*[*in_qubits, *op.data])
+        if isinstance(op, qml.BasisState):
+            basis_state = jax.lax.convert_element_type(op.parameters[0], jnp.dtype(jnp.bool))
+            out_qubits = set_basis_state_p.bind(*in_qubits, basis_state)
+
+        elif isinstance(op, qml.StatePrep):
+            # jnp.complex128 is the top element in the type promotion lattice so it is ok to do
+            # this: https://jax.readthedocs.io/en/latest/type_promotion.html
+            state_vector = jax.lax.convert_element_type(op.parameters[0], jnp.dtype(jnp.complex128))
+
+            err_msg = "State vector must have shape (2**wires,)"
+            assert state_vector.shape == (2 ** len(in_qubits),), err_msg
+
+            out_qubits = set_state_p.bind(*in_qubits, state_vector)
 
         else:
             out_qubits = qinst_p.bind(

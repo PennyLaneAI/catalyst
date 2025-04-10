@@ -428,6 +428,72 @@ class TestCatalystCompareJaxpr:
 
         compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c)
 
+    def test_basis_state(self, disable_capture):
+        """Test comparison and execution of a jaxpr containing BasisState."""
+        dev = qml.device("lightning.qubit", wires=2)
+
+        @qml.qnode(dev)
+        def circuit(_basis_state):
+            qml.BasisState(_basis_state, wires=[0, 1])
+            return qml.state()
+
+        basis_state = np.array([1, 1])
+        expected_state_vector = np.array([0, 0, 0, 1], dtype=np.complex128)
+
+        qml.capture.enable()
+        plxpr = jax.make_jaxpr(circuit)(basis_state)
+        converted = from_plxpr(plxpr)(basis_state)
+        qml.capture.disable()
+
+        assert converted.eqns[0].primitive == catalyst.jax_primitives.quantum_kernel_p
+        assert converted.eqns[0].params["qnode"] is circuit
+
+        catalyst_res = catalyst_execute_jaxpr(converted)(basis_state)
+        assert len(catalyst_res) == 1
+        assert qml.math.allclose(catalyst_res[0], expected_state_vector)
+
+        qjit_obj = qjit(circuit)
+        qjit_obj(basis_state)
+        catalxpr = qjit_obj.jaxpr
+        call_jaxpr_pl = get_call_jaxpr(converted)
+        call_jaxpr_c = get_call_jaxpr(catalxpr)
+
+        compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c)
+
+    def test_state_prep(self, disable_capture):
+        """Test comparison and execution of a jaxpr containing StatePrep."""
+        dev = qml.device("lightning.qubit", wires=1)
+
+        @qml.qnode(dev)
+        def circuit(_init_state):
+            qml.StatePrep(_init_state, wires=0)
+            return qml.state()
+
+        init_state = np.array([1, 1], dtype=np.complex128) / np.sqrt(2)
+
+        qml.capture.enable()
+        plxpr = jax.make_jaxpr(circuit)(init_state)
+        converted = from_plxpr(plxpr)(init_state)
+        qml.capture.disable()
+
+        assert converted.eqns[0].primitive == catalyst.jax_primitives.quantum_kernel_p
+        assert converted.eqns[0].params["qnode"] is circuit
+
+        catalyst_res = catalyst_execute_jaxpr(converted)(init_state)
+        assert len(catalyst_res) == 1
+        assert qml.math.allclose(catalyst_res[0], init_state)
+
+        qjit_obj = qjit(circuit)
+        qjit_obj(init_state)
+        catalxpr = qjit_obj.jaxpr
+        call_jaxpr_pl = get_call_jaxpr(converted)
+        call_jaxpr_c = get_call_jaxpr(catalxpr)
+
+        # Skip eqns 0, 1, 2 (qdevice, pjit, qalloc); their order is permuted in
+        # the PL and Catalyst jaxprs
+        # TODO: why is the ordering of these eqns permuted?
+        compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c, skip_eqns=[0, 1, 2])
+
     def test_multiple_measurements(self, disable_capture):
         """Test that we can convert a circuit with multiple measurement returns."""
 
