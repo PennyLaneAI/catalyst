@@ -452,3 +452,83 @@ func.func @test_loop_boundary_register_3(%arg0: tensor<i64>, %arg1: tensor<f64>)
       quantum.dealloc %4#1 : !quantum.reg
       return %from_elements : tensor<f64>
     }
+
+// -----
+
+func.func @test_loop_boundary_with_two_dominance_gate(%q0: !quantum.bit) -> !quantum.bit {
+    %start = arith.constant 0 : index
+    %stop = arith.constant 10 : index
+    %step = arith.constant 1 : index
+    %phi = arith.constant 0.2 : f64
+    %theta = arith.constant 0.5 : f64
+
+    // CHECK-NO: "RX"
+    %scf = scf.for %i = %start to %stop step %step iter_args(%q_arg = %q0) -> (!quantum.bit) {
+        // CHECK: "RX"
+        // CHECK: "RX"
+        %q_0 = quantum.custom "RX"(%phi) %q_arg : !quantum.bit
+        %q_2 = quantum.custom "RX"(%theta) %q_0 : !quantum.bit
+        scf.yield %q_2 : !quantum.bit
+    }
+    // CHECK-NO: "RX"
+    func.return %scf : !quantum.bit
+}
+
+// -----
+
+func.func public @test_loop_boundary_with_sequence_insert_bottom(%arg0: tensor<i64>, %arg1: tensor<i64>) -> tensor<f64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode} {
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+    %cst = arith.constant 1.000000e-01 : f64
+
+
+    %0 = quantum.alloc( 2) : !quantum.reg
+    %extracted = tensor.extract %arg0[] : tensor<i64>
+    %1 = arith.index_cast %extracted : i64 to index
+
+    // CHECK: [[q_0:%.+]] = quantum.alloc( 2) : !quantum.reg
+    // CHECK: [[ex_1:%.+]]  = tensor.extract %arg0[] : tensor<i64>
+    // CHECK: [[q_1:%.+]]  = arith.index_cast [[ex_1]]  : i64 to index
+
+    // CHECK: [[q_2:%.+]]  = quantum.extract [[q_0]][ 0] : !quantum.reg -> !quantum.bit
+    // CHECK: [[o_0:%.+]]  = quantum.custom "Hadamard"() [[q_2]]  : !quantum.bit
+    // CHECK: [[q_3:%.+]]  = quantum.insert [[q_0]][ 0], [[o_0]]  : !quantum.reg, !quantum.bit
+
+    // CHECK: [[q_4:%.+]] = scf.for %arg2 = %c0 to [[q_1]] step %c1 iter_args(%arg3 = [[q_3]]) -> (!quantum.reg) {
+    %2 = scf.for %arg2 = %c0 to %1 step %c1 iter_args(%arg3 = %0) -> (!quantum.reg) {
+    // CHECK:   [[q_10:%.+]]  = quantum.extract %arg3[ 0] : !quantum.reg -> !quantum.bit
+    // CHECK:   [[q_11:%.+]]  = quantum.insert %arg3[ 0], [[q_10]]  : !quantum.reg, !quantum.bit
+
+    // CHECK:   [[q_12:%.+]]  = quantum.extract [[q_11]][ 0] : !quantum.reg -> !quantum.bit
+    // CHECK:   [[o_1:%.+]]  = quantum.custom "T"() [[q_12]]  : !quantum.bit
+    // CHECK:   [[q_13:%.+]]  = quantum.insert %11[ 0], [[o_1]]  : !quantum.reg, !quantum.bit
+    
+    // CHECK:   [[q_14:%.+]]  = quantum.extract [[q_13]][ 0] : !quantum.reg -> !quantum.bit
+    // CHECK:   [[q_15:%.+]]  = quantum.insert [[q_13]][ 0], [[q_14]]  : !quantum.reg, !quantum.bit
+    // CHECK:   scf.yield [[q_15]]  : !quantum.reg
+
+      %6 = quantum.extract %arg3[ 0] : !quantum.reg -> !quantum.bit
+      %out_qubits = quantum.custom "Hadamard"() %6 : !quantum.bit
+      %7 = quantum.insert %arg3[ 0], %out_qubits : !quantum.reg, !quantum.bit
+
+      %8 = quantum.extract %7[ 0] : !quantum.reg -> !quantum.bit
+      %out_qubits_1 = quantum.custom "T"() %8 : !quantum.bit
+      %9 = quantum.insert %7[ 0], %out_qubits_1 : !quantum.reg, !quantum.bit
+
+      %10 = quantum.extract %9[ 0] : !quantum.reg -> !quantum.bit
+      %out_qubits_2 = quantum.custom "Hadamard"() %10 : !quantum.bit
+      %11 = quantum.insert %9[ 0], %out_qubits_2 : !quantum.reg, !quantum.bit
+
+      scf.yield %11 : !quantum.reg
+    }
+    // CHECK: [[q_16:%.+]]  = quantum.extract [[q_4]][ 0] : !quantum.reg -> !quantum.bit
+    // CHECK: [[o_2:%.+]]  = quantum.custom "Hadamard"() [[q_16]]  : !quantum.bit
+    // CHECK: [[q_17:%.+]]  = quantum.insert %4[ 0], [[o_2]]  : !quantum.reg, !quantum.bit
+    %extracted_0 = tensor.extract %arg1[] : tensor<i64>
+    %3 = quantum.extract %2[%extracted_0] : !quantum.reg -> !quantum.bit
+    %4 = quantum.namedobs %3[ PauliZ] : !quantum.obs
+    %5 = quantum.expval %4 : f64
+    %from_elements = tensor.from_elements %5 : tensor<f64>
+    quantum.dealloc %2 : !quantum.reg
+    return %from_elements : tensor<f64>
+  }
