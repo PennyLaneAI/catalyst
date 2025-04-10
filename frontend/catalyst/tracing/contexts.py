@@ -23,12 +23,12 @@ from enum import Enum
 from pathlib import Path
 from typing import ContextManager, Dict, List, Optional, Set, Tuple
 
-from jax._src.core import MainTrace as JaxMainTrace
-from jax._src.core import cur_sublevel, new_base_main
+#from jax._src.core import MainTrace as JaxMainTrace
+#from jax._src.core import cur_sublevel, new_base_main
 from jax._src.interpreters.partial_eval import (
     DynamicJaxprTrace,
     JaxprStackFrame,
-    extend_jaxpr_stack,
+    #extend_jaxpr_stack,
 )
 from jax._src.source_info_util import reset_name_stack
 from jax.core import find_top_trace
@@ -157,13 +157,13 @@ class JaxTracingContext:
         trace: Current JAX trace object.
     """
 
-    main: JaxMainTrace
+    main: DynamicJaxprTrace #JaxMainTrace
     frames: Dict[DynamicJaxprTrace, JaxprStackFrame]
-    mains: Dict[DynamicJaxprTrace, JaxMainTrace]
+    mains: Dict[DynamicJaxprTrace, DynamicJaxprTrace]#JaxMainTrace]
     trace: Optional[DynamicJaxprTrace]
 
     @debug_logger_init
-    def __init__(self, main: JaxMainTrace):
+    def __init__(self, main: DynamicJaxprTrace):#JaxMainTrace):
         self.main, self.frames, self.mains, self.trace = main, {}, {}, None
 
 

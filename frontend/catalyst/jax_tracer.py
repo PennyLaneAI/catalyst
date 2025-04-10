@@ -54,7 +54,7 @@ from catalyst.jax_extras import (
     PyTreeDef,
     PyTreeRegistry,
     ShapedArray,
-    _abstractify,
+    #_abstractify,
     _input_type_to_tracers,
     cond_expansion_strategy,
     convert_element_type,

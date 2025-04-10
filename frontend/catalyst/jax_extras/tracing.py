@@ -36,7 +36,7 @@ from typing import (
 
 import jax
 from jax import ShapeDtypeStruct
-from jax._src.core import DBIdx, _update_thread_local_jit_state
+from jax._src.core import DBIdx#, _update_thread_local_jit_state
 from jax._src.interpreters.mlir import _module_name_regex, register_lowering
 from jax._src.interpreters.partial_eval import (
     _input_type_to_tracers,
@@ -44,7 +44,7 @@ from jax._src.interpreters.partial_eval import (
     trace_to_jaxpr_dynamic2,
 )
 from jax._src.lax.control_flow import _initial_style_jaxpr
-from jax._src.lax.lax import _abstractify
+#from jax._src.lax.lax import _abstractify
 from jax._src.lax.slicing import _gather_lower, gather_p
 from jax._src.linear_util import annotate
 from jax._src.pjit import _extract_implicit_args, _flat_axes_specs
@@ -54,13 +54,13 @@ from jax.api_util import flatten_fun
 from jax.core import (
     AbstractValue,
     ClosedJaxpr,
-    ConcreteArray,
+    #ConcreteArray,
     DShapedArray,
     InDBIdx,
     InputType,
     Jaxpr,
     JaxprEqn,
-    MainTrace,
+    #MainTrace,
     OutDBIdx,
     OutputType,
 )
@@ -73,7 +73,7 @@ from jax.core import (
     find_top_trace,
     gensym,
     new_jaxpr_eqn,
-    thread_local_state,
+    #thread_local_state,
 )
 from jax.extend.linear_util import transformation_with_aux, wrap_init
 from jax.interpreters.partial_eval import (

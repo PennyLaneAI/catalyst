@@ -21,7 +21,7 @@ from catalyst.jax_extras.patches import (
 )
 from catalyst.jax_extras.tracing import (
     ClosedJaxpr,
-    ConcreteArray,
+    #ConcreteArray,
     DBIdx,
     DShapedArray,
     DynamicJaxprTrace,
@@ -38,7 +38,7 @@ from catalyst.jax_extras.tracing import (
     PyTreeRegistry,
     ShapedArray,
     ShapeDtypeStruct,
-    _abstractify,
+    #_abstractify,
     _extract_implicit_args,
     _initial_style_jaxpr,
     _input_type_to_tracers,
