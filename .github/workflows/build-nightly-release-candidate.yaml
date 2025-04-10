@@ -1,6 +1,12 @@
 name: Build Release Branch Nightly for TestPyPI
 
 on:
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
   schedule:
     # Run from April 8th to April 13th at 02:00 UTC (10:00 PM EDT)
     - cron: "0 2 8-13 4 *"
@@ -20,14 +26,6 @@ jobs:
     - name: Bump RC version
       run: |
         python $GITHUB_WORKSPACE/.github/workflows/set_rc_version.py
-
-    - name: Push new version
-      run: |
-        git config --global user.email '${{ secrets.AUTO_UPDATE_VERSION_RINGO_EMAIL }}'
-        git config --global user.name "ringo-but-quantum"
-        git add $GITHUB_WORKSPACE/frontend/catalyst/_version.py
-        git commit -m "[no ci] bump nightly rc version"
-        git push
 
   # Only build the most popular configurations on a nightly schedule to save PyPI storage.
 
@@ -49,39 +47,3 @@ jobs:
 
     - name: macos-arm
       uses: ./.github/workflows/build-wheel-macos-arm64.yaml
-
-  upload:
-    name: Prepare & Upload wheels to TestPyPI
-    needs: [build-wheels]
-    runs-on: ubuntu-22.04
-    permissions:
-      id-token: write  # IMPORTANT: mandatory for trusted publishing
-
-    steps:
-    - name: Download wheels
-      uses: actions/download-artifact@v4
-      with:
-        merge-multiple: true
-        path: dist
-
-    - name: Install rename
-      run: |
-        sudo apt install rename
-
-    - name: Prepare wheels
-      run: |
-        rename "s/linux/manylinux_2_28/" dist/PennyLane_Catalyst-*
-        rename "s/linux/manylinux_2_28/" dist/pennylane_catalyst-*
-        rename "s/macosx_13_0_universal2/macosx_13_0_x86_64/" dist/PennyLane_Catalyst-*
-        rename "s/macosx_13_0_universal2/macosx_13_0_x86_64/" dist/pennylane_catalyst-*
-        rename "s/macosx_14_0_universal2/macosx_13_0_arm64/" dist/PennyLane_Catalyst-*
-        rename "s/macosx_14_0_universal2/macosx_13_0_arm64/" dist/pennylane_catalyst-*
-        rename "s/macosx_14/macosx_13/" dist/PennyLane_Catalyst-*
-        rename "s/macosx_14/macosx_13/" dist/pennylane_catalyst-*
-
-    - name: Upload wheels
-      uses: pypa/gh-action-pypi-publish@release/v1
-      with:
-        repository-url: https://test.pypi.org/legacy/
-        packages-dir: dist
-        verbose: true
