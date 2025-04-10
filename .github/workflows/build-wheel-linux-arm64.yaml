@@ -231,7 +231,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-            python${{ matrix.python_version }} -m pip install numpy auditwheel ssnanobind pybind11 PyYAML ninja delocate
+            python${{ matrix.python_version }} -m pip install numpy auditwheel nanobind pybind11 PyYAML ninja delocate
             python${{ matrix.python_version }} -m pip install cmake'<4'
 
       - name: Get Cached LLVM Source
