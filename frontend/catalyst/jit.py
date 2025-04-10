@@ -444,7 +444,7 @@ def qjit(
     .. details::
         :title: Qubit-invariant compilation
 
-        In general, the inputs and outputs to the function being qjitted must have static types
+        In general, the inputs and outputs of the function being qjitted must have static types
         and shapes. Otherwise, recompilation would be triggered.
 
         Out of all the :ref:`Catalyst-supported terminal measurements <measurements>`, there are
