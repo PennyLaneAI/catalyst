@@ -228,6 +228,12 @@ jobs:
         with:
           python-version: ${{ matrix.python_version }}
 
+
+      - name: Install dependencies
+        run: |
+            python${{ matrix.python_version }} -m pip install numpy nanobind pybind11 PyYAML cmake ninja
+
+
       - name: Get Cached LLVM Source
         id: cache-llvm-source
         uses: actions/cache/restore@v4
