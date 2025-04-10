@@ -82,7 +82,10 @@ def get_abstract_signature(args):
 
     abstract_args = [shaped_abstractify(arg) for arg in flat_args]
 
-    return tree_unflatten(treedef, abstract_args)
+    if all(not isinstance(arg, jax.core.ShapedArray) for arg in abstract_args):
+        return tree_unflatten(treedef, abstract_args)
+
+    raise TypeError("Cannot reconstruct a PyTree leaf from a ShapedArray")
 
 
 def verify_static_argnums_type(static_argnums):
