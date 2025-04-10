@@ -15,6 +15,12 @@ on:
     - cron: '35 4 * * 4'
   workflow_dispatch:
   workflow_call:
+    inputs:
+      branch:
+        description: 'Branch to build from'
+        required: true
+        default: 'main'
+        type: string
 
 env:
   MACOSX_DEPLOYMENT_TARGET: 14.0
@@ -50,6 +56,8 @@ jobs:
     steps:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
+      with:
+        ref: ${{ inputs.branch }}
 
     # Python 3.10 was dropped from the GH images on macOS arm
     - name: Install Python 3.10

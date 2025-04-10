@@ -15,6 +15,12 @@ on:
     - cron: '35 4 * * 4'
   workflow_dispatch:
   workflow_call:
+    inputs:
+      branch:
+        description: 'Branch to build from'
+        required: true
+        default: 'main'
+        type: string
 
 concurrency:
   group: Build Catalyst Wheel on Linux (x86_64)-${{ github.ref }}
@@ -58,6 +64,8 @@ jobs:
     steps:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
+      with:
+        ref: ${{ inputs.branch }}
 
     - name: Set Ownership in Container
       run: |

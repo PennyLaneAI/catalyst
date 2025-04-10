@@ -5,16 +5,27 @@ on:
     # Run from April 8th to April 13th at 02:00 UTC (10:00 PM EDT)
     - cron: "0 2 8-13 4 *"
   workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to build from'
+        required: true
+        default: 'v0.11.0-rc'
 
 jobs:
   setup:
     name: Setup the release
     runs-on: ubuntu-22.04
+    outputs:
+      branch: ${{ steps.set_branch.outputs.branch }}
     steps:
+    - name: Set branch
+      id: set_branch
+      run: echo "branch=${{ github.event.inputs.branch || 'v0.11.0-rc' }}" >> $GITHUB_OUTPUT
+
     - name: Checkout Catalyst repo release branch
       uses: actions/checkout@v4
       with:
-        ref: v0.11.0-rc
+        ref: ${{ steps.set_branch.outputs.branch }}
         ssh-key: ${{ secrets.NIGHTLY_VERSION_UPDATE_DEPLOY_KEY }}
 
     - name: Bump RC version
@@ -35,22 +46,29 @@ jobs:
     name: Build on Linux x86-64
     needs: [setup]
     uses: ./.github/workflows/build-wheel-linux-x86_64.yaml
+    with:
+      branch: ${{ needs.setup.outputs.branch }}
 
   linux-aarch:
     name: Build on Linux aarch64
     needs: [setup]
     uses: ./.github/workflows/build-wheel-linux-arm64.yaml
+    with:
+      branch: ${{ needs.setup.outputs.branch }}
 
   macos-arm:
     name: Build on macOS arm64
     needs: [setup]
     uses: ./.github/workflows/build-wheel-macos-arm64.yaml
+    with:
+      branch: ${{ needs.setup.outputs.branch }}
 
   # macos-x86:
   #   name: Build on macOS x86-64
   #   needs: [setup]
   #   uses: ./.github/workflows/build-wheel-macos-x86_64.yaml
-
+  #   with:
+  #     branch: ${{ needs.setup.outputs.branch }}
 
   upload:
     name: Prepare & Upload wheels to TestPyPI
