@@ -10,11 +10,14 @@ from catalyst import qjit
 # print(identity(42.0))
 
 
-dev = qml.device("lightning.qubit", wires=1)
+
 
 @qjit
-@qml.qnode(dev)
-def foo(x):
-	return qml.probs()
+def foo(x, N):
+	dev = qml.device("lightning.qubit", wires=N)
+	@qml.qnode(dev)
+	def circuit():
+		return qml.probs()
+	return circuit()
 
-print(foo(42.0))
+print(foo(42.0, 3))
