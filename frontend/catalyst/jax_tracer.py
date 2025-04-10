@@ -1095,12 +1095,6 @@ def is_transform_valid_for_batch_transforms(tape, flat_results):
         return isinstance(op, catalyst.api_extensions.MidCircuitMeasure)
 
     is_valid_output = is_out_measurement_sequence or is_out_single_measurement
-    if not is_valid_output:
-        msg = (
-            "A transformed quantum function must return either a single measurement, "
-            "or a nonempty sequence of measurements."
-        )
-        raise CompileError(msg)
 
     is_wave_function_collapsed = any(map(is_midcircuit_measurement, tape.operations))
     are_batch_transforms_valid = is_valid_output and not is_wave_function_collapsed
@@ -1137,7 +1131,21 @@ def apply_transform(
     if not is_valid_for_batch and len(tapes) > 1:
         msg = "Multiple tapes are generated, but each run might produce different results."
         raise CompileError(msg)
-    return tapes, post_processing
+
+    # Check if there is exactly one tape and device modification measurements are enabled
+    # TODO: Tapes can be more than one
+    if len(tapes) == 1 and device_modify_measurements:
+        # If both have no measurements, no modification needed
+        if len(tapes[0].measurements) == 0 and len(tape.measurements) == 0:
+            device_modify_measurements = False
+        # Otherwise, check if measurements are different
+        elif len(tapes[0].measurements) == len(tape.measurements):
+            # Check if any measurements differ. True if different, False if all the same
+            device_modify_measurements = any(
+                t != d for t, d in zip(tapes[0].measurements, tape.measurements)
+            )
+
+    return tapes, post_processing, device_modify_measurements
 
 
 @debug_logger
@@ -1290,7 +1298,7 @@ def trace_quantum_function(
 
             qnode_program = qnode.transform_program if qnode else TransformProgram()
 
-            tapes, post_processing = apply_transform(
+            tapes, post_processing, device_modify_measurements = apply_transform(
                 qnode_program,
                 device_program,
                 device_modify_measurements,

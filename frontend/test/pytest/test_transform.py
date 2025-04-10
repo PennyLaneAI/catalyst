@@ -1103,10 +1103,7 @@ class TestTransformValidity:
         )
         H4 += qml.PauliZ(0) @ qml.PauliX(1) @ qml.PauliY(2)
 
-        msg = (
-            "A transformed quantum function must return either a single measurement, "
-            "or a nonempty sequence of measurements."
-        )
+        msg = "Multiple tapes are generated, but each run might produce different results."
         with pytest.raises(CompileError, match=msg):
 
             @qjit
