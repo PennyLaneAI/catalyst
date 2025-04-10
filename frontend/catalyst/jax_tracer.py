@@ -16,7 +16,9 @@
 This module contains functions tracing and lowering JAX code to MLIR.
 """
 
+import itertools
 import logging
+import weakref
 from collections.abc import Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -416,6 +418,9 @@ class HybridOpRegion:
     res_classical_tracers: List[DynamicJaxprTracer]
 
 
+cached_vars = weakref.WeakKeyDictionary()
+
+
 class HybridOp(Operator):
     """A base class for operations carrying nested regions. The class stores the information
     obtained in the process of classical tracing and required for the completion of the quantum
@@ -476,22 +481,82 @@ class HybridOp(Operator):
         as-is.
         """
         assert self.binder is not None, "HybridOp should set a binder"
+        # Here, we are binding any of the possible hybrid ops.
+        # which includes: for_loop, while_loop, cond, measure.
+        # This will place an equation at the very end of the current list of equations.
         out_quantum_tracer = self.binder(*in_expanded_tracers, **kwargs)[-1]
+        # eqn corresponds to the current hybrid operation that was just inserted
+        # into the list of equations.
         eqn = ctx.frames[trace].eqns[-1]
+
         assert len(eqn.outvars[:-1]) == len(
             out_expanded_tracers
         ), f"{eqn.outvars=}\n{out_expanded_tracers=}"
-        for i, t in zip(range(len(eqn.outvars[:-1])), out_expanded_tracers):
-            if trace.getvar(t) in set(
-                [
-                    *sum([e.outvars for e in ctx.frames[trace].eqns[:-1]], []),
-                    *ctx.frames[trace].invars,
-                    *ctx.frames[trace].constvar_to_val.keys(),
-                ]
-            ):
-                # Do not re-assign vars from other equations
+
+        frame = ctx.frames[trace]
+        jaxpr_variables = cached_vars.get(frame, set())
+        if not jaxpr_variables:
+            # We get all variables in the current frame
+            outvars = itertools.chain.from_iterable([e.outvars for e in frame.eqns])
+            jaxpr_variables = set(outvars)
+            jaxpr_variables.update(frame.invars)
+            jaxpr_variables.update(frame.constvar_to_val.keys())
+            cached_vars[frame] = jaxpr_variables
+
+        for outvar in frame.eqns[-1].outvars:
+            # With the exception of the output variables from the current equation.
+            jaxpr_variables.discard(outvar)
+
+        for i, t in enumerate(out_expanded_tracers):
+            # We look for what were the previous output tracers.
+            # If they haven't changed, then we leave them unchanged.
+            if trace.getvar(t) in jaxpr_variables:
                 continue
+
+            # If the variable cannot be found in the current frame
+            # it is because we have created it via new_inner_tracer
+            # which uses JAX internals to create a tracer without associating
+            # a particular variable nor binding it to an equation.
+            # So at this moment, we create a new variable for it
+            # and set it as the eqn.outvars.
+            # For example catalyst.measure always returns a tracer associated with
+            # the value true but without having it being bound to any primitive
+            #
+            #    m = new_inner_tracer(ctx.trace, get_aval(True))
+            #
+            # Then we would land here and bound that inner_trace to this primitive
+            #
+            #    a: bool, b: qubit = measure_p.bind()
+            #
+            # At the moment, it is a little bit unclear why we need this.
+            # I think it may be due to the separation between tracing the quantum
+            # part from the classical part.
+            #
+            # First we would have traced the classical part (which includes hybrid ops)
+            # and we need tracers for those values.
+            # Here we would be tracing the quantum part, and it is where we would finally
+            # bind it with the correct primitive.
+            #
+            # This seems to be the case since the measure function does not bound.
+            # But it returns this inner tracer.
+            #
+            # Then the topological sorter would sort the operations that depended
+            # on the original inner_trace accordingly.
+            #
+            # This method only gets called in a for loop for quantum operations
+            #
+            #     for op in ops:
+            #       qrp2 = None
+            #         if isinstance(op, HybridOp):
+            #            // ... snip...
+            #            qrp2 = op.trace_quantum(ctx, device, trace, qrp, **kwargs)
+            #
+            # So it should be safe to cache the tracers as we are doing it.
             eqn.outvars[i] = trace.getvar(t)
+
+        # Now, the output variables can be considered as part of the current frame.
+        # This allows us to avoid importing all equations again next time.
+        jaxpr_variables.update(eqn.outvars)
         return out_quantum_tracer
 
     @debug_logger
