@@ -208,7 +208,7 @@ jobs:
           key: ${{ matrix.container_img }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-wheel-build
 
   catalyst-linux-wheels-arm-64:
-    needs: [constants, build-dependencies, determine_runner]
+    needs: [constants, build-dependencies]
     strategy:
       fail-fast: false
       matrix:
