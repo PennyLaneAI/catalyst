@@ -458,6 +458,12 @@ jobs:
         ref: v0.41.0_rc
         path: lightning_build
         fetch-depth: 0
+      run: |
+        cd lightning_build
+        pip install -r requirements.txt
+        pip install --no-deps --force .
+        PL_BACKEND=lightning_kokkos python scripts/configure_pyproject_toml.py
+        pip install --no-deps --force .
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
