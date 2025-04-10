@@ -450,7 +450,7 @@ jobs:
       run: |
         pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@v0.41.0-rc0
 
-    - name: Install PennyLane-Lightning release candidate
+    - name: Checkout PennyLane-Lightning release branch
       if: github.event.pull_request.base.ref == 'v0.11.0-rc'
       uses: actions/checkout@v4
       with:
@@ -458,6 +458,9 @@ jobs:
         ref: v0.41.0_rc
         path: lightning_build
         fetch-depth: 0
+
+    - name: Install PennyLane-Lightning release candidate
+      if: github.event.pull_request.base.ref == 'v0.11.0-rc'
       run: |
         # Lightning-Kokkos can no longer be installed with pip from git
         cd lightning_build
@@ -548,7 +551,7 @@ jobs:
       run: |
         pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@v0.41.0-rc0
 
-    - name: Install PennyLane-Lightning release candidate
+    - name: Checkout PennyLane-Lightning release branch
       if: github.event.pull_request.base.ref == 'v0.11.0-rc'
       uses: actions/checkout@v4
       with:
@@ -556,6 +559,9 @@ jobs:
         ref: v0.41.0_rc
         path: lightning_build
         fetch-depth: 0
+
+    - name: Install PennyLane-Lightning release candidate
+      if: github.event.pull_request.base.ref == 'v0.11.0-rc'
       run: |
         # Lightning-Kokkos can no longer be installed with pip from git
         cd lightning_build
@@ -626,7 +632,7 @@ jobs:
       run: |
         pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@v0.41.0-rc0
 
-    - name: Install PennyLane-Lightning release candidate
+    - name: Checkout PennyLane-Lightning release branch
       if: github.event.pull_request.base.ref == 'v0.11.0-rc'
       uses: actions/checkout@v4
       with:
@@ -634,6 +640,9 @@ jobs:
         ref: v0.41.0_rc
         path: lightning_build
         fetch-depth: 0
+
+    - name: Install PennyLane-Lightning release candidate
+      if: github.event.pull_request.base.ref == 'v0.11.0-rc'
       run: |
         # Lightning-Kokkos can no longer be installed with pip from git
         cd lightning_build
