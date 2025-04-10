@@ -23,10 +23,6 @@ jobs:
         ref: v0.11.0-rc
         ssh-key: ${{ secrets.NIGHTLY_VERSION_UPDATE_DEPLOY_KEY }}
 
-    - name: Bump RC version
-      run: |
-        python $GITHUB_WORKSPACE/.github/workflows/set_rc_version.py
-
   # Only build the most popular configurations on a nightly schedule to save PyPI storage.
 
   build-wheels:
