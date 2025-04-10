@@ -728,8 +728,10 @@ def trace_quantum_operations(
 
         assert qrp2 is not None
         qrp = qrp2
-
-    ctx.frames[trace].eqns = sort_eqns(ctx.frames[trace].eqns, FORCED_ORDER_PRIMITIVES)  # [1]
+    #breakpoint()
+    with jax.core.take_current_trace() as trace:
+        #breakpoint()
+        trace.frame.eqns = sort_eqns(trace.frame.eqns, FORCED_ORDER_PRIMITIVES)  # [1]
     return qrp
 
 
@@ -1109,7 +1111,6 @@ def trace_post_processing(ctx, trace, post_processing: Callable, pp_args):
         out_type(jax.OutputType) : List of abstract values with explicitness flag
         out_tree(PyTreeDef): PyTree shape of the qnode result
     """
-
     with EvaluationContext.frame_tracing_context(ctx, trace):
         # What is the input to the post_processing function?
         # The input to the post_processing function is going to be a list of values One for each
@@ -1122,7 +1123,9 @@ def trace_post_processing(ctx, trace, post_processing: Callable, pp_args):
         # After wffa is called, then the shape becomes available in out_tree_promise.
         in_tracers = [trace.full_raise(t) for t in tree_flatten(pp_args)[0]]
         out_tracers = [trace.full_raise(t) for t in wffa.call_wrapped(*in_tracers)]
-        jaxpr, out_type, consts = ctx.frames[trace].to_jaxpr2(out_tracers)
+        with jax.core.take_current_trace() as cur_trace:
+            #breakpoint()
+            jaxpr, out_type, consts = cur_trace.frame.to_jaxpr2(out_tracers, cur_trace.frame.debug_info)
         closed_jaxpr = ClosedJaxpr(jaxpr, consts)
         return closed_jaxpr, out_type, out_tree_promise()
 
@@ -1235,8 +1238,9 @@ def trace_quantum_function(
 
         # (2) - Quantum tracing
         transformed_results = []
-
+        #breakpoint()
         with EvaluationContext.frame_tracing_context(ctx, trace):
+        #with EvaluationContext.frame_tracing_context(ctx) as trace:
             qnode_transformed = len(qnode_program) > 0
             for tape in tapes:
                 # Set up quantum register for the current tape.
@@ -1306,6 +1310,7 @@ def trace_quantum_function(
         closed_jaxpr, out_type, out_tree = trace_post_processing(
             ctx, trace, post_processing, transformed_results
         )
+        breakpoint()
         # TODO: `check_jaxpr` complains about the `AbstractQreg` type. Consider fixing.
         # check_jaxpr(jaxpr)
     return closed_jaxpr, out_type, out_tree, return_values_tree
