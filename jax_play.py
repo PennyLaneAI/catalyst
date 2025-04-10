@@ -14,7 +14,7 @@ dev = qml.device("lightning.qubit", wires=1)
 
 @qjit
 @qml.qnode(dev)
-def foo():
+def foo(x):
 	return qml.probs()
 
-print(foo())
+print(foo(42.0))
