@@ -466,7 +466,7 @@ def qjit(
 
         To use this feature, the PennyLane device needs to be instantiated within the qjitted
         function, or another function within its call graph. The ``wires`` parameter can then be
-        any (integer) program value, for example one of the function arguments.
+        any (integer) program value, such as one of the function arguments.
 
         .. code-block:: python
 
