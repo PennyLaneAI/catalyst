@@ -456,8 +456,7 @@ def qjit(
         The general rule of recompilation mentioned above would imply that changing the number of qubits
         in a workflow that returns any of these four measurements triggers recompilation.
 
-        However, despite the general recompilation rule, Catalyst presents the powerful feature of
-        qubit-invariant compilation: the same compiled QNode can be invoked with a
+        However, Catalyst offers a powerful exception to this rule with *qubit-invariant compilation*: the same compiled QNode can be invoked with a
         different number of qubits! This is especially helpful for workflows where you would
         like to, for example, iterate through the wires without knowing how many of them
         there are in advance. For instance, many workflows (such as `Grover's algorithm
