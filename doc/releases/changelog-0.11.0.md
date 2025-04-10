@@ -113,22 +113,15 @@
 
   For more information on PPMs, please refer to our [PPM documentation page](https://pennylane.ai/compilation/pauli-product-measurement).
 
-<h3>Improvements 🛠</h3>
 
-* Changed pattern rewritting in `quantum-to-ion` lowering pass to use MLIR's dialect conversion
-  infrastracture.
-  [(#1442)](https://github.com/PennyLaneAI/catalyst/pull/1442)
-
-* Extend `merge-rotations` peephole optimization pass to also merge compatible rotation gates (either both controlled, or both uncontrolled) where rotation angles are any combination of static constants or dynamic values.
-  [(#1489)](https://github.com/PennyLaneAI/catalyst/pull/1489)
-
-* Catalyst now supports experimental capture of `cond`, `for_loop` and `while_loop` control flow.
+* Catalyst now supports PennyLane's `cond`, `for_loop` and `while_loop` control flow functions with
+  `experimental_capture=True`.
   [(#1468)](https://github.com/PennyLaneAI/catalyst/pull/1468)
   [(#1509)](https://github.com/PennyLaneAI/catalyst/pull/1509)
   [(#1521)](https://github.com/PennyLaneAI/catalyst/pull/1521)
 
-  To trigger the PennyLane pipeline for capturing the program as a Jaxpr, simply set
-  `experimental_capture=True` in the qjit decorator.
+  To trigger the PennyLane pipeline for capturing the program as plxpr, simply set `experimental_capture=True` 
+  in the qjit decorator.
 
   ```python
   import pennylane as qml
@@ -152,7 +145,7 @@
       return qml.expval(qml.Z(0))
   ```
 
-* Catalyst now supports experimental capture of PennyLane transforms.
+* Catalyst now supports PennyLane transforms captured with plxpr.
   [(#1544)](https://github.com/PennyLaneAI/catalyst/pull/1544)
   [(#1561)](https://github.com/PennyLaneAI/catalyst/pull/1561)
   [(#1567)](https://github.com/PennyLaneAI/catalyst/pull/1567)
@@ -183,16 +176,26 @@
       return circuit(x)
   ```
 
-* Changes to reduce compile time:
+<h3>Improvements 🛠</h3>
 
-  - Turn off MLIR's verifier.
+* Pattern rewritting in the `quantum-to-ion` lowering pass has been changed to use MLIR's dialect conversion
+  infrastracture.
+  [(#1442)](https://github.com/PennyLaneAI/catalyst/pull/1442)
+
+* The `merge-rotations` peephole optimization pass has been extended to also merge compatible rotation 
+  gates (either both controlled, or both uncontrolled) where rotation angles are any combination of 
+  static constants or dynamic values.
+  [(#1489)](https://github.com/PennyLaneAI/catalyst/pull/1489)
+
+* Several changes have been made to reduce compile time:
+  * Turn off MLIR's verifier.
     [(#1513)](https://github.com/PennyLaneAI/catalyst/pull/1513)
-  - Remove unnecessary I/O.
+  * Remove unnecessary I/O.
     [(#1514)](https://github.com/PennyLaneAI/catalyst/pull/1514)
     [(#1602)](https://github.com/PennyLaneAI/catalyst/pull/1602)
-  - Sort improvements to reduce complexity and memory.
+  * Sort improvements to reduce complexity and memory.
     [(#1524)](https://github.com/PennyLaneAI/catalyst/pull/1524)
-  - Lazy IR canonicalization and LLVMIR textual generation.
+  * Lazy IR canonicalization and LLVMIR textual generation.
     [(#1530)](https://github.com/PennyLaneAI/catalyst/pull/1530)
 
 * Catalyst now decomposes non-differentiable gates when in a gradient method.
@@ -206,75 +209,77 @@
   for the `StatePrep`, `BasisState`, and `QubitUnitary` operations. For the parameter-shift method,
   this is allowable for all operations.
 
-* Changes to support a dynamic number of qubits:
+* Several changes have been made to support dynamic qubit specification:
 
-  - The `qalloc_p` custom JAX primitive can now take in a dynamic number of qubits as a tracer
+  * The `qalloc_p` custom JAX primitive can now take in a dynamic number of qubits as a tracer
     and lower it to mlir.
     [(#1549)](https://github.com/PennyLaneAI/catalyst/pull/1549)
 
-  - `ComputationalBasisOp` can now take in a quantum register in mlir, instead of an explicit, fixed-size list of qubits.
+  * `ComputationalBasisOp` can now take in a quantum register in mlir, instead of an explicit, fixed-size list of qubits.
     [(#1553)](https://github.com/PennyLaneAI/catalyst/pull/1553)
 
-  - Non-observable measurements without explicit wires will now compile to `ComputationalBasisOp` with a quantum register, instead of the explicit list of all qubits on the device.
+  * Non-observable measurements without explicit wires will now compile to `ComputationalBasisOp` with a quantum register, instead of the explicit list of all qubits on the device.
   This means the same compiled IR can be reused even if the device changes its number of qubits across runs.
   This includes `probs(), state(), sample(), counts()`.
     [(#1565)](https://github.com/PennyLaneAI/catalyst/pull/1565)
 
-  - In mlir, `ProbsOp, StateOp, SampleOp, CountsOp` ops now carry an optional new SSA operand for their return shapes.
+  * In mlir, `ProbsOp, StateOp, SampleOp, CountsOp` ops now carry an optional new SSA operand for their return shapes.
     This operand is used during bufferization pass to allocate result memrefs dynamically.
     A new verification is added to check that this new operand and static return shapes cannot coexist.
     [(#1574)](https://github.com/PennyLaneAI/catalyst/pull/1574)
 
-* Added `qjit.mlir_opt` property to access the optimized MLIR representation of a compiled function.
+* A `mlir_opt` property has been added to `qjit` to access the optimized MLIR representation of a compiled 
+  function.
   [(#1579)](https://github.com/PennyLaneAI/catalyst/pull/1579)
 
-* Improve error message for ZNE.
+* The error message in `catalyst.mitigate_with_zne` has been improved.
   [(#1603)](https://github.com/PennyLaneAI/catalyst/pull/1603)
-
 
 <h3>Breaking changes 💔</h3>
 
+🦗... 🦗... 🦗...
+
 <h3>Deprecations 👋</h3>
+
+🦗... 🦗... 🦗...
 
 <h3>Bug fixes 🐛</h3>
 
-* Fixed `argnums` parameter of `grad` and `value_and_grad` being ignored.
+* Fixed the `argnums` parameter of `grad` and `value_and_grad` being ignored.
   [(#1478)](https://github.com/PennyLaneAI/catalyst/pull/1478)
 
 * All dialects are loaded preemptively.
   This allows third-party plugins to load their dialects.
   [(#1584)](https://github.com/PennyLaneAI/catalyst/pull/1584)
 
-* Fixed an issue ([(#1488)](https://github.com/PennyLaneAI/catalyst/pull/1488)) where Catalyst could
-  give incorrect results for circuits containing `qml.StatePrep`.
+* Fixed an issue where Catalyst could give incorrect results for circuits containing `qml.StatePrep`.
   [(#1491)](https://github.com/PennyLaneAI/catalyst/pull/1491)
 
-* Fixes an issue ([(#1501)](https://github.com/PennyLaneAI/catalyst/issues/1501)) where using
-  autograph in conjunction with catalyst passes causes a crash.
+* Fixed an issue where using autograph in conjunction with catalyst passes caused a crash.
   [(#1541)](https://github.com/PennyLaneAI/catalyst/pull/1541)
 
-* Fixes an issue ([(#1548)](https://github.com/PennyLaneAI/catalyst/issues/1548)) where using
-  autograph in conjunction with catalyst pipeline causes a crash.
+* Fixed an issue where using
+  autograph in conjunction with catalyst pipeline caused a crash.
   [(#1576)](https://github.com/PennyLaneAI/catalyst/pull/1576)
 
-* Fixes an issue ([(#1547)](https://github.com/PennyLaneAI/catalyst/issues/1547)) where using
-  chained catalyst passes decorators causes a crash.
+* Fixed an issue where using
+  chained catalyst passes decorators caused a crash.
   [(#1576)](https://github.com/PennyLaneAI/catalyst/pull/1576)
 
-* Autographs and catalyst pipeline fix.
+* Specialized handling for `pipeline`s was added.
   [(#1599)](https://github.com/PennyLaneAI/catalyst/pull/1599)
 
-* Fixes an issue ([(#1339)](https://github.com/PennyLaneAI/catalyst/issues/1339)) where using
-  autograph with control/adjoint functions used on operator objects causes a crash.
+* Fixed an issue where using
+  autograph with control/adjoint functions used on operator objects caused a crash.
   [(#1605)](https://github.com/PennyLaneAI/catalyst/pull/1605)
 
-* Fixes an issue ([(#896)](https://github.com/PennyLaneAI/catalyst/issues/896)) where using
-  pytrees inside a loop with autograph causes falling back to python.
+* Fixed an issue where using
+  pytrees inside a loop with autograph caused falling back to Python.
   [(#1601)](https://github.com/PennyLaneAI/catalyst/pull/1601)
 
 <h3>Internal changes ⚙️</h3>
 
-* Updated the call signature for the PLXPR `qnode_prim` primitive.
+* Updated the call signature for the plxpr `qnode_prim` primitive.
   [(#1538)](https://github.com/PennyLaneAI/catalyst/pull/1538)
 
 * Update deprecated access to `QNode.execute_kwargs["mcm_config"]`.
@@ -292,41 +297,41 @@
 
 * Several changes for experimental support of trapped-ion OQD devices have been made, including:
 
-  - The `get_c_interface` method has been added to the OQD device, which enables retrieval of the C++
+  * The `get_c_interface` method has been added to the OQD device, which enables retrieval of the C++
     implementation of the device from Python. This allows `qjit` to accept an instance of the device
     and connect to its runtime.
     [(#1420)](https://github.com/PennyLaneAI/catalyst/pull/1420)
 
-  - Improved ion dialect to reduce redundant code generated. Added a string attribute `label` to Level.
+  * Improved ion dialect to reduce redundant code generated. Added a string attribute `label` to Level.
     Also changed the levels of a transition from `LevelAttr` to `string`
     [(#1471)](https://github.com/PennyLaneAI/catalyst/pull/1471)
 
-  - The region of a `ParallelProtocolOp` is now always terminated with a `ion::YieldOp` with explicitly yielded SSA values. This ensures the op is well-formed, and improves readability.
+  * The region of a `ParallelProtocolOp` is now always terminated with a `ion::YieldOp` with explicitly yielded SSA values. This ensures the op is well-formed, and improves readability.
     [(#1475)](https://github.com/PennyLaneAI/catalyst/pull/1475)
 
-  - Add a new pass `convert-ion-to-llvm` which lowers the Ion dialect to llvm dialect. This pass
+  * Add a new pass `convert-ion-to-llvm` which lowers the Ion dialect to llvm dialect. This pass
     introduces oqd device specific stubs that will be implemented in oqd runtime including:
     `@ __catalyst__oqd__pulse`, `@ __catalyst__oqd__ParallelProtocol`.
     [(#1466)](https://github.com/PennyLaneAI/catalyst/pull/1466)
 
-  - The OQD device can now generate OpenAPL JSON specs during runtime. The oqd stubs
+  * The OQD device can now generate OpenAPL JSON specs during runtime. The oqd stubs
   `@ __catalyst__oqd__pulse`, and `@ __catalyst__oqd__ParallelProtocol`, which
   are called in the llvm dialect after the aforementioned lowering ([(#1466)](https://github.com/PennyLaneAI/catalyst/pull/1466)), are defined to produce JSON specs that OpenAPL expects.
     [(#1516)](https://github.com/PennyLaneAI/catalyst/pull/1516)
 
-  - The OQD device is moved from `frontend/catalyst/third_party/oqd` to `runtime/lib/backend/oqd`. An overall switch, `ENABLE_OQD`, is added to control the OQD build system from a single entry point. The switch is `OFF` by default, and OQD can be built from source via `make all ENABLE_OQD=ON`, or `make runtime ENABLE_OQD=ON`.
+  * The OQD device is moved from `frontend/catalyst/third_party/oqd` to `runtime/lib/backend/oqd`. An overall switch, `ENABLE_OQD`, is added to control the OQD build system from a single entry point. The switch is `OFF` by default, and OQD can be built from source via `make all ENABLE_OQD=ON`, or `make runtime ENABLE_OQD=ON`.
     [(#1508)](https://github.com/PennyLaneAI/catalyst/pull/1508)
 
-  - Ion dialect now supports phonon modes using `ion.modes` operation.
+  * Ion dialect now supports phonon modes using `ion.modes` operation.
     [(#1517)](https://github.com/PennyLaneAI/catalyst/pull/1517)
 
-  - Rotation angles are normalized to avoid negative duration for pulses during ion dialect lowering.
+  * Rotation angles are normalized to avoid negative duration for pulses during ion dialect lowering.
     [(#1517)](https://github.com/PennyLaneAI/catalyst/pull/1517)
 
-  - Catalyst now generates OpenAPL programs for Pennylane circuits of up to two qubits using the OQD device.
+  * Catalyst now generates OpenAPL programs for Pennylane circuits of up to two qubits using the OQD device.
     [(#1517)](https://github.com/PennyLaneAI/catalyst/pull/1517)
 
-  - The end-to-end compilation pipeline for OQD devices is available as an API function.
+  * The end-to-end compilation pipeline for OQD devices is available as an API function.
     [(#1545)](https://github.com/PennyLaneAI/catalyst/pull/1545)
 
 * Update source code to comply with changes requested by black v25.1.0
