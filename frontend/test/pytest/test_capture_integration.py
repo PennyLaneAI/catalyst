@@ -180,9 +180,11 @@ class TestCapture:
     @pytest.mark.parametrize(
         "init_state",
         [
-            jnp.array([1.0, 0.0], dtype="complex"),
-            jnp.array([0.0, 1.0], dtype="complex"),
-            jnp.array([1.0, 1.0], dtype="complex") / jnp.sqrt(2),
+            jnp.array([1.0, 0.0], dtype=jnp.complex128),
+            jnp.array([0.0, 1.0], dtype=jnp.complex128),
+            jnp.array([1.0, 1.0], dtype=jnp.complex128) / jnp.sqrt(2.0),
+            jnp.array([0.0, 1.0], dtype=jnp.float64),
+            jnp.array([0, 1], dtype=jnp.int64),
         ],
     )
     def test_state_prep(self, backend, init_state):
@@ -193,8 +195,6 @@ class TestCapture:
         def circuit(init_state):
             qml.StatePrep(init_state, wires=0)
             return qml.state()
-
-        init_state = jnp.array([1.0 + 0.0j, 1.0 + 0.0j], dtype="complex") / jnp.sqrt(2)
 
         desired = circuit(init_state)
         actual = qjit(circuit, experimental_capture=True)(init_state)
