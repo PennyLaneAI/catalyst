@@ -23,18 +23,18 @@ from enum import Enum
 from pathlib import Path
 from typing import ContextManager, Dict, List, Optional, Set, Tuple
 
-from jax._src.core import MainTrace as JaxMainTrace
-from jax._src.core import cur_sublevel, new_base_main
+#from jax._src.core import MainTrace as JaxMainTrace
+#from jax._src.core import cur_sublevel, new_base_main
 from jax._src.interpreters.partial_eval import (
     DynamicJaxprTrace,
     JaxprStackFrame,
-    extend_jaxpr_stack,
+    #extend_jaxpr_stack,
 )
 from jax._src.source_info_util import reset_name_stack
-from jax.core import find_top_trace
+from jax.core import find_top_trace, trace_ctx, take_current_trace, set_current_trace
 from pennylane.queuing import QueuingManager
 
-from catalyst.jax_extras import new_dynamic_main2
+#from catalyst.jax_extras import new_dynamic_main2
 from catalyst.logging import debug_logger_init
 from catalyst.utils.exceptions import CompileError
 
@@ -157,13 +157,13 @@ class JaxTracingContext:
         trace: Current JAX trace object.
     """
 
-    main: JaxMainTrace
+    main: DynamicJaxprTrace #JaxMainTrace
     frames: Dict[DynamicJaxprTrace, JaxprStackFrame]
-    mains: Dict[DynamicJaxprTrace, JaxMainTrace]
+    mains: Dict[DynamicJaxprTrace, DynamicJaxprTrace]#JaxMainTrace]
     trace: Optional[DynamicJaxprTrace]
 
     @debug_logger_init
-    def __init__(self, main: JaxMainTrace):
+    def __init__(self, main: DynamicJaxprTrace):#JaxMainTrace):
         self.main, self.frames, self.mains, self.trace = main, {}, {}, None
 
 
@@ -174,7 +174,7 @@ class EvaluationContext:
     tracing contexts. Contexts can be nested.
     """
 
-    _tracing_stack: List[Tuple[EvaluationMode, Optional[JaxTracingContext]]] = []
+    _mode_stack: List[EvaluationMode] = []
     _mlir_plugins: Set[Path] = set()
 
     @debug_logger_init
@@ -203,51 +203,44 @@ class EvaluationContext:
     @classmethod
     @contextmanager
     def _create_tracing_context(cls, mode) -> ContextManager[JaxTracingContext]:
-        with new_base_main(DynamicJaxprTrace, dynamic=True) as main:
-            main.jaxpr_stack = ()
-            cls._tracing_stack.append((mode, JaxTracingContext(main)))
-            try:
-                yield cls._tracing_stack[-1][1]
-            finally:
-                cls._tracing_stack.pop()
+        cls._mode_stack.append(mode)
+        try:
+            yield trace_ctx
+        finally:
+            cls._mode_stack.pop()
 
     @classmethod
     @contextmanager
     def _create_interpretation_context(cls) -> ContextManager[JaxTracingContext]:
-        cls._tracing_stack.append((EvaluationMode.INTERPRETATION, None))
+        cls._mode_stack.append(EvaluationMode.INTERPRETATION)
         try:
-            yield cls._tracing_stack[-1][1]
+            yield None
         finally:
-            cls._tracing_stack.pop()
+            cls._mode_stack.pop()
 
     @classmethod
     @contextmanager
     def frame_tracing_context(
-        cls, ctx: JaxTracingContext, trace: Optional[DynamicJaxprTrace] = None
+        cls, trace: Optional[DynamicJaxprTrace] = None
     ) -> ContextManager[DynamicJaxprTrace]:
         """Start a new JAX tracing frame, e.g. to trace a region of some
         :class:`~.jax_tracer.HybridOp`. Not applicable in non-tracing evaluation modes."""
-        assert ctx is cls._tracing_stack[-1][1], f"{ctx=}"
-        main = ctx.mains[trace] if trace is not None else None
-        with new_dynamic_main2(DynamicJaxprTrace, main=main) as nmain:
-            nmain.jaxpr_stack = ()
-            frame = JaxprStackFrame() if trace is None else ctx.frames[trace]
-            with extend_jaxpr_stack(nmain, frame), reset_name_stack():
-                parent_trace = ctx.trace
-                ctx.trace = DynamicJaxprTrace(nmain, cur_sublevel()) if trace is None else trace
-                ctx.frames[ctx.trace] = frame
-                ctx.mains[ctx.trace] = nmain
-                try:
-                    yield ctx.trace
-                finally:
-                    ctx.trace = parent_trace
+        if trace is not None:
+            with set_current_trace(trace):
+                yield trace
+        else:
+            new_trace = DynamicJaxprTrace(None)
+            with set_current_trace(new_trace):
+                print("created new trace ", id(new_trace))
+                yield new_trace
 
     @classmethod
     def get_main_tracing_context(cls, hint=None) -> JaxTracingContext:
         """Return the current JAX tracing context, raise an exception if not in tracing mode."""
         msg = f"{hint or 'catalyst functions'} can only be used from within @qjit decorated code."
         EvaluationContext.check_is_tracing(msg)
-        return cls._tracing_stack[-1][1]
+        with take_current_trace() as parent_trace:
+            return parent_trace
 
     def __enter__(self):
         if self.mode in [EvaluationMode.QUANTUM_COMPILATION, EvaluationMode.CLASSICAL_COMPILATION]:
@@ -263,14 +256,14 @@ class EvaluationContext:
     @classmethod
     def get_evaluation_mode(cls) -> Tuple[EvaluationMode, Optional[JaxTracingContext]]:
         """Return the name of the evaluation mode, paired with tracing context if applicable"""
-        if not EvaluationContext._tracing_stack:
-            return (EvaluationMode.INTERPRETATION, None)
-        return cls._tracing_stack[-1]
+        if not EvaluationContext._mode_stack:
+            return EvaluationMode.INTERPRETATION
+        return cls._mode_stack[-1]
 
     @classmethod
     def get_mode(cls):
         """Return the name of current evaluation mode."""
-        return cls.get_evaluation_mode()[0]
+        return cls.get_evaluation_mode()
 
     @classmethod
     def is_tracing(cls):
