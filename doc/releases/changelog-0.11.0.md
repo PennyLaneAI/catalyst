@@ -118,6 +118,45 @@ Pauli product measurements as described in [arXiv:1808.02892](https://arxiv.org/
 
   For more information on PPMs, please refer to our [PPM documentation page](https://pennylane.ai/compilation/pauli-product-measurement).
 
+* Catalyst now supports qubit number-invariant compilation. That is, programs can be compiled without
+  specifying the number of qubits to allocate ahead of time. Instead, the device can be supplied with
+  a dynamic program variable as the number of wires.
+  [(#1549)](https://github.com/PennyLaneAI/catalyst/pull/1549)
+  [(#1553)](https://github.com/PennyLaneAI/catalyst/pull/1553)
+  [(#1565)](https://github.com/PennyLaneAI/catalyst/pull/1565)
+  [(#1574)](https://github.com/PennyLaneAI/catalyst/pull/1574)
+
+  For example, the following toy workflow is now supported, where the number of qubits, `n`, is provided
+  as an argument to a qjit'd function:
+
+  ```python
+  import catalyst
+  import pennylane as qml
+
+  @catalyst.qjit(autograph=True)
+  def f(n):  
+      device = qml.device("lightning.qubit", wires=n, shots=10)
+
+      @qml.qnode(device)
+      def circuit():
+
+          for i in range(n):
+              qml.RX(1.5, wires=i)
+
+          return qml.counts()
+
+      return circuit()
+  ```
+
+  ```pycon
+  >>> f(3)
+  (Array([0, 1, 2, 3, 4, 5, 6, 7], dtype=int64),
+  Array([0, 0, 3, 2, 3, 1, 1, 0], dtype=int64))
+  >>> f(10)
+  (Array([ 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15],      dtype=int64),
+  Array([0, 0, 1, 1, 2, 0, 0, 0, 0, 0, 1, 1, 2, 1, 0, 1], dtype=int64))
+  ```
+
 * Catalyst now supports PennyLane's `cond`, `for_loop` and `while_loop` control flow functions with
   `experimental_capture=True`.
   [(#1468)](https://github.com/PennyLaneAI/catalyst/pull/1468)
@@ -218,29 +257,6 @@ Pauli product measurements as described in [arXiv:1808.02892](https://arxiv.org/
   decomposed when this is allowable. For the adjoint differentiation method, this is allowable
   for the `StatePrep`, `BasisState`, and `QubitUnitary` operations. For the parameter-shift method,
   this is allowable for all operations.
-
-* Catalyst now supports qubit number-invariant compilation! That is, programs can be compiled without
-  specifying the number of qubits to allocate ahead of time. Instead, the device can be supplied with
-  a dynamic program variable as the number of wires.
-
-  * The `qalloc_p` custom JAX primitive can now take in a dynamic number of qubits as a tracer
-    and lower it to mlir.
-    [(#1549)](https://github.com/PennyLaneAI/catalyst/pull/1549)
-
-  * `ComputationalBasisOp` can now take in a quantum register in mlir, instead of an explicit, fixed-size 
-    list of qubits.
-    [(#1553)](https://github.com/PennyLaneAI/catalyst/pull/1553)
-
-  * Non-observable measurements without explicit wires will now compile to `ComputationalBasisOp` with 
-    a quantum register, instead of the explicit list of all qubits on the device. This means the same 
-    compiled IR can be reused even if the device changes its number of qubits across runs. This includes 
-    `probs(), state(), sample(), counts()`.
-    [(#1565)](https://github.com/PennyLaneAI/catalyst/pull/1565)
-
-  * In mlir, `ProbsOp, StateOp, SampleOp, CountsOp` ops now carry an optional new SSA operand for their 
-    return shapes. This operand is used during bufferization pass to allocate result memrefs dynamically.
-    A new verification is added to check that this new operand and static return shapes cannot coexist.
-    [(#1574)](https://github.com/PennyLaneAI/catalyst/pull/1574)
 
 * An `mlir_opt` property has been added to `qjit` to access the optimized MLIR representation of a compiled 
   function.
