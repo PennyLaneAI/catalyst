@@ -286,6 +286,9 @@
   pytrees inside a loop with autograph caused falling back to Python.
   [(#1601)](https://github.com/PennyLaneAI/catalyst/pull/1601)
 
+* Closure variables are now supported with `grad` and `value_and_grad`.
+  [(#1613)](https://github.com/PennyLaneAI/catalyst/pull/1613)
+
 <h3>Internal changes ⚙️</h3>
 
 * Updated the call signature for the plxpr `qnode_prim` primitive.
