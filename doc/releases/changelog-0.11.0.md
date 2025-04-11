@@ -30,10 +30,10 @@
   Here, the Hadamard gate pairs which are consecutive across two iterations are eliminated,
   leaving behind only two unpaired Hadamard gates, from the first and last iteration.
 
-* A new intermediate representation and compilation framework has been added to Catalyst
-  to describe and manipulate programs in the Pauli product measurement (PPM) representation.
-  As part of this framework, three new passes are now available to convert Clifford + T gates to
-Pauli product measurements as described in [arXiv:1808.02892](https://arxiv.org/abs/1808.02892v3).
+* A new intermediate representation and compilation framework has been added to Catalyst to describe 
+  and manipulate programs in the Pauli product measurement (PPM) representation. As part of this framework, 
+  three new passes are now available to convert Clifford + T gates to Pauli product measurements as 
+  described in [arXiv:1808.02892](https://arxiv.org/abs/1808.02892v3).
   [(#1499)](https://github.com/PennyLaneAI/catalyst/pull/1499)
   [(#1551)](https://github.com/PennyLaneAI/catalyst/pull/1551)
   [(#1563)](https://github.com/PennyLaneAI/catalyst/pull/1563)
@@ -44,8 +44,7 @@ Pauli product measurements as described in [arXiv:1808.02892](https://arxiv.org/
   The passes currently exist for analysis, but PPM programs may become executable in the future
   when a suitable backend is available.
 
-  The following new compilation passes can be accessed from the :mod:`~.passes` 
-  module or in :func:`~.pipeline`:
+  The following new compilation passes can be accessed from the :mod:`~.passes` module or in :func:`~.pipeline`:
 
   * :func:`catalyst.passes.to_ppr <~.passes.to_ppr>`: Clifford + T gates are converted into Pauli product 
     rotations (PPRs) (:math:`\exp{iP \theta}`, where :math:`P` is a tensor product of Pauli operators):
@@ -54,67 +53,12 @@ Pauli product measurements as described in [arXiv:1808.02892](https://arxiv.org/
     * `T` gate → 1 rotation with :math:`P = Z` and :math:`\theta = \tfrac{\pi}{8}` 
     * `CNOT` gate → 3 rotations with :math:`P_1 = (Z \otimes X), P_2 = (-Z \otimes \mathbb{1}), P_3 = (-\mathbb{1} \otimes X)` and :math:`\theta = \tfrac{\pi}{4}` 
 
-  ```python
-  import catalyst
-
-  @catalyst.qjit(keep_intermediate=True)
-  @catalyst.passes.to_ppr
-  @qml.qnode(dev)
-  def circuit():
-      qml.H(0)
-      qml.S(1)
-      qml.T(0)
-      qml.CNOT([0, 1])
-      m1 = catalyst.measure(wires=0)
-      m2 = catalyst.measure(wires=1)
-      return m1, m2
-  ```
-
-  This circuit has the following representation in MLIR:
-  ```mlir
-    . . .
-      %0 = quantum.alloc( 2) : !quantum.reg
-      %1 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
-      %2 = qec.ppr ["Z"](4) %1 : !quantum.bit
-      %3 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
-      %4 = qec.ppr ["Z"](4) %3 : !quantum.bit
-      %5 = qec.ppr ["X"](4) %4 : !quantum.bit
-      %6 = qec.ppr ["Z"](4) %5 : !quantum.bit
-      %7 = qec.ppr ["Z"](8) %6 : !quantum.bit
-      %8:2 = qec.ppr ["Z", "X"](4) %7, %2 : !quantum.bit, !quantum.bit
-      %9 = qec.ppr ["Z"](-4) %8#0 : !quantum.bit
-      %10 = qec.ppr ["X"](-4) %8#1 : !quantum.bit
-      %mres, %out_qubits = qec.ppm ["Z"] %9 : !quantum.bit
-      %mres_0, %out_qubits_1 = qec.ppm ["Z"] %10 : !quantum.bit
-    . . .
-  ```
-
-  * :func:`catalyst.passes.commute_ppr <~.passes.commute_ppr>`: Commuting Clifford PPR operations 
-    (PPRs with :math:`\theta = \tfrac{\pi}{4}`) to the end of a circuit, past non-Clifford PPRs (PPRs 
+  * :func:`catalyst.passes.commute_ppr <~.passes.commute_ppr>`: Commute Clifford PPR operations 
+    (PPRs with :math:`\theta = \tfrac{\pi}{4}`) to the end of the circuit, past non-Clifford PPRs (PPRs 
     with :math:`\theta = \tfrac{\pi}{8}`)
-  
-  ```python
-  @catalyst.qjit(keep_intermediate=True)
-  @catalyst.pipeline({"to_ppr": {}, "commute_ppr": {}})
-  @qml.qnode(qml.device("null.qubit", wires=1))
-  def circuit():
-      qml.H(0)
-      qml.T(0)
-      return measure(0)
-  ```
 
-  * :func:`catalyst.passes.ppr_to_ppm <~.passes.ppr_to_ppm>`: Absorbing Clifford PPRs into terminal 
-    Pauli product measurements (PPMs).
-
-  ```python
-  @catalyst.qjit(keep_intermediate=True)
-  @catalyst.pipeline({"to_ppr": {}, "commute_ppr": {}, "ppr_to_ppm": {}})
-  @qml.qnode(qml.device("null.qubit", wires=1))
-  def circuit():
-      qml.H(0)
-      qml.T(0)
-      return measure(0)
-  ```
+  * :func:`catalyst.passes.ppr_to_ppm <~.passes.ppr_to_ppm>`: Absorb Clifford PPRs into terminal Pauli 
+    product measurements (PPMs).
 
   For more information on PPMs, please refer to our [PPM documentation page](https://pennylane.ai/compilation/pauli-product-measurement).
 
@@ -157,70 +101,91 @@ Pauli product measurements as described in [arXiv:1808.02892](https://arxiv.org/
   Array([0, 0, 1, 1, 2, 0, 0, 0, 0, 0, 1, 1, 2, 1, 0, 1], dtype=int64))
   ```
 
-* Catalyst now supports PennyLane's `cond`, `for_loop` and `while_loop` control flow functions with
-  `experimental_capture=True`.
+* Catalyst better integrates with PennyLane program capture, supporting PennyLane-native control flow 
+  operations and providing more efficient transform handling when both Catalyst and PennyLane support 
+  a transform.
   [(#1468)](https://github.com/PennyLaneAI/catalyst/pull/1468)
   [(#1509)](https://github.com/PennyLaneAI/catalyst/pull/1509)
   [(#1521)](https://github.com/PennyLaneAI/catalyst/pull/1521)
-
-  To trigger the PennyLane pipeline for capturing a program as plxpr, simply set `experimental_capture=True` 
-  in the qjit decorator.
-
-  ```python
-  import pennylane as qml
-  from catalyst import qjit
-
-  dev = qml.device("lightning.qubit", wires=1)
-
-  @qjit(experimental_capture=True)
-  @qml.qnode(dev)
-  def circuit(x: float):
-
-      def ansatz_true():
-          qml.RX(x, wires=0)
-          qml.Hadamard(wires=0)
-
-      def ansatz_false():
-          qml.RY(x, wires=0)
-
-      qml.cond(x > 1.4, ansatz_true, ansatz_false)()
-
-      return qml.expval(qml.Z(0))
-  ```
-
-* Catalyst now supports PennyLane transforms captured as plxpr.
   [(#1544)](https://github.com/PennyLaneAI/catalyst/pull/1544)
   [(#1561)](https://github.com/PennyLaneAI/catalyst/pull/1561)
   [(#1567)](https://github.com/PennyLaneAI/catalyst/pull/1567)
   [(#1578)](https://github.com/PennyLaneAI/catalyst/pull/1578)
 
-  To trigger the PennyLane pipeline for capturing the mentioned transforms, simply set `experimental_capture=True` 
-  in the qjit decorator. If available, Catalyst will apply its own equivalent pass in replacement of 
-  the original transform provided by PennyLane (e.g., `cancel_inverses` and `merge_rotations`). Otherwise, 
-  the transform will be expanded according to rules provided by PennyLane.
+  Using PennyLane's program capture mechanism involves setting `experimental_capture=True` in the qjit 
+  decorator. With this present, the following control flow functions in PennyLane are now usable with
+  qjit:
+
+  * Support for `qml.cond`:
+
+    ```python
+    import pennylane as qml
+    from catalyst import qjit
+
+    dev = qml.device("lightning.qubit", wires=1)
+
+    @qjit(experimental_capture=True)
+    @qml.qnode(dev)
+    def circuit(x: float):
+
+        def ansatz_true():
+            qml.RX(x, wires=0)
+            qml.Hadamard(wires=0)
+
+        def ansatz_false():
+            qml.RY(x, wires=0)
+
+        qml.cond(x > 1.4, ansatz_true, ansatz_false)()
+
+        return qml.expval(qml.Z(0))
+    ```
+
+  * Support for `qml.for_loop`:
+
+  
+
+  * Support for `qml.while_loop`:
+
+
+
+  Additionally, Catalyst can now apply its own compilation passes when equivalent transforms are provided 
+  by PennyLane (e.g., `cancel_inverses` and `merge_rotations`). In cases where Catalyst does not have 
+  its own analogous implementation of a transform available in PennyLane, the transform will be expanded 
+  according to rules provided by PennyLane.
+
+  For example, consider this workflow that contains two PennyLane transforms: `cancel_inverses` and 
+  `single_qubit_fusion`. Catalyst has its own implementation of `cancel_inverses` in the `passes` module, 
+  and will smartly invoke its implementation intead. Conversely, Catalyst does not have its own implementation
+  of `single_qubit_fusion`, and will therefore resort to PennyLane's implementation of the transform.
 
   ```python
-  import pennylane as qml
-  import jax.numpy as jnp
-
   dev = qml.device("lightning.qubit", wires=1)
 
   @qjit(experimental_capture=True)
-  def func(x: float):
+  def func(r1, r2):
+
+      @qml.transforms.single_qubit_fusion
       @qml.transforms.cancel_inverses
       @qml.qnode(dev)
-      def circuit(x: float):
-          qml.RX(x, wires=0)
-          qml.Hadamard(wires=0)
-          qml.Hadamard(wires=0)
-          return qml.expval(qml.PauliZ(0))
+      def circuit(r1, r2):
+          qml.Rot(*r1, wires=0)
+          qml.Rot(*r2, wires=0)
+          qml.RZ(r1[0], wires=0)
+          qml.RZ(r2[0], wires=0) 
 
-      return circuit(x)
+          qml.Hadamard(wires=0)
+          qml.Hadamard(wires=0)
+          
+          return qml.expval(qml.PauliZ(0))  
+
+      return circuit(r1, r2)
   ```
 
   ```pycon
-  >>> func(0.1)
-  Array(0.99500417, dtype=float64)  
+  >>> r1 = jnp.array([0.1, 0.2, 0.3])
+  >>> r2 = jnp.array([0.4, 0.5, 0.6])
+  >>> func(r1, r2)
+  Array(0.7872403, dtype=float64)
   ```
 
 <h3>Improvements 🛠</h3>
