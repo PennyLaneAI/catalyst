@@ -197,6 +197,8 @@
     [(#1524)](https://github.com/PennyLaneAI/catalyst/pull/1524)
   * Lazy IR canonicalization and LLVMIR textual generation.
     [(#1530)](https://github.com/PennyLaneAI/catalyst/pull/1530)
+  - Speed up how tracers are overwritten for hybrid ops.
+    [(#1622)](https://github.com/PennyLaneAI/catalyst/pull/1622)
 
 * Catalyst now decomposes non-differentiable gates when in a gradient method.
   [(#1562)](https://github.com/PennyLaneAI/catalyst/pull/1562)
