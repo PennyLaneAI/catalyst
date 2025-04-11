@@ -26,6 +26,7 @@
 #include "QuantumDevice.hpp"
 #include "QubitManager.hpp"
 #include "Types.h"
+#include "Utils.hpp"
 
 // The delimited to print before and after the JSON representing resource usage.
 //   This is intended to make parsing the output easier.
@@ -34,28 +35,6 @@
 #define RESOURCE_PRINT_DELIMETER "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
 
 namespace Catalyst::Runtime::Devices {
-
-// TODO: For PR reviewers: Is this a good place to put this function?
-// It is used to print the resource usage of the device in a pretty format.
-// It is not used anywhere else in the codebase, but it feels like more of a utils type function
-// than anything that has to do with the device itself.
-template <class K, class V>
-void prettyPrint(const std::unordered_map<K, V> &map, size_t leadingSpaces = 0)
-{
-    std::cout << "{\n";
-    auto maplen = map.size();
-    for (const auto &pair : map) {
-        for (size_t i = 0; i < leadingSpaces + 2; ++i) {
-            std::cout << " ";
-        }
-        std::cout << "\"" << pair.first << "\": " << pair.second << (--maplen > 0 ? "," : "")
-                  << "\n";
-    }
-    for (size_t i = 0; i < leadingSpaces; ++i) {
-        std::cout << " ";
-    }
-    std::cout << "}";
-}
 
 /**
  * @brief struct API for a null backend quantum device.
@@ -100,7 +79,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
         std::cout << "  \"gate_types\": ";
         resource_data_.erase("num_gates");
         resource_data_.erase("num_qubits");
-        prettyPrint(resource_data_, 2);
+        pretty_print(resource_data_, 2);
         std::cout << "\n}" << std::endl;
         std::cout << RESOURCE_PRINT_DELIMETER << std::endl;
     }
