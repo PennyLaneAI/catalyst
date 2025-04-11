@@ -327,7 +327,7 @@ def _options_to_cli_flags(options):
         pipeline_name, passes = pipeline
         passes_str = ";".join(passes)
         pipeline_str += f"{pipeline_name}({passes_str}),"
-    extra_args += ["--catalyst-pipeline", pipeline_str]
+    extra_args += ["--catalyst-pipeline", f'"{pipeline_str}"']
 
     for plugin in options.pass_plugins:
         extra_args += [("--load-pass-plugin", plugin)]
