@@ -22,9 +22,9 @@ import weakref
 from collections.abc import Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
+from enum import Enum, auto
 from functools import partial, reduce
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
-from enum import Enum, auto
 
 import jax
 import jax.numpy as jnp
@@ -1133,19 +1133,21 @@ def is_transform_valid_for_batch_transforms(tape, flat_results):
 
 class TracingMode(Enum):
     """Enumerate the tracing modes supported by the quantum function tracer:
-    
+
     DEFAULT - Allows mid-circuit measurements and returns function's results directly.
-              Used when no transform is applied or when transform doesn't modify 
+              Used when no transform is applied or when transform doesn't modify
               measurements or produce multiple tapes.
-              
+
     TRANSFORM - Uses tape measurements instead of original function results.
-                Prohibits mid-circuit measurements with multiple tapes and requires 
+                Prohibits mid-circuit measurements with multiple tapes and requires
                 function to return only measurements (no classical results).
                 Used when transform produces multiple tapes or modifies measurements.
     """
+
     DEFAULT = 0
     TRANSFORM = 1
-    
+
+
 @debug_logger
 def determine_transform_legality_and_mode(flat_results, tape, tapes):
     """Determines whether a transform is legal for the given program and which tracing mode to use.
@@ -1381,7 +1383,7 @@ def trace_quantum_function(
 
         with EvaluationContext.frame_tracing_context(ctx, trace):
             # Determine if we're using transformed measurements based on tracing mode
-            
+
             if len(qnode_program) > 0:
                 tracing_mode = TracingMode.TRANSFORM
 
@@ -1410,7 +1412,7 @@ def trace_quantum_function(
                 # If the program is batched, that means that it was transformed.
                 # If it was transformed, that means that the program might have
                 # changed the output. See `split_non_commuting`
-                if tracing_mode == TracingMode.DEFAULT:
+                if tracing_mode == TracingMode.TRANSFORM:
                     # TODO: In the future support arbitrary output from the user function.
                     output = tape.measurements
                     _, trees = jax.tree_util.tree_flatten(output, is_leaf=is_leaf)
