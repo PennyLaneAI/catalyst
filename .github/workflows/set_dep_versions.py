@@ -39,6 +39,11 @@ if not match:
     url = f"https://raw.githubusercontent.com/google/jax/jaxlib-v{jax_version}/third_party/xla/workspace.bzl"
     response = requests.get(url)
     match = re.search(r'XLA_COMMIT = "([a-zA-Z0-9]*)"', response.text)
+if not match:
+    # It looks like starting version 5.0 there are no new releases of jaxlib and only of jax
+    url = f"https://raw.githubusercontent.com/jax-ml/jax/jax-v{jax_version}/third_party/xla/workspace.bzl"
+    response = requests.get(url)
+    match = re.search(r'XLA_COMMIT = "([a-zA-Z0-9]*)"', response.text)
 xla_commit = match.group(1)
 
 url = f"https://raw.githubusercontent.com/openxla/xla/{xla_commit}/third_party/llvm/workspace.bzl"
