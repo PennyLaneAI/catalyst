@@ -39,7 +39,7 @@ jobs:
 
     name: Build Dependencies (Python ${{ matrix.python_version }})
     runs-on: ubuntu-22.04-arm
-    container: quay.io/pypa/${{ matrix.container_img }}        
+    # container: quay.io/pypa/${{ matrix.container_img }}        
 
     # if: needs.check_if_wheel_build_required.outputs.build-wheels == 'true'
 
@@ -129,6 +129,7 @@ jobs:
         #   steps.cache-mhlo-build.outputs.cache-hit != 'true' ||
         #   steps.cache-enzyme-build.outputs.cache-hit != 'true'
         run: |
+          echo /Library/Frameworks/Python.framework/Versions/${{ matrix.python_version }}/bin >> $GITHUB_PATH
           python${{ matrix.python_version }} -m pip install numpy nanobind pybind11 PyYAML cmake ninja
 
       - name: Build LLVM / MLIR
@@ -226,7 +227,7 @@ jobs:
       - name: Set up Python ${{ matrix.python_version }}
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python_version }}
+          python-version: '3.10'
 
       - name: Install dependencies (Python)
         run: |
