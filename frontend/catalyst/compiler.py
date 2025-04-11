@@ -290,8 +290,11 @@ def _catalyst(*args, stdin=None):
     catalyst *args
     """
     cmd = _get_catalyst_cli_cmd(*args, stdin=stdin)
-    result = subprocess.run(cmd, input=stdin, check=True, capture_output=True, text=True)
-    return result.stdout
+    try:
+        result = subprocess.run(cmd, input=stdin, check=True, capture_output=True, text=True)
+        return result.stdout
+    except subprocess.CalledProcessError as e:
+        raise CompileError(f"catalyst failed with error code {e.returncode}: {e.stderr}") from e
 
 
 def _quantum_opt(*args, stdin=None):

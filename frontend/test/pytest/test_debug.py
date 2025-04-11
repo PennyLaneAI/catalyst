@@ -558,6 +558,12 @@ class TestOptionsToCliFlags:
         ).strip()
         assert expected in observed
 
+    def test_catalyst_error(self):
+        mlir = """This is invalid MLIR"""
+        msg = "custom op 'This'"
+        with pytest.raises(CompileError, match=msg):
+            to_mlir_opt(stdin=mlir)
+
 
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
