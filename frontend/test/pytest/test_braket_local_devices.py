@@ -15,6 +15,7 @@
 """Unit tests for `OpenQasmDevice` on "local" Amazon Braket devices"""
 import numpy as np
 import pennylane as qml
+import pennylane.errors
 import pytest
 from numpy.testing import assert_allclose
 
@@ -22,7 +23,7 @@ from catalyst import grad, qjit
 
 try:
     qml.device("braket.local.qubit", backend="default", wires=1)
-except qml.DeviceError:
+except pennylane.errors.DeviceError:
     pytest.skip(
         "skipping Braket local tests because ``amazon-braket-pennylane-plugin`` is not installed",
         allow_module_level=True,
