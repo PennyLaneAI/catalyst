@@ -126,7 +126,7 @@ def custom_lower_jaxpr_to_module(
     custom_lowering_rules = catalyst.jax_primitives.CUSTOM_LOWERING_RULES
     lowering_params = LoweringParameters(override_lowering_rules=custom_lowering_rules)
     ctx = ModuleContext(
-        backend_or_name=None,
+        backend=None,
         platforms=[platform],
         axis_context=axis_context,
         keepalives=keepalives,
@@ -147,8 +147,6 @@ def custom_lower_jaxpr_to_module(
             jaxpr,
             effects,
             public=True,
-            create_tokens=True,
-            replace_tokens_with_dummy=True,
             replicated_args=replicated_args,
             arg_shardings=arg_shardings,
             result_shardings=result_shardings,
