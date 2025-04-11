@@ -26,6 +26,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 import jax
 import jax.numpy as jnp
 import pennylane as qml
+from jax.core import get_aval
 from jax._src.lax.lax import _extract_tracers_dyn_shape
 from pennylane import QubitUnitary, QueuingManager
 from pennylane.devices import QubitDevice
@@ -227,7 +228,7 @@ def retrace_with_result_types(jaxpr: ClosedJaxpr, target_types: List[ShapedArray
                 (out_tracers[:-1], target_types[:-1]) if with_qreg else (out_tracers, target_types)
             )
             out_promoted_tracers = [
-                (convert_element_type(tr, ty) if _abstractify(tr).dtype != ty else tr)
+                (convert_element_type(tr, ty) if get_aval(tr).dtype != ty else tr)
                 for tr, ty in zip(out_tracers_, target_types_)
             ]
             jaxpr2, _, consts = ctx.frames[trace].to_jaxpr2(
@@ -269,7 +270,7 @@ def _apply_result_type_conversion(
             (out_tracers[:-1], target_types[:-1]) if with_qreg else (out_tracers, target_types)
         )
         out_promoted_tracers = [
-            (convert_element_type(tr, ty) if _abstractify(tr).dtype != ty else tr)
+            (convert_element_type(tr, ty) if get_aval(tr).dtype != ty else tr)
             for tr, ty in zip(out_tracers_, target_types_)
         ]
         return out_promoted_tracers[num_implicit_outputs:] + (
