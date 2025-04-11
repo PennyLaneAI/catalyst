@@ -219,7 +219,7 @@ def retrace_with_result_types(jaxpr: ClosedJaxpr, target_types: List[ShapedArray
     # TODO: is eval expensive? or would it be better to modify the jaxpr in place?
     with_qreg = isinstance(target_types[-1], AbstractQreg)
     with EvaluationContext(EvaluationMode.CLASSICAL_COMPILATION) as ctx:
-        with EvaluationContext.frame_tracing_context(ctx) as trace:
+        with EvaluationContext.frame_tracing_context() as trace:
             in_tracers = _input_type_to_tracers(trace.new_arg, jaxpr.in_avals)
             out_tracers = [
                 trace.full_raise(t) for t in eval_jaxpr(jaxpr.jaxpr, jaxpr.consts, *in_tracers)
@@ -1112,7 +1112,7 @@ def trace_post_processing(ctx, trace, post_processing: Callable, pp_args):
         out_type(jax.OutputType) : List of abstract values with explicitness flag
         out_tree(PyTreeDef): PyTree shape of the qnode result
     """
-    with EvaluationContext.frame_tracing_context(ctx, trace):
+    with EvaluationContext.frame_tracing_context(trace):
         # What is the input to the post_processing function?
         # The input to the post_processing function is going to be a list of values One for each
         # tape. The tracers are all flat in pp_args.
@@ -1157,7 +1157,7 @@ def trace_function(
         fun, args, kwargs, expansion_strategy=expansion_strategy
     )
 
-    with EvaluationContext.frame_tracing_context(ctx) as trace:
+    with EvaluationContext.frame_tracing_context() as trace:
         arg_expanded_tracers = input_type_to_tracers(
             in_sig.in_type, trace.new_arg, trace.full_raise
         )
@@ -1194,7 +1194,7 @@ def trace_quantum_function(
     with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
         # (1) - Classical tracing
         quantum_tape = QuantumTape(shots=device.shots)
-        with EvaluationContext.frame_tracing_context(ctx) as trace:
+        with EvaluationContext.frame_tracing_context() as trace:
             wffa, in_avals, keep_inputs, out_tree_promise = deduce_avals(
                 f, args, kwargs, static_argnums
             )
@@ -1240,8 +1240,7 @@ def trace_quantum_function(
         # (2) - Quantum tracing
         transformed_results = []
         #breakpoint()
-        with EvaluationContext.frame_tracing_context(ctx, trace):
-        #with EvaluationContext.frame_tracing_context(ctx) as trace:
+        with EvaluationContext.frame_tracing_context(trace):
             qnode_transformed = len(qnode_program) > 0
             for tape in tapes:
                 # Set up quantum register for the current tape.
