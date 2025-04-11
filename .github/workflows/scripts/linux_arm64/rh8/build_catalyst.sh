@@ -32,7 +32,9 @@ ln -s /opt/_internal/cpython-${PYTHON_VERSION}.${PYTHON_SUBVERSION}/bin/python3 
 export PYTHON=/usr/bin/python3
 
 # Add LLVM, Python and GCC to the PATH env var
-export PATH=/catalyst/llvm-build/bin:/opt/_internal/cpython-${PYTHON_VERSION}.${PYTHON_SUBVERSION}/bin:/opt/rh/gcc-toolset-${GCC_VERSION}/root/usr/bin:$PATH
+# export PATH=/catalyst/llvm-build/bin:/opt/_internal/cpython-${PYTHON_VERSION}.${PYTHON_SUBVERSION}/bin:/opt/rh/gcc-toolset-${GCC_VERSION}/root/usr/bin:$PATH
+export PATH=/catalyst/llvm-build/bin:/opt/rh/gcc-toolset-${GCC_VERSION}/root/usr/bin:$PATH
+
 
 # Install python dependencies
 /usr/bin/python3 -m pip install pennylane nanobind pybind11 PyYAML cmake ninja delocate 'amazon-braket-pennylane-plugin>1.27.1'
