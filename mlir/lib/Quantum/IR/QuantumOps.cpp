@@ -42,10 +42,101 @@ static const mlir::StringSet<> hermitianOps = {"Hadamard", "PauliX", "PauliY", "
                                                "CY",       "CZ",     "SWAP",   "Toffoli"};
 static const mlir::StringSet<> rotationsOps = {"RX",  "RY",  "RZ",  "PhaseShift",
                                                "CRX", "CRY", "CRZ", "ControlledPhaseShift"};
+static const mlir::StringSet<> commuteOps = {"CNOT", "RZ", "PauliX"};
 
-LogicalResult CustomOp::canonicalize(CustomOp op, mlir::PatternRewriter &rewriter)
-{
-    if (op.getAdjoint()) {
+namespace {
+// Pattern for quantum gate commutation
+struct GateCommutationPattern : public mlir::OpRewritePattern<CustomOp> {
+    using OpRewritePattern<CustomOp>::OpRewritePattern;
+    mlir::LogicalResult matchAndRewrite(CustomOp op, mlir::PatternRewriter &rewriter) const override
+    {
+        if (!commuteOps.contains(op.getGateName())) {
+            return failure();
+        }
+
+        auto name = op.getGateName();
+        if (name == "CNOT") {
+            ValueRange inQubits = op.getInQubits();
+            // RZ commutes with CNOT
+            // (RZ(θ) ⊗ I) * CNOT = CNOT * (RZ(θ) ⊗ I)
+            if (auto defOp = llvm::dyn_cast_or_null<CustomOp>(inQubits[0].getDefiningOp());
+                defOp && defOp.getGateName() == "RZ") {
+                auto newCnotOp = rewriter.create<CustomOp>(
+                    op.getLoc(), op.getOutQubits().getTypes(), op.getOutCtrlQubits().getTypes(),
+                    op.getParams(), ValueRange({defOp.getInQubits()[0], inQubits[1]}), name,
+                    nullptr, op.getInCtrlQubits(), op.getInCtrlValues());
+
+                auto newRzOp = rewriter.create<CustomOp>(
+                    defOp.getLoc(), defOp.getOutQubits().getTypes(),
+                    defOp.getOutCtrlQubits().getTypes(), defOp.getParams(),
+                    ValueRange({newCnotOp.getOutQubits()[0]}), defOp.getGateName(), nullptr,
+                    defOp.getInCtrlQubits(), defOp.getInCtrlValues());
+
+                rewriter.replaceAllUsesWith(op.getOutQubits()[0], newRzOp.getOutQubits()[0]);
+                rewriter.replaceAllUsesWith(op.getOutQubits()[1], newCnotOp.getOutQubits()[1]);
+                return success();
+            }
+            // PauliX commutes with CNOT
+            // (I ⊗ PauliX) * CNOT = CNOT * (I ⊗ PauliX)
+            else if (auto defOp = llvm::dyn_cast_or_null<CustomOp>(inQubits[1].getDefiningOp());
+                     defOp && defOp.getGateName() == "PauliX") {
+                auto newCnotOp = rewriter.create<CustomOp>(
+                    op.getLoc(), op.getOutQubits().getTypes(), op.getOutCtrlQubits().getTypes(),
+                    op.getParams(), ValueRange({inQubits[0], defOp.getInQubits()[0]}), name,
+                    nullptr, op.getInCtrlQubits(), op.getInCtrlValues());
+
+                auto newPauliXOp = rewriter.create<CustomOp>(
+                    defOp.getLoc(), defOp.getOutQubits().getTypes(),
+                    defOp.getOutCtrlQubits().getTypes(), defOp.getParams(),
+                    ValueRange({newCnotOp.getOutQubits()[1]}), defOp.getGateName(), nullptr,
+                    defOp.getInCtrlQubits(), defOp.getInCtrlValues());
+
+                rewriter.replaceAllUsesWith(op.getOutQubits()[0], newCnotOp.getOutQubits()[0]);
+                rewriter.replaceAllUsesWith(op.getOutQubits()[1], newPauliXOp.getOutQubits()[0]);
+                return success();
+            }
+        }
+        else if (name == "RZ") {
+            // PauliX commutes with RZ
+            // PauliX * RZ(θ) = RZ(-θ) * PauliX
+            ValueRange inQubits = op.getInQubits();
+            if (auto defOp = llvm::dyn_cast_or_null<CustomOp>(inQubits[0].getDefiningOp());
+                defOp && defOp.getGateName() == "PauliX") {
+                auto params = op.getParams();
+                SmallVector<Value> paramsNeg;
+                for (auto param : params) {
+                    auto paramNeg = rewriter.create<mlir::arith::NegFOp>(op.getLoc(), param);
+                    paramsNeg.push_back(paramNeg);
+                }
+
+                auto newRzOp = rewriter.create<CustomOp>(
+                    op.getLoc(), op.getOutQubits().getTypes(), op.getOutCtrlQubits().getTypes(),
+                    paramsNeg, defOp.getInQubits(), name, nullptr, op.getInCtrlQubits(),
+                    op.getInCtrlValues());
+
+                auto newPauliXOp = rewriter.create<CustomOp>(
+                    defOp.getLoc(), defOp.getOutQubits().getTypes(),
+                    defOp.getOutCtrlQubits().getTypes(), defOp.getParams(), newRzOp.getOutQubits(),
+                    defOp.getGateName(), nullptr, defOp.getInCtrlQubits(), defOp.getInCtrlValues());
+
+                rewriter.replaceAllUsesWith(op.getOutQubits(), newPauliXOp.getOutQubits());
+                return success();
+            }
+        }
+        return failure();
+    }
+};
+
+// Pattern for adjoint canonicalization
+struct AdjointCanonicalizationPattern : public mlir::OpRewritePattern<CustomOp> {
+    using OpRewritePattern<CustomOp>::OpRewritePattern;
+
+    mlir::LogicalResult matchAndRewrite(CustomOp op, mlir::PatternRewriter &rewriter) const override
+    {
+        if (!op.getAdjoint()) {
+            return failure();
+        }
+
         auto name = op.getGateName();
         if (hermitianOps.contains(name)) {
             op.setAdjoint(false);
@@ -67,7 +158,14 @@ LogicalResult CustomOp::canonicalize(CustomOp op, mlir::PatternRewriter &rewrite
         }
         return failure();
     }
-    return failure();
+};
+
+} // namespace
+
+void CustomOp::getCanonicalizationPatterns(RewritePatternSet &results, MLIRContext *context)
+{
+    results.add<AdjointCanonicalizationPattern>(context);
+    results.add<GateCommutationPattern>(context);
 }
 
 LogicalResult MultiRZOp::canonicalize(MultiRZOp op, mlir::PatternRewriter &rewriter)
