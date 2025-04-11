@@ -228,6 +228,13 @@ jobs:
         with:
           python-version: ${{ matrix.python_version }}
 
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install numpy nanobind pybind11 PyYAML cmake ninja auditwheel
+          PYTHON_BINS=$(find /opt/_internal/cpython-${{ matrix.python_version }}.*/bin -maxdepth 1 -type d | tr '\n' ':' | sed 's/:$//')
+          echo $PYTHON_BINS >> $GITHUB_PATH
+
       - name: Get Cached LLVM Source
         id: cache-llvm-source
         uses: actions/cache/restore@v4
