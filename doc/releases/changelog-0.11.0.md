@@ -140,13 +140,60 @@
         return qml.expval(qml.Z(0))
     ```
 
+    ```pycon
+    >>> circuit(0.1)
+    Array(0.99500417, dtype=float64)
+    ```
+
   * Support for `qml.for_loop`:
 
-  
+    ```python
+    dev = qml.device("lightning.qubit", wires=2)
+
+    @qjit(experimental_capture=True)
+    @qml.qnode(dev)
+    def circuit(x: float):
+
+        @qml.for_loop(10)
+        def loop(i):
+            qml.H(wires=1)
+            qml.RX(x, wires=0)
+            qml.CNOT(wires=[0, 1])
+
+        loop()
+        return qml.expval(qml.Z(0))
+    ```
+
+    ```pycon
+    >>> circuit(0.1)
+    Array(0.97986841, dtype=float64)
+    ```
 
   * Support for `qml.while_loop`:
 
+    ```python
+    @qjit(experimental_capture=True)
+    @qml.qnode(dev)
+    def circuit(x: float):
 
+        f = lambda c: c < 5
+
+        @qml.while_loop(f)
+        def loop(c):
+            qml.H(wires=1)
+            qml.RX(x, wires=0)
+            qml.CNOT(wires=[0, 1])
+
+            return c + 1
+        
+        loop(0)
+        return qml.expval(qml.Z(0))
+    ```
+
+    ```pycon
+    >>> circuit(0.1)
+    Array(0.97526892, dtype=float64)
+    ```
 
   Additionally, Catalyst can now apply its own compilation passes when equivalent transforms are provided 
   by PennyLane (e.g., `cancel_inverses` and `merge_rotations`). In cases where Catalyst does not have 
