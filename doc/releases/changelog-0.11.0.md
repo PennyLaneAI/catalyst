@@ -3,7 +3,7 @@
 <h3>New features since last release</h3>
 
 * The `cancel_inverses` and `merge_rotations` compilation passes are now more efficient when control 
-  flow is present.
+  flow is present by optimizing over loop boundaries.
   [(#1476)](https://github.com/PennyLaneAI/catalyst/pull/1476)
 
   Loop boundary optimizations have been implemented to identify and optimize redundant quantum operations 
@@ -37,14 +37,15 @@
   [(#1564)](https://github.com/PennyLaneAI/catalyst/pull/1564)
   [(#1577)](https://github.com/PennyLaneAI/catalyst/pull/1577)
   
-  These new compilation passes are currently only represented symbolically. However, these operations 
-  are not yet executable on any backend, since they exist purely as intermediate representations for 
-  analysis and potential future execution when a suitable backend is available.
+  These new compilation passes are currently only represented symbolically and are not yet executable 
+  on any backend. They exist purely as intermediate representations for analysis and potential future 
+  xecution when a suitable backend is available.
 
-  The following new compilation passes have been added in the `passes` module:
+  The following new compilation passes have been added, and can be accessed from the :mod:`~.passes` 
+  module or in :func:`~.pipeline`:
 
-  * `catalyst.passes.to_ppr`: Clifford + T gates are converted into Pauli product rotations (PPRs) 
-    (:math:`\exp{iP \theta}`, where :math:`P` is a Pauli word (a product of Pauli operators)):
+  * :func:`catalyst.passes.to_ppr <~.passes.to_ppr>`: Clifford + T gates are converted into Pauli product 
+    rotations (PPRs) (:math:`\exp{iP \theta}`, where :math:`P` is a Pauli word (a product of Pauli operators)):
     * `H` gate → :math:`P = ZXZ` and :math:`\theta = \tfrac{\pi}{4}` 
     * `S` gate → :math:`P = Z` and :math:`\theta = \tfrac{\pi}{4}` 
     * `T` gate → :math:`P = Z` and :math:`\theta = \tfrac{\pi}{8}` 
@@ -85,8 +86,9 @@
     . . .
   ```
 
-  * `catalyst.passes.commute_ppr`: Commuting Clifford PPR operations (PPRs with :math:`\theta = \tfrac{\pi}{4}`) to the end of a circuit, past non-Clifford 
-    PPRs (PPRs with :math:`\theta = \tfrac{\pi}{8}`)
+  * :func:`catalyst.passes.commute_ppr <~.passes.commute_ppr>`: Commuting Clifford PPR operations 
+    (PPRs with :math:`\theta = \tfrac{\pi}{4}`) to the end of a circuit, past non-Clifford PPRs (PPRs 
+    with :math:`\theta = \tfrac{\pi}{8}`)
   
   ```python
   @catalyst.qjit(keep_intermediate=True)
@@ -98,7 +100,8 @@
       return measure(0)
   ```
 
-  * `catalyst.passes.ppr_to_ppm`: Absorbing Clifford PPRs into terminal Pauli product measurements (PPMs).
+  * :func:`catalyst.passes.ppr_to_ppm <~.passes.ppr_to_ppm>`: Absorbing Clifford PPRs into terminal 
+    Pauli product measurements (PPMs).
 
   Example:
   ```python
@@ -113,14 +116,13 @@
 
   For more information on PPMs, please refer to our [PPM documentation page](https://pennylane.ai/compilation/pauli-product-measurement).
 
-
 * Catalyst now supports PennyLane's `cond`, `for_loop` and `while_loop` control flow functions with
   `experimental_capture=True`.
   [(#1468)](https://github.com/PennyLaneAI/catalyst/pull/1468)
   [(#1509)](https://github.com/PennyLaneAI/catalyst/pull/1509)
   [(#1521)](https://github.com/PennyLaneAI/catalyst/pull/1521)
 
-  To trigger the PennyLane pipeline for capturing the program as plxpr, simply set `experimental_capture=True` 
+  To trigger the PennyLane pipeline for capturing a program as plxpr, simply set `experimental_capture=True` 
   in the qjit decorator.
 
   ```python
@@ -145,17 +147,16 @@
       return qml.expval(qml.Z(0))
   ```
 
-* Catalyst now supports PennyLane transforms captured with plxpr.
+* Catalyst now supports PennyLane transforms captured as plxpr.
   [(#1544)](https://github.com/PennyLaneAI/catalyst/pull/1544)
   [(#1561)](https://github.com/PennyLaneAI/catalyst/pull/1561)
   [(#1567)](https://github.com/PennyLaneAI/catalyst/pull/1567)
   [(#1578)](https://github.com/PennyLaneAI/catalyst/pull/1578)
 
-  To trigger the PennyLane pipeline for capturing the mentioned transforms,
-  simply set `experimental_capture=True` in the qjit decorator. If available,
-  Catalyst will apply its own pass in replacement of the original transform
-  provided by PennyLane. Otherwise, the transform will be expanded according
-  to PennyLane rules.
+  To trigger the PennyLane pipeline for capturing the mentioned transforms, simply set `experimental_capture=True` 
+  in the qjit decorator. If available, Catalyst will apply its own equivalent pass in replacement of 
+  the original transform provided by PennyLane (e.g., `cancel_inverses` and `merge_rotations`). Otherwise, 
+  the transform will be expanded according to rules provided by PennyLane.
 
   ```python
   import pennylane as qml
@@ -174,6 +175,11 @@
           return qml.expval(qml.PauliZ(0))
 
       return circuit(x)
+  ```
+
+  ```pycon
+  >>> func(0.1)
+  Array(0.99500417, dtype=float64)
   ```
 
 <h3>Improvements 🛠</h3>
