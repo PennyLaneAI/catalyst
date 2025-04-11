@@ -1171,8 +1171,9 @@ def determine_transform_legality_and_mode(flat_results, tape, tapes):
         original_meas != modified_meas
         for original_meas, modified_meas in zip(tape.measurements, tapes[0].measurements)
     )
-    
+
     return tracing_mode
+
 
 @debug_logger
 def apply_transform(
@@ -1195,13 +1196,13 @@ def apply_transform(
     is_device_modified = qnode_program or device_modify_measurements
     # Apply the identity transform (only device_program) in order to keep generalization
     total_program = qnode_program + device_program if is_device_modified else device_program
-    
+
     # Apply the transform
     tapes, post_processing = total_program([tape])
 
     tracing_mode = 0
     if is_device_modified:
-        # The transform may either only modify operations (not measurements) 
+        # The transform may either only modify operations (not measurements)
         # or make no modifications at all.
         tracing_mode = determine_transform_legality_and_mode(flat_results, tape, tapes)
 
