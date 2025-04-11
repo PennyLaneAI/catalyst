@@ -218,23 +218,37 @@ jobs:
 
     name: Build Wheels (Python ${{ matrix.python_version }})
     runs-on: ubuntu-22.04-arm
-    # container: quay.io/pypa/${{ matrix.container_img }}
+    container: quay.io/pypa/${{ matrix.container_img }}
 
     steps:
       - name: Checkout Catalyst repo
         uses: actions/checkout@v4
 
-      - name: Set up Python ${{ matrix.python_version }}
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.10'
-
-      - name: Install dependencies (Python)
+      - name: Install dependencies (AlmaLinux)
         run: |
-          python${{ matrix.python_version }} -m pip install --upgrade pip
-          python${{ matrix.python_version }} -m pip install numpy nanobind pybind11 PyYAML cmake ninja auditwheel
+          # Reduce wait time for repos not responding
+          cat /etc/dnf.conf | sed "s/\[main\]/\[main\]\ntimeout=5/g" > /etc/dnf.conf
+          dnf update -y && dnf install -y openmpi-devel libzstd-devel gcc-toolset-12
+          # Update env vars valid for all tasks of this job
+          echo '/opt/rh/gcc-toolset-12/root/usr/bin' >> $GITHUB_PATH
+
+      - name: Install Dependencies (Python)
+        run: |
+          python${{ matrix.python_version }} -m pip install numpy nanobind pybind11 PyYAML cmake ninja
+          # Add cmake and ninja to the PATH env var
           PYTHON_BINS=$(find /opt/_internal/cpython-${{ matrix.python_version }}.*/bin -maxdepth 1 -type d | tr '\n' ':' | sed 's/:$//')
           echo $PYTHON_BINS >> $GITHUB_PATH
+      # - name: Set up Python ${{ matrix.python_version }}
+      #   uses: actions/setup-python@v5
+      #   with:
+      #     python-version: ${{ matrix.python_version }}
+
+      # - name: Install dependencies (Python)
+      #   run: |
+      #     python${{ matrix.python_version }} -m pip install --upgrade pip
+      #     python${{ matrix.python_version }} -m pip install numpy nanobind pybind11 PyYAML cmake ninja auditwheel
+      #     PYTHON_BINS=$(find /opt/_internal/cpython-${{ matrix.python_version }}.*/bin -maxdepth 1 -type d | tr '\n' ':' | sed 's/:$//')
+      #     echo $PYTHON_BINS >> $GITHUB_PATH
 
       - name: Get Cached LLVM Source
         id: cache-llvm-source
