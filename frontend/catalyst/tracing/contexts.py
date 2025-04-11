@@ -221,7 +221,7 @@ class EvaluationContext:
     @classmethod
     @contextmanager
     def frame_tracing_context(
-        cls, ctx: JaxTracingContext, trace: Optional[DynamicJaxprTrace] = None
+        cls, trace: Optional[DynamicJaxprTrace] = None
     ) -> ContextManager[DynamicJaxprTrace]:
         """Start a new JAX tracing frame, e.g. to trace a region of some
         :class:`~.jax_tracer.HybridOp`. Not applicable in non-tracing evaluation modes."""
