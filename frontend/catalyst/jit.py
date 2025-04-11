@@ -128,8 +128,9 @@ def qjit(
             ``sys.stderr``).
         pipelines (Optional(List[Tuple[str,List[str]]])): A list of pipelines to be executed. The
             elements of this list are named sequences of MLIR passes to be executed. A ``None``
-            value (the default) results in the execution of the default pipeline. This option is
-            considered to be used by advanced users for low-level debugging purposes.
+            value (the default) results in the execution of the default pipeline (specified by the device). 
+            If ``pipelines != None``, the default behaviour is overrided. This option is considered 
+            to be used by advanced users for low-level debugging purposes.
         static_argnums(int or Seqence[Int]): an index or a sequence of indices that specifies the
             positions of static arguments.
         static_argnames(str or Seqence[str]): a string or a sequence of strings that specifies the
@@ -583,13 +584,22 @@ class QJIT(CatalystCallable):
 
     @debug_logger
     def __call__(self, *args, **kwargs):
+        isQNode = isinstance(self.user_function, qml.QNode)
+
         # Transparantly call Python function in case of nested QJIT calls.
         if EvaluationContext.is_tracing():
-            isQNode = isinstance(self.user_function, qml.QNode)
             if isQNode and self.compile_options.static_argnums:
                 kwargs = {"static_argnums": self.compile_options.static_argnums, **kwargs}
 
             return self.user_function(*args, **kwargs)
+
+        # pylint: disable=no-member
+        if isQNode and hasattr(self.device, "get_compilation_pipelines"):
+            # TODO: This line is not currently covered by tests. This will be resolved as soon as
+            # the OQD runtime is implemented and integration tests are added.
+            self.compile_options.pipelines = (
+                self.device.get_compilation_pipelines()
+            )  # pragma: nocover
 
         requires_promotion = self.jit_compile(args, **kwargs)
 
