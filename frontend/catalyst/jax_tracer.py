@@ -24,6 +24,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import partial, reduce
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from enum import Enum, auto
 
 import jax
 import jax.numpy as jnp
@@ -1130,6 +1131,21 @@ def is_transform_valid_for_batch_transforms(tape, flat_results):
     return are_batch_transforms_valid
 
 
+class TracingMode(Enum):
+    """Enumerate the tracing modes supported by the quantum function tracer:
+    
+    DEFAULT - Allows mid-circuit measurements and returns function's results directly.
+              Used when no transform is applied or when transform doesn't modify 
+              measurements or produce multiple tapes.
+              
+    TRANSFORM - Uses tape measurements instead of original function results.
+                Prohibits mid-circuit measurements with multiple tapes and requires 
+                function to return only measurements (no classical results).
+                Used when transform produces multiple tapes or modifies measurements.
+    """
+    DEFAULT = 0
+    TRANSFORM = 1
+    
 @debug_logger
 def determine_transform_legality_and_mode(flat_results, tape, tapes):
     """Determines whether a transform is legal for the given program and which tracing mode to use.
@@ -1140,14 +1156,7 @@ def determine_transform_legality_and_mode(flat_results, tape, tapes):
         device_modify_measurements: Whether device modified measurements
 
     Returns:
-        int: Tracing mode to use - either 0 (default) or 1 (transform)
-            - "default": Allows mid-circuit measurements and return function's results
-              directly. Used when no transform is applied or when transform doesn't
-              modify measurements or produce multiple tapes.
-            - "transform": Uses tape measurements instead of original function results.
-              Prohibits mid-circuit measurements with multiple tapes and requires function to
-              return only measurements (no classical results). Used when transform produces
-              multiple tapes or modifies measurements.
+        TracingMode: Tracing mode to use - either TracingMode.DEFAULT or TracingMode.TRANSFORM
 
     Raises:
         CompileError: If the transform is not legal for the given program
@@ -1167,12 +1176,12 @@ def determine_transform_legality_and_mode(flat_results, tape, tapes):
         raise CompileError(msg)
 
     # Tracing mode 0 is default, 1 is transform
-    tracing_mode = any(
+    measurements_modified = any(
         original_meas != modified_meas
         for original_meas, modified_meas in zip(tape.measurements, tapes[0].measurements)
     )
 
-    return tracing_mode
+    return TracingMode.TRANSFORM if measurements_modified else TracingMode.DEFAULT
 
 
 @debug_logger
@@ -1200,7 +1209,7 @@ def apply_transform(
     # Apply the transform
     tapes, post_processing = total_program([tape])
 
-    tracing_mode = 0
+    tracing_mode = TracingMode.DEFAULT
     if is_device_modified:
         # The transform may either only modify operations (not measurements)
         # or make no modifications at all.
@@ -1372,7 +1381,9 @@ def trace_quantum_function(
 
         with EvaluationContext.frame_tracing_context(ctx, trace):
             # Determine if we're using transformed measurements based on tracing mode
-            use_transformed_measurements = tracing_mode or len(qnode_program) > 0
+            
+            if len(qnode_program) > 0:
+                tracing_mode = TracingMode.TRANSFORM
 
             for tape in tapes:
                 # Set up quantum register for the current tape.
@@ -1399,7 +1410,7 @@ def trace_quantum_function(
                 # If the program is batched, that means that it was transformed.
                 # If it was transformed, that means that the program might have
                 # changed the output. See `split_non_commuting`
-                if use_transformed_measurements:
+                if tracing_mode == TracingMode.DEFAULT:
                     # TODO: In the future support arbitrary output from the user function.
                     output = tape.measurements
                     _, trees = jax.tree_util.tree_flatten(output, is_leaf=is_leaf)
@@ -1426,7 +1437,7 @@ def trace_quantum_function(
                 meas_results = tree_unflatten(meas_trees, meas_tracers)
 
                 # TODO: Allow the user to return whatever types they specify.
-                if use_transformed_measurements:
+                if tracing_mode == TracingMode.TRANSFORM:
                     assert isinstance(meas_results, list)
                     if len(meas_results) == 1:
                         transformed_results.append(meas_results[0])
