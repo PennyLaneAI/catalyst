@@ -21,7 +21,7 @@ import jax
 from jax._src.dispatch import jaxpr_replicas
 from jax._src.effects import ordered_effects as jax_ordered_effects
 from jax._src.interpreters.mlir import _module_name_regex
-from jax._src.lax.lax import xla
+from jax._src.sharding_impls import AxisEnv
 from jax._src.sharding_impls import ReplicaAxisContext
 from jax._src.source_info_util import new_name_stack
 from jax._src.util import wrap_name
@@ -70,7 +70,7 @@ def jaxpr_to_mlir(func_name, jaxpr):
     ):
         nrep = jaxpr_replicas(jaxpr)
         effects = jax_ordered_effects.filter_in(jaxpr.effects)
-        axis_context = ReplicaAxisContext(xla.AxisEnv(nrep, (), ()))
+        axis_context = ReplicaAxisContext(AxisEnv(nrep, (), ()))
         name_stack = new_name_stack(wrap_name("ok", "jit"))
         module, context = custom_lower_jaxpr_to_module(
             func_name="jit_" + func_name,
