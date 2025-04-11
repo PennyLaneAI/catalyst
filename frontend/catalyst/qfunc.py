@@ -262,7 +262,8 @@ def dynamic_one_shot(qnode, **kwargs):
 
         arg_vmap = jnp.empty((total_shots,), dtype=float)
         results = catalyst.vmap(wrap_single_shot_qnode)(arg_vmap)
-        if isinstance(results[0], tuple) and len(results) == 1:
+        # TODO: handle pytrees properly
+        if isinstance(results[0], (tuple, list)) and len(results) == 1:
             results = results[0]
         has_mcm = any(isinstance(op, MidCircuitMeasure) for op in cpy_tape.operations)
         out = list(results)
