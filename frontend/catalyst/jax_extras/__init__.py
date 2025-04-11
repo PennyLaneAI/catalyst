@@ -61,7 +61,7 @@ from catalyst.jax_extras.tracing import (
     jaxpr_pad_consts,
     make_jaxpr2,
     make_jaxpr_effects,
-    new_dynamic_main2,
+    #new_dynamic_main2,
     new_inner_tracer,
     output_type_to_tracers,
     sort_eqns,

@@ -114,7 +114,7 @@ __all__ = (
     "PyTreeRegistry",
     "ShapedArray",
     "DShapedArray",
-    "ConcreteArray",
+    #"ConcreteArray",
     "ShapeDtypeStruct",
     "DynshapePrimitive",
     "convert_constvars_jaxpr",
@@ -128,7 +128,7 @@ __all__ = (
     "expand_args",
     "expand_results",
     "eval_jaxpr",
-    "_abstractify",
+    #"_abstractify",
     "_initial_style_jaxpr",
     "_input_type_to_tracers",
     "input_type_to_tracers",
@@ -138,11 +138,10 @@ __all__ = (
     "convert_constvars_jaxpr",
     "convert_element_type",
     "eval_jaxpr",
-    "_abstractify",
     "_module_name_regex",
     "make_jaxpr_effects",
     "make_jaxpr2",
-    "new_dynamic_main2",
+    #"new_dynamic_main2",
     "new_inner_tracer",
     "sort_eqns",
     "transient_jax_config",
@@ -182,29 +181,29 @@ def transient_jax_config(want_vals) -> Generator[None, None, None]:
             jax.config.update(name, val)
 
 
-@contextmanager
-@debug_logger
-def new_dynamic_main2(
-    trace_type: Type[Trace],
-    main: Optional[MainTrace] = None,
-    **payload,
-) -> Generator[MainTrace, None, None]:
-    """A verison of JAX `new_main` function that knows how to re-use an already existing `MainTrace`
-    object"""
+# @contextmanager
+# @debug_logger
+# def new_dynamic_main2(
+#     trace_type: Type[Trace],
+#     main: Optional[MainTrace] = None,
+#     **payload,
+# ) -> Generator[MainTrace, None, None]:
+#     """A verison of JAX `new_main` function that knows how to re-use an already existing `MainTrace`
+#     object"""
 
-    stack = thread_local_state.trace_state.trace_stack
-    level = stack.next_level() if main is None else main.level
-    main = MainTrace(level, trace_type, **payload) if main is None else main
-    stack.push(main)
-    prev_dynamic, stack.dynamic = stack.dynamic, main
-    _update_thread_local_jit_state(stack.dynamic)
+#     stack = thread_local_state.trace_state.trace_stack
+#     level = stack.next_level() if main is None else main.level
+#     main = MainTrace(level, trace_type, **payload) if main is None else main
+#     stack.push(main)
+#     prev_dynamic, stack.dynamic = stack.dynamic, main
+#     _update_thread_local_jit_state(stack.dynamic)
 
-    try:
-        yield main
-    finally:
-        stack.pop()
-        stack.dynamic = prev_dynamic
-        _update_thread_local_jit_state(stack.dynamic)
+#     try:
+#         yield main
+#     finally:
+#         stack.pop()
+#         stack.dynamic = prev_dynamic
+#         _update_thread_local_jit_state(stack.dynamic)
 
 
 def stable_toposort(end_nodes: list) -> list:

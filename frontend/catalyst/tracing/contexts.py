@@ -34,7 +34,7 @@ from jax._src.source_info_util import reset_name_stack
 from jax.core import find_top_trace, trace_ctx, take_current_trace, set_current_trace
 from pennylane.queuing import QueuingManager
 
-from catalyst.jax_extras import new_dynamic_main2
+#from catalyst.jax_extras import new_dynamic_main2
 from catalyst.logging import debug_logger_init
 from catalyst.utils.exceptions import CompileError
 
