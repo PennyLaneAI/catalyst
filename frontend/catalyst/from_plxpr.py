@@ -324,20 +324,13 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
         in_qubits = [self.get_wire(w) for w in op.wires]
 
         if isinstance(op, qml.BasisState):
-            basis_state = jax.lax.convert_element_type(op.parameters[0], jnp.dtype(jnp.bool))
-            out_qubits = set_basis_state_p.bind(*in_qubits, basis_state)
+            out_qubits = self._interpret_and_bind_basis_state_op(op, in_qubits)
 
         elif isinstance(op, qml.StatePrep):
-            # jnp.complex128 is the top element in the type promotion lattice so it is ok to do
-            # this: https://jax.readthedocs.io/en/latest/type_promotion.html
-            state_vector = jax.lax.convert_element_type(op.parameters[0], jnp.dtype(jnp.complex128))
-
-            err_msg = "State vector must have shape (2**wires,)"
-            assert state_vector.shape == (2 ** len(in_qubits),), err_msg
-
-            out_qubits = set_state_p.bind(*in_qubits, state_vector)
+            out_qubits = self._interpret_and_bind_state_prep_op(op, in_qubits)
 
         else:
+            # Assume all other ops reaching this point are general quantum instructions
             out_qubits = qinst_p.bind(
                 *[*in_qubits, *op.data],
                 op=op.name,
@@ -350,6 +343,24 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
         for wire_values, new_wire in zip(op.wires, out_qubits):
             self.wire_map[wire_values] = new_wire
 
+        return out_qubits
+
+    def _interpret_and_bind_basis_state_op(self, op, in_qubits):
+        """Helper function for `interpret_operation` for BasisState ops."""
+        basis_state = jax.lax.convert_element_type(op.parameters[0], jnp.dtype(jnp.bool))
+        out_qubits = set_basis_state_p.bind(*in_qubits, basis_state)
+        return out_qubits
+
+    def _interpret_and_bind_state_prep_op(self, op, in_qubits):
+        """Helper function for `interpret_operation` for StatePrep ops."""
+        # jnp.complex128 is the top element in the type promotion lattice so it is ok to do
+        # this: https://jax.readthedocs.io/en/latest/type_promotion.html
+        state_vector = jax.lax.convert_element_type(op.parameters[0], jnp.dtype(jnp.complex128))
+
+        err_msg = "State vector must have shape (2**wires,)"
+        assert state_vector.shape == (2 ** len(in_qubits),), err_msg
+
+        out_qubits = set_state_p.bind(*in_qubits, state_vector)
         return out_qubits
 
     def _obs(self, obs):
