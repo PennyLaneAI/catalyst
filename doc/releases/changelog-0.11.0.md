@@ -194,17 +194,17 @@
   [(#1489)](https://github.com/PennyLaneAI/catalyst/pull/1489)
 
 * Several changes have been made to reduce compile time:
-  * Turn off MLIR's verifier.
+  * MLIR's verifier has been turned off.
     [(#1513)](https://github.com/PennyLaneAI/catalyst/pull/1513)
-  * Remove unnecessary I/O.
+  * Unnecessary I/O has been removed.
     [(#1514)](https://github.com/PennyLaneAI/catalyst/pull/1514)
     [(#1602)](https://github.com/PennyLaneAI/catalyst/pull/1602)
-  * Sort improvements to reduce complexity and memory.
+  * Improvements have been made to reduce complexity and memory.
     [(#1524)](https://github.com/PennyLaneAI/catalyst/pull/1524)
-  * Lazy IR canonicalization and LLVMIR textual generation.
+  * IR canonicalization and LLVMIR textual generation is now performed lazily.
     [(#1530)](https://github.com/PennyLaneAI/catalyst/pull/1530)
 
-* Catalyst now decomposes non-differentiable gates when in a gradient method.
+* Catalyst now decomposes non-differentiable gates when differentiating through workflows.
   [(#1562)](https://github.com/PennyLaneAI/catalyst/pull/1562)
   [(#1568)](https://github.com/PennyLaneAI/catalyst/pull/1568)
   [(#1569)](https://github.com/PennyLaneAI/catalyst/pull/1569)
@@ -221,20 +221,22 @@
     and lower it to mlir.
     [(#1549)](https://github.com/PennyLaneAI/catalyst/pull/1549)
 
-  * `ComputationalBasisOp` can now take in a quantum register in mlir, instead of an explicit, fixed-size list of qubits.
+  * `ComputationalBasisOp` can now take in a quantum register in mlir, instead of an explicit, fixed-size 
+    list of qubits.
     [(#1553)](https://github.com/PennyLaneAI/catalyst/pull/1553)
 
-  * Non-observable measurements without explicit wires will now compile to `ComputationalBasisOp` with a quantum register, instead of the explicit list of all qubits on the device.
-  This means the same compiled IR can be reused even if the device changes its number of qubits across runs.
-  This includes `probs(), state(), sample(), counts()`.
+  * Non-observable measurements without explicit wires will now compile to `ComputationalBasisOp` with 
+    a quantum register, instead of the explicit list of all qubits on the device. This means the same 
+    compiled IR can be reused even if the device changes its number of qubits across runs. This includes 
+    `probs(), state(), sample(), counts()`.
     [(#1565)](https://github.com/PennyLaneAI/catalyst/pull/1565)
 
-  * In mlir, `ProbsOp, StateOp, SampleOp, CountsOp` ops now carry an optional new SSA operand for their return shapes.
-    This operand is used during bufferization pass to allocate result memrefs dynamically.
+  * In mlir, `ProbsOp, StateOp, SampleOp, CountsOp` ops now carry an optional new SSA operand for their 
+    return shapes. This operand is used during bufferization pass to allocate result memrefs dynamically.
     A new verification is added to check that this new operand and static return shapes cannot coexist.
     [(#1574)](https://github.com/PennyLaneAI/catalyst/pull/1574)
 
-* A `mlir_opt` property has been added to `qjit` to access the optimized MLIR representation of a compiled 
+* An `mlir_opt` property has been added to `qjit` to access the optimized MLIR representation of a compiled 
   function.
   [(#1579)](https://github.com/PennyLaneAI/catalyst/pull/1579)
 
@@ -254,8 +256,7 @@
 * Fixed the `argnums` parameter of `grad` and `value_and_grad` being ignored.
   [(#1478)](https://github.com/PennyLaneAI/catalyst/pull/1478)
 
-* All dialects are loaded preemptively.
-  This allows third-party plugins to load their dialects.
+* All dialects are loaded preemptively. This allows third-party plugins to load their dialects.
   [(#1584)](https://github.com/PennyLaneAI/catalyst/pull/1584)
 
 * Fixed an issue where Catalyst could give incorrect results for circuits containing `qml.StatePrep`.
@@ -295,10 +296,13 @@
 * `from_plxpr` now uses the `qml.capture.PlxprInterpreter` class for reduced code duplication.
   [(#1398)](https://github.com/PennyLaneAI/catalyst/pull/1398)
 
-* Improve the error message for invalid measurement in `adjoin()` or `ctrl()` region.
+* Improved the error message for invalid measurement in `adjoin()` or `ctrl()` region.
   [(#1425)](https://github.com/PennyLaneAI/catalyst/pull/1425)
 
-* Replace `ValueRange` with `ResultRange` and `Value` with `OpResult` to better align with the semantics of `**QubitResult()` functions like `getNonCtrlQubitResults()`. This change ensures clearer intent and usage. Improve the `matchAndRewrite` function by using `replaceAllUsesWith` instead of for loop.
+* Replaced `ValueRange` with `ResultRange` and `Value` with `OpResult` to better align with the semantics 
+  of `**QubitResult()` functions like `getNonCtrlQubitResults()`. This change ensures clearer intent 
+  and usage. Also, the `matchAndRewrite` function has improved by using `replaceAllUsesWith` instead 
+  of a `for` loop.
   [(#1426)](https://github.com/PennyLaneAI/catalyst/pull/1426)
 
 * Several changes for experimental support of trapped-ion OQD devices have been made, including:
@@ -308,24 +312,29 @@
     and connect to its runtime.
     [(#1420)](https://github.com/PennyLaneAI/catalyst/pull/1420)
 
-  * Improved ion dialect to reduce redundant code generated. Added a string attribute `label` to Level.
-    Also changed the levels of a transition from `LevelAttr` to `string`
+  * The ion dialect has been improved to reduce redundant code generated, a string attribute `label` 
+    has been added to Level, and the levels of a transition have changed from `LevelAttr` to `string`.
     [(#1471)](https://github.com/PennyLaneAI/catalyst/pull/1471)
 
-  * The region of a `ParallelProtocolOp` is now always terminated with a `ion::YieldOp` with explicitly yielded SSA values. This ensures the op is well-formed, and improves readability.
+  * The region of a `ParallelProtocolOp` is now always terminated with a `ion::YieldOp` with explicitly 
+    yielded SSA values. This ensures the op is well-formed, and improves readability.
     [(#1475)](https://github.com/PennyLaneAI/catalyst/pull/1475)
 
-  * Add a new pass `convert-ion-to-llvm` which lowers the Ion dialect to llvm dialect. This pass
-    introduces oqd device specific stubs that will be implemented in oqd runtime including:
+  * Added a new pass called `convert-ion-to-llvm` which lowers the Ion dialect to llvm dialect. This 
+    pass introduces oqd device specific stubs that will be implemented in oqd runtime including:
     `@ __catalyst__oqd__pulse`, `@ __catalyst__oqd__ParallelProtocol`.
     [(#1466)](https://github.com/PennyLaneAI/catalyst/pull/1466)
 
-  * The OQD device can now generate OpenAPL JSON specs during runtime. The oqd stubs
-  `@ __catalyst__oqd__pulse`, and `@ __catalyst__oqd__ParallelProtocol`, which
-  are called in the llvm dialect after the aforementioned lowering ([(#1466)](https://github.com/PennyLaneAI/catalyst/pull/1466)), are defined to produce JSON specs that OpenAPL expects.
+  * The OQD device can now generate OpenAPL JSON specs during runtime. The oqd stubs `@ __catalyst__oqd__pulse`, 
+    and `@ __catalyst__oqd__ParallelProtocol`, which are called in the llvm dialect after the aforementioned 
+    lowering ([(#1466)](https://github.com/PennyLaneAI/catalyst/pull/1466)), are defined to produce 
+    JSON specs that OpenAPL expects.
     [(#1516)](https://github.com/PennyLaneAI/catalyst/pull/1516)
 
-  * The OQD device is moved from `frontend/catalyst/third_party/oqd` to `runtime/lib/backend/oqd`. An overall switch, `ENABLE_OQD`, is added to control the OQD build system from a single entry point. The switch is `OFF` by default, and OQD can be built from source via `make all ENABLE_OQD=ON`, or `make runtime ENABLE_OQD=ON`.
+  * The OQD device has been moved from `frontend/catalyst/third_party/oqd` to `runtime/lib/backend/oqd`. 
+    An overall switch, `ENABLE_OQD`, is added to control the OQD build system from a single entry point. 
+    The switch is `OFF` by default, and OQD can be built from source via `make all ENABLE_OQD=ON`, or 
+    `make runtime ENABLE_OQD=ON`.
     [(#1508)](https://github.com/PennyLaneAI/catalyst/pull/1508)
 
   * Ion dialect now supports phonon modes using `ion.modes` operation.
@@ -340,21 +349,21 @@
   * The end-to-end compilation pipeline for OQD devices is available as an API function.
     [(#1545)](https://github.com/PennyLaneAI/catalyst/pull/1545)
 
-* Update source code to comply with changes requested by black v25.1.0
+* The source code has been updated to comply with changes requested by black v25.1.0
   [(#1490)](https://github.com/PennyLaneAI/catalyst/pull/1490)
 
-* Revert `StaticCustomOp` in favour of adding helper functions (`isStatic()`, `getStaticParams()`
+* Reverted `StaticCustomOp` in favour of adding helper functions `isStatic()`, `getStaticParams()`
   to the `CustomOp` which preserves the same functionality. More specifically, this reverts
   [#1387] and [#1396], modifies [#1484].
   [(#1558)](https://github.com/PennyLaneAI/catalyst/pull/1558)
   [(#1555)](https://github.com/PennyLaneAI/catalyst/pull/1555)
 
-* Updated the c++ standard in mlir layer from 17 to 20.
+* Updated the C++ standard in mlir layer from 17 to 20.
   [(#1229)](https://github.com/PennyLaneAI/catalyst/pull/1229)
 
 <h3>Documentation 📝</h3>
 
-* Added more details to Jax integration documentation regarding the use of `.at` with multiple indices.
+* Added more details to JAX integration documentation regarding the use of `.at` with multiple indices.
   [(#1595)](https://github.com/PennyLaneAI/catalyst/pull/1595)
 
 <h3>Contributors ✍️</h3>
@@ -363,6 +372,7 @@ This release contains contributions from (in alphabetical order):
 
 Joey Carter,
 Yushao Chen,
+Isaac De Vlugt,
 Zach Goldthorpe,
 Sengthai Heng,
 David Ittah,
