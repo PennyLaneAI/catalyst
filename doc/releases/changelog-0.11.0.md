@@ -2,13 +2,14 @@
 
 <h3>New features since last release</h3>
 
-* The `cancel_inverses` and `merge_rotations` compilation passes are now more efficient when control 
-  flow is present by optimizing over loop boundaries.
+* A novel optimization technique is implemented in Catalyst that performs quantum peephole
+  optimizations across loop boundaries. The technique has been added to the existing optimizations
+  `cancel_inverses` and `merge_rotations` to increase their effectiveness in structured programs.
   [(#1476)](https://github.com/PennyLaneAI/catalyst/pull/1476)
 
-  Loop boundary optimizations have been implemented to identify and optimize redundant quantum operations 
-  that occur at loop iteration boundaries, where operations at iteration boundaries often cancel each 
-  other out. This eliminates redundant operations and aims to reduce quantum circuit depth. 
+  A frequently occurring pattern is operations at the beginning and end of a loop that cancel each
+  other out. With loop boundary analysis, the `cancel_inverses` optimization can eliminate
+  these redundant operations and thus reduce quantum circuit depth. 
 
   For example,
 
@@ -26,30 +27,32 @@
       return qml.expval(qml.Z(0))
   ```
 
-  Note that this optimization specifically targets operations that are exact inverses of each other 
-  when applied in sequence. For example, consecutive Hadamard gate pairs will be identified and eliminated.
+  Here, the Hadamard gate pairs which are consecutive across two iterations are eliminated,
+  leaving behind only two unpaired Hadamard gates, from the first and last iteration.
 
-* Three new compilation passes have been added to help convert Clifford + T gates to Pauli product measurements 
-  (PPMs) as prescribed in [arXiv:1808.02892](https://arxiv.org/abs/1808.02892v3). 
+* A new intermediate representation and compilation framework has been added to Catalyst
+  to describe and manipulate programs in the Pauli product measurement (PPM) representation.
+  As part of this framework, three new passes are now available to convert Clifford + T gates to
+Pauli product measurements as described in [arXiv:1808.02892](https://arxiv.org/abs/1808.02892v3).
   [(#1499)](https://github.com/PennyLaneAI/catalyst/pull/1499)
   [(#1551)](https://github.com/PennyLaneAI/catalyst/pull/1551)
   [(#1563)](https://github.com/PennyLaneAI/catalyst/pull/1563)
   [(#1564)](https://github.com/PennyLaneAI/catalyst/pull/1564)
   [(#1577)](https://github.com/PennyLaneAI/catalyst/pull/1577)
   
-  These new compilation passes are currently only represented symbolically and are not yet executable 
-  on any backend. They exist purely as intermediate representations for analysis and potential future 
-  execution when a suitable backend is available.
+  Note that programs in the PPM representation cannot yet be executed on available backends.
+  The passes currently exist for analysis, but PPM programs may become executable in the future
+  when a suitable backend is available.
 
-  The following new compilation passes have been added, and can be accessed from the :mod:`~.passes` 
+  The following new compilation passes can be accessed from the :mod:`~.passes` 
   module or in :func:`~.pipeline`:
 
   * :func:`catalyst.passes.to_ppr <~.passes.to_ppr>`: Clifford + T gates are converted into Pauli product 
-    rotations (PPRs) (:math:`\exp{iP \theta}`, where :math:`P` is a Pauli word (a product of Pauli operators)):
-    * `H` gate → :math:`P = ZXZ` and :math:`\theta = \tfrac{\pi}{4}` 
-    * `S` gate → :math:`P = Z` and :math:`\theta = \tfrac{\pi}{4}` 
-    * `T` gate → :math:`P = Z` and :math:`\theta = \tfrac{\pi}{8}` 
-    * `CNOT` gate → :math:`P = (Z \otimes X)(-Z \otimes \mathbb{1})(-\mathbb{1} \otimes X)` and :math:`\theta = \tfrac{\pi}{4}` 
+    rotations (PPRs) (:math:`\exp{iP \theta}`, where :math:`P` is a tensor product of Pauli operators):
+    * `H` gate → 3 rotations with :math:`P_1 = Z, P_2 = X, P_3 = Z` and :math:`\theta = \tfrac{\pi}{4}` 
+    * `S` gate → 1 rotation with :math:`P = Z` and :math:`\theta = \tfrac{\pi}{4}` 
+    * `T` gate → 1 rotation with :math:`P = Z` and :math:`\theta = \tfrac{\pi}{8}` 
+    * `CNOT` gate → 3 rotations with :math:`P_1 = (Z \otimes X), P_2 = (-Z \otimes \mathbb{1}), P_3 = (-\mathbb{1} \otimes X)` and :math:`\theta = \tfrac{\pi}{4}` 
 
   ```python
   import catalyst
@@ -103,7 +106,6 @@
   * :func:`catalyst.passes.ppr_to_ppm <~.passes.ppr_to_ppm>`: Absorbing Clifford PPRs into terminal 
     Pauli product measurements (PPMs).
 
-  Example:
   ```python
   @catalyst.qjit(keep_intermediate=True)
   @catalyst.pipeline({"to_ppr": {}, "commute_ppr": {}, "ppr_to_ppm": {}})
@@ -203,7 +205,7 @@
     [(#1524)](https://github.com/PennyLaneAI/catalyst/pull/1524)
   * IR canonicalization and LLVMIR textual generation is now performed lazily.
     [(#1530)](https://github.com/PennyLaneAI/catalyst/pull/1530)
-  - Speed up how tracers are overwritten for hybrid ops.
+  * Speed up how tracers are overwritten for hybrid ops.
     [(#1622)](https://github.com/PennyLaneAI/catalyst/pull/1622)
 
 * Catalyst now decomposes non-differentiable gates when differentiating through workflows.
@@ -217,7 +219,9 @@
   for the `StatePrep`, `BasisState`, and `QubitUnitary` operations. For the parameter-shift method,
   this is allowable for all operations.
 
-* Several changes have been made to support dynamic qubit specification:
+* Catalyst now supports qubit number-invariant compilation! That is, programs can be compiled without
+  specifying the number of qubits to allocate ahead of time. Instead, the device can be supplied with
+  a dynamic program variable as the number of wires.
 
   * The `qalloc_p` custom JAX primitive can now take in a dynamic number of qubits as a tracer
     and lower it to mlir.
