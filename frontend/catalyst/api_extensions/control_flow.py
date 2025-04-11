@@ -669,7 +669,7 @@ class CondCallable:
                 branch_fn, [], {}, expansion_strategy=self.expansion_strategy
             )
             assert len(in_sig.in_type) == 0
-            with EvaluationContext.frame_tracing_context(ctx) as inner_trace:
+            with EvaluationContext.frame_tracing_context() as inner_trace:
                 with QueuingManager.stop_recording(), quantum_tape:
                     res_classical_tracers = [inner_trace.full_raise(t) for t in wfun.call_wrapped()]
 
@@ -915,7 +915,7 @@ class ForLoopCallable:
         )
         in_type = in_sig.in_type
 
-        with EvaluationContext.frame_tracing_context(ctx) as inner_trace:
+        with EvaluationContext.frame_tracing_context() as inner_trace:
             arg_classical_tracers = input_type_to_tracers(
                 in_type, inner_trace.new_arg, inner_trace.full_raise
             )
@@ -1083,7 +1083,7 @@ class WhileLoopCallable:
         in_type = in_sig.in_type
         in_expanded_classical_tracers = in_sig.in_expanded_args
 
-        with EvaluationContext.frame_tracing_context(ctx) as cond_trace:
+        with EvaluationContext.frame_tracing_context() as cond_trace:
             arg_classical_tracers = input_type_to_tracers(
                 in_type, cond_trace.new_arg, cond_trace.full_raise
             )
@@ -1104,7 +1104,7 @@ class WhileLoopCallable:
 
             _check_single_bool_value(out_tree, cond_region.res_classical_tracers)
 
-        with EvaluationContext.frame_tracing_context(ctx) as body_trace:
+        with EvaluationContext.frame_tracing_context() as body_trace:
             arg_classical_tracers = input_type_to_tracers(
                 in_type, body_trace.new_arg, body_trace.full_raise
             )
@@ -1198,7 +1198,7 @@ class Cond(HybridOp):
         jaxprs, consts, nimplouts = [], [], []
         op = self
         for region in op.regions:
-            with EvaluationContext.frame_tracing_context(ctx, region.trace):
+            with EvaluationContext.frame_tracing_context(region.trace):
                 new_qreg = AbstractQreg()
                 qreg_in = _input_type_to_tracers(region.trace.new_arg, [new_qreg])[0]
                 qreg_out = trace_quantum_operations(
@@ -1257,7 +1257,7 @@ class ForLoop(HybridOp):
         inner_tape = op.regions[0].quantum_tape
         expansion_strategy = self.expansion_strategy
 
-        with EvaluationContext.frame_tracing_context(ctx, inner_trace):
+        with EvaluationContext.frame_tracing_context(inner_trace):
             new_qreg = AbstractQreg()
             qreg_in = _input_type_to_tracers(inner_trace.new_arg, [new_qreg])[0]
             qrp_out = trace_quantum_operations(inner_tape, device, qreg_in, ctx, inner_trace)
@@ -1323,7 +1323,7 @@ class WhileLoop(HybridOp):
     def trace_quantum(self, ctx, device, trace, qrp) -> QRegPromise:
         cond_trace = self.regions[0].trace
         expansion_strategy = self.expansion_strategy
-        with EvaluationContext.frame_tracing_context(ctx, cond_trace):
+        with EvaluationContext.frame_tracing_context(cond_trace):
             region = self.regions[0]
             arg_classical_tracers = region.arg_classical_tracers
             arg_expanded_classical_tracers, _ = expand_args(
@@ -1347,7 +1347,7 @@ class WhileLoop(HybridOp):
         nimplicit = len(arg_expanded_classical_tracers) - len(self.regions[0].arg_classical_tracers)
         body_trace = self.regions[1].trace
         body_tape = self.regions[1].quantum_tape
-        with EvaluationContext.frame_tracing_context(ctx, body_trace):
+        with EvaluationContext.frame_tracing_context(body_trace):
             region = self.regions[1]
             res_classical_tracers = region.res_classical_tracers
             qreg_in = _input_type_to_tracers(body_trace.new_arg, [AbstractQreg()])[0]
