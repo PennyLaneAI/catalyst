@@ -1112,25 +1112,6 @@ def has_midcircuit_measurement(tape):
     return any(map(is_midcircuit_measurement, tape.operations))
 
 
-@debug_logger
-def is_transform_valid_for_batch_transforms(tape, flat_results):
-    """Not all transforms are valid for batch transforms.
-    Batch transforms will increase the number of tapes from 1 to N.
-    However, if the wave function collapses or there is any other non-deterministic behaviour
-    such as noise present, then each tape would have different results.
-
-    Also, MidCircuitMeasure is a HybridOp, which PL does not handle at the moment.
-    Let's wait until mid-circuit measurements are better integrated into both PL
-    and Catalyst and discussed more as well."""
-
-    # Check if outputs are valid for transformations (measurements only)
-    is_valid_output = has_valid_measurement_outputs(flat_results)
-    is_wave_function_collapsed = has_midcircuit_measurement(tape)
-
-    are_batch_transforms_valid = is_valid_output and not is_wave_function_collapsed
-    return are_batch_transforms_valid
-
-
 class TracingMode(Enum):
     """Enumerate the tracing modes supported by the quantum function tracer:
 
