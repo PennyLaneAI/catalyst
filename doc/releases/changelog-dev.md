@@ -19,6 +19,10 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Catalyst now correctly supports `qml.StatePrep()` and `qml.BasisState()` operations in the
+  experimental PennyLane program-capture pipeline.
+  [(#1631)](https://github.com/PennyLaneAI/catalyst/pull/1631)
+
 <h3>Internal changes ⚙️</h3>
 
 <h3>Documentation 📝</h3>
