@@ -160,7 +160,7 @@
 
   ```python
   import pennylane as qml
-  from catalyst import qjit
+  import jax.numpy as jnp
 
   dev = qml.device("lightning.qubit", wires=1)
 
@@ -179,7 +179,7 @@
 
   ```pycon
   >>> func(0.1)
-  Array(0.99500417, dtype=float64)
+  Array(0.99500417, dtype=float64)  
   ```
 
 <h3>Improvements 🛠</h3>
