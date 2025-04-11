@@ -468,7 +468,7 @@ def CustomOp : UnitaryGate_Op<"custom", [DifferentiableGate, NoMemoryEffect,
             if (!isStatic()) {
                 return staticValues;
             }
-            
+
             for (mlir::Value param : getParams()) {
                 auto constOp = param.getDefiningOp();
                 if (auto floatAttr = constOp->getAttrOfType<mlir::FloatAttr>("value")) {
@@ -478,7 +478,7 @@ def CustomOp : UnitaryGate_Op<"custom", [DifferentiableGate, NoMemoryEffect,
             return staticValues;
         }
     }];
-    let hasCanonicalizeMethod = 1;
+    let hasCanonicalizer = 1;
 }
 
 def GlobalPhaseOp : UnitaryGate_Op<"gphase", [DifferentiableGate, AttrSizedOperandSegments]> {
@@ -549,7 +549,7 @@ def MultiRZOp : UnitaryGate_Op<"multirz", [DifferentiableGate, NoMemoryEffect,
             return getODSOperands(getParamOperandIdx());
         }
     }];
-    
+
     let hasCanonicalizeMethod = 1;
 }
 

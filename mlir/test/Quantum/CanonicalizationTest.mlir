@@ -157,3 +157,118 @@ func.func @test_multirz_adjoint_canonicalize(%arg0: f64) -> (!quantum.bit, !quan
     return %3#0, %3#1 : !quantum.bit, !quantum.bit
 }
 
+// CHECK-LABEL: test_cnot_rz_canonicalize
+func.func @test_cnot_rz_canonicalize(%arg0: f64) -> (!quantum.bit, !quantum.bit) {
+    // CHECK: [[reg:%.+]] = quantum.alloc( 2) : !quantum.reg
+    // CHECK: [[qubit1:%.+]] = quantum.extract [[reg]][ 0] : !quantum.reg -> !quantum.bit
+    // CHECK: [[qubit2:%.+]] = quantum.extract [[reg]][ 1] : !quantum.reg -> !quantum.bit
+    %0 = quantum.alloc(2) : !quantum.reg
+    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+
+    // CHECK: [[qubit3:%.+]]:2 = quantum.custom "CNOT"() %1, %2 : !quantum.bit, !quantum.bit
+    // CHECK: [[qubit4:%.+]] = quantum.custom "RZ"(%arg0) [[qubit3]]#0 : !quantum.bit
+    %rz = quantum.custom "RZ"(%arg0) %1 : !quantum.bit
+    %3:2 = quantum.custom "CNOT"() %rz, %2 : !quantum.bit, !quantum.bit
+    quantum.dealloc %0 : !quantum.reg
+
+    // CHECK: return [[qubit4]], [[qubit3]]#1 : !quantum.bit, !quantum.bit
+    return %3#0, %3#1 : !quantum.bit, !quantum.bit
+}
+
+// CHECK-LABEL: test_cnot_pauli_x_canonicalize
+func.func @test_cnot_pauli_x_canonicalize(%arg0: f64) -> (!quantum.bit, !quantum.bit) {
+    // CHECK: [[reg:%.+]] = quantum.alloc( 2) : !quantum.reg
+    // CHECK: [[qubit1:%.+]] = quantum.extract [[reg]][ 0] : !quantum.reg -> !quantum.bit
+    // CHECK: [[qubit2:%.+]] = quantum.extract [[reg]][ 1] : !quantum.reg -> !quantum.bit
+    %0 = quantum.alloc(2) : !quantum.reg
+    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+
+    // CHECK: [[qubit3:%.+]]:2 = quantum.custom "CNOT"() %1, %2 : !quantum.bit, !quantum.bit
+    // CHECK: [[qubit4:%.+]] = quantum.custom "PauliX"() [[qubit3]]#1 : !quantum.bit
+    %pauli_x = quantum.custom "PauliX"() %2 : !quantum.bit
+    %3:2 = quantum.custom "CNOT"() %1, %pauli_x : !quantum.bit, !quantum.bit
+    quantum.dealloc %0 : !quantum.reg
+
+    // CHECK: return [[qubit3]]#0, [[qubit4]] : !quantum.bit, !quantum.bit
+    return %3#0, %3#1 : !quantum.bit, !quantum.bit
+}
+
+// CHECK-LABEL: test_cnot_rz_non_commute
+func.func @test_cnot_rz_non_commute(%arg0: f64) -> (!quantum.bit, !quantum.bit) {
+    // CHECK: [[reg:%.+]] = quantum.alloc( 2) : !quantum.reg
+    // CHECK: [[qubit1:%.+]] = quantum.extract [[reg]][ 0] : !quantum.reg -> !quantum.bit
+    // CHECK: [[qubit2:%.+]] = quantum.extract [[reg]][ 1] : !quantum.reg -> !quantum.bit
+    %0 = quantum.alloc(2) : !quantum.reg
+    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+
+    // CHECK: [[rz:%.+]] = quantum.custom "RZ"(%arg0) [[qubit2]] : !quantum.bit
+    // CHECK: [[cnot:%.+]]:2 = quantum.custom "CNOT"() [[qubit1]], [[rz]] : !quantum.bit, !quantum.bit
+    %rz = quantum.custom "RZ"(%arg0) %2 : !quantum.bit
+    %3:2 = quantum.custom "CNOT"() %1, %rz : !quantum.bit, !quantum.bit
+    quantum.dealloc %0 : !quantum.reg
+
+    // CHECK: return [[cnot]]#0, [[cnot]]#1 : !quantum.bit, !quantum.bit
+    return %3#0, %3#1 : !quantum.bit, !quantum.bit
+}
+
+// CHECK-LABEL: test_cnot_pauli_x_non_commute
+func.func @test_cnot_pauli_x_non_commute(%arg0: f64) -> (!quantum.bit, !quantum.bit) {
+    // CHECK: [[reg:%.+]] = quantum.alloc( 2) : !quantum.reg
+    // CHECK: [[qubit1:%.+]] = quantum.extract [[reg]][ 0] : !quantum.reg -> !quantum.bit
+    // CHECK: [[qubit2:%.+]] = quantum.extract [[reg]][ 1] : !quantum.reg -> !quantum.bit
+    %0 = quantum.alloc(2) : !quantum.reg
+    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+
+    // CHECK: [[pauli_x:%.+]] = quantum.custom "PauliX"() [[qubit1]] : !quantum.bit
+    // CHECK: [[cnot:%.+]]:2 = quantum.custom "CNOT"() [[pauli_x]], [[qubit2]] : !quantum.bit, !quantum.bit
+    %pauli_x = quantum.custom "PauliX"() %1 : !quantum.bit
+    %3:2 = quantum.custom "CNOT"() %pauli_x, %2 : !quantum.bit, !quantum.bit
+    quantum.dealloc %0 : !quantum.reg
+
+    // CHECK: return [[cnot]]#0, [[cnot]]#1 : !quantum.bit, !quantum.bit
+    return %3#0, %3#1 : !quantum.bit, !quantum.bit
+}
+
+// CHECK-LABEL: test_rz_pauli_x_canonicalize
+func.func @test_rz_pauli_x_canonicalize(%arg0: f64) -> !quantum.bit {
+    // CHECK: [[reg:%.+]] = quantum.alloc( 1) : !quantum.reg
+    // CHECK: [[qubit1:%.+]] = quantum.extract [[reg]][ 0] : !quantum.reg -> !quantum.bit
+    %0 = quantum.alloc(1) : !quantum.reg
+    %1 = quantum.extract %0[0] : !quantum.reg -> !quantum.bit
+
+    // CHECK: [[arg0neg:%.+]] = arith.negf %arg0 : f64
+    // CHECK: [[qubit2:%.+]] = quantum.custom "RZ"([[arg0neg]]) [[qubit1]] : !quantum.bit
+    // CHECK: [[qubit3:%.+]] = quantum.custom "PauliX"() [[qubit2]] : !quantum.bit
+    %pauli_x = quantum.custom "PauliX"() %1 : !quantum.bit
+    %2 = quantum.custom "RZ"(%arg0) %pauli_x : !quantum.bit
+    quantum.dealloc %0 : !quantum.reg
+
+    // CHECK: return [[qubit3]] : !quantum.bit
+    return %2 : !quantum.bit
+}
+
+// CHECK-LABEL: test_pauli_x_rz_cnot_canonicalize
+func.func @test_pauli_x_rz_cnot_canonicalize(%arg0: f64) -> (!quantum.bit, !quantum.bit) {
+    // CHECK: [[reg:%.+]] = quantum.alloc( 2) : !quantum.reg
+    // CHECK: [[qubit1:%.+]] = quantum.extract [[reg]][ 0] : !quantum.reg -> !quantum.bit
+    // CHECK: [[qubit2:%.+]] = quantum.extract [[reg]][ 1] : !quantum.reg -> !quantum.bit
+    %0 = quantum.alloc(2) : !quantum.reg
+    %1 = quantum.extract %0[0] : !quantum.reg -> !quantum.bit
+    %2 = quantum.extract %0[1] : !quantum.reg -> !quantum.bit
+
+    // CHECK: [[cnot:%.+]]:2 = quantum.custom "CNOT"() [[qubit1]], [[qubit2]] : !quantum.bit, !quantum.bit
+    // CHECK: [[pauli_x:%.+]] = quantum.custom "PauliX"() [[cnot]]#1 : !quantum.bit
+    // CHECK: [[rz:%.+]] = quantum.custom "RZ"(%arg0) [[cnot]]#0 : !quantum.bit
+    %pauli_x = quantum.custom "PauliX"() %2 : !quantum.bit
+    %rz = quantum.custom "RZ"(%arg0) %1 : !quantum.bit
+    %3:2 = quantum.custom "CNOT"() %rz, %pauli_x : !quantum.bit, !quantum.bit
+    quantum.dealloc %0 : !quantum.reg
+
+    // CHECK: return [[rz]], [[pauli_x]] : !quantum.bit, !quantum.bit
+    return %3#0, %3#1 : !quantum.bit, !quantum.bit
+}
+
