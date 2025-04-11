@@ -27,7 +27,7 @@
   ```
 
   Note that this optimization specifically targets operations that are exact inverses of each other 
-  when applied in sequence. For example, consecutive Hadamard gates pairs will be identified and eliminated.
+  when applied in sequence. For example, consecutive Hadamard gate pairs will be identified and eliminated.
 
 * Three new compilation passes have been added to help convert Clifford + T gates to Pauli product measurements 
   (PPMs) as prescribed in [arXiv:1808.02892](https://arxiv.org/abs/1808.02892v3). 
@@ -39,7 +39,7 @@
   
   These new compilation passes are currently only represented symbolically and are not yet executable 
   on any backend. They exist purely as intermediate representations for analysis and potential future 
-  xecution when a suitable backend is available.
+  execution when a suitable backend is available.
 
   The following new compilation passes have been added, and can be accessed from the :mod:`~.passes` 
   module or in :func:`~.pipeline`:
@@ -184,8 +184,8 @@
 
 <h3>Improvements 🛠</h3>
 
-* Pattern rewritting in the `quantum-to-ion` lowering pass has been changed to use MLIR's dialect conversion
-  infrastracture.
+* Pattern rewriting in the `quantum-to-ion` lowering pass has been changed to use MLIR's dialect conversion
+  infrastructure.
   [(#1442)](https://github.com/PennyLaneAI/catalyst/pull/1442)
 
 * The `merge-rotations` peephole optimization pass has been extended to also merge compatible rotation 
