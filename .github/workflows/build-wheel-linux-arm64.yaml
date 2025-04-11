@@ -12,6 +12,12 @@ on:
     branches: [ main ]
   workflow_dispatch:
   workflow_call:
+    inputs:
+      branch:
+        description: 'Branch to build from'
+        required: true
+        default: 'main'
+        type: string
 
 env:
   MACOSX_DEPLOYMENT_TARGET: 14.0
@@ -50,6 +56,8 @@ jobs:
     steps:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
+      with:
+        ref: ${{ inputs.branch }}
 
     - name: Setup Runner Environment
       id: setup_env
