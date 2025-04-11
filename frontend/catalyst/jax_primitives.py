@@ -25,6 +25,7 @@ import jax
 import numpy as np
 import pennylane as qml
 from jax._src import api_util, core, source_info_util, util
+from jax._src.core import pytype_aval_mappings
 from jax._src.interpreters import partial_eval as pe
 from jax._src.lax.lax import _merge_dyn_shape, _nary_lower_hlo, cos_p, sin_p
 from jax._src.lib.mlir import ir
@@ -2230,8 +2231,4 @@ def _scalar_abstractify(t):
         return core.ShapedArray([], dtype=t, weak_type=True)
     raise TypeError(f"Argument type {t} is not a valid JAX type.")
 
-
-# pylint: disable=protected-access
-#api_util._shaped_abstractify_handlers[type] = _scalar_abstractify
-# pylint: disable=protected-access
-#api_util._shaped_abstractify_handlers[jax._src.numpy.lax_numpy._ScalarMeta] = _scalar_abstractify
+pytype_aval_mappings[type] = _scalar_abstractify
