@@ -51,6 +51,7 @@ response = requests.get(url)
 match = re.search(r'LLVM_COMMIT = "([a-zA-Z0-9]*)"', response.text)
 llvm_commit = match.group(1)
 
+
 # If the XLA commit is an "Integrate LLVM" commit we need to get the piper_id directly from there
 # to look up the corresponding mlir-hlo commit.
 url = f"https://api.github.com/repos/openxla/xla/commits?sha={xla_commit}&per_page=1"
@@ -68,6 +69,11 @@ else:
     match = re.search(r"PiperOrigin-RevId: ([0-9]*)", response[0]["commit"]["message"])
     piper_id = match.group(1)
 
+title = f"Integrate+LLVM+at+llvm/llvm-project@{llvm_commit[:12]}"
+url = f"https://api.github.com/search/commits?q=repo:openxla/stablehlo+{title}&per_page=1"
+responses = requests.get(url).json()
+stablehlo_commit = responses["items"][0]["sha"]
+
 url = f"https://api.github.com/search/commits?q=repo:tensorflow/mlir-hlo+{piper_id}"
 response = requests.get(url).json()
 hlo_commit = response["items"][0]["sha"]
@@ -83,6 +89,7 @@ jax={jax_version}
 mhlo={hlo_commit}
 llvm={llvm_commit}
 enzyme={enzyme_commit}
+stablehlo={stablehlo_commit}
 """
     )
 
