@@ -1065,43 +1065,25 @@ def trace_quantum_measurements(
 
 
 @debug_logger
-def has_valid_measurement_outputs(flat_results):
-    """Checks if the quantum function outputs are valid for transformations.
-
-    Valid outputs for transformations must be either:
-    1. A single or measurement process
-    2. A non-empty sequence of measurement processes
-
-    Args:
-        flat_results: Flat list of function results
+def has_classical_outputs(flat_results):
+    """Checks if the quantum function outputs classical values.
 
     Returns:
-        bool: True if outputs are valid for transformations, False otherwise
+        bool
     """
-    # Can transforms be applied?
-    # Since transforms are a PL feature and PL does not support the same things as
-    # Catalyst, transforms may have invariants that rely on PL invariants.
-    # For example:
-    #   * mid-circuit measurements (for batch-transforms)
-    #   * that the output will be only a sequence of `MeasurementProcess`es.
-    class_tracers, meas_tracers = split_tracers_and_measurements(flat_results)
 
-    def is_measurement(op):
-        """Only to avoid 100 character per line limit."""
-        return isinstance(op, MeasurementProcess)
+    classical, measurements = [], []
+    for result in flat_results:
+        if isinstance(result, MeasurementProcess):
+            measurements.append(result)  # pragma: no cover
+        else:
+            classical.append(result)
 
-    has_mixed_classical_quantum_results = class_tracers and meas_tracers
-    is_out_measurements = map(is_measurement, meas_tracers)
-    is_all_out_measurements = all(is_out_measurements) and not has_mixed_classical_quantum_results
-    is_out_measurement_sequence = is_all_out_measurements and isinstance(meas_tracers, Sequence)
-    is_out_single_measurement = is_all_out_measurements and is_measurement(meas_tracers)
-    is_valid_output = is_out_measurement_sequence or is_out_single_measurement
-
-    return is_valid_output
+    return bool(classical)
 
 
 @debug_logger
-def has_midcircuit_measurement(tape):
+def has_midcircuit_measurements(tape):
     """Check if the tape contains any mid-circuit measurements."""
 
     # Check if there are any mid-circuit measurements
@@ -1112,69 +1094,21 @@ def has_midcircuit_measurement(tape):
     return any(map(is_midcircuit_measurement, tape.operations))
 
 
-class TracingMode(Enum):
-    """Enumerate the tracing modes supported by the quantum function tracer:
+@debug_logger
+def tape_measurements_change(tape1, tape2):
+    """Check if the measurements are different between two tapes."""
 
-    DEFAULT - Allows mid-circuit measurements and returns function's results directly.
-              Used when no transform is applied or when transform doesn't modify
-              measurements or produce multiple tapes.
+    if len(tape1.measurements) != len(tape2.measurements):
+        return True
+    # Generally transforms that copy tapes will maintain identity of the elements.
+    elif any(m1 is not m2 for m1, m2 in zip(tape1.measurements, tape2.measurements)):
+        return True
 
-    TRANSFORM - Uses tape measurements instead of original function results.
-                Prohibits mid-circuit measurements with multiple tapes and requires
-                function to return only measurements (no classical results).
-                Used when transform produces multiple tapes or modifies measurements.
-    """
-
-    DEFAULT = 0
-    TRANSFORM = 1
+    return False
 
 
 @debug_logger
-def determine_transform_legality_and_mode(flat_results, tape, tapes):
-    """Determines whether a transform is legal for the given program and which tracing mode to use.
-
-    Args:
-        tape: The original quantum tape before transformation
-        tapes: List of tapes produced by the transform
-        device_modify_measurements: Whether device modified measurements
-
-    Returns:
-        TracingMode: Tracing mode to use - either TracingMode.DEFAULT or TracingMode.TRANSFORM
-
-    Raises:
-        CompileError: If the transform is not legal for the given program
-    """
-    # Before determine the tracing mode, make sure that the transform:
-    # - Not allow mid-circuit measurements on the tapes (wave function collapse)
-    # - Does not produce multiple tapes
-    if not has_valid_measurement_outputs(flat_results):
-        msg = (
-            "A transformed quantum function must return either a single measurement, "
-            "or a nonempty sequence of measurements."
-        )
-        raise CompileError(msg)
-
-    if has_midcircuit_measurement(tape) and len(tapes) > 1:
-        msg = "Multiple tapes are generated, but each run might produce different results."
-        raise CompileError(msg)
-
-    # Tracing mode 0 is default, 1 is transform
-    measurements_modified = any(
-        original_meas != modified_meas
-        for original_meas, modified_meas in zip(tape.measurements, tapes[0].measurements)
-    )
-
-    return TracingMode.TRANSFORM if measurements_modified else TracingMode.DEFAULT
-
-
-@debug_logger
-def apply_transform(
-    qnode_program,
-    device_program,
-    device_modify_measurements,
-    tape,
-    flat_results,
-):
+def apply_transform(qnode_program, device_program, device_modify_measurements, tape, flat_results):
     """Apply transform."""
     # Some transforms use trainability as a basis for transforming.
     # See batch_params
@@ -1185,38 +1119,38 @@ def apply_transform(
         msg = "Catalyst does not support informative transforms."
         raise CompileError(msg)
 
-    is_device_modified = qnode_program or device_modify_measurements
-    # Apply the identity transform (only device_program) in order to keep generalization
-    total_program = qnode_program + device_program if is_device_modified else device_program
-
     # Apply the transform
+    total_program = qnode_program + device_program
     tapes, post_processing = total_program([tape])
 
-    tracing_mode = TracingMode.DEFAULT
-    if is_device_modified:
-        # The transform may either only modify operations (not measurements)
-        # or make no modifications at all.
-        tracing_mode = determine_transform_legality_and_mode(flat_results, tape, tapes)
+    # Verify restrictions on transformed programs
+    may_modify_measurements = device_modify_measurements or len(qnode_program)  # optimization
+    classical_outputs = has_classical_outputs(flat_results)
+    midcircuit_measurements = has_midcircuit_measurements(tape)
+    if len(tapes) > 1:
+        # batch transform
+        if classical_outputs or midcircuit_measurements:
+            msg = (
+                "Batch transforms are unsupported with MCMs or non-MeasurementProcess QNode "
+                "outputs. The selected device (options), or applied QNode transform, may be "
+                "attempting to produce multiple tapes."
+            )
+            raise CompileError(msg)
+        use_tape_results = True
+    elif may_modify_measurements and tape_measurements_change(tape, tapes[0]):
+        # transform affects tape measurements
+        if classical_outputs:
+            msg = (
+                "Transforming MeasurementProcesses is unsupported with non-MeasurementProcess "
+                "QNode outputs. The selected device (options), or applied QNode transform, may be "
+                "attempting to transform MeasurementProcesses from the tape."
+            )
+            raise CompileError(msg)
+        use_tape_results = True
+    else:
+        use_tape_results = False
 
-    return tapes, post_processing, tracing_mode
-
-
-@debug_logger
-def split_tracers_and_measurements(flat_values):
-    """Return classical tracers and measurements"""
-    classical = []
-    measurements = []
-    for flat_value in flat_values:
-        if isinstance(flat_value, DynamicJaxprTracer):
-            # classical should remain empty for all valid cases at the moment.
-            # This is because split_tracers_and_measurements is only called
-            # when checking the validity of transforms. And transforms cannot
-            # return any tracers.
-            classical.append(flat_value)  # pragma: no cover
-        else:
-            measurements.append(flat_value)
-
-    return classical, measurements
+    return tapes, post_processing, use_tape_results
 
 
 @debug_logger
@@ -1351,7 +1285,7 @@ def trace_quantum_function(
 
             qnode_program = qnode.transform_program if qnode else TransformProgram()
 
-            tapes, post_processing, tracing_mode = apply_transform(
+            tapes, post_processing, use_transformed_measurements = apply_transform(
                 qnode_program,
                 device_program,
                 device_modify_measurements,
@@ -1363,11 +1297,6 @@ def trace_quantum_function(
         transformed_results = []
 
         with EvaluationContext.frame_tracing_context(ctx, trace):
-            # Determine if we're using transformed measurements based on tracing mode
-
-            if len(qnode_program) > 0:
-                tracing_mode = TracingMode.TRANSFORM
-
             for tape in tapes:
                 # Set up quantum register for the current tape.
                 # We just need to ensure there is a tape cut in between each.

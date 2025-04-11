@@ -1106,22 +1106,21 @@ class TestTransformValidity:
         )
         H4 += qml.PauliZ(0) @ qml.PauliX(1) @ qml.PauliY(2)
 
-        msg = (
-            "A transformed quantum function must return either a single measurement, "
-            "or a nonempty sequence of measurements."
-        )
-        with pytest.raises(CompileError, match=msg):
+        @qml.transforms.split_non_commuting
+        @qml.qnode(qml.device(backend, wires=3))
+        def qfunc():
+            """Example taken from PL tests."""
+            qml.Hadamard(0)
+            qml.Hadamard(1)
+            qml.PauliZ(1)
+            qml.PauliX(2)
+            return [1, qml.expval(H4)]
 
-            @qjit
-            @qml.transforms.split_non_commuting
-            @qml.qnode(qml.device(backend, wires=3))
-            def qfunc():
-                """Example taken from PL tests."""
-                qml.Hadamard(0)
-                qml.Hadamard(1)
-                qml.PauliZ(1)
-                qml.PauliX(2)
-                return [1, qml.expval(H4)]
+        with pytest.raises(
+            CompileError,
+            match="Batch transforms are unsupported with MCMs or non-MeasurementProcess",
+        ):
+            qjit(qfunc)
 
     def test_invalid_batch_transform_due_to_measure(self, backend):
         """Test split non commuting"""
@@ -1152,7 +1151,10 @@ class TestTransformValidity:
 
             return qfunc
 
-        with pytest.raises(CompileError, match="Multiple tapes are generated"):
+        with pytest.raises(
+            CompileError,
+            match="Batch transforms are unsupported with MCMs or non-MeasurementProcess",
+        ):
             qjit(qnode_builder(backend))
 
     @pytest.mark.parametrize(("theta_1", "theta_2"), [(0.3, -0.2)])
