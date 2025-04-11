@@ -1069,7 +1069,7 @@ def has_valid_measurement_outputs(flat_results):
     """Checks if the quantum function outputs are valid for transformations.
 
     Valid outputs for transformations must be either:
-    1. A single or measurement process
+    1. A single measurement process
     2. A non-empty sequence of measurement processes
 
     Args:
@@ -1104,7 +1104,6 @@ def has_valid_measurement_outputs(flat_results):
 def has_midcircuit_measurement(tape):
     """Check if the tape contains any mid-circuit measurements."""
 
-    # Check if there are any mid-circuit measurements
     def is_midcircuit_measurement(op):
         """Only to avoid 100 character per line limit."""
         return isinstance(op, catalyst.api_extensions.MidCircuitMeasure)
