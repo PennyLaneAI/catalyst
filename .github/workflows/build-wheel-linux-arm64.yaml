@@ -378,15 +378,15 @@ jobs:
 
 
   test-wheels:
-    needs: [constants, catalyst-linux-wheels-arm-64, determine_runner]
+    needs: [constants, catalyst-linux-wheels-arm-64,]
     strategy:
       fail-fast: false
       matrix:
         python_version: ${{ fromJSON(needs.constants.outputs.python_versions) }}
 
     # To check all wheels for supported python3 versions
-    name: Test Wheels (Python ${{ matrix.python_version }}) on Linux x86
-    runs-on: ${{ needs.determine_runner.outputs.runner_group }}
+    name: Test Wheels (Python ${{ matrix.python_version }}) on Linux Arm
+    runs-on: ubuntu-22.04-arm
 
     steps:
     - name: Checkout Catalyst repo
