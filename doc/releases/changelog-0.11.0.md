@@ -332,6 +332,26 @@
   pytrees inside a loop with autograph caused falling back to Python.
   [(#1601)](https://github.com/PennyLaneAI/catalyst/pull/1601)
 
+For example, the following example will now be captured and executed properly with Autograph enabled:
+
+```python
+from catalyst import qjit
+
+def updateList(x):
+    return [x[0]+1, x[1]+2]
+
+@qjit(autograph=True)
+def fn(x):
+    for i in range(4):
+        x = updateList(x)
+    return x
+```
+
+```pycon
+>>> fn([1, 2])
+[Array(5, dtype=int64), Array(10, dtype=int64)]
+```
+
 * Closure variables are now supported with `grad` and `value_and_grad`.
   [(#1613)](https://github.com/PennyLaneAI/catalyst/pull/1613)
 
