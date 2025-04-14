@@ -614,7 +614,8 @@ class QJIT(CatalystCallable):
                 self.compiled_function.shared_object.close()
 
             self.jaxpr, self.out_type, self.out_treedef, self.c_sig = self.capture(args, **kwargs)
-            breakpoint()
+            #breakpoint()
+            print(self.jaxpr)
             self.mlir_module = self.generate_ir()
             #breakpoint()
             self.compiled_function, _ = self.compile()

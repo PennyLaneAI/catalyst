@@ -422,7 +422,9 @@ def deduce_signatures(
     """
     flat_args, in_tree = tree_flatten((args, kwargs))
     trace: DynamicJaxprTrace = find_top_trace(flat_args)
-    flat_tracers = [trace.full_raise(a) for a in flat_args]
+    #flat_tracers = [trace.full_raise(a) for a in flat_args]
+    #flat_tracers = [trace.lift(a) for a in flat_args]
+    flat_tracers = [trace.to_jaxpr_tracer(a) for a in flat_args]
     in_expanded_args, in_type = expand_args(flat_tracers, expansion_strategy=expansion_strategy)
     wf = wrap_init(f)
     wf, out_tree_promise = flatten_fun(wf, in_tree)
@@ -609,7 +611,6 @@ def infer_input_type_unshared(inputs: List[TracerLike]) -> InputType:
     impl_avals = []
     expl_avals = []
     for o in expl_ins:
-        breakpoint()
         assert _is_tracer_like(o), (o,)
         if isinstance(o.aval, DShapedArray):
             shape2 = []

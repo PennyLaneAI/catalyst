@@ -1723,11 +1723,11 @@ def _cond_lowering(
                     if_ctx.name_stack,
                     mlir.TokenSet(),
                     [mlir.ir_constants(c) for c in true_jaxpr.consts],
-                    *([a] for a in flat_args_plus_consts),  # fn expects [a1], [a2], [a3] format
+                    *(a for a in flat_args_plus_consts),  # fn expects [a1], [a2], [a3] format
                     dim_var_values=jax_ctx.dim_var_values,
                 )
-
-                YieldOp([o[0] for o in out[0]])
+                #breakpoint()
+                YieldOp([o for o in out[0]])
 
             # else block
             source_info_util.extend_name_stack("else")
@@ -1743,11 +1743,11 @@ def _cond_lowering(
                         else_ctx.name_stack,
                         mlir.TokenSet(),
                         [mlir.ir_constants(c) for c in otherwise_jaxpr.consts],
-                        *([a] for a in flat_args_plus_consts),
+                        *(a for a in flat_args_plus_consts),
                         dim_var_values=jax_ctx.dim_var_values,
                     )
 
-                    YieldOp([o[0] for o in out[0]])
+                    YieldOp([o for o in out[0]])
             else:
                 with ir.InsertionPoint(else_block) as else_ip:
                     child_if_op = emit_branches(preds[1:], branch_jaxprs[1:], else_ip)

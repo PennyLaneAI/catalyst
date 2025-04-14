@@ -10,6 +10,7 @@ from catalyst import qjit, cond
 # 	return x
 
 # print(identity(42.0))
+# print(identity.jaxpr)
 
 
 # def subcircuit(angle):
@@ -46,4 +47,4 @@ def circuit(n):
 
     return cond_fn()
 
-print(circuit(10))
+print(circuit(10), circuit(1))

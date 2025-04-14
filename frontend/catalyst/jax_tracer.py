@@ -327,7 +327,6 @@ def unify_convert_result_types(ctx, jaxprs, consts, nimplouts):
         TypePromotionError: Unification is not possible.
 
     """
-    breakpoint()
     promoted_types = _promote_jaxpr_types([[v.aval for v in j.outvars] for j in jaxprs])
     jaxpr_acc, type_acc, tracers_acc, consts_acc = [], [], [], []
     for j, a, num_implicit_outputs in zip(jaxprs, consts, nimplouts):
@@ -338,7 +337,6 @@ def unify_convert_result_types(ctx, jaxprs, consts, nimplouts):
         type_acc.append(out_sig.out_type())
         tracers_acc.append(tracers)
         consts_acc.append(out_sig.out_consts())
-    breakpoint()
     return jaxpr_acc, type_acc[0], tracers_acc, consts_acc
 
 
@@ -480,21 +478,24 @@ class HybridOp(Operator):
         """
         assert self.binder is not None, "HybridOp should set a binder"
         out_quantum_tracer = self.binder(*in_expanded_tracers, **kwargs)[-1]
-        eqn = ctx.frames[trace].eqns[-1]
+        with jax.core.take_current_trace() as cur_trace:
+            #eqn = ctx.frames[trace].eqns[-1]
+            eqn = cur_trace.frame.eqns[-1]
         assert len(eqn.outvars[:-1]) == len(
             out_expanded_tracers
         ), f"{eqn.outvars=}\n{out_expanded_tracers=}"
         for i, t in zip(range(len(eqn.outvars[:-1])), out_expanded_tracers):
-            if trace.getvar(t) in set(
-                [
-                    *sum([e.outvars for e in ctx.frames[trace].eqns[:-1]], []),
-                    *ctx.frames[trace].invars,
-                    *ctx.frames[trace].constvar_to_val.keys(),
-                ]
-            ):
-                # Do not re-assign vars from other equations
-                continue
-            eqn.outvars[i] = trace.getvar(t)
+            with jax.core.take_current_trace() as cur_trace:
+                if trace.getvar(t) in set(
+                    [
+                        *sum([e.outvars for e in cur_trace.frame.eqns[:-1]], []),
+                        *cur_trace.frame.invars,
+                        *cur_trace.frame.constvar_to_val.keys(),
+                    ]
+                ):
+                    # Do not re-assign vars from other equations
+                    continue
+                eqn.outvars[i] = trace.getvar(t)
         return out_quantum_tracer
 
     @debug_logger
@@ -731,9 +732,7 @@ def trace_quantum_operations(
 
         assert qrp2 is not None
         qrp = qrp2
-    #breakpoint()
     with jax.core.take_current_trace() as trace:
-        #breakpoint()
         trace.frame.eqns = sort_eqns(trace.frame.eqns, FORCED_ORDER_PRIMITIVES)  # [1]
     return qrp
 
@@ -1127,7 +1126,6 @@ def trace_post_processing(ctx, trace, post_processing: Callable, pp_args):
         in_tracers = [trace.full_raise(t) for t in tree_flatten(pp_args)[0]]
         out_tracers = [trace.full_raise(t) for t in wffa.call_wrapped(*in_tracers)]
         with jax.core.take_current_trace() as cur_trace:
-            #breakpoint()
             jaxpr, out_type, consts = cur_trace.frame.to_jaxpr2(out_tracers, cur_trace.frame.debug_info)
         closed_jaxpr = ClosedJaxpr(jaxpr, consts)
         return closed_jaxpr, out_type, out_tree_promise()
@@ -1155,7 +1153,6 @@ def trace_function(
         InputSignature of the resulting Jaxpr program
         OutputSignature of the resulting Jaxpr program
     """
-    #breakpoint()
     wfun, in_sig, out_sig = deduce_signatures(
         fun, args, kwargs, expansion_strategy=expansion_strategy
     )
@@ -1242,7 +1239,6 @@ def trace_quantum_function(
 
         # (2) - Quantum tracing
         transformed_results = []
-        #breakpoint()
         with EvaluationContext.frame_tracing_context(trace):
             qnode_transformed = len(qnode_program) > 0
             for tape in tapes:
