@@ -132,7 +132,7 @@ jobs:
           # echo /Library/Frameworks/Python.framework/Versions/${{ matrix.python_version }}/bin >> $GITHUB_PATH
           # python${{ matrix.python_version }} -m pip install numpy nanobind pybind11 PyYAML cmake ninja
           cat /etc/dnf.conf | sed "s/\[main\]/\[main\]\ntimeout=5/g" > /etc/dnf.conf
-          dnf update -y && dnf install -y libzstd-devel gcc-toolset-12
+          dnf update -y && dnf install -y libzstd-devel gcc-toolset-12 python3 python3-pip
           # Update env vars valid for all tasks of this job
           echo '/opt/rh/gcc-toolset-12/root/usr/bin' >> $GITHUB_PATH          
 
