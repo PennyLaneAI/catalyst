@@ -266,7 +266,7 @@
   this is allowable for all operations.
 
 * An `mlir_opt` property has been added to `qjit` to access the optimized MLIR representation of a compiled 
-  function.
+  function. This is the representation of the program after running everything in the MLIR stage of the entire pipeline.
   [(#1579)](https://github.com/PennyLaneAI/catalyst/pull/1579)
   [(#1637)](https://github.com/PennyLaneAI/catalyst/pull/1637)
 
