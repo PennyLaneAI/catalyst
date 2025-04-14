@@ -178,43 +178,53 @@ class TestCapture:
         assert jnp.allclose(actual, desired)
 
     @pytest.mark.parametrize(
-        "init_state",
+        "n_wires, basis_state",
         [
-            jnp.array([1.0, 0.0], dtype=jnp.complex128),
-            jnp.array([0.0, 1.0], dtype=jnp.complex128),
-            jnp.array([1.0, 1.0], dtype=jnp.complex128) / jnp.sqrt(2.0),
-            jnp.array([0.0, 1.0], dtype=jnp.float64),
-            jnp.array([0, 1], dtype=jnp.int64),
+            (1, jnp.array([0])),
+            (1, jnp.array([1])),
+            (2, jnp.array([0, 0])),
+            (2, jnp.array([0, 1])),
+            (2, jnp.array([1, 0])),
+            (2, jnp.array([1, 1])),
         ],
     )
-    def test_state_prep(self, backend, init_state):
-        """Test the integration for a circuit with StatePrep."""
-        dev = qml.device(backend, wires=1)
-
-        @qml.qnode(dev)
-        def circuit(init_state):
-            qml.StatePrep(init_state, wires=0)
-            return qml.state()
-
-        desired = circuit(init_state)
-        actual = qjit(circuit, experimental_capture=True)(init_state)
-
-        assert jnp.allclose(actual, desired)
-
-    @pytest.mark.parametrize(
-        "basis_state", [jnp.array([0, 0]), jnp.array([0, 1]), jnp.array([1, 0]), jnp.array([1, 1])]
-    )
-    def test_basis_state(self, backend, basis_state):
+    def test_basis_state(self, backend, n_wires, basis_state):
         """Test the integration for a circuit with BasisState."""
-        dev = qml.device(backend, wires=2)
+        dev = qml.device(backend, wires=n_wires)
 
         @qml.qnode(dev)
         def circuit(_basis_state):
-            qml.BasisState(_basis_state, wires=[0, 1])
+            qml.BasisState(_basis_state, wires=list(range(n_wires)))
             return qml.state()
 
         desired = circuit(basis_state)
         actual = qjit(circuit, experimental_capture=True)(basis_state)
+
+        assert jnp.allclose(actual, desired)
+
+    @pytest.mark.parametrize(
+        "n_wires, init_state",
+        [
+            (1, jnp.array([1.0, 0.0], dtype=jnp.complex128)),
+            (1, jnp.array([0.0, 1.0], dtype=jnp.complex128)),
+            (1, jnp.array([1.0, 1.0], dtype=jnp.complex128) / jnp.sqrt(2.0)),
+            (1, jnp.array([0.0, 1.0], dtype=jnp.float64)),
+            (1, jnp.array([0, 1], dtype=jnp.int64)),
+            (2, jnp.array([1.0, 0.0, 0.0, 0.0], dtype=jnp.complex128)),
+            (2, jnp.array([0.0, 1.0, 0.0, 0.0], dtype=jnp.complex128)),
+        ],
+    )
+    def test_state_prep(self, backend, n_wires, init_state):
+        """Test the integration for a circuit with StatePrep."""
+        dev = qml.device(backend, wires=n_wires)
+
+        @qml.qnode(dev)
+        def circuit(init_state):
+            qml.StatePrep(init_state, wires=list(range(n_wires)))
+            return qml.state()
+
+        desired = circuit(init_state)
+        actual = qjit(circuit, experimental_capture=True)(init_state)
 
         assert jnp.allclose(actual, desired)
 
