@@ -137,6 +137,8 @@ a tensor product of a :class:`qml.PauliX <pennylane.PauliX>`, :class:`qml.Hadama
         )
         return qml.expval(qml.PauliX(0) @ qml.Hadamard(1) @ qml.Hermitian(h_matrix, 2))
 
+.. _measurements:
+
 Measurements
 ------------
 Most PennyLane :doc:`measurement processes <introduction/measurements>`

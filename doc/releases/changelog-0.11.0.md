@@ -188,6 +188,8 @@
     [(#1524)](https://github.com/PennyLaneAI/catalyst/pull/1524)
   - Lazy IR canonicalization and LLVMIR textual generation.
     [(#1530)](https://github.com/PennyLaneAI/catalyst/pull/1530)
+  - Speed up how tracers are overwritten for hybrid ops.
+    [(#1622)](https://github.com/PennyLaneAI/catalyst/pull/1622)
 
 * Catalyst now decomposes non-differentiable gates when in a gradient method.
   [(#1562)](https://github.com/PennyLaneAI/catalyst/pull/1562)
@@ -221,6 +223,7 @@
 
 * Added `qjit.mlir_opt` property to access the optimized MLIR representation of a compiled function.
   [(#1579)](https://github.com/PennyLaneAI/catalyst/pull/1579)
+  [(#1637)](https://github.com/PennyLaneAI/catalyst/pull/1637)
 
 * Improve error message for ZNE.
   [(#1603)](https://github.com/PennyLaneAI/catalyst/pull/1603)
@@ -265,6 +268,9 @@
 * Fixes an issue ([(#896)](https://github.com/PennyLaneAI/catalyst/issues/896)) where using
   pytrees inside a loop with autograph causes falling back to python.
   [(#1601)](https://github.com/PennyLaneAI/catalyst/pull/1601)
+
+* Closure variables are now supported with `grad` and `value_and_grad`.
+  [(#1613)](https://github.com/PennyLaneAI/catalyst/pull/1613)
 
 <h3>Internal changes ⚙️</h3>
 
