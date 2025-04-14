@@ -451,8 +451,8 @@ def handle_state_prep(self, *invals, n_wires, **kwargs):
     # https://jax.readthedocs.io/en/latest/type_promotion.html
     state = jax.lax.convert_element_type(state_inval, jnp.dtype(jnp.complex128))
     wires = [self.get_wire(w) for w in wires_inval]
-
     out_wires = set_state_p.bind(*wires, state)
+
     for wire_values, new_wire in zip(wires_inval, out_wires):
         self.wire_map[wire_values] = new_wire
 
