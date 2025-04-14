@@ -375,3 +375,61 @@ jobs:
         run: |
           # exclude libopenblas as we rely on the openblas/lapack library shipped by scipy
           auditwheel repair dist/*.whl -w ./wheel --no-update-tags --exclude libopenblasp-r0-23e5df77.3.21.dev.so
+
+
+  test-wheels:
+    needs: [constants, catalyst-linux-wheels-x86-64, determine_runner]
+    strategy:
+      fail-fast: false
+      matrix:
+        python_version: ${{ fromJSON(needs.constants.outputs.python_versions) }}
+
+    # To check all wheels for supported python3 versions
+    name: Test Wheels (Python ${{ matrix.python_version }}) on Linux x86
+    runs-on: ${{ needs.determine_runner.outputs.runner_group }}
+
+    steps:
+    - name: Checkout Catalyst repo
+      uses: actions/checkout@v4
+
+    - name: Download Wheel Artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: catalyst-manylinux_2_28_x86_64-wheel-py-${{ matrix.python_version }}.zip
+        path: ${{ github.workspace }}/dist
+
+    - name: Download Standalone Plugin Wheel Artifact
+      # Run only on Thursday at the given time
+      if: github.event.schedule == '35 4 * * 4'
+      uses: actions/download-artifact@v4
+      with:
+        name: standalone-plugin-manylinux_2_28_x86_64-wheel-py-${{ matrix.python_version }}.zip
+        path: ${{ github.workspace }}/standalone_plugin_wheel/wheel
+
+    - name: Set up Python ${{ matrix.python_version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python_version }}
+
+    - name: Install Python dependencies
+      run: |
+        python${{ matrix.python_version }} -m pip install pytest pytest-xdist pytest-mock
+
+    - name: Install PennyLane Plugins
+      run: |
+        python${{ matrix.python_version }} -m pip install PennyLane-Lightning-Kokkos
+        python${{ matrix.python_version }} -m pip install 'amazon-braket-pennylane-plugin>=1.31.0'
+
+    - name: Install OQC client
+      run: |
+        python${{ matrix.python_version }} -m pip install oqc-qcaas-client
+
+    - name: Install Catalyst
+      run: |
+        python${{ matrix.python_version }} -m pip install dist/*.whl --extra-index-url https://test.pypi.org/simple
+
+    - name: Install Standalone Plugin
+      # Run only on Thursday at the given time (TODO: set comparison to == before merging)
+      if: github.event.schedule == '35 4 * * 4'
+      run: |
+        python${{ matrix.python_version }} -m pip install standalone_plugin_wheel/wheel/*.whl --no-deps
