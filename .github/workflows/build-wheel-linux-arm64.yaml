@@ -136,9 +136,8 @@ jobs:
           echo '/opt/rh/gcc-toolset-12/root/usr/bin' >> $GITHUB_PATH          
 
       - name: Set up Python ${{ matrix.python_version }}
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python_version }}
+        run: |
+          dnf install -y python3
 
       - name: Install Dependencies (Python)
         run: |
@@ -251,6 +250,7 @@ jobs:
 
       - name: Install Dependencies (Python)
         run: |
+          dnf install -y python3
           python${{ matrix.python_version }} -m pip install numpy nanobind pybind11 PyYAML cmake ninja
           # Add cmake and ninja to the PATH env var
           PYTHON_BINS=$(find /opt/_internal/cpython-${{ matrix.python_version }}.*/bin -maxdepth 1 -type d | tr '\n' ':' | sed 's/:$//')
