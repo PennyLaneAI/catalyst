@@ -376,6 +376,22 @@ jobs:
           # exclude libopenblas as we rely on the openblas/lapack library shipped by scipy
           auditwheel repair dist/*.whl -w ./wheel --no-update-tags --exclude libopenblasp-r0-23e5df77.3.21.dev.so
 
+      - name: Upload Wheel Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: catalyst-manylinux_2_28_arm_64-wheel-py-${{ matrix.python_version }}.zip
+          path: ${{ github.workspace }}/wheel/
+          retention-days: 14
+
+      - name: Upload Standalone Plugin Wheel Artifact
+        # Run only on Thursday at the given time
+        if: github.event.schedule == '35 4 * * 4'
+        uses: actions/upload-artifact@v4
+        with:
+          name: standalone-plugin-manylinux_2_28_arm_64-wheel-py-${{ matrix.python_version }}.zip
+          path: ${{ github.workspace }}/standalone_plugin_wheel/dist
+          retention-days: 14     
+
 
   test-wheels:
     needs: [constants, catalyst-linux-wheels-arm-64,]
