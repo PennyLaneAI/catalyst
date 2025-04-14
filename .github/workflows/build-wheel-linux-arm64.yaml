@@ -34,7 +34,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10"]
+        python-version: ["3.10.16"]
         container_img: ["manylinux_2_28_aarch64"]
 
     name: Build Dependencies (Python ${{ matrix.python_version }})
@@ -135,10 +135,10 @@ jobs:
           # Update env vars valid for all tasks of this job
           echo '/opt/rh/gcc-toolset-12/root/usr/bin' >> $GITHUB_PATH          
 
-      - name: Set up Python
+      - name: Set up Python ${{ matrix.python_version }}
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: ${{ matrix.python_version }}
 
       - name: Install Dependencies (Python)
         run: |
@@ -255,17 +255,6 @@ jobs:
           # Add cmake and ninja to the PATH env var
           PYTHON_BINS=$(find /opt/_internal/cpython-${{ matrix.python_version }}.*/bin -maxdepth 1 -type d | tr '\n' ':' | sed 's/:$//')
           echo $PYTHON_BINS >> $GITHUB_PATH
-      # - name: Set up Python ${{ matrix.python_version }}
-      #   uses: actions/setup-python@v5
-      #   with:
-      #     python-version: ${{ matrix.python_version }}
-
-      # - name: Install dependencies (Python)
-      #   run: |
-      #     python${{ matrix.python_version }} -m pip install --upgrade pip
-      #     python${{ matrix.python_version }} -m pip install numpy nanobind pybind11 PyYAML cmake ninja auditwheel
-      #     PYTHON_BINS=$(find /opt/_internal/cpython-${{ matrix.python_version }}.*/bin -maxdepth 1 -type d | tr '\n' ':' | sed 's/:$//')
-      #     echo $PYTHON_BINS >> $GITHUB_PATH
 
       - name: Get Cached LLVM Source
         id: cache-llvm-source
