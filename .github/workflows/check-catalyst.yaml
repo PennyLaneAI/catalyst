@@ -444,9 +444,9 @@ jobs:
         python3 -m pip install cuda-quantum==0.6.0
         python3 -m pip install oqc-qcaas-client
         # TODO: --- remove workaround before merging to main ----------------- #
+        pip install git+https://github.com/PennyLaneAI/pennylane@v0.41.0-rc0
         pip install --extra-index-url=https://test.pypi.org/simple/ PennyLane-Lightning==0.41.0
         pip install --extra-index-url=https://test.pypi.org/simple/ PennyLane-Lightning-Kokkos==0.41.0
-        pip install git+https://github.com/PennyLaneAI/pennylane@v0.41.0-rc0
         # -------------------------------------------------------------------- #
         make frontend
 
@@ -526,9 +526,9 @@ jobs:
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
         # TODO: --- remove workaround before merging to main ----------------- #
+        pip install git+https://github.com/PennyLaneAI/pennylane@v0.41.0-rc0
         pip install --extra-index-url=https://test.pypi.org/simple/ PennyLane-Lightning==0.41.0
         pip install --extra-index-url=https://test.pypi.org/simple/ PennyLane-Lightning-Kokkos==0.41.0
-        pip install git+https://github.com/PennyLaneAI/pennylane@v0.41.0-rc0
         # -------------------------------------------------------------------- #
         make frontend
 
@@ -588,9 +588,9 @@ jobs:
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
         # TODO: --- remove workaround before merging to main ----------------- #
+        pip install git+https://github.com/PennyLaneAI/pennylane@v0.41.0-rc0
         pip install --extra-index-url=https://test.pypi.org/simple/ PennyLane-Lightning==0.41.0
         pip install --extra-index-url=https://test.pypi.org/simple/ PennyLane-Lightning-Kokkos==0.41.0
-        pip install git+https://github.com/PennyLaneAI/pennylane@v0.41.0-rc0
         # -------------------------------------------------------------------- #
         make frontend
 
