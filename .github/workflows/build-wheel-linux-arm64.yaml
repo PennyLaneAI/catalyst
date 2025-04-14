@@ -130,18 +130,24 @@ jobs:
           steps.cache-enzyme-build.outputs.cache-hit != 'true'
         run: |
           # echo /Library/Frameworks/Python.framework/Versions/${{ matrix.python_version }}/bin >> $GITHUB_PATH
-          # python${{ matrix.python_version }} -m pip install numpy nanobind pybind11 PyYAML cmake ninja
           cat /etc/dnf.conf | sed "s/\[main\]/\[main\]\ntimeout=5/g" > /etc/dnf.conf
-          dnf update -y && dnf install -y libzstd-devel gcc-toolset-12 python3 python3-pip
+          dnf update -y && dnf install -y libzstd-devel gcc-toolset-12 
           # Update env vars valid for all tasks of this job
           echo '/opt/rh/gcc-toolset-12/root/usr/bin' >> $GITHUB_PATH          
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
       - name: Install Dependencies (Python)
         run: |
+          python${{ matrix.python-version }} -m pip install --upgrade pip
           python${{ matrix.python_version }} -m pip install numpy nanobind pybind11 PyYAML cmake ninja
           # Add cmake and ninja to the PATH env var
           PYTHON_BINS=$(find /opt/_internal/cpython-${{ matrix.python_version }}.*/bin -maxdepth 1 -type d | tr '\n' ':' | sed 's/:$//')
           echo $PYTHON_BINS >> $GITHUB_PATH
+          python${{ matrix.python-version }} --version
 
       - name: Build LLVM / MLIR
         if: steps.cache-llvm-build.outputs.cache-hit != 'true'
