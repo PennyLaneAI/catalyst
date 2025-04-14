@@ -225,14 +225,25 @@ class EvaluationContext:
     ) -> ContextManager[DynamicJaxprTrace]:
         """Start a new JAX tracing frame, e.g. to trace a region of some
         :class:`~.jax_tracer.HybridOp`. Not applicable in non-tracing evaluation modes."""
-        if trace is not None:
-            with set_current_trace(trace):
-                yield trace
-        else:
-            new_trace = DynamicJaxprTrace(None)
-            with set_current_trace(new_trace):
+        with take_current_trace() as parent_trace:
+            if trace is not None:
+                new_trace = trace
+            else:
+                new_trace = DynamicJaxprTrace(None)
                 print("created new trace ", id(new_trace))
-                yield new_trace
+
+            # add invars from parent for closure variables
+            #new_trace.frame.invars.extend(parent_trace.frame.invars)
+            #breakpoint()
+            with set_current_trace(new_trace):
+                try:
+                    yield new_trace
+                finally:
+                    #breakpoint()
+                    pass
+                    #new_trace = parent_trace
+                    #new_trace.frame.invars.extend(parent_trace.frame.invars)
+
 
     @classmethod
     def get_main_tracing_context(cls, hint=None) -> JaxTracingContext:

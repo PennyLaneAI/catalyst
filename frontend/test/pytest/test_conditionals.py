@@ -78,7 +78,7 @@ class TestCond:
 
             @cond_fn.otherwise
             def else_fn():
-                return n
+                return n+1
 
             return cond_fn()
 

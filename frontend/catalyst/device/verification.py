@@ -69,7 +69,7 @@ def _verify_nested(
         if has_nested_tapes(op):
             for region in nested_quantum_regions(op):
                 if region.trace is not None:
-                    with EvaluationContext.frame_tracing_context(ctx, region.trace):
+                    with EvaluationContext.frame_tracing_context(region.trace):
                         inner_state = _verify_nested(
                             region.quantum_tape.operations, inner_state, op_checker_fn
                         )

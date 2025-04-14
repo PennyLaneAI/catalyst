@@ -468,7 +468,8 @@ def trace_to_jaxpr(
     This method would remove return values related to sizes of tensors when compiling with
     dynamically sized tensors.
     """
-    jaxpr, tracers, consts = trace.frame.to_jaxpr2((*outputs, *inputs))
+    #breakpoint()
+    jaxpr, tracers, consts = trace.frame.to_jaxpr2((*outputs, *inputs), trace.frame.debug_info)
     del jaxpr._outvars[len(outputs) :]
     return jaxpr, tracers, consts
 
@@ -608,6 +609,7 @@ def infer_input_type_unshared(inputs: List[TracerLike]) -> InputType:
     impl_avals = []
     expl_avals = []
     for o in expl_ins:
+        breakpoint()
         assert _is_tracer_like(o), (o,)
         if isinstance(o.aval, DShapedArray):
             shape2 = []

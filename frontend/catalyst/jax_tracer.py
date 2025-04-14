@@ -327,6 +327,7 @@ def unify_convert_result_types(ctx, jaxprs, consts, nimplouts):
         TypePromotionError: Unification is not possible.
 
     """
+    breakpoint()
     promoted_types = _promote_jaxpr_types([[v.aval for v in j.outvars] for j in jaxprs])
     jaxpr_acc, type_acc, tracers_acc, consts_acc = [], [], [], []
     for j, a, num_implicit_outputs in zip(jaxprs, consts, nimplouts):
@@ -337,6 +338,7 @@ def unify_convert_result_types(ctx, jaxprs, consts, nimplouts):
         type_acc.append(out_sig.out_type())
         tracers_acc.append(tracers)
         consts_acc.append(out_sig.out_consts())
+    breakpoint()
     return jaxpr_acc, type_acc[0], tracers_acc, consts_acc
 
 
@@ -1153,6 +1155,7 @@ def trace_function(
         InputSignature of the resulting Jaxpr program
         OutputSignature of the resulting Jaxpr program
     """
+    #breakpoint()
     wfun, in_sig, out_sig = deduce_signatures(
         fun, args, kwargs, expansion_strategy=expansion_strategy
     )

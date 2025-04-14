@@ -655,8 +655,11 @@ class CondCallable:
 
         return False
 
-    def _call_with_quantum_ctx(self, ctx):
-        outer_trace = ctx.trace
+    def _call_with_quantum_ctx(self):
+        #outer_trace = ctx.trace
+        with jax.core.take_current_trace() as cur_trace:
+            outer_trace = cur_trace
+            #breakpoint()
         in_classical_tracers = self.preds
         regions: List[HybridOpRegion] = []
 
@@ -670,15 +673,17 @@ class CondCallable:
             )
             assert len(in_sig.in_type) == 0
             with EvaluationContext.frame_tracing_context() as inner_trace:
+                #breakpoint()
                 with QueuingManager.stop_recording(), quantum_tape:
                     res_classical_tracers = [inner_trace.full_raise(t) for t in wfun.call_wrapped()]
-
+                #breakpoint()
+            #breakpoint()
             explicit_return_tys = collapse(out_sig.out_type(), res_classical_tracers)
             hybridRegion = HybridOpRegion(inner_trace, quantum_tape, [], explicit_return_tys)
             regions.append(hybridRegion)
             in_sigs.append(in_sig)
             out_sigs.append(out_sig)
-
+        breakpoint()
         _assert_cond_result_structure([s.out_tree() for s in out_sigs])
         _assert_cond_result_types([[t[0] for t in s.out_type()] for s in out_sigs])
         out_tree = out_sigs[-1].out_tree()
@@ -751,9 +756,10 @@ class CondCallable:
         return self.otherwise_fn()
 
     def __call__(self):
-        mode, ctx = EvaluationContext.get_evaluation_mode()
+        mode = EvaluationContext.get_evaluation_mode()
+        ctx = jax.core.trace_ctx
         if mode == EvaluationMode.QUANTUM_COMPILATION:
-            return self._call_with_quantum_ctx(ctx)
+            return self._call_with_quantum_ctx()
         elif mode == EvaluationMode.CLASSICAL_COMPILATION:
             return self._call_with_classical_ctx(ctx)
         else:
@@ -1221,6 +1227,7 @@ class Cond(HybridOp):
                 nimplouts.append(len(out_type) - len(region.res_classical_tracers) - 1)
 
         qreg = qrp.actualize()
+        breakpoint()
         all_jaxprs, _, _, all_consts = unify_convert_result_types(ctx, jaxprs, consts, nimplouts)
         branch_jaxprs = jaxpr_pad_consts(all_jaxprs)
 
