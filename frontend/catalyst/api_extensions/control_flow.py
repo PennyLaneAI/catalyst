@@ -32,6 +32,7 @@ from pennylane.tape import QuantumTape
 
 from catalyst.jax_extras import (
     ClosedJaxpr,
+    DynamicJaxprTrace,
     DynamicJaxprTracer,
     ShapedArray,
     _input_type_to_tracers,
@@ -672,7 +673,11 @@ class CondCallable:
             )
             assert len(in_sig.in_type) == 0
             with EvaluationContext.frame_tracing_context() as inner_trace:
+            #inner_trace = DynamicJaxprTrace(None)
+            #breakpoint()
+            #with jax.core.set_current_trace(inner_trace):
                 with QueuingManager.stop_recording(), quantum_tape:
+                    #breakpoint()
                     #res_classical_tracers = [inner_trace.full_raise(t) for t in wfun.call_wrapped()]
                     res_classical_tracers = [inner_trace.to_jaxpr_tracer(t) for t in wfun.call_wrapped()]
             explicit_return_tys = collapse(out_sig.out_type(), res_classical_tracers)
@@ -680,6 +685,7 @@ class CondCallable:
             regions.append(hybridRegion)
             in_sigs.append(in_sig)
             out_sigs.append(out_sig)
+            #breakpoint()
         _assert_cond_result_structure([s.out_tree() for s in out_sigs])
         _assert_cond_result_types([[t[0] for t in s.out_type()] for s in out_sigs])
         out_tree = out_sigs[-1].out_tree()
