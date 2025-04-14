@@ -75,7 +75,7 @@ jobs:
           enableCrossOsArchive: True
 
       - name: Clone LLVM Submodule
-        if: steps.cache-llvm-source.outputs.cache-hit != 'true'
+        # if: steps.cache-llvm-source.outputs.cache-hit != 'true'
         uses: actions/checkout@v4
         with:
           repository: llvm/llvm-project
@@ -83,7 +83,7 @@ jobs:
           path: ${{ github.workspace }}/mlir/llvm-project
 
       - name: Clone MHLO Submodule
-        if: steps.cache-mhlo-source.outputs.cache-hit != 'true'
+        # if: steps.cache-mhlo-source.outputs.cache-hit != 'true'
         uses: actions/checkout@v4
         with:
           repository: tensorflow/mlir-hlo
@@ -91,7 +91,7 @@ jobs:
           path: ${{ github.workspace }}/mlir/mlir-hlo
           
       - name: Clone Enzyme Submodule
-        if: steps.cache-enzyme-source.outputs.cache-hit != 'true'
+        # if: steps.cache-enzyme-source.outputs.cache-hit != 'true'
         uses: actions/checkout@v4
         with:
           repository: EnzymeAD/Enzyme
@@ -416,7 +416,7 @@ jobs:
 
     - name: Download Standalone Plugin Wheel Artifact
       # Run only on Thursday at the given time
-      if: github.event.schedule == '35 4 * * 4'
+      # if: github.event.schedule == '35 4 * * 4'
       uses: actions/download-artifact@v4
       with:
         name: standalone-plugin-manylinux_2_28_arm_64-wheel-py-${{ matrix.python_version }}.zip
@@ -446,6 +446,6 @@ jobs:
 
     - name: Install Standalone Plugin
       # Run only on Thursday at the given time (TODO: set comparison to == before merging)
-      if: github.event.schedule == '35 4 * * 4'
+      # if: github.event.schedule == '35 4 * * 4'
       run: |
         python${{ matrix.python_version }} -m pip install standalone_plugin_wheel/wheel/*.whl --no-deps
