@@ -28,7 +28,9 @@
   ```
 
   Here, the Hadamard gate pairs which are consecutive across two iterations are eliminated,
-  leaving behind only two unpaired Hadamard gates, from the first and last iteration.
+  leaving behind only two unpaired Hadamard gates, from the first and last iteration, without unrolling the for loop.
+  For more details on loop-boundary optimization, see the
+  [PennyLane Compilation entry](https://pennylane.ai/compilation/loop-boundary-optimization).
 
 * A new intermediate representation and compilation framework has been added to Catalyst to describe 
   and manipulate programs in the Pauli product measurement (PPM) representation. As part of this framework, 
@@ -96,7 +98,7 @@
   >>> f(3)
   (Array([0, 1, 2, 3, 4, 5, 6, 7], dtype=int64),
   Array([0, 0, 3, 2, 3, 1, 1, 0], dtype=int64))
-  >>> f(10)
+  >>> f(4)
   (Array([ 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15],      dtype=int64),
   Array([0, 0, 1, 1, 2, 0, 0, 0, 0, 0, 1, 1, 2, 1, 0, 1], dtype=int64))
   ```
@@ -211,8 +213,8 @@
   @qjit(experimental_capture=True)
   def func(r1, r2):
 
-      @qml.transforms.single_qubit_fusion
       @qml.transforms.cancel_inverses
+      @qml.transforms.single_qubit_fusion
       @qml.qnode(dev)
       def circuit(r1, r2):
           qml.Rot(*r1, wires=0)
@@ -237,10 +239,6 @@
 
 <h3>Improvements 🛠</h3>
 
-* The `merge-rotations` peephole optimization pass has been extended to also merge compatible rotation 
-  gates (either both controlled, or both uncontrolled) where rotation angles are any combination of 
-  static constants or dynamic values.
-  [(#1489)](https://github.com/PennyLaneAI/catalyst/pull/1489)
 
 * Several changes have been made to reduce compile time:
   * MLIR's verifier has been turned off.
@@ -255,7 +253,8 @@
   * Speed up how tracers are overwritten for hybrid ops.
     [(#1622)](https://github.com/PennyLaneAI/catalyst/pull/1622)
 
-* Catalyst now decomposes non-differentiable gates when differentiating through workflows.
+* Catalyst now decomposes non-differentiable gates when differentiating through workflows. Additionally, with `diff_method=parameter-shift`,
+  circuits are now verified to be fully compatible with Catalyst's parameter-shift implementation before compilation.
   [(#1562)](https://github.com/PennyLaneAI/catalyst/pull/1562)
   [(#1568)](https://github.com/PennyLaneAI/catalyst/pull/1568)
   [(#1569)](https://github.com/PennyLaneAI/catalyst/pull/1569)
@@ -287,74 +286,8 @@
     llvm.func @__catalyst__rt__finalize()
     llvm.func @__catalyst__rt__initialize(!llvm.ptr)
     llvm.func @_mlir_memref_to_llvm_alloc(i64) -> !llvm.ptr
-    llvm.func @jit_f(%arg0: !llvm.ptr, %arg1: !llvm.ptr, %arg2: i64) -> !llvm.struct<(ptr, ptr, i64)> attributes {llvm.copy_memref, llvm.emit_c_interface} {
-      %0 = llvm.mlir.constant(0 : index) : i64
-      %1 = llvm.mlir.constant(64 : index) : i64
-      %2 = llvm.mlir.constant(1 : index) : i64
-      %3 = llvm.mlir.constant(3735928559 : index) : i64
-      %4 = llvm.load %arg1 : !llvm.ptr -> i64
-      %5 = llvm.mul %4, %4 : i64
-      %6 = llvm.mlir.zero : !llvm.ptr
-      %7 = llvm.getelementptr %6[1] : (!llvm.ptr) -> !llvm.ptr, i64
-      %8 = llvm.ptrtoint %7 : !llvm.ptr to i64
-      %9 = llvm.add %8, %1 : i64
-      %10 = llvm.call @_mlir_memref_to_llvm_alloc(%9) : (i64) -> !llvm.ptr
-      %11 = llvm.ptrtoint %10 : !llvm.ptr to i64
-      %12 = llvm.sub %1, %2 : i64
-      %13 = llvm.add %11, %12 : i64
-      %14 = llvm.urem %13, %1  : i64
-      %15 = llvm.sub %13, %14 : i64
-      %16 = llvm.inttoptr %15 : i64 to !llvm.ptr
-      %17 = llvm.mlir.undef : !llvm.struct<(ptr, ptr, i64)>
-      %18 = llvm.insertvalue %10, %17[0] : !llvm.struct<(ptr, ptr, i64)> 
-      %19 = llvm.insertvalue %16, %18[1] : !llvm.struct<(ptr, ptr, i64)> 
-      %20 = llvm.insertvalue %0, %19[2] : !llvm.struct<(ptr, ptr, i64)> 
-      llvm.store %5, %16 : i64, !llvm.ptr
-      %21 = llvm.ptrtoint %10 : !llvm.ptr to i64
-      %22 = llvm.icmp "eq" %3, %21 : i64
-      llvm.cond_br %22, ^bb1, ^bb2
-    ^bb1:  // pred: ^bb0
-      %23 = llvm.mlir.zero : !llvm.ptr
-      %24 = llvm.getelementptr %23[1] : (!llvm.ptr) -> !llvm.ptr, i64
-      %25 = llvm.ptrtoint %24 : !llvm.ptr to i64
-      %26 = llvm.call @_mlir_memref_to_llvm_alloc(%25) : (i64) -> !llvm.ptr
-      %27 = llvm.mlir.undef : !llvm.struct<(ptr, ptr, i64)>
-      %28 = llvm.insertvalue %26, %27[0] : !llvm.struct<(ptr, ptr, i64)> 
-      %29 = llvm.insertvalue %26, %28[1] : !llvm.struct<(ptr, ptr, i64)> 
-      %30 = llvm.insertvalue %0, %29[2] : !llvm.struct<(ptr, ptr, i64)> 
-      %31 = llvm.mlir.zero : !llvm.ptr
-      %32 = llvm.getelementptr %31[1] : (!llvm.ptr) -> !llvm.ptr, i64
-      %33 = llvm.ptrtoint %32 : !llvm.ptr to i64
-      %34 = llvm.mul %33, %2 : i64
-      "llvm.intr.memcpy"(%26, %16, %34) <{isVolatile = false}> : (!llvm.ptr, !llvm.ptr, i64) -> ()
-      llvm.br ^bb3(%30 : !llvm.struct<(ptr, ptr, i64)>)
-    ^bb2:  // pred: ^bb0
-      llvm.br ^bb3(%20 : !llvm.struct<(ptr, ptr, i64)>)
-    ^bb3(%35: !llvm.struct<(ptr, ptr, i64)>):  // 2 preds: ^bb1, ^bb2
-      llvm.br ^bb4
-    ^bb4:  // pred: ^bb3
-      llvm.return %35 : !llvm.struct<(ptr, ptr, i64)>
-    }
-    llvm.func @_catalyst_pyface_jit_f(%arg0: !llvm.ptr, %arg1: !llvm.ptr) {
-      %0 = llvm.load %arg1 : !llvm.ptr -> !llvm.struct<(ptr, ptr)>
-      %1 = llvm.extractvalue %0[0] : !llvm.struct<(ptr, ptr)> 
-      llvm.call @_catalyst_ciface_jit_f(%arg0, %1) : (!llvm.ptr, !llvm.ptr) -> ()
-      llvm.return
-    }
-    llvm.func @_catalyst_ciface_jit_f(%arg0: !llvm.ptr, %arg1: !llvm.ptr) attributes {llvm.copy_memref, llvm.emit_c_interface} {
-      %0 = llvm.load %arg1 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64)>
-      %1 = llvm.extractvalue %0[0] : !llvm.struct<(ptr, ptr, i64)> 
-      %2 = llvm.extractvalue %0[1] : !llvm.struct<(ptr, ptr, i64)> 
-      %3 = llvm.extractvalue %0[2] : !llvm.struct<(ptr, ptr, i64)> 
-      %4 = llvm.call @jit_f(%1, %2, %3) : (!llvm.ptr, !llvm.ptr, i64) -> !llvm.struct<(ptr, ptr, i64)>
-      llvm.store %4, %arg0 : !llvm.struct<(ptr, ptr, i64)>, !llvm.ptr
-      llvm.return
-    }
-    llvm.func @setup() {
-      %0 = llvm.mlir.zero : !llvm.ptr
-      llvm.call @__catalyst__rt__initialize(%0) : (!llvm.ptr) -> ()
-      llvm.return
-    }
+    llvm.func @jit_f(%arg0: !llvm.ptr, %arg1: !llvm.ptr, %arg2: i64) -> !llvm.struct<(ptr, ptr, i64)> attributes {llvm.copy_memref, llvm.emit_c_interface} 
+    ...
     llvm.func @teardown() {
       llvm.call @__catalyst__rt__finalize() : () -> ()
       llvm.return
@@ -365,14 +298,6 @@
 * The error messages that indicate invalid `scale_factors` in `catalyst.mitigate_with_zne` have been
   improved to be formatted properly.
   [(#1603)](https://github.com/PennyLaneAI/catalyst/pull/1603)
-
-<h3>Breaking changes 💔</h3>
-
-🦗... 🦗... 🦗...
-
-<h3>Deprecations 👋</h3>
-
-🦗... 🦗... 🦗...
 
 <h3>Bug fixes 🐛</h3>
 
@@ -484,7 +409,7 @@
 
 * Reverted `StaticCustomOp` in favour of adding helper functions `isStatic()`, `getStaticParams()`
   to the `CustomOp` which preserves the same functionality. More specifically, this reverts
-  [#1387] and [#1396], modifies [#1484].
+  [#1387] and [#1396], modifies [#1489].
   [(#1558)](https://github.com/PennyLaneAI/catalyst/pull/1558)
   [(#1555)](https://github.com/PennyLaneAI/catalyst/pull/1555)
 
