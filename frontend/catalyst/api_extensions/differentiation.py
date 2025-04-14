@@ -667,7 +667,7 @@ class GradCallable(CatalystCallable):
 
                     # It always returns list as required by catalyst control-flows
                     results = value_and_grad_p.bind(
-                        *input_data_flat, jaxpr=jaxpr, fn=fn, grad_params=grad_params
+                        *input_data_flat, *jaxpr.consts, jaxpr=jaxpr, fn=fn, grad_params=grad_params
                     )
 
                     # value_and_grad returns two results: the values and the gradients,
@@ -686,7 +686,7 @@ class GradCallable(CatalystCallable):
 
                     # It always returns list as required by catalyst control-flows
                     results = grad_p.bind(
-                        *input_data_flat, jaxpr=jaxpr, fn=fn, grad_params=grad_params
+                        *input_data_flat, *jaxpr.consts, jaxpr=jaxpr, fn=fn, grad_params=grad_params
                     )
 
                     # grad returns only the gradients,

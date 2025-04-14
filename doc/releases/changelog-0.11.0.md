@@ -223,6 +223,7 @@
 
 * Added `qjit.mlir_opt` property to access the optimized MLIR representation of a compiled function.
   [(#1579)](https://github.com/PennyLaneAI/catalyst/pull/1579)
+  [(#1637)](https://github.com/PennyLaneAI/catalyst/pull/1637)
 
 * Improve error message for ZNE.
   [(#1603)](https://github.com/PennyLaneAI/catalyst/pull/1603)
@@ -267,6 +268,9 @@
 * Fixes an issue ([(#896)](https://github.com/PennyLaneAI/catalyst/issues/896)) where using
   pytrees inside a loop with autograph causes falling back to python.
   [(#1601)](https://github.com/PennyLaneAI/catalyst/pull/1601)
+
+* Closure variables are now supported with `grad` and `value_and_grad`.
+  [(#1613)](https://github.com/PennyLaneAI/catalyst/pull/1613)
 
 <h3>Internal changes ⚙️</h3>
 
