@@ -378,7 +378,7 @@ jobs:
 
 
   test-wheels:
-    needs: [constants, catalyst-linux-wheels-x86-64, determine_runner]
+    needs: [constants, catalyst-linux-wheels-arm-64, determine_runner]
     strategy:
       fail-fast: false
       matrix:
