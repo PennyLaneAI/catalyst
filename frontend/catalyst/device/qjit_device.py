@@ -183,8 +183,8 @@ def extract_backend_info(
         shots = get_device_shots(device) or 0
         device_kwargs["shots"] = shots
 
-    if hasattr(device, "track_resources"):
-        device_kwargs["track_resources"] = device.track_resources
+    if hasattr(device, "_track_resources"):
+        device_kwargs["track_resources"] = device._track_resources
 
     if dname == "braket.local.qubit":  # pragma: no cover
         device_kwargs["device_type"] = dname

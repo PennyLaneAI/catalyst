@@ -55,12 +55,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
             track_resources_ = device_kwargs["track_resources"] == "True";
         }
     }
-    ~NullQubit()
-    {
-        if (this->track_resources_) {
-            PrintResourceUsage();
-        }
-    } // LCOV_EXCL_LINE
+    ~NullQubit() {} // LCOV_EXCL_LINE
 
     NullQubit &operator=(const NullQubit &) = delete;
     NullQubit(const NullQubit &) = delete;
@@ -72,16 +67,25 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      */
     void PrintResourceUsage()
     {
-        std::cout << RESOURCE_PRINT_DELIMETER << std::endl;
-        std::cout << "{" << std::endl;
-        std::cout << "  \"num_qubits\": " << resource_data_["num_qubits"] << ",\n";
-        std::cout << "  \"num_gates\": " << resource_data_["num_gates"] << ",\n";
-        std::cout << "  \"gate_types\": ";
+        // Store the 2 special variables and clear them from the map to make
+        // pretty-printing easier
+        const size_t num_qubits = resource_data_["num_qubits"];
+        const size_t num_gates = resource_data_["num_gates"];
         resource_data_.erase("num_gates");
         resource_data_.erase("num_qubits");
+
+        std::cout << RESOURCE_PRINT_DELIMETER << std::endl;
+        std::cout << "{" << std::endl;
+        std::cout << "  \"num_qubits\": " << num_qubits << ",\n";
+        std::cout << "  \"num_gates\": " << num_gates << ",\n";
+        std::cout << "  \"gate_types\": ";
         pretty_print(resource_data_, 2);
         std::cout << "\n}" << std::endl;
         std::cout << RESOURCE_PRINT_DELIMETER << std::endl;
+
+        // Restore 2 special variables
+        resource_data_["num_qubits"] = num_qubits;
+        resource_data_["num_gates"] = num_gates;
     }
 
     /**
@@ -134,6 +138,10 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     {
         num_qubits_ = 0;
         this->qubit_manager.ReleaseAll();
+        if (this->track_resources_) {
+            PrintResourceUsage();
+            this->resource_data_.clear();
+        }
     }
 
     /**
