@@ -1726,7 +1726,6 @@ def _cond_lowering(
                     *(a for a in flat_args_plus_consts),  # fn expects [a1], [a2], [a3] format
                     dim_var_values=jax_ctx.dim_var_values,
                 )
-                #breakpoint()
                 YieldOp([o for o in out[0]])
 
             # else block
@@ -1828,13 +1827,13 @@ def _while_loop_lowering(
         cond_args = [cond_block.arguments[i] for i in range(len(loop_carry_types))]
 
         # recursively generate the mlir for the while cond
-        ((pred,),), _ = mlir.jaxpr_subcomp(
+        (pred,), _ = mlir.jaxpr_subcomp(
             cond_ctx.module_context,
             cond_jaxpr.jaxpr,
             cond_ctx.name_stack,
             mlir.TokenSet(),
             [mlir.ir_constants(c) for c in cond_jaxpr.consts],
-            *([a] for a in (cond_consts + cond_args)),  # fn expects [a1], [a2], [a3] format
+            *(a for a in (cond_consts + cond_args)),  # fn expects [a1], [a2], [a3] format
             dim_var_values=jax_ctx.dim_var_values,
         )
 
@@ -1854,11 +1853,11 @@ def _while_loop_lowering(
             body_ctx.name_stack,
             mlir.TokenSet(),
             [mlir.ir_constants(c) for c in cond_jaxpr.consts],
-            *([a] for a in (body_consts + body_args)),  # fn expects [a1], [a2], [a3] format
+            *(a for a in (body_consts + body_args)),  # fn expects [a1], [a2], [a3] format
             dim_var_values=jax_ctx.dim_var_values,
         )
 
-        YieldOp([o[0] for o in out])
+        YieldOp([o for o in out])
 
     return while_op_scf.results
 
@@ -1983,7 +1982,7 @@ def _for_loop_lowering(
         implicit_args = body_args[1 : nimplicit + 1]
         explicit_args = body_args[nimplicit + 1 :]
         loop_params = (*consts, *implicit_args, loop_iter, *explicit_args)
-        body_args = [[param] for param in loop_params]
+        body_args = [param for param in loop_params]
 
         # Recursively generate the mlir for the loop body
         out, _ = mlir.jaxpr_subcomp(
@@ -1996,7 +1995,7 @@ def _for_loop_lowering(
             dim_var_values=jax_ctx.dim_var_values,
         )
 
-        YieldOp([o[0] for o in out])
+        YieldOp([o for o in out])
 
     return for_op_scf.results
 

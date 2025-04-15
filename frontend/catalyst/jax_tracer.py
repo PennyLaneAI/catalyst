@@ -238,7 +238,6 @@ def retrace_with_result_types(jaxpr: ClosedJaxpr, target_types: List[ShapedArray
 
 
 def _apply_result_type_conversion(
-    ctx,
     jaxpr: ClosedJaxpr,
     consts: List[Any],
     target_types: List[ShapedArray],
@@ -249,7 +248,6 @@ def _apply_result_type_conversion(
     one quantum register as an argument.
 
     Args:
-        ctx: Jax tracing context object.
         jaxpr: The Jaxpr program to apply the conversion to.
         consts: List of constant values we need to know to trace this program.
         target_types: List of types we want to convert the outputs of the program to. The list must
@@ -278,7 +276,7 @@ def _apply_result_type_conversion(
         )
 
     expanded_tracers, in_sig, out_sig = trace_function(
-        ctx, _fun, *args, expansion_strategy=cond_expansion_strategy()
+        _fun, *args, expansion_strategy=cond_expansion_strategy()
     )
 
     return expanded_tracers, in_sig, out_sig
@@ -308,7 +306,7 @@ def _promote_jaxpr_types(types: List[List[Any]]) -> List[Any]:
 
 
 @debug_logger
-def unify_convert_result_types(ctx, jaxprs, consts, nimplouts):
+def unify_convert_result_types(jaxprs, consts, nimplouts):
     """Unify result types of the jaxpr programs given.
     Args:
         jaxprs (list of ClosedJaxpr): Source Jaxpr programs. The program results must have
@@ -331,7 +329,7 @@ def unify_convert_result_types(ctx, jaxprs, consts, nimplouts):
     jaxpr_acc, type_acc, tracers_acc, consts_acc = [], [], [], []
     for j, a, num_implicit_outputs in zip(jaxprs, consts, nimplouts):
         tracers, _, out_sig = _apply_result_type_conversion(
-            ctx, j, a, promoted_types, num_implicit_outputs
+            j, a, promoted_types, num_implicit_outputs
         )
         jaxpr_acc.append(out_sig.out_initial_jaxpr())
         type_acc.append(out_sig.out_type())
@@ -1133,7 +1131,7 @@ def trace_post_processing(ctx, trace, post_processing: Callable, pp_args):
 
 @debug_logger
 def trace_function(
-    ctx, fun: Callable, *args, expansion_strategy: ExpansionStrategy, **kwargs
+    fun: Callable, *args, expansion_strategy: ExpansionStrategy, **kwargs
 ) -> Tuple[List[Any], InputSignature, OutputSignature]:
     """Trace classical Python function containing no quantum computations. Arguments and results of
     the function are allowed to contain dynamic dimensions. Depending on the expansion strategy, the
@@ -1142,7 +1140,6 @@ def trace_function(
     `jax_extras.make_jaxpr2`.
 
     Args:
-        ctx: Jax tracing context helper.
         fun: Callable python function.
         expansion_strategy: dynamic dimension expansion options.
         *args: Sample positional arguments of the function.

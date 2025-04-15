@@ -901,9 +901,11 @@ class ForLoopCallable:
             )
         return self._operation
 
-    def _call_with_quantum_ctx(self, ctx, *init_state):
+    def _call_with_quantum_ctx(self, *init_state):
         quantum_tape = QuantumTape()
-        outer_trace = ctx.trace
+        #outer_trace = ctx.trace
+        with jax.core.take_current_trace() as cur_trace:
+            outer_trace = cur_trace
         aux_classical_tracers = [
             outer_trace.to_jaxpr_tracer(t) for t in [self.lower_bound, self.upper_bound, self.step]
         ]
@@ -953,14 +955,13 @@ class ForLoopCallable:
         )
         return tree_unflatten(out_tree, collapse(out_type, out_expanded_classical_tracers))
 
-    def _call_with_classical_ctx(self, ctx, *init_state):
+    def _call_with_classical_ctx(self, *init_state):
         outer_trace = find_top_trace([self.lower_bound, self.upper_bound, self.step])
         aux_tracers = [
             outer_trace.to_jaxpr_tracer(t) for t in [self.lower_bound, self.upper_bound, self.step]
         ]
 
         _, in_sig, out_sig = trace_function(
-            ctx,
             self.body_fn,
             *(aux_tracers[0], *init_state),
             expansion_strategy=self.expansion_strategy,
@@ -998,9 +999,9 @@ class ForLoopCallable:
     def __call__(self, *init_state):
         mode = EvaluationContext.get_evaluation_mode()
         if mode == EvaluationMode.QUANTUM_COMPILATION:
-            return self._call_with_quantum_ctx(ctx, *init_state)
+            return self._call_with_quantum_ctx(*init_state)
         elif mode == EvaluationMode.CLASSICAL_COMPILATION:
-            return self._call_with_classical_ctx(ctx, *init_state)
+            return self._call_with_classical_ctx(*init_state)
         else:
             assert mode == EvaluationMode.INTERPRETATION, f"Unsupported evaluation mode {mode}"
             return self._call_during_interpretation(*init_state)
@@ -1071,8 +1072,9 @@ class WhileLoopCallable:
             )
         return self._operation
 
-    def _call_with_quantum_ctx(self, ctx, *init_state):
-        outer_trace = ctx.trace
+    def _call_with_quantum_ctx(self, *init_state):
+        with jax.core.take_current_trace() as cur_trace:
+            outer_trace = cur_trace
 
         cond_wffa, _, cond_out_sig = deduce_signatures(
             self.cond_fn, init_state, {}, self.expansion_strategy
@@ -1141,12 +1143,12 @@ class WhileLoopCallable:
         )
         return tree_unflatten(out_tree, collapse(out_type, out_expanded_classical_tracers))
 
-    def _call_with_classical_ctx(self, ctx, *init_state):
+    def _call_with_classical_ctx(self, *init_state):
         _, _, out_cond_sig = trace_function(
-            ctx, self.cond_fn, *init_state, expansion_strategy=self.expansion_strategy
+            self.cond_fn, *init_state, expansion_strategy=self.expansion_strategy
         )
         _, in_body_sig, out_body_sig = trace_function(
-            ctx, self.body_fn, *init_state, expansion_strategy=self.expansion_strategy
+            self.body_fn, *init_state, expansion_strategy=self.expansion_strategy
         )
 
         _check_single_bool_value(out_cond_sig.out_tree(), out_cond_sig.out_jaxpr().out_avals)
@@ -1179,11 +1181,11 @@ class WhileLoopCallable:
         return fn_res
 
     def __call__(self, *init_state):
-        mode, ctx = EvaluationContext.get_evaluation_mode()
+        mode = EvaluationContext.get_evaluation_mode()
         if mode == EvaluationMode.QUANTUM_COMPILATION:
-            return self._call_with_quantum_ctx(ctx, *init_state)
+            return self._call_with_quantum_ctx(*init_state)
         elif mode == EvaluationMode.CLASSICAL_COMPILATION:
-            return self._call_with_classical_ctx(ctx, *init_state)
+            return self._call_with_classical_ctx(*init_state)
         else:
             assert mode == EvaluationMode.INTERPRETATION, f"Unsupported evaluation mode {mode}"
             return self._call_during_interpretation(*init_state)
