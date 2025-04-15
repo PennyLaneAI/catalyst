@@ -36,7 +36,6 @@ from pennylane.measurements import (
     ExpectationMP,
     MeasurementProcess,
     ProbabilityMP,
-    SampleMP,
     StateMP,
     VarianceMP,
 )
