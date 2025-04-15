@@ -50,8 +50,10 @@
 
 #ifdef USE_XLA_LIB
 #include "xla/service/custom_call_status.h"
+#include "xla/ffi/api/c_api.h"
 #else
 typedef struct XlaCustomCallStatus_ XlaCustomCallStatus;
+#include "xla/ffi/api/ffi.h"
 #endif
 
 // Underlying function pointers (e.g., Trsm<double>::Fn) are initialized either
