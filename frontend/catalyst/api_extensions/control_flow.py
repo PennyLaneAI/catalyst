@@ -660,6 +660,7 @@ class CondCallable:
         #outer_trace = ctx.trace
         with jax.core.take_current_trace() as cur_trace:
             outer_trace = cur_trace
+        #breakpoint()
         in_classical_tracers = self.preds
         regions: List[HybridOpRegion] = []
 

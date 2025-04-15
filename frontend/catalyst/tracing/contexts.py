@@ -232,6 +232,9 @@ class EvaluationContext:
                 new_trace = DynamicJaxprTrace(parent_trace.frame.debug_info)
                 #new_trace.frame = parent_trace.frame
                 print("created new trace ", id(new_trace))
+                # for t in parent_trace.frame.tracers:
+                #     new_trace.new_arg(t)
+                #breakpoint()
                 #print("came from parent ", parent_trace.frame.eqns)
 
             # add invars from parent for closure variables
@@ -244,8 +247,8 @@ class EvaluationContext:
                     yield new_trace
                 finally:
                     #breakpoint()
-                    #print("exiting new trace ", id(new_trace))
-                    #print("new trace contents ", new_trace.frame.eqns)
+                    print("  exiting new trace ", id(new_trace))
+                    print("  new trace contents ", new_trace.frame.eqns)
                     #breakpoint()
                     #new_trace.frame.reset_states()
                     #del new_trace
