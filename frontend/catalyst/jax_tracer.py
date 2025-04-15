@@ -1174,8 +1174,10 @@ def apply_transform(
             msg = "Multiple tapes are generated, but each run might produce different results."
             raise CompileError(msg)
         tracing_mode = TracingMode.TRANSFORM
-    elif is_measurement_changed(tape, tapes[0]):
-        if has_classical_outputs:
+    elif len(qnode_program) or is_measurement_changed(tape, tapes[0]):
+        # TODO: Ideally we should allow qnode transforms that don't modify the measurements to
+        # operate in the permissive tracing mode, but that currently leads to a small number of
+        # test failures due to the different result format produced in trace_quantum_function.
             msg = "Transforms that modify MeasurementProcesses are not supported with non-MeasurementProcess QNode outputs."
             raise CompileError(msg)
         tracing_mode = TracingMode.TRANSFORM
@@ -1342,13 +1344,7 @@ def trace_quantum_function(
 
         # (2) - Quantum tracing
         transformed_results = []
-
         with EvaluationContext.frame_tracing_context(ctx, trace):
-            # Determine if we're using transformed measurements based on tracing mode
-
-            if len(qnode_program) > 0:
-                tracing_mode = TracingMode.TRANSFORM
-
             for tape in tapes:
                 # Set up quantum register for the current tape.
                 # We just need to ensure there is a tape cut in between each.
