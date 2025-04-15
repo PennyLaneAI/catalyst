@@ -35,6 +35,11 @@ export PATH=/catalyst/llvm-build/bin:/opt/_internal/cpython-${PYTHON_MAJOR_MINOR
 /usr/bin/python3 -m pip install oqc-qcaas-client
 
 # Install Catalyst wheel
+# TODO: --- remove workaround before merging to main ----------------- #
+pip install git+https://github.com/PennyLaneAI/pennylane@v0.41.0-rc0
+pip install --extra-index-url=https://test.pypi.org/simple/ PennyLane-Lightning==0.41.0
+pip install --extra-index-url=https://test.pypi.org/simple/ PennyLane-Lightning-Kokkos==0.41.0
+# -------------------------------------------------------------------- #
 /usr/bin/python3 -m pip install /catalyst/dist/*.whl --extra-index-url https://test.pypi.org/simple
 
 # Test Catalyst
