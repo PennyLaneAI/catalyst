@@ -36,8 +36,6 @@ from jax import numpy as jnp
 from numpy.testing import assert_allclose
 from pennylane import numpy as pnp
 
-from catalyst import measure
-
 try:
     from pennylane import qcut
 except:  # pylint: disable=bare-except
@@ -46,6 +44,11 @@ except:  # pylint: disable=bare-except
 from pennylane.transforms import merge_rotations
 
 from catalyst import measure, qjit
+from catalyst.device import QJITDevice
+from catalyst.device.decomposition import (
+    measurements_from_counts,
+    measurements_from_samples,
+)
 from catalyst.utils.exceptions import CompileError
 
 # pylint: disable=too-many-lines,line-too-long
@@ -1091,7 +1094,68 @@ class TestQFuncTransforms:
 class TestTransformValidity:
     """Test validity of transforms."""
 
-    def test_return_classical_value(self, backend):
+    @pytest.mark.parametrize("transform", (measurements_from_counts, measurements_from_samples))
+    def test_invalid_modify_measurements_classical_return(self, backend, transform, monkeypatch):
+        """Test verification for transforms that are non-batching but modify tape measurements
+        while returning classical values."""
+
+        def inject_device_transforms(self, ctx, execution_config=None):
+            program, config = original_preprocess(self, ctx, execution_config)
+
+            program.add_transform(transform, self.wires)
+
+            return program, config
+
+        # Simulate a Qrack-like device that requires meassurement process transforms.
+        # Qnode transforms raise this error anyway so we cannot use them directly.
+        original_preprocess = QJITDevice.preprocess
+        monkeypatch.setattr(QJITDevice, "preprocess", inject_device_transforms)
+
+        dev = qml.device(backend, wires=2, shots=5)
+
+        @partial(transform, device_wires=dev.wires)
+        @qml.qnode(dev)
+        def qfunc():
+            qml.X(0)
+            measurements = [measure(i) for i in range(2)]
+            return measurements, qml.expval(qml.PauliZ(0))
+
+        with pytest.raises(
+            CompileError,
+            match="Transforming MeasurementProcesses is unsupported with non-MeasurementProcess",
+        ):
+            qjit(qfunc)
+
+    @pytest.mark.parametrize("transform", (measurements_from_counts, measurements_from_samples))
+    def test_valid_modify_measurements_no_measurements(self, backend, transform, monkeypatch):
+        """Test verification for transforms that are non-batching and in-principle can modify tape
+        measurements but don't, while returning classical values."""
+
+        def inject_device_transforms(self, ctx, execution_config=None):
+            program, config = original_preprocess(self, ctx, execution_config)
+
+            program.add_transform(transform, self.wires)
+
+            return program, config
+
+        # Simulate a Qrack-like device that requires meassurement process transforms.
+        # Qnode transforms raise this error anyway so we cannot use them directly.
+        original_preprocess = QJITDevice.preprocess
+        monkeypatch.setattr(QJITDevice, "preprocess", inject_device_transforms)
+
+        dev = qml.device(backend, wires=2)
+
+        @qjit
+        @qml.qnode(dev)
+        def qfunc():
+            qml.X(0)
+            measurements = [measure(i) for i in range(2)]
+            return measurements
+
+        m1, m2 = qfunc()
+        assert m1 == True and m2 == False
+
+    def test_invalid_batch_return_classical_value(self, backend):
         """Test that there's an error raised if the users uses a transform and returns
         a classical value."""
 
