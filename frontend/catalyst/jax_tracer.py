@@ -19,10 +19,9 @@ This module contains functions tracing and lowering JAX code to MLIR.
 import itertools
 import logging
 import weakref
-from collections.abc import Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
-from enum import Enum, auto
+from enum import Enum
 from functools import partial, reduce
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
@@ -905,11 +904,6 @@ def pauli_word_to_tensor_obs(obs, qrp: QRegPromise) -> List[DynamicJaxprTracer]:
     return tensorobs_p.bind(*nested_obs)
 
 
-def identity_qnode_transform(tape: QuantumTape) -> (Sequence[QuantumTape], Callable):
-    """Identity transform"""
-    return [tape], lambda res: res[0]
-
-
 # pylint: disable=too-many-statements,too-many-branches
 @debug_logger
 def trace_quantum_measurements(
@@ -1066,39 +1060,17 @@ def trace_quantum_measurements(
 
 
 @debug_logger
-def has_valid_measurement_outputs(flat_results):
-    """Checks if the quantum function outputs are valid for transformations.
-
-    Valid outputs for transformations must be either:
-    1. A single measurement process
-    2. A non-empty sequence of measurement processes
-
-    Args:
-        flat_results: Flat list of function results
+def has_classical_outputs(flat_results):
+    """Checks if the quantum function outputs classical values.
 
     Returns:
-        bool: True if outputs are valid for transformations, False otherwise
+        bool
     """
-    # Can transforms be applied?
-    # Since transforms are a PL feature and PL does not support the same things as
-    # Catalyst, transforms may have invariants that rely on PL invariants.
-    # For example:
-    #   * mid-circuit measurements (for batch-transforms)
-    #   * that the output will be only a sequence of `MeasurementProcess`es.
-    class_tracers, meas_tracers = split_tracers_and_measurements(flat_results)
+    for result in flat_results:
+        if not isinstance(result, MeasurementProcess):
+            return True
 
-    def is_measurement(op):
-        """Only to avoid 100 character per line limit."""
-        return isinstance(op, MeasurementProcess)
-
-    has_mixed_classical_quantum_results = class_tracers and meas_tracers
-    is_out_measurements = map(is_measurement, meas_tracers)
-    is_all_out_measurements = all(is_out_measurements) and not has_mixed_classical_quantum_results
-    is_out_measurement_sequence = is_all_out_measurements and isinstance(meas_tracers, Sequence)
-    is_out_single_measurement = is_all_out_measurements and is_measurement(meas_tracers)
-    is_valid_output = is_out_measurement_sequence or is_out_single_measurement
-
-    return is_valid_output
+    return False
 
 
 @debug_logger
@@ -1143,13 +1115,13 @@ def is_measurement_changed(original_tape, modified_tape):
 
 
 @debug_logger
-def apply_transform(
+def apply_transforms(
     qnode_program,
     device_program,
     tape,
     flat_results,
 ):
-    """Apply transform."""
+    """Apply device and qnode transform programs."""
     # Some transforms use trainability as a basis for transforming.
     # See batch_params
     params = tape.get_parameters(trainable_only=False)
@@ -1159,18 +1131,12 @@ def apply_transform(
         msg = "Catalyst does not support informative transforms."
         raise CompileError(msg)
 
-    # Apply the identity transform (only device_program) in order to keep generalization
-    total_program = qnode_program + device_program if qnode_program else device_program
-
     # Apply the transform
+    total_program = qnode_program + device_program
     tapes, post_processing = total_program([tape])
 
-    has_classical_outputs = not has_valid_measurement_outputs(flat_results)
-    has_midcircuit_measurements = has_midcircuit_measurement(tape)
-
-    tracing_mode = TracingMode.DEFAULT
     if len(tapes) > 1:
-        if has_classical_outputs or has_midcircuit_measurements:
+        if has_classical_outputs(flat_results) or has_midcircuit_measurement(tape):
             msg = "Multiple tapes are generated, but each run might produce different results."
             raise CompileError(msg)
         tracing_mode = TracingMode.TRANSFORM
@@ -1178,6 +1144,7 @@ def apply_transform(
         # TODO: Ideally we should allow qnode transforms that don't modify the measurements to
         # operate in the permissive tracing mode, but that currently leads to a small number of
         # test failures due to the different result format produced in trace_quantum_function.
+        if has_classical_outputs(flat_results):
             msg = "Transforms that modify MeasurementProcesses are not supported with non-MeasurementProcess QNode outputs."
             raise CompileError(msg)
         tracing_mode = TracingMode.TRANSFORM
@@ -1335,7 +1302,7 @@ def trace_quantum_function(
 
             qnode_program = qnode.transform_program if qnode else TransformProgram()
 
-            tapes, post_processing, tracing_mode = apply_transform(
+            tapes, post_processing, tracing_mode = apply_transforms(
                 qnode_program,
                 device_program,
                 quantum_tape,

@@ -26,7 +26,6 @@ which correspond to QNode transforms.
 """
 
 from functools import partial
-from typing import Callable, Sequence
 
 import jax
 import numpy as np
@@ -38,7 +37,6 @@ from numpy.testing import assert_allclose
 from pennylane import numpy as pnp
 
 from catalyst import measure
-from catalyst.jax_tracer import has_valid_measurement_outputs
 
 try:
     from pennylane import qcut
@@ -1182,19 +1180,18 @@ class TestTransformValidity:
     def test_informative_transform(self, backend):
         """Informative transforms are not supported!"""
 
-        def _id(tape: qml.tape.QuantumTape) -> (Sequence[qml.tape.QuantumTape], Callable):
+        # Just fake that it is informative
+        @partial(qml.transforms.core.transform, is_informative=True)
+        def id_transform(tape):
             return [tape], lambda res: res[0]
 
-        # Just fake that it is informative
-        id_transform = qml.transforms.core.transform(_id, is_informative=True)
+        @id_transform
+        @qml.qnode(qml.device(backend, wires=1))
+        def f():
+            return qml.state()
 
         with pytest.raises(CompileError, match="Catalyst does not support informative transforms."):
-
-            @qjit
-            @id_transform
-            @qml.qnode(qml.device(backend, wires=1))
-            def f():
-                return qml.state()
+            qjit(f)
 
 
 @pytest.mark.xfail(reason="Fails due to use of numpy arrays in transform")
@@ -1524,47 +1521,3 @@ def test_unitary_to_rot(backend):
     _, expected_shape = jax.tree_util.tree_flatten(expected)
     _, observed_shape = jax.tree_util.tree_flatten(observed)
     assert expected_shape == observed_shape
-
-
-class TestHasValidMeasurementOutputs:
-    """Tests for the has_valid_measurement_outputs function."""
-
-    def test_single_measurement(self):
-        """Test with a single measurement process."""
-        # Create a measurement process
-        measurement = qml.measurements.ExpectationMP(qml.PauliZ(0))
-
-        # Test with a single measurement
-        assert has_valid_measurement_outputs([measurement])
-
-    def test_multiple_measurements(self):
-        """Test with multiple measurement processes."""
-        # Create measurement processes
-        m1 = qml.measurements.ExpectationMP(qml.PauliZ(0))
-        m2 = qml.measurements.ExpectationMP(qml.PauliX(1))
-
-        # Test with a list of measurements
-        assert has_valid_measurement_outputs([m1, m2])
-
-    def test_mixed_outputs(self):
-        """Test with mixed classical and quantum results."""
-        # Create a measurement process and a classical value
-        measurement = qml.measurements.ExpectationMP(qml.PauliZ(0))
-        classical = 0.5
-
-        # Test with mixed outputs (should return False)
-        assert not has_valid_measurement_outputs([measurement, classical])
-
-    def test_only_classical(self):
-        """Test with only classical outputs."""
-        # Create classical values
-        classical1 = 0.5
-        classical2 = 0.1
-
-        # Test with only classical outputs (should return False)
-        assert has_valid_measurement_outputs([classical1, classical2])
-
-    def test_empty_list(self):
-        """Test with an empty list."""
-        # Test with empty list (should return False)
-        assert has_valid_measurement_outputs([])
