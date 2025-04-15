@@ -64,7 +64,7 @@ from catalyst.jax_tracer import (
 from catalyst.tracing.contexts import (
     EvaluationContext,
     EvaluationMode,
-    JaxTracingContext,
+    #JaxTracingContext,
 )
 
 
@@ -906,7 +906,7 @@ class ForLoopCallable:
             )
         return self._operation
 
-    def _call_with_quantum_ctx(self, ctx: JaxTracingContext, *init_state):
+    def _call_with_quantum_ctx(self, ctx, *init_state):
         quantum_tape = QuantumTape()
         outer_trace = ctx.trace
         aux_classical_tracers = [
@@ -1076,7 +1076,7 @@ class WhileLoopCallable:
             )
         return self._operation
 
-    def _call_with_quantum_ctx(self, ctx: JaxTracingContext, *init_state):
+    def _call_with_quantum_ctx(self, ctx, *init_state):
         outer_trace = ctx.trace
 
         cond_wffa, _, cond_out_sig = deduce_signatures(

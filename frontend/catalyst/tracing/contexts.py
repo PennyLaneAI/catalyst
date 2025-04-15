@@ -31,7 +31,7 @@ from jax._src.interpreters.partial_eval import (
     #extend_jaxpr_stack,
 )
 from jax._src.source_info_util import reset_name_stack
-from jax.core import find_top_trace, trace_ctx, take_current_trace, set_current_trace, TraceTag
+from jax.core import find_top_trace, take_current_trace, set_current_trace
 from pennylane.queuing import QueuingManager
 
 #from catalyst.jax_extras import new_dynamic_main2
@@ -143,28 +143,28 @@ class EvaluationMode(Enum):
     CLASSICAL_COMPILATION = 2
 
 
-@dataclass
-class JaxTracingContext:
-    """JAX tracing context supporting nested quantum operations. Keeps track of the re-entrable
-    tracing frames. The tracing algorithm visits these frames several times: first during the
-    classical tracing, then during the quantum tracing and also during the optional transformations.
+# @dataclass
+# class JaxTracingContext:
+#     """JAX tracing context supporting nested quantum operations. Keeps track of the re-entrable
+#     tracing frames. The tracing algorithm visits these frames several times: first during the
+#     classical tracing, then during the quantum tracing and also during the optional transformations.
 
-    Args:
-        main: Base JAX tracing data structure.
-        frames: JAX tracing frames; holding the JAXPR equations.
-        mains: Secondary JAX tracing structrures. Each structure has one frame and
-               corresponds to a :class:`~.jax_tracer.HybridOpRegion`
-        trace: Current JAX trace object.
-    """
+#     Args:
+#         main: Base JAX tracing data structure.
+#         frames: JAX tracing frames; holding the JAXPR equations.
+#         mains: Secondary JAX tracing structrures. Each structure has one frame and
+#                corresponds to a :class:`~.jax_tracer.HybridOpRegion`
+#         trace: Current JAX trace object.
+#     """
 
-    main: DynamicJaxprTrace #JaxMainTrace
-    frames: Dict[DynamicJaxprTrace, JaxprStackFrame]
-    mains: Dict[DynamicJaxprTrace, DynamicJaxprTrace]#JaxMainTrace]
-    trace: Optional[DynamicJaxprTrace]
+#     main: DynamicJaxprTrace #JaxMainTrace
+#     frames: Dict[DynamicJaxprTrace, JaxprStackFrame]
+#     mains: Dict[DynamicJaxprTrace, DynamicJaxprTrace]#JaxMainTrace]
+#     trace: Optional[DynamicJaxprTrace]
 
-    @debug_logger_init
-    def __init__(self, main: DynamicJaxprTrace):#JaxMainTrace):
-        self.main, self.frames, self.mains, self.trace = main, {}, {}, None
+#     @debug_logger_init
+#     def __init__(self, main: DynamicJaxprTrace):#JaxMainTrace):
+#         self.main, self.frames, self.mains, self.trace = main, {}, {}, None
 
 
 class EvaluationContext:
@@ -184,7 +184,7 @@ class EvaluationContext:
             mode: Evaluation mode of this instance
         """
         self.mode = mode
-        self.ctx = None
+        self._ctx = None
 
     @classmethod
     def add_plugin(cls, plugin: Path):
@@ -202,16 +202,16 @@ class EvaluationContext:
 
     @classmethod
     @contextmanager
-    def _create_tracing_context(cls, mode) -> ContextManager[JaxTracingContext]:
+    def _create_tracing_context(cls, mode):
         cls._mode_stack.append(mode)
         try:
-            yield trace_ctx
+            yield
         finally:
             cls._mode_stack.pop()
 
     @classmethod
     @contextmanager
-    def _create_interpretation_context(cls) -> ContextManager[JaxTracingContext]:
+    def _create_interpretation_context(cls):
         cls._mode_stack.append(EvaluationMode.INTERPRETATION)
         try:
             yield None
@@ -221,8 +221,7 @@ class EvaluationContext:
     @classmethod
     @contextmanager
     def frame_tracing_context(
-        cls, trace: Optional[DynamicJaxprTrace] = None,
-        create_ancestor_tag = True
+        cls, trace: Optional[DynamicJaxprTrace] = None
     ) -> ContextManager[DynamicJaxprTrace]:
         """Start a new JAX tracing frame, e.g. to trace a region of some
         :class:`~.jax_tracer.HybridOp`. Not applicable in non-tracing evaluation modes."""
@@ -231,53 +230,20 @@ class EvaluationContext:
                 new_trace = trace
             else:
                 new_trace = DynamicJaxprTrace(parent_trace.frame.debug_info)
-                # if create_ancestor_tag:
-                #     try:
-                #         new_trace.tag = parent_trace.tag
-                #     except AttributeError:
-                #         new_trace.tag = TraceTag()
-                # else:
-                #     new_trace.tag = parent_trace.tag
-                #new_trace.frame = parent_trace.frame
-                print("created new trace ", id(new_trace))
-                # for t in parent_trace.frame.tracers:
-                #     new_trace.new_arg(t)
-                #breakpoint()
-                #print("came from parent ", parent_trace.frame.eqns)
+                #print("created new trace ", id(new_trace))
 
-            # add invars from parent for closure variables
-            #new_trace.frame.invars.extend(parent_trace.frame.invars)
-            #new_trace.frame.tracer_to_var |= parent_trace.frame.tracer_to_var
-            #new_trace.frame.tracers.extend(parent_trace.frame.tracers)
-            #breakpoint()
         with set_current_trace(new_trace):
             try:
                 yield new_trace
             finally:
-                #breakpoint()
-                print("  exiting new trace ", id(new_trace))
-                print("  new trace contents ", new_trace.frame.eqns)
-                #breakpoint()
-                #new_trace.frame.reset_states()
-                #del new_trace
-                #pass
-                # for t in new_trace.frame.tracers:
-                #     if id(t) in map(id, parent_trace.frame.tracers):
-                #         del t
-                # for t, v in new_trace.frame.tracer_to_var.items():
-                #     if id(t) in map(id, parent_trace.frame.tracer_to_var.keys()):
-                #         del t, v
-                # for i in new_trace.frame.invars:
-                #     if id(i) in map(id, parent_trace.frame.invars):
-                #         del i
-
-                #new_trace = parent_trace
-                #new_trace.frame.invars.extend(parent_trace.frame.invars)
+                pass
+                #print("  exiting new trace ", id(new_trace))
+                #print("  new trace contents ", new_trace.frame.eqns)
 
 
     @classmethod
-    def get_main_tracing_context(cls, hint=None) -> JaxTracingContext:
-        """Return the current JAX tracing context, raise an exception if not in tracing mode."""
+    def get_current_trace(cls, hint=None):
+        """Return the current JAX trace, raise an exception if not in tracing mode."""
         msg = f"{hint or 'catalyst functions'} can only be used from within @qjit decorated code."
         EvaluationContext.check_is_tracing(msg)
         with take_current_trace() as parent_trace:
@@ -285,17 +251,17 @@ class EvaluationContext:
 
     def __enter__(self):
         if self.mode in [EvaluationMode.QUANTUM_COMPILATION, EvaluationMode.CLASSICAL_COMPILATION]:
-            self.ctx = self._create_tracing_context(self.mode)
+            self._ctx = self._create_tracing_context(self.mode)
         else:
             assert self.mode in {EvaluationMode.INTERPRETATION}, f"Unknown mode {self.mode}"
-            self.ctx = self._create_interpretation_context()
-        return self.ctx.__enter__()
+            self._ctx = self._create_interpretation_context()
+        return self._ctx.__enter__()
 
     def __exit__(self, *args, **kwargs):
-        self.ctx.__exit__(*args, **kwargs)
+        self._ctx.__exit__(*args, **kwargs)
 
     @classmethod
-    def get_evaluation_mode(cls) -> Tuple[EvaluationMode, Optional[JaxTracingContext]]:
+    def get_evaluation_mode(cls) -> EvaluationMode:
         """Return the name of the evaluation mode, paired with tracing context if applicable"""
         if not EvaluationContext._mode_stack:
             return EvaluationMode.INTERPRETATION

@@ -101,7 +101,7 @@ from catalyst.logging import debug_logger, debug_logger_init
 from catalyst.tracing.contexts import (
     EvaluationContext,
     EvaluationMode,
-    JaxTracingContext,
+    #JaxTracingContext,
 )
 from catalyst.utils.exceptions import CompileError
 
@@ -238,7 +238,7 @@ def retrace_with_result_types(jaxpr: ClosedJaxpr, target_types: List[ShapedArray
 
 
 def _apply_result_type_conversion(
-    ctx: JaxTracingContext,
+    ctx,
     jaxpr: ClosedJaxpr,
     consts: List[Any],
     target_types: List[ShapedArray],
@@ -464,7 +464,7 @@ class HybridOp(Operator):
     @debug_logger
     def bind_overwrite_classical_tracers(
         self,
-        ctx: JaxTracingContext,
+        ctx,
         trace: DynamicJaxprTrace,
         in_expanded_tracers,
         out_expanded_tracers,
@@ -501,7 +501,7 @@ class HybridOp(Operator):
     @debug_logger
     def trace_quantum(
         self,
-        ctx: JaxTracingContext,
+        ctx,
         device: QubitDevice,
         trace: DynamicJaxprTrace,
         qrp: QRegPromise,
@@ -626,7 +626,7 @@ def trace_quantum_operations(
     quantum_tape: QuantumTape,
     device: QubitDevice,
     qreg: DynamicJaxprTracer,
-    ctx: JaxTracingContext,
+    ctx,
     trace: DynamicJaxprTrace,
     mcm_config: qml.devices.MCMConfig = qml.devices.MCMConfig(),
 ) -> QRegPromise:
@@ -1133,7 +1133,7 @@ def trace_post_processing(ctx, trace, post_processing: Callable, pp_args):
 
 @debug_logger
 def trace_function(
-    ctx: JaxTracingContext, fun: Callable, *args, expansion_strategy: ExpansionStrategy, **kwargs
+    ctx, fun: Callable, *args, expansion_strategy: ExpansionStrategy, **kwargs
 ) -> Tuple[List[Any], InputSignature, OutputSignature]:
     """Trace classical Python function containing no quantum computations. Arguments and results of
     the function are allowed to contain dynamic dimensions. Depending on the expansion strategy, the
