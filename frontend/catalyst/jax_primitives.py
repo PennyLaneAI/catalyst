@@ -1745,17 +1745,17 @@ def _cond_lowering(
             if_ctx = jax_ctx.replace(name_stack=jax_ctx.name_stack.extend("if"))
             with ir.InsertionPoint(if_block):
                 # recursively generate the mlir for the if block
-                out = mlir.jaxpr_subcomp(
+                (out, _) = mlir.jaxpr_subcomp(
                     if_ctx.module_context,
                     true_jaxpr.jaxpr,
                     if_ctx.name_stack,
                     mlir.TokenSet(),
                     [mlir.ir_constants(c) for c in true_jaxpr.consts],
-                    *([a] for a in flat_args_plus_consts),  # fn expects [a1], [a2], [a3] format
+                    *flat_args_plus_consts,  # fn expects [a1], [a2], [a3] format
                     dim_var_values=jax_ctx.dim_var_values,
                 )
 
-                YieldOp([o[0] for o in out[0]])
+                YieldOp(out)
 
             # else block
             source_info_util.extend_name_stack("else")
@@ -1765,17 +1765,17 @@ def _cond_lowering(
                 # Base case: reached the otherwise block
                 otherwise_jaxpr = branch_jaxprs[-1]
                 with ir.InsertionPoint(else_block):
-                    out = mlir.jaxpr_subcomp(
+                    (out, _) = mlir.jaxpr_subcomp(
                         else_ctx.module_context,
                         otherwise_jaxpr.jaxpr,
                         else_ctx.name_stack,
                         mlir.TokenSet(),
                         [mlir.ir_constants(c) for c in otherwise_jaxpr.consts],
-                        *([a] for a in flat_args_plus_consts),
+                        *flat_args_plus_consts,
                         dim_var_values=jax_ctx.dim_var_values,
                     )
 
-                    YieldOp([o[0] for o in out[0]])
+                    YieldOp(out)
             else:
                 with ir.InsertionPoint(else_block) as else_ip:
                     child_if_op = emit_branches(preds[1:], branch_jaxprs[1:], else_ip)
@@ -1854,15 +1854,16 @@ def _while_loop_lowering(
     cond_ctx = jax_ctx.replace(name_stack=name_stack.extend("cond"))
     with ir.InsertionPoint(cond_block):
         cond_args = [cond_block.arguments[i] for i in range(len(loop_carry_types))]
+        params = cond_consts + cond_args
 
         # recursively generate the mlir for the while cond
-        ((pred,),), _ = mlir.jaxpr_subcomp(
+        ((pred,), _) = mlir.jaxpr_subcomp(
             cond_ctx.module_context,
             cond_jaxpr.jaxpr,
             cond_ctx.name_stack,
             mlir.TokenSet(),
             [mlir.ir_constants(c) for c in cond_jaxpr.consts],
-            *([a] for a in (cond_consts + cond_args)),  # fn expects [a1], [a2], [a3] format
+            *params,
             dim_var_values=jax_ctx.dim_var_values,
         )
 
@@ -1874,6 +1875,7 @@ def _while_loop_lowering(
     body_ctx = jax_ctx.replace(name_stack=name_stack.extend("body"))
     with ir.InsertionPoint(body_block):
         body_args = [body_block.arguments[i] for i in range(len(loop_carry_types))]
+        params = body_consts + body_args
 
         # recursively generate the mlir for the while body
         out, _ = mlir.jaxpr_subcomp(
@@ -1882,11 +1884,11 @@ def _while_loop_lowering(
             body_ctx.name_stack,
             mlir.TokenSet(),
             [mlir.ir_constants(c) for c in cond_jaxpr.consts],
-            *([a] for a in (body_consts + body_args)),  # fn expects [a1], [a2], [a3] format
+            *params,
             dim_var_values=jax_ctx.dim_var_values,
         )
 
-        YieldOp([o[0] for o in out])
+        YieldOp(out)
 
     return while_op_scf.results
 
@@ -2011,7 +2013,6 @@ def _for_loop_lowering(
         implicit_args = body_args[1 : nimplicit + 1]
         explicit_args = body_args[nimplicit + 1 :]
         loop_params = (*consts, *implicit_args, loop_iter, *explicit_args)
-        body_args = [[param] for param in loop_params]
 
         # Recursively generate the mlir for the loop body
         out, _ = mlir.jaxpr_subcomp(
@@ -2020,11 +2021,11 @@ def _for_loop_lowering(
             body_ctx.name_stack,
             mlir.TokenSet(),
             [mlir.ir_constants(c) for c in body_jaxpr.consts],
-            *body_args,
+            *loop_params,
             dim_var_values=jax_ctx.dim_var_values,
         )
 
-        YieldOp([o[0] for o in out])
+        YieldOp(out)
 
     return for_op_scf.results
 
@@ -2150,11 +2151,11 @@ def _adjoint_lowering(
             jax_ctx.name_stack.extend("adjoint"),
             mlir.TokenSet(),
             [mlir.ir_constants(c) for c in jaxpr.consts],
-            *([a] for a in chain(consts, cargs, adjoint_block.arguments)),  # [3]
+            *list(chain(consts, cargs, adjoint_block.arguments)),
             dim_var_values=jax_ctx.dim_var_values,
         )
 
-        QYieldOp([a[0] for a in out[-1:]])
+        QYieldOp([out[-1]])
 
     return op.results
 
