@@ -657,10 +657,8 @@ class CondCallable:
         return False
 
     def _call_with_quantum_ctx(self):
-        #outer_trace = ctx.trace
         with jax.core.take_current_trace() as cur_trace:
             outer_trace = cur_trace
-        #breakpoint()
         in_classical_tracers = self.preds
         regions: List[HybridOpRegion] = []
 
@@ -674,7 +672,6 @@ class CondCallable:
             )
             assert len(in_sig.in_type) == 0
             with EvaluationContext.frame_tracing_context() as inner_trace:
-            #with jax.core.set_current_trace(inner_trace):
                 with QueuingManager.stop_recording(), quantum_tape:
                     res_classical_tracers = [inner_trace.to_jaxpr_tracer(t) for t in wfun.call_wrapped()]
             explicit_return_tys = collapse(out_sig.out_type(), res_classical_tracers)
@@ -682,7 +679,6 @@ class CondCallable:
             regions.append(hybridRegion)
             in_sigs.append(in_sig)
             out_sigs.append(out_sig)
-            #breakpoint()
         _assert_cond_result_structure([s.out_tree() for s in out_sigs])
         _assert_cond_result_types([[t[0] for t in s.out_type()] for s in out_sigs])
         out_tree = out_sigs[-1].out_tree()
@@ -692,7 +688,7 @@ class CondCallable:
         # all_jaxprs = [s.out_initial_jaxpr() for s in out_sigs]
         # all_noimplouts = [s.num_implicit_outputs() for s in out_sigs]
         # _, out_type, _, all_consts = unify_convert_result_types(
-        #     ctx, all_jaxprs, all_consts, all_noimplouts
+        #     all_jaxprs, all_consts, all_noimplouts
         # )
         # Unfortunately, we can not do this beacuse some tracers (specifically, the results of
         # ``qml.measure``) might not have their source Jaxpr equation yet. Thus, we delay the
@@ -720,12 +716,12 @@ class CondCallable:
         )
         return tree_unflatten(out_tree, out_classical_tracers)
 
-    def _call_with_classical_ctx(self, ctx):
+    def _call_with_classical_ctx(self):
         in_classical_tracers = self.preds
 
         def _trace(branch_fn):
             _, in_sig, out_sig = trace_function(
-                ctx, branch_fn, *(), expansion_strategy=cond_expansion_strategy()
+                branch_fn, *(), expansion_strategy=cond_expansion_strategy()
             )
             return in_sig, out_sig
 
@@ -736,7 +732,7 @@ class CondCallable:
         all_consts = [s.out_consts() for s in out_sigs]
         all_noimplouts = [s.num_implicit_outputs() for s in out_sigs]
         all_jaxprs, _, _, all_consts = unify_convert_result_types(
-            ctx, all_jaxprs, all_consts, all_noimplouts
+            all_jaxprs, all_consts, all_noimplouts
         )
         branch_jaxprs = jaxpr_pad_consts(all_jaxprs)
         # Output types from all the branches are unified by now, we use the first branch for
@@ -756,11 +752,10 @@ class CondCallable:
 
     def __call__(self):
         mode = EvaluationContext.get_evaluation_mode()
-        ctx = jax.core.trace_ctx
         if mode == EvaluationMode.QUANTUM_COMPILATION:
             return self._call_with_quantum_ctx()
         elif mode == EvaluationMode.CLASSICAL_COMPILATION:
-            return self._call_with_classical_ctx(ctx)
+            return self._call_with_classical_ctx()
         else:
             assert mode == EvaluationMode.INTERPRETATION, f"Unsupported evaluation mode {mode}"
             return self._call_during_interpretation()
@@ -1001,7 +996,7 @@ class ForLoopCallable:
         return fn_res
 
     def __call__(self, *init_state):
-        mode, ctx = EvaluationContext.get_evaluation_mode()
+        mode = EvaluationContext.get_evaluation_mode()
         if mode == EvaluationMode.QUANTUM_COMPILATION:
             return self._call_with_quantum_ctx(ctx, *init_state)
         elif mode == EvaluationMode.CLASSICAL_COMPILATION:
@@ -1226,7 +1221,7 @@ class Cond(HybridOp):
                 nimplouts.append(len(out_type) - len(region.res_classical_tracers) - 1)
 
         qreg = qrp.actualize()
-        all_jaxprs, _, _, all_consts = unify_convert_result_types(ctx, jaxprs, consts, nimplouts)
+        all_jaxprs, _, _, all_consts = unify_convert_result_types(jaxprs, consts, nimplouts)
         branch_jaxprs = jaxpr_pad_consts(all_jaxprs)
 
         in_expanded_classical_tracers = [*self.in_classical_tracers, *sum(all_consts, []), qreg]
