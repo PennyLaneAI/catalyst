@@ -376,7 +376,7 @@ jobs:
       - name: Upload Wheel Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: catalyst-manylinux_2_28_arm_64-wheel-py-${{ matrix.python_version }}.zip
+          name: catalyst-linux_arm_64-wheel-py-${{ matrix.python_version }}.zip
           path: ${{ github.workspace }}/wheel/
           retention-days: 14
 
@@ -385,7 +385,7 @@ jobs:
         if: github.event.schedule == '35 4 * * 4'
         uses: actions/upload-artifact@v4
         with:
-          name: standalone-plugin-manylinux_2_28_arm_64-wheel-py-${{ matrix.python_version }}.zip
+          name: standalone-plugin-linux_arm_64-wheel-py-${{ matrix.python_version }}.zip
           path: ${{ github.workspace }}/standalone_plugin_wheel/dist
           retention-days: 14     
 
@@ -408,7 +408,7 @@ jobs:
     - name: Download Wheel Artifact
       uses: actions/download-artifact@v4
       with:
-        name: catalyst-manylinux_2_28_arm_64-wheel-py-${{ matrix.python_version }}.zip
+        name: catalyst-linux_arm_64-wheel-py-${{ matrix.python_version }}.zip
         path: ${{ github.workspace }}/dist
 
     - name: Download Standalone Plugin Wheel Artifact
@@ -416,7 +416,7 @@ jobs:
       if: github.event.schedule == '35 4 * * 4'
       uses: actions/download-artifact@v4
       with:
-        name: standalone-plugin-manylinux_2_28_arm_64-wheel-py-${{ matrix.python_version }}.zip
+        name: standalone-plugin-linux_arm_64-wheel-py-${{ matrix.python_version }}.zip
         path: ${{ github.workspace }}/standalone_plugin_wheel/wheel
 
     - name: Set up Python ${{ matrix.python_version }}
