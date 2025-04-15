@@ -222,7 +222,7 @@ def retrace_with_result_types(jaxpr: ClosedJaxpr, target_types: List[ShapedArray
         with EvaluationContext.frame_tracing_context() as trace:
             in_tracers = _input_type_to_tracers(trace.new_arg, jaxpr.in_avals)
             out_tracers = [
-                trace.full_raise(t) for t in eval_jaxpr(jaxpr.jaxpr, jaxpr.consts, *in_tracers)
+                trace.to_jaxpr_tracer(t) for t in eval_jaxpr(jaxpr.jaxpr, jaxpr.consts, *in_tracers)
             ]
             out_tracers_, target_types_ = (
                 (out_tracers[:-1], target_types[:-1]) if with_qreg else (out_tracers, target_types)
@@ -1123,8 +1123,8 @@ def trace_post_processing(ctx, trace, post_processing: Callable, pp_args):
 
         # wffa will take as an input a flatten tracers.
         # After wffa is called, then the shape becomes available in out_tree_promise.
-        in_tracers = [trace.full_raise(t) for t in tree_flatten(pp_args)[0]]
-        out_tracers = [trace.full_raise(t) for t in wffa.call_wrapped(*in_tracers)]
+        in_tracers = [trace.to_jaxpr_tracer(t) for t in tree_flatten(pp_args)[0]]
+        out_tracers = [trace.to_jaxpr_tracer(t) for t in wffa.call_wrapped(*in_tracers)]
         with jax.core.take_current_trace() as cur_trace:
             jaxpr, out_type, consts = cur_trace.frame.to_jaxpr2(out_tracers, cur_trace.frame.debug_info)
         closed_jaxpr = ClosedJaxpr(jaxpr, consts)
@@ -1159,7 +1159,7 @@ def trace_function(
 
     with EvaluationContext.frame_tracing_context() as trace:
         arg_expanded_tracers = input_type_to_tracers(
-            in_sig.in_type, trace.new_arg, trace.full_raise
+            in_sig.in_type, trace.new_arg, trace.to_jaxpr_tracer
         )
         res_expanded_tracers = wfun.call_wrapped(*arg_expanded_tracers)
 
@@ -1282,14 +1282,14 @@ def trace_quantum_function(
                 meas, meas_trees = trace_quantum_measurements(device, qrp_out, output, trees)
                 qreg_out = qrp_out.actualize()
 
-                # Check if the measurements are nested then apply the full_raise
+                # Check if the measurements are nested then apply the to_jaxpr_tracer
                 def check_full_raise(arr, func):
                     if isinstance(arr, (list, tuple)):
                         return type(arr)(check_full_raise(x, func) for x in arr)
                     else:
                         return func(arr)
 
-                meas_tracers = check_full_raise(meas, trace.full_raise)
+                meas_tracers = check_full_raise(meas, trace.to_jaxpr_tracer)
                 meas_results = tree_unflatten(meas_trees, meas_tracers)
 
                 # TODO: Allow the user to return whatever types they specify.

@@ -31,7 +31,7 @@ from jax._src.interpreters.partial_eval import (
     #extend_jaxpr_stack,
 )
 from jax._src.source_info_util import reset_name_stack
-from jax.core import find_top_trace, trace_ctx, take_current_trace, set_current_trace
+from jax.core import find_top_trace, trace_ctx, take_current_trace, set_current_trace, TraceTag
 from pennylane.queuing import QueuingManager
 
 #from catalyst.jax_extras import new_dynamic_main2
@@ -221,7 +221,8 @@ class EvaluationContext:
     @classmethod
     @contextmanager
     def frame_tracing_context(
-        cls, trace: Optional[DynamicJaxprTrace] = None
+        cls, trace: Optional[DynamicJaxprTrace] = None,
+        create_ancestor_tag = True
     ) -> ContextManager[DynamicJaxprTrace]:
         """Start a new JAX tracing frame, e.g. to trace a region of some
         :class:`~.jax_tracer.HybridOp`. Not applicable in non-tracing evaluation modes."""
@@ -230,6 +231,13 @@ class EvaluationContext:
                 new_trace = trace
             else:
                 new_trace = DynamicJaxprTrace(parent_trace.frame.debug_info)
+                # if create_ancestor_tag:
+                #     try:
+                #         new_trace.tag = parent_trace.tag
+                #     except AttributeError:
+                #         new_trace.tag = TraceTag()
+                # else:
+                #     new_trace.tag = parent_trace.tag
                 #new_trace.frame = parent_trace.frame
                 print("created new trace ", id(new_trace))
                 # for t in parent_trace.frame.tracers:
@@ -242,26 +250,29 @@ class EvaluationContext:
             #new_trace.frame.tracer_to_var |= parent_trace.frame.tracer_to_var
             #new_trace.frame.tracers.extend(parent_trace.frame.tracers)
             #breakpoint()
-            with set_current_trace(new_trace):
-                try:
-                    yield new_trace
-                finally:
-                    #breakpoint()
-                    print("  exiting new trace ", id(new_trace))
-                    print("  new trace contents ", new_trace.frame.eqns)
-                    #breakpoint()
-                    #new_trace.frame.reset_states()
-                    #del new_trace
-                    pass
-                    # for t in new_trace.frame.tracers:
-                    #     if id(t) in map(id, parent_trace.frame.tracers):
-                    #         del t
-                    # for t, v in new_trace.frame.tracer_to_var.items():
-                    #     if id(t) in map(id, parent_trace.frame.tracer_to_var.keys()):
-                    #         del t, v
+        with set_current_trace(new_trace):
+            try:
+                yield new_trace
+            finally:
+                #breakpoint()
+                print("  exiting new trace ", id(new_trace))
+                print("  new trace contents ", new_trace.frame.eqns)
+                #breakpoint()
+                #new_trace.frame.reset_states()
+                #del new_trace
+                #pass
+                # for t in new_trace.frame.tracers:
+                #     if id(t) in map(id, parent_trace.frame.tracers):
+                #         del t
+                # for t, v in new_trace.frame.tracer_to_var.items():
+                #     if id(t) in map(id, parent_trace.frame.tracer_to_var.keys()):
+                #         del t, v
+                # for i in new_trace.frame.invars:
+                #     if id(i) in map(id, parent_trace.frame.invars):
+                #         del i
 
-                    #new_trace = parent_trace
-                    #new_trace.frame.invars.extend(parent_trace.frame.invars)
+                #new_trace = parent_trace
+                #new_trace.frame.invars.extend(parent_trace.frame.invars)
 
 
     @classmethod

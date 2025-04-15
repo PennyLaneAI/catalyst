@@ -342,6 +342,7 @@ def expanded_fun(static_args, *args_expanded):
     args_collapsed = [a for a, (_, k) in zip(args_expanded, in_type) if k]
     res_flat = yield args_collapsed, {}
     num_implicit_inputs = len([() for _, k in in_type if not k])
+    #breakpoint()
     all_outs, out_sig = infer_output_type_python(
         args_expanded, res_flat, expansion_strategy, num_implicit_inputs
     )
@@ -422,8 +423,6 @@ def deduce_signatures(
     """
     flat_args, in_tree = tree_flatten((args, kwargs))
     trace: DynamicJaxprTrace = find_top_trace(flat_args)
-    #flat_tracers = [trace.full_raise(a) for a in flat_args]
-    #flat_tracers = [trace.lift(a) for a in flat_args]
     flat_tracers = [trace.to_jaxpr_tracer(a) for a in flat_args]
     in_expanded_args, in_type = expand_args(flat_tracers, expansion_strategy=expansion_strategy)
     wf = wrap_init(f)
@@ -472,6 +471,7 @@ def trace_to_jaxpr(
     """
     #breakpoint()
     jaxpr, tracers, consts = trace.frame.to_jaxpr2((*outputs, *inputs), trace.frame.debug_info)
+    #breakpoint()
     del jaxpr._outvars[len(outputs) :]
     return jaxpr, tracers, consts
 
@@ -779,14 +779,14 @@ def infer_output_type_python(
     """
 
     trace: DynamicJaxprTrace = find_top_trace(expanded_inputs)
-    outputs = [trace.full_raise(t) for t in outputs]
+    outputs = [trace.to_jaxpr_tracer(t) for t in outputs]
 
     # Calculate the constants. We need it to set InDBIdx correctly
     _, _, consts = trace_to_jaxpr(trace, expanded_inputs, outputs)
 
     # Calculate output type containing the correct De Brjuin indices
     expanded_outputs, out_type = infer_output_type(
-        [trace.full_raise(t) for t in consts],
+        [trace.to_jaxpr_tracer(t) for t in consts],
         expanded_inputs,
         outputs,
         expansion_strategy,
@@ -945,7 +945,7 @@ class DynshapePrimitive(JaxprPrimitive):
         # explicitness.
 
         trace = find_top_trace(args)
-        tracers = map(trace.full_raise, args)
+        tracers = map(trace.to_jaxpr_tracer, args)
         source_info = jax_current()
 
         in_type = infer_lambda_input_type(None, tracers)

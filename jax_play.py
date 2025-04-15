@@ -7,25 +7,27 @@ from catalyst import qjit, cond
 
 # @qjit
 # def identity(x):
-# 	return x
+#     nest = lambda : x
+#     return nest()+1
 
 # print(identity(42.0))
 # print(identity.jaxpr)
 
 
 # def subcircuit(angle):
-# 	qml.RX(angle, wires=0)
+#   qml.RX(angle, wires=0)
 
 ###########################
 
-# #@qjit
+# @qjit
 # def foo(x, N):
-# 	dev = qml.device("lightning.qubit", wires=N)
-# 	@qml.qnode(dev)
-# 	def circuit():
-# 		subcircuit(x)
-# 		return qml.probs()
-# 	return circuit()
+#   dev = qml.device("lightning.qubit", wires=N)
+#   @qml.qnode(dev)
+#   def circuit():
+#       #subcircuit(x)
+#       qml.RX(x, wires=0)
+#       return qml.probs()
+#   return circuit()
 
 # cat = qjit(foo)
 
@@ -39,11 +41,15 @@ from catalyst import qjit, cond
 def circuit(n):
     @cond(n > 4)
     def cond_fn():
-        return n**2
+        return 1
+        #qml.Hadamard(0)
+        #return n**2
 
     @cond_fn.otherwise
     def else_fn():
-        return n+1
+        return 2
+        #qml.RX(3.14, 0)
+        #return n
 
     return cond_fn()
 

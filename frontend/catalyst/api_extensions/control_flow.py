@@ -674,12 +674,8 @@ class CondCallable:
             )
             assert len(in_sig.in_type) == 0
             with EvaluationContext.frame_tracing_context() as inner_trace:
-            #inner_trace = DynamicJaxprTrace(None)
-            #breakpoint()
             #with jax.core.set_current_trace(inner_trace):
                 with QueuingManager.stop_recording(), quantum_tape:
-                    #breakpoint()
-                    #res_classical_tracers = [inner_trace.full_raise(t) for t in wfun.call_wrapped()]
                     res_classical_tracers = [inner_trace.to_jaxpr_tracer(t) for t in wfun.call_wrapped()]
             explicit_return_tys = collapse(out_sig.out_type(), res_classical_tracers)
             hybridRegion = HybridOpRegion(inner_trace, quantum_tape, [], explicit_return_tys)
@@ -914,7 +910,7 @@ class ForLoopCallable:
         quantum_tape = QuantumTape()
         outer_trace = ctx.trace
         aux_classical_tracers = [
-            outer_trace.full_raise(t) for t in [self.lower_bound, self.upper_bound, self.step]
+            outer_trace.to_jaxpr_tracer(t) for t in [self.lower_bound, self.upper_bound, self.step]
         ]
         wfun, in_sig, out_sig = deduce_signatures(
             self.body_fn,
@@ -926,11 +922,11 @@ class ForLoopCallable:
 
         with EvaluationContext.frame_tracing_context() as inner_trace:
             arg_classical_tracers = input_type_to_tracers(
-                in_type, inner_trace.new_arg, inner_trace.full_raise
+                in_type, inner_trace.new_arg, inner_trace.to_jaxpr_tracer
             )
             with QueuingManager.stop_recording(), quantum_tape:
                 res_classical_tracers = [
-                    inner_trace.full_raise(t) for t in wfun.call_wrapped(*arg_classical_tracers)
+                    inner_trace.to_jaxpr_tracer(t) for t in wfun.call_wrapped(*arg_classical_tracers)
                 ]
                 out_type = out_sig.out_type()
                 out_tree = out_sig.out_tree()
@@ -965,7 +961,7 @@ class ForLoopCallable:
     def _call_with_classical_ctx(self, ctx, *init_state):
         outer_trace = find_top_trace([self.lower_bound, self.upper_bound, self.step])
         aux_tracers = [
-            outer_trace.full_raise(t) for t in [self.lower_bound, self.upper_bound, self.step]
+            outer_trace.to_jaxpr_tracer(t) for t in [self.lower_bound, self.upper_bound, self.step]
         ]
 
         _, in_sig, out_sig = trace_function(
@@ -1094,10 +1090,10 @@ class WhileLoopCallable:
 
         with EvaluationContext.frame_tracing_context() as cond_trace:
             arg_classical_tracers = input_type_to_tracers(
-                in_type, cond_trace.new_arg, cond_trace.full_raise
+                in_type, cond_trace.new_arg, cond_trace.to_jaxpr_tracer
             )
             res_classical_tracers = [
-                cond_trace.full_raise(t) for t in cond_wffa.call_wrapped(*arg_classical_tracers)
+                cond_trace.to_jaxpr_tracer(t) for t in cond_wffa.call_wrapped(*arg_classical_tracers)
             ]
 
             out_type = cond_out_sig.out_type()
@@ -1115,13 +1111,13 @@ class WhileLoopCallable:
 
         with EvaluationContext.frame_tracing_context() as body_trace:
             arg_classical_tracers = input_type_to_tracers(
-                in_type, body_trace.new_arg, body_trace.full_raise
+                in_type, body_trace.new_arg, body_trace.to_jaxpr_tracer
             )
 
             quantum_tape = QuantumTape()
             with QueuingManager.stop_recording(), quantum_tape:
                 res_classical_tracers = [
-                    body_trace.full_raise(t) for t in body_wffa.call_wrapped(*arg_classical_tracers)
+                    body_trace.to_jaxpr_tracer(t) for t in body_wffa.call_wrapped(*arg_classical_tracers)
                 ]
 
             out_type = out_sig.out_type()
@@ -1284,7 +1280,7 @@ class ForLoop(HybridOp):
             res_tracers = res_classical_tracers + [qreg_out]
             _, _, consts = trace_to_jaxpr(inner_trace, [], res_tracers)
             res_expanded_tracers, _ = expand_results(
-                [inner_trace.full_raise(t) for t in consts],
+                [inner_trace.to_jaxpr_tracer(t) for t in consts],
                 arg_expanded_tracers,
                 res_tracers,
                 expansion_strategy=expansion_strategy,
@@ -1293,7 +1289,7 @@ class ForLoop(HybridOp):
             jaxpr, _, _ = trace_to_jaxpr(inner_trace, arg_expanded_tracers, res_expanded_tracers)
 
         operand_tracers = op.in_classical_tracers
-        const_tracers = [trace.full_raise(c) for c in consts]
+        const_tracers = [trace.to_jaxpr_tracer(c) for c in consts]
         operand_expanded_tracers, _ = expand_args(
             operand_tracers, expansion_strategy=expansion_strategy
         )
@@ -1343,7 +1339,7 @@ class WhileLoop(HybridOp):
                 cond_trace, arg_expanded_classical_tracers, res_classical_tracers
             )
             res_expanded_classical_tracers, _ = expand_results(
-                [cond_trace.full_raise(t) for t in consts],
+                [cond_trace.to_jaxpr_tracer(t) for t in consts],
                 arg_expanded_classical_tracers,
                 res_classical_tracers,
                 expansion_strategy=expansion_strategy,
@@ -1370,7 +1366,7 @@ class WhileLoop(HybridOp):
                 body_trace, arg_expanded_tracers, res_classical_tracers + [qreg_out]
             )
             res_expanded_tracers, _ = expand_results(
-                [body_trace.full_raise(t) for t in consts],
+                [body_trace.to_jaxpr_tracer(t) for t in consts],
                 arg_expanded_tracers,
                 res_classical_tracers + [qreg_out],
                 expansion_strategy=expansion_strategy,
@@ -1380,13 +1376,13 @@ class WhileLoop(HybridOp):
             )
 
         in_expanded_tracers = [
-            *[trace.full_raise(c) for c in (cond_consts + body_consts)],
+            *[trace.to_jaxpr_tracer(c) for c in (cond_consts + body_consts)],
             *expand_args(self.in_classical_tracers, expansion_strategy=expansion_strategy)[0],
             qrp.actualize(),
         ]
 
         out_expanded_classical_tracers = expand_results(
-            [trace.full_raise(c) for c in (cond_consts + body_consts)],
+            [trace.to_jaxpr_tracer(c) for c in (cond_consts + body_consts)],
             in_expanded_tracers,
             self.out_classical_tracers,
             expansion_strategy=expansion_strategy,
