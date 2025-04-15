@@ -45,87 +45,149 @@ static const mlir::StringSet<> rotationsOps = {"RX",  "RY",  "RZ",  "PhaseShift"
 static const mlir::StringSet<> commuteOps = {"CNOT", "RZ", "PauliX"};
 
 namespace {
+
+bool isInvalidCommutativeOp(CustomOp op)
+{
+    // Not currently supported that a gate has adjoint or control qubits as a commutative gate
+    return !commuteOps.contains(op.getGateName()) || op.getAdjoint() ||
+           !op.getInCtrlQubits().empty();
+}
+
+// Get the parent of a gate that acting on a specific qubit of the current gate
+CustomOp getParentOfGate(CustomOp op, StringRef parentGateName, size_t qubitIndex)
+{
+    ValueRange inQubits = op.getInQubits();
+    if (auto defOp = llvm::dyn_cast_or_null<CustomOp>(inQubits[qubitIndex].getDefiningOp());
+        defOp && defOp.getGateName() == parentGateName) {
+        return defOp;
+    }
+    return nullptr;
+}
+
+// Check if (RZ(θ) ⊗ I) * CNOT pattern applies and get the RZ op
+CustomOp getCommutativeParentOfRZ_CNOT(CustomOp op)
+{
+    if (op.getGateName() != "CNOT") {
+        return nullptr;
+    }
+    // Check if the first input qubit is defined by an RZ gate
+    // And check the op and its parent are valid commutative ops
+    if (auto parent = getParentOfGate(op, "RZ", 0);
+        parent && !isInvalidCommutativeOp(parent) && !isInvalidCommutativeOp(op)) {
+        return parent;
+    }
+    return nullptr;
+}
+
+// Check if (I ⊗ PauliX) * CNOT pattern applies and get the PauliX op
+CustomOp getCommutativeParentOfPauliX_CNOT(CustomOp op)
+{
+    if (op.getGateName() != "CNOT") {
+        return nullptr;
+    }
+    // Check if the second input qubit is defined by a PauliX gate
+    // And check the op and its parent are valid commutative ops
+    if (auto parent = getParentOfGate(op, "PauliX", 1);
+        parent && !isInvalidCommutativeOp(parent) && !isInvalidCommutativeOp(op)) {
+        return parent;
+    }
+    return nullptr;
+}
+
+// Check if (I ⊗ PauliX) * RZ(θ) pattern applies and get the PauliX op
+CustomOp getCommutativeParentOfPauliX_RZ(CustomOp op)
+{
+    if (op.getGateName() != "RZ") {
+        return nullptr;
+    }
+    // Check if the first input qubit is defined by a PauliX gate
+    // And check the op and its parent are valid commutative ops
+    if (auto parent = getParentOfGate(op, "PauliX", 0);
+        parent && !isInvalidCommutativeOp(parent) && !isInvalidCommutativeOp(op)) {
+        return parent;
+    }
+    return nullptr;
+}
+
 // Pattern for quantum gate commutation
 struct GateCommutationPattern : public mlir::OpRewritePattern<CustomOp> {
     using OpRewritePattern<CustomOp>::OpRewritePattern;
+
+  private:
+    // Rewrite (RZ(θ) ⊗ I) * CNOT to CNOT * (RZ(θ) ⊗ I)
+    void rewriteRZ_CNOT(CustomOp op, CustomOp defOp, mlir::PatternRewriter &rewriter) const
+    {
+        ValueRange inQubits = op.getInQubits();
+        auto newCnotOp = rewriter.create<CustomOp>(
+            op.getLoc(), op.getOutQubits().getTypes(), op.getOutCtrlQubits().getTypes(),
+            op.getParams(), ValueRange({defOp.getInQubits()[0], inQubits[1]}), op.getGateName(),
+            nullptr, op.getInCtrlQubits(), op.getInCtrlValues());
+
+        auto newRzOp = rewriter.create<CustomOp>(
+            defOp.getLoc(), defOp.getOutQubits().getTypes(), defOp.getOutCtrlQubits().getTypes(),
+            defOp.getParams(), ValueRange({newCnotOp.getOutQubits()[0]}), defOp.getGateName(),
+            nullptr, defOp.getInCtrlQubits(), defOp.getInCtrlValues());
+
+        rewriter.replaceOp(op, {newRzOp.getOutQubits()[0], newCnotOp.getOutQubits()[1]});
+        rewriter.eraseOp(defOp);
+    }
+
+    // Rewrite (I ⊗ PauliX) * CNOT to CNOT * (I ⊗ PauliX)
+    void rewritePauliX_CNOT(CustomOp op, CustomOp defOp, mlir::PatternRewriter &rewriter) const
+    {
+        ValueRange inQubits = op.getInQubits();
+        auto newCnotOp = rewriter.create<CustomOp>(
+            op.getLoc(), op.getOutQubits().getTypes(), op.getOutCtrlQubits().getTypes(),
+            op.getParams(), ValueRange({inQubits[0], defOp.getInQubits()[0]}), op.getGateName(),
+            nullptr, op.getInCtrlQubits(), op.getInCtrlValues());
+
+        auto newPauliXOp = rewriter.create<CustomOp>(
+            defOp.getLoc(), defOp.getOutQubits().getTypes(), defOp.getOutCtrlQubits().getTypes(),
+            defOp.getParams(), ValueRange({newCnotOp.getOutQubits()[1]}), defOp.getGateName(),
+            nullptr, defOp.getInCtrlQubits(), defOp.getInCtrlValues());
+
+        rewriter.replaceOp(op, {newCnotOp.getOutQubits()[0], newPauliXOp.getOutQubits()[0]});
+        rewriter.eraseOp(defOp);
+    }
+
+    // Rewrite PauliX * RZ(θ) to RZ(-θ) * PauliX
+    void rewritePauliX_RZ(CustomOp op, CustomOp defOp, mlir::PatternRewriter &rewriter) const
+    {
+        auto params = op.getParams();
+        SmallVector<Value> paramsNeg;
+        for (auto param : params) {
+            auto paramNeg = rewriter.create<mlir::arith::NegFOp>(op.getLoc(), param);
+            paramsNeg.push_back(paramNeg);
+        }
+
+        auto newRzOp = rewriter.create<CustomOp>(op.getLoc(), op.getOutQubits().getTypes(),
+                                                 op.getOutCtrlQubits().getTypes(), paramsNeg,
+                                                 defOp.getInQubits(), op.getGateName(), nullptr,
+                                                 op.getInCtrlQubits(), op.getInCtrlValues());
+
+        auto newPauliXOp = rewriter.create<CustomOp>(
+            defOp.getLoc(), defOp.getOutQubits().getTypes(), defOp.getOutCtrlQubits().getTypes(),
+            defOp.getParams(), newRzOp.getOutQubits(), defOp.getGateName(), nullptr,
+            defOp.getInCtrlQubits(), defOp.getInCtrlValues());
+
+        rewriter.replaceOp(op, newPauliXOp.getOutQubits());
+        rewriter.eraseOp(defOp);
+    }
+
+  public:
     mlir::LogicalResult matchAndRewrite(CustomOp op, mlir::PatternRewriter &rewriter) const override
     {
-        // Gate must not be adjoint, must have empty control qubits,
-        // and must be in the set of commuting ops for this pattern.
-        if (op.getAdjoint() || !op.getInCtrlQubits().empty() ||
-            !commuteOps.contains(op.getGateName())) {
-            return failure();
+        if (auto parent = getCommutativeParentOfRZ_CNOT(op)) {
+            rewriteRZ_CNOT(op, parent, rewriter);
+            return success();
         }
-
-        auto name = op.getGateName();
-        if (name == "CNOT") {
-            ValueRange inQubits = op.getInQubits();
-            // RZ commutes with CNOT
-            // (RZ(θ) ⊗ I) * CNOT = CNOT * (RZ(θ) ⊗ I)
-            if (auto defOp = llvm::dyn_cast_or_null<CustomOp>(inQubits[0].getDefiningOp());
-                defOp && defOp.getGateName() == "RZ") {
-                auto newCnotOp = rewriter.create<CustomOp>(
-                    op.getLoc(), op.getOutQubits().getTypes(), op.getOutCtrlQubits().getTypes(),
-                    op.getParams(), ValueRange({defOp.getInQubits()[0], inQubits[1]}), name,
-                    nullptr, op.getInCtrlQubits(), op.getInCtrlValues());
-
-                auto newRzOp = rewriter.create<CustomOp>(
-                    defOp.getLoc(), defOp.getOutQubits().getTypes(),
-                    defOp.getOutCtrlQubits().getTypes(), defOp.getParams(),
-                    ValueRange({newCnotOp.getOutQubits()[0]}), defOp.getGateName(), nullptr,
-                    defOp.getInCtrlQubits(), defOp.getInCtrlValues());
-
-                rewriter.replaceOp(op, {newRzOp.getOutQubits()[0], newCnotOp.getOutQubits()[1]});
-                rewriter.eraseOp(defOp);
-                return success();
-            }
-            // PauliX commutes with CNOT
-            // (I ⊗ PauliX) * CNOT = CNOT * (I ⊗ PauliX)
-            else if (auto defOp = llvm::dyn_cast_or_null<CustomOp>(inQubits[1].getDefiningOp());
-                     defOp && defOp.getGateName() == "PauliX") {
-                auto newCnotOp = rewriter.create<CustomOp>(
-                    op.getLoc(), op.getOutQubits().getTypes(), op.getOutCtrlQubits().getTypes(),
-                    op.getParams(), ValueRange({inQubits[0], defOp.getInQubits()[0]}), name,
-                    nullptr, op.getInCtrlQubits(), op.getInCtrlValues());
-
-                auto newPauliXOp = rewriter.create<CustomOp>(
-                    defOp.getLoc(), defOp.getOutQubits().getTypes(),
-                    defOp.getOutCtrlQubits().getTypes(), defOp.getParams(),
-                    ValueRange({newCnotOp.getOutQubits()[1]}), defOp.getGateName(), nullptr,
-                    defOp.getInCtrlQubits(), defOp.getInCtrlValues());
-
-                rewriter.replaceOp(op, {newCnotOp.getOutQubits()[0], newPauliXOp.getOutQubits()[0]});
-                rewriter.eraseOp(defOp);
-                return success();
-            }
+        if (auto parent = getCommutativeParentOfPauliX_CNOT(op)) {
+            rewritePauliX_CNOT(op, parent, rewriter);
+            return success();
         }
-        else if (name == "RZ") {
-            // PauliX commutes with RZ
-            // PauliX * RZ(θ) = RZ(-θ) * PauliX
-            ValueRange inQubits = op.getInQubits();
-            if (auto defOp = llvm::dyn_cast_or_null<CustomOp>(inQubits[0].getDefiningOp());
-                defOp && defOp.getGateName() == "PauliX") {
-                auto params = op.getParams();
-                SmallVector<Value> paramsNeg;
-                for (auto param : params) {
-                    auto paramNeg = rewriter.create<mlir::arith::NegFOp>(op.getLoc(), param);
-                    paramsNeg.push_back(paramNeg);
-                }
-
-                auto newRzOp = rewriter.create<CustomOp>(
-                    op.getLoc(), op.getOutQubits().getTypes(), op.getOutCtrlQubits().getTypes(),
-                    paramsNeg, defOp.getInQubits(), name, nullptr, op.getInCtrlQubits(),
-                    op.getInCtrlValues());
-
-                auto newPauliXOp = rewriter.create<CustomOp>(
-                    defOp.getLoc(), defOp.getOutQubits().getTypes(),
-                    defOp.getOutCtrlQubits().getTypes(), defOp.getParams(), newRzOp.getOutQubits(),
-                    defOp.getGateName(), nullptr, defOp.getInCtrlQubits(), defOp.getInCtrlValues());
-
-                rewriter.replaceOp(op, newPauliXOp.getOutQubits());
-                rewriter.eraseOp(defOp);
-                return success();
-            }
+        if (auto parent = getCommutativeParentOfPauliX_RZ(op)) {
+            rewritePauliX_RZ(op, parent, rewriter);
+            return success();
         }
         return failure();
     }
