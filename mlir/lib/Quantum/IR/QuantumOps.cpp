@@ -50,7 +50,10 @@ struct GateCommutationPattern : public mlir::OpRewritePattern<CustomOp> {
     using OpRewritePattern<CustomOp>::OpRewritePattern;
     mlir::LogicalResult matchAndRewrite(CustomOp op, mlir::PatternRewriter &rewriter) const override
     {
-        if (!commuteOps.contains(op.getGateName())) {
+        // Gate must not be adjoint, must have empty control qubits,
+        // and must be in the set of commuting ops for this pattern.
+        if (op.getAdjoint() || !op.getInCtrlQubits().empty() ||
+            !commuteOps.contains(op.getGateName())) {
             return failure();
         }
 
@@ -72,8 +75,8 @@ struct GateCommutationPattern : public mlir::OpRewritePattern<CustomOp> {
                     ValueRange({newCnotOp.getOutQubits()[0]}), defOp.getGateName(), nullptr,
                     defOp.getInCtrlQubits(), defOp.getInCtrlValues());
 
-                rewriter.replaceAllUsesWith(op.getOutQubits()[0], newRzOp.getOutQubits()[0]);
-                rewriter.replaceAllUsesWith(op.getOutQubits()[1], newCnotOp.getOutQubits()[1]);
+                rewriter.replaceOp(op, {newRzOp.getOutQubits()[0], newCnotOp.getOutQubits()[1]});
+                rewriter.eraseOp(defOp);
                 return success();
             }
             // PauliX commutes with CNOT
@@ -91,8 +94,8 @@ struct GateCommutationPattern : public mlir::OpRewritePattern<CustomOp> {
                     ValueRange({newCnotOp.getOutQubits()[1]}), defOp.getGateName(), nullptr,
                     defOp.getInCtrlQubits(), defOp.getInCtrlValues());
 
-                rewriter.replaceAllUsesWith(op.getOutQubits()[0], newCnotOp.getOutQubits()[0]);
-                rewriter.replaceAllUsesWith(op.getOutQubits()[1], newPauliXOp.getOutQubits()[0]);
+                rewriter.replaceOp(op, {newCnotOp.getOutQubits()[0], newPauliXOp.getOutQubits()[0]});
+                rewriter.eraseOp(defOp);
                 return success();
             }
         }
@@ -119,7 +122,8 @@ struct GateCommutationPattern : public mlir::OpRewritePattern<CustomOp> {
                     defOp.getOutCtrlQubits().getTypes(), defOp.getParams(), newRzOp.getOutQubits(),
                     defOp.getGateName(), nullptr, defOp.getInCtrlQubits(), defOp.getInCtrlValues());
 
-                rewriter.replaceAllUsesWith(op.getOutQubits(), newPauliXOp.getOutQubits());
+                rewriter.replaceOp(op, newPauliXOp.getOutQubits());
+                rewriter.eraseOp(defOp);
                 return success();
             }
         }
