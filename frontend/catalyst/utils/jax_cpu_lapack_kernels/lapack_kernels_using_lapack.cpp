@@ -115,60 +115,60 @@ jax::Sytrd<std::complex<double>>::FnType GET_SYMBOL(LAPACKE_zhetrd);
 namespace jax {
 
 static auto init = []() -> int {
-    RealTrsm<float>::fn = GET_SYMBOL(cblas_strsm);
-    RealTrsm<double>::fn = GET_SYMBOL(cblas_dtrsm);
-    ComplexTrsm<std::complex<float>>::fn = GET_SYMBOL(cblas_ctrsm);
-    ComplexTrsm<std::complex<double>>::fn = GET_SYMBOL(cblas_ztrsm);
+    AssignKernelFn<RealTrsm<float>>(GET_SYMBOL(cblas_strsm));
+    AssignKernelFn<RealTrsm<double>>(GET_SYMBOL(cblas_dtrsm));
+    AssignKernelFn<ComplexTrsm<std::complex<float>>>(GET_SYMBOL(cblas_ctrsm));
+    AssignKernelFn<ComplexTrsm<std::complex<double>>>(GET_SYMBOL(cblas_ztrsm));
 
-    Getrf<float>::fn = GET_SYMBOL(LAPACKE_sgetrf);
-    Getrf<double>::fn = GET_SYMBOL(LAPACKE_dgetrf);
-    Getrf<std::complex<float>>::fn = GET_SYMBOL(LAPACKE_cgetrf);
-    Getrf<std::complex<double>>::fn = GET_SYMBOL(LAPACKE_zgetrf);
+    AssignKernelFn<Getrf<float>>(GET_SYMBOL(LAPACKE_sgetrf));
+    AssignKernelFn<Getrf<double>>(GET_SYMBOL(LAPACKE_dgetrf));
+    AssignKernelFn<Getrf<std::complex<float>>>(GET_SYMBOL(LAPACKE_cgetrf));
+    AssignKernelFn<Getrf<std::complex<double>>>(GET_SYMBOL(LAPACKE_zgetrf));
 
-    Geqrf<float>::fn = GET_SYMBOL(LAPACKE_sgeqrf);
-    Geqrf<double>::fn = GET_SYMBOL(LAPACKE_dgeqrf);
-    Geqrf<std::complex<float>>::fn = GET_SYMBOL(LAPACKE_cgeqrf);
-    Geqrf<std::complex<double>>::fn = GET_SYMBOL(LAPACKE_zgeqrf);
+    AssignKernelFn<Geqrf<float>>(GET_SYMBOL(LAPACKE_sgeqrf));
+    AssignKernelFn<Geqrf<double>>(GET_SYMBOL(LAPACKE_dgeqrf));
+    AssignKernelFn<Geqrf<std::complex<float>>>(GET_SYMBOL(LAPACKE_cgeqrf));
+    AssignKernelFn<Geqrf<std::complex<double>>>(GET_SYMBOL(LAPACKE_zgeqrf));
 
-    Orgqr<float>::fn = GET_SYMBOL(LAPACKE_sorgqr);
-    Orgqr<double>::fn = GET_SYMBOL(LAPACKE_dorgqr);
-    Orgqr<std::complex<float>>::fn = GET_SYMBOL(LAPACKE_cungqr);
-    Orgqr<std::complex<double>>::fn = GET_SYMBOL(LAPACKE_zungqr);
+    AssignKernelFn<Orgqr<float>>(GET_SYMBOL(LAPACKE_sorgqr));
+    AssignKernelFn<Orgqr<double>>(GET_SYMBOL(LAPACKE_dorgqr));
+    AssignKernelFn<Orgqr<std::complex<float>>>(GET_SYMBOL(LAPACKE_cungqr));
+    AssignKernelFn<Orgqr<std::complex<double>>>(GET_SYMBOL(LAPACKE_zungqr));
 
-    Potrf<float>::fn = GET_SYMBOL(LAPACKE_spotrf);
-    Potrf<double>::fn = GET_SYMBOL(LAPACKE_dpotrf);
-    Potrf<std::complex<float>>::fn = GET_SYMBOL(LAPACKE_cpotrf);
-    Potrf<std::complex<double>>::fn = GET_SYMBOL(LAPACKE_zpotrf);
+    AssignKernelFn<Potrf<float>>(GET_SYMBOL(LAPACKE_spotrf));
+    AssignKernelFn<Potrf<double>>(GET_SYMBOL(LAPACKE_dpotrf));
+    AssignKernelFn<Potrf<std::complex<float>>>(GET_SYMBOL(LAPACKE_cpotrf));
+    AssignKernelFn<Potrf<std::complex<double>>>(GET_SYMBOL(LAPACKE_zpotrf));
 
-    RealGesdd<float>::fn = GET_SYMBOL(LAPACKE_sgesdd);
-    RealGesdd<double>::fn = GET_SYMBOL(LAPACKE_dgesdd);
-    ComplexGesdd<std::complex<float>>::fn = GET_SYMBOL(LAPACKE_cgesdd);
-    ComplexGesdd<std::complex<double>>::fn = GET_SYMBOL(LAPACKE_zgesdd);
+    AssignKernelFn<RealGesdd<float>>(GET_SYMBOL(LAPACKE_sgesdd));
+    AssignKernelFn<RealGesdd<double>>(GET_SYMBOL(LAPACKE_dgesdd));
+    AssignKernelFn<ComplexGesdd<std::complex<float>>>(GET_SYMBOL(LAPACKE_cgesdd));
+    AssignKernelFn<ComplexGesdd<std::complex<double>>>(GET_SYMBOL(LAPACKE_zgesdd));
 
-    RealSyevd<float>::fn = GET_SYMBOL(LAPACKE_ssyevd);
-    RealSyevd<double>::fn = GET_SYMBOL(LAPACKE_dsyevd);
-    ComplexHeevd<std::complex<float>>::fn = GET_SYMBOL(LAPACKE_cheevd);
-    ComplexHeevd<std::complex<double>>::fn = GET_SYMBOL(LAPACKE_zheevd);
+    AssignKernelFn<RealSyevd<float>>(GET_SYMBOL(LAPACKE_ssyevd));
+    AssignKernelFn<RealSyevd<double>>(GET_SYMBOL(LAPACKE_dsyevd));
+    AssignKernelFn<ComplexHeevd<std::complex<float>>>(GET_SYMBOL(LAPACKE_cheevd));
+    AssignKernelFn<ComplexHeevd<std::complex<double>>>(GET_SYMBOL(LAPACKE_zheevd));
 
-    RealGeev<float>::fn = GET_SYMBOL(LAPACKE_sgeev);
-    RealGeev<double>::fn = GET_SYMBOL(LAPACKE_dgeev);
-    ComplexGeev<std::complex<float>>::fn = GET_SYMBOL(LAPACKE_cgeev);
-    ComplexGeev<std::complex<double>>::fn = GET_SYMBOL(LAPACKE_zgeev);
+    AssignKernelFn<RealGeev<float>>(GET_SYMBOL(LAPACKE_sgeev));
+    AssignKernelFn<RealGeev<double>>(GET_SYMBOL(LAPACKE_dgeev));
+    AssignKernelFn<ComplexGeev<std::complex<float>>>(GET_SYMBOL(LAPACKE_cgeev));
+    AssignKernelFn<ComplexGeev<std::complex<double>>>(GET_SYMBOL(LAPACKE_zgeev));
 
-    RealGees<float>::fn = GET_SYMBOL(LAPACKE_sgees);
-    RealGees<double>::fn = GET_SYMBOL(LAPACKE_dgees);
-    ComplexGees<std::complex<float>>::fn = GET_SYMBOL(LAPACKE_cgees);
-    ComplexGees<std::complex<double>>::fn = GET_SYMBOL(LAPACKE_zgees);
+    AssignKernelFn<RealGees<float>>(GET_SYMBOL(LAPACKE_sgees));
+    AssignKernelFn<RealGees<double>>(GET_SYMBOL(LAPACKE_dgees));
+    AssignKernelFn<ComplexGees<std::complex<float>>>(GET_SYMBOL(LAPACKE_cgees));
+    AssignKernelFn<ComplexGees<std::complex<double>>>(GET_SYMBOL(LAPACKE_zgees));
 
-    Gehrd<float>::fn = GET_SYMBOL(LAPACKE_sgehrd);
-    Gehrd<double>::fn = GET_SYMBOL(LAPACKE_dgehrd);
-    Gehrd<std::complex<float>>::fn = GET_SYMBOL(LAPACKE_cgehrd);
-    Gehrd<std::complex<double>>::fn = GET_SYMBOL(LAPACKE_zgehrd);
+    AssignKernelFn<Gehrd<float>>(GET_SYMBOL(LAPACKE_sgehrd));
+    AssignKernelFn<Gehrd<double>>(GET_SYMBOL(LAPACKE_dgehrd));
+    AssignKernelFn<Gehrd<std::complex<float>>>(GET_SYMBOL(LAPACKE_cgehrd));
+    AssignKernelFn<Gehrd<std::complex<double>>>(GET_SYMBOL(LAPACKE_zgehrd));
 
-    Sytrd<float>::fn = GET_SYMBOL(LAPACKE_ssytrd);
-    Sytrd<double>::fn = GET_SYMBOL(LAPACKE_dsytrd);
-    Sytrd<std::complex<float>>::fn = GET_SYMBOL(LAPACKE_chetrd);
-    Sytrd<std::complex<double>>::fn = GET_SYMBOL(LAPACKE_zhetrd);
+    AssignKernelFn<Sytrd<float>>(GET_SYMBOL(LAPACKE_ssytrd));
+    AssignKernelFn<Sytrd<double>>(GET_SYMBOL(LAPACKE_dsytrd));
+    AssignKernelFn<Sytrd<std::complex<float>>>(GET_SYMBOL(LAPACKE_chetrd));
+    AssignKernelFn<Sytrd<std::complex<double>>>(GET_SYMBOL(LAPACKE_zhetrd));
 
     return 0;
 }();
