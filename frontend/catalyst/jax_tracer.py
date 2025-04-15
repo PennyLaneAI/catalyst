@@ -37,6 +37,7 @@ from pennylane.measurements import (
     ExpectationMP,
     MeasurementProcess,
     ProbabilityMP,
+    SampleMP,
     StateMP,
     VarianceMP,
 )
@@ -1131,19 +1132,14 @@ class TracingMode(Enum):
 @debug_logger
 def is_measurement_changed(original_tape, modified_tape):
     """Check if the measurement has changed."""
-
-    if len(original_tape.measurements) != len(modified_tape.measurements):
-        return True
-
-    for original_meas, modified_meas in zip(original_tape.measurements, modified_tape.measurements):
-        if type(original_meas) != type(modified_meas):
-            return True
-
-        if hasattr(original_meas, "obs") and hasattr(modified_meas, "obs"):
-            if original_meas.obs is not modified_meas.obs:
-                return True
-
-    return False
+    # TODO: Remove str() comparison after
+    # fixing def _equal_sprod(op1: SProd, op2: SProd, **kwargs)
+    return any(
+        str(original_meas) != str(modified_meas)
+        for original_meas, modified_meas in zip(
+            original_tape.measurements, modified_tape.measurements
+        )
+    )
 
 
 @debug_logger
