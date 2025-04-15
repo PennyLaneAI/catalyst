@@ -741,18 +741,9 @@ def trace_from_pennylane(fn, static_argnums, abstracted_axes, sig, kwargs):
             "abstracted_axes": abstracted_axes,
         }
 
-        if enabled():
-            capture_on = True
-        else:
-            capture_on = False
-            enable()
-
         args = sig
-        try:
-            plxpr, out_type, out_treedef = make_jaxpr2(fn, **make_jaxpr_kwargs)(*args, **kwargs)
-            jaxpr = from_plxpr(plxpr)(*args, **kwargs)
-        finally:
-            if not capture_on:
-                disable()
+
+        plxpr, out_type, out_treedef = make_jaxpr2(fn, **make_jaxpr_kwargs)(*args, **kwargs)
+        jaxpr = from_plxpr(plxpr)(*args, **kwargs)
 
     return jaxpr, out_type, out_treedef, sig
