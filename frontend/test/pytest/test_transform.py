@@ -1104,19 +1104,21 @@ class TestTransformValidity:
         )
         H4 += qml.PauliZ(0) @ qml.PauliX(1) @ qml.PauliY(2)
 
-        msg = "Multiple tapes are generated, but each run might produce different results."
-        with pytest.raises(CompileError, match=msg):
+        @qml.transforms.split_non_commuting
+        @qml.qnode(qml.device(backend, wires=3))
+        def qfunc():
+            """Example taken from PL tests."""
+            qml.Hadamard(0)
+            qml.Hadamard(1)
+            qml.PauliZ(1)
+            qml.PauliX(2)
+            return [1, qml.expval(H4)]
 
-            @qjit
-            @qml.transforms.split_non_commuting
-            @qml.qnode(qml.device(backend, wires=3))
-            def qfunc():
-                """Example taken from PL tests."""
-                qml.Hadamard(0)
-                qml.Hadamard(1)
-                qml.PauliZ(1)
-                qml.PauliX(2)
-                return [1, qml.expval(H4)]
+        with pytest.raises(
+            CompileError,
+            match="Batch transforms are unsupported with MCMs or non-MeasurementProcess",
+        ):
+            qjit(qfunc)
 
     def test_invalid_batch_transform_due_to_measure(self, backend):
         """Test split non commuting"""
@@ -1147,7 +1149,10 @@ class TestTransformValidity:
 
             return qfunc
 
-        with pytest.raises(CompileError, match="Multiple tapes are generated"):
+        with pytest.raises(
+            CompileError,
+            match="Batch transforms are unsupported with MCMs or non-MeasurementProcess",
+        ):
             qjit(qnode_builder(backend))
 
     @pytest.mark.parametrize(("theta_1", "theta_2"), [(0.3, -0.2)])
@@ -1521,3 +1526,47 @@ def test_unitary_to_rot(backend):
     _, expected_shape = jax.tree_util.tree_flatten(expected)
     _, observed_shape = jax.tree_util.tree_flatten(observed)
     assert expected_shape == observed_shape
+
+
+# class TestHasValidMeasurementOutputs:
+#     """Tests for the has_valid_measurement_outputs function."""
+
+#     def test_single_measurement(self):
+#         """Test with a single measurement process."""
+#         # Create a measurement process
+#         measurement = qml.measurements.ExpectationMP(qml.PauliZ(0))
+
+#         # Test with a single measurement
+#         assert has_valid_measurement_outputs([measurement])
+
+#     def test_multiple_measurements(self):
+#         """Test with multiple measurement processes."""
+#         # Create measurement processes
+#         m1 = qml.measurements.ExpectationMP(qml.PauliZ(0))
+#         m2 = qml.measurements.ExpectationMP(qml.PauliX(1))
+
+#         # Test with a list of measurements
+#         assert has_valid_measurement_outputs([m1, m2])
+
+#     def test_mixed_outputs(self):
+#         """Test with mixed classical and quantum results."""
+#         # Create a measurement process and a classical value
+#         measurement = qml.measurements.ExpectationMP(qml.PauliZ(0))
+#         classical = 0.5
+
+#         # Test with mixed outputs (should return False)
+#         assert not has_valid_measurement_outputs([measurement, classical])
+
+#     def test_only_classical(self):
+#         """Test with only classical outputs."""
+#         # Create classical values
+#         classical1 = 0.5
+#         classical2 = 0.1
+
+#         # Test with only classical outputs (should return False)
+#         assert has_valid_measurement_outputs([classical1, classical2])
+
+#     def test_empty_list(self):
+#         """Test with an empty list."""
+#         # Test with empty list (should return False)
+#         assert has_valid_measurement_outputs([])

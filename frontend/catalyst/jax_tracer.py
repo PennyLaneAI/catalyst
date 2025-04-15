@@ -1137,7 +1137,11 @@ def apply_transforms(
 
     if len(tapes) > 1:
         if has_classical_outputs(flat_results) or has_midcircuit_measurement(tape):
-            msg = "Multiple tapes are generated, but each run might produce different results."
+            msg = (
+                "Batch transforms are unsupported with MCMs or non-MeasurementProcess QNode "
+                "outputs. The selected device, options, or applied QNode transforms, may be "
+                "attempting to produce multiple tapes."
+            )
             raise CompileError(msg)
         tracing_mode = TracingMode.TRANSFORM
     elif len(qnode_program) or is_measurement_changed(tape, tapes[0]):
@@ -1145,7 +1149,11 @@ def apply_transforms(
         # operate in the permissive tracing mode, but that currently leads to a small number of
         # test failures due to the different result format produced in trace_quantum_function.
         if has_classical_outputs(flat_results):
-            msg = "Transforms that modify MeasurementProcesses are not supported with non-MeasurementProcess QNode outputs."
+            msg = (
+                "Transforming MeasurementProcesses is unsupported with non-MeasurementProcess "
+                "QNode outputs. The selected device, options, or applied QNode transforms, may be "
+                "attempting to transform MeasurementProcesses from the tape."
+            )
             raise CompileError(msg)
         tracing_mode = TracingMode.TRANSFORM
     else:
