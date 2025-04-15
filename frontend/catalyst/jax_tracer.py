@@ -1102,16 +1102,17 @@ class TracingMode(Enum):
 
 
 @debug_logger
-def is_measurement_changed(original_tape, modified_tape):
+def have_measurements_changed(original_tape, modified_tape):
     """Check if the measurement has changed."""
-    # TODO: Remove str() comparison after
-    # fixing def _equal_sprod(op1: SProd, op2: SProd, **kwargs)
-    return any(
-        str(original_meas) != str(modified_meas)
-        for original_meas, modified_meas in zip(
-            original_tape.measurements, modified_tape.measurements
-        )
-    )
+
+    # Copying tapes preserves object identity in the operation and measurement lists, due to
+    # immutability. So we can compare identity directly. Equality comparisons are problematic
+    # when the measurements contain tracers.
+    for original_meas, modified_meas in zip(original_tape.measurements, modified_tape.measurements):
+        if original_meas is not modified_meas:
+            return True
+
+    return False
 
 
 @debug_logger
@@ -1144,7 +1145,7 @@ def apply_transforms(
             )
             raise CompileError(msg)
         tracing_mode = TracingMode.TRANSFORM
-    elif len(qnode_program) or is_measurement_changed(tape, tapes[0]):
+    elif len(qnode_program) or have_measurements_changed(tape, tapes[0]):
         # TODO: Ideally we should allow qnode transforms that don't modify the measurements to
         # operate in the permissive tracing mode, but that currently leads to a small number of
         # test failures due to the different result format produced in trace_quantum_function.
