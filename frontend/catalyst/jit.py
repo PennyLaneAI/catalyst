@@ -41,6 +41,7 @@ from catalyst.compiler import (
 )
 from catalyst.debug.instruments import instrument
 from catalyst.from_plxpr import trace_from_pennylane
+from catalyst.jax_extras.patches import get_aval2
 from catalyst.jax_tracer import lower_jaxpr_to_mlir, trace_to_jaxpr
 from catalyst.logging import debug_logger, debug_logger_init
 from catalyst.qfunc import QFunc
@@ -716,9 +717,12 @@ class QJIT(CatalystCallable):
         full_sig = merge_static_args(dynamic_sig, args, static_argnums)
 
         if self.compile_options.experimental_capture:
-            return trace_from_pennylane(
-                self.user_function, static_argnums, abstracted_axes, full_sig, kwargs
-            )
+            with Patcher(
+                (jax._src.interpreters.partial_eval, "get_aval", get_aval2),
+            ):
+                return trace_from_pennylane(
+                    self.user_function, static_argnums, abstracted_axes, full_sig, kwargs
+                )
 
         def closure(qnode, *args, **kwargs):
             params = {}
