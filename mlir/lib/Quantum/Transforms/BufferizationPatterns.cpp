@@ -76,31 +76,17 @@ struct BufferizeSampleOp : public OpConversionPattern<SampleOp> {
         MemRefType resultType = cast<MemRefType>(getTypeConverter()->convertType(tensorType));
         Location loc = op.getLoc();
 
-        // SampleOp's result shape is (shots, num_qubits)
-        // shots is a SSA argument to the device and can potentially be dynamic
-        // so we need to memref alloc from the shots SSA value
-        auto shape = cast<mlir::RankedTensorType>(tensorType).getShape();
         SmallVector<Value> allocSizes;
-
-        if (shape[0] == ShapedType::kDynamic) {
-            auto parentFunc = op->getParentOfType<func::FuncOp>();
-            SmallVector<DeviceInitOp> DeviceInitOpPool;
-            parentFunc->walk(
-                [&](DeviceInitOp deviceInitOp) { DeviceInitOpPool.push_back(deviceInitOp); });
-            assert(DeviceInitOpPool.size() == 1 &&
-                   "quantum.sample operation is only valid when either inside a function with "
-                   "exactly one shot-ful device init operation, or have allocated memref as input");
-
-            auto shots = rewriter.create<index::CastSOp>(loc, rewriter.getIndexType(),
-                                                         DeviceInitOpPool[0].getShots());
-
-            allocSizes.push_back(shots);
+        for (Value dynShapeDimension : op.getDynamicShape()) {
+            auto indexCastOp =
+                rewriter.create<index::CastSOp>(loc, rewriter.getIndexType(), dynShapeDimension);
+            allocSizes.push_back(indexCastOp);
         }
 
         Value allocVal = rewriter.replaceOpWithNewOp<memref::AllocOp>(op, resultType, allocSizes);
-        rewriter.create<SampleOp>(loc, TypeRange{}, ValueRange{adaptor.getObs(), allocVal},
-                                  op->getAttrs());
-
+        auto allocedSampleOp = rewriter.create<SampleOp>(
+            loc, TypeRange{}, ValueRange{adaptor.getObs(), allocVal}, op->getAttrs());
+        allocedSampleOp->setAttr("operandSegmentSizes", rewriter.getDenseI32ArrayAttr({1, 0, 1}));
         return success();
     }
 };
@@ -114,8 +100,22 @@ struct BufferizeStateOp : public OpConversionPattern<StateOp> {
         Type tensorType = op.getType(0);
         MemRefType resultType = cast<MemRefType>(getTypeConverter()->convertType(tensorType));
         Location loc = op.getLoc();
-        Value allocVal = rewriter.replaceOpWithNewOp<memref::AllocOp>(op, resultType);
-        rewriter.create<StateOp>(loc, TypeRange{}, ValueRange{adaptor.getObs(), allocVal});
+
+        Value buffer;
+        auto shape = cast<mlir::RankedTensorType>(tensorType).getShape();
+        if (shape[0] == ShapedType::kDynamic) {
+            auto indexCastOp =
+                rewriter.create<index::CastSOp>(loc, rewriter.getIndexType(), op.getDynamicShape());
+            buffer = rewriter.replaceOpWithNewOp<memref::AllocOp>(op, resultType,
+                                                                  ValueRange{indexCastOp});
+        }
+        else {
+            buffer = rewriter.replaceOpWithNewOp<memref::AllocOp>(op, resultType);
+        }
+
+        auto allocedStateOp =
+            rewriter.create<StateOp>(loc, TypeRange{}, ValueRange{adaptor.getObs(), buffer});
+        allocedStateOp->setAttr("operandSegmentSizes", rewriter.getDenseI32ArrayAttr({1, 0, 1}));
         return success();
     }
 };
@@ -129,8 +129,22 @@ struct BufferizeProbsOp : public OpConversionPattern<ProbsOp> {
         Type tensorType = op.getType(0);
         MemRefType resultType = cast<MemRefType>(getTypeConverter()->convertType(tensorType));
         Location loc = op.getLoc();
-        Value allocVal = rewriter.replaceOpWithNewOp<memref::AllocOp>(op, resultType);
-        rewriter.create<ProbsOp>(loc, TypeRange{}, ValueRange{adaptor.getObs(), allocVal});
+
+        Value buffer;
+        auto shape = cast<mlir::RankedTensorType>(tensorType).getShape();
+        if (shape[0] == ShapedType::kDynamic) {
+            auto indexCastOp =
+                rewriter.create<index::CastSOp>(loc, rewriter.getIndexType(), op.getDynamicShape());
+            buffer = rewriter.replaceOpWithNewOp<memref::AllocOp>(op, resultType,
+                                                                  ValueRange{indexCastOp});
+        }
+        else {
+            buffer = rewriter.replaceOpWithNewOp<memref::AllocOp>(op, resultType);
+        }
+
+        auto allocedProbsOp =
+            rewriter.create<ProbsOp>(loc, TypeRange{}, ValueRange{adaptor.getObs(), buffer});
+        allocedProbsOp->setAttr("operandSegmentSizes", rewriter.getDenseI32ArrayAttr({1, 0, 1}));
         return success();
     }
 };
@@ -142,14 +156,28 @@ struct BufferizeCountsOp : public OpConversionPattern<CountsOp> {
                                   ConversionPatternRewriter &rewriter) const override
     {
         Location loc = op.getLoc();
-        Type tensorType0 = op.getType(0);
-        Type tensorType1 = op.getType(1);
-        MemRefType resultType0 = cast<MemRefType>(getTypeConverter()->convertType(tensorType0));
-        MemRefType resultType1 = cast<MemRefType>(getTypeConverter()->convertType(tensorType1));
-        Value allocVal0 = rewriter.create<memref::AllocOp>(loc, resultType0);
-        Value allocVal1 = rewriter.create<memref::AllocOp>(loc, resultType1);
-        rewriter.replaceOp(op, ValueRange{allocVal0, allocVal1});
-        rewriter.create<CountsOp>(loc, nullptr, nullptr, adaptor.getObs(), allocVal0, allocVal1);
+        SmallVector<Value> buffers;
+        for (size_t i : {0, 1}) {
+            Type tensorType = op.getType(i);
+            MemRefType resultType = cast<MemRefType>(getTypeConverter()->convertType(tensorType));
+            auto shape = cast<mlir::RankedTensorType>(tensorType).getShape();
+
+            Value allocVal;
+            if (shape[0] == ShapedType::kDynamic) {
+                auto indexCastOp = rewriter.create<index::CastSOp>(loc, rewriter.getIndexType(),
+                                                                   op.getDynamicShape());
+                allocVal =
+                    rewriter.create<memref::AllocOp>(loc, resultType, ValueRange{indexCastOp});
+            }
+            else {
+                allocVal = rewriter.create<memref::AllocOp>(loc, resultType);
+            }
+            buffers.push_back(allocVal);
+        }
+        rewriter.replaceOp(op, buffers);
+
+        rewriter.create<CountsOp>(loc, nullptr, nullptr, adaptor.getObs(), nullptr, buffers[0],
+                                  buffers[1]);
 
         return success();
     }

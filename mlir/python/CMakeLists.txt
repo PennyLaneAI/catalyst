@@ -5,7 +5,7 @@ add_compile_definitions("MLIR_PYTHON_PACKAGE_PREFIX=mlir_quantum.")
 
 
 ################################################################################
-# Sources
+# Declare Dialect Sources
 ################################################################################
 
 declare_mlir_python_sources(QuantumPythonSources)
@@ -44,23 +44,7 @@ declare_mlir_dialect_python_bindings(
 
 
 ################################################################################
-# Common CAPI
-################################################################################
-
-
-add_mlir_python_common_capi_library(QuantumPythonCAPI
-  INSTALL_COMPONENT QuantumPythonModules
-  INSTALL_DESTINATION python_packages/quantum/mlir_quantum/_mlir_libs
-  OUTPUT_DIRECTORY "${MLIR_BINARY_DIR}/python_packages/quantum/mlir_quantum/_mlir_libs"
-  RELATIVE_INSTALL_ROOT "../../../.."
-  DECLARED_SOURCES
-    QuantumPythonSources
-    MLIRPythonExtension.RegisterEverything
-    MLIRPythonSources.Core
-)
-
-################################################################################
-# Instantiation of all Python modules
+# Build Python Bindings (without C extension)
 ################################################################################
 
 add_mlir_python_modules(QuantumPythonModules
@@ -68,8 +52,7 @@ add_mlir_python_modules(QuantumPythonModules
   INSTALL_PREFIX "python_packages/quantum/mlir_quantum/"
   DECLARED_SOURCES
     QuantumPythonSources
-    MLIRPythonExtension.RegisterEverything
-    MLIRPythonSources
-  COMMON_CAPI_LINK_LIBS
-    QuantumPythonCAPI
+    MLIRPythonSources.Dialects         # we also use upstream dialect bindings
+    MLIRPythonSources.Core.Python      # common sources, like _ods_common.py
+    MLIRPythonSources.ExecutionEngine  # for the mlir_quantum.runtime module
   )

@@ -18,7 +18,8 @@ Test that mcmc, num_burnin, and kernel_name are set in MLIR
 """
 
 import pennylane as qml
-from utils import qjit_for_tests as qjit
+
+from catalyst import qjit
 
 
 @qjit

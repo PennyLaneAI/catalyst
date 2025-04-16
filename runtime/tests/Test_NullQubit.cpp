@@ -143,6 +143,30 @@ TEST_CASE("Test a NullQubit circuit with num_qubits=4 and observables", "[NullQu
     CHECK(obs_keys.empty());
 }
 
+TEST_CASE("Test a NullQubit circuit with num_qubits=1 that performs a measurement", "[NullQubit]")
+{
+    std::unique_ptr<NullQubit> sim = std::make_unique<NullQubit>();
+
+    // state-vector with #qubits = n
+    constexpr size_t n = 1;
+    std::vector<QubitIdType> Qs;
+    Qs.reserve(n);
+    Qs.push_back(sim->AllocateQubit());
+
+    sim->StartTapeRecording();
+    sim->NamedOperation("Hadamard", {}, {Qs[0]}, false);
+
+    auto m = sim->Measure(Qs[0], {} /*postselect*/);
+
+    auto &&[num_ops, num_obs, num_params, op_names, obs_keys] = sim->CacheManagerInfo();
+    CHECK(num_ops == 0);
+    CHECK(num_obs == 0);
+    CHECK(num_params == 0);
+    CHECK(op_names.empty());
+    CHECK(obs_keys.empty());
+    CHECK(*m == false); // Measurement of NullQubit should always return 0 (false)
+}
+
 TEST_CASE("Test __catalyst__qis__Sample with num_qubits=2 and PartialSample calling Hadamard, "
           "ControlledPhaseShift, IsingYY, and CRX quantum operations",
           "[CoreQIS]")
@@ -200,7 +224,7 @@ TEST_CASE("NullQubit (no) Basis vector", "[NullQubit]")
     sim->State(view);
 
     CHECK(view.size() == 8);
-    CHECK(view(0).real() == Catch::Approx(0.0).epsilon(1e-5));
+    CHECK(view(0).real() == Catch::Approx(1.0).epsilon(1e-5));
     CHECK(view(0).imag() == Catch::Approx(0.0).epsilon(1e-5));
 }
 
@@ -219,7 +243,7 @@ TEST_CASE("test AllocateQubits", "[NullQubit]")
     sim->State(view);
 
     CHECK(state.size() == 4);
-    CHECK(state[0].real() == Catch::Approx(0.0).epsilon(1e-5));
+    CHECK(state[0].real() == Catch::Approx(1.0).epsilon(1e-5));
     CHECK(state[0].imag() == Catch::Approx(0.0).epsilon(1e-5));
 }
 
@@ -258,7 +282,7 @@ TEST_CASE("Mix Gate test R(X,Y,Z) num_qubits=4", "[NullQubit]")
     sim->State(view);
 
     CHECK(view.size() == 16);
-    CHECK(view(0).real() == Catch::Approx(0.0).epsilon(1e-5));
+    CHECK(view(0).real() == Catch::Approx(1.0).epsilon(1e-5));
     CHECK(view(0).imag() == Catch::Approx(0.0).epsilon(1e-5));
 }
 
@@ -318,4 +342,220 @@ TEST_CASE("Test __catalyst__qis__Gradient_params Op=[Hadamard,RZ,RY,RZ,S,T,Param
 
     delete[] buffer;
     delete[] buffer_tp;
+}
+
+TEST_CASE("Test NullQubit measurement processes with num_qubits=0", "[NullQubit]")
+{
+    std::unique_ptr<NullQubit> sim = std::make_unique<NullQubit>();
+
+    constexpr size_t num_qubits = 0;
+    constexpr size_t shots = 100;
+
+    SECTION("State")
+    {
+        std::vector<std::complex<double>> state(1);
+        DataView<std::complex<double>, 1> state_view(state);
+        sim->State(state_view);
+
+        CHECK(state_view(0).real() == Catch::Approx(1.0).margin(1e-5));
+        CHECK(state_view(0).imag() == Catch::Approx(0.0).margin(1e-5));
+    }
+
+    SECTION("Probs")
+    {
+        std::vector<double> probs(1);
+        DataView<double, 1> probs_view(probs);
+        sim->Probs(probs_view);
+
+        CHECK(probs_view(0) == Catch::Approx(1.0).margin(1e-5));
+    }
+
+    SECTION("PartialProbs")
+    {
+        std::vector<double> probs(1);
+        DataView<double, 1> probs_view(probs);
+        std::vector<QubitIdType> wires;
+        sim->PartialProbs(probs_view, wires);
+
+        CHECK(probs_view(0) == Catch::Approx(1.0).margin(1e-5));
+    }
+
+    SECTION("Sample")
+    {
+        double *_data_aligned = nullptr;
+        size_t _offset = 0U;
+        size_t _sizes[2] = {shots, num_qubits};
+        size_t _strides[2] = {1, 1};
+
+        DataView<double, 2> sample_view(_data_aligned, _offset, _sizes, _strides);
+        sim->Sample(sample_view, shots);
+
+        CHECK(sample_view.size() == 0);
+    }
+
+    SECTION("PartialSample")
+    {
+        double *_data_aligned = nullptr;
+        size_t _offset = 0U;
+        size_t _sizes[2] = {shots, num_qubits};
+        size_t _strides[2] = {1, 1};
+
+        DataView<double, 2> sample_view(_data_aligned, _offset, _sizes, _strides);
+        std::vector<QubitIdType> wires;
+        sim->PartialSample(sample_view, wires, shots);
+
+        CHECK(sample_view.size() == 0);
+    }
+
+    SECTION("Counts")
+    {
+        std::vector<int64_t> counts(1);
+        DataView<int64_t, 1> counts_view(counts);
+        std::vector<double> eigvals(1);
+        DataView<double, 1> eigvals_view(eigvals);
+        sim->Counts(eigvals_view, counts_view, shots);
+
+        CHECK(eigvals_view(0) == Catch::Approx(0.0).margin(1e-5));
+        CHECK(counts_view(0) == shots);
+    }
+
+    SECTION("PartialCounts")
+    {
+        std::vector<int64_t> counts(1);
+        DataView<int64_t, 1> counts_view(counts);
+        std::vector<double> eigvals(1);
+        DataView<double, 1> eigvals_view(eigvals);
+        std::vector<QubitIdType> wires;
+        sim->PartialCounts(eigvals_view, counts_view, wires, shots);
+
+        CHECK(eigvals_view(0) == Catch::Approx(0.0).margin(1e-5));
+        CHECK(counts_view(0) == shots);
+    }
+}
+
+TEST_CASE("Test NullQubit measurement processes with num_qubits=1", "[NullQubit]")
+{
+    std::unique_ptr<NullQubit> sim = std::make_unique<NullQubit>();
+
+    constexpr size_t num_qubits = 1;
+    constexpr size_t shots = 100;
+
+    std::vector<QubitIdType> Qs;
+    Qs.reserve(num_qubits);
+    Qs.push_back(sim->AllocateQubit());
+
+    SECTION("State")
+    {
+        std::vector<std::complex<double>> state(2);
+        DataView<std::complex<double>, 1> state_view(state);
+        sim->State(state_view);
+
+        CHECK(state_view(0).real() == Catch::Approx(1.0).margin(1e-5));
+        CHECK(state_view(0).imag() == Catch::Approx(0.0).margin(1e-5));
+        CHECK(state_view(1).real() == Catch::Approx(0.0).margin(1e-5));
+        CHECK(state_view(1).imag() == Catch::Approx(0.0).margin(1e-5));
+    }
+
+    SECTION("Probs")
+    {
+        std::vector<double> probs(2);
+        DataView<double, 1> probs_view(probs);
+        sim->Probs(probs_view);
+
+        CHECK(probs_view(0) == Catch::Approx(1.0).margin(1e-5));
+        CHECK(probs_view(1) == Catch::Approx(0.0).margin(1e-5));
+    }
+
+    SECTION("PartialProbs")
+    {
+        std::vector<double> probs(2);
+        DataView<double, 1> probs_view(probs);
+        std::vector<QubitIdType> wires;
+        sim->PartialProbs(probs_view, wires);
+
+        CHECK(probs_view(0) == Catch::Approx(1.0).margin(1e-5));
+        CHECK(probs_view(1) == Catch::Approx(0.0).margin(1e-5));
+    }
+
+    SECTION("Sample")
+    {
+        double _data_aligned[shots * num_qubits];
+        size_t _offset = 0U;
+        size_t _sizes[2] = {shots, num_qubits};
+        size_t _strides[2] = {1, 1};
+
+        DataView<double, 2> sample_view(_data_aligned, _offset, _sizes, _strides);
+        sim->Sample(sample_view, shots);
+
+        CHECK(sample_view.size() == shots * num_qubits);
+        CHECK(sample_view(0, 0) == 0.0);
+    }
+
+    SECTION("PartialSample")
+    {
+        double _data_aligned[shots * num_qubits];
+        size_t _offset = 0U;
+        size_t _sizes[2] = {shots, num_qubits};
+        size_t _strides[2] = {1, 1};
+
+        DataView<double, 2> sample_view(_data_aligned, _offset, _sizes, _strides);
+        std::vector<QubitIdType> wires;
+        sim->PartialSample(sample_view, wires, shots);
+
+        CHECK(sample_view.size() == shots * num_qubits);
+        CHECK(sample_view(0, 0) == 0.0);
+    }
+
+    SECTION("Counts")
+    {
+        std::vector<int64_t> counts(2);
+        DataView<int64_t, 1> counts_view(counts);
+        std::vector<double> eigvals(2);
+        DataView<double, 1> eigvals_view(eigvals);
+        sim->Counts(eigvals_view, counts_view, shots);
+
+        CHECK(eigvals_view(0) == Catch::Approx(0.0).margin(1e-5));
+        CHECK(eigvals_view(1) == Catch::Approx(1.0).margin(1e-5));
+        CHECK(counts_view(0) == shots);
+        CHECK(counts_view(1) == 0);
+    }
+
+    SECTION("PartialCounts")
+    {
+        std::vector<int64_t> counts(2);
+        DataView<int64_t, 1> counts_view(counts);
+        std::vector<double> eigvals(2);
+        DataView<double, 1> eigvals_view(eigvals);
+        std::vector<QubitIdType> wires;
+        sim->PartialCounts(eigvals_view, counts_view, wires, shots);
+
+        CHECK(eigvals_view(0) == Catch::Approx(0.0).margin(1e-5));
+        CHECK(eigvals_view(1) == Catch::Approx(1.0).margin(1e-5));
+        CHECK(counts_view(0) == shots);
+        CHECK(counts_view(1) == 0);
+    }
+}
+
+TEST_CASE("Test NullQubit::Zero()", "[NullQubit]")
+{
+    std::unique_ptr<NullQubit> sim = std::make_unique<NullQubit>();
+
+    CHECK(*sim->Zero() == false);
+}
+
+TEST_CASE("Test NullQubit::One()", "[NullQubit]")
+{
+    std::unique_ptr<NullQubit> sim = std::make_unique<NullQubit>();
+
+    CHECK(*sim->One() == true);
+}
+
+TEST_CASE("Test NullQubit device shots methods", "[NullQubit]")
+{
+    std::unique_ptr<NullQubit> sim = std::make_unique<NullQubit>();
+
+    for (size_t i = 0; i < 3; i++) {
+        sim->SetDeviceShots(i);
+        CHECK(sim->GetDeviceShots() == i);
+    }
 }

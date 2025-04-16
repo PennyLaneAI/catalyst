@@ -16,7 +16,9 @@
 This module contains functions tracing and lowering JAX code to MLIR.
 """
 
+import itertools
 import logging
+import weakref
 from collections.abc import Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -26,6 +28,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 import jax
 import jax.numpy as jnp
 import pennylane as qml
+from jax._src.lax.lax import _extract_tracers_dyn_shape
 from pennylane import QubitUnitary, QueuingManager
 from pennylane.devices import QubitDevice
 from pennylane.measurements import (
@@ -70,7 +73,6 @@ from catalyst.jax_extras import (
     tree_unflatten,
     wrap_init,
 )
-from catalyst.jax_extras.tracing import bind_flexible_primitive
 from catalyst.jax_primitives import (
     AbstractQreg,
     compbasis_p,
@@ -416,6 +418,9 @@ class HybridOpRegion:
     res_classical_tracers: List[DynamicJaxprTracer]
 
 
+cached_vars = weakref.WeakKeyDictionary()
+
+
 class HybridOp(Operator):
     """A base class for operations carrying nested regions. The class stores the information
     obtained in the process of classical tracing and required for the completion of the quantum
@@ -476,22 +481,82 @@ class HybridOp(Operator):
         as-is.
         """
         assert self.binder is not None, "HybridOp should set a binder"
+        # Here, we are binding any of the possible hybrid ops.
+        # which includes: for_loop, while_loop, cond, measure.
+        # This will place an equation at the very end of the current list of equations.
         out_quantum_tracer = self.binder(*in_expanded_tracers, **kwargs)[-1]
+        # eqn corresponds to the current hybrid operation that was just inserted
+        # into the list of equations.
         eqn = ctx.frames[trace].eqns[-1]
+
         assert len(eqn.outvars[:-1]) == len(
             out_expanded_tracers
         ), f"{eqn.outvars=}\n{out_expanded_tracers=}"
-        for i, t in zip(range(len(eqn.outvars[:-1])), out_expanded_tracers):
-            if trace.getvar(t) in set(
-                [
-                    *sum([e.outvars for e in ctx.frames[trace].eqns[:-1]], []),
-                    *ctx.frames[trace].invars,
-                    *ctx.frames[trace].constvar_to_val.keys(),
-                ]
-            ):
-                # Do not re-assign vars from other equations
+
+        frame = ctx.frames[trace]
+        jaxpr_variables = cached_vars.get(frame, set())
+        if not jaxpr_variables:
+            # We get all variables in the current frame
+            outvars = itertools.chain.from_iterable([e.outvars for e in frame.eqns])
+            jaxpr_variables = set(outvars)
+            jaxpr_variables.update(frame.invars)
+            jaxpr_variables.update(frame.constvar_to_val.keys())
+            cached_vars[frame] = jaxpr_variables
+
+        for outvar in frame.eqns[-1].outvars:
+            # With the exception of the output variables from the current equation.
+            jaxpr_variables.discard(outvar)
+
+        for i, t in enumerate(out_expanded_tracers):
+            # We look for what were the previous output tracers.
+            # If they haven't changed, then we leave them unchanged.
+            if trace.getvar(t) in jaxpr_variables:
                 continue
+
+            # If the variable cannot be found in the current frame
+            # it is because we have created it via new_inner_tracer
+            # which uses JAX internals to create a tracer without associating
+            # a particular variable nor binding it to an equation.
+            # So at this moment, we create a new variable for it
+            # and set it as the eqn.outvars.
+            # For example catalyst.measure always returns a tracer associated with
+            # the value true but without having it being bound to any primitive
+            #
+            #    m = new_inner_tracer(ctx.trace, get_aval(True))
+            #
+            # Then we would land here and bound that inner_trace to this primitive
+            #
+            #    a: bool, b: qubit = measure_p.bind()
+            #
+            # At the moment, it is a little bit unclear why we need this.
+            # I think it may be due to the separation between tracing the quantum
+            # part from the classical part.
+            #
+            # First we would have traced the classical part (which includes hybrid ops)
+            # and we need tracers for those values.
+            # Here we would be tracing the quantum part, and it is where we would finally
+            # bind it with the correct primitive.
+            #
+            # This seems to be the case since the measure function does not bound.
+            # But it returns this inner tracer.
+            #
+            # Then the topological sorter would sort the operations that depended
+            # on the original inner_trace accordingly.
+            #
+            # This method only gets called in a for loop for quantum operations
+            #
+            #     for op in ops:
+            #       qrp2 = None
+            #         if isinstance(op, HybridOp):
+            #            // ... snip...
+            #            qrp2 = op.trace_quantum(ctx, device, trace, qrp, **kwargs)
+            #
+            # So it should be safe to cache the tracers as we are doing it.
             eqn.outvars[i] = trace.getvar(t)
+
+        # Now, the output variables can be considered as part of the current frame.
+        # This allows us to avoid importing all equations again next time.
+        jaxpr_variables.update(eqn.outvars)
         return out_quantum_tracer
 
     @debug_logger
@@ -878,9 +943,14 @@ def trace_quantum_measurements(
                     "Use qml.sample() instead."
                 )
 
+            d_wires = (
+                device.wires[0]
+                if catalyst.device.qjit_device.is_dynamic_wires(device.wires)
+                else len(device.wires)
+            )
             m_wires = output.wires if output.wires else None
             obs_tracers, nqubits = trace_observables(output.obs, qrp, m_wires)
-            nqubits = len(device.wires) if nqubits is None else nqubits
+            nqubits = d_wires if nqubits is None else nqubits
 
             using_compbasis = obs_tracers.primitive == compbasis_p
 
@@ -894,21 +964,30 @@ def trace_quantum_measurements(
                 if output.mv is not None:  # qml.sample(m)
                     out_classical_tracers.append(output.mv)
                 else:
-                    shape = (shots, nqubits) if using_compbasis else (shots,)
-                    result = bind_flexible_primitive(
-                        sample_p, {"shots": shots}, obs_tracers, num_qubits=nqubits
-                    )
+                    shape = (shots, nqubits)
+                    dyn_dims, static_shape = _extract_tracers_dyn_shape(shape)
+                    result = sample_p.bind(obs_tracers, *dyn_dims, static_shape=tuple(static_shape))
                     if using_compbasis:
                         result = jnp.astype(result, jnp.int64)
 
                     reshaped_result = ()
                     shot_vector = get_device_shot_vector(device)
                     start_idx = 0  # Start index for slicing
-                    for shot, copies in shot_vector:
-                        for _ in range(copies):
-                            sliced_result = result[start_idx : start_idx + shot]
-                            reshaped_result += (sliced_result.reshape(shot, nqubits),)
-                            start_idx += shot
+                    # TODO: shots still can only be static in PL frontend
+                    # TODO: Update to dynamic shots
+                    has_shot_vector = len(shot_vector) > 1 or any(
+                        copies > 1 for _, copies in shot_vector
+                    )
+                    if has_shot_vector:
+                        for shot, copies in shot_vector:
+                            for _ in range(copies):
+                                sliced_result = jax.lax.dynamic_slice(
+                                    result, (start_idx, 0), (shot, nqubits)
+                                )
+                                reshaped_result += (sliced_result.reshape(shot, nqubits),)
+                                start_idx += shot
+                    else:
+                        reshaped_result += (result,)
 
                     if len(reshaped_result) == 1:
                         reshaped_result = reshaped_result[0]
@@ -921,18 +1000,31 @@ def trace_quantum_measurements(
                 out_classical_tracers.append(var_p.bind(obs_tracers))
             elif type(output) is ProbabilityMP:
                 assert using_compbasis
-                shape = (2**nqubits,)
-                out_classical_tracers.append(probs_p.bind(obs_tracers, shape=shape))
+                if isinstance(nqubits, DynamicJaxprTracer):
+                    shape = (jnp.left_shift(1, nqubits),)
+                else:
+                    shape = (2**nqubits,)
+                dyn_dims, static_shape = _extract_tracers_dyn_shape(shape)
+                result = probs_p.bind(obs_tracers, *dyn_dims, static_shape=tuple(static_shape))
+                out_classical_tracers.append(result)
             elif type(output) is CountsMP:
                 if shots is None:  # needed for old device API only
                     raise ValueError(
-                        "qml.sample cannot work with shots=None. "
+                        "qml.counts cannot work with shots=None. "
                         "Please specify a finite number of shots."
                     )
-                shape = (2**nqubits,) if using_compbasis else (2,)
-                results = bind_flexible_primitive(
-                    counts_p, {"shots": shots}, obs_tracers, shape=shape
-                )
+
+                if using_compbasis:
+                    if isinstance(nqubits, DynamicJaxprTracer):
+                        shape = (jnp.left_shift(1, nqubits),)
+                    else:
+                        shape = (2**nqubits,)
+                else:
+                    shape = (2,)
+
+                dyn_dims, static_shape = _extract_tracers_dyn_shape(shape)
+                results = counts_p.bind(obs_tracers, *dyn_dims, static_shape=tuple(static_shape))
+
                 if using_compbasis:
                     results = (jnp.asarray(results[0], jnp.int64), results[1])
                 out_classical_tracers.extend(results)
@@ -949,8 +1041,13 @@ def trace_quantum_measurements(
                     out_tree = counts_tree
             elif type(output) is StateMP:
                 assert using_compbasis
-                shape = (2**nqubits,)
-                out_classical_tracers.append(state_p.bind(obs_tracers, shape=shape))
+                if isinstance(nqubits, DynamicJaxprTracer):
+                    shape = (jnp.left_shift(1, nqubits),)
+                else:
+                    shape = (2**nqubits,)
+                dyn_dims, static_shape = _extract_tracers_dyn_shape(shape)
+                result = state_p.bind(obs_tracers, *dyn_dims, static_shape=tuple(static_shape))
+                out_classical_tracers.append(result)
             else:
                 raise NotImplementedError(
                     f"Measurement {type(output)} is not implemented"

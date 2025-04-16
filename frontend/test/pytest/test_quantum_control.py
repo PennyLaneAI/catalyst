@@ -34,12 +34,11 @@ from pennylane import ctrl as PL_ctrl
 from pennylane.operation import DecompositionUndefinedError, Operation, Operator, Wires
 from pennylane.ops.op_math.controlled import Controlled
 from pennylane.tape import QuantumTape
-from utils import qjit_for_tests as qjit
 
 from catalyst import adjoint as C_adjoint
 from catalyst import cond
 from catalyst import ctrl as C_ctrl
-from catalyst import for_loop, measure, while_loop
+from catalyst import for_loop, measure, qjit, while_loop
 from catalyst.api_extensions.quantum_operators import HybridCtrl
 from catalyst.jax_tracer import HybridOpRegion
 
@@ -311,7 +310,7 @@ class TestCatalystControlled:
     def test_qctrl_wires(self, backend):
         """Test the wires property of HybridCtrl"""
 
-        @qml.qjit
+        @qjit
         @qml.qnode(qml.device(backend, wires=3))
         def circuit(theta):
             def func(theta):
@@ -328,7 +327,7 @@ class TestCatalystControlled:
     def test_qctrl_wires_arg_fun(self, backend):
         """Test the wires property of HybridCtrl with argument wires"""
 
-        @qml.qjit
+        @qjit
         @qml.qnode(qml.device(backend, wires=4))
         def circuit():
             def func(anc, wires):
@@ -345,7 +344,7 @@ class TestCatalystControlled:
     def test_qctrl_var_wires(self, backend):
         """Test the wires property of HybridCtrl with variable wires"""
 
-        @qml.qjit
+        @qjit
         @qml.qnode(qml.device(backend, wires=4))
         def circuit(anc, wires):
             def func(anc, wires):
@@ -362,7 +361,7 @@ class TestCatalystControlled:
     def test_qctrl_wires_nested(self, backend):
         """Test the wires property of HybridCtrl with nested branches"""
 
-        @qml.qjit
+        @qjit
         @qml.qnode(qml.device(backend, wires=4))
         def circuit(theta, w1, w2, cw1, cw2):
             def _func1():
@@ -383,7 +382,7 @@ class TestCatalystControlled:
     def test_qctrl_work_wires(self, backend):
         """Test the wires property of HybridCtrl with work-wires"""
 
-        @qml.qjit
+        @qjit
         @qml.qnode(qml.device(backend, wires=5))
         def circuit(theta):
             def _func1():
@@ -405,7 +404,7 @@ class TestCatalystControlled:
     def test_qctrl_wires_controlflow(self, backend):
         """Test the wires property of HybridCtrl with control flow branches"""
 
-        @qml.qjit
+        @qjit
         @qml.qnode(qml.device(backend, wires=3))
         def circuit(theta, w1, w2, cw):
             def _func():
@@ -511,7 +510,7 @@ class TestCatalystControlled:
             qml.ControlledSequence(qml.TrotterProduct(H, time=2.4, order=2), control=[1])
             return qml.expval(qml.PauliZ(0))
 
-        assert qml.math.allclose(qml.qjit(circuit)(), circuit())
+        assert qml.math.allclose(qjit(circuit)(), circuit())
 
     def test_distribute_controlled_with_adj(self):
         """Test that the distribute_controlled function with a PennyLane Adjoint,

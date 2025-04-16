@@ -58,7 +58,7 @@ def test_dynamic_sample_backend_functionality():
       quantum.device shots(%shots) [""",
     )
     new_ir = new_ir.replace("tensor<10x1x", "tensor<?x1x")
-
+    new_ir = new_ir.replace("quantum.sample %3 :", "quantum.sample %3 shape %shots:")
     replace_ir(workflow_dyn_sample, "mlir", new_ir)
     res = workflow_dyn_sample(37)
     assert len(res) == 37
@@ -136,6 +136,201 @@ def test_dynamic_wires_scalar_readouts(readout, backend, capfd):
     assert np.allclose(ref(4), cat(4))
     out, _ = capfd.readouterr()
     assert out.count("compiling...") == 3
+
+
+@pytest.mark.parametrize("readout", [qml.probs])
+def test_dynamic_wires_statebased_with_wires(readout, backend, capfd):
+    """
+    Test that a circuit with dynamic number of wires can be executed correctly
+    with state based measurements with wires specified.
+
+    Note that qml.state() cannot have wires.
+    """
+
+    def ref(num_qubits):
+        print("compiling...")
+        dev = qml.device(backend, wires=num_qubits)
+
+        @qml.qnode(dev)
+        def circ():
+            @catalyst.for_loop(0, num_qubits, 1)
+            def loop_0(i):
+                qml.RY(2.2, wires=i)
+
+            loop_0()
+            qml.RX(1.23, wires=num_qubits - 1)
+            qml.RZ(3.45, wires=0)
+            qml.CNOT(wires=[num_qubits - 2, 1])
+            return readout(wires=[0, num_qubits - 2])
+
+        return circ()
+
+    cat = catalyst.qjit(ref)
+
+    assert np.allclose(ref(10), cat(10))
+    assert np.allclose(ref(4), cat(4))
+    out, _ = capfd.readouterr()
+    assert out.count("compiling...") == 3
+
+
+@pytest.mark.parametrize("readout", [qml.probs, qml.state])
+def test_dynamic_wires_statebased_without_wires(readout, backend, capfd):
+    """
+    Test that a circuit with dynamic number of wires can be executed correctly
+    with state based measurements without wires specified.
+    """
+
+    def ref(num_qubits):
+        print("compiling...")
+        dev = qml.device(backend, wires=num_qubits)
+
+        @qml.qnode(dev)
+        def circ(x):
+            @catalyst.for_loop(0, num_qubits, 1)
+            def loop_0(i):
+                qml.RY(2.2, wires=i)
+
+            loop_0()
+            qml.cond(x == 42, qml.RZ)(3.45, wires=0)
+            return readout()
+
+        return circ(42)
+
+    cat = catalyst.qjit(ref)
+
+    assert np.allclose(ref(10), cat(10))
+    assert np.allclose(ref(4), cat(4))
+    out, _ = capfd.readouterr()
+    assert out.count("compiling...") == 3
+
+
+@pytest.mark.parametrize("shots", [3, (3, 4, 5)])
+def test_dynamic_wires_sample_with_wires(shots, backend, capfd):
+    """
+    Test that a circuit with dynamic number of wires can be executed correctly
+    with sample measurements with wires specified.
+    """
+
+    def ref(num_qubits):
+        print("compiling...")
+        dev = qml.device(backend, wires=num_qubits, shots=shots)
+
+        @qml.qnode(dev)
+        def circ():
+            @catalyst.for_loop(0, num_qubits, 1)
+            def loop_0(i):
+                qml.RY(0.0, wires=i)
+
+            loop_0()
+            qml.RX(0.0, wires=num_qubits - 1)
+            return qml.sample(wires=[0, num_qubits - 1])
+
+        return circ()
+
+    cat = catalyst.qjit(ref)
+    num_shots = 1 if isinstance(shots, int) else len(shots)
+    for test_nqubits in (10, 4):
+        expected = ref(test_nqubits)
+        observed = cat(test_nqubits)
+        assert all(np.allclose(expected[i], observed[i]) for i in range(num_shots))
+
+    out, _ = capfd.readouterr()
+    assert out.count("compiling...") == 3
+
+
+@pytest.mark.parametrize("shots", [3, (3, 4, 5), (7,) * 3])
+def test_dynamic_wires_sample_without_wires(shots, backend, capfd):
+    """
+    Test that a circuit with dynamic number of wires can be executed correctly
+    with sample measurements without wires specified.
+    """
+
+    def ref(num_qubits):
+        print("compiling...")
+        dev = qml.device(backend, wires=num_qubits, shots=shots)
+
+        @qml.qnode(dev)
+        def circ():
+            @catalyst.for_loop(0, num_qubits, 1)
+            def loop_0(i):
+                qml.RY(0.0, wires=i)
+
+            loop_0()
+            qml.RX(0.0, wires=num_qubits - 1)
+            return qml.sample()
+
+        return circ()
+
+    cat = catalyst.qjit(ref)
+    num_shots = 1 if isinstance(shots, int) else len(shots)
+    for test_nqubits in (10, 4):
+        expected = ref(test_nqubits)
+        observed = cat(test_nqubits)
+        assert all(np.allclose(expected[i], observed[i]) for i in range(num_shots))
+
+    out, _ = capfd.readouterr()
+    assert out.count("compiling...") == 3
+
+
+def test_dynamic_wires_counts_with_wires(backend, capfd):
+    """
+    Test that a circuit with dynamic number of wires can be executed correctly
+    with counts measurements with wires specified.
+
+    Note that Catalyst does not support shot vectors with counts.
+    """
+
+    @catalyst.qjit
+    def func(num_qubits):
+        print("compiling...")
+        dev = qml.device(backend, wires=num_qubits, shots=1000)
+
+        @qml.qnode(dev)
+        def circ():
+            qml.RX(0.0, wires=num_qubits - 1)
+            return qml.counts(wires=[0, num_qubits - 1])
+
+        return circ()
+
+    expected = [np.array([0, 1, 2, 3]), np.array([1000, 0, 0, 0])]
+    for test_nqubits in (10, 4, 7):
+        observed = func(test_nqubits)
+        assert np.allclose(expected, observed)
+
+    out, _ = capfd.readouterr()
+    assert out.count("compiling...") == 1
+
+
+def test_dynamic_wires_counts_without_wires(backend, capfd):
+    """
+    Test that a circuit with dynamic number of wires can be executed correctly
+    with counts measurements without wires specified.
+
+    Note that Catalyst does not support shot vectors with counts.
+    """
+
+    @catalyst.qjit
+    def func(num_qubits):
+        print("compiling...")
+        dev = qml.device(backend, wires=num_qubits, shots=1000)
+
+        @qml.qnode(dev)
+        def circ():
+            qml.RX(0.0, wires=num_qubits - 1)
+            return qml.counts()
+
+        return circ()
+
+    for test_nqubits in (1, 2, 3):
+        size = 2**test_nqubits
+        expected_counts = np.zeros(size)
+        expected_counts[0] = 1000
+        expected = [np.arange(size), expected_counts]
+        observed = func(test_nqubits)
+        assert np.allclose(expected, observed)
+
+    out, _ = capfd.readouterr()
+    assert out.count("compiling...") == 1
 
 
 @pytest.mark.parametrize("wires", [1.1, (1.1)])
