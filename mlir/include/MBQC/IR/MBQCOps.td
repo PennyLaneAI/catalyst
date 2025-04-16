@@ -54,8 +54,9 @@ def MeasureInBasisOp : MBQC_Op<"measure_in_basis"> {
     let description = [{
         A parametric single-qubit projective measurement is equivalent to the `quantum.measure`
         operation except that it supports measurements in an arbitrary basis, rather than the
-        computational basis only. Specifically, the measurement basis is parameterized by a rotation
-        angle about a plane along the major axes of the Bloch sphere (either XY, ZX or YZ).
+        computational basis only. Specifically, the measurement basis is parameterized by a plane
+        along the major axes of the Bloch sphere (either XY, ZX or YZ) and a rotation angle about
+        that plane.
     }];
 
     let arguments = (ins
