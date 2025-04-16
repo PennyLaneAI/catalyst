@@ -1751,7 +1751,7 @@ def _cond_lowering(
                     if_ctx.name_stack,
                     mlir.TokenSet(),
                     [mlir.ir_constants(c) for c in true_jaxpr.consts],
-                    *flat_args_plus_consts,  # fn expects [a1], [a2], [a3] format
+                    *flat_args_plus_consts,
                     dim_var_values=jax_ctx.dim_var_values,
                 )
 
