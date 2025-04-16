@@ -15,9 +15,9 @@
 """Unit tests for `OpenQasmDevice` on "local" Amazon Braket devices"""
 import numpy as np
 import pennylane as qml
-from pennylane import exceptions
 import pytest
 from numpy.testing import assert_allclose
+from pennylane import exceptions
 
 from catalyst import grad, qjit
 

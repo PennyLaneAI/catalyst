@@ -23,9 +23,9 @@ from typing import Callable, Sequence
 
 import jax.numpy as jnp
 import pennylane as qml
-from pennylane import exceptions
 from jax.core import eval_jaxpr
 from jax.tree_util import tree_flatten, tree_unflatten
+from pennylane import exceptions
 from pennylane.measurements import (
     CountsMP,
     ExpectationMP,

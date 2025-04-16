@@ -20,9 +20,9 @@ from typing import Iterable, Sequence
 import jax.numpy as jnp
 import numpy as np
 import pennylane as qml
-from pennylane import exceptions
 import pytest
 from jax.tree_util import tree_flatten
+from pennylane import exceptions
 from pennylane.transforms.dynamic_one_shot import fill_in_value
 
 import catalyst
