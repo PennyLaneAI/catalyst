@@ -731,9 +731,11 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
 
     if (runTranslate && (inType == InputType::MLIR)) {
         TimingScope translateTiming = timing.nest("Translate");
+	// TODO: Change to true for release.
+	bool disableVerification = false;
         llvmModule =
             timer::timer(translateModuleToLLVMIR, "translateModuleToLLVMIR",
-                         /* add_endl */ false, *mlirModule, llvmContext, "LLVMDialectModule");
+                         /* add_endl */ false, *mlirModule, llvmContext, "LLVMDialectModule", disableVerification);
         if (!llvmModule) {
             CO_MSG(options, Verbosity::Urgent, "Failed to translate LLVM module\n");
             return failure();
