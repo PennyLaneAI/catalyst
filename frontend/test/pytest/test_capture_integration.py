@@ -1132,7 +1132,7 @@ class TestCapture:
             qml.QubitUnitary(U, 0)
             return qml.expval(qml.Z(0))
 
-        experimental_capture_result = captured_circuit(U.matrix())
+        capture_result = captured_circuit(U.matrix())
         assert is_unitary_rotated(captured_circuit.mlir)
 
         qml.capture.disable()
@@ -1146,7 +1146,7 @@ class TestCapture:
             qml.QubitUnitary(U, 0)
             return qml.expval(qml.Z(0))
 
-        assert circuit(U.matrix()) == experimental_capture_result
+        assert circuit(U.matrix()) == capture_result
 
     def test_mixed_transforms_workflow(self, backend):
         """Test the integration for a circuit with a combination of 'unitary_to_rot'
