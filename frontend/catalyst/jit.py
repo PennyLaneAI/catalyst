@@ -712,7 +712,6 @@ class QJIT(CatalystCallable):
         full_sig = merge_static_args(dynamic_sig, args, static_argnums)
 
         if qml.capture.enabled():
-            print("Capture enabled")
             return trace_from_pennylane(
                 self.user_function, static_argnums, abstracted_axes, full_sig, kwargs
             )
