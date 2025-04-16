@@ -17,7 +17,7 @@ import inspect
 from collections.abc import Sequence
 
 import numpy as np
-from jax._src.core import shaped_abstractify
+from jax._src.api_util import shaped_abstractify
 from jax._src.lib.mlir import ir
 
 from catalyst.jax_extras import ShapedArray

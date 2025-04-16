@@ -27,7 +27,7 @@ from typing import Any, Callable
 
 import jax
 import jax.numpy as jnp
-from jax._src.core import shaped_abstractify
+from jax._src.api_util import shaped_abstractify
 from jax._src.tree_util import (
     Partial,
     tree_flatten,
