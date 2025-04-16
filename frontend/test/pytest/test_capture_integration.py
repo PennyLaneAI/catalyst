@@ -178,7 +178,7 @@ class TestCapture:
 
         qml.capture.enable()
 
-        @qjit()
+        @qjit
         @qml.qnode(device=dev)
         def captured_circuit(x):
             qml.Hadamard(wires=0)
@@ -194,7 +194,7 @@ class TestCapture:
 
         # Capture disabled
 
-        @qjit()
+        @qjit
         @qml.qnode(device=dev)
         def circuit(x):
             qml.Hadamard(wires=0)
@@ -225,7 +225,7 @@ class TestCapture:
 
         qml.capture.enable()
 
-        @qjit()
+        @qjit
         @qml.qnode(dev)
         def captured_circuit(_basis_state):
             qml.BasisState(_basis_state, wires=list(range(n_wires)))
@@ -237,7 +237,7 @@ class TestCapture:
 
         # Capture disabled
 
-        @qjit()
+        @qjit
         @qml.qnode(dev)
         def circuit(_basis_state):
             qml.BasisState(_basis_state, wires=list(range(n_wires)))
@@ -265,7 +265,7 @@ class TestCapture:
 
         qml.capture.enable()
 
-        @qjit()
+        @qjit
         @qml.qnode(dev)
         def captured_circuit(init_state):
             qml.StatePrep(init_state, wires=list(range(n_wires)))
@@ -277,7 +277,7 @@ class TestCapture:
 
         # Capture disabled
 
-        @qjit()
+        @qjit
         @qml.qnode(dev)
         def circuit(init_state):
             qml.StatePrep(init_state, wires=list(range(n_wires)))
@@ -295,7 +295,7 @@ class TestCapture:
 
         qml.capture.enable()
 
-        @qjit()
+        @qjit
         @qml.qnode(device)
         def captured_circuit(theta, val):
             qml.adjoint(qml.RY)(jnp.pi, val)
@@ -326,7 +326,7 @@ class TestCapture:
 
         qml.capture.enable()
 
-        @qjit()
+        @qjit
         @qml.qnode(device)
         def captured_circuit(theta):
             qml.ctrl(qml.RX(theta, wires=0), control=[1], control_values=[False])
@@ -355,7 +355,7 @@ class TestCapture:
 
         qml.capture.enable()
 
-        @qjit()
+        @qjit
         @qml.qnode(qml.device(backend, wires=4))
         def captured_circuit(x):
 
@@ -392,7 +392,7 @@ class TestCapture:
 
         qml.capture.enable()
 
-        @qjit()
+        @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def captured_circuit(n, x):
 
@@ -412,7 +412,7 @@ class TestCapture:
 
         # Capture disabled
 
-        @qjit()
+        @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def circuit(n, x):
 
@@ -435,7 +435,7 @@ class TestCapture:
 
         qml.capture.enable()
 
-        @qjit()
+        @qjit
         @qml.qnode(qml.device(backend, wires=4))
         def captured_circuit(n):
             # Input state: equal superposition
@@ -466,7 +466,7 @@ class TestCapture:
 
         # Capture disabled
 
-        @qjit()
+        @qjit
         @qml.qnode(qml.device(backend, wires=4))
         def circuit(n):
             # Input state: equal superposition
@@ -503,7 +503,7 @@ class TestCapture:
 
         qml.capture.enable()
 
-        @qjit()
+        @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def capturted_circuit(x: float):
 
@@ -529,7 +529,7 @@ class TestCapture:
 
         # Capture disabled
 
-        @qjit()
+        @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def circuit(x: float):
 
@@ -559,7 +559,7 @@ class TestCapture:
 
         qml.capture.enable()
 
-        @qjit()
+        @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def captured_circuit(x: float, step: float):
 
@@ -583,7 +583,7 @@ class TestCapture:
 
         # Capture disabled
 
-        @qjit()
+        @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def circuit(x: float, step: float):
 
@@ -610,7 +610,7 @@ class TestCapture:
 
         qml.capture.enable()
 
-        @qjit()
+        @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def captured_circuit(x: float, y: float):
 
@@ -641,7 +641,7 @@ class TestCapture:
 
         # Capture disabled
 
-        @qjit()
+        @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def circuit(x: float, y: float):
 
@@ -675,7 +675,7 @@ class TestCapture:
 
         qml.capture.enable()
 
-        @qjit()
+        @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def captured_circuit(x: float):
 
@@ -696,7 +696,7 @@ class TestCapture:
 
         # Capture disabled
 
-        @qjit()
+        @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def circuit(x: float):
 
@@ -720,7 +720,7 @@ class TestCapture:
 
         qml.capture.enable()
 
-        @qjit()
+        @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def captured_circuit(x: float):
 
@@ -738,7 +738,7 @@ class TestCapture:
 
         # Capture disabled
 
-        @qjit()
+        @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def circuit(x: float):
 
@@ -760,7 +760,7 @@ class TestCapture:
 
         qml.capture.enable()
 
-        @qjit()
+        @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def captured_circuit(x: float):
 
@@ -783,7 +783,7 @@ class TestCapture:
 
         # Capture disabled
 
-        @qjit()
+        @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def circuit(x: float):
 
@@ -810,7 +810,7 @@ class TestCapture:
 
         qml.capture.enable()
 
-        @qjit()
+        @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def captured_circuit(x: float):
 
@@ -833,7 +833,7 @@ class TestCapture:
 
         # Capture disabled
 
-        @qjit()
+        @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def circuit(x: float):
 
@@ -860,7 +860,7 @@ class TestCapture:
 
         qml.capture.enable()
 
-        @qjit()
+        @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def captured_circuit(x: float):
 
@@ -883,7 +883,7 @@ class TestCapture:
 
         # Capture disabled
 
-        @qjit()
+        @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def circuit(x: float):
 
@@ -909,7 +909,7 @@ class TestCapture:
 
         qml.capture.enable()
 
-        @qjit()
+        @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def captured_circuit(x: float, y: float):
 
@@ -937,7 +937,7 @@ class TestCapture:
 
         # Capture disabled
 
-        @qjit()
+        @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def circuit(x: float, y: float):
 
@@ -969,7 +969,7 @@ class TestCapture:
 
         qml.capture.enable()
 
-        @qjit()
+        @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def captured_circuit(x: float):
 
@@ -983,7 +983,7 @@ class TestCapture:
 
         # Capture disabled
 
-        @qjit()
+        @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def circuit(x: float):
 
@@ -1018,7 +1018,7 @@ class TestCapture:
 
         # Capture disabled
 
-        @qjit()
+        @qjit
         @qml.transforms.cancel_inverses
         @qml.qnode(qml.device(backend, wires=1))
         def circuit(x: float):
@@ -1052,7 +1052,7 @@ class TestCapture:
 
         # Capture disabled
 
-        @qjit()
+        @qjit
         @qml.transforms.merge_rotations
         @qml.qnode(qml.device(backend, wires=1))
         def circuit(x: float):
@@ -1142,7 +1142,7 @@ class TestCapture:
 
         # Capture disabled
 
-        @qjit()
+        @qjit
         @qml.transforms.unitary_to_rot
         @qml.qnode(qml.device(backend, wires=1))
         def circuit(U: ShapedArray([2, 2], float)):
@@ -1249,7 +1249,7 @@ class TestCapture:
 
         # Capture disabled
 
-        @qjit()
+        @qjit
         @partial(qml.transforms.decompose, gate_set=[qml.RX, qml.RY, qml.RZ])
         @qml.qnode(qml.device(backend, wires=2))
         def circuit(x: float, y: float, z: float):
@@ -1280,7 +1280,7 @@ class TestCapture:
 
         # Capture disabled
 
-        @qjit()
+        @qjit
         @partial(qml.map_wires, wire_map={0: 1})
         @qml.qnode(qml.device(backend, wires=2))
         def circuit(x):
@@ -1315,7 +1315,7 @@ class TestCapture:
 
         # Capture disabled
 
-        @qjit()
+        @qjit
         @qml.transforms.single_qubit_fusion
         @qml.qnode(qml.device(backend, wires=1))
         def circuit():
@@ -1360,7 +1360,7 @@ class TestCapture:
 
         # Capture disabled
 
-        @qjit()
+        @qjit
         @partial(qml.transforms.commute_controlled, direction="left")
         @qml.qnode(qml.device(backend, wires=3))
         def circuit():
@@ -1396,7 +1396,7 @@ class TestCapture:
 
         # Capture disabled
 
-        @qjit()
+        @qjit
         @qml.transforms.merge_amplitude_embedding
         @qml.qnode(qml.device(backend, wires=2))
         def circuit():
@@ -1432,7 +1432,7 @@ class TestCapture:
 
         # Capture disabled
 
-        @qjit()
+        @qjit
         @qml.qnode(qml.device(backend, wires=2, shots=10))
         def circuit():
             @qml.for_loop(0, 2, 1)
