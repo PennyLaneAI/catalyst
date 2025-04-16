@@ -24,7 +24,7 @@ import jax.numpy as jnp
 import pennylane as qml
 from jax.extend.linear_util import wrap_init
 from jax.interpreters.partial_eval import convert_constvars_jaxpr
-from pennylane.capture import PlxprInterpreter, disable, enable, enabled, qnode_prim
+from pennylane.capture import PlxprInterpreter, qnode_prim
 from pennylane.capture.expand_transforms import ExpandTransformsInterpreter
 from pennylane.capture.primitives import cond_prim as plxpr_cond_prim
 from pennylane.capture.primitives import for_loop_prim as plxpr_for_loop_prim

@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Integration tests for the the PL capture in Catalyst."""
+# pylint: disable=too-many-lines
+
 from functools import partial
 
 import jax.numpy as jnp
@@ -44,6 +46,7 @@ def circuit_aot_builder(dev):
 
 
 def has_catalyst_transforms(mlir):
+    """Check in the MLIR if the transforms were scheduled"""
     return (
         'transform.apply_registered_pass "remove-chained-self-inverse"' in mlir
         and 'transform.apply_registered_pass "merge-rotations"' in mlir
