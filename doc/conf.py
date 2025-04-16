@@ -158,6 +158,7 @@ autosummary_generate = True
 autosummary_imported_members = False
 automodapi_toctreedirnm = "code/api"
 automodsumm_inherited_members = True
+autosummary_ignore_module_all = False
 
 # Breathe extension
 breathe_projects = {"Catalyst": "./doxyoutput/xml"}
