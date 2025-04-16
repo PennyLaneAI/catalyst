@@ -20,6 +20,7 @@ from typing import Callable, Sequence
 
 import jax
 import jax.core
+import jax.numpy as jnp
 import pennylane as qml
 from jax.extend.linear_util import wrap_init
 from jax.interpreters.partial_eval import convert_constvars_jaxpr
@@ -65,6 +66,8 @@ from catalyst.jax_primitives import (
     quantum_kernel_p,
     qunitary_p,
     sample_p,
+    set_basis_state_p,
+    set_state_p,
     state_p,
     var_p,
     while_p,
@@ -421,6 +424,37 @@ def handle_qubit_unitary(self, *invals, n_wires):
 def handle_global_phase(self, phase, *wires, n_wires):
     """Handle the conversion from plxpr to Catalyst jaxpr for the GlobalPhase primitive"""
     gphase_p.bind(phase, ctrl_len=0, adjoint=False)
+
+
+@QFuncPlxprInterpreter.register_primitive(qml.BasisState._primitive)
+def handle_basis_state(self, *invals, n_wires):
+    """Handle the conversion from plxpr to Catalyst jaxpr for the BasisState primitive"""
+    state_inval = invals[0]
+    wires_inval = invals[1:]
+
+    state = jax.lax.convert_element_type(state_inval, jnp.dtype(jnp.bool))
+    wires = [self.get_wire(w) for w in wires_inval]
+    out_wires = set_basis_state_p.bind(*wires, state)
+
+    for wire_values, new_wire in zip(wires_inval, out_wires):
+        self.wire_map[wire_values] = new_wire
+
+
+# pylint: disable=unused-argument
+@QFuncPlxprInterpreter.register_primitive(qml.StatePrep._primitive)
+def handle_state_prep(self, *invals, n_wires, **kwargs):
+    """Handle the conversion from plxpr to Catalyst jaxpr for the StatePrep primitive"""
+    state_inval = invals[0]
+    wires_inval = invals[1:]
+
+    # jnp.complex128 is the top element in the type promotion lattice so it is ok to do this:
+    # https://jax.readthedocs.io/en/latest/type_promotion.html
+    state = jax.lax.convert_element_type(state_inval, jnp.dtype(jnp.complex128))
+    wires = [self.get_wire(w) for w in wires_inval]
+    out_wires = set_state_p.bind(*wires, state)
+
+    for wire_values, new_wire in zip(wires_inval, out_wires):
+        self.wire_map[wire_values] = new_wire
 
 
 # pylint: disable=unused-argument, too-many-arguments
