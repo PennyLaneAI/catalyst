@@ -16,6 +16,7 @@
 
 #include <algorithm> // generate_n
 #include <complex>
+#include <fstream>
 #include <memory>
 #include <optional>
 #include <random>
@@ -32,7 +33,7 @@
 //   This is intended to make parsing the output easier.
 //   Ideally, at some point resource usage would be passed back through as an object, and printing
 //   at all would be unneeded.
-#define RESOURCE_PRINT_DELIMETER "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+#define RESOURCES_FNAME "__pennylane_resources_data.json"
 
 namespace Catalyst::Runtime::Devices {
 
@@ -74,14 +75,18 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
         resource_data_.erase("num_gates");
         resource_data_.erase("num_qubits");
 
-        std::cout << RESOURCE_PRINT_DELIMETER << std::endl;
-        std::cout << "{" << std::endl;
-        std::cout << "  \"num_qubits\": " << num_qubits << ",\n";
-        std::cout << "  \"num_gates\": " << num_gates << ",\n";
-        std::cout << "  \"gate_types\": ";
-        pretty_print(resource_data_, 2);
-        std::cout << "\n}" << std::endl;
-        std::cout << RESOURCE_PRINT_DELIMETER << std::endl;
+        // Open the file for writing
+        std::ofstream resource_file(RESOURCES_FNAME);
+        if (!resource_file.is_open()) {
+            throw std::runtime_error("Failed to open resource usage file for writing.");
+        }
+
+        resource_file << "{" << std::endl;
+        resource_file << "  \"num_qubits\": " << num_qubits << ",\n";
+        resource_file << "  \"num_gates\": " << num_gates << ",\n";
+        resource_file << "  \"gate_types\": ";
+        pretty_print(resource_data_, 2, resource_file);
+        resource_file << "\n}" << std::endl;
 
         // Restore 2 special variables
         resource_data_["num_qubits"] = num_qubits;
@@ -264,7 +269,8 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
 
             if (controlled_wires.empty()) {
                 resource_data_["QubitUnitary"]++;
-            } else {
+            }
+            else {
                 resource_data_["ControlledQubitUnitary"]++;
             }
         }
