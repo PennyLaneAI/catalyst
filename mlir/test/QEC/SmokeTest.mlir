@@ -18,3 +18,14 @@ func.func @foo(%q1 : !quantum.bit, %q2 : !quantum.bit) {
     qec.ppr ["X", "Z"] (4) %q1, %q2 : !quantum.bit, !quantum.bit
     func.return
 }
+
+func.func @boo(%q1 : !quantum.bit) {
+    %0 = qec.prepare zero %q1 : !quantum.bit
+    %1 = qec.prepare one %0 : !quantum.bit
+    %2 = qec.prepare plus %1 : !quantum.bit
+    %3 = qec.prepare minus %2 : !quantum.bit
+    %4 = qec.prepare plus_i %3 : !quantum.bit
+    %5 = qec.prepare minus_i %4 : !quantum.bit
+    %6 = qec.prepare magic %5 : !quantum.bit 
+    func.return
+}

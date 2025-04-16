@@ -15,6 +15,7 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/OpImplementation.h"
+#include "llvm/ADT/TypeSwitch.h" // needed for enums
 
 #include "QEC/IR/QECDialect.h"
 #include "Quantum/IR/QuantumDialect.h"
@@ -34,7 +35,10 @@ void QECDialect::initialize()
 #define GET_TYPEDEF_LIST
 #include "QEC/IR/QECDialectTypes.cpp.inc"
         >();
-
+    addAttributes<
+#define GET_ATTRDEF_LIST
+#include "QEC/IR/QECAttributes.cpp.inc"
+        >();
     addOperations<
 #define GET_OP_LIST
 #include "QEC/IR/QECDialect.cpp.inc"
@@ -47,6 +51,19 @@ void QECDialect::initialize()
 
 #define GET_TYPEDEF_CLASSES
 #include "QEC/IR/QECDialectTypes.cpp.inc"
+
+//===----------------------------------------------------------------------===//
+// QEC enum definitions.
+//===----------------------------------------------------------------------===//
+
+#include "QEC/IR/QECEnums.cpp.inc"
+
+//===----------------------------------------------------------------------===//
+// QEC attribute definitions.
+//===----------------------------------------------------------------------===//
+
+#define GET_ATTRDEF_CLASSES
+#include "QEC/IR/QECAttributes.cpp.inc"
 
 //===----------------------------------------------------------------------===//
 // QEC op definitions.
