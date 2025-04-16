@@ -136,10 +136,6 @@ jobs:
           # Update env vars valid for all tasks of this job
           echo '/opt/rh/gcc-toolset-12/root/usr/bin' >> $GITHUB_PATH          
 
-      # - name: Set up Python ${{ matrix.python_version }}
-      #   run: |
-      #     dnf install -y python3
-
       - name: Install Dependencies (Python)
         run: |
           python${{ matrix.python_version }} -m pip install --upgrade pip
@@ -349,7 +345,7 @@ jobs:
 
       - name: Build Plugin wheel
         # Run only on Thursday at the given time
-        # if: github.event_name == 'schedule'
+        if: github.event_name == 'schedule'
         run: |
           MLIR_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir" \
           LLVM_BUILD_DIR="$GITHUB_WORKSPACE/llvm-build" \
@@ -380,7 +376,7 @@ jobs:
 
       - name: Upload Standalone Plugin Wheel Artifact
         # Run only on Thursday at the given time
-        # if: github.event_name == 'schedule'
+        if: github.event_name == 'schedule'
         uses: actions/upload-artifact@v4
         with:
           name: standalone-plugin-linux_arm_64-wheel-py-${{ matrix.python_version }}.zip
@@ -410,7 +406,7 @@ jobs:
 
     - name: Download Standalone Plugin Wheel Artifact
       # Run only on Thursday at the given time
-      # if: github.event_name == 'schedule'
+      if: github.event_name == 'schedule'
       uses: actions/download-artifact@v4
       with:
         name: standalone-plugin-linux_arm_64-wheel-py-${{ matrix.python_version }}.zip
@@ -440,7 +436,7 @@ jobs:
 
     - name: Install Standalone Plugin
       # Run only on Thursday at the given time (TODO: set comparison to == before merging)
-      # if: github.event_name == 'schedule'
+      if: github.event_name == 'schedule'
       run: |
         python${{ matrix.python_version }} -m pip install standalone_plugin_wheel/wheel/*.whl --no-deps
 
@@ -454,6 +450,6 @@ jobs:
 
     - name: Run Standalone Plugin Tests
       # Run only on Thursday at the given time
-      # if: github.event_name == 'scheduled'
+      if: github.event_name == 'scheduled'
       run: |
         python${{ matrix.python_version }} -m pytest standalone_plugin_wheel/standalone_plugin/test -n auto
