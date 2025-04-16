@@ -17,7 +17,7 @@
 #include "llvm/Support/Debug.h"
 
 #include "mlir/Analysis/SliceAnalysis.h"
-#include "mlir/Transforms/TopologicalSortUtils.h"
+#include "mlir/Analysis/TopologicalSortUtils.h"
 
 #include "QEC/IR/QECDialect.h"
 #include "QEC/IR/QECOpInterfaces.h"
