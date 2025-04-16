@@ -829,7 +829,7 @@ def MeasureOp : Quantum_Op<"measure"> {
     }];
 }
 
-def SampleOp : Measurement_Op<"sample"> {
+def SampleOp : Measurement_Op<"sample", [AttrSizedOperandSegments]> {
     let summary = "Sample eigenvalues from the given observable for the current state";
     let description = [{
         The `quantum.sample` operation represents the measurement process of sampling eigenvalues
@@ -862,6 +862,7 @@ def SampleOp : Measurement_Op<"sample"> {
 
     let arguments = (ins
         ObservableType:$obs,
+        Variadic<I64>:$dynamic_shape,
         Optional<
            AnyTypeOf<[
             MemRefRankOf<[F64], [1]>,
@@ -880,7 +881,9 @@ def SampleOp : Measurement_Op<"sample"> {
     );
 
     let assemblyFormat = [{
-        $obs ( `in` `(` $in_data^ `:` type($in_data) `)` )? attr-dict ( `:` type($samples)^ )?
+        $obs ( `shape` $dynamic_shape^ )?
+        ( `in` `(` $in_data^ `:` type($in_data) `)` )?
+        attr-dict ( `:` type($samples)^ )?
     }];
 
     let extraClassDeclaration = [{
@@ -892,7 +895,7 @@ def SampleOp : Measurement_Op<"sample"> {
     let hasVerifier = 1;
 }
 
-def CountsOp : Measurement_Op<"counts", [SameVariadicOperandSize, SameVariadicResultSize]> {
+def CountsOp : Measurement_Op<"counts", [AttrSizedOperandSegments, SameVariadicResultSize]> {
     let summary = "Compute sample counts for the given observable for the current state";
     let description = [{
         The `quantum.counts` operation represents the measurement process of sampling eigenvalues
@@ -926,6 +929,7 @@ def CountsOp : Measurement_Op<"counts", [SameVariadicOperandSize, SameVariadicRe
 
     let arguments = (ins
         ObservableType:$obs,
+        Optional<I64>:$dynamic_shape,
         Optional<MemRefRankOf<[F64], [1]>>:$in_eigvals,
         Optional<MemRefRankOf<[I64], [1]>>:$in_counts
     );
@@ -936,7 +940,7 @@ def CountsOp : Measurement_Op<"counts", [SameVariadicOperandSize, SameVariadicRe
     );
 
     let assemblyFormat = [{
-        $obs
+        $obs ( `shape` $dynamic_shape^ )?
         ( `in` `(` $in_eigvals^ `:` type($in_eigvals) `,` $in_counts `:` type($in_counts) `)` )?
         attr-dict ( `:` type($eigvals)^ `,` type($counts) )?
     }];
@@ -1023,7 +1027,7 @@ def VarianceOp : Measurement_Op<"var"> {
     }];
 }
 
-def ProbsOp : Measurement_Op<"probs"> {
+def ProbsOp : Measurement_Op<"probs", [AttrSizedOperandSegments]> {
     let summary = "Compute computational basis probabilities for the current state";
     let description = [{
         The `quantum.probs` operation represents the measurement process of computing probabilities
@@ -1046,6 +1050,7 @@ def ProbsOp : Measurement_Op<"probs"> {
 
     let arguments = (ins
         ObservableType:$obs,
+        Optional<I64>:$dynamic_shape,
         Optional<MemRefRankOf<[F64], [1]>>:$state_in
     );
 
@@ -1054,7 +1059,9 @@ def ProbsOp : Measurement_Op<"probs"> {
     );
 
     let assemblyFormat = [{
-        $obs ( `in` `(` $state_in^ `:` type($state_in) `)` )? attr-dict ( `:` type($probabilities)^ )?
+        $obs ( `shape` $dynamic_shape^ )?
+        ( `in` `(` $state_in^ `:` type($state_in) `)` )?
+        attr-dict ( `:` type($probabilities)^ )?
     }];
 
     let extraClassDeclaration = [{
@@ -1066,7 +1073,7 @@ def ProbsOp : Measurement_Op<"probs"> {
     let hasVerifier = 1;
 }
 
-def StateOp : Measurement_Op<"state"> {
+def StateOp : Measurement_Op<"state", [AttrSizedOperandSegments]> {
     let summary = "Return the current statevector";
     let description = [{
         The `quantum.state` operation represents the measurement process of returning the current
@@ -1090,6 +1097,7 @@ def StateOp : Measurement_Op<"state"> {
 
     let arguments = (ins
         ObservableType:$obs,
+        Optional<I64>:$dynamic_shape,
         Optional<MemRefRankOf<[Complex<F64>], [1]>>:$state_in
     );
 
@@ -1104,7 +1112,9 @@ def StateOp : Measurement_Op<"state"> {
     }];
 
     let assemblyFormat = [{
-        $obs ( `in` `(` $state_in^ `:` type($state_in) `)` )? attr-dict ( `:` type($state)^ )?
+        $obs ( `shape` $dynamic_shape^ )?
+        ( `in` `(` $state_in^ `:` type($state_in) `)` )?
+        attr-dict ( `:` type($state)^ )?
     }];
 
     let hasVerifier = 1;

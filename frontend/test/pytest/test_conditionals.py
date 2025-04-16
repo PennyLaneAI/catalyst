@@ -18,9 +18,8 @@ import jax.numpy as jnp
 import numpy as np
 import pennylane as qml
 import pytest
-from utils import qjit_for_tests as qjit
 
-from catalyst import api_extensions, cond, measure
+from catalyst import api_extensions, cond, measure, qjit
 
 # pylint: disable=missing-function-docstring
 
@@ -749,7 +748,7 @@ class TestCondPredicateConversion:
     def test_conversion_integer(self):
         """Test entry predicate conversion from integer to bool."""
 
-        @qml.qjit()
+        @qjit()
         def workflow(x):
             n = 1
 
@@ -769,7 +768,7 @@ class TestCondPredicateConversion:
     def test_conversion_float(self):
         """Test entry predicate conversion from float to bool."""
 
-        @qml.qjit()
+        @qjit()
         def workflow(x):
             n = 2.0
 
@@ -789,7 +788,7 @@ class TestCondPredicateConversion:
     def test_jax_bool(self):
         """Test entry predicate with a JAX bool."""
 
-        @qml.qjit()
+        @qjit()
         def workflow(x):
             n = jnp.bool_(True)
 
@@ -809,7 +808,7 @@ class TestCondPredicateConversion:
     def test_else_if_conversion_integer(self):
         """Test else_if predicate conversion from integer to bool."""
 
-        @qml.qjit()
+        @qjit()
         def workflow(x):
             n = 1
 
@@ -833,7 +832,7 @@ class TestCondPredicateConversion:
     def test_conversion_int_autograph(self):
         """Test entry predicate conversion from integer to bool using Autograph."""
 
-        @qml.qjit(autograph=True)
+        @qjit(autograph=True)
         def workflow(x):
             n = 1
 
@@ -849,7 +848,7 @@ class TestCondPredicateConversion:
     def test_conversion_int_autograph_elif(self):
         """Test elif predicate conversion from integer to bool using Autograph."""
 
-        @qml.qjit(autograph=True)
+        @qjit(autograph=True)
         def workflow(x):
             n = 1
 
@@ -867,7 +866,7 @@ class TestCondPredicateConversion:
     def test_string_conversion_failed(self):
         """Test failure at converting string to bool using Autograph."""
 
-        @qml.qjit(autograph=True)
+        @qjit(autograph=True)
         def workflow(x):
             n = "fail"
 
@@ -887,7 +886,7 @@ class TestCondPredicateConversion:
     def test_array_conversion_failed(self):
         """Test failure at converting array to bool using Autograph."""
 
-        @qml.qjit(autograph=True)
+        @qjit(autograph=True)
         def workflow(x):
             n = jnp.array([[1], [2]])
 

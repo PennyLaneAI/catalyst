@@ -14,15 +14,15 @@
 
 #define DEBUG_TYPE "loop-boundary"
 
+#include "llvm/ADT/StringSet.h"
+#include "llvm/Support/Debug.h"
+
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Support/LogicalResult.h"
-#include "llvm/ADT/StringSet.h"
-#include "llvm/Support/Debug.h"
 
-#include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Transforms/Patterns.h"
 
@@ -106,6 +106,8 @@ bool isValidQuantumOperation(CustomOp &op, Mode mode)
         return hermitianSet.contains(gateName) || rotationsSet.contains(gateName) ||
                multiQubitSet.contains(gateName);
     }
+
+    assert(false && "Invalid Enum value for `Mode`");
 }
 
 // Determines if the given operation has any successors that are quantum CustomOps.
@@ -137,6 +139,19 @@ bool hasQuantumCustomPredecessor(CustomOp &op)
     return false;
 }
 
+// Return true if bottomOp is the immediate successor of topOp.
+// In this case, we don't want to perform loop boundary commutation,
+// as it would prevent a fix-point from being reached by the rewrite driver.
+bool isSourceAndSink(CustomOp topOp, CustomOp bottomOp)
+{
+    for (auto [outQubit, inQubit] : llvm::zip(topOp.getOutQubits(), bottomOp.getInQubits())) {
+        if (outQubit != inQubit) {
+            return false;
+        }
+    }
+    return true;
+}
+
 // Helper function to determine if a pair of operations can be optimized.
 bool isValidEdgePair(const CustomOp &bottomOp, std::vector<QubitOrigin> &bottomQubitOrigins,
                      const CustomOp &topOp, std::vector<QubitOrigin> &topQubitOrigins)
@@ -146,7 +161,8 @@ bool isValidEdgePair(const CustomOp &bottomOp, std::vector<QubitOrigin> &bottomQ
 
     if (bottomOpNonConst.getGateName() != topOpNonConst.getGateName() || topOp == bottomOp ||
         !verifyQubitOrigins(topQubitOrigins, bottomQubitOrigins) ||
-        hasQuantumCustomSuccessor(bottomOp) || hasQuantumCustomPredecessor(topOpNonConst)) {
+        isSourceAndSink(topOpNonConst, bottomOpNonConst) || hasQuantumCustomSuccessor(bottomOp) ||
+        hasQuantumCustomPredecessor(topOpNonConst)) {
         return false;
     }
     return true;
@@ -252,7 +268,12 @@ QubitOrigin determineQubitOrigin(Value qubit)
         }
 
         unsigned long position = extractOp.getIdxAttr().value();
-        return QubitOrigin(extractOp.getQreg(), position, true);
+        auto regType = extractOp.getQreg();
+        while (InsertOp insertOp = regType.getDefiningOp<quantum::InsertOp>()) {
+            regType = insertOp.getInQreg();
+        }
+
+        return QubitOrigin(regType, position, true);
     }
 
     return QubitOrigin(qubit, 0, false);

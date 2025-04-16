@@ -59,6 +59,7 @@ template <typename T, size_t R> class DataView {
             int64_t idx;
             for (int64_t i = R; i > 0; --i) {
                 idx = i - 1;
+                RT_ASSERT(view.sizes[idx] > 0);
                 if (indices[idx]++ < view.sizes[idx] - 1) {
                     next_axis = idx;
                     break;
@@ -77,6 +78,7 @@ template <typename T, size_t R> class DataView {
             int64_t idx;
             for (int64_t i = R; i > 0; --i) {
                 idx = i - 1;
+                RT_ASSERT(view.sizes[idx] > 0);
                 if (indices[idx]++ < view.sizes[idx] - 1) {
                     next_axis = idx;
                     break;

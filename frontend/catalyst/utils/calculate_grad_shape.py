@@ -17,7 +17,7 @@ Deduce the function signatures after taking their gradients with respect to some
 """
 
 
-from jax.core import ShapedArray
+from jax.core import DShapedArray, ShapedArray
 
 
 class Signature:
@@ -76,15 +76,15 @@ class Signature:
 
     @staticmethod
     def is_tensor(x):
-        """Determine whether a type ``x`` is a ``jax.core.ShapedArray``.
+        """Determine whether a type ``x`` is a ``jax.core.(D)ShapedArray``.
 
         Args:
             x: The type to be tested.
 
         Returns:
-            bool: Whether the type ``x`` is a ``jax.core.ShapedArray``
+            bool: Whether the type ``x`` is a ``jax.core.(D)ShapedArray``
         """
-        return isinstance(x, ShapedArray)
+        return isinstance(x, (DShapedArray, ShapedArray))
 
     def __eq__(self, other):
         return self.xs == other.xs and self.ys == other.ys
@@ -107,7 +107,7 @@ def calculate_grad_shape(signature, indices) -> Signature:
     inputs = signature.get_inputs()
 
     if not all(Signature.is_tensor(result) for result in results) and not all(
-        Signature.is_tensor(input) for inpute in inputs
+        Signature.is_tensor(_input) for _input in inputs
     ):
         raise TypeError("Inputs and results must be tensor type.")
 

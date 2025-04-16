@@ -23,9 +23,8 @@ import pennylane as qml
 import pytest
 from jax import numpy as jnp
 from numpy import pi
-from utils import qjit_for_tests as qjit
 
-from catalyst import for_loop, grad, measure
+from catalyst import for_loop, grad, measure, qjit
 from catalyst.jax_primitives import _scalar_abstractify
 from catalyst.tracing.type_signatures import (
     TypeCompatibility,
@@ -861,7 +860,7 @@ class TestDefaultAvailableIR:
     def test_mlir(self):
         """Test mlir."""
 
-        @qml.qjit  # Note that we are using the default qjit
+        @qjit  # Note that we are using the default qjit
         def f():
             return 1
 
@@ -875,12 +874,39 @@ class TestDefaultAvailableIR:
             qml.RX(x, wires=0)
             return qml.state()
 
-        @qml.qjit  # Note that we are using the default qjit
+        @qjit  # Note that we are using the default qjit
         def g(x: float):
             return f(x)
 
         assert g.qir
         assert "__catalyst__qis" in g.qir
+
+    def test_mlir_opt(self, backend):
+        """Test mlir opt."""
+
+        @qml.qnode(qml.device(backend, wires=1))
+        def f(x: float):
+            qml.RX(x, wires=0)
+            return qml.state()
+
+        @qjit  # Note that we are using the default qjit
+        def g(x: float):
+            return f(x)
+
+        assert g.mlir_opt
+        assert "__catalyst__qis" in g.mlir_opt
+
+    def test_jaxpr_target(self, backend):
+        """Test no mlir is generated for jaxpr target."""
+
+        @qjit(target="jaxpr")
+        @qml.qnode(qml.device(backend, wires=1))
+        def f(x: float):
+            qml.RX(x, wires=0)
+            return qml.state()
+
+        assert f.mlir_opt is None
+        assert f.mlir is None
 
 
 class TestAvoidVerification:

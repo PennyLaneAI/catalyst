@@ -22,9 +22,8 @@ import pytest
 from jax import numpy as jnp
 from numpy import array_equal
 from numpy.testing import assert_allclose
-from utils import qjit_for_tests as qjit
 
-from catalyst import cond, for_loop, while_loop
+from catalyst import cond, for_loop, qjit, while_loop
 from catalyst.jax_extras import DShapedArray, ShapedArray
 from catalyst.jax_extras.tracing import trace_to_jaxpr
 from catalyst.tracing.contexts import EvaluationContext
@@ -1143,7 +1142,7 @@ def test_trace_to_jaxpr():
 def test_abstracted_axis_no_recompilation():
     """Test that a function that does not need recompilation can be executed a second time"""
 
-    @qml.qjit(abstracted_axes=(("n",), ()))
+    @qjit(abstracted_axes=(("n",), ()))
     @qml.qnode(qml.device("lightning.qubit", wires=2))
     def circuit(x1, x2):
 

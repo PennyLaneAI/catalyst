@@ -32,7 +32,13 @@ from jax.tree_util import tree_flatten, tree_unflatten
 import catalyst
 from catalyst.autograph import run_autograph
 from catalyst.compiled_functions import CompilationCache, CompiledFunction
-from catalyst.compiler import CompileOptions, Compiler, canonicalize, to_llvmir
+from catalyst.compiler import (
+    CompileOptions,
+    Compiler,
+    canonicalize,
+    to_llvmir,
+    to_mlir_opt,
+)
 from catalyst.debug.instruments import instrument
 from catalyst.from_plxpr import trace_from_pennylane
 from catalyst.jax_tracer import lower_jaxpr_to_mlir, trace_to_jaxpr
@@ -114,8 +120,8 @@ def qjit(
         target (str): the compilation target
         keep_intermediate (bool): Whether or not to store the intermediate files throughout the
             compilation. If ``True``, intermediate representations are available via the
-            :attr:`~.QJIT.mlir`, :attr:`~.QJIT.jaxpr`, and :attr:`~.QJIT.qir`, representing
-            different stages in the optimization process.
+            :attr:`~.QJIT.mlir`, :attr:`~.QJIT.mlir_opt`, :attr:`~.QJIT.jaxpr`,
+            and :attr:`~.QJIT.qir`, representing different stages in the optimization process.
         verbose (bool): If ``True``, the tools and flags used by Catalyst behind the scenes are
             printed out.
         logfile (Optional[TextIOWrapper]): File object to write verbose messages to (default -
@@ -433,6 +439,57 @@ def qjit(
 
         the ``sum_abstracted`` function would only compile once and its definition would be
         reused for subsequent function calls.
+
+    .. _qubit_invariant_compilation:
+    .. details::
+        :title: Qubit-invariant compilation
+
+        In general, the inputs and outputs of the function being qjitted must have static types
+        and shapes. Otherwise, recompilation is triggered.
+
+        Out of all the :ref:`Catalyst-supported terminal measurements <measurements>`, there are
+        four that have a return shape that depend on the number of qubits. Namely, the return shape
+        of :func:`qml.probs() <pennylane.probs>` and :func:`qml.state() <pennylane.state>` is a 1D
+        array of size ``(2**num_qubits)``, the return shape of :func:`qml.sample() <pennylane.sample>`
+        is a 2D array of size ``(shots, num_qubits)``, and the return shape of
+        :func:`qml.counts() <pennylane.counts>` is two 1D arrays of size ``(2**num_qubits)``.
+        The general rule of recompilation mentioned above would imply that changing the number of qubits
+        in a workflow that returns any of these four measurements triggers recompilation.
+
+        However, Catalyst offers a powerful exception to this rule with **qubit-invariant compilation**:
+        the same compiled QNode can be invoked with a different number of qubits! This is especially
+        helpful for workflows where you would like to, for example, iterate through the wires without
+        knowing how many of them there are in advance. For instance, many workflows (such as `Grover's
+        algorithm <https://pennylane.ai/qml/demos/tutorial_grovers_algorithm>`_) have
+        an entangling layer at the beginning, where a Hadamard gate is applied to every wire.
+
+        To use this feature, the PennyLane device needs to be instantiated within the qjitted
+        function, or another function within its call graph. The ``wires`` parameter can then be
+        any (integer) program value, such as one of the function arguments.
+
+        .. code-block:: python
+
+            @qjit
+            def workflow(num_qubits):
+                print("compiling...")
+                dev = qml.device("lightning.qubit", wires=num_qubits)
+
+                @qml.qnode(dev)
+                def circuit():
+                    @catalyst.for_loop(0, num_qubits, 1)
+                    def entangle_all_qubits(i):
+                        qml.Hadamard(wires=i)
+                    entangle_all_qubits()
+
+                    return qml.probs()
+
+                return circuit()
+
+        >>> workflow(2)  # the first call, compilation occurs here
+        compiling...
+        [0.25 0.25 0.25 0.25]
+        >>> workflow(3)  # the precompiled quantum function is called
+        [0.125 0.125 0.125 0.125 0.125 0.125 0.125 0.125]
     """
     kwargs = copy.copy(locals())
     kwargs.pop("fn")
@@ -515,6 +572,14 @@ class QJIT(CatalystCallable):
             return None
 
         return canonicalize(stdin=str(self.mlir_module))
+
+    @property
+    def mlir_opt(self):
+        """obtain the MLIR representation after optimization"""
+        if not self.mlir_module:
+            return None
+
+        return to_mlir_opt(stdin=str(self.mlir_module), options=self.compile_options)
 
     @debug_logger
     def __call__(self, *args, **kwargs):

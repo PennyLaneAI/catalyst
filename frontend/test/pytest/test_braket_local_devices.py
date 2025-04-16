@@ -17,12 +17,13 @@ import numpy as np
 import pennylane as qml
 import pytest
 from numpy.testing import assert_allclose
+from pennylane import exceptions
 
 from catalyst import grad, qjit
 
 try:
     qml.device("braket.local.qubit", backend="default", wires=1)
-except qml.DeviceError:
+except exceptions.DeviceError:
     pytest.skip(
         "skipping Braket local tests because ``amazon-braket-pennylane-plugin`` is not installed",
         allow_module_level=True,

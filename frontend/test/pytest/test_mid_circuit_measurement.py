@@ -22,6 +22,7 @@ import numpy as np
 import pennylane as qml
 import pytest
 from jax.tree_util import tree_flatten
+from pennylane import exceptions
 from pennylane.transforms.dynamic_one_shot import fill_in_value
 
 import catalyst
@@ -326,7 +327,7 @@ class TestMidCircuitMeasurement:
         """Test that the correct default mcm_method is chosen based on postselect_mode"""
         dev = qml.device(backend, wires=1, shots=20)
 
-        @qml.qjit
+        @qjit
         @qml.qnode(dev, mcm_method=mcm_method, postselect_mode=postselect_mode)
         def circuit(x):
             qml.RX(x, wires=0)
@@ -343,7 +344,7 @@ class TestMidCircuitMeasurement:
         """Test that the correct default mcm_method is chosen based on postselect_mode"""
         dev = qml.device(backend, wires=1, shots=20)
 
-        @qml.qjit
+        @qjit
         @qml.qnode(dev, mcm_method=mcm_method, postselect_mode=postselect_mode)
         def circuit(x):
             qml.RX(x, wires=0)
@@ -368,7 +369,7 @@ class TestMidCircuitMeasurement:
         """Test that the correct default mcm_method is chosen based on postselect_mode"""
         dev = qml.device(backend, wires=1, shots=5)
 
-        @qml.qjit
+        @qjit
         @qml.qnode(dev, mcm_method=mcm_method, postselect_mode=postselect_mode)
         def circuit(x):
             qml.RX(x, wires=0)
@@ -496,7 +497,7 @@ class TestDynamicOneShotIntegration:
         dev = qml.device(backend, wires=1, shots=None)
 
         with pytest.raises(
-            qml.QuantumFunctionError,
+            exceptions.QuantumFunctionError,
             match="dynamic_one_shot is only supported with finite shots.",
         ):
 
@@ -740,7 +741,7 @@ class TestDynamicOneShotIntegration:
         shots = 10
         dev = qml.device(backend, wires=qubits, shots=shots)
 
-        @qml.qjit
+        @qjit
         @qml.qnode(dev, mcm_method="one-shot")
         def cost():
             qml.Hadamard(0)

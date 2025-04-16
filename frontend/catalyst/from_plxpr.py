@@ -20,6 +20,7 @@ from typing import Callable, Sequence
 
 import jax
 import jax.core
+import jax.numpy as jnp
 import pennylane as qml
 from jax.extend.linear_util import wrap_init
 from jax.interpreters.partial_eval import convert_constvars_jaxpr
@@ -45,7 +46,6 @@ from catalyst.device import (
     get_device_shots,
 )
 from catalyst.jax_extras import jaxpr_pad_consts, make_jaxpr2, transient_jax_config
-from catalyst.jax_extras.tracing import bind_flexible_primitive
 from catalyst.jax_primitives import (
     AbstractQbit,
     AbstractQreg,
@@ -66,6 +66,8 @@ from catalyst.jax_primitives import (
     quantum_kernel_p,
     qunitary_p,
     sample_p,
+    set_basis_state_p,
+    set_state_p,
     state_p,
     var_p,
     while_p,
@@ -379,17 +381,19 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
         )
 
         prim = measurement_map[type(measurement)]
+        assert (
+            prim is not counts_p
+        ), "CountsMP returns a dictionary, which is not compatible with capture"
         if prim is sample_p:
             num_qubits = len(measurement.wires) or len(self._device.wires)
-            mval = bind_flexible_primitive(
-                sample_p, {"shots": self._shots}, obs, num_qubits=num_qubits
-            )
-        elif prim is counts_p:
-            mval = bind_flexible_primitive(counts_p, {"shots": self._shots}, shape=shape)
+            sample_shape = (self._shots, num_qubits)
+            dyn_dims, static_shape = jax._src.lax.lax._extract_tracers_dyn_shape(sample_shape)
+            mval = sample_p.bind(obs, *dyn_dims, static_shape=tuple(static_shape))
         elif prim in {expval_p, var_p}:
             mval = prim.bind(obs, shape=shape)
         else:
-            mval = prim.bind(obs, shape=shape, shots=self._shots)
+            dyn_dims, static_shape = jax._src.lax.lax._extract_tracers_dyn_shape(shape)
+            mval = prim.bind(obs, *dyn_dims, static_shape=tuple(static_shape))
 
         # sample_p returns floats, so we need to converted it back to the expected integers here
         if dtype != mval.dtype:
@@ -420,6 +424,37 @@ def handle_qubit_unitary(self, *invals, n_wires):
 def handle_global_phase(self, phase, *wires, n_wires):
     """Handle the conversion from plxpr to Catalyst jaxpr for the GlobalPhase primitive"""
     gphase_p.bind(phase, ctrl_len=0, adjoint=False)
+
+
+@QFuncPlxprInterpreter.register_primitive(qml.BasisState._primitive)
+def handle_basis_state(self, *invals, n_wires):
+    """Handle the conversion from plxpr to Catalyst jaxpr for the BasisState primitive"""
+    state_inval = invals[0]
+    wires_inval = invals[1:]
+
+    state = jax.lax.convert_element_type(state_inval, jnp.dtype(jnp.bool))
+    wires = [self.get_wire(w) for w in wires_inval]
+    out_wires = set_basis_state_p.bind(*wires, state)
+
+    for wire_values, new_wire in zip(wires_inval, out_wires):
+        self.wire_map[wire_values] = new_wire
+
+
+# pylint: disable=unused-argument
+@QFuncPlxprInterpreter.register_primitive(qml.StatePrep._primitive)
+def handle_state_prep(self, *invals, n_wires, **kwargs):
+    """Handle the conversion from plxpr to Catalyst jaxpr for the StatePrep primitive"""
+    state_inval = invals[0]
+    wires_inval = invals[1:]
+
+    # jnp.complex128 is the top element in the type promotion lattice so it is ok to do this:
+    # https://jax.readthedocs.io/en/latest/type_promotion.html
+    state = jax.lax.convert_element_type(state_inval, jnp.dtype(jnp.complex128))
+    wires = [self.get_wire(w) for w in wires_inval]
+    out_wires = set_state_p.bind(*wires, state)
+
+    for wire_values, new_wire in zip(wires_inval, out_wires):
+        self.wire_map[wire_values] = new_wire
 
 
 # pylint: disable=unused-argument, too-many-arguments
