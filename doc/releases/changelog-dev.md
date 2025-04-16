@@ -25,6 +25,9 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* The version of JAX used by Catalyst is updated to 0.5.3.
+  [(#???)](https://github.com/PennyLaneAI/catalyst/pull/???)
+
 <h3>Documentation 📝</h3>
 
 <h3>Contributors ✍️</h3>
@@ -32,4 +35,5 @@
 This release contains contributions from (in alphabetical order):
 
 Joey Carter,
-Erick Ochoa Lopez.
+Erick Ochoa Lopez,
+Paul Haochen Wang.
