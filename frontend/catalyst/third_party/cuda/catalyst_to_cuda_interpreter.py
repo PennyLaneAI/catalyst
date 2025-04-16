@@ -139,7 +139,7 @@ def remove_host_context(jaxpr):
     is_single_equation_call = prim in {func_p, quantum_kernel_p}
     is_valid = is_one_equation and is_single_equation_call
     if is_valid:
-        return jaxpr.jaxpr.eqns[0][3]["call_jaxpr"]
+        return jaxpr.jaxpr.eqns[0].params["call_jaxpr"]
     raise CompileError("Cannot translate tapes with context.")
 
 
