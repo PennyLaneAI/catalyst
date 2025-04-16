@@ -229,7 +229,8 @@ class EvaluationContext:
             if trace is not None:
                 new_trace = trace
             else:
-                new_trace = DynamicJaxprTrace(parent_trace.frame.debug_info)
+                #new_trace = DynamicJaxprTrace(parent_trace.frame.debug_info)  # not yet in 0.4.36
+                new_trace = DynamicJaxprTrace()
                 #print("created new trace ", id(new_trace))
 
         with set_current_trace(new_trace):
