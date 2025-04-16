@@ -718,7 +718,11 @@ class QJIT(CatalystCallable):
 
         if self.compile_options.experimental_capture:
             with Patcher(
-                (jax._src.interpreters.partial_eval, "get_aval", get_aval2),
+                (
+                    jax._src.interpreters.partial_eval,  # pylint: disable=protected-access
+                    "get_aval",
+                    get_aval2,
+                ),
             ):
                 return trace_from_pennylane(
                     self.user_function, static_argnums, abstracted_axes, full_sig, kwargs
