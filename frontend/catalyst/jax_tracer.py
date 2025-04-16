@@ -1104,6 +1104,9 @@ class TracingMode(Enum):
 def have_measurements_changed(original_tape, modified_tape):
     """Check if the measurement has changed."""
 
+    if len(original_tape.measurements) != len(modified_tape.measurements):
+        return True
+
     # Copying tapes preserves object identity in the operation and measurement lists, due to
     # immutability. So we can compare identity directly. Equality comparisons are problematic
     # when the measurements contain tracers.
