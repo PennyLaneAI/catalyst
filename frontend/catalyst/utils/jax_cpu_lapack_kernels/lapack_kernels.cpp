@@ -61,6 +61,32 @@
 #include "absl/base/dynamic_annotations.h"
 #endif
 
+namespace ffi = xla::ffi;
+
+#define REGISTER_CHAR_ENUM_ATTR_DECODING(type)                                \
+  std::optional<type> xla::ffi::AttrDecoding<type>::Decode(                   \
+      XLA_FFI_AttrType attr_type, void* attr, DiagnosticEngine& diagnostic) { \
+    if (attr_type != XLA_FFI_AttrType_SCALAR) [[unlikely]] {                  \
+      return diagnostic.Emit("Wrong attribute type: expected ")               \
+             << XLA_FFI_AttrType_SCALAR << " but got" << attr_type;           \
+    }                                                                         \
+    auto* scalar = reinterpret_cast<XLA_FFI_Scalar*>(attr);                   \
+    if (scalar->dtype != XLA_FFI_DataType_U8) [[unlikely]] {                  \
+      return diagnostic.Emit("Wrong scalar data type: expected ")             \
+             << XLA_FFI_DataType_U8 << " but got " << scalar->dtype;          \
+    }                                                                         \
+    auto underlying =                                                         \
+        *reinterpret_cast<std::underlying_type_t<type>*>(scalar->value);      \
+    return static_cast<type>(underlying);                                     \
+  }
+
+REGISTER_CHAR_ENUM_ATTR_DECODING(jax::MatrixParams::Side);
+REGISTER_CHAR_ENUM_ATTR_DECODING(jax::MatrixParams::Transpose);
+REGISTER_CHAR_ENUM_ATTR_DECODING(jax::MatrixParams::Diag);
+REGISTER_CHAR_ENUM_ATTR_DECODING(jax::MatrixParams::UpLo);
+
+#undef REGISTER_CHAR_ENUM_ATTR_DECODING
+
 namespace {
 
 inline int64_t catch_lapack_int_overflow(const std::string &source, int64_t value)
@@ -331,6 +357,38 @@ template struct Potrf<float>;
 template struct Potrf<double>;
 template struct Potrf<std::complex<float>>;
 template struct Potrf<std::complex<double>>;
+
+
+// FFI Kernel
+
+template <ffi::DataType dtype>
+ffi::Error CholeskyFactorization<dtype>::Kernel(
+    ffi::Buffer<dtype> x, MatrixParams::UpLo uplo,
+    ffi::ResultBuffer<dtype> x_out, ffi::ResultBuffer<LapackIntDtype> info) {
+  auto [batch_count, x_rows, x_cols] = SplitBatch2D(x.dimensions);
+  auto* x_out_data = x_out->data;
+  auto* info_data = info->data;
+
+  CopyIfDiffBuffer(x, x_out);
+
+  auto uplo_v = static_cast<char>(uplo);
+  auto x_order_v = CastNoOverflow<lapack_int>(x.dimensions.back());
+  auto x_leading_dim_v = x_order_v;
+
+  const int64_t x_out_step{x_rows * x_cols};
+  for (int64_t i = 0; i < batch_count; ++i) {
+    fn(&uplo_v, &x_order_v, x_out_data, &x_leading_dim_v, info_data);
+    x_out_data += x_out_step;
+    ++info_data;
+  }
+  return ffi::Error::Success();
+}
+
+template struct CholeskyFactorization<ffi::DataType::F32>;
+template struct CholeskyFactorization<ffi::DataType::F64>;
+template struct CholeskyFactorization<ffi::DataType::C64>;
+template struct CholeskyFactorization<ffi::DataType::C128>;
+
 
 // Gesdd
 

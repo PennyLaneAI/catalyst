@@ -56,6 +56,22 @@ struct EncodedMemref {
     }                                                                                              \
     }
 
+#define JAX_CPU_DEFINE_POTRF(name, data_type)            \
+  XLA_FFI_DEFINE_HANDLER(                                \
+      name, jax::CholeskyFactorization<data_type>::Kernel,    \
+      ::xla::ffi::Ffi::Bind()                            \
+          .Arg<::xla::ffi::Buffer<data_type>>(/*x*/)     \
+          .Attr<jax::MatrixParams::UpLo>("uplo")              \
+          .Ret<::xla::ffi::Buffer<data_type>>(/*x_out*/) \
+          .Ret<::xla::ffi::Buffer<jax::LapackIntDtype>>(/*info*/))
+
+
+
+JAX_CPU_DEFINE_POTRF(lapack_spotrf_ffi_handler, ::xla::ffi::DataType::F32);
+JAX_CPU_DEFINE_POTRF(lapack_dpotrf_ffi_handler, ::xla::ffi::DataType::F64);
+JAX_CPU_DEFINE_POTRF(lapack_cpotrf_ffi_handler, ::xla::ffi::DataType::C64);
+JAX_CPU_DEFINE_POTRF(lapack_zpotrf_ffi_handler, ::xla::ffi::DataType::C128);
+
 DEFINE_LAPACK_FUNC(blas_strsm, 10, 1, jax::RealTrsm<float>)
 DEFINE_LAPACK_FUNC(blas_dtrsm, 10, 1, jax::RealTrsm<double>)
 DEFINE_LAPACK_FUNC(blas_ctrsm, 10, 1, jax::ComplexTrsm<std::complex<float>>)
@@ -76,10 +92,10 @@ DEFINE_LAPACK_FUNC(lapack_dorgqr, 7, 3, jax::Orgqr<double>)
 DEFINE_LAPACK_FUNC(lapack_cungqr, 7, 3, jax::Orgqr<std::complex<float>>)
 DEFINE_LAPACK_FUNC(lapack_zungqr, 7, 3, jax::Orgqr<std::complex<double>>)
 
-DEFINE_LAPACK_FUNC(lapack_spotrf, 4, 2, jax::Potrf<float>)
-DEFINE_LAPACK_FUNC(lapack_dpotrf, 4, 2, jax::Potrf<double>)
-DEFINE_LAPACK_FUNC(lapack_cpotrf, 4, 2, jax::Potrf<std::complex<float>>)
-DEFINE_LAPACK_FUNC(lapack_zpotrf, 4, 2, jax::Potrf<std::complex<double>>)
+//DEFINE_LAPACK_FUNC(lapack_spotrf_ffi, 4, 2, jax::CholeskyFactorization<ffi::DataType::F32>)
+//DEFINE_LAPACK_FUNC(lapack_dpotrf_ffi, 4, 2, jax::CholeskyFactorization<ffi::DataType::F64>)
+//DEFINE_LAPACK_FUNC(lapack_cpotrf_ffi, 4, 2, jax::CholeskyFactorization<ffi::DataType::C64>)
+//DEFINE_LAPACK_FUNC(lapack_zpotrf_ffi, 4, 2, jax::CholeskyFactorization<ffi::DataType::C128>)
 
 DEFINE_LAPACK_FUNC(lapack_sgesdd, 7, 7, jax::RealGesdd<float>)
 DEFINE_LAPACK_FUNC(lapack_dgesdd, 7, 7, jax::RealGesdd<double>)
