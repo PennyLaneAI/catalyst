@@ -500,6 +500,27 @@ def _grad_lowering(ctx, *args, jaxpr, fn, grad_params):
         argnums: argument indices which define over which arguments to
             differentiate.
     """
+    consts = []
+    offset = len(args) - len(jaxpr.consts)
+    for i, jax_array_or_tracer in enumerate(jaxpr.consts):
+        if not isinstance(
+            jax_array_or_tracer, jax._src.interpreters.partial_eval.DynamicJaxprTracer
+        ):
+            # ``ir.DenseElementsAttr.get()`` constructs a dense elements attribute from an array of
+            # element values. This doesn't support ``jaxlib.xla_extension.Array``, so we have to
+            # cast such constants to numpy array types.
+            const = jax_array_or_tracer
+            const_type = shape_dtype_to_ir_type(const.shape, const.dtype)
+            nparray = np.asarray(const)
+            attr = ir.DenseElementsAttr.get(nparray, type=const_type)
+            constval = StableHLOConstantOp(attr).results
+            consts.append(constval)
+        else:
+            # There are some cases where this value cannot be converted into
+            # a jax.numpy.array.
+            # in that case we get it from the arguments.
+            consts.append(args[offset + i])
+
     method, h, argnums = grad_params.method, grad_params.h, grad_params.expanded_argnums
     mlir_ctx = ctx.module_context.context
     finiteDiffParam = None
@@ -510,24 +531,15 @@ def _grad_lowering(ctx, *args, jaxpr, fn, grad_params):
     new_argnums = [num + offset for num in argnums]
     argnum_numpy = np.array(new_argnums)
     diffArgIndices = ir.DenseIntElementsAttr.get(argnum_numpy)
-    func_op = lower_jaxpr(ctx, jaxpr)
+    func_op = lower_jaxpr(ctx, jaxpr, (method, h, *argnums))
 
     symbol_ref = get_symbolref(ctx, func_op)
     output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
     flat_output_types = util.flatten(output_types)
 
-    # ``ir.DenseElementsAttr.get()`` constructs a dense elements attribute from an array of
-    # element values. This doesn't support ``jaxlib.xla_extension.Array``, so we have to cast
-    # such constants to numpy array types.
-
-    constants = []
-    for const in jaxpr.consts:
-        const_type = shape_dtype_to_ir_type(const.shape, const.dtype)
-        nparray = np.asarray(const)
-        attr = ir.DenseElementsAttr.get(nparray, type=const_type)
-        constantVals = StableHLOConstantOp(attr).results
-        constants.append(constantVals)
-    args_and_consts = constants + list(args)
+    len_args = len(args)
+    index = len_args - len(consts)
+    args_and_consts = consts + list(args[:index])
 
     return GradOp(
         flat_output_types,
@@ -563,7 +575,30 @@ def _value_and_grad_lowering(ctx, *args, jaxpr, fn, grad_params):
     Returns:
         MLIR results
     """
-    args = list(args)
+    consts = []
+    offset = len(args) - len(jaxpr.consts)
+    for i, jax_array_or_tracer in enumerate(jaxpr.consts):
+        if not isinstance(
+            jax_array_or_tracer, jax._src.interpreters.partial_eval.DynamicJaxprTracer
+        ):
+            # ``ir.DenseElementsAttr.get()`` constructs a dense elements attribute from an array of
+            # element values. This doesn't support ``jaxlib.xla_extension.Array``, so we have to
+            # cast such constants to numpy array types.
+            const = jax_array_or_tracer
+            const_type = shape_dtype_to_ir_type(const.shape, const.dtype)
+            nparray = np.asarray(const)
+            attr = ir.DenseElementsAttr.get(nparray, type=const_type)
+            constval = StableHLOConstantOp(attr).results
+            consts.append(constval)
+        else:
+            # There are some cases where this value cannot be converted into
+            # a jax.numpy.array.
+            # in that case we get it from the arguments.
+            consts.append(args[offset + i])
+
+    len_args = len(args)
+    index = len_args - len(consts)
+    args = list(args[0:index])
     method, h, argnums = grad_params.method, grad_params.h, grad_params.expanded_argnums
     mlir_ctx = ctx.module_context.context
     new_argnums = np.array([len(jaxpr.consts) + num for num in argnums])
@@ -571,13 +606,7 @@ def _value_and_grad_lowering(ctx, *args, jaxpr, fn, grad_params):
     output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
     flat_output_types = util.flatten(output_types)
 
-    constants = []
-    for const in jaxpr.consts:
-        const_type = shape_dtype_to_ir_type(const.shape, const.dtype)
-        nparray = np.asarray(const)
-        attr = ir.DenseElementsAttr.get(nparray, type=const_type)
-        constantVals = StableHLOConstantOp(attr).results
-        constants.append(constantVals)
+    constants = consts
 
     consts_and_args = constants + args
     func_call_jaxpr = get_call_jaxpr(jaxpr)
@@ -585,7 +614,7 @@ def _value_and_grad_lowering(ctx, *args, jaxpr, fn, grad_params):
     val_result_types = flat_output_types[: len(flat_output_types) - len(argnums)]
     gradient_result_types = flat_output_types[len(flat_output_types) - len(argnums) :]
 
-    func_op = lower_jaxpr(ctx, jaxpr)
+    func_op = lower_jaxpr(ctx, jaxpr, (method, h, *argnums))
 
     symbol_ref = get_symbolref(ctx, func_op)
     return ValueAndGradOp(
@@ -635,7 +664,7 @@ def _jvp_lowering(ctx, *args, jaxpr, fn, grad_params):
     func_args = consts_and_args[: len(func_call_jaxpr.invars)]
     tang_args = consts_and_args[len(func_call_jaxpr.invars) :]
 
-    func_op = lower_jaxpr(ctx, jaxpr)
+    func_op = lower_jaxpr(ctx, jaxpr, (method, h, *argnums))
 
     assert (
         len(flat_output_types) % 2 == 0
@@ -688,7 +717,7 @@ def _vjp_lowering(ctx, *args, jaxpr, fn, grad_params):
     func_result_types = flat_output_types[: len(flat_output_types) - len(argnums)]
     vjp_result_types = flat_output_types[len(flat_output_types) - len(argnums) :]
 
-    func_op = lower_jaxpr(ctx, jaxpr)
+    func_op = lower_jaxpr(ctx, jaxpr, (method, h, *argnums))
 
     symbol_ref = get_symbolref(ctx, func_op)
     return VJPOp(

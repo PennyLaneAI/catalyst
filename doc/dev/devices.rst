@@ -95,3 +95,8 @@ Supported backend devices include:
 
       See the `Catalyst configuration file <https://github.com/PennyLaneAI/catalyst/blob/main/frontend/catalyst/third_party/oqc/src/oqc.toml>`__
       for natively supported instructions.
+
+  * - ``null.qubit``
+
+    - A device that performs no numerical operations, useful for resource estimation and benchmarking.
+      See the `NullQubit documentation <https://pennylane.ai/devices/null-qubit>`__ for more details.

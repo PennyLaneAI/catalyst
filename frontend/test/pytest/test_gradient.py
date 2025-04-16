@@ -86,7 +86,7 @@ def test_gradient_generate_once():
     def identity(x):
         return x
 
-    @qml.qjit
+    @qjit
     def wrap(x: float):
         diff = grad(identity)
         return diff(x) + diff(x)
@@ -1725,7 +1725,7 @@ class TestGradientErrors:
 
         with pytest.raises(DifferentiableCompileError, match="MidCircuitMeasure is not allowed"):
 
-            @qml.qjit
+            @qjit
             def cir(x: float):
                 return grad(f)(x)
 
@@ -1740,7 +1740,7 @@ class TestGradientErrors:
 
         with pytest.raises(CompileError, match=".*Compilation failed.*"):
 
-            @qml.qjit
+            @qjit
             def cir(x: float):
                 return grad(f)(x)
 
@@ -1757,7 +1757,7 @@ class TestGradientErrors:
 
         with pytest.raises(CompileError, match=".*Compilation failed.*"):
 
-            @qml.qjit
+            @qjit
             def cir(x: float):
                 return grad(g)(x)
 
@@ -2103,7 +2103,7 @@ class TestParameterShiftVerificationIntegrationTests:
 
         with pytest.raises(DifferentiableCompileError, match="MidCircuitMeasure is not allowed"):
 
-            @qml.qjit
+            @qjit
             @grad
             @qml.qnode(device, diff_method="parameter-shift")
             def circuit(_: float):
@@ -2117,7 +2117,7 @@ class TestParameterShiftVerificationIntegrationTests:
         # Yes, this test does not have an assertion.
         # The test is that this does not produce an assertion.
 
-        @qml.qjit
+        @qjit
         @grad
         @qml.qnode(device, diff_method="parameter-shift")
         def circuit(_: float):
@@ -2137,7 +2137,7 @@ class TestParameterShiftVerificationIntegrationTests:
 
         with pytest.raises(CompileError):
 
-            @qml.qjit
+            @qjit
             @grad
             @qml.qnode(device, diff_method="parameter-shift")
             def circuit(x: float):
@@ -2155,7 +2155,7 @@ class TestParameterShiftVerificationIntegrationTests:
 
         with pytest.raises(CompileError):
 
-            @qml.qjit
+            @qjit
             @grad
             @qml.qnode(device, diff_method="parameter-shift")
             def circuit(x: float):
@@ -2174,7 +2174,7 @@ class TestParameterShiftVerificationIntegrationTests:
 
         with pytest.raises(CompileError):
 
-            @qml.qjit
+            @qjit
             @grad
             @qml.qnode(device, diff_method="parameter-shift")
             def circuit(x: float):
@@ -2193,12 +2193,85 @@ class TestParameterShiftVerificationIntegrationTests:
 
         with pytest.raises(CompileError):
 
-            @qml.qjit
+            @qjit
             @grad
             @qml.qnode(device, diff_method="parameter-shift")
             def circuit(x: float):
                 RX(x, wires=[0])
                 return qml.expval(qml.PauliZ(wires=0))
+
+
+def test_closure_variable_grad():
+    """Test that grad can take closure variables"""
+
+    @qml.qjit
+    def workflow_closure(x, y):
+
+        dev = qml.device("lightning.qubit", wires=1)
+
+        @qml.qnode(dev)
+        def circuit(x):
+            qml.RX(jnp.pi * x, wires=0)
+            qml.RX(jnp.pi * y, wires=0)
+            return qml.expval(qml.PauliY(0))
+
+        g = grad(circuit)
+        return g(x)
+
+    @qml.qjit
+    def workflow_no_closure(x, y):
+
+        dev = qml.device("lightning.qubit", wires=1)
+
+        @qml.qnode(dev)
+        def circuit(x, y):
+            qml.RX(jnp.pi * x, wires=0)
+            qml.RX(jnp.pi * y, wires=0)
+            return qml.expval(qml.PauliY(0))
+
+        g = grad(circuit)
+        return g(x, y)
+
+    expected = workflow_no_closure(1.0, 0.25)
+    observed = workflow_closure(1.0, 0.25)
+    assert np.allclose(expected, observed)
+
+
+def test_closure_variable_value_and_grad():
+    """Test that value and grad can take closure variables"""
+
+    @qml.qjit
+    def workflow_closure(x, y):
+
+        dev = qml.device("lightning.qubit", wires=1)
+
+        @qml.qnode(dev)
+        def circuit(x):
+            qml.RX(jnp.pi * x, wires=0)
+            qml.RX(jnp.pi * y, wires=0)
+            return qml.expval(qml.PauliY(0))
+
+        g = value_and_grad(circuit)
+        return g(x)
+
+    @qml.qjit
+    def workflow_no_closure(x, y):
+
+        dev = qml.device("lightning.qubit", wires=1)
+
+        @qml.qnode(dev)
+        def circuit(x, y):
+            qml.RX(jnp.pi * x, wires=0)
+            qml.RX(jnp.pi * y, wires=0)
+            return qml.expval(qml.PauliY(0))
+
+        g = value_and_grad(circuit)
+        return g(x, y)
+
+    x, y = 1.0, 0.25
+    expected = workflow_no_closure(x, y)
+    observed = workflow_closure(x, y)
+    assert np.allclose(expected, observed)
 
 
 if __name__ == "__main__":
