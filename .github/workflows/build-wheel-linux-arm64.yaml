@@ -10,6 +10,9 @@ on:
       - ready_for_review
   push:
     branches: [ main ]
+  schedule:
+    # Thursdays we test the standalone plugin
+    - cron: '35 4 * * 4'  
   workflow_dispatch:
   workflow_call:
 
@@ -30,7 +33,6 @@ jobs:
 
   build-dependencies:
     needs: [constants, check_if_wheel_build_required]
-
     strategy:
       fail-fast: false
       matrix:
@@ -42,10 +44,12 @@ jobs:
     container: quay.io/pypa/${{ matrix.container_img }}        
 
     if: needs.check_if_wheel_build_required.outputs.build-wheels == 'true'
-
     steps:  
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Checkout Catalyst repo
+        uses: actions/checkout@v4
+      
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
           node-version: '20'
 
@@ -97,7 +101,6 @@ jobs:
           ref: ${{ needs.constants.outputs.enzyme_version }}
           path: ${{ github.workspace }}/mlir/Enzyme                  
 
-
       # Cache external project builds
       - name: Restore LLVM Build
         id: cache-llvm-build
@@ -128,15 +131,14 @@ jobs:
           steps.cache-mhlo-build.outputs.cache-hit != 'true' ||
           steps.cache-enzyme-build.outputs.cache-hit != 'true'
         run: |
-          # echo /Library/Frameworks/Python.framework/Versions/${{ matrix.python_version }}/bin >> $GITHUB_PATH
           cat /etc/dnf.conf | sed "s/\[main\]/\[main\]\ntimeout=5/g" > /etc/dnf.conf
           dnf update -y && dnf install -y libzstd-devel gcc-toolset-12 
           # Update env vars valid for all tasks of this job
           echo '/opt/rh/gcc-toolset-12/root/usr/bin' >> $GITHUB_PATH          
 
-      - name: Set up Python ${{ matrix.python_version }}
-        run: |
-          dnf install -y python3
+      # - name: Set up Python ${{ matrix.python_version }}
+      #   run: |
+      #     dnf install -y python3
 
       - name: Install Dependencies (Python)
         run: |
@@ -189,8 +191,6 @@ jobs:
                 -DCMAKE_CXX_VISIBILITY_PRESET=default \
                 -DLLVM_ENABLE_LLD=ON
 
-          LIT_FILTER_OUT="chlo_legalize_to_mhlo" cmake --build $GITHUB_WORKSPACE/mhlo-build --target check-mlir-hlo
-          LIT_FILTER_OUT="chlo_legalize_to_mhlo" cmake --build $GITHUB_WORKSPACE/mhlo-build --target check-mlir-hlo
           LIT_FILTER_OUT="chlo_legalize_to_mhlo" cmake --build $GITHUB_WORKSPACE/mhlo-build --target check-mlir-hlo        
 
       - name: Save MHLO Build
@@ -223,7 +223,7 @@ jobs:
           path: ${{ github.workspace }}/enzyme-build
           key: ${{ matrix.container_img }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-wheel-build
 
-  catalyst-linux-wheels-arm-64:
+  catalyst-linux-wheels-arm64:
     needs: [constants, build-dependencies]
     strategy:
       fail-fast: false
@@ -249,7 +249,7 @@ jobs:
 
       - name: Install Dependencies (Python)
         run: |
-          dnf install -y python3
+          # dnf install -y python3
           python${{ matrix.python_version }} -m pip install numpy nanobind pybind11 PyYAML cmake ninja
           # Add cmake and ninja to the PATH env var
           PYTHON_BINS=$(find /opt/_internal/cpython-${{ matrix.python_version }}.*/bin -maxdepth 1 -type d | tr '\n' ':' | sed 's/:$//')
@@ -351,7 +351,7 @@ jobs:
 
       - name: Build Plugin wheel
         # Run only on Thursday at the given time
-        if: github.event.schedule == '35 4 * * 4'
+        if: github.event.schedule == 'schedule'
         run: |
           MLIR_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir" \
           LLVM_BUILD_DIR="$GITHUB_WORKSPACE/llvm-build" \
@@ -382,16 +382,15 @@ jobs:
 
       - name: Upload Standalone Plugin Wheel Artifact
         # Run only on Thursday at the given time
-        if: github.event.schedule == '35 4 * * 4'
+        if: github.event.schedule == 'schedule'
         uses: actions/upload-artifact@v4
         with:
           name: standalone-plugin-linux_arm_64-wheel-py-${{ matrix.python_version }}.zip
           path: ${{ github.workspace }}/standalone_plugin_wheel/dist
           retention-days: 14     
 
-
   test-wheels:
-    needs: [constants, catalyst-linux-wheels-arm-64,]
+    needs: [constants, catalyst-linux-wheels-arm64]
     strategy:
       fail-fast: false
       matrix:
@@ -413,7 +412,7 @@ jobs:
 
     - name: Download Standalone Plugin Wheel Artifact
       # Run only on Thursday at the given time
-      if: github.event.schedule == '35 4 * * 4'
+      if: github.event.schedule == 'schedule'
       uses: actions/download-artifact@v4
       with:
         name: standalone-plugin-linux_arm_64-wheel-py-${{ matrix.python_version }}.zip
@@ -443,6 +442,6 @@ jobs:
 
     - name: Install Standalone Plugin
       # Run only on Thursday at the given time (TODO: set comparison to == before merging)
-      if: github.event.schedule == '35 4 * * 4'
+      if: github.event.schedule == 'schedule'
       run: |
         python${{ matrix.python_version }} -m pip install standalone_plugin_wheel/wheel/*.whl --no-deps
