@@ -470,7 +470,7 @@ def trace_to_jaxpr(
     dynamically sized tensors.
     """
     #breakpoint()
-    jaxpr, tracers, consts = trace.frame.to_jaxpr2((*outputs, *inputs), trace.frame.debug_info)
+    jaxpr, tracers, consts = trace.frame.to_jaxpr2((*outputs, *inputs))#, trace.frame.debug_info) # not yet in 0.4.36
     #breakpoint()
     del jaxpr._outvars[len(outputs) :]
     return jaxpr, tracers, consts
