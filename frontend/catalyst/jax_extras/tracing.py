@@ -36,7 +36,7 @@ from typing import (
 
 import jax
 from jax import ShapeDtypeStruct
-from jax._src.core import DBIdx, _update_thread_local_jit_state
+from jax._src.core import DBIdx#, _update_thread_local_jit_state
 from jax._src.interpreters.mlir import _module_name_regex, register_lowering
 from jax._src.interpreters.partial_eval import (
     _input_type_to_tracers,
@@ -44,7 +44,7 @@ from jax._src.interpreters.partial_eval import (
     trace_to_jaxpr_dynamic2,
 )
 from jax._src.lax.control_flow import _initial_style_jaxpr
-from jax._src.lax.lax import _abstractify
+#from jax._src.lax.lax import _abstractify
 from jax._src.lax.slicing import _gather_lower, gather_p
 from jax._src.linear_util import annotate
 from jax._src.pjit import _extract_implicit_args, _flat_axes_specs
@@ -54,13 +54,13 @@ from jax.api_util import flatten_fun
 from jax.core import (
     AbstractValue,
     ClosedJaxpr,
-    ConcreteArray,
+    #ConcreteArray,
     DShapedArray,
     InDBIdx,
     InputType,
     Jaxpr,
     JaxprEqn,
-    MainTrace,
+    #MainTrace,
     OutDBIdx,
     OutputType,
 )
@@ -73,7 +73,7 @@ from jax.core import (
     find_top_trace,
     gensym,
     new_jaxpr_eqn,
-    thread_local_state,
+    #thread_local_state,
 )
 from jax.extend.linear_util import transformation_with_aux, wrap_init
 from jax.interpreters.partial_eval import (
@@ -114,7 +114,7 @@ __all__ = (
     "PyTreeRegistry",
     "ShapedArray",
     "DShapedArray",
-    "ConcreteArray",
+    #"ConcreteArray",
     "ShapeDtypeStruct",
     "DynshapePrimitive",
     "convert_constvars_jaxpr",
@@ -128,7 +128,7 @@ __all__ = (
     "expand_args",
     "expand_results",
     "eval_jaxpr",
-    "_abstractify",
+    #"_abstractify",
     "_initial_style_jaxpr",
     "_input_type_to_tracers",
     "input_type_to_tracers",
@@ -138,11 +138,10 @@ __all__ = (
     "convert_constvars_jaxpr",
     "convert_element_type",
     "eval_jaxpr",
-    "_abstractify",
     "_module_name_regex",
     "make_jaxpr_effects",
     "make_jaxpr2",
-    "new_dynamic_main2",
+    #"new_dynamic_main2",
     "new_inner_tracer",
     "sort_eqns",
     "transient_jax_config",
@@ -182,29 +181,29 @@ def transient_jax_config(want_vals) -> Generator[None, None, None]:
             jax.config.update(name, val)
 
 
-@contextmanager
-@debug_logger
-def new_dynamic_main2(
-    trace_type: Type[Trace],
-    main: Optional[MainTrace] = None,
-    **payload,
-) -> Generator[MainTrace, None, None]:
-    """A verison of JAX `new_main` function that knows how to re-use an already existing `MainTrace`
-    object"""
+# @contextmanager
+# @debug_logger
+# def new_dynamic_main2(
+#     trace_type: Type[Trace],
+#     main: Optional[MainTrace] = None,
+#     **payload,
+# ) -> Generator[MainTrace, None, None]:
+#     """A verison of JAX `new_main` function that knows how to re-use an already existing `MainTrace`
+#     object"""
 
-    stack = thread_local_state.trace_state.trace_stack
-    level = stack.next_level() if main is None else main.level
-    main = MainTrace(level, trace_type, **payload) if main is None else main
-    stack.push(main)
-    prev_dynamic, stack.dynamic = stack.dynamic, main
-    _update_thread_local_jit_state(stack.dynamic)
+#     stack = thread_local_state.trace_state.trace_stack
+#     level = stack.next_level() if main is None else main.level
+#     main = MainTrace(level, trace_type, **payload) if main is None else main
+#     stack.push(main)
+#     prev_dynamic, stack.dynamic = stack.dynamic, main
+#     _update_thread_local_jit_state(stack.dynamic)
 
-    try:
-        yield main
-    finally:
-        stack.pop()
-        stack.dynamic = prev_dynamic
-        _update_thread_local_jit_state(stack.dynamic)
+#     try:
+#         yield main
+#     finally:
+#         stack.pop()
+#         stack.dynamic = prev_dynamic
+#         _update_thread_local_jit_state(stack.dynamic)
 
 
 def stable_toposort(end_nodes: list) -> list:
@@ -343,6 +342,7 @@ def expanded_fun(static_args, *args_expanded):
     args_collapsed = [a for a, (_, k) in zip(args_expanded, in_type) if k]
     res_flat = yield args_collapsed, {}
     num_implicit_inputs = len([() for _, k in in_type if not k])
+    #breakpoint()
     all_outs, out_sig = infer_output_type_python(
         args_expanded, res_flat, expansion_strategy, num_implicit_inputs
     )
@@ -423,7 +423,7 @@ def deduce_signatures(
     """
     flat_args, in_tree = tree_flatten((args, kwargs))
     trace: DynamicJaxprTrace = find_top_trace(flat_args)
-    flat_tracers = [trace.full_raise(a) for a in flat_args]
+    flat_tracers = [trace.to_jaxpr_tracer(a) for a in flat_args]
     in_expanded_args, in_type = expand_args(flat_tracers, expansion_strategy=expansion_strategy)
     wf = wrap_init(f)
     wf, out_tree_promise = flatten_fun(wf, in_tree)
@@ -469,7 +469,9 @@ def trace_to_jaxpr(
     This method would remove return values related to sizes of tensors when compiling with
     dynamically sized tensors.
     """
-    jaxpr, tracers, consts = trace.frame.to_jaxpr2((*outputs, *inputs))
+    #breakpoint()
+    jaxpr, tracers, consts = trace.frame.to_jaxpr2((*outputs, *inputs), trace.frame.debug_info)
+    #breakpoint()
     del jaxpr._outvars[len(outputs) :]
     return jaxpr, tracers, consts
 
@@ -777,14 +779,14 @@ def infer_output_type_python(
     """
 
     trace: DynamicJaxprTrace = find_top_trace(expanded_inputs)
-    outputs = [trace.full_raise(t) for t in outputs]
+    outputs = [trace.to_jaxpr_tracer(t) for t in outputs]
 
     # Calculate the constants. We need it to set InDBIdx correctly
     _, _, consts = trace_to_jaxpr(trace, expanded_inputs, outputs)
 
     # Calculate output type containing the correct De Brjuin indices
     expanded_outputs, out_type = infer_output_type(
-        [trace.full_raise(t) for t in consts],
+        [trace.to_jaxpr_tracer(t) for t in consts],
         expanded_inputs,
         outputs,
         expansion_strategy,
@@ -943,7 +945,7 @@ class DynshapePrimitive(JaxprPrimitive):
         # explicitness.
 
         trace = find_top_trace(args)
-        tracers = map(trace.full_raise, args)
+        tracers = map(trace.to_jaxpr_tracer, args)
         source_info = jax_current()
 
         in_type = infer_lambda_input_type(None, tracers)
