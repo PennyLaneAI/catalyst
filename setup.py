@@ -321,6 +321,9 @@ class CustomBuildExtMacos(UnifiedBuildExt):
 
 Py_LIMITED_API_macros = [("Py_LIMITED_API", "0x030C0000")]
 
+project_root_dir = os.path.abspath(os.path.dirname(__file__))
+frontend_dir = os.path.join(project_root_dir, "frontend")
+
 # Compile the library of custom calls in the frontend
 if system_platform == "Linux":
     custom_calls_extension = Extension(
@@ -331,6 +334,9 @@ if system_platform == "Linux":
             "frontend/catalyst/utils/jax_cpu_lapack_kernels/lapack_kernels_using_lapack.cpp",
         ],
         extra_compile_args=["-std=c++20"],
+        include_dirs=[
+            f"{frontend_dir}/catalyst/utils/jax_cpu_lapack_kernels/includes",
+        ],
         define_macros=Py_LIMITED_API_macros,
     )
     cmdclass = {"build_ext": CustomBuildExtLinux}
@@ -348,14 +354,15 @@ elif system_platform == "Darwin":
             "frontend/catalyst/utils/jax_cpu_lapack_kernels/lapack_kernels.cpp",
             "frontend/catalyst/utils/jax_cpu_lapack_kernels/lapack_kernels_using_lapack.cpp",
         ],
+        include_dirs=[
+            f"{frontend_dir}/catalyst/utils/jax_cpu_lapack_kernels/includes/",
+        ],
         extra_compile_args=["-std=c++20"],
         define_macros=Py_LIMITED_API_macros,
     )
     cmdclass = {"build_ext": CustomBuildExtMacos}
 
 
-project_root_dir = os.path.abspath(os.path.dirname(__file__))
-frontend_dir = os.path.join(project_root_dir, "frontend")
 
 ext_modules = [
     custom_calls_extension,
