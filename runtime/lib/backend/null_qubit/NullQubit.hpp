@@ -260,19 +260,22 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      *
      */
     void MatrixOperation(const std::vector<std::complex<double>> &,
-                         const std::vector<QubitIdType> &, bool,
+                         const std::vector<QubitIdType> &, bool inverse,
                          const std::vector<QubitIdType> &controlled_wires = {},
                          const std::vector<bool> &controlled_values = {})
     {
         if (this->track_resources_) {
             resource_data_["num_gates"]++;
 
-            if (controlled_wires.empty()) {
-                resource_data_["QubitUnitary"]++;
+            std::string op_name = "QubitUnitary";
+
+            if (!controlled_wires.empty()) {
+                op_name = "Controlled" + op_name;
             }
-            else {
-                resource_data_["ControlledQubitUnitary"]++;
+            if (inverse) {
+                op_name = "adj_" + op_name;
             }
+            resource_data_[op_name]++;
         }
     }
 
