@@ -313,6 +313,7 @@ class TestCholesky:
     and similarly where U is an upper-triangular matrix.
     """
 
+    # pylint: disable=line-too-long
     @pytest.mark.skip(
         reason="https://github.com/jax-ml/jax/commit/3d39b6e752ac21ce984c17d5bae60a3e1857695b#diff-d0942b178f0d5e43c80d3871b8d541c979bb363f3969d2299ed034bd7a36cab6"
     )
@@ -351,6 +352,7 @@ class TestCholesky:
         assert np.allclose(L_exp @ L_exp.T.conj(), A)  # Check jax solution is correct
         assert jnp.allclose(L_obs, L_exp)
 
+    # pylint: disable=line-too-long
     @pytest.mark.skip(
         reason="https://github.com/jax-ml/jax/commit/3d39b6e752ac21ce984c17d5bae60a3e1857695b#diff-d0942b178f0d5e43c80d3871b8d541c979bb363f3969d2299ed034bd7a36cab6"
     )
@@ -722,6 +724,7 @@ class TestPolar:
         assert jnp.allclose(U_obs, U_exp)
         assert jnp.allclose(P_obs, P_exp)
 
+    # pylint: disable=line-too-long
     @pytest.mark.skip(
         reason="https://github.com/jax-ml/jax/commit/3d39b6e752ac21ce984c17d5bae60a3e1857695b#diff-d0942b178f0d5e43c80d3871b8d541c979bb363f3969d2299ed034bd7a36cab6"
     )
