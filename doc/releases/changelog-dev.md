@@ -19,9 +19,8 @@
   unified program capture behaviour. 
   [(#1657)](https://github.com/PennyLaneAI/catalyst/pull/1657)
 
-  Program capture has to be enabled before the definition of the function to be qjitted.
-  
-  For AOT compilation, program capture can be disabled right after the qjit usage and before execution.
+  Program capture has to be enabled before the definition of the function to be qjitted, and 
+  should be disabled after execution.
   
   ```python
   import pennylane as qml
@@ -31,30 +30,7 @@
 
   qml.capture.enable()
 
-  @qjit()
-  @qml.qnode(dev)
-  def circuit(x: float):
-      qml.Hadamard(0)
-      qml.CNOT([0, 1])
-      return qml.expval(qml.Z(0))
-
-  qml.capture.disable()
-
-  circuit(0.1)
-  ```
-
-  But for JIT compilation, program capture cannot be disabled before execution,
-  otherwise the capture will not take place:
-
-  ```python
-  import pennylane as qml
-  from catalyst import qjit
-
-  dev = qml.device("lightning.qubit", wires=1)
-
-  qml.capture.enable()
-
-  @qjit()
+  @qjit
   @qml.qnode(dev)
   def circuit(x):
       qml.Hadamard(0)
