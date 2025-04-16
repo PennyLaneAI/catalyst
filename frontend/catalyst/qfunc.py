@@ -23,7 +23,7 @@ from typing import Callable, Sequence
 
 import jax.numpy as jnp
 import pennylane as qml
-import pennylane.errors
+from pennylane import exceptions
 from jax.core import eval_jaxpr
 from jax.tree_util import tree_flatten, tree_unflatten
 from pennylane.measurements import (
@@ -206,7 +206,7 @@ def dynamic_one_shot(qnode, **kwargs):
 
     def transform_to_single_shot(qnode):
         if not qnode.device.shots:
-            raise pennylane.errors.QuantumFunctionError(
+            raise exceptions.QuantumFunctionError(
                 "dynamic_one_shot is only supported with finite shots."
             )
 
