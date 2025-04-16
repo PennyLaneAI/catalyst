@@ -1,0 +1,5 @@
+add_mlir_dialect(MBQCOps mbqc)
+add_mlir_interface(MBQCInterfaces)
+add_mlir_doc(MBQCDialect MBQCDialect MBQC/ -gen-dialect-doc)
+add_mlir_doc(MBQCOps MBQCOps MBQC/ -gen-op-doc)
+add_mlir_doc(MBQCInterfaces MBQCInterfaces MBQC/ -gen-op-interface-docs)
