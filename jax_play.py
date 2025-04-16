@@ -1,7 +1,7 @@
 import jax
 import pennylane as qml
 import catalyst
-from catalyst import qjit, cond, measure
+from catalyst import qjit, cond, measure, for_loop
 
 ##########################
 
@@ -60,17 +60,12 @@ from catalyst import qjit, cond, measure
 
 @qjit
 @qml.qnode(qml.device("lightning.qubit", wires=1))
-def circuit(pred: bool):
-    @cond(pred)
-    def conditional_flip():
+def circuit(n):
+    @for_loop(n, 0, -1)
+    def loop_fn(_):
         qml.PauliX(0)
 
-    @conditional_flip.otherwise
-    def conditional_flip():
-        qml.Identity(0)
+    loop_fn()
+    return measure(0)
 
-    conditional_flip()
-
-    return measure(wires=0)
-
-print(circuit(False))
+print(circuit(1))
