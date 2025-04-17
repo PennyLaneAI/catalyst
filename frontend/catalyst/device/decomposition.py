@@ -152,7 +152,7 @@ def _decompose_nested_tapes(op, ctx, capabilities: DeviceCapabilities):
         if region.quantum_tape is None:
             new_tape = None
         else:
-            with EvaluationContext.frame_tracing_context(ctx, region.trace):
+            with EvaluationContext.frame_tracing_context(region.trace):
                 tapes, _ = catalyst_decompose(
                     region.quantum_tape, ctx=ctx, capabilities=capabilities
                 )

@@ -681,6 +681,14 @@ class TestCapture:
             == rotations_inverses_result
         )
 
+    @pytest.mark.xfail(
+        reason="""
+        `broadcast_in_dim` primitive got a new kwarg `out_sharding`.
+        Corresponding updates are being made in core PL plxpr.
+        Re-enable this test after core PL's jax update is finished.
+        """,
+        strict=True,
+    )
     def test_transform_unitary_to_rot_workflow(self, backend):
         """Test the integration for a circuit with a 'unitary_to_rot' transform."""
 
@@ -702,6 +710,14 @@ class TestCapture:
         experimental_capture_result = captured_func(U.matrix())
         assert no_capture_result == experimental_capture_result
 
+    @pytest.mark.xfail(
+        reason="""
+        `broadcast_in_dim` primitive got a new kwarg `out_sharding`.
+        Corresponding updates are being made in core PL plxpr.
+        Re-enable this test after core PL's jax update is finished.
+        """,
+        strict=True,
+    )
     def test_mixed_transforms_workflow(self, backend):
         """Test the integration for a circuit with a combination of 'unitary_to_rot'
         and 'cancel_inverses' transforms."""

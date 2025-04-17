@@ -582,7 +582,15 @@ class TestSignatureErrors:
     def test_incompatible_type_reachable_from_user_code(self):
         """Raise error message for incompatible types"""
 
-        with pytest.raises(TypeError, match="<class 'str'> is not a valid JAX type"):
+        # TODO: migration to new shaped_abstractify is not complete in jax 0.4.36
+        # For this reason we still go throguh _shaped_abstractify_handlers
+        # In the later version that removes _shaped_abstractify_handlers, update this
+        # error message being checked
+        with pytest.raises(
+            TypeError,
+            # match="Cannot interpret value of type <class 'type'> as an abstract array",
+            match="Argument type <class 'str'> is not a valid JAX type.",
+        ):
 
             @qjit
             def f(x: str):

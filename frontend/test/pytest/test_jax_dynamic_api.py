@@ -1118,13 +1118,13 @@ def test_trace_to_jaxpr():
 
     @qjit
     def circuit(sz):
-        mode, ctx = EvaluationContext.get_evaluation_mode()
+        mode = EvaluationContext.get_evaluation_mode()
 
         def f(i, _):
             return i < 3
 
-        with EvaluationContext.frame_tracing_context(ctx) as trace:
-            sz2 = trace.full_raise(sz)
+        with EvaluationContext.frame_tracing_context() as trace:
+            sz2 = trace.to_jaxpr_tracer(sz)
             i = trace.new_arg(ShapedArray(shape=[], dtype=jnp.dtype("int64")))
             a = trace.new_arg(DShapedArray(shape=[sz2], dtype=jnp.dtype("float64")))
             r = f(i, a)
