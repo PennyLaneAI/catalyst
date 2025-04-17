@@ -132,6 +132,24 @@ static inline auto parse_kwargs(std::string kwargs) -> std::unordered_map<std::s
     return map;
 }
 
+template <class K, class V>
+void pretty_print(const std::unordered_map<K, V> &map, size_t leadingSpaces = 0,
+                  std::ostream &out = std::cout)
+{
+    out << "{\n";
+    auto maplen = map.size();
+    for (const auto &[key, val] : map) {
+        for (size_t i = 0; i < leadingSpaces + 2; i++) {
+            out << " ";
+        }
+        out << "\"" << key << "\": " << val << (--maplen > 0 ? "," : "") << "\n";
+    }
+    for (size_t i = 0; i < leadingSpaces; i++) {
+        out << " ";
+    }
+    out << "}";
+}
+
 enum class MeasurementsT : uint8_t {
     None, // = 0
     Expval,
