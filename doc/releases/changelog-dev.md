@@ -38,8 +38,6 @@
       return qml.expval(qml.Z(0))
 
   circuit(0.1)
-
-  qml.capture.disable()
   ```
 
 <h3>Deprecations 👋</h3>
