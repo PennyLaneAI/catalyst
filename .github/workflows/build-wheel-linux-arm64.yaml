@@ -404,11 +404,6 @@ jobs:
         name: standalone-plugin-linux_arm_64-wheel-py-${{ matrix.python_version }}.zip
         path: ${{ github.workspace }}/standalone_plugin_wheel/wheel
 
-    - name: Set up Python ${{ matrix.python_version }}
-      uses: actions/setup-python@v5
-      with:
-        python-version: ${{ matrix.python_version }}
-
     - name: Install Python dependencies
       run: |
         python${{ matrix.python_version }} -m pip install pytest pytest-xdist pytest-mock
