@@ -27,8 +27,6 @@
 using namespace Catalyst::Runtime;
 using namespace Catalyst::Runtime::Devices;
 
-#define RESOURCES_FNAME "__pennylane_resources_data.json"
-
 TEST_CASE("Test success of loading a device", "[NullQubit]")
 {
     std::unique_ptr<ExecutionContext> driver = std::make_unique<ExecutionContext>();

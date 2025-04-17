@@ -29,12 +29,10 @@
 #include "Types.h"
 #include "Utils.hpp"
 
-// The delimited to print before and after the JSON representing resource usage.
-//   This is intended to make parsing the output easier.
-//   Ideally, at some point resource usage would be passed back through as an object, and printing
-//   at all would be unneeded.
-#define RESOURCES_FNAME "__pennylane_resources_data.json"
-
+namespace {
+    // The name of the file where the resource usage data is stored
+    constexpr char RESOURCES_FNAME[] = "__pennylane_resources_data.json";
+}
 namespace Catalyst::Runtime::Devices {
 
 /**
@@ -81,7 +79,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
             throw std::runtime_error("Failed to open resource usage file for writing.");
         }
 
-        resource_file << "{" << std::endl;
+        resource_file << "{\n";
         resource_file << "  \"num_qubits\": " << num_qubits << ",\n";
         resource_file << "  \"num_gates\": " << num_gates << ",\n";
         resource_file << "  \"gate_types\": ";
