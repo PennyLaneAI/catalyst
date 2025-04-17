@@ -44,6 +44,10 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Fix AutoGraph fallback for valid iteration targets with constant data but no length, for example
+  `itertools.product(range(2), repeat=2)`.
+  [(#1665)](https://github.com/PennyLaneAI/catalyst/pull/1665)
+
 * Catalyst now correctly supports `qml.StatePrep()` and `qml.BasisState()` operations in the
   experimental PennyLane program-capture pipeline.
   [(#1631)](https://github.com/PennyLaneAI/catalyst/pull/1631)
@@ -57,4 +61,5 @@
 This release contains contributions from (in alphabetical order):
 
 Joey Carter,
+David Ittah,
 Erick Ochoa Lopez.
