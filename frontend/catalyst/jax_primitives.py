@@ -1758,7 +1758,6 @@ def _cond_lowering(
 
                 YieldOp(out)
 
-
             # else block
             source_info_util.extend_name_stack("else")
             else_ctx = jax_ctx.replace(name_stack=jax_ctx.name_stack.extend("else"))
@@ -2261,5 +2260,6 @@ def _scalar_abstractify(t):
     if t in {int, float, complex, bool} or isinstance(t, jax._src.numpy.lax_numpy._ScalarMeta):
         return core.ShapedArray([], dtype=t, weak_type=True)
     raise TypeError(f"Argument type {t} is not a valid JAX type.")
+
 
 pytype_aval_mappings[type] = _scalar_abstractify

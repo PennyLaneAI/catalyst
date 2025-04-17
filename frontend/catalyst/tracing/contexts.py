@@ -23,18 +23,14 @@ from enum import Enum
 from pathlib import Path
 from typing import ContextManager, Dict, List, Optional, Set, Tuple
 
-#from jax._src.core import MainTrace as JaxMainTrace
-#from jax._src.core import cur_sublevel, new_base_main
 from jax._src.interpreters.partial_eval import (
     DynamicJaxprTrace,
     JaxprStackFrame,
-    #extend_jaxpr_stack,
 )
 from jax._src.source_info_util import reset_name_stack
-from jax.core import find_top_trace, take_current_trace, set_current_trace
+from jax.core import find_top_trace, set_current_trace, take_current_trace
 from pennylane.queuing import QueuingManager
 
-#from catalyst.jax_extras import new_dynamic_main2
 from catalyst.logging import debug_logger_init
 from catalyst.utils.exceptions import CompileError
 
@@ -143,30 +139,6 @@ class EvaluationMode(Enum):
     CLASSICAL_COMPILATION = 2
 
 
-# @dataclass
-# class JaxTracingContext:
-#     """JAX tracing context supporting nested quantum operations. Keeps track of the re-entrable
-#     tracing frames. The tracing algorithm visits these frames several times: first during the
-#     classical tracing, then during the quantum tracing and also during the optional transformations.
-
-#     Args:
-#         main: Base JAX tracing data structure.
-#         frames: JAX tracing frames; holding the JAXPR equations.
-#         mains: Secondary JAX tracing structrures. Each structure has one frame and
-#                corresponds to a :class:`~.jax_tracer.HybridOpRegion`
-#         trace: Current JAX trace object.
-#     """
-
-#     main: DynamicJaxprTrace #JaxMainTrace
-#     frames: Dict[DynamicJaxprTrace, JaxprStackFrame]
-#     mains: Dict[DynamicJaxprTrace, DynamicJaxprTrace]#JaxMainTrace]
-#     trace: Optional[DynamicJaxprTrace]
-
-#     @debug_logger_init
-#     def __init__(self, main: DynamicJaxprTrace):#JaxMainTrace):
-#         self.main, self.frames, self.mains, self.trace = main, {}, {}, None
-
-
 class EvaluationContext:
     """Utility context managing class keeping track of various modes of Catalyst executions.
 
@@ -229,18 +201,13 @@ class EvaluationContext:
             if trace is not None:
                 new_trace = trace
             else:
-                #new_trace = DynamicJaxprTrace(parent_trace.frame.debug_info)  # not yet in 0.4.36
                 new_trace = DynamicJaxprTrace()
-                #print("created new trace ", id(new_trace))
 
         with set_current_trace(new_trace):
             try:
                 yield new_trace
             finally:
                 pass
-                #print("  exiting new trace ", id(new_trace))
-                #print("  new trace contents ", new_trace.frame.eqns)
-
 
     @classmethod
     def get_current_trace(cls, hint=None):

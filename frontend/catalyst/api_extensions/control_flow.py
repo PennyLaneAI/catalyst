@@ -64,7 +64,6 @@ from catalyst.jax_tracer import (
 from catalyst.tracing.contexts import (
     EvaluationContext,
     EvaluationMode,
-    #JaxTracingContext,
 )
 
 
@@ -673,7 +672,9 @@ class CondCallable:
             assert len(in_sig.in_type) == 0
             with EvaluationContext.frame_tracing_context() as inner_trace:
                 with QueuingManager.stop_recording(), quantum_tape:
-                    res_classical_tracers = [inner_trace.to_jaxpr_tracer(t) for t in wfun.call_wrapped()]
+                    res_classical_tracers = [
+                        inner_trace.to_jaxpr_tracer(t) for t in wfun.call_wrapped()
+                    ]
             explicit_return_tys = collapse(out_sig.out_type(), res_classical_tracers)
             hybridRegion = HybridOpRegion(inner_trace, quantum_tape, [], explicit_return_tys)
             regions.append(hybridRegion)
@@ -903,7 +904,6 @@ class ForLoopCallable:
 
     def _call_with_quantum_ctx(self, *init_state):
         quantum_tape = QuantumTape()
-        #outer_trace = ctx.trace
         with jax.core.take_current_trace() as cur_trace:
             outer_trace = cur_trace
         aux_classical_tracers = [
@@ -923,7 +923,8 @@ class ForLoopCallable:
             )
             with QueuingManager.stop_recording(), quantum_tape:
                 res_classical_tracers = [
-                    inner_trace.to_jaxpr_tracer(t) for t in wfun.call_wrapped(*arg_classical_tracers)
+                    inner_trace.to_jaxpr_tracer(t)
+                    for t in wfun.call_wrapped(*arg_classical_tracers)
                 ]
                 out_type = out_sig.out_type()
                 out_tree = out_sig.out_tree()
@@ -1090,7 +1091,8 @@ class WhileLoopCallable:
                 in_type, cond_trace.new_arg, cond_trace.to_jaxpr_tracer
             )
             res_classical_tracers = [
-                cond_trace.to_jaxpr_tracer(t) for t in cond_wffa.call_wrapped(*arg_classical_tracers)
+                cond_trace.to_jaxpr_tracer(t)
+                for t in cond_wffa.call_wrapped(*arg_classical_tracers)
             ]
 
             out_type = cond_out_sig.out_type()
@@ -1114,7 +1116,8 @@ class WhileLoopCallable:
             quantum_tape = QuantumTape()
             with QueuingManager.stop_recording(), quantum_tape:
                 res_classical_tracers = [
-                    body_trace.to_jaxpr_tracer(t) for t in body_wffa.call_wrapped(*arg_classical_tracers)
+                    body_trace.to_jaxpr_tracer(t)
+                    for t in body_wffa.call_wrapped(*arg_classical_tracers)
                 ]
 
             out_type = out_sig.out_type()
@@ -1260,7 +1263,6 @@ class ForLoop(HybridOp):
         expansion_strategy = self.expansion_strategy
 
         with EvaluationContext.frame_tracing_context(inner_trace):
-        #with EvaluationContext.frame_tracing_context():
             new_qreg = AbstractQreg()
             qreg_in = _input_type_to_tracers(inner_trace.new_arg, [new_qreg])[0]
             qrp_out = trace_quantum_operations(inner_tape, device, qreg_in, ctx, inner_trace)

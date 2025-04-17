@@ -423,7 +423,6 @@ class AdjointCallable:
             return [], [], [adjoint_region]
 
         # Create a nested jaxpr scope for the body of the adjoint.
-        # cur_trace = EvaluationContext.get_current_trace()
         with EvaluationContext.frame_tracing_context() as inner_trace:
             in_classical_tracers, _ = tree_flatten((args, kwargs))
             wffa, in_avals, _, _ = deduce_avals(self.target, args, kwargs)

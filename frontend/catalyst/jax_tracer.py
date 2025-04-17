@@ -28,8 +28,8 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 import jax
 import jax.numpy as jnp
 import pennylane as qml
-from jax.core import get_aval
 from jax._src.lax.lax import _extract_tracers_dyn_shape
+from jax.core import get_aval
 from pennylane import QubitUnitary, QueuingManager
 from pennylane.devices import QubitDevice
 from pennylane.measurements import (
@@ -57,7 +57,6 @@ from catalyst.jax_extras import (
     PyTreeDef,
     PyTreeRegistry,
     ShapedArray,
-    # _abstractify,
     _input_type_to_tracers,
     cond_expansion_strategy,
     convert_element_type,
@@ -103,7 +102,6 @@ from catalyst.logging import debug_logger, debug_logger_init
 from catalyst.tracing.contexts import (
     EvaluationContext,
     EvaluationMode,
-    # JaxTracingContext,
 )
 from catalyst.utils.exceptions import CompileError
 
@@ -493,7 +491,6 @@ class HybridOp(Operator):
                 out_expanded_tracers
             ), f"{eqn.outvars=}\n{out_expanded_tracers=}"
 
-            # frame = ctx.frames[trace]
             jaxpr_variables = cached_vars.get(frame, set())
             if not jaxpr_variables:
                 # We get all variables in the current frame
