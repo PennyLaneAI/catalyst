@@ -601,9 +601,7 @@ TEST_CASE("Test NullQubit device resource tracking", "[NullQubit]")
 
     // Open the file of resource data
     std::ifstream resource_file(RESOURCES_FNAME);
-    if (!resource_file.is_open()) {
-        FAIL("Failed to open resource usage file for writing.");
-    }
+    CHECK(resource_file.is_open()); // fail-fast if file failed to create
 
     std::vector<std::string> resource_names = {"PauliX",
                                                "C_adj_T",
@@ -653,8 +651,6 @@ TEST_CASE("Test NullQubit device resource tracking", "[NullQubit]")
     CHECK(sim->ResourcesGetNumQubits() == 0);
 
     std::ifstream resource_file2(RESOURCES_FNAME);
-    if (!resource_file2.is_open()) {
-        FAIL("Failed to open resource usage file for writing.");
-    }
+    CHECK(resource_file2.is_open()); // fail-fast if file failed to create
     std::remove(RESOURCES_FNAME);
 }
