@@ -582,7 +582,10 @@ class TestSignatureErrors:
     def test_incompatible_type_reachable_from_user_code(self):
         """Raise error message for incompatible types"""
 
-        with pytest.raises(TypeError, match="<class 'str'> is not a valid JAX type"):
+        with pytest.raises(
+            TypeError,
+            match="Cannot interpret value of type <class 'type'> as an abstract array",
+        ):
 
             @qjit
             def f(x: str):
