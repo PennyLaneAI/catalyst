@@ -13,6 +13,10 @@
   ensures that measurement processes on `null.qubit` always return the value 0 or the result
   corresponding to the '0' state, depending on the context.
 
+  * Custom deivces can optionally define a default pass pipeline using `get_compilation_pipelines` 
+    that overrides the catalyst default pass pipeline.
+    [(#1500)](https://github.com/PennyLaneAI/catalyst/pull/1500)
+
 <h3>Breaking changes 💔</h3>
 
 <h3>Deprecations 👋</h3>
