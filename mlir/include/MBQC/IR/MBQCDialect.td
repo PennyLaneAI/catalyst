@@ -55,6 +55,7 @@ def MBQC_Dialect : Dialect {
 // MBQC dialect types.
 //===----------------------------------------------------------------------===//
 
+/// Uncomment the lines below if defining types for the MBQC dialect
 // class MBQC_Type<string name, string typeMnemonic, list<Trait> traits = []>
 //         : TypeDef<MBQC_Dialect, name, traits> {
 //     let mnemonic = typeMnemonic;

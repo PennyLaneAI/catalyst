@@ -15,7 +15,7 @@
 #ifndef MBQC_INTERFACES
 #define MBQC_INTERFACES
 
-include "mlir/IR/OpBase.td"
+include "mlir/IR/Interfaces.td"
 
 
 #endif // MBQC_INTERFACES

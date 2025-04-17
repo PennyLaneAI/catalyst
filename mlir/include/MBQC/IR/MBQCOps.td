@@ -16,24 +16,17 @@
 #ifndef MBQC_OPS
 #define MBQC_OPS
 
+include "mlir/IR/AttrTypeBase.td"
+
 include "Quantum/IR/QuantumDialect.td"
 
 include "MBQC/IR/MBQCDialect.td"
+
 
 //===----------------------------------------------------------------------===//
 // MBQC dialect enums.
 //===----------------------------------------------------------------------===//
 
-// def BlochPlane : I32EnumAttr<"BlochPlane",
-//     "Planes in the Bloch sphere representation that are supported for parametric measurements",
-//     [
-//         I32EnumAttrCase<"XY", 0>,
-//         I32EnumAttrCase<"ZX", 1>,
-//         I32EnumAttrCase<"YZ", 2>,
-//     ]> {
-//     let cppNamespace = "catalyst::mbqc";
-//     let genSpecializedAttr = 0;
-// }
 
 //===----------------------------------------------------------------------===//
 // MBQC dialect traits.
