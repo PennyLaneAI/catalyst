@@ -26,7 +26,6 @@ which correspond to QNode transforms.
 """
 
 from functools import partial
-from typing import Callable, Sequence
 
 import jax
 import numpy as np
@@ -45,6 +44,11 @@ except:  # pylint: disable=bare-except
 from pennylane.transforms import merge_rotations
 
 from catalyst import measure, qjit
+from catalyst.device import QJITDevice
+from catalyst.device.decomposition import (
+    measurements_from_counts,
+    measurements_from_samples,
+)
 from catalyst.utils.exceptions import CompileError
 
 # pylint: disable=too-many-lines,line-too-long
@@ -1090,7 +1094,68 @@ class TestQFuncTransforms:
 class TestTransformValidity:
     """Test validity of transforms."""
 
-    def test_return_classical_value(self, backend):
+    @pytest.mark.parametrize("transform", (measurements_from_counts, measurements_from_samples))
+    def test_invalid_modify_measurements_classical_return(self, backend, transform, monkeypatch):
+        """Test verification for transforms that are non-batching but modify tape measurements
+        while returning classical values."""
+
+        def inject_device_transforms(self, ctx, execution_config=None):
+            program, config = original_preprocess(self, ctx, execution_config)
+
+            program.add_transform(transform, self.wires)
+
+            return program, config
+
+        # Simulate a Qrack-like device that requires meassurement process transforms.
+        # Qnode transforms raise this error anyway so we cannot use them directly.
+        original_preprocess = QJITDevice.preprocess
+        monkeypatch.setattr(QJITDevice, "preprocess", inject_device_transforms)
+
+        dev = qml.device(backend, wires=2, shots=5)
+
+        @partial(transform, device_wires=dev.wires)
+        @qml.qnode(dev)
+        def qfunc():
+            qml.X(0)
+            measurements = [measure(i) for i in range(2)]
+            return measurements, qml.expval(qml.PauliZ(0))
+
+        with pytest.raises(
+            CompileError,
+            match="Transforming MeasurementProcesses is unsupported with non-MeasurementProcess",
+        ):
+            qjit(qfunc)
+
+    @pytest.mark.parametrize("transform", (measurements_from_counts, measurements_from_samples))
+    def test_valid_modify_measurements_no_measurements(self, backend, transform, monkeypatch):
+        """Test verification for transforms that are non-batching and in-principle can modify tape
+        measurements but don't, while returning classical values."""
+
+        def inject_device_transforms(self, ctx, execution_config=None):
+            program, config = original_preprocess(self, ctx, execution_config)
+
+            program.add_transform(transform, self.wires)
+
+            return program, config
+
+        # Simulate a Qrack-like device that requires meassurement process transforms.
+        # Qnode transforms raise this error anyway so we cannot use them directly.
+        original_preprocess = QJITDevice.preprocess
+        monkeypatch.setattr(QJITDevice, "preprocess", inject_device_transforms)
+
+        dev = qml.device(backend, wires=2)
+
+        @qjit
+        @qml.qnode(dev)
+        def qfunc():
+            qml.X(0)
+            measurements = [measure(i) for i in range(2)]
+            return measurements
+
+        m1, m2 = qfunc()
+        assert m1 == True and m2 == False
+
+    def test_invalid_batch_return_classical_value(self, backend):
         """Test that there's an error raised if the users uses a transform and returns
         a classical value."""
 
@@ -1103,22 +1168,21 @@ class TestTransformValidity:
         )
         H4 += qml.PauliZ(0) @ qml.PauliX(1) @ qml.PauliY(2)
 
-        msg = (
-            "A transformed quantum function must return either a single measurement, "
-            "or a nonempty sequence of measurements."
-        )
-        with pytest.raises(CompileError, match=msg):
+        @qml.transforms.split_non_commuting
+        @qml.qnode(qml.device(backend, wires=3))
+        def qfunc():
+            """Example taken from PL tests."""
+            qml.Hadamard(0)
+            qml.Hadamard(1)
+            qml.PauliZ(1)
+            qml.PauliX(2)
+            return [1, qml.expval(H4)]
 
-            @qjit
-            @qml.transforms.split_non_commuting
-            @qml.qnode(qml.device(backend, wires=3))
-            def qfunc():
-                """Example taken from PL tests."""
-                qml.Hadamard(0)
-                qml.Hadamard(1)
-                qml.PauliZ(1)
-                qml.PauliX(2)
-                return [1, qml.expval(H4)]
+        with pytest.raises(
+            CompileError,
+            match="Batch transforms are unsupported with MCMs or non-MeasurementProcess",
+        ):
+            qjit(qfunc)
 
     def test_invalid_batch_transform_due_to_measure(self, backend):
         """Test split non commuting"""
@@ -1149,7 +1213,10 @@ class TestTransformValidity:
 
             return qfunc
 
-        with pytest.raises(CompileError, match="Multiple tapes are generated"):
+        with pytest.raises(
+            CompileError,
+            match="Batch transforms are unsupported with MCMs or non-MeasurementProcess",
+        ):
             qjit(qnode_builder(backend))
 
     @pytest.mark.parametrize(("theta_1", "theta_2"), [(0.3, -0.2)])
@@ -1182,19 +1249,18 @@ class TestTransformValidity:
     def test_informative_transform(self, backend):
         """Informative transforms are not supported!"""
 
-        def _id(tape: qml.tape.QuantumTape) -> (Sequence[qml.tape.QuantumTape], Callable):
+        # Just fake that it is informative
+        @partial(qml.transforms.core.transform, is_informative=True)
+        def id_transform(tape):
             return [tape], lambda res: res[0]
 
-        # Just fake that it is informative
-        id_transform = qml.transforms.core.transform(_id, is_informative=True)
+        @id_transform
+        @qml.qnode(qml.device(backend, wires=1))
+        def f():
+            return qml.state()
 
         with pytest.raises(CompileError, match="Catalyst does not support informative transforms."):
-
-            @qjit
-            @id_transform
-            @qml.qnode(qml.device(backend, wires=1))
-            def f():
-                return qml.state()
+            qjit(f)
 
 
 @pytest.mark.xfail(reason="Fails due to use of numpy arrays in transform")
