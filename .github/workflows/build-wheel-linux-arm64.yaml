@@ -138,7 +138,6 @@ jobs:
         # Add cmake and ninja to the PATH env var
         PYTHON_BINS=$(find /opt/_internal/cpython-${{ matrix.python_version }}.*/bin -maxdepth 1 -type d | tr '\n' ':' | sed 's/:$//')
         echo $PYTHON_BINS >> $GITHUB_PATH
-        python${{ matrix.python_version }} --version
 
     - name: Build LLVM / MLIR
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
