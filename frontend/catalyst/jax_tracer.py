@@ -1189,6 +1189,7 @@ def trace_post_processing(ctx, trace, post_processing: Callable, pp_args):
         with jax.core.take_current_trace() as cur_trace:
             jaxpr, out_type, consts = cur_trace.frame.to_jaxpr2(out_tracers)#, cur_trace.frame.debug_info)  # not yet in 0.4.36
         closed_jaxpr = ClosedJaxpr(jaxpr, consts)
+        breakpoint()
         return closed_jaxpr, out_type, out_tree_promise()
 
 

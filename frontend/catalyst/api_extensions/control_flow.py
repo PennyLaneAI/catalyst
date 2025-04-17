@@ -1260,6 +1260,7 @@ class ForLoop(HybridOp):
         expansion_strategy = self.expansion_strategy
 
         with EvaluationContext.frame_tracing_context(inner_trace):
+        #with EvaluationContext.frame_tracing_context():
             new_qreg = AbstractQreg()
             qreg_in = _input_type_to_tracers(inner_trace.new_arg, [new_qreg])[0]
             qrp_out = trace_quantum_operations(inner_tape, device, qreg_in, ctx, inner_trace)
