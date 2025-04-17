@@ -49,6 +49,7 @@ def MBQC_Dialect : Dialect {
     ];
 
     /// Use the default type printing/parsing hooks, otherwise we would have to explicitly define them.
+    let useDefaultAttributePrinterParser = 1;
     /// Uncomment the line below if defining types for the MBQC dialect
     // let useDefaultTypePrinterParser = 1;
 }

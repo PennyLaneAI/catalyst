@@ -12,10 +12,36 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt %s
+// RUN: quantum-opt --split-input-file --verify-diagnostics %s
 
 func.func @foo(%q1 : !quantum.bit) {
-    %0 = arith.constant 3.141592653589793 : f64
-    %res, %new_q = mbqc.measure_in_basis ["XY", %0] %q1 : i1, !quantum.bit
+    %angle = arith.constant 3.141592653589793 : f64
+    %res, %new_q = mbqc.measure_in_basis [XY, %angle] %q1 : i1, !quantum.bit
+    func.return
+}
+
+// -----
+
+func.func @foo(%q1 : !quantum.bit) {
+    %angle = arith.constant 3.141592653589793 : f64
+    %res, %new_q = mbqc.measure_in_basis [YZ, %angle] %q1 : i1, !quantum.bit
+    func.return
+}
+
+// -----
+
+func.func @foo(%q1 : !quantum.bit) {
+    %angle = arith.constant 3.141592653589793 : f64
+    %res, %new_q = mbqc.measure_in_basis [ZX, %angle] %q1 : i1, !quantum.bit
+    func.return
+}
+
+// -----
+
+func.func @foo(%q1 : !quantum.bit) {
+    %angle = arith.constant 3.141592653589793 : f64
+    // expected-error@below {{expected catalyst::mbqc::BlochPlane to be one of: XY, ZX, YZ}}
+    // expected-error@below {{failed to parse BlochPlaneAttr parameter}}
+    %res, %new_q = mbqc.measure_in_basis [YX, %angle] %q1 : i1, !quantum.bit
     func.return
 }

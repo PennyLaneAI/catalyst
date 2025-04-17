@@ -24,5 +24,7 @@ using namespace catalyst::mbqc;
 // MBQC op definitions.
 //===----------------------------------------------------------------------===//
 
+#include "MBQC/IR/MBQCEnums.cpp.inc"
+
 #define GET_OP_CLASSES
 #include "MBQC/IR/MBQCOps.cpp.inc"

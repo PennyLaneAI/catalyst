@@ -9,4 +9,5 @@ add_mlir_library(MLIRMBQC
     DEPENDS
     MLIRMBQCInterfacesIncGen
     MLIRMBQCOpsIncGen
+    MLIRMBQCEnumsIncGen
 )

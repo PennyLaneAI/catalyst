@@ -12,8 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// #include "mlir/IR/DialectImplementation.h" // needed for generated type parser
-// #include "llvm/ADT/TypeSwitch.h"           // needed for generated type parser
+#include "mlir/IR/DialectImplementation.h" // needed for generated type parser
+#include "llvm/ADT/TypeSwitch.h"           // needed for generated type parser
+#include <mlir/IR/Builders.h>
 
 #include "MBQC/IR/MBQCDialect.h"
 #include "MBQC/IR/MBQCOps.h"
@@ -35,6 +36,11 @@ void MBQCDialect::initialize()
     // #include "MBQC/IR/MBQCOpsTypes.cpp.inc"
     //         >();
 
+    addAttributes<
+#define GET_ATTRDEF_LIST
+#include "MBQC/IR/MBQCAttributes.cpp.inc"
+        >();
+
     addOperations<
 #define GET_OP_LIST
 #include "MBQC/IR/MBQCOps.cpp.inc"
@@ -49,6 +55,5 @@ void MBQCDialect::initialize()
 // #define GET_TYPEDEF_CLASSES
 // #include "MBQC/IR/MBQCOpsTypes.cpp.inc"
 
-/// Uncomment the lines below if defining attributes for the MBQC dialect
-// #define GET_ATTRDEF_CLASSES
-// #include "MBQC/IR/MBQCAttributes.cpp.inc"
+#define GET_ATTRDEF_CLASSES
+#include "MBQC/IR/MBQCAttributes.cpp.inc"

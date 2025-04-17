@@ -29,7 +29,3 @@
 /// Uncomment the lines below if defining types for the MBQC dialect
 // #define GET_TYPEDEF_CLASSES
 // #include "MBQC/IR/MBQCOpsTypes.h.inc"
-
-/// Uncomment the lines below if defining attributes for the MBQC dialect
-// #define GET_ATTRDEF_CLASSES
-// #include "MBQC/IR/MBQCAttributes.h.inc"

@@ -22,5 +22,10 @@
 // MBQC ops declarations.
 //===----------------------------------------------------------------------===//
 
+#include "MBQC/IR/MBQCEnums.h.inc"
+
+#define GET_ATTRDEF_CLASSES
+#include "MBQC/IR/MBQCAttributes.h.inc"
+
 #define GET_OP_CLASSES
 #include "MBQC/IR/MBQCOps.h.inc"
