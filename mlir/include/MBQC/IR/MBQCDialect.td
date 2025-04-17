@@ -44,6 +44,10 @@ def MBQC_Dialect : Dialect {
     /// This is the C++ namespace in which the dialect and all of its sub-components are placed.
     let cppNamespace = "::catalyst::mbqc";
 
+    let dependentDialects = [
+        "quantum::QuantumDialect"
+    ];
+
     /// Use the default type printing/parsing hooks, otherwise we would have to explicitly define them.
     /// Uncomment the line below if defining types for the MBQC dialect
     // let useDefaultTypePrinterParser = 1;
