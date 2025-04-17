@@ -138,7 +138,7 @@ def test_simple_circuit():
 
 
 def test_track_resources():
-    """Test that a circuit with the new device API is compiling to MLIR."""
+    """Test that resource tracking settings get passed to the device."""
     dev = NullQubit(wires=2)
     assert "track_resources" in QJITDevice.extract_backend_info(dev, dev.capabilities).kwargs
     assert QJITDevice.extract_backend_info(dev, dev.capabilities).kwargs["track_resources"] is False
