@@ -29,7 +29,7 @@ using namespace catalyst::mbqc;
 
 void MBQCDialect::initialize()
 {
-    // Uncomment the lines below if defining types for the MBQC dialect
+    /// Uncomment the lines below if defining types for the MBQC dialect
     //     addTypes<
     // #define GET_TYPEDEF_LIST
     // #include "MBQC/IR/MBQCOpsTypes.cpp.inc"
@@ -45,9 +45,10 @@ void MBQCDialect::initialize()
 // MBQC type definitions.
 //===----------------------------------------------------------------------===//
 
-#define GET_TYPEDEF_CLASSES
-#include "MBQC/IR/MBQCOpsTypes.cpp.inc"
+/// Uncomment the lines below if defining types for the MBQC dialect
+// #define GET_TYPEDEF_CLASSES
+// #include "MBQC/IR/MBQCOpsTypes.cpp.inc"
 
-// Uncomment the lines below if defining types for the MBQC dialect
+/// Uncomment the lines below if defining attributes for the MBQC dialect
 // #define GET_ATTRDEF_CLASSES
 // #include "MBQC/IR/MBQCAttributes.cpp.inc"
