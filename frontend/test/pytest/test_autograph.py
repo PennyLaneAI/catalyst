@@ -14,6 +14,7 @@
 
 """PyTests for the AutoGraph source-to-source transformation feature."""
 
+import itertools
 import traceback
 import warnings
 from collections import defaultdict
@@ -26,8 +27,21 @@ import pytest
 from jax.errors import TracerBoolConversionError
 from numpy.testing import assert_allclose
 
-from catalyst import *
-from catalyst import qjit
+from catalyst import AutoGraphError, debug, passes, qjit
+from catalyst.api_extensions import (
+    adjoint,
+    cond,
+    ctrl,
+    for_loop,
+    grad,
+    jacobian,
+    jvp,
+    measure,
+    vjp,
+    vmap,
+    while_loop,
+)
+from catalyst.autograph import autograph_source, disable_autograph, run_autograph
 from catalyst.autograph.transformer import TRANSFORMER
 from catalyst.utils.dummy import dummy_func
 from catalyst.utils.exceptions import CompileError
@@ -1287,6 +1301,20 @@ class TestForLoops:
             return acc
 
         assert f() == 9
+
+    def test_fallback_itertools(self):
+        """Test the AutoGraph fallback when the iteration target has no length, as is for example
+        the case with an itertools.product with constant arguments."""
+
+        @qml.qjit(autograph=True)
+        def f(x: float):
+
+            for i, j in itertools.product(range(2), repeat=2):
+                x += i + j
+
+            return x
+
+        assert f(5) == 9
 
 
 class TestWhileLoops:
