@@ -428,9 +428,9 @@ class AdjointCallable:
             wffa, in_avals, _, _ = deduce_avals(self.target, args, kwargs)
             arg_classical_tracers = _input_type_to_tracers(inner_trace.new_arg, in_avals)
             with QueuingManager.stop_recording(), QuantumTape() as quantum_tape:
-                # FIXME: move all full_raise calls into a separate function
+                # FIXME: move all to_jaxpr_tracer calls into a separate function
                 res_classical_tracers = [
-                    inner_trace.full_raise(t)
+                    inner_trace.to_jaxpr_tracer(t)
                     for t in wffa.call_wrapped(*arg_classical_tracers)
                     if isinstance(t, DynamicJaxprTracer)
                 ]
