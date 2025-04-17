@@ -16,11 +16,11 @@
 
 #include "Quantum/IR/QuantumDialect.h"
 
+#include "MBQC/IR/MBQCDialect.h"
+
 //===----------------------------------------------------------------------===//
 // MBQC ops declarations.
 //===----------------------------------------------------------------------===//
-
-#include "MBQC/IR/MBQCDialect.h"
 
 #define GET_OP_CLASSES
 #include "MBQC/IR/MBQCOps.h.inc"
