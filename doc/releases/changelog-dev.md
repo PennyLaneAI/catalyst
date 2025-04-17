@@ -26,7 +26,7 @@
   import pennylane as qml
   from catalyst import qjit
 
-  dev = qml.device("lightning.qubit", wires=1)
+  dev = qml.device("lightning.qubit", wires=2)
 
   qml.capture.enable()
 
