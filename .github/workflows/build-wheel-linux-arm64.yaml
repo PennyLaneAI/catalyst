@@ -429,7 +429,7 @@ jobs:
         python${{ matrix.python_version }} -m pip install dist/*.whl --extra-index-url https://test.pypi.org/simple
 
     - name: Install Standalone Plugin
-      # Run only on Thursday at the given time (TODO: set comparison to == before merging)
+      # Run only on Thursday at the given time
       if: github.event_name == 'schedule'
       run: |
         python${{ matrix.python_version }} -m pip install standalone_plugin_wheel/wheel/*.whl --no-deps
