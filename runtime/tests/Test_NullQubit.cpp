@@ -605,7 +605,16 @@ TEST_CASE("Test NullQubit device resource tracking", "[NullQubit]")
         FAIL("Failed to open resource usage file for writing.");
     }
 
-    std::vector<std::string> resource_names = {"PauliX", "C_adj_T", "adj_T", "C_S", "S", "CNOT", "adj_ControlledQubitUnitary", "ControlledQubitUnitary", "adj_QubitUnitary", "QubitUnitary"};
+    std::vector<std::string> resource_names = {"PauliX",
+                                               "C_adj_T",
+                                               "adj_T",
+                                               "C_S",
+                                               "S",
+                                               "CNOT",
+                                               "adj_ControlledQubitUnitary",
+                                               "ControlledQubitUnitary",
+                                               "adj_QubitUnitary",
+                                               "QubitUnitary"};
 
     // Check all fields have the correct value
     std::string full_json;
