@@ -450,6 +450,6 @@ jobs:
 
     - name: Run Standalone Plugin Tests
       # Run only on Thursday at the given time
-      if: github.event_name == 'scheduled'
+      if: github.event_name == 'schedule'
       run: |
         python${{ matrix.python_version }} -m pytest standalone_plugin_wheel/standalone_plugin/test -n auto
