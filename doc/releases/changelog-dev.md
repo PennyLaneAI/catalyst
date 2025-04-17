@@ -15,12 +15,12 @@
 
 <h3>Breaking changes 💔</h3>
 
-* Catalyst has removed the `experimental_capture` keyword from its `qjit` function in favor of a
-  unified program capture behaviour. 
+* Catalyst has removed the `experimental_capture` keyword from the `qjit` decorator in favour of
+  unified behaviour with PennyLane. 
   [(#1657)](https://github.com/PennyLaneAI/catalyst/pull/1657)
 
-  Program capture has to be enabled before the definition of the function to be qjitted, and 
-  should be disabled after execution.
+  Instead of enabling program capture with Catalyst via `qjit(experimental_capture=True)`, program capture
+  can be enabled via the global toggle `qml.capture.enable`:
   
   ```python
   import pennylane as qml
