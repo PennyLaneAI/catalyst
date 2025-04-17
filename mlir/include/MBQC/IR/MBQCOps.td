@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
 #ifndef MBQC_OPS
 #define MBQC_OPS
 
@@ -21,7 +20,6 @@ include "mlir/IR/AttrTypeBase.td"
 include "Quantum/IR/QuantumDialect.td"
 
 include "MBQC/IR/MBQCDialect.td"
-
 
 //===----------------------------------------------------------------------===//
 // MBQC dialect enums.

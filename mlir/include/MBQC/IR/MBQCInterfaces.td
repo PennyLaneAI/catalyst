@@ -17,5 +17,4 @@
 
 include "mlir/IR/Interfaces.td"
 
-
 #endif // MBQC_INTERFACES
