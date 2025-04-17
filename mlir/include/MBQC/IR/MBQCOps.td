@@ -26,7 +26,7 @@ include "MBQC/IR/MBQCDialect.td"
 // MBQC dialect enums.
 //===----------------------------------------------------------------------===//
 
-def BlochPlane : I32EnumAttr<"BlochPlane",
+def MeasurementPlane : I32EnumAttr<"MeasurementPlane",
     "Planes in the Bloch sphere representation with support for arbitrary-basis measurements",
     [
         I32EnumAttrCase<"XY", 0>,
@@ -47,7 +47,7 @@ def BlochPlane : I32EnumAttr<"BlochPlane",
 // MBQC dialect attributes.
 //===----------------------------------------------------------------------===//
 
-def BlochPlaneAttr : EnumAttr<MBQC_Dialect, BlochPlane, "bloch_plane">;
+def MeasurementPlaneAttr : EnumAttr<MBQC_Dialect, MeasurementPlane, "measurement_plane">;
 
 
 //===----------------------------------------------------------------------===//
@@ -66,7 +66,7 @@ def MeasureInBasisOp : MBQC_Op<"measure_in_basis"> {
 
     let arguments = (ins
         QubitType:$in_qubit,
-        BlochPlaneAttr:$plane,
+        MeasurementPlaneAttr:$plane,
         F64:$angle,
         OptionalAttr<ConfinedAttr<I32Attr, [IntMinValue<0>, IntMaxValue<1>]>>:$postselect
     );

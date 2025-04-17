@@ -40,8 +40,8 @@ func.func @foo(%q1 : !quantum.bit) {
 
 func.func @foo(%q1 : !quantum.bit) {
     %angle = arith.constant 3.141592653589793 : f64
-    // expected-error@below {{expected catalyst::mbqc::BlochPlane to be one of: XY, ZX, YZ}}
-    // expected-error@below {{failed to parse BlochPlaneAttr parameter}}
+    // expected-error@below {{expected catalyst::mbqc::MeasurementPlane to be one of: XY, ZX, YZ}}
+    // expected-error@below {{failed to parse MeasurementPlaneAttr parameter}}
     %res, %new_q = mbqc.measure_in_basis [YX, %angle] %q1 : i1, !quantum.bit
     func.return
 }
