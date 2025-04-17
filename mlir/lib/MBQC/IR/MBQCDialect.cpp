@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "mlir/IR/Builders.h"
 #include "mlir/IR/DialectImplementation.h" // needed for generated type parser
 #include "llvm/ADT/TypeSwitch.h"           // needed for generated type parser
-#include <mlir/IR/Builders.h>
 
 #include "MBQC/IR/MBQCDialect.h"
 #include "MBQC/IR/MBQCOps.h"
