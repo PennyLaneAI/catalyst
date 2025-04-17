@@ -423,7 +423,7 @@ class AdjointCallable:
             return [], [], [adjoint_region]
 
         # Create a nested jaxpr scope for the body of the adjoint.
-        #cur_trace = EvaluationContext.get_current_trace()
+        # cur_trace = EvaluationContext.get_current_trace()
         with EvaluationContext.frame_tracing_context() as inner_trace:
             in_classical_tracers, _ = tree_flatten((args, kwargs))
             wffa, in_avals, _, _ = deduce_avals(self.target, args, kwargs)
@@ -462,18 +462,15 @@ class HybridAdjoint(HybridOp):
         if body_trace is None:
             frame_ctx = EvaluationContext.frame_tracing_context()
         else:
-            #frame_ctx = EvaluationContext.frame_tracing_context(body_trace)
-            frame_ctx = EvaluationContext.frame_tracing_context()
+            frame_ctx = EvaluationContext.frame_tracing_context(body_trace)
 
         with frame_ctx as body_trace:
-            #breakpoint()
             qreg_in = _input_type_to_tracers(body_trace.new_arg, [AbstractQreg()])[0]
             qrp_out = trace_quantum_operations(body_tape, device, qreg_in, ctx, body_trace)
             qreg_out = qrp_out.actualize()
             body_jaxpr, _, body_consts = body_trace.frame.to_jaxpr2(
                 res_classical_tracers + [qreg_out]
             )
-            #breakpoint()
 
         qreg = qrp.actualize()
         args, args_tree = tree_flatten((body_consts, op.in_classical_tracers, [qreg]))

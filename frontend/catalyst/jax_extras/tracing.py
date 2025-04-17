@@ -36,7 +36,7 @@ from typing import (
 
 import jax
 from jax import ShapeDtypeStruct
-from jax._src.core import DBIdx#, _update_thread_local_jit_state
+from jax._src.core import DBIdx  # , _update_thread_local_jit_state
 from jax._src.interpreters.mlir import _module_name_regex, register_lowering
 from jax._src.interpreters.partial_eval import (
     _input_type_to_tracers,
@@ -44,7 +44,8 @@ from jax._src.interpreters.partial_eval import (
     trace_to_jaxpr_dynamic2,
 )
 from jax._src.lax.control_flow import _initial_style_jaxpr
-#from jax._src.lax.lax import _abstractify
+
+# from jax._src.lax.lax import _abstractify
 from jax._src.lax.slicing import _gather_lower, gather_p
 from jax._src.linear_util import annotate
 from jax._src.pjit import _extract_implicit_args, _flat_axes_specs
@@ -54,13 +55,13 @@ from jax.api_util import flatten_fun
 from jax.core import (
     AbstractValue,
     ClosedJaxpr,
-    #ConcreteArray,
+    # ConcreteArray,
     DShapedArray,
     InDBIdx,
     InputType,
     Jaxpr,
     JaxprEqn,
-    #MainTrace,
+    # MainTrace,
     OutDBIdx,
     OutputType,
 )
@@ -73,7 +74,7 @@ from jax.core import (
     find_top_trace,
     gensym,
     new_jaxpr_eqn,
-    #thread_local_state,
+    # thread_local_state,
 )
 from jax.extend.linear_util import transformation_with_aux, wrap_init
 from jax.interpreters.partial_eval import (
@@ -114,7 +115,7 @@ __all__ = (
     "PyTreeRegistry",
     "ShapedArray",
     "DShapedArray",
-    #"ConcreteArray",
+    # "ConcreteArray",
     "ShapeDtypeStruct",
     "DynshapePrimitive",
     "convert_constvars_jaxpr",
@@ -128,7 +129,7 @@ __all__ = (
     "expand_args",
     "expand_results",
     "eval_jaxpr",
-    #"_abstractify",
+    # "_abstractify",
     "_initial_style_jaxpr",
     "_input_type_to_tracers",
     "input_type_to_tracers",
@@ -141,7 +142,7 @@ __all__ = (
     "_module_name_regex",
     "make_jaxpr_effects",
     "make_jaxpr2",
-    #"new_dynamic_main2",
+    # "new_dynamic_main2",
     "new_inner_tracer",
     "sort_eqns",
     "transient_jax_config",
@@ -342,7 +343,6 @@ def expanded_fun(static_args, *args_expanded):
     args_collapsed = [a for a, (_, k) in zip(args_expanded, in_type) if k]
     res_flat = yield args_collapsed, {}
     num_implicit_inputs = len([() for _, k in in_type if not k])
-    #breakpoint()
     all_outs, out_sig = infer_output_type_python(
         args_expanded, res_flat, expansion_strategy, num_implicit_inputs
     )
@@ -469,9 +469,9 @@ def trace_to_jaxpr(
     This method would remove return values related to sizes of tensors when compiling with
     dynamically sized tensors.
     """
-    #breakpoint()
-    jaxpr, tracers, consts = trace.frame.to_jaxpr2((*outputs, *inputs))#, trace.frame.debug_info) # not yet in 0.4.36
-    #breakpoint()
+    jaxpr, tracers, consts = trace.frame.to_jaxpr2(
+        (*outputs, *inputs)
+    )  # , trace.frame.debug_info) # not yet in 0.4.36
     del jaxpr._outvars[len(outputs) :]
     return jaxpr, tracers, consts
 
