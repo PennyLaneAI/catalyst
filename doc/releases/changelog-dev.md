@@ -40,6 +40,8 @@
   circuit(0.1)
   ```
 
+  Disabling program capture can be done with `qml.capture.disable()`.
+
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
