@@ -20,7 +20,7 @@
   [(#1657)](https://github.com/PennyLaneAI/catalyst/pull/1657)
 
   Instead of enabling program capture with Catalyst via `qjit(experimental_capture=True)`, program capture
-  can be enabled via the global toggle `qml.capture.enable`:
+  can be enabled via the global toggle `qml.capture.enable()`:
   
   ```python
   import pennylane as qml
