@@ -10,6 +10,7 @@ add_mlir_public_c_api_library(QuantumCAPI
     qec-transforms
     MLIRGradient
     gradient-transforms
+    MLIRMBQC
     MLIRMitigation
     mitigation-transforms
     MLIRIon
