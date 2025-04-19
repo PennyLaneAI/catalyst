@@ -18,6 +18,7 @@
 include "mlir/IR/AttrTypeBase.td"
 include "mlir/IR/DialectBase.td"
 include "mlir/IR/OpBase.td"
+include "mlir/IR/EnumAttr.td"
 
 include "Quantum/IR/QuantumDialect.td"
 include "QEC/IR/QECOpInterfaces.td"
@@ -46,6 +47,28 @@ def QECDialect : Dialect {
     /// This is the C++ namespace that the dialect, and all sub-components, get placed in.
     let cppNamespace = "::catalyst::qec";
 
+    /// Use the default attribute printer/parser hooks, otherwise we would explicitly define them.
+    let useDefaultAttributePrinterParser = 1;
+}
+
+
+//===----------------------------------------------------------------------===//
+// QEC dialect enums.
+//===----------------------------------------------------------------------===//
+
+def LogicalLogicalInitKind : I32EnumAttr<"LogicalLogicalInitKind",
+    "Kinds of Pauli operators",
+        [
+        I32EnumAttrCase<"zero",     0>, // |0⟩
+        I32EnumAttrCase<"one",      1>, // |1⟩
+        I32EnumAttrCase<"plus",     2>, // |+⟩  = (|0⟩ + |1⟩) / sqrt(2)
+        I32EnumAttrCase<"minus",    3>, // |-⟩  = (|0⟩ - |1⟩) / sqrt(2)
+        I32EnumAttrCase<"plus_i",   4>, // |+i⟩ = (|0⟩ + i|1⟩) / sqrt(2)
+        I32EnumAttrCase<"minus_i",  5>, // |-i⟩ = (|0⟩ - i|1⟩) / sqrt(2)
+        I32EnumAttrCase<"magic",    6>, // |T⟩  = cos(π/8)|0⟩ + e^{iπ/4}sin(π/8)|1⟩
+    ]> {
+    let cppNamespace = "::catalyst::qec";
+    let genSpecializedAttr = 0;
 }
 
 //===----------------------------------------------------------------------===//
@@ -53,13 +76,33 @@ def QECDialect : Dialect {
 //===----------------------------------------------------------------------===//
 
 def PauliWord : TypedArrayAttrBase<StrAttr, "A product of Pauli operators, aka a Pauli word.">;
-
+def LogicalInit : EnumAttr<QECDialect, LogicalLogicalInitKind, "enum">;
 
 //===----------------------------------------------------------------------===//
 // QEC dialect operations.
 //===----------------------------------------------------------------------===//
 
 class QEC_Op<string mnemonic, list<Trait> traits = []> : Op<QECDialect, mnemonic, traits>;
+
+def PrepareStateOp : QEC_Op<"prepare"> {
+    let summary = "Initial state of a quantum circuit.";
+    let description = [{
+        The PrepareStateOp represents the initial state of logical qubits.
+    }];
+
+    let arguments = (ins
+        LogicalInit:$init_state,
+        Variadic<QubitType>:$in_qubits
+    );
+
+    let results = (outs
+        Variadic<QubitType>:$out_qubits
+    );
+
+    let assemblyFormat = [{
+        $init_state $in_qubits attr-dict `:` type($out_qubits)
+    }];
+}
 
 def PPRotationOp : QEC_Op<"ppr", [QECOpInterface]> {
     let summary = "Pauli Product Rotation on qubits.";
