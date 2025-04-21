@@ -25,8 +25,8 @@ include "mlir/IR/OpBase.td"
 def MBQC_Dialect : Dialect {
     let summary = "A dialect for measurement-based quantum computing.";
     let description = [{
-        The measurement-based quantum computing (MBQC) dialect extends extends the Quantum dialect
-        with operations and passes that are useful for expressing quantum workloads in the MBQC
+        The measurement-based quantum computing (MBQC) dialect extends the Quantum dialect with
+        operations and passes that are useful for expressing quantum workloads in the MBQC
         representation.
 
         See for example Raussendorf et al., Measurement-based quantum computation with cluster
