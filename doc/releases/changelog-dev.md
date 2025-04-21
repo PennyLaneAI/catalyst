@@ -15,6 +15,33 @@
 
 <h3>Breaking changes 💔</h3>
 
+* Catalyst has removed the `experimental_capture` keyword from the `qjit` decorator in favour of
+  unified behaviour with PennyLane. 
+  [(#1657)](https://github.com/PennyLaneAI/catalyst/pull/1657)
+
+  Instead of enabling program capture with Catalyst via `qjit(experimental_capture=True)`, program capture
+  can be enabled via the global toggle `qml.capture.enable()`:
+  
+  ```python
+  import pennylane as qml
+  from catalyst import qjit
+
+  dev = qml.device("lightning.qubit", wires=2)
+
+  qml.capture.enable()
+
+  @qjit
+  @qml.qnode(dev)
+  def circuit(x):
+      qml.Hadamard(0)
+      qml.CNOT([0, 1])
+      return qml.expval(qml.Z(0))
+
+  circuit(0.1)
+  ```
+
+  Disabling program capture can be done with `qml.capture.disable()`.
+
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
