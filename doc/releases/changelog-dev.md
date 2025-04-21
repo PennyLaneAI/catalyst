@@ -56,6 +56,10 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Catalyst now includes an experimental `mbqc` dialect for representing measurement-based
+  quantum-computing protocols in MLIR.
+  [(#1663)](https://github.com/PennyLaneAI/catalyst/pull/1663)
+
 * The version of JAX used by Catalyst is updated to 0.5.3.
   [(#???)](https://github.com/PennyLaneAI/catalyst/pull/???)
 
