@@ -20,10 +20,11 @@ from typing import Callable, Sequence
 
 import jax
 import jax.core
+import jax.numpy as jnp
 import pennylane as qml
 from jax.extend.linear_util import wrap_init
 from jax.interpreters.partial_eval import convert_constvars_jaxpr
-from pennylane.capture import PlxprInterpreter, disable, enable, enabled, qnode_prim
+from pennylane.capture import PlxprInterpreter, qnode_prim
 from pennylane.capture.expand_transforms import ExpandTransformsInterpreter
 from pennylane.capture.primitives import cond_prim as plxpr_cond_prim
 from pennylane.capture.primitives import for_loop_prim as plxpr_for_loop_prim
@@ -32,9 +33,7 @@ from pennylane.ops.functions.map_wires import _map_wires_transform as pl_map_wir
 from pennylane.transforms import cancel_inverses as pl_cancel_inverses
 from pennylane.transforms import commute_controlled as pl_commute_controlled
 from pennylane.transforms import decompose as pl_decompose
-from pennylane.transforms import (
-    merge_amplitude_embedding as pl_merge_amplitude_embedding,
-)
+from pennylane.transforms import merge_amplitude_embedding as pl_merge_amplitude_embedding
 from pennylane.transforms import merge_rotations as pl_merge_rotations
 from pennylane.transforms import single_qubit_fusion as pl_single_qubit_fusion
 from pennylane.transforms import unitary_to_rot as pl_unitary_to_rot
@@ -65,6 +64,8 @@ from catalyst.jax_primitives import (
     quantum_kernel_p,
     qunitary_p,
     sample_p,
+    set_basis_state_p,
+    set_state_p,
     state_p,
     var_p,
     while_p,
@@ -423,6 +424,37 @@ def handle_global_phase(self, phase, *wires, n_wires):
     gphase_p.bind(phase, ctrl_len=0, adjoint=False)
 
 
+@QFuncPlxprInterpreter.register_primitive(qml.BasisState._primitive)
+def handle_basis_state(self, *invals, n_wires):
+    """Handle the conversion from plxpr to Catalyst jaxpr for the BasisState primitive"""
+    state_inval = invals[0]
+    wires_inval = invals[1:]
+
+    state = jax.lax.convert_element_type(state_inval, jnp.dtype(jnp.bool))
+    wires = [self.get_wire(w) for w in wires_inval]
+    out_wires = set_basis_state_p.bind(*wires, state)
+
+    for wire_values, new_wire in zip(wires_inval, out_wires):
+        self.wire_map[wire_values] = new_wire
+
+
+# pylint: disable=unused-argument
+@QFuncPlxprInterpreter.register_primitive(qml.StatePrep._primitive)
+def handle_state_prep(self, *invals, n_wires, **kwargs):
+    """Handle the conversion from plxpr to Catalyst jaxpr for the StatePrep primitive"""
+    state_inval = invals[0]
+    wires_inval = invals[1:]
+
+    # jnp.complex128 is the top element in the type promotion lattice so it is ok to do this:
+    # https://jax.readthedocs.io/en/latest/type_promotion.html
+    state = jax.lax.convert_element_type(state_inval, jnp.dtype(jnp.complex128))
+    wires = [self.get_wire(w) for w in wires_inval]
+    out_wires = set_state_p.bind(*wires, state)
+
+    for wire_values, new_wire in zip(wires_inval, out_wires):
+        self.wire_map[wire_values] = new_wire
+
+
 # pylint: disable=unused-argument, too-many-arguments
 @QFuncPlxprInterpreter.register_primitive(plxpr_cond_prim)
 def handle_cond(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
@@ -707,18 +739,9 @@ def trace_from_pennylane(fn, static_argnums, abstracted_axes, sig, kwargs):
             "abstracted_axes": abstracted_axes,
         }
 
-        if enabled():
-            capture_on = True
-        else:
-            capture_on = False
-            enable()
-
         args = sig
-        try:
-            plxpr, out_type, out_treedef = make_jaxpr2(fn, **make_jaxpr_kwargs)(*args, **kwargs)
-            jaxpr = from_plxpr(plxpr)(*args, **kwargs)
-        finally:
-            if not capture_on:
-                disable()
+
+        plxpr, out_type, out_treedef = make_jaxpr2(fn, **make_jaxpr_kwargs)(*args, **kwargs)
+        jaxpr = from_plxpr(plxpr)(*args, **kwargs)
 
     return jaxpr, out_type, out_treedef, sig

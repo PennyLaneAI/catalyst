@@ -34,6 +34,7 @@ set(LIBS
     qec-transforms
     MLIRGradient
     gradient-transforms
+    MLIRMBQC
     MLIRMitigation
     mitigation-transforms
     MLIRIon
