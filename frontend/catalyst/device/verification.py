@@ -63,7 +63,6 @@ def _verify_nested(
 ) -> Any:
     """Traverse the nested quantum tape, carry a caller-defined state."""
 
-    cur_trace = EvaluationContext.get_current_trace()
     for op in operations:
         inner_state = op_checker_fn(op, state)
         if has_nested_tapes(op):
