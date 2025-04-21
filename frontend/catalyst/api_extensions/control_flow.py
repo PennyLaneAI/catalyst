@@ -656,8 +656,7 @@ class CondCallable:
         return False
 
     def _call_with_quantum_ctx(self):
-        with jax.core.take_current_trace() as cur_trace:
-            outer_trace = cur_trace
+        outer_trace = EvaluationContext.get_current_trace()
         in_classical_tracers = self.preds
         regions: List[HybridOpRegion] = []
 
@@ -904,8 +903,7 @@ class ForLoopCallable:
 
     def _call_with_quantum_ctx(self, *init_state):
         quantum_tape = QuantumTape()
-        with jax.core.take_current_trace() as cur_trace:
-            outer_trace = cur_trace
+        outer_trace = EvaluationContext.get_current_trace()
         aux_classical_tracers = [
             outer_trace.to_jaxpr_tracer(t) for t in [self.lower_bound, self.upper_bound, self.step]
         ]
@@ -1074,9 +1072,7 @@ class WhileLoopCallable:
         return self._operation
 
     def _call_with_quantum_ctx(self, *init_state):
-        with jax.core.take_current_trace() as cur_trace:
-            outer_trace = cur_trace
-
+        outer_trace = EvaluationContext.get_current_trace()
         cond_wffa, _, cond_out_sig = deduce_signatures(
             self.cond_fn, init_state, {}, self.expansion_strategy
         )

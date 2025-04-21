@@ -211,8 +211,8 @@ class EvaluationContext:
         """Return the current JAX trace, raise an exception if not in tracing mode."""
         msg = f"{hint or 'catalyst functions'} can only be used from within @qjit decorated code."
         EvaluationContext.check_is_tracing(msg)
-        with take_current_trace() as parent_trace:
-            return parent_trace
+        with take_current_trace() as current_trace:
+            return current_trace
 
     def __enter__(self):
         if self.mode in [EvaluationMode.QUANTUM_COMPILATION, EvaluationMode.CLASSICAL_COMPILATION]:
