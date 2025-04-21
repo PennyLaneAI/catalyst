@@ -204,10 +204,7 @@ class EvaluationContext:
                 new_trace = DynamicJaxprTrace()
 
         with set_current_trace(new_trace):
-            try:
-                yield new_trace
-            finally:
-                pass
+            yield new_trace
 
     @classmethod
     def get_current_trace(cls, hint=None):
