@@ -18,16 +18,11 @@ This module provides context classes to manage and query Catalyst's and JAX's tr
 
 import logging
 from contextlib import contextmanager
-from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import ContextManager, Dict, List, Optional, Set, Tuple
+from typing import ContextManager, List, Optional, Set
 
-from jax._src.interpreters.partial_eval import (
-    DynamicJaxprTrace,
-    JaxprStackFrame,
-)
-from jax._src.source_info_util import reset_name_stack
+from jax._src.interpreters.partial_eval import DynamicJaxprTrace
 from jax.core import find_top_trace, set_current_trace, take_current_trace
 from pennylane.queuing import QueuingManager
 
@@ -197,7 +192,7 @@ class EvaluationContext:
     ) -> ContextManager[DynamicJaxprTrace]:
         """Start a new JAX tracing frame, e.g. to trace a region of some
         :class:`~.jax_tracer.HybridOp`. Not applicable in non-tracing evaluation modes."""
-        with take_current_trace() as parent_trace:
+        with take_current_trace():
             if trace is not None:
                 new_trace = trace
             else:

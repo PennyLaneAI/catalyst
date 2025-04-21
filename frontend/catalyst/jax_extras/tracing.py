@@ -30,7 +30,6 @@ from typing import (
     Optional,
     Set,
     Tuple,
-    Type,
     TypeVar,
 )
 
@@ -64,7 +63,6 @@ from jax.core import (
 from jax.core import Primitive as JaxprPrimitive
 from jax.core import (
     ShapedArray,
-    Trace,
     Var,
     eval_jaxpr,
     find_top_trace,

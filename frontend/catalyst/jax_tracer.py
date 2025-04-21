@@ -464,7 +464,6 @@ class HybridOp(Operator):
     @debug_logger
     def bind_overwrite_classical_tracers(
         self,
-        ctx,
         _trace: DynamicJaxprTrace,
         in_expanded_tracers,
         out_expanded_tracers,
@@ -1180,7 +1179,7 @@ def split_tracers_and_measurements(flat_values):
 
 
 @debug_logger
-def trace_post_processing(ctx, trace, post_processing: Callable, pp_args):
+def trace_post_processing(trace, post_processing: Callable, pp_args):
     """Trace post processing function.
 
     Args:
@@ -1386,7 +1385,7 @@ def trace_quantum_function(
                 qdealloc_p.bind(qreg_out)
 
         closed_jaxpr, out_type, out_tree = trace_post_processing(
-            ctx, trace, post_processing, transformed_results
+            trace, post_processing, transformed_results
         )
         # TODO: `check_jaxpr` complains about the `AbstractQreg` type. Consider fixing.
         # check_jaxpr(jaxpr)

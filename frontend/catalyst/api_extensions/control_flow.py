@@ -32,7 +32,6 @@ from pennylane.tape import QuantumTape
 
 from catalyst.jax_extras import (
     ClosedJaxpr,
-    DynamicJaxprTrace,
     DynamicJaxprTracer,
     ShapedArray,
     _input_type_to_tracers,
@@ -1236,7 +1235,6 @@ class Cond(HybridOp):
 
         qrp2 = QRegPromise(
             op.bind_overwrite_classical_tracers(
-                ctx,
                 trace,
                 in_expanded_tracers=in_expanded_classical_tracers,
                 out_expanded_tracers=out_expanded_classical_tracers,
@@ -1302,7 +1300,6 @@ class ForLoop(HybridOp):
 
         qrp2 = QRegPromise(
             op.bind_overwrite_classical_tracers(
-                ctx,
                 trace,
                 in_expanded_tracers=in_expanded_tracers,
                 out_expanded_tracers=out_expanded_classical_tracers,
@@ -1386,7 +1383,6 @@ class WhileLoop(HybridOp):
 
         qrp2 = QRegPromise(
             self.bind_overwrite_classical_tracers(
-                ctx,
                 trace,
                 in_expanded_tracers=in_expanded_tracers,
                 out_expanded_tracers=out_expanded_classical_tracers,
