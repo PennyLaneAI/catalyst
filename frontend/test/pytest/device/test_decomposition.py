@@ -124,8 +124,6 @@ class TestControlledDecomposition:
         class OpWithNoMatrix(qml.operation.Operation):
             """Op without a matrix"""
 
-            num_wires = qml.operation.AnyWires
-
             def matrix(self):
                 """matrix undefined"""
                 raise NotImplementedError()
@@ -143,8 +141,6 @@ class TestControlledDecomposition:
 
         class UnknownOp(qml.operation.Operation):
             """An unknown operation"""
-
-            num_wires = qml.operation.AnyWires
 
             def matrix(self):
                 """The matrix"""
