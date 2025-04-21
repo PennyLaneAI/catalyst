@@ -40,7 +40,7 @@ from pennylane.measurements import (
     StateMP,
     VarianceMP,
 )
-from pennylane.operation import AnyWires, Operation, Operator, Wires
+from pennylane.operation import Operation, Operator, Wires
 from pennylane.ops import Adjoint, Controlled, ControlledOp
 from pennylane.tape import QuantumTape
 from pennylane.transforms.core import TransformProgram
@@ -438,7 +438,6 @@ class HybridOp(Operator):
     def _no_binder(self, *_):
         raise RuntimeError("{self} does not support JAX binding")  # pragma: no cover
 
-    num_wires = AnyWires
     binder: Callable = _no_binder
 
     @debug_logger_init

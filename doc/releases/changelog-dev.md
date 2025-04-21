@@ -56,6 +56,10 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Stop overriding the `num_wires` property when the operator can exist on `AnyWires`. This allows the deprecation
+  of `WiresEnum` in pennylane.
+  [(#1667)](https://github.com/PennyLaneAI/catalyst/pull/1667)
+
 * Catalyst now includes an experimental `mbqc` dialect for representing measurement-based
   quantum-computing protocols in MLIR.
   [(#1663)](https://github.com/PennyLaneAI/catalyst/pull/1663)
@@ -71,5 +75,6 @@ This release contains contributions from (in alphabetical order):
 
 Joey Carter,
 David Ittah,
+Christina Lee,
 Erick Ochoa Lopez,
 Paul Haochen Wang.
