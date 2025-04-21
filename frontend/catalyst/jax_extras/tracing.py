@@ -35,7 +35,7 @@ from typing import (
 
 import jax
 from jax import ShapeDtypeStruct
-from jax._src.core import DBIdx
+from jax._src.core import DBIdx, InDBIdx, InputType, OutDBIdx, OutputType
 from jax._src.interpreters.mlir import _module_name_regex, register_lowering
 from jax._src.interpreters.partial_eval import (
     _input_type_to_tracers,
@@ -51,13 +51,8 @@ from jax._src.util import safe_map, unzip2, wraps
 from jax.api_util import flatten_fun
 from jax.core import (
     AbstractValue,
-    ClosedJaxpr,
     DShapedArray,
-    InDBIdx,
-    InputType,
     Jaxpr,
-    OutDBIdx,
-    OutputType,
 )
 from jax.core import Primitive as JaxprPrimitive
 from jax.core import (
@@ -68,7 +63,7 @@ from jax.core import (
     gensym,
     new_jaxpr_eqn,
 )
-from jax.extend.core import JaxprEqn
+from jax.extend.core import ClosedJaxpr, JaxprEqn
 from jax.extend.linear_util import transformation_with_aux, wrap_init
 from jax.interpreters.partial_eval import (
     DynamicJaxprTrace,
