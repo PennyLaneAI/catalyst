@@ -68,4 +68,5 @@ This release contains contributions from (in alphabetical order):
 
 Joey Carter,
 David Ittah,
+Christina Lee,
 Erick Ochoa Lopez.
