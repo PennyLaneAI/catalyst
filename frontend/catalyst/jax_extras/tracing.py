@@ -56,7 +56,6 @@ from jax.core import (
     InDBIdx,
     InputType,
     Jaxpr,
-    JaxprEqn,
     OutDBIdx,
     OutputType,
 )
@@ -69,6 +68,7 @@ from jax.core import (
     gensym,
     new_jaxpr_eqn,
 )
+from jax.extend.core import JaxprEqn
 from jax.extend.linear_util import transformation_with_aux, wrap_init
 from jax.interpreters.partial_eval import (
     DynamicJaxprTrace,

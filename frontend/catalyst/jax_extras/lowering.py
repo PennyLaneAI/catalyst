@@ -24,7 +24,7 @@ from jax._src.interpreters.mlir import _module_name_regex
 from jax._src.sharding_impls import AxisEnv, ReplicaAxisContext
 from jax._src.source_info_util import new_name_stack
 from jax._src.util import wrap_name
-from jax.core import ClosedJaxpr
+from jax.extend.core import ClosedJaxpr
 from jax.interpreters.mlir import (
     AxisContext,
     LoweringParameters,
