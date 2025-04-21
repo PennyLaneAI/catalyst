@@ -92,7 +92,6 @@ def qjit(
     abstracted_axes=None,
     disable_assertions=False,
     seed=None,
-    experimental_capture=False,
     circuit_transform_pipeline=None,
     pass_plugins=None,
     dialect_plugins=None,
@@ -152,9 +151,6 @@ def qjit(
             :func:`qml.sample() <pennylane.sample>`, :func:`qml.counts() <pennylane.counts>`,
             :func:`qml.probs() <pennylane.probs>`, :func:`qml.expval() <pennylane.expval>`,
             :func:`qml.var() <pennylane.var>`.
-        experimental_capture (bool): If set to ``True``, the qjit decorator
-            will use PennyLane's experimental program capture capabilities
-            to capture the decorated function for compilation.
         circuit_transform_pipeline (Optional[dict[str, dict[str, str]]]):
             A dictionary that specifies the quantum circuit transformation pass pipeline order,
             and optionally arguments for each pass in the pipeline. Keys of this dictionary
@@ -716,17 +712,10 @@ class QJIT(CatalystCallable):
         dynamic_sig = get_abstract_signature(dynamic_args)
         full_sig = merge_static_args(dynamic_sig, args, static_argnums)
 
-        if self.compile_options.experimental_capture:
-            with Patcher(
-                (
-                    jax._src.interpreters.partial_eval,  # pylint: disable=protected-access
-                    "get_aval",
-                    get_aval2,
-                ),
-            ):
-                return trace_from_pennylane(
-                    self.user_function, static_argnums, abstracted_axes, full_sig, kwargs
-                )
+        if qml.capture.enabled():
+            return trace_from_pennylane(
+                self.user_function, static_argnums, abstracted_axes, full_sig, kwargs
+            )
 
         def closure(qnode, *args, **kwargs):
             params = {}
