@@ -24,6 +24,7 @@ set(TEST_SUITES
     Mitigation
     Catalyst
     Ion
+    MBQC
     cli
     QEC
     )

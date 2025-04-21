@@ -372,7 +372,6 @@ class QJITDevice(qml.devices.Device):
         # measurement transformations, so must occur before decomposition
         measurement_transforms = self._measurement_transform_program()
         config = replace(config, device_options=deepcopy(config.device_options))
-        config.device_options["transforms_modify_measurements"] = bool(measurement_transforms)
         program = program + measurement_transforms
 
         # decomposition to supported ops/measurements
