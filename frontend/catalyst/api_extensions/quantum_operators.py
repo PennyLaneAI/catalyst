@@ -146,7 +146,7 @@ def measure(
     EvaluationContext.check_is_quantum_tracing(
         "catalyst.measure can only be used from within a qml.qnode."
     )
-    ctx = EvaluationContext.get_main_tracing_context()
+    cur_trace = EvaluationContext.get_current_trace()
     wires = list(wires) if isinstance(wires, (list, tuple)) else [wires]
     if len(wires) != 1:
         raise TypeError(f"Only one element is supported for the 'wires' parameter, got {wires}.")
@@ -161,7 +161,7 @@ def measure(
     if postselect is not None and postselect not in [0, 1]:
         raise TypeError(f"postselect must be '0' or '1', got {postselect}")
 
-    m = new_inner_tracer(ctx.trace, get_aval(True))
+    m = new_inner_tracer(cur_trace, get_aval(True))
     MidCircuitMeasure(
         in_classical_tracers=in_classical_tracers,
         out_classical_tracers=[m],
@@ -344,14 +344,12 @@ class MidCircuitMeasure(HybridOp):
         qubit = qrp.extract(self.wires)[0]
         if postselect_mode == "hw-like":
             qubit2 = self.bind_overwrite_classical_tracers(
-                ctx,
                 trace,
                 in_expanded_tracers=[qubit],
                 out_expanded_tracers=self.out_classical_tracers,
             )
         else:
             qubit2 = self.bind_overwrite_classical_tracers(
-                ctx,
                 trace,
                 in_expanded_tracers=[qubit],
                 out_expanded_tracers=self.out_classical_tracers,
@@ -423,15 +421,14 @@ class AdjointCallable:
             return [], [], [adjoint_region]
 
         # Create a nested jaxpr scope for the body of the adjoint.
-        ctx = EvaluationContext.get_main_tracing_context()
-        with EvaluationContext.frame_tracing_context(ctx) as inner_trace:
+        with EvaluationContext.frame_tracing_context() as inner_trace:
             in_classical_tracers, _ = tree_flatten((args, kwargs))
             wffa, in_avals, _, _ = deduce_avals(self.target, args, kwargs)
             arg_classical_tracers = _input_type_to_tracers(inner_trace.new_arg, in_avals)
             with QueuingManager.stop_recording(), QuantumTape() as quantum_tape:
-                # FIXME: move all full_raise calls into a separate function
+                # FIXME: move all to_jaxpr_tracer calls into a separate function
                 res_classical_tracers = [
-                    inner_trace.full_raise(t)
+                    inner_trace.to_jaxpr_tracer(t)
                     for t in wffa.call_wrapped(*arg_classical_tracers)
                     if isinstance(t, DynamicJaxprTracer)
                 ]
@@ -460,15 +457,15 @@ class HybridAdjoint(HybridOp):
 
         # Handle ops that were instantiated outside of a tracing context.
         if body_trace is None:
-            frame_ctx = EvaluationContext.frame_tracing_context(ctx)
+            frame_ctx = EvaluationContext.frame_tracing_context()
         else:
-            frame_ctx = EvaluationContext.frame_tracing_context(ctx, body_trace)
+            frame_ctx = EvaluationContext.frame_tracing_context(body_trace)
 
         with frame_ctx as body_trace:
             qreg_in = _input_type_to_tracers(body_trace.new_arg, [AbstractQreg()])[0]
             qrp_out = trace_quantum_operations(body_tape, device, qreg_in, ctx, body_trace)
             qreg_out = qrp_out.actualize()
-            body_jaxpr, _, body_consts = ctx.frames[body_trace].to_jaxpr2(
+            body_jaxpr, _, body_consts = body_trace.frame.to_jaxpr2(
                 res_classical_tracers + [qreg_out]
             )
 
@@ -657,9 +654,9 @@ def ctrl_distribute(
 
     # Allow decompositions outside of a Catalyst context.
     if EvaluationContext.is_tracing():
-        ctx = EvaluationContext.get_main_tracing_context()
+        cur_trace = EvaluationContext.get_current_trace()
     else:
-        ctx = None
+        cur_trace = None
 
     new_ops = []
     for op in tape.operations:
@@ -675,8 +672,8 @@ def ctrl_distribute(
             else:
                 for region in [region for region in op.regions if region.quantum_tape is not None]:
                     # Re-enter a JAXPR frame but do not create a new one is none exists.
-                    if ctx and region.trace:
-                        trace_manager = EvaluationContext.frame_tracing_context(ctx, region.trace)
+                    if cur_trace and region.trace:
+                        trace_manager = EvaluationContext.frame_tracing_context(region.trace)
                     else:
                         trace_manager = nullcontext
 

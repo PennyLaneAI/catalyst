@@ -29,6 +29,7 @@ import jax
 import jax.numpy as jnp
 import pennylane as qml
 from jax._src.lax.lax import _extract_tracers_dyn_shape
+from jax.core import get_aval
 from pennylane import QubitUnitary, QueuingManager
 from pennylane.devices import QubitDevice
 from pennylane.measurements import (
@@ -56,7 +57,6 @@ from catalyst.jax_extras import (
     PyTreeDef,
     PyTreeRegistry,
     ShapedArray,
-    _abstractify,
     _input_type_to_tracers,
     cond_expansion_strategy,
     convert_element_type,
@@ -102,7 +102,6 @@ from catalyst.logging import debug_logger, debug_logger_init
 from catalyst.tracing.contexts import (
     EvaluationContext,
     EvaluationMode,
-    JaxTracingContext,
 )
 from catalyst.utils.exceptions import CompileError
 
@@ -220,16 +219,16 @@ def retrace_with_result_types(jaxpr: ClosedJaxpr, target_types: List[ShapedArray
     # TODO: is eval expensive? or would it be better to modify the jaxpr in place?
     with_qreg = isinstance(target_types[-1], AbstractQreg)
     with EvaluationContext(EvaluationMode.CLASSICAL_COMPILATION) as ctx:
-        with EvaluationContext.frame_tracing_context(ctx) as trace:
+        with EvaluationContext.frame_tracing_context() as trace:
             in_tracers = _input_type_to_tracers(trace.new_arg, jaxpr.in_avals)
             out_tracers = [
-                trace.full_raise(t) for t in eval_jaxpr(jaxpr.jaxpr, jaxpr.consts, *in_tracers)
+                trace.to_jaxpr_tracer(t) for t in eval_jaxpr(jaxpr.jaxpr, jaxpr.consts, *in_tracers)
             ]
             out_tracers_, target_types_ = (
                 (out_tracers[:-1], target_types[:-1]) if with_qreg else (out_tracers, target_types)
             )
             out_promoted_tracers = [
-                (convert_element_type(tr, ty) if _abstractify(tr).dtype != ty else tr)
+                (convert_element_type(tr, ty) if get_aval(tr).dtype != ty else tr)
                 for tr, ty in zip(out_tracers_, target_types_)
             ]
             jaxpr2, _, consts = ctx.frames[trace].to_jaxpr2(
@@ -239,7 +238,6 @@ def retrace_with_result_types(jaxpr: ClosedJaxpr, target_types: List[ShapedArray
 
 
 def _apply_result_type_conversion(
-    ctx: JaxTracingContext,
     jaxpr: ClosedJaxpr,
     consts: List[Any],
     target_types: List[ShapedArray],
@@ -250,7 +248,6 @@ def _apply_result_type_conversion(
     one quantum register as an argument.
 
     Args:
-        ctx: Jax tracing context object.
         jaxpr: The Jaxpr program to apply the conversion to.
         consts: List of constant values we need to know to trace this program.
         target_types: List of types we want to convert the outputs of the program to. The list must
@@ -271,7 +268,7 @@ def _apply_result_type_conversion(
             (out_tracers[:-1], target_types[:-1]) if with_qreg else (out_tracers, target_types)
         )
         out_promoted_tracers = [
-            (convert_element_type(tr, ty) if _abstractify(tr).dtype != ty else tr)
+            (convert_element_type(tr, ty) if get_aval(tr).dtype != ty else tr)
             for tr, ty in zip(out_tracers_, target_types_)
         ]
         return out_promoted_tracers[num_implicit_outputs:] + (
@@ -279,7 +276,7 @@ def _apply_result_type_conversion(
         )
 
     expanded_tracers, in_sig, out_sig = trace_function(
-        ctx, _fun, *args, expansion_strategy=cond_expansion_strategy()
+        _fun, *args, expansion_strategy=cond_expansion_strategy()
     )
 
     return expanded_tracers, in_sig, out_sig
@@ -309,7 +306,7 @@ def _promote_jaxpr_types(types: List[List[Any]]) -> List[Any]:
 
 
 @debug_logger
-def unify_convert_result_types(ctx, jaxprs, consts, nimplouts):
+def unify_convert_result_types(jaxprs, consts, nimplouts):
     """Unify result types of the jaxpr programs given.
     Args:
         jaxprs (list of ClosedJaxpr): Source Jaxpr programs. The program results must have
@@ -332,7 +329,7 @@ def unify_convert_result_types(ctx, jaxprs, consts, nimplouts):
     jaxpr_acc, type_acc, tracers_acc, consts_acc = [], [], [], []
     for j, a, num_implicit_outputs in zip(jaxprs, consts, nimplouts):
         tracers, _, out_sig = _apply_result_type_conversion(
-            ctx, j, a, promoted_types, num_implicit_outputs
+            j, a, promoted_types, num_implicit_outputs
         )
         jaxpr_acc.append(out_sig.out_initial_jaxpr())
         type_acc.append(out_sig.out_type())
@@ -467,8 +464,7 @@ class HybridOp(Operator):
     @debug_logger
     def bind_overwrite_classical_tracers(
         self,
-        ctx: JaxTracingContext,
-        trace: DynamicJaxprTrace,
+        _trace: DynamicJaxprTrace,
         in_expanded_tracers,
         out_expanded_tracers,
         **kwargs,
@@ -484,15 +480,15 @@ class HybridOp(Operator):
         # which includes: for_loop, while_loop, cond, measure.
         # This will place an equation at the very end of the current list of equations.
         out_quantum_tracer = self.binder(*in_expanded_tracers, **kwargs)[-1]
-        # eqn corresponds to the current hybrid operation that was just inserted
-        # into the list of equations.
-        eqn = ctx.frames[trace].eqns[-1]
+
+        trace = EvaluationContext.get_current_trace()
+        eqn = trace.frame.eqns[-1]
+        frame = trace.frame
 
         assert len(eqn.outvars[:-1]) == len(
             out_expanded_tracers
         ), f"{eqn.outvars=}\n{out_expanded_tracers=}"
 
-        frame = ctx.frames[trace]
         jaxpr_variables = cached_vars.get(frame, set())
         if not jaxpr_variables:
             # We get all variables in the current frame
@@ -561,7 +557,7 @@ class HybridOp(Operator):
     @debug_logger
     def trace_quantum(
         self,
-        ctx: JaxTracingContext,
+        ctx,
         device: QubitDevice,
         trace: DynamicJaxprTrace,
         qrp: QRegPromise,
@@ -686,7 +682,7 @@ def trace_quantum_operations(
     quantum_tape: QuantumTape,
     device: QubitDevice,
     qreg: DynamicJaxprTracer,
-    ctx: JaxTracingContext,
+    ctx,
     trace: DynamicJaxprTrace,
     mcm_config: qml.devices.MCMConfig = qml.devices.MCMConfig(),
 ) -> QRegPromise:
@@ -792,8 +788,8 @@ def trace_quantum_operations(
 
         assert qrp2 is not None
         qrp = qrp2
-
-    ctx.frames[trace].eqns = sort_eqns(ctx.frames[trace].eqns, FORCED_ORDER_PRIMITIVES)  # [1]
+    trace = EvaluationContext.get_current_trace()
+    trace.frame.eqns = sort_eqns(trace.frame.eqns, FORCED_ORDER_PRIMITIVES)  # [1]
     return qrp
 
 
@@ -1183,7 +1179,7 @@ def split_tracers_and_measurements(flat_values):
 
 
 @debug_logger
-def trace_post_processing(ctx, trace, post_processing: Callable, pp_args):
+def trace_post_processing(trace, post_processing: Callable, pp_args):
     """Trace post processing function.
 
     Args:
@@ -1198,8 +1194,7 @@ def trace_post_processing(ctx, trace, post_processing: Callable, pp_args):
         out_type(jax.OutputType) : List of abstract values with explicitness flag
         out_tree(PyTreeDef): PyTree shape of the qnode result
     """
-
-    with EvaluationContext.frame_tracing_context(ctx, trace):
+    with EvaluationContext.frame_tracing_context(trace):
         # What is the input to the post_processing function?
         # The input to the post_processing function is going to be a list of values One for each
         # tape. The tracers are all flat in pp_args.
@@ -1209,16 +1204,19 @@ def trace_post_processing(ctx, trace, post_processing: Callable, pp_args):
 
         # wffa will take as an input a flatten tracers.
         # After wffa is called, then the shape becomes available in out_tree_promise.
-        in_tracers = [trace.full_raise(t) for t in tree_flatten(pp_args)[0]]
-        out_tracers = [trace.full_raise(t) for t in wffa.call_wrapped(*in_tracers)]
-        jaxpr, out_type, consts = ctx.frames[trace].to_jaxpr2(out_tracers)
+        in_tracers = [trace.to_jaxpr_tracer(t) for t in tree_flatten(pp_args)[0]]
+        out_tracers = [trace.to_jaxpr_tracer(t) for t in wffa.call_wrapped(*in_tracers)]
+        cur_trace = EvaluationContext.get_current_trace()
+        jaxpr, out_type, consts = cur_trace.frame.to_jaxpr2(
+            out_tracers
+        )  # , cur_trace.frame.debug_info)  # not yet in 0.4.36
         closed_jaxpr = ClosedJaxpr(jaxpr, consts)
         return closed_jaxpr, out_type, out_tree_promise()
 
 
 @debug_logger
 def trace_function(
-    ctx: JaxTracingContext, fun: Callable, *args, expansion_strategy: ExpansionStrategy, **kwargs
+    fun: Callable, *args, expansion_strategy: ExpansionStrategy, **kwargs
 ) -> Tuple[List[Any], InputSignature, OutputSignature]:
     """Trace classical Python function containing no quantum computations. Arguments and results of
     the function are allowed to contain dynamic dimensions. Depending on the expansion strategy, the
@@ -1227,7 +1225,6 @@ def trace_function(
     `jax_extras.make_jaxpr2`.
 
     Args:
-        ctx: Jax tracing context helper.
         fun: Callable python function.
         expansion_strategy: dynamic dimension expansion options.
         *args: Sample positional arguments of the function.
@@ -1242,9 +1239,9 @@ def trace_function(
         fun, args, kwargs, expansion_strategy=expansion_strategy
     )
 
-    with EvaluationContext.frame_tracing_context(ctx) as trace:
+    with EvaluationContext.frame_tracing_context() as trace:
         arg_expanded_tracers = input_type_to_tracers(
-            in_sig.in_type, trace.new_arg, trace.full_raise
+            in_sig.in_type, trace.new_arg, trace.to_jaxpr_tracer
         )
         res_expanded_tracers = wfun.call_wrapped(*arg_expanded_tracers)
 
@@ -1279,7 +1276,7 @@ def trace_quantum_function(
     with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
         # (1) - Classical tracing
         quantum_tape = QuantumTape(shots=device.shots)
-        with EvaluationContext.frame_tracing_context(ctx) as trace:
+        with EvaluationContext.frame_tracing_context() as trace:
             wffa, in_avals, keep_inputs, out_tree_promise = deduce_avals(
                 f, args, kwargs, static_argnums
             )
@@ -1321,7 +1318,7 @@ def trace_quantum_function(
 
         # (2) - Quantum tracing
         transformed_results = []
-        with EvaluationContext.frame_tracing_context(ctx, trace):
+        with EvaluationContext.frame_tracing_context(trace):
             for tape in tapes:
                 # Set up quantum register for the current tape.
                 # We just need to ensure there is a tape cut in between each.
@@ -1363,14 +1360,14 @@ def trace_quantum_function(
                 meas, meas_trees = trace_quantum_measurements(device, qrp_out, output, trees)
                 qreg_out = qrp_out.actualize()
 
-                # Check if the measurements are nested then apply the full_raise
+                # Check if the measurements are nested then apply the to_jaxpr_tracer
                 def check_full_raise(arr, func):
                     if isinstance(arr, (list, tuple)):
                         return type(arr)(check_full_raise(x, func) for x in arr)
                     else:
                         return func(arr)
 
-                meas_tracers = check_full_raise(meas, trace.full_raise)
+                meas_tracers = check_full_raise(meas, trace.to_jaxpr_tracer)
                 meas_results = tree_unflatten(meas_trees, meas_tracers)
 
                 # TODO: Allow the user to return whatever types they specify.
@@ -1388,7 +1385,7 @@ def trace_quantum_function(
                 qdealloc_p.bind(qreg_out)
 
         closed_jaxpr, out_type, out_tree = trace_post_processing(
-            ctx, trace, post_processing, transformed_results
+            trace, post_processing, transformed_results
         )
         # TODO: `check_jaxpr` complains about the `AbstractQreg` type. Consider fixing.
         # check_jaxpr(jaxpr)
