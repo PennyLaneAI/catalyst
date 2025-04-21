@@ -65,6 +65,7 @@
 #include "Gradient/IR/GradientInterfaces.h"
 #include "Gradient/Transforms/Passes.h"
 #include "Ion/IR/IonDialect.h"
+#include "MBQC/IR/MBQCDialect.h"
 #include "Mitigation/IR/MitigationDialect.h"
 #include "Mitigation/Transforms/Passes.h"
 #include "QEC/IR/QECDialect.h"
@@ -297,6 +298,7 @@ void registerAllCatalystDialects(DialectRegistry &registry)
     registry.insert<CatalystDialect>();
     registry.insert<quantum::QuantumDialect>();
     registry.insert<qec::QECDialect>();
+    registry.insert<mbqc::MBQCDialect>();
     registry.insert<ion::IonDialect>();
     registry.insert<gradient::GradientDialect>();
     registry.insert<mitigation::MitigationDialect>();
