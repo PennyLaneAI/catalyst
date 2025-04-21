@@ -287,20 +287,18 @@ def for_stmt(
         enum_start = None
         iteration_array = None
     elif isinstance(iteration_target, CEnumerate):
-        start, stop, step = 0, len(iteration_target.iteration_target), 1
-        enum_start = iteration_target.start_idx
         try:
+            start, stop, step = 0, len(iteration_target.iteration_target), 1
+            enum_start = iteration_target.start_idx
             iteration_array = jnp.asarray(iteration_target.iteration_target)
         except:  # pylint: disable=bare-except
-            iteration_array = None
             fallback = True
     else:
-        start, stop, step = 0, len(iteration_target), 1
-        enum_start = None
         try:
+            start, stop, step = 0, len(iteration_target), 1
+            enum_start = None
             iteration_array = jnp.asarray(iteration_target)
         except:  # pylint: disable=bare-except
-            iteration_array = None
             fallback = True
 
     if catalyst.autograph_strict_conversion and fallback:
