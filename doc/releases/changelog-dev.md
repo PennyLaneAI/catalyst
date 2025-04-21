@@ -56,6 +56,10 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Stop overriding the `num_wires` property when the operator can exist on `AnyWires`. This allows the deprecation
+  of `WiresEnum` in pennylane.
+  [(#1667)](https://github.com/PennyLaneAI/catalyst/pull/1667)
+
 <h3>Documentation 📝</h3>
 
 <h3>Contributors ✍️</h3>
