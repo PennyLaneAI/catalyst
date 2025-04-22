@@ -196,7 +196,12 @@ class EvaluationContext:
             if trace is not None:
                 new_trace = trace
             else:
-                new_trace = DynamicJaxprTrace(current_trace.frame.debug_info)
+                debug_info = (
+                    current_trace.frame.debug_info
+                    if isinstance(current_trace, DynamicJaxprTrace)
+                    else None
+                )
+                new_trace = DynamicJaxprTrace(debug_info)
 
         with set_current_trace(new_trace):
             yield new_trace
