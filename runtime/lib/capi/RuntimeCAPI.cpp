@@ -1031,4 +1031,24 @@ int8_t *__catalyst__rt__array_get_element_ptr_1d(QirArray *ptr, int64_t idx)
     QubitIdType *data = qubit_vector_ptr->data();
     return (int8_t *)&data[idx];
 }
+
+// -------------------------------------------------------------------------- //
+// MBQC Runtime CAPI
+// -------------------------------------------------------------------------- //
+
+// FIXME: param `plane` should be the enum
+// NOTE: Currently this runtime operations is exactly the same as __catalyst__qis__Measure();
+//       we treat it as a no-op for now
+RESULT *__catalyst__mbqc__measure_in_basis(QUBIT *wire, int32_t plane, double angle, int32_t postselect)
+{
+    std::optional<int32_t> postselectOpt{postselect};
+
+    // Any value different to 0 or 1 denotes absence of postselect, and it is hence turned into
+    // std::nullopt at the C++ interface
+    if (postselect != 0 && postselect != 1) {
+        postselectOpt = std::nullopt;
+    }
+
+    return getQuantumDevicePtr()->Measure(reinterpret_cast<QubitIdType>(wire), postselectOpt);
+}
 }
