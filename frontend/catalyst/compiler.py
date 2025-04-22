@@ -496,6 +496,14 @@ class Compiler:
         ctx.load_dialect(scf.Scf)
         ctx.load_dialect(tensor.Tensor)
         ctx.load_dialect(transform.Transform)
+        # TODO: In order of importance
+        # TODO: Load quantum
+        # TODO: Load gradient
+        # TODO: Load the stablehlo dialect? I kind of want to wait until all operations
+        # are properly represented. I am not sure how an incompletely known dialect would be handled
+        # but it is likely worse than an unregistered dialect.
+        # TODO: Load Catalyst
+        # TODO: Load ion/ppm/mbqc/zne...
         m = xdsl.parser.Parser(ctx, generic_assembly_format).parse_module()
         # TODO: transform the program based on the transform dialect
 
