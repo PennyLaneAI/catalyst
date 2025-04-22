@@ -63,6 +63,7 @@ jobs:
       with:
         merge-multiple: true
         path: dist
+        pattern: catalyst-*
 
     - name: Install rename
       run: |
