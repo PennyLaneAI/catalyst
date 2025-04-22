@@ -428,9 +428,7 @@ def trace_to_jaxpr(
     This method would remove return values related to sizes of tensors when compiling with
     dynamically sized tensors.
     """
-    jaxpr, tracers, consts = trace.frame.to_jaxpr2(
-        (*outputs, *inputs)
-    )  # , trace.frame.debug_info) # not yet in 0.4.36
+    jaxpr, tracers, consts = trace.frame.to_jaxpr2((*outputs, *inputs), trace.frame.debug_info)
     del jaxpr._outvars[len(outputs) :]
     return jaxpr, tracers, consts
 
