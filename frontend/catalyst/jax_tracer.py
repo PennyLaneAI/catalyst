@@ -1209,7 +1209,7 @@ def trace_post_processing(trace, post_processing: Callable, pp_args):
         cur_trace = EvaluationContext.get_current_trace()
         jaxpr, out_type, consts = cur_trace.frame.to_jaxpr2(
             out_tracers
-        )  # , cur_trace.frame.debug_info)  # not yet in 0.4.36
+        )  # , cur_trace.frame.debug_info)  # not yet in 0.5.0
         closed_jaxpr = ClosedJaxpr(jaxpr, consts)
         return closed_jaxpr, out_type, out_tree_promise()
 
