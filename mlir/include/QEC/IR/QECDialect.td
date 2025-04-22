@@ -223,6 +223,21 @@ def PPRotationOp : QEC_Op<"ppr", [QECOpInterface, AttrSizedOperandSegments]> {
             /*condition=*/ condition);
         }]
         >,
+        // Convenience builder with ArrayRef<StringRef> with condition
+        OpBuilder<
+        (ins
+            "::mlir::ArrayRef<mlir::StringRef>":$pauli_product,
+            "uint16_t":$rotation_kind,
+            "::mlir::ValueRange":$in_qubits,
+            "::mlir::Value":$condition
+        ),[{
+            PPRotationOp::build($_builder, $_state,
+            /*out_qubits=*/ mlir::TypeRange(in_qubits),
+            /*pauli_product=*/ $_builder.getStrArrayAttr(pauli_product),
+            /*rotation_kind=*/ rotation_kind,
+            /*in_qubits=*/ in_qubits,
+            /*condition=*/ condition);
+        }]>
     ];
 
     let assemblyFormat = [{
