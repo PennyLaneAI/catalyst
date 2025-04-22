@@ -468,6 +468,38 @@ class Compiler:
         return output_object_name, out_IR
 
     @debug_logger
+    def is_using_python_compiler(self):
+        xdsl_path = pathlib.Path("xdsl-does-not-use-a-real-path")
+        using_xdsl = False
+        if xdsl_path in self.options.pass_plugins:
+            plugins = self.options.pass_plugins
+            self.options.pass_plugins = tuple(elem for elem in plugins if elem != xdsl_path)
+            using_xdsl = True
+
+        if xdsl_path in self.options.dialect_plugins:
+            plugins = self.options.dialect_plugins
+            self.options.dialect_plugins = tuple(elem for elem in plugins if elem != xdsl_path)
+            using_xdsl = True
+
+        return using_xdsl
+
+    def run_python_compiler(self, mlir_module):
+        # TODO: check that xdsl is available to be imported
+        import xdsl
+        from xdsl.context import Context
+        from xdsl.dialects import arith, builtin, func, scf, tensor, transform
+        generic_assembly_format = mlir_module.operation.get_asm(binary=False, print_generic_op_form=True, assume_verified=True)
+        ctx = Context(allow_unregistered=True)
+        ctx.load_dialect(arith.Arith)
+        ctx.load_dialect(builtin.Builtin)
+        ctx.load_dialect(func.Func)
+        ctx.load_dialect(scf.Scf)
+        ctx.load_dialect(tensor.Tensor)
+        ctx.load_dialect(transform.Transform)
+        m = xdsl.parser.Parser(ctx, generic_assembly_format).parse_module()
+        # TODO: transform the program based on the transform dialect
+
+    @debug_logger
     def run(self, mlir_module, *args, **kwargs):
         """Compile an MLIR module to a shared object.
 
@@ -483,17 +515,9 @@ class Compiler:
             (str): filename of shared object
         """
 
-        xdsl_path = pathlib.Path("xdsl-does-not-use-a-real-path")
-        using_xdsl = False
-        if xdsl_path in self.options.pass_plugins:
-            plugins = self.options.pass_plugins
-            self.options.pass_plugins = tuple(elem for elem in plugins if elem != xdsl_path)
-            using_xdsl = True
-
-        if xdsl_path in self.options.dialect_plugins:
-            plugins = self.options.dialect_plugins
-            self.options.dialect_plugins = tuple(elem for elem in plugins if elem != xdsl_path)
-            using_xdsl = True
+        python_compiler = self.is_using_python_compiler()
+        if python_compiler:
+            self.run_python_compiler(mlir_module)
 
         return self.run_from_ir(
             mlir_module.operation.get_asm(
