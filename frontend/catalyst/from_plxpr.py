@@ -29,6 +29,7 @@ from pennylane.capture.expand_transforms import ExpandTransformsInterpreter
 from pennylane.capture.primitives import cond_prim as plxpr_cond_prim
 from pennylane.capture.primitives import for_loop_prim as plxpr_for_loop_prim
 from pennylane.capture.primitives import while_loop_prim as plxpr_while_loop_prim
+from pennylane.ftqc.primitives import measure_in_basis_prim as plxpr_measure_in_basis_prim
 from pennylane.ops.functions.map_wires import _map_wires_transform as pl_map_wires
 from pennylane.transforms import cancel_inverses as pl_cancel_inverses
 from pennylane.transforms import commute_controlled as pl_commute_controlled
@@ -53,6 +54,8 @@ from catalyst.jax_primitives import (
     expval_p,
     for_p,
     gphase_p,
+    measure_in_basis_p,
+    MeasurementPlane,
     namedobs_p,
     probs_p,
     qalloc_p,
@@ -630,6 +633,28 @@ def handle_while_loop(
     self.qreg = outvals.pop()
 
     # Return only the output values that match the plxpr output values
+    return outvals
+
+
+# pylint: disable=unused-argument
+@QFuncPlxprInterpreter.register_primitive(plxpr_measure_in_basis_prim)
+def handle_measure_in_basis(self, *invals, angle, plane, reset, postselect):
+    """Handle the conversion from plxpr to Catalyst jaxpr for the measure_in_basis primitive"""
+    wires_inval = invals[0:]
+
+    # angle = jax.lax.convert_element_type(angle, jnp.dtype(jnp.float64))  # TODO if jax.config.jax_enable_x64
+
+    try:
+        measurement_plane = MeasurementPlane(plane)
+    except ValueError as e:
+        raise ValueError(f"Measurement plane must be one of {[plane.value for plane in MeasurementPlane]}") from e
+
+    wires = [self.get_wire(w) for w in wires_inval]
+    outvals = measure_in_basis_p.bind(*wires, 0, float(angle))
+
+    # for wire_values, new_wire in zip(wires_inval, out_wires):
+    #     self.wire_map[wire_values] = new_wire
+
     return outvals
 
 

@@ -23,6 +23,30 @@ import pytest
 
 from catalyst import qjit
 
+mbqc_pipeline = [
+    (
+        "device-agnostic-pipeline",
+        [
+            "enforce-runtime-invariants-pipeline",
+            "hlo-lowering-pipeline",
+            "quantum-compilation-pipeline",
+            "bufferization-pipeline",
+        ],
+    ),
+    (
+        "mbqc-pipeline",
+        [
+            "convert-mbqc-to-llvm",
+        ],
+    ),
+    (
+        "llvm-dialect-lowering-pipeline",
+        [
+            "llvm-dialect-lowering-pipeline",
+        ],
+    ),
+]
+
 
 def test_measure_x():
     """Test the compilation of the qml.ftqc.measure_x function, which performs a mid-circuit
@@ -32,11 +56,15 @@ def test_measure_x():
     """
     dev = qml.device("null.qubit", wires=1)
 
-    @qjit(experimental_capture=True)
+    qml.capture.enable()
+
+    @qjit(pipelines=mbqc_pipeline)
     @qml.qnode(dev)
     def workload():
         m0 = plft.measure_x(0)
         return qml.expval(qml.Z(0))
+
+    qml.capture.disable()
 
     result = workload()
     assert result == 0.0
@@ -50,11 +78,15 @@ def test_measure_y():
     """
     dev = qml.device("null.qubit", wires=1)
 
-    @qjit(experimental_capture=True)
+    qml.capture.enable()
+
+    @qjit(pipelines=mbqc_pipeline)
     @qml.qnode(dev)
     def workload():
         m0 = plft.measure_y(0)
         return qml.expval(qml.Z(0))
+
+    qml.capture.disable()
 
     result = workload()
     assert result == 0.0
@@ -69,11 +101,15 @@ def test_measure_z():
     """
     dev = qml.device("null.qubit", wires=1)
 
-    @qjit(experimental_capture=True)
+    qml.capture.enable()
+
+    @qjit(pipelines=mbqc_pipeline)
     @qml.qnode(dev)
     def workload():
         m0 = plft.measure_z(0)
         return qml.expval(qml.Z(0))
+
+    qml.capture.disable()
 
     result = workload()
     assert result == 0.0
@@ -90,11 +126,15 @@ def test_measure_measure_arbitrary_basis(angle, plane):
     """
     dev = qml.device("null.qubit", wires=1)
 
-    @qjit(experimental_capture=True)
+    qml.capture.enable()
+
+    @qjit(pipelines=mbqc_pipeline)
     @qml.qnode(dev)
     def workload():
         m0 = plft.measure_arbitrary_basis(wires=0, angle=angle, plane=plane)
         return qml.expval(qml.Z(0))
+
+    qml.capture.disable()
 
     result = workload()
     assert result == 0.0
