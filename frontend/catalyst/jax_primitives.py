@@ -1986,7 +1986,7 @@ def _for_loop_lowering(
 
         # Iterate from 0 to the number of iterations (ceil((stop - start) / step))
         distance = SubIOp(stop_val, start_val)
-        num_iterations = CeilDivSIOp(distance, step_val)
+        num_iterations = CeilDivSIOp(distance.result, step_val)
         lower_bound, upper_bound, step = zero, num_iterations, one
 
     for_op_scf = ForOp(lower_bound, upper_bound, step, iter_args=loop_args)
