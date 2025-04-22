@@ -34,8 +34,6 @@ from catalyst.tracing.type_signatures import (
 )
 from catalyst.utils.exceptions import CompileError
 
-# pylint: disable=too-many-lines
-
 
 def f_aot_builder(backend, wires=1, shots=1000):
     """Test AOT builder."""
@@ -584,10 +582,7 @@ class TestSignatureErrors:
     def test_incompatible_type_reachable_from_user_code(self):
         """Raise error message for incompatible types"""
 
-        with pytest.raises(
-            TypeError,
-            match="Argument type <class 'str'> is not a valid JAX type.",
-        ):
+        with pytest.raises(TypeError, match="<class 'str'> is not a valid JAX type"):
 
             @qjit
             def f(x: str):
