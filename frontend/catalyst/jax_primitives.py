@@ -2263,4 +2263,4 @@ def _scalar_abstractify(t):
 
 
 pytype_aval_mappings[type] = _scalar_abstractify
-pytype_aval_mappings[jax._src.numpy.lax_numpy._ScalarMeta] = _scalar_abstractify
+pytype_aval_mappings[jax._src.numpy.scalar_types._ScalarMeta] = _scalar_abstractify
