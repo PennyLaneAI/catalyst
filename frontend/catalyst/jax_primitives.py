@@ -24,7 +24,7 @@ from typing import Iterable, List, Union
 import jax
 import numpy as np
 import pennylane as qml
-from jax._src import api_util, core, source_info_util, util
+from jax._src import core, source_info_util, util
 from jax._src.core import pytype_aval_mappings
 from jax._src.interpreters import partial_eval as pe
 from jax._src.lax.lax import _merge_dyn_shape, _nary_lower_hlo, cos_p, sin_p
