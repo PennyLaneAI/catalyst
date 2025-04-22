@@ -2257,7 +2257,7 @@ CUSTOM_LOWERING_RULES = (
 
 def _scalar_abstractify(t):
     # pylint: disable=protected-access
-    if t in {int, float, complex, bool} or isinstance(t, jax._src.numpy.lax_numpy._ScalarMeta):
+    if t in {int, float, complex, bool} or isinstance(t, jax._src.numpy.scalar_types._ScalarMeta):
         return core.ShapedArray([], dtype=t, weak_type=True)
     raise TypeError(f"Argument type {t} is not a valid JAX type.")
 
