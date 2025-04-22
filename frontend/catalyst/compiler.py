@@ -483,6 +483,18 @@ class Compiler:
             (str): filename of shared object
         """
 
+        xdsl_path = pathlib.Path("xdsl-does-not-use-a-real-path")
+        using_xdsl = False
+        if xdsl_path in self.options.pass_plugins:
+            plugins = self.options.pass_plugins
+            self.options.pass_plugins = tuple(elem for elem in plugins if elem != xdsl_path)
+            using_xdsl = True
+
+        if xdsl_path in self.options.dialect_plugins:
+            plugins = self.options.dialect_plugins
+            self.options.dialect_plugins = tuple(elem for elem in plugins if elem != xdsl_path)
+            using_xdsl = True
+
         return self.run_from_ir(
             mlir_module.operation.get_asm(
                 binary=False, print_generic_op_form=False, assume_verified=True

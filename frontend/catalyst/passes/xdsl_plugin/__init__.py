@@ -28,4 +28,4 @@ def getXDSLPluginAbsolutePath():
 
 
 def name2pass(name):
-    return getXDSLPluginAbsolutePath(), "foo"
+    return getXDSLPluginAbsolutePath(), name
