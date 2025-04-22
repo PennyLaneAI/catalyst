@@ -2262,5 +2262,5 @@ def _scalar_abstractify(t):
     raise TypeError(f"Argument type {t} is not a valid JAX type.")
 
 
-# Not yet fully in 0.4.36: complex types still go through _shaped_abstractify_handlers
 pytype_aval_mappings[type] = _scalar_abstractify
+pytype_aval_mappings[jax._src.numpy.lax_numpy._ScalarMeta] = _scalar_abstractify
