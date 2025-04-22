@@ -31,7 +31,7 @@ struct ExtractOpInterface
 
   LogicalResult bufferize(mlir::Operation *op, RewriterBase &rewriter,
                           const mlir::bufferization::BufferizationOptions &options) const {
-    auto extractOp = cast<catalyst::quantum::ExtractOp>(op);
+    //auto extractOp = cast<catalyst::quantum::ExtractOp>(op);
 
     return success();
   }
