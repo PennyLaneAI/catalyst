@@ -56,16 +56,16 @@ def QECDialect : Dialect {
 // QEC dialect enums.
 //===----------------------------------------------------------------------===//
 
-def LogicalLogicalInitKind : I32EnumAttr<"LogicalLogicalInitKind",
-    "Kinds of Pauli operators",
+def LogicalInitKind : I32EnumAttr<"LogicalInitKind",
+    "The initial state of a logical qubit such as |0⟩, |1⟩, |+⟩, |−⟩, |Y⟩, |-Y⟩, or |T⟩.",
         [
         I32EnumAttrCase<"zero",     0>, // |0⟩
         I32EnumAttrCase<"one",      1>, // |1⟩
         I32EnumAttrCase<"plus",     2>, // |+⟩  = (|0⟩ + |1⟩) / sqrt(2)
         I32EnumAttrCase<"minus",    3>, // |-⟩  = (|0⟩ - |1⟩) / sqrt(2)
-        I32EnumAttrCase<"plus_i",   4>, // |+i⟩ = (|0⟩ + i|1⟩) / sqrt(2)
-        I32EnumAttrCase<"minus_i",  5>, // |-i⟩ = (|0⟩ - i|1⟩) / sqrt(2)
-        I32EnumAttrCase<"magic",    6>, // |T⟩  = cos(π/8)|0⟩ + e^{iπ/4}sin(π/8)|1⟩
+        I32EnumAttrCase<"plus_i",   4>, // |Y⟩ = (|0⟩ + i|1⟩) / sqrt(2)
+        I32EnumAttrCase<"minus_i",  5>, // |-Y⟩ = (|0⟩ - i|1⟩) / sqrt(2)
+        I32EnumAttrCase<"magic",    6>, // |T⟩  = |0⟩ + e^{iπ/4}|1⟩
     ]> {
     let cppNamespace = "::catalyst::qec";
     let genSpecializedAttr = 0;
@@ -76,7 +76,7 @@ def LogicalLogicalInitKind : I32EnumAttr<"LogicalLogicalInitKind",
 //===----------------------------------------------------------------------===//
 
 def PauliWord : TypedArrayAttrBase<StrAttr, "A product of Pauli operators, aka a Pauli word.">;
-def LogicalInit : EnumAttr<QECDialect, LogicalLogicalInitKind, "enum">;
+def LogicalInit : EnumAttr<QECDialect, LogicalInitKind, "enum">;
 
 //===----------------------------------------------------------------------===//
 // QEC dialect operations.
@@ -85,9 +85,20 @@ def LogicalInit : EnumAttr<QECDialect, LogicalLogicalInitKind, "enum">;
 class QEC_Op<string mnemonic, list<Trait> traits = []> : Op<QECDialect, mnemonic, traits>;
 
 def PrepareStateOp : QEC_Op<"prepare"> {
-    let summary = "Initial state of a quantum circuit.";
+    let summary = "Initial state of logical qubit.";
     let description = [{
-        The PrepareStateOp represents the initial state of logical qubits.
+        Prepares logical qubits in a specific initial quantum state, 
+        such as |0⟩, |1⟩, |+⟩, |-⟩, |Y⟩, |-Y⟩, or |T⟩.
+
+        This operation is typically used at the start of a quantum circuit to initialize 
+        logical qubits according to the error-corrected encoding scheme.
+
+        Example:
+        ```mlir
+        %0 = qec.prepare zero %q0 : !quantum.bit
+        %1 = qec.prepare magic %q0 : !quantum.bit
+        ```
+        These prepares the logical qubit in the |0⟩ state and the |T⟩ state respectively.
     }];
 
     let arguments = (ins
@@ -99,12 +110,24 @@ def PrepareStateOp : QEC_Op<"prepare"> {
         Variadic<QubitType>:$out_qubits
     );
 
+    let builders = [
+        OpBuilder<(ins
+            "::catalyst::qec::LogicalInitKind":$init_state,
+            "::mlir::ValueRange":$in_qubits
+        ),[{
+            PrepareStateOp::build($_builder, $_state,
+            /*out_qubits=*/ mlir::TypeRange(in_qubits),
+            /*init_state=*/ init_state,
+            /*in_qubits=*/ in_qubits);
+        }]>
+    ];
+
     let assemblyFormat = [{
-        $init_state $in_qubits attr-dict `:` type($out_qubits)
+      $init_state $in_qubits attr-dict `:` type($out_qubits)
     }];
 }
 
-def PPRotationOp : QEC_Op<"ppr", [QECOpInterface]> {
+def PPRotationOp : QEC_Op<"ppr", [QECOpInterface, AttrSizedOperandSegments]> {
     let summary = "Pauli Product Rotation on qubits.";
 
     let description = [{
@@ -122,7 +145,7 @@ def PPRotationOp : QEC_Op<"ppr", [QECOpInterface]> {
         
         Example:
         ```mlir
-        %result = qec.ppr ["X", "I", "Z"](4) %q0, %q1, %q2 : (qreg, qreg, qreg) -> (qreg, qreg, qreg)
+        %result = qec.ppr ["X", "I", "Z"](4) %q0, %q1, %q2 : !quantum.bit, !quantum.bit, !quantum.bit
         ```
         This applies exp(iπ/4 * X⊗I⊗Z) to the three qubits.
     }];
@@ -130,15 +153,80 @@ def PPRotationOp : QEC_Op<"ppr", [QECOpInterface]> {
     let arguments = (ins
         PauliWord:$pauli_product,  // The Pauli product to apply (e.g., ["X", "I", "Z"])
         I16Attr:$rotation_kind,    // Rotation angle in fractions of π (e.g., 4 for π/2)
-        Variadic<QubitType>:$in_qubits  // The qubits to apply the rotation to
+        Variadic<QubitType>:$in_qubits,  // The qubits to apply the rotation to
+        Optional<I1>:$condition
     );
 
     let results = (outs
         Variadic<QubitType>:$out_qubits
     );
 
+    let builders = [
+        // Convenience builder with no condition
+        OpBuilder<
+        (ins
+            "::mlir::TypeRange":$out_qubits,
+            "::mlir::ArrayAttr":$pauli_product,
+            "uint16_t":$rotation_kind,
+            "::mlir::ValueRange":$in_qubits
+        ),[{
+            PPRotationOp::build($_builder, $_state,
+            /*out_qubits=*/ out_qubits,
+            /*pauli_product=*/ pauli_product,
+            /*rotation_kind=*/ rotation_kind,
+            /*in_qubits=*/ in_qubits,
+            /*condition=*/ nullptr);
+        }]>,
+        // Convenience builder with no condition and rotation kind as an attribute
+        OpBuilder<
+        (ins
+            "::mlir::TypeRange":$out_qubits,
+            "::mlir::ArrayAttr":$pauli_product,
+            "::mlir::IntegerAttr":$rotation_kind,
+            "::mlir::ValueRange":$in_qubits
+        ),[{
+            PPRotationOp::build($_builder, $_state,
+            /*out_qubits=*/ out_qubits,
+            /*pauli_product=*/ pauli_product,
+            /*rotation_kind=*/ rotation_kind,
+            /*in_qubits=*/ in_qubits,
+            /*condition=*/ nullptr);
+        }]>,
+        // Convenience builder with no type range
+        OpBuilder<
+        (ins
+            "::mlir::ArrayAttr":$pauli_product,
+            "::mlir::IntegerAttr":$rotation_kind,
+            "::mlir::ValueRange":$in_qubits,
+            "::mlir::Value":$condition
+        ),[{
+            PPRotationOp::build($_builder, $_state,
+            /*out_qubits=*/ mlir::TypeRange(in_qubits),
+            /*pauli_product=*/ pauli_product,
+            /*rotation_kind=*/ rotation_kind,
+            /*in_qubits=*/ in_qubits,
+            /*condition=*/ condition);
+        }]>,
+        // Convenience builder with no type range with uint16_t
+        OpBuilder<
+        (ins
+            "::mlir::ArrayAttr":$pauli_product,
+            "uint16_t":$rotation_kind,
+            "::mlir::ValueRange":$in_qubits,
+            "::mlir::Value":$condition
+        ),[{
+            PPRotationOp::build($_builder, $_state,
+            /*out_qubits=*/ mlir::TypeRange(in_qubits),
+            /*pauli_product=*/ pauli_product,
+            /*rotation_kind=*/ rotation_kind,
+            /*in_qubits=*/ in_qubits,
+            /*condition=*/ condition);
+        }]
+        >,
+    ];
+
     let assemblyFormat = [{
-      $pauli_product `(` $rotation_kind `)` $in_qubits attr-dict `:` type($out_qubits)
+      $pauli_product `(` $rotation_kind `)` $in_qubits attr-dict (`cond` `(` $condition^ `)`)? `:` type($out_qubits)
     }];
 
     let hasVerifier = 1;
@@ -156,7 +244,7 @@ def PPRotationOp : QEC_Op<"ppr", [QECOpInterface]> {
     let extraClassDeclaration = extraBaseClassDeclaration;
 }
 
-def PPMeasurementOp : QEC_Op<"ppm", [QECOpInterface, SameVariadicOperandSize]> {
+def PPMeasurementOp : QEC_Op<"ppm", [QECOpInterface, AttrSizedOperandSegments]> {
     let summary = "Pauli Product Measurement on qubits.";
 
     let description = [{
@@ -181,7 +269,8 @@ def PPMeasurementOp : QEC_Op<"ppm", [QECOpInterface, SameVariadicOperandSize]> {
     let arguments = (ins
         PauliWord:$pauli_product,  // The Pauli product specifying the measurement basis
         DefaultValuedAttr<I16Attr, "1">:$rotation_sign, 
-        Variadic<QubitType>:$in_qubits  // The qubits to measure
+        Variadic<QubitType>:$in_qubits,  // The qubits to measure
+        Optional<I1>:$condition
     );
 
     let results = (outs
@@ -189,8 +278,69 @@ def PPMeasurementOp : QEC_Op<"ppm", [QECOpInterface, SameVariadicOperandSize]> {
         Variadic<QubitType>:$out_qubits  // The post-measurement state of the qubits
     );
 
+    let builders = [
+        // Convenience builder with no condition
+        OpBuilder<
+        (ins
+            "::mlir::Type":$mres,
+            "::mlir::TypeRange":$out_qubits,
+            "::mlir::ArrayAttr":$pauli_product,
+            "::mlir::IntegerAttr":$rotation_sign,
+            "::mlir::ValueRange":$in_qubits
+        ),[{
+            PPMeasurementOp::build($_builder, $_state,
+            /*mres=*/ mres,
+            /*out_qubits=*/ out_qubits,
+            /*pauli_product=*/ pauli_product,
+            /*rotation_sign=*/ rotation_sign,
+            /*in_qubits=*/ in_qubits,
+            /*condition=*/ nullptr);
+        }]>,
+        // Convenience builder with no condition and rotation sign as an attribute
+        OpBuilder<
+        (ins
+            "::mlir::Type":$mres,
+            "::mlir::TypeRange":$out_qubits,
+            "::mlir::ArrayAttr":$pauli_product,
+            "uint16_t":$rotation_sign,
+            "::mlir::ValueRange":$in_qubits
+        ),[{
+            PPMeasurementOp::build($_builder, $_state,
+            /*mres=*/ mres,
+            /*out_qubits=*/ out_qubits,
+            /*pauli_product=*/ pauli_product,
+            /*rotation_sign=*/ rotation_sign,
+            /*in_qubits=*/ in_qubits,
+            /*condition=*/ nullptr);
+        }]>,
+        // Convenience builder with only pauli product and in_qubits, the type of mres is i1
+        OpBuilder<
+        (ins
+            "::mlir::ArrayAttr":$pauli_product,
+            "::mlir::ValueRange":$in_qubits
+        ),[{
+            PPMeasurementOp::build($_builder, $_state,
+            /*mres=*/ $_builder.getI1Type(),
+            /*out_qubits=*/ mlir::TypeRange(in_qubits),
+            /*pauli_product=*/ pauli_product, 
+            /*rotation_sign=*/ 1,
+            /*in_qubits=*/ in_qubits,
+            /*condition=*/ nullptr);
+        }]>,
+        // Convenience builder with ArrayRef<StringRef>
+        OpBuilder<
+        (ins
+            "::mlir::ArrayRef<mlir::StringRef>":$pauli_product,
+            "::mlir::ValueRange":$in_qubits
+        ),[{
+            PPMeasurementOp::build($_builder, $_state,
+            /*pauli_product=*/ $_builder.getStrArrayAttr(pauli_product),
+            /*in_qubits=*/ in_qubits);
+        }]>
+    ];
+
     let assemblyFormat = [{
-      $pauli_product (`(` $rotation_sign^ `)`)? $in_qubits attr-dict `:` type($out_qubits)
+      $pauli_product (`(` $rotation_sign^ `)`)? $in_qubits (`cond` `(` $condition^ `)`)? attr-dict `:` type($out_qubits)
     }];
 
     let hasVerifier = 1;
@@ -206,4 +356,75 @@ def PPMeasurementOp : QEC_Op<"ppm", [QECOpInterface, SameVariadicOperandSize]> {
     let extraClassDeclaration = extraBaseClassDeclaration;
 }
 
+def SelectPPMeasurementOp : QEC_Op<"select.ppm"> {
+    let summary = "Conditional Pauli product measurement based on a boolean control.";
+
+    let description = [{
+    Conditionally applies and Pauli Product Measurement on qubits.
+
+    Based on the boolean `condition` (type `i1`), this op selects between two Pauli product strings:  
+    - If `condition` is 1, applies and measures using `pauli_product`.  
+    - If `condition` is 0, uses `else_pauli_product`.  
+
+    The operation returns:
+    - `mres`: the result of the Pauli product measurement (`i1`)
+    - `out_qubits`: post-measurement qubits
+
+    Example:
+    ```mlir
+    %m3, %3 = qec.select.ppm (%m1, ["X"], ["Z"]) %1#1 : !quantum.bit
+    ```
+    If %m1 == 1, applies "X" to %1#1; else applies "Z". Then measures.
+    }];
+
+    let arguments = (ins
+        I1:$condition,  // The condition qubit
+        PauliWord:$pauli_product,
+        PauliWord:$else_pauli_product,
+        Variadic<QubitType>:$in_qubits  // The qubits to measure
+    );
+
+    let results = (outs
+        I1:$mres,  // The measurement result (0 or 1)
+        Variadic<QubitType>:$out_qubits  // The post-measurement state of the qubits
+    );
+
+    let builders = [
+        OpBuilder<
+        (ins
+            "::mlir::Value":$condition,
+            "::mlir::ArrayAttr":$pauli_product,
+            "::mlir::ArrayAttr":$else_pauli_product,
+            "::mlir::ValueRange":$in_qubits
+        ),[{
+            SelectPPMeasurementOp::build($_builder, $_state,
+            /*mres_type=*/ $_builder.getI1Type(),
+            /*out_qubits=*/ mlir::TypeRange(in_qubits),
+            /*condition=*/ condition,
+            /*pauli_product=*/ pauli_product,
+            /*else_pauli_product=*/ else_pauli_product,
+            /*in_qubits=*/ in_qubits);
+        }]>,
+        OpBuilder<
+        (ins
+            "::mlir::Value":$condition,
+            "::mlir::ArrayRef<mlir::StringRef>":$pauli_product,
+            "::mlir::ArrayRef<mlir::StringRef>":$else_pauli_product,
+            "::mlir::ValueRange":$in_qubits
+        ),[{
+            SelectPPMeasurementOp::build($_builder, $_state,
+            /*mres_type=*/ $_builder.getI1Type(),
+            /*out_qubits=*/ mlir::TypeRange(in_qubits),
+            /*condition=*/ condition,
+            /*pauli_product=*/ $_builder.getStrArrayAttr(pauli_product),
+            /*else_pauli_product=*/ $_builder.getStrArrayAttr(else_pauli_product),
+            /*in_qubits=*/ in_qubits);
+        }]>
+        
+    ];
+
+    let assemblyFormat = [{
+      `(` $condition `,` $pauli_product `,` $else_pauli_product `)` $in_qubits attr-dict `:` type($out_qubits)
+    }];
+}
 #endif // QEC_DIALECT

@@ -29,3 +29,15 @@ func.func @boo(%q1 : !quantum.bit) {
     %6 = qec.prepare magic %5 : !quantum.bit 
     func.return
 }
+
+func.func @bar(%q1 : !quantum.bit, %q2 : !quantum.bit) {
+    %m_0, %0 = qec.ppm ["Z"] %q1 : !quantum.bit
+    %m_1, %1 = qec.select.ppm (%m_0, ["X"], ["Z"]) %q2 : !quantum.bit
+    func.return
+}
+
+func.func @baz(%q1 : !quantum.bit, %q2 : !quantum.bit) {
+    %m_0, %0 = qec.ppm ["Z"] %q1 : !quantum.bit
+    %1:2 = qec.ppr ["Y", "Y"] (4) %0, %q2 cond(%m_0) : !quantum.bit, !quantum.bit
+    func.return
+}
