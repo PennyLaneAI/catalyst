@@ -218,7 +218,7 @@ TEST_CASE("Test the OpenQasmDevice setBasisState", "[openqasm]")
     DataView<int8_t, 1> view(state);
     std::vector<QubitIdType> wires{0};
     REQUIRE_THROWS_WITH(device->SetBasisState(view, wires),
-                        ContainsSubstring("Unsupported functionality"));
+                        ContainsSubstring("unsupported by device"));
 }
 
 TEST_CASE("Test the OpenQasmDevice setState", "[openqasm]")
@@ -231,8 +231,7 @@ TEST_CASE("Test the OpenQasmDevice setState", "[openqasm]")
     std::vector<std::complex<double>> state{{1.0, 0.0}};
     DataView<std::complex<double>, 1> view(state);
     std::vector<QubitIdType> wires{0};
-    REQUIRE_THROWS_WITH(device->SetState(view, wires),
-                        ContainsSubstring("Unsupported functionality"));
+    REQUIRE_THROWS_WITH(device->SetState(view, wires), ContainsSubstring("unsupported by device"));
 }
 
 TEST_CASE("Test the bell pair circuit with BuilderType::Common", "[openqasm]")
