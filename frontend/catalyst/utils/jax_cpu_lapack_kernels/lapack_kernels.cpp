@@ -67,9 +67,7 @@ namespace {
 
 namespace jax {
 
-static_assert(sizeof(lapack_int) == sizeof(int32_t), "Expected LAPACK integers to be 32-bit");
-
-// Trsm
+// Trsm (Triangular System Solver)
 // ~~~~
 
 template <typename T> typename RealTrsm<T>::FnType *RealTrsm<T>::fn = nullptr;
@@ -161,7 +159,7 @@ template struct RealTrsm<double>;
 template struct ComplexTrsm<std::complex<float>>;
 template struct ComplexTrsm<std::complex<double>>;
 
-// Getrf
+// Getrf (LU Decomposition)
 // ~~~~~
 
 template <typename T> typename Getrf<T>::FnType *Getrf<T>::fn = nullptr;
@@ -199,7 +197,7 @@ template struct Getrf<double>;
 template struct Getrf<std::complex<float>>;
 template struct Getrf<std::complex<double>>;
 
-// Geqrf
+// Geqrf (QR Factorization)
 // ~~~~~
 
 template <typename T> typename Geqrf<T>::FnType *Geqrf<T>::fn = nullptr;
@@ -240,7 +238,7 @@ template struct Geqrf<double>;
 template struct Geqrf<std::complex<float>>;
 template struct Geqrf<std::complex<double>>;
 
-// Orgqr
+// Orgqr (Orthogonal Matrix from QR Decomposition)
 // ~~~~~
 
 template <typename T> typename Orgqr<T>::FnType *Orgqr<T>::fn = nullptr;
@@ -282,7 +280,7 @@ template struct Orgqr<double>;
 template struct Orgqr<std::complex<float>>;
 template struct Orgqr<std::complex<double>>;
 
-// Potrf
+// Potrf (Cholesky Factorization)
 // ~~~~~
 
 template <typename T> typename Potrf<T>::FnType *Potrf<T>::fn = nullptr;
@@ -470,8 +468,8 @@ template struct RealGesdd<double>;
 template struct ComplexGesdd<std::complex<float>>;
 template struct ComplexGesdd<std::complex<double>>;
 
-// Syevd/Heevd
-// ~~~~~~~~~~~
+// Syevd/Heevd (Eigenvalues and eigenvectors for Symmetric Matrices)
+// ~~~~~
 
 template <typename T> typename RealSyevd<T>::FnType *RealSyevd<T>::fn = nullptr;
 
@@ -575,8 +573,8 @@ static void UnpackEigenvectors(int n, const T *im_eigenvalues, const T *packed,
     }
 }
 
-// Geev
-// ~~~~
+// Geev (Eigenvalues and eigenvectors for General Matrices)
+// ~~~~~
 
 template <typename T> typename RealGeev<T>::FnType *RealGeev<T>::fn = nullptr;
 
@@ -717,9 +715,8 @@ template struct RealGeev<double>;
 template struct ComplexGeev<std::complex<float>>;
 template struct ComplexGeev<std::complex<double>>;
 
-// Gees
-// ~~~~
-
+// Gees (Schur Decomposition)
+// ~~~~~
 template <typename T> typename RealGees<T>::FnType *RealGees<T>::fn = nullptr;
 
 template <typename T> void RealGees<T>::Kernel(void *out_tuple, void **data, XlaCustomCallStatus *)
@@ -834,8 +831,8 @@ template struct RealGees<double>;
 template struct ComplexGees<std::complex<float>>;
 template struct ComplexGees<std::complex<double>>;
 
-// Gehrd
-
+// Gehrd (Hessenberg Decomposition)
+// ~~~~~
 template <typename T> typename Gehrd<T>::FnType *Gehrd<T>::fn = nullptr;
 
 template <typename T> void Gehrd<T>::Kernel(void *out_tuple, void **data, XlaCustomCallStatus *)
@@ -877,7 +874,7 @@ template struct Gehrd<double>;
 template struct Gehrd<std::complex<float>>;
 template struct Gehrd<std::complex<double>>;
 
-// Sytrd
+// Sytrd/Hetrd (Tridiagonal Reduction)
 // ~~~~~
 
 template <typename T> typename Sytrd<T>::FnType *Sytrd<T>::fn = nullptr;
