@@ -55,93 +55,7 @@
 typedef struct XlaCustomCallStatus_ XlaCustomCallStatus;
 #endif
 
-namespace ffi = xla::ffi;
-
-namespace jax {
-struct MatrixParams {
-  enum class Side : char { kLeft = 'L', kRight = 'R' };
-  enum class UpLo : char { kLower = 'L', kUpper = 'U' };
-  enum class Diag : char { kNonUnit = 'N', kUnit = 'U' };
-  enum class Transpose : char {
-    kNoTrans = 'N',
-    kTrans = 'T',
-    kConjTrans = 'C'
-  };
-};
-
-}
-
-
-
-#define DEFINE_CHAR_ENUM_ATTR_DECODING(ATTR)                             \
-  template <>                                                            \
-  struct xla::ffi::AttrDecoding<ATTR> {                                  \
-    using Type = ATTR;                                                   \
-    static std::optional<Type> Decode(XLA_FFI_AttrType type, void* attr, \
-                                      DiagnosticEngine& diagnostic);     \
-  }
-
-// XLA needs attributes to have deserialization method specified
-DEFINE_CHAR_ENUM_ATTR_DECODING(jax::MatrixParams::Side);
-DEFINE_CHAR_ENUM_ATTR_DECODING(jax::MatrixParams::UpLo);
-DEFINE_CHAR_ENUM_ATTR_DECODING(jax::MatrixParams::Transpose);
-DEFINE_CHAR_ENUM_ATTR_DECODING(jax::MatrixParams::Diag);
-#undef DEFINE_CHAR_ENUM_ATTR_DECODING
-
-namespace {
-
-template <typename T>
-inline T CastNoOverflow(int64_t value, const std::string& source = __FILE__) {
-  if constexpr (sizeof(T) == sizeof(int64_t)) {
-    return value;
-  } else {
-    if (value > std::numeric_limits<T>::max()) [[unlikely]] {
-#ifdef USE_ABSEIL_LIB
-      throw std::overflow_error{
-          absl::StrFormat("%s: Value (=%d) exceeds the maximum representable "
-                          "value of the desired type",
-                          source, value)};
-#else
-      throw std::overflow_error{"Value exceeds the maximum representable "
-	                 "value of the desired type"};
-#endif
-    }
-    return static_cast<T>(value);
-  }
-}
-
-template <typename T>
-std::tuple<int64_t, int64_t, int64_t> SplitBatch2D(ffi::Span<T> dims) {
-  if (dims.size() < 2) {
-    throw std::invalid_argument("Matrix must have at least 2 dimensions");
-  }
-  auto matrix_dims = dims.last(2);
-#ifdef USE_ABSEIL_LIB
-  return std::make_tuple(absl::c_accumulate(dims.first(dims.size() - 2), 1,
-                                            std::multiplies<int64_t>()),
-                         matrix_dims.front(), matrix_dims.back());
-#else
-  auto sequence = dims.first(dims.size() - 2);
-  return std::make_tuple(std::accumulate(std::begin(sequence), std::end(sequence), 1,
-                                            std::multiplies<int64_t>()),
-                         matrix_dims.front(), matrix_dims.back());
-#endif
-}
-
-template <ffi::DataType dtype>
-void CopyIfDiffBuffer(ffi::Buffer<dtype> x, ffi::ResultBuffer<dtype> x_out) {
-  auto [batch_count, x_rows, x_cols] = SplitBatch2D(x.dimensions);
-  if (x.data != x_out->data) {
-    const auto x_size = batch_count * x_rows * x_cols;
-    std::copy_n(x.data, x_size, x_out->data);
-  }
-}
-
-} // namespace
-
-
-
-// Underlying function pointers (e.g., Trsm<double>::Fn) are initialized either
+// Underlying function pointers (i.e., KERNEL_CLASS::Fn) are initialized either
 // by the pybind wrapper that links them to an existing SciPy lapack instance,
 // or using the lapack_kernels_strong.cc static initialization to link them
 // directly to lapack for use in a pure C++ context.
@@ -162,15 +76,14 @@ typedef enum CBLAS_SIDE { CblasLeft = 141, CblasRight = 142 } CBLAS_SIDE;
 typedef CBLAS_ORDER CBLAS_LAYOUT;
 
 typedef int lapack_int;
-inline constexpr auto LapackIntDtype = ::xla::ffi::DataType::S32;
-template <typename KernelType>
-void AssignKernelFn(void* func) {
-  KernelType::fn = reinterpret_cast<typename KernelType::FnType*>(func);
+template <typename KernelType> void AssignKernelFn(void *func)
+{
+    KernelType::fn = reinterpret_cast<typename KernelType::FnType *>(func);
 }
 
-template <typename KernelType>
-void AssignKernelFn(typename KernelType::FnType* func) {
-  KernelType::fn = func;
+template <typename KernelType> void AssignKernelFn(typename KernelType::FnType *func)
+{
+    KernelType::fn = func;
 }
 
 } // namespace jax
@@ -231,20 +144,6 @@ template <typename T> struct Potrf {
     using FnType = lapack_int(int matrix_layout, char uplo, lapack_int n, T *a, lapack_int lda);
     static FnType *fn;
     static void Kernel(void *out, void **data, XlaCustomCallStatus *);
-};
-
-// FFI Kernel
-
-template <::xla::ffi::DataType dtype>
-struct CholeskyFactorization {
-  using ValueType = ::xla::ffi::NativeType<dtype>;
-  using FnType = void(char* uplo, lapack_int* n, ValueType* a, lapack_int* lda,
-                      lapack_int* info);
-  inline static FnType* fn = nullptr;
-  static ::xla::ffi::Error Kernel(
-      ::xla::ffi::Buffer<dtype> x, MatrixParams::UpLo uplo,
-      ::xla::ffi::ResultBuffer<dtype> x_out,
-      ::xla::ffi::ResultBuffer<LapackIntDtype> info);
 };
 
 // gesdd: computes the singular value decomposition (SVD) of an m-by-n matrix

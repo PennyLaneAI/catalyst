@@ -75,14 +75,10 @@ jax::Orgqr<double>::FnType GET_SYMBOL(LAPACKE_dorgqr);
 jax::Orgqr<std::complex<float>>::FnType GET_SYMBOL(LAPACKE_cungqr);
 jax::Orgqr<std::complex<double>>::FnType GET_SYMBOL(LAPACKE_zungqr);
 
-//jax::Potrf<float>::FnType GET_SYMBOL(LAPACKE_spotrf);
-//jax::Potrf<double>::FnType GET_SYMBOL(LAPACKE_dpotrf);
-//jax::Potrf<std::complex<float>>::FnType GET_SYMBOL(LAPACKE_cpotrf);
-//jax::Potrf<std::complex<double>>::FnType GET_SYMBOL(LAPACKE_zpotrf);
-jax::CholeskyFactorization<ffi::DataType::F32>::FnType GET_SYMBOL(LAPACKE_spotrf);
-jax::CholeskyFactorization<ffi::DataType::F64>::FnType GET_SYMBOL(LAPACKE_dpotrf);
-jax::CholeskyFactorization<ffi::DataType::C64>::FnType GET_SYMBOL(LAPACKE_cpotrf);
-jax::CholeskyFactorization<ffi::DataType::C128>::FnType GET_SYMBOL(LAPACKE_zpotrf);
+jax::Potrf<float>::FnType GET_SYMBOL(LAPACKE_spotrf);
+jax::Potrf<double>::FnType GET_SYMBOL(LAPACKE_dpotrf);
+jax::Potrf<std::complex<float>>::FnType GET_SYMBOL(LAPACKE_cpotrf);
+jax::Potrf<std::complex<double>>::FnType GET_SYMBOL(LAPACKE_zpotrf);
 
 jax::RealGesdd<float>::FnType GET_SYMBOL(LAPACKE_sgesdd);
 jax::RealGesdd<double>::FnType GET_SYMBOL(LAPACKE_dgesdd);
@@ -139,11 +135,10 @@ static auto init = []() -> int {
     AssignKernelFn<Orgqr<std::complex<float>>>(GET_SYMBOL(LAPACKE_cungqr));
     AssignKernelFn<Orgqr<std::complex<double>>>(GET_SYMBOL(LAPACKE_zungqr));
 
-    //AssignKernelFn<Potrf<float>>(GET_SYMBOL(LAPACKE_spotrf));
-    //AssignKernelFn<Potrf<double>>(GET_SYMBOL(LAPACKE_dpotrf));
-    //AssignKernelFn<Potrf<std::complex<float>>>(GET_SYMBOL(LAPACKE_cpotrf));
-    //AssignKernelFn<Potrf<std::complex<double>>>(GET_SYMBOL(LAPACKE_zpotrf));
-
+    AssignKernelFn<Potrf<float>>(GET_SYMBOL(LAPACKE_spotrf));
+    AssignKernelFn<Potrf<double>>(GET_SYMBOL(LAPACKE_dpotrf));
+    AssignKernelFn<Potrf<std::complex<float>>>(GET_SYMBOL(LAPACKE_cpotrf));
+    AssignKernelFn<Potrf<std::complex<double>>>(GET_SYMBOL(LAPACKE_zpotrf));
     AssignKernelFn<RealGesdd<float>>(GET_SYMBOL(LAPACKE_sgesdd));
     AssignKernelFn<RealGesdd<double>>(GET_SYMBOL(LAPACKE_dgesdd));
     AssignKernelFn<ComplexGesdd<std::complex<float>>>(GET_SYMBOL(LAPACKE_cgesdd));
@@ -173,11 +168,6 @@ static auto init = []() -> int {
     AssignKernelFn<Sytrd<double>>(GET_SYMBOL(LAPACKE_dsytrd));
     AssignKernelFn<Sytrd<std::complex<float>>>(GET_SYMBOL(LAPACKE_chetrd));
     AssignKernelFn<Sytrd<std::complex<double>>>(GET_SYMBOL(LAPACKE_zhetrd));
-
-    AssignKernelFn<CholeskyFactorization<ffi::DataType::F32>>(GET_SYMBOL(LAPACKE_spotrf));
-    AssignKernelFn<CholeskyFactorization<ffi::DataType::F64>>(GET_SYMBOL(LAPACKE_dpotrf));
-    AssignKernelFn<CholeskyFactorization<ffi::DataType::C64>>(GET_SYMBOL(LAPACKE_cpotrf));
-    AssignKernelFn<CholeskyFactorization<ffi::DataType::C128>>(GET_SYMBOL(LAPACKE_zpotrf));
 
     return 0;
 }();
