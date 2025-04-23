@@ -466,7 +466,7 @@ class HybridAdjoint(HybridOp):
             qrp_out = trace_quantum_operations(body_tape, device, qreg_in, ctx, body_trace)
             qreg_out = qrp_out.actualize()
             body_jaxpr, _, body_consts = body_trace.frame.to_jaxpr2(
-                res_classical_tracers + [qreg_out]
+                res_classical_tracers + [qreg_out], body_trace.frame.debug_info
             )
 
         qreg = qrp.actualize()

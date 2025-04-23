@@ -188,19 +188,14 @@ class EvaluationContext:
     @classmethod
     @contextmanager
     def frame_tracing_context(
-        cls, trace: Optional[DynamicJaxprTrace] = None
+        cls, trace: Optional[DynamicJaxprTrace] = None, debug_info=None
     ) -> ContextManager[DynamicJaxprTrace]:
         """Start a new JAX tracing frame, e.g. to trace a region of some
         :class:`~.jax_tracer.HybridOp`. Not applicable in non-tracing evaluation modes."""
-        with take_current_trace() as current_trace:
+        with take_current_trace():
             if trace is not None:
                 new_trace = trace
             else:
-                debug_info = (
-                    current_trace.frame.debug_info
-                    if isinstance(current_trace, DynamicJaxprTrace)
-                    else None
-                )
                 new_trace = DynamicJaxprTrace(debug_info)
 
         with set_current_trace(new_trace):
