@@ -22,14 +22,6 @@ func.func @testXY(%q1 : !quantum.bit) {
 
 // -----
 
-func.func @testZX(%q1 : !quantum.bit) {
-    %angle = arith.constant 3.141592653589793 : f64
-    %res, %new_q = mbqc.measure_in_basis [ZX, %angle] %q1 : i1, !quantum.bit
-    func.return
-}
-
-// -----
-
 func.func @testYZ(%q1 : !quantum.bit) {
     %angle = arith.constant 3.141592653589793 : f64
     %res, %new_q = mbqc.measure_in_basis [YZ, %angle] %q1 : i1, !quantum.bit
@@ -38,9 +30,17 @@ func.func @testYZ(%q1 : !quantum.bit) {
 
 // -----
 
+func.func @testZX(%q1 : !quantum.bit) {
+    %angle = arith.constant 3.141592653589793 : f64
+    %res, %new_q = mbqc.measure_in_basis [ZX, %angle] %q1 : i1, !quantum.bit
+    func.return
+}
+
+// -----
+
 func.func @testInvalid(%q1 : !quantum.bit) {
     %angle = arith.constant 3.141592653589793 : f64
-    // expected-error@below {{expected catalyst::mbqc::MeasurementPlane to be one of: XY, ZX, YZ}}
+    // expected-error@below {{expected catalyst::mbqc::MeasurementPlane to be one of: XY, YZ, ZX}}
     // expected-error@below {{failed to parse MeasurementPlaneAttr parameter}}
     %res, %new_q = mbqc.measure_in_basis [YX, %angle] %q1 : i1, !quantum.bit
     func.return

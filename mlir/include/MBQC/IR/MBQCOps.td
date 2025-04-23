@@ -30,8 +30,8 @@ def MeasurementPlane : I32EnumAttr<"MeasurementPlane",
     "Planes in the Bloch sphere representation with support for arbitrary-basis measurements",
     [
         I32EnumAttrCase<"XY", 0>,
-        I32EnumAttrCase<"ZX", 1>,
-        I32EnumAttrCase<"YZ", 2>,
+        I32EnumAttrCase<"YZ", 1>,
+        I32EnumAttrCase<"ZX", 2>,
     ]> {
     let cppNamespace = "catalyst::mbqc";
     let genSpecializedAttr = 0;
@@ -60,7 +60,7 @@ def MeasureInBasisOp : MBQC_Op<"measure_in_basis"> {
         A parametric single-qubit projective measurement is equivalent to the `quantum.measure`
         operation except that it supports measurements in an arbitrary basis, rather than the
         computational basis only. Specifically, the measurement basis is parameterized by a plane
-        along the major axes of the Bloch sphere (either XY, ZX or YZ) and a rotation angle about
+        along the major axes of the Bloch sphere (either XY, YZ or ZX) and a rotation angle about
         that plane.
     }];
 
