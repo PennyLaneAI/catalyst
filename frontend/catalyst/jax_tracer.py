@@ -586,6 +586,7 @@ def nested_quantum_regions(op: Operation) -> List[HybridOpRegion]:
     )
 
 
+# pylint: disable=too-many-arguments
 @debug_logger
 def trace_to_jaxpr(func, static_argnums, abstracted_axes, args, kwargs, debug_info=None):
     """Trace a Python function to JAXPR.
