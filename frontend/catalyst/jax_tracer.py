@@ -1201,8 +1201,9 @@ def trace_post_processing(trace, post_processing: Callable, pp_args, debug_info=
         # tape. The tracers are all flat in pp_args.
 
         # We need to deduce the type/shape/tree of the post_processing.
-        #breakpoint()
-        wffa, _, _, out_tree_promise = deduce_avals(post_processing, (pp_args,), {}, debug_info=debug_info)
+        wffa, _, _, out_tree_promise = deduce_avals(
+            post_processing, (pp_args,), {}, debug_info=debug_info
+        )
 
         # wffa will take as an input a flatten tracers.
         # After wffa is called, then the shape becomes available in out_tree_promise.
@@ -1235,7 +1236,6 @@ def trace_function(
         InputSignature of the resulting Jaxpr program
         OutputSignature of the resulting Jaxpr program
     """
-    #breakpoint()
     wfun, in_sig, out_sig = deduce_signatures(
         fun, args, kwargs, expansion_strategy=expansion_strategy
     )
@@ -1384,7 +1384,6 @@ def trace_quantum_function(
                 # Deallocate the register after the current tape is finished
                 # This dealloc primitive also serves as the tape cut when splitting tapes
                 qdealloc_p.bind(qreg_out)
-        #breakpoint()
         closed_jaxpr, out_type, out_tree = trace_post_processing(
             trace, post_processing, transformed_results, debug_info
         )

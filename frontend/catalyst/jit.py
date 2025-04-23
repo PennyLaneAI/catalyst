@@ -735,11 +735,7 @@ class QJIT(CatalystCallable):
             pass_pipeline = params.get("pass_pipeline", default_pass_pipeline)
             params["pass_pipeline"] = pass_pipeline
             params["debug_info"] = dbg
-            #breakpoint()
-            #  dbg = debug_info(
-            # 'jit', fun, args, kwargs, static_argnums=ji.static_argnums,
-            # static_argnames=ji.static_argnames, sourceinfo=ji.fun_sourceinfo,
-            # signature=ji.fun_signature)
+
             return QFunc.__call__(
                 qnode,
                 *args,
@@ -751,12 +747,7 @@ class QJIT(CatalystCallable):
         ):
             # TODO: improve PyTree handling
             jaxpr, out_type, treedef, plugins = trace_to_jaxpr(
-                self.user_function,
-                static_argnums,
-                abstracted_axes,
-                full_sig,
-                kwargs,
-                dbg
+                self.user_function, static_argnums, abstracted_axes, full_sig, kwargs, dbg
             )
             self.compile_options.pass_plugins.update(plugins)
             self.compile_options.dialect_plugins.update(plugins)

@@ -405,7 +405,6 @@ def deduce_avals(f: Callable, args, kwargs, static_argnums=None, debug_info=None
     and returning expanded flatten results. Calculate input abstract values and output_tree promise.
     The promise must be called after the resulting wrapped function is evaluated."""
     # TODO: deprecate in favor of `deduce_signatures`
-    #breakpoint()
     wf = wrap_init(f, debug_info=debug_info)
     if static_argnums:
         verify_static_argnums_type(static_argnums)
@@ -429,7 +428,6 @@ def trace_to_jaxpr(
     This method would remove return values related to sizes of tensors when compiling with
     dynamically sized tensors.
     """
-    #breakpoint()
     jaxpr, tracers, consts = trace.frame.to_jaxpr2((*outputs, *inputs), None)
     del jaxpr._outvars[len(outputs) :]
     return jaxpr, tracers, consts
@@ -459,12 +457,12 @@ def make_jaxpr2(
     fun: Callable,
     static_argnums: Any | None = None,
     abstracted_axes: Any | None = None,
-    debug_info = None,
+    debug_info=None,
 ) -> Callable[..., (tuple[ClosedJaxpr, PyTreeDef])]:
     """A customized version of ``jax.make_jaxpr``, compatible with the JAX dynamic API."""
+
     # TODO: Use `deduce_signatures` here. Ideally, unify this function with the
     # `jax_tracer.trace_function` function.
-    #breakpoint()
     def abstractify(args, kwargs):
         flat_args, in_tree = tree_flatten((args, kwargs))
         axes_specs = _flat_axes_specs(abstracted_axes, *args, **kwargs)
@@ -484,7 +482,6 @@ def make_jaxpr2(
             (jax._src.interpreters.partial_eval, "get_aval", get_aval2),
             (jax._src.lax.slicing, "gather_p", gather2_p),
         ), ExitStack():
-            #breakpoint()
             f = wrap_init(fun, debug_info=debug_info)
             if static_argnums:
                 argnums = [static_argnums] if isinstance(static_argnums, int) else static_argnums

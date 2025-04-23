@@ -26,6 +26,7 @@ import jax
 import jax.numpy as jnp
 import pennylane as qml
 from jax._src.tree_util import PyTreeDef, tree_unflatten, treedef_is_leaf
+from jax.api_util import debug_info
 from jax.core import AbstractValue
 from pennylane import QueuingManager
 from pennylane.tape import QuantumTape
@@ -664,15 +665,15 @@ class CondCallable:
         for branch_fn in self.branch_fns + [self.otherwise_fn]:
             quantum_tape = QuantumTape()
             # Cond branches take no arguments
-            #breakpoint()
             wfun, in_sig, out_sig = deduce_signatures(
-                branch_fn, [], {}, expansion_strategy=self.expansion_strategy,
-                #debug_info=outer_trace.frame.debug_info
-                debug_info=None
+                branch_fn,
+                [],
+                {},
+                expansion_strategy=self.expansion_strategy,
+                debug_info=debug_info("cond_quantum_call", branch_fn, [], {}),
             )
             assert len(in_sig.in_type) == 0
             with EvaluationContext.frame_tracing_context() as inner_trace:
-                #breakpoint()
                 with QueuingManager.stop_recording(), quantum_tape:
                     res_classical_tracers = [
                         inner_trace.to_jaxpr_tracer(t) for t in wfun.call_wrapped()
@@ -915,6 +916,9 @@ class ForLoopCallable:
             (aux_classical_tracers[0], *init_state),
             {},
             self.expansion_strategy,
+            debug_info=debug_info(
+                "forloop_quantum_call", self.body_fn, (aux_classical_tracers[0], *init_state), {}
+            ),
         )
         in_type = in_sig.in_type
 
@@ -1077,10 +1081,18 @@ class WhileLoopCallable:
     def _call_with_quantum_ctx(self, *init_state):
         outer_trace = EvaluationContext.get_current_trace()
         cond_wffa, _, cond_out_sig = deduce_signatures(
-            self.cond_fn, init_state, {}, self.expansion_strategy
+            self.cond_fn,
+            init_state,
+            {},
+            self.expansion_strategy,
+            debug_info=debug_info("whileloop_quantum_call_cond_fn", self.cond_fn, init_state, {}),
         )
         body_wffa, in_sig, out_sig = deduce_signatures(
-            self.body_fn, init_state, {}, self.expansion_strategy
+            self.body_fn,
+            init_state,
+            {},
+            self.expansion_strategy,
+            debug_info=debug_info("whileloop_quantum_call_body_fn", self.body_fn, init_state, {}),
         )
         in_type = in_sig.in_type
         in_expanded_classical_tracers = in_sig.in_expanded_args
@@ -1217,7 +1229,6 @@ class Cond(HybridOp):
                     region.res_classical_tracers + [qreg_out],
                     expansion_strategy=self.expansion_strategy,
                 )
-                #breakpoint()
                 jaxpr, out_type, const = trace_to_jaxpr(region.trace, [], res_expanded_tracers)
 
                 jaxprs.append(jaxpr)
