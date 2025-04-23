@@ -65,3 +65,39 @@ func.func @testZX(%q1 : !quantum.bit) {
     %res, %new_q = mbqc.measure_in_basis [ZX, %angle] %q1 : i1, !quantum.bit
     func.return
 }
+
+// -----
+
+// CHECK-DAG: llvm.func @__catalyst__mbqc__measure_in_basis(!llvm.ptr, i32, f64, i32)
+
+// CHECK-LABEL: testXYPostSelect0
+func.func @testXYPostSelect0(%q1 : !quantum.bit) {
+    // CHECK: [[inqubit:%.+]] = builtin.unrealized_conversion_cast {{.+}} : !quantum.bit to !llvm.ptr
+
+    // CHECK: [[angle:%.+]] = arith.constant 3.1415926535897931 : f64
+    %angle = arith.constant 3.141592653589793 : f64
+
+    // CHECK: [[plane:%.+]] = llvm.mlir.constant(0 : i32) : i32
+    // CHECK: [[postselect:%.+]] = llvm.mlir.constant(0 : i32) : i32
+    // CHECK: llvm.call @__catalyst__mbqc__measure_in_basis([[inqubit]], [[plane]], [[angle]], [[postselect]])
+    %res, %new_q = mbqc.measure_in_basis [XY, %angle] %q1 {postselect = 0 : i32} : i1, !quantum.bit
+    func.return
+}
+
+// -----
+
+// CHECK-DAG: llvm.func @__catalyst__mbqc__measure_in_basis(!llvm.ptr, i32, f64, i32)
+
+// CHECK-LABEL: testXYPostSelect1
+func.func @testXYPostSelect1(%q1 : !quantum.bit) {
+    // CHECK: [[inqubit:%.+]] = builtin.unrealized_conversion_cast {{.+}} : !quantum.bit to !llvm.ptr
+
+    // CHECK: [[angle:%.+]] = arith.constant 3.1415926535897931 : f64
+    %angle = arith.constant 3.141592653589793 : f64
+
+    // CHECK: [[plane:%.+]] = llvm.mlir.constant(0 : i32) : i32
+    // CHECK: [[postselect:%.+]] = llvm.mlir.constant(1 : i32) : i32
+    // CHECK: llvm.call @__catalyst__mbqc__measure_in_basis([[inqubit]], [[plane]], [[angle]], [[postselect]])
+    %res, %new_q = mbqc.measure_in_basis [XY, %angle] %q1 {postselect = 1 : i32} : i1, !quantum.bit
+    func.return
+}
