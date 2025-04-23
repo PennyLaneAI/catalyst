@@ -17,6 +17,10 @@ on:
     inputs:
       build_standalone_plugin:
         description: 'Build the standalone plugin wheel'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
         required: false
         default: 'false'
   workflow_call:
