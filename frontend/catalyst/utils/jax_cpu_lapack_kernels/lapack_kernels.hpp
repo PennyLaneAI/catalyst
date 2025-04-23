@@ -53,9 +53,6 @@
 #include "xla/service/custom_call_status.h"
 #else
 typedef struct XlaCustomCallStatus_ XlaCustomCallStatus;
-#include "xla/ffi/api/c_api.h"
-#include "xla/ffi/api/api.h"
-#include "xla/ffi/api/ffi.h"
 #endif
 
 namespace ffi = xla::ffi;
