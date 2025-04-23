@@ -602,14 +602,14 @@ TEST_CASE("Test NullQubit device resource tracking", "[NullQubit]")
     CHECK(resource_file.is_open()); // fail-fast if file failed to create
 
     std::vector<std::string> resource_names = {"PauliX",
-                                               "C_adj_T",
-                                               "adj_T",
-                                               "C_S",
+                                               "C(Adj(T))",
+                                               "Adj(T)",
+                                               "C(S)",
                                                "S",
                                                "CNOT",
-                                               "adj_ControlledQubitUnitary",
+                                               "Adj(ControlledQubitUnitary)",
                                                "ControlledQubitUnitary",
-                                               "adj_QubitUnitary",
+                                               "Adj(QubitUnitary)",
                                                "QubitUnitary"};
 
     // Check all fields have the correct value

@@ -247,15 +247,18 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
                         const std::vector<bool> &controlled_values = {})
     {
         if (this->track_resources_) {
-            std::string op_name = name;
-            if (inverse) {
-                op_name = "adj_" + op_name;
-            }
+            std::string prefix = "";
+            std::string suffix = "";
             if (!controlled_wires.empty()) {
-                op_name = "C_" + op_name;
+                prefix += "C(";
+                suffix += ")";
+            }
+            if (inverse) {
+                prefix += "Adj(";
+                suffix += ")";
             }
             resource_data_["num_gates"]++;
-            resource_data_[op_name]++;
+            resource_data_[prefix + name + suffix]++;
         }
     }
 
@@ -277,7 +280,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
                 op_name = "Controlled" + op_name;
             }
             if (inverse) {
-                op_name = "adj_" + op_name;
+                op_name = "Adj(" + op_name + ")";
             }
             resource_data_[op_name]++;
         }
