@@ -1213,7 +1213,7 @@ def trace_post_processing(trace, post_processing: Callable, pp_args, debug_info=
         in_tracers = [trace.to_jaxpr_tracer(t) for t in tree_flatten(pp_args)[0]]
         out_tracers = [trace.to_jaxpr_tracer(t) for t in wffa.call_wrapped(*in_tracers)]
         cur_trace = EvaluationContext.get_current_trace()
-        jaxpr, out_type, consts = cur_trace.frame.to_jaxpr2(out_tracers, debug_info)
+        jaxpr, out_type, consts = cur_trace.frame.to_jaxpr2(out_tracers, wffa.debug_info)
         closed_jaxpr = ClosedJaxpr(jaxpr, consts)
         return closed_jaxpr, out_type, out_tree_promise()
 
