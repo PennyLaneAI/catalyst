@@ -187,7 +187,9 @@ class Function:
 
     @debug_logger
     def __call__(self, *args, **kwargs):
-        jaxpr, _, out_tree = make_jaxpr2(self.fn)(*args, **kwargs)
+        jaxpr, _, out_tree = make_jaxpr2(self.fn, debug_info=kwargs.pop("debug_info", None))(
+            *args, **kwargs
+        )
 
         def _eval_jaxpr(*args, **kwargs):
             return jax.core.eval_jaxpr(jaxpr.jaxpr, jaxpr.consts, *args, **kwargs)
