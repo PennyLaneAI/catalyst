@@ -664,11 +664,15 @@ class CondCallable:
         for branch_fn in self.branch_fns + [self.otherwise_fn]:
             quantum_tape = QuantumTape()
             # Cond branches take no arguments
+            #breakpoint()
             wfun, in_sig, out_sig = deduce_signatures(
-                branch_fn, [], {}, expansion_strategy=self.expansion_strategy
+                branch_fn, [], {}, expansion_strategy=self.expansion_strategy,
+                #debug_info=outer_trace.frame.debug_info
+                debug_info=None
             )
             assert len(in_sig.in_type) == 0
             with EvaluationContext.frame_tracing_context() as inner_trace:
+                #breakpoint()
                 with QueuingManager.stop_recording(), quantum_tape:
                     res_classical_tracers = [
                         inner_trace.to_jaxpr_tracer(t) for t in wfun.call_wrapped()
@@ -1213,7 +1217,7 @@ class Cond(HybridOp):
                     region.res_classical_tracers + [qreg_out],
                     expansion_strategy=self.expansion_strategy,
                 )
-
+                #breakpoint()
                 jaxpr, out_type, const = trace_to_jaxpr(region.trace, [], res_expanded_tracers)
 
                 jaxprs.append(jaxpr)

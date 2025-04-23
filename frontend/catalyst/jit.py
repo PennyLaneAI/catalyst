@@ -26,6 +26,7 @@ import warnings
 import jax
 import jax.numpy as jnp
 import pennylane as qml
+from jax.api_util import debug_info
 from jax.interpreters import mlir
 from jax.tree_util import tree_flatten, tree_unflatten
 
@@ -712,6 +713,8 @@ class QJIT(CatalystCallable):
         dynamic_sig = get_abstract_signature(dynamic_args)
         full_sig = merge_static_args(dynamic_sig, args, static_argnums)
 
+        dbg = debug_info("qjit_capture", self.user_function, args, kwargs)
+
         if qml.capture.enabled():
             with Patcher(
                 (
@@ -731,6 +734,12 @@ class QJIT(CatalystCallable):
             default_pass_pipeline = self.compile_options.circuit_transform_pipeline
             pass_pipeline = params.get("pass_pipeline", default_pass_pipeline)
             params["pass_pipeline"] = pass_pipeline
+            params["debug_info"] = dbg
+            #breakpoint()
+            #  dbg = debug_info(
+            # 'jit', fun, args, kwargs, static_argnums=ji.static_argnums,
+            # static_argnames=ji.static_argnames, sourceinfo=ji.fun_sourceinfo,
+            # signature=ji.fun_signature)
             return QFunc.__call__(
                 qnode,
                 *args,
@@ -747,6 +756,7 @@ class QJIT(CatalystCallable):
                 abstracted_axes,
                 full_sig,
                 kwargs,
+                dbg
             )
             self.compile_options.pass_plugins.update(plugins)
             self.compile_options.dialect_plugins.update(plugins)

@@ -358,7 +358,7 @@ class OutputSignature:
 
 
 def deduce_signatures(
-    f: Callable, args, kwargs, expansion_strategy
+    f: Callable, args, kwargs, expansion_strategy, debug_info=None
 ) -> Tuple[Callable, InputSignature, OutputSignature]:
     """Prepares the callable ``f`` for tracing by wrapping it into a WrappedFun container accepting
     expanded flattened arguments and returning expanded flatten results. Jax input and output types
@@ -384,7 +384,7 @@ def deduce_signatures(
     trace: DynamicJaxprTrace = find_top_trace(flat_args)
     flat_tracers = [trace.to_jaxpr_tracer(a) for a in flat_args]
     in_expanded_args, in_type = expand_args(flat_tracers, expansion_strategy=expansion_strategy)
-    wf = wrap_init(f)
+    wf = wrap_init(f, debug_info=debug_info)
     wf, out_tree_promise = flatten_fun(wf, in_tree)
     wf, out_sig_promise = expanded_fun(wf, (in_type, expansion_strategy))
     return (
@@ -400,12 +400,13 @@ def deduce_signatures(
     )
 
 
-def deduce_avals(f: Callable, args, kwargs, static_argnums=None):
+def deduce_avals(f: Callable, args, kwargs, static_argnums=None, debug_info=None):
     """Wraps the callable ``f`` into a WrappedFun container accepting collapsed flatten arguments
     and returning expanded flatten results. Calculate input abstract values and output_tree promise.
     The promise must be called after the resulting wrapped function is evaluated."""
     # TODO: deprecate in favor of `deduce_signatures`
-    wf = wrap_init(f)
+    #breakpoint()
+    wf = wrap_init(f, debug_info=debug_info)
     if static_argnums:
         verify_static_argnums_type(static_argnums)
         dynamic_argnums = [i for i in range(len(args)) if i not in static_argnums]
@@ -428,7 +429,8 @@ def trace_to_jaxpr(
     This method would remove return values related to sizes of tensors when compiling with
     dynamically sized tensors.
     """
-    jaxpr, tracers, consts = trace.frame.to_jaxpr2((*outputs, *inputs), trace.frame.debug_info)
+    #breakpoint()
+    jaxpr, tracers, consts = trace.frame.to_jaxpr2((*outputs, *inputs), None)
     del jaxpr._outvars[len(outputs) :]
     return jaxpr, tracers, consts
 
@@ -457,11 +459,12 @@ def make_jaxpr2(
     fun: Callable,
     static_argnums: Any | None = None,
     abstracted_axes: Any | None = None,
+    debug_info = None,
 ) -> Callable[..., (tuple[ClosedJaxpr, PyTreeDef])]:
     """A customized version of ``jax.make_jaxpr``, compatible with the JAX dynamic API."""
     # TODO: Use `deduce_signatures` here. Ideally, unify this function with the
     # `jax_tracer.trace_function` function.
-
+    #breakpoint()
     def abstractify(args, kwargs):
         flat_args, in_tree = tree_flatten((args, kwargs))
         axes_specs = _flat_axes_specs(abstracted_axes, *args, **kwargs)
@@ -481,7 +484,8 @@ def make_jaxpr2(
             (jax._src.interpreters.partial_eval, "get_aval", get_aval2),
             (jax._src.lax.slicing, "gather_p", gather2_p),
         ), ExitStack():
-            f = wrap_init(fun)
+            #breakpoint()
+            f = wrap_init(fun, debug_info=debug_info)
             if static_argnums:
                 argnums = [static_argnums] if isinstance(static_argnums, int) else static_argnums
                 dynamic_argnums = [i for i in range(len(args)) if i not in argnums]

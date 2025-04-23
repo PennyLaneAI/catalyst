@@ -585,7 +585,7 @@ def nested_quantum_regions(op: Operation) -> List[HybridOpRegion]:
 
 
 @debug_logger
-def trace_to_jaxpr(func, static_argnums, abstracted_axes, args, kwargs):
+def trace_to_jaxpr(func, static_argnums, abstracted_axes, args, kwargs, debug_info=None):
     """Trace a Python function to JAXPR.
 
     Args:
@@ -605,6 +605,7 @@ def trace_to_jaxpr(func, static_argnums, abstracted_axes, args, kwargs):
         make_jaxpr_kwargs = {
             "static_argnums": static_argnums,
             "abstracted_axes": abstracted_axes,
+            "debug_info": debug_info,
         }
         with EvaluationContext(EvaluationMode.CLASSICAL_COMPILATION):
             jaxpr, out_type, out_treedef = make_jaxpr2(func, **make_jaxpr_kwargs)(*args, **kwargs)
@@ -1179,7 +1180,7 @@ def split_tracers_and_measurements(flat_values):
 
 
 @debug_logger
-def trace_post_processing(trace, post_processing: Callable, pp_args):
+def trace_post_processing(trace, post_processing: Callable, pp_args, debug_info=None):
     """Trace post processing function.
 
     Args:
@@ -1200,14 +1201,15 @@ def trace_post_processing(trace, post_processing: Callable, pp_args):
         # tape. The tracers are all flat in pp_args.
 
         # We need to deduce the type/shape/tree of the post_processing.
-        wffa, _, _, out_tree_promise = deduce_avals(post_processing, (pp_args,), {})
+        #breakpoint()
+        wffa, _, _, out_tree_promise = deduce_avals(post_processing, (pp_args,), {}, debug_info=debug_info)
 
         # wffa will take as an input a flatten tracers.
         # After wffa is called, then the shape becomes available in out_tree_promise.
         in_tracers = [trace.to_jaxpr_tracer(t) for t in tree_flatten(pp_args)[0]]
         out_tracers = [trace.to_jaxpr_tracer(t) for t in wffa.call_wrapped(*in_tracers)]
         cur_trace = EvaluationContext.get_current_trace()
-        jaxpr, out_type, consts = cur_trace.frame.to_jaxpr2(out_tracers, cur_trace.frame.debug_info)
+        jaxpr, out_type, consts = cur_trace.frame.to_jaxpr2(out_tracers, debug_info)
         closed_jaxpr = ClosedJaxpr(jaxpr, consts)
         return closed_jaxpr, out_type, out_tree_promise()
 
@@ -1233,6 +1235,7 @@ def trace_function(
         InputSignature of the resulting Jaxpr program
         OutputSignature of the resulting Jaxpr program
     """
+    #breakpoint()
     wfun, in_sig, out_sig = deduce_signatures(
         fun, args, kwargs, expansion_strategy=expansion_strategy
     )
@@ -1248,7 +1251,7 @@ def trace_function(
 
 @debug_logger
 def trace_quantum_function(
-    f: Callable, device: QubitDevice, args, kwargs, qnode, static_argnums
+    f: Callable, device: QubitDevice, args, kwargs, qnode, static_argnums, debug_info
 ) -> Tuple[ClosedJaxpr, Any]:
     """Trace quantum function in a way that allows building a nested quantum tape describing the
     quantum algorithm.
@@ -1274,9 +1277,9 @@ def trace_quantum_function(
     with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
         # (1) - Classical tracing
         quantum_tape = QuantumTape(shots=device.shots)
-        with EvaluationContext.frame_tracing_context() as trace:
+        with EvaluationContext.frame_tracing_context(debug_info=debug_info) as trace:
             wffa, in_avals, keep_inputs, out_tree_promise = deduce_avals(
-                f, args, kwargs, static_argnums
+                f, args, kwargs, static_argnums, debug_info
             )
             in_classical_tracers = _input_type_to_tracers(trace.new_arg, in_avals)
             with QueuingManager.stop_recording(), quantum_tape:
@@ -1381,9 +1384,9 @@ def trace_quantum_function(
                 # Deallocate the register after the current tape is finished
                 # This dealloc primitive also serves as the tape cut when splitting tapes
                 qdealloc_p.bind(qreg_out)
-
+        #breakpoint()
         closed_jaxpr, out_type, out_tree = trace_post_processing(
-            trace, post_processing, transformed_results
+            trace, post_processing, transformed_results, debug_info
         )
         # TODO: `check_jaxpr` complains about the `AbstractQreg` type. Consider fixing.
         # check_jaxpr(jaxpr)
