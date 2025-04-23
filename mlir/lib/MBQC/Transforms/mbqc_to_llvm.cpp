@@ -58,10 +58,6 @@ struct MBQCConversionPass : impl::MBQCConversionPassBase<MBQCConversionPass> {
 
         LLVMConversionTarget target(*context);
         target.addIllegalDialect<catalyst::mbqc::MBQCDialect>();
-        target.addLegalDialect<catalyst::quantum::QuantumDialect>();
-        target.addLegalDialect<mlir::func::FuncDialect>();
-        target.addLegalDialect<arith::ArithDialect>();
-        target.addLegalDialect<scf::SCFDialect>();
 
         if (failed(applyPartialConversion(getOperation(), target, std::move(patterns)))) {
             signalPassFailure();
