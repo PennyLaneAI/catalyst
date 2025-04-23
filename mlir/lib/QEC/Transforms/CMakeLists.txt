@@ -8,6 +8,8 @@ file(GLOB SRC
     commute_clifford_t_ppr.cpp
     CommuteCliffordPastPPM.cpp
     commute_clifford_past_ppm.cpp
+    decompose_non_clifford_ppr_to_ppm.cpp
+    DecomposeNonCliffordPPRToPPM.cpp
 )
 
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)

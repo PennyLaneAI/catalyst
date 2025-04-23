@@ -1,0 +1,232 @@
+// Copyright 2025 Xanadu Quantum Technologies Inc.
+
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+
+//     http://www.apache.org/licenses/LICENSE-2.0
+
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+#define DEBUG_TYPE "decompose_non_clifford_ppr_to_ppm"
+#include <llvm/ADT/SmallVector.h>
+
+#include <mlir/Dialect/Arith/IR/Arith.h> // for arith::AndIOp and arith::ConstantOp
+
+#include "QEC/IR/QECDialect.h"
+#include "QEC/Transforms/Patterns.h"
+#include "Quantum/IR/QuantumOps.h"
+
+using namespace mlir;
+using namespace catalyst::qec;
+using namespace catalyst::quantum;
+
+namespace {
+
+// build quantum.alloc operation.
+AllocOp buildAllocQreg(Location loc, int64_t size, PatternRewriter &rewriter)
+{
+    IntegerType intType = rewriter.getI64Type();
+    QuregType qregType = QuregType::get(rewriter.getContext());
+
+    TypedAttr typeAttr = rewriter.getIntegerAttr(intType, size);
+    IntegerAttr intAttr{};
+
+    auto intVal = rewriter.create<arith::ConstantOp>(loc, typeAttr);
+    return rewriter.create<AllocOp>(loc, qregType, intVal, intAttr);
+}
+
+ExtractOp buildExtractOp(Value qreg, Location loc, int64_t position, PatternRewriter &rewriter)
+{
+    auto idxAttr = rewriter.getI64IntegerAttr(position);
+    auto type = rewriter.getType<QubitType>();
+    return rewriter.create<ExtractOp>(loc, type, qreg, nullptr, idxAttr);
+}
+
+SmallVector<StringRef> extractPauliString(QECOpInterface op)
+{
+    SmallVector<StringRef> pauliWord;
+    for (auto pauli : op.getPauliProduct()) {
+        pauliWord.emplace_back(mlir::cast<mlir::StringAttr>(pauli).getValue());
+    }
+    return pauliWord;
+}
+
+/// Decompose the Non-Clifford (pi/8) PPR into PPR and PPMs operations via auto corrected method
+/// as described in Figure 11(b) in the paper: https://arxiv.org/abs/1808.02892
+///
+/// ─────┌───┐───────
+/// ─────│ P │(π/8)──
+/// ─────└───┘───────
+///
+/// into
+///
+/// ─────┌───┐────────────────┌───────┐──
+/// ─────| P |────────────────| P(π/2)|──
+/// ─────|   |────────────────└───╦───┘──
+///      |   ╠═══════════╗        ║
+///      |   |  ┌───┐    ║  ┌───┐ ║
+/// |m⟩──| Z |──| Z |────║──| X ╠═╣
+///      └───┘  |   |    ║  └───┘ ║
+///             |   ╠═════════════╝
+///             |   |    ║  ┌───┐
+/// |0⟩─────────| Y |────╚══╣X/Z|
+///             └───┘       └───┘
+/// All the operations in second diagram are PPM except for the last PPR P(π/2)
+///
+/// Details:
+/// - If P⊗Z measurement yields -1 then apply X, otherwise apply Z
+///   * The measurement results are stored as i1 values, -1 is true and 1 is false
+/// - If Z⊗Y and X measurement yield different result, then apply P(π/2) on the input qubits
+void decompose_auto_corrected_pi_over_eight(PPRotationOp op, PatternRewriter &rewriter)
+{
+    auto loc = op.getLoc();
+
+    // Allocate two axillary qubits
+    Value axillary_qubits = buildAllocQreg(loc, 2, rewriter);
+    ExtractOp zOp = buildExtractOp(axillary_qubits, loc, 0, rewriter);
+    ExtractOp mOp = buildExtractOp(axillary_qubits, loc, 1, rewriter);
+
+    // Prepare |0⟩ and |m⟩
+    auto zero = rewriter.create<PrepareStateOp>(loc, LogicalInitKind::zero, zOp->getResults());
+    auto magic = rewriter.create<PrepareStateOp>(loc, LogicalInitKind::magic, mOp->getResults());
+
+    SmallVector<StringRef> pauliP = extractPauliString(op);
+    SmallVector<Value> inQubits = op.getInQubits(); // [input qubits]
+
+    // PPM (P⊗Z) on input qubits and |m⟩
+    // extend the pi/8 P with Z -> P⊗Z
+    SmallVector<StringRef> extPauliP = pauliP;
+    extPauliP.emplace_back("Z");                    // extend Z for the axillary qubit
+    inQubits.emplace_back(magic.getOutQubits()[0]); // [input qubits, |m⟩]
+    auto ppmPZ = rewriter.create<PPMeasurementOp>(loc, extPauliP, inQubits); // [input qubits, |m⟩]
+
+    // PPM (Z⊗Y) on qubits |0⟩ and |m⟩
+    SmallVector<Value> axillaryQubits = {zero.getOutQubits().front(), ppmPZ.getOutQubits().back()};
+    ArrayRef<StringRef> pauliZY = {"Z", "Y"};
+    auto ppmZY = rewriter.create<PPMeasurementOp>(loc, pauliZY, axillaryQubits); // [|0⟩, |m⟩]
+
+    // PPM (X) on qubit |m⟩
+    ArrayRef<StringRef> pauliX = {"X"};
+    auto pprX = rewriter.create<PPMeasurementOp>(loc, pauliX, ppmZY.getOutQubits().back()); // |m⟩
+
+    // PPM (X/Z) based on the result of PPM (P⊗Z) on qubit |0⟩
+    ArrayRef<StringRef> pauliZ = {"Z"};
+    rewriter.create<SelectPPMeasurementOp>(loc, ppmPZ.getMres(), pauliX, pauliZ,
+                                           ppmZY.getOutQubits().front()); // |0⟩
+
+    // ANDi of the results of PPM (P⊗Z) and PPM (X)
+    auto condOp = rewriter.create<arith::AndIOp>(loc, ppmZY.getMres(), pprX.getMres());
+
+    // PPR P(π/2) based on the result of ANDi on input qubits
+    SmallVector<Value> outPZQubits = ppmPZ.getOutQubits();
+    outPZQubits.pop_back();
+    auto pprPI2 = rewriter.create<PPRotationOp>(loc, pauliP, 2, outPZQubits, condOp.getResult());
+
+    // Free axillary qubits
+    rewriter.create<DeallocOp>(loc, axillary_qubits);
+
+    rewriter.replaceOp(op, pprPI2.getOutQubits());
+}
+
+/// Decompose the Non-Clifford (pi/8) PPR into PPR and PPMs operations via inject magic state method
+/// as described in Figure 7 in the paper: https://arxiv.org/abs/1808.02892
+///
+/// ─────┌───┐───────
+/// ─────│ P │(π/8)──
+/// ─────└───┘───────
+///
+/// into
+///
+/// ─────┌───┐────┌───────┐─────┌───────┐──
+/// ─────| P |────| P(π/4)|─────| P(π/2)|──
+/// ─────|   |────└───╦───┘─────└───╦───┘──
+///      |   ╠════════╝             ║
+///      |   |        ┌───┐         ║
+/// |m⟩──| Z |────────| X ╠═════════╝
+///      └───┘        └───┘
+/// All the operations in second diagram are PPM except for the last PPR P(π/2) and P(π/4)
+///
+/// Details:
+/// - If P⊗Z measurement yields -1 then apply P(π/4)
+///   * The measurement results are stored as i1 values, -1 is true and 1 is false
+/// - If X measurement yields -1 then apply P(π/2)
+void decompose_inject_magic_state_pi_over_eight(PPRotationOp op, PatternRewriter &rewriter)
+{
+    auto loc = op.getLoc();
+
+    // Allocate 1 axillary qubit
+    Value axillary_qubit = buildAllocQreg(loc, 1, rewriter);
+    ExtractOp mOp = buildExtractOp(axillary_qubit, loc, 0, rewriter);
+
+    // Prepare magic state |m⟩
+    auto magic = rewriter.create<PrepareStateOp>(loc, LogicalInitKind::magic, mOp->getResults());
+
+    SmallVector<StringRef> pauliP = extractPauliString(op); // [P]
+    SmallVector<Value> inQubits = op.getInQubits();         // [input qubits]
+
+    // PPM (P⊗Z) on input qubits and |m⟩
+    SmallVector<StringRef> extendedPauliP = pauliP;
+    extendedPauliP.emplace_back("Z");               // extend Z for the axillary qubit -> [P, Z]
+    inQubits.emplace_back(magic.getOutQubits()[0]); // [input qubits, |m⟩]
+    auto ppmPZ = rewriter.create<PPMeasurementOp>(loc, extendedPauliP, inQubits);
+
+    // PPR P(π/4) on input qubits if PPM (P⊗Z) yields -1
+    SmallVector<Value> outPZQubits = ppmPZ.getOutQubits(); // [input qubits, |m⟩]
+    outPZQubits.pop_back();                                // [input qubits]
+    auto pprPI4 = rewriter.create<PPRotationOp>(loc, pauliP, 4, outPZQubits, ppmPZ.getMres());
+
+    // PPM (X) on |m⟩
+    SmallVector<StringRef> pauliX = {"X"};
+    auto ppmX = rewriter.create<PPMeasurementOp>(loc, pauliX, ppmPZ.getOutQubits().back());
+
+    // PPR P(π/2) on input qubits if PPM (X) yields -1
+    auto pprPI2 =
+        rewriter.create<PPRotationOp>(loc, pauliP, 2, pprPI4.getOutQubits(), ppmX.getMres());
+
+    // Free axillary qubit
+    rewriter.create<DeallocOp>(loc, axillary_qubit);
+
+    rewriter.replaceOp(op, pprPI2.getOutQubits());
+}
+
+struct DecomposeNonCliffordPPRToPPM : public OpRewritePattern<PPRotationOp> {
+    using OpRewritePattern::OpRewritePattern;
+
+    enum class DecompositionMethod { InjectMagicState, AutoCorrected };
+
+    LogicalResult matchAndRewrite(PPRotationOp op, PatternRewriter &rewriter) const override
+    {
+        // TODO: Make this configurable
+        DecompositionMethod method = DecompositionMethod::AutoCorrected;
+        // TODO: PPR can't has condition. Msg to user about this.
+        if (op.isNonClifford()) {
+            switch (method) {
+            case DecompositionMethod::AutoCorrected:
+                decompose_auto_corrected_pi_over_eight(op, rewriter);
+                break;
+            case DecompositionMethod::InjectMagicState:
+                decompose_inject_magic_state_pi_over_eight(op, rewriter);
+                break;
+            }
+            return success();
+        }
+        return failure();
+    }
+};
+} // namespace
+
+namespace catalyst {
+namespace qec {
+
+void populateDecomposeNonCliffordPPRToPPMPatterns(RewritePatternSet &patterns)
+{
+    patterns.add<DecomposeNonCliffordPPRToPPM>(patterns.getContext(), 1);
+}
+
+} // namespace qec
+} // namespace catalyst
