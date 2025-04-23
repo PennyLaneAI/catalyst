@@ -63,6 +63,7 @@
 * Catalyst now includes an experimental `mbqc` dialect for representing measurement-based
   quantum-computing protocols in MLIR.
   [(#1663)](https://github.com/PennyLaneAI/catalyst/pull/1663)
+  [(#1674)](https://github.com/PennyLaneAI/catalyst/pull/1674)
 
 <h3>Documentation 📝</h3>
 
