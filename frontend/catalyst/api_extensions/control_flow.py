@@ -725,7 +725,10 @@ class CondCallable:
 
         def _trace(branch_fn):
             _, in_sig, out_sig = trace_function(
-                branch_fn, *(), expansion_strategy=cond_expansion_strategy()
+                branch_fn,
+                *(),
+                expansion_strategy=cond_expansion_strategy(),
+                debug_info=debug_info("cond_classical_call", branch_fn, [], {}),
             )
             return in_sig, out_sig
 
@@ -971,6 +974,9 @@ class ForLoopCallable:
             self.body_fn,
             *(aux_tracers[0], *init_state),
             expansion_strategy=self.expansion_strategy,
+            debug_info=debug_info(
+                "forloop_classical_call", self.body_fn, (aux_tracers[0], *init_state), {}
+            ),
         )
 
         in_expanded_tracers = [
@@ -1159,10 +1165,16 @@ class WhileLoopCallable:
 
     def _call_with_classical_ctx(self, *init_state):
         _, _, out_cond_sig = trace_function(
-            self.cond_fn, *init_state, expansion_strategy=self.expansion_strategy
+            self.cond_fn,
+            *init_state,
+            expansion_strategy=self.expansion_strategy,
+            debug_info=debug_info("whileloop_classical_call_cond_fn", self.cond_fn, init_state, {}),
         )
         _, in_body_sig, out_body_sig = trace_function(
-            self.body_fn, *init_state, expansion_strategy=self.expansion_strategy
+            self.body_fn,
+            *init_state,
+            expansion_strategy=self.expansion_strategy,
+            debug_info=debug_info("whileloop_classical_call_body_fn", self.body_fn, init_state, {}),
         )
 
         _check_single_bool_value(out_cond_sig.out_tree(), out_cond_sig.out_jaxpr().out_avals)
