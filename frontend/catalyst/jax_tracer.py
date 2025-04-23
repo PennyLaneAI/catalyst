@@ -1237,7 +1237,11 @@ def trace_function(
         OutputSignature of the resulting Jaxpr program
     """
     wfun, in_sig, out_sig = deduce_signatures(
-        fun, args, kwargs, expansion_strategy=expansion_strategy
+        fun,
+        args,
+        kwargs,
+        expansion_strategy=expansion_strategy,
+        debug_info=kwargs.pop("debug_info", None),
     )
 
     with EvaluationContext.frame_tracing_context() as trace:
