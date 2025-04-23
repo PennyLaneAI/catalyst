@@ -57,15 +57,16 @@ def QECDialect : Dialect {
 //===----------------------------------------------------------------------===//
 
 def LogicalInitKind : I32EnumAttr<"LogicalInitKind",
-    "The initial state of a logical qubit such as |0⟩, |1⟩, |+⟩, |−⟩, |Y⟩, |-Y⟩, or |T⟩.",
-        [
+    "The initial state of a logical qubit such as |0⟩, |1⟩, |+⟩, |−⟩, |Y⟩, |-Y⟩, |m⟩, or |m̅⟩.",
+    [
         I32EnumAttrCase<"zero",     0>, // |0⟩
         I32EnumAttrCase<"one",      1>, // |1⟩
         I32EnumAttrCase<"plus",     2>, // |+⟩  = (|0⟩ + |1⟩) / sqrt(2)
         I32EnumAttrCase<"minus",    3>, // |-⟩  = (|0⟩ - |1⟩) / sqrt(2)
-        I32EnumAttrCase<"plus_i",   4>, // |Y⟩ = (|0⟩ + i|1⟩) / sqrt(2)
+        I32EnumAttrCase<"plus_i",   4>, // |Y⟩  = (|0⟩ + i|1⟩) / sqrt(2)
         I32EnumAttrCase<"minus_i",  5>, // |-Y⟩ = (|0⟩ - i|1⟩) / sqrt(2)
-        I32EnumAttrCase<"magic",    6>, // |T⟩  = |0⟩ + e^{iπ/4}|1⟩
+        I32EnumAttrCase<"magic",    6>, // |m⟩  = |0⟩ + e^{iπ/4}|1⟩
+        I32EnumAttrCase<"magic_conj", 7>, // |m̅⟩  = |0⟩ + e^{-iπ/4}|1⟩
     ]> {
     let cppNamespace = "::catalyst::qec";
     let genSpecializedAttr = 0;

@@ -16,10 +16,10 @@
 #include "llvm/Support/Debug.h"
 
 #include "mlir/IR/PatternMatch.h"
-#include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include "QEC/IR/QECDialect.h"
+#include "QEC/Transforms/Passes.h"
 #include "QEC/Transforms/Patterns.h"
 
 using namespace llvm;
@@ -41,7 +41,7 @@ struct DecomposeNonCliffordPPRToPPMPass
     {
         RewritePatternSet patterns(&getContext());
 
-        populateDecomposeNonCliffordPPRToPPMPatterns(patterns);
+        populateDecomposeNonCliffordPPRToPPMPatterns(patterns, decomposeMethod);
 
         if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
             return signalPassFailure();

@@ -56,6 +56,15 @@ SmallVector<StringRef> extractPauliString(QECOpInterface op)
     return pauliWord;
 }
 
+LogicalInitKind getMagicState(PPRotationOp op)
+{
+    int16_t rotationKind = static_cast<int16_t>(op.getRotationKind());
+    if (rotationKind > 0) {
+        return LogicalInitKind::magic;
+    }
+    return LogicalInitKind::magic_conj;
+}
+
 /// Decompose the Non-Clifford (pi/8) PPR into PPR and PPMs operations via auto corrected method
 /// as described in Figure 11(b) in the paper: https://arxiv.org/abs/1808.02892
 ///
@@ -77,6 +86,7 @@ SmallVector<StringRef> extractPauliString(QECOpInterface op)
 /// |0⟩─────────| Y |────╚══╣X/Z|
 ///             └───┘       └───┘
 /// All the operations in second diagram are PPM except for the last PPR P(π/2)
+/// For P(-π/8) we need to use complex conjugate|M̅⟩ as the magic state.
 ///
 /// Details:
 /// - If P⊗Z measurement yields -1 then apply X, otherwise apply Z
@@ -93,7 +103,7 @@ void decompose_auto_corrected_pi_over_eight(PPRotationOp op, PatternRewriter &re
 
     // Prepare |0⟩ and |m⟩
     auto zero = rewriter.create<PrepareStateOp>(loc, LogicalInitKind::zero, zOp->getResults());
-    auto magic = rewriter.create<PrepareStateOp>(loc, LogicalInitKind::magic, mOp->getResults());
+    auto magic = rewriter.create<PrepareStateOp>(loc, getMagicState(op), mOp->getResults());
 
     SmallVector<StringRef> pauliP = extractPauliString(op);
     SmallVector<Value> inQubits = op.getInQubits(); // [input qubits]
@@ -119,10 +129,10 @@ void decompose_auto_corrected_pi_over_eight(PPRotationOp op, PatternRewriter &re
     rewriter.create<SelectPPMeasurementOp>(loc, ppmPZ.getMres(), pauliX, pauliZ,
                                            ppmZY.getOutQubits().front()); // |0⟩
 
-    // ANDi of the results of PPM (P⊗Z) and PPM (X)
-    auto condOp = rewriter.create<arith::AndIOp>(loc, ppmZY.getMres(), pprX.getMres());
+    // XOR of the results of PPM (P⊗Z) and PPM (X)
+    auto condOp = rewriter.create<arith::XOrIOp>(loc, ppmZY.getMres(), pprX.getMres());
 
-    // PPR P(π/2) based on the result of ANDi on input qubits
+    // PPR P(π/2) based on the result of XOR on input qubits
     SmallVector<Value> outPZQubits = ppmPZ.getOutQubits();
     outPZQubits.pop_back();
     auto pprPI2 = rewriter.create<PPRotationOp>(loc, pauliP, 2, outPZQubits, condOp.getResult());
@@ -150,6 +160,7 @@ void decompose_auto_corrected_pi_over_eight(PPRotationOp op, PatternRewriter &re
 /// |m⟩──| Z |────────| X ╠═════════╝
 ///      └───┘        └───┘
 /// All the operations in second diagram are PPM except for the last PPR P(π/2) and P(π/4)
+/// For P(-π/8) we need to use complex conjugate|M̅⟩ as the magic state.
 ///
 /// Details:
 /// - If P⊗Z measurement yields -1 then apply P(π/4)
@@ -164,7 +175,7 @@ void decompose_inject_magic_state_pi_over_eight(PPRotationOp op, PatternRewriter
     ExtractOp mOp = buildExtractOp(axillary_qubit, loc, 0, rewriter);
 
     // Prepare magic state |m⟩
-    auto magic = rewriter.create<PrepareStateOp>(loc, LogicalInitKind::magic, mOp->getResults());
+    auto magic = rewriter.create<PrepareStateOp>(loc, getMagicState(op), mOp->getResults());
 
     SmallVector<StringRef> pauliP = extractPauliString(op); // [P]
     SmallVector<Value> inQubits = op.getInQubits();         // [input qubits]
@@ -197,14 +208,17 @@ void decompose_inject_magic_state_pi_over_eight(PPRotationOp op, PatternRewriter
 struct DecomposeNonCliffordPPRToPPM : public OpRewritePattern<PPRotationOp> {
     using OpRewritePattern::OpRewritePattern;
 
-    enum class DecompositionMethod { InjectMagicState, AutoCorrected };
+    DecompositionMethod method;
+
+    DecomposeNonCliffordPPRToPPM(MLIRContext *context, DecompositionMethod method,
+                                 PatternBenefit benefit = 1)
+        : OpRewritePattern(context, benefit), method(method)
+    {
+    }
 
     LogicalResult matchAndRewrite(PPRotationOp op, PatternRewriter &rewriter) const override
     {
-        // TODO: Make this configurable
-        DecompositionMethod method = DecompositionMethod::AutoCorrected;
-        // TODO: PPR can't has condition. Msg to user about this.
-        if (op.isNonClifford()) {
+        if (op.isNonClifford() && !op.getCondition()) {
             switch (method) {
             case DecompositionMethod::AutoCorrected:
                 decompose_auto_corrected_pi_over_eight(op, rewriter);
@@ -223,9 +237,10 @@ struct DecomposeNonCliffordPPRToPPM : public OpRewritePattern<PPRotationOp> {
 namespace catalyst {
 namespace qec {
 
-void populateDecomposeNonCliffordPPRToPPMPatterns(RewritePatternSet &patterns)
+void populateDecomposeNonCliffordPPRToPPMPatterns(RewritePatternSet &patterns,
+                                                  DecompositionMethod decomposeMethod)
 {
-    patterns.add<DecomposeNonCliffordPPRToPPM>(patterns.getContext(), 1);
+    patterns.add<DecomposeNonCliffordPPRToPPM>(patterns.getContext(), decomposeMethod, 1);
 }
 
 } // namespace qec

@@ -16,6 +16,7 @@
 #define QEC_PASSES
 
 include "mlir/Pass/PassBase.td"
+include "mlir/IR/EnumAttr.td"
 
 def CliffordTToPPRPass : Pass<"to_ppr"> {
     let summary = "Convert quantum dialects to the QEC dialect.";
@@ -45,6 +46,41 @@ def CommuteCliffordPastPPMPass : Pass<"ppr_to_ppm"> {
     ];
     
     let constructor = "catalyst::createCommuteCliffordPastPPMPass()";
+}
+
+def DecompositionMethod : I32EnumAttr<"DecompositionMethod", "Decomposition method", 
+    [
+    I32EnumAttrCase<"AutoCorrected", 0, "auto-corrected">,
+    I32EnumAttrCase<"InjectMagicState", 1, "inject-magic-state">
+    ]> { 
+    let cppNamespace = "catalyst::qec";
+    let genSpecializedAttr = 0; 
+}
+
+def DecomposeNonCliffordPPRToPPMPass : Pass<"decompose_non_clifford_ppr_to_ppm"> {
+    let summary = "Decompose non-Clifford PPRotation operations to set of Pauli Product Measurement operations.";
+    
+    let dependentDialects = [
+        "catalyst::qec::QECDialect",
+    ];
+
+    let constructor = "catalyst::createDecomposeNonCliffordPPRToPPMPass()";
+
+    let options = [
+       Option<
+          /*C++ var name=*/"decomposeMethod",
+          /*CLI arg name=*/"decompose-method",
+          /*type=*/"::catalyst::qec::DecompositionMethod",
+          /*default=*/"::catalyst::qec::DecompositionMethod::AutoCorrected",
+          "Decomposition method to use",
+          [{::llvm::cl::values(
+                clEnumValN(::catalyst::qec::DecompositionMethod::AutoCorrected,
+                           "auto-corrected", "Decompose using auto-corrected method."),
+                clEnumValN(::catalyst::qec::DecompositionMethod::InjectMagicState,
+                           "inject-magic-state",
+                           "Decompose by injecting magic states method.")
+          )}]>
+    ];
 }
 
 #endif // QEC_PASSES
