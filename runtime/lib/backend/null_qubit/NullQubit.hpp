@@ -30,9 +30,9 @@
 #include "Utils.hpp"
 
 namespace {
-    // The name of the file where the resource usage data is stored
-    constexpr char RESOURCES_FNAME[] = "__pennylane_resources_data.json";
-}
+// The name of the file where the resource usage data is stored
+constexpr char RESOURCES_FNAME[] = "__pennylane_resources_data.json";
+} // namespace
 namespace Catalyst::Runtime::Devices {
 
 /**
