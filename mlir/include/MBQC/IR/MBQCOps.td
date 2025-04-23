@@ -62,6 +62,16 @@ def MeasureInBasisOp : MBQC_Op<"measure_in_basis"> {
         computational basis only. Specifically, the measurement basis is parameterized by a plane
         along the major axes of the Bloch sphere (either XY, YZ or ZX) and a rotation angle about
         that plane.
+
+        The convention we have adopted to denote the measurement plane is with a two-character
+        string (one of "XY", "YZ" or "ZX"), where the first character indicates the axis along which
+        the basis vector is aligned for a rotation angle of 0, and the second character indicates
+        the other axis that forms the plane. For instance, the measurement basis defined by the XY
+        plane with a rotation angle of 0 is the Pauli-X basis, with orthonormal basis vector |+> and
+        |->, which point along the +x and -x axes of the Bloch sphere, respectively. For more
+        details, see the documentation for the [`qml.ftqc.measure_arbitrary_basis()`
+        ](https://docs.pennylane.ai/en/stable/code/api/pennylane.ftqc.measure_arbitrary_basis.html)
+        function.
     }];
 
     let arguments = (ins
