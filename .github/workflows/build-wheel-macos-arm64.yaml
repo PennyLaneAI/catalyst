@@ -33,7 +33,7 @@ env:
   # If the `inputs.build_standalone_plugin` is set to a value (true/false), then that is used.
   # If the input is empty (meaning this workflow was not triggered by a workflow_call/workflow_dispatch), then check if event_name is schedule.
   # If event_name is NOT schedule, default to false
-  BUILD_STANDALONE_PLUGIN: ${{ (inputs.build_standalone_plugin == true || inputs.build_standalone_plugin == 'true') && 'true' || (github.event_name == 'schedule' && 'true') || 'false' }}
+  BUILD_STANDALONE_PLUGIN: ${{ inputs.build_standalone_plugin != '' && format('{0}', inputs.build_standalone_plugin) || github.event_name == 'schedule' && 'true' || 'false' }}
 
 concurrency:
   group: Build Catalyst Wheel on macOS (arm64)-${{ github.ref }}
