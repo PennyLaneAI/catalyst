@@ -304,7 +304,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      *
      * Always fills array of samples with 0.
      */
-    void Sample(DataView<double, 2> &samples, size_t)
+    void Sample(DataView<double, 2> &samples)
     {
         // If num_qubits == 0, the samples array is unallocated (shape=(shots, 0)), so don't fill
         if (num_qubits_ > 0) {
@@ -314,7 +314,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
 
     /**
      * @brief Doesn't Compute partial samples with the number of shots on `wires`,
-     * returing raw samples.
+     * returning raw samples.
      *
      * Same behaviour as Sample().
      *
@@ -322,9 +322,9 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      * shape `shots * numWires`. The built-in iterator in `DataView<double, 2>`
      * iterates over all elements of `samples` row-wise.
      */
-    void PartialSample(DataView<double, 2> &samples, const std::vector<QubitIdType> &, size_t)
+    void PartialSample(DataView<double, 2> &samples, const std::vector<QubitIdType> &)
     {
-        Sample(samples, 0U);
+        Sample(samples);
     }
 
     /**
@@ -334,14 +334,14 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      * Always fills eigenvalues with integers ranging from 0, 1, ..., 2**num_qubits
      * Always sets the first element of counts to `shots` and fills the rest with 0.
      */
-    void Counts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts, size_t shots)
+    void Counts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts)
     {
         auto iter_eigvals = eigvals.begin();
         *iter_eigvals = 0.0;
         ++iter_eigvals;
 
         auto iter_counts = counts.begin();
-        *iter_counts = shots;
+        *iter_counts = GetDeviceShots();
         ++iter_counts;
 
         if (num_qubits_ > 0) {
@@ -357,9 +357,9 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      * Same behaviour as Counts().
      */
     void PartialCounts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts,
-                       const std::vector<QubitIdType> &, size_t shots)
+                       const std::vector<QubitIdType> &)
     {
-        Counts(eigvals, counts, shots);
+        Counts(eigvals, counts);
     }
 
     /**

@@ -83,7 +83,7 @@ void OQCDevice::NamedOperation(const std::string &name, const std::vector<double
 }
 
 void OQCDevice::PartialCounts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts,
-                              const std::vector<QubitIdType> &wires, size_t shots)
+                              const std::vector<QubitIdType> &wires)
 {
     const size_t numQubits = GetNumQubits();
     // Add the measurements on the given wires
@@ -92,7 +92,7 @@ void OQCDevice::PartialCounts(DataView<double, 1> &eigvals, DataView<int64_t, 1>
     }
     std::iota(eigvals.begin(), eigvals.end(), 0);
 
-    auto &&results = runner->Counts(builder->toOpenQASM2(), "", shots, GetNumQubits());
+    auto &&results = runner->Counts(builder->toOpenQASM2(), "", device_shots, GetNumQubits());
 
     int i = 0;
     for (auto r : results) {
@@ -105,7 +105,7 @@ void OQCDevice::PartialCounts(DataView<double, 1> &eigvals, DataView<int64_t, 1>
 auto OQCDevice::AllocateQubit() -> QubitIdType { RT_FAIL("Unsupported functionality"); }
 void OQCDevice::PrintState() { RT_FAIL("Unsupported functionality"); }
 
-void OQCDevice::Counts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts, size_t shots)
+void OQCDevice::Counts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts)
 {
     RT_FAIL("Unsupported functionality");
 }
@@ -151,8 +151,8 @@ void OQCDevice::PartialProbs(DataView<double, 1> &, const std::vector<QubitIdTyp
 {
     RT_FAIL("Unsupported functionality");
 };
-void OQCDevice::Sample(DataView<double, 2> &, size_t) { RT_FAIL("Unsupported functionality"); };
-void OQCDevice::PartialSample(DataView<double, 2> &, const std::vector<QubitIdType> &, size_t)
+void OQCDevice::Sample(DataView<double, 2> &) { RT_FAIL("Unsupported functionality"); };
+void OQCDevice::PartialSample(DataView<double, 2> &, const std::vector<QubitIdType> &)
 {
     RT_FAIL("Unsupported functionality");
 }

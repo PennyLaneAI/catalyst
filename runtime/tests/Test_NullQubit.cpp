@@ -351,6 +351,8 @@ TEST_CASE("Test NullQubit measurement processes with num_qubits=0", "[NullQubit]
     constexpr size_t num_qubits = 0;
     constexpr size_t shots = 100;
 
+    sim->SetDeviceShots(shots);
+
     SECTION("State")
     {
         std::vector<std::complex<double>> state(1);
@@ -388,7 +390,7 @@ TEST_CASE("Test NullQubit measurement processes with num_qubits=0", "[NullQubit]
         size_t _strides[2] = {1, 1};
 
         DataView<double, 2> sample_view(_data_aligned, _offset, _sizes, _strides);
-        sim->Sample(sample_view, shots);
+        sim->Sample(sample_view);
 
         CHECK(sample_view.size() == 0);
     }
@@ -402,7 +404,7 @@ TEST_CASE("Test NullQubit measurement processes with num_qubits=0", "[NullQubit]
 
         DataView<double, 2> sample_view(_data_aligned, _offset, _sizes, _strides);
         std::vector<QubitIdType> wires;
-        sim->PartialSample(sample_view, wires, shots);
+        sim->PartialSample(sample_view, wires);
 
         CHECK(sample_view.size() == 0);
     }
@@ -413,7 +415,7 @@ TEST_CASE("Test NullQubit measurement processes with num_qubits=0", "[NullQubit]
         DataView<int64_t, 1> counts_view(counts);
         std::vector<double> eigvals(1);
         DataView<double, 1> eigvals_view(eigvals);
-        sim->Counts(eigvals_view, counts_view, shots);
+        sim->Counts(eigvals_view, counts_view);
 
         CHECK(eigvals_view(0) == Catch::Approx(0.0).margin(1e-5));
         CHECK(counts_view(0) == shots);
@@ -426,7 +428,7 @@ TEST_CASE("Test NullQubit measurement processes with num_qubits=0", "[NullQubit]
         std::vector<double> eigvals(1);
         DataView<double, 1> eigvals_view(eigvals);
         std::vector<QubitIdType> wires;
-        sim->PartialCounts(eigvals_view, counts_view, wires, shots);
+        sim->PartialCounts(eigvals_view, counts_view, wires);
 
         CHECK(eigvals_view(0) == Catch::Approx(0.0).margin(1e-5));
         CHECK(counts_view(0) == shots);
@@ -439,6 +441,8 @@ TEST_CASE("Test NullQubit measurement processes with num_qubits=1", "[NullQubit]
 
     constexpr size_t num_qubits = 1;
     constexpr size_t shots = 100;
+
+    sim->SetDeviceShots(shots);
 
     std::vector<QubitIdType> Qs;
     Qs.reserve(num_qubits);
@@ -485,7 +489,7 @@ TEST_CASE("Test NullQubit measurement processes with num_qubits=1", "[NullQubit]
         size_t _strides[2] = {1, 1};
 
         DataView<double, 2> sample_view(_data_aligned, _offset, _sizes, _strides);
-        sim->Sample(sample_view, shots);
+        sim->Sample(sample_view);
 
         CHECK(sample_view.size() == shots * num_qubits);
         CHECK(sample_view(0, 0) == 0.0);
@@ -500,7 +504,7 @@ TEST_CASE("Test NullQubit measurement processes with num_qubits=1", "[NullQubit]
 
         DataView<double, 2> sample_view(_data_aligned, _offset, _sizes, _strides);
         std::vector<QubitIdType> wires;
-        sim->PartialSample(sample_view, wires, shots);
+        sim->PartialSample(sample_view, wires);
 
         CHECK(sample_view.size() == shots * num_qubits);
         CHECK(sample_view(0, 0) == 0.0);
@@ -512,7 +516,7 @@ TEST_CASE("Test NullQubit measurement processes with num_qubits=1", "[NullQubit]
         DataView<int64_t, 1> counts_view(counts);
         std::vector<double> eigvals(2);
         DataView<double, 1> eigvals_view(eigvals);
-        sim->Counts(eigvals_view, counts_view, shots);
+        sim->Counts(eigvals_view, counts_view);
 
         CHECK(eigvals_view(0) == Catch::Approx(0.0).margin(1e-5));
         CHECK(eigvals_view(1) == Catch::Approx(1.0).margin(1e-5));
@@ -527,7 +531,7 @@ TEST_CASE("Test NullQubit measurement processes with num_qubits=1", "[NullQubit]
         std::vector<double> eigvals(2);
         DataView<double, 1> eigvals_view(eigvals);
         std::vector<QubitIdType> wires;
-        sim->PartialCounts(eigvals_view, counts_view, wires, shots);
+        sim->PartialCounts(eigvals_view, counts_view, wires);
 
         CHECK(eigvals_view(0) == Catch::Approx(0.0).margin(1e-5));
         CHECK(eigvals_view(1) == Catch::Approx(1.0).margin(1e-5));

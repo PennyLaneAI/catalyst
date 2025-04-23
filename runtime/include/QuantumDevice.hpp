@@ -380,9 +380,8 @@ struct QuantumDevice {
      * The result of this operation must be written into the `samples` argument buffer.
      *
      * @param samples The pre-allocated buffer for the measurement samples.
-     * @param shots The number of shots to use (deprecated).
      */
-    virtual void Sample(DataView<double, 2> &samples, size_t shots)
+    virtual void Sample(DataView<double, 2> &samples)
     {
         RT_FAIL("Sample is unsupported by device");
     }
@@ -394,10 +393,8 @@ struct QuantumDevice {
      *
      * @param samples The pre-allocated buffer for the measurement samples.
      * @param wires Qubits to compute samples for.
-     * @param shots The number of shots to use (deprecated).
      */
-    virtual void PartialSample(DataView<double, 2> &samples, const std::vector<QubitIdType> &wires,
-                               size_t shots)
+    virtual void PartialSample(DataView<double, 2> &samples, const std::vector<QubitIdType> &wires)
     {
         RT_FAIL("PartialSample is unsupported by device");
     }
@@ -433,9 +430,8 @@ struct QuantumDevice {
      *
      * @param eigvals The pre-allocated buffer for all measured states.
      * @param counts The pre-allocated buffer for all measured counts.
-     * @param shots The number of shots to use (deprecated).
      */
-    virtual void Counts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts, size_t shots)
+    virtual void Counts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts)
     {
         RT_FAIL("Counts is unsupported by device");
     }
@@ -448,10 +444,9 @@ struct QuantumDevice {
      * @param eigvals The pre-allocated buffer for all measured states.
      * @param counts The pre-allocated buffer for all measured counts.
      * @param wires Qubits to compute sample counts for.
-     * @param shots The number of shots to use (deprecated).
      */
     virtual void PartialCounts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts,
-                               const std::vector<QubitIdType> &wires, size_t shots)
+                               const std::vector<QubitIdType> &wires)
     {
         RT_FAIL("PartialCounts is unsupported by device");
     }

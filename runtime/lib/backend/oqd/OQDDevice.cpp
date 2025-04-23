@@ -79,7 +79,7 @@ void OQDDevice::NamedOperation(const std::string &name, const std::vector<double
 }
 
 void OQDDevice::PartialCounts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts,
-                              const std::vector<QubitIdType> &wires, size_t shots)
+                              const std::vector<QubitIdType> &wires)
 {
     // Note that we do not support this in OQD device.
     // This is a just a fake readout method for testing purposes.
@@ -90,7 +90,7 @@ void OQDDevice::PartialCounts(DataView<double, 1> &eigvals, DataView<int64_t, 1>
 
 void OQDDevice::PrintState() { RT_FAIL("Unsupported functionality"); }
 
-void OQDDevice::Counts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts, size_t shots)
+void OQDDevice::Counts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts)
 {
     RT_FAIL("Unsupported functionality");
 }
@@ -136,8 +136,8 @@ void OQDDevice::PartialProbs(DataView<double, 1> &, const std::vector<QubitIdTyp
 {
     RT_FAIL("Unsupported functionality");
 };
-void OQDDevice::Sample(DataView<double, 2> &, size_t) { RT_FAIL("Unsupported functionality"); };
-void OQDDevice::PartialSample(DataView<double, 2> &, const std::vector<QubitIdType> &, size_t)
+void OQDDevice::Sample(DataView<double, 2> &) { RT_FAIL("Unsupported functionality"); };
+void OQDDevice::PartialSample(DataView<double, 2> &, const std::vector<QubitIdType> &)
 {
     RT_FAIL("Unsupported functionality");
 }

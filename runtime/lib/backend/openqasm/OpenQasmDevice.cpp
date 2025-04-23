@@ -335,7 +335,7 @@ void OpenQasmDevice::PartialProbs([[maybe_unused]] DataView<double, 1> &probs,
     std::move(dv_probs.begin(), dv_probs.end(), probs.begin());
 }
 
-void OpenQasmDevice::Sample(DataView<double, 2> &samples, size_t shots)
+void OpenQasmDevice::Sample(DataView<double, 2> &samples)
 {
     std::string s3_folder_str{};
     if (device_kwargs.contains("s3_destination_folder")) {
@@ -357,7 +357,7 @@ void OpenQasmDevice::Sample(DataView<double, 2> &samples, size_t shots)
     const size_t numQubits = GetNumQubits();
 
     auto samplesIter = samples.begin();
-    for (size_t shot = 0; shot < shots; shot++) {
+    for (size_t shot = 0; shot < device_shots; shot++) {
         for (size_t wire = 0; wire < numQubits; wire++) {
             *(samplesIter++) = static_cast<double>(li_samples[shot * numQubits + wire]);
         }
@@ -365,14 +365,14 @@ void OpenQasmDevice::Sample(DataView<double, 2> &samples, size_t shots)
 }
 
 void OpenQasmDevice::PartialSample(DataView<double, 2> &samples,
-                                   const std::vector<QubitIdType> &wires, size_t shots)
+                                   const std::vector<QubitIdType> &wires)
 {
     const size_t numWires = wires.size();
     const size_t numQubits = GetNumQubits();
 
     RT_FAIL_IF(numWires > numQubits, "Invalid number of wires");
     RT_FAIL_IF(!isValidQubits(wires), "Invalid given wires to measure");
-    RT_FAIL_IF(samples.size() != shots * numWires,
+    RT_FAIL_IF(samples.size() != device_shots * numWires,
                "Invalid size for the pre-allocated partial-samples");
 
     // // get device wires
@@ -395,15 +395,14 @@ void OpenQasmDevice::PartialSample(DataView<double, 2> &samples,
                                        GetNumQubits(), s3_folder_str);
 
     auto samplesIter = samples.begin();
-    for (size_t shot = 0; shot < shots; shot++) {
+    for (size_t shot = 0; shot < device_shots; shot++) {
         for (auto wire : dev_wires) {
             *(samplesIter++) = static_cast<double>(li_samples[shot * numQubits + wire]);
         }
     }
 }
 
-void OpenQasmDevice::Counts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts,
-                            size_t shots)
+void OpenQasmDevice::Counts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts)
 {
     const size_t numQubits = GetNumQubits();
     const size_t numElements = 1U << numQubits;
@@ -430,7 +429,7 @@ void OpenQasmDevice::Counts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &
     std::iota(eigvals.begin(), eigvals.end(), 0);
     std::fill(counts.begin(), counts.end(), 0);
 
-    for (size_t shot = 0; shot < shots; shot++) {
+    for (size_t shot = 0; shot < device_shots; shot++) {
         std::bitset<52> basisState; // only 52 bits of precision in a double, TODO: improve
         size_t idx = numQubits;
         for (size_t wire = 0; wire < numQubits; wire++) {
@@ -441,7 +440,7 @@ void OpenQasmDevice::Counts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &
 }
 
 void OpenQasmDevice::PartialCounts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts,
-                                   const std::vector<QubitIdType> &wires, size_t shots)
+                                   const std::vector<QubitIdType> &wires)
 {
     const size_t numWires = wires.size();
     const size_t numQubits = GetNumQubits();
@@ -473,7 +472,7 @@ void OpenQasmDevice::PartialCounts(DataView<double, 1> &eigvals, DataView<int64_
     std::iota(eigvals.begin(), eigvals.end(), 0);
     std::fill(counts.begin(), counts.end(), 0);
 
-    for (size_t shot = 0; shot < shots; shot++) {
+    for (size_t shot = 0; shot < device_shots; shot++) {
         std::bitset<52> basisState; // only 52 bits of precision in a double, TODO: improve
         size_t idx = dev_wires.size();
         for (auto wire : dev_wires) {

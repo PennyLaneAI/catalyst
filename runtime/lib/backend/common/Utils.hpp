@@ -72,13 +72,12 @@
     void State(DataView<std::complex<double>, 1> &state) override;                                 \
     void Probs(DataView<double, 1> &probs) override;                                               \
     void PartialProbs(DataView<double, 1> &probs, const std::vector<QubitIdType> &wires) override; \
-    void Sample(DataView<double, 2> &samples, size_t shots) override;                              \
-    void PartialSample(DataView<double, 2> &samples, const std::vector<QubitIdType> &wires,        \
-                       size_t shots) override;                                                     \
-    void Counts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts, size_t shots)          \
+    void Sample(DataView<double, 2> &samples) override;                                            \
+    void PartialSample(DataView<double, 2> &samples, const std::vector<QubitIdType> &wires)        \
         override;                                                                                  \
+    void Counts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts) override;              \
     void PartialCounts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts,                 \
-                       const std::vector<QubitIdType> &wires, size_t shots) override;              \
+                       const std::vector<QubitIdType> &wires) override;                            \
     auto Measure(QubitIdType wire, std::optional<int32_t> postselect = std::nullopt)               \
         ->Result override;                                                                         \
     void Gradient(std::vector<DataView<double, 1>> &gradients,                                     \
