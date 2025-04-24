@@ -88,8 +88,6 @@ template <typename KernelType> void AssignKernelFn(typename KernelType::FnType *
 
 } // namespace jax
 
-
-
 namespace jax {
 
 // Copied from lapacke.h
