@@ -560,7 +560,6 @@ class TestHessenberg:
         assert jnp.allclose(Q_obs, Q_exp)
 
 
-@pytest.mark.skip(reason="lapack symbols undefined, WIP")
 class TestLU:
     """Test results of jax.scipy.linalg.lu are numerically correct when qjit compiled.
 
