@@ -14,4 +14,4 @@
 
 """MLIR Dialect for MBQC."""
 
-from ._mbqc_ops_gen import *  # noqa: F401
+from ._mbqc_ops_gen import *  # pragma: no cover
