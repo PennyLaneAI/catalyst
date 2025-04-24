@@ -19,29 +19,115 @@
 
 #include "Catalyst/IR/CatalystOps.h"
 #include "mhlo/IR/hlo_ops.h"
-
+#include "mlir/Dialect/Arith/IR/Arith.h"
+#include "llvm/Support/Debug.h"
 using namespace mlir;
 
 namespace catalyst {
 
-struct HloCustomCallOpRewritePattern : public mlir::OpRewritePattern<mhlo::CustomCallOp> {
+struct HloCustomCallLoweringPattern : public mlir::OpRewritePattern<mhlo::CustomCallOp> {
     using mlir::OpRewritePattern<mhlo::CustomCallOp>::OpRewritePattern;
 
-    mlir::LogicalResult matchAndRewrite(mhlo::CustomCallOp op,
-                                        mlir::PatternRewriter &rewriter) const override
+    LogicalResult matchAndRewrite(mhlo::CustomCallOp op, PatternRewriter &rewriter) const override
     {
+        LLVM_DEBUG(llvm::dbgs() << "DEBUG: matchAndRewrite1\n");
         StringRef calleeName = op.getCallTargetName();
         auto operands = op.getOperands();
         TypeRange resultsType = op.getResultTypes();
-        rewriter.replaceOpWithNewOp<catalyst::CustomCallOp>(op, resultsType, operands, calleeName,
-                                                            nullptr);
+        Location loc = op.getLoc();
+
+        SmallVector<Value> newOperands(operands.begin(), operands.end());
+
+        // Check if this is a FFI-style LAPACK function
+        bool isFFILapackFunction = calleeName.contains("lapack_") && calleeName.contains("_ffi");
+
+        auto makeConst = [&](int64_t val) -> Value {
+            auto type = RankedTensorType::get({}, rewriter.getI32Type());
+            auto attr = DenseElementsAttr::get(type, APInt(32, static_cast<uint64_t>(val)));
+            return rewriter.create<arith::ConstantOp>(loc, attr);
+        };
+
+        if (isFFILapackFunction) {
+            if (operands.empty()) {
+                LLVM_DEBUG(llvm::dbgs()
+                           << "DEBUG: No operands for FFI LAPACK function " << calleeName << "\n");
+                return failure();
+            }
+            LLVM_DEBUG(llvm::dbgs()
+                       << "DEBUG: Handling FFI LAPACK function " << calleeName << "\n");
+
+            // Extract tensor type and dimensions
+            if (auto tensorType = dyn_cast<RankedTensorType>(operands[0].getType())) {
+                auto shape = tensorType.getShape();
+                auto rank = shape.size();
+
+                if (rank < 2 ||
+                    llvm::any_of(shape, [](int64_t d) { return d == ShapedType::kDynamic; }))
+                    return failure(); // Bail out on dynamic shapes
+
+                // Add batch count and matrix dimensions as new operands
+                int64_t batch = 1;
+                for (size_t i = 0; i < rank - 2; ++i)
+                    batch *= shape[i];
+
+                int64_t rows = shape[rank - 2];
+                int64_t cols = shape[rank - 1];
+
+                newOperands.push_back(makeConst(batch));
+                newOperands.push_back(makeConst(rows));
+                newOperands.push_back(makeConst(cols));
+
+                LLVM_DEBUG(llvm::dbgs() << "DEBUG: Appended batch=" << batch << ", rows=" << rows
+                                        << ", cols=" << cols << "\n");
+            }
+
+            // Lower backend_config dictionary attributes to constants
+            if (auto configAttr = llvm::dyn_cast<DictionaryAttr>(op->getAttr("backend_config"))) {
+                LLVM_DEBUG(llvm::dbgs() << "DEBUG: Processing backend_config attributes\n");
+
+                // Process and add all attributes from configAttr as operands
+                for (auto attr : configAttr) {
+                    Attribute attrValue = attr.getValue();
+                    Value constVal;
+                    LLVM_DEBUG(llvm::dbgs()
+                               << "Adding attribute: " << attr.getName().strref() << "\n");
+
+                    if (auto intAttr = dyn_cast<IntegerAttr>(attrValue)) {
+                        auto type = RankedTensorType::get({}, intAttr.getType());
+                        constVal = rewriter.create<arith::ConstantOp>(
+                            loc, DenseElementsAttr::get(type, intAttr.getValue()));
+                    }
+                    else if (auto floatAttr = llvm::dyn_cast<FloatAttr>(attrValue)) {
+                        auto type = RankedTensorType::get({}, floatAttr.getType());
+                        constVal = rewriter.create<arith::ConstantOp>(
+                            loc, DenseElementsAttr::get(type, floatAttr.getValue()));
+                    }
+                    else if (auto boolAttr = llvm::dyn_cast<BoolAttr>(attrValue)) {
+                        auto type = RankedTensorType::get({}, rewriter.getI1Type());
+                        constVal = rewriter.create<arith::ConstantOp>(
+                            loc, DenseElementsAttr::get(type, boolAttr.getValue()));
+                    }
+                    else {
+                        LLVM_DEBUG(llvm::dbgs() << "Unsupported attribute type for: "
+                                                << attr.getName().strref() << "\n");
+                        return failure();
+                    }
+                    newOperands.push_back(constVal);
+                }
+            }
+        }
+
+        auto callTargetAttr = rewriter.getStringAttr(calleeName);
+        rewriter.replaceOpWithNewOp<CustomCallOp>(op, resultsType, newOperands, callTargetAttr,
+                                                  nullptr);
+
         return success();
     }
 };
 
 void populateHloCustomCallPatterns(RewritePatternSet &patterns)
 {
-    patterns.add<catalyst::HloCustomCallOpRewritePattern>(patterns.getContext(), 1);
+    patterns.add<HloCustomCallLoweringPattern>(patterns.getContext());
 }
 
 } // namespace catalyst
