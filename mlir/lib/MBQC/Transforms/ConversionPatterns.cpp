@@ -20,6 +20,8 @@
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Transforms/DialectConversion.h"
 
+#include "Catalyst/Utils/EnsureFunctionDeclaration.h"
+
 #include "MBQC/IR/MBQCOps.h"
 #include "MBQC/Transforms/Patterns.h"
 
@@ -31,26 +33,6 @@ using namespace catalyst::mbqc;
 using namespace catalyst::quantum;
 
 constexpr int32_t NO_POSTSELECT = -1;
-
-// NOTE: This function is duplicated in a number of places in the Catalyst codebase
-LLVM::LLVMFuncOp ensureFunctionDeclaration(PatternRewriter &rewriter, Operation *op,
-                                           StringRef fnSymbol, Type fnType)
-{
-    Operation *fnDecl = SymbolTable::lookupNearestSymbolFrom(op, rewriter.getStringAttr(fnSymbol));
-
-    if (!fnDecl) {
-        PatternRewriter::InsertionGuard insertGuard(rewriter);
-        ModuleOp mod = op->getParentOfType<ModuleOp>();
-        rewriter.setInsertionPointToStart(mod.getBody());
-
-        fnDecl = rewriter.create<LLVM::LLVMFuncOp>(op->getLoc(), fnSymbol, fnType);
-    }
-    else {
-        assert(isa<LLVM::LLVMFuncOp>(fnDecl) && "QIR function declaration is not a LLVMFuncOp");
-    }
-
-    return cast<LLVM::LLVMFuncOp>(fnDecl);
-}
 
 struct MeasureInBasisOpPattern : public OpConversionPattern<MeasureInBasisOp> {
     using OpConversionPattern::OpConversionPattern;
@@ -74,7 +56,8 @@ struct MeasureInBasisOpPattern : public OpConversionPattern<MeasureInBasisOp> {
         Type fnSignature =
             LLVM::LLVMFunctionType::get(conv->convertType(ResultType::get(ctx)), argSignatures);
 
-        LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, fnName, fnSignature);
+        LLVM::LLVMFuncOp fnDecl =
+            catalyst::ensureFunctionDeclaration(rewriter, op, fnName, fnSignature);
 
         // Extract the integer value for the plane attribute from its enum
         auto planeValueInt = static_cast<uint32_t>(op.getPlane());
