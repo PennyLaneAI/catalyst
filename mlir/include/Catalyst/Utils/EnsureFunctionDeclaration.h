@@ -12,12 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "mlir/IR/PatternMatch.h"
+#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 
 using namespace mlir;
 
 namespace catalyst {
 
+// When lowering custom dialects to the llvm dialect, we will generate calls to runtime CAPI
+// functions. This utility function will generate declarations for the CAPI functions in the llvm
+// dialect IR.
 LLVM::LLVMFuncOp ensureFunctionDeclaration(PatternRewriter &rewriter, Operation *op,
                                            StringRef fnSymbol, Type fnType);
 
