@@ -23,9 +23,8 @@ from catalyst import qjit
 
 # pylint: disable=too-many-lines
 
-pytestmark = pytest.mark.skip("lapack symbols undefined, WIP")
 
-
+@pytest.mark.skip(reason="lapack symbols undefined, WIP")
 class MatrixGenerator:
     """
     A class for generating random matrices.
@@ -388,6 +387,7 @@ class TestCholesky:
         assert jnp.allclose(U_obs, U_exp)
 
 
+@pytest.mark.skip(reason="lapack symbols undefined, WIP")
 class TestExpm:
     """Test results of jax.scipy.linalg.expm are numerically correct when qjit compiled.
 
@@ -471,6 +471,7 @@ class TestExpm:
         assert np.allclose(expmA_obs, expmA_exp)
 
 
+@pytest.mark.skip(reason="lapack symbols undefined, WIP")
 class TestFunmNumerical:
     """Test results of jax.scipy.linalg.funm are numerically correct when qjit compiled.
 
@@ -511,6 +512,7 @@ class TestFunmNumerical:
         assert jnp.allclose(fA_obs, fA_exp)
 
 
+@pytest.mark.skip(reason="lapack symbols undefined, WIP")
 class TestHessenberg:
     """Test results of jax.scipy.linalg.hessenberg are numerically correct when qjit compiled.
 
@@ -558,6 +560,7 @@ class TestHessenberg:
         assert jnp.allclose(Q_obs, Q_exp)
 
 
+@pytest.mark.skip(reason="lapack symbols undefined, WIP")
 class TestLU:
     """Test results of jax.scipy.linalg.lu are numerically correct when qjit compiled.
 
@@ -617,6 +620,7 @@ class TestLU:
         assert jnp.allclose(U_obs, U_exp)
 
 
+@pytest.mark.skip(reason="lapack symbols undefined, WIP")
 class TestLUSolve:
     """Test results of jax.scipy.linalg.lu_solve are numerically correct when qjit compiled.
 
@@ -668,6 +672,7 @@ class TestLUSolve:
         assert jnp.allclose(x_obs, x_exp)
 
 
+@pytest.mark.skip(reason="lapack symbols undefined, WIP")
 class TestPolar:
     """Test results of jax.scipy.linalg.polar are numerically correct when qjit compiled.
 
@@ -755,6 +760,7 @@ class TestPolar:
         assert jnp.allclose(P_obs, P_exp)
 
 
+@pytest.mark.skip(reason="lapack symbols undefined, WIP")
 class TestQR:
     """Test results of jax.scipy.linalg.qr are numerically correct when qjit compiled.
 
@@ -810,6 +816,7 @@ class TestQR:
         assert jnp.allclose(R_obs, R_exp)
 
 
+@pytest.mark.skip(reason="lapack symbols undefined, WIP")
 class TestSchur:
     """Test results of jax.scipy.linalg.schur are numerically correct when qjit compiled.
 
@@ -892,6 +899,7 @@ class TestSchur:
         assert jnp.allclose(Z_obs, Z_exp)
 
 
+@pytest.mark.skip(reason="lapack symbols undefined, WIP")
 class TestSolve:
     """Test results of jax.scipy.linalg.solve are numerically correct when qjit compiled.
 
@@ -971,6 +979,7 @@ class TestSolve:
         assert jnp.allclose(x_obs, x_exp)
 
 
+@pytest.mark.skip(reason="lapack symbols undefined, WIP")
 class TestSqrtm:
     """Test results of jax.scipy.linalg.sqrtm are numerically correct when qjit compiled.
 
@@ -1019,6 +1028,7 @@ class TestSqrtm:
         assert jnp.allclose(sqrtmA_obs, sqrtmA_exp)
 
 
+@pytest.mark.skip(reason="lapack symbols undefined, WIP")
 class TestSVD:
     """Test results of jax.scipy.linalg.svd are numerically correct when qjit compiled.
 
