@@ -38,6 +38,29 @@ def CommuteCliffordTPPRPass : Pass<"commute_ppr"> {
     let constructor = "catalyst::createCommuteCliffordTPPRPass()";
 }
 
+def DecompositionMethod : I32EnumAttr<"DecompositionMethod", "Decomposition method", 
+    [
+    I32EnumAttrCase<"AutoCorrected", 0, "auto-corrected">,
+    I32EnumAttrCase<"InjectMagicState", 1, "inject-magic-state">
+    ]> { 
+    let cppNamespace = "catalyst::qec";
+    let genSpecializedAttr = 0; 
+}
+
+def DecomposeMethodOption : Option<
+    /*C++ var name=*/"decomposeMethod",
+    /*CLI arg name=*/"decompose-method",
+    /*type=*/"::catalyst::qec::DecompositionMethod",
+    /*default=*/"::catalyst::qec::DecompositionMethod::AutoCorrected",
+    "Decomposition method to use",
+    [{::llvm::cl::values(
+        clEnumValN(::catalyst::qec::DecompositionMethod::AutoCorrected,
+                    "auto-corrected", "Decompose using auto-corrected method."),
+        clEnumValN(::catalyst::qec::DecompositionMethod::InjectMagicState,
+                    "inject-magic-state",
+                    "Decompose by injecting magic states method.")
+    ), ::llvm::cl::Optional}]>;
+
 def CommuteCliffordPastPPMPass : Pass<"ppr_to_ppm"> {
     let summary = "Absorb Clifford operations into Pauli Product Measurement operations.";
     
@@ -46,15 +69,6 @@ def CommuteCliffordPastPPMPass : Pass<"ppr_to_ppm"> {
     ];
     
     let constructor = "catalyst::createCommuteCliffordPastPPMPass()";
-}
-
-def DecompositionMethod : I32EnumAttr<"DecompositionMethod", "Decomposition method", 
-    [
-    I32EnumAttrCase<"AutoCorrected", 0, "auto-corrected">,
-    I32EnumAttrCase<"InjectMagicState", 1, "inject-magic-state">
-    ]> { 
-    let cppNamespace = "catalyst::qec";
-    let genSpecializedAttr = 0; 
 }
 
 def DecomposeNonCliffordPPRToPPMPass : Pass<"decompose_non_clifford_ppr_to_ppm"> {
@@ -66,21 +80,7 @@ def DecomposeNonCliffordPPRToPPMPass : Pass<"decompose_non_clifford_ppr_to_ppm">
 
     let constructor = "catalyst::createDecomposeNonCliffordPPRToPPMPass()";
 
-    let options = [
-       Option<
-          /*C++ var name=*/"decomposeMethod",
-          /*CLI arg name=*/"decompose-method",
-          /*type=*/"::catalyst::qec::DecompositionMethod",
-          /*default=*/"::catalyst::qec::DecompositionMethod::AutoCorrected",
-          "Decomposition method to use",
-          [{::llvm::cl::values(
-                clEnumValN(::catalyst::qec::DecompositionMethod::AutoCorrected,
-                           "auto-corrected", "Decompose using auto-corrected method."),
-                clEnumValN(::catalyst::qec::DecompositionMethod::InjectMagicState,
-                           "inject-magic-state",
-                           "Decompose by injecting magic states method.")
-          )}]>
-    ];
+    let options = [DecomposeMethodOption];
 }
 
 #endif // QEC_PASSES
