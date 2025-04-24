@@ -1247,7 +1247,7 @@ def trace_function(
         debug_info=kwargs.pop("debug_info", None),
     )
 
-    with EvaluationContext.frame_tracing_context() as trace:
+    with EvaluationContext.frame_tracing_context(debug_info=wfun.debug_info) as trace:
         arg_expanded_tracers = input_type_to_tracers(
             in_sig.in_type, trace.new_arg, trace.to_jaxpr_tracer
         )
