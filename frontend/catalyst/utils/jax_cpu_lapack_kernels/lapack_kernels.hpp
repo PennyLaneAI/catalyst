@@ -47,7 +47,6 @@
 
 #include <complex>
 #include <cstdint>
-#include <numeric>
 
 #ifdef USE_XLA_LIB
 #include "xla/service/custom_call_status.h"
@@ -107,7 +106,6 @@ template <typename T> struct ComplexTrsm {
     using FnType = void(const CBLAS_LAYOUT layout, const CBLAS_SIDE Side, const CBLAS_UPLO Uplo,
                         const CBLAS_TRANSPOSE TransA, const CBLAS_DIAG Diag, const int M,
                         const int N, const void *alpha, const void *A, const int lda, void *B,
-
                         const int ldb);
     static FnType *fn;
     static void Kernel(void *out, void **data, XlaCustomCallStatus *);
