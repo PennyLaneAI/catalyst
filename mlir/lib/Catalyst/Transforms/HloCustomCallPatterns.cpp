@@ -37,7 +37,7 @@ struct HloCustomCallLoweringPattern : public mlir::OpRewritePattern<mhlo::Custom
         Location loc = op.getLoc();
 
         SmallVector<Value> newOperands;
-        
+
         // Check if this is a FFI-style LAPACK function
         bool isFFILapackFunction = calleeName.contains("lapack_") && calleeName.contains("_ffi");
 
@@ -115,9 +115,9 @@ struct HloCustomCallLoweringPattern : public mlir::OpRewritePattern<mhlo::Custom
                 LLVM_DEBUG(llvm::dbgs() << "DEBUG: Appended batch=" << batch << ", rows=" << rows
                                         << ", cols=" << cols << "\n");
             }
-            
+
             newOperands.append(operands.begin(), operands.end());
-        } 
+        }
         else {
             newOperands = operands;
         }
