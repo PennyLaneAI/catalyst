@@ -30,7 +30,8 @@ namespace mbqc {
 #define GEN_PASS_DEF_MBQCCONVERSIONPASS
 #include "MBQC/Transforms/Passes.h.inc"
 
-struct MBQCTypeConverter : public LLVMTypeConverter {
+class MBQCTypeConverter : public LLVMTypeConverter {
+  public:
     MBQCTypeConverter(MLIRContext *ctx) : LLVMTypeConverter(ctx)
     {
         addConversion([&](quantum::QubitType type) { return convertQubitType(type); });
