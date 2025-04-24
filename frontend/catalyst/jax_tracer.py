@@ -29,6 +29,7 @@ import jax
 import jax.numpy as jnp
 import pennylane as qml
 from jax._src.lax.lax import _extract_tracers_dyn_shape
+from jax.api_util import debug_info
 from jax.core import get_aval
 from pennylane import QubitUnitary, QueuingManager
 from pennylane.devices import QubitDevice
@@ -187,15 +188,17 @@ class Function:
 
     @debug_logger
     def __call__(self, *args, **kwargs):
-        jaxpr, _, out_tree = make_jaxpr2(self.fn, debug_info=kwargs.pop("debug_info", None))(
-            *args, **kwargs
-        )
+        jaxpr, _, out_tree = make_jaxpr2(
+            self.fn, debug_info=debug_info("Function", self.fn, args, kwargs)
+        )(*args, **kwargs)
 
         def _eval_jaxpr(*args, **kwargs):
             return jax.core.eval_jaxpr(jaxpr.jaxpr, jaxpr.consts, *args, **kwargs)
 
         args, _ = jax.tree_util.tree_flatten((args, kwargs))
-        retval = func_p.bind(wrap_init(_eval_jaxpr), *args, fn=self.fn)
+        retval = func_p.bind(
+            wrap_init(_eval_jaxpr, debug_info=jaxpr.jaxpr.debug_info), *args, fn=self.fn
+        )
         return tree_unflatten(out_tree, retval)
 
 

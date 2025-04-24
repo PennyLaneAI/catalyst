@@ -27,6 +27,7 @@ import jax
 import jax.numpy as jnp
 from jax._src.api import _dtype
 from jax._src.tree_util import PyTreeDef, tree_flatten, tree_unflatten
+from jax.api_util import debug_info
 from pennylane import QNode
 
 import catalyst
@@ -807,7 +808,9 @@ def _make_jaxpr_check_differentiable(
     return the output tree."""
     method = grad_params.method
     with mark_gradient_tracing(method):
-        jaxpr, _, out_tree = make_jaxpr2(f)(*args, **kwargs)
+        jaxpr, _, out_tree = make_jaxpr2(
+            f, debug_info=debug_info("grad make jaxpr", f, args, kwargs)
+        )(*args, **kwargs)
 
     for pos, arg in enumerate(jaxpr.in_avals):
         if arg.dtype.kind != "f" and pos in grad_params.expanded_argnums:
