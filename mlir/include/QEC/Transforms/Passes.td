@@ -59,7 +59,7 @@ def DecomposeMethodOption : Option<
         clEnumValN(::catalyst::qec::DecompositionMethod::InjectMagicState,
                     "inject-magic-state",
                     "Decompose by injecting magic states method.")
-    ), ::llvm::cl::Optional}]>;
+    )}]>;
 
 def CommuteCliffordPastPPMPass : Pass<"ppr_to_ppm"> {
     let summary = "Absorb Clifford operations into Pauli Product Measurement operations.";

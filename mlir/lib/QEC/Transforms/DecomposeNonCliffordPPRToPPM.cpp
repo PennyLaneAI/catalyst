@@ -117,15 +117,15 @@ void decompose_auto_corrected_pi_over_eight(PPRotationOp op, PatternRewriter &re
 
     // PPM (Z⊗Y) on qubits |0⟩ and |m⟩
     SmallVector<Value> axillaryQubits = {zero.getOutQubits().front(), ppmPZ.getOutQubits().back()};
-    ArrayRef<StringRef> pauliZY = {"Z", "Y"};
+    SmallVector<StringRef> pauliZY = {"Z", "Y"};
     auto ppmZY = rewriter.create<PPMeasurementOp>(loc, pauliZY, axillaryQubits); // [|0⟩, |m⟩]
 
     // PPM (X) on qubit |m⟩
-    ArrayRef<StringRef> pauliX = {"X"};
+    SmallVector<StringRef> pauliX = {"X"};
     auto pprX = rewriter.create<PPMeasurementOp>(loc, pauliX, ppmZY.getOutQubits().back()); // |m⟩
 
     // PPM (X/Z) based on the result of PPM (P⊗Z) on qubit |0⟩
-    ArrayRef<StringRef> pauliZ = {"Z"};
+    SmallVector<StringRef> pauliZ = {"Z"};
     rewriter.create<SelectPPMeasurementOp>(loc, ppmPZ.getMres(), pauliX, pauliZ,
                                            ppmZY.getOutQubits().front()); // |0⟩
 

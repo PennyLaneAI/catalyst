@@ -41,12 +41,7 @@ struct DecomposeNonCliffordPPRToPPMPass
     {
         RewritePatternSet patterns(&getContext());
 
-        auto method = DecompositionMethod::AutoCorrected;
-        if (decomposeMethod.hasValue()) {
-            method = decomposeMethod.getValue();
-        }
-
-        populateDecomposeNonCliffordPPRToPPMPatterns(patterns, method);
+        populateDecomposeNonCliffordPPRToPPMPatterns(patterns, decomposeMethod);
 
         if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
             return signalPassFailure();
