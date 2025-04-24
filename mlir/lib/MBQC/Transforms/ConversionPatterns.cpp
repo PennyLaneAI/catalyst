@@ -46,7 +46,7 @@ struct MeasureInBasisOpPattern : public OpConversionPattern<MeasureInBasisOp> {
 
         // Add types to the function signature
         Type qubitTy = conv->convertType(QubitType::get(ctx));
-        Type planeTy = IntegerType::get(ctx, 32);
+        Type planeTy = IntegerType::get(ctx, 8);
         Type angleTy = Float64Type::get(ctx);
         Type postselectTy = IntegerType::get(ctx, 32);
         SmallVector<Type> argSignatures = {qubitTy, planeTy, angleTy, postselectTy};
@@ -60,9 +60,9 @@ struct MeasureInBasisOpPattern : public OpConversionPattern<MeasureInBasisOp> {
             catalyst::ensureFunctionDeclaration(rewriter, op, fnName, fnSignature);
 
         // Extract the integer value for the plane attribute from its enum
-        auto planeValueInt = static_cast<uint32_t>(op.getPlane());
+        auto planeValueInt = static_cast<uint8_t>(op.getPlane());
         Value planeValue =
-            rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI32IntegerAttr(planeValueInt));
+            rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI8IntegerAttr(planeValueInt));
 
         // Create the postselect value. If not given, it defaults to NO_POSTSELECT
         LLVM::ConstantOp postselect = rewriter.create<LLVM::ConstantOp>(

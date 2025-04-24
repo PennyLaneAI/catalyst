@@ -26,12 +26,20 @@ include "MBQC/IR/MBQCDialect.td"
 // MBQC dialect enums.
 //===----------------------------------------------------------------------===//
 
-def MeasurementPlane : I32EnumAttr<"MeasurementPlane",
+class I8EnumAttrCase<string sym, int val, string str = sym>
+    : IntEnumAttrCaseBase<I8, sym, str, val>;
+
+class I8EnumAttr<string name, string summary, list<I8EnumAttrCase> cases> :
+        IntEnumAttr<I8, name, summary, cases> {
+    let underlyingType = "uint8_t";
+}
+
+def MeasurementPlane : I8EnumAttr<"MeasurementPlane",
     "Planes in the Bloch sphere representation with support for arbitrary-basis measurements",
     [
-        I32EnumAttrCase<"XY", 0>,
-        I32EnumAttrCase<"YZ", 1>,
-        I32EnumAttrCase<"ZX", 2>,
+        I8EnumAttrCase<"XY", 0>,
+        I8EnumAttrCase<"YZ", 1>,
+        I8EnumAttrCase<"ZX", 2>,
     ]> {
     let cppNamespace = "catalyst::mbqc";
     let genSpecializedAttr = 0;
