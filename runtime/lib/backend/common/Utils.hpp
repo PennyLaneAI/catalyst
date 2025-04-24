@@ -136,18 +136,19 @@ template <class K, class V>
 void pretty_print(const std::unordered_map<K, V> &map, size_t leadingSpaces = 0,
                   std::ostream &out = std::cout)
 {
-    out << "{\n";
-    auto maplen = map.size();
-    for (const auto &[key, val] : map) {
-        for (size_t i = 0; i < leadingSpaces + 2; i++) {
-            out << " ";
+    const std::string indent(leadingSpaces, ' ');
+    const std::string innerIndent = indent + "  ";
+
+    out << indent << "{\n";
+    auto it = map.begin();
+    while (it != map.end()) {
+        out << innerIndent << "\"" << it->first << "\": " << it->second;
+        if (++it != map.end()) {
+            out << ",";
         }
-        out << "\"" << key << "\": " << val << (--maplen > 0 ? "," : "") << "\n";
+        out << "\n";
     }
-    for (size_t i = 0; i < leadingSpaces; i++) {
-        out << " ";
-    }
-    out << "}";
+    out << indent << "}";
 }
 
 enum class MeasurementsT : uint8_t {
