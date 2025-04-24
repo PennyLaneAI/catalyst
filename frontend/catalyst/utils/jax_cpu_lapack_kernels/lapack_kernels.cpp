@@ -287,26 +287,27 @@ template <typename T> typename Potrf<T>::FnType *Potrf<T>::fn = nullptr;
 
 template <typename T> void Potrf<T>::Kernel(void *out_tuple, void **data, XlaCustomCallStatus *)
 {
-    const int32_t lower = *(reinterpret_cast<int32_t *>(data[0]));
+    const T *a_in = reinterpret_cast<T *>(data[0]);
     const int b = *(reinterpret_cast<int32_t *>(data[1]));
-    const int n = *(reinterpret_cast<int32_t *>(data[2]));
-    const T *a_in = reinterpret_cast<T *>(data[3]);
-    const char uplo = lower ? 'L' : 'U';
+    const int n_row = *(reinterpret_cast<int32_t *>(data[2]));
+    const int n_col = *(reinterpret_cast<int32_t *>(data[3]));
+    int8_t *uplo_tensor = reinterpret_cast<int8_t *>(data[4]);
+    char uplo = static_cast<char>(*uplo_tensor);
 
     void **out = reinterpret_cast<void **>(out_tuple);
     T *a_out = reinterpret_cast<T *>(out[0]);
     int *info = reinterpret_cast<int *>(out[1]);
     if (a_out != a_in) {
         std::memcpy(a_out, a_in,
-                    static_cast<int64_t>(b) * static_cast<int64_t>(n) * static_cast<int64_t>(n) *
-                        sizeof(T));
+                    static_cast<int64_t>(b) * static_cast<int64_t>(n_row) *
+                        static_cast<int64_t>(n_col) * sizeof(T));
     }
 
     constexpr int corder = LAPACK_ROW_MAJOR;
 
     for (int i = 0; i < b; ++i) {
-        *info = fn(corder, uplo, n, a_out, n);
-        a_out += static_cast<int64_t>(n) * static_cast<int64_t>(n);
+        *info = fn(corder, uplo, n_col, a_out, n_row);
+        a_out += static_cast<int64_t>(n_row) * static_cast<int64_t>(n_col);
         ++info;
     }
 }
