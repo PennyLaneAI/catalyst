@@ -71,12 +71,17 @@ jobs:
     - name: Prepare wheels
       run: |
         rename "s/linux/manylinux_2_28/" dist/PennyLane_Catalyst-*
+        rename "s/linux/manylinux_2_28/" dist/pennylane_catalyst-*
         rename "s/macosx_13_0_universal2/macosx_13_0_x86_64/" dist/PennyLane_Catalyst-*
+        rename "s/macosx_13_0_universal2/macosx_13_0_x86_64/" dist/pennylane_catalyst-*
         rename "s/macosx_14_0_universal2/macosx_13_0_arm64/" dist/PennyLane_Catalyst-*
+        rename "s/macosx_14_0_universal2/macosx_13_0_arm64/" dist/pennylane_catalyst-*
         rename "s/macosx_14/macosx_13/" dist/PennyLane_Catalyst-*
+        rename "s/macosx_14/macosx_13/" dist/pennylane_catalyst-*
 
     - name: Upload wheels
       uses: pypa/gh-action-pypi-publish@release/v1
       with:
         repository-url: https://test.pypi.org/legacy/
         packages-dir: dist
+        verbose: true

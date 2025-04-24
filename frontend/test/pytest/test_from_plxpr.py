@@ -22,6 +22,8 @@ import pytest
 catalyst = pytest.importorskip("catalyst")
 jax = pytest.importorskip("jax")
 
+from catalyst import qjit
+
 # needs to be below the importorskip calls
 # pylint: disable=wrong-import-position,unused-argument
 from catalyst.from_plxpr import QFuncPlxprInterpreter, from_plxpr
@@ -46,17 +48,40 @@ def catalyst_execute_jaxpr(jaxpr):
     return JAXPRRunner(fn=lambda: None, compile_options=catalyst.CompileOptions())
 
 
-def compare_call_jaxprs(jaxpr1, jaxpr2, skip_eqns=()):
+def compare_call_jaxprs(jaxpr1, jaxpr2, skip_eqns=(), ignore_order=False):
     """Compares two call jaxprs and validates that they are essentially equal."""
     for inv1, inv2 in zip(jaxpr1.invars, jaxpr2.invars):
         assert inv1.aval == inv2.aval, f"{inv1.aval}, {inv2.aval}"
     for ov1, ov2 in zip(jaxpr1.outvars, jaxpr2.outvars):
         assert ov1.aval == ov2.aval
-    assert len(jaxpr1.eqns) == len(jaxpr2.eqns)
+    assert len(jaxpr1.eqns) == len(
+        jaxpr2.eqns
+    ), f"Number of equations differ: {len(jaxpr1.eqns)} vs {len(jaxpr2.eqns)}"
 
-    for i, (eqn1, eqn2) in enumerate(zip(jaxpr1.eqns, jaxpr2.eqns)):
-        if i not in skip_eqns:
-            compare_eqns(eqn1, eqn2)
+    if not ignore_order:
+        # Assert that equations in both jaxprs are equivalent and in same order
+        for i, (eqn1, eqn2) in enumerate(zip(jaxpr1.eqns, jaxpr2.eqns)):
+            if i not in skip_eqns:
+                compare_eqns(eqn1, eqn2)
+
+    else:
+        # Assert that equations in both jaxprs are equivalent but in any order
+        eqns1 = [eqn for i, eqn in enumerate(jaxpr1.eqns) if i not in skip_eqns]
+        eqns2 = [eqn for i, eqn in enumerate(jaxpr2.eqns) if i not in skip_eqns]
+
+        for eqn1 in eqns1:
+            found_match = False
+            for i, eqn2 in enumerate(eqns2):
+                try:
+                    compare_eqns(eqn1, eqn2)
+                    # Remove the matched equation to prevent double-matching
+                    eqns2.pop(i)
+                    found_match = True
+                    break  # Exit inner loop after finding a match
+                except AssertionError:
+                    pass  # Continue to the next equation in eqns2
+            if not found_match:
+                raise AssertionError(f"No matching equation found for: {eqn1}")
 
 
 def compare_eqns(eqn1, eqn2):
@@ -194,7 +219,7 @@ class TestCatalystCompareJaxpr:
         assert len(catalyst_res) == 1
         assert qml.math.allclose(catalyst_res[0], -1)
 
-        qjit_obj = qml.qjit(circuit)
+        qjit_obj = qjit(circuit)
         qjit_obj(x)
         catalxpr = qjit_obj.jaxpr
         call_jaxpr_pl = get_call_jaxpr(converted)
@@ -219,7 +244,7 @@ class TestCatalystCompareJaxpr:
         catalyst_res = catalyst_execute_jaxpr(converted)(phi)
         assert qml.math.allclose(catalyst_res, np.exp(-0.5j) * np.array([1.0, 0.0]))
 
-        qjit_obj = qml.qjit(circuit)
+        qjit_obj = qjit(circuit)
         qjit_obj(0.5)
 
         catalxpr = qjit_obj.jaxpr
@@ -248,7 +273,7 @@ class TestCatalystCompareJaxpr:
         assert len(catalyst_res) == 1
         assert qml.math.allclose(catalyst_res[0], jax.numpy.cos(0.5))
 
-        qjit_obj = qml.qjit(circuit)
+        qjit_obj = qjit(circuit)
         qjit_obj(0.5)
         catalxpr = qjit_obj.jaxpr
         call_jaxpr_pl = get_call_jaxpr(converted)
@@ -280,7 +305,7 @@ class TestCatalystCompareJaxpr:
         expected = np.array([np.cos(0.5 / 2) ** 2, np.sin(0.5 / 2) ** 2])
         assert qml.math.allclose(catalyst_res[0], expected)
 
-        qjit_obj = qml.qjit(circuit)
+        qjit_obj = qjit(circuit)
         qjit_obj(0.5)
         catalxpr = qjit_obj.jaxpr
         call_jaxpr_pl = get_call_jaxpr(converted)
@@ -319,7 +344,7 @@ class TestCatalystCompareJaxpr:
 
         assert qml.math.allclose(catalyst_res[0], expected)
 
-        qjit_obj = qml.qjit(circuit)
+        qjit_obj = qjit(circuit)
         qjit_obj(phi)
         catalxpr = qjit_obj.jaxpr
         call_jaxpr_pl = get_call_jaxpr(converted)
@@ -354,7 +379,7 @@ class TestCatalystCompareJaxpr:
         expected = 1 - np.sin(x) ** 2
         assert qml.math.allclose(catalyst_res[0], expected)
 
-        qjit_obj = qml.qjit(circuit)
+        qjit_obj = qjit(circuit)
         qjit_obj(x)
         catalxpr = qjit_obj.jaxpr
         call_jaxpr_pl = get_call_jaxpr(converted)
@@ -386,7 +411,7 @@ class TestCatalystCompareJaxpr:
         expected = np.transpose(np.vstack([np.ones(50), np.zeros(50)]))
         assert qml.math.allclose(catalyst_res[0], expected)
 
-        qjit_obj = qml.qjit(circuit)
+        qjit_obj = qjit(circuit)
         qjit_obj()
         catalxpr = qjit_obj.jaxpr
         call_jaxpr_pl = get_call_jaxpr(converted)
@@ -418,13 +443,80 @@ class TestCatalystCompareJaxpr:
         expected = np.transpose(np.vstack([np.ones(50), np.zeros(50)]))
         assert qml.math.allclose(catalyst_res[0], expected)
 
-        qjit_obj = qml.qjit(circuit)
+        qjit_obj = qjit(circuit)
         qjit_obj()
         catalxpr = qjit_obj.jaxpr
         call_jaxpr_pl = converted.eqns[0].params["call_jaxpr"]
         call_jaxpr_c = catalxpr.eqns[1].params["call_jaxpr"]
 
         compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c)
+
+    def test_basis_state(self, disable_capture):
+        """Test comparison and execution of a jaxpr containing BasisState."""
+        dev = qml.device("lightning.qubit", wires=2)
+
+        @qml.qnode(dev)
+        def circuit(_basis_state):
+            qml.BasisState(_basis_state, wires=[0, 1])
+            return qml.state()
+
+        basis_state = np.array([1, 1])
+        expected_state_vector = np.array([0, 0, 0, 1], dtype=np.complex128)
+
+        qml.capture.enable()
+        plxpr = jax.make_jaxpr(circuit)(basis_state)
+        converted = from_plxpr(plxpr)(basis_state)
+        qml.capture.disable()
+
+        assert converted.eqns[0].primitive == catalyst.jax_primitives.quantum_kernel_p
+        assert converted.eqns[0].params["qnode"] is circuit
+
+        catalyst_res = catalyst_execute_jaxpr(converted)(basis_state)
+        assert len(catalyst_res) == 1
+        assert qml.math.allclose(catalyst_res[0], expected_state_vector)
+
+        qjit_obj = qjit(circuit)
+        qjit_obj(basis_state)
+        catalxpr = qjit_obj.jaxpr
+        call_jaxpr_pl = get_call_jaxpr(converted)
+        call_jaxpr_c = get_call_jaxpr(catalxpr)
+
+        # Ignore ordering of eqns when comparing jaxpr since Catalyst performs sorting
+        compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c, ignore_order=True)
+
+    def test_state_prep(self, disable_capture):
+        """Test comparison and execution of a jaxpr containing StatePrep."""
+        dev = qml.device("lightning.qubit", wires=1)
+
+        @qml.qnode(dev)
+        def circuit(_init_state):
+            # NOTE: Require validate_norm=False here otherwise Catalyst jaxpr contains
+            # unused function that computes norm
+            qml.StatePrep(_init_state, wires=0, validate_norm=False)
+            return qml.state()
+
+        init_state = np.array([1, 1], dtype=np.complex128) / np.sqrt(2)
+
+        qml.capture.enable()
+        plxpr = jax.make_jaxpr(circuit)(init_state)
+        converted = from_plxpr(plxpr)(init_state)
+        qml.capture.disable()
+
+        assert converted.eqns[0].primitive == catalyst.jax_primitives.quantum_kernel_p
+        assert converted.eqns[0].params["qnode"] is circuit
+
+        catalyst_res = catalyst_execute_jaxpr(converted)(init_state)
+        assert len(catalyst_res) == 1
+        assert qml.math.allclose(catalyst_res[0], init_state)
+
+        qjit_obj = qjit(circuit)
+        qjit_obj(init_state)
+        catalxpr = qjit_obj.jaxpr
+        call_jaxpr_pl = get_call_jaxpr(converted)
+        call_jaxpr_c = get_call_jaxpr(catalxpr)
+
+        # Ignore ordering of eqns when comparing jaxpr since Catalyst performs sorting
+        compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c, ignore_order=True)
 
     def test_multiple_measurements(self, disable_capture):
         """Test that we can convert a circuit with multiple measurement returns."""
@@ -460,7 +552,7 @@ class TestCatalystCompareJaxpr:
         assert qml.math.allclose(catalyst_res[1], expected_expval_y)
         assert qml.math.allclose(catalyst_res[2], expected_probs)
 
-        qjit_obj = qml.qjit(circuit)
+        qjit_obj = qjit(circuit)
         qjit_obj(x, y, z)
         catalxpr = qjit_obj.jaxpr
         call_jaxpr_pl = get_call_jaxpr(converted)
@@ -527,7 +619,7 @@ class TestHybridPrograms:
 
         assert qml.math.allclose(expected, res[0])
 
-        qjit_obj = qml.qjit(workflow)
+        qjit_obj = qjit(workflow)
         qjit_obj(0.5)
 
         call_jaxpr_pl = get_call_jaxpr(converted)

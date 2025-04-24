@@ -29,7 +29,6 @@ This module also uses the CUDA-quantum API. Here is the reference:
 """
 
 import functools
-import json
 import operator
 from functools import reduce, wraps
 from typing import Hashable
@@ -157,7 +156,7 @@ def get_instruction(jaxpr, primitive):
     return next((eqn for eqn in jaxpr.eqns if eqn.primitive == primitive), None)  # pragma: no cover
 
 
-class InterpreterContext:
+class InterpreterContext:  # pylint: disable=too-many-instance-attributes
     """This class keeps some state that is useful for interpreting Catalyst's JAXPR and evaluating
     it in CUDA-quantum primitives.
 
@@ -182,7 +181,7 @@ class InterpreterContext:
         if kernel is None:
             # TODO: Do we need these shots?
             # It looks like measurement operations already come with their own shots value.
-            self.kernel, _shots = change_device_to_cuda_device(self)
+            self.kernel, self.shots = change_device_to_cuda_device(self)
             change_alloc_to_cuda_alloc(self, self.kernel)
         else:
             # This is equivalent to passing a qreg into a function.
@@ -257,22 +256,13 @@ def change_device_to_cuda_device(ctx):
 
     qdevice_eqn = get_instruction(ctx.jaxpr, qdevice_p)
 
-    # These parameters are stored in a json-like string.
-    # We first convert the string to json.
-    json_like_string = qdevice_eqn.params["rtd_kwargs"]
-    json_like_string = json_like_string.replace("'", '"')
-    json_like_string = json_like_string.replace("True", "true")
-    json_string = json_like_string.replace("False", "false")
-
-    # Finally, we load it
-    parameters = json.loads(json_string)
-
     # Now we have the number of shots.
     # Shots are specified in PL at the very beginning, but in cuda
     # shots are not needed until the very end.
     # So, we will just return this variable
     # and it is the responsibility of the caller to propagate this information.
-    shots = parameters.get("shots")
+    assert isinstance(qdevice_eqn.invars[0], jax._src.core.Literal)
+    shots = qdevice_eqn.invars[0].val
 
     device_name = qdevice_eqn.params.get("rtd_name")
 
@@ -428,17 +418,10 @@ def change_instruction(ctx, eqn):
     op = params["op"]
     cuda_inst_name = from_catalyst_to_cuda[op]
     qubits_len = params["qubits_len"]
-    static_params = params.get("static_params")
 
     # Now, we can map to the correct op
     # For now just assume rx
-    cuda_inst(
-        ctx.kernel,
-        *qubits_or_params,
-        inst=cuda_inst_name,
-        qubits_len=qubits_len,
-        static_params=static_params,
-    )
+    cuda_inst(ctx.kernel, *qubits_or_params, inst=cuda_inst_name, qubits_len=qubits_len)
 
     # Finally determine how many are qubits.
     qubits = qubits_or_params[:qubits_len]
@@ -509,8 +492,7 @@ def change_sample_or_counts(ctx, eqn):
     # And parameters...
     # * shots
     # * shape
-    params = eqn.params
-    shots = params["shots"]
+    shots = ctx.shots
 
     # We will deal with compbasis in the same way as
     # when we deal with the state

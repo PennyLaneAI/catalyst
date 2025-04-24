@@ -7,12 +7,14 @@ set(LIBS
     ${extension_libs}
     MLIROptLib
     MLIRCatalyst
-    MLIRCatalystTransforms
+    catalyst-transforms
     MLIRQuantum
     quantum-transforms
     MLIRQEC
+    qec-transforms
     MLIRGradient
     gradient-transforms
+    MLIRMBQC
     MLIRMitigation
     mitigation-transforms
     MLIRIon

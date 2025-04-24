@@ -23,7 +23,7 @@ from pennylane.devices import Device, NullQubit
 from pennylane.devices.capabilities import DeviceCapabilities, OperatorProperties
 from pennylane.tape import QuantumScript
 
-from catalyst import CompileError, ctrl
+from catalyst import CompileError, ctrl, qjit
 from catalyst.api_extensions.control_flow import (
     Cond,
     ForLoop,
@@ -113,13 +113,13 @@ class TestDecomposition:
         """Test the decompose transform as part of the Catalyst pipeline."""
         dev = NullQubit(wires=4, shots=None)
 
-        @qml.qjit
+        @qjit
         @qml.qnode(dev)
         def circuit(theta: float):
             qml.SingleExcitationPlus(theta, wires=[0, 1])
             return qml.state()
 
-        mlir = qml.qjit(circuit, target="mlir").mlir
+        mlir = qjit(circuit, target="mlir").mlir
         assert "PauliX" in mlir
         assert "CNOT" in mlir
         assert "ControlledPhaseShift" in mlir
@@ -140,13 +140,13 @@ class TestDecomposition:
         """Test the decompose ops to unitary transform as part of the Catalyst pipeline."""
         dev = CustomDevice(wires=4, shots=None)
 
-        @qml.qjit
+        @qjit
         @qml.qnode(dev)
         def circuit():
             qml.BlockEncode(np.array([[1, 1, 1], [0, 1, 0]]), wires=[0, 1, 2])
             return qml.state()
 
-        mlir = qml.qjit(circuit, target="mlir").mlir
+        mlir = qjit(circuit, target="mlir").mlir
         assert "quantum.unitary" in mlir
         assert "BlockEncode" not in mlir
 
@@ -156,8 +156,6 @@ class TestDecomposition:
 
         class OpWithNoMatrix(qml.operation.Operation):
             """Op without matrix."""
-
-            num_wires = qml.operation.AnyWires
 
             def matrix(self, wire_order=None):
                 """Matrix is overriden."""
@@ -169,7 +167,7 @@ class TestDecomposition:
             return qml.probs()
 
         with pytest.raises(CompileError, match="could not be decomposed, it might be unsupported."):
-            qml.qjit(f, target="jaxpr")
+            qjit(f, target="jaxpr")
 
 
 # tapes and regions for generating HybridOps
@@ -271,14 +269,14 @@ class TestPreprocessHybridOp:
 
         dev = qml.device("lightning.qubit", wires=1)
 
-        @qml.qjit
+        @qjit
         @qml.qnode(dev)
         def circuit(x: float, y: float):
             qml.RY(y, 0)
             adjoint(lambda: OtherRX(x, 0))()
             return qml.expval(qml.PauliZ(0))
 
-        mlir = qml.qjit(circuit, target="mlir").mlir
+        mlir = qjit(circuit, target="mlir").mlir
 
         assert "quantum.adjoint" in mlir
         assert "RX" in mlir
@@ -293,7 +291,7 @@ class TestPreprocessHybridOp:
 
         dev = qml.device("lightning.qubit", wires=[0, 1])
 
-        @qml.qjit
+        @qjit
         @qml.qnode(dev)
         def circuit(phi: float):
             OtherHadamard(wires=0)
@@ -313,7 +311,7 @@ class TestPreprocessHybridOp:
             return qml.state()
 
         # mlir contains expected gate names, and not the unsupported gate names
-        mlir = qml.qjit(circuit, target="mlir").mlir
+        mlir = qjit(circuit, target="mlir").mlir
         assert "RX" in mlir
         assert "CNOT" in mlir
         assert "PhaseShift" in mlir
@@ -341,7 +339,7 @@ class TestPreprocessHybridOp:
 
         dev = qml.device("lightning.qubit", wires=2)
 
-        @qml.qjit
+        @qjit
         @qml.qnode(dev)
         def circuit(n: int, x: float):
             OtherHadamard(wires=0)
@@ -374,7 +372,7 @@ class TestPreprocessHybridOp:
 
         dev = qml.device("lightning.qubit", wires=1)
 
-        @qml.qjit
+        @qjit
         @qml.qnode(dev)
         def circuit(x: float):
             @while_loop(lambda x: x < 2.0)

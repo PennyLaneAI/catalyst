@@ -12,10 +12,10 @@ MHLO_BUILD_DIR ?= $(MK_DIR)/mlir/mlir-hlo/bazel-build
 DIALECTS_BUILD_DIR ?= $(MK_DIR)/mlir/build
 RT_BUILD_DIR ?= $(MK_DIR)/runtime/build
 OQC_BUILD_DIR ?= $(MK_DIR)/frontend/catalyst/third_party/oqc/src/build
-OQD_BUILD_DIR ?= $(MK_DIR)/frontend/catalyst/third_party/oqd/src/build
 ENZYME_BUILD_DIR ?= $(MK_DIR)/mlir/Enzyme/build
 COVERAGE_REPORT ?= term-missing
-ENABLE_OPENQASM?=ON
+ENABLE_OPENQASM ?= ON
+ENABLE_OQD ?= OFF
 TEST_BACKEND ?= "lightning.qubit"
 TEST_BRAKET ?= NONE
 ENABLE_ASAN ?= OFF
@@ -26,19 +26,34 @@ ifeq ($(PLATFORM),Linux)
 COPY_FLAGS := --dereference
 endif
 
+# Note: ASAN replaces dlopen calls, which means that when we open other libraries via dlopen that
+#       relied on the parent's library's RPATH, these libraries are no longer found.
+#         e.g. `dlopen(catalyst_callback_registry.so)` from RuntimeCAPI.cpp
+#              `dlopen(libscipy_openblas.dylib)` from lightning's BLASLibLoaderManager.hpp
+#       We can fix this using LD_LIBRARY_PATH (for dev builds).
 ifeq ($(PLATFORM) $(findstring clang,$(C_COMPILER)),Linux clang)
 ASAN_FLAGS := LD_PRELOAD="$(shell clang  -print-file-name=libclang_rt.asan-x86_64.so)"
+ASAN_FLAGS += LD_LIBRARY_PATH="$(RT_BUILD_DIR)/lib:$(LD_LIBRARY_PATH)"
 else ifeq ($(PLATFORM) $(findstring gcc,$(C_COMPILER)),Linux gcc)
 ASAN_FLAGS := LD_PRELOAD="$(shell gcc  -print-file-name=libasan.so)"
+ASAN_FLAGS += LD_LIBRARY_PATH="$(RT_BUILD_DIR)/lib:$(LD_LIBRARY_PATH)"
 else ifeq ($(PLATFORM),Darwin)
 ASAN_FLAGS := DYLD_INSERT_LIBRARIES="$(shell clang -print-file-name=libclang_rt.asan_osx_dynamic.dylib)"
+SCIPY_DIR := $(shell python -c 'import os, scipy_openblas32; print(os.path.dirname(scipy_openblas32.__file__))')
+ASAN_FLAGS += DYLD_LIBRARY_PATH="$(RT_BUILD_DIR)/lib:$(SCIPY_DIR)/lib:$(DYLD_LIBRARY_PATH)"
 endif
 
 PARALLELIZE := -n auto
-ifeq ($(ENABLE_ASAN) $(PLATFORM),ON Darwin)
+ifeq ($(ENABLE_ASAN),ON)
+ifeq ($(PLATFORM),Darwin)
 # Launching subprocesses with ASAN on macOS is not supported (see https://stackoverflow.com/a/47853433).
 PARALLELIZE :=
 endif
+# These tests build a standalone executable from the Python frontend, which would have to be built
+# with the ASAN runtime. Since we don't exert much control over the "user" compiler, skip them.
+TEST_EXCLUDES := -k "not test_executable_generation"
+endif
+PYTEST_FLAGS := $(PARALLELIZE) $(TEST_EXCLUDES)
 
 # TODO: Find out why we have container overflow on macOS.
 ASAN_OPTIONS := ASAN_OPTIONS="detect_leaks=0,detect_container_overflow=0"
@@ -56,9 +71,6 @@ else
 ASAN_COMMAND :=
 endif
 
-# Export variables so that they can be set here without needing to also set them in sub-make files.
-export ENABLE_ASAN ASAN_COMMAND
-
 # Flag for verbose pip install output
 PIP_VERBOSE_FLAG :=
 ifeq ($(VERBOSE),1)
@@ -73,16 +85,14 @@ help:
 	@echo "  mlir               to build MLIR and custom Catalyst dialects"
 	@echo "  runtime            to build Catalyst Runtime"
 	@echo "  oqc                to build Catalyst-OQC Runtime"
-	@echo "  oqd                to build Catalyst-OQD Runtime"
 	@echo "  test               to run the Catalyst test suites"
 	@echo "  docs               to build the documentation for Catalyst"
-	@echo "  clean              to uninstall Catalyst and delete all temporary and cache files"
-	@echo "  clean-frontend     to clean build files of Catalyst Frontend"
+	@echo "  clean              to uninstall Catalyst and delete frontend build and cache files"
 	@echo "  clean-mlir         to clean build files of MLIR and custom Catalyst dialects"
 	@echo "  clean-runtime      to clean build files of Catalyst Runtime"
 	@echo "  clean-oqc          to clean build files of OQC Runtime"
-	@echo "  clean-oqd          to clean build files of OQD Runtime"
 	@echo "  clean-all          to uninstall Catalyst and delete all temporary, cache, and build files"
+	@echo "  clean-catalyst     to uninstall Catalyst and delete all temporary, cache, and build files for catalyst dialects and runtime (but keeping llvm build files)"
 	@echo "  clean-docs         to delete all built documentation"
 	@echo "  coverage           to generate a coverage report"
 	@echo "  format [check=1]   to apply C++ and Python formatter; use with 'check=1' to check instead of modify (requires black, pylint and clang-format)"
@@ -90,8 +100,8 @@ help:
 
 
 .PHONY: all catalyst
-all: runtime oqc oqd mlir frontend
-catalyst: runtime dialects plugin oqd frontend
+all: runtime oqc mlir frontend
+catalyst: runtime dialects plugin frontend
 
 .PHONY: frontend
 frontend:
@@ -102,7 +112,7 @@ frontend:
 	$(PYTHON) -m pip install -e . --extra-index-url https://test.pypi.org/simple $(PIP_VERBOSE_FLAG)
 	rm -r frontend/PennyLane_Catalyst.egg-info
 
-.PHONY: mlir llvm mhlo enzyme dialects runtime oqc oqd
+.PHONY: mlir llvm mhlo enzyme dialects runtime oqc
 mlir:
 	$(MAKE) -C mlir all
 
@@ -119,15 +129,12 @@ dialects:
 	$(MAKE) -C mlir dialects
 
 runtime:
-	$(MAKE) -C runtime runtime
+	$(MAKE) -C runtime runtime ENABLE_OQD=$(ENABLE_OQD)
 
 oqc:
 	$(MAKE) -C frontend/catalyst/third_party/oqc/src oqc
 
-oqd:
-	$(MAKE) -C frontend/catalyst/third_party/oqd/src oqd
-
-.PHONY: test test-runtime test-frontend lit pytest test-demos test-oqc test-oqd test-toml-spec
+.PHONY: test test-runtime test-frontend lit pytest test-demos test-oqc test-toml-spec
 test: test-runtime test-frontend test-demos
 
 test-toml-spec:
@@ -144,13 +151,10 @@ test-frontend: lit pytest
 test-oqc:
 	$(MAKE) -C frontend/catalyst/third_party/oqc/src test
 
-test-oqd:
-	$(MAKE) -C frontend/catalyst/third_party/oqd/src test
-
 lit:
 ifeq ($(ENABLE_ASAN),ON)
 ifneq ($(findstring clang,$(C_COMPILER)),clang)
-	@echo "Build and Test with Address Sanitizer are only supported by Clang, but provided $(C_COMPILER)"
+	@echo "Running Python tests with Address Sanitizer is only supported with Clang, but provided $(C_COMPILER)"
 	@exit 1
 endif
 endif
@@ -160,13 +164,16 @@ endif
 pytest:
 ifeq ($(ENABLE_ASAN),ON)
 ifneq ($(findstring clang,$(C_COMPILER)),clang)
-	@echo "Build and Test with Address Sanitizer are only supported by Clang, but provided $(C_COMPILER)"
+	@echo "Running Python tests with Address Sanitizer is only supported with Clang, but provided $(C_COMPILER)"
 	@exit 1
 endif
 endif
 	@echo "check the Catalyst PyTest suite"
-	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/pytest --tb=native --backend=$(TEST_BACKEND) --runbraket=$(TEST_BRAKET) $(PARALLELIZE)
+	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/pytest --tb=native --backend=$(TEST_BACKEND) --runbraket=$(TEST_BRAKET) $(PYTEST_FLAGS)
 	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/test_oqc/oqc
+ifeq ($(ENABLE_OQD), ON)
+	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/test_oqd/oqd
+endif
 ifeq ($(TEST_BRAKET), NONE)
 	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/async_tests --tb=native --backend=$(TEST_BACKEND)
 endif
@@ -178,7 +185,7 @@ ifeq ($(ENABLE_ASAN) $(PLATFORM),ON Darwin)
 endif
 	@echo "check the Catalyst demos"
 	MDD_BENCHMARK_PRECISION=1 \
-	$(ASAN_COMMAND) $(PYTHON) -m pytest demos --nbmake $(PARALLELIZE)
+	$(ASAN_COMMAND) $(PYTHON) -m pytest demos --nbmake $(PYTEST_FLAGS)
 
 wheel:
 	echo "INSTALLED = True" > $(MK_DIR)/frontend/catalyst/_configuration.py
@@ -223,11 +230,11 @@ plugin-wheel: plugin
 	rm -r $(MK_DIR)/standalone_plugin_wheel/standalone_plugin.egg-info
 	rm -r $(MK_DIR)/standalone_plugin_wheel/build
 
-.PHONY: clean clean-all
+.PHONY: clean clean-all clean-catalyst
 clean:
 	@echo "uninstall catalyst and delete all temporary and cache files"
 	$(PYTHON) -m pip uninstall -y pennylane-catalyst
-	find frontend/catalyst -name "*.so" -exec rm -v {} +
+	find frontend/catalyst -name "*.so" -not -path "*/third_party/*" -exec rm -v {} +
 	git restore frontend/catalyst/_configuration.py
 	rm -rf $(MK_DIR)/frontend/catalyst/_revision.py
 	rm -rf $(MK_DIR)/frontend/mlir_quantum $(MK_DIR)/frontend/catalyst/lib $(MK_DIR)/frontend/catalyst/bin
@@ -235,7 +242,8 @@ clean:
 	rm -rf .coverage coverage_html_report
 	rm -rf .benchmarks
 
-clean-all: clean clean-mlir clean-runtime clean-oqc clean-oqd
+clean-all: clean clean-mlir clean-runtime clean-oqc
+clean-catalyst: clean clean-dialects clean-runtime clean-oqc
 
 .PHONY: clean-mlir clean-dialects clean-plugin clean-llvm clean-mhlo clean-enzyme
 clean-mlir:
@@ -256,23 +264,29 @@ clean-mhlo:
 clean-enzyme:
 	$(MAKE) -C mlir clean-enzyme
 
-.PHONY: clean-runtime clean-oqc clean-oqd
+.PHONY: clean-runtime clean-oqc
 clean-runtime:
 	$(MAKE) -C runtime clean
 
 clean-oqc:
 	$(MAKE) -C frontend/catalyst/third_party/oqc/src clean
 
-clean-oqd:
-	$(MAKE) -C frontend/catalyst/third_party/oqd/src clean
-
 .PHONY: coverage coverage-frontend coverage-runtime
 coverage: coverage-frontend coverage-runtime
 
 coverage-frontend:
+ifeq ($(ENABLE_ASAN),ON)
+ifneq ($(findstring clang,$(C_COMPILER)),clang)
+	@echo "Running Python tests with Address Sanitizer is only supported with Clang, but provided $(C_COMPILER)"
+	@exit 1
+endif
+endif
 	@echo "Generating coverage report for the frontend"
-	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/pytest $(PARALLELIZE) --cov=catalyst --tb=native --cov-report=$(COVERAGE_REPORT)
-	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/test_oqc/oqc $(PARALLELIZE) --cov=catalyst --cov-append --tb=native --cov-report=$(COVERAGE_REPORT)
+	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/pytest $(PYTEST_FLAGS) --cov=catalyst --tb=native --cov-report=$(COVERAGE_REPORT)
+	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/test_oqc/oqc $(PYTEST_FLAGS) --cov=catalyst --cov-append --tb=native --cov-report=$(COVERAGE_REPORT)
+ifeq ($(ENABLE_OQD), ON)
+	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/test_oqd/oqd $(PYTEST_FLAGS) --cov=catalyst --cov-append --tb=native --cov-report=$(COVERAGE_REPORT)
+endif
 ifeq ($(TEST_BRAKET), NONE)
 	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/async_tests --tb=native --backend=$(TEST_BACKEND) --tb=native
 endif

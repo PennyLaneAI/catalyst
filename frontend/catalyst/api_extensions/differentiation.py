@@ -30,7 +30,7 @@ from jax._src.tree_util import PyTreeDef, tree_flatten, tree_unflatten
 from pennylane import QNode
 
 import catalyst
-from catalyst.jax_extras import Jaxpr
+from catalyst.jax_extras import Jaxpr, make_jaxpr2
 from catalyst.jax_primitives import (
     GradParams,
     expval_p,
@@ -667,7 +667,7 @@ class GradCallable(CatalystCallable):
 
                     # It always returns list as required by catalyst control-flows
                     results = value_and_grad_p.bind(
-                        *input_data_flat, jaxpr=jaxpr, fn=fn, grad_params=grad_params
+                        *input_data_flat, *jaxpr.consts, jaxpr=jaxpr, fn=fn, grad_params=grad_params
                     )
 
                     # value_and_grad returns two results: the values and the gradients,
@@ -686,7 +686,7 @@ class GradCallable(CatalystCallable):
 
                     # It always returns list as required by catalyst control-flows
                     results = grad_p.bind(
-                        *input_data_flat, jaxpr=jaxpr, fn=fn, grad_params=grad_params
+                        *input_data_flat, *jaxpr.consts, jaxpr=jaxpr, fn=fn, grad_params=grad_params
                     )
 
                     # grad returns only the gradients,
@@ -807,8 +807,7 @@ def _make_jaxpr_check_differentiable(
     return the output tree."""
     method = grad_params.method
     with mark_gradient_tracing(method):
-        jaxpr, shape = jax.make_jaxpr(f, return_shape=True)(*args, **kwargs)
-    _, out_tree = tree_flatten(shape)
+        jaxpr, _, out_tree = make_jaxpr2(f)(*args, **kwargs)
 
     for pos, arg in enumerate(jaxpr.in_avals):
         if arg.dtype.kind != "f" and pos in grad_params.expanded_argnums:

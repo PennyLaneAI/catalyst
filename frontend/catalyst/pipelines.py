@@ -68,9 +68,6 @@ class CompileOptions:
         disable_assertions (Optional[bool]): disables all assertions. Default is ``False``.
         seed (Optional[int]) : the seed for random operations in a qjit call.
             Default is None.
-        experimental_capture (bool): If set to ``True``,
-            use PennyLane's experimental program capture capabilities
-            to capture the function for compilation.
         circuit_transform_pipeline (Optional[dict[str, dict[str, str]]]):
             A dictionary that specifies the quantum circuit transformation pass pipeline order,
             and optionally arguments for each pass in the pipeline.
@@ -94,7 +91,6 @@ class CompileOptions:
     checkpoint_stage: Optional[str] = ""
     disable_assertions: Optional[bool] = False
     seed: Optional[int] = None
-    experimental_capture: Optional[bool] = False
     circuit_transform_pipeline: Optional[dict[str, dict[str, str]]] = None
     pass_plugins: Optional[Set[Path]] = None
     dialect_plugins: Optional[Set[Path]] = None
@@ -104,7 +100,7 @@ class CompileOptions:
         if self.async_qnodes and self.seed != None:
             raise CompileError(
                 """
-                Seeding has no effect on asyncronous qnodes,
+                Seeding has no effect on asynchronous QNodes,
                 as the execution order of parallel runs is not guaranteed.
                 As such, seeding an asynchronous run is not supported.
                 """
@@ -152,7 +148,7 @@ class CompileOptions:
         """Returns all stages in order for compilation"""
         # Dictionaries in python are ordered
         stages = {}
-        stages["EnforeRuntimeInvariantsPass"] = get_enforce_runtime_invariants_stage(self)
+        stages["EnforceRuntimeInvariantsPass"] = get_enforce_runtime_invariants_stage(self)
         stages["HLOLoweringPass"] = get_hlo_lowering_stage(self)
         stages["QuantumCompilationPass"] = get_quantum_compilation_stage(self)
         stages["BufferizationPass"] = get_bufferization_stage(self)
@@ -169,15 +165,13 @@ def get_enforce_runtime_invariants_stage(_options: CompileOptions) -> List[str]:
         "split-multiple-tapes",
         # Run the transform sequence defined in the MLIR module
         "builtin.module(apply-transform-sequence)",
-        # Lower the static custom ops to regular custom ops with dynamic parameters.
-        "static-custom-lowering",
         # Nested modules are something that will be used in the future
         # for making device specific transformations.
         # Since at the moment, nothing in the runtime is using them
         # and there is no lowering for them,
         # we inline them to preserve the semantics. We may choose to
-        # keep inlining modules targetting the Catalyst runtime.
-        # But qnodes targetting other backends may choose to lower
+        # keep inlining modules targeting the Catalyst runtime.
+        # But qnodes targeting other backends may choose to lower
         # this into something else.
         "inline-nested-module",
     ]
@@ -296,7 +290,7 @@ def get_convert_to_llvm_stage(options: CompileOptions) -> List[str]:
         # of this list to here that does folding
         # add-exception-handling will fail to add async.drop_ref
         # correctly. See https://github.com/PennyLaneAI/catalyst/pull/995
-        "add-exception-handling",
+        "add-exception-handling" if options.async_qnodes else None,
         "emit-catalyst-py-interface",
         # Remove any dead casts as the final pass expects to remove all existing casts,
         # but only those that form a loop back to the original type.
@@ -312,7 +306,7 @@ def get_stages(options):
     """Returns all stages in order for compilation"""
     # Dictionaries in python are ordered
     stages = {}
-    stages["EnforeRuntimeInvariantsPass"] = get_enforce_runtime_invariants_stage(options)
+    stages["EnforceRuntimeInvariantsPass"] = get_enforce_runtime_invariants_stage(options)
     stages["HLOLoweringPass"] = get_hlo_lowering_stage(options)
     stages["QuantumCompilationPass"] = get_quantum_compilation_stage(options)
     stages["BufferizationPass"] = get_bufferization_stage(options)

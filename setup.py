@@ -107,7 +107,7 @@ jax_version = dep_versions.get("jax")
 pl_version = dep_versions.get("pennylane")
 lq_version = dep_versions.get("lightning")
 
-pl_min_release = "0.40"
+pl_min_release = "0.41.0"
 lq_min_release = pl_min_release
 
 if pl_version is not None:
@@ -330,7 +330,7 @@ if system_platform == "Linux":
             "frontend/catalyst/utils/jax_cpu_lapack_kernels/lapack_kernels.cpp",
             "frontend/catalyst/utils/jax_cpu_lapack_kernels/lapack_kernels_using_lapack.cpp",
         ],
-        extra_compile_args=["-std=c++17"],
+        extra_compile_args=["-std=c++20"],
         define_macros=Py_LIMITED_API_macros,
     )
     cmdclass = {"build_ext": CustomBuildExtLinux}
@@ -348,7 +348,7 @@ elif system_platform == "Darwin":
             "frontend/catalyst/utils/jax_cpu_lapack_kernels/lapack_kernels.cpp",
             "frontend/catalyst/utils/jax_cpu_lapack_kernels/lapack_kernels_using_lapack.cpp",
         ],
-        extra_compile_args=["-std=c++17"],
+        extra_compile_args=["-std=c++20"],
         define_macros=Py_LIMITED_API_macros,
     )
     cmdclass = {"build_ext": CustomBuildExtMacos}

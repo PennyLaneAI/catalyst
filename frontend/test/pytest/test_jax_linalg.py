@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Test that the jax linear algebra functions yield correct results when compiled with qml.qjit"""
+"""Test that the jax linear algebra functions yield correct results when compiled with catalyst.qjit"""
 
 import numpy as np
 import pytest

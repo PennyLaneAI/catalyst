@@ -19,7 +19,7 @@
 import jax.numpy as jnp
 import pennylane as qml
 from jax.core import ShapedArray
-from lit_util_printers import print_jaxpr, print_mlir
+from utils import print_jaxpr, print_mlir
 
 from catalyst import qjit
 

@@ -31,10 +31,24 @@ static const mlir::StringSet<> rotationsSet = {"RX",  "RY",  "RZ",  "PhaseShift"
 
 namespace {
 
-struct MergeRotationsRewritePattern : public mlir::OpRewritePattern<CustomOp> {
-    using mlir::OpRewritePattern<CustomOp>::OpRewritePattern;
+// convertOpParamsToValues: helper function for extracting CustomOp parameters as mlir::Values
+SmallVector<mlir::Value> convertOpParamsToValues(CustomOp &op, mlir::PatternRewriter &rewriter)
+{
+    SmallVector<mlir::Value> values;
+    auto params = op.getParams();
+    for (auto param : params) {
+        values.push_back(param);
+    }
+    return values;
+}
 
-    mlir::LogicalResult matchAndRewrite(CustomOp op, mlir::PatternRewriter &rewriter) const override
+template <typename ParentOpType, typename OpType>
+struct MergeRotationsRewritePattern : public mlir::OpRewritePattern<OpType> {
+    // Merge rotation patterns where at least one operand is non-static.
+    // The result is a non-static CustomOp, as at least one operand is not known at compile time.
+    using mlir::OpRewritePattern<OpType>::OpRewritePattern;
+
+    mlir::LogicalResult matchAndRewrite(OpType op, mlir::PatternRewriter &rewriter) const override
     {
         LLVM_DEBUG(dbgs() << "Simplifying the following operation:\n" << op << "\n");
         auto loc = op.getLoc();
@@ -42,9 +56,9 @@ struct MergeRotationsRewritePattern : public mlir::OpRewritePattern<CustomOp> {
         if (!rotationsSet.contains(opGateName))
             return failure();
         ValueRange inQubits = op.getInQubits();
-        auto parentOp = dyn_cast_or_null<CustomOp>(inQubits[0].getDefiningOp());
+        auto parentOp = dyn_cast_or_null<ParentOpType>(inQubits[0].getDefiningOp());
 
-        VerifyParentGateAndNameAnalysis<CustomOp> vpga(op);
+        VerifyHeterogeneousParentGateAndNameAnalysis<OpType, ParentOpType> vpga(op);
         if (!vpga.getVerifierResult()) {
             return failure();
         }
@@ -55,8 +69,10 @@ struct MergeRotationsRewritePattern : public mlir::OpRewritePattern<CustomOp> {
         ValueRange parentInCtrlQubits = parentOp.getInCtrlQubits();
         ValueRange parentInCtrlValues = parentOp.getInCtrlValues();
 
-        auto parentParams = parentOp.getParams();
-        auto params = op.getParams();
+        // extract parameters of the op and its parent,
+        // promoting the parameters to mlir::Values if necessary
+        auto parentParams = convertOpParamsToValues(parentOp, rewriter);
+        auto params = convertOpParamsToValues(op, rewriter);
         SmallVector<mlir::Value> sumParams;
         for (auto [param, parentParam] : llvm::zip(params, parentParams)) {
             mlir::Value sumParam =
@@ -67,48 +83,8 @@ struct MergeRotationsRewritePattern : public mlir::OpRewritePattern<CustomOp> {
                                                  parentInQubits, opGateName, nullptr,
                                                  parentInCtrlQubits, parentInCtrlValues);
 
-        op.replaceAllUsesWith(mergeOp);
-
-        return success();
-    }
-};
-
-struct MergeRotationsStaticRewritePattern : public mlir::OpRewritePattern<StaticCustomOp> {
-    using mlir::OpRewritePattern<StaticCustomOp>::OpRewritePattern;
-
-    mlir::LogicalResult matchAndRewrite(StaticCustomOp op,
-                                        mlir::PatternRewriter &rewriter) const override
-    {
-        LLVM_DEBUG(dbgs() << "Simplifying the following operation:\n" << op << "\n");
-        auto loc = op.getLoc();
-        StringRef opGateName = op.getGateName();
-        if (!rotationsSet.contains(opGateName))
-            return failure();
-        ValueRange inQubits = op.getInQubits();
-        auto parentOp = dyn_cast_or_null<StaticCustomOp>(inQubits[0].getDefiningOp());
-
-        VerifyParentGateAndNameAnalysis<StaticCustomOp> vpga(op);
-        if (!vpga.getVerifierResult()) {
-            return failure();
-        }
-
-        TypeRange outQubitsTypes = op.getOutQubits().getTypes();
-        TypeRange outQubitsCtrlTypes = op.getOutCtrlQubits().getTypes();
-        ValueRange parentInQubits = parentOp.getInQubits();
-        ValueRange parentInCtrlQubits = parentOp.getInCtrlQubits();
-        ValueRange parentInCtrlValues = parentOp.getInCtrlValues();
-
-        auto parentParams = parentOp.getStaticParams();
-        auto params = op.getStaticParams();
-        SmallVector<double> sumParams;
-        for (auto [param, parentParam] : llvm::zip(params, parentParams)) {
-            sumParams.push_back(parentParam + param);
-        };
-        auto mergeOp = rewriter.create<StaticCustomOp>(
-            loc, outQubitsTypes, outQubitsCtrlTypes, sumParams, parentInQubits, opGateName, nullptr,
-            parentInCtrlQubits, parentInCtrlValues);
-
-        op.replaceAllUsesWith(mergeOp);
+        rewriter.replaceOp(op, mergeOp);
+        rewriter.eraseOp(parentOp);
 
         return success();
     }
@@ -147,7 +123,9 @@ struct MergeMultiRZRewritePattern : public mlir::OpRewritePattern<MultiRZOp> {
         auto mergeOp = rewriter.create<MultiRZOp>(loc, outQubitsTypes, outQubitsCtrlTypes, sumParam,
                                                   parentInQubits, nullptr, parentInCtrlQubits,
                                                   parentInCtrlValues);
-        op.replaceAllUsesWith(mergeOp);
+        rewriter.replaceOp(op, mergeOp);
+        rewriter.eraseOp(parentOp);
+
         return success();
     }
 };
@@ -158,8 +136,7 @@ namespace quantum {
 
 void populateMergeRotationsPatterns(RewritePatternSet &patterns)
 {
-    patterns.add<MergeRotationsStaticRewritePattern>(patterns.getContext(), 1);
-    patterns.add<MergeRotationsRewritePattern>(patterns.getContext(), 1);
+    patterns.add<MergeRotationsRewritePattern<CustomOp, CustomOp>>(patterns.getContext(), 1);
     patterns.add<MergeMultiRZRewritePattern>(patterns.getContext(), 1);
 }
 

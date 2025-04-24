@@ -168,6 +168,7 @@ specific pass pipeline.
 To do so, simply use the :func:`~.debug.get_compilation_stage` function and print the return value out.
 For example, if one wishes to inspect the output of the ``BufferizationPass`` pipeline, simply run
 the following command.
+One also needs to have used the ``keep_intermediate=True`` option in the ``@qjit`` decorator.
 
 .. code-block:: python
 

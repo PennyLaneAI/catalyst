@@ -34,7 +34,6 @@ from pennylane import ctrl as PL_ctrl
 from pennylane.operation import DecompositionUndefinedError, Operation, Operator, Wires
 from pennylane.ops.op_math.controlled import Controlled
 from pennylane.tape import QuantumTape
-from scipy import sparse
 
 from catalyst import adjoint as C_adjoint
 from catalyst import cond
@@ -311,7 +310,7 @@ class TestCatalystControlled:
     def test_qctrl_wires(self, backend):
         """Test the wires property of HybridCtrl"""
 
-        @qml.qjit
+        @qjit
         @qml.qnode(qml.device(backend, wires=3))
         def circuit(theta):
             def func(theta):
@@ -328,7 +327,7 @@ class TestCatalystControlled:
     def test_qctrl_wires_arg_fun(self, backend):
         """Test the wires property of HybridCtrl with argument wires"""
 
-        @qml.qjit
+        @qjit
         @qml.qnode(qml.device(backend, wires=4))
         def circuit():
             def func(anc, wires):
@@ -345,7 +344,7 @@ class TestCatalystControlled:
     def test_qctrl_var_wires(self, backend):
         """Test the wires property of HybridCtrl with variable wires"""
 
-        @qml.qjit
+        @qjit
         @qml.qnode(qml.device(backend, wires=4))
         def circuit(anc, wires):
             def func(anc, wires):
@@ -362,7 +361,7 @@ class TestCatalystControlled:
     def test_qctrl_wires_nested(self, backend):
         """Test the wires property of HybridCtrl with nested branches"""
 
-        @qml.qjit
+        @qjit
         @qml.qnode(qml.device(backend, wires=4))
         def circuit(theta, w1, w2, cw1, cw2):
             def _func1():
@@ -383,7 +382,7 @@ class TestCatalystControlled:
     def test_qctrl_work_wires(self, backend):
         """Test the wires property of HybridCtrl with work-wires"""
 
-        @qml.qjit
+        @qjit
         @qml.qnode(qml.device(backend, wires=5))
         def circuit(theta):
             def _func1():
@@ -405,7 +404,7 @@ class TestCatalystControlled:
     def test_qctrl_wires_controlflow(self, backend):
         """Test the wires property of HybridCtrl with control flow branches"""
 
-        @qml.qjit
+        @qjit
         @qml.qnode(qml.device(backend, wires=3))
         def circuit(theta, w1, w2, cw):
             def _func():
@@ -511,7 +510,7 @@ class TestCatalystControlled:
             qml.ControlledSequence(qml.TrotterProduct(H, time=2.4, order=2), control=[1])
             return qml.expval(qml.PauliZ(0))
 
-        assert qml.math.allclose(qml.qjit(circuit)(), circuit())
+        assert qml.math.allclose(qjit(circuit)(), circuit())
 
     def test_distribute_controlled_with_adj(self):
         """Test that the distribute_controlled function with a PennyLane Adjoint,
@@ -537,8 +536,9 @@ class TestCatalystControlled:
 # - remove Controlled.id attribute checking from tests
 # - update metadata size (1 -> 2)
 # - remove hash(metadata) as `HybridOp` is not hashable
-# - remove torch, tf, autograd, and custom decompostion tests
+# - remove torch, tf, autograd, and custom decomposition tests
 # - remove non-callable error message test (duplicates catalyst test)
+# - remove PL-only tests of the Controlled class
 
 
 class TempOperator(Operator):
@@ -617,7 +617,7 @@ class TestControlledInit:
     @pytest.mark.parametrize("control_values", [True, False, 0, 1])
     def test_scalar_control_values(self, control_values):
         """Test assignment of provided control_values."""
-        op = Controlled(self.temp_op, 0, control_values=control_values)
+        op = C_ctrl(self.temp_op, 0, control_values=control_values)
         assert op.control_values == [control_values]
 
     def test_tuple_control_values(self):
@@ -1139,117 +1139,6 @@ class TestControlledQueuing:
         assert q.queue[0] is op
 
 
-CSWAP = qml.math.array(
-    [
-        [1, 0, 0, 0, 0, 0, 0, 0],
-        [0, 1, 0, 0, 0, 0, 0, 0],
-        [0, 0, 1, 0, 0, 0, 0, 0],
-        [0, 0, 0, 1, 0, 0, 0, 0],
-        [0, 0, 0, 0, 1, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0, 1, 0],
-        [0, 0, 0, 0, 0, 1, 0, 0],
-        [0, 0, 0, 0, 0, 0, 0, 1],
-    ]
-)  #: CSWAP gate
-
-CH = qml.math.array(
-    [
-        [1, 0, 0, 0],
-        [0, 1, 0, 0],
-        [0, 0, 1 / qml.math.sqrt(2), 1 / qml.math.sqrt(2)],
-        [0, 0, 1 / qml.math.sqrt(2), -1 / qml.math.sqrt(2)],
-    ]
-)  # CH gate
-
-
-def CRotx(theta):
-    r"""Two-qubit controlled rotation about the x axis.
-
-    Args:
-        theta (float): rotation angle
-    Returns:
-        array: unitary 4x4 rotation matrix
-        :math:`|0\rangle\langle 0|\otimes \mathbb{I}+|1\rangle\langle 1|\otimes R_x(\theta)`
-    """
-    return qml.math.array(
-        [
-            [1, 0, 0, 0],
-            [0, 1, 0, 0],
-            [0, 0, qml.math.cos(theta / 2), -1j * qml.math.sin(theta / 2)],
-            [0, 0, -1j * qml.math.sin(theta / 2), qml.math.cos(theta / 2)],
-        ]
-    )
-
-
-def CRoty(theta):
-    r"""Two-qubit controlled rotation about the y axis.
-
-    Args:
-        theta (float): rotation angle
-    Returns:
-        array: unitary 4x4 rotation matrix
-        :math:`|0\rangle\langle 0|\otimes \mathbb{I}+|1\rangle\langle 1|\otimes R_y(\theta)`
-    """
-    return qml.math.array(
-        [
-            [1, 0, 0, 0],
-            [0, 1, 0, 0],
-            [0, 0, qml.math.cos(theta / 2), -qml.math.sin(theta / 2)],
-            [0, 0, qml.math.sin(theta / 2), qml.math.cos(theta / 2)],
-        ]
-    )
-
-
-def CRotz(theta):
-    r"""Two-qubit controlled rotation about the z axis.
-
-    Args:
-        theta (float): rotation angle
-    Returns:
-        array: unitary 4x4 rotation matrix
-        :math:`|0\rangle\langle 0|\otimes \mathbb{I}+|1\rangle\langle 1|\otimes R_z(\theta)`
-    """
-    return qml.math.array(
-        [
-            [1, 0, 0, 0],
-            [0, 1, 0, 0],
-            [0, 0, qml.math.exp(-1j * theta / 2), 0],
-            [0, 0, 0, qml.math.exp(1j * theta / 2)],
-        ],
-        like=theta,
-    )
-
-
-def CRot3(a, b, c):
-    r"""Arbitrary two-qubit controlled rotation using three Euler angles.
-
-    Args:
-        a,b,c (float): rotation angles
-    Returns:
-        array: unitary 4x4 rotation matrix
-        :math:`|0\rangle\langle 0|\otimes \mathbb{I}+|1\rangle\langle 1|\otimes R(a,b,c)`
-    """
-    return qml.math.array(
-        [
-            [1, 0, 0, 0],
-            [0, 1, 0, 0],
-            [
-                0,
-                0,
-                qml.math.exp(-1j * (a + c) / 2) * qml.math.cos(b / 2),
-                -qml.math.exp(1j * (a - c) / 2) * qml.math.sin(b / 2),
-            ],
-            [
-                0,
-                0,
-                qml.math.exp(-1j * (a - c) / 2) * qml.math.sin(b / 2),
-                qml.math.exp(1j * (a + c) / 2) * qml.math.cos(b / 2),
-            ],
-        ],
-        like=a,
-    )
-
-
 def ControlledPhaseShift(phi):
     r"""Controlled phase shift.
 
@@ -1260,139 +1149,6 @@ def ControlledPhaseShift(phi):
         array: the two-wire controlled-phase matrix
     """
     return qml.math.diag([1, 1, 1, qml.math.exp(1j * phi)])
-
-
-# Failed with Catalyst because of different decomposition:
-# (qml.PauliX("a"), 2, qml.math.diag([1 for i in range(8)])),
-# (qml.CNOT(["a", "b"]), 1, qml.math.diag([1 for i in range(8)])),
-base_num_control_mats = [
-    (qml.PauliX("a"), 1, qml.math.array([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 0, 1], [0, 0, 1, 0]])),
-    (
-        qml.PauliY("a"),
-        1,
-        qml.math.array([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 0, -1j], [0, 0, 1j, 0]]),
-    ),
-    (qml.PauliZ("a"), 1, qml.math.array([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, -1]])),
-    (qml.PauliZ("a"), 2, qml.math.diag([1] * 7 + [-1])),
-    (qml.SWAP(("a", "b")), 1, CSWAP),
-    (qml.Hadamard("a"), 1, CH),
-    (qml.RX(1.234, "b"), 1, CRotx(1.234)),
-    (qml.RY(-0.432, "a"), 1, CRoty(-0.432)),
-    (qml.RZ(6.78, "a"), 1, CRotz(6.78)),
-    (qml.Rot(1.234, -0.432, 9.0, "a"), 1, CRot3(1.234, -0.432, 9.0)),
-    (qml.PhaseShift(1.234, wires="a"), 1, ControlledPhaseShift(1.234)),
-]
-
-
-class TestMatrix:
-    """Tests of Controlled.matrix and Controlled.sparse_matrix"""
-
-    def test_correct_matrix_dimensions_with_batching(self):
-        """Test batching returns a matrix of the correct dimensions"""
-
-        x = pnp.array([1.0, 2.0, 3.0])
-        base = qml.RX(x, 0)
-        op = Controlled(base, 1)
-        matrix = op.matrix()
-        assert matrix.shape == (3, 4, 4)
-
-    @pytest.mark.parametrize("base, num_control, mat", base_num_control_mats)
-    def test_matrix_compare_with_gate_data(self, base, num_control, mat):
-        """Test the matrix against matrices provided by `gate_data` file."""
-        op = Controlled(base, list(range(num_control)))
-        assert qml.math.allclose(op.matrix(), mat)
-
-    def test_aux_wires_included(self):
-        """Test that matrix expands to have identity on work wires."""
-
-        base = qml.PauliX(1)
-        op = Controlled(
-            base,
-            0,
-            work_wires="aux",
-        )
-        mat = op.matrix()
-        assert mat.shape == (4, 4)
-
-    def test_wire_order(self):
-        """Test that the ``wire_order`` keyword argument alters the matrix as expected."""
-        base = qml.RX(-4.432, wires=1)
-        op = Controlled(base, 0)
-
-        method_order = op.matrix(wire_order=(1, 0))
-        function_order = qml.math.expand_matrix(op.matrix(), op.wires, (1, 0))
-
-        assert qml.math.allclose(method_order, function_order)
-
-    @pytest.mark.parametrize("control_values", ([0, 0, 0], [0, 1, 0], [0, 0, 1], [1, 1, 0]))
-    def test_control_values(self, control_values):
-        """Test that the matrix with specified control_values is the same as using PauliX flips
-        to reverse the control values."""
-        control_wires = (0, 1, 2)
-
-        base = qml.RX(3.456, wires=3)
-        op = Controlled(base, control_wires, control_values=control_values)
-
-        mat = op.matrix()
-        with qml.queuing.AnnotatedQueue() as q:
-            [qml.PauliX(w) for w, val in zip(control_wires, control_values) if not val]
-            Controlled(base, control_wires, control_values=[1, 1, 1])
-            [qml.PauliX(w) for w, val in zip(control_wires, control_values) if not val]
-        tape = qml.tape.QuantumScript.from_queue(q)
-        decomp_mat = qml.matrix(tape, wire_order=op.wires)
-
-        assert qml.math.allclose(mat, decomp_mat)
-
-    def test_sparse_matrix_base_defines(self):
-        """Check that an op that defines a sparse matrix has it used in the controlled
-        sparse matrix."""
-
-        Hmat = (1.0 * qml.PauliX(0)).sparse_matrix()
-        H_sparse = qml.SparseHamiltonian(Hmat, wires="0")
-        op = Controlled(H_sparse, "a")
-
-        sparse_mat = op.sparse_matrix()
-        assert isinstance(sparse_mat, sparse.csr_matrix)
-        assert qml.math.allclose(sparse_mat.toarray(), op.matrix())
-
-    @pytest.mark.parametrize("control_values", ([0, 0, 0], [0, 1, 0], [0, 1, 1], [1, 1, 1]))
-    def test_sparse_matrix_only_matrix_defined(self, control_values):
-        """Check that an base doesn't define a sparse matrix but defines a dense matrix
-        still provides a controlled sparse matrix."""
-        control_wires = (0, 1, 2)
-        base = qml.U2(1.234, -3.2, wires=3)
-        op = Controlled(base, control_wires, control_values=control_values)
-
-        sparse_mat = op.sparse_matrix()
-        assert isinstance(sparse_mat, sparse.csr_matrix)
-        assert qml.math.allclose(op.sparse_matrix().toarray(), op.matrix())
-
-    def test_sparse_matrix_wire_order_error(self):
-        """Check a NonImplementedError is raised if the user requests specific wire order."""
-        control_wires = (0, 1, 2)
-        base = qml.U2(1.234, -3.2, wires=3)
-        op = Controlled(base, control_wires)
-
-        with pytest.raises(NotImplementedError):
-            op.sparse_matrix(wire_order=[3, 2, 1, 0])
-
-    def test_no_matrix_defined_sparse_matrix_error(self):
-        """Check that if the base gate defines neither a sparse matrix nor a dense matrix, a
-        SparseMatrixUndefined error is raised."""
-
-        base = TempOperator(1)
-        op = Controlled(base, 2)
-
-        with pytest.raises(qml.operation.SparseMatrixUndefinedError):
-            op.sparse_matrix()
-
-    def test_sparse_matrix_format(self):
-        """Test format keyword determines output type of sparse matrix."""
-        base = qml.PauliX(0)
-        op = Controlled(base, 1)
-
-        lil_mat = op.sparse_matrix(format="lil")
-        assert isinstance(lil_mat, sparse.lil_matrix)
 
 
 special_non_par_op_decomps = [
@@ -1665,14 +1421,6 @@ class TestDecomposition:
         op = C_ctrl(TempOperator(0), (1, 2))
         with pytest.raises(DecompositionUndefinedError):
             op.decomposition()
-
-    def test_global_phase_decomp_raises_warning(self):
-        """Test that ctrl(GlobalPhase).decomposition() raises a warning."""
-        op = qml.ctrl(qml.GlobalPhase(1.23), control=[0, 1])
-        with pytest.warns(
-            UserWarning, match="Multi-Controlled-GlobalPhase currently decomposes to nothing"
-        ):
-            assert op.decomposition() == []
 
     def test_control_on_zero(self):
         """Test decomposition applies PauliX gates to flip any control-on-zero wires."""

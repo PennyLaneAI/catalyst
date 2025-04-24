@@ -19,8 +19,10 @@
 import jax.numpy as jnp
 import pennylane as qml
 
+from catalyst import qjit
 
-@qml.qjit(target="mlir")
+
+@qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2))
 def state_prep_example():
     """Test example from
@@ -38,7 +40,7 @@ def state_prep_example():
 print(state_prep_example.mlir)
 
 
-@qml.qjit(target="mlir")
+@qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2))
 def basis_state_example():
     """Test example from
@@ -56,7 +58,7 @@ def basis_state_example():
 print(basis_state_example.mlir)
 
 
-@qml.qjit(target="mlir")
+@qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2))
 def state_prep_example_double():
     """What happens if we have two? It shouldn't be repeated because

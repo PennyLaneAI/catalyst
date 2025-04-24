@@ -14,6 +14,8 @@
 
 """Test built-in differentiation support in Catalyst."""
 
+import platform
+
 import jax
 import numpy as np
 import pennylane as qml
@@ -36,8 +38,17 @@ from catalyst import (
     value_and_grad,
     vmap,
 )
+from catalyst.compiler import get_lib_path
+from catalyst.device.op_support import (
+    _are_param_frequencies_same_as_catalyst,
+    _has_grad_recipe,
+    _has_parameter_frequencies,
+    _is_grad_recipe_same_as_catalyst,
+    _paramshift_op_checker,
+)
+from catalyst.jax_tracer import HybridOp
 
-# pylint: disable=too-many-lines
+# pylint: disable=too-many-lines,missing-function-docstring,missing-class-docstring
 
 
 class TestGradShape:
@@ -75,7 +86,7 @@ def test_gradient_generate_once():
     def identity(x):
         return x
 
-    @qml.qjit
+    @qjit
     def wrap(x: float):
         diff = grad(identity)
         return diff(x) + diff(x)
@@ -779,6 +790,28 @@ def test_ps_probs(backend):
 
     result = workflow(0.5)
     reference = qml.jacobian(func, argnum=0)(0.5)
+
+    assert np.allclose(result, reference)
+
+
+@pytest.mark.xfail(reason="Issue #1571 https://github.com/PennyLaneAI/catalyst/issues/1571")
+@pytest.mark.parametrize("gate_n_inputs", [(qml.CRX, [1]), (qml.CRot, [1, 2, 3])])
+def test_ps_four_term_rule(backend, gate_n_inputs):
+    """Operations with the 4-term shift rule need to be decomposed to be differentiated."""
+    gate, inputs = gate_n_inputs
+
+    @qml.qnode(qml.device(backend, wires=2), diff_method="parameter-shift")
+    def f(x):
+        qml.RY(0.321, wires=0)
+        gate(*(x * i for i in inputs), wires=[0, 1])
+        return qml.expval(0.5 * qml.Z(1) @ qml.X(0) - 0.4 * qml.Y(1) @ qml.H(0))
+
+    @qjit
+    def main(x: float):
+        return qml.grad(f)(x)
+
+    result = main(0.1)
+    reference = main.original_function(qml.numpy.array(0.1))
 
     assert np.allclose(result, reference)
 
@@ -1692,7 +1725,7 @@ class TestGradientErrors:
 
         with pytest.raises(DifferentiableCompileError, match="MidCircuitMeasure is not allowed"):
 
-            @qml.qjit
+            @qjit
             def cir(x: float):
                 return grad(f)(x)
 
@@ -1707,7 +1740,7 @@ class TestGradientErrors:
 
         with pytest.raises(CompileError, match=".*Compilation failed.*"):
 
-            @qml.qjit
+            @qjit
             def cir(x: float):
                 return grad(f)(x)
 
@@ -1724,7 +1757,7 @@ class TestGradientErrors:
 
         with pytest.raises(CompileError, match=".*Compilation failed.*"):
 
-            @qml.qjit
+            @qjit
             def cir(x: float):
                 return grad(g)(x)
 
@@ -1805,6 +1838,440 @@ def test_grad_argnums(argnums):
     _, result = value_and_grad(circuit, argnums=argnums)(weights, inputs)
     _, expected = jax.value_and_grad(circuit.original_function, argnums=argnums)(weights, inputs)
     assert compare_structure_and_value(result, expected)
+
+
+class TestGradientMethodErrors:
+    """Test errors for different gradient methods."""
+
+    @staticmethod
+    def get_custom_device(grad_method="fd", **kwargs):
+        """Generate a custom device with specified gradient method."""
+        lightning_device = qml.device("lightning.qubit", wires=0)
+
+        class CustomDevice(qml.devices.Device):
+            """Custom Gate Set Device"""
+
+            def __init__(self, shots=None, wires=None):
+                super().__init__(wires=wires, shots=shots)
+                self.qjit_capabilities = lightning_device.capabilities
+
+            def preprocess(self, execution_config=None):
+                """Device preprocessing function."""
+                program, config = lightning_device.preprocess(execution_config)
+                config.gradient_method = grad_method
+                return program, config
+
+            @staticmethod
+            def get_c_interface():
+                """Returns a tuple consisting of the device name, and
+                the location to the shared object with the C/C++ device implementation.
+                """
+                system_extension = ".dylib" if platform.system() == "Darwin" else ".so"
+                lib_path = (
+                    get_lib_path("runtime", "RUNTIME_LIB_DIR")
+                    + "/librtd_null_qubit"
+                    + system_extension
+                )
+                return "NullQubit", lib_path
+
+            def execute(self, _circuits, _execution_config):
+                """Raises: RuntimeError"""
+                raise RuntimeError("QJIT devices cannot execute tapes.")
+
+            def supports_derivatives(self, config, circuit=None):  # pylint: disable=unused-argument
+                """Pretend we support any derivatives"""
+                return True
+
+        return CustomDevice(**kwargs)
+
+    def test_device_grad_method_error(self):
+        """Test that using 'device' grad method raises appropriate error."""
+
+        @qml.qnode(self.get_custom_device(grad_method="device", wires=1))
+        def f(x: float):
+            qml.RX(x, wires=0)
+            return qml.expval(qml.PauliY(0))
+
+        with pytest.raises(
+            ValueError, match="The device does not provide a catalyst compatible gradient method"
+        ):
+            qjit(grad(f))
+
+    def test_finite_diff_grad_method_error(self):
+        """Test that using 'finite-diff' grad method raises appropriate error."""
+
+        @qml.qnode(self.get_custom_device(grad_method="finite-diff", wires=1))
+        def f(x: float):
+            qml.RX(x, wires=0)
+            return qml.expval(qml.PauliY(0))
+
+        with pytest.raises(
+            ValueError, match="Finite differences at the QNode level is not supported"
+        ):
+            qjit(grad(f))
+
+    def test_invalid_grad_method_error(self):
+        """Test that using an invalid grad method raises appropriate error."""
+
+        @qml.qnode(self.get_custom_device(grad_method="invalid_method", wires=1))
+        def f(x: float):
+            qml.RX(x, wires=0)
+            return qml.expval(qml.PauliY(0))
+
+        with pytest.raises(ValueError, match="Invalid gradient method: invalid_method"):
+            qjit(grad(f))
+
+
+class TestParameterShiftVerificationUnitTests:
+    """Unit tests for parameter shift verification"""
+
+    def test_check_grad_recipe_no_grad_recipe(self):
+        """Check that if grad recipe is not defined, no exception gets triggered"""
+
+        # a family of ops that do not have grad recipe are control flow ops
+        class DummyOp(qml.operation.Operator): ...
+
+        assert not _has_grad_recipe(DummyOp(wires=[0]))
+
+    def test_check_grad_recipe_empty(self):
+        """Some grad recipes are defined but are filled with Nones"""
+
+        class DummyOp(qml.operation.Operator):
+            @property
+            def grad_recipe(self):
+                return [None]
+
+        assert not _has_grad_recipe(DummyOp(wires=[0]))
+
+    def test_check_grad_recipe_different_size(self):
+        """len(grad_recipe) != len(op.data)"""
+
+        class DummyOp(qml.operation.Operator):
+            def __init__(self, wires=None):
+                param = 0.0
+                super().__init__(param, wires=wires)
+
+            @property
+            def num_params(self):
+                return 1
+
+            @property
+            def grad_recipe(self):
+                return (
+                    [[0.5, 1.0, np.pi / 2], [-0.5, 1.0, -np.pi / 2]],
+                    [[0.5, 1.0, np.pi / 2], [-0.5, 1.0, -np.pi / 2]],
+                )
+
+        assert not _is_grad_recipe_same_as_catalyst(DummyOp(wires=[0]))
+
+    def test_check_grad_recipe_different(self):
+        """Check exception is raised when invalid grad_recipe is found"""
+
+        class DummyOp(qml.operation.Operator):
+            def __init__(self, wires=None):
+                param = 0.0
+                super().__init__(param, wires=wires)
+
+            @property
+            def num_params(self):
+                return 1
+
+            @property
+            def grad_recipe(self):
+                return ([[0.0, 0.0, 0.0], [0.0, 0.0, 0.0]],)
+
+        assert not _is_grad_recipe_same_as_catalyst(DummyOp(wires=[0]))
+
+    def test_check_grad_recipe_dynamic(self):
+        """Check exception is raised when dynamic grad recipe is found"""
+
+        class DummyOp(qml.operation.Operator):
+            def __init__(self, param, wires=None):
+                self.param = param
+                super().__init__(param, wires=wires)
+
+            @property
+            def num_params(self):
+                return 1
+
+            @property
+            def grad_recipe(self):
+                return ([[0.5, self.param, jnp.pi / 2], [-0.5, 1.0, -jnp.pi / 2]],)
+
+        def program(x):
+            assert not _is_grad_recipe_same_as_catalyst(DummyOp(x, wires=[0]))
+
+        jax.make_jaxpr(program)(0.0)
+
+    def test_check_param_frequencies(self):
+        """No param frequencies attr"""
+
+        class DummyOp(qml.operation.Operator): ...
+
+        assert not hasattr(DummyOp, "parameter_frequencies")
+        assert not _has_parameter_frequencies(DummyOp(wires=[0]))
+
+    def test_check_param_frequencies_different_length(self):
+        """Check exception is raised when frequencies length mismatches parameter length"""
+
+        class DummyOp(qml.operation.Operator):
+            def __init__(self, wires=None):
+                super().__init__(0.0, wires=wires)
+
+            @property
+            def num_params(self):
+                return 1
+
+            @property
+            def parameter_frequencies(self):
+                return [1.0, 1.0]
+
+        assert not _are_param_frequencies_same_as_catalyst(DummyOp(wires=[0]))
+
+    def test_check_invalid_frequencies(self):
+        """Check exception is raised when invalid frequencies are found"""
+
+        class DummyOp(qml.operation.Operator):
+            def __init__(self, wires=None):
+                super().__init__(0.0, wires=wires)
+
+            @property
+            def num_params(self):
+                return 1
+
+            @property
+            def parameter_frequencies(self):
+                return [(0.0,)]
+
+        assert not _are_param_frequencies_same_as_catalyst(DummyOp(wires=[0]))
+
+    def test_undefined_frequencies(self):
+        """Test ParameterFrequenciesUndefinedError"""
+
+        class DummyOp(qml.operation.Operator):
+            def __init__(self, wires=None):
+                super().__init__(0.0, wires=wires)
+
+            @property
+            def num_params(self):
+                return 1
+
+            @property
+            def parameter_frequencies(self):
+                raise qml.operation.ParameterFrequenciesUndefinedError()
+
+        assert not _has_parameter_frequencies(DummyOp(wires=[0]))
+
+    def test_qubit_unitary(self):
+        """QubitUnitary is not a differentiable gate in Catalyst"""
+        op = qml.QubitUnitary(jnp.array([[1, 1], [1, -1]]), wires=0)
+        assert not _paramshift_op_checker(op)
+
+    def test_no_grad_recipe_no_param_frequencies(self):
+        """No grad recipe, no param shift, not hybrid op => no grad"""
+
+        class DummyOp(qml.operation.Operator):
+            def __init__(self, wires=None):
+                super().__init__(0.0, wires=wires)
+
+            @property
+            def num_params(self):
+                return 1
+
+        assert not _paramshift_op_checker(DummyOp(wires=[0]))
+
+    def test_hybrid_op(self):
+        """HybridOp => grad"""
+
+        class DummyOp(HybridOp):
+            def __init__(self):
+                super().__init__([], [], [])
+
+        assert _paramshift_op_checker(DummyOp())
+
+
+class TestParameterShiftVerificationIntegrationTests:
+    """Test to verify operations / observables / measurements when doing parameter shift.
+
+    Source of truth obtained from shortcut story: 84819
+    """
+
+    def test_is_mcm(self, backend):
+        """No mcm"""
+
+        device = qml.device(backend, wires=1)
+
+        with pytest.raises(DifferentiableCompileError, match="MidCircuitMeasure is not allowed"):
+
+            @qjit
+            @grad
+            @qml.qnode(device, diff_method="parameter-shift")
+            def circuit(_: float):
+                measure(0)
+                return qml.expval(qml.PauliZ(wires=0))
+
+    def test_all_arguments_are_constant(self, backend):
+        """When all arguments are constant they do not contribute to the gradient"""
+        device = qml.device(backend, wires=1)
+
+        # Yes, this test does not have an assertion.
+        # The test is that this does not produce an assertion.
+
+        @qjit
+        @grad
+        @qml.qnode(device, diff_method="parameter-shift")
+        def circuit(_: float):
+            qml.RX(0.0, wires=[0])
+            return qml.expval(qml.PauliZ(wires=0))
+
+    def test_grad_recipe_dynamic(self, backend):
+        """Raise exception when there is an op with a grad_recipe that's dynamic"""
+        device = qml.device(backend, wires=1)
+
+        class RX(qml.RX):
+            @property
+            def grad_recipe(self):
+                x = self.data[0]
+                c = 0.5 / jnp.sin(x)
+                return ([[c, 0.0, 2 * x], [-c, 0.0, 0.0]],)
+
+        with pytest.raises(CompileError):
+
+            @qjit
+            @grad
+            @qml.qnode(device, diff_method="parameter-shift")
+            def circuit(x: float):
+                RX(x, wires=[0])
+                return qml.expval(qml.PauliZ(wires=0))
+
+    def test_grad_recipe_static(self, backend):
+        """Raise exception when there is an op with a mismatching grad_recipe"""
+        device = qml.device(backend, wires=1)
+
+        class RX(qml.RX):
+            @property
+            def grad_recipe(self):
+                return ([[0.0, 0.0, 0.0], [0.0, 0.0, 0.0]],)
+
+        with pytest.raises(CompileError):
+
+            @qjit
+            @grad
+            @qml.qnode(device, diff_method="parameter-shift")
+            def circuit(x: float):
+                RX(x, wires=[0])
+                return qml.expval(qml.PauliZ(wires=0))
+
+    def test_parameter_frequencies(self, backend):
+        """Raise exception when when there is an lengths are mismatched."""
+        device = qml.device(backend, wires=1)
+
+        class RX(qml.RX):
+            @property
+            def parameter_frequencies(self):
+                # Only one parameter but two frequencies is an error
+                return (1.0, 1.0)
+
+        with pytest.raises(CompileError):
+
+            @qjit
+            @grad
+            @qml.qnode(device, diff_method="parameter-shift")
+            def circuit(x: float):
+                RX(x, wires=[0])
+                return qml.expval(qml.PauliZ(wires=0))
+
+    def test_parameter_frequencies_not_one(self, backend):
+        """When there is an op without parameter_frequencies, ps gradient should fail"""
+        device = qml.device(backend, wires=1)
+
+        class RX(qml.RX):
+            @property
+            def parameter_frequencies(self):
+                # Only one parameter but two frequencies is an error
+                return [(2.0,)]
+
+        with pytest.raises(CompileError):
+
+            @qjit
+            @grad
+            @qml.qnode(device, diff_method="parameter-shift")
+            def circuit(x: float):
+                RX(x, wires=[0])
+                return qml.expval(qml.PauliZ(wires=0))
+
+
+def test_closure_variable_grad():
+    """Test that grad can take closure variables"""
+
+    @qml.qjit
+    def workflow_closure(x, y):
+
+        dev = qml.device("lightning.qubit", wires=1)
+
+        @qml.qnode(dev)
+        def circuit(x):
+            qml.RX(jnp.pi * x, wires=0)
+            qml.RX(jnp.pi * y, wires=0)
+            return qml.expval(qml.PauliY(0))
+
+        g = grad(circuit)
+        return g(x)
+
+    @qml.qjit
+    def workflow_no_closure(x, y):
+
+        dev = qml.device("lightning.qubit", wires=1)
+
+        @qml.qnode(dev)
+        def circuit(x, y):
+            qml.RX(jnp.pi * x, wires=0)
+            qml.RX(jnp.pi * y, wires=0)
+            return qml.expval(qml.PauliY(0))
+
+        g = grad(circuit)
+        return g(x, y)
+
+    expected = workflow_no_closure(1.0, 0.25)
+    observed = workflow_closure(1.0, 0.25)
+    assert np.allclose(expected, observed)
+
+
+def test_closure_variable_value_and_grad():
+    """Test that value and grad can take closure variables"""
+
+    @qml.qjit
+    def workflow_closure(x, y):
+
+        dev = qml.device("lightning.qubit", wires=1)
+
+        @qml.qnode(dev)
+        def circuit(x):
+            qml.RX(jnp.pi * x, wires=0)
+            qml.RX(jnp.pi * y, wires=0)
+            return qml.expval(qml.PauliY(0))
+
+        g = value_and_grad(circuit)
+        return g(x)
+
+    @qml.qjit
+    def workflow_no_closure(x, y):
+
+        dev = qml.device("lightning.qubit", wires=1)
+
+        @qml.qnode(dev)
+        def circuit(x, y):
+            qml.RX(jnp.pi * x, wires=0)
+            qml.RX(jnp.pi * y, wires=0)
+            return qml.expval(qml.PauliY(0))
+
+        g = value_and_grad(circuit)
+        return g(x, y)
+
+    x, y = 1.0, 0.25
+    expected = workflow_no_closure(x, y)
+    observed = workflow_closure(x, y)
+    assert np.allclose(expected, observed)
 
 
 if __name__ == "__main__":

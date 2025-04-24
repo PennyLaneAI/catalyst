@@ -14,10 +14,30 @@ on:
     # Thursdays we test the standalone plugin
     - cron: '35 4 * * 4'
   workflow_dispatch:
+    inputs:
+      build_standalone_plugin:
+        description: 'Build the standalone plugin wheel'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+        required: false
+        default: 'false'
   workflow_call:
+    inputs:
+      build_standalone_plugin:
+        description: 'Build the standalone plugin wheel'
+        type: boolean
+        required: false
+        default: false
 
 env:
   MACOSX_DEPLOYMENT_TARGET: 14.0
+
+  # If the `inputs.build_standalone_plugin` is set to a value (true/false), then that is used.
+  # If the input is empty (meaning this workflow was not triggered by a workflow_call/workflow_dispatch), then check if event_name is schedule.
+  # If event_name is NOT schedule, default to false
+  BUILD_STANDALONE_PLUGIN: ${{ format('{0}', inputs.build_standalone_plugin) || github.event_name == 'schedule' }}
 
 concurrency:
   group: Build Catalyst Wheel on macOS (arm64)-${{ github.ref }}
@@ -240,9 +260,12 @@ jobs:
       run: |
         echo /Library/Frameworks/Python.framework/Versions/${{ matrix.python_version }}/bin >> $GITHUB_PATH
 
+    # CMake four has dropped compatibility for CMake 3.5, which is the minimum specified by the
+    # LAPACKE reference implementation. TODO: Look into how to upgrade beyond this limit.
     - name: Install Dependencies (Python)
       run: |
-        python${{ matrix.python_version }} -m pip install numpy nanobind pybind11 PyYAML cmake ninja delocate
+        python${{ matrix.python_version }} -m pip install numpy nanobind pybind11 PyYAML ninja delocate
+        python${{ matrix.python_version }} -m pip install cmake'<4'
 
     - name: Get Cached LLVM Source
       id: cache-llvm-source
@@ -297,6 +320,7 @@ jobs:
 
     # Build Catalyst-Runtime
     - name: Build Catalyst-Runtime
+      id: runtime-build
       run: |
         # On GH images, gfortran is only available as a specific version.
         export FC=gfortran-14
@@ -305,9 +329,15 @@ jobs:
               -DCMAKE_LIBRARY_OUTPUT_DIRECTORY="$GITHUB_WORKSPACE/runtime-build/lib" \
               -DPython_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -DENABLE_OPENQASM=ON \
+              -DENABLE_OQD=OFF \
               -DMLIR_INCLUDE_DIRS="$GITHUB_WORKSPACE/mlir/llvm-project/mlir/include"
 
         cmake --build $GITHUB_WORKSPACE/runtime-build --target rt_capi rtd_openqasm rtd_null_qubit
+
+    - name: Error log on failure
+      if: failure() && steps.runtime-build.outcome == 'failure'
+      run: |
+        cat $GITHUB_WORKSPACE/runtime-build/_lapacke-accelerate/src/lapacke-accelerate-stamp/*-err.log 2>/dev/null || True
 
     - name: Test Catalyst-Runtime
       run: |
@@ -322,14 +352,6 @@ jobs:
           RT_BUILD_DIR="$GITHUB_WORKSPACE/runtime-build" \
           PYTHON=$(which python${{ matrix.python_version }}) \
           make oqc
-
-    # Build OQD-Runtime
-    - name: Build OQD-Runtime
-      run: |
-          OQD_BUILD_DIR="$GITHUB_WORKSPACE/oqd-build" \
-          RT_BUILD_DIR="$GITHUB_WORKSPACE/runtime-build" \
-          PYTHON=$(which python${{ matrix.python_version }}) \
-          make oqd
 
     # Build Quantum and Gradient Dialects
     - name: Build MLIR Dialects
@@ -354,7 +376,7 @@ jobs:
 
     - name: Build Plugin wheel
       # Run only on Thursday at the given time
-      if: github.event.schedule == '35 4 * * 4'
+      if: env.BUILD_STANDALONE_PLUGIN == 'true'
       run: |
         MLIR_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir" \
         LLVM_BUILD_DIR="$GITHUB_WORKSPACE/llvm-build" \
@@ -368,7 +390,6 @@ jobs:
         DIALECTS_BUILD_DIR="$GITHUB_WORKSPACE/quantum-build" \
         RT_BUILD_DIR="$GITHUB_WORKSPACE/runtime-build" \
         OQC_BUILD_DIR="$GITHUB_WORKSPACE/oqc-build" \
-        OQD_BUILD_DIR="$GITHUB_WORKSPACE/oqd-build" \
         ENZYME_BUILD_DIR="$GITHUB_WORKSPACE/enzyme-build" \
         make wheel
 
@@ -386,7 +407,7 @@ jobs:
 
     - name: Upload Standalone Plugin Wheel Artifact
       # Run only on Thursday at the given time
-      if: github.event.schedule == '35 4 * * 4'
+      if: env.BUILD_STANDALONE_PLUGIN == 'true'
       uses: actions/upload-artifact@v4
       with:
         name: standalone-plugin-macos_arm64-wheel-py-${{ matrix.python_version }}.zip
@@ -423,7 +444,7 @@ jobs:
 
     - name: Download Standalone Plugin Wheel Artifact
       # Run only on Thursday at the given time
-      if: github.event.schedule == '35 4 * * 4'
+      if: env.BUILD_STANDALONE_PLUGIN == 'true'
       uses: actions/download-artifact@v4
       with:
         name: standalone-plugin-macos_arm64-wheel-py-${{ matrix.python_version }}.zip
@@ -455,7 +476,7 @@ jobs:
 
     - name: Install Standalone Plugin
       # Run only on Thursday at the given time
-      if: github.event.schedule == '35 4 * * 4'
+      if: env.BUILD_STANDALONE_PLUGIN == 'true'
       run: |
         python${{ matrix.python_version }} -m pip install standalone_plugin_wheel/wheel/*.whl --no-deps
 
@@ -469,6 +490,6 @@ jobs:
 
     - name: Run Standalone Plugin Tests
       # Run only on Thursday at the given time
-      if: github.event.schedule == '35 4 * * 4'
+      if: env.BUILD_STANDALONE_PLUGIN == 'true'
       run: |
         python${{ matrix.python_version }} -m pytest standalone_plugin_wheel/standalone_plugin/test -n auto

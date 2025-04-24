@@ -65,8 +65,10 @@
 #include "Gradient/IR/GradientInterfaces.h"
 #include "Gradient/Transforms/Passes.h"
 #include "Ion/IR/IonDialect.h"
+#include "MBQC/IR/MBQCDialect.h"
 #include "Mitigation/IR/MitigationDialect.h"
 #include "Mitigation/Transforms/Passes.h"
+#include "QEC/IR/QECDialect.h"
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/Transforms/Passes.h"
 
@@ -295,6 +297,8 @@ void registerAllCatalystDialects(DialectRegistry &registry)
     // Catalyst
     registry.insert<CatalystDialect>();
     registry.insert<quantum::QuantumDialect>();
+    registry.insert<qec::QECDialect>();
+    registry.insert<mbqc::MBQCDialect>();
     registry.insert<ion::IonDialect>();
     registry.insert<gradient::GradientDialect>();
     registry.insert<mitigation::MitigationDialect>();
@@ -460,6 +464,12 @@ LogicalResult runEnzymePasses(const CompilerOptions &options,
 
 std::string readInputFile(const std::string &filename)
 {
+    if (filename == "-") {
+        std::stringstream buffer;
+        std::istreambuf_iterator<char> begin(std::cin), end;
+        buffer << std::string(begin, end);
+        return buffer.str();
+    }
     std::ifstream file(filename);
     if (!file.is_open()) {
         return "";
@@ -494,7 +504,7 @@ LogicalResult preparePassManager(PassManager &pm, const CompilerOptions &options
             s << *op;
             std::string fileName = pipelineName.str();
             if (auto funcOp = dyn_cast<mlir::func::FuncOp>(op)) {
-                fileName += "_" + funcOp.getName().str();
+                fileName += std::string("_") + funcOp.getName().str();
             }
             dumpToFile(options, output.nextPipelineDumpFilename(fileName), tmp);
         }
@@ -645,6 +655,10 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
     // TODO: FIXME:
     // Let's try to enable multithreading. Do not forget to protect the printing.
     ctx.disableMultithreading();
+    // The transform dialect doesn't appear to load dependent dialects
+    // fpr named passes.
+    ctx.loadAllAvailableDialects();
+
     ScopedDiagnosticHandler scopedHandler(
         &ctx, [&](Diagnostic &diag) { diag.print(options.diagnosticStream); });
 
@@ -711,7 +725,9 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
             return failure();
         }
         output.outIR.clear();
-        outIRStream << *mlirModule;
+        if (options.keepIntermediate) {
+            outIRStream << *mlirModule;
+        }
         optTiming.stop();
     }
 
@@ -736,7 +752,9 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
             dumpToFile(options, outFile, tmp);
         }
         output.outIR.clear();
-        outIRStream << *llvmModule;
+        if (options.keepIntermediate) {
+            outIRStream << *llvmModule;
+        }
         translateTiming.stop();
     }
 
@@ -790,16 +808,47 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
             catalyst::utils::LinesCount::Module(*llvmModule.get());
         }
 
+        std::string errorMessage;
+        auto outfile = openOutputFile(output.outputFilename, &errorMessage);
+        if (output.outputFilename == "-" && llvmModule) {
+            // Do not generate file if outputting to stdout.
+            outfile->os() << *llvmModule;
+            outfile->keep();
+            // early exit
+            return success();
+        }
+
         TimingScope outputTiming = llcTiming.nest("compileObject");
         output.outIR.clear();
-        outIRStream << *llvmModule;
+        if (options.keepIntermediate) {
+            outIRStream << *llvmModule;
+        }
 
         if (failed(timer::timer(compileObjectFile, "compileObjFile", /* add_endl */ true, options,
-                                std::move(llvmModule), targetMachine, options.getObjectFile()))) {
+                                llvmModule, targetMachine, options.getObjectFile()))) {
             return failure();
         }
         outputTiming.stop();
         llcTiming.stop();
+    }
+
+    std::string errorMessage;
+    auto outfile = openOutputFile(output.outputFilename, &errorMessage);
+    if (!outfile) {
+        llvm::errs() << errorMessage << "\n";
+        return failure();
+    }
+    else if (output.outputFilename == "-" && llvmModule) {
+        // already handled
+    }
+    else if (output.outputFilename == "-" && mlirModule) {
+        outfile->os() << *mlirModule;
+        outfile->keep();
+    }
+
+    if (options.keepIntermediate and output.outputFilename != "-") {
+        outfile->os() << output.outIR;
+        outfile->keep();
     }
 
     return success();
@@ -958,15 +1007,6 @@ int QuantumDriverMainFromCL(int argc, char **argv)
         return 1;
     }
 
-    // If not creating object file, output the IR to the specified file.
-    std::string errorMessage;
-    auto outfile = openOutputFile(outputFilename, &errorMessage);
-    if (!outfile) {
-        llvm::errs() << errorMessage << "\n";
-        return 1;
-    }
-    outfile->os() << output->outIR;
-    outfile->keep();
     if (Verbose)
         llvm::outs() << "Compilation successful:\n" << output->diagnosticMessages << "\n";
     return 0;

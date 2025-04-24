@@ -32,6 +32,7 @@ something like the following:
 
   ```python
   import pennylane as qml
+  from catalyst import qjit
   from pathlib import Path
 
   from catalyst.passes import apply_pass
@@ -43,7 +44,7 @@ something like the following:
   def bar():
     return qml.state()
 
-  @qml.qjit(keep_intermediate=True, verbose=True, pass_plugins=[plugin], dialect_plugins=[plugin])
+  @qjit(keep_intermediate=True, verbose=True, pass_plugins=[plugin], dialect_plugins=[plugin])
   def module():
     return bar()
 
@@ -66,8 +67,8 @@ from pathlib import Path
 import pennylane as qml
 
 import catalyst
-from catalyst.compiler import CompileOptions, Compiler
-from catalyst.utils.filesystem import WorkspaceManager
+from catalyst import qjit
+from catalyst.compiler import _quantum_opt
 from catalyst.utils.runtime_environment import get_bin_path
 
 mlir_module = """
@@ -92,19 +93,19 @@ ext = "so" if platform.system() == "Linux" else "dylib"
 plugin_path = get_bin_path("cli", "CATALYST_BIN_DIR") + f"/../lib/StandalonePlugin.{ext}"
 plugin = Path(plugin_path)
 custom_pipeline = [("run_only_plugin", ["builtin.module(apply-transform-sequence)"])]
-options = CompileOptions(
-    pipelines=custom_pipeline, lower_to_llvm=False, pass_plugins=[plugin], dialect_plugins=[plugin]
+mlir_string = _quantum_opt(
+    ("--load-pass-plugin", plugin),
+    ("--load-dialect-plugin", plugin),
+    ("--pass-pipeline", "builtin.module(apply-transform-sequence)"),
+    stdin=mlir_module,
 )
-workspace = WorkspaceManager.get_or_create_workspace("test", None)
-custom_compiler = Compiler(options)
-_, mlir_string = custom_compiler.run_from_ir(mlir_module, "test", workspace)
 print(mlir_string)
 
 
 def test_pass_options():
     """Is the option in the generated MLIR?"""
 
-    @qml.qjit(target="mlir")
+    @qjit(target="mlir")
     # CHECK: options = "an-option maxValue=1"
     @catalyst.passes.apply_pass("some-pass", "an-option", maxValue=1)
     @qml.qnode(qml.device("null.qubit", wires=1))

@@ -256,7 +256,7 @@ class TestCudaQ:
     def test_cuda_device_entry_point_compiler(self):
         """Test the entry point for cudaq.qjit"""
 
-        @qml.qjit(compiler="cuda_quantum")
+        @qjit(compiler="cuda_quantum")
         @qml.qnode(qml.device("softwareq.qpp", wires=1))
         def circuit(a):
             qml.RX(a, wires=[0])

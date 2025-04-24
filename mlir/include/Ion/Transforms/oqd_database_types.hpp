@@ -18,7 +18,8 @@
 #include <string>
 #include <vector>
 
-namespace {
+namespace catalyst {
+namespace ion {
 
 //
 // Calibrated parameters
@@ -39,21 +40,12 @@ struct Beam {
 struct Phonon {
     // This struct contains the calibrated phonon parameters on one axis.
     double energy;
-    std::vector<int64_t> eigenvector;
+    std::vector<double> eigenvector;
 
-    Phonon(double _energy, std::vector<int64_t> _eigenvector)
+    Phonon(double _energy, std::vector<double> _eigenvector)
         : energy(_energy), eigenvector(_eigenvector)
     {
     }
-};
-
-struct PhononMode {
-    // This struct contains the calibrated phonon parameters for one ion.
-    Phonon COM_x;
-    Phonon COM_y;
-    Phonon COM_z;
-
-    PhononMode(Phonon x, Phonon y, Phonon z) : COM_x(x), COM_y(y), COM_z(z) {}
 };
 
 //
@@ -81,11 +73,12 @@ struct Level {
 struct Transition {
     // This class represents a transition between two atomic levels.
     // It contains the innate properties of the qubit.
-    std::string level_0, level_1;
+    std::string level_0, level_1, multipole;
     double einstein_a;
 
-    Transition(std::string _level_0, std::string _level_1, double _einstein_a)
-        : level_0(_level_0), level_1(_level_1), einstein_a(_einstein_a)
+    Transition(std::string _level_0, std::string _level_1, std::string _multipole,
+               double _einstein_a)
+        : level_0(_level_0), level_1(_level_1), multipole(_multipole), einstein_a(_einstein_a)
     {
     }
 };
@@ -107,4 +100,5 @@ struct Ion {
     }
 };
 
-} // namespace
+} // namespace ion
+} // namespace catalyst

@@ -14,7 +14,9 @@
 
 """PyTests for the AutoGraph source-to-source transformation feature."""
 
+import itertools
 import traceback
+import warnings
 from collections import defaultdict
 
 import jax
@@ -25,7 +27,21 @@ import pytest
 from jax.errors import TracerBoolConversionError
 from numpy.testing import assert_allclose
 
-from catalyst import *
+from catalyst import AutoGraphError, debug, passes, qjit
+from catalyst.api_extensions import (
+    adjoint,
+    cond,
+    ctrl,
+    for_loop,
+    grad,
+    jacobian,
+    jvp,
+    measure,
+    vjp,
+    vmap,
+    while_loop,
+)
+from catalyst.autograph import autograph_source, disable_autograph, run_autograph
 from catalyst.autograph.transformer import TRANSFORMER
 from catalyst.utils.dummy import dummy_func
 from catalyst.utils.exceptions import CompileError
@@ -370,6 +386,60 @@ class TestIntegration:
         assert np.allclose(fn(3)[0], tuple([jnp.array(6.0), jnp.array(9.0)]))
         assert np.allclose(fn(3)[1], tuple([jnp.array(2.0), jnp.array(6.0)]))
 
+    def test_ctrl_with_operation_as_argument(self):
+        """Test that qml.ctrl works when an operation is passed as argument."""
+        dev = qml.device("lightning.qubit", wires=2)
+
+        @qml.qjit(autograph=True)
+        @qml.qnode(dev)
+        def circuit():
+            qml.ctrl(qml.PauliX(0), control=1)
+            return qml.probs(wires=0)
+
+        assert hasattr(circuit.user_function, "ag_unconverted")
+        assert jnp.allclose(circuit(), jnp.array([1.0, 0.0]))
+
+    def test_adjoint_with_operation_as_argument(self):
+        """Test that qml.adjoint works when an operation is passed as argument."""
+        dev = qml.device("lightning.qubit", wires=2)
+
+        @qml.qjit(autograph=True)
+        @qml.qnode(dev)
+        def circuit():
+            qml.adjoint(qml.PauliX(0))
+            return qml.probs(wires=0)
+
+        assert hasattr(circuit.user_function, "ag_unconverted")
+        assert jnp.allclose(circuit(), jnp.array([0.0, 1.0]))
+
+    def test_adjoint_no_argument(self):
+        """Test that passing no argument to qml.adjoint raises an error."""
+        with pytest.raises(ValueError, match="adjoint requires at least one argument"):
+            dev = qml.device("lightning.qubit", wires=2)
+
+            @qml.qjit(autograph=True)
+            @qml.qnode(dev)
+            def circuit():
+                qml.adjoint()
+                return qml.probs(wires=0)
+
+            circuit()
+
+    def test_adjoint_wrong_argument_type(self):
+        """Test that passing a non-callable/non-Operation to qml.adjoint raises an error."""
+        with pytest.raises(
+            ValueError, match="First argument to adjoint must be callable or an Operation"
+        ):
+            dev = qml.device("lightning.qubit", wires=2)
+
+            @qml.qjit(autograph=True)
+            @qml.qnode(dev)
+            def circuit():
+                qml.adjoint(3)
+                return qml.probs(wires=0)
+
+            circuit()
+
     def test_tape_transform(self):
         """Test if tape transform is applied when autograph is on."""
 
@@ -379,7 +449,7 @@ class TestIntegration:
         def my_quantum_transform(tape):
             raise NotImplementedError
 
-        @qml.qjit(autograph=True)
+        @qjit(autograph=True)
         def f(x):
             @my_quantum_transform
             @qml.qnode(dev)
@@ -397,7 +467,7 @@ class TestIntegration:
         """Test if mcm one-shot miss transforms."""
         dev = qml.device("lightning.qubit", wires=5, shots=20)
 
-        @qml.qjit(autograph=True)
+        @qjit(autograph=True)
         @qml.qnode(dev, mcm_method="one-shot", postselect_mode="hw-like")
         def func(x):
             qml.RX(x, wires=0)
@@ -1231,6 +1301,20 @@ class TestForLoops:
             return acc
 
         assert f() == 9
+
+    def test_fallback_itertools(self):
+        """Test the AutoGraph fallback when the iteration target has no length, as is for example
+        the case with an itertools.product with constant arguments."""
+
+        @qml.qjit(autograph=True)
+        def f(x: float):
+
+            for i, j in itertools.product(range(2), repeat=2):
+                x += i + j
+
+            return x
+
+        assert f(5) == 9
 
 
 class TestWhileLoops:
@@ -2265,8 +2349,95 @@ class TestJaxIndexOperatorUpdate:
         assert jnp.allclose(result, jnp.array([10, 4, 6, 2, 2]))
         assert jnp.allclose(result, expected)
 
-    def test_unsopported_cases(self):
-        """Test that TypeError is raised in unsopported cases."""
+    def test_iterating_lists_inside_a_loop(self):
+        """Test support for iterating lists inside a loop."""
+
+        def updateList(x):
+            return [x[0] + 1, x[1] + 2]
+
+        @qjit(autograph=True)
+        def fn(x):
+            # pylint: disable=unused-variable
+            for i in range(4):
+                x = updateList(x)
+            return x
+
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "error", "Tracing of an AutoGraph converted for loop failed with an exception"
+            )
+            try:
+                assert jnp.allclose(jnp.array(fn([1, 2])), jnp.array([5, 10]))
+            # pylint: disable=bare-except
+            except:
+                assert False, "This warning should not show up again"
+
+    def test_iterating_tuples_inside_a_loop(self):
+        """Test support for iterating tuples inside a loop."""
+
+        def updateTuple(x):
+            return (x[0] + 1, x[1] + 2)
+
+        @qjit(autograph=True)
+        def fn(x):
+            # pylint: disable=unused-variable
+            for i in range(4):
+                x = updateTuple(x)
+            return x
+
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "error", "Tracing of an AutoGraph converted for loop failed with an exception"
+            )
+            try:
+                assert jnp.allclose(jnp.array(fn([1, 2])), jnp.array([5, 10]))
+            # pylint: disable=bare-except
+            except:
+                assert False, "This warning should not show up again"
+
+    def test_iterating_dictionaries_inside_a_loop(self):
+        """Test support for iterating dictionaries inside a loop."""
+
+        def updateDict(x):
+            return {0: x[0] + 1, 1: x[1] + 2}
+
+        @qjit(autograph=True)
+        def fn(x):
+            # pylint: disable=unused-variable
+            for i in range(4):
+                x = updateDict(x)
+            return x
+
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "error", "Tracing of an AutoGraph converted for loop failed with an exception"
+            )
+            try:
+                assert jnp.allclose(jnp.array(list(fn({0: 1, 1: 2}).values())), jnp.array([5, 10]))
+            # pylint: disable=bare-except
+            except:
+                assert False, "This warning should not show up again"
+
+    def test_unsupported_iterating_sets_inside_a_loop(self):
+        """Test unsupported case for iterating sets inside a loop.
+        Sets cannot be properly flattened.
+        """
+
+        def updateSet(x):
+            return {x[0] + 1, x[1] + 2}
+
+        @qjit(autograph=True)
+        def fn(x):
+            # pylint: disable=unused-variable
+            for i in range(4):
+                x = updateSet(x)
+            return x
+
+        with pytest.raises(TypeError, match="Cannot interpret value of type"):
+            fn({1, 2})
+
+    def test_unsupported_cases(self):
+        """Test that TypeError is raised in unsupported cases."""
 
         @qjit(autograph=True)
         def workflow(x):
@@ -2296,6 +2467,25 @@ class TestJaxIndexOperatorUpdate:
 
             with pytest.raises(TypeError, match="JAX arrays are immutable"):
                 test_array_index(x)
+
+
+class TestWithPassPipelineWrapper:
+    """Test with passes"""
+
+    def test_with_pass_pipeline_wrapper(self):
+        """this test should work. So there are no asserts"""
+
+        @qjit(autograph=True)
+        @passes.merge_rotations
+        @qml.qnode(qml.device("null.qubit", wires=1))
+        def circuit(n_iter: int):
+            for _ in range(n_iter):
+                qml.RX(0.1, wires=0)
+                qml.T(0)
+                qml.RX(0.2, wires=0)
+            return qml.expval(qml.PauliZ(0))
+
+        circuit(10)
 
 
 if __name__ == "__main__":

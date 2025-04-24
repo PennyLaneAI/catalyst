@@ -173,3 +173,5 @@ licenses:
 - [accelerate-lapacke](https://github.com/lepus2589/accelerate-lapacke)
 - [LAPACK](https://github.com/Reference-LAPACK/lapack)
 - [TOML++](https://github.com/marzer/tomlplusplus)
+- [json](https://github.com/nlohmann/json)
+- [stim](https://github.com/quantumlib/Stim)

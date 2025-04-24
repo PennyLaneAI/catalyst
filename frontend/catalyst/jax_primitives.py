@@ -26,7 +26,7 @@ import numpy as np
 import pennylane as qml
 from jax._src import api_util, core, source_info_util, util
 from jax._src.interpreters import partial_eval as pe
-from jax._src.lax.lax import _nary_lower_hlo, cos_p, sin_p
+from jax._src.lax.lax import _merge_dyn_shape, _nary_lower_hlo, cos_p, sin_p
 from jax._src.lib.mlir import ir
 from jax._src.lib.mlir.dialects import hlo
 from jax.core import AbstractValue
@@ -86,7 +86,6 @@ from mlir_quantum.dialects.quantum import (
     SetBasisStateOp,
     SetStateOp,
     StateOp,
-    StaticCustomOp,
     TensorOp,
     VarianceOp,
 )
@@ -175,18 +174,28 @@ def _qreg_lowering(aval):
 class AbstractObs(AbstractValue):
     """Abstract observable."""
 
-    def __init__(self, num_qubits=None, primitive=None):
-        self.num_qubits = num_qubits
+    def __init__(self, num_qubits_or_qreg=None, primitive=None):
+        self.num_qubits = None
+        self.qreg = None
         self.primitive = primitive
+
+        if isinstance(num_qubits_or_qreg, int):
+            self.num_qubits = num_qubits_or_qreg
+        elif isinstance(num_qubits_or_qreg, AbstractQreg):
+            self.qreg = num_qubits_or_qreg
 
     def __eq__(self, other):  # pragma: nocover
         if not isinstance(other, AbstractObs):
             return False
 
-        return self.num_qubits == other.num_qubits and self.primitive == other.primitive
+        return (
+            self.num_qubits == other.num_qubits
+            and self.qreg == other.qreg
+            and self.primitive == other.primitive
+        )
 
     def __hash__(self):  # pragma: nocover
-        return hash(self.primitive) + self.num_qubits
+        return hash(self.primitive) + hash(self.num_qubits) + hash(self.qreg)
 
 
 class ConcreteObs(AbstractObs):
@@ -491,6 +500,27 @@ def _grad_lowering(ctx, *args, jaxpr, fn, grad_params):
         argnums: argument indices which define over which arguments to
             differentiate.
     """
+    consts = []
+    offset = len(args) - len(jaxpr.consts)
+    for i, jax_array_or_tracer in enumerate(jaxpr.consts):
+        if not isinstance(
+            jax_array_or_tracer, jax._src.interpreters.partial_eval.DynamicJaxprTracer
+        ):
+            # ``ir.DenseElementsAttr.get()`` constructs a dense elements attribute from an array of
+            # element values. This doesn't support ``jaxlib.xla_extension.Array``, so we have to
+            # cast such constants to numpy array types.
+            const = jax_array_or_tracer
+            const_type = shape_dtype_to_ir_type(const.shape, const.dtype)
+            nparray = np.asarray(const)
+            attr = ir.DenseElementsAttr.get(nparray, type=const_type)
+            constval = StableHLOConstantOp(attr).results
+            consts.append(constval)
+        else:
+            # There are some cases where this value cannot be converted into
+            # a jax.numpy.array.
+            # in that case we get it from the arguments.
+            consts.append(args[offset + i])
+
     method, h, argnums = grad_params.method, grad_params.h, grad_params.expanded_argnums
     mlir_ctx = ctx.module_context.context
     finiteDiffParam = None
@@ -501,24 +531,15 @@ def _grad_lowering(ctx, *args, jaxpr, fn, grad_params):
     new_argnums = [num + offset for num in argnums]
     argnum_numpy = np.array(new_argnums)
     diffArgIndices = ir.DenseIntElementsAttr.get(argnum_numpy)
-    func_op = lower_jaxpr(ctx, jaxpr)
+    func_op = lower_jaxpr(ctx, jaxpr, (method, h, *argnums))
 
     symbol_ref = get_symbolref(ctx, func_op)
     output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
     flat_output_types = util.flatten(output_types)
 
-    # ``ir.DenseElementsAttr.get()`` constructs a dense elements attribute from an array of
-    # element values. This doesn't support ``jaxlib.xla_extension.Array``, so we have to cast
-    # such constants to numpy array types.
-
-    constants = []
-    for const in jaxpr.consts:
-        const_type = shape_dtype_to_ir_type(const.shape, const.dtype)
-        nparray = np.asarray(const)
-        attr = ir.DenseElementsAttr.get(nparray, type=const_type)
-        constantVals = StableHLOConstantOp(attr).results
-        constants.append(constantVals)
-    args_and_consts = constants + list(args)
+    len_args = len(args)
+    index = len_args - len(consts)
+    args_and_consts = consts + list(args[:index])
 
     return GradOp(
         flat_output_types,
@@ -554,7 +575,30 @@ def _value_and_grad_lowering(ctx, *args, jaxpr, fn, grad_params):
     Returns:
         MLIR results
     """
-    args = list(args)
+    consts = []
+    offset = len(args) - len(jaxpr.consts)
+    for i, jax_array_or_tracer in enumerate(jaxpr.consts):
+        if not isinstance(
+            jax_array_or_tracer, jax._src.interpreters.partial_eval.DynamicJaxprTracer
+        ):
+            # ``ir.DenseElementsAttr.get()`` constructs a dense elements attribute from an array of
+            # element values. This doesn't support ``jaxlib.xla_extension.Array``, so we have to
+            # cast such constants to numpy array types.
+            const = jax_array_or_tracer
+            const_type = shape_dtype_to_ir_type(const.shape, const.dtype)
+            nparray = np.asarray(const)
+            attr = ir.DenseElementsAttr.get(nparray, type=const_type)
+            constval = StableHLOConstantOp(attr).results
+            consts.append(constval)
+        else:
+            # There are some cases where this value cannot be converted into
+            # a jax.numpy.array.
+            # in that case we get it from the arguments.
+            consts.append(args[offset + i])
+
+    len_args = len(args)
+    index = len_args - len(consts)
+    args = list(args[0:index])
     method, h, argnums = grad_params.method, grad_params.h, grad_params.expanded_argnums
     mlir_ctx = ctx.module_context.context
     new_argnums = np.array([len(jaxpr.consts) + num for num in argnums])
@@ -562,13 +606,7 @@ def _value_and_grad_lowering(ctx, *args, jaxpr, fn, grad_params):
     output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
     flat_output_types = util.flatten(output_types)
 
-    constants = []
-    for const in jaxpr.consts:
-        const_type = shape_dtype_to_ir_type(const.shape, const.dtype)
-        nparray = np.asarray(const)
-        attr = ir.DenseElementsAttr.get(nparray, type=const_type)
-        constantVals = StableHLOConstantOp(attr).results
-        constants.append(constantVals)
+    constants = consts
 
     consts_and_args = constants + args
     func_call_jaxpr = get_call_jaxpr(jaxpr)
@@ -576,7 +614,7 @@ def _value_and_grad_lowering(ctx, *args, jaxpr, fn, grad_params):
     val_result_types = flat_output_types[: len(flat_output_types) - len(argnums)]
     gradient_result_types = flat_output_types[len(flat_output_types) - len(argnums) :]
 
-    func_op = lower_jaxpr(ctx, jaxpr)
+    func_op = lower_jaxpr(ctx, jaxpr, (method, h, *argnums))
 
     symbol_ref = get_symbolref(ctx, func_op)
     return ValueAndGradOp(
@@ -626,7 +664,7 @@ def _jvp_lowering(ctx, *args, jaxpr, fn, grad_params):
     func_args = consts_and_args[: len(func_call_jaxpr.invars)]
     tang_args = consts_and_args[len(func_call_jaxpr.invars) :]
 
-    func_op = lower_jaxpr(ctx, jaxpr)
+    func_op = lower_jaxpr(ctx, jaxpr, (method, h, *argnums))
 
     assert (
         len(flat_output_types) % 2 == 0
@@ -679,7 +717,7 @@ def _vjp_lowering(ctx, *args, jaxpr, fn, grad_params):
     func_result_types = flat_output_types[: len(flat_output_types) - len(argnums)]
     vjp_result_types = flat_output_types[len(flat_output_types) - len(argnums) :]
 
-    func_op = lower_jaxpr(ctx, jaxpr)
+    func_op = lower_jaxpr(ctx, jaxpr, (method, h, *argnums))
 
     symbol_ref = get_symbolref(ctx, func_op)
     return VJPOp(
@@ -805,16 +843,18 @@ def _qalloc_lowering(jax_ctx: mlir.LoweringRuleContext, size_value: ir.Value):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
-    assert size_value.owner.name == "stablehlo.constant"
-    size_value_attr = size_value.owner.attributes["value"]
-    assert ir.DenseIntElementsAttr.isinstance(size_value_attr)
-    size = ir.DenseIntElementsAttr(size_value_attr)[0]
-
     qreg_type = ir.OpaqueType.get("quantum", "reg", ctx)
-    i64_type = ir.IntegerType.get_signless(64, ctx)
-    size_attr = ir.IntegerAttr.get(i64_type, size)
+    if isinstance(size_value.owner, ir.Operation) and size_value.owner.name == "stablehlo.constant":
+        size_value_attr = size_value.owner.attributes["value"]
+        assert ir.DenseIntElementsAttr.isinstance(size_value_attr)
+        size = ir.DenseIntElementsAttr(size_value_attr)[0]
+        assert size >= 0
 
-    return AllocOp(qreg_type, nqubits_attr=size_attr).results
+        size_attr = ir.IntegerAttr.get(ir.IntegerType.get_signless(64, ctx), size)
+        return AllocOp(qreg_type, nqubits_attr=size_attr).results
+    else:
+        size_value = extract_scalar(size_value, "qalloc")
+        return AllocOp(qreg_type, nqubits=size_value).results
 
 
 #
@@ -917,21 +957,13 @@ def _qinsert_lowering(
 # gphase
 #
 @gphase_p.def_abstract_eval
-def _gphase_abstract_eval(
-    *qubits_or_params,
-    ctrl_len=0,
-    adjoint=False,
-    static_params=None,
-):
+def _gphase_abstract_eval(*qubits_or_params, ctrl_len=0, adjoint=False):
     # The signature here is: (using * to denote zero or more)
     # param, ctrl_qubits*, ctrl_values*
     # since gphase has no target qubits.
-    if static_params is None:
-        param = qubits_or_params[-1]
-    else:
-        param = static_params[0]
+    param = qubits_or_params[0]
     assert not isinstance(param, AbstractQbit)
-    ctrl_qubits = qubits_or_params[:ctrl_len]
+    ctrl_qubits = qubits_or_params[-2 * ctrl_len : -ctrl_len]
     for idx in range(ctrl_len):
         qubit = ctrl_qubits[idx]
         assert isinstance(qubit, AbstractQbit)
@@ -945,63 +977,34 @@ def _gphase_def_impl(*args, **kwargs):
 
 
 def _gphase_lowering(
-    jax_ctx: mlir.LoweringRuleContext,
-    *qubits_or_params,
-    ctrl_len=0,
-    adjoint=False,
-    static_params=None,
+    jax_ctx: mlir.LoweringRuleContext, *qubits_or_params, ctrl_len=0, adjoint=False
 ):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
-    param = None if static_params else qubits_or_params[-1]
-    ctrl_qubits = qubits_or_params[:ctrl_len]
-    ctrl_values = qubits_or_params[ctrl_len:-1] if param else qubits_or_params[ctrl_len:]
+    param = qubits_or_params[0]
+    ctrl_qubits = qubits_or_params[1 : 1 + ctrl_len]
+    ctrl_values = qubits_or_params[1 + ctrl_len :]
 
-    assert (
-        not static_params or len(static_params) == 1
-    ), "GlobalPhase only takes one static float parameter"
+    param = safe_cast_to_f64(param, "GlobalPhase")
+    param = extract_scalar(param, "GlobalPhase")
 
-    param_attr = (
-        None
-        if static_params is None
-        else ir.DenseF64ArrayAttr.get([ir.FloatAttr.get_f64(static_params[0])])
-    )
-
-    assert bool(param_attr) != bool(param)
-
-    if param_attr is None:
-        param = safe_cast_to_f64(param, "GlobalPhase")
-        param = extract_scalar(param, "GlobalPhase")
-
-        assert ir.F64Type.isinstance(
-            param.type
-        ), "Only scalar double parameters are allowed for quantum gates!"
+    assert ir.F64Type.isinstance(
+        param.type
+    ), "Only scalar double parameters are allowed for quantum gates!"
 
     ctrl_values_i1 = []
     for v in ctrl_values:
         p = TensorExtractOp(ir.IntegerType.get_signless(1), v, []).result
         ctrl_values_i1.append(p)
 
-    if static_params:
-        StaticCustomOp(
-            out_qubits=[],
-            out_ctrl_qubits=[qubit.type for qubit in ctrl_qubits],
-            static_params=param_attr,
-            in_qubits=[],
-            gate_name="GlobalPhase",
-            in_ctrl_qubits=ctrl_qubits,
-            in_ctrl_values=ctrl_values_i1,
-            adjoint=adjoint,
-        )
-    else:
-        GlobalPhaseOp(
-            params=param,
-            out_ctrl_qubits=[qubit.type for qubit in ctrl_qubits],
-            in_ctrl_qubits=ctrl_qubits,
-            in_ctrl_values=ctrl_values_i1,
-            adjoint=adjoint,
-        )
+    GlobalPhaseOp(
+        params=param,
+        out_ctrl_qubits=[qubit.type for qubit in ctrl_qubits],
+        in_ctrl_qubits=ctrl_qubits,
+        in_ctrl_values=ctrl_values_i1,
+        adjoint=adjoint,
+    )
     return ctrl_qubits
 
 
@@ -1010,17 +1013,13 @@ def _gphase_lowering(
 #
 @qinst_p.def_abstract_eval
 def _qinst_abstract_eval(
-    *qubits_or_params,
-    op=None,
-    qubits_len=0,
-    ctrl_len=0,
-    ctrl_value_len=0,
-    adjoint=False,
-    static_params=None,
+    *qubits_or_params, op=None, qubits_len=0, params_len=0, ctrl_len=0, adjoint=False
 ):
     # The signature here is: (using * to denote zero or more)
-    # qubits*, ctrl_qubits*, ctrl_values*, params*
-    all_qubits = qubits_or_params[: qubits_len + ctrl_len]
+    # qubits*, params*, ctrl_qubits*, ctrl_values*
+    qubits = qubits_or_params[:qubits_len]
+    ctrl_qubits = qubits_or_params[-2 * ctrl_len : -ctrl_len]
+    all_qubits = qubits + ctrl_qubits
     for idx in range(qubits_len + ctrl_len):
         qubit = all_qubits[idx]
         assert isinstance(qubit, AbstractQbit)
@@ -1038,19 +1037,17 @@ def _qinst_lowering(
     *qubits_or_params,
     op=None,
     qubits_len=0,
+    params_len=0,
     ctrl_len=0,
-    ctrl_value_len=0,
     adjoint=False,
-    static_params=None,
 ):
-    assert ctrl_value_len == ctrl_len, "Control values must be the same length as control qubits"
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
     qubits = qubits_or_params[:qubits_len]
-    ctrl_qubits = qubits_or_params[qubits_len : qubits_len + ctrl_len]
-    ctrl_values = qubits_or_params[qubits_len + ctrl_len : qubits_len + ctrl_len + ctrl_value_len]
-    params = qubits_or_params[qubits_len + ctrl_len + ctrl_value_len :]
+    params = qubits_or_params[qubits_len : qubits_len + params_len]
+    ctrl_qubits = qubits_or_params[qubits_len + params_len : qubits_len + params_len + ctrl_len]
+    ctrl_values = qubits_or_params[qubits_len + params_len + ctrl_len :]
 
     for qubit in qubits:
         assert ir.OpaqueType.isinstance(qubit.type)
@@ -1073,42 +1070,13 @@ def _qinst_lowering(
         p = TensorExtractOp(ir.IntegerType.get_signless(1), v, []).result
         ctrl_values_i1.append(p)
 
-    params_attr = (
-        None
-        if static_params is None
-        else ir.DenseF64ArrayAttr.get([ir.FloatAttr.get_f64(val) for val in static_params])
-    )
-    if len(float_params) > 0:
-        assert (
-            params_attr is None
-        ), "Static parameters are not allowed when having dynamic parameters"
-
     name_attr = ir.StringAttr.get(op)
     name_str = str(name_attr)
     name_str = name_str.replace('"', "")
 
-    if static_params:
-        return StaticCustomOp(
-            out_qubits=[qubit.type for qubit in qubits],
-            out_ctrl_qubits=[qubit.type for qubit in ctrl_qubits],
-            static_params=params_attr,
-            in_qubits=qubits,
-            gate_name=name_attr,
-            in_ctrl_qubits=ctrl_qubits,
-            in_ctrl_values=ctrl_values_i1,
-            adjoint=adjoint,
-        ).results
-
     if name_str == "MultiRZ":
-        assert len(float_params) <= 1, "MultiRZ takes at most one dynamic float parameter"
-        assert (
-            not static_params or len(static_params) <= 1
-        ), "MultiRZ takes at most one static float parameter"
-        float_param = (
-            TensorExtractOp(ir.F64Type.get(), mlir.ir_constant(static_params[0]), [])
-            if len(float_params) == 0
-            else float_params[0]
-        )
+        assert len(float_params) == 1, "MultiRZ takes one float parameter"
+        float_param = float_params[0]
         return MultiRZOp(
             out_qubits=[qubit.type for qubit in qubits],
             out_ctrl_qubits=[qubit.type for qubit in ctrl_qubits],
@@ -1118,6 +1086,7 @@ def _qinst_lowering(
             in_ctrl_values=ctrl_values_i1,
             adjoint=adjoint,
         ).results
+
     return CustomOp(
         out_qubits=[qubit.type for qubit in qubits],
         out_ctrl_qubits=[qubit.type for qubit in ctrl_qubits],
@@ -1249,29 +1218,46 @@ def _qmeasure_lowering(jax_ctx: mlir.LoweringRuleContext, qubit: ir.Value, posts
 # compbasis observable
 #
 @compbasis_p.def_abstract_eval
-def _compbasis_abstract_eval(*qubits):
-    for qubit in qubits:
-        assert isinstance(qubit, AbstractQbit)
-    return AbstractObs(len(qubits), compbasis_p)
+def _compbasis_abstract_eval(*qubits_or_qreg, qreg_available=False):
+    if qreg_available:
+        qreg = qubits_or_qreg[0]
+        assert isinstance(qreg, AbstractQreg)
+        return AbstractObs(qreg, compbasis_p)
+    else:
+        qubits = qubits_or_qreg
+        for qubit in qubits:
+            assert isinstance(qubit, AbstractQbit)
+        return AbstractObs(len(qubits), compbasis_p)
 
 
 @compbasis_p.def_impl
-def _compbasis_def_impl(ctx, *qubits):  # pragma: no cover
+def _compbasis_def_impl(ctx, *qubits_or_qreg, qreg_available):  # pragma: no cover
     raise NotImplementedError()
 
 
-def _compbasis_lowering(jax_ctx: mlir.LoweringRuleContext, *qubits: tuple):
+def _compbasis_lowering(
+    jax_ctx: mlir.LoweringRuleContext, *qubits_or_qreg: tuple, qreg_available=False
+):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
-    for qubit in qubits:
-        assert ir.OpaqueType.isinstance(qubit.type)
-        assert ir.OpaqueType(qubit.type).dialect_namespace == "quantum"
-        assert ir.OpaqueType(qubit.type).data == "bit"
-
     result_type = ir.OpaqueType.get("quantum", "obs")
 
-    return ComputationalBasisOp(result_type, qubits).results
+    if qreg_available:
+        qreg = qubits_or_qreg[0]
+        assert ir.OpaqueType.isinstance(qreg.type)
+        assert ir.OpaqueType(qreg.type).dialect_namespace == "quantum"
+        assert ir.OpaqueType(qreg.type).data == "reg"
+        return ComputationalBasisOp(result_type, [], qreg=qreg).results
+
+    else:
+        qubits = qubits_or_qreg
+        for qubit in qubits:
+            assert ir.OpaqueType.isinstance(qubit.type)
+            assert ir.OpaqueType(qubit.type).dialect_namespace == "quantum"
+            assert ir.OpaqueType(qubit.type).data == "bit"
+
+        return ComputationalBasisOp(result_type, qubits).results
 
 
 #
@@ -1383,22 +1369,24 @@ def _hamiltonian_lowering(jax_ctx: mlir.LoweringRuleContext, coeffs: ir.Value, *
 
 
 #
-# sample measurement
+# measurements
 #
-def sample_staging_rule(jaxpr_trace, obs, shots, num_qubits):
+def custom_measurement_staging_rule(
+    primitive, jaxpr_trace, obs, dtypes, *dynamic_shape, static_shape
+):
     """
-    The result shape of `sample_p` is (shots, num_qubits).
-
     In jax, the default `def_abstract_eval` method for binding primitives keeps the abstract aval in
     the dynamic shape dimension, instead of the SSA value for the shape, i.e.
 
-    c:i64[] = ...
+    c:i64[] = ...  # to be used as the 0th dimension of value `e`
     d:AbstractObs = ...
     e:f64[ShapedArray(int64[], weak_type=True),1] = sample[num_qubits=1] d c
 
+    which contains escaped tracers.
+
     To ensure that the result DShapedArray is actually constructed with the tracer value,
     we need to provide a custom staging rule for the primitive, where we manually link
-    the tracer to the output shape. This will now correctly produce
+    the tracer's value to the output shape. This will now correctly produce
 
     e:f64[c,1] = sample[num_qubits=1] d c
 
@@ -1409,80 +1397,126 @@ def sample_staging_rule(jaxpr_trace, obs, shots, num_qubits):
     See jax._src.interpreters.partial_eval.process_primitive and default_process_primitive,
     https://github.com/jax-ml/jax/blob/a54319ec1886ed920d50cacf10e147a743888464/jax/_src/interpreters/partial_eval.py#L1881C7-L1881C24
     """
-    if obs.primitive is compbasis_p:
-        assert num_qubits == obs.num_qubits
 
-    out_shape = core.DShapedArray((shots, num_qubits), jax.numpy.dtype("float64"))
-    out_tracer = pe.DynamicJaxprTracer(jaxpr_trace, out_shape)
-
-    if isinstance(shots, int):
-        invars = [jaxpr_trace.getvar(obs)]
-        params = {"shots": shots, "num_qubits": num_qubits}
+    shape = _merge_dyn_shape(static_shape, dynamic_shape)
+    if not dynamic_shape:
+        # Some PL transforms, like @qml.batch_params, do not support dynamic shapes yet
+        # Therefore we still keep static shapes when possible
+        # This can be removed, and all avals turned into DShapedArrays, when
+        # dynamic program capture in PL is complete
+        out_shapes = tuple(core.ShapedArray(shape, dtype) for dtype in dtypes)
     else:
-        invars = [jaxpr_trace.getvar(obs), jaxpr_trace.getvar(shots)]
-        params = {"num_qubits": num_qubits}
+        out_shapes = tuple(core.DShapedArray(shape, dtype) for dtype in dtypes)
+
+    invars = [jaxpr_trace.getvar(obs)]
+    for dyn_dim in dynamic_shape:
+        invars.append(jaxpr_trace.getvar(dyn_dim))
+
+    params = {"static_shape": static_shape}
+
+    out_tracers = tuple(pe.DynamicJaxprTracer(jaxpr_trace, out_shape) for out_shape in out_shapes)
 
     eqn = pe.new_jaxpr_eqn(
         invars,
-        [jaxpr_trace.makevar(out_tracer)],
-        sample_p,
+        [jaxpr_trace.makevar(out_tracer) for out_tracer in out_tracers],
+        primitive,
         params,
         jax.core.no_effects,
     )
+
     jaxpr_trace.frame.add_eqn(eqn)
-    return out_tracer
+    return out_tracers if len(out_tracers) > 1 else out_tracers[0]
+
+
+#
+# sample measurement
+#
+def sample_staging_rule(jaxpr_trace, obs, *dynamic_shape, static_shape):
+    """
+    The result shape of `sample_p` is (shots, num_qubits).
+    """
+    shape = _merge_dyn_shape(static_shape, dynamic_shape)
+    if obs.primitive is compbasis_p:
+        if obs.num_qubits:
+            assert isinstance(shape[1], int)
+            assert shape[1] == obs.num_qubits
+
+    return custom_measurement_staging_rule(
+        sample_p,
+        jaxpr_trace,
+        obs,
+        [jax.numpy.dtype("float64")],
+        *dynamic_shape,
+        static_shape=static_shape,
+    )
 
 
 pe.custom_staging_rules[sample_p] = sample_staging_rule
 
 
 @sample_p.def_impl
-def _sample_def_impl(ctx, obs, shots, num_qubits):  # pragma: no cover
+def _sample_def_impl(ctx, obs, *dynamic_shape, static_shape):  # pragma: no cover
     raise NotImplementedError()
 
 
 def _sample_lowering(
-    jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: Union[int, ir.Value], num_qubits: int
+    jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, *dynamic_shape, static_shape
 ):
-    # Note: result shape of sample op is (shots, number_of_qubits)
+    # result shape of sample op is (shots, number_of_qubits)
+    # The static_shape argument contains the static dimensions, and None for dynamic dimensions
+
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
-
     f64_type = ir.F64Type.get()
-    result_shape = (
-        (shots, num_qubits)
-        if isinstance(shots, int)
-        else (ir.ShapedType.get_dynamic_size(), num_qubits)
-    )
+
+    # Replace Nones in static_shape with dynamic mlir dimensions
+    result_shape = tuple(ir.ShapedType.get_dynamic_size() if d is None else d for d in static_shape)
     result_type = ir.RankedTensorType.get(result_shape, f64_type)
 
-    return SampleOp(result_type, obs).results
+    dynamic_shape = list(dynamic_shape)
+    for i, dyn_dim in enumerate(dynamic_shape):
+        dynamic_shape[i] = extract_scalar(dyn_dim, f"sample_dyn_dim_{i}")
+
+    return SampleOp(result_type, obs, dynamic_shape=dynamic_shape).results
 
 
 #
 # counts measurement
 #
-@counts_p.def_impl
-def _counts_def_impl(ctx, obs, shots, shape):  # pragma: no cover
-    raise NotImplementedError()
+def counts_staging_rule(jaxpr_trace, obs, *dynamic_shape, static_shape):
+    """
+    The result shape of `counts_p` is (tensor<Nxf64>, tensor<Nxi64>)
+    where N = 2**number_of_qubits.
+    """
 
-
-@counts_p.def_abstract_eval
-def _counts_abstract_eval(obs, shots, shape):
-    assert isinstance(obs, AbstractObs)
-
+    shape = _merge_dyn_shape(static_shape, dynamic_shape)
     if obs.primitive is compbasis_p:
-        assert shape == (2**obs.num_qubits,)
+        if obs.num_qubits:
+            if isinstance(shape[0], int):
+                assert shape == (2**obs.num_qubits,)
     else:
         assert shape == (2,)
 
-    return core.ShapedArray(shape, jax.numpy.dtype("float64")), core.ShapedArray(
-        shape, jax.numpy.dtype("int64")
+    return custom_measurement_staging_rule(
+        counts_p,
+        jaxpr_trace,
+        obs,
+        [jax.numpy.dtype("float64"), jax.numpy.dtype("int64")],
+        *dynamic_shape,
+        static_shape=static_shape,
     )
 
 
+pe.custom_staging_rules[counts_p] = counts_staging_rule
+
+
+@counts_p.def_impl
+def _counts_def_impl(ctx, obs, *dynamic_shape, static_shape):  # pragma: no cover
+    raise NotImplementedError()
+
+
 def _counts_lowering(
-    jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: Union[int, ir.Value], shape: tuple
+    jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, *dynamic_shape, static_shape
 ):
     # Note: result shape of counts op is (tensor<Nxf64>, tensor<Nxi64>)
     # where N = 2**number_of_qubits
@@ -1492,10 +1526,20 @@ def _counts_lowering(
 
     i64_type = ir.IntegerType.get_signless(64, ctx)
     f64_type = ir.F64Type.get()
+
+    # Replace Nones in static_shape with dynamic mlir dimensions
+    shape = tuple(ir.ShapedType.get_dynamic_size() if d is None else d for d in static_shape)
     eigvals_type = ir.RankedTensorType.get(shape, f64_type)
     counts_type = ir.RankedTensorType.get(shape, i64_type)
 
-    return CountsOp(eigvals_type, counts_type, obs).results
+    if static_shape[0] is None:
+        # dynamic num_qubits, pass the SSA value to the op
+        dyn_shape = extract_scalar(dynamic_shape[0], "counts_size")
+    else:
+        # static num_qubits already in the shape, no need to pass another operand
+        dyn_shape = None
+
+    return CountsOp(eigvals_type, counts_type, obs, dynamic_shape=dyn_shape).results
 
 
 #
@@ -1561,60 +1605,97 @@ def _var_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shape=None):
 #
 # probs measurement
 #
-@probs_p.def_abstract_eval
-def _probs_abstract_eval(obs, shape, shots=None):
-    assert isinstance(obs, AbstractObs)
+def probs_staging_rule(jaxpr_trace, obs, *dynamic_shape, static_shape):
+    """
+    The result shape of probs_p is (2^num_qubits,).
+    """
+    return custom_measurement_staging_rule(
+        probs_p,
+        jaxpr_trace,
+        obs,
+        [jax.numpy.dtype("float64")],
+        *dynamic_shape,
+        static_shape=static_shape,
+    )
 
-    if obs.primitive is compbasis_p:
-        assert shape == (2**obs.num_qubits,)
-    else:
-        raise TypeError("probs only supports computational basis")
 
-    return core.ShapedArray(shape, jax.numpy.float64)
+pe.custom_staging_rules[probs_p] = probs_staging_rule
 
 
 @probs_p.def_impl
-def _probs_def_impl(ctx, obs, shape, shots=None):  # pragma: no cover
+def _probs_def_impl(ctx, obs, *dynamic_shape, static_shape):  # pragma: no cover
     raise NotImplementedError()
 
 
-def _probs_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shape: tuple, shots=None):
+def _probs_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, *dynamic_shape, static_shape):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
-    result_type = ir.RankedTensorType.get(shape, ir.F64Type.get())
+    f64_type = ir.F64Type.get()
 
-    return ProbsOp(result_type, obs).results
+    # Replace Nones in static_shape with dynamic mlir dimensions
+    result_shape = tuple(ir.ShapedType.get_dynamic_size() if d is None else d for d in static_shape)
+    result_type = ir.RankedTensorType.get(result_shape, f64_type)
+
+    if static_shape[0] is None:
+        # dynamic sv_length, pass the SSA value to the op
+        dyn_shape = extract_scalar(dynamic_shape[0], "probs_sv_length")
+    else:
+        # static sv_length already in the shape, no need to pass another operand
+        dyn_shape = None
+    return ProbsOp(result_type, obs, dynamic_shape=dyn_shape).results
 
 
 #
 # state measurement
 #
-@state_p.def_abstract_eval
-def _state_abstract_eval(obs, shape, shots=None):
-    assert isinstance(obs, AbstractObs)
-
+def state_staging_rule(jaxpr_trace, obs, *dynamic_shape, static_shape):
+    """
+    The result shape of state_p is (2^num_qubits,).
+    """
     if obs.primitive is compbasis_p:
-        assert shape == (2**obs.num_qubits,)
+        assert not obs.num_qubits, """
+        A "wires" argument should not be provided since state() always
+        returns a pure state describing all wires in the device.
+        """
     else:
         raise TypeError("state only supports computational basis")
 
-    return core.ShapedArray(shape, jax.numpy.complex128)
+    return custom_measurement_staging_rule(
+        state_p,
+        jaxpr_trace,
+        obs,
+        [jax.numpy.dtype("complex128")],
+        *dynamic_shape,
+        static_shape=static_shape,
+    )
+
+
+pe.custom_staging_rules[state_p] = state_staging_rule
 
 
 @state_p.def_impl
-def _state_def_impl(ctx, obs, shape, shots=None):  # pragma: no cover
+def _state_def_impl(ctx, obs, *dynamic_shape, static_shape):  # pragma: no cover
     raise NotImplementedError()
 
 
-def _state_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shape: tuple, shots=None):
+def _state_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, *dynamic_shape, static_shape):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
     c64_type = ir.ComplexType.get(ir.F64Type.get())
-    result_type = ir.RankedTensorType.get(shape, c64_type)
 
-    return StateOp(result_type, obs).results
+    # Replace Nones in static_shape with dynamic mlir dimensions
+    result_shape = tuple(ir.ShapedType.get_dynamic_size() if d is None else d for d in static_shape)
+    result_type = ir.RankedTensorType.get(result_shape, c64_type)
+
+    if static_shape[0] is None:
+        # dynamic sv_length, pass the SSA value to the op
+        dyn_shape = extract_scalar(dynamic_shape[0], "state_sv_length")
+    else:
+        # static sv_length already in the shape, no need to pass another operand
+        dyn_shape = None
+    return StateOp(result_type, obs, dynamic_shape=dyn_shape).results
 
 
 #

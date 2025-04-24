@@ -31,8 +31,6 @@
 #include "QuantumDevice.hpp"
 #include "Types.h"
 
-extern void callbackCall(int64_t, int64_t, int64_t, va_list);
-
 namespace Catalyst::Runtime {
 
 extern "C" void __catalyst_inactive_callback(int64_t identifier, int64_t argc, int64_t retc, ...);
@@ -201,6 +199,10 @@ class RTDevice {
         else if (rtd_lib == "braket.aws.qubit" || rtd_lib == "braket.local.qubit") {
             rtd_name = "OpenQasmDevice";
             _complete_dylib_os_extension(rtd_lib, "openqasm");
+        }
+        else if (rtd_lib == "oqd.qubit") {
+            rtd_name = "oqd";
+            _complete_dylib_os_extension(rtd_lib, "oqd_device");
         }
     }
 

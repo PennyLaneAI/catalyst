@@ -27,6 +27,8 @@
 #include "Catalyst/IR/CatalystOps.h"
 #include "Catalyst/Transforms/Passes.h"
 #include "Catalyst/Transforms/Patterns.h"
+#include "Catalyst/Utils/EnsureFunctionDeclaration.h"
+#include "Catalyst/Utils/StaticAllocas.h"
 #include "Gradient/IR/GradientDialect.h"
 #include "Gradient/IR/GradientOps.h"
 #include "Gradient/Transforms/Utils.h"
@@ -35,25 +37,6 @@ using namespace mlir;
 using namespace catalyst;
 
 namespace {
-
-LLVM::LLVMFuncOp ensureFunctionDeclaration(PatternRewriter &rewriter, Operation *op,
-                                           StringRef fnSymbol, Type fnType)
-{
-    Operation *fnDecl = SymbolTable::lookupNearestSymbolFrom(op, rewriter.getStringAttr(fnSymbol));
-
-    if (!fnDecl) {
-        PatternRewriter::InsertionGuard insertGuard(rewriter);
-        ModuleOp mod = op->getParentOfType<ModuleOp>();
-        rewriter.setInsertionPointToStart(mod.getBody());
-
-        fnDecl = rewriter.create<LLVM::LLVMFuncOp>(op->getLoc(), fnSymbol, fnType);
-    }
-    else {
-        assert(isa<LLVM::LLVMFuncOp>(fnDecl) && "QIR function declaration is not a LLVMFuncOp");
-    }
-
-    return cast<LLVM::LLVMFuncOp>(fnDecl);
-}
 
 Value getGlobalString(Location loc, OpBuilder &rewriter, StringRef key, StringRef value,
                       ModuleOp mod)
@@ -177,9 +160,7 @@ Value EncodeOpaqueMemRef(Location loc, PatternRewriter &rewriter, MemRefType mem
     memref = rewriter.create<LLVM::InsertValueOp>(loc, memref, rank, 0);
 
     // Memref
-    Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
-    Value memrefPtr = rewriter.create<LLVM::AllocaOp>(
-        loc, LLVM::LLVMPointerType::get(rewriter.getContext()), llvmMemrefType, c1);
+    Value memrefPtr = getStaticAlloca(loc, rewriter, llvmMemrefType, 1);
     rewriter.create<LLVM::StoreOp>(loc, memrefLlvm, memrefPtr);
     memref = rewriter.create<LLVM::InsertValueOp>(loc, memref, memrefPtr, 1);
 
@@ -210,7 +191,7 @@ struct PrintOpPattern : public OpConversionPattern<PrintOp> {
             Type charPtrType = LLVM::LLVMPointerType::get(rewriter.getContext());
             Type qirSignature = LLVM::LLVMFunctionType::get(voidType, charPtrType);
             LLVM::LLVMFuncOp fnDecl =
-                ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+                catalyst::ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
 
             StringRef stringValue = op.getConstVal().value();
             std::string symbolName = std::to_string(std::hash<std::string>()(stringValue.str()));
@@ -235,7 +216,7 @@ struct PrintOpPattern : public OpConversionPattern<PrintOp> {
             SmallVector<Type> argTypes{structPtrType, IntegerType::get(ctx, 1)};
             Type qirSignature = LLVM::LLVMFunctionType::get(voidType, argTypes);
             LLVM::LLVMFuncOp fnDecl =
-                ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+                catalyst::ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
 
             Value memref = op.getVal();
             MemRefType memrefType = cast<MemRefType>(memref.getType());
@@ -244,10 +225,7 @@ struct PrintOpPattern : public OpConversionPattern<PrintOp> {
             Value structValue =
                 EncodeOpaqueMemRef(loc, rewriter, memrefType, llvmMemrefType, llvmMemref);
 
-            Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
-
-            Value structPtr = rewriter.create<LLVM::AllocaOp>(
-                loc, LLVM::LLVMPointerType::get(rewriter.getContext()), structType, c1);
+            Value structPtr = getStaticAlloca(loc, rewriter, structType, 1);
             rewriter.create<LLVM::StoreOp>(loc, structValue, structPtr);
 
             Value printDescriptor = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI1Type(),
@@ -279,7 +257,7 @@ struct AssertionOpPattern : public OpConversionPattern<AssertionOp> {
 
         ModuleOp mod = op->getParentOfType<ModuleOp>();
         LLVM::LLVMFuncOp assertFunc =
-            ensureFunctionDeclaration(rewriter, op, qirName, assertSignature);
+            catalyst::ensureFunctionDeclaration(rewriter, op, qirName, assertSignature);
 
         Value assertionDescriptor = adaptor.getAssertion();
 
@@ -374,15 +352,13 @@ struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
                                            operandsConverted.end()};
 
         // Encode args
-        Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
         SmallVector<LLVM::AllocaOp> encodedArgs;
         for (auto tuple : llvm::zip(args, argsConverted)) {
             auto memref_type = cast<MemRefType>(std::get<0>(tuple).getType());
             Type llvmMemrefType = std::get<1>(tuple).getType();
             auto encodedArg =
                 EncodeDataMemRef(loc, rewriter, memref_type, llvmMemrefType, std::get<1>(tuple));
-            LLVM::AllocaOp alloca =
-                rewriter.create<LLVM::AllocaOp>(loc, ptr, encodedArg.getType(), c1, 0);
+            LLVM::AllocaOp alloca = getStaticAlloca(loc, rewriter, encodedArg.getType(), 1);
             rewriter.create<LLVM::StoreOp>(loc, encodedArg, alloca);
             encodedArgs.push_back(alloca);
         }
@@ -402,7 +378,7 @@ struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
             insertValueArgs(pair.value(), offset);
         }
         // Get allocation for packed arguments pointers.
-        LLVM::AllocaOp alloca = rewriter.create<LLVM::AllocaOp>(loc, ptr, arrArgs.getType(), c1, 0);
+        LLVM::AllocaOp alloca = getStaticAlloca(loc, rewriter, arrArgs.getType(), 1);
 
         // Store constructed arguments pointers array into the alloca.
         rewriter.create<LLVM::StoreOp>(loc, arrArgs, alloca);
@@ -419,8 +395,7 @@ struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
             Type llvmMemrefType = std::get<1>(tuple).getType();
             auto encodedRes =
                 EncodeDataMemRef(loc, rewriter, memref_type, llvmMemrefType, std::get<1>(tuple));
-            LLVM::AllocaOp alloca =
-                rewriter.create<LLVM::AllocaOp>(loc, ptr, encodedRes.getType(), c1, 0);
+            LLVM::AllocaOp alloca = getStaticAlloca(loc, rewriter, encodedRes.getType(), 1);
             rewriter.create<LLVM::StoreOp>(loc, encodedRes, alloca);
             encodedRess.push_back(alloca);
         }
@@ -442,8 +417,7 @@ struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
         }
 
         // Get allocation for packed results pointers.
-        LLVM::AllocaOp allocaRes =
-            rewriter.create<LLVM::AllocaOp>(loc, ptr, arrRes.getType(), c1, 0);
+        LLVM::AllocaOp allocaRes = getStaticAlloca(loc, rewriter, arrRes.getType(), 1);
 
         // Store constructed results pointers array on the stack.
         rewriter.create<LLVM::StoreOp>(loc, arrRes, allocaRes);
@@ -476,10 +450,7 @@ struct DefineCallbackOpPattern : public OpConversionPattern<CallbackOp> {
         rewriter.setInsertionPointToStart(entry);
 
         auto ctx = rewriter.getContext();
-        Type ptrTy = LLVM::LLVMPointerType::get(ctx);
-        auto one = rewriter.getI64IntegerAttr(1);
         auto loc = op.getLoc();
-        Value c1 = rewriter.create<LLVM::ConstantOp>(loc, one);
         auto idAttr = op.getIdAttr();
         auto constantId = rewriter.create<LLVM::ConstantOp>(loc, idAttr);
         auto argcAttr = op.getArgcAttr();
@@ -506,7 +477,7 @@ struct DefineCallbackOpPattern : public OpConversionPattern<CallbackOp> {
             Type structTy = typeConverter->convertType(arg.getType());
             auto structVal =
                 rewriter.create<UnrealizedConversionCastOp>(loc, structTy, arg).getResult(0);
-            Value ptr = rewriter.create<LLVM::AllocaOp>(loc, ptrTy, structTy, c1);
+            Value ptr = getStaticAlloca(loc, rewriter, structTy, 1);
             rewriter.create<LLVM::StoreOp>(loc, structVal, ptr);
             callArgs.push_back(ptr);
         }
@@ -552,13 +523,10 @@ struct CallbackCallOpPattern : public OpConversionPattern<CallbackCallOp> {
         // Just change the calling convention from scalar replacement of aggregates
         // to pointer to struct.
         auto loc = op.getLoc();
-        auto ctx = rewriter.getContext();
         SmallVector<Value> callArgs;
-        Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
         for (auto structVal : adaptor.getInputs()) {
-            Type ptrTy = LLVM::LLVMPointerType::get(ctx);
             // allocate a memref descriptor on the stack
-            Value ptr = rewriter.create<LLVM::AllocaOp>(loc, ptrTy, structVal.getType(), c1);
+            Value ptr = getStaticAlloca(loc, rewriter, structVal.getType(), 1);
             // store the memref descriptor on the pointer
             rewriter.create<LLVM::StoreOp>(loc, structVal, ptr);
             // add the ptr to the arguments

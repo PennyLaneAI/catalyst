@@ -19,6 +19,7 @@ compilation & execution on devices.
 import copy
 import logging
 from functools import partial
+from typing import Union
 
 import jax
 import pennylane as qml
@@ -35,6 +36,13 @@ from pennylane.measurements import (
 )
 
 from catalyst.api_extensions import HybridCtrl
+from catalyst.device.op_support import (
+    is_active,
+    is_controllable,
+    is_differentiable,
+    is_invertible,
+    is_supported,
+)
 from catalyst.jax_tracer import HybridOpRegion, has_nested_tapes
 from catalyst.logging import debug_logger
 from catalyst.tracing.contexts import EvaluationContext
@@ -47,7 +55,7 @@ logger.addHandler(logging.NullHandler())
 def check_alternative_support(op, capabilities: DeviceCapabilities):
     """Verify that aliased operations aren't supported via alternative definitions."""
 
-    if isinstance(op, qml.ops.Controlled):
+    if isinstance(op, qml.ops.Controlled) and type(op) is not qml.ops.ControlledOp:
         # "Cast" away the specialized class for gates like Toffoli, ControlledQubitUnitary, etc.
         supported = capabilities.operations.get(op.base.name)
         if supported and supported.controllable:
@@ -82,7 +90,9 @@ def catalyst_decomposer(op, capabilities: DeviceCapabilities):
 
 @transform
 @debug_logger
-def catalyst_decompose(tape: qml.tape.QuantumTape, ctx, capabilities: DeviceCapabilities):
+def catalyst_decompose(
+    tape: qml.tape.QuantumTape, ctx, capabilities: DeviceCapabilities, grad_method: str = None
+):
     """Decompose operations until the stopping condition is met.
 
     In a single call of the catalyst_decompose function, the PennyLane operations are decomposed
@@ -101,14 +111,14 @@ def catalyst_decompose(tape: qml.tape.QuantumTape, ctx, capabilities: DeviceCapa
     # are compatible with Catalyst's handling of initial state preparation. Currently, Catalyst
     # only supports qml.StatePrep and qml.BasisState. A default strategy for handling any PennyLane
     # operator of type qml.StatePrepBase will be needed before this conditional can be removed.
-    if len(tape) == 0 or type(tape[0]) in (qml.StatePrep, qml.BasisState):
-        skip_initial_state_prep = capabilities.initial_state_prep
-    else:
-        skip_initial_state_prep = False
+    skip_initial_state_prep = False
+    if len(tape) > 0 and type(tape[0]) in (qml.StatePrep, qml.BasisState):
+        if grad_method is None or not is_active(tape[0]):
+            skip_initial_state_prep = capabilities.initial_state_prep
 
     (toplevel_tape,), _ = decompose(
         tape,
-        stopping_condition=lambda op: bool(catalyst_acceptance(op, capabilities)),
+        stopping_condition=lambda op: catalyst_acceptance(op, capabilities, grad_method),
         skip_initial_state_prep=skip_initial_state_prep,
         decomposer=partial(catalyst_decomposer, capabilities=capabilities),
         name="catalyst on this device",
@@ -197,25 +207,28 @@ def decompose_ops_to_unitary(tape, convert_to_matrix_ops):
     return [new_tape], null_postprocessing
 
 
-def catalyst_acceptance(op: qml.operation.Operator, capabilities: DeviceCapabilities) -> str | None:
+def catalyst_acceptance(
+    op: qml.operation.Operator, capabilities: DeviceCapabilities, grad_method: Union[str, None]
+) -> Union[str, None]:
     """Check whether an Operator is supported and returns the name of the operation or None."""
 
-    op_support = capabilities.operations
+    if not is_differentiable(op, capabilities, grad_method):
+        return None
 
     if isinstance(op, qml.ops.Adjoint):
-        match = catalyst_acceptance(op.base, capabilities)
-        if match and op_support[match].invertible:
+        match = catalyst_acceptance(op.base, capabilities, grad_method)
+        if match and is_invertible(op.base, capabilities):
             return match
 
     # There are cases where a custom controlled gate, e.g., CH, is supported, but its
     # base, i.e., H, is not labeled controllable. In this case, we don't want to use
     # this branch to check the support for this operation.
     elif type(op) is qml.ops.ControlledOp:
-        match = catalyst_acceptance(op.base, capabilities)
-        if match and op_support[match].controllable:
+        match = catalyst_acceptance(op.base, capabilities, grad_method)
+        if match and is_controllable(op.base, capabilities):
             return match
 
-    elif op.name in op_support:
+    elif is_supported(op, capabilities):
         return op.name
 
     return None
@@ -240,6 +253,19 @@ def measurements_from_counts(tape, device_wires):
 
         Samples are not supported.
     """
+    changed = False
+    for meas in tape.measurements:
+        changed |= isinstance(meas, (ExpectationMP, VarianceMP, ProbabilityMP, SampleMP))
+        if isinstance(meas, CountsMP):
+            changed |= meas.obs is not None
+
+    def postprocessing(args):
+        if len(args) == 1:
+            return args[0]
+        return args
+
+    if not changed:
+        return [tape], postprocessing
 
     new_operations, measured_wires = _diagonalize_measurements(tape, device_wires=device_wires)
 
@@ -298,6 +324,19 @@ def measurements_from_samples(tape, device_wires):
 
         Counts are not supported.
     """
+    changed = False
+    for meas in tape.measurements:
+        changed |= isinstance(meas, (ExpectationMP, VarianceMP, ProbabilityMP, CountsMP))
+        if isinstance(meas, SampleMP):
+            changed |= meas.obs is not None
+
+    def postprocessing(args):
+        if len(args) == 1:
+            return args[0]
+        return args
+
+    if not changed:
+        return [tape], postprocessing
 
     new_operations, measured_wires = _diagonalize_measurements(tape, device_wires=device_wires)
 

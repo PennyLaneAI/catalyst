@@ -25,7 +25,7 @@ from typing import Callable, Sequence
 
 import numpy as np
 import pennylane as qml
-from lit_util_printers import print_jaxpr, print_mlir
+from utils import print_jaxpr, print_mlir
 
 from catalyst import qjit
 

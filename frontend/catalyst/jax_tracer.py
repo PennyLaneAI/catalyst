@@ -16,16 +16,19 @@
 This module contains functions tracing and lowering JAX code to MLIR.
 """
 
+import itertools
 import logging
-from collections.abc import Sequence
+import weakref
 from contextlib import contextmanager
 from dataclasses import dataclass
+from enum import Enum
 from functools import partial, reduce
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import jax
 import jax.numpy as jnp
 import pennylane as qml
+from jax._src.lax.lax import _extract_tracers_dyn_shape
 from pennylane import QubitUnitary, QueuingManager
 from pennylane.devices import QubitDevice
 from pennylane.measurements import (
@@ -36,7 +39,7 @@ from pennylane.measurements import (
     StateMP,
     VarianceMP,
 )
-from pennylane.operation import AnyWires, Operation, Operator, Wires
+from pennylane.operation import Operation, Operator, Wires
 from pennylane.ops import Adjoint, Controlled, ControlledOp
 from pennylane.tape import QuantumTape
 from pennylane.transforms.core import TransformProgram
@@ -70,7 +73,6 @@ from catalyst.jax_extras import (
     tree_unflatten,
     wrap_init,
 )
-from catalyst.jax_extras.tracing import bind_flexible_primitive
 from catalyst.jax_primitives import (
     AbstractQreg,
     compbasis_p,
@@ -416,6 +418,9 @@ class HybridOpRegion:
     res_classical_tracers: List[DynamicJaxprTracer]
 
 
+cached_vars = weakref.WeakKeyDictionary()
+
+
 class HybridOp(Operator):
     """A base class for operations carrying nested regions. The class stores the information
     obtained in the process of classical tracing and required for the completion of the quantum
@@ -436,7 +441,6 @@ class HybridOp(Operator):
     def _no_binder(self, *_):
         raise RuntimeError("{self} does not support JAX binding")  # pragma: no cover
 
-    num_wires = AnyWires
     binder: Callable = _no_binder
 
     @debug_logger_init
@@ -476,22 +480,82 @@ class HybridOp(Operator):
         as-is.
         """
         assert self.binder is not None, "HybridOp should set a binder"
+        # Here, we are binding any of the possible hybrid ops.
+        # which includes: for_loop, while_loop, cond, measure.
+        # This will place an equation at the very end of the current list of equations.
         out_quantum_tracer = self.binder(*in_expanded_tracers, **kwargs)[-1]
+        # eqn corresponds to the current hybrid operation that was just inserted
+        # into the list of equations.
         eqn = ctx.frames[trace].eqns[-1]
+
         assert len(eqn.outvars[:-1]) == len(
             out_expanded_tracers
         ), f"{eqn.outvars=}\n{out_expanded_tracers=}"
-        for i, t in zip(range(len(eqn.outvars[:-1])), out_expanded_tracers):
-            if trace.getvar(t) in set(
-                [
-                    *sum([e.outvars for e in ctx.frames[trace].eqns[:-1]], []),
-                    *ctx.frames[trace].invars,
-                    *ctx.frames[trace].constvar_to_val.keys(),
-                ]
-            ):
-                # Do not re-assign vars from other equations
+
+        frame = ctx.frames[trace]
+        jaxpr_variables = cached_vars.get(frame, set())
+        if not jaxpr_variables:
+            # We get all variables in the current frame
+            outvars = itertools.chain.from_iterable([e.outvars for e in frame.eqns])
+            jaxpr_variables = set(outvars)
+            jaxpr_variables.update(frame.invars)
+            jaxpr_variables.update(frame.constvar_to_val.keys())
+            cached_vars[frame] = jaxpr_variables
+
+        for outvar in frame.eqns[-1].outvars:
+            # With the exception of the output variables from the current equation.
+            jaxpr_variables.discard(outvar)
+
+        for i, t in enumerate(out_expanded_tracers):
+            # We look for what were the previous output tracers.
+            # If they haven't changed, then we leave them unchanged.
+            if trace.getvar(t) in jaxpr_variables:
                 continue
+
+            # If the variable cannot be found in the current frame
+            # it is because we have created it via new_inner_tracer
+            # which uses JAX internals to create a tracer without associating
+            # a particular variable nor binding it to an equation.
+            # So at this moment, we create a new variable for it
+            # and set it as the eqn.outvars.
+            # For example catalyst.measure always returns a tracer associated with
+            # the value true but without having it being bound to any primitive
+            #
+            #    m = new_inner_tracer(ctx.trace, get_aval(True))
+            #
+            # Then we would land here and bound that inner_trace to this primitive
+            #
+            #    a: bool, b: qubit = measure_p.bind()
+            #
+            # At the moment, it is a little bit unclear why we need this.
+            # I think it may be due to the separation between tracing the quantum
+            # part from the classical part.
+            #
+            # First we would have traced the classical part (which includes hybrid ops)
+            # and we need tracers for those values.
+            # Here we would be tracing the quantum part, and it is where we would finally
+            # bind it with the correct primitive.
+            #
+            # This seems to be the case since the measure function does not bound.
+            # But it returns this inner tracer.
+            #
+            # Then the topological sorter would sort the operations that depended
+            # on the original inner_trace accordingly.
+            #
+            # This method only gets called in a for loop for quantum operations
+            #
+            #     for op in ops:
+            #       qrp2 = None
+            #         if isinstance(op, HybridOp):
+            #            // ... snip...
+            #            qrp2 = op.trace_quantum(ctx, device, trace, qrp, **kwargs)
+            #
+            # So it should be safe to cache the tracers as we are doing it.
             eqn.outvars[i] = trace.getvar(t)
+
+        # Now, the output variables can be considered as part of the current frame.
+        # This allows us to avoid importing all equations again next time.
+        jaxpr_variables.update(eqn.outvars)
         return out_quantum_tracer
 
     @debug_logger
@@ -678,10 +742,8 @@ def trace_quantum_operations(
             qrp.insert(controlled_wires, qubits2[len(qubits) :])
         elif isinstance(op, qml.GlobalPhase):
             controlled_qubits = qrp.extract(controlled_wires)
-            qubits2 = bind_flexible_primitive(
-                gphase_p,
-                {"static_params": op.parameters},
-                *[*controlled_qubits, *controlled_values],
+            qubits2 = gphase_p.bind(
+                *[*op.parameters, *controlled_qubits, *controlled_values],
                 ctrl_len=len(controlled_qubits),
                 adjoint=adjoint,
             )
@@ -693,14 +755,12 @@ def trace_quantum_operations(
         else:
             qubits = qrp.extract(op.wires)
             controlled_qubits = qrp.extract(controlled_wires)
-            qubits2 = bind_flexible_primitive(
-                qinst_p,
-                {"static_params": op.parameters},
-                *[*qubits, *controlled_qubits, *controlled_values],
+            qubits2 = qinst_p.bind(
+                *[*qubits, *op.parameters, *controlled_qubits, *controlled_values],
                 op=op.name,
                 qubits_len=len(qubits),
+                params_len=len(op.parameters),
                 ctrl_len=len(controlled_qubits),
-                ctrl_value_len=len(controlled_values),
                 adjoint=adjoint,
             )
             qrp.insert(op.wires, qubits2[: len(qubits)])
@@ -739,14 +799,14 @@ def trace_quantum_operations(
 
 @debug_logger
 def trace_observables(
-    obs: Operator, qrp: QRegPromise, m_wires: int
+    obs: Operator, qrp: QRegPromise, m_wires: Optional[qml.wires.Wires]
 ) -> Tuple[List[DynamicJaxprTracer], Optional[int]]:
     """Trace observables.
 
     Args:
         obs (Operator): an observable operator
         qrp (QRegPromise): Quantum register tracer with cached qubits
-        m_wires (int): the default number of wires to use for this measurement process
+        m_wires (Optional[qml.wires.Wires]): the default wires to use for this measurement process
 
     Returns:
         out_classical_tracers: a list of classical tracers corresponding to the measured values.
@@ -755,8 +815,15 @@ def trace_observables(
     wires = obs.wires if (obs and len(obs.wires) > 0) else m_wires
     qubits = None
     if obs is None:
-        qubits = qrp.extract(wires, allow_reuse=True)
-        obs_tracers = compbasis_p.bind(*qubits)
+        if wires is None:
+            # If measuring all wires on the device, pass in the qreg to compbasis op
+            # TODO: "all wires on the device" is None when number of wires is static,
+            # but a tracer when dynamic. Update to handle dynamic case.
+            qreg_out = qrp.actualize()
+            obs_tracers = compbasis_p.bind(qreg_out, qreg_available=True)
+        else:
+            qubits = qrp.extract(wires, allow_reuse=True)
+            obs_tracers = compbasis_p.bind(*qubits)
     elif isinstance(obs, KNOWN_NAMED_OBS):
         qubits = qrp.extract(wires, allow_reuse=True)
         obs_tracers = namedobs_p.bind(qubits[0], kind=type(obs).__name__)
@@ -786,7 +853,7 @@ def trace_observables(
         raise NotImplementedError(
             f"Observable {obs} (of type {type(obs)}) is not implemented"
         )  # pragma: no cover
-    return obs_tracers, (len(qubits) if qubits else 0)
+    return obs_tracers, (len(qubits) if qubits else None)
 
 
 @debug_logger
@@ -835,11 +902,6 @@ def pauli_word_to_tensor_obs(obs, qrp: QRegPromise) -> List[DynamicJaxprTracer]:
     return tensorobs_p.bind(*nested_obs)
 
 
-def identity_qnode_transform(tape: QuantumTape) -> (Sequence[QuantumTape], Callable):
-    """Identity transform"""
-    return [tape], lambda res: res[0]
-
-
 # pylint: disable=too-many-statements,too-many-branches
 @debug_logger
 def trace_quantum_measurements(
@@ -865,71 +927,98 @@ def trace_quantum_measurements(
     shots = get_device_shots(device)
     out_classical_tracers = []
 
-    for i, o in enumerate(outputs):
-        if isinstance(o, MeasurementProcess):
+    for i, output in enumerate(outputs):
+        if isinstance(output, MeasurementProcess):
 
             # Check if the measurement is supported shot-vector where num_of_total_copies > 1
-            if device.shots.num_copies > 1 and not isinstance(o, qml.measurements.SampleMP):
+            if device.shots.num_copies > 1 and not isinstance(output, qml.measurements.SampleMP):
                 raise NotImplementedError(
-                    f"Measurement {type(o).__name__} is not supported a shot-vector. "
+                    f"Measurement {type(output).__name__} is not supported a shot-vector. "
                     "Use qml.sample() instead."
                 )
 
-            m_wires = o.wires if o.wires else range(len(device.wires))
-
-            obs_tracers, nqubits = trace_observables(o.obs, qrp, m_wires)
+            d_wires = (
+                device.wires[0]
+                if catalyst.device.qjit_device.is_dynamic_wires(device.wires)
+                else len(device.wires)
+            )
+            m_wires = output.wires if output.wires else None
+            obs_tracers, nqubits = trace_observables(output.obs, qrp, m_wires)
+            nqubits = d_wires if nqubits is None else nqubits
 
             using_compbasis = obs_tracers.primitive == compbasis_p
 
-            if isinstance(o, qml.measurements.SampleMP):
+            if isinstance(output, qml.measurements.SampleMP):
 
                 if shots is None:  # needed for old device API only
                     raise ValueError(
                         "qml.sample cannot work with shots=None. "
                         "Please specify a finite number of shots."
                     )
-                if o.mv is not None:  # qml.sample(m)
-                    out_classical_tracers.append(o.mv)
+                if output.mv is not None:  # qml.sample(m)
+                    out_classical_tracers.append(output.mv)
                 else:
-                    shape = (shots, nqubits) if using_compbasis else (shots,)
-                    result = bind_flexible_primitive(
-                        sample_p, {"shots": shots}, obs_tracers, num_qubits=nqubits
-                    )
+                    shape = (shots, nqubits)
+                    dyn_dims, static_shape = _extract_tracers_dyn_shape(shape)
+                    result = sample_p.bind(obs_tracers, *dyn_dims, static_shape=tuple(static_shape))
                     if using_compbasis:
                         result = jnp.astype(result, jnp.int64)
 
                     reshaped_result = ()
                     shot_vector = get_device_shot_vector(device)
                     start_idx = 0  # Start index for slicing
-                    for shot, copies in shot_vector:
-                        for _ in range(copies):
-                            sliced_result = result[start_idx : start_idx + shot]
-                            reshaped_result += (sliced_result.reshape(shot, nqubits),)
-                            start_idx += shot
+                    # TODO: shots still can only be static in PL frontend
+                    # TODO: Update to dynamic shots
+                    has_shot_vector = len(shot_vector) > 1 or any(
+                        copies > 1 for _, copies in shot_vector
+                    )
+                    if has_shot_vector:
+                        for shot, copies in shot_vector:
+                            for _ in range(copies):
+                                sliced_result = jax.lax.dynamic_slice(
+                                    result, (start_idx, 0), (shot, nqubits)
+                                )
+                                reshaped_result += (sliced_result.reshape(shot, nqubits),)
+                                start_idx += shot
+                    else:
+                        reshaped_result += (result,)
 
                     if len(reshaped_result) == 1:
                         reshaped_result = reshaped_result[0]
 
                     out_classical_tracers.append(reshaped_result)
 
-            elif type(o) is ExpectationMP:
+            elif type(output) is ExpectationMP:
                 out_classical_tracers.append(expval_p.bind(obs_tracers))
-            elif type(o) is VarianceMP:
+            elif type(output) is VarianceMP:
                 out_classical_tracers.append(var_p.bind(obs_tracers))
-            elif type(o) is ProbabilityMP:
+            elif type(output) is ProbabilityMP:
                 assert using_compbasis
-                shape = (2**nqubits,)
-                out_classical_tracers.append(probs_p.bind(obs_tracers, shape=shape))
-            elif type(o) is CountsMP:
+                if isinstance(nqubits, DynamicJaxprTracer):
+                    shape = (jnp.left_shift(1, nqubits),)
+                else:
+                    shape = (2**nqubits,)
+                dyn_dims, static_shape = _extract_tracers_dyn_shape(shape)
+                result = probs_p.bind(obs_tracers, *dyn_dims, static_shape=tuple(static_shape))
+                out_classical_tracers.append(result)
+            elif type(output) is CountsMP:
                 if shots is None:  # needed for old device API only
                     raise ValueError(
-                        "qml.sample cannot work with shots=None. "
+                        "qml.counts cannot work with shots=None. "
                         "Please specify a finite number of shots."
                     )
-                shape = (2**nqubits,) if using_compbasis else (2,)
-                results = bind_flexible_primitive(
-                    counts_p, {"shots": shots}, obs_tracers, shape=shape
-                )
+
+                if using_compbasis:
+                    if isinstance(nqubits, DynamicJaxprTracer):
+                        shape = (jnp.left_shift(1, nqubits),)
+                    else:
+                        shape = (2**nqubits,)
+                else:
+                    shape = (2,)
+
+                dyn_dims, static_shape = _extract_tracers_dyn_shape(shape)
+                results = counts_p.bind(obs_tracers, *dyn_dims, static_shape=tuple(static_shape))
+
                 if using_compbasis:
                     results = (jnp.asarray(results[0], jnp.int64), results[1])
                 out_classical_tracers.extend(results)
@@ -944,76 +1033,97 @@ def trace_quantum_measurements(
                     )
                 else:
                     out_tree = counts_tree
-            elif type(o) is StateMP:
+            elif type(output) is StateMP:
                 assert using_compbasis
-                shape = (2**nqubits,)
-                out_classical_tracers.append(state_p.bind(obs_tracers, shape=shape))
+                if isinstance(nqubits, DynamicJaxprTracer):
+                    shape = (jnp.left_shift(1, nqubits),)
+                else:
+                    shape = (2**nqubits,)
+                dyn_dims, static_shape = _extract_tracers_dyn_shape(shape)
+                result = state_p.bind(obs_tracers, *dyn_dims, static_shape=tuple(static_shape))
+                out_classical_tracers.append(result)
             else:
                 raise NotImplementedError(
-                    f"Measurement {type(o)} is not implemented"
+                    f"Measurement {type(output)} is not implemented"
                 )  # pragma: no cover
-        elif isinstance(o, DynamicJaxprTracer):
-            out_classical_tracers.append(o)
+        elif isinstance(output, DynamicJaxprTracer):
+            out_classical_tracers.append(output)
         else:
-            assert not isinstance(o, (list, dict)), f"Expected a tracer or a measurement, got {o}"
-            out_classical_tracers.append(o)
+            assert not isinstance(
+                output, (list, dict)
+            ), f"Expected a tracer or a measurement, got {output}"
+            out_classical_tracers.append(output)
 
     return out_classical_tracers, out_tree
 
 
 @debug_logger
-def is_transform_valid_for_batch_transforms(tape, flat_results):
-    """Not all transforms are valid for batch transforms.
-    Batch transforms will increase the number of tapes from 1 to N.
-    However, if the wave function collapses or there is any other non-deterministic behaviour
-    such as noise present, then each tape would have different results.
+def has_classical_outputs(flat_results):
+    """Checks if the quantum function outputs classical values.
 
-    Also, MidCircuitMeasure is a HybridOp, which PL does not handle at the moment.
-    Let's wait until mid-circuit measurements are better integrated into both PL
-    and Catalyst and discussed more as well."""
-    class_tracers, meas_tracers = split_tracers_and_measurements(flat_results)
+    Returns:
+        bool
+    """
+    for result in flat_results:
+        if not isinstance(result, MeasurementProcess):
+            return True
 
-    # Can transforms be applied?
-    # Since transforms are a PL feature and PL does not support the same things as
-    # Catalyst, transforms may have invariants that rely on PL invariants.
-    # For example:
-    #   * mid-circuit measurements (for batch-transforms)
-    #   * that the output will be only a sequence of `MeasurementProcess`es.
-    def is_measurement(op):
-        """Only to avoid 100 character per line limit."""
-        return isinstance(op, MeasurementProcess)
+    return False
 
-    is_out_measurements = map(is_measurement, meas_tracers)
-    is_all_out_measurements = all(is_out_measurements) and not class_tracers
-    is_out_measurement_sequence = is_all_out_measurements and isinstance(meas_tracers, Sequence)
-    is_out_single_measurement = is_all_out_measurements and is_measurement(meas_tracers)
+
+@debug_logger
+def has_midcircuit_measurement(tape):
+    """Check if the tape contains any mid-circuit measurements."""
 
     def is_midcircuit_measurement(op):
         """Only to avoid 100 character per line limit."""
         return isinstance(op, catalyst.api_extensions.MidCircuitMeasure)
 
-    is_valid_output = is_out_measurement_sequence or is_out_single_measurement
-    if not is_valid_output:
-        msg = (
-            "A transformed quantum function must return either a single measurement, "
-            "or a nonempty sequence of measurements."
-        )
-        raise CompileError(msg)
+    return any(map(is_midcircuit_measurement, tape.operations))
 
-    is_wave_function_collapsed = any(map(is_midcircuit_measurement, tape.operations))
-    are_batch_transforms_valid = is_valid_output and not is_wave_function_collapsed
-    return are_batch_transforms_valid
+
+class TracingMode(Enum):
+    """Enumerate the tracing modes supported by the quantum function tracer:
+
+    DEFAULT - Allows mid-circuit measurements and returns function's results directly.
+              Used when no transform is applied or when transform doesn't modify
+              measurements or produce multiple tapes.
+
+    TRANSFORM - Uses tape measurements instead of original function results.
+                Prohibits mid-circuit measurements with multiple tapes and requires
+                function to return only measurements (no classical results).
+                Used when transform produces multiple tapes or modifies measurements.
+    """
+
+    DEFAULT = 0
+    TRANSFORM = 1
 
 
 @debug_logger
-def apply_transform(
+def have_measurements_changed(original_tape, modified_tape):
+    """Check if the measurement has changed."""
+
+    if len(original_tape.measurements) != len(modified_tape.measurements):
+        return True
+
+    # Copying tapes preserves object identity in the operation and measurement lists, due to
+    # immutability. So we can compare identity directly. Equality comparisons are problematic
+    # when the measurements contain tracers.
+    for original_meas, modified_meas in zip(original_tape.measurements, modified_tape.measurements):
+        if original_meas is not modified_meas:
+            return True
+
+    return False
+
+
+@debug_logger
+def apply_transforms(
     qnode_program,
     device_program,
-    device_modify_measurements,
     tape,
     flat_results,
 ):
-    """Apply transform."""
+    """Apply device and qnode transform programs."""
     # Some transforms use trainability as a basis for transforming.
     # See batch_params
     params = tape.get_parameters(trainable_only=False)
@@ -1023,19 +1133,35 @@ def apply_transform(
         msg = "Catalyst does not support informative transforms."
         raise CompileError(msg)
 
-    if qnode_program or device_modify_measurements:
-        is_valid_for_batch = is_transform_valid_for_batch_transforms(tape, flat_results)
-        total_program = qnode_program + device_program
-    else:
-        is_valid_for_batch = True
-        # Apply the identity transform in order to keep generalization
-        total_program = device_program
-
+    # Apply the transform
+    total_program = qnode_program + device_program
     tapes, post_processing = total_program([tape])
-    if not is_valid_for_batch and len(tapes) > 1:
-        msg = "Multiple tapes are generated, but each run might produce different results."
-        raise CompileError(msg)
-    return tapes, post_processing
+
+    if len(tapes) > 1:
+        if has_classical_outputs(flat_results) or has_midcircuit_measurement(tape):
+            msg = (
+                "Batch transforms are unsupported with MCMs or non-MeasurementProcess QNode "
+                "outputs. The selected device, options, or applied QNode transforms, may be "
+                "attempting to produce multiple tapes."
+            )
+            raise CompileError(msg)
+        tracing_mode = TracingMode.TRANSFORM
+    elif len(qnode_program) or have_measurements_changed(tape, tapes[0]):
+        # TODO: Ideally we should allow qnode transforms that don't modify the measurements to
+        # operate in the permissive tracing mode, but that currently leads to a small number of
+        # test failures due to the different result format produced in trace_quantum_function.
+        if has_classical_outputs(flat_results):
+            msg = (
+                "Transforming MeasurementProcesses is unsupported with non-MeasurementProcess "
+                "QNode outputs. The selected device, options, or applied QNode transforms, may be "
+                "attempting to transform MeasurementProcesses from the tape."
+            )
+            raise CompileError(msg)
+        tracing_mode = TracingMode.TRANSFORM
+    else:
+        tracing_mode = TracingMode.DEFAULT
+
+    return tapes, post_processing, tracing_mode
 
 
 @debug_logger
@@ -1044,14 +1170,14 @@ def split_tracers_and_measurements(flat_values):
     classical = []
     measurements = []
     for flat_value in flat_values:
-        if isinstance(flat_value, DynamicJaxprTracer):
+        if isinstance(flat_value, MeasurementProcess):
+            measurements.append(flat_value)  # pragma: no cover
+        else:
             # classical should remain empty for all valid cases at the moment.
             # This is because split_tracers_and_measurements is only called
             # when checking the validity of transforms. And transforms cannot
             # return any tracers.
-            classical.append(flat_value)  # pragma: no cover
-        else:
-            measurements.append(flat_value)
+            classical.append(flat_value)
 
     return classical, measurements
 
@@ -1181,26 +1307,21 @@ def trace_quantum_function(
             if isinstance(device, qml.devices.Device):
                 config = _make_execution_config(qnode)
                 device_program, config = device.preprocess(ctx, config)
-                device_modify_measurements = config.device_options["transforms_modify_measurements"]
             else:
                 device_program = TransformProgram()
-                device_modify_measurements = False  # this is only for the new API transform program
 
             qnode_program = qnode.transform_program if qnode else TransformProgram()
 
-            tapes, post_processing = apply_transform(
+            tapes, post_processing, tracing_mode = apply_transforms(
                 qnode_program,
                 device_program,
-                device_modify_measurements,
                 quantum_tape,
                 return_values_flat,
             )
 
         # (2) - Quantum tracing
         transformed_results = []
-
         with EvaluationContext.frame_tracing_context(ctx, trace):
-            qnode_transformed = len(qnode_program) > 0
             for tape in tapes:
                 # Set up quantum register for the current tape.
                 # We just need to ensure there is a tape cut in between each.
@@ -1216,12 +1337,17 @@ def trace_quantum_function(
                     rtd_name=device.backend_name,
                     rtd_kwargs=str(device.backend_kwargs),
                 )
-                qreg_in = qalloc_p.bind(len(device.wires))
+                if catalyst.device.qjit_device.is_dynamic_wires(device.wires):
+                    # When device has dynamic wires, the device.wires iterable object
+                    # has a single value, which is the tracer for the number of wires
+                    qreg_in = qalloc_p.bind(device.wires[0])
+                else:
+                    qreg_in = qalloc_p.bind(len(device.wires))
 
                 # If the program is batched, that means that it was transformed.
                 # If it was transformed, that means that the program might have
                 # changed the output. See `split_non_commuting`
-                if qnode_transformed or device_modify_measurements:
+                if tracing_mode == TracingMode.TRANSFORM:
                     # TODO: In the future support arbitrary output from the user function.
                     output = tape.measurements
                     _, trees = jax.tree_util.tree_flatten(output, is_leaf=is_leaf)
@@ -1248,7 +1374,7 @@ def trace_quantum_function(
                 meas_results = tree_unflatten(meas_trees, meas_tracers)
 
                 # TODO: Allow the user to return whatever types they specify.
-                if qnode_transformed or device_modify_measurements:
+                if tracing_mode == TracingMode.TRANSFORM:
                     assert isinstance(meas_results, list)
                     if len(meas_results) == 1:
                         transformed_results.append(meas_results[0])

@@ -33,6 +33,8 @@
 #include "mlir/IR/IRMapping.h"
 
 #include "Catalyst/Utils/CallGraph.h"
+#include "Catalyst/Utils/EnsureFunctionDeclaration.h"
+#include "Catalyst/Utils/StaticAllocas.h"
 #include "Gradient/IR/GradientOps.h"
 #include "Gradient/Transforms/EnzymeConstants.h"
 #include "Gradient/Transforms/Patterns.h"
@@ -85,8 +87,6 @@ void wrapMemRefArgsCallsites(func::FuncOp func, const TypeConverter *typeConvert
                              RewriterBase &rewriter, Location loc, bool volatileArgs = false)
 {
     ModuleOp moduleOp = func->getParentOfType<ModuleOp>();
-    MLIRContext *ctx = rewriter.getContext();
-    auto ptrType = LLVM::LLVMPointerType::get(ctx);
     std::optional<SymbolTable::UseRange> uses = func.getSymbolUses(moduleOp);
     if (uses.has_value()) {
         for (auto use : *uses) {
@@ -94,15 +94,12 @@ void wrapMemRefArgsCallsites(func::FuncOp func, const TypeConverter *typeConvert
                 PatternRewriter::InsertionGuard insertionGuard(rewriter);
                 rewriter.setInsertionPoint(callOp);
 
-                Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
-
                 SmallVector<Value> operands;
                 SmallVector<Value> outputs;
                 auto wrapMemref = [&](Value memref) {
                     Type convertedType = typeConverter->convertType(memref.getType());
-                    Value space =
-                        rewriter.create<LLVM::AllocaOp>(loc, /*resultType=*/ptrType,
-                                                        /*elementType=*/convertedType, c1);
+                    Value space = getStaticAlloca(loc, rewriter, convertedType, 1);
+
                     Value convertedValue =
                         rewriter.create<UnrealizedConversionCastOp>(loc, convertedType, memref)
                             .getResult(0);
@@ -192,25 +189,6 @@ namespace {
 
 constexpr int64_t UNKNOWN = ShapedType::kDynamic;
 
-LLVM::LLVMFuncOp ensureFunctionDeclaration(PatternRewriter &rewriter, Operation *op,
-                                           StringRef fnSymbol, Type fnType)
-{
-    Operation *fnDecl = SymbolTable::lookupNearestSymbolFrom(op, rewriter.getStringAttr(fnSymbol));
-
-    if (!fnDecl) {
-        PatternRewriter::InsertionGuard insertGuard(rewriter);
-        ModuleOp mod = op->getParentOfType<ModuleOp>();
-        rewriter.setInsertionPointToStart(mod.getBody());
-
-        fnDecl = rewriter.create<LLVM::LLVMFuncOp>(op->getLoc(), fnSymbol, fnType);
-    }
-    else {
-        assert(isa<LLVM::LLVMFuncOp>(fnDecl) && "QIR function declaration is not a LLVMFuncOp");
-    }
-
-    return cast<LLVM::LLVMFuncOp>(fnDecl);
-}
-
 struct AdjointOpPattern : public ConvertOpToLLVMPattern<AdjointOp> {
     using ConvertOpToLLVMPattern::ConvertOpToLLVMPattern;
 
@@ -246,9 +224,9 @@ struct AdjointOpPattern : public ConvertOpToLLVMPattern<AdjointOp> {
             LLVM::LLVMVoidType::get(ctx), IntegerType::get(ctx, 64), /*isVarArg=*/true);
 
         LLVM::LLVMFuncOp cacheFnDecl =
-            ensureFunctionDeclaration(rewriter, op, cacheFnName, cacheFnSignature);
+            catalyst::ensureFunctionDeclaration(rewriter, op, cacheFnName, cacheFnSignature);
         LLVM::LLVMFuncOp gradFnDecl =
-            ensureFunctionDeclaration(rewriter, op, gradFnName, gradFnSignature);
+            catalyst::ensureFunctionDeclaration(rewriter, op, gradFnName, gradFnSignature);
 
         // Run the forward pass and cache the circuit.
         Value c_true = rewriter.create<LLVM::ConstantOp>(
@@ -367,8 +345,8 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
         // way to do this is to append the number of scalar results to the name of the function.
         std::string autodiff_func_name =
             enzyme_autodiff_func_name + std::to_string(op.getNumResults());
-        LLVM::LLVMFuncOp backpropFnDecl =
-            ensureFunctionDeclaration(rewriter, op, autodiff_func_name, backpropFnSignature);
+        LLVM::LLVMFuncOp backpropFnDecl = catalyst::ensureFunctionDeclaration(
+            rewriter, op, autodiff_func_name, backpropFnSignature);
 
         // The first argument to Enzyme is a function pointer of the function to be differentiated
         Value calleePtr =

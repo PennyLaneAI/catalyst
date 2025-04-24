@@ -29,6 +29,54 @@ from catalyst.compiler import get_lib_path
 BACKENDS = ["default"]
 
 
+def OQDDevicePipeline(device, qubit, gate):
+    """
+    Generate the compilation pipeline for an OQD device.
+
+    Args:
+        device (str): the path to the device toml file specifications.
+        qubit (str): the path to the qubit toml file specifications.
+        gate (str): the path to the gate toml file specifications.
+
+    Returns:
+        A list of tuples, with each tuple being a stage in the compilation pipeline.
+        When using ``keep_intermediate=True`` from :func:`~.qjit`, the kept stages
+        correspond to the tuples.
+    """
+    return [
+        (
+            "device-agnostic-pipeline",
+            [
+                "enforce-runtime-invariants-pipeline",
+                "hlo-lowering-pipeline",
+                "quantum-compilation-pipeline",
+                "bufferization-pipeline",
+            ],
+        ),
+        (
+            "oqd_pipeline",
+            [
+                "func.func(ions-decomposition)",
+                "func.func(quantum-to-ion{"
+                + "device-toml-loc="
+                + device
+                + " qubit-toml-loc="
+                + qubit
+                + " gate-to-pulse-toml-loc="
+                + gate
+                + "})",
+                "convert-ion-to-llvm",
+            ],
+        ),
+        (
+            "llvm-dialect-lowering-pipeline",
+            [
+                "llvm-dialect-lowering-pipeline",
+            ],
+        ),
+    ]
+
+
 class OQDDevice(Device):
     """The OQD device allows access to the hardware devices from OQD using Catalyst."""
 
@@ -41,7 +89,9 @@ class OQDDevice(Device):
         """
 
         system_extension = ".dylib" if platform.system() == "Darwin" else ".so"
-        lib_path = get_lib_path("oqd_runtime", "OQD_LIB_DIR") + "/librtd_oqd" + system_extension
+        lib_path = (
+            get_lib_path("oqd_runtime", "OQD_LIB_DIR") + "/librtd_oqd_device" + system_extension
+        )
 
         return "oqd", lib_path
 

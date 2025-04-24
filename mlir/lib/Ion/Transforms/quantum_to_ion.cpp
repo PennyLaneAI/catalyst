@@ -30,7 +30,6 @@
 #include "Quantum/IR/QuantumOps.h"
 
 using namespace mlir;
-using namespace catalyst::ion;
 
 namespace catalyst {
 namespace ion {
@@ -57,7 +56,14 @@ struct QuantumToIonPass : impl::QuantumToIonPassBase<QuantumToIonPass> {
     {
         return TransitionAttr::get(ctx, builder.getStringAttr(transition.level_0),
                                    builder.getStringAttr(transition.level_1),
-                                   builder.getF64FloatAttr(transition.einstein_a));
+                                   builder.getF64FloatAttr(transition.einstein_a),
+                                   builder.getStringAttr(transition.multipole));
+    }
+
+    PhononAttr getPhononAttr(MLIRContext *ctx, IRRewriter &builder, Phonon phonon)
+    {
+        return PhononAttr::get(ctx, builder.getF64FloatAttr(phonon.energy),
+                               builder.getDenseF64ArrayAttr(phonon.eigenvector));
     }
 
     bool canScheduleOn(RegisteredOperationName opInfo) const override
@@ -78,7 +84,11 @@ struct QuantumToIonPass : impl::QuantumToIonPassBase<QuantumToIonPass> {
         target.addLegalDialect<IonDialect>();
         target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });
 
-        OQDDatabaseManager dataManager(DeviceTomlLoc, QubitTomlLoc, Gate2PulseDecompTomlLoc);
+        auto allocOp = *op.getOps<quantum::AllocOp>().begin();
+        auto nQubits = allocOp.getNqubitsAttr().value();
+
+        OQDDatabaseManager dataManager(DeviceTomlLoc, QubitTomlLoc, Gate2PulseDecompTomlLoc,
+                                       nQubits);
 
         if (LoadIon) {
             // FIXME(?): we only load Yb171 ion since the hardware ion species is unlikely to change
@@ -99,6 +109,14 @@ struct QuantumToIonPass : impl::QuantumToIonPassBase<QuantumToIonPass> {
                 op->getLoc(), IonType::get(ctx), builder.getStringAttr(ion.name),
                 builder.getF64FloatAttr(ion.mass), builder.getF64FloatAttr(ion.charge),
                 ion.position, builder.getArrayAttr(levels), builder.getArrayAttr(transitions));
+
+            SmallVector<Attribute> phonons;
+            for (const Phonon &phonon : dataManager.getPhononParams()) {
+                phonons.push_back(cast<Attribute>(getPhononAttr(ctx, builder, phonon)));
+            }
+            // TODO: For now, we only print one phonon to be consistent with TriCal examples,
+            // but we should print all of them eventually
+            builder.create<ion::ModesOp>(op->getLoc(), builder.getArrayAttr(phonons[0]));
         }
 
         RewritePatternSet ionPatterns(&getContext());
