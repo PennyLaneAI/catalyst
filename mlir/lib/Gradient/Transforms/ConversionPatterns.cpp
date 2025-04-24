@@ -33,6 +33,7 @@
 #include "mlir/IR/IRMapping.h"
 
 #include "Catalyst/Utils/CallGraph.h"
+#include "Catalyst/Utils/EnsureFunctionDeclaration.h"
 #include "Catalyst/Utils/StaticAllocas.h"
 #include "Gradient/IR/GradientOps.h"
 #include "Gradient/Transforms/EnzymeConstants.h"
@@ -188,25 +189,6 @@ namespace {
 
 constexpr int64_t UNKNOWN = ShapedType::kDynamic;
 
-LLVM::LLVMFuncOp ensureFunctionDeclaration(PatternRewriter &rewriter, Operation *op,
-                                           StringRef fnSymbol, Type fnType)
-{
-    Operation *fnDecl = SymbolTable::lookupNearestSymbolFrom(op, rewriter.getStringAttr(fnSymbol));
-
-    if (!fnDecl) {
-        PatternRewriter::InsertionGuard insertGuard(rewriter);
-        ModuleOp mod = op->getParentOfType<ModuleOp>();
-        rewriter.setInsertionPointToStart(mod.getBody());
-
-        fnDecl = rewriter.create<LLVM::LLVMFuncOp>(op->getLoc(), fnSymbol, fnType);
-    }
-    else {
-        assert(isa<LLVM::LLVMFuncOp>(fnDecl) && "QIR function declaration is not a LLVMFuncOp");
-    }
-
-    return cast<LLVM::LLVMFuncOp>(fnDecl);
-}
-
 struct AdjointOpPattern : public ConvertOpToLLVMPattern<AdjointOp> {
     using ConvertOpToLLVMPattern::ConvertOpToLLVMPattern;
 
@@ -242,9 +224,9 @@ struct AdjointOpPattern : public ConvertOpToLLVMPattern<AdjointOp> {
             LLVM::LLVMVoidType::get(ctx), IntegerType::get(ctx, 64), /*isVarArg=*/true);
 
         LLVM::LLVMFuncOp cacheFnDecl =
-            ensureFunctionDeclaration(rewriter, op, cacheFnName, cacheFnSignature);
+            catalyst::ensureFunctionDeclaration(rewriter, op, cacheFnName, cacheFnSignature);
         LLVM::LLVMFuncOp gradFnDecl =
-            ensureFunctionDeclaration(rewriter, op, gradFnName, gradFnSignature);
+            catalyst::ensureFunctionDeclaration(rewriter, op, gradFnName, gradFnSignature);
 
         // Run the forward pass and cache the circuit.
         Value c_true = rewriter.create<LLVM::ConstantOp>(
@@ -363,8 +345,8 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
         // way to do this is to append the number of scalar results to the name of the function.
         std::string autodiff_func_name =
             enzyme_autodiff_func_name + std::to_string(op.getNumResults());
-        LLVM::LLVMFuncOp backpropFnDecl =
-            ensureFunctionDeclaration(rewriter, op, autodiff_func_name, backpropFnSignature);
+        LLVM::LLVMFuncOp backpropFnDecl = catalyst::ensureFunctionDeclaration(
+            rewriter, op, autodiff_func_name, backpropFnSignature);
 
         // The first argument to Enzyme is a function pointer of the function to be differentiated
         Value calleePtr =
