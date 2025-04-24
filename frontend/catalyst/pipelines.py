@@ -74,6 +74,7 @@ class CompileOptions:
             Default is None.
         pass_plugins (Optional[Set[Path]]): List of paths to pass plugins.
         dialect_plugins (Optional[Set[Path]]): List of paths to dialect plugins.
+        track_resources (Optional[bool]): Flag indicating whether to enable experimental resource tracking (NullQubit only).
     """
 
     verbose: Optional[bool] = False
@@ -94,6 +95,7 @@ class CompileOptions:
     circuit_transform_pipeline: Optional[dict[str, dict[str, str]]] = None
     pass_plugins: Optional[Set[Path]] = None
     dialect_plugins: Optional[Set[Path]] = None
+    track_resources: Optional[bool] = False
 
     def __post_init__(self):
         # Check that async runs must not be seeded

@@ -32,10 +32,7 @@ from pennylane.transforms import split_non_commuting, split_to_single_terms
 from catalyst import qjit
 from catalyst.compiler import get_lib_path
 from catalyst.device import QJITDevice, get_device_capabilities
-from catalyst.device.decomposition import (
-    measurements_from_counts,
-    measurements_from_samples,
-)
+from catalyst.device.decomposition import measurements_from_counts, measurements_from_samples
 from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
 
 # pylint: disable=attribute-defined-outside-init

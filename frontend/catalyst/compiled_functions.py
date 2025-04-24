@@ -23,11 +23,7 @@ import jax.numpy as jnp
 import numpy as np
 from jax.interpreters import mlir
 from jax.tree_util import PyTreeDef, tree_flatten, tree_unflatten
-from mlir_quantum.runtime import (
-    as_ctype,
-    make_nd_memref_descriptor,
-    make_zero_d_memref_descriptor,
-)
+from mlir_quantum.runtime import as_ctype, make_nd_memref_descriptor, make_zero_d_memref_descriptor
 
 from catalyst.jax_extras import get_implicit_and_explicit_flat_args
 from catalyst.logging import debug_logger_init
