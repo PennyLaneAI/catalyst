@@ -77,6 +77,7 @@ class CompileOptions:
             Default is None.
         pass_plugins (Optional[Set[Path]]): List of paths to pass plugins.
         dialect_plugins (Optional[Set[Path]]): List of paths to dialect plugins.
+        track_resources (Optional[bool]): Flag indicating whether to enable experimental resource tracking (NullQubit only).
     """
 
     verbose: Optional[bool] = False

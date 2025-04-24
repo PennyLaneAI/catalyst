@@ -60,11 +60,7 @@ from catalyst.jax_tracer import (
     trace_quantum_operations,
     unify_convert_result_types,
 )
-from catalyst.tracing.contexts import (
-    EvaluationContext,
-    EvaluationMode,
-    JaxTracingContext,
-)
+from catalyst.tracing.contexts import EvaluationContext, EvaluationMode, JaxTracingContext
 
 
 ## API ##

@@ -91,6 +91,10 @@ runtime: configure
 test_runner: configure
 	cmake --build $(RT_BUILD_DIR) --target $(TEST_TARGETS) -j$(NPROC)
 
+test2:
+	cmake --build $(RT_BUILD_DIR) --target runner_tests_qir_runtime -j$(NPROC)
+	$(RT_BUILD_DIR)/tests/runner_tests_qir_runtime
+
 .PHONY: test
 test: CODE_COVERAGE=OFF
 test: BUILD_TYPE?=RelWithDebInfo
