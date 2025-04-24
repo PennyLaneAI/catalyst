@@ -925,7 +925,7 @@ class ForLoopCallable:
         )
         in_type = in_sig.in_type
 
-        with EvaluationContext.frame_tracing_context() as inner_trace:
+        with EvaluationContext.frame_tracing_context(debug_info=wfun.debug_info) as inner_trace:
             arg_classical_tracers = input_type_to_tracers(
                 in_type, inner_trace.new_arg, inner_trace.to_jaxpr_tracer
             )
@@ -1103,7 +1103,7 @@ class WhileLoopCallable:
         in_type = in_sig.in_type
         in_expanded_classical_tracers = in_sig.in_expanded_args
 
-        with EvaluationContext.frame_tracing_context() as cond_trace:
+        with EvaluationContext.frame_tracing_context(debug_info=cond_wffa.debug_info) as cond_trace:
             arg_classical_tracers = input_type_to_tracers(
                 in_type, cond_trace.new_arg, cond_trace.to_jaxpr_tracer
             )
@@ -1125,7 +1125,7 @@ class WhileLoopCallable:
 
             _check_single_bool_value(out_tree, cond_region.res_classical_tracers)
 
-        with EvaluationContext.frame_tracing_context() as body_trace:
+        with EvaluationContext.frame_tracing_context(debug_info=body_wffa.debug_info) as body_trace:
             arg_classical_tracers = input_type_to_tracers(
                 in_type, body_trace.new_arg, body_trace.to_jaxpr_tracer
             )
