@@ -376,13 +376,11 @@ template <typename T> typename RealGesdd<T>::FnType *RealGesdd<T>::fn = nullptr;
 
 template <typename T> void RealGesdd<T>::Kernel(void *out_tuple, void **data, XlaCustomCallStatus *)
 {
-    const int32_t job_opt_full_matrices = *(reinterpret_cast<int32_t *>(data[0]));
-    const int32_t job_opt_compute_uv = *(reinterpret_cast<int32_t *>(data[1]));
-    const int b = *(reinterpret_cast<int32_t *>(data[2]));
-    const int m = *(reinterpret_cast<int32_t *>(data[3]));
-    const int n = *(reinterpret_cast<int32_t *>(data[4]));
-    const int lwork = *(reinterpret_cast<int32_t *>(data[5]));
-    T *a_in = reinterpret_cast<T *>(data[6]);
+    const char jobz = *(reinterpret_cast<int32_t *>(data[0]));
+    const int b = *(reinterpret_cast<int32_t *>(data[1]));
+    const int m = *(reinterpret_cast<int32_t *>(data[2]));
+    const int n = *(reinterpret_cast<int32_t *>(data[3]));
+    T *a_in = reinterpret_cast<T *>(data[4]);
 
     void **out = reinterpret_cast<void **>(out_tuple);
     T *a_out = reinterpret_cast<T *>(out[0]);
@@ -390,8 +388,6 @@ template <typename T> void RealGesdd<T>::Kernel(void *out_tuple, void **data, Xl
     T *u = reinterpret_cast<T *>(out[2]);
     T *vt = reinterpret_cast<T *>(out[3]);
     int *info = reinterpret_cast<int *>(out[4]);
-    int *iwork = reinterpret_cast<int *>(out[5]);
-    T *work = reinterpret_cast<T *>(out[6]);
 
     if (a_out != a_in) {
         std::memcpy(a_out, a_in,
@@ -399,7 +395,6 @@ template <typename T> void RealGesdd<T>::Kernel(void *out_tuple, void **data, Xl
                         sizeof(T));
     }
 
-    const char jobz = GesddJobz(job_opt_compute_uv, job_opt_full_matrices);
 
     constexpr int corder = LAPACK_ROW_MAJOR;
     const int lda = (corder == LAPACK_ROW_MAJOR) ? n : m;
