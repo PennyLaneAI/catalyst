@@ -28,7 +28,13 @@ from typing import Any, Callable
 import jax
 import jax.numpy as jnp
 from jax._src.api_util import shaped_abstractify
-from jax._src.tree_util import Partial, tree_flatten, tree_leaves, tree_map, tree_unflatten
+from jax._src.tree_util import (
+    Partial,
+    tree_flatten,
+    tree_leaves,
+    tree_map,
+    tree_unflatten,
+)
 
 from catalyst.jax_extras import transient_jax_config
 from catalyst.jax_primitives import python_callback_p

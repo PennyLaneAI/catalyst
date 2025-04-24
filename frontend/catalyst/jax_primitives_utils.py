@@ -23,7 +23,11 @@ from jax._src.lib.mlir import ir
 from jax.interpreters import mlir
 from jaxlib.mlir.dialects.builtin import ModuleOp
 from jaxlib.mlir.dialects.func import CallOp
-from mlir_quantum.dialects._transform_ops_gen import ApplyRegisteredPassOp, NamedSequenceOp, YieldOp
+from mlir_quantum.dialects._transform_ops_gen import (
+    ApplyRegisteredPassOp,
+    NamedSequenceOp,
+    YieldOp,
+)
 from mlir_quantum.dialects.catalyst import LaunchKernelOp
 
 

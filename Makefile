@@ -134,9 +134,6 @@ runtime:
 oqc:
 	$(MAKE) -C frontend/catalyst/third_party/oqc/src oqc
 
-test2:
-	$(MAKE) -C runtime test2
-
 .PHONY: test test-runtime test-frontend lit pytest test-demos test-oqc test-toml-spec
 test: test-runtime test-frontend test-demos
 

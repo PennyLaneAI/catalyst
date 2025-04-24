@@ -26,7 +26,13 @@ import pennylane as qml
 from jax.core import eval_jaxpr
 from jax.tree_util import tree_flatten, tree_unflatten
 from pennylane import exceptions
-from pennylane.measurements import CountsMP, ExpectationMP, ProbabilityMP, SampleMP, VarianceMP
+from pennylane.measurements import (
+    CountsMP,
+    ExpectationMP,
+    ProbabilityMP,
+    SampleMP,
+    VarianceMP,
+)
 from pennylane.transforms.dynamic_one_shot import (
     gather_non_mcm,
     init_auxiliary_tape,
@@ -36,7 +42,11 @@ from pennylane.transforms.dynamic_one_shot import (
 import catalyst
 from catalyst.api_extensions import MidCircuitMeasure
 from catalyst.device import QJITDevice, get_device_shots
-from catalyst.jax_extras import deduce_avals, get_implicit_and_explicit_flat_args, unzip2
+from catalyst.jax_extras import (
+    deduce_avals,
+    get_implicit_and_explicit_flat_args,
+    unzip2,
+)
 from catalyst.jax_primitives import quantum_kernel_p
 from catalyst.jax_tracer import Function, trace_quantum_function
 from catalyst.logging import debug_logger
