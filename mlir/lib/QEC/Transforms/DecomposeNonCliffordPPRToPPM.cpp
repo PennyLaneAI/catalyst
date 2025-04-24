@@ -86,7 +86,7 @@ LogicalInitKind getMagicState(PPRotationOp op)
 /// |0⟩─────────| Y |────╚══╣X/Z|
 ///             └───┘       └───┘
 /// All the operations in second diagram are PPM except for the last PPR P(π/2)
-/// For P(-π/8) we need to use complex conjugate|M̅⟩ as the magic state.
+/// For P(-π/8) we need to use complex conjugate|m̅⟩ as the magic state.
 ///
 /// Details:
 /// - If P⊗Z measurement yields -1 then apply X, otherwise apply Z
@@ -160,7 +160,7 @@ void decompose_auto_corrected_pi_over_eight(PPRotationOp op, PatternRewriter &re
 /// |m⟩──| Z |────────| X ╠═════════╝
 ///      └───┘        └───┘
 /// All the operations in second diagram are PPM except for the last PPR P(π/2) and P(π/4)
-/// For P(-π/8) we need to use complex conjugate|M̅⟩ as the magic state.
+/// For P(-π/8) we need to use complex conjugate|m̅⟩ as the magic state.
 ///
 /// Details:
 /// - If P⊗Z measurement yields -1 then apply P(π/4)

@@ -59,14 +59,14 @@ def QECDialect : Dialect {
 def LogicalInitKind : I32EnumAttr<"LogicalInitKind",
     "The initial state of a logical qubit such as |0⟩, |1⟩, |+⟩, |−⟩, |Y⟩, |-Y⟩, |m⟩, or |m̅⟩.",
     [
-        I32EnumAttrCase<"zero",     0>, // |0⟩
-        I32EnumAttrCase<"one",      1>, // |1⟩
-        I32EnumAttrCase<"plus",     2>, // |+⟩  = (|0⟩ + |1⟩) / sqrt(2)
-        I32EnumAttrCase<"minus",    3>, // |-⟩  = (|0⟩ - |1⟩) / sqrt(2)
-        I32EnumAttrCase<"plus_i",   4>, // |Y⟩  = (|0⟩ + i|1⟩) / sqrt(2)
-        I32EnumAttrCase<"minus_i",  5>, // |-Y⟩ = (|0⟩ - i|1⟩) / sqrt(2)
-        I32EnumAttrCase<"magic",    6>, // |m⟩  = |0⟩ + e^{iπ/4}|1⟩
-        I32EnumAttrCase<"magic_conj", 7>, // |m̅⟩  = |0⟩ + e^{-iπ/4}|1⟩
+        I32EnumAttrCase<"zero",     0>,     // |0⟩
+        I32EnumAttrCase<"one",      1>,     // |1⟩
+        I32EnumAttrCase<"plus",     2>,     // |+⟩  = (|0⟩ + |1⟩) / sqrt(2)
+        I32EnumAttrCase<"minus",    3>,     // |-⟩  = (|0⟩ - |1⟩) / sqrt(2)
+        I32EnumAttrCase<"plus_i",   4>,     // |Y⟩  = (|0⟩ + i|1⟩) / sqrt(2)
+        I32EnumAttrCase<"minus_i",  5>,     // |-Y⟩ = (|0⟩ - i|1⟩) / sqrt(2)
+        I32EnumAttrCase<"magic",    6>,     // |m⟩  = |0⟩ + e^{iπ/4}|1⟩ (or can be any magic state)
+        I32EnumAttrCase<"magic_conj", 7>,   // |m̅⟩  = |0⟩ + e^{-iπ/4}|1⟩ (or can be any magic state)
     ]> {
     let cppNamespace = "::catalyst::qec";
     let genSpecializedAttr = 0;
@@ -89,7 +89,7 @@ def PrepareStateOp : QEC_Op<"prepare"> {
     let summary = "Initial state of logical qubit.";
     let description = [{
         Prepares logical qubits in a specific initial quantum state, 
-        such as |0⟩, |1⟩, |+⟩, |-⟩, |Y⟩, |-Y⟩, or |T⟩.
+        such as |0⟩, |1⟩, |+⟩, |-⟩, |Y⟩, |-Y⟩, |m⟩, or |m̅⟩.
 
         This operation is typically used at the start of a quantum circuit to initialize 
         logical qubits according to the error-corrected encoding scheme.
@@ -99,7 +99,7 @@ def PrepareStateOp : QEC_Op<"prepare"> {
         %0 = qec.prepare zero %q0 : !quantum.bit
         %1 = qec.prepare magic %q0 : !quantum.bit
         ```
-        These prepares the logical qubit in the |0⟩ state and the |T⟩ state respectively.
+        These prepares the logical qubit in the |0⟩ state and the |m⟩ state respectively.
     }];
 
     let arguments = (ins
@@ -268,7 +268,7 @@ def PPMeasurementOp : QEC_Op<"ppm", [QECOpInterface, AttrSizedOperandSegments]> 
         It measures a set of qubits in the basis specified by a Pauli product.
         
         The operation is characterized by:
-        1. A Pauli product (e.g., "XIZ") specifying the measurement basis
+        1. A Pauli product (e.g., ["X", "I", "Z"]) specifying the measurement basis
         2. A list of input qubits to measure
         
         The operation returns:
@@ -277,7 +277,7 @@ def PPMeasurementOp : QEC_Op<"ppm", [QECOpInterface, AttrSizedOperandSegments]> 
         
         Example:
         ```mlir
-        %result, %q0, %q1, %q2 = qec.ppm "XIZ" %q0, %q1, %q2 : (qreg, qreg, qreg) -> (i1, qreg, qreg, qreg)
+        %result, %q0:3 = qec.ppm ["X", "I", "Z"] %q0, %q1, %q2 : !quantum.bit, !quantum.bit, !quantum.bit
         ```
         This measures the three qubits in the X⊗I⊗Z basis.
     }];
@@ -442,5 +442,7 @@ def SelectPPMeasurementOp : QEC_Op<"select.ppm"> {
     let assemblyFormat = [{
       `(` $condition `,` $pauli_product `,` $else_pauli_product `)` $in_qubits attr-dict `:` type($out_qubits)
     }];
+    
+    let hasVerifier = 1;
 }
 #endif // QEC_DIALECT
