@@ -30,13 +30,12 @@ from typing import (
     Optional,
     Set,
     Tuple,
-    Type,
     TypeVar,
 )
 
 import jax
 from jax import ShapeDtypeStruct
-from jax._src.core import DBIdx, _update_thread_local_jit_state
+from jax._src.core import DBIdx, InDBIdx, InputType, OutDBIdx, OutputType
 from jax._src.interpreters.mlir import _module_name_regex, register_lowering
 from jax._src.interpreters.partial_eval import (
     _input_type_to_tracers,
@@ -44,7 +43,6 @@ from jax._src.interpreters.partial_eval import (
     trace_to_jaxpr_dynamic2,
 )
 from jax._src.lax.control_flow import _initial_style_jaxpr
-from jax._src.lax.lax import _abstractify
 from jax._src.lax.slicing import _gather_lower, gather_p
 from jax._src.linear_util import annotate
 from jax._src.pjit import _extract_implicit_args, _flat_axes_specs
@@ -53,28 +51,18 @@ from jax._src.util import safe_map, unzip2, wraps
 from jax.api_util import flatten_fun
 from jax.core import (
     AbstractValue,
-    ClosedJaxpr,
-    ConcreteArray,
     DShapedArray,
-    InDBIdx,
-    InputType,
-    Jaxpr,
-    JaxprEqn,
-    MainTrace,
-    OutDBIdx,
-    OutputType,
 )
 from jax.core import Primitive as JaxprPrimitive
 from jax.core import (
     ShapedArray,
-    Trace,
     Var,
     eval_jaxpr,
     find_top_trace,
     gensym,
     new_jaxpr_eqn,
-    thread_local_state,
 )
+from jax.extend.core import ClosedJaxpr, Jaxpr, JaxprEqn
 from jax.extend.linear_util import transformation_with_aux, wrap_init
 from jax.interpreters.partial_eval import (
     DynamicJaxprTrace,
@@ -114,7 +102,6 @@ __all__ = (
     "PyTreeRegistry",
     "ShapedArray",
     "DShapedArray",
-    "ConcreteArray",
     "ShapeDtypeStruct",
     "DynshapePrimitive",
     "convert_constvars_jaxpr",
@@ -128,7 +115,6 @@ __all__ = (
     "expand_args",
     "expand_results",
     "eval_jaxpr",
-    "_abstractify",
     "_initial_style_jaxpr",
     "_input_type_to_tracers",
     "input_type_to_tracers",
@@ -138,11 +124,9 @@ __all__ = (
     "convert_constvars_jaxpr",
     "convert_element_type",
     "eval_jaxpr",
-    "_abstractify",
     "_module_name_regex",
     "make_jaxpr_effects",
     "make_jaxpr2",
-    "new_dynamic_main2",
     "new_inner_tracer",
     "sort_eqns",
     "transient_jax_config",
@@ -180,31 +164,6 @@ def transient_jax_config(want_vals) -> Generator[None, None, None]:
     finally:
         for name, val in prev_vals.items():
             jax.config.update(name, val)
-
-
-@contextmanager
-@debug_logger
-def new_dynamic_main2(
-    trace_type: Type[Trace],
-    main: Optional[MainTrace] = None,
-    **payload,
-) -> Generator[MainTrace, None, None]:
-    """A verison of JAX `new_main` function that knows how to re-use an already existing `MainTrace`
-    object"""
-
-    stack = thread_local_state.trace_state.trace_stack
-    level = stack.next_level() if main is None else main.level
-    main = MainTrace(level, trace_type, **payload) if main is None else main
-    stack.push(main)
-    prev_dynamic, stack.dynamic = stack.dynamic, main
-    _update_thread_local_jit_state(stack.dynamic)
-
-    try:
-        yield main
-    finally:
-        stack.pop()
-        stack.dynamic = prev_dynamic
-        _update_thread_local_jit_state(stack.dynamic)
 
 
 def stable_toposort(end_nodes: list) -> list:
@@ -399,7 +358,7 @@ class OutputSignature:
 
 
 def deduce_signatures(
-    f: Callable, args, kwargs, expansion_strategy
+    f: Callable, args, kwargs, expansion_strategy, debug_info=None
 ) -> Tuple[Callable, InputSignature, OutputSignature]:
     """Prepares the callable ``f`` for tracing by wrapping it into a WrappedFun container accepting
     expanded flattened arguments and returning expanded flatten results. Jax input and output types
@@ -423,9 +382,9 @@ def deduce_signatures(
     """
     flat_args, in_tree = tree_flatten((args, kwargs))
     trace: DynamicJaxprTrace = find_top_trace(flat_args)
-    flat_tracers = [trace.full_raise(a) for a in flat_args]
+    flat_tracers = [trace.to_jaxpr_tracer(a) for a in flat_args]
     in_expanded_args, in_type = expand_args(flat_tracers, expansion_strategy=expansion_strategy)
-    wf = wrap_init(f)
+    wf = wrap_init(f, debug_info=debug_info)
     wf, out_tree_promise = flatten_fun(wf, in_tree)
     wf, out_sig_promise = expanded_fun(wf, (in_type, expansion_strategy))
     return (
@@ -441,12 +400,12 @@ def deduce_signatures(
     )
 
 
-def deduce_avals(f: Callable, args, kwargs, static_argnums=None):
+def deduce_avals(f: Callable, args, kwargs, static_argnums=None, debug_info=None):
     """Wraps the callable ``f`` into a WrappedFun container accepting collapsed flatten arguments
     and returning expanded flatten results. Calculate input abstract values and output_tree promise.
     The promise must be called after the resulting wrapped function is evaluated."""
     # TODO: deprecate in favor of `deduce_signatures`
-    wf = wrap_init(f)
+    wf = wrap_init(f, debug_info=debug_info)
     if static_argnums:
         verify_static_argnums_type(static_argnums)
         dynamic_argnums = [i for i in range(len(args)) if i not in static_argnums]
@@ -469,7 +428,7 @@ def trace_to_jaxpr(
     This method would remove return values related to sizes of tensors when compiling with
     dynamically sized tensors.
     """
-    jaxpr, tracers, consts = trace.frame.to_jaxpr2((*outputs, *inputs))
+    jaxpr, tracers, consts = trace.frame.to_jaxpr2((*outputs, *inputs), None)
     del jaxpr._outvars[len(outputs) :]
     return jaxpr, tracers, consts
 
@@ -498,11 +457,12 @@ def make_jaxpr2(
     fun: Callable,
     static_argnums: Any | None = None,
     abstracted_axes: Any | None = None,
+    debug_info=None,
 ) -> Callable[..., (tuple[ClosedJaxpr, PyTreeDef])]:
     """A customized version of ``jax.make_jaxpr``, compatible with the JAX dynamic API."""
+
     # TODO: Use `deduce_signatures` here. Ideally, unify this function with the
     # `jax_tracer.trace_function` function.
-
     def abstractify(args, kwargs):
         flat_args, in_tree = tree_flatten((args, kwargs))
         axes_specs = _flat_axes_specs(abstracted_axes, *args, **kwargs)
@@ -522,7 +482,7 @@ def make_jaxpr2(
             (jax._src.interpreters.partial_eval, "get_aval", get_aval2),
             (jax._src.lax.slicing, "gather_p", gather2_p),
         ), ExitStack():
-            f = wrap_init(fun)
+            f = wrap_init(fun, debug_info=debug_info)
             if static_argnums:
                 argnums = [static_argnums] if isinstance(static_argnums, int) else static_argnums
                 dynamic_argnums = [i for i in range(len(args)) if i not in argnums]
@@ -777,14 +737,14 @@ def infer_output_type_python(
     """
 
     trace: DynamicJaxprTrace = find_top_trace(expanded_inputs)
-    outputs = [trace.full_raise(t) for t in outputs]
+    outputs = [trace.to_jaxpr_tracer(t) for t in outputs]
 
     # Calculate the constants. We need it to set InDBIdx correctly
     _, _, consts = trace_to_jaxpr(trace, expanded_inputs, outputs)
 
     # Calculate output type containing the correct De Brjuin indices
     expanded_outputs, out_type = infer_output_type(
-        [trace.full_raise(t) for t in consts],
+        [trace.to_jaxpr_tracer(t) for t in consts],
         expanded_inputs,
         outputs,
         expansion_strategy,
@@ -943,7 +903,7 @@ class DynshapePrimitive(JaxprPrimitive):
         # explicitness.
 
         trace = find_top_trace(args)
-        tracers = map(trace.full_raise, args)
+        tracers = map(trace.to_jaxpr_tracer, args)
         source_info = jax_current()
 
         in_type = infer_lambda_input_type(None, tracers)

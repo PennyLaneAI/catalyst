@@ -24,7 +24,8 @@ from typing import Iterable, List, Union
 import jax
 import numpy as np
 import pennylane as qml
-from jax._src import api_util, core, source_info_util, util
+from jax._src import core, source_info_util, util
+from jax._src.core import pytype_aval_mappings
 from jax._src.interpreters import partial_eval as pe
 from jax._src.lax.lax import _merge_dyn_shape, _nary_lower_hlo, cos_p, sin_p
 from jax._src.lib.mlir import ir
@@ -1985,7 +1986,7 @@ def _for_loop_lowering(
 
         # Iterate from 0 to the number of iterations (ceil((stop - start) / step))
         distance = SubIOp(stop_val, start_val)
-        num_iterations = CeilDivSIOp(distance, step_val)
+        num_iterations = CeilDivSIOp(distance.result, step_val)
         lower_bound, upper_bound, step = zero, num_iterations, one
 
     for_op_scf = ForOp(lower_bound, upper_bound, step, iter_args=loop_args)
@@ -2256,12 +2257,10 @@ CUSTOM_LOWERING_RULES = (
 
 def _scalar_abstractify(t):
     # pylint: disable=protected-access
-    if t in {int, float, complex, bool} or isinstance(t, jax._src.numpy.lax_numpy._ScalarMeta):
+    if t in {int, float, complex, bool} or isinstance(t, jax._src.numpy.scalar_types._ScalarMeta):
         return core.ShapedArray([], dtype=t, weak_type=True)
     raise TypeError(f"Argument type {t} is not a valid JAX type.")
 
 
-# pylint: disable=protected-access
-api_util._shaped_abstractify_handlers[type] = _scalar_abstractify
-# pylint: disable=protected-access
-api_util._shaped_abstractify_handlers[jax._src.numpy.lax_numpy._ScalarMeta] = _scalar_abstractify
+pytype_aval_mappings[type] = _scalar_abstractify
+pytype_aval_mappings[jax._src.numpy.scalar_types._ScalarMeta] = _scalar_abstractify

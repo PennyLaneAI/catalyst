@@ -22,9 +22,10 @@ import jax
 import jax.core
 import jax.numpy as jnp
 import pennylane as qml
+from jax.extend.core import ClosedJaxpr, Jaxpr
 from jax.extend.linear_util import wrap_init
 from jax.interpreters.partial_eval import convert_constvars_jaxpr
-from pennylane.capture import PlxprInterpreter, disable, enable, enabled, qnode_prim
+from pennylane.capture import PlxprInterpreter, qnode_prim
 from pennylane.capture.expand_transforms import ExpandTransformsInterpreter
 from pennylane.capture.primitives import cond_prim as plxpr_cond_prim
 from pennylane.capture.primitives import for_loop_prim as plxpr_for_loop_prim
@@ -33,9 +34,7 @@ from pennylane.ops.functions.map_wires import _map_wires_transform as pl_map_wir
 from pennylane.transforms import cancel_inverses as pl_cancel_inverses
 from pennylane.transforms import commute_controlled as pl_commute_controlled
 from pennylane.transforms import decompose as pl_decompose
-from pennylane.transforms import (
-    merge_amplitude_embedding as pl_merge_amplitude_embedding,
-)
+from pennylane.transforms import merge_amplitude_embedding as pl_merge_amplitude_embedding
 from pennylane.transforms import merge_rotations as pl_merge_rotations
 from pennylane.transforms import single_qubit_fusion as pl_single_qubit_fusion
 from pennylane.transforms import unitary_to_rot as pl_unitary_to_rot
@@ -99,11 +98,11 @@ def _get_device_kwargs(device) -> dict:
 
 # code example has long lines
 # pylint: disable=line-too-long
-def from_plxpr(plxpr: jax.core.ClosedJaxpr) -> Callable[..., jax.core.Jaxpr]:
+def from_plxpr(plxpr: ClosedJaxpr) -> Callable[..., Jaxpr]:
     """Convert PennyLane variant jaxpr to Catalyst variant jaxpr.
 
     Args:
-        jaxpr (jax.core.ClosedJaxpr): PennyLane variant jaxpr
+        jaxpr (ClosedJaxpr): PennyLane variant jaxpr
 
     Returns:
         Callable: A function that accepts the same arguments as the plxpr and returns catalyst
@@ -546,9 +545,7 @@ def handle_for_loop(
         consts,
     )
     converted_jaxpr_branch = jax.make_jaxpr(converted_func)(*start_plus_args_plus_qreg).jaxpr
-    converted_closed_jaxpr_branch = jax.core.ClosedJaxpr(
-        convert_constvars_jaxpr(converted_jaxpr_branch), ()
-    )
+    converted_closed_jaxpr_branch = ClosedJaxpr(convert_constvars_jaxpr(converted_jaxpr_branch), ())
 
     # Build Catalyst compatible input values
     for_loop_invals = [*consts, start, stop, step, *start_plus_args_plus_qreg]
@@ -598,7 +595,7 @@ def handle_while_loop(
         consts_body,
     )
     converted_body_jaxpr_branch = jax.make_jaxpr(converted_body_func)(*args_plus_qreg).jaxpr
-    converted_body_closed_jaxpr_branch = jax.core.ClosedJaxpr(
+    converted_body_closed_jaxpr_branch = ClosedJaxpr(
         convert_constvars_jaxpr(converted_body_jaxpr_branch), ()
     )
 
@@ -609,7 +606,7 @@ def handle_while_loop(
         consts_cond,
     )
     converted_cond_jaxpr_branch = jax.make_jaxpr(converted_cond_func)(*args_plus_qreg).jaxpr
-    converted_cond_closed_jaxpr_branch = jax.core.ClosedJaxpr(
+    converted_cond_closed_jaxpr_branch = ClosedJaxpr(
         convert_constvars_jaxpr(converted_cond_jaxpr_branch), ()
     )
 
@@ -741,18 +738,9 @@ def trace_from_pennylane(fn, static_argnums, abstracted_axes, sig, kwargs):
             "abstracted_axes": abstracted_axes,
         }
 
-        if enabled():
-            capture_on = True
-        else:
-            capture_on = False
-            enable()
-
         args = sig
-        try:
-            plxpr, out_type, out_treedef = make_jaxpr2(fn, **make_jaxpr_kwargs)(*args, **kwargs)
-            jaxpr = from_plxpr(plxpr)(*args, **kwargs)
-        finally:
-            if not capture_on:
-                disable()
+
+        plxpr, out_type, out_treedef = make_jaxpr2(fn, **make_jaxpr_kwargs)(*args, **kwargs)
+        jaxpr = from_plxpr(plxpr)(*args, **kwargs)
 
     return jaxpr, out_type, out_treedef, sig

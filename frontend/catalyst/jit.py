@@ -26,6 +26,7 @@ import warnings
 import jax
 import jax.numpy as jnp
 import pennylane as qml
+from jax.api_util import debug_info
 from jax.interpreters import mlir
 from jax.tree_util import tree_flatten, tree_unflatten
 
@@ -92,7 +93,6 @@ def qjit(
     abstracted_axes=None,
     disable_assertions=False,
     seed=None,
-    experimental_capture=False,
     circuit_transform_pipeline=None,
     pass_plugins=None,
     dialect_plugins=None,
@@ -152,9 +152,6 @@ def qjit(
             :func:`qml.sample() <pennylane.sample>`, :func:`qml.counts() <pennylane.counts>`,
             :func:`qml.probs() <pennylane.probs>`, :func:`qml.expval() <pennylane.expval>`,
             :func:`qml.var() <pennylane.var>`.
-        experimental_capture (bool): If set to ``True``, the qjit decorator
-            will use PennyLane's experimental program capture capabilities
-            to capture the decorated function for compilation.
         circuit_transform_pipeline (Optional[dict[str, dict[str, str]]]):
             A dictionary that specifies the quantum circuit transformation pass pipeline order,
             and optionally arguments for each pass in the pipeline. Keys of this dictionary
@@ -716,7 +713,9 @@ class QJIT(CatalystCallable):
         dynamic_sig = get_abstract_signature(dynamic_args)
         full_sig = merge_static_args(dynamic_sig, args, static_argnums)
 
-        if self.compile_options.experimental_capture:
+        dbg = debug_info("qjit_capture", self.user_function, args, kwargs)
+
+        if qml.capture.enabled():
             with Patcher(
                 (
                     jax._src.interpreters.partial_eval,  # pylint: disable=protected-access
@@ -735,6 +734,8 @@ class QJIT(CatalystCallable):
             default_pass_pipeline = self.compile_options.circuit_transform_pipeline
             pass_pipeline = params.get("pass_pipeline", default_pass_pipeline)
             params["pass_pipeline"] = pass_pipeline
+            params["debug_info"] = dbg
+
             return QFunc.__call__(
                 qnode,
                 *args,
@@ -746,11 +747,7 @@ class QJIT(CatalystCallable):
         ):
             # TODO: improve PyTree handling
             jaxpr, out_type, treedef, plugins = trace_to_jaxpr(
-                self.user_function,
-                static_argnums,
-                abstracted_axes,
-                full_sig,
-                kwargs,
+                self.user_function, static_argnums, abstracted_axes, full_sig, kwargs, dbg
             )
             self.compile_options.pass_plugins.update(plugins)
             self.compile_options.dialect_plugins.update(plugins)

@@ -21,11 +21,10 @@ import jax
 from jax._src.dispatch import jaxpr_replicas
 from jax._src.effects import ordered_effects as jax_ordered_effects
 from jax._src.interpreters.mlir import _module_name_regex
-from jax._src.lax.lax import xla
-from jax._src.sharding_impls import ReplicaAxisContext
+from jax._src.sharding_impls import AxisEnv, ReplicaAxisContext
 from jax._src.source_info_util import new_name_stack
 from jax._src.util import wrap_name
-from jax.core import ClosedJaxpr
+from jax.extend.core import ClosedJaxpr
 from jax.interpreters.mlir import (
     AxisContext,
     LoweringParameters,
@@ -70,7 +69,7 @@ def jaxpr_to_mlir(func_name, jaxpr):
     ):
         nrep = jaxpr_replicas(jaxpr)
         effects = jax_ordered_effects.filter_in(jaxpr.effects)
-        axis_context = ReplicaAxisContext(xla.AxisEnv(nrep, (), ()))
+        axis_context = ReplicaAxisContext(AxisEnv(nrep, (), ()))
         name_stack = new_name_stack(wrap_name("ok", "jit"))
         module, context = custom_lower_jaxpr_to_module(
             func_name="jit_" + func_name,
@@ -126,7 +125,7 @@ def custom_lower_jaxpr_to_module(
     custom_lowering_rules = catalyst.jax_primitives.CUSTOM_LOWERING_RULES
     lowering_params = LoweringParameters(override_lowering_rules=custom_lowering_rules)
     ctx = ModuleContext(
-        backend_or_name=None,
+        backend=None,
         platforms=[platform],
         axis_context=axis_context,
         keepalives=keepalives,
