@@ -287,12 +287,12 @@ template <typename T> typename Potrf<T>::FnType *Potrf<T>::fn = nullptr;
 
 template <typename T> void Potrf<T>::Kernel(void *out_tuple, void **data, XlaCustomCallStatus *)
 {
-    const T *a_in = reinterpret_cast<T *>(data[0]);
+    int8_t *uplo_tensor = reinterpret_cast<int8_t *>(data[0]);
+    char uplo = static_cast<char>(*uplo_tensor);
     const int b = *(reinterpret_cast<int32_t *>(data[1]));
     const int n_row = *(reinterpret_cast<int32_t *>(data[2]));
     const int n_col = *(reinterpret_cast<int32_t *>(data[3]));
-    int8_t *uplo_tensor = reinterpret_cast<int8_t *>(data[4]);
-    char uplo = static_cast<char>(*uplo_tensor);
+    const T *a_in = reinterpret_cast<T *>(data[4]);
 
     void **out = reinterpret_cast<void **>(out_tuple);
     T *a_out = reinterpret_cast<T *>(out[0]);

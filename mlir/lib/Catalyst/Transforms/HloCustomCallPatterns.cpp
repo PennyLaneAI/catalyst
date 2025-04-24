@@ -36,8 +36,8 @@ struct HloCustomCallLoweringPattern : public mlir::OpRewritePattern<mhlo::Custom
         TypeRange resultsType = op.getResultTypes();
         Location loc = op.getLoc();
 
-        SmallVector<Value> newOperands(operands.begin(), operands.end());
-
+        SmallVector<Value> newOperands;
+        
         // Check if this is a FFI-style LAPACK function
         bool isFFILapackFunction = calleeName.contains("lapack_") && calleeName.contains("_ffi");
 
@@ -55,31 +55,6 @@ struct HloCustomCallLoweringPattern : public mlir::OpRewritePattern<mhlo::Custom
             }
             LLVM_DEBUG(llvm::dbgs()
                        << "DEBUG: Handling FFI LAPACK function " << calleeName << "\n");
-
-            // Extract tensor type and dimensions
-            if (auto tensorType = dyn_cast<RankedTensorType>(operands[0].getType())) {
-                auto shape = tensorType.getShape();
-                auto rank = shape.size();
-
-                if (rank < 2 ||
-                    llvm::any_of(shape, [](int64_t d) { return d == ShapedType::kDynamic; }))
-                    return failure(); // Bail out on dynamic shapes
-
-                // Add batch count and matrix dimensions as new operands
-                int64_t batch = 1;
-                for (size_t i = 0; i < rank - 2; ++i)
-                    batch *= shape[i];
-
-                int64_t rows = shape[rank - 2];
-                int64_t cols = shape[rank - 1];
-
-                newOperands.push_back(makeConst(batch));
-                newOperands.push_back(makeConst(rows));
-                newOperands.push_back(makeConst(cols));
-
-                LLVM_DEBUG(llvm::dbgs() << "DEBUG: Appended batch=" << batch << ", rows=" << rows
-                                        << ", cols=" << cols << "\n");
-            }
 
             // Lower backend_config dictionary attributes to constants
             if (auto configAttr = llvm::dyn_cast<DictionaryAttr>(op->getAttr("backend_config"))) {
@@ -115,6 +90,36 @@ struct HloCustomCallLoweringPattern : public mlir::OpRewritePattern<mhlo::Custom
                     newOperands.push_back(constVal);
                 }
             }
+
+            // Extract tensor type and dimensions
+            if (auto tensorType = dyn_cast<RankedTensorType>(operands[0].getType())) {
+                auto shape = tensorType.getShape();
+                auto rank = shape.size();
+
+                if (rank < 2 ||
+                    llvm::any_of(shape, [](int64_t d) { return d == ShapedType::kDynamic; }))
+                    return failure(); // Bail out on dynamic shapes
+
+                // Add batch count and matrix dimensions as new operands
+                int64_t batch = 1;
+                for (size_t i = 0; i < rank - 2; ++i)
+                    batch *= shape[i];
+
+                int64_t rows = shape[rank - 2];
+                int64_t cols = shape[rank - 1];
+
+                newOperands.push_back(makeConst(batch));
+                newOperands.push_back(makeConst(rows));
+                newOperands.push_back(makeConst(cols));
+
+                LLVM_DEBUG(llvm::dbgs() << "DEBUG: Appended batch=" << batch << ", rows=" << rows
+                                        << ", cols=" << cols << "\n");
+            }
+            
+            newOperands.append(operands.begin(), operands.end());
+        } 
+        else {
+            newOperands = operands;
         }
 
         auto callTargetAttr = rewriter.getStringAttr(calleeName);
