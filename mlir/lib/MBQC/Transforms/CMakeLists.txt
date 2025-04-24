@@ -1,6 +1,6 @@
 set(LIBRARY_NAME mbqc-transforms)
 
-file(GLOB SRC
+set(SRC
     ConversionPatterns.cpp
     mbqc_to_llvm.cpp
 )
