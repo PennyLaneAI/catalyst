@@ -278,7 +278,7 @@ def _apply_result_type_conversion(
         )
 
     expanded_tracers, in_sig, out_sig = trace_function(
-        _fun, *args, expansion_strategy=cond_expansion_strategy()
+        _fun, *args, expansion_strategy=cond_expansion_strategy(), debug_info=jaxpr.debug_info
     )
 
     return expanded_tracers, in_sig, out_sig

@@ -673,7 +673,7 @@ class CondCallable:
                 debug_info=debug_info("cond_quantum_call", branch_fn, [], {}),
             )
             assert len(in_sig.in_type) == 0
-            with EvaluationContext.frame_tracing_context() as inner_trace:
+            with EvaluationContext.frame_tracing_context(debug_info=wfun.debug_info) as inner_trace:
                 with QueuingManager.stop_recording(), quantum_tape:
                     res_classical_tracers = [
                         inner_trace.to_jaxpr_tracer(t) for t in wfun.call_wrapped()
