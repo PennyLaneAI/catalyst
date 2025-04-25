@@ -1037,8 +1037,10 @@ int8_t *__catalyst__rt__array_get_element_ptr_1d(QirArray *ptr, int64_t idx)
 // -------------------------------------------------------------------------- //
 
 // NOTE: Currently this runtime operations is exactly the same as __catalyst__qis__Measure();
-//       we effectively treat it as a no-op for now
-RESULT *__catalyst__mbqc__measure_in_basis(QUBIT *wire, int32_t plane, double angle,
+//       we effectively treat it as a no-op for now. When hardware devices that natively support
+//       mid-circuit measurements in an arbitrary basis are available, we will create a new
+//       QuantumDevice to implement this functionality according to the hardware specs.
+RESULT *__catalyst__mbqc__measure_in_basis(QUBIT *wire, uint32_t plane, double angle,
                                            int32_t postselect)
 {
     std::optional<int32_t> postselectOpt{postselect};
