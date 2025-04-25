@@ -91,31 +91,40 @@ struct HloCustomCallLoweringPattern : public mlir::OpRewritePattern<mhlo::Custom
                 }
             }
 
-            // Extract tensor type and dimensions
-            if (auto tensorType = dyn_cast<RankedTensorType>(operands[0].getType())) {
-                auto shape = tensorType.getShape();
-                auto rank = shape.size();
+            // Extract sizes of operands
+            for (auto operand : operands) {
+                if (auto tensorType = dyn_cast<RankedTensorType>(operand.getType())) {
+                    auto shape = tensorType.getShape();
+                    auto rank = shape.size();
 
-                if (rank < 2 ||
-                    llvm::any_of(shape, [](int64_t d) { return d == ShapedType::kDynamic; })) {
-                    return failure(); // Bail out on dynamic shapes
+                    // Add batch count and matrix dimensions as new operands
+                    if (rank < 1 ||
+                        llvm::any_of(shape, [](int64_t d) { return d == ShapedType::kDynamic; })) {
+                        return failure(); // Bail out on dynamic shapes
+                    }
+
+                    if (rank == 1) {
+                        int64_t size = shape[0];
+                        newOperands.push_back(makeConst(size));
+                        LLVM_DEBUG(llvm::dbgs() << "DEBUG: Appended vector size=" << size << "\n");
+                    }
+                    else if (rank >= 2) {
+                        int64_t batch = 1;
+                        for (size_t i = 0; i < rank - 2; ++i) {
+                            batch *= shape[i];
+                        }
+
+                        int64_t rows = shape[rank - 2];
+                        int64_t cols = shape[rank - 1];
+
+                        newOperands.push_back(makeConst(batch));
+                        newOperands.push_back(makeConst(rows));
+                        newOperands.push_back(makeConst(cols));
+
+                        LLVM_DEBUG(llvm::dbgs() << "DEBUG: Appended batch=" << batch
+                                                << ", rows=" << rows << ", cols=" << cols << "\n");
+                    }
                 }
-
-                // Add batch count and matrix dimensions as new operands
-                int64_t batch = 1;
-                for (size_t i = 0; i < rank - 2; ++i) {
-                    batch *= shape[i];
-                }
-
-                int64_t rows = shape[rank - 2];
-                int64_t cols = shape[rank - 1];
-
-                newOperands.push_back(makeConst(batch));
-                newOperands.push_back(makeConst(rows));
-                newOperands.push_back(makeConst(cols));
-
-                LLVM_DEBUG(llvm::dbgs() << "DEBUG: Appended batch=" << batch << ", rows=" << rows
-                                        << ", cols=" << cols << "\n");
             }
 
             newOperands.append(operands.begin(), operands.end());
