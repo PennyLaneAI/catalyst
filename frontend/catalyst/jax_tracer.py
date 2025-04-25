@@ -454,12 +454,14 @@ class HybridOp(Operator):
         regions: List[HybridOpRegion],
         apply_reverse_transform=False,
         expansion_strategy=None,
+        debug_info=None,
     ):  # pylint: disable=too-many-arguments
         self.in_classical_tracers = in_classical_tracers
         self.out_classical_tracers = out_classical_tracers
         self.regions: List[HybridOpRegion] = regions
         self.expansion_strategy = expansion_strategy
         self.apply_reverse_transform = apply_reverse_transform
+        self.debug_info = debug_info
         super().__init__(wires=Wires(HybridOp.num_wires))
 
     def __repr__(self):
