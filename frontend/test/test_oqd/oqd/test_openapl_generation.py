@@ -61,7 +61,6 @@ class TestOpenAPL:
 
         assert sorted(catalyst_json.items()) == sorted(expected_json.items())
         os.remove(self.output_f)
-        assert 0==1
 
     def test_CNOT_gate(self):
         """Test OpenAPL generation for a circuit with a single CNOT circuit."""
