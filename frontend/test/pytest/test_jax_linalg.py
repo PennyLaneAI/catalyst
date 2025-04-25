@@ -671,7 +671,6 @@ class TestLUSolve:
         assert jnp.allclose(x_obs, x_exp)
 
 
-@pytest.mark.skip(reason="lapack symbols undefined, WIP")
 class TestPolar:
     """Test results of jax.scipy.linalg.polar are numerically correct when qjit compiled.
 
@@ -725,6 +724,7 @@ class TestPolar:
         assert jnp.allclose(P_obs, P_exp)
 
     # pylint: disable=line-too-long
+    @pytest.mark.skip(reason="lapack symbols undefined, WIP")
     @pytest.mark.parametrize(
         "A",
         [
