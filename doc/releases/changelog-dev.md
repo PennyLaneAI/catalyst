@@ -42,7 +42,7 @@
 
   Disabling program capture can be done with `qml.capture.disable()`.
 
-* The `ppr_to_ppm` pass has been renamed to `merge_ppr_ppm` (same functionality). A new `ppr_to_ppm` will handle decomposition of non-Clifford PPRs into PPMs.
+* The `ppr_to_ppm` pass has been renamed to `merge_ppr_ppm` (same functionality). A new `ppr_to_ppm` will handle direct decomposition of PPRs into PPMs.
   [(#1688)](https://github.com/PennyLaneAI/catalyst/pull/1688)
 
 <h3>Deprecations 👋</h3>
