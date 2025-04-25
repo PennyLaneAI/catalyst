@@ -42,6 +42,14 @@ declare_mlir_dialect_python_bindings(
   dialects/mitigation.py
   DIALECT_NAME mitigation)
 
+declare_mlir_dialect_python_bindings(
+  ADD_TO_PARENT QuantumPythonSources
+  ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/"
+  TD_FILE dialects/MBQCOps.td
+  SOURCES
+  dialects/mbqc.py
+  DIALECT_NAME mbqc)
+
 
 ################################################################################
 # Build Python Bindings (without C extension)
