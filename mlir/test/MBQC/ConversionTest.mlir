@@ -20,14 +20,14 @@
 // RUN:   --split-input-file -verify-diagnostics \
 // RUN: | FileCheck %s
 
-// CHECK-DAG: llvm.func @__catalyst__mbqc__measure_in_basis(!llvm.ptr, i8, f64, i32)
+// CHECK-DAG: llvm.func @__catalyst__mbqc__measure_in_basis(!llvm.ptr, i32, f64, i32)
 
 // CHECK-LABEL: testXY
 func.func @testXY(%q1 : !quantum.bit) {
     // CHECK: [[angle:%.+]] = llvm.mlir.constant(3.1415926535897931 : f64) : f64
     %angle = arith.constant 3.141592653589793 : f64
 
-    // CHECK: [[plane:%.+]] = llvm.mlir.constant(0 : i8) : i8
+    // CHECK: [[plane:%.+]] = llvm.mlir.constant(0 : i32) : i32
     // CHECK: [[postselect:%.+]] = llvm.mlir.constant(-1 : i32) : i32
     // CHECK: llvm.call @__catalyst__mbqc__measure_in_basis(%arg0, [[plane]], [[angle]], [[postselect]])
     %res, %new_q = mbqc.measure_in_basis [XY, %angle] %q1 : i1, !quantum.bit
@@ -36,14 +36,14 @@ func.func @testXY(%q1 : !quantum.bit) {
 
 // -----
 
-// CHECK-DAG: llvm.func @__catalyst__mbqc__measure_in_basis(!llvm.ptr, i8, f64, i32)
+// CHECK-DAG: llvm.func @__catalyst__mbqc__measure_in_basis(!llvm.ptr, i32, f64, i32)
 
 // CHECK-LABEL: testYZ
 func.func @testYZ(%q1 : !quantum.bit) {
     // CHECK: [[angle:%.+]] = llvm.mlir.constant(3.1415926535897931 : f64) : f64
     %angle = arith.constant 3.141592653589793 : f64
 
-    // CHECK: [[plane:%.+]] = llvm.mlir.constant(1 : i8) : i8
+    // CHECK: [[plane:%.+]] = llvm.mlir.constant(1 : i32) : i32
     // CHECK: [[postselect:%.+]] = llvm.mlir.constant(-1 : i32) : i32
     // CHECK: llvm.call @__catalyst__mbqc__measure_in_basis(%arg0, [[plane]], [[angle]], [[postselect]])
     %res, %new_q = mbqc.measure_in_basis [YZ, %angle] %q1 : i1, !quantum.bit
@@ -52,14 +52,14 @@ func.func @testYZ(%q1 : !quantum.bit) {
 
 // -----
 
-// CHECK-DAG: llvm.func @__catalyst__mbqc__measure_in_basis(!llvm.ptr, i8, f64, i32)
+// CHECK-DAG: llvm.func @__catalyst__mbqc__measure_in_basis(!llvm.ptr, i32, f64, i32)
 
 // CHECK-LABEL: testZX
 func.func @testZX(%q1 : !quantum.bit) {
     // CHECK: [[angle:%.+]] = llvm.mlir.constant(3.1415926535897931 : f64) : f64
     %angle = arith.constant 3.141592653589793 : f64
 
-    // CHECK: [[plane:%.+]] = llvm.mlir.constant(2 : i8) : i8
+    // CHECK: [[plane:%.+]] = llvm.mlir.constant(2 : i32) : i32
     // CHECK: [[postselect:%.+]] = llvm.mlir.constant(-1 : i32) : i32
     // CHECK: llvm.call @__catalyst__mbqc__measure_in_basis(%arg0, [[plane]], [[angle]], [[postselect]])
     %res, %new_q = mbqc.measure_in_basis [ZX, %angle] %q1 : i1, !quantum.bit
@@ -68,14 +68,14 @@ func.func @testZX(%q1 : !quantum.bit) {
 
 // -----
 
-// CHECK-DAG: llvm.func @__catalyst__mbqc__measure_in_basis(!llvm.ptr, i8, f64, i32)
+// CHECK-DAG: llvm.func @__catalyst__mbqc__measure_in_basis(!llvm.ptr, i32, f64, i32)
 
 // CHECK-LABEL: testXYPostSelect0
 func.func @testXYPostSelect0(%q1 : !quantum.bit) {
     // CHECK: [[angle:%.+]] = llvm.mlir.constant(3.1415926535897931 : f64) : f64
     %angle = arith.constant 3.141592653589793 : f64
 
-    // CHECK: [[plane:%.+]] = llvm.mlir.constant(0 : i8) : i8
+    // CHECK: [[plane:%.+]] = llvm.mlir.constant(0 : i32) : i32
     // CHECK: [[postselect:%.+]] = llvm.mlir.constant(0 : i32) : i32
     // CHECK: llvm.call @__catalyst__mbqc__measure_in_basis(%arg0, [[plane]], [[angle]], [[postselect]])
     %res, %new_q = mbqc.measure_in_basis [XY, %angle] %q1 {postselect = 0 : i32} : i1, !quantum.bit
@@ -84,14 +84,14 @@ func.func @testXYPostSelect0(%q1 : !quantum.bit) {
 
 // -----
 
-// CHECK-DAG: llvm.func @__catalyst__mbqc__measure_in_basis(!llvm.ptr, i8, f64, i32)
+// CHECK-DAG: llvm.func @__catalyst__mbqc__measure_in_basis(!llvm.ptr, i32, f64, i32)
 
 // CHECK-LABEL: testXYPostSelect1
 func.func @testXYPostSelect1(%q1 : !quantum.bit) {
     // CHECK: [[angle:%.+]] = llvm.mlir.constant(3.1415926535897931 : f64) : f64
     %angle = arith.constant 3.141592653589793 : f64
 
-    // CHECK: [[plane:%.+]] = llvm.mlir.constant(0 : i8) : i8
+    // CHECK: [[plane:%.+]] = llvm.mlir.constant(0 : i32) : i32
     // CHECK: [[postselect:%.+]] = llvm.mlir.constant(1 : i32) : i32
     // CHECK: llvm.call @__catalyst__mbqc__measure_in_basis(%arg0, [[plane]], [[angle]], [[postselect]])
     %res, %new_q = mbqc.measure_in_basis [XY, %angle] %q1 {postselect = 1 : i32} : i1, !quantum.bit
