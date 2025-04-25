@@ -15,6 +15,7 @@ set(LIBS
     MLIRGradient
     gradient-transforms
     MLIRMBQC
+    mbqc-transforms
     MLIRMitigation
     mitigation-transforms
     MLIRIon

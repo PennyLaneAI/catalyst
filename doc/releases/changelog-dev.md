@@ -63,7 +63,11 @@
 * Catalyst now includes an experimental `mbqc` dialect for representing measurement-based
   quantum-computing protocols in MLIR.
   [(#1663)](https://github.com/PennyLaneAI/catalyst/pull/1663)
+  [(#1679)](https://github.com/PennyLaneAI/catalyst/pull/1679)
   [(#1674)](https://github.com/PennyLaneAI/catalyst/pull/1674)
+
+* The utility function `EnsureFunctionDeclaration` is refactored into the `Utils` of the `Catalyst` dialect, instead of being duplicated in each individual dialect.
+  [(#1683)](https://github.com/PennyLaneAI/catalyst/pull/1683)
 
 <h3>Documentation 📝</h3>
 
@@ -74,4 +78,5 @@ This release contains contributions from (in alphabetical order):
 Joey Carter,
 David Ittah,
 Christina Lee,
-Erick Ochoa Lopez.
+Erick Ochoa Lopez,
+Paul Haochen Wang.
