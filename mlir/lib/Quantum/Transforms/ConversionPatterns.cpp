@@ -18,6 +18,7 @@
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Transforms/DialectConversion.h"
 
+#include "Catalyst/Utils/EnsureFunctionDeclaration.h"
 #include "Catalyst/Utils/StaticAllocas.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Transforms/Patterns.h"
@@ -29,25 +30,6 @@ namespace {
 
 constexpr int64_t UNKNOWN = ShapedType::kDynamic;
 constexpr int32_t NO_POSTSELECT = -1;
-
-LLVM::LLVMFuncOp ensureFunctionDeclaration(PatternRewriter &rewriter, Operation *op,
-                                           StringRef fnSymbol, Type fnType)
-{
-    Operation *fnDecl = SymbolTable::lookupNearestSymbolFrom(op, rewriter.getStringAttr(fnSymbol));
-
-    if (!fnDecl) {
-        PatternRewriter::InsertionGuard insertGuard(rewriter);
-        ModuleOp mod = op->getParentOfType<ModuleOp>();
-        rewriter.setInsertionPointToStart(mod.getBody());
-
-        fnDecl = rewriter.create<LLVM::LLVMFuncOp>(op->getLoc(), fnSymbol, fnType);
-    }
-    else {
-        assert(isa<LLVM::LLVMFuncOp>(fnDecl) && "QIR function declaration is not a LLVMFuncOp");
-    }
-
-    return cast<LLVM::LLVMFuncOp>(fnDecl);
-}
 
 Value getGlobalString(Location loc, OpBuilder &rewriter, StringRef key, StringRef value,
                       ModuleOp mod)
@@ -175,7 +157,7 @@ template <typename T> struct RTBasedPattern : public OpConversionPattern<T> {
                 seed_val = rewriter.create<LLVM::ZeroOp>(loc, intPtrType);
             }
             LLVM::LLVMFuncOp fnDecl =
-                ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+                catalyst::ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
             SmallVector<Value> operands = {seed_val};
             rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, fnDecl, operands);
         }
@@ -183,7 +165,7 @@ template <typename T> struct RTBasedPattern : public OpConversionPattern<T> {
             qirName = "__catalyst__rt__finalize";
             Type qirSignature = LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx), {});
             LLVM::LLVMFuncOp fnDecl =
-                ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+                catalyst::ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
             rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, fnDecl, ValueRange{});
         }
 
@@ -210,7 +192,8 @@ struct DeviceInitOpPattern : public OpConversionPattern<DeviceInitOp> {
                                                          /* rtd_name = */ charPtrType,
                                                          /* rtd_kwargs = */ charPtrType,
                                                          /* shots = */ int64Type});
-        LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+        LLVM::LLVMFuncOp fnDecl =
+            catalyst::ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
 
         auto rtd_lib = op.getLib().str();
         auto rtd_name = op.getName().str();
@@ -254,7 +237,8 @@ struct DeviceReleaseOpPattern : public OpConversionPattern<DeviceReleaseOp> {
 
         Type qirSignature = LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx), {});
 
-        LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+        LLVM::LLVMFuncOp fnDecl =
+            catalyst::ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
 
         rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, fnDecl, ValueRange{});
 
@@ -280,7 +264,8 @@ struct AllocOpPattern : public OpConversionPattern<AllocOp> {
         Type qirSignature = LLVM::LLVMFunctionType::get(conv->convertType(QuregType::get(ctx)),
                                                         IntegerType::get(ctx, 64));
 
-        LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+        LLVM::LLVMFuncOp fnDecl =
+            catalyst::ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
 
         Value nQubits = adaptor.getNqubits();
         if (!nQubits) {
@@ -306,7 +291,8 @@ struct DeallocOpPattern : public OpConversionPattern<DeallocOp> {
         Type qirSignature = LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx),
                                                         conv->convertType(QuregType::get(ctx)));
 
-        LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+        LLVM::LLVMFuncOp fnDecl =
+            catalyst::ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
 
         rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, fnDecl, adaptor.getOperands());
 
@@ -329,7 +315,8 @@ struct ExtractOpPattern : public OpConversionPattern<ExtractOp> {
             LLVM::LLVMPointerType::get(rewriter.getContext()),
             {conv->convertType(QuregType::get(ctx)), IntegerType::get(ctx, 64)});
 
-        LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+        LLVM::LLVMFuncOp fnDecl =
+            catalyst::ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
 
         Value index = adaptor.getIdx();
         if (!index) {
@@ -382,7 +369,8 @@ struct CustomOpPattern : public OpConversionPattern<CustomOp> {
                         adaptor.getInQubits().getTypes().end());
         argTypes.insert(argTypes.end(), modifiersPtr.getType());
         Type qirSignature = LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx), argTypes);
-        LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+        LLVM::LLVMFuncOp fnDecl =
+            catalyst::ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
 
         SmallVector<Value> args;
         args.insert(args.end(), adaptor.getParams().begin(), adaptor.getParams().end());
@@ -416,7 +404,8 @@ struct GlobalPhaseOpPattern : public OpConversionPattern<GlobalPhaseOp> {
         Type qirSignature = LLVM::LLVMFunctionType::get(
             LLVM::LLVMVoidType::get(ctx), {Float64Type::get(ctx), modifiersPtr.getType()});
 
-        LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+        LLVM::LLVMFuncOp fnDecl =
+            catalyst::ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
         SmallVector<Value> args;
         args.insert(args.end(), adaptor.getParams());
         args.insert(args.end(), modifiersPtr);
@@ -446,7 +435,8 @@ struct MultiRZOpPattern : public OpConversionPattern<MultiRZOp> {
             {Float64Type::get(ctx), modifiersPtr.getType(), IntegerType::get(ctx, 64)},
             /*isVarArg=*/true);
 
-        LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+        LLVM::LLVMFuncOp fnDecl =
+            catalyst::ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
 
         int64_t numQubits = op.getOutQubits().size();
         SmallVector<Value> args;
@@ -492,7 +482,8 @@ struct QubitUnitaryOpPattern : public OpConversionPattern<QubitUnitaryOp> {
                                          modifiersPtr.getType(), IntegerType::get(ctx, 64)},
                                         /*isVarArg=*/true);
 
-        LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+        LLVM::LLVMFuncOp fnDecl =
+            catalyst::ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
 
         int64_t numQubits = adaptor.getInQubits().size();
         SmallVector<Value> args = adaptor.getOperands();
@@ -561,7 +552,8 @@ struct NamedObsOpPattern : public OpConversionPattern<NamedObsOp> {
             conv->convertType(ObservableType::get(ctx)),
             {IntegerType::get(ctx, 64), conv->convertType(QubitType::get(ctx))});
 
-        LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+        LLVM::LLVMFuncOp fnDecl =
+            catalyst::ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
 
         auto obsTypeInt = static_cast<uint32_t>(op.getType());
         Value obsType =
@@ -596,7 +588,8 @@ struct HermitianOpPattern : public OpConversionPattern<HermitianOp> {
             {LLVM::LLVMPointerType::get(rewriter.getContext()), IntegerType::get(ctx, 64)},
             /*isVarArg=*/true);
 
-        LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+        LLVM::LLVMFuncOp fnDecl =
+            catalyst::ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
 
         int64_t numQubits = op.getQubits().size();
         SmallVector<Value> args = adaptor.getOperands();
@@ -627,7 +620,8 @@ struct TensorOpPattern : public OpConversionPattern<TensorOp> {
             LLVM::LLVMFunctionType::get(conv->convertType(ObservableType::get(ctx)),
                                         IntegerType::get(ctx, 64), /*isVarArg=*/true);
 
-        LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+        LLVM::LLVMFuncOp fnDecl =
+            catalyst::ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
 
         int64_t numTerms = op.getTerms().size();
         SmallVector<Value> args = adaptor.getOperands();
@@ -661,7 +655,8 @@ struct HamiltonianOpPattern : public OpConversionPattern<HamiltonianOp> {
             {LLVM::LLVMPointerType::get(rewriter.getContext()), IntegerType::get(ctx, 64)},
             /*isVarArg=*/true);
 
-        LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+        LLVM::LLVMFuncOp fnDecl =
+            catalyst::ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
 
         int64_t numTerms = op.getTerms().size();
         SmallVector<Value> args = adaptor.getOperands();
@@ -700,7 +695,8 @@ struct MeasureOpPattern : public OpConversionPattern<MeasureOp> {
         Type qirSignature =
             LLVM::LLVMFunctionType::get(conv->convertType(ResultType::get(ctx)), argSignatures);
 
-        LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+        LLVM::LLVMFuncOp fnDecl =
+            catalyst::ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
 
         // Create the postselect value. If not given, it defaults to NO_POSTSELECT
         LLVM::ConstantOp postselect = rewriter.create<LLVM::ConstantOp>(
@@ -733,7 +729,8 @@ template <typename T> class SampleBasedPattern : public OpConversionPattern<T> {
             {LLVM::LLVMPointerType::get(rewriter.getContext()), IntegerType::get(ctx, 64)},
             /*isVarArg=*/true);
 
-        LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+        LLVM::LLVMFuncOp fnDecl =
+            catalyst::ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
 
         // We need to handle the C ABI convention of passing the result memref
         // as a struct pointer in the first argument to the C function.
@@ -835,7 +832,8 @@ template <typename T> struct StatsBasedPattern : public OpConversionPattern<T> {
         Type qirSignature = LLVM::LLVMFunctionType::get(
             Float64Type::get(ctx), conv->convertType(ObservableType::get(ctx)));
 
-        LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+        LLVM::LLVMFuncOp fnDecl =
+            catalyst::ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
 
         rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, fnDecl, adaptor.getObs());
 
@@ -873,7 +871,8 @@ template <typename T> struct StateBasedPattern : public OpConversionPattern<T> {
             {LLVM::LLVMPointerType::get(rewriter.getContext()), IntegerType::get(ctx, 64)},
             /*isVarArg=*/true);
 
-        LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+        LLVM::LLVMFuncOp fnDecl =
+            catalyst::ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
 
         // We need to handle the C ABI convention of passing the result memref
         // as a struct pointer in the first argument to the C function.
