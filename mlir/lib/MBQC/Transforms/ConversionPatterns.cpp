@@ -21,7 +21,6 @@
 #include "mlir/Transforms/DialectConversion.h"
 
 #include "Catalyst/Utils/EnsureFunctionDeclaration.h"
-
 #include "MBQC/IR/MBQCOps.h"
 #include "MBQC/Transforms/Patterns.h"
 
