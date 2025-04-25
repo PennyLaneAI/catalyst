@@ -64,6 +64,10 @@
   quantum-computing protocols in MLIR.
   [(#1663)](https://github.com/PennyLaneAI/catalyst/pull/1663)
   [(#1679)](https://github.com/PennyLaneAI/catalyst/pull/1679)
+
+* The Catalyst Runtime C-API now includes a stub for the `mbqc.measure_in_basis` operation,
+  `__catalyst__mbqc__measure_in_basis()`, allowing for execution of MBQC workloads containing
+  parameterized arbitrary-basis measurements.
   [(#1674)](https://github.com/PennyLaneAI/catalyst/pull/1674)
 
 * The utility function `EnsureFunctionDeclaration` is refactored into the `Utils` of the `Catalyst` dialect, instead of being duplicated in each individual dialect.
