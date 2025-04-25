@@ -207,14 +207,10 @@ template <typename T> void Geqrf<T>::Kernel(void *out_tuple, void **data, XlaCus
     const int b = *(reinterpret_cast<int32_t *>(data[0]));
     const int m = *(reinterpret_cast<int32_t *>(data[1]));
     const int n = *(reinterpret_cast<int32_t *>(data[2]));
-    const int lwork = *(reinterpret_cast<int32_t *>(data[3]));
-    const T *a_in = reinterpret_cast<T *>(data[4]);
-
+    const T *a_in = reinterpret_cast<T *>(data[3]);
     void **out = reinterpret_cast<void **>(out_tuple);
     T *a_out = reinterpret_cast<T *>(out[0]);
     T *tau = reinterpret_cast<T *>(out[1]);
-    int *info = reinterpret_cast<int *>(out[2]);
-    T *work = reinterpret_cast<T *>(out[3]);
 
     if (a_out != a_in) {
         std::memcpy(a_out, a_in,
@@ -226,10 +222,9 @@ template <typename T> void Geqrf<T>::Kernel(void *out_tuple, void **data, XlaCus
     const int lda = (corder == LAPACK_ROW_MAJOR) ? n : m;
 
     for (int i = 0; i < b; ++i) {
-        *info = fn(LAPACK_ROW_MAJOR, m, n, a_out, lda, tau);
+        fn(LAPACK_ROW_MAJOR, m, n, a_out, lda, tau);
         a_out += static_cast<int64_t>(m) * static_cast<int64_t>(n);
         tau += std::min(m, n);
-        ++info;
     }
 }
 
@@ -249,14 +244,10 @@ template <typename T> void Orgqr<T>::Kernel(void *out_tuple, void **data, XlaCus
     const int m = *(reinterpret_cast<int32_t *>(data[1]));
     const int n = *(reinterpret_cast<int32_t *>(data[2]));
     const int k = *(reinterpret_cast<int32_t *>(data[3]));
-    const int lwork = *(reinterpret_cast<int32_t *>(data[4]));
-    const T *a_in = reinterpret_cast<T *>(data[5]);
-    T *tau = reinterpret_cast<T *>(data[6]);
+    const T *a_in = reinterpret_cast<T *>(data[4]);
+    T *tau = reinterpret_cast<T *>(data[5]);
 
-    void **out = reinterpret_cast<void **>(out_tuple);
-    T *a_out = reinterpret_cast<T *>(out[0]);
-    int *info = reinterpret_cast<int *>(out[1]);
-    T *work = reinterpret_cast<T *>(out[2]);
+    T *a_out = reinterpret_cast<T *>(out_tuple);
 
     if (a_out != a_in) {
         std::memcpy(a_out, a_in,
@@ -268,10 +259,9 @@ template <typename T> void Orgqr<T>::Kernel(void *out_tuple, void **data, XlaCus
     const int lda = (corder == LAPACK_ROW_MAJOR) ? n : m;
 
     for (int i = 0; i < b; ++i) {
-        *info = fn(LAPACK_ROW_MAJOR, m, n, k, a_out, lda, tau);
+        fn(LAPACK_ROW_MAJOR, m, n, k, a_out, lda, tau);
         a_out += static_cast<int64_t>(m) * static_cast<int64_t>(n);
         tau += k;
-        ++info;
     }
 }
 
