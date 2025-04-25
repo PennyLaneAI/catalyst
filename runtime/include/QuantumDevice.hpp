@@ -1,4 +1,4 @@
-// Copyright 2022-2023 Xanadu Quantum Technologies Inc.
+// Copyright 2022-2025 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -40,7 +40,7 @@ namespace Catalyst::Runtime {
  * All Catalyst device plugins must implement this class and distribute it as a shared library.
  * See https://docs.pennylane.ai/projects/catalyst/en/stable/dev/custom_devices.html for details.
  *
- * The QuantumDevice interface methods can broadly be categorized into device management functions
+ * The `QuantumDevice` interface methods can broadly be categorized into device management functions
  * that do not directly impact the computation or quantum state (think qubit management,
  * execution configuration, or recording functionality), and computation functions like quantum
  * gates and measurement procedures.
@@ -70,16 +70,20 @@ struct QuantumDevice {
      * is optional and only useful if the device intends to support dynamic qubit allocations
      * (that is allocations during quantum program execution).
      *
+     * The values returned by this operation are integer IDs that will be used to address the
+     * allocated qubits in subsequent operations (like gates or measurements). There are no
+     * restrictions on the values these IDs can take, but the IDs of all active qubits must not
+     * overlap, and once an ID is mapped to a particular qubit that ID must not change until the
+     * qubit is explicitly freed.
+     *
      * While devices may choose not to distinguish between logical and device IDs, having a logical
-     * qubit labeling system can help catch program errors such as addressing a previously released
-     * qubit. An example implementation can be found in `QubitManager.hpp`. Devices are also free
+     * qubit labeling system can help catch program errors such as addressing previously freed
+     * qubits. An example implementation can be found in `QubitManager.hpp`. Devices are also free
      * to disable a resource without physically freeing it, allowing for faster dynamic allocations.
-     * The returned IDs must be accepted in addressing operations (like gates) until the quantum
-     * resource is explicitly freed or the device is destroyed.
      *
      * @param num_qubits The number of qubits to allocate.
      *
-     * @return `std::vector<QubitIdType>` Array of logical qubit IDs.
+     * @return `std::vector<QubitIdType>` Array of qubit IDs.
      */
     virtual auto AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType> = 0;
 
@@ -111,7 +115,7 @@ struct QuantumDevice {
      *
      * See `AllocateQubits` for more details on allocation semantics.
      *
-     * @return `QubitIdType` Logical qubit ID.
+     * @return `QubitIdType` Qubit ID.
      */
     virtual auto AllocateQubit() -> QubitIdType
     {
@@ -134,7 +138,7 @@ struct QuantumDevice {
      *
      * @param qubit ID of the qubit to release.
      */
-    virtual void ReleaseQubit([[maybe_unused]] QubitIdType qubit)
+    virtual void ReleaseQubit(QubitIdType qubit)
     {
         RT_FAIL("Dynamic qubit release is unsupported by device");
     }
@@ -165,7 +169,7 @@ struct QuantumDevice {
     virtual auto GetDeviceShots() const -> size_t = 0;
 
     /**
-     * @brief (optional) Set the PRNG of the device.
+     * @brief (Optional) Set the PRNG of the device.
      *
      * The Catalyst runtime enables seeded program execution on non-hardware devices.
      * A random number generator instance is managed by the runtime to predictably
@@ -183,7 +187,7 @@ struct QuantumDevice {
      *
      * @param gen Pointer to a Catalyst-managed Mersenne Twister instance.
      */
-    virtual void SetDevicePRNG([[maybe_unused]] std::mt19937 *gen){};
+    virtual void SetDevicePRNG(std::mt19937 *gen){};
 
     // ----------------------------------------
     //  QUANTUM OPERATIONS
@@ -225,10 +229,10 @@ struct QuantumDevice {
     virtual auto Measure(QubitIdType wire, std::optional<int32_t> postselect) -> Result = 0;
 
     /**
-     * @brief (Optional) Apply an arbitrary Unitary matrix to the device.
+     * @brief (Optional) Apply an arbitrary unitary matrix to the device.
      *
      * Instead of identifying an operation by name, this instruction uses the mathematical
-     * representation of a quantum operator as a Unitary matrix in the computational basis.
+     * representation of a quantum operator as a unitary matrix in the computational basis.
      *
      * See `NamedOperation` for additional gate semantics.
      *
@@ -238,11 +242,10 @@ struct QuantumDevice {
      * @param controlled_wires Control qubits applied to the operation.
      * @param controlled_values Control values associated to the control qubits (equal length).
      */
-    virtual void
-    MatrixOperation([[maybe_unused]] const std::vector<std::complex<double>> &matrix,
-                    [[maybe_unused]] const std::vector<QubitIdType> &wires, bool inverse = false,
-                    [[maybe_unused]] const std::vector<QubitIdType> &controlled_wires = {},
-                    [[maybe_unused]] const std::vector<bool> &controlled_values = {})
+    virtual void MatrixOperation(const std::vector<std::complex<double>> &matrix,
+                                 const std::vector<QubitIdType> &wires, bool inverse = false,
+                                 const std::vector<QubitIdType> &controlled_wires = {},
+                                 const std::vector<bool> &controlled_values = {})
     {
         RT_FAIL("MatrixOperation is unsupported by device");
     }
@@ -260,8 +263,7 @@ struct QuantumDevice {
      * @param n Bitstring representation of the basis state |n>, stored as a Byte-array.
      * @param wires The qubits to initialize.
      */
-    virtual void SetBasisState([[maybe_unused]] DataView<int8_t, 1> &n,
-                               [[maybe_unused]] std::vector<QubitIdType> &wires)
+    virtual void SetBasisState(DataView<int8_t, 1> &n, std::vector<QubitIdType> &wires)
     {
         RT_FAIL("SetBasisState is unsupported by device");
     }
@@ -276,8 +278,7 @@ struct QuantumDevice {
      * @param state Quantum state vector of size 2^len(wires).
      * @param wires The qubits to initialize.
      */
-    virtual void SetState([[maybe_unused]] DataView<std::complex<double>, 1> &state,
-                          [[maybe_unused]] std::vector<QubitIdType> &wires)
+    virtual void SetState(DataView<std::complex<double>, 1> &state, std::vector<QubitIdType> &wires)
     {
         RT_FAIL("SetState is unsupported by device");
     }
@@ -305,7 +306,7 @@ struct QuantumDevice {
      * ID is not required to be unique across different calls supplied with the same information.
      *
      * @param id The name of the observable.
-     * @param matrix The matrix of data to use for a Hermitian observable.
+     * @param matrix The matrix of data to use for a Hermitian observable (unused otherwise).
      * @param wires Qubits the observable applies to.
      *
      * @return `ObsIdType` ID of the constructed observable.
@@ -523,7 +524,7 @@ struct QuantumDevice {
      *
      * @param state Pre-allocated buffer for the quantum state.
      */
-    virtual void State([[maybe_unused]] DataView<std::complex<double>, 1> &state)
+    virtual void State(DataView<std::complex<double>, 1> &state)
     {
         RT_FAIL("State is unsupported by device");
     }
@@ -552,10 +553,9 @@ struct QuantumDevice {
      * The result of this operation must be written into the `gradients` argument buffer.
      *
      * @param gradients The vector of pre-allocated `DataView<double, 1>*`
-     *                  to store gradients results for the list of cached observables.
+     *                  to store the flattened Jacobian (one gradient per cached observable).
      * @param trainParams The vector of trainable parameters; if empty, all parameters
      *                    would be assumed trainable.
-     *
      */
     virtual void Gradient(std::vector<DataView<double, 1>> &gradients,
                           const std::vector<size_t> &trainParams)
