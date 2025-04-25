@@ -417,13 +417,11 @@ template <typename T> typename ComplexGesdd<T>::FnType *ComplexGesdd<T>::fn = nu
 template <typename T>
 void ComplexGesdd<T>::Kernel(void *out_tuple, void **data, XlaCustomCallStatus *)
 {
-    const int32_t job_opt_full_matrices = *(reinterpret_cast<int32_t *>(data[0]));
-    const int32_t job_opt_compute_uv = *(reinterpret_cast<int32_t *>(data[1]));
-    const int b = *(reinterpret_cast<int32_t *>(data[2]));
-    const int m = *(reinterpret_cast<int32_t *>(data[3]));
-    const int n = *(reinterpret_cast<int32_t *>(data[4]));
-    const int lwork = *(reinterpret_cast<int32_t *>(data[5]));
-    T *a_in = reinterpret_cast<T *>(data[6]);
+    const char jobz = *(reinterpret_cast<int32_t *>(data[0]));
+    const int b = *(reinterpret_cast<int32_t *>(data[1]));
+    const int m = *(reinterpret_cast<int32_t *>(data[2]));
+    const int n = *(reinterpret_cast<int32_t *>(data[3]));
+    T *a_in = reinterpret_cast<T *>(data[4]);
 
     void **out = reinterpret_cast<void **>(out_tuple);
     T *a_out = reinterpret_cast<T *>(out[0]);
@@ -431,17 +429,12 @@ void ComplexGesdd<T>::Kernel(void *out_tuple, void **data, XlaCustomCallStatus *
     T *u = reinterpret_cast<T *>(out[2]);
     T *vt = reinterpret_cast<T *>(out[3]);
     int *info = reinterpret_cast<int *>(out[4]);
-    int *iwork = reinterpret_cast<int *>(out[5]);
-    typename T::value_type *rwork = reinterpret_cast<typename T::value_type *>(out[6]);
-    T *work = reinterpret_cast<T *>(out[7]);
 
     if (a_out != a_in) {
         std::memcpy(a_out, a_in,
                     static_cast<int64_t>(b) * static_cast<int64_t>(m) * static_cast<int64_t>(n) *
                         sizeof(T));
     }
-
-    const char jobz = GesddJobz(job_opt_compute_uv, job_opt_full_matrices);
 
     constexpr int corder = LAPACK_ROW_MAJOR;
     const int lda = (corder == LAPACK_ROW_MAJOR) ? n : m;
