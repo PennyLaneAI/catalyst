@@ -22,14 +22,8 @@
 #include <unordered_map>
 #include <vector>
 
-#include "Exception.hpp"
 #include "QuantumDevice.hpp"
-
-// catalyst/runtime/lib/backend/common/
-
-#include "CacheManager.hpp"
 #include "QubitManager.hpp"
-#include "Utils.hpp"
 
 #include "OQCRunner.hpp"
 #include "OpenQASM2Builder.hpp"
@@ -47,8 +41,6 @@ class OQCDevice final : public Catalyst::Runtime::QuantumDevice {
     std::unique_ptr<OpenQASM2Builder> builder;
     std::unique_ptr<OQCRunner> runner;
 
-    Catalyst::Runtime::CacheManager<std::complex<double>> cache_manager{};
-    bool tape_recording{false};
     size_t device_shots;
 
     std::unordered_map<std::string, std::string> device_kwargs;
@@ -74,10 +66,23 @@ class OQCDevice final : public Catalyst::Runtime::QuantumDevice {
     }
     ~OQCDevice() = default;
 
-    QUANTUM_DEVICE_DEL_DECLARATIONS(OQCDevice);
+    auto AllocateQubits(size_t) -> std::vector<QubitIdType> override;
+    void ReleaseAllQubits() override;
+    auto GetNumQubits() const -> size_t override;
+    void SetDeviceShots(size_t) override;
+    auto GetDeviceShots() const -> size_t override;
 
-    QUANTUM_DEVICE_RT_DECLARATIONS;
-    QUANTUM_DEVICE_QIS_DECLARATIONS;
+    auto Zero() const -> Result override;
+    auto One() const -> Result override;
+
+    void NamedOperation(const std::string &, const std::vector<double> &,
+                        const std::vector<QubitIdType> &, bool = false,
+                        const std::vector<QubitIdType> & = {},
+                        const std::vector<bool> & = {}) override;
+    auto Measure(QubitIdType, std::optional<int32_t> = std::nullopt) -> Result override;
+
+    void PartialCounts(DataView<double, 1> &, DataView<int64_t, 1> &,
+                       const std::vector<QubitIdType> &) override;
 
     // Circuit RT
     [[nodiscard]] auto Circuit() const -> std::string { return builder->toOpenQASM2(); }
