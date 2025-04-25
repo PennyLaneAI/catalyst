@@ -15,13 +15,31 @@
 
 <h3>Breaking changes 💔</h3>
 
+* (Device Developers Only) The `QuantumDevice` interface in the Catalyst Runtime plugin system
+  has been modified, which requires recompiling plugins for binary compatibility.
+  [(#1680)](https://github.com/PennyLaneAI/catalyst/pull/1680)
+
+  As announced in the [0.10.0 release](https://docs.pennylane.ai/projects/catalyst/en/stable/dev/release_notes.html#release-0-10-0),
+  the `shots` argument has been removed from the `Sample` and `Counts` methods in the interface,
+  since it unnecessarily duplicated this information. Additionally, `shots` will no longer be
+  supplied by Catalyst through the `kwargs` parameter of the device constructor. The shot value must
+  now be obtained through the `SetDeviceShots` method.
+
+  Further, the documentation for the interface has been overhauled and now describes the
+  expected behaviour of each method in detail. A quality of life improvement is that optional
+  methods are now clearly marked as such and also come with a default implementation in the base
+  class, so device plugins need only override the methods they wish to support.
+
+  Finally, the `PrintState` and the `One`/`Zero` utility functions have been removed, since they
+  did not serve a convincing purpose.
+
 * Catalyst has removed the `experimental_capture` keyword from the `qjit` decorator in favour of
-  unified behaviour with PennyLane. 
+  unified behaviour with PennyLane.
   [(#1657)](https://github.com/PennyLaneAI/catalyst/pull/1657)
 
-  Instead of enabling program capture with Catalyst via `qjit(experimental_capture=True)`, program capture
-  can be enabled via the global toggle `qml.capture.enable()`:
-  
+  Instead of enabling program capture with Catalyst via `qjit(experimental_capture=True)`, program
+  capture can be enabled via the global toggle `qml.capture.enable()`:
+
   ```python
   import pennylane as qml
   from catalyst import qjit
@@ -56,8 +74,8 @@
 
 <h3>Internal changes ⚙️</h3>
 
-* Stop overriding the `num_wires` property when the operator can exist on `AnyWires`. This allows the deprecation
-  of `WiresEnum` in pennylane.
+* Stop overriding the `num_wires` property when the operator can exist on `AnyWires`. This allows
+  the deprecation of `WiresEnum` in pennylane.
   [(#1667)](https://github.com/PennyLaneAI/catalyst/pull/1667)
 
 * Catalyst now includes an experimental `mbqc` dialect for representing measurement-based
