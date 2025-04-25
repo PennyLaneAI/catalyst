@@ -70,7 +70,7 @@ class TestOpenAPL:
         @qml.qnode(oqd_dev)
         def circuit():
             qml.CNOT(wires=[0, 1])
-            return qml.counts()
+            return qml.counts(wires=0)
 
         circuit()
 
