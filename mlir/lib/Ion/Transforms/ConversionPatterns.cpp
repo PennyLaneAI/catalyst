@@ -18,6 +18,7 @@
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/IR/IRMapping.h"
 
+#include "Catalyst/Utils/EnsureFunctionDeclaration.h"
 #include "Ion/IR/IonOps.h"
 #include "Ion/Transforms/Patterns.h"
 #include "Quantum/IR/QuantumOps.h"
@@ -28,25 +29,6 @@ using namespace catalyst::quantum;
 using json = nlohmann::json;
 
 namespace {
-
-LLVM::LLVMFuncOp ensureFunctionDeclaration(PatternRewriter &rewriter, Operation *op,
-                                           StringRef fnSymbol, Type fnType)
-{
-    Operation *fnDecl = SymbolTable::lookupNearestSymbolFrom(op, rewriter.getStringAttr(fnSymbol));
-
-    if (!fnDecl) {
-        PatternRewriter::InsertionGuard insertGuard(rewriter);
-        ModuleOp mod = op->getParentOfType<ModuleOp>();
-        rewriter.setInsertionPointToStart(mod.getBody());
-
-        fnDecl = rewriter.create<LLVM::LLVMFuncOp>(op->getLoc(), fnSymbol, fnType);
-    }
-    else {
-        assert(isa<LLVM::LLVMFuncOp>(fnDecl) && "QIR function declaration is not a LLVMFuncOp");
-    }
-
-    return cast<LLVM::LLVMFuncOp>(fnDecl);
-}
 
 LLVM::LLVMStructType createBeamStructType(MLIRContext *ctx, OpBuilder &rewriter, BeamAttr &beamAttr)
 {
@@ -285,7 +267,7 @@ struct ParallelProtocolOpPattern : public OpConversionPattern<catalyst::ion::Par
                                                             {ptrType, pulseArraySize.getType()});
         std::string protocolFuncName = "__catalyst__oqd__ParallelProtocol";
         LLVM::LLVMFuncOp protocolFnDecl =
-            ensureFunctionDeclaration(rewriter, op, protocolFuncName, protocolFuncType);
+            catalyst::ensureFunctionDeclaration(rewriter, op, protocolFuncName, protocolFuncType);
         rewriter.create<LLVM::CallOp>(loc, protocolFnDecl, operands);
 
         SmallVector<Value> values;
@@ -326,7 +308,8 @@ struct PulseOpPattern : public OpConversionPattern<catalyst::ion::PulseOp> {
             {conv->convertType(qubitTy), time.getType(), Float64Type::get(ctx),
              LLVM::LLVMPointerType::get(rewriter.getContext())});
         std::string qirName = "__catalyst__oqd__pulse";
-        LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+        LLVM::LLVMFuncOp fnDecl =
+            catalyst::ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
         rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, fnDecl, operands);
 
         return success();
