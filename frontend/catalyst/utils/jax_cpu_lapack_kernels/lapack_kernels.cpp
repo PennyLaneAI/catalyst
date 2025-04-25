@@ -385,7 +385,6 @@ template <typename T> void RealGesdd<T>::Kernel(void *out_tuple, void **data, Xl
                         sizeof(T));
     }
 
-
     constexpr int corder = LAPACK_ROW_MAJOR;
     const int lda = (corder == LAPACK_ROW_MAJOR) ? n : m;
     const int ldu = Gesdd_ldu(corder, jobz, m, n);

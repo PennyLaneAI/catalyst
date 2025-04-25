@@ -759,7 +759,6 @@ class TestPolar:
         assert jnp.allclose(P_obs, P_exp)
 
 
-@pytest.mark.skip(reason="lapack symbols undefined, WIP")
 class TestQR:
     """Test results of jax.scipy.linalg.qr are numerically correct when qjit compiled.
 
