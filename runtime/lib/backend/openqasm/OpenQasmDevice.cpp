@@ -54,49 +54,6 @@ void OpenQasmDevice::SetDeviceShots(size_t shots) { device_shots = shots; }
 
 auto OpenQasmDevice::GetDeviceShots() const -> size_t { return device_shots; }
 
-void OpenQasmDevice::PrintState()
-{
-    using std::cout;
-    using std::endl;
-
-    std::ostringstream oss;
-    oss << "#pragma braket result state_vector";
-    auto &&circuit = builder->toOpenQasmWithCustomInstructions(oss.str());
-
-    std::string s3_folder_str{};
-    if (device_kwargs.contains("s3_destination_folder")) {
-        s3_folder_str = device_kwargs["s3_destination_folder"];
-    }
-
-    std::string device_info{};
-    if (builder_type == OpenQasm::BuilderType::BraketRemote) {
-        device_info = device_kwargs["device_arn"];
-    }
-    else if (builder_type == OpenQasm::BuilderType::BraketLocal) {
-        device_info = device_kwargs["backend"];
-    }
-
-    auto &&state = runner->State(circuit, device_info, device_shots, GetNumQubits(), s3_folder_str);
-
-    const size_t num_qubits = GetNumQubits();
-    const size_t size = 1UL << num_qubits;
-    size_t idx = 0;
-    cout << "*** State-Vector of Size " << size << " ***" << endl;
-    cout << "[";
-
-    for (; idx < size - 1; idx++) {
-        cout << state[idx] << ", ";
-    }
-    cout << state[idx] << "]" << endl;
-}
-
-auto OpenQasmDevice::Zero() const -> Result
-{
-    return const_cast<Result>(&GLOBAL_RESULT_FALSE_CONST);
-}
-
-auto OpenQasmDevice::One() const -> Result { return const_cast<Result>(&GLOBAL_RESULT_TRUE_CONST); }
-
 void OpenQasmDevice::NamedOperation(const std::string &name, const std::vector<double> &params,
                                     const std::vector<QubitIdType> &wires, bool inverse,
                                     const std::vector<QubitIdType> &controlled_wires,

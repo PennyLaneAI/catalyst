@@ -571,39 +571,6 @@ struct QuantumDevice {
      * See `Gradient` for additional information.
      */
     virtual void StopTapeRecording() { RT_FAIL("Differentiation is unsupported by device"); }
-
-    // ----------------------------------------
-    //  DEVICE
-    // ----------------------------------------
-
-    /**
-     * @brief Produce a measurement result value for "0" (computational basis).
-     *
-     * Results produced by projective qubit measurements (see `Measure`) have to be of the `Result`
-     * datatype. Currently, this type is defined as `bool*`, but in principle it could be a
-     * implementation-defined type supported by additional runtime functions. For the latter case,
-     * these functions exist to produce a known measurement value ("0" or "1") and compare it
-     * against another measurement value (like those produced by `Measure`). In the absence of such
-     * functionality however, these methods don't serve much of a purpose, but should be implemented
-     * nontheless for compliance with the interface.
-     *
-     * @return `Result` A "0" measurement result.
-     */
-    [[nodiscard]] virtual auto Zero() const -> Result = 0;
-
-    /**
-     * @brief Produce a measurement result value for "1" (computational basis).
-     *
-     * Like `Zero`, but with a flipped result.
-     *
-     * @return `Result` A "1" measurement result.
-     */
-    [[nodiscard]] virtual auto One() const -> Result = 0;
-
-    /**
-     * @brief (Optional) A helper method to print the state vector of a device.
-     */
-    virtual void PrintState() { RT_FAIL("PrintState is unsupported by device"); }
 };
 
 } // namespace Catalyst::Runtime

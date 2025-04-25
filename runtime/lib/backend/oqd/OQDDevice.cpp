@@ -46,10 +46,6 @@ void OQDDevice::SetDeviceShots([[maybe_unused]] size_t shots) { device_shots = s
 
 auto OQDDevice::GetDeviceShots() const -> size_t { return device_shots; }
 
-auto OQDDevice::Zero() const -> Result { return const_cast<Result>(&GLOBAL_RESULT_FALSE_CONST); }
-
-auto OQDDevice::One() const -> Result { return const_cast<Result>(&GLOBAL_RESULT_TRUE_CONST); }
-
 void OQDDevice::NamedOperation(const std::string &, const std::vector<double> &,
                                const std::vector<QubitIdType> &, bool,
                                const std::vector<QubitIdType> &, const std::vector<bool> &)

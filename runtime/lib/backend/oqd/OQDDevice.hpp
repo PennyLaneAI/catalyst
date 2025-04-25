@@ -27,10 +27,6 @@
 namespace Catalyst::Runtime::Device {
 class OQDDevice final : public Catalyst::Runtime::QuantumDevice {
   private:
-    // static constants for RESULT values
-    static constexpr bool GLOBAL_RESULT_TRUE_CONST{true};
-    static constexpr bool GLOBAL_RESULT_FALSE_CONST{false};
-
     Catalyst::Runtime::QubitManager<QubitIdType, size_t> qubit_manager{};
 
     size_t device_shots;
@@ -89,9 +85,6 @@ class OQDDevice final : public Catalyst::Runtime::QuantumDevice {
     auto GetNumQubits() const -> size_t override;
     void SetDeviceShots(size_t) override;
     auto GetDeviceShots() const -> size_t override;
-
-    auto Zero() const -> Result override;
-    auto One() const -> Result override;
 
     void NamedOperation(const std::string &, const std::vector<double> &,
                         const std::vector<QubitIdType> &, bool = false,

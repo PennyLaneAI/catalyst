@@ -43,10 +43,7 @@
     void StartTapeRecording() override;                                                            \
     void StopTapeRecording() override;                                                             \
     void SetDeviceShots(size_t shots) override;                                                    \
-    [[nodiscard]] auto GetDeviceShots() const->size_t override;                                    \
-    void PrintState() override;                                                                    \
-    [[nodiscard]] auto Zero() const->Result override;                                              \
-    [[nodiscard]] auto One() const->Result override;
+    [[nodiscard]] auto GetDeviceShots() const->size_t override;
 
 #define QUANTUM_DEVICE_QIS_DECLARATIONS                                                            \
     void NamedOperation(                                                                           \

@@ -36,6 +36,9 @@
 
 namespace Catalyst::Runtime {
 
+static constexpr RESULT GLOBAL_RESULT_TRUE_CONST{true};
+static constexpr RESULT GLOBAL_RESULT_FALSE_CONST{false};
+
 /**
  * @brief Global quantum device unique pointer.
  */
@@ -280,7 +283,20 @@ void __catalyst__rt__device_release()
     timer::timer(__catalyst__rt__device_release__impl, "device_release", /* add_endl */ true);
 }
 
-void __catalyst__rt__print_state() { getQuantumDevicePtr()->PrintState(); }
+void __catalyst__rt__print_state()
+{
+    size_t num_wires = getQuantumDevicePtr()->GetNumQubits();
+    std::vector<std::complex<double>> state(1 << num_wires);
+    DataView<std::complex<double>, 1> view(state);
+
+    getQuantumDevicePtr()->State(view);
+
+    std::cout << "State = [\n";
+    for (size_t idx = 0; idx < state.size(); idx++) {
+        std::cout << "  " << state[idx] << ",\n";
+    }
+    std::cout << "]\n";
+}
 
 void __catalyst__rt__toggle_recorder(bool status)
 {
@@ -381,9 +397,12 @@ int64_t __catalyst__rt__num_qubits()
 
 bool __catalyst__rt__result_equal(RESULT *r0, RESULT *r1) { return (r0 == r1) || (*r0 == *r1); }
 
-RESULT *__catalyst__rt__result_get_one() { return getQuantumDevicePtr()->One(); }
+RESULT *__catalyst__rt__result_get_one() { return const_cast<RESULT *>(&GLOBAL_RESULT_TRUE_CONST); }
 
-RESULT *__catalyst__rt__result_get_zero() { return getQuantumDevicePtr()->Zero(); }
+RESULT *__catalyst__rt__result_get_zero()
+{
+    return const_cast<RESULT *>(&GLOBAL_RESULT_FALSE_CONST);
+}
 
 void __catalyst__qis__Gradient(int64_t numResults, /* results = */...)
 {

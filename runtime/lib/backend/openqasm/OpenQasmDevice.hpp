@@ -34,10 +34,6 @@
 namespace Catalyst::Runtime::Device {
 class OpenQasmDevice final : public Catalyst::Runtime::QuantumDevice {
   private:
-    // static constants for RESULT values
-    static constexpr bool GLOBAL_RESULT_TRUE_CONST{true};
-    static constexpr bool GLOBAL_RESULT_FALSE_CONST{false};
-
     Catalyst::Runtime::QubitManager<QubitIdType, size_t> qubit_manager{};
     std::unique_ptr<OpenQasm::OpenQasmBuilder> builder;
     std::unique_ptr<OpenQasm::OpenQasmRunner> runner;
@@ -106,9 +102,6 @@ class OpenQasmDevice final : public Catalyst::Runtime::QuantumDevice {
     void SetDeviceShots(size_t) override;
     auto GetDeviceShots() const -> size_t override;
 
-    auto Zero() const -> Result override;
-    auto One() const -> Result override;
-
     void NamedOperation(const std::string &, const std::vector<double> &,
                         const std::vector<QubitIdType> &, bool = false,
                         const std::vector<QubitIdType> & = {},
@@ -135,8 +128,6 @@ class OpenQasmDevice final : public Catalyst::Runtime::QuantumDevice {
     auto Expval(ObsIdType) -> double override;
     auto Var(ObsIdType) -> double override;
     void State(DataView<std::complex<double>, 1> &) override;
-
-    void PrintState() override;
 
     // Circuit RT
     [[nodiscard]] auto Circuit() const -> std::string { return builder->toOpenQasm(); }

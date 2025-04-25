@@ -152,31 +152,6 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     void StopTapeRecording() {}
 
     /**
-     * @brief Not the result value for "Zero" used in the measurement process.
-     *
-     * @return `Result`
-     */
-    [[nodiscard]] auto Zero() const -> Result
-    {
-        return const_cast<Result>(&GLOBAL_RESULT_FALSE_CONST);
-    }
-
-    /**
-     * @brief Not the result value for "One"  used in the measurement process.
-     *
-     * @return `Result`
-     */
-    [[nodiscard]] auto One() const -> Result
-    {
-        return const_cast<Result>(&GLOBAL_RESULT_TRUE_CONST);
-    }
-
-    /**
-     * @brief Not a helper method to print the state vector of a device.
-     */
-    void PrintState() {}
-
-    /**
      * @brief Doesn't prepare subsystems using the given ket vector in the computational basis.
      */
     void SetState(DataView<std::complex<double>, 1> &, std::vector<QubitIdType> &) {}
@@ -367,7 +342,10 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      *
      * @return `Result` The measurement result
      */
-    auto Measure(QubitIdType, std::optional<int32_t>) -> Result { return this->Zero(); }
+    auto Measure(QubitIdType, std::optional<int32_t>) -> Result
+    {
+        return const_cast<Result>(&GLOBAL_RESULT_FALSE_CONST);
+    }
 
     /**
      * @brief Doesn't Compute the gradient of a quantum tape, that is cached using
@@ -388,7 +366,6 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     Catalyst::Runtime::QubitManager<QubitIdType, size_t> qubit_manager{};
 
     // static constants for RESULT values
-    static constexpr bool GLOBAL_RESULT_TRUE_CONST = true;
     static constexpr bool GLOBAL_RESULT_FALSE_CONST = false;
 };
 } // namespace Catalyst::Runtime::Devices

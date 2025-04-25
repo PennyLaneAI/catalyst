@@ -15,6 +15,7 @@
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_string.hpp>
 
 #include "ExecutionContext.hpp"
 #include "QuantumDevice.hpp"
@@ -344,6 +345,54 @@ TEST_CASE("Test __catalyst__qis__Gradient_params Op=[Hadamard,RZ,RY,RZ,S,T,Param
     delete[] buffer_tp;
 }
 
+TEST_CASE("Test __catalyst__rt__result_get_zero", "[CoreQIS]")
+{
+    __catalyst__rt__initialize(nullptr);
+
+    bool *result = __catalyst__rt__result_get_zero();
+    CHECK(*result == false);
+
+    __catalyst__rt__finalize();
+}
+
+TEST_CASE("Test __catalyst__rt__print_state", "[CoreQIS]")
+{
+    __catalyst__rt__initialize(nullptr);
+
+    bool *result = __catalyst__rt__result_get_one();
+    CHECK(*result == true);
+
+    __catalyst__rt__finalize();
+}
+
+TEST_CASE("Test __catalyst__rt__print_state", "[NullQubit]")
+{
+    __catalyst__rt__initialize(nullptr);
+    auto [rtd_lib, rtd_name, rtd_kwargs] =
+        std::array<std::string, 3>{"null.qubit", "null_qubit", ""};
+    __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
+                                (int8_t *)rtd_kwargs.c_str(), 0);
+
+    QirArray *qs = __catalyst__rt__qubit_allocate_array(2);
+
+    // Redirect std::cout to inspect the output
+    std::ostringstream oss;
+    auto stdoutBuffer = std::cout.rdbuf();
+    std::cout.rdbuf(oss.rdbuf());
+
+    __catalyst__rt__print_state();
+
+    // Restore the original buffer
+    std::cout.rdbuf(stdoutBuffer);
+
+    CHECK_THAT(oss.str(),
+               Catch::Matchers::Equals("State = [\n  (1,0),\n  (0,0),\n  (0,0),\n  (0,0),\n]\n"));
+
+    __catalyst__rt__qubit_release_array(qs);
+    __catalyst__rt__device_release();
+    __catalyst__rt__finalize();
+}
+
 TEST_CASE("Test NullQubit measurement processes with num_qubits=0", "[NullQubit]")
 {
     std::unique_ptr<NullQubit> sim = std::make_unique<NullQubit>();
@@ -538,20 +587,6 @@ TEST_CASE("Test NullQubit measurement processes with num_qubits=1", "[NullQubit]
         CHECK(counts_view(0) == shots);
         CHECK(counts_view(1) == 0);
     }
-}
-
-TEST_CASE("Test NullQubit::Zero()", "[NullQubit]")
-{
-    std::unique_ptr<NullQubit> sim = std::make_unique<NullQubit>();
-
-    CHECK(*sim->Zero() == false);
-}
-
-TEST_CASE("Test NullQubit::One()", "[NullQubit]")
-{
-    std::unique_ptr<NullQubit> sim = std::make_unique<NullQubit>();
-
-    CHECK(*sim->One() == true);
 }
 
 TEST_CASE("Test NullQubit device shots methods", "[NullQubit]")
