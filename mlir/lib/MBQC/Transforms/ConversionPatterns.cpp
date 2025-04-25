@@ -60,7 +60,10 @@ struct MeasureInBasisOpPattern : public OpConversionPattern<MeasureInBasisOp> {
             catalyst::ensureFunctionDeclaration(rewriter, op, fnName, fnSignature);
 
         // Extract the integer value for the plane attribute from its enum
-        auto planeValueInt = static_cast<uint8_t>(op.getPlane());
+        const auto planeValueInt = static_cast<int8_t>(op.getPlane());
+        assert(planeValueInt ==
+                   static_cast<std::underlying_type_t<MeasurementPlane>>(op.getPlane()) &&
+               "Integer overflow during cast of MeasurementPlane to int8_t");
         Value planeValue =
             rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI8IntegerAttr(planeValueInt));
 
