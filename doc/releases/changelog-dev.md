@@ -16,7 +16,7 @@
 <h3>Breaking changes 💔</h3>
 
 * Catalyst has removed the `experimental_capture` keyword from the `qjit` decorator in favour of
-  unified behaviour with PennyLane. 
+  unified behaviour with PennyLane.
   [(#1657)](https://github.com/PennyLaneAI/catalyst/pull/1657)
 
   Instead of enabling program capture with Catalyst via `qjit(experimental_capture=True)`, program capture
@@ -41,6 +41,9 @@
   ```
 
   Disabling program capture can be done with `qml.capture.disable()`.
+
+* The `ppr_to_ppm` pass has been renamed to `merge_ppr_ppm` (same functionality). A new `ppr_to_ppm` will handle decomposition of non-Clifford PPRs into PPMs.
+  [(#)](https://github.com/PennyLaneAI/catalyst/pull/)
 
 <h3>Deprecations 👋</h3>
 
@@ -74,6 +77,7 @@
 This release contains contributions from (in alphabetical order):
 
 Joey Carter,
+Sengthai Heng,
 David Ittah,
 Christina Lee,
 Erick Ochoa Lopez,

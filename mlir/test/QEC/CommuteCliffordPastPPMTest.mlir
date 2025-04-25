@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt --ppr_to_ppm --split-input-file -verify-diagnostics %s | FileCheck %s
+// RUN: quantum-opt --merge_ppr_ppm --split-input-file -verify-diagnostics %s | FileCheck %s
 
-func.func public @ppr_to_ppm_test_1(%q1: !quantum.bit) -> tensor<i1> {
+func.func public @merge_ppr_ppm_test_1(%q1: !quantum.bit) -> tensor<i1> {
 
     // CHECK-NOT:   qec.ppr["X"](4)
     // CHECK:       qec.ppm ["X"] %
@@ -25,7 +25,7 @@ func.func public @ppr_to_ppm_test_1(%q1: !quantum.bit) -> tensor<i1> {
     return %from_elements : tensor<i1>
 }
 
-func.func public @ppr_to_ppm_test_2(%q1: !quantum.bit) -> (tensor<i1>, !quantum.bit) {
+func.func public @merge_ppr_ppm_test_2(%q1: !quantum.bit) -> (tensor<i1>, !quantum.bit) {
 
     // CHECK-NOT:   qec.ppr["X"](4)
     // CHECK:       qec.ppm ["Z"](-1) %
@@ -36,7 +36,7 @@ func.func public @ppr_to_ppm_test_2(%q1: !quantum.bit) -> (tensor<i1>, !quantum.
     return %from_elements, %out_qubits : tensor<i1>, !quantum.bit
 }
 
-func.func public @ppr_to_ppm_test_3(%q1: !quantum.bit) -> (tensor<i1>, !quantum.bit) {
+func.func public @merge_ppr_ppm_test_3(%q1: !quantum.bit) -> (tensor<i1>, !quantum.bit) {
 
     // CHECK-NOT:   qec.ppr["X"](4)
     // CHECK:       qec.ppm ["Y"] %
@@ -47,7 +47,7 @@ func.func public @ppr_to_ppm_test_3(%q1: !quantum.bit) -> (tensor<i1>, !quantum.
     return %from_elements, %out_qubits : tensor<i1>, !quantum.bit
 }
 
-func.func public @ppr_to_ppm_test_4(%q1: !quantum.bit, %q2: !quantum.bit) -> (tensor<i1>, !quantum.bit) {
+func.func public @merge_ppr_ppm_test_4(%q1: !quantum.bit, %q2: !quantum.bit) -> (tensor<i1>, !quantum.bit) {
 
     // CHECK: [[q0:%.+]] = qec.ppr ["X"](8) %arg0 : !quantum.bit
     // CHECK-NOT: ["X"](4)
@@ -62,7 +62,7 @@ func.func public @ppr_to_ppm_test_4(%q1: !quantum.bit, %q2: !quantum.bit) -> (te
     return %from_elements, %out_qubits#0 : tensor<i1>, !quantum.bit
 }
 
-func.func public @ppr_to_ppm_test_5(%q1: !quantum.bit, %q2: !quantum.bit) -> (tensor<i1>, !quantum.bit) {
+func.func public @merge_ppr_ppm_test_5(%q1: !quantum.bit, %q2: !quantum.bit) -> (tensor<i1>, !quantum.bit) {
 
     // CHECK:       [[q0:%.+]] = qec.ppr ["X"](8) %arg0 : !quantum.bit
     // CHECK-NOT:   qec.ppr ["Y"](4)
@@ -77,7 +77,7 @@ func.func public @ppr_to_ppm_test_5(%q1: !quantum.bit, %q2: !quantum.bit) -> (te
     return %from_elements, %out_qubits#0 : tensor<i1>, !quantum.bit
 }
 
-func.func public @ppr_to_ppm_test_6(%q1: !quantum.bit, %q2: !quantum.bit) -> (tensor<i1>, !quantum.bit) {
+func.func public @merge_ppr_ppm_test_6(%q1: !quantum.bit, %q2: !quantum.bit) -> (tensor<i1>, !quantum.bit) {
 
     // CHECK: [[q1:%.+]]:2 = qec.ppr ["X", "X"](8) %arg0, %arg1
     // CHECK: [[m1:%.+]], [[o1:%.+]]:2 = qec.ppm ["X", "Z"] [[q1]]#0, [[q1]]#1
