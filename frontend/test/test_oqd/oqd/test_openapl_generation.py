@@ -44,7 +44,7 @@ class TestOpenAPL:
         @qml.qnode(oqd_dev)
         def circuit(x):
             qml.RX(x, wires=0)
-            return qml.counts()
+            return qml.counts(wires=0)
 
         circuit(np.pi / 2)
 
