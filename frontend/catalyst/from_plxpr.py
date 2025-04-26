@@ -721,7 +721,7 @@ class PredicatePlxprInterpreter(PlxprInterpreter):
         return outvals
 
 
-def trace_from_pennylane(fn, static_argnums, abstracted_axes, sig, kwargs):
+def trace_from_pennylane(fn, static_argnums, abstracted_axes, sig, kwargs, debug_info=None):
     """Capture the JAX program representation (JAXPR) of the wrapped function, using
     PL capure module.
 
@@ -739,6 +739,7 @@ def trace_from_pennylane(fn, static_argnums, abstracted_axes, sig, kwargs):
         make_jaxpr_kwargs = {
             "static_argnums": static_argnums,
             "abstracted_axes": abstracted_axes,
+            "debug_info": debug_info,
         }
 
         args = sig

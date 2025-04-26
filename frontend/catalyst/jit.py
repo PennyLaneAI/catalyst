@@ -724,7 +724,12 @@ class QJIT(CatalystCallable):
                 ),
             ):
                 return trace_from_pennylane(
-                    self.user_function, static_argnums, abstracted_axes, full_sig, kwargs
+                    self.user_function,
+                    static_argnums,
+                    abstracted_axes,
+                    full_sig,
+                    kwargs,
+                    debug_info=dbg,
                 )
 
         def closure(qnode, *args, **kwargs):
