@@ -47,6 +47,7 @@ from catalyst.jax_tracer import Function, mark_gradient_tracing
 from catalyst.tracing.contexts import EvaluationContext, GradContext
 from catalyst.utils.callables import CatalystCallable
 from catalyst.utils.exceptions import DifferentiableCompileError
+from catalyst.utils.types import get_shape
 
 Differentiable = Union[Function, QNode]
 
@@ -475,10 +476,10 @@ def jvp(f: Callable, params, tangents, *, method=None, h=None, argnums=None):
                     f"{_dtype(p)}, but got tangent dtype {_dtype(t)} instead."
                 )
 
-            if jnp.shape(p) != jnp.shape(t):
+            if get_shape(p) != get_shape(t):
                 raise ValueError(
                     "catalyst.jvp called with different function params and tangent shapes; "
-                    f"got function params shape {jnp.shape(p)} and tangent shape {jnp.shape(t)}"
+                    f"got function params shape {get_shape(p)} and tangent shape {get_shape(t)}"
                 )
 
         jaxpr, out_tree = _make_jaxpr_check_differentiable(fn, grad_params, *params)
@@ -585,11 +586,11 @@ def vjp(f: Callable, params, cotangents, *, method=None, h=None, argnums=None):
                     f"{_dtype(p)}, but got cotangent dtype {_dtype(t)} instead."
                 )
 
-            if jnp.shape(p) != jnp.shape(t):
+            if get_shape(p) != get_shape(t):
                 raise ValueError(
                     "catalyst.vjp called with different function output params and cotangent "
-                    f"shapes; got function output params shape {jnp.shape(p)} and cotangent shape "
-                    f"{jnp.shape(t)}"
+                    f"shapes; got function output params shape {get_shape(p)} and cotangent shape "
+                    f"{get_shape(t)}"
                 )
 
         cotangents, _ = tree_flatten(cotangents)
