@@ -12,10 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <mlir/IR/Builders.h>
 #define DEBUG_TYPE "decompose_non_clifford_ppr_to_ppm"
 #include <llvm/ADT/SmallVector.h>
 
 #include <mlir/Dialect/Arith/IR/Arith.h> // for arith::AndIOp and arith::ConstantOp
+#include <mlir/Dialect/SCF/IR/SCF.h>     // for scf::IfOp
 
 #include "QEC/IR/QECDialect.h"
 #include "QEC/Transforms/Patterns.h"
@@ -56,13 +58,75 @@ SmallVector<StringRef> extractPauliString(QECOpInterface op)
     return pauliWord;
 }
 
-LogicalInitKind getMagicState(PPRotationOp op)
+LogicalInitKind getMagicState(QECOpInterface op)
 {
     int16_t rotationKind = static_cast<int16_t>(op.getRotationKind());
     if (rotationKind > 0) {
         return LogicalInitKind::magic;
     }
     return LogicalInitKind::magic_conj;
+}
+
+/// Decompose the PPR (pi/4) into PPR and PPMs operations via flattening method
+/// as described in Figure 11(b) in the paper: https://arxiv.org/abs/1808.02892
+///
+/// ─────┌───┐───────
+/// ─────│ P │(π/4)──
+/// ─────└───┘───────
+///
+/// into
+///
+/// ─────┌───┐────┌───────┐─────┌───────┐──
+/// ─────|-P |────| P(π/4)|─────| P(π/2)|──
+/// ─────|   |────└───╦───┘─────└───╦───┘──
+///      |   ╠════════╝             ║
+///      |   |        ┌───┐         ║
+/// |0⟩──| Y |────────| X ╠═════════╝
+///      └───┘        └───┘
+/// If we prepare |Y⟩ as axillary qubit, then we can use P⊗Z as the measurement operator
+/// on first operation instead of -P⊗Y.
+PPRotationOp decompose_pi_over_four_flattening(LogicalInitKind ancillaType, PPRotationOp op,
+                                               TypedValue<IntegerType> measResult,
+                                               Value axillaryQubitReg, PatternRewriter &rewriter)
+{
+    auto loc = op.getLoc();
+
+    ExtractOp zOp = buildExtractOp(axillaryQubitReg, loc, 1, rewriter);
+    auto magic = rewriter.create<PrepareStateOp>(loc, ancillaType, zOp->getResults());
+
+    SmallVector<Value> m1InQubits = op.getInQubits();
+    m1InQubits.emplace_back(magic.getOutQubits().front());
+    SmallVector<StringRef> pauliP = extractPauliString(op);
+
+    uint16_t rotation_sign = 1;
+    // if |Y⟩ is used as axillary qubit
+    if (ancillaType == LogicalInitKind::plus_i) {
+        pauliP.emplace_back("Z");
+    }
+    else if (ancillaType == LogicalInitKind::zero) {
+        pauliP.emplace_back("Y");
+        rotation_sign = -1;
+    }
+    else {
+        assert(false && "Only |Y⟩ or |0⟩ can be used as axillary qubit for pi/4 decomposition");
+    }
+
+    auto ppmPZ =
+        rewriter.create<PPMeasurementOp>(loc, pauliP, rotation_sign, m1InQubits, measResult);
+
+    SmallVector<StringRef> pauliX = {"X"};
+    auto ppmX =
+        rewriter.create<PPMeasurementOp>(loc, pauliX, ppmPZ.getOutQubits().back(), measResult);
+
+    auto cond = rewriter.create<arith::XOrIOp>(loc, ppmPZ.getMres(), ppmX.getMres());
+
+    SmallVector<Value> outPZQubits = ppmPZ.getOutQubits();
+    outPZQubits.pop_back();
+    pauliP.pop_back();
+    auto pprPI2 = rewriter.create<PPRotationOp>(loc, pauliP, 2, outPZQubits, cond.getResult());
+
+    rewriter.replaceOp(op, pprPI2.getOutQubits());
+    return pprPI2;
 }
 
 /// Decompose the Non-Clifford (pi/8) PPR into PPR and PPMs operations via auto corrected method
@@ -171,7 +235,7 @@ void decompose_inject_magic_state_pi_over_eight(PPRotationOp op, PatternRewriter
     auto loc = op.getLoc();
 
     // Allocate 1 axillary qubit
-    Value axillary_qubit = buildAllocQreg(loc, 1, rewriter);
+    Value axillary_qubit = buildAllocQreg(loc, 2, rewriter);
     ExtractOp mOp = buildExtractOp(axillary_qubit, loc, 0, rewriter);
 
     // Prepare magic state |m⟩
@@ -190,6 +254,8 @@ void decompose_inject_magic_state_pi_over_eight(PPRotationOp op, PatternRewriter
     SmallVector<Value> outPZQubits = ppmPZ.getOutQubits(); // [input qubits, |m⟩]
     outPZQubits.pop_back();                                // [input qubits]
     auto pprPI4 = rewriter.create<PPRotationOp>(loc, pauliP, 4, outPZQubits, ppmPZ.getMres());
+    pprPI4 = decompose_pi_over_four_flattening(LogicalInitKind::zero, pprPI4, ppmPZ.getMres(),
+                                               axillary_qubit, rewriter);
 
     // PPM (X) on |m⟩
     SmallVector<StringRef> pauliX = {"X"};

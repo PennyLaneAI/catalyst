@@ -352,7 +352,38 @@ def PPMeasurementOp : QEC_Op<"ppm", [QECOpInterface, AttrSizedOperandSegments]> 
             PPMeasurementOp::build($_builder, $_state,
             /*pauli_product=*/ $_builder.getStrArrayAttr(pauli_product),
             /*in_qubits=*/ in_qubits);
-        }]>
+        }]>,
+        // Convenience builder with ArrayRef<StringRef> and rotation sign
+        OpBuilder<
+        (ins
+            "::mlir::ArrayRef<mlir::StringRef>":$pauli_product,
+            "uint16_t":$rotation_sign,
+            "::mlir::ValueRange":$in_qubits,
+            "::mlir::Value":$condition
+        ),[{
+            PPMeasurementOp::build($_builder, $_state,
+            /*mres=*/ $_builder.getI1Type(),
+            /*out_qubits=*/ mlir::TypeRange(in_qubits),
+            /*pauli_product=*/ $_builder.getStrArrayAttr(pauli_product), 
+            /*rotation_sign=*/ rotation_sign,
+            /*in_qubits=*/ in_qubits,
+            /*condition=*/ condition);
+        }]>,
+        // Convenience builder with ArrayRef<StringRef> and rotation sign
+        OpBuilder<
+        (ins
+            "::mlir::ArrayRef<mlir::StringRef>":$pauli_product,
+            "::mlir::ValueRange":$in_qubits,
+            "::mlir::Value":$condition
+        ),[{
+            PPMeasurementOp::build($_builder, $_state,
+            /*mres=*/ $_builder.getI1Type(),
+            /*out_qubits=*/ mlir::TypeRange(in_qubits),
+            /*pauli_product=*/ $_builder.getStrArrayAttr(pauli_product), 
+            /*rotation_sign=*/ 1,
+            /*in_qubits=*/ in_qubits,
+            /*condition=*/ condition);
+        }]>,
     ];
 
     let assemblyFormat = [{
