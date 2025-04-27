@@ -16,6 +16,7 @@ extend-exclude = '''
 [tool.isort]
 py_version=311
 profile = "black"
+line_length = 100
 skip = [
   "catalyst/mlir/llvm-project",
   "frontend/catalyst/test/test_oqc/conftest.py",

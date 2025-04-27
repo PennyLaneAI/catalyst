@@ -15,6 +15,7 @@
 #include "Catalyst/Transforms/Passes.h"
 #include "Gradient/Transforms/Passes.h"
 #include "Ion/Transforms/Passes.h"
+#include "MBQC/Transforms/Passes.h"
 #include "Mitigation/Transforms/Passes.h"
 #include "QEC/Transforms/Passes.h"
 #include "Quantum/Transforms/Passes.h"
@@ -64,4 +65,5 @@ void catalyst::registerAllCatalystPasses()
     mlir::registerPass(catalyst::createCliffordTToPPRPass);
     mlir::registerPass(catalyst::createCommuteCliffordPastPPMPass);
     mlir::registerPass(catalyst::createDecomposeNonCliffordPPRToPPMPass);
+    mlir::registerPass(catalyst::createMBQCConversionPass);
 }

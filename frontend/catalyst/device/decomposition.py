@@ -253,6 +253,19 @@ def measurements_from_counts(tape, device_wires):
 
         Samples are not supported.
     """
+    changed = False
+    for meas in tape.measurements:
+        changed |= isinstance(meas, (ExpectationMP, VarianceMP, ProbabilityMP, SampleMP))
+        if isinstance(meas, CountsMP):
+            changed |= meas.obs is not None
+
+    def postprocessing(args):
+        if len(args) == 1:
+            return args[0]
+        return args
+
+    if not changed:
+        return [tape], postprocessing
 
     new_operations, measured_wires = _diagonalize_measurements(tape, device_wires=device_wires)
 
@@ -311,6 +324,19 @@ def measurements_from_samples(tape, device_wires):
 
         Counts are not supported.
     """
+    changed = False
+    for meas in tape.measurements:
+        changed |= isinstance(meas, (ExpectationMP, VarianceMP, ProbabilityMP, CountsMP))
+        if isinstance(meas, SampleMP):
+            changed |= meas.obs is not None
+
+    def postprocessing(args):
+        if len(args) == 1:
+            return args[0]
+        return args
+
+    if not changed:
+        return [tape], postprocessing
 
     new_operations, measured_wires = _diagonalize_measurements(tape, device_wires=device_wires)
 

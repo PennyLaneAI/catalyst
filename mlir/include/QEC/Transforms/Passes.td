@@ -61,7 +61,7 @@ def DecomposeMethodOption : Option<
                     "Decompose by injecting magic states method.")
     )}]>;
 
-def CommuteCliffordPastPPMPass : Pass<"ppr_to_ppm"> {
+def CommuteCliffordPastPPMPass : Pass<"merge_ppr_ppm"> {
     let summary = "Absorb Clifford operations into Pauli Product Measurement operations.";
     
     let dependentDialects = [
