@@ -24,7 +24,6 @@ import numbers
 from typing import Callable, Iterable, List, Optional, Union
 
 import jax
-import jax.numpy as jnp
 from jax._src.api import _dtype
 from jax._src.tree_util import PyTreeDef, tree_flatten, tree_unflatten
 from jax.api_util import debug_info

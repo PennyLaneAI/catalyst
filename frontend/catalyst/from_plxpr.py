@@ -42,7 +42,6 @@ from pennylane.transforms import unitary_to_rot as pl_unitary_to_rot
 from catalyst.device import (
     extract_backend_info,
     get_device_capabilities,
-    get_device_shots,
 )
 from catalyst.jax_extras import jaxpr_pad_consts, make_jaxpr2, transient_jax_config
 from catalyst.jax_primitives import (
@@ -721,6 +720,7 @@ class PredicatePlxprInterpreter(PlxprInterpreter):
         return outvals
 
 
+# pylint: disable=too-many-positional-arguments
 def trace_from_pennylane(fn, static_argnums, abstracted_axes, sig, kwargs, debug_info=None):
     """Capture the JAX program representation (JAXPR) of the wrapped function, using
     PL capure module.
