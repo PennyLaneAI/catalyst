@@ -26,6 +26,7 @@ from typing import Any, Callable, Optional, Union
 import jax
 import jax.numpy as jnp
 import numpy as np
+from jax.api_util import debug_info
 from jax._src.tree_util import tree_flatten, tree_leaves, tree_structure, tree_unflatten
 
 from catalyst.api_extensions.control_flow import for_loop
@@ -227,7 +228,9 @@ class VmapCallable(CatalystCallable):
         fn_args = tree_unflatten(args_tree, fn_args_flat)
 
         # Run 'fn' one time to get output-shape
-        _, shapes, init_result_tree = make_jaxpr2(self.fn)(*fn_args, **kwargs)
+        _, shapes, init_result_tree = make_jaxpr2(
+            self.fn, debug_info=debug_info("vmap", self.fn, args, kwargs)
+        )(*fn_args, **kwargs)
 
         init_result_flat = [jnp.zeros(shape=shape.shape, dtype=shape.dtype) for shape, _ in shapes]
         init_result = tree_unflatten(init_result_tree, init_result_flat)

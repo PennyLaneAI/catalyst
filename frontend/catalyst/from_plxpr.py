@@ -182,7 +182,10 @@ def handle_qnode(
     f = partial(QFuncPlxprInterpreter(device, shots).eval, qfunc_jaxpr, consts)
 
     return quantum_kernel_p.bind(
-        wrap_init(f), *non_const_args, qnode=qnode, pipeline=self._pass_pipeline
+        wrap_init(f, debug_info=qfunc_jaxpr.debug_info),
+        *non_const_args,
+        qnode=qnode,
+        pipeline=self._pass_pipeline,
     )
 
 
@@ -718,7 +721,7 @@ class PredicatePlxprInterpreter(PlxprInterpreter):
         return outvals
 
 
-def trace_from_pennylane(fn, static_argnums, abstracted_axes, sig, kwargs):
+def trace_from_pennylane(fn, static_argnums, abstracted_axes, sig, kwargs, debug_info=None):
     """Capture the JAX program representation (JAXPR) of the wrapped function, using
     PL capure module.
 
@@ -736,6 +739,7 @@ def trace_from_pennylane(fn, static_argnums, abstracted_axes, sig, kwargs):
         make_jaxpr_kwargs = {
             "static_argnums": static_argnums,
             "abstracted_axes": abstracted_axes,
+            "debug_info": debug_info,
         }
 
         args = sig

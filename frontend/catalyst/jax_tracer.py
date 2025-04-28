@@ -29,6 +29,7 @@ import jax
 import jax.numpy as jnp
 import pennylane as qml
 from jax._src.lax.lax import _extract_tracers_dyn_shape
+from jax.api_util import debug_info
 from jax.core import get_aval
 from pennylane import QubitUnitary, QueuingManager
 from pennylane.devices import QubitDevice
@@ -187,15 +188,18 @@ class Function:
 
     @debug_logger
     def __call__(self, *args, **kwargs):
-        jaxpr, _, out_tree = make_jaxpr2(self.fn, debug_info=kwargs.pop("debug_info", None))(
-            *args, **kwargs
-        )
+        jaxpr, _, out_tree = make_jaxpr2(
+            self.fn,
+            debug_info=kwargs.pop("debug_info", debug_info("Function", self.fn, args, kwargs)),
+        )(*args, **kwargs)
 
         def _eval_jaxpr(*args, **kwargs):
             return jax.core.eval_jaxpr(jaxpr.jaxpr, jaxpr.consts, *args, **kwargs)
 
         args, _ = jax.tree_util.tree_flatten((args, kwargs))
-        retval = func_p.bind(wrap_init(_eval_jaxpr), *args, fn=self.fn)
+        retval = func_p.bind(
+            wrap_init(_eval_jaxpr, debug_info=jaxpr.jaxpr.debug_info), *args, fn=self.fn
+        )
         return tree_unflatten(out_tree, retval)
 
 
@@ -278,7 +282,7 @@ def _apply_result_type_conversion(
         )
 
     expanded_tracers, in_sig, out_sig = trace_function(
-        _fun, *args, expansion_strategy=cond_expansion_strategy()
+        _fun, *args, expansion_strategy=cond_expansion_strategy(), debug_info=jaxpr.debug_info
     )
 
     return expanded_tracers, in_sig, out_sig
@@ -450,12 +454,14 @@ class HybridOp(Operator):
         regions: List[HybridOpRegion],
         apply_reverse_transform=False,
         expansion_strategy=None,
+        debug_info=None,
     ):  # pylint: disable=too-many-arguments
         self.in_classical_tracers = in_classical_tracers
         self.out_classical_tracers = out_classical_tracers
         self.regions: List[HybridOpRegion] = regions
         self.expansion_strategy = expansion_strategy
         self.apply_reverse_transform = apply_reverse_transform
+        self.debug_info = debug_info
         super().__init__(wires=Wires(HybridOp.num_wires))
 
     def __repr__(self):
@@ -1213,7 +1219,7 @@ def trace_post_processing(trace, post_processing: Callable, pp_args, debug_info=
         in_tracers = [trace.to_jaxpr_tracer(t) for t in tree_flatten(pp_args)[0]]
         out_tracers = [trace.to_jaxpr_tracer(t) for t in wffa.call_wrapped(*in_tracers)]
         cur_trace = EvaluationContext.get_current_trace()
-        jaxpr, out_type, consts = cur_trace.frame.to_jaxpr2(out_tracers, debug_info)
+        jaxpr, out_type, consts = cur_trace.frame.to_jaxpr2(out_tracers, wffa.debug_info)
         closed_jaxpr = ClosedJaxpr(jaxpr, consts)
         return closed_jaxpr, out_type, out_tree_promise()
 
@@ -1247,7 +1253,7 @@ def trace_function(
         debug_info=kwargs.pop("debug_info", None),
     )
 
-    with EvaluationContext.frame_tracing_context() as trace:
+    with EvaluationContext.frame_tracing_context(debug_info=wfun.debug_info) as trace:
         arg_expanded_tracers = input_type_to_tracers(
             in_sig.in_type, trace.new_arg, trace.to_jaxpr_tracer
         )
