@@ -814,7 +814,6 @@ class TestQR:
         assert jnp.allclose(R_obs, R_exp)
 
 
-@pytest.mark.skip(reason="lapack symbols undefined, WIP")
 class TestSchur:
     """Test results of jax.scipy.linalg.schur are numerically correct when qjit compiled.
 
@@ -977,7 +976,6 @@ class TestSolve:
         assert jnp.allclose(x_obs, x_exp)
 
 
-@pytest.mark.skip(reason="lapack symbols undefined, WIP")
 class TestSqrtm:
     """Test results of jax.scipy.linalg.sqrtm are numerically correct when qjit compiled.
 
