@@ -204,7 +204,7 @@ class DeallocOp(IRDLOperation):
 class DeviceInitOp(IRDLOperation):
     """Initialize a quantum device."""
 
-    name = prop_def(BaseAttr(StringAttr))
+    name = "quantum.device_init"
 
     # assembly_format = """
     #      (`shots` `(` $shots^ `)`)? `[` $lib `,` $name `,` $kwargs `]` attr-dict
@@ -608,7 +608,6 @@ class YieldOp(IRDLOperation):
     #    """
 
     results = var_operand_def(BaseAttr(QuregType))
-
 
 QuantumDialect = Dialect(
     "quantum",

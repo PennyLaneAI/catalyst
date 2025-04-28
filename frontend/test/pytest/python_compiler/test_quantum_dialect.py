@@ -14,6 +14,82 @@
 
 """Unit test module for catalyst/python_compiler/quantum_dialect.py"""
 
+
+import pytest
+
 import pennylane as qml
 
 from catalyst import qjit
+
+import pytest
+from catalyst.python_compiler.quantum_dialect import QuantumDialect
+
+name = QuantumDialect.name
+all_ops = list(QuantumDialect.operations)
+all_attrs = list(QuantumDialect.attributes)
+
+expected_ops_names = {
+    "AdjointOp": "quantum.adjoint",
+    "AllocOp": "quantum.alloc",
+    "ComputationalBasisOp": "quantum.compbasis",
+    "CountsOp": "quantum.counts",
+    "CustomOp": "quantum.custom",
+    "DeallocOp": "quantum.dealloc",
+    "DeviceInitOp": "quantum.device_init",
+    "DeviceReleaseOp": "quantum.device_release",
+    "ExpvalOp": "quantum.expval",
+    "ExtractOp": "quantum.extract",
+    "FinalizeOp": "quantum.finalize",
+    "GlobalPhaseOp": "quantum.gphase",
+    "HamiltonianOp": "quantum.hamiltonian",
+    "HermitianOp": "quantum.hermitian",
+    "InitializeOp": "quantum.init",
+    "InsertOp": "quantum.insert",
+    "MeasureOp": "quantum.measure",
+    "MultiRZOp": "quantum.multirz",
+    "NamedObsOp": "quantum.namedobs",
+    "ProbsOp": "quantum.probs",
+    "QubitUnitaryOp": "quantum.unitary",
+    "SampleOp": "quantum.sample",
+    "SetBasisStateOp": "quantum.set_basis_state",
+    "SetStateOp": "quantum.set_state",
+    "StateOp": "quantum.state",
+    "TensorOp": "quantum.tensor",
+    "VarianceOp": "quantum.var",
+    "YieldOp": "quantum.yield",
+}
+
+expected_attrs_names = {
+    "ObservableType": "quantum.obs",
+    "QubitType": "quantum.bit",
+    "QuregType": "quantum.reg",
+    "ResultType": "quantum.res",
+    "NamedObservableAttr": "quantum.named_observable",
+}
+
+
+def test_quantum_dialect_name():
+    """Test that the QuantumDialect name is correct."""
+    assert name == "quantum"
+
+
+@pytest.mark.parametrize("op", all_ops)
+def test_all_operations_names(op):
+    """Test that all operations have the expected name."""
+    op_class_name = op.__name__
+    expected_name = expected_ops_names.get(op_class_name)
+    assert (
+        expected_name is not None
+    ), f"Unexpected operation {op_class_name} found in QuantumDialect"
+    assert op.name == expected_name
+
+
+@pytest.mark.parametrize("attr", all_attrs)
+def test_all_attributes_names(attr):
+    """Test that all attributes have the expected name."""
+    attr_class_name = attr.__name__
+    expected_name = expected_attrs_names.get(attr_class_name)
+    assert (
+        expected_name is not None
+    ), f"Unexpected attribute {attr_class_name} found in QuantumDialect"
+    assert attr.name == expected_name
