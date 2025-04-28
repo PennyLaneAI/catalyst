@@ -216,7 +216,9 @@ def get_quantum_compilation_stage(options: CompileOptions) -> List[str]:
 def get_bufferization_stage(_options: CompileOptions) -> List[str]:
     """Returns the list of passes that performs bufferization"""
     bufferization = [
-        "one-shot-bufferize{dialect-filter=memref}",
+        #"one-shot-bufferize{dialect-filter=memref}",
+        "eliminate-empty-tensors",
+        "one-shot-bufferize{bufferize-function-boundaries}",
         "inline",
         "gradient-preprocess",
         "gradient-bufferize",

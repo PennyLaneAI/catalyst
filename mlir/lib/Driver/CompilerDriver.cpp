@@ -70,6 +70,7 @@
 #include "Mitigation/Transforms/Passes.h"
 #include "QEC/IR/QECDialect.h"
 #include "Quantum/IR/QuantumDialect.h"
+#include "Quantum/Transforms/BufferizableOpInterfaceImpl.h"
 #include "Quantum/Transforms/Passes.h"
 
 #include "Enzyme.h"
@@ -963,6 +964,9 @@ int QuantumDriverMainFromCL(int argc, char **argv)
     mhlo::registerAllMhloPasses();
     registerAllCatalystDialects(registry);
     registerLLVMTranslations(registry);
+
+    // Register bufferization interfaces
+    catalyst::quantum::registerBufferizableOpInterfaceExternalModels(registry);
 
     // Register and parse command line options.
     std::string inputFilename, outputFilename;
