@@ -68,9 +68,6 @@ class CompileOptions:
         disable_assertions (Optional[bool]): disables all assertions. Default is ``False``.
         seed (Optional[int]) : the seed for random operations in a qjit call.
             Default is None.
-        experimental_capture (bool): If set to ``True``,
-            use PennyLane's experimental program capture capabilities
-            to capture the function for compilation.
         circuit_transform_pipeline (Optional[dict[str, dict[str, str]]]):
             A dictionary that specifies the quantum circuit transformation pass pipeline order,
             and optionally arguments for each pass in the pipeline.
@@ -94,7 +91,6 @@ class CompileOptions:
     checkpoint_stage: Optional[str] = ""
     disable_assertions: Optional[bool] = False
     seed: Optional[int] = None
-    experimental_capture: Optional[bool] = False
     circuit_transform_pipeline: Optional[dict[str, dict[str, str]]] = None
     pass_plugins: Optional[Set[Path]] = None
     dialect_plugins: Optional[Set[Path]] = None
@@ -220,14 +216,35 @@ def get_quantum_compilation_stage(options: CompileOptions) -> List[str]:
 def get_bufferization_stage(_options: CompileOptions) -> List[str]:
     """Returns the list of passes that performs bufferization"""
     bufferization = [
-        "eliminate-empty-tensors",
-        "one-shot-bufferize{bufferize-function-boundaries}",
+        "one-shot-bufferize{dialect-filter=memref}",
+        "inline",
+        "gradient-preprocess",
+        "gradient-bufferize",
+        "scf-bufferize",
+        "convert-tensor-to-linalg",  # tensor.pad
+        "convert-elementwise-to-linalg",  # Must be run before --arith-bufferize
+        "arith-bufferize",
+        "empty-tensor-to-alloc-tensor",
+        "func.func(bufferization-bufferize)",
+        "func.func(tensor-bufferize)",
+        "catalyst-bufferize",  # Must be run before -- func.func(linalg-bufferize)
+        "func.func(linalg-bufferize)",
+        "func.func(tensor-bufferize)",
+        "quantum-bufferize",
+        "func-bufferize",
+        "func.func(finalizing-bufferize)",
+        "canonicalize",  # Remove dead memrefToTensorOp's
+        "gradient-postprocess",
+        # introduced during gradient-bufferize of callbacks
         "func.func(buffer-hoisting)",
         "func.func(buffer-loop-hoisting)",
-        "buffer-results-to-out-params",
-        "drop-equivalent-buffer-results",
-        "func.func(promote-buffers-to-stack)",
-        #"buffer-deallocation-pipeline",
+        "func.func(buffer-deallocation)",
+        "convert-arraylist-to-memref",
+        "convert-bufferization-to-memref",
+        "canonicalize",  # Must be after convert-bufferization-to-memref
+        # otherwise there are issues in lowering of dynamic tensors.
+        # "cse",
+        "cp-global-memref",
     ]
     return bufferization
 

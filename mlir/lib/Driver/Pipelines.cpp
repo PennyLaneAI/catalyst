@@ -72,13 +72,13 @@ void createBufferizationPipeline(OpPassManager &pm)
     pm.addPass(mlir::createSCFBufferizePass());
     pm.addPass(mlir::createConvertTensorToLinalgPass());
     pm.addPass(mlir::createConvertElementwiseToLinalgPass());
-    //pm.addPass(mlir::arith::createArithBufferizePass());
+    pm.addPass(mlir::arith::createArithBufferizePass());
     pm.addPass(mlir::bufferization::createEmptyTensorToAllocTensorPass());
-    //pm.addNestedPass<mlir::func::FuncOp>(mlir::bufferization::createBufferizationBufferizePass());
-    //pm.addNestedPass<mlir::func::FuncOp>(mlir::tensor::createTensorBufferizePass());
+    pm.addNestedPass<mlir::func::FuncOp>(mlir::bufferization::createBufferizationBufferizePass());
+    pm.addNestedPass<mlir::func::FuncOp>(mlir::tensor::createTensorBufferizePass());
     pm.addPass(catalyst::createCatalystBufferizationPass());
-    //pm.addNestedPass<mlir::func::FuncOp>(mlir::createLinalgBufferizePass());
-    //pm.addNestedPass<mlir::func::FuncOp>(mlir::tensor::createTensorBufferizePass());
+    pm.addNestedPass<mlir::func::FuncOp>(mlir::createLinalgBufferizePass());
+    pm.addNestedPass<mlir::func::FuncOp>(mlir::tensor::createTensorBufferizePass());
     pm.addPass(catalyst::createQuantumBufferizationPass());
     pm.addPass(mlir::func::createFuncBufferizePass());
     pm.addNestedPass<mlir::func::FuncOp>(mlir::bufferization::createFinalizingBufferizePass());
