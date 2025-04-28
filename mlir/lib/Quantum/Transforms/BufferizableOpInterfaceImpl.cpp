@@ -75,6 +75,64 @@ struct SampleOpInterface
     }
 };
 
+// Bufferization of quantum.counts.
+// Result tensors of quantum.counts are bufferized with corresponding memref.alloc ops.
+// Users of the result tensors are updated to use the new memrefs.
+struct CountsOpInterface
+    : public bufferization::BufferizableOpInterface::ExternalModel<CountsOpInterface, CountsOp> {
+    bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
+                                const bufferization::AnalysisState &state) const
+    {
+        return false;
+    }
+
+    bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
+                                 const bufferization::AnalysisState &state) const
+    {
+        return false;
+    }
+
+    bufferization::AliasingValueList
+    getAliasingValues(Operation *op, OpOperand &opOperand,
+                      const bufferization::AnalysisState &state) const
+    {
+        return {};
+    }
+
+    LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
+                            const bufferization::BufferizationOptions &options) const
+    {
+        auto countsOp = cast<CountsOp>(op);
+        Location loc = op->getLoc();
+
+        SmallVector<Value> buffers;
+        for (size_t i : {0, 1}) {
+            auto tensorType = cast<RankedTensorType>(countsOp.getType(i));
+            MemRefType resultType =
+                MemRefType::get(tensorType.getShape(), tensorType.getElementType());
+            auto shape = cast<mlir::RankedTensorType>(tensorType).getShape();
+
+            Value allocVal;
+            if (shape[0] == ShapedType::kDynamic) {
+                auto indexCastOp = rewriter.create<index::CastSOp>(loc, rewriter.getIndexType(),
+                                                                   countsOp.getDynamicShape());
+                allocVal =
+                    rewriter.create<memref::AllocOp>(loc, resultType, ValueRange{indexCastOp});
+            }
+            else {
+                allocVal = rewriter.create<memref::AllocOp>(loc, resultType);
+            }
+            buffers.push_back(allocVal);
+        }
+
+        rewriter.create<CountsOp>(loc, nullptr, nullptr, countsOp.getObs(), nullptr, buffers[0],
+                                  buffers[1]);
+        bufferization::replaceOpWithBufferizedValues(rewriter, op, buffers);
+
+        return success();
+    }
+};
+
 // Bufferization of quantum.probs.
 // Result tensor of quantum.probs is bufferized with a corresponding memref.alloc.
 // Users of the result tensor are updated to use the new memref.
@@ -267,6 +325,7 @@ void catalyst::quantum::registerBufferizableOpInterfaceExternalModels(DialectReg
 {
     registry.addExtension(+[](MLIRContext *ctx, catalyst::quantum::QuantumDialect *dialect) {
         SampleOp::attachInterface<SampleOpInterface>(*ctx);
+        CountsOp::attachInterface<CountsOpInterface>(*ctx);
         ProbsOp::attachInterface<ProbsOpInterface>(*ctx);
         StateOp::attachInterface<StateOpInterface>(*ctx);
         SetStateOp::attachInterface<SetStateOpInterface>(*ctx);

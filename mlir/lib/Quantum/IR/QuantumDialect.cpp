@@ -45,8 +45,8 @@ void QuantumDialect::initialize()
 #include "Quantum/IR/QuantumOps.cpp.inc"
         >();
 
-    declarePromisedInterfaces<bufferization::BufferizableOpInterface, SampleOp, ProbsOp, StateOp,
-                              SetStateOp, SetBasisStateOp>();
+    declarePromisedInterfaces<bufferization::BufferizableOpInterface, SampleOp, CountsOp, ProbsOp,
+                              StateOp, SetStateOp, SetBasisStateOp>();
 }
 
 //===----------------------------------------------------------------------===//
