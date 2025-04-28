@@ -96,6 +96,7 @@ MOCK_MODULES = [
     "mlir_quantum.dialects.quantum",
     "mlir_quantum.dialects.gradient",
     "mlir_quantum.dialects.catalyst",
+    "mlir_quantum.dialects.mbqc",
     "mlir_quantum.dialects.mitigation",
     "mlir_quantum.dialects._transform_ops_gen",
     "pybind11",
