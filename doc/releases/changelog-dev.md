@@ -42,6 +42,9 @@
 
   Disabling program capture can be done with `qml.capture.disable()`.
 
+* The `ppr_to_ppm` pass has been renamed to `merge_ppr_ppm` (same functionality). A new `ppr_to_ppm` will handle direct decomposition of PPRs into PPMs.
+  [(#1688)](https://github.com/PennyLaneAI/catalyst/pull/1688)
+
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
@@ -63,6 +66,10 @@
 * Catalyst now includes an experimental `mbqc` dialect for representing measurement-based
   quantum-computing protocols in MLIR.
   [(#1663)](https://github.com/PennyLaneAI/catalyst/pull/1663)
+  [(#1679)](https://github.com/PennyLaneAI/catalyst/pull/1679)
+
+* The utility function `EnsureFunctionDeclaration` is refactored into the `Utils` of the `Catalyst` dialect, instead of being duplicated in each individual dialect.
+  [(#1683)](https://github.com/PennyLaneAI/catalyst/pull/1683)
 
 * The version of JAX used by Catalyst is updated to 0.5.3.
   [(#???)](https://github.com/PennyLaneAI/catalyst/pull/???)
@@ -74,6 +81,7 @@
 This release contains contributions from (in alphabetical order):
 
 Joey Carter,
+Sengthai Heng,
 David Ittah,
 Christina Lee,
 Erick Ochoa Lopez,
