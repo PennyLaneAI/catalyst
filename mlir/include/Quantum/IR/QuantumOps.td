@@ -619,7 +619,7 @@ def YieldOp : Quantum_Op<"yield", [Pure, ReturnLike, Terminator, ParentOneOf<["A
     let summary = "Return results from quantum program regions";
 
     let arguments = (ins
-        Variadic<AnyTypeOf<[QuregType]>>:$results
+        Variadic<QuregType>:$results
     );
 
     let assemblyFormat = [{

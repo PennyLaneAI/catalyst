@@ -72,6 +72,9 @@
 * The utility function `EnsureFunctionDeclaration` is refactored into the `Utils` of the `Catalyst` dialect, instead of being duplicated in each individual dialect.
   [(#1683)](https://github.com/PennyLaneAI/catalyst/pull/1683)
 
+* Improved the definition of `YieldOp` in the quantum dialect by removing `AnyTypeOf`
+  [(#1696)](https://github.com/PennyLaneAI/catalyst/pull/1696)
+
 <h3>Documentation 📝</h3>
 
 <h3>Contributors ✍️</h3>
