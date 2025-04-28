@@ -13,11 +13,12 @@
 // limitations under the License.
 
 #define DEBUG_TYPE "ppr_to_ppm"
+
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/Debug.h"
-
 #include "mlir/Analysis/SliceAnalysis.h"
-#include "mlir/Analysis/TopologicalSortUtils.h"
+//#include "mlir/Analysis/TopologicalSortUtils.h"
+#include "mlir/Transforms/TopologicalSortUtils.h"
 
 #include "QEC/IR/QECDialect.h"
 #include "QEC/IR/QECOpInterfaces.h"
