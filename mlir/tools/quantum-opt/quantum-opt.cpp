@@ -33,6 +33,7 @@
 #include "Mitigation/Transforms/Passes.h"
 #include "QEC/IR/QECDialect.h"
 #include "Quantum/IR/QuantumDialect.h"
+#include "Quantum/Transforms/BufferizableOpInterfaceImpl.h"
 #include "Quantum/Transforms/Passes.h"
 
 namespace test {
@@ -58,6 +59,8 @@ int main(int argc, char **argv)
     registry.insert<catalyst::mitigation::MitigationDialect>();
     registry.insert<catalyst::ion::IonDialect>();
     registry.insert<mlir::mhlo::MhloDialect>();
+
+    catalyst::quantum::registerBufferizableOpInterfaceExternalModels(registry);
 
     return mlir::asMainReturnCode(
         mlir::MlirOptMain(argc, argv, "Quantum optimizer driver\n", registry));
