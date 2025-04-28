@@ -61,7 +61,7 @@ def test_measure_x():
     @qjit(pipelines=mbqc_pipeline)
     @qml.qnode(dev)
     def workload():
-        m0 = plft.measure_x(0)
+        _ = plft.measure_x(0)
         return qml.expval(qml.Z(0))
 
     qml.capture.disable()
@@ -83,7 +83,7 @@ def test_measure_y():
     @qjit(pipelines=mbqc_pipeline)
     @qml.qnode(dev)
     def workload():
-        m0 = plft.measure_y(0)
+        _ = plft.measure_y(0)
         return qml.expval(qml.Z(0))
 
     qml.capture.disable()
@@ -107,7 +107,7 @@ def test_measure_z():
     @qjit(pipelines=mbqc_pipeline)
     @qml.qnode(dev)
     def workload():
-        m0 = plft.measure_z(0)
+        _ = plft.measure_z(0)
         return qml.expval(qml.Z(0))
 
     qml.capture.disable()
@@ -132,7 +132,7 @@ def test_measure_measure_arbitrary_basis(angle, plane):
     @qjit(pipelines=mbqc_pipeline)
     @qml.qnode(dev)
     def workload():
-        m0 = plft.measure_arbitrary_basis(wires=0, angle=angle, plane=plane)
+        _ = plft.measure_arbitrary_basis(wires=0, angle=angle, plane=plane)
         return qml.expval(qml.Z(0))
 
     qml.capture.disable()

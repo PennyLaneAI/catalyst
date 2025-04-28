@@ -14,14 +14,14 @@
 
 # RUN: %PYTHON %s | FileCheck %s
 
+# pylint: disable=line-too-long
+
 """Lit tests for capturing and compiling circuits with parametric arbitrary-basis mid-circuit
 measurements from PennyLane's ftqc module in Catalyst.
 """
 
-import numpy as np
 import pennylane as qml
 import pennylane.ftqc as plft
-import pytest
 
 from catalyst import qjit
 
@@ -44,7 +44,7 @@ def test_measure_x():
         # CHECK: [[qreg:%.+]] = quantum.alloc( 1) : !quantum.reg
         # CHECK: [[q0:%.+]] = quantum.extract [[qreg]][ 0] : !quantum.reg -> !quantum.bit
         # CHECK: [[mres:%.+]], [[out_qubit:%.+]] = mbqc.measure_in_basis[ XY, [[angle]]] [[q0]] : i1, !quantum.bit
-        m0 = plft.measure_x(0)
+        _ = plft.measure_x(0)
         return qml.expval(qml.Z(0))
 
     qml.capture.disable()
@@ -73,7 +73,7 @@ def test_measure_y():
         # CHECK: [[qreg:%.+]] = quantum.alloc( 1) : !quantum.reg
         # CHECK: [[q0:%.+]] = quantum.extract [[qreg]][ 0] : !quantum.reg -> !quantum.bit
         # CHECK: [[mres:%.+]], [[out_qubit:%.+]] = mbqc.measure_in_basis[ XY, [[angle]]] [[q0]] : i1, !quantum.bit
-        m0 = plft.measure_y(0)
+        _ = plft.measure_y(0)
         return qml.expval(qml.Z(0))
 
     qml.capture.disable()
@@ -105,7 +105,7 @@ def test_measure_z():
         # COM: CHECK: [[qreg:%.+]] = quantum.alloc( 1) : !quantum.reg
         # COM: CHECK: [[q0:%.+]] = quantum.extract [[qreg]][ 0] : !quantum.reg -> !quantum.bit
         # COM: CHECK: [[mres:%.+]], [[out_qubit:%.+]] = quantum.measure [[q0]] : i1, !quantum.bit
-        m0 = plft.measure_z(0)
+        _ = plft.measure_z(0)
         return qml.expval(qml.Z(0))
 
     qml.capture.disable()
@@ -116,7 +116,7 @@ def test_measure_z():
 try:
     test_measure_z()
 
-except:
+except NotImplementedError:
     ...
 
 
@@ -132,7 +132,7 @@ def test_measure_arbitrary_basis(angle, plane):
     @qjit(target="mlir")
     @qml.qnode(dev)
     def workload_measure_arbitrary_basis():
-        m0 = plft.measure_arbitrary_basis(wires=0, angle=angle, plane=plane)
+        _ = plft.measure_arbitrary_basis(wires=0, angle=angle, plane=plane)
         return qml.expval(qml.Z(0))
 
     qml.capture.disable()
@@ -165,6 +165,7 @@ test_measure_arbitrary_basis(0.3, "ZX")
 
 
 try:
+    # The plane 'XZ' is invalid; check that this raise a ValueError
     test_measure_arbitrary_basis(0.4, "XZ")
 
 except ValueError as e:
