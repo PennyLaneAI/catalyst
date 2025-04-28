@@ -510,7 +510,6 @@ class TestFunmNumerical:
         assert jnp.allclose(fA_obs, fA_exp)
 
 
-@pytest.mark.skip(reason="lapack symbols undefined, WIP")
 class TestHessenberg:
     """Test results of jax.scipy.linalg.hessenberg are numerically correct when qjit compiled.
 
