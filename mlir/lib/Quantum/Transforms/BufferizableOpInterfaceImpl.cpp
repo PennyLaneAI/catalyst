@@ -27,8 +27,57 @@ using namespace catalyst::quantum;
 
 namespace {
 
-/// Bufferization of catalyst.quantum.probs. Replace with memref.alloc and a new
-/// catalyst.quantum.probs that uses the memory allocated by memref.alloc.
+// Bufferization of quantum.sample.
+// Result tensor of quantum.sample is bufferized with a corresponding memref.alloc.
+// Users of the result tensor are updated to use the new memref.
+struct SampleOpInterface
+    : public bufferization::BufferizableOpInterface::ExternalModel<SampleOpInterface, SampleOp> {
+    bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
+                                const bufferization::AnalysisState &state) const
+    {
+        return false;
+    }
+
+    bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
+                                 const bufferization::AnalysisState &state) const
+    {
+        return false;
+    }
+
+    bufferization::AliasingValueList
+    getAliasingValues(Operation *op, OpOperand &opOperand,
+                      const bufferization::AnalysisState &state) const
+    {
+        return {};
+    }
+
+    LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
+                            const bufferization::BufferizationOptions &options) const
+    {
+        auto sampleOp = cast<SampleOp>(op);
+        Location loc = op->getLoc();
+        auto tensorType = cast<RankedTensorType>(sampleOp.getSamples().getType());
+        MemRefType resultType = MemRefType::get(tensorType.getShape(), tensorType.getElementType());
+
+        SmallVector<Value> allocSizes;
+        for (Value dynShapeDimension : sampleOp.getDynamicShape()) {
+            auto indexCastOp =
+                rewriter.create<index::CastSOp>(loc, rewriter.getIndexType(), dynShapeDimension);
+            allocSizes.push_back(indexCastOp);
+        }
+
+        Value allocVal = rewriter.create<memref::AllocOp>(loc, resultType, allocSizes);
+        auto allocedSampleOp = rewriter.create<SampleOp>(
+            loc, TypeRange{}, ValueRange{sampleOp.getObs(), allocVal}, op->getAttrs());
+        allocedSampleOp->setAttr("operandSegmentSizes", rewriter.getDenseI32ArrayAttr({1, 0, 1}));
+        bufferization::replaceOpWithBufferizedValues(rewriter, op, allocVal);
+        return success();
+    }
+};
+
+// Bufferization of quantum.probs.
+// Result tensor of quantum.probs is bufferized with a corresponding memref.alloc.
+// Users of the result tensor are updated to use the new memref.
 struct ProbsOpInterface
     : public bufferization::BufferizableOpInterface::ExternalModel<ProbsOpInterface, ProbsOp> {
     bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
@@ -77,8 +126,9 @@ struct ProbsOpInterface
     }
 };
 
-/// Bufferization of catalyst.quantum.state. Replace with memref.alloc and a new
-/// catalyst.quantum.state that uses the memory allocated by memref.alloc.
+// Bufferization of quantum.state.
+// Result tensor of quantum.state is bufferized with a corresponding memref.alloc.
+// Users of the result tensor are updated to use the new memref.
 struct StateOpInterface
     : public bufferization::BufferizableOpInterface::ExternalModel<StateOpInterface, StateOp> {
     bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
@@ -127,7 +177,8 @@ struct StateOpInterface
     }
 };
 
-/// Bufferization of catalyst.quantum.set_state. Convert InState into memref.
+// Bufferization of quantum.set_state.
+// Convert InState into memref.
 struct SetStateOpInterface
     : public bufferization::BufferizableOpInterface::ExternalModel<SetStateOpInterface,
                                                                    SetStateOp> {
@@ -168,7 +219,8 @@ struct SetStateOpInterface
     }
 };
 
-/// Bufferization of catalyst.quantum.set_basis_state. Convert BasisState into memref.
+// Bufferization of quantum.set_basis_state.
+// Convert BasisState into memref.
 struct SetBasisStateOpInterface
     : public bufferization::BufferizableOpInterface::ExternalModel<SetBasisStateOpInterface,
                                                                    SetBasisStateOp> {
@@ -214,6 +266,7 @@ struct SetBasisStateOpInterface
 void catalyst::quantum::registerBufferizableOpInterfaceExternalModels(DialectRegistry &registry)
 {
     registry.addExtension(+[](MLIRContext *ctx, catalyst::quantum::QuantumDialect *dialect) {
+        SampleOp::attachInterface<SampleOpInterface>(*ctx);
         ProbsOp::attachInterface<ProbsOpInterface>(*ctx);
         StateOp::attachInterface<StateOpInterface>(*ctx);
         SetStateOp::attachInterface<SetStateOpInterface>(*ctx);
