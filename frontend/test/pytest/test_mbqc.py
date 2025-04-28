@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Test cases for capturing and compiling circuits with parametric mid-circuit measurements from
-PennyLane's ftqc module in Catalyst.
+"""Test cases for capturing and compiling circuits with parametric arbitrary-basis mid-circuit
+measurements from PennyLane's ftqc module in Catalyst.
 """
 
 import numpy as np
@@ -25,7 +25,7 @@ from catalyst import qjit
 
 mbqc_pipeline = [
     (
-        "device-agnostic-pipeline",
+        "default-pipeline",
         [
             "enforce-runtime-invariants-pipeline",
             "hlo-lowering-pipeline",
