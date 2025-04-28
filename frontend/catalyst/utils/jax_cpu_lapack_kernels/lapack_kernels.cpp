@@ -558,24 +558,25 @@ template <typename T> typename RealGeev<T>::FnType *RealGeev<T>::fn = nullptr;
 
 template <typename T> void RealGeev<T>::Kernel(void *out_tuple, void **data, XlaCustomCallStatus *)
 {
-    const int b = *(reinterpret_cast<int32_t *>(data[0]));
-    const int n_int = *(reinterpret_cast<int32_t *>(data[1]));
+    const char jobvl = *(reinterpret_cast<uint8_t *>(data[0]));
+    const char jobvr = *(reinterpret_cast<uint8_t *>(data[1]));
+    const int b = *(reinterpret_cast<int32_t *>(data[2]));
+    const int n_int = *(reinterpret_cast<int32_t *>(data[4]));
     const int64_t n = n_int;
-    const char jobvl = *(reinterpret_cast<uint8_t *>(data[2]));
-    const char jobvr = *(reinterpret_cast<uint8_t *>(data[3]));
 
-    const T *a_in = reinterpret_cast<T *>(data[4]);
+    const T *a_in = reinterpret_cast<T *>(data[5]);
 
     void **out = reinterpret_cast<void **>(out_tuple);
-    T *a_work = reinterpret_cast<T *>(out[0]);
-    T *vl_work = reinterpret_cast<T *>(out[1]);
-    T *vr_work = reinterpret_cast<T *>(out[2]);
+    T *wr_out = reinterpret_cast<T *>(out[0]);
+    T *wi_out = reinterpret_cast<T *>(out[1]);
+    std::complex<T> *vl_out = reinterpret_cast<std::complex<T> *>(out[2]);
+    std::complex<T> *vr_out = reinterpret_cast<std::complex<T> *>(out[3]);
+    int *info = reinterpret_cast<int *>(out[4]);
 
-    T *wr_out = reinterpret_cast<T *>(out[3]);
-    T *wi_out = reinterpret_cast<T *>(out[4]);
-    std::complex<T> *vl_out = reinterpret_cast<std::complex<T> *>(out[5]);
-    std::complex<T> *vr_out = reinterpret_cast<std::complex<T> *>(out[6]);
-    int *info = reinterpret_cast<int *>(out[7]);
+    T *a_work = new T[n * n];
+    std::memcpy(a_work, a_in, n * n * sizeof(T));
+    T *vl_work = new T[n * n];
+    T *vr_work = new T[n * n];
 
     constexpr int corder = LAPACK_ROW_MAJOR;
 
@@ -629,22 +630,22 @@ template <typename T> typename ComplexGeev<T>::FnType *ComplexGeev<T>::fn = null
 template <typename T>
 void ComplexGeev<T>::Kernel(void *out_tuple, void **data, XlaCustomCallStatus *)
 {
-    const int b = *(reinterpret_cast<int32_t *>(data[0]));
-    const int n_int = *(reinterpret_cast<int32_t *>(data[1]));
+    const char jobvl = *(reinterpret_cast<uint8_t *>(data[0]));
+    const char jobvr = *(reinterpret_cast<uint8_t *>(data[1]));
+    const int b = *(reinterpret_cast<int32_t *>(data[2]));
+    const int n_int = *(reinterpret_cast<int32_t *>(data[4]));
     const int64_t n = n_int;
-    const char jobvl = *(reinterpret_cast<uint8_t *>(data[2]));
-    const char jobvr = *(reinterpret_cast<uint8_t *>(data[3]));
 
-    const T *a_in = reinterpret_cast<T *>(data[4]);
+    const T *a_in = reinterpret_cast<T *>(data[5]);
 
     void **out = reinterpret_cast<void **>(out_tuple);
-    T *a_work = reinterpret_cast<T *>(out[0]);
-    typename T::value_type *r_work = reinterpret_cast<typename T::value_type *>(out[1]);
+    T *w_out = reinterpret_cast<T *>(out[0]);
+    T *vl_out = reinterpret_cast<T *>(out[1]);
+    T *vr_out = reinterpret_cast<T *>(out[2]);
+    int *info = reinterpret_cast<int *>(out[3]);
 
-    T *w_out = reinterpret_cast<T *>(out[2]);
-    T *vl_out = reinterpret_cast<T *>(out[3]);
-    T *vr_out = reinterpret_cast<T *>(out[4]);
-    int *info = reinterpret_cast<int *>(out[5]);
+    T *a_work = new T[n * n];
+    std::memcpy(a_work, a_in, n * n * sizeof(T));
 
     constexpr int corder = LAPACK_ROW_MAJOR;
 
