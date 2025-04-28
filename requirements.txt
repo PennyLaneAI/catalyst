@@ -29,3 +29,6 @@ nbmake
 # optional rt/test dependencies
 pennylane-lightning-kokkos
 amazon-braket-pennylane-plugin>1.27.1
+
+# python compiler project
+xdsl

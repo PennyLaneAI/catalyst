@@ -15,4 +15,5 @@
 """Unit test module for catalyst/python_compiler/quantum_dialect.py"""
 
 import pennylane as qml
+
 from catalyst import qjit
