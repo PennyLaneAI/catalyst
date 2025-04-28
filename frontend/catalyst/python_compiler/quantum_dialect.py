@@ -609,6 +609,7 @@ class YieldOp(IRDLOperation):
 
     results = var_operand_def(BaseAttr(QuregType))
 
+
 QuantumDialect = Dialect(
     "quantum",
     [

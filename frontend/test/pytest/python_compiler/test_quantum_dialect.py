@@ -15,13 +15,10 @@
 """Unit test module for catalyst/python_compiler/quantum_dialect.py"""
 
 
-import pytest
-
 import pennylane as qml
+import pytest
 
 from catalyst import qjit
-
-import pytest
 from catalyst.python_compiler.quantum_dialect import QuantumDialect
 
 name = QuantumDialect.name
