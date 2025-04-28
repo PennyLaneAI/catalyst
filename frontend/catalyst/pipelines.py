@@ -216,9 +216,7 @@ def get_quantum_compilation_stage(options: CompileOptions) -> List[str]:
 def get_bufferization_stage(_options: CompileOptions) -> List[str]:
     """Returns the list of passes that performs bufferization"""
     bufferization = [
-        #"one-shot-bufferize{dialect-filter=memref}",
-        "eliminate-empty-tensors",
-        "one-shot-bufferize{bufferize-function-boundaries}",
+        "one-shot-bufferize{dialect-filter=memref}",
         "inline",
         "gradient-preprocess",
         "gradient-bufferize",
@@ -232,7 +230,8 @@ def get_bufferization_stage(_options: CompileOptions) -> List[str]:
         "catalyst-bufferize",  # Must be run before -- func.func(linalg-bufferize)
         "func.func(linalg-bufferize)",
         "func.func(tensor-bufferize)",
-        "quantum-bufferize",
+        #"quantum-bufferize",
+        "one-shot-bufferize{dialect-filter=quantum}",
         "func-bufferize",
         "func.func(finalizing-bufferize)",
         "canonicalize",  # Remove dead memrefToTensorOp's
