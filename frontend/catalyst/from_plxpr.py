@@ -48,6 +48,7 @@ from catalyst.jax_extras import jaxpr_pad_consts, make_jaxpr2, transient_jax_con
 from catalyst.jax_primitives import (
     AbstractQbit,
     AbstractQreg,
+    MeasurementPlane,
     compbasis_p,
     cond_p,
     counts_p,
@@ -55,7 +56,6 @@ from catalyst.jax_primitives import (
     for_p,
     gphase_p,
     measure_in_basis_p,
-    MeasurementPlane,
     namedobs_p,
     probs_p,
     qalloc_p,
@@ -642,20 +642,28 @@ def handle_measure_in_basis(self, *invals, angle, plane, reset, postselect):
     """Handle the conversion from plxpr to Catalyst jaxpr for the measure_in_basis primitive"""
     wires_inval = invals[0:]
 
-    # angle = jax.lax.convert_element_type(angle, jnp.dtype(jnp.float64))  # TODO if jax.config.jax_enable_x64
+    num_inval_wires = len(wires_inval)
+    assert (
+        num_inval_wires == 1
+    ), f"Expected exactly 1 input wire to measure_in_basis; got {num_inval_wires}"
+
+    wire_inval = wires_inval[0]
+
+    _angle = jax.lax.convert_element_type(angle, jnp.dtype(jnp.float64))
 
     try:
-        measurement_plane = MeasurementPlane(plane)
+        _plane = MeasurementPlane(plane)
     except ValueError as e:
-        raise ValueError(f"Measurement plane must be one of {[plane.value for plane in MeasurementPlane]}") from e
+        raise ValueError(
+            f"Measurement plane must be one of {[plane.value for plane in MeasurementPlane]}"
+        ) from e
 
-    wires = [self.get_wire(w) for w in wires_inval]
-    outvals = measure_in_basis_p.bind(*wires, 0, float(angle))
+    in_wire = self.get_wire(wire_inval)
+    result, out_wire = measure_in_basis_p.bind(in_wire, _angle, plane=_plane, postselect=postselect)
 
-    # for wire_values, new_wire in zip(wires_inval, out_wires):
-    #     self.wire_map[wire_values] = new_wire
+    self.wire_map[wire_inval] = out_wire
 
-    return outvals
+    return result
 
 
 # Derived interpreters must be declared after the primitive registrations of their

@@ -237,8 +237,8 @@ class MeasurementPlane(Enum):
     """
 
     XY = "XY"
-    ZX = "ZX"
     YZ = "YZ"
+    ZX = "ZX"
 
 
 ##############
@@ -1231,17 +1231,21 @@ def _qmeasure_lowering(jax_ctx: mlir.LoweringRuleContext, qubit: ir.Value, posts
 # arbitrary-basis measurements
 #
 @measure_in_basis_p.def_abstract_eval
-def _measure_in_basis_abstract_eval(qubit, plane, angle, postselect: int = None):
+def _measure_in_basis_abstract_eval(
+    qubit, angle: float, plane: MeasurementPlane, postselect: int = None
+):
     assert isinstance(qubit, AbstractQbit)
     return core.ShapedArray((), bool), qubit
 
 
 @measure_in_basis_p.def_impl
-def _measure_in_basis_def_impl(ctx, qubit, plane, angle, postselect: int = None):  # pragma: no cover
+def _measure_in_basis_def_impl(
+    ctx, qubit, angle: float, plane: MeasurementPlane, postselect: int = None
+):  # pragma: no cover
     raise NotImplementedError()
 
 
-def _measurement_plane_attribute(ctx, plane):
+def _measurement_plane_attribute(ctx, plane: MeasurementPlane):
     # ctx = ctx.module_context.context
     return ir.OpaqueAttr.get(
         "mbqc",
@@ -1252,7 +1256,11 @@ def _measurement_plane_attribute(ctx, plane):
 
 
 def _measure_in_basis_lowering(
-    jax_ctx: mlir.LoweringRuleContext, qubit: ir.Value, plane, angle, postselect: int = None
+    jax_ctx: mlir.LoweringRuleContext,
+    qubit: ir.Value,
+    angle: float,
+    plane: MeasurementPlane,
+    postselect: int = None,
 ):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
@@ -1279,7 +1287,7 @@ def _measure_in_basis_lowering(
         result_type,
         qubit.type,
         qubit,
-        plane=_measurement_plane_attribute(ctx, "XY"),  # FIXME: "XY" -> plane
+        plane=_measurement_plane_attribute(ctx, plane),
         angle=angle,
         postselect=postselect,
     ).results
