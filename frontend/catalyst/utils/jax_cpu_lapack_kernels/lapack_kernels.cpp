@@ -699,23 +699,20 @@ template <typename T> typename RealGees<T>::FnType *RealGees<T>::fn = nullptr;
 
 template <typename T> void RealGees<T>::Kernel(void *out_tuple, void **data, XlaCustomCallStatus *)
 {
-    const int b = *(reinterpret_cast<int32_t *>(data[0]));
-    const int n_int = *(reinterpret_cast<int32_t *>(data[1]));
+    const char jobvs = *(reinterpret_cast<uint8_t *>(data[0]));
+    const char sort = *(reinterpret_cast<uint8_t *>(data[1]));
+    const int b = *(reinterpret_cast<int32_t *>(data[2]));
+    const int n_int = *(reinterpret_cast<int32_t *>(data[4]));
     const int64_t n = n_int;
-    const char jobvs = *(reinterpret_cast<uint8_t *>(data[2]));
-    const char sort = *(reinterpret_cast<uint8_t *>(data[3]));
+    const T *a_in = reinterpret_cast<T *>(data[5]);
 
-    const T *a_in = reinterpret_cast<T *>(data[4]);
-
-    // bool* select (T, T) = reinterpret_cast<bool* (T, T)>(data[5]);
     bool (*select)(T, T) = nullptr;
 
     void **out = reinterpret_cast<void **>(out_tuple);
     T *a_out = reinterpret_cast<T *>(out[0]);
-
-    T *wr_out = reinterpret_cast<T *>(out[1]);
-    T *wi_out = reinterpret_cast<T *>(out[2]);
-    T *vs_out = reinterpret_cast<T *>(out[3]);
+    T *vs_out = reinterpret_cast<T *>(out[1]);
+    T *wr_out = reinterpret_cast<T *>(out[2]);
+    T *wi_out = reinterpret_cast<T *>(out[3]);
     int *sdim_out = reinterpret_cast<int *>(out[4]);
     int *info = reinterpret_cast<int *>(out[5]);
 
@@ -738,7 +735,7 @@ template <typename T> void RealGees<T>::Kernel(void *out_tuple, void **data, Xla
         ABSL_ANNOTATE_MEMORY_IS_INITIALIZED(wr_out, sizeof(T) * n);
         ABSL_ANNOTATE_MEMORY_IS_INITIALIZED(wi_out, sizeof(T) * n);
         ABSL_ANNOTATE_MEMORY_IS_INITIALIZED(vs_out, sizeof(T) * n * n);
-        ABSL_ANNOTATE_MEMORY_IS_INITIALIZED(info_out, sizeof(int));
+        ABSL_ANNOTATE_MEMORY_IS_INITIALIZED(info, sizeof(int));
 #endif
 
         a_in += n * n;
@@ -746,8 +743,8 @@ template <typename T> void RealGees<T>::Kernel(void *out_tuple, void **data, Xla
         wr_out += n;
         wi_out += n;
         vs_out += n * n;
-        ++sdim_out;
         ++info;
+        ++sdim_out;
     }
 }
 
@@ -756,24 +753,23 @@ template <typename T> typename ComplexGees<T>::FnType *ComplexGees<T>::fn = null
 template <typename T>
 void ComplexGees<T>::Kernel(void *out_tuple, void **data, XlaCustomCallStatus *)
 {
-    const int b = *(reinterpret_cast<int32_t *>(data[0]));
-    const int n_int = *(reinterpret_cast<int32_t *>(data[1]));
+    const char jobvs = *(reinterpret_cast<uint8_t *>(data[0]));
+    const char sort = *(reinterpret_cast<uint8_t *>(data[1]));
+    const int b = *(reinterpret_cast<int32_t *>(data[2]));
+    const int n_int = *(reinterpret_cast<int32_t *>(data[4]));
     const int64_t n = n_int;
-    const char jobvs = *(reinterpret_cast<uint8_t *>(data[2]));
-    const char sort = *(reinterpret_cast<uint8_t *>(data[3]));
 
-    const T *a_in = reinterpret_cast<T *>(data[4]);
+    const T *a_in = reinterpret_cast<T *>(data[5]);
 
     // bool* select (T, T) = reinterpret_cast<bool* (T, T)>(data[5]);
     bool (*select)(T) = nullptr;
 
     void **out = reinterpret_cast<void **>(out_tuple);
     T *a_out = reinterpret_cast<T *>(out[0]);
-    typename T::value_type *r_work = reinterpret_cast<typename T::value_type *>(out[1]);
+    T *vs_out = reinterpret_cast<T *>(out[1]);
     T *w_out = reinterpret_cast<T *>(out[2]);
-    T *vs_out = reinterpret_cast<T *>(out[3]);
-    int *sdim_out = reinterpret_cast<int *>(out[4]);
-    int *info = reinterpret_cast<int *>(out[5]);
+    int *sdim_out = reinterpret_cast<int *>(out[3]);
+    int *info = reinterpret_cast<int *>(out[4]);
 
     constexpr int corder = LAPACK_ROW_MAJOR;
 
