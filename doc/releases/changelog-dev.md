@@ -68,6 +68,11 @@
   [(#1663)](https://github.com/PennyLaneAI/catalyst/pull/1663)
   [(#1679)](https://github.com/PennyLaneAI/catalyst/pull/1679)
 
+* PennyLane's arbitrary-basis measurement operations, such as [`qml.ftqc.measure_arbitrary_basis()`
+  ](https://docs.pennylane.ai/en/stable/code/api/pennylane.ftqc.measure_arbitrary_basis.html), are
+  now QJIT-compatible with program capture enabled.
+  [(#1645)](https://github.com/PennyLaneAI/catalyst/pull/1645)
+
 * The utility function `EnsureFunctionDeclaration` is refactored into the `Utils` of the `Catalyst` dialect, instead of being duplicated in each individual dialect.
   [(#1683)](https://github.com/PennyLaneAI/catalyst/pull/1683)
 
