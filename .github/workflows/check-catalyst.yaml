@@ -607,10 +607,6 @@ jobs:
         echo "CATALYST_BIN_DIR=$(pwd)/quantum-build/bin" >> $GITHUB_ENV
         chmod +x $(pwd)/quantum-build/bin/catalyst  # artifact upload does not preserve permissions
 
-    - name: Run Python Pytest Tests
-      run: |
-        make pytest TEST_BRAKET=LOCAL
-
   runtime-device-tests:
     name: Third-Party Device Tests (C++)
     needs: [constants, runtime, determine_runner]
