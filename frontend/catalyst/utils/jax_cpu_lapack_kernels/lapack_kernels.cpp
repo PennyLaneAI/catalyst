@@ -296,7 +296,7 @@ template <typename T> void Potrf<T>::Kernel(void *out_tuple, void **data, XlaCus
     constexpr int corder = LAPACK_ROW_MAJOR;
 
     for (int i = 0; i < b; ++i) {
-        *info = fn(corder, uplo, n_col, a_out, n_row);
+        *info = fn(corder, uplo, n_col, a_out, n_col);
         a_out += static_cast<int64_t>(n_row) * static_cast<int64_t>(n_col);
         ++info;
     }
