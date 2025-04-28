@@ -478,6 +478,7 @@ jobs:
         echo "RUNTIME_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
         echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
         echo "OQC_LIB_DIR=$(pwd)/oqc-build" >> $GITHUB_ENV
+        echo "OQD_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
         echo "CATALYST_BIN_DIR=$(pwd)/quantum-build/bin" >> $GITHUB_ENV
         chmod +x $(pwd)/quantum-build/bin/catalyst  # artifact upload does not preserve permissions
 
@@ -488,7 +489,7 @@ jobs:
     - name: Run Python Pytest Tests
       run: |
         COVERAGE_REPORT="xml:coverage.xml -p no:warnings" \
-        make coverage-frontend
+        make coverage-frontend ENABLE_OQD=ON
         mv coverage.xml coverage-${{ github.job }}.xml
 
     - name: Upload to Codecov
