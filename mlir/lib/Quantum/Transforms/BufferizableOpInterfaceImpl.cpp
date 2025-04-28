@@ -27,6 +27,56 @@ using namespace catalyst::quantum;
 
 namespace {
 
+/// Bufferization of catalyst.quantum.probs. Replace with memref.alloc and a new
+/// catalyst.quantum.probs that uses the memory allocated by memref.alloc.
+struct ProbsOpInterface
+    : public bufferization::BufferizableOpInterface::ExternalModel<ProbsOpInterface, ProbsOp> {
+    bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
+                                const bufferization::AnalysisState &state) const
+    {
+        return false;
+    }
+
+    bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
+                                 const bufferization::AnalysisState &state) const
+    {
+        return false;
+    }
+
+    bufferization::AliasingValueList
+    getAliasingValues(Operation *op, OpOperand &opOperand,
+                      const bufferization::AnalysisState &state) const
+    {
+        return {};
+    }
+
+    LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
+                            const bufferization::BufferizationOptions &options) const
+    {
+        auto probsOp = cast<ProbsOp>(op);
+        Location loc = op->getLoc();
+        auto tensorType = cast<RankedTensorType>(probsOp.getProbabilities().getType());
+        MemRefType resultType = MemRefType::get(tensorType.getShape(), tensorType.getElementType());
+
+        Value buffer;
+        auto shape = cast<mlir::RankedTensorType>(tensorType).getShape();
+        if (shape[0] == ShapedType::kDynamic) {
+            auto indexCastOp = rewriter.create<index::CastSOp>(loc, rewriter.getIndexType(),
+                                                               probsOp.getDynamicShape());
+            buffer = rewriter.create<memref::AllocOp>(loc, resultType, ValueRange{indexCastOp});
+        }
+        else {
+            buffer = rewriter.create<memref::AllocOp>(loc, resultType);
+        }
+
+        auto allocedProbsOp =
+            rewriter.create<ProbsOp>(loc, TypeRange{}, ValueRange{probsOp.getObs(), buffer});
+        allocedProbsOp->setAttr("operandSegmentSizes", rewriter.getDenseI32ArrayAttr({1, 0, 1}));
+        bufferization::replaceOpWithBufferizedValues(rewriter, op, buffer);
+        return success();
+    }
+};
+
 /// Bufferization of catalyst.quantum.state. Replace with memref.alloc and a new
 /// catalyst.quantum.state that uses the memory allocated by memref.alloc.
 struct StateOpInterface
@@ -164,6 +214,7 @@ struct SetBasisStateOpInterface
 void catalyst::quantum::registerBufferizableOpInterfaceExternalModels(DialectRegistry &registry)
 {
     registry.addExtension(+[](MLIRContext *ctx, catalyst::quantum::QuantumDialect *dialect) {
+        ProbsOp::attachInterface<ProbsOpInterface>(*ctx);
         StateOp::attachInterface<StateOpInterface>(*ctx);
         SetStateOp::attachInterface<SetStateOpInterface>(*ctx);
         SetBasisStateOp::attachInterface<SetBasisStateOpInterface>(*ctx);
