@@ -20,41 +20,15 @@
 #include "Quantum/Transforms/BufferizableOpInterfaceImpl.h"
 
 using namespace mlir;
+using namespace mlir::bufferization;
 using namespace catalyst::quantum;
 
 namespace {
 
-/// Bufferization of tensor.extract. Replace with memref.load.
-// struct ExtractOpInterface
-//     : public mlir::bufferization::BufferizableOpInterface::ExternalModel<ExtractOpInterface,
-//                                                     catalyst::quantum::ExtractOp> {
-//   bool bufferizesToMemoryRead(mlir::Operation *op, mlir::OpOperand &opOperand,
-//                               const mlir::bufferization::AnalysisState &state) const {
-//     return true;
-//   }
-
-//   bool bufferizesToMemoryWrite(mlir::Operation *op, mlir::OpOperand &opOperand,
-//                                const mlir::bufferization::AnalysisState &state) const {
-//     return false;
-//   }
-
-//   mlir::bufferization::AliasingValueList getAliasingValues(mlir::Operation *op,
-//                                       mlir::OpOperand &opOperand,
-//                                       const mlir::bufferization::AnalysisState &state) const {
-//     return {};
-//   }
-
-//   LogicalResult bufferize(mlir::Operation *op, RewriterBase &rewriter,
-//                           const mlir::bufferization::BufferizationOptions &options) const {
-//     //auto extractOp = cast<catalyst::quantum::ExtractOp>(op);
-
-//     return success();
-//   }
-// };
-
 /// Bufferization of catalyst.quantum.set_state. Convert InState into memref.
-struct SetStateOpInterface : public mlir::bufferization::BufferizableOpInterface::ExternalModel<
-                                 SetStateOpInterface, catalyst::quantum::SetStateOp> {
+struct SetStateOpInterface
+    : public bufferization::BufferizableOpInterface::ExternalModel<SetStateOpInterface,
+                                                                   SetStateOp> {
     bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
                                 const bufferization::AnalysisState &state) const
     {
@@ -92,12 +66,53 @@ struct SetStateOpInterface : public mlir::bufferization::BufferizableOpInterface
     }
 };
 
+/// Bufferization of catalyst.quantum.set_basis_state. Convert BasisState into memref.
+struct SetBasisStateOpInterface
+    : public bufferization::BufferizableOpInterface::ExternalModel<SetBasisStateOpInterface,
+                                                                   SetBasisStateOp> {
+    bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
+                                const bufferization::AnalysisState &state) const
+    {
+        return true;
+    }
+
+    bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
+                                 const bufferization::AnalysisState &state) const
+    {
+        return false;
+    }
+
+    bufferization::AliasingValueList
+    getAliasingValues(Operation *op, OpOperand &opOperand,
+                      const bufferization::AnalysisState &state) const
+    {
+        return {};
+    }
+
+    LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
+                            const bufferization::BufferizationOptions &options) const
+    {
+        auto setBasisStateOp = cast<SetBasisStateOp>(op);
+        Location loc = op->getLoc();
+        auto tensorType = cast<RankedTensorType>(setBasisStateOp.getBasisState().getType());
+        MemRefType memrefType = MemRefType::get(tensorType.getShape(), tensorType.getElementType());
+
+        auto toMemrefOp = rewriter.create<bufferization::ToMemrefOp>(
+            loc, memrefType, setBasisStateOp.getBasisState());
+        auto memref = toMemrefOp.getResult();
+        auto newSetStateOp = rewriter.create<SetBasisStateOp>(
+            loc, setBasisStateOp.getOutQubits().getTypes(), memref, setBasisStateOp.getInQubits());
+        bufferization::replaceOpWithBufferizedValues(rewriter, op, newSetStateOp.getOutQubits());
+        return success();
+    }
+};
+
 } // namespace
 
 void catalyst::quantum::registerBufferizableOpInterfaceExternalModels(DialectRegistry &registry)
 {
     registry.addExtension(+[](MLIRContext *ctx, catalyst::quantum::QuantumDialect *dialect) {
-        // ExtractOp::attachInterface<ExtractOpInterface>(*ctx);
         SetStateOp::attachInterface<SetStateOpInterface>(*ctx);
+        SetBasisStateOp::attachInterface<SetBasisStateOpInterface>(*ctx);
     });
 }
