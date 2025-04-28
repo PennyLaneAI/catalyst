@@ -92,6 +92,7 @@ def test_measure_y():
     assert result == 0.0
 
 
+@pytest.mark.xfail(reason="qml.ftqc.measure_z is not yet supported with program capture")
 def test_measure_z():
     """Test the compilation of the qml.ftqc.measure_z function, which performs a mid-circuit
     measurement in the Pauli Z basis. Including for completeness; measure_z() dispatches directly to
