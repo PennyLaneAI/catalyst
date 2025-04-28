@@ -1246,7 +1246,6 @@ def _measure_in_basis_def_impl(
 
 
 def _measurement_plane_attribute(ctx, plane: MeasurementPlane):
-    # ctx = ctx.module_context.context
     return ir.OpaqueAttr.get(
         "mbqc",
         ("measurement_plane " + MeasurementPlane(plane).name).encode("utf-8"),
