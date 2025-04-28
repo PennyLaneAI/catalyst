@@ -812,19 +812,17 @@ template <typename T> typename Gehrd<T>::FnType *Gehrd<T>::fn = nullptr;
 
 template <typename T> void Gehrd<T>::Kernel(void *out_tuple, void **data, XlaCustomCallStatus *)
 {
-    const int32_t n = *reinterpret_cast<int32_t *>(data[0]);
+    const int32_t ihi = *reinterpret_cast<int32_t *>(data[0]);
     const int32_t ilo = *reinterpret_cast<int32_t *>(data[1]);
-    const int32_t ihi = *reinterpret_cast<int32_t *>(data[2]);
+    const int32_t batch = *reinterpret_cast<int32_t *>(data[2]);
     const int32_t lda = *reinterpret_cast<int32_t *>(data[3]);
-    const int32_t batch = *reinterpret_cast<int32_t *>(data[4]);
-    const int32_t lwork = *reinterpret_cast<int32_t *>(data[5]);
-    T *a = reinterpret_cast<T *>(data[6]);
+    const int32_t n = *reinterpret_cast<int32_t *>(data[4]);
+    T *a = reinterpret_cast<T *>(data[5]);
 
     void **out = reinterpret_cast<void **>(out_tuple);
     T *a_out = reinterpret_cast<T *>(out[0]);
     T *tau = reinterpret_cast<T *>(out[1]);
     int *info = reinterpret_cast<int *>(out[2]);
-    T *work = reinterpret_cast<T *>(out[3]);
 
     if (a_out != a) {
         std::memcpy(a_out, a,
