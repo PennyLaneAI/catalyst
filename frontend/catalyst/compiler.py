@@ -488,6 +488,7 @@ class Compiler:
         import xdsl
         from xdsl.context import Context
         from xdsl.dialects import arith, builtin, func, scf, tensor, transform
+        from .python_compiler import quantum 
         generic_assembly_format = mlir_module.operation.get_asm(binary=False, print_generic_op_form=True, assume_verified=True)
         ctx = Context(allow_unregistered=True)
         ctx.load_dialect(arith.Arith)
@@ -496,6 +497,7 @@ class Compiler:
         ctx.load_dialect(scf.Scf)
         ctx.load_dialect(tensor.Tensor)
         ctx.load_dialect(transform.Transform)
+        ctx.load_dialect(quantum.QuantumDialect)
         # TODO: In order of importance
         # TODO: Load quantum
         # TODO: Load gradient
@@ -504,7 +506,16 @@ class Compiler:
         # but it is likely worse than an unregistered dialect.
         # TODO: Load Catalyst
         # TODO: Load ion/ppm/mbqc/zne...
-        m = xdsl.parser.Parser(ctx, generic_assembly_format).parse_module()
+        mlir = """
+        func.func @foo(%arg0 : i64) -> () {
+          %0 = quantum.alloc(4) : !quantum.reg
+          %1 = quantum.alloc(%arg0) : !quantum.reg
+          return
+        }
+        """
+        m = xdsl.parser.Parser(ctx, mlir).parse_module()
+        breakpoint()
+        print(m)
         # TODO: transform the program based on the transform dialect
 
     @debug_logger
