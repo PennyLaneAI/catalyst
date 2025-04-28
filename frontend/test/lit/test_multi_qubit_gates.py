@@ -98,7 +98,7 @@ def get_custom_qjit_device(num_wires, discards, additions):
             system_extension = ".dylib" if platform.system() == "Darwin" else ".so"
             # Borrowing the NullQubit library:
             lib_path = (
-                get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_null_qubit"  system_extension
+                get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_null_qubit"  + system_extension
             )
             return "NullQubit", lib_path
 
