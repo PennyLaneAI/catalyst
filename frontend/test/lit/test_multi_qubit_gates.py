@@ -29,6 +29,7 @@ from catalyst.device import get_device_capabilities
 TEST_PATH = os.path.dirname(__file__)
 CONFIG_CUSTOM_DEVICE = pathlib.Path(f"{TEST_PATH}/../custom_device/custom_device.toml")
 
+
 # CHECK-LABEL: public @jit_circuit
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=5))
@@ -98,7 +99,7 @@ def get_custom_qjit_device(num_wires, discards, additions):
             system_extension = ".dylib" if platform.system() == "Darwin" else ".so"
             # Borrowing the NullQubit library:
             lib_path = (
-                get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_null_qubit"  + system_extension
+                get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_null_qubit" + system_extension
             )
             return "NullQubit", lib_path
 
@@ -107,6 +108,7 @@ def get_custom_qjit_device(num_wires, discards, additions):
             raise RuntimeError("No execution for the custom device")
 
     return CustomDevice(wires=num_wires)
+
 
 # CHECK-LABEL: public @jit_circuit
 @qjit(target="mlir")
