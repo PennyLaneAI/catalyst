@@ -15,15 +15,61 @@
 
 <h3>Breaking changes 💔</h3>
 
+* Catalyst has removed the `experimental_capture` keyword from the `qjit` decorator in favour of
+  unified behaviour with PennyLane.
+  [(#1657)](https://github.com/PennyLaneAI/catalyst/pull/1657)
+
+  Instead of enabling program capture with Catalyst via `qjit(experimental_capture=True)`, program capture
+  can be enabled via the global toggle `qml.capture.enable()`:
+  
+  ```python
+  import pennylane as qml
+  from catalyst import qjit
+
+  dev = qml.device("lightning.qubit", wires=2)
+
+  qml.capture.enable()
+
+  @qjit
+  @qml.qnode(dev)
+  def circuit(x):
+      qml.Hadamard(0)
+      qml.CNOT([0, 1])
+      return qml.expval(qml.Z(0))
+
+  circuit(0.1)
+  ```
+
+  Disabling program capture can be done with `qml.capture.disable()`.
+
+* The `ppr_to_ppm` pass has been renamed to `merge_ppr_ppm` (same functionality). A new `ppr_to_ppm` will handle direct decomposition of PPRs into PPMs.
+  [(#1688)](https://github.com/PennyLaneAI/catalyst/pull/1688)
+
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
+
+* Fix AutoGraph fallback for valid iteration targets with constant data but no length, for example
+  `itertools.product(range(2), repeat=2)`.
+  [(#1665)](https://github.com/PennyLaneAI/catalyst/pull/1665)
 
 * Catalyst now correctly supports `qml.StatePrep()` and `qml.BasisState()` operations in the
   experimental PennyLane program-capture pipeline.
   [(#1631)](https://github.com/PennyLaneAI/catalyst/pull/1631)
 
 <h3>Internal changes ⚙️</h3>
+
+* Stop overriding the `num_wires` property when the operator can exist on `AnyWires`. This allows the deprecation
+  of `WiresEnum` in pennylane.
+  [(#1667)](https://github.com/PennyLaneAI/catalyst/pull/1667)
+
+* Catalyst now includes an experimental `mbqc` dialect for representing measurement-based
+  quantum-computing protocols in MLIR.
+  [(#1663)](https://github.com/PennyLaneAI/catalyst/pull/1663)
+  [(#1679)](https://github.com/PennyLaneAI/catalyst/pull/1679)
+
+* The utility function `EnsureFunctionDeclaration` is refactored into the `Utils` of the `Catalyst` dialect, instead of being duplicated in each individual dialect.
+  [(#1683)](https://github.com/PennyLaneAI/catalyst/pull/1683)
 
 <h3>Documentation 📝</h3>
 
@@ -32,4 +78,8 @@
 This release contains contributions from (in alphabetical order):
 
 Joey Carter,
-Erick Ochoa Lopez.
+Sengthai Heng,
+David Ittah,
+Christina Lee,
+Erick Ochoa Lopez,
+Paul Haochen Wang.

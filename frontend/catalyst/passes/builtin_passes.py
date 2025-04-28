@@ -451,7 +451,7 @@ def commute_ppr(qnode):
     return PassPipelineWrapper(qnode, "commute_ppr")
 
 
-def ppr_to_ppm(qnode):
+def merge_ppr_ppm(qnode):
     R"""
     Specify that the MLIR compiler pass for absorbing Clifford Pauli
     Product Rotation (PPR) operations, :math:`\exp{iP\tfrac{\pi}{4}}`,
@@ -477,7 +477,7 @@ def ppr_to_ppm(qnode):
         import pennylane as qml
         from catalyst import qjit, measure
 
-        ppm_passes = [("PPM",["to_ppr", "commute_ppr","ppr_to_ppm",])]
+        ppm_passes = [("PPM",["to_ppr", "commute_ppr","merge_ppr_ppm",])]
 
         @qjit(pipelines=ppm_passes, keep_intermediate=True, target="mlir")
         @qml.qnode(qml.device("lightning.qubit", wires=1))
@@ -498,4 +498,4 @@ def ppr_to_ppm(qnode):
         . . .
 
     """
-    return PassPipelineWrapper(qnode, "ppr_to_ppm")
+    return PassPipelineWrapper(qnode, "merge_ppr_ppm")

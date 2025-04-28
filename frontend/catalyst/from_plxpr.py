@@ -24,7 +24,7 @@ import jax.numpy as jnp
 import pennylane as qml
 from jax.extend.linear_util import wrap_init
 from jax.interpreters.partial_eval import convert_constvars_jaxpr
-from pennylane.capture import PlxprInterpreter, disable, enable, enabled, qnode_prim
+from pennylane.capture import PlxprInterpreter, qnode_prim
 from pennylane.capture.expand_transforms import ExpandTransformsInterpreter
 from pennylane.capture.primitives import cond_prim as plxpr_cond_prim
 from pennylane.capture.primitives import for_loop_prim as plxpr_for_loop_prim
@@ -33,9 +33,7 @@ from pennylane.ops.functions.map_wires import _map_wires_transform as pl_map_wir
 from pennylane.transforms import cancel_inverses as pl_cancel_inverses
 from pennylane.transforms import commute_controlled as pl_commute_controlled
 from pennylane.transforms import decompose as pl_decompose
-from pennylane.transforms import (
-    merge_amplitude_embedding as pl_merge_amplitude_embedding,
-)
+from pennylane.transforms import merge_amplitude_embedding as pl_merge_amplitude_embedding
 from pennylane.transforms import merge_rotations as pl_merge_rotations
 from pennylane.transforms import single_qubit_fusion as pl_single_qubit_fusion
 from pennylane.transforms import unitary_to_rot as pl_unitary_to_rot
@@ -741,18 +739,9 @@ def trace_from_pennylane(fn, static_argnums, abstracted_axes, sig, kwargs):
             "abstracted_axes": abstracted_axes,
         }
 
-        if enabled():
-            capture_on = True
-        else:
-            capture_on = False
-            enable()
-
         args = sig
-        try:
-            plxpr, out_type, out_treedef = make_jaxpr2(fn, **make_jaxpr_kwargs)(*args, **kwargs)
-            jaxpr = from_plxpr(plxpr)(*args, **kwargs)
-        finally:
-            if not capture_on:
-                disable()
+
+        plxpr, out_type, out_treedef = make_jaxpr2(fn, **make_jaxpr_kwargs)(*args, **kwargs)
+        jaxpr = from_plxpr(plxpr)(*args, **kwargs)
 
     return jaxpr, out_type, out_treedef, sig

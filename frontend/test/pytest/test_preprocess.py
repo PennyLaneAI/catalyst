@@ -157,8 +157,6 @@ class TestDecomposition:
         class OpWithNoMatrix(qml.operation.Operation):
             """Op without matrix."""
 
-            num_wires = qml.operation.AnyWires
-
             def matrix(self, wire_order=None):
                 """Matrix is overriden."""
                 raise NotImplementedError()

@@ -25,6 +25,7 @@ import jax.numpy as jnp
 import pennylane as qml
 from jax.core import eval_jaxpr
 from jax.tree_util import tree_flatten, tree_unflatten
+from pennylane import exceptions
 from pennylane.measurements import (
     CountsMP,
     ExpectationMP,
@@ -205,7 +206,9 @@ def dynamic_one_shot(qnode, **kwargs):
 
     def transform_to_single_shot(qnode):
         if not qnode.device.shots:
-            raise qml.QuantumFunctionError("dynamic_one_shot is only supported with finite shots.")
+            raise exceptions.QuantumFunctionError(
+                "dynamic_one_shot is only supported with finite shots."
+            )
 
         @qml.transform
         def dynamic_one_shot_partial(
