@@ -71,7 +71,7 @@ def CommuteCliffordPastPPMPass : Pass<"merge_ppr_ppm"> {
     let constructor = "catalyst::createCommuteCliffordPastPPMPass()";
 }
 
-def DecomposeNonCliffordPPRToPPMPass : Pass<"decompose_non_clifford_ppr_to_ppm"> {
+def DecomposeNonCliffordPPRToPPMPass : Pass<"ppr_to_ppm"> {
     let summary = "Decompose non-Clifford PPRotation operations to set of Pauli Product Measurement operations.";
     
     let dependentDialects = [

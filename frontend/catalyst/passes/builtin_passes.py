@@ -499,3 +499,56 @@ def merge_ppr_ppm(qnode):
 
     """
     return PassPipelineWrapper(qnode, "merge_ppr_ppm")
+
+
+def ppr_to_ppm(qnode):
+    R"""Specify that the MLIR compiler pass for decomposing
+    non-Clifford Pauli Product Rotation (PPR) operation,
+    :math:`\exp{iP\tfrac{\pi}{8}}` into Pauli Pauli Measurement
+    will be applied using Auto-corrected :math:`\pi/8` rotation method.
+
+    Args:
+        fn (QNode): QNode to apply the pass to
+
+    Returns:
+        ~.QNode
+
+    **Example**
+
+    This example shows the sequence of passes that will be applied. The last pass
+    will convert the non-Clifford PPR into Pauli Product Measurements.
+
+    .. code-block:: python
+
+        import pennylane as qml
+        from catalyst import qjit, measure
+
+        ppm_passes = [("PPM", ["to_ppr", "commute_ppr", "merge_ppr_ppm", "ppr_to_ppm"])]
+
+        @qjit(pipelines=ppm_passes, keep_intermediate=True, target="mlir")
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def circuit():
+            qml.H(0)
+            qml.T(0)
+            qml.CNOT([0,1])
+            return measure(0), measure(1)
+
+        print(circuit.mlir_opt)
+
+    Example MLIR Representation:
+
+    .. code-block:: mlir
+
+        . . .
+        %5 = qec.prepare  zero %3 : !quantum.bit
+        %6 = qec.prepare  magic %4 : !quantum.bit
+        %mres, %out_qubits:2 = qec.ppm ["X", "Z"] %1, %6 : !quantum.bit, !quantum.bit
+        %mres_0, %out_qubits_1:2 = qec.ppm ["Z", "Y"] %5, %out_qubits#1 : !quantum.bit, !quantum.bit
+        %mres_2, %out_qubits_3 = qec.ppm ["X"] %out_qubits_1#1 : !quantum.bit
+        %mres_4, %out_qubits_5 = qec.select.ppm(%mres, ["X"], ["Z"]) %out_qubits_1#0 : !quantum.bit
+        %7 = arith.xori %mres_0, %mres_2 : i1
+        %8 = qec.ppr ["X"](2) %out_qubits#0 cond(%7) : !quantum.bit
+        . . .
+
+    """
+    return PassPipelineWrapper(qnode, "ppr_to_ppm")

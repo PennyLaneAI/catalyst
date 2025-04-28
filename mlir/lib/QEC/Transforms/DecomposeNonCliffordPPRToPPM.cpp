@@ -13,7 +13,7 @@
 // limitations under the License.
 
 #include <mlir/IR/Builders.h>
-#define DEBUG_TYPE "decompose_non_clifford_ppr_to_ppm"
+#define DEBUG_TYPE "ppr_to_ppm"
 #include <llvm/ADT/SmallVector.h>
 
 #include <mlir/Dialect/Arith/IR/Arith.h> // for arith::AndIOp and arith::ConstantOp

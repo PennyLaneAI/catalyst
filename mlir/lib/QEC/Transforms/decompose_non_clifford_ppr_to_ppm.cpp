@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#define DEBUG_TYPE "decompose_non_clifford_ppr_to_ppm"
+#define DEBUG_TYPE "ppr_to_ppm"
 #include "llvm/Support/Debug.h"
 
 #include "mlir/IR/PatternMatch.h"
