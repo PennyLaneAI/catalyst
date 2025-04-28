@@ -1021,7 +1021,6 @@ class TestSqrtm:
         assert jnp.allclose(sqrtmA_obs, sqrtmA_exp)
 
 
-@pytest.mark.skip(reason="lapack symbols undefined, WIP")
 class TestSVD:
     """Test results of jax.scipy.linalg.svd are numerically correct when qjit compiled.
 
