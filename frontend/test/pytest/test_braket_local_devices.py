@@ -23,9 +23,9 @@ from catalyst import grad, qjit
 
 try:
     qml.device("braket.local.qubit", backend="default", wires=1)
-except exceptions.DeviceError:
+except:
     pytest.skip(
-        "skipping Braket local tests because ``amazon-braket-pennylane-plugin`` is not installed",
+        "skipping Braket local tests because ``amazon-braket-pennylane-plugin`` is not working",
         allow_module_level=True,
     )
 
