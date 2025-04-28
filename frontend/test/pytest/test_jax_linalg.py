@@ -24,7 +24,6 @@ from catalyst import qjit
 # pylint: disable=too-many-lines
 
 
-@pytest.mark.skip(reason="lapack symbols undefined, WIP")
 class MatrixGenerator:
     """
     A class for generating random matrices.
@@ -471,7 +470,6 @@ class TestExpm:
         assert np.allclose(expmA_obs, expmA_exp)
 
 
-@pytest.mark.skip(reason="lapack symbols undefined, WIP")
 class TestFunmNumerical:
     """Test results of jax.scipy.linalg.funm are numerically correct when qjit compiled.
 
