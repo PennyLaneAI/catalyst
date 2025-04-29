@@ -70,6 +70,48 @@ struct QubitUnitaryOpInterface
     }
 };
 
+// Bufferization of quantum.hermitian.
+// Convert Matrix into memref.
+struct HermitianOpInterface
+    : public bufferization::BufferizableOpInterface::ExternalModel<HermitianOpInterface,
+                                                                   HermitianOp> {
+    bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
+                                const bufferization::AnalysisState &state) const
+    {
+        return true;
+    }
+
+    bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
+                                 const bufferization::AnalysisState &state) const
+    {
+        return false;
+    }
+
+    bufferization::AliasingValueList
+    getAliasingValues(Operation *op, OpOperand &opOperand,
+                      const bufferization::AnalysisState &state) const
+    {
+        return {};
+    }
+
+    LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
+                            const bufferization::BufferizationOptions &options) const
+    {
+        auto hermitianOp = cast<HermitianOp>(op);
+        Location loc = op->getLoc();
+        auto tensorType = cast<RankedTensorType>(hermitianOp.getMatrix().getType());
+        MemRefType memrefType = MemRefType::get(tensorType.getShape(), tensorType.getElementType());
+        auto toMemrefOp =
+            rewriter.create<bufferization::ToMemrefOp>(loc, memrefType, hermitianOp.getMatrix());
+        auto memref = toMemrefOp.getResult();
+        auto newHermitianOp = rewriter.create<HermitianOp>(loc, hermitianOp.getType(), memref,
+                                                           hermitianOp.getQubits());
+        bufferization::replaceOpWithBufferizedValues(rewriter, op, newHermitianOp.getObs());
+
+        return success();
+    }
+};
+
 // Bufferization of quantum.sample.
 // Result tensor of quantum.sample is bufferized with a corresponding memref.alloc.
 // Users of the result tensor are updated to use the new memref.
@@ -368,6 +410,7 @@ void catalyst::quantum::registerBufferizableOpInterfaceExternalModels(DialectReg
 {
     registry.addExtension(+[](MLIRContext *ctx, catalyst::quantum::QuantumDialect *dialect) {
         QubitUnitaryOp::attachInterface<QubitUnitaryOpInterface>(*ctx);
+        HermitianOp::attachInterface<HermitianOpInterface>(*ctx);
         SampleOp::attachInterface<SampleOpInterface>(*ctx);
         CountsOp::attachInterface<CountsOpInterface>(*ctx);
         ProbsOp::attachInterface<ProbsOpInterface>(*ctx);

@@ -24,6 +24,16 @@ func.func @qubit_unitary(%q0: !quantum.bit, %matrix: tensor<2x2xcomplex<f64>>) {
 
 // -----
 
+func.func @hermitian(%q0: !quantum.bit, %matrix: tensor<2x2xcomplex<f64>>) {
+    // CHECK: [[memref:%.+]] = bufferization.to_memref %arg1 : memref<2x2xcomplex<f64>>
+    // CHECK: {{%.+}} = quantum.hermitian([[memref]] : memref<2x2xcomplex<f64>>) %arg0 : !quantum.obs
+    %obs = quantum.hermitian(%matrix : tensor<2x2xcomplex<f64>>) %q0 : !quantum.obs
+
+    func.return
+}
+
+// -----
+
 //////////////////
 // Measurements //
 //////////////////
