@@ -462,7 +462,7 @@ class HybridOp(Operator):
         self.expansion_strategy = expansion_strategy
         self.apply_reverse_transform = apply_reverse_transform
         self.debug_info = debug_info
-        super().__init__(wires=Wires(HybridOp.num_wires))
+        super().__init__(wires=Wires(()))
 
     def __repr__(self):
         """Constructor-call-like representation."""
