@@ -79,7 +79,6 @@ void createBufferizationPipeline(OpPassManager &pm)
     pm.addPass(catalyst::createCatalystBufferizationPass());
     pm.addNestedPass<mlir::func::FuncOp>(mlir::createLinalgBufferizePass());
     pm.addNestedPass<mlir::func::FuncOp>(mlir::tensor::createTensorBufferizePass());
-    pm.addPass(catalyst::createQuantumBufferizationPass());
     pm.addPass(mlir::func::createFuncBufferizePass());
     pm.addNestedPass<mlir::func::FuncOp>(mlir::bufferization::createFinalizingBufferizePass());
     pm.addPass(mlir::createCanonicalizerPass());
