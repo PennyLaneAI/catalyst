@@ -825,7 +825,7 @@ def MeasureOp : Quantum_Op<"measure"> {
     );
 
     let assemblyFormat = [{
-        $in_qubit attr-dict `:` type(results)
+        $in_qubit (`postselect` $postselect^)? attr-dict `:` type(results)
     }];
 }
 
