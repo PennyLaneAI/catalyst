@@ -321,7 +321,6 @@ class TestCompilerState:
         assert stack_trace_pattern in e.value.args[0]
 
 
-@pytest.mark.skip("lapack symbols undefined, WIP")
 class TestCustomCall:
     """Test compilation of `lapack_dsyevd` via lowering to `stablehlo.custom_call`."""
 
