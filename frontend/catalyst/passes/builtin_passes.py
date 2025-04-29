@@ -518,13 +518,14 @@ def ppr_to_ppm(qnode=None, decompose_method="auto-corrected", prepare_state="zer
 
     Args:
         qnode (QNode, optional): QNode to apply the pass to. If None, returns a decorator.
-        decompose_method (str, optional): The method to use for decomposing non-Clifford PPR operations.
+        decompose_method (str, optional): The method to use for decomposing non-Clifford PPR.
             Options are "auto-corrected" and "inject-magic-state". Defaults to "auto-corrected".
-        prepare_state (str, optional): The state to prepare for decomposing Clifford PPR operations.
+        prepare_state (str, optional): The state to prepare for decomposing Clifford PPR.
             Options are "zero" and "plus_i". Defaults to "zero".
 
     Returns:
-        ~.QNode or callable: Returns decorated QNode if qnode is provided, otherwise returns a decorator.
+        ~.QNode or callable: Returns decorated QNode if qnode is provided,
+            otherwise returns a decorator.
 
     **Example**
 
