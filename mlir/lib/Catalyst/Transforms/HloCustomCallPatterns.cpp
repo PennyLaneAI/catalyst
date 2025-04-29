@@ -98,8 +98,7 @@ struct HloCustomCallLoweringPattern : public mlir::OpRewritePattern<mhlo::Custom
                     auto rank = shape.size();
 
                     // Add batch count and matrix dimensions as new operands
-                    if (rank < 1 ||
-                        llvm::any_of(shape, [](int64_t d) { return d == ShapedType::kDynamic; })) {
+                    if (llvm::any_of(shape, [](int64_t d) { return d == ShapedType::kDynamic; })) {
                         return failure(); // Bail out on dynamic shapes
                     }
 
