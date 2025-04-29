@@ -18,8 +18,15 @@ import numpy as np
 import pennylane as qml
 import pytest
 
-from catalyst import pipeline, qjit
-from catalyst.passes import cancel_inverses, merge_rotations, to_ppr
+from catalyst import measure, pipeline, qjit
+from catalyst.passes import (
+    cancel_inverses,
+    commute_ppr,
+    merge_ppr_ppm,
+    merge_rotations,
+    ppr_to_ppm,
+    to_ppr,
+)
 
 # pylint: disable=missing-function-docstring
 
@@ -223,6 +230,115 @@ def test_convert_clifford_to_ppr():
 
 test_convert_clifford_to_ppr()
 
+#
+# commute_ppr
+#
+
+
+def test_commute_ppr():
+    """
+    Test commute_ppr
+    """
+    pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+
+    @qjit(pipelines=pipe, target="mlir")
+    def test_commute_ppr_workflow():
+
+        @to_ppr
+        @commute_ppr
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def f():
+            qml.H(0)
+            qml.S(1)
+            qml.T(0)
+            qml.CNOT([0, 1])
+            return measure(0), measure(1)
+
+        return f()
+
+    assert 'transform.apply_registered_pass "commute_ppr"' in test_commute_ppr_workflow.mlir
+    optimized_ir = test_commute_ppr_workflow.mlir_opt
+    assert 'transform.apply_registered_pass "commute_ppr"' not in optimized_ir
+    assert "qec.ppr" in optimized_ir
+    assert "qec.ppm" in optimized_ir
+
+
+test_commute_ppr()
+
+#
+# merge_ppr_ppm
+#
+
+
+def test_merge_ppr_ppm():
+    """
+    Test merge_ppr_ppm
+    """
+    pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+
+    @qjit(pipelines=pipe, target="mlir")
+    def test_merge_ppr_ppm_workflow():
+
+        @to_ppr
+        @commute_ppr
+        @merge_ppr_ppm
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def f():
+            qml.H(0)
+            qml.S(1)
+            qml.T(0)
+            qml.CNOT([0, 1])
+            return measure(0), measure(1)
+
+        return f()
+
+    assert 'transform.apply_registered_pass "merge_ppr_ppm"' in test_merge_ppr_ppm_workflow.mlir
+    optimized_ir = test_merge_ppr_ppm_workflow.mlir_opt
+    assert 'transform.apply_registered_pass "merge_ppr_ppm"' not in optimized_ir
+    assert 'qec.ppm ["Z", "X"]' in optimized_ir
+    assert 'qec.ppm ["X"]' in optimized_ir
+
+
+test_merge_ppr_ppm()
+
+#
+# ppr_to_ppm
+#
+
+
+def test_ppr_to_ppm():
+    """
+    Test ppr_to_ppm
+    """
+    pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+
+    @qjit(pipelines=pipe, target="mlir")
+    def test_ppr_to_ppm_workflow():
+
+        @to_ppr
+        @commute_ppr
+        @merge_ppr_ppm
+        @ppr_to_ppm
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def f():
+            qml.H(0)
+            qml.S(1)
+            qml.T(0)
+            qml.CNOT([0, 1])
+            return measure(0), measure(1)
+
+        return f()
+
+    assert 'transform.apply_registered_pass "ppr_to_ppm"' in test_ppr_to_ppm_workflow.mlir
+    optimized_ir = test_ppr_to_ppm_workflow.mlir_opt
+    assert 'transform.apply_registered_pass "ppr_to_ppm"' not in optimized_ir
+    assert "qec.prepare  zero" in optimized_ir
+    assert "qec.prepare  magic" in optimized_ir
+    assert "qec.select.ppm" in optimized_ir
+    assert 'qec.ppr ["X"]' in optimized_ir
+
+
+test_ppr_to_ppm()
 
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
