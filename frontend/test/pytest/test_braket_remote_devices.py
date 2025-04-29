@@ -29,7 +29,10 @@ try:
     )
 except Exception as e:
     # To capture all exceptions associated with AWS credentials or PL plugins
-    pytestmark = pytest.mark.skip(f"skipping Braket remote tests because {e}")
+    pytest.skip(
+        f"skipping Braket remote tests because {e}",
+        allow_module_level=True,
+    )
 
 
 @pytest.mark.braketremote
