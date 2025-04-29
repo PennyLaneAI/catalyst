@@ -82,12 +82,12 @@ def DeviceInitOp : Quantum_Op<"device"> {
     let arguments = (ins
         Optional<I64>:$shots,
         StrAttr:$lib,
-        StrAttr:$name,
+        StrAttr:$dev_name,
         StrAttr:$kwargs
     );
 
     let assemblyFormat = [{
-      (`shots` `(` $shots^ `)`)? `[` $lib `,` $name `,` $kwargs `]` attr-dict
+      (`shots` `(` $shots^ `)`)? `[` $lib `,` $dev_name `,` $kwargs `]` attr-dict
     }];
 
 }
@@ -663,11 +663,11 @@ def YieldOp : Quantum_Op<"yield", [Pure, ReturnLike, Terminator, ParentOneOf<["A
     let summary = "Return results from quantum program regions";
 
     let arguments = (ins
-        Variadic<QuregType>:$results
+        Variadic<QuregType>:$retvals
     );
 
     let assemblyFormat = [{
-        attr-dict ($results^ `:` type($results))?
+        attr-dict ($retvals ^ `:` type($retvals))?
     }];
 
     let builders = [
