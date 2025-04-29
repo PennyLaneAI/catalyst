@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#define DEBUG_TYPE "ppr_to_ppm"
+#define DEBUG_TYPE "decompose_non_clifford_ppr"
+
 #include "llvm/Support/Debug.h"
 
 #include "mlir/IR/PatternMatch.h"
@@ -29,19 +30,19 @@ using namespace catalyst::qec;
 
 namespace catalyst {
 namespace qec {
-#define GEN_PASS_DEF_DECOMPOSENONCLIFFORDPPRTOPPMPASS
-#define GEN_PASS_DECL_DECOMPOSENONCLIFFORDPPRTOPPMPASS
+#define GEN_PASS_DEF_DECOMPOSENONCLIFFORDPPRPASS
+#define GEN_PASS_DECL_DECOMPOSENONCLIFFORDPPRPASS
 #include "QEC/Transforms/Passes.h.inc"
 
-struct DecomposeNonCliffordPPRToPPMPass
-    : public impl::DecomposeNonCliffordPPRToPPMPassBase<DecomposeNonCliffordPPRToPPMPass> {
-    using DecomposeNonCliffordPPRToPPMPassBase::DecomposeNonCliffordPPRToPPMPassBase;
+struct DecomposeNonCliffordPPRPass
+    : public impl::DecomposeNonCliffordPPRPassBase<DecomposeNonCliffordPPRPass> {
+    using DecomposeNonCliffordPPRPassBase::DecomposeNonCliffordPPRPassBase;
 
     void runOnOperation() final
     {
         RewritePatternSet patterns(&getContext());
 
-        populateDecomposeNonCliffordPPRToPPMPatterns(patterns, decomposeMethod);
+        populateDecomposeNonCliffordPPRPatterns(patterns, decomposeMethod);
 
         if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
             return signalPassFailure();
@@ -51,9 +52,9 @@ struct DecomposeNonCliffordPPRToPPMPass
 
 } // namespace qec
 
-std::unique_ptr<Pass> createDecomposeNonCliffordPPRToPPMPass()
+std::unique_ptr<Pass> createDecomposeNonCliffordPPRPass()
 {
-    return std::make_unique<DecomposeNonCliffordPPRToPPMPass>();
+    return std::make_unique<DecomposeNonCliffordPPRPass>();
 }
 
 } // namespace catalyst

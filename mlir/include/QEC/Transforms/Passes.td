@@ -61,6 +61,19 @@ def DecomposeMethodOption : Option<
                     "Decompose by injecting magic states method.")
     )}]>;
 
+def PrepareStateOption : Option<
+    /*C++ var name=*/"prepareState",
+    /*CLI arg name=*/"prep-state",
+    /*type=*/"::catalyst::qec::LogicalInitKind",
+    /*default=*/"::catalyst::qec::LogicalInitKind::zero",
+    "Initial state of logical qubit", 
+    [{::llvm::cl::values(
+        clEnumValN(::catalyst::qec::LogicalInitKind::zero,
+                    "zero", "Initial state is |0⟩."),
+        clEnumValN(::catalyst::qec::LogicalInitKind::plus_i,
+                    "plus_i", "Initial state is |+i⟩.")
+    )}]>;
+
 def CommuteCliffordPastPPMPass : Pass<"merge_ppr_ppm"> {
     let summary = "Absorb Clifford operations into Pauli Product Measurement operations.";
     
@@ -71,16 +84,28 @@ def CommuteCliffordPastPPMPass : Pass<"merge_ppr_ppm"> {
     let constructor = "catalyst::createCommuteCliffordPastPPMPass()";
 }
 
-def DecomposeNonCliffordPPRToPPMPass : Pass<"ppr_to_ppm"> {
+def DecomposeNonCliffordPPRPass : Pass<"decompose_non_clifford_ppr"> {
     let summary = "Decompose non-Clifford PPRotation operations to set of Pauli Product Measurement operations.";
     
     let dependentDialects = [
         "catalyst::qec::QECDialect",
     ];
 
-    let constructor = "catalyst::createDecomposeNonCliffordPPRToPPMPass()";
+    let constructor = "catalyst::createDecomposeNonCliffordPPRPass()";
 
     let options = [DecomposeMethodOption];
+}
+
+def DecomposeCliffordPPRPass : Pass<"decompose_clifford_ppr"> {
+    let summary = "Decompose Clifford PPRotation operations to set of Pauli Product Measurement operations.";
+    
+    let dependentDialects = [
+        "catalyst::qec::QECDialect",
+    ];
+
+    let options = [PrepareStateOption];
+
+    let constructor = "catalyst::createDecomposeCliffordPPRPass()";
 }
 
 #endif // QEC_PASSES

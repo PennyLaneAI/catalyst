@@ -501,17 +501,30 @@ def merge_ppr_ppm(qnode):
     return PassPipelineWrapper(qnode, "merge_ppr_ppm")
 
 
-def ppr_to_ppm(qnode):
+def ppr_to_ppm(qnode=None, decompose_method="auto-corrected", prepare_state="zero"):
     R"""Specify that the MLIR compiler pass for decomposing
     non-Clifford Pauli Product Rotation (PPR) operation,
     :math:`\exp{iP\tfrac{\pi}{8}}` into Pauli Pauli Measurement
     will be applied using Auto-corrected :math:`\pi/8` rotation method.
 
+    .. note::
+
+        This pass is used to decompose both non-Clifford and Clifford PPRs into
+        Pauli Product Measurements. The non-Clifford PPRs are decomposed first and then
+        Clifford PPRs are decomposed. The ``decompose_method`` argument has two options:
+        "auto-corrected" and "inject-magic-state". Both methods are based on the paper
+        `"Game of surface code" <https://arxiv.org/abs/1808.02892>` from Figure 17(b) and 7,
+        respectively.
+
     Args:
-        fn (QNode): QNode to apply the pass to
+        qnode (QNode, optional): QNode to apply the pass to. If None, returns a decorator.
+        decompose_method (str, optional): The method to use for decomposing non-Clifford PPR operations.
+            Options are "auto-corrected" and "inject-magic-state". Defaults to "auto-corrected".
+        prepare_state (str, optional): The state to prepare for decomposing Clifford PPR operations.
+            Options are "zero" and "plus_i". Defaults to "zero".
 
     Returns:
-        ~.QNode
+        ~.QNode or callable: Returns decorated QNode if qnode is provided, otherwise returns a decorator.
 
     **Example**
 
@@ -522,15 +535,20 @@ def ppr_to_ppm(qnode):
 
         import pennylane as qml
         from catalyst import qjit, measure
+        from catalyst.passes import to_ppr, commute_ppr, merge_ppr_ppm, ppr_to_ppm
 
-        ppm_passes = [("PPM", ["to_ppr", "commute_ppr", "merge_ppr_ppm", "ppr_to_ppm"])]
+        pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]
 
-        @qjit(pipelines=ppm_passes, keep_intermediate=True, target="mlir")
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        @qjit(pipelines=pipeline, target="mlir")
+        @to_ppr
+        @commute_ppr
+        @merge_ppr_ppm
+        @ppr_to_ppm
+        @qml.qnode(qml.device("null.qubit", wires=2))
         def circuit():
             qml.H(0)
             qml.T(0)
-            qml.CNOT([0,1])
+            qml.CNOT([0, 1])
             return measure(0), measure(1)
 
         print(circuit.mlir_opt)
@@ -551,4 +569,14 @@ def ppr_to_ppm(qnode):
         . . .
 
     """
-    return PassPipelineWrapper(qnode, "ppr_to_ppm")
+    passes = {
+        "decompose_non_clifford_ppr": {"decompose-method": decompose_method},
+        "decompose_clifford_ppr": {"prep-state": prepare_state},
+    }
+
+    def decorator(qnode_func):
+        return PassPipelineWrapper(qnode_func, passes)
+
+    if qnode is None:
+        return decorator
+    return decorator(qnode)

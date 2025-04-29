@@ -19,13 +19,16 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/DialectConversion.h"
 
+#include "QEC/IR/QECDialect.h"
+
 namespace catalyst {
 namespace qec {
 
 void populateCliffordTToPPRPatterns(mlir::RewritePatternSet &);
 void populateCommuteCliffordTPPRPatterns(mlir::RewritePatternSet &);
 void populateCommuteCliffordPastPPMPatterns(mlir::RewritePatternSet &);
-void populateDecomposeNonCliffordPPRToPPMPatterns(mlir::RewritePatternSet &, DecompositionMethod);
+void populateDecomposeNonCliffordPPRPatterns(mlir::RewritePatternSet &, DecompositionMethod);
+void populateDecomposeCliffordPPRPatterns(mlir::RewritePatternSet &, LogicalInitKind);
 
 } // namespace qec
 } // namespace catalyst

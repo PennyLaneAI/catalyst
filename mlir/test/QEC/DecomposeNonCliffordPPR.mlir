@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt --pass-pipeline="builtin.module(ppr_to_ppm{decompose-method=inject-magic-state})" --split-input-file -verify-diagnostics %s | FileCheck %s --check-prefix=CHECK-INJECT
-// RUN: quantum-opt --pass-pipeline="builtin.module(ppr_to_ppm{decompose-method=auto-corrected})" --split-input-file -verify-diagnostics %s | FileCheck %s --check-prefix=CHECK-AUTO
+// RUN: quantum-opt --pass-pipeline="builtin.module(decompose_non_clifford_ppr{decompose-method=inject-magic-state})" --split-input-file -verify-diagnostics %s | FileCheck %s --check-prefix=CHECK-INJECT
+// RUN: quantum-opt --pass-pipeline="builtin.module(decompose_non_clifford_ppr{decompose-method=auto-corrected})" --split-input-file -verify-diagnostics %s | FileCheck %s --check-prefix=CHECK-AUTO
 
 func.func @test_ppr_to_ppm(%q1 : !quantum.bit) {
     %0 = qec.ppr ["Z"](8) %q1 : !quantum.bit
@@ -29,7 +29,7 @@ func.func @test_ppr_to_ppm(%q1 : !quantum.bit) {
 // PPM X on |m⟩ => m1
 // PPR[Z](2) on Q if cond(m1) is true
 
-// CHECK-INJECT: [[n_qubit:%.+]] = arith.constant 2 : i64
+// CHECK-INJECT: [[n_qubit:%.+]] = arith.constant 1 : i64
 // CHECK-INJECT: [[reg:%.+]] = quantum.alloc([[n_qubit]]) : !quantum.reg
 // CHECK-INJECT: [[ext_0:%.+]] = quantum.extract [[reg]][ 0] : !quantum.reg -> !quantum.bit
 
@@ -40,14 +40,7 @@ func.func @test_ppr_to_ppm(%q1 : !quantum.bit) {
 // CHECK-INJECT: [[m_0:%.+]], [[out_0:%.+]]:2 = qec.ppm ["Z", "Z"] %arg0, [[magic]] : !quantum.bit, !quantum.bit
 
 // // PPR[Z](4) on Q if cond(m0) is true
-// // START DECOMPOSE: [[q0:%.+]] = qec.ppr ["Z"](4) [[out_0]]#0 cond([[m_0]]) : !quantum.bit
-// CHECK-INJECT: [[zero:%.+]] = quantum.extract [[reg]][ 1] : !quantum.reg -> !quantum.bit
-// CHECK-INJECT: [[zero_0:%.+]] = qec.prepare  zero [[zero]] : !quantum.bit
-// CHECK-INJECT: [[mres_0:%.+]], [[ppmZY:%.+]]:2 = qec.ppm ["Z", "Y"](-1) [[out_0]]#0, [[zero_0]] cond([[m_0]]) : !quantum.bit, !quantum.bit
-// CHECK-INJECT: [[mres_2:%.+]], [[ppmX:%.+]] = qec.ppm ["X"] [[ppmZY]]#1 cond([[m_0]]) : !quantum.bit
-// CHECK-INJECT: [[cond:%.+]] = arith.xori [[mres_0]], [[mres_2]] : i1
-// CHECK-INJECT: [[q0:%.+]]  = qec.ppr ["Z"](2) [[ppmZY]]#0 cond([[cond]]) : !quantum.bit
-// // END DECOMPOSE
+// CHECK-INJECT: [[q0:%.+]] = qec.ppr ["Z"](4) [[out_0]]#0 cond([[m_0]]) : !quantum.bit
 
 // // PPM X on |m⟩ => m1
 // CHECK-INJECT: [[m_1:%.+]], [[out_1:%.+]] = qec.ppm ["X"] [[out_0]]#1 : !quantum.bit
@@ -117,11 +110,7 @@ func.func @test_ppr_to_ppm_2(%q1 : !quantum.bit, %q2 : !quantum.bit, %q3 : !quan
     // // P = ["X", "Y", "Z", "Y"]
     // // PPM P⊗Z on Q and |m⟩   => m0
     // CHECK-INJECT: qec.ppm ["X", "Y", "Z", "Y", "Z"]
-    // // START DECOMPOSE: qec.ppr ["X", "Y", "Z", "Y"](4) {{.*}} cond({{.*}})
-    // CHECK-INJECT: qec.ppm ["X", "Y", "Z", "Y", "Y"](-1) {{.*}} cond({{.*}})
-    // CHECK-INJECT: qec.ppm ["X"] {{.*}} cond({{.*}})
-    // CHECK-INJECT: qec.ppr ["X", "Y", "Z", "Y"](2) {{.*}} cond({{.*}})
-    // // END DECOMPOSE
+    // CHECK-INJECT: qec.ppr ["X", "Y", "Z", "Y"](4) {{.*}} cond({{.*}})
     // CHECK-INJECT: qec.ppm ["X"]
     // CHECK-INJECT: qec.ppr ["X", "Y", "Z", "Y"](2) {{.*}} cond({{.*}})
 
@@ -178,20 +167,13 @@ func.func public @game_of_surface_code(%arg0: !quantum.bit, %arg1: !quantum.bit,
     // // PPR ["Z"](8) Q0 
     
     // CHECK-INJECT: [[Q0:%.+]]: !quantum.bit, [[Q1:%.+]]: !quantum.bit, [[Q2:%.+]]: !quantum.bit, [[Q3:%.+]]: !quantum.bit) {
-    // CHECK-INJECT: [[one:%.+]]    = arith.constant 2 : i64
+    // CHECK-INJECT: [[one:%.+]]    = arith.constant 1 : i64
     // CHECK-INJECT: [[q0:%.+]]     = quantum.alloc([[one]]) : !quantum.reg
     // CHECK-INJECT: [[q1:%.+]]     = quantum.extract [[q0]][ 0] : !quantum.reg -> !quantum.bit
     // CHECK-INJECT: [[q2:%.+]]     = qec.prepare  magic [[q1]] : !quantum.bit
     // CHECK-INJECT: [[M:%.+]], [[out:%.+]]:2 = qec.ppm ["Z", "Z"] [[Q0]], [[q2]] : !quantum.bit, !quantum.bit
 
-    // // START DECOMPOSE: [[q3:%.+]]  = qec.ppr ["Z"](4) [[out]]#0 cond([[M]]) : !quantum.bit
-    // CHECK-INJECT: [[d0_zero:%.+]] = quantum.extract [[q0]][ 1] : !quantum.reg -> !quantum.bit
-    // CHECK-INJECT: [[d0_zero_0:%.+]] = qec.prepare  zero [[d0_zero]] : !quantum.bit
-    // CHECK-INJECT: [[d0_m1:%.+]], [[d0_ppmZY:%.+]]:2 = qec.ppm ["Z", "Y"](-1) [[out]]#0, [[d0_zero_0]] cond([[M]]) : !quantum.bit, !quantum.bit
-    // CHECK-INJECT: [[d0_m2:%.+]], [[d0_ppmX:%.+]] = qec.ppm ["X"] [[d0_ppmZY]]#1 cond([[M]]) : !quantum.bit
-    // CHECK-INJECT: [[d0_cond:%.+]] = arith.xori [[d0_m1]], [[d0_m2]] : i1
-    // CHECK-INJECT: [[q3:%.+]]  = qec.ppr ["Z"](2) [[d0_ppmZY]]#0 cond([[d0_cond]]) : !quantum.bit
-    // // END DECOMPOSE
+    // CHECK-INJECT: [[q3:%.+]]  = qec.ppr ["Z"](4) [[out]]#0 cond([[M]]) : !quantum.bit
 
     // CHECK-INJECT: [[M1:%.+]], [[out_0:%.+]] = qec.ppm ["X"] [[out]]#1 : !quantum.bit
     // CHECK-INJECT: [[q4:%.+]]     = qec.ppr ["Z"](2) [[q3]] cond([[M1]]) : !quantum.bit
@@ -204,14 +186,7 @@ func.func public @game_of_surface_code(%arg0: !quantum.bit, %arg1: !quantum.bit,
     // CHECK-INJECT: [[q6:%.+]]     = quantum.extract [[q5]][ 0] : !quantum.reg -> !quantum.bit
     // CHECK-INJECT: [[q7:%.+]]     = qec.prepare  magic_conj [[q6]] : !quantum.bit
     // CHECK-INJECT: [[mres_0:%.+]], [[out:%.+]]:2 = qec.ppm ["Y", "Z"] [[Q3]], [[q7]] : !quantum.bit, !quantum.bit
-    // // START DECOMPOSE: [[q8:%.+]]     = qec.ppr ["Y"](4) [[out]]#0 cond([[mres_0]]) : !quantum.bit
-    // CHECK-INJECT: [[d0_zero:%.+]] = quantum.extract [[q5]][ 1] : !quantum.reg -> !quantum.bit
-    // CHECK-INJECT: [[d0_zero_0:%.+]] = qec.prepare  zero [[d0_zero]] : !quantum.bit
-    // CHECK-INJECT: [[d0_m1:%.+]], [[d0_ppmZY:%.+]]:2 = qec.ppm ["Y", "Y"](-1) [[out]]#0, [[d0_zero_0]] cond([[mres_0]]) : !quantum.bit, !quantum.bit
-    // CHECK-INJECT: [[d0_m2:%.+]], [[d0_ppmX:%.+]] = qec.ppm ["X"] [[d0_ppmZY]]#1 cond([[mres_0]]) : !quantum.bit
-    // CHECK-INJECT: [[d0_cond:%.+]] = arith.xori [[d0_m1]], [[d0_m2]] : i1
-    // CHECK-INJECT: [[q8:%.+]]  = qec.ppr ["Y"](2) [[d0_ppmZY]]#0 cond([[d0_cond]]) : !quantum.bit
-    // // END DECOMPOSE
+    // CHECK-INJECT: [[q8:%.+]]     = qec.ppr ["Y"](4) [[out]]#0 cond([[mres_0]]) : !quantum.bit
     // CHECK-INJECT: [[mres_1:%.+]], [[out_1:%.+]] = qec.ppm ["X"] [[out]]#1 : !quantum.bit
     // CHECK-INJECT: [[q9:%.+]]     = qec.ppr ["Y"](2) [[q8]] cond([[mres_1]]) : !quantum.bit
     // CHECK-INJECT: quantum.dealloc [[q5]]
@@ -223,14 +198,7 @@ func.func public @game_of_surface_code(%arg0: !quantum.bit, %arg1: !quantum.bit,
     // CHECK-INJECT: [[q11:%.+]] = quantum.extract [[q10]][ 0] : !quantum.reg -> !quantum.bit
     // CHECK-INJECT: [[q12:%.+]] = qec.prepare  magic [[q11]] : !quantum.bit
     // CHECK-INJECT: [[mres_2:%.+]], [[out_2:%.+]]:3 = qec.ppm ["Y", "X", "Z"] [[Q2]], [[Q1]], [[q12]]
-    // // START DECOMPOSE: [[q13:%.+]]:2 = qec.ppr ["Y", "X"](4) [[out_2]]#0, [[out_2]]#1 cond([[mres_2]])
-    // CHECK-INJECT: [[d0_zero:%.+]] = quantum.extract [[q10]][ 1] : !quantum.reg -> !quantum.bit
-    // CHECK-INJECT: [[d0_zero_0:%.+]] = qec.prepare  zero [[d0_zero]] : !quantum.bit
-    // CHECK-INJECT: [[d0_m1:%.+]], [[d0_ppmZY:%.+]]:3 = qec.ppm ["Y", "X", "Y"](-1) [[out_2]]#0, [[out_2]]#1, [[d0_zero_0]] cond([[mres_2]]) : !quantum.bit, !quantum.bit, !quantum.bit
-    // CHECK-INJECT: [[d0_m2:%.+]], [[d0_ppmX:%.+]] = qec.ppm ["X"] [[d0_ppmZY]]#2 cond([[mres_2]]) : !quantum.bit
-    // CHECK-INJECT: [[d0_cond:%.+]] = arith.xori [[d0_m1]], [[d0_m2]] : i1
-    // CHECK-INJECT: [[q13:%.+]]:2  = qec.ppr ["Y", "X"](2) [[d0_ppmZY]]#0, [[d0_ppmZY]]#1 cond([[d0_cond]]) : !quantum.bit, !quantum.bit
-    // // END DECOMPOSE
+    // CHECK-INJECT: [[q13:%.+]]:2 = qec.ppr ["Y", "X"](4) [[out_2]]#0, [[out_2]]#1 cond([[mres_2]])
     // CHECK-INJECT: [[mres_3:%.+]], [[out_3:%.+]] = qec.ppm ["X"] [[out_2]]#2 : !quantum.bit
     // CHECK-INJECT: [[q14:%.+]]:2 = qec.ppr ["Y", "X"](2) [[q13]]#0, [[q13]]#1 cond([[mres_3]]) : !quantum.bit, !quantum.bit
     // CHECK-INJECT: quantum.dealloc [[q10]]
@@ -244,14 +212,7 @@ func.func public @game_of_surface_code(%arg0: !quantum.bit, %arg1: !quantum.bit,
     // CHECK-INJECT: [[q17:%.+]] = qec.prepare  magic_conj [[q16]] : !quantum.bit
     ////// PPM ["Z", "Z", "Y", "Z", "Z"] Q2, Q1, Q3, Q0, conj |m⟩
     // CHECK-INJECT: [[mres_4:%.+]], [[out_4:%.+]]:5 = qec.ppm ["Z", "Z", "Y", "Z", "Z"] [[q14]]#0, [[q14]]#1, [[q9]], [[q4]], [[q17]]
-    // // START DECOMPOSE: [[q18:%.+]]:4 = qec.ppr ["Z", "Z", "Y", "Z"](4) [[out_4]]#0, [[out_4]]#1, [[out_4]]#2, [[out_4]]#3 cond([[mres_4]])
-    // CHECK-INJECT: [[d0_zero:%.+]] = quantum.extract [[q15]][ 1] : !quantum.reg -> !quantum.bit
-    // CHECK-INJECT: [[d0_zero_0:%.+]] = qec.prepare  zero [[d0_zero]] : !quantum.bit
-    // CHECK-INJECT: [[d0_m1:%.+]], [[d0_ppmZY:%.+]]:5 = qec.ppm ["Z", "Z", "Y", "Z", "Y"](-1) [[out_4]]#0, [[out_4]]#1, [[out_4]]#2, [[out_4]]#3, [[d0_zero_0]] cond([[mres_4]]) : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
-    // CHECK-INJECT: [[d0_m2:%.+]], [[d0_ppmX:%.+]] = qec.ppm ["X"] [[d0_ppmZY]]#4 cond([[mres_4]]) : !quantum.bit
-    // CHECK-INJECT: [[d0_cond:%.+]] = arith.xori [[d0_m1]], [[d0_m2]] : i1
-    // CHECK-INJECT: [[q18:%.+]]:4  = qec.ppr ["Z", "Z", "Y", "Z"](2) [[d0_ppmZY]]#0, [[d0_ppmZY]]#1, [[d0_ppmZY]]#2, [[d0_ppmZY]]#3 cond([[d0_cond]]) : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
-    // // END DECOMPOSE
+    // CHECK-INJECT: [[q18:%.+]]:4 = qec.ppr ["Z", "Z", "Y", "Z"](4) [[out_4]]#0, [[out_4]]#1, [[out_4]]#2, [[out_4]]#3 cond([[mres_4]])
     // CHECK-INJECT: [[mres_5:%.+]], [[out_5:%.+]] = qec.ppm ["X"] [[out_4]]#4 : !quantum.bit
     // CHECK-INJECT: [[q19:%.+]]:4 = qec.ppr ["Z", "Z", "Y", "Z"](2) [[q18]]#0, [[q18]]#1, [[q18]]#2, [[q18]]#3 cond([[mres_5]]) 
     // CHECK-INJECT: quantum.dealloc [[q15]]

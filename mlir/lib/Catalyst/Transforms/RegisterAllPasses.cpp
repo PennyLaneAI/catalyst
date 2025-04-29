@@ -64,6 +64,7 @@ void catalyst::registerAllCatalystPasses()
     mlir::registerPass(catalyst::createCommuteCliffordTPPRPass);
     mlir::registerPass(catalyst::createCliffordTToPPRPass);
     mlir::registerPass(catalyst::createCommuteCliffordPastPPMPass);
-    mlir::registerPass(catalyst::createDecomposeNonCliffordPPRToPPMPass);
+    mlir::registerPass(catalyst::createDecomposeNonCliffordPPRPass);
+    mlir::registerPass(catalyst::createDecomposeCliffordPPRPass);
     mlir::registerPass(catalyst::createMBQCConversionPass);
 }
