@@ -46,7 +46,8 @@ void QuantumDialect::initialize()
         >();
 
     declarePromisedInterfaces<bufferization::BufferizableOpInterface, QubitUnitaryOp, HermitianOp,
-                              SampleOp, CountsOp, ProbsOp, StateOp, SetStateOp, SetBasisStateOp>();
+                              HamiltonianOp, SampleOp, CountsOp, ProbsOp, StateOp, SetStateOp,
+                              SetBasisStateOp>();
 }
 
 //===----------------------------------------------------------------------===//

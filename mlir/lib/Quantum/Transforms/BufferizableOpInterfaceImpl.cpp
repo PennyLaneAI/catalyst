@@ -112,6 +112,48 @@ struct HermitianOpInterface
     }
 };
 
+// Bufferization of quantum.hamiltonian.
+// Convert coefficient tensor into memref.
+struct HamiltonianOpInterface
+    : public bufferization::BufferizableOpInterface::ExternalModel<HamiltonianOpInterface,
+                                                                   HamiltonianOp> {
+    bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
+                                const bufferization::AnalysisState &state) const
+    {
+        return true;
+    }
+
+    bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
+                                 const bufferization::AnalysisState &state) const
+    {
+        return false;
+    }
+
+    bufferization::AliasingValueList
+    getAliasingValues(Operation *op, OpOperand &opOperand,
+                      const bufferization::AnalysisState &state) const
+    {
+        return {};
+    }
+
+    LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
+                            const bufferization::BufferizationOptions &options) const
+    {
+        auto hamiltonianOp = cast<HamiltonianOp>(op);
+        Location loc = op->getLoc();
+        auto tensorType = cast<RankedTensorType>(hamiltonianOp.getCoeffs().getType());
+        MemRefType memrefType = MemRefType::get(tensorType.getShape(), tensorType.getElementType());
+        auto toMemrefOp =
+            rewriter.create<bufferization::ToMemrefOp>(loc, memrefType, hamiltonianOp.getCoeffs());
+        auto memref = toMemrefOp.getResult();
+        auto newHamiltonianOp = rewriter.create<HamiltonianOp>(loc, hamiltonianOp.getType(), memref,
+                                                               hamiltonianOp.getTerms());
+        bufferization::replaceOpWithBufferizedValues(rewriter, op, newHamiltonianOp.getObs());
+
+        return success();
+    }
+};
+
 // Bufferization of quantum.sample.
 // Result tensor of quantum.sample is bufferized with a corresponding memref.alloc.
 // Users of the result tensor are updated to use the new memref.
@@ -411,6 +453,7 @@ void catalyst::quantum::registerBufferizableOpInterfaceExternalModels(DialectReg
     registry.addExtension(+[](MLIRContext *ctx, catalyst::quantum::QuantumDialect *dialect) {
         QubitUnitaryOp::attachInterface<QubitUnitaryOpInterface>(*ctx);
         HermitianOp::attachInterface<HermitianOpInterface>(*ctx);
+        HamiltonianOp::attachInterface<HamiltonianOpInterface>(*ctx);
         SampleOp::attachInterface<SampleOpInterface>(*ctx);
         CountsOp::attachInterface<CountsOpInterface>(*ctx);
         ProbsOp::attachInterface<ProbsOpInterface>(*ctx);
