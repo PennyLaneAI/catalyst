@@ -452,18 +452,20 @@ template struct ComplexGesdd<std::complex<double>>;
 template <typename T> typename RealSyevd<T>::FnType *RealSyevd<T>::fn = nullptr;
 
 template <typename T> void RealSyevd<T>::Kernel(void *out_tuple, void **data, XlaCustomCallStatus *)
-{
-    const int32_t lower = *(reinterpret_cast<int32_t *>(data[0]));
-    const int b = *(reinterpret_cast<int32_t *>(data[1]));
-    const int n = *(reinterpret_cast<int32_t *>(data[2]));
-    const T *a_in = reinterpret_cast<T *>(data[3]);
+{   
+    const char jobz = *(reinterpret_cast<int32_t *>(data[0]));
+    int8_t *uplo_tensor = reinterpret_cast<int8_t *>(data[1]);
+    char uplo = static_cast<char>(*uplo_tensor);
+    const int b = *(reinterpret_cast<int32_t *>(data[2]));
+    const int m = *(reinterpret_cast<int32_t *>(data[3]));
+    const int n = *(reinterpret_cast<int32_t *>(data[4]));
+    const T *a_in = reinterpret_cast<T *>(data[5]);
 
     void **out = reinterpret_cast<void **>(out_tuple);
     T *a_out = reinterpret_cast<T *>(out[0]);
     T *w_out = reinterpret_cast<T *>(out[1]);
     int *info = reinterpret_cast<int *>(out[2]);
-    T *work = reinterpret_cast<T *>(out[3]);
-    int *iwork = reinterpret_cast<int *>(out[4]);
+
     if (a_out != a_in) {
         std::memcpy(a_out, a_in,
                     static_cast<int64_t>(b) * static_cast<int64_t>(n) * static_cast<int64_t>(n) *
@@ -471,8 +473,6 @@ template <typename T> void RealSyevd<T>::Kernel(void *out_tuple, void **data, Xl
     }
 
     constexpr int corder = LAPACK_ROW_MAJOR;
-    const char jobz = 'V';
-    const char uplo = lower ? 'L' : 'U';
 
     for (int i = 0; i < b; ++i) {
         *info = fn(corder, jobz, uplo, n, a_out, n, w_out);
@@ -487,18 +487,19 @@ template <typename T> typename ComplexHeevd<T>::FnType *ComplexHeevd<T>::fn = nu
 template <typename T>
 void ComplexHeevd<T>::Kernel(void *out_tuple, void **data, XlaCustomCallStatus *)
 {
-    const int32_t lower = *(reinterpret_cast<int32_t *>(data[0]));
-    const int b = *(reinterpret_cast<int32_t *>(data[1]));
-    const int n = *(reinterpret_cast<int32_t *>(data[2]));
-    const T *a_in = reinterpret_cast<T *>(data[3]);
+    const char jobz = *(reinterpret_cast<int32_t *>(data[0]));
+    int8_t *uplo_tensor = reinterpret_cast<int8_t *>(data[1]);
+    char uplo = static_cast<char>(*uplo_tensor);
+    const int b = *(reinterpret_cast<int32_t *>(data[2]));
+    const int m = *(reinterpret_cast<int32_t *>(data[3]));
+    const int n = *(reinterpret_cast<int32_t *>(data[4]));
+    const T *a_in = reinterpret_cast<T *>(data[5]);
 
     void **out = reinterpret_cast<void **>(out_tuple);
     T *a_out = reinterpret_cast<T *>(out[0]);
     typename T::value_type *w_out = reinterpret_cast<typename T::value_type *>(out[1]);
     int *info = reinterpret_cast<int *>(out[2]);
-    T *work = reinterpret_cast<T *>(out[3]);
-    typename T::value_type *rwork = reinterpret_cast<typename T::value_type *>(out[4]);
-    int *iwork = reinterpret_cast<int *>(out[5]);
+
     if (a_out != a_in) {
         std::memcpy(a_out, a_in,
                     static_cast<int64_t>(b) * static_cast<int64_t>(n) * static_cast<int64_t>(n) *
@@ -506,8 +507,6 @@ void ComplexHeevd<T>::Kernel(void *out_tuple, void **data, XlaCustomCallStatus *
     }
 
     constexpr int corder = LAPACK_ROW_MAJOR;
-    const char jobz = 'V';
-    const char uplo = lower ? 'L' : 'U';
 
     for (int i = 0; i < b; ++i) {
         *info = fn(corder, jobz, uplo, n, a_out, n, w_out);
