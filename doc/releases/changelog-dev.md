@@ -71,6 +71,9 @@
 * The utility function `EnsureFunctionDeclaration` is refactored into the `Utils` of the `Catalyst` dialect, instead of being duplicated in each individual dialect.
   [(#1683)](https://github.com/PennyLaneAI/catalyst/pull/1683)
 
+* The bufferization of custom catalyst dialects has been migrated to the new one-shot bufferization interface in mlir. The new mlir bufferization interface is required by jax 0.4.29 or higher.
+  [(#1686)](https://github.com/PennyLaneAI/catalyst/pull/1686)
+
 <h3>Documentation 📝</h3>
 
 <h3>Contributors ✍️</h3>
@@ -80,6 +83,7 @@ This release contains contributions from (in alphabetical order):
 Joey Carter,
 Sengthai Heng,
 David Ittah,
+Tzung-Han Juang,
 Christina Lee,
 Erick Ochoa Lopez,
 Paul Haochen Wang.
