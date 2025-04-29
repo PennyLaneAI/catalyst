@@ -64,9 +64,9 @@ def test_measure_x():
         _ = plft.measure_x(0)
         return qml.expval(qml.Z(0))
 
+    result = workload()
     qml.capture.disable()
 
-    result = workload()
     assert result == 0.0
 
 
@@ -86,9 +86,9 @@ def test_measure_y():
         _ = plft.measure_y(0)
         return qml.expval(qml.Z(0))
 
+    result = workload()
     qml.capture.disable()
 
-    result = workload()
     assert result == 0.0
 
 
@@ -110,9 +110,9 @@ def test_measure_z():
         _ = plft.measure_z(0)
         return qml.expval(qml.Z(0))
 
+    result = workload()
     qml.capture.disable()
 
-    result = workload()
     assert result == 0.0
 
 
@@ -135,9 +135,9 @@ def test_measure_measure_arbitrary_basis(angle, plane):
         _ = plft.measure_arbitrary_basis(wires=0, angle=angle, plane=plane)
         return qml.expval(qml.Z(0))
 
+    result = workload()
     qml.capture.disable()
 
-    result = workload()
     assert result == 0.0
 
 
