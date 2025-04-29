@@ -12,12 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
 #define DEBUG_TYPE "merge_ppr_ppm"
 
+#include "mlir/Analysis/SliceAnalysis.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/Debug.h"
-#include "mlir/Analysis/SliceAnalysis.h"
 //#include "mlir/Analysis/TopologicalSortUtils.h"  // enable when updating llvm
 #include "mlir/Transforms/TopologicalSortUtils.h"
 
