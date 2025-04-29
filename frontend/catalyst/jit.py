@@ -109,9 +109,8 @@ def qjit(
     Args:
         fn (Callable): the quantum or classical function
         autograph (bool): Experimental support for automatically converting Python control
-            flow statements to Catalyst-compatible control flow. Currently supports Python ``if``,
-            ``elif``, ``else``, and ``for`` statements. Note that this feature requires an
-            available TensorFlow installation. For more details, see the
+            flow statements (including ``if`` statements, ``for`` and ``while`` loops, and more)
+            to Catalyst-compatible control flow. For more details, see the
             :doc:`AutoGraph guide </dev/autograph>`.
         autograph_include: A list of (sub)modules to be allow-listed for autograph conversion.
         async_qnodes (bool): Experimental support for automatically executing
