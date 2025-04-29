@@ -14,6 +14,16 @@
 
 // RUN: quantum-opt --one-shot-bufferize --split-input-file %s | FileCheck %s
 
+func.func @qubit_unitary(%q0: !quantum.bit, %matrix: tensor<2x2xcomplex<f64>>) {
+    // CHECK: [[memref:%.+]] = bufferization.to_memref %arg1 : memref<2x2xcomplex<f64>>
+    // CHECK: {{%.+}} = quantum.unitary([[memref]] : memref<2x2xcomplex<f64>>) %arg0 : !quantum.bit
+    %out_qubits = quantum.unitary(%matrix : tensor<2x2xcomplex<f64>>) %q0 : !quantum.bit
+
+    func.return
+}
+
+// -----
+
 //////////////////
 // Measurements //
 //////////////////

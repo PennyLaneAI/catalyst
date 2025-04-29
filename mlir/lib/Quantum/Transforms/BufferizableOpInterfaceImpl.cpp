@@ -27,6 +27,49 @@ using namespace catalyst::quantum;
 
 namespace {
 
+// Bufferization of quantum.unitary.
+// Convert Matrix into memref.
+struct QubitUnitaryOpInterface
+    : public bufferization::BufferizableOpInterface::ExternalModel<QubitUnitaryOpInterface,
+                                                                   QubitUnitaryOp> {
+    bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
+                                const bufferization::AnalysisState &state) const
+    {
+        return true;
+    }
+
+    bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
+                                 const bufferization::AnalysisState &state) const
+    {
+        return false;
+    }
+
+    bufferization::AliasingValueList
+    getAliasingValues(Operation *op, OpOperand &opOperand,
+                      const bufferization::AnalysisState &state) const
+    {
+        return {};
+    }
+
+    LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
+                            const bufferization::BufferizationOptions &options) const
+    {
+        auto qubitUnitaryOp = cast<QubitUnitaryOp>(op);
+        Location loc = op->getLoc();
+        auto tensorType = cast<RankedTensorType>(qubitUnitaryOp.getMatrix().getType());
+        MemRefType memrefType = MemRefType::get(tensorType.getShape(), tensorType.getElementType());
+        auto toMemrefOp =
+            rewriter.create<bufferization::ToMemrefOp>(loc, memrefType, qubitUnitaryOp.getMatrix());
+        auto memref = toMemrefOp.getResult();
+        bufferization::replaceOpWithNewBufferizedOp<QubitUnitaryOp>(
+            rewriter, op, qubitUnitaryOp.getOutQubits().getTypes(),
+            qubitUnitaryOp.getOutCtrlQubits().getTypes(), memref, qubitUnitaryOp.getInQubits(),
+            qubitUnitaryOp.getAdjointAttr(), qubitUnitaryOp.getInCtrlQubits(),
+            qubitUnitaryOp.getInCtrlValues());
+        return success();
+    }
+};
+
 // Bufferization of quantum.sample.
 // Result tensor of quantum.sample is bufferized with a corresponding memref.alloc.
 // Users of the result tensor are updated to use the new memref.
@@ -324,6 +367,7 @@ struct SetBasisStateOpInterface
 void catalyst::quantum::registerBufferizableOpInterfaceExternalModels(DialectRegistry &registry)
 {
     registry.addExtension(+[](MLIRContext *ctx, catalyst::quantum::QuantumDialect *dialect) {
+        QubitUnitaryOp::attachInterface<QubitUnitaryOpInterface>(*ctx);
         SampleOp::attachInterface<SampleOpInterface>(*ctx);
         CountsOp::attachInterface<CountsOpInterface>(*ctx);
         ProbsOp::attachInterface<ProbsOpInterface>(*ctx);
