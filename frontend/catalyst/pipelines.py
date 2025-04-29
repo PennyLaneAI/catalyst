@@ -217,7 +217,6 @@ def get_bufferization_stage(_options: CompileOptions) -> List[str]:
     """Returns the list of passes that performs bufferization"""
     bufferization = [
         "one-shot-bufferize{dialect-filter=memref}",
-        "inline",
         "gradient-preprocess",
         "gradient-bufferize",
         "scf-bufferize",
