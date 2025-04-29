@@ -52,7 +52,11 @@ def test_measure_x():
     """Test the compilation of the qml.ftqc.measure_x function, which performs a mid-circuit
     measurement in the Pauli X basis.
 
-    Executes on the null.qubit device; does not check correctness of the result.
+    Executes on the null.qubit device. This test does not check the correctness of the result, only
+    that the workload can be compiled and executed end-to-end. We expect expval(Z) to always return
+    0.0 for the null.qubit device, but this is not guaranteed in future releases. The test therefore
+    only asserts that the result is mathematically valid given this final measurement process, i.e.
+    that it is in the range [-1, +1].
     """
     dev = qml.device("null.qubit", wires=1)
 
@@ -67,14 +71,18 @@ def test_measure_x():
     result = workload()
     qml.capture.disable()
 
-    assert result == 0.0
+    assert -1.0 <= result <= 1.0
 
 
 def test_measure_y():
     """Test the compilation of the qml.ftqc.measure_y function, which performs a mid-circuit
     measurement in the Pauli Y basis.
 
-    Executes on the null.qubit device; does not check correctness of the result.
+    Executes on the null.qubit device. This test does not check the correctness of the result, only
+    that the workload can be compiled and executed end-to-end. We expect expval(Z) to always return
+    0.0 for the null.qubit device, but this is not guaranteed in future releases. The test therefore
+    only asserts that the result is mathematically valid given this final measurement process, i.e.
+    that it is in the range [-1, +1].
     """
     dev = qml.device("null.qubit", wires=1)
 
@@ -89,7 +97,7 @@ def test_measure_y():
     result = workload()
     qml.capture.disable()
 
-    assert result == 0.0
+    assert -1.0 <= result <= 1.0
 
 
 @pytest.mark.xfail(reason="qml.ftqc.measure_z is not yet supported with program capture")
@@ -98,7 +106,11 @@ def test_measure_z():
     measurement in the Pauli Z basis. Including for completeness; measure_z() dispatches directly to
     qml.measure().
 
-    Executes on the null.qubit device; does not check correctness of the result.
+    Executes on the null.qubit device. This test does not check the correctness of the result, only
+    that the workload can be compiled and executed end-to-end. We expect expval(Z) to always return
+    0.0 for the null.qubit device, but this is not guaranteed in future releases. The test therefore
+    only asserts that the result is mathematically valid given this final measurement process, i.e.
+    that it is in the range [-1, +1].
     """
     dev = qml.device("null.qubit", wires=1)
 
@@ -113,7 +125,7 @@ def test_measure_z():
     result = workload()
     qml.capture.disable()
 
-    assert result == 0.0
+    assert -1.0 <= result <= 1.0
 
 
 @pytest.mark.parametrize("angle", [-np.pi / 2, 0.0, np.pi / 2])
@@ -123,7 +135,11 @@ def test_measure_measure_arbitrary_basis(angle, plane):
     mid-circuit measurement in an arbitrary basis defined by a plane and rotation angle about that
     plane on the supplied qubit.
 
-    Executes on the null.qubit device; does not check correctness of the result.
+    Executes on the null.qubit device. This test does not check the correctness of the result, only
+    that the workload can be compiled and executed end-to-end. We expect expval(Z) to always return
+    0.0 for the null.qubit device, but this is not guaranteed in future releases. The test therefore
+    only asserts that the result is mathematically valid given this final measurement process, i.e.
+    that it is in the range [-1, +1].
     """
     dev = qml.device("null.qubit", wires=1)
 
@@ -138,7 +154,7 @@ def test_measure_measure_arbitrary_basis(angle, plane):
     result = workload()
     qml.capture.disable()
 
-    assert result == 0.0
+    assert -1.0 <= result <= 1.0
 
 
 if __name__ == "__main__":
