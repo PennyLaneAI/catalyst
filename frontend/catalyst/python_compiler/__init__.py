@@ -52,11 +52,17 @@ class TransformFunctionsExt(TransformFunctions):
         schedule = tuple(
             pass_type.from_pass_spec(spec) for pass_type, spec in requested_by_user
         )
-        pipeline = PipelinePass(schedule)
+        pipeline = passes.PipelinePass(schedule)
         pipeline.apply(self.ctx, args[0])
         return (args[0],)
 
 from xdsl.transforms import get_all_passes
+
+updated_passes = get_all_passes()
+
+def register_pass(name, _callable):
+    global updated_passes
+    updated_passes[name] = _callable
 
 @dataclass(frozen=True)
 class TransformInterpreterPass(ModulePass):
@@ -85,7 +91,8 @@ class TransformInterpreterPass(ModulePass):
             op, self.entry_point
         )
         interpreter = Interpreter(op)
-        interpreter.register_implementations(TransformFunctionsExt(ctx, get_all_passes()))
+        global updated_passes
+        interpreter.register_implementations(TransformFunctionsExt(ctx, updated_passes))
         interpreter.call_op(schedule, (op,))
 
 @dataclass(frozen=True)

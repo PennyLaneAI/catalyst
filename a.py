@@ -21,6 +21,8 @@ def xdsl_transform(_klass):
     identity_transform.__name__ = "xdsl_transform" + _klass.__name__
     transform = qml.transform(identity_transform)
     catalyst.from_plxpr.register_transform(transform, _klass.name, False)
+    from catalyst.python_compiler import register_pass
+    register_pass(_klass.name, lambda : _klass())
 
     return transform
 
@@ -40,7 +42,7 @@ class PrintModule(passes.ModulePass):
 qml.capture.enable()
 
 @catalyst.qjit(pass_plugins=[getXDSLPluginAbsolutePath()])
-#@PrintModule
+@PrintModule
 @qml.qnode(qml.device("lightning.qubit", wires=1))
 def captured_circuit(x: float):
     qml.RX(x, wires=0)
