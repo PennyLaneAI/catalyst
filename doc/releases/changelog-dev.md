@@ -80,6 +80,9 @@
 * The utility function `EnsureFunctionDeclaration` is refactored into the `Utils` of the `Catalyst` dialect, instead of being duplicated in each individual dialect.
   [(#1683)](https://github.com/PennyLaneAI/catalyst/pull/1683)
 
+* The assembly format for some MLIR operations now includes adjoint.
+  [(#1695)](https://github.com/PennyLaneAI/catalyst/pull/1695)
+
 * Improved the definition of `YieldOp` in the quantum dialect by removing `AnyTypeOf`
   [(#1696)](https://github.com/PennyLaneAI/catalyst/pull/1696)
 
