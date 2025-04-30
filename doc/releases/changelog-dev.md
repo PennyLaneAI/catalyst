@@ -62,17 +62,29 @@
 * Stop overriding the `num_wires` property when the operator can exist on `AnyWires`. This allows the deprecation
   of `WiresEnum` in pennylane.
   [(#1667)](https://github.com/PennyLaneAI/catalyst/pull/1667)
+  [(#1676)](https://github.com/PennyLaneAI/catalyst/pull/1676)
 
 * Catalyst now includes an experimental `mbqc` dialect for representing measurement-based
   quantum-computing protocols in MLIR.
   [(#1663)](https://github.com/PennyLaneAI/catalyst/pull/1663)
   [(#1679)](https://github.com/PennyLaneAI/catalyst/pull/1679)
 
+* The Catalyst Runtime C-API now includes a stub for the experimental `mbqc.measure_in_basis`
+  operation, `__catalyst__mbqc__measure_in_basis()`, allowing for mock execution of MBQC workloads
+  containing parameterized arbitrary-basis measurements.
+  [(#1674)](https://github.com/PennyLaneAI/catalyst/pull/1674)
+
+  This runtime stub is currently for mock execution only and should be treated as a placeholder
+  operation. Internally, it functions just as a computational-basis measurement instruction.
+
 * The utility function `EnsureFunctionDeclaration` is refactored into the `Utils` of the `Catalyst` dialect, instead of being duplicated in each individual dialect.
   [(#1683)](https://github.com/PennyLaneAI/catalyst/pull/1683)
 
 * The assembly format for some MLIR operations now includes adjoint.
   [(#1695)](https://github.com/PennyLaneAI/catalyst/pull/1695)
+
+* Improved the definition of `YieldOp` in the quantum dialect by removing `AnyTypeOf`
+  [(#1696)](https://github.com/PennyLaneAI/catalyst/pull/1696)
 
 <h3>Documentation 📝</h3>
 
