@@ -484,6 +484,7 @@ class Compiler:
         return using_xdsl
 
     def run_python_compiler(self, mlir_module):
+
         # TODO: check that xdsl is available to be imported
         import xdsl
         from xdsl.context import Context
@@ -505,9 +506,24 @@ class Compiler:
         # but it is likely worse than an unregistered dialect.
         # TODO: Load Catalyst
         # TODO: Load ion/ppm/mbqc/zne...
-        m = xdsl.parser.Parser(ctx, generic_assembly_format).parse_module()
-        breakpoint()
-        print(m)
+        module = xdsl.parser.Parser(ctx, generic_assembly_format).parse_module()
+
+        from jax._src.interpreters import mlir
+        from jaxlib.mlir.dialects import stablehlo
+        from jaxlib.mlir.ir import Context, Module
+        from xdsl.printer import Printer
+        import io
+
+        buffer = io.StringIO()
+        Printer(stream=buffer, print_generic_format=True).print(module)
+        with Context() as ctx:
+            ctx.allow_unregistered_dialects = True
+            ctx.append_dialect_registry(mlir.upstream_dialects)
+            stablehlo.register_dialect(ctx)
+
+            module = Module.parse(buffer.getvalue())
+        return module
+
         # TODO: transform the program based on the transform dialect
 
     @debug_logger
@@ -528,7 +544,7 @@ class Compiler:
 
         python_compiler = self.is_using_python_compiler()
         if python_compiler:
-            self.run_python_compiler(mlir_module)
+            mlir_module = self.run_python_compiler(mlir_module)
 
         return self.run_from_ir(
             mlir_module.operation.get_asm(
