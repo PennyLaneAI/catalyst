@@ -21,16 +21,17 @@
 #include "mhlo/IR/hlo_ops.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "llvm/Support/Debug.h"
+
 using namespace mlir;
 
 namespace catalyst {
 
-struct HloCustomCallLoweringPattern : public mlir::OpRewritePattern<mhlo::CustomCallOp> {
+struct HloCustomCallOpRewritePattern : public mlir::OpRewritePattern<mhlo::CustomCallOp> {
     using mlir::OpRewritePattern<mhlo::CustomCallOp>::OpRewritePattern;
 
-    LogicalResult matchAndRewrite(mhlo::CustomCallOp op, PatternRewriter &rewriter) const override
+    mlir::LogicalResult matchAndRewrite(mhlo::CustomCallOp op,
+                                        mlir::PatternRewriter &rewriter) const override
     {
-        LLVM_DEBUG(llvm::dbgs() << "DEBUG: matchAndRewrite1\n");
         StringRef calleeName = op.getCallTargetName();
         auto operands = op.getOperands();
         TypeRange resultsType = op.getResultTypes();
@@ -142,7 +143,7 @@ struct HloCustomCallLoweringPattern : public mlir::OpRewritePattern<mhlo::Custom
 
 void populateHloCustomCallPatterns(RewritePatternSet &patterns)
 {
-    patterns.add<HloCustomCallLoweringPattern>(patterns.getContext());
+    patterns.add<HloCustomCallOpRewritePattern>(patterns.getContext());
 }
 
 } // namespace catalyst
