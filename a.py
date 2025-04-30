@@ -72,16 +72,17 @@ class DeepCancelInversesSingleQubitPass(passes.ModulePass):
 qml.capture.enable()
 
 @catalyst.qjit(pass_plugins=[getXDSLPluginAbsolutePath()])
+
+@qml.transforms.merge_rotations
 @DeepCancelInversesSingleQubitPass
 @qml.qnode(qml.device("lightning.qubit", wires=1))
 def captured_circuit(x: float):
+    qml.RX(x, wires=0)
     qml.RX(x, wires=0)
     qml.Hadamard(wires=0)
     qml.Hadamard(wires=0)
     return qml.state()
 
 
-qml.capture.disable()
-
-
 print(captured_circuit(1.))
+qml.capture.disable()

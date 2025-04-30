@@ -49,12 +49,32 @@ class TransformFunctionsExt(TransformFunctions):
         )
         # TODO: Switch between catalyst and xDSL
 
-        schedule = tuple(
-            pass_type.from_pass_spec(spec) for pass_type, spec in requested_by_user
-        )
-        pipeline = passes.PipelinePass(schedule)
-        pipeline.apply(self.ctx, args[0])
-        return (args[0],)
+        try:
+            schedule = tuple(
+                pass_type.from_pass_spec(spec) for pass_type, spec in requested_by_user
+            )
+            pipeline = passes.PipelinePass(schedule)
+            pipeline.apply(self.ctx, args[0])
+            return (args[0],)
+        except:
+            from catalyst.compiler import _quantum_opt
+            from xdsl.printer import Printer
+            import io
+            buffer = io.StringIO()
+
+            Printer(stream=buffer, print_generic_format=True).print(args[0])
+            schedule = f"--{pass_name}"
+            modified = _quantum_opt(schedule, "-mlir-print-op-generic", stdin=buffer.getvalue())
+
+            import xdsl
+            module = args[0]
+            data = xdsl.parser.Parser(self.ctx, modified).parse_module()
+            from xdsl.rewriter import Rewriter
+            rewriter = Rewriter()
+            rewriter.replace_op(module, data)
+            return (data,)
+
+
 
 from xdsl.transforms import get_all_passes
 
@@ -93,6 +113,7 @@ class TransformInterpreterPass(ModulePass):
         interpreter = Interpreter(op)
         global updated_passes
         interpreter.register_implementations(TransformFunctionsExt(ctx, updated_passes))
+        schedule.parent_op().detach()
         interpreter.call_op(schedule, (op,))
 
 @dataclass(frozen=True)
