@@ -30,7 +30,6 @@ class TestExpmAndSolve:
     Also test that their results are numerically correct when qjit compiled.
     """
 
-    @pytest.mark.skip("lapack symbols undefined, WIP")
     def test_expm_and_solve(self):
         """
         Test against the "gather rule not implemented" bug for

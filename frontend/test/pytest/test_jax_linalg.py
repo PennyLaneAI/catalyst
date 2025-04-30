@@ -386,7 +386,6 @@ class TestCholesky:
         assert jnp.allclose(U_obs, U_exp)
 
 
-@pytest.mark.skip(reason="lapack symbols undefined, WIP")
 class TestExpm:
     """Test results of jax.scipy.linalg.expm are numerically correct when qjit compiled.
 
@@ -616,7 +615,6 @@ class TestLU:
         assert jnp.allclose(U_obs, U_exp)
 
 
-@pytest.mark.skip(reason="lapack symbols undefined, WIP")
 class TestLUSolve:
     """Test results of jax.scipy.linalg.lu_solve are numerically correct when qjit compiled.
 
@@ -721,7 +719,6 @@ class TestPolar:
         assert jnp.allclose(P_obs, P_exp)
 
     # pylint: disable=line-too-long
-    @pytest.mark.skip(reason="lapack symbols undefined, WIP")
     @pytest.mark.parametrize(
         "A",
         [
@@ -893,7 +890,6 @@ class TestSchur:
         assert jnp.allclose(Z_obs, Z_exp)
 
 
-@pytest.mark.skip(reason="lapack symbols undefined, WIP")
 class TestSolve:
     """Test results of jax.scipy.linalg.solve are numerically correct when qjit compiled.
 
