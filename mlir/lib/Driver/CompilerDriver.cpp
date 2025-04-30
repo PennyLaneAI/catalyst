@@ -56,6 +56,7 @@
 #include "llvm/Transforms/IPO/GlobalDCE.h"
 
 #include "Catalyst/IR/CatalystDialect.h"
+#include "Catalyst/Transforms/BufferizableOpInterfaceImpl.h"
 #include "Catalyst/Transforms/Passes.h"
 #include "Driver/CatalystLLVMTarget.h"
 #include "Driver/CompilerDriver.h"
@@ -961,6 +962,9 @@ int QuantumDriverMainFromCL(int argc, char **argv)
     mhlo::registerAllMhloPasses();
     registerAllCatalystDialects(registry);
     registerLLVMTranslations(registry);
+
+    // Register bufferization interfaces
+    catalyst::registerBufferizableOpInterfaceExternalModels(registry);
 
     // Register and parse command line options.
     std::string inputFilename, outputFilename;
