@@ -255,8 +255,8 @@ def register_transform(pl_transform, pass_name, decomposition):
 # Catalyst pass as arguments whose default values are set by the loop.
 for pl_transform, (pass_name, decomposition) in transforms_to_passes.items():
     register_transform(
-        pl_transform, pass_name, decomposition
-    )  # pylint: disable=redefined-outer-name
+        pl_transform, pass_name, decomposition  # pylint: disable=redefined-outer-name
+    )
 
 
 class QFuncPlxprInterpreter(PlxprInterpreter):
