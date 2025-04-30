@@ -222,15 +222,6 @@ template <typename T> struct real_type<std::complex<T>> {
     typedef T type;
 };
 
-// Sytrd/Hetrd: Reduces a symmetric (Hermitian) square matrix to tridiagonal form
-template <typename T> struct Sytrd {
-    using FnType = lapack_int(int matrix_layout, char uplo, lapack_int n, T *a, lapack_int lda,
-                              typename real_type<T>::type *d, typename real_type<T>::type *e,
-                              T *tau);
-    static FnType *fn;
-    static void Kernel(void *out, void **data, XlaCustomCallStatus *);
-};
-
 } // namespace jax
 
 #endif // JAXLIB_CPU_LAPACK_KERNELS_H_

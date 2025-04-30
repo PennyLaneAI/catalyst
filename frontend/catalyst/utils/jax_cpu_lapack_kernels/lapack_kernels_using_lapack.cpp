@@ -105,11 +105,6 @@ jax::Gehrd<double>::FnType GET_SYMBOL(LAPACKE_dgehrd);
 jax::Gehrd<std::complex<float>>::FnType GET_SYMBOL(LAPACKE_cgehrd);
 jax::Gehrd<std::complex<double>>::FnType GET_SYMBOL(LAPACKE_zgehrd);
 
-jax::Sytrd<float>::FnType GET_SYMBOL(LAPACKE_ssytrd);
-jax::Sytrd<double>::FnType GET_SYMBOL(LAPACKE_dsytrd);
-jax::Sytrd<std::complex<float>>::FnType GET_SYMBOL(LAPACKE_chetrd);
-jax::Sytrd<std::complex<double>>::FnType GET_SYMBOL(LAPACKE_zhetrd);
-
 } // extern "C"
 
 namespace jax {
@@ -163,11 +158,6 @@ static auto init = []() -> int {
     AssignKernelFn<Gehrd<double>>(GET_SYMBOL(LAPACKE_dgehrd));
     AssignKernelFn<Gehrd<std::complex<float>>>(GET_SYMBOL(LAPACKE_cgehrd));
     AssignKernelFn<Gehrd<std::complex<double>>>(GET_SYMBOL(LAPACKE_zgehrd));
-
-    AssignKernelFn<Sytrd<float>>(GET_SYMBOL(LAPACKE_ssytrd));
-    AssignKernelFn<Sytrd<double>>(GET_SYMBOL(LAPACKE_dsytrd));
-    AssignKernelFn<Sytrd<std::complex<float>>>(GET_SYMBOL(LAPACKE_chetrd));
-    AssignKernelFn<Sytrd<std::complex<double>>>(GET_SYMBOL(LAPACKE_zhetrd));
 
     return 0;
 }();

@@ -105,8 +105,3 @@ DEFINE_LAPACK_FUNC(lapack_sgehrd_ffi, 6, 3, jax::Gehrd<float>)
 DEFINE_LAPACK_FUNC(lapack_dgehrd_ffi, 6, 3, jax::Gehrd<double>)
 DEFINE_LAPACK_FUNC(lapack_cgehrd_ffi, 6, 3, jax::Gehrd<std::complex<float>>)
 DEFINE_LAPACK_FUNC(lapack_zgehrd_ffi, 6, 3, jax::Gehrd<std::complex<double>>)
-
-DEFINE_LAPACK_FUNC(lapack_ssytrd, 6, 6, jax::Sytrd<float>)
-DEFINE_LAPACK_FUNC(lapack_dsytrd, 6, 6, jax::Sytrd<double>)
-DEFINE_LAPACK_FUNC(lapack_chetrd, 6, 6, jax::Sytrd<std::complex<float>>)
-DEFINE_LAPACK_FUNC(lapack_zhetrd, 6, 6, jax::Sytrd<std::complex<double>>)
