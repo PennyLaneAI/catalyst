@@ -71,6 +71,9 @@
 * The utility function `EnsureFunctionDeclaration` is refactored into the `Utils` of the `Catalyst` dialect, instead of being duplicated in each individual dialect.
   [(#1683)](https://github.com/PennyLaneAI/catalyst/pull/1683)
 
+* The assembly format for some MLIR operations now includes adjoint.
+  [(#1695)](https://github.com/PennyLaneAI/catalyst/pull/1695)
+
 <h3>Documentation 📝</h3>
 
 <h3>Contributors ✍️</h3>
