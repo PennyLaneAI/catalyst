@@ -499,21 +499,13 @@ class Compiler:
         ctx.load_dialect(transform.Transform)
         ctx.load_dialect(quantum.QuantumDialect)
         # TODO: In order of importance
-        # TODO: Load quantum
         # TODO: Load gradient
         # TODO: Load the stablehlo dialect? I kind of want to wait until all operations
         # are properly represented. I am not sure how an incompletely known dialect would be handled
         # but it is likely worse than an unregistered dialect.
         # TODO: Load Catalyst
         # TODO: Load ion/ppm/mbqc/zne...
-        mlir = """
-        func.func @foo(%arg0 : i64) -> () {
-          %0 = quantum.alloc(4) : !quantum.reg
-          %1 = quantum.alloc(%arg0) : !quantum.reg
-          return
-        }
-        """
-        m = xdsl.parser.Parser(ctx, mlir).parse_module()
+        m = xdsl.parser.Parser(ctx, generic_assembly_format).parse_module()
         breakpoint()
         print(m)
         # TODO: transform the program based on the transform dialect
