@@ -724,7 +724,12 @@ class QJIT(CatalystCallable):
                 ),
             ):
                 return trace_from_pennylane(
-                    self.user_function, static_argnums, abstracted_axes, full_sig, kwargs
+                    self.user_function,
+                    static_argnums,
+                    abstracted_axes,
+                    full_sig,
+                    kwargs,
+                    debug_info=dbg,
                 )
 
         def closure(qnode, *args, **kwargs):
@@ -877,7 +882,7 @@ class JAX_QJIT:
     def wrap_callback(qjit_function, *args, **kwargs):
         """Wrap a QJIT function inside a jax host callback."""
         data = jax.pure_callback(
-            qjit_function, qjit_function.jaxpr.out_avals, *args, vectorized=False, **kwargs
+            qjit_function, qjit_function.jaxpr.out_avals, *args, vmap_method="sequential", **kwargs
         )
 
         # Unflatten the return value w.r.t. the original PyTree definition if available

@@ -42,6 +42,9 @@
 
   Disabling program capture can be done with `qml.capture.disable()`.
 
+* The `ppr_to_ppm` pass has been renamed to `merge_ppr_ppm` (same functionality). A new `ppr_to_ppm` will handle direct decomposition of PPRs into PPMs.
+  [(#1688)](https://github.com/PennyLaneAI/catalyst/pull/1688)
+
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
@@ -59,13 +62,32 @@
 * Stop overriding the `num_wires` property when the operator can exist on `AnyWires`. This allows the deprecation
   of `WiresEnum` in pennylane.
   [(#1667)](https://github.com/PennyLaneAI/catalyst/pull/1667)
+  [(#1676)](https://github.com/PennyLaneAI/catalyst/pull/1676)
 
 * Catalyst now includes an experimental `mbqc` dialect for representing measurement-based
   quantum-computing protocols in MLIR.
   [(#1663)](https://github.com/PennyLaneAI/catalyst/pull/1663)
+  [(#1679)](https://github.com/PennyLaneAI/catalyst/pull/1679)
+
+* The utility function `EnsureFunctionDeclaration` is refactored into the `Utils` of the `Catalyst` dialect, instead of being duplicated in each individual dialect.
+  [(#1683)](https://github.com/PennyLaneAI/catalyst/pull/1683)
+
+* Improved the definition of `YieldOp` in the quantum dialect by removing `AnyTypeOf`
+  [(#1696)](https://github.com/PennyLaneAI/catalyst/pull/1696)
 
 * The version of JAX used by Catalyst is updated to 0.5.3.
-  [(#???)](https://github.com/PennyLaneAI/catalyst/pull/???)
+  [(#1652)](https://github.com/PennyLaneAI/catalyst/pull/1652)
+  [(#1654)](https://github.com/PennyLaneAI/catalyst/pull/1654)
+  [(#1656)](https://github.com/PennyLaneAI/catalyst/pull/1656)
+  [(#1658)](https://github.com/PennyLaneAI/catalyst/pull/1658)
+  [(#1659)](https://github.com/PennyLaneAI/catalyst/pull/1659)
+  [(#1660)](https://github.com/PennyLaneAI/catalyst/pull/1660)
+  [(#1661)](https://github.com/PennyLaneAI/catalyst/pull/1661)
+  [(#1662)](https://github.com/PennyLaneAI/catalyst/pull/1662)
+  [(#1669)](https://github.com/PennyLaneAI/catalyst/pull/1669)
+  [(#1670)](https://github.com/PennyLaneAI/catalyst/pull/1670)
+  [(#1671)](https://github.com/PennyLaneAI/catalyst/pull/1671)
+  [(#1681)](https://github.com/PennyLaneAI/catalyst/pull/1681)
 
 <h3>Documentation 📝</h3>
 
@@ -74,6 +96,7 @@
 This release contains contributions from (in alphabetical order):
 
 Joey Carter,
+Sengthai Heng,
 David Ittah,
 Christina Lee,
 Erick Ochoa Lopez,

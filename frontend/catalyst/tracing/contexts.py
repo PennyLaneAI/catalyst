@@ -199,7 +199,10 @@ class EvaluationContext:
                 new_trace = DynamicJaxprTrace(debug_info)
 
         with set_current_trace(new_trace):
-            yield new_trace
+            try:
+                yield new_trace
+            finally:
+                del new_trace
 
     @classmethod
     def get_current_trace(cls, hint=None):

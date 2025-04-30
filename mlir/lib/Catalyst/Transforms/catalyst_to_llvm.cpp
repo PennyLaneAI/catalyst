@@ -27,6 +27,7 @@
 #include "Catalyst/IR/CatalystOps.h"
 #include "Catalyst/Transforms/Passes.h"
 #include "Catalyst/Transforms/Patterns.h"
+#include "Catalyst/Utils/EnsureFunctionDeclaration.h"
 #include "Catalyst/Utils/StaticAllocas.h"
 #include "Gradient/IR/GradientDialect.h"
 #include "Gradient/IR/GradientOps.h"
@@ -36,25 +37,6 @@ using namespace mlir;
 using namespace catalyst;
 
 namespace {
-
-LLVM::LLVMFuncOp ensureFunctionDeclaration(PatternRewriter &rewriter, Operation *op,
-                                           StringRef fnSymbol, Type fnType)
-{
-    Operation *fnDecl = SymbolTable::lookupNearestSymbolFrom(op, rewriter.getStringAttr(fnSymbol));
-
-    if (!fnDecl) {
-        PatternRewriter::InsertionGuard insertGuard(rewriter);
-        ModuleOp mod = op->getParentOfType<ModuleOp>();
-        rewriter.setInsertionPointToStart(mod.getBody());
-
-        fnDecl = rewriter.create<LLVM::LLVMFuncOp>(op->getLoc(), fnSymbol, fnType);
-    }
-    else {
-        assert(isa<LLVM::LLVMFuncOp>(fnDecl) && "QIR function declaration is not a LLVMFuncOp");
-    }
-
-    return cast<LLVM::LLVMFuncOp>(fnDecl);
-}
 
 Value getGlobalString(Location loc, OpBuilder &rewriter, StringRef key, StringRef value,
                       ModuleOp mod)
@@ -209,7 +191,7 @@ struct PrintOpPattern : public OpConversionPattern<PrintOp> {
             Type charPtrType = LLVM::LLVMPointerType::get(rewriter.getContext());
             Type qirSignature = LLVM::LLVMFunctionType::get(voidType, charPtrType);
             LLVM::LLVMFuncOp fnDecl =
-                ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+                catalyst::ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
 
             StringRef stringValue = op.getConstVal().value();
             std::string symbolName = std::to_string(std::hash<std::string>()(stringValue.str()));
@@ -234,7 +216,7 @@ struct PrintOpPattern : public OpConversionPattern<PrintOp> {
             SmallVector<Type> argTypes{structPtrType, IntegerType::get(ctx, 1)};
             Type qirSignature = LLVM::LLVMFunctionType::get(voidType, argTypes);
             LLVM::LLVMFuncOp fnDecl =
-                ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+                catalyst::ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
 
             Value memref = op.getVal();
             MemRefType memrefType = cast<MemRefType>(memref.getType());
@@ -275,7 +257,7 @@ struct AssertionOpPattern : public OpConversionPattern<AssertionOp> {
 
         ModuleOp mod = op->getParentOfType<ModuleOp>();
         LLVM::LLVMFuncOp assertFunc =
-            ensureFunctionDeclaration(rewriter, op, qirName, assertSignature);
+            catalyst::ensureFunctionDeclaration(rewriter, op, qirName, assertSignature);
 
         Value assertionDescriptor = adaptor.getAssertion();
 
