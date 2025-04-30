@@ -30,7 +30,7 @@ def xdsl_transform(_klass):
 # All passes inherit from passes.ModulePass
 class PrintModule(passes.ModulePass):
     # All passes require a name field
-    name = "print"
+    name = "remove-chained-self-inverse"
 
     # All passes require an apply method with this signature.
     def apply(self, ctx: context.MLContext, module: builtin.ModuleOp) -> None:

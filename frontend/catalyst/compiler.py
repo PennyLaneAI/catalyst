@@ -488,8 +488,9 @@ class Compiler:
         # TODO: check that xdsl is available to be imported
         import xdsl
         from xdsl.context import Context
+        from xdsl import passes
         from xdsl.dialects import arith, builtin, func, scf, tensor, transform
-        from .python_compiler import quantum 
+        from .python_compiler import quantum, PrintModule
         generic_assembly_format = mlir_module.operation.get_asm(binary=False, print_generic_op_form=True, assume_verified=True)
         ctx = Context(allow_unregistered=True)
         ctx.load_dialect(arith.Arith)
@@ -507,6 +508,8 @@ class Compiler:
         # TODO: Load Catalyst
         # TODO: Load ion/ppm/mbqc/zne...
         module = xdsl.parser.Parser(ctx, generic_assembly_format).parse_module()
+        pipeline = passes.PipelinePass((PrintModule(),))
+        pipeline.apply(ctx, module)
 
         from jax._src.interpreters import mlir
         from jaxlib.mlir.dialects import stablehlo
@@ -520,7 +523,6 @@ class Compiler:
             ctx.allow_unregistered_dialects = True
             ctx.append_dialect_registry(mlir.upstream_dialects)
             stablehlo.register_dialect(ctx)
-
             module = Module.parse(buffer.getvalue())
         return module
 
