@@ -35,47 +35,29 @@ from catalyst.python_compiler import quantum
 
 self_inverses = ("PauliZ", "PauliX", "PauliY", "Hadamard", "Identity")
 
-
-def cancel_ops(rewriter, op, next_op):
-    rewriter.replace_all_uses_with(next_op.results[0], op.in_qubits[0])
-    rewriter.erase_op(next_op)
-    rewriter.erase_op(op)
-    owner = op.in_qubits[0].owner
-
-    if isinstance(owner, quantum.CustomOp) and owner.gate_name.data in self_inverses:
-        next_user = None
-
-        for use in owner.results[0].uses:
-            user = use.operation
-            if isinstance(user, quantum.CustomOp) and user.gate_name.data == owner.gate_name.data:
-                next_user = user
-                break
-
-        if next_user is not None:
-            cancel_ops(rewriter, owner, next_user)
-
-
 class DeepCancelInversesSingleQubitPattern(pattern_rewriter.RewritePattern):
     @pattern_rewriter.op_type_rewrite_pattern
     def match_and_rewrite(self, funcOp: func.FuncOp, rewriter: pattern_rewriter.PatternRewriter):
         """Deep Cancel for Self Inverses"""
-        print(funcOp)
         for op in funcOp.body.walk():
-            if not isinstance(op, quantum.CustomOp):
-                continue
 
-            if op.gate_name.data not in self_inverses:
-                continue
+            while isinstance(op, quantum.CustomOp) and op.gate_name.data in self_inverses:
 
-            next_user = None
-            for use in op.results[0].uses:
-                user = use.operation
-                if isinstance(user, quantum.CustomOp) and user.gate_name.data == op.gate_name.data:
-                    next_user = user
+                next_user = None
+                for use in op.results[0].uses:
+                    user = use.operation
+                    if isinstance(user, quantum.CustomOp) and user.gate_name.data == op.gate_name.data:
+                        next_user = user
+                        break
+
+                if next_user is None:
                     break
 
-            if next_user is not None:
-                cancel_ops(rewriter, op, next_user)
+                rewriter.replace_all_uses_with(next_user.results[0], op.in_qubits[0])
+                rewriter.erase_op(next_user)
+                rewriter.erase_op(op)
+
+                op = op.in_qubits[0].owner
 
 
 @xdsl_transform
@@ -102,4 +84,4 @@ def captured_circuit(x: float):
 qml.capture.disable()
 
 
-captured_circuit(0.0)
+print(captured_circuit(1.))
