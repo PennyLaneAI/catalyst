@@ -11,7 +11,7 @@ import functools
 from dataclasses import dataclass
 from xdsl import context, passes
 from xdsl.utils import parse_pipeline
-from xdsl.dialects import builtin
+from xdsl.dialects import builtin, func
 
 def xdsl_transform(_klass):
 
@@ -27,22 +27,70 @@ def xdsl_transform(_klass):
     return transform
 
 
+from xdsl.rewriter import InsertPoint
+from xdsl import pattern_rewriter
+
+from catalyst.python_compiler import quantum
+
+
+self_inverses = ("PauliZ", "PauliX", "PauliY", "Hadamard", "Identity")
+
+
+def cancel_ops(rewriter, op, next_op):
+    rewriter.replace_all_uses_with(next_op.results[0], op.in_qubits[0])
+    rewriter.erase_op(next_op)
+    rewriter.erase_op(op)
+    owner = op.in_qubits[0].owner
+
+    if isinstance(owner, quantum.CustomOp) and owner.gate_name.data in self_inverses:
+        next_user = None
+
+        for use in owner.results[0].uses:
+            user = use.operation
+            if isinstance(user, quantum.CustomOp) and user.gate_name.data == owner.gate_name.data:
+                next_user = user
+                break
+
+        if next_user is not None:
+            cancel_ops(rewriter, owner, next_user)
+
+
+class DeepCancelInversesSingleQubitPattern(pattern_rewriter.RewritePattern):
+    @pattern_rewriter.op_type_rewrite_pattern
+    def match_and_rewrite(self, funcOp: func.FuncOp, rewriter: pattern_rewriter.PatternRewriter):
+        """Deep Cancel for Self Inverses"""
+        print(funcOp)
+        for op in funcOp.body.walk():
+            if not isinstance(op, quantum.CustomOp):
+                continue
+
+            if op.gate_name.data not in self_inverses:
+                continue
+
+            next_user = None
+            for use in op.results[0].uses:
+                user = use.operation
+                if isinstance(user, quantum.CustomOp) and user.gate_name.data == op.gate_name.data:
+                    next_user = user
+                    break
+
+            if next_user is not None:
+                cancel_ops(rewriter, op, next_user)
+
+
 @xdsl_transform
-#@dataclass(frozen=True)
-# All passes inherit from passes.ModulePass
-class PrintModule(passes.ModulePass):
-    # All passes require a name field
-    name = "remove-chained-self-inverse"
+class DeepCancelInversesSingleQubitPass(passes.ModulePass):
+    name = "deep-cancel-inverses-single-qubit"
 
-    # All passes require an apply method with this signature.
     def apply(self, ctx: context.MLContext, module: builtin.ModuleOp) -> None:
-        print("Hello from inside the pass\n", module)
-
+        pattern_rewriter.PatternRewriteWalker(
+            pattern_rewriter.GreedyRewritePatternApplier([DeepCancelInversesSingleQubitPattern()])
+        ).rewrite_module(module)
 
 qml.capture.enable()
 
 @catalyst.qjit(pass_plugins=[getXDSLPluginAbsolutePath()])
-@PrintModule
+@DeepCancelInversesSingleQubitPass
 @qml.qnode(qml.device("lightning.qubit", wires=1))
 def captured_circuit(x: float):
     qml.RX(x, wires=0)
@@ -53,6 +101,5 @@ def captured_circuit(x: float):
 
 qml.capture.disable()
 
-print(captured_circuit.mlir)
 
 captured_circuit(0.0)
