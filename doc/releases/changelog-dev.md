@@ -69,6 +69,14 @@
   [(#1663)](https://github.com/PennyLaneAI/catalyst/pull/1663)
   [(#1679)](https://github.com/PennyLaneAI/catalyst/pull/1679)
 
+* The Catalyst Runtime C-API now includes a stub for the experimental `mbqc.measure_in_basis`
+  operation, `__catalyst__mbqc__measure_in_basis()`, allowing for mock execution of MBQC workloads
+  containing parameterized arbitrary-basis measurements.
+  [(#1674)](https://github.com/PennyLaneAI/catalyst/pull/1674)
+
+  This runtime stub is currently for mock execution only and should be treated as a placeholder
+  operation. Internally, it functions just as a computational-basis measurement instruction.
+
 * The utility function `EnsureFunctionDeclaration` is refactored into the `Utils` of the `Catalyst` dialect, instead of being duplicated in each individual dialect.
   [(#1683)](https://github.com/PennyLaneAI/catalyst/pull/1683)
 
