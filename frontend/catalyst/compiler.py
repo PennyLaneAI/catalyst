@@ -490,7 +490,7 @@ class Compiler:
         from xdsl.context import Context
         from xdsl import passes
         from xdsl.dialects import arith, builtin, func, scf, tensor, transform
-        from .python_compiler import quantum, PrintModule
+        from .python_compiler import quantum, ApplyTransformSequence
         generic_assembly_format = mlir_module.operation.get_asm(binary=False, print_generic_op_form=True, assume_verified=True)
         ctx = Context(allow_unregistered=True)
         ctx.load_dialect(arith.Arith)
@@ -508,7 +508,7 @@ class Compiler:
         # TODO: Load Catalyst
         # TODO: Load ion/ppm/mbqc/zne...
         module = xdsl.parser.Parser(ctx, generic_assembly_format).parse_module()
-        pipeline = passes.PipelinePass((PrintModule(),))
+        pipeline = passes.PipelinePass((ApplyTransformSequence(),))
         pipeline.apply(ctx, module)
 
         from jax._src.interpreters import mlir

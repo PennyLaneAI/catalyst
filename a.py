@@ -40,7 +40,7 @@ class PrintModule(passes.ModulePass):
 qml.capture.enable()
 
 @catalyst.qjit(pass_plugins=[getXDSLPluginAbsolutePath()])
-@PrintModule
+#@PrintModule
 @qml.qnode(qml.device("lightning.qubit", wires=1))
 def captured_circuit(x: float):
     qml.RX(x, wires=0)
