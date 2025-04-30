@@ -25,6 +25,7 @@
 #include "mhlo/IR/hlo_ops.h"
 
 #include "Catalyst/IR/CatalystDialect.h"
+#include "Catalyst/Transforms/BufferizableOpInterfaceImpl.h"
 #include "Catalyst/Transforms/Passes.h"
 #include "Gradient/IR/GradientDialect.h"
 #include "Gradient/Transforms/Passes.h"
@@ -60,6 +61,8 @@ int main(int argc, char **argv)
     registry.insert<catalyst::mitigation::MitigationDialect>();
     registry.insert<catalyst::ion::IonDialect>();
     registry.insert<mlir::mhlo::MhloDialect>();
+
+    catalyst::registerBufferizableOpInterfaceExternalModels(registry);
 
     return mlir::asMainReturnCode(
         mlir::MlirOptMain(argc, argv, "Quantum optimizer driver\n", registry));
