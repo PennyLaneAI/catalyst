@@ -59,6 +59,9 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Creates a function that allows developers to register an equivalent MLIR transform for a given PLxPR transform.
+  [(#1705)](https://github.com/PennyLaneAI/catalyst/pull/1705)
+
 * Stop overriding the `num_wires` property when the operator can exist on `AnyWires`. This allows the deprecation
   of `WiresEnum` in pennylane.
   [(#1667)](https://github.com/PennyLaneAI/catalyst/pull/1667)
