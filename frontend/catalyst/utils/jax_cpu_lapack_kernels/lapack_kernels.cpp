@@ -74,16 +74,16 @@ template <typename T> typename RealTrsm<T>::FnType *RealTrsm<T>::fn = nullptr;
 
 template <typename T> void RealTrsm<T>::Kernel(void *out, void **data, XlaCustomCallStatus *)
 {
-    const int32_t left_side = *reinterpret_cast<int32_t *>(data[0]);
-    const int32_t lower = *reinterpret_cast<int32_t *>(data[1]);
-    const int32_t trans_a = *reinterpret_cast<int32_t *>(data[2]);
-    const int32_t diag = *reinterpret_cast<int32_t *>(data[3]);
-    const int m = *reinterpret_cast<int32_t *>(data[4]);
-    const int n = *reinterpret_cast<int32_t *>(data[5]);
-    const int batch = *reinterpret_cast<int32_t *>(data[6]);
-    const T alpha = *reinterpret_cast<T *>(data[7]);
-    const T *a = reinterpret_cast<T *>(data[8]);
-    T *b = reinterpret_cast<T *>(data[9]);
+    const char diag = *(reinterpret_cast<uint8_t *>(data[0]));
+    const char side = *(reinterpret_cast<uint8_t *>(data[1]));
+    const char trans = *(reinterpret_cast<uint8_t *>(data[2]));
+    const char uplo = *(reinterpret_cast<uint8_t *>(data[3]));
+    const int batch = *reinterpret_cast<int32_t *>(data[7]);
+    const int m = *reinterpret_cast<int32_t *>(data[8]);
+    const int n = *reinterpret_cast<int32_t *>(data[9]);
+    const T *a = reinterpret_cast<T *>(data[10]);
+    T *b = reinterpret_cast<T *>(data[11]);
+    const T alpha = *reinterpret_cast<T *>(data[12]);
 
     T *x = reinterpret_cast<T *>(out);
     if (x != b) {
@@ -93,13 +93,13 @@ template <typename T> void RealTrsm<T>::Kernel(void *out, void **data, XlaCustom
     }
 
     constexpr CBLAS_ORDER corder = CblasRowMajor;
-    const CBLAS_SIDE cside = left_side ? CblasLeft : CblasRight;
-    const CBLAS_UPLO cuplo = lower ? CblasLower : CblasUpper;
-    const CBLAS_TRANSPOSE ctransa = (trans_a == 1)   ? CblasTrans
-                                    : (trans_a == 2) ? CblasConjTrans
+    const CBLAS_SIDE cside = (side == 'L') ? CblasLeft : CblasRight;
+    const CBLAS_UPLO cuplo = (uplo == 'L') ? CblasLower : CblasUpper;
+    const CBLAS_TRANSPOSE ctransa = (trans == 'T')   ? CblasTrans
+                                    : (trans == 'C') ? CblasConjTrans
                                                      : CblasNoTrans;
-    const CBLAS_DIAG cdiag = diag ? CblasUnit : CblasNonUnit;
-    const int lda = left_side ? m : n;
+    const CBLAS_DIAG cdiag = (diag == 'U') ? CblasUnit : CblasNonUnit;
+    const int lda = (side == 'L') ? m : n;
     const int ldb = (corder == CblasColMajor) ? m : n; // Note: m if col-major, n if row-major
 
     const int64_t x_plus = static_cast<int64_t>(m) * static_cast<int64_t>(n);
@@ -116,16 +116,16 @@ template <typename T> typename ComplexTrsm<T>::FnType *ComplexTrsm<T>::fn = null
 
 template <typename T> void ComplexTrsm<T>::Kernel(void *out, void **data, XlaCustomCallStatus *)
 {
-    const int32_t left_side = *reinterpret_cast<int32_t *>(data[0]);
-    const int32_t lower = *reinterpret_cast<int32_t *>(data[1]);
-    const int32_t trans_a = *reinterpret_cast<int32_t *>(data[2]);
-    const int32_t diag = *reinterpret_cast<int32_t *>(data[3]);
-    const int m = *reinterpret_cast<int32_t *>(data[4]);
-    const int n = *reinterpret_cast<int32_t *>(data[5]);
-    const int batch = *reinterpret_cast<int32_t *>(data[6]);
-    const T *alpha = reinterpret_cast<T *>(data[7]);
-    const T *a = reinterpret_cast<T *>(data[8]);
-    T *b = reinterpret_cast<T *>(data[9]);
+    const char diag = *(reinterpret_cast<uint8_t *>(data[0]));
+    const char side = *(reinterpret_cast<uint8_t *>(data[1]));
+    const char trans = *(reinterpret_cast<uint8_t *>(data[2]));
+    const char uplo = *(reinterpret_cast<uint8_t *>(data[3]));
+    const int batch = *reinterpret_cast<int32_t *>(data[7]);
+    const int m = *reinterpret_cast<int32_t *>(data[8]);
+    const int n = *reinterpret_cast<int32_t *>(data[9]);
+    const T *a = reinterpret_cast<T *>(data[10]);
+    T *b = reinterpret_cast<T *>(data[11]);
+    const T *alpha = reinterpret_cast<T *>(data[12]);
 
     T *x = reinterpret_cast<T *>(out);
     if (x != b) {
@@ -135,13 +135,13 @@ template <typename T> void ComplexTrsm<T>::Kernel(void *out, void **data, XlaCus
     }
 
     constexpr CBLAS_ORDER corder = CblasRowMajor;
-    const CBLAS_SIDE cside = left_side ? CblasLeft : CblasRight;
-    const CBLAS_UPLO cuplo = lower ? CblasLower : CblasUpper;
-    const CBLAS_TRANSPOSE ctransa = (trans_a == 1)   ? CblasTrans
-                                    : (trans_a == 2) ? CblasConjTrans
+    const CBLAS_SIDE cside = (side == 'L') ? CblasLeft : CblasRight;
+    const CBLAS_UPLO cuplo = (uplo == 'L') ? CblasLower : CblasUpper;
+    const CBLAS_TRANSPOSE ctransa = (trans == 'T')   ? CblasTrans
+                                    : (trans == 'C') ? CblasConjTrans
                                                      : CblasNoTrans;
-    const CBLAS_DIAG cdiag = diag ? CblasUnit : CblasNonUnit;
-    const int lda = left_side ? m : n;
+    const CBLAS_DIAG cdiag = (diag == 'U') ? CblasUnit : CblasNonUnit;
+    const int lda = (side == 'L') ? m : n;
     const int ldb = (corder == CblasColMajor) ? m : n; // Note: m if col-major, n if row-major
 
     const int64_t x_plus = static_cast<int64_t>(m) * static_cast<int64_t>(n);
@@ -452,7 +452,7 @@ template struct ComplexGesdd<std::complex<double>>;
 template <typename T> typename RealSyevd<T>::FnType *RealSyevd<T>::fn = nullptr;
 
 template <typename T> void RealSyevd<T>::Kernel(void *out_tuple, void **data, XlaCustomCallStatus *)
-{   
+{
     const char jobz = *(reinterpret_cast<int32_t *>(data[0]));
     int8_t *uplo_tensor = reinterpret_cast<int8_t *>(data[1]);
     char uplo = static_cast<char>(*uplo_tensor);

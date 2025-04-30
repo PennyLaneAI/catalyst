@@ -56,10 +56,10 @@ struct EncodedMemref {
     }                                                                                              \
     }
 
-DEFINE_LAPACK_FUNC(blas_strsm, 10, 1, jax::RealTrsm<float>)
-DEFINE_LAPACK_FUNC(blas_dtrsm, 10, 1, jax::RealTrsm<double>)
-DEFINE_LAPACK_FUNC(blas_ctrsm, 10, 1, jax::ComplexTrsm<std::complex<float>>)
-DEFINE_LAPACK_FUNC(blas_ztrsm, 10, 1, jax::ComplexTrsm<std::complex<double>>)
+DEFINE_LAPACK_FUNC(lapack_strsm_ffi, 13, 1, jax::RealTrsm<float>)
+DEFINE_LAPACK_FUNC(lapack_dtrsm_ffi, 13, 1, jax::RealTrsm<double>)
+DEFINE_LAPACK_FUNC(lapack_ctrsm_ffi, 13, 1, jax::ComplexTrsm<std::complex<float>>)
+DEFINE_LAPACK_FUNC(lapack_ztrsm_ffi, 13, 1, jax::ComplexTrsm<std::complex<double>>)
 
 DEFINE_LAPACK_FUNC(lapack_sgetrf_ffi, 4, 3, jax::Getrf<float>)
 DEFINE_LAPACK_FUNC(lapack_dgetrf_ffi, 4, 3, jax::Getrf<double>)
