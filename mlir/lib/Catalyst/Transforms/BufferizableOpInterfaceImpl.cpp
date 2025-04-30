@@ -12,13 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
+#include "mlir/Dialect/Bufferization/IR/Bufferization.h"
+#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
+
+#include "Catalyst/IR/CatalystOps.h"
+#include "Catalyst/Transforms/BufferizableOpInterfaceImpl.h"
+
+using namespace mlir;
+using namespace mlir::bufferization;
+using namespace catalyst;
+
 namespace {
 	// stuff here
 } // namespace
 
 void catalyst::registerBufferizableOpInterfaceExternalModels(DialectRegistry &registry)
 {
-    registry.addExtension(+[](MLIRContext *ctx, catalyst::quantum::QuantumDialect *dialect) {
+    registry.addExtension(+[](MLIRContext *ctx, catalyst::CatalystDialect *dialect) {
         //QubitUnitaryOp::attachInterface<QubitUnitaryOpInterface>(*ctx);
     });
 }
