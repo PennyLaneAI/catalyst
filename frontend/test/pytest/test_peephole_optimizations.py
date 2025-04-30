@@ -347,5 +347,51 @@ def test_ppr_to_ppm():
 
 test_ppr_to_ppm()
 
+#
+# ppr_to_ppm with inject-magic-state
+#
+
+
+def test_ppr_to_ppm_inject_magic_state():
+    """
+    Test ppr_to_ppm
+    """
+    pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+
+    @qjit(pipelines=pipe, target="mlir")
+    def test_ppr_to_ppm_workflow():
+
+        @to_ppr
+        @commute_ppr
+        @merge_ppr_ppm
+        @ppr_to_ppm(decompose_method="inject-magic-state", prepare_state="plus_i")
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def f():
+            qml.H(0)
+            qml.S(1)
+            qml.T(0)
+            qml.CNOT([0, 1])
+            return measure(0), measure(1)
+
+        return f()
+
+    assert (
+        'transform.apply_registered_pass "decompose_non_clifford_ppr"'
+        in test_ppr_to_ppm_workflow.mlir
+    )
+    assert (
+        'transform.apply_registered_pass "decompose_clifford_ppr"' in test_ppr_to_ppm_workflow.mlir
+    )
+    optimized_ir = test_ppr_to_ppm_workflow.mlir_opt
+    assert 'transform.apply_registered_pass "decompose_non_clifford_ppr"' not in optimized_ir
+    assert 'transform.apply_registered_pass "decompose_clifford_ppr"' not in optimized_ir
+    assert "qec.prepare  magic" in optimized_ir
+    assert "qec.prepare  plus_i" in optimized_ir
+    assert 'qec.ppm ["X", "Z"]' in optimized_ir
+    assert 'qec.ppr ["X"]' in optimized_ir
+
+
+test_ppr_to_ppm_inject_magic_state()
+
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
