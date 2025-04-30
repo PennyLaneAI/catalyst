@@ -201,6 +201,7 @@ transforms_to_passes = {
 }
 
 
+# pylint: disable-next=redefined-outer-name
 def register_transform(pl_transform, pass_name, decomposition):
     """Register pennylane transforms and their conversion to Catalyst transforms"""
 
@@ -253,7 +254,6 @@ def register_transform(pl_transform, pass_name, decomposition):
 # across the map above and generates a custom handler for each transform.
 # In order to ensure early binding, we pass the PL plxpr transform and the
 # Catalyst pass as arguments whose default values are set by the loop.
-# pylint: disable-next=redefined-outer-name
 for pl_transform, (pass_name, decomposition) in transforms_to_passes.items():
     register_transform(pl_transform, pass_name, decomposition)
 
