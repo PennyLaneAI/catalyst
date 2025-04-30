@@ -201,11 +201,10 @@ transforms_to_passes = {
 }
 
 
-# This is our registration factory for PL transforms. The loop below iterates
-# across the map above and generates a custom handler for each transform.
-# In order to ensure early binding, we pass the PL plxpr transform and the
-# Catalyst pass as arguments whose default values are set by the loop.
-for pl_transform, (pass_name, decomposition) in transforms_to_passes.items():
+# pylint: disable-next=redefined-outer-name
+def register_transform(pl_transform, pass_name, decomposition):
+    """Register pennylane transforms and their conversion to Catalyst transforms"""
+
     # pylint: disable=unused-argument, too-many-arguments, cell-var-from-loop
     @WorkflowInterpreter.register_primitive(pl_transform._primitive)
     def handle_transform(
@@ -249,6 +248,14 @@ for pl_transform, (pass_name, decomposition) in transforms_to_passes.items():
             # Apply the corresponding Catalyst pass counterpart
             self._pass_pipeline.append(Pass(catalyst_pass_name))
             return self.eval(inner_jaxpr, consts, *non_const_args)
+
+
+# This is our registration factory for PL transforms. The loop below iterates
+# across the map above and generates a custom handler for each transform.
+# In order to ensure early binding, we pass the PL plxpr transform and the
+# Catalyst pass as arguments whose default values are set by the loop.
+for pl_transform, (pass_name, decomposition) in transforms_to_passes.items():
+    register_transform(pl_transform, pass_name, decomposition)
 
 
 class QFuncPlxprInterpreter(PlxprInterpreter):
