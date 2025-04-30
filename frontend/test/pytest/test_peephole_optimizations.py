@@ -329,8 +329,13 @@ def test_ppr_to_ppm():
 
         return f()
 
-    assert 'transform.apply_registered_pass "decompose_non_clifford_ppr"' in test_ppr_to_ppm_workflow.mlir
-    assert 'transform.apply_registered_pass "decompose_clifford_ppr"' in test_ppr_to_ppm_workflow.mlir
+    assert (
+        'transform.apply_registered_pass "decompose_non_clifford_ppr"'
+        in test_ppr_to_ppm_workflow.mlir
+    )
+    assert (
+        'transform.apply_registered_pass "decompose_clifford_ppr"' in test_ppr_to_ppm_workflow.mlir
+    )
     optimized_ir = test_ppr_to_ppm_workflow.mlir_opt
     assert 'transform.apply_registered_pass "decompose_non_clifford_ppr"' not in optimized_ir
     assert 'transform.apply_registered_pass "decompose_clifford_ppr"' not in optimized_ir
