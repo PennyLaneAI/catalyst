@@ -81,6 +81,7 @@
   [(#1683)](https://github.com/PennyLaneAI/catalyst/pull/1683)
 
 * The bufferization of custom catalyst dialects has been migrated to the new one-shot bufferization interface in mlir. The new mlir bufferization interface is required by jax 0.4.29 or higher.
+  [(#1027)](https://github.com/PennyLaneAI/catalyst/pull/1027)
   [(#1686)](https://github.com/PennyLaneAI/catalyst/pull/1686)
 
 * Improved the definition of `YieldOp` in the quantum dialect by removing `AnyTypeOf`
