@@ -59,6 +59,9 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* `null.qubit` can now support an optional `track_resources` argument which allows it to record which gates are executed.
+  [(#1619)](https://github.com/PennyLaneAI/catalyst/pull/1619)
+
 * Creates a function that allows developers to register an equivalent MLIR transform for a given PLxPR transform.
   [(#1705)](https://github.com/PennyLaneAI/catalyst/pull/1705)
 
@@ -100,4 +103,5 @@ Sengthai Heng,
 David Ittah,
 Christina Lee,
 Erick Ochoa Lopez,
-Paul Haochen Wang.
+Paul Haochen Wang,
+Jake Zaia.
