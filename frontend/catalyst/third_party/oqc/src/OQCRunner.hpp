@@ -15,97 +15,18 @@
 
 #pragma once
 
-#include <complex>
 #include <string>
 #include <vector>
 
 #include "DynamicLibraryLoader.hpp"
-#include "Exception.hpp"
 
 namespace Catalyst::Runtime::Device {
-
-/**
- * The OpenQasm circuit runner interface.
- */
-struct OQCRunnerBase {
-    explicit OQCRunnerBase() = default;
-    virtual ~OQCRunnerBase() = default;
-
-    [[nodiscard]] virtual auto runCircuit([[maybe_unused]] const std::string &circuit,
-                                          [[maybe_unused]] const std::string &device,
-                                          [[maybe_unused]] size_t shots,
-                                          [[maybe_unused]] const std::string &kwargs = "") const
-        -> std::string
-    {
-        RT_FAIL("Not implemented method");
-        return {};
-    }
-    [[nodiscard]] virtual auto
-    Probs([[maybe_unused]] const std::string &circuit, [[maybe_unused]] const std::string &device,
-          [[maybe_unused]] size_t shots, [[maybe_unused]] size_t num_qubits,
-          [[maybe_unused]] const std::string &kwargs = "") const -> std::vector<double>
-    {
-        RT_FAIL("Not implemented method");
-        return {};
-    }
-    [[nodiscard]] virtual auto
-    Sample([[maybe_unused]] const std::string &circuit, [[maybe_unused]] const std::string &device,
-           [[maybe_unused]] size_t shots, [[maybe_unused]] size_t num_qubits,
-           [[maybe_unused]] const std::string &kwargs = "") const -> std::vector<size_t>
-    {
-        RT_FAIL("Not implemented method");
-        return {};
-    }
-    [[nodiscard]] virtual auto
-    Counts([[maybe_unused]] const std::string &circuit, [[maybe_unused]] const std::string &device,
-           [[maybe_unused]] size_t shots, [[maybe_unused]] size_t num_qubits,
-           [[maybe_unused]] const std::string &kwargs = "") const -> std::vector<size_t>
-    {
-        RT_FAIL("Not implemented method");
-        return {};
-    }
-    [[nodiscard]] virtual auto
-    Expval([[maybe_unused]] const std::string &circuit, [[maybe_unused]] const std::string &device,
-           [[maybe_unused]] size_t shots, [[maybe_unused]] const std::string &kwargs = "") const
-        -> double
-    {
-        RT_FAIL("Not implemented method");
-        return {};
-    }
-    [[nodiscard]] virtual auto Var([[maybe_unused]] const std::string &circuit,
-                                   [[maybe_unused]] const std::string &device,
-                                   [[maybe_unused]] size_t shots,
-                                   [[maybe_unused]] const std::string &kwargs = "") const -> double
-    {
-        RT_FAIL("Not implemented method");
-        return {};
-    }
-    [[nodiscard]] virtual auto
-    State([[maybe_unused]] const std::string &circuit, [[maybe_unused]] const std::string &device,
-          [[maybe_unused]] size_t shots, [[maybe_unused]] size_t num_qubits,
-          [[maybe_unused]] const std::string &kwargs = "") const
-        -> std::vector<std::complex<double>>
-    {
-        RT_FAIL("Not implemented method");
-        return {};
-    }
-    [[nodiscard]] virtual auto Gradient([[maybe_unused]] const std::string &circuit,
-                                        [[maybe_unused]] const std::string &device,
-                                        [[maybe_unused]] size_t shots,
-                                        [[maybe_unused]] size_t num_qubits,
-                                        [[maybe_unused]] const std::string &kwargs = "") const
-        -> std::vector<double>
-    {
-        RT_FAIL("Not implemented method");
-        return {};
-    }
-};
 
 /**
  * The OpenQASM circuit runner to execute an OpenQASM circuit on OQC devices thanks to
  * OQC qcaas client.
  */
-struct OQCRunner : public OQCRunnerBase {
+struct OQCRunner {
 
     [[nodiscard]] auto Counts(const std::string &circuit, const std::string &device, size_t shots,
                               size_t num_qubits, const std::string &kwargs = "") const
