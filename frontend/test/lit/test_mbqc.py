@@ -124,6 +124,8 @@ def test_measure_arbitrary_basis(angle, plane):
     """Test the compilation of the qml.ftqc.measure_arbitrary_basis function, which performs a
     mid-circuit measurement in an arbitrary basis defined by a plane and rotation angle about that
     plane on the supplied qubit.
+
+    In this case, the rotation angle is static (known at compile time).
     """
     dev = qml.device("null.qubit", wires=1)
 
@@ -170,3 +172,34 @@ try:
 
 except ValueError as e:
     assert "Measurement plane must be one of ['XY', 'YZ', 'ZX']" in str(e)
+
+
+def test_measure_arbitrary_basis_dyn_angle(plane):
+    """Test the compilation of the qml.ftqc.measure_arbitrary_basis function, which performs a
+    mid-circuit measurement in an arbitrary basis defined by a plane and rotation angle about that
+    plane on the supplied qubit.
+
+    In this case, the rotation angle is dynamic (not known until runtime).
+    """
+    dev = qml.device("null.qubit", wires=1)
+
+    qml.capture.enable()
+
+    @qjit(target="mlir")
+    @qml.qnode(dev)
+    def workload_measure_arbitrary_basis_dyn_angle(_angle: float):
+        _ = plft.measure_arbitrary_basis(wires=0, angle=_angle, plane=plane)
+        return qml.expval(qml.Z(0))
+
+    qml.capture.disable()
+
+    print(workload_measure_arbitrary_basis_dyn_angle.mlir)
+
+
+# CHECK-LABEL: public @workload_measure_arbitrary_basis_dyn_angle(%arg0: tensor<f64>)
+# CHECK-DAG: [[qreg:%.+]] = quantum.alloc( 1) : !quantum.reg
+# CHECK-DAG: [[q0:%.+]] = quantum.extract [[qreg]][ 0] : !quantum.reg -> !quantum.bit
+# CHECK-DAG: [[angle_tensor:%.+]] = stablehlo.convert %arg0 : tensor<f64>
+# CHECK-DAG: [[angle:%.+]] = tensor.extract [[angle_tensor]][] : tensor<f64>
+# CHECK: %mres, %out_qubit = mbqc.measure_in_basis[ XY, [[angle]]] %2 : i1, !quantum.bit
+test_measure_arbitrary_basis_dyn_angle("XY")
