@@ -178,6 +178,8 @@ struct SampleOpInterface
         return false;
     }
 
+    bool bufferizesToAllocation(Operation *op, Value value) const { return true; }
+
     bufferization::AliasingValueList
     getAliasingValues(Operation *op, OpOperand &opOperand,
                       const bufferization::AnalysisState &state) const
@@ -225,6 +227,8 @@ struct CountsOpInterface
     {
         return false;
     }
+
+    bool bufferizesToAllocation(Operation *op, Value value) const { return true; }
 
     bufferization::AliasingValueList
     getAliasingValues(Operation *op, OpOperand &opOperand,
@@ -284,6 +288,8 @@ struct ProbsOpInterface
         return false;
     }
 
+    bool bufferizesToAllocation(Operation *op, Value value) const { return true; }
+
     bufferization::AliasingValueList
     getAliasingValues(Operation *op, OpOperand &opOperand,
                       const bufferization::AnalysisState &state) const
@@ -334,6 +340,8 @@ struct StateOpInterface
     {
         return false;
     }
+
+    bool bufferizesToAllocation(Operation *op, Value value) const { return true; }
 
     bufferization::AliasingValueList
     getAliasingValues(Operation *op, OpOperand &opOperand,
