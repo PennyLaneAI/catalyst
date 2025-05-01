@@ -617,11 +617,12 @@ TEST_CASE("Test NullQubit device resource tracking", "[NullQubit]")
     // Apply named gates to test all possible name modifiers
     sim->NamedOperation("PauliX", {}, {Qs[0]}, false);
     sim->NamedOperation("T", {}, {Qs[0]}, true);
-    sim->NamedOperation("S", {}, {Qs[0], Qs[1]}, false, {Qs[2]});
-    sim->NamedOperation("T", {}, {Qs[0], Qs[1]}, true, {Qs[2]});
+    sim->NamedOperation("S", {}, {Qs[0]}, false, {Qs[2]});
+    sim->NamedOperation("S", {}, {Qs[0]}, false, {Qs[1], Qs[2]});
+    sim->NamedOperation("T", {}, {Qs[0]}, true, {Qs[2]});
     sim->NamedOperation("CNOT", {}, {Qs[0], Qs[1]}, false);
 
-    CHECK(sim->ResourcesGetNumGates() == 5);
+    CHECK(sim->ResourcesGetNumGates() == 6);
     CHECK(sim->ResourcesGetNumQubits() == 4);
 
     // Applying an empty matrix is fine for NullQubit
@@ -629,8 +630,9 @@ TEST_CASE("Test NullQubit device resource tracking", "[NullQubit]")
     sim->MatrixOperation({}, {Qs[0]}, false, {Qs[1]});
     sim->MatrixOperation({}, {Qs[0]}, true);
     sim->MatrixOperation({}, {Qs[0]}, true, {Qs[1]});
+    sim->MatrixOperation({}, {Qs[0]}, true, {Qs[1], Qs[2]});
 
-    CHECK(sim->ResourcesGetNumGates() == 9);
+    CHECK(sim->ResourcesGetNumGates() == 11);
     CHECK(sim->ResourcesGetNumQubits() == 4);
 
     // Capture resources usage
@@ -644,12 +646,14 @@ TEST_CASE("Test NullQubit device resource tracking", "[NullQubit]")
                                                "C(Adj(T))",
                                                "Adj(T)",
                                                "C(S)",
+                                               "2C(S)",
                                                "S",
                                                "CNOT",
                                                "Adj(ControlledQubitUnitary)",
                                                "ControlledQubitUnitary",
                                                "Adj(QubitUnitary)",
-                                               "QubitUnitary"};
+                                               "QubitUnitary",
+                                               "2C(QubitUnitary)"};
 
     // Check all fields have the correct value
     std::string full_json;
@@ -660,7 +664,7 @@ TEST_CASE("Test NullQubit device resource tracking", "[NullQubit]")
             CHECK(line.find("4") != std::string::npos);
         }
         if (line.find("num_gates") != std::string::npos) {
-            CHECK(line.find("9") != std::string::npos);
+            CHECK(line.find("11") != std::string::npos);
         }
         // If one of the resource names is in the line, check that there is precisely 1
         for (const auto &name : resource_names) {

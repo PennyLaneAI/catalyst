@@ -75,7 +75,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
 
         // Open the file for writing
         std::ofstream resource_file(RESOURCES_FNAME);
-        if (!resource_file.is_open()) {
+        if (!resource_file.is_open()) { // LCOV_EXCL_LINE
             throw std::runtime_error("Failed to open resource usage file for writing.");
         }
 
@@ -225,6 +225,9 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
             std::string prefix = "";
             std::string suffix = "";
             if (!controlled_wires.empty()) {
+                if (controlled_wires.size() > 1) {
+                    prefix += std::to_string(controlled_wires.size());
+                }
                 prefix += "C(";
                 suffix += ")";
             }
@@ -252,7 +255,12 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
             std::string op_name = "QubitUnitary";
 
             if (!controlled_wires.empty()) {
-                op_name = "Controlled" + op_name;
+                if (controlled_wires.size() == 1) {
+                    op_name = "Controlled" + op_name;
+                }
+                else {
+                    op_name = std::to_string(controlled_wires.size()) + "C(" + op_name + ")";
+                }
             }
             if (inverse) {
                 op_name = "Adj(" + op_name + ")";
