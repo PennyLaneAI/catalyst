@@ -20,6 +20,8 @@
 measurements from PennyLane's ftqc module in Catalyst.
 """
 
+from functools import partial
+
 import pennylane as qml
 import pennylane.ftqc as plft
 
@@ -203,3 +205,75 @@ def test_measure_arbitrary_basis_dyn_angle(plane):
 # CHECK-DAG: [[angle:%.+]] = tensor.extract [[angle_tensor]][] : tensor<f64>
 # CHECK: %mres, %out_qubit = mbqc.measure_in_basis[ XY, [[angle]]] %2 : i1, !quantum.bit
 test_measure_arbitrary_basis_dyn_angle("XY")
+
+
+def test_pseudo_mbqc_workload():
+    """Test the compilation of a pseudo-MBQC workload.
+
+    This workload implements a simplified mock circuit in an explicit MBQC-like representation that
+    contains all of the elements of a typical gate represented in the MBQC formalism, but with
+    reduced complexity for the sake of testing.
+    """
+    dev = qml.device("null.qubit", wires=3)
+
+    qml.capture.enable()
+
+    # CHECK-LABEL: public @workload_pseudo_mbqc(
+    @qjit(target="mlir")
+    @qml.qnode(dev)
+    def workload_pseudo_mbqc(rotation_angle: float):
+        # CHECK: [[cst_zero:%.+]] = arith.constant 0.000000e+00 : f64
+
+        # Create graph state
+        # CHECK: quantum.custom "Hadamard"() {{.+}} : !quantum.bit
+        # CHECK: quantum.custom "Hadamard"() {{.+}} : !quantum.bit
+        # CHECK: quantum.custom "Hadamard"() {{.+}} : !quantum.bit
+        qml.Hadamard(0)
+        qml.Hadamard(1)
+        qml.Hadamard(2)
+
+        # CHECK: quantum.custom "CZ"() {{.+}}, {{.+}} : !quantum.bit, !quantum.bit
+        # CHECK: quantum.custom "CZ"() {{.+}}, {{.+}} : !quantum.bit, !quantum.bit
+        qml.CZ([0, 1])
+        qml.CZ([1, 2])
+
+        # Perform measurement pattern
+        # CHECK: [[m0:%.+]], [[out0:%.+]] = mbqc.measure_in_basis[ XY, [[cst_zero]]] {{.+}} : i1, !quantum.bit
+        m0 = plft.measure_x(0)
+
+        # CHECK: [[neg_angle:%.+]] = stablehlo.negate %arg0 : tensor<f64>
+        # CHECK: scf.if [[m0]] -> (tensor<i1>, !quantum.reg) {
+        # CHECK:   stablehlo.convert %arg0 : tensor<f64>
+        # CHECK:   [[angle_ext:%.+]] = tensor.extract {{.+}} : tensor<f64>
+        # CHECK:   mbqc.measure_in_basis[ XY, [[angle_ext]]] {{.+}} : i1, !quantum.bit
+        # CHECK: } else {
+        # CHECK:   stablehlo.convert [[neg_angle]] : tensor<f64>
+        # CHECK:   [[neg_angle_ext:%.+]] = tensor.extract {{.+}} : tensor<f64>
+        # CHECK:   mbqc.measure_in_basis[ XY, [[neg_angle_ext]]] {{.+}} : i1, !quantum.bit
+        # CHECK: }
+        m1 = qml.ftqc.cond_measure(
+            m0,
+            partial(qml.ftqc.measure_arbitrary_basis, angle=rotation_angle),
+            partial(qml.ftqc.measure_arbitrary_basis, angle=-rotation_angle),
+        )(plane="XY", wires=1)
+
+        # Apply by-product correction
+        # CHECK: stablehlo.xor {{.+}}, {{.+}} : tensor<i1>
+        # CHECK: [[xor_res:%.+]] = tensor.extract {{.+}}[] : tensor<i1>
+        # CHECK: scf.if [[xor_res]] -> (!quantum.reg) {
+        # CHECK:   quantum.custom "PauliX"() {{.+}} : !quantum.bit
+        # CHECK: } else {
+        # CHECK:   quantum.custom "Identity"() {{.+}} : !quantum.bit
+        # CHECK: }
+        qml.cond(m0 ^ m1, qml.X, qml.I)(2)
+
+        # CHECK: [[obs:%.+]] = quantum.namedobs {{.+}}[ PauliZ] : !quantum.obs
+        # CHECK: quantum.expval [[obs]] : f64
+        return qml.expval(qml.Z(2))
+
+    qml.capture.disable()
+
+    print(workload_pseudo_mbqc.mlir)
+
+
+test_pseudo_mbqc_workload()
