@@ -22,6 +22,7 @@ import pytest
 
 import catalyst
 from catalyst import qjit
+from catalyst.passes import xdsl_plugin
 
 
 def test_path_does_not_exists():
@@ -91,3 +92,15 @@ def test_get_options():
         == "an-option bn-option"
     )
     assert catalyst.passes.Pass("example-pass", option=True).get_options() == "option=True"
+
+
+def test_xdsl_plugin():
+    """Here, we just test that we are able to run."""
+
+    @catalyst.qjit(pass_plugins={xdsl_plugin.getXDSLPluginAbsolutePath()})
+    @catalyst.passes.apply_pass("catalyst_xdsl_plugin.remove-chained-self-inverse")
+    @qml.qnode(qml.device("null.qubit", wires=1))
+    def example():
+        return qml.state()
+
+    example()
