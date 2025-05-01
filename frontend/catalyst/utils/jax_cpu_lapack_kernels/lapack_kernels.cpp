@@ -83,7 +83,7 @@ template <typename T> void RealTrsm<T>::Kernel(void *out, void **data, XlaCustom
     const int n = *reinterpret_cast<int32_t *>(data[9]);
     const T *a = reinterpret_cast<T *>(data[10]);
     T *b = reinterpret_cast<T *>(data[11]);
-    const T alpha = *reinterpret_cast<T *>(data[12]);
+    const T alpha = static_cast<T>(1);
 
     T *x = reinterpret_cast<T *>(out);
     if (x != b) {
@@ -125,7 +125,7 @@ template <typename T> void ComplexTrsm<T>::Kernel(void *out, void **data, XlaCus
     const int n = *reinterpret_cast<int32_t *>(data[9]);
     const T *a = reinterpret_cast<T *>(data[10]);
     T *b = reinterpret_cast<T *>(data[11]);
-    const T *alpha = reinterpret_cast<T *>(data[12]);
+    const T alpha = static_cast<T>(1);
 
     T *x = reinterpret_cast<T *>(out);
     if (x != b) {
@@ -148,7 +148,7 @@ template <typename T> void ComplexTrsm<T>::Kernel(void *out, void **data, XlaCus
     const int64_t a_plus = static_cast<int64_t>(lda) * static_cast<int64_t>(lda);
 
     for (int i = 0; i < batch; ++i) {
-        fn(CblasRowMajor, cside, cuplo, ctransa, cdiag, m, n, alpha, a, lda, x, ldb);
+        fn(CblasRowMajor, cside, cuplo, ctransa, cdiag, m, n, &alpha, a, lda, x, ldb);
         x += x_plus;
         a += a_plus;
     }
