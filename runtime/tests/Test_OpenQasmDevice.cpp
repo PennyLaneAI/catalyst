@@ -218,7 +218,7 @@ TEST_CASE("Test the OpenQasmDevice setBasisState", "[openqasm]")
     DataView<int8_t, 1> view(state);
     std::vector<QubitIdType> wires{0};
     REQUIRE_THROWS_WITH(device->SetBasisState(view, wires),
-                        ContainsSubstring("Unsupported functionality"));
+                        ContainsSubstring("unsupported by device"));
 }
 
 TEST_CASE("Test the OpenQasmDevice setState", "[openqasm]")
@@ -231,8 +231,7 @@ TEST_CASE("Test the OpenQasmDevice setState", "[openqasm]")
     std::vector<std::complex<double>> state{{1.0, 0.0}};
     DataView<std::complex<double>, 1> view(state);
     std::vector<QubitIdType> wires{0};
-    REQUIRE_THROWS_WITH(device->SetState(view, wires),
-                        ContainsSubstring("Unsupported functionality"));
+    REQUIRE_THROWS_WITH(device->SetState(view, wires), ContainsSubstring("unsupported by device"));
 }
 
 TEST_CASE("Test the bell pair circuit with BuilderType::Common", "[openqasm]")
@@ -306,7 +305,7 @@ TEST_CASE("Test measurement processes, the bell pair circuit with BuilderType::B
         std::vector<double> samples(shots * n);
         MemRefT<double, 2> buffer{samples.data(), samples.data(), 0, {shots, n}, {1, 1}};
         DataView<double, 2> view(buffer.data_aligned, buffer.offset, buffer.sizes, buffer.strides);
-        device->Sample(view, shots);
+        device->Sample(view);
 
         for (size_t i = 0; i < shots * n; i++) {
             CHECK((samples[i] == 0.f || samples[i] == 1.f));
@@ -318,7 +317,7 @@ TEST_CASE("Test measurement processes, the bell pair circuit with BuilderType::B
         std::vector<double> samples(shots);
         MemRefT<double, 2> buffer{samples.data(), samples.data(), 0, {shots, 1}, {1, 1}};
         DataView<double, 2> view(buffer.data_aligned, buffer.offset, buffer.sizes, buffer.strides);
-        device->PartialSample(view, std::vector<QubitIdType>{0}, shots);
+        device->PartialSample(view, std::vector<QubitIdType>{0});
 
         for (size_t i = 0; i < shots; i++) {
             CHECK((samples[i] == 0.f || samples[i] == 1.f));
@@ -331,7 +330,7 @@ TEST_CASE("Test measurement processes, the bell pair circuit with BuilderType::B
         std::vector<int64_t> counts(size);
         DataView<double, 1> eview(eigvals);
         DataView<int64_t, 1> cview(counts);
-        device->Counts(eview, cview, shots);
+        device->Counts(eview, cview);
 
         size_t sum = 0;
         for (size_t i = 0; i < size; i++) {
@@ -348,7 +347,7 @@ TEST_CASE("Test measurement processes, the bell pair circuit with BuilderType::B
         std::vector<int64_t> counts(size);
         DataView<double, 1> eview(eigvals);
         DataView<int64_t, 1> cview(counts);
-        device->PartialCounts(eview, cview, std::vector<QubitIdType>{1}, shots);
+        device->PartialCounts(eview, cview, std::vector<QubitIdType>{1});
 
         size_t sum = 0;
         for (size_t i = 0; i < size; i++) {
@@ -449,7 +448,7 @@ TEST_CASE("Test measurement processes, a simple circuit with BuilderType::Braket
         std::vector<double> samples(shots * n);
         MemRefT<double, 2> buffer{samples.data(), samples.data(), 0, {shots, n}, {1, 1}};
         DataView<double, 2> view(buffer.data_aligned, buffer.offset, buffer.sizes, buffer.strides);
-        device->Sample(view, shots);
+        device->Sample(view);
 
         for (size_t i = 0; i < shots * n; i++) {
             CHECK((samples[i] == 0.f || samples[i] == 1.f));
@@ -461,7 +460,7 @@ TEST_CASE("Test measurement processes, a simple circuit with BuilderType::Braket
         std::vector<double> samples(shots);
         MemRefT<double, 2> buffer{samples.data(), samples.data(), 0, {shots, 1}, {1, 1}};
         DataView<double, 2> view(buffer.data_aligned, buffer.offset, buffer.sizes, buffer.strides);
-        device->PartialSample(view, std::vector<QubitIdType>{0}, shots);
+        device->PartialSample(view, std::vector<QubitIdType>{0});
 
         for (size_t i = 0; i < shots; i++) {
             CHECK((samples[i] == 0.f || samples[i] == 1.f));
@@ -474,7 +473,7 @@ TEST_CASE("Test measurement processes, a simple circuit with BuilderType::Braket
         std::vector<int64_t> counts(size);
         DataView<double, 1> eview(eigvals);
         DataView<int64_t, 1> cview(counts);
-        device->Counts(eview, cview, shots);
+        device->Counts(eview, cview);
 
         size_t sum = 0;
         for (size_t i = 0; i < size; i++) {
@@ -491,7 +490,7 @@ TEST_CASE("Test measurement processes, a simple circuit with BuilderType::Braket
         std::vector<int64_t> counts(size);
         DataView<double, 1> eview(eigvals);
         DataView<int64_t, 1> cview(counts);
-        device->PartialCounts(eview, cview, std::vector<QubitIdType>{1}, shots);
+        device->PartialCounts(eview, cview, std::vector<QubitIdType>{1});
 
         size_t sum = 0;
         for (size_t i = 0; i < size; i++) {
