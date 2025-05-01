@@ -89,6 +89,9 @@
   [(#1671)](https://github.com/PennyLaneAI/catalyst/pull/1671)
   [(#1681)](https://github.com/PennyLaneAI/catalyst/pull/1681)
 
+* LAPACK kernels are updated to adhere to the new JAX lowering rules for external functions.
+  [(#1685)](https://github.com/PennyLaneAI/catalyst/pull/1685)
+
 <h3>Documentation 📝</h3>
 
 <h3>Contributors ✍️</h3>
@@ -100,4 +103,5 @@ Sengthai Heng,
 David Ittah,
 Christina Lee,
 Erick Ochoa Lopez,
+Mehrdad Malekmohammadi,
 Paul Haochen Wang.
