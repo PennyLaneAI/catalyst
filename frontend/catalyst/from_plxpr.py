@@ -643,7 +643,7 @@ def handle_while_loop(
     return outvals
 
 
-# pylint: disable=unused-argument
+# pylint: disable=unused-argument, too-many-positional-arguments
 @QFuncPlxprInterpreter.register_primitive(plxpr_measure_in_basis_prim)
 def handle_measure_in_basis(self, angle, wire, plane, reset, postselect):
     """Handle the conversion from plxpr to Catalyst jaxpr for the measure_in_basis primitive"""
