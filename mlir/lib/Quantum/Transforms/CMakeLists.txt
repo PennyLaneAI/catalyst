@@ -1,8 +1,7 @@
 set(LIBRARY_NAME quantum-transforms)
 
 file(GLOB SRC
-    BufferizationPatterns.cpp
-    quantum_bufferize.cpp
+    BufferizableOpInterfaceImpl.cpp
     ConversionPatterns.cpp
     quantum_to_llvm.cpp
     emit_catalyst_pyface.cpp

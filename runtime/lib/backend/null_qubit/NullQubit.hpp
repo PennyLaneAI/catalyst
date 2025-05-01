@@ -203,31 +203,6 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     void StopTapeRecording() {}
 
     /**
-     * @brief Not the result value for "Zero" used in the measurement process.
-     *
-     * @return `Result`
-     */
-    [[nodiscard]] auto Zero() const -> Result
-    {
-        return const_cast<Result>(&GLOBAL_RESULT_FALSE_CONST);
-    }
-
-    /**
-     * @brief Not the result value for "One"  used in the measurement process.
-     *
-     * @return `Result`
-     */
-    [[nodiscard]] auto One() const -> Result
-    {
-        return const_cast<Result>(&GLOBAL_RESULT_TRUE_CONST);
-    }
-
-    /**
-     * @brief Not a helper method to print the state vector of a device.
-     */
-    void PrintState() {}
-
-    /**
      * @brief Doesn't prepare subsystems using the given ket vector in the computational basis.
      */
     void SetState(DataView<std::complex<double>, 1> &, std::vector<QubitIdType> &) {}
@@ -382,7 +357,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      *
      * Always fills array of samples with 0.
      */
-    void Sample(DataView<double, 2> &samples, size_t)
+    void Sample(DataView<double, 2> &samples)
     {
         // If num_qubits == 0, the samples array is unallocated (shape=(shots, 0)), so don't fill
         if (num_qubits_ > 0) {
@@ -392,7 +367,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
 
     /**
      * @brief Doesn't Compute partial samples with the number of shots on `wires`,
-     * returing raw samples.
+     * returning raw samples.
      *
      * Same behaviour as Sample().
      *
@@ -400,9 +375,9 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      * shape `shots * numWires`. The built-in iterator in `DataView<double, 2>`
      * iterates over all elements of `samples` row-wise.
      */
-    void PartialSample(DataView<double, 2> &samples, const std::vector<QubitIdType> &, size_t)
+    void PartialSample(DataView<double, 2> &samples, const std::vector<QubitIdType> &)
     {
-        Sample(samples, 0U);
+        Sample(samples);
     }
 
     /**
@@ -412,14 +387,14 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      * Always fills eigenvalues with integers ranging from 0, 1, ..., 2**num_qubits
      * Always sets the first element of counts to `shots` and fills the rest with 0.
      */
-    void Counts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts, size_t shots)
+    void Counts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts)
     {
         auto iter_eigvals = eigvals.begin();
         *iter_eigvals = 0.0;
         ++iter_eigvals;
 
         auto iter_counts = counts.begin();
-        *iter_counts = shots;
+        *iter_counts = GetDeviceShots();
         ++iter_counts;
 
         if (num_qubits_ > 0) {
@@ -435,9 +410,9 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      * Same behaviour as Counts().
      */
     void PartialCounts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts,
-                       const std::vector<QubitIdType> &, size_t shots)
+                       const std::vector<QubitIdType> &)
     {
-        Counts(eigvals, counts, shots);
+        Counts(eigvals, counts);
     }
 
     /**
@@ -445,7 +420,10 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      *
      * @return `Result` The measurement result
      */
-    auto Measure(QubitIdType, std::optional<int32_t>) -> Result { return this->Zero(); }
+    auto Measure(QubitIdType, std::optional<int32_t>) -> Result
+    {
+        return const_cast<Result>(&GLOBAL_RESULT_FALSE_CONST);
+    }
 
     /**
      * @brief Doesn't Compute the gradient of a quantum tape, that is cached using
@@ -485,7 +463,6 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     Catalyst::Runtime::QubitManager<QubitIdType, size_t> qubit_manager{};
 
     // static constants for RESULT values
-    static constexpr bool GLOBAL_RESULT_TRUE_CONST = true;
     static constexpr bool GLOBAL_RESULT_FALSE_CONST = false;
 };
 } // namespace Catalyst::Runtime::Devices

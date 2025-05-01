@@ -36,6 +36,9 @@
 
 namespace Catalyst::Runtime {
 
+static constexpr RESULT GLOBAL_RESULT_TRUE_CONST{true};
+static constexpr RESULT GLOBAL_RESULT_FALSE_CONST{false};
+
 /**
  * @brief Global quantum device unique pointer.
  */
@@ -280,7 +283,20 @@ void __catalyst__rt__device_release()
     timer::timer(__catalyst__rt__device_release__impl, "device_release", /* add_endl */ true);
 }
 
-void __catalyst__rt__print_state() { getQuantumDevicePtr()->PrintState(); }
+void __catalyst__rt__print_state()
+{
+    size_t num_wires = getQuantumDevicePtr()->GetNumQubits();
+    std::vector<std::complex<double>> state(1 << num_wires);
+    DataView<std::complex<double>, 1> view(state);
+
+    getQuantumDevicePtr()->State(view);
+
+    std::cout << "State = [\n";
+    for (size_t idx = 0; idx < state.size(); idx++) {
+        std::cout << "  " << state[idx] << ",\n";
+    }
+    std::cout << "]\n";
+}
 
 void __catalyst__rt__toggle_recorder(bool status)
 {
@@ -381,9 +397,12 @@ int64_t __catalyst__rt__num_qubits()
 
 bool __catalyst__rt__result_equal(RESULT *r0, RESULT *r1) { return (r0 == r1) || (*r0 == *r1); }
 
-RESULT *__catalyst__rt__result_get_one() { return getQuantumDevicePtr()->One(); }
+RESULT *__catalyst__rt__result_get_one() { return const_cast<RESULT *>(&GLOBAL_RESULT_TRUE_CONST); }
 
-RESULT *__catalyst__rt__result_get_zero() { return getQuantumDevicePtr()->Zero(); }
+RESULT *__catalyst__rt__result_get_zero()
+{
+    return const_cast<RESULT *>(&GLOBAL_RESULT_FALSE_CONST);
+}
 
 void __catalyst__qis__Gradient(int64_t numResults, /* results = */...)
 {
@@ -949,12 +968,12 @@ void __catalyst__qis__Probs(MemRefT_double_1d *result, int64_t numQubits, ...)
 
 void __catalyst__qis__Sample(MemRefT_double_2d *result, int64_t numQubits, ...)
 {
-    int64_t shots = getQuantumDevicePtr()->GetDeviceShots();
-    RT_ASSERT(shots >= 0);
     RT_ASSERT(numQubits >= 0);
     std::string error_msg = "return tensor must have 2D shape equal to (number of shots, "
                             "number of qubits in observable)";
     if (numQubits != 0) {
+        size_t shots = getQuantumDevicePtr()->GetDeviceShots();
+        RT_FAIL_IF(result->sizes[0] != shots, error_msg.c_str());
         RT_FAIL_IF(result->sizes[1] != static_cast<size_t>(numQubits), error_msg.c_str());
     }
     MemRefT<double, 2> *result_p = (MemRefT<double, 2> *)result;
@@ -971,17 +990,15 @@ void __catalyst__qis__Sample(MemRefT_double_2d *result, int64_t numQubits, ...)
                              result_p->strides);
 
     if (wires.empty()) {
-        getQuantumDevicePtr()->Sample(view, shots);
+        getQuantumDevicePtr()->Sample(view);
     }
     else {
-        getQuantumDevicePtr()->PartialSample(view, wires, shots);
+        getQuantumDevicePtr()->PartialSample(view, wires);
     }
 }
 
 void __catalyst__qis__Counts(PairT_MemRefT_double_int64_1d *result, int64_t numQubits, ...)
 {
-    int64_t shots = getQuantumDevicePtr()->GetDeviceShots();
-    RT_ASSERT(shots >= 0);
     RT_ASSERT(numQubits >= 0);
     RT_ASSERT(result->first.sizes[0] == result->second.sizes[0]);
     std::string error_msg = "number of eigenvalues or counts did not match observable";
@@ -1006,10 +1023,10 @@ void __catalyst__qis__Counts(PairT_MemRefT_double_int64_1d *result, int64_t numQ
                                      result_counts_p->sizes, result_counts_p->strides);
 
     if (wires.empty()) {
-        getQuantumDevicePtr()->Counts(eigvals_view, counts_view, shots);
+        getQuantumDevicePtr()->Counts(eigvals_view, counts_view);
     }
     else {
-        getQuantumDevicePtr()->PartialCounts(eigvals_view, counts_view, wires, shots);
+        getQuantumDevicePtr()->PartialCounts(eigvals_view, counts_view, wires);
     }
 }
 
