@@ -41,7 +41,7 @@ ASAN_COMMAND = $(ASAN_FLAGS)
 endif
 
 BUILD_TARGETS := rt_capi rtd_null_qubit
-TEST_TARGETS := runner_tests_qir_runtime
+TEST_TARGETS := runner_tests_qir_runtime runner_tests_mbqc_runtime
 
 ifeq ($(ENABLE_OPENQASM), ON)
 	BUILD_TARGETS += rtd_openqasm
@@ -97,6 +97,8 @@ test: BUILD_TYPE?=RelWithDebInfo
 test: test_runner
 	@echo "Catalyst runtime test suite - NullQubit"
 	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_qir_runtime
+	@echo "Catalyst MBQC runtime test suite"
+	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_mbqc_runtime
 ifeq ($(ENABLE_OPENQASM), ON)
 	# Test the OpenQasm devices C++ tests
 	$(ASAN_COMMAND) $(PY_ASAN_OPTIONS) $(RT_BUILD_DIR)/tests/runner_tests_openqasm
@@ -116,6 +118,7 @@ coverage: export LLVM_PROFILE_FILE := $(RT_BUILD_DIR)/tests/%m.profraw
 coverage: test_runner
 	@echo "check C++ code coverage"
 	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_qir_runtime
+	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_mbqc_runtime
 ifeq ($(ENABLE_OPENQASM), ON)
 	$(ASAN_COMMAND) $(PY_ASAN_OPTIONS) $(RT_BUILD_DIR)/tests/runner_tests_openqasm
 endif
@@ -131,6 +134,7 @@ else
 	xcrun llvm-cov show -instr-profile $(RT_BUILD_DIR)/tests/rt_test_coverage.profdata \
 		-object $(RT_BUILD_DIR)/tests/runner_tests_openqasm \
 		$(RT_BUILD_DIR)/tests/runner_tests_qir_runtime \
+		$(RT_BUILD_DIR)/tests/runner_tests_mbqc_runtime \
 		-format=html -output-dir=$(RT_BUILD_DIR)/coverage_html \
 		$(MK_DIR)/include $(MK_DIR)/lib $(MK_DIR)/tests
 endif
