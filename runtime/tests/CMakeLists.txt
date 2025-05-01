@@ -116,3 +116,18 @@ if(ENABLE_OQD)
 
     catch_discover_tests(runner_tests_oqd)
 endif()
+
+
+# MBQC test suite
+add_executable(runner_tests_mbqc_runtime)
+target_sources(runner_tests_mbqc_runtime PRIVATE
+    Test_MBQC.cpp
+)
+
+target_link_libraries(runner_tests_mbqc_runtime PRIVATE
+    Catch2WithMain
+    catalyst_runtime_testing
+    rtd_null_qubit
+)
+
+catch_discover_tests(runner_tests_mbqc_runtime)
