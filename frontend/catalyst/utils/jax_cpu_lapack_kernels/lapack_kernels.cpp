@@ -73,11 +73,15 @@ namespace jax {
 template <typename T> typename RealTrsm<T>::FnType *RealTrsm<T>::fn = nullptr;
 
 template <typename T> void RealTrsm<T>::Kernel(void *out, void **data, XlaCustomCallStatus *)
-{
-    const char diag = *(reinterpret_cast<uint8_t *>(data[0]));
-    const char side = *(reinterpret_cast<uint8_t *>(data[1]));
-    const char trans = *(reinterpret_cast<uint8_t *>(data[2]));
-    const char uplo = *(reinterpret_cast<uint8_t *>(data[3]));
+{   
+    const uint8_t *diag_tensor = reinterpret_cast<uint8_t *>(data[0]);
+    const char diag = static_cast<char>(*diag_tensor);
+    const uint8_t *side_tensor = reinterpret_cast<uint8_t *>(data[1]);
+    const char side = static_cast<char>(*side_tensor);
+    const uint8_t *trans_tensor = reinterpret_cast<uint8_t *>(data[2]);
+    const char trans = static_cast<char>(*trans_tensor);
+    const uint8_t *uplo_tensor = reinterpret_cast<uint8_t *>(data[3]);
+    const char uplo = static_cast<char>(*uplo_tensor);
     const int batch = *reinterpret_cast<int32_t *>(data[7]);
     const int m = *reinterpret_cast<int32_t *>(data[8]);
     const int n = *reinterpret_cast<int32_t *>(data[9]);
@@ -116,10 +120,14 @@ template <typename T> typename ComplexTrsm<T>::FnType *ComplexTrsm<T>::fn = null
 
 template <typename T> void ComplexTrsm<T>::Kernel(void *out, void **data, XlaCustomCallStatus *)
 {
-    const char diag = *(reinterpret_cast<uint8_t *>(data[0]));
-    const char side = *(reinterpret_cast<uint8_t *>(data[1]));
-    const char trans = *(reinterpret_cast<uint8_t *>(data[2]));
-    const char uplo = *(reinterpret_cast<uint8_t *>(data[3]));
+    const uint8_t *diag_tensor = reinterpret_cast<uint8_t *>(data[0]);
+    const char diag = static_cast<char>(*diag_tensor);
+    const uint8_t *side_tensor = reinterpret_cast<uint8_t *>(data[1]);
+    const char side = static_cast<char>(*side_tensor);
+    const uint8_t *trans_tensor = reinterpret_cast<uint8_t *>(data[2]);
+    const char trans = static_cast<char>(*trans_tensor);
+    const uint8_t *uplo_tensor = reinterpret_cast<uint8_t *>(data[3]);
+    const char uplo = static_cast<char>(*uplo_tensor);
     const int batch = *reinterpret_cast<int32_t *>(data[7]);
     const int m = *reinterpret_cast<int32_t *>(data[8]);
     const int n = *reinterpret_cast<int32_t *>(data[9]);
@@ -277,8 +285,8 @@ template <typename T> typename Potrf<T>::FnType *Potrf<T>::fn = nullptr;
 
 template <typename T> void Potrf<T>::Kernel(void *out_tuple, void **data, XlaCustomCallStatus *)
 {
-    int8_t *uplo_tensor = reinterpret_cast<int8_t *>(data[0]);
-    char uplo = static_cast<char>(*uplo_tensor);
+    const uint8_t *uplo_tensor = reinterpret_cast<uint8_t *>(data[0]);
+    const char uplo = static_cast<char>(*uplo_tensor);
     const int b = *(reinterpret_cast<int32_t *>(data[1]));
     const int n_row = *(reinterpret_cast<int32_t *>(data[2]));
     const int n_col = *(reinterpret_cast<int32_t *>(data[3]));
@@ -366,7 +374,8 @@ template <typename T> typename RealGesdd<T>::FnType *RealGesdd<T>::fn = nullptr;
 
 template <typename T> void RealGesdd<T>::Kernel(void *out_tuple, void **data, XlaCustomCallStatus *)
 {
-    const char jobz = *(reinterpret_cast<int32_t *>(data[0]));
+    const uint8_t *jobz_tensor = reinterpret_cast<uint8_t *>(data[0]);
+    const char jobz = static_cast<char>(*jobz_tensor);
     const int b = *(reinterpret_cast<int32_t *>(data[1]));
     const int m = *(reinterpret_cast<int32_t *>(data[2]));
     const int n = *(reinterpret_cast<int32_t *>(data[3]));
@@ -406,7 +415,8 @@ template <typename T> typename ComplexGesdd<T>::FnType *ComplexGesdd<T>::fn = nu
 template <typename T>
 void ComplexGesdd<T>::Kernel(void *out_tuple, void **data, XlaCustomCallStatus *)
 {
-    const char jobz = *(reinterpret_cast<int32_t *>(data[0]));
+    const uint8_t *jobz_tensor = reinterpret_cast<uint8_t *>(data[0]);
+    const char jobz = static_cast<char>(*jobz_tensor);
     const int b = *(reinterpret_cast<int32_t *>(data[1]));
     const int m = *(reinterpret_cast<int32_t *>(data[2]));
     const int n = *(reinterpret_cast<int32_t *>(data[3]));
@@ -453,9 +463,10 @@ template <typename T> typename RealSyevd<T>::FnType *RealSyevd<T>::fn = nullptr;
 
 template <typename T> void RealSyevd<T>::Kernel(void *out_tuple, void **data, XlaCustomCallStatus *)
 {
-    const char jobz = *(reinterpret_cast<int32_t *>(data[0]));
-    int8_t *uplo_tensor = reinterpret_cast<int8_t *>(data[1]);
-    char uplo = static_cast<char>(*uplo_tensor);
+    const uint8_t *jobz_tensor = reinterpret_cast<uint8_t *>(data[0]);
+    const char jobz = static_cast<char>(*jobz_tensor);
+    const uint8_t *uplo_tensor = reinterpret_cast<uint8_t *>(data[1]);
+    const char uplo = static_cast<char>(*uplo_tensor);
     const int b = *(reinterpret_cast<int32_t *>(data[2]));
     const int m = *(reinterpret_cast<int32_t *>(data[3]));
     const int n = *(reinterpret_cast<int32_t *>(data[4]));
@@ -487,9 +498,10 @@ template <typename T> typename ComplexHeevd<T>::FnType *ComplexHeevd<T>::fn = nu
 template <typename T>
 void ComplexHeevd<T>::Kernel(void *out_tuple, void **data, XlaCustomCallStatus *)
 {
-    const char jobz = *(reinterpret_cast<int32_t *>(data[0]));
-    int8_t *uplo_tensor = reinterpret_cast<int8_t *>(data[1]);
-    char uplo = static_cast<char>(*uplo_tensor);
+    const uint8_t *jobz_tensor = reinterpret_cast<uint8_t *>(data[0]);
+    const char jobz = static_cast<char>(*jobz_tensor);
+    const uint8_t *uplo_tensor = reinterpret_cast<uint8_t *>(data[1]);
+    const char uplo = static_cast<char>(*uplo_tensor);
     const int b = *(reinterpret_cast<int32_t *>(data[2]));
     const int m = *(reinterpret_cast<int32_t *>(data[3]));
     const int n = *(reinterpret_cast<int32_t *>(data[4]));
@@ -557,8 +569,10 @@ template <typename T> typename RealGeev<T>::FnType *RealGeev<T>::fn = nullptr;
 
 template <typename T> void RealGeev<T>::Kernel(void *out_tuple, void **data, XlaCustomCallStatus *)
 {
-    const char jobvl = *(reinterpret_cast<uint8_t *>(data[0]));
-    const char jobvr = *(reinterpret_cast<uint8_t *>(data[1]));
+    const uint8_t *jobvl_tensor = reinterpret_cast<uint8_t *>(data[0]);
+    const char jobvl = static_cast<char>(*jobvl_tensor);
+    const uint8_t *jobvr_tensor = reinterpret_cast<uint8_t *>(data[1]);
+    const char jobvr = static_cast<char>(*jobvr_tensor);
     const int b = *(reinterpret_cast<int32_t *>(data[2]));
     const int n_int = *(reinterpret_cast<int32_t *>(data[4]));
     const int64_t n = n_int;
@@ -629,8 +643,10 @@ template <typename T> typename ComplexGeev<T>::FnType *ComplexGeev<T>::fn = null
 template <typename T>
 void ComplexGeev<T>::Kernel(void *out_tuple, void **data, XlaCustomCallStatus *)
 {
-    const char jobvl = *(reinterpret_cast<uint8_t *>(data[0]));
-    const char jobvr = *(reinterpret_cast<uint8_t *>(data[1]));
+    const uint8_t *jobvl_tensor = reinterpret_cast<uint8_t *>(data[0]);
+    const char jobvl = static_cast<char>(*jobvl_tensor);
+    const uint8_t *jobvr_tensor = reinterpret_cast<uint8_t *>(data[1]);
+    const char jobvr = static_cast<char>(*jobvr_tensor);
     const int b = *(reinterpret_cast<int32_t *>(data[2]));
     const int n_int = *(reinterpret_cast<int32_t *>(data[4]));
     const int64_t n = n_int;
@@ -699,8 +715,10 @@ template <typename T> typename RealGees<T>::FnType *RealGees<T>::fn = nullptr;
 
 template <typename T> void RealGees<T>::Kernel(void *out_tuple, void **data, XlaCustomCallStatus *)
 {
-    const char jobvs = *(reinterpret_cast<uint8_t *>(data[0]));
-    const char sort = *(reinterpret_cast<uint8_t *>(data[1]));
+    const uint8_t *jobvs_tensor = reinterpret_cast<uint8_t *>(data[0]);
+    const char jobvs = static_cast<char>(*jobvs_tensor);
+    const uint8_t *sort_tensor = reinterpret_cast<uint8_t *>(data[1]);
+    const char sort = static_cast<char>(*sort_tensor);
     const int b = *(reinterpret_cast<int32_t *>(data[2]));
     const int n_int = *(reinterpret_cast<int32_t *>(data[4]));
     const int64_t n = n_int;
@@ -753,8 +771,10 @@ template <typename T> typename ComplexGees<T>::FnType *ComplexGees<T>::fn = null
 template <typename T>
 void ComplexGees<T>::Kernel(void *out_tuple, void **data, XlaCustomCallStatus *)
 {
-    const char jobvs = *(reinterpret_cast<uint8_t *>(data[0]));
-    const char sort = *(reinterpret_cast<uint8_t *>(data[1]));
+    const uint8_t *jobvs_tensor = reinterpret_cast<uint8_t *>(data[0]);
+    const char jobvs = static_cast<char>(*jobvs_tensor);
+    const uint8_t *sort_tensor = reinterpret_cast<uint8_t *>(data[1]);
+    const char sort = static_cast<char>(*sort_tensor);
     const int b = *(reinterpret_cast<int32_t *>(data[2]));
     const int n_int = *(reinterpret_cast<int32_t *>(data[4]));
     const int64_t n = n_int;
