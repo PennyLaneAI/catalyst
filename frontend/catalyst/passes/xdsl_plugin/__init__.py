@@ -26,6 +26,7 @@ from pathlib import Path
 def getXDSLPluginAbsolutePath():
     """Returns a fake path"""
     try:
+        # pylint: disable-next=import-outside-toplevel,unused-import
         import xdsl
     except ImportError as e:
         msg = "The xdsl plugin requires the xdsl package to be installed"
@@ -35,4 +36,9 @@ def getXDSLPluginAbsolutePath():
 
 
 def name2pass(name):
+    """Identity function
+
+    This function is useful if we want a map from user-facing pass name
+    to mlir-facing pass names.
+    """
     return getXDSLPluginAbsolutePath(), name
