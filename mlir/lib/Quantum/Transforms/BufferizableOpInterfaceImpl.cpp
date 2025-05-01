@@ -25,6 +25,13 @@ using namespace mlir;
 using namespace mlir::bufferization;
 using namespace catalyst::quantum;
 
+/**
+ * Implementation of the BufferizableOpInterface for use with one-shot bufferization.
+ * For more information on the interface, refer to the documentation below:
+ *  - https://mlir.llvm.org/docs/Bufferization/#extending-one-shot-bufferize
+ *  - https://github.com/llvm/llvm-project/blob/main/mlir/include/mlir/Dialect/Bufferization/IR/BufferizableOpInterface.td#L14
+ */
+
 namespace {
 
 // Bufferization of quantum.unitary.
