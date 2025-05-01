@@ -638,17 +638,8 @@ def handle_while_loop(
 
 # pylint: disable=unused-argument
 @QFuncPlxprInterpreter.register_primitive(plxpr_measure_in_basis_prim)
-def handle_measure_in_basis(self, *invals, angle, plane, reset, postselect):
+def handle_measure_in_basis(self, angle, wire, plane, reset, postselect):
     """Handle the conversion from plxpr to Catalyst jaxpr for the measure_in_basis primitive"""
-    wires_inval = invals[0:]
-
-    num_inval_wires = len(wires_inval)
-    assert (
-        num_inval_wires == 1
-    ), f"Expected exactly 1 input wire to measure_in_basis; got {num_inval_wires}"
-
-    wire_inval = wires_inval[0]
-
     _angle = jax.lax.convert_element_type(angle, jnp.dtype(jnp.float64))
 
     try:
@@ -658,10 +649,10 @@ def handle_measure_in_basis(self, *invals, angle, plane, reset, postselect):
             f"Measurement plane must be one of {[plane.value for plane in MeasurementPlane]}"
         ) from e
 
-    in_wire = self.get_wire(wire_inval)
-    result, out_wire = measure_in_basis_p.bind(in_wire, _angle, plane=_plane, postselect=postselect)
+    in_wire = self.get_wire(wire)
+    result, out_wire = measure_in_basis_p.bind(_angle, in_wire, plane=_plane, postselect=postselect)
 
-    self.wire_map[wire_inval] = out_wire
+    self.wire_map[wire] = out_wire
 
     return result
 

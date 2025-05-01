@@ -1232,7 +1232,7 @@ def _qmeasure_lowering(jax_ctx: mlir.LoweringRuleContext, qubit: ir.Value, posts
 #
 @measure_in_basis_p.def_abstract_eval
 def _measure_in_basis_abstract_eval(
-    qubit, angle: float, plane: MeasurementPlane, postselect: int = None
+    angle: float, qubit: AbstractQbit, plane: MeasurementPlane, postselect: int = None
 ):
     assert isinstance(qubit, AbstractQbit)
     return core.ShapedArray((), bool), qubit
@@ -1240,7 +1240,7 @@ def _measure_in_basis_abstract_eval(
 
 @measure_in_basis_p.def_impl
 def _measure_in_basis_def_impl(
-    ctx, qubit, angle: float, plane: MeasurementPlane, postselect: int = None
+    ctx, angle: float, qubit: AbstractQbit, plane: MeasurementPlane, postselect: int = None
 ):  # pragma: no cover
     raise NotImplementedError()
 
@@ -1256,8 +1256,8 @@ def _measurement_plane_attribute(ctx, plane: MeasurementPlane):
 
 def _measure_in_basis_lowering(
     jax_ctx: mlir.LoweringRuleContext,
-    qubit: ir.Value,
     angle: float,
+    qubit: ir.Value,
     plane: MeasurementPlane,
     postselect: int = None,
 ):
