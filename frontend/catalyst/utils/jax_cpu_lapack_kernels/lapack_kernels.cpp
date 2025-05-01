@@ -73,7 +73,7 @@ namespace jax {
 template <typename T> typename RealTrsm<T>::FnType *RealTrsm<T>::fn = nullptr;
 
 template <typename T> void RealTrsm<T>::Kernel(void *out, void **data, XlaCustomCallStatus *)
-{   
+{
     const uint8_t *diag_tensor = reinterpret_cast<uint8_t *>(data[0]);
     const char diag = static_cast<char>(*diag_tensor);
     const uint8_t *side_tensor = reinterpret_cast<uint8_t *>(data[1]);
