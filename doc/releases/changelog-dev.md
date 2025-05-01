@@ -59,6 +59,9 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Creates a function that allows developers to register an equivalent MLIR transform for a given PLxPR transform.
+  [(#1705)](https://github.com/PennyLaneAI/catalyst/pull/1705)
+
 * Stop overriding the `num_wires` property when the operator can exist on `AnyWires`. This allows the deprecation
   of `WiresEnum` in pennylane.
   [(#1667)](https://github.com/PennyLaneAI/catalyst/pull/1667)
@@ -80,12 +83,15 @@
 * The utility function `EnsureFunctionDeclaration` is refactored into the `Utils` of the `Catalyst` dialect, instead of being duplicated in each individual dialect.
   [(#1683)](https://github.com/PennyLaneAI/catalyst/pull/1683)
 
-* The bufferization of custom catalyst dialects has been migrated to the new one-shot bufferization interface in mlir. The new mlir bufferization interface is required by jax 0.4.29 or higher.
-  [(#1027)](https://github.com/PennyLaneAI/catalyst/pull/1027)
-  [(#1686)](https://github.com/PennyLaneAI/catalyst/pull/1686)
+* The assembly format for some MLIR operations now includes adjoint.
+  [(#1695)](https://github.com/PennyLaneAI/catalyst/pull/1695)
 
 * Improved the definition of `YieldOp` in the quantum dialect by removing `AnyTypeOf`
   [(#1696)](https://github.com/PennyLaneAI/catalyst/pull/1696)
+
+* The bufferization of custom catalyst dialects has been migrated to the new one-shot bufferization interface in mlir. The new mlir bufferization interface is required by jax 0.4.29 or higher.
+  [(#1027)](https://github.com/PennyLaneAI/catalyst/pull/1027)
+  [(#1686)](https://github.com/PennyLaneAI/catalyst/pull/1686)
 
 <h3>Documentation 📝</h3>
 
