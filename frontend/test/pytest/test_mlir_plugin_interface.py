@@ -22,7 +22,6 @@ import pytest
 
 import catalyst
 from catalyst import qjit
-from catalyst.passes import xdsl_plugin
 
 
 def test_path_does_not_exists():
