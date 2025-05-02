@@ -129,7 +129,7 @@ static inline auto parse_kwargs(std::string kwargs) -> std::unordered_map<std::s
 }
 
 template <class K, class V>
-void pretty_print(const std::unordered_map<K, V> &map, size_t leadingSpaces = 0,
+void pretty_print_dict(const std::unordered_map<K, V> &map, size_t leadingSpaces = 0,
                   std::ostream &out = std::cout)
 {
     const std::string indent(leadingSpaces, ' ');
