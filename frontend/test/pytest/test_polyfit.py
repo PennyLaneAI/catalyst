@@ -21,8 +21,6 @@ from jax import numpy as jnp
 
 from catalyst import qjit
 
-pytestmark = pytest.mark.skip("lapack symbols undefined, WIP")
-
 
 @pytest.mark.parametrize(
     "x, y, deg",
