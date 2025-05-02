@@ -506,10 +506,7 @@ class Compiler:
             (str): filename of shared object
         """
 
-        if self.is_using_python_compiler():
-            from pennylane.compiler.python_compiler.impl import Compiler
-            compiler = Compiler()
-            mlir_module = compiler.run(mlir_module)
+        self.is_using_python_compiler():
 
         return self.run_from_ir(
             mlir_module.operation.get_asm(
