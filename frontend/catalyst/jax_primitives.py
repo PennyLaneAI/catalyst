@@ -61,6 +61,7 @@ from mlir_quantum.dialects.gradient import (
     ValueAndGradOp,
     VJPOp,
 )
+from mlir_quantum.dialects.mbqc import MeasureInBasisOp
 from mlir_quantum.dialects.mitigation import ZneOp
 from mlir_quantum.dialects.quantum import (
     AdjointOp,
@@ -230,6 +231,16 @@ class Folding(Enum):
     ALL = "local-all"
 
 
+class MeasurementPlane(Enum):
+    """
+    Measurement planes for arbitrary-basis measurements in MBQC
+    """
+
+    XY = "XY"
+    YZ = "YZ"
+    ZX = "ZX"
+
+
 ##############
 # Primitives #
 ##############
@@ -292,6 +303,8 @@ set_basis_state_p = jax.core.Primitive("set_basis_state")
 set_basis_state_p.multiple_results = True
 quantum_kernel_p = core.CallPrimitive("quantum_kernel")
 quantum_kernel_p.multiple_results = True
+measure_in_basis_p = core.Primitive("measure_in_basis")
+measure_in_basis_p.multiple_results = True
 
 
 def _assert_jaxpr_without_constants(jaxpr: ClosedJaxpr):
@@ -1204,6 +1217,79 @@ def _qmeasure_lowering(jax_ctx: mlir.LoweringRuleContext, qubit: ir.Value, posts
     result_type = ir.IntegerType.get_signless(1)
 
     result, new_qubit = MeasureOp(result_type, qubit.type, qubit, postselect=postselect).results
+
+    result_from_elements_op = ir.RankedTensorType.get((), result.type)
+    from_elements_op = FromElementsOp(result_from_elements_op, result)
+
+    return (
+        from_elements_op.results[0],
+        new_qubit,
+    )
+
+
+#
+# arbitrary-basis measurements
+#
+@measure_in_basis_p.def_abstract_eval
+def _measure_in_basis_abstract_eval(
+    angle: float, qubit: AbstractQbit, plane: MeasurementPlane, postselect: int = None
+):
+    assert isinstance(qubit, AbstractQbit)
+    return core.ShapedArray((), bool), qubit
+
+
+@measure_in_basis_p.def_impl
+def _measure_in_basis_def_impl(
+    ctx, angle: float, qubit: AbstractQbit, plane: MeasurementPlane, postselect: int = None
+):  # pragma: no cover
+    raise NotImplementedError()
+
+
+def _measurement_plane_attribute(ctx, plane: MeasurementPlane):
+    return ir.OpaqueAttr.get(
+        "mbqc",
+        ("measurement_plane " + MeasurementPlane(plane).name).encode("utf-8"),
+        ir.NoneType.get(ctx),
+        ctx,
+    )
+
+
+def _measure_in_basis_lowering(
+    jax_ctx: mlir.LoweringRuleContext,
+    angle: float,
+    qubit: ir.Value,
+    plane: MeasurementPlane,
+    postselect: int = None,
+):
+    ctx = jax_ctx.module_context.context
+    ctx.allow_unregistered_dialects = True
+
+    assert ir.OpaqueType.isinstance(qubit.type)
+    assert ir.OpaqueType(qubit.type).dialect_namespace == "quantum"
+    assert ir.OpaqueType(qubit.type).data == "bit"
+
+    angle = safe_cast_to_f64(angle, "angle")
+    angle = extract_scalar(angle, "angle")
+
+    assert ir.F64Type.isinstance(
+        angle.type
+    ), "Only scalar double parameters are allowed for quantum gates!"
+
+    # Prepare postselect attribute
+    if postselect is not None:
+        i32_type = ir.IntegerType.get_signless(32, ctx)
+        postselect = ir.IntegerAttr.get(i32_type, postselect)
+
+    result_type = ir.IntegerType.get_signless(1)
+
+    result, new_qubit = MeasureInBasisOp(
+        result_type,
+        qubit.type,
+        qubit,
+        plane=_measurement_plane_attribute(ctx, plane),
+        angle=angle,
+        postselect=postselect,
+    ).results
 
     result_from_elements_op = ir.RankedTensorType.get((), result.type)
     from_elements_op = FromElementsOp(result_from_elements_op, result)
@@ -2250,6 +2336,7 @@ CUSTOM_LOWERING_RULES = (
     (sin_p, _sin_lowering2),
     (cos_p, _cos_lowering2),
     (quantum_kernel_p, _quantum_kernel_lowering),
+    (measure_in_basis_p, _measure_in_basis_lowering),
 )
 
 
