@@ -93,6 +93,7 @@ def test_get_options():
     assert catalyst.passes.Pass("example-pass", option=True).get_options() == "option=True"
 
 
+@pytest.mark.skip(reason="xdsl not installed in ci cd yet")
 def test_xdsl_plugin():
     """Here, we just test that we are able to run."""
 
