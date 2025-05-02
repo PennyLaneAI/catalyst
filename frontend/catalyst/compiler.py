@@ -468,6 +468,29 @@ class Compiler:
         return output_object_name, out_IR
 
     @debug_logger
+    def is_using_python_compiler(self):
+        """Returns true if we detect that there is an xdsl plugin in use.
+
+        Will also modify self.options.pass_plugins and self.options.dialect_plugins to remove
+        the xdsl plugin.
+        """
+        xdsl_path = pathlib.Path("xdsl-does-not-use-a-real-path")
+        if not (
+            xdsl_path in self.options.pass_plugins or xdsl_path in self.options.dialect_plugins
+        ):
+            return False
+
+        if xdsl_path in self.options.pass_plugins:
+            plugins = self.options.pass_plugins
+            self.options.pass_plugins = tuple(elem for elem in plugins if elem != xdsl_path)
+
+        if xdsl_path in self.options.dialect_plugins:
+            plugins = self.options.dialect_plugins
+            self.options.dialect_plugins = tuple(elem for elem in plugins if elem != xdsl_path)
+
+        return True
+
+    @debug_logger
     def run(self, mlir_module, *args, **kwargs):
         """Compile an MLIR module to a shared object.
 
@@ -482,6 +505,8 @@ class Compiler:
         Returns:
             (str): filename of shared object
         """
+
+        self.is_using_python_compiler()
 
         return self.run_from_ir(
             mlir_module.operation.get_asm(

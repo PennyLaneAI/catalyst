@@ -170,12 +170,12 @@ endif
 endif
 	@echo "check the Catalyst PyTest suite"
 	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/pytest --tb=native --backend=$(TEST_BACKEND) --runbraket=$(TEST_BRAKET) $(PYTEST_FLAGS)
+ifeq ($(TEST_BRAKET), NONE)
+	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/async_tests --tb=native --backend=$(TEST_BACKEND)
 	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/test_oqc/oqc
 ifeq ($(ENABLE_OQD), ON)
 	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/test_oqd/oqd
 endif
-ifeq ($(TEST_BRAKET), NONE)
-	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/async_tests --tb=native --backend=$(TEST_BACKEND)
 endif
 
 test-demos:
@@ -208,7 +208,7 @@ wheel:
 	# Copy mlir bindings & compiler driver to frontend/mlir_quantum
 	mkdir -p $(MK_DIR)/frontend/mlir_quantum/dialects
 	cp -R $(COPY_FLAGS) $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/runtime $(MK_DIR)/frontend/mlir_quantum/runtime
-	for file in gradient quantum _ods_common catalyst mitigation _transform; do \
+	for file in gradient quantum _ods_common catalyst mbqc mitigation _transform; do \
 		cp $(COPY_FLAGS) $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/dialects/*$${file}* $(MK_DIR)/frontend/mlir_quantum/dialects ; \
 	done
 	mkdir -p $(MK_DIR)/frontend/bin

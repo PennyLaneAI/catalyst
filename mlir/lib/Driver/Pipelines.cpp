@@ -16,6 +16,7 @@
 #include "Catalyst/Transforms/Passes.h"
 #include "Gradient/Transforms/Passes.h"
 #include "Mitigation/Transforms/Passes.h"
+#include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/Transforms/Passes.h"
 #include "mhlo/transforms/passes.h"
 #include "mlir/InitAllDialects.h"
@@ -79,7 +80,9 @@ void createBufferizationPipeline(OpPassManager &pm)
     pm.addPass(catalyst::createCatalystBufferizationPass());
     pm.addNestedPass<mlir::func::FuncOp>(mlir::createLinalgBufferizePass());
     pm.addNestedPass<mlir::func::FuncOp>(mlir::tensor::createTensorBufferizePass());
-    pm.addPass(catalyst::createQuantumBufferizationPass());
+    mlir::bufferization::OneShotBufferizationOptions quantum_buffer_options;
+    quantum_buffer_options.opFilter.allowDialect<catalyst::quantum::QuantumDialect>();
+    pm.addPass(mlir::bufferization::createOneShotBufferizePass(quantum_buffer_options));
     pm.addPass(mlir::func::createFuncBufferizePass());
     pm.addNestedPass<mlir::func::FuncOp>(mlir::bufferization::createFinalizingBufferizePass());
     pm.addPass(mlir::createCanonicalizerPass());

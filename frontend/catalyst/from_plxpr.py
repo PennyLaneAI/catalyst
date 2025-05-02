@@ -30,6 +30,7 @@ from pennylane.capture.expand_transforms import ExpandTransformsInterpreter
 from pennylane.capture.primitives import cond_prim as plxpr_cond_prim
 from pennylane.capture.primitives import for_loop_prim as plxpr_for_loop_prim
 from pennylane.capture.primitives import while_loop_prim as plxpr_while_loop_prim
+from pennylane.ftqc.primitives import measure_in_basis_prim as plxpr_measure_in_basis_prim
 from pennylane.ops.functions.map_wires import _map_wires_transform as pl_map_wires
 from pennylane.transforms import cancel_inverses as pl_cancel_inverses
 from pennylane.transforms import commute_controlled as pl_commute_controlled
@@ -47,12 +48,14 @@ from catalyst.jax_extras import jaxpr_pad_consts, make_jaxpr2, transient_jax_con
 from catalyst.jax_primitives import (
     AbstractQbit,
     AbstractQreg,
+    MeasurementPlane,
     compbasis_p,
     cond_p,
     counts_p,
     expval_p,
     for_p,
     gphase_p,
+    measure_in_basis_p,
     namedobs_p,
     probs_p,
     qalloc_p,
@@ -204,11 +207,10 @@ transforms_to_passes = {
 }
 
 
-# This is our registration factory for PL transforms. The loop below iterates
-# across the map above and generates a custom handler for each transform.
-# In order to ensure early binding, we pass the PL plxpr transform and the
-# Catalyst pass as arguments whose default values are set by the loop.
-for pl_transform, (pass_name, decomposition) in transforms_to_passes.items():
+# pylint: disable-next=redefined-outer-name
+def register_transform(pl_transform, pass_name, decomposition):
+    """Register pennylane transforms and their conversion to Catalyst transforms"""
+
     # pylint: disable=unused-argument, too-many-arguments, cell-var-from-loop
     @WorkflowInterpreter.register_primitive(pl_transform._primitive)
     def handle_transform(
@@ -252,6 +254,14 @@ for pl_transform, (pass_name, decomposition) in transforms_to_passes.items():
             # Apply the corresponding Catalyst pass counterpart
             self._pass_pipeline.append(Pass(catalyst_pass_name))
             return self.eval(inner_jaxpr, consts, *non_const_args)
+
+
+# This is our registration factory for PL transforms. The loop below iterates
+# across the map above and generates a custom handler for each transform.
+# In order to ensure early binding, we pass the PL plxpr transform and the
+# Catalyst pass as arguments whose default values are set by the loop.
+for pl_transform, (pass_name, decomposition) in transforms_to_passes.items():
+    register_transform(pl_transform, pass_name, decomposition)
 
 
 class QFuncPlxprInterpreter(PlxprInterpreter):
@@ -632,6 +642,27 @@ def handle_while_loop(
 
     # Return only the output values that match the plxpr output values
     return outvals
+
+
+# pylint: disable=unused-argument, too-many-positional-arguments
+@QFuncPlxprInterpreter.register_primitive(plxpr_measure_in_basis_prim)
+def handle_measure_in_basis(self, angle, wire, plane, reset, postselect):
+    """Handle the conversion from plxpr to Catalyst jaxpr for the measure_in_basis primitive"""
+    _angle = jax.lax.convert_element_type(angle, jnp.dtype(jnp.float64))
+
+    try:
+        _plane = MeasurementPlane(plane)
+    except ValueError as e:
+        raise ValueError(
+            f"Measurement plane must be one of {[plane.value for plane in MeasurementPlane]}"
+        ) from e
+
+    in_wire = self.get_wire(wire)
+    result, out_wire = measure_in_basis_p.bind(_angle, in_wire, plane=_plane, postselect=postselect)
+
+    self.wire_map[wire] = out_wire
+
+    return result
 
 
 # Derived interpreters must be declared after the primitive registrations of their
