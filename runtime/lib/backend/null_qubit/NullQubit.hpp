@@ -83,7 +83,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
         resource_file << "  \"num_qubits\": " << num_qubits << ",\n";
         resource_file << "  \"num_gates\": " << num_gates << ",\n";
         resource_file << "  \"gate_types\": ";
-        pretty_print(resource_data_, 2, resource_file);
+        pretty_print_dict(resource_data_, 2, resource_file);
         resource_file << "\n}" << std::endl;
 
         // Restore 2 special variables
