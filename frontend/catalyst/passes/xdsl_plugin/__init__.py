@@ -29,6 +29,7 @@ def getXDSLPluginAbsolutePath():
         # pylint: disable-next=import-outside-toplevel,unused-import
         import xdsl
     except ImportError as e:
+        # pragma: nocover
         msg = "The xdsl plugin requires the xdsl package to be installed"
         raise ImportError(msg) from e
 
