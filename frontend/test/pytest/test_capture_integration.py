@@ -1426,7 +1426,7 @@ class TestCapture:
             return qml.sample()
 
         capture_result = captured_circuit()
-        assert "'shots': 10" in captured_circuit.mlir
+        assert "shots(%" in captured_circuit.mlir
 
         qml.capture.disable()
 
