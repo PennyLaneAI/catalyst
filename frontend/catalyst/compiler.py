@@ -468,6 +468,67 @@ class Compiler:
         return output_object_name, out_IR
 
     @debug_logger
+    def is_using_python_compiler(self):
+        xdsl_path = pathlib.Path("xdsl-does-not-use-a-real-path")
+        using_xdsl = False
+        if xdsl_path in self.options.pass_plugins:
+            plugins = self.options.pass_plugins
+            self.options.pass_plugins = tuple(elem for elem in plugins if elem != xdsl_path)
+            using_xdsl = True
+
+        if xdsl_path in self.options.dialect_plugins:
+            plugins = self.options.dialect_plugins
+            self.options.dialect_plugins = tuple(elem for elem in plugins if elem != xdsl_path)
+            using_xdsl = True
+
+        return using_xdsl
+
+    def run_python_compiler(self, mlir_module):
+
+        # TODO: check that xdsl is available to be imported
+        import xdsl
+        from xdsl.context import Context
+        from xdsl import passes
+        from xdsl.dialects import arith, builtin, func, scf, tensor, transform
+        from .python_compiler import quantum, ApplyTransformSequence
+        generic_assembly_format = mlir_module.operation.get_asm(binary=False, print_generic_op_form=True, assume_verified=True)
+        ctx = Context(allow_unregistered=True)
+        ctx.load_dialect(arith.Arith)
+        ctx.load_dialect(builtin.Builtin)
+        ctx.load_dialect(func.Func)
+        ctx.load_dialect(scf.Scf)
+        ctx.load_dialect(tensor.Tensor)
+        ctx.load_dialect(transform.Transform)
+        ctx.load_dialect(quantum.QuantumDialect)
+        # TODO: In order of importance
+        # TODO: Load gradient
+        # TODO: Load the stablehlo dialect? I kind of want to wait until all operations
+        # are properly represented. I am not sure how an incompletely known dialect would be handled
+        # but it is likely worse than an unregistered dialect.
+        # TODO: Load Catalyst
+        # TODO: Load ion/ppm/mbqc/zne...
+        module = xdsl.parser.Parser(ctx, generic_assembly_format).parse_module()
+        pipeline = passes.PipelinePass((ApplyTransformSequence(),))
+        pipeline.apply(ctx, module)
+
+        from jax._src.interpreters import mlir
+        from jaxlib.mlir.dialects import stablehlo
+        from jaxlib.mlir.ir import Context, Module
+        from xdsl.printer import Printer
+        import io
+
+        buffer = io.StringIO()
+        Printer(stream=buffer, print_generic_format=True).print(module)
+        with Context() as ctx:
+            ctx.allow_unregistered_dialects = True
+            ctx.append_dialect_registry(mlir.upstream_dialects)
+            stablehlo.register_dialect(ctx)
+            module = Module.parse(buffer.getvalue())
+        return module
+
+        # TODO: transform the program based on the transform dialect
+
+    @debug_logger
     def run(self, mlir_module, *args, **kwargs):
         """Compile an MLIR module to a shared object.
 
@@ -482,6 +543,10 @@ class Compiler:
         Returns:
             (str): filename of shared object
         """
+
+        python_compiler = self.is_using_python_compiler()
+        if python_compiler:
+            mlir_module = self.run_python_compiler(mlir_module)
 
         return self.run_from_ir(
             mlir_module.operation.get_asm(

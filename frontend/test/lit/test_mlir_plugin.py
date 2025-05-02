@@ -116,3 +116,19 @@ def test_pass_options():
 
 
 test_pass_options()
+
+
+def test_xdsl_plugin():
+    """Test that catalyst_xdsl_plugin is available"""
+
+    @qjit(target="mlir")
+    # CHECK: transform.apply_registered_pass "foo"
+    @catalyst.passes.apply_pass("catalyst_xdsl_plugin.foo")
+    @qml.qnode(qml.device("null.qubit", wires=1))
+    def example():
+        return qml.state()
+
+    print(example.mlir)
+
+
+test_xdsl_plugin()
