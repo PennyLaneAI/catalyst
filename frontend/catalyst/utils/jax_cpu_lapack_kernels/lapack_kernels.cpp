@@ -61,10 +61,6 @@
 #include "absl/base/dynamic_annotations.h"
 #endif
 
-namespace {
-
-} // namespace
-
 namespace jax {
 
 // Trsm (Triangular System Solver)
