@@ -91,3 +91,15 @@ def test_get_options():
         == "an-option bn-option"
     )
     assert catalyst.passes.Pass("example-pass", option=True).get_options() == "option=True"
+
+
+def test_xdsl_plugin():
+    """Here, we just test that we are able to run."""
+
+    @catalyst.qjit
+    @catalyst.passes.apply_pass("catalyst_xdsl_plugin.remove-chained-self-inverse")
+    @qml.qnode(qml.device("null.qubit", wires=1))
+    def example():
+        return qml.state()
+
+    example()
