@@ -28,7 +28,7 @@ import warnings
 from os import path
 from typing import List, Optional
 
-from catalyst.debug.debugger import debugger_is_active
+from catalyst.debug.debugger import is_debugger_active
 from catalyst.logging import debug_logger, debug_logger_init
 from catalyst.pipelines import CompileOptions
 from catalyst.utils.exceptions import CompileError
@@ -449,7 +449,7 @@ class Compiler:
             if p.returncode not in {0, None}:
                 raise subprocess.CalledProcessError(p.returncode, cmd)
 
-            if debugger_is_active():
+            if self.options.debug_compiler and is_debugger_active():
                 print(f"Compiler PID={p.pid}")
                 print(
                     f"Ensure gdb/lldb debugger is attached and running before continuing with:\nkill -s SIGCONT {p.pid}"
