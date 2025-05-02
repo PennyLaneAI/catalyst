@@ -29,7 +29,7 @@ endif()
 #########################
 
 find_package(MLIR REQUIRED CONFIG)
-find_package(MHLO REQUIRED CONFIG)
+#find_package(MHLO REQUIRED CONFIG)
 
 message(STATUS "Using MLIRConfig.cmake in: ${MLIR_DIR}")
 message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
@@ -41,19 +41,19 @@ set(MLIR_BINARY_DIR ${CMAKE_BINARY_DIR})
 
 # Taken from mlir-hlo/mhlo/transforms/CMakeLists.txt.
 # Unfortunately, AllMhloPasses doesn't appear to be exported.
-set(ALL_MHLO_PASSES
-  ChloPasses
-  MhloPasses
-  StablehloPasses
-  MhloToArithmeticConversion
-  MhloToMemrefConversion
-  MhloToStandard
-  HloToLinalgUtils
-  MhloToLinalg
-  MhloToStablehlo
-  MhloQuantToIntConversion
-  StablehloToMhlo
-)
+#set(ALL_MHLO_PASSES
+#  ChloPasses
+#  MhloPasses
+#  StablehloPasses
+#  MhloToArithmeticConversion
+#  MhloToMemrefConversion
+#  MhloToStandard
+#  HloToLinalgUtils
+#  MhloToLinalg
+#  MhloToStablehlo
+#  MhloQuantToIntConversion
+#  StablehloToMhlo
+#)
 
 list(APPEND CMAKE_MODULE_PATH "${MLIR_CMAKE_DIR}")
 list(APPEND CMAKE_MODULE_PATH "${LLVM_CMAKE_DIR}")
@@ -87,8 +87,8 @@ if(QUANTUM_ENABLE_BINDINGS_PYTHON)
   mlir_configure_python_dev_packages()
 endif()
 
-list(GET MHLO_INCLUDE_DIRS 1 MLIRHLO_DIR)
-list(GET MHLO_INCLUDE_DIRS 2 MLIRHLO_BUILD_DIR)
+#list(GET MHLO_INCLUDE_DIRS 1 MLIRHLO_DIR)
+#list(GET MHLO_INCLUDE_DIRS 2 MLIRHLO_BUILD_DIR)
 
 set(CATALYST_MAIN_INCLUDE_DIR ${PROJECT_SOURCE_DIR}/include)
 set(CATALYST_GEN_INCLUDE_DIR ${PROJECT_BINARY_DIR}/include)
@@ -115,7 +115,7 @@ include_directories(
 
 add_subdirectory(include)
 add_subdirectory(lib)
-add_subdirectory(tools)
+#add_subdirectory(tools)
 
 if(QUANTUM_ENABLE_BINDINGS_PYTHON)
   message(STATUS "Enabling Python API")
@@ -193,4 +193,4 @@ endif()
 # End of CIRCT code  #
 ######################
 
-add_subdirectory(test)
+#add_subdirectory(test)
