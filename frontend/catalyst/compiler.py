@@ -21,6 +21,7 @@ import os
 import pathlib
 import platform
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -439,24 +440,26 @@ class Compiler:
         output_ir_name = os.path.join(str(workspace), f"{module_name}.ll")
 
         cmd = self.get_cli_command(tmp_infile_name, output_ir_name, module_name, workspace)
-        import signal
 
         try:
             if self.options.verbose:
                 print(f"[SYSTEM] {' '.join(cmd)}", file=self.options.logfile)
 
-            p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-            if p.returncode not in {0, None}:
-                raise subprocess.CalledProcessError(p.returncode, cmd)
+            with subprocess.Popen(
+                cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+            ) as p:
+                if p.returncode not in {0, None}:
+                    raise subprocess.CalledProcessError(p.returncode, cmd)
 
-            if self.options.debug_compiler and is_debugger_active():
-                print(f"Compiler PID={p.pid}")
-                print(
-                    f"Ensure gdb/lldb debugger is attached and running before continuing with:\nkill -s SIGCONT {p.pid}"
-                )
-                p.send_signal(signal.SIGSTOP)
+                if self.options.debug_compiler and is_debugger_active():
+                    print(f"Compiler PID={p.pid}")
+                    print(
+                        f"""Ensure C++ debugger is attached and running before continuing with:
+                        kill -s SIGCONT {p.pid}"""
+                    )
+                    p.send_signal(signal.SIGSTOP)
 
-            res_stdout, res_stderr = p.communicate()
+                res_stdout, res_stderr = p.communicate()
             if self.options.verbose or os.getenv("ENABLE_DIAGNOSTICS"):
                 if res_stdout:
                     print(res_stdout.strip(), file=self.options.logfile)
