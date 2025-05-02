@@ -78,6 +78,10 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Add an xDSL MLIR plugin to denote whether we will be using xDSL to execute some passes.
+  This changelog entry may be moved to new features once all branches are merged together.
+  [(#1707)](https://github.com/PennyLaneAI/catalyst/pull/1707)
+
 * Creates a function that allows developers to register an equivalent MLIR transform for a given
   PLxPR transform.
   [(#1705)](https://github.com/PennyLaneAI/catalyst/pull/1705)
