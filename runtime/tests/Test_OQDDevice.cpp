@@ -34,12 +34,8 @@ TEST_CASE("Test the OQDDevice constructor", "[oqd]")
 {
     auto device = OQDDevice("{shots : 100}");
 
-    REQUIRE_THROWS_WITH(device.GetNumQubits(), ContainsSubstring("Unsupported functionality"));
-    REQUIRE_THROWS_WITH(device.PrintState(), ContainsSubstring("Unsupported functionality"));
-    REQUIRE_THROWS_WITH(device.AllocateQubit(), ContainsSubstring("Unsupported functionality"));
-    REQUIRE_THROWS_WITH(device.Measure(0), ContainsSubstring("Unsupported functionality"));
-    REQUIRE_THROWS_WITH(device.Expval(0), ContainsSubstring("Unsupported functionality"));
-    REQUIRE_THROWS_WITH(device.Var(0), ContainsSubstring("Unsupported functionality"));
+    REQUIRE_THROWS_WITH(device.GetNumQubits(), ContainsSubstring("unsupported by device"));
+    REQUIRE_THROWS_WITH(device.Measure(0), ContainsSubstring("unsupported by device"));
 }
 
 TEST_CASE("Test the OQDDevice qubit allocation and release", "[oqd]")
