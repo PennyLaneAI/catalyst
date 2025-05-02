@@ -25,6 +25,7 @@ import pennylane.ftqc as plft
 import pytest
 
 from catalyst import qjit
+from catalyst.utils.exceptions import CompileError
 
 mbqc_pipeline = [
     (
@@ -158,6 +159,80 @@ def test_measure_measure_arbitrary_basis(angle, plane):
     qml.capture.disable()
 
     assert -1.0 <= result <= 1.0
+
+
+@pytest.mark.parametrize("postselect", [0, 1])
+def test_measure_measure_arbitrary_basis_postselect(postselect):
+    """Test the compilation of the qml.ftqc.measure_arbitrary_basis function with a postselect
+    argument.
+
+    Executes on the null.qubit device. This test does not check the correctness of the result, only
+    that the workload can be compiled and executed end-to-end.
+    """
+    dev = qml.device("null.qubit", wires=1)
+
+    qml.capture.enable()
+
+    @qjit(pipelines=mbqc_pipeline)
+    @qml.qnode(dev)
+    def workload():
+        _ = plft.measure_arbitrary_basis(wires=0, angle=0.1, plane="XY", postselect=postselect)
+        return qml.expval(qml.Z(0))
+
+    result = workload()
+    qml.capture.disable()
+
+    assert -1.0 <= result <= 1.0
+
+
+def test_measure_measure_arbitrary_basis_invalid_plane():
+    """Test that inputting an invalid ``plane`` parameter to qml.ftqc.measure_arbitrary_basis raises
+    a ValueError.
+    """
+    dev = qml.device("null.qubit", wires=1)
+
+    qml.capture.enable()
+
+    with pytest.raises(ValueError, match=r"Measurement plane must be one of \['XY', 'YZ', 'ZX'\]"):
+
+        @qjit(pipelines=mbqc_pipeline)
+        @qml.qnode(dev)
+        def workload():
+            _ = plft.measure_arbitrary_basis(wires=0, angle=0.1, plane="YX")
+            return qml.expval(qml.Z(0))
+
+        _ = workload()
+
+    qml.capture.disable()
+
+
+@pytest.mark.parametrize("postselect", [-1, 2])
+def test_measure_measure_arbitrary_basis_invalid_postselect(postselect):
+    """Test that inputting an invalid ``postselect`` parameter to qml.ftqc.measure_arbitrary_basis
+    raises a CompileError.
+    """
+    dev = qml.device("null.qubit", wires=1)
+
+    qml.capture.enable()
+
+    with pytest.raises(
+        CompileError, match="op attribute 'postselect' failed to satisfy constraint"
+    ):
+
+        @qjit(pipelines=mbqc_pipeline)
+        @qml.qnode(dev)
+        def workload():
+            _ = plft.measure_arbitrary_basis(wires=0, angle=0.1, plane="XY", postselect=postselect)
+            return qml.expval(qml.Z(0))
+
+        _ = workload()
+
+    qml.capture.disable()
+
+
+# ---------------------------------------------------------------------------- #
+# Workloads implementing gates explicitly in the MBQC representation
+# ---------------------------------------------------------------------------- #
 
 
 @pytest.mark.parametrize("rz_angle", [0.5])
