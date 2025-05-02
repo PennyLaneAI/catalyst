@@ -456,12 +456,12 @@ class Compiler:
                 )
                 p.send_signal(signal.SIGSTOP)
 
-            result = p.communicate()
+            res_stdout, res_stderr = p.communicate()
             if self.options.verbose or os.getenv("ENABLE_DIAGNOSTICS"):
-                if result.stdout:
-                    print(result.stdout.strip(), file=self.options.logfile)
-                if result.stderr:
-                    print(result.stderr.strip(), file=self.options.logfile)
+                if res_stdout:
+                    print(res_stdout.strip(), file=self.options.logfile)
+                if res_stderr:
+                    print(res_stderr.strip(), file=self.options.logfile)
         except subprocess.CalledProcessError as e:  # pragma: nocover
             raise CompileError(f"catalyst failed with error code {e.returncode}: {e.stderr}") from e
 
