@@ -97,7 +97,7 @@ def test_get_options():
 def test_xdsl_plugin():
     """Here, we just test that we are able to run."""
 
-    @catalyst.qjit(pass_plugins={xdsl_plugin.getXDSLPluginAbsolutePath()})
+    @catalyst.qjit
     @catalyst.passes.apply_pass("catalyst_xdsl_plugin.remove-chained-self-inverse")
     @qml.qnode(qml.device("null.qubit", wires=1))
     def example():
