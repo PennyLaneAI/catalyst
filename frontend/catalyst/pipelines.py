@@ -94,6 +94,7 @@ class CompileOptions:
     circuit_transform_pipeline: Optional[dict[str, dict[str, str]]] = None
     pass_plugins: Optional[Set[Path]] = None
     dialect_plugins: Optional[Set[Path]] = None
+    debug_compiler: Optional[bool] = False
 
     def __post_init__(self):
         # Check that async runs must not be seeded

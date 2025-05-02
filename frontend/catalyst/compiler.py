@@ -28,6 +28,7 @@ import warnings
 from os import path
 from typing import List, Optional
 
+from catalyst.debug.debugger import debugger_is_active
 from catalyst.logging import debug_logger, debug_logger_init
 from catalyst.pipelines import CompileOptions
 from catalyst.utils.exceptions import CompileError
@@ -438,10 +439,24 @@ class Compiler:
         output_ir_name = os.path.join(str(workspace), f"{module_name}.ll")
 
         cmd = self.get_cli_command(tmp_infile_name, output_ir_name, module_name, workspace)
+        import signal
+
         try:
             if self.options.verbose:
                 print(f"[SYSTEM] {' '.join(cmd)}", file=self.options.logfile)
-            result = subprocess.run(cmd, check=True, capture_output=True, text=True)
+
+            p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            if p.returncode not in {0, None}:
+                raise subprocess.CalledProcessError(p.returncode, cmd)
+
+            if debugger_is_active():
+                print(f"Compiler PID={p.pid}")
+                print(
+                    f"Ensure gdb/lldb debugger is attached and running before continuing with:\nkill -s SIGCONT {p.pid}"
+                )
+                p.send_signal(signal.SIGSTOP)
+
+            result = p.communicate()
             if self.options.verbose or os.getenv("ENABLE_DIAGNOSTICS"):
                 if result.stdout:
                     print(result.stdout.strip(), file=self.options.logfile)
