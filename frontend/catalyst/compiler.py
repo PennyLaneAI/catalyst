@@ -506,7 +506,7 @@ class Compiler:
             (str): filename of shared object
         """
 
-        self.is_using_python_compiler():
+        self.is_using_python_compiler()
 
         return self.run_from_ir(
             mlir_module.operation.get_asm(
