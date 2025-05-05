@@ -67,7 +67,9 @@
 * Support for Mac x86 has been removed. This is because [JAX has
 also dropped support for them since 0.5.0](https://github.com/jax-ml/jax/blob/main/CHANGELOG.md#jax-050-jan-17-2025),
 with the rationale being that such machines are becoming increasingly scarce.
-  [(#???)](https://github.com/PennyLaneAI/catalyst/pull/???)
+  If support for Mac x86 platforms, please install Catalyst version 0.11.0,
+  and Jax version 0.4.28.
+  [(#1716)](https://github.com/PennyLaneAI/catalyst/pull/1716)
 
 <h3>Deprecations 👋</h3>
 
