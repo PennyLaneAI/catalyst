@@ -183,7 +183,7 @@ struct CommuteCliffordTPPR : public OpRewritePattern<PPRotationOp> {
 namespace catalyst {
 namespace qec {
 
-void populateCommuteCliffordTPPRPatterns(mlir::RewritePatternSet &patterns, int max_pauli_size)
+void populateCommuteCliffordTPPRPatterns(mlir::RewritePatternSet &patterns, uint max_pauli_size)
 {
     patterns.add<CommuteCliffordTPPR>(patterns.getContext(), max_pauli_size, 1);
 }

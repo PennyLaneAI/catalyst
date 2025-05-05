@@ -392,7 +392,7 @@ def to_ppr(qnode):
     return PassPipelineWrapper(qnode, "to_ppr")
 
 
-def commute_ppr(qnode):
+def commute_ppr(qnode=None, max_pauli_size=0):
     R"""
     Specify that the MLIR compiler pass for commuting
     Clifford Pauli Product Rotation (PPR) gates, :math:`\exp({iP\tfrac{\pi}{4}})`,
@@ -408,6 +408,7 @@ def commute_ppr(qnode):
 
     Args:
         fn (QNode): QNode to apply the pass to.
+        max_pauli_size (uint): The maximum size of the Pauli strings after commuting.
 
     Returns:
         ~.QNode
@@ -448,10 +449,18 @@ def commute_ppr(qnode):
         . . .
 
     """
-    return PassPipelineWrapper(qnode, "commute_ppr")
+
+    def decorator(qnode_func):
+        commute_ppr_pass = {"commute_ppr": {"max-pauli-size": max_pauli_size}}
+        return PassPipelineWrapper(qnode_func, commute_ppr_pass)
+
+    if qnode is None:
+        return decorator
+
+    return decorator(qnode)
 
 
-def merge_ppr_ppm(qnode):
+def merge_ppr_ppm(qnode=None, max_pauli_size=0):
     R"""
     Specify that the MLIR compiler pass for absorbing Clifford Pauli
     Product Rotation (PPR) operations, :math:`\exp{iP\tfrac{\pi}{4}}`,
@@ -462,6 +471,7 @@ def merge_ppr_ppm(qnode):
 
     Args:
         fn (QNode): QNode to apply the pass to
+        max_pauli_size (uint): The maximum size of the Pauli strings after merging.
 
     Returns:
         ~.QNode
@@ -498,4 +508,12 @@ def merge_ppr_ppm(qnode):
         . . .
 
     """
-    return PassPipelineWrapper(qnode, "merge_ppr_ppm")
+
+    def decorator(qnode_func):
+        merge_ppr_ppm_pass = {"merge_ppr_ppm": {"max-pauli-size": max_pauli_size}}
+        return PassPipelineWrapper(qnode_func, merge_ppr_ppm_pass)
+
+    if qnode is None:
+        return decorator
+
+    return decorator(qnode)

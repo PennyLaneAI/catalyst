@@ -224,7 +224,7 @@ struct RemoveDeadPPR : public OpRewritePattern<PPRotationOp> {
 namespace catalyst {
 namespace qec {
 
-void populateCommuteCliffordPastPPMPatterns(RewritePatternSet &patterns, int max_pauli_size)
+void populateCommuteCliffordPastPPMPatterns(RewritePatternSet &patterns, uint max_pauli_size)
 {
     patterns.add<CommuteCliffordPastPPM>(patterns.getContext(), max_pauli_size, 1);
     patterns.add<RemoveDeadPPR>(patterns.getContext(), 1);
