@@ -24,6 +24,8 @@ from jax.core import ShapedArray
 import catalyst
 from catalyst import qjit
 
+pytestmark = pytest.mark.usefixtures("disable_capture")
+
 
 def circuit_aot_builder(dev):
     """Test AOT builder."""
