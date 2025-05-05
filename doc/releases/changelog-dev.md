@@ -64,6 +64,11 @@
   will handle direct decomposition of PPRs into PPMs.
   [(#1688)](https://github.com/PennyLaneAI/catalyst/pull/1688)
 
+* Support for Mac x86 has been removed. This is because [JAX has
+also dropped support for them since 0.5.0](https://github.com/jax-ml/jax/blob/main/CHANGELOG.md#jax-050-jan-17-2025),
+with the rationale being that such machines are becoming increasingly scarce.
+  [(#???)](https://github.com/PennyLaneAI/catalyst/pull/???)
+
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
