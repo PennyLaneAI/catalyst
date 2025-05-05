@@ -27,6 +27,8 @@ import pytest
 from catalyst import qjit
 from catalyst.utils.exceptions import CompileError
 
+pytestmark = pytest.mark.usefixtures("disable_capture")
+
 mbqc_pipeline = [
     (
         "default-pipeline",
