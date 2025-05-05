@@ -53,6 +53,7 @@ from catalyst.jax_primitives import (
     cond_p,
     counts_p,
     device_init_p,
+    device_release_p,
     expval_p,
     for_p,
     gphase_p,
@@ -303,11 +304,12 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
         """Perform any final steps after processing the plxpr.
 
         For conversion to calayst, this reinserts extracted qubits and
-        deallocates the register.
+        deallocates the register, and releases the device.
         """
         if not self.actualized:
             self.actualize_qreg()
         qdealloc_p.bind(self.qreg)
+        device_release_p.bind()
         self.stateref = None
 
     def get_wire(self, wire_value) -> AbstractQbit:
