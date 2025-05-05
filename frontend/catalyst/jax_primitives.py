@@ -248,6 +248,8 @@ class MeasurementPlane(Enum):
 zne_p = core.Primitive("zne")
 device_init_p = core.Primitive("device_init")
 device_init_p.multiple_results = True
+device_release_p = core.Primitive("device_release")
+device_release_p.multiple_results = True
 qalloc_p = core.Primitive("qalloc")
 qdealloc_p = core.Primitive("qdealloc")
 qdealloc_p.multiple_results = True
@@ -811,11 +813,6 @@ def _zne_lowering(ctx, *args, folding, jaxpr, fn):
 #
 # device_init
 #
-@device_init_p.def_impl
-def _device_init_def_impl(ctx, shots, rtd_lib, rtd_name, rtd_kwargs):  # pragma: no cover
-    raise NotImplementedError()
-
-
 @device_init_p.def_abstract_eval
 def _device_init_abstract_eval(shots, rtd_lib, rtd_name, rtd_kwargs):
     return ()
@@ -835,6 +832,19 @@ def _device_init_lowering(
         shots=shots_value,
     )
 
+    return ()
+
+
+#
+# device_release
+#
+@device_release_p.def_abstract_eval
+def _device_release_abstract_eval():
+    return ()
+
+
+def _device_release_lowering(jax_ctx: mlir.LoweringRuleContext):
+    DeviceReleaseOp()  # end of qnode
     return ()
 
 
@@ -887,7 +897,6 @@ def _qdealloc_lowering(jax_ctx: mlir.LoweringRuleContext, qreg):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
     DeallocOp(qreg)
-    DeviceReleaseOp()  # end of qnode
     return ()
 
 
@@ -2300,6 +2309,7 @@ def _cos_lowering2(ctx, x):
 CUSTOM_LOWERING_RULES = (
     (zne_p, _zne_lowering),
     (device_init_p, _device_init_lowering),
+    (device_release_p, _device_release_lowering),
     (qalloc_p, _qalloc_lowering),
     (qdealloc_p, _qdealloc_lowering),
     (qextract_p, _qextract_lowering),

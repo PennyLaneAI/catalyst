@@ -78,6 +78,7 @@ from catalyst.jax_primitives import (
     compbasis_p,
     counts_p,
     device_init_p,
+    device_release_p,
     expval_p,
     func_p,
     gphase_p,
@@ -1383,9 +1384,9 @@ def trace_quantum_function(
                 else:
                     transformed_results.append(meas_results)
 
-                # Deallocate the register after the current tape is finished
-                # This dealloc primitive also serves as the tape cut when splitting tapes
+                # Deallocate the register and release the device after the current tape is finished.
                 qdealloc_p.bind(qreg_out)
+                device_release_p.bind()
 
         closed_jaxpr, out_type, out_tree = trace_post_processing(
             ctx, trace, post_processing, transformed_results
