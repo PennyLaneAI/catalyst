@@ -179,10 +179,6 @@ def extract_backend_info(
     if not pathlib.Path(device_lpath).is_file():
         raise CompileError(f"Device at {device_lpath} cannot be found!")
 
-    if hasattr(device, "_track_resources"):
-        # pylint: disable=protected-access
-        device_kwargs["track_resources"] = device._track_resources
-
     if dname == "braket.local.qubit":  # pragma: no cover
         device_kwargs["device_type"] = dname
         device_kwargs["backend"] = (
