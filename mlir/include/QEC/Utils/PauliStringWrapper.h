@@ -160,5 +160,11 @@ void updatePauliWord(QECOpInterface op, const PauliWord &newPauliWord, PatternRe
 // Update the sign of the operation.
 void updatePauliWordSign(QECOpInterface op, bool isNegated, PatternRewriter &rewriter);
 
+// No size limit when max_pauli_size is -1
+bool isInfinitySize(int max_pauli_size);
+
+// Combine the size check logic in one place
+bool exceedPauliSizeLimit(size_t pauliSize, int max_pauli_size);
+
 } // namespace qec
 } // namespace catalyst

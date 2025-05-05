@@ -15,7 +15,7 @@
 #define DEBUG_TYPE "commute_ppr"
 
 #include "llvm/Support/Debug.h"
-//#include "mlir/Analysis/TopologicalSortUtils.h" // enable when updating llvm
+// #include "mlir/Analysis/TopologicalSortUtils.h" // enable when updating llvm
 #include "mlir/Transforms/TopologicalSortUtils.h"
 
 #include "QEC/IR/QECDialect.h"
@@ -67,8 +67,8 @@ bool verifyNextNonClifford(PPRotationOp op, PPRotationOp nextOp)
     return true;
 }
 
-LogicalResult visitPPRotationOp(PPRotationOp op,
-                                std::function<LogicalResult(PPRotationOp)> callback)
+LogicalResult visitValidNonCliffordPPR(PPRotationOp op,
+                                       std::function<LogicalResult(PPRotationOp)> callback)
 {
     if (op.isNonClifford())
         return failure();
@@ -143,19 +143,36 @@ void moveCliffordPastNonClifford(const PauliStringWrapper &lhsPauli,
 struct CommuteCliffordTPPR : public OpRewritePattern<PPRotationOp> {
     using OpRewritePattern::OpRewritePattern;
 
+    int MAX_PAULI_SIZE;
+
+    CommuteCliffordTPPR(mlir::MLIRContext *context, int max_pauli_size, PatternBenefit benefit)
+        : OpRewritePattern(context), MAX_PAULI_SIZE(max_pauli_size)
+    {
+    }
+
     LogicalResult matchAndRewrite(PPRotationOp op, PatternRewriter &rewriter) const override
     {
-        return visitPPRotationOp(op, [&](PPRotationOp nextPPROp) {
-            PauliWordPair normOps = normalizePPROps(op, nextPPROp);
+        return visitValidNonCliffordPPR(op, [&](PPRotationOp nonCliffordPPR) {
+            auto [normCliffordPPR, normNonCliffordPPR] = normalizePPROps(op, nonCliffordPPR);
 
-            if (normOps.first.commutes(normOps.second)) {
-                moveCliffordPastNonClifford(normOps.first, normOps.second, nullptr, rewriter);
-            }
-            else {
-                auto resultStr = normOps.first.computeCommutationRulesWith(normOps.second);
-                moveCliffordPastNonClifford(normOps.first, normOps.second, &resultStr, rewriter);
+            // Handle commuting case
+            if (normCliffordPPR.commutes(normNonCliffordPPR)) {
+                moveCliffordPastNonClifford(normCliffordPPR, normNonCliffordPPR, nullptr, rewriter);
+                sortTopologically(op->getBlock());
+                return success();
             }
 
+            // Handle non-commuting case
+            auto commutedResult = normCliffordPPR.computeCommutationRulesWith(normNonCliffordPPR);
+
+            // Skip if Pauli size is too large
+            size_t pauliSize = commutedResult.get_pauli_word().size();
+            if (exceedPauliSizeLimit(pauliSize, MAX_PAULI_SIZE)) {
+                return failure();
+            }
+
+            moveCliffordPastNonClifford(normCliffordPPR, normNonCliffordPPR, &commutedResult,
+                                        rewriter);
             sortTopologically(op->getBlock());
             return success();
         });
@@ -166,9 +183,9 @@ struct CommuteCliffordTPPR : public OpRewritePattern<PPRotationOp> {
 namespace catalyst {
 namespace qec {
 
-void populateCommuteCliffordTPPRPatterns(mlir::RewritePatternSet &patterns)
+void populateCommuteCliffordTPPRPatterns(mlir::RewritePatternSet &patterns, int max_pauli_size)
 {
-    patterns.add<CommuteCliffordTPPR>(patterns.getContext(), 1);
+    patterns.add<CommuteCliffordTPPR>(patterns.getContext(), max_pauli_size, 1);
 }
 } // namespace qec
 

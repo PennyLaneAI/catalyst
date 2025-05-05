@@ -17,7 +17,7 @@
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/Debug.h"
-//#include "mlir/Analysis/TopologicalSortUtils.h"  // enable when updating llvm
+// #include "mlir/Analysis/TopologicalSortUtils.h"  // enable when updating llvm
 #include "mlir/Transforms/TopologicalSortUtils.h"
 
 #include "QEC/IR/QECDialect.h"
@@ -84,8 +84,8 @@ bool verifyPrevNonClifford(PPMeasurementOp op, PPRotationOp prevOp)
     return true;
 }
 
-LogicalResult visitPPMeasurementOp(PPMeasurementOp op,
-                                   std::function<LogicalResult(PPRotationOp)> callback)
+LogicalResult visitValidCliffordPPR(PPMeasurementOp op,
+                                    std::function<LogicalResult(PPRotationOp)> callback)
 {
     for (auto qubit : op->getOperands()) {
         if (qubit.getDefiningOp() == nullptr)
@@ -173,18 +173,34 @@ bool shouldRemovePPR(PPRotationOp op)
 struct CommuteCliffordPastPPM : public OpRewritePattern<PPMeasurementOp> {
     using OpRewritePattern::OpRewritePattern;
 
-    LogicalResult matchAndRewrite(PPMeasurementOp op, PatternRewriter &rewriter) const override
-    {
-        return visitPPMeasurementOp(op, [&](PPRotationOp pprOp) {
-            PauliWordPair normOps = normalizePPROps(pprOp, op);
+    int MAX_PAULI_SIZE;
 
-            if (normOps.first.commutes(normOps.second)) {
-                moveCliffordPastPPM(normOps.first, normOps.second, nullptr, rewriter);
+    CommuteCliffordPastPPM(mlir::MLIRContext *context, int max_pauli_size, PatternBenefit benefit)
+        : OpRewritePattern(context, benefit), MAX_PAULI_SIZE(max_pauli_size)
+    {
+    }
+
+    LogicalResult matchAndRewrite(PPMeasurementOp PPMOp, PatternRewriter &rewriter) const override
+    {
+        return visitValidCliffordPPR(PPMOp, [&](PPRotationOp cliffordPPROp) {
+            auto [normPPROp, normPPMOp] = normalizePPROps(cliffordPPROp, PPMOp);
+
+            // Handle commuting case
+            if (normPPROp.commutes(normPPMOp)) {
+                moveCliffordPastPPM(normPPROp, normPPMOp, nullptr, rewriter);
+                return success();
             }
-            else {
-                auto resultStr = normOps.first.computeCommutationRulesWith(normOps.second);
-                moveCliffordPastPPM(normOps.first, normOps.second, &resultStr, rewriter);
+
+            // Handle non-commuting case
+            auto commutedResult = normPPROp.computeCommutationRulesWith(normPPMOp);
+
+            // Skip if Pauli size is too large
+            size_t pauliSize = commutedResult.get_pauli_word().size();
+            if (exceedPauliSizeLimit(pauliSize, MAX_PAULI_SIZE)) {
+                return failure();
             }
+
+            moveCliffordPastPPM(normPPROp, normPPMOp, &commutedResult, rewriter);
             return success();
         });
     }
@@ -208,9 +224,9 @@ struct RemoveDeadPPR : public OpRewritePattern<PPRotationOp> {
 namespace catalyst {
 namespace qec {
 
-void populateCommuteCliffordPastPPMPatterns(RewritePatternSet &patterns)
+void populateCommuteCliffordPastPPMPatterns(RewritePatternSet &patterns, int max_pauli_size)
 {
-    patterns.add<CommuteCliffordPastPPM>(patterns.getContext(), 1);
+    patterns.add<CommuteCliffordPastPPM>(patterns.getContext(), max_pauli_size, 1);
     patterns.add<RemoveDeadPPR>(patterns.getContext(), 1);
 }
 
