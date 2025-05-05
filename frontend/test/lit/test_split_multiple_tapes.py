@@ -64,10 +64,10 @@ def test_multiple_tape_transforms():
 
     # CHECK: circuit_twotapes
     # CHECK: call_jaxpr={ lambda ;
-    # CHECK: qdevice[
+    # CHECK: device_init[
     # CHECK: ]
     # CHECK: qdealloc
-    # CHECK: qdevice[
+    # CHECK: device_init[
     # CHECK: ]
     # CHECK: qdealloc
     # CHECK-NEXT: {{.+}}:f64[] = add {{.+}} {{.+}}
