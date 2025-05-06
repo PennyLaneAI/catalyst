@@ -35,7 +35,7 @@ get_property(MLIR_EXPORTS GLOBAL PROPERTY MLIR_EXPORTS)
 # libstim is Apache version 2.0
 # QECUtils needs to be added manually since it is not in MLIR_EXPORTS
 # TODO: Can we avoid adding these other export targets?
-export(TARGETS ${MLIR_EXPORTS} QECUtils libstim nlohmann_json tomlplusplus_tomlplusplus FILE ${catalyst_cmake_builddir}/CatalystTargets.cmake)
+export(TARGETS ${MLIR_EXPORTS} QECUtils libstim tomlplusplus_tomlplusplus FILE ${catalyst_cmake_builddir}/CatalystTargets.cmake)
 
 # Generate MlirConfig.cmake for the build tree.
 set(CATALYST_CONFIG_CMAKE_DIR "${catalyst_cmake_builddir}")
