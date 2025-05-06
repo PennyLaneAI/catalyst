@@ -46,6 +46,7 @@ from catalyst.jax_primitives import (
     cond_p,
     counts_p,
     device_init_p,
+    device_release_p,
     expval_p,
     for_p,
     func_p,
@@ -727,6 +728,7 @@ INST_IMPL = {
     # not necessary in the CUDA-quantum API.
     qdealloc_p: ignore_impl,
     device_init_p: ignore_impl,
+    device_release_p: ignore_impl,
     qalloc_p: ignore_impl,
     # These are unimplemented at the moment.
     zne_p: unimplemented_impl,
