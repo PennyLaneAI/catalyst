@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "Driver/Pipelines.h"
+#include "Catalyst/IR/CatalystDialect.h"
 #include "Catalyst/Transforms/Passes.h"
 #include "Gradient/Transforms/Passes.h"
 #include "Mitigation/Transforms/Passes.h"
