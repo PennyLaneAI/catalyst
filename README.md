@@ -80,6 +80,17 @@ higher. To install it, simply run the following ``pip`` command:
 pip install pennylane-catalyst
 ```
 
+Catalyst does not currently support macOS with x86_64 architecture. This includes Macs running on Intel processors.
+If you would like to use Catalyst on these systems, please install Catalyst version 0.11.0, PennyLane version 0.41.0, PennyLane-Lightning
+version 0.41.0, and Jax version 0.4.28:
+
+```console
+pip install pennylane-catalyst==0.11.0
+pip install pennylane==0.41.0
+pip install pennylane-lightning==0.41.0
+pip install jax==0.4.28
+```
+
 If you wish to contribute to Catalyst or develop against our runtime or compiler, instructions for
 [building from source](https://docs.pennylane.ai/projects/catalyst/en/latest/dev/installation.html#minimal-building-from-source-guide)
 are also available.
