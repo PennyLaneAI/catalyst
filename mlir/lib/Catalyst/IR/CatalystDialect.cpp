@@ -42,7 +42,7 @@ void CatalystDialect::initialize()
 #include "Catalyst/IR/CatalystOps.cpp.inc"
         >();
 
-    declarePromisedInterfaces<bufferization::BufferizableOpInterface>();
+    declarePromisedInterfaces<bufferization::BufferizableOpInterface, PrintOp, CustomCallOp, CallbackCallOp, CallbackOp>();
 }
 
 //===----------------------------------------------------------------------===//

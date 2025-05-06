@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt --catalyst-bufferize --split-input-file %s | FileCheck %s
+// RUN: quantum-opt --one-shot-bufferize --split-input-file %s | FileCheck %s
 
 //////////////////////
 // Catalyst PrintOp //
@@ -20,7 +20,8 @@
 
 func.func @dbprint_val(%arg0: tensor<?xf64>) {
 
-    // CHECK: "catalyst.print"(%0) : (memref<?xf64>) -> ()
+    // CHECK: %0 = bufferization.to_memref %arg0
+    // CHECK: "catalyst.print"(%0) : (memref<?xf64, strided<[?], offset: ?>>) -> ()
     "catalyst.print"(%arg0) : (tensor<?xf64>) -> ()
 
     return
@@ -30,7 +31,8 @@ func.func @dbprint_val(%arg0: tensor<?xf64>) {
 
 func.func @dbprint_memref(%arg0: tensor<?xf64>) {
 
-    // CHECK: "catalyst.print"(%0) <{print_descriptor}> : (memref<?xf64>) -> ()
+    // CHECK: %0 = bufferization.to_memref %arg0
+    // CHECK: "catalyst.print"(%0) <{print_descriptor}> : (memref<?xf64, strided<[?], offset: ?>>) -> ()
     "catalyst.print"(%arg0) {print_descriptor} : (tensor<?xf64>) -> ()
 
     return
@@ -49,11 +51,12 @@ func.func @dbprint_str() {
 // -----
 
 func.func @custom_call(%arg0: tensor<3x3xf64>) -> tensor<3x3xf64> {
-    // CHECK: [[memrefArg:%.+]] = bufferization.to_memref %arg0 : memref<3x3xf64>
-    // CHECK: [[alloc:%.+]] = bufferization.alloc_tensor() {{.*}}: tensor<3x3xf64>
-    // CHECK: [[allocmemref:%.+]]  = bufferization.to_memref [[alloc]] : memref<3x3xf64>
-    // CHECK: catalyst.custom_call fn("lapack_dgesdd") ([[memrefArg]], [[allocmemref]]) {number_original_arg = array<i32: 1>} : (memref<3x3xf64>, memref<3x3xf64>) -> ()
-    // CHECK: [[res:%.+]] = bufferization.to_tensor [[allocmemref]] : memref<3x3xf64>
+    // CHECK: [[memrefArg:%.+]] = bufferization.to_memref %arg0 : memref<3x3xf64, strided<[?, ?], offset: ?>>
+    // CHECK: [[sourceAlloc:%.+]] = memref.alloc() {{.*}}: memref<3x3xf64>
+    // CHECK: memref.copy [[memrefArg]], [[sourceAlloc]]
+    // CHECK: [[destAlloc:%.+]] = memref.alloc() {{.*}}: memref<3x3xf64>
+    // CHECK: catalyst.custom_call fn("lapack_dgesdd") ([[sourceAlloc]], [[destAlloc]]) {number_original_arg = array<i32: 1>} : (memref<3x3xf64>, memref<3x3xf64>) -> ()
+    // CHECK: [[res:%.+]] = bufferization.to_tensor [[destAlloc]] : memref<3x3xf64>
     // CHECK: return [[res]] : tensor<3x3xf64>
     %0 = catalyst.custom_call fn("lapack_dgesdd") (%arg0) : (tensor<3x3xf64>) -> (tensor<3x3xf64>)
 
@@ -77,12 +80,11 @@ module @test1 {
   // CHECK-LABEL: @foo(
   // CHECK-SAME: [[arg0:%.+]]: tensor<f64>)
   func.func private @foo(%arg0: tensor<f64>) -> tensor<f64> {
-    // CHECK-DAG: [[memref0:%.+]] = bufferization.to_memref [[arg0]]
-    // CHECK-DAG: [[tensor1:%.+]] = bufferization.alloc_tensor
-    // CHECK:     [[memref1:%.+]] = bufferization.to_memref [[tensor1]]
-    // CHECK:     catalyst.callback_call @callback_1([[memref0]], [[memref1]])
+    // CHECK-DAG: [[memref0:%.+]] = bufferization.to_memref [[arg0]] : memref<f64, strided<[], offset: ?>>
+    // CHECK-DAG: [[resAlloc:%.+]] = memref.alloc() {{.*}}: memref<f64>
+    // CHECK:     catalyst.callback_call @callback_1([[memref0]], [[resAlloc]]) : (memref<f64, strided<[], offset: ?>>, memref<f64>) -> ()
     %1 = catalyst.callback_call @callback_1(%arg0) : (tensor<f64>) -> (tensor<f64>)
-    // CHECK:     [[retval:%.+]] = bufferization.to_tensor [[memref1]]
+    // CHECK:     [[retval:%.+]] = bufferization.to_tensor [[resAlloc]]
     // CHECK:     return [[retval]]
     return %1 : tensor<f64>
   }
