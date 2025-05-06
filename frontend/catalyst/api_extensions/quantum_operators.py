@@ -43,7 +43,7 @@ from catalyst.jax_extras import (
     deduce_avals,
     new_inner_tracer,
 )
-from catalyst.jax_primitives import AbstractQreg, adjoint_p, qmeasure_p
+from catalyst.jax_primitives import AbstractQreg, adjoint_p, measure_p
 from catalyst.jax_tracer import (
     HybridOp,
     HybridOpRegion,
@@ -324,7 +324,7 @@ def ctrl(
 class MidCircuitMeasure(HybridOp):
     """Operation representing a mid-circuit measurement."""
 
-    binder = qmeasure_p.bind
+    binder = measure_p.bind
 
     # pylint: disable=too-many-arguments
     def __init__(
