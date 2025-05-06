@@ -12,8 +12,8 @@ PyYAML
 
 # formatting/linting
 black
-clang-format==14.*
-clang-tidy~=16.0
+clang-format
+clang-tidy
 pylint
 isort
 
