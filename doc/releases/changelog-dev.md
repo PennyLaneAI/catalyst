@@ -135,8 +135,18 @@
   [(#1681)](https://github.com/PennyLaneAI/catalyst/pull/1681)
   [(#1685)](https://github.com/PennyLaneAI/catalyst/pull/1685)
 
-* LAPACK kernels are updated to adhere to the new JAX lowering rules for external functions.
-  [(#1685)](https://github.com/PennyLaneAI/catalyst/pull/1685)
+  Several internal changes were made for this update.
+    - LAPACK kernels are updated to adhere to the new JAX lowering rules for external functions.
+    [(#1685)](https://github.com/PennyLaneAI/catalyst/pull/1685)
+
+    - The trace stack is removed and replaced with a tracing context manager.
+    [(#1662)](https://github.com/PennyLaneAI/catalyst/pull/1662)
+
+    - A new `debug_info` argument is added to `Jaxpr`, the `make_jaxpr`
+    functions, and `jax.extend.linear_util.wrap_init`.
+    [(#1670)](https://github.com/PennyLaneAI/catalyst/pull/1670)
+    [(#1671)](https://github.com/PennyLaneAI/catalyst/pull/1671)
+    [(#1681)](https://github.com/PennyLaneAI/catalyst/pull/1681)
 
 * The bufferization of custom catalyst dialects has been migrated to the new one-shot
   bufferization interface in mlir.
