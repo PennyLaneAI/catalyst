@@ -9,9 +9,7 @@ on:
       - Build Catalyst Wheel on Linux (arm64)
       - Build Catalyst Wheel on Linux (x86_64)
       - Build Catalyst Wheel on macOS (arm64)
-      # mac x86 is dropped from jax 0.5.0 onwards, see
-      # https://github.com/PennyLaneAI/catalyst/pull/1716
-      # - Build Catalyst Wheel on macOS (x86_64)
+      - Build Catalyst Wheel on macOS (x86_64)
       - Build nightly Catalyst releases for TestPyPI
 
 jobs:
