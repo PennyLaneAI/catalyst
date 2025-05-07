@@ -16,7 +16,7 @@ from __future__ import annotations
 import argparse
 import sys
 
-from ._commands import cmake_dir
+from ._commands import include_dir
 from ._version import __version__
 
 
@@ -27,25 +27,25 @@ def main() -> None:
 
     .. code-block:: bash
 
-        python -m catalyst [--version] [--cmake_dir]
+        python -m catalyst [--version] [--include_dir]
 
     It provides the following command line options:
 
     - :code:`--version`: Print the version and exit.
-    - :code:`--cmake_dir`: Print the path to the catalyst CMake module directory.
+    - :code:`--include_dir`: Print the path to the catalyst C++ include directory.
 
     """
     parser = argparse.ArgumentParser()
     parser.add_argument("--version", action="version", version=__version__, help="Print version and exit.")
 
     parser.add_argument(
-        "--cmake_dir", action="store_true", help="Print the path to the catalyst CMake module directory."
+        "--include_dir", action="store_true", help="Print the path to the catalyst C++ include directory."
     )
     args = parser.parse_args()
     if not sys.argv[1:]:
         parser.print_help()
-    if args.cmake_dir:
-        print(cmake_dir().resolve())
+    if args.include_dir:
+        print(include_dir().resolve())
 
 
 if __name__ == "__main__":

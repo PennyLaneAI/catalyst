@@ -17,21 +17,20 @@ from importlib.metadata import PackageNotFoundError, distribution
 from pathlib import Path
 
 
-
-def cmake_dir() -> Path:
-    """Return the path to the catalyst CMake module directory.
+def include_dir() -> Path:
+    """Return the path to the catalyst include directory.
 
     Raises:
-        FileNotFoundError: If the CMake module directory is not found.
+        FileNotFoundError: If the include directory is not found.
         ImportError: If catalyst is not installed.
     """
     try:
         dist = distribution("catalyst")
-        located_cmake_dir = Path(dist.locate_file("catalyst/cmake"))
-        if located_cmake_dir.exists() and located_cmake_dir.is_dir():
-            return located_cmake_dir
-        msg = "catalyst CMake files not found."
+        located_include_dir = Path(dist.locate_file("catalyst/include"))
+        if located_include_dir.exists() and located_include_dir.is_dir():
+            return located_include_dir
+        msg = "catalyst include files not found."
         raise FileNotFoundError(msg)
     except PackageNotFoundError:
-        msg = "catalyst not installed, installation required to access the CMake files."
+        msg = "catalyst not installed, installation required to access the include files."
         raise ImportError(msg) from None
