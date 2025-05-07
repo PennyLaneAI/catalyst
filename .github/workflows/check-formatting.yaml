@@ -37,10 +37,10 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get -y install clang-format-14
+          sudo apt-get -y install clang-format-20
 
       - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Run clang-format
-        run: python3 ./bin/format.py --check --verbose --cfversion 14 .
+        run: python3 ./bin/format.py --check --verbose --cfversion 20 .
