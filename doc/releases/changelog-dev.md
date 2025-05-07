@@ -2,16 +2,19 @@
 
 <h3>New features since last release</h3>
 
-* A new compilation pass has been added to Catalyst to decompose non-Clifford Pauli product rotations (PPRs) into Pauli product measurements (PPMs) that aim to consume magic states. Two decomposition strategies are supported: *inject magic state* and *auto-corrected :math:`\pi/8` rotation method* as described in [arXiv:1808.02892](https://arxiv.org/abs/1808.02892v3).
+* A new compilation pass has been added to Catalyst to decompose Pauli product rotations (PPRs) into
+  Pauli product measurements (PPMs). Non-Clifford (pi/8) rotations require the consumption of a
+  magic state, while Clifford rotations will not. The methods are implemented as described in
+  [arXiv:1808.02892](https://arxiv.org/abs/1808.02892v3).
   [(#1664)](https://github.com/PennyLaneAI/catalyst/pull/1664)
 
-  The new compilation pass can be accessed from the :mod:`~.passes` module or in :func:`~.pipeline`:
-  * :func:`catalyst.passes.ppr_to_ppm <~.passes.ppr_to_ppm>`: Decomposes non-Clifford PPRs into PPMs, consuming magic states using the auto-corrected :math:`\pi/8` rotation method by default.
+  The new compilation pass can be accessed in the frontend from the :mod:`~.passes` module:
+  * :func:`~.passes.ppr_to_ppm`: Decomposes all PPRs into PPMs (except Pauli rotations).
 
-  The following new and extended operations in intermediate representation are available:
-  * :func:`qec.select.ppm <~.ops.qec.select.ppm>`: Performs a conditional PPM based on a boolean control.
-  * :func:`qec.prepare <~.ops.qec.prepare>`: Prepares logical qubits in specified initial states.
-  * :func:`qec.ppr <~.ops.qec.ppr>` and :func:`qec.ppm <~.ops.qec.ppm>`: Now support conditional execution.
+  Or via the Catalyst CLI as two separate passes:
+  * `decompose_clifford_ppr`: Decompose pi/4 rotations into PPMs.
+  * `decompose_non_clifford_ppr`: Decompose pi/8 rotations into PPMs using a magic state.
+
 
 <h3>Improvements 🛠</h3>
 

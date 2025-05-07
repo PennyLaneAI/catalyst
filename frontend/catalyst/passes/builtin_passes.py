@@ -502,26 +502,21 @@ def merge_ppr_ppm(qnode):
 
 
 def ppr_to_ppm(qnode=None, decompose_method="auto-corrected", prepare_state="zero"):
-    R"""Specify that the MLIR compiler pass for decomposing
-    non-Clifford Pauli Product Rotation (PPR) operation,
-    :math:`\exp{iP\tfrac{\pi}{8}}` into Pauli Pauli Measurement
-    will be applied using Auto-corrected :math:`\pi/8` rotation method.
+    R"""Specify that the MLIR compiler passes for decomposing Pauli Product rotations (PPR)
+    into Pauli Pauli measurements (PPM) will be applied.
 
-    .. note::
-
-        This pass is used to decompose both non-Clifford and Clifford PPRs into
-        Pauli Product Measurements. The non-Clifford PPRs are decomposed first and then
-        Clifford PPRs are decomposed. The ``decompose_method`` argument has two options:
-        "auto-corrected" and "inject-magic-state". Both methods are based on the paper
-        `"Game of surface code" <https://arxiv.org/abs/1808.02892>` from Figure 17(b) and 7,
-        respectively.
+    This pass is used to decompose both non-Clifford and Clifford PPRs into PPMs. The non-Clifford
+    PPRs (pi/8) are decomposed first, and then Clifford PPRs (pi/4) are decomposed. Non-Clifford
+    decomposition can be performed in one of two ways: "clifford-corrected" or "auto-corrected",
+    by default the latter is used. Both methods are based on
+    `A Game of Surface Codes <https://arxiv.org/abs/1808.02892>`, figures 7 and 17(b) respectively.
 
     Args:
         qnode (QNode, optional): QNode to apply the pass to. If None, returns a decorator.
-        decompose_method (str, optional): The method to use for decomposing non-Clifford PPR.
-            Options are "auto-corrected" and "inject-magic-state". Defaults to "auto-corrected".
+        decompose_method (str, optional): The method to use for decomposing non-Clifford PPRs.
+            Options are "auto-corrected" and "clifford-corrected". Defaults to "auto-corrected".
         prepare_state (str, optional): The state to prepare for decomposing Clifford PPR.
-            Options are "zero" and "plus_i". Defaults to "zero".
+            Defaults to ``False``.
 
     Returns:
         ~.QNode or callable: Returns decorated QNode if qnode is provided,
