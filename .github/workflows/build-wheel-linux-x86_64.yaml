@@ -47,7 +47,7 @@ jobs:
     name: Determine runner type to use
     uses: ./.github/workflows/determine-workflow-runner.yml
     with:
-      default_runner: ubuntu-22.04
+      default_runner: ubuntu-24.04
 
   check_if_wheel_build_required:
     if: github.event.pull_request.draft == false
