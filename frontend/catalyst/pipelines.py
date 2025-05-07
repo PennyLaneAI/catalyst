@@ -227,13 +227,11 @@ def get_bufferization_stage(_options: CompileOptions) -> List[str]:
         "empty-tensor-to-alloc-tensor",
         "func.func(bufferization-bufferize)",
         "func.func(tensor-bufferize)",
-        #"catalyst-bufferize",  # Must be run before -- func.func(linalg-bufferize)
-        "one-shot-bufferize{dialect-filter=catalyst}",  # Must be run before -- func.func(linalg-bufferize)
+        "one-shot-bufferize{dialect-filter=catalyst}",  # Must be run before --func.func(linalg-bufferize)
         "func.func(linalg-bufferize)",
         "func.func(tensor-bufferize)",
         "one-shot-bufferize{dialect-filter=quantum}",
         "func-bufferize",
-        #"func.func(finalizing-bufferize)",
         "canonicalize",  # Remove dead memrefToTensorOp's
         "gradient-postprocess",
         # introduced during gradient-bufferize of callbacks

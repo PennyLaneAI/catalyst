@@ -21,9 +21,6 @@
 
 namespace catalyst {
 
-// TODO: remove buffer pattern
-void populateBufferizationPatterns(mlir::TypeConverter &, mlir::RewritePatternSet &);
-
 void populateScatterPatterns(mlir::RewritePatternSet &);
 
 void populateHloCustomCallPatterns(mlir::RewritePatternSet &);

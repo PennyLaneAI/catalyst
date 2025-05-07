@@ -78,7 +78,6 @@ void createBufferizationPipeline(OpPassManager &pm)
     pm.addPass(mlir::bufferization::createEmptyTensorToAllocTensorPass());
     pm.addNestedPass<mlir::func::FuncOp>(mlir::bufferization::createBufferizationBufferizePass());
     pm.addNestedPass<mlir::func::FuncOp>(mlir::tensor::createTensorBufferizePass());
-    //pm.addPass(catalyst::createCatalystBufferizationPass());
     mlir::bufferization::OneShotBufferizationOptions catalyst_buffer_options;
     catalyst_buffer_options.opFilter.allowDialect<catalyst::CatalystDialect>();
     pm.addPass(mlir::bufferization::createOneShotBufferizePass(catalyst_buffer_options));
@@ -88,7 +87,6 @@ void createBufferizationPipeline(OpPassManager &pm)
     quantum_buffer_options.opFilter.allowDialect<catalyst::quantum::QuantumDialect>();
     pm.addPass(mlir::bufferization::createOneShotBufferizePass(quantum_buffer_options));
     pm.addPass(mlir::func::createFuncBufferizePass());
-    //pm.addNestedPass<mlir::func::FuncOp>(mlir::bufferization::createFinalizingBufferizePass());
     pm.addPass(mlir::createCanonicalizerPass());
     pm.addPass(catalyst::createGradientPostprocessingPass());
     pm.addNestedPass<mlir::func::FuncOp>(mlir::bufferization::createBufferHoistingPass());

@@ -5,8 +5,6 @@ file(GLOB SRC
     ArrayListToMemRefPass.cpp
     AsyncUtils.cpp
     BufferizableOpInterfaceImpl.cpp
-    BufferizationPatterns.cpp  // remove
-    catalyst_bufferize.cpp  // remove
     catalyst_to_llvm.cpp
     DetectQNodes.cpp
     DetensorizeSCFPass.cpp
