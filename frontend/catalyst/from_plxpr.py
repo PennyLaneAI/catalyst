@@ -52,6 +52,8 @@ from catalyst.jax_primitives import (
     compbasis_p,
     cond_p,
     counts_p,
+    device_init_p,
+    device_release_p,
     expval_p,
     for_p,
     gphase_p,
@@ -60,16 +62,15 @@ from catalyst.jax_primitives import (
     probs_p,
     qalloc_p,
     qdealloc_p,
-    qdevice_p,
     qextract_p,
     qinsert_p,
     qinst_p,
     quantum_kernel_p,
-    qunitary_p,
     sample_p,
     set_basis_state_p,
     set_state_p,
     state_p,
+    unitary_p,
     var_p,
     while_p,
 )
@@ -136,7 +137,7 @@ def from_plxpr(plxpr: jax.core.ClosedJaxpr) -> Callable[..., jax.core.Jaxpr]:
         { lambda ; a:f64[]. let
             b:f64[4] = func[
             call_jaxpr={ lambda ; c:f64[]. let
-                qdevice[
+                device_init[
                     rtd_kwargs={'shots': 0, 'mcmc': False, 'num_burnin': 0, 'kernel_name': None}
                     rtd_lib=***
                     rtd_name=LightningSimulator
@@ -295,7 +296,7 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
     def setup(self):
         """Initialize the stateref and bind the device."""
         if self.stateref is None:
-            qdevice_p.bind(self._shots, **_get_device_kwargs(self._device))
+            device_init_p.bind(self._shots, **_get_device_kwargs(self._device))
             self.stateref = {"qreg": qalloc_p.bind(len(self._device.wires)), "wire_map": {}}
 
     # pylint: disable=attribute-defined-outside-init
@@ -303,11 +304,12 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
         """Perform any final steps after processing the plxpr.
 
         For conversion to calayst, this reinserts extracted qubits and
-        deallocates the register.
+        deallocates the register, and releases the device.
         """
         if not self.actualized:
             self.actualize_qreg()
         qdealloc_p.bind(self.qreg)
+        device_release_p.bind()
         self.stateref = None
 
     def get_wire(self, wire_value) -> AbstractQbit:
@@ -422,7 +424,7 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
 def handle_qubit_unitary(self, *invals, n_wires):
     """Handle the conversion from plxpr to Catalyst jaxpr for the QubitUnitary primitive"""
     wires = [self.get_wire(w) for w in invals[1:]]
-    outvals = qunitary_p.bind(invals[0], *wires, qubits_len=n_wires, ctrl_len=0, adjoint=False)
+    outvals = unitary_p.bind(invals[0], *wires, qubits_len=n_wires, ctrl_len=0, adjoint=False)
     for wire_values, new_wire in zip(invals[1:], outvals):
         self.wire_map[wire_values] = new_wire
 
