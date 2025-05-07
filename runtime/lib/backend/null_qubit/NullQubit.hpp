@@ -30,8 +30,9 @@
 #include "Utils.hpp"
 
 namespace {
-// The name of the file where the resource usage data is stored
-constexpr char RESOURCES_FNAME[] = "__pennylane_resources_data.json";
+// The delimiter to use to separate the resource usage data from different runs in the printed
+// output
+constexpr char RESOURCE_PRINT_DELIMETER[] = "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=";
 } // namespace
 namespace Catalyst::Runtime::Devices {
 
@@ -64,7 +65,8 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     /**
      * @brief Prints resources that would be used to execute this circuit as a JSON
      */
-    void PrintResourceUsage()
+    void PrintResourceUsage(std::ostream &resource_file = std::cout,
+                            const bool skip_delimiter = false)
     {
         // Store the 2 special variables and clear them from the map to make
         // pretty-printing easier
@@ -73,10 +75,8 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
         resource_data_.erase("num_gates");
         resource_data_.erase("num_qubits");
 
-        // Open the file for writing
-        std::ofstream resource_file(RESOURCES_FNAME);
-        if (!resource_file.is_open()) { // LCOV_EXCL_LINE
-            throw std::runtime_error("Failed to open resource usage file for writing.");
+        if (!skip_delimiter) {
+            resource_file << RESOURCE_PRINT_DELIMETER << "\n";
         }
 
         resource_file << "{\n";
@@ -85,6 +85,10 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
         resource_file << "  \"gate_types\": ";
         pretty_print_dict(resource_data_, 2, resource_file);
         resource_file << "\n}" << std::endl;
+
+        if (!skip_delimiter) {
+            resource_file << RESOURCE_PRINT_DELIMETER << std::endl;
+        }
 
         // Restore 2 special variables
         resource_data_["num_qubits"] = num_qubits;

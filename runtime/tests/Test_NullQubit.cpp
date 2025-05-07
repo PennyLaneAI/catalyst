@@ -601,6 +601,15 @@ TEST_CASE("Test NullQubit device shots methods", "[NullQubit]")
 
 TEST_CASE("Test NullQubit device resource tracking", "[NullQubit]")
 {
+    // The name of the file where the resource usage data is stored
+    constexpr char RESOURCES_FNAME[] = "__pennylane_resources_data.json";
+
+    // Open a file for writing the resources JSON
+    std::ofstream resource_file_w(RESOURCES_FNAME);
+    if (!resource_file_w.is_open()) { // LCOV_EXCL_LINE
+        FAIL("Failed to open resource usage file for writing.");
+    }
+
     std::unique_ptr<NullQubit> dummy = std::make_unique<NullQubit>();
     CHECK(dummy->IsTrackingResources() == false);
 
@@ -636,11 +645,12 @@ TEST_CASE("Test NullQubit device resource tracking", "[NullQubit]")
     CHECK(sim->ResourcesGetNumQubits() == 4);
 
     // Capture resources usage
-    sim->PrintResourceUsage();
+    sim->PrintResourceUsage(resource_file_w, true);
+    resource_file_w.close();
 
     // Open the file of resource data
-    std::ifstream resource_file(RESOURCES_FNAME);
-    CHECK(resource_file.is_open()); // fail-fast if file failed to create
+    std::ifstream resource_file_r(RESOURCES_FNAME);
+    CHECK(resource_file_r.is_open()); // fail-fast if file failed to create
 
     std::vector<std::string> resource_names = {"PauliX",
                                                "C(Adj(T))",
@@ -657,9 +667,9 @@ TEST_CASE("Test NullQubit device resource tracking", "[NullQubit]")
 
     // Check all fields have the correct value
     std::string full_json;
-    while (resource_file) {
+    while (resource_file_r) {
         std::string line;
-        std::getline(resource_file, line);
+        std::getline(resource_file_r, line);
         if (line.find("num_qubits") != std::string::npos) {
             CHECK(line.find("4") != std::string::npos);
         }
@@ -675,7 +685,7 @@ TEST_CASE("Test NullQubit device resource tracking", "[NullQubit]")
         }
         full_json += line + "\n";
     }
-    resource_file.close();
+    resource_file_r.close();
     std::remove(RESOURCES_FNAME);
 
     // Ensure all expected fields are present
@@ -690,8 +700,4 @@ TEST_CASE("Test NullQubit device resource tracking", "[NullQubit]")
 
     CHECK(sim->ResourcesGetNumGates() == 0);
     CHECK(sim->ResourcesGetNumQubits() == 0);
-
-    std::ifstream resource_file2(RESOURCES_FNAME);
-    CHECK(resource_file2.is_open()); // fail-fast if file failed to create
-    std::remove(RESOURCES_FNAME);
 }
