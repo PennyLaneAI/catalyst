@@ -33,6 +33,18 @@
   Finally, the `PrintState` and the `One`/`Zero` utility functions have been removed, since they
   did not serve a convincing purpose.
 
+* (Frontend Developers Only) Some Catalyst primitives for JAX have been renamed, and the qubit
+  deallocation primitive has been split into deallocation and a separate device release primitive.
+  [(#1720)](https://github.com/PennyLaneAI/catalyst/pull/1720)
+
+  - `qunitary_p` is now `unitary_p` (unchanged)
+  - `qmeasure_p` is now `measure_p` (unchanged)
+  - `qdevice_p` is now `device_init_p` (unchanged)
+  - `qdealloc_p` no longer releases the device, thus it can be used at any point of a quantum
+     execution scope
+  - `device_release_p` is a new primitive that must be used to mark the end of a quantum execution
+     scope, which will release the quantum device
+
 * Catalyst has removed the `experimental_capture` keyword from the `qjit` decorator in favour of
   unified behaviour with PennyLane.
   [(#1657)](https://github.com/PennyLaneAI/catalyst/pull/1657)

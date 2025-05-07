@@ -77,6 +77,8 @@ from catalyst.jax_primitives import (
     AbstractQreg,
     compbasis_p,
     counts_p,
+    device_init_p,
+    device_release_p,
     expval_p,
     func_p,
     gphase_p,
@@ -86,16 +88,15 @@ from catalyst.jax_primitives import (
     probs_p,
     qalloc_p,
     qdealloc_p,
-    qdevice_p,
     qextract_p,
     qinsert_p,
     qinst_p,
-    qunitary_p,
     sample_p,
     set_basis_state_p,
     set_state_p,
     state_p,
     tensorobs_p,
+    unitary_p,
     var_p,
 )
 from catalyst.logging import debug_logger, debug_logger_init
@@ -203,7 +204,7 @@ KNOWN_NAMED_OBS = (qml.Identity, qml.PauliX, qml.PauliY, qml.PauliZ, qml.Hadamar
 # Take care when adding primitives to this set in order to avoid introducing a quadratic number of
 # edges to the jaxpr equation graph in ``sort_eqns()``. Each equation with a primitive in this set
 # is constrained to occur before all subsequent equations in the quantum operations trace.
-FORCED_ORDER_PRIMITIVES = {qdevice_p, gphase_p}
+FORCED_ORDER_PRIMITIVES = {device_init_p, gphase_p}
 
 PAULI_NAMED_MAP = {
     "I": "Identity",
@@ -732,7 +733,7 @@ def trace_quantum_operations(
         elif isinstance(op, QubitUnitary):
             qubits = qrp.extract(op.wires)
             controlled_qubits = qrp.extract(controlled_wires)
-            qubits2 = qunitary_p.bind(
+            qubits2 = unitary_p.bind(
                 *[*op.parameters, *qubits, *controlled_qubits, *controlled_values],
                 qubits_len=len(qubits),
                 ctrl_len=len(controlled_qubits),
@@ -1331,7 +1332,7 @@ def trace_quantum_function(
                 # TODO: device shots is now always a concrete integer or None
                 # When PennyLane allows dynamic shots, update tracing to accept dynamic shots too
                 device_shots = get_device_shots(device) or 0
-                qdevice_p.bind(
+                device_init_p.bind(
                     device_shots,
                     rtd_lib=device.backend_lib,
                     rtd_name=device.backend_name,
@@ -1383,9 +1384,9 @@ def trace_quantum_function(
                 else:
                     transformed_results.append(meas_results)
 
-                # Deallocate the register after the current tape is finished
-                # This dealloc primitive also serves as the tape cut when splitting tapes
+                # Deallocate the register and release the device after the current tape is finished.
                 qdealloc_p.bind(qreg_out)
+                device_release_p.bind()
 
         closed_jaxpr, out_type, out_tree = trace_post_processing(
             ctx, trace, post_processing, transformed_results
