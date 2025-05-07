@@ -606,8 +606,8 @@ TEST_CASE("Test NullQubit device resource tracking", "[NullQubit]")
 
     // Open a file for writing the resources JSON
     std::ofstream resource_file_w(RESOURCES_FNAME);
-    if (!resource_file_w.is_open()) { // LCOV_EXCL_LINE
-        FAIL("Failed to open resource usage file for writing.");
+    if (!resource_file_w.is_open()) {                            // LCOV_EXCL_LINE
+        FAIL("Failed to open resource usage file for writing."); // LCOV_EXCL_LINE
     }
 
     std::unique_ptr<NullQubit> dummy = std::make_unique<NullQubit>();
