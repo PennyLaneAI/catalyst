@@ -454,7 +454,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      * @brief Returns the number of gates used since the last time all qubits were released. Only
      * works if resource tracking is enabled
      */
-    std::size_t ResourcesGetNumGates() { return resource_data_["num_gates"]; }
+    auto ResourcesGetNumGates() -> std::size_t { return resource_data_["num_gates"]; }
 
     /**
      * @brief Returns the maximum number of qubits used since the last time all qubits were
