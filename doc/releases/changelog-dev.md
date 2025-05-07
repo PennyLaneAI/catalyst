@@ -33,6 +33,18 @@
   Finally, the `PrintState` and the `One`/`Zero` utility functions have been removed, since they
   did not serve a convincing purpose.
 
+* (Frontend Developers Only) Some Catalyst primitives for JAX have been renamed, and the qubit
+  deallocation primitive has been split into deallocation and a separate device release primitive.
+  [(#1720)](https://github.com/PennyLaneAI/catalyst/pull/1720)
+
+  - `qunitary_p` is now `unitary_p` (unchanged)
+  - `qmeasure_p` is now `measure_p` (unchanged)
+  - `qdevice_p` is now `device_init_p` (unchanged)
+  - `qdealloc_p` no longer releases the device, thus it can be used at any point of a quantum
+     execution scope
+  - `device_release_p` is a new primitive that must be used to mark the end of a quantum execution
+     scope, which will release the quantum device
+
 * Catalyst has removed the `experimental_capture` keyword from the `qjit` decorator in favour of
   unified behaviour with PennyLane.
   [(#1657)](https://github.com/PennyLaneAI/catalyst/pull/1657)
@@ -78,6 +90,10 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Add an xDSL MLIR plugin to denote whether we will be using xDSL to execute some passes.
+  This changelog entry may be moved to new features once all branches are merged together.
+  [(#1707)](https://github.com/PennyLaneAI/catalyst/pull/1707)
+
 * Creates a function that allows developers to register an equivalent MLIR transform for a given
   PLxPR transform.
   [(#1705)](https://github.com/PennyLaneAI/catalyst/pull/1705)
@@ -99,6 +115,12 @@
 
   This runtime stub is currently for mock execution only and should be treated as a placeholder
   operation. Internally, it functions just as a computational-basis measurement instruction.
+
+* PennyLane's arbitrary-basis measurement operations, such as [`qml.ftqc.measure_arbitrary_basis()`
+  ](https://docs.pennylane.ai/en/stable/code/api/pennylane.ftqc.measure_arbitrary_basis.html), are
+  now QJIT-compatible with program capture enabled.
+  [(#1645)](https://github.com/PennyLaneAI/catalyst/pull/1645)
+  [(#1710)](https://github.com/PennyLaneAI/catalyst/pull/1710)
 
 * The utility function `EnsureFunctionDeclaration` is refactored into the `Utils` of the `Catalyst`
   dialect, instead of being duplicated in each individual dialect.

@@ -740,7 +740,7 @@ a single RX gate is being applied due to the rotation gate merger:
           g:f64[1] = add d f
           h:f64[1] = slice[limit_indices=(1,) start_indices=(0,) strides=(1,)] g
           i:f64[] = squeeze[dimensions=(0,)] h
-           = qdevice[
+           = device_init[
             rtd_kwargs={'shots': 0, 'mcmc': False}
             rtd_lib=/usr/local/lib/python3.10/dist-packages/catalyst/utils/../lib/librtd_lightning.so
             rtd_name=LightningSimulator

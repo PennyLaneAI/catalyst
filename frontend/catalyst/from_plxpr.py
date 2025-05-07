@@ -29,6 +29,7 @@ from pennylane.capture.expand_transforms import ExpandTransformsInterpreter
 from pennylane.capture.primitives import cond_prim as plxpr_cond_prim
 from pennylane.capture.primitives import for_loop_prim as plxpr_for_loop_prim
 from pennylane.capture.primitives import while_loop_prim as plxpr_while_loop_prim
+from pennylane.ftqc.primitives import measure_in_basis_prim as plxpr_measure_in_basis_prim
 from pennylane.ops.functions.map_wires import _map_wires_transform as pl_map_wires
 from pennylane.transforms import cancel_inverses as pl_cancel_inverses
 from pennylane.transforms import commute_controlled as pl_commute_controlled
@@ -47,26 +48,29 @@ from catalyst.jax_extras import jaxpr_pad_consts, make_jaxpr2, transient_jax_con
 from catalyst.jax_primitives import (
     AbstractQbit,
     AbstractQreg,
+    MeasurementPlane,
     compbasis_p,
     cond_p,
     counts_p,
+    device_init_p,
+    device_release_p,
     expval_p,
     for_p,
     gphase_p,
+    measure_in_basis_p,
     namedobs_p,
     probs_p,
     qalloc_p,
     qdealloc_p,
-    qdevice_p,
     qextract_p,
     qinsert_p,
     qinst_p,
     quantum_kernel_p,
-    qunitary_p,
     sample_p,
     set_basis_state_p,
     set_state_p,
     state_p,
+    unitary_p,
     var_p,
     while_p,
 )
@@ -133,7 +137,7 @@ def from_plxpr(plxpr: jax.core.ClosedJaxpr) -> Callable[..., jax.core.Jaxpr]:
         { lambda ; a:f64[]. let
             b:f64[4] = func[
             call_jaxpr={ lambda ; c:f64[]. let
-                qdevice[
+                device_init[
                     rtd_kwargs={'shots': 0, 'mcmc': False, 'num_burnin': 0, 'kernel_name': None}
                     rtd_lib=***
                     rtd_name=LightningSimulator
@@ -292,7 +296,7 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
     def setup(self):
         """Initialize the stateref and bind the device."""
         if self.stateref is None:
-            qdevice_p.bind(self._shots, **_get_device_kwargs(self._device))
+            device_init_p.bind(self._shots, **_get_device_kwargs(self._device))
             self.stateref = {"qreg": qalloc_p.bind(len(self._device.wires)), "wire_map": {}}
 
     # pylint: disable=attribute-defined-outside-init
@@ -300,11 +304,12 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
         """Perform any final steps after processing the plxpr.
 
         For conversion to calayst, this reinserts extracted qubits and
-        deallocates the register.
+        deallocates the register, and releases the device.
         """
         if not self.actualized:
             self.actualize_qreg()
         qdealloc_p.bind(self.qreg)
+        device_release_p.bind()
         self.stateref = None
 
     def get_wire(self, wire_value) -> AbstractQbit:
@@ -419,7 +424,7 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
 def handle_qubit_unitary(self, *invals, n_wires):
     """Handle the conversion from plxpr to Catalyst jaxpr for the QubitUnitary primitive"""
     wires = [self.get_wire(w) for w in invals[1:]]
-    outvals = qunitary_p.bind(invals[0], *wires, qubits_len=n_wires, ctrl_len=0, adjoint=False)
+    outvals = unitary_p.bind(invals[0], *wires, qubits_len=n_wires, ctrl_len=0, adjoint=False)
     for wire_values, new_wire in zip(invals[1:], outvals):
         self.wire_map[wire_values] = new_wire
 
@@ -638,6 +643,27 @@ def handle_while_loop(
 
     # Return only the output values that match the plxpr output values
     return outvals
+
+
+# pylint: disable=unused-argument, too-many-positional-arguments
+@QFuncPlxprInterpreter.register_primitive(plxpr_measure_in_basis_prim)
+def handle_measure_in_basis(self, angle, wire, plane, reset, postselect):
+    """Handle the conversion from plxpr to Catalyst jaxpr for the measure_in_basis primitive"""
+    _angle = jax.lax.convert_element_type(angle, jnp.dtype(jnp.float64))
+
+    try:
+        _plane = MeasurementPlane(plane)
+    except ValueError as e:
+        raise ValueError(
+            f"Measurement plane must be one of {[plane.value for plane in MeasurementPlane]}"
+        ) from e
+
+    in_wire = self.get_wire(wire)
+    result, out_wire = measure_in_basis_p.bind(_angle, in_wire, plane=_plane, postselect=postselect)
+
+    self.wire_map[wire] = out_wire
+
+    return result
 
 
 # Derived interpreters must be declared after the primitive registrations of their

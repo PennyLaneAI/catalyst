@@ -61,6 +61,7 @@ from mlir_quantum.dialects.gradient import (
     ValueAndGradOp,
     VJPOp,
 )
+from mlir_quantum.dialects.mbqc import MeasureInBasisOp
 from mlir_quantum.dialects.mitigation import ZneOp
 from mlir_quantum.dialects.quantum import (
     AdjointOp,
@@ -230,13 +231,25 @@ class Folding(Enum):
     ALL = "local-all"
 
 
+class MeasurementPlane(Enum):
+    """
+    Measurement planes for arbitrary-basis measurements in MBQC
+    """
+
+    XY = "XY"
+    YZ = "YZ"
+    ZX = "ZX"
+
+
 ##############
 # Primitives #
 ##############
 
 zne_p = core.Primitive("zne")
-qdevice_p = core.Primitive("qdevice")
-qdevice_p.multiple_results = True
+device_init_p = core.Primitive("device_init")
+device_init_p.multiple_results = True
+device_release_p = core.Primitive("device_release")
+device_release_p.multiple_results = True
 qalloc_p = core.Primitive("qalloc")
 qdealloc_p = core.Primitive("qdealloc")
 qdealloc_p.multiple_results = True
@@ -246,10 +259,10 @@ gphase_p = core.Primitive("gphase")
 gphase_p.multiple_results = True
 qinst_p = core.Primitive("qinst")
 qinst_p.multiple_results = True
-qunitary_p = core.Primitive("qunitary")
-qunitary_p.multiple_results = True
-qmeasure_p = core.Primitive("qmeasure")
-qmeasure_p.multiple_results = True
+unitary_p = core.Primitive("unitary")
+unitary_p.multiple_results = True
+measure_p = core.Primitive("measure")
+measure_p.multiple_results = True
 compbasis_p = core.Primitive("compbasis")
 namedobs_p = core.Primitive("namedobs")
 hermitian_p = core.Primitive("hermitian")
@@ -292,6 +305,8 @@ set_basis_state_p = jax.core.Primitive("set_basis_state")
 set_basis_state_p.multiple_results = True
 quantum_kernel_p = core.CallPrimitive("quantum_kernel")
 quantum_kernel_p.multiple_results = True
+measure_in_basis_p = core.Primitive("measure_in_basis")
+measure_in_basis_p.multiple_results = True
 
 
 def _assert_jaxpr_without_constants(jaxpr: ClosedJaxpr):
@@ -796,19 +811,14 @@ def _zne_lowering(ctx, *args, folding, jaxpr, fn):
 
 
 #
-# qdevice
+# device_init
 #
-@qdevice_p.def_impl
-def _qdevice_def_impl(ctx, shots, rtd_lib, rtd_name, rtd_kwargs):  # pragma: no cover
-    raise NotImplementedError()
-
-
-@qdevice_p.def_abstract_eval
-def _qdevice_abstract_eval(shots, rtd_lib, rtd_name, rtd_kwargs):
+@device_init_p.def_abstract_eval
+def _device_init_abstract_eval(shots, rtd_lib, rtd_name, rtd_kwargs):
     return ()
 
 
-def _qdevice_lowering(
+def _device_init_lowering(
     jax_ctx: mlir.LoweringRuleContext, shots: ir.Value, rtd_lib, rtd_name, rtd_kwargs
 ):
     ctx = jax_ctx.module_context.context
@@ -822,6 +832,19 @@ def _qdevice_lowering(
         shots=shots_value,
     )
 
+    return ()
+
+
+#
+# device_release
+#
+@device_release_p.def_abstract_eval
+def _device_release_abstract_eval():
+    return ()
+
+
+def _device_release_lowering(jax_ctx: mlir.LoweringRuleContext):
+    DeviceReleaseOp()  # end of qnode
     return ()
 
 
@@ -874,7 +897,6 @@ def _qdealloc_lowering(jax_ctx: mlir.LoweringRuleContext, qreg):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
     DeallocOp(qreg)
-    DeviceReleaseOp()  # end of qnode
     return ()
 
 
@@ -1102,20 +1124,20 @@ def _qinst_lowering(
 #
 # qubit unitary operation
 #
-@qunitary_p.def_abstract_eval
-def _qunitary_abstract_eval(matrix, *qubits, qubits_len=0, ctrl_len=0, adjoint=False):
+@unitary_p.def_abstract_eval
+def _unitary_abstract_eval(matrix, *qubits, qubits_len=0, ctrl_len=0, adjoint=False):
     for idx in range(qubits_len + ctrl_len):
         qubit = qubits[idx]
         assert isinstance(qubit, AbstractQbit)
     return (AbstractQbit(),) * (qubits_len + ctrl_len)
 
 
-@qunitary_p.def_impl
-def _qunitary_def_impl(*args, **kwargs):  # pragma: no cover
+@unitary_p.def_impl
+def _unitary_def_impl(*args, **kwargs):  # pragma: no cover
     raise NotImplementedError()
 
 
-def _qunitary_lowering(
+def _unitary_lowering(
     jax_ctx: mlir.LoweringRuleContext,
     matrix: ir.Value,
     *qubits_or_controlled: tuple,
@@ -1175,20 +1197,20 @@ def _qunitary_lowering(
 
 
 #
-# qmeasure
+# measure
 #
-@qmeasure_p.def_abstract_eval
-def _qmeasure_abstract_eval(qubit, postselect: int = None):
+@measure_p.def_abstract_eval
+def _measure_abstract_eval(qubit, postselect: int = None):
     assert isinstance(qubit, AbstractQbit)
     return core.ShapedArray((), bool), qubit
 
 
-@qmeasure_p.def_impl
-def _qmeasure_def_impl(ctx, qubit, postselect: int = None):  # pragma: no cover
+@measure_p.def_impl
+def _measure_def_impl(ctx, qubit, postselect: int = None):  # pragma: no cover
     raise NotImplementedError()
 
 
-def _qmeasure_lowering(jax_ctx: mlir.LoweringRuleContext, qubit: ir.Value, postselect: int = None):
+def _measure_lowering(jax_ctx: mlir.LoweringRuleContext, qubit: ir.Value, postselect: int = None):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
@@ -1204,6 +1226,79 @@ def _qmeasure_lowering(jax_ctx: mlir.LoweringRuleContext, qubit: ir.Value, posts
     result_type = ir.IntegerType.get_signless(1)
 
     result, new_qubit = MeasureOp(result_type, qubit.type, qubit, postselect=postselect).results
+
+    result_from_elements_op = ir.RankedTensorType.get((), result.type)
+    from_elements_op = FromElementsOp(result_from_elements_op, result)
+
+    return (
+        from_elements_op.results[0],
+        new_qubit,
+    )
+
+
+#
+# arbitrary-basis measurements
+#
+@measure_in_basis_p.def_abstract_eval
+def _measure_in_basis_abstract_eval(
+    angle: float, qubit: AbstractQbit, plane: MeasurementPlane, postselect: int = None
+):
+    assert isinstance(qubit, AbstractQbit)
+    return core.ShapedArray((), bool), qubit
+
+
+@measure_in_basis_p.def_impl
+def _measure_in_basis_def_impl(
+    ctx, angle: float, qubit: AbstractQbit, plane: MeasurementPlane, postselect: int = None
+):  # pragma: no cover
+    raise NotImplementedError()
+
+
+def _measurement_plane_attribute(ctx, plane: MeasurementPlane):
+    return ir.OpaqueAttr.get(
+        "mbqc",
+        ("measurement_plane " + MeasurementPlane(plane).name).encode("utf-8"),
+        ir.NoneType.get(ctx),
+        ctx,
+    )
+
+
+def _measure_in_basis_lowering(
+    jax_ctx: mlir.LoweringRuleContext,
+    angle: float,
+    qubit: ir.Value,
+    plane: MeasurementPlane,
+    postselect: int = None,
+):
+    ctx = jax_ctx.module_context.context
+    ctx.allow_unregistered_dialects = True
+
+    assert ir.OpaqueType.isinstance(qubit.type)
+    assert ir.OpaqueType(qubit.type).dialect_namespace == "quantum"
+    assert ir.OpaqueType(qubit.type).data == "bit"
+
+    angle = safe_cast_to_f64(angle, "angle")
+    angle = extract_scalar(angle, "angle")
+
+    assert ir.F64Type.isinstance(
+        angle.type
+    ), "Only scalar double parameters are allowed for quantum gates!"
+
+    # Prepare postselect attribute
+    if postselect is not None:
+        i32_type = ir.IntegerType.get_signless(32, ctx)
+        postselect = ir.IntegerAttr.get(i32_type, postselect)
+
+    result_type = ir.IntegerType.get_signless(1)
+
+    result, new_qubit = MeasureInBasisOp(
+        result_type,
+        qubit.type,
+        qubit,
+        plane=_measurement_plane_attribute(ctx, plane),
+        angle=angle,
+        postselect=postselect,
+    ).results
 
     result_from_elements_op = ir.RankedTensorType.get((), result.type)
     from_elements_op = FromElementsOp(result_from_elements_op, result)
@@ -2213,15 +2308,16 @@ def _cos_lowering2(ctx, x):
 
 CUSTOM_LOWERING_RULES = (
     (zne_p, _zne_lowering),
-    (qdevice_p, _qdevice_lowering),
+    (device_init_p, _device_init_lowering),
+    (device_release_p, _device_release_lowering),
     (qalloc_p, _qalloc_lowering),
     (qdealloc_p, _qdealloc_lowering),
     (qextract_p, _qextract_lowering),
     (qinsert_p, _qinsert_lowering),
     (qinst_p, _qinst_lowering),
     (gphase_p, _gphase_lowering),
-    (qunitary_p, _qunitary_lowering),
-    (qmeasure_p, _qmeasure_lowering),
+    (unitary_p, _unitary_lowering),
+    (measure_p, _measure_lowering),
     (compbasis_p, _compbasis_lowering),
     (namedobs_p, _named_obs_lowering),
     (hermitian_p, _hermitian_lowering),
@@ -2250,6 +2346,7 @@ CUSTOM_LOWERING_RULES = (
     (sin_p, _sin_lowering2),
     (cos_p, _cos_lowering2),
     (quantum_kernel_p, _quantum_kernel_lowering),
+    (measure_in_basis_p, _measure_in_basis_lowering),
 )
 
 
