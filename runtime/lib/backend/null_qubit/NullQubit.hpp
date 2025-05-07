@@ -460,7 +460,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      * @brief Returns the maximum number of qubits used since the last time all qubits were
      * released. Only works if resource tracking is enabled
      */
-    std::size_t ResourcesGetNumQubits() { return resource_data_["num_qubits"]; }
+    auto ResourcesGetNumQubits() -> std::size_t { return resource_data_["num_qubits"]; }
 
     /**
      * @brief Returns whether the device is tracking resources or not.
