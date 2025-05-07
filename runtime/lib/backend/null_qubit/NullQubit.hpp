@@ -465,7 +465,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     /**
      * @brief Returns whether the device is tracking resources or not.
      */
-    bool IsTrackingResources() const { return track_resources_; }
+    auto IsTrackingResources() const -> bool { return track_resources_; }
 
   private:
     bool track_resources_{false};
