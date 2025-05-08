@@ -34,12 +34,11 @@ jobs:
     runs-on: ubuntu-24.04
 
     steps:
-      - name: Install dependencies
-        run: |
-          python3 -m pip install -r requirements.txt
-
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: python3 -m pip install -r requirements.txt
 
       - name: Run clang-format
         run: python3 ./bin/format.py --check --verbose .
