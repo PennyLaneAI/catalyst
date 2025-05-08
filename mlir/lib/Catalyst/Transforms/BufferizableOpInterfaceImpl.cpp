@@ -81,21 +81,12 @@ struct CustomCallOpInterface
     bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
                                  const bufferization::AnalysisState &state) const
     {
-        // Custom Call Op will only write to memory after bufferization is complete,
-        // and the op is already talking to memrefs.
-        // i.e. there will be no memory write when the op is still in tensor land.
-        // This assumption is ok, since bufferization is run after all the tensor
-        // abstract transformations are complete.
-        // See https://mlir.llvm.org/docs/Bufferization/#overview:
-        //   * These [bufferization] passes typically run as one of the last steps in a pass
-        //   * pipeline, right before lowering to memref ops to LLVM. That is because many
-        //   * transformations are easier or only supported in tensor land; e.g., tile/fuse/… on
-        //   * tensors first, then bufferize the remaining IR.
-
-        if (isa<MemRefType>(opOperand.get().getType())) {
-            return true;
-        }
-        return false;
+        // We use custom call op to call the lapack kernels.
+        // These kernels might write to the source array.
+        // https://www.netlib.org/lapack/lug/node112.html
+        //   * array or scalar arguments defining the input data;
+        //   * some of them may be overwritten by results;
+        return true;
     }
 
     bufferization::AliasingValueList

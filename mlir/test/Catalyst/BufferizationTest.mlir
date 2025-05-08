@@ -52,9 +52,11 @@ func.func @dbprint_str() {
 
 func.func @custom_call(%arg0: tensor<3x3xf64>) -> tensor<3x3xf64> {
     // CHECK: [[memrefArg:%.+]] = bufferization.to_memref %arg0 : memref<3x3xf64, strided<[?, ?], offset: ?>>
+    // CHECK: [[sourceAlloc:%.+]] = memref.alloc() {{.*}}: memref<3x3xf64>
+    // CHECK: memref.copy [[memrefArg]], [[sourceAlloc]]
     // CHECK: [[destAlloc:%.+]] = memref.alloc() {{.*}}: memref<3x3xf64>
-    // CHECK: catalyst.custom_call fn("lapack_dgesdd") ([[memrefArg]], [[destAlloc]]) {number_original_arg = array<i32: 1>} :
-    // CHECK-SAME: (memref<3x3xf64, strided<[?, ?], offset: ?>>, memref<3x3xf64>) -> ()
+    // CHECK: catalyst.custom_call fn("lapack_dgesdd") ([[sourceAlloc]], [[destAlloc]]) {number_original_arg = array<i32: 1>} :
+    // CHECK-SAME: (memref<3x3xf64>, memref<3x3xf64>) -> ()
     // CHECK: [[res:%.+]] = bufferization.to_tensor [[destAlloc]] : memref<3x3xf64>
     // CHECK: return [[res]] : tensor<3x3xf64>
     %0 = catalyst.custom_call fn("lapack_dgesdd") (%arg0) : (tensor<3x3xf64>) -> (tensor<3x3xf64>)
