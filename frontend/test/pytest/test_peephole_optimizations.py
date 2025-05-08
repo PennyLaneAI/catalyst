@@ -225,6 +225,7 @@ def test_convert_clifford_to_ppr():
     assert 'transform.apply_registered_pass "to_ppr"' not in optimized_ir
     assert "qec.ppr" in optimized_ir
 
+
 #
 # commute_ppr
 #
@@ -256,6 +257,7 @@ def test_commute_ppr():
     assert 'transform.apply_registered_pass "commute_ppr"' not in optimized_ir
     assert "qec.ppr" in optimized_ir
     assert "qec.ppm" in optimized_ir
+
 
 #
 # merge_ppr_ppm
