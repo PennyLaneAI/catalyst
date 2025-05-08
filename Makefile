@@ -88,6 +88,7 @@ help:
 	@echo "  oqc                to build Catalyst-OQC Runtime"
 	@echo "  test               to run the Catalyst test suites"
 	@echo "  docs               to build the documentation for Catalyst"
+	@echo "  wheel              to build the Catalyst wheel"
 	@echo "  clean              to uninstall Catalyst and delete frontend build and cache files"
 	@echo "  clean-mlir         to clean build files of MLIR and custom Catalyst dialects"
 	@echo "  clean-runtime      to clean build files of Catalyst Runtime"
