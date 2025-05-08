@@ -59,6 +59,7 @@ jobs:
 
   upload:
     name: Prepare & Upload wheels to TestPyPI
+    if: ${{ !failure() && !cancelled() }}  # needed in case linux-aarch is skipped
     needs: [linux-x86, macos-arm, linux-aarch]  #, macos-x86
     runs-on: ubuntu-22.04
     permissions:
