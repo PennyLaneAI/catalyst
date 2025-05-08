@@ -516,7 +516,7 @@ def ppr_to_ppm(qnode=None, decompose_method="auto-corrected", avoid_y_measure=Fa
         decompose_method (str, optional): The method to use for decomposing non-Clifford PPRs.
             Options are "auto-corrected" and "clifford-corrected". Defaults to "auto-corrected".
         avoid_y_measure (bool): Rather than performing a Pauli-Y measurement for Clifford rotations
-            (sometimes more costly), a Y state is used instead (requires Y state preparation).
+            (sometimes more costly), a :math:`Y` state (:math:`Y\vert 0 \rangle`) is used instead (requires :math:`Y` state preparation).
             Defaults to ``False``.
 
     Returns:
