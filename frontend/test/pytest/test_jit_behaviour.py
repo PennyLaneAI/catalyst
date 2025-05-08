@@ -34,6 +34,8 @@ from catalyst.tracing.type_signatures import (
 )
 from catalyst.utils.exceptions import CompileError
 
+# pylint: disable=too-many-lines
+
 
 def f_aot_builder(backend, wires=1, shots=1000):
     """Test AOT builder."""

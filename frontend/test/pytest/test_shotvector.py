@@ -38,7 +38,7 @@ class TestShotVector:
 
         assert type(circuit()) == tuple
         assert len(circuit()) == 4
-        assert jnp.shape(circuit()) == (4, 3, 1)
+        assert jnp.array(circuit()).shape == (4, 3, 1)
 
     @pytest.mark.parametrize("shots", [((3, 4),), (3,) * 4, (3, 3, 3, 3), [3, 3, 3, 3]])
     def test_multiple_sample_measurement(self, shots):
@@ -53,8 +53,8 @@ class TestShotVector:
             return [qml.sample(), qml.sample()]
 
         assert len(circuit_list()) == 2
-        assert jnp.shape(circuit_list()[0]) == (4, 3, 1)
-        assert jnp.shape(circuit_list()[1]) == (4, 3, 1)
+        assert jnp.array(circuit_list()[0]).shape == (4, 3, 1)
+        assert jnp.array(circuit_list()[1]).shape == (4, 3, 1)
 
         @qjit
         @qml.qnode(dev)
@@ -63,8 +63,8 @@ class TestShotVector:
             return {"first": qml.sample(), "second": qml.sample()}
 
         assert list(circuit_dict().keys()) == ["first", "second"]
-        assert jnp.shape(circuit_dict()["first"]) == (4, 3, 1)
-        assert jnp.shape(circuit_dict()["second"]) == (4, 3, 1)
+        assert jnp.array(circuit_dict()["first"]).shape == (4, 3, 1)
+        assert jnp.array(circuit_dict()["second"]).shape == (4, 3, 1)
 
     def test_shot_vector_with_mixes_shots_and_without_copies(self):
         """Test shot-vector with mixes shots and without copies"""
@@ -81,10 +81,10 @@ class TestShotVector:
         assert len(circuit()) == 8
 
         for i in range(5):
-            assert jnp.shape(circuit()[i]) == (20, 1)
-        assert jnp.shape(circuit()[5]) == (100, 1)
-        assert jnp.shape(circuit()[6]) == (101, 1)
-        assert jnp.shape(circuit()[7]) == (101, 1)
+            assert jnp.array(circuit()[i]).shape == (20, 1)
+        assert jnp.array(circuit()[5]).shape == (100, 1)
+        assert jnp.array(circuit()[6]).shape == (101, 1)
+        assert jnp.array(circuit()[7]).shape == (101, 1)
 
     def test_shot_vector_with_different_measurement(self):
         """Test a NotImplementedError is raised when using a shot-vector with a measurement that is not qml.sample()"""
@@ -152,10 +152,10 @@ class TestShotVector:
             }
 
         assert list(circuit().keys()) == ["first", "second", "third"]
-        assert jnp.shape(circuit()["first"]) == (4, 3, 1)
+        assert jnp.array(circuit()["first"]).shape == (4, 3, 1)
         assert circuit()["second"][0] == 100
-        assert jnp.shape(circuit()["second"][1]) == (4, 3, 1)
-        assert jnp.shape(circuit()["third"]) == (2, 4, 3, 1)
+        assert jnp.array(circuit()["second"][1]).shape == (4, 3, 1)
+        assert jnp.array(circuit()["third"]).shape == (2, 4, 3, 1)
 
 
 if __name__ == "__main__":
