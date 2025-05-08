@@ -258,9 +258,10 @@ class CVariable(Variable):
     def _get_array_data(array):
         rank = len(array.shape)
         if rank == 0:
-            return array
-        elements_str = str(array.tolist()).replace("[", "{").replace("]", "}")
-        return elements_str
+            elements_str = str(array)
+        else:
+            elements_str = str(array.tolist()).replace("[", "{").replace("]", "}")
+        return elements_str.replace("True", "true").replace("False", "false")
 
     @staticmethod
     def _get_sizes(array):
