@@ -60,7 +60,8 @@ def test_qjit_dynamic_result(a):
     """Test getting a dynamic result from qjit"""
     # CHECK:       { lambda ; [[a:.]]:i64[]. let
     # CHECK:         [[b:.]]:i64[] = add [[a]] 1
-    # CHECK:         [[c:.]]:f64[[[b]]] = {{[a-z_0-9.]+\[[^]]*\]}} 1.0 [[b]]
+    # CHECK:         [[c:.]]:f64[[[b]]] = {{[a-z_0-9.]+\[[^]]*}}
+    # CHECK:           ] 1.0 [[b]]
     # CHECK:       in ([[b]], [[c]]) }
     return jnp.ones((a + 1,), dtype=float)
 

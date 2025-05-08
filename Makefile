@@ -101,7 +101,7 @@ help:
 
 .PHONY: all catalyst
 all: runtime oqc mlir frontend
-catalyst: runtime dialects plugin frontend
+catalyst: runtime dialects plugin frontend oqc
 
 .PHONY: frontend
 frontend:
