@@ -645,7 +645,7 @@ TEST_CASE("Test NullQubit device resource tracking", "[NullQubit]")
     CHECK(sim->ResourcesGetNumQubits() == 4);
 
     // Capture resources usage
-    sim->PrintResourceUsage(resource_file_w, true);
+    sim->PrintResourceUsage(resource_file_w);
     resource_file_w.close();
 
     // Open the file of resource data

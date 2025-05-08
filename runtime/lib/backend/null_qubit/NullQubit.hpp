@@ -29,11 +29,6 @@
 #include "Types.h"
 #include "Utils.hpp"
 
-namespace {
-// The delimiter to use to separate the resource usage data from different runs in the printed
-// output
-constexpr char RESOURCE_PRINT_DELIMETER[] = "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=";
-} // namespace
 namespace Catalyst::Runtime::Devices {
 
 /**
@@ -53,6 +48,9 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
         auto device_kwargs = Catalyst::Runtime::parse_kwargs(kwargs);
         if (device_kwargs.find("track_resources") != device_kwargs.end()) {
             track_resources_ = device_kwargs["track_resources"] == "True";
+            if (device_kwargs["track_resources_stdout"] == "False") {
+                resource_fname_ = device_kwargs["track_resources_fname"];
+            }
         }
     }
     ~NullQubit() {} // LCOV_EXCL_LINE
@@ -65,8 +63,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     /**
      * @brief Prints resources that would be used to execute this circuit as a JSON
      */
-    void PrintResourceUsage(std::ostream &resource_file = std::cout,
-                            const bool skip_delimiter = false)
+    void PrintResourceUsage(std::ostream &resource_file = std::cout)
     {
         // Store the 2 special variables and clear them from the map to make
         // pretty-printing easier
@@ -75,20 +72,12 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
         resource_data_.erase("num_gates");
         resource_data_.erase("num_qubits");
 
-        if (!skip_delimiter) {
-            resource_file << RESOURCE_PRINT_DELIMETER << "\n";
-        }
-
         resource_file << "{\n";
         resource_file << "  \"num_qubits\": " << num_qubits << ",\n";
         resource_file << "  \"num_gates\": " << num_gates << ",\n";
         resource_file << "  \"gate_types\": ";
         pretty_print_dict(resource_data_, 2, resource_file);
         resource_file << "\n}" << std::endl;
-
-        if (!skip_delimiter) {
-            resource_file << RESOURCE_PRINT_DELIMETER << std::endl;
-        }
 
         // Restore 2 special variables
         resource_data_["num_qubits"] = num_qubits;
@@ -146,7 +135,20 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
         num_qubits_ = 0;
         this->qubit_manager.ReleaseAll();
         if (this->track_resources_) {
-            PrintResourceUsage();
+            if (!this->resource_fname_.empty()) {
+                std::ofstream resource_file(this->resource_fname_);
+                if (resource_file.is_open()) {
+                    PrintResourceUsage(resource_file);
+                    resource_file.close();
+                }
+                else {
+                    std::cerr << "Error opening file: " << this->resource_fname_ << std::endl;
+                    // TODO: Should this throw?
+                }
+            }
+            else {
+                PrintResourceUsage();
+            }
             this->resource_data_.clear();
         }
     }
@@ -469,6 +471,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
 
   private:
     bool track_resources_{false};
+    std::string resource_fname_{""};
     std::size_t num_qubits_{0};
     std::size_t device_shots_{0};
     std::unordered_map<std::string, std::size_t> resource_data_;
