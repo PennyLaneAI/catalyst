@@ -36,12 +36,10 @@ jobs:
     steps:
       - name: Install dependencies
         run: |
-          sudo apt-get update
-          sudo apt-cache search clang-format
-          sudo apt-get -y install clang-format-20
+          python3 -m pip install -r requirements.txt
 
       - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Run clang-format
-        run: python3 ./bin/format.py --check --verbose --cfversion 20 .
+        run: python3 ./bin/format.py --check --verbose .

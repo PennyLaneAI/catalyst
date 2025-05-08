@@ -132,9 +132,6 @@ if __name__ == "__main__":
     cf_version = args.cfversion
     cf_cmd = "clang-format"
 
-    if cf_version:
-        cf_cmd += f"-{cf_version}"
-
     check_bin(cf_cmd)
 
     if args.check:
