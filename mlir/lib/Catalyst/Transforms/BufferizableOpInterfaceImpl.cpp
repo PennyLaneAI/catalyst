@@ -170,13 +170,6 @@ struct CallbackOpInterface
         return false;
     }
 
-    bufferization::AliasingOpOperandList
-    getAliasingOpOperands(Operation *op, Value value,
-                          const bufferization::AnalysisState &state) const
-    {
-        return {};
-    }
-
     LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
                             const bufferization::BufferizationOptions &options) const
     {
