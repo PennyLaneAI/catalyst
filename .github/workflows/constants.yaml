@@ -94,6 +94,8 @@ jobs:
           else
             echo 'compilers=["gcc"]' >> $GITHUB_OUTPUT
           fi
+          gcc --version
+          g++ --version
         env:
           MULTIPLE: ${{ inputs.multiple_compilers }}
 
