@@ -13,7 +13,7 @@ on:
         type: boolean
       runs_on:
         required: false
-        default: ubuntu-24.04
+        default: ubuntu-22.04
         type: string
     outputs:
       llvm_version:
@@ -38,11 +38,11 @@ on:
         description: "List of compilers to test Catalyst builds with."
         value: ${{ jobs.set-constants.outputs.compilers }}
       c_compiler.gcc:
-        value: gcc-11
+        value: gcc
       c_compiler.clang:
         value: clang
       cxx_compiler.gcc:
-        value: g++-11
+        value: g++
       cxx_compiler.clang:
         value: clang++
 
@@ -90,12 +90,10 @@ jobs:
         run: |
           # TODO: add Clang after https://github.com/actions/runner-images/issues/8659 is fixed
           if [[ $MULTIPLE ]]; then
-            echo 'compilers=["gcc"]' >> $GITHUB_OUTPUT
+            echo 'compilers=["gcc-11"]' >> $GITHUB_OUTPUT
           else
-            echo 'compilers=["gcc"]' >> $GITHUB_OUTPUT
+            echo 'compilers=["gcc-11"]' >> $GITHUB_OUTPUT
           fi
-          gcc --version
-          g++ --version
         env:
           MULTIPLE: ${{ inputs.multiple_compilers }}
 
