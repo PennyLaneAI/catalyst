@@ -212,13 +212,13 @@ def _obs_lowering(aval):
 #
 # registration
 #
-core.raise_to_shaped_mappings[AbstractQbit] = lambda aval, _: aval
+# core.raise_to_shaped_mappings[AbstractQbit] = lambda aval, _: aval
 mlir.ir_type_handlers[AbstractQbit] = _qbit_lowering
 
-core.raise_to_shaped_mappings[AbstractQreg] = lambda aval, _: aval
+# core.raise_to_shaped_mappings[AbstractQreg] = lambda aval, _: aval
 mlir.ir_type_handlers[AbstractQreg] = _qreg_lowering
 
-core.raise_to_shaped_mappings[AbstractObs] = lambda aval, _: aval
+# core.raise_to_shaped_mappings[AbstractObs] = lambda aval, _: aval
 mlir.ir_type_handlers[AbstractObs] = _obs_lowering
 
 
@@ -290,9 +290,9 @@ jvp_p = core.Primitive("jvp")
 jvp_p.multiple_results = True
 vjp_p = core.Primitive("vjp")
 vjp_p.multiple_results = True
-adjoint_p = jax.core.Primitive("adjoint")
+adjoint_p = core.Primitive("adjoint")
 adjoint_p.multiple_results = True
-print_p = jax.core.Primitive("debug_print")
+print_p = core.Primitive("debug_print")
 print_p.multiple_results = True
 python_callback_p = core.Primitive("python_callback")
 python_callback_p.multiple_results = True
@@ -300,9 +300,9 @@ value_and_grad_p = core.Primitive("value_and_grad")
 value_and_grad_p.multiple_results = True
 assert_p = core.Primitive("assert")
 assert_p.multiple_results = True
-set_state_p = jax.core.Primitive("state_prep")
+set_state_p = core.Primitive("state_prep")
 set_state_p.multiple_results = True
-set_basis_state_p = jax.core.Primitive("set_basis_state")
+set_basis_state_p = core.Primitive("set_basis_state")
 set_basis_state_p.multiple_results = True
 quantum_kernel_p = core.CallPrimitive("quantum_kernel")
 quantum_kernel_p.multiple_results = True
