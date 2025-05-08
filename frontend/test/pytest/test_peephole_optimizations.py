@@ -291,8 +291,6 @@ def test_merge_ppr_ppm():
     assert 'qec.ppm ["X"]' in optimized_ir
 
 
-test_merge_ppr_ppm()
-
 #
 # ppr_to_ppm
 #
@@ -334,8 +332,6 @@ def test_ppr_to_ppm():
     assert "qec.select.ppm" in optimized_ir
     assert 'qec.ppr ["X"]' in optimized_ir
 
-
-test_ppr_to_ppm()
 
 #
 # ppr_to_ppm with clifford-corrected
