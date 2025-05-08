@@ -677,6 +677,11 @@ jobs:
           repository: llvm/llvm-project
           ref: ${{ needs.constants.outputs.llvm_version }}
           path: mlir/llvm-project
+     
+      - name: Which gcc
+        run: |
+          echo "C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }})"
+          echo "CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }})"
 
       - name: Run the main runtime test suite for coverage
         run: |
