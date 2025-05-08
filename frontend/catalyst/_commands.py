@@ -25,7 +25,7 @@ def include_dir() -> Path:
         ImportError: If catalyst is not installed.
     """
     try:
-        dist = distribution("catalyst")
+        dist = distribution("pennylane-catalyst")
         located_include_dir = Path(dist.locate_file("catalyst/include"))
         if located_include_dir.exists() and located_include_dir.is_dir():
             return located_include_dir
