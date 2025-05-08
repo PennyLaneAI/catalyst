@@ -163,8 +163,9 @@ struct CallbackOpInterface
         auto callbackOp = cast<CallbackOp>(op);
         bool hasTensorArg = any_of(callbackOp.getArgumentTypes(), isaTensor);
         bool hasTensorResult = any_of(callbackOp.getResultTypes(), isaTensor);
-        if (hasTensorArg || hasTensorResult)
+        if (hasTensorArg || hasTensorResult) {
             return true;
+        }
 
         return false;
     }
