@@ -16,6 +16,7 @@ frontend/bin
 frontend/catalyst/lib
 frontend/catalyst/_revision.py
 frontend/mlir_quantum
+frontend/catalyst/include
 
 # IDEs
 .vscode
