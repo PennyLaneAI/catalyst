@@ -862,4 +862,52 @@ template struct Gehrd<double>;
 template struct Gehrd<std::complex<float>>;
 template struct Gehrd<std::complex<double>>;
 
+// Sytrd
+// ~~~~~
+
+template <typename T> typename Sytrd<T>::FnType *Sytrd<T>::fn = nullptr;
+
+template <typename T> void Sytrd<T>::Kernel(void *out_tuple, void **data, XlaCustomCallStatus *)
+{
+    const uint8_t *uplo_tensor = reinterpret_cast<uint8_t *>(data[0]);
+    const char cuplo = static_cast<char>(*uplo_tensor);
+    const int32_t batch = *reinterpret_cast<int32_t *>(data[1]);
+    const int32_t lda = *reinterpret_cast<int32_t *>(data[2]);
+    const int32_t n = *reinterpret_cast<int32_t *>(data[3]);
+
+    T *a = reinterpret_cast<T *>(data[4]);
+
+    void **out = reinterpret_cast<void **>(out_tuple);
+    T *a_out = reinterpret_cast<T *>(out[0]);
+    typedef typename real_type<T>::type Real;
+    Real *d = reinterpret_cast<Real *>(out[1]);
+    Real *e = reinterpret_cast<Real *>(out[2]);
+    T *tau = reinterpret_cast<T *>(out[3]);
+    int *info = reinterpret_cast<int *>(out[4]);
+
+    if (a_out != a) {
+        std::memcpy(a_out, a,
+                    static_cast<int64_t>(batch) * static_cast<int64_t>(n) *
+                        static_cast<int64_t>(n) * sizeof(T));
+    }
+
+    constexpr int corder = LAPACK_ROW_MAJOR;
+
+    const int64_t a_plus = static_cast<int64_t>(lda) * static_cast<int64_t>(n);
+
+    for (int i = 0; i < batch; ++i) {
+        *info = fn(corder, cuplo, n, a_out, lda, d, e, tau);
+        a_out += a_plus;
+        d += n;
+        e += n - 1;
+        tau += n - 1;
+        ++info;
+    }
+}
+
+template struct Sytrd<float>;
+template struct Sytrd<double>;
+template struct Sytrd<std::complex<float>>;
+template struct Sytrd<std::complex<double>>;
+
 } // namespace jax
