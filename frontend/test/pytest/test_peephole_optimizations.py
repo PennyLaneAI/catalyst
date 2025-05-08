@@ -327,8 +327,8 @@ def test_ppr_to_ppm():
     optimized_ir = test_ppr_to_ppm_workflow.mlir_opt
     assert 'transform.apply_registered_pass "decompose_non_clifford_ppr"' not in optimized_ir
     assert 'transform.apply_registered_pass "decompose_clifford_ppr"' not in optimized_ir
-    assert "qec.prepare  zero" in optimized_ir
-    assert "qec.prepare  magic" in optimized_ir
+    assert "qec.fabricate  zero" in optimized_ir
+    assert "qec.fabricate  magic" in optimized_ir
     assert "qec.select.ppm" in optimized_ir
     assert 'qec.ppr ["X"]' in optimized_ir
 
@@ -369,8 +369,8 @@ def test_ppr_to_ppm_inject_magic_state():
     optimized_ir = test_ppr_to_ppm_workflow.mlir_opt
     assert 'transform.apply_registered_pass "decompose_non_clifford_ppr"' not in optimized_ir
     assert 'transform.apply_registered_pass "decompose_clifford_ppr"' not in optimized_ir
-    assert "qec.prepare  magic" in optimized_ir
-    assert "qec.prepare  plus_i" in optimized_ir
+    assert "qec.fabricate  magic" in optimized_ir
+    assert "qec.fabricate  plus_i" in optimized_ir
     assert 'qec.ppm ["X", "Z"]' in optimized_ir
     assert 'qec.ppr ["X"]' in optimized_ir
 

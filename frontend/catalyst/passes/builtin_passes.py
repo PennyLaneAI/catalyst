@@ -557,8 +557,8 @@ def ppr_to_ppm(qnode=None, decompose_method="auto-corrected", avoid_y_measure=Fa
     .. code-block:: mlir
 
         . . .
-        %5 = qec.prepare  zero %3 : !quantum.bit
-        %6 = qec.prepare  magic %4 : !quantum.bit
+        %5 = qec.fabricate  zero : !quantum.bit
+        %6 = qec.fabricate  magic : !quantum.bit
         %mres, %out_qubits:2 = qec.ppm ["X", "Z"] %1, %6 : !quantum.bit, !quantum.bit
         %mres_0, %out_qubits_1:2 = qec.ppm ["Z", "Y"] %5, %out_qubits#1 : !quantum.bit, !quantum.bit
         %mres_2, %out_qubits_3 = qec.ppm ["X"] %out_qubits_1#1 : !quantum.bit

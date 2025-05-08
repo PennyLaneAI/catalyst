@@ -60,14 +60,9 @@ void decompose_auto_corrected_pi_over_eight(PPRotationOp op, PatternRewriter &re
 {
     auto loc = op.getLoc();
 
-    // Allocate two axillary qubits
-    Value axillary_qubits = buildAllocQreg(loc, 2, rewriter);
-    ExtractOp zOp = buildExtractOp(loc, axillary_qubits, 0, rewriter);
-    ExtractOp mOp = buildExtractOp(loc, axillary_qubits, 1, rewriter);
-
     // Prepare |0⟩ and |m⟩
-    auto zero = rewriter.create<PrepareStateOp>(loc, LogicalInitKind::zero, zOp->getResults());
-    auto magic = rewriter.create<PrepareStateOp>(loc, getMagicState(op), mOp->getResults());
+    auto zero = rewriter.create<FabricateOp>(loc, LogicalInitKind::zero);
+    auto magic = rewriter.create<FabricateOp>(loc, getMagicState(op));
 
     SmallVector<StringRef> pauliP = extractPauliString(op);
     SmallVector<Value> inQubits = op.getInQubits(); // [input qubits]
@@ -101,9 +96,6 @@ void decompose_auto_corrected_pi_over_eight(PPRotationOp op, PatternRewriter &re
     outPZQubits.pop_back();
     auto pprPI2 = rewriter.create<PPRotationOp>(loc, pauliP, 2, outPZQubits, condOp.getResult());
 
-    // Free axillary qubits
-    rewriter.create<DeallocOp>(loc, axillary_qubits);
-
     rewriter.replaceOp(op, pprPI2.getOutQubits());
 }
 
@@ -134,12 +126,8 @@ void decompose_inject_magic_state_pi_over_eight(PPRotationOp op, PatternRewriter
 {
     auto loc = op.getLoc();
 
-    // Allocate 1 axillary qubit
-    Value axillary_qubit = buildAllocQreg(loc, 1, rewriter);
-    ExtractOp mOp = buildExtractOp(loc, axillary_qubit, 0, rewriter);
-
     // Prepare magic state |m⟩
-    auto magic = rewriter.create<PrepareStateOp>(loc, getMagicState(op), mOp->getResults());
+    auto magic = rewriter.create<FabricateOp>(loc, getMagicState(op));
 
     SmallVector<StringRef> pauliP = extractPauliString(op); // [P]
     SmallVector<Value> inQubits = op.getInQubits();         // [input qubits]
@@ -153,7 +141,9 @@ void decompose_inject_magic_state_pi_over_eight(PPRotationOp op, PatternRewriter
     // PPR P(π/4) on input qubits if PPM (P⊗Z) yields -1
     SmallVector<Value> outPZQubits = ppmPZ.getOutQubits(); // [input qubits, |m⟩]
     outPZQubits.pop_back();                                // [input qubits]
-    auto pprPI4 = rewriter.create<PPRotationOp>(loc, pauliP, 4, outPZQubits, ppmPZ.getMres());
+    const uint16_t PI_DENOMINATOR = 4;                     // For rotation of P(PI/4)
+    auto pprPI4 =
+        rewriter.create<PPRotationOp>(loc, pauliP, PI_DENOMINATOR, outPZQubits, ppmPZ.getMres());
 
     // PPM (X) on |m⟩
     SmallVector<StringRef> pauliX = {"X"};
@@ -162,9 +152,6 @@ void decompose_inject_magic_state_pi_over_eight(PPRotationOp op, PatternRewriter
     // PPR P(π/2) on input qubits if PPM (X) yields -1
     auto pprPI2 =
         rewriter.create<PPRotationOp>(loc, pauliP, 2, pprPI4.getOutQubits(), ppmX.getMres());
-
-    // Free axillary qubit
-    rewriter.create<DeallocOp>(loc, axillary_qubit);
 
     rewriter.replaceOp(op, pprPI2.getOutQubits());
 }

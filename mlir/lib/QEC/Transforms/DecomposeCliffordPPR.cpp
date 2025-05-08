@@ -96,7 +96,7 @@ PPRotationOp decompose_pi_over_four_flattening(LogicalInitKind ancillaType, PPRo
     outPZQubits.pop_back();
     pauliP.pop_back();
 
-    uint16_t PI_DENOMINATOR = 2; // For rotation of P(PI/2)
+    const uint16_t PI_DENOMINATOR = 2; // For rotation of P(PI/2)
     auto pprPI2 =
         rewriter.create<PPRotationOp>(loc, pauliP, PI_DENOMINATOR, outPZQubits, cond.getResult());
 
