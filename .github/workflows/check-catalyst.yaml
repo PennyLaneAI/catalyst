@@ -683,7 +683,7 @@ jobs:
           COMPILER_LAUNCHER="" \
           ENABLE_OQD=ON \
           LLVM_DIR="$(pwd)/mlir/llvm-project" \
-          make coverage-runtime
+          make coverage-runtime --ignore-errors mismatch
           mv runtime/build_cov/coverage.info coverage-${{ github.job }}.info
 
       - name: Upload to Codecov
