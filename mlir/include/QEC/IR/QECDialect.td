@@ -128,6 +128,59 @@ def PrepareStateOp : QEC_Op<"prepare"> {
     }];
 }
 
+def FabricateOp : QEC_Op<"fabricate"> {
+    let summary = "Fabricate axillary qubits from qubit's factory.";
+    let description = [{
+        The FabricateOp represents a operation that produces/fetches axillary qubits from a qubit's factory.
+        This operation typically gets a magic state from a qubit's factory that determines in runtime.
+
+        Example:
+        ```mlir
+        %0 = qec.fabricate magic: !quantum.bit
+        ```
+        This fetches a magic state from a qubit's factory.
+    }];
+
+    let arguments = (ins
+        LogicalInit:$init_state
+    );
+
+    let results = (outs
+        Variadic<QubitType>:$out_qubits
+    );
+
+    let builders = [
+        // Convenience builder with single qubit
+        OpBuilder<
+        (ins
+            "::catalyst::qec::LogicalInitKind":$init_state
+        ),[{
+            FabricateOp::build($_builder, $_state,
+            /*out_qubits=*/ mlir::TypeRange({catalyst::quantum::QubitType::get($_builder.getContext())}),
+            /*init_state=*/ init_state);
+        }]>,
+        // Convenience builder with size of qubits
+        OpBuilder<
+        (ins
+            "::catalyst::qec::LogicalInitKind":$init_state,
+            "int":$size_of_qubits
+        ),[{
+            std::vector<mlir::Type> types;
+            for (int i = 0; i < size_of_qubits; i++) {
+                types.push_back(catalyst::quantum::QubitType::get($_builder.getContext()));
+            }
+            mlir::TypeRange out_qubits(types);
+            FabricateOp::build($_builder, $_state,
+            /*out_qubits=*/ out_qubits,
+            /*init_state=*/ init_state);
+        }]>
+    ];
+
+    let assemblyFormat = [{
+        $init_state attr-dict `:` type($out_qubits)
+    }];
+}
+
 def PPRotationOp : QEC_Op<"ppr", [QECOpInterface, AttrSizedOperandSegments]> {
     let summary = "Pauli Product Rotation on qubits.";
 

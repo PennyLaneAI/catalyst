@@ -30,6 +30,22 @@ using namespace catalyst::quantum;
 
 namespace {
 
+// Determine type of measurement based on the type of axillary qubit
+// If |Y⟩ is used as axillary qubit, then we use P⊗Z as the measurement operator
+// Otherwise, we use -P⊗Y
+std::pair<StringRef, uint16_t>
+determinePauliAndRotationSignOfMeasurement(LogicalInitKind ancillaType)
+{
+    switch (ancillaType) {
+    case LogicalInitKind::plus_i:
+        return std::make_pair("Z", 1);
+    case LogicalInitKind::zero:
+        return std::make_pair("Y", -1);
+    default:
+        assert(false && "Only |Y⟩ or |0⟩ can be used as axillary qubit for pi/4 decomposition");
+    }
+}
+
 /// Decompose the PPR (pi/4) into PPR and PPMs operations via flattening method
 /// as described in Figure 11(b) in the paper: https://arxiv.org/abs/1808.02892
 ///
@@ -39,13 +55,13 @@ namespace {
 ///
 /// into
 ///
-/// ─────┌───┐────┌───────┐─────┌───────┐──
-/// ─────|-P |────| P(π/4)|─────| P(π/2)|──
-/// ─────|   |────└───╦───┘─────└───╦───┘──
-///      |   ╠════════╝             ║
-///      |   |        ┌───┐         ║
-/// |0⟩──| Y |────────| X ╠═════════╝
-///      └───┘        └───┘
+/// ─────┌───┐────────┌───────┐──
+/// ─────|-P |────────| P(π/2)|──
+/// ─────|   |────────└───╦───┘──
+///      |   ╠════════════╣
+///      |   |     ┌───┐  ║
+/// |0⟩──| Y |─────| X ╠══╝
+///      └───┘     └───┘
 /// If we prepare |Y⟩ as axillary qubit, then we can use P⊗Z as the measurement operator
 /// on first operation instead of -P⊗Y.
 PPRotationOp decompose_pi_over_four_flattening(LogicalInitKind ancillaType, PPRotationOp op,
@@ -54,29 +70,21 @@ PPRotationOp decompose_pi_over_four_flattening(LogicalInitKind ancillaType, PPRo
 {
     auto loc = op.getLoc();
 
-    AllocOp axillaryQubitReg = buildAllocQreg(loc, 1, rewriter);
-    ExtractOp zOp = buildExtractOp(loc, axillaryQubitReg, 0, rewriter);
-    auto magic = rewriter.create<PrepareStateOp>(loc, ancillaType, zOp->getResults());
+    auto magic = rewriter.create<FabricateOp>(loc, ancillaType);
 
+    auto [pauliForAxillaryQubit, rotationSign] =
+        determinePauliAndRotationSignOfMeasurement(ancillaType);
+
+    // Extract qubits and insert axillary qubit
     SmallVector<Value> m1InQubits = op.getInQubits();
     m1InQubits.emplace_back(magic.getOutQubits().front());
-    SmallVector<StringRef> pauliP = extractPauliString(op);
 
-    uint16_t rotation_sign = 1;
-    // if |Y⟩ is used as axillary qubit
-    if (ancillaType == LogicalInitKind::plus_i) {
-        pauliP.emplace_back("Z");
-    }
-    else if (ancillaType == LogicalInitKind::zero) {
-        pauliP.emplace_back("Y");
-        rotation_sign = -1;
-    }
-    else {
-        assert(false && "Only |Y⟩ or |0⟩ can be used as axillary qubit for pi/4 decomposition");
-    }
+    // Extract P and insert Pauli for axillary qubit
+    SmallVector<StringRef> pauliP = extractPauliString(op);
+    pauliP.emplace_back(pauliForAxillaryQubit);
 
     auto ppmPZ =
-        rewriter.create<PPMeasurementOp>(loc, pauliP, rotation_sign, m1InQubits, measResult);
+        rewriter.create<PPMeasurementOp>(loc, pauliP, rotationSign, m1InQubits, measResult);
 
     SmallVector<StringRef> pauliX = {"X"};
     auto ppmX =
@@ -87,7 +95,10 @@ PPRotationOp decompose_pi_over_four_flattening(LogicalInitKind ancillaType, PPRo
     SmallVector<Value> outPZQubits = ppmPZ.getOutQubits();
     outPZQubits.pop_back();
     pauliP.pop_back();
-    auto pprPI2 = rewriter.create<PPRotationOp>(loc, pauliP, 2, outPZQubits, cond.getResult());
+
+    uint16_t PI_DENOMINATOR = 2; // For rotation of P(PI/2)
+    auto pprPI2 =
+        rewriter.create<PPRotationOp>(loc, pauliP, PI_DENOMINATOR, outPZQubits, cond.getResult());
 
     rewriter.replaceOp(op, pprPI2.getOutQubits());
     return pprPI2;
@@ -97,6 +108,7 @@ struct DecomposeCliffordPPR : public OpRewritePattern<PPRotationOp> {
     using OpRewritePattern::OpRewritePattern;
 
     LogicalInitKind ancillaType;
+
     DecomposeCliffordPPR(MLIRContext *context, LogicalInitKind ancillaType,
                          PatternBenefit benefit = 1)
         : OpRewritePattern(context, benefit), ancillaType(ancillaType)
