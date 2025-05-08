@@ -428,7 +428,7 @@ def commute_ppr(qnode=None, max_pauli_size=0):
         ppm_passes = [("PPM", ["to_ppr", "commute_ppr"])]
 
         @qjit(pipelines=ppm_passes, keep_intermediate=True, target="mlir")
-        @qml.qnode(qml.device("null.qubit", wires=0))
+        @qml.qnode(qml.device("null.qubit", wires=1))
         def circuit():
             qml.H(0)
             qml.T(0)
@@ -448,6 +448,39 @@ def commute_ppr(qnode=None, max_pauli_size=0):
         %mres, %out_qubits = qec.ppm ["Z"] %5 : !quantum.bit
         . . .
 
+    If a commutation resulted in a PPR acting on more than
+    'max_pauli_size' (here, 2) qubits, that commutation would be skipped.
+
+    .. code-block:: python
+
+        from catalyst.passes import commute_ppr, merge_ppr_ppm, to_ppr
+
+        pips = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+
+        @qjit(pipelines=pips, target="mlir")
+        @to_ppr
+        @commute_ppr(max_pauli_size=2)
+        @qml.qnode(qml.device("lightning.qubit", wires=3))
+        def circuit():
+            qml.H(0)
+            qml.CNOT([1, 2])
+            qml.CNOT([0, 1])
+            qml.CNOT([0, 2])
+            for i in range(3):
+                qml.T(i)
+            return measure(0), measure(1), measure(2)
+
+        print(circuit.mlir_opt)
+
+    Example MLIR Representation:
+
+    .. code-block:: mlir
+
+        . . .
+        %4:2 = qec.ppr ["Z", "X"](4) %2, %3 : !quantum.bit, !quantum.bit
+        . . .
+        %6:2 = qec.ppr ["X", "Y"](-8) %5, %4#1 : !quantum.bit, !quantum.bit
+        . . .
     """
 
     def decorator(qnode_func):
