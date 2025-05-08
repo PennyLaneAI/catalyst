@@ -5,6 +5,12 @@ on:
     # Run every weekday at 23:40 EDT (cron is in UTC)
     - cron: "40 3 * * 2-6"
   workflow_dispatch:
+    inputs:
+      build-linux-arm:
+        description: 'Publish ARM wheels for Linux'
+        default: false
+        required: false
+        type: boolean
 
 jobs:
   setup:
@@ -36,6 +42,7 @@ jobs:
     uses: ./.github/workflows/build-wheel-linux-x86_64.yaml
 
   linux-aarch:
+    if: ${{ inputs.build-linux-arm }}
     name: Build on Linux aarch64
     needs: [setup]
     uses: ./.github/workflows/build-wheel-linux-arm64.yaml
@@ -47,6 +54,7 @@ jobs:
 
   upload:
     name: Prepare & Upload wheels to TestPyPI
+    if: ${{ !failure() && !cancelled() }}  # needed in case linux-aarch is skipped
     needs: [linux-x86, macos-arm, linux-aarch]
     runs-on: ubuntu-22.04
     permissions:
