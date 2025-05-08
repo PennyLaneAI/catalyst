@@ -16,6 +16,7 @@
 
 import numpy as np
 import pytest
+from jax import lax as lax
 from jax import numpy as jnp
 from jax import scipy as jsp
 
@@ -1073,6 +1074,39 @@ class TestSVD:
         assert jnp.allclose(U_obs, U_exp)
         assert jnp.allclose(S_obs, S_exp)
         assert jnp.allclose(Vt_obs, Vt_exp)
+
+
+class TestTridiagonal:
+    """Test results of jax.lax.linalg.tridiagonal are numerically correct when qjit compiled.
+
+    See: https://jax.readthedocs.io/en/latest/_autosummary/jax.lax.linalg.tridiagonal.html
+
+    Tridiagonal Reduction: Reduces a symmetric/Hermitian matrix to tridiagonal form.
+    """
+
+    @pytest.mark.parametrize(
+        "A",
+        [
+            jnp.array(MatrixGenerator.random_real_symmetric_matrix(3, seed=11)),
+            jnp.array(MatrixGenerator.random_complex_hermitian_matrix(5, seed=12)),
+        ],
+    )
+    def test_tridiagonal_numerical(self, A):
+        """Test basic numerical correctness of jax.lax.linalg.tridiagonal for matrices
+        of various data types and sizes.
+        """
+
+        @qjit
+        def f(X):
+            return lax.linalg.tridiagonal(X)
+
+        a_tridiag_obs, d_obs, e_obs, taus_obs = f(A)
+        a_tridiag_exp, d_exp, e_exp, taus_exp = lax.linalg.tridiagonal(A)
+
+        assert jnp.allclose(a_tridiag_obs, a_tridiag_exp)
+        assert jnp.allclose(d_obs, d_exp)
+        assert jnp.allclose(e_obs, e_exp)
+        assert jnp.allclose(taus_obs, taus_exp)
 
 
 if __name__ == "__main__":
