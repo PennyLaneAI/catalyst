@@ -37,6 +37,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
+          sudo apt-cache search clang-format
           sudo apt-get -y install clang-format-20
 
       - name: Checkout code
