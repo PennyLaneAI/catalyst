@@ -16,12 +16,12 @@
 <h3>Breaking changes 💔</h3>
 
 * Catalyst has removed the `experimental_capture` keyword from the `qjit` decorator in favour of
-  unified behaviour with PennyLane. 
+  unified behaviour with PennyLane.
   [(#1657)](https://github.com/PennyLaneAI/catalyst/pull/1657)
 
   Instead of enabling program capture with Catalyst via `qjit(experimental_capture=True)`, program capture
   can be enabled via the global toggle `qml.capture.enable()`:
-  
+
   ```python
   import pennylane as qml
   from catalyst import qjit
@@ -45,6 +45,10 @@
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
+
+* Fix Boolean arguments/results not working with the debugging functions `debug.get_cmain` and
+  `debug.compile_executable`.
+  [(#1687)](https://github.com/PennyLaneAI/catalyst/pull/1687)
 
 * Fix AutoGraph fallback for valid iteration targets with constant data but no length, for example
   `itertools.product(range(2), repeat=2)`.
