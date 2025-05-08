@@ -453,7 +453,7 @@ def commute_ppr(qnode=None, max_pauli_size=0):
 
     .. code-block:: python
 
-        from catalyst.passes import commute_ppr, merge_ppr_ppm, to_ppr
+        from catalyst.passes import to_ppr, commute_ppr
 
         pips = [("pipe", ["enforce-runtime-invariants-pipeline"])]
 
@@ -538,6 +538,39 @@ def merge_ppr_ppm(qnode=None, max_pauli_size=0):
         . . .
         %2 = qec.ppr ["X"](8) %1 : !quantum.bit
         %mres, %out_qubits = qec.ppm ["X"] %2 : !quantum.bit
+        . . .
+
+    If a merging resulted in a PPM acting on more than
+    'max_pauli_size' (here, 2) qubits, that merging would be skipped.
+
+    .. code-block:: python
+
+        from catalyst import measure, qjit
+        from catalyst.passes import to_ppr, merge_ppr_ppm
+
+        pips = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+
+
+        @qjit(pipelines=pips, target="mlir")
+        @to_ppr
+        @merge_ppr_ppm(max_pauli_size=2)
+        @qml.qnode(qml.device("lightning.qubit", wires=3))
+        def circuit():
+            qml.CNOT([1, 2])
+            qml.CNOT([0, 1])
+            qml.CNOT([0, 2])
+            return measure(0), measure(1), measure(2)
+
+        print(circuit.mlir_opt)
+
+    Example MLIR Representation:
+
+    .. code-block:: mlir
+
+        . . .
+        %3:2 = qec.ppr ["Z", "X"](4) %1, %2 : !quantum.bit, !quantum.bit
+        . . .
+        %mres, %out_qubits:2 = qec.ppm ["Y", "Z"](-1) %3#1, %4 : !quantum.bit, !quantum.bit
         . . .
 
     """
