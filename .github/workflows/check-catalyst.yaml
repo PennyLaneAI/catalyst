@@ -680,12 +680,8 @@ jobs:
      
       - name: Which gcc
         run: |
-          echo "C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }})"
-          echo "CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }})"
           gcc --version
           g++ --version
-          clang --version
-          clang++ --version
 
       - name: Run the main runtime test suite for coverage
         run: |
