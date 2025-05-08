@@ -76,6 +76,22 @@
   will handle direct decomposition of PPRs into PPMs.
   [(#1688)](https://github.com/PennyLaneAI/catalyst/pull/1688)
 
+* The version of JAX used by Catalyst is updated to 0.5.3.
+  [(#1652)](https://github.com/PennyLaneAI/catalyst/pull/1652)
+
+  Several internal changes were made for this update.
+    - LAPACK kernels are updated to adhere to the new JAX lowering rules for external functions.
+    [(#1685)](https://github.com/PennyLaneAI/catalyst/pull/1685)
+
+    - The trace stack is removed and replaced with a tracing context manager.
+    [(#1662)](https://github.com/PennyLaneAI/catalyst/pull/1662)
+
+    - A new `debug_info` argument is added to `Jaxpr`, the `make_jaxpr`
+    functions, and `jax.extend.linear_util.wrap_init`.
+    [(#1670)](https://github.com/PennyLaneAI/catalyst/pull/1670)
+    [(#1671)](https://github.com/PennyLaneAI/catalyst/pull/1671)
+    [(#1681)](https://github.com/PennyLaneAI/catalyst/pull/1681)
+
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
@@ -150,4 +166,5 @@ David Ittah,
 Tzung-Han Juang,
 Christina Lee,
 Erick Ochoa Lopez,
+Mehrdad Malekmohammadi,
 Paul Haochen Wang.
