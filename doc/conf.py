@@ -96,6 +96,7 @@ MOCK_MODULES = [
     "mlir_quantum.dialects.quantum",
     "mlir_quantum.dialects.gradient",
     "mlir_quantum.dialects.catalyst",
+    "mlir_quantum.dialects.mbqc",
     "mlir_quantum.dialects.mitigation",
     "mlir_quantum.dialects._transform_ops_gen",
     "pybind11",
@@ -287,6 +288,7 @@ html_theme_options = {
     ],
     "toc_overview": True,
     "github_repo": "PennyLaneAI/catalyst",
+    "search_on_pennylane_ai": True,
 }
 
 edit_on_github_project = "PennyLaneAI/catalyst"

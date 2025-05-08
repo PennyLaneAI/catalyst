@@ -18,6 +18,7 @@
 from __future__ import annotations
 
 import jax
+from jax._src.core import abstractify
 from jax._src.lax.slicing import (
     _argnum_weak_type,
     _gather_dtype_rule,
@@ -28,7 +29,7 @@ from jax._src.lax.slicing import (
     _sorted_dims_in_range,
     standard_primitive,
 )
-from jax.core import AbstractValue, Tracer, concrete_aval
+from jax.core import AbstractValue, Tracer
 
 __all__ = (
     "get_aval2",
@@ -46,7 +47,7 @@ def get_aval2(x):
     elif isinstance(x, Tracer):
         return x.aval
     else:
-        return concrete_aval(x)
+        return abstractify(x)
 
 
 def _no_clean_up_dead_vars(_eqn, _env, _last_used):

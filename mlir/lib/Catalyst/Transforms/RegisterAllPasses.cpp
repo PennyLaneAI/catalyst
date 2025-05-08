@@ -15,6 +15,7 @@
 #include "Catalyst/Transforms/Passes.h"
 #include "Gradient/Transforms/Passes.h"
 #include "Ion/Transforms/Passes.h"
+#include "MBQC/Transforms/Passes.h"
 #include "Mitigation/Transforms/Passes.h"
 #include "QEC/Transforms/Passes.h"
 #include "Quantum/Transforms/Passes.h"
@@ -49,7 +50,6 @@ void catalyst::registerAllCatalystPasses()
     mlir::registerPass(catalyst::createMemrefToLLVMWithTBAAPass);
     mlir::registerPass(catalyst::createMitigationLoweringPass);
     mlir::registerPass(catalyst::createQnodeToAsyncLoweringPass);
-    mlir::registerPass(catalyst::createQuantumBufferizationPass);
     mlir::registerPass(catalyst::createQuantumConversionPass);
     mlir::registerPass(catalyst::createRegisterInactiveCallbackPass);
     mlir::registerPass(catalyst::createRemoveChainedSelfInversePass);
@@ -63,4 +63,5 @@ void catalyst::registerAllCatalystPasses()
     mlir::registerPass(catalyst::createCommuteCliffordTPPRPass);
     mlir::registerPass(catalyst::createCliffordTToPPRPass);
     mlir::registerPass(catalyst::createCommuteCliffordPastPPMPass);
+    mlir::registerPass(catalyst::createMBQCConversionPass);
 }
