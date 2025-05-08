@@ -24,7 +24,8 @@ from typing import Iterable, List, Union
 import jax
 import numpy as np
 import pennylane as qml
-from jax._src import api_util, core, source_info_util, util
+from jax._src import core, source_info_util, util
+from jax._src.core import pytype_aval_mappings
 from jax._src.interpreters import partial_eval as pe
 from jax._src.lax.lax import _merge_dyn_shape, _nary_lower_hlo, cos_p, sin_p
 from jax._src.lib.mlir import ir
@@ -1840,17 +1841,17 @@ def _cond_lowering(
             if_ctx = jax_ctx.replace(name_stack=jax_ctx.name_stack.extend("if"))
             with ir.InsertionPoint(if_block):
                 # recursively generate the mlir for the if block
-                out = mlir.jaxpr_subcomp(
+                (out, _) = mlir.jaxpr_subcomp(
                     if_ctx.module_context,
                     true_jaxpr.jaxpr,
                     if_ctx.name_stack,
                     mlir.TokenSet(),
                     [mlir.ir_constants(c) for c in true_jaxpr.consts],
-                    *([a] for a in flat_args_plus_consts),  # fn expects [a1], [a2], [a3] format
+                    *flat_args_plus_consts,
                     dim_var_values=jax_ctx.dim_var_values,
                 )
 
-                YieldOp([o[0] for o in out[0]])
+                YieldOp(out)
 
             # else block
             source_info_util.extend_name_stack("else")
@@ -1860,17 +1861,17 @@ def _cond_lowering(
                 # Base case: reached the otherwise block
                 otherwise_jaxpr = branch_jaxprs[-1]
                 with ir.InsertionPoint(else_block):
-                    out = mlir.jaxpr_subcomp(
+                    (out, _) = mlir.jaxpr_subcomp(
                         else_ctx.module_context,
                         otherwise_jaxpr.jaxpr,
                         else_ctx.name_stack,
                         mlir.TokenSet(),
                         [mlir.ir_constants(c) for c in otherwise_jaxpr.consts],
-                        *([a] for a in flat_args_plus_consts),
+                        *flat_args_plus_consts,
                         dim_var_values=jax_ctx.dim_var_values,
                     )
 
-                    YieldOp([o[0] for o in out[0]])
+                    YieldOp(out)
             else:
                 with ir.InsertionPoint(else_block) as else_ip:
                     child_if_op = emit_branches(preds[1:], branch_jaxprs[1:], else_ip)
@@ -1949,15 +1950,16 @@ def _while_loop_lowering(
     cond_ctx = jax_ctx.replace(name_stack=name_stack.extend("cond"))
     with ir.InsertionPoint(cond_block):
         cond_args = [cond_block.arguments[i] for i in range(len(loop_carry_types))]
+        params = cond_consts + cond_args
 
         # recursively generate the mlir for the while cond
-        ((pred,),), _ = mlir.jaxpr_subcomp(
+        ((pred,), _) = mlir.jaxpr_subcomp(
             cond_ctx.module_context,
             cond_jaxpr.jaxpr,
             cond_ctx.name_stack,
             mlir.TokenSet(),
             [mlir.ir_constants(c) for c in cond_jaxpr.consts],
-            *([a] for a in (cond_consts + cond_args)),  # fn expects [a1], [a2], [a3] format
+            *params,
             dim_var_values=jax_ctx.dim_var_values,
         )
 
@@ -1969,6 +1971,7 @@ def _while_loop_lowering(
     body_ctx = jax_ctx.replace(name_stack=name_stack.extend("body"))
     with ir.InsertionPoint(body_block):
         body_args = [body_block.arguments[i] for i in range(len(loop_carry_types))]
+        params = body_consts + body_args
 
         # recursively generate the mlir for the while body
         out, _ = mlir.jaxpr_subcomp(
@@ -1977,11 +1980,11 @@ def _while_loop_lowering(
             body_ctx.name_stack,
             mlir.TokenSet(),
             [mlir.ir_constants(c) for c in cond_jaxpr.consts],
-            *([a] for a in (body_consts + body_args)),  # fn expects [a1], [a2], [a3] format
+            *params,
             dim_var_values=jax_ctx.dim_var_values,
         )
 
-        YieldOp([o[0] for o in out])
+        YieldOp(out)
 
     return while_op_scf.results
 
@@ -2078,7 +2081,7 @@ def _for_loop_lowering(
 
         # Iterate from 0 to the number of iterations (ceil((stop - start) / step))
         distance = SubIOp(stop_val, start_val)
-        num_iterations = CeilDivSIOp(distance, step_val)
+        num_iterations = CeilDivSIOp(distance.result, step_val)
         lower_bound, upper_bound, step = zero, num_iterations, one
 
     for_op_scf = ForOp(lower_bound, upper_bound, step, iter_args=loop_args)
@@ -2106,7 +2109,6 @@ def _for_loop_lowering(
         implicit_args = body_args[1 : nimplicit + 1]
         explicit_args = body_args[nimplicit + 1 :]
         loop_params = (*consts, *implicit_args, loop_iter, *explicit_args)
-        body_args = [[param] for param in loop_params]
 
         # Recursively generate the mlir for the loop body
         out, _ = mlir.jaxpr_subcomp(
@@ -2115,11 +2117,11 @@ def _for_loop_lowering(
             body_ctx.name_stack,
             mlir.TokenSet(),
             [mlir.ir_constants(c) for c in body_jaxpr.consts],
-            *body_args,
+            *loop_params,
             dim_var_values=jax_ctx.dim_var_values,
         )
 
-        YieldOp([o[0] for o in out])
+        YieldOp(out)
 
     return for_op_scf.results
 
@@ -2245,11 +2247,11 @@ def _adjoint_lowering(
             jax_ctx.name_stack.extend("adjoint"),
             mlir.TokenSet(),
             [mlir.ir_constants(c) for c in jaxpr.consts],
-            *([a] for a in chain(consts, cargs, adjoint_block.arguments)),  # [3]
+            *list(chain(consts, cargs, adjoint_block.arguments)),
             dim_var_values=jax_ctx.dim_var_values,
         )
 
-        QYieldOp([a[0] for a in out[-1:]])
+        QYieldOp([out[-1]])
 
     return op.results
 
@@ -2352,12 +2354,10 @@ CUSTOM_LOWERING_RULES = (
 
 def _scalar_abstractify(t):
     # pylint: disable=protected-access
-    if t in {int, float, complex, bool} or isinstance(t, jax._src.numpy.lax_numpy._ScalarMeta):
+    if t in {int, float, complex, bool} or isinstance(t, jax._src.numpy.scalar_types._ScalarMeta):
         return core.ShapedArray([], dtype=t, weak_type=True)
     raise TypeError(f"Argument type {t} is not a valid JAX type.")
 
 
-# pylint: disable=protected-access
-api_util._shaped_abstractify_handlers[type] = _scalar_abstractify
-# pylint: disable=protected-access
-api_util._shaped_abstractify_handlers[jax._src.numpy.lax_numpy._ScalarMeta] = _scalar_abstractify
+pytype_aval_mappings[type] = _scalar_abstractify
+pytype_aval_mappings[jax._src.numpy.scalar_types._ScalarMeta] = _scalar_abstractify
