@@ -52,15 +52,10 @@ jobs:
     needs: [setup]
     uses: ./.github/workflows/build-wheel-macos-arm64.yaml
 
-  # macos-x86:
-  #   name: Build on macOS x86-64
-  #   needs: [setup]
-  #   uses: ./.github/workflows/build-wheel-macos-x86_64.yaml
-
   upload:
     name: Prepare & Upload wheels to TestPyPI
     if: ${{ !failure() && !cancelled() }}  # needed in case linux-aarch is skipped
-    needs: [linux-x86, macos-arm, linux-aarch]  #, macos-x86
+    needs: [linux-x86, macos-arm, linux-aarch]
     runs-on: ubuntu-22.04
     permissions:
       id-token: write  # IMPORTANT: mandatory for trusted publishing
@@ -80,8 +75,6 @@ jobs:
       run: |
         rename "s/linux/manylinux_2_28/" dist/PennyLane_Catalyst-*
         rename "s/linux/manylinux_2_28/" dist/pennylane_catalyst-*
-        rename "s/macosx_13_0_universal2/macosx_13_0_x86_64/" dist/PennyLane_Catalyst-*
-        rename "s/macosx_13_0_universal2/macosx_13_0_x86_64/" dist/pennylane_catalyst-*
         rename "s/macosx_14_0_universal2/macosx_13_0_arm64/" dist/PennyLane_Catalyst-*
         rename "s/macosx_14_0_universal2/macosx_13_0_arm64/" dist/pennylane_catalyst-*
         rename "s/macosx_14/macosx_13/" dist/PennyLane_Catalyst-*
