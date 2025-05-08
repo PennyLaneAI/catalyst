@@ -305,6 +305,8 @@ jobs:
     name: Quantum Dialects Build
     needs: [constants, llvm, mhlo, enzyme, determine_runner]
     runs-on: ${{ needs.determine_runner.outputs.runner_group }}
+    env:
+      ACTIONS_STEP_DEBUG: true
     strategy:
       matrix:
         compiler: ${{ fromJson(needs.constants.outputs.compilers) }}
