@@ -22,6 +22,7 @@ import jax
 import jax.core
 import jax.numpy as jnp
 import pennylane as qml
+from jax.extend.core import ClosedJaxpr, Jaxpr
 from jax.extend.linear_util import wrap_init
 from jax.interpreters.partial_eval import convert_constvars_jaxpr
 from pennylane.capture import PlxprInterpreter, qnode_prim
@@ -42,7 +43,6 @@ from pennylane.transforms import unitary_to_rot as pl_unitary_to_rot
 from catalyst.device import (
     extract_backend_info,
     get_device_capabilities,
-    get_device_shots,
 )
 from catalyst.jax_extras import jaxpr_pad_consts, make_jaxpr2, transient_jax_config
 from catalyst.jax_primitives import (
@@ -101,11 +101,11 @@ def _get_device_kwargs(device) -> dict:
 
 # code example has long lines
 # pylint: disable=line-too-long
-def from_plxpr(plxpr: jax.core.ClosedJaxpr) -> Callable[..., jax.core.Jaxpr]:
+def from_plxpr(plxpr: ClosedJaxpr) -> Callable[..., Jaxpr]:
     """Convert PennyLane variant jaxpr to Catalyst variant jaxpr.
 
     Args:
-        jaxpr (jax.core.ClosedJaxpr): PennyLane variant jaxpr
+        jaxpr (ClosedJaxpr): PennyLane variant jaxpr
 
     Returns:
         Callable: A function that accepts the same arguments as the plxpr and returns catalyst
@@ -185,7 +185,10 @@ def handle_qnode(
     f = partial(QFuncPlxprInterpreter(device, shots).eval, qfunc_jaxpr, consts)
 
     return quantum_kernel_p.bind(
-        wrap_init(f), *non_const_args, qnode=qnode, pipeline=self._pass_pipeline
+        wrap_init(f, debug_info=qfunc_jaxpr.debug_info),
+        *non_const_args,
+        qnode=qnode,
+        pipeline=self._pass_pipeline,
     )
 
 
@@ -556,9 +559,7 @@ def handle_for_loop(
         consts,
     )
     converted_jaxpr_branch = jax.make_jaxpr(converted_func)(*start_plus_args_plus_qreg).jaxpr
-    converted_closed_jaxpr_branch = jax.core.ClosedJaxpr(
-        convert_constvars_jaxpr(converted_jaxpr_branch), ()
-    )
+    converted_closed_jaxpr_branch = ClosedJaxpr(convert_constvars_jaxpr(converted_jaxpr_branch), ())
 
     # Build Catalyst compatible input values
     for_loop_invals = [*consts, start, stop, step, *start_plus_args_plus_qreg]
@@ -608,7 +609,7 @@ def handle_while_loop(
         consts_body,
     )
     converted_body_jaxpr_branch = jax.make_jaxpr(converted_body_func)(*args_plus_qreg).jaxpr
-    converted_body_closed_jaxpr_branch = jax.core.ClosedJaxpr(
+    converted_body_closed_jaxpr_branch = ClosedJaxpr(
         convert_constvars_jaxpr(converted_body_jaxpr_branch), ()
     )
 
@@ -619,7 +620,7 @@ def handle_while_loop(
         consts_cond,
     )
     converted_cond_jaxpr_branch = jax.make_jaxpr(converted_cond_func)(*args_plus_qreg).jaxpr
-    converted_cond_closed_jaxpr_branch = jax.core.ClosedJaxpr(
+    converted_cond_closed_jaxpr_branch = ClosedJaxpr(
         convert_constvars_jaxpr(converted_cond_jaxpr_branch), ()
     )
 
@@ -752,7 +753,8 @@ class PredicatePlxprInterpreter(PlxprInterpreter):
         return outvals
 
 
-def trace_from_pennylane(fn, static_argnums, abstracted_axes, sig, kwargs):
+# pylint: disable=too-many-positional-arguments
+def trace_from_pennylane(fn, static_argnums, abstracted_axes, sig, kwargs, debug_info=None):
     """Capture the JAX program representation (JAXPR) of the wrapped function, using
     PL capure module.
 
@@ -770,6 +772,7 @@ def trace_from_pennylane(fn, static_argnums, abstracted_axes, sig, kwargs):
         make_jaxpr_kwargs = {
             "static_argnums": static_argnums,
             "abstracted_axes": abstracted_axes,
+            "debug_info": debug_info,
         }
 
         args = sig
