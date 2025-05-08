@@ -46,6 +46,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
+          sudo apt-get remove -y gcc g++
           sudo apt-get -y -q install ninja-build make cmake clang libomp-dev gcc-11 g++-11
           python3 -m pip install nanobind pybind11
 
