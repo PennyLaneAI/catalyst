@@ -404,11 +404,9 @@ def PPMeasurementOp : QEC_Op<"ppm", [QECOpInterface, AttrSizedOperandSegments]> 
 }
 
 def SelectPPMeasurementOp : QEC_Op<"select.ppm"> {
-    let summary = "Conditional Pauli product measurement based on a boolean control.";
+    let summary = "Multiplexed Pauli product measurement.";
 
     let description = [{
-    Conditionally applies and Pauli Product Measurement on qubits.
-
     Based on the boolean `condition` (type `i1`), this op selects between two Pauli product strings:  
     - If `condition` is 1, applies and measures using `pauli_product`.  
     - If `condition` is 0, uses `else_pauli_product`.  

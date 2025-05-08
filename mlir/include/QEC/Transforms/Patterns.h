@@ -14,12 +14,12 @@
 
 #pragma once
 
-#include "QEC/Transforms/Passes.h" // need for DecompositionMethod
 #include "mlir/Conversion/LLVMCommon/TypeConverter.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 #include "QEC/IR/QECDialect.h"
+#include "QEC/Transforms/Passes.h" // need for DecomposeMethod
 
 namespace catalyst {
 namespace qec {
@@ -27,7 +27,7 @@ namespace qec {
 void populateCliffordTToPPRPatterns(mlir::RewritePatternSet &);
 void populateCommuteCliffordTPPRPatterns(mlir::RewritePatternSet &);
 void populateCommuteCliffordPastPPMPatterns(mlir::RewritePatternSet &);
-void populateDecomposeNonCliffordPPRPatterns(mlir::RewritePatternSet &, DecompositionMethod);
+void populateDecomposeNonCliffordPPRPatterns(mlir::RewritePatternSet &, DecomposeMethod);
 void populateDecomposeCliffordPPRPatterns(mlir::RewritePatternSet &, LogicalInitKind);
 
 } // namespace qec

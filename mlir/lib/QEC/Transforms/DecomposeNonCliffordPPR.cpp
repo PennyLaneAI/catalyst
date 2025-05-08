@@ -172,9 +172,9 @@ void decompose_inject_magic_state_pi_over_eight(PPRotationOp op, PatternRewriter
 struct DecomposeNonCliffordPPR : public OpRewritePattern<PPRotationOp> {
     using OpRewritePattern::OpRewritePattern;
 
-    DecompositionMethod method;
+    DecomposeMethod method;
 
-    DecomposeNonCliffordPPR(MLIRContext *context, DecompositionMethod method,
+    DecomposeNonCliffordPPR(MLIRContext *context, DecomposeMethod method,
                             PatternBenefit benefit = 1)
         : OpRewritePattern(context, benefit), method(method)
     {
@@ -184,10 +184,10 @@ struct DecomposeNonCliffordPPR : public OpRewritePattern<PPRotationOp> {
     {
         if (op.isNonClifford() && !op.getCondition()) {
             switch (method) {
-            case DecompositionMethod::AutoCorrected:
+            case DecomposeMethod::AutoCorrected:
                 decompose_auto_corrected_pi_over_eight(op, rewriter);
                 break;
-            case DecompositionMethod::InjectMagicState:
+            case DecomposeMethod::CliffordCorrected:
                 decompose_inject_magic_state_pi_over_eight(op, rewriter);
                 break;
             }
@@ -202,7 +202,7 @@ namespace catalyst {
 namespace qec {
 
 void populateDecomposeNonCliffordPPRPatterns(RewritePatternSet &patterns,
-                                             DecompositionMethod decomposeMethod)
+                                             DecomposeMethod decomposeMethod)
 {
     patterns.add<DecomposeNonCliffordPPR>(patterns.getContext(), decomposeMethod, 1);
 }

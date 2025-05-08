@@ -501,7 +501,7 @@ def merge_ppr_ppm(qnode):
     return PassPipelineWrapper(qnode, "merge_ppr_ppm")
 
 
-def ppr_to_ppm(qnode=None, decompose_method="auto-corrected", prepare_state="zero"):
+def ppr_to_ppm(qnode=None, decompose_method="auto-corrected", avoid_y_measure=False):
     R"""Specify that the MLIR compiler passes for decomposing Pauli Product rotations (PPR)
     into Pauli Pauli measurements (PPM) will be applied.
 
@@ -568,7 +568,7 @@ def ppr_to_ppm(qnode=None, decompose_method="auto-corrected", prepare_state="zer
     """
     passes = {
         "decompose_non_clifford_ppr": {"decompose-method": decompose_method},
-        "decompose_clifford_ppr": {"prep-state": prepare_state},
+        "decompose_clifford_ppr": {"avoid-y-measure": avoid_y_measure},
     }
 
     def decorator(qnode_func):

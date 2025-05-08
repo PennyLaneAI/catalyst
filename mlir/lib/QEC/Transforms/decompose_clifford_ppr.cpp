@@ -41,7 +41,12 @@ struct DecomposeCliffordPPRPass
     {
         RewritePatternSet patterns(&getContext());
 
-        populateDecomposeCliffordPPRPatterns(patterns, prepareState);
+        LogicalInitKind ancillaType = LogicalInitKind::zero;
+        if (avoidYMeasure) {
+            ancillaType = LogicalInitKind::plus_i;
+        }
+
+        populateDecomposeCliffordPPRPatterns(patterns, ancillaType);
 
         if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
             return signalPassFailure();

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt --pass-pipeline="builtin.module(decompose_non_clifford_ppr{decompose-method=inject-magic-state})" --split-input-file -verify-diagnostics %s | FileCheck %s --check-prefix=CHECK-INJECT
+// RUN: quantum-opt --pass-pipeline="builtin.module(decompose_non_clifford_ppr{decompose-method=clifford-corrected})" --split-input-file -verify-diagnostics %s | FileCheck %s --check-prefix=CHECK-INJECT
 // RUN: quantum-opt --pass-pipeline="builtin.module(decompose_non_clifford_ppr{decompose-method=auto-corrected})" --split-input-file -verify-diagnostics %s | FileCheck %s --check-prefix=CHECK-AUTO
 
 func.func @test_ppr_to_ppm(%q1 : !quantum.bit) {

@@ -38,10 +38,10 @@ def CommuteCliffordTPPRPass : Pass<"commute_ppr"> {
     let constructor = "catalyst::createCommuteCliffordTPPRPass()";
 }
 
-def DecompositionMethod : I32EnumAttr<"DecompositionMethod", "Decomposition method", 
+def DecomposeMethod : I32EnumAttr<"DecomposeMethod", "Decomposition method", 
     [
     I32EnumAttrCase<"AutoCorrected", 0, "auto-corrected">,
-    I32EnumAttrCase<"InjectMagicState", 1, "inject-magic-state">
+    I32EnumAttrCase<"CliffordCorrected", 1, "clifford-corrected">
     ]> { 
     let cppNamespace = "catalyst::qec";
     let genSpecializedAttr = 0; 
@@ -50,29 +50,23 @@ def DecompositionMethod : I32EnumAttr<"DecompositionMethod", "Decomposition meth
 def DecomposeMethodOption : Option<
     /*C++ var name=*/"decomposeMethod",
     /*CLI arg name=*/"decompose-method",
-    /*type=*/"::catalyst::qec::DecompositionMethod",
-    /*default=*/"::catalyst::qec::DecompositionMethod::AutoCorrected",
+    /*type=*/"::catalyst::qec::DecomposeMethod",
+    /*default=*/"::catalyst::qec::DecomposeMethod::AutoCorrected",
     "Decomposition method to use",
     [{::llvm::cl::values(
-        clEnumValN(::catalyst::qec::DecompositionMethod::AutoCorrected,
+        clEnumValN(::catalyst::qec::DecomposeMethod::AutoCorrected,
                     "auto-corrected", "Decompose using auto-corrected method."),
-        clEnumValN(::catalyst::qec::DecompositionMethod::InjectMagicState,
-                    "inject-magic-state",
+        clEnumValN(::catalyst::qec::DecomposeMethod::CliffordCorrected,
+                    "clifford-corrected",
                     "Decompose by injecting magic states method.")
     )}]>;
 
-def PrepareStateOption : Option<
-    /*C++ var name=*/"prepareState",
-    /*CLI arg name=*/"prep-state",
-    /*type=*/"::catalyst::qec::LogicalInitKind",
-    /*default=*/"::catalyst::qec::LogicalInitKind::zero",
-    "Initial state of logical qubit", 
-    [{::llvm::cl::values(
-        clEnumValN(::catalyst::qec::LogicalInitKind::zero,
-                    "zero", "Initial state is |0⟩."),
-        clEnumValN(::catalyst::qec::LogicalInitKind::plus_i,
-                    "plus_i", "Initial state is |+i⟩.")
-    )}]>;
+def AvoidYMeasureOption : Option<
+    /*C++ var name=*/"avoidYMeasure",
+    /*CLI arg name=*/"avoid-y-measure",
+    /*type=*/"bool",
+    /*default=*/"false",
+    "Avoid Pauli-Y measurements for Clifford rotations. Rather than performing a Pauli-Y measurement for Clifford rotations (sometimes more costly), a Y state is used instead (requires Y state preparation).">;
 
 def CommuteCliffordPastPPMPass : Pass<"merge_ppr_ppm"> {
     let summary = "Absorb Clifford operations into Pauli Product Measurement operations.";
@@ -103,7 +97,7 @@ def DecomposeCliffordPPRPass : Pass<"decompose_clifford_ppr"> {
         "catalyst::qec::QECDialect",
     ];
 
-    let options = [PrepareStateOption];
+    let options = [AvoidYMeasureOption];
 
     let constructor = "catalyst::createDecomposeCliffordPPRPass()";
 }

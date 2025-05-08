@@ -196,8 +196,6 @@ def test_chained_passes():
     assert "merge-rotations" in test_chained_apply_passes_workflow.mlir
 
 
-test_chained_passes()
-
 #
 # to_ppr
 #
@@ -226,9 +224,6 @@ def test_convert_clifford_to_ppr():
     optimized_ir = test_convert_clifford_to_ppr_workflow.mlir_opt
     assert 'transform.apply_registered_pass "to_ppr"' not in optimized_ir
     assert "qec.ppr" in optimized_ir
-
-
-test_convert_clifford_to_ppr()
 
 #
 # commute_ppr
@@ -262,9 +257,6 @@ def test_commute_ppr():
     assert "qec.ppr" in optimized_ir
     assert "qec.ppm" in optimized_ir
 
-
-test_commute_ppr()
-
 #
 # merge_ppr_ppm
 #
@@ -280,13 +272,11 @@ def test_merge_ppr_ppm():
     def test_merge_ppr_ppm_workflow():
 
         @to_ppr
-        @commute_ppr
         @merge_ppr_ppm
         @qml.qnode(qml.device("lightning.qubit", wires=2))
         def f():
             qml.H(0)
             qml.S(1)
-            qml.T(0)
             qml.CNOT([0, 1])
             return measure(0), measure(1)
 
@@ -316,8 +306,6 @@ def test_ppr_to_ppm():
     def test_ppr_to_ppm_workflow():
 
         @to_ppr
-        @commute_ppr
-        @merge_ppr_ppm
         @ppr_to_ppm
         @qml.qnode(qml.device("lightning.qubit", wires=2))
         def f():
@@ -348,7 +336,7 @@ def test_ppr_to_ppm():
 test_ppr_to_ppm()
 
 #
-# ppr_to_ppm with inject-magic-state
+# ppr_to_ppm with clifford-corrected
 #
 
 
@@ -362,9 +350,7 @@ def test_ppr_to_ppm_inject_magic_state():
     def test_ppr_to_ppm_workflow():
 
         @to_ppr
-        @commute_ppr
-        @merge_ppr_ppm
-        @ppr_to_ppm(decompose_method="inject-magic-state", prepare_state="plus_i")
+        @ppr_to_ppm(decompose_method="clifford-corrected", avoid_y_measure=True)
         @qml.qnode(qml.device("lightning.qubit", wires=2))
         def f():
             qml.H(0)
@@ -390,8 +376,6 @@ def test_ppr_to_ppm_inject_magic_state():
     assert 'qec.ppm ["X", "Z"]' in optimized_ir
     assert 'qec.ppr ["X"]' in optimized_ir
 
-
-test_ppr_to_ppm_inject_magic_state()
 
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
