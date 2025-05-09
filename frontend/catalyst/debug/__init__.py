@@ -22,6 +22,7 @@ from catalyst.debug.compiler_functions import (
     get_compilation_stages_groups,
     replace_ir,
 )
+from catalyst.debug.debugger import is_debugger_active
 from catalyst.debug.instruments import instrumentation
 from catalyst.debug.printing import (  # pylint: disable=redefined-builtin
     print,
@@ -38,4 +39,5 @@ __all__ = (
     "instrumentation",
     "replace_ir",
     "compile_executable",
+    "is_debugger_active",
 )

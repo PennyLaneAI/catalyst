@@ -21,6 +21,7 @@ import os
 import pathlib
 import platform
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -28,6 +29,7 @@ import warnings
 from os import path
 from typing import List, Optional
 
+from catalyst.debug.debugger import is_debugger_active
 from catalyst.logging import debug_logger, debug_logger_init
 from catalyst.pipelines import CompileOptions
 from catalyst.utils.exceptions import CompileError
@@ -438,15 +440,31 @@ class Compiler:
         output_ir_name = os.path.join(str(workspace), f"{module_name}.ll")
 
         cmd = self.get_cli_command(tmp_infile_name, output_ir_name, module_name, workspace)
+
         try:
             if self.options.verbose:
                 print(f"[SYSTEM] {' '.join(cmd)}", file=self.options.logfile)
-            result = subprocess.run(cmd, check=True, capture_output=True, text=True)
+
+            with subprocess.Popen(
+                cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+            ) as p:
+                if p.returncode not in {0, None}:
+                    raise subprocess.CalledProcessError(p.returncode, cmd)
+
+                if self.options.debug_compiler and is_debugger_active():
+                    print(f"Compiler PID={p.pid}")
+                    print(
+                        f"""Ensure C++ debugger is attached and running before continuing with:
+                        kill -s SIGCONT {p.pid}"""
+                    )
+                    p.send_signal(signal.SIGSTOP)
+
+                res_stdout, res_stderr = p.communicate()
             if self.options.verbose or os.getenv("ENABLE_DIAGNOSTICS"):
-                if result.stdout:
-                    print(result.stdout.strip(), file=self.options.logfile)
-                if result.stderr:
-                    print(result.stderr.strip(), file=self.options.logfile)
+                if res_stdout:
+                    print(res_stdout.strip(), file=self.options.logfile)
+                if res_stderr:
+                    print(res_stderr.strip(), file=self.options.logfile)
         except subprocess.CalledProcessError as e:  # pragma: nocover
             raise CompileError(f"catalyst failed with error code {e.returncode}: {e.stderr}") from e
 
