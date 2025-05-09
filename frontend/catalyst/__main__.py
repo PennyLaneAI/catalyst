@@ -36,10 +36,14 @@ def main() -> None:
 
     """
     parser = argparse.ArgumentParser()
-    parser.add_argument("--version", action="version", version=__version__, help="Print version and exit.")
+    parser.add_argument(
+        "--version", action="version", version=__version__, help="Print version and exit."
+    )
 
     parser.add_argument(
-        "--include_dir", action="store_true", help="Print the path to the catalyst C++ include directory."
+        "--include_dir",
+        action="store_true",
+        help="Print the path to the catalyst C++ include directory.",
     )
     args = parser.parse_args()
     if not sys.argv[1:]:
