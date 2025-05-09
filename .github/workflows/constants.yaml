@@ -38,11 +38,11 @@ on:
         description: "List of compilers to test Catalyst builds with."
         value: ${{ jobs.set-constants.outputs.compilers }}
       c_compiler.gcc:
-        value: gcc
+        value: gcc-11
       c_compiler.clang:
         value: clang
       cxx_compiler.gcc:
-        value: g++
+        value: g++-11
       cxx_compiler.clang:
         value: clang++
 
