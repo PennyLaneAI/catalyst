@@ -213,13 +213,8 @@ def _obs_lowering(aval):
 #
 # registration
 #
-# core.raise_to_shaped_mappings[AbstractQbit] = lambda aval, _: aval
 mlir.ir_type_handlers[AbstractQbit] = _qbit_lowering
-
-# core.raise_to_shaped_mappings[AbstractQreg] = lambda aval, _: aval
 mlir.ir_type_handlers[AbstractQreg] = _qreg_lowering
-
-# core.raise_to_shaped_mappings[AbstractObs] = lambda aval, _: aval
 mlir.ir_type_handlers[AbstractObs] = _obs_lowering
 
 
