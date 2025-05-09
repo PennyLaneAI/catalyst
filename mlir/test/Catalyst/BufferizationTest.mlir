@@ -53,7 +53,7 @@ func.func @dbprint_str() {
 
 // -----
 
-func.func @custom_call_no_user(%arg0: tensor<3x3xf64>) -> tensor<3x3xf64> {
+func.func @custom_call(%arg0: tensor<3x3xf64>) -> tensor<3x3xf64> {
     // CHECK: [[sourceAlloc:%.+]] = bufferization.to_memref %arg0
     // CHECK: [[destAlloc:%.+]] = memref.alloc() {{.*}}: memref<3x3xf64>
     // CHECK: catalyst.custom_call fn("lapack_dgesdd") ([[sourceAlloc]], [[destAlloc]]) {number_original_arg = array<i32: 1>} :
