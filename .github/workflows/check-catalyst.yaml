@@ -52,6 +52,11 @@ jobs:
           sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-11 10
           sudo apt-get -y -q install ninja-build make cmake clang libomp-dev
           python3 -m pip install nanobind pybind11
+     
+      - name: Which gcc
+        run: |        
+          gcc --version
+          g++ --version
 
       - name: Get Cached LLVM Source
         id: cache-llvm-source
