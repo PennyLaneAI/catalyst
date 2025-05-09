@@ -93,6 +93,10 @@ struct CustomCallOpInterface
         // https://www.netlib.org/lapack/lug/node112.html
         //   * array or scalar arguments defining the input data;
         //   * some of them may be overwritten by results;
+        if (cast<CustomCallOp>(op).getCallTargetName().str() == "lapack_dgesdd") {
+            // white list lapack kernels that are known to not write into input tensors
+            return false;
+        }
         return true;
     }
 
