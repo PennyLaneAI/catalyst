@@ -686,8 +686,8 @@ jobs:
 
       - name: Run the main runtime test suite for coverage
         run: |
-          C_COMPILER=$(which gcc-11) \
-          CXX_COMPILER=$(which g++-11) \
+          C_COMPILER="/usr/bin/gcc-11" \
+          CXX_COMPILER=/usr/bin/g++-11 \
           COMPILER_LAUNCHER="" \
           ENABLE_OQD=ON \
           LLVM_DIR="$(pwd)/mlir/llvm-project" \
