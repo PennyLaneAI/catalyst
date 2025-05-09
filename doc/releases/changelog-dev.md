@@ -75,6 +75,9 @@
 * Improved the definition of `YieldOp` in the quantum dialect by removing `AnyTypeOf`
   [(#1696)](https://github.com/PennyLaneAI/catalyst/pull/1696)
 
+* Added ```postselect``` to ```assemblyFormat``` to ```MeasureOp``` in QuantumOp.td and ```MeasureInBasisOp``` in MBQCOps.td
+  [(#1732)](https://github.com/PennyLaneAI/catalyst/pull/1732)
+
 <h3>Documentation 📝</h3>
 
 <h3>Contributors ✍️</h3>
@@ -86,4 +89,5 @@ Sengthai Heng,
 David Ittah,
 Christina Lee,
 Erick Ochoa Lopez,
-Paul Haochen Wang.
+Paul Haochen Wang,
+Ritu Thombre
