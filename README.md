@@ -7,12 +7,12 @@
 [![License](https://img.shields.io/pypi/l/PennyLane.svg?logo=apache&style=flat-square)](https://www.apache.org/licenses/LICENSE-2.0)
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/PennyLaneAI/catalyst/main/doc/_static/catalyst.png#gh-light-mode-only" width="700px">
+  <img src="https://raw.githubusercontent.com/PennyLaneAI/catalyst/main/doc/_static/pl-catalyst-logo-lightmode.png#gh-light-mode-only" width="700px">
     <!--
     Use a relative import for the dark mode image. When loading on PyPI, this
     will fail automatically and show nothing.
     -->
-  <img src="./doc/_static/catalyst-dark.png#gh-dark-mode-only" width="700px" onerror="this.style.display='none'" alt=""/>
+  <img src="./doc/_static/pl-catalyst-logo-darkmode.png#gh-dark-mode-only" width="700px" onerror="this.style.display='none'" alt=""/>
 </p>
 
 Catalyst is an experimental package that enables just-in-time (JIT) compilation of hybrid
