@@ -20,6 +20,7 @@
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/Transforms/Passes.h"
 #include "mhlo/transforms/passes.h"
+#include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/InitAllDialects.h"
 #include "mlir/InitAllPasses.h"
 #include "mlir/Pass/PassManager.h"
@@ -80,6 +81,12 @@ void createBufferizationPipeline(OpPassManager &pm)
     pm.addNestedPass<mlir::func::FuncOp>(mlir::tensor::createTensorBufferizePass());
     mlir::bufferization::OneShotBufferizationOptions catalyst_buffer_options;
     catalyst_buffer_options.opFilter.allowDialect<catalyst::CatalystDialect>();
+    catalyst_buffer_options.unknownTypeConverterFn =
+        [=](Value value, Attribute memorySpace,
+            const mlir::bufferization::BufferizationOptions &options) {
+            auto tensorType = cast<TensorType>(value.getType());
+            return bufferization::getMemRefTypeWithStaticIdentityLayout(tensorType, memorySpace);
+        };
     pm.addPass(mlir::bufferization::createOneShotBufferizePass(catalyst_buffer_options));
     pm.addNestedPass<mlir::func::FuncOp>(mlir::createLinalgBufferizePass());
     pm.addNestedPass<mlir::func::FuncOp>(mlir::tensor::createTensorBufferizePass());

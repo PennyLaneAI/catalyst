@@ -228,7 +228,7 @@ def get_bufferization_stage(_options: CompileOptions) -> List[str]:
         "func.func(bufferization-bufferize)",
         "func.func(tensor-bufferize)",
         # Catalyst dialect's bufferization must be run before --func.func(linalg-bufferize)
-        "one-shot-bufferize{dialect-filter=catalyst}",
+        "one-shot-bufferize{dialect-filter=catalyst unknown-type-conversion=identity-layout-map}",
         "func.func(linalg-bufferize)",
         "func.func(tensor-bufferize)",
         "one-shot-bufferize{dialect-filter=quantum}",
