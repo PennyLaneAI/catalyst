@@ -306,7 +306,7 @@ jobs:
       if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
       run: |
         C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler_gcc', matrix.compiler)] }}) \
-        CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.gxx', matrix.compiler)] }}) \
+        CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler_gxx', matrix.compiler)] }}) \
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \
         ENZYME_BUILD_DIR="$(pwd)/enzyme-build" \
         COMPILER_LAUNCHER="" \
