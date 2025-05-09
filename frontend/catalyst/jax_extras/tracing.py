@@ -478,7 +478,7 @@ def make_jaxpr2(
         # TODO: re-use `deduce_avals` here.
         with Patcher(
             (jax._src.interpreters.partial_eval, "get_aval", get_aval2),
-            #(jax._src.lax.slicing, "gather_p", gather2_p),
+            # (jax._src.lax.slicing, "gather_p", gather2_p),
         ), ExitStack():
             f = wrap_init(fun, debug_info=debug_info)
             if static_argnums:
