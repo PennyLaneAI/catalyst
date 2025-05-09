@@ -167,7 +167,7 @@ jobs:
         # echo 'target_compile_options(mlir_c_runner_utils PRIVATE "-fno-sanitize=all")' \
         #       >> mlir/llvm-project/mlir/lib/ExecutionEngine/CMakeLists.txt
         C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler_gcc', matrix.compiler)] }}) \
-        CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
+        CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler_gxx', matrix.compiler)] }}) \
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \
         COMPILER_LAUNCHER="" \
         make llvm

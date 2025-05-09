@@ -38,12 +38,16 @@ on:
         description: "List of compilers to test Catalyst builds with."
         value: ${{ jobs.set-constants.outputs.compilers }}
       c_compiler_gcc:
-        value: gcc-11
+        description: "C Compiler GCC"
+        value: gcc
       c_compiler_clang:
+        description: "C Compiler Clang"
         value: clang
       cxx_compiler_gxx:
-        value: g++-11
+        description: "C++ Compiler G++"
+        value: g++
       cxx_compiler_clang:
+        description: "C++ Compiler Clang++"
         value: clang++
 
 jobs:
@@ -90,9 +94,9 @@ jobs:
         run: |
           # TODO: add Clang after https://github.com/actions/runner-images/issues/8659 is fixed
           if [[ $MULTIPLE ]]; then
-            echo 'compilers=["gcc-11"]' >> $GITHUB_OUTPUT
+            echo 'compilers=["gcc"]' >> $GITHUB_OUTPUT
           else
-            echo 'compilers=["gcc-11"]' >> $GITHUB_OUTPUT
+            echo 'compilers=["gcc"]' >> $GITHUB_OUTPUT
           fi
         env:
           MULTIPLE: ${{ inputs.multiple_compilers }}
