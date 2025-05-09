@@ -42,7 +42,7 @@ struct CommuteCliffordTPPRPass : public impl::CommuteCliffordTPPRPassBase<Commut
     {
         RewritePatternSet patterns(&getContext());
 
-        populateCommuteCliffordTPPRPatterns(patterns);
+        populateCommuteCliffordTPPRPatterns(patterns, max_pauli_size);
 
         if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
             return signalPassFailure();

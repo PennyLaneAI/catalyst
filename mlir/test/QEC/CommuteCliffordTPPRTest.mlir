@@ -13,6 +13,7 @@
 // limitations under the License.
 
 // RUN: quantum-opt --commute_ppr --split-input-file -verify-diagnostics %s | FileCheck %s
+// RUN: quantum-opt --commute_ppr="max-pauli-size=3" --split-input-file -verify-diagnostics %s | FileCheck %s --check-prefixes=CHECK-MPS
 
 func.func @test_commute_1(%q1 : !quantum.bit){
     
@@ -298,6 +299,10 @@ func.func public @game_of_surface_code(%q1: !quantum.bit, %q2: !quantum.bit, %q3
     // CHECK-DAG: %20 = qec.ppr ["X"](4) %19 : !quantum.bit
     // CHECK-DAG: %15 = qec.ppr ["X"](4) %14 : !quantum.bit
 
+    // Because the Pauli size is limited to 3, the two operations below are not commuted.
+    // CHECK-MPS: qec.ppr ["Z", "X"](4)
+    // CHECK-MPS: qec.ppr ["Y", "Y", "Z"](8)
+    // CHECK-MPS-NOT: qec.ppr ["Z", "Z", "Y", "Z"](-8)
 
     %0 = qec.ppr ["Z"](8) %q1 : !quantum.bit // q1
 
