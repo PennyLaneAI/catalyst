@@ -92,6 +92,16 @@
     [(#1671)](https://github.com/PennyLaneAI/catalyst/pull/1671)
     [(#1681)](https://github.com/PennyLaneAI/catalyst/pull/1681)
 
+* Support for Mac x86 has been removed. This includes Macs running on Intel processors.
+  [(#1716)](https://github.com/PennyLaneAI/catalyst/pull/1716)
+
+  This is because [JAX has also dropped support for it since 0.5.0](https://github.com/jax-ml/jax/blob/main/CHANGELOG.md#jax-050-jan-17-2025),
+  with the rationale being that such machines are becoming increasingly scarce.
+
+  If support for Mac x86 platforms is still desired, please install
+  Catalyst version 0.11.0, PennyLane version 0.41.0, PennyLane-Lightning
+  version 0.41.0, and Jax version 0.4.28.
+
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
