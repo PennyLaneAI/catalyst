@@ -152,7 +152,7 @@ jobs:
         key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-ci-build-${{ matrix.compiler }}
 
     - name: Install Deps
-      if: steps.cache-llvm-build.outputs.cache-hit != 'true'
+      # if: steps.cache-llvm-build.outputs.cache-hit != 'true'
       run: |
         sudo apt-get update
         sudo apt-get install -y python3 python3-pip cmake ninja-build clang lld
