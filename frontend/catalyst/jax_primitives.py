@@ -31,6 +31,7 @@ from jax._src.lax.lax import _merge_dyn_shape, _nary_lower_hlo, cos_p, sin_p
 from jax._src.lib.mlir import ir
 from jax._src.lib.mlir.dialects import hlo
 from jax.core import AbstractValue
+from jax.extend.core import Primitive
 from jax.interpreters import mlir
 from jax.tree_util import PyTreeDef, tree_unflatten
 from jaxlib.hlo_helpers import shape_dtype_to_ir_type
@@ -246,67 +247,67 @@ class MeasurementPlane(Enum):
 # Primitives #
 ##############
 
-zne_p = core.Primitive("zne")
-device_init_p = core.Primitive("device_init")
+zne_p = Primitive("zne")
+device_init_p = Primitive("device_init")
 device_init_p.multiple_results = True
-device_release_p = core.Primitive("device_release")
+device_release_p = Primitive("device_release")
 device_release_p.multiple_results = True
-qalloc_p = core.Primitive("qalloc")
-qdealloc_p = core.Primitive("qdealloc")
+qalloc_p = Primitive("qalloc")
+qdealloc_p = Primitive("qdealloc")
 qdealloc_p.multiple_results = True
-qextract_p = core.Primitive("qextract")
-qinsert_p = core.Primitive("qinsert")
-gphase_p = core.Primitive("gphase")
+qextract_p = Primitive("qextract")
+qinsert_p = Primitive("qinsert")
+gphase_p = Primitive("gphase")
 gphase_p.multiple_results = True
-qinst_p = core.Primitive("qinst")
+qinst_p = Primitive("qinst")
 qinst_p.multiple_results = True
-unitary_p = core.Primitive("unitary")
+unitary_p = Primitive("unitary")
 unitary_p.multiple_results = True
-measure_p = core.Primitive("measure")
+measure_p = Primitive("measure")
 measure_p.multiple_results = True
-compbasis_p = core.Primitive("compbasis")
-namedobs_p = core.Primitive("namedobs")
-hermitian_p = core.Primitive("hermitian")
-tensorobs_p = core.Primitive("tensorobs")
-hamiltonian_p = core.Primitive("hamiltonian")
-sample_p = core.Primitive("sample")
-counts_p = core.Primitive("counts")
+compbasis_p = Primitive("compbasis")
+namedobs_p = Primitive("namedobs")
+hermitian_p = Primitive("hermitian")
+tensorobs_p = Primitive("tensorobs")
+hamiltonian_p = Primitive("hamiltonian")
+sample_p = Primitive("sample")
+counts_p = Primitive("counts")
 counts_p.multiple_results = True
-expval_p = core.Primitive("expval")
-var_p = core.Primitive("var")
-probs_p = core.Primitive("probs")
-state_p = core.Primitive("state")
+expval_p = Primitive("expval")
+var_p = Primitive("var")
+probs_p = Primitive("probs")
+state_p = Primitive("state")
 cond_p = DynshapePrimitive("cond")
 cond_p.multiple_results = True
 while_p = DynshapePrimitive("while_loop")
 while_p.multiple_results = True
 for_p = DynshapePrimitive("for_loop")
 for_p.multiple_results = True
-grad_p = core.Primitive("grad")
+grad_p = Primitive("grad")
 grad_p.multiple_results = True
 func_p = core.CallPrimitive("func")
 func_p.multiple_results = True
-jvp_p = core.Primitive("jvp")
+jvp_p = Primitive("jvp")
 jvp_p.multiple_results = True
-vjp_p = core.Primitive("vjp")
+vjp_p = Primitive("vjp")
 vjp_p.multiple_results = True
-adjoint_p = jax.core.Primitive("adjoint")
+adjoint_p = Primitive("adjoint")
 adjoint_p.multiple_results = True
-print_p = jax.core.Primitive("debug_print")
+print_p = Primitive("debug_print")
 print_p.multiple_results = True
-python_callback_p = core.Primitive("python_callback")
+python_callback_p = Primitive("python_callback")
 python_callback_p.multiple_results = True
-value_and_grad_p = core.Primitive("value_and_grad")
+value_and_grad_p = Primitive("value_and_grad")
 value_and_grad_p.multiple_results = True
-assert_p = core.Primitive("assert")
+assert_p = Primitive("assert")
 assert_p.multiple_results = True
-set_state_p = jax.core.Primitive("state_prep")
+set_state_p = Primitive("state_prep")
 set_state_p.multiple_results = True
-set_basis_state_p = jax.core.Primitive("set_basis_state")
+set_basis_state_p = Primitive("set_basis_state")
 set_basis_state_p.multiple_results = True
 quantum_kernel_p = core.CallPrimitive("quantum_kernel")
 quantum_kernel_p.multiple_results = True
-measure_in_basis_p = core.Primitive("measure_in_basis")
+measure_in_basis_p = Primitive("measure_in_basis")
 measure_in_basis_p.multiple_results = True
 
 
