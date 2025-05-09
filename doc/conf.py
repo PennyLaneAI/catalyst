@@ -136,7 +136,7 @@ extensions = [
     "m2r2",
 ]
 
-intersphinx_mapping = {"https://docs.pennylane.ai/en/stable/": None}
+intersphinx_mapping = {"pennylane": ("https://docs.pennylane.ai/en/stable/", None)}
 
 # add the custom MLIR Lexer
 lexers["mlir"] = MLIRLexer(startinline=True)
