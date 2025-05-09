@@ -89,5 +89,5 @@ Sengthai Heng,
 David Ittah,
 Christina Lee,
 Erick Ochoa Lopez,
-Paul Haochen Wang,
-Ritu Thombre
+Ritu Thombre,
+Paul Haochen Wang.
