@@ -13,7 +13,7 @@
   ensures that measurement processes on `null.qubit` always return the value 0 or the result
   corresponding to the '0' state, depending on the context.
 
-* The `commute_ppr` and `merge_ppr_ppm` passes now accept an optional `max_pauli_size` argument,
+* The :func:`~.passes.commute_ppr` and :func:`~.passes.merge_ppr_ppm` passes now accept an optional `max_pauli_size` argument,
   which limits the size of the Pauli strings that can be commuted or merged.
   [(#1719)](https://github.com/PennyLaneAI/catalyst/pull/1719)
 

@@ -449,7 +449,7 @@ def commute_ppr(qnode=None, max_pauli_size=0):
         . . .
 
     If a commutation resulted in a PPR acting on more than
-    'max_pauli_size' (here, 2) qubits, that commutation would be skipped.
+    `max_pauli_size` qubits (here, `max_pauli_size = 2`), that commutation would be skipped.
 
     .. code-block:: python
 
@@ -541,7 +541,7 @@ def merge_ppr_ppm(qnode=None, max_pauli_size=0):
         . . .
 
     If a merging resulted in a PPM acting on more than
-    'max_pauli_size' (here, 2) qubits, that merging would be skipped.
+    `max_pauli_size` qubits (here, `max_pauli_size = 2`), that merging would be skipped.
 
     .. code-block:: python
 
