@@ -57,6 +57,8 @@ jobs:
         run: |        
           gcc --version
           g++ --version
+          which gcc
+          which g++
 
       - name: Get Cached LLVM Source
         id: cache-llvm-source
@@ -77,8 +79,8 @@ jobs:
       - name: Build Catalyst-Runtime
         run: |
           COMPILER_LAUNCHER="" \
-          C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
-          CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
+          C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler_gcc', matrix.compiler)] }}) \
+          CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler_gxx', matrix.compiler)] }}) \
           RT_BUILD_DIR="$(pwd)/runtime-build" \
           LLVM_DIR="$(pwd)/mlir/llvm-project" \
           ENABLE_ASAN=OFF \
@@ -86,8 +88,8 @@ jobs:
           make runtime
 
           COMPILER_LAUNCHER="" \
-          C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
-          CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
+          C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler_gcc', matrix.compiler)] }}) \
+          CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler_gxx', matrix.compiler)] }}) \
           RT_BUILD_DIR="$(pwd)/runtime-build" \
           OQC_BUILD_DIR="$(pwd)/oqc-build" \
           LLVM_DIR="$(pwd)/mlir/llvm-project" \
