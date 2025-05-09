@@ -14,19 +14,23 @@
 
 #pragma once
 
-#include <memory>
+#include "QEC/IR/QECDialect.h"
+#include "Quantum/IR/QuantumOps.h"
 
-#include "mlir/Pass/Pass.h"
-
-#include "QEC/Transforms/PassesEnums.h.inc"
+using namespace mlir;
+using namespace catalyst::quantum;
 
 namespace catalyst {
+namespace qec {
 
-std::unique_ptr<mlir::Pass> createLowerToQECPass();
-std::unique_ptr<mlir::Pass> createCommuteCliffordTPPRPass();
-std::unique_ptr<mlir::Pass> createCliffordTToPPRPass();
-std::unique_ptr<mlir::Pass> createCommuteCliffordPastPPMPass();
-std::unique_ptr<mlir::Pass> createDecomposeNonCliffordPPRPass();
-std::unique_ptr<mlir::Pass> createDecomposeCliffordPPRPass();
+// build quantum.alloc operation.
+AllocOp buildAllocQreg(Location loc, int64_t size, PatternRewriter &rewriter);
 
+// build quantum.extract operation.
+ExtractOp buildExtractOp(Location loc, Value qreg, int64_t position, PatternRewriter &rewriter);
+
+// get the magic state from the operation.
+LogicalInitKind getMagicState(QECOpInterface op);
+
+} // namespace qec
 } // namespace catalyst

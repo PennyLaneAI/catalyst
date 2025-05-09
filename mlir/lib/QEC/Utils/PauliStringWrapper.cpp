@@ -190,5 +190,14 @@ void updatePauliWordSign(QECOpInterface op, bool isNegated, PatternRewriter &rew
     op.setRotationKind(rotationKind);
 }
 
+SmallVector<StringRef> extractPauliString(QECOpInterface op)
+{
+    SmallVector<StringRef> pauliWord;
+    for (auto pauli : op.getPauliProduct()) {
+        pauliWord.emplace_back(mlir::cast<mlir::StringAttr>(pauli).getValue());
+    }
+    return pauliWord;
+}
+
 } // namespace qec
 } // namespace catalyst

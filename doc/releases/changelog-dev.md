@@ -2,6 +2,20 @@
 
 <h3>New features since last release</h3>
 
+* A new compilation pass called :func:`~.passes.ppr_to_ppm` has been added to Catalyst to decompose Pauli product rotations (PPRs) into
+  Pauli product measurements (PPMs). Non-Clifford (pi/8) rotations require the consumption of a
+  magic state, while Clifford rotations will not. The methods are implemented as described in
+  [arXiv:1808.02892](https://arxiv.org/abs/1808.02892v3).
+  [(#1664)](https://github.com/PennyLaneAI/catalyst/pull/1664)
+
+  The new compilation pass can be accessed in the frontend from the :mod:`~.passes` module:
+  * :func:`~.passes.ppr_to_ppm`: Decomposes all PPRs into PPMs (except Pauli rotations).
+
+  Or via the Catalyst CLI as two separate passes:
+  * `decompose_clifford_ppr`: Decompose pi/4 rotations into PPMs.
+  * `decompose_non_clifford_ppr`: Decompose pi/8 rotations into PPMs using a magic state.
+
+
 <h3>Improvements 🛠</h3>
 
 * The behaviour of measurement processes executed on `null.qubit` with QJIT is now more in line with
