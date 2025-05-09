@@ -27,18 +27,6 @@ def DetensorizeSCFPass : Pass<"detensorize-scf"> {
     let constructor = "catalyst::createDetensorizeSCFPass()";
 }
 
-def CatalystBufferizationPass : Pass<"catalyst-bufferize"> {
-    let summary = "Bufferize tensors in catalyst utility ops.";
-
-    let dependentDialects = [
-        "bufferization::BufferizationDialect",
-        "memref::MemRefDialect",
-        "index::IndexDialect"
-    ];
-
-    let constructor = "catalyst::createCatalystBufferizationPass()";
-}
-
 def ArrayListToMemRefPass : Pass<"convert-arraylist-to-memref"> {
     let summary = "Lower array list operations to memref operations.";
     let description = [{

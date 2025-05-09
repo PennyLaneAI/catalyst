@@ -29,7 +29,6 @@ void catalyst::registerAllCatalystPasses()
     mlir::registerPass(catalyst::createAnnotateFunctionPass);
     mlir::registerPass(catalyst::createApplyTransformSequencePass);
     mlir::registerPass(catalyst::createArrayListToMemRefPass);
-    mlir::registerPass(catalyst::createCatalystBufferizationPass);
     mlir::registerPass(catalyst::createCatalystConversionPass);
     mlir::registerPass(catalyst::createCopyGlobalMemRefPass);
     mlir::registerPass(catalyst::createDetensorizeSCFPass);
