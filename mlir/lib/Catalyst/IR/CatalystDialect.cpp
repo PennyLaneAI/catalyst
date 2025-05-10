@@ -28,6 +28,18 @@ using namespace catalyst;
 //===----------------------------------------------------------------------===//
 // Catalyst dialect.
 //===----------------------------------------------------------------------===//
+//
+namespace {
+struct CatalystInlinerInterface : public DialectInlinerInterface {
+    using DialectInlinerInterface::DialectInlinerInterface;
+
+    /// Operations in Gradient dialect are always legal to inline.
+    bool isLegalToInline(Operation *op, Region *, bool, IRMapping &valueMapping) const final
+    {
+        return isa<CallbackCallOp>(op);
+    }
+};
+}
 
 void CatalystDialect::initialize()
 {
@@ -40,6 +52,7 @@ void CatalystDialect::initialize()
 #define GET_OP_LIST
 #include "Catalyst/IR/CatalystOps.cpp.inc"
         >();
+    addInterface<CatalystInlinerInterface>();
 }
 
 //===----------------------------------------------------------------------===//

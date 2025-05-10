@@ -131,6 +131,9 @@ class QFunc:
         out_tree_expected = kwargs.pop("_out_tree_expected", [])
         debug_info = kwargs.pop("debug_info", None)
 
+        import jax
+
+        @jax.jit
         def _eval_quantum(*args, **kwargs):
             closed_jaxpr, out_type, out_tree, out_tree_exp = trace_quantum_function(
                 self.func,

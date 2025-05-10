@@ -173,6 +173,7 @@ def get_enforce_runtime_invariants_stage(_options: CompileOptions) -> List[str]:
         # keep inlining modules targeting the Catalyst runtime.
         # But qnodes targeting other backends may choose to lower
         # this into something else.
+        "builtin.module(inline)",
         "inline-nested-module",
     ]
     return enforce_runtime_invariants
@@ -217,7 +218,6 @@ def get_bufferization_stage(_options: CompileOptions) -> List[str]:
     """Returns the list of passes that performs bufferization"""
     bufferization = [
         "one-shot-bufferize{dialect-filter=memref}",
-        "inline",
         "gradient-preprocess",
         "gradient-bufferize",
         "scf-bufferize",

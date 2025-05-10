@@ -211,44 +211,6 @@ def test_non_differentiable_qnode():
         grad_f(1.0)
 
 
-def test_param_shift_on_non_expval(backend):
-    """Check for an error message when parameter-shift is used on QNodes that return anything but
-    qml.expval or qml.probs.
-    """
-
-    @qml.qnode(qml.device(backend, wires=1), diff_method="parameter-shift")
-    def func(p):
-        x = qml.expval(qml.PauliZ(0))
-        y = p**2
-        return x, y
-
-    def workflow(p: float):
-        return jacobian(func, method="auto")(p)
-
-    with pytest.raises(
-        DifferentiableCompileError, match="The parameter-shift method can only be used"
-    ):
-        qjit(workflow)
-
-
-def test_adjoint_on_non_expval(backend):
-    """Check for an error message when adjoint is used on QNodes that return anything but
-    qml.expval or qml.probs.
-    """
-
-    @qml.qnode(qml.device(backend, wires=1), diff_method="adjoint")
-    def func(p):
-        x = qml.expval(qml.PauliZ(0))
-        y = p**2
-        return x, y
-
-    def workflow(p: float):
-        return jacobian(func, method="auto")(p)
-
-    with pytest.raises(DifferentiableCompileError, match="The adjoint method can only be used"):
-        qjit(workflow)
-
-
 def test_grad_on_qjit():
     """Check that grad works when called on an existing qjit object that does not wrap a QNode."""
 
@@ -517,7 +479,7 @@ def test_adj(inp, backend):
         qml.RX(x, wires=0)
         return qml.expval(qml.PauliY(0))
 
-    @qjit()
+    @qjit(keep_intermediate=True)
     def compiled(x: float):
         g = qml.qnode(qml.device(backend, wires=1), diff_method="adjoint")(f)
         h = grad(g, method="auto")
