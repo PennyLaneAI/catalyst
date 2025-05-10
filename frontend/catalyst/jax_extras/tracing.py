@@ -52,17 +52,15 @@ from jax.api_util import flatten_fun
 from jax.core import (
     AbstractValue,
     DShapedArray,
-)
-from jax.core import Primitive as JaxprPrimitive
-from jax.core import (
     ShapedArray,
-    Var,
     eval_jaxpr,
     find_top_trace,
     gensym,
     new_jaxpr_eqn,
 )
 from jax.extend.core import ClosedJaxpr, Jaxpr, JaxprEqn
+from jax.extend.core import Primitive as JaxprPrimitive
+from jax.extend.core import Var
 from jax.extend.linear_util import transformation_with_aux, wrap_init
 from jax.interpreters.partial_eval import (
     DynamicJaxprTrace,

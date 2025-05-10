@@ -206,7 +206,7 @@ class InterpreterContext:  # pylint: disable=too-many-instance-attributes
 
     def read(self, var):
         """Read the value of variable var."""
-        if isinstance(var, jax.core.Literal):
+        if isinstance(var, jax.extend.core.Literal):
             return var.val
         if self.variable_map.get(var):
             var = self.variable_map[var]
@@ -262,7 +262,7 @@ def change_device_to_cuda_device(ctx):
     # shots are not needed until the very end.
     # So, we will just return this variable
     # and it is the responsibility of the caller to propagate this information.
-    assert isinstance(qdevice_eqn.invars[0], jax._src.core.Literal)
+    assert isinstance(qdevice_eqn.invars[0], jax.extend.core.Literal)
     shots = qdevice_eqn.invars[0].val
 
     device_name = qdevice_eqn.params.get("rtd_name")

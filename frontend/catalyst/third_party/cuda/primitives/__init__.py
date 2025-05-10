@@ -21,6 +21,7 @@ from importlib.metadata import version
 import cudaq
 import jax
 from jax import numpy as jnp
+from jax.extend.core import Primitive
 
 # We disable protected access in particular to avoid warnings with cudaq._pycuda.
 # And we disable unused-argument to avoid unused arguments in abstract_eval, particularly kwargs.
@@ -177,7 +178,7 @@ class CudaQObserveResult(cudaq.ObserveResult):
 # And also explicitly state which ones we are skipping for now.
 
 # cudaq.make_kernel() -> cudaq.Kernel
-cudaq_make_kernel_p = jax.core.Primitive("cudaq_make_kernel")
+cudaq_make_kernel_p = Primitive("cudaq_make_kernel")
 cudaq_make_kernel_p.multiple_results = True
 
 
@@ -229,7 +230,7 @@ def cudaq_make_kernel_primitive_abs(*args):
 # `QuakeValue`.
 # qalloc(self: cudaq.Kernel, qubit_count: int) -> cudaq.QuakeValue
 
-kernel_qalloc_p = jax.core.Primitive("kernel_qalloc")
+kernel_qalloc_p = Primitive("kernel_qalloc")
 
 
 def kernel_qalloc(kernel, size):
@@ -249,7 +250,7 @@ def kernel_qalloc_primitive_abs(_kernel, _size):
     return AbsCudaQReg()
 
 
-qreg_getitem_p = jax.core.Primitive("qreg_getitem")
+qreg_getitem_p = Primitive("qreg_getitem")
 
 
 def qreg_getitem(qreg, idx):
@@ -269,7 +270,7 @@ def qreg_getitem_primitive_abs(_qreg, _idx):
     return AbsCudaQbit()
 
 
-cudaq_getstate_p = jax.core.Primitive("cudaq_getstate")
+cudaq_getstate_p = Primitive("cudaq_getstate")
 
 
 def cudaq_getstate(kernel):
@@ -312,7 +313,7 @@ def make_primitive_for_gate():
       * gate_func: A convenience function for binding
       * kernel_gate_p: A JAX primitive for quantum gates.
     """
-    kernel_gate_p = jax.core.Primitive("kernel_inst")
+    kernel_gate_p = Primitive("kernel_inst")
     kernel_gate_p.multiple_results = True
 
     def gate_func(kernel, *qubits_or_params, inst=None, qubits_len=-1):
@@ -357,7 +358,7 @@ def make_primitive_for_m(gate: str):
 
     assert gate in {"x", "y", "z"}
     gate = f"m{gate}"
-    kernel_gate_p = jax.core.Primitive(f"kernel_{gate}")
+    kernel_gate_p = Primitive(f"kernel_{gate}")
     method = getattr(cudaq.Kernel, gate)
 
     def gate_func(kernel, target):
@@ -383,8 +384,8 @@ my_call, my_p = make_primitive_for_m("y")
 mz_call, mz_p = make_primitive_for_m("z")
 
 
-cudaq_sample_p = jax.core.Primitive("cudaq_sample")
-cudaq_counts_p = jax.core.Primitive("cudaq_counts")
+cudaq_sample_p = Primitive("cudaq_sample")
+cudaq_counts_p = Primitive("cudaq_counts")
 cudaq_counts_p.multiple_results = True
 
 
@@ -462,7 +463,7 @@ def cudaq_counts_abs(kernel, shape, shots_count=1000):  # pragma: nocover
     return bitstrings, counts_shape
 
 
-cudaq_spin_p = jax.core.Primitive("spin")
+cudaq_spin_p = Primitive("spin")
 
 
 def cudaq_spin(target, kind: str):
@@ -484,7 +485,7 @@ def cudaq_spin_abs(target, kind):  # pragma: nocover
     return AbsCudaSpinOperator()
 
 
-cudaq_observe_p = jax.core.Primitive("observe")
+cudaq_observe_p = Primitive("observe")
 
 
 def cudaq_observe(kernel, spin_operator, shots_count=-1, noise_model=None):
@@ -528,7 +529,7 @@ def cudaq_observe_impl(kernel, spin_operator, shots_count=-1, noise_model=None):
     return cudaq.observe(kernel, spin_operator, shots_count=shots_count, noise_model=noise_model)
 
 
-cudaq_expectation_p = jax.core.Primitive("expectation")
+cudaq_expectation_p = Primitive("expectation")
 
 
 def cudaq_expectation(observe_result):
@@ -548,7 +549,7 @@ def cudaq_expectation_impl(observe_result):
     return observe_result.expectation()
 
 
-cudaq_adjoint_p = jax.core.Primitive("cudaq_adjoint")
+cudaq_adjoint_p = Primitive("cudaq_adjoint")
 cudaq_adjoint_p.multiple_results = True
 
 
@@ -583,13 +584,3 @@ jax.core.pytype_aval_mappings[CudaSampleResult] = lambda x: x.aval  # pragma: no
 jax.core.pytype_aval_mappings[CudaQState] = lambda x: x.aval  # pragma: nocover
 jax.core.pytype_aval_mappings[CudaSpinOperator] = lambda x: x.aval  # pragma: nocover
 jax.core.pytype_aval_mappings[CudaQObserveResult] = lambda x: x.aval  # pragma: nocover
-
-# TODO: Investigate nocover in this ones.
-jax.core.raise_to_shaped_mappings[AbsCudaValue] = lambda aval, _: aval
-jax.core.raise_to_shaped_mappings[AbsCudaQReg] = lambda aval, _: aval
-jax.core.raise_to_shaped_mappings[AbsCudaKernel] = lambda aval, _: aval
-jax.core.raise_to_shaped_mappings[AbsCudaQbit] = lambda aval, _: aval
-jax.core.raise_to_shaped_mappings[AbsCudaSampleResult] = lambda aval, _: aval  # pragma: nocover
-jax.core.raise_to_shaped_mappings[AbsCudaQState] = lambda aval, _: aval
-jax.core.raise_to_shaped_mappings[AbsCudaQObserveResult] = lambda aval, _: aval  # pragma: nocover
-jax.core.raise_to_shaped_mappings[AbsCudaSpinOperator] = lambda aval, _: aval  # pragma: nocover

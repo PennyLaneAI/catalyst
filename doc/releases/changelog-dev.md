@@ -76,8 +76,9 @@
   will handle direct decomposition of PPRs into PPMs.
   [(#1688)](https://github.com/PennyLaneAI/catalyst/pull/1688)
 
-* The version of JAX used by Catalyst is updated to 0.5.3.
+* The version of JAX used by Catalyst is updated to 0.6.0.
   [(#1652)](https://github.com/PennyLaneAI/catalyst/pull/1652)
+  [(#1729)](https://github.com/PennyLaneAI/catalyst/pull/1729)
 
   Several internal changes were made for this update.
     - LAPACK kernels are updated to adhere to the new JAX lowering rules for external functions.
