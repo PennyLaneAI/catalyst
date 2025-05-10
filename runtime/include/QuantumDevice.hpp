@@ -187,7 +187,7 @@ struct QuantumDevice {
      *
      * @param gen Pointer to a Catalyst-managed Mersenne Twister instance.
      */
-    virtual void SetDevicePRNG(std::mt19937 *gen){};
+    virtual void SetDevicePRNG(std::mt19937 *gen) {};
 
     // ----------------------------------------
     //  QUANTUM OPERATIONS

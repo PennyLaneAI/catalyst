@@ -25,7 +25,7 @@ CLANG_FMT_BIN = "clang-format"
 
 IGNORE_PATTERNS = ["external", "build", "llvm-project", "mlir-hlo", "Enzyme"]
 
-DEFAULT_CLANG_FORMAT_VERSION = 13
+DEFAULT_CLANG_FORMAT_VERSION = 20
 
 CLANG_FMT_CNFG_PATH = "../.clang-format"
 

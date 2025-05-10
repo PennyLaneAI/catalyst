@@ -159,6 +159,7 @@ check-tidy:
 		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
 		-DCMAKE_C_COMPILER=$(C_COMPILER) \
 		-DCMAKE_CXX_COMPILER=$(CXX_COMPILER) \
+		-DMLIR_INCLUDE_DIRS="$(abspath $(LLVM_DIR))/mlir/include" \
 		-DRUNTIME_CLANG_TIDY=ON
 
 	cmake --build $(MK_DIR)/BuildTidy --target rt_capi -j$(NPROC)

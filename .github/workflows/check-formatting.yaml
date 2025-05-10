@@ -34,13 +34,11 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get -y install clang-format-14
-
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Install dependencies
+        run: python3 -m pip install clang-format~=20.1
+
       - name: Run clang-format
-        run: python3 ./bin/format.py --check --verbose --cfversion 14 .
+        run: python3 ./bin/format.py --check --verbose .

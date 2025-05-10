@@ -92,6 +92,9 @@
     [(#1671)](https://github.com/PennyLaneAI/catalyst/pull/1671)
     [(#1681)](https://github.com/PennyLaneAI/catalyst/pull/1681)
 
+* The clang-format and clang-tidy versions used by Catalyst have been updated to v20.
+  [(#1721)](https://github.com/PennyLaneAI/catalyst/pull/1721)
+
 * Support for Mac x86 has been removed. This includes Macs running on Intel processors.
   [(#1716)](https://github.com/PennyLaneAI/catalyst/pull/1716)
 
