@@ -268,12 +268,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
             std::string op_name = "QubitUnitary";
 
             if (!controlled_wires.empty()) {
-                if (controlled_wires.size() == 1) {
-                    op_name = "Controlled" + op_name;
-                }
-                else {
-                    op_name = std::to_string(controlled_wires.size()) + "C(" + op_name + ")";
-                }
+                op_name = "Controlled" + op_name;
             }
             if (inverse) {
                 op_name = "Adj(" + op_name + ")";
