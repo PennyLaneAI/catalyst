@@ -161,7 +161,7 @@ void updatePauliWord(QECOpInterface op, const PauliWord &newPauliWord, PatternRe
 void updatePauliWordSign(QECOpInterface op, bool isNegated, PatternRewriter &rewriter);
 
 // No size limit when max_pauli_size is 0
-bool isInfinitySize(uint max_pauli_size);
+bool allowsUnlimitedSize(uint max_pauli_size);
 
 // Combine the size check logic in one place
 bool exceedPauliSizeLimit(size_t pauliSize, uint max_pauli_size);
