@@ -94,6 +94,7 @@ void createBufferizationPipeline(OpPassManager &pm)
     quantum_buffer_options.opFilter.allowDialect<catalyst::quantum::QuantumDialect>();
     pm.addPass(mlir::bufferization::createOneShotBufferizePass(quantum_buffer_options));
     pm.addPass(mlir::func::createFuncBufferizePass());
+    pm.addNestedPass<mlir::func::FuncOp>(mlir::bufferization::createFinalizingBufferizePass());
     pm.addPass(mlir::createCanonicalizerPass());
     pm.addPass(catalyst::createGradientPostprocessingPass());
     pm.addNestedPass<mlir::func::FuncOp>(mlir::bufferization::createBufferHoistingPass());
