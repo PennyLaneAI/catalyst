@@ -24,11 +24,6 @@ from catalyst.passes import cancel_inverses, commute_ppr, merge_ppr_ppm, merge_r
 # pylint: disable=missing-function-docstring
 
 
-#
-# cancel_inverses
-#
-
-
 ### Test peephole pass decorators preserve functionality of circuits ###
 @pytest.mark.parametrize("theta", [42.42])
 def test_cancel_inverses_functionality(theta, backend):
@@ -47,11 +42,6 @@ def test_cancel_inverses_functionality(theta, backend):
 
     assert np.allclose(reference_workflow(theta), qjitted_workflow(theta))
     assert np.allclose(reference_workflow(theta), optimized_workflow(theta))
-
-
-#
-# merge_rotations
-#
 
 
 @pytest.mark.parametrize("theta", [42.42])
@@ -189,13 +179,6 @@ def test_chained_passes():
     assert "merge-rotations" in test_chained_apply_passes_workflow.mlir
 
 
-test_chained_passes()
-
-#
-# to_ppr
-#
-
-
 def test_convert_clifford_to_ppr():
     """
     Test convert_clifford_to_ppr
@@ -219,13 +202,6 @@ def test_convert_clifford_to_ppr():
     optimized_ir = test_convert_clifford_to_ppr_workflow.mlir_opt
     assert 'transform.apply_registered_pass "to_ppr"' not in optimized_ir
     assert "qec.ppr" in optimized_ir
-
-
-test_convert_clifford_to_ppr()
-
-#
-# commute_ppr and merge_ppr_ppm with max_pauli_size
-#
 
 
 def test_commute_ppr_and_merge_ppr_ppm_with_max_pauli_size():
@@ -285,8 +261,6 @@ def test_commute_ppr_and_merge_ppr_ppm_with_max_pauli_size():
     assert 'qec.ppr ["Z", "X"](4)' in optimized_ir
     assert 'qec.ppm ["Y"](-1)' in optimized_ir
 
-
-test_commute_ppr_and_merge_ppr_ppm_with_max_pauli_size()
 
 if __name__ == "__main__":
     pytest.main(["-x", __file__])

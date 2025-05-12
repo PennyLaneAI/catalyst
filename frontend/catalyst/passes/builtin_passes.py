@@ -490,7 +490,7 @@ def commute_ppr(qnode=None, *, max_pauli_size=0):
     return PassPipelineWrapper(qnode, commute_ppr_pass)
 
 
-def merge_ppr_ppm(qnode=None, max_pauli_size=0):
+def merge_ppr_ppm(qnode=None, *, max_pauli_size=0):
     R"""
     Specify that the MLIR compiler pass for absorbing Clifford Pauli
     Product Rotation (PPR) operations, :math:`\exp{iP\tfrac{\pi}{4}}`,
@@ -572,11 +572,8 @@ def merge_ppr_ppm(qnode=None, max_pauli_size=0):
 
     """
 
-    def decorator(qnode_func):
-        merge_ppr_ppm_pass = {"merge_ppr_ppm": {"max-pauli-size": max_pauli_size}}
-        return PassPipelineWrapper(qnode_func, merge_ppr_ppm_pass)
-
     if qnode is None:
-        return decorator
+        return functools.partial(merge_ppr_ppm, max_pauli_size=max_pauli_size)
 
-    return decorator(qnode)
+    commute_ppr_pass = {"commute_ppr": {"max-pauli-size": max_pauli_size}}
+    return PassPipelineWrapper(qnode, commute_ppr_pass)
