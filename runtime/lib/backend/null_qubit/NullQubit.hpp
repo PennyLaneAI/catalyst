@@ -15,7 +15,9 @@
 #pragma once
 
 #include <algorithm> // generate_n
+#include <chrono>
 #include <complex>
+#include <cstdio>
 #include <fstream>
 #include <memory>
 #include <optional>
@@ -48,9 +50,6 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
         auto device_kwargs = Catalyst::Runtime::parse_kwargs(kwargs);
         if (device_kwargs.find("track_resources") != device_kwargs.end()) {
             track_resources_ = device_kwargs["track_resources"] == "True";
-            if (device_kwargs["track_resources_stdout"] == "False") {
-                resource_fname_ = device_kwargs["track_resources_fname"];
-            }
         }
     }
     ~NullQubit() {} // LCOV_EXCL_LINE
@@ -63,7 +62,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     /**
      * @brief Prints resources that would be used to execute this circuit as a JSON
      */
-    void PrintResourceUsage(std::ostream &resource_file = std::cout)
+    void PrintResourceUsage(FILE *resources_file)
     {
         // Store the 2 special variables and clear them from the map to make
         // pretty-printing easier
@@ -72,12 +71,16 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
         resource_data_.erase("num_gates");
         resource_data_.erase("num_qubits");
 
-        resource_file << "{\n";
-        resource_file << "  \"num_qubits\": " << num_qubits << ",\n";
-        resource_file << "  \"num_gates\": " << num_gates << ",\n";
-        resource_file << "  \"gate_types\": ";
-        pretty_print_dict(resource_data_, 2, resource_file);
-        resource_file << "\n}" << std::endl;
+        std::stringstream resources;
+
+        resources << "{\n";
+        resources << "  \"num_qubits\": " << num_qubits << ",\n";
+        resources << "  \"num_gates\": " << num_gates << ",\n";
+        resources << "  \"gate_types\": ";
+        pretty_print_dict(resource_data_, 2, resources);
+        resources << "\n}" << std::endl;
+
+        fwrite(resources.str().c_str(), 1, resources.str().size(), resources_file);
 
         // Restore 2 special variables
         resource_data_["num_qubits"] = num_qubits;
@@ -135,19 +138,23 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
         num_qubits_ = 0;
         this->qubit_manager.ReleaseAll();
         if (this->track_resources_) {
-            if (!this->resource_fname_.empty()) {
-                std::ofstream resource_file(this->resource_fname_);
-                if (resource_file.is_open()) {
-                    PrintResourceUsage(resource_file);
-                    resource_file.close();
-                }
-                else {
-                    std::cerr << "Error opening file: " << this->resource_fname_ << std::endl;
-                    // TODO: Should this throw?
-                }
+            auto time = std::chrono::high_resolution_clock::now();
+            auto timestamp =
+                std::chrono::duration_cast<std::chrono::nanoseconds>(time.time_since_epoch())
+                    .count();
+            std::stringstream resources_fname;
+            resources_fname << "__pennylane_resources_data_" << timestamp << ".json";
+
+            // Need to use FILE* instead of ofstream since ofstream has no way to atomically open a
+            // file only if it does not already exist
+            FILE *resources_file = fopen(resources_fname.str().c_str(), "wx");
+            if (resources_file == nullptr) {
+                std::cerr << "Error opening file: " << resources_fname.str();
+                // TODO: Should this throw?
             }
             else {
-                PrintResourceUsage();
+                PrintResourceUsage(resources_file);
+                fclose(resources_file);
             }
             this->resource_data_.clear();
         }
@@ -471,7 +478,6 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
 
   private:
     bool track_resources_{false};
-    std::string resource_fname_{""};
     std::size_t num_qubits_{0};
     std::size_t device_shots_{0};
     std::unordered_map<std::string, std::size_t> resource_data_;

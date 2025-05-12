@@ -16,6 +16,7 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
+#include <cstdio>
 
 #include "ExecutionContext.hpp"
 #include "QuantumDevice.hpp"
@@ -605,8 +606,8 @@ TEST_CASE("Test NullQubit device resource tracking", "[NullQubit]")
     constexpr char RESOURCES_FNAME[] = "__pennylane_resources_data.json";
 
     // Open a file for writing the resources JSON
-    std::ofstream resource_file_w(RESOURCES_FNAME);
-    if (!resource_file_w.is_open()) {                            // LCOV_EXCL_LINE
+    FILE* resource_file_w = fopen(RESOURCES_FNAME, "wx");
+    if (resource_file_w == nullptr) {                            // LCOV_EXCL_LINE
         FAIL("Failed to open resource usage file for writing."); // LCOV_EXCL_LINE
     }
 
@@ -646,7 +647,7 @@ TEST_CASE("Test NullQubit device resource tracking", "[NullQubit]")
 
     // Capture resources usage
     sim->PrintResourceUsage(resource_file_w);
-    resource_file_w.close();
+    fclose(resource_file_w);
 
     // Open the file of resource data
     std::ifstream resource_file_r(RESOURCES_FNAME);
