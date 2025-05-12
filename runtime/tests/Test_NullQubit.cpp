@@ -606,7 +606,7 @@ TEST_CASE("Test NullQubit device resource tracking", "[NullQubit]")
     constexpr char RESOURCES_FNAME[] = "__pennylane_resources_data.json";
 
     // Open a file for writing the resources JSON
-    FILE* resource_file_w = fopen(RESOURCES_FNAME, "wx");
+    FILE *resource_file_w = fopen(RESOURCES_FNAME, "wx");
     if (resource_file_w == nullptr) {                            // LCOV_EXCL_LINE
         FAIL("Failed to open resource usage file for writing."); // LCOV_EXCL_LINE
     }
