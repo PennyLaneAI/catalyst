@@ -102,6 +102,9 @@ struct CustomCallOpInterface
         // the lapack kernel is supposed to write into. The other input arrays are all marked const.
         // Jax then purifies the function by adding a new argument `out` to hold the
         // output array.
+        //
+        // In other words, the jax wrappers we call here with custom call op
+        // are already pure, and we won't have side effects on the input tensors.
 
         return false;
     }
