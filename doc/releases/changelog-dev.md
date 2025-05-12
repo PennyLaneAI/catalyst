@@ -167,6 +167,7 @@
   The new mlir bufferization interface is required by jax 0.4.29 or higher.
   [(#1027)](https://github.com/PennyLaneAI/catalyst/pull/1027)
   [(#1686)](https://github.com/PennyLaneAI/catalyst/pull/1686)
+  [(#1708)](https://github.com/PennyLaneAI/catalyst/pull/1708)
 
 <h3>Documentation 📝</h3>
 
