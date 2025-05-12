@@ -49,7 +49,7 @@ namespace {
 
 void catalyst::gradient::registerBufferizableOpInterfaceExternalModels(DialectRegistry &registry)
 {
-    registry.addExtension(+[](MLIRContext *ctx, CatalystDialect *dialect) {
+    registry.addExtension(+[](MLIRContext *ctx, catalyst::gradient::GradientDialect *dialect) {
        // CustomCallOp::attachInterface<CustomCallOpInterface>(*ctx);
     });
 }
