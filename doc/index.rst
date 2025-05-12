@@ -53,8 +53,8 @@ Catalyst
    <br>
 
 .. image:: _static/pl-catalyst-logo-lightmode.png
-    :align: left
-    :width: 450px
+    :align: center
+    :width: 700px
     :target: javascript:void(0);
 
 .. mdinclude:: ../README.md
