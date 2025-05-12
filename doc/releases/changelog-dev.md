@@ -13,6 +13,11 @@
   ensures that measurement processes on `null.qubit` always return the value 0 or the result
   corresponding to the '0' state, depending on the context.
 
+* The :func:`~.passes.to_ppr` pass now supports decomposition of Pauli gates (`X`, `Y`, `Z`),
+  the phase gate adjoint (`S†`), and the π/8 gate adjoint (`T†`). This extension improves
+  performance by eliminating indirect decompositions.
+  [(#1738)](https://github.com/PennyLaneAI/catalyst/pull/1738)
+
 <h3>Breaking changes 💔</h3>
 
 * (Device Developers Only) The `QuantumDevice` interface in the Catalyst Runtime plugin system
@@ -37,12 +42,12 @@
   deallocation primitive has been split into deallocation and a separate device release primitive.
   [(#1720)](https://github.com/PennyLaneAI/catalyst/pull/1720)
 
-  - `qunitary_p` is now `unitary_p` (unchanged)
-  - `qmeasure_p` is now `measure_p` (unchanged)
-  - `qdevice_p` is now `device_init_p` (unchanged)
-  - `qdealloc_p` no longer releases the device, thus it can be used at any point of a quantum
+  * `qunitary_p` is now `unitary_p` (unchanged)
+  * `qmeasure_p` is now `measure_p` (unchanged)
+  * `qdevice_p` is now `device_init_p` (unchanged)
+  * `qdealloc_p` no longer releases the device, thus it can be used at any point of a quantum
      execution scope
-  - `device_release_p` is a new primitive that must be used to mark the end of a quantum execution
+  * `device_release_p` is a new primitive that must be used to mark the end of a quantum execution
      scope, which will release the quantum device
 
 * Catalyst has removed the `experimental_capture` keyword from the `qjit` decorator in favour of
@@ -80,13 +85,13 @@
   [(#1652)](https://github.com/PennyLaneAI/catalyst/pull/1652)
 
   Several internal changes were made for this update.
-    - LAPACK kernels are updated to adhere to the new JAX lowering rules for external functions.
+  * LAPACK kernels are updated to adhere to the new JAX lowering rules for external functions.
     [(#1685)](https://github.com/PennyLaneAI/catalyst/pull/1685)
 
-    - The trace stack is removed and replaced with a tracing context manager.
+  * The trace stack is removed and replaced with a tracing context manager.
     [(#1662)](https://github.com/PennyLaneAI/catalyst/pull/1662)
 
-    - A new `debug_info` argument is added to `Jaxpr`, the `make_jaxpr`
+  * A new `debug_info` argument is added to `Jaxpr`, the `make_jaxpr`
     functions, and `jax.extend.linear_util.wrap_init`.
     [(#1670)](https://github.com/PennyLaneAI/catalyst/pull/1670)
     [(#1671)](https://github.com/PennyLaneAI/catalyst/pull/1671)
