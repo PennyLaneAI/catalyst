@@ -14,6 +14,7 @@
 
 """This module exposes built-in Catalyst MLIR passes to the frontend."""
 
+import functools
 from catalyst.passes.pass_api import PassPipelineWrapper
 
 
