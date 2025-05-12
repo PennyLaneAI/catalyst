@@ -183,6 +183,7 @@ def handle_qnode(
     non_const_args = args[n_consts:]
 
     f = partial(QFuncPlxprInterpreter(device, shots).eval, qfunc_jaxpr, consts)
+    f = jax.jit(f)
 
     return quantum_kernel_p.bind(
         wrap_init(f, debug_info=qfunc_jaxpr.debug_info),

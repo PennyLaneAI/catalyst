@@ -14,6 +14,7 @@
 
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
 #include "mlir/IR/DialectImplementation.h" // needed for generated type parser
+#include "mlir/Transforms/InliningUtils.h"
 #include "llvm/ADT/TypeSwitch.h"           // needed for generated type parser
 
 #include "Quantum/IR/QuantumDialect.h"
@@ -27,6 +28,20 @@ using namespace catalyst::quantum;
 //===----------------------------------------------------------------------===//
 
 #include "Quantum/IR/QuantumOpsDialect.cpp.inc"
+
+namespace {
+struct QuantumInlinerInterface : public DialectInlinerInterface {
+    using DialectInlinerInterface::DialectInlinerInterface;
+
+    /// Operations in Gradient dialect are always legal to inline.
+    bool isLegalToInline(Operation *, Region *, bool, IRMapping &valueMapping) const final
+    {
+        return true;
+    }
+};
+} // namespace
+
+
 
 void QuantumDialect::initialize()
 {
@@ -48,6 +63,7 @@ void QuantumDialect::initialize()
     declarePromisedInterfaces<bufferization::BufferizableOpInterface, QubitUnitaryOp, HermitianOp,
                               HamiltonianOp, SampleOp, CountsOp, ProbsOp, StateOp, SetStateOp,
                               SetBasisStateOp>();
+    addInterface<QuantumInlinerInterface>();
 }
 
 //===----------------------------------------------------------------------===//
