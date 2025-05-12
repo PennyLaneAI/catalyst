@@ -28,6 +28,7 @@
 #include "mlir/Transforms/DialectConversion.h"
 
 #include "Gradient/IR/GradientOps.h"
+#include "Gradient/Transforms/BufferizableOpInterfaceImpl.h"
 #include "Gradient/Transforms/Passes.h"
 #include "Gradient/Utils/GradientShape.h"
 
