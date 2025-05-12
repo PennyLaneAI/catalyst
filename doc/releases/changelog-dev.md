@@ -173,6 +173,10 @@
 
 <h3>Documentation 📝</h3>
 
+* The Catalyst Runtime Device Interface page has been updated, pointing to the
+  `QuantumDevice` struct documentation. Also the QIR C-API page has been removed.
+  [(#1739)](https://github.com/PennyLaneAI/catalyst/pull/1739)
+
 <h3>Contributors ✍️</h3>
 
 This release contains contributions from (in alphabetical order):
