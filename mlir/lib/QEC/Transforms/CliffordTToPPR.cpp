@@ -79,22 +79,7 @@ void applyAdjointIfNeeded(GateConversion &gateConversion, CustomOp op)
 //===----------------------------------------------------------------------===//
 
 // C(P) = G(Angle)
-PPRotationOp singleQubitConversion(CustomOp op, GateConversion gateConversion,
-                                   ConversionPatternRewriter &rewriter)
-{
-    auto loc = op->getLoc();
-    auto types = op.getOutQubits().getType();
-    auto inQubits = op.getInQubits();
-
-    applyAdjointIfNeeded(gateConversion, op);
-
-    auto pauliProduct = rewriter.getStrArrayAttr(gateConversion.pauliOperators);
-    auto pprOp = rewriter.create<PPRotationOp>(loc, types, pauliProduct,
-                                               gateConversion.rotationKind, inQubits);
-    return pprOp;
-}
-
-PPRotationOp singleQubitConversion(CustomOp op, SmallVector<GateConversion> gateConversions,
+void applySingleQubitConversion(CustomOp op, SmallVector<GateConversion> gateConversions,
                                    ConversionPatternRewriter &rewriter)
 {
     auto loc = op->getLoc();
@@ -111,7 +96,8 @@ PPRotationOp singleQubitConversion(CustomOp op, SmallVector<GateConversion> gate
         inQubits = pprOp.getOutQubits();
         types = pprOp.getOutQubits().getType();
     }
-    return pprOp;
+
+    rewriter.replaceOp(op, pprOp.getOutQubits());
 }
 
 // Ref: Fig. 5 in [A Game of Surface Codes](https://doi.org/10.22331/q-2019-03-05-128)
@@ -169,9 +155,7 @@ LogicalResult convertHGate(CustomOp op, ConversionPatternRewriter &rewriter)
     auto X1 = GateConversion({"X"}, 4);
     auto Z2 = GateConversion({"Z"}, 4);
 
-    SmallVector<GateConversion> gateConversions = {Z0, X1, Z2};
-    auto pprOp = singleQubitConversion(op, gateConversions, rewriter);
-    rewriter.replaceOp(op, pprOp);
+    applySingleQubitConversion(op, {Z0, X1, Z2}, rewriter);
     return success();
 }
 
@@ -179,8 +163,7 @@ LogicalResult convertHGate(CustomOp op, ConversionPatternRewriter &rewriter)
 LogicalResult convertSGate(CustomOp op, ConversionPatternRewriter &rewriter)
 {
     auto gate = GateConversion({"Z"}, 4);
-    auto singleQubitOp = singleQubitConversion(op, gate, rewriter);
-    rewriter.replaceOp(op, singleQubitOp);
+    applySingleQubitConversion(op, {gate}, rewriter);
     return success();
 }
 
@@ -188,8 +171,7 @@ LogicalResult convertSGate(CustomOp op, ConversionPatternRewriter &rewriter)
 LogicalResult convertTGate(CustomOp op, ConversionPatternRewriter &rewriter)
 {
     auto gate = GateConversion({"Z"}, 8);
-    auto singleQubitOp = singleQubitConversion(op, gate, rewriter);
-    rewriter.replaceOp(op, singleQubitOp);
+    applySingleQubitConversion(op, {gate}, rewriter);
     return success();
 }
 
@@ -197,8 +179,7 @@ LogicalResult convertTGate(CustomOp op, ConversionPatternRewriter &rewriter)
 LogicalResult convertXGate(CustomOp op, ConversionPatternRewriter &rewriter)
 {
     auto gate = GateConversion({"X"}, 2);
-    auto singleQubitOp = singleQubitConversion(op, gate, rewriter);
-    rewriter.replaceOp(op, singleQubitOp);
+    applySingleQubitConversion(op, {gate}, rewriter);
     return success();
 }
 
@@ -206,8 +187,7 @@ LogicalResult convertXGate(CustomOp op, ConversionPatternRewriter &rewriter)
 LogicalResult convertYGate(CustomOp op, ConversionPatternRewriter &rewriter)
 {
     auto gate = GateConversion({"Y"}, 2);
-    auto singleQubitOp = singleQubitConversion(op, gate, rewriter);
-    rewriter.replaceOp(op, singleQubitOp);
+    applySingleQubitConversion(op, {gate}, rewriter);
     return success();
 }
 
@@ -215,8 +195,7 @@ LogicalResult convertYGate(CustomOp op, ConversionPatternRewriter &rewriter)
 LogicalResult convertZGate(CustomOp op, ConversionPatternRewriter &rewriter)
 {
     auto gate = GateConversion({"Z"}, 2);
-    auto singleQubitOp = singleQubitConversion(op, gate, rewriter);
-    rewriter.replaceOp(op, singleQubitOp);
+    applySingleQubitConversion(op, {gate}, rewriter);
     return success();
 }
 
@@ -282,7 +261,7 @@ struct QECOpLowering : public ConversionPattern {
             case GateEnum::CNOT:
                 return convertCNOTGate(originOp, rewriter);
             case GateEnum::Unknown: {
-                op->emitError("Unsupported gate. Supported gates: H, S, T, X, Y, Z, CNOT");
+                op->emitError("Unsupported gate. Supported gates: H, S, T, X, Y, Z, S†, T†, and CNOT");
                 return failure();
             }
             }
