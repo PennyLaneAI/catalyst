@@ -80,7 +80,7 @@ void applyAdjointIfNeeded(GateConversion &gateConversion, CustomOp op)
 
 // C(P) = G(Angle)
 void applySingleQubitConversion(CustomOp op, SmallVector<GateConversion> gateConversions,
-                                   ConversionPatternRewriter &rewriter)
+                                ConversionPatternRewriter &rewriter)
 {
     auto loc = op->getLoc();
     auto types = op.getOutQubits().getType();
@@ -261,7 +261,8 @@ struct QECOpLowering : public ConversionPattern {
             case GateEnum::CNOT:
                 return convertCNOTGate(originOp, rewriter);
             case GateEnum::Unknown: {
-                op->emitError("Unsupported gate. Supported gates: H, S, T, X, Y, Z, S†, T†, and CNOT");
+                op->emitError(
+                    "Unsupported gate. Supported gates: H, S, T, X, Y, Z, S†, T†, and CNOT");
                 return failure();
             }
             }
