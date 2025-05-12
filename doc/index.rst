@@ -107,5 +107,6 @@ Catalyst
 
    code/__init__
    catalyst-cli/catalyst-cli.rst
+   Runtime Device Interface <api/structCatalyst_1_1Runtime_1_1QuantumDevice>
    Runtime Device Interface <api/file_runtime_include_QuantumDevice.hpp>
    QIR C-API <api/file_runtime_include_RuntimeCAPI.h>
