@@ -147,6 +147,7 @@ entry_points = {
         "cuda_quantum.ops = catalyst.api_extensions",
         "cuda_quantum.qjit = catalyst.third_party.cuda:cudaqjit",
     ],
+    "catalyst.passes_resolution": ["catalyst_xdsl_plugin.passes = catalyst.passes.xdsl_plugin"],
 }
 
 classifiers = [

@@ -24,12 +24,14 @@ from typing import Iterable, List, Union
 import jax
 import numpy as np
 import pennylane as qml
-from jax._src import api_util, core, source_info_util, util
+from jax._src import core, source_info_util, util
+from jax._src.core import pytype_aval_mappings
 from jax._src.interpreters import partial_eval as pe
 from jax._src.lax.lax import _merge_dyn_shape, _nary_lower_hlo, cos_p, sin_p
 from jax._src.lib.mlir import ir
 from jax._src.lib.mlir.dialects import hlo
 from jax.core import AbstractValue
+from jax.extend.core import Primitive
 from jax.interpreters import mlir
 from jax.tree_util import PyTreeDef, tree_unflatten
 from jaxlib.hlo_helpers import shape_dtype_to_ir_type
@@ -61,6 +63,7 @@ from mlir_quantum.dialects.gradient import (
     ValueAndGradOp,
     VJPOp,
 )
+from mlir_quantum.dialects.mbqc import MeasureInBasisOp
 from mlir_quantum.dialects.mitigation import ZneOp
 from mlir_quantum.dialects.quantum import (
     AdjointOp,
@@ -230,68 +233,82 @@ class Folding(Enum):
     ALL = "local-all"
 
 
+class MeasurementPlane(Enum):
+    """
+    Measurement planes for arbitrary-basis measurements in MBQC
+    """
+
+    XY = "XY"
+    YZ = "YZ"
+    ZX = "ZX"
+
+
 ##############
 # Primitives #
 ##############
 
-zne_p = core.Primitive("zne")
-qdevice_p = core.Primitive("qdevice")
-qdevice_p.multiple_results = True
-qalloc_p = core.Primitive("qalloc")
-qdealloc_p = core.Primitive("qdealloc")
+zne_p = Primitive("zne")
+device_init_p = Primitive("device_init")
+device_init_p.multiple_results = True
+device_release_p = Primitive("device_release")
+device_release_p.multiple_results = True
+qalloc_p = Primitive("qalloc")
+qdealloc_p = Primitive("qdealloc")
 qdealloc_p.multiple_results = True
-qextract_p = core.Primitive("qextract")
-qinsert_p = core.Primitive("qinsert")
-gphase_p = core.Primitive("gphase")
+qextract_p = Primitive("qextract")
+qinsert_p = Primitive("qinsert")
+gphase_p = Primitive("gphase")
 gphase_p.multiple_results = True
-qinst_p = core.Primitive("qinst")
+qinst_p = Primitive("qinst")
 qinst_p.multiple_results = True
-qunitary_p = core.Primitive("qunitary")
-qunitary_p.multiple_results = True
-qmeasure_p = core.Primitive("qmeasure")
-qmeasure_p.multiple_results = True
-compbasis_p = core.Primitive("compbasis")
-namedobs_p = core.Primitive("namedobs")
-hermitian_p = core.Primitive("hermitian")
-tensorobs_p = core.Primitive("tensorobs")
-hamiltonian_p = core.Primitive("hamiltonian")
-sample_p = core.Primitive("sample")
-counts_p = core.Primitive("counts")
+unitary_p = Primitive("unitary")
+unitary_p.multiple_results = True
+measure_p = Primitive("measure")
+measure_p.multiple_results = True
+compbasis_p = Primitive("compbasis")
+namedobs_p = Primitive("namedobs")
+hermitian_p = Primitive("hermitian")
+tensorobs_p = Primitive("tensorobs")
+hamiltonian_p = Primitive("hamiltonian")
+sample_p = Primitive("sample")
+counts_p = Primitive("counts")
 counts_p.multiple_results = True
-expval_p = core.Primitive("expval")
-var_p = core.Primitive("var")
-probs_p = core.Primitive("probs")
-state_p = core.Primitive("state")
+expval_p = Primitive("expval")
+var_p = Primitive("var")
+probs_p = Primitive("probs")
+state_p = Primitive("state")
 cond_p = DynshapePrimitive("cond")
 cond_p.multiple_results = True
 while_p = DynshapePrimitive("while_loop")
 while_p.multiple_results = True
 for_p = DynshapePrimitive("for_loop")
 for_p.multiple_results = True
-grad_p = core.Primitive("grad")
+grad_p = Primitive("grad")
 grad_p.multiple_results = True
 func_p = core.CallPrimitive("func")
 func_p.multiple_results = True
-jvp_p = core.Primitive("jvp")
+jvp_p = Primitive("jvp")
 jvp_p.multiple_results = True
-vjp_p = core.Primitive("vjp")
+vjp_p = Primitive("vjp")
 vjp_p.multiple_results = True
-adjoint_p = jax.core.Primitive("adjoint")
+adjoint_p = Primitive("adjoint")
 adjoint_p.multiple_results = True
-print_p = jax.core.Primitive("debug_print")
+print_p = Primitive("debug_print")
 print_p.multiple_results = True
-python_callback_p = core.Primitive("python_callback")
+python_callback_p = Primitive("python_callback")
 python_callback_p.multiple_results = True
-value_and_grad_p = core.Primitive("value_and_grad")
+value_and_grad_p = Primitive("value_and_grad")
 value_and_grad_p.multiple_results = True
-assert_p = core.Primitive("assert")
+assert_p = Primitive("assert")
 assert_p.multiple_results = True
-set_state_p = jax.core.Primitive("state_prep")
+set_state_p = Primitive("state_prep")
 set_state_p.multiple_results = True
-set_basis_state_p = jax.core.Primitive("set_basis_state")
+set_basis_state_p = Primitive("set_basis_state")
 set_basis_state_p.multiple_results = True
 quantum_kernel_p = core.CallPrimitive("quantum_kernel")
 quantum_kernel_p.multiple_results = True
+measure_in_basis_p = Primitive("measure_in_basis")
+measure_in_basis_p.multiple_results = True
 
 
 def _assert_jaxpr_without_constants(jaxpr: ClosedJaxpr):
@@ -796,19 +813,14 @@ def _zne_lowering(ctx, *args, folding, jaxpr, fn):
 
 
 #
-# qdevice
+# device_init
 #
-@qdevice_p.def_impl
-def _qdevice_def_impl(ctx, shots, rtd_lib, rtd_name, rtd_kwargs):  # pragma: no cover
-    raise NotImplementedError()
-
-
-@qdevice_p.def_abstract_eval
-def _qdevice_abstract_eval(shots, rtd_lib, rtd_name, rtd_kwargs):
+@device_init_p.def_abstract_eval
+def _device_init_abstract_eval(shots, rtd_lib, rtd_name, rtd_kwargs):
     return ()
 
 
-def _qdevice_lowering(
+def _device_init_lowering(
     jax_ctx: mlir.LoweringRuleContext, shots: ir.Value, rtd_lib, rtd_name, rtd_kwargs
 ):
     ctx = jax_ctx.module_context.context
@@ -822,6 +834,19 @@ def _qdevice_lowering(
         shots=shots_value,
     )
 
+    return ()
+
+
+#
+# device_release
+#
+@device_release_p.def_abstract_eval
+def _device_release_abstract_eval():
+    return ()
+
+
+def _device_release_lowering(jax_ctx: mlir.LoweringRuleContext):
+    DeviceReleaseOp()  # end of qnode
     return ()
 
 
@@ -874,7 +899,6 @@ def _qdealloc_lowering(jax_ctx: mlir.LoweringRuleContext, qreg):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
     DeallocOp(qreg)
-    DeviceReleaseOp()  # end of qnode
     return ()
 
 
@@ -1102,20 +1126,20 @@ def _qinst_lowering(
 #
 # qubit unitary operation
 #
-@qunitary_p.def_abstract_eval
-def _qunitary_abstract_eval(matrix, *qubits, qubits_len=0, ctrl_len=0, adjoint=False):
+@unitary_p.def_abstract_eval
+def _unitary_abstract_eval(matrix, *qubits, qubits_len=0, ctrl_len=0, adjoint=False):
     for idx in range(qubits_len + ctrl_len):
         qubit = qubits[idx]
         assert isinstance(qubit, AbstractQbit)
     return (AbstractQbit(),) * (qubits_len + ctrl_len)
 
 
-@qunitary_p.def_impl
-def _qunitary_def_impl(*args, **kwargs):  # pragma: no cover
+@unitary_p.def_impl
+def _unitary_def_impl(*args, **kwargs):  # pragma: no cover
     raise NotImplementedError()
 
 
-def _qunitary_lowering(
+def _unitary_lowering(
     jax_ctx: mlir.LoweringRuleContext,
     matrix: ir.Value,
     *qubits_or_controlled: tuple,
@@ -1175,20 +1199,20 @@ def _qunitary_lowering(
 
 
 #
-# qmeasure
+# measure
 #
-@qmeasure_p.def_abstract_eval
-def _qmeasure_abstract_eval(qubit, postselect: int = None):
+@measure_p.def_abstract_eval
+def _measure_abstract_eval(qubit, postselect: int = None):
     assert isinstance(qubit, AbstractQbit)
     return core.ShapedArray((), bool), qubit
 
 
-@qmeasure_p.def_impl
-def _qmeasure_def_impl(ctx, qubit, postselect: int = None):  # pragma: no cover
+@measure_p.def_impl
+def _measure_def_impl(ctx, qubit, postselect: int = None):  # pragma: no cover
     raise NotImplementedError()
 
 
-def _qmeasure_lowering(jax_ctx: mlir.LoweringRuleContext, qubit: ir.Value, postselect: int = None):
+def _measure_lowering(jax_ctx: mlir.LoweringRuleContext, qubit: ir.Value, postselect: int = None):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
@@ -1204,6 +1228,79 @@ def _qmeasure_lowering(jax_ctx: mlir.LoweringRuleContext, qubit: ir.Value, posts
     result_type = ir.IntegerType.get_signless(1)
 
     result, new_qubit = MeasureOp(result_type, qubit.type, qubit, postselect=postselect).results
+
+    result_from_elements_op = ir.RankedTensorType.get((), result.type)
+    from_elements_op = FromElementsOp(result_from_elements_op, result)
+
+    return (
+        from_elements_op.results[0],
+        new_qubit,
+    )
+
+
+#
+# arbitrary-basis measurements
+#
+@measure_in_basis_p.def_abstract_eval
+def _measure_in_basis_abstract_eval(
+    angle: float, qubit: AbstractQbit, plane: MeasurementPlane, postselect: int = None
+):
+    assert isinstance(qubit, AbstractQbit)
+    return core.ShapedArray((), bool), qubit
+
+
+@measure_in_basis_p.def_impl
+def _measure_in_basis_def_impl(
+    ctx, angle: float, qubit: AbstractQbit, plane: MeasurementPlane, postselect: int = None
+):  # pragma: no cover
+    raise NotImplementedError()
+
+
+def _measurement_plane_attribute(ctx, plane: MeasurementPlane):
+    return ir.OpaqueAttr.get(
+        "mbqc",
+        ("measurement_plane " + MeasurementPlane(plane).name).encode("utf-8"),
+        ir.NoneType.get(ctx),
+        ctx,
+    )
+
+
+def _measure_in_basis_lowering(
+    jax_ctx: mlir.LoweringRuleContext,
+    angle: float,
+    qubit: ir.Value,
+    plane: MeasurementPlane,
+    postselect: int = None,
+):
+    ctx = jax_ctx.module_context.context
+    ctx.allow_unregistered_dialects = True
+
+    assert ir.OpaqueType.isinstance(qubit.type)
+    assert ir.OpaqueType(qubit.type).dialect_namespace == "quantum"
+    assert ir.OpaqueType(qubit.type).data == "bit"
+
+    angle = safe_cast_to_f64(angle, "angle")
+    angle = extract_scalar(angle, "angle")
+
+    assert ir.F64Type.isinstance(
+        angle.type
+    ), "Only scalar double parameters are allowed for quantum gates!"
+
+    # Prepare postselect attribute
+    if postselect is not None:
+        i32_type = ir.IntegerType.get_signless(32, ctx)
+        postselect = ir.IntegerAttr.get(i32_type, postselect)
+
+    result_type = ir.IntegerType.get_signless(1)
+
+    result, new_qubit = MeasureInBasisOp(
+        result_type,
+        qubit.type,
+        qubit,
+        plane=_measurement_plane_attribute(ctx, plane),
+        angle=angle,
+        postselect=postselect,
+    ).results
 
     result_from_elements_op = ir.RankedTensorType.get((), result.type)
     from_elements_op = FromElementsOp(result_from_elements_op, result)
@@ -1745,17 +1842,17 @@ def _cond_lowering(
             if_ctx = jax_ctx.replace(name_stack=jax_ctx.name_stack.extend("if"))
             with ir.InsertionPoint(if_block):
                 # recursively generate the mlir for the if block
-                out = mlir.jaxpr_subcomp(
+                (out, _) = mlir.jaxpr_subcomp(
                     if_ctx.module_context,
                     true_jaxpr.jaxpr,
                     if_ctx.name_stack,
                     mlir.TokenSet(),
                     [mlir.ir_constants(c) for c in true_jaxpr.consts],
-                    *([a] for a in flat_args_plus_consts),  # fn expects [a1], [a2], [a3] format
+                    *flat_args_plus_consts,
                     dim_var_values=jax_ctx.dim_var_values,
                 )
 
-                YieldOp([o[0] for o in out[0]])
+                YieldOp(out)
 
             # else block
             source_info_util.extend_name_stack("else")
@@ -1765,17 +1862,17 @@ def _cond_lowering(
                 # Base case: reached the otherwise block
                 otherwise_jaxpr = branch_jaxprs[-1]
                 with ir.InsertionPoint(else_block):
-                    out = mlir.jaxpr_subcomp(
+                    (out, _) = mlir.jaxpr_subcomp(
                         else_ctx.module_context,
                         otherwise_jaxpr.jaxpr,
                         else_ctx.name_stack,
                         mlir.TokenSet(),
                         [mlir.ir_constants(c) for c in otherwise_jaxpr.consts],
-                        *([a] for a in flat_args_plus_consts),
+                        *flat_args_plus_consts,
                         dim_var_values=jax_ctx.dim_var_values,
                     )
 
-                    YieldOp([o[0] for o in out[0]])
+                    YieldOp(out)
             else:
                 with ir.InsertionPoint(else_block) as else_ip:
                     child_if_op = emit_branches(preds[1:], branch_jaxprs[1:], else_ip)
@@ -1854,15 +1951,16 @@ def _while_loop_lowering(
     cond_ctx = jax_ctx.replace(name_stack=name_stack.extend("cond"))
     with ir.InsertionPoint(cond_block):
         cond_args = [cond_block.arguments[i] for i in range(len(loop_carry_types))]
+        params = cond_consts + cond_args
 
         # recursively generate the mlir for the while cond
-        ((pred,),), _ = mlir.jaxpr_subcomp(
+        ((pred,), _) = mlir.jaxpr_subcomp(
             cond_ctx.module_context,
             cond_jaxpr.jaxpr,
             cond_ctx.name_stack,
             mlir.TokenSet(),
             [mlir.ir_constants(c) for c in cond_jaxpr.consts],
-            *([a] for a in (cond_consts + cond_args)),  # fn expects [a1], [a2], [a3] format
+            *params,
             dim_var_values=jax_ctx.dim_var_values,
         )
 
@@ -1874,6 +1972,7 @@ def _while_loop_lowering(
     body_ctx = jax_ctx.replace(name_stack=name_stack.extend("body"))
     with ir.InsertionPoint(body_block):
         body_args = [body_block.arguments[i] for i in range(len(loop_carry_types))]
+        params = body_consts + body_args
 
         # recursively generate the mlir for the while body
         out, _ = mlir.jaxpr_subcomp(
@@ -1882,11 +1981,11 @@ def _while_loop_lowering(
             body_ctx.name_stack,
             mlir.TokenSet(),
             [mlir.ir_constants(c) for c in cond_jaxpr.consts],
-            *([a] for a in (body_consts + body_args)),  # fn expects [a1], [a2], [a3] format
+            *params,
             dim_var_values=jax_ctx.dim_var_values,
         )
 
-        YieldOp([o[0] for o in out])
+        YieldOp(out)
 
     return while_op_scf.results
 
@@ -1983,7 +2082,7 @@ def _for_loop_lowering(
 
         # Iterate from 0 to the number of iterations (ceil((stop - start) / step))
         distance = SubIOp(stop_val, start_val)
-        num_iterations = CeilDivSIOp(distance, step_val)
+        num_iterations = CeilDivSIOp(distance.result, step_val)
         lower_bound, upper_bound, step = zero, num_iterations, one
 
     for_op_scf = ForOp(lower_bound, upper_bound, step, iter_args=loop_args)
@@ -2011,7 +2110,6 @@ def _for_loop_lowering(
         implicit_args = body_args[1 : nimplicit + 1]
         explicit_args = body_args[nimplicit + 1 :]
         loop_params = (*consts, *implicit_args, loop_iter, *explicit_args)
-        body_args = [[param] for param in loop_params]
 
         # Recursively generate the mlir for the loop body
         out, _ = mlir.jaxpr_subcomp(
@@ -2020,11 +2118,11 @@ def _for_loop_lowering(
             body_ctx.name_stack,
             mlir.TokenSet(),
             [mlir.ir_constants(c) for c in body_jaxpr.consts],
-            *body_args,
+            *loop_params,
             dim_var_values=jax_ctx.dim_var_values,
         )
 
-        YieldOp([o[0] for o in out])
+        YieldOp(out)
 
     return for_op_scf.results
 
@@ -2150,11 +2248,11 @@ def _adjoint_lowering(
             jax_ctx.name_stack.extend("adjoint"),
             mlir.TokenSet(),
             [mlir.ir_constants(c) for c in jaxpr.consts],
-            *([a] for a in chain(consts, cargs, adjoint_block.arguments)),  # [3]
+            *list(chain(consts, cargs, adjoint_block.arguments)),
             dim_var_values=jax_ctx.dim_var_values,
         )
 
-        QYieldOp([a[0] for a in out[-1:]])
+        QYieldOp([out[-1]])
 
     return op.results
 
@@ -2213,15 +2311,16 @@ def _cos_lowering2(ctx, x):
 
 CUSTOM_LOWERING_RULES = (
     (zne_p, _zne_lowering),
-    (qdevice_p, _qdevice_lowering),
+    (device_init_p, _device_init_lowering),
+    (device_release_p, _device_release_lowering),
     (qalloc_p, _qalloc_lowering),
     (qdealloc_p, _qdealloc_lowering),
     (qextract_p, _qextract_lowering),
     (qinsert_p, _qinsert_lowering),
     (qinst_p, _qinst_lowering),
     (gphase_p, _gphase_lowering),
-    (qunitary_p, _qunitary_lowering),
-    (qmeasure_p, _qmeasure_lowering),
+    (unitary_p, _unitary_lowering),
+    (measure_p, _measure_lowering),
     (compbasis_p, _compbasis_lowering),
     (namedobs_p, _named_obs_lowering),
     (hermitian_p, _hermitian_lowering),
@@ -2250,17 +2349,16 @@ CUSTOM_LOWERING_RULES = (
     (sin_p, _sin_lowering2),
     (cos_p, _cos_lowering2),
     (quantum_kernel_p, _quantum_kernel_lowering),
+    (measure_in_basis_p, _measure_in_basis_lowering),
 )
 
 
 def _scalar_abstractify(t):
     # pylint: disable=protected-access
-    if t in {int, float, complex, bool} or isinstance(t, jax._src.numpy.lax_numpy._ScalarMeta):
+    if t in {int, float, complex, bool} or isinstance(t, jax._src.numpy.scalar_types._ScalarMeta):
         return core.ShapedArray([], dtype=t, weak_type=True)
     raise TypeError(f"Argument type {t} is not a valid JAX type.")
 
 
-# pylint: disable=protected-access
-api_util._shaped_abstractify_handlers[type] = _scalar_abstractify
-# pylint: disable=protected-access
-api_util._shaped_abstractify_handlers[jax._src.numpy.lax_numpy._ScalarMeta] = _scalar_abstractify
+pytype_aval_mappings[type] = _scalar_abstractify
+pytype_aval_mappings[jax._src.numpy.scalar_types._ScalarMeta] = _scalar_abstractify

@@ -230,7 +230,7 @@ def get_bufferization_stage(_options: CompileOptions) -> List[str]:
         "catalyst-bufferize",  # Must be run before -- func.func(linalg-bufferize)
         "func.func(linalg-bufferize)",
         "func.func(tensor-bufferize)",
-        "quantum-bufferize",
+        "one-shot-bufferize{dialect-filter=quantum}",
         "func-bufferize",
         "func.func(finalizing-bufferize)",
         "canonicalize",  # Remove dead memrefToTensorOp's

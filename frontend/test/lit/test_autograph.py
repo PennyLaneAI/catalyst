@@ -431,7 +431,7 @@ try:
         return len(y)
 
 except TypeError as e:
-    # CHECK:   Value 'hi' with type <class 'str'> is not a valid JAX type
+    # CHECK:   Argument 'hi' of type <class 'str'> is not a valid JAX type
     print(e)
 
 # -----
