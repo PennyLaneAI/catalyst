@@ -49,6 +49,9 @@
    </div>
    <br>
 
+Catalyst
+########
+
 .. mdinclude:: ../README.md
   :start-line: 20
   :end-line: 72
