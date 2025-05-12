@@ -88,7 +88,21 @@ struct CustomCallOpInterface
     bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
                                  const bufferization::AnalysisState &state) const
     {
-        // TODO: update explanation about our lapack already doing copy
+        // We only use custom call for the jax lapack kernels.
+        // This is actually hard-guarded: in the lowering pattern for custom call
+        // we check that the name of the callee is a jax symbol for a lapack kernel.
+        //
+        // The lapack kernels themselves might overwrite some of the input arrays.
+        // However, in jax's shim wrapper layer, a memcpy is already performed.
+        // See
+        // https://github.com/PennyLaneAI/catalyst/blob/main/frontend/catalyst/utils/jax_cpu_lapack_kernels/lapack_kernels.cpp
+        //
+        // The arguments to the underlying lapack kernel are denoted by the jax wrapper
+        // function as `data`. The `data` args already contain the output array that
+        // the lapack kernel is supposed to write into. The other input arrays are all marked const.
+        // Jax then purifies the function by adding a new argument `out` to hold the
+        // output array.
+
         return false;
     }
 
