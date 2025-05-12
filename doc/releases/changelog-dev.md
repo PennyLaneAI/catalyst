@@ -13,6 +13,11 @@
   ensures that measurement processes on `null.qubit` always return the value 0 or the result
   corresponding to the '0' state, depending on the context.
 
+* The :func:`~.passes.to_ppr` pass now supports conversion of Pauli gates (`X`, `Y`, `Z`),
+  the phase gate adjoint (`S†`), and the π/8 gate adjoint (`T†`). This extension improves
+  performance by eliminating indirect conversion.
+  [(#1738)](https://github.com/PennyLaneAI/catalyst/pull/1738)
+
 <h3>Breaking changes 💔</h3>
 
 * (Device Developers Only) The `QuantumDevice` interface in the Catalyst Runtime plugin system
@@ -169,6 +174,7 @@
   The new mlir bufferization interface is required by jax 0.4.29 or higher.
   [(#1027)](https://github.com/PennyLaneAI/catalyst/pull/1027)
   [(#1686)](https://github.com/PennyLaneAI/catalyst/pull/1686)
+  [(#1708)](https://github.com/PennyLaneAI/catalyst/pull/1708)
 
 <h3>Documentation 📝</h3>
 
