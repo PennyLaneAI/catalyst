@@ -13,6 +13,11 @@
   ensures that measurement processes on `null.qubit` always return the value 0 or the result
   corresponding to the '0' state, depending on the context.
 
+* The :func:`~.passes.to_ppr` pass now supports conversion of Pauli gates (`X`, `Y`, `Z`),
+  the phase gate adjoint (`S†`), and the π/8 gate adjoint (`T†`). This extension improves
+  performance by eliminating indirect conversion.
+  [(#1738)](https://github.com/PennyLaneAI/catalyst/pull/1738)
+
 <h3>Breaking changes 💔</h3>
 
 * (Device Developers Only) The `QuantumDevice` interface in the Catalyst Runtime plugin system
@@ -104,6 +109,9 @@
   If support for Mac x86 platforms is still desired, please install
   Catalyst version 0.11.0, PennyLane version 0.41.0, PennyLane-Lightning
   version 0.41.0, and Jax version 0.4.28.
+
+* Sphix version has been updated to 8.1. Some other related packages have been updated as well.
+  [(#1734)](https://github.com/PennyLaneAI/catalyst/pull/1734)
 
 <h3>Deprecations 👋</h3>
 
