@@ -182,6 +182,11 @@
   reflecting that Catalyst is now beyond the beta!
   [(#1718)](https://github.com/PennyLaneAI/catalyst/pull/1718)
 
+* The API section in the documentation has been simplified. The Catalyst 'Runtime Device Interface'
+  page has been updated to point directly to the documented `QuantumDevice` struct, and the 'QIR
+  C-API' page has been removed due to limited utility.
+  [(#1739)](https://github.com/PennyLaneAI/catalyst/pull/1739)
+
 <h3>Contributors ✍️</h3>
 
 This release contains contributions from (in alphabetical order):
