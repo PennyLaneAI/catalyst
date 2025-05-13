@@ -196,15 +196,8 @@ def test_chained_passes():
     assert "merge-rotations" in test_chained_apply_passes_workflow.mlir
 
 
-#
-# to_ppr
-#
-
-
 def test_convert_clifford_to_ppr():
-    """
-    Test convert_clifford_to_ppr
-    """
+
     pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
 
     @qjit(pipelines=pipe, target="mlir")
@@ -224,11 +217,6 @@ def test_convert_clifford_to_ppr():
     optimized_ir = test_convert_clifford_to_ppr_workflow.mlir_opt
     assert 'transform.apply_registered_pass "to_ppr"' not in optimized_ir
     assert "qec.ppr" in optimized_ir
-
-
-#
-# commute_ppr
-#
 
 
 def test_commute_ppr():
@@ -259,15 +247,8 @@ def test_commute_ppr():
     assert "qec.ppm" in optimized_ir
 
 
-#
-# merge_ppr_ppm
-#
-
-
 def test_merge_ppr_ppm():
-    """
-    Test merge_ppr_ppm
-    """
+
     pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
 
     @qjit(pipelines=pipe, target="mlir")
@@ -291,15 +272,8 @@ def test_merge_ppr_ppm():
     assert 'qec.ppm ["X"]' in optimized_ir
 
 
-#
-# ppr_to_ppm
-#
-
-
 def test_ppr_to_ppm():
-    """
-    Test ppr_to_ppm
-    """
+
     pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
 
     @qjit(pipelines=pipe, target="mlir")
@@ -333,15 +307,8 @@ def test_ppr_to_ppm():
     assert 'qec.ppr ["X"]' in optimized_ir
 
 
-#
-# ppr_to_ppm with clifford-corrected
-#
-
-
 def test_ppr_to_ppm_inject_magic_state():
-    """
-    Test ppr_to_ppm
-    """
+
     pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
 
     @qjit(pipelines=pipe, target="mlir")
