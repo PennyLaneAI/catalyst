@@ -28,7 +28,7 @@ void populateCliffordTToPPRPatterns(mlir::RewritePatternSet &);
 void populateCommuteCliffordTPPRPatterns(mlir::RewritePatternSet &);
 void populateCommuteCliffordPastPPMPatterns(mlir::RewritePatternSet &);
 void populateDecomposeNonCliffordPPRPatterns(mlir::RewritePatternSet &, DecomposeMethod);
-void populateDecomposeCliffordPPRPatterns(mlir::RewritePatternSet &, LogicalInitKind);
+void populateDecomposeCliffordPPRPatterns(mlir::RewritePatternSet &, bool);
 
 } // namespace qec
 } // namespace catalyst

@@ -30,20 +30,15 @@ using namespace catalyst::quantum;
 
 namespace {
 
-// Determine type of measurement based on the type of axillary qubit
-// If |Y⟩ is used as axillary qubit, then we use P⊗Z as the measurement operator
-// Otherwise, we use -P⊗Y
-std::pair<StringRef, uint16_t>
-determinePauliAndRotationSignOfMeasurement(LogicalInitKind ancillaType)
+// Determine type of measurement best on two options:
+// 1. avoidPauliYMeasure == true: Use |Y⟩ as axillary qubit and measure P⊗Z
+// 2. avoidPauliYMeasure == false: Use |0⟩ as axillary qubit and measure -P⊗Y
+std::pair<StringRef, uint16_t> determinePauliAndRotationSignOfMeasurement(bool avoidPauliYMeasure)
 {
-    switch (ancillaType) {
-    case LogicalInitKind::plus_i:
+    if (avoidPauliYMeasure) {
         return std::make_pair("Z", 1);
-    case LogicalInitKind::zero:
-        return std::make_pair("Y", -1);
-    default:
-        assert(false && "Only |Y⟩ or |0⟩ can be used as axillary qubit for pi/4 decomposition");
     }
+    return std::make_pair("Y", -1);
 }
 
 /// Decompose the PPR (pi/4) into PPR and PPMs operations via flattening method
@@ -64,20 +59,22 @@ determinePauliAndRotationSignOfMeasurement(LogicalInitKind ancillaType)
 ///      └───┘     └───┘
 /// If we prepare |Y⟩ as axillary qubit, then we can use P⊗Z as the measurement operator
 /// on first operation instead of -P⊗Y.
-PPRotationOp decompose_pi_over_four_flattening(LogicalInitKind ancillaType, PPRotationOp op,
+PPRotationOp decompose_pi_over_four_flattening(bool avoidPauliYMeasure, PPRotationOp op,
                                                TypedValue<IntegerType> measResult,
                                                PatternRewriter &rewriter)
 {
     auto loc = op.getLoc();
 
-    auto magic = rewriter.create<FabricateOp>(loc, ancillaType);
+    // Fabricate axillary qubit |Y⟩ (plus_i) or |0⟩ (zero)
+    auto axillaryType = avoidPauliYMeasure ? LogicalInitKind::plus_i : LogicalInitKind::zero;
+    auto magicFabrication = rewriter.create<FabricateOp>(loc, axillaryType);
 
     auto [pauliForAxillaryQubit, rotationSign] =
-        determinePauliAndRotationSignOfMeasurement(ancillaType);
+        determinePauliAndRotationSignOfMeasurement(avoidPauliYMeasure);
 
     // Extract qubits and insert axillary qubit
     SmallVector<Value> m1InQubits = op.getInQubits();
-    m1InQubits.emplace_back(magic.getOutQubits().front());
+    m1InQubits.emplace_back(magicFabrication.getOutQubits().front());
 
     // Extract P and insert Pauli for axillary qubit
     SmallVector<StringRef> pauliP = extractPauliString(op);
@@ -107,18 +104,17 @@ PPRotationOp decompose_pi_over_four_flattening(LogicalInitKind ancillaType, PPRo
 struct DecomposeCliffordPPR : public OpRewritePattern<PPRotationOp> {
     using OpRewritePattern::OpRewritePattern;
 
-    LogicalInitKind ancillaType;
+    bool avoidPauliYMeasure;
 
-    DecomposeCliffordPPR(MLIRContext *context, LogicalInitKind ancillaType,
-                         PatternBenefit benefit = 1)
-        : OpRewritePattern(context, benefit), ancillaType(ancillaType)
+    DecomposeCliffordPPR(MLIRContext *context, bool avoidPauliYMeasure, PatternBenefit benefit = 1)
+        : OpRewritePattern(context, benefit), avoidPauliYMeasure(avoidPauliYMeasure)
     {
     }
 
     LogicalResult matchAndRewrite(PPRotationOp op, PatternRewriter &rewriter) const override
     {
         if (op.isClifford()) {
-            decompose_pi_over_four_flattening(ancillaType, op, op.getCondition(), rewriter);
+            decompose_pi_over_four_flattening(avoidPauliYMeasure, op, op.getCondition(), rewriter);
             return success();
         }
         return failure();
@@ -129,9 +125,9 @@ struct DecomposeCliffordPPR : public OpRewritePattern<PPRotationOp> {
 namespace catalyst {
 namespace qec {
 
-void populateDecomposeCliffordPPRPatterns(RewritePatternSet &patterns, LogicalInitKind ancillaType)
+void populateDecomposeCliffordPPRPatterns(RewritePatternSet &patterns, bool avoidPauliYMeasure)
 {
-    patterns.add<DecomposeCliffordPPR>(patterns.getContext(), ancillaType, 1);
+    patterns.add<DecomposeCliffordPPR>(patterns.getContext(), avoidPauliYMeasure, 1);
 }
 
 } // namespace qec
