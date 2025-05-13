@@ -90,20 +90,24 @@ void decompose_auto_corrected_pi_over_eight(PPRotationOp op, PatternRewriter &re
 
     // PPM (X) on qubit |m⟩
     SmallVector<StringRef> pauliX = {"X"};
-    auto pprX = rewriter.create<PPMeasurementOp>(loc, pauliX, ppmZY.getOutQubits().back()); // |m⟩
+    auto ppmX = rewriter.create<PPMeasurementOp>(loc, pauliX, ppmZY.getOutQubits().back()); // |m⟩
 
     // PPM (X/Z) based on the result of PPM (P⊗Z) on qubit |0⟩
     SmallVector<StringRef> pauliZ = {"Z"};
-    rewriter.create<SelectPPMeasurementOp>(loc, ppmPZ.getMres(), pauliX, pauliZ,
-                                           ppmZY.getOutQubits().front()); // |0⟩
+    auto ppmXZ = rewriter.create<SelectPPMeasurementOp>(loc, ppmPZ.getMres(), pauliX, pauliZ,
+                                                        ppmZY.getOutQubits().front()); // |0⟩
 
     // XOR of the results of PPM (P⊗Z) and PPM (X)
-    auto condOp = rewriter.create<arith::XOrIOp>(loc, ppmZY.getMres(), pprX.getMres());
+    auto condOp = rewriter.create<arith::XOrIOp>(loc, ppmZY.getMres(), ppmX.getMres());
 
     // PPR P(π/2) based on the result of XOR on input qubits
     SmallVector<Value> outPZQubits = ppmPZ.getOutQubits();
     outPZQubits.pop_back();
     auto pprPI2 = rewriter.create<PPRotationOp>(loc, pauliP, 2, outPZQubits, condOp.getResult());
+
+    // Deallocate the axillary qubits
+    rewriter.create<DeallocQubitOp>(loc, ppmXZ.getOutQubits().back()); // |0⟩
+    rewriter.create<DeallocQubitOp>(loc, ppmX.getOutQubits().back());  // |m⟩
 
     rewriter.replaceOp(op, pprPI2.getOutQubits());
 }
@@ -161,6 +165,9 @@ void decompose_inject_magic_state_pi_over_eight(PPRotationOp op, PatternRewriter
     // PPR P(π/2) on input qubits if PPM (X) yields -1
     auto pprPI2 =
         rewriter.create<PPRotationOp>(loc, pauliP, 2, pprPI4.getOutQubits(), ppmX.getMres());
+
+    // Deallocate the axillary qubit
+    rewriter.create<DeallocQubitOp>(loc, pprPI2.getOutQubits().back());
 
     rewriter.replaceOp(op, pprPI2.getOutQubits());
 }

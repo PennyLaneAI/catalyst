@@ -128,6 +128,33 @@ def AllocOp : Memory_Op<"alloc", [NoMemoryEffect]> {
     }];
 }
 
+def AllocQubitOp : Memory_Op<"alloc_qubit", [NoMemoryEffect]> {
+    let summary = "Allocate a qubit.";
+    let description = [{
+    }];
+
+    let results = (outs
+        QubitType:$qubit
+    );
+
+    let assemblyFormat = [{
+        attr-dict `:` type(results)
+    }];
+}
+
+def DeallocQubitOp : Memory_Op<"dealloc_qubit"> {
+    let summary = "Deallocate a qubit.";
+    let description = [{
+    }];
+
+    let arguments = (ins
+        QubitType:$qubit
+    );
+
+    let assemblyFormat = [{
+        $qubit attr-dict `:` type(operands)
+    }];
+}
 
 def DeallocOp : Memory_Op<"dealloc"> {
     let summary = "Deallocate a quantum register.";

@@ -95,6 +95,9 @@ PPRotationOp decompose_pi_over_four_flattening(bool avoidPauliYMeasure, PPRotati
     auto pprPI2 =
         rewriter.create<PPRotationOp>(loc, pauliP, PI_DENOMINATOR, outPZQubits, cond.getResult());
 
+    // Deallocate the axillary qubit
+    rewriter.create<DeallocQubitOp>(loc, ppmX.getOutQubits().back());
+
     rewriter.replaceOp(op, pprPI2.getOutQubits());
     return pprPI2;
 }
