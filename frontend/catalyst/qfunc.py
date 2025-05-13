@@ -19,8 +19,10 @@ the default behaviour and replacing it with a function-like "QNode" primitive.
 """
 import logging
 from copy import copy
+import functools
 from typing import Callable, Sequence
 
+import jax
 import jax.numpy as jnp
 import pennylane as qml
 from jax.core import eval_jaxpr
@@ -131,6 +133,8 @@ class QFunc:
         out_tree_expected = kwargs.pop("_out_tree_expected", [])
         debug_info = kwargs.pop("debug_info", None)
 
+
+        @functools.partial(jax.jit, static_argnums=static_argnums)
         def _eval_quantum(*args, **kwargs):
             closed_jaxpr, out_type, out_tree, out_tree_exp = trace_quantum_function(
                 self.func,

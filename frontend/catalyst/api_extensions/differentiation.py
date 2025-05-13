@@ -877,6 +877,10 @@ def _check_qnode_against_grad_method(f: QNode, method: str, jaxpr: Jaxpr):
         return
 
     return_ops = []
+    if str(jaxpr.eqns[0].primitive) == "pjit":
+        jaxpr = jaxpr.eqns[0].params["jaxpr"].jaxpr
+        
+
     for res in jaxpr.outvars:
         for eq in reversed(jaxpr.eqns):  # pragma: no branch
             if res in eq.outvars:
