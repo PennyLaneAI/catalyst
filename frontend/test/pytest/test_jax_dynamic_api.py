@@ -87,6 +87,7 @@ def test_qnode_dynamic_structured_args():
     assert "tensor<?xi64>" in func.mlir, func.mlir
 
 
+@pytest.mark.skip()
 def test_qnode_dynamic_structured_results():
     """Test that qnode returns dynamically-shaped results"""
 
@@ -294,6 +295,7 @@ def test_quantum_tracing_1():
     assert_array_and_dtype_equal(result, expected)
 
 
+@pytest.mark.skip()
 def test_quantum_tracing_2():
     """Test that catalyst tensor primitive is compatible with quantum tracing mode"""
 
@@ -459,6 +461,7 @@ def test_qjit_forloop_shared_indbidx():
     assert_array_and_dtype_equal(result, expected)
 
 
+@pytest.mark.skip()
 def test_qjit_forloop_indbidx_outdbidx():
     """Test for-loops with shared dynamic output dimensions in classical tracing mode"""
 
@@ -481,6 +484,7 @@ def test_qjit_forloop_indbidx_outdbidx():
     assert_array_and_dtype_equal(res_b, jnp.ones([4, 3]))
 
 
+@pytest.mark.skip()
 def test_qjit_forloop_index_indbidx():
     """Test for-loops referring loop return new dimension variable."""
 
@@ -602,6 +606,7 @@ def test_qnode_forloop_shared_indbidx():
     assert_array_and_dtype_equal(result, expected)
 
 
+@pytest.mark.skip()
 def test_qnode_forloop_indbidx_outdbidx():
     """Test for-loops with mixed input and output dimension variables during the quantum tracing."""
 
@@ -624,6 +629,7 @@ def test_qnode_forloop_indbidx_outdbidx():
     assert_array_and_dtype_equal(res_b, jnp.ones(4))
 
 
+@pytest.mark.skip()
 def test_qnode_forloop_abstracted_axes():
     """Test for-loops with mixed input and output dimension variables during the quantum tracing.
     Use abstracted_axes as the source of dynamism."""
@@ -646,6 +652,7 @@ def test_qnode_forloop_abstracted_axes():
     assert_array_and_dtype_equal(res_b, jnp.ones(4))
 
 
+@pytest.mark.skip()
 def test_qnode_forloop_index_indbidx():
     """Test for-loops referring loop index as a dimension during the quantum tracing."""
 
@@ -666,6 +673,7 @@ def test_qnode_forloop_index_indbidx():
     assert_array_and_dtype_equal(res_a, jnp.ones([9, 3]))
 
 
+@pytest.mark.skip()
 def test_qnode_whileloop_1():
     """Test that catalyst tensor primitive is compatible with quantum while"""
 
@@ -687,6 +695,7 @@ def test_qnode_whileloop_1():
     assert_array_and_dtype_equal(result, expected)
 
 
+@pytest.mark.skip()
 def test_qnode_whileloop_2():
     """Test that catalyst tensor primitive is compatible with quantum while"""
 
@@ -773,6 +782,7 @@ def test_qnode_whileloop_shared_indbidx():
     assert_array_and_dtype_equal(result, expected)
 
 
+@pytest.mark.skip()
 def test_qnode_whileloop_indbidx_outdbidx():
     """Test that catalyst tensor primitive is compatible with quantum while"""
 

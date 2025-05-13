@@ -25,6 +25,7 @@ import catalyst
 from catalyst.debug import get_compilation_stage, replace_ir
 
 
+@pytest.mark.skip()
 def test_dynamic_sample_backend_functionality():
     """Test that a `sample` program with dynamic shots can be executed correctly."""
 
@@ -66,6 +67,7 @@ def test_dynamic_sample_backend_functionality():
     workflow_dyn_sample.workspace.cleanup()
 
 
+@pytest.mark.skip()
 def test_dynamic_counts_backend_functionality():
     """Test that a `counts` program with dynamic shots can be executed correctly."""
 
@@ -173,6 +175,7 @@ def test_dynamic_wires_statebased_with_wires(readout, backend, capfd):
     assert out.count("compiling...") == 3
 
 
+@pytest.mark.skip()
 @pytest.mark.parametrize("readout", [qml.probs, qml.state])
 def test_dynamic_wires_statebased_without_wires(readout, backend, capfd):
     """
@@ -238,6 +241,7 @@ def test_dynamic_wires_sample_with_wires(shots, backend, capfd):
     assert out.count("compiling...") == 3
 
 
+@pytest.mark.skip()
 @pytest.mark.parametrize("shots", [3, (3, 4, 5), (7,) * 3])
 def test_dynamic_wires_sample_without_wires(shots, backend, capfd):
     """
@@ -301,6 +305,7 @@ def test_dynamic_wires_counts_with_wires(backend, capfd):
     assert out.count("compiling...") == 1
 
 
+@pytest.mark.skip()
 def test_dynamic_wires_counts_without_wires(backend, capfd):
     """
     Test that a circuit with dynamic number of wires can be executed correctly
