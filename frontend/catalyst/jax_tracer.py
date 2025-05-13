@@ -722,7 +722,9 @@ def trace_quantum_operations(
     #       equations in a wrong order. The set of variables are always complete though, so we sort
     #       the equations to restore their correct order.
 
-    def bind_native_operation(qrp, op, controlled_wires, controlled_values, out_snapshot_tracer, adjoint=False):
+    def bind_native_operation(
+        qrp, op, controlled_wires, controlled_values, out_snapshot_tracer, adjoint=False
+    ):
         # For named-controlled operations (e.g. CNOT, CY, CZ) - bind directly by name. For
         # Controlled(OP) bind OP with native quantum control syntax, and similarly for Adjoint(OP).
         if type(op) in (Controlled, ControlledOp):
@@ -1388,7 +1390,9 @@ def trace_quantum_function(
                     postselect_mode=qnode.execute_kwargs["postselect_mode"],
                     mcm_method=qnode.execute_kwargs["mcm_method"],
                 )
-                qrp_out, snapshot_results = trace_quantum_operations(tape, device, qreg_in, ctx, trace, mcm_config)
+                qrp_out, snapshot_results = trace_quantum_operations(
+                    tape, device, qreg_in, ctx, trace, mcm_config
+                )
                 meas, meas_trees = trace_quantum_measurements(device, qrp_out, output, trees)
                 qreg_out = qrp_out.actualize()
 
@@ -1401,7 +1405,7 @@ def trace_quantum_function(
 
                 meas_tracers = check_full_raise(meas, trace.to_jaxpr_tracer)
                 for s in snapshot_results:
-                    meas_tracers.insert(0,s)
+                    meas_tracers.insert(0, s)
                 meas_results = tree_unflatten(tree_structure(meas_tracers), meas_tracers)
 
                 # TODO: Allow the user to return whatever types they specify.
