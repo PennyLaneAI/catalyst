@@ -129,7 +129,31 @@ struct CustomCallOpInterface
             if (failed(opBuffer)) {
                 return failure();
             }
-            bufferArgs.push_back(*opBuffer);
+
+            // If any of the input buffers have non-identity layout, we need to make a copy
+            // This is because the lapack kernel runtime demands contiguous arrays,
+            // aka identity, non-strided, non-offset memory layout
+            //
+            // TODO: reuse this copy for the result buffer whenever the semantics of the kernel
+            // allow this reuse.
+            // The kernel runtime performs a copy from the input array to the output array
+            // if they are separate memrefs. We can avoid the extra copy there by just passing in
+            // the newly allocated memref here into the kernel as the result buffer too.
+            // However, we need to check that the kernels' semantics allow this.
+            MemRefType bufferedOperandMemrefType = cast<MemRefType>(opBuffer->getType());
+            if (!bufferedOperandMemrefType.getLayout().isIdentity()) {
+                MemRefType copiedOperandMemrefType =
+                    MemRefType::get(bufferedOperandMemrefType.getShape(),
+                                    bufferedOperandMemrefType.getElementType());
+                auto allocOp =
+                    rewriter.create<memref::AllocOp>(op->getLoc(), copiedOperandMemrefType);
+                auto copyOp =
+                    rewriter.create<memref::CopyOp>(op->getLoc(), *opBuffer, allocOp.getResult());
+                bufferArgs.push_back(copyOp.getTarget());
+            }
+            else {
+                bufferArgs.push_back(*opBuffer);
+            }
         }
 
         // Add bufferized return values to the arguments
