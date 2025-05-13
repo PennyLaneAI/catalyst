@@ -476,9 +476,9 @@ def SelectPPMeasurementOp : QEC_Op<"select.ppm"> {
     }];
 
     let arguments = (ins
-        I1:$condition,  // The condition qubit
-        PauliWord:$pauli_product,
-        PauliWord:$else_pauli_product,
+        I1:$switch,
+        PauliWord:$pauli_product_0,
+        PauliWord:$pauli_product_1,
         Variadic<QubitType>:$in_qubits  // The qubits to measure
     );
 
