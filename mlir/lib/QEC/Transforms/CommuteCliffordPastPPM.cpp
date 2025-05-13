@@ -175,7 +175,8 @@ struct CommuteCliffordPastPPM : public OpRewritePattern<PPMeasurementOp> {
 
     unsigned int MAX_PAULI_SIZE;
 
-    CommuteCliffordPastPPM(mlir::MLIRContext *context, unsigned int max_pauli_size, PatternBenefit benefit)
+    CommuteCliffordPastPPM(mlir::MLIRContext *context, unsigned int max_pauli_size,
+                           PatternBenefit benefit)
         : OpRewritePattern(context, benefit), MAX_PAULI_SIZE(max_pauli_size)
     {
     }
@@ -224,7 +225,8 @@ struct RemoveDeadPPR : public OpRewritePattern<PPRotationOp> {
 namespace catalyst {
 namespace qec {
 
-void populateCommuteCliffordPastPPMPatterns(RewritePatternSet &patterns, unsigned int max_pauli_size)
+void populateCommuteCliffordPastPPMPatterns(RewritePatternSet &patterns,
+                                            unsigned int max_pauli_size)
 {
     patterns.add<CommuteCliffordPastPPM>(patterns.getContext(), max_pauli_size, 1);
     patterns.add<RemoveDeadPPR>(patterns.getContext(), 1);
