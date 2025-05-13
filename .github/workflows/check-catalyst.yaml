@@ -171,7 +171,6 @@ jobs:
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \
         COMPILER_LAUNCHER="" \
         PYTHON_EXECUTABLE=$(which python3) \
-        cmake -DPYTHON_EXECUTABLE=$PYTHON_EXECUTABLE 
         make llvm 
 
   mhlo:
