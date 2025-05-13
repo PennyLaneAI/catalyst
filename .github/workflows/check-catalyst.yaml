@@ -69,7 +69,7 @@ jobs:
           enableCrossOsArchive: true
 
       - name: Clone LLVM Submodule
-        if: steps.cache-llvm-source.outputs.cache-hit != 'true'
+        # if: steps.cache-llvm-source.outputs.cache-hit != 'true'
         uses: actions/checkout@v4
         with:
           repository: llvm/llvm-project
@@ -137,7 +137,7 @@ jobs:
         enableCrossOsArchive: true
 
     - name: Clone LLVM Submodule
-      if: steps.cache-llvm-source.outputs.cache-hit != 'true'
+      # if: steps.cache-llvm-source.outputs.cache-hit != 'true'
       uses: actions/checkout@v4
       with:
         repository: llvm/llvm-project
@@ -687,7 +687,7 @@ jobs:
           enableCrossOsArchive: true
 
       - name: Clone LLVM Submodule
-        if: steps.cache-llvm-source.outputs.cache-hit != 'true'
+        # if: steps.cache-llvm-source.outputs.cache-hit != 'true'
         uses: actions/checkout@v4
         with:
           repository: llvm/llvm-project
