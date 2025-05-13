@@ -54,7 +54,7 @@
 typedef struct XlaCustomCallStatus_ XlaCustomCallStatus;
 #endif
 
-// Underlying function pointers (e.g., Trsm<double>::Fn) are initialized either
+// Underlying function pointers (i.e., KERNEL_CLASS::Fn) are initialized either
 // by the pybind wrapper that links them to an existing SciPy lapack instance,
 // or using the lapack_kernels_strong.cc static initialization to link them
 // directly to lapack for use in a pure C++ context.
@@ -75,6 +75,19 @@ typedef enum CBLAS_SIDE { CblasLeft = 141, CblasRight = 142 } CBLAS_SIDE;
 typedef CBLAS_ORDER CBLAS_LAYOUT;
 
 typedef int lapack_int;
+template <typename KernelType> void AssignKernelFn(void *func)
+{
+    KernelType::fn = reinterpret_cast<typename KernelType::FnType *>(func);
+}
+
+template <typename KernelType> void AssignKernelFn(typename KernelType::FnType *func)
+{
+    KernelType::fn = func;
+}
+
+} // namespace jax
+
+namespace jax {
 
 // Copied from lapacke.h
 #define LAPACK_ROW_MAJOR 101

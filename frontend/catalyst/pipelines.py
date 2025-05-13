@@ -97,7 +97,7 @@ class CompileOptions:
 
     def __post_init__(self):
         # Check that async runs must not be seeded
-        if self.async_qnodes and self.seed != None:
+        if self.async_qnodes and self.seed is not None:
             raise CompileError(
                 """
                 Seeding has no effect on asynchronous QNodes,
@@ -107,7 +107,7 @@ class CompileOptions:
             )
 
         # Check that seed is 32-bit unsigned int
-        if (self.seed != None) and (self.seed < 0 or self.seed > 2**32 - 1):
+        if (self.seed is not None) and (self.seed < 0 or self.seed > 2**32 - 1):
             raise ValueError(
                 """
                 Seed must be an unsigned 32-bit integer!
@@ -227,10 +227,11 @@ def get_bufferization_stage(_options: CompileOptions) -> List[str]:
         "empty-tensor-to-alloc-tensor",
         "func.func(bufferization-bufferize)",
         "func.func(tensor-bufferize)",
-        "catalyst-bufferize",  # Must be run before -- func.func(linalg-bufferize)
+        # Catalyst dialect's bufferization must be run before --func.func(linalg-bufferize)
+        "one-shot-bufferize{dialect-filter=catalyst unknown-type-conversion=identity-layout-map}",
         "func.func(linalg-bufferize)",
         "func.func(tensor-bufferize)",
-        "quantum-bufferize",
+        "one-shot-bufferize{dialect-filter=quantum}",
         "func-bufferize",
         "func.func(finalizing-bufferize)",
         "canonicalize",  # Remove dead memrefToTensorOp's
