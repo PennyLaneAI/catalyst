@@ -178,6 +178,10 @@
 
 <h3>Documentation 📝</h3>
 
+* The header (logo+title) images in the README and in the overview on RtD have been updated,
+  reflecting that Catalyst is now beyond the beta!
+  [(#1718)](https://github.com/PennyLaneAI/catalyst/pull/1718)
+
 <h3>Contributors ✍️</h3>
 
 This release contains contributions from (in alphabetical order):
@@ -189,4 +193,5 @@ Tzung-Han Juang,
 Christina Lee,
 Erick Ochoa Lopez,
 Mehrdad Malekmohammadi,
+Anton Naim Ibrahim,
 Paul Haochen Wang.
