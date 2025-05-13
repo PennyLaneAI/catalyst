@@ -440,7 +440,7 @@ func.func @measure(%q : !quantum.bit) -> !quantum.bit {
     // CHECK: [[postselect:%.+]] = llvm.mlir.constant(0 : i32) : i32
 
     // CHECK: llvm.call @__catalyst__qis__Measure(%arg0, [[postselect]])
-    %res, %new_q = quantum.measure %q {postselect = 0 : i32} : i1, !quantum.bit
+    %res, %new_q = quantum.measure %q postselect 0 : i1, !quantum.bit
 
     // CHECK: return %arg0
     return %new_q : !quantum.bit
