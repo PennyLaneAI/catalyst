@@ -28,7 +28,6 @@ Catalyst
             Catalyst is an experimental package that enables just-in-time (JIT)
             compilation of PennyLane programs. Compile the entire quantum-classical workflow.
         </p>
-        <img src="_static/catalyst.png" style="max-width: 700px; width: 100%;">
       <div class="row mt-3">
 
 .. index-card::
@@ -51,6 +50,11 @@ Catalyst
       </div>
    </div>
    <br>
+
+.. image:: _static/pl-catalyst-logo-lightmode.png
+    :align: center
+    :width: 700px
+    :target: javascript:void(0);
 
 .. mdinclude:: ../README.md
   :start-line: 20

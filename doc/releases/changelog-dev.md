@@ -178,6 +178,10 @@
 
 <h3>Documentation 📝</h3>
 
+* The header (logo+title) images in the README and in the overview on RtD have been updated,
+  reflecting that Catalyst is now beyond the beta!
+  [(#1718)](https://github.com/PennyLaneAI/catalyst/pull/1718)
+
 * The API section in the documentation has been simplified. The Catalyst 'Runtime Device Interface'
   page has been updated to point directly to the documented `QuantumDevice` struct, and the 'QIR
   C-API' page has been removed due to limited utility.
@@ -194,4 +198,5 @@ Tzung-Han Juang,
 Christina Lee,
 Erick Ochoa Lopez,
 Mehrdad Malekmohammadi,
+Anton Naim Ibrahim,
 Paul Haochen Wang.
