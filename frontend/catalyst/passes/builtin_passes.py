@@ -15,6 +15,7 @@
 """This module exposes built-in Catalyst MLIR passes to the frontend."""
 
 import functools
+
 from catalyst.passes.pass_api import PassPipelineWrapper
 
 
@@ -581,5 +582,5 @@ def merge_ppr_ppm(qnode=None, *, max_pauli_size=0):
     if qnode is None:
         return functools.partial(merge_ppr_ppm, max_pauli_size=max_pauli_size)
 
-    commute_ppr_pass = {"commute_ppr": {"max-pauli-size": max_pauli_size}}
-    return PassPipelineWrapper(qnode, commute_ppr_pass)
+    merge_ppr_ppm_pass = {"merge_ppr_ppm": {"max-pauli-size": max_pauli_size}}
+    return PassPipelineWrapper(qnode, merge_ppr_ppm_pass)
