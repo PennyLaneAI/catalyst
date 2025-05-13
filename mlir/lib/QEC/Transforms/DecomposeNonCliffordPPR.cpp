@@ -20,7 +20,6 @@
 #include "QEC/IR/QECDialect.h"
 #include "QEC/Transforms/Patterns.h"
 #include "QEC/Utils/PauliStringWrapper.h"
-#include "QEC/Utils/Utility.h"
 #include "Quantum/IR/QuantumOps.h"
 
 using namespace mlir;
@@ -28,6 +27,16 @@ using namespace catalyst::qec;
 using namespace catalyst::quantum;
 
 namespace {
+
+// Return the magic state or complex conjugate of the magic state
+LogicalInitKind getMagicState(QECOpInterface op)
+{
+    int16_t rotationKind = static_cast<int16_t>(op.getRotationKind());
+    if (rotationKind > 0) {
+        return LogicalInitKind::magic;
+    }
+    return LogicalInitKind::magic_conj;
+}
 
 /// Decompose the Non-Clifford (pi/8) PPR into PPR and PPMs operations via auto corrected method
 /// as described in Figure 11(b) in the paper: https://arxiv.org/abs/1808.02892
@@ -60,7 +69,7 @@ void decompose_auto_corrected_pi_over_eight(PPRotationOp op, PatternRewriter &re
 {
     auto loc = op.getLoc();
 
-    // Prepare |0⟩ and |m⟩
+    // Fabricate the magic state |0⟩ and |m⟩
     auto zero = rewriter.create<FabricateOp>(loc, LogicalInitKind::zero);
     auto magic = rewriter.create<FabricateOp>(loc, getMagicState(op));
 
@@ -126,7 +135,7 @@ void decompose_inject_magic_state_pi_over_eight(PPRotationOp op, PatternRewriter
 {
     auto loc = op.getLoc();
 
-    // Prepare magic state |m⟩
+    // Fabricate the magic state |m⟩
     auto magic = rewriter.create<FabricateOp>(loc, getMagicState(op));
 
     SmallVector<StringRef> pauliP = extractPauliString(op); // [P]

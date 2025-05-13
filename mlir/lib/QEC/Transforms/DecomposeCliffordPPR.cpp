@@ -22,7 +22,6 @@
 #include "QEC/IR/QECDialect.h"
 #include "QEC/Transforms/Patterns.h"
 #include "QEC/Utils/PauliStringWrapper.h"
-#include "QEC/Utils/Utility.h"
 
 using namespace mlir;
 using namespace catalyst::qec;
@@ -30,7 +29,6 @@ using namespace catalyst::quantum;
 
 namespace {
 
-// Determine type of measurement best on two options:
 // 1. avoidPauliYMeasure == true: Use |Y⟩ as axillary qubit and measure P⊗Z
 // 2. avoidPauliYMeasure == false: Use |0⟩ as axillary qubit and measure -P⊗Y
 std::pair<StringRef, uint16_t> determinePauliAndRotationSignOfMeasurement(bool avoidPauliYMeasure)

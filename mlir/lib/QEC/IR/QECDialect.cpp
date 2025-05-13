@@ -94,8 +94,8 @@ LogicalResult PPMeasurementOp::verify()
 
 LogicalResult SelectPPMeasurementOp::verify()
 {
-    if (getInQubits().size() != getPauliProduct().size() ||
-        getInQubits().size() != getElsePauliProduct().size()) {
+    if (getInQubits().size() != getPauliProduct_0().size() ||
+        getInQubits().size() != getPauliProduct_1().size()) {
         return emitOpError("Number of qubits must match number of pauli operators");
     }
     return mlir::success();

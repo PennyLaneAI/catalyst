@@ -460,9 +460,9 @@ def SelectPPMeasurementOp : QEC_Op<"select.ppm"> {
     let summary = "Multiplexed Pauli product measurement.";
 
     let description = [{
-    Based on the boolean `condition` (type `i1`), this op selects between two Pauli product strings:  
-    - If `condition` is 1, applies and measures using `pauli_product`.  
-    - If `condition` is 0, uses `else_pauli_product`.  
+    Based on the boolean `select_switch` (type `i1`), this op selects between two Pauli product strings:  
+    - If `select_switch` is 1, applies and measures using `pauli_product_0`.  
+    - If `select_switch` is 0, uses `pauli_product_1`.  
 
     The operation returns:
     - `mres`: the result of the Pauli product measurement (`i1`)
@@ -476,7 +476,7 @@ def SelectPPMeasurementOp : QEC_Op<"select.ppm"> {
     }];
 
     let arguments = (ins
-        I1:$switch,
+        I1:$select_switch,
         PauliWord:$pauli_product_0,
         PauliWord:$pauli_product_1,
         Variadic<QubitType>:$in_qubits  // The qubits to measure
@@ -490,39 +490,39 @@ def SelectPPMeasurementOp : QEC_Op<"select.ppm"> {
     let builders = [
         OpBuilder<
         (ins
-            "::mlir::Value":$condition,
-            "::mlir::ArrayAttr":$pauli_product,
-            "::mlir::ArrayAttr":$else_pauli_product,
+            "::mlir::Value":$select_switch,
+            "::mlir::ArrayAttr":$pauli_product_0,
+            "::mlir::ArrayAttr":$pauli_product_1,
             "::mlir::ValueRange":$in_qubits
         ),[{
             SelectPPMeasurementOp::build($_builder, $_state,
             /*mres_type=*/ $_builder.getI1Type(),
             /*out_qubits=*/ mlir::TypeRange(in_qubits),
-            /*condition=*/ condition,
-            /*pauli_product=*/ pauli_product,
-            /*else_pauli_product=*/ else_pauli_product,
+            /*select_switch=*/ select_switch,
+            /*pauli_product_0=*/ pauli_product_0,
+            /*pauli_product_1=*/ pauli_product_1,
             /*in_qubits=*/ in_qubits);
         }]>,
         OpBuilder<
         (ins
-            "::mlir::Value":$condition,
-            "::mlir::ArrayRef<mlir::StringRef>":$pauli_product,
-            "::mlir::ArrayRef<mlir::StringRef>":$else_pauli_product,
+            "::mlir::Value":$select_switch,
+            "::mlir::ArrayRef<mlir::StringRef>":$pauli_product_0,
+            "::mlir::ArrayRef<mlir::StringRef>":$pauli_product_1,
             "::mlir::ValueRange":$in_qubits
         ),[{
             SelectPPMeasurementOp::build($_builder, $_state,
             /*mres_type=*/ $_builder.getI1Type(),
             /*out_qubits=*/ mlir::TypeRange(in_qubits),
-            /*condition=*/ condition,
-            /*pauli_product=*/ $_builder.getStrArrayAttr(pauli_product),
-            /*else_pauli_product=*/ $_builder.getStrArrayAttr(else_pauli_product),
+            /*select_switch=*/ select_switch,
+            /*pauli_product_0=*/ $_builder.getStrArrayAttr(pauli_product_0),
+            /*pauli_product_1=*/ $_builder.getStrArrayAttr(pauli_product_1),
             /*in_qubits=*/ in_qubits);
         }]>
         
     ];
 
     let assemblyFormat = [{
-      `(` $condition `,` $pauli_product `,` $else_pauli_product `)` $in_qubits attr-dict `:` type($out_qubits)
+      `(` $select_switch `,` $pauli_product_0 `,` $pauli_product_1 `)` $in_qubits attr-dict `:` type($out_qubits)
     }];
     
     let hasVerifier = 1;
