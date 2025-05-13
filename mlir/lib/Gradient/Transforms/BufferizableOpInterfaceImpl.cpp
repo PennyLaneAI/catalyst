@@ -44,11 +44,103 @@ using namespace catalyst::gradient;
  */
 
 namespace {
+static BaseMemRefType
+getBufferizedFunctionArgType(FunctionOpInterface funcOp, int64_t index,
+                             const bufferization::BufferizationOptions &options)
+{
+    auto tensorType = dyn_cast<TensorType>(funcOp.getArgument(index).getType());
+    assert(tensorType && "expected TensorType");
+
+    BaseMemRefType memrefType = options.functionArgTypeConverterFn(
+        tensorType, *options.defaultMemorySpaceFn(tensorType), funcOp, options);
+
+    auto layoutAttr = funcOp.getArgAttrOfType<AffineMapAttr>(
+        index, bufferization::BufferizationDialect::kBufferLayoutAttrName);
+    if (!layoutAttr)
+        return memrefType;
+
+    auto rankedMemrefType = dyn_cast<MemRefType>(memrefType);
+    assert(rankedMemrefType && "buffer layout not supported on unranked tensors");
+    return MemRefType::get(rankedMemrefType.getShape(), rankedMemrefType.getElementType(),
+                           layoutAttr.getValue(), rankedMemrefType.getMemorySpace());
+}
+
+static ReturnOp getAssumedUniqueReturnOp(FunctionOpInterface funcOp)
+{
+    ReturnOp returnOp;
+    for (Block &b : funcOp.getFunctionBody()) {
+        if (auto candidateOp = dyn_cast<ReturnOp>(b.getTerminator())) {
+            if (returnOp)
+                return nullptr;
+            returnOp = candidateOp;
+        }
+    }
+    return returnOp;
+}
 
 Value generateAllocation(OpBuilder &builder, Location loc, Value reference)
 {
-    auto memrefType = cast<MemRefType>(reference.getType());
-    // Get dynamic dimension sizes from the provided reference value if necessary.
+    auto origMemrefType = cast<MemRefType>(reference.getType());
+    // TODO: Investigate how to get rid of identity-layout-map
+    //
+    //     Hi all. For one-shot-bufferization, is there any automatic way to pass all memref symbols
+    //     to AllocOp? we have an example below that triggers  error: 'memref.alloc' op symbol
+    //     operand count does not equal memref symbol count: expected 1, got 0 .  We think we have
+    //     to pass the offset symbol to AllocOp.
+    //
+    //         %0 = "bufferization.to_memref"(%arg0) : (tensor<f64>) -> memref<f64, strided<[],
+    //         offset: ?>> %1 = "memref.alloc"() <{operandSegmentSizes = array<i32: 0, 0>}> : () ->
+    //         memref<f64, strided<[], offset: ?>>
+    //
+    //     We know we can set function-signature-type-conversion=identity-layout-map to get rid of
+    //     it. But according to the document, identity-layout-map could be less efficient, we still
+    //     want to stick with the default setting.
+    //
+    // https://discord.com/channels/636084430946959380/642426447167881246/1281620504859512914
+    //
+    //     Something looks odd here.
+    //     The result of a `memref.alloc` should be a memref without identity layout.
+    //     I know that the op supports operands for dims/symbols in the memref type,
+    //     but I never understood why.
+    //     Imo, a `memref.alloc() : memref<f64>` should have been generated.
+    //     The result value can then be casted to `memref<f64, strided<[], offset: ?>>`.
+    //
+    // https://discord.com/channels/636084430946959380/642426447167881246/1281710682160627785
+    //
+    // What I find interesting is that the comment says that
+    //
+    //     "we know we can set function-signature-type-conversion=identity-layout-map to get rid of
+    //     it"
+    //
+    // and that is what we are using, however we still have this rebuilding a memref without the
+    // layout. If that were true, then we could uncomment the following line and it should work.
+    // auto memrefType = origMemrefType;
+    // I can confirm that having
+    // function-signature-type-conversion=identity-layout-map makes the line above succed while the
+    // line below fail:
+    //
+    //     Get dynamic dimension sizes from the provided reference value if necessary.
+    auto memrefType = MemRefType::get(origMemrefType.getShape(), origMemrefType.getElementType());
+    //
+    // Looking at this a little bit deeper, I can say that the variable reference
+    // appears to come from a function parameter.
+    // and since it is not the identity layout, then we see the following generic MLIR when not
+    // using identity layout
+    //
+    // "func.func"() <{function_type = (memref<f64, strided<[], offset: ?>>) -> memref<f64,
+    // strided<[], offset: ?>>
+    //
+    // and we see this when using the identity layout:
+    //
+    // func.func public @jit_fn(%arg0: memref<f64>) -> memref<f64>
+    //
+    // When not using identity layout but also not removing the layout in the alloca, there are
+    // errors in some cases but not in others. I believe we have to do some casts in other places as
+    // well, whenever we use allocas and the types come from the arguments.
+    //
+    // My recommendation: at some point it would be good to remove the identity-layout-map from the
+    // frontend but until we have some more resources, let's keep it along with the origMemrefType.
+
     SmallVector<Value> dynamicDims;
     if (!memrefType.hasStaticShape()) {
         for (int64_t dim = 0; dim < memrefType.getRank(); dim++) {
@@ -60,14 +152,17 @@ Value generateAllocation(OpBuilder &builder, Location loc, Value reference)
     }
 
     return builder.create<memref::AllocOp>(loc, memrefType, dynamicDims);
+    // Uncomment below to follow Matthias suggestion of placing a CastOp after AllocOp
+    // some more tests will pass.
+    // return builder.create<memref::CastOp>(loc, origMemrefType, alloc_uncasted);
 }
 
 /// Helper function to generate a set of memref allocations.
 ///
 /// The allocation size and shape is deduced from a list of existing memref values.
 ///
-void generateAllocations(RewriterBase &rewriter, Location loc,
-                         SmallVectorImpl<Value> &allocations, ValueRange referenceValues)
+void generateAllocations(RewriterBase &rewriter, Location loc, SmallVectorImpl<Value> &allocations,
+                         ValueRange referenceValues)
 {
     for (Value memref : referenceValues) {
         allocations.push_back(
@@ -76,6 +171,7 @@ void generateAllocations(RewriterBase &rewriter, Location loc,
 }
 
 struct AdjointOpInterface
+    // This operation is not in DPS style and I believe that operands will only be read.
     : public bufferization::BufferizableOpInterface::ExternalModel<AdjointOpInterface, AdjointOp> {
     bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
                                 const bufferization::AnalysisState &state) const
@@ -125,16 +221,23 @@ struct AdjointOpInterface
             bufferArgs.push_back(*opBuffer);
         }
 
-
-        rewriter.create<AdjointOp>(loc, TypeRange{}, adjointOp.getCalleeAttr(), adjointOp.getGradSize(),
-                                   bufferArgs, memrefValues);
+        rewriter.create<AdjointOp>(loc, TypeRange{}, adjointOp.getCalleeAttr(),
+                                   adjointOp.getGradSize(), bufferArgs, memrefValues);
         bufferization::replaceOpWithBufferizedValues(rewriter, op, memrefValues);
         return success();
     }
 };
 
 struct BackpropOpInterface
-    : public bufferization::BufferizableOpInterface::ExternalModel<BackpropOpInterface, BackpropOp> {
+    // This operation is not in DPS style
+    // but it has a lot of parameters, notably:
+    // Variadic<AnyType>: $args
+    // Variadic<...RankedTensorOf<[AnyFloat]>>: $cotangents
+    // I think we don't write to the cotangents. And also not to the arguments
+    // so we can set bufferizesToMemoryWrite as false.
+    // The safe assumption is that it should be true.
+    : public bufferization::BufferizableOpInterface::ExternalModel<BackpropOpInterface,
+                                                                   BackpropOp> {
     bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
                                 const bufferization::AnalysisState &state) const
     {
@@ -144,7 +247,7 @@ struct BackpropOpInterface
     bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
                                  const bufferization::AnalysisState &state) const
     {
-        return true;
+        return false;
     }
 
     bufferization::AliasingValueList
@@ -172,15 +275,15 @@ struct BackpropOpInterface
         SmallVector<Value> bufferArgs;
         ValueRange operands = backpropOp.getArgs();
         for (Value operand : operands) {
-            if(isa<TensorType>(operand.getType())) {
+            if (isa<TensorType>(operand.getType())) {
                 FailureOr<Value> opBuffer = getBuffer(rewriter, operand, options);
                 if (failed(opBuffer))
                     return failure();
                 bufferArgs.push_back(*opBuffer);
-            } else {
+            }
+            else {
                 bufferArgs.push_back(operand);
             }
-
         }
 
         std::vector<Value> diffArgs =
@@ -256,123 +359,243 @@ struct BackpropOpInterface
 };
 
 struct ForwardOpInterface
-    : public bufferization::BufferizableOpInterface::ExternalModel<ForwardOpInterface, ForwardOp> {
-    bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
-                                const bufferization::AnalysisState &state) const
+    : public bufferization::OpWithUnstructuredControlFlowBufferizableOpInterfaceExternalModel<
+          ForwardOpInterface, ForwardOp> {
+    static bool supportsUnstructuredControlFlow() { return false; }
+
+    bool hasTensorSemantics(Operation *op) const
     {
-        return true;
+        auto isaTensor = llvm::IsaPred<TensorType>;
+
+        // A function has tensor semantics if it has tensor arguments/results.
+        auto forwardOp = cast<ForwardOp>(op);
+        bool hasTensorArg = any_of(forwardOp.getArgumentTypes(), isaTensor);
+        bool hasTensorResult = any_of(forwardOp.getResultTypes(), isaTensor);
+        bool hasTensorFuncInType = any_of(forwardOp.getFunctionType().getInputs(), isaTensor);
+        bool hasTensorFuncOutType = any_of(forwardOp.getFunctionType().getResults(), isaTensor);
+        if (hasTensorArg || hasTensorResult || hasTensorFuncInType || hasTensorFuncOutType)
+            return true;
+
+        return false;
     }
 
-    bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
-                                 const bufferization::AnalysisState &state) const
-    {
-        return true;
-    }
-
-    bufferization::AliasingValueList
-    getAliasingValues(Operation *op, OpOperand &opOperand,
-                      const bufferization::AnalysisState &state) const
+    bufferization::AliasingOpOperandList
+    getAliasingOpOperands(Operation *op, Value value,
+                          const bufferization::AnalysisState &state) const
     {
         return {};
+    }
+
+    FailureOr<BaseMemRefType> getBufferType(Operation *op, Value value,
+                                            const bufferization::BufferizationOptions &options,
+                                            SmallVector<Value> &invocationStack) const
+    {
+        auto forwardOp = cast<ForwardOp>(op);
+        auto bbArg = cast<BlockArgument>(value);
+
+        // Function arguments are special.
+        if (bbArg.getOwner() == &forwardOp.getBody().front())
+            return getBufferizedFunctionArgType(forwardOp, bbArg.getArgNumber(), options);
+
+        return OpWithUnstructuredControlFlowBufferizableOpInterfaceExternalModel::getBufferType(
+            op, value, options, invocationStack);
+    }
+
+    LogicalResult verifyAnalysis(Operation *op, const bufferization::AnalysisState &state) const
+    {
+        auto forwardOp = cast<ForwardOp>(op);
+        // TODO: func.func with multiple returns are not supported.
+        if (!getAssumedUniqueReturnOp(forwardOp))
+            return op->emitOpError("op without unique func.return is not supported");
+        return success();
     }
 
     LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
                             const bufferization::BufferizationOptions &options) const
     {
         auto forwardOp = cast<ForwardOp>(op);
+        FunctionType funcType = forwardOp.getFunctionType();
 
-        auto argc = forwardOp.getArgc();
-        auto resc = forwardOp.getResc();
-        SmallVector<Value> inputs;
-        SmallVector<Value> differentials;
-        SmallVector<Value> outputs;
-        SmallVector<Value> cotangents;
-
-        Block *block;
-        rewriter.modifyOpInPlace(op, [&] { block = forwardOp.addEntryBlock(); });
-
-        PatternRewriter::InsertionGuard guard(rewriter);
-        rewriter.setInsertionPointToStart(block);
-        auto params = forwardOp.getArguments();
-
-        for (size_t i = 0; i < argc * 2; i++) {
-            bool isDup = (i % 2) != 0;
-            Value val = params[i];
-            isDup ? differentials.push_back(val) : inputs.push_back(val);
+        // Construct the bufferized function type.
+        SmallVector<Type> argTypes;
+        for (const auto &it : llvm::enumerate(funcType.getInputs())) {
+            Type argType = it.value();
+            if (dyn_cast<TensorType>(argType)) {
+                argTypes.push_back(getBufferizedFunctionArgType(forwardOp, it.index(), options));
+                continue;
+            }
+            argTypes.push_back(argType);
         }
 
-        auto upperLimit = (argc * 2) + (resc * 2);
-        for (size_t i = argc * 2; i < upperLimit; i++) {
-            bool isDup = (i % 2) != 0;
-            Value val = params[i];
-            isDup ? cotangents.push_back(val) : outputs.push_back(val);
+        ReturnOp returnOp = getAssumedUniqueReturnOp(forwardOp);
+        assert(returnOp && "expected func with single return op");
+        Location loc = returnOp.getLoc();
+
+        // 1. Bufferize every block.
+        for (Block &block : forwardOp.getBody())
+            if (failed(bufferization::bufferizeBlockSignature(&block, rewriter, options)))
+                return failure();
+
+        // 2. For each result, keep track of which inplace argument it reuses.
+        SmallVector<Value> returnValues;
+        for (OpOperand &returnOperand : returnOp->getOpOperands()) {
+            Value returnVal = returnOperand.get();
+            auto tensorType = dyn_cast<TensorType>(returnVal.getType());
+            rewriter.setInsertionPoint(returnOp);
+
+            // If not a tensor type just forward it.
+            if (!tensorType) {
+                returnValues.push_back(returnVal);
+                continue;
+            }
+
+            // Note: If `inferFunctionResultLayout = true`, cast are later folded
+            // away.
+            BaseMemRefType resultType = options.functionArgTypeConverterFn(
+                tensorType, *options.defaultMemorySpaceFn(tensorType), forwardOp, options);
+            Value toMemrefOp =
+                rewriter.create<bufferization::ToMemrefOp>(loc, resultType, returnVal);
+            returnValues.push_back(toMemrefOp);
         }
 
-        auto implAttr = forwardOp.getImplementationAttr();
-        auto impl = forwardOp.getImplementation();
-        auto implOp = SymbolTable::lookupNearestSymbolFrom<FunctionOpInterface>(op, implAttr);
-        auto implResTy = implOp.getResultTypes();
-        Location loc = forwardOp.getLoc();
+        // 3. Rewrite the terminator.
+        forwardOp.walk([&](ReturnOp returnOp) {
+            PatternRewriter::InsertionGuard guard(rewriter);
+            rewriter.setInsertionPoint(returnOp);
+            rewriter.replaceOpWithNewOp<ReturnOp>(returnOp, returnValues, returnOp.getEmpty());
+        });
 
-        SmallVector<Value> tensorInputs;
-        for (auto input : inputs) {
-            Value tensorIn = rewriter.create<bufferization::ToTensorOp>(loc, input);
-            tensorInputs.push_back(tensorIn);
+        // 4. Rewrite the FuncOp type to buffer form. Also preserve unused return types.
+        SmallVector<Type> returnTypes;
+        for (auto retTy : forwardOp.getResultTypes()) {
+            auto tensorType = dyn_cast<TensorType>(retTy);
+            BaseMemRefType resultType = options.functionArgTypeConverterFn(
+                tensorType, *options.defaultMemorySpaceFn(tensorType), forwardOp, options);
+            returnTypes.push_back(resultType);
         }
-
-        auto callOp = rewriter.create<func::CallOp>(loc, impl, implResTy, tensorInputs);
-        SmallVector<Value> tensorOutputs(callOp.getResults());
-
-        for (auto [memrefOutput, tensorOutput] : llvm::zip(outputs, tensorOutputs)) {
-            Value castVal = rewriter.create<bufferization::ToMemrefOp>(loc, memrefOutput.getType(),
-                                                                       tensorOutput);
-            rewriter.create<memref::CopyOp>(loc, castVal, memrefOutput);
-        }
-
-        auto tapeCount = forwardOp.getTape();
-        SmallVector<Value> tapeOutputs;
-        tapeOutputs.insert(tapeOutputs.begin(), tensorOutputs.end() - tapeCount,
-                           tensorOutputs.end());
-
-        SmallVector<Value> tapeMemrefOutputs;
-        for (auto [tapeTensorOutput, memrefTapeOutput] :
-             llvm::zip(tapeOutputs, forwardOp.getResultTypes())) {
-            Value castVal =
-                rewriter.create<bufferization::ToMemrefOp>(loc, memrefTapeOutput, tapeTensorOutput);
-            tapeMemrefOutputs.push_back(castVal);
-        }
-
-        auto F = rewriter.getIntegerAttr(rewriter.getI1Type(), 0);
-        bufferization::replaceOpWithNewBufferizedOp<catalyst::gradient::ReturnOp>(rewriter, op, tapeMemrefOutputs, F);
+        forwardOp.setType(FunctionType::get(op->getContext(), argTypes, returnTypes));
 
         return success();
     }
 };
 
 struct ReverseOpInterface
-    : public bufferization::BufferizableOpInterface::ExternalModel<ReverseOpInterface, ReverseOp> {
-    bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
-                                const bufferization::AnalysisState &state) const
-    {
-        return true;
-    }
+    : public bufferization::OpWithUnstructuredControlFlowBufferizableOpInterfaceExternalModel<
+          ReverseOpInterface, ReverseOp> {
+    static bool supportsUnstructuredControlFlow() { return false; }
 
-    bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
-                                 const bufferization::AnalysisState &state) const
+    bool hasTensorSemantics(Operation *op) const
     {
+        auto isaTensor = llvm::IsaPred<TensorType>;
+
+        // A function has tensor semantics if it has tensor arguments/results.
+        auto reverseOp = cast<ReverseOp>(op);
+        bool hasTensorArg = any_of(reverseOp.getArgumentTypes(), isaTensor);
+        bool hasTensorResult = any_of(reverseOp.getResultTypes(), isaTensor);
+        bool hasTensorFuncInType = any_of(reverseOp.getFunctionType().getInputs(), isaTensor);
+        bool hasTensorFuncOutType = any_of(reverseOp.getFunctionType().getResults(), isaTensor);
+        if (hasTensorArg || hasTensorResult || hasTensorFuncInType || hasTensorFuncOutType)
+            return true;
+
         return false;
     }
 
-    bufferization::AliasingValueList
-    getAliasingValues(Operation *op, OpOperand &opOperand,
-                      const bufferization::AnalysisState &state) const
+    bufferization::AliasingOpOperandList
+    getAliasingOpOperands(Operation *op, Value value,
+                          const bufferization::AnalysisState &state) const
     {
         return {};
+    }
+
+    FailureOr<BaseMemRefType> getBufferType(Operation *op, Value value,
+                                            const bufferization::BufferizationOptions &options,
+                                            SmallVector<Value> &invocationStack) const
+    {
+        auto reverseOp = cast<ReverseOp>(op);
+        auto bbArg = cast<BlockArgument>(value);
+
+        // Function arguments are special.
+        if (bbArg.getOwner() == &reverseOp.getBody().front())
+            return getBufferizedFunctionArgType(reverseOp, bbArg.getArgNumber(), options);
+
+        return OpWithUnstructuredControlFlowBufferizableOpInterfaceExternalModel::getBufferType(
+            op, value, options, invocationStack);
+    }
+
+    LogicalResult verifyAnalysis(Operation *op, const bufferization::AnalysisState &state) const
+    {
+        auto reverseOp = cast<ReverseOp>(op);
+        // TODO: func.func with multiple returns are not supported.
+        if (!getAssumedUniqueReturnOp(reverseOp))
+            return op->emitOpError("op without unique func.return is not supported");
+        return success();
     }
 
     LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
                             const bufferization::BufferizationOptions &options) const
     {
+        auto reverseOp = cast<ReverseOp>(op);
+        FunctionType funcType = reverseOp.getFunctionType();
+
+        // Construct the bufferized function type.
+        SmallVector<Type> argTypes;
+        for (const auto &it : llvm::enumerate(funcType.getInputs())) {
+            Type argType = it.value();
+            if (dyn_cast<TensorType>(argType)) {
+                argTypes.push_back(getBufferizedFunctionArgType(reverseOp, it.index(), options));
+                continue;
+            }
+            argTypes.push_back(argType);
+        }
+
+        ReturnOp returnOp = getAssumedUniqueReturnOp(reverseOp);
+        assert(returnOp && "expected func with single return op");
+        Location loc = returnOp.getLoc();
+
+        // 1. Bufferize every block.
+        for (Block &block : reverseOp.getBody())
+            if (failed(bufferization::bufferizeBlockSignature(&block, rewriter, options)))
+                return failure();
+
+        // 2. For each result, keep track of which inplace argument it reuses.
+        SmallVector<Value> returnValues;
+        for (OpOperand &returnOperand : returnOp->getOpOperands()) {
+            Value returnVal = returnOperand.get();
+            auto tensorType = dyn_cast<TensorType>(returnVal.getType());
+            rewriter.setInsertionPoint(returnOp);
+
+            // If not a tensor type just forward it.
+            if (!tensorType) {
+                returnValues.push_back(returnVal);
+                continue;
+            }
+
+            // Note: If `inferFunctionResultLayout = true`, cast are later folded
+            // away.
+            BaseMemRefType resultType = options.functionArgTypeConverterFn(
+                tensorType, *options.defaultMemorySpaceFn(tensorType), reverseOp, options);
+            Value toMemrefOp =
+                rewriter.create<bufferization::ToMemrefOp>(loc, resultType, returnVal);
+            returnValues.push_back(toMemrefOp);
+        }
+
+        // 3. Rewrite the terminator.
+        reverseOp.walk([&](ReturnOp returnOp) {
+            PatternRewriter::InsertionGuard guard(rewriter);
+            rewriter.setInsertionPoint(returnOp);
+            rewriter.replaceOpWithNewOp<ReturnOp>(returnOp, returnValues, returnOp.getEmpty());
+        });
+
+        // 4. Rewrite the FuncOp type to buffer form. Also preserve unused return types.
+        SmallVector<Type> returnTypes;
+        for (auto retTy : reverseOp.getResultTypes()) {
+            auto tensorType = dyn_cast<TensorType>(retTy);
+            BaseMemRefType resultType = options.functionArgTypeConverterFn(
+                tensorType, *options.defaultMemorySpaceFn(tensorType), reverseOp, options);
+            returnTypes.push_back(resultType);
+        }
+        reverseOp.setType(FunctionType::get(op->getContext(), argTypes, returnTypes));
+
         return success();
     }
 };
@@ -381,7 +604,10 @@ struct ReverseOpInterface
 
 void catalyst::gradient::registerBufferizableOpInterfaceExternalModels(DialectRegistry &registry)
 {
-    registry.addExtension(+[](MLIRContext *ctx, catalyst::gradient::GradientDialect *dialect) {
-       // CustomCallOp::attachInterface<CustomCallOpInterface>(*ctx);
+    registry.addExtension(+[](MLIRContext *ctx, GradientDialect *dialect) {
+        AdjointOp::attachInterface<AdjointOpInterface>(*ctx);
+        BackpropOp::attachInterface<BackpropOpInterface>(*ctx);
+        ForwardOp::attachInterface<ForwardOpInterface>(*ctx);
+        ReverseOp::attachInterface<ReverseOpInterface>(*ctx);
     });
 }
