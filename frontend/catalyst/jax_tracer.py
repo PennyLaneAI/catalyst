@@ -696,7 +696,7 @@ def trace_quantum_operations(
     ctx,
     trace: DynamicJaxprTrace,
     mcm_config: qml.devices.MCMConfig = qml.devices.MCMConfig(),
-) -> QRegPromise:
+) -> Tuple[QRegPromise, List[DynamicJaxprTracer]]:
     """Recursively trace ``quantum_tape``'s operations containing both PennyLane original and
     Catalyst extension operations. Produce ``QRegPromise`` object holding the resulting quantum
     register tracer.
@@ -711,6 +711,7 @@ def trace_quantum_operations(
     Returns:
         qrp: QRegPromise object holding the JAX tracer representing the quantum register into its
              final state.
+        out_snapshot_tracer: modified list of JAX classical qnode snapshot tracers.
     """
     # Notes:
     # [1] - At this point JAX equation contains both equations added during the classical tracing
@@ -721,7 +722,7 @@ def trace_quantum_operations(
     #       equations in a wrong order. The set of variables are always complete though, so we sort
     #       the equations to restore their correct order.
 
-    def bind_native_operation(qrp, op, controlled_wires, controlled_values, adjoint=False):
+    def bind_native_operation(qrp, op, controlled_wires, controlled_values, out_snapshot_tracer, adjoint=False):
         # For named-controlled operations (e.g. CNOT, CY, CZ) - bind directly by name. For
         # Controlled(OP) bind OP with native quantum control syntax, and similarly for Adjoint(OP).
         if type(op) in (Controlled, ControlledOp):
@@ -759,6 +760,21 @@ def trace_quantum_operations(
             trace_state_prep(op, qrp)
         elif isinstance(op, qml.BasisState):
             trace_basis_state(op, qrp)
+        elif isinstance(op, qml.Snapshot):
+            nqubits = (
+                device.wires[0]
+                if catalyst.device.qjit_device.is_dynamic_wires(device.wires)
+                else len(device.wires)
+            )
+            if isinstance(nqubits, DynamicJaxprTracer):
+                shape = (jnp.left_shift(1, nqubits),)
+            else:
+                shape = (2**nqubits,)
+            qreg_out = qrp.actualize()
+            obs_tracers = compbasis_p.bind(qreg_out, qreg_available=True)
+            dyn_dims, static_shape = _extract_tracers_dyn_shape(shape)
+            result = state_p.bind(obs_tracers, *dyn_dims, static_shape=tuple(static_shape))
+            out_snapshot_tracer.append(result)
         else:
             qubits = qrp.extract(op.wires)
             controlled_qubits = qrp.extract(controlled_wires)
@@ -783,6 +799,7 @@ def trace_quantum_operations(
     else:
         ops = quantum_tape.operations
 
+    out_snapshot_tracer = []
     for op in ops:
         qrp2 = None
         if isinstance(op, HybridOp):
@@ -795,13 +812,13 @@ def trace_quantum_operations(
         elif isinstance(op, MeasurementProcess):
             qrp2 = qrp
         else:
-            qrp2 = bind_native_operation(qrp, op, [], [])
+            qrp2 = bind_native_operation(qrp, op, [], [], out_snapshot_tracer)
 
         assert qrp2 is not None
         qrp = qrp2
     trace = EvaluationContext.get_current_trace()
     trace.frame.eqns = sort_eqns(trace.frame.eqns, FORCED_ORDER_PRIMITIVES)  # [1]
-    return qrp
+    return qrp, out_snapshot_tracer
 
 
 @debug_logger
@@ -1371,7 +1388,7 @@ def trace_quantum_function(
                     postselect_mode=qnode.execute_kwargs["postselect_mode"],
                     mcm_method=qnode.execute_kwargs["mcm_method"],
                 )
-                qrp_out = trace_quantum_operations(tape, device, qreg_in, ctx, trace, mcm_config)
+                qrp_out, snapshot_results = trace_quantum_operations(tape, device, qreg_in, ctx, trace, mcm_config)
                 meas, meas_trees = trace_quantum_measurements(device, qrp_out, output, trees)
                 qreg_out = qrp_out.actualize()
 
@@ -1383,7 +1400,9 @@ def trace_quantum_function(
                         return func(arr)
 
                 meas_tracers = check_full_raise(meas, trace.to_jaxpr_tracer)
-                meas_results = tree_unflatten(meas_trees, meas_tracers)
+                for s in snapshot_results:
+                    meas_tracers.insert(0,s)
+                meas_results = tree_unflatten(tree_structure(meas_tracers), meas_tracers)
 
                 # TODO: Allow the user to return whatever types they specify.
                 if tracing_mode == TracingMode.TRANSFORM:
