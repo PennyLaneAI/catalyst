@@ -110,6 +110,9 @@
   Catalyst version 0.11.0, PennyLane version 0.41.0, PennyLane-Lightning
   version 0.41.0, and Jax version 0.4.28.
 
+* Sphix version has been updated to 8.1. Some other related packages have been updated as well.
+  [(#1734)](https://github.com/PennyLaneAI/catalyst/pull/1734)
+
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
