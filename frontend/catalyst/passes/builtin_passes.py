@@ -341,6 +341,11 @@ def to_ppr(qnode):
     :class:`qml.H <pennylane.H>`,
     :class:`qml.S <pennylane.S>`,
     :class:`qml.T <pennylane.T>`,
+    :class:`qml.X <pennylane.X>`,
+    :class:`qml.Y <pennylane.Y>`,
+    :class:`qml.Z <pennylane.Z>`,
+    :class:`qml.adjoint(qml.S) <pennylane.adjoint(pennylane.S)>`,
+    :class:`qml.adjoint(qml.T) <pennylane.adjoint(pennylane.T)>`,
     :class:`qml.CNOT <pennylane.CNOT>`,
     :class:`qml.measure() <pennylane.measure>`
 

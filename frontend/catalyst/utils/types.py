@@ -17,7 +17,8 @@ import inspect
 from collections.abc import Sequence
 
 import numpy as np
-from jax._src.api_util import shaped_abstractify
+from jax import numpy as jnp
+from jax._src.core import shaped_abstractify
 from jax._src.lib.mlir import ir
 
 from catalyst.jax_extras import ShapedArray
@@ -69,3 +70,13 @@ def convert_numpy_dtype_to_mlir(dtp):
     elif dtp == np.dtype(np.int64):
         return ir.IntegerType.get_signless(64)
     raise ValueError("Requested type conversion not available.")
+
+
+def get_shape(x):
+    """
+    Jax deprecated support of jnp.shape(ShapedArray) on 0.5.3.
+    This method extracts the shape from regular and ShapedArray variables.
+    """
+
+    shape = x.shape if isinstance(x, ShapedArray) else jnp.shape(x)
+    return shape

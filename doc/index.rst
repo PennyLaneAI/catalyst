@@ -28,7 +28,6 @@ Catalyst
             Catalyst is an experimental package that enables just-in-time (JIT)
             compilation of PennyLane programs. Compile the entire quantum-classical workflow.
         </p>
-        <img src="_static/catalyst.png" style="max-width: 700px; width: 100%;">
       <div class="row mt-3">
 
 .. index-card::
@@ -52,13 +51,18 @@ Catalyst
    </div>
    <br>
 
+.. image:: _static/pl-catalyst-logo-lightmode.png
+    :align: center
+    :width: 700px
+    :target: javascript:void(0);
+
 .. mdinclude:: ../README.md
   :start-line: 20
   :end-line: 72
 
 .. mdinclude:: ../README.md
   :start-line: 134
-  :end-line: 155
+  :end-line: 167
 
 .. toctree::
    :maxdepth: 2
@@ -107,5 +111,4 @@ Catalyst
 
    code/__init__
    catalyst-cli/catalyst-cli.rst
-   Runtime Device Interface <api/file_runtime_include_QuantumDevice.hpp>
-   QIR C-API <api/file_runtime_include_RuntimeCAPI.h>
+   Runtime Device Interface <api/structCatalyst_1_1Runtime_1_1QuantumDevice>
