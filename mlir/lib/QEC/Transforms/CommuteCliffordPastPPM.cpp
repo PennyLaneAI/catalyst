@@ -173,9 +173,9 @@ bool shouldRemovePPR(PPRotationOp op)
 struct CommuteCliffordPastPPM : public OpRewritePattern<PPMeasurementOp> {
     using OpRewritePattern::OpRewritePattern;
 
-    unsigned int MAX_PAULI_SIZE;
+    size_t MAX_PAULI_SIZE;
 
-    CommuteCliffordPastPPM(mlir::MLIRContext *context, unsigned int max_pauli_size,
+    CommuteCliffordPastPPM(mlir::MLIRContext *context, size_t max_pauli_size,
                            PatternBenefit benefit)
         : OpRewritePattern(context, benefit), MAX_PAULI_SIZE(max_pauli_size)
     {

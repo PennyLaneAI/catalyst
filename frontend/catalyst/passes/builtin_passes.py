@@ -508,7 +508,7 @@ def merge_ppr_ppm(qnode=None, *, max_pauli_size=0):
 
     Args:
         fn (QNode): QNode to apply the pass to
-        max_pauli_size (uint): The maximum size of the Pauli strings after merging.
+        max_pauli_size (int): The maximum size of the Pauli strings after merging.
 
     Returns:
         ~.QNode

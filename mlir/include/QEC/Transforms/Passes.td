@@ -20,7 +20,7 @@ include "mlir/Pass/PassBase.td"
 def MaxPauliSizeOption : Option<
     /*C++ var name=*/"max_pauli_size",
     /*CLI name=*/"max-pauli-size",
-    /*Type=*/"unsigned int",
+    /*Type=*/"size_t",
     /*Default=*/"0", // 0 means no limit
     /*Description=*/"The maximum size of the Pauli product. 0 means no limit.">;
 

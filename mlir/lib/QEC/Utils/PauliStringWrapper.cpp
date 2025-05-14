@@ -190,15 +190,15 @@ void updatePauliWordSign(QECOpInterface op, bool isNegated, PatternRewriter &rew
     op.setRotationKind(rotationKind);
 }
 
-bool isNoSizeLimit(uint max_pauli_size) { return max_pauli_size == 0; }
+bool isNoSizeLimit(size_t MaxPauliSize) { return MaxPauliSize == 0; }
 
-bool exceedPauliSizeLimit(size_t pauliSize, uint max_pauli_size)
+bool exceedPauliSizeLimit(size_t pauliSize, size_t MaxPauliSize)
 {
     // No size limit
-    if (isNoSizeLimit(max_pauli_size)) {
+    if (isNoSizeLimit(MaxPauliSize)) {
         return false;
     }
-    return pauliSize > max_pauli_size;
+    return pauliSize > MaxPauliSize;
 }
 
 } // namespace qec

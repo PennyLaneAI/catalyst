@@ -143,10 +143,9 @@ void moveCliffordPastNonClifford(const PauliStringWrapper &lhsPauli,
 struct CommuteCliffordTPPR : public OpRewritePattern<PPRotationOp> {
     using OpRewritePattern::OpRewritePattern;
 
-    unsigned int MAX_PAULI_SIZE;
+    size_t MAX_PAULI_SIZE;
 
-    CommuteCliffordTPPR(mlir::MLIRContext *context, unsigned int max_pauli_size,
-                        PatternBenefit benefit)
+    CommuteCliffordTPPR(mlir::MLIRContext *context, size_t max_pauli_size, PatternBenefit benefit)
         : OpRewritePattern(context), MAX_PAULI_SIZE(max_pauli_size)
     {
     }
