@@ -250,7 +250,8 @@ class UnitaryGate_Op<string mnemonic, list<Trait> traits = []> :
         }
 
         bool getAdjointFlag() {
-            return getAdjoint().value_or(false);
+            // return getAdjoint().value_or(false);
+            return getAdjoint();
         }
         void setAdjointFlag(bool adjoint) {
             if (adjoint) {
@@ -371,7 +372,7 @@ def CustomOp : UnitaryGate_Op<"custom", [DifferentiableGate, NoMemoryEffect,
         Variadic<F64>:$params,
         Variadic<QubitType>:$in_qubits,
         StrAttr:$gate_name,
-        OptionalAttr<UnitAttr>:$adjoint,
+        UnitAttr:$adjoint,
         Variadic<QubitType>:$in_ctrl_qubits,
         Variadic<I1>:$in_ctrl_values
     );
@@ -492,7 +493,7 @@ def GlobalPhaseOp : UnitaryGate_Op<"gphase", [DifferentiableGate, AttrSizedOpera
 
     let arguments = (ins
         F64:$params,
-        OptionalAttr<UnitAttr>:$adjoint,
+        UnitAttr:$adjoint,
         Variadic<QubitType>:$in_ctrl_qubits,
         Variadic<I1>:$in_ctrl_values
     );
@@ -534,7 +535,7 @@ def MultiRZOp : UnitaryGate_Op<"multirz", [DifferentiableGate, NoMemoryEffect,
     let arguments = (ins
         F64:$theta,
         Variadic<QubitType>:$in_qubits,
-        OptionalAttr<UnitAttr>:$adjoint,
+        UnitAttr:$adjoint,
         Variadic<QubitType>:$in_ctrl_qubits,
         Variadic<I1>:$in_ctrl_values
     );
@@ -571,7 +572,7 @@ def QubitUnitaryOp : UnitaryGate_Op<"unitary", [ParametrizedGate, NoMemoryEffect
             2DTensorOf<[Complex<F64>]>, MemRefRankOf<[Complex<F64>], [2]>
         ]>:$matrix,
         Variadic<QubitType>:$in_qubits,
-        OptionalAttr<UnitAttr>:$adjoint,
+        UnitAttr:$adjoint,
         Variadic<QubitType>:$in_ctrl_qubits,
         Variadic<I1>:$in_ctrl_values
     );
