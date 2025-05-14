@@ -155,9 +155,16 @@ jobs:
       # if: steps.cache-llvm-build.outputs.cache-hit != 'true'
       run: |
         sudo apt-get update
-        sudo apt-get install -y python3.10 python3.10-venv python3.10-dev cmake ninja-build clang lld
-        python3 --version 
+        sudo add-apt-repository -y ppa:deadsnakes/ppa
+        sudo apt-get install -y python3.10 python3.10-dev python3.10-venv
+        sudo apt-get install -y cmake ninja-build clang lld
+        python3.10 --version 
         python3 -m pip install numpy pybind11
+
+    - name: List all installed Python versions
+      run: |
+        ls -l /usr/bin/python*
+        pyenv versions || true
 
     - name: Build LLVM
       # if: steps.cache-llvm-build.outputs.cache-hit != 'true'
