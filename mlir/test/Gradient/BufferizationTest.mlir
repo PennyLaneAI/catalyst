@@ -70,11 +70,11 @@ func.func private @circuit(%arg0: f64)
 func.func @backprop_scalar_in(%arg0: f64, %arg1: tensor<?xf64>) {
 
     // CHECK:   [[cotangentSource:%.+]] = bufferization.to_memref %arg1 : memref<?xf64>
-    // CHECK:   [[dim:%.+]] = memref.dim [[cotangentSource]]
-    // CHECK:   [[calleeRes:%.+]] = memref.alloc([[dim]]) : memref<?xf64>
     // CHECK:   [[dim1:%.+]] = memref.dim [[cotangentSource]]
-    // CHECK:   [[cotangentRes:%.+]] = memref.alloc([[dim1]]) : memref<?xf64>
+    // CHECK:   [[cotangentRes:%.+]] = memref.alloc([[dim1]]) {alignment = 64 : i64} : memref<?xf64>
     // CHECK:   memref.copy [[cotangentSource]], [[cotangentRes]]
+    // CHECK:   [[dim:%.+]] = memref.dim [[cotangentRes]]
+    // CHECK:   [[calleeRes:%.+]] = memref.alloc([[dim]]) : memref<?xf64>
     // CHECK:   {{%.+}} = gradient.backprop @circuit(%arg0)
     // CHECK-SAME:  callee_out([[calleeRes]] : memref<?xf64>)
     // CHECK-SAME:  cotangents([[cotangentRes]] : memref<?xf64>)
@@ -93,13 +93,13 @@ func.func @backprop_tensor_in(%arg0: tensor<?x2xf64>, %arg1: tensor<?xf64>) {
 
     // CHECK-DAG:   [[argSource:%.+]] = bufferization.to_memref %arg0 : memref<?x2xf64>
     // CHECK-DAG:   [[cotangentSource:%.+]] = bufferization.to_memref %arg1 : memref<?xf64>
+    // CHECK:   [[dim2:%.+]] = memref.dim [[cotangentSource]]
+    // CHECK:   [[cotangentRes:%.+]] = memref.alloc([[dim2]]) {alignment = 64 : i64} : memref<?xf64>
+    // CHECK:   memref.copy [[cotangentSource]], [[cotangentRes]]
     // CHECK:   [[dim:%.+]] = memref.dim [[argSource]]
     // CHECK:   [[argShadow:%.+]] = memref.alloc([[dim]]) : memref<?x2xf64>
-    // CHECK:   [[dim1:%.+]] = memref.dim [[cotangentSource]]
+    // CHECK:   [[dim1:%.+]] = memref.dim [[cotangentRes]]
     // CHECK:   [[calleeRes:%.+]] = memref.alloc([[dim1]]) : memref<?xf64>
-    // CHECK:   [[dim2:%.+]] = memref.dim [[cotangentSource]]
-    // CHECK:   [[cotangentRes:%.+]] = memref.alloc([[dim2]]) : memref<?xf64>
-    // CHECK:   memref.copy [[cotangentSource]], [[cotangentRes]]
     // CHECK:   gradient.backprop @circuit([[argSource]])
     // CHECK-SAME:  grad_out([[argShadow]] : memref<?x2xf64>)
     // CHECK-SAME:  callee_out([[calleeRes]] : memref<?xf64>)
@@ -119,11 +119,12 @@ func.func @backprop_multiple_tensors_in(%arg0: tensor<10xf64>, %arg1: tensor<2xf
 
     // CHECK-DAG:   [[argSource0:%.+]] = bufferization.to_memref %arg0 : memref<10xf64>
     // CHECK-DAG:   [[argSource1:%.+]] = bufferization.to_memref %arg1 : memref<2xf64>
+    // CHECK:   memref.alloc
+    // CHECK:   memref.copy
     // CHECK:   [[argShadow1:%.+]] = memref.alloc() : memref<10xf64>
     // CHECK:   [[argShadow2:%.+]] = memref.alloc() : memref<2xf64>
     // CHECK:   [[dim:%.+]] = memref.dim
     // CHECK:   [[calleeRes:%.+]] = memref.alloc([[dim]]) : memref<?xf64>
-    // CHECK:   memref.copy
     // CHECK:   gradient.backprop @circuit([[argSource0]], [[argSource1]])
     // CHECK-SAME: grad_out([[argShadow1]], [[argShadow2]] : memref<10xf64>, memref<2xf64>)
     // CHECK-SAME: callee_out([[calleeRes]] : memref<?xf64>)

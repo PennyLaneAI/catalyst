@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <algorithm> // std::find
 #include <vector>
 
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
@@ -190,10 +191,7 @@ struct AdjointOpInterface
 // Argument tensor is converted to memrefs by bufferization.to_memref.
 // Result tensor of gradient.backprop is bufferized with a corresponding memref.alloc.
 // Users of the result tensor are updated to use the new memref.
-// Cotangents are copied.
-//
-// Note that backprop is the only one that supports value_and_grad, so result tensors might
-// include both the value tensor and the grad tensor.
+// Cotangent operands are copied.
 struct BackpropOpInterface
     : public bufferization::BufferizableOpInterface::ExternalModel<BackpropOpInterface,
                                                                    BackpropOp> {
@@ -206,9 +204,16 @@ struct BackpropOpInterface
     bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
                                  const bufferization::AnalysisState &state) const
     {
-        // The visible operands in tensor land are $args and $cotangents,
-        // neither of which is altered by the op.
-        return false;
+        // Enzyme mutates the result shadows, but the cotangent tensors must be immutable for SSA.
+        // Thus we create copies to be the result shadows passed into Enzyme.
+        // For example, the same cotangent tensor SSA value can be used by multiple backprop ops,
+        // due to things like CSE. Therefore the memref corresponding to the original tensor must
+        // be left untouched.
+        //
+        // All other operands will not be written into.
+
+        SmallVector<Value> cotangents = cast<BackpropOp>(op).getCotangents();
+        return std::find(cotangents.begin(), cotangents.end(), opOperand.get()) != cotangents.end();
     }
 
     bufferization::AliasingValueList
@@ -283,23 +288,15 @@ struct BackpropOpInterface
             bufferCotangents.push_back(*opBuffer);
         }
 
-        SmallVector<Value> calleeResults, resShadows;
+        SmallVector<Value> calleeResults;
         generateAllocations(rewriter, loc, calleeResults, bufferCotangents);
-        // Enzyme mutates the result shadows, but the cotangent tensors must be immutable for SSA.
-        // Thus we create copies to be the result shadows to be passed into Enzyme.
-        // For example, the same cotangent tensor SSA value can be used by multiple backprop ops,
-        // due to things like CSE. Therefore the memref corresponding to the original tensor must
-        // be left untouched.
-        generateAllocations(rewriter, loc, resShadows, bufferCotangents);
-        for (const auto &[cotangent, resShadow] : llvm::zip(bufferCotangents, resShadows)) {
-            rewriter.create<memref::CopyOp>(loc, cotangent, resShadow);
-        }
 
         // 4. Create bufferized backprop op
         DenseIntElementsAttr diffArgIndicesAttr = backpropOp.getDiffArgIndices().value_or(nullptr);
         auto bufferizedBackpropOp = rewriter.create<BackpropOp>(
             loc, TypeRange{}, scalarReturnTypes, backpropOp.getCalleeAttr(), bufferArgs, argShadows,
-            calleeResults, resShadows, diffArgIndicesAttr, backpropOp.getKeepValueResultsAttr());
+            calleeResults, bufferCotangents, diffArgIndicesAttr,
+            backpropOp.getKeepValueResultsAttr());
         // Fill in the null placeholders.
         for (const auto &[idx, scalarResult] :
              llvm::enumerate(bufferizedBackpropOp.getGradients())) {
