@@ -48,6 +48,22 @@ func.func @adjoint_with_tensor_arg(%arg0: tensor<2xf64>, %arg1: index) {
 
 // -----
 
+func.func private @circuit(%arg0: tensor<2xf64>)
+
+// CHECK-LABEL: @adjoint_with_multiple_results
+func.func @adjoint_with_multiple_results(%arg0: tensor<2xf64>, %arg1: index) {
+
+    // CHECK:   [[argBuffer:%.+]] = bufferization.to_memref %arg0 : memref<2xf64>
+    // CHECK:   [[alloc0:%.+]] = memref.alloc(%arg1) : memref<?xf64>
+    // CHECK:   [[alloc1:%.+]] = memref.alloc(%arg1) : memref<?xf32>
+    // CHECK:   gradient.adjoint @circuit([[argBuffer]]) size(%arg1) in([[alloc0]], [[alloc1]]
+    // CHECK-SAME: memref<?xf64>, memref<?xf32>) : (memref<2xf64>) -> ()
+    %grad:2 = gradient.adjoint @circuit(%arg0) size(%arg1) : (tensor<2xf64>) -> (tensor<?xf64>, tensor<?xf32>)
+    return
+}
+
+// -----
+
 func.func private @circuit2(%arg0: f64)
 
 // CHECK-LABEL: @backprop
