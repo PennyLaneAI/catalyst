@@ -157,6 +157,7 @@ void TensorType2MemrefType(const SmallVector<Type> &inTypes, SmallVector<Type> &
 }
 
 // Bufferization of gradient.adjoint.
+// Argument tensor is converted to memrefs by bufferization.to_memref.
 // Result tensor of gradient.adjoint is bufferized with a corresponding memref.alloc.
 // Users of the result tensor are updated to use the new memref.
 struct AdjointOpInterface
@@ -221,14 +222,15 @@ struct AdjointOpInterface
     }
 };
 
+// Bufferization of gradient.backprop.
+// Argument tensor is converted to memrefs by bufferization.to_memref.
+// Result tensor of gradient.backprop is bufferized with a corresponding memref.alloc.
+// Users of the result tensor are updated to use the new memref.
+// cotangents?
+//
+// Note that backprop is the only one that supports value_and_grad, so result tensors might
+// include both the value tensor and the grad tensor.
 struct BackpropOpInterface
-    // This operation is not in DPS style
-    // but it has a lot of parameters, notably:
-    // Variadic<AnyType>: $args
-    // Variadic<...RankedTensorOf<[AnyFloat]>>: $cotangents
-    // I think we don't write to the cotangents. And also not to the arguments
-    // so we can set bufferizesToMemoryWrite as false.
-    // The safe assumption is that it should be true.
     : public bufferization::BufferizableOpInterface::ExternalModel<BackpropOpInterface,
                                                                    BackpropOp> {
     bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
@@ -240,6 +242,9 @@ struct BackpropOpInterface
     bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
                                  const bufferization::AnalysisState &state) const
     {
+        // I think we don't write to the cotangents. And also not to the arguments
+        // so we can set bufferizesToMemoryWrite as false.
+        // The safe assumption is that it should be true.
         return false;
     }
 
@@ -270,8 +275,9 @@ struct BackpropOpInterface
         for (Value operand : operands) {
             if (isa<TensorType>(operand.getType())) {
                 FailureOr<Value> opBuffer = getBuffer(rewriter, operand, options);
-                if (failed(opBuffer))
+                if (failed(opBuffer)) {
                     return failure();
+                }
                 bufferArgs.push_back(*opBuffer);
             }
             else {
@@ -308,8 +314,9 @@ struct BackpropOpInterface
         SmallVector<Value> bufferCotangentsList;
         for (Value operand : cotangents) {
             FailureOr<Value> opBuffer = getBuffer(rewriter, operand, options);
-            if (failed(opBuffer))
+            if (failed(opBuffer)) {
                 return failure();
+            }
             bufferCotangentsList.push_back(*opBuffer);
         }
         mlir::ValueRange bufferCotangents(bufferCotangentsList);
