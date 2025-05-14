@@ -12,8 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iostream"
-#include "llvm/Support/raw_ostream.h"
+#include <vector>
 
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
@@ -43,70 +42,41 @@ using namespace catalyst::gradient;
  *  https://github.com/llvm/llvm-project/blob/main/mlir/include/mlir/Dialect/Bufferization/IR/BufferizableOpInterface.td#L14
  */
 
+// TODO: Investigate how to get rid of identity-layout-map
+//
+// By default, one-shot-bufferization chooses dynamic memory layout.
+// See https://mlir.llvm.org/docs/Bufferization/#memory-layouts
+// In practice, this means the `getBuffer()` methods will return memrefs with dynamic
+// memory layout, e.g. `memref<2x3xf64, strided<[?, ?], offset: ?>>`
+// However, this causes some issues, namely:
+// - Type mismatches during pattern rewriting
+// - Ops taking in dynamic layouts need to supply operands for them
+//
+// For now, we force identity layout on all generated memrefs.
+// This is be done by
+// - For the `getBuffer()` methods: setting `unknown-type-conversion=identity-layout-map` on the
+// `one-shot-bufferize` pass
+// - For the memrefs we generate ourselves: creating a new MemRefType object by
+// `MemRefType::get(shape, elementType)`, without supplying detailed layouts.
+//
+//
+// The goal of the TODO is to eliminate the need to specify
+// `unknown-type-conversion=identity-layout-map` on the pass.
+// An easy strategy is just to insert memref.cast ops everywhere such mismatches happen.
+// See https://mlir.llvm.org/docs/Dialects/MemRef/#memrefcast-memrefcastop:
+//   * The source and destination types are compatible if:
+//   *   - ...
+//   *   - The individual sizes (resp. offset and strides in the case of strided memrefs) may
+//   *     convert constant dimensions to dynamic dimensions and vice-versa.
+
 namespace {
 
+// A helper to generate a memref.alloc() with an identical type as the
+// (possibly dynamically-shaped) reference Value.
 Value generateAllocation(OpBuilder &builder, Location loc, Value reference)
 {
     auto origMemrefType = cast<MemRefType>(reference.getType());
-    // TODO: Investigate how to get rid of identity-layout-map
-    //
-    //     Hi all. For one-shot-bufferization, is there any automatic way to pass all memref symbols
-    //     to AllocOp? we have an example below that triggers  error: 'memref.alloc' op symbol
-    //     operand count does not equal memref symbol count: expected 1, got 0 .  We think we have
-    //     to pass the offset symbol to AllocOp.
-    //
-    //         %0 = "bufferization.to_memref"(%arg0) : (tensor<f64>) -> memref<f64, strided<[],
-    //         offset: ?>> %1 = "memref.alloc"() <{operandSegmentSizes = array<i32: 0, 0>}> : () ->
-    //         memref<f64, strided<[], offset: ?>>
-    //
-    //     We know we can set function-signature-type-conversion=identity-layout-map to get rid of
-    //     it. But according to the document, identity-layout-map could be less efficient, we still
-    //     want to stick with the default setting.
-    //
-    // https://discord.com/channels/636084430946959380/642426447167881246/1281620504859512914
-    //
-    //     Something looks odd here.
-    //     The result of a `memref.alloc` should be a memref without identity layout.
-    //     I know that the op supports operands for dims/symbols in the memref type,
-    //     but I never understood why.
-    //     Imo, a `memref.alloc() : memref<f64>` should have been generated.
-    //     The result value can then be casted to `memref<f64, strided<[], offset: ?>>`.
-    //
-    // https://discord.com/channels/636084430946959380/642426447167881246/1281710682160627785
-    //
-    // What I find interesting is that the comment says that
-    //
-    //     "we know we can set function-signature-type-conversion=identity-layout-map to get rid of
-    //     it"
-    //
-    // and that is what we are using, however we still have this rebuilding a memref without the
-    // layout. If that were true, then we could uncomment the following line and it should work.
-    // auto memrefType = origMemrefType;
-    // I can confirm that having
-    // function-signature-type-conversion=identity-layout-map makes the line above succed while the
-    // line below fail:
-    //
-    //     Get dynamic dimension sizes from the provided reference value if necessary.
     auto memrefType = MemRefType::get(origMemrefType.getShape(), origMemrefType.getElementType());
-    //
-    // Looking at this a little bit deeper, I can say that the variable reference
-    // appears to come from a function parameter.
-    // and since it is not the identity layout, then we see the following generic MLIR when not
-    // using identity layout
-    //
-    // "func.func"() <{function_type = (memref<f64, strided<[], offset: ?>>) -> memref<f64,
-    // strided<[], offset: ?>>
-    //
-    // and we see this when using the identity layout:
-    //
-    // func.func public @jit_fn(%arg0: memref<f64>) -> memref<f64>
-    //
-    // When not using identity layout but also not removing the layout in the alloca, there are
-    // errors in some cases but not in others. I believe we have to do some casts in other places as
-    // well, whenever we use allocas and the types come from the arguments.
-    //
-    // My recommendation: at some point it would be good to remove the identity-layout-map from the
-    // frontend but until we have some more resources, let's keep it along with the origMemrefType.
 
     SmallVector<Value> dynamicDims;
     if (!memrefType.hasStaticShape()) {
@@ -119,15 +89,9 @@ Value generateAllocation(OpBuilder &builder, Location loc, Value reference)
     }
 
     return builder.create<memref::AllocOp>(loc, memrefType, dynamicDims);
-    // Uncomment below to follow Matthias suggestion of placing a CastOp after AllocOp
-    // some more tests will pass.
-    // return builder.create<memref::CastOp>(loc, origMemrefType, alloc_uncasted);
 }
 
-/// Helper function to generate a set of memref allocations.
-///
-/// The allocation size and shape is deduced from a list of existing memref values.
-///
+// Helper function to generate a list of memref allocations.
 void generateAllocations(RewriterBase &rewriter, Location loc, SmallVectorImpl<Value> &allocations,
                          ValueRange referenceValues)
 {
@@ -137,14 +101,14 @@ void generateAllocations(RewriterBase &rewriter, Location loc, SmallVectorImpl<V
     }
 }
 
+// A helper to collect a list of tensor types into corresponding memref types.
+//
+// This function essentially is the BufferizeTypeConverter. It just converts types without
+// doing any real heavy-duty.
+// However, the converter was removed upstream.
+// See https://github.com/llvm/llvm-project/pull/114155/files
 void TensorType2MemrefType(const SmallVector<Type> &inTypes, SmallVector<Type> &convertedResults)
 {
-    // A helper to collect the result tensor values into corresponding memref types.
-    // We force identity layout on the memref.
-    //
-    // This function essentially is the BufferizeTypeConverter
-    // However, the converter was removed upstream.
-    // See https://github.com/llvm/llvm-project/pull/114155/files
     for (Type inType : inTypes) {
         if (isa<TensorType>(inType)) {
             convertedResults.push_back(
@@ -226,7 +190,7 @@ struct AdjointOpInterface
 // Argument tensor is converted to memrefs by bufferization.to_memref.
 // Result tensor of gradient.backprop is bufferized with a corresponding memref.alloc.
 // Users of the result tensor are updated to use the new memref.
-// cotangents?
+// Cotangents are copied.
 //
 // Note that backprop is the only one that supports value_and_grad, so result tensors might
 // include both the value tensor and the grad tensor.
@@ -242,9 +206,8 @@ struct BackpropOpInterface
     bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
                                  const bufferization::AnalysisState &state) const
     {
-        // I think we don't write to the cotangents. And also not to the arguments
-        // so we can set bufferizesToMemoryWrite as false.
-        // The safe assumption is that it should be true.
+        // The visible operands in tensor land are $args and $cotangents,
+        // neither of which is altered by the op.
         return false;
     }
 
@@ -259,10 +222,8 @@ struct BackpropOpInterface
                             const bufferization::BufferizationOptions &options) const
     {
         auto backpropOp = cast<BackpropOp>(op);
-
         Location loc = backpropOp.getLoc();
-        SmallVector<Value> gradients;
-        SmallVector<Value> argShadows;
+
         // Conceptually a map from scalar result indices (w.r.t. other scalars) to the position in
         // the overall list of returned gradients.
         // For instance, a backprop op that returns (tensor, f64, tensor, f64, f64) will have
@@ -270,6 +231,7 @@ struct BackpropOpInterface
         SmallVector<unsigned> scalarIndices;
         SmallVector<Type> scalarReturnTypes;
 
+        // 1. Convert callee's tensor arguments into memrefs
         SmallVector<Value> bufferArgs;
         ValueRange operands = backpropOp.getArgs();
         for (Value operand : operands) {
@@ -285,13 +247,13 @@ struct BackpropOpInterface
             }
         }
 
+        // 2. Allocate buffers to place the differentiation results (gradients) into.
+        // Enzyme refers to these as shadow arguments. There is one result for each
+        // differentiable MemRef argument, with a matching shape and type.
+        SmallVector<Value> gradients, argShadows;
         std::vector<Value> diffArgs =
             computeDiffArgs(bufferArgs, backpropOp.getDiffArgIndicesAttr());
-
         for (const auto &[idx, diffArg] : llvm::enumerate(diffArgs)) {
-            // Allocate buffers to place the differentiation results (gradients) into. Enzyme refers
-            // to these as shadow arguments. There is one result for each differentiable MemRef
-            // argument, with a matching shape and type.
             if (isa<MemRefType>(diffArg.getType())) {
                 Value shadow = generateAllocation(rewriter, loc, diffArg);
                 gradients.push_back(shadow);
@@ -306,31 +268,34 @@ struct BackpropOpInterface
             }
         }
 
+        // 3. Convert cotangent operands into memrefs.
         // Enzyme requires buffers for the primal outputs as well, even though we don't need their
         // values. We'll mark them dupNoNeed later on to allow Enzyme to optimize away their
         // computation.
-        SmallVector<Value> calleeResults, resShadows;
+        // Note that cotangents cannot be scalars.
         ValueRange cotangents = backpropOp.getCotangents();
-        SmallVector<Value> bufferCotangentsList;
+        SmallVector<Value> bufferCotangents;
         for (Value operand : cotangents) {
             FailureOr<Value> opBuffer = getBuffer(rewriter, operand, options);
             if (failed(opBuffer)) {
                 return failure();
             }
-            bufferCotangentsList.push_back(*opBuffer);
+            bufferCotangents.push_back(*opBuffer);
         }
-        mlir::ValueRange bufferCotangents(bufferCotangentsList);
 
+        SmallVector<Value> calleeResults, resShadows;
         generateAllocations(rewriter, loc, calleeResults, bufferCotangents);
-        // Enzyme mutates the result shadows but the cotangent tensors must be immutable, so we
-        // create copies to pass into Enzyme. Concretely, this issue pops up with multiple
-        // BackpropOps that have the same cotangent tensor due to a CSE effect from one-shot
-        // bufferization.
+        // Enzyme mutates the result shadows, but the cotangent tensors must be immutable for SSA.
+        // Thus we create copies to be the result shadows to be passed into Enzyme.
+        // For example, the same cotangent tensor SSA value can be used by multiple backprop ops,
+        // due to things like CSE. Therefore the memref corresponding to the original tensor must
+        // be left untouched.
         generateAllocations(rewriter, loc, resShadows, bufferCotangents);
         for (const auto &[cotangent, resShadow] : llvm::zip(bufferCotangents, resShadows)) {
             rewriter.create<memref::CopyOp>(loc, cotangent, resShadow);
         }
 
+        // 4. Create bufferized backprop op
         DenseIntElementsAttr diffArgIndicesAttr = backpropOp.getDiffArgIndices().value_or(nullptr);
         auto bufferizedBackpropOp = rewriter.create<BackpropOp>(
             loc, TypeRange{}, scalarReturnTypes, backpropOp.getCalleeAttr(), bufferArgs, argShadows,
