@@ -212,7 +212,7 @@ struct BackpropOpInterface
         //
         // All other operands will not be written into.
 
-        SmallVector<Value> cotangents = cast<BackpropOp>(op).getCotangents();
+        ValueRange cotangents = cast<BackpropOp>(op).getCotangents();
         return std::find(cotangents.begin(), cotangents.end(), opOperand.get()) != cotangents.end();
     }
 
