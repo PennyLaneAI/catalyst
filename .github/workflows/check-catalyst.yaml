@@ -151,20 +151,19 @@ jobs:
         path: llvm-build
         key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-ci-build-${{ matrix.compiler }}
 
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.10"
+
     - name: Install Deps
       # if: steps.cache-llvm-build.outputs.cache-hit != 'true'
       run: |
         sudo apt-get update
-        sudo add-apt-repository -y ppa:deadsnakes/ppa
-        sudo apt-get install -y python3.10 python3.10-dev python3.10-venv
-        sudo apt-get install -y cmake ninja-build clang lld
-        python3.10 --version 
+        sudo apt-get install -y python3.10 cmake ninja-build clang lld
+        python3 --version 
         python3 -m pip install numpy pybind11
 
-    - name: List all installed Python versions
-      run: |
-        ls -l /usr/bin/python*
-        pyenv versions || true
 
     - name: Build LLVM
       # if: steps.cache-llvm-build.outputs.cache-hit != 'true'
