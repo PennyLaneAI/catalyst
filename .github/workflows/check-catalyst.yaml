@@ -674,7 +674,6 @@ jobs:
           sudo apt-get update
           sudo apt-get -y -q install cmake ninja-build lcov
           python3 -m pip install nanobind pybind11
-          sudo apt-get remove -y gcc g++
           sudo apt-get install -y gcc-11 g++-11
           sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 10
           sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-11 10  
