@@ -204,16 +204,13 @@ struct BackpropOpInterface
     bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
                                  const bufferization::AnalysisState &state) const
     {
-        // Enzyme mutates the result shadows, but the cotangent tensors must be immutable for SSA.
-        // Thus we create copies to be the result shadows passed into Enzyme.
-        // For example, the same cotangent tensor SSA value can be used by multiple backprop ops,
-        // due to things like CSE. Therefore the memref corresponding to the original tensor must
-        // be left untouched.
-        //
-        // All other operands will not be written into.
-
+        // Enzyme mutates the result shadows. This means the cotangents will be written into.
+        // The other visible operand before bufferization is $args, the arguments to the
+        // differentiated callee. It will not be written into.
         ValueRange cotangents = cast<BackpropOp>(op).getCotangents();
-        return std::find(cotangents.begin(), cotangents.end(), opOperand.get()) != cotangents.end();
+        bool operandIsCotangent =
+            std::find(cotangents.begin(), cotangents.end(), opOperand.get()) != cotangents.end();
+        return operandIsCotangent;
     }
 
     bufferization::AliasingValueList
