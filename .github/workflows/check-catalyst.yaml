@@ -708,14 +708,14 @@ jobs:
 
       - name: Run the main runtime test suite for coverage
         run: |
-          geninfo --ignore-errors mismatch 
-          C_COMPILER="/usr/bin/gcc-11" \
-          CXX_COMPILER=/usr/bin/g++-11 \
-          COMPILER_LAUNCHER="" \
-          ENABLE_OQD=ON \
-          LLVM_DIR="$(pwd)/mlir/llvm-project" \
-          make coverage-runtime
-          mv runtime/build_cov/coverage.info coverage-${{ github.job }}.info
+          geninfo --ignore-errors mismatch,source \
+                C_COMPILER="/usr/bin/gcc-11" \
+                CXX_COMPILER=/usr/bin/g++-11 \
+                COMPILER_LAUNCHER="" \
+                ENABLE_OQD=ON \
+                LLVM_DIR="$(pwd)/mlir/llvm-project" \
+                make coverage-runtime
+                mv runtime/build_cov/coverage.info coverage-${{ github.job }}.info
 
       - name: Upload to Codecov
         uses: codecov/codecov-action@v4
