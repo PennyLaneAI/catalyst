@@ -762,7 +762,6 @@ def trace_quantum_operations(
         elif isinstance(op, qml.BasisState):
             trace_basis_state(op, qrp)
         elif isinstance(op, qml.Snapshot):
-            print("Snapshot")
             nqubits = (
                 device.wires[0]
                 if catalyst.device.qjit_device.is_dynamic_wires(device.wires)
@@ -1405,11 +1404,15 @@ def trace_quantum_function(
 
                 meas_tracers = check_full_raise(meas, trace.to_jaxpr_tracer)
                 if len(snapshot_results) > 0:
-                    for s in snapshot_results[::-1]:
-                        meas_tracers.insert(0, s)
-                    meas_results = tree_unflatten(tree_structure(meas_tracers), meas_tracers)
-                else:
-                    meas_results = tree_unflatten(meas_trees, meas_tracers)
+                    meas_return_trees_children = meas_trees.children()
+                    meas_return_trees_children.insert(0, tree_structure(snapshot_results))
+                    meas_trees = meas_trees.make_from_node_data_and_children(
+                        PyTreeRegistry(),
+                        meas_trees.node_data(),
+                        meas_return_trees_children,
+                    )
+                    meas_tracers = snapshot_results + meas_tracers
+                meas_results = tree_unflatten(meas_trees, meas_tracers)
 
                 # TODO: Allow the user to return whatever types they specify.
                 if tracing_mode == TracingMode.TRANSFORM:

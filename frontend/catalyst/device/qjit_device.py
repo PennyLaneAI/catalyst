@@ -265,8 +265,10 @@ def get_qjit_device_capabilities(target_capabilities: DeviceCapabilities) -> Dev
             }
         )
 
-    # Optionally enable runtime-powered snapshot of quantum state at any particular instance
-    qjit_capabilities.operations.update({"Snapshot": OperatorProperties()})
+    # Enable runtime-powered snapshot of quantum state at any particular instance
+    qjit_capabilities.operations.update(
+        {"Snapshot": OperatorProperties(invertible=False, controllable=False, differentiable=False)}
+    )
 
     # TODO: Optionally enable runtime-powered quantum gate controlling once they
     #       are supported natively in MLIR.
