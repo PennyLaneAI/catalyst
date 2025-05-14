@@ -51,9 +51,9 @@ def check_bin(command):
 
         if version < DEFAULT_CLANG_FORMAT_VERSION:
             print(
-                f"Using clang-format version {version}. "
-                f"As this is lower than the version used for the CI, "
-                f"the CI may fail even after formatting."
+                f"Warning: using clang-format version {version}, while the CI uses version "
+                f"{DEFAULT_CLANG_FORMAT_VERSION}. Since the local version is lower than the "
+                f"version used for the CI, the CI may fail even after formatting."
             )
     except FileNotFoundError as exc:
         raise FileNotFoundError(f"{command} is not installed or is not in PATH.") from exc
