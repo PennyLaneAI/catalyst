@@ -27,11 +27,11 @@ func.func private @workflow_plain() -> tensor<4xcomplex<f64>> attributes {} {
   %3 = quantum.insert %0[%c0_i64], %2 : !quantum.reg, !quantum.bit
   %4 = quantum.adjoint(%3) : !quantum.reg {
   // CHECK:        PauliZ
-  // CHECK-SAME:          adjoint
+  // CHECK-SAME:          adj
   // CHECK:        PauliY
-  // CHECK-SAME:          adjoint
+  // CHECK-SAME:          adj
   // CHECK:        PauliX
-  // CHECK-SAME:          adjoint
+  // CHECK-SAME:          adj
   ^bb0(%arg0: !quantum.reg):
     %10 = quantum.extract %arg0[%c0_i64] : !quantum.reg -> !quantum.bit
     %11 = quantum.custom "PauliX"() %10 : !quantum.bit
@@ -57,13 +57,13 @@ func.func private @workflow_plain() -> tensor<4xcomplex<f64>> attributes {} {
 // CHECK:      OpC
 // CHECK:      OpD
 // CHECK:      OpF
-// CHECK-SAME:      adjoint
+// CHECK-SAME:      adj
 // CHECK:      OpE
-// CHECK-SAME:      adjoint
+// CHECK-SAME:      adj
 // CHECK:      OpB
-// CHECK-SAME:      adjoint
+// CHECK-SAME:      adj
 // CHECK:      OpA
-// CHECK-SAME:      adjoint
+// CHECK-SAME:      adj
 func.func private @workflow_nested() -> tensor<4xcomplex<f64>> attributes {} {
   %c1_i64 = arith.constant 1 : i64
   %c0_i64 = arith.constant 0 : i64
@@ -182,17 +182,17 @@ func.func private @circuit(%arg0: f64, %arg1: !quantum.reg) -> !quantum.reg {
 }
 
 // CHECK:   func.func private @circuit.adjoint(%arg0: f64, %arg1: !quantum.reg) -> !quantum.reg {
-// CHECK:   quantum.custom "PauliZ"() {{%.+}} {adjoint} : !quantum.bit
-// CHECK:   quantum.custom "RX"({{%.+}}) {{%.+}} {adjoint} : !quantum.bit
-// CHECK:   quantum.custom "PauliX"() {{%.+}} {adjoint} : !quantum.bit
+// CHECK:   quantum.custom "PauliZ"() {{%.+}} adj : !quantum.bit
+// CHECK:   quantum.custom "RX"({{%.+}}) {{%.+}} adj : !quantum.bit
+// CHECK:   quantum.custom "PauliX"() {{%.+}} adj : !quantum.bit
 
 // CHECK:   func.func private @workflow_adjoint(%arg0: f64) -> tensor<4xcomplex<f64>> {
 // CHECK:   quantum.custom "RX"({{%.+}}) {{%.+}} : !quantum.bit
-// CHECK:   quantum.custom "RY"({{%.+}}) {{%.+}} {adjoint} : !quantum.bit
+// CHECK:   quantum.custom "RY"({{%.+}}) {{%.+}} adj : !quantum.bit
 // CHECK:   call @circuit.adjoint(%arg0, {{%.+}}) : (f64, !quantum.reg) -> !quantum.reg
-// CHECK:   quantum.custom "PauliZ"() {{%.+}} {adjoint} : !quantum.bit
-// CHECK:   quantum.custom "RX"({{%.+}}) {{%.+}} {adjoint} : !quantum.bit
-// CHECK:   quantum.custom "PauliX"() {{%.+}} {adjoint} : !quantum.bit
+// CHECK:   quantum.custom "PauliZ"() {{%.+}} adj : !quantum.bit
+// CHECK:   quantum.custom "RX"({{%.+}}) {{%.+}} adj : !quantum.bit
+// CHECK:   quantum.custom "PauliX"() {{%.+}} adj : !quantum.bit
 // CHECK:   quantum.custom "RY"({{%.+}}) {{%.+}} : !quantum.bit
 
 func.func private @workflow_adjoint(%arg0: f64) -> tensor<4xcomplex<f64>> attributes {} {

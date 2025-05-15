@@ -12,8 +12,8 @@ PyYAML
 
 # formatting/linting
 black
-clang-format==14.*
-clang-tidy~=16.0
+clang-format~=20.1
+clang-tidy~=20.1
 pylint
 isort
 
@@ -29,3 +29,4 @@ nbmake
 # optional rt/test dependencies
 pennylane-lightning-kokkos
 amazon-braket-pennylane-plugin>1.27.1
+xdsl

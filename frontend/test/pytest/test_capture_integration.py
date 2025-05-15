@@ -24,6 +24,8 @@ from jax.core import ShapedArray
 import catalyst
 from catalyst import qjit
 
+pytestmark = pytest.mark.usefixtures("disable_capture")
+
 
 def circuit_aot_builder(dev):
     """Test AOT builder."""
@@ -1426,7 +1428,7 @@ class TestCapture:
             return qml.sample()
 
         capture_result = captured_circuit()
-        assert "'shots': 10" in captured_circuit.mlir
+        assert "shots(%" in captured_circuit.mlir
 
         qml.capture.disable()
 

@@ -26,6 +26,7 @@ import warnings
 import jax
 import jax.numpy as jnp
 import pennylane as qml
+from jax.api_util import debug_info
 from jax.interpreters import mlir
 from jax.tree_util import tree_flatten, tree_unflatten
 
@@ -41,6 +42,7 @@ from catalyst.compiler import (
 )
 from catalyst.debug.instruments import instrument
 from catalyst.from_plxpr import trace_from_pennylane
+from catalyst.jax_extras.patches import get_aval2
 from catalyst.jax_tracer import lower_jaxpr_to_mlir, trace_to_jaxpr
 from catalyst.logging import debug_logger, debug_logger_init
 from catalyst.qfunc import QFunc
@@ -109,9 +111,8 @@ def qjit(
     Args:
         fn (Callable): the quantum or classical function
         autograph (bool): Experimental support for automatically converting Python control
-            flow statements to Catalyst-compatible control flow. Currently supports Python ``if``,
-            ``elif``, ``else``, and ``for`` statements. Note that this feature requires an
-            available TensorFlow installation. For more details, see the
+            flow statements (including ``if`` statements, ``for`` and ``while`` loops) to
+            Catalyst-compatible control flow, and more. For more details, see the
             :doc:`AutoGraph guide </dev/autograph>`.
         autograph_include: A list of (sub)modules to be allow-listed for autograph conversion.
         async_qnodes (bool): Experimental support for automatically executing
@@ -711,10 +712,24 @@ class QJIT(CatalystCallable):
         dynamic_sig = get_abstract_signature(dynamic_args)
         full_sig = merge_static_args(dynamic_sig, args, static_argnums)
 
+        dbg = debug_info("qjit_capture", self.user_function, args, kwargs)
+
         if qml.capture.enabled():
-            return trace_from_pennylane(
-                self.user_function, static_argnums, abstracted_axes, full_sig, kwargs
-            )
+            with Patcher(
+                (
+                    jax._src.interpreters.partial_eval,  # pylint: disable=protected-access
+                    "get_aval",
+                    get_aval2,
+                ),
+            ):
+                return trace_from_pennylane(
+                    self.user_function,
+                    static_argnums,
+                    abstracted_axes,
+                    full_sig,
+                    kwargs,
+                    debug_info=dbg,
+                )
 
         def closure(qnode, *args, **kwargs):
             params = {}
@@ -723,6 +738,8 @@ class QJIT(CatalystCallable):
             default_pass_pipeline = self.compile_options.circuit_transform_pipeline
             pass_pipeline = params.get("pass_pipeline", default_pass_pipeline)
             params["pass_pipeline"] = pass_pipeline
+            params["debug_info"] = dbg
+
             return QFunc.__call__(
                 qnode,
                 *args,
@@ -734,11 +751,7 @@ class QJIT(CatalystCallable):
         ):
             # TODO: improve PyTree handling
             jaxpr, out_type, treedef, plugins = trace_to_jaxpr(
-                self.user_function,
-                static_argnums,
-                abstracted_axes,
-                full_sig,
-                kwargs,
+                self.user_function, static_argnums, abstracted_axes, full_sig, kwargs, dbg
             )
             self.compile_options.pass_plugins.update(plugins)
             self.compile_options.dialect_plugins.update(plugins)
@@ -868,7 +881,7 @@ class JAX_QJIT:
     def wrap_callback(qjit_function, *args, **kwargs):
         """Wrap a QJIT function inside a jax host callback."""
         data = jax.pure_callback(
-            qjit_function, qjit_function.jaxpr.out_avals, *args, vectorized=False, **kwargs
+            qjit_function, qjit_function.jaxpr.out_avals, *args, vmap_method="sequential", **kwargs
         )
 
         # Unflatten the return value w.r.t. the original PyTree definition if available

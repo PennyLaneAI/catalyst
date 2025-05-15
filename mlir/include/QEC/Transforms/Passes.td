@@ -18,6 +18,13 @@
 include "mlir/Pass/PassBase.td"
 include "mlir/IR/EnumAttr.td"
 
+def MaxPauliSizeOption : Option<
+    /*C++ var name=*/"max_pauli_size",
+    /*CLI name=*/"max-pauli-size",
+    /*Type=*/"size_t",
+    /*Default=*/"0", // 0 means no limit
+    /*Description=*/"The maximum size of the Pauli product. 0 means no limit.">;
+
 def CliffordTToPPRPass : Pass<"to_ppr"> {
     let summary = "Convert quantum dialects to the QEC dialect.";
 
@@ -34,7 +41,7 @@ def CommuteCliffordTPPRPass : Pass<"commute_ppr"> {
     let dependentDialects = [
         "catalyst::qec::QECDialect",
     ];
-    
+    let options = [MaxPauliSizeOption];
     let constructor = "catalyst::createCommuteCliffordTPPRPass()";
 }
 
@@ -74,7 +81,7 @@ def CommuteCliffordPastPPMPass : Pass<"merge_ppr_ppm"> {
     let dependentDialects = [
         "catalyst::qec::QECDialect",
     ];
-    
+    let options = [MaxPauliSizeOption];
     let constructor = "catalyst::createCommuteCliffordPastPPMPass()";
 }
 

@@ -96,6 +96,7 @@ MOCK_MODULES = [
     "mlir_quantum.dialects.quantum",
     "mlir_quantum.dialects.gradient",
     "mlir_quantum.dialects.catalyst",
+    "mlir_quantum.dialects.mbqc",
     "mlir_quantum.dialects.mitigation",
     "mlir_quantum.dialects._transform_ops_gen",
     "pybind11",
@@ -109,7 +110,7 @@ for mod_name in MOCK_MODULES:
 # -- General configuration ------------------------------------------------
 
 # If your documentation needs a minimal Sphinx version, state it here.
-needs_sphinx = "3.3"
+needs_sphinx = "8.1"
 
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
@@ -135,7 +136,7 @@ extensions = [
     "m2r2",
 ]
 
-intersphinx_mapping = {"https://docs.pennylane.ai/en/stable/": None}
+intersphinx_mapping = {"pennylane": ("https://docs.pennylane.ai/en/stable/", None)}
 
 # add the custom MLIR Lexer
 lexers["mlir"] = MLIRLexer(startinline=True)
@@ -287,6 +288,7 @@ html_theme_options = {
     ],
     "toc_overview": True,
     "github_repo": "PennyLaneAI/catalyst",
+    "search_on_pennylane_ai": True,
 }
 
 edit_on_github_project = "PennyLaneAI/catalyst"

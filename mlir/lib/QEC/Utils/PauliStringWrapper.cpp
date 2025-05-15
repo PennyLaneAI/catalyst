@@ -199,5 +199,16 @@ SmallVector<StringRef> extractPauliString(QECOpInterface op)
     return pauliWord;
 }
 
+bool isNoSizeLimit(size_t MaxPauliSize) { return MaxPauliSize == 0; }
+
+bool exceedPauliSizeLimit(size_t pauliSize, size_t MaxPauliSize)
+{
+    // No size limit
+    if (isNoSizeLimit(MaxPauliSize)) {
+        return false;
+    }
+    return pauliSize > MaxPauliSize;
+}
+
 } // namespace qec
 } // namespace catalyst

@@ -163,5 +163,11 @@ void updatePauliWordSign(QECOpInterface op, bool isNegated, PatternRewriter &rew
 // Extract the pauli string from the operation.
 SmallVector<StringRef> extractPauliString(QECOpInterface op);
 
+ // No size limit when MaxPauliSize is 0
+bool isNoSizeLimit(size_t MaxPauliSize);
+
+// Combine the size check logic in one place
+bool exceedPauliSizeLimit(size_t pauliSize, size_t MaxPauliSize);
+
 } // namespace qec
 } // namespace catalyst

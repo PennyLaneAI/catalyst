@@ -20,49 +20,12 @@
 
 using namespace Catalyst::Runtime::Device;
 
-TEST_CASE("Test OpenQasmRunner base class", "[openqasm]")
-{
-    // check the coverage support
-    OQCRunnerBase runner{};
-    REQUIRE_THROWS_WITH(runner.runCircuit("", "", 0),
-                        Catch::Contains("[Function:runCircuit] Error in Catalyst Runtime: "
-                                        "Not implemented method"));
-
-    REQUIRE_THROWS_WITH(runner.Probs("", "", 0, 0),
-                        Catch::Contains("[Function:Probs] Error in Catalyst Runtime: "
-                                        "Not implemented method"));
-
-    REQUIRE_THROWS_WITH(runner.Sample("", "", 0, 0),
-                        Catch::Contains("[Function:Sample] Error in Catalyst Runtime: "
-                                        "Not implemented method"));
-
-    REQUIRE_THROWS_WITH(runner.Expval("", "", 0),
-                        Catch::Contains("[Function:Expval] Error in Catalyst Runtime: "
-                                        "Not implemented method"));
-
-    REQUIRE_THROWS_WITH(runner.Var("", "", 0),
-                        Catch::Contains("[Function:Var] Error in Catalyst Runtime: "
-                                        "Not implemented method"));
-
-    REQUIRE_THROWS_WITH(runner.State("", "", 0, 0),
-                        Catch::Contains("[Function:State] Error in Catalyst Runtime: "
-                                        "Not implemented method"));
-
-    REQUIRE_THROWS_WITH(runner.Gradient("", "", 0, 0),
-                        Catch::Contains("[Function:Gradient] Error in Catalyst Runtime: "
-                                        "Not implemented method"));
-}
-
 TEST_CASE("Test the OQCDevice constructor", "[openqasm]")
 {
     auto device = OQCDevice("{shots : 100}");
     CHECK(device.GetNumQubits() == 0);
 
-    REQUIRE_THROWS_WITH(device.PrintState(), Catch::Contains("Unsupported functionality"));
-    REQUIRE_THROWS_WITH(device.AllocateQubit(), Catch::Contains("Unsupported functionality"));
-    REQUIRE_THROWS_WITH(device.Measure(0), Catch::Contains("Unsupported functionality"));
-    REQUIRE_THROWS_WITH(device.Expval(0), Catch::Contains("Unsupported functionality"));
-    REQUIRE_THROWS_WITH(device.Var(0), Catch::Contains("Unsupported functionality"));
+    REQUIRE_THROWS_WITH(device.Measure(0), Catch::Contains("unsupported by device"));
 }
 
 TEST_CASE("Test qubits allocation OpenQasmDevice", "[openqasm]")
