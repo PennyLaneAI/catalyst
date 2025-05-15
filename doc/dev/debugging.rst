@@ -44,6 +44,7 @@ Using the :func:`~.debug.get_cmain` function, the following string is returned t
     #include <complex.h>
     #include <stddef.h>
     #include <stdint.h>
+    #include <stdbool.h>
 
     typedef int64_t int64;
     typedef double float64;

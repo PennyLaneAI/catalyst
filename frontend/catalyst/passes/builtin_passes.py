@@ -14,6 +14,8 @@
 
 """This module exposes built-in Catalyst MLIR passes to the frontend."""
 
+import functools
+
 from catalyst.passes.pass_api import PassPipelineWrapper
 
 
@@ -397,7 +399,7 @@ def to_ppr(qnode):
     return PassPipelineWrapper(qnode, "to_ppr")
 
 
-def commute_ppr(qnode):
+def commute_ppr(qnode=None, *, max_pauli_size=0):
     R"""
     Specify that the MLIR compiler pass for commuting
     Clifford Pauli Product Rotation (PPR) gates, :math:`\exp({iP\tfrac{\pi}{4}})`,
@@ -413,6 +415,7 @@ def commute_ppr(qnode):
 
     Args:
         fn (QNode): QNode to apply the pass to.
+        max_pauli_size (int): The maximum size of the Pauli strings after commuting.
 
     Returns:
         ~.QNode
@@ -432,7 +435,7 @@ def commute_ppr(qnode):
         ppm_passes = [("PPM", ["to_ppr", "commute_ppr"])]
 
         @qjit(pipelines=ppm_passes, keep_intermediate=True, target="mlir")
-        @qml.qnode(qml.device("null.qubit", wires=0))
+        @qml.qnode(qml.device("null.qubit", wires=1))
         def circuit():
             qml.H(0)
             qml.T(0)
@@ -452,11 +455,49 @@ def commute_ppr(qnode):
         %mres, %out_qubits = qec.ppm ["Z"] %5 : !quantum.bit
         . . .
 
+    If a commutation resulted in a PPR acting on more than
+    `max_pauli_size` qubits (here, `max_pauli_size = 2`), that commutation would be skipped.
+
+    .. code-block:: python
+
+        from catalyst.passes import to_ppr, commute_ppr
+
+        pips = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+
+        @qjit(pipelines=pips, target="mlir")
+        @to_ppr
+        @commute_ppr(max_pauli_size=2)
+        @qml.qnode(qml.device("lightning.qubit", wires=3))
+        def circuit():
+            qml.H(0)
+            qml.CNOT([1, 2])
+            qml.CNOT([0, 1])
+            qml.CNOT([0, 2])
+            for i in range(3):
+                qml.T(i)
+            return measure(0), measure(1), measure(2)
+
+        print(circuit.mlir_opt)
+
+    Example MLIR Representation:
+
+    .. code-block:: mlir
+
+        . . .
+        %4:2 = qec.ppr ["Z", "X"](4) %2, %3 : !quantum.bit, !quantum.bit
+        . . .
+        %6:2 = qec.ppr ["X", "Y"](-8) %5, %4#1 : !quantum.bit, !quantum.bit
+        . . .
     """
-    return PassPipelineWrapper(qnode, "commute_ppr")
+
+    if qnode is None:
+        return functools.partial(commute_ppr, max_pauli_size=max_pauli_size)
+
+    commute_ppr_pass = {"commute_ppr": {"max-pauli-size": max_pauli_size}}
+    return PassPipelineWrapper(qnode, commute_ppr_pass)
 
 
-def merge_ppr_ppm(qnode):
+def merge_ppr_ppm(qnode=None, *, max_pauli_size=0):
     R"""
     Specify that the MLIR compiler pass for absorbing Clifford Pauli
     Product Rotation (PPR) operations, :math:`\exp{iP\tfrac{\pi}{4}}`,
@@ -467,6 +508,7 @@ def merge_ppr_ppm(qnode):
 
     Args:
         fn (QNode): QNode to apply the pass to
+        max_pauli_size (int): The maximum size of the Pauli strings after merging.
 
     Returns:
         ~.QNode
@@ -502,5 +544,43 @@ def merge_ppr_ppm(qnode):
         %mres, %out_qubits = qec.ppm ["X"] %2 : !quantum.bit
         . . .
 
+    If a merging resulted in a PPM acting on more than
+    `max_pauli_size` qubits (here, `max_pauli_size = 2`), that merging would be skipped.
+
+    .. code-block:: python
+
+        from catalyst import measure, qjit
+        from catalyst.passes import to_ppr, merge_ppr_ppm
+
+        pips = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+
+
+        @qjit(pipelines=pips, target="mlir")
+        @to_ppr
+        @merge_ppr_ppm(max_pauli_size=2)
+        @qml.qnode(qml.device("lightning.qubit", wires=3))
+        def circuit():
+            qml.CNOT([1, 2])
+            qml.CNOT([0, 1])
+            qml.CNOT([0, 2])
+            return measure(0), measure(1), measure(2)
+
+        print(circuit.mlir_opt)
+
+    Example MLIR Representation:
+
+    .. code-block:: mlir
+
+        . . .
+        %3:2 = qec.ppr ["Z", "X"](4) %1, %2 : !quantum.bit, !quantum.bit
+        . . .
+        %mres, %out_qubits:2 = qec.ppm ["Y", "Z"](-1) %3#1, %4 : !quantum.bit, !quantum.bit
+        . . .
+
     """
-    return PassPipelineWrapper(qnode, "merge_ppr_ppm")
+
+    if qnode is None:
+        return functools.partial(merge_ppr_ppm, max_pauli_size=max_pauli_size)
+
+    merge_ppr_ppm_pass = {"merge_ppr_ppm": {"max-pauli-size": max_pauli_size}}
+    return PassPipelineWrapper(qnode, merge_ppr_ppm_pass)
