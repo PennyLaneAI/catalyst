@@ -17,12 +17,15 @@
 
 from __future__ import annotations
 
+from functools import partial
+
 import jax
-from jax._src.core import abstractify
+from jax._src.core import abstractify, standard_vma_rule
 from jax._src.lax.slicing import (
     _argnum_weak_type,
     _gather_dtype_rule,
     _gather_shape_computation,
+    _gather_sharding_rule,
     _is_sorted,
     _no_duplicate_dims,
     _rank,
@@ -194,4 +197,6 @@ gather2_p = standard_primitive(
     _gather_dtype_rule,
     "gather",
     weak_type_rule=_argnum_weak_type(0),
+    sharding_rule=_gather_sharding_rule,
+    vma_rule=partial(standard_vma_rule, "gather"),
 )
