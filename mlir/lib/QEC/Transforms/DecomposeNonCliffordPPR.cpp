@@ -39,7 +39,7 @@ LogicalInitKind getMagicState(QECOpInterface op)
 }
 
 /// Decompose the Non-Clifford (pi/8) PPR into PPR and PPMs operations via auto corrected method
-/// as described in Figure 11(b) in the paper: https://arxiv.org/abs/1808.02892
+/// as described in Figure 17(b) in the paper: https://arxiv.org/abs/1808.02892
 ///
 /// ─────┌───┐───────
 /// ─────│ P │(π/8)──

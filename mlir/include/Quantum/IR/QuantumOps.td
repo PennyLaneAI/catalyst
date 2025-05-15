@@ -128,7 +128,7 @@ def AllocOp : Memory_Op<"alloc", [NoMemoryEffect]> {
     }];
 }
 
-def AllocQubitOp : Memory_Op<"alloc_qb", [NoMemoryEffect]> {
+def AllocQubitOp : Memory_Op<"alloc_qb"> {
     let summary = "Allocate a single qubit.";
     let description = [{
     }];

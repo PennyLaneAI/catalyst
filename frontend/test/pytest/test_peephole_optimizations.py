@@ -301,7 +301,7 @@ def test_ppr_to_ppm():
     optimized_ir = test_ppr_to_ppm_workflow.mlir_opt
     assert 'transform.apply_registered_pass "decompose_non_clifford_ppr"' not in optimized_ir
     assert 'transform.apply_registered_pass "decompose_clifford_ppr"' not in optimized_ir
-    assert "qec.fabricate  zero" in optimized_ir
+    assert "quantum.alloc_qb" in optimized_ir
     assert "qec.fabricate  magic" in optimized_ir
     assert "qec.select.ppm" in optimized_ir
     assert 'qec.ppr ["X"]' in optimized_ir
