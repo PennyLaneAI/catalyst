@@ -68,6 +68,11 @@ jobs:
     steps:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
+    
+    - name: Setup Python 
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.10"
 
     - name: Cache LLVM Source
       id: cache-llvm-source
@@ -352,8 +357,7 @@ jobs:
               -DENZYME_SRC_DIR="$GITHUB_WORKSPACE/mlir/Enzyme" \
               -DLLVM_ENABLE_ZLIB=FORCE_ON \
               -DLLVM_ENABLE_ZSTD=OFF \
-              -DLLVM_ENABLE_LLD=ON \
-              -DPython_EXECUTABLE=$(which python${{ matrix.python_version }})
+              -DLLVM_ENABLE_LLD=ON
 
         cmake --build $GITHUB_WORKSPACE/quantum-build --target check-dialects catalyst-cli
 
