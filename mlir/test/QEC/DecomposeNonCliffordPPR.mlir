@@ -58,7 +58,7 @@ func.func @test_ppr_to_ppm(%q1 : !quantum.bit) {
 
 
 // // prepare |m⟩ and |0⟩
-// CHECK-AUTO: [[zero_1:%.+]] = qec.fabricate  zero
+// CHECK-AUTO: [[zero_1:%.+]] = quantum.alloc_qb : !quantum.bit
 // CHECK-AUTO: [[magic_1:%.+]] = qec.fabricate  magic
 
 // // PPM P⊗Z on Q and |m⟩   => m0
@@ -226,7 +226,7 @@ func.func public @game_of_surface_code(%arg0: !quantum.bit, %arg1: !quantum.bit,
     // // PPR ["Z"](8) Q0 
 
     // CHECK-AUTO: [[Q0:%.+]]: !quantum.bit, [[Q1:%.+]]: !quantum.bit, [[Q2:%.+]]: !quantum.bit, [[Q3:%.+]]: !quantum.bit) {
-    // CHECK-AUTO: [[Q_3:%.+]] = qec.fabricate  zero
+    // CHECK-AUTO: [[Q_3:%.+]] = quantum.alloc_qb : !quantum.bit
     // CHECK-AUTO: [[Q_4:%.+]] = qec.fabricate  magic
     // CHECK-AUTO: [[M:%.+]], [[OUT:%.+]]:2 = qec.ppm ["Z", "Z"] [[Q0]], [[Q_4]] : !quantum.bit, !quantum.bit
     // CHECK-AUTO: [[M_0:%.+]], [[OUT_1:%.+]]:2 = qec.ppm ["Z", "Y"] [[Q_3]], [[OUT]]#1 : !quantum.bit, !quantum.bit
@@ -239,7 +239,7 @@ func.func public @game_of_surface_code(%arg0: !quantum.bit, %arg1: !quantum.bit,
 
     // // PPR ["Y"](-8) Q3
 
-    // CHECK-AUTO: [[Q_10:%.+]] = qec.fabricate  zero
+    // CHECK-AUTO: [[Q_10:%.+]] = quantum.alloc_qb : !quantum.bit
     // CHECK-AUTO: [[Q_11:%.+]] = qec.fabricate  magic_conj
     // CHECK-AUTO: [[M_6:%.+]], [[OUT_7:%.+]]:2 = qec.ppm ["Y", "Z"] [[Q3]], [[Q_11]] : !quantum.bit, !quantum.bit
     // CHECK-AUTO: [[M_8:%.+]], [[OUT_9:%.+]]:2 = qec.ppm ["Z", "Y"] [[Q_10]], [[OUT_7]]#1 : !quantum.bit, !quantum.bit
@@ -252,7 +252,7 @@ func.func public @game_of_surface_code(%arg0: !quantum.bit, %arg1: !quantum.bit,
 
     // // PPR ["Y", "X"](8) Q2, Q1
 
-    // CHECK-AUTO: [[Q_17:%.+]] = qec.fabricate  zero
+    // CHECK-AUTO: [[Q_17:%.+]] = quantum.alloc_qb : !quantum.bit
     // CHECK-AUTO: [[Q_18:%.+]] = qec.fabricate  magic
     ///// PPM ["Y", "X", "Z"] Q2, Q1, conj |m⟩
     // CHECK-AUTO: [[M_14:%.+]], [[OUT_15:%.+]]:3 = qec.ppm ["Y", "X", "Z"] [[Q2]], [[Q1]], [[Q_18]]
@@ -268,7 +268,7 @@ func.func public @game_of_surface_code(%arg0: !quantum.bit, %arg1: !quantum.bit,
     // // PPR ["Z", "Z", "Y", "Z"](-8) Q2, Q1, Q3, Q0
 
 
-    // CHECK-AUTO: [[Q_24:%.+]] = qec.fabricate  zero
+    // CHECK-AUTO: [[Q_24:%.+]] = quantum.alloc_qb : !quantum.bit
     // CHECK-AUTO: [[Q_25:%.+]] = qec.fabricate  magic_conj
     ///// PPM ["Z", "Z", "Y", "Z", "Z"] Q2, Q1, Q3, Q0, conj |m⟩
     // CHECK-AUTO: [[M_22:%.+]], [[OUT_23:%.+]]:5 = qec.ppm ["Z", "Z", "Y", "Z", "Z"] [[Q_20]]#0, [[Q_20]]#1, [[Q_13]], [[Q_6]], [[Q_25]]

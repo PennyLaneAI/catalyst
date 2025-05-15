@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <mlir/IR/Value.h>
 #define DEBUG_TYPE "decompose_clifford_ppr"
 
 #include <mlir/Dialect/Arith/IR/Arith.h> // for arith::XOrIOp and arith::ConstantOp
@@ -39,6 +40,20 @@ std::pair<StringRef, uint16_t> determinePauliAndRotationSignOfMeasurement(bool a
     return std::make_pair("Y", -1);
 }
 
+// Initialize |0⟩ or Fabricate|Y⟩ based on avoidPauliYMeasure
+OpResult initializeZeroOrPlusI(bool avoidPauliYMeasure, Location loc, PatternRewriter &rewriter)
+{
+    if (avoidPauliYMeasure) {
+        // Fabricate |Y⟩
+        auto plusIOp = rewriter.create<FabricateOp>(loc, LogicalInitKind::plus_i);
+        return plusIOp.getOutQubits().back();
+    }
+
+    // Initialize |0⟩
+    auto allocatedQubit = rewriter.create<AllocQubitOp>(loc);
+    return allocatedQubit.getOutQubit();
+}
+
 /// Decompose the PPR (pi/4) into PPR and PPMs operations via flattening method
 /// as described in Figure 11(b) in the paper: https://arxiv.org/abs/1808.02892
 ///
@@ -63,16 +78,15 @@ PPRotationOp decompose_pi_over_four_flattening(bool avoidPauliYMeasure, PPRotati
 {
     auto loc = op.getLoc();
 
-    // Fabricate axillary qubit |Y⟩ (plus_i) or |0⟩ (zero)
-    auto axillaryType = avoidPauliYMeasure ? LogicalInitKind::plus_i : LogicalInitKind::zero;
-    auto magicFabrication = rewriter.create<FabricateOp>(loc, axillaryType);
+    // Initialize |0⟩ (zero) or Fabricate |Y⟩ (plus_i)
+    auto axillaryQubit = initializeZeroOrPlusI(avoidPauliYMeasure, loc, rewriter);
 
     auto [pauliForAxillaryQubit, rotationSign] =
         determinePauliAndRotationSignOfMeasurement(avoidPauliYMeasure);
 
     // Extract qubits and insert axillary qubit
     SmallVector<Value> m1InQubits = op.getInQubits();
-    m1InQubits.emplace_back(magicFabrication.getOutQubits().front());
+    m1InQubits.emplace_back(axillaryQubit);
 
     // Extract P and insert Pauli for axillary qubit
     SmallVector<StringRef> pauliP = extractPauliString(op);

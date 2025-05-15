@@ -70,7 +70,7 @@ void decompose_auto_corrected_pi_over_eight(PPRotationOp op, PatternRewriter &re
     auto loc = op.getLoc();
 
     // Fabricate the magic state |0⟩ and |m⟩
-    auto zero = rewriter.create<FabricateOp>(loc, LogicalInitKind::zero);
+    auto zero = rewriter.create<AllocQubitOp>(loc);
     auto magic = rewriter.create<FabricateOp>(loc, getMagicState(op));
 
     SmallVector<StringRef> pauliP = extractPauliString(op);
@@ -84,7 +84,7 @@ void decompose_auto_corrected_pi_over_eight(PPRotationOp op, PatternRewriter &re
     auto ppmPZ = rewriter.create<PPMeasurementOp>(loc, extPauliP, inQubits); // [input qubits, |m⟩]
 
     // PPM (Z⊗Y) on qubits |0⟩ and |m⟩
-    SmallVector<Value> axillaryQubits = {zero.getOutQubits().front(), ppmPZ.getOutQubits().back()};
+    SmallVector<Value> axillaryQubits = {zero.getOutQubit(), ppmPZ.getOutQubits().back()};
     SmallVector<StringRef> pauliZY = {"Z", "Y"};
     auto ppmZY = rewriter.create<PPMeasurementOp>(loc, pauliZY, axillaryQubits); // [|0⟩, |m⟩]
 

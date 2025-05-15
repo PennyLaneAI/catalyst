@@ -128,8 +128,8 @@ def AllocOp : Memory_Op<"alloc", [NoMemoryEffect]> {
     }];
 }
 
-def AllocQubitOp : Memory_Op<"alloc_qubit", [NoMemoryEffect]> {
-    let summary = "Allocate a qubit.";
+def AllocQubitOp : Memory_Op<"alloc_qb", [NoMemoryEffect]> {
+    let summary = "Allocate a single qubit.";
     let description = [{
     }];
 
@@ -140,10 +140,26 @@ def AllocQubitOp : Memory_Op<"alloc_qubit", [NoMemoryEffect]> {
     let assemblyFormat = [{
         attr-dict `:` type(results)
     }];
+
+    let builders = [
+        OpBuilder<(ins),[{
+            AllocQubitOp::build($_builder, $_state,
+            /*qubit=*/ $_builder.getType<QubitType>()
+            );
+        }]>,
+    ];
+
+    code extraBaseClassDeclaration = [{
+        mlir::OpResult getOutQubit() {
+            return getODSResults(0).front();
+        }
+    }];
+
+    let extraClassDeclaration = extraBaseClassDeclaration;
 }
 
-def DeallocQubitOp : Memory_Op<"dealloc_qubit"> {
-    let summary = "Deallocate a qubit.";
+def DeallocQubitOp : Memory_Op<"dealloc_qb"> {
+    let summary = "Deallocate a single qubit.";
     let description = [{
     }];
 
