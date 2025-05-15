@@ -660,9 +660,9 @@ def ppr_to_ppm(qnode=None, decompose_method="auto-corrected", avoid_y_measure=Fa
         "decompose_clifford_ppr": {"avoid-y-measure": avoid_y_measure},
     }
 
-    def decorator(qnode_func):
-        return PassPipelineWrapper(qnode_func, passes)
-
     if qnode is None:
-        return decorator
-    return decorator(qnode)
+        return functools.partial(
+            ppr_to_ppm, decompose_method=decompose_method, avoid_y_measure=avoid_y_measure
+        )
+
+    return PassPipelineWrapper(qnode, passes)
