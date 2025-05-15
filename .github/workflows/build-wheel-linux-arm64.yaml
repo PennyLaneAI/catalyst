@@ -68,12 +68,6 @@ jobs:
     steps:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
-    
-    - name: Setup Python ${{ matrix.python_version }}
-      uses: actions/setup-python@v5
-      with:
-        python-version: ${{ matrix.python_version }}
-        architecture: <arm64>
 
     - name: Cache LLVM Source
       id: cache-llvm-source
