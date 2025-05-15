@@ -54,9 +54,9 @@ void GradientDialect::initialize()
 
     declarePromisedInterfaces<bufferization::BufferizableOpInterface,
                                 AdjointOp,
-                                BackpropOp//,
-                                //ForwardOp,
-                                //ReverseOp
+                                BackpropOp,
+                                ForwardOp,
+                                ReverseOp
                                 >();
 }
 

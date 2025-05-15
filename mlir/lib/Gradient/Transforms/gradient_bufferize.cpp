@@ -42,6 +42,7 @@ struct GradientBufferizationPass : impl::GradientBufferizationPassBase<GradientB
         MLIRContext *context = &getContext();
         bufferization::BufferizeTypeConverter typeConverter;
 
+        llvm::errs() << "runonop: " << *getOperation() << "\n";
         RewritePatternSet patterns(context);
         populateBufferizationPatterns(typeConverter, patterns);
         populateFunctionOpInterfaceTypeConversionPattern<ForwardOp>(patterns, typeConverter);

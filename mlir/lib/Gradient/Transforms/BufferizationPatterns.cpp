@@ -182,6 +182,7 @@ struct BufferizeForwardOp : public OpConversionPattern<ForwardOp> {
         }
 
         // Only match here if we have all memref arguments and return values.
+        llvm::errs() << "match: " << op << "\n";
         if (llvm::any_of(op.getArgumentTypes(),
                          [](Type argType) { return !isa<MemRefType>(argType); })) {
             return failure();

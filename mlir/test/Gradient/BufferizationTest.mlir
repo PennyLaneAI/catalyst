@@ -134,3 +134,4 @@ func.func @backprop_multiple_tensors_in(%arg0: tensor<10xf64>, %arg1: tensor<2xf
     %grad:2 = gradient.backprop @circuit(%arg0, %arg1) cotangents(%arg2: tensor<?xf64>) {diffArgIndices = dense<[0, 1]> : tensor<2xindex>, resultSegmentSizes = array<i32: 0, 2>}: (tensor<10xf64>, tensor<2xf64>) -> (tensor<10xf64>, tensor<2xf64>)
     return
 }
+
