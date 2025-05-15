@@ -13,24 +13,18 @@
 
 from __future__ import annotations
 
-from importlib.metadata import PackageNotFoundError, distribution
 from pathlib import Path
 
 
-def include_dir() -> Path:
-    """Return the path to the catalyst include directory.
+def get_include_dir() -> Path:
+    """Return the path to Catalyst's include directory.
 
     Raises:
         FileNotFoundError: If the include directory is not found.
-        ImportError: If catalyst is not installed.
+        ImportError: If Catalyst is not installed.
     """
-    try:
-        dist = distribution("pennylane-catalyst")
-        located_include_dir = Path(dist.locate_file("catalyst/include"))
-        if located_include_dir.exists() and located_include_dir.is_dir():
-            return located_include_dir
-        msg = "catalyst include files not found."
-        raise FileNotFoundError(msg)
-    except PackageNotFoundError:
-        msg = "catalyst not installed, installation required to access the include files."
-        raise ImportError(msg) from None
+    located_include_dir = Path(__file__).parent/"include"
+    if located_include_dir.exists() and located_include_dir.is_dir():
+        return located_include_dir
+    msg = "Catalyst's include directory not found."
+    raise FileNotFoundError(msg)

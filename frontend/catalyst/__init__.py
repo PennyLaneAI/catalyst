@@ -36,6 +36,7 @@ if _jaxlib.__version__ != _jaxlib_version:
 
 from catalyst._configuration import INSTALLED
 from catalyst._version import __version__
+from catalyst._commands import get_include_dir
 
 try:
     if INSTALLED:
@@ -178,4 +179,5 @@ __all__ = (
     "pipeline",
     *_api_extension_list,
     *_autograph_functions,
+    "get_include_dir",
 )
