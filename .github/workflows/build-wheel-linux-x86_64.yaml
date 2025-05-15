@@ -174,7 +174,7 @@ jobs:
 
     - name: Install Dependencies (Python)
       run: |
-        python${{ matrix.python_version }} -m pip install numpy nanobind pybind11 PyYAML cmake ninja 
+        python${{ matrix.python_version }} -m pip install numpy nanobind pybind11 PyYAML cmake ninja
         # Add cmake and ninja to the PATH env var
         PYTHON_BINS=$(find /opt/_internal/cpython-${{ matrix.python_version }}.*/bin -maxdepth 1 -type d | tr '\n' ':' | sed 's/:$//')
         echo $PYTHON_BINS >> $GITHUB_PATH
@@ -275,15 +275,10 @@ jobs:
       run: |
         # Reduce wait time for repos not responding
         cat /etc/dnf.conf | sed "s/\[main\]/\[main\]\ntimeout=5/g" > /etc/dnf.conf
-        dnf update -y && dnf install -y openmpi-devel libzstd-devel gcc-toolset-12 glibc
+        dnf update -y && dnf install -y openmpi-devel libzstd-devel gcc-toolset-12
         # Update env vars valid for all tasks of this job
         echo '/opt/rh/gcc-toolset-12/root/usr/bin' >> $GITHUB_PATH
 
-    - name: Set up Python ${{ matrix.python_version }}
-      uses: actions/setup-python@v4
-      with:
-        python-version: ${{ matrix.python_version }}
-        
     - name: Install Dependencies (Python)
       run: |
         python${{ matrix.python_version }} -m pip install numpy nanobind pybind11 PyYAML cmake ninja
@@ -454,6 +449,11 @@ jobs:
       with:
         name: standalone-plugin-manylinux_2_28_x86_64-wheel-py-${{ matrix.python_version }}.zip
         path: ${{ github.workspace }}/standalone_plugin_wheel/wheel
+
+    - name: Set up Python ${{ matrix.python_version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python_version }}
 
     - name: Install Python dependencies
       run: |
