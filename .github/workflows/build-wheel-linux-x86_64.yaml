@@ -280,7 +280,7 @@ jobs:
         echo '/opt/rh/gcc-toolset-12/root/usr/bin' >> $GITHUB_PATH
 
     - name: Set up Python ${{ matrix.python_version }}
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python_version }}
         
