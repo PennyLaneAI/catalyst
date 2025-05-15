@@ -68,6 +68,11 @@ jobs:
     steps:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
+    
+    - name: Setup Python ${{ matrix.python_version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python_version }}
 
     - name: Cache LLVM Source
       id: cache-llvm-source
@@ -255,11 +260,6 @@ jobs:
         dnf update -y && dnf install -y openmpi-devel libzstd-devel gcc-toolset-12
         # Update env vars valid for all tasks of this job
         echo '/opt/rh/gcc-toolset-12/root/usr/bin' >> $GITHUB_PATH
-
-    - name: Setup Python ${{ matrix.python_version }}
-      uses: actions/setup-python@v5
-      with:
-        python-version: ${{ matrix.python_version }}
           
     - name: Install Dependencies (Python)
       run: |
