@@ -352,7 +352,8 @@ jobs:
               -DENZYME_SRC_DIR="$GITHUB_WORKSPACE/mlir/Enzyme" \
               -DLLVM_ENABLE_ZLIB=FORCE_ON \
               -DLLVM_ENABLE_ZSTD=OFF \
-              -DLLVM_ENABLE_LLD=ON
+              -DLLVM_ENABLE_LLD=ON \
+              -DPython_EXECUTABLE=$(which python${{ matrix.python_version }})
 
         cmake --build $GITHUB_WORKSPACE/quantum-build --target check-dialects catalyst-cli
 
