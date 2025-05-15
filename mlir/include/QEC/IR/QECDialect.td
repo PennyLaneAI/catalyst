@@ -89,9 +89,11 @@ def PrepareStateOp : QEC_Op<"prepare"> {
     let summary = "Initial state of logical qubit.";
     let description = [{
         Prepares non-magic states of logical qubits in a specific initial quantum state, 
-        such as |0⟩, |1⟩, |+⟩, |-⟩, |Y⟩, |-Y⟩.
+        such as |0⟩, |1⟩, |+⟩, |-⟩, |Y⟩, |-Y⟩. 
+        The input state of qubits can be any state, not necessarily |0⟩.
         
-        By default, when allocating a qubit, it is prepared in the |0⟩ state.
+        By default, when allocating a qubit using `quantum.alloc_qb` or `quantum.alloc`, 
+        it is prepared in the |0⟩ state.
 
         Based on QEC scheme, |Y⟩ (plus_i) and |-Y⟩ (minus_i) can be prepared as transversal 
         operations. Otherwise, if those states are fabricated, `FabricateOp` should be used.
