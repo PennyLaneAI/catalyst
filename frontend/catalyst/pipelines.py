@@ -220,7 +220,6 @@ def get_bufferization_stage(_options: CompileOptions) -> List[str]:
         "inline",
         "gradient-preprocess",
         "one-shot-bufferize{dialect-filter=gradient unknown-type-conversion=identity-layout-map}",
-        #"gradient-bufferize",
         "scf-bufferize",
         "convert-tensor-to-linalg",  # tensor.pad
         "convert-elementwise-to-linalg",  # Must be run before --arith-bufferize

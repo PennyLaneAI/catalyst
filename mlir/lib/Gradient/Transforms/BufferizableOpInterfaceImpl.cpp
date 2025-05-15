@@ -128,13 +128,14 @@ getBufferizedFunctionArgType(FunctionOpInterface funcOp, int64_t index,
                              const bufferization::BufferizationOptions &options)
 {
     llvm::errs() << "getBufferizedFunctionArgType funcOp: " << funcOp << "\n";
-    //llvm::errs() << funcOp.getArgumentTypes()[index] << "\n";
-    //auto tensorType = dyn_cast<TensorType>(funcOp.getArgument(index).getType());
+    // llvm::errs() << funcOp.getArgumentTypes()[index] << "\n";
+    // auto tensorType = dyn_cast<TensorType>(funcOp.getArgument(index).getType());
     auto tensorType = dyn_cast<TensorType>(funcOp.getArgumentTypes()[index]);
     assert(tensorType && "expected TensorType");
 
-    BaseMemRefType memrefType = options.functionArgTypeConverterFn(
-        tensorType, *options.defaultMemorySpaceFn(tensorType), dyn_cast<func::FuncOp>(*funcOp), options);
+    BaseMemRefType memrefType =
+        options.functionArgTypeConverterFn(tensorType, *options.defaultMemorySpaceFn(tensorType),
+                                           dyn_cast<func::FuncOp>(*funcOp), options);
 
     auto layoutAttr = funcOp.getArgAttrOfType<AffineMapAttr>(
         index, bufferization::BufferizationDialect::kBufferLayoutAttrName);
@@ -435,7 +436,7 @@ struct ForwardOpInterface
         }
 
         ReturnOp returnOp = getAssumedUniqueReturnOp(forwardOp);
-        //llvm::errs() << "assumed unique return: " << returnOp << "\n";
+        // llvm::errs() << "assumed unique return: " << returnOp << "\n";
         assert(returnOp && "expected func with single return op");
         Location loc = returnOp.getLoc();
 
@@ -462,7 +463,8 @@ struct ForwardOpInterface
             // Note: If `inferFunctionResultLayout = true`, cast are later folded
             // away.
             BaseMemRefType resultType = options.functionArgTypeConverterFn(
-                tensorType, *options.defaultMemorySpaceFn(tensorType), dyn_cast<func::FuncOp>(*forwardOp), options);
+                tensorType, *options.defaultMemorySpaceFn(tensorType),
+                dyn_cast<func::FuncOp>(*forwardOp), options);
             Value toMemrefOp =
                 rewriter.create<bufferization::ToMemrefOp>(loc, resultType, returnVal);
             returnValues.push_back(toMemrefOp);
@@ -480,7 +482,8 @@ struct ForwardOpInterface
         for (auto retTy : forwardOp.getResultTypes()) {
             auto tensorType = dyn_cast<TensorType>(retTy);
             BaseMemRefType resultType = options.functionArgTypeConverterFn(
-                tensorType, *options.defaultMemorySpaceFn(tensorType), dyn_cast<func::FuncOp>(*forwardOp), options);
+                tensorType, *options.defaultMemorySpaceFn(tensorType),
+                dyn_cast<func::FuncOp>(*forwardOp), options);
             returnTypes.push_back(resultType);
         }
         forwardOp.setType(FunctionType::get(op->getContext(), argTypes, returnTypes));
@@ -488,7 +491,6 @@ struct ForwardOpInterface
         return success();
     }
 };
-
 
 // Bufferization of gradient.reverse.
 struct ReverseOpInterface
@@ -585,7 +587,8 @@ struct ReverseOpInterface
             // Note: If `inferFunctionResultLayout = true`, cast are later folded
             // away.
             BaseMemRefType resultType = options.functionArgTypeConverterFn(
-                tensorType, *options.defaultMemorySpaceFn(tensorType), dyn_cast<func::FuncOp>(*reverseOp), options);
+                tensorType, *options.defaultMemorySpaceFn(tensorType),
+                dyn_cast<func::FuncOp>(*reverseOp), options);
             Value toMemrefOp =
                 rewriter.create<bufferization::ToMemrefOp>(loc, resultType, returnVal);
             returnValues.push_back(toMemrefOp);
@@ -603,7 +606,8 @@ struct ReverseOpInterface
         for (auto retTy : reverseOp.getResultTypes()) {
             auto tensorType = dyn_cast<TensorType>(retTy);
             BaseMemRefType resultType = options.functionArgTypeConverterFn(
-                tensorType, *options.defaultMemorySpaceFn(tensorType), dyn_cast<func::FuncOp>(*reverseOp), options);
+                tensorType, *options.defaultMemorySpaceFn(tensorType),
+                dyn_cast<func::FuncOp>(*reverseOp), options);
             returnTypes.push_back(resultType);
         }
         reverseOp.setType(FunctionType::get(op->getContext(), argTypes, returnTypes));
