@@ -100,3 +100,23 @@ LogicalResult SelectPPMeasurementOp::verify()
     }
     return mlir::success();
 }
+
+LogicalResult PrepareStateOp::verify()
+{
+    auto initState = getInitState();
+    if (initState == LogicalInitKind::magic || initState == LogicalInitKind::magic_conj) {
+        return emitOpError(
+            "Magic state cannot be prepared by this operation, use `FabricateOp` instead.");
+    }
+    return mlir::success();
+}
+
+LogicalResult FabricateOp::verify()
+{
+    auto initState = getInitState();
+    if (initState == LogicalInitKind::zero || initState == LogicalInitKind::one ||
+        initState == LogicalInitKind::plus || initState == LogicalInitKind::minus) {
+        return emitOpError("Logical state should not be fabricated, use `PrepareStateOp` instead.");
+    }
+    return mlir::success();
+}

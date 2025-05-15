@@ -59,14 +59,14 @@ def QECDialect : Dialect {
 def LogicalInitKind : I32EnumAttr<"LogicalInitKind",
     "The initial state of a logical qubit such as |0⟩, |1⟩, |+⟩, |−⟩, |Y⟩, |-Y⟩, |m⟩, or |m̅⟩.",
     [
-        I32EnumAttrCase<"zero",     0>,     // |0⟩
-        I32EnumAttrCase<"one",      1>,     // |1⟩
-        I32EnumAttrCase<"plus",     2>,     // |+⟩  = (|0⟩ + |1⟩) / sqrt(2)
-        I32EnumAttrCase<"minus",    3>,     // |-⟩  = (|0⟩ - |1⟩) / sqrt(2)
-        I32EnumAttrCase<"plus_i",   4>,     // |Y⟩  = (|0⟩ + i|1⟩) / sqrt(2)
-        I32EnumAttrCase<"minus_i",  5>,     // |-Y⟩ = (|0⟩ - i|1⟩) / sqrt(2)
-        I32EnumAttrCase<"magic",    6>,     // |m⟩  = |0⟩ + e^{iπ/4}|1⟩ (or can be any magic state)
-        I32EnumAttrCase<"magic_conj", 7>,   // |m̅⟩  = |0⟩ + e^{-iπ/4}|1⟩ (or can be any magic state)
+        I32EnumAttrCase<"zero",     0>,     // |0⟩ Non-magic state
+        I32EnumAttrCase<"one",      1>,     // |1⟩ Non-magic state
+        I32EnumAttrCase<"plus",     2>,     // |+⟩  = (|0⟩ + |1⟩) / sqrt(2)  Non-magic state
+        I32EnumAttrCase<"minus",    3>,     // |-⟩  = (|0⟩ - |1⟩) / sqrt(2)  Non-magic state
+        I32EnumAttrCase<"plus_i",   4>,     // |Y⟩  = (|0⟩ + i|1⟩) / sqrt(2) Non-magic / Magic state
+        I32EnumAttrCase<"minus_i",  5>,     // |-Y⟩ = (|0⟩ - i|1⟩) / sqrt(2) Non-magic / Magic state
+        I32EnumAttrCase<"magic",    6>,     // |m⟩  = |0⟩ + e^{iπ/4}|1⟩      Magic state
+        I32EnumAttrCase<"magic_conj", 7>,   // |m̅⟩  = |0⟩ + e^{-iπ/4}|1⟩     Magic state
     ]> {
     let cppNamespace = "::catalyst::qec";
     let genSpecializedAttr = 0;
@@ -88,16 +88,24 @@ class QEC_Op<string mnemonic, list<Trait> traits = []> : Op<QECDialect, mnemonic
 def PrepareStateOp : QEC_Op<"prepare"> {
     let summary = "Initial state of logical qubit.";
     let description = [{
-        Prepares logical qubits in a specific initial quantum state, 
-        such as |0⟩, |1⟩, |+⟩, |-⟩, |Y⟩, |-Y⟩, |m⟩, or |m̅⟩.
+        Prepares non-magic states of logical qubits in a specific initial quantum state, 
+        such as |0⟩, |1⟩, |+⟩, |-⟩, |Y⟩, |-Y⟩.
+        
+        By default, when allocating a qubit, it is prepared in the |0⟩ state.
 
-        This operation is typically used at the start of a quantum circuit to initialize 
-        logical qubits according to the error-corrected encoding scheme.
+        Based on QEC scheme, |Y⟩ (plus_i) and |-Y⟩ (minus_i) can be prepared as transversal 
+        operations. Otherwise, if those states are fabricated, `FabricateOp` should be used.
+
+        Magic state such as |m⟩ (magic) and |m̅⟩ (magic_conj) cannot be prepared 
+        by this operation, use `FabricateOp` instead.
 
         Example:
         ```mlir
         %0 = qec.prepare zero %q0 : !quantum.bit
-        %1 = qec.prepare magic %q0 : !quantum.bit
+        %1 = qec.prepare one %q1 : !quantum.bit
+        %2 = qec.prepare plus %q2 : !quantum.bit
+        %3 = qec.prepare minus %q3 : !quantum.bit
+        %4 = qec.prepare plus_i %q4 : !quantum.bit
         ```
         These prepares the logical qubit in the |0⟩ state and the |m⟩ state respectively.
     }];
@@ -126,6 +134,8 @@ def PrepareStateOp : QEC_Op<"prepare"> {
     let assemblyFormat = [{
       $init_state $in_qubits attr-dict `:` type($out_qubits)
     }];
+
+    let hasVerifier = 1;
 }
 
 def FabricateOp : QEC_Op<"fabricate"> {
@@ -134,9 +144,15 @@ def FabricateOp : QEC_Op<"fabricate"> {
         The FabricateOp represents a operation that produces/fetches axillary qubits from a qubit's factory.
         This operation typically gets a magic state from a qubit's factory that determines in runtime.
 
+        FabricateOp is used to prepare magic states such as |m⟩ (magic), |m̅⟩ (magic_conj), 
+        |Y⟩ (plus_i), and |-Y⟩ (minus_i). For non-magic states, use `PrepareStateOp` instead.
+
         Example:
         ```mlir
         %0 = qec.fabricate magic: !quantum.bit
+        %1 = qec.fabricate magic_conj: !quantum.bit
+        %2 = qec.fabricate plus_i: !quantum.bit
+        %3 = qec.fabricate minus_i: !quantum.bit
         ```
         This fetches a magic state from a qubit's factory.
     }];
@@ -179,6 +195,8 @@ def FabricateOp : QEC_Op<"fabricate"> {
     let assemblyFormat = [{
         $init_state attr-dict `:` type($out_qubits)
     }];
+
+    let hasVerifier = 1;
 }
 
 def PPRotationOp : QEC_Op<"ppr", [QECOpInterface, AttrSizedOperandSegments]> {

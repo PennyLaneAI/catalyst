@@ -26,7 +26,14 @@ func.func @boo(%q1 : !quantum.bit) {
     %3 = qec.prepare minus %2 : !quantum.bit
     %4 = qec.prepare plus_i %3 : !quantum.bit
     %5 = qec.prepare minus_i %4 : !quantum.bit
-    %6 = qec.prepare magic %5 : !quantum.bit 
+    func.return
+}
+
+func.func @magic() {
+    %0 = qec.fabricate magic : !quantum.bit
+    %1 = qec.fabricate magic_conj : !quantum.bit
+    %2 = qec.fabricate plus_i : !quantum.bit
+    %3 = qec.fabricate minus_i : !quantum.bit
     func.return
 }
 
