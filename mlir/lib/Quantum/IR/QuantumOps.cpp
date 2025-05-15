@@ -61,7 +61,7 @@ LogicalResult CustomOp::canonicalize(CustomOp op, mlir::PatternRewriter &rewrite
 
             rewriter.replaceOpWithNewOp<CustomOp>(
                 op, op.getOutQubits().getTypes(), op.getOutCtrlQubits().getTypes(), paramsNeg,
-                op.getInQubits(), name, nullptr, op.getInCtrlQubits(), op.getInCtrlValues());
+                op.getInQubits(), name, false, op.getInCtrlQubits(), op.getInCtrlValues());
 
             return success();
         }

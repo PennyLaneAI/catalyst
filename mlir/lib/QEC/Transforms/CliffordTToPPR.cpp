@@ -69,7 +69,7 @@ struct GateConversion {
 // If adjoint attribute is true, invert the sign of rotationKind
 void applyAdjointIfNeeded(GateConversion &gateConversion, CustomOp op)
 {
-    if (op.getAdjoint().value_or(false)) {
+    if (op.getAdjoint()) {
         gateConversion.rotationKind = -gateConversion.rotationKind;
     }
 }
