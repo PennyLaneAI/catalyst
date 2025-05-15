@@ -52,13 +52,6 @@ jobs:
           sudo apt-get install -y gcc-11 g++-11
           sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 10
           sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-11 10          
-     
-      - name: Which gcc
-        run: |        
-          gcc --version
-          g++ --version
-          which gcc
-          which g++
 
       - name: Get Cached LLVM Source
         id: cache-llvm-source
@@ -700,11 +693,6 @@ jobs:
           repository: llvm/llvm-project
           ref: ${{ needs.constants.outputs.llvm_version }}
           path: mlir/llvm-project
-     
-      - name: Which gcc
-        run: |        
-          gcc --version
-          g++ --version
 
       - name: Run the main runtime test suite for coverage
         run: |
