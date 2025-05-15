@@ -210,7 +210,7 @@ def test_convert_clifford_to_ppr():
 
 
 def test_commute_ppr():
-  
+
     pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
 
     @qjit(pipelines=pipe, target="mlir")

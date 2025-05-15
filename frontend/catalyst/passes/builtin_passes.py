@@ -591,15 +591,17 @@ def ppr_to_ppm(qnode=None, decompose_method="auto-corrected", avoid_y_measure=Fa
 
     This pass is used to decompose both non-Clifford and Clifford PPRs into PPMs. The non-Clifford
     PPRs (:math:`\theta = \tfrac{\pi}{8}`) are decomposed first, and then Clifford PPRs
-    (:math:`\theta = \tfrac{\pi}{4}`) are decomposed. Non-Clifford decomposition can be performed in
-    one of two ways: ``"clifford-corrected"`` or ``"auto-corrected"``, by default the latter is used.
+    (:math:`\theta = \tfrac{\pi}{4}`) are decomposed.
+    Non-Clifford decomposition can be performed in one of two ways:
+    ``"clifford-corrected"`` or ``"auto-corrected"``, by default the latter is used.
     Both methods are based on `A Game of Surface Codes <https://arxiv.org/abs/1808.02892>`__,
     figures 7 and 17(b) respectively.
 
     Args:
         qnode (QNode, optional): QNode to apply the pass to. If None, returns a decorator.
         decompose_method (str, optional): The method to use for decomposing non-Clifford PPRs.
-            Options are ``"auto-corrected"`` and ``"clifford-corrected"``. Defaults to ``"auto-corrected"``.
+            Options are ``"auto-corrected"`` and ``"clifford-corrected"``.
+            Defaults to ``"auto-corrected"``.
             ``"auto-corrected"`` uses an additional measurement for correction.
             ``"clifford-corrected"`` uses a Clifford rotation for correction.
         avoid_y_measure (bool): Rather than performing a Pauli-Y measurement for Clifford rotations
