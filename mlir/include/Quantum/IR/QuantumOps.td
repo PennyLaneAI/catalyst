@@ -250,7 +250,6 @@ class UnitaryGate_Op<string mnemonic, list<Trait> traits = []> :
         }
 
         bool getAdjointFlag() {
-            // return getAdjoint().value_or(false);
             return getAdjoint();
         }
         void setAdjointFlag(bool adjoint) {
