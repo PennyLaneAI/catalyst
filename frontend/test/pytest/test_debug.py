@@ -439,6 +439,8 @@ class TestCProgramGeneration:
     @pytest.mark.parametrize(
         "arg",
         [
+            False,
+            np.array([False, True]),
             5,
             np.ones(5, dtype=int),
             np.ones((5, 2), dtype=int),
@@ -455,6 +457,8 @@ class TestCProgramGeneration:
             return y
 
         ans = str(f(arg).tolist()).replace(" ", "")
+        # bools are printed as integers in the runtime
+        ans = ans.replace("False", "0").replace("True", "1")
 
         binary = compile_executable(f, arg)
         result = subprocess.run(binary, capture_output=True, text=True, check=True)

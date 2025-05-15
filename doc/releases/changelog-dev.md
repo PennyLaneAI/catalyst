@@ -118,6 +118,10 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Fix Boolean arguments/results not working with the debugging functions `debug.get_cmain` and
+  `debug.compile_executable`.
+  [(#1687)](https://github.com/PennyLaneAI/catalyst/pull/1687)
+
 * Fix AutoGraph fallback for valid iteration targets with constant data but no length, for example
   `itertools.product(range(2), repeat=2)`.
   [(#1665)](https://github.com/PennyLaneAI/catalyst/pull/1665)
