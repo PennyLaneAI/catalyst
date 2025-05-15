@@ -279,6 +279,11 @@ jobs:
         # Update env vars valid for all tasks of this job
         echo '/opt/rh/gcc-toolset-12/root/usr/bin' >> $GITHUB_PATH
 
+    - name: Set up Python ${{ matrix.python_version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python_version }}
+        
     - name: Install Dependencies (Python)
       run: |
         python${{ matrix.python_version }} -m pip install numpy nanobind pybind11 PyYAML cmake ninja
@@ -449,11 +454,6 @@ jobs:
       with:
         name: standalone-plugin-manylinux_2_28_x86_64-wheel-py-${{ matrix.python_version }}.zip
         path: ${{ github.workspace }}/standalone_plugin_wheel/wheel
-
-    - name: Set up Python ${{ matrix.python_version }}
-      uses: actions/setup-python@v5
-      with:
-        python-version: ${{ matrix.python_version }}
 
     - name: Install Python dependencies
       run: |
