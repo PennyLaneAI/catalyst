@@ -213,13 +213,8 @@ def _obs_lowering(aval):
 #
 # registration
 #
-core.raise_to_shaped_mappings[AbstractQbit] = lambda aval, _: aval
 mlir.ir_type_handlers[AbstractQbit] = _qbit_lowering
-
-core.raise_to_shaped_mappings[AbstractQreg] = lambda aval, _: aval
 mlir.ir_type_handlers[AbstractQreg] = _qreg_lowering
-
-core.raise_to_shaped_mappings[AbstractObs] = lambda aval, _: aval
 mlir.ir_type_handlers[AbstractObs] = _obs_lowering
 
 
@@ -2299,14 +2294,14 @@ def extract_scalar(value, op, kind="parameter"):
 
 
 # TODO: remove these patches after https://github.com/jax-ml/jax/pull/23886
-def _sin_lowering2(ctx, x):
+def _sin_lowering2(ctx, x, accuracy):
     """Use hlo.sine lowering instead of the new sin lowering from jax 0.4.28"""
-    return _nary_lower_hlo(hlo.sine, ctx, x)
+    return _nary_lower_hlo(hlo.sine, ctx, x, accuracy=accuracy)
 
 
-def _cos_lowering2(ctx, x):
+def _cos_lowering2(ctx, x, accuracy):
     """Use hlo.cosine lowering instead of the new cosine lowering from jax 0.4.28"""
-    return _nary_lower_hlo(hlo.cosine, ctx, x)
+    return _nary_lower_hlo(hlo.cosine, ctx, x, accuracy=accuracy)
 
 
 CUSTOM_LOWERING_RULES = (
