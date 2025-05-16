@@ -25,6 +25,7 @@ from catalyst.passes import (
     merge_ppr_ppm,
     merge_rotations,
     ppr_to_ppm,
+    to_ppm,
     to_ppr,
 )
 
@@ -384,6 +385,42 @@ def test_commute_ppr_and_merge_ppr_ppm_with_max_pauli_size():
     # Test merge_ppr_ppm with max_pauli_size
     assert 'qec.ppr ["Z", "X"](4)' in optimized_ir
     assert 'qec.ppm ["Y"](-1)' in optimized_ir
+
+
+def test_clifford_to_ppm():
+
+    pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+
+    @qjit(pipelines=pipe, target="mlir")
+    def test_clifford_to_ppm_workflow():
+
+        @to_ppm
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def f():
+            for idx in range(5):
+                qml.H(idx)
+                qml.CNOT(wires=[idx, idx + 1])
+                qml.T(idx)
+                qml.T(idx + 1)
+            return measure(0)
+
+        @to_ppm(decompose_method="clifford-corrected", avoid_y_measure=True, max_pauli_size=2)
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def g():
+            for idx in range(5):
+                qml.H(idx)
+                qml.CNOT(wires=[idx, idx + 1])
+                qml.T(idx)
+                qml.T(idx + 1)
+
+        return f(), g()
+
+    assert 'transform.apply_registered_pass "to_ppm"' in test_clifford_to_ppm_workflow.mlir
+    optimized_ir = test_clifford_to_ppm_workflow.mlir_opt
+    assert 'transform.apply_registered_pass "to_ppm"' not in optimized_ir
+    assert 'qec.ppm ["X", "Z", "Z"]' in optimized_ir
+    assert 'qec.ppm ["Z", "Y"]' in optimized_ir
+    assert 'qec.ppr ["X", "Z"](2)' in optimized_ir
 
 
 if __name__ == "__main__":
