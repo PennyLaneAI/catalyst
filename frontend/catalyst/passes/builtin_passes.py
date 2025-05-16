@@ -585,7 +585,7 @@ def merge_ppr_ppm(qnode=None, *, max_pauli_size=0):
     return PassPipelineWrapper(qnode, merge_ppr_ppm_pass)
 
 
-def ppr_to_ppm(qnode=None, decompose_method="auto-corrected", avoid_y_measure=False):
+def ppr_to_ppm(qnode=None, *, decompose_method="auto-corrected", avoid_y_measure=False):
     R"""Specify that the MLIR compiler passes for decomposing Pauli Product rotations (PPR)
     , :math:`\exp(-iP\theta)`, into Pauli Pauli measurements (PPM) will be applied.
 
