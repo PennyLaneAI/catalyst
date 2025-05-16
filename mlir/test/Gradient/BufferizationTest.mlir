@@ -14,8 +14,10 @@
 
 // RUN: quantum-opt --split-input-file \
 // RUN:   --pass-pipeline="builtin.module( \
-// RUN:     one-shot-bufferize{unknown-type-conversion=identity-layout-map} \
-// RUN:   )" %s | FileCheck %s
+// RUN:     one-shot-bufferize{ \
+// RUN:        unknown-type-conversion=identity-layout-map \
+// RUN:        function-boundary-type-conversion=identity-layout-map \
+// RUN:   })" %s | FileCheck %s
 
 //////////////////////
 // Native Gradients //
@@ -135,3 +137,44 @@ func.func @backprop_multiple_tensors_in(%arg0: tensor<10xf64>, %arg1: tensor<2xf
     return
 }
 
+// -----
+
+// CHECK: func.func private @callback_fn_fwd(tensor<2xf64>) -> (tensor<f64>, tensor<2xf64>)
+func.func private @callback_fn_fwd(tensor<2xf64>) -> (tensor<f64>, tensor<2xf64>)
+
+// CHECK: gradient.forward @callback_fn_fwd.fwd(%arg0: memref<2xf64>) -> (memref<f64>, memref<2xf64>)
+// CHECK-SAME: attributes {argc = 1 : i64, implementation = @callback_fn_fwd, resc = 1 : i64, tape = 1 : i64}
+// CHECK-SAME: {
+gradient.forward @callback_fn_fwd.fwd(%arg0: tensor<2xf64>) -> (tensor<f64>, tensor<2xf64>) attributes {argc = 1 : i64, implementation = @callback_fn_fwd, resc = 1 : i64, tape = 1 : i64} {
+
+    // CHECK: [[in:%.+]] = bufferization.to_tensor %arg0 : memref<2xf64>
+    // CHECK: [[callOut:%.+]]:2 = func.call @callback_fn_fwd([[in]]) : (tensor<2xf64>) -> (tensor<f64>, tensor<2xf64>)
+    // CHECK: [[res0:%.+]] = bufferization.to_memref [[callOut]]#0 : memref<f64>
+    // CHECK: [[res1:%.+]] = bufferization.to_memref [[callOut]]#1 : memref<2xf64>
+    // CHECK: gradient.return {empty = false} [[res0]], [[res1]] : memref<f64>, memref<2xf64>
+    // CHECK: }
+
+    %0:2 = func.call @callback_fn_fwd(%arg0) : (tensor<2xf64>) -> (tensor<f64>, tensor<2xf64>)
+    gradient.return {empty = false} %0#0, %0#1 : tensor<f64>, tensor<2xf64>
+}
+
+// -----
+
+// CHECK: func.func private @callback_fn_vjp(tensor<2xf64>, tensor<f64>) -> tensor<2xf64>
+func.func private @callback_fn_vjp(tensor<2xf64>, tensor<f64>) -> tensor<2xf64>
+
+// CHECK: gradient.reverse @callback_fn_vjp.rev(%arg0: memref<f64>, %arg1: memref<2xf64>) -> memref<2xf64>
+// CHECK-SAME: attributes {argc = 1 : i64, implementation = @callback_fn_vjp, resc = 1 : i64, tape = 1 : i64}
+// CHECK-SAME: {
+gradient.reverse @callback_fn_vjp.rev(%arg0: tensor<f64>, %arg1: tensor<2xf64>) -> tensor<2xf64> attributes {argc = 1 : i64, implementation = @callback_fn_vjp, resc = 1 : i64, tape = 1 : i64} {
+
+    // CHECK: [[in1:%.+]] = bufferization.to_tensor %arg1 : memref<2xf64>
+    // CHECK: [[in0:%.+]] = bufferization.to_tensor %arg0 : memref<f64>
+    // CHECK: [[callOut:%.+]] = func.call @callback_fn_vjp([[in1]], [[in0]]) : (tensor<2xf64>, tensor<f64>) -> tensor<2xf64>
+    // CHECK: [[res:%.+]] = bufferization.to_memref [[callOut]] : memref<2xf64>
+    // CHECK: gradient.return {empty = true} [[res]] : memref<2xf64>
+    // CHECK: }
+
+    %0 = func.call @callback_fn_vjp(%arg1, %arg0) : (tensor<2xf64>, tensor<f64>) -> tensor<2xf64>
+    gradient.return {empty = true} %0 : tensor<2xf64>
+}
