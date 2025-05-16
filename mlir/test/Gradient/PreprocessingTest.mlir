@@ -25,3 +25,16 @@ gradient.forward @callback_fn_fwd.fwd(tensor<2xf64>) -> (tensor<f64>, tensor<2xf
 // CHECK:     [[res:%.+]]:2 = func.call @callback_fn_fwd(%arg0) : (tensor<2xf64>) -> (tensor<f64>, tensor<2xf64>)
 // CHECK:     gradient.return {empty = false} [[res]]#0, [[res]]#1 : tensor<f64>, tensor<2xf64>
 // CHECK:   }
+
+// -----
+
+func.func private @callback_fn_vjp(tensor<2xf64>, tensor<f64>) -> tensor<2xf64>
+gradient.reverse @callback_fn_vjp.rev(tensor<f64>, tensor<2xf64>) -> tensor<2xf64> attributes {argc = 1 : i64, implementation = @callback_fn_vjp, resc = 1 : i64, tape = 1 : i64}
+
+// CHECK:   func.func private @callback_fn_vjp(tensor<2xf64>, tensor<f64>) -> tensor<2xf64>
+//
+// CHECK:   gradient.reverse @callback_fn_vjp.rev(%arg0: tensor<f64>, %arg1: tensor<2xf64>) -> tensor<2xf64>
+// CHECK-SAME:  attributes {argc = 1 : i64, implementation = @callback_fn_vjp, resc = 1 : i64, tape = 1 : i64} {
+// CHECK:     [[res:%.+]] = func.call @callback_fn_vjp(%arg1, %arg0) : (tensor<2xf64>, tensor<f64>) -> tensor<2xf64>
+// CHECK:     gradient.return {empty = true} [[res]] : tensor<2xf64>
+// CHECK:   }
