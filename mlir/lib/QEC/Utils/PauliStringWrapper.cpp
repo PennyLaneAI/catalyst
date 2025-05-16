@@ -190,6 +190,15 @@ void updatePauliWordSign(QECOpInterface op, bool isNegated, PatternRewriter &rew
     op.setRotationKind(rotationKind);
 }
 
+SmallVector<StringRef> extractPauliString(QECOpInterface op)
+{
+    SmallVector<StringRef> pauliWord;
+    for (auto pauli : op.getPauliProduct()) {
+        pauliWord.emplace_back(mlir::cast<mlir::StringAttr>(pauli).getValue());
+    }
+    return pauliWord;
+}
+
 bool isNoSizeLimit(size_t MaxPauliSize) { return MaxPauliSize == 0; }
 
 bool exceedPauliSizeLimit(size_t pauliSize, size_t MaxPauliSize)

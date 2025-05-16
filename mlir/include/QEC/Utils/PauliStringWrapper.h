@@ -160,6 +160,9 @@ void updatePauliWord(QECOpInterface op, const PauliWord &newPauliWord, PatternRe
 // Update the sign of the operation.
 void updatePauliWordSign(QECOpInterface op, bool isNegated, PatternRewriter &rewriter);
 
+// Extract the pauli string from the operation.
+SmallVector<StringRef> extractPauliString(QECOpInterface op);
+
 // No size limit when MaxPauliSize is 0
 bool isNoSizeLimit(size_t MaxPauliSize);
 
