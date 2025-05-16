@@ -196,7 +196,7 @@ struct DeviceInitOpPattern : public OpConversionPattern<DeviceInitOp> {
             catalyst::ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
 
         auto rtd_lib = op.getLib().str();
-        auto rtd_name = op.getName().str();
+        auto rtd_name = op.getDevName().str();
         auto rtd_kwargs = op.getKwargs().str();
 
         auto rtd_lib_gs = getGlobalString(loc, rewriter, rtd_lib,
