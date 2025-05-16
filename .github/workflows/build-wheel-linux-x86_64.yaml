@@ -360,6 +360,10 @@ jobs:
           PYTHON=$(which python${{ matrix.python_version }}) \
           make oqc
 
+    - name: which python
+      run: |
+        which python${{ matrix.python_version }}
+        
     # Build Quantum and Gradient Dialects
     - name: Build MLIR Dialects
       run: |
