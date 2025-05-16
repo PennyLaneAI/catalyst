@@ -119,6 +119,6 @@ def CliffordTToPPMPass : Pass<"to_ppm"> {
 
     let constructor = "catalyst::createCliffordTToPPMPass()";
 
-    let options = [MaxPauliSizeOption];
+    let options = [MaxPauliSizeOption, DecomposeMethodOption, AvoidYMeasureOption];
 }
 #endif // QEC_PASSES
