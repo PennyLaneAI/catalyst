@@ -19,6 +19,7 @@ func.func private @callback_fn_fwd(tensor<2xf64>) -> (tensor<f64>, tensor<2xf64>
 gradient.forward @callback_fn_fwd.fwd(tensor<2xf64>) -> (tensor<f64>, tensor<2xf64>) attributes {argc = 1 : i64, implementation = @callback_fn_fwd, resc = 1 : i64, tape = 1 : i64}
 
 // CHECK:   func.func private @callback_fn_fwd(tensor<2xf64>) -> (tensor<f64>, tensor<2xf64>)
+//
 // CHECK:   gradient.forward @callback_fn_fwd.fwd(%arg0: tensor<2xf64>) -> (tensor<f64>, tensor<2xf64>)
 // CHECK-SAME:  attributes {argc = 1 : i64, implementation = @callback_fn_fwd, resc = 1 : i64, tape = 1 : i64} {
 // CHECK:     [[res:%.+]]:2 = func.call @callback_fn_fwd(%arg0) : (tensor<2xf64>) -> (tensor<f64>, tensor<2xf64>)
