@@ -363,7 +363,7 @@ jobs:
     - name: which python
       run: |
         which python${{ matrix.python_version }}
-        
+
     # Build Quantum and Gradient Dialects
     - name: Build MLIR Dialects
       run: |
@@ -372,7 +372,9 @@ jobs:
               -DCMAKE_BUILD_TYPE=Release \
               -DLLVM_ENABLE_ASSERTIONS=ON \
               -DQUANTUM_ENABLE_BINDINGS_PYTHON=ON \
+              -DPython3_LIBRARY=$(python${{ matrix.python_version }} -c "import sysconfig; print(sysconfig.get_config_var('LIBDIR'))") \
               -DPython3_EXECUTABLE=$(which python${{ matrix.python_version }}) \
+              -DPython3_INCLUDE_DIR="/usr/include/python${{ matrix.python_version }}" \
               -DPython3_NumPy_INCLUDE_DIRS=$(python${{ matrix.python_version }} -c "import numpy as np; print(np.get_include())") \
               -DMLIR_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir" \
               -DMHLO_DIR="$GITHUB_WORKSPACE/mhlo-build/lib/cmake/mlir-hlo" \
