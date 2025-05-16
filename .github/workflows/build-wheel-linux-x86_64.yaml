@@ -47,7 +47,7 @@ jobs:
     name: Determine runner type to use
     uses: ./.github/workflows/determine-workflow-runner.yml
     with:
-      default_runner: ubuntu-22.04
+      default_runner: ubuntu-24.04
 
   check_if_wheel_build_required:
     if: github.event.pull_request.draft == false
@@ -275,7 +275,7 @@ jobs:
       run: |
         # Reduce wait time for repos not responding
         cat /etc/dnf.conf | sed "s/\[main\]/\[main\]\ntimeout=5/g" > /etc/dnf.conf
-        dnf update -y && dnf install -y openmpi-devel libzstd-devel gcc-toolset-12
+        dnf update -y && dnf install -y openmpi-devel libzstd-devel gcc-toolset-12 
         # Update env vars valid for all tasks of this job
         echo '/opt/rh/gcc-toolset-12/root/usr/bin' >> $GITHUB_PATH
 
@@ -360,6 +360,12 @@ jobs:
           PYTHON=$(which python${{ matrix.python_version }}) \
           make oqc
 
+    - name: which python
+      run: |
+        which python${{ matrix.python_version }}
+        echo $GITHUB_WORKSPACE
+        echo $PATH
+
     # Build Quantum and Gradient Dialects
     - name: Build MLIR Dialects
       run: |
@@ -368,10 +374,13 @@ jobs:
               -DCMAKE_BUILD_TYPE=Release \
               -DLLVM_ENABLE_ASSERTIONS=ON \
               -DQUANTUM_ENABLE_BINDINGS_PYTHON=ON \
+              -DPython3_LIBRARY=$(python${{ matrix.python_version }} -c "import sysconfig; print(sysconfig.get_config_var('LIBDIR'))") \
               -DPython3_EXECUTABLE=$(which python${{ matrix.python_version }}) \
-              -DPython3_NumPy_INCLUDE_DIRS=$(python${{ matrix.python_version }} -c "import numpy as np; print(np.get_include())") \
+              -DPython3_INCLUDE_DIR=$(python${{ matrix.python_version }} -c "from sysconfig import get_paths; print(get_paths()['include'])")              -DPython3_NumPy_INCLUDE_DIRS=$(python${{ matrix.python_version }} -c "import numpy as np; print(np.get_include())") \
               -DMLIR_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir" \
               -DMHLO_DIR="$GITHUB_WORKSPACE/mhlo-build/lib/cmake/mlir-hlo" \
+              -DPYTHON_INCLUDE_DIR=$(python -c "import sysconfig; print(sysconfig.get_path('include'))")  \
+              -DPYTHON_LIBRARY=$(python -c "import sysconfig; print(sysconfig.get_config_var('LIBDIR'))")
               -DMHLO_BINARY_DIR="$GITHUB_WORKSPACE/mhlo-build/bin" \
               -DEnzyme_DIR="$GITHUB_WORKSPACE/enzyme-build" \
               -DENZYME_SRC_DIR="$GITHUB_WORKSPACE/mlir/Enzyme" \
@@ -454,6 +463,7 @@ jobs:
       uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python_version }}
+        cache: "poetry"
 
     - name: Install Python dependencies
       run: |
