@@ -44,8 +44,9 @@ struct PostprocessForwardOp : public OpRewritePattern<ForwardOp> {
         auto tapeCount = op.getTape();
 
         if (op.getFunctionType().getNumInputs() == (argc + resc) * 2 &&
-            op.getFunctionType().getNumResults() == tapeCount)
+            op.getFunctionType().getNumResults() == tapeCount) {
             return failure();
+        }
 
         auto argTys = op.getArgumentTypes();
         auto retTys = op.getResultTypes();
@@ -127,8 +128,9 @@ struct PostprocessReverseOp : public OpRewritePattern<ReverseOp> {
         auto forwardResc = op.getResc();
         auto tape = op.getTape();
 
-        if (op.getFunctionType().getNumInputs() == (forwardArgc + forwardResc) * 2 + tape)
+        if (op.getFunctionType().getNumInputs() == (forwardArgc + forwardResc) * 2 + tape) {
             return failure();
+        }
 
         auto argTys = op.getArgumentTypes();
         auto retTys = op.getResultTypes();
