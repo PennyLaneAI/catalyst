@@ -127,9 +127,6 @@ static BaseMemRefType
 getBufferizedFunctionArgType(FunctionOpInterface funcOp, int64_t index,
                              const bufferization::BufferizationOptions &options)
 {
-    llvm::errs() << "getBufferizedFunctionArgType funcOp: " << funcOp << "\n";
-    // llvm::errs() << funcOp.getArgumentTypes()[index] << "\n";
-    // auto tensorType = dyn_cast<TensorType>(funcOp.getArgument(index).getType());
     auto tensorType = dyn_cast<TensorType>(funcOp.getArgumentTypes()[index]);
     assert(tensorType && "expected TensorType");
 
@@ -152,10 +149,8 @@ getBufferizedFunctionArgType(FunctionOpInterface funcOp, int64_t index,
 static ReturnOp getAssumedUniqueReturnOp(FunctionOpInterface funcOp)
 {
     ReturnOp returnOp;
-    llvm::errs() << "assumed return: " << funcOp << "\n";
     for (Block &b : funcOp.getFunctionBody()) {
         if (auto candidateOp = dyn_cast<ReturnOp>(b.getTerminator())) {
-            llvm::errs() << "return candidate: " << candidateOp << "\n";
             if (returnOp) {
                 return nullptr;
             }
@@ -410,7 +405,6 @@ struct ForwardOpInterface
     LogicalResult verifyAnalysis(Operation *op, const bufferization::AnalysisState &state) const
     {
         auto forwardOp = cast<ForwardOp>(op);
-        llvm::errs() << "verifyAnalysis, forwardOp: " << forwardOp << "\n";
         // TODO: func.func with multiple returns are not supported.
         if (!getAssumedUniqueReturnOp(forwardOp)) {
             return op->emitOpError("op without unique func.return is not supported");
@@ -436,7 +430,6 @@ struct ForwardOpInterface
         }
 
         ReturnOp returnOp = getAssumedUniqueReturnOp(forwardOp);
-        // llvm::errs() << "assumed unique return: " << returnOp << "\n";
         assert(returnOp && "expected func with single return op");
         Location loc = returnOp.getLoc();
 
