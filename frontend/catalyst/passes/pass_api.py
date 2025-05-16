@@ -378,4 +378,5 @@ def _API_name_to_pass_name():
         "commute_ppr": "commute_ppr",
         "merge_ppr_ppm": "merge_ppr_ppm",
         "ppr_to_ppm": "ppr_to_ppm",
+        "to_ppm": "to_ppm",
     }
