@@ -81,6 +81,26 @@ struct CliffordTToPPMPass : public impl::CliffordTToPPMPassBase<CliffordTToPPMPa
                 return signalPassFailure();
             }
         }
+
+        // Phase 4: Decompose non-Clifford PPRs into PPMs
+        {
+            RewritePatternSet patterns(ctx);
+            populateDecomposeNonCliffordPPRPatterns(patterns, decomposeMethod);
+
+            if (failed(applyPatternsAndFoldGreedily(module, std::move(patterns)))) {
+                return signalPassFailure();
+            }
+        }
+
+        // Phase 5: Decompose Clifford PPRs into PPMs
+        {
+            RewritePatternSet patterns(ctx);
+            populateDecomposeCliffordPPRPatterns(patterns, avoidYMeasure);
+
+            if (failed(applyPatternsAndFoldGreedily(module, std::move(patterns)))) {
+                return signalPassFailure();
+            }
+        }
     }
 };
 
