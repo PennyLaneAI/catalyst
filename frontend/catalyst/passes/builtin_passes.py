@@ -684,9 +684,9 @@ def to_ppm(
     - :func:`~.passes.merge_ppr_ppm` : Merges PPRs into Pauli Product Measurements (PPMs)
     - :func:`~.passes.ppr_to_ppm` : Decomposes PPRs into PPMs
 
-    The ``avoid_y_measure`` and ``decompose_method`` arguments are passed 
+    The ``avoid_y_measure`` and ``decompose_method`` arguments are passed
     to the :func:`~.passes.ppr_to_ppm` pass.
-    The ``max_pauli_size`` argument is passed to the :func:`~.passes.commute_ppr` 
+    The ``max_pauli_size`` argument is passed to the :func:`~.passes.commute_ppr`
     and :func:`~.passes.merge_ppr_ppm` passes.
 
     Args:
