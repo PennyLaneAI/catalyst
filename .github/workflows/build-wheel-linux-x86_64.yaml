@@ -363,11 +363,8 @@ jobs:
     - name: which python
       run: |
         which python${{ matrix.python_version }}
-    
-    - name: Set up Python ${{ matrix.python_version }}
-      uses: actions/setup-python@v5
-      with:
-        python-version: ${{ matrix.python_version }}
+        echo $GITHUB_WORKSPACE
+        echo $PATH
 
     # Build Quantum and Gradient Dialects
     - name: Build MLIR Dialects
