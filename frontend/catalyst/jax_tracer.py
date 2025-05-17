@@ -696,6 +696,7 @@ def trace_quantum_operations(
     ctx,
     trace: DynamicJaxprTrace,
     mcm_config: qml.devices.MCMConfig = qml.devices.MCMConfig(),
+    out_snapshot_tracer=None,
 ) -> QRegPromise:
     """Recursively trace ``quantum_tape``'s operations containing both PennyLane original and
     Catalyst extension operations. Produce ``QRegPromise`` object holding the resulting quantum
@@ -707,6 +708,7 @@ def trace_quantum_operations(
         qreg: JAX tracer for quantum register in its initial state.
         ctx: JAX tracing context object.
         trace: JAX frame to emit the Jaxpr equations into.
+        out_snapshot_tracer: modified list to store JAX classical qnode snapshot results.
 
     Returns:
         qrp: QRegPromise object holding the JAX tracer representing the quantum register into its
@@ -759,6 +761,21 @@ def trace_quantum_operations(
             trace_state_prep(op, qrp)
         elif isinstance(op, qml.BasisState):
             trace_basis_state(op, qrp)
+        elif isinstance(op, qml.Snapshot):
+            nqubits = (
+                device.wires[0]
+                if catalyst.device.qjit_device.is_dynamic_wires(device.wires)
+                else len(device.wires)
+            )
+            if isinstance(nqubits, DynamicJaxprTracer):
+                shape = (jnp.left_shift(1, nqubits),)
+            else:
+                shape = (2**nqubits,)
+            qreg_out = qrp.actualize()
+            obs_tracers = compbasis_p.bind(qreg_out, qreg_available=True)
+            dyn_dims, static_shape = _extract_tracers_dyn_shape(shape)
+            result = state_p.bind(obs_tracers, *dyn_dims, static_shape=tuple(static_shape))
+            out_snapshot_tracer.append(result)
         else:
             qubits = qrp.extract(op.wires)
             controlled_qubits = qrp.extract(controlled_wires)
@@ -1371,7 +1388,10 @@ def trace_quantum_function(
                     postselect_mode=qnode.execute_kwargs["postselect_mode"],
                     mcm_method=qnode.execute_kwargs["mcm_method"],
                 )
-                qrp_out = trace_quantum_operations(tape, device, qreg_in, ctx, trace, mcm_config)
+                snapshot_results = []
+                qrp_out = trace_quantum_operations(
+                    tape, device, qreg_in, ctx, trace, mcm_config, snapshot_results
+                )
                 meas, meas_trees = trace_quantum_measurements(device, qrp_out, output, trees)
                 qreg_out = qrp_out.actualize()
 
@@ -1383,6 +1403,15 @@ def trace_quantum_function(
                         return func(arr)
 
                 meas_tracers = check_full_raise(meas, trace.to_jaxpr_tracer)
+                if len(snapshot_results) > 0:
+                    meas_return_trees_children = meas_trees.children()
+                    meas_return_trees_children.insert(0, tree_structure(snapshot_results))
+                    meas_trees = meas_trees.make_from_node_data_and_children(
+                        PyTreeRegistry(),
+                        meas_trees.node_data(),
+                        meas_return_trees_children,
+                    )
+                    meas_tracers = snapshot_results + meas_tracers
                 meas_results = tree_unflatten(meas_trees, meas_tracers)
 
                 # TODO: Allow the user to return whatever types they specify.
