@@ -17,18 +17,6 @@
 
 include "mlir/Pass/PassBase.td"
 
-def GradientBufferizationPass : Pass<"gradient-bufferize"> {
-    let summary = "Bufferize tensors in quantum operations.";
-
-    let dependentDialects = [
-        "bufferization::BufferizationDialect",
-        "memref::MemRefDialect",
-        "index::IndexDialect"
-    ];
-
-    let constructor = "catalyst::createGradientBufferizationPass()";
-}
-
 def GradientPreprocessingPass : Pass<"gradient-preprocess"> {
     let summary = "Insert Func.CallOp for ForwardOp and ReverseOp.";
 

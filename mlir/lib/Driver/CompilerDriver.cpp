@@ -64,6 +64,7 @@
 #include "Driver/Support.h"
 #include "Gradient/IR/GradientDialect.h"
 #include "Gradient/IR/GradientInterfaces.h"
+#include "Gradient/Transforms/BufferizableOpInterfaceImpl.h"
 #include "Gradient/Transforms/Passes.h"
 #include "Ion/IR/IonDialect.h"
 #include "MBQC/IR/MBQCDialect.h"
@@ -966,6 +967,7 @@ int QuantumDriverMainFromCL(int argc, char **argv)
 
     // Register bufferization interfaces
     catalyst::registerBufferizableOpInterfaceExternalModels(registry);
+    catalyst::gradient::registerBufferizableOpInterfaceExternalModels(registry);
     catalyst::quantum::registerBufferizableOpInterfaceExternalModels(registry);
 
     // Register and parse command line options.

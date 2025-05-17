@@ -17,6 +17,7 @@
 
 include "mlir/Interfaces/FunctionInterfaces.td"
 include "mlir/Interfaces/CallInterfaces.td"
+include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/IR/SymbolInterfaces.td"
 include "mlir/IR/BuiltinAttributes.td"
 include "mlir/IR/OpBase.td"
@@ -388,7 +389,7 @@ def ReverseOp : Gradient_Op<"reverse",
 }
 
 def ReturnOp : Gradient_Op<"return",
-    [Terminator, ParentOneOf<["ForwardOp", "ReverseOp"]>]> {
+    [ReturnLike, Terminator, ParentOneOf<["ForwardOp", "ReverseOp"]>]> {
 
   let summary = "Return tapes or nothing";
 

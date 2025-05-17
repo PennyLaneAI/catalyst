@@ -36,8 +36,9 @@ struct PreprocessForwardOp : public OpRewritePattern<ForwardOp> {
     mlir::LogicalResult matchAndRewrite(ForwardOp op,
                                         mlir::PatternRewriter &rewriter) const override
     {
-        if (!op.getBody().empty())
+        if (!op.getBody().empty()) {
             return failure();
+        }
 
         Block *block;
         rewriter.modifyOpInPlace(op, [&] { block = op.addEntryBlock(); });
@@ -68,8 +69,9 @@ struct PreprocessReverseOp : public OpRewritePattern<ReverseOp> {
     mlir::LogicalResult matchAndRewrite(ReverseOp op,
                                         mlir::PatternRewriter &rewriter) const override
     {
-        if (!op.getBody().empty())
+        if (!op.getBody().empty()) {
             return failure();
+        }
 
         Block *block;
         rewriter.modifyOpInPlace(op, [&] { block = op.addEntryBlock(); });
