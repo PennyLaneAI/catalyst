@@ -223,14 +223,13 @@ def get_bufferization_stage(_options: CompileOptions) -> List[str]:
         "convert-tensor-to-linalg",  # tensor.pad
         "convert-elementwise-to-linalg",  # Must be run before --arith-bufferize
         "gradient-preprocess",
+        "empty-tensor-to-alloc-tensor",
         ####################
         "one-shot-bufferize{dialect-filter=gradient unknown-type-conversion=identity-layout-map}",
         "one-shot-bufferize{dialect-filter=scf " + options + "}",
         "one-shot-bufferize{dialect-filter=arith " + options + "}",
-        "empty-tensor-to-alloc-tensor",
         "one-shot-bufferize{dialect-filter=bufferization " + options + "}",
         "func.func(tensor-bufferize)",  # TODO
-        # "one-shot-bufferize{dialect-filter=tensor " + options + "}",
         # Catalyst dialect's bufferization must be run before --func.func(linalg-bufferize)
         "one-shot-bufferize{dialect-filter=catalyst unknown-type-conversion=identity-layout-map}",
         "one-shot-bufferize{dialect-filter=linalg " + options + "}",
