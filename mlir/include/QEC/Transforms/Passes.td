@@ -94,7 +94,7 @@ def DecomposeNonCliffordPPRPass : Pass<"decompose_non_clifford_ppr"> {
 
     let constructor = "catalyst::createDecomposeNonCliffordPPRPass()";
 
-    let options = [DecomposeMethodOption];
+    let options = [DecomposeMethodOption, AvoidYMeasureOption];
 }
 
 def DecomposeCliffordPPRPass : Pass<"decompose_clifford_ppr"> {

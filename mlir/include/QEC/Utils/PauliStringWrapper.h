@@ -169,5 +169,12 @@ bool isNoSizeLimit(size_t MaxPauliSize);
 // Combine the size check logic in one place
 bool exceedPauliSizeLimit(size_t pauliSize, size_t MaxPauliSize);
 
+// 1. avoidPauliYMeasure == true: Use |Y⟩ as axillary qubit and measure P⊗Z
+// 2. avoidPauliYMeasure == false: Use |0⟩ as axillary qubit and measure -P⊗Y
+std::pair<StringRef, uint16_t> determinePauliAndRotationSignOfMeasurement(bool avoidPauliYMeasure);
+
+// Initialize |0⟩ (zero) or Fabricate |Y⟩ (plus_i)
+OpResult initializeZeroOrPlusI(bool avoidPauliYMeasure, Location loc, PatternRewriter &rewriter);
+
 } // namespace qec
 } // namespace catalyst

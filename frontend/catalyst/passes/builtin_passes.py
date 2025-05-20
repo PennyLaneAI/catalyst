@@ -656,7 +656,10 @@ def ppr_to_ppm(qnode=None, *, decompose_method="auto-corrected", avoid_y_measure
 
     """
     passes = {
-        "decompose_non_clifford_ppr": {"decompose-method": decompose_method},
+        "decompose_non_clifford_ppr": {
+            "decompose-method": decompose_method,
+            "avoid-y-measure": avoid_y_measure,
+        },
         "decompose_clifford_ppr": {"avoid-y-measure": avoid_y_measure},
     }
 

@@ -17,10 +17,11 @@
 #include <mlir/Dialect/Arith/IR/Arith.h> // for arith::XOrIOp and arith::ConstantOp
 #include <mlir/IR/Builders.h>
 
+#include "Quantum/IR/QuantumOps.h"
+
 #include "QEC/IR/QECDialect.h"
 #include "QEC/Transforms/Patterns.h"
 #include "QEC/Utils/PauliStringWrapper.h"
-#include "Quantum/IR/QuantumOps.h"
 
 using namespace mlir;
 using namespace catalyst::qec;
@@ -61,17 +62,24 @@ LogicalInitKind getMagicState(QECOpInterface op)
 /// All the operations in second diagram are PPM except for the last PPR P(π/2)
 /// For P(-π/8) we need to use complex conjugate|m̅⟩ as the magic state.
 ///
+/// Rather than performing a Pauli-Y measurement for Clifford rotations (sometimes more costly),
+/// a |Y⟩ state is used instead, `avoidPauliYMeasure` is used to control this.
+///
 /// Details:
 /// - If P⊗Z measurement yields -1 then apply X, otherwise apply Z
 ///   * The measurement results are stored as i1 values, -1 is true and 1 is false
 /// - If Z⊗Y and X measurement yield different result, then apply P(π/2) on the input qubits
-void decompose_auto_corrected_pi_over_eight(PPRotationOp op, PatternRewriter &rewriter)
+void decompose_auto_corrected_pi_over_eight(bool avoidPauliYMeasure, PPRotationOp op,
+                                            PatternRewriter &rewriter)
 {
     auto loc = op.getLoc();
 
-    // Fabricate the magic state |0⟩ and |m⟩
-    auto zero = rewriter.create<AllocQubitOp>(loc);
+    // Initialize |0⟩ (zero) or Fabricate |Y⟩ (plus_i)
+    auto axillaryQubit = initializeZeroOrPlusI(avoidPauliYMeasure, loc, rewriter);
     auto magic = rewriter.create<FabricateOp>(loc, getMagicState(op));
+
+    auto [pauliForAxillaryQubit, rotationSign] =
+        determinePauliAndRotationSignOfMeasurement(avoidPauliYMeasure);
 
     SmallVector<StringRef> pauliP = extractPauliString(op);
     SmallVector<Value> inQubits = op.getInQubits(); // [input qubits]
@@ -83,19 +91,20 @@ void decompose_auto_corrected_pi_over_eight(PPRotationOp op, PatternRewriter &re
     inQubits.emplace_back(magic.getOutQubits()[0]); // [input qubits, |m⟩]
     auto ppmPZ = rewriter.create<PPMeasurementOp>(loc, extPauliP, inQubits); // [input qubits, |m⟩]
 
-    // PPM (Z⊗Y) on qubits |0⟩ and |m⟩
-    SmallVector<Value> axillaryQubits = {zero.getOutQubit(), ppmPZ.getOutQubits().back()};
-    SmallVector<StringRef> pauliZY = {"Z", "Y"};
-    auto ppmZY = rewriter.create<PPMeasurementOp>(loc, pauliZY, axillaryQubits); // [|0⟩, |m⟩]
+    // PPM (Z⊗Y/0) on qubits |m⟩ and |Y⟩or|0⟩
+    SmallVector<Value> axillaryQubits = {ppmPZ.getOutQubits().back(), axillaryQubit};
+    SmallVector<StringRef> pauliZY = {"Z", pauliForAxillaryQubit}; // [Z, Y/Z]
+    auto ppmZY = rewriter.create<PPMeasurementOp>(loc, pauliZY, rotationSign, axillaryQubits,
+                                                  nullptr); // [|m⟩, |Y⟩/|0⟩]
 
     // PPM (X) on qubit |m⟩
     SmallVector<StringRef> pauliX = {"X"};
-    auto ppmX = rewriter.create<PPMeasurementOp>(loc, pauliX, ppmZY.getOutQubits().back()); // |m⟩
+    auto ppmX = rewriter.create<PPMeasurementOp>(loc, pauliX, ppmZY.getOutQubits().front()); // |m⟩
 
     // PPM (X/Z) based on the result of PPM (P⊗Z) on qubit |0⟩
     SmallVector<StringRef> pauliZ = {"Z"};
     auto ppmXZ = rewriter.create<SelectPPMeasurementOp>(loc, ppmPZ.getMres(), pauliX, pauliZ,
-                                                        ppmZY.getOutQubits().front()); // |0⟩
+                                                        ppmZY.getOutQubits().back()); // |0⟩
 
     // XOR of the results of PPM (P⊗Z) and PPM (X)
     auto condOp = rewriter.create<arith::XOrIOp>(loc, ppmZY.getMres(), ppmX.getMres());
@@ -176,10 +185,11 @@ struct DecomposeNonCliffordPPR : public OpRewritePattern<PPRotationOp> {
     using OpRewritePattern::OpRewritePattern;
 
     DecomposeMethod method;
+    bool avoidPauliYMeasure;
 
-    DecomposeNonCliffordPPR(MLIRContext *context, DecomposeMethod method,
+    DecomposeNonCliffordPPR(MLIRContext *context, DecomposeMethod method, bool avoidPauliYMeasure,
                             PatternBenefit benefit = 1)
-        : OpRewritePattern(context, benefit), method(method)
+        : OpRewritePattern(context, benefit), method(method), avoidPauliYMeasure(avoidPauliYMeasure)
     {
     }
 
@@ -188,7 +198,7 @@ struct DecomposeNonCliffordPPR : public OpRewritePattern<PPRotationOp> {
         if (op.isNonClifford() && !op.getCondition()) {
             switch (method) {
             case DecomposeMethod::AutoCorrected:
-                decompose_auto_corrected_pi_over_eight(op, rewriter);
+                decompose_auto_corrected_pi_over_eight(avoidPauliYMeasure, op, rewriter);
                 break;
             case DecomposeMethod::CliffordCorrected:
                 decompose_inject_magic_state_pi_over_eight(op, rewriter);
@@ -205,9 +215,11 @@ namespace catalyst {
 namespace qec {
 
 void populateDecomposeNonCliffordPPRPatterns(RewritePatternSet &patterns,
-                                             DecomposeMethod decomposeMethod)
+                                             DecomposeMethod decomposeMethod,
+                                             bool avoidPauliYMeasure)
 {
-    patterns.add<DecomposeNonCliffordPPR>(patterns.getContext(), decomposeMethod, 1);
+    patterns.add<DecomposeNonCliffordPPR>(patterns.getContext(), decomposeMethod,
+                                          avoidPauliYMeasure, 1);
 }
 
 } // namespace qec

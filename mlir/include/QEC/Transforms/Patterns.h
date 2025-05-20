@@ -27,7 +27,7 @@ namespace qec {
 void populateCliffordTToPPRPatterns(mlir::RewritePatternSet &);
 void populateCommuteCliffordTPPRPatterns(mlir::RewritePatternSet &, unsigned int max_pauli_size);
 void populateCommuteCliffordPastPPMPatterns(mlir::RewritePatternSet &, unsigned int max_pauli_size);
-void populateDecomposeNonCliffordPPRPatterns(mlir::RewritePatternSet &, DecomposeMethod);
+void populateDecomposeNonCliffordPPRPatterns(mlir::RewritePatternSet &, DecomposeMethod, bool);
 void populateDecomposeCliffordPPRPatterns(mlir::RewritePatternSet &, bool);
 
 } // namespace qec
