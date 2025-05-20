@@ -87,7 +87,7 @@ def MeasureInBasisOp : MBQC_Op<"measure_in_basis"> {
     );
 
     let assemblyFormat = [{
-        `[` $plane `,` $angle `]` $in_qubit attr-dict `:` type(results)
+        `[` $plane `,` $angle `]` $in_qubit (`postselect` $postselect^)? attr-dict `:` type(results)
     }];
 }
 
