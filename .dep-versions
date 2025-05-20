@@ -1,7 +1,7 @@
 # Always update the version check in catalyst.__init__ when changing the JAX version.
 
 #############
-# We track llvm and mhlo from jax 0.4.32 for now
+# We track mlir submodule versions from jax 0.4.32 for now
 # These are the earliest versions with complete upstream bufferization changes
 # Versions are retrieved from
 # python3 .github/workflows/set_dep_versions.py 0.4.32
