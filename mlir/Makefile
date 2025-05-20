@@ -130,7 +130,7 @@ enzyme:
 		-DCMAKE_CXX_VISIBILITY_PRESET=$(SYMBOL_VISIBILITY) \
 		-DCMAKE_POLICY_DEFAULT_CMP0116=NEW
 
-	cmake --build $(ENZYME_BUILD_DIR) --target EnzymeStatic-21
+	cmake --build $(ENZYME_BUILD_DIR) --target EnzymeStatic-20
 
 .PHONY: plugin
 plugin:
