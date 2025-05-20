@@ -1,7 +1,7 @@
 # Always update the version check in catalyst.__init__ when changing the JAX version.
 jax=0.6.0
 mhlo=89a891c986650c33df76885f5620e0a92150d90f
-llvm=3a8316216807d64a586b971f51695e23883331f7
+llvm=7f04a8ad131881b5a58b97c8191733ed42d18e20
 enzyme=v0.0.149
 
 # Always remove custom PL/LQ versions before release.
