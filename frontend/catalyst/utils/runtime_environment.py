@@ -34,7 +34,7 @@ DEFAULT_LIB_PATHS = {
 }
 
 DEFAULT_INCLUDE_PATHS = {
-    "mlir": os.path.join(package_root, "../../../include"),
+    "mlir": os.path.join(package_root, "../../../mlir/include"),
 }
 
 DEFAULT_BIN_PATHS = {
@@ -49,11 +49,11 @@ def get_lib_path(project, env_var):
     return os.getenv(env_var, DEFAULT_LIB_PATHS.get(project, ""))
 
 
-def get_include_path(project, env_var):
+def get_include_path():
     """Return the path to Catalyst's include directory."""
     if INSTALLED:
         return os.path.join(package_root, "..", "include")  # pragma: no cover
-    return os.getenv(env_var, DEFAULT_INCLUDE_PATHS.get(project, ""))
+    return os.getenv("CATALYST_INCLUDE_DIRS", DEFAULT_INCLUDE_PATHS.get("mlir", ""))
 
 
 def get_bin_path(project, env_var):
