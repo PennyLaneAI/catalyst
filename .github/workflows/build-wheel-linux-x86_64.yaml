@@ -364,7 +364,7 @@ jobs:
       run: |
         which python${{ matrix.python_version }}
         echo $GITHUB_WORKSPACE
-        ls $GITHUB_WORKSPACE
+        ls $GITHUB_WORKSPACE/enzyme-build
         echo $PATH
 
     # Build Quantum and Gradient Dialects
