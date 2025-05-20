@@ -196,6 +196,9 @@
 * Improved the definition of `YieldOp` in the quantum dialect by removing `AnyTypeOf`
   [(#1696)](https://github.com/PennyLaneAI/catalyst/pull/1696)
 
+* The assembly format of `MeasureOp` in the `Quantum` dialect and `MeasureInBasisOp` in the `MBQC` dialect now contains the `postselect` attribute. 
+  [(#1732)](https://github.com/PennyLaneAI/catalyst/pull/1732)
+
 * The bufferization of custom catalyst dialects has been migrated to the new one-shot
   bufferization interface in mlir.
   The new mlir bufferization interface is required by jax 0.4.29 or higher.
@@ -205,6 +208,9 @@
 
 * Redundant `OptionalAttr` is removed from `adjoint` argument in `QuantumOps.td` TableGen file
   [(#1746)](https://github.com/PennyLaneAI/catalyst/pull/1746)
+
+* `ValueRange` is replaced with `TypeRange` for creating `CustomOp` in `IonsDecompositionPatterns.cpp` to match the build constructors
+  [(#1749)](https://github.com/PennyLaneAI/catalyst/pull/1749)
 
 <h3>Documentation 📝</h3>
 
@@ -226,8 +232,8 @@ Sengthai Heng,
 David Ittah,
 Tzung-Han Juang,
 Christina Lee,
-Erick Ochoa Lopez,
 Mehrdad Malekmohammadi,
 Anton Naim Ibrahim,
+Erick Ochoa Lopez,
 Ritu Thombre,
 Paul Haochen Wang.

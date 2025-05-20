@@ -78,7 +78,7 @@ func.func @testXYPostSelect0(%q1 : !quantum.bit) {
     // CHECK: [[plane:%.+]] = llvm.mlir.constant(0 : i32) : i32
     // CHECK: [[postselect:%.+]] = llvm.mlir.constant(0 : i32) : i32
     // CHECK: llvm.call @__catalyst__mbqc__measure_in_basis(%arg0, [[plane]], [[angle]], [[postselect]])
-    %res, %new_q = mbqc.measure_in_basis [XY, %angle] %q1 {postselect = 0 : i32} : i1, !quantum.bit
+    %res, %new_q = mbqc.measure_in_basis [XY, %angle] %q1 postselect 0 : i1, !quantum.bit
     func.return
 }
 
@@ -94,6 +94,6 @@ func.func @testXYPostSelect1(%q1 : !quantum.bit) {
     // CHECK: [[plane:%.+]] = llvm.mlir.constant(0 : i32) : i32
     // CHECK: [[postselect:%.+]] = llvm.mlir.constant(1 : i32) : i32
     // CHECK: llvm.call @__catalyst__mbqc__measure_in_basis(%arg0, [[plane]], [[angle]], [[postselect]])
-    %res, %new_q = mbqc.measure_in_basis [XY, %angle] %q1 {postselect = 1 : i32} : i1, !quantum.bit
+    %res, %new_q = mbqc.measure_in_basis [XY, %angle] %q1 postselect 1 : i1, !quantum.bit
     func.return
 }
