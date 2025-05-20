@@ -84,10 +84,10 @@ void createBufferizationPipeline(OpPassManager &pm)
     pm.addPass(mlir::createSCFBufferizePass());
     pm.addPass(mlir::createConvertTensorToLinalgPass());
     pm.addPass(mlir::createConvertElementwiseToLinalgPass());
-    pm.addPass(mlir::arith::createArithBufferizePass());
+    //pm.addPass(mlir::arith::createArithBufferizePass());
     pm.addPass(mlir::bufferization::createEmptyTensorToAllocTensorPass());
-    pm.addNestedPass<mlir::func::FuncOp>(mlir::bufferization::createBufferizationBufferizePass());
-    pm.addNestedPass<mlir::func::FuncOp>(mlir::tensor::createTensorBufferizePass());
+    //pm.addNestedPass<mlir::func::FuncOp>(mlir::bufferization::createBufferizationBufferizePass());
+    //pm.addNestedPass<mlir::func::FuncOp>(mlir::tensor::createTensorBufferizePass());
     mlir::bufferization::OneShotBufferizationOptions catalyst_buffer_options;
     catalyst_buffer_options.opFilter.allowDialect<catalyst::CatalystDialect>();
     catalyst_buffer_options.unknownTypeConverterFn =
@@ -97,8 +97,8 @@ void createBufferizationPipeline(OpPassManager &pm)
             return bufferization::getMemRefTypeWithStaticIdentityLayout(tensorType, memorySpace);
         };
     pm.addPass(mlir::bufferization::createOneShotBufferizePass(catalyst_buffer_options));
-    pm.addNestedPass<mlir::func::FuncOp>(mlir::createLinalgBufferizePass());
-    pm.addNestedPass<mlir::func::FuncOp>(mlir::tensor::createTensorBufferizePass());
+    //pm.addNestedPass<mlir::func::FuncOp>(mlir::createLinalgBufferizePass());
+    //pm.addNestedPass<mlir::func::FuncOp>(mlir::tensor::createTensorBufferizePass());
     mlir::bufferization::OneShotBufferizationOptions quantum_buffer_options;
     quantum_buffer_options.opFilter.allowDialect<catalyst::quantum::QuantumDialect>();
     pm.addPass(mlir::bufferization::createOneShotBufferizePass(quantum_buffer_options));
