@@ -384,6 +384,7 @@ jobs:
               -DPYTHON_LIBRARY=$(python${{ matrix.python_version }} -c "import sysconfig; print(sysconfig.get_config_var('LIBDIR'))")
               -DMHLO_BINARY_DIR="$GITHUB_WORKSPACE/mhlo-build/bin" \
               -DEnzyme_DIR="$GITHUB_WORKSPACE/enzyme-build" \
+              -DCMAKE_PREFIX_PATH=$GITHUB_WORKSPACE/enzyme-install
               -DENZYME_SRC_DIR="$GITHUB_WORKSPACE/mlir/Enzyme" \
               -DLLVM_ENABLE_ZLIB=FORCE_ON \
               -DLLVM_ENABLE_ZSTD=OFF \
