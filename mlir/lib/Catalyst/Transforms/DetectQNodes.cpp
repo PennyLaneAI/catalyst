@@ -924,8 +924,8 @@ struct AddExceptionHandlingPass : impl::AddExceptionHandlingPassBase<AddExceptio
         patterns1.add<DetectCallsInAsyncRegionsTransform>(context);
 
         GreedyRewriteConfig config;
-        config.strictMode = GreedyRewriteStrictness::ExistingOps;
-        config.enableRegionSimplification = mlir::GreedySimplifyRegionLevel::Disabled;
+        //config.strictMode = GreedyRewriteStrictness::ExistingOps;
+        //config.enableRegionSimplification = false;
 
         if (failed(applyPatternsGreedily(getOperation(), std::move(patterns1), config))) {
             signalPassFailure();
