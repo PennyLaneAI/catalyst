@@ -679,6 +679,7 @@ def to_ppm(
     clifford+T gates into Pauli Product Measurements (PPM) will be applied.
 
     This pass combines multiple sub-passes:
+
     - :func:`~.passes.to_ppr` : Converts gates into Pauli Product Rotations (PPRs)
     - :func:`~.passes.commute_ppr` : Commutes PPRs past non-Clifford PPRs
     - :func:`~.passes.merge_ppr_ppm` : Merges PPRs into Pauli Product Measurements (PPMs)
@@ -709,7 +710,7 @@ def to_ppm(
     **Example**
 
     If a merging resulted in a PPM acting on more than
-    `max_pauli_size` qubits (here, `max_pauli_size = 2`), that merging would be skipped.
+    ``max_pauli_size`` qubits (here, ``max_pauli_size = 2``), that merging would be skipped.
     However, when decomposed into PPMs, at least one qubit will be applied, so the final
     PPMs will act on at least plus one more qubit.
 
