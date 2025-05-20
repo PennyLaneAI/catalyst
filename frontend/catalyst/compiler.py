@@ -508,6 +508,7 @@ class Compiler:
 
         if self.is_using_python_compiler():
             from pennylane.compiler.python_compiler.impl import Compiler
+
             compiler = Compiler()
             mlir_module = compiler.run(mlir_module)
 
