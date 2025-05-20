@@ -219,16 +219,20 @@ wheel:
 
 	# Copy selected headers to `frontend/include' to include them in the wheel
 	mkdir -p $(MK_DIR)/frontend/catalyst/include
-	find $(DIALECTS_SRC_DIR)/include/Quantum -name "*.h" | while read file; do \
-		dest_dir=$(MK_DIR)/frontend/catalyst/include/$$(dirname $${file#$(DIALECTS_SRC_DIR)/include/}); \
-		mkdir -p $${dest_dir}; \
-		cp $(COPY_FLAGS) $${file} $${dest_dir}; \
-	done
-	find $(DIALECTS_BUILD_DIR)/include/Quantum -name "*.h.inc" | while read file; do \
-		dest_dir=$(MK_DIR)/frontend/catalyst/include/$$(dirname $${file#$(DIALECTS_BUILD_DIR)/include/}); \
-		mkdir -p $${dest_dir}; \
-		cp $(COPY_FLAGS) $${file} $${dest_dir}; \
-	done
+	find $(DIALECTS_SRC_DIR)/include/Quantum $(DIALECTS_BUILD_DIR)/include/Quantum \
+	    $(DIALECTS_SRC_DIR)/include/Gradient $(DIALECTS_BUILD_DIR)/include/Gradient \
+	    $(DIALECTS_SRC_DIR)/include/Mitigation $(DIALECTS_BUILD_DIR)/include/Mitigation \
+	    \( -name "*.h" -o -name "*.h.inc" \) -type f -exec sh -c \
+	    'for file do \
+	        if [ "$$file" = "$${file#$(DIALECTS_BUILD_DIR)}" ]; then \
+				base_dir=$(DIALECTS_SRC_DIR); \
+			else \
+				base_dir=$(DIALECTS_BUILD_DIR); \
+			fi; \
+			dest_dir=$(MK_DIR)/frontend/catalyst/include/$$(dirname $${file#$${base_dir}/include/}); \
+			mkdir -p $$dest_dir; \
+		    cp $(COPY_FLAGS) $$file $$dest_dir; \
+	    done' sh {} +
 
 	$(PYTHON) -m pip wheel --no-deps . -w dist
 
