@@ -507,9 +507,10 @@ class Compiler:
         """
 
         if self.is_using_python_compiler():
-            from pennylane.compiler.python_compiler.impl import Compiler
+            # pylint: disable-next=import-outside-toplevel
+            from pennylane.compiler.python_compiler.impl import Compiler as PythonCompiler
 
-            compiler = Compiler()
+            compiler = PythonCompiler()
             mlir_module = compiler.run(mlir_module)
 
         return self.run_from_ir(
