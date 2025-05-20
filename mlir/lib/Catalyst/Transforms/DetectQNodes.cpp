@@ -113,8 +113,8 @@ LogicalResult DetectCallsInAsyncRegionsTransform::matchAndRewrite(LLVM::CallOp c
 struct AddExceptionHandlingTransform : public OpRewritePattern<LLVM::CallOp> {
     using OpRewritePattern<LLVM::CallOp>::OpRewritePattern;
 
-    LogicalResult match(LLVM::CallOp op) const override;
-    void rewrite(LLVM::CallOp op, PatternRewriter &rewriter) const override;
+    LogicalResult match(LLVM::CallOp op) const;
+    void rewrite(LLVM::CallOp op, PatternRewriter &rewriter) const;
 };
 
 /* Here we only match with calls that have the { catalyst.preInvoke } annotations.
@@ -264,8 +264,8 @@ void AddExceptionHandlingTransform::rewrite(LLVM::CallOp callOp, PatternRewriter
 struct RemoveAbortAndPutsInsertCallTransform : public OpRewritePattern<LLVM::CallOp> {
     using OpRewritePattern<LLVM::CallOp>::OpRewritePattern;
 
-    LogicalResult match(LLVM::CallOp op) const override;
-    void rewrite(LLVM::CallOp op, PatternRewriter &rewriter) const override;
+    LogicalResult match(LLVM::CallOp op) const;
+    void rewrite(LLVM::CallOp op, PatternRewriter &rewriter) const;
 };
 
 // In this pattern we are looking for function calls to functions annotated
@@ -450,8 +450,8 @@ void RemoveAbortAndPutsInsertCallTransform::rewrite(LLVM::CallOp callOp,
 struct LivenessAnalysisDropRef : public OpRewritePattern<LLVM::CallOp> {
     using OpRewritePattern<LLVM::CallOp>::OpRewritePattern;
 
-    LogicalResult match(LLVM::CallOp op) const override;
-    void rewrite(LLVM::CallOp op, PatternRewriter &rewriter) const override;
+    LogicalResult match(LLVM::CallOp op) const;
+    void rewrite(LLVM::CallOp op, PatternRewriter &rewriter) const;
 };
 
 LogicalResult LivenessAnalysisDropRef::match(LLVM::CallOp op) const
