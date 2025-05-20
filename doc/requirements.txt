@@ -1,25 +1,25 @@
-docutils==0.16
-sphinxcontrib-bibtex
-sphinx==4.5.0
-sphinxcontrib-applehelp==1.0.4
-sphinxcontrib-devhelp==1.0.2
-sphinxcontrib-qthelp==1.0.3
-sphinxcontrib-htmlhelp==2.0.1
-sphinxcontrib-serializinghtml==1.1.5
+docutils==0.20
+sphinxcontrib-bibtex==2.6.3
+sphinx==8.1
+sphinxcontrib-applehelp==2.0.0
+sphinxcontrib-devhelp==2.0.0
+sphinxcontrib-qthelp==2.0.0
+sphinxcontrib-htmlhelp==2.1.0
+sphinxcontrib-serializinghtml==2.0.0
 ipykernel
-nbsphinx==0.7
+nbsphinx==0.9.7
 Jinja2==3.1.4
 version_information
 sphinx-copybutton
 sphinx-tabs
-markupsafe==2.1.1
+markupsafe==3.0.2
 pennylane-sphinx-theme
 nbconvert
 pygments
 breathe
-ipython==8.10.0
+ipython==8.36.0
 sphinx-automodapi
-exhale>=0.3.3
+exhale>=0.3.7
 graphviz
 pybind11
 m2r2
@@ -30,6 +30,6 @@ lxml_html_clean
 
 # Pre-install PL development wheels
 --extra-index-url https://test.pypi.org/simple/
-pennylane-lightning-kokkos==0.42.0-dev11
-pennylane-lightning==0.42.0-dev11
-pennylane==0.42.0-dev19
+pennylane-lightning-kokkos==0.42.0-dev16
+pennylane-lightning==0.42.0-dev16
+pennylane==0.42.0-dev27

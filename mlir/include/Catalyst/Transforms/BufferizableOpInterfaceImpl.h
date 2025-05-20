@@ -1,4 +1,4 @@
-// Copyright 2025 Xanadu Quantum Technologies Inc.
+// Copyright 2024-2025 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,16 +14,10 @@
 
 #pragma once
 
-#include "mlir/Conversion/LLVMCommon/TypeConverter.h"
-#include "mlir/IR/PatternMatch.h"
-#include "mlir/Transforms/DialectConversion.h"
+using namespace mlir;
 
 namespace catalyst {
-namespace qec {
 
-void populateCliffordTToPPRPatterns(mlir::RewritePatternSet &);
-void populateCommuteCliffordTPPRPatterns(mlir::RewritePatternSet &, unsigned int max_pauli_size);
-void populateCommuteCliffordPastPPMPatterns(mlir::RewritePatternSet &, unsigned int max_pauli_size);
+void registerBufferizableOpInterfaceExternalModels(mlir::DialectRegistry &registry);
 
-} // namespace qec
 } // namespace catalyst
