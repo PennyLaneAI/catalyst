@@ -55,7 +55,7 @@ struct DisentangleSWAPPass : public impl::DisentangleSWAPPassBase<DisentangleSWA
                                               /*params=*/mlir::ValueRange(),
                                               /*in_qubits=*/mlir::ValueRange({inQubit}),
                                               /*gate_name=*/gateName,
-                                              /*adjoint=*/nullptr,
+                                              /*adjoint=*/false,
                                               /*in_ctrl_qubits=*/mlir::ValueRange(),
                                               /*in_ctrl_values=*/mlir::ValueRange());
 
@@ -77,7 +77,7 @@ struct DisentangleSWAPPass : public impl::DisentangleSWAPPassBase<DisentangleSWA
                                               /*params=*/mlir::ValueRange(),
                                               /*in_qubits=*/mlir::ValueRange({inQubit}),
                                               /*gate_name=*/gateName,
-                                              /*adjoint=*/nullptr,
+                                              /*adjoint=*/false,
                                               /*in_ctrl_qubits=*/mlir::ValueRange(),
                                               /*in_ctrl_values=*/mlir::ValueRange());
 
@@ -101,7 +101,7 @@ struct DisentangleSWAPPass : public impl::DisentangleSWAPPassBase<DisentangleSWA
             /*params=*/mlir::ValueRange(),
             /*in_qubits=*/mlir::ValueRange({controlIn, targetIn}),
             /*gate_name=*/gateName,
-            /*adjoint=*/nullptr,
+            /*adjoint=*/false,
             /*in_ctrl_qubits=*/mlir::ValueRange({}),
             /*in_ctrl_values=*/mlir::ValueRange());
 
@@ -124,7 +124,7 @@ struct DisentangleSWAPPass : public impl::DisentangleSWAPPassBase<DisentangleSWA
             /*params=*/mlir::ValueRange(),
             /*in_qubits=*/mlir::ValueRange({controlIn, targetIn}),
             /*gate_name=*/gateName,
-            /*adjoint=*/nullptr,
+            /*adjoint=*/false,
             /*in_ctrl_qubits=*/mlir::ValueRange({}),
             /*in_ctrl_values=*/mlir::ValueRange());
 

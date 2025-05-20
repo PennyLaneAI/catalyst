@@ -190,5 +190,16 @@ void updatePauliWordSign(QECOpInterface op, bool isNegated, PatternRewriter &rew
     op.setRotationKind(rotationKind);
 }
 
+bool isNoSizeLimit(size_t MaxPauliSize) { return MaxPauliSize == 0; }
+
+bool exceedPauliSizeLimit(size_t pauliSize, size_t MaxPauliSize)
+{
+    // No size limit
+    if (isNoSizeLimit(MaxPauliSize)) {
+        return false;
+    }
+    return pauliSize > MaxPauliSize;
+}
+
 } // namespace qec
 } // namespace catalyst
