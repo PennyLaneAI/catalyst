@@ -2,6 +2,10 @@
 
 <h3>New features since last release</h3>
 
+* Adds integration with PennyLane's experimental python compiler based on xDSL.
+  This allows people to write xDSL transformations.
+  [(#1715)](https://github.com/PennyLaneAI/catalyst/pull/1715)
+
 <h3>Improvements 🛠</h3>
 
 * The behaviour of measurement processes executed on `null.qubit` with QJIT is now more in line with
