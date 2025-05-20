@@ -236,6 +236,7 @@ def get_bufferization_stage(_options: CompileOptions) -> List[str]:
         "func.func(tensor-bufferize)",  # TODO
         "one-shot-bufferize{dialect-filter=quantum}",
         "func-bufferize",  # TODO
+        # "one-shot-bufferize{ " + options + "}",
         ####################
         "canonicalize",  # Remove dead memrefToTensorOp's
         "gradient-postprocess",
