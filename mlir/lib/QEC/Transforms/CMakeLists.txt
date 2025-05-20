@@ -12,6 +12,7 @@ file(GLOB SRC
     DecomposeNonCliffordPPR.cpp
     decompose_clifford_ppr.cpp
     DecomposeCliffordPPR.cpp
+    PPRDecomposeUtils.cpp
 )
 
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)

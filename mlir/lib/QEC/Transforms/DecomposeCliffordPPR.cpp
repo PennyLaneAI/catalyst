@@ -12,15 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <mlir/IR/Value.h>
 #define DEBUG_TYPE "decompose_clifford_ppr"
 
 #include <mlir/Dialect/Arith/IR/Arith.h> // for arith::XOrIOp and arith::ConstantOp
 #include <mlir/IR/Builders.h>
+#include <mlir/IR/Value.h>
 
 #include "Quantum/IR/QuantumOps.h"
 
 #include "QEC/IR/QECDialect.h"
+#include "QEC/Transforms/PPRDecomposeUtils.h"
 #include "QEC/Transforms/Patterns.h"
 #include "QEC/Utils/PauliStringWrapper.h"
 

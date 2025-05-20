@@ -212,29 +212,5 @@ bool exceedPauliSizeLimit(size_t pauliSize, size_t MaxPauliSize)
     return pauliSize > MaxPauliSize;
 }
 
-// 1. avoidPauliYMeasure == true: Use |Y⟩ as axillary qubit and measure -P⊗Z
-// 2. avoidPauliYMeasure == false: Use |0⟩ as axillary qubit and measure P⊗Y
-std::pair<StringRef, uint16_t> determinePauliAndRotationSignOfMeasurement(bool avoidPauliYMeasure)
-{
-    if (avoidPauliYMeasure) {
-        return std::make_pair("Z", -1);
-    }
-    return std::make_pair("Y", 1);
-}
-
-// Initialize |0⟩ or Fabricate|Y⟩ based on avoidPauliYMeasure
-OpResult initializeZeroOrPlusI(bool avoidPauliYMeasure, Location loc, PatternRewriter &rewriter)
-{
-    if (avoidPauliYMeasure) {
-        // Fabricate |Y⟩
-        auto plusIOp = rewriter.create<FabricateOp>(loc, LogicalInitKind::plus_i);
-        return plusIOp.getOutQubits().back();
-    }
-
-    // Initialize |0⟩
-    auto allocatedQubit = rewriter.create<quantum::AllocQubitOp>(loc);
-    return allocatedQubit.getOutQubit();
-}
-
 } // namespace qec
 } // namespace catalyst

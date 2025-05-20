@@ -20,6 +20,7 @@
 #include "Quantum/IR/QuantumOps.h"
 
 #include "QEC/IR/QECDialect.h"
+#include "QEC/Transforms/PPRDecomposeUtils.h"
 #include "QEC/Transforms/Patterns.h"
 #include "QEC/Utils/PauliStringWrapper.h"
 
