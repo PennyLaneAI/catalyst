@@ -2,8 +2,8 @@
 
 <h3>New features since last release</h3>
 
-* Adds integration with PennyLane's experimental python compiler based on xDSL.
-  This allows people to write xDSL transformations.
+* Add integration with PennyLane's experimental python compiler based on xDSL.
+  This allows people to write xDSL transformations that can be used with Catalyst.
   [(#1715)](https://github.com/PennyLaneAI/catalyst/pull/1715)
 
 <h3>Improvements 🛠</h3>
