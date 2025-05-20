@@ -692,7 +692,10 @@ def to_ppm(
     Args:
         qnode (QNode, optional): QNode to apply the pass to. If None, returns a decorator.
         decompose_method (str, optional): The method to use for decomposing non-Clifford PPRs.
-            Options are ``"auto-corrected"`` and ``"clifford-corrected"``.
+            Options are ``"auto-corrected"`` and ``"clifford-corrected"``. Defaults to
+            Defaults to ``"auto-corrected"``.
+            ``"auto-corrected"`` uses an additional measurement for correction.
+            ``"clifford-corrected"`` uses a Clifford rotation for correction.
         avoid_y_measure (bool): Rather than performing a Pauli-Y measurement for Clifford rotations
             (sometimes more costly), a :math:`Y` state (:math:`Y\vert 0 \rangle`) is used instead
             (requires :math:`Y` state preparation). Defaults to ``False``.
