@@ -225,17 +225,18 @@ def get_bufferization_stage(_options: CompileOptions) -> List[str]:
         "gradient-preprocess",
         "empty-tensor-to-alloc-tensor",
         ####################
-        "one-shot-bufferize{dialect-filter=gradient unknown-type-conversion=identity-layout-map}",
-        "one-shot-bufferize{dialect-filter=scf " + options + "}",
-        "one-shot-bufferize{dialect-filter=arith " + options + "}",
-        "one-shot-bufferize{dialect-filter=bufferization " + options + "}",
-        "func.func(tensor-bufferize)",  # TODO
-        # Catalyst dialect's bufferization must be run before --func.func(linalg-bufferize)
-        "one-shot-bufferize{dialect-filter=catalyst unknown-type-conversion=identity-layout-map}",
-        "one-shot-bufferize{dialect-filter=linalg " + options + "}",
-        "func.func(tensor-bufferize)",  # TODO
-        "one-shot-bufferize{dialect-filter=quantum}",
-        "func-bufferize",  # TODO
+        # "one-shot-bufferize{dialect-filter=gradient unknown-type-conversion=identity-layout-map}",
+        # "one-shot-bufferize{dialect-filter=scf " + options + "}",
+        # "one-shot-bufferize{dialect-filter=arith " + options + "}",
+        # "one-shot-bufferize{dialect-filter=bufferization " + options + "}",
+        # "func.func(tensor-bufferize)",  # TODO
+        # # Catalyst dialect's bufferization must be run before --func.func(linalg-bufferize)
+        # "one-shot-bufferize{dialect-filter=catalyst unknown-type-conversion=identity-layout-map}",
+        # "one-shot-bufferize{dialect-filter=linalg " + options + "}",
+        # "func.func(tensor-bufferize)",  # TODO
+        # "one-shot-bufferize{dialect-filter=quantum}",
+        # "func-bufferize",  #
+        "one-shot-bufferize{" + options + "}",
         ####################
         "canonicalize",  # Remove dead memrefToTensorOp's
         "gradient-postprocess",
