@@ -352,7 +352,7 @@ struct DetensorizeSCFPass : public impl::DetensorizeSCFPassBase<DetensorizeSCFPa
         patterns.add<DetensorizeForOp>(context);
         patterns.add<DetensorizeIfOp>(context);
         patterns.add<DetensorizeWhileOp>(context);
-        if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns))))
+        if (failed(applyPatternsGreedily(getOperation(), std::move(patterns))))
             signalPassFailure();
     }
 };

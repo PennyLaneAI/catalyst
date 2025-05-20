@@ -190,7 +190,7 @@ struct AnnotateFunctionPassVerified
         patterns.add<AnnotateFunctionPattern>(context);
         patterns.add<PropagateAnnotationPattern>(context, cg);
 
-        if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
+        if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
             signalPassFailure();
         }
     }
