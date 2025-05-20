@@ -86,7 +86,7 @@ def LogicalInit : EnumAttr<QECDialect, LogicalInitKind, "enum">;
 class QEC_Op<string mnemonic, list<Trait> traits = []> : Op<QECDialect, mnemonic, traits>;
 
 def PrepareStateOp : QEC_Op<"prepare"> {
-    let summary = "Initial state of logical qubit.";
+    let summary = "Initialize existing qubits into a given state.";
     let description = [{
         Prepares non-magic states of logical qubits in a specific initial quantum state, 
         such as |0⟩, |1⟩, |+⟩, |-⟩, |Y⟩, |-Y⟩. 
@@ -141,13 +141,14 @@ def PrepareStateOp : QEC_Op<"prepare"> {
 }
 
 def FabricateOp : QEC_Op<"fabricate"> {
-    let summary = "Fabricate axillary qubits from qubit's factory.";
+    let summary = "Fabricate axillary qubits from qubit factories.";
     let description = [{
-        The FabricateOp represents a operation that produces/fetches axillary qubits from a qubit's factory.
-        This operation typically gets a magic state from a qubit's factory that determines in runtime.
+        The FabricateOp represents a operation that produces/fetches auxiliary qubits from a qubit factory.
 
-        FabricateOp is used to prepare magic states such as |m⟩ (magic), |m̅⟩ (magic_conj), 
-        |Y⟩ (plus_i), and |-Y⟩ (minus_i). For non-magic states, use `PrepareStateOp` instead.
+        FabricateOp is used to prepare states not normally available in an error correction scheme,
+        such as magic states |m⟩ (magic) and |m̅⟩ (magic_conj), or |Y⟩ (plus_i), and |-Y⟩ (minus_i)
+        in some instances. For states constructible within the scheme, use `PrepareStateOp` instead.
+        Contrary to `PrepareStateOp`, this operation does not operate on existing qubits.
 
         Example:
         ```mlir
@@ -156,7 +157,6 @@ def FabricateOp : QEC_Op<"fabricate"> {
         %2 = qec.fabricate plus_i: !quantum.bit
         %3 = qec.fabricate minus_i: !quantum.bit
         ```
-        This fetches a magic state from a qubit's factory.
     }];
 
     let arguments = (ins
