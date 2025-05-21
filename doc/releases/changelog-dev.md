@@ -212,6 +212,9 @@
 * `ValueRange` is replaced with `TypeRange` for creating `CustomOp` in `IonsDecompositionPatterns.cpp` to match the build constructors
   [(#1749)](https://github.com/PennyLaneAI/catalyst/pull/1749)
 
+* The unused helper function `genArgMapFunction` in the `--lower-gradients` pass is removed.
+  [(#1753)](https://github.com/PennyLaneAI/catalyst/pull/1753)
+
 <h3>Documentation 📝</h3>
 
 * The header (logo+title) images in the README and in the overview on RtD have been updated,
