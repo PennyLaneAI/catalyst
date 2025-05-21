@@ -17,14 +17,6 @@ import numpy as np
 import pennylane as qml
 import pytest
 from pennylane import numpy as np
-from pennylane.measurements import (
-    CountsMP,
-    ExpectationMP,
-    ProbabilityMP,
-    StateMP,
-    VarianceMP,
-)
-
 from catalyst import qjit
 
 

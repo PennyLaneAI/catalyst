@@ -1421,7 +1421,8 @@ def trace_quantum_function(
                         meas_trees_node_data,
                         meas_return_trees_children,
                     )
-                    # add original measurement tracer tree structure in case overwritten by snapshot_results
+                    # add original measurement tracer tree structure 
+                    # in case overwritten by snapshot_results
                     if len(snapshot_results + meas_tracers) != meas_trees.num_leaves:
                         meas_return_trees_children.append(tree_structure(meas_tracers))
                         meas_trees = meas_trees.make_from_node_data_and_children(

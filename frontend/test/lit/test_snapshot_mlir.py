@@ -19,11 +19,13 @@ from pennylane import numpy as np
 
 from catalyst import qjit
 
+# pylint: disable=line-too-long
 
 # CHECK-LABEL: public @jit_circuit
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=1))
-def circuit():
+def single_qubit_circuit():
+    """Test MLIR output of all six single qubit basis states in qml.Snapshot without shots"""
     # CHECK: %0 = quantum.alloc( 1) : !quantum.reg
 
     # CHECK: %1 = quantum.compbasis qreg %0 : !quantum.obs
@@ -93,13 +95,14 @@ def circuit():
     return qml.state(), qml.probs(), qml.expval(qml.X(0)), qml.var(qml.Z(0))
 
 
-print(circuit.mlir)
+print(single_qubit_circuit.mlir)
 
 
 # CHECK-LABEL: public @jit_circuit
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2, shots=5))
-def circuit():
+def two_qubit_circuit():
+    """Test MLIR output of qml.Snapshot on two qubits with shots"""
     # CHECK: %0 = quantum.alloc( 2) : !quantum.reg
 
     # CHECK: %1 = quantum.compbasis qreg %0 : !quantum.obs
@@ -144,4 +147,4 @@ def circuit():
     return qml.counts(), qml.sample()
 
 
-print(circuit.mlir)
+print(two_qubit_circuit.mlir)
