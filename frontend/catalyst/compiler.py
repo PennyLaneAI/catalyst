@@ -28,6 +28,8 @@ import warnings
 from os import path
 from typing import List, Optional
 
+from pennylane.compiler.python_compiler.impl import Compiler as PythonCompiler
+
 from catalyst.logging import debug_logger, debug_logger_init
 from catalyst.pipelines import CompileOptions
 from catalyst.utils.exceptions import CompileError
@@ -506,7 +508,10 @@ class Compiler:
             (str): filename of shared object
         """
 
-        self.is_using_python_compiler()
+        if self.is_using_python_compiler():
+
+            compiler = PythonCompiler()
+            mlir_module = compiler.run(mlir_module)
 
         return self.run_from_ir(
             mlir_module.operation.get_asm(
