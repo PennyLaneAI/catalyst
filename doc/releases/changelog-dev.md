@@ -2,10 +2,6 @@
 
 <h3>New features since last release</h3>
 
-* Added integration with PennyLane's experimental python compiler based on xDSL.
-  This allows developers and users to write xDSL transformations that can be used with Catalyst.
-  [(#1715)](https://github.com/PennyLaneAI/catalyst/pull/1715)
-
 * A new compilation pass called :func:`~.passes.ppr_to_ppm` has been added to Catalyst
   to decompose Pauli product rotations (PPRs), :math:`\exp(-iP_{\{x, y, z\}} \theta)`, into
   Pauli product measurements (PPMs). Non-Clifford PPR (:math:`\theta = \tfrac{\pi}{8}`) requires
