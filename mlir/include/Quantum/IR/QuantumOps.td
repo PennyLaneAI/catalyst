@@ -128,6 +128,49 @@ def AllocOp : Memory_Op<"alloc", [NoMemoryEffect]> {
     }];
 }
 
+def AllocQubitOp : Memory_Op<"alloc_qb"> {
+    let summary = "Allocate a single qubit.";
+    let description = [{
+    }];
+
+    let results = (outs
+        QubitType:$qubit
+    );
+
+    let assemblyFormat = [{
+        attr-dict `:` type(results)
+    }];
+
+    let builders = [
+        OpBuilder<(ins),[{
+            AllocQubitOp::build($_builder, $_state,
+            /*qubit=*/ $_builder.getType<QubitType>()
+            );
+        }]>,
+    ];
+
+    code extraBaseClassDeclaration = [{
+        mlir::OpResult getOutQubit() {
+            return getODSResults(0).front();
+        }
+    }];
+
+    let extraClassDeclaration = extraBaseClassDeclaration;
+}
+
+def DeallocQubitOp : Memory_Op<"dealloc_qb"> {
+    let summary = "Deallocate a single qubit.";
+    let description = [{
+    }];
+
+    let arguments = (ins
+        QubitType:$qubit
+    );
+
+    let assemblyFormat = [{
+        $qubit attr-dict `:` type(operands)
+    }];
+}
 
 def DeallocOp : Memory_Op<"dealloc"> {
     let summary = "Deallocate a quantum register.";
@@ -250,7 +293,7 @@ class UnitaryGate_Op<string mnemonic, list<Trait> traits = []> :
         }
 
         bool getAdjointFlag() {
-            return getAdjoint().value_or(false);
+            return getAdjoint();
         }
         void setAdjointFlag(bool adjoint) {
             if (adjoint) {
@@ -371,7 +414,7 @@ def CustomOp : UnitaryGate_Op<"custom", [DifferentiableGate, NoMemoryEffect,
         Variadic<F64>:$params,
         Variadic<QubitType>:$in_qubits,
         StrAttr:$gate_name,
-        OptionalAttr<UnitAttr>:$adjoint,
+        UnitAttr:$adjoint,
         Variadic<QubitType>:$in_ctrl_qubits,
         Variadic<I1>:$in_ctrl_values
     );
@@ -492,7 +535,7 @@ def GlobalPhaseOp : UnitaryGate_Op<"gphase", [DifferentiableGate, AttrSizedOpera
 
     let arguments = (ins
         F64:$params,
-        OptionalAttr<UnitAttr>:$adjoint,
+        UnitAttr:$adjoint,
         Variadic<QubitType>:$in_ctrl_qubits,
         Variadic<I1>:$in_ctrl_values
     );
@@ -534,7 +577,7 @@ def MultiRZOp : UnitaryGate_Op<"multirz", [DifferentiableGate, NoMemoryEffect,
     let arguments = (ins
         F64:$theta,
         Variadic<QubitType>:$in_qubits,
-        OptionalAttr<UnitAttr>:$adjoint,
+        UnitAttr:$adjoint,
         Variadic<QubitType>:$in_ctrl_qubits,
         Variadic<I1>:$in_ctrl_values
     );
@@ -571,7 +614,7 @@ def QubitUnitaryOp : UnitaryGate_Op<"unitary", [ParametrizedGate, NoMemoryEffect
             2DTensorOf<[Complex<F64>]>, MemRefRankOf<[Complex<F64>], [2]>
         ]>:$matrix,
         Variadic<QubitType>:$in_qubits,
-        OptionalAttr<UnitAttr>:$adjoint,
+        UnitAttr:$adjoint,
         Variadic<QubitType>:$in_ctrl_qubits,
         Variadic<I1>:$in_ctrl_values
     );
@@ -829,7 +872,7 @@ def MeasureOp : Quantum_Op<"measure"> {
     );
 
     let assemblyFormat = [{
-        $in_qubit attr-dict `:` type(results)
+        $in_qubit (`postselect` $postselect^)? attr-dict `:` type(results)
     }];
 }
 

@@ -15,6 +15,7 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/OpImplementation.h"
+#include "llvm/ADT/TypeSwitch.h" // needed for enums
 
 #include "QEC/IR/QECDialect.h"
 #include "Quantum/IR/QuantumDialect.h"
@@ -34,7 +35,10 @@ void QECDialect::initialize()
 #define GET_TYPEDEF_LIST
 #include "QEC/IR/QECDialectTypes.cpp.inc"
         >();
-
+    addAttributes<
+#define GET_ATTRDEF_LIST
+#include "QEC/IR/QECAttributes.cpp.inc"
+        >();
     addOperations<
 #define GET_OP_LIST
 #include "QEC/IR/QECDialect.cpp.inc"
@@ -47,6 +51,19 @@ void QECDialect::initialize()
 
 #define GET_TYPEDEF_CLASSES
 #include "QEC/IR/QECDialectTypes.cpp.inc"
+
+//===----------------------------------------------------------------------===//
+// QEC enum definitions.
+//===----------------------------------------------------------------------===//
+
+#include "QEC/IR/QECEnums.cpp.inc"
+
+//===----------------------------------------------------------------------===//
+// QEC attribute definitions.
+//===----------------------------------------------------------------------===//
+
+#define GET_ATTRDEF_CLASSES
+#include "QEC/IR/QECAttributes.cpp.inc"
 
 //===----------------------------------------------------------------------===//
 // QEC op definitions.
@@ -71,6 +88,35 @@ LogicalResult PPMeasurementOp::verify()
 {
     if (getInQubits().size() != getPauliProduct().size()) {
         return emitOpError("Number of qubits must match number of pauli operators");
+    }
+    return mlir::success();
+}
+
+LogicalResult SelectPPMeasurementOp::verify()
+{
+    if (getInQubits().size() != getPauliProduct_0().size() ||
+        getInQubits().size() != getPauliProduct_1().size()) {
+        return emitOpError("Number of qubits must match number of pauli operators");
+    }
+    return mlir::success();
+}
+
+LogicalResult PrepareStateOp::verify()
+{
+    auto initState = getInitState();
+    if (initState == LogicalInitKind::magic || initState == LogicalInitKind::magic_conj) {
+        return emitOpError(
+            "Magic state cannot be prepared by this operation, use `FabricateOp` instead.");
+    }
+    return mlir::success();
+}
+
+LogicalResult FabricateOp::verify()
+{
+    auto initState = getInitState();
+    if (initState == LogicalInitKind::zero || initState == LogicalInitKind::one ||
+        initState == LogicalInitKind::plus || initState == LogicalInitKind::minus) {
+        return emitOpError("Logical state should not be fabricated, use `PrepareStateOp` instead.");
     }
     return mlir::success();
 }

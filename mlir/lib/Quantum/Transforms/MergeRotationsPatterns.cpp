@@ -80,7 +80,7 @@ struct MergeRotationsRewritePattern : public mlir::OpRewritePattern<OpType> {
             sumParams.push_back(sumParam);
         };
         auto mergeOp = rewriter.create<CustomOp>(loc, outQubitsTypes, outQubitsCtrlTypes, sumParams,
-                                                 parentInQubits, opGateName, nullptr,
+                                                 parentInQubits, opGateName, false,
                                                  parentInCtrlQubits, parentInCtrlValues);
 
         rewriter.replaceOp(op, mergeOp);
