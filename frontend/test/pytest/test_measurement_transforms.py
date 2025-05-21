@@ -442,7 +442,11 @@ class TestMeasurementTransforms:
         if len(measurement().wires) == 1:
             samples_expected = qjit(circuit, seed=37)(theta)
         else:
-            samples_expected = circuit(theta)
+            # lightning.qubit does not support seeding.
+            # To resolve flakiness, we put the non qjit reference run on default.qubit,
+            # which can be seeded
+            ref_dev = qml.device("default.qubit", wires=4, shots=3000, seed=42)
+            samples_expected = qml.qnode(ref_dev)(circuit.func)(theta)
 
         assert res.shape == samples_expected.shape
         assert np.allclose(np.mean(res, axis=0), np.mean(samples_expected, axis=0), atol=0.05)
