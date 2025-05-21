@@ -40,13 +40,13 @@ def mbqc_pipeline() -> PipelineStages:
 
     assert (
         llvm_dialect_conversion_stage_name in stage_names
-    ), f"Stage 'MLIRToLLVMDialect' not found in default pipeline stages"
+    ), "Stage 'MLIRToLLVMDialect' not found in default pipeline stages"
 
     llvm_dialect_conversion_stage_index = stage_names.index(llvm_dialect_conversion_stage_name)
 
     _, pipeline = stages[llvm_dialect_conversion_stage_index]
 
-    assert len(pipeline) > 0, f"Pipeline for stage 'MLIRToLLVMDialect' is empty"
+    assert len(pipeline) > 0, "Pipeline for stage 'MLIRToLLVMDialect' is empty"
 
     # Insert (in-place) the "convert-mbqc-to-llvm" pass immediately before the
     # "convert-quantum-to-llvm" pass in the MLIRToLLVMDialect pipeline
