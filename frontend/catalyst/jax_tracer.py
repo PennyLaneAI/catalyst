@@ -687,6 +687,41 @@ def trace_basis_state(op, qrp):
     qrp.insert(op.wires, qubits2)
 
 
+def trace_snapshot_op(
+    op: Operation,
+    device: QubitDevice,
+    qrp: QRegPromise,
+    out_snapshot_tracer: List[DynamicJaxprTracer],
+) -> None:
+    """Trace StateMP passed inside qml.Snapshot
+    Args:
+        op: qml.Snapshot being traced.
+        device: PennyLane quantum device.
+        qrp: QRegPromise object holding the JAX tracer representing the quantum register's state.
+        out_snapshot_tracer: list to store JAX classical qnode snapshot results.
+
+    """
+    if type(op.hyperparameters["measurement"]) == StateMP:
+        nqubits = (
+            device.wires[0]
+            if catalyst.device.qjit_device.is_dynamic_wires(device.wires)
+            else len(device.wires)
+        )
+        if isinstance(nqubits, DynamicJaxprTracer):
+            shape = (jnp.left_shift(1, nqubits),)
+        else:
+            shape = (2**nqubits,)
+        qreg_out = qrp.actualize()
+        obs_tracers = compbasis_p.bind(qreg_out, qreg_available=True)
+        dyn_dims, static_shape = _extract_tracers_dyn_shape(shape)
+        result = state_p.bind(obs_tracers, *dyn_dims, static_shape=tuple(static_shape))
+        out_snapshot_tracer.append(result)
+    else:
+        raise NotImplementedError(
+            f"Snapshot of type {type(op.hyperparameters['measurement'])} is not implemented"
+        )  # pragma: no cover
+
+
 # pylint: disable=too-many-arguments,too-many-statements
 @debug_logger
 def trace_quantum_operations(
@@ -762,25 +797,7 @@ def trace_quantum_operations(
         elif isinstance(op, qml.BasisState):
             trace_basis_state(op, qrp)
         elif isinstance(op, qml.Snapshot):
-            if type(op.hyperparameters["measurement"]) == StateMP:
-                nqubits = (
-                    device.wires[0]
-                    if catalyst.device.qjit_device.is_dynamic_wires(device.wires)
-                    else len(device.wires)
-                )
-                if isinstance(nqubits, DynamicJaxprTracer):
-                    shape = (jnp.left_shift(1, nqubits),)
-                else:
-                    shape = (2**nqubits,)
-                qreg_out = qrp.actualize()
-                obs_tracers = compbasis_p.bind(qreg_out, qreg_available=True)
-                dyn_dims, static_shape = _extract_tracers_dyn_shape(shape)
-                result = state_p.bind(obs_tracers, *dyn_dims, static_shape=tuple(static_shape))
-                out_snapshot_tracer.append(result)
-            else:
-                raise NotImplementedError(
-                    f"Snapshot of type {type(op.hyperparameters['measurement'])} is not implemented"
-                )  # pragma: no cover
+            trace_snapshot_op(op, device, qrp, out_snapshot_tracer)
         else:
             qubits = qrp.extract(op.wires)
             controlled_qubits = qrp.extract(controlled_wires)
@@ -1285,6 +1302,47 @@ def trace_function(
         return res_expanded_tracers, in_sig, out_sig
 
 
+def restructure_pytree_for_snapshot(
+    snapshot_results: List[DynamicJaxprTracer],
+    meas_trees: PyTreeDef,
+    meas_tracers: List[DynamicJaxprTracer],
+) -> Tuple[PyTreeDef, List[DynamicJaxprTracer]]:
+    """Restructure PyTreeDef if states from qml.Snapshot are traced
+    Args:
+        snapshot_results: list with JAX classical qnode snapshot results.
+        meas_trees: PyTree-shape of the qnode output to be modified for snapshot.
+        meas_tracers: list of JAX classical qnode ouput tracers.
+
+    Returns:
+        meas_trees: Modified PyTree-shape of the qnode output with snapshots.
+        meas_tracers: Modified list of JAX classical qnode ouput tracers with snapshots inserted.
+    """
+    meas_return_trees_children = meas_trees.children()
+    meas_trees_node_data = meas_trees.node_data()
+    # add snapshot results type to allowed types in tree data
+    if meas_trees_node_data is None:
+        meas_trees_node_data = (type(tuple()), None)
+    meas_return_trees_children.insert(0, tree_structure(snapshot_results))
+    # restructure the tree to include snapshot results
+    meas_trees = meas_trees.make_from_node_data_and_children(
+        PyTreeRegistry(),
+        meas_trees_node_data,
+        meas_return_trees_children,
+    )
+    # add original measurement tracer tree structure
+    # in case overwritten by snapshot_results
+    if len(snapshot_results + meas_tracers) != meas_trees.num_leaves:
+        meas_return_trees_children.append(tree_structure(meas_tracers))
+        meas_trees = meas_trees.make_from_node_data_and_children(
+            PyTreeRegistry(),
+            meas_trees_node_data,
+            meas_return_trees_children,
+        )
+    # add snapshpot results to measurement tracers
+    meas_tracers = snapshot_results + meas_tracers
+    return meas_trees, meas_tracers
+
+
 @debug_logger
 def trace_quantum_function(
     f: Callable, device: QubitDevice, args, kwargs, qnode, static_argnums, debug_info
@@ -1409,29 +1467,9 @@ def trace_quantum_function(
 
                 meas_tracers = check_full_raise(meas, trace.to_jaxpr_tracer)
                 if len(snapshot_results) > 0:
-                    meas_return_trees_children = meas_trees.children()
-                    meas_trees_node_data = meas_trees.node_data()
-                    # add snapshot results type to allowed types in tree data
-                    if meas_trees_node_data is None:
-                        meas_trees_node_data = (type(tuple()), None)
-                    meas_return_trees_children.insert(0, tree_structure(snapshot_results))
-                    # restructure the tree to include snapshot results
-                    meas_trees = meas_trees.make_from_node_data_and_children(
-                        PyTreeRegistry(),
-                        meas_trees_node_data,
-                        meas_return_trees_children,
+                    meas_trees, meas_tracers = restructure_pytree_for_snapshot(
+                        snapshot_results, meas_trees, meas_tracers
                     )
-                    # add original measurement tracer tree structure 
-                    # in case overwritten by snapshot_results
-                    if len(snapshot_results + meas_tracers) != meas_trees.num_leaves:
-                        meas_return_trees_children.append(tree_structure(meas_tracers))
-                        meas_trees = meas_trees.make_from_node_data_and_children(
-                            PyTreeRegistry(),
-                            meas_trees_node_data,
-                            meas_return_trees_children,
-                        )
-                    # add snapshpot results to measurement tracers
-                    meas_tracers = snapshot_results + meas_tracers
                 meas_results = tree_unflatten(meas_trees, meas_tracers)
 
                 # TODO: Allow the user to return whatever types they specify.

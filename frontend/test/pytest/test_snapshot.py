@@ -21,7 +21,9 @@ import numpy as np
 import pennylane as qml
 import pytest
 from pennylane import numpy as np
+
 from catalyst import qjit
+
 
 class TestSnapshot:
     """Test if Snapshots are captured correctly."""
@@ -92,12 +94,12 @@ class TestSnapshot:
             returned_output[1:],
         )
         assert all(
-                jnp.allclose(expected_snapshot_states[i], returned_snapshot_states[i])
-                for i in range(len(returned_snapshot_states))
+            jnp.allclose(expected_snapshot_states[i], returned_snapshot_states[i])
+            for i in range(len(returned_snapshot_states))
         )
         assert all(
-                jnp.allclose(expected_measurement_results[i], returned_measurement_results[i])
-                for i in range(len(returned_measurement_results))
+            jnp.allclose(expected_measurement_results[i], returned_measurement_results[i])
+            for i in range(len(returned_measurement_results))
         )
 
     def test_snapshot_on_two_wire(self):
@@ -131,14 +133,14 @@ class TestSnapshot:
         expected_counts, returned_counts = expected_output[1], returned_output[1]
         expected_samples, returned_samples = expected_output[2], returned_output[2]
         assert all(
-                jnp.allclose(expected_snapshot_states[i], returned_snapshot_states[i])
-                for i in range(len(returned_snapshot_states))
+            jnp.allclose(expected_snapshot_states[i], returned_snapshot_states[i])
+            for i in range(len(returned_snapshot_states))
         )
         assert all(
-                jnp.allclose(expected_counts[i], returned_counts[i])
-                for i in range(len(returned_counts))
+            jnp.allclose(expected_counts[i], returned_counts[i])
+            for i in range(len(returned_counts))
         )
         assert all(
-                jnp.allclose(expected_samples[i], returned_samples[i])
-                for i in range(len(returned_samples))
+            jnp.allclose(expected_samples[i], returned_samples[i])
+            for i in range(len(returned_samples))
         )
