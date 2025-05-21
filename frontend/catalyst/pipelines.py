@@ -313,3 +313,57 @@ def get_stages(options):
     stages["BufferizationPass"] = get_bufferization_stage(options)
     stages["MLIRToLLVMDialect"] = get_convert_to_llvm_stage(options)
     return list(stages.items())
+
+
+def insert_after_pass(pipeline: list[str], ref_pass: str, new_pass: str) -> None:
+    """Insert a pass into an existing pass pipeline at the position after the given reference pass.
+
+    Args:
+        pipeline (list[str]): An existing pass pipeline, given as a list of passes.
+        ref_pass (str): The name of the reference pass after which the new pass is inserted.
+        new_pass (str): The name of the pass to insert.
+
+    Raises:
+        ValueError: If `ref_pass` is not found in the pass pipeline.
+
+    Example:
+        >>> pipeline = ["pass1", "pass2"]
+        >>> insert_after_pass(pipeline, "pass1", "new_pass")
+        >>> pipeline
+        ['pass1', 'new_pass', 'pass2']
+    """
+    try:
+        ref_index = pipeline.index(ref_pass)
+    except ValueError as e:
+        raise ValueError(
+            f"Cannot insert pass '{new_pass}' into pipeline; reference pass '{ref_pass}' not found"
+        ) from e
+
+    pipeline.insert(ref_index + 1, new_pass)
+
+
+def insert_before_pass(pipeline: list[str], ref_pass: str, new_pass: str) -> None:
+    """Insert a pass into an existing pass pipeline at the position before the given reference pass.
+
+    Args:
+        pipeline (list[str]): An existing pass pipeline, given as a list of passes.
+        ref_pass (str): The name of the reference pass before which the new pass is inserted.
+        new_pass (str): The name of the pass to insert.
+
+    Raises:
+        ValueError: If `ref_pass` is not found in the pass pipeline.
+
+    Example:
+        >>> pipeline = ["pass1", "pass2"]
+        >>> insert_before_pass(pipeline, "pass1", "new_pass")
+        >>> pipeline
+        ['new_pass', 'pass1', 'pass2']
+    """
+    try:
+        ref_index = pipeline.index(ref_pass)
+    except ValueError as e:
+        raise ValueError(
+            f"Cannot insert pass '{new_pass}' into pipeline; reference pass '{ref_pass}' not found"
+        ) from e
+
+    pipeline.insert(ref_index, new_pass)
