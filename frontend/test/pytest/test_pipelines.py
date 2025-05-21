@@ -21,8 +21,9 @@ import pytest
 from catalyst.pipelines import insert_after_pass, insert_before_pass
 
 
-@pytest.fixture(scope="function")
-def pipeline():
+@pytest.fixture(name="pipeline", scope="function")
+def fixture_pipeline():
+    """Fixture that returns a sample pass pipeline with a list of made-up pass names"""
     return ["pass1", "pass2", "pass3"]
 
 
