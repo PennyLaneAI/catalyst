@@ -762,7 +762,7 @@ def trace_quantum_operations(
         elif isinstance(op, qml.BasisState):
             trace_basis_state(op, qrp)
         elif isinstance(op, qml.Snapshot):
-            if type(op.hyperparameters['measurement']) == StateMP:
+            if type(op.hyperparameters["measurement"]) == StateMP:
                 nqubits = (
                     device.wires[0]
                     if catalyst.device.qjit_device.is_dynamic_wires(device.wires)
@@ -780,7 +780,7 @@ def trace_quantum_operations(
             else:
                 raise NotImplementedError(
                     f"Snapshot of type {type(op.hyperparameters['measurement'])} is not implemented"
-                ) # pragma: no cover
+                )  # pragma: no cover
         else:
             qubits = qrp.extract(op.wires)
             controlled_qubits = qrp.extract(controlled_wires)
@@ -1410,7 +1410,7 @@ def trace_quantum_function(
                 meas_tracers = check_full_raise(meas, trace.to_jaxpr_tracer)
                 if len(snapshot_results) > 0:
                     meas_return_trees_children = meas_trees.children()
-                    meas_trees_node_data = meas_trees.node_data() 
+                    meas_trees_node_data = meas_trees.node_data()
                     # add snapshot results type to allowed types in tree data
                     if meas_trees_node_data is None:
                         meas_trees_node_data = (type(tuple()), None)
