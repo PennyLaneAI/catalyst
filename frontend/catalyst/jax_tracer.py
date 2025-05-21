@@ -687,7 +687,7 @@ def trace_basis_state(op, qrp):
     qrp.insert(op.wires, qubits2)
 
 
-# pylint: disable=too-many-arguments
+# pylint: disable=too-many-arguments,too-many-statements
 @debug_logger
 def trace_quantum_operations(
     quantum_tape: QuantumTape,

@@ -14,6 +14,10 @@
 
 # RUN: %PYTHON %s | FileCheck %s
 
+"""
+This file performs the lit test checking MLIR output for qml.Snapshot support in Catalyst.
+"""
+
 import pennylane as qml
 from pennylane import numpy as np
 
