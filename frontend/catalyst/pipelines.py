@@ -213,10 +213,12 @@ def get_quantum_compilation_stage(options: CompileOptions) -> List[str]:
     return list(filter(partial(is_not, None), quantum_compilation))
 
 
-def get_bufferization_stage(_options: CompileOptions) -> List[str]:
+def get_bufferization_stage(options: CompileOptions) -> List[str]:
     """Returns the list of passes that performs bufferization"""
 
-    options = "bufferize-function-boundaries allow-return-allocs-from-loops function-boundary-type-conversion=identity-layout-map unknown-type-conversion=identity-layout-map"
+    bufferization_options = "bufferize-function-boundaries allow-return-allocs-from-loops function-boundary-type-conversion=identity-layout-map unknown-type-conversion=identity-layout-map"
+    if options.async_qnodes:
+        bufferization_options += " copy-before-write"
 
     bufferization = [
         "inline",
@@ -225,7 +227,7 @@ def get_bufferization_stage(_options: CompileOptions) -> List[str]:
         "gradient-preprocess",
         "empty-tensor-to-alloc-tensor",
         ####################
-        "one-shot-bufferize{" + options + "}",
+        "one-shot-bufferize{" + bufferization_options + "}",
         ####################
         "canonicalize",  # Remove dead memrefToTensorOp's
         "gradient-postprocess",
