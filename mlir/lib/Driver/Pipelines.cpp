@@ -71,7 +71,7 @@ void createBufferizationPipeline(OpPassManager &pm)
     pm.addPass(mlir::createConvertTensorToLinalgPass());
     pm.addPass(mlir::createConvertElementwiseToLinalgPass());
     pm.addPass(catalyst::createGradientPreprocessingPass());
-    pm.addPass(mlir::bufferization::createEmptyTensorToAllocTensorPass());
+    pm.addPass(mlir::bufferization::createEmptyTensorEliminationPass());
     ///////////
     mlir::bufferization::OneShotBufferizationOptions options;
     options.bufferizeFunctionBoundaries = true;

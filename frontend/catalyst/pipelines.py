@@ -223,9 +223,9 @@ def get_bufferization_stage(options: CompileOptions) -> List[str]:
     bufferization = [
         "inline",
         "convert-tensor-to-linalg",  # tensor.pad
-        "convert-elementwise-to-linalg",  # Must be run before --arith-bufferize
+        "convert-elementwise-to-linalg",  # Must be run before --one-shot-bufferize
         "gradient-preprocess",
-        "empty-tensor-to-alloc-tensor",
+        "eliminate-empty-tensors",
         ####################
         "one-shot-bufferize{" + bufferization_options + "}",
         ####################
