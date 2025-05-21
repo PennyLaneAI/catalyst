@@ -12,7 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Tests reasonable output for get_include_path"""
+
 from pathlib import Path
+
+import pytest
+
 from catalyst.utils.runtime_environment import get_include_path
 
 
