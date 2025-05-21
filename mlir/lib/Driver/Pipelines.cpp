@@ -67,43 +67,24 @@ void createQuantumCompilationPipeline(OpPassManager &pm)
 }
 void createBufferizationPipeline(OpPassManager &pm)
 {
-    mlir::bufferization::OneShotBufferizationOptions options;
-    options.opFilter.allowDialect<mlir::bufferization::BufferizationDialect>();
-    pm.addPass(mlir::bufferization::createOneShotBufferizePass(options));
     pm.addPass(mlir::createInlinerPass());
-    pm.addPass(catalyst::createGradientPreprocessingPass());
-    mlir::bufferization::OneShotBufferizationOptions gradient_buffer_options;
-    gradient_buffer_options.opFilter.allowDialect<catalyst::gradient::GradientDialect>();
-    gradient_buffer_options.unknownTypeConverterFn =
-        [=](Value value, Attribute memorySpace,
-            const mlir::bufferization::BufferizationOptions &options) {
-            auto tensorType = cast<TensorType>(value.getType());
-            return bufferization::getMemRefTypeWithStaticIdentityLayout(tensorType, memorySpace);
-        };
-    pm.addPass(mlir::bufferization::createOneShotBufferizePass(gradient_buffer_options));
-    pm.addPass(mlir::createSCFBufferizePass());
     pm.addPass(mlir::createConvertTensorToLinalgPass());
     pm.addPass(mlir::createConvertElementwiseToLinalgPass());
-    //pm.addPass(mlir::arith::createArithBufferizePass());
+    pm.addPass(catalyst::createGradientPreprocessingPass());
     pm.addPass(mlir::bufferization::createEmptyTensorToAllocTensorPass());
-    //pm.addNestedPass<mlir::func::FuncOp>(mlir::bufferization::createBufferizationBufferizePass());
-    //pm.addNestedPass<mlir::func::FuncOp>(mlir::tensor::createTensorBufferizePass());
-    mlir::bufferization::OneShotBufferizationOptions catalyst_buffer_options;
-    catalyst_buffer_options.opFilter.allowDialect<catalyst::CatalystDialect>();
-    catalyst_buffer_options.unknownTypeConverterFn =
-        [=](Value value, Attribute memorySpace,
-            const mlir::bufferization::BufferizationOptions &options) {
-            auto tensorType = cast<TensorType>(value.getType());
-            return bufferization::getMemRefTypeWithStaticIdentityLayout(tensorType, memorySpace);
-        };
-    pm.addPass(mlir::bufferization::createOneShotBufferizePass(catalyst_buffer_options));
-    //pm.addNestedPass<mlir::func::FuncOp>(mlir::createLinalgBufferizePass());
-    //pm.addNestedPass<mlir::func::FuncOp>(mlir::tensor::createTensorBufferizePass());
-    mlir::bufferization::OneShotBufferizationOptions quantum_buffer_options;
-    quantum_buffer_options.opFilter.allowDialect<catalyst::quantum::QuantumDialect>();
-    pm.addPass(mlir::bufferization::createOneShotBufferizePass(quantum_buffer_options));
-    pm.addPass(mlir::func::createFuncBufferizePass());
-    pm.addNestedPass<mlir::func::FuncOp>(mlir::bufferization::createFinalizingBufferizePass());
+    ///////////
+    mlir::bufferization::OneShotBufferizationOptions options;
+    options.bufferizeFunctionBoundaries = true;
+    options.allowReturnAllocsFromLoops = true;
+    options.setFunctionBoundaryTypeConversion(
+        mlir::bufferization::LayoutMapOption::IdentityLayoutMap);
+    options.unknownTypeConverterFn = [=](Value value, Attribute memorySpace,
+                                         const mlir::bufferization::BufferizationOptions &options) {
+        auto tensorType = cast<TensorType>(value.getType());
+        return bufferization::getMemRefTypeWithStaticIdentityLayout(tensorType, memorySpace);
+    };
+    pm.addPass(mlir::bufferization::createOneShotBufferizePass(options));
+    //////////////
     pm.addPass(mlir::createCanonicalizerPass());
     pm.addPass(catalyst::createGradientPostprocessingPass());
     pm.addNestedPass<mlir::func::FuncOp>(mlir::bufferization::createBufferHoistingPass());
