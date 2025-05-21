@@ -216,7 +216,12 @@ def get_quantum_compilation_stage(options: CompileOptions) -> List[str]:
 def get_bufferization_stage(options: CompileOptions) -> List[str]:
     """Returns the list of passes that performs bufferization"""
 
-    bufferization_options = "bufferize-function-boundaries allow-return-allocs-from-loops function-boundary-type-conversion=identity-layout-map unknown-type-conversion=identity-layout-map"
+    bufferization_options = """bufferize-function-boundaries
+        allow-return-allocs-from-loops
+        function-boundary-type-conversion=identity-layout-map
+        unknown-type-conversion=identity-layout-map""".replace(
+        "\n", " "
+    )
     if options.async_qnodes:
         bufferization_options += " copy-before-write"
 
