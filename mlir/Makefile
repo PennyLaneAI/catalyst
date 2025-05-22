@@ -100,6 +100,10 @@ mhlo:
 	@if patch --dry-run -p1 -N $(TARGET_FILE) $(PATCH_FILE) > /dev/null 2>&1; then \
 		patch -p1 $(TARGET_FILE) $(PATCH_FILE); \
 	fi
+	# Patch MHLO shardy dependency
+	@if patch -p0 --dry-run -N < $(MK_DIR)/patches/mhlo-remove-shardy.patch > /dev/null 2>&1; then \
+		patch -p0 < $(MK_DIR)/patches/mhlo-remove-shardy.patch; \
+	fi
 	cmake -G Ninja -S mlir-hlo -B $(MHLO_BUILD_DIR) \
 		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
 		-DLLVM_ENABLE_ASSERTIONS=ON \
