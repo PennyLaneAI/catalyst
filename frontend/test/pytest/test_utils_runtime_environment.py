@@ -12,8 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Version information.
-Version number (major.minor.patch[-label])
-"""
+"""Tests reasonable output for get_include_path"""
 
-__version__ = "0.12.0-dev38"
+from pathlib import Path
+
+import pytest
+
+from catalyst.utils.runtime_environment import get_include_path
+
+
+def test_get_include_path():
+    """Test retrieved include path exists."""
+
+    include_path = Path(get_include_path())
+    assert include_path.exists()
+    assert include_path.is_dir()
+    assert any(include_path.rglob("**/*.h"))
+
+
+if __name__ == "__main__":
+    pytest.main(["-x", __file__])

@@ -16,6 +16,8 @@
 #include <stim/stabilizers/flex_pauli_string.h>
 #include <stim/stabilizers/pauli_string.h>
 
+#include "Quantum/IR/QuantumOps.h" // for quantum::AllocQubitOp
+
 #include "QEC/Utils/PauliStringWrapper.h"
 
 namespace catalyst {
@@ -188,6 +190,15 @@ void updatePauliWordSign(QECOpInterface op, bool isNegated, PatternRewriter &rew
     int16_t sign = isNegated ? -1 : 1;
     rotationKind = (rotationKind < 0 ? -rotationKind : rotationKind) * sign;
     op.setRotationKind(rotationKind);
+}
+
+SmallVector<StringRef> extractPauliString(QECOpInterface op)
+{
+    SmallVector<StringRef> pauliWord;
+    for (auto pauli : op.getPauliProduct()) {
+        pauliWord.emplace_back(mlir::cast<mlir::StringAttr>(pauli).getValue());
+    }
+    return pauliWord;
 }
 
 bool isNoSizeLimit(size_t MaxPauliSize) { return MaxPauliSize == 0; }

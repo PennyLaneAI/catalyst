@@ -129,6 +129,7 @@ extensions = [
     "sphinx.ext.napoleon",
     "sphinx.ext.todo",
     "sphinx.ext.viewcode",
+    "sphinx_copybutton",
     "sphinxext.opengraph",
     "sphinx_automodapi.automodapi",
     "sphinx_automodapi.smart_resolver",

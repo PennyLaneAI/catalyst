@@ -59,7 +59,7 @@ func.func @testInvalid(%q1 : !quantum.bit) {
 
 func.func @testPostSelect0(%q1 : !quantum.bit) {
     %angle = arith.constant 3.141592653589793 : f64
-    %res, %new_q = mbqc.measure_in_basis [XY, %angle] %q1 {postselect = 0 : i32} : i1, !quantum.bit
+    %res, %new_q = mbqc.measure_in_basis [XY, %angle] %q1 postselect 0 : i1, !quantum.bit
     func.return
 }
 
@@ -67,7 +67,7 @@ func.func @testPostSelect0(%q1 : !quantum.bit) {
 
 func.func @testPostSelect1(%q1 : !quantum.bit) {
     %angle = arith.constant 3.141592653589793 : f64
-    %res, %new_q = mbqc.measure_in_basis [XY, %angle] %q1 {postselect = 1 : i32} : i1, !quantum.bit
+    %res, %new_q = mbqc.measure_in_basis [XY, %angle] %q1 postselect 1 : i1, !quantum.bit
     func.return
 }
 
@@ -76,7 +76,7 @@ func.func @testPostSelect1(%q1 : !quantum.bit) {
 func.func @testPostSelectInvalid(%q1 : !quantum.bit) {
     %angle = arith.constant 3.141592653589793 : f64
     // expected-error@below {{op attribute 'postselect' failed to satisfy constraint}}
-    %res, %new_q = mbqc.measure_in_basis [XY, %angle] %q1 {postselect = -1 : i32} : i1, !quantum.bit
+    %res, %new_q = mbqc.measure_in_basis [XY, %angle] %q1 postselect -1 : i1, !quantum.bit
     func.return
 }
 
@@ -85,6 +85,6 @@ func.func @testPostSelectInvalid(%q1 : !quantum.bit) {
 func.func @testPostSelectInvalid(%q1 : !quantum.bit) {
     %angle = arith.constant 3.141592653589793 : f64
     // expected-error@below {{op attribute 'postselect' failed to satisfy constraint}}
-    %res, %new_q = mbqc.measure_in_basis [XY, %angle] %q1 {postselect = 2 : i32} : i1, !quantum.bit
+    %res, %new_q = mbqc.measure_in_basis [XY, %angle] %q1 postselect 2 : i1, !quantum.bit
     func.return
 }

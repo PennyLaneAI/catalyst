@@ -8,4 +8,5 @@ add_mlir_library(MLIRQEC
     DEPENDS
     MLIRQECOpInterfacesIncGen
     MLIRQECDialectIncGen
+    MLIRQECEnumsIncGen
 )
