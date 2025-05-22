@@ -438,15 +438,15 @@ class TestMeasurementTransforms:
 
         theta = 2.5
         res = qjit(measurements_from_samples(circuit, dev.wires), seed=37)(theta)
-
+        # PL flattens N-by-1 2D result arrays into size-N 1D arrays, but Catalyst does not
         if len(measurement().wires) == 1:
-            samples_expected = qjit(circuit, seed=37)(theta)
-        else:
-            # lightning.qubit does not support seeding.
-            # To resolve flakiness, we put the non qjit reference run on default.qubit,
-            # which can be seeded
-            ref_dev = qml.device("default.qubit", wires=4, shots=3000, seed=42)
-            samples_expected = qml.qnode(ref_dev)(circuit.func)(theta)
+            res = res.flatten()
+
+        # lightning.qubit does not support seeding.
+        # To resolve flakiness, we put the non qjit reference run on default.qubit,
+        # which can be seeded
+        ref_dev = qml.device("default.qubit", wires=4, shots=3000, seed=42)
+        samples_expected = qml.qnode(ref_dev)(circuit.func)(theta)
 
         assert res.shape == samples_expected.shape
         assert np.allclose(np.mean(res, axis=0), np.mean(samples_expected, axis=0), atol=0.05)
