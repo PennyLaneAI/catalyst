@@ -154,6 +154,9 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* `null.qubit` can now support an optional `track_resources` argument which allows it to record which gates are executed.
+  [(#1619)](https://github.com/PennyLaneAI/catalyst/pull/1619)
+
 * Add an xDSL MLIR plugin to denote whether we will be using xDSL to execute some passes.
   This changelog entry may be moved to new features once all branches are merged together.
   [(#1707)](https://github.com/PennyLaneAI/catalyst/pull/1707)
@@ -239,4 +242,5 @@ Mehrdad Malekmohammadi,
 Anton Naim Ibrahim,
 Erick Ochoa Lopez,
 Ritu Thombre,
-Paul Haochen Wang.
+Paul Haochen Wang,
+Jake Zaia.
