@@ -2,7 +2,7 @@
 # To update JAX version alongside compatible dependency tags, run the following script:
 # python3 .github/workflows/set_dep_versions.py {JAX_version}
 jax=0.6.0
-mhlo=30c930069dccdd399c40bbe178c8fe4f4e950960
+mhlo=617a9361d186199480c080c9e8c474a5e30c22d1
 llvm=179d30f8c3fddd3c85056fd2b8e877a4a8513158
 enzyme=v0.0.149
 
