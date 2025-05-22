@@ -24,6 +24,7 @@ find_package(Python3 COMPONENTS Interpreter Development)
 find_package(Python3 COMPONENTS Interpreter Development.Module REQUIRED)
 find_package(Python3 REQUIRED COMPONENTS Development NumPy)
 find_package(MLIR REQUIRED CONFIG)
+find_package(MHLO REQUIRED CONFIG)
 find_package(Python3 COMPONENTS Development NumPy REQUIRED)
 
 # Keep this in sync with llvm/cmake/CMakeLists.txt!
