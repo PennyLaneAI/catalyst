@@ -337,19 +337,19 @@ jobs:
 
     - name: Build deps paths
       run: |
-        PYTHON=python${{ matrix.python_version }} \
-        LLVM_BUILD_DIR="$GITHUB_WORKSPACE/llvm-build" \
-        MHLO_BUILD_DIR="$GITHUB_WORKSPACE/mhlo-build" \
-        DIALECTS_BUILD_DIR="$GITHUB_WORKSPACE/quantum-build" \
-        RT_BUILD_DIR="$GITHUB_WORKSPACE/runtime-build" \
-        OQC_BUILD_DIR="$GITHUB_WORKSPACE/oqc-build" \
-        ENZYME_BUILD_DIR="$GITHUB_WORKSPACE/enzyme-build" \
+        PYTHON=python${{ matrix.python_version }} 
+        LLVM_BUILD_DIR="$GITHUB_WORKSPACE/llvm-build" 
+        MHLO_BUILD_DIR="$GITHUB_WORKSPACE/mhlo-build" 
+        DIALECTS_BUILD_DIR="$GITHUB_WORKSPACE/quantum-build" 
+        RT_BUILD_DIR="$GITHUB_WORKSPACE/runtime-build" 
+        OQC_BUILD_DIR="$GITHUB_WORKSPACE/oqc-build" 
+        ENZYME_BUILD_DIR="$GITHUB_WORKSPACE/enzyme-build" 
 
     - name: which
       run: |
         ls -l $GITHUB_WORKSPACE/llvm-build/bin
-        ls $GITHUB_WORKSPACE/mhlo-build/bin
-        ls -l $GITHUB_WORKSPACE/mlir-build/lib/cmake
+        ls $GITHUB_WORKSPACE/mhlo-build
+        ls -l $GITHUB_WORKSPACE/mlir-build/lib
 
     # Build Quantum and Gradient Dialects
     - name: Build MLIR Dialects
