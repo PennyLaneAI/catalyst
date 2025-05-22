@@ -1302,47 +1302,6 @@ def trace_function(
         return res_expanded_tracers, in_sig, out_sig
 
 
-def restructure_pytree_for_snapshot(
-    snapshot_results: List[DynamicJaxprTracer],
-    meas_trees: PyTreeDef,
-    meas_tracers: List[DynamicJaxprTracer],
-) -> Tuple[PyTreeDef, List[DynamicJaxprTracer]]:
-    """Restructure PyTreeDef if states from qml.Snapshot are traced
-    Args:
-        snapshot_results: list with JAX classical qnode snapshot results.
-        meas_trees: PyTree-shape of the qnode output to be modified for snapshot.
-        meas_tracers: list of JAX classical qnode ouput tracers.
-
-    Returns:
-        meas_trees: Modified PyTree-shape of the qnode output with snapshots.
-        meas_tracers: Modified list of JAX classical qnode ouput tracers with snapshots inserted.
-    """
-    meas_return_trees_children = meas_trees.children()
-    meas_trees_node_data = meas_trees.node_data()
-    # add snapshot results type to allowed types in tree data
-    if meas_trees_node_data is None:
-        meas_trees_node_data = (type(tuple()), None)
-    meas_return_trees_children.insert(0, tree_structure(snapshot_results))
-    # restructure the tree to include snapshot results
-    meas_trees = meas_trees.make_from_node_data_and_children(
-        PyTreeRegistry(),
-        meas_trees_node_data,
-        meas_return_trees_children,
-    )
-    # add original measurement tracer tree structure
-    # in case overwritten by snapshot_results
-    if len(snapshot_results + meas_tracers) != meas_trees.num_leaves:
-        meas_return_trees_children.append(tree_structure(meas_tracers))
-        meas_trees = meas_trees.make_from_node_data_and_children(
-            PyTreeRegistry(),
-            meas_trees_node_data,
-            meas_return_trees_children,
-        )
-    # add snapshpot results to measurement tracers
-    meas_tracers = snapshot_results + meas_tracers
-    return meas_trees, meas_tracers
-
-
 @debug_logger
 def trace_quantum_function(
     f: Callable, device: QubitDevice, args, kwargs, qnode, static_argnums, debug_info
@@ -1390,7 +1349,11 @@ def trace_quantum_function(
                 return_values = tree_unflatten(out_tree_promise(), return_values_flat)
 
             def is_leaf(obj):
-                return isinstance(obj, qml.measurements.MeasurementProcess)
+                if isinstance(obj, qml.measurements.MeasurementProcess):
+                    return True
+                elif isinstance(obj, Operator) and isinstance(obj.hyperparameters['measurement'], qml.measurements.MeasurementProcess):
+                    return True
+                return False
 
             # 2. Create a new tree that has measurements as leaves
             return_values_flat, return_values_tree = jax.tree_util.tree_flatten(
@@ -1441,6 +1404,7 @@ def trace_quantum_function(
                 # changed the output. See `split_non_commuting`
                 if tracing_mode == TracingMode.TRANSFORM:
                     # TODO: In the future support arbitrary output from the user function.
+                    # output = [op.hyperparameters['measurement'] for op in tape.operations if isinstance(op, qml.Snapshot)] + tape.measurements
                     output = tape.measurements
                     _, trees = jax.tree_util.tree_flatten(output, is_leaf=is_leaf)
                 else:
@@ -1466,10 +1430,8 @@ def trace_quantum_function(
                         return func(arr)
 
                 meas_tracers = check_full_raise(meas, trace.to_jaxpr_tracer)
-                if len(snapshot_results) > 0:
-                    meas_trees, meas_tracers = restructure_pytree_for_snapshot(
-                        snapshot_results, meas_trees, meas_tracers
-                    )
+                # if len(snapshot_results) > 0:
+                #     meas_tracers = snapshot_results + meas_tracers
                 meas_results = tree_unflatten(meas_trees, meas_tracers)
 
                 # TODO: Allow the user to return whatever types they specify.

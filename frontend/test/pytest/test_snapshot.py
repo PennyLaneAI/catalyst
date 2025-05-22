@@ -74,14 +74,12 @@ class TestSnapshot:
             return qml.state(), qml.probs(), qml.expval(qml.X(0)), qml.var(qml.Z(0))
 
         expected_output = (
-            [
-                jnp.array([1.0 + 0.0j, 0.0 + 0.0j], dtype=jnp.complex128),
-                jnp.array([0.0 + 0.0j, 1.0 + 0.0j], dtype=jnp.complex128),
-                jnp.array([0.70710678 + 0.0j, -0.70710678 + 0.0j], dtype=jnp.complex128),
-                jnp.array([7.07106781e-01 + 0.0j, 0.0 - 0.70710678j], dtype=jnp.complex128),
-                jnp.array([7.07106781e-01 + 0.0j, 0.0 + 0.70710678j], dtype=jnp.complex128),
-                jnp.array([0.70710678 + 0.0j, 0.70710678 + 0.0j], dtype=jnp.complex128),
-            ],
+            jnp.array([1.0 + 0.0j, 0.0 + 0.0j], dtype=jnp.complex128),
+            jnp.array([0.0 + 0.0j, 1.0 + 0.0j], dtype=jnp.complex128),
+            jnp.array([0.70710678 + 0.0j, -0.70710678 + 0.0j], dtype=jnp.complex128),
+            jnp.array([7.07106781e-01 + 0.0j, 0.0 - 0.70710678j], dtype=jnp.complex128),
+            jnp.array([7.07106781e-01 + 0.0j, 0.0 + 0.70710678j], dtype=jnp.complex128),
+            jnp.array([0.70710678 + 0.0j, 0.70710678 + 0.0j], dtype=jnp.complex128),
             jnp.array([0.70710678 + 0.0j, 0.70710678 + 0.0j], dtype=jnp.complex128),
             jnp.array([0.5, 0.5], dtype=jnp.float64),
             jnp.array(1.0, dtype=jnp.float64),
@@ -121,10 +119,8 @@ class TestSnapshot:
             return qml.counts(), qml.sample()
 
         expected_output = (
-            [
-                jnp.array([1.0 + 0.0j, 0.0 + 0.0j, 0.0 + 0.0j, 0.0 + 0.0j], dtype=jnp.complex128),
-                jnp.array([0.5 + 0.0j, 0.5 + 0.0j, 0.5 + 0.0j, 0.5 + 0.0j], dtype=jnp.complex128),
-            ],
+            jnp.array([1.0 + 0.0j, 0.0 + 0.0j, 0.0 + 0.0j, 0.0 + 0.0j], dtype=jnp.complex128),
+            jnp.array([0.5 + 0.0j, 0.5 + 0.0j, 0.5 + 0.0j, 0.5 + 0.0j], dtype=jnp.complex128),
             (jnp.array([0, 1, 2, 3], dtype=jnp.int64), jnp.array([0, 0, 0, 5], dtype=jnp.int64)),
             jnp.array([[1, 1], [1, 1], [1, 1], [1, 1], [1, 1]], dtype=jnp.int64),
         )
