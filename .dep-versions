@@ -4,8 +4,7 @@
 jax=0.6.0
 mhlo=617a9361d186199480c080c9e8c474a5e30c22d1
 llvm=179d30f8c3fddd3c85056fd2b8e877a4a8513158
-# not_150_just_a_random_number_to_avoid_CI_s_cache
-enzyme=v0.0.150
+enzyme=v0.0.180
 
 # Always remove custom PL/LQ versions before release.
 
