@@ -130,9 +130,8 @@ getBufferizedFunctionArgType(FunctionOpInterface funcOp, int64_t index,
     auto tensorType = dyn_cast<TensorType>(funcOp.getArgumentTypes()[index]);
     assert(tensorType && "expected TensorType");
 
-    BaseMemRefType memrefType =
-        options.functionArgTypeConverterFn(tensorType, *options.defaultMemorySpaceFn(tensorType),
-                                           dyn_cast<func::FuncOp>(*funcOp), options);
+    BaseMemRefType memrefType = options.functionArgTypeConverterFn(
+        tensorType, *options.defaultMemorySpaceFn(tensorType), nullptr, options);
 
     auto layoutAttr = funcOp.getArgAttrOfType<AffineMapAttr>(
         index, bufferization::BufferizationDialect::kBufferLayoutAttrName);
@@ -456,8 +455,7 @@ struct ForwardOpInterface
             // Note: If `inferFunctionResultLayout = true`, cast are later folded
             // away.
             BaseMemRefType resultType = options.functionArgTypeConverterFn(
-                tensorType, *options.defaultMemorySpaceFn(tensorType),
-                dyn_cast<func::FuncOp>(*forwardOp), options);
+                tensorType, *options.defaultMemorySpaceFn(tensorType), nullptr, options);
             Value toMemrefOp =
                 rewriter.create<bufferization::ToMemrefOp>(loc, resultType, returnVal);
             returnValues.push_back(toMemrefOp);
@@ -475,8 +473,7 @@ struct ForwardOpInterface
         for (auto retTy : forwardOp.getResultTypes()) {
             auto tensorType = dyn_cast<TensorType>(retTy);
             BaseMemRefType resultType = options.functionArgTypeConverterFn(
-                tensorType, *options.defaultMemorySpaceFn(tensorType),
-                dyn_cast<func::FuncOp>(*forwardOp), options);
+                tensorType, *options.defaultMemorySpaceFn(tensorType), nullptr, options);
             returnTypes.push_back(resultType);
         }
         forwardOp.setType(FunctionType::get(op->getContext(), argTypes, returnTypes));
@@ -580,8 +577,7 @@ struct ReverseOpInterface
             // Note: If `inferFunctionResultLayout = true`, cast are later folded
             // away.
             BaseMemRefType resultType = options.functionArgTypeConverterFn(
-                tensorType, *options.defaultMemorySpaceFn(tensorType),
-                dyn_cast<func::FuncOp>(*reverseOp), options);
+                tensorType, *options.defaultMemorySpaceFn(tensorType), nullptr, options);
             Value toMemrefOp =
                 rewriter.create<bufferization::ToMemrefOp>(loc, resultType, returnVal);
             returnValues.push_back(toMemrefOp);
@@ -599,8 +595,7 @@ struct ReverseOpInterface
         for (auto retTy : reverseOp.getResultTypes()) {
             auto tensorType = dyn_cast<TensorType>(retTy);
             BaseMemRefType resultType = options.functionArgTypeConverterFn(
-                tensorType, *options.defaultMemorySpaceFn(tensorType),
-                dyn_cast<func::FuncOp>(*reverseOp), options);
+                tensorType, *options.defaultMemorySpaceFn(tensorType), nullptr, options);
             returnTypes.push_back(resultType);
         }
         reverseOp.setType(FunctionType::get(op->getContext(), argTypes, returnTypes));

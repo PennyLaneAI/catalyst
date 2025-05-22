@@ -32,7 +32,5 @@ func::FuncOp genParamCountFunction(PatternRewriter &rewriter, Location loc, func
 func::FuncOp genSplitPreprocessed(PatternRewriter &rewriter, Location loc, func::FuncOp qnode,
                                   func::FuncOp qnodeQuantum);
 
-func::FuncOp genArgMapFunction(PatternRewriter &rewriter, Location loc, func::FuncOp callee);
-
 } // namespace gradient
 } // namespace catalyst

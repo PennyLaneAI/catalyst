@@ -379,11 +379,7 @@ struct AnnotateWithFullyQualifiedNamePass
     void runOnOperation() override
     {
         MLIRContext *context = &getContext();
-
-        // Do not fold to save in compile time.
         GreedyRewriteConfig config;
-        //config.strictMode = GreedyRewriteStrictness::ExistingOps;
-        //config.enableRegionSimplification = false;
 
         RewritePatternSet annotate(context);
         auto root = getOperation();
@@ -408,9 +404,6 @@ struct InlineNestedSymbolTablePass : PassWrapper<InlineNestedSymbolTablePass, Op
         MLIRContext *context = &getContext();
 
         GreedyRewriteConfig config;
-        //config.strictMode = GreedyRewriteStrictness::ExistingOps;
-        //config.enableRegionSimplification = false;
-
         RewritePatternSet renameFunctions(context);
 
         // Get all symbol tables in current symbol table. Will be useful for making sure that

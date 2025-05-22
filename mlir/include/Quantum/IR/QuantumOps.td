@@ -128,6 +128,49 @@ def AllocOp : Memory_Op<"alloc", [NoMemoryEffect]> {
     }];
 }
 
+def AllocQubitOp : Memory_Op<"alloc_qb"> {
+    let summary = "Allocate a single qubit.";
+    let description = [{
+    }];
+
+    let results = (outs
+        QubitType:$qubit
+    );
+
+    let assemblyFormat = [{
+        attr-dict `:` type(results)
+    }];
+
+    let builders = [
+        OpBuilder<(ins),[{
+            AllocQubitOp::build($_builder, $_state,
+            /*qubit=*/ $_builder.getType<QubitType>()
+            );
+        }]>,
+    ];
+
+    code extraBaseClassDeclaration = [{
+        mlir::OpResult getOutQubit() {
+            return getODSResults(0).front();
+        }
+    }];
+
+    let extraClassDeclaration = extraBaseClassDeclaration;
+}
+
+def DeallocQubitOp : Memory_Op<"dealloc_qb"> {
+    let summary = "Deallocate a single qubit.";
+    let description = [{
+    }];
+
+    let arguments = (ins
+        QubitType:$qubit
+    );
+
+    let assemblyFormat = [{
+        $qubit attr-dict `:` type(operands)
+    }];
+}
 
 def DeallocOp : Memory_Op<"dealloc"> {
     let summary = "Deallocate a quantum register.";
@@ -829,7 +872,7 @@ def MeasureOp : Quantum_Op<"measure"> {
     );
 
     let assemblyFormat = [{
-        $in_qubit attr-dict `:` type(results)
+        $in_qubit (`postselect` $postselect^)? attr-dict `:` type(results)
     }];
 }
 
