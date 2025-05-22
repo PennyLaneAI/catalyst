@@ -1,5 +1,5 @@
 # Always update the version check in catalyst.__init__ when changing the JAX version.
-# To update JAX version alongside compatible llvm and mhlo tags, run the following script:
+# To update JAX version alongside compatible dependency tags, run the following script:
 # python3 .github/workflows/set_dep_versions.py {JAX_version}
 jax=0.6.0
 mhlo=617a9361d186199480c080c9e8c474a5e30c22d1
