@@ -1349,11 +1349,7 @@ def trace_quantum_function(
                 return_values = tree_unflatten(out_tree_promise(), return_values_flat)
 
             def is_leaf(obj):
-                if isinstance(obj, qml.measurements.MeasurementProcess):
-                    return True
-                elif isinstance(obj, Operator) and isinstance(obj.hyperparameters['measurement'], qml.measurements.MeasurementProcess):
-                    return True
-                return False
+                return isinstance(obj, qml.measurements.MeasurementProcess)
 
             # 2. Create a new tree that has measurements as leaves
             return_values_flat, return_values_tree = jax.tree_util.tree_flatten(
@@ -1404,7 +1400,6 @@ def trace_quantum_function(
                 # changed the output. See `split_non_commuting`
                 if tracing_mode == TracingMode.TRANSFORM:
                     # TODO: In the future support arbitrary output from the user function.
-                    # output = [op.hyperparameters['measurement'] for op in tape.operations if isinstance(op, qml.Snapshot)] + tape.measurements
                     output = tape.measurements
                     _, trees = jax.tree_util.tree_flatten(output, is_leaf=is_leaf)
                 else:
@@ -1430,8 +1425,9 @@ def trace_quantum_function(
                         return func(arr)
 
                 meas_tracers = check_full_raise(meas, trace.to_jaxpr_tracer)
-                # if len(snapshot_results) > 0:
-                #     meas_tracers = snapshot_results + meas_tracers
+                if len(snapshot_results) > 0:
+                    meas_trees = jax.tree_util.treedef_tuple([tree_structure(snapshot_results), meas_trees])
+                    meas_tracers = snapshot_results + meas_tracers
                 meas_results = tree_unflatten(meas_trees, meas_tracers)
 
                 # TODO: Allow the user to return whatever types they specify.
