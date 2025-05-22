@@ -28,8 +28,6 @@ import warnings
 from os import path
 from typing import List, Optional
 
-from pennylane.compiler.python_compiler.impl import Compiler as PythonCompiler
-
 from catalyst.logging import debug_logger, debug_logger_init
 from catalyst.pipelines import CompileOptions
 from catalyst.utils.exceptions import CompileError
@@ -509,6 +507,8 @@ class Compiler:
         """
 
         if self.is_using_python_compiler():
+            # pylint: disable-next=import-outside-toplevel
+            from pennylane.compiler.python_compiler.impl import Compiler as PythonCompiler
 
             compiler = PythonCompiler()
             mlir_module = compiler.run(mlir_module)
