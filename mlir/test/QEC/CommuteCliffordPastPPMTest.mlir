@@ -13,6 +13,7 @@
 // limitations under the License.
 
 // RUN: quantum-opt --merge_ppr_ppm --split-input-file -verify-diagnostics %s | FileCheck %s
+// RUN: quantum-opt --merge_ppr_ppm="max-pauli-size=3" --split-input-file -verify-diagnostics %s | FileCheck %s --check-prefixes=CHECK-MPS
 
 func.func public @merge_ppr_ppm_test_1(%q1: !quantum.bit) -> tensor<i1> {
 
@@ -113,6 +114,11 @@ func.func public @game_of_surface_code(%arg0: !quantum.bit, %arg1: !quantum.bit,
 
     // q1, q4
     // CHECK: [[m4:%.+]], [[o4:%.+]]:2 = qec.ppm ["X", "X"] [[o2]]#1, [[o1]]#3
+
+    // Because the Pauli size is limited to 3, the two operations below are not commuted.
+    // CHECK-MPS: qec.ppr ["Z", "X"](4)
+    // CHECK-MPS: qec.ppm ["Y", "Y", "Y"](-1)
+    // CHECK-MPS-NOT: qec.ppm ["Z", "Z", "Y", "Y"]
 
     %0 = qec.ppr ["Z"](8) %arg0 : !quantum.bit
     %1 = qec.ppr ["Y"](-8) %arg3 : !quantum.bit

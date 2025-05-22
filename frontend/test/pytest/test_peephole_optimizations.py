@@ -18,15 +18,17 @@ import numpy as np
 import pennylane as qml
 import pytest
 
-from catalyst import pipeline, qjit
-from catalyst.passes import cancel_inverses, merge_rotations, to_ppr
+from catalyst import measure, pipeline, qjit
+from catalyst.passes import (
+    cancel_inverses,
+    commute_ppr,
+    merge_ppr_ppm,
+    merge_rotations,
+    ppr_to_ppm,
+    to_ppr,
+)
 
 # pylint: disable=missing-function-docstring
-
-
-#
-# cancel_inverses
-#
 
 
 ### Test peephole pass decorators preserve functionality of circuits ###
@@ -47,11 +49,6 @@ def test_cancel_inverses_functionality(theta, backend):
 
     assert np.allclose(reference_workflow(theta), qjitted_workflow(theta))
     assert np.allclose(reference_workflow(theta), optimized_workflow(theta))
-
-
-#
-# merge_rotations
-#
 
 
 @pytest.mark.parametrize("theta", [42.42])
@@ -189,17 +186,8 @@ def test_chained_passes():
     assert "merge-rotations" in test_chained_apply_passes_workflow.mlir
 
 
-test_chained_passes()
-
-#
-# to_ppr
-#
-
-
 def test_convert_clifford_to_ppr():
-    """
-    Test convert_clifford_to_ppr
-    """
+
     pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
 
     @qjit(pipelines=pipe, target="mlir")
@@ -221,7 +209,181 @@ def test_convert_clifford_to_ppr():
     assert "qec.ppr" in optimized_ir
 
 
-test_convert_clifford_to_ppr()
+def test_commute_ppr():
+
+    pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+
+    @qjit(pipelines=pipe, target="mlir")
+    def test_commute_ppr_workflow():
+
+        @to_ppr
+        @commute_ppr
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def f():
+            qml.H(0)
+            qml.S(1)
+            qml.T(0)
+            qml.CNOT([0, 1])
+            return measure(0), measure(1)
+
+        return f()
+
+    assert 'transform.apply_registered_pass "commute_ppr"' in test_commute_ppr_workflow.mlir
+    optimized_ir = test_commute_ppr_workflow.mlir_opt
+    assert 'transform.apply_registered_pass "commute_ppr"' not in optimized_ir
+    assert "qec.ppr" in optimized_ir
+    assert "qec.ppm" in optimized_ir
+
+
+def test_merge_ppr_ppm():
+
+    pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+
+    @qjit(pipelines=pipe, target="mlir")
+    def test_merge_ppr_ppm_workflow():
+
+        @to_ppr
+        @merge_ppr_ppm
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def f():
+            qml.H(0)
+            qml.S(1)
+            qml.CNOT([0, 1])
+            return measure(0), measure(1)
+
+        return f()
+
+    assert 'transform.apply_registered_pass "merge_ppr_ppm"' in test_merge_ppr_ppm_workflow.mlir
+    optimized_ir = test_merge_ppr_ppm_workflow.mlir_opt
+    assert 'transform.apply_registered_pass "merge_ppr_ppm"' not in optimized_ir
+    assert 'qec.ppm ["Z", "X"]' in optimized_ir
+    assert 'qec.ppm ["X"]' in optimized_ir
+
+
+def test_ppr_to_ppm():
+
+    pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+
+    @qjit(pipelines=pipe, target="mlir")
+    def test_ppr_to_ppm_workflow():
+
+        @to_ppr
+        @ppr_to_ppm
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def f():
+            qml.H(0)
+            qml.S(1)
+            qml.T(0)
+            qml.CNOT([0, 1])
+            return measure(0), measure(1)
+
+        return f()
+
+    assert (
+        'transform.apply_registered_pass "decompose_non_clifford_ppr"'
+        in test_ppr_to_ppm_workflow.mlir
+    )
+    assert (
+        'transform.apply_registered_pass "decompose_clifford_ppr"' in test_ppr_to_ppm_workflow.mlir
+    )
+    optimized_ir = test_ppr_to_ppm_workflow.mlir_opt
+    assert 'transform.apply_registered_pass "decompose_non_clifford_ppr"' not in optimized_ir
+    assert 'transform.apply_registered_pass "decompose_clifford_ppr"' not in optimized_ir
+    assert "quantum.alloc_qb" in optimized_ir
+    assert "qec.fabricate  magic" in optimized_ir
+    assert "qec.select.ppm" in optimized_ir
+    assert 'qec.ppr ["X"]' in optimized_ir
+
+
+def test_ppr_to_ppm_inject_magic_state():
+
+    pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+
+    @qjit(pipelines=pipe, target="mlir")
+    def test_ppr_to_ppm_workflow():
+
+        @to_ppr
+        @ppr_to_ppm(decompose_method="clifford-corrected", avoid_y_measure=True)
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def f():
+            qml.H(0)
+            qml.S(1)
+            qml.T(0)
+            qml.CNOT([0, 1])
+            return measure(0), measure(1)
+
+        return f()
+
+    assert (
+        'transform.apply_registered_pass "decompose_non_clifford_ppr"'
+        in test_ppr_to_ppm_workflow.mlir
+    )
+    assert (
+        'transform.apply_registered_pass "decompose_clifford_ppr"' in test_ppr_to_ppm_workflow.mlir
+    )
+    optimized_ir = test_ppr_to_ppm_workflow.mlir_opt
+    assert 'transform.apply_registered_pass "decompose_non_clifford_ppr"' not in optimized_ir
+    assert 'transform.apply_registered_pass "decompose_clifford_ppr"' not in optimized_ir
+    assert "qec.fabricate  magic" in optimized_ir
+    assert "qec.fabricate  plus_i" in optimized_ir
+    assert 'qec.ppm ["X", "Z"]' in optimized_ir
+    assert 'qec.ppr ["X"]' in optimized_ir
+
+
+def test_commute_ppr_and_merge_ppr_ppm_with_max_pauli_size():
+
+    pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+
+    @qjit(pipelines=pipe, target="mlir")
+    def test_convert_clifford_to_ppr_workflow():
+
+        @to_ppr
+        @commute_ppr(max_pauli_size=2)
+        @merge_ppr_ppm
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def f():
+            qml.CNOT([0, 2])
+            qml.T(0)
+            qml.T(1)
+            qml.CNOT([0, 1])
+            qml.S(0)
+            qml.H(0)
+            qml.T(0)
+            return measure(0), measure(1)
+
+        @to_ppr
+        @commute_ppr
+        @merge_ppr_ppm(max_pauli_size=1)
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def g():
+            qml.CNOT([0, 2])
+            qml.T(0)
+            qml.T(1)
+            qml.CNOT([0, 1])
+            return measure(0), measure(1)
+
+        return f(), g()
+
+    assert (
+        'transform.apply_registered_pass "commute_ppr"'
+        in test_convert_clifford_to_ppr_workflow.mlir
+    )
+    assert (
+        'transform.apply_registered_pass "merge_ppr_ppm"'
+        in test_convert_clifford_to_ppr_workflow.mlir
+    )
+
+    optimized_ir = test_convert_clifford_to_ppr_workflow.mlir_opt
+    assert 'transform.apply_registered_pass "commute_ppr"' not in optimized_ir
+    assert 'transform.apply_registered_pass "merge_ppr_ppm"' not in optimized_ir
+
+    # Test commute_ppr with max_pauli_size
+    assert 'qec.ppr ["Z", "X"](4)' in optimized_ir
+    assert 'qec.ppr ["X", "X"](8)' in optimized_ir
+
+    # Test merge_ppr_ppm with max_pauli_size
+    assert 'qec.ppr ["Z", "X"](4)' in optimized_ir
+    assert 'qec.ppm ["Y"](-1)' in optimized_ir
 
 
 if __name__ == "__main__":

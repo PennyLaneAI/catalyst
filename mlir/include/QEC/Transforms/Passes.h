@@ -18,11 +18,15 @@
 
 #include "mlir/Pass/Pass.h"
 
+#include "QEC/Transforms/PassesEnums.h.inc"
+
 namespace catalyst {
 
 std::unique_ptr<mlir::Pass> createLowerToQECPass();
 std::unique_ptr<mlir::Pass> createCommuteCliffordTPPRPass();
 std::unique_ptr<mlir::Pass> createCliffordTToPPRPass();
 std::unique_ptr<mlir::Pass> createCommuteCliffordPastPPMPass();
+std::unique_ptr<mlir::Pass> createDecomposeNonCliffordPPRPass();
+std::unique_ptr<mlir::Pass> createDecomposeCliffordPPRPass();
 
 } // namespace catalyst

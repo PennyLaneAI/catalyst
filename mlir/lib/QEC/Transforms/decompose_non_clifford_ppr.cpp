@@ -12,15 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#define DEBUG_TYPE "commute_ppr"
+#define DEBUG_TYPE "decompose_non_clifford_ppr"
 
 #include "llvm/Support/Debug.h"
 
 #include "mlir/IR/PatternMatch.h"
-#include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include "QEC/IR/QECDialect.h"
+#include "QEC/Transforms/Passes.h"
 #include "QEC/Transforms/Patterns.h"
 
 using namespace llvm;
@@ -30,19 +30,19 @@ using namespace catalyst::qec;
 
 namespace catalyst {
 namespace qec {
-
-#define GEN_PASS_DEF_COMMUTECLIFFORDTPPRPASS
-#define GEN_PASS_DECL_COMMUTECLIFFORDTPPRPASS
+#define GEN_PASS_DEF_DECOMPOSENONCLIFFORDPPRPASS
+#define GEN_PASS_DECL_DECOMPOSENONCLIFFORDPPRPASS
 #include "QEC/Transforms/Passes.h.inc"
 
-struct CommuteCliffordTPPRPass : public impl::CommuteCliffordTPPRPassBase<CommuteCliffordTPPRPass> {
-    using CommuteCliffordTPPRPassBase::CommuteCliffordTPPRPassBase;
+struct DecomposeNonCliffordPPRPass
+    : public impl::DecomposeNonCliffordPPRPassBase<DecomposeNonCliffordPPRPass> {
+    using DecomposeNonCliffordPPRPassBase::DecomposeNonCliffordPPRPassBase;
 
     void runOnOperation() final
     {
         RewritePatternSet patterns(&getContext());
 
-        populateCommuteCliffordTPPRPatterns(patterns, max_pauli_size);
+        populateDecomposeNonCliffordPPRPatterns(patterns, decomposeMethod, avoidYMeasure);
 
         if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
             return signalPassFailure();
@@ -52,9 +52,9 @@ struct CommuteCliffordTPPRPass : public impl::CommuteCliffordTPPRPassBase<Commut
 
 } // namespace qec
 
-std::unique_ptr<Pass> createCommuteCliffordTPPRPass()
+std::unique_ptr<Pass> createDecomposeNonCliffordPPRPass()
 {
-    return std::make_unique<CommuteCliffordTPPRPass>();
+    return std::make_unique<DecomposeNonCliffordPPRPass>();
 }
 
 } // namespace catalyst
