@@ -2,6 +2,23 @@
 
 <h3>New features since last release</h3>
 
+* A new compilation pass called :func:`~.passes.ppr_to_ppm` has been added to Catalyst
+  to decompose Pauli product rotations (PPRs), :math:`\exp(-iP_{\{x, y, z\}} \theta)`, into
+  Pauli product measurements (PPMs). Non-Clifford PPR (:math:`\theta = \tfrac{\pi}{8}`) requires
+  the consumption of a magic state, while Clifford PPR (:math:`\theta = \tfrac{\pi}{4}`) will not.
+  The methods are implemented as described in [arXiv:1808.02892](https://arxiv.org/abs/1808.02892v3).
+  [(#1664)](https://github.com/PennyLaneAI/catalyst/pull/1664)
+
+  The new compilation pass can be accessed in the frontend from the :mod:`~.passes` module:
+  * :func:`~.passes.ppr_to_ppm`: Decomposes all PPRs into PPMs
+  (except PPR (:math:`\theta = \tfrac{\pi}{2}`)).
+
+  Or via the Catalyst CLI as two separate passes:
+  * `decompose_clifford_ppr`: Decompose Clifford PPR (:math:`\theta = \tfrac{\pi}{4}`)
+  rotations into PPMs.
+  * `decompose_non_clifford_ppr`: Decompose non-Cliford PPR (:math:`\theta = \tfrac{\pi}{8}`)
+  into PPMs using a magic state.
+
 <h3>Improvements 🛠</h3>
 
 * The behaviour of measurement processes executed on `null.qubit` with QJIT is now more in line with
@@ -47,12 +64,12 @@
   deallocation primitive has been split into deallocation and a separate device release primitive.
   [(#1720)](https://github.com/PennyLaneAI/catalyst/pull/1720)
 
-  - `qunitary_p` is now `unitary_p` (unchanged)
-  - `qmeasure_p` is now `measure_p` (unchanged)
-  - `qdevice_p` is now `device_init_p` (unchanged)
-  - `qdealloc_p` no longer releases the device, thus it can be used at any point of a quantum
+  * `qunitary_p` is now `unitary_p` (unchanged)
+  * `qmeasure_p` is now `measure_p` (unchanged)
+  * `qdevice_p` is now `device_init_p` (unchanged)
+  * `qdealloc_p` no longer releases the device, thus it can be used at any point of a quantum
      execution scope
-  - `device_release_p` is a new primitive that must be used to mark the end of a quantum execution
+  * `device_release_p` is a new primitive that must be used to mark the end of a quantum execution
      scope, which will release the quantum device
 
 * Catalyst has removed the `experimental_capture` keyword from the `qjit` decorator in favour of
@@ -91,13 +108,13 @@
   [(#1729)](https://github.com/PennyLaneAI/catalyst/pull/1729)
 
   Several internal changes were made for this update.
-    - LAPACK kernels are updated to adhere to the new JAX lowering rules for external functions.
+  * LAPACK kernels are updated to adhere to the new JAX lowering rules for external functions.
     [(#1685)](https://github.com/PennyLaneAI/catalyst/pull/1685)
 
-    - The trace stack is removed and replaced with a tracing context manager.
+  * The trace stack is removed and replaced with a tracing context manager.
     [(#1662)](https://github.com/PennyLaneAI/catalyst/pull/1662)
 
-    - A new `debug_info` argument is added to `Jaxpr`, the `make_jaxpr`
+  * A new `debug_info` argument is added to `Jaxpr`, the `make_jaxpr`
     functions, and `jax.extend.linear_util.wrap_init`.
     [(#1670)](https://github.com/PennyLaneAI/catalyst/pull/1670)
     [(#1671)](https://github.com/PennyLaneAI/catalyst/pull/1671)
@@ -179,6 +196,9 @@
 * Improved the definition of `YieldOp` in the quantum dialect by removing `AnyTypeOf`
   [(#1696)](https://github.com/PennyLaneAI/catalyst/pull/1696)
 
+* The assembly format of `MeasureOp` in the `Quantum` dialect and `MeasureInBasisOp` in the `MBQC` dialect now contains the `postselect` attribute. 
+  [(#1732)](https://github.com/PennyLaneAI/catalyst/pull/1732)
+
 * The bufferization of custom catalyst dialects has been migrated to the new one-shot
   bufferization interface in mlir.
   The new mlir bufferization interface is required by jax 0.4.29 or higher.
@@ -193,6 +213,9 @@
 
 * `ValueRange` is replaced with `TypeRange` for creating `CustomOp` in `IonsDecompositionPatterns.cpp` to match the build constructors
   [(#1749)](https://github.com/PennyLaneAI/catalyst/pull/1749)
+
+* The unused helper function `genArgMapFunction` in the `--lower-gradients` pass is removed.
+  [(#1753)](https://github.com/PennyLaneAI/catalyst/pull/1753)
 
 <h3>Documentation 📝</h3>
 
@@ -214,8 +237,8 @@ Sengthai Heng,
 David Ittah,
 Tzung-Han Juang,
 Christina Lee,
-Erick Ochoa Lopez,
 Mehrdad Malekmohammadi,
 Anton Naim Ibrahim,
+Erick Ochoa Lopez,
 Ritu Thombre,
 Paul Haochen Wang.

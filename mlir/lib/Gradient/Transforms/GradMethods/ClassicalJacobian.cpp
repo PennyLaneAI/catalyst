@@ -33,9 +33,9 @@ namespace gradient {
 
 /// Generate a new mlir function that counts the (runtime) number of gate parameters.
 ///
-/// This enables other functions like `genArgMapFunction` to allocate memory for vectors of gate
-/// parameters without having to deal with dynamic memory management. The function works similarly
-/// to `genArgMapFunction` by eliminating all quantum code and running the classical preprocessing,
+/// This enables other functions to allocate memory for vectors of gate
+/// parameters without having to deal with dynamic memory management. The function works
+/// by eliminating all quantum code and running the classical preprocessing,
 /// but instead of storing gate parameters it merely counts them.
 /// The impact on execution time is expected to be non-dominant, as the classical pre-processing is
 /// already run multiple times, such as to differentiate the ArgMap and on every execution of
@@ -209,98 +209,6 @@ func::FuncOp genSplitPreprocessed(PatternRewriter &rewriter, Location loc, func:
     }
 
     return splitFn;
-}
-
-/// Generate a new mlir function that maps qfunc arguments to gate parameters.
-///
-/// This enables to extract any classical preprocessing done inside the quantum function and compute
-/// its jacobian separately in order to combine it with quantum-only gradients such as the
-/// parameter-shift or adjoint method.
-///
-func::FuncOp genArgMapFunction(PatternRewriter &rewriter, Location loc, func::FuncOp callee)
-{
-    // Define the properties of the classical preprocessing function.
-    std::string fnName = callee.getSymName().str() + ".argmap";
-    SmallVector<Type> fnArgTypes(callee.getArgumentTypes());
-    fnArgTypes.push_back(rewriter.getIndexType());
-    auto paramsVectorType = RankedTensorType::get({ShapedType::kDynamic}, rewriter.getF64Type());
-    FunctionType fnType = rewriter.getFunctionType(fnArgTypes, paramsVectorType);
-    StringAttr visibility = rewriter.getStringAttr("private");
-
-    func::FuncOp argMapFn =
-        SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(callee, rewriter.getStringAttr(fnName));
-    if (!argMapFn) {
-        // First copy the original function as is, then we can replace all quantum ops by collecting
-        // their gate parameters in a memory buffer instead. The size of this vector is passed as an
-        // input to the new function.
-        argMapFn = rewriter.create<func::FuncOp>(loc, fnName, fnType, visibility, nullptr, nullptr);
-        rewriter.cloneRegionBefore(callee.getBody(), argMapFn.getBody(), argMapFn.end());
-        Block &argMapBlock = argMapFn.getFunctionBody().front();
-        // Allocate the memory for the gate parameters collected at runtime
-        Value numParams = argMapBlock.addArgument(rewriter.getIndexType(), loc);
-        auto paramsBufferType =
-            MemRefType::get(paramsVectorType.getShape(), paramsVectorType.getElementType());
-
-        PatternRewriter::InsertionGuard insertGuard(rewriter);
-        rewriter.setInsertionPointToStart(&argMapFn.getBody().front());
-
-        Value paramsBuffer = rewriter.create<memref::AllocOp>(loc, paramsBufferType, numParams);
-        MemRefType paramsProcessedType = MemRefType::get({}, rewriter.getIndexType());
-        Value paramsProcessed = getStaticMemrefAlloca(loc, rewriter, paramsProcessedType);
-        Value cZero = rewriter.create<index::ConstantOp>(loc, 0);
-        rewriter.create<memref::StoreOp>(loc, cZero, paramsProcessed);
-        Value cOne = rewriter.create<index::ConstantOp>(loc, 1);
-
-        argMapFn.walk([&](Operation *op) {
-            // Insert gate parameters into the params buffer.
-            if (auto gate = dyn_cast<quantum::DifferentiableGate>(op)) {
-                PatternRewriter::InsertionGuard insertGuard(rewriter);
-                rewriter.setInsertionPoint(gate);
-
-                ValueRange diffParams = gate.getDiffParams();
-                if (!diffParams.empty()) {
-                    Value paramIdx = rewriter.create<memref::LoadOp>(loc, paramsProcessed);
-                    for (auto param : diffParams) {
-                        rewriter.create<memref::StoreOp>(loc, param, paramsBuffer, paramIdx);
-                        paramIdx = rewriter.create<index::AddOp>(loc, paramIdx, cOne);
-                    }
-                    rewriter.create<memref::StoreOp>(loc, paramIdx, paramsProcessed);
-                }
-
-                rewriter.replaceOp(op, gate.getQubitOperands());
-            }
-            // Any other gates or quantum instructions also need to be stripped.
-            // Measurements are handled separately.
-            else if (isa<quantum::DeviceInitOp>(op)) {
-                rewriter.eraseOp(op);
-            }
-            else if (auto gate = dyn_cast<quantum::QuantumOperation>(op)) {
-                rewriter.replaceOp(op, gate.getQubitOperands());
-            }
-            else if (auto region = dyn_cast<quantum::QuantumRegion>(op)) {
-                rewriter.replaceOp(op, region.getRegisterOperand());
-            }
-            else if (isa<quantum::DeallocOp>(op)) {
-                rewriter.eraseOp(op);
-            }
-            else if (isa<quantum::DeviceReleaseOp>(op)) {
-                rewriter.eraseOp(op);
-            }
-
-            else if (auto returnOp = dyn_cast<func::ReturnOp>(op)) {
-                PatternRewriter::InsertionGuard insertionGuard(rewriter);
-                rewriter.setInsertionPoint(returnOp);
-                Value paramsVector =
-                    rewriter.create<bufferization::ToTensorOp>(loc, paramsVectorType, paramsBuffer);
-                returnOp.getOperandsMutable().assign(paramsVector);
-            }
-        });
-
-        quantum::removeQuantumMeasurements(argMapFn, rewriter);
-        argMapFn->setAttr("QuantumFree", rewriter.getUnitAttr());
-    }
-
-    return argMapFn;
 }
 
 } // namespace gradient

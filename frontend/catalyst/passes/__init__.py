@@ -39,6 +39,7 @@ from catalyst.passes.builtin_passes import (
     ions_decomposition,
     merge_ppr_ppm,
     merge_rotations,
+    ppr_to_ppm,
     to_ppr,
 )
 from catalyst.passes.pass_api import Pass, PassPlugin, apply_pass, apply_pass_plugin
@@ -54,4 +55,5 @@ __all__ = (
     "apply_pass",
     "apply_pass_plugin",
     "merge_ppr_ppm",
+    "ppr_to_ppm",
 )
