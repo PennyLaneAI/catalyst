@@ -507,6 +507,8 @@ class Compiler:
         """
 
         if self.is_using_python_compiler():
+            # We keep this module here to keep xDSL requirement optional
+            # Only move this is it has been decided that xDSL is no longer optional.
             # pylint: disable-next=import-outside-toplevel
             from pennylane.compiler.python_compiler.impl import Compiler as PythonCompiler
 
