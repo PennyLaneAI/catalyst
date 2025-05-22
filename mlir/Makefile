@@ -119,8 +119,14 @@ mhlo:
 	LIT_FILTER_OUT="chlo_legalize_to_mhlo" cmake --build $(MHLO_BUILD_DIR) --target check-mlir-hlo
 
 .PHONY: enzyme
+enzyme: TARGET_FILE := $(MK_DIR)/Enzyme/enzyme/Enzyme/TypeAnalysis/TypeAnalysis.cpp
+enzyme: PATCH_FILE := $(MK_DIR)/patches/enzyme-nvvm-fabs-intrinsics.patch
 enzyme:
 	@echo "build enzyme"
+	# Patch enzyme's dependency on nvidia fabs llvm intrinsics
+	@if patch --dry-run -p1 -N $(TARGET_FILE) $(PATCH_FILE) > /dev/null 2>&1; then \
+		patch -p1 $(TARGET_FILE) $(PATCH_FILE); \
+	fi
 	cmake -G Ninja -S Enzyme/enzyme -B $(ENZYME_BUILD_DIR) \
 		-DENZYME_STATIC_LIB=ON \
 		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
