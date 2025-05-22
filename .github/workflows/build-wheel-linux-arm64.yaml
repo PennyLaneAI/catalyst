@@ -345,6 +345,12 @@ jobs:
         OQC_BUILD_DIR="$GITHUB_WORKSPACE/oqc-build" \
         ENZYME_BUILD_DIR="$GITHUB_WORKSPACE/enzyme-build" \
 
+    - name: which
+      run: |
+        ls -l $GITHUB_WORKSPACE/llvm-build/bin
+        ls $GITHUB_WORKSPACE/mhlo-build/bin
+        ls -l $GITHUB_WORKSPACE/mlir-build/lib/cmake
+
     # Build Quantum and Gradient Dialects
     - name: Build MLIR Dialects
       run: |
