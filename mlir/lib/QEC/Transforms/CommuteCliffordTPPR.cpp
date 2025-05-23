@@ -14,8 +14,8 @@
 
 #define DEBUG_TYPE "commute_ppr"
 
-#include "llvm/Support/Debug.h"
 #include "mlir/Analysis/TopologicalSortUtils.h"
+#include "llvm/Support/Debug.h"
 
 #include "QEC/IR/QECDialect.h"
 #include "QEC/IR/QECOpInterfaces.h"
