@@ -99,3 +99,36 @@ void ReverseOp::print(OpAsmPrinter &p)
                                              getFunctionTypeAttrName(), getArgAttrsAttrName(),
                                              getResAttrsAttrName());
 }
+
+//===----------------------------------------------------------------------===//
+// Gradient op verifiers.
+//===----------------------------------------------------------------------===//
+
+namespace {
+size_t getNumReturnOps(FunctionOpInterface funcOp)
+{
+    size_t count = 0;
+    for (Block &b : funcOp.getFunctionBody()) {
+        if (isa<ReturnOp>(b.getTerminator())) {
+            count++;
+        }
+    }
+    return count;
+}
+} // namespace
+
+LogicalResult ForwardOp::verify()
+{
+    if (getNumReturnOps(*this) > 1) {
+        return emitOpError("forward op with more than one func.return is not supported");
+    }
+    return mlir::success();
+}
+
+LogicalResult ReverseOp::verify()
+{
+    if (getNumReturnOps(*this) > 1) {
+        return emitOpError("reverse op with more than one func.return is not supported");
+    }
+    return mlir::success();
+}

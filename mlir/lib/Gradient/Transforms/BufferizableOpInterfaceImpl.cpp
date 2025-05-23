@@ -414,16 +414,6 @@ struct ForwardOpInterface
             op, value, options, invocationStack);
     }
 
-    LogicalResult verifyAnalysis(Operation *op, const bufferization::AnalysisState &state) const
-    {
-        auto forwardOp = cast<ForwardOp>(op);
-        // TODO: func.func with multiple returns are not supported.
-        if (!getAssumedUniqueReturnOp(forwardOp)) {
-            return op->emitOpError("op without unique func.return is not supported");
-        }
-        return success();
-    }
-
     LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
                             const bufferization::BufferizationOptions &options) const
     {
@@ -442,7 +432,6 @@ struct ForwardOpInterface
         }
 
         ReturnOp returnOp = getAssumedUniqueReturnOp(forwardOp);
-        assert(returnOp && "expected func with single return op");
         Location loc = returnOp.getLoc();
 
         // 1. Bufferize every block.
@@ -538,15 +527,6 @@ struct ReverseOpInterface
             op, value, options, invocationStack);
     }
 
-    LogicalResult verifyAnalysis(Operation *op, const bufferization::AnalysisState &state) const
-    {
-        auto reverseOp = cast<ReverseOp>(op);
-        // TODO: func.func with multiple returns are not supported.
-        if (!getAssumedUniqueReturnOp(reverseOp))
-            return op->emitOpError("op without unique func.return is not supported");
-        return success();
-    }
-
     LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
                             const bufferization::BufferizationOptions &options) const
     {
@@ -565,7 +545,6 @@ struct ReverseOpInterface
         }
 
         ReturnOp returnOp = getAssumedUniqueReturnOp(reverseOp);
-        assert(returnOp && "expected func with single return op");
         Location loc = returnOp.getLoc();
 
         // 1. Bufferize every block.
