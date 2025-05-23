@@ -1,4 +1,4 @@
-// Copyright 2022-2023 Xanadu Quantum Technologies Inc.
+// Copyright 2024-2025 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,17 +14,14 @@
 
 #pragma once
 
-#include "mlir/Conversion/LLVMCommon/TypeConverter.h"
-#include "mlir/IR/PatternMatch.h"
-#include "mlir/Transforms/DialectConversion.h"
+using namespace mlir;
 
 namespace catalyst {
+
 namespace gradient {
 
-void populatePreprocessingPatterns(mlir::RewritePatternSet &);
-void populatePostprocessingPatterns(mlir::RewritePatternSet &);
-void populateLoweringPatterns(mlir::RewritePatternSet &);
-void populateConversionPatterns(mlir::LLVMTypeConverter &, mlir::RewritePatternSet &);
+void registerBufferizableOpInterfaceExternalModels(mlir::DialectRegistry &registry);
 
-} // namespace gradient
+}
+
 } // namespace catalyst
