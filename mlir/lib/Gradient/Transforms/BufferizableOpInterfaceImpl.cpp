@@ -109,7 +109,7 @@ void generateAllocations(RewriterBase &rewriter, Location loc, SmallVectorImpl<V
 // doing any real heavy-duty.
 // However, the converter was removed upstream.
 // See https://github.com/llvm/llvm-project/pull/114155/files
-void TensorType2MemrefType(const SmallVector<Type> &inTypes, SmallVector<Type> &convertedResults)
+void TensorType2MemrefType(const TypeRange &inTypes, SmallVector<Type> &convertedResults)
 {
     for (Type inType : inTypes) {
         if (isa<TensorType>(inType)) {
@@ -182,7 +182,7 @@ struct AdjointOpInterface
         Value gradSize = adjointOp.getGradSize();
 
         SmallVector<Type> resTypes;
-        TensorType2MemrefType(SmallVector<Type>(adjointOp.getResultTypes()), resTypes);
+        TensorType2MemrefType(adjointOp.getResultTypes(), resTypes);
         assert(adjointOp->getNumResults() == resTypes.size() &&
                "Number of memrefs do not match number of tensor results!");
 
@@ -455,8 +455,8 @@ struct ForwardOpInterface
 
             // Note: If `inferFunctionResultLayout = true`, cast are later folded
             // away.
-            BaseMemRefType resultType = options.functionArgTypeConverterFn(
-                tensorType, *options.defaultMemorySpaceFn(tensorType), nullptr, options);
+            BaseMemRefType resultType = options.unknownTypeConverterFn(
+                returnVal, *options.defaultMemorySpaceFn(tensorType), options);
             Value toMemrefOp =
                 rewriter.create<bufferization::ToMemrefOp>(loc, resultType, returnVal);
             returnValues.push_back(toMemrefOp);
@@ -471,12 +471,7 @@ struct ForwardOpInterface
 
         // 4. Rewrite the FuncOp type to buffer form. Also preserve unused return types.
         SmallVector<Type> returnTypes;
-        for (auto retTy : forwardOp.getResultTypes()) {
-            auto tensorType = dyn_cast<TensorType>(retTy);
-            BaseMemRefType resultType = options.functionArgTypeConverterFn(
-                tensorType, *options.defaultMemorySpaceFn(tensorType), nullptr, options);
-            returnTypes.push_back(resultType);
-        }
+        TensorType2MemrefType(forwardOp.getResultTypes(), returnTypes);
         forwardOp.setType(FunctionType::get(op->getContext(), argTypes, returnTypes));
 
         return success();
@@ -565,8 +560,8 @@ struct ReverseOpInterface
 
             // Note: If `inferFunctionResultLayout = true`, cast are later folded
             // away.
-            BaseMemRefType resultType = options.functionArgTypeConverterFn(
-                tensorType, *options.defaultMemorySpaceFn(tensorType), nullptr, options);
+            BaseMemRefType resultType = options.unknownTypeConverterFn(
+                returnVal, *options.defaultMemorySpaceFn(tensorType), options);
             Value toMemrefOp =
                 rewriter.create<bufferization::ToMemrefOp>(loc, resultType, returnVal);
             returnValues.push_back(toMemrefOp);
@@ -581,12 +576,7 @@ struct ReverseOpInterface
 
         // 4. Rewrite the FuncOp type to buffer form. Also preserve unused return types.
         SmallVector<Type> returnTypes;
-        for (auto retTy : reverseOp.getResultTypes()) {
-            auto tensorType = dyn_cast<TensorType>(retTy);
-            BaseMemRefType resultType = options.functionArgTypeConverterFn(
-                tensorType, *options.defaultMemorySpaceFn(tensorType), nullptr, options);
-            returnTypes.push_back(resultType);
-        }
+        TensorType2MemrefType(reverseOp.getResultTypes(), returnTypes);
         reverseOp.setType(FunctionType::get(op->getContext(), argTypes, returnTypes));
 
         return success();
