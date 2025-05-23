@@ -410,8 +410,7 @@ struct ForwardOpInterface
             return getBufferizedFunctionArgType(forwardOp, bbArg.getArgNumber(), options);
         }
 
-        return OpWithUnstructuredControlFlowBufferizableOpInterfaceExternalModel::getBufferType(
-            op, value, options, invocationStack);
+        return bufferization::detail::defaultGetBufferType(value, options, invocationStack);
     }
 
     LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
@@ -523,8 +522,7 @@ struct ReverseOpInterface
             return getBufferizedFunctionArgType(reverseOp, bbArg.getArgNumber(), options);
         }
 
-        return OpWithUnstructuredControlFlowBufferizableOpInterfaceExternalModel::getBufferType(
-            op, value, options, invocationStack);
+        return bufferization::detail::defaultGetBufferType(value, options, invocationStack);
     }
 
     LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
