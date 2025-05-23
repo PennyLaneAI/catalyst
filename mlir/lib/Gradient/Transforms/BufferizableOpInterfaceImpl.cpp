@@ -109,6 +109,8 @@ void generateAllocations(RewriterBase &rewriter, Location loc, SmallVectorImpl<V
 // doing any real heavy-duty.
 // However, the converter was removed upstream.
 // See https://github.com/llvm/llvm-project/pull/114155/files
+//
+// Note that as stated in the overall TODO, we force identity layout at the moment.
 void TensorType2MemrefType(const TypeRange &inTypes, SmallVector<Type> &convertedResults)
 {
     for (Type inType : inTypes) {
