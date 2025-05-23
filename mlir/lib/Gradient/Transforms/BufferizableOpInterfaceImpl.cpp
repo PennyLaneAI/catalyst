@@ -404,10 +404,24 @@ struct ForwardOpInterface
                                             const bufferization::BufferizationOptions &options,
                                             SmallVector<Value> &invocationStack) const
     {
+        // The getBufferType() method is called on either BlockArguments or OpResults.
+        // https://github.com/llvm/llvm-project/blob/main/mlir/include/mlir/Dialect/Bufferization/IR/BufferizableOpInterface.td#L506
+        // Since forward and reverse ops are funcop-like, they do not have result Values,
+        // so this method will only be called on BlockArguments.
+        //
+        // Among the block arguments, function arguments are special.
+        // One-shot bufferize has two options to control type conversions from tensor to memref:
+        // 1. The `unknown-type-conversion` controls the conversion of a generic Value.
+        //   * Without implementing this `getBufferType()` method, all BlockArgument conversions
+        //   * go through this default path.
+        //   * https://github.com/llvm/llvm-project/blob/main/mlir/include/mlir/Dialect/Bufferization/IR/BufferizableOpInterface.td#L533
+        //   * https://github.com/llvm/llvm-project/blob/main/mlir/lib/Dialect/Bufferization/IR/BufferizableOpInterface.cpp#L952
+        // 2. The `function-boundary-type-conversion` controls the conversion of function arguments.
+        //
+        // Since they go through separate bufferization API, so we need to separete them here too.
         auto forwardOp = cast<ForwardOp>(op);
         auto bbArg = cast<BlockArgument>(value);
 
-        // Function arguments are special.
         if (bbArg.getOwner() == &forwardOp.getBody().front()) {
             return getBufferizedFunctionArgType(forwardOp, bbArg.getArgNumber(), options);
         }
@@ -511,6 +525,7 @@ struct ReverseOpInterface
                                             const bufferization::BufferizationOptions &options,
                                             SmallVector<Value> &invocationStack) const
     {
+        // See comment on the getBufferType() method on forward op.
         auto reverseOp = cast<ReverseOp>(op);
         auto bbArg = cast<BlockArgument>(value);
 
