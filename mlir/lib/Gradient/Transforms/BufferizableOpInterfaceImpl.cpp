@@ -132,16 +132,7 @@ getBufferizedFunctionArgType(FunctionOpInterface funcOp, int64_t index,
     BaseMemRefType memrefType = options.functionArgTypeConverterFn(
         tensorType, *options.defaultMemorySpaceFn(tensorType), nullptr, options);
 
-    auto layoutAttr = funcOp.getArgAttrOfType<AffineMapAttr>(
-        index, bufferization::BufferizationDialect::kBufferLayoutAttrName);
-    if (!layoutAttr) {
-        return memrefType;
-    }
-
-    auto rankedMemrefType = dyn_cast<MemRefType>(memrefType);
-    assert(rankedMemrefType && "buffer layout not supported on unranked tensors");
-    return MemRefType::get(rankedMemrefType.getShape(), rankedMemrefType.getElementType(),
-                           layoutAttr.getValue(), rankedMemrefType.getMemorySpace());
+    return memrefType;
 }
 
 static ReturnOp getAssumedUniqueReturnOp(FunctionOpInterface funcOp)
