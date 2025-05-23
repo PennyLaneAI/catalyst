@@ -36,6 +36,28 @@ func.func @adjoint(%arg0: f64, %arg1: index) {
 
 // -----
 
+func.func private @circuit(%arg0: f64)
+
+// CHECK-LABEL: @adjoint_with_scalar_return
+func.func @adjoint_with_scalar_return(%arg0: f64, %arg1: index) {
+
+    // CHECK:   [[alloc:%.+]] = memref.alloc(%arg1) : memref<?xf64>
+    // CHECK:   [[bufferedRes:%.+]]:2 = gradient.adjoint @circuit(%arg0) size(%arg1) in([[alloc]] : memref<?xf64>)
+    // CHECK-SAME: (f64) -> (f64, f64)
+    %grad:3 = gradient.adjoint @circuit(%arg0) size(%arg1) : (f64) -> (f64, tensor<?xf64>, f64)
+
+    // CHECK: [[toTen:%.+]] = bufferization.to_tensor [[alloc]] : memref<?xf64>
+    // CHECK: math.sin [[toTen]]
+    %user0 = math.sin %grad#1 : tensor<?xf64>
+
+    // CHECK: arith.addf [[bufferedRes]]#0, [[bufferedRes]]#1
+    %user1 = arith.addf %grad#0, %grad#2 : f64
+
+    return
+}
+
+// -----
+
 func.func private @circuit(%arg0: tensor<2xf64>)
 
 // CHECK-LABEL: @adjoint_with_tensor_arg

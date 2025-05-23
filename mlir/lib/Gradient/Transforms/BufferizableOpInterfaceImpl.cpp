@@ -196,10 +196,18 @@ struct AdjointOpInterface
                "Number of memrefs do not match number of tensor results!");
 
         SmallVector<Value> memrefValues;
-        for (Type resType : resTypes) {
-            MemRefType memrefType = cast<MemRefType>(resType);
-            Value memrefValue = rewriter.create<memref::AllocOp>(loc, memrefType, gradSize);
-            memrefValues.push_back(memrefValue);
+        SmallVector<Type> nonTensorResultTypes;
+        std::vector<size_t> nonTensorResultIndices;
+        for (const auto &[i, resType] : llvm::enumerate(resTypes)) {
+            if (isa<MemRefType>(resType)) {
+                MemRefType memrefType = cast<MemRefType>(resType);
+                Value memrefValue = rewriter.create<memref::AllocOp>(loc, memrefType, gradSize);
+                memrefValues.push_back(memrefValue);
+            }
+            else {
+                nonTensorResultTypes.push_back(adjointOp->getResultTypes()[i]);
+                nonTensorResultIndices.push_back(i);
+            }
         }
 
         SmallVector<Value> bufferArgs;
@@ -217,9 +225,26 @@ struct AdjointOpInterface
             }
         }
 
-        rewriter.create<AdjointOp>(loc, TypeRange{}, adjointOp.getCalleeAttr(),
-                                   adjointOp.getGradSize(), bufferArgs, memrefValues);
-        bufferization::replaceOpWithBufferizedValues(rewriter, op, memrefValues);
+        auto newAdjointOp =
+            rewriter.create<AdjointOp>(loc, nonTensorResultTypes, adjointOp.getCalleeAttr(),
+                                       adjointOp.getGradSize(), bufferArgs, memrefValues);
+        SmallVector<Value> bufferdNewValues;
+        size_t nonTensorResultCounter = 0;
+        size_t tensorResultCounter = 0;
+        for (size_t i = 0; i < adjointOp->getNumResults(); i++) {
+            if (std::find(nonTensorResultIndices.begin(), nonTensorResultIndices.end(), i) !=
+                nonTensorResultIndices.end()) {
+                // a non tensor result, just use the Value
+                bufferdNewValues.push_back(newAdjointOp->getResult(nonTensorResultCounter));
+                nonTensorResultCounter++;
+            }
+            else {
+                // a tensor result, use the buffer
+                bufferdNewValues.push_back(memrefValues[tensorResultCounter]);
+                tensorResultCounter++;
+            }
+        }
+        bufferization::replaceOpWithBufferizedValues(rewriter, op, bufferdNewValues);
         return success();
     }
 };
@@ -358,7 +383,6 @@ struct BackpropOpInterface
 struct ForwardOpInterface
     : public bufferization::OpWithUnstructuredControlFlowBufferizableOpInterfaceExternalModel<
           ForwardOpInterface, ForwardOp> {
-
     bool hasTensorSemantics(Operation *op) const
     {
         auto isaTensor = llvm::IsaPred<TensorType>;
@@ -484,7 +508,6 @@ struct ForwardOpInterface
 struct ReverseOpInterface
     : public bufferization::OpWithUnstructuredControlFlowBufferizableOpInterfaceExternalModel<
           ReverseOpInterface, ReverseOp> {
-
     bool hasTensorSemantics(Operation *op) const
     {
         auto isaTensor = llvm::IsaPred<TensorType>;
