@@ -359,7 +359,6 @@ struct BackpropOpInterface
 struct ForwardOpInterface
     : public bufferization::OpWithUnstructuredControlFlowBufferizableOpInterfaceExternalModel<
           ForwardOpInterface, ForwardOp> {
-    static bool supportsUnstructuredControlFlow() { return false; }
 
     bool hasTensorSemantics(Operation *op) const
     {
@@ -486,7 +485,6 @@ struct ForwardOpInterface
 struct ReverseOpInterface
     : public bufferization::OpWithUnstructuredControlFlowBufferizableOpInterfaceExternalModel<
           ReverseOpInterface, ReverseOp> {
-    static bool supportsUnstructuredControlFlow() { return false; }
 
     bool hasTensorSemantics(Operation *op) const
     {
@@ -519,8 +517,9 @@ struct ReverseOpInterface
         auto bbArg = cast<BlockArgument>(value);
 
         // Function arguments are special.
-        if (bbArg.getOwner() == &reverseOp.getBody().front())
+        if (bbArg.getOwner() == &reverseOp.getBody().front()) {
             return getBufferizedFunctionArgType(reverseOp, bbArg.getArgNumber(), options);
+        }
 
         return OpWithUnstructuredControlFlowBufferizableOpInterfaceExternalModel::getBufferType(
             op, value, options, invocationStack);
