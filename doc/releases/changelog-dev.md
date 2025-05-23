@@ -2,6 +2,10 @@
 
 <h3>New features since last release</h3>
 
+* Added integration with PennyLane's experimental python compiler based on xDSL.
+  This allows developers and users to write xDSL transformations that can be used with Catalyst.
+  [(#1715)](https://github.com/PennyLaneAI/catalyst/pull/1715)
+
 * A new compilation pass called :func:`~.passes.ppr_to_ppm` has been added to Catalyst
   to decompose Pauli product rotations (PPRs), :math:`\exp(-iP_{\{x, y, z\}} \theta)`, into
   Pauli product measurements (PPMs). Non-Clifford PPR (:math:`\theta = \tfrac{\pi}{8}`) requires
@@ -154,6 +158,9 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* `null.qubit` can now support an optional `track_resources` argument which allows it to record which gates are executed.
+  [(#1619)](https://github.com/PennyLaneAI/catalyst/pull/1619)
+
 * Add an xDSL MLIR plugin to denote whether we will be using xDSL to execute some passes.
   This changelog entry may be moved to new features once all branches are merged together.
   [(#1707)](https://github.com/PennyLaneAI/catalyst/pull/1707)
@@ -240,4 +247,5 @@ Mehrdad Malekmohammadi,
 Anton Naim Ibrahim,
 Erick Ochoa Lopez,
 Ritu Thombre,
-Paul Haochen Wang.
+Paul Haochen Wang,
+Jake Zaia.
