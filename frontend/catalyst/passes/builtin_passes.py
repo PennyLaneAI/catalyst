@@ -694,7 +694,7 @@ def to_ppm(
         qnode (QNode, optional): QNode to apply the pass to. If None, returns a decorator.
         decompose_method (str, optional): The method to use for decomposing non-Clifford PPRs.
             Options are ``"auto-corrected"`` and ``"clifford-corrected"``. Defaults to
-            Defaults to ``"auto-corrected"``.
+            ``"auto-corrected"``.
             ``"auto-corrected"`` uses an additional measurement for correction.
             ``"clifford-corrected"`` uses a Clifford rotation for correction.
         avoid_y_measure (bool): Rather than performing a Pauli-Y measurement for Clifford rotations
@@ -705,14 +705,14 @@ def to_ppm(
 
     Returns:
         ~.QNode or callable: Returns decorated QNode if qnode is provided,
-            otherwise returns a decorator.
+        otherwise returns a decorator.
 
     **Example**
 
     If a merging resulted in a PPM acting on more than
     ``max_pauli_size`` qubits (here, ``max_pauli_size = 2``), that merging would be skipped.
     However, when decomposed into PPMs, at least one qubit will be applied, so the final
-    PPMs will act on at least plus one more qubit.
+    PPMs will act on at least one additional qubit.
 
     .. code-block:: python
 
