@@ -35,7 +35,6 @@
 #include "Gradient/Utils/GradientShape.h"
 
 using namespace mlir;
-using namespace mlir::bufferization;
 using namespace catalyst::gradient;
 
 /**
