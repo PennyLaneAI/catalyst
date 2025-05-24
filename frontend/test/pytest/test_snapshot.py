@@ -74,22 +74,26 @@ class TestSnapshot:
             return qml.state(), qml.probs(), qml.expval(qml.X(0)), qml.var(qml.Z(0))
 
         expected_output = (
-            jnp.array([1.0 + 0.0j, 0.0 + 0.0j], dtype=jnp.complex128),
-            jnp.array([0.0 + 0.0j, 1.0 + 0.0j], dtype=jnp.complex128),
-            jnp.array([0.70710678 + 0.0j, -0.70710678 + 0.0j], dtype=jnp.complex128),
-            jnp.array([7.07106781e-01 + 0.0j, 0.0 - 0.70710678j], dtype=jnp.complex128),
-            jnp.array([7.07106781e-01 + 0.0j, 0.0 + 0.70710678j], dtype=jnp.complex128),
-            jnp.array([0.70710678 + 0.0j, 0.70710678 + 0.0j], dtype=jnp.complex128),
-            jnp.array([0.70710678 + 0.0j, 0.70710678 + 0.0j], dtype=jnp.complex128),
-            jnp.array([0.5, 0.5], dtype=jnp.float64),
-            jnp.array(1.0, dtype=jnp.float64),
-            jnp.array(1, dtype=jnp.float64),
+            [
+                jnp.array([1.0 + 0.0j, 0.0 + 0.0j], dtype=jnp.complex128),
+                jnp.array([0.0 + 0.0j, 1.0 + 0.0j], dtype=jnp.complex128),
+                jnp.array([0.70710678 + 0.0j, -0.70710678 + 0.0j], dtype=jnp.complex128),
+                jnp.array([7.07106781e-01 + 0.0j, 0.0 - 0.70710678j], dtype=jnp.complex128),
+                jnp.array([7.07106781e-01 + 0.0j, 0.0 + 0.70710678j], dtype=jnp.complex128),
+                jnp.array([0.70710678 + 0.0j, 0.70710678 + 0.0j], dtype=jnp.complex128),
+            ],
+            (
+                jnp.array([0.70710678 + 0.0j, 0.70710678 + 0.0j], dtype=jnp.complex128),
+                jnp.array([0.5, 0.5], dtype=jnp.float64),
+                jnp.array(1.0, dtype=jnp.float64),
+                jnp.array(1.0, dtype=jnp.float64),
+            ),
         )
         returned_output = circuit()
         expected_snapshot_states, returned_snapshot_states = expected_output[0], returned_output[0]
         expected_measurement_results, returned_measurement_results = (
-            expected_output[1:],
-            returned_output[1:],
+            expected_output[1],
+            returned_output[1],
         )
         assert all(
             jnp.allclose(expected_snapshot_states[i], returned_snapshot_states[i])
@@ -119,15 +123,22 @@ class TestSnapshot:
             return qml.counts(), qml.sample()
 
         expected_output = (
-            jnp.array([1.0 + 0.0j, 0.0 + 0.0j, 0.0 + 0.0j, 0.0 + 0.0j], dtype=jnp.complex128),
-            jnp.array([0.5 + 0.0j, 0.5 + 0.0j, 0.5 + 0.0j, 0.5 + 0.0j], dtype=jnp.complex128),
-            (jnp.array([0, 1, 2, 3], dtype=jnp.int64), jnp.array([0, 0, 0, 5], dtype=jnp.int64)),
-            jnp.array([[1, 1], [1, 1], [1, 1], [1, 1], [1, 1]], dtype=jnp.int64),
+            [
+                jnp.array([1.0 + 0.0j, 0.0 + 0.0j, 0.0 + 0.0j, 0.0 + 0.0j], dtype=jnp.complex128),
+                jnp.array([0.5 + 0.0j, 0.5 + 0.0j, 0.5 + 0.0j, 0.5 + 0.0j], dtype=jnp.complex128),
+            ],
+            (
+                (
+                    jnp.array([0, 1, 2, 3], dtype=jnp.int64),
+                    jnp.array([0, 0, 0, 5], dtype=jnp.int64),
+                ),
+                jnp.array([[1, 1], [1, 1], [1, 1], [1, 1], [1, 1]], dtype=jnp.int64),
+            ),
         )
         returned_output = circuit()
         expected_snapshot_states, returned_snapshot_states = expected_output[0], returned_output[0]
-        expected_counts, returned_counts = expected_output[1], returned_output[1]
-        expected_samples, returned_samples = expected_output[2], returned_output[2]
+        expected_counts, returned_counts = expected_output[1][0], returned_output[1][0]
+        expected_samples, returned_samples = expected_output[1][1], returned_output[1][1]
         assert all(
             jnp.allclose(expected_snapshot_states[i], returned_snapshot_states[i])
             for i in range(len(returned_snapshot_states))

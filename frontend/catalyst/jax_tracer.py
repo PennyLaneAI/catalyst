@@ -1426,7 +1426,12 @@ def trace_quantum_function(
 
                 meas_tracers = check_full_raise(meas, trace.to_jaxpr_tracer)
                 if len(snapshot_results) > 0:
-                    meas_trees = jax.tree_util.treedef_tuple([tree_structure(snapshot_results), meas_trees])
+                    meas_trees = jax.tree_util.tree_structure(
+                        jax.tree_util.tree_unflatten(meas_trees, meas_tracers)
+                    )
+                    meas_trees = jax.tree_util.treedef_tuple(
+                        [tree_structure(snapshot_results), meas_trees]
+                    )
                     meas_tracers = snapshot_results + meas_tracers
                 meas_results = tree_unflatten(meas_trees, meas_tracers)
 
