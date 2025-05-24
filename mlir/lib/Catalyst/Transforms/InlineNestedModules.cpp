@@ -379,18 +379,14 @@ struct AnnotateWithFullyQualifiedNamePass
     void runOnOperation() override
     {
         MLIRContext *context = &getContext();
-
-        // Do not fold to save in compile time.
         GreedyRewriteConfig config;
-        config.strictMode = GreedyRewriteStrictness::ExistingOps;
-        config.enableRegionSimplification = mlir::GreedySimplifyRegionLevel::Disabled;
 
         RewritePatternSet annotate(context);
         auto root = getOperation();
         auto parent = root->getParentOp();
         annotate.add<AnnotateWithFullyQualifiedName>(context, parent);
 
-        if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(annotate), config))) {
+        if (failed(applyPatternsGreedily(getOperation(), std::move(annotate), config))) {
             signalPassFailure();
         }
     }
@@ -408,9 +404,6 @@ struct InlineNestedSymbolTablePass : PassWrapper<InlineNestedSymbolTablePass, Op
         MLIRContext *context = &getContext();
 
         GreedyRewriteConfig config;
-        config.strictMode = GreedyRewriteStrictness::ExistingOps;
-        config.enableRegionSimplification = mlir::GreedySimplifyRegionLevel::Disabled;
-
         RewritePatternSet renameFunctions(context);
 
         // Get all symbol tables in current symbol table. Will be useful for making sure that
@@ -433,7 +426,7 @@ struct InlineNestedSymbolTablePass : PassWrapper<InlineNestedSymbolTablePass, Op
 
         bool run = _stopAfterStep >= 2 || _stopAfterStep == 0;
         if (run &&
-            failed(applyPatternsAndFoldGreedily(symbolTable, std::move(renameFunctions), config))) {
+            failed(applyPatternsGreedily(symbolTable, std::move(renameFunctions), config))) {
             signalPassFailure();
         }
 
@@ -441,7 +434,7 @@ struct InlineNestedSymbolTablePass : PassWrapper<InlineNestedSymbolTablePass, Op
         inlineNested.add<InlineNestedModule>(context);
         run = _stopAfterStep >= 3 || _stopAfterStep == 0;
         if (run &&
-            failed(applyPatternsAndFoldGreedily(symbolTable, std::move(inlineNested), config))) {
+            failed(applyPatternsGreedily(symbolTable, std::move(inlineNested), config))) {
             signalPassFailure();
         }
 
@@ -468,14 +461,14 @@ struct InlineNestedSymbolTablePass : PassWrapper<InlineNestedSymbolTablePass, Op
             context, &old_to_new);
         run = _stopAfterStep >= 4 || _stopAfterStep == 0;
         if (run &&
-            failed(applyPatternsAndFoldGreedily(symbolTable, std::move(nestedToFlat), config))) {
+            failed(applyPatternsGreedily(symbolTable, std::move(nestedToFlat), config))) {
             signalPassFailure();
         }
 
         RewritePatternSet cleanup(context);
         cleanup.add<CleanupPattern>(context);
         run = _stopAfterStep >= 5 || _stopAfterStep == 0;
-        if (run && failed(applyPatternsAndFoldGreedily(symbolTable, std::move(cleanup), config))) {
+        if (run && failed(applyPatternsGreedily(symbolTable, std::move(cleanup), config))) {
             signalPassFailure();
         }
     }

@@ -1,0 +1,107 @@
+diff -ruN mlir-hlo/bindings/c/CMakeLists.txt mlir-hlo_no_patch/bindings/c/CMakeLists.txt
+--- mlir-hlo/bindings/c/CMakeLists.txt	2025-05-22 17:39:52.674922859 -0400
++++ mlir-hlo_no_patch/bindings/c/CMakeLists.txt	2025-05-22 17:39:45.931006469 -0400
+@@ -10,7 +10,6 @@
+   MhloPasses
+   MhloToArithmeticConversion
+   MhloToMemrefConversion
+-  MhloToStandard
+   MhloToLinalg
+   MhloToStablehlo
+   StablehloToMhlo
+diff -ruN mlir-hlo/stablehlo_ext/analysis/CMakeLists.txt mlir-hlo_no_patch/stablehlo_ext/analysis/CMakeLists.txt
+--- mlir-hlo/stablehlo_ext/analysis/CMakeLists.txt	2025-05-22 17:39:52.674922859 -0400
++++ mlir-hlo_no_patch/stablehlo_ext/analysis/CMakeLists.txt	2025-05-22 17:39:46.150003753 -0400
+@@ -1,5 +1,6 @@
+ add_mlir_library(MhloAnalysis
+-  shape_component_analysis.cc
++  shape_component_analysis.cpp
++  PARTIAL_SOURCES_INTENDED
+ 
+   DEPENDS
+   mlir-headers
+diff -ruN mlir-hlo/stablehlo_ext/CMakeLists.txt mlir-hlo_no_patch/stablehlo_ext/CMakeLists.txt
+--- mlir-hlo/stablehlo_ext/CMakeLists.txt	2025-05-22 17:39:52.674922859 -0400
++++ mlir-hlo_no_patch/stablehlo_ext/CMakeLists.txt	2025-05-22 17:39:46.150003753 -0400
+@@ -12,5 +12,6 @@
+ # See the License for the specific language governing permissions and
+ # limitations under the License.
+ 
++add_subdirectory(analysis)
+ add_subdirectory(IR)
+ add_subdirectory(transforms)
+diff -ruN mlir-hlo/stablehlo_ext/transforms/CMakeLists.txt mlir-hlo_no_patch/stablehlo_ext/transforms/CMakeLists.txt
+--- mlir-hlo/stablehlo_ext/transforms/CMakeLists.txt	2025-05-22 17:39:52.674922859 -0400
++++ mlir-hlo_no_patch/stablehlo_ext/transforms/CMakeLists.txt	2025-05-22 17:39:46.150003753 -0400
+@@ -20,9 +20,14 @@
+   PARTIAL_SOURCES_INTENDED
+   chlo_recompose_ops.cpp
+   chlo_preserve_high_level_ops.cpp
++  sink_constants_to_control_flow.cpp
++  stablehlo_add_quant_dequant_conv.cpp
+   stablehlo_canonicalize_dynamism.cpp
++  stablehlo_canonicalize_from_hlo_import.cpp
++  stablehlo_legalize_quant_composite.cpp
++  stablehlo_prepare_for_hlo_export.cpp
+   stablehlo_refine_shapes.cpp
+-  sdy_refine_shapes.cpp
++  symbolic_shape_optimization.cpp
+ 
+   DEPENDS
+   StablehloExtensionPassesIncGen
+diff -ruN mlir-hlo/stablehlo_ext/transforms/stablehlo_refine_shapes.cpp mlir-hlo_no_patch/stablehlo_ext/transforms/stablehlo_refine_shapes.cpp
+--- mlir-hlo/stablehlo_ext/transforms/stablehlo_refine_shapes.cpp	2025-05-22 17:39:52.674922859 -0400
++++ mlir-hlo_no_patch/stablehlo_ext/transforms/stablehlo_refine_shapes.cpp	2025-05-22 17:39:46.150003753 -0400
+@@ -34,7 +34,6 @@
+ #include "stablehlo_ext/IR/base.h"
+ #include "stablehlo_ext/IR/stablehlo_ops.h"
+ #include "stablehlo_ext/transforms/passes.h"  // NOLINT: Used in passes.h.inc
+-#include "stablehlo_ext/transforms/sdy_refine_shapes.h"
+ 
+ namespace mlir {
+ namespace stablehlo_ext {
+@@ -154,7 +153,6 @@
+           patterns->add<RefineDynamicReduceWindowOpPattern>(context);
+           patterns->add<RefineDynamicRngBitGeneratorOpPattern>(context);
+           patterns->add<RefineDynamicTopKOpPattern>(context);
+-          populateSdyShapeRefinementPatterns(patterns, context);
+         };
+ 
+     if (failed(stablehlo::refineEntryFunction(*context, func,
+@@ -172,7 +170,6 @@
+   patterns->add<RefineDynamicReduceWindowOpPattern>(context);
+   patterns->add<RefineDynamicRngBitGeneratorOpPattern>(context);
+   patterns->add<RefineDynamicTopKOpPattern>(context);
+-  populateSdyShapeRefinementPatterns(patterns, context);
+ }
+ 
+ }  // namespace stablehlo_ext
+diff -ruN mlir-hlo/tests/lit.cfg.py mlir-hlo_no_patch/tests/lit.cfg.py
+--- mlir-hlo/tests/lit.cfg.py	2025-05-22 17:39:52.674922859 -0400
++++ mlir-hlo_no_patch/tests/lit.cfg.py	2025-05-22 17:39:45.989005749 -0400
+@@ -32,6 +32,7 @@
+ 
+ # suffixes: A list of file extensions to treat as test files.
+ config.suffixes = ['.mlir']
++config.excludes = ['sdy_refine_shapes.mlir']
+ 
+ # test_source_root: The root path where tests are located.
+ config.test_source_root = os.path.dirname(__file__)
+diff -ruN mlir-hlo/tools/mlir-hlo-opt/mlir-hlo-opt.cc mlir-hlo_no_patch/tools/mlir-hlo-opt/mlir-hlo-opt.cc
+--- mlir-hlo/tools/mlir-hlo-opt/mlir-hlo-opt.cc	2025-05-22 17:39:52.674922859 -0400
++++ mlir-hlo_no_patch/tools/mlir-hlo-opt/mlir-hlo-opt.cc	2025-05-22 17:39:45.991005725 -0400
+@@ -20,7 +20,6 @@
+ #include "mlir/InitAllExtensions.h"
+ #include "mlir/InitAllPasses.h"
+ #include "mlir/Tools/mlir-opt/MlirOptMain.h"
+-#include "shardy/dialect/sdy/ir/dialect.h"
+ #include "stablehlo/dialect/Register.h"
+ #include "stablehlo_ext/transforms/passes.h"
+ #include "transforms/gpu_passes.h"
+@@ -41,6 +40,5 @@
+   registerAllExtensions(registry);
+   mhlo::registerAllMhloDialects(registry);
+   stablehlo::registerAllDialects(registry);
+-  registry.insert<mlir::sdy::SdyDialect>();
+   return failed(MlirOptMain(argc, argv, "MLIR HLO pass driver\n", registry));
+ }

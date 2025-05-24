@@ -113,8 +113,8 @@ LogicalResult DetectCallsInAsyncRegionsTransform::matchAndRewrite(LLVM::CallOp c
 struct AddExceptionHandlingTransform : public OpRewritePattern<LLVM::CallOp> {
     using OpRewritePattern<LLVM::CallOp>::OpRewritePattern;
 
-    LogicalResult match(LLVM::CallOp op) const override;
-    void rewrite(LLVM::CallOp op, PatternRewriter &rewriter) const override;
+    LogicalResult match(LLVM::CallOp op) const;
+    void rewrite(LLVM::CallOp op, PatternRewriter &rewriter) const;
 };
 
 /* Here we only match with calls that have the { catalyst.preInvoke } annotations.
@@ -264,8 +264,8 @@ void AddExceptionHandlingTransform::rewrite(LLVM::CallOp callOp, PatternRewriter
 struct RemoveAbortAndPutsInsertCallTransform : public OpRewritePattern<LLVM::CallOp> {
     using OpRewritePattern<LLVM::CallOp>::OpRewritePattern;
 
-    LogicalResult match(LLVM::CallOp op) const override;
-    void rewrite(LLVM::CallOp op, PatternRewriter &rewriter) const override;
+    LogicalResult match(LLVM::CallOp op) const;
+    void rewrite(LLVM::CallOp op, PatternRewriter &rewriter) const;
 };
 
 // In this pattern we are looking for function calls to functions annotated
@@ -450,8 +450,8 @@ void RemoveAbortAndPutsInsertCallTransform::rewrite(LLVM::CallOp callOp,
 struct LivenessAnalysisDropRef : public OpRewritePattern<LLVM::CallOp> {
     using OpRewritePattern<LLVM::CallOp>::OpRewritePattern;
 
-    LogicalResult match(LLVM::CallOp op) const override;
-    void rewrite(LLVM::CallOp op, PatternRewriter &rewriter) const override;
+    LogicalResult match(LLVM::CallOp op) const;
+    void rewrite(LLVM::CallOp op, PatternRewriter &rewriter) const;
 };
 
 LogicalResult LivenessAnalysisDropRef::match(LLVM::CallOp op) const
@@ -924,10 +924,8 @@ struct AddExceptionHandlingPass : impl::AddExceptionHandlingPassBase<AddExceptio
         patterns1.add<DetectCallsInAsyncRegionsTransform>(context);
 
         GreedyRewriteConfig config;
-        config.strictMode = GreedyRewriteStrictness::ExistingOps;
-        config.enableRegionSimplification = mlir::GreedySimplifyRegionLevel::Disabled;
 
-        if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns1), config))) {
+        if (failed(applyPatternsGreedily(getOperation(), std::move(patterns1), config))) {
             signalPassFailure();
         }
 
@@ -937,7 +935,7 @@ struct AddExceptionHandlingPass : impl::AddExceptionHandlingPassBase<AddExceptio
 
         RewritePatternSet patterns2(context);
         patterns2.add<AddExceptionHandlingTransform>(context);
-        if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns2), config))) {
+        if (failed(applyPatternsGreedily(getOperation(), std::move(patterns2), config))) {
             signalPassFailure();
         }
 
@@ -947,7 +945,7 @@ struct AddExceptionHandlingPass : impl::AddExceptionHandlingPassBase<AddExceptio
 
         RewritePatternSet patterns3(context);
         patterns3.add<RemoveAbortAndPutsInsertCallTransform>(context);
-        if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns3), config))) {
+        if (failed(applyPatternsGreedily(getOperation(), std::move(patterns3), config))) {
             signalPassFailure();
         }
 
@@ -957,7 +955,7 @@ struct AddExceptionHandlingPass : impl::AddExceptionHandlingPassBase<AddExceptio
 
         RewritePatternSet patterns4(context);
         patterns4.add<LivenessAnalysisDropRef>(context);
-        if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns4), config))) {
+        if (failed(applyPatternsGreedily(getOperation(), std::move(patterns4), config))) {
             signalPassFailure();
         }
 
@@ -967,7 +965,7 @@ struct AddExceptionHandlingPass : impl::AddExceptionHandlingPassBase<AddExceptio
 
         RewritePatternSet patterns5(context);
         patterns5.add<CleanUpSourceTransform, BranchToUnreachableTransform>(context);
-        if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns5), config))) {
+        if (failed(applyPatternsGreedily(getOperation(), std::move(patterns5), config))) {
             signalPassFailure();
         }
     }

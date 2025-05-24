@@ -201,7 +201,7 @@ struct CopyGlobalMemRefPass : impl::CopyGlobalMemRefPassBase<CopyGlobalMemRefPas
         RewritePatternSet patterns(context);
         patterns.add<CopyGlobalMemRefTransform>(context);
 
-        if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
+        if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
             signalPassFailure();
         }
     }

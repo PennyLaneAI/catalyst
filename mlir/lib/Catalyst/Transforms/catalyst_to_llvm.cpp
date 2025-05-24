@@ -435,14 +435,14 @@ struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
 struct DefineCallbackOpPattern : public OpConversionPattern<CallbackOp> {
     using OpConversionPattern::OpConversionPattern;
 
-    LogicalResult match(CallbackOp op) const override
+    LogicalResult match(CallbackOp op) const
     {
         // Only match with ops without an entry block
         return !op.empty() ? failure() : success();
     }
 
     void rewrite(CallbackOp op, CallbackOpAdaptor adaptor,
-                 ConversionPatternRewriter &rewriter) const override
+                 ConversionPatternRewriter &rewriter) const
     {
         Block *entry;
         rewriter.modifyOpInPlace(op, [&] { entry = op.addEntryBlock(); });
@@ -489,13 +489,13 @@ struct DefineCallbackOpPattern : public OpConversionPattern<CallbackOp> {
 struct ReplaceCallbackOpWithFuncOp : public OpConversionPattern<CallbackOp> {
     using OpConversionPattern::OpConversionPattern;
 
-    LogicalResult match(CallbackOp op) const override
+    LogicalResult match(CallbackOp op) const
     {
         // Only match with ops with an entry block
         return !op.empty() ? success() : failure();
     }
     void rewrite(CallbackOp op, CallbackOpAdaptor adaptor,
-                 ConversionPatternRewriter &rewriter) const override
+                 ConversionPatternRewriter &rewriter) const
     {
         ModuleOp mod = op->getParentOfType<ModuleOp>();
         rewriter.setInsertionPointToStart(mod.getBody());
@@ -541,7 +541,7 @@ struct CallbackCallOpPattern : public OpConversionPattern<CallbackCallOp> {
 struct CustomGradOpPattern : public OpConversionPattern<gradient::CustomGradOp> {
     using OpConversionPattern::OpConversionPattern;
 
-    LogicalResult match(gradient::CustomGradOp op) const override
+    LogicalResult match(gradient::CustomGradOp op) const
     {
         // only match after all three are func.func
         auto callee = op.getCalleeAttr();
@@ -556,7 +556,7 @@ struct CustomGradOpPattern : public OpConversionPattern<gradient::CustomGradOp> 
     }
 
     void rewrite(gradient::CustomGradOp op, gradient::CustomGradOpAdaptor adaptor,
-                 ConversionPatternRewriter &rewriter) const override
+                 ConversionPatternRewriter &rewriter) const
     {
         auto loc = op.getLoc();
         ModuleOp mod = op->getParentOfType<ModuleOp>();

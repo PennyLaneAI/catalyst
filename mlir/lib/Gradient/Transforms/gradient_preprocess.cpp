@@ -42,7 +42,7 @@ struct GradientPreprocessingPass : impl::GradientPreprocessingPassBase<GradientP
         RewritePatternSet patterns(&getContext());
         populatePreprocessingPatterns(patterns);
 
-        if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
+        if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
             return signalPassFailure();
         }
     }

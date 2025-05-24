@@ -44,7 +44,7 @@ struct MitigationLoweringPass : impl::MitigationLoweringPassBase<MitigationLower
         RewritePatternSet mitigationPatterns(&getContext());
         populateLoweringPatterns(mitigationPatterns);
 
-        if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(mitigationPatterns)))) {
+        if (failed(applyPatternsGreedily(getOperation(), std::move(mitigationPatterns)))) {
             return signalPassFailure();
         }
     }
