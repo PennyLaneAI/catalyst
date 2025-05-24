@@ -48,7 +48,7 @@ func.func @simple_circuit(%arg0: tensor<3xf64>) -> f64 attributes {qnode, diff_m
     // CHECK-NOT: quantum.custom
     %q_1 = quantum.custom "h"() %q_0 : !quantum.bit
 
-    // CHECK: [[sel:%[a-zA-Z0-9_]+]] = bufferization.to_tensor [[selBuff]]
+    // CHECK: [[sel:%[a-zA-Z0-9_]+]] = bufferization.to_tensor [[selBuff]] restrict
     // CHECK: [[epos:%[a-zA-Z0-9_]+]] = call @simple_circuit.shifted(%arg0, [[shift0pos]], [[sel]])
     // CHECK: [[eneg:%[a-zA-Z0-9_]+]] = call @simple_circuit.shifted(%arg0, [[shift0neg]], [[sel]])
     // CHECK: [[diff:%[a-zA-Z0-9_]+]] = arith.subf [[epos]], [[eneg]]
@@ -61,7 +61,7 @@ func.func @simple_circuit(%arg0: tensor<3xf64>) -> f64 attributes {qnode, diff_m
     // CHECK-NOT: quantum.custom
     %q_2 = quantum.custom "rz"(%f0) %q_1 : !quantum.bit
 
-    // CHECK: [[sel:%[a-zA-Z0-9_]+]] = bufferization.to_tensor [[selBuff]]
+    // CHECK: [[sel:%[a-zA-Z0-9_]+]] = bufferization.to_tensor [[selBuff]] restrict
     // CHECK: [[epos:%[a-zA-Z0-9_]+]] = call @simple_circuit.shifted(%arg0, [[shift1pos]], [[sel]])
     // CHECK: [[eneg:%[a-zA-Z0-9_]+]] = call @simple_circuit.shifted(%arg0, [[shift1neg]], [[sel]])
     // CHECK: [[diff:%[a-zA-Z0-9_]+]] = arith.subf [[epos]], [[eneg]]
@@ -71,7 +71,7 @@ func.func @simple_circuit(%arg0: tensor<3xf64>) -> f64 attributes {qnode, diff_m
     // CHECK: [[newIdx:%[a-zA-Z0-9_]+]] = index.add [[idx]], [[c1]]
     // CHECK: memref.store [[newIdx]], [[gradIdx]]
     //
-    // CHECK: [[sel:%[a-zA-Z0-9_]+]] = bufferization.to_tensor [[selBuff]]
+    // CHECK: [[sel:%[a-zA-Z0-9_]+]] = bufferization.to_tensor [[selBuff]] restrict
     // CHECK: [[epos:%[a-zA-Z0-9_]+]] = call @simple_circuit.shifted(%arg0, [[shift2pos]], [[sel]])
     // CHECK: [[eneg:%[a-zA-Z0-9_]+]] = call @simple_circuit.shifted(%arg0, [[shift2neg]], [[sel]])
     // CHECK: [[diff:%[a-zA-Z0-9_]+]] = arith.subf [[epos]], [[eneg]]
@@ -81,7 +81,7 @@ func.func @simple_circuit(%arg0: tensor<3xf64>) -> f64 attributes {qnode, diff_m
     // CHECK: [[newIdx:%[a-zA-Z0-9_]+]] = index.add [[idx]], [[c1]]
     // CHECK: memref.store [[newIdx]], [[gradIdx]]
     //
-    // CHECK: [[sel:%[a-zA-Z0-9_]+]] = bufferization.to_tensor [[selBuff]]
+    // CHECK: [[sel:%[a-zA-Z0-9_]+]] = bufferization.to_tensor [[selBuff]] restrict
     // CHECK: [[epos:%[a-zA-Z0-9_]+]] = call @simple_circuit.shifted(%arg0, [[shift3pos]], [[sel]])
     // CHECK: [[eneg:%[a-zA-Z0-9_]+]] = call @simple_circuit.shifted(%arg0, [[shift3neg]], [[sel]])
     // CHECK: [[diff:%[a-zA-Z0-9_]+]] = arith.subf [[epos]], [[eneg]]
@@ -96,7 +96,7 @@ func.func @simple_circuit(%arg0: tensor<3xf64>) -> f64 attributes {qnode, diff_m
     %obs = quantum.namedobs %q_3[PauliX] : !quantum.obs
     %expval = quantum.expval %obs : f64
 
-    // CHECK: [[ret:%[a-zA-Z0-9_]+]] = bufferization.to_tensor [[grad]]
+    // CHECK: [[ret:%[a-zA-Z0-9_]+]] = bufferization.to_tensor [[grad]] restrict
     // CHECK: return [[ret]] : tensor<?xf64>
     func.return %expval : f64
 }
@@ -136,7 +136,7 @@ func.func @structured_circuit(%arg0: f64, %arg1: i1, %arg2: i1) -> f64 attribute
     // CHECK-NOT: quantum.extract
     %q_0 = quantum.extract %r[%idx] : !quantum.reg -> !quantum.bit
 
-    // CHECK: [[sel:%[a-zA-Z0-9_]+]] = bufferization.to_tensor [[selBuff]]
+    // CHECK: [[sel:%[a-zA-Z0-9_]+]] = bufferization.to_tensor [[selBuff]] restrict
     // CHECK: [[epos:%[a-zA-Z0-9_]+]] = call @structured_circuit.shifted(%arg0, %arg1, %arg2, [[shift0pos]], [[sel]])
     // CHECK: [[eneg:%[a-zA-Z0-9_]+]] = call @structured_circuit.shifted(%arg0, %arg1, %arg2, [[shift0neg]], [[sel]])
     // CHECK: [[diff:%[a-zA-Z0-9_]+]] = arith.subf [[epos]], [[eneg]]
@@ -151,7 +151,7 @@ func.func @structured_circuit(%arg0: f64, %arg1: i1, %arg2: i1) -> f64 attribute
 
     // CHECK: scf.if %arg1
     %q_2 = scf.if %arg1 -> !quantum.bit {
-        // CHECK: [[sel:%[a-zA-Z0-9_]+]] = bufferization.to_tensor [[selBuff]]
+        // CHECK: [[sel:%[a-zA-Z0-9_]+]] = bufferization.to_tensor [[selBuff]] restrict
         // CHECK: [[epos:%[a-zA-Z0-9_]+]] = func.call @structured_circuit.shifted(%arg0, %true, %arg2, [[shift1pos]], [[sel]])
         // CHECK: [[eneg:%[a-zA-Z0-9_]+]] = func.call @structured_circuit.shifted(%arg0, %true, %arg2, [[shift1neg]], [[sel]])
         // CHECK: [[diff:%[a-zA-Z0-9_]+]] = arith.subf [[epos]], [[eneg]]
@@ -166,7 +166,7 @@ func.func @structured_circuit(%arg0: f64, %arg1: i1, %arg2: i1) -> f64 attribute
 
         // CHECK: scf.if %arg2
         %q_1_1 = scf.if %arg2 -> !quantum.bit {
-            // CHECK: [[sel:%[a-zA-Z0-9_]+]] = bufferization.to_tensor [[selBuff]]
+            // CHECK: [[sel:%[a-zA-Z0-9_]+]] = bufferization.to_tensor [[selBuff]] restrict
             // CHECK: [[epos:%[a-zA-Z0-9_]+]] = func.call @structured_circuit.shifted(%arg0, %true, %true, [[shift2pos]], [[sel]])
             // CHECK: [[eneg:%[a-zA-Z0-9_]+]] = func.call @structured_circuit.shifted(%arg0, %true, %true, [[shift2neg]], [[sel]])
             // CHECK: [[diff:%[a-zA-Z0-9_]+]] = arith.subf [[epos]], [[eneg]]
@@ -181,7 +181,7 @@ func.func @structured_circuit(%arg0: f64, %arg1: i1, %arg2: i1) -> f64 attribute
             scf.yield %q_1_0_0 : !quantum.bit
         // CHECK: else
         } else {
-            // CHECK: [[sel:%[a-zA-Z0-9_]+]] = bufferization.to_tensor [[selBuff]]
+            // CHECK: [[sel:%[a-zA-Z0-9_]+]] = bufferization.to_tensor [[selBuff]] restrict
             // CHECK: [[epos:%[a-zA-Z0-9_]+]] = func.call @structured_circuit.shifted(%arg0, %true, %false, [[shift3pos]], [[sel]])
             // CHECK: [[eneg:%[a-zA-Z0-9_]+]] = func.call @structured_circuit.shifted(%arg0, %true, %false, [[shift3neg]], [[sel]])
             // CHECK: [[diff:%[a-zA-Z0-9_]+]] = arith.subf [[epos]], [[eneg]]
@@ -193,7 +193,7 @@ func.func @structured_circuit(%arg0: f64, %arg1: i1, %arg2: i1) -> f64 attribute
             //
             // CHECK-NOT: quantum.custom
             %q_1_0_1 = quantum.custom "rz"(%arg0) %q_1_0 : !quantum.bit
-            // CHECK: [[sel:%[a-zA-Z0-9_]+]] = bufferization.to_tensor [[selBuff]]
+            // CHECK: [[sel:%[a-zA-Z0-9_]+]] = bufferization.to_tensor [[selBuff]] restrict
             // CHECK: [[epos:%[a-zA-Z0-9_]+]] = func.call @structured_circuit.shifted(%arg0, %true, %false, [[shift4pos]], [[sel]])
             // CHECK: [[eneg:%[a-zA-Z0-9_]+]] = func.call @structured_circuit.shifted(%arg0, %true, %false, [[shift4neg]], [[sel]])
             // CHECK: [[diff:%[a-zA-Z0-9_]+]] = arith.subf [[epos]], [[eneg]]
@@ -216,7 +216,7 @@ func.func @structured_circuit(%arg0: f64, %arg1: i1, %arg2: i1) -> f64 attribute
     cf.br ^exit
 
   ^exit:
-    // CHECK: [[sel:%[a-zA-Z0-9_]+]] = bufferization.to_tensor [[selBuff]]
+    // CHECK: [[sel:%[a-zA-Z0-9_]+]] = bufferization.to_tensor [[selBuff]] restrict
     // CHECK: [[epos:%[a-zA-Z0-9_]+]] = call @structured_circuit.shifted(%arg0, %arg1, %arg2, [[shift5pos]], [[sel]])
     // CHECK: [[eneg:%[a-zA-Z0-9_]+]] = call @structured_circuit.shifted(%arg0, %arg1, %arg2, [[shift5neg]], [[sel]])
     // CHECK: [[diff:%[a-zA-Z0-9_]+]] = arith.subf [[epos]], [[eneg]]
@@ -231,7 +231,7 @@ func.func @structured_circuit(%arg0: f64, %arg1: i1, %arg2: i1) -> f64 attribute
     %obs = quantum.namedobs %q_3[PauliX] : !quantum.obs
     %expval = quantum.expval %obs : f64
 
-    // CHECK: [[ret:%[a-zA-Z0-9_]+]] = bufferization.to_tensor [[grad]]
+    // CHECK: [[ret:%[a-zA-Z0-9_]+]] = bufferization.to_tensor [[grad]] restrict
     // CHECK: return [[ret]] : tensor<?xf64>
     func.return %expval : f64
 }
@@ -267,7 +267,7 @@ func.func @loop_circuit(%arg0: f64) -> f64 attributes {qnode, diff_method = "par
     // CHECK-NOT: quantum.extract
     %q_0 = quantum.extract %r[%idx] : !quantum.reg -> !quantum.bit
 
-    // CHECK: [[sel:%[a-zA-Z0-9_]+]] = bufferization.to_tensor [[selBuff]]
+    // CHECK: [[sel:%[a-zA-Z0-9_]+]] = bufferization.to_tensor [[selBuff]] restrict
     // CHECK: [[epos:%[a-zA-Z0-9_]+]] = call @loop_circuit.shifted(%arg0, [[shift0pos]], [[sel]])
     // CHECK: [[eneg:%[a-zA-Z0-9_]+]] = call @loop_circuit.shifted(%arg0, [[shift0neg]], [[sel]])
     // CHECK: [[diff:%[a-zA-Z0-9_]+]] = arith.subf [[epos]], [[eneg]]
@@ -288,7 +288,7 @@ func.func @loop_circuit(%arg0: f64) -> f64 attributes {qnode, diff_method = "par
     %q_2 = scf.for %i = %lb to %ub step %st iter_args(%q_1_0 = %q_1) -> !quantum.bit {
         // CHECK: memref.store [[i]], [[selBuff]][[[c0]]]
 
-        // CHECK: [[sel:%[a-zA-Z0-9_]+]] = bufferization.to_tensor [[selBuff]]
+        // CHECK: [[sel:%[a-zA-Z0-9_]+]] = bufferization.to_tensor [[selBuff]] restrict
         // CHECK: [[epos:%[a-zA-Z0-9_]+]] = func.call @loop_circuit.shifted(%arg0, [[shift1pos]], [[sel]])
         // CHECK: [[eneg:%[a-zA-Z0-9_]+]] = func.call @loop_circuit.shifted(%arg0, [[shift1neg]], [[sel]])
         // CHECK: [[diff:%[a-zA-Z0-9_]+]] = arith.subf [[epos]], [[eneg]]
@@ -308,7 +308,7 @@ func.func @loop_circuit(%arg0: f64) -> f64 attributes {qnode, diff_method = "par
     %q_3 = scf.for %j = %lb to %ub step %st iter_args(%q_2_0 = %q_2) -> !quantum.bit {
         // CHECK: memref.store [[j]], [[selBuff]][[[c0]]]
 
-        // CHECK: [[sel:%[a-zA-Z0-9_]+]] = bufferization.to_tensor [[selBuff]]
+        // CHECK: [[sel:%[a-zA-Z0-9_]+]] = bufferization.to_tensor [[selBuff]] restrict
         // CHECK: [[epos:%[a-zA-Z0-9_]+]] = func.call @loop_circuit.shifted(%arg0, [[shift2pos]], [[sel]])
         // CHECK: [[eneg:%[a-zA-Z0-9_]+]] = func.call @loop_circuit.shifted(%arg0, [[shift2neg]], [[sel]])
         // CHECK: [[diff:%[a-zA-Z0-9_]+]] = arith.subf [[epos]], [[eneg]]
@@ -325,7 +325,7 @@ func.func @loop_circuit(%arg0: f64) -> f64 attributes {qnode, diff_method = "par
         %q_1_1 = scf.for %k = %j to %ub step %st iter_args(%q_2_1_0 = %q_2_1) -> !quantum.bit {
             // CHECK: memref.store [[k]], [[selBuff]][[[c1]]]
 
-            // CHECK: [[sel:%[a-zA-Z0-9_]+]] = bufferization.to_tensor [[selBuff]]
+            // CHECK: [[sel:%[a-zA-Z0-9_]+]] = bufferization.to_tensor [[selBuff]] restrict
             // CHECK: [[epos:%[a-zA-Z0-9_]+]] = func.call @loop_circuit.shifted(%arg0, [[shift3pos]], [[sel]])
             // CHECK: [[eneg:%[a-zA-Z0-9_]+]] = func.call @loop_circuit.shifted(%arg0, [[shift3neg]], [[sel]])
             // CHECK: [[diff:%[a-zA-Z0-9_]+]] = arith.subf [[epos]], [[eneg]]
@@ -346,7 +346,7 @@ func.func @loop_circuit(%arg0: f64) -> f64 attributes {qnode, diff_method = "par
     %obs = quantum.namedobs %q_3[PauliX] : !quantum.obs
     %expval = quantum.expval %obs : f64
 
-    // CHECK: [[ret:%[a-zA-Z0-9_]+]] = bufferization.to_tensor [[grad]]
+    // CHECK: [[ret:%[a-zA-Z0-9_]+]] = bufferization.to_tensor [[grad]] restrict
     // CHECK: return [[ret]] : tensor<?xf64>
     func.return %expval : f64
 }
@@ -376,7 +376,7 @@ func.func @tensor_circuit(%arg0: f64) -> tensor<2x3xf64> attributes {qnode, diff
     // CHECK-NOT: quantum.extract
     %q_0 = quantum.extract %r[%idx] : !quantum.reg -> !quantum.bit
 
-    // CHECK: [[sel:%[a-zA-Z0-9_]+]] = bufferization.to_tensor [[selBuff]]
+    // CHECK: [[sel:%[a-zA-Z0-9_]+]] = bufferization.to_tensor [[selBuff]] restrict
     // CHECK: [[epos:%[a-zA-Z0-9_]+]] = call @tensor_circuit.shifted(%arg0, [[shift0pos]], [[sel]])
     // CHECK: [[eneg:%[a-zA-Z0-9_]+]] = call @tensor_circuit.shifted(%arg0, [[shift0neg]], [[sel]])
     // CHECK: [[diff:%[a-zA-Z0-9_]+]] = arith.subf [[epos]], [[eneg]]
@@ -392,7 +392,7 @@ func.func @tensor_circuit(%arg0: f64) -> tensor<2x3xf64> attributes {qnode, diff
     %obs = quantum.namedobs %q_1[PauliX] : !quantum.obs
     %expval = quantum.expval %obs : f64
 
-    // CHECK: [[ret:%[a-zA-Z0-9_]+]] = bufferization.to_tensor [[grad]]
+    // CHECK: [[ret:%[a-zA-Z0-9_]+]] = bufferization.to_tensor [[grad]] restrict
     // CHECK: return [[ret]] : tensor<?x2x3xf64>
     %res = tensor.from_elements %expval, %expval, %expval, %expval, %expval, %expval : tensor<2x3xf64>
     func.return %res : tensor<2x3xf64>
@@ -425,7 +425,7 @@ func.func @multi_res_circuit(%arg0: f64) -> (f64, tensor<2xf64>) attributes {qno
     %r = quantum.alloc(1) : !quantum.reg
     %q_0 = quantum.extract %r[%idx] : !quantum.reg -> !quantum.bit
 
-    // CHECK:         [[SEL:%.+]] = bufferization.to_tensor [[SELBUFF]] : memref<0xindex>
+    // CHECK:         [[SEL:%.+]] = bufferization.to_tensor [[SELBUFF]] restrict : memref<0xindex>
     // CHECK:         [[EVALPOS:%.+]]:2 = call @multi_res_circuit.shifted(%arg0, [[SHIFTPOS]], [[SEL]]) : {{.+}} -> (f64, tensor<2xf64>)
     // CHECK:         [[EVALNEG:%.+]]:2 = call @multi_res_circuit.shifted(%arg0, [[SHIFTNEG]], [[SEL]]) : {{.+}} -> (f64, tensor<2xf64>)
     // CHECK:         [[DIFF0:%.+]] = arith.subf [[EVALPOS]]#0, [[EVALNEG]]#0
@@ -443,8 +443,8 @@ func.func @multi_res_circuit(%arg0: f64) -> (f64, tensor<2xf64>) attributes {qno
     %obs = quantum.namedobs %q_1[PauliX] : !quantum.obs
     %expval = quantum.expval %obs : f64
 
-    // CHECK:         [[RES0:%.+]] = bufferization.to_tensor [[GRAD0]]
-    // CHECK:         [[RES1:%.+]] = bufferization.to_tensor [[GRAD1]]
+    // CHECK:         [[RES0:%.+]] = bufferization.to_tensor [[GRAD0]] restrict
+    // CHECK:         [[RES1:%.+]] = bufferization.to_tensor [[GRAD1]] restrict
     // CHECK:         return [[RES0]], [[RES1]] : tensor<?xf64>, tensor<?x2xf64>
     %res = tensor.from_elements %expval, %expval : tensor<2xf64>
     func.return %arg0, %res : f64, tensor<2xf64>

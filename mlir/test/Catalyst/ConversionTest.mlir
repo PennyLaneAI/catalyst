@@ -147,9 +147,9 @@ module @test1 {
   // CHECK-SAME:)
   func.func private @foo(%arg0: tensor<f64>) -> tensor<f64> {
     // CHECK: [[memref0:%.+]] = bufferization.to_memref [[arg0]]
-    // CHECK: [[struct0:%.+]] = builtin.unrealized_conversion_cast [[memref0]]
     // CHECK: [[ptr0:%.+]] = llvm.alloca {{.*}}
     // CHECK: [[ptr1:%.+]] = llvm.alloca {{.*}}
+    // CHECK: [[struct0:%.+]] = builtin.unrealized_conversion_cast [[memref0]]
 
     // CHECK: [[tensor1:%.+]] = bufferization.alloc_tensor()
     // CHECK: [[memref1:%.+]] = bufferization.to_memref [[tensor1]]

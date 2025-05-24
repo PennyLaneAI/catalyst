@@ -383,7 +383,7 @@ struct AnnotateWithFullyQualifiedNamePass
         // Do not fold to save in compile time.
         GreedyRewriteConfig config;
         config.strictMode = GreedyRewriteStrictness::ExistingOps;
-        config.enableRegionSimplification = false;
+        config.enableRegionSimplification = mlir::GreedySimplifyRegionLevel::Disabled;
 
         RewritePatternSet annotate(context);
         auto root = getOperation();
@@ -409,7 +409,7 @@ struct InlineNestedSymbolTablePass : PassWrapper<InlineNestedSymbolTablePass, Op
 
         GreedyRewriteConfig config;
         config.strictMode = GreedyRewriteStrictness::ExistingOps;
-        config.enableRegionSimplification = false;
+        config.enableRegionSimplification = mlir::GreedySimplifyRegionLevel::Disabled;
 
         RewritePatternSet renameFunctions(context);
 

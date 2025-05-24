@@ -925,7 +925,7 @@ struct AddExceptionHandlingPass : impl::AddExceptionHandlingPassBase<AddExceptio
 
         GreedyRewriteConfig config;
         config.strictMode = GreedyRewriteStrictness::ExistingOps;
-        config.enableRegionSimplification = false;
+        config.enableRegionSimplification = mlir::GreedySimplifyRegionLevel::Disabled;
 
         if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns1), config))) {
             signalPassFailure();
