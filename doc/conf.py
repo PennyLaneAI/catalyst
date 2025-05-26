@@ -139,8 +139,6 @@ extensions = [
 
 intersphinx_mapping = {"pennylane": ("https://docs.pennylane.ai/en/stable/", None)}
 
-copybutton_exclude = '.linenos, .gp, .go'
-copybutton_only_copy_prompt_lines = True
 copybutton_prompt_text = r">>> |\.\.\. |\$ |In \[\d*\]: | {2,5}\.\.\.: | {5,8}: "
 copybutton_prompt_is_regexp = True
 
