@@ -120,12 +120,13 @@ struct AddExceptionHandlingTransform : public OpRewritePattern<LLVM::CallOp> {
  * The reason behind this separation between the previous pattern and this one,
  * is that this pattern can potentially be reused as long as this single annotation is present.
  */
-LogicalResult AddExceptionHandlingTransform::matchAndRewrite(LLVM::CallOp callOp, PatternRewriter &rewriter) const
+LogicalResult AddExceptionHandlingTransform::matchAndRewrite(LLVM::CallOp callOp,
+                                                             PatternRewriter &rewriter) const
 {
     // The following is a valid match
     //     llvm.call @callee() { catalyst.preInvoke }
     bool validCandidate = AsyncUtils::isScheduledForTransformation(callOp);
-    if (!validCandidate){
+    if (!validCandidate) {
         return failure();
     }
 
@@ -274,8 +275,9 @@ struct RemoveAbortAndPutsInsertCallTransform : public OpRewritePattern<LLVM::Cal
 //    %results = call @async_execute_fn()
 //
 // These functions return async values or tokens.
-LogicalResult RemoveAbortAndPutsInsertCallTransform::matchAndRewrite(LLVM::CallOp callOp,
-                                                    PatternRewriter &rewriter) const
+LogicalResult
+RemoveAbortAndPutsInsertCallTransform::matchAndRewrite(LLVM::CallOp callOp,
+                                                       PatternRewriter &rewriter) const
 {
     auto maybeCallee = AsyncUtils::getCalleeSafe(callOp);
     if (!maybeCallee) {
@@ -288,7 +290,6 @@ LogicalResult RemoveAbortAndPutsInsertCallTransform::matchAndRewrite(LLVM::CallO
     if (!hasAttr) {
         return failure();
     }
-
 
     // Here, we are declaring an external function which is available in the Catalyst runtime.
     //     llvm.func @__catalyst__host__rt__unrecoverable_error()
@@ -446,11 +447,12 @@ struct LivenessAnalysisDropRef : public OpRewritePattern<LLVM::CallOp> {
     LogicalResult matchAndRewrite(LLVM::CallOp op, PatternRewriter &rewriter) const override;
 };
 
-LogicalResult LivenessAnalysisDropRef::matchAndRewrite(LLVM::CallOp sink, PatternRewriter &rewriter) const
+LogicalResult LivenessAnalysisDropRef::matchAndRewrite(LLVM::CallOp sink,
+                                                       PatternRewriter &rewriter) const
 {
     // We match on function calls that have the sink attribute.
     //     llvm.call @__catalyst__host__rt__unrecoverable_error() { catalyst.sink }
-    if (!AsyncUtils::isSink(sink)){
+    if (!AsyncUtils::isSink(sink)) {
         return failure();
     }
 

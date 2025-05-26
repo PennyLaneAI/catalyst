@@ -169,13 +169,14 @@ struct CopyGlobalMemRefTransform : public OpRewritePattern<func::FuncOp> {
     LogicalResult matchAndRewrite(func::FuncOp op, PatternRewriter &rewriter) const override;
 };
 
-LogicalResult CopyGlobalMemRefTransform::matchAndRewrite(func::FuncOp op, PatternRewriter &rewriter) const
+LogicalResult CopyGlobalMemRefTransform::matchAndRewrite(func::FuncOp op,
+                                                         PatternRewriter &rewriter) const
 {
     bool isCandidate = hasCWrapperButNoCopyWrapperAttribute(op);
     if (!isCandidate) {
         return failure();
     }
-    if (!hasMemRefReturnTypes(op)){
+    if (!hasMemRefReturnTypes(op)) {
         return failure();
     }
 

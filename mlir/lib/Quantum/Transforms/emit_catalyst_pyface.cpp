@@ -176,9 +176,10 @@ struct EmitCatalystPyInterfaceTransform : public OpRewritePattern<LLVM::LLVMFunc
     LogicalResult matchAndRewrite(LLVM::LLVMFuncOp op, PatternRewriter &rewriter) const override;
 };
 
-LogicalResult EmitCatalystPyInterfaceTransform::matchAndRewrite(LLVM::LLVMFuncOp op, PatternRewriter &rewriter) const
+LogicalResult EmitCatalystPyInterfaceTransform::matchAndRewrite(LLVM::LLVMFuncOp op,
+                                                                PatternRewriter &rewriter) const
 {
-    if (!isFunctionMLIRCWrapper(op)){
+    if (!isFunctionMLIRCWrapper(op)) {
         return failure();
     }
 

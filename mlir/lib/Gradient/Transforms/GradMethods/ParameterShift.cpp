@@ -23,7 +23,8 @@
 namespace catalyst {
 namespace gradient {
 
-LogicalResult ParameterShiftLowering::matchAndRewrite(func::FuncOp op, PatternRewriter &rewriter) const
+LogicalResult ParameterShiftLowering::matchAndRewrite(func::FuncOp op,
+                                                      PatternRewriter &rewriter) const
 {
     if (!(getQNodeDiffMethod(op) == "parameter-shift" && requiresCustomGradient(op))) {
         return failure();

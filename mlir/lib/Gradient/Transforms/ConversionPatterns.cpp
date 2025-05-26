@@ -826,7 +826,7 @@ struct ForwardOpPattern : public ConvertOpToLLVMPattern<ForwardOp> {
     using ConvertOpToLLVMPattern::ConvertOpToLLVMPattern;
 
     LogicalResult matchAndRewrite(ForwardOp op, OpAdaptor adaptor,
-                 ConversionPatternRewriter &rewriter) const override
+                                  ConversionPatternRewriter &rewriter) const override
     {
         // convert all arguments to pointers...
         auto typeConverter = getTypeConverter();
@@ -872,7 +872,7 @@ struct ReverseOpPattern : public ConvertOpToLLVMPattern<ReverseOp> {
     using ConvertOpToLLVMPattern::ConvertOpToLLVMPattern;
 
     LogicalResult matchAndRewrite(ReverseOp op, OpAdaptor adaptor,
-                 ConversionPatternRewriter &rewriter) const override
+                                  ConversionPatternRewriter &rewriter) const override
     {
         auto argc = op.getArgc();
         auto resc = op.getResc();
@@ -996,7 +996,8 @@ struct ReverseOpPattern : public ConvertOpToLLVMPattern<ReverseOp> {
 struct ReturnOpPattern : public ConvertOpToLLVMPattern<ReturnOp> {
     using ConvertOpToLLVMPattern::ConvertOpToLLVMPattern;
 
-    LogicalResult matchAndRewrite(ReturnOp op, OpAdaptor adaptor, ConversionPatternRewriter &rewriter) const override
+    LogicalResult matchAndRewrite(ReturnOp op, OpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
     {
         auto loc = op.getLoc();
         if (op.getEmpty()) {

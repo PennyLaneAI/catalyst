@@ -425,16 +425,14 @@ struct InlineNestedSymbolTablePass : PassWrapper<InlineNestedSymbolTablePass, Op
         renameFunctions.add<RenameFunctionsPattern>(context, &symbolTables);
 
         bool run = _stopAfterStep >= 2 || _stopAfterStep == 0;
-        if (run &&
-            failed(applyPatternsGreedily(symbolTable, std::move(renameFunctions), config))) {
+        if (run && failed(applyPatternsGreedily(symbolTable, std::move(renameFunctions), config))) {
             signalPassFailure();
         }
 
         RewritePatternSet inlineNested(context);
         inlineNested.add<InlineNestedModule>(context);
         run = _stopAfterStep >= 3 || _stopAfterStep == 0;
-        if (run &&
-            failed(applyPatternsGreedily(symbolTable, std::move(inlineNested), config))) {
+        if (run && failed(applyPatternsGreedily(symbolTable, std::move(inlineNested), config))) {
             signalPassFailure();
         }
 
@@ -460,8 +458,7 @@ struct InlineNestedSymbolTablePass : PassWrapper<InlineNestedSymbolTablePass, Op
         nestedToFlat.add<NestedToFlatCallPattern, SymbolReplacerPattern, ZNEReplacerPattern>(
             context, &old_to_new);
         run = _stopAfterStep >= 4 || _stopAfterStep == 0;
-        if (run &&
-            failed(applyPatternsGreedily(symbolTable, std::move(nestedToFlat), config))) {
+        if (run && failed(applyPatternsGreedily(symbolTable, std::move(nestedToFlat), config))) {
             signalPassFailure();
         }
 

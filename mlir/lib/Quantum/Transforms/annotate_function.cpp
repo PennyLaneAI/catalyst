@@ -86,9 +86,10 @@ struct AnnotateFunctionPattern : public OpInterfaceRewritePattern<FunctionOpInte
     LogicalResult matchAndRewrite(FunctionOpInterface op, PatternRewriter &rewriter) const override;
 };
 
-LogicalResult AnnotateFunctionPattern::matchAndRewrite(FunctionOpInterface op, PatternRewriter &rewriter) const
+LogicalResult AnnotateFunctionPattern::matchAndRewrite(FunctionOpInterface op,
+                                                       PatternRewriter &rewriter) const
 {
-    if (!successfulMatchLeaf(op)){
+    if (!successfulMatchLeaf(op)) {
         return failure();
     }
 
@@ -161,9 +162,10 @@ struct PropagateAnnotationPattern : public OpInterfaceRewritePattern<FunctionOpI
     CallGraph &callgraph;
 };
 
-LogicalResult PropagateAnnotationPattern::matchAndRewrite(FunctionOpInterface op, PatternRewriter &rewriter) const
+LogicalResult PropagateAnnotationPattern::matchAndRewrite(FunctionOpInterface op,
+                                                          PatternRewriter &rewriter) const
 {
-    if (!successfulMatchNode(op, hasInvalidGradientOp, callgraph)){
+    if (!successfulMatchNode(op, hasInvalidGradientOp, callgraph)) {
         return failure();
     }
 

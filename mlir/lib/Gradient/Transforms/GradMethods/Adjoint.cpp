@@ -30,7 +30,7 @@ namespace gradient {
 
 LogicalResult AdjointLowering::matchAndRewrite(func::FuncOp op, PatternRewriter &rewriter) const
 {
-    if (!(getQNodeDiffMethod(op) == "adjoint" && requiresCustomGradient(op))){
+    if (!(getQNodeDiffMethod(op) == "adjoint" && requiresCustomGradient(op))) {
         return failure();
     }
 
