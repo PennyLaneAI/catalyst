@@ -374,7 +374,7 @@ jobs:
         cmake -S mlir -B $GITHUB_WORKSPACE/quantum-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
               -DLLVM_ENABLE_ASSERTIONS=ON \
-              -DCMAKE_PREFIX_PATH=$GITHUB_WORKSPACE/catalyst/catalyst \
+              -DCMAKE_PREFIX_PATH=$GITHUB_WORKSPACE \
               -DQUANTUM_ENABLE_BINDINGS_PYTHON=ON \
               -DPython3_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -DPython3_NumPy_INCLUDE_DIRS=$(python${{ matrix.python_version }} -c "import numpy as np; print(np.get_include())") \
