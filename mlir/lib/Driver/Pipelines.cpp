@@ -73,7 +73,7 @@ void createBufferizationPipeline(OpPassManager &pm)
     pm.addPass(catalyst::createGradientPreprocessingPass());
     pm.addPass(mlir::bufferization::createEmptyTensorEliminationPass());
     ///////////
-    mlir::bufferization::OneShotBufferizationOptions options;
+    mlir::bufferization::OneShotBufferizePassOptions options;
     options.bufferizeFunctionBoundaries = true;
     options.allowReturnAllocsFromLoops = true;
     options.setFunctionBoundaryTypeConversion(
