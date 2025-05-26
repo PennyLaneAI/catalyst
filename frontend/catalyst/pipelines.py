@@ -242,10 +242,11 @@ def get_bufferization_stage(options: CompileOptions) -> List[str]:
         "func.func(promote-buffers-to-stack)",
         "func.func(buffer-deallocation)",
         "convert-arraylist-to-memref",
-        "canonicalize",
+        "convert-bufferization-to-memref",
+        "canonicalize",  # Must be after convert-bufferization-to-memref
+        # otherwise there are issues in lowering of dynamic tensors.
         # "cse",
         "cp-global-memref",
-        "convert-bufferization-to-memref",
     ]
 
     return bufferization
