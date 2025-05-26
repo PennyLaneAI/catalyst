@@ -221,7 +221,7 @@ struct EmitCatalystPyInterfacePass
         SmallVector<Operation *> targets;
         op->walk([&](LLVM::LLVMFuncOp func) { targets.push_back(func); });
 
-        if (failed(applyOpPatternsAndFold(targets, std::move(patterns), config))) {
+        if (failed(applyOpPatternsGreedily(targets, std::move(patterns), config))) {
             signalPassFailure();
         }
     }
