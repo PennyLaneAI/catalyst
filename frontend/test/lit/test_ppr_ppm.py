@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""This file performs the frontend tests that the PPR and PPM passes are correctly lowered."""
+
 # RUN: %PYTHON %s | FileCheck %s
 
 # pylint: disable=line-too-long
