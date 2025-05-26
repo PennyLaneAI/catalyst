@@ -19,6 +19,38 @@
   * `decompose_non_clifford_ppr`: Decompose non-Cliford PPR (:math:`\theta = \tfrac{\pi}{8}`)
   into PPMs using a magic state.
 
+* PennyLane supports the [`qml.Snapshot`](https://docs.pennylane.ai/en/stable/code/api/pennylane.Snapshot.html) operation
+  which saves the internal state of devices at arbitrary points of execution. Support for `qml.Snapshot` to capture quantum states at any point in a circuit has been added to Catalyst. For example, the code below is capturing two snapshot states:
+
+  ``` python
+  NUM_QUBITS = 2
+  dev = qml.device("lightning.qubit", wires=NUM_QUBITS)
+
+  @qjit
+  @qml.qnode(dev)
+  def circuit():
+      wires = list(range(NUM_QUBITS))
+      qml.Snapshot("Initial state")
+
+      for wire in wires:
+          qml.Hadamard(wires=wire)
+
+      qml.Snapshot("After applying Hadamard gates")
+
+      return qml.probs()
+
+  results = circuit()
+  print(results)
+  ```
+
+  The output would be a tuple of two elements: 
+    * Array of snapshot states
+    * Tuple of measurements being returned
+  ```shell
+  ([Array([1.+0.j, 0.+0.j, 0.+0.j, 0.+0.j], dtype=complex128), Array([0.5+0.j, 0.5+0.j, 0.5+0.j, 0.5+0.j], dtype=complex128)], Array([0.25, 0.25, 0.25, 0.25], dtype=float64))
+  ```
+
+
 <h3>Improvements 🛠</h3>
 
 * The behaviour of measurement processes executed on `null.qubit` with QJIT is now more in line with
