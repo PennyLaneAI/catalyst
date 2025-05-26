@@ -15,6 +15,7 @@
 #include "Driver/Pipelines.h"
 #include "Catalyst/IR/CatalystDialect.h"
 #include "Catalyst/Transforms/Passes.h"
+#include "Gradient/IR/GradientDialect.h"
 #include "Gradient/Transforms/Passes.h"
 #include "Mitigation/Transforms/Passes.h"
 #include "Quantum/IR/QuantumDialect.h"
@@ -71,7 +72,15 @@ void createBufferizationPipeline(OpPassManager &pm)
     pm.addPass(mlir::bufferization::createOneShotBufferizePass(options));
     pm.addPass(mlir::createInlinerPass());
     pm.addPass(catalyst::createGradientPreprocessingPass());
-    pm.addPass(catalyst::createGradientBufferizationPass());
+    mlir::bufferization::OneShotBufferizationOptions gradient_buffer_options;
+    gradient_buffer_options.opFilter.allowDialect<catalyst::gradient::GradientDialect>();
+    gradient_buffer_options.unknownTypeConverterFn =
+        [=](Value value, Attribute memorySpace,
+            const mlir::bufferization::BufferizationOptions &options) {
+            auto tensorType = cast<TensorType>(value.getType());
+            return bufferization::getMemRefTypeWithStaticIdentityLayout(tensorType, memorySpace);
+        };
+    pm.addPass(mlir::bufferization::createOneShotBufferizePass(gradient_buffer_options));
     pm.addPass(mlir::createSCFBufferizePass());
     pm.addPass(mlir::createConvertTensorToLinalgPass());
     pm.addPass(mlir::createConvertElementwiseToLinalgPass());
