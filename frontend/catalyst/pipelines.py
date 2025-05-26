@@ -239,6 +239,7 @@ def get_bufferization_stage(options: CompileOptions) -> List[str]:
         # introduced during gradient-bufferize of callbacks
         "func.func(buffer-hoisting)",
         "func.func(buffer-loop-hoisting)",
+        "func.func(promote-buffers-to-stack)",
         "func.func(buffer-deallocation)",
         "convert-arraylist-to-memref",
         "convert-bufferization-to-memref",

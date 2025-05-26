@@ -307,7 +307,7 @@ def ForwardOp : Gradient_Op<"forward",
      OptionalAttr<DictArrayAttr>: $res_attrs
   );
 
-  let regions = (region AnyRegion: $body);
+  let regions = (region MaxSizedRegion<1>: $body);
 
   let builders = [OpBuilder<(ins
     "mlir::StringRef":$name, "mlir::FunctionType":$type,
@@ -363,7 +363,7 @@ def ReverseOp : Gradient_Op<"reverse",
      OptionalAttr<DictArrayAttr>: $res_attrs
   );
 
-  let regions = (region AnyRegion: $body);
+  let regions = (region MaxSizedRegion<1>: $body);
 
   let builders = [OpBuilder<(ins
     "mlir::StringRef":$name, "mlir::FunctionType":$type,

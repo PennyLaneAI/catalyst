@@ -9,6 +9,7 @@ pennylane_catalyst.egg-info
 # Testing files and directories
 .lit
 .pytest_cache
+__pennylane_resources_data_*.json
 
 # Packaging directories
 dist
@@ -30,6 +31,7 @@ doc/code/api
 
 # Development
 venv
+.venv
 
 # Cache files
 .cache
