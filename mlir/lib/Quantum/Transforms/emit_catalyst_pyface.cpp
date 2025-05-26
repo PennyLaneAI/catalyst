@@ -173,8 +173,8 @@ void wrapResultsAndArgsInTwoStructs(LLVM::LLVMFuncOp op, PatternRewriter &rewrit
 struct EmitCatalystPyInterfaceTransform : public OpRewritePattern<LLVM::LLVMFuncOp> {
     using OpRewritePattern<LLVM::LLVMFuncOp>::OpRewritePattern;
 
-    LogicalResult match(LLVM::LLVMFuncOp op) const override;
-    void rewrite(LLVM::LLVMFuncOp op, PatternRewriter &rewriter) const override;
+    LogicalResult match(LLVM::LLVMFuncOp op) const;
+    void rewrite(LLVM::LLVMFuncOp op, PatternRewriter &rewriter) const;
 };
 
 LogicalResult EmitCatalystPyInterfaceTransform::match(LLVM::LLVMFuncOp op) const
