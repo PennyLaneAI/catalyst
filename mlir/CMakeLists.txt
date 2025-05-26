@@ -29,6 +29,7 @@ endif()
 #########################
 
 find_package(MLIR REQUIRED CONFIG)
+set(CMAKE_PREFIX_PATH "/path/to/install" ${CMAKE_PREFIX_PATH})
 find_package(MHLO REQUIRED CONFIG)
 
 message(STATUS "Using MLIRConfig.cmake in: ${MLIR_DIR}")
