@@ -83,8 +83,8 @@ void annotate(FunctionOpInterface op, PatternRewriter &rewriter, const char *att
 struct AnnotateFunctionPattern : public OpInterfaceRewritePattern<FunctionOpInterface> {
     using OpInterfaceRewritePattern<FunctionOpInterface>::OpInterfaceRewritePattern;
 
-    LogicalResult match(FunctionOpInterface op) const override;
-    void rewrite(FunctionOpInterface op, PatternRewriter &rewriter) const override;
+    LogicalResult match(FunctionOpInterface op) const;
+    void rewrite(FunctionOpInterface op, PatternRewriter &rewriter) const;
 };
 
 LogicalResult AnnotateFunctionPattern::match(FunctionOpInterface op) const
@@ -156,8 +156,8 @@ struct PropagateAnnotationPattern : public OpInterfaceRewritePattern<FunctionOpI
     {
     }
 
-    LogicalResult match(FunctionOpInterface op) const override;
-    void rewrite(FunctionOpInterface op, PatternRewriter &rewriter) const override;
+    LogicalResult match(FunctionOpInterface op) const;
+    void rewrite(FunctionOpInterface op, PatternRewriter &rewriter) const;
 
   private:
     CallGraph &callgraph;
