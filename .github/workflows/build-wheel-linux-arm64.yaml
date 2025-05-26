@@ -335,16 +335,6 @@ jobs:
           PYTHON=$(which python${{ matrix.python_version }}) \
           make oqc
 
-    - name: Build deps paths
-      run: |
-        PYTHON=python${{ matrix.python_version }} 
-        LLVM_BUILD_DIR="$GITHUB_WORKSPACE/llvm-build" 
-        MHLO_BUILD_DIR="$GITHUB_WORKSPACE/mhlo-build" 
-        DIALECTS_BUILD_DIR="$GITHUB_WORKSPACE/quantum-build" 
-        RT_BUILD_DIR="$GITHUB_WORKSPACE/runtime-build" 
-        OQC_BUILD_DIR="$GITHUB_WORKSPACE/oqc-build" 
-        ENZYME_BUILD_DIR="$GITHUB_WORKSPACE/enzyme-build" 
-
     # - name: which
     #   run: |
     #     ls -l $GITHUB_WORKSPACE/llvm-build/bin
@@ -359,14 +349,10 @@ jobs:
               -DLLVM_ENABLE_ASSERTIONS=ON \
               -DQUANTUM_ENABLE_BINDINGS_PYTHON=ON \
               -DCMAKE_PREFIX_PATH=$GITHUB_WORKSPACE/catalyst/catalyst \
-              -DPython3_LIBRARY=$(python${{ matrix.python_version }} -c "import sysconfig; print(sysconfig.get_config_var('LIBDIR'))") \
-              -DPython3_INCLUDE_DIR=$(python${{ matrix.python_version }} -c "from sysconfig import get_paths; print(get_paths()['include'])") \             
               -DPython3_EXECUTABLE=$(which python${{ matrix.python_version }}) \
-              -DPython_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -DPython3_NumPy_INCLUDE_DIRS=$(python${{ matrix.python_version }} -c "import numpy as np; print(np.get_include())") \
               -DMLIR_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir" \
               -DMHLO_DIR="$GITHUB_WORKSPACE/mhlo-build/lib/cmake/mlir-hlo" \
-              -DCMAKE_PREFIX_PATH=$GITHUB_WORKSPACE \
               -DMHLO_BINARY_DIR="$GITHUB_WORKSPACE/mhlo-build/bin" \
               -DEnzyme_DIR="$GITHUB_WORKSPACE/enzyme-build" \
               -DENZYME_SRC_DIR="$GITHUB_WORKSPACE/mlir/Enzyme" \
@@ -435,7 +421,6 @@ jobs:
       uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python_version }}
-        architecture: <arm64>
 
     - name: Download Wheel Artifact
       uses: actions/download-artifact@v4
