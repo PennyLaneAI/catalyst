@@ -19,7 +19,7 @@
 import pennylane as qml
 
 from catalyst import measure, qjit
-from catalyst.passes import to_ppr, commute_ppr, merge_ppr_ppm, ppr_to_ppm, to_ppm
+from catalyst.passes import commute_ppr, merge_ppr_ppm, ppr_to_ppm, to_ppm, to_ppr
 
 
 def test_convert_clifford_to_ppr():
