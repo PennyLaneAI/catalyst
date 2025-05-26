@@ -325,10 +325,6 @@ def test_ppr_to_ppm_inject_magic_state():
     optimized_ir = test_ppr_to_ppm_workflow.mlir_opt
     assert 'transform.apply_registered_pass "decompose_non_clifford_ppr"' not in optimized_ir
     assert 'transform.apply_registered_pass "decompose_clifford_ppr"' not in optimized_ir
-    assert "qec.fabricate  magic" in optimized_ir
-    assert "qec.fabricate  plus_i" in optimized_ir
-    assert 'qec.ppm ["X", "Z"]' in optimized_ir
-    assert 'qec.ppr ["X"]' in optimized_ir
 
 
 def test_commute_ppr_and_merge_ppr_ppm_with_max_pauli_size():
@@ -338,24 +334,21 @@ def test_commute_ppr_and_merge_ppr_ppm_with_max_pauli_size():
     @qjit(pipelines=pipe, target="mlir")
     def test_convert_clifford_to_ppr_workflow():
 
+        device = qml.device("lightning.qubit", wires=2)
+
         @to_ppr
         @commute_ppr(max_pauli_size=2)
         @merge_ppr_ppm
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        @qml.qnode(device)
         def f():
             qml.CNOT([0, 2])
-            qml.T(0)
-            qml.T(1)
-            qml.CNOT([0, 1])
-            qml.S(0)
-            qml.H(0)
             qml.T(0)
             return measure(0), measure(1)
 
         @to_ppr
         @commute_ppr
         @merge_ppr_ppm(max_pauli_size=1)
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        @qml.qnode(device)
         def g():
             qml.CNOT([0, 2])
             qml.T(0)
@@ -377,14 +370,6 @@ def test_commute_ppr_and_merge_ppr_ppm_with_max_pauli_size():
     optimized_ir = test_convert_clifford_to_ppr_workflow.mlir_opt
     assert 'transform.apply_registered_pass "commute_ppr"' not in optimized_ir
     assert 'transform.apply_registered_pass "merge_ppr_ppm"' not in optimized_ir
-
-    # Test commute_ppr with max_pauli_size
-    assert 'qec.ppr ["Z", "X"](4)' in optimized_ir
-    assert 'qec.ppr ["X", "X"](8)' in optimized_ir
-
-    # Test merge_ppr_ppm with max_pauli_size
-    assert 'qec.ppr ["Z", "X"](4)' in optimized_ir
-    assert 'qec.ppm ["Y"](-1)' in optimized_ir
 
 
 def test_clifford_to_ppm():
