@@ -20,13 +20,6 @@ include(LLVMDistributionSupport)
 set(CATALYST_INSTALL_PACKAGE_DIR lib${LLVM_LIBDIR_SUFFIX}/cmake/catalyst)
 set(catalyst_cmake_builddir "${CMAKE_BINARY_DIR}/${CATALYST_INSTALL_PACKAGE_DIR}")
 
-find_package(Python3 COMPONENTS Interpreter Development)
-find_package(Python3 COMPONENTS Interpreter Development.Module REQUIRED)
-find_package(Python3 REQUIRED COMPONENTS Development NumPy)
-find_package(MLIR REQUIRED CONFIG)
-find_package(MHLO REQUIRED CONFIG)
-find_package(Python3 COMPONENTS Development NumPy REQUIRED)
-
 # Keep this in sync with llvm/cmake/CMakeLists.txt!
 set(LLVM_INSTALL_PACKAGE_DIR lib${LLVM_LIBDIR_SUFFIX}/cmake/llvm)
 set(llvm_cmake_builddir "${LLVM_BINARY_DIR}/${LLVM_INSTALL_PACKAGE_DIR}")

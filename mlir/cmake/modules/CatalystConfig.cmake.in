@@ -12,9 +12,6 @@
 
 # MLIR is needed for this setup to be usable.
 find_package(MLIR REQUIRED CONFIG)
-find_package(Python3 COMPONENTS Interpreter Development)
-find_package(Python3 COMPONENTS Interpreter Development.Module REQUIRED)
-find_package(Python3 COMPONENTS Development NumPy REQUIRED)
 
 # Set variables needed by dependent projects.
 set(CATALYST_BUILD_LIBRARY_DIR "@CATALYST_LIB_DIR@")
