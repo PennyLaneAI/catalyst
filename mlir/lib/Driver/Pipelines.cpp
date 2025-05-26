@@ -76,13 +76,9 @@ void createBufferizationPipeline(OpPassManager &pm)
     mlir::bufferization::OneShotBufferizePassOptions options;
     options.bufferizeFunctionBoundaries = true;
     options.allowReturnAllocsFromLoops = true;
-    options.setFunctionBoundaryTypeConversion(
-        mlir::bufferization::LayoutMapOption::IdentityLayoutMap);
-    options.unknownTypeConverterFn = [=](Value value, Attribute memorySpace,
-                                         const mlir::bufferization::BufferizationOptions &options) {
-        auto tensorType = cast<TensorType>(value.getType());
-        return bufferization::getMemRefTypeWithStaticIdentityLayout(tensorType, memorySpace);
-    };
+    options.functionBoundaryTypeConversion =
+        mlir::bufferization::LayoutMapOption::IdentityLayoutMap;
+    options.unknownTypeConversion = mlir::bufferization::LayoutMapOption::IdentityLayoutMap;
     pm.addPass(mlir::bufferization::createOneShotBufferizePass(options));
     //////////////
     pm.addPass(mlir::createCanonicalizerPass());
