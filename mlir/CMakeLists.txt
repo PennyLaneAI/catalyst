@@ -52,7 +52,6 @@ set(ALL_MHLO_PASSES
   HloToLinalgUtils
   MhloToLinalg
   MhloToStablehlo
-  MhloQuantToIntConversion
   StablehloToMhlo
 )
 

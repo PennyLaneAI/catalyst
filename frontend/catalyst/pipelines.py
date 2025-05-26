@@ -213,32 +213,33 @@ def get_quantum_compilation_stage(options: CompileOptions) -> List[str]:
     return list(filter(partial(is_not, None), quantum_compilation))
 
 
-def get_bufferization_stage(_options: CompileOptions) -> List[str]:
+def get_bufferization_stage(options: CompileOptions) -> List[str]:
     """Returns the list of passes that performs bufferization"""
+
+    bufferization_options = """bufferize-function-boundaries
+        allow-return-allocs-from-loops
+        function-boundary-type-conversion=identity-layout-map
+        unknown-type-conversion=identity-layout-map""".replace(
+        "\n", " "
+    )
+    if options.async_qnodes:
+        bufferization_options += " copy-before-write"
+
     bufferization = [
-        "one-shot-bufferize{dialect-filter=memref}",
         "inline",
-        "gradient-preprocess",
-        "one-shot-bufferize{dialect-filter=gradient unknown-type-conversion=identity-layout-map}",
-        "scf-bufferize",
         "convert-tensor-to-linalg",  # tensor.pad
-        "convert-elementwise-to-linalg",  # Must be run before --arith-bufferize
-        "arith-bufferize",
-        "empty-tensor-to-alloc-tensor",
-        "func.func(bufferization-bufferize)",
-        "func.func(tensor-bufferize)",
-        # Catalyst dialect's bufferization must be run before --func.func(linalg-bufferize)
-        "one-shot-bufferize{dialect-filter=catalyst unknown-type-conversion=identity-layout-map}",
-        "func.func(linalg-bufferize)",
-        "func.func(tensor-bufferize)",
-        "one-shot-bufferize{dialect-filter=quantum}",
-        "func-bufferize",
-        "func.func(finalizing-bufferize)",
+        "convert-elementwise-to-linalg",  # Must be run before --one-shot-bufferize
+        "gradient-preprocess",
+        "eliminate-empty-tensors",
+        ####################
+        "one-shot-bufferize{" + bufferization_options + "}",
+        ####################
         "canonicalize",  # Remove dead memrefToTensorOp's
         "gradient-postprocess",
         # introduced during gradient-bufferize of callbacks
         "func.func(buffer-hoisting)",
         "func.func(buffer-loop-hoisting)",
+        "func.func(promote-buffers-to-stack)",
         "func.func(buffer-deallocation)",
         "convert-arraylist-to-memref",
         "convert-bufferization-to-memref",
@@ -247,6 +248,7 @@ def get_bufferization_stage(_options: CompileOptions) -> List[str]:
         # "cse",
         "cp-global-memref",
     ]
+
     return bufferization
 
 
