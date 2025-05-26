@@ -14,12 +14,16 @@
 
 // RUN: quantum-opt --to_ppm --split-input-file -verify-diagnostics %s > %t.ppm
 // RUN: quantum-opt --to_ppr --commute_ppr --merge_ppr_ppm --decompose_non_clifford_ppr --decompose_clifford_ppr --split-input-file -verify-diagnostics %s > %t.ppr
+// RUN: test -s %t.ppm
+// RUN: test -s %t.ppr
 // RUN: diff %t.ppm %t.ppr
 
 // With decompose-method=clifford-corrected and avoid-y-measure=false and max-pauli-size=3
-// RUN: quantum-opt --to_ppm="decompose-method=clifford-corrected avoid-y-measure=false max-pauli-size=3" --split-input-file -verify-diagnostics %s > %t.ppm
-// RUN: quantum-opt --to_ppr --commute_ppr="max-pauli-size=3" --merge_ppr_ppm="max-pauli-size=3" --decompose_non_clifford_ppr="decompose-method=clifford-corrected" --decompose_clifford_ppr="avoid-y-measure=false" --split-input-file -verify-diagnostics %s > %t.ppr
-// RUN: diff %t.ppm %t.ppr
+// RUN: quantum-opt --to_ppm="decompose-method=clifford-corrected avoid-y-measure=false max-pauli-size=3" --split-input-file -verify-diagnostics %s > %t.ppm.params
+// RUN: quantum-opt --to_ppr --commute_ppr="max-pauli-size=3" --merge_ppr_ppm="max-pauli-size=3" --decompose_non_clifford_ppr="decompose-method=clifford-corrected" --decompose_clifford_ppr="avoid-y-measure=false" --split-input-file -verify-diagnostics %s > %t.ppr.params
+// RUN: test -s %t.ppm.params
+// RUN: test -s %t.ppr.params
+// RUN: diff %t.ppm.params %t.ppr.params
 
 func.func @test_clifford_t_to_ppm_1() -> (tensor<i1>, tensor<i1>) {
     %0 = quantum.alloc( 2) : !quantum.reg
