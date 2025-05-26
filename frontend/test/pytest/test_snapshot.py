@@ -1,4 +1,4 @@
-# Copyright 2024 Xanadu Quantum Technologies Inc.
+# Copyright 2025 Xanadu Quantum Technologies Inc.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -35,13 +35,15 @@ class TestSnapshot:
             (qml.expval(qml.X(0))),
             (qml.counts()),
             (qml.var(qml.X(0))),
+            (qml.sample()),
         ),
     )
     def test_not_implemented_snapshots(self, operation_passed_to_snapshot):
         """Make sure only qml.state is allowed to be in qml.Snapshot"""
         with pytest.raises(
             NotImplementedError,
-            match=f"Snapshot of type {type(operation_passed_to_snapshot)} is not implemented",
+            match = r"qml.Snapshot\(\) only supports qml.state\(\) when used from within Catalyst," +
+            f" but encountered {type(operation_passed_to_snapshot)}"
         ):
             dev = qml.device("lightning.qubit", wires=1, shots=5)
 
@@ -57,7 +59,6 @@ class TestSnapshot:
         """Test all six single qubit basis states in qml.Snapshot without shots"""
         dev = qml.device("lightning.qubit", wires=1)
 
-        @qjit
         @qml.qnode(dev)
         def circuit():
             qml.Snapshot()  # |0>
@@ -73,42 +74,27 @@ class TestSnapshot:
             qml.Snapshot()  # |+>
             return qml.state(), qml.probs(), qml.expval(qml.X(0)), qml.var(qml.Z(0))
 
-        expected_output = (
-            [
-                jnp.array([1.0 + 0.0j, 0.0 + 0.0j], dtype=jnp.complex128),
-                jnp.array([0.0 + 0.0j, 1.0 + 0.0j], dtype=jnp.complex128),
-                jnp.array([0.70710678 + 0.0j, -0.70710678 + 0.0j], dtype=jnp.complex128),
-                jnp.array([7.07106781e-01 + 0.0j, 0.0 - 0.70710678j], dtype=jnp.complex128),
-                jnp.array([7.07106781e-01 + 0.0j, 0.0 + 0.70710678j], dtype=jnp.complex128),
-                jnp.array([0.70710678 + 0.0j, 0.70710678 + 0.0j], dtype=jnp.complex128),
-            ],
-            (
-                jnp.array([0.70710678 + 0.0j, 0.70710678 + 0.0j], dtype=jnp.complex128),
-                jnp.array([0.5, 0.5], dtype=jnp.float64),
-                jnp.array(1.0, dtype=jnp.float64),
-                jnp.array(1.0, dtype=jnp.float64),
-            ),
-        )
-        returned_output = circuit()
-        expected_snapshot_states, returned_snapshot_states = expected_output[0], returned_output[0]
-        expected_measurement_results, returned_measurement_results = (
-            expected_output[1],
-            returned_output[1],
-        )
+        expected_measurement_results = circuit()
+
+        expected_snapshot_results = list(
+            qml.snapshots(circuit)().values()
+        )  # get the snapshot result values
+        expected_snapshot_results = expected_snapshot_results[:-1]  # remove 'execution_results' key
+
+        jitted_results = qjit(circuit)()
+        jitted_snapshot_results = jitted_results[0]
+        jitted_measurement_results = jitted_results[1]
+
+        assert np.allclose(jitted_snapshot_results, expected_snapshot_results)
         assert all(
-            jnp.allclose(expected_snapshot_states[i], returned_snapshot_states[i])
-            for i in range(len(returned_snapshot_states))
-        )
-        assert all(
-            jnp.allclose(expected_measurement_results[i], returned_measurement_results[i])
-            for i in range(len(returned_measurement_results))
+            jnp.allclose(expected_measurement_results[i], jitted_measurement_results[i])
+            for i in range(len(jitted_measurement_results))
         )
 
     def test_snapshot_on_two_wire(self):
         """Test qml.Snapshot on two qubits with shots"""
         dev = qml.device("lightning.qubit", wires=2, shots=5)
 
-        @qjit
         @qml.qnode(dev)
         def circuit():
             qml.Snapshot()  # |00>
@@ -120,34 +106,21 @@ class TestSnapshot:
             qml.Hadamard(wires=1)  # |00>
             qml.X(wires=0)
             qml.X(wires=1)  # |11> to measure in comp-basis
-            return qml.counts(), qml.sample()
+            return {0: qml.counts(), 1: qml.sample()}
 
-        expected_output = (
-            [
-                jnp.array([1.0 + 0.0j, 0.0 + 0.0j, 0.0 + 0.0j, 0.0 + 0.0j], dtype=jnp.complex128),
-                jnp.array([0.5 + 0.0j, 0.5 + 0.0j, 0.5 + 0.0j, 0.5 + 0.0j], dtype=jnp.complex128),
-            ],
-            (
-                (
-                    jnp.array([0, 1, 2, 3], dtype=jnp.int64),
-                    jnp.array([0, 0, 0, 5], dtype=jnp.int64),
-                ),
-                jnp.array([[1, 1], [1, 1], [1, 1], [1, 1], [1, 1]], dtype=jnp.int64),
-            ),
-        )
-        returned_output = circuit()
-        expected_snapshot_states, returned_snapshot_states = expected_output[0], returned_output[0]
-        expected_counts, returned_counts = expected_output[1][0], returned_output[1][0]
-        expected_samples, returned_samples = expected_output[1][1], returned_output[1][1]
-        assert all(
-            jnp.allclose(expected_snapshot_states[i], returned_snapshot_states[i])
-            for i in range(len(returned_snapshot_states))
-        )
-        assert all(
-            jnp.allclose(expected_counts[i], returned_counts[i])
-            for i in range(len(returned_counts))
-        )
-        assert all(
-            jnp.allclose(expected_samples[i], returned_samples[i])
-            for i in range(len(returned_samples))
-        )
+        expected_measurement_results = circuit()
+
+        expected_snapshot_results = list(
+            qml.snapshots(circuit)().values()
+        )  # get the snapshot result values
+        expected_snapshot_results = expected_snapshot_results[:-1]  # remove 'execution_results' key
+
+        jitted_results = qjit(circuit)()
+        jitted_snapshot_results = jitted_results[0]
+        jitted_measurement_results = jitted_results[1]
+
+        assert np.allclose(jitted_snapshot_results, expected_snapshot_results)
+        assert expected_measurement_results.keys() == jitted_measurement_results.keys()
+
+        assert expected_measurement_results[0]["11"] == jitted_measurement_results[0][1][3]
+        assert jnp.allclose(expected_measurement_results[1], jitted_measurement_results[1])

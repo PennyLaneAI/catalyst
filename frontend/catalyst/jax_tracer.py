@@ -718,7 +718,8 @@ def trace_snapshot_op(
         out_snapshot_tracer.append(result)
     else:
         raise NotImplementedError(
-            f"Snapshot of type {type(op.hyperparameters['measurement'])} is not implemented"
+            "qml.Snapshot() only supports qml.state() when used from within Catalyst,"
+            f" but encountered {type(op.hyperparameters['measurement'])}"
         )  # pragma: no cover
 
 

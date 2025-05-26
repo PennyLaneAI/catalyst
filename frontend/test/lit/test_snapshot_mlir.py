@@ -1,4 +1,4 @@
-# Copyright 2022-2023 Xanadu Quantum Technologies Inc.
+# Copyright 2025 Xanadu Quantum Technologies Inc.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -31,41 +31,41 @@ from catalyst import qjit
 @qml.qnode(qml.device("lightning.qubit", wires=1))
 def single_qubit_circuit():
     """Test MLIR output of all six single qubit basis states in qml.Snapshot without shots"""
-    # CHECK: {{%.+}} = quantum.compbasis qreg {{%.+}} : !quantum.obs
-    # CHECK: {{%.+}} = quantum.state {{%.+}} : tensor<2xcomplex<f64>>
+    # CHECK: [[compbasis:%.+]] = quantum.compbasis qreg {{%.+}} : !quantum.obs
+    # CHECK: [[snapshot0:%.+]] = quantum.state [[compbasis]] : tensor<2xcomplex<f64>>
     qml.Snapshot()  # |0>
 
     qml.X(wires=0)
 
-    # CHECK: {{%.+}} = quantum.compbasis qreg {{%.+}} : !quantum.obs
-    # CHECK: {{%.+}} = quantum.state {{%.+}} : tensor<2xcomplex<f64>>
+    # CHECK: [[compbasis:%.+]] = quantum.compbasis qreg {{%.+}} : !quantum.obs
+    # CHECK: [[snapshot1:%.+]] = quantum.state [[compbasis]] : tensor<2xcomplex<f64>>
     qml.Snapshot()  # |1>
 
     qml.Hadamard(wires=0)
 
-    # CHECK: {{%.+}} = quantum.compbasis qreg {{%.+}} : !quantum.obs
-    # CHECK: {{%.+}} = quantum.state {{%.+}} : tensor<2xcomplex<f64>>
+    # CHECK: [[compbasis:%.+]] = quantum.compbasis qreg {{%.+}} : !quantum.obs
+    # CHECK: [[snapshot2:%.+]] = quantum.state [[compbasis]] : tensor<2xcomplex<f64>>
     qml.Snapshot()  # |->
 
     qml.PhaseShift(np.pi / 2, wires=0)
 
-    # CHECK: {{%.+}} = quantum.compbasis qreg {{%.+}} : !quantum.obs
-    # CHECK: {{%.+}} = quantum.state {{%.+}} : tensor<2xcomplex<f64>>
+    # CHECK: [[compbasis:%.+]] = quantum.compbasis qreg {{%.+}} : !quantum.obs
+    # CHECK: [[snapshot3:%.+]] = quantum.state [[compbasis]] : tensor<2xcomplex<f64>>
     qml.Snapshot()  # |-i>
 
     qml.Z(wires=0)
 
-    # CHECK: {{%.+}} = quantum.compbasis qreg {{%.+}} : !quantum.obs
-    # CHECK: {{%.+}} = quantum.state {{%.+}} : tensor<2xcomplex<f64>>
+    # CHECK: [[compbasis:%.+]] = quantum.compbasis qreg {{%.+}} : !quantum.obs
+    # CHECK: [[snapshot4:%.+]] = quantum.state [[compbasis]] : tensor<2xcomplex<f64>>
     qml.Snapshot()  # |+i>
 
     qml.PhaseShift(-np.pi / 2, wires=0)
 
-    # CHECK: {{%.+}} = quantum.compbasis qreg {{%.+}} : !quantum.obs
-    # CHECK: {{%.+}} = quantum.state {{%.+}} : tensor<2xcomplex<f64>>
+    # CHECK: [[compbasis:%.+]] = quantum.compbasis qreg {{%.+}} : !quantum.obs
+    # CHECK: [[snapshot5:%.+]] = quantum.state [[compbasis]] : tensor<2xcomplex<f64>>
     qml.Snapshot()  # |+>
 
-    # CHECK: return {{%.+}}, {{%.+}}, {{%.+}}, {{%.+}}, {{%.+}}, {{%.+}}, {{%.+}}, {{%.+}}, {{%.+}}, {{%.+}} :
+    # CHECK: return [[snapshot0]], [[snapshot1]], [[snapshot2]], [[snapshot3]], [[snapshot4]], [[snapshot5]], {{%.+}}, {{%.+}}, {{%.+}}, {{%.+}} :
     # CHECK-SAME: tensor<2xcomplex<f64>>, tensor<2xcomplex<f64>>, tensor<2xcomplex<f64>>, tensor<2xcomplex<f64>>, tensor<2xcomplex<f64>>, tensor<2xcomplex<f64>>,
     # CHECK-SAME: tensor<2xcomplex<f64>>, tensor<2xf64>, tensor<f64>, tensor<f64>
     return qml.state(), qml.probs(), qml.expval(qml.X(0)), qml.var(qml.Z(0))
@@ -80,15 +80,15 @@ print(single_qubit_circuit.mlir)
 def two_qubit_circuit():
     """Test MLIR output of qml.Snapshot on two qubits with shots"""
 
-    # CHECK: {{%.+}} = quantum.compbasis qreg {{%.+}} : !quantum.obs
-    # CHECK: {{%.+}} = quantum.state {{%.+}} : tensor<4xcomplex<f64>>
+    # CHECK: [[compbasis:%.+]] = quantum.compbasis qreg {{%.+}} : !quantum.obs
+    # CHECK: [[snapshot0:%.+]] = quantum.state [[compbasis]] : tensor<4xcomplex<f64>>
     qml.Snapshot()  # |00>
 
     qml.Hadamard(wires=0)
     qml.Hadamard(wires=1)
 
-    # CHECK: {{%.+}} = quantum.compbasis qreg {{%.+}} : !quantum.obs
-    # CHECK: {{%.+}} = quantum.state {{%.+}} : tensor<4xcomplex<f64>>
+    # CHECK: [[compbasis:%.+]] = quantum.compbasis qreg {{%.+}} : !quantum.obs
+    # CHECK: [[snapshot1:%.+]] = quantum.state [[compbasis]] : tensor<4xcomplex<f64>>
     qml.Snapshot()  # |++>
 
     qml.Hadamard(wires=0)
@@ -96,7 +96,7 @@ def two_qubit_circuit():
     qml.X(wires=0)
     qml.X(wires=1)  # |11> to measure in comp-basis
 
-    # CHECK: return {{%.+}}, {{%.+}}, {{%.+}}, {{%.+}}, {{%.+}} : tensor<4xcomplex<f64>>, tensor<4xcomplex<f64>>, tensor<4xi64>, tensor<4xi64>, tensor<5x2xi64>
+    # CHECK: return [[snapshot0]], [[snapshot1]], {{%.+}}, {{%.+}}, {{%.+}} : tensor<4xcomplex<f64>>, tensor<4xcomplex<f64>>, tensor<4xi64>, tensor<4xi64>, tensor<5x2xi64>
     return qml.counts(), qml.sample()
 
 

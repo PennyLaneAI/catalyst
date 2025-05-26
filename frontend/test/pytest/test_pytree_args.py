@@ -300,7 +300,6 @@ class TestPyTreesReturnValues:
         ]
         jitted_fn = qjit(circuit2_snapshot)
         result = jitted_fn(params)
-        print("Result:", result)
         assert isinstance(result, tuple)
         assert isinstance(result[0], list)
         assert isinstance(result[1], dict)
