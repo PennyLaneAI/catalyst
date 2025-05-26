@@ -115,6 +115,9 @@ mhlo:
 		-DLLVM_ENABLE_ZSTD=$(ENABLE_ZSTD) \
 		-DCMAKE_CXX_VISIBILITY_PRESET=$(SYMBOL_VISIBILITY)
 
+	cmake --build $(MHLO_BUILD_DIR) --target StablehloLinalgTransforms
+	cmake --build $(MHLO_BUILD_DIR) --target check-stablehlo-linalg
+
         # TODO: figure out why this test is failing
 	LIT_FILTER_OUT="chlo_legalize_to_mhlo" cmake --build $(MHLO_BUILD_DIR) --target check-mlir-hlo
 

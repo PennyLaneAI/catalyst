@@ -28,7 +28,10 @@ import jax.numpy as jnp
 import pennylane as qml
 from jax.api_util import debug_info
 from jax.interpreters import mlir
+from jax._src.interpreters import mlir as jax_mlir
 from jax.tree_util import tree_flatten, tree_unflatten
+from jaxlib.mlir.ir import Context, Module
+from jax._src.lib.mlir import ir
 
 import catalyst
 from catalyst.autograph import run_autograph
@@ -62,6 +65,10 @@ from catalyst.utils.exceptions import CompileError
 from catalyst.utils.filesystem import WorkspaceManager
 from catalyst.utils.gen_mlir import inject_functions
 from catalyst.utils.patching import Patcher
+
+from jaxlib.mlir.dialects import stablehlo
+from jaxlib.mlir.passmanager import PassManager
+
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -757,6 +764,39 @@ class QJIT(CatalystCallable):
             self.compile_options.dialect_plugins.update(plugins)
 
         return jaxpr, out_type, treedef, dynamic_sig
+    
+    def generate_stablehlo_ir(self, mlir_module, ctx):
+        with open("mlir_module_before.mlir", "w") as f:
+            f.write(str(mlir_module))
+        module_str = str(mlir_module)
+        with jax_mlir.make_ir_context() as ctx:
+            ctx.allow_unregistered_dialects = True
+            stablehlo_module = ir.Module.parse(module_str, context=ctx)
+            stablehlo_asm = stablehlo_module.operation.get_asm(large_elements_limit=20)
+            with open("stablehlo_asm.mlir", "w") as f:
+                f.write(stablehlo_asm)
+            stablehlo.register_dialect(ctx)
+            stablehlo.register_stablehlo_passes()
+            
+            # module = Module.parse(module_str)
+            pm = PassManager.parse(
+                "builtin.module("
+                "canonicalize,"
+                "func.func(shape-legalize-to-stablehlo),"
+                # "stablehlo-aggressive-folder,"
+                # "stablehlo-aggressive-simplification,"
+                "stablehlo-convert-to-signless,"
+                "func.func(stablehlo-legalize-to-linalg),"
+                "canonicalize"
+                ")"
+            )
+            pm.enable_ir_printing()
+
+            pm.run(stablehlo_module.operation)
+        
+            with open("mlir_module_after.mlir", "w") as f:
+                    f.write(str(stablehlo_module))
+        return stablehlo_module, ctx
 
     @instrument(size_from=0, has_finegrained=True)
     @debug_logger
@@ -768,6 +808,7 @@ class QJIT(CatalystCallable):
         """
 
         mlir_module, ctx = lower_jaxpr_to_mlir(self.jaxpr, self.__name__)
+        # mlir_module, ctx = self.generate_stablehlo_ir(mlir_module, ctx)
 
         # Inject Runtime Library-specific functions (e.g. setup/teardown).
         inject_functions(mlir_module, ctx, self.compile_options.seed)

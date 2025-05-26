@@ -35,6 +35,8 @@
 #include "mlir/Support/FileUtilities.h"
 #include "mlir/Target/LLVMIR/Export.h"
 #include "stablehlo/dialect/Register.h"
+#include "stablehlo/conversions/linalg/transforms/Passes.h"
+#include "stablehlo/transforms/Passes.h"
 #include "llvm/Analysis/CGSCCPassManager.h"
 #include "llvm/Analysis/LoopAnalysisManager.h"
 #include "llvm/IR/LegacyPassManager.h"
@@ -963,6 +965,9 @@ int QuantumDriverMainFromCL(int argc, char **argv)
     registerAllCatalystPasses();
     registerAllCatalystPipelines();
     mhlo::registerAllMhloPasses();
+    stablehlo::registerPassPipelines();
+    stablehlo::registerPasses();
+    stablehlo::registerStablehloLinalgTransformsPasses();
     registerAllCatalystDialects(registry);
     registerLLVMTranslations(registry);
 

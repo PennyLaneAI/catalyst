@@ -18,7 +18,7 @@
 #include "mlir/IR/PatternMatch.h"
 
 #include "Catalyst/IR/CatalystOps.h"
-#include "mhlo/IR/hlo_ops.h"
+#include "stablehlo/dialect/StablehloOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "llvm/Support/Debug.h"
 
@@ -26,10 +26,10 @@ using namespace mlir;
 
 namespace catalyst {
 
-struct HloCustomCallOpRewritePattern : public mlir::OpRewritePattern<mhlo::CustomCallOp> {
-    using mlir::OpRewritePattern<mhlo::CustomCallOp>::OpRewritePattern;
+struct HloCustomCallOpRewritePattern : public mlir::OpRewritePattern<stablehlo::CustomCallOp> {
+    using mlir::OpRewritePattern<stablehlo::CustomCallOp>::OpRewritePattern;
 
-    mlir::LogicalResult matchAndRewrite(mhlo::CustomCallOp op,
+    mlir::LogicalResult matchAndRewrite(stablehlo::CustomCallOp op,
                                         mlir::PatternRewriter &rewriter) const override
     {
         StringRef calleeName = op.getCallTargetName();

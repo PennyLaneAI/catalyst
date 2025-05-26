@@ -397,6 +397,9 @@ class Compiler:
             ("--module-name", module_name),
             ("--workspace", str(workspace)),
             "-verify-each=false",
+            "--save-ir-after-each=pass",
+            "--verbose=true",
+            "--keep-intermediate=true",
             *opts,
             tmp_infile_name,
         )

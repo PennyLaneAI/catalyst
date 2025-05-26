@@ -40,6 +40,12 @@ import catalyst
 from catalyst.logging import debug_logger
 from catalyst.utils.patching import Patcher
 
+from jaxlib.mlir.dialects import stablehlo
+from jaxlib.mlir.passmanager import PassManager
+from jaxlib.mlir.ir import Context, Module
+from jax._src.interpreters import mlir as jax_mlir
+
+
 # pylint: disable=protected-access
 
 __all__ = ("jaxpr_to_mlir", "custom_lower_jaxpr_to_module")

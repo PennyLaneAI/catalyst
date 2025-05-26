@@ -44,6 +44,7 @@ set(LIBS
     StablehloRegister
     MLIRCatalystTest
     ${ALL_MHLO_PASSES}
+    StablehloLinalgTransforms
     ${ENZYME_LIB}
 )
 
