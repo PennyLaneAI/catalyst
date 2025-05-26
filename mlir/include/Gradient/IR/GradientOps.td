@@ -58,7 +58,9 @@ def GradOp : Gradient_Op<"grad", [
         SymbolRefAttr:$callee,
         Variadic<AnyType>:$operands,
         OptionalAttr<AnyIntElementsAttr>:$diffArgIndices,
-        OptionalAttr<Builtin_FloatAttr>:$finiteDiffParam
+        OptionalAttr<Builtin_FloatAttr>:$finiteDiffParam,
+        OptionalAttr<DictArrayAttr>:$arg_attrs,
+        OptionalAttr<DictArrayAttr>:$res_attrs
     );
     let results = (outs Variadic<AnyTypeOf<[AnyFloat, RankedTensorOf<[AnyFloat]>]>>);
 
@@ -82,7 +84,9 @@ def ValueAndGradOp : Gradient_Op<"value_and_grad", [
         SymbolRefAttr:$callee,
         Variadic<AnyType>:$operands,
         OptionalAttr<AnyIntElementsAttr>:$diffArgIndices,
-        OptionalAttr<Builtin_FloatAttr>:$finiteDiffParam
+        OptionalAttr<Builtin_FloatAttr>:$finiteDiffParam,
+        OptionalAttr<DictArrayAttr>:$arg_attrs,
+        OptionalAttr<DictArrayAttr>:$res_attrs
     );
 
     let results = (outs
@@ -184,7 +188,9 @@ def JVPOp : Gradient_Op<"jvp", [
         Variadic<AnyType>:$params,
         Variadic<AnyType>:$tangents,
         OptionalAttr<AnyIntElementsAttr>:$diffArgIndices,
-        OptionalAttr<Builtin_FloatAttr>:$finiteDiffParam
+        OptionalAttr<Builtin_FloatAttr>:$finiteDiffParam,
+        OptionalAttr<DictArrayAttr>:$arg_attrs,
+        OptionalAttr<DictArrayAttr>:$res_attrs
     );
 
     let results = (outs
@@ -217,7 +223,9 @@ def VJPOp : Gradient_Op<"vjp", [
         Variadic<AnyType>:$params,
         Variadic<AnyType>:$cotangents,
         OptionalAttr<AnyIntElementsAttr>:$diffArgIndices,
-        OptionalAttr<Builtin_FloatAttr>:$finiteDiffParam
+        OptionalAttr<Builtin_FloatAttr>:$finiteDiffParam,
+        OptionalAttr<DictArrayAttr>:$arg_attrs,
+        OptionalAttr<DictArrayAttr>:$res_attrs
     );
 
     let results = (outs
