@@ -15,16 +15,21 @@
 #pragma once
 
 #include <algorithm> // generate_n
+#include <chrono>
 #include <complex>
+#include <cstdio>
+#include <fstream>
 #include <memory>
 #include <optional>
 #include <random>
+#include <unordered_map>
 #include <vector>
 
 #include "DataView.hpp"
 #include "QuantumDevice.hpp"
 #include "QubitManager.hpp"
 #include "Types.h"
+#include "Utils.hpp"
 
 namespace Catalyst::Runtime::Devices {
 
@@ -40,13 +45,47 @@ namespace Catalyst::Runtime::Devices {
  *   of the device; these are used to implement Quantum Instruction Set (QIS) instructions.
  */
 struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
-    NullQubit(const std::string &kwargs = "{}") {}
-    ~NullQubit() = default; // LCOV_EXCL_LINE
+    NullQubit(const std::string &kwargs = "{}")
+    {
+        auto device_kwargs = Catalyst::Runtime::parse_kwargs(kwargs);
+        if (device_kwargs.find("track_resources") != device_kwargs.end()) {
+            track_resources_ = device_kwargs["track_resources"] == "True";
+        }
+    }
+    ~NullQubit() {} // LCOV_EXCL_LINE
 
     NullQubit &operator=(const NullQubit &) = delete;
     NullQubit(const NullQubit &) = delete;
     NullQubit(NullQubit &&) = delete;
     NullQubit &operator=(NullQubit &&) = delete;
+
+    /**
+     * @brief Prints resources that would be used to execute this circuit as a JSON
+     */
+    void PrintResourceUsage(FILE *resources_file)
+    {
+        // Store the 2 special variables and clear them from the map to make
+        // pretty-printing easier
+        const size_t num_qubits = resource_data_["num_qubits"];
+        const size_t num_gates = resource_data_["num_gates"];
+        resource_data_.erase("num_gates");
+        resource_data_.erase("num_qubits");
+
+        std::stringstream resources;
+
+        resources << "{\n";
+        resources << "  \"num_qubits\": " << num_qubits << ",\n";
+        resources << "  \"num_gates\": " << num_gates << ",\n";
+        resources << "  \"gate_types\": ";
+        pretty_print_dict(resource_data_, 2, resources);
+        resources << "\n}" << std::endl;
+
+        fwrite(resources.str().c_str(), 1, resources.str().size(), resources_file);
+
+        // Restore 2 special variables
+        resource_data_["num_qubits"] = num_qubits;
+        resource_data_["num_gates"] = num_gates;
+    }
 
     /**
      * @brief Allocate a "null" qubit.
@@ -56,6 +95,10 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     auto AllocateQubit() -> QubitIdType
     {
         num_qubits_++; // next_id
+        if (this->track_resources_) {
+            // Store the highest number of qubits allocated at any time since device creation
+            resource_data_["num_qubits"] = std::max(num_qubits_, resource_data_["num_qubits"]);
+        }
         return this->qubit_manager.Allocate(num_qubits_);
     }
 
@@ -94,6 +137,27 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     {
         num_qubits_ = 0;
         this->qubit_manager.ReleaseAll();
+        if (this->track_resources_) {
+            auto time = std::chrono::high_resolution_clock::now();
+            auto timestamp =
+                std::chrono::duration_cast<std::chrono::nanoseconds>(time.time_since_epoch())
+                    .count();
+            std::stringstream resources_fname;
+            resources_fname << "__pennylane_resources_data_" << timestamp << ".json";
+
+            // Need to use FILE* instead of ofstream since ofstream has no way to atomically open a
+            // file only if it does not already exist
+            FILE *resources_file = fopen(resources_fname.str().c_str(), "wx");
+            if (resources_file == nullptr) {
+                std::string err_msg = "Error opening file '" + resources_fname.str() + "'.";
+                RT_FAIL(err_msg.c_str());
+            }
+            else {
+                PrintResourceUsage(resources_file);
+                fclose(resources_file);
+            }
+            this->resource_data_.clear();
+        }
     }
 
     /**
@@ -170,6 +234,23 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
                         const std::vector<QubitIdType> &controlled_wires = {},
                         const std::vector<bool> &controlled_values = {})
     {
+        if (this->track_resources_) {
+            std::string prefix = "";
+            std::string suffix = "";
+            if (!controlled_wires.empty()) {
+                if (controlled_wires.size() > 1) {
+                    prefix += std::to_string(controlled_wires.size());
+                }
+                prefix += "C(";
+                suffix += ")";
+            }
+            if (inverse) {
+                prefix += "Adj(";
+                suffix += ")";
+            }
+            resource_data_["num_gates"]++;
+            resource_data_[prefix + name + suffix]++;
+        }
     }
 
     /**
@@ -177,10 +258,23 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      *
      */
     void MatrixOperation(const std::vector<std::complex<double>> &,
-                         const std::vector<QubitIdType> &, bool,
+                         const std::vector<QubitIdType> &, bool inverse,
                          const std::vector<QubitIdType> &controlled_wires = {},
                          const std::vector<bool> &controlled_values = {})
     {
+        if (this->track_resources_) {
+            resource_data_["num_gates"]++;
+
+            std::string op_name = "QubitUnitary";
+
+            if (!controlled_wires.empty()) {
+                op_name = "Controlled" + op_name;
+            }
+            if (inverse) {
+                op_name = "Adj(" + op_name + ")";
+            }
+            resource_data_[op_name]++;
+        }
     }
 
     /**
@@ -360,9 +454,28 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
         return {0, 0, 0, {}, {}};
     }
 
+    /**
+     * @brief Returns the number of gates used since the last time all qubits were released. Only
+     * works if resource tracking is enabled
+     */
+    auto ResourcesGetNumGates() -> std::size_t { return resource_data_["num_gates"]; }
+
+    /**
+     * @brief Returns the maximum number of qubits used since the last time all qubits were
+     * released. Only works if resource tracking is enabled
+     */
+    auto ResourcesGetNumQubits() -> std::size_t { return resource_data_["num_qubits"]; }
+
+    /**
+     * @brief Returns whether the device is tracking resources or not.
+     */
+    auto IsTrackingResources() const -> bool { return track_resources_; }
+
   private:
+    bool track_resources_{false};
     std::size_t num_qubits_{0};
     std::size_t device_shots_{0};
+    std::unordered_map<std::string, std::size_t> resource_data_;
     Catalyst::Runtime::QubitManager<QubitIdType, size_t> qubit_manager{};
 
     // static constants for RESULT values

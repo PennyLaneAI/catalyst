@@ -6,6 +6,7 @@ sphinxcontrib-devhelp==2.0.0
 sphinxcontrib-qthelp==2.0.0
 sphinxcontrib-htmlhelp==2.1.0
 sphinxcontrib-serializinghtml==2.0.0
+sphinx-copybutton
 ipykernel
 nbsphinx==0.9.7
 Jinja2==3.1.4
@@ -32,4 +33,4 @@ lxml_html_clean
 --extra-index-url https://test.pypi.org/simple/
 pennylane-lightning-kokkos==0.42.0-dev16
 pennylane-lightning==0.42.0-dev16
-pennylane==0.42.0-dev27
+pennylane==0.42.0-dev33

@@ -129,6 +129,7 @@ extensions = [
     "sphinx.ext.napoleon",
     "sphinx.ext.todo",
     "sphinx.ext.viewcode",
+    "sphinx_copybutton",
     "sphinxext.opengraph",
     "sphinx_automodapi.automodapi",
     "sphinx_automodapi.smart_resolver",
@@ -137,6 +138,9 @@ extensions = [
 ]
 
 intersphinx_mapping = {"pennylane": ("https://docs.pennylane.ai/en/stable/", None)}
+
+copybutton_prompt_text = r">>> |\.\.\. |\$ |In \[\d*\]: | {2,5}\.\.\.: | {5,8}: "
+copybutton_prompt_is_regexp = True
 
 # add the custom MLIR Lexer
 lexers["mlir"] = MLIRLexer(startinline=True)
