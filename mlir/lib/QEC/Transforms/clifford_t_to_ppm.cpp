@@ -14,8 +14,6 @@
 
 #define DEBUG_TYPE "to_ppm"
 
-#include "llvm/Support/Debug.h"
-
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
