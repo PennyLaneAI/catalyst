@@ -23,6 +23,10 @@ from catalyst.passes import commute_ppr, merge_ppr_ppm, ppr_to_ppm, to_ppm, to_p
 
 
 def test_convert_clifford_to_ppr():
+    """
+    Test the `to_ppr` pass.
+    Check that the original qnode is correctly kept and untransformed.
+    """
 
     pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
 
@@ -46,6 +50,10 @@ test_convert_clifford_to_ppr()
 
 
 def test_commute_ppr():
+    """
+    Test the `commute_ppr` pass.
+    Ensure that the `qec.ppr` with pi/8 rotations are moved to the beginning of the circuit.
+    """
 
     pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
 
@@ -73,6 +81,10 @@ test_commute_ppr()
 
 
 def test_commute_ppr_max_pauli_size():
+    """
+    Test the `commute_ppr` pass with max_pauli_size.
+    The Pauli string should not be larger than max_pauli_size.
+    """
 
     pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
 
@@ -100,6 +112,10 @@ test_commute_ppr_max_pauli_size()
 
 
 def test_merge_ppr_ppm():
+    """
+    Test the `merge_ppr_ppm` pass.
+    `qec.ppr` should be merged into `qec.ppm`, thus no `qec.ppr` should be left.
+    """
 
     pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
 
@@ -124,6 +140,10 @@ test_merge_ppr_ppm()
 
 
 def test_merge_ppr_ppm_max_pauli_size():
+    """
+    Test the `merge_ppr_ppm` pass with max_pauli_size.
+    The Pauli string should not be larger than max_pauli_size.
+    """
 
     pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
 
@@ -148,6 +168,10 @@ test_merge_ppr_ppm_max_pauli_size()
 
 
 def test_ppr_to_ppm():
+    """
+    Test the pipeline `ppr_to_ppm` pass.
+    Check that the `qec.ppr` is correctly decomposed into `qec.ppm`.
+    """
 
     pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
 
@@ -202,55 +226,13 @@ def test_ppr_to_ppm():
 test_ppr_to_ppm()
 
 
-def test_commute_ppr_and_merge_ppr_ppm_with_max_pauli_size():
-
-    pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
-
-    @qjit(pipelines=pipe, target="mlir")
-    def test_convert_clifford_to_ppr_workflow():
-
-        @to_ppr
-        @commute_ppr(max_pauli_size=2)
-        @merge_ppr_ppm
-        @qml.qnode(qml.device("null.qubit", wires=2))
-        def f():
-            qml.CNOT([0, 2])
-            qml.T(0)
-            qml.T(1)
-            qml.CNOT([0, 1])
-            qml.S(0)
-            qml.H(0)
-            qml.T(0)
-            return measure(0), measure(1)
-
-        @to_ppr
-        @commute_ppr
-        @merge_ppr_ppm(max_pauli_size=1)
-        @qml.qnode(qml.device("null.qubit", wires=2))
-        def g():
-            qml.CNOT([0, 2])
-            qml.T(0)
-            qml.T(1)
-            qml.CNOT([0, 1])
-            return measure(0), measure(1)
-
-        return f(), g()
-
-    print(test_convert_clifford_to_ppr_workflow.mlir_opt)
-
-
-# Test commute_ppr with max_pauli_size
-# CHECK-LABEL: public @f
-# CHECK: qec.ppr ["Z", "X"](4)
-# CHECK: qec.ppr ["X", "X"](8)
-# Test merge_ppr_ppm with max_pauli_size
-# CHECK-LABEL: public @g
-# CHECK: qec.ppr ["Z", "X"](4)
-# CHECK: qec.ppm ["Y"](-1)
-test_commute_ppr_and_merge_ppr_ppm_with_max_pauli_size()
-
-
 def test_clifford_to_ppm():
+    """
+    Test the pipeline `to_ppm` pass.
+    Check whole pipeline of PPM's sub-passes.
+    The Pauli string should not be larger than max_pauli_size, but in ppr_to_ppm,
+    the Pauli string can increase by one because of an additional auxiliary qubit.
+    """
 
     pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
 
