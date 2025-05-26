@@ -83,18 +83,17 @@ void annotate(FunctionOpInterface op, PatternRewriter &rewriter, const char *att
 struct AnnotateFunctionPattern : public OpInterfaceRewritePattern<FunctionOpInterface> {
     using OpInterfaceRewritePattern<FunctionOpInterface>::OpInterfaceRewritePattern;
 
-    LogicalResult match(FunctionOpInterface op) const;
-    void rewrite(FunctionOpInterface op, PatternRewriter &rewriter) const;
+    LogicalResult matchAndRewrite(FunctionOpInterface op, PatternRewriter &rewriter) const override;
 };
 
-LogicalResult AnnotateFunctionPattern::match(FunctionOpInterface op) const
+LogicalResult AnnotateFunctionPattern::matchAndRewrite(FunctionOpInterface op, PatternRewriter &rewriter) const
 {
-    return successfulMatchLeaf(op) ? success() : failure();
-}
+    if (!successfulMatchLeaf(op)){
+        return failure();
+    }
 
-void AnnotateFunctionPattern::rewrite(FunctionOpInterface op, PatternRewriter &rewriter) const
-{
     annotate(op, rewriter, hasInvalidGradientOp);
+    return success();
 }
 
 std::optional<FunctionOpInterface> getFuncOp(const CallGraphNode *node, CallGraph &cg)
@@ -156,21 +155,20 @@ struct PropagateAnnotationPattern : public OpInterfaceRewritePattern<FunctionOpI
     {
     }
 
-    LogicalResult match(FunctionOpInterface op) const;
-    void rewrite(FunctionOpInterface op, PatternRewriter &rewriter) const;
+    LogicalResult matchAndRewrite(FunctionOpInterface op, PatternRewriter &rewriter) const override;
 
   private:
     CallGraph &callgraph;
 };
 
-LogicalResult PropagateAnnotationPattern::match(FunctionOpInterface op) const
+LogicalResult PropagateAnnotationPattern::matchAndRewrite(FunctionOpInterface op, PatternRewriter &rewriter) const
 {
-    return successfulMatchNode(op, hasInvalidGradientOp, callgraph) ? success() : failure();
-}
+    if (!successfulMatchNode(op, hasInvalidGradientOp, callgraph)){
+        return failure();
+    }
 
-void PropagateAnnotationPattern::rewrite(FunctionOpInterface op, PatternRewriter &rewriter) const
-{
     annotate(op, rewriter, hasInvalidGradientOp);
+    return success();
 }
 
 } // namespace

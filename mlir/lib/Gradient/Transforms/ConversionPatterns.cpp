@@ -825,9 +825,7 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
 struct ForwardOpPattern : public ConvertOpToLLVMPattern<ForwardOp> {
     using ConvertOpToLLVMPattern::ConvertOpToLLVMPattern;
 
-    LogicalResult match(ForwardOp op) const override { return success(); }
-
-    void rewrite(ForwardOp op, OpAdaptor adaptor,
+    LogicalResult matchAndRewrite(ForwardOp op, OpAdaptor adaptor,
                  ConversionPatternRewriter &rewriter) const override
     {
         // convert all arguments to pointers...
@@ -866,15 +864,14 @@ struct ForwardOpPattern : public ConvertOpToLLVMPattern<ForwardOp> {
         rewriter.inlineRegionBefore(op.getRegion(), func.getBody(), func.end());
         catalyst::gradient::wrapMemRefArgsFunc(func, typeConverter, rewriter, op.getLoc());
         rewriter.eraseOp(op);
+        return success();
     }
 };
 
 struct ReverseOpPattern : public ConvertOpToLLVMPattern<ReverseOp> {
     using ConvertOpToLLVMPattern::ConvertOpToLLVMPattern;
 
-    LogicalResult match(ReverseOp op) const override { return success(); }
-
-    void rewrite(ReverseOp op, OpAdaptor adaptor,
+    LogicalResult matchAndRewrite(ReverseOp op, OpAdaptor adaptor,
                  ConversionPatternRewriter &rewriter) const override
     {
         auto argc = op.getArgc();
@@ -992,15 +989,14 @@ struct ReverseOpPattern : public ConvertOpToLLVMPattern<ReverseOp> {
         catalyst::gradient::wrapMemRefArgsFunc(func, typeConverter, rewriter, op.getLoc());
 
         rewriter.eraseOp(op);
+        return success();
     }
 };
 
 struct ReturnOpPattern : public ConvertOpToLLVMPattern<ReturnOp> {
     using ConvertOpToLLVMPattern::ConvertOpToLLVMPattern;
 
-    LogicalResult match(ReturnOp op) const override { return success(); }
-
-    void rewrite(ReturnOp op, OpAdaptor adaptor, ConversionPatternRewriter &rewriter) const override
+    LogicalResult matchAndRewrite(ReturnOp op, OpAdaptor adaptor, ConversionPatternRewriter &rewriter) const override
     {
         auto loc = op.getLoc();
         if (op.getEmpty()) {
@@ -1036,6 +1032,7 @@ struct ReturnOpPattern : public ConvertOpToLLVMPattern<ReturnOp> {
 
         auto returnOp = rewriter.create<LLVM::ReturnOp>(loc, result);
         rewriter.replaceOp(op, returnOp);
+        return success();
     }
 };
 

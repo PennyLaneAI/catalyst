@@ -28,16 +28,12 @@
 namespace catalyst {
 namespace gradient {
 
-LogicalResult AdjointLowering::match(func::FuncOp op) const
+LogicalResult AdjointLowering::matchAndRewrite(func::FuncOp op, PatternRewriter &rewriter) const
 {
-    if (getQNodeDiffMethod(op) == "adjoint" && requiresCustomGradient(op))
-        return success();
+    if (!(getQNodeDiffMethod(op) == "adjoint" && requiresCustomGradient(op))){
+        return failure();
+    }
 
-    return failure();
-}
-
-void AdjointLowering::rewrite(func::FuncOp op, PatternRewriter &rewriter) const
-{
     Location loc = op.getLoc();
     rewriter.setInsertionPointAfter(op);
 
@@ -47,6 +43,7 @@ void AdjointLowering::rewrite(func::FuncOp op, PatternRewriter &rewriter) const
 
     // Register the quantum gradient on the quantum-only split-out QNode.
     registerCustomGradient(op, FlatSymbolRefAttr::get(qGradFn));
+    return success();
 }
 
 func::FuncOp AdjointLowering::discardAndReturnReg(PatternRewriter &rewriter, Location loc,

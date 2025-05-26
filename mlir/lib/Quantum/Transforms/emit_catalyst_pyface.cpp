@@ -173,17 +173,15 @@ void wrapResultsAndArgsInTwoStructs(LLVM::LLVMFuncOp op, PatternRewriter &rewrit
 struct EmitCatalystPyInterfaceTransform : public OpRewritePattern<LLVM::LLVMFuncOp> {
     using OpRewritePattern<LLVM::LLVMFuncOp>::OpRewritePattern;
 
-    LogicalResult match(LLVM::LLVMFuncOp op) const;
-    void rewrite(LLVM::LLVMFuncOp op, PatternRewriter &rewriter) const;
+    LogicalResult matchAndRewrite(LLVM::LLVMFuncOp op, PatternRewriter &rewriter) const override;
 };
 
-LogicalResult EmitCatalystPyInterfaceTransform::match(LLVM::LLVMFuncOp op) const
+LogicalResult EmitCatalystPyInterfaceTransform::matchAndRewrite(LLVM::LLVMFuncOp op, PatternRewriter &rewriter) const
 {
-    return isFunctionMLIRCWrapper(op) ? success() : failure();
-}
+    if (!isFunctionMLIRCWrapper(op)){
+        return failure();
+    }
 
-void EmitCatalystPyInterfaceTransform::rewrite(LLVM::LLVMFuncOp op, PatternRewriter &rewriter) const
-{
     // Find substr after _mlir_ciface_
     std::string _mlir_ciface = "_mlir_ciface_";
     size_t _mlir_ciface_len = _mlir_ciface.length();
@@ -194,6 +192,7 @@ void EmitCatalystPyInterfaceTransform::rewrite(LLVM::LLVMFuncOp op, PatternRewri
 
     rewriter.modifyOpInPlace(op, [&] { op.setSymName(newName); });
     wrapResultsAndArgsInTwoStructs(op, rewriter, functionNameWithoutPrefix);
+    return success();
 }
 
 } // namespace
