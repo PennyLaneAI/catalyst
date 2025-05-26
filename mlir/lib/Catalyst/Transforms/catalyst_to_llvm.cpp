@@ -334,8 +334,10 @@ struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
         ModuleOp mod = op->getParentOfType<ModuleOp>();
         rewriter.setInsertionPointToStart(mod.getBody());
 
-        LLVM::LLVMFuncOp customCallFnOp = mlir::LLVM::lookupOrCreateFn(
-            mod, op.getCallTargetName(), {/*args=*/ptr, /*rets=*/ptr}, /*ret_type=*/voidType);
+        LLVM::LLVMFuncOp customCallFnOp =
+            mlir::LLVM::lookupOrCreateFn(mod, op.getCallTargetName(), {/*args=*/ptr, /*rets=*/ptr},
+                                         /*ret_type=*/voidType)
+                .value();
         customCallFnOp.setPrivate();
         rewriter.restoreInsertionPoint(point);
 
@@ -465,9 +467,11 @@ struct DefineCallbackOpPattern : public OpConversionPattern<CallbackOp> {
         bool isVarArg = true;
         ModuleOp mod = op->getParentOfType<ModuleOp>();
         auto typeConverter = getTypeConverter();
-        LLVM::LLVMFuncOp customCallFnOp = mlir::LLVM::lookupOrCreateFn(
-            mod, "__catalyst_inactive_callback", {/*args=*/i64, i64, i64},
-            /*ret_type=*/voidType, isVarArg);
+        LLVM::LLVMFuncOp customCallFnOp =
+            mlir::LLVM::lookupOrCreateFn(mod, "__catalyst_inactive_callback",
+                                         {/*args=*/i64, i64, i64},
+                                         /*ret_type=*/voidType, isVarArg)
+                .value();
         SmallVector<Attribute> passthroughs;
         auto keyAttr = StringAttr::get(ctx, "nofree");
         passthroughs.push_back(keyAttr);
