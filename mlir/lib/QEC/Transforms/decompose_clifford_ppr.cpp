@@ -43,7 +43,7 @@ struct DecomposeCliffordPPRPass
 
         populateDecomposeCliffordPPRPatterns(patterns, avoidYMeasure);
 
-        if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
+        if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
             return signalPassFailure();
         }
     }

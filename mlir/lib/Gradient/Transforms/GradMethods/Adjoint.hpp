@@ -25,8 +25,8 @@ namespace gradient {
 struct AdjointLowering : public OpRewritePattern<func::FuncOp> {
     using OpRewritePattern<func::FuncOp>::OpRewritePattern;
 
-    LogicalResult match(func::FuncOp op) const override;
-    void rewrite(func::FuncOp op, PatternRewriter &rewriter) const override;
+    LogicalResult match(func::FuncOp op) const;
+    void rewrite(func::FuncOp op, PatternRewriter &rewriter) const;
 
   private:
     static func::FuncOp genQGradFunction(PatternRewriter &rewriter, Location loc,
