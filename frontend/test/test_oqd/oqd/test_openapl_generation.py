@@ -56,7 +56,7 @@ def verify_json(correct_file_name, expected_file_name):
 
 
 class TestTargetGates:
-    """Test that the OQD device correctly generates an OpenAPL program for target gates of the OQD device ({'RX', 'RY', 'MS'})."""
+    """Test OQD device OpenAPL generation for target gates ({'RX', 'RY', 'MS'})."""
 
     test_path = os.path.dirname(__file__)
 
@@ -114,7 +114,7 @@ class TestChainedGates:
 
 
 class TestDecomposableGates:
-    """Test that the OQD device correctly generates an OpenAPL program for gates that can be decomposed into target gates of the OQD device."""
+    """Test OQD device OpenAPL generation for gates decomposable into target gates."""
 
     test_path = os.path.dirname(__file__)
 
@@ -225,7 +225,7 @@ class TestDecomposableGates:
 
 
 class TestComplexCircuits:
-    """Test that the OQD device correctly generates an OpenAPL program for more complex quantum circuits."""
+    """Test OQD device OpenAPL generation for more complex quantum circuits."""
 
     test_path = os.path.dirname(__file__)
 
