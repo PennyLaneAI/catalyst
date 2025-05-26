@@ -1002,7 +1002,7 @@ struct ReturnOpPattern : public ConvertOpToLLVMPattern<ReturnOp> {
         if (op.getEmpty()) {
             auto returnOp = rewriter.create<LLVM::ReturnOp>(loc, ValueRange{});
             rewriter.replaceOp(op, returnOp);
-            return;
+            return success();
         }
 
         auto tape = adaptor.getTape();
@@ -1013,7 +1013,7 @@ struct ReturnOpPattern : public ConvertOpToLLVMPattern<ReturnOp> {
             Value nullPtr = rewriter.create<LLVM::ZeroOp>(loc, ptrType);
             auto returnOp = rewriter.create<LLVM::ReturnOp>(loc, nullPtr);
             rewriter.replaceOp(op, returnOp);
-            return;
+            return success();
         }
 
         SmallVector<Value> tapeStructVals(tape);
