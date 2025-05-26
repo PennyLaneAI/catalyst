@@ -670,7 +670,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get -y -q install cmake ninja-build 
+          sudo apt-get -y -q install cmake ninja-build lcov
           python3 -m pip install nanobind pybind11
           # sudo apt-get remove -y gcc g++
           # sudo apt-get install -y gcc-11 g++-11 lcov
@@ -706,7 +706,7 @@ jobs:
           COMPILER_LAUNCHER="" \
           ENABLE_OQD=ON \
           LLVM_DIR="$(pwd)/mlir/llvm-project" \
-          make coverage-runtime --ignore-errors mismatch
+          make coverage-runtime
           mv runtime/build_cov/coverage.info coverage-${{ github.job }}.info
 
       - name: Upload to Codecov
