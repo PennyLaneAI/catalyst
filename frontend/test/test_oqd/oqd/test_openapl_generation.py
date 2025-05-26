@@ -20,11 +20,10 @@ import os
 import numpy as np
 import pennylane as qml
 import pytest
+from pennylane_ionq import ops
 
 from catalyst import qjit
 from catalyst.third_party.oqd import OQDDevice, OQDDevicePipeline
-from pennylane_ionq import ops
-
 
 
 @pytest.fixture(scope="module")
@@ -94,8 +93,9 @@ class TestTargetGates:
 
 class TestChainedGates:
     """Test that the OQD device correctly generates an OpenAPL program for chained gates."""
+
     test_path = os.path.dirname(__file__)
-    
+
     def test_RX_RY_gate(self, oqd_pipelines, result_openapl_file):
         """Test OpenAPL generation for a circuit with a single RX and RY Gate."""
         oqd_dev = OQDDevice(backend="default", shots=4, wires=1)
@@ -111,7 +111,7 @@ class TestChainedGates:
 
         expected_f = os.path.join(self.test_path, "test_RX_RY.json")
         assert verify_json(expected_f, result_openapl_file)
-    
+
 
 class TestDecomposableGates:
     """Test that the OQD device correctly generates an OpenAPL program for gates that can be decomposed into target gates of the OQD device."""
@@ -170,7 +170,7 @@ class TestDecomposableGates:
         @qjit(pipelines=oqd_pipelines)
         @qml.qnode(oqd_dev)
         def circuit():
-            qml.PhaseShift(np.pi/4, wires=0)
+            qml.PhaseShift(np.pi / 4, wires=0)
             return qml.counts(wires=0)
 
         circuit()
@@ -185,7 +185,7 @@ class TestDecomposableGates:
         @qjit(pipelines=oqd_pipelines)
         @qml.qnode(oqd_dev)
         def circuit():
-            qml.RZ(np.pi/4, wires=0)
+            qml.RZ(np.pi / 4, wires=0)
             return qml.counts(wires=0)
 
         circuit()
@@ -222,6 +222,7 @@ class TestDecomposableGates:
 
         expected_f = os.path.join(self.test_path, "test_single_S.json")
         assert verify_json(expected_f, result_openapl_file)
+
 
 class TestComplexCircuits:
     """Test that the OQD device correctly generates an OpenAPL program for more complex quantum circuits."""
