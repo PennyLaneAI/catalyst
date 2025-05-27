@@ -88,7 +88,7 @@ void createBufferizationPipeline(OpPassManager &pm)
     pm.addNestedPass<mlir::func::FuncOp>(mlir::bufferization::createPromoteBuffersToStackPass());
     pm.addNestedPass<mlir::func::FuncOp>(mlir::bufferization::createBufferDeallocationPass());
     pm.addPass(catalyst::createArrayListToMemRefPass());
-    pm.addPass(mlir::createBufferizationToMemRefPass());
+    pm.addPass(mlir::createConvertBufferizationToMemRefPass());
     pm.addPass(mlir::createCanonicalizerPass());
     pm.addPass(catalyst::createCopyGlobalMemRefPass());
 }
