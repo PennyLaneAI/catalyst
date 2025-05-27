@@ -450,11 +450,16 @@ jobs:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
 
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.10"
+
     - name: Install Deps
       run: |
         sudo apt-get update
         sudo apt-get install -y python3 python3-pip libomp-dev libasan6 make ninja-build
-        # python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
+        python3 --version 
         python3 -m pip install -r requirements.txt
         # cuda-quantum is added manually here.
         # It can't be in requirements.txt as that will break
