@@ -661,7 +661,7 @@ jobs:
   runtime-code-cov:
     name: Runtime Tests & Coverage
     needs: [constants, determine_runner]
-    runs-on: ubuntu-22.04
+    runs-on: ${{ needs.determine_runner.outputs.runner_group }}
 
     steps:
       - name: Checkout the repo
@@ -678,16 +678,21 @@ jobs:
           sudo apt-get -y -q install cmake ninja-build 
           python3.10 -m pip install nanobind pybind11
           sudo apt-get remove -y gcc g++
-          sudo apt-get install -y gcc-11 g++-11 lcov
-          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 100
-          sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-11 100 
-          sudo update-alternatives --install /usr/bin/gcov gcov /usr/bin/gcov-11 100 
+          sudo apt-get install -y gcc-11 g++-11 
+          # sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 100
+          # sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-11 100 
+          # sudo update-alternatives --install /usr/bin/gcov gcov /usr/bin/gcov-11 100 
+
+      - name: Install lcov # Manually install lcov 1.15
+        run: |
+          wget http://archive.ubuntu.com/ubuntu/pool/universe/l/lcov/lcov_1.15-1_all.deb
+          sudo apt-get install -y ./lcov_1.15-1_all.deb
+          lcov --version 
 
       - name: Install additional dependencies for OpenQasm device
         run: |
           pip install numpy pybind11 amazon-braket-sdk PyYAML
           echo "AWS_DEFAULT_REGION=us-east-1" >> $GITHUB_ENV
-          lcov --version
 
       - name: Get Cached LLVM Source
         id: cache-llvm-source
@@ -708,7 +713,7 @@ jobs:
       - name: Run the debug
         run: |
           find $(pwd) -name "*.gc*" -print
-          # geninfo --ignore-errors gcov,mismatch .
+          geninfo --ignore-errors gcov,mismatch .
 
       - name: Run the main runtime test suite for coverage
         run: |
