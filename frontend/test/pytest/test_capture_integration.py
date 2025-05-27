@@ -388,6 +388,32 @@ class TestCapture:
 
         assert capture_result == expected_result
 
+    def test_measure_postselect(self, backend):
+        """Test the integration for a circuit with a mid-circuit measurement using postselect.
+
+        See note in test_measure() above for discussion on testing strategy.
+        """
+        device = qml.device(backend, wires=1)
+
+        # Capture enabled
+
+        qml.capture.enable()
+
+        @qjit
+        @qml.qnode(device)
+        def captured_circuit():
+            qml.H(wires=0)
+            qml.measure(wires=0, postselect=1)
+            return qml.expval(qml.Z(0))
+
+        capture_result = captured_circuit()
+
+        qml.capture.disable()
+
+        expected_result = -1
+
+        assert capture_result == expected_result
+
     @pytest.mark.parametrize("theta", (jnp.pi, 0.1, 0.0))
     def test_forloop(self, backend, theta):
         """Test the integration for a circuit with a for loop."""
