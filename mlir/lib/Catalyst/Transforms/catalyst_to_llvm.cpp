@@ -437,15 +437,14 @@ struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
 struct DefineCallbackOpPattern : public OpConversionPattern<CallbackOp> {
     using OpConversionPattern::OpConversionPattern;
 
-    LogicalResult match(CallbackOp op) const
+    LogicalResult matchAndRewrite(CallbackOp op, CallbackOpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
     {
         // Only match with ops without an entry block
-        return !op.empty() ? failure() : success();
-    }
+        if (!op.empty()) {
+            return failure();
+        }
 
-    void rewrite(CallbackOp op, CallbackOpAdaptor adaptor,
-                 ConversionPatternRewriter &rewriter) const
-    {
         Block *entry;
         rewriter.modifyOpInPlace(op, [&] { entry = op.addEntryBlock(); });
         PatternRewriter::InsertionGuard guard(rewriter);
@@ -487,20 +486,21 @@ struct DefineCallbackOpPattern : public OpConversionPattern<CallbackOp> {
         }
         rewriter.create<LLVM::CallOp>(loc, customCallFnOp, callArgs);
         rewriter.create<func::ReturnOp>(loc, TypeRange{}, ValueRange{});
+        return success();
     }
 };
 
 struct ReplaceCallbackOpWithFuncOp : public OpConversionPattern<CallbackOp> {
     using OpConversionPattern::OpConversionPattern;
 
-    LogicalResult match(CallbackOp op) const
+    LogicalResult matchAndRewrite(CallbackOp op, CallbackOpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
     {
         // Only match with ops with an entry block
-        return !op.empty() ? success() : failure();
-    }
-    void rewrite(CallbackOp op, CallbackOpAdaptor adaptor,
-                 ConversionPatternRewriter &rewriter) const
-    {
+        if (op.empty()) {
+            return failure();
+        }
+
         ModuleOp mod = op->getParentOfType<ModuleOp>();
         rewriter.setInsertionPointToStart(mod.getBody());
 
@@ -515,6 +515,7 @@ struct ReplaceCallbackOpWithFuncOp : public OpConversionPattern<CallbackOp> {
         auto typeConverter = getTypeConverter();
         gradient::wrapMemRefArgsFunc(func, typeConverter, rewriter, op.getLoc());
         rewriter.eraseOp(op);
+        return success();
     }
 };
 
@@ -545,7 +546,8 @@ struct CallbackCallOpPattern : public OpConversionPattern<CallbackCallOp> {
 struct CustomGradOpPattern : public OpConversionPattern<gradient::CustomGradOp> {
     using OpConversionPattern::OpConversionPattern;
 
-    LogicalResult match(gradient::CustomGradOp op) const
+    LogicalResult matchAndRewrite(gradient::CustomGradOp op, gradient::CustomGradOpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
     {
         // only match after all three are func.func
         auto callee = op.getCalleeAttr();
@@ -556,22 +558,14 @@ struct CustomGradOpPattern : public OpConversionPattern<gradient::CustomGradOp> 
         auto forwardOp = mod.lookupSymbol<func::FuncOp>(forward);
         auto reverseOp = mod.lookupSymbol<func::FuncOp>(reverse);
         auto ready = calleeOp && forwardOp && reverseOp;
-        return ready ? success() : failure();
-    }
+        if (!ready) {
+            return failure();
+        }
 
-    void rewrite(gradient::CustomGradOp op, gradient::CustomGradOpAdaptor adaptor,
-                 ConversionPatternRewriter &rewriter) const
-    {
         auto loc = op.getLoc();
-        ModuleOp mod = op->getParentOfType<ModuleOp>();
-        auto callee = op.getCalleeAttr();
-        auto forward = op.getForwardAttr();
-        auto reverse = op.getReverseAttr();
-        auto calleeOp = mod.lookupSymbol<func::FuncOp>(callee);
-        auto forwardOp = mod.lookupSymbol<func::FuncOp>(forward);
-        auto reverseOp = mod.lookupSymbol<func::FuncOp>(reverse);
         gradient::insertEnzymeCustomGradient(rewriter, mod, loc, calleeOp, forwardOp, reverseOp);
         rewriter.eraseOp(op);
+        return success();
     }
 };
 
