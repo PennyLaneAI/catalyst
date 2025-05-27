@@ -649,7 +649,7 @@ def handle_while_loop(
 
 
 @QFuncPlxprInterpreter.register_primitive(plxpr_measure_prim)
-def handle_measure_in_basis(self, wire, reset, postselect):
+def handle_measure(self, wire, reset, postselect):
     """Handle the conversion from plxpr to Catalyst jaxpr for the mid-circuit measure primitive."""
 
     in_wire = self.get_wire(wire)
