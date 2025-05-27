@@ -252,7 +252,7 @@ struct LowerListPop : public OpConversionPattern<ListPopOp> {
 struct LowerListLoadData : public OpConversionPattern<ListLoadDataOp> {
     using OpConversionPattern<ListLoadDataOp>::OpConversionPattern;
 
-    LogicalResult matchAndRewrite(ListLoadDataOp op, OpAdaptor adaptor,
+    LogicalResult matchAndRewrite(ListLoadDataOp op, OneToNOpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
         auto typeConverter = getTypeConverter();
