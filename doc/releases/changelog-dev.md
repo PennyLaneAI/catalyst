@@ -156,6 +156,10 @@
   experimental PennyLane program-capture pipeline.
   [(#1631)](https://github.com/PennyLaneAI/catalyst/pull/1631)
 
+* Correctly copies contents to avoid mutating arguments during finite-diff lowering and avoids
+  generating incorrect code.
+  [(#1769)](https://github.com/PennyLaneAI/catalyst/pull/1769)
+
 <h3>Internal changes ⚙️</h3>
 
 * `null.qubit` can now support an optional `track_resources` argument which allows it to record which gates are executed.
@@ -214,6 +218,7 @@
   [(#1708)](https://github.com/PennyLaneAI/catalyst/pull/1708)
   [(#1740)](https://github.com/PennyLaneAI/catalyst/pull/1740)
   [(#1751)](https://github.com/PennyLaneAI/catalyst/pull/1751)
+  [(#1769)](https://github.com/PennyLaneAI/catalyst/pull/1769)
 
 * Redundant `OptionalAttr` is removed from `adjoint` argument in `QuantumOps.td` TableGen file
   [(#1746)](https://github.com/PennyLaneAI/catalyst/pull/1746)
