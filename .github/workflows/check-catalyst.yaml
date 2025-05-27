@@ -677,11 +677,11 @@ jobs:
           sudo apt-get update
           sudo apt-get -y -q install cmake ninja-build lcov
           python3.10 -m pip install nanobind pybind11
-          # sudo apt-get remove -y gcc g++
-          # sudo apt-get install -y gcc-11 g++-11 lcov
-          # sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 100
-          # sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-11 100 
-          # sudo update-alternatives --install /usr/bin/gcov gcov /usr/bin/gcov-11 100 
+          sudo apt-get remove -y gcc g++
+          sudo apt-get install -y gcc-11 g++-11 lcov
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 100
+          sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-11 100 
+          sudo update-alternatives --install /usr/bin/gcov gcov /usr/bin/gcov-11 100 
 
       - name: Install additional dependencies for OpenQasm device
         run: |
@@ -708,7 +708,7 @@ jobs:
         run: |
           find $(pwd) -name "*.gc*" -print
           geninfo --ignore-errors gcov,mismatch .
-          
+
           C_COMPILER="/usr/bin/gcc" \
           CXX_COMPILER="/usr/bin/g++" \
           COMPILER_LAUNCHER="" \
