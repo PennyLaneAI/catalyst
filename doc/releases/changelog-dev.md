@@ -227,6 +227,16 @@
 * The unused helper function `genArgMapFunction` in the `--lower-gradients` pass is removed.
   [(#1753)](https://github.com/PennyLaneAI/catalyst/pull/1753)
 
+* The `qml.measure()` operation for mid-circuit measurements can now be used in QJIT-compiled
+  circuits with program capture enabled.
+  [(#1766)](https://github.com/PennyLaneAI/catalyst/pull/1766)
+
+  Note that using `qml.measure()` in this way binds the operation to :func:`catalyst.measure`, which
+  may behave differently than `qml.measure()` in an native PennyLane circuit, as described in the
+  :doc:`Measurements section <quick_start#measurements>` of the quick start guide. In regular
+  QJIT-compiled workloads (without program capture enabled), you must continue to use
+  :func:`catalyst.measure`.
+
 <h3>Documentation 📝</h3>
 
 * The header (logo+title) images in the README and in the overview on RtD have been updated,
