@@ -687,6 +687,7 @@ jobs:
         run: |
           pip install numpy pybind11 amazon-braket-sdk PyYAML
           echo "AWS_DEFAULT_REGION=us-east-1" >> $GITHUB_ENV
+          lcov --version
 
       - name: Get Cached LLVM Source
         id: cache-llvm-source
