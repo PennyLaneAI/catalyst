@@ -708,7 +708,7 @@ jobs:
       - name: Run the debug
         run: |
           find $(pwd) -name "*.gc*" -print
-          geninfo --ignore-errors gcov,mismatch .
+          # geninfo --ignore-errors gcov,mismatch .
 
       - name: Run the main runtime test suite for coverage
         run: |
