@@ -211,10 +211,10 @@ struct AdjointOpPattern : public ConvertOpToLLVMPattern<AdjointOp> {
                 return op.emitOpError("adjoint can only return MemRef<?xf64> or tuple thereof");
         }
 
-        // The callee of the adjoint op must return as a single result the quantum register.
+        // The callee of the adjoint op must return 2 results: the quantum register and the expval.
         func::FuncOp callee =
             SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
-        assert(callee && callee.getNumResults() == 1 && "invalid qfunc symbol in adjoint op");
+        assert(callee && callee.getNumResults() == 2 && "invalid qfunc symbol in adjoint op");
 
         StringRef cacheFnName = "__catalyst__rt__toggle_recorder";
         StringRef gradFnName = "__catalyst__qis__Gradient";

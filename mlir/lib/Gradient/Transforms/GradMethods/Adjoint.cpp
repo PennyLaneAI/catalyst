@@ -65,10 +65,13 @@ func::FuncOp AdjointLowering::discardAndReturnReg(PatternRewriter &rewriter, Loc
     }
 
     // Since the return value is guaranteed to be discarded, then let's change the return type
-    // to be only the quantum register.
+    // to be only the quantum register and the expval.
+    // We also need to return the expval to avoid dead code elimination downstream from
+    // removing the expval op in the body.
     std::string fnName = callee.getName().str() + ".nodealloc";
     Type qregType = quantum::QuregType::get(rewriter.getContext());
-    FunctionType fnType = rewriter.getFunctionType(callee.getArgumentTypes(), qregType);
+    Type f64Type = rewriter.getF64Type();
+    FunctionType fnType = rewriter.getFunctionType(callee.getArgumentTypes(), {qregType, f64Type});
     StringAttr visibility = rewriter.getStringAttr("private");
 
     func::FuncOp unallocFn =
@@ -79,20 +82,30 @@ func::FuncOp AdjointLowering::discardAndReturnReg(PatternRewriter &rewriter, Loc
         rewriter.setInsertionPointAfter(callee);
         unallocFn =
             rewriter.create<func::FuncOp>(loc, fnName, fnType, visibility, nullptr, nullptr);
-        // clone the body.
+        // Clone the body.
+        // TODO: we do not support submodules, i.e. our gradient functions
+        // will have just one block.
+        assert(callee.getBody().hasOneBlock() &&
+               "Gradients with quantum submodules are not supported");
         rewriter.cloneRegionBefore(callee.getBody(), unallocFn.getBody(), unallocFn.end());
         rewriter.setInsertionPointToStart(&unallocFn.getBody().front());
 
-        // Let's capture the qreg.
-        quantum::DeallocOp localDealloc = *unallocFn.getOps<quantum::DeallocOp>().begin();
-
         // Let's return the qreg and erase the device release.
+        // We also need to return the expval op so it is not dead-code-eliminated
+        // TODO: we only support grad on expval op for now
+        SmallVector<Value> returnVals;
+        quantum::DeallocOp localDealloc = *unallocFn.getOps<quantum::DeallocOp>().begin();
+        returnVals.push_back(localDealloc.getOperand());
+        quantum::ExpvalOp expvalOp = *unallocFn.getOps<quantum::ExpvalOp>().begin();
+        returnVals.push_back(expvalOp.getExpval());
+
+        // TODO: don't walk
         unallocFn.walk([&](Operation *op) {
             if (isa<quantum::DeviceReleaseOp>(op)) {
                 rewriter.eraseOp(op);
             }
             else if (isa<func::ReturnOp>(op)) {
-                op->setOperands(localDealloc.getOperand());
+                op->setOperands(returnVals);
             }
         });
 
