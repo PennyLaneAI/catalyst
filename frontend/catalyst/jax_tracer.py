@@ -720,7 +720,7 @@ def trace_snapshot_op(
         raise NotImplementedError(
             "qml.Snapshot() only supports qml.state() when used from within Catalyst,"
             f" but encountered {type(op.hyperparameters['measurement'])}"
-        )  # pragma: no cover
+        )
 
 
 # pylint: disable=too-many-arguments,too-many-statements
@@ -1427,6 +1427,7 @@ def trace_quantum_function(
 
                 meas_tracers = check_full_raise(meas, trace.to_jaxpr_tracer)
                 if len(snapshot_results) > 0:
+                    # redefine meas_trees PyTree to have same PyTreeRegistry as Snapshot PyTree
                     meas_trees = jax.tree_util.tree_structure(
                         jax.tree_util.tree_unflatten(meas_trees, meas_tracers)
                     )
