@@ -20,6 +20,7 @@
 #include <vector>
 
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 
@@ -156,12 +157,32 @@ void FiniteDiffLowering::computeFiniteDiff(PatternRewriter &rewriter, Location l
             else {
                 auto bodyBuilder = [&](OpBuilder &rewriter, Location loc,
                                        ValueRange tensorIndices) -> void {
+                    // we need to do this to guarantee a copy here.
+                    // otherwise, each time we enter this scope, we will have a different
+                    // value for diffArgElemen
+                    //
+                    // %memref = bufferization.to_memref %arg0 : memref<2xf64>
+                    // %copy = bufferization.clone %memref : memref<2xf64> to memref<2xf64>
+                    // %tensor = bufferization.to_tensor %copy restrict : memref<2xf64>
+                    auto tensorTy = diffArg.getType();
+                    auto memrefTy = bufferization::getMemRefTypeWithStaticIdentityLayout(
+                        cast<TensorType>(tensorTy));
+                    auto toMemrefOp =
+                        rewriter.create<bufferization::ToMemrefOp>(loc, memrefTy, diffArg);
+
+                    auto cloneOp = rewriter.create<bufferization::CloneOp>(loc, toMemrefOp);
+
+                    auto toTensorOp =
+                        rewriter.create<bufferization::ToTensorOp>(loc, cloneOp, true);
+
+                    auto diffArgCopy = toTensorOp.getResult();
+
                     Value diffArgElem = rewriter.create<tensor::ExtractOp>(
-                        loc, diffArg, tensorIndices.take_back(operandRank));
+                        loc, diffArgCopy, tensorIndices.take_back(operandRank));
                     Value diffArgElemShifted =
                         rewriter.create<arith::AddFOp>(loc, diffArgElem, hForOperand);
                     Value diffArgShifted = rewriter.create<tensor::InsertOp>(
-                        loc, diffArgElemShifted, diffArg, tensorIndices.take_back(operandRank));
+                        loc, diffArgElemShifted, diffArgCopy, tensorIndices.take_back(operandRank));
 
                     std::vector<Value> callArgsForward(callArgs.begin(), callArgs.end());
                     callArgsForward[diffArgIdx] = diffArgShifted;
