@@ -72,7 +72,7 @@ jobs:
       - name: Build Catalyst-Runtime
         run: |
           COMPILER_LAUNCHER="" \
-          C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler_gcc', matrix.compiler)] }}) \
+          C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
           CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler_gxx', matrix.compiler)] }}) \
           RT_BUILD_DIR="$(pwd)/runtime-build" \
           LLVM_DIR="$(pwd)/mlir/llvm-project" \

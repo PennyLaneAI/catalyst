@@ -13,7 +13,7 @@ on:
         type: boolean
       runs_on:
         required: false
-        default: ubuntu-22.04
+        default: ubuntu-24.04
         type: string
     outputs:
       llvm_version:
@@ -45,6 +45,9 @@ on:
         value: g++
       cxx_compiler_clang:
         value: clang++
+      c_compiler.gcc:
+        description: "C compiler GCC"
+        value: gcc
 
 jobs:
   set-constants:
