@@ -23,8 +23,8 @@
   * `decompose_non_clifford_ppr`: Decompose non-Cliford PPR (:math:`\theta = \tfrac{\pi}{8}`)
   into PPMs using a magic state.
 
-* PennyLane supports the [`qml.Snapshot`]
-  (https://docs.pennylane.ai/en/stable/code/api/pennylane.Snapshot.html)
+* PennyLane supports the 
+  [`qml.Snapshot`](https://docs.pennylane.ai/en/stable/code/api/pennylane.Snapshot.html)
   operation which saves the internal state of devices at arbitrary points of execution. Support for 
   `qml.Snapshot` to capture quantum states at any point in a circuit has been added to Catalyst. 
   For example, the code below is capturing two snapshot states:
