@@ -98,7 +98,7 @@ void createLLVMDialectLoweringPipeline(OpPassManager &pm)
     pm.addPass(catalyst::createGradientConversionPass());
     pm.addPass(catalyst::createMemrefCopyToLinalgCopyPass());
     pm.addNestedPass<mlir::func::FuncOp>(mlir::createConvertLinalgToLoopsPass());
-    pm.addPass(mlir::createConvertSCFToCFPass());
+    pm.addPass(mlir::createSCFToControlFlowPass());
     pm.addPass(mlir::memref::createExpandStridedMetadataPass());
     pm.addPass(mlir::createLowerAffinePass());
     pm.addPass(mlir::arith::createArithExpandOpsPass());
