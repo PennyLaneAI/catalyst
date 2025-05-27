@@ -232,10 +232,9 @@
   [(#1766)](https://github.com/PennyLaneAI/catalyst/pull/1766)
 
   Note that using `qml.measure()` in this way binds the operation to :func:`catalyst.measure`, which
-  may behave differently than `qml.measure()` in an native PennyLane circuit, as described in the
-  :doc:`Measurements section <quick_start#measurements>` of the quick start guide. In regular
-  QJIT-compiled workloads (without program capture enabled), you must continue to use
-  :func:`catalyst.measure`.
+  may behave differently than `qml.measure()` in a native PennyLane circuit, as described in the
+  :doc:`Measurements section <measurements>` of the quick start guide. In regular QJIT-compiled
+  workloads (without program capture enabled), you must continue to use :func:`catalyst.measure`.
 
 <h3>Documentation 📝</h3>
 
