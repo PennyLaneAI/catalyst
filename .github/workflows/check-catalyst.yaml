@@ -333,7 +333,7 @@ jobs:
         # python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install numpy nanobind pybind11
         # sudo apt-get remove -y gcc g++
-        # sudo apt-get install -y gcc-11 g++-11 lcov
+        # sudo apt-get install -y gcc-11 g++-11 lcov==1.15.5a0
         # sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 100
         # sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-11 100 
         # sudo update-alternatives --install /usr/bin/gcov gcov /usr/bin/gcov-11 100 
@@ -675,10 +675,10 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get -y -q install cmake ninja-build lcov
+          sudo apt-get -y -q install cmake ninja-build 
           python3.10 -m pip install nanobind pybind11
           sudo apt-get remove -y gcc g++
-          sudo apt-get install -y gcc-11 g++-11 lcov
+          sudo apt-get install -y gcc-11 g++-11 lcov==1.15.5a0
           sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 100
           sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-11 100 
           sudo update-alternatives --install /usr/bin/gcov gcov /usr/bin/gcov-11 100 
