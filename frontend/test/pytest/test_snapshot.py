@@ -87,7 +87,7 @@ class TestSnapshot:
 
         assert np.allclose(jitted_snapshot_results, expected_snapshot_results)
         assert all(
-            jnp.allclose(expected_measurement_results[i], jitted_measurement_results[i])
+            np.allclose(expected_measurement_results[i], jitted_measurement_results[i])
             for i in range(len(jitted_measurement_results))
         )
 
@@ -123,4 +123,26 @@ class TestSnapshot:
         assert expected_measurement_results.keys() == jitted_measurement_results.keys()
 
         assert expected_measurement_results[0]["11"] == jitted_measurement_results[0][1][3]
-        assert jnp.allclose(expected_measurement_results[1], jitted_measurement_results[1])
+        assert np.allclose(expected_measurement_results[1], jitted_measurement_results[1])
+
+    def test_snapshots_with_dynamic_wires(self):
+        """Test if qml.Snapshot captures dynamic shaped states"""
+
+        @qjit
+        def workflow(num_qubits):
+            @qml.qnode(qml.device("lightning.qubit", wires=num_qubits))
+            def circuit():
+                qml.X(wires=0)
+                qml.Snapshot()
+                return qml.probs()
+
+            return circuit()
+
+        returned_results = workflow(2)
+        assert np.allclose(
+            returned_results[0],
+            [jnp.array([0.0 + 0.0j, 0.0 + 0.0j, 1.0 + 0.0j, 0.0 + 0.0j], dtype=jnp.complex128)],
+        )
+        assert np.allclose(
+            returned_results[1], [jnp.array([0.0, 0.0, 1.0, 0.0], dtype=jnp.float64)]
+        )
