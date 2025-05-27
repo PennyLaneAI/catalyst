@@ -39,8 +39,12 @@ def oqd_pipelines():
 def result_openapl_file():
     """Create a temporary OpenAPL file with the given content."""
     openapl_file = "__openapl__output.json"
-    yield openapl_file
-    # os.remove(openapl_file)
+    openapl_file_path = os.path.join(os.getcwd(), openapl_file)
+    if os.path.exists(openapl_file_path):
+        os.remove(openapl_file_path)
+    yield openapl_file_path
+    if os.path.exists(openapl_file_path):
+        os.remove(openapl_file_path)
 
 
 def verify_json(correct_file_name, expected_file_name):
