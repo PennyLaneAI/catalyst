@@ -104,6 +104,17 @@ mhlo:
 	@if patch -p0 --dry-run -N < $(MK_DIR)/patches/mhlo-remove-shardy.patch > /dev/null 2>&1; then \
 		patch -p0 < $(MK_DIR)/patches/mhlo-remove-shardy.patch; \
 	fi
+	# Patch MHLO passes removed from upstream
+	mkdir $(MK_DIR)/mlir-hlo/mhlo/transforms/legalize_control_flow
+	mkdir $(MK_DIR)/mlir-hlo/mhlo/transforms/legalize_sort
+	mkdir $(MK_DIR)/mlir-hlo/mhlo/transforms/legalize_to_standard
+	touch $(MK_DIR)/mlir-hlo/mhlo/transforms/legalize_control_flow/legalize_control_flow.cc
+	touch $(MK_DIR)/mlir-hlo/mhlo/transforms/legalize_sort/legalize_sort.cc
+	touch $(MK_DIR)/mlir-hlo/mhlo/transforms/legalize_to_standard/legalize_to_standard.cc
+	touch $(MK_DIR)/mlir-hlo/mhlo/transforms/legalize_to_standard/legalize_to_standard_patterns.td
+	@if patch -p0 --dry-run -N --verbose < $(MK_DIR)/patches/mhlo-add-back-necessary-passes.patch > /dev/null 2>&1; then \
+		patch -p0 < $(MK_DIR)/patches/mhlo-add-back-necessary-passes.patch; \
+	fi
 	cmake -G Ninja -S mlir-hlo -B $(MHLO_BUILD_DIR) \
 		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
 		-DLLVM_ENABLE_ASSERTIONS=ON \
