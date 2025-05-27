@@ -63,7 +63,7 @@ def NamedObservableAttr : EnumAttr<QuantumDialect, NamedObservable, "named_obser
 
 class Quantum_Op<string mnemonic, list<Trait> traits = []> : Op<QuantumDialect, mnemonic, traits>;
 
-def InitializeOp : Quantum_Op<"init"> {
+def InitializeOp : Quantum_Op<"init", [MemoryEffects<[MemAlloc<QuantumMemory>]>]> {
     let summary = "Initialize the quantum runtime.";
 
     let assemblyFormat = [{
@@ -71,7 +71,7 @@ def InitializeOp : Quantum_Op<"init"> {
     }];
 }
 
-def FinalizeOp : Quantum_Op<"finalize"> {
+def FinalizeOp : Quantum_Op<"finalize", [MemoryEffects<[MemFree<QuantumMemory>]>]> {
     let summary = "Teardown the quantum runtime.";
 
     let assemblyFormat = [{
@@ -79,7 +79,7 @@ def FinalizeOp : Quantum_Op<"finalize"> {
     }];
 }
 
-def DeviceInitOp : Quantum_Op<"device"> {
+def DeviceInitOp : Quantum_Op<"device", [MemoryEffects<[MemAlloc<QuantumMemory>]>]> {
     let summary = "Initialize a quantum device.";
 
     let arguments = (ins
@@ -95,7 +95,7 @@ def DeviceInitOp : Quantum_Op<"device"> {
 
 }
 
-def DeviceReleaseOp : Quantum_Op<"device_release"> {
+def DeviceReleaseOp : Quantum_Op<"device_release", [MemoryEffects<[MemFree<QuantumMemory>]>]> {
     let summary = "Release the active quantum device.";
 
     let assemblyFormat = [{
@@ -172,7 +172,7 @@ def DeallocQubitOp : Memory_Op<"dealloc_qb"> {
     }];
 }
 
-def DeallocOp : Memory_Op<"dealloc"> {
+def DeallocOp : Memory_Op<"dealloc", [MemoryEffects<[MemFree<QuantumMemory>]>]> {
     let summary = "Deallocate a quantum register.";
     let description = [{
     }];
@@ -856,7 +856,12 @@ def HamiltonianOp : Observable_Op<"hamiltonian"> {
 class Measurement_Op<string mnemonic, list<Trait> traits = []> :
         Quantum_Op<mnemonic, traits # [MeasurementProcess]>;
 
-def MeasureOp : Quantum_Op<"measure"> {
+def MeasureOp : Quantum_Op<"measure",
+    // Measurement both read and write since it collapses states
+    // This is even more true for the mbqc variant, since that one's entire point
+    // is to alter the state via measurement.
+    [MemoryEffects<[MemRead<QuantumMemory>, MemWrite<QuantumMemory>]>]
+    > {
     let summary = "A single-qubit projective measurement in the computational basis.";
     let description = [{
     }];
@@ -876,7 +881,7 @@ def MeasureOp : Quantum_Op<"measure"> {
     }];
 }
 
-def SampleOp : Measurement_Op<"sample", [AttrSizedOperandSegments]> {
+def SampleOp : Measurement_Op<"sample", [AttrSizedOperandSegments, MemoryEffects<[MemAlloc]>]> {
     let summary = "Sample eigenvalues from the given observable for the current state";
     let description = [{
         The `quantum.sample` operation represents the measurement process of sampling eigenvalues
@@ -942,7 +947,8 @@ def SampleOp : Measurement_Op<"sample", [AttrSizedOperandSegments]> {
     let hasVerifier = 1;
 }
 
-def CountsOp : Measurement_Op<"counts", [AttrSizedOperandSegments, SameVariadicResultSize]> {
+def CountsOp : Measurement_Op<"counts", [AttrSizedOperandSegments, SameVariadicResultSize,
+                                            MemoryEffects<[MemAlloc]>]> {
     let summary = "Compute sample counts for the given observable for the current state";
     let description = [{
         The `quantum.counts` operation represents the measurement process of sampling eigenvalues
@@ -1001,7 +1007,7 @@ def CountsOp : Measurement_Op<"counts", [AttrSizedOperandSegments, SameVariadicR
     let hasVerifier = 1;
 }
 
-def ExpvalOp : Measurement_Op<"expval"> {
+def ExpvalOp : Measurement_Op<"expval", [NoMemoryEffect]> {
     let summary = "Compute the expectation value of the given observable for the current state";
     let description = [{
         The `quantum.expval` operation represents the measurement process of computing the
@@ -1038,7 +1044,7 @@ def ExpvalOp : Measurement_Op<"expval"> {
     }];
 }
 
-def VarianceOp : Measurement_Op<"var"> {
+def VarianceOp : Measurement_Op<"var", [NoMemoryEffect]> {
     let summary = "Compute the variance of the given observable for the current state";
     let description = [{
         The `quantum.var` operation represents the measurement process of computing the variance of
@@ -1074,7 +1080,7 @@ def VarianceOp : Measurement_Op<"var"> {
     }];
 }
 
-def ProbsOp : Measurement_Op<"probs", [AttrSizedOperandSegments]> {
+def ProbsOp : Measurement_Op<"probs", [AttrSizedOperandSegments, MemoryEffects<[MemAlloc]>]> {
     let summary = "Compute computational basis probabilities for the current state";
     let description = [{
         The `quantum.probs` operation represents the measurement process of computing probabilities
@@ -1120,7 +1126,7 @@ def ProbsOp : Measurement_Op<"probs", [AttrSizedOperandSegments]> {
     let hasVerifier = 1;
 }
 
-def StateOp : Measurement_Op<"state", [AttrSizedOperandSegments]> {
+def StateOp : Measurement_Op<"state", [AttrSizedOperandSegments, MemoryEffects<[MemAlloc]>]> {
     let summary = "Return the current statevector";
     let description = [{
         The `quantum.state` operation represents the measurement process of returning the current
