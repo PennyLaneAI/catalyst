@@ -667,11 +667,16 @@ jobs:
       - name: Checkout the repo
         uses: actions/checkout@v4
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
       - name: Install dependencies
         run: |
           sudo apt-get update
           sudo apt-get -y -q install cmake ninja-build lcov
-          python3 -m pip install nanobind pybind11
+          python3.10 -m pip install nanobind pybind11
           # sudo apt-get remove -y gcc g++
           # sudo apt-get install -y gcc-11 g++-11 lcov
           # sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 100
@@ -706,7 +711,7 @@ jobs:
           COMPILER_LAUNCHER="" \
           ENABLE_OQD=ON \
           LLVM_DIR="$(pwd)/mlir/llvm-project" \
-          make coverage-runtime --ignore-errors mismatch
+          make coverage-runtime --ignore-errors empty
           mv runtime/build_cov/coverage.info coverage-${{ github.job }}.info
 
       - name: Upload to Codecov
