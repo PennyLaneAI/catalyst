@@ -706,8 +706,9 @@ jobs:
 
       - name: Run the main runtime test suite for coverage
         run: |
-          geninfo --ignore-errors gcov,gcov ...
-          geninfo --ignore-errors mismatch ...
+          find $(pwd) -name "*.gc*" -print
+          geninfo --ignore-errors gcov,mismatch .
+          
           C_COMPILER="/usr/bin/gcc" \
           CXX_COMPILER="/usr/bin/g++" \
           COMPILER_LAUNCHER="" \
