@@ -335,11 +335,6 @@ jobs:
           PYTHON=$(which python${{ matrix.python_version }}) \
           make oqc
 
-    # - name: which
-    #   run: |
-    #     ls -l $GITHUB_WORKSPACE/llvm-build/bin
-    #     ls $GITHUB_WORKSPACE/mhlo-build
-
     # Build Quantum and Gradient Dialects
     - name: Build MLIR Dialects
       run: |

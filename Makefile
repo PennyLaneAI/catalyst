@@ -20,7 +20,6 @@ ENABLE_OQD ?= OFF
 TEST_BACKEND ?= "lightning.qubit"
 TEST_BRAKET ?= NONE
 ENABLE_ASAN ?= OFF
-PYTHON3_EXECUTABLE=$(which python3) 
 TOML_SPECS ?= $(shell find ./runtime ./frontend -name '*.toml' -not -name 'pyproject.toml')
 
 PLATFORM := $(shell uname -s)

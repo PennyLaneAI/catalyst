@@ -275,7 +275,7 @@ jobs:
       run: |
         # Reduce wait time for repos not responding
         cat /etc/dnf.conf | sed "s/\[main\]/\[main\]\ntimeout=5/g" > /etc/dnf.conf
-        dnf update -y && dnf install -y openmpi-devel libzstd-devel gcc-toolset-12 
+        dnf update -y && dnf install -y openmpi-devel libzstd-devel gcc-toolset-12
         # Update env vars valid for all tasks of this job
         echo '/opt/rh/gcc-toolset-12/root/usr/bin' >> $GITHUB_PATH
 
@@ -359,13 +359,6 @@ jobs:
           RT_BUILD_DIR="$GITHUB_WORKSPACE/runtime-build" \
           PYTHON=$(which python${{ matrix.python_version }}) \
           make oqc
-
-    - name: which python
-      run: |
-        which python${{ matrix.python_version }}
-        echo $GITHUB_WORKSPACE
-        ls $GITHUB_WORKSPACE/enzyme-build
-        echo $PATH
 
     # Build Quantum and Gradient Dialects
     - name: Build MLIR Dialects
