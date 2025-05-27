@@ -212,10 +212,15 @@ struct EmitCatalystPyInterfacePass
         MLIRContext *context = &getContext();
         RewritePatternSet patterns(context);
         patterns.add<EmitCatalystPyInterfaceTransform>(context);
+
         GreedyRewriteConfig config;
         config.strictMode = GreedyRewriteStrictness::ExistingOps;
         config.enableRegionSimplification = mlir::GreedySimplifyRegionLevel::Disabled;
         config.maxIterations = 1;
+        // Update to the following lines the next time we update llvm
+        // config.setStrictness(GreedyRewriteStrictness::ExistingOps);
+        // config.setRegionSimplificationLevel(mlir::GreedySimplifyRegionLevel::Disabled);
+        // config.setMaxIterations(1);
 
         auto op = getOperation();
         SmallVector<Operation *> targets;
