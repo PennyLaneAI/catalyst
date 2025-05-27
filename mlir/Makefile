@@ -95,6 +95,14 @@ mhlo: TARGET_FILE := $(MK_DIR)/mlir-hlo/mhlo/transforms/CMakeLists.txt
 mhlo: PATCH_FILE := $(MK_DIR)/patches/mhlo-Add-PassesIncGen-in-transforms-CMakeList.patch
 mhlo:
 	@echo "build MLIR-HLO"
+	# We have too many mhlo patches now, so let's clean it everytime.
+	# make clean-mhlo
+	# TODO: probably clean this up
+	# git submodule mlir-hlo checkout -f 617a9361d186199480c080c9e8c474a5e30c22d1
+	#rm -rf $(MK_DIR)/mlir-hlo/mhlo/transforms/legalize_control_flow
+	#rm -rf $(MK_DIR)/mlir-hlo/mhlo/transforms/legalize_sort
+	#rm -rf $(MK_DIR)/mlir-hlo/mhlo/transforms/legalize_to_standard
+
 	# Patch MHLO cmake dependency
 	# TODO: remove once https://github.com/openxla/xla/pull/15446 is merged
 	@if patch --dry-run -p1 -N $(TARGET_FILE) $(PATCH_FILE) > /dev/null 2>&1; then \
@@ -105,9 +113,10 @@ mhlo:
 		patch -p0 < $(MK_DIR)/patches/mhlo-remove-shardy.patch; \
 	fi
 	# Patch MHLO passes removed from upstream
-	mkdir $(MK_DIR)/mlir-hlo/mhlo/transforms/legalize_control_flow
-	mkdir $(MK_DIR)/mlir-hlo/mhlo/transforms/legalize_sort
-	mkdir $(MK_DIR)/mlir-hlo/mhlo/transforms/legalize_to_standard
+	# TODO: probably clean this up
+	mkdir -p $(MK_DIR)/mlir-hlo/mhlo/transforms/legalize_control_flow
+	mkdir -p $(MK_DIR)/mlir-hlo/mhlo/transforms/legalize_sort
+	mkdir -p $(MK_DIR)/mlir-hlo/mhlo/transforms/legalize_to_standard
 	touch $(MK_DIR)/mlir-hlo/mhlo/transforms/legalize_control_flow/legalize_control_flow.cc
 	touch $(MK_DIR)/mlir-hlo/mhlo/transforms/legalize_sort/legalize_sort.cc
 	touch $(MK_DIR)/mlir-hlo/mhlo/transforms/legalize_to_standard/legalize_to_standard.cc
