@@ -233,7 +233,7 @@
 
   Note that using `qml.measure()` in this way binds the operation to :func:`catalyst.measure`, which
   may behave differently than `qml.measure()` in a native PennyLane circuit, as described in the
-  :doc:`Measurements section <measurements>` of the quick start guide. In regular QJIT-compiled
+  Measurements section of the :doc:`quick start guide <quick_start>`. In regular QJIT-compiled
   workloads (without program capture enabled), you must continue to use :func:`catalyst.measure`.
 
 <h3>Documentation 📝</h3>
