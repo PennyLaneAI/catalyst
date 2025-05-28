@@ -160,13 +160,13 @@ module @test1 {
 
     // call @callback_1([[ptr0]], [[ptr1]])
 
-    %0 = bufferization.to_memref %arg0 : memref<f64>
+    %0 = bufferization.to_memref %arg0 : tensor<f64> to memref<f64>
     %1 = bufferization.alloc_tensor() {memory_space = 0 : i64} : tensor<f64>
-    %2 = bufferization.to_memref %1 : memref<f64>
+    %2 = bufferization.to_memref %1 : tensor<f64> to memref<f64>
 
 
     catalyst.callback_call @callback_1(%0, %2) : (memref<f64>, memref<f64>) -> ()
-    %3 = bufferization.to_tensor %2 : memref<f64>
+    %3 = bufferization.to_tensor %2 : memref<f64> to tensor<f64>
     return %3 : tensor<f64>
   }
 }
