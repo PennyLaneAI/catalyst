@@ -83,7 +83,7 @@ def PrintOp : Catalyst_Op<"print", [MemoryEffects<[MemRead, MemAlloc]>]> {
     );
 }
 
-def AssertionOp : Catalyst_Op<"assert"> {
+def AssertionOp : Catalyst_Op<"assert", [MemoryEffects<[MemWrite]>]> {
     let summary = "Asserts condition at runtime.";
 
     let arguments = (ins
