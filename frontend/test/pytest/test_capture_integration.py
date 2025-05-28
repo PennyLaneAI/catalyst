@@ -349,9 +349,11 @@ class TestCapture:
 
         assert jnp.allclose(capture_result, circuit(theta))
 
-    @pytest.mark.parametrize("reset", [False, True])
-    @pytest.mark.parametrize("op", [qml.I, qml.X])
-    def test_measure(self, backend, reset, op):
+    @pytest.mark.parametrize(
+        "reset, op, expected",
+        [(False, qml.I, 1), (False, qml.X, -1), (True, qml.I, 1), (True, qml.X, 1)],
+    )
+    def test_measure(self, backend, reset, op, expected):
         """Test the integration for a circuit with a mid-circuit measurement.
 
         We do not currently have full feature parity between PennyLane's `measure` and Catalyst's.
@@ -360,8 +362,6 @@ class TestCapture:
         returns correct results.
         """
         device = qml.device(backend, wires=1)
-
-        # Capture enabled
 
         qml.capture.enable()
 
@@ -376,17 +376,7 @@ class TestCapture:
 
         qml.capture.disable()
 
-        if reset:
-            expected_result = 1
-        else:
-            if op is qml.I:
-                expected_result = 1
-            elif op is qml.X:
-                expected_result = -1
-            else:
-                raise AssertionError(f"Unexpected op '{op.__name__}'")
-
-        assert capture_result == expected_result
+        assert capture_result == expected
 
     def test_measure_postselect(self, backend):
         """Test the integration for a circuit with a mid-circuit measurement using postselect.
@@ -394,8 +384,6 @@ class TestCapture:
         See note in test_measure() above for discussion on testing strategy.
         """
         device = qml.device(backend, wires=1)
-
-        # Capture enabled
 
         qml.capture.enable()
 
