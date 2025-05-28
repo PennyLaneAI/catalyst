@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "Adjoint.hpp"
-
 #include <algorithm>
 #include <sstream>
 #include <vector>
@@ -24,6 +22,8 @@
 #include "Gradient/Utils/DifferentialQNode.h"
 #include "Gradient/Utils/GradientShape.h"
 #include "Quantum/IR/QuantumOps.h"
+
+#include "Adjoint.hpp"
 
 namespace catalyst {
 namespace gradient {
@@ -52,7 +52,7 @@ func::FuncOp AdjointLowering::discardAndReturnReg(PatternRewriter &rewriter, Loc
     SmallVector<quantum::DeallocOp> deallocs;
     for (auto op : callee.getOps<quantum::DeallocOp>()) {
         deallocs.push_back(op);
-    };
+    }
 
     // If there are no deallocs leave early then this transformation
     // is invalid. This is because the caller will expect a quantum register
@@ -66,12 +66,20 @@ func::FuncOp AdjointLowering::discardAndReturnReg(PatternRewriter &rewriter, Loc
 
     // Since the return value is guaranteed to be discarded, then let's change the return type
     // to be only the quantum register and the expval.
+    //
     // We also need to return the expval to avoid dead code elimination downstream from
     // removing the expval op in the body.
+    // TODO: we only support grad on expval op for now
     std::string fnName = callee.getName().str() + ".nodealloc";
     Type qregType = quantum::QuregType::get(rewriter.getContext());
+
     Type f64Type = rewriter.getF64Type();
-    FunctionType fnType = rewriter.getFunctionType(callee.getArgumentTypes(), {qregType, f64Type});
+    SmallVector<Type> retTypes{qregType};
+    auto expvalOps = callee.getOps<quantum::ExpvalOp>();
+    std::for_each(expvalOps.begin(), expvalOps.end(),
+                  [&](const quantum::ExpvalOp &) { retTypes.push_back(f64Type); });
+
+    FunctionType fnType = rewriter.getFunctionType(callee.getArgumentTypes(), retTypes);
     StringAttr visibility = rewriter.getStringAttr("private");
 
     func::FuncOp unallocFn =
@@ -91,13 +99,17 @@ func::FuncOp AdjointLowering::discardAndReturnReg(PatternRewriter &rewriter, Loc
         rewriter.setInsertionPointToStart(&unallocFn.getBody().front());
 
         // Let's return the qreg and erase the device release.
-        // We also need to return the expval op so it is not dead-code-eliminated
-        // TODO: we only support grad on expval op for now
         SmallVector<Value> returnVals;
+
+        // Fine for now: only one block in body so only one quantum.dealloc
         quantum::DeallocOp localDealloc = *unallocFn.getOps<quantum::DeallocOp>().begin();
         returnVals.push_back(localDealloc.getOperand());
-        quantum::ExpvalOp expvalOp = *unallocFn.getOps<quantum::ExpvalOp>().begin();
-        returnVals.push_back(expvalOp.getExpval());
+
+        // We also need to return the expval op so it won't be dead-code-eliminated
+        // TODO: we only support grad on expval op for now
+        for (auto expvalOp : unallocFn.getOps<quantum::ExpvalOp>()) {
+            returnVals.push_back(expvalOp);
+        }
 
         // TODO: don't walk
         unallocFn.walk([&](Operation *op) {
