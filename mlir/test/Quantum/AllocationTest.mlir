@@ -12,25 +12,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt --buffer-deallocation --split-input-file %s | FileCheck %s
+// RUN: quantum-opt --buffer-deallocation-pipeline --split-input-file %s | FileCheck %s
 
 // CHECK-LABEL: @existing_deallocation
-func.func @existing_deallocation() {
+func.func @existing_deallocation() -> i64 {
     // CHECK: [[reg:%.+]] = quantum.alloc
     %0 = quantum.alloc( 1) : !quantum.reg
+    %user = builtin.unrealized_conversion_cast %0 : !quantum.reg to i64
     // CHECK: quantum.dealloc [[reg]]
     quantum.dealloc %0 : !quantum.reg
-    return
+    return %user : i64
 }
 
 // -----
 
 // CHECK-LABEL: @missing_deallocation
-func.func @missing_deallocation() {
+func.func @missing_deallocation() -> i64 {
     // CHECK: [[reg:%.+]] = quantum.alloc
     %0 = quantum.alloc( 1) : !quantum.reg
+    %user = builtin.unrealized_conversion_cast %0 : !quantum.reg to i64
     // CHECK-NOT: quantum.dealloc [[reg]]
-    return
+    return %user : i64
 }
 
 // -----

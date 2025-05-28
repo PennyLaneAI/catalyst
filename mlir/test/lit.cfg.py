@@ -10,9 +10,6 @@ config.test_format = lit.formats.ShTest(True)
 # Define the file extensions to treat as test files.
 config.suffixes = [".mlir", ".py"]
 config.excludes = ["lit.cfg.py"]
-# TODO: re-enable Quantum/AllocationTest.mlir
-# It uses --buffer-deallocation, which we will deal with later
-config.excludes = ["AllocationTest.mlir"]
 
 # Define the root path of where to look for tests.
 config.test_source_root = os.path.dirname(__file__)
