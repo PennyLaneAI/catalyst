@@ -30,8 +30,9 @@ import pennylane as qml
 import pytest
 
 from catalyst import qjit
-from catalyst.compiler import CompileOptions, Compiler, LinkerDriver
+from catalyst.compiler import CompileOptions, Compiler, LinkerDriver, _options_to_cli_flags
 from catalyst.debug import instrumentation
+from catalyst.pipelines import KeepIntermediateLevel
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.filesystem import Directory
 
@@ -91,6 +92,73 @@ class TestCompilerOptions:
         capture_result = capsys.readouterr()
         capture = capture_result.out + capture_result.err
         assert "[DIAGNOSTICS]" in capture
+
+    @pytest.mark.parametrize(
+        "input_value, expected_level",
+        [
+            (None, KeepIntermediateLevel.NONE),
+            (False, KeepIntermediateLevel.NONE),
+            (True, KeepIntermediateLevel.BASIC),
+            (0, KeepIntermediateLevel.NONE),
+            (1, KeepIntermediateLevel.BASIC),
+            (2, KeepIntermediateLevel.DEBUG),
+            ("none", KeepIntermediateLevel.NONE),
+            ("NONE", KeepIntermediateLevel.NONE),
+            ("basic", KeepIntermediateLevel.BASIC),
+            ("BASIC", KeepIntermediateLevel.BASIC),
+            ("debug", KeepIntermediateLevel.DEBUG),
+            ("DEBUG", KeepIntermediateLevel.DEBUG),
+            (KeepIntermediateLevel.NONE, KeepIntermediateLevel.NONE),
+            (KeepIntermediateLevel.BASIC, KeepIntermediateLevel.BASIC),
+            (KeepIntermediateLevel.DEBUG, KeepIntermediateLevel.DEBUG),
+        ],
+    )
+    def test_keep_intermediate_levels_conversion(self, input_value, expected_level):
+        """Test that various inputs for keep_intermediate are correctly converted to Enum."""
+        options = CompileOptions(keep_intermediate=input_value)
+        assert options.keep_intermediate == expected_level
+
+    @pytest.mark.parametrize(
+        "invalid_input, error_type, error_match",
+        [
+            (3, ValueError, "Invalid int for keep_intermediate: 3. Valid integers are 0, 1, 2."),
+            (-1, ValueError, "Invalid int for keep_intermediate: -1. Valid integers are 0, 1, 2."),
+            (
+                "invalid_string",
+                ValueError,
+                "Invalid string for keep_intermediate: invalid_string. Valid strings are 'none', 'basic', 'debug'.",
+            ),
+            (3.0, TypeError, "Invalid type for keep_intermediate: <class 'float'>."),
+            ([], TypeError, "Invalid type for keep_intermediate: <class 'list'>."),
+        ],
+    )
+    def test_keep_intermediate_invalid_inputs(self, invalid_input, error_type, error_match):
+        """Test that invalid inputs for keep_intermediate raise appropriate errors."""
+        with pytest.raises(error_type, match=error_match):
+            CompileOptions(keep_intermediate=invalid_input)
+
+    def test_options_to_cli_flags_keep_intermediate_none(self):
+        """Test _options_to_cli_flags with KeepIntermediateLevel.NONE."""
+        options = CompileOptions(keep_intermediate=KeepIntermediateLevel.NONE)
+        flags = _options_to_cli_flags(options)
+        assert "--keep-intermediate" not in flags
+        assert "--save-ir-after-each=pass" not in flags
+
+    def test_options_to_cli_flags_keep_intermediate_basic(self):
+        """Test _options_to_cli_flags with KeepIntermediateLevel.BASIC."""
+        options = CompileOptions(keep_intermediate=KeepIntermediateLevel.BASIC)
+        flags = _options_to_cli_flags(options)
+        assert "--keep-intermediate" in flags
+        assert "--save-ir-after-each=pass" not in flags
+        assert flags.count("--save-ir-after-each=pass") <= 1
+
+    def test_options_to_cli_flags_keep_intermediate_debug(self):
+        """Test _options_to_cli_flags with KeepIntermediateLevel.DEBUG."""
+        options = CompileOptions(keep_intermediate=KeepIntermediateLevel.DEBUG)
+        flags = _options_to_cli_flags(options)
+        assert "--keep-intermediate" in flags
+        assert "--save-ir-after-each=pass" in flags
+        assert flags.count("--save-ir-after-each=pass") == 1
 
 
 class TestCompilerWarnings:
