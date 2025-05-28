@@ -498,7 +498,7 @@ jobs:
 
     - name: Run Python Lit Tests
       run: |
-        ls $(LLVM_BUILD_DIR)
+        pip show lit
         which llvm-lit
         llvm-lit -sv frontend/test/lit -j$(nproc)
 
