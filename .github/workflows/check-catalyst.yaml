@@ -498,8 +498,8 @@ jobs:
 
     - name: Run Python Lit Tests
       run: |
-        pip show lit
-        which llvm-lit
+        cat /home/runner/work/catalyst/catalyst/llvm-build/bin/llvm-lit
+        python3 -m pip install lit
         llvm-lit -sv frontend/test/lit -j$(nproc)
 
     - name: Run Python Pytest Tests
