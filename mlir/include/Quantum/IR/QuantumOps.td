@@ -17,7 +17,6 @@
 
 include "mlir/IR/EnumAttr.td"
 include "mlir/IR/OpBase.td"
-include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Dialect/Bufferization/IR/AllocationOpInterface.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 
@@ -48,8 +47,6 @@ def NamedObservable : I32EnumAttr<"NamedObservable",
 
 def Unitary : NativeOpTrait<"UnitaryTrait">;
 def Hermitian : NativeOpTrait<"HermitianTrait">;
-
-def QuantumMemory : Resource<"QuantumMemory">;
 
 //===----------------------------------------------------------------------===//
 // Quantum dialect attributes.
