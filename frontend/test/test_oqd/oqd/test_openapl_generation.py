@@ -47,6 +47,16 @@ def result_openapl_file():
         os.remove(openapl_file_path)
 
 
+def ordered(obj):
+    """Sort the JSON file."""
+    if isinstance(obj, dict):
+        return sorted((k, ordered(v)) for k, v in obj.items())
+    if isinstance(obj, list):
+        return sorted(ordered(x) for x in obj)
+    else:
+        return obj
+
+
 def verify_json(correct_file_name, expected_file_name):
     """Verify the two JSON files are identical."""
     with open(correct_file_name, "r", encoding="utf-8") as f:
@@ -55,7 +65,7 @@ def verify_json(correct_file_name, expected_file_name):
     with open(expected_file_name, "r", encoding="utf-8") as f:
         expected_json = json.load(f)
 
-    return sorted(correct_json.items()) == sorted(expected_json.items())
+    return ordered(correct_json) == ordered(expected_json)
 
 
 class TestTargetGates:
