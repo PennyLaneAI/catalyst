@@ -255,6 +255,7 @@
   [(#1708)](https://github.com/PennyLaneAI/catalyst/pull/1708)
   [(#1740)](https://github.com/PennyLaneAI/catalyst/pull/1740)
   [(#1751)](https://github.com/PennyLaneAI/catalyst/pull/1751)
+  [(#1769)](https://github.com/PennyLaneAI/catalyst/pull/1769)
 
 * Redundant `OptionalAttr` is removed from `adjoint` argument in `QuantumOps.td` TableGen file
   [(#1746)](https://github.com/PennyLaneAI/catalyst/pull/1746)
