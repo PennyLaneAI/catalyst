@@ -24,12 +24,13 @@ import pytest
 from catalyst import qjit
 from catalyst.third_party.oqd import OQDDevice, OQDDevicePipeline
 
+MODULE_TEST_PATH = os.path.dirname(__file__)
+
 
 @pytest.fixture(scope="module")
 def oqd_pipelines():
     """Get the OQD device pipelines."""
-    test_path = os.path.dirname(__file__)
-    toml_path = os.path.join(test_path, "calibration_data/")
+    toml_path = os.path.join(MODULE_TEST_PATH, "calibration_data/")
     return OQDDevicePipeline(
         toml_path + "device.toml", toml_path + "qubit.toml", toml_path + "gate.toml"
     )
@@ -108,8 +109,6 @@ def verify_json(correct_file_name, expected_file_name):
 class TestTargetGates:
     """Test OQD device OpenAPL generation for target gates ({'RX', 'RY', 'MS'})."""
 
-    test_path = os.path.dirname(__file__)
-
     def test_RX_gate(self, oqd_pipelines, result_openapl_file):
         """Test OpenAPL generation for a circuit with a single RX Gate."""
         oqd_dev = OQDDevice(backend="default", shots=4, wires=1)
@@ -128,7 +127,7 @@ class TestTargetGates:
         assert stats["num_beams"] == 2
         assert stats["num_transitions"] == 4
         assert stats["num_levels"] == 4
-        expected_f = os.path.join(self.test_path, "test_single_RX.json")
+        expected_f = os.path.join(MODULE_TEST_PATH, "test_single_RX.json")
         assert verify_json(expected_f, result_openapl_file)
 
     def test_RY_gate(self, oqd_pipelines, result_openapl_file):
@@ -160,8 +159,6 @@ class TestTargetGates:
 class TestChainedGates:
     """Test that the OQD device correctly generates an OpenAPL program for chained gates."""
 
-    test_path = os.path.dirname(__file__)
-
     def test_RX_RY_gate(self, oqd_pipelines, result_openapl_file):
         """Test OpenAPL generation for a circuit with a single RX and RY Gate."""
         oqd_dev = OQDDevice(backend="default", shots=4, wires=1)
@@ -185,8 +182,6 @@ class TestChainedGates:
 
 class TestDecomposableGates:
     """Test OQD device OpenAPL generation for gates decomposable into target gates."""
-
-    test_path = os.path.dirname(__file__)
 
     def test_CNOT_gate(self, oqd_pipelines, result_openapl_file):
         """Test OpenAPL generation for a circuit with a single CNOT circuit."""
@@ -324,8 +319,6 @@ class TestDecomposableGates:
 
 class TestComplexCircuits:
     """Test OQD device OpenAPL generation for more complex quantum circuits."""
-
-    test_path = os.path.dirname(__file__)
 
     def test_2qubit_QFT(self, oqd_pipelines, result_openapl_file):
         """Test OpenAPL generation for a 2-qubit Quantum Fourier Transform circuit."""
