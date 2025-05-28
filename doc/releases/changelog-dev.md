@@ -228,9 +228,9 @@
   This runtime stub is currently for mock execution only and should be treated as a placeholder
   operation. Internally, it functions just as a computational-basis measurement instruction.
 
-* PennyLane's arbitrary-basis measurement operations, such as [`qml.ftqc.measure_arbitrary_basis()`
-  ](https://docs.pennylane.ai/en/stable/code/api/pennylane.ftqc.measure_arbitrary_basis.html), are
-  now QJIT-compatible with program capture enabled.
+* PennyLane's arbitrary-basis measurement operations, such as
+  :func:`qml.ftqc.measure_arbitrary_basis() <pennylane.ftqc.measure_arbitrary_basis>`, are now
+  QJIT-compatible with program capture enabled.
   [(#1645)](https://github.com/PennyLaneAI/catalyst/pull/1645)
   [(#1710)](https://github.com/PennyLaneAI/catalyst/pull/1710)
 
@@ -264,6 +264,16 @@
 
 * The unused helper function `genArgMapFunction` in the `--lower-gradients` pass is removed.
   [(#1753)](https://github.com/PennyLaneAI/catalyst/pull/1753)
+
+* The `qml.measure()` operation for mid-circuit measurements can now be used in QJIT-compiled
+  circuits with program capture enabled.
+  [(#1766)](https://github.com/PennyLaneAI/catalyst/pull/1766)
+
+  Note that using `qml.measure()` in this way binds the operation to :func:`catalyst.measure`, which
+  behaves differently than `qml.measure()` in a native PennyLane circuit, as described in the
+  *Functionality differences from PennyLane* section of the
+  :doc:`sharp bits and debugging tips <sharp_bits>` guide. In regular QJIT-compiled workloads
+  (without program capture enabled), you must continue to use :func:`catalyst.measure`.
 
 <h3>Documentation 📝</h3>
 
