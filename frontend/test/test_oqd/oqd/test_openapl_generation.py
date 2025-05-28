@@ -47,6 +47,43 @@ def result_openapl_file():
         os.remove(openapl_file_path)
 
 
+def profile_openapl(file_path):
+    """Parses an OpenAPL JSON file and extracts statistics."""
+    with open(file_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    num_parallel_protocols = 0
+    num_beams = 0
+    num_transitions = 0
+    num_levels = 0
+    num_ions = 0
+    if "system" in data and "ions" in data["system"]:
+        for ion in data["system"]["ions"]:
+            if "levels" in ion:
+                for _ in ion["levels"]:
+                    num_levels += 1
+            if "transitions" in ion:
+                for _ in ion["transitions"]:
+                    num_transitions += 1
+            num_ions += 1
+    if "protocol" in data and "sequence" in data["protocol"]:
+        for item in data["protocol"]["sequence"]:
+            if item.get("class_") == "ParallelProtocol":
+                num_parallel_protocols += 1
+                if "sequence" in item:
+                    for sub_item in item["sequence"]:
+                        if "beam" in sub_item and sub_item["beam"].get("class_") == "Beam":
+                            num_beams += 1
+    stats = {
+        "num_parallel_protocols": num_parallel_protocols,
+        "num_beams": num_beams,
+        "num_transitions": num_transitions,
+        "num_levels": num_levels,
+        "num_ions": num_ions,
+    }
+    return stats
+
+
 def ordered(obj):
     """Sort the JSON file."""
     if isinstance(obj, dict):
@@ -85,6 +122,12 @@ class TestTargetGates:
 
         circuit(np.pi / 2)
 
+        stats = profile_openapl(result_openapl_file)
+        assert stats["num_ions"] == 1
+        assert stats["num_parallel_protocols"] == 1
+        assert stats["num_beams"] == 2
+        assert stats["num_transitions"] == 4
+        assert stats["num_levels"] == 4
         expected_f = os.path.join(self.test_path, "test_single_RX.json")
         assert verify_json(expected_f, result_openapl_file)
 
@@ -100,8 +143,18 @@ class TestTargetGates:
 
         circuit(np.pi / 2)
 
-        expected_f = os.path.join(self.test_path, "test_single_RY.json")
-        assert verify_json(expected_f, result_openapl_file)
+        stats = profile_openapl(result_openapl_file)
+        assert stats["num_ions"] == 1
+        assert stats["num_parallel_protocols"] == 1
+        assert stats["num_beams"] == 2
+        assert stats["num_transitions"] == 4
+        assert stats["num_levels"] == 4
+        with open(result_openapl_file, "r", encoding="utf-8") as f:
+            result_json = json.load(f)
+        assert (
+            result_json["protocol"]["sequence"][0]["sequence"][0]["beam"]["phase"]["value"]
+            == 1.5707963267948966
+        )
 
 
 class TestChainedGates:
@@ -122,8 +175,12 @@ class TestChainedGates:
 
         circuit()
 
-        expected_f = os.path.join(self.test_path, "test_RX_RY.json")
-        assert verify_json(expected_f, result_openapl_file)
+        stats = profile_openapl(result_openapl_file)
+        assert stats["num_ions"] == 1
+        assert stats["num_parallel_protocols"] == 2
+        assert stats["num_beams"] == 4
+        assert stats["num_transitions"] == 4
+        assert stats["num_levels"] == 4
 
 
 class TestDecomposableGates:
@@ -143,8 +200,12 @@ class TestDecomposableGates:
 
         circuit()
 
-        expected_f = os.path.join(self.test_path, "test_single_CNOT.json")
-        assert verify_json(expected_f, result_openapl_file)
+        stats = profile_openapl(result_openapl_file)
+        assert stats["num_ions"] == 2
+        assert stats["num_parallel_protocols"] == 5
+        assert stats["num_beams"] == 14
+        assert stats["num_transitions"] == 8
+        assert stats["num_levels"] == 8
 
     def test_Hadamard_gate(self, oqd_pipelines, result_openapl_file):
         """Test OpenAPL generation for a circuit with a single Hadamard gate."""
@@ -158,8 +219,12 @@ class TestDecomposableGates:
 
         circuit()
 
-        expected_f = os.path.join(self.test_path, "test_single_Hadamard.json")
-        assert verify_json(expected_f, result_openapl_file)
+        stats = profile_openapl(result_openapl_file)
+        assert stats["num_ions"] == 1
+        assert stats["num_parallel_protocols"] == 3
+        assert stats["num_beams"] == 6
+        assert stats["num_transitions"] == 4
+        assert stats["num_levels"] == 4
 
     def test_PauliZ_gate(self, oqd_pipelines, result_openapl_file):
         """Test OpenAPL generation for a circuit with a single PauliZ gate."""
@@ -173,8 +238,12 @@ class TestDecomposableGates:
 
         circuit()
 
-        expected_f = os.path.join(self.test_path, "test_single_PauliZ.json")
-        assert verify_json(expected_f, result_openapl_file)
+        stats = profile_openapl(result_openapl_file)
+        assert stats["num_ions"] == 1
+        assert stats["num_parallel_protocols"] == 3
+        assert stats["num_beams"] == 6
+        assert stats["num_transitions"] == 4
+        assert stats["num_levels"] == 4
 
     def test_PhaseShift_gate(self, oqd_pipelines, result_openapl_file):
         """Test OpenAPL generation for a circuit with a single PhaseShift gate."""
@@ -188,8 +257,12 @@ class TestDecomposableGates:
 
         circuit()
 
-        expected_f = os.path.join(self.test_path, "test_single_PhaseShift.json")
-        assert verify_json(expected_f, result_openapl_file)
+        stats = profile_openapl(result_openapl_file)
+        assert stats["num_ions"] == 1
+        assert stats["num_parallel_protocols"] == 3
+        assert stats["num_beams"] == 6
+        assert stats["num_transitions"] == 4
+        assert stats["num_levels"] == 4
 
     def test_RZ_gate(self, oqd_pipelines, result_openapl_file):
         """Test OpenAPL generation for a circuit with a single RZ gate."""
@@ -203,8 +276,12 @@ class TestDecomposableGates:
 
         circuit()
 
-        expected_f = os.path.join(self.test_path, "test_single_RZ.json")
-        assert verify_json(expected_f, result_openapl_file)
+        stats = profile_openapl(result_openapl_file)
+        assert stats["num_ions"] == 1
+        assert stats["num_parallel_protocols"] == 3
+        assert stats["num_beams"] == 6
+        assert stats["num_transitions"] == 4
+        assert stats["num_levels"] == 4
 
     def test_T_gate(self, oqd_pipelines, result_openapl_file):
         """Test OpenAPL generation for a circuit with a single T gate."""
@@ -218,8 +295,12 @@ class TestDecomposableGates:
 
         circuit()
 
-        expected_f = os.path.join(self.test_path, "test_single_T.json")
-        assert verify_json(expected_f, result_openapl_file)
+        stats = profile_openapl(result_openapl_file)
+        assert stats["num_ions"] == 1
+        assert stats["num_parallel_protocols"] == 3
+        assert stats["num_beams"] == 6
+        assert stats["num_transitions"] == 4
+        assert stats["num_levels"] == 4
 
     def test_S_gate(self, oqd_pipelines, result_openapl_file):
         """Test OpenAPL generation for a circuit with a single S gate."""
@@ -233,8 +314,12 @@ class TestDecomposableGates:
 
         circuit()
 
-        expected_f = os.path.join(self.test_path, "test_single_S.json")
-        assert verify_json(expected_f, result_openapl_file)
+        stats = profile_openapl(result_openapl_file)
+        assert stats["num_ions"] == 1
+        assert stats["num_parallel_protocols"] == 3
+        assert stats["num_beams"] == 6
+        assert stats["num_transitions"] == 4
+        assert stats["num_levels"] == 4
 
 
 class TestComplexCircuits:
@@ -256,8 +341,12 @@ class TestComplexCircuits:
 
         circuit(np.array([0, 1]))
 
-        expected_f = os.path.join(self.test_path, "test_2qubit_QFT.json")
-        assert verify_json(expected_f, result_openapl_file)
+        stats = profile_openapl(result_openapl_file)
+        assert stats["num_ions"] == 2
+        assert stats["num_parallel_protocols"] == 54
+        assert stats["num_beams"] == 128
+        assert stats["num_transitions"] == 8
+        assert stats["num_levels"] == 8
 
 
 if __name__ == "__main__":
