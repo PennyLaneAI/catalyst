@@ -24,7 +24,8 @@
   into PPMs using a magic state.
 
 * Support for :class:`qml.Snapshot <pennylane.Snapshot>` to capture quantum states at any 
-  point in a circuit has been added to Catalyst. For example, the code below is capturing 
+  point in a circuit has been added to Catalyst [(#1741)](https://github.com/PennyLaneAI/catalyst/pull/1741).
+  For example, the code below is capturing 
   two snapshot states:
 
   ``` python
