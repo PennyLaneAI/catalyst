@@ -201,6 +201,8 @@ class TestDecomposableGates:
         assert stats["num_beams"] == 14
         assert stats["num_transitions"] == 8
         assert stats["num_levels"] == 8
+        expected_f = os.path.join(MODULE_TEST_PATH, "test_single_CNOT.json")
+        assert verify_json(expected_f, result_openapl_file)
 
     def test_Hadamard_gate(self, oqd_pipelines, result_openapl_file):
         """Test OpenAPL generation for a circuit with a single Hadamard gate."""
