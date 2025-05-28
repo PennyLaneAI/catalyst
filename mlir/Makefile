@@ -142,6 +142,10 @@ plugin:
 		patch -p0 < $(MK_DIR)/patches/test-plugin-with-catalyst.patch; \
 	fi
 	cmake -B standalone/build -G Ninja \
+		-DCMAKE_C_COMPILER=$(C_COMPILER) \
+		-DCMAKE_CXX_COMPILER=$(CXX_COMPILER) \
+		-DCMAKE_C_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
+		-DCMAKE_CXX_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
 		-DMLIR_DIR=$(LLVM_BUILD_DIR)/lib/cmake/mlir \
 		-DLLVM_EXTERNAL_LIT=$(LLVM_EXTERNAL_LIT) \
 		-DCATALYST_TOOLS_DIR=$(DIALECTS_BUILD_DIR)/bin \

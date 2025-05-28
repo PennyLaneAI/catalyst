@@ -1842,7 +1842,7 @@ def _cond_lowering(
                     true_jaxpr.jaxpr,
                     if_ctx.name_stack,
                     mlir.TokenSet(),
-                    [mlir.ir_constants(c) for c in true_jaxpr.consts],
+                    [mlir.ir_constant(c) for c in true_jaxpr.consts],  # is never hit in our tests
                     *flat_args_plus_consts,
                     dim_var_values=jax_ctx.dim_var_values,
                 )
