@@ -244,6 +244,7 @@
 
 This release contains contributions from (in alphabetical order):
 
+Runor Agbaire
 Joey Carter,
 Sengthai Heng,
 David Ittah,
