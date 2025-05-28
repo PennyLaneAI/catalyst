@@ -156,10 +156,6 @@
   experimental PennyLane program-capture pipeline.
   [(#1631)](https://github.com/PennyLaneAI/catalyst/pull/1631)
 
-* Correctly copies contents to avoid mutating arguments during finite-diff lowering and avoids
-  generating incorrect code.
-  [(#1769)](https://github.com/PennyLaneAI/catalyst/pull/1769)
-
 * `make all` now correctly compiles the standalone plugin with the same compiler used to compile LLVM and MLIR.
   [(#1768)](https://github.com/PennyLaneAI/catalyst/pull/1768)
 
