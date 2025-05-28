@@ -29,7 +29,7 @@ from os import path
 from typing import List, Optional
 
 from catalyst.logging import debug_logger, debug_logger_init
-from catalyst.pipelines import CompileOptions
+from catalyst.pipelines import CompileOptions, KeepIntermediateLevel
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.filesystem import Directory
 from catalyst.utils.runtime_environment import get_cli_path, get_lib_path
@@ -342,7 +342,7 @@ def _options_to_cli_flags(options):
     if not options.lower_to_llvm:
         extra_args += [("--tool", "opt")]
 
-    if options.keep_intermediate:
+    if options.keep_intermediate >= KeepIntermediateLevel.BASIC:
         extra_args += ["--keep-intermediate"]
 
     if options.verbose:
@@ -350,6 +350,9 @@ def _options_to_cli_flags(options):
 
     if options.async_qnodes:  # pragma: nocover
         extra_args += ["--async-qnodes"]
+
+    if options.keep_intermediate >= KeepIntermediateLevel.DEBUG:
+        extra_args += ["--save-ir-after-each=pass"]
 
     return extra_args
 
