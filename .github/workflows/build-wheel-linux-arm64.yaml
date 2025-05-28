@@ -255,7 +255,7 @@ jobs:
         dnf update -y && dnf install -y openmpi-devel libzstd-devel gcc-toolset-12
         # Update env vars valid for all tasks of this job
         echo '/opt/rh/gcc-toolset-12/root/usr/bin' >> $GITHUB_PATH
-          
+
     - name: Install Dependencies (Python)
       run: |
         python${{ matrix.python_version }} -m pip install numpy nanobind pybind11 PyYAML cmake ninja

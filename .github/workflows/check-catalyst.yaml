@@ -47,7 +47,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get -y -q install ninja-build make cmake clang libomp-dev
-          python3 -m pip install nanobind pybind11       
+          python3 -m pip install nanobind pybind11
 
       - name: Get Cached LLVM Source
         id: cache-llvm-source
@@ -69,7 +69,7 @@ jobs:
         run: |
           COMPILER_LAUNCHER="" \
           C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
-          CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler_gxx', matrix.compiler)] }}) \
+          CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
           RT_BUILD_DIR="$(pwd)/runtime-build" \
           LLVM_DIR="$(pwd)/mlir/llvm-project" \
           ENABLE_ASAN=OFF \
@@ -77,8 +77,8 @@ jobs:
           make runtime
 
           COMPILER_LAUNCHER="" \
-          C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler_gcc', matrix.compiler)] }}) \
-          CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler_gxx', matrix.compiler)] }}) \
+          C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
+          CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
           RT_BUILD_DIR="$(pwd)/runtime-build" \
           OQC_BUILD_DIR="$(pwd)/oqc-build" \
           LLVM_DIR="$(pwd)/mlir/llvm-project" \
@@ -150,7 +150,7 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y python3.10 cmake ninja-build clang lld
-        python3 --version 
+        python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install numpy pybind11
 
 
@@ -161,8 +161,8 @@ jobs:
       run: |
         # echo 'target_compile_options(mlir_c_runner_utils PRIVATE "-fno-sanitize=all")' \
         #       >> mlir/llvm-project/mlir/lib/ExecutionEngine/CMakeLists.txt
-        C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler_gcc', matrix.compiler)] }}) \
-        CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler_gxx', matrix.compiler)] }}) \
+        C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
+        CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \
         COMPILER_LAUNCHER="" \
         PYTHON_EXECUTABLE=$(which python3) \
@@ -231,8 +231,8 @@ jobs:
     - name: Build MHLO Dialect
       if: steps.cache-mhlo.outputs.cache-hit != 'true'
       run: |
-        C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler_gcc', matrix.compiler)] }}) \
-        CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler_gxx', matrix.compiler)] }}) \
+        C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
+        CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \
         MHLO_BUILD_DIR="$(pwd)/mhlo-build" \
         COMPILER_LAUNCHER="" \
@@ -301,8 +301,8 @@ jobs:
     - name: Build Enzyme
       if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
       run: |
-        C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler_gcc', matrix.compiler)] }}) \
-        CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler_gxx', matrix.compiler)] }}) \
+        C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
+        CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \
         ENZYME_BUILD_DIR="$(pwd)/enzyme-build" \
         COMPILER_LAUNCHER="" \
@@ -326,7 +326,7 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y python3 python3-dev python3-pip cmake ninja-build ccache clang lld
-        # python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
+        python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install numpy nanobind pybind11
 
     - name: Get Cached LLVM Source
@@ -392,8 +392,8 @@ jobs:
     - name: Build MLIR Dialects
       run: |
         CCACHE_DIR="$(pwd)/.ccache" \
-        C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler_gcc', matrix.compiler)] }}) \
-        CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler_gxx', matrix.compiler)] }}) \
+        C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
+        CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \
         MHLO_BUILD_DIR="$(pwd)/mhlo-build" \
         ENZYME_BUILD_DIR="$(pwd)/enzyme-build" \
@@ -403,8 +403,8 @@ jobs:
     - name: Build Standalone Plugin
       run: |
         CCACHE_DIR="$(pwd)/.ccache" \
-        C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler_gcc', matrix.compiler)] }}) \
-        CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler_gxx', matrix.compiler)] }}) \
+        C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
+        CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \
         MLIR_DIR="$(pwd)/llvm-build/lib/cmake/mlir" \
         make plugin
@@ -533,7 +533,7 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y python3 python3-pip libomp-dev libasan6 make ninja-build
-        # python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
+        python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
         make frontend
 
@@ -590,7 +590,7 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y python3 python3-pip libomp-dev libasan6 make ninja-build
-        # python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
+        python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
         make frontend
 
@@ -649,8 +649,8 @@ jobs:
 
       - name: Build Runtime test suite for OQC device
         run: |
-          C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler_gcc', matrix.compiler)] }}) \
-          CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler_gxx', matrix.compiler)] }}) \
+          C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
+          CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
           RT_BUILD_DIR="$(pwd)/runtime-build" \
           make test-oqc
 
@@ -672,9 +672,9 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get -y -q install cmake ninja-build 
-          python3.10 -m pip install nanobind pybind11
+          python3 -m pip install nanobind pybind11
 
-      - name: Install lcov # Manually install lcov 1.14
+      - name: Install lcov # Manually install lcov 1.14 (lcov_1.15-1_all.deb)
         run: |
           wget http://archive.ubuntu.com/ubuntu/pool/universe/l/lcov/lcov_1.15-1_all.deb
           sudo apt-get install -y ./lcov_1.15-1_all.deb
