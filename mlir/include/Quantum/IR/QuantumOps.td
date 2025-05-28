@@ -530,7 +530,7 @@ def CustomOp : UnitaryGate_Op<"custom", [DifferentiableGate, NoMemoryEffect,
 }
 
 def GlobalPhaseOp : UnitaryGate_Op<"gphase", [DifferentiableGate, AttrSizedOperandSegments,
-                                                MemoryEffects<[MemRead<QuantumMemory>]>]> {
+                            MemoryEffects<[MemRead<QuantumMemory>, MemWrite<QuantumMemory>]>]> {
     let summary = "Global Phase.";
     let description = [{
     }];
