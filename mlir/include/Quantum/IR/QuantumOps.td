@@ -405,7 +405,7 @@ def SetBasisStateOp : Gate_Op<"set_basis_state",
 
 def CustomOp : UnitaryGate_Op<"custom", [DifferentiableGate, NoMemoryEffect,
                                          AttrSizedOperandSegments, AttrSizedResultSegments,
-                            MemoryEffects<[MemRead<QuantumMemory>, MemWrite<QuantumMemory>]>
+                                         MemoryEffects<[MemRead<QuantumMemory>]>
                             ]> {
     let summary = "A generic quantum gate on n qubits with m floating point parameters.";
     let description = [{
@@ -530,7 +530,7 @@ def CustomOp : UnitaryGate_Op<"custom", [DifferentiableGate, NoMemoryEffect,
 }
 
 def GlobalPhaseOp : UnitaryGate_Op<"gphase", [DifferentiableGate, AttrSizedOperandSegments,
-                        MemoryEffects<[MemRead<QuantumMemory>, MemWrite<QuantumMemory>]>]> {
+                                                MemoryEffects<[MemRead<QuantumMemory>]>]> {
     let summary = "Global Phase.";
     let description = [{
     }];
@@ -570,7 +570,7 @@ def GlobalPhaseOp : UnitaryGate_Op<"gphase", [DifferentiableGate, AttrSizedOpera
 
 def MultiRZOp : UnitaryGate_Op<"multirz", [DifferentiableGate, NoMemoryEffect,
                             AttrSizedOperandSegments, AttrSizedResultSegments,
-                            MemoryEffects<[MemRead<QuantumMemory>, MemWrite<QuantumMemory>]>]> {
+                            MemoryEffects<[MemRead<QuantumMemory>]>]> {
     let summary = "Apply an arbitrary multi Z rotation";
     let description = [{
         The `quantum.multirz` operation applies an arbitrary multi Z rotation to the state-vector.
@@ -605,7 +605,7 @@ def MultiRZOp : UnitaryGate_Op<"multirz", [DifferentiableGate, NoMemoryEffect,
 
 def QubitUnitaryOp : UnitaryGate_Op<"unitary", [ParametrizedGate, NoMemoryEffect,
                             AttrSizedOperandSegments, AttrSizedResultSegments,
-                            MemoryEffects<[MemRead<QuantumMemory>, MemWrite<QuantumMemory>]>]> {
+                            MemoryEffects<[MemRead<QuantumMemory>]>]> {
     let summary = "Apply an arbitrary fixed unitary matrix";
     let description = [{
         The `quantum.unitary` operation applies an arbitrary fixed unitary matrix to the
