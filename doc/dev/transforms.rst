@@ -252,8 +252,8 @@ Note how the value ``%q2`` links the two operations together from definition ``(
 across several other instructions.
 
 As seen in the `pattern rewriter documentation <https://mlir.llvm.org/docs/PatternRewriter/#defining-patterns>`_,
-a new rewrite pattern can be defined as a C++ class as follows, where we will focus on the ``match``
-and ``rewrite`` methods (refer to the link for the full class and up to date information):
+a new rewrite pattern can be defined as a C++ class as follows, where we will focus on the
+``matchAndRewrite`` method (refer to the link for the full class and up to date information):
 
 .. code-block:: cpp
 
@@ -261,14 +261,13 @@ and ``rewrite`` methods (refer to the link for the full class and up to date inf
     {
         ...
 
-        LogicalResult match(QubitUnitaryOp op) const override {
-            // The ``match`` method returns ``success()`` if the pattern is a match, failure
-            // otherwise.
-        }
-
-        void rewrite(QubitUnitaryOp op, PatternRewriter &rewriter) {
-            // The ``rewrite`` method performs mutations on the IR rooted at ``op`` using
-            // the provided rewriter. All mutations must go through the provided rewriter.
+        LogicalResult matchAndRewrite(QubitUnitaryOp op, PatternRewriter &rewriter) const override {
+            // The `matchAndRewrite` method performs both the pattern matching and the mutation 
+            // on the IR rooted at `op` using the provided rewriter.
+            // All mutations must go through the provided rewriter and IR mutation should only
+            // take place after the match is deemed successful. 
+            // matchAndRewrite must return "success" if and only if the IR was modified.
+            // The root operation is required to either be: updated in-place, replaced, or erased.
         }
 
         ...
@@ -286,11 +285,11 @@ the second is a list of qubits):
 
     QubitUnitary(*, QubitUnitary(*, *))
 
-Let's implement it in C++:
+Let's add the pattern matching logic to the ``matchAndRewrite`` method:
 
 .. code-block:: cpp
 
-    LogicalResult match(QubitUnitaryOp op) const override
+    LogicalResult matchAndRewrite(QubitUnitaryOp op, PatternRewriter &rewriter) const override
     {
         ValueRange qbs = op.getInQubits();
         Operation *parent = qbs[0].getDefiningOp();
@@ -313,6 +312,9 @@ Let's implement it in C++:
             if (qb1 != qb2) {
                 return failure();
             }
+
+        // Rewrite logic
+        // ... We have matched the pattern, now rewrite the IR here
 
         return success();
     }
@@ -351,8 +353,8 @@ MLIR will automatically generate canonical ``get*`` methods for attributes like 
 ``out_qubits``, and ``matrix``. When in doubt it's best to have a look at the generated C++ files in
 the build folder, named ``QuantumOps.h.inc`` and ``QuantumOps.cpp.inc`` in this instance.
 
-Alright, now that we have the matching part, let's implement the actual transformation via the
-``rewrite`` method. All we need to do is replace the original pattern with the following:
+Alright, now that we have the matching part, let's add the actual transformation to the
+``matchAndRewrite`` method. All we need to do is replace the original pattern with the following:
 
 .. code-block::
 
@@ -362,8 +364,13 @@ In C++ it will look as follows:
 
 .. code-block:: cpp
 
-    void rewrite(QubitUnitaryOp op, PatternRewriter &rewriter) const override
+    LogicalResult matchAndRewrite(QubitUnitaryOp op, PatternRewriter &rewriter) const override
     {
+
+        // Pattern matching logic
+        // ... match the pattern
+
+        // Rewrite logic
         ValueRange qbs = op.getInQubits();
         QubitUnitaryOp parentOp = cast<QubitUnitaryOp>(qbs[0].getDefiningOp());
 
@@ -410,11 +417,13 @@ In C++ it will look as follows:
         // The second unitary is not needed anymore
         // Whoever uses the second unitary, use the first one instead!
         op.replaceAllUsesWith(parentOp);
+
+        return success();
     }
 
 When writing transformations, the rewriter is the most important tool we have. It can create new
 operations for us, delete others, or change the place in the IR where we are choosing to make
-changes (also called the insertion point). Let's have look at some of these elements:
+changes (also called the insertion point). Let's have a look at some of these elements:
 
 - **Constructing new operations**:
 
@@ -565,12 +574,16 @@ gradient ops that specify the finite-difference method, indicated via the ``"fd"
 
 .. code-block:: cpp
 
-    LogicalResult FiniteDiffLowering::match(GradOp op)
+    LogicalResult FiniteDiffLowering::matchAndRewrite(GradOp op, PatternRewriter &rewriter)
     {
-        if (op.getMethod() == "fd")
-            return success();
+        // Pattern matching logic
+        if (op.getMethod() != "fd")
+            return failure();
 
-        return failure();
+        // Rewrite logic
+        // ...
+
+        return success();
     }
 
 For the rewriting part we'll want to introduce a few new elements, such as looking up symbols
@@ -578,8 +591,13 @@ For the rewriting part we'll want to introduce a few new elements, such as looki
 
 .. code-block:: cpp
 
-    void FiniteDiffLowering::rewrite(GradOp op, PatternRewriter &rewriter)
+    LogicalResult FiniteDiffLowering::matchAndRewrite(GradOp op, PatternRewriter &rewriter)
     {
+        // Pattern matching logic
+        if (op.getMethod() != "fd")
+            return failure();
+
+        // Rewrite logic
         // First let's find the function the grad operation is referencing.
         func::FuncOp callee =
             SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
@@ -609,6 +627,8 @@ For the rewriting part we'll want to introduce a few new elements, such as looki
             // Populate the function body.
             populateFiniteDiffMethod(rewriter, op, gradFn);
         }
+
+        return success();
     }
 
 Symbols are string references to IR objects, which rather than containing a physical reference or
@@ -711,18 +731,20 @@ Alright, our function should now look something like this:
         func.return %dx, %dy, %dz : f64, f64, f64
     }
 
-Finally, we have to amend our rewrite function to invoke the new function we created and delete the
+Finally, we have to amend our matchAndRewrite function to invoke the new function we created and delete the
 ``GradOp`` from the IR:
 
 .. code-block:: cpp
 
-    void FiniteDiffLowering::rewrite(GradOp op, PatternRewriter &rewriter)
+    LogicalResult FiniteDiffLowering::matchAndRewrite(GradOp op, PatternRewriter &rewriter)
     {
         ...
             populateFiniteDiffMethod(rewriter, op, gradFn);
         }
 
         rewriter.replaceOpWithNewOp<func::CallOp>(op, gradFn, op.getArgOperands());
+
+        return success();
     }
 
 Note how we can create a new operation, take its results, and use those to replace another operation
