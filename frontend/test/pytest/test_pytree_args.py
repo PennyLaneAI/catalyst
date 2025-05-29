@@ -276,6 +276,41 @@ class TestPyTreesReturnValues:
             result["expval"]["z0"], expected_expval, atol=tol_stochastic, rtol=tol_stochastic
         )
 
+        @qml.qnode(qml.device(backend, wires=2, shots=1000))
+        def circuit2_snapshot(params):
+            qml.Snapshot()
+            qml.RX(params[0], wires=0)
+            qml.RX(params[1], wires=1)
+            qml.Snapshot()
+            return {
+                "counts": qml.counts(),
+                "expval": {
+                    "z0": qml.expval(qml.PauliZ(0)),
+                },
+            }
+
+        params = [0.5, 0.6]
+        expected_expval = 0.87758256
+        expected_snapshot_states = [
+            jnp.array([1.0 + 0.0j, 0.0 + 0.0j, 0.0 + 0.0j, 0.0 + 0.0j], dtype=np.complex128),
+            jnp.array(
+                [0.92563739 + 0.0j, 0.0 - 0.2863332j, 0.0 - 0.23635403j, -0.07311287 + 0.0j],
+                dtype=jnp.complex128,
+            ),
+        ]
+        jitted_fn = qjit(circuit2_snapshot)
+        result = jitted_fn(params)
+        assert isinstance(result, tuple)
+        assert isinstance(result[0], list)
+        assert isinstance(result[1], dict)
+        assert isinstance(result[1]["counts"], tuple)
+        assert all(
+            jnp.allclose(expected_snapshot_states[i], result[0][i]) for i in range(len(result[0]))
+        )
+        assert jnp.allclose(
+            result[1]["expval"]["z0"], expected_expval, atol=tol_stochastic, rtol=tol_stochastic
+        )
+
         @qml.qnode(qml.device(backend, wires=2, shots=None))
         def circuit3(params):
             qml.RX(params[0], wires=0)

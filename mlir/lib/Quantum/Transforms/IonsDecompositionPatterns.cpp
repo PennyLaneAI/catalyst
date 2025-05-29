@@ -14,9 +14,12 @@
 
 #define DEBUG_TYPE "ions-decomposition"
 
+#include <variant>
+
+#include "mlir/Dialect/Arith/IR/Arith.h"
+
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Transforms/Patterns.h"
-#include "mlir/Dialect/Arith/IR/Arith.h"
 
 using namespace mlir;
 using namespace catalyst::quantum;

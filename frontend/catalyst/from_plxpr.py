@@ -29,6 +29,7 @@ from pennylane.capture import PlxprInterpreter, qnode_prim
 from pennylane.capture.expand_transforms import ExpandTransformsInterpreter
 from pennylane.capture.primitives import cond_prim as plxpr_cond_prim
 from pennylane.capture.primitives import for_loop_prim as plxpr_for_loop_prim
+from pennylane.capture.primitives import measure_prim as plxpr_measure_prim
 from pennylane.capture.primitives import while_loop_prim as plxpr_while_loop_prim
 from pennylane.ftqc.primitives import measure_in_basis_prim as plxpr_measure_in_basis_prim
 from pennylane.ops.functions.map_wires import _map_wires_transform as pl_map_wires
@@ -58,6 +59,7 @@ from catalyst.jax_primitives import (
     for_p,
     gphase_p,
     measure_in_basis_p,
+    measure_p,
     namedobs_p,
     probs_p,
     qalloc_p,
@@ -644,6 +646,30 @@ def handle_while_loop(
 
     # Return only the output values that match the plxpr output values
     return outvals
+
+
+@QFuncPlxprInterpreter.register_primitive(plxpr_measure_prim)
+def handle_measure(self, wire, reset, postselect):
+    """Handle the conversion from plxpr to Catalyst jaxpr for the mid-circuit measure primitive."""
+
+    in_wire = self.get_wire(wire)
+
+    result, out_wire = measure_p.bind(in_wire, postselect=postselect)
+
+    if reset:
+        # Constants need to be passed as input values for some reason I forgot about.
+        correction = jaxpr_pad_consts(
+            [
+                jax.make_jaxpr(lambda: qinst_p.bind(in_wire, op="PauliX", qubits_len=1))().jaxpr,
+                jax.make_jaxpr(lambda: out_wire)().jaxpr,
+            ]
+        )
+        out_wire = cond_p.bind(
+            result, in_wire, out_wire, branch_jaxprs=correction, nimplicit_outputs=None
+        )[0]
+
+    self.wire_map[wire] = out_wire
+    return result
 
 
 # pylint: disable=unused-argument, too-many-positional-arguments

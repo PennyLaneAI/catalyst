@@ -22,7 +22,6 @@
 #include "Catalyst/Transforms/BufferizableOpInterfaceImpl.h"
 
 using namespace mlir;
-using namespace mlir::bufferization;
 using namespace catalyst;
 
 /**
