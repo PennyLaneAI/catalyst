@@ -28,6 +28,7 @@
 #include "Catalyst/Transforms/BufferizableOpInterfaceImpl.h"
 #include "Catalyst/Transforms/Passes.h"
 #include "Gradient/IR/GradientDialect.h"
+#include "Gradient/Transforms/BufferizableOpInterfaceImpl.h"
 #include "Gradient/Transforms/Passes.h"
 #include "Ion/IR/IonDialect.h"
 #include "MBQC/IR/MBQCDialect.h"
@@ -64,6 +65,7 @@ int main(int argc, char **argv)
     registry.insert<mlir::mhlo::MhloDialect>();
 
     catalyst::registerBufferizableOpInterfaceExternalModels(registry);
+    catalyst::gradient::registerBufferizableOpInterfaceExternalModels(registry);
     catalyst::quantum::registerBufferizableOpInterfaceExternalModels(registry);
 
     return mlir::asMainReturnCode(

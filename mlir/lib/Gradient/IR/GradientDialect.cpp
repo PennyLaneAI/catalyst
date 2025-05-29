@@ -12,11 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
+#include "mlir/Interfaces/FunctionImplementation.h"
 #include "mlir/Transforms/InliningUtils.h"
 
 #include "Gradient/IR/GradientDialect.h"
 #include "Gradient/IR/GradientOps.h"
-#include "mlir/Interfaces/FunctionImplementation.h"
 
 using namespace mlir;
 using namespace catalyst::gradient;
@@ -50,6 +51,9 @@ void GradientDialect::initialize()
 #include "Gradient/IR/GradientOps.cpp.inc"
         >();
     addInterface<GradientInlinerInterface>();
+
+    declarePromisedInterfaces<bufferization::BufferizableOpInterface, AdjointOp, BackpropOp,
+                              ForwardOp, ReverseOp>();
 }
 
 //===----------------------------------------------------------------------===//

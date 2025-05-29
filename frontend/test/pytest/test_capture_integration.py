@@ -349,6 +349,59 @@ class TestCapture:
 
         assert jnp.allclose(capture_result, circuit(theta))
 
+    @pytest.mark.parametrize(
+        "reset, op, expected",
+        [(False, qml.I, 1), (False, qml.X, -1), (True, qml.I, 1), (True, qml.X, 1)],
+    )
+    def test_measure(self, backend, reset, op, expected):
+        """Test the integration for a circuit with a mid-circuit measurement.
+
+        We do not currently have full feature parity between PennyLane's `measure` and Catalyst's.
+        Moreover, there is limited support for the various MCM methods with QJIT and with program
+        capture enabled. Hence, we only test that a simple example with a deterministic outcome
+        returns correct results.
+        """
+        device = qml.device(backend, wires=1)
+
+        qml.capture.enable()
+
+        @qjit
+        @qml.qnode(device)
+        def captured_circuit():
+            op(wires=0)
+            qml.measure(wires=0, reset=reset)
+            return qml.expval(qml.Z(0))
+
+        capture_result = captured_circuit()
+
+        qml.capture.disable()
+
+        assert capture_result == expected
+
+    def test_measure_postselect(self, backend):
+        """Test the integration for a circuit with a mid-circuit measurement using postselect.
+
+        See note in test_measure() above for discussion on testing strategy.
+        """
+        device = qml.device(backend, wires=1)
+
+        qml.capture.enable()
+
+        @qjit
+        @qml.qnode(device)
+        def captured_circuit():
+            qml.H(wires=0)
+            qml.measure(wires=0, postselect=1)
+            return qml.expval(qml.Z(0))
+
+        capture_result = captured_circuit()
+
+        qml.capture.disable()
+
+        expected_result = -1
+
+        assert capture_result == expected_result
+
     @pytest.mark.parametrize("theta", (jnp.pi, 0.1, 0.0))
     def test_forloop(self, backend, theta):
         """Test the integration for a circuit with a for loop."""
