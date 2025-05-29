@@ -1,7 +1,28 @@
-diff -ruN ./mlir/mlir-hlo/mhlo/transforms/CMakeLists.txt mlir-hlo/mhlo/transforms/CMakeLists.txt
---- ./mlir/mlir-hlo/mhlo/transforms/CMakeLists.txt	2025-05-26 21:35:32.604430350 -0400
-+++ mlir-hlo/mhlo/transforms/CMakeLists.txt	2025-05-26 21:30:16.779715320 -0400
-@@ -26,14 +26,20 @@
+From b1728b65b1511cd5ef3e11650b9e416d3fad068f Mon Sep 17 00:00:00 2001
+From: paul0403 <paulhaochen.wang@gmail.com>
+Date: Thu, 29 May 2025 11:00:56 -0400
+Subject: [PATCH] restore the removed mhlo passes we need:
+ mhlo-legalize-control-flow, mhlo-legalize-to-std, hlo-legalize-sort
+
+---
+ mhlo/transforms/CMakeLists.txt                |   6 +
+ .../legalize_control_flow.cc                  | 288 +++++++++
+ .../transforms/legalize_sort/legalize_sort.cc | 577 ++++++++++++++++++
+ .../legalize_to_standard.cc                   | 243 ++++++++
+ .../legalize_to_standard_patterns.td          |  92 +++
+ mhlo/transforms/mhlo_passes.td                |  19 +
+ mhlo/transforms/passes.h                      |   4 +
+ 7 files changed, 1229 insertions(+)
+ create mode 100644 mhlo/transforms/legalize_control_flow/legalize_control_flow.cc
+ create mode 100644 mhlo/transforms/legalize_sort/legalize_sort.cc
+ create mode 100644 mhlo/transforms/legalize_to_standard/legalize_to_standard.cc
+ create mode 100644 mhlo/transforms/legalize_to_standard/legalize_to_standard_patterns.td
+
+diff --git a/mhlo/transforms/CMakeLists.txt b/mhlo/transforms/CMakeLists.txt
+index d6848633..26d3b419 100644
+--- a/mhlo/transforms/CMakeLists.txt
++++ b/mhlo/transforms/CMakeLists.txt
+@@ -26,14 +26,20 @@ set(LLVM_TARGET_DEFINITIONS chlo_legalize_to_hlo/chlo_legalize_to_hlo_patterns.t
  mlir_tablegen(chlo_legalize_to_hlo/generated_chlo_legalize_to_hlo.inc -gen-rewriters)
  add_public_tablegen_target(MLIRChloLegalizeToHloIncGen)
  
@@ -22,9 +43,11 @@ diff -ruN ./mlir/mlir-hlo/mhlo/transforms/CMakeLists.txt mlir-hlo/mhlo/transform
    legalize_torch_index_select_to_gather/legalize_torch_index_select_to_gather.cc
    legalize_trigonometric_to_approximation/legalize_trigonometric_to_approximation.cc
    materialize_broadcasts/materialize_broadcasts.cc
-diff -ruN mlir-hlo/mhlo/transforms/legalize_control_flow/legalize_control_flow.cc mlir-hlo/mhlo/transforms/legalize_control_flow/legalize_control_flow.cc
---- mlir-hlo/mhlo/transforms/legalize_control_flow/legalize_control_flow.cc	2025-05-26 21:08:54.516387289 -0400
-+++ mlir-hlo/mhlo/transforms/legalize_control_flow/legalize_control_flow.cc	1969-12-31 19:00:00.000000000 -0500
+diff --git a/mhlo/transforms/legalize_control_flow/legalize_control_flow.cc b/mhlo/transforms/legalize_control_flow/legalize_control_flow.cc
+new file mode 100644
+index 00000000..9d473b9a
+--- /dev/null
++++ b/mhlo/transforms/legalize_control_flow/legalize_control_flow.cc
 @@ -0,0 +1,288 @@
 +/* Copyright 2019 The OpenXLA Authors.
 +
@@ -314,9 +337,11 @@ diff -ruN mlir-hlo/mhlo/transforms/legalize_control_flow/legalize_control_flow.c
 +mlir::mhlo::createLegalizeControlFlowPass() {
 +  return std::make_unique<LegalizeControlFlowPass>();
 +}
-diff -ruN mlir-hlo/mhlo/transforms/legalize_sort/legalize_sort.cc mlir-hlo/mhlo/transforms/legalize_sort/legalize_sort.cc
---- mlir-hlo/mhlo/transforms/legalize_sort/legalize_sort.cc	2025-05-26 21:09:55.157329936 -0400
-+++ mlir-hlo/mhlo/transforms/legalize_sort/legalize_sort.cc	1969-12-31 19:00:00.000000000 -0500
+diff --git a/mhlo/transforms/legalize_sort/legalize_sort.cc b/mhlo/transforms/legalize_sort/legalize_sort.cc
+new file mode 100644
+index 00000000..8ba9de9a
+--- /dev/null
++++ b/mhlo/transforms/legalize_sort/legalize_sort.cc
 @@ -0,0 +1,577 @@
 +/* Copyright 2019 The OpenXLA Authors.
 +
@@ -895,9 +920,11 @@ diff -ruN mlir-hlo/mhlo/transforms/legalize_sort/legalize_sort.cc mlir-hlo/mhlo/
 +mlir::mhlo::createLegalizeSortPass() {
 +  return std::make_unique<LegalizeSortPass>();
 +}
-diff -ruN mlir-hlo/mhlo/transforms/legalize_to_standard/legalize_to_standard.cc mlir-hlo/mhlo/transforms/legalize_to_standard/legalize_to_standard.cc
---- mlir-hlo/mhlo/transforms/legalize_to_standard/legalize_to_standard.cc	2025-05-26 21:13:33.254735743 -0400
-+++ mlir-hlo/mhlo/transforms/legalize_to_standard/legalize_to_standard.cc	1969-12-31 19:00:00.000000000 -0500
+diff --git a/mhlo/transforms/legalize_to_standard/legalize_to_standard.cc b/mhlo/transforms/legalize_to_standard/legalize_to_standard.cc
+new file mode 100644
+index 00000000..be752397
+--- /dev/null
++++ b/mhlo/transforms/legalize_to_standard/legalize_to_standard.cc
 @@ -0,0 +1,243 @@
 +/* Copyright 2019 The OpenXLA Authors.
 +
@@ -1142,9 +1169,11 @@ diff -ruN mlir-hlo/mhlo/transforms/legalize_to_standard/legalize_to_standard.cc 
 +
 +}  // end namespace mhlo
 +}  // end namespace mlir
-diff -ruN mlir-hlo/mhlo/transforms/legalize_to_standard/legalize_to_standard_patterns.td mlir-hlo/mhlo/transforms/legalize_to_standard/legalize_to_standard_patterns.td
---- mlir-hlo/mhlo/transforms/legalize_to_standard/legalize_to_standard_patterns.td	2025-05-26 21:19:18.219800260 -0400
-+++ mlir-hlo/mhlo/transforms/legalize_to_standard/legalize_to_standard_patterns.td	1969-12-31 19:00:00.000000000 -0500
+diff --git a/mhlo/transforms/legalize_to_standard/legalize_to_standard_patterns.td b/mhlo/transforms/legalize_to_standard/legalize_to_standard_patterns.td
+new file mode 100644
+index 00000000..f4d24608
+--- /dev/null
++++ b/mhlo/transforms/legalize_to_standard/legalize_to_standard_patterns.td
 @@ -0,0 +1,92 @@
 +/* Copyright 2019 The OpenXLA Authors.
 +
@@ -1238,10 +1267,11 @@ diff -ruN mlir-hlo/mhlo/transforms/legalize_to_standard/legalize_to_standard_pat
 +def : Pat<(MHLO_SelectOp $pred, $tv, $fv),
 +          (SelectOp $pred, $tv, $fv),
 +          [(IsSameSizeConstraint $pred, $tv), (IsSameSizeConstraint $tv, $fv)]>;
-diff -ruN ./mlir/mlir-hlo/mhlo/transforms/mhlo_passes.td mlir-hlo/mhlo/transforms/mhlo_passes.td
---- ./mlir/mlir-hlo/mhlo/transforms/mhlo_passes.td	2025-05-26 21:35:32.604430350 -0400
-+++ mlir-hlo/mhlo/transforms/mhlo_passes.td	2025-05-26 21:30:16.779715320 -0400
-@@ -15,6 +15,25 @@
+diff --git a/mhlo/transforms/mhlo_passes.td b/mhlo/transforms/mhlo_passes.td
+index 853531c1..378f8944 100644
+--- a/mhlo/transforms/mhlo_passes.td
++++ b/mhlo/transforms/mhlo_passes.td
+@@ -15,6 +15,25 @@ limitations under the License.
  
  include "mlir/Pass/PassBase.td"
  
@@ -1267,10 +1297,11 @@ diff -ruN ./mlir/mlir-hlo/mhlo/transforms/mhlo_passes.td mlir-hlo/mhlo/transform
  def ChloLegalizeToHighLevelMhloPass : Pass<"chlo-legalize-to-high-level-mhlo", "func::FuncOp"> {
    let summary = "Legalize CHLO's with XLA counterparts, like TopK and Erf.";
    let description = [{
-diff -ruN ./mlir/mlir-hlo/mhlo/transforms/passes.h mlir-hlo/mhlo/transforms/passes.h
---- ./mlir/mlir-hlo/mhlo/transforms/passes.h	2025-05-26 21:35:32.604430350 -0400
-+++ mlir-hlo/mhlo/transforms/passes.h	2025-05-26 21:30:16.779715320 -0400
-@@ -37,6 +37,10 @@
+diff --git a/mhlo/transforms/passes.h b/mhlo/transforms/passes.h
+index 3d2aa3b3..3f03b2df 100644
+--- a/mhlo/transforms/passes.h
++++ b/mhlo/transforms/passes.h
+@@ -37,6 +37,10 @@ namespace mhlo {
  #define GEN_PASS_DECL
  #include "mhlo/transforms/mhlo_passes.h.inc"
  
@@ -1281,3 +1312,6 @@ diff -ruN ./mlir/mlir-hlo/mhlo/transforms/passes.h mlir-hlo/mhlo/transforms/pass
  /// Lowers from HLO dialect to Arithmetic dialect.
  std::unique_ptr<OperationPass<ModuleOp>> createLegalizeToArithmeticPass();
  
+-- 
+2.34.1
+

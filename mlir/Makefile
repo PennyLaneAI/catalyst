@@ -95,13 +95,8 @@ mhlo: TARGET_FILE := $(MK_DIR)/mlir-hlo/mhlo/transforms/CMakeLists.txt
 mhlo: PATCH_FILE := $(MK_DIR)/patches/mhlo-Add-PassesIncGen-in-transforms-CMakeList.patch
 mhlo:
 	@echo "build MLIR-HLO"
-	# We have too many mhlo patches now, so let's clean it everytime.
-	# make clean-mhlo
-	# TODO: probably clean this up
-	# git submodule mlir-hlo checkout -f 617a9361d186199480c080c9e8c474a5e30c22d1
-	#rm -rf $(MK_DIR)/mlir-hlo/mhlo/transforms/legalize_control_flow
-	#rm -rf $(MK_DIR)/mlir-hlo/mhlo/transforms/legalize_sort
-	#rm -rf $(MK_DIR)/mlir-hlo/mhlo/transforms/legalize_to_standard
+	# Clean mhlo submodule for git patches
+	make clean-mhlo
 
 	# Patch MHLO cmake dependency
 	# TODO: remove once https://github.com/openxla/xla/pull/15446 is merged
@@ -110,19 +105,13 @@ mhlo:
 	fi
 
 	# Patch MHLO shardy dependency
-	cd mlir-hlo; pwd; git apply $(MK_DIR)/patches/mhlo-remove-shardy.patch; \
+	@if cd mlir-hlo; git apply --summary $(MK_DIR)/patches/mhlo-remove-shardy.patch; then \
+		git apply $(MK_DIR)/patches/mhlo-remove-shardy.patch; \
+	fi
 
 	# Patch MHLO passes removed from upstream
-	# TODO: probably clean this up
-	mkdir -p $(MK_DIR)/mlir-hlo/mhlo/transforms/legalize_control_flow
-	mkdir -p $(MK_DIR)/mlir-hlo/mhlo/transforms/legalize_sort
-	mkdir -p $(MK_DIR)/mlir-hlo/mhlo/transforms/legalize_to_standard
-	touch $(MK_DIR)/mlir-hlo/mhlo/transforms/legalize_control_flow/legalize_control_flow.cc
-	touch $(MK_DIR)/mlir-hlo/mhlo/transforms/legalize_sort/legalize_sort.cc
-	touch $(MK_DIR)/mlir-hlo/mhlo/transforms/legalize_to_standard/legalize_to_standard.cc
-	touch $(MK_DIR)/mlir-hlo/mhlo/transforms/legalize_to_standard/legalize_to_standard_patterns.td
-	@if patch -p0 --dry-run -N --verbose < $(MK_DIR)/patches/mhlo-add-back-necessary-passes.patch > /dev/null 2>&1; then \
-		patch -p0 < $(MK_DIR)/patches/mhlo-add-back-necessary-passes.patch; \
+	@if cd mlir-hlo; git apply --summary $(MK_DIR)/patches/mhlo-add-back-necessary-passes.patch; then \
+		git apply $(MK_DIR)/patches/mhlo-add-back-necessary-passes.patch; \
 	fi
 	cmake -G Ninja -S mlir-hlo -B $(MHLO_BUILD_DIR) \
 		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
@@ -234,6 +223,7 @@ clean-llvm:
 clean-mhlo:
 	@echo "clean HLO dialect build files"
 	rm -rf $(MHLO_BUILD_DIR)
+	cd mlir-hlo; git clean -fd; git checkout .;\
 
 clean-enzyme:
 	@echo "clean enzyme build files"
