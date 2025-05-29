@@ -21,7 +21,7 @@
 import pennylane as qml
 
 from catalyst import measure, qjit
-from catalyst.passes import commute_ppr, merge_ppr_ppm, ppr_to_ppm, to_ppm, to_ppr
+from catalyst.passes import commute_ppr, merge_ppr_ppm, ppm_compilation, ppr_to_ppm, to_ppr
 
 
 def test_convert_clifford_to_ppr():
@@ -241,7 +241,7 @@ def test_clifford_to_ppm():
     @qjit(pipelines=pipe, target="mlir")
     def test_clifford_to_ppm_workflow():
 
-        @to_ppm
+        @ppm_compilation
         @qml.qnode(qml.device("null.qubit", wires=2))
         def cir_clifford_to_ppm():
             qml.H(0)
@@ -250,7 +250,9 @@ def test_clifford_to_ppm():
             qml.T(1)
             return [measure(0), measure(1)]
 
-        @to_ppm(decompose_method="clifford-corrected", avoid_y_measure=True, max_pauli_size=2)
+        @ppm_compilation(
+            decompose_method="clifford-corrected", avoid_y_measure=True, max_pauli_size=2
+        )
         @qml.qnode(qml.device("null.qubit", wires=5))
         def cir_clifford_to_ppm_with_params():
             for idx in range(5):

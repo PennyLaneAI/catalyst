@@ -24,8 +24,8 @@ from catalyst.passes import (
     commute_ppr,
     merge_ppr_ppm,
     merge_rotations,
+    ppm_compilation,
     ppr_to_ppm,
-    to_ppm,
     to_ppr,
 )
 
@@ -379,7 +379,7 @@ def test_clifford_to_ppm():
     @qjit(pipelines=pipe, target="mlir")
     def test_clifford_to_ppm_workflow():
 
-        @to_ppm
+        @ppm_compilation
         @qml.qnode(qml.device("lightning.qubit", wires=2))
         def f():
             for idx in range(5):
@@ -389,7 +389,9 @@ def test_clifford_to_ppm():
                 qml.T(idx + 1)
             return measure(0)
 
-        @to_ppm(decompose_method="clifford-corrected", avoid_y_measure=True, max_pauli_size=2)
+        @ppm_compilation(
+            decompose_method="clifford-corrected", avoid_y_measure=True, max_pauli_size=2
+        )
         @qml.qnode(qml.device("lightning.qubit", wires=2))
         def g():
             for idx in range(5):
@@ -400,9 +402,9 @@ def test_clifford_to_ppm():
 
         return f(), g()
 
-    assert 'transform.apply_registered_pass "to_ppm"' in test_clifford_to_ppm_workflow.mlir
+    assert 'transform.apply_registered_pass "ppm_compilation"' in test_clifford_to_ppm_workflow.mlir
     optimized_ir = test_clifford_to_ppm_workflow.mlir_opt
-    assert 'transform.apply_registered_pass "to_ppm"' not in optimized_ir
+    assert 'transform.apply_registered_pass "ppm_compilation"' not in optimized_ir
     assert 'qec.ppm ["X", "Z", "Z"]' in optimized_ir
     assert 'qec.ppm ["Z", "Y"]' in optimized_ir
     assert 'qec.ppr ["X", "Z"](2)' in optimized_ir
