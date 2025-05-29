@@ -102,7 +102,7 @@ func::FuncOp AdjointLowering::discardAndReturnReg(PatternRewriter &rewriter, Loc
         SmallVector<Value> returnVals;
 
         // Fine for now: only one block in body so only one quantum.dealloc
-        quantum::DeallocOp localDealloc = *unallocFn.getOps<quantum::DeallocOp>().begin();
+        auto localDealloc = *unallocFn.getOps<quantum::DeallocOp>().begin();
         returnVals.push_back(localDealloc.getOperand());
 
         // We also need to return the expval op so it won't be dead-code-eliminated
@@ -111,15 +111,22 @@ func::FuncOp AdjointLowering::discardAndReturnReg(PatternRewriter &rewriter, Loc
             returnVals.push_back(expvalOp);
         }
 
-        // TODO: don't walk
-        unallocFn.walk([&](Operation *op) {
-            if (isa<quantum::DeviceReleaseOp>(op)) {
-                rewriter.eraseOp(op);
-            }
-            else if (isa<func::ReturnOp>(op)) {
-                op->setOperands(returnVals);
-            }
-        });
+        // Erase the device release.
+        // Unfortunately erasing on the fly within the getOps() causes the
+        // "erasing while iterating" segfault
+        // So we need a separate, completely materialized worklist.
+        SmallVector<quantum::DeviceReleaseOp> deviceReleaseOpsEraseWorklist;
+        auto deviceReleaseOps = unallocFn.getOps<quantum::DeviceReleaseOp>();
+        std::for_each(deviceReleaseOps.begin(), deviceReleaseOps.end(),
+                      [&](const quantum::DeviceReleaseOp &op) {
+                          deviceReleaseOpsEraseWorklist.push_back(op);
+                      });
+        std::for_each(deviceReleaseOpsEraseWorklist.begin(), deviceReleaseOpsEraseWorklist.end(),
+                      [&](const quantum::DeviceReleaseOp &op) { rewriter.eraseOp(op); });
+
+        // Create the return
+        // Again, assume just one block for now
+        (*unallocFn.getOps<func::ReturnOp>().begin())->setOperands(returnVals);
 
         // Let's erase the deallocation.
         rewriter.eraseOp(localDealloc);
