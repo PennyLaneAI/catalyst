@@ -215,7 +215,7 @@
 * The unused helper function `genArgMapFunction` in the `--lower-gradients` pass is removed.
   [(#1753)](https://github.com/PennyLaneAI/catalyst/pull/1753)
 
-* Catalyst now includes a new module `catalyst.passes.builtin_pipelines`, which contains built-in
+* Catalyst now includes a new module called `catalyst.passes.builtin_pipelines`, which contains built-in
   compilation-pass pipelines for common workloads that extend the default Catalyst pass pipeline.
   [(#1758)](https://github.com/PennyLaneAI/catalyst/pull/1758)
 
