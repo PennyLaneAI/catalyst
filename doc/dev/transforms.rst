@@ -731,7 +731,7 @@ Alright, our function should now look something like this:
         func.return %dx, %dy, %dz : f64, f64, f64
     }
 
-Finally, we have to amend our matchAndRewrite function to invoke the new function we created and delete the
+Finally, we have to amend our ``matchAndRewrite`` function to invoke the new function we created and delete the
 ``GradOp`` from the IR:
 
 .. code-block:: cpp
