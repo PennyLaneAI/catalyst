@@ -19,18 +19,19 @@
   * `decompose_non_clifford_ppr`: Decompose non-Cliford PPR (:math:`\theta = \tfrac{\pi}{8}`)
   into PPMs using a magic state.
 
-* A new compilation pass called :func:`~.passes.to_ppm` has been added to Catalyst to transform
-  Clifford+T gates into Pauli Product Measurements (PPMs). This high-level pass simplifies
+* A new compilation pass called :func:`~.passes.ppm_compilation` has been added to Catalyst to 
+  transform Clifford+T gates into Pauli Product Measurements (PPMs). This high-level pass simplifies
   circuit transformation and optimization by combining multiple sub-passes into a single step.
   [(#1750)](https://github.com/PennyLaneAI/catalyst/pull/1750)
   
-  The sub-passes that make up the :func:`~.passes.to_ppm` pass are:
+  The sub-passes that make up the :func:`~.passes.ppm_compilation` pass are:
   * :func:`~.passes.to_ppr`: Converts gates into Pauli Product Rotations (PPRs).
   * :func:`~.passes.commute_ppr`: Commutes PPRs past non-Clifford PPRs.
   * :func:`~.passes.merge_ppr_ppm`: Merges Clifford PPRs into PPMs.
   * :func:`~.passes.ppr_to_ppm`: Decomposes non-Clifford and Clifford PPRs into PPMs.
 
-  Use this pass via the :func:`~.passes.to_ppm` decorator to compile circuits in a single pipeline.
+  Use this pass via the :func:`~.passes.ppm_compilation` decorator to compile circuits 
+  in a single pipeline.
 
 <h3>Improvements 🛠</h3>
 

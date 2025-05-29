@@ -671,7 +671,7 @@ def ppr_to_ppm(qnode=None, *, decompose_method="auto-corrected", avoid_y_measure
     return PassPipelineWrapper(qnode, passes)
 
 
-def to_ppm(
+def ppm_compilation(
     qnode=None, *, decompose_method="auto-corrected", avoid_y_measure=False, max_pauli_size=0
 ):
     R"""
@@ -718,12 +718,13 @@ def to_ppm(
 
         import pennylane as qml
         from catalyst import qjit, measure
-        from catalyst.passes import to_ppm
+        from catalyst.passes import ppm_compilation
 
         pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+        method = "clifford-corrected"
 
         @qjit(pipelines=pipeline, target="mlir")
-        @to_ppm(decompose_method="clifford-corrected", avoid_y_measure=True, max_pauli_size=2)
+        @ppm_compilation(decompose_method=method, avoid_y_measure=True, max_pauli_size=2)
         @qml.qnode(qml.device("null.qubit", wires=2))
         def circuit():
             qml.CNOT([0, 1])
@@ -764,7 +765,7 @@ def to_ppm(
 
     """
     passes = {
-        "to_ppm": {
+        "ppm_compilation": {
             "decompose-method": decompose_method,
             "avoid-y-measure": avoid_y_measure,
             "max-pauli-size": max_pauli_size,
@@ -773,7 +774,7 @@ def to_ppm(
 
     if qnode is None:
         return functools.partial(
-            to_ppm,
+            ppm_compilation,
             decompose_method=decompose_method,
             avoid_y_measure=avoid_y_measure,
             max_pauli_size=max_pauli_size,

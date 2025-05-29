@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#define DEBUG_TYPE "to_ppm"
+#define DEBUG_TYPE "ppm_compilation"
 
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
