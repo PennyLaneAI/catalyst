@@ -285,7 +285,7 @@ the second is a list of qubits):
 
     QubitUnitary(*, QubitUnitary(*, *))
 
-Let's add the pattern matching logic to the ``matchAndRewrite`` method:
+Let's add the pattern-matching logic to the ``matchAndRewrite`` method:
 
 .. code-block:: cpp
 
