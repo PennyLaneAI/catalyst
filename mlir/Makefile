@@ -108,10 +108,10 @@ mhlo:
 	@if patch --dry-run -p1 -N $(TARGET_FILE) $(PATCH_FILE) > /dev/null 2>&1; then \
 		patch -p1 $(TARGET_FILE) $(PATCH_FILE); \
 	fi
+
 	# Patch MHLO shardy dependency
-	@if patch -p0 --dry-run -N < $(MK_DIR)/patches/mhlo-remove-shardy.patch > /dev/null 2>&1; then \
-		patch -p0 < $(MK_DIR)/patches/mhlo-remove-shardy.patch; \
-	fi
+	cd mlir-hlo; pwd; git apply $(MK_DIR)/patches/mhlo-remove-shardy.patch; \
+
 	# Patch MHLO passes removed from upstream
 	# TODO: probably clean this up
 	mkdir -p $(MK_DIR)/mlir-hlo/mhlo/transforms/legalize_control_flow
