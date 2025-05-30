@@ -121,4 +121,14 @@ def CliffordTToPPMPass : Pass<"ppm_compilation"> {
     let options = [MaxPauliSizeOption, DecomposeMethodOption, AvoidYMeasureOption];
 }
 
+def createCountPPMSpecsPass : Pass<"ppm_specs"> {
+    let summary = "Convert CliffordT operations to Pauli Product Measurement operations.";
+    
+    let dependentDialects = [
+        "catalyst::qec::QECDialect",
+    ];
+
+    let constructor = "catalyst::createCountPPMSpecsPass()";
+}
+
 #endif // QEC_PASSES

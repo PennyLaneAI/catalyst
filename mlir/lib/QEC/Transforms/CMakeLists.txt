@@ -8,6 +8,7 @@ file(GLOB SRC
     commute_clifford_t_ppr.cpp
     CommuteCliffordPastPPM.cpp
     commute_clifford_past_ppm.cpp
+    CountPPMSpecs.cpp
     decompose_non_clifford_ppr.cpp
     DecomposeNonCliffordPPR.cpp
     decompose_clifford_ppr.cpp

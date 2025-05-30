@@ -29,5 +29,6 @@ std::unique_ptr<mlir::Pass> createCommuteCliffordPastPPMPass();
 std::unique_ptr<mlir::Pass> createDecomposeNonCliffordPPRPass();
 std::unique_ptr<mlir::Pass> createDecomposeCliffordPPRPass();
 std::unique_ptr<mlir::Pass> createCliffordTToPPMPass();
+std::unique_ptr<mlir::Pass> createCountPPMSpecsPass();
 
 } // namespace catalyst
