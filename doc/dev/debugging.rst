@@ -397,12 +397,13 @@ the ``@qjit`` decorator. Enabling this option signals to the compiler to wait fo
 after launching the compiler process. Some notes about use of this support:
 
 * This functionality requires building Catalyst with debug symbols. This can be achieved via make all 
-``BUILD_TYPE="RelWithDebInfo"``. The debug symbols are only within available within the Catalyst-owned targets. 
+  ``BUILD_TYPE="RelWithDebInfo"``. The debug symbols are only within available within the Catalyst-owned targets. 
 To enable debugging of LLVM and other associated external libraries and binaries, ensure the 
-``BUILD_TYPE_EXT="RelWithDebInfo"`` option is also set.
-* Launching the C++ debugger requires attaching to a running process. This often requires ``sudo`` privileges on the running system.
-* The spawned compiler subprocess immediately issues a ``SIGSTOP`` signal to avoid execution of the compiler. To continue execution
-requires receipt of a ``SIGCONT`` signal after the C++ debugger has attached.
+  ``BUILD_TYPE_EXT="RelWithDebInfo"`` option is also set.
+* Launching the C++ debugger requires attaching to a running process. This often requires ``sudo`` privileges on the 
+  running system.
+* The spawned compiler subprocess immediately issues a ``SIGSTOP`` signal to avoid execution of the compiler. To 
+  continue execution requires receipt of a ``SIGCONT`` signal after the C++ debugger has attached.
 
 The signalling steps can be provided via an active terminal session as
 
@@ -422,7 +423,7 @@ To enable support from VSCode, the following configuration files can be used to 
 C++.
 
 .. code-block:: json
-    :caption: .vscode/launch.json
+    :caption: Filename ``.vscode/launch.json``
 
     {
         "version": "0.2.0",
@@ -455,7 +456,7 @@ C++.
 
 
 .. code-block:: json
-    :caption: .vscode/settings.json
+    :caption: Filename ``.vscode/settings.json``
 
     {
         "python.defaultInterpreterPath": "${env:VIRTUAL_ENV}",
