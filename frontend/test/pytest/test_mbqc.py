@@ -25,33 +25,41 @@ import pennylane.ftqc as plft
 import pytest
 
 from catalyst import qjit
+from catalyst.passes.builtin_pipelines import mbqc_pipeline
+from catalyst.pipelines import CompileOptions
 from catalyst.utils.exceptions import CompileError
 
 pytestmark = pytest.mark.usefixtures("disable_capture")
 
-mbqc_pipeline = [
-    (
-        "default-pipeline",
-        [
-            "enforce-runtime-invariants-pipeline",
-            "hlo-lowering-pipeline",
-            "quantum-compilation-pipeline",
-            "bufferization-pipeline",
-        ],
-    ),
-    (
-        "mbqc-pipeline",
-        [
-            "convert-mbqc-to-llvm",
-        ],
-    ),
-    (
-        "llvm-dialect-lowering-pipeline",
-        [
-            "llvm-dialect-lowering-pipeline",
-        ],
-    ),
-]
+MBQC_PIPELINE = mbqc_pipeline()
+
+
+def test_mbqc_pipeline():
+    """Loosely check that the MBQC pipeline is the same as the default Catalyst pipeline, but with
+    the MBQC-to-LLVM dialect-conversion pass inserted before the Quantum-to-LLVM dialect-conversion
+    pass in the ``MLIRToLLVMDialect`` pipeline stage.
+    """
+    options = CompileOptions()
+    default_pipelines = options.get_pipelines()
+
+    # Check that the stage names are the same
+    default_stage_names = [item[0] for item in default_pipelines]
+    mbqc_stage_names = [item[0] for item in MBQC_PIPELINE]
+
+    assert default_stage_names == mbqc_stage_names
+    assert mbqc_stage_names[-1] == "MLIRToLLVMDialect"
+
+    # Check that the conversion pass(es) are in the mbqc pipeline
+    _, mbqc_llvm_conversion_pipeline = MBQC_PIPELINE[-1]
+
+    assert "convert-quantum-to-llvm" in mbqc_llvm_conversion_pipeline
+    assert "convert-mbqc-to-llvm" in mbqc_llvm_conversion_pipeline
+
+    # Check that the mbqc-to-llvm pass comes *before* the quantum-to-llvm pass
+    quantum_to_llvm_index = mbqc_llvm_conversion_pipeline.index("convert-quantum-to-llvm")
+    mbqc_to_llvm_index = mbqc_llvm_conversion_pipeline.index("convert-mbqc-to-llvm")
+
+    assert mbqc_to_llvm_index < quantum_to_llvm_index
 
 
 def test_measure_x():
@@ -68,7 +76,7 @@ def test_measure_x():
 
     qml.capture.enable()
 
-    @qjit(pipelines=mbqc_pipeline)
+    @qjit(pipelines=MBQC_PIPELINE)
     @qml.qnode(dev)
     def workload():
         _ = plft.measure_x(0)
@@ -94,7 +102,7 @@ def test_measure_y():
 
     qml.capture.enable()
 
-    @qjit(pipelines=mbqc_pipeline)
+    @qjit(pipelines=MBQC_PIPELINE)
     @qml.qnode(dev)
     def workload():
         _ = plft.measure_y(0)
@@ -121,7 +129,7 @@ def test_measure_z():
 
     qml.capture.enable()
 
-    @qjit(pipelines=mbqc_pipeline)
+    @qjit(pipelines=MBQC_PIPELINE)
     @qml.qnode(dev)
     def workload():
         _ = plft.measure_z(0)
@@ -150,7 +158,7 @@ def test_measure_measure_arbitrary_basis(angle, plane):
 
     qml.capture.enable()
 
-    @qjit(pipelines=mbqc_pipeline)
+    @qjit(pipelines=MBQC_PIPELINE)
     @qml.qnode(dev)
     def workload():
         _ = plft.measure_arbitrary_basis(wires=0, angle=angle, plane=plane)
@@ -174,7 +182,7 @@ def test_measure_measure_arbitrary_basis_postselect(postselect):
 
     qml.capture.enable()
 
-    @qjit(pipelines=mbqc_pipeline)
+    @qjit(pipelines=MBQC_PIPELINE)
     @qml.qnode(dev)
     def workload():
         _ = plft.measure_arbitrary_basis(wires=0, angle=0.1, plane="XY", postselect=postselect)
@@ -196,7 +204,7 @@ def test_measure_measure_arbitrary_basis_invalid_plane():
 
     with pytest.raises(ValueError, match=r"Measurement plane must be one of \['XY', 'YZ', 'ZX'\]"):
 
-        @qjit(pipelines=mbqc_pipeline)
+        @qjit(pipelines=MBQC_PIPELINE)
         @qml.qnode(dev)
         def workload():
             _ = plft.measure_arbitrary_basis(wires=0, angle=0.1, plane="YX")
@@ -220,7 +228,7 @@ def test_measure_measure_arbitrary_basis_invalid_postselect(postselect):
         CompileError, match="op attribute 'postselect' failed to satisfy constraint"
     ):
 
-        @qjit(pipelines=mbqc_pipeline)
+        @qjit(pipelines=MBQC_PIPELINE)
         @qml.qnode(dev)
         def workload():
             _ = plft.measure_arbitrary_basis(wires=0, angle=0.1, plane="XY", postselect=postselect)
@@ -258,7 +266,7 @@ def test_explicit_rz_in_mbqc(rz_angle):
     qml.capture.enable()
 
     # RZ circuit in the MBQC representation
-    @qjit(pipelines=mbqc_pipeline)
+    @qjit(pipelines=MBQC_PIPELINE)
     @qml.qnode(dev, mcm_method="tree-traversal")
     def circuit_mbqc(start_state, angle):
         # prep input node
@@ -353,7 +361,7 @@ def test_cnot_in_mbqc_representation():
     qml.capture.enable()
 
     # Equivalent CNOT circuit in the MBQC representation
-    @qjit(pipelines=mbqc_pipeline)
+    @qjit(pipelines=MBQC_PIPELINE)
     @qml.qnode(dev, mcm_method="tree-traversal")
     def circuit_mbqc(start_state):
         # prep input nodes
