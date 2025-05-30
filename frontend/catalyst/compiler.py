@@ -29,7 +29,6 @@ import warnings
 from os import path
 from typing import List, Optional
 
-from catalyst.debug.debugger import is_debugger_active
 from catalyst.logging import debug_logger, debug_logger_init
 from catalyst.pipelines import CompileOptions
 from catalyst.utils.exceptions import CompileError

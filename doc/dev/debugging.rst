@@ -404,6 +404,8 @@ To enable debugging of LLVM and other associated external libraries and binaries
   running system.
 * The spawned compiler subprocess immediately issues a ``SIGSTOP`` signal to avoid execution of the compiler. To 
   continue execution requires receipt of a ``SIGCONT`` signal after the C++ debugger has attached.
+* To validate if running within an active (Python) debugger session, the function :func:`~.debug.debugger.is_debugger_active`
+  can be used.
 
 The signalling steps can be provided via an active terminal session as
 
