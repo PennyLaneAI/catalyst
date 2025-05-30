@@ -175,7 +175,8 @@
     [(#1671)](https://github.com/PennyLaneAI/catalyst/pull/1671)
     [(#1681)](https://github.com/PennyLaneAI/catalyst/pull/1681)
 
-* The version of LLVM, MHLO and Enzyme used by Catalyst is updated to track those in jax 0.6.0.
+* (Compiler developers only) The version of LLVM, MHLO and Enzyme used by Catalyst is
+  updated to track those in jax 0.6.0.
   [(#1752)](https://github.com/PennyLaneAI/catalyst/pull/1752)
 
   The LLVM version is updated to commit 179d30f8c3fddd3c85056fd2b8e877a4a8513158.
