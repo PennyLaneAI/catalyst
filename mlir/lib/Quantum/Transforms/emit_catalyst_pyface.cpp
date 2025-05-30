@@ -217,7 +217,7 @@ struct EmitCatalystPyInterfacePass
         config.strictMode = GreedyRewriteStrictness::ExistingOps;
         config.enableRegionSimplification = mlir::GreedySimplifyRegionLevel::Disabled;
         config.maxIterations = 1;
-        // Update to the following lines the next time we update llvm
+        // TODO: Update to the following lines the next time we update llvm
         // config.setStrictness(GreedyRewriteStrictness::ExistingOps);
         // config.setRegionSimplificationLevel(mlir::GreedySimplifyRegionLevel::Disabled);
         // config.setMaxIterations(1);
