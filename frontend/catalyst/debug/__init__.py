@@ -38,6 +38,5 @@ __all__ = (
     "get_cmain",
     "instrumentation",
     "replace_ir",
-    "compile_executable",
-    "is_debugger_active",
+    "compile_executable"
 )
