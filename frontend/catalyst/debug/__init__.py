@@ -38,5 +38,5 @@ __all__ = (
     "get_cmain",
     "instrumentation",
     "replace_ir",
-    "compile_executable"
+    "compile_executable",
 )
