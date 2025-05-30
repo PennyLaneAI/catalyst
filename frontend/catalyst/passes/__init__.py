@@ -39,6 +39,7 @@ from catalyst.passes.builtin_passes import (
     ions_decomposition,
     merge_ppr_ppm,
     merge_rotations,
+    ppm_compilation,
     ppr_to_ppm,
     to_ppr,
 )
@@ -56,4 +57,5 @@ __all__ = (
     "apply_pass_plugin",
     "merge_ppr_ppm",
     "ppr_to_ppm",
+    "ppm_compilation",
 )
