@@ -524,7 +524,14 @@ class Compiler:
             (str): filename of shared object
         """
 
-        self.is_using_python_compiler()
+        if self.is_using_python_compiler():
+            # We keep this module here to keep xDSL requirement optional
+            # Only move this is it has been decided that xDSL is no longer optional.
+            # pylint: disable-next=import-outside-toplevel
+            from pennylane.compiler.python_compiler.impl import Compiler as PythonCompiler
+
+            compiler = PythonCompiler()
+            mlir_module = compiler.run(mlir_module)
 
         return self.run_from_ir(
             mlir_module.operation.get_asm(

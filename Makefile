@@ -9,6 +9,7 @@ MK_ABSPATH := $(abspath $(lastword $(MAKEFILE_LIST)))
 MK_DIR := $(dir $(MK_ABSPATH))
 LLVM_BUILD_DIR ?= $(MK_DIR)/mlir/llvm-project/build
 MHLO_BUILD_DIR ?= $(MK_DIR)/mlir/mlir-hlo/bazel-build
+DIALECTS_SRC_DIR ?= $(MK_DIR)/mlir
 DIALECTS_BUILD_DIR ?= $(MK_DIR)/mlir/build
 RT_BUILD_DIR ?= $(MK_DIR)/runtime/build
 OQC_BUILD_DIR ?= $(MK_DIR)/frontend/catalyst/third_party/oqc/src/build
@@ -87,6 +88,7 @@ help:
 	@echo "  oqc                to build Catalyst-OQC Runtime"
 	@echo "  test               to run the Catalyst test suites"
 	@echo "  docs               to build the documentation for Catalyst"
+	@echo "  wheel              to build the Catalyst wheel"
 	@echo "  clean              to uninstall Catalyst and delete frontend build and cache files"
 	@echo "  clean-mlir         to clean build files of MLIR and custom Catalyst dialects"
 	@echo "  clean-runtime      to clean build files of Catalyst Runtime"
@@ -101,7 +103,7 @@ help:
 
 .PHONY: all catalyst
 all: runtime oqc mlir frontend
-catalyst: runtime dialects plugin frontend
+catalyst: runtime dialects plugin frontend oqc
 
 .PHONY: frontend
 frontend:
@@ -214,6 +216,23 @@ wheel:
 	mkdir -p $(MK_DIR)/frontend/bin
 	cp $(COPY_FLAGS) $(DIALECTS_BUILD_DIR)/bin/catalyst $(MK_DIR)/frontend/bin/
 	find $(MK_DIR)/frontend -type d -name __pycache__ -exec rm -rf {} +
+
+	# Copy selected headers to `frontend/include' to include them in the wheel
+	mkdir -p $(MK_DIR)/frontend/catalyst/include
+	find $(DIALECTS_SRC_DIR)/include/Quantum $(DIALECTS_BUILD_DIR)/include/Quantum \
+	    $(DIALECTS_SRC_DIR)/include/Gradient $(DIALECTS_BUILD_DIR)/include/Gradient \
+	    $(DIALECTS_SRC_DIR)/include/Mitigation $(DIALECTS_BUILD_DIR)/include/Mitigation \
+	    \( -name "*.h" -o -name "*.h.inc" \) -type f -exec sh -c \
+	    'for file do \
+	        if [ "$$file" = "$${file#$(DIALECTS_BUILD_DIR)}" ]; then \
+				base_dir=$(DIALECTS_SRC_DIR); \
+			else \
+				base_dir=$(DIALECTS_BUILD_DIR); \
+			fi; \
+			dest_dir=$(MK_DIR)/frontend/catalyst/include/$$(dirname $${file#$${base_dir}/include/}); \
+			mkdir -p $$dest_dir; \
+		    cp $(COPY_FLAGS) $$file $$dest_dir; \
+	    done' sh {} +
 
 	$(PYTHON) -m pip wheel --no-deps . -w dist
 

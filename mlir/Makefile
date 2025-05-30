@@ -85,7 +85,10 @@ llvm:
 
 	# TODO: when updating LLVM, test to see if mlir/unittests/Bytecode/BytecodeTest.cpp:55 is passing
 	# and remove filter. This tests fails on CI/CD not locally.
-	LIT_FILTER_OUT="Bytecode|tosa-to-tensor" cmake --build $(LLVM_BUILD_DIR) --target $(LLVM_TARGETS)
+	# Note: the upstream lit test llvm-project/mlir/test/python/execution_engine.py requries
+	# the python package `ml_dtypes`. We don't actually use the execution engine, so we skip the
+	# test to reduce unnecessary dependencies.
+	LIT_FILTER_OUT="Bytecode|tosa-to-tensor|execution_engine" cmake --build $(LLVM_BUILD_DIR) --target $(LLVM_TARGETS)
 
 .PHONY: mhlo
 mhlo: TARGET_FILE := $(MK_DIR)/mlir-hlo/mhlo/transforms/CMakeLists.txt
@@ -130,7 +133,7 @@ enzyme:
 		-DCMAKE_CXX_VISIBILITY_PRESET=$(SYMBOL_VISIBILITY) \
 		-DCMAKE_POLICY_DEFAULT_CMP0116=NEW
 
-	cmake --build $(ENZYME_BUILD_DIR) --target EnzymeStatic-19
+	cmake --build $(ENZYME_BUILD_DIR) --target EnzymeStatic-20
 
 .PHONY: plugin
 plugin:
@@ -139,6 +142,10 @@ plugin:
 		patch -p0 < $(MK_DIR)/patches/test-plugin-with-catalyst.patch; \
 	fi
 	cmake -B standalone/build -G Ninja \
+		-DCMAKE_C_COMPILER=$(C_COMPILER) \
+		-DCMAKE_CXX_COMPILER=$(CXX_COMPILER) \
+		-DCMAKE_C_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
+		-DCMAKE_CXX_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
 		-DMLIR_DIR=$(LLVM_BUILD_DIR)/lib/cmake/mlir \
 		-DLLVM_EXTERNAL_LIT=$(LLVM_EXTERNAL_LIT) \
 		-DCATALYST_TOOLS_DIR=$(DIALECTS_BUILD_DIR)/bin \

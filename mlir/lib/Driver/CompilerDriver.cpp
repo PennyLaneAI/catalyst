@@ -56,6 +56,7 @@
 #include "llvm/Transforms/IPO/GlobalDCE.h"
 
 #include "Catalyst/IR/CatalystDialect.h"
+#include "Catalyst/Transforms/BufferizableOpInterfaceImpl.h"
 #include "Catalyst/Transforms/Passes.h"
 #include "Driver/CatalystLLVMTarget.h"
 #include "Driver/CompilerDriver.h"
@@ -63,6 +64,7 @@
 #include "Driver/Support.h"
 #include "Gradient/IR/GradientDialect.h"
 #include "Gradient/IR/GradientInterfaces.h"
+#include "Gradient/Transforms/BufferizableOpInterfaceImpl.h"
 #include "Gradient/Transforms/Passes.h"
 #include "Ion/IR/IonDialect.h"
 #include "MBQC/IR/MBQCDialect.h"
@@ -736,7 +738,8 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         TimingScope translateTiming = timing.nest("Translate");
         llvmModule =
             timer::timer(translateModuleToLLVMIR, "translateModuleToLLVMIR",
-                         /* add_endl */ false, *mlirModule, llvmContext, "LLVMDialectModule");
+                         /* add_endl */ false, *mlirModule, llvmContext, "LLVMDialectModule",
+                         /* disableVerification */ true);
         if (!llvmModule) {
             CO_MSG(options, Verbosity::Urgent, "Failed to translate LLVM module\n");
             return failure();
@@ -964,6 +967,8 @@ int QuantumDriverMainFromCL(int argc, char **argv)
     registerLLVMTranslations(registry);
 
     // Register bufferization interfaces
+    catalyst::registerBufferizableOpInterfaceExternalModels(registry);
+    catalyst::gradient::registerBufferizableOpInterfaceExternalModels(registry);
     catalyst::quantum::registerBufferizableOpInterfaceExternalModels(registry);
 
     // Register and parse command line options.

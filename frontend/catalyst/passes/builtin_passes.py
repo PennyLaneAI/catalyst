@@ -14,6 +14,8 @@
 
 """This module exposes built-in Catalyst MLIR passes to the frontend."""
 
+import functools
+
 from catalyst.passes.pass_api import PassPipelineWrapper
 
 
@@ -340,6 +342,11 @@ def to_ppr(qnode):
     :class:`qml.H <pennylane.H>`,
     :class:`qml.S <pennylane.S>`,
     :class:`qml.T <pennylane.T>`,
+    :class:`qml.X <pennylane.X>`,
+    :class:`qml.Y <pennylane.Y>`,
+    :class:`qml.Z <pennylane.Z>`,
+    :class:`qml.adjoint(qml.S) <pennylane.adjoint(pennylane.S)>`,
+    :class:`qml.adjoint(qml.T) <pennylane.adjoint(pennylane.T)>`,
     :class:`qml.CNOT <pennylane.CNOT>`,
     :class:`qml.measure() <pennylane.measure>`
 
@@ -392,7 +399,7 @@ def to_ppr(qnode):
     return PassPipelineWrapper(qnode, "to_ppr")
 
 
-def commute_ppr(qnode):
+def commute_ppr(qnode=None, *, max_pauli_size=0):
     R"""
     Specify that the MLIR compiler pass for commuting
     Clifford Pauli Product Rotation (PPR) gates, :math:`\exp({iP\tfrac{\pi}{4}})`,
@@ -408,6 +415,7 @@ def commute_ppr(qnode):
 
     Args:
         fn (QNode): QNode to apply the pass to.
+        max_pauli_size (int): The maximum size of the Pauli strings after commuting.
 
     Returns:
         ~.QNode
@@ -427,7 +435,7 @@ def commute_ppr(qnode):
         ppm_passes = [("PPM", ["to_ppr", "commute_ppr"])]
 
         @qjit(pipelines=ppm_passes, keep_intermediate=True, target="mlir")
-        @qml.qnode(qml.device("null.qubit", wires=0))
+        @qml.qnode(qml.device("null.qubit", wires=1))
         def circuit():
             qml.H(0)
             qml.T(0)
@@ -447,11 +455,49 @@ def commute_ppr(qnode):
         %mres, %out_qubits = qec.ppm ["Z"] %5 : !quantum.bit
         . . .
 
+    If a commutation resulted in a PPR acting on more than
+    `max_pauli_size` qubits (here, `max_pauli_size = 2`), that commutation would be skipped.
+
+    .. code-block:: python
+
+        from catalyst.passes import to_ppr, commute_ppr
+
+        pips = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+
+        @qjit(pipelines=pips, target="mlir")
+        @to_ppr
+        @commute_ppr(max_pauli_size=2)
+        @qml.qnode(qml.device("lightning.qubit", wires=3))
+        def circuit():
+            qml.H(0)
+            qml.CNOT([1, 2])
+            qml.CNOT([0, 1])
+            qml.CNOT([0, 2])
+            for i in range(3):
+                qml.T(i)
+            return measure(0), measure(1), measure(2)
+
+        print(circuit.mlir_opt)
+
+    Example MLIR Representation:
+
+    .. code-block:: mlir
+
+        . . .
+        %4:2 = qec.ppr ["Z", "X"](4) %2, %3 : !quantum.bit, !quantum.bit
+        . . .
+        %6:2 = qec.ppr ["X", "Y"](-8) %5, %4#1 : !quantum.bit, !quantum.bit
+        . . .
     """
-    return PassPipelineWrapper(qnode, "commute_ppr")
+
+    if qnode is None:
+        return functools.partial(commute_ppr, max_pauli_size=max_pauli_size)
+
+    commute_ppr_pass = {"commute_ppr": {"max-pauli-size": max_pauli_size}}
+    return PassPipelineWrapper(qnode, commute_ppr_pass)
 
 
-def merge_ppr_ppm(qnode):
+def merge_ppr_ppm(qnode=None, *, max_pauli_size=0):
     R"""
     Specify that the MLIR compiler pass for absorbing Clifford Pauli
     Product Rotation (PPR) operations, :math:`\exp{iP\tfrac{\pi}{4}}`,
@@ -462,6 +508,7 @@ def merge_ppr_ppm(qnode):
 
     Args:
         fn (QNode): QNode to apply the pass to
+        max_pauli_size (int): The maximum size of the Pauli strings after merging.
 
     Returns:
         ~.QNode
@@ -497,5 +544,240 @@ def merge_ppr_ppm(qnode):
         %mres, %out_qubits = qec.ppm ["X"] %2 : !quantum.bit
         . . .
 
+    If a merging resulted in a PPM acting on more than
+    `max_pauli_size` qubits (here, `max_pauli_size = 2`), that merging would be skipped.
+
+    .. code-block:: python
+
+        from catalyst import measure, qjit
+        from catalyst.passes import to_ppr, merge_ppr_ppm
+
+        pips = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+
+
+        @qjit(pipelines=pips, target="mlir")
+        @to_ppr
+        @merge_ppr_ppm(max_pauli_size=2)
+        @qml.qnode(qml.device("lightning.qubit", wires=3))
+        def circuit():
+            qml.CNOT([1, 2])
+            qml.CNOT([0, 1])
+            qml.CNOT([0, 2])
+            return measure(0), measure(1), measure(2)
+
+        print(circuit.mlir_opt)
+
+    Example MLIR Representation:
+
+    .. code-block:: mlir
+
+        . . .
+        %3:2 = qec.ppr ["Z", "X"](4) %1, %2 : !quantum.bit, !quantum.bit
+        . . .
+        %mres, %out_qubits:2 = qec.ppm ["Y", "Z"](-1) %3#1, %4 : !quantum.bit, !quantum.bit
+        . . .
+
     """
-    return PassPipelineWrapper(qnode, "merge_ppr_ppm")
+    if qnode is None:
+        return functools.partial(merge_ppr_ppm, max_pauli_size=max_pauli_size)
+
+    merge_ppr_ppm_pass = {"merge_ppr_ppm": {"max-pauli-size": max_pauli_size}}
+    return PassPipelineWrapper(qnode, merge_ppr_ppm_pass)
+
+
+def ppr_to_ppm(qnode=None, *, decompose_method="auto-corrected", avoid_y_measure=False):
+    R"""Specify that the MLIR compiler passes for decomposing Pauli Product rotations (PPR)
+    , :math:`\exp(-iP\theta)`, into Pauli Pauli measurements (PPM) will be applied.
+
+    This pass is used to decompose both non-Clifford and Clifford PPRs into PPMs. The non-Clifford
+    PPRs (:math:`\theta = \tfrac{\pi}{8}`) are decomposed first, and then Clifford PPRs
+    (:math:`\theta = \tfrac{\pi}{4}`) are decomposed.
+    Non-Clifford decomposition can be performed in one of two ways:
+    ``"clifford-corrected"`` or ``"auto-corrected"``, by default the latter is used.
+    Both methods are based on `A Game of Surface Codes <https://arxiv.org/abs/1808.02892>`__,
+    figures 7 and 17(b) respectively.
+
+    Args:
+        qnode (QNode, optional): QNode to apply the pass to. If None, returns a decorator.
+        decompose_method (str, optional): The method to use for decomposing non-Clifford PPRs.
+            Options are ``"auto-corrected"`` and ``"clifford-corrected"``.
+            Defaults to ``"auto-corrected"``.
+            ``"auto-corrected"`` uses an additional measurement for correction.
+            ``"clifford-corrected"`` uses a Clifford rotation for correction.
+        avoid_y_measure (bool): Rather than performing a Pauli-Y measurement for Clifford rotations
+            (sometimes more costly), a :math:`Y` state (:math:`Y\vert 0 \rangle`) is used instead
+            (requires :math:`Y` state preparation). Defaults to ``False``.
+
+    Returns:
+        ~.QNode or callable: Returns decorated QNode if qnode is provided,
+            otherwise returns a decorator.
+
+    **Example**
+
+    This example shows the sequence of passes that will be applied. The last pass
+    will convert the non-Clifford PPR into Pauli Product Measurements.
+
+    .. code-block:: python
+
+        import pennylane as qml
+        from catalyst import qjit, measure
+        from catalyst.passes import to_ppr, commute_ppr, merge_ppr_ppm, ppr_to_ppm
+
+        pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+
+        @qjit(pipelines=pipeline, target="mlir")
+        @to_ppr
+        @commute_ppr
+        @merge_ppr_ppm
+        @ppr_to_ppm
+        @qml.qnode(qml.device("null.qubit", wires=2))
+        def circuit():
+            qml.H(0)
+            qml.T(0)
+            qml.CNOT([0, 1])
+            return measure(0), measure(1)
+
+        print(circuit.mlir_opt)
+
+    Example MLIR Representation:
+
+    .. code-block:: mlir
+
+        . . .
+        %5 = qec.fabricate  zero : !quantum.bit
+        %6 = qec.fabricate  magic : !quantum.bit
+        %mres, %out_qubits:2 = qec.ppm ["X", "Z"] %1, %6 : !quantum.bit, !quantum.bit
+        %mres_0, %out_qubits_1:2 = qec.ppm ["Z", "Y"] %5, %out_qubits#1 : !quantum.bit, !quantum.bit
+        %mres_2, %out_qubits_3 = qec.ppm ["X"] %out_qubits_1#1 : !quantum.bit
+        %mres_4, %out_qubits_5 = qec.select.ppm(%mres, ["X"], ["Z"]) %out_qubits_1#0 : !quantum.bit
+        %7 = arith.xori %mres_0, %mres_2 : i1
+        %8 = qec.ppr ["X"](2) %out_qubits#0 cond(%7) : !quantum.bit
+        . . .
+
+    """
+    passes = {
+        "decompose_non_clifford_ppr": {
+            "decompose-method": decompose_method,
+            "avoid-y-measure": avoid_y_measure,
+        },
+        "decompose_clifford_ppr": {"avoid-y-measure": avoid_y_measure},
+    }
+
+    if qnode is None:
+        return functools.partial(
+            ppr_to_ppm, decompose_method=decompose_method, avoid_y_measure=avoid_y_measure
+        )
+
+    return PassPipelineWrapper(qnode, passes)
+
+
+def ppm_compilation(
+    qnode=None, *, decompose_method="auto-corrected", avoid_y_measure=False, max_pauli_size=0
+):
+    R"""
+    Specify that the MLIR compiler pass for transforming
+    clifford+T gates into Pauli Product Measurements (PPM) will be applied.
+
+    This pass combines multiple sub-passes:
+
+    - :func:`~.passes.to_ppr` : Converts gates into Pauli Product Rotations (PPRs)
+    - :func:`~.passes.commute_ppr` : Commutes PPRs past non-Clifford PPRs
+    - :func:`~.passes.merge_ppr_ppm` : Merges PPRs into Pauli Product Measurements (PPMs)
+    - :func:`~.passes.ppr_to_ppm` : Decomposes PPRs into PPMs
+
+    The ``avoid_y_measure`` and ``decompose_method`` arguments are passed
+    to the :func:`~.passes.ppr_to_ppm` pass.
+    The ``max_pauli_size`` argument is passed to the :func:`~.passes.commute_ppr`
+    and :func:`~.passes.merge_ppr_ppm` passes.
+
+    Args:
+        qnode (QNode, optional): QNode to apply the pass to. If None, returns a decorator.
+        decompose_method (str, optional): The method to use for decomposing non-Clifford PPRs.
+            Options are ``"auto-corrected"`` and ``"clifford-corrected"``. Defaults to
+            ``"auto-corrected"``.
+            ``"auto-corrected"`` uses an additional measurement for correction.
+            ``"clifford-corrected"`` uses a Clifford rotation for correction.
+        avoid_y_measure (bool): Rather than performing a Pauli-Y measurement for Clifford rotations
+            (sometimes more costly), a :math:`Y` state (:math:`Y\vert 0 \rangle`) is used instead
+            (requires :math:`Y` state preparation). Defaults to ``False``.
+        max_pauli_size (int): The maximum size of the Pauli strings after commuting or merging.
+            Defaults to 0 (no limit).
+
+    Returns:
+        ~.QNode or callable: Returns decorated QNode if qnode is provided,
+        otherwise returns a decorator.
+
+    **Example**
+
+    If a merging resulted in a PPM acting on more than
+    ``max_pauli_size`` qubits (here, ``max_pauli_size = 2``), that merging would be skipped.
+    However, when decomposed into PPMs, at least one qubit will be applied, so the final
+    PPMs will act on at least one additional qubit.
+
+    .. code-block:: python
+
+        import pennylane as qml
+        from catalyst import qjit, measure
+        from catalyst.passes import ppm_compilation
+
+        pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+        method = "clifford-corrected"
+
+        @qjit(pipelines=pipeline, target="mlir")
+        @ppm_compilation(decompose_method=method, avoid_y_measure=True, max_pauli_size=2)
+        @qml.qnode(qml.device("null.qubit", wires=2))
+        def circuit():
+            qml.CNOT([0, 1])
+            qml.CNOT([1, 0])
+            qml.adjoint(qml.T)(0)
+            qml.T(1)
+            return measure(0), measure(1)
+
+        print(circuit.mlir_opt)
+
+    Example MLIR Representation:
+
+    .. code-block:: mlir
+
+        . . .
+        %m, %out:3 = qec.ppm ["Z", "Z", "Z"] %1, %2, %4 : !quantum.bit, !quantum.bit, !quantum.bit
+        %m_0, %out_1:2 = qec.ppm ["Z", "Y"] %3, %out#2 : !quantum.bit, !quantum.bit
+        %m_2, %out_3 = qec.ppm ["X"] %out_1#1 : !quantum.bit
+        %m_4, %out_5 = qec.select.ppm(%m, ["X"], ["Z"]) %out_1#0 : !quantum.bit
+        %5 = arith.xori %m_0, %m_2 : i1
+        %6:2 = qec.ppr ["Z", "Z"](2) %out#0, %out#1 cond(%5) : !quantum.bit, !quantum.bit
+        quantum.dealloc_qb %out_5 : !quantum.bit
+        quantum.dealloc_qb %out_3 : !quantum.bit
+        %7 = quantum.alloc_qb : !quantum.bit
+        %8 = qec.fabricate  magic_conj : !quantum.bit
+        %m_6, %out_7:2 = qec.ppm ["Z", "Z"] %6#1, %8 : !quantum.bit, !quantum.bit
+        %m_8, %out_9:2 = qec.ppm ["Z", "Y"] %7, %out_7#1 : !quantum.bit, !quantum.bit
+        %m_10, %out_11 = qec.ppm ["X"] %out_9#1 : !quantum.bit
+        %m_12, %out_13 = qec.select.ppm(%m_6, ["X"], ["Z"]) %out_9#0 : !quantum.bit
+        %9 = arith.xori %m_8, %m_10 : i1
+        %10 = qec.ppr ["Z"](2) %out_7#0 cond(%9) : !quantum.bit
+        quantum.dealloc_qb %out_13 : !quantum.bit
+        quantum.dealloc_qb %out_11 : !quantum.bit
+        %m_14, %out_15:2 = qec.ppm ["Z", "Z"] %6#0, %10 : !quantum.bit, !quantum.bit
+        %from_elements = tensor.from_elements %m_14 : tensor<i1>
+        %m_16, %out_17 = qec.ppm ["Z"] %out_15#1 : !quantum.bit
+        . . .
+
+    """
+    passes = {
+        "ppm_compilation": {
+            "decompose-method": decompose_method,
+            "avoid-y-measure": avoid_y_measure,
+            "max-pauli-size": max_pauli_size,
+        }
+    }
+
+    if qnode is None:
+        return functools.partial(
+            ppm_compilation,
+            decompose_method=decompose_method,
+            avoid_y_measure=avoid_y_measure,
+            max_pauli_size=max_pauli_size,
+        )
+
+    return PassPipelineWrapper(qnode, passes)

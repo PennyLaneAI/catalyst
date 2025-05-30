@@ -2,7 +2,7 @@ Installation
 ============
 
 
-Catalyst is officially supported on Linux (x86_64, aarch64) and macOS (arm64, x86_64)
+Catalyst is officially supported on Linux (x86_64, aarch64) and macOS (arm64)
 platforms, and pre-built binaries are being distributed via the Python Package Index (PyPI) for
 Python versions 3.10 and higher. To install it, simply run the following ``pip`` command:
 
@@ -18,6 +18,20 @@ Python versions 3.10 and higher. To install it, simply run the following ``pip``
 
     The easiest method of installation is to run ``xcode-select --install`` from the Terminal
     app.
+
+.. note::
+
+  Catalyst no longer supports macOS with x86_64 architecture after 0.11.0. This includes Macs running on Intel processors.
+
+  If you would like to use Catalyst on these systems, please install Catalyst version 0.11.0, PennyLane version 0.41.0, PennyLane-Lightning
+  version 0.41.0, and Jax version 0.4.28:
+
+  .. code-block:: console
+
+    pip install pennylane-catalyst==0.11.0
+    pip install pennylane==0.41.0
+    pip install pennylane-lightning==0.41.0
+    pip install jax==0.4.28
 
 Pre-built packages for Windows are not yet available, and compatibility is untested and cannot
 be guaranteed. If you would like to use Catalyst on Windows, we recommend trying the

@@ -18,12 +18,17 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/DialectConversion.h"
 
+#include "QEC/IR/QECDialect.h"
+#include "QEC/Transforms/Passes.h" // need for DecomposeMethod
+
 namespace catalyst {
 namespace qec {
 
 void populateCliffordTToPPRPatterns(mlir::RewritePatternSet &);
-void populateCommuteCliffordTPPRPatterns(mlir::RewritePatternSet &);
-void populateCommuteCliffordPastPPMPatterns(mlir::RewritePatternSet &);
+void populateCommuteCliffordTPPRPatterns(mlir::RewritePatternSet &, unsigned int max_pauli_size);
+void populateCommuteCliffordPastPPMPatterns(mlir::RewritePatternSet &, unsigned int max_pauli_size);
+void populateDecomposeNonCliffordPPRPatterns(mlir::RewritePatternSet &, DecomposeMethod, bool);
+void populateDecomposeCliffordPPRPatterns(mlir::RewritePatternSet &, bool);
 
 } // namespace qec
 } // namespace catalyst

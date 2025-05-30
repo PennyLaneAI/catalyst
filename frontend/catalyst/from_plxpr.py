@@ -22,12 +22,14 @@ import jax
 import jax.core
 import jax.numpy as jnp
 import pennylane as qml
+from jax.extend.core import ClosedJaxpr, Jaxpr
 from jax.extend.linear_util import wrap_init
 from jax.interpreters.partial_eval import convert_constvars_jaxpr
 from pennylane.capture import PlxprInterpreter, qnode_prim
 from pennylane.capture.expand_transforms import ExpandTransformsInterpreter
 from pennylane.capture.primitives import cond_prim as plxpr_cond_prim
 from pennylane.capture.primitives import for_loop_prim as plxpr_for_loop_prim
+from pennylane.capture.primitives import measure_prim as plxpr_measure_prim
 from pennylane.capture.primitives import while_loop_prim as plxpr_while_loop_prim
 from pennylane.ftqc.primitives import measure_in_basis_prim as plxpr_measure_in_basis_prim
 from pennylane.ops.functions.map_wires import _map_wires_transform as pl_map_wires
@@ -42,7 +44,6 @@ from pennylane.transforms import unitary_to_rot as pl_unitary_to_rot
 from catalyst.device import (
     extract_backend_info,
     get_device_capabilities,
-    get_device_shots,
 )
 from catalyst.jax_extras import jaxpr_pad_consts, make_jaxpr2, transient_jax_config
 from catalyst.jax_primitives import (
@@ -52,24 +53,26 @@ from catalyst.jax_primitives import (
     compbasis_p,
     cond_p,
     counts_p,
+    device_init_p,
+    device_release_p,
     expval_p,
     for_p,
     gphase_p,
     measure_in_basis_p,
+    measure_p,
     namedobs_p,
     probs_p,
     qalloc_p,
     qdealloc_p,
-    qdevice_p,
     qextract_p,
     qinsert_p,
     qinst_p,
     quantum_kernel_p,
-    qunitary_p,
     sample_p,
     set_basis_state_p,
     set_state_p,
     state_p,
+    unitary_p,
     var_p,
     while_p,
 )
@@ -100,11 +103,11 @@ def _get_device_kwargs(device) -> dict:
 
 # code example has long lines
 # pylint: disable=line-too-long
-def from_plxpr(plxpr: jax.core.ClosedJaxpr) -> Callable[..., jax.core.Jaxpr]:
+def from_plxpr(plxpr: ClosedJaxpr) -> Callable[..., Jaxpr]:
     """Convert PennyLane variant jaxpr to Catalyst variant jaxpr.
 
     Args:
-        jaxpr (jax.core.ClosedJaxpr): PennyLane variant jaxpr
+        jaxpr (ClosedJaxpr): PennyLane variant jaxpr
 
     Returns:
         Callable: A function that accepts the same arguments as the plxpr and returns catalyst
@@ -136,7 +139,7 @@ def from_plxpr(plxpr: jax.core.ClosedJaxpr) -> Callable[..., jax.core.Jaxpr]:
         { lambda ; a:f64[]. let
             b:f64[4] = func[
             call_jaxpr={ lambda ; c:f64[]. let
-                qdevice[
+                device_init[
                     rtd_kwargs={'shots': 0, 'mcmc': False, 'num_burnin': 0, 'kernel_name': None}
                     rtd_lib=***
                     rtd_name=LightningSimulator
@@ -184,7 +187,10 @@ def handle_qnode(
     f = partial(QFuncPlxprInterpreter(device, shots).eval, qfunc_jaxpr, consts)
 
     return quantum_kernel_p.bind(
-        wrap_init(f), *non_const_args, qnode=qnode, pipeline=self._pass_pipeline
+        wrap_init(f, debug_info=qfunc_jaxpr.debug_info),
+        *non_const_args,
+        qnode=qnode,
+        pipeline=self._pass_pipeline,
     )
 
 
@@ -295,7 +301,7 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
     def setup(self):
         """Initialize the stateref and bind the device."""
         if self.stateref is None:
-            qdevice_p.bind(self._shots, **_get_device_kwargs(self._device))
+            device_init_p.bind(self._shots, **_get_device_kwargs(self._device))
             self.stateref = {"qreg": qalloc_p.bind(len(self._device.wires)), "wire_map": {}}
 
     # pylint: disable=attribute-defined-outside-init
@@ -303,11 +309,12 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
         """Perform any final steps after processing the plxpr.
 
         For conversion to calayst, this reinserts extracted qubits and
-        deallocates the register.
+        deallocates the register, and releases the device.
         """
         if not self.actualized:
             self.actualize_qreg()
         qdealloc_p.bind(self.qreg)
+        device_release_p.bind()
         self.stateref = None
 
     def get_wire(self, wire_value) -> AbstractQbit:
@@ -422,7 +429,7 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
 def handle_qubit_unitary(self, *invals, n_wires):
     """Handle the conversion from plxpr to Catalyst jaxpr for the QubitUnitary primitive"""
     wires = [self.get_wire(w) for w in invals[1:]]
-    outvals = qunitary_p.bind(invals[0], *wires, qubits_len=n_wires, ctrl_len=0, adjoint=False)
+    outvals = unitary_p.bind(invals[0], *wires, qubits_len=n_wires, ctrl_len=0, adjoint=False)
     for wire_values, new_wire in zip(invals[1:], outvals):
         self.wire_map[wire_values] = new_wire
 
@@ -554,9 +561,7 @@ def handle_for_loop(
         consts,
     )
     converted_jaxpr_branch = jax.make_jaxpr(converted_func)(*start_plus_args_plus_qreg).jaxpr
-    converted_closed_jaxpr_branch = jax.core.ClosedJaxpr(
-        convert_constvars_jaxpr(converted_jaxpr_branch), ()
-    )
+    converted_closed_jaxpr_branch = ClosedJaxpr(convert_constvars_jaxpr(converted_jaxpr_branch), ())
 
     # Build Catalyst compatible input values
     for_loop_invals = [*consts, start, stop, step, *start_plus_args_plus_qreg]
@@ -606,7 +611,7 @@ def handle_while_loop(
         consts_body,
     )
     converted_body_jaxpr_branch = jax.make_jaxpr(converted_body_func)(*args_plus_qreg).jaxpr
-    converted_body_closed_jaxpr_branch = jax.core.ClosedJaxpr(
+    converted_body_closed_jaxpr_branch = ClosedJaxpr(
         convert_constvars_jaxpr(converted_body_jaxpr_branch), ()
     )
 
@@ -617,7 +622,7 @@ def handle_while_loop(
         consts_cond,
     )
     converted_cond_jaxpr_branch = jax.make_jaxpr(converted_cond_func)(*args_plus_qreg).jaxpr
-    converted_cond_closed_jaxpr_branch = jax.core.ClosedJaxpr(
+    converted_cond_closed_jaxpr_branch = ClosedJaxpr(
         convert_constvars_jaxpr(converted_cond_jaxpr_branch), ()
     )
 
@@ -641,6 +646,30 @@ def handle_while_loop(
 
     # Return only the output values that match the plxpr output values
     return outvals
+
+
+@QFuncPlxprInterpreter.register_primitive(plxpr_measure_prim)
+def handle_measure(self, wire, reset, postselect):
+    """Handle the conversion from plxpr to Catalyst jaxpr for the mid-circuit measure primitive."""
+
+    in_wire = self.get_wire(wire)
+
+    result, out_wire = measure_p.bind(in_wire, postselect=postselect)
+
+    if reset:
+        # Constants need to be passed as input values for some reason I forgot about.
+        correction = jaxpr_pad_consts(
+            [
+                jax.make_jaxpr(lambda: qinst_p.bind(in_wire, op="PauliX", qubits_len=1))().jaxpr,
+                jax.make_jaxpr(lambda: out_wire)().jaxpr,
+            ]
+        )
+        out_wire = cond_p.bind(
+            result, in_wire, out_wire, branch_jaxprs=correction, nimplicit_outputs=None
+        )[0]
+
+    self.wire_map[wire] = out_wire
+    return result
 
 
 # pylint: disable=unused-argument, too-many-positional-arguments
@@ -750,7 +779,8 @@ class PredicatePlxprInterpreter(PlxprInterpreter):
         return outvals
 
 
-def trace_from_pennylane(fn, static_argnums, abstracted_axes, sig, kwargs):
+# pylint: disable=too-many-positional-arguments
+def trace_from_pennylane(fn, static_argnums, abstracted_axes, sig, kwargs, debug_info=None):
     """Capture the JAX program representation (JAXPR) of the wrapped function, using
     PL capure module.
 
@@ -768,6 +798,7 @@ def trace_from_pennylane(fn, static_argnums, abstracted_axes, sig, kwargs):
         make_jaxpr_kwargs = {
             "static_argnums": static_argnums,
             "abstracted_axes": abstracted_axes,
+            "debug_info": debug_info,
         }
 
         args = sig
