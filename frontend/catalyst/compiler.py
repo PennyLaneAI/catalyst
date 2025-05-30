@@ -451,7 +451,7 @@ class Compiler:
                 if p.returncode not in {0, None}:
                     raise subprocess.CalledProcessError(p.returncode, cmd)
 
-                if self.options.debug_compiler and is_debugger_active():
+                if self.options.debug_compiler:
                     print(f"Compiler PID={p.pid}")
                     print(
                         f"""Ensure C++ debugger is attached and running before continuing with:
