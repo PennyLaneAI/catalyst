@@ -512,7 +512,7 @@ and other function operations, which themselves can contain other operations, an
             quantumPatterns.add<QubitUnitaryFusion>(ctx);
 
             // Apply patterns in an iterative and greedy manner.
-            if (failed(applyPatternsAndFoldGreedily(op, std::move(quantumPatterns)))) {
+            if (failed(applyPatternsGreedily(op, std::move(quantumPatterns)))) {
                 return signalPassFailure();
             }
         }
@@ -520,7 +520,7 @@ and other function operations, which themselves can contain other operations, an
 
 To apply patterns we need a `pattern applicator <https://mlir.llvm.org/docs/PatternRewriter/#common-pattern-drivers>`_.
 There a few in MLIR but typically you can just use the greedy pattern rewrite driver
-(``applyPatternsAndFoldGreedily``), which will iterative over the IR and apply patterns until a
+(``applyPatternsGreedily``), which will iterative over the IR and apply patterns until a
 fixed point is reached.
 
 .. note::
