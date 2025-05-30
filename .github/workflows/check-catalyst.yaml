@@ -165,8 +165,9 @@ jobs:
         CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \
         COMPILER_LAUNCHER="" \
-        PYTHON_EXECUTABLE=$(which python3) \
-        make llvm --ignore-errors mismatch
+        PYTHON3_EXECUTABLE=$(which python3) \
+        Python3_NumPy_INCLUDE_DIRS=$$($(PYTHON) -c "import numpy as np; print(np.get_include())") \
+        make llvm
 
   mhlo:
     name: MHLO Dialect Build
