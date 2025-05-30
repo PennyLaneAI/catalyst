@@ -442,7 +442,7 @@ C++.
                 "name": "(C++): Attach To Executing Python Process",
                 "type": "cppdbg",
                 "request": "attach",
-                "program": "${workspaceFolder}/pyenv/bin/python",
+                "program": "${command:python.interpreterPath}",
                 "processId": "${command:pickProcess}",
                 "MIMode": "gdb",
                 "setupCommands": [
