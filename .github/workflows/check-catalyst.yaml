@@ -499,7 +499,7 @@ jobs:
 
     - name: Run Python Lit Tests
       run: |
-        which python3
+        export PYTHONPATH=$PYTHONPATH:/opt/hostedtoolcache/Python/3.10.17/x64/lib/python3.10/site-packages
         llvm-lit -sv frontend/test/lit -j$(nproc)
 
     - name: Run Python Pytest Tests
