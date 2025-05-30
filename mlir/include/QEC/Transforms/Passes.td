@@ -122,7 +122,7 @@ def CliffordTToPPMPass : Pass<"ppm_compilation"> {
 }
 
 def createCountPPMSpecsPass : Pass<"ppm_specs"> {
-    let summary = "Convert CliffordT operations to Pauli Product Measurement operations.";
+    let summary = "Count specs in Pauli Product Measurement operations.";
     
     let dependentDialects = [
         "catalyst::qec::QECDialect",
