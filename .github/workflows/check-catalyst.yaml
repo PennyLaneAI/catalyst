@@ -499,9 +499,9 @@ jobs:
 
     - name: Run Python Lit Tests
       run: |
-        # echo $PYTHONPATH
+        echo $GITHUB_ENV
         python --version
-        export PYTHONPATH=$PYTHONPATH:/opt/hostedtoolcache/Python/3.10.17/x64/lib/python3.10/site-packages
+        export PYTHONPATH=$PYTHONPATH:$(pwd)/quantum-build/python_packages/quantum
         llvm-lit -sv frontend/test/lit -j$(nproc)
 
     - name: Run Python Pytest Tests
