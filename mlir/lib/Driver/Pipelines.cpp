@@ -86,8 +86,8 @@ void createBufferizationPipeline(OpPassManager &pm)
     pm.addNestedPass<mlir::func::FuncOp>(mlir::bufferization::createBufferHoistingPass());
     pm.addNestedPass<mlir::func::FuncOp>(mlir::bufferization::createBufferLoopHoistingPass());
     pm.addNestedPass<mlir::func::FuncOp>(mlir::bufferization::createPromoteBuffersToStackPass());
-    mlir::bufferization::BufferDeallocationPipelineOptions bufferDeallocOptions;
-    mlir::bufferization::buildBufferDeallocationPipeline(pm, bufferDeallocOptions);
+    // TODO: migrate to new buffer deallocation "buffer-deallocation-pipeline"
+    pm.addNestedPass<mlir::func::FuncOp>(catalyst::createBufferDeallocationPass());
     pm.addPass(catalyst::createArrayListToMemRefPass());
     pm.addPass(mlir::createConvertBufferizationToMemRefPass());
     pm.addPass(mlir::createCanonicalizerPass());
