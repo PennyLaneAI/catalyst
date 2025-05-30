@@ -396,8 +396,9 @@ Catalyst supports mixed-mode debugging of Python and/or C++ code when providing 
 the ``@qjit`` decorator. Enabling this option signals to the compiler to wait for an appropriate user-provided signal
 after launching the compiler process. Some notes about use of this support:
 
-* This functionality requires building Catalyst with debug symbols. This can be achieved via make all 
-  ``BUILD_TYPE="RelWithDebInfo"``. The debug symbols are only within available within the Catalyst-owned targets. 
+* This functionality requires building Catalyst with debug symbols. This can be achieved via
+  ``make all BUILD_TYPE="RelWithDebInfo"``. The debug symbols are only within available
+  within the Catalyst-owned targets. 
 To enable debugging of LLVM and other associated external libraries and binaries, ensure the 
   ``BUILD_TYPE_EXT="RelWithDebInfo"`` option is also set.
 * Launching the C++ debugger requires attaching to a running process. This often requires ``sudo`` privileges on the 
