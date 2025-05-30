@@ -382,7 +382,7 @@ struct AnnotateWithFullyQualifiedNamePass
         GreedyRewriteConfig config;
         config.strictMode = GreedyRewriteStrictness::ExistingOps;
         config.enableRegionSimplification = mlir::GreedySimplifyRegionLevel::Disabled;
-        // Update to the following lines the next time we update llvm
+        // TODO: Update to the following lines the next time we update llvm
         // config.setStrictness(GreedyRewriteStrictness::ExistingOps);
         // config.setRegionSimplificationLevel(mlir::GreedySimplifyRegionLevel::Disabled);
 
