@@ -212,6 +212,10 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* `qjit` now supports a `debug_compiler` argument, which signals that the compiler driver should stop and wait
+  for a user-provided `SIGNCONT`. This allows developer to attach a debugger session to the driver before processing its input.
+  [(#1712)](https://github.com/PennyLaneAI/catalyst/pull/1712)
+
 * `null.qubit` can now support an optional `track_resources` argument which allows it to record which gates are executed.
   [(#1619)](https://github.com/PennyLaneAI/catalyst/pull/1619)
 
@@ -291,6 +295,10 @@
 
 <h3>Documentation 📝</h3>
 
+* Documentation for the configuration of mixed-mode (Python and C++) debugging with Catalyst has
+  been added. Configuration guidelines are provided for VSCode.
+  [(#1712)](https://github.com/PennyLaneAI/catalyst/pull/1712)
+
 * The header (logo+title) images in the README and in the overview on RtD have been updated,
   reflecting that Catalyst is now beyond the beta!
   [(#1718)](https://github.com/PennyLaneAI/catalyst/pull/1718)
@@ -312,6 +320,7 @@ Christina Lee,
 Mehrdad Malekmohammadi,
 Anton Naim Ibrahim,
 Erick Ochoa Lopez,
+Lee J. O'Riordan,
 Ritu Thombre,
 Paul Haochen Wang,
 Jake Zaia.

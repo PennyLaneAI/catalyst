@@ -13,6 +13,7 @@ RT_BUILD_DIR ?= $(MK_DIR)/../runtime/build
 ENABLE_ASAN ?= OFF
 STRICT_WARNINGS ?= ON
 BUILD_TYPE ?= Release
+BUILD_TYPE_EXT ?= Release
 LLVM_EXTERNAL_LIT ?= $(LLVM_BUILD_DIR)/bin/llvm-lit
 
 ifeq ($(shell uname), Darwin)
@@ -65,7 +66,7 @@ llvm:
 		patch -p1 $(TARGET_FILE) $(PATCH_FILE); \
 	fi
 	cmake -G Ninja -S llvm-project/llvm -B $(LLVM_BUILD_DIR) \
-		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
+		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE_EXT) \
 		-DLLVM_BUILD_EXAMPLES=OFF \
 		-DLLVM_TARGETS_TO_BUILD="host" \
 		-DLLVM_ENABLE_PROJECTS="$(LLVM_PROJECTS)" \
@@ -101,7 +102,7 @@ mhlo:
 		patch -p1 $(TARGET_FILE) $(PATCH_FILE); \
 	fi
 	cmake -G Ninja -S mlir-hlo -B $(MHLO_BUILD_DIR) \
-		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
+		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE_EXT) \
 		-DLLVM_ENABLE_ASSERTIONS=ON \
 		-DMLIR_DIR=$(LLVM_BUILD_DIR)/lib/cmake/mlir \
 		-DPython3_EXECUTABLE=$(PYTHON) \
@@ -123,7 +124,7 @@ enzyme:
 	@echo "build enzyme"
 	cmake -G Ninja -S Enzyme/enzyme -B $(ENZYME_BUILD_DIR) \
 		-DENZYME_STATIC_LIB=ON \
-		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
+		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE_EXT) \
 		-DLLVM_DIR=$(LLVM_BUILD_DIR)/lib/cmake/llvm \
 		-DCMAKE_C_COMPILER=$(C_COMPILER) \
 		-DCMAKE_CXX_COMPILER=$(CXX_COMPILER) \
@@ -144,6 +145,7 @@ plugin:
 	cmake -B standalone/build -G Ninja \
 		-DCMAKE_C_COMPILER=$(C_COMPILER) \
 		-DCMAKE_CXX_COMPILER=$(CXX_COMPILER) \
+		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE_EXT) \
 		-DCMAKE_C_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
 		-DCMAKE_CXX_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
 		-DMLIR_DIR=$(LLVM_BUILD_DIR)/lib/cmake/mlir \
