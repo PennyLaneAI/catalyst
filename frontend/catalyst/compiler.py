@@ -447,6 +447,7 @@ class Compiler:
             with subprocess.Popen(
                 cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
             ) as p:
+                # Ensure process creation succeeds
                 if p.returncode not in {0, None}:
                     raise subprocess.CalledProcessError(p.returncode, cmd)
 
@@ -459,6 +460,10 @@ class Compiler:
                     p.send_signal(signal.SIGSTOP)
 
                 res_stdout, res_stderr = p.communicate()
+                # Ensure process execution succeeds
+                if p.returncode not in {0, None}:
+                    raise subprocess.CalledProcessError(p.returncode, cmd, res_stdout, res_stderr)
+
             if self.options.verbose or os.getenv("ENABLE_DIAGNOSTICS"):
                 if res_stdout:
                     print(res_stdout.strip(), file=self.options.logfile)
