@@ -22,10 +22,10 @@ import inspect
 from typing import Callable
 
 import jax
-from jax.core import AbstractValue
 from jax._src.core import shaped_abstractify
 from jax._src.interpreters.partial_eval import infer_lambda_input_type
 from jax._src.pjit import _flat_axes_specs
+from jax.core import AbstractValue
 from jax.tree_util import tree_flatten, tree_unflatten
 
 from catalyst.jax_extras import get_aval2
