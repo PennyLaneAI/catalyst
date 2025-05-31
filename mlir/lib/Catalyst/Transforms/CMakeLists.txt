@@ -4,6 +4,7 @@ file(GLOB SRC
     ApplyTransformSequencePass.cpp
     ArrayListToMemRefPass.cpp
     AsyncUtils.cpp
+    BufferDeallocation.cpp
     BufferizableOpInterfaceImpl.cpp
     catalyst_to_llvm.cpp
     DetectQNodes.cpp

@@ -40,7 +40,7 @@ CallInterfaceCallable ZneOp::getCallableForCallee() { return getCalleeAttr(); }
 
 void ZneOp::setCalleeFromCallable(CallInterfaceCallable callee)
 {
-    (*this)->setAttr("callee", callee.get<SymbolRefAttr>());
+    (*this)->setAttr("callee", cast<SymbolRefAttr>(callee));
 };
 
 Operation::operand_range ZneOp::getArgOperands() { return getOperands(); }

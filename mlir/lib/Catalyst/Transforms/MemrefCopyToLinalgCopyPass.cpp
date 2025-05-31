@@ -44,7 +44,7 @@ struct MemrefCopyToLinalgCopyPass
         RewritePatternSet patterns(&getContext());
 
         populateMemrefCopyToLinalgCopyPatterns(patterns);
-        if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
+        if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
             return signalPassFailure();
         }
     }

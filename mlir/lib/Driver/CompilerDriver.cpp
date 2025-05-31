@@ -765,7 +765,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
     if (runLLC && (inType == InputType::LLVMIR)) {
         TimingScope llcTiming = timing.nest("llc");
         // Set data layout before LLVM passes or the default one is used.
-        std::string targetTriple = llvm::sys::getDefaultTargetTriple();
+        llvm::Triple targetTriple(llvm::sys::getDefaultTargetTriple());
 
         llvm::InitializeAllTargetInfos();
         llvm::InitializeAllTargets();

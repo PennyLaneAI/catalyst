@@ -113,24 +113,23 @@ LogicalResult DetectCallsInAsyncRegionsTransform::matchAndRewrite(LLVM::CallOp c
 struct AddExceptionHandlingTransform : public OpRewritePattern<LLVM::CallOp> {
     using OpRewritePattern<LLVM::CallOp>::OpRewritePattern;
 
-    LogicalResult match(LLVM::CallOp op) const override;
-    void rewrite(LLVM::CallOp op, PatternRewriter &rewriter) const override;
+    LogicalResult matchAndRewrite(LLVM::CallOp op, PatternRewriter &rewriter) const override;
 };
 
 /* Here we only match with calls that have the { catalyst.preInvoke } annotations.
  * The reason behind this separation between the previous pattern and this one,
  * is that this pattern can potentially be reused as long as this single annotation is present.
  */
-LogicalResult AddExceptionHandlingTransform::match(LLVM::CallOp callOp) const
+LogicalResult AddExceptionHandlingTransform::matchAndRewrite(LLVM::CallOp callOp,
+                                                             PatternRewriter &rewriter) const
 {
     // The following is a valid match
     //     llvm.call @callee() { catalyst.preInvoke }
     bool validCandidate = AsyncUtils::isScheduledForTransformation(callOp);
-    return validCandidate ? success() : failure();
-}
+    if (!validCandidate) {
+        return failure();
+    }
 
-void AddExceptionHandlingTransform::rewrite(LLVM::CallOp callOp, PatternRewriter &rewriter) const
-{
     auto moduleOp = callOp->getParentOfType<ModuleOp>();
     // Here, we are adding a reference to the personality declaration.
     // From the documentation: https://llvm.org/docs/ExceptionHandling.html#exception-tables
@@ -255,6 +254,7 @@ void AddExceptionHandlingTransform::rewrite(LLVM::CallOp callOp, PatternRewriter
     //
     //     llvm.func caller() attributes { catalyst.preHandleError }
     AsyncUtils::scheduleAnalysisForErrorHandling(caller, rewriter);
+    return success();
 }
 
 /* The next step is to inspect callers of the previous caller.
@@ -264,8 +264,7 @@ void AddExceptionHandlingTransform::rewrite(LLVM::CallOp callOp, PatternRewriter
 struct RemoveAbortAndPutsInsertCallTransform : public OpRewritePattern<LLVM::CallOp> {
     using OpRewritePattern<LLVM::CallOp>::OpRewritePattern;
 
-    LogicalResult match(LLVM::CallOp op) const override;
-    void rewrite(LLVM::CallOp op, PatternRewriter &rewriter) const override;
+    LogicalResult matchAndRewrite(LLVM::CallOp op, PatternRewriter &rewriter) const override;
 };
 
 // In this pattern we are looking for function calls to functions annotated
@@ -276,27 +275,21 @@ struct RemoveAbortAndPutsInsertCallTransform : public OpRewritePattern<LLVM::Cal
 //    %results = call @async_execute_fn()
 //
 // These functions return async values or tokens.
-LogicalResult RemoveAbortAndPutsInsertCallTransform::match(LLVM::CallOp callOp) const
+LogicalResult
+RemoveAbortAndPutsInsertCallTransform::matchAndRewrite(LLVM::CallOp callOp,
+                                                       PatternRewriter &rewriter) const
 {
     auto maybeCallee = AsyncUtils::getCalleeSafe(callOp);
-    if (!maybeCallee)
+    if (!maybeCallee) {
         return failure();
+    }
 
     // llvm.func @callee() attributes { catalyst.preHandleError }
     auto calleeFuncOp = maybeCallee.value();
     bool hasAttr = AsyncUtils::hasPreHandleErrorAttr(calleeFuncOp);
-    if (!hasAttr)
+    if (!hasAttr) {
         return failure();
-
-    return success();
-}
-
-void RemoveAbortAndPutsInsertCallTransform::rewrite(LLVM::CallOp callOp,
-                                                    PatternRewriter &rewriter) const
-{
-    auto maybeCallee = AsyncUtils::getCalleeSafe(callOp);
-    if (!maybeCallee)
-        return;
+    }
 
     // Here, we are declaring an external function which is available in the Catalyst runtime.
     //     llvm.func @__catalyst__host__rt__unrecoverable_error()
@@ -443,6 +436,7 @@ void RemoveAbortAndPutsInsertCallTransform::rewrite(LLVM::CallOp callOp,
     // to
     //    llvm.func @async_execute_fn()
     AsyncUtils::cleanupPreHandleErrorAttr(callee, rewriter);
+    return success();
 }
 
 // We come to the liveness analysis, which will find out values that flow from multiple
@@ -450,19 +444,18 @@ void RemoveAbortAndPutsInsertCallTransform::rewrite(LLVM::CallOp callOp,
 struct LivenessAnalysisDropRef : public OpRewritePattern<LLVM::CallOp> {
     using OpRewritePattern<LLVM::CallOp>::OpRewritePattern;
 
-    LogicalResult match(LLVM::CallOp op) const override;
-    void rewrite(LLVM::CallOp op, PatternRewriter &rewriter) const override;
+    LogicalResult matchAndRewrite(LLVM::CallOp op, PatternRewriter &rewriter) const override;
 };
 
-LogicalResult LivenessAnalysisDropRef::match(LLVM::CallOp op) const
+LogicalResult LivenessAnalysisDropRef::matchAndRewrite(LLVM::CallOp sink,
+                                                       PatternRewriter &rewriter) const
 {
     // We match on function calls that have the sink attribute.
     //     llvm.call @__catalyst__host__rt__unrecoverable_error() { catalyst.sink }
-    return AsyncUtils::isSink(op) ? success() : failure();
-}
+    if (!AsyncUtils::isSink(sink)) {
+        return failure();
+    }
 
-void LivenessAnalysisDropRef::rewrite(LLVM::CallOp sink, PatternRewriter &rewriter) const
-{
     auto caller = AsyncUtils::getCaller(sink);
 
     SmallVector<LLVM::CallOp> sources;
@@ -557,6 +550,7 @@ void LivenessAnalysisDropRef::rewrite(LLVM::CallOp sink, PatternRewriter &rewrit
     // NEVER CALL:
     //    cleanupSource(annotatedCalls, rewriter);
     AsyncUtils::cleanupSink(sink, rewriter);
+    return success();
 }
 
 // We now can cleanup the source
@@ -926,8 +920,11 @@ struct AddExceptionHandlingPass : impl::AddExceptionHandlingPassBase<AddExceptio
         GreedyRewriteConfig config;
         config.strictMode = GreedyRewriteStrictness::ExistingOps;
         config.enableRegionSimplification = mlir::GreedySimplifyRegionLevel::Disabled;
+        // TODO: Update to the following lines the next time we update llvm
+        // config.setStrictness(GreedyRewriteStrictness::ExistingOps);
+        // config.setRegionSimplificationLevel(mlir::GreedySimplifyRegionLevel::Disabled);
 
-        if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns1), config))) {
+        if (failed(applyPatternsGreedily(getOperation(), std::move(patterns1), config))) {
             signalPassFailure();
         }
 
@@ -937,7 +934,7 @@ struct AddExceptionHandlingPass : impl::AddExceptionHandlingPassBase<AddExceptio
 
         RewritePatternSet patterns2(context);
         patterns2.add<AddExceptionHandlingTransform>(context);
-        if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns2), config))) {
+        if (failed(applyPatternsGreedily(getOperation(), std::move(patterns2), config))) {
             signalPassFailure();
         }
 
@@ -947,7 +944,7 @@ struct AddExceptionHandlingPass : impl::AddExceptionHandlingPassBase<AddExceptio
 
         RewritePatternSet patterns3(context);
         patterns3.add<RemoveAbortAndPutsInsertCallTransform>(context);
-        if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns3), config))) {
+        if (failed(applyPatternsGreedily(getOperation(), std::move(patterns3), config))) {
             signalPassFailure();
         }
 
@@ -957,7 +954,7 @@ struct AddExceptionHandlingPass : impl::AddExceptionHandlingPassBase<AddExceptio
 
         RewritePatternSet patterns4(context);
         patterns4.add<LivenessAnalysisDropRef>(context);
-        if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns4), config))) {
+        if (failed(applyPatternsGreedily(getOperation(), std::move(patterns4), config))) {
             signalPassFailure();
         }
 
@@ -967,7 +964,7 @@ struct AddExceptionHandlingPass : impl::AddExceptionHandlingPassBase<AddExceptio
 
         RewritePatternSet patterns5(context);
         patterns5.add<CleanUpSourceTransform, BranchToUnreachableTransform>(context);
-        if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns5), config))) {
+        if (failed(applyPatternsGreedily(getOperation(), std::move(patterns5), config))) {
             signalPassFailure();
         }
     }

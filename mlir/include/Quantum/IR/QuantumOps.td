@@ -17,7 +17,6 @@
 
 include "mlir/IR/EnumAttr.td"
 include "mlir/IR/OpBase.td"
-include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Dialect/Bufferization/IR/AllocationOpInterface.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 
@@ -48,8 +47,6 @@ def NamedObservable : I32EnumAttr<"NamedObservable",
 
 def Unitary : NativeOpTrait<"UnitaryTrait">;
 def Hermitian : NativeOpTrait<"HermitianTrait">;
-
-def QuantumMemory : Resource<"QuantumMemory">;
 
 //===----------------------------------------------------------------------===//
 // Quantum dialect attributes.
@@ -341,7 +338,7 @@ class UnitaryGate_Op<string mnemonic, list<Trait> traits = []> :
     let extraClassDeclaration = extraBaseClassDeclaration;
 }
 
-def SetStateOp : Gate_Op<"set_state", []> {
+def SetStateOp : Gate_Op<"set_state"> {
     let summary = "Set state to a complex vector.";
     let description = [{
         This operation is useful for simulators implementing state preparation.
@@ -372,7 +369,7 @@ def SetStateOp : Gate_Op<"set_state", []> {
 
 }
 
-def SetBasisStateOp : Gate_Op<"set_basis_state", []> {
+def SetBasisStateOp : Gate_Op<"set_basis_state"> {
     let summary = "Set basis state.";
     let description = [{
         This operation is useful for simulators implementing set basis state.
@@ -567,7 +564,7 @@ def GlobalPhaseOp : UnitaryGate_Op<"gphase", [DifferentiableGate, AttrSizedOpera
 }
 
 def MultiRZOp : UnitaryGate_Op<"multirz", [DifferentiableGate, NoMemoryEffect,
-                                           AttrSizedOperandSegments, AttrSizedResultSegments]> {
+                            AttrSizedOperandSegments, AttrSizedResultSegments]> {
     let summary = "Apply an arbitrary multi Z rotation";
     let description = [{
         The `quantum.multirz` operation applies an arbitrary multi Z rotation to the state-vector.
@@ -601,7 +598,7 @@ def MultiRZOp : UnitaryGate_Op<"multirz", [DifferentiableGate, NoMemoryEffect,
 }
 
 def QubitUnitaryOp : UnitaryGate_Op<"unitary", [ParametrizedGate, NoMemoryEffect,
-                                                AttrSizedOperandSegments, AttrSizedResultSegments]> {
+                            AttrSizedOperandSegments, AttrSizedResultSegments]> {
     let summary = "Apply an arbitrary fixed unitary matrix";
     let description = [{
         The `quantum.unitary` operation applies an arbitrary fixed unitary matrix to the

@@ -43,7 +43,7 @@ struct GradientPostprocessingPass
         RewritePatternSet patterns(&getContext());
         populatePostprocessingPatterns(patterns);
 
-        if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
+        if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
             return signalPassFailure();
         }
     }

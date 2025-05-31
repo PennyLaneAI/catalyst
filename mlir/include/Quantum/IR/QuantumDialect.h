@@ -16,6 +16,7 @@
 
 #include "mlir/Bytecode/BytecodeOpInterface.h"
 #include "mlir/IR/Dialect.h"
+#include "mlir/Interfaces/SideEffectInterfaces.h"
 
 //===----------------------------------------------------------------------===//
 // Quantum dialect declarations.
@@ -29,3 +30,7 @@
 
 #define GET_TYPEDEF_CLASSES
 #include "Quantum/IR/QuantumOpsTypes.h.inc"
+
+class QuantumMemory : public mlir::SideEffects::Resource::Base<QuantumMemory> {
+    llvm::StringRef getName() final { return "QuantumMemory"; }
+};

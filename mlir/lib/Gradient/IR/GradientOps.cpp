@@ -130,7 +130,7 @@ CallInterfaceCallable GradOp::getCallableForCallee() { return getCalleeAttr(); }
 
 void GradOp::setCalleeFromCallable(CallInterfaceCallable callee)
 {
-    (*this)->setAttr("callee", callee.get<SymbolRefAttr>());
+    (*this)->setAttr("callee", cast<SymbolRefAttr>(callee));
 };
 
 Operation::operand_range GradOp::getArgOperands() { return getOperands(); }
@@ -187,7 +187,7 @@ CallInterfaceCallable ValueAndGradOp::getCallableForCallee() { return getCalleeA
 
 void ValueAndGradOp::setCalleeFromCallable(CallInterfaceCallable callee)
 {
-    (*this)->setAttr("callee", callee.get<SymbolRefAttr>());
+    (*this)->setAttr("callee", cast<SymbolRefAttr>(callee));
 };
 
 Operation::operand_range ValueAndGradOp::getArgOperands() { return getOperands(); }
@@ -260,7 +260,7 @@ CallInterfaceCallable JVPOp::getCallableForCallee() { return getCalleeAttr(); }
 
 void JVPOp::setCalleeFromCallable(CallInterfaceCallable callee)
 {
-    (*this)->setAttr("callee", callee.get<SymbolRefAttr>());
+    (*this)->setAttr("callee", cast<SymbolRefAttr>(callee));
 };
 
 Operation::operand_range JVPOp::getArgOperands() { return getOperands(); }
@@ -367,7 +367,7 @@ CallInterfaceCallable VJPOp::getCallableForCallee() { return getCalleeAttr(); }
 
 void VJPOp::setCalleeFromCallable(CallInterfaceCallable callee)
 {
-    (*this)->setAttr("callee", callee.get<SymbolRefAttr>());
+    (*this)->setAttr("callee", cast<SymbolRefAttr>(callee));
 };
 
 Operation::operand_range VJPOp::getArgOperands() { return getOperands(); }

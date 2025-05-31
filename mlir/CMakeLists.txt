@@ -47,7 +47,6 @@ set(ALL_MHLO_PASSES
   StablehloPasses
   MhloToArithmeticConversion
   MhloToMemrefConversion
-  MhloToStandard
   HloToLinalgUtils
   MhloToLinalg
   MhloToStablehlo

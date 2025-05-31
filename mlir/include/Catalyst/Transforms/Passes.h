@@ -23,6 +23,7 @@ namespace catalyst {
 std::unique_ptr<mlir::Pass> createAddExceptionHandlingPass();
 std::unique_ptr<mlir::Pass> createApplyTransformSequencePass();
 std::unique_ptr<mlir::Pass> createArrayListToMemRefPass();
+std::unique_ptr<mlir::Pass> createBufferDeallocationPass();
 std::unique_ptr<mlir::Pass> createCatalystBufferizationPass();
 std::unique_ptr<mlir::Pass> createCatalystConversionPass();
 std::unique_ptr<mlir::Pass> createDetensorizeSCFPass();

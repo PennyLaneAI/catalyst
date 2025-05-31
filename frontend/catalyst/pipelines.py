@@ -240,6 +240,7 @@ def get_bufferization_stage(options: CompileOptions) -> List[str]:
         "func.func(buffer-hoisting)",
         "func.func(buffer-loop-hoisting)",
         "func.func(promote-buffers-to-stack)",
+        # TODO: migrate to new buffer deallocation "buffer-deallocation-pipeline"
         "func.func(buffer-deallocation)",
         "convert-arraylist-to-memref",
         "convert-bufferization-to-memref",
