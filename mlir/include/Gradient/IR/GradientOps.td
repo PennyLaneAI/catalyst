@@ -18,6 +18,7 @@
 include "mlir/Interfaces/FunctionInterfaces.td"
 include "mlir/Interfaces/CallInterfaces.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
+include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/SymbolInterfaces.td"
 include "mlir/IR/BuiltinAttributes.td"
 include "mlir/IR/OpBase.td"
@@ -58,7 +59,9 @@ def GradOp : Gradient_Op<"grad", [
         SymbolRefAttr:$callee,
         Variadic<AnyType>:$operands,
         OptionalAttr<AnyIntElementsAttr>:$diffArgIndices,
-        OptionalAttr<Builtin_FloatAttr>:$finiteDiffParam
+        OptionalAttr<Builtin_FloatAttr>:$finiteDiffParam,
+        OptionalAttr<DictArrayAttr>:$arg_attrs,
+        OptionalAttr<DictArrayAttr>:$res_attrs
     );
     let results = (outs Variadic<AnyTypeOf<[AnyFloat, RankedTensorOf<[AnyFloat]>]>>);
 
@@ -82,7 +85,9 @@ def ValueAndGradOp : Gradient_Op<"value_and_grad", [
         SymbolRefAttr:$callee,
         Variadic<AnyType>:$operands,
         OptionalAttr<AnyIntElementsAttr>:$diffArgIndices,
-        OptionalAttr<Builtin_FloatAttr>:$finiteDiffParam
+        OptionalAttr<Builtin_FloatAttr>:$finiteDiffParam,
+        OptionalAttr<DictArrayAttr>:$arg_attrs,
+        OptionalAttr<DictArrayAttr>:$res_attrs
     );
 
     let results = (outs
@@ -100,7 +105,8 @@ def ValueAndGradOp : Gradient_Op<"value_and_grad", [
 }
 
 
-def AdjointOp : Gradient_Op<"adjoint", [AttrSizedOperandSegments]> {
+def AdjointOp : Gradient_Op<"adjoint", [AttrSizedOperandSegments,
+                                        MemoryEffects<[MemRead, MemWrite, MemAlloc, MemFree]>]> {
     let summary = "Perform quantum AD using the adjoint method on a device.";
 
     let arguments = (ins
@@ -129,7 +135,8 @@ def AdjointOp : Gradient_Op<"adjoint", [AttrSizedOperandSegments]> {
 def BackpropOp : Gradient_Op<"backprop", [
         AttrSizedOperandSegments,
         AttrSizedResultSegments,
-        DeclareOpInterfaceMethods<SymbolUserOpInterface>
+        DeclareOpInterfaceMethods<SymbolUserOpInterface>,
+        MemoryEffects<[MemRead, MemWrite, MemAlloc, MemFree]>
         ]> {
     let summary = "Perform classic automatic differentiation using Enzyme AD.";
 
@@ -174,7 +181,8 @@ def JVPOp : Gradient_Op<"jvp", [
         SameVariadicResultSize,
         DeclareOpInterfaceMethods<CallOpInterface>,
         DeclareOpInterfaceMethods<SymbolUserOpInterface>,
-        GradientOpInterface
+        GradientOpInterface,
+        MemoryEffects<[MemRead, MemWrite, MemAlloc, MemFree]>
         ]> {
     let summary = "Compute the jvp of a function.";
 
@@ -184,7 +192,9 @@ def JVPOp : Gradient_Op<"jvp", [
         Variadic<AnyType>:$params,
         Variadic<AnyType>:$tangents,
         OptionalAttr<AnyIntElementsAttr>:$diffArgIndices,
-        OptionalAttr<Builtin_FloatAttr>:$finiteDiffParam
+        OptionalAttr<Builtin_FloatAttr>:$finiteDiffParam,
+        OptionalAttr<DictArrayAttr>:$arg_attrs,
+        OptionalAttr<DictArrayAttr>:$res_attrs
     );
 
     let results = (outs
@@ -207,7 +217,8 @@ def VJPOp : Gradient_Op<"vjp", [
         AttrSizedResultSegments,
         DeclareOpInterfaceMethods<CallOpInterface>,
         DeclareOpInterfaceMethods<SymbolUserOpInterface>,
-        GradientOpInterface
+        GradientOpInterface,
+        MemoryEffects<[MemRead, MemWrite, MemAlloc, MemFree]>
         ]> {
     let summary = "Compute the vjp of a function.";
 
@@ -217,7 +228,9 @@ def VJPOp : Gradient_Op<"vjp", [
         Variadic<AnyType>:$params,
         Variadic<AnyType>:$cotangents,
         OptionalAttr<AnyIntElementsAttr>:$diffArgIndices,
-        OptionalAttr<Builtin_FloatAttr>:$finiteDiffParam
+        OptionalAttr<Builtin_FloatAttr>:$finiteDiffParam,
+        OptionalAttr<DictArrayAttr>:$arg_attrs,
+        OptionalAttr<DictArrayAttr>:$res_attrs
     );
 
     let results = (outs

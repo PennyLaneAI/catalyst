@@ -73,16 +73,12 @@ void createBufferizationPipeline(OpPassManager &pm)
     pm.addPass(catalyst::createGradientPreprocessingPass());
     pm.addPass(mlir::bufferization::createEmptyTensorEliminationPass());
     ///////////
-    mlir::bufferization::OneShotBufferizationOptions options;
+    mlir::bufferization::OneShotBufferizePassOptions options;
     options.bufferizeFunctionBoundaries = true;
     options.allowReturnAllocsFromLoops = true;
-    options.setFunctionBoundaryTypeConversion(
-        mlir::bufferization::LayoutMapOption::IdentityLayoutMap);
-    options.unknownTypeConverterFn = [=](Value value, Attribute memorySpace,
-                                         const mlir::bufferization::BufferizationOptions &options) {
-        auto tensorType = cast<TensorType>(value.getType());
-        return bufferization::getMemRefTypeWithStaticIdentityLayout(tensorType, memorySpace);
-    };
+    options.functionBoundaryTypeConversion =
+        mlir::bufferization::LayoutMapOption::IdentityLayoutMap;
+    options.unknownTypeConversion = mlir::bufferization::LayoutMapOption::IdentityLayoutMap;
     pm.addPass(mlir::bufferization::createOneShotBufferizePass(options));
     //////////////
     pm.addPass(mlir::createCanonicalizerPass());
@@ -90,9 +86,10 @@ void createBufferizationPipeline(OpPassManager &pm)
     pm.addNestedPass<mlir::func::FuncOp>(mlir::bufferization::createBufferHoistingPass());
     pm.addNestedPass<mlir::func::FuncOp>(mlir::bufferization::createBufferLoopHoistingPass());
     pm.addNestedPass<mlir::func::FuncOp>(mlir::bufferization::createPromoteBuffersToStackPass());
-    pm.addNestedPass<mlir::func::FuncOp>(mlir::bufferization::createBufferDeallocationPass());
+    mlir::bufferization::BufferDeallocationPipelineOptions bufferDeallocOptions;
+    mlir::bufferization::buildBufferDeallocationPipeline(pm, bufferDeallocOptions);
     pm.addPass(catalyst::createArrayListToMemRefPass());
-    pm.addPass(mlir::createBufferizationToMemRefPass());
+    pm.addPass(mlir::createConvertBufferizationToMemRefPass());
     pm.addPass(mlir::createCanonicalizerPass());
     pm.addPass(catalyst::createCopyGlobalMemRefPass());
 }
@@ -102,7 +99,7 @@ void createLLVMDialectLoweringPipeline(OpPassManager &pm)
     pm.addPass(catalyst::createGradientConversionPass());
     pm.addPass(catalyst::createMemrefCopyToLinalgCopyPass());
     pm.addNestedPass<mlir::func::FuncOp>(mlir::createConvertLinalgToLoopsPass());
-    pm.addPass(mlir::createConvertSCFToCFPass());
+    pm.addPass(mlir::createSCFToControlFlowPass());
     pm.addPass(mlir::memref::createExpandStridedMetadataPass());
     pm.addPass(mlir::createLowerAffinePass());
     pm.addPass(mlir::arith::createArithExpandOpsPass());

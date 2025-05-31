@@ -221,9 +221,9 @@ module @custom_gate {
   // CHECK: llvm.func @__catalyst__qis__RX(f64, !llvm.ptr, !llvm.ptr)
   // CHECK-LABEL: @test
   func.func @test(%q0: !quantum.bit, %p: f64) -> () {
+    // CHECK: [[nullptr:%.+]] = llvm.mlir.zero
     // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
     // CHECK: [[alloca:%.+]] = llvm.alloca [[c1]] x !llvm.struct<(i1, i64, ptr, ptr)>
-    // CHECK: [[nullptr:%.+]] = llvm.mlir.zero
     // CHECK: [[true:%.+]] = llvm.mlir.constant(true)
     // CHECK: [[off0:%.+]] = llvm.getelementptr inbounds [[alloca]][0, 0]
     // CHECK: [[off1:%.+]] = llvm.getelementptr inbounds [[alloca]][0, 1]
@@ -374,16 +374,14 @@ func.func @tensor(%obs : !quantum.obs) {
 // CHECK: llvm.func @__catalyst__qis__HamiltonianObs(!llvm.ptr, i64, ...) -> i64
 // CHECK-LABEL: @hamiltonian
 func.func @hamiltonian(%obs : !quantum.obs, %p1 : memref<1xf64>, %p2 : memref<3xf64>) {
-    // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
-    // CHECK: [[alloca:%.+]] = llvm.alloca [[c1]] x !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
-    // CHECK: [[memrefvar:%.+]] = llvm.mlir.undef
+    // CHECK: [[memrefvar:%.+]] = llvm.mlir.poison
     // CHECK: [[memrefvar0:%.+]] = llvm.insertvalue %arg1, [[memrefvar]][0]
     // CHECK: [[memrefvar1:%.+]] = llvm.insertvalue %arg2, [[memrefvar0]][1]
     // CHECK: [[memrefvar2:%.+]] = llvm.insertvalue %arg3, [[memrefvar1]][2]
     // CHECK: [[memrefvar3:%.+]] = llvm.insertvalue %arg4, [[memrefvar2]][3, 0]
     // CHECK: [[memrefvar4:%.+]] = llvm.insertvalue %arg5, [[memrefvar3]][4, 0]
-    // CHECK: [[cast:%.+]] = builtin.unrealized_conversion_cast [[memrefvar4]]
-    // CHECK: [[memrefvar4:%.+]] = builtin.unrealized_conversion_cast [[cast]]
+    // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
+    // CHECK: [[alloca:%.+]] = llvm.alloca [[c1]] x !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
     // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
     // CHECK: llvm.store [[memrefvar4]], [[alloca]]
     // CHECK: llvm.call @__catalyst__qis__HamiltonianObs([[alloca]], [[c1]], %arg0)
@@ -397,16 +395,14 @@ func.func @hamiltonian(%obs : !quantum.obs, %p1 : memref<1xf64>, %p2 : memref<3x
 
 // CHECK-LABEL: @hamiltonian
 func.func @hamiltonian(%obs : !quantum.obs, %p1 : memref<1xf64>, %p2 : memref<3xf64>) {
-    // CHECK: [[memrefvar:%.+]] = llvm.mlir.undef
+    // CHECK: [[memrefvar:%.+]] = llvm.mlir.poison
     // CHECK: [[memrefvar0:%.+]] = llvm.insertvalue %arg6, [[memrefvar]][0]
     // CHECK: [[memrefvar1:%.+]] = llvm.insertvalue %arg7, [[memrefvar0]][1]
     // CHECK: [[memrefvar2:%.+]] = llvm.insertvalue %arg8, [[memrefvar1]][2]
     // CHECK: [[memrefvar3:%.+]] = llvm.insertvalue %arg9, [[memrefvar2]][3, 0]
     // CHECK: [[memrefvar4:%.+]] = llvm.insertvalue %arg10, [[memrefvar3]][4, 0]
-    // CHECK: [[cast:%.+]] = builtin.unrealized_conversion_cast [[memrefvar4]]
     // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
     // CHECK: [[alloca:%.+]] = llvm.alloca [[c1]] x !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
-    // CHECK: [[memrefvar4:%.+]] = builtin.unrealized_conversion_cast [[cast]]
     // CHECK: [[c3:%.+]] = llvm.mlir.constant(3 : i64)
     // CHECK: llvm.store [[memrefvar4]], [[alloca]]
     // CHECK: llvm.call @__catalyst__qis__HamiltonianObs([[alloca]], [[c3]], %arg0, %arg0, %arg0)
@@ -588,7 +584,6 @@ func.func @state(%q : !quantum.bit) {
 
     // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
     // CHECK: [[ptr:%.+]] = llvm.alloca [[c1]] x !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
-    // CHECK: [[qb:%.+]] = builtin.unrealized_conversion_cast %arg0
     // CHECK: [[c0:%.+]] = llvm.mlir.constant(0 : i64)
     // CHECK: llvm.call @__catalyst__qis__State([[ptr]], [[c0]])
     %alloc1 = memref.alloc() : memref<2xcomplex<f64>>
@@ -621,13 +616,13 @@ func.func @controlled_circuit(%1 : !quantum.bit, %2 : !quantum.bit, %3 : !quantu
     %cst_0 = llvm.mlir.constant (9.000000e-01 : f64) : f64
     %cst_1 = llvm.mlir.constant (3.000000e-01 : f64) : f64
 
+    // CHECK: [[true:%.+]] = llvm.mlir.constant(true)
     // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
     // CHECK: [[alloca0:%.+]] = llvm.alloca [[c1]] x i1
     // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
     // CHECK: [[alloca1:%.+]] = llvm.alloca [[c1]] x !llvm.ptr
     // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
     // CHECK: [[mod:%.+]] = llvm.alloca [[c1]] x !llvm.struct<(i1, i64, ptr, ptr)>
-    // CHECK: [[true:%.+]] = llvm.mlir.constant(true)
 
 
     // CHECK-DAG: [[cst6:%.+]] = llvm.mlir.constant(6.0
@@ -661,13 +656,13 @@ func.func @controlled_circuit(%1 : !quantum.bit, %2 : !quantum.bit, %3 : !quantu
     %cst = llvm.mlir.constant (6.000000e-01 : f64) : f64
     %true = llvm.mlir.constant (1 : i1) :i1
 
+    // CHECK: [[cst6:%.+]] = llvm.mlir.constant(6.0
     // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
     // CHECK: [[alloca0:%.+]] = llvm.alloca [[c1]] x i1
     // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
     // CHECK: [[alloca1:%.+]] = llvm.alloca [[c1]] x !llvm.ptr
     // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
     // CHECK: [[mod:%.+]] = llvm.alloca [[c1]] x !llvm.struct<(i1, i64, ptr, ptr)>
-    // CHECK: [[cst6:%.+]] = llvm.mlir.constant(6.0
     // CHECK: [[true:%.+]] = llvm.mlir.constant(true)
 
     // CHECK: [[offset0:%.+]] = llvm.getelementptr inbounds [[mod]][0, 0]

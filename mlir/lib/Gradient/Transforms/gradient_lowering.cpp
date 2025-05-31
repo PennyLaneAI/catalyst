@@ -59,7 +59,7 @@ struct GradientLoweringPass : impl::GradientLoweringPassBase<GradientLoweringPas
         catalyst::quantum::InsertOp::getCanonicalizationPatterns(gradientPatterns, &getContext());
         catalyst::quantum::DeallocOp::getCanonicalizationPatterns(gradientPatterns, &getContext());
 
-        if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(gradientPatterns)))) {
+        if (failed(applyPatternsGreedily(getOperation(), std::move(gradientPatterns)))) {
             return signalPassFailure();
         }
 

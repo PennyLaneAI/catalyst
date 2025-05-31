@@ -52,7 +52,7 @@ struct MergeRotationsPass : impl::MergeRotationsPassBase<MergeRotationsPass> {
                                                                  &getContext());
         catalyst::quantum::MultiRZOp::getCanonicalizationPatterns(patternsCanonicalization,
                                                                   &getContext());
-        if (failed(applyPatternsAndFoldGreedily(module, std::move(patternsCanonicalization)))) {
+        if (failed(applyPatternsGreedily(module, std::move(patternsCanonicalization)))) {
             return signalPassFailure();
         }
 
@@ -60,7 +60,7 @@ struct MergeRotationsPass : impl::MergeRotationsPassBase<MergeRotationsPass> {
         populateLoopBoundaryPatterns(patterns, 1);
         populateMergeRotationsPatterns(patterns);
 
-        if (failed(applyPatternsAndFoldGreedily(module, std::move(patterns)))) {
+        if (failed(applyPatternsGreedily(module, std::move(patterns)))) {
             return signalPassFailure();
         }
     }

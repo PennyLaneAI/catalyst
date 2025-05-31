@@ -211,10 +211,10 @@ struct AdjointOpPattern : public ConvertOpToLLVMPattern<AdjointOp> {
                 return op.emitOpError("adjoint can only return MemRef<?xf64> or tuple thereof");
         }
 
-        // The callee of the adjoint op must return as a single result the quantum register.
+        // The callee of the adjoint op must return 2 results: the quantum register and the expval.
         func::FuncOp callee =
             SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
-        assert(callee && callee.getNumResults() == 1 && "invalid qfunc symbol in adjoint op");
+        assert(callee && callee.getNumResults() == 2 && "invalid qfunc symbol in adjoint op");
 
         StringRef cacheFnName = "__catalyst__rt__toggle_recorder";
         StringRef gradFnName = "__catalyst__qis__Gradient";
@@ -319,8 +319,9 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
         LowerToLLVMOptions options = getTypeConverter()->getOptions();
         if (options.useGenericFunctions) {
             LLVM::LLVMFuncOp allocFn =
-                LLVM::lookupOrCreateGenericAllocFn(moduleOp, getTypeConverter()->getIndexType());
-            LLVM::LLVMFuncOp freeFn = LLVM::lookupOrCreateGenericFreeFn(moduleOp);
+                LLVM::lookupOrCreateGenericAllocFn(moduleOp, getTypeConverter()->getIndexType())
+                    .value();
+            LLVM::LLVMFuncOp freeFn = LLVM::lookupOrCreateGenericFreeFn(moduleOp).value();
 
             // Register the previous functions as llvm globals (for Enzyme)
             // With the following piece of metadata, shadow memory is allocated with
@@ -824,10 +825,8 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
 struct ForwardOpPattern : public ConvertOpToLLVMPattern<ForwardOp> {
     using ConvertOpToLLVMPattern::ConvertOpToLLVMPattern;
 
-    LogicalResult match(ForwardOp op) const override { return success(); }
-
-    void rewrite(ForwardOp op, OpAdaptor adaptor,
-                 ConversionPatternRewriter &rewriter) const override
+    LogicalResult matchAndRewrite(ForwardOp op, OpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
     {
         // convert all arguments to pointers...
         auto typeConverter = getTypeConverter();
@@ -865,16 +864,15 @@ struct ForwardOpPattern : public ConvertOpToLLVMPattern<ForwardOp> {
         rewriter.inlineRegionBefore(op.getRegion(), func.getBody(), func.end());
         catalyst::gradient::wrapMemRefArgsFunc(func, typeConverter, rewriter, op.getLoc());
         rewriter.eraseOp(op);
+        return success();
     }
 };
 
 struct ReverseOpPattern : public ConvertOpToLLVMPattern<ReverseOp> {
     using ConvertOpToLLVMPattern::ConvertOpToLLVMPattern;
 
-    LogicalResult match(ReverseOp op) const override { return success(); }
-
-    void rewrite(ReverseOp op, OpAdaptor adaptor,
-                 ConversionPatternRewriter &rewriter) const override
+    LogicalResult matchAndRewrite(ReverseOp op, OpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
     {
         auto argc = op.getArgc();
         auto resc = op.getResc();
@@ -991,21 +989,21 @@ struct ReverseOpPattern : public ConvertOpToLLVMPattern<ReverseOp> {
         catalyst::gradient::wrapMemRefArgsFunc(func, typeConverter, rewriter, op.getLoc());
 
         rewriter.eraseOp(op);
+        return success();
     }
 };
 
 struct ReturnOpPattern : public ConvertOpToLLVMPattern<ReturnOp> {
     using ConvertOpToLLVMPattern::ConvertOpToLLVMPattern;
 
-    LogicalResult match(ReturnOp op) const override { return success(); }
-
-    void rewrite(ReturnOp op, OpAdaptor adaptor, ConversionPatternRewriter &rewriter) const override
+    LogicalResult matchAndRewrite(ReturnOp op, OpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
     {
         auto loc = op.getLoc();
         if (op.getEmpty()) {
             auto returnOp = rewriter.create<LLVM::ReturnOp>(loc, ValueRange{});
             rewriter.replaceOp(op, returnOp);
-            return;
+            return success();
         }
 
         auto tape = adaptor.getTape();
@@ -1016,7 +1014,7 @@ struct ReturnOpPattern : public ConvertOpToLLVMPattern<ReturnOp> {
             Value nullPtr = rewriter.create<LLVM::ZeroOp>(loc, ptrType);
             auto returnOp = rewriter.create<LLVM::ReturnOp>(loc, nullPtr);
             rewriter.replaceOp(op, returnOp);
-            return;
+            return success();
         }
 
         SmallVector<Value> tapeStructVals(tape);
@@ -1035,6 +1033,7 @@ struct ReturnOpPattern : public ConvertOpToLLVMPattern<ReturnOp> {
 
         auto returnOp = rewriter.create<LLVM::ReturnOp>(loc, result);
         rewriter.replaceOp(op, returnOp);
+        return success();
     }
 };
 

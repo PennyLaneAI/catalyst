@@ -65,7 +65,7 @@ struct CliffordTToPPMPass : public impl::CliffordTToPPMPassBase<CliffordTToPPMPa
             RewritePatternSet patterns(ctx);
             populateCommuteCliffordTPPRPatterns(patterns, max_pauli_size);
 
-            if (failed(applyPatternsAndFoldGreedily(module, std::move(patterns)))) {
+            if (failed(applyPatternsGreedily(module, std::move(patterns)))) {
                 return signalPassFailure();
             }
         }
@@ -75,7 +75,7 @@ struct CliffordTToPPMPass : public impl::CliffordTToPPMPassBase<CliffordTToPPMPa
             RewritePatternSet patterns(ctx);
             populateCommuteCliffordPastPPMPatterns(patterns, max_pauli_size);
 
-            if (failed(applyPatternsAndFoldGreedily(module, std::move(patterns)))) {
+            if (failed(applyPatternsGreedily(module, std::move(patterns)))) {
                 return signalPassFailure();
             }
         }
@@ -85,7 +85,7 @@ struct CliffordTToPPMPass : public impl::CliffordTToPPMPassBase<CliffordTToPPMPa
             RewritePatternSet patterns(ctx);
             populateDecomposeNonCliffordPPRPatterns(patterns, decomposeMethod, avoidYMeasure);
 
-            if (failed(applyPatternsAndFoldGreedily(module, std::move(patterns)))) {
+            if (failed(applyPatternsGreedily(module, std::move(patterns)))) {
                 return signalPassFailure();
             }
         }
@@ -95,7 +95,7 @@ struct CliffordTToPPMPass : public impl::CliffordTToPPMPassBase<CliffordTToPPMPa
             RewritePatternSet patterns(ctx);
             populateDecomposeCliffordPPRPatterns(patterns, avoidYMeasure);
 
-            if (failed(applyPatternsAndFoldGreedily(module, std::move(patterns)))) {
+            if (failed(applyPatternsGreedily(module, std::move(patterns)))) {
                 return signalPassFailure();
             }
         }

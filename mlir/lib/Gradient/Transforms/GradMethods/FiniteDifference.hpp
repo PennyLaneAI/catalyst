@@ -29,8 +29,7 @@ namespace gradient {
 struct FiniteDiffLowering : public OpRewritePattern<GradOp> {
     using OpRewritePattern<GradOp>::OpRewritePattern;
 
-    LogicalResult match(GradOp op) const override;
-    void rewrite(GradOp op, PatternRewriter &rewriter) const override;
+    LogicalResult matchAndRewrite(GradOp op, PatternRewriter &rewriter) const override;
 
   private:
     static void computeFiniteDiff(PatternRewriter &rewriter, Location loc, func::FuncOp gradFn,

@@ -95,10 +95,23 @@ mhlo: TARGET_FILE := $(MK_DIR)/mlir-hlo/mhlo/transforms/CMakeLists.txt
 mhlo: PATCH_FILE := $(MK_DIR)/patches/mhlo-Add-PassesIncGen-in-transforms-CMakeList.patch
 mhlo:
 	@echo "build MLIR-HLO"
+	# Clean mhlo submodule for git patches
+	make clean-mhlo
+
 	# Patch MHLO cmake dependency
 	# TODO: remove once https://github.com/openxla/xla/pull/15446 is merged
 	@if patch --dry-run -p1 -N $(TARGET_FILE) $(PATCH_FILE) > /dev/null 2>&1; then \
 		patch -p1 $(TARGET_FILE) $(PATCH_FILE); \
+	fi
+
+	# Patch MHLO shardy dependency
+	@if cd mlir-hlo; git apply --summary $(MK_DIR)/patches/mhlo-remove-shardy.patch; then \
+		git apply $(MK_DIR)/patches/mhlo-remove-shardy.patch; \
+	fi
+
+	# Patch MHLO passes removed from upstream
+	@if cd mlir-hlo; git apply --summary $(MK_DIR)/patches/mhlo-add-back-necessary-passes.patch; then \
+		git apply $(MK_DIR)/patches/mhlo-add-back-necessary-passes.patch; \
 	fi
 	cmake -G Ninja -S mlir-hlo -B $(MHLO_BUILD_DIR) \
 		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
@@ -119,8 +132,14 @@ mhlo:
 	LIT_FILTER_OUT="chlo_legalize_to_mhlo" cmake --build $(MHLO_BUILD_DIR) --target check-mlir-hlo
 
 .PHONY: enzyme
+enzyme: TARGET_FILE := $(MK_DIR)/Enzyme/enzyme/Enzyme/TypeAnalysis/TypeAnalysis.cpp
+enzyme: PATCH_FILE := $(MK_DIR)/patches/enzyme-nvvm-fabs-intrinsics.patch
 enzyme:
 	@echo "build enzyme"
+	# Patch enzyme's dependency on nvidia fabs llvm intrinsics
+	@if patch --dry-run -p1 -N $(TARGET_FILE) $(PATCH_FILE) > /dev/null 2>&1; then \
+		patch -p1 $(TARGET_FILE) $(PATCH_FILE); \
+	fi
 	cmake -G Ninja -S Enzyme/enzyme -B $(ENZYME_BUILD_DIR) \
 		-DENZYME_STATIC_LIB=ON \
 		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
@@ -133,7 +152,7 @@ enzyme:
 		-DCMAKE_CXX_VISIBILITY_PRESET=$(SYMBOL_VISIBILITY) \
 		-DCMAKE_POLICY_DEFAULT_CMP0116=NEW
 
-	cmake --build $(ENZYME_BUILD_DIR) --target EnzymeStatic-20
+	cmake --build $(ENZYME_BUILD_DIR) --target EnzymeStatic-21
 
 .PHONY: plugin
 plugin:
@@ -204,6 +223,7 @@ clean-llvm:
 clean-mhlo:
 	@echo "clean HLO dialect build files"
 	rm -rf $(MHLO_BUILD_DIR)
+	cd mlir-hlo; git clean -fd; git checkout .;\
 
 clean-enzyme:
 	@echo "clean enzyme build files"

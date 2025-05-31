@@ -97,7 +97,8 @@ LogicalResult JVPLoweringPattern::matchAndRewrite(JVPOp op, PatternRewriter &rew
 
     auto gradOp = rewriter.create<GradOp>(loc, grad_result_types, op.getMethod(), op.getCallee(),
                                           calleeOperands, op.getDiffArgIndicesAttr(),
-                                          op.getFiniteDiffParamAttr());
+                                          op.getFiniteDiffParamAttr(), /*arg_attrs=*/nullptr,
+                                          /*res_attrs=*/nullptr);
 
     std::vector<Value> einsumResults;
     for (size_t nout = 0; nout < funcResultTypes.size(); nout++) {
@@ -219,7 +220,8 @@ LogicalResult VJPLoweringPattern::matchAndRewrite(VJPOp op, PatternRewriter &rew
 
     auto gradOp = rewriter.create<GradOp>(loc, grad_result_types, op.getMethod(), op.getCallee(),
                                           calleeOperands, op.getDiffArgIndicesAttr(),
-                                          op.getFiniteDiffParamAttr());
+                                          op.getFiniteDiffParamAttr(), /*arg_attrs=*/nullptr,
+                                          /*res_attrs=*/nullptr);
 
     std::vector<Value> einsumResults;
     for (size_t nparam = 0; nparam < func_diff_operand_indices.size(); nparam++) {
