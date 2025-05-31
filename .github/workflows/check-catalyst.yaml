@@ -21,7 +21,7 @@ jobs:
     name: Determine runner type to use
     uses: ./.github/workflows/determine-workflow-runner.yml
     with:
-      default_runner: ubuntu-22.04
+      default_runner: ubuntu-24.04
 
   constants:
     name: "Set build matrix"
@@ -140,13 +140,19 @@ jobs:
         path: llvm-build
         key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-ci-build-${{ matrix.compiler }}
 
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.10"
+
     - name: Install Deps
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
       run: |
         sudo apt-get update
-        sudo apt-get install -y python3 python3-pip cmake ninja-build clang lld
-        python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
+        sudo apt-get install -y python cmake ninja-build clang lld
+        python3 --version
         python3 -m pip install numpy pybind11
+
 
     - name: Build LLVM
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
@@ -159,6 +165,8 @@ jobs:
         CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \
         COMPILER_LAUNCHER="" \
+        PYTHON3_EXECUTABLE=$(which python3) \
+        Python3_NumPy_INCLUDE_DIRS=$$($(PYTHON) -c "import numpy as np; print(np.get_include())") \
         make llvm
 
   mhlo:
@@ -305,6 +313,8 @@ jobs:
     name: Quantum Dialects Build
     needs: [constants, llvm, mhlo, enzyme, determine_runner]
     runs-on: ${{ needs.determine_runner.outputs.runner_group }}
+    env:
+      ACTIONS_STEP_DEBUG: true
     strategy:
       matrix:
         compiler: ${{ fromJson(needs.constants.outputs.compilers) }}
@@ -316,9 +326,9 @@ jobs:
     - name: Install Deps
       run: |
         sudo apt-get update
-        sudo apt-get install -y python3 python3-pip cmake ninja-build ccache clang lld
-        python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
-        python3 -m pip install numpy nanobind pybind11
+        sudo apt-get install -y python3 python3-dev python3-pip cmake ninja-build ccache clang lld
+        python3 --version
+        python3 -m pip install numpy nanobind pybind11 lit
 
     - name: Get Cached LLVM Source
       id: cache-llvm-source
@@ -432,17 +442,22 @@ jobs:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
 
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.10"
+
     - name: Install Deps
       run: |
         sudo apt-get update
         sudo apt-get install -y python3 python3-pip libomp-dev libasan6 make ninja-build
-        python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
+        python3 --version 
         python3 -m pip install -r requirements.txt
         # cuda-quantum is added manually here.
         # It can't be in requirements.txt as that will break
         # macOS requirements.txt
         python3 -m pip install cuda-quantum==0.6.0
-        python3 -m pip install oqc-qcaas-client
+        python3 -m pip install oqc-qcaas-client lit
         make frontend
 
     - name: Get Cached LLVM Build
@@ -484,6 +499,9 @@ jobs:
 
     - name: Run Python Lit Tests
       run: |
+        # echo $PYTHONPATH
+        python --version
+        export PYTHONPATH=$PYTHONPATH:$(python3 -c "import site; print(site.getsitepackages()[0])")
         llvm-lit -sv frontend/test/lit -j$(nproc)
 
     - name: Run Python Pytest Tests
@@ -519,7 +537,7 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y python3 python3-pip libomp-dev libasan6 make ninja-build
-        python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
+        python3 --version
         python3 -m pip install -r requirements.txt
         make frontend
 
@@ -576,7 +594,7 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y python3 python3-pip libomp-dev libasan6 make ninja-build
-        python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
+        python3 --version
         python3 -m pip install -r requirements.txt
         make frontend
 
@@ -649,15 +667,26 @@ jobs:
       - name: Checkout the repo
         uses: actions/checkout@v4
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get -y -q install cmake ninja-build lcov
+          sudo apt-get -y -q install cmake ninja-build 
           python3 -m pip install nanobind pybind11
+
+      - name: Install lcov # Manually install lcov 1.14 (lcov_1.15-1_all.deb)
+        run: |
+          wget http://archive.ubuntu.com/ubuntu/pool/universe/l/lcov/lcov_1.15-1_all.deb
+          sudo apt-get install -y ./lcov_1.15-1_all.deb
+          lcov --version 
 
       - name: Install additional dependencies for OpenQasm device
         run: |
-          pip install numpy pybind11 amazon-braket-sdk
+          pip install numpy pybind11 amazon-braket-sdk PyYAML
           echo "AWS_DEFAULT_REGION=us-east-1" >> $GITHUB_ENV
 
       - name: Get Cached LLVM Source
