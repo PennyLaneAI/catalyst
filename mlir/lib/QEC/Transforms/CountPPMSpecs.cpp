@@ -45,29 +45,7 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
 
     void runOnOperation() final
     {
-        auto ctx = &getContext();
-        auto module = getOperation();
-
-        // Phase 1: Convert Clifford+T to PPR representation
-        {
-            ConversionTarget target(*ctx);
-            target.addIllegalDialect<quantum::QuantumDialect>();
-            target.addLegalOp<quantum::InitializeOp, quantum::FinalizeOp>();
-            target.addLegalOp<quantum::DeviceInitOp, quantum::DeviceReleaseOp>();
-            target.addLegalOp<quantum::AllocOp, quantum::DeallocOp>();
-            target.addLegalOp<quantum::InsertOp, quantum::ExtractOp>();
-            target.addLegalDialect<qec::QECDialect>();
-
-            RewritePatternSet patterns(ctx);
-            populateCliffordTToPPRPatterns(patterns);
-
-            if (failed(applyPartialConversion(module, target, std::move(patterns)))) {
-                return signalPassFailure();
-            }
-            else {
-                llvm::outs() << "TEST for Count PPM Specs\n";
-            }
-        }
+        llvm::outs() << "TEST for Count PPM Specs\n";
     }
 };
 

@@ -50,7 +50,6 @@ struct CliffordTToPPRPass : impl::CliffordTToPPRPassBase<CliffordTToPPRPass> {
 
         RewritePatternSet patterns(ctx);
         populateCliffordTToPPRPatterns(patterns);
-        llvm::outs() << "TEST\n";
 
         if (failed(applyPartialConversion(getOperation(), target, std::move(patterns)))) {
             return signalPassFailure();

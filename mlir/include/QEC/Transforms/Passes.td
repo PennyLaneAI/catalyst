@@ -121,7 +121,7 @@ def CliffordTToPPMPass : Pass<"ppm_compilation"> {
     let options = [MaxPauliSizeOption, DecomposeMethodOption, AvoidYMeasureOption];
 }
 
-def createCountPPMSpecsPass : Pass<"ppm_specs"> {
+def CountPPMSpecsPass : Pass<"ppm_specs"> {
     let summary = "Count specs in Pauli Product Measurement operations.";
     
     let dependentDialects = [
