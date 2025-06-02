@@ -91,16 +91,8 @@ llvm:
 	LIT_FILTER_OUT="Bytecode|tosa-to-tensor|execution_engine" cmake --build $(LLVM_BUILD_DIR) --target $(LLVM_TARGETS)
 
 .PHONY: mhlo
-mhlo: TARGET_FILE := $(MK_DIR)/mlir-hlo/mhlo/transforms/CMakeLists.txt
-mhlo: PATCH_FILE := $(MK_DIR)/patches/mhlo-Add-PassesIncGen-in-transforms-CMakeList.patch
 mhlo:
 	@echo "build MLIR-HLO"
-
-	# Patch MHLO cmake dependency
-	# TODO: remove once https://github.com/openxla/xla/pull/15446 is merged
-	@if patch --dry-run -p1 -N $(TARGET_FILE) $(PATCH_FILE) > /dev/null 2>&1; then \
-		patch -p1 $(TARGET_FILE) $(PATCH_FILE); \
-	fi
 
 	# Patch MHLO shardy dependency
 	@if cd mlir-hlo; git apply --check $(MK_DIR)/patches/mhlo-remove-shardy.patch; then \
