@@ -43,13 +43,14 @@ jobs:
       - name: Checkout Catalyst repo
         uses: actions/checkout@v4
       
-      - name: Set up Python
+      - name: Set up Python # Ensure python3.10 is used
         uses: actions/setup-python@v5
         with:
           python-version: "3.10"
 
       - name: Install dependencies
         run: |
+          python3 --version
           sudo apt-get update
           sudo apt-get -y -q install ninja-build make cmake clang libomp-dev
           python3 -m pip install nanobind pybind11
@@ -145,7 +146,7 @@ jobs:
         path: llvm-build
         key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-ci-build-${{ matrix.compiler }}
 
-    - name: Set up Python
+    - name: Set up Python # Ensure python3.10 is used
       uses: actions/setup-python@v5
       with:
         python-version: "3.10"
@@ -153,6 +154,7 @@ jobs:
     - name: Install Deps
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
       run: |
+        python3 --version
         sudo apt-get update
         sudo apt-get install -y python cmake ninja-build clang lld
         python3 --version
@@ -185,6 +187,11 @@ jobs:
     steps:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
+    
+    - name: Set up Python # Ensure python3.10 is used
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.10"
 
     - name: Cache MHLO Source
       id: cache-mhlo-source
@@ -231,6 +238,7 @@ jobs:
     - name: Install Deps
       if: steps.cache-mhlo.outputs.cache-hit != 'true'
       run: |
+        python3 --version
         sudo apt-get update
         sudo apt-get install -y cmake ninja-build clang lld
 
@@ -255,6 +263,11 @@ jobs:
     steps:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
+
+    - name: Set up Python # Ensure python3.10 is used
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.10"
 
     - name: Cache Enzyme Source
       id: cache-enzyme-source
@@ -301,6 +314,7 @@ jobs:
     - name: Install Deps
       if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
       run: |
+        python3 --version
         sudo apt-get update
         sudo apt-get install -y cmake ninja-build clang lld
 
@@ -327,6 +341,11 @@ jobs:
     steps:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
+
+    - name: Set up Python # Ensure python3.10 is used
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.10"
 
     - name: Install Deps
       run: |
@@ -447,7 +466,7 @@ jobs:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
 
-    - name: Set up Python
+    - name: Set up Python # Ensure python3.10 is used
       uses: actions/setup-python@v5
       with:
         python-version: "3.10"
@@ -538,6 +557,11 @@ jobs:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
 
+    - name: Set up Python # Ensure python3.10 is used
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.10"
+
     - name: Install Deps
       run: |
         sudo apt-get update
@@ -589,6 +613,11 @@ jobs:
     steps:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
+
+    - name: Set up Python # Ensure python3.10 is used
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.10"
 
     - name: Install device dependencies (OpenQasm device)
       run: |
@@ -644,6 +673,11 @@ jobs:
       - name: Checkout the repo
         uses: actions/checkout@v4
 
+      - name: Set up Python # Ensure python3.10 is used
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
       - name: Install dependencies
         run: |
           sudo apt-get update
@@ -672,7 +706,7 @@ jobs:
       - name: Checkout the repo
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Set up Python # Ensure python3.10 is used
         uses: actions/setup-python@v5
         with:
           python-version: "3.10"
