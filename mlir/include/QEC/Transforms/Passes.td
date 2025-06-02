@@ -109,4 +109,16 @@ def DecomposeCliffordPPRPass : Pass<"decompose_clifford_ppr"> {
     let constructor = "catalyst::createDecomposeCliffordPPRPass()";
 }
 
+def CliffordTToPPMPass : Pass<"ppm_compilation"> {
+    let summary = "Convert CliffordT operations to Pauli Product Measurement operations.";
+    
+    let dependentDialects = [
+        "catalyst::qec::QECDialect",
+    ];
+
+    let constructor = "catalyst::createCliffordTToPPMPass()";
+
+    let options = [MaxPauliSizeOption, DecomposeMethodOption, AvoidYMeasureOption];
+}
+
 #endif // QEC_PASSES

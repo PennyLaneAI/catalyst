@@ -54,11 +54,7 @@ def MeasurementPlaneAttr : EnumAttr<MBQC_Dialect, MeasurementPlane, "measurement
 // MBQC dialect operations.
 //===----------------------------------------------------------------------===//
 
-def MeasureInBasisOp : MBQC_Op<"measure_in_basis",
-    // Measurement both read and write since it collapses states
-    // In fact, MBQC's entire point is to alter the state via measurement.
-    [MemoryEffects<[MemRead<QuantumMemory>, MemWrite<QuantumMemory>]>]
-    > {
+def MeasureInBasisOp : MBQC_Op<"measure_in_basis"> {
     let summary = "A parametric single-qubit projective measurement in an arbitrary basis.";
     let description = [{
         A parametric single-qubit projective measurement is equivalent to the `quantum.measure`

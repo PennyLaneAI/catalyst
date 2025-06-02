@@ -23,6 +23,20 @@
   * `decompose_non_clifford_ppr`: Decompose non-Cliford PPR (:math:`\theta = \tfrac{\pi}{8}`)
   into PPMs using a magic state.
 
+* A new compilation pass called :func:`~.passes.ppm_compilation` has been added to Catalyst to 
+  transform Clifford+T gates into Pauli Product Measurements (PPMs). This high-level pass simplifies
+  circuit transformation and optimization by combining multiple sub-passes into a single step.
+  [(#1750)](https://github.com/PennyLaneAI/catalyst/pull/1750)
+  
+  The sub-passes that make up the :func:`~.passes.ppm_compilation` pass are:
+  * :func:`~.passes.to_ppr`: Converts gates into Pauli Product Rotations (PPRs).
+  * :func:`~.passes.commute_ppr`: Commutes PPRs past non-Clifford PPRs.
+  * :func:`~.passes.merge_ppr_ppm`: Merges Clifford PPRs into PPMs.
+  * :func:`~.passes.ppr_to_ppm`: Decomposes non-Clifford and Clifford PPRs into PPMs.
+
+  Use this pass via the :func:`~.passes.ppm_compilation` decorator to compile circuits 
+  in a single pipeline.
+
 * Support for :class:`qml.Snapshot <pennylane.Snapshot>` to capture quantum states at any 
   point in a circuit has been added to Catalyst [(#1741)](https://github.com/PennyLaneAI/catalyst/pull/1741).
   For example, the code below is capturing 
@@ -59,7 +73,6 @@
   Array([0.5+0.j, 0.5+0.j, 0.5+0.j, 0.5+0.j], dtype=complex128)], 
   Array([0.25, 0.25, 0.25, 0.25], dtype=float64))
   ```
-
 
 <h3>Improvements 🛠</h3>
 
@@ -106,12 +119,12 @@
   deallocation primitive has been split into deallocation and a separate device release primitive.
   [(#1720)](https://github.com/PennyLaneAI/catalyst/pull/1720)
 
-  * `qunitary_p` is now `unitary_p` (unchanged)
-  * `qmeasure_p` is now `measure_p` (unchanged)
-  * `qdevice_p` is now `device_init_p` (unchanged)
-  * `qdealloc_p` no longer releases the device, thus it can be used at any point of a quantum
+  - `qunitary_p` is now `unitary_p` (unchanged)
+  - `qmeasure_p` is now `measure_p` (unchanged)
+  - `qdevice_p` is now `device_init_p` (unchanged)
+  - `qdealloc_p` no longer releases the device, thus it can be used at any point of a quantum
      execution scope
-  * `device_release_p` is a new primitive that must be used to mark the end of a quantum execution
+  - `device_release_p` is a new primitive that must be used to mark the end of a quantum execution
      scope, which will release the quantum device
 
 * Catalyst has removed the `experimental_capture` keyword from the `qjit` decorator in favour of
@@ -150,19 +163,20 @@
   [(#1729)](https://github.com/PennyLaneAI/catalyst/pull/1729)
 
   Several internal changes were made for this update.
-  * LAPACK kernels are updated to adhere to the new JAX lowering rules for external functions.
+    - LAPACK kernels are updated to adhere to the new JAX lowering rules for external functions.
     [(#1685)](https://github.com/PennyLaneAI/catalyst/pull/1685)
 
-  * The trace stack is removed and replaced with a tracing context manager.
+    - The trace stack is removed and replaced with a tracing context manager.
     [(#1662)](https://github.com/PennyLaneAI/catalyst/pull/1662)
 
-  * A new `debug_info` argument is added to `Jaxpr`, the `make_jaxpr`
+    - A new `debug_info` argument is added to `Jaxpr`, the `make_jaxpr`
     functions, and `jax.extend.linear_util.wrap_init`.
     [(#1670)](https://github.com/PennyLaneAI/catalyst/pull/1670)
     [(#1671)](https://github.com/PennyLaneAI/catalyst/pull/1671)
     [(#1681)](https://github.com/PennyLaneAI/catalyst/pull/1681)
 
-* The version of LLVM, MHLO and Enzyme used by Catalyst is updated to track those in jax 0.6.0.
+* (Compiler developers only) The version of LLVM, MHLO and Enzyme used by Catalyst is
+  updated to track those in jax 0.6.0.
   [(#1752)](https://github.com/PennyLaneAI/catalyst/pull/1752)
 
   The LLVM version is updated to commit 179d30f8c3fddd3c85056fd2b8e877a4a8513158.
