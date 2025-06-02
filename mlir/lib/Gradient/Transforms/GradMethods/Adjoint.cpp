@@ -66,12 +66,12 @@ func::FuncOp AdjointLowering::discardAndReturnReg(PatternRewriter &rewriter, Loc
     SmallVector<quantum::DeviceReleaseOp> deviceReleaseOps;
     for (Operation &op : callee.getBody().getOps()) {
         if (isa<quantum::DeallocOp>(op)) {
-            deallocs.push_back(dyn_cast<quantum::DeallocOp>(op));
+            deallocs.push_back(cast<quantum::DeallocOp>(op));
             continue;
         }
         else if (isa<quantum::MeasurementProcess>(op)) {
             if (isa<quantum::ExpvalOp>(op)) {
-                expvalOps.push_back(dyn_cast<quantum::ExpvalOp>(op));
+                expvalOps.push_back(cast<quantum::ExpvalOp>(op));
                 continue;
             }
             else {
@@ -79,7 +79,7 @@ func::FuncOp AdjointLowering::discardAndReturnReg(PatternRewriter &rewriter, Loc
             }
         }
         else if (isa<quantum::DeviceReleaseOp>(op)) {
-            deviceReleaseOps.push_back(dyn_cast<quantum::DeviceReleaseOp>(op));
+            deviceReleaseOps.push_back(cast<quantum::DeviceReleaseOp>(op));
         }
     }
 
