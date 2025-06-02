@@ -397,7 +397,7 @@ the ``@qjit`` decorator. Enabling this option signals to the compiler to wait fo
 after launching the compiler process. Some notes about use of this support:
 
 * This functionality requires building Catalyst with debug symbols. This can be achieved via
-  ``make all BUILD_TYPE="RelWithDebInfo"``. The debug symbols are only within available
+  ``make all BUILD_TYPE="RelWithDebInfo"``. The debug symbols are only available
   within the Catalyst-owned targets. 
 To enable debugging of LLVM and other associated external libraries and binaries, ensure the 
   ``BUILD_TYPE_EXT="RelWithDebInfo"`` option is also set.
