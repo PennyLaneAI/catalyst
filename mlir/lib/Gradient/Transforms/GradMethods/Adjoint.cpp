@@ -91,10 +91,10 @@ func::FuncOp AdjointLowering::discardAndReturnReg(PatternRewriter &rewriter, Loc
         unallocFn =
             rewriter.create<func::FuncOp>(loc, fnName, fnType, visibility, nullptr, nullptr);
         // Clone the body.
-        // TODO: we do not support submodules, i.e. our gradient functions
+        // TODO: we do not support subroutines, i.e. our gradient functions
         // will have just one block.
         assert(callee.getBody().hasOneBlock() &&
-               "Gradients with quantum submodules are not supported");
+               "Gradients with quantum subroutines are not supported");
         rewriter.cloneRegionBefore(callee.getBody(), unallocFn.getBody(), unallocFn.end());
         rewriter.setInsertionPointToStart(&unallocFn.getBody().front());
 
