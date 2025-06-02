@@ -400,7 +400,7 @@ after launching the compiler process. Some notes about use of this support:
   ``make all BUILD_TYPE="RelWithDebInfo"``. The debug symbols are only available
   within the Catalyst-owned targets. 
 To enable debugging of LLVM and other associated external libraries and binaries, ensure the 
-  ``BUILD_TYPE_EXT="RelWithDebInfo"`` option is also set.
+  ``BUILD_TYPE_EXT="RelWithDebInfo"`` option is also set when building Catalyst.
 * Launching the C++ debugger requires attaching to a running process. This often requires ``sudo`` privileges on the 
   running system.
 * The spawned compiler subprocess immediately issues a ``SIGSTOP`` signal to avoid execution of the compiler. To 
