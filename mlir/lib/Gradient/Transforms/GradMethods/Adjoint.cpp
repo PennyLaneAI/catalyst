@@ -50,9 +50,37 @@ LogicalResult AdjointLowering::matchAndRewrite(func::FuncOp op, PatternRewriter 
 func::FuncOp AdjointLowering::discardAndReturnReg(PatternRewriter &rewriter, Location loc,
                                                   func::FuncOp callee)
 {
+    // TODO: we do not support subroutines, i.e. our gradient functions
+    // will have just one block.
+    assert(callee.getBody().hasOneBlock() &&
+           "Gradients with quantum subroutines are not supported");
+
+    // Since the return value is guaranteed to be discarded, then let's change the return type
+    // to be only the quantum register and the expval.
+    //
+    // We also need to return the expval to avoid dead code elimination downstream from
+    // removing the expval op in the body.
+    // TODO: we only support grad on expval op for now
     SmallVector<quantum::DeallocOp> deallocs;
-    for (auto op : callee.getOps<quantum::DeallocOp>()) {
-        deallocs.push_back(op);
+    SmallVector<quantum::ExpvalOp> expvalOps;
+    SmallVector<quantum::DeviceReleaseOp> deviceReleaseOps;
+    for (Operation &op : callee.getBody().getOps()) {
+        if (isa<quantum::DeallocOp>(op)) {
+            deallocs.push_back(dyn_cast<quantum::DeallocOp>(op));
+            continue;
+        }
+        else if (isa<quantum::MeasurementProcess>(op)) {
+            if (isa<quantum::ExpvalOp>(op)) {
+                expvalOps.push_back(dyn_cast<quantum::ExpvalOp>(op));
+                continue;
+            }
+            else {
+                callee.emitOpError() << "Adjoint gradient is only supported on expval measurements";
+            }
+        }
+        else if (isa<quantum::DeviceReleaseOp>(op)) {
+            deviceReleaseOps.push_back(dyn_cast<quantum::DeviceReleaseOp>(op));
+        }
     }
 
     // If there are no deallocs leave early then this transformation
@@ -65,16 +93,6 @@ func::FuncOp AdjointLowering::discardAndReturnReg(PatternRewriter &rewriter, Loc
         return callee;
     }
 
-    // Since the return value is guaranteed to be discarded, then let's change the return type
-    // to be only the quantum register and the expval.
-    //
-    // We also need to return the expval to avoid dead code elimination downstream from
-    // removing the expval op in the body.
-    // TODO: we only support grad on expval op for now
-    SmallVector<quantum::ExpvalOp> expvalOps;
-    for (auto op : callee.getOps<quantum::ExpvalOp>()) {
-        expvalOps.push_back(op);
-    }
     size_t numExpvals = expvalOps.size();
     if (numExpvals != 1) {
         callee.emitOpError() << "Invalid number of expval ops: " << numExpvals;
@@ -97,12 +115,8 @@ func::FuncOp AdjointLowering::discardAndReturnReg(PatternRewriter &rewriter, Loc
         rewriter.setInsertionPointAfter(callee);
         unallocFn =
             rewriter.create<func::FuncOp>(loc, fnName, fnType, visibility, nullptr, nullptr);
-        // Clone the body.
-        // TODO: we do not support subroutines, i.e. our gradient functions
-        // will have just one block.
-        assert(callee.getBody().hasOneBlock() &&
-               "Gradients with quantum subroutines are not supported");
 
+        // Clone the body.
         IRMapping mapper;
         rewriter.cloneRegionBefore(callee.getBody(), unallocFn.getBody(), unallocFn.end(), mapper);
         rewriter.setInsertionPointToStart(&unallocFn.getBody().front());
@@ -119,7 +133,7 @@ func::FuncOp AdjointLowering::discardAndReturnReg(PatternRewriter &rewriter, Loc
         returnOp->setOperands(returnVals);
 
         // Erase the device release.
-        for (auto op : callee.getOps<quantum::DeviceReleaseOp>()) {
+        for (auto op : deviceReleaseOps) {
             rewriter.eraseOp(mapper.lookup(op));
         }
 
