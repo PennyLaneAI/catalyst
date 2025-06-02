@@ -75,6 +75,8 @@ struct PrintOpInterface
 struct CustomCallOpInterface
     : public bufferization::BufferizableOpInterface::ExternalModel<CustomCallOpInterface,
                                                                    CustomCallOp> {
+    bool bufferizesToAllocation(Operation *op, Value value) const { return true; }
+
     bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
                                 const bufferization::AnalysisState &state) const
     {
@@ -249,6 +251,8 @@ void convertTypes(SmallVector<Type> inTypes, SmallVector<Type> &convertedResults
 struct CallbackCallOpInterface
     : public bufferization::BufferizableOpInterface::ExternalModel<CallbackCallOpInterface,
                                                                    CallbackCallOp> {
+    bool bufferizesToAllocation(Operation *op, Value value) const { return true; }
+
     bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
                                 const bufferization::AnalysisState &state) const
     {
