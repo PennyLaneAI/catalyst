@@ -126,7 +126,9 @@ func::FuncOp AdjointLowering::discardAndReturnReg(PatternRewriter &rewriter, Loc
 
         // Create the return
         // Again, assume just one block for now
-        (*unallocFn.getOps<func::ReturnOp>().begin())->setOperands(returnVals);
+        Operation *returnOp = unallocFn.getBody().front().getTerminator();
+        assert(isa<func::ReturnOp>(returnOp) && "adjoint block must terminate with return op");
+        returnOp->setOperands(returnVals);
 
         // Let's erase the deallocation.
         rewriter.eraseOp(localDealloc);
