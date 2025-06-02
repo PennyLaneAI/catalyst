@@ -153,8 +153,14 @@ def _qbit_lowering(aval):
 class AbstractQreg(AbstractValue):
     """Abstract quantum register."""
 
-    def _add(self, left, right):
-        return AbstractQreg()
+    hash_value = hash("AbstractQreg")
+
+    def __eq__(self, other):
+        return isinstance(other, AbstractQreg)
+
+    def __hash__(self):
+        return self.hash_value
+
 
 class ConcreteQreg:
     """Concrete quantum register."""
