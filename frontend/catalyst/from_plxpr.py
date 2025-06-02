@@ -68,6 +68,7 @@ from catalyst.jax_primitives import (
     qinsert_p,
     qinst_p,
     quantum_kernel_p,
+    quantum_subroutine_p,
     sample_p,
     set_basis_state_p,
     set_state_p,
@@ -424,6 +425,50 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
 
         return shots.total_shots if shots else 0
 
+
+
+@QFuncPlxprInterpreter.register_primitive(quantum_subroutine_p)
+def handle_subroutine(self, *args, **kwargs):
+    # We need to pass the wire as an argument...
+    # And we somehow need to start another interpreter
+    # but only in case it is not yet already available...
+    from jax.experimental.pjit import pjit_p
+    from catalyst.jax_primitives import AbstractQreg
+    from jax._src.core import jaxpr_as_fun
+
+    backup = {orig_wire: wire for orig_wire, wire in self.wire_map.items()}
+    self.actualize_qreg()
+
+    def wrapper(qreg, *args):
+        retval = jaxpr_as_fun(kwargs["jaxpr"], *args)()
+        return qreg, retval
+
+    jaxpr = jax.make_jaxpr(wrapper)(AbstractQreg(), *args)
+    # So, what I need to do here is transform this jaxpr
+    # With `from_plxpr` to but we need to make sure that
+    # the first argument is treated as the qreg...
+
+
+    vals_out = quantum_subroutine_p.bind(self.qreg, *args,
+                jaxpr=jaxpr,
+                in_shardings=kwargs["in_shardings"],
+                out_shardings=kwargs["out_shardings"],
+                in_layouts=kwargs["in_layouts"],
+                out_layouts=kwargs["out_layouts"],
+                donated_invars=kwargs["donated_invars"],
+                ctx_mesh=kwargs["ctx_mesh"],
+                name=kwargs["name"],
+                keep_unused=kwargs["keep_unused"],
+                inline=kwargs["inline"],
+                compiler_options_kvs=kwargs["compiler_options_kvs"])
+
+    self.qjit = vals_out[0]
+    vals_out = vals_out[1:]
+
+    for orig_wire, _ in backup:
+        self.wire_map[orig_wire] = qextract_p.bind(self.qreg, orig_wire)
+
+    return vals_out
 
 @QFuncPlxprInterpreter.register_primitive(qml.QubitUnitary._primitive)
 def handle_qubit_unitary(self, *invals, n_wires):
