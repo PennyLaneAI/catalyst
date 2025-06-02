@@ -175,13 +175,13 @@
     [(#1671)](https://github.com/PennyLaneAI/catalyst/pull/1671)
     [(#1681)](https://github.com/PennyLaneAI/catalyst/pull/1681)
 
-* (Compiler developers only) The version of LLVM, MHLO and Enzyme used by Catalyst is
+* (Compiler developers only) The version of LLVM, mlir-hlo and Enzyme used by Catalyst is
   updated to track those in jax 0.6.0.
   [(#1752)](https://github.com/PennyLaneAI/catalyst/pull/1752)
 
-  The LLVM version is updated to commit 179d30f8c3fddd3c85056fd2b8e877a4a8513158.
-  The MHLO version is updated to commit 617a9361d186199480c080c9e8c474a5e30c22d1.
-  The Enzyme version is updated to v0.0.180.
+  The LLVM version is updated to [commit 179d30f8c3fddd3c85056fd2b8e877a4a8513158](https://github.com/llvm/llvm-project/tree/179d30f8c3fddd3c85056fd2b8e877a4a8513158).
+  The mlir-hlo version is updated to [commit 617a9361d186199480c080c9e8c474a5e30c22d1](https://github.com/tensorflow/mlir-hlo/tree/617a9361d186199480c080c9e8c474a5e30c22d1).
+  The Enzyme version is updated to [v0.0.180](https://github.com/EnzymeAD/Enzyme/releases/tag/v0.0.180).
 
 * The clang-format and clang-tidy versions used by Catalyst have been updated to v20.
   [(#1721)](https://github.com/PennyLaneAI/catalyst/pull/1721)
