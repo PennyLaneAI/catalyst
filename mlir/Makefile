@@ -206,7 +206,7 @@ clean-llvm:
 clean-mhlo:
 	@echo "clean HLO dialect build files"
 	rm -rf $(MHLO_BUILD_DIR)
-	cd mlir-hlo; git clean -fd; git checkout .; \
+	cd mlir-hlo; git clean -fd; git checkout .
 
 clean-enzyme:
 	@echo "clean enzyme build files"
