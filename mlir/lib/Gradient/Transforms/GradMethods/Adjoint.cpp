@@ -94,17 +94,19 @@ func::FuncOp AdjointLowering::discardAndReturnReg(PatternRewriter &rewriter, Loc
         return callee;
     }
 
-    size_t numExpvals = expvalOps.size();
-    if (numExpvals != 1) {
-        callee.emitOpError() << "Invalid number of expval ops: " << numExpvals;
+    size_t numDeviceReleases = deviceReleaseOps.size();
+    if (numDeviceReleases > 1) {
+        callee.emitOpError() << "Invalid number of device release ops: " << numDeviceReleases;
         return callee;
     }
 
-    // Create clone, return type is qreg and float for the (unique) expval
+    // Create clone, return type is qreg and float for the expvals
     std::string fnName = callee.getName().str() + ".nodealloc";
     Type qregType = quantum::QuregType::get(rewriter.getContext());
     Type f64Type = rewriter.getF64Type();
-    SmallVector<Type> retTypes{qregType, f64Type};
+    SmallVector<Type> retTypes{qregType};
+    std::for_each(expvalOps.begin(), expvalOps.end(),
+                  [&](const quantum::ExpvalOp &) { retTypes.push_back(f64Type); });
     FunctionType fnType = rewriter.getFunctionType(callee.getArgumentTypes(), retTypes);
     StringAttr visibility = rewriter.getStringAttr("private");
 
@@ -124,8 +126,10 @@ func::FuncOp AdjointLowering::discardAndReturnReg(PatternRewriter &rewriter, Loc
 
         // Let's return the qreg+expval and erase the device release.
         // Fine for now: only one block in body so only one dealloc and one expval
-        SmallVector<Value> returnVals{mapper.lookup(deallocs[0])->getOperand(0),
-                                      mapper.lookup(expvalOps[0])};
+        SmallVector<Value> returnVals{mapper.lookup(deallocs[0])->getOperand(0)};
+        std::for_each(expvalOps.begin(), expvalOps.end(), [&](const quantum::ExpvalOp &expval) {
+            returnVals.push_back(mapper.lookup(expval));
+        });
 
         // Create the return
         // Again, assume just one block for now
