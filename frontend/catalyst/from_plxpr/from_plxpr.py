@@ -57,6 +57,7 @@ from catalyst.jax_primitives import (
     qdealloc_p,
     qinst_p,
     quantum_kernel_p,
+    quantum_subroutine_p,
     sample_p,
     set_basis_state_p,
     set_state_p,
@@ -153,6 +154,9 @@ def from_plxpr(plxpr: ClosedJaxpr) -> Callable[..., Jaxpr]:
 
     """
     return jax.make_jaxpr(partial(WorkflowInterpreter().eval, plxpr.jaxpr, plxpr.consts))
+
+def from_subroutine(jaxpr):
+    return jax.make_jaxpr(partial(SubroutineInterpreter(None, 0).eval, jaxpr.jaxpr, jaxpr.consts))
 
 
 class WorkflowInterpreter(PlxprInterpreter):
@@ -398,6 +402,61 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         """
         return self.eval(jaxpr.jaxpr, jaxpr.consts, *args)
 
+from catalyst.jax_primitives import qinsert_p
+
+@PLxPRToQuantumJaxprInterpreter.register_primitive(quantum_subroutine_p)
+def handle_subroutine(self, *args, **kwargs):
+    # We need to pass the wire as an argument...
+    # And we somehow need to start another interpreter
+    # but only in case it is not yet already available...
+    from jax.experimental.pjit import pjit_p
+    from catalyst.jax_primitives import AbstractQreg, qextract_p, qinsert_p
+    from jax._src.core import jaxpr_as_fun
+
+    backup = {orig_wire: wire for orig_wire, wire in self.wire_map.items()}
+
+    # Make sure the quantum register is updated
+    self.actualize_qreg()
+    plxpr = kwargs["jaxpr"]
+
+    def wrapper(qreg, *args):
+        device = self.device
+        shots = self.shots
+        converter = PLxPRToQuantumJaxprInterpreter(device, shots, qreg)
+        retvals = converter(plxpr, *args)
+        return qreg, *retvals
+
+    converted_jaxpr_branch = jax.make_jaxpr(wrapper)(self.qreg, *args).jaxpr
+    converted_closed_jaxpr_branch = ClosedJaxpr(convert_constvars_jaxpr(converted_jaxpr_branch), ())
+    #jaxpr = from_plxpr(jaxpr)(AbstractQreg(), *args)
+    # So, what I need to do here is transform this jaxpr
+    # With `from_plxpr` to but we need to make sure that
+    # the first argument is treated as the qreg...
+
+
+    from jax._src.sharding_impls import UnspecifiedValue
+    # quantum_subroutine_p.bind
+    # is just pjit_p with a different name.
+    vals_out = quantum_subroutine_p.bind(self.qreg, *args,
+                jaxpr=converted_closed_jaxpr_branch,
+                in_shardings=(UnspecifiedValue(), *kwargs["in_shardings"]),
+                out_shardings=(UnspecifiedValue(), *kwargs["out_shardings"]),
+                in_layouts=(None, *kwargs["in_layouts"]),
+                out_layouts=(None, *kwargs["out_layouts"]),
+                donated_invars=kwargs["donated_invars"],
+                ctx_mesh=kwargs["ctx_mesh"],
+                name=kwargs["name"],
+                keep_unused=kwargs["keep_unused"],
+                inline=kwargs["inline"],
+                compiler_options_kvs=kwargs["compiler_options_kvs"])
+
+    self.qreg = vals_out[0]
+    vals_out = vals_out[1:]
+
+    for orig_wire, _ in backup:
+        self.wire_map[orig_wire] = qextract_p.bind(self.qreg, orig_wire)
+
+    return vals_out
 
 @PLxPRToQuantumJaxprInterpreter.register_primitive(qml.QubitUnitary._primitive)
 def handle_qubit_unitary(self, *invals, n_wires):
