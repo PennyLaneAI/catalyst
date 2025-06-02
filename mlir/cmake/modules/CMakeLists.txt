@@ -36,7 +36,7 @@ get_property(MLIR_EXPORTS GLOBAL PROPERTY MLIR_EXPORTS)
 # QECUtils needs to be added manually since it is not in MLIR_EXPORTS
 # todo: the following two lines removed nlohmann_json as export targets, should probably be done for the other extra targets as well
 include(CMakeFindDependencyMacro)
-find_dependency(nlohmann_json)
+find_dependency(nlohmann_json QUIET)
 export(TARGETS ${MLIR_EXPORTS} QECUtils libstim tomlplusplus_tomlplusplus FILE ${catalyst_cmake_builddir}/CatalystTargets.cmake)
 
 # Generate MlirConfig.cmake for the build tree.
