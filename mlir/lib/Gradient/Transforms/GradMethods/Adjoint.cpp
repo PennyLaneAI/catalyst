@@ -50,10 +50,10 @@ LogicalResult AdjointLowering::matchAndRewrite(func::FuncOp op, PatternRewriter 
 func::FuncOp AdjointLowering::discardAndReturnReg(PatternRewriter &rewriter, Location loc,
                                                   func::FuncOp callee)
 {
-    // TODO: we do not support subroutines, i.e. our gradient functions
-    // will have just one block.
+    // TODO: we do not support multiple return statements (which can happen for unstructured
+    // control flow), i.e. our gradient functions will have just one block.
     assert(callee.getBody().hasOneBlock() &&
-           "Gradients with quantum subroutines are not supported");
+           "Gradients with unstructured control flow are not supported");
 
     // Since the return value is guaranteed to be discarded, then let's change the return type
     // to be only the quantum register and the expval.
