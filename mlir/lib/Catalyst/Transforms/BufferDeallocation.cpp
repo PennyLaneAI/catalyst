@@ -356,6 +356,9 @@ class BufferDeallocation : public BufferPlacementTransformationBase {
 
         // Add new allocs and additional clone operations.
         for (Value value : valuesToFree) {
+            if (!isa<BaseMemRefType>(value.getType())) {
+                continue;
+            }
             if (failed(isa<BlockArgument>(value) ? introduceBlockArgCopy(cast<BlockArgument>(value))
                                                  : introduceValueCopyForRegionResult(value)))
                 return failure();

@@ -55,15 +55,8 @@ help:
 all: llvm mhlo enzyme dialects plugin
 
 .PHONY: llvm
-llvm: TARGET_FILE := $(MK_DIR)/llvm-project/mlir/lib/Dialect/Bufferization/Transforms/BufferDeallocation.cpp
-llvm: PATCH_FILE := $(MK_DIR)/patches/mlir-buffer-deallocation.patch
 llvm:
 	@echo "build LLVM and MLIR enabling Python bindings"
-	# Patch in MLIR buffer deallocation bugfix
-	# TODO: remove once https://github.com/llvm/llvm-project/pull/121582 is merged & the dep updated
-	@if patch --dry-run -p1 -N $(TARGET_FILE) $(PATCH_FILE) > /dev/null 2>&1; then \
-		patch -p1 $(TARGET_FILE) $(PATCH_FILE); \
-	fi
 	cmake -G Ninja -S llvm-project/llvm -B $(LLVM_BUILD_DIR) \
 		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
 		-DLLVM_BUILD_EXAMPLES=OFF \
