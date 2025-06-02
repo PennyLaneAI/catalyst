@@ -21,7 +21,7 @@ jobs:
     name: Determine runner type to use
     uses: ./.github/workflows/determine-workflow-runner.yml
     with:
-      default_runner: ubuntu-24.04
+      default_runner: ubuntu-22.04
 
   constants:
     name: "Set build matrix"
