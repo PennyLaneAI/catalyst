@@ -564,7 +564,7 @@ def GlobalPhaseOp : UnitaryGate_Op<"gphase", [DifferentiableGate, AttrSizedOpera
 }
 
 def MultiRZOp : UnitaryGate_Op<"multirz", [DifferentiableGate, NoMemoryEffect,
-                            AttrSizedOperandSegments, AttrSizedResultSegments]> {
+                                           AttrSizedOperandSegments, AttrSizedResultSegments]> {
     let summary = "Apply an arbitrary multi Z rotation";
     let description = [{
         The `quantum.multirz` operation applies an arbitrary multi Z rotation to the state-vector.
@@ -598,7 +598,7 @@ def MultiRZOp : UnitaryGate_Op<"multirz", [DifferentiableGate, NoMemoryEffect,
 }
 
 def QubitUnitaryOp : UnitaryGate_Op<"unitary", [ParametrizedGate, NoMemoryEffect,
-                            AttrSizedOperandSegments, AttrSizedResultSegments]> {
+                                                AttrSizedOperandSegments, AttrSizedResultSegments]> {
     let summary = "Apply an arbitrary fixed unitary matrix";
     let description = [{
         The `quantum.unitary` operation applies an arbitrary fixed unitary matrix to the
