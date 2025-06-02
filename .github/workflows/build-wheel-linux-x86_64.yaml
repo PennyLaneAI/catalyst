@@ -210,8 +210,8 @@ jobs:
       run: |
         export PATH=$GITHUB_WORKSPACE/llvm-build/bin:$PATH
 
-        if cd mlir/mlir-hlo; git apply --check ../patches/mhlo-remove-shardy.patch; then git apply ../patches/mhlo-remove-shardy.patch; fi
-        if cd mlir/mlir-hlo; git apply --check ../patches/mhlo-add-back-necessary-passes.patch; then git apply ../patches/mhlo-add-back-necessary-passes.patch; fi
+        if git apply --check ../patches/mhlo-remove-shardy.patch; then git apply ../patches/mhlo-remove-shardy.patch; fi
+        if git apply --check ../patches/mhlo-add-back-necessary-passes.patch; then git apply ../patches/mhlo-add-back-necessary-passes.patch; fi
 
         cmake -S mlir/mlir-hlo -B $GITHUB_WORKSPACE/mhlo-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
