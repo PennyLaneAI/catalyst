@@ -75,8 +75,13 @@ bool isMemrefArgOfDeallocHelper(Operation *op)
     }
 
     auto funcArgs = parentOp.getCallableRegion()->getArguments();
-    bool memIsFuncArg = (std::find(funcArgs.begin(), funcArgs.end(), mem) != funcArgs.end());
-    if (!memIsFuncArg) {
+    auto memPos = std::find(funcArgs.begin(), funcArgs.end(), mem);
+    if (memPos == funcArgs.end()) {
+        // not found, memref Value is not an arg
+        return false;
+    }
+    if (std::distance(funcArgs.begin(), memPos) >= 2) {
+        // Only the first two arguments to `dealloc_helper` are the memrefs we are looking for
         return false;
     }
 
