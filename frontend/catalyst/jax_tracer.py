@@ -425,6 +425,7 @@ class HybridOpRegion:
 cached_vars = weakref.WeakKeyDictionary()
 
 
+
 class HybridOp(Operator):
     """A base class for operations carrying nested regions. The class stores the information
     obtained in the process of classical tracing and required for the completion of the quantum
@@ -1302,6 +1303,16 @@ def trace_function(
 
         return res_expanded_tracers, in_sig, out_sig
 
+GLOBAL_QREG = None
+
+def get_qreg():
+    global GLOBAL_QREG
+    return GLOBAL_QREG
+
+def set_qreg(qreg):
+    global GLOBAL_QREG
+    GLOBAL_QREG = qreg
+
 
 @debug_logger
 def trace_quantum_function(
@@ -1371,6 +1382,7 @@ def trace_quantum_function(
                 return_values_flat,
             )
 
+        global GLOBAL_QREG
         # (2) - Quantum tracing
         transformed_results = []
         with EvaluationContext.frame_tracing_context(trace):
@@ -1392,9 +1404,9 @@ def trace_quantum_function(
                 if catalyst.device.qjit_device.is_dynamic_wires(device.wires):
                     # When device has dynamic wires, the device.wires iterable object
                     # has a single value, which is the tracer for the number of wires
-                    qreg_in = qalloc_p.bind(device.wires[0])
+                    GLOBAL_QREG = qalloc_p.bind(device.wires[0])
                 else:
-                    qreg_in = qalloc_p.bind(len(device.wires))
+                    GLOBAL_QREG = qalloc_p.bind(len(device.wires))
 
                 # If the program is batched, that means that it was transformed.
                 # If it was transformed, that means that the program might have
@@ -1413,10 +1425,10 @@ def trace_quantum_function(
                 )
                 snapshot_results = []
                 qrp_out = trace_quantum_operations(
-                    tape, device, qreg_in, ctx, trace, mcm_config, snapshot_results
+                    tape, device, GLOBAL_QREG, ctx, trace, mcm_config, snapshot_results
                 )
                 meas, meas_trees = trace_quantum_measurements(device, qrp_out, output, trees)
-                qreg_out = qrp_out.actualize()
+                GLOBAL_QREG = qrp_out.actualize()
 
                 # Check if the measurements are nested then apply the to_jaxpr_tracer
                 def check_full_raise(arr, func):
@@ -1448,7 +1460,7 @@ def trace_quantum_function(
                     transformed_results.append(meas_results)
 
                 # Deallocate the register and release the device after the current tape is finished.
-                qdealloc_p.bind(qreg_out)
+                qdealloc_p.bind(GLOBAL_QREG)
                 device_release_p.bind()
 
         closed_jaxpr, out_type, out_tree = trace_post_processing(

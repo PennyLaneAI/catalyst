@@ -424,6 +424,12 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
 
         return shots.total_shots if shots else 0
 
+from jax._src.pjit import pjit_p
+
+@QFuncPlxprInterpreter.register_primitive(pjit_p)
+def handle_pjit_p(self, *args, **kwargs):
+    breakpoint()
+
 
 @QFuncPlxprInterpreter.register_primitive(qml.QubitUnitary._primitive)
 def handle_qubit_unitary(self, *invals, n_wires):

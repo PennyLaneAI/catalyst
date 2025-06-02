@@ -140,6 +140,7 @@ def custom_lower_jaxpr_to_module(
         # XLA computation preserves the module name.
         module_name = _module_name_regex.sub("_", module_name)
         ctx.module.operation.attributes["sym_name"] = ir.StringAttr.get(module_name)
+        breakpoint()
         lower_jaxpr_to_fun(
             ctx,
             func_name,
