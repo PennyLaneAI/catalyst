@@ -95,8 +95,6 @@ mhlo: TARGET_FILE := $(MK_DIR)/mlir-hlo/mhlo/transforms/CMakeLists.txt
 mhlo: PATCH_FILE := $(MK_DIR)/patches/mhlo-Add-PassesIncGen-in-transforms-CMakeList.patch
 mhlo:
 	@echo "build MLIR-HLO"
-	# Clean mhlo submodule for git patches
-	make clean-mhlo
 
 	# Patch MHLO cmake dependency
 	# TODO: remove once https://github.com/openxla/xla/pull/15446 is merged
@@ -105,12 +103,12 @@ mhlo:
 	fi
 
 	# Patch MHLO shardy dependency
-	@if cd mlir-hlo; git apply --summary $(MK_DIR)/patches/mhlo-remove-shardy.patch; then \
+	@if cd mlir-hlo; git apply --check $(MK_DIR)/patches/mhlo-remove-shardy.patch; then \
 		git apply $(MK_DIR)/patches/mhlo-remove-shardy.patch; \
 	fi
 
 	# Patch MHLO passes removed from upstream
-	@if cd mlir-hlo; git apply --summary $(MK_DIR)/patches/mhlo-add-back-necessary-passes.patch; then \
+	@if cd mlir-hlo; git apply --check $(MK_DIR)/patches/mhlo-add-back-necessary-passes.patch; then \
 		git apply $(MK_DIR)/patches/mhlo-add-back-necessary-passes.patch; \
 	fi
 	cmake -G Ninja -S mlir-hlo -B $(MHLO_BUILD_DIR) \
@@ -223,7 +221,7 @@ clean-llvm:
 clean-mhlo:
 	@echo "clean HLO dialect build files"
 	rm -rf $(MHLO_BUILD_DIR)
-	cd mlir-hlo; git clean -fd; git checkout .;\
+	cd mlir-hlo; git clean -fd; git checkout .; \
 
 clean-enzyme:
 	@echo "clean enzyme build files"
