@@ -46,7 +46,7 @@ jobs:
       - name: Set up Python # Ensure python3.10 is used
         uses: actions/setup-python@v5
         with:
-          python-version: "3.10"
+          python-version: ${{ needs.constants.outputs.primary_python_version }}
 
       - name: Install dependencies
         run: |
@@ -149,7 +149,7 @@ jobs:
     - name: Set up Python # Ensure python3.10 is used
       uses: actions/setup-python@v5
       with:
-        python-version: "3.10"
+        python-version: ${{needs.constants.outputs.primary_python_version}}
 
     - name: Install Deps
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
@@ -191,7 +191,7 @@ jobs:
     - name: Set up Python # Ensure python3.10 is used
       uses: actions/setup-python@v5
       with:
-        python-version: "3.10"
+        python-version: ${{ needs.constants.outputs.primary_python_version }}
 
     - name: Cache MHLO Source
       id: cache-mhlo-source
@@ -267,7 +267,7 @@ jobs:
     - name: Set up Python # Ensure python3.10 is used
       uses: actions/setup-python@v5
       with:
-        python-version: "3.10"
+        python-version: ${{ needs.constants.outputs.primary_python_version }}
 
     - name: Cache Enzyme Source
       id: cache-enzyme-source
@@ -345,7 +345,7 @@ jobs:
     - name: Set up Python # Ensure python3.10 is used
       uses: actions/setup-python@v5
       with:
-        python-version: "3.10"
+        python-version: ${{ needs.constants.outputs.primary_python_version }}
 
     - name: Install Deps
       run: |
@@ -469,7 +469,7 @@ jobs:
     - name: Set up Python # Ensure python3.10 is used
       uses: actions/setup-python@v5
       with:
-        python-version: "3.10"
+        python-version: ${{ needs.constants.outputs.primary_python_version }}
 
     - name: Install Deps
       run: |
@@ -523,8 +523,6 @@ jobs:
 
     - name: Run Python Lit Tests
       run: |
-        # echo $PYTHONPATH
-        python --version
         export PYTHONPATH=$PYTHONPATH:$(python3 -c "import site; print(site.getsitepackages()[0])")
         llvm-lit -sv frontend/test/lit -j$(nproc)
 
@@ -560,7 +558,7 @@ jobs:
     - name: Set up Python # Ensure python3.10 is used
       uses: actions/setup-python@v5
       with:
-        python-version: "3.10"
+        python-version: ${{ needs.constants.outputs.primary_python_version }}
 
     - name: Install Deps
       run: |
@@ -617,7 +615,7 @@ jobs:
     - name: Set up Python # Ensure python3.10 is used
       uses: actions/setup-python@v5
       with:
-        python-version: "3.10"
+        python-version: ${{ needs.constants.outputs.primary_python_version }}
 
     - name: Install device dependencies (OpenQasm device)
       run: |
@@ -676,7 +674,7 @@ jobs:
       - name: Set up Python # Ensure python3.10 is used
         uses: actions/setup-python@v5
         with:
-          python-version: "3.10"
+          python-version: ${{ needs.constants.outputs.primary_python_version }}
 
       - name: Install dependencies
         run: |
@@ -709,7 +707,7 @@ jobs:
       - name: Set up Python # Ensure python3.10 is used
         uses: actions/setup-python@v5
         with:
-          python-version: "3.10"
+          python-version: ${{ needs.constants.outputs.primary_python_version }}
 
       - name: Install dependencies
         run: |
