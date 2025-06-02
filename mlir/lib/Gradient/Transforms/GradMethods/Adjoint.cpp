@@ -76,6 +76,7 @@ func::FuncOp AdjointLowering::discardAndReturnReg(PatternRewriter &rewriter, Loc
             }
             else {
                 callee.emitOpError() << "Adjoint gradient is only supported on expval measurements";
+                return callee;
             }
         }
         else if (isa<quantum::DeviceReleaseOp>(op)) {
