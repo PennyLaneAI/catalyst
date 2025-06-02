@@ -289,6 +289,8 @@
   :doc:`sharp bits and debugging tips <sharp_bits>` guide. In regular QJIT-compiled workloads
   (without program capture enabled), you must continue to use :func:`catalyst.measure`.
 
+* Upgraded action runners from Ubuntu22.04 to Ubuntu24.04. [(#1728)](https://github.com/PennyLaneAI/catalyst/pull/1728)
+
 <h3>Documentation 📝</h3>
 
 * The header (logo+title) images in the README and in the overview on RtD have been updated,
