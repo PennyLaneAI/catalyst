@@ -17,6 +17,7 @@
 #include <vector>
 
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/IR/IRMapping.h"
 
 #include "Gradient/IR/GradientOps.h"
 #include "Gradient/Utils/DifferentialQNode.h"
@@ -70,15 +71,21 @@ func::FuncOp AdjointLowering::discardAndReturnReg(PatternRewriter &rewriter, Loc
     // We also need to return the expval to avoid dead code elimination downstream from
     // removing the expval op in the body.
     // TODO: we only support grad on expval op for now
+    SmallVector<quantum::ExpvalOp> expvalOps;
+    for (auto op : callee.getOps<quantum::ExpvalOp>()) {
+        expvalOps.push_back(op);
+    }
+    size_t numExpvals = expvalOps.size();
+    if (numExpvals != 1) {
+        callee.emitOpError() << "Invalid number of expval ops: " << numExpvals;
+        return callee;
+    }
+
+    // Create clone, return type is qreg and float for the (unique) expval
     std::string fnName = callee.getName().str() + ".nodealloc";
     Type qregType = quantum::QuregType::get(rewriter.getContext());
-
     Type f64Type = rewriter.getF64Type();
-    SmallVector<Type> retTypes{qregType};
-    auto expvalOps = callee.getOps<quantum::ExpvalOp>();
-    std::for_each(expvalOps.begin(), expvalOps.end(),
-                  [&](const quantum::ExpvalOp &) { retTypes.push_back(f64Type); });
-
+    SmallVector<Type> retTypes{qregType, f64Type};
     FunctionType fnType = rewriter.getFunctionType(callee.getArgumentTypes(), retTypes);
     StringAttr visibility = rewriter.getStringAttr("private");
 
@@ -95,34 +102,15 @@ func::FuncOp AdjointLowering::discardAndReturnReg(PatternRewriter &rewriter, Loc
         // will have just one block.
         assert(callee.getBody().hasOneBlock() &&
                "Gradients with quantum subroutines are not supported");
-        rewriter.cloneRegionBefore(callee.getBody(), unallocFn.getBody(), unallocFn.end());
+
+        IRMapping mapper;
+        rewriter.cloneRegionBefore(callee.getBody(), unallocFn.getBody(), unallocFn.end(), mapper);
         rewriter.setInsertionPointToStart(&unallocFn.getBody().front());
 
-        // Let's return the qreg and erase the device release.
-        SmallVector<Value> returnVals;
-
-        // Fine for now: only one block in body so only one quantum.dealloc
-        auto localDealloc = *unallocFn.getOps<quantum::DeallocOp>().begin();
-        returnVals.push_back(localDealloc.getOperand());
-
-        // We also need to return the expval op so it won't be dead-code-eliminated
-        // TODO: we only support grad on expval op for now
-        for (auto expvalOp : unallocFn.getOps<quantum::ExpvalOp>()) {
-            returnVals.push_back(expvalOp);
-        }
-
-        // Erase the device release.
-        // Unfortunately erasing on the fly within the getOps() causes the
-        // "erasing while iterating" segfault
-        // So we need a separate, completely materialized worklist.
-        SmallVector<quantum::DeviceReleaseOp> deviceReleaseOpsEraseWorklist;
-        auto deviceReleaseOps = unallocFn.getOps<quantum::DeviceReleaseOp>();
-        std::for_each(deviceReleaseOps.begin(), deviceReleaseOps.end(),
-                      [&](const quantum::DeviceReleaseOp &op) {
-                          deviceReleaseOpsEraseWorklist.push_back(op);
-                      });
-        std::for_each(deviceReleaseOpsEraseWorklist.begin(), deviceReleaseOpsEraseWorklist.end(),
-                      [&](const quantum::DeviceReleaseOp &op) { rewriter.eraseOp(op); });
+        // Let's return the qreg+expval and erase the device release.
+        // Fine for now: only one block in body so only one dealloc and one expval
+        SmallVector<Value> returnVals{mapper.lookup(deallocs[0])->getOperand(0),
+                                      mapper.lookup(expvalOps[0])};
 
         // Create the return
         // Again, assume just one block for now
@@ -130,8 +118,13 @@ func::FuncOp AdjointLowering::discardAndReturnReg(PatternRewriter &rewriter, Loc
         assert(isa<func::ReturnOp>(returnOp) && "adjoint block must terminate with return op");
         returnOp->setOperands(returnVals);
 
+        // Erase the device release.
+        for (auto op : callee.getOps<quantum::DeviceReleaseOp>()) {
+            rewriter.eraseOp(mapper.lookup(op));
+        }
+
         // Let's erase the deallocation.
-        rewriter.eraseOp(localDealloc);
+        rewriter.eraseOp(mapper.lookup(deallocs[0]));
     }
 
     return unallocFn;

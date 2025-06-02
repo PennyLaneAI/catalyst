@@ -18,6 +18,9 @@
 func.func private @funcScalarScalar(%arg0: f64) -> f64 attributes {qnode, diff_method = "adjoint"} {
     %0 = quantum.alloc(1) : !quantum.reg
     %1 = quantum.adjoint(%0) : !quantum.reg {}  // prevent folding of dealloc into alloc
+    %q = quantum.extract %1[0] : !quantum.reg -> !quantum.bit
+    %obs = quantum.namedobs %q[PauliX] : !quantum.obs
+    %expval = quantum.expval %obs : f64
     quantum.dealloc %1 : !quantum.reg
     return %arg0 : f64
 }
@@ -44,6 +47,9 @@ func.func @gradCallScalarScalar(%arg0: f64) -> f64 {
 func.func private @funcScalarTensor(%arg0: f64) -> tensor<2x3xf64> attributes {qnode, diff_method = "adjoint"} {
     %0 = quantum.alloc(1) : !quantum.reg
     %1 = quantum.adjoint(%0) : !quantum.reg {}  // prevent folding of dealloc into alloc
+    %q = quantum.extract %1[0] : !quantum.reg -> !quantum.bit
+    %obs = quantum.namedobs %q[PauliX] : !quantum.obs
+    %expval = quantum.expval %obs : f64
     quantum.dealloc %1 : !quantum.reg
     %c0 = arith.constant 0.0 : f64
     %res = tensor.from_elements %c0, %c0, %c0, %c0, %c0, %c0 : tensor<2x3xf64>
@@ -71,6 +77,9 @@ func.func @gradCallScalarTensor(%arg0: f64) -> tensor<2x3xf64> {
 func.func private @funcTensorScalar(%arg0: tensor<3xf64>) -> f64 attributes {qnode, diff_method = "adjoint"} {
     %0 = quantum.alloc(1) : !quantum.reg
     %1 = quantum.adjoint(%0) : !quantum.reg {}  // prevent folding of dealloc into alloc
+    %q = quantum.extract %1[0] : !quantum.reg -> !quantum.bit
+    %obs = quantum.namedobs %q[PauliX] : !quantum.obs
+    %expval = quantum.expval %obs : f64
     quantum.dealloc %1 : !quantum.reg
     %res = arith.constant 0.0 : f64
     return %res : f64
@@ -98,6 +107,9 @@ func.func @gradCallTensorScalar(%arg0: tensor<3xf64>) -> tensor<3xf64> {
 func.func private @funcTensorTensor(%arg0: tensor<7x3x2x1xf64>) -> tensor<2xf64> attributes {qnode, diff_method = "adjoint"} {
     %0 = quantum.alloc(1) : !quantum.reg
     %1 = quantum.adjoint(%0) : !quantum.reg {}  // prevent folding of dealloc into alloc
+    %q = quantum.extract %1[0] : !quantum.reg -> !quantum.bit
+    %obs = quantum.namedobs %q[PauliX] : !quantum.obs
+    %expval = quantum.expval %obs : f64
     quantum.dealloc %1 : !quantum.reg
     %c0 = arith.constant 0.0 : f64
     %res = tensor.from_elements %c0, %c0 : tensor<2xf64>
@@ -125,6 +137,9 @@ func.func @gradCallTensorTensor(%arg0: tensor<7x3x2x1xf64>) -> tensor<2x7x3x2x1x
 func.func @funcMultiRes(%arg0: f64) -> (f64, tensor<2xf64>) attributes {qnode, diff_method = "adjoint"} {
     %0 = quantum.alloc(1) : !quantum.reg
     %1 = quantum.adjoint(%0) : !quantum.reg {}  // prevent folding of dealloc into alloc
+    %q = quantum.extract %1[0] : !quantum.reg -> !quantum.bit
+    %obs = quantum.namedobs %q[PauliX] : !quantum.obs
+    %expval = quantum.expval %obs : f64
     quantum.dealloc %1 : !quantum.reg
     %res = tensor.from_elements %arg0, %arg0 : tensor<2xf64>
     func.return %arg0, %res : f64, tensor<2xf64>
@@ -152,6 +167,9 @@ func.func @gradCallMultiRes(%arg0: f64) -> (f64, tensor<2xf64>)  {
 func.func @funcMultiArg(%arg0: f64, %arg1: tensor<2xf64>) -> f64 attributes {qnode, diff_method = "adjoint"} {
     %0 = quantum.alloc(1) : !quantum.reg
     %1 = quantum.adjoint(%0) : !quantum.reg {}  // prevent folding of dealloc into alloc
+    %q = quantum.extract %1[0] : !quantum.reg -> !quantum.bit
+    %obs = quantum.namedobs %q[PauliX] : !quantum.obs
+    %expval = quantum.expval %obs : f64
     quantum.dealloc %1 : !quantum.reg
     func.return %arg0 : f64
 }
@@ -180,6 +198,9 @@ func.func @gradCallMultiArg(%arg0: f64, %arg1: tensor<2xf64>) -> (f64, tensor<2x
 func.func private @funcMultiCall(%arg0: f64) -> f64 attributes {qnode, diff_method = "adjoint"} {
     %0 = quantum.alloc(1) : !quantum.reg
     %1 = quantum.adjoint(%0) : !quantum.reg {}  // prevent folding of dealloc into alloc
+    %q = quantum.extract %1[0] : !quantum.reg -> !quantum.bit
+    %obs = quantum.namedobs %q[PauliX] : !quantum.obs
+    %expval = quantum.expval %obs : f64
     quantum.dealloc %1 : !quantum.reg
     func.return %arg0 : f64
 }
