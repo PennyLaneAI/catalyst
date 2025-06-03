@@ -187,11 +187,7 @@ jobs:
       run: |
         export PATH=$GITHUB_WORKSPACE/llvm-build/bin:$PATH
 
-        echo "before pushd"
-        pwd
         pushd $GITHUB_WORKSPACE/mlir/mlir-hlo
-        echo "after pushd"
-        pwd
         git apply $GITHUB_WORKSPACE/mlir/patches/mhlo-remove-shardy.patch
         git apply $GITHUB_WORKSPACE/mlir/patches/mhlo-add-back-necessary-passes.patch
         popd
