@@ -12,8 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <algorithm> // std::find, distance
+#include <algorithm>
 
+#include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Conversion/LLVMCommon/MemRefBuilder.h"
 #include "mlir/Conversion/LLVMCommon/Pattern.h"
 #include "mlir/Conversion/LLVMCommon/TypeConverter.h"
@@ -31,14 +32,20 @@ namespace catalyst {
 
 bool isFromExtractAlignedPointerAsIndexOp(Operation *op)
 {
-    if (isa<memref::ExtractAlignedPointerAsIndexOp>(op)) {
-        return true;
-    }
-    auto prevOp = op->getPrevNode();
-    if (prevOp) {
-        return isFromExtractAlignedPointerAsIndexOp(prevOp);
-    }
-    return false;
+    // Returns true if the memref.store/load ops deal with memrefs coming from a
+    // memref.extract_aligned_pointer_as_index op
+
+    SetVector<Operation *> backwardSlice;
+    BackwardSliceOptions options;
+    // Upstream slice analysis fails if encounters a block argument in an op with
+    // more than one region
+    // https://github.com/llvm/llvm-project/blob/179d30f8c3fddd3c85056fd2b8e877a4a8513158/mlir/lib/Analysis/SliceAnalysis.cpp#L109
+    options.omitBlockArguments = true;
+    getBackwardSlice(op, &backwardSlice, options);
+    bool found = std::find_if(backwardSlice.begin(), backwardSlice.end(), [](const Operation *op) {
+                     return isa<memref::ExtractAlignedPointerAsIndexOp>(op);
+                 }) != backwardSlice.end();
+    return found;
 }
 
 bool isMemrefArgOfDeallocHelper(Operation *op)
