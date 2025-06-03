@@ -37,9 +37,11 @@ OPENAPL_FILE_PATH = os.path.join(os.getcwd(), "__openapl__output.json")
 def cleanup_openapl_file():
     """Ensure the OpenAPL output file is clean before and after each test."""
     if os.path.exists(OPENAPL_FILE_PATH):
+        print("removing openapl file before test")
         os.remove(OPENAPL_FILE_PATH)
     yield
     if os.path.exists(OPENAPL_FILE_PATH):
+        print("removing openapl file after test")
         os.remove(OPENAPL_FILE_PATH)
 
 
@@ -122,6 +124,7 @@ class TestTargetGates:
         circuit(np.pi / 2)
 
         stats = profile_openapl(OPENAPL_FILE_PATH)
+        print("stats: ", stats)
         assert stats["num_ions"] == 1
         assert stats["num_parallel_protocols"] == 1
         assert stats["num_beams"] == 2
