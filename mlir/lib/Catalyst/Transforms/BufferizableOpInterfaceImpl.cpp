@@ -321,7 +321,8 @@ struct CallbackCallOpInterface
         }
 
         SmallVector<Type> emptyRets;
-        rewriter.create<CallbackCallOp>(loc, emptyRets, callOp.getCallee(), newInputs);
+        rewriter.create<CallbackCallOp>(loc, emptyRets, callOp.getCallee(), newInputs,
+                                        /*arg_attrs=*/nullptr, /*res_attrs=*/nullptr);
         bufferization::replaceOpWithBufferizedValues(rewriter, op, outmemrefs);
         return success();
     }

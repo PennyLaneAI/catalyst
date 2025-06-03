@@ -106,7 +106,7 @@ module @test1 {
   // CHECK-LABEL: @foo(
   // CHECK-SAME: [[arg0:%.+]]: tensor<f64>)
   func.func private @foo(%arg0: tensor<f64>) -> tensor<f64> {
-    // CHECK-DAG: [[memref0:%.+]] = bufferization.to_memref [[arg0]] : memref<f64>
+    // CHECK-DAG: [[memref0:%.+]] = bufferization.to_memref [[arg0]] : tensor<f64> to memref<f64>
     // CHECK-DAG: [[resAlloc:%.+]] = memref.alloc() {{.*}}: memref<f64>
     // CHECK:     catalyst.callback_call @callback_1([[memref0]], [[resAlloc]]) : (memref<f64>, memref<f64>) -> ()
     %1 = catalyst.callback_call @callback_1(%arg0) : (tensor<f64>) -> (tensor<f64>)
