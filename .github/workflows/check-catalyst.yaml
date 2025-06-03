@@ -194,7 +194,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path: mhlo-build
-        key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-ci-build-${{ matrix.compiler }}
+        key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-ci-build-${{ matrix.compiler }}-0
 
     - name: Get Cached LLVM Source
       id: cache-llvm-source
@@ -351,7 +351,7 @@ jobs:
       uses: actions/cache/restore@v4
       with:
         path: mhlo-build
-        key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-ci-build-${{ matrix.compiler }}
+        key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-ci-build-${{ matrix.compiler }}-0
         fail-on-cache-miss: true
 
     - name: Get Cached Enzyme Source
