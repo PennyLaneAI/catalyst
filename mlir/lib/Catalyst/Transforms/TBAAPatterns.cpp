@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <algorithm> // std::find
+#include <algorithm> // std::find, distance
 
 #include "mlir/Conversion/LLVMCommon/MemRefBuilder.h"
 #include "mlir/Conversion/LLVMCommon/Pattern.h"
@@ -76,12 +76,10 @@ bool isMemrefArgOfDeallocHelper(Operation *op)
 
     auto funcArgs = parentOp.getCallableRegion()->getArguments();
     auto memPos = std::find(funcArgs.begin(), funcArgs.end(), mem);
-    if (memPos == funcArgs.end()) {
-        // not found, memref Value is not an arg
-        return false;
-    }
     if (std::distance(funcArgs.begin(), memPos) >= 2) {
         // Only the first two arguments to `dealloc_helper` are the memrefs we are looking for
+        // Note that std::find returns end iterator if not found
+        // so distance >=2 also covers the case for not found
         return false;
     }
 
