@@ -919,7 +919,8 @@ struct SetStateOpPattern : public OpConversionPattern<SetStateOp> {
         auto ptrTy = LLVM::LLVMPointerType::get(rewriter.getContext());
         ModuleOp moduleOp = op->getParentOfType<ModuleOp>();
         auto func = mlir::LLVM::lookupOrCreateFn(moduleOp, "__catalyst__qis__SetState",
-                                                 {ptrTy, i64}, voidTy, isVarArg);
+                                                 {ptrTy, i64}, voidTy, isVarArg)
+                        .value();
 
         SmallVector<Value> args;
 
@@ -958,7 +959,8 @@ struct SetBasisStateOpPattern : public OpConversionPattern<SetBasisStateOp> {
         auto ptrTy = LLVM::LLVMPointerType::get(rewriter.getContext());
         ModuleOp moduleOp = op->getParentOfType<ModuleOp>();
         auto func = mlir::LLVM::lookupOrCreateFn(moduleOp, "__catalyst__qis__SetBasisState",
-                                                 {ptrTy, i64}, voidTy, isVarArg);
+                                                 {ptrTy, i64}, voidTy, isVarArg)
+                        .value();
 
         SmallVector<Value> args;
 

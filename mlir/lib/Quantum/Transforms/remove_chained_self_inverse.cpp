@@ -69,7 +69,7 @@ struct RemoveChainedSelfInversePass
         populateLoopBoundaryPatterns(patterns, 2);
         populateSelfInversePatterns(patterns);
 
-        if (failed(applyPatternsAndFoldGreedily(module, std::move(patterns)))) {
+        if (failed(applyPatternsGreedily(module, std::move(patterns)))) {
             return signalPassFailure();
         }
     }
