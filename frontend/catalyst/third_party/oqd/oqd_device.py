@@ -95,11 +95,20 @@ class OQDDevice(Device):
 
         return "oqd", lib_path
 
-    def __init__(self, wires, shots, backend="default", **kwargs):
+    def __init__(self, wires, shots, backend="default", openapl_file="__openapl__output.json", **kwargs):
         self._backend = backend
+        self._openapl_file = openapl_file
         _check_backend(backend=backend)
-        super().__init__(wires=wires, shots=shots, **kwargs)
+        super().__init__(wires=wires, shots=shots)
+        self.device_kwargs = {
+            "openapl_file": self._openapl_file,
+        }
 
+    @property
+    def openapl_file(self):
+        """The OpenAPL output filename."""
+        return self._openapl_file
+    
     @property
     def backend(self):
         """Backend property of the device."""
