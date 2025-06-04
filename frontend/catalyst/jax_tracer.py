@@ -1341,7 +1341,7 @@ def trace_quantum_function(
         
         if set_shots_transform:
             # Apply set_shots transform to update device shots
-            shots_value = set_shots_transform.kwargs["shots"] if hasattr(set_shots_transform, "kwargs") else None
+            shots_value = set_shots_transform.kwargs.get('shots', None)
             # Update device shots
             if hasattr(device, 'shots'):
                 if isinstance(device, qml.devices.LegacyDevice):
