@@ -162,6 +162,9 @@ class AbstractQreg(AbstractValue):
     def __hash__(self):
         return self.hash_value
 
+    def _add(self, first, second):
+        return AbstractQreg()
+
 
 class ConcreteQreg:
     """Concrete quantum register."""

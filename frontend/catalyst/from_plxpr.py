@@ -168,7 +168,7 @@ def from_plxpr(plxpr: ClosedJaxpr) -> Callable[..., Jaxpr]:
     return jax.make_jaxpr(partial(WorkflowInterpreter().eval, plxpr.jaxpr, plxpr.consts))
 
 def from_subroutine(jaxpr):
-    return jax.make_jaxpr(partial(SubroutineInterpreter().eval, jaxpr.jaxpr, jaxpr.consts))
+    return jax.make_jaxpr(partial(SubroutineInterpreter(None, 0).eval, jaxpr.jaxpr, jaxpr.consts))
 
 
 class WorkflowInterpreter(PlxprInterpreter):
@@ -271,7 +271,9 @@ for pl_transform, (pass_name, decomposition) in transforms_to_passes.items():
     register_transform(pl_transform, pass_name, decomposition)
 
 class SubroutineInterpreter(PlxprInterpreter):
-    def __init__(self):
+    def __init__(self, device, shots):
+        self._device = device
+        self._shots = self._extract_shots_value(shots)
         self.stateref = None
         self.actualized = False
         super().__init__()
@@ -398,8 +400,38 @@ class SubroutineInterpreter(PlxprInterpreter):
 
         return shots.total_shots if shots else 0
 
+    # pylint: disable=too-many-branches
+    def eval(self, jaxpr: "jax.core.Jaxpr", consts: Sequence, *args) -> list:
+        """Evaluate a jaxpr.
 
-class QFuncPlxprInterpreter(SubroutineInterpreter):
+        Args:
+            jaxpr (jax.core.Jaxpr): the jaxpr to evaluate
+            consts (list[TensorLike]): the constant variables for the jaxpr
+            *args (tuple[TensorLike]): The arguments for the jaxpr.
+
+        Returns:
+            list[TensorLike]: the results of the execution.
+
+        """
+
+        # We assume we have at least one argument (the qreg)
+        assert len(args) > 0
+
+        self._parent_qreg = args[-1]
+        self.stateref = {"qreg": self._parent_qreg, "wire_map": {}}
+
+        # Send the original args (without the qreg)
+        outvals = super().eval(jaxpr, consts, *args)
+
+        # Add the qreg to the output values
+        outvals = outvals
+
+        self.stateref = None
+
+        return outvals
+
+
+class QFuncPlxprInterpreter(SubroutineInterpreter, PlxprInterpreter):
     """An interpreter that converts plxpr into catalyst-variant jaxpr.
 
     Args:
@@ -408,10 +440,11 @@ class QFuncPlxprInterpreter(SubroutineInterpreter):
 
     """
 
+    def eval(self, jaxpr: "jax.core.Jaxpr", consts: Sequence, *args) -> list:
+        return PlxprInterpreter.eval(self, jaxpr, consts, *args)
+
     def __init__(self, device, shots: qml.measurements.Shots | int):
-        self._device = device
-        self._shots = self._extract_shots_value(shots)
-        super().__init__()
+        super().__init__(device, shots)
 
     def setup(self):
         """Initialize the stateref and bind the device."""
@@ -438,33 +471,43 @@ def handle_subroutine(self, *args, **kwargs):
     # We need to pass the wire as an argument...
     # And we somehow need to start another interpreter
     # but only in case it is not yet already available...
-    raise NotImplementedError()
     from jax.experimental.pjit import pjit_p
-    from catalyst.jax_primitives import AbstractQreg
+    from catalyst.jax_primitives import AbstractQreg, qextract_p, qinsert_p
     from jax._src.core import jaxpr_as_fun
 
     backup = {orig_wire: wire for orig_wire, wire in self.wire_map.items()}
     self.actualize_qreg()
+    plxpr = kwargs["jaxpr"]
 
     def wrapper(qreg, *args):
-        retval = jaxpr_as_fun(kwargs["jaxpr"], *args)()
+        #qubit = qextract_p.bind(qreg, 0)
+        retval = jaxpr_as_fun(plxpr, *args)()
+        #qreg = qinsert_p.bind(qreg, 0, qubit)
         return qreg, retval
 
-    jaxpr = jax.make_jaxpr(wrapper)(AbstractQreg(), *args)
+    jaxpr_with_parameter_and_return = jax.make_jaxpr(wrapper)(AbstractQreg(), *args)
+    converted_func = partial(
+        SubroutineInterpreter(self._device, self._shots).eval,
+        jaxpr_with_parameter_and_return.jaxpr,
+        jaxpr_with_parameter_and_return.consts,
+    )
+    converted_jaxpr_branch = jax.make_jaxpr(converted_func)(self.qreg, *args).jaxpr
+    converted_closed_jaxpr_branch = ClosedJaxpr(convert_constvars_jaxpr(converted_jaxpr_branch), ())
     #jaxpr = from_plxpr(jaxpr)(AbstractQreg(), *args)
     # So, what I need to do here is transform this jaxpr
     # With `from_plxpr` to but we need to make sure that
     # the first argument is treated as the qreg...
 
 
+    from jax._src.sharding_impls import UnspecifiedValue
     # quantum_subroutine_p.bind
     # is just pjit_p with a different name.
     vals_out = quantum_subroutine_p.bind(self.qreg, *args,
-                jaxpr=jaxpr,
-                in_shardings=kwargs["in_shardings"],
-                out_shardings=kwargs["out_shardings"],
-                in_layouts=kwargs["in_layouts"],
-                out_layouts=kwargs["out_layouts"],
+                jaxpr=converted_closed_jaxpr_branch,
+                in_shardings=(UnspecifiedValue(), *kwargs["in_shardings"]),
+                out_shardings=(UnspecifiedValue(), *kwargs["out_shardings"]),
+                in_layouts=(None, *kwargs["in_layouts"]),
+                out_layouts=(None, *kwargs["out_layouts"]),
                 donated_invars=kwargs["donated_invars"],
                 ctx_mesh=kwargs["ctx_mesh"],
                 name=kwargs["name"],
