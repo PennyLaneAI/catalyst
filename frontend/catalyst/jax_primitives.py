@@ -2326,6 +2326,7 @@ def _cos_lowering2(ctx, x, accuracy):
     return _nary_lower_hlo(hlo.cosine, ctx, x, accuracy=accuracy)
 
 def subroutine_lowering(*args, **kwargs):
+    breakpoint()
     retval = _pjit_lowering(*args, **kwargs)
     return retval
 
