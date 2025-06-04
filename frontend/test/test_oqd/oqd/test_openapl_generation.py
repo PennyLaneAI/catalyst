@@ -16,7 +16,6 @@
 
 import json
 import os
-from tempfile import TemporaryDirectory
 
 import numpy as np
 import pennylane as qml
@@ -31,15 +30,6 @@ OQD_PIPELINES = OQDDevicePipeline(
     os.path.join(MODULE_TEST_PATH, "calibration_data/qubit.toml"),
     os.path.join(MODULE_TEST_PATH, "calibration_data/gate.toml"),
 )
-
-
-@pytest.fixture()
-def temporary_openapl_file():
-    """Ensure the OpenAPL output file is clean before and after each test."""
-    with TemporaryDirectory() as temp_dir:
-        openapl_file = os.path.join(temp_dir, "__openapl__output.json")
-        yield openapl_file
-
 
 def profile_openapl(file_path):
     """Parses an OpenAPL JSON file and extracts statistics."""
@@ -108,7 +98,6 @@ def verify_json(correct_file_name, expected_file_name):
 class TestTargetGates:
     """Test OQD device OpenAPL generation for target gates ({'RX', 'RY', 'MS'})."""
 
-    @pytest.mark.usefixtures("temporary_openapl_file")
     def test_RX_gate(self, temporary_openapl_file):
         """Test OpenAPL generation for a circuit with a single RX Gate."""
         oqd_dev = OQDDevice(

@@ -101,7 +101,7 @@ class OQDDevice(Device):
         self._backend = backend
         self._openapl_file = openapl_file
         _check_backend(backend=backend)
-        super().__init__(wires=wires, shots=shots)
+        super().__init__(wires=wires, shots=shots, **kwargs)
         self.device_kwargs = {
             "openapl_file": self._openapl_file,
         }
