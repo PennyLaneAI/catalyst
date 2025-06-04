@@ -304,7 +304,7 @@ endif
 	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/pytest $(PYTEST_FLAGS) --cov=catalyst --tb=native --cov-report=$(COVERAGE_REPORT)
 	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/test_oqc/oqc $(PYTEST_FLAGS) --cov=catalyst --cov-append --tb=native --cov-report=$(COVERAGE_REPORT)
 ifeq ($(ENABLE_OQD), ON)
-	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/test_oqd/oqd $(PYTEST_FLAGS) --cov=catalyst --cov-append --tb=native --cov-report=$(COVERAGE_REPORT)
+	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/test_oqd/oqd $(PYTEST_FLAGS) --cov=catalyst --cov-append --tb=native --cov-report=$(COVERAGE_REPORT) -s
 endif
 ifeq ($(TEST_BRAKET), NONE)
 	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/async_tests --tb=native --backend=$(TEST_BACKEND) --tb=native

@@ -79,6 +79,7 @@ def profile_openapl(file_path):
         "num_levels": num_levels,
         "num_ions": num_ions,
     }
+    print("stats: ", stats)
     return stats
 
 
@@ -124,7 +125,6 @@ class TestTargetGates:
         circuit(np.pi / 2)
 
         stats = profile_openapl(OPENAPL_FILE_PATH)
-        print("stats: ", stats)
         assert stats["num_ions"] == 1
         assert stats["num_parallel_protocols"] == 1
         assert stats["num_beams"] == 2
