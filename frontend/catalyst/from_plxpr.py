@@ -521,12 +521,8 @@ def handle_cond(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
         else:
             # Convert branch from plxpr to Catalyst jaxpr
 
-            class Mixin(self.__class__, BranchPlxprInterpreter):
-                def __init__(self, dev, shots, stateref, actualized):
-                    super().__init__(dev, shots, stateref, actualized)
-
             converted_func = partial(
-                Mixin(self._device, self._shots, self.stateref, self.actualized).eval,
+                BranchPlxprInterpreter(self._device, self._shots, self.stateref, self.actualized).eval,
                 plxpr_branch,
                 branch_consts,
             )
@@ -585,16 +581,14 @@ def handle_for_loop(
     consts = plxpr_invals[consts_slice]
 
     # Convert for loop body from plxpr to Catalyst jaxpr
-    class Mixin(self.__class__, BranchPlxprInterpreter):
-        def __init__(self, dev, shots, stateref, actualized):
-            super().__init__(dev, shots, stateref, actualized)
     converted_func = partial(
-        Mixin(self._device, self._shots, self.stateref, self.actualized).eval,
+        BranchPlxprInterpreter(self._device, self._shots, self.stateref, self.actualized).eval,
         jaxpr_body_fn,
         consts,
     )
     converted_jaxpr_branch = jax.make_jaxpr(converted_func)(*start_plus_args_plus_qreg).jaxpr
     converted_closed_jaxpr_branch = ClosedJaxpr(convert_constvars_jaxpr(converted_jaxpr_branch), ())
+    breakpoint()
 
     # Build Catalyst compatible input values
     for_loop_invals = [*consts, start, stop, step, *start_plus_args_plus_qreg]
@@ -638,11 +632,8 @@ def handle_while_loop(
     args_plus_qreg = [*args, self.qreg]  # Add the qreg to the args
 
     # Convert for while body from plxpr to Catalyst jaxpr
-    class Mixin(self.__class__, BranchPlxprInterpreter):
-        def __init__(self, dev, shots, stateref, actualized):
-            super().__init__(dev, shots, stateref, actualized)
     converted_body_func = partial(
-        Mixin(self.device, self.shots, self.stateref, self.actualized).eval,
+        BranchPlxprInterpreter(self.device, self.shots, self.stateref, self.actualized).eval,
         jaxpr_body_fn,
         consts_body,
     )
@@ -774,9 +765,9 @@ class BranchPlxprInterpreter(SubroutineInterpreter):
         # We assume we have at least one argument (the qreg)
         assert len(args) > 0
 
+        breakpoint()
         self._parent_qreg = args[-1]
 
-        breakpoint()
         # Send the original args (without the qreg)
         outvals = super().eval(jaxpr, consts, *args[:-1])
 
