@@ -105,7 +105,8 @@ def ValueAndGradOp : Gradient_Op<"value_and_grad", [
 }
 
 
-def AdjointOp : Gradient_Op<"adjoint", [AttrSizedOperandSegments]> {
+def AdjointOp : Gradient_Op<"adjoint", [AttrSizedOperandSegments,
+                                        MemoryEffects<[MemRead, MemWrite, MemAlloc, MemFree]>]> {
     let summary = "Perform quantum AD using the adjoint method on a device.";
 
     let arguments = (ins
@@ -134,7 +135,8 @@ def AdjointOp : Gradient_Op<"adjoint", [AttrSizedOperandSegments]> {
 def BackpropOp : Gradient_Op<"backprop", [
         AttrSizedOperandSegments,
         AttrSizedResultSegments,
-        DeclareOpInterfaceMethods<SymbolUserOpInterface>
+        DeclareOpInterfaceMethods<SymbolUserOpInterface>,
+        MemoryEffects<[MemRead, MemWrite, MemAlloc, MemFree]>
         ]> {
     let summary = "Perform classic automatic differentiation using Enzyme AD.";
 
@@ -179,7 +181,8 @@ def JVPOp : Gradient_Op<"jvp", [
         SameVariadicResultSize,
         DeclareOpInterfaceMethods<CallOpInterface>,
         DeclareOpInterfaceMethods<SymbolUserOpInterface>,
-        GradientOpInterface
+        GradientOpInterface,
+        MemoryEffects<[MemRead, MemWrite, MemAlloc, MemFree]>
         ]> {
     let summary = "Compute the jvp of a function.";
 
@@ -214,7 +217,8 @@ def VJPOp : Gradient_Op<"vjp", [
         AttrSizedResultSegments,
         DeclareOpInterfaceMethods<CallOpInterface>,
         DeclareOpInterfaceMethods<SymbolUserOpInterface>,
-        GradientOpInterface
+        GradientOpInterface,
+        MemoryEffects<[MemRead, MemWrite, MemAlloc, MemFree]>
         ]> {
     let summary = "Compute the vjp of a function.";
 
