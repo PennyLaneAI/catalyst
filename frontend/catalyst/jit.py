@@ -23,6 +23,9 @@ import logging
 import os
 import warnings
 
+import cloudpickle
+import zmq
+
 import jax
 import jax.numpy as jnp
 import pennylane as qml
@@ -96,6 +99,7 @@ def qjit(
     circuit_transform_pipeline=None,
     pass_plugins=None,
     dialect_plugins=None,
+    remote=None
 ):  # pylint: disable=too-many-arguments,unused-argument
     """A just-in-time decorator for PennyLane and JAX programs using Catalyst.
 
@@ -162,6 +166,7 @@ def qjit(
             If not specified, the default pass pipeline will be applied.
         pass_plugins (Optional[List[Path]]): List of paths to pass plugins.
         dialect_plugins (Optional[List[Path]]): List of paths to dialect plugins.
+        remote (bool): Indicate whether to defer the QJIT call to a remote server.
 
     Returns:
         QJIT object.
@@ -493,6 +498,17 @@ def qjit(
 
     if fn is None:
         return functools.partial(qjit, **kwargs)
+
+    if kwargs["remote"]:
+        with zmq.Context() as ctx:
+            socket = ctx.socket(zmq.REQ)
+            from zmq import ssh
+            ssh.tunnel_connection(socket, "tcp://127.0.0.1:9098", kwargs["remote"])
+            socket.connect("tcp://10.88.111.9:9098") # 10.88.111.9
+            ser_func = cloudpickle.dumps(fn)
+            socket.send(ser_func)
+            out = socket.recv()
+        return cloudpickle.loads(out)
 
     return QJIT(fn, CompileOptions(**kwargs))
 

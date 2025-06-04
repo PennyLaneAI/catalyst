@@ -74,6 +74,8 @@ struct CompilerOptions {
     Action loweringAction;
     /// If true, the compiler will dump the pass pipeline that will be run.
     bool dumpPassPipeline;
+    /// Sets the default target backend for the compiler
+    std::string target_triple;
 
     /// Get the destination of the object file at the end of compilation.
     std::string getObjectFile() const
