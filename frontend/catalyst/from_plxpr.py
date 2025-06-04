@@ -520,7 +520,7 @@ def handle_subroutine(self, *args, **kwargs):
                 inline=kwargs["inline"],
                 compiler_options_kvs=kwargs["compiler_options_kvs"])
 
-    self.qjit = vals_out[0]
+    self.qreg = vals_out[0]
     vals_out = vals_out[1:]
 
     for orig_wire, _ in backup:
