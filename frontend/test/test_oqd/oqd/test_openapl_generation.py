@@ -65,7 +65,6 @@ def profile_openapl(file_path):
         "num_levels": num_levels,
         "num_ions": num_ions,
     }
-    print("stats: ", stats)
     return stats
 
 
