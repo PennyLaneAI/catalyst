@@ -171,8 +171,6 @@ jobs:
         CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \
         COMPILER_LAUNCHER="" \
-        PYTHON3_EXECUTABLE=$(which python3) \
-        Python3_NumPy_INCLUDE_DIRS=$$($(PYTHON) -c "import numpy as np; print(np.get_include())") \
         make llvm
 
   mhlo:
@@ -713,8 +711,8 @@ jobs:
 
       - name: Install lcov # Manually install lcov 1.14 (lcov_1.15-1_all.deb)
         run: |
-          wget http://archive.ubuntu.com/ubuntu/pool/universe/l/lcov/lcov_1.15-1_all.deb
-          sudo apt-get install -y ./lcov_1.15-1_all.deb
+          # wget http://archive.ubuntu.com/ubuntu/pool/universe/l/lcov/lcov_1.15-1_all.deb
+          # sudo apt-get install -y ./lcov_1.15-1_all.deb
           lcov --version 
 
       - name: Install additional dependencies for OpenQasm device
