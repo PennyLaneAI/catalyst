@@ -417,7 +417,7 @@ class SubroutineInterpreter(PlxprInterpreter):
         # We assume we have at least one argument (the qreg)
         assert len(args) > 0
 
-        self._parent_qreg = args[-1]
+        self._parent_qreg = args[0]
         self.stateref = {"qreg": self._parent_qreg, "wire_map": {}}
 
         # Send the original args (without the qreg)
