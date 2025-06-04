@@ -188,7 +188,7 @@ def handle_qnode(
     consts = args[:n_consts]
     non_const_args = args[n_consts:]
 
-    f = partial(QFuncPlxprInterpreter(device, shots, None, True).eval, qfunc_jaxpr, consts)
+    f = partial(QFuncPlxprInterpreter(device, shots).eval, qfunc_jaxpr, consts)
 
     return quantum_kernel_p.bind(
         wrap_init(f, debug_info=qfunc_jaxpr.debug_info),
@@ -271,11 +271,9 @@ for pl_transform, (pass_name, decomposition) in transforms_to_passes.items():
     register_transform(pl_transform, pass_name, decomposition)
 
 class SubroutineInterpreter(PlxprInterpreter):
-    def __init__(self, device, shots, stateref, actualized):
-        self._device = device
-        self._shots = self._extract_shots_value(shots)
-        self.stateref = stateref
-        self.actualized = actualized
+    def __init__(self):
+        self.stateref = None
+        self.actualized = False
         super().__init__()
 
     def __getattr__(self, key):
@@ -365,11 +363,9 @@ class SubroutineInterpreter(PlxprInterpreter):
         else:
             obs = self._compbasis_obs(*measurement.wires)
 
-        shots = self._device.shots.total_shots
-
         shape, dtype = measurement._abstract_eval(
             n_wires=len(measurement.wires),
-            shots=shots,
+            shots=self._device.shots.total_shots,
             num_device_wires=len(self._device.wires),
         )
 
@@ -403,12 +399,46 @@ class SubroutineInterpreter(PlxprInterpreter):
         return shots.total_shots if shots else 0
 
 
+class QFuncPlxprInterpreter(SubroutineInterpreter):
+    """An interpreter that converts plxpr into catalyst-variant jaxpr.
 
-@SubroutineInterpreter.register_primitive(quantum_subroutine_p)
+    Args:
+        device (qml.devices.Device)
+        shots (qml.measurements.Shots)
+
+    """
+
+    def __init__(self, device, shots: qml.measurements.Shots | int):
+        self._device = device
+        self._shots = self._extract_shots_value(shots)
+        super().__init__()
+
+    def setup(self):
+        """Initialize the stateref and bind the device."""
+        if self.stateref is None:
+            device_init_p.bind(self._shots, **_get_device_kwargs(self._device))
+            self.stateref = {"qreg": qalloc_p.bind(len(self._device.wires)), "wire_map": {}}
+
+    # pylint: disable=attribute-defined-outside-init
+    def cleanup(self):
+        """Perform any final steps after processing the plxpr.
+
+        For conversion to calayst, this reinserts extracted qubits and
+        deallocates the register, and releases the device.
+        """
+        if not self.actualized:
+            self.actualize_qreg()
+        qdealloc_p.bind(self.qreg)
+        device_release_p.bind()
+        self.stateref = None
+
+
+@QFuncPlxprInterpreter.register_primitive(quantum_subroutine_p)
 def handle_subroutine(self, *args, **kwargs):
     # We need to pass the wire as an argument...
     # And we somehow need to start another interpreter
     # but only in case it is not yet already available...
+    raise NotImplementedError()
     from jax.experimental.pjit import pjit_p
     from catalyst.jax_primitives import AbstractQreg
     from jax._src.core import jaxpr_as_fun
@@ -450,7 +480,7 @@ def handle_subroutine(self, *args, **kwargs):
 
     return vals_out
 
-@SubroutineInterpreter.register_primitive(qml.QubitUnitary._primitive)
+@QFuncPlxprInterpreter.register_primitive(qml.QubitUnitary._primitive)
 def handle_qubit_unitary(self, *invals, n_wires):
     """Handle the conversion from plxpr to Catalyst jaxpr for the QubitUnitary primitive"""
     wires = [self.get_wire(w) for w in invals[1:]]
@@ -460,13 +490,13 @@ def handle_qubit_unitary(self, *invals, n_wires):
 
 
 # pylint: disable=unused-argument
-@SubroutineInterpreter.register_primitive(qml.GlobalPhase._primitive)
+@QFuncPlxprInterpreter.register_primitive(qml.GlobalPhase._primitive)
 def handle_global_phase(self, phase, *wires, n_wires):
     """Handle the conversion from plxpr to Catalyst jaxpr for the GlobalPhase primitive"""
     gphase_p.bind(phase, ctrl_len=0, adjoint=False)
 
 
-@SubroutineInterpreter.register_primitive(qml.BasisState._primitive)
+@QFuncPlxprInterpreter.register_primitive(qml.BasisState._primitive)
 def handle_basis_state(self, *invals, n_wires):
     """Handle the conversion from plxpr to Catalyst jaxpr for the BasisState primitive"""
     state_inval = invals[0]
@@ -481,7 +511,7 @@ def handle_basis_state(self, *invals, n_wires):
 
 
 # pylint: disable=unused-argument
-@SubroutineInterpreter.register_primitive(qml.StatePrep._primitive)
+@QFuncPlxprInterpreter.register_primitive(qml.StatePrep._primitive)
 def handle_state_prep(self, *invals, n_wires, **kwargs):
     """Handle the conversion from plxpr to Catalyst jaxpr for the StatePrep primitive"""
     state_inval = invals[0]
@@ -498,7 +528,7 @@ def handle_state_prep(self, *invals, n_wires, **kwargs):
 
 
 # pylint: disable=unused-argument, too-many-arguments
-@SubroutineInterpreter.register_primitive(plxpr_cond_prim)
+@QFuncPlxprInterpreter.register_primitive(plxpr_cond_prim)
 def handle_cond(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
     """Handle the conversion from plxpr to Catalyst jaxpr for the cond primitive"""
     args = plxpr_invals[args_slice]
@@ -520,13 +550,8 @@ def handle_cond(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
             converted_jaxpr_branch = jax.make_jaxpr(lambda x: x)(AbstractQreg()).jaxpr
         else:
             # Convert branch from plxpr to Catalyst jaxpr
-
-            class Mixin(self.__class__, BranchPlxprInterpreter):
-                def __init__(self, dev, shots, stateref, actualized):
-                    super().__init__(dev, shots, stateref, actualized)
-
             converted_func = partial(
-                Mixin(self._device, self._shots, self.stateref, self.actualized).eval,
+                BranchPlxprInterpreter(self._device, self._shots).eval,
                 plxpr_branch,
                 branch_consts,
             )
@@ -559,7 +584,7 @@ def handle_cond(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
 
 
 # pylint: disable=unused-argument, too-many-arguments
-@SubroutineInterpreter.register_primitive(plxpr_for_loop_prim)
+@QFuncPlxprInterpreter.register_primitive(plxpr_for_loop_prim)
 def handle_for_loop(
     self,
     start,
@@ -585,11 +610,8 @@ def handle_for_loop(
     consts = plxpr_invals[consts_slice]
 
     # Convert for loop body from plxpr to Catalyst jaxpr
-    class Mixin(self.__class__, BranchPlxprInterpreter):
-        def __init__(self, dev, shots, stateref, actualized):
-            super().__init__(dev, shots, stateref, actualized)
     converted_func = partial(
-        Mixin(self._device, self._shots, self.stateref, self.actualized).eval,
+        BranchPlxprInterpreter(self._device, self._shots).eval,
         jaxpr_body_fn,
         consts,
     )
@@ -621,7 +643,7 @@ def handle_for_loop(
 
 
 # pylint: disable=unused-argument, too-many-arguments
-@SubroutineInterpreter.register_primitive(plxpr_while_loop_prim)
+@QFuncPlxprInterpreter.register_primitive(plxpr_while_loop_prim)
 def handle_while_loop(
     self,
     *plxpr_invals,
@@ -638,11 +660,8 @@ def handle_while_loop(
     args_plus_qreg = [*args, self.qreg]  # Add the qreg to the args
 
     # Convert for while body from plxpr to Catalyst jaxpr
-    class Mixin(self.__class__, BranchPlxprInterpreter):
-        def __init__(self, dev, shots, stateref, actualized):
-            super().__init__(dev, shots, stateref, actualized)
     converted_body_func = partial(
-        Mixin(self.device, self.shots, self.stateref, self.actualized).eval,
+        BranchPlxprInterpreter(self._device, self._shots).eval,
         jaxpr_body_fn,
         consts_body,
     )
@@ -684,7 +703,7 @@ def handle_while_loop(
     return outvals
 
 
-@SubroutineInterpreter.register_primitive(plxpr_measure_prim)
+@QFuncPlxprInterpreter.register_primitive(plxpr_measure_prim)
 def handle_measure(self, wire, reset, postselect):
     """Handle the conversion from plxpr to Catalyst jaxpr for the mid-circuit measure primitive."""
 
@@ -709,7 +728,7 @@ def handle_measure(self, wire, reset, postselect):
 
 
 # pylint: disable=unused-argument, too-many-positional-arguments
-@SubroutineInterpreter.register_primitive(plxpr_measure_in_basis_prim)
+@QFuncPlxprInterpreter.register_primitive(plxpr_measure_in_basis_prim)
 def handle_measure_in_basis(self, angle, wire, plane, reset, postselect):
     """Handle the conversion from plxpr to Catalyst jaxpr for the measure_in_basis primitive"""
     _angle = jax.lax.convert_element_type(angle, jnp.dtype(jnp.float64))
@@ -734,7 +753,7 @@ def handle_measure_in_basis(self, angle, wire, plane, reset, postselect):
 # This is due to the registrations being done outside the parent class definition.
 
 
-class BranchPlxprInterpreter(SubroutineInterpreter):
+class BranchPlxprInterpreter(QFuncPlxprInterpreter):
     """An interpreter that converts a plxpr branch into catalyst-variant jaxpr branch.
 
     Args:
@@ -742,9 +761,9 @@ class BranchPlxprInterpreter(SubroutineInterpreter):
         shots (qml.measurements.Shots)
     """
 
-    def __init__(self, device, shots, stateref, actualized):
+    def __init__(self, device, shots: qml.measurements.Shots):
         self._parent_qreg = None
-        super().__init__(device, shots, stateref, actualized)
+        super().__init__(device, shots)
 
     def setup(self):
         """Initialize the stateref."""
@@ -776,7 +795,6 @@ class BranchPlxprInterpreter(SubroutineInterpreter):
 
         self._parent_qreg = args[-1]
 
-        breakpoint()
         # Send the original args (without the qreg)
         outvals = super().eval(jaxpr, consts, *args[:-1])
 
@@ -786,38 +804,6 @@ class BranchPlxprInterpreter(SubroutineInterpreter):
         self.stateref = None
 
         return outvals
-
-class QFuncPlxprInterpreter(SubroutineInterpreter):
-    """An interpreter that converts plxpr into catalyst-variant jaxpr.
-
-    Args:
-        device (qml.devices.Device)
-        shots (qml.measurements.Shots)
-
-    """
-
-    def __init__(self, device, shots: qml.measurements.Shots | int, stateref, actualized):
-        super().__init__(device, shots, stateref, actualized)
-
-    def setup(self):
-        """Initialize the stateref and bind the device."""
-        if self.stateref is None:
-            device_init_p.bind(self._shots, **_get_device_kwargs(self._device))
-            self.stateref = {"qreg": qalloc_p.bind(len(self._device.wires)), "wire_map": {}}
-
-    # pylint: disable=attribute-defined-outside-init
-    def cleanup(self):
-        """Perform any final steps after processing the plxpr.
-
-        For conversion to calayst, this reinserts extracted qubits and
-        deallocates the register, and releases the device.
-        """
-        if not self.actualized:
-            self.actualize_qreg()
-        qdealloc_p.bind(self.qreg)
-        device_release_p.bind()
-        self.stateref = None
-
 
 
 class PredicatePlxprInterpreter(PlxprInterpreter):
