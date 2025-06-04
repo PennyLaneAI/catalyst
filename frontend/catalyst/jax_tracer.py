@@ -1327,28 +1327,28 @@ def trace_quantum_function(
         out_type: JAXPR output type (list of abstract values with explicitness flags).
         out_tree: PyTree shapen of the result
     """
-    
+
     if qml.transforms.set_shots in qnode.transform_program:
         # Then just apply it immediately
         user_transform = qnode.transform_program.copy()
         set_shots_transform = TransformProgram()
-        
+
         # Find and extract the set_shots transform
         for transform_container in user_transform:
             if transform_container.transform == qml.set_shots.transform:
                 set_shots_transform = transform_container
                 break
-        
+
         if set_shots_transform:
             # Apply set_shots transform to update device shots
-            shots_value = set_shots_transform.kwargs.get('shots', None)
+            shots_value = set_shots_transform.kwargs.get("shots", None)
             # Update device shots
-            if hasattr(device, 'shots'):
+            if hasattr(device, "shots"):
                 if isinstance(device, qml.devices.LegacyDevice):
                     device._shots = shots_value
                 else:
                     device._shots = qml.measurements.Shots(shots_value)
-            
+
             # Remove set_shots from the transform program since we've applied it
             user_transform.remove(set_shots_transform)
             qnode_program = user_transform
