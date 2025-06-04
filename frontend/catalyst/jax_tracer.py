@@ -1330,7 +1330,7 @@ def trace_quantum_function(
 
     if qml.transforms.set_shots in qnode.transform_program:
         # Then just apply it immediately
-        user_transform = qnode.transform_program.copy()
+        user_transform = qnode.transform_program
         set_shots_transform = TransformProgram()
 
         # Find and extract the set_shots transform
@@ -1349,9 +1349,9 @@ def trace_quantum_function(
                 else:
                     device._shots = qml.measurements.Shots(shots_value)
 
-            # Remove set_shots from the transform program since we've applied it
-            user_transform.remove(set_shots_transform)
-            qnode_program = user_transform
+            # # Remove set_shots from the transform program since we've applied it
+            # user_transform.remove(set_shots_transform)
+            # qnode_program = user_transform
 
     with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
         # (1) - Classical tracing
