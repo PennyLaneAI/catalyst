@@ -127,4 +127,10 @@ def LoopBoundaryOptimizationPass : Pass<"loop-boundary"> {
 }
 // ----- Quantum circuit transformation passes end ----- //
 
+def MergeUnitaryGatesPass : Pass<"merge-unitary-gates"> {
+    let summary = "Perform merging of chained unitary gates.";
+
+    let constructor = "catalyst::createMergeUnitaryGatesPass()";
+}
+
 #endif // QUANTUM_PASSES
