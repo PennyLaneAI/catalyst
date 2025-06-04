@@ -153,7 +153,6 @@ jobs:
     - name: Install Deps
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
       run: |
-        python3 --version
         sudo apt-get update
         sudo apt-get install -y python3 python3-pip cmake ninja-build clang lld
 
@@ -235,7 +234,6 @@ jobs:
     - name: Install Deps
       if: steps.cache-mhlo.outputs.cache-hit != 'true'
       run: |
-        python3 --version
         sudo apt-get update
         sudo apt-get install -y cmake ninja-build clang lld
 
@@ -558,7 +556,7 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y libomp-dev libasan6 make ninja-build
-        python3 --version
+        python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
         make frontend
 
@@ -709,7 +707,7 @@ jobs:
           sudo apt-get -y -q install cmake ninja-build
           python3 -m pip install nanobind pybind11
 
-      - name: Install lcov # Manually install lcov 1.14 (lcov_1.15-1_all.deb)
+      - name: Install lcov # Manually install lcov_1.15-1_all
         run: |
           wget http://archive.ubuntu.com/ubuntu/pool/universe/l/lcov/lcov_1.15-1_all.deb
           sudo apt-get install -y ./lcov_1.15-1_all.deb
