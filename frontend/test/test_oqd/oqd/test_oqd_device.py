@@ -26,7 +26,9 @@ class TestOQDDevice:
     def test_initialization(self):
         """Test the initialization."""
 
-        device = OQDDevice(backend="default", shots=1000, wires=8, openapl_file="test_openapl_generation.json")
+        device = OQDDevice(
+            backend="default", shots=1000, wires=8, openapl_file="test_openapl_generation.json"
+        )
 
         assert device.openapl_file == "test_openapl_generation.json"
         assert device.backend == "default"

@@ -78,9 +78,8 @@ class OQDDevice final : public Catalyst::Runtime::QuantumDevice {
         device_shots = device_kwargs.contains("shots")
                            ? static_cast<size_t>(std::stoll(device_kwargs["shots"]))
                            : 0;
-        openapl_file = device_kwargs.contains("openapl_file")
-                           ? device_kwargs["openapl_file"]
-                           : "__openapl__output.json";
+        openapl_file = device_kwargs.contains("openapl_file") ? device_kwargs["openapl_file"]
+                                                              : "__openapl__output.json";
     }
     ~OQDDevice() { __catalyst__oqd__rt__finalize(openapl_file); };
 
