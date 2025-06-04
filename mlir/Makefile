@@ -55,15 +55,8 @@ help:
 all: llvm mhlo enzyme dialects plugin
 
 .PHONY: llvm
-llvm: TARGET_FILE := $(MK_DIR)/llvm-project/mlir/lib/Dialect/Bufferization/Transforms/BufferDeallocation.cpp
-llvm: PATCH_FILE := $(MK_DIR)/patches/mlir-buffer-deallocation.patch
 llvm:
 	@echo "build LLVM and MLIR enabling Python bindings"
-	# Patch in MLIR buffer deallocation bugfix
-	# TODO: remove once https://github.com/llvm/llvm-project/pull/121582 is merged & the dep updated
-	@if patch --dry-run -p1 -N $(TARGET_FILE) $(PATCH_FILE) > /dev/null 2>&1; then \
-		patch -p1 $(TARGET_FILE) $(PATCH_FILE); \
-	fi
 	cmake -G Ninja -S llvm-project/llvm -B $(LLVM_BUILD_DIR) \
 		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
 		-DLLVM_BUILD_EXAMPLES=OFF \
@@ -91,26 +84,16 @@ llvm:
 	LIT_FILTER_OUT="Bytecode|tosa-to-tensor|execution_engine" cmake --build $(LLVM_BUILD_DIR) --target $(LLVM_TARGETS)
 
 .PHONY: mhlo
-mhlo: TARGET_FILE := $(MK_DIR)/mlir-hlo/mhlo/transforms/CMakeLists.txt
-mhlo: PATCH_FILE := $(MK_DIR)/patches/mhlo-Add-PassesIncGen-in-transforms-CMakeList.patch
 mhlo:
 	@echo "build MLIR-HLO"
-	# Clean mhlo submodule for git patches
-	make clean-mhlo
-
-	# Patch MHLO cmake dependency
-	# TODO: remove once https://github.com/openxla/xla/pull/15446 is merged
-	@if patch --dry-run -p1 -N $(TARGET_FILE) $(PATCH_FILE) > /dev/null 2>&1; then \
-		patch -p1 $(TARGET_FILE) $(PATCH_FILE); \
-	fi
 
 	# Patch MHLO shardy dependency
-	@if cd mlir-hlo; git apply --summary $(MK_DIR)/patches/mhlo-remove-shardy.patch; then \
+	@if cd mlir-hlo; git apply --check $(MK_DIR)/patches/mhlo-remove-shardy.patch; then \
 		git apply $(MK_DIR)/patches/mhlo-remove-shardy.patch; \
 	fi
 
 	# Patch MHLO passes removed from upstream
-	@if cd mlir-hlo; git apply --summary $(MK_DIR)/patches/mhlo-add-back-necessary-passes.patch; then \
+	@if cd mlir-hlo; git apply --check $(MK_DIR)/patches/mhlo-add-back-necessary-passes.patch; then \
 		git apply $(MK_DIR)/patches/mhlo-add-back-necessary-passes.patch; \
 	fi
 	cmake -G Ninja -S mlir-hlo -B $(MHLO_BUILD_DIR) \
@@ -223,7 +206,7 @@ clean-llvm:
 clean-mhlo:
 	@echo "clean HLO dialect build files"
 	rm -rf $(MHLO_BUILD_DIR)
-	cd mlir-hlo; git clean -fd; git checkout .;\
+	cd mlir-hlo; git clean -fd; git checkout .
 
 clean-enzyme:
 	@echo "clean enzyme build files"

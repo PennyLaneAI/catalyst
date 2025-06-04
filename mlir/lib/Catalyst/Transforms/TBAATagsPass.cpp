@@ -12,20 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "mlir/Pass/Pass.h"
-#include "mlir/Transforms/DialectConversion.h"
-
-#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-
 #include "mlir/Conversion/LLVMCommon/ConversionTarget.h"
 #include "mlir/Conversion/LLVMCommon/TypeConverter.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/Pass/Pass.h"
+#include "mlir/Transforms/DialectConversion.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include "Catalyst/Transforms/Passes.h"
-#include "Catalyst/Transforms/TBAAUtils.h"
-
 #include "Catalyst/Transforms/Patterns.h"
+#include "Catalyst/Transforms/TBAAUtils.h"
 #include "Gradient/IR/GradientInterfaces.h"
 
 using namespace mlir;

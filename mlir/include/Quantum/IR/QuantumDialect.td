@@ -81,7 +81,6 @@ def QuantumMemory : Resource<"QuantumMemory"> {
     // This resource represents a generic piece of quantum memory. It can be used to
     // model the resource bahavior of quantum operations, in order to help make decisions
     // during various IR analyses.
-    // For example, a gate operation will both read from and write to quantum memory.
     //
     // For an operation from a downstream dialect (e.g. the MBQC dialect) to use this resource,
     // all the downstream dialect needs to do is to
