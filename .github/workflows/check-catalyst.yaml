@@ -50,7 +50,6 @@ jobs:
 
       - name: Install dependencies
         run: |
-          python3 --version
           sudo apt-get update
           sudo apt-get -y -q install ninja-build make cmake clang libomp-dev
           python3 -m pip install nanobind pybind11
@@ -159,7 +158,7 @@ jobs:
         sudo apt-get install -y python3 python3-pip cmake ninja-build clang lld
 
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
-        python3 -m pip install numpy pybind11 nanobind
+        python3 -m pip install numpy pybind11 nanobind PyYAML
 
     - name: Build LLVM
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
@@ -172,6 +171,8 @@ jobs:
         CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \
         COMPILER_LAUNCHER="" \
+        PYTHON3_EXECUTABLE=$(which python3) \
+        Python3_NumPy_INCLUDE_DIRS=$$($(PYTHON) -c "import numpy as np; print(np.get_include())") \
         make llvm
 
   mhlo:
@@ -470,7 +471,7 @@ jobs:
     - name: Install Deps
       run: |
         sudo apt-get update
-        sudo apt-get install -y python3 python3-pip libomp-dev libasan6 make ninja-build
+        sudo apt-get install -y libomp-dev libasan6 make ninja-build
         python3 --version 
         python3 -m pip install -r requirements.txt
         # cuda-quantum is added manually here.
@@ -558,7 +559,7 @@ jobs:
     - name: Install Deps
       run: |
         sudo apt-get update
-        sudo apt-get install -y python3 python3-pip libomp-dev libasan6 make ninja-build
+        sudo apt-get install -y libomp-dev libasan6 make ninja-build
         python3 --version
         python3 -m pip install -r requirements.txt
         make frontend
@@ -620,7 +621,7 @@ jobs:
     - name: Install Deps
       run: |
         sudo apt-get update
-        sudo apt-get install -y python3 python3-pip libomp-dev libasan6 make ninja-build
+        sudo apt-get install -y libomp-dev libasan6 make ninja-build
         python3 --version
         python3 -m pip install -r requirements.txt
         make frontend
