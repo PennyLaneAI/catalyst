@@ -309,7 +309,6 @@ jobs:
     - name: Install Deps
       if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
       run: |
-        python3 --version
         sudo apt-get update
         sudo apt-get install -y cmake ninja-build clang lld
 
@@ -344,7 +343,7 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y python3 python3-pip cmake ninja-build ccache clang lld
-        python3 --version
+        python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install numpy nanobind pybind11
 
     - name: Get Cached LLVM Source
@@ -468,7 +467,7 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y libomp-dev libasan6 make ninja-build
-        python3 --version 
+        python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
         # cuda-quantum is added manually here.
         # It can't be in requirements.txt as that will break
@@ -618,7 +617,7 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y libomp-dev libasan6 make ninja-build
-        python3 --version
+        python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
         make frontend
 
