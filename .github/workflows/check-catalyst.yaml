@@ -711,8 +711,8 @@ jobs:
 
       - name: Install lcov # Manually install lcov 1.14 (lcov_1.15-1_all.deb)
         run: |
-          # wget http://archive.ubuntu.com/ubuntu/pool/universe/l/lcov/lcov_1.15-1_all.deb
-          # sudo apt-get install -y ./lcov_1.15-1_all.deb
+          wget http://archive.ubuntu.com/ubuntu/pool/universe/l/lcov/lcov_1.15-1_all.deb
+          sudo apt-get install -y ./lcov_1.15-1_all.deb
           lcov --version 
 
       - name: Install additional dependencies for OpenQasm device
