@@ -424,7 +424,11 @@ class SubroutineInterpreter(PlxprInterpreter):
         outvals = super().eval(jaxpr, consts, *args)
 
         # Add the qreg to the output values
-        outvals = outvals
+        self.qreg, retvals = outvals[0], outvals[1:]
+
+        self.actualize_qreg()
+
+        outvals = (self.qreg, *retvals)
 
         self.stateref = None
 
@@ -465,6 +469,7 @@ class QFuncPlxprInterpreter(SubroutineInterpreter, PlxprInterpreter):
         device_release_p.bind()
         self.stateref = None
 
+from catalyst.jax_primitives import qinsert_p
 
 @QFuncPlxprInterpreter.register_primitive(quantum_subroutine_p)
 def handle_subroutine(self, *args, **kwargs):
