@@ -31,6 +31,7 @@ OQD_PIPELINES = OQDDevicePipeline(
     os.path.join(MODULE_TEST_PATH, "calibration_data/gate.toml"),
 )
 
+
 def profile_openapl(file_path):
     """Parses an OpenAPL JSON file and extracts statistics."""
     with open(file_path, "r", encoding="utf-8") as f:
