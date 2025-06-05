@@ -84,13 +84,13 @@ void __catalyst__oqd__rt__initialize()
     (*JSON)["protocol"] = protocol;
 }
 
-void __catalyst__oqd__rt__finalize(const std::string &openapl_file)
+void __catalyst__oqd__rt__finalize(const std::string &openapl_file_name)
 {
     for (auto pulse : *PulseGarbageCan) {
         delete pulse;
     }
 
-    std::ofstream out_json(openapl_file);
+    std::ofstream out_json(openapl_file_name);
     out_json << JSON->dump(2);
     JSON = nullptr;
 }

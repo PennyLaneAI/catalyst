@@ -31,7 +31,7 @@ class OQDDevice final : public Catalyst::Runtime::QuantumDevice {
 
     size_t device_shots;
     std::string ion_specs;
-    std::string openapl_file;
+    std::string openapl_file_name;
     std::vector<std::string> phonon_specs;
 
     std::unordered_map<std::string, std::string> device_kwargs;
@@ -78,10 +78,10 @@ class OQDDevice final : public Catalyst::Runtime::QuantumDevice {
         device_shots = device_kwargs.contains("shots")
                            ? static_cast<size_t>(std::stoll(device_kwargs["shots"]))
                            : 0;
-        openapl_file = device_kwargs.contains("openapl_file") ? device_kwargs["openapl_file"]
+        openapl_file_name = device_kwargs.contains("openapl_file_name") ? device_kwargs["openapl_file_name"]
                                                               : "__openapl__output.json";
     }
-    ~OQDDevice() { __catalyst__oqd__rt__finalize(openapl_file); };
+    ~OQDDevice() { __catalyst__oqd__rt__finalize(openapl_file_name); };
 
     auto AllocateQubits(size_t) -> std::vector<QubitIdType> override;
     void ReleaseAllQubits() override;
@@ -100,6 +100,6 @@ class OQDDevice final : public Catalyst::Runtime::QuantumDevice {
 
     const std::string &getIonSpecs() { return ion_specs; }
     const std::vector<std::string> &getPhononSpecs() { return phonon_specs; }
-    const std::string &getOutputFile() { return openapl_file; }
+    const std::string &getOutputFile() { return openapl_file_name; }
 };
 } // namespace Catalyst::Runtime::Device

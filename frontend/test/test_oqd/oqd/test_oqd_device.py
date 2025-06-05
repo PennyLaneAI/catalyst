@@ -27,10 +27,10 @@ class TestOQDDevice:
         """Test the initialization."""
 
         device = OQDDevice(
-            backend="default", shots=1000, wires=8, openapl_file="test_openapl_generation.json"
+            backend="default", shots=1000, wires=8, openapl_file_name="test_openapl_generation.json"
         )
 
-        assert device.openapl_file == "test_openapl_generation.json"
+        assert device.openapl_file_name == "test_openapl_generation.json"
         assert device.backend == "default"
         assert device.shots == qml.measurements.Shots(1000)
         assert device.wires == qml.wires.Wires(range(0, 8))

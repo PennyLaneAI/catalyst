@@ -23,8 +23,8 @@ import pytest
 
 
 @pytest.fixture()
-def temporary_openapl_file():
-    """Ensure the OpenAPL output file is clean before and after each test."""
+def tmp_openapl_file_name():
+    """Returns a temporary directory for the OpenAPL output file."""
     with TemporaryDirectory() as temp_dir:
-        openapl_file = os.path.join(temp_dir, "__openapl__output.json")
-        yield openapl_file
+        openapl_file_name = os.path.join(temp_dir, "__openapl__output.json")
+        yield openapl_file_name
