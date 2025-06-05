@@ -1,0 +1,132 @@
+From 70172e8399383d6c1964d73a2d20cba3c55a3279 Mon Sep 17 00:00:00 2001
+From: paul0403 <paulhaochen.wang@gmail.com>
+Date: Thu, 29 May 2025 10:06:35 -0400
+Subject: [PATCH] remove shardy dependency
+
+---
+ bindings/c/CMakeLists.txt                            | 1 -
+ stablehlo_ext/CMakeLists.txt                         | 1 +
+ stablehlo_ext/analysis/CMakeLists.txt                | 3 ++-
+ stablehlo_ext/transforms/CMakeLists.txt              | 7 ++++++-
+ stablehlo_ext/transforms/stablehlo_refine_shapes.cpp | 3 ---
+ tests/lit.cfg.py                                     | 1 +
+ tools/mlir-hlo-opt/mlir-hlo-opt.cc                   | 2 --
+ 7 files changed, 10 insertions(+), 8 deletions(-)
+
+diff --git a/bindings/c/CMakeLists.txt b/bindings/c/CMakeLists.txt
+index fd2a5c2c..53d916d5 100644
+--- a/bindings/c/CMakeLists.txt
++++ b/bindings/c/CMakeLists.txt
+@@ -10,7 +10,6 @@ add_mlir_public_c_api_library(MLIRHLOCAPIDialects
+   MhloPasses
+   MhloToArithmeticConversion
+   MhloToMemrefConversion
+-  MhloToStandard
+   MhloToLinalg
+   MhloToStablehlo
+   StablehloToMhlo
+diff --git a/stablehlo_ext/CMakeLists.txt b/stablehlo_ext/CMakeLists.txt
+index 3e55a89d..e8d318f1 100644
+--- a/stablehlo_ext/CMakeLists.txt
++++ b/stablehlo_ext/CMakeLists.txt
+@@ -12,5 +12,6 @@
+ # See the License for the specific language governing permissions and
+ # limitations under the License.
+ 
++add_subdirectory(analysis)
+ add_subdirectory(IR)
+ add_subdirectory(transforms)
+diff --git a/stablehlo_ext/analysis/CMakeLists.txt b/stablehlo_ext/analysis/CMakeLists.txt
+index 726d340d..0c0259b8 100644
+--- a/stablehlo_ext/analysis/CMakeLists.txt
++++ b/stablehlo_ext/analysis/CMakeLists.txt
+@@ -1,5 +1,6 @@
+ add_mlir_library(MhloAnalysis
+-  shape_component_analysis.cc
++  shape_component_analysis.cpp
++  PARTIAL_SOURCES_INTENDED
+ 
+   DEPENDS
+   mlir-headers
+diff --git a/stablehlo_ext/transforms/CMakeLists.txt b/stablehlo_ext/transforms/CMakeLists.txt
+index ee58f490..2d7cc22c 100644
+--- a/stablehlo_ext/transforms/CMakeLists.txt
++++ b/stablehlo_ext/transforms/CMakeLists.txt
+@@ -20,9 +20,14 @@ add_mlir_dialect_library(StablehloExtensionPasses
+   PARTIAL_SOURCES_INTENDED
+   chlo_recompose_ops.cpp
+   chlo_preserve_high_level_ops.cpp
++  sink_constants_to_control_flow.cpp
++  stablehlo_add_quant_dequant_conv.cpp
+   stablehlo_canonicalize_dynamism.cpp
++  stablehlo_canonicalize_from_hlo_import.cpp
++  stablehlo_legalize_quant_composite.cpp
++  stablehlo_prepare_for_hlo_export.cpp
+   stablehlo_refine_shapes.cpp
+-  sdy_refine_shapes.cpp
++  symbolic_shape_optimization.cpp
+ 
+   DEPENDS
+   StablehloExtensionPassesIncGen
+diff --git a/stablehlo_ext/transforms/stablehlo_refine_shapes.cpp b/stablehlo_ext/transforms/stablehlo_refine_shapes.cpp
+index cabd6a9f..2e64b4ed 100644
+--- a/stablehlo_ext/transforms/stablehlo_refine_shapes.cpp
++++ b/stablehlo_ext/transforms/stablehlo_refine_shapes.cpp
+@@ -34,7 +34,6 @@ limitations under the License.
+ #include "stablehlo_ext/IR/base.h"
+ #include "stablehlo_ext/IR/stablehlo_ops.h"
+ #include "stablehlo_ext/transforms/passes.h"  // NOLINT: Used in passes.h.inc
+-#include "stablehlo_ext/transforms/sdy_refine_shapes.h"
+ 
+ namespace mlir {
+ namespace stablehlo_ext {
+@@ -154,7 +153,6 @@ struct StablehloRefineShapesPass
+           patterns->add<RefineDynamicReduceWindowOpPattern>(context);
+           patterns->add<RefineDynamicRngBitGeneratorOpPattern>(context);
+           patterns->add<RefineDynamicTopKOpPattern>(context);
+-          populateSdyShapeRefinementPatterns(patterns, context);
+         };
+ 
+     if (failed(stablehlo::refineEntryFunction(*context, func,
+@@ -172,7 +170,6 @@ void populateStablehloExtRefineShapesPatterns(RewritePatternSet *patterns,
+   patterns->add<RefineDynamicReduceWindowOpPattern>(context);
+   patterns->add<RefineDynamicRngBitGeneratorOpPattern>(context);
+   patterns->add<RefineDynamicTopKOpPattern>(context);
+-  populateSdyShapeRefinementPatterns(patterns, context);
+ }
+ 
+ }  // namespace stablehlo_ext
+diff --git a/tests/lit.cfg.py b/tests/lit.cfg.py
+index ab20fbb5..6c61aec5 100644
+--- a/tests/lit.cfg.py
++++ b/tests/lit.cfg.py
+@@ -32,6 +32,7 @@ config.test_format = lit.formats.ShTest(not llvm_config.use_lit_shell)
+ 
+ # suffixes: A list of file extensions to treat as test files.
+ config.suffixes = ['.mlir']
++config.excludes = ['sdy_refine_shapes.mlir']
+ 
+ # test_source_root: The root path where tests are located.
+ config.test_source_root = os.path.dirname(__file__)
+diff --git a/tools/mlir-hlo-opt/mlir-hlo-opt.cc b/tools/mlir-hlo-opt/mlir-hlo-opt.cc
+index f018cbdc..b4474850 100644
+--- a/tools/mlir-hlo-opt/mlir-hlo-opt.cc
++++ b/tools/mlir-hlo-opt/mlir-hlo-opt.cc
+@@ -20,7 +20,6 @@ limitations under the License.
+ #include "mlir/InitAllExtensions.h"
+ #include "mlir/InitAllPasses.h"
+ #include "mlir/Tools/mlir-opt/MlirOptMain.h"
+-#include "shardy/dialect/sdy/ir/dialect.h"
+ #include "stablehlo/dialect/Register.h"
+ #include "stablehlo_ext/transforms/passes.h"
+ #include "transforms/gpu_passes.h"
+@@ -41,6 +40,5 @@ int main(int argc, char** argv) {
+   registerAllExtensions(registry);
+   mhlo::registerAllMhloDialects(registry);
+   stablehlo::registerAllDialects(registry);
+-  registry.insert<mlir::sdy::SdyDialect>();
+   return failed(MlirOptMain(argc, argv, "MLIR HLO pass driver\n", registry));
+ }
+-- 
+2.34.1
+

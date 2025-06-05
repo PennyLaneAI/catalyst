@@ -44,7 +44,7 @@ struct CommuteCliffordTPPRPass : public impl::CommuteCliffordTPPRPassBase<Commut
 
         populateCommuteCliffordTPPRPatterns(patterns, max_pauli_size);
 
-        if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
+        if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
             return signalPassFailure();
         }
     }
