@@ -35,11 +35,11 @@ namespace driver {
 // low-level messages, we might want to hide these.
 enum class Verbosity { Silent = 0, Urgent = 1, Debug = 2, All = 3 };
 
-enum SaveTemps { None, AfterPipeline, AfterPass };
+enum class SaveTemps { None, AfterPipeline, AfterPass };
 
-enum Action { OPT, Translate, LLC, All };
+enum class Action { OPT, Translate, LLC, All };
 
-enum InputType { MLIR, LLVMIR, OTHER };
+enum class InputType { MLIR, LLVMIR, OTHER };
 
 /// Helper verbose reporting macro.
 #define CO_MSG(opt, level, op)                                                                     \

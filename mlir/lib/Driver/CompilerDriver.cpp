@@ -349,7 +349,7 @@ LogicalResult runCoroLLVMPasses(const CompilerOptions &options,
     // Optimize the IR!
     CoroPM.run(*llvmModule.get(), MAM);
 
-    if (options.keepIntermediate) {
+    if (options.keepIntermediate != SaveTemps::None) {
         std::string tmp;
         llvm::raw_string_ostream rawStringOstream{tmp};
         llvmModule->print(rawStringOstream, nullptr);
@@ -401,7 +401,7 @@ LogicalResult runO2LLVMPasses(const CompilerOptions &options,
     // Optimize the IR!
     MPM.run(*llvmModule.get(), MAM);
 
-    if (options.keepIntermediate) {
+    if (options.keepIntermediate != SaveTemps::None) {
         std::string tmp;
         llvm::raw_string_ostream rawStringOstream{tmp};
         llvmModule->print(rawStringOstream, nullptr);
@@ -449,7 +449,7 @@ LogicalResult runEnzymePasses(const CompilerOptions &options,
     // Optimize the IR!
     MPM.run(*llvmModule.get(), MAM);
 
-    if (options.keepIntermediate) {
+    if (options.keepIntermediate != SaveTemps::None) {
         std::string tmp;
         llvm::raw_string_ostream rawStringOstream{tmp};
         llvmModule->print(rawStringOstream, nullptr);
@@ -516,7 +516,7 @@ LogicalResult preparePassManager(PassManager &pm, const CompilerOptions &options
         std::string tmp;
         llvm::raw_string_ostream s{tmp};
         s << *op;
-        if (options.keepIntermediate) {
+        if (options.keepIntermediate != SaveTemps::None) {
             dumpToFile(options, output.nextPipelineDumpFilename(pass->getName().str() + "_FAILED"),
                        tmp);
         }
@@ -567,7 +567,8 @@ LogicalResult runPipeline(PassManager &pm, const CompilerOptions &options, Compi
         llvm::errs() << "Failed to run pipeline: " << pipeline.getName() << "\n";
         return failure();
     }
-    if (options.keepIntermediate && (options.checkpointStage.empty() || output.isCheckpointFound)) {
+    if ((options.keepIntermediate != SaveTemps::None) &&
+        (options.checkpointStage.empty() || output.isCheckpointFound)) {
         std::string tmp;
         llvm::raw_string_ostream s{tmp};
         s << moduleOp;
@@ -580,7 +581,8 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
                           CompilerOutput &output, TimingScope &timing)
 
 {
-    if (options.keepIntermediate && (options.checkpointStage.empty() || output.isCheckpointFound)) {
+    if ((options.keepIntermediate != SaveTemps::None) &&
+        (options.checkpointStage.empty() || output.isCheckpointFound)) {
         std::string tmp;
         llvm::raw_string_ostream s{tmp};
         s << moduleOp;
@@ -725,7 +727,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
             return failure();
         }
         output.outIR.clear();
-        if (options.keepIntermediate) {
+        if (options.keepIntermediate != SaveTemps::None) {
             outIRStream << *mlirModule;
         }
         optTiming.stop();
@@ -745,7 +747,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         inType = InputType::LLVMIR;
         catalyst::utils::LinesCount::Module(*llvmModule);
 
-        if (options.keepIntermediate) {
+        if (options.keepIntermediate != SaveTemps::None) {
             std::string tmp;
             llvm::raw_string_ostream rawStringOstream{tmp};
             llvmModule->print(rawStringOstream, nullptr);
@@ -753,7 +755,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
             dumpToFile(options, outFile, tmp);
         }
         output.outIR.clear();
-        if (options.keepIntermediate) {
+        if (options.keepIntermediate != SaveTemps::None) {
             outIRStream << *llvmModule;
         }
         translateTiming.stop();
@@ -821,7 +823,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
 
         TimingScope outputTiming = llcTiming.nest("compileObject");
         output.outIR.clear();
-        if (options.keepIntermediate) {
+        if (options.keepIntermediate != SaveTemps::None) {
             outIRStream << *llvmModule;
         }
 
@@ -847,7 +849,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         outfile->keep();
     }
 
-    if (options.keepIntermediate and output.outputFilename != "-") {
+    if ((options.keepIntermediate != SaveTemps::None) && output.outputFilename != "-") {
         outfile->os() << output.outIR;
         outfile->keep();
     }
