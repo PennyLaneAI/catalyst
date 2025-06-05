@@ -151,6 +151,7 @@ plugin:
 		-DMLIR_DIR=$(LLVM_BUILD_DIR)/lib/cmake/mlir \
 		-DLLVM_EXTERNAL_LIT=$(LLVM_EXTERNAL_LIT) \
 		-DCATALYST_TOOLS_DIR=$(DIALECTS_BUILD_DIR)/bin \
+		-DPython_EXECUTABLE=$(PYTHON) \
 		-DPython3_EXECUTABLE=$(PYTHON) \
 		-DPython3_NumPy_INCLUDE_DIRS=$$($(PYTHON) -c "import numpy as np; print(np.get_include())") \
 		standalone
