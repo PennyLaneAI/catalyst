@@ -267,16 +267,16 @@ for pl_transform, (pass_name, decomposition) in transforms_to_passes.items():
     register_transform(pl_transform, pass_name, decomposition)
 
 
-class QFuncPlxprInterpreter(PlxprInterpreter):
-    """An interpreter that converts plxpr into catalyst-variant jaxpr.
+class SubroutineInterpreter(PlxprInterpreter):
+    """Base interpreter for quantum operations.
 
-    Args:
-        device (qml.devices.Device)
-        shots (qml.measurements.Shots)
-
+    It is a subroutine interpreter because unlike the QFuncPlxprInterpreter it
+    * does not allocate a new register upon beginning,
+    * does not deallocate the quantum register upon ending,
+    * and it does not release the quantum device back to the runtime.
     """
 
-    def __init__(self, device, shots: qml.measurements.Shots | int):
+    def __init__(self, device, shots):
         self._device = device
         self._shots = self._extract_shots_value(shots)
         self.stateref = None
@@ -297,29 +297,6 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
             self.stateref[__name] = __value
         else:
             super().__setattr__(__name, __value)
-
-    def setup(self):
-        """Initialize the stateref and bind the device."""
-        if self.stateref is None:
-            device_init_p.bind(
-                self._shots,
-                auto_qubit_management=(self._device.wires is None),
-                **_get_device_kwargs(self._device),
-            )
-            self.stateref = {"qreg": qalloc_p.bind(len(self._device.wires)), "wire_map": {}}
-
-    # pylint: disable=attribute-defined-outside-init
-    def cleanup(self):
-        """Perform any final steps after processing the plxpr.
-
-        For conversion to calayst, this reinserts extracted qubits and
-        deallocates the register, and releases the device.
-        """
-        if not self.actualized:
-            self.actualize_qreg()
-        qdealloc_p.bind(self.qreg)
-        device_release_p.bind()
-        self.stateref = None
 
     def get_wire(self, wire_value) -> AbstractQbit:
         """Get the ``AbstractQbit`` corresponding to a wire value."""
@@ -427,6 +404,83 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
         assert isinstance(shots, qml.measurements.Shots)
 
         return shots.total_shots if shots else 0
+
+    def eval(self, jaxpr: "jax.core.Jaxpr", consts: Sequence, *args) -> list:
+        """Evaluate a jaxpr.
+        Args:
+            jaxpr (jax.core.Jaxpr): the jaxpr to evaluate
+            consts (list[TensorLike]): the constant variables for the jaxpr
+            *args (tuple[TensorLike]): The arguments for the jaxpr.
+        Returns:
+            list[TensorLike]: the results of the execution.
+        """
+        raise NotImplementedError("Unreachable code until we add subroutine feature")
+
+        """
+
+        # We assume we have at least one argument (the qreg)
+        assert len(args) > 0
+
+        self._parent_qreg = args[0]
+        self.stateref = {"qreg": self._parent_qreg, "wire_map": {}}
+
+        # Send the original args (without the qreg)
+        outvals = super().eval(jaxpr, consts, *args)
+
+        # Add the qreg to the output values
+        self.qreg, retvals = outvals[0], outvals[1:]
+
+        self.actualize_qreg()
+
+        outvals = (self.qreg, *retvals)
+
+        self.stateref = None
+
+        return outvals
+        """
+
+
+class QFuncPlxprInterpreter(SubroutineInterpreter, PlxprInterpreter):
+    """An interpreter that converts plxpr into catalyst-variant jaxpr.
+
+    Args:
+        device (qml.devices.Device)
+        shots (qml.measurements.Shots)
+
+    """
+
+    def __init__(self, device, shots: qml.measurements.Shots | int):
+        super().__init__(device, shots)
+
+    def setup(self):
+        """Initialize the stateref and bind the device."""
+        if self.stateref is None:
+            device_init_p.bind(self._shots, **_get_device_kwargs(self._device))
+            self.stateref = {"qreg": qalloc_p.bind(len(self._device.wires)), "wire_map": {}}
+
+    # pylint: disable=attribute-defined-outside-init
+    def cleanup(self):
+        """Perform any final steps after processing the plxpr.
+
+        For conversion to calayst, this reinserts extracted qubits and
+        deallocates the register, and releases the device.
+        """
+        if not self.actualized:
+            self.actualize_qreg()
+        qdealloc_p.bind(self.qreg)
+        device_release_p.bind()
+        self.stateref = None
+
+    def eval(self, jaxpr: "jax.core.Jaxpr", consts: Sequence, *args) -> list:
+        """Use the PlxprInterpreter.eval method and not the SubroutineInterpreter
+
+        The Subroutine's eval method expects the first argument to be the qreg.
+        This will not be the case when first evaluating a QFuncPlxprInterpreter
+        as the qreg will be available only after the function has started running.
+        It will be one of the first instructions in the function and it is
+        added by the setup function.
+        """
+        return PlxprInterpreter.eval(self, jaxpr, consts, *args)
 
 
 @QFuncPlxprInterpreter.register_primitive(qml.QubitUnitary._primitive)
