@@ -15,6 +15,7 @@
 #pragma once
 
 #include <filesystem>
+#include <format>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -22,7 +23,6 @@
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Tools/mlir-opt/MlirOptMain.h"
-#include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include "Driver/Pipelines.h"
@@ -84,7 +84,7 @@ struct CompilerOptions {
 };
 
 struct CompilerOutput {
-    typedef std::unordered_map<std::string, std::string> PipelineOutputs;
+    using PipelineOutputs = std::unordered_map<std::string, std::string>;
     std::string outputFilename;
     std::string outIR;
     std::string diagnosticMessages;
@@ -94,9 +94,10 @@ struct CompilerOutput {
     bool isCheckpointFound;
 
     // Gets the next pipeline dump file name, prefixed with number.
-    std::string nextPipelineDumpFilename(std::string pipelineName, std::string ext = ".mlir")
+    std::string nextPipelineDumpFilename(const std::string &pipelineName,
+                                         const std::string &ext = ".mlir")
     {
-        return std::filesystem::path(std::to_string(this->pipelineCounter++) + "_" + pipelineName)
+        return std::filesystem::path(std::format("{}_{}", this->pipelineCounter++, pipelineName))
             .replace_extension(ext);
     };
 };
