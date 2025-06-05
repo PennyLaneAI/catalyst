@@ -1056,7 +1056,7 @@ int8_t *__catalyst__rt__array_get_element_ptr_1d(QirArray *ptr, int64_t idx)
             // allocate a new qubit if we are in automatic qubit allocation mode
             // `idx` is the new user wire index from frontend pennylane
             // number of currently allocated qubits is `qubit_vector_ptr->size()`
-            while (qubit_vector_ptr->size() <= idx) {
+            while (qubit_vector_ptr->size() <= static_cast<size_t>(idx)) {
                 auto new_alloced_id =
                     reinterpret_cast<QubitIdType>(__catalyst__rt__qubit_allocate());
                 qubit_vector_ptr->push_back(new_alloced_id);
