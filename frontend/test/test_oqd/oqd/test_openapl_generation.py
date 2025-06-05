@@ -163,7 +163,6 @@ class TestDecomposableGates:
 
     def test_CNOT_gate(self, tmp_openapl_file_name):
         """Test OpenAPL generation for a circuit with a single CNOT circuit."""
-        print("tmp_openapl_file_name: ", tmp_openapl_file_name)
         oqd_dev = OQDDevice(
             backend="default", shots=4, wires=2, openapl_file_name=tmp_openapl_file_name
         )
