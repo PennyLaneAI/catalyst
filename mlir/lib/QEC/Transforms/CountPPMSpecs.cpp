@@ -14,18 +14,18 @@
 
 #define DEBUG_TYPE "ppm_specs"
 
+#include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
-// #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-#include "mlir/Analysis/TopologicalSortUtils.h"
-#include "llvm/Support/Debug.h"
 
 #include "QEC/IR/QECDialect.h"
 #include "QEC/Transforms/Patterns.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "QEC/Utils/PauliStringWrapper.h"
 #include <algorithm>
+#include <string>
 
 using namespace llvm;
 using namespace mlir;
@@ -46,65 +46,94 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
     void print_specs(StringRef pass_name)
     {
         llvm::outs() << pass_name <<"\n";
+        llvm::BumpPtrAllocator string_allocator;
         llvm::DenseMap<StringRef, int> PPM_Specs;
-        PPM_Specs["num_pi4_gates"] = 0;
-        PPM_Specs["num_pi8_gates"] = 0;
-        PPM_Specs["max_weight_pi4"] = 0;
-        PPM_Specs["max_weight_pi8"] = 0;
+        PPM_Specs["num_logical_qubits"] = 0;
+        PPM_Specs["num_of_ppm"] = 0;
 
         // Walk over all operations in the IR (could be ModuleOp or FuncOp)
         getOperation()->walk([&](Operation *op) {
             // Skip top-level container ops if desired
             if (isa<ModuleOp>(op)) return;
 
-            StringRef gate_name = op->getName().getStringRef();
-            if (gate_name != "qec.ppr" && gate_name != "qec.ppm") return;
+            // llvm::outs()<<"\n-----------------------------MLIR------------------------------\n";
+            // op->print(llvm::outs());
+            // llvm::outs()<<"\n-----------------------------MLIR------------------------------\n";
 
-            auto rotation_attr = op->getAttrOfType<mlir::IntegerAttr>("rotation_kind");
-            int16_t rotation_kind = rotation_attr ? static_cast<int16_t>(rotation_attr.getInt()) : 0;
-            if (rotation_kind) {
+            StringRef gate_name = op->getName().getStringRef();
+
+            if (gate_name == "quantum.alloc") {
+                auto num_qubits_attr = op->getAttrOfType<mlir::IntegerAttr>("nqubits_attr");
+                u_int64_t num_qubits = num_qubits_attr ? static_cast<u_int64_t>(num_qubits_attr.getInt()) : 0;
+                PPM_Specs["num_logical_qubits"] = num_qubits;
+            }
+
+            if (gate_name == "qec.ppm") {
+                PPM_Specs["num_of_ppm"] = PPM_Specs["num_of_ppm"] + 1;
+            }
+
+            if (gate_name == "qec.ppr") {
+                auto rotation_attr = op->getAttrOfType<mlir::IntegerAttr>("rotation_kind");
                 auto pauli_product_attr = op->getAttrOfType<mlir::ArrayAttr>("pauli_product");
-                if (rotation_kind == 4 || rotation_kind == -4) {
-                    PPM_Specs["num_pi4_gates"] = PPM_Specs["num_pi4_gates"] + 1;
-                    PPM_Specs["max_wight_pi4"] = std::max(PPM_Specs["max_wight_pi4"], static_cast<int>(pauli_product_attr.size()));
-                }
-                if (rotation_kind == 8 || rotation_kind == -8) {
-                    PPM_Specs["num_pi8_gates"] = PPM_Specs["num_pi8_gates"] + 1;
-                    PPM_Specs["max_wight_pi8"] = std::max(PPM_Specs["max_wight_pi8"], static_cast<int>(pauli_product_attr.size()));
+                int16_t rotation_kind = rotation_attr ? static_cast<int16_t>(rotation_attr.getInt()) : 0;
+                if (rotation_kind) {
+                    llvm::StringSaver saver(string_allocator);
+                    StringRef num_pi_key = saver.save("num_pi"+std::to_string(abs(rotation_kind))+"_gates");
+                    StringRef max_weight_pi_key = saver.save("max_weight_pi"+std::to_string(abs(rotation_kind)));
+
+                    if (PPM_Specs.find(llvm::StringRef(num_pi_key)) == PPM_Specs.end()) {
+                        PPM_Specs[num_pi_key] = 1;
+                        PPM_Specs[max_weight_pi_key] = static_cast<int>(pauli_product_attr.size());
+                    }
+                    else {
+                        PPM_Specs[num_pi_key] = PPM_Specs[num_pi_key] + 1;
+                        PPM_Specs[max_weight_pi_key] = std::max(PPM_Specs[max_weight_pi_key], static_cast<int>(pauli_product_attr.size()));
+                    }
                 }
             }
+            // mlir::SetVector <Operation *> backwardSlice;
+            // getBackwardSlice(op, &backwardSlice);
+            // llvm::outs()<<"\n-----------------------------SLICE-----------------------------\n";
+            // llvm::outs()<<"Backward slicing\n";
+            // for (Operation *o : backwardSlice) {
+            //     if (o->getName().getStringRef() == "quantum.extract") {
+            //         llvm::outs() << *o << "\n"; 
+            //     }
+            // }
+            // llvm::outs()<<"\n-----------------------------SLICE------------------------------\n";
         });
-
+        
         for (const auto &entry : PPM_Specs) {
             llvm::outs() << "  " << entry.first << ": " << entry.second << "\n";
         }
+        llvm::outs()<<"\n=====================================================================\n";
         return;
     }
 
     void runOnOperation() final
     {
-        auto ctx = &getContext();
-        auto module = getOperation();
+        // auto ctx = &getContext();
+        // auto module = getOperation();
 
-        // Phase 1: Convert Clifford+T to PPR representation
-        {
-            ConversionTarget target(*ctx);
-            target.addIllegalDialect<quantum::QuantumDialect>();
-            target.addLegalOp<quantum::InitializeOp, quantum::FinalizeOp>();
-            target.addLegalOp<quantum::DeviceInitOp, quantum::DeviceReleaseOp>();
-            target.addLegalOp<quantum::AllocOp, quantum::DeallocOp>();
-            target.addLegalOp<quantum::InsertOp, quantum::ExtractOp>();
-            target.addLegalDialect<qec::QECDialect>();
+        // // Phase 1: Convert Clifford+T to PPR representation
+        // {
+        //     ConversionTarget target(*ctx);
+        //     target.addIllegalDialect<quantum::QuantumDialect>();
+        //     target.addLegalOp<quantum::InitializeOp, quantum::FinalizeOp>();
+        //     target.addLegalOp<quantum::DeviceInitOp, quantum::DeviceReleaseOp>();
+        //     target.addLegalOp<quantum::AllocOp, quantum::DeallocOp>();
+        //     target.addLegalOp<quantum::InsertOp, quantum::ExtractOp>();
+        //     target.addLegalDialect<qec::QECDialect>();
 
-            RewritePatternSet patterns(ctx);
-            populateCliffordTToPPRPatterns(patterns);
+        //     RewritePatternSet patterns(ctx);
+        //     populateCliffordTToPPRPatterns(patterns);
 
-            if (failed(applyPartialConversion(module, target, std::move(patterns)))) {
-                return signalPassFailure();
-            }
-            print_specs("Clifford+T to PPR");
-        }
-
+        //     if (failed(applyPartialConversion(module, target, std::move(patterns)))) {
+        //         return signalPassFailure();
+        //     }
+        //     print_specs("Clifford+T to PPR");
+        // }
+        print_specs("Clifford+T to PPR");
 
     }
 };
