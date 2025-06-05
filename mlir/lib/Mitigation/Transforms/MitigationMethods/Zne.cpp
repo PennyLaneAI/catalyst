@@ -391,7 +391,7 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
 
     Operation *shots = deviceInitOp.getShots().getDefiningOp();
     StringAttr lib = deviceInitOp.getLibAttr();
-    StringAttr name = deviceInitOp.getNameAttr();
+    StringAttr name = deviceInitOp.getDeviceNameAttr();
     StringAttr kwargs = deviceInitOp.getKwargsAttr();
 
     TypeRange originalTypes = op.getArgumentTypes();
