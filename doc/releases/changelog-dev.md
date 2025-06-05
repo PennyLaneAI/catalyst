@@ -74,6 +74,10 @@
   Array([0.25, 0.25, 0.25, 0.25], dtype=float64))
   ```
 
+* Catalyst now supports automatic qubit management.
+  (Add explanation and examples here.)
+  [(#???)](https://github.com/PennyLaneAI/catalyst/pull/???)
+
 <h3>Improvements 🛠</h3>
 
 * The behaviour of measurement processes executed on `null.qubit` with QJIT is now more in line with
