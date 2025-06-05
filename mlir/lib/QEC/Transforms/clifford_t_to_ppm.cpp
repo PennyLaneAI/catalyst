@@ -14,6 +14,7 @@
 
 #define DEBUG_TYPE "ppm_compilation"
 
+#include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -28,6 +29,10 @@ using namespace llvm;
 using namespace mlir;
 using namespace catalyst;
 using namespace catalyst::qec;
+
+// bool qsimFilter(mlir::Operation *op) {
+//     return op->getName().getStringRef() == "quantum.extract";
+// }
 
 namespace catalyst {
 namespace qec {
@@ -52,9 +57,9 @@ struct CliffordTToPPMPass : public impl::CliffordTToPPMPassBase<CliffordTToPPMPa
             // Skip top-level container ops if desired
             if (isa<ModuleOp>(op)) return;
 
-            llvm::outs()<<"\n-----------------------------MLIR------------------------------\n";
-            op->print(llvm::outs());
-            llvm::outs()<<"\n-----------------------------MLIR------------------------------\n";
+            // llvm::outs()<<"\n-----------------------------MLIR------------------------------\n";
+            // op->print(llvm::outs());
+            // llvm::outs()<<"\n-----------------------------MLIR------------------------------\n";
 
             StringRef gate_name = op->getName().getStringRef();
 
@@ -87,6 +92,16 @@ struct CliffordTToPPMPass : public impl::CliffordTToPPMPassBase<CliffordTToPPMPa
                     }
                 }
             }
+            mlir::SetVector <Operation *> backwardSlice;
+            getBackwardSlice(op, &backwardSlice);
+            llvm::outs()<<"\n-----------------------------SLICE-----------------------------\n";
+            llvm::outs()<<"Backward slicing\n";
+            for (Operation *o : backwardSlice) {
+                if (o->getName().getStringRef() == "quantum.extract") {
+                    llvm::outs() << *o << "\n"; 
+                }
+            }
+            llvm::outs()<<"\n-----------------------------SLICE------------------------------\n";
         });
 
         for (const auto &entry : PPM_Specs) {
