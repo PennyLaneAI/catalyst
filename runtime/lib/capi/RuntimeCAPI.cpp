@@ -1048,9 +1048,6 @@ int8_t *__catalyst__rt__array_get_element_ptr_1d(QirArray *ptr, int64_t idx)
     std::string error_msg = "The qubit register does not contain the requested wire: ";
     error_msg += std::to_string(idx);
 
-    bool _ = isDeviceAutomaticQubitManageMode();
-    std::cout << "auto management: " << _ << "\n";
-
     if (static_cast<size_t>(idx) >= qubit_vector_ptr->size()) {
         if (!isDeviceAutomaticQubitManageMode()) {
             RT_FAIL(error_msg.c_str());
