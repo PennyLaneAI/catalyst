@@ -274,9 +274,13 @@ class SubroutineInterpreter(PlxprInterpreter):
     * does not allocate a new register upon beginning,
     * does not deallocate the quantum register upon ending,
     * and it does not release the quantum device back to the runtime.
+
+    Args:
+        device (qml.devices.Device)
+        shots (qml.measurements.Shots)
     """
 
-    def __init__(self, device, shots):
+    def __init__(self, device, shots: qml.measurements.Shots | int):
         self._device = device
         self._shots = self._extract_shots_value(shots)
         self.stateref = None
@@ -413,10 +417,6 @@ class SubroutineInterpreter(PlxprInterpreter):
             *args (tuple[TensorLike]): The arguments for the jaxpr.
         Returns:
             list[TensorLike]: the results of the execution.
-        """
-        raise NotImplementedError("Unreachable code until we add subroutine feature")
-
-        """
 
         # We assume we have at least one argument (the qreg)
         assert len(args) > 0
@@ -438,9 +438,10 @@ class SubroutineInterpreter(PlxprInterpreter):
 
         return outvals
         """
+        raise NotImplementedError("Unreachable code until we add subroutine feature")
 
 
-class QFuncPlxprInterpreter(SubroutineInterpreter, PlxprInterpreter):
+class QFuncPlxprInterpreter(SubroutineInterpreter):
     """An interpreter that converts plxpr into catalyst-variant jaxpr.
 
     Args:
@@ -448,9 +449,6 @@ class QFuncPlxprInterpreter(SubroutineInterpreter, PlxprInterpreter):
         shots (qml.measurements.Shots)
 
     """
-
-    def __init__(self, device, shots: qml.measurements.Shots | int):
-        super().__init__(device, shots)
 
     def setup(self):
         """Initialize the stateref and bind the device."""
