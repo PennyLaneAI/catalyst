@@ -69,16 +69,6 @@ def profile_openapl(file_path):
     return stats
 
 
-def ordered(obj):
-    """Sort the JSON file."""
-    if isinstance(obj, dict):
-        return sorted((k, ordered(v)) for k, v in obj.items())
-    if isinstance(obj, list):
-        return sorted(ordered(x) for x in obj)
-    else:
-        return obj
-
-
 def verify_json(correct_file_name, expected_file_name):
     """Verify the two JSON files are identical."""
     if not os.path.exists(correct_file_name):
@@ -88,11 +78,10 @@ def verify_json(correct_file_name, expected_file_name):
 
     with open(correct_file_name, "r", encoding="utf-8") as f:
         correct_json = json.load(f)
-
     with open(expected_file_name, "r", encoding="utf-8") as f:
         expected_json = json.load(f)
 
-    return ordered(correct_json) == ordered(expected_json)
+    return correct_json == expected_json
 
 
 class TestTargetGates:
@@ -112,12 +101,6 @@ class TestTargetGates:
 
         circuit(np.pi / 2)
 
-        stats = profile_openapl(oqd_dev.openapl_file_name)
-        assert stats["num_ions"] == 1
-        assert stats["num_parallel_protocols"] == 1
-        assert stats["num_beams"] == 2
-        assert stats["num_transitions"] == 4
-        assert stats["num_levels"] == 4
         expected_f = os.path.join(MODULE_TEST_PATH, "test_single_RX.json")
         assert verify_json(expected_f, oqd_dev.openapl_file_name)
 
@@ -180,6 +163,7 @@ class TestDecomposableGates:
 
     def test_CNOT_gate(self, tmp_openapl_file_name):
         """Test OpenAPL generation for a circuit with a single CNOT circuit."""
+        print("tmp_openapl_file_name: ", tmp_openapl_file_name)
         oqd_dev = OQDDevice(
             backend="default", shots=4, wires=2, openapl_file_name=tmp_openapl_file_name
         )
@@ -192,12 +176,6 @@ class TestDecomposableGates:
 
         circuit()
 
-        stats = profile_openapl(oqd_dev.openapl_file_name)
-        assert stats["num_ions"] == 2
-        assert stats["num_parallel_protocols"] == 5
-        assert stats["num_beams"] == 14
-        assert stats["num_transitions"] == 8
-        assert stats["num_levels"] == 8
         expected_f = os.path.join(MODULE_TEST_PATH, "test_single_CNOT.json")
         assert verify_json(expected_f, oqd_dev.openapl_file_name)
 
