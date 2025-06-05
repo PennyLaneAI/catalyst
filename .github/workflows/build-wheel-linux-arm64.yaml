@@ -61,7 +61,7 @@ jobs:
         container_img: ["manylinux_2_28_aarch64"]
 
     name: Build Dependencies (Python ${{ matrix.python_version }})
-    runs-on: ubuntu-22.04-arm
+    runs-on: ubuntu-24.04-arm
     container: quay.io/pypa/${{ matrix.container_img }}
 
     if: needs.check_if_wheel_build_required.outputs.build-wheels == 'true'
@@ -247,7 +247,7 @@ jobs:
         container_img: ["manylinux_2_28_aarch64"]
 
     name: Build Wheels (Python ${{ matrix.python_version }})
-    runs-on: ubuntu-22.04-arm
+    runs-on: ubuntu-24.04-arm
     container: quay.io/pypa/${{ matrix.container_img }}
 
     steps:
@@ -349,6 +349,7 @@ jobs:
               -DCMAKE_BUILD_TYPE=Release \
               -DLLVM_ENABLE_ASSERTIONS=ON \
               -DQUANTUM_ENABLE_BINDINGS_PYTHON=ON \
+              -DCMAKE_PREFIX_PATH=$GITHUB_WORKSPACE/catalyst/catalyst \
               -DPython3_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -DPython3_NumPy_INCLUDE_DIRS=$(python${{ matrix.python_version }} -c "import numpy as np; print(np.get_include())") \
               -DMLIR_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir" \
@@ -411,11 +412,16 @@ jobs:
 
     # To check all wheels for supported python3 versions
     name: Test Wheels (Python ${{ matrix.python_version }}) on Linux Arm
-    runs-on: ubuntu-22.04-arm
+    runs-on: ubuntu-24.04-arm
 
     steps:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
+
+    - name: Setup Python ${{ matrix.python_version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python_version }}
 
     - name: Download Wheel Artifact
       uses: actions/download-artifact@v4
