@@ -12,24 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <bitset>
 #include <cstdarg>
 #include <cstdlib>
 #include <ctime>
-
-#include <bitset>
-#include <stdexcept>
-
 #include <memory>
 #include <ostream>
+#include <stdexcept>
 #include <string_view>
+#include <tuple>
 
 #include "mlir/ExecutionEngine/CRunnerUtils.h"
 
 #include "Exception.hpp"
-#include "QuantumDevice.hpp"
-
 #include "ExecutionContext.hpp"
 #include "MemRefUtils.hpp"
+#include "QuantumDevice.hpp"
 #include "Timer.hpp"
 
 #include "RuntimeCAPI.h"
@@ -243,7 +241,7 @@ void __catalyst__rt__finalize()
 }
 
 static int __catalyst__rt__device_init__impl(int8_t *rtd_lib, int8_t *rtd_name, int8_t *rtd_kwargs,
-                                             int64_t shots)
+                                             int64_t shots, bool auto_qubit_management)
 {
     // Device library cannot be a nullptr
     RT_FAIL_IF(!rtd_lib, "Invalid device library");
@@ -256,6 +254,7 @@ static int __catalyst__rt__device_init__impl(int8_t *rtd_lib, int8_t *rtd_name, 
         (rtd_kwargs ? reinterpret_cast<char *>(rtd_kwargs) : "")};
     RT_FAIL_IF(!initRTDevicePtr(args[0], args[1], args[2]),
                "Failed initialization of the backend device");
+    RTD_PTR->setDeviceAutoQubitManagementMode(auto_qubit_management);
     getQuantumDevicePtr()->SetDeviceShots(shots);
     if (CTX->getDeviceRecorderStatus()) {
         getQuantumDevicePtr()->StartTapeRecording();
@@ -264,10 +263,10 @@ static int __catalyst__rt__device_init__impl(int8_t *rtd_lib, int8_t *rtd_name, 
 }
 
 void __catalyst__rt__device_init(int8_t *rtd_lib, int8_t *rtd_name, int8_t *rtd_kwargs,
-                                 int64_t shots)
+                                 int64_t shots, bool auto_qubit_management)
 {
     timer::timer(__catalyst__rt__device_init__impl, "device_init", /* add_endl */ true, rtd_lib,
-                 rtd_name, rtd_kwargs, shots);
+                 rtd_name, rtd_kwargs, shots, auto_qubit_management);
 }
 
 static int __catalyst__rt__device_release__impl()
@@ -1036,6 +1035,11 @@ int64_t __catalyst__rt__array_get_size_1d(QirArray *ptr)
     return qubit_vector_ptr->size();
 }
 
+static bool isDeviceAutomaticQubitManageMode()
+{
+    return RTD_PTR->getDeviceAutoQubitManagementMode();
+}
+
 int8_t *__catalyst__rt__array_get_element_ptr_1d(QirArray *ptr, int64_t idx)
 {
     std::vector<QubitIdType> *qubit_vector_ptr = reinterpret_cast<std::vector<QubitIdType> *>(ptr);
@@ -1043,7 +1047,25 @@ int8_t *__catalyst__rt__array_get_element_ptr_1d(QirArray *ptr, int64_t idx)
     RT_ASSERT(idx >= 0);
     std::string error_msg = "The qubit register does not contain the requested wire: ";
     error_msg += std::to_string(idx);
-    RT_FAIL_IF(static_cast<size_t>(idx) >= qubit_vector_ptr->size(), error_msg.c_str());
+
+    bool _ = isDeviceAutomaticQubitManageMode();
+    std::cout << "auto management: " << _ << "\n";
+
+    if (static_cast<size_t>(idx) >= qubit_vector_ptr->size()) {
+        if (!isDeviceAutomaticQubitManageMode()) {
+            RT_FAIL(error_msg.c_str());
+        }
+        else {
+            // allocate a new qubit if we are in automatic qubit allocation mode
+            // `idx` is the new user wire index from frontend pennylane
+            // number of currently allocated qubits is `qubit_vector_ptr->size()`
+            while (qubit_vector_ptr->size() <= idx) {
+                auto new_alloced_id =
+                    reinterpret_cast<QubitIdType>(__catalyst__rt__qubit_allocate());
+                qubit_vector_ptr->push_back(new_alloced_id);
+            }
+        }
+    }
 
     QubitIdType *data = qubit_vector_ptr->data();
     return (int8_t *)&data[idx];
