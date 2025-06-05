@@ -297,6 +297,14 @@
   :doc:`sharp bits and debugging tips <sharp_bits>` guide. In regular QJIT-compiled workloads
   (without program capture enabled), you must continue to use :func:`catalyst.measure`.
 
+* An argument (`openapl_file_name`) is added to the `OQDDevice` constructor to specify the name of
+  the output OpenAPL file.
+  [(#1763)](https://github.com/PennyLaneAI/catalyst/pull/1763)
+
+* The OQD device toml file is modified to only include gates that are decomposable to the OQD device
+  target gate set.
+  [(#1763)](https://github.com/PennyLaneAI/catalyst/pull/1763)
+
 * Upgraded action runners from Ubuntu22.04 to Ubuntu24.04. [(#1728)](https://github.com/PennyLaneAI/catalyst/pull/1728)
 
 <h3>Documentation 📝</h3>
