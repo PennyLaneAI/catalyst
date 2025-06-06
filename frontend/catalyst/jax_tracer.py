@@ -988,7 +988,7 @@ def trace_quantum_measurements(
             if device.wires is None:
                 d_wires = num_qubits_p.bind()
             elif catalyst.device.qjit_device.is_dynamic_wires(device.wires):
-                d_wires = device.wires[0]
+                d_wires = num_qubits_p.bind()
             else:
                 d_wires = len(device.wires)
 
