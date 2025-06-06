@@ -126,7 +126,7 @@ class TestCompilerOptions:
             (
                 "invalid_string",
                 ValueError,
-                "Invalid string for keep_intermediate: invalid_string. Valid strings are 'none', 'basic', 'debug'.",
+                "Invalid string for keep_intermediate: Valid strings are 'none', 'basic', 'debug'.",
             ),
             (3.0, TypeError, "Invalid type for keep_intermediate: <class 'float'>."),
             ([], TypeError, "Invalid type for keep_intermediate: <class 'list'>."),
