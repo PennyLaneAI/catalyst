@@ -45,9 +45,9 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y cmake ninja-build ccache libomp-dev libasan6 lld
-        python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
-        python3 -m pip install -r requirements.txt
-        pip install amazon-braket-pennylane-plugin
+        # python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
+        # python3 -m pip install -r requirements.txt
+        # pip install amazon-braket-pennylane-plugin
         echo "AWS_DEFAULT_REGION=us-east-1" >> $GITHUB_ENV
 
     - name: Get Catalyst Build Dependencies (latest)
