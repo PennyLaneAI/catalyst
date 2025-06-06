@@ -305,7 +305,15 @@
   target gate set.
   [(#1763)](https://github.com/PennyLaneAI/catalyst/pull/1763)
 
-* Upgraded action runners from Ubuntu22.04 to Ubuntu24.04. [(#1728)](https://github.com/PennyLaneAI/catalyst/pull/1728)
+* Upgraded action runners from Ubuntu22.04 to Ubuntu24.04.
+  [(#1728)](https://github.com/PennyLaneAI/catalyst/pull/1728)
+
+* The runtime CAPI function `__catalyst__rt__num_qubits` now has a corresponding jax primitive
+  `num_qubits_p` and quantum dialect operation `NumQubitsOp`.
+  [(#1793)](https://github.com/PennyLaneAI/catalyst/pull/1793)
+
+  For measurements whose shapes depend on the number of qubits, they now properly retrieve the
+  number of qubits through this new operation when it is dynamic.
 
 <h3>Documentation 📝</h3>
 
