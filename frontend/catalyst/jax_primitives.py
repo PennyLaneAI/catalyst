@@ -850,11 +850,6 @@ def _device_release_lowering(jax_ctx: mlir.LoweringRuleContext):
 #
 # num_qubits_p
 #
-@num_qubits_p.def_impl
-def _num_qubits_def_impl(ctx):  # pragma: no cover
-    raise NotImplementedError()
-
-
 @num_qubits_p.def_abstract_eval
 def _num_qubits_abstract_eval():
     return core.ShapedArray((), jax.numpy.int64)
