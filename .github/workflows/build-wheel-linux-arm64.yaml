@@ -61,7 +61,7 @@ jobs:
         container_img: ["manylinux_2_28_aarch64"]
 
     name: Build Dependencies (Python ${{ matrix.python_version }})
-    runs-on: ubuntu-22.04-arm
+    runs-on: ubuntu-24.04-arm
     container: quay.io/pypa/${{ matrix.container_img }}
 
     if: needs.check_if_wheel_build_required.outputs.build-wheels == 'true'
@@ -187,9 +187,10 @@ jobs:
       run: |
         export PATH=$GITHUB_WORKSPACE/llvm-build/bin:$PATH
 
-        export TARGET_FILE=mlir/mlir-hlo/mhlo/transforms/CMakeLists.txt
-        export PATCH_FILE=mlir/patches/mhlo-Add-PassesIncGen-in-transforms-CMakeList.patch
-        if patch --dry-run -p1 -N $TARGET_FILE $PATCH_FILE > /dev/null 2>&1; then patch -p1 $TARGET_FILE $PATCH_FILE; fi
+        pushd $GITHUB_WORKSPACE/mlir/mlir-hlo
+        git apply $GITHUB_WORKSPACE/mlir/patches/mhlo-remove-shardy.patch
+        git apply $GITHUB_WORKSPACE/mlir/patches/mhlo-add-back-necessary-passes.patch
+        popd
 
         cmake -S mlir/mlir-hlo -B $GITHUB_WORKSPACE/mhlo-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
@@ -215,6 +216,11 @@ jobs:
       if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
       run: |
         export PATH=$GITHUB_WORKSPACE/llvm-build/bin:$PATH
+
+        export TARGET_FILE=mlir/Enzyme/enzyme/Enzyme/TypeAnalysis/TypeAnalysis.cpp
+        export PATCH_FILE=mlir/patches/enzyme-nvvm-fabs-intrinsics.patch
+        if patch --dry-run -p1 -N $TARGET_FILE $PATCH_FILE > /dev/null 2>&1; then patch -p1 $TARGET_FILE $PATCH_FILE; fi
+
         cmake -S mlir/Enzyme/enzyme -B $GITHUB_WORKSPACE/enzyme-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
               -DLLVM_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/llvm" \
@@ -222,7 +228,7 @@ jobs:
               -DCMAKE_CXX_VISIBILITY_PRESET=default \
               -DCMAKE_CXX_FLAGS="-fuse-ld=lld"
 
-        cmake --build $GITHUB_WORKSPACE/enzyme-build --target EnzymeStatic-20
+        cmake --build $GITHUB_WORKSPACE/enzyme-build --target EnzymeStatic-21
 
     - name: Save Enzyme Build
       id: save-enzyme-build
@@ -241,7 +247,7 @@ jobs:
         container_img: ["manylinux_2_28_aarch64"]
 
     name: Build Wheels (Python ${{ matrix.python_version }})
-    runs-on: ubuntu-22.04-arm
+    runs-on: ubuntu-24.04-arm
     container: quay.io/pypa/${{ matrix.container_img }}
 
     steps:
@@ -343,6 +349,7 @@ jobs:
               -DCMAKE_BUILD_TYPE=Release \
               -DLLVM_ENABLE_ASSERTIONS=ON \
               -DQUANTUM_ENABLE_BINDINGS_PYTHON=ON \
+              -DCMAKE_PREFIX_PATH=$GITHUB_WORKSPACE/catalyst/catalyst \
               -DPython3_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -DPython3_NumPy_INCLUDE_DIRS=$(python${{ matrix.python_version }} -c "import numpy as np; print(np.get_include())") \
               -DMLIR_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir" \
@@ -362,6 +369,8 @@ jobs:
       run: |
         MLIR_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir" \
         LLVM_BUILD_DIR="$GITHUB_WORKSPACE/llvm-build" \
+        C_COMPILER=$(which gcc) \
+        CXX_COMPILER=$(which g++) \
         make plugin-wheel
 
     - name: Build wheel
@@ -405,11 +414,16 @@ jobs:
 
     # To check all wheels for supported python3 versions
     name: Test Wheels (Python ${{ matrix.python_version }}) on Linux Arm
-    runs-on: ubuntu-22.04-arm
+    runs-on: ubuntu-24.04-arm
 
     steps:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
+
+    - name: Setup Python ${{ matrix.python_version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python_version }}
 
     - name: Download Wheel Artifact
       uses: actions/download-artifact@v4

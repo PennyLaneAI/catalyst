@@ -72,11 +72,9 @@ func::FuncOp createZneFunc(func::FuncOp funcOp, PatternRewriter &rewriter)
     return fnFoldedOp;
 }
 
-LogicalResult ZneLowering::match(mitigation::ZneOp op) const { return success(); }
-
 // TODO: Optimize the traversal of call graphs (currently used twice)
 // Also all functions exploree in the call graph get their ZNE version.
-void ZneLowering::rewrite(mitigation::ZneOp op, PatternRewriter &rewriter) const
+LogicalResult ZneLowering::matchAndRewrite(mitigation::ZneOp op, PatternRewriter &rewriter) const
 {
     Location loc = op.getLoc();
     auto moduleOp = op->getParentOfType<ModuleOp>();
@@ -226,6 +224,8 @@ void ZneLowering::rewrite(mitigation::ZneOp op, PatternRewriter &rewriter) const
             .getResult(0);
     // Replace the original results
     rewriter.replaceOp(op, resultValues);
+
+    return success();
 }
 
 // In *.cpp module only, to keep extraneous headers out of *.hpp
@@ -391,7 +391,7 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
 
     Operation *shots = deviceInitOp.getShots().getDefiningOp();
     StringAttr lib = deviceInitOp.getLibAttr();
-    StringAttr name = deviceInitOp.getNameAttr();
+    StringAttr name = deviceInitOp.getDeviceNameAttr();
     StringAttr kwargs = deviceInitOp.getKwargsAttr();
 
     TypeRange originalTypes = op.getArgumentTypes();

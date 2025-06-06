@@ -42,6 +42,7 @@ TEST_CASE("Test the OQDDevice qubit allocation and release", "[oqd]")
 {
     auto device = OQDDevice(R"({shots : 100}ION:{"name":"Yb171"}PHONON:{"class_":"Phonon"})");
 
+    CHECK(device.getOutputFile() == "__openapl__output.json");
     CHECK(device.getIonSpecs() == "{\"name\":\"Yb171\"}");
     CHECK(device.getPhononSpecs()[0] == "{\"class_\":\"Phonon\"}");
 

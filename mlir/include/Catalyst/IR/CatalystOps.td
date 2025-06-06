@@ -170,7 +170,9 @@ def CallbackCallOp : Catalyst_Op<"callback_call",
 
   let arguments = (ins
         FlatSymbolRefAttr:$callee,
-        Variadic<AnyTypeOf<[AnyRankedTensor, MemRefOf<[AnyType]>]>>:$inputs
+        Variadic<AnyTypeOf<[AnyRankedTensor, MemRefOf<[AnyType]>]>>:$inputs,
+        OptionalAttr<DictArrayAttr>:$arg_attrs,
+        OptionalAttr<DictArrayAttr>:$res_attrs
   );
 
   let results = (outs Variadic<AnyType>);
@@ -188,7 +190,9 @@ def LaunchKernelOp : Catalyst_Op<"launch_kernel",
 
   let arguments = (ins
         SymbolRefAttr:$callee,
-        Variadic<AnyTypeOf<[AnyRankedTensor, MemRefOf<[AnyType]>]>>:$inputs
+        Variadic<AnyTypeOf<[AnyRankedTensor, MemRefOf<[AnyType]>]>>:$inputs,
+        OptionalAttr<DictArrayAttr>:$arg_attrs,
+        OptionalAttr<DictArrayAttr>:$res_attrs
   );
 
   let results = (outs Variadic<AnyType>);

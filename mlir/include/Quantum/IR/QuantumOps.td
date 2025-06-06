@@ -17,7 +17,6 @@
 
 include "mlir/IR/EnumAttr.td"
 include "mlir/IR/OpBase.td"
-include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Dialect/Bufferization/IR/AllocationOpInterface.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 
@@ -48,8 +47,6 @@ def NamedObservable : I32EnumAttr<"NamedObservable",
 
 def Unitary : NativeOpTrait<"UnitaryTrait">;
 def Hermitian : NativeOpTrait<"HermitianTrait">;
-
-def QuantumMemory : Resource<"QuantumMemory">;
 
 //===----------------------------------------------------------------------===//
 // Quantum dialect attributes.
@@ -85,12 +82,12 @@ def DeviceInitOp : Quantum_Op<"device"> {
     let arguments = (ins
         Optional<I64>:$shots,
         StrAttr:$lib,
-        StrAttr:$name,
+        StrAttr:$device_name,
         StrAttr:$kwargs
     );
 
     let assemblyFormat = [{
-      (`shots` `(` $shots^ `)`)? `[` $lib `,` $name `,` $kwargs `]` attr-dict
+      (`shots` `(` $shots^ `)`)? `[` $lib `,` $device_name `,` $kwargs `]` attr-dict
     }];
 
 }
@@ -100,6 +97,18 @@ def DeviceReleaseOp : Quantum_Op<"device_release"> {
 
     let assemblyFormat = [{
         attr-dict
+    }];
+}
+
+def NumQubitsOp : Quantum_Op<"num_qubits"> {
+    let summary = "Get the number of currently allocated qubits.";
+
+    let results = (outs
+        I64:$num_qubits
+    );
+
+    let assemblyFormat = [{
+        attr-dict `:` type(results)
     }];
 }
 
@@ -341,7 +350,7 @@ class UnitaryGate_Op<string mnemonic, list<Trait> traits = []> :
     let extraClassDeclaration = extraBaseClassDeclaration;
 }
 
-def SetStateOp : Gate_Op<"set_state", []> {
+def SetStateOp : Gate_Op<"set_state"> {
     let summary = "Set state to a complex vector.";
     let description = [{
         This operation is useful for simulators implementing state preparation.
@@ -372,7 +381,7 @@ def SetStateOp : Gate_Op<"set_state", []> {
 
 }
 
-def SetBasisStateOp : Gate_Op<"set_basis_state", []> {
+def SetBasisStateOp : Gate_Op<"set_basis_state"> {
     let summary = "Set basis state.";
     let description = [{
         This operation is useful for simulators implementing set basis state.
@@ -666,11 +675,11 @@ def YieldOp : Quantum_Op<"yield", [Pure, ReturnLike, Terminator, ParentOneOf<["A
     let summary = "Return results from quantum program regions";
 
     let arguments = (ins
-        Variadic<QuregType>:$results
+        Variadic<QuregType>:$retvals
     );
 
     let assemblyFormat = [{
-        attr-dict ($results^ `:` type($results))?
+        attr-dict ($retvals ^ `:` type($retvals))?
     }];
 
     let builders = [

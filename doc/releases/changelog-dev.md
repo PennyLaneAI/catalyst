@@ -175,6 +175,14 @@
     [(#1671)](https://github.com/PennyLaneAI/catalyst/pull/1671)
     [(#1681)](https://github.com/PennyLaneAI/catalyst/pull/1681)
 
+* (Compiler developers only) The version of LLVM, mlir-hlo and Enzyme used by Catalyst is
+  updated to track those in jax 0.6.0.
+  [(#1752)](https://github.com/PennyLaneAI/catalyst/pull/1752)
+
+  The LLVM version is updated to [commit 179d30f8c3fddd3c85056fd2b8e877a4a8513158](https://github.com/llvm/llvm-project/tree/179d30f8c3fddd3c85056fd2b8e877a4a8513158).
+  The mlir-hlo version is updated to [commit 617a9361d186199480c080c9e8c474a5e30c22d1](https://github.com/tensorflow/mlir-hlo/tree/617a9361d186199480c080c9e8c474a5e30c22d1).
+  The Enzyme version is updated to [v0.0.180](https://github.com/EnzymeAD/Enzyme/releases/tag/v0.0.180).
+
 * The clang-format and clang-tidy versions used by Catalyst have been updated to v20.
   [(#1721)](https://github.com/PennyLaneAI/catalyst/pull/1721)
 
@@ -257,7 +265,7 @@
 * Improved the definition of `YieldOp` in the quantum dialect by removing `AnyTypeOf`
   [(#1696)](https://github.com/PennyLaneAI/catalyst/pull/1696)
 
-* The assembly format of `MeasureOp` in the `Quantum` dialect and `MeasureInBasisOp` in the `MBQC` dialect now contains the `postselect` attribute. 
+* The assembly format of `MeasureOp` in the `Quantum` dialect and `MeasureInBasisOp` in the `MBQC` dialect now contains the `postselect` attribute.
   [(#1732)](https://github.com/PennyLaneAI/catalyst/pull/1732)
 
 * The bufferization of custom catalyst dialects has been migrated to the new one-shot
@@ -289,6 +297,21 @@
   :doc:`sharp bits and debugging tips <sharp_bits>` guide. In regular QJIT-compiled workloads
   (without program capture enabled), you must continue to use :func:`catalyst.measure`.
 
+* An argument (`openapl_file_name`) is added to the `OQDDevice` constructor to specify the name of
+  the output OpenAPL file.
+  [(#1763)](https://github.com/PennyLaneAI/catalyst/pull/1763)
+
+* The OQD device toml file is modified to only include gates that are decomposable to the OQD device
+  target gate set.
+  [(#1763)](https://github.com/PennyLaneAI/catalyst/pull/1763)
+
+* The runtime CAPI function `__catalyst__rt__num_qubits` now has a corresponding jax primitive
+  `num_qubits_p` and quantum dialect operation `NumQubitsOp`.
+  [(#1793)](https://github.com/PennyLaneAI/catalyst/pull/1793)
+
+  For measurements whose shapes depend on the number of qubits, they now properly retrieve the
+  number of qubits through this new operation when it is dynamic.
+
 <h3>Documentation 📝</h3>
 
 * The header (logo+title) images in the README and in the overview on RtD have been updated,
@@ -304,6 +327,7 @@
 
 This release contains contributions from (in alphabetical order):
 
+Runor Agbaire
 Joey Carter,
 Sengthai Heng,
 David Ittah,

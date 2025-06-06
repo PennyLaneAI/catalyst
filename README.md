@@ -1,6 +1,6 @@
 [![Tests](https://github.com/PennyLaneAI/catalyst/actions/workflows/check-catalyst.yaml/badge.svg?branch=main&event=push)](https://github.com/PennyLaneAI/catalyst/actions/workflows/check-catalyst.yaml)
-[![Coverage](https://img.shields.io/codecov/c/github/PennyLaneAI/catalyst/master.svg?logo=codecov&style=flat-square)](https://codecov.io/gh/PennyLaneAI/catalyst)
-[![Documentation](https://readthedocs.com/projects/xanaduai-catalyst/badge/?version=latest&token=e6f8607e841564d11d02baef4540523169f95d9c64fcdc656a0ecfd6564203ca)](https://docs.pennylane.ai/projects/catalyst)
+[![Coverage](https://img.shields.io/codecov/c/github/PennyLaneAI/catalyst/main.svg?logo=codecov&style=flat-square)](https://codecov.io/gh/PennyLaneAI/catalyst)
+[![Documentation](https://readthedocs.com/projects/xanaduai-catalyst/badge/?version=latest)](https://docs.pennylane.ai/projects/catalyst)
 [![DOI](https://joss.theoj.org/papers/10.21105/joss.06720/status.svg)](https://doi.org/10.21105/joss.06720)
 [![PyPI](https://img.shields.io/pypi/v/PennyLane-Catalyst.svg?style=flat-square)](https://pypi.org/project/PennyLane-Catalyst)
 [![Forum](https://img.shields.io/discourse/https/discuss.pennylane.ai/posts.svg?logo=discourse&style=flat-square)](https://discuss.pennylane.ai)

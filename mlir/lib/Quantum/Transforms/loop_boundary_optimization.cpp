@@ -53,7 +53,7 @@ struct LoopBoundaryOptimizationPass
         RewritePatternSet patterns(&getContext());
         populateLoopBoundaryPatterns(patterns, 0);
 
-        if (failed(applyPatternsAndFoldGreedily(module, std::move(patterns)))) {
+        if (failed(applyPatternsGreedily(module, std::move(patterns)))) {
             return signalPassFailure();
         }
     }
