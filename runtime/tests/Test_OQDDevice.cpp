@@ -928,7 +928,7 @@ TEST_CASE("Test OpenAPL Program generation", "[oqd]")
 
     __catalyst__rt__initialize(nullptr);
     __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
-                                (int8_t *)rtd_kwargs.c_str(), 1000);
+                                (int8_t *)rtd_kwargs.c_str(), 1000, false);
 
     QirArray *qs = __catalyst__rt__qubit_allocate_array(num_qubits);
 
