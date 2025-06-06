@@ -121,8 +121,9 @@ def qjit(
         keep_intermediate (Union[str, int, bool]): Level controlling intermediate file generation.
             - ``False`` or ``0`` or ``"none"`` (default): No intermediate files are kept.
             - ``True`` or ``1`` or ``"basic"``: Standard intermediate files are kept.
-            - ``2`` or ``"debug"``: Standard intermediate files are kept, and IR is saved after each pass.
-            If enabled, intermediate representations are also available via the following attributes:
+            - ``2`` or ``"debug"``: Standard intermediate files are kept, and IR is saved after 
+            each pass.
+            If enabled, intermediate representations are available via the following attributes:
             - :attr:`~.QJIT.jaxpr`: JAX program representation
             - :attr:`~.QJIT.mlir`: MLIR representation after canonicalization
             - :attr:`~.QJIT.mlir_opt`: MLIR representation after optimization

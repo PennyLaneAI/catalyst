@@ -56,10 +56,12 @@ class CompileOptions:
             Default is ``False``
         logfile (Optional[TextIOWrapper]): the logfile to write output to.
             Default is ``sys.stderr``
-        keep_intermediate (Optional[Union[str, int, bool]]): Level controlling intermediate file generation.
+        keep_intermediate (Optional[Union[str, int, bool]]): Level controlling intermediate file 
+        generation.
             - ``False`` or ``0`` or ``"none"`` (default): No intermediate files are kept.
             - ``True`` or ``1`` or ``"basic"``: Standard intermediate files are kept.
-            - ``2`` or ``"debug"``: Standard intermediate files are kept, and IR is saved after each pass.
+            - ``2`` or ``"debug"``: Standard intermediate files are kept, and IR is saved after 
+            each pass.
         pipelines (Optional[List[Tuple[str,List[str]]]]): A list of tuples. The first entry of the
             tuple corresponds to the name of a pipeline. The second entry of the tuple corresponds
             to a list of MLIR passes.
