@@ -39,6 +39,7 @@ from catalyst.compiler import (
     canonicalize,
     to_llvmir,
     to_mlir_opt,
+    to_ppm_spec
 )
 from catalyst.debug.instruments import instrument
 from catalyst.from_plxpr import trace_from_pennylane
@@ -577,6 +578,14 @@ class QJIT(CatalystCallable):
             return None
 
         return to_mlir_opt(stdin=str(self.mlir_module), options=self.compile_options)
+    
+    def get_ppm_spec(self):
+        """obtain the PPM specs after optimization"""
+        if not self.mlir_module:
+            return None
+        
+        return to_ppm_spec(stdin=str(self.mlir_module), options=self.compile_options)
+
 
     @debug_logger
     def __call__(self, *args, **kwargs):

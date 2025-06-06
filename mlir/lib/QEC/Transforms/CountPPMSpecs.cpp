@@ -43,9 +43,8 @@ namespace qec {
 struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass> {
     using CountPPMSpecsPassBase::CountPPMSpecsPassBase;
 
-    void print_specs(StringRef pass_name)
+    void print_specs()
     {
-        llvm::outs() << pass_name <<"\n";
         llvm::BumpPtrAllocator string_allocator;
         llvm::DenseMap<StringRef, int> PPM_Specs;
         PPM_Specs["num_logical_qubits"] = 0;
@@ -56,6 +55,7 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
             // Skip top-level container ops if desired
             if (isa<ModuleOp>(op)) return;
 
+            // TODO: Remove debug in future
             // llvm::outs()<<"\n-----------------------------MLIR------------------------------\n";
             // op->print(llvm::outs());
             // llvm::outs()<<"\n-----------------------------MLIR------------------------------\n";
@@ -91,6 +91,7 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
                     }
                 }
             }
+            // TODO: Implement depth using slicing 
             // mlir::SetVector <Operation *> backwardSlice;
             // getBackwardSlice(op, &backwardSlice);
             // llvm::outs()<<"\n-----------------------------SLICE-----------------------------\n";
@@ -103,38 +104,17 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
             // llvm::outs()<<"\n-----------------------------SLICE------------------------------\n";
         });
         
+        llvm::outs() << "{\n";
         for (const auto &entry : PPM_Specs) {
-            llvm::outs() << "  " << entry.first << ": " << entry.second << "\n";
+            llvm::outs() << '"' << entry.first << '"' << ":" << entry.second << ",\n";
         }
-        llvm::outs()<<"\n=====================================================================\n";
+        llvm::outs() << "}\n";
         return;
     }
 
     void runOnOperation() final
     {
-        // auto ctx = &getContext();
-        // auto module = getOperation();
-
-        // // Phase 1: Convert Clifford+T to PPR representation
-        // {
-        //     ConversionTarget target(*ctx);
-        //     target.addIllegalDialect<quantum::QuantumDialect>();
-        //     target.addLegalOp<quantum::InitializeOp, quantum::FinalizeOp>();
-        //     target.addLegalOp<quantum::DeviceInitOp, quantum::DeviceReleaseOp>();
-        //     target.addLegalOp<quantum::AllocOp, quantum::DeallocOp>();
-        //     target.addLegalOp<quantum::InsertOp, quantum::ExtractOp>();
-        //     target.addLegalDialect<qec::QECDialect>();
-
-        //     RewritePatternSet patterns(ctx);
-        //     populateCliffordTToPPRPatterns(patterns);
-
-        //     if (failed(applyPartialConversion(module, target, std::move(patterns)))) {
-        //         return signalPassFailure();
-        //     }
-        //     print_specs("Clifford+T to PPR");
-        // }
-        print_specs("Clifford+T to PPR");
-
+        print_specs();
     }
 };
 

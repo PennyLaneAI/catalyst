@@ -25,6 +25,8 @@ import subprocess
 import sys
 import tempfile
 import warnings
+import json
+import re
 from os import path
 from typing import List, Optional
 
@@ -371,8 +373,25 @@ def to_mlir_opt(*args, stdin=None, options: Optional[CompileOptions] = None):
         return _quantum_opt(*args, stdin=stdin)
 
     opts = _options_to_cli_flags(options)
-    return _quantum_opt(*opts, *args, stdin=stdin)
+    raw_result = _quantum_opt(*opts, *args, stdin=stdin)
+    regex_search_for_json = re.search(r'\{[a-zA-Z0-9_\":\{\},\n]+\}', raw_result)
+    raw_result = raw_result.replace(regex_search_for_json.group(0), "")
+    return raw_result
 
+def to_ppm_spec(*args, stdin=None, options: Optional[CompileOptions] = None):
+    """echo ${input} | catalyst --tool=opt *args *opts -"""
+    # These are the options that may affect compilation
+    if not options:
+        return _quantum_opt(*args, stdin=stdin)
+    
+    opts = _options_to_cli_flags(options)
+    
+    raw_json_format = _quantum_opt(*opts, *args, stdin=stdin)
+    regex_search_for_json = re.search(r'\{[a-zA-Z0-9_\":\{\},\n]+\}', raw_json_format)
+    json_ppm_specs = regex_search_for_json.group(0)
+    json_ppm_specs = json_ppm_specs.replace(",\n}","\n}")
+    json_ppm_specs = json.loads(json_ppm_specs)
+    return json_ppm_specs
 
 class Compiler:
     """Compiles MLIR modules to shared objects by executing the Catalyst compiler driver library."""
