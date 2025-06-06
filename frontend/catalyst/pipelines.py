@@ -47,10 +47,12 @@ class KeepIntermediateLevel(enum.IntEnum):
 
 
 def _parse_keep_intermediate(
-    level: Union[str, int, bool, KeepIntermediateLevel, None]
+    level: Union[str, int, bool, KeepIntermediateLevel, None],
 ) -> KeepIntermediateLevel:
     """Parse the keep_intermediate value into a KeepIntermediateLevel enum."""
-    if level is None:
+    if isinstance(level, KeepIntermediateLevel):
+        return level
+    elif level is None:
         return KeepIntermediateLevel.NONE
     elif isinstance(level, bool):
         return KeepIntermediateLevel.PIPELINE if level else KeepIntermediateLevel.NONE
@@ -69,8 +71,7 @@ def _parse_keep_intermediate(
                 f"Invalid string for keep_intermediate: {level}. "
                 "Valid strings are 'none', 'pipeline', 'pass'."
             ) from e
-    elif not isinstance(level, KeepIntermediateLevel):
-        raise TypeError(f"Invalid type for keep_intermediate: {type(level)}.")
+    raise TypeError(f"Invalid type for keep_intermediate: {type(level)}.")
 
 
 # pylint: disable=too-many-instance-attributes
@@ -83,7 +84,7 @@ class CompileOptions:
             Default is ``False``
         logfile (Optional[TextIOWrapper]): the logfile to write output to.
             Default is ``sys.stderr``
-        keep_intermediate (Optional[Union[str, int, bool]]): Level controlling intermediate file 
+        keep_intermediate (Optional[Union[str, int, bool]]): Level controlling intermediate file
         generation.
             - ``False`` or ``0`` or ``"none"`` (default): No intermediate files are kept.
             - ``True`` or ``1`` or ``"pipeline"``: Intermediate files are saved after each pipeline.
