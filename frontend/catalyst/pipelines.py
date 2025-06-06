@@ -42,8 +42,35 @@ class KeepIntermediateLevel(enum.IntEnum):
     """Enum to control the level of intermediate file keeping."""
 
     NONE = 0  # No intermediate files are kept.
-    BASIC = 1  # Standard intermediate files are kept.
-    DEBUG = 2  # Standard intermediate files are kept, and IR is saved after each pass.
+    PIPELINE = 1  # Intermediate files are saved after each pipeline.
+    PASS = 2  # Intermediate files are saved after each pass.
+
+
+def _parse_keep_intermediate(
+    level: Union[str, int, bool, KeepIntermediateLevel, None]
+) -> KeepIntermediateLevel:
+    """Parse the keep_intermediate value into a KeepIntermediateLevel enum."""
+    if level is None:
+        return KeepIntermediateLevel.NONE
+    elif isinstance(level, bool):
+        return KeepIntermediateLevel.PIPELINE if level else KeepIntermediateLevel.NONE
+    elif isinstance(level, int):
+        try:
+            return KeepIntermediateLevel(level)
+        except ValueError as e:
+            raise ValueError(
+                f"Invalid int for keep_intermediate: {level}. " "Valid integers are 0, 1, 2."
+            ) from e
+    elif isinstance(level, str):
+        try:
+            return KeepIntermediateLevel[level.upper()]
+        except KeyError as e:
+            raise ValueError(
+                f"Invalid string for keep_intermediate: {level}. "
+                "Valid strings are 'none', 'pipeline', 'pass'."
+            ) from e
+    elif not isinstance(level, KeepIntermediateLevel):
+        raise TypeError(f"Invalid type for keep_intermediate: {type(level)}.")
 
 
 # pylint: disable=too-many-instance-attributes
@@ -59,9 +86,8 @@ class CompileOptions:
         keep_intermediate (Optional[Union[str, int, bool]]): Level controlling intermediate file 
         generation.
             - ``False`` or ``0`` or ``"none"`` (default): No intermediate files are kept.
-            - ``True`` or ``1`` or ``"basic"``: Standard intermediate files are kept.
-            - ``2`` or ``"debug"``: Standard intermediate files are kept, and IR is saved after 
-            each pass.
+            - ``True`` or ``1`` or ``"pipeline"``: Intermediate files are saved after each pipeline.
+            - ``2`` or ``"pass"``: Intermediate files are saved after each pass.
         pipelines (Optional[List[Tuple[str,List[str]]]]): A list of tuples. The first entry of the
             tuple corresponds to the name of a pipeline. The second entry of the tuple corresponds
             to a list of MLIR passes.
@@ -110,32 +136,7 @@ class CompileOptions:
 
     def __post_init__(self):
         # Convert keep_intermediate to Enum
-        if self.keep_intermediate is None:
-            self.keep_intermediate = KeepIntermediateLevel.NONE
-        elif isinstance(self.keep_intermediate, bool):
-            self.keep_intermediate = (
-                KeepIntermediateLevel.BASIC
-                if self.keep_intermediate
-                else KeepIntermediateLevel.NONE
-            )
-        elif isinstance(self.keep_intermediate, int):
-            try:
-                self.keep_intermediate = KeepIntermediateLevel(self.keep_intermediate)
-            except ValueError as e:
-                raise ValueError(
-                    f"Invalid int for keep_intermediate: {self.keep_intermediate}. "
-                    "Valid integers are 0, 1, 2."
-                ) from e
-        elif isinstance(self.keep_intermediate, str):
-            try:
-                self.keep_intermediate = KeepIntermediateLevel[self.keep_intermediate.upper()]
-            except KeyError as e:
-                raise ValueError(
-                    f"Invalid string for keep_intermediate: {self.keep_intermediate}. "
-                    "Valid strings are 'none', 'basic', 'debug'."
-                ) from e
-        elif not isinstance(self.keep_intermediate, KeepIntermediateLevel):
-            raise TypeError(f"Invalid type for keep_intermediate: {type(self.keep_intermediate)}.")
+        self.keep_intermediate = _parse_keep_intermediate(self.keep_intermediate)
 
         # Check that async runs must not be seeded
         if self.async_qnodes and self.seed is not None:

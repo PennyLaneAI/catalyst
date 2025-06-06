@@ -98,19 +98,19 @@ class TestCompilerOptions:
         [
             (None, KeepIntermediateLevel.NONE),
             (False, KeepIntermediateLevel.NONE),
-            (True, KeepIntermediateLevel.BASIC),
+            (True, KeepIntermediateLevel.PIPELINE),
             (0, KeepIntermediateLevel.NONE),
-            (1, KeepIntermediateLevel.BASIC),
-            (2, KeepIntermediateLevel.DEBUG),
+            (1, KeepIntermediateLevel.PIPELINE),
+            (2, KeepIntermediateLevel.PASS),
             ("none", KeepIntermediateLevel.NONE),
             ("NONE", KeepIntermediateLevel.NONE),
-            ("basic", KeepIntermediateLevel.BASIC),
-            ("BASIC", KeepIntermediateLevel.BASIC),
-            ("debug", KeepIntermediateLevel.DEBUG),
-            ("DEBUG", KeepIntermediateLevel.DEBUG),
+            ("pipeline", KeepIntermediateLevel.PIPELINE),
+            ("PIPELINE", KeepIntermediateLevel.PIPELINE),
+            ("pass", KeepIntermediateLevel.PASS),
+            ("PASS", KeepIntermediateLevel.PASS),
             (KeepIntermediateLevel.NONE, KeepIntermediateLevel.NONE),
-            (KeepIntermediateLevel.BASIC, KeepIntermediateLevel.BASIC),
-            (KeepIntermediateLevel.DEBUG, KeepIntermediateLevel.DEBUG),
+            (KeepIntermediateLevel.PIPELINE, KeepIntermediateLevel.PIPELINE),
+            (KeepIntermediateLevel.PASS, KeepIntermediateLevel.PASS),
         ],
     )
     def test_keep_intermediate_levels_conversion(self, input_value, expected_level):
@@ -126,7 +126,8 @@ class TestCompilerOptions:
             (
                 "invalid_string",
                 ValueError,
-                "Invalid string for keep_intermediate: Valid strings are 'none', 'basic', 'debug'.",
+                "Invalid string for keep_intermediate: invalid_string. Valid strings are 'none',"
+                " 'pipeline', 'pass'.",
             ),
             (3.0, TypeError, "Invalid type for keep_intermediate: <class 'float'>."),
             ([], TypeError, "Invalid type for keep_intermediate: <class 'list'>."),
@@ -145,16 +146,16 @@ class TestCompilerOptions:
         assert "--save-ir-after-each=pass" not in flags
 
     def test_options_to_cli_flags_keep_intermediate_basic(self):
-        """Test _options_to_cli_flags with KeepIntermediateLevel.BASIC."""
-        options = CompileOptions(keep_intermediate=KeepIntermediateLevel.BASIC)
+        """Test _options_to_cli_flags with KeepIntermediateLevel.PIPELINE."""
+        options = CompileOptions(keep_intermediate=KeepIntermediateLevel.PIPELINE)
         flags = _options_to_cli_flags(options)
         assert "--keep-intermediate" in flags
         assert "--save-ir-after-each=pass" not in flags
         assert flags.count("--save-ir-after-each=pass") <= 1
 
     def test_options_to_cli_flags_keep_intermediate_debug(self):
-        """Test _options_to_cli_flags with KeepIntermediateLevel.DEBUG."""
-        options = CompileOptions(keep_intermediate=KeepIntermediateLevel.DEBUG)
+        """Test _options_to_cli_flags with KeepIntermediateLevel.PASS."""
+        options = CompileOptions(keep_intermediate=KeepIntermediateLevel.PASS)
         flags = _options_to_cli_flags(options)
         assert "--keep-intermediate" in flags
         assert "--save-ir-after-each=pass" in flags
