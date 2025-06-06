@@ -95,6 +95,14 @@
   performance by eliminating indirect conversion.
   [(#1738)](https://github.com/PennyLaneAI/catalyst/pull/1738)
 
+* The `keep_intermediate` argument in the `qjit` decorator now accepts a new value that allows for
+  saving intermediate files after each pass. The updated possible options for this argument are:
+  * `False` or `0` or `"none"`: No intermediate files are kept.
+  * `True` or `1` or `"pipeline"`: Intermediate files are saved after each pipeline.
+  * `2` or `"pass"`: Intermediate files are saved after each pass.
+  The default value is `False`.
+  [(#1791)](https://github.com/PennyLaneAI/catalyst/pull/1791)
+
 <h3>Breaking changes 💔</h3>
 
 * (Device Developers Only) The `QuantumDevice` interface in the Catalyst Runtime plugin system
