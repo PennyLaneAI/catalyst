@@ -90,6 +90,17 @@ func.func @device() {
 
 // -----
 
+// CHECK: llvm.func @__catalyst__rt__num_qubits()
+
+// CHECK-LABEL: @num_qubits
+func.func @num_qubits() {
+    // CHECK: {{%.+}} = llvm.call @__catalyst__rt__num_qubits() : () -> i64
+    %0 = quantum.num_qubits : i64
+    return
+}
+
+// -----
+
 ///////////////////////
 // Memory Management //
 ///////////////////////

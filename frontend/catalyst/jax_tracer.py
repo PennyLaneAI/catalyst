@@ -86,6 +86,7 @@ from catalyst.jax_primitives import (
     hamiltonian_p,
     hermitian_p,
     namedobs_p,
+    num_qubits_p,
     probs_p,
     qalloc_p,
     qdealloc_p,
@@ -985,7 +986,8 @@ def trace_quantum_measurements(
                 )
 
             d_wires = (
-                device.wires[0]
+                # device.wires[0]
+                num_qubits_p.bind()
                 if catalyst.device.qjit_device.is_dynamic_wires(device.wires)
                 else len(device.wires)
             )
