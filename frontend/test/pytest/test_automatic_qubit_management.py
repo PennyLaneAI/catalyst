@@ -30,9 +30,7 @@ specified during device initialization, instead of non qjit runs.
 
 import numpy as np
 import pennylane as qml
-import pytest
 
-import catalyst
 from catalyst import qjit
 
 
@@ -45,6 +43,7 @@ def test_partial_sample(backend):
     wires = [4, None]
     devices = [qml.device(backend, shots=10, wires=wire) for wire in wires]
     ref, observed = (qjit(qml.qnode(dev)(circuit))() for dev in devices)
+    assert ref.shape == observed.shape
     assert np.allclose(ref, observed)
 
 
@@ -57,6 +56,7 @@ def test_partial_counts(backend):
     wires = [4, None]
     devices = [qml.device(backend, shots=10, wires=wire) for wire in wires]
     ref, observed = (qjit(qml.qnode(dev)(circuit))() for dev in devices)
+    assert (ref[i].shape == observed[i].shape for i in (0, 1))
     assert np.allclose(ref, observed)
 
 
@@ -69,4 +69,57 @@ def test_partial_probs(backend):
     wires = [4, None]
     devices = [qml.device(backend, wires=wire) for wire in wires]
     ref, observed = (qjit(qml.qnode(dev)(circuit))() for dev in devices)
+    assert ref.shape == observed.shape
+    assert np.allclose(ref, observed)
+
+
+def test_sample(backend):
+
+    def circuit():
+        qml.RX(0.0, wires=3)
+        return qml.sample()
+
+    wires = [4, None]
+    devices = [qml.device(backend, shots=10, wires=wire) for wire in wires]
+    ref, observed = (qjit(qml.qnode(dev)(circuit))() for dev in devices)
+    assert ref.shape == observed.shape
+    assert np.allclose(ref, observed)
+
+
+def test_counts(backend):
+
+    def circuit():
+        qml.RX(0.0, wires=3)
+        return qml.counts()
+
+    wires = [4, None]
+    devices = [qml.device(backend, shots=10, wires=wire) for wire in wires]
+    ref, observed = (qjit(qml.qnode(dev)(circuit))() for dev in devices)
+    assert (ref[i].shape == observed[i].shape for i in (0, 1))
+    assert np.allclose(ref, observed)
+
+
+def test_probs(backend):
+
+    def circuit():
+        qml.PauliX(wires=3)
+        return qml.probs()
+
+    wires = [4, None]
+    devices = [qml.device(backend, wires=wire) for wire in wires]
+    ref, observed = (qjit(qml.qnode(dev)(circuit))() for dev in devices)
+    assert ref.shape == observed.shape
+    assert np.allclose(ref, observed)
+
+
+def test_state(backend):
+
+    def circuit():
+        qml.PauliX(wires=3)
+        return qml.state()
+
+    wires = [4, None]
+    devices = [qml.device(backend, wires=wire) for wire in wires]
+    ref, observed = (qjit(qml.qnode(dev)(circuit))() for dev in devices)
+    assert ref.shape == observed.shape
     assert np.allclose(ref, observed)
