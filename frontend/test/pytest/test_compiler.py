@@ -96,21 +96,14 @@ class TestCompilerOptions:
     @pytest.mark.parametrize(
         "input_value, expected_level",
         [
-            (None, KeepIntermediateLevel.NONE),
             (False, KeepIntermediateLevel.NONE),
             (True, KeepIntermediateLevel.PIPELINE),
             (0, KeepIntermediateLevel.NONE),
             (1, KeepIntermediateLevel.PIPELINE),
             (2, KeepIntermediateLevel.PASS),
             ("none", KeepIntermediateLevel.NONE),
-            ("NONE", KeepIntermediateLevel.NONE),
             ("pipeline", KeepIntermediateLevel.PIPELINE),
-            ("PIPELINE", KeepIntermediateLevel.PIPELINE),
             ("pass", KeepIntermediateLevel.PASS),
-            ("PASS", KeepIntermediateLevel.PASS),
-            (KeepIntermediateLevel.NONE, KeepIntermediateLevel.NONE),
-            (KeepIntermediateLevel.PIPELINE, KeepIntermediateLevel.PIPELINE),
-            (KeepIntermediateLevel.PASS, KeepIntermediateLevel.PASS),
         ],
     )
     def test_keep_intermediate_levels_conversion(self, input_value, expected_level):
@@ -118,24 +111,10 @@ class TestCompilerOptions:
         options = CompileOptions(keep_intermediate=input_value)
         assert options.keep_intermediate == expected_level
 
-    @pytest.mark.parametrize(
-        "invalid_input, error_type, error_match",
-        [
-            (3, ValueError, "Invalid int for keep_intermediate: 3. Valid integers are 0, 1, 2."),
-            (-1, ValueError, "Invalid int for keep_intermediate: -1. Valid integers are 0, 1, 2."),
-            (
-                "invalid_string",
-                ValueError,
-                "Invalid string for keep_intermediate: invalid_string. Valid strings are 'none',"
-                " 'pipeline', 'pass'.",
-            ),
-            (3.0, TypeError, "Invalid type for keep_intermediate: <class 'float'>."),
-            ([], TypeError, "Invalid type for keep_intermediate: <class 'list'>."),
-        ],
-    )
-    def test_keep_intermediate_invalid_inputs(self, invalid_input, error_type, error_match):
+    @pytest.mark.parametrize("invalid_input", [3, -1, "invalid_string", 3.0, []])
+    def test_keep_intermediate_invalid_inputs(self, invalid_input):
         """Test that invalid inputs for keep_intermediate raise appropriate errors."""
-        with pytest.raises(error_type, match=error_match):
+        with pytest.raises(ValueError, match=f"Invalid value for keep_intermediate: "):
             CompileOptions(keep_intermediate=invalid_input)
 
     def test_options_to_cli_flags_keep_intermediate_none(self):

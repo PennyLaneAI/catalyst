@@ -47,31 +47,23 @@ class KeepIntermediateLevel(enum.IntEnum):
 
 
 def _parse_keep_intermediate(
-    level: Union[str, int, bool, KeepIntermediateLevel, None],
+    level: Union[str, int, bool],
 ) -> KeepIntermediateLevel:
     """Parse the keep_intermediate value into a KeepIntermediateLevel enum."""
-    if isinstance(level, KeepIntermediateLevel):
-        return level
-    elif level is None:
-        return KeepIntermediateLevel.NONE
-    elif isinstance(level, bool):
-        return KeepIntermediateLevel.PIPELINE if level else KeepIntermediateLevel.NONE
-    elif isinstance(level, int):
-        try:
+    match level:
+        case 0 | 1 | 2:
             return KeepIntermediateLevel(level)
-        except ValueError as e:
+        case "none":
+            return KeepIntermediateLevel.NONE
+        case "pipeline":
+            return KeepIntermediateLevel.PIPELINE
+        case "pass":
+            return KeepIntermediateLevel.PASS
+        case _:
             raise ValueError(
-                f"Invalid int for keep_intermediate: {level}. " "Valid integers are 0, 1, 2."
-            ) from e
-    elif isinstance(level, str):
-        try:
-            return KeepIntermediateLevel[level.upper()]
-        except KeyError as e:
-            raise ValueError(
-                f"Invalid string for keep_intermediate: {level}. "
-                "Valid strings are 'none', 'pipeline', 'pass'."
-            ) from e
-    raise TypeError(f"Invalid type for keep_intermediate: {type(level)}.")
+                f"Invalid value for keep_intermediate: {level}. "
+                "Valid values are True, False, 0, 1, 2, 'none', 'pipeline', 'pass'."
+            )
 
 
 # pylint: disable=too-many-instance-attributes
