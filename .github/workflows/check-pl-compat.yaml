@@ -41,6 +41,11 @@ jobs:
       run: |
         git checkout v0.11.0-rc
 
+    - name: Set up Python # Ensure python3.10 is used
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ needs.constants.outputs.primary_python_version }}
+
     - name: Install deps
       if: ${{ inputs.catalyst != 'stable' }}
       run: |
