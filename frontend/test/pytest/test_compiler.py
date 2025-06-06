@@ -114,7 +114,7 @@ class TestCompilerOptions:
     @pytest.mark.parametrize("invalid_input", [3, -1, "invalid_string", 3.0, []])
     def test_keep_intermediate_invalid_inputs(self, invalid_input):
         """Test that invalid inputs for keep_intermediate raise appropriate errors."""
-        with pytest.raises(ValueError, match=f"Invalid value for keep_intermediate: "):
+        with pytest.raises(ValueError, match="Invalid value for keep_intermediate:"):
             CompileOptions(keep_intermediate=invalid_input)
 
     def test_options_to_cli_flags_keep_intermediate_none(self):
