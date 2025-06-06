@@ -34,12 +34,12 @@ jobs:
       uses: actions/checkout@v4
       with:
         fetch-depth: 0
-    - if: ${{ inputs.catalyst == 'stable' }}
-      run: |
-        git checkout $(git tag | sort -V | tail -1)
-    - if: ${{ inputs.catalyst == 'release-candidate' }}
-      run: |
-        git checkout v0.11.0-rc
+    # - if: ${{ inputs.catalyst == 'stable' }}
+    #   run: |
+    #     git checkout $(git tag | sort -V | tail -1)
+    # - if: ${{ inputs.catalyst == 'release-candidate' }}
+    #   run: |
+    #     git checkout v0.11.0-rc
 
     - name: Install deps
       run: |
