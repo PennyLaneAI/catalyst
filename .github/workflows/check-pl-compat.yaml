@@ -13,16 +13,16 @@ on:
         required: true
         type: string
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+# concurrency:
+#   group: ${{ github.workflow }}-${{ github.ref }}
+#   cancel-in-progress: true
 
 jobs:
   constants:
     name: "Set build matrix"
     uses: ./.github/workflows/constants.yaml
-    with:
-      use_release_tag: ${{ inputs.catalyst == 'stable' }}
+    # with:
+    #   use_release_tag: ${{ inputs.catalyst == 'stable' }}
 
   check-config:
     name: Build Configuration
@@ -105,7 +105,7 @@ jobs:
         make catalyst
 
     - name: Install PennyLane-Lightning (stable)
-      if: ${{ inputs.lightning == 'stable' }}
+      # if: ${{ inputs.lightning == 'stable' }}
       run: |
         pip install --no-deps --force pennylane-lightning
         pip install --no-deps --force pennyLane-lightning-kokkos
@@ -146,7 +146,7 @@ jobs:
         pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@master
 
     - name: Install PennyLane (stable)
-      if: ${{ inputs.pennylane == 'stable' }}
+      # if: ${{ inputs.pennylane == 'stable' }}
       run: |
         pip install --no-deps --force pennylane
 
