@@ -86,6 +86,7 @@ from catalyst.jax_primitives import (
     hamiltonian_p,
     hermitian_p,
     namedobs_p,
+    num_qubits_p,
     probs_p,
     qalloc_p,
     qdealloc_p,
@@ -984,19 +985,13 @@ def trace_quantum_measurements(
                     "Use qml.sample() instead."
                 )
 
-            # d_wires = (
-            #     device.wires[0]
-            #     if catalyst.device.qjit_device.is_dynamic_wires(device.wires)
-            #     else len(device.wires)
-            # )
             if device.wires is None:
-                # Automatic qubit management mode, TODO: what here???
-                d_wires = 0
-                pass
+                d_wires = num_qubits_p.bind()
             elif catalyst.device.qjit_device.is_dynamic_wires(device.wires):
                 d_wires = device.wires[0]
             else:
                 d_wires = len(device.wires)
+
             m_wires = output.wires if output.wires else None
             obs_tracers, nqubits = trace_observables(output.obs, qrp, m_wires)
             nqubits = d_wires if nqubits is None else nqubits

@@ -113,6 +113,18 @@ def DeviceReleaseOp : Quantum_Op<"device_release"> {
     }];
 }
 
+def NumQubitsOp : Quantum_Op<"num_qubits"> {
+    let summary = "Get the number of currently allocated qubits.";
+
+    let results = (outs
+        I64:$num_qubits
+    );
+
+    let assemblyFormat = [{
+        attr-dict `:` type(results)
+    }];
+}
+
 // -----
 
 class Memory_Op<string mnemonic, list<Trait> traits = []> : Quantum_Op<mnemonic, traits>;
