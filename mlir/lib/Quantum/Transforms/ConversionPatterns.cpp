@@ -187,11 +187,13 @@ struct DeviceInitOpPattern : public OpConversionPattern<DeviceInitOp> {
 
         Type charPtrType = LLVM::LLVMPointerType::get(rewriter.getContext());
         Type int64Type = IntegerType::get(rewriter.getContext(), 64);
+        Type int1Type = IntegerType::get(rewriter.getContext(), 1);
         Type qirSignature = LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx),
                                                         {/* rtd_lib = */ charPtrType,
                                                          /* rtd_name = */ charPtrType,
                                                          /* rtd_kwargs = */ charPtrType,
-                                                         /* shots = */ int64Type});
+                                                         /* shots = */ int64Type,
+                                                         /*auto_qubit_management = */ int1Type});
         LLVM::LLVMFuncOp fnDecl =
             catalyst::ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
 
@@ -216,6 +218,10 @@ struct DeviceInitOpPattern : public OpConversionPattern<DeviceInitOp> {
         else {
             operands.push_back(shots);
         }
+
+        Value autoQubitManagement = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI1Type(),
+                                                                      op.getAutoQubitManagement());
+        operands.push_back(autoQubitManagement);
 
         rewriter.create<LLVM::CallOp>(loc, fnDecl, operands);
 

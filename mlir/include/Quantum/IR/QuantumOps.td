@@ -81,6 +81,7 @@ def DeviceInitOp : Quantum_Op<"device"> {
 
     let arguments = (ins
         Optional<I64>:$shots,
+        UnitAttr:$auto_qubit_management,
         StrAttr:$lib,
         StrAttr:$device_name,
         StrAttr:$kwargs
@@ -90,6 +91,18 @@ def DeviceInitOp : Quantum_Op<"device"> {
       (`shots` `(` $shots^ `)`)? `[` $lib `,` $device_name `,` $kwargs `]` attr-dict
     }];
 
+    let builders = [
+        OpBuilder<
+        // Convenience builder for a device not in automatic qubit management mode
+        (ins
+             "mlir::Value":$shots,
+             "mlir::StringAttr":$lib,
+             "mlir::StringAttr":$device_name,
+             "mlir::StringAttr":$kwargs
+        ),[{
+            DeviceInitOp::build($_builder, $_state, shots, false, lib, device_name, kwargs);
+        }]>,
+    ];
 }
 
 def DeviceReleaseOp : Quantum_Op<"device_release"> {

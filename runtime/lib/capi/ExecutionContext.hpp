@@ -166,6 +166,7 @@ class RTDevice {
     std::string rtd_lib;
     std::string rtd_name;
     std::string rtd_kwargs;
+    bool auto_qubit_management;
 
     std::unique_ptr<SharedLibraryManager> rtd_dylib{nullptr};
     std::unique_ptr<QuantumDevice> rtd_qdevice{nullptr};
@@ -258,6 +259,9 @@ class RTDevice {
     [[nodiscard]] auto getDeviceName() const -> const std::string & { return rtd_name; }
 
     void setDeviceStatus(RTDeviceStatus new_status) noexcept { status = new_status; }
+
+    void setDeviceAutoQubitManagementMode(bool mode) { auto_qubit_management = mode; }
+    bool getDeviceAutoQubitManagementMode() { return auto_qubit_management; }
 
     [[nodiscard]] auto getDeviceStatus() const -> RTDeviceStatus { return status; }
 
