@@ -781,3 +781,8 @@ def ppm_compilation(
         )
 
     return PassPipelineWrapper(qnode, passes)
+
+
+def ppm_specs(qnode):
+    # TODO: Add docstring
+    return PassPipelineWrapper(qnode, "ppm_specs")
