@@ -389,10 +389,16 @@ def to_ppm_spec(*args, stdin=None, options: Optional[CompileOptions] = None):
 
     raw_json_format = _quantum_opt(*opts, *args, stdin=stdin)
     regex_search_for_json = re.search(r"\{[a-zA-Z0-9_\":\{\},\n]+\}", raw_json_format)
+
+    # No ppm_specs json is found
+    if regex_search_for_json is None:
+        return raw_json_format
+    
     json_ppm_specs = regex_search_for_json.group(0)
     json_ppm_specs = json_ppm_specs.replace(",\n}", "\n}")
     json_ppm_specs = json.loads(json_ppm_specs)
     return json_ppm_specs
+
 
 
 class Compiler:
