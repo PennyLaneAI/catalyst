@@ -209,16 +209,17 @@ class RTDevice {
 
   public:
     explicit RTDevice(std::string _rtd_lib, std::string _rtd_name = {},
-                      std::string _rtd_kwargs = {})
+                      std::string _rtd_kwargs = {}, bool _auto_qubit_management = false)
         : rtd_lib(std::move(_rtd_lib)), rtd_name(std::move(_rtd_name)),
-          rtd_kwargs(std::move(_rtd_kwargs))
+          rtd_kwargs(std::move(_rtd_kwargs)), auto_qubit_management(_auto_qubit_management)
     {
         _pl2runtime_device_info(rtd_lib, rtd_name);
     }
 
     explicit RTDevice(std::string_view _rtd_lib, std::string_view _rtd_name,
-                      std::string_view _rtd_kwargs)
-        : rtd_lib(_rtd_lib), rtd_name(_rtd_name), rtd_kwargs(_rtd_kwargs)
+                      std::string_view _rtd_kwargs, bool _auto_qubit_management)
+        : rtd_lib(_rtd_lib), rtd_name(_rtd_name), rtd_kwargs(_rtd_kwargs),
+          auto_qubit_management(_auto_qubit_management)
     {
         _pl2runtime_device_info(rtd_lib, rtd_name);
     }
@@ -260,8 +261,7 @@ class RTDevice {
 
     void setDeviceStatus(RTDeviceStatus new_status) noexcept { status = new_status; }
 
-    void setDeviceAutoQubitManagementMode(bool mode) { auto_qubit_management = mode; }
-    bool getDeviceAutoQubitManagementMode() { return auto_qubit_management; }
+    bool getQubitManagementMode() { return auto_qubit_management; }
 
     [[nodiscard]] auto getDeviceStatus() const -> RTDeviceStatus { return status; }
 
@@ -317,12 +317,13 @@ class ExecutionContext final {
     }
 
     [[nodiscard]] auto getOrCreateDevice(std::string_view rtd_lib, std::string_view rtd_name,
-                                         std::string_view rtd_kwargs)
+                                         std::string_view rtd_kwargs, bool auto_qubit_management)
         -> const std::shared_ptr<RTDevice> &
     {
         std::lock_guard<std::mutex> lock(pool_mu);
 
-        auto device = std::make_shared<RTDevice>(rtd_lib, rtd_name, rtd_kwargs);
+        auto device =
+            std::make_shared<RTDevice>(rtd_lib, rtd_name, rtd_kwargs, auto_qubit_management);
 
         const size_t key = device_pool.size();
         for (size_t i = 0; i < key; i++) {
@@ -348,13 +349,13 @@ class ExecutionContext final {
         return device_pool[key];
     }
 
-    [[nodiscard]] auto getOrCreateDevice(const std::string &rtd_lib,
-                                         const std::string &rtd_name = {},
-                                         const std::string &rtd_kwargs = {})
+    [[nodiscard]] auto
+    getOrCreateDevice(const std::string &rtd_lib, const std::string &rtd_name = {},
+                      const std::string &rtd_kwargs = {}, bool auto_qubit_management = false)
         -> const std::shared_ptr<RTDevice> &
     {
         return getOrCreateDevice(std::string_view{rtd_lib}, std::string_view{rtd_name},
-                                 std::string_view{rtd_kwargs});
+                                 std::string_view{rtd_kwargs}, auto_qubit_management);
     }
 
     [[nodiscard]] auto getDevice(size_t device_key) -> const std::shared_ptr<RTDevice> &

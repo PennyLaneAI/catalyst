@@ -76,9 +76,9 @@ std::vector<bool> getModifiersControlledValues(const Modifiers *modifiers)
  * to the new initialized device pointer.
  */
 [[nodiscard]] bool initRTDevicePtr(std::string_view rtd_lib, std::string_view rtd_name,
-                                   std::string_view rtd_kwargs)
+                                   std::string_view rtd_kwargs, bool auto_qubit_management)
 {
-    auto &&device = CTX->getOrCreateDevice(rtd_lib, rtd_name, rtd_kwargs);
+    auto &&device = CTX->getOrCreateDevice(rtd_lib, rtd_name, rtd_kwargs, auto_qubit_management);
     if (device) {
         RTD_PTR = device.get();
         return RTD_PTR ? true : false;
@@ -252,9 +252,8 @@ static int __catalyst__rt__device_init__impl(int8_t *rtd_lib, int8_t *rtd_name, 
     const std::vector<std::string_view> args{
         reinterpret_cast<char *>(rtd_lib), (rtd_name ? reinterpret_cast<char *>(rtd_name) : ""),
         (rtd_kwargs ? reinterpret_cast<char *>(rtd_kwargs) : "")};
-    RT_FAIL_IF(!initRTDevicePtr(args[0], args[1], args[2]),
+    RT_FAIL_IF(!initRTDevicePtr(args[0], args[1], args[2], auto_qubit_management),
                "Failed initialization of the backend device");
-    RTD_PTR->setDeviceAutoQubitManagementMode(auto_qubit_management);
     getQuantumDevicePtr()->SetDeviceShots(shots);
     if (CTX->getDeviceRecorderStatus()) {
         getQuantumDevicePtr()->StartTapeRecording();
@@ -1035,11 +1034,6 @@ int64_t __catalyst__rt__array_get_size_1d(QirArray *ptr)
     return qubit_vector_ptr->size();
 }
 
-static bool isDeviceAutomaticQubitManageMode()
-{
-    return RTD_PTR->getDeviceAutoQubitManagementMode();
-}
-
 int8_t *__catalyst__rt__array_get_element_ptr_1d(QirArray *ptr, int64_t idx)
 {
     std::vector<QubitIdType> *qubit_vector_ptr = reinterpret_cast<std::vector<QubitIdType> *>(ptr);
@@ -1049,7 +1043,7 @@ int8_t *__catalyst__rt__array_get_element_ptr_1d(QirArray *ptr, int64_t idx)
     error_msg += std::to_string(idx);
 
     if (static_cast<size_t>(idx) >= qubit_vector_ptr->size()) {
-        if (!isDeviceAutomaticQubitManageMode()) {
+        if (!RTD_PTR->getQubitManagementMode()) {
             RT_FAIL(error_msg.c_str());
         }
         else {
