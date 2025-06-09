@@ -102,6 +102,20 @@ void deactivateDevice()
     CTX->deactivateDevice(RTD_PTR);
     RTD_PTR = nullptr;
 }
+
+static void autoQubitManagementAllocate(std::vector<QubitIdType> *qubit_vector_ptr, int64_t idx)
+{
+    // allocate new qubits if we are in automatic qubit allocation mode
+    // and encountered a new user wire index
+    // `idx` is the new user wire index from frontend pennylane
+    // number of currently allocated qubits is `qubit_vector_ptr->size()`
+    QirArray *new_qubits = __catalyst__rt__qubit_allocate_array(
+        idx + 1 - static_cast<int64_t>(qubit_vector_ptr->size()));
+    std::vector<QubitIdType> *new_qubits_vector =
+        reinterpret_cast<std::vector<QubitIdType> *>(new_qubits);
+    qubit_vector_ptr->insert(qubit_vector_ptr->end(), new_qubits_vector->begin(),
+                             new_qubits_vector->end());
+}
 } // namespace Catalyst::Runtime
 
 extern "C" {
@@ -1047,14 +1061,7 @@ int8_t *__catalyst__rt__array_get_element_ptr_1d(QirArray *ptr, int64_t idx)
             RT_FAIL(error_msg.c_str());
         }
         else {
-            // allocate a new qubit if we are in automatic qubit allocation mode
-            // `idx` is the new user wire index from frontend pennylane
-            // number of currently allocated qubits is `qubit_vector_ptr->size()`
-            while (qubit_vector_ptr->size() <= static_cast<size_t>(idx)) {
-                auto new_alloced_id =
-                    reinterpret_cast<QubitIdType>(__catalyst__rt__qubit_allocate());
-                qubit_vector_ptr->push_back(new_alloced_id);
-            }
+            autoQubitManagementAllocate(qubit_vector_ptr, idx);
         }
     }
 
