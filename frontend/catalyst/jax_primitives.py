@@ -817,6 +817,7 @@ def _device_init_abstract_eval(shots, auto_qubit_management, rtd_lib, rtd_name, 
     return ()
 
 
+# pylint: disable=too-many-arguments, too-many-positional-arguments
 def _device_init_lowering(
     jax_ctx: mlir.LoweringRuleContext,
     shots: ir.Value,

@@ -35,6 +35,10 @@ from catalyst import qjit
 
 
 def test_partial_sample(backend):
+    """
+    Test that a `sample` terminal measurement with wires specified can be executed
+    correctly with automatic qubit management.
+    """
 
     def circuit():
         qml.RX(0.0, wires=0)
@@ -48,6 +52,10 @@ def test_partial_sample(backend):
 
 
 def test_partial_counts(backend):
+    """
+    Test that a `counts` terminal measurement with wires specified can be executed
+    correctly with automatic qubit management.
+    """
 
     def circuit():
         qml.RX(0.0, wires=0)
@@ -61,6 +69,10 @@ def test_partial_counts(backend):
 
 
 def test_partial_probs(backend):
+    """
+    Test that a `probs` terminal measurement with wires specified can be executed
+    correctly with automatic qubit management.
+    """
 
     def circuit():
         qml.PauliX(wires=0)
@@ -74,6 +86,10 @@ def test_partial_probs(backend):
 
 
 def test_sample(backend):
+    """
+    Test that a `sample` terminal measurement without wires specified can be executed
+    correctly with automatic qubit management.
+    """
 
     def circuit():
         qml.RX(0.0, wires=3)
@@ -87,6 +103,10 @@ def test_sample(backend):
 
 
 def test_counts(backend):
+    """
+    Test that a `counts` terminal measurement without wires specified can be executed
+    correctly with automatic qubit management.
+    """
 
     def circuit():
         qml.RX(0.0, wires=3)
@@ -100,6 +120,10 @@ def test_counts(backend):
 
 
 def test_probs(backend):
+    """
+    Test that a `probs` terminal measurement without wires specified can be executed
+    correctly with automatic qubit management.
+    """
 
     def circuit():
         qml.PauliX(wires=3)
@@ -113,6 +137,10 @@ def test_probs(backend):
 
 
 def test_state(backend):
+    """
+    Test that a `state` terminal measurement without wires specified can be executed
+    correctly with automatic qubit management.
+    """
 
     def circuit():
         qml.PauliX(wires=3)
