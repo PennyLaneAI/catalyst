@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import TypeVar
+from typing import Type, TypeVar
 
 import jax
 import pennylane as qml
@@ -20,7 +20,7 @@ import pennylane.compiler.python_compiler.quantum_dialect as quantum
 from pennylane.compiler.python_compiler.transforms import xdsl_transform
 from xdsl import ir, passes
 from xdsl.context import Context
-from xdsl.dialects import arith, builtin, func, memref, scf
+from xdsl.dialects import arith, builtin, func, memref, scf, tensor
 from xdsl.pattern_rewriter import *
 from xdsl.rewriter import InsertPoint
 
@@ -33,7 +33,7 @@ from catalyst.passes.xdsl_plugin import getXDSLPluginAbsolutePath
 T = TypeVar("T")
 
 
-def get_parent_of_type(op: ir.Operation, kind: T) -> T | None:
+def get_parent_of_type(op: ir.Operation, kind: Type[T]) -> T | None:
     """Walk up the parent tree until an op of the specified type is found."""
 
     while (op := op.parent_op()) and not isinstance(op, kind):
@@ -45,9 +45,8 @@ def get_parent_of_type(op: ir.Operation, kind: T) -> T | None:
 class TreeTraversal(RewritePattern):
 
     def __init__(self):
-        self.segment_counter = 0
+        self.ttOp: func.FuncOp = None
         self.segment_functions: list[func.FuncOp] = []
-        self.alloc_op: quantum.AllocOp = None
 
     @op_type_rewrite_pattern
     def match_and_rewrite(self, funcOp: func.FuncOp, rewriter: PatternRewriter):
@@ -59,22 +58,44 @@ class TreeTraversal(RewritePattern):
         assert module is not None, "got orphaned qnode function"
 
         # Start with creating a new QNode function that will perform the tree traversal simulation.
+        self.setup_traversal_function(funcOp, module, rewriter)
+
+        self.split_traversal_segments(funcOp, rewriter)
+
+        self.initialize_data_structures(rewriter)
+
+        self.generate_traversal_code(rewriter)
+
+        self.finalize_traversal_function(rewriter)
+
+    def setup_traversal_function(
+        self, funcOp: func.FuncOp, module: builtin.ModuleOp, rewriter: RewritePattern
+    ):
+        """Setup a clone of the original QNode function, which will instead perform TT."""
+
         ttOp = funcOp.clone_without_regions()
-        ttOp.sym_name = builtin.StringAttr(ttOp.sym_name.name + ".tree_traversal")
+        ttOp.sym_name = builtin.StringAttr(funcOp.sym_name.data + ".tree_traversal")
         rewriter.create_block(BlockInsertPoint.at_start(ttOp.body), ttOp.function_type.inputs)
         rewriter.insert_op(ttOp, InsertPoint.at_end(module.body.block))
 
-        self.split_traversal_segments(funcOp, ttOp, rewriter)
+        self.ttOp = ttOp
 
-        self.initialize_data_structures(ttOp, rewriter)
+    def finalize_traversal_function(self, rewriter: RewritePattern):
+        """Complete the function and ensure it's correctly formed, e.g. returning proper results."""
+        rewriter.insertion_point = InsertPoint.at_end(self.ttOp.body.block)
 
-        self.generate_traversal_code(ttOp, rewriter)
+        # For now return nothing from the Tree-Traversal function to satisfy the verifier.
+        result_vals = []
+        for resType in self.ttOp.function_type.outputs:
+            assert isinstance(resType, builtin.TensorType)
+            result = tensor.EmptyOp((), tensor_type=resType)
+            result_vals.append(rewriter.insert(result))
 
-    def split_traversal_segments(
-        self, funcOp: func.FuncOp, ttOp: func.FuncOp, rewriter: PatternRewriter
-    ):
+        rewriter.insert(func.ReturnOp(*result_vals))
+
+    def split_traversal_segments(self, funcOp: func.FuncOp, rewriter: PatternRewriter):
         """Split the quantum function into segments separated by measure operations."""
-        rewriter.insertion_point = InsertPoint.at_start(ttOp.body.block)
+        rewriter.insertion_point = InsertPoint.at_start(self.ttOp.body.block)
 
         # Ideally try to iterate over the function only once.
         op_iter = funcOp.body.walk()
@@ -84,8 +105,7 @@ class TreeTraversal(RewritePattern):
         while (op := next(op_iter, None)) and not isinstance(op, quantum.AllocOp):
             rewriter.insert(op.clone(value_mapper))
         assert op is not None, "didn't find an alloc op"
-        rewriter.insert(op.clone(value_mapper))
-        self.alloc_op = op
+        self.alloc_op = rewriter.insert(op.clone(value_mapper))
 
         # Generate new functions for each segment separated by a measure op.
         op_list = []
@@ -113,9 +133,8 @@ class TreeTraversal(RewritePattern):
         fun_type = builtin.FunctionType.from_lists(
             [arg.type for arg in input_vals], [res.type for res in output_vals]
         )
-        new_func = func.FuncOp(f"quantum_segment_{self.segment_counter}", fun_type)
+        new_func = func.FuncOp(f"quantum_segment_{len(self.segment_functions)}", fun_type)
         self.segment_functions.append(new_func)
-        self.segment_counter += 1
 
         rewriter.insertion_point = InsertPoint.at_start(new_func.body.block)
 
@@ -148,13 +167,9 @@ class TreeTraversal(RewritePattern):
 
         return inputs, outputs
 
-    def initialize_data_structures(self, ttOp: func.FuncOp, rewriter: PatternRewriter):
+    def initialize_data_structures(self, rewriter: PatternRewriter):
         """Create data structures in the IR required for the dynamic tree traversal."""
-        rewriter.insertion_point = InsertPoint.at_end(ttOp.body.block)
-
-        # get the tree depth (for now just the segment count)
-        tree_depth = arith.ConstantOp.from_int_and_width(len(self.segment_functions), 64).result
-        rewriter.insert(tree_depth.owner)
+        rewriter.insertion_point = InsertPoint.at_end(self.ttOp.body.block)
 
         # get the qubit count
         if self.alloc_op.nqubits:
@@ -163,43 +178,46 @@ class TreeTraversal(RewritePattern):
             qubit_count = arith.ConstantOp(self.alloc_op.nqubits_attr).result
             rewriter.insert(qubit_count.owner)
 
-        # initialize stack variables
+        # get the tree depth (for now just the segment count)
+        tree_depth = arith.ConstantOp.from_int_and_width(
+            len(self.segment_functions), builtin.IndexType()
+        )
+
+        # initialize stack variables #
 
         # statevector storage to allow for rollback
-        const_1 = arith.ConstantOp.from_int_and_width(1, 64).result
-        rewriter.insert(const_1.owner)
-        statevec_size = arith.ShLIOp(const_1, qubit_count).result
-        rewriter.insert(statevec_size.owner)
+        c1 = arith.ConstantOp.from_int_and_width(1, 64)
+        statevec_size = arith.ShLIOp(c1, qubit_count)
         statevec_type = builtin.TensorType(
             builtin.ComplexType(builtin.f64), (builtin.DYNAMIC_INDEX,)
         )
         # TODO: don't know if this actually works, alternatively we can instantiate a 2D array
         statevec_stack_type = builtin.MemRefType(statevec_type, (builtin.DYNAMIC_INDEX,))
-        statevec_stack = memref.AllocOp((tree_depth,), (), statevec_stack_type).results[0]
-        rewriter.insert(statevec_stack.owner)
+        statevec_stack = memref.AllocOp((tree_depth,), (), statevec_stack_type)
 
         # probabilities for each branch are tracked here
         probs_stack_type = builtin.MemRefType(builtin.f64, (builtin.DYNAMIC_INDEX,))
-        probs_stack = memref.AllocOp((tree_depth,), (), probs_stack_type).results[0]
-        rewriter.insert(probs_stack.owner)
+        probs_stack = memref.AllocOp((tree_depth,), (), probs_stack_type)
 
         # For the current path, we track whether a node is:
         #  - unvisited: 0
         #  - visited down the left branch: 1
         #  - visited down the right branch: 2
         visited_stack_type = builtin.MemRefType(builtin.i8, (builtin.DYNAMIC_INDEX,))
-        visited_stack = memref.AllocOp((tree_depth,), (), visited_stack_type).results[0]
-        rewriter.insert(visited_stack.owner)
+        visited_stack = memref.AllocOp((tree_depth,), (), visited_stack_type)
+
+        for op in (tree_depth, c1, statevec_size, statevec_stack, probs_stack, visited_stack):
+            rewriter.insert(op)
 
         # store some useful values for later
-        self.tree_depth = tree_depth
-        self.statevec_stack = statevec_stack
-        self.probs_stack = probs_stack
-        self.visited_stack = visited_stack
+        self.tree_depth = tree_depth.result
+        self.statevec_stack = statevec_stack.results[0]
+        self.probs_stack = probs_stack.results[0]
+        self.visited_stack = visited_stack.results[0]
 
-    def generate_traversal_code(self, ttOp: func.FuncOp, rewriter: PatternRewriter):
+    def generate_traversal_code(self, rewriter: PatternRewriter):
         """Create the traversal code of the quantum simulation tree."""
-        rewriter.insertion_point = InsertPoint.at_end(ttOp.body.block)
+        rewriter.insertion_point = InsertPoint.at_end(self.ttOp.body.block)
 
 
 @xdsl_transform
