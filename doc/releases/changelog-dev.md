@@ -218,6 +218,9 @@
 * `make all` now correctly compiles the standalone plugin with the same compiler used to compile LLVM and MLIR.
   [(#1768)](https://github.com/PennyLaneAI/catalyst/pull/1768)
 
+* Stacked python decorators for built-in catalyst passes are now applied in the correct order.
+  [(#???)](https://github.com/PennyLaneAI/catalyst/pull/???)
+
 <h3>Internal changes ⚙️</h3>
 
 * `null.qubit` can now support an optional `track_resources` argument which allows it to record which gates are executed.
