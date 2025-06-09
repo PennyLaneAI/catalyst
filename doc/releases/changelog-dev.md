@@ -219,7 +219,7 @@
   [(#1768)](https://github.com/PennyLaneAI/catalyst/pull/1768)
 
 * Stacked python decorators for built-in catalyst passes are now applied in the correct order.
-  [(#???)](https://github.com/PennyLaneAI/catalyst/pull/???)
+  [(#1798)](https://github.com/PennyLaneAI/catalyst/pull/1798)
 
 <h3>Internal changes ⚙️</h3>
 
