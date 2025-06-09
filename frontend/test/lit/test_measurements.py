@@ -678,3 +678,26 @@ def state_dynamic(num_qubits):
 
 state_dynamic(10)
 print(state_dynamic.mlir)
+
+
+# CHECK-LABEL: @automatic_qubit_management
+@qjit(target="mlir")
+def automatic_qubit_management():
+    @qml.qnode(qml.device("lightning.qubit"))
+    def circ():
+        # CHECK: [[qreg:%.+]] = quantum.alloc( 0) : !quantum.reg
+        # CHECK: [[in_qubit:%.+]] = quantum.extract [[qreg]][ 2] : !quantum.reg -> !quantum.bit
+        # CHECK: [[out_qubit:%.+]] = quantum.custom "Hadamard"() [[in_qubit]] : !quantum.bit
+        qml.Hadamard(wires=2)
+
+        # CHECK: [[nqubits:%.+]] = quantum.num_qubits : i64
+        # CHECK: [[toTensor:%.+]] = tensor.from_elements [[nqubits]] : tensor<i64>
+        # CHECK: [[probs_shape:%.+]] = stablehlo.shift_left {{%.+}}, [[toTensor]] : tensor<i64>
+        # CHECK: [[deTensor:%.+]] = tensor.extract [[probs_shape]][] : tensor<i64>
+        # CHECK: {{%.+}} = quantum.probs {{%.+}} shape [[deTensor]] : tensor<?xf64>
+        return qml.probs()
+
+    return circ()
+
+
+print(automatic_qubit_management.mlir)
