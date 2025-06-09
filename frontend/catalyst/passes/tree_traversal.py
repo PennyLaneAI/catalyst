@@ -12,28 +12,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Implementation of the Tree-Traversal MCM simulation method as an xDSL transform in Catalyst."""
+
 from typing import Type, TypeVar
 
 import jax
 import pennylane as qml
 import pennylane.compiler.python_compiler.quantum_dialect as quantum
 from pennylane.compiler.python_compiler.transforms import xdsl_transform
-from xdsl import ir, passes
 from xdsl.context import Context
 from xdsl.dialects import arith, builtin, func, memref, scf, tensor
-from xdsl.pattern_rewriter import *
-from xdsl.rewriter import InsertPoint
+from xdsl.ir import Block, Operation, Region, SSAValue
+from xdsl.passes import ModulePass
+from xdsl.pattern_rewriter import PatternRewriter, RewritePattern, op_type_rewrite_pattern
+from xdsl.rewriter import BlockInsertPoint, InsertPoint
 
 from catalyst.passes.xdsl_plugin import getXDSLPluginAbsolutePath
-
-#############
-# Transform #
-#############
 
 T = TypeVar("T")
 
 
-def get_parent_of_type(op: ir.Operation, kind: Type[T]) -> T | None:
+def get_parent_of_type(op: Operation, kind: Type[T]) -> T | None:
     """Walk up the parent tree until an op of the specified type is found."""
 
     while (op := op.parent_op()) and not isinstance(op, kind):
@@ -120,7 +119,7 @@ class TreeTraversal(RewritePattern):
                 op_list.append(op)
         assert op is not None, "didn't find a dealloc op"
 
-    def clone_ops_into_func(self, op_list: list[ir.Operation], rewriter: PatternRewriter):
+    def clone_ops_into_func(self, op_list: list[Operation], rewriter: PatternRewriter):
         """Clone a set of ops into a new function."""
         if not op_list:
             return
@@ -149,7 +148,7 @@ class TreeTraversal(RewritePattern):
         rewriter.insert_op(new_func, InsertPoint.at_end(module.body.block))
 
     @staticmethod
-    def gather_segment_io(op_list: list[ir.Operation]) -> tuple[set[ir.SSAValue], set[ir.SSAValue]]:
+    def gather_segment_io(op_list: list[Operation]) -> tuple[set[SSAValue], set[SSAValue]]:
         """Gather SSA values that need to be passed in and out of the segment to be outlined."""
         inputs = set()
         outputs = set()
@@ -231,8 +230,8 @@ class TreeTraversal(RewritePattern):
         depth_init = arith.ConstantOp.from_int_and_width(0, builtin.IndexType())
         restore_init = arith.ConstantOp.from_int_and_width(0, 1)
 
-        conditionBlock = builtin.Block(arg_types=(depth_init.result.type, restore_init.result.type))
-        bodyBlock = builtin.Block(arg_types=conditionBlock.arg_types)
+        conditionBlock = Block(arg_types=(depth_init.result.type, restore_init.result.type))
+        bodyBlock = Block(arg_types=conditionBlock.arg_types)
         traversalOp = scf.WhileOp(
             (depth_init, restore_init), conditionBlock.arg_types, (conditionBlock,), (bodyBlock,)
         )
@@ -268,8 +267,8 @@ class TreeTraversal(RewritePattern):
         switchOp = scf.IndexSwitchOp(
             casted_status,
             cases,
-            builtin.Region(builtin.Block()),
-            [builtin.Region(builtin.Block()) for _ in range(3)],
+            Region(Block()),
+            [Region(Block()) for _ in range(3)],
             (current_depth.type, needs_restore.type),
         )
 
@@ -284,14 +283,14 @@ class TreeTraversal(RewritePattern):
         self, current_depth: SSAValue, needs_restore: SSAValue, rewriter: PatternRewriter
     ) -> tuple[SSAValue, SSAValue]:
         """Verify whether we've hit the bottom of the tree, and perform update actions."""
-        assert isinstance(current_depth.owner, builtin.Block)
+        assert isinstance(current_depth.owner, Block)
         assert current_depth.owner == needs_restore.owner
         ip_backup = rewriter.insertion_point
         rewriter.insertion_point = InsertPoint.at_start(current_depth.owner)
 
         # if instruction
         hit_leaf = arith.CmpiOp(current_depth, self.tree_depth, "eq")
-        trueBlock, falseBlock = builtin.Block(), builtin.Block()
+        trueBlock, falseBlock = Block(), Block()
         ifOp = scf.IfOp(
             hit_leaf, (current_depth.type, needs_restore.type), (trueBlock,), (falseBlock,)
         )
@@ -347,7 +346,7 @@ class TreeTraversal(RewritePattern):
         c2 = arith.ConstantOp.from_int_and_width(2, self.visited_stack.type.element_type)
         storeOp = memref.StoreOp.get(c2, self.visited_stack, (current_depth,))
 
-        trueBlock, falseBlock = builtin.Block(), builtin.Block()
+        trueBlock, falseBlock = Block(), Block()
         updated_restore = scf.IfOp(
             needs_restore, (needs_restore.type,), (trueBlock,), (falseBlock,)
         )
@@ -430,7 +429,7 @@ class TreeTraversal(RewritePattern):
 
         sum_init = arith.ConstantOp.from_int_and_width(0, builtin.i64)
 
-        bodyBlock = builtin.Block(arg_types=(builtin.IndexType(), sum_init.result.type))
+        bodyBlock = Block(arg_types=(builtin.IndexType(), sum_init.result.type))
         reduced_sum = scf.ForOp(c0, l, c1, iter_args=(sum_init,), body=bodyBlock)
         casted_sum = arith.IndexCastOp(reduced_sum, builtin.IndexType())
 
@@ -453,7 +452,7 @@ class TreeTraversal(RewritePattern):
 
 
 @xdsl_transform
-class TTPass(passes.ModulePass):
+class TTPass(ModulePass):
     name = "tree-traversal"
 
     def apply(self, ctx: Context, module: builtin.ModuleOp) -> None:
