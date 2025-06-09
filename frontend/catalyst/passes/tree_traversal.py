@@ -173,10 +173,11 @@ class TreeTraversal(RewritePattern):
 
         # get the qubit count
         if self.alloc_op.nqubits:
-            qubit_count = self.alloc_op.nqubits
+            qubit_count = arith.IndexCastOp(self.alloc_op.nqubits, builtin.IndexType())
         else:
-            qubit_count = arith.ConstantOp(self.alloc_op.nqubits_attr).result
-            rewriter.insert(qubit_count.owner)
+            qubit_count = arith.ConstantOp.from_int_and_width(
+                self.alloc_op.nqubits_attr.value, builtin.IndexType()
+            )
 
         # get the tree depth (for now just the segment count)
         tree_depth = arith.ConstantOp.from_int_and_width(
@@ -186,14 +187,12 @@ class TreeTraversal(RewritePattern):
         # initialize stack variables #
 
         # statevector storage to allow for rollback
-        c1 = arith.ConstantOp.from_int_and_width(1, 64)
+        c1 = arith.ConstantOp.from_int_and_width(1, builtin.IndexType())
         statevec_size = arith.ShLIOp(c1, qubit_count)
-        statevec_type = builtin.TensorType(
-            builtin.ComplexType(builtin.f64), (builtin.DYNAMIC_INDEX,)
+        statevec_stack_type = builtin.MemRefType(
+            builtin.ComplexType(builtin.f64), (builtin.DYNAMIC_INDEX, builtin.DYNAMIC_INDEX)
         )
-        # TODO: don't know if this actually works, alternatively we can instantiate a 2D array
-        statevec_stack_type = builtin.MemRefType(statevec_type, (builtin.DYNAMIC_INDEX,))
-        statevec_stack = memref.AllocOp((tree_depth,), (), statevec_stack_type)
+        statevec_stack = memref.AllocOp((tree_depth, statevec_size), (), statevec_stack_type)
 
         # probabilities for each branch are tracked here
         probs_stack_type = builtin.MemRefType(builtin.f64, (builtin.DYNAMIC_INDEX,))
@@ -206,7 +205,15 @@ class TreeTraversal(RewritePattern):
         visited_stack_type = builtin.MemRefType(builtin.i8, (builtin.DYNAMIC_INDEX,))
         visited_stack = memref.AllocOp((tree_depth,), (), visited_stack_type)
 
-        for op in (tree_depth, c1, statevec_size, statevec_stack, probs_stack, visited_stack):
+        for op in (
+            qubit_count,
+            tree_depth,
+            c1,
+            statevec_size,
+            statevec_stack,
+            probs_stack,
+            visited_stack,
+        ):
             rewriter.insert(op)
 
         # store some useful values for later
