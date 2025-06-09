@@ -218,6 +218,7 @@ class TreeTraversal(RewritePattern):
 
         # store some useful values for later
         self.tree_depth = tree_depth.result
+        self.statevec_size = statevec_size.result
         self.statevec_stack = statevec_stack.results[0]
         self.probs_stack = probs_stack.results[0]
         self.visited_stack = visited_stack.results[0]
@@ -225,6 +226,230 @@ class TreeTraversal(RewritePattern):
     def generate_traversal_code(self, rewriter: PatternRewriter):
         """Create the traversal code of the quantum simulation tree."""
         rewriter.insertion_point = InsertPoint.at_end(self.ttOp.body.block)
+
+        # loop instruction
+        depth_init = arith.ConstantOp.from_int_and_width(0, builtin.IndexType())
+        restore_init = arith.ConstantOp.from_int_and_width(0, 1)
+
+        conditionBlock = builtin.Block(arg_types=(depth_init.result.type, restore_init.result.type))
+        bodyBlock = builtin.Block(arg_types=conditionBlock.arg_types)
+        traversalOp = scf.WhileOp(
+            (depth_init, restore_init), conditionBlock.arg_types, (conditionBlock,), (bodyBlock,)
+        )
+
+        for op in (depth_init, restore_init, traversalOp):
+            rewriter.insert(op)
+
+        # condition block of the while loop
+        current_depth, needs_restore = self.check_if_leaf(*conditionBlock.args, rewriter)
+
+        c0 = arith.ConstantOp.from_int_and_width(0, builtin.IndexType())
+        c2 = arith.ConstantOp.from_int_and_width(2, builtin.IndexType())
+
+        positive_depth = arith.CmpiOp(current_depth, c0, "sge")
+
+        visited_sum = self.sum_array(self.visited_stack, rewriter, conditionBlock)
+        max_sum = arith.MuliOp(c2, self.tree_depth)
+        not_fully_traversed = arith.CmpiOp(visited_sum, max_sum, "ne")
+
+        final_condition = arith.AndIOp(positive_depth, not_fully_traversed)
+        condOp = scf.ConditionOp(final_condition, current_depth, needs_restore)
+
+        for op in (c0, c2, positive_depth, max_sum, not_fully_traversed, final_condition, condOp):
+            rewriter.insert_op(op, InsertPoint.at_end(conditionBlock))
+
+        # body block of the while
+        current_depth, needs_restore = bodyBlock.args
+
+        node_status = memref.LoadOp.get(self.visited_stack, (current_depth,))
+        casted_status = arith.IndexCastOp(node_status, builtin.IndexType())
+
+        cases = builtin.DenseArrayBase.from_list(builtin.i64, [0, 1, 2])
+        switchOp = scf.IndexSwitchOp(
+            casted_status,
+            cases,
+            builtin.Region(builtin.Block()),
+            [builtin.Region(builtin.Block()) for _ in range(3)],
+            (current_depth.type, needs_restore.type),
+        )
+
+        self.process_node(switchOp, current_depth, needs_restore, rewriter)
+
+        yieldOp = scf.YieldOp(*switchOp.results)
+
+        for op in (node_status, casted_status, switchOp, yieldOp):
+            rewriter.insert_op(op, InsertPoint.at_end(bodyBlock))
+
+    def check_if_leaf(
+        self, current_depth: SSAValue, needs_restore: SSAValue, rewriter: PatternRewriter
+    ) -> tuple[SSAValue, SSAValue]:
+        """Verify whether we've hit the bottom of the tree, and perform update actions."""
+        assert isinstance(current_depth.owner, builtin.Block)
+        assert current_depth.owner == needs_restore.owner
+        ip_backup = rewriter.insertion_point
+        rewriter.insertion_point = InsertPoint.at_start(current_depth.owner)
+
+        # if instruction
+        hit_leaf = arith.CmpiOp(current_depth, self.tree_depth, "eq")
+        trueBlock, falseBlock = builtin.Block(), builtin.Block()
+        ifOp = scf.IfOp(
+            hit_leaf, (current_depth.type, needs_restore.type), (trueBlock,), (falseBlock,)
+        )
+
+        for op in (hit_leaf, ifOp):
+            rewriter.insert(op)
+
+        # true branch body
+        c1 = arith.ConstantOp.from_int_and_width(1, current_depth.type)
+        updated_depth = arith.SubiOp(current_depth, c1)
+        true = arith.ConstantOp.from_int_and_width(1, 1)
+        yieldOp = scf.YieldOp(updated_depth, true)
+
+        for op in (c1, updated_depth, true, yieldOp):
+            rewriter.insert_op(op, InsertPoint.at_end(trueBlock))
+
+        # false branch body
+        yieldOp = scf.YieldOp(current_depth, needs_restore)
+        rewriter.insert_op(yieldOp, InsertPoint.at_end(falseBlock))
+
+        rewriter.insertion_point = ip_backup
+
+        return ifOp.results
+
+    def process_node(
+        self,
+        switchOp: scf.IndexSwitchOp,
+        current_depth: SSAValue,
+        needs_restore: SSAValue,
+        rewriter: PatternRewriter,
+    ):
+        """Update data structures and effect transition from one node to the next."""
+        defaultBlock = switchOp.default_region.block
+        unvisitedBlock, leftVisitedBlock, rightVisitedBlock = (
+            reg.block for reg in switchOp.case_regions
+        )
+
+        # handle unvisited region: need to ge left
+        c1 = arith.ConstantOp.from_int_and_width(1, self.visited_stack.type.element_type)
+        storeOp = memref.StoreOp.get(c1, self.visited_stack, (current_depth,))
+
+        # TODO: add simulation segment
+
+        c1_ = arith.ConstantOp.from_int_and_width(1, current_depth.type)
+        updated_depth = arith.AddiOp(current_depth, c1_)
+
+        yieldOp = scf.YieldOp(updated_depth, needs_restore)
+
+        for op in (c1, c1_, storeOp, updated_depth, yieldOp):
+            rewriter.insert_op(op, InsertPoint.at_end(unvisitedBlock))
+
+        # handle left visited region: need to go right
+        c2 = arith.ConstantOp.from_int_and_width(2, self.visited_stack.type.element_type)
+        storeOp = memref.StoreOp.get(c2, self.visited_stack, (current_depth,))
+
+        trueBlock, falseBlock = builtin.Block(), builtin.Block()
+        updated_restore = scf.IfOp(
+            needs_restore, (needs_restore.type,), (trueBlock,), (falseBlock,)
+        )
+        self.handle_restore(needs_restore, current_depth, trueBlock, falseBlock, rewriter)
+
+        # TODO: add simulation segment
+
+        c1 = arith.ConstantOp.from_int_and_width(1, current_depth.type)
+        updated_depth = arith.AddiOp(current_depth, c1)
+
+        yieldOp = scf.YieldOp(updated_depth, updated_restore)
+
+        for op in (c1, c2, storeOp, updated_restore, updated_depth, yieldOp):
+            rewriter.insert_op(op, InsertPoint.at_end(leftVisitedBlock))
+
+        # handle right visited region: need to go back up
+        c0 = arith.ConstantOp.from_int_and_width(0, self.visited_stack.type.element_type)
+        storeOp = memref.StoreOp.get(c0, self.visited_stack, (current_depth,))  # erase tracks
+
+        c1 = arith.ConstantOp.from_int_and_width(1, current_depth.type)
+        updated_depth = arith.SubiOp(current_depth, c1)
+
+        yieldOp = scf.YieldOp(updated_depth, needs_restore)
+
+        for op in (c0, c1, storeOp, updated_depth, yieldOp):
+            rewriter.insert_op(op, InsertPoint.at_end(rightVisitedBlock))
+
+        # handle default region, TODO: ideally should raise a runtime exception here
+        cm1 = arith.ConstantOp.from_int_and_width(-1, current_depth.type)  # will end traversal
+        yieldOp = scf.YieldOp(cm1, needs_restore)
+
+        for op in (cm1, yieldOp):
+            rewriter.insert_op(op, InsertPoint.at_end(defaultBlock))
+
+    def handle_restore(
+        self,
+        needs_restore: SSAValue,
+        current_depth: SSAValue,
+        trueBlock: Block,
+        falseBlock: Block,
+        rewriter: PatternRewriter,
+    ):
+        """Restore statevector to previous state when entering a new branch in the tree."""
+
+        # true branch, restore statevector from the stack
+        targetType = builtin.MemRefType(
+            builtin.ComplexType(builtin.f64),
+            (builtin.DYNAMIC_INDEX,),  # rank-reduce: get rid of leading size-1 dimension
+            builtin.StridedLayoutAttr([1], None),  # needed due to dynamic indexing
+        )
+        statevec = memref.SubviewOp.get(
+            self.statevec_stack, (current_depth, 0), (1, self.statevec_size), (1, 1), targetType
+        )
+        # TODO: do something with the statevector (quantum op)
+
+        false = arith.ConstantOp.from_int_and_width(0, 1)
+        yieldOp = scf.YieldOp(false)
+
+        for op in (false, statevec, yieldOp):
+            rewriter.insert_op(op, InsertPoint.at_end(trueBlock))
+
+        # false branch, no restore needed
+        rewriter.insert_op(scf.YieldOp(needs_restore), InsertPoint.at_end(falseBlock))
+
+    @staticmethod
+    def sum_array(arg: SSAValue, rewriter: PatternRewriter, insert_into: Block) -> SSAValue:
+        """Generate a sum reduction using the scf dialect. Produces an integer sum of index type."""
+        assert isinstance(arg.type, builtin.MemRefType), "expected memref value to sum"
+        assert len(arg.type.shape) == 1, "expected 1D memref to sum"
+        assert isinstance(arg.type.element_type, builtin.IntegerType), "expected int memref to sum"
+        ip_backup = rewriter.insertion_point
+        rewriter.insertion_point = InsertPoint.at_end(insert_into)
+
+        # TODO: reduce not available in either linalg or stablehlo dialects
+
+        # loop instruction
+        c0 = arith.ConstantOp.from_int_and_width(0, builtin.IndexType())
+        c1 = arith.ConstantOp.from_int_and_width(1, builtin.IndexType())
+        l = memref.DimOp.from_source_and_index(arg, c0)
+
+        sum_init = arith.ConstantOp.from_int_and_width(0, builtin.i64)
+
+        bodyBlock = builtin.Block(arg_types=(builtin.IndexType(), sum_init.result.type))
+        reduced_sum = scf.ForOp(c0, l, c1, iter_args=(sum_init,), body=bodyBlock)
+        casted_sum = arith.IndexCastOp(reduced_sum, builtin.IndexType())
+
+        for op in (c0, c1, l, sum_init, reduced_sum, casted_sum):
+            rewriter.insert(op)
+
+        # loop body
+        iter_index, last_sum = bodyBlock.args
+
+        val = memref.LoadOp.get(arg, (iter_index,))
+        casted_val = arith.ExtSIOp(val, last_sum.type)
+        curr_sum = arith.AddiOp(casted_val, last_sum)
+        yieldOp = scf.YieldOp(curr_sum)
+
+        for op in (val, casted_val, curr_sum, yieldOp):
+            rewriter.insert_op(op, InsertPoint.at_end(bodyBlock))
+
+        rewriter.insertion_point = ip_backup
+        return casted_sum
 
 
 @xdsl_transform
