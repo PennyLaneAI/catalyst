@@ -233,7 +233,8 @@ class RTDevice {
     auto operator==(const RTDevice &other) const -> bool
     {
         return (this->rtd_lib == other.rtd_lib && this->rtd_name == other.rtd_name) &&
-               this->rtd_kwargs == other.rtd_kwargs;
+               this->rtd_kwargs == other.rtd_kwargs &&
+               this->auto_qubit_management == other.auto_qubit_management;
     }
 
     [[nodiscard]] auto getQuantumDevicePtr() -> const std::unique_ptr<QuantumDevice> &
@@ -252,9 +253,10 @@ class RTDevice {
         return rtd_qdevice;
     }
 
-    [[nodiscard]] auto getDeviceInfo() const -> std::tuple<std::string, std::string, std::string>
+    [[nodiscard]] auto getDeviceInfo() const
+        -> std::tuple<std::string, std::string, std::string, bool>
     {
-        return {rtd_lib, rtd_name, rtd_kwargs};
+        return {rtd_lib, rtd_name, rtd_kwargs, auto_qubit_management};
     }
 
     [[nodiscard]] auto getDeviceName() const -> const std::string & { return rtd_name; }
@@ -268,7 +270,8 @@ class RTDevice {
     friend std::ostream &operator<<(std::ostream &os, const RTDevice &device)
     {
         os << "RTD, name: " << device.rtd_name << " lib: " << device.rtd_lib
-           << " kwargs: " << device.rtd_kwargs;
+           << " kwargs: " << device.rtd_kwargs
+           << "auto_qubit_management: " << device.auto_qubit_management;
         return os;
     }
 };
