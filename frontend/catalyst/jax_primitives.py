@@ -18,6 +18,7 @@ of quantum operations, measurements, and observables to JAXPR.
 import sys
 from dataclasses import dataclass
 from enum import Enum
+import functools
 from itertools import chain
 from typing import Iterable, List, Union
 
@@ -139,13 +140,13 @@ class AbstractQbit(AbstractValue):
         return self.hash_value
 
 
-class ConcreteQbit(AbstractQbit):
+class ConcreteQbit:
     """Concrete Qbit."""
 
 
 def _qbit_lowering(aval):
     assert isinstance(aval, AbstractQbit)
-    return (ir.OpaqueType.get("quantum", "bit"),)
+    return ir.OpaqueType.get("quantum", "bit")
 
 
 #
@@ -162,14 +163,17 @@ class AbstractQreg(AbstractValue):
     def __hash__(self):
         return self.hash_value
 
+    def _add(self, first, second):
+        return AbstractQreg()
 
-class ConcreteQreg(AbstractQreg):
+
+class ConcreteQreg:
     """Concrete quantum register."""
 
 
 def _qreg_lowering(aval):
     assert isinstance(aval, AbstractQreg)
-    return (ir.OpaqueType.get("quantum", "reg"),)
+    return ir.OpaqueType.get("quantum", "reg")
 
 
 #
@@ -306,6 +310,27 @@ quantum_kernel_p = core.CallPrimitive("quantum_kernel")
 quantum_kernel_p.multiple_results = True
 measure_in_basis_p = Primitive("measure_in_basis")
 measure_in_basis_p.multiple_results = True
+
+from jax.experimental.pjit import pjit_p
+from jax._src.pjit import _pjit_lowering
+import copy
+from catalyst.utils.patching import Patcher
+quantum_subroutine_p = copy.deepcopy(pjit_p)
+quantum_subroutine_p.name = "quantum_subroutine_p"
+
+def subroutine(func):
+
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        with Patcher(
+            (
+                jax._src.pjit,
+                "pjit_p",
+                quantum_subroutine_p,
+            ),
+        ):
+            return jax.jit(func)(*args, **kwargs)
+    return wrapper
 
 
 def _assert_jaxpr_without_constants(jaxpr: ClosedJaxpr):
@@ -2325,6 +2350,9 @@ def _cos_lowering2(ctx, x, accuracy):
     """Use hlo.cosine lowering instead of the new cosine lowering from jax 0.4.28"""
     return _nary_lower_hlo(hlo.cosine, ctx, x, accuracy=accuracy)
 
+def subroutine_lowering(*args, **kwargs):
+    retval = _pjit_lowering(*args, **kwargs)
+    return retval
 
 CUSTOM_LOWERING_RULES = (
     (zne_p, _zne_lowering),
@@ -2367,6 +2395,7 @@ CUSTOM_LOWERING_RULES = (
     (sin_p, _sin_lowering2),
     (cos_p, _cos_lowering2),
     (quantum_kernel_p, _quantum_kernel_lowering),
+    (quantum_subroutine_p, subroutine_lowering),
     (measure_in_basis_p, _measure_in_basis_lowering),
 )
 
@@ -2380,3 +2409,5 @@ def _scalar_abstractify(t):
 
 pytype_aval_mappings[type] = _scalar_abstractify
 pytype_aval_mappings[jax._src.numpy.scalar_types._ScalarMeta] = _scalar_abstractify
+pytype_aval_mappings[ConcreteQbit] = lambda _: AbstractQbit()
+pytype_aval_mappings[ConcreteQreg] = lambda _: AbstractQreg()
