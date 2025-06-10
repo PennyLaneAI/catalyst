@@ -25,7 +25,7 @@ jobs:
     - name: Install Deps
       run: |
         python3 -m pip install -r requirements.txt
-        python3 -m pip install cuda-quantum==0.6.0
+        #python3 -m pip install cuda-quantum==0.6.0
         python3 -m pip install oqc-qcaas-client
         make frontend
         pip uninstall pennylane-catalyst
