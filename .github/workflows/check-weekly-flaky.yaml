@@ -28,7 +28,7 @@ jobs:
         #python3 -m pip install cuda-quantum==0.6.0
         python3 -m pip install oqc-qcaas-client
         make frontend
-        pip uninstall pennylane-catalyst
+        pip uninstall -y pennylane-catalyst
         pip install -i https://test.pypi.org/simple/ PennyLane-Catalyst
 
     - name: Run Python Pytest Tests with flaky Checks
