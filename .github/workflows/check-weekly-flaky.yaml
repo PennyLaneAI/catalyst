@@ -1,0 +1,36 @@
+name: Run Catalyst pytests for flaky test checking
+
+on:
+  pull_request: # temporarily set this on PR to check this script
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
+  schedule:
+    # Run every weekend on Saturday at 23:40 EDT (cron is in UTC)
+    # https://crontab.cronhub.io/
+    - cron: "40 23 * * SAT"
+  workflow_dispatch:
+
+jobs:
+  install-dependencies:
+    name: Install dependencies
+    runs-on: ubuntu-24.04
+
+    steps:
+    - name: Checkout Catalyst repo
+      uses: actions/checkout@v4
+
+    - name: Install Deps
+      run: |
+        python3 -m pip install -r requirements.txt
+        python3 -m pip install cuda-quantum==0.6.0
+        python3 -m pip install oqc-qcaas-client
+        make frontend
+        pip uninstall pennylane-catalyst
+        pip install -i https://test.pypi.org/simple/ PennyLane-Catalyst
+
+    - name: Run Python Pytest Tests with flaky Checks
+      run: |
+        make pytest ENABLE_FLAKY=ON
