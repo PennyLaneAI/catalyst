@@ -14,6 +14,7 @@
 
 """Implementation of the Tree-Traversal MCM simulation method as an xDSL transform in Catalyst."""
 
+from dataclasses import dataclass, field
 from typing import Type, TypeVar
 
 import jax
@@ -41,11 +42,23 @@ def get_parent_of_type(op: Operation, kind: Type[T]) -> T | None:
     return op
 
 
+@dataclass
+class ProgramSegment:
+    """A program segment and associated data."""
+
+    ops: list[Operation] = field(default_factory=list)
+    mcm: quantum.MeasureOp = None
+    inputs: set[SSAValue] = None
+    outputs: set[SSAValue] = None
+    fun: func.FuncOp = None
+
+
 class TreeTraversal(RewritePattern):
 
     def __init__(self):
+        self.module: builtin.ModuleOp = None
         self.ttOp: func.FuncOp = None
-        self.segment_functions: list[func.FuncOp] = []
+        self.quantum_segments: list[ProgramSegment] = []
 
     @op_type_rewrite_pattern
     def match_and_rewrite(self, funcOp: func.FuncOp, rewriter: PatternRewriter):
@@ -53,11 +66,11 @@ class TreeTraversal(RewritePattern):
         if not "qnode" in funcOp.attributes:
             return
 
-        module = get_parent_of_type(funcOp, builtin.ModuleOp)
-        assert module is not None, "got orphaned qnode function"
+        self.module = get_parent_of_type(funcOp, builtin.ModuleOp)
+        assert self.module is not None, "got orphaned qnode function"
 
         # Start with creating a new QNode function that will perform the tree traversal simulation.
-        self.setup_traversal_function(funcOp, module, rewriter)
+        self.setup_traversal_function(funcOp, rewriter)
 
         self.split_traversal_segments(funcOp, rewriter)
 
@@ -67,15 +80,13 @@ class TreeTraversal(RewritePattern):
 
         self.finalize_traversal_function(rewriter)
 
-    def setup_traversal_function(
-        self, funcOp: func.FuncOp, module: builtin.ModuleOp, rewriter: RewritePattern
-    ):
+    def setup_traversal_function(self, funcOp: func.FuncOp, rewriter: RewritePattern):
         """Setup a clone of the original QNode function, which will instead perform TT."""
 
         ttOp = funcOp.clone_without_regions()
         ttOp.sym_name = builtin.StringAttr(funcOp.sym_name.data + ".tree_traversal")
         rewriter.create_block(BlockInsertPoint.at_start(ttOp.body), ttOp.function_type.inputs)
-        rewriter.insert_op(ttOp, InsertPoint.at_end(module.body.block))
+        rewriter.insert_op(ttOp, InsertPoint.at_end(self.module.body.block))
 
         self.ttOp = ttOp
 
@@ -106,63 +117,81 @@ class TreeTraversal(RewritePattern):
         assert op is not None, "didn't find an alloc op"
         self.alloc_op = rewriter.insert(op.clone(value_mapper))
 
-        # Generate new functions for each segment separated by a measure op.
-        op_list = []
-        while op := next(op_iter, None):
+        # Split ops into segments divided by measurements.
+        quantum_segments = [ProgramSegment()]
+        while (op := next(op_iter, None)) and not isinstance(op, quantum.DeallocOp):
             if isinstance(op, quantum.MeasureOp):
-                self.clone_ops_into_func(op_list, rewriter)
-                op_list = []
-            elif isinstance(op, quantum.DeallocOp):
-                self.clone_ops_into_func(op_list, rewriter)
-                break
+                quantum_segments[-1].mcm = op
+                quantum_segments.append(ProgramSegment())
             else:
-                op_list.append(op)
+                quantum_segments[-1].ops.append(op)
         assert op is not None, "didn't find a dealloc op"
+        self.quantum_segments = quantum_segments
 
-    def clone_ops_into_func(self, op_list: list[Operation], rewriter: PatternRewriter):
+        # Go through the rest of the function to initialize the missing input values set.
+        terminal_segment = []
+        while op := next(op_iter, None):
+            terminal_segment.append(op)
+
+        # Generate new functions for each segment separated by a measure op.
+        # We traverse them bottom up first to correctly determine the I/O of each segment.
+        missing_input_values, _ = self.gather_segment_io(terminal_segment)
+        for segment in reversed(quantum_segments):
+            missing_input_values.update(getattr(segment.mcm, "operands", ()))
+            inputs, outputs = self.gather_segment_io(segment.ops, missing_input_values)
+            segment.inputs, segment.outputs = inputs, outputs
+
+        for idx, segment in enumerate(quantum_segments):
+            segment.fun = self.clone_ops_into_func(segment, idx, rewriter)
+
+        # Generate a function table to select the right program segment.
+
+    def clone_ops_into_func(self, segment: ProgramSegment, id: int, rewriter: PatternRewriter):
         """Clone a set of ops into a new function."""
+        op_list, input_vals, output_vals = segment.ops, segment.inputs, segment.outputs
         if not op_list:
             return
-
-        module = get_parent_of_type(op_list[0], builtin.ModuleOp)
-        assert module is not None, "got orphaned operation"
-
-        input_vals, output_vals = self.gather_segment_io(op_list)
 
         fun_type = builtin.FunctionType.from_lists(
             [arg.type for arg in input_vals], [res.type for res in output_vals]
         )
-        new_func = func.FuncOp(f"quantum_segment_{len(self.segment_functions)}", fun_type)
-        self.segment_functions.append(new_func)
-
-        rewriter.insertion_point = InsertPoint.at_start(new_func.body.block)
+        new_func = func.FuncOp(f"quantum_segment_{id}", fun_type)
 
         value_mapper = dict(zip(input_vals, new_func.args))
         for op in op_list:
             new_op = op.clone(value_mapper)
-            rewriter.insert(new_op)
+            rewriter.insert_op(new_op, InsertPoint.at_end(new_func.body.block))
 
         returnOp = func.ReturnOp(*(value_mapper[res] for res in output_vals))
-        rewriter.insert(returnOp)
+        rewriter.insert_op(returnOp, InsertPoint.at_end(new_func.body.block))
 
-        rewriter.insert_op(new_func, InsertPoint.at_end(module.body.block))
+        rewriter.insert_op(new_func, InsertPoint.at_end(self.module.body.block))
+        return new_func
 
     @staticmethod
-    def gather_segment_io(op_list: list[Operation]) -> tuple[set[SSAValue], set[SSAValue]]:
+    def gather_segment_io(
+        op_list: list[Operation], missing_inputs: set[SSAValue] = None
+    ) -> tuple[set[SSAValue], set[SSAValue]]:
         """Gather SSA values that need to be passed in and out of the segment to be outlined."""
         inputs = set()
         outputs = set()
+        if missing_inputs is None:
+            missing_inputs = set()
 
-        # TODO: The outputs are not quite right, since just because an op result has been used
-        #       doesn't mean it won't be needed in a subsequent region.
-        #       The inputs should be correct though.
-        #       Might also have to be more careful with the quantum input/output values.
-        for op in op_list:
+        # The segment only needs to return values produced here (i.e. in all op.results) and
+        # required by segments further down (i.e. in missing_inputs).
+        # The inputs are determined straightforwardly by all operands not defined in this segment.
+        # TODO: We might need to be more careful with qubit/register values in the future.
+        for op in reversed(op_list):
             inputs.update(op.operands)
             inputs.difference_update(op.results)
 
             outputs.update(op.results)
-            outputs.difference_update(op.operands)
+        outputs.intersection_update(missing_inputs)
+
+        # Update the information used in subsequent calls.
+        missing_inputs.difference_update(outputs)
+        missing_inputs.update(inputs)
 
         return inputs, outputs
 
@@ -180,7 +209,7 @@ class TreeTraversal(RewritePattern):
 
         # get the tree depth (for now just the segment count)
         tree_depth = arith.ConstantOp.from_int_and_width(
-            len(self.segment_functions), builtin.IndexType()
+            len(self.quantum_segments), builtin.IndexType()
         )
 
         # initialize stack variables #
@@ -268,7 +297,7 @@ class TreeTraversal(RewritePattern):
             casted_status,
             cases,
             Region(Block()),
-            [Region(Block()) for _ in range(3)],
+            [Region(Block()) for _ in range(len(cases))],
             (current_depth.type, needs_restore.type),
         )
 
