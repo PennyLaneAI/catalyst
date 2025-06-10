@@ -24,6 +24,7 @@ import jax.numpy as jnp
 import numpy as np
 import pennylane as qml
 import pytest
+from flaky import flaky
 from jax.errors import TracerBoolConversionError
 from numpy.testing import assert_allclose
 
@@ -1685,6 +1686,7 @@ class TestLogicalOps:
 class TestMixed:
     """Test a mix of supported autograph conversions and Catalyst control flow."""
 
+    @flaky(max_runs=1, min_passes=1)
     def test_force_python_fallbacks(self):
         """Test fallback modes of control-flow primitives."""
 

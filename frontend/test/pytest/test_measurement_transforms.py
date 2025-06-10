@@ -25,6 +25,7 @@ import numpy as np
 import pennylane as qml
 import pytest
 from conftest import CONFIG_CUSTOM_DEVICE
+from flaky import flaky
 from pennylane.devices import Device
 from pennylane.devices.capabilities import OperatorProperties
 from pennylane.transforms import split_non_commuting, split_to_single_terms
@@ -741,6 +742,7 @@ class TestMeasurementTransforms:
 
         assert split_non_commuting in transform_program
 
+    @flaky(max_runs=1, min_passes=1)
     def test_measurements_are_split(self, mocker):
         """Test that the split_to_single_terms or split_non_commuting transform
         are added to the transform program from preprocess as expected, based on the

@@ -21,6 +21,7 @@ import platform
 import numpy as np
 import pennylane as qml
 import pytest
+from flaky import flaky
 from pennylane.devices.capabilities import DeviceCapabilities, OperatorProperties
 
 from catalyst import CompileError, ctrl, qjit
@@ -136,6 +137,7 @@ class TestControlledDecomposition:
         with pytest.raises(CompileError, match="could not be decomposed, it might be unsupported."):
             qjit(f, target="jaxpr")
 
+    @flaky(max_runs=1, min_passes=1)
     def test_no_unitary_support(self):
         """Test that unknown controlled operations without QubitUnitary support raise an error."""
 
