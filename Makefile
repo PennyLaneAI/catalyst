@@ -57,7 +57,7 @@ TEST_EXCLUDES := -k "not test_executable_generation"
 endif
 FLAKY :=
 ifeq ($(ENABLE_FLAKY),ON)
-FLAKY := --force-flaky --max-runs=2 --min-passes=2
+FLAKY := --force-flaky --max-runs=5 --min-passes=5
 endif
 PYTEST_FLAGS := $(PARALLELIZE) $(TEST_EXCLUDES) $(FLAKY)
 
