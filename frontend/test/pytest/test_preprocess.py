@@ -88,7 +88,6 @@ class CustomDevice(Device):
 
     def __init__(self, wires, shots=1024):
         super().__init__(wires=wires, shots=shots)
-        self.capabilities.operations.pop("BlockEncode")
         self.qjit_capabilities = self.capabilities
 
     @staticmethod
@@ -105,6 +104,9 @@ class CustomDevice(Device):
     def execute(self, circuits, execution_config):
         """Execution."""
         raise NotImplementedError
+
+
+CustomDevice.capabilities.operations.pop("BlockEncode")
 
 
 class TestDecomposition:
@@ -137,7 +139,6 @@ class TestDecomposition:
         assert isinstance(decomposed_ops[0], qml.QubitUnitary)
         assert isinstance(decomposed_ops[1], qml.RX)
 
-    @flaky(max_runs=1, min_passes=1)
     def test_decompose_ops_to_unitary_integration(self):
         """Test the decompose ops to unitary transform as part of the Catalyst pipeline."""
         dev = CustomDevice(wires=4, shots=None)

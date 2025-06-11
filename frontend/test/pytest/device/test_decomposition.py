@@ -91,7 +91,6 @@ class NoUnitaryDevice(qml.devices.Device):
 
     def __init__(self, shots=None, wires=None):
         super().__init__(wires=wires, shots=shots)
-        self.capabilities.operations.pop("QubitUnitary")
         self.qjit_capabilities = self.capabilities
 
     def apply(self, operations, **kwargs):
@@ -112,6 +111,9 @@ class NoUnitaryDevice(qml.devices.Device):
     def execute(self, circuits, execution_config):
         """Execution."""
         return circuits, execution_config
+
+
+NoUnitaryDevice.capabilities.operations.pop("QubitUnitary")
 
 
 class TestControlledDecomposition:
@@ -137,7 +139,6 @@ class TestControlledDecomposition:
         with pytest.raises(CompileError, match="could not be decomposed, it might be unsupported."):
             qjit(f, target="jaxpr")
 
-    @flaky(max_runs=1, min_passes=1)
     def test_no_unitary_support(self):
         """Test that unknown controlled operations without QubitUnitary support raise an error."""
 
