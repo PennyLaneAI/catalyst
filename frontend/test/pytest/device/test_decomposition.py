@@ -21,7 +21,6 @@ import platform
 import numpy as np
 import pennylane as qml
 import pytest
-from flaky import flaky
 from pennylane.devices.capabilities import DeviceCapabilities, OperatorProperties
 
 from catalyst import CompileError, ctrl, qjit
