@@ -50,13 +50,16 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
         // Walk over all operations in the IR (could be ModuleOp or FuncOp)
         getOperation()->walk([&](Operation *op) {
             // Skip top-level container ops if desired
-            if (isa<ModuleOp>(op)) return;
+            if (isa<ModuleOp>(op))
+                return;
 
             StringRef gate_name = op->getName().getStringRef();
 
             if (gate_name == "quantum.alloc") {
                 auto num_qubits_attr = op->getAttrOfType<mlir::IntegerAttr>("nqubits_attr");
-                u_int64_t num_qubits = num_qubits_attr ? static_cast<u_int64_t>(num_qubits_attr.getInt()) : 0;
+                assert(num_qubits_attr == nullptr && "num_qubits_attr is a dynamic SSA value");
+                u_int64_t num_qubits =
+                    num_qubits_attr ? static_cast<u_int64_t>(num_qubits_attr.getInt()) : 0;
                 PPM_Specs["num_logical_qubits"] = num_qubits;
             }
 
@@ -67,11 +70,14 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
             if (gate_name == "qec.ppr") {
                 auto rotation_attr = op->getAttrOfType<mlir::IntegerAttr>("rotation_kind");
                 auto pauli_product_attr = op->getAttrOfType<mlir::ArrayAttr>("pauli_product");
-                int16_t rotation_kind = rotation_attr ? static_cast<int16_t>(rotation_attr.getInt()) : 0;
+                int16_t rotation_kind =
+                    rotation_attr ? static_cast<int16_t>(rotation_attr.getInt()) : 0;
                 if (rotation_kind) {
                     llvm::StringSaver saver(string_allocator);
-                    StringRef num_pi_key = saver.save("num_pi"+std::to_string(abs(rotation_kind))+"_gates");
-                    StringRef max_weight_pi_key = saver.save("max_weight_pi"+std::to_string(abs(rotation_kind)));
+                    StringRef num_pi_key =
+                        saver.save("num_pi" + std::to_string(abs(rotation_kind)) + "_gates");
+                    StringRef max_weight_pi_key =
+                        saver.save("max_weight_pi" + std::to_string(abs(rotation_kind)));
 
                     if (PPM_Specs.find(llvm::StringRef(num_pi_key)) == PPM_Specs.end()) {
                         PPM_Specs[num_pi_key] = 1;
@@ -79,21 +85,20 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
                     }
                     else {
                         PPM_Specs[num_pi_key]++;
-                        PPM_Specs[max_weight_pi_key] = std::max(PPM_Specs[max_weight_pi_key], static_cast<int>(pauli_product_attr.size()));
+                        PPM_Specs[max_weight_pi_key] =
+                            std::max(PPM_Specs[max_weight_pi_key],
+                                     static_cast<int>(pauli_product_attr.size()));
                     }
                 }
             }
         });
-        
+
         json PPM_Specs_Json = PPM_Specs;
         llvm::outs() << PPM_Specs_Json.dump(4) << "\n";
         return;
     }
 
-    void runOnOperation() final
-    {
-        print_specs();
-    }
+    void runOnOperation() final { print_specs(); }
 };
 
 } // namespace qec
