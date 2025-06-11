@@ -1,5 +1,8 @@
 name: Run Catalyst pytests for flaky test checking
 
+permissions:
+  contents: read
+
 on:
   pull_request: # temporarily set this on PR to check this script
     types:
