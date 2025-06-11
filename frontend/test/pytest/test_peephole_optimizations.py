@@ -173,8 +173,8 @@ def test_chained_passes():
     """
 
     @qjit()
-    @cancel_inverses
     @merge_rotations
+    @cancel_inverses
     @qml.qnode(qml.device("lightning.qubit", wires=2))
     def test_chained_apply_passes_workflow(x: float):
         qml.Hadamard(wires=[1])
@@ -217,8 +217,8 @@ def test_commute_ppr():
     @qjit(pipelines=pipe, target="mlir")
     def test_commute_ppr_workflow():
 
-        @to_ppr
         @commute_ppr
+        @to_ppr
         @qml.qnode(qml.device("lightning.qubit", wires=2))
         def f():
             qml.H(0)
@@ -243,8 +243,8 @@ def test_merge_ppr_ppm():
     @qjit(pipelines=pipe, target="mlir")
     def test_merge_ppr_ppm_workflow():
 
-        @to_ppr
         @merge_ppr_ppm
+        @to_ppr
         @qml.qnode(qml.device("lightning.qubit", wires=2))
         def f():
             qml.H(0)
@@ -268,8 +268,8 @@ def test_ppr_to_ppm():
     @qjit(pipelines=pipe, target="mlir")
     def test_ppr_to_ppm_workflow():
 
-        @to_ppr
         @ppr_to_ppm
+        @to_ppr
         @qml.qnode(qml.device("lightning.qubit", wires=2))
         def f():
             qml.H(0)
@@ -303,8 +303,8 @@ def test_ppr_to_ppm_inject_magic_state():
     @qjit(pipelines=pipe, target="mlir")
     def test_ppr_to_ppm_workflow():
 
-        @to_ppr
         @ppr_to_ppm(decompose_method="clifford-corrected", avoid_y_measure=True)
+        @to_ppr
         @qml.qnode(qml.device("lightning.qubit", wires=2))
         def f():
             qml.H(0)
@@ -336,18 +336,18 @@ def test_commute_ppr_and_merge_ppr_ppm_with_max_pauli_size():
 
         device = qml.device("lightning.qubit", wires=2)
 
-        @to_ppr
-        @commute_ppr(max_pauli_size=2)
         @merge_ppr_ppm
+        @commute_ppr(max_pauli_size=2)
+        @to_ppr
         @qml.qnode(device)
         def f():
             qml.CNOT([0, 2])
             qml.T(0)
             return measure(0), measure(1)
 
-        @to_ppr
-        @commute_ppr
         @merge_ppr_ppm(max_pauli_size=1)
+        @commute_ppr
+        @to_ppr
         @qml.qnode(device)
         def g():
             qml.CNOT([0, 2])

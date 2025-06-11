@@ -218,6 +218,9 @@
 * `make all` now correctly compiles the standalone plugin with the same compiler used to compile LLVM and MLIR.
   [(#1768)](https://github.com/PennyLaneAI/catalyst/pull/1768)
 
+* Stacked python decorators for built-in catalyst passes are now applied in the correct order.
+  [(#1798)](https://github.com/PennyLaneAI/catalyst/pull/1798)
+
 <h3>Internal changes ⚙️</h3>
 
 * `null.qubit` can now support an optional `track_resources` argument which allows it to record which gates are executed.
@@ -297,7 +300,20 @@
   :doc:`sharp bits and debugging tips <sharp_bits>` guide. In regular QJIT-compiled workloads
   (without program capture enabled), you must continue to use :func:`catalyst.measure`.
 
-* Upgraded action runners from Ubuntu22.04 to Ubuntu24.04. [(#1728)](https://github.com/PennyLaneAI/catalyst/pull/1728)
+* An argument (`openapl_file_name`) is added to the `OQDDevice` constructor to specify the name of
+  the output OpenAPL file.
+  [(#1763)](https://github.com/PennyLaneAI/catalyst/pull/1763)
+
+* The OQD device toml file is modified to only include gates that are decomposable to the OQD device
+  target gate set.
+  [(#1763)](https://github.com/PennyLaneAI/catalyst/pull/1763)
+
+* The runtime CAPI function `__catalyst__rt__num_qubits` now has a corresponding jax primitive
+  `num_qubits_p` and quantum dialect operation `NumQubitsOp`.
+  [(#1793)](https://github.com/PennyLaneAI/catalyst/pull/1793)
+
+  For measurements whose shapes depend on the number of qubits, they now properly retrieve the
+  number of qubits through this new operation when it is dynamic.
 
 <h3>Documentation 📝</h3>
 
