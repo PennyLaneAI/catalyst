@@ -813,12 +813,18 @@ def _zne_lowering(ctx, *args, folding, jaxpr, fn):
 # device_init
 #
 @device_init_p.def_abstract_eval
-def _device_init_abstract_eval(shots, rtd_lib, rtd_name, rtd_kwargs):
+def _device_init_abstract_eval(shots, auto_qubit_management, rtd_lib, rtd_name, rtd_kwargs):
     return ()
 
 
+# pylint: disable=too-many-arguments, too-many-positional-arguments
 def _device_init_lowering(
-    jax_ctx: mlir.LoweringRuleContext, shots: ir.Value, rtd_lib, rtd_name, rtd_kwargs
+    jax_ctx: mlir.LoweringRuleContext,
+    shots: ir.Value,
+    auto_qubit_management,
+    rtd_lib,
+    rtd_name,
+    rtd_kwargs,
 ):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
@@ -829,6 +835,7 @@ def _device_init_lowering(
         ir.StringAttr.get(rtd_name),
         ir.StringAttr.get(rtd_kwargs),
         shots=shots_value,
+        auto_qubit_management=auto_qubit_management,
     )
 
     return ()
