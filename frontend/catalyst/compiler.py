@@ -379,7 +379,7 @@ def to_mlir_opt(*args, stdin=None, options: Optional[CompileOptions] = None):
     # No ppm_specs json is found
     if regex_search_for_json is None:
         return raw_result
-    
+
     raw_result = raw_result.replace(regex_search_for_json.group(0), "")
     return raw_result
 
@@ -398,7 +398,6 @@ def to_ppm_spec(*args, stdin=None, options: Optional[CompileOptions] = None):
     json_ppm_specs = json_ppm_specs.replace(",\n}", "\n}")
     json_ppm_specs = json.loads(json_ppm_specs)
     return json_ppm_specs
-
 
 
 class Compiler:
