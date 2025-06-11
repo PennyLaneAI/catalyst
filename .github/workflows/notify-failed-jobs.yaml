@@ -3,7 +3,7 @@ on:
   workflow_run:
     branches:
       - main
-      - paul0403/add_flaky_runs # just testing, remove later
+      - refs/remotes/pull/1799/merge # just testing, remove later
     types:
       - completed
     workflows:
