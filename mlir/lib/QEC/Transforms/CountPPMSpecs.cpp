@@ -14,23 +14,21 @@
 
 #define DEBUG_TYPE "ppm_specs"
 
-#include "mlir/Analysis/SliceAnalysis.h"
-#include "mlir/IR/PatternMatch.h"
-#include "mlir/Pass/Pass.h"
-#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-
-
-#include "QEC/IR/QECDialect.h"
-#include "QEC/Transforms/Patterns.h"
-#include "Quantum/IR/QuantumOps.h"
-#include "QEC/Utils/PauliStringWrapper.h"
 #include <algorithm>
 #include <string>
+
+#include <nlohmann/json.hpp>
+
+#include "mlir/IR/PatternMatch.h"
+#include "mlir/Pass/Pass.h"
+
+#include "QEC/IR/QECDialect.h"
 
 using namespace llvm;
 using namespace mlir;
 using namespace catalyst;
 using namespace catalyst::qec;
+using json = nlohmann::json;
 
 namespace catalyst {
 namespace qec {
@@ -38,7 +36,6 @@ namespace qec {
 #define GEN_PASS_DEF_COUNTPPMSPECSPASS
 #define GEN_PASS_DECL_COUNTPPMSPECSPASS
 #include "QEC/Transforms/Passes.h.inc"
-
 
 struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass> {
     using CountPPMSpecsPassBase::CountPPMSpecsPassBase;
@@ -55,11 +52,6 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
             // Skip top-level container ops if desired
             if (isa<ModuleOp>(op)) return;
 
-            // TODO: Remove debug in future
-            // llvm::outs()<<"\n-----------------------------MLIR------------------------------\n";
-            // op->print(llvm::outs());
-            // llvm::outs()<<"\n-----------------------------MLIR------------------------------\n";
-
             StringRef gate_name = op->getName().getStringRef();
 
             if (gate_name == "quantum.alloc") {
@@ -69,7 +61,7 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
             }
 
             if (gate_name == "qec.ppm") {
-                PPM_Specs["num_of_ppm"] = PPM_Specs["num_of_ppm"] + 1;
+                PPM_Specs["num_of_ppm"]++;
             }
 
             if (gate_name == "qec.ppr") {
@@ -86,29 +78,15 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
                         PPM_Specs[max_weight_pi_key] = static_cast<int>(pauli_product_attr.size());
                     }
                     else {
-                        PPM_Specs[num_pi_key] = PPM_Specs[num_pi_key] + 1;
+                        PPM_Specs[num_pi_key]++;
                         PPM_Specs[max_weight_pi_key] = std::max(PPM_Specs[max_weight_pi_key], static_cast<int>(pauli_product_attr.size()));
                     }
                 }
             }
-            // TODO: Implement depth using slicing 
-            // mlir::SetVector <Operation *> backwardSlice;
-            // getBackwardSlice(op, &backwardSlice);
-            // llvm::outs()<<"\n-----------------------------SLICE-----------------------------\n";
-            // llvm::outs()<<"Backward slicing\n";
-            // for (Operation *o : backwardSlice) {
-            //     if (o->getName().getStringRef() == "quantum.extract") {
-            //         llvm::outs() << *o << "\n"; 
-            //     }
-            // }
-            // llvm::outs()<<"\n-----------------------------SLICE------------------------------\n";
         });
         
-        llvm::outs() << "{\n";
-        for (const auto &entry : PPM_Specs) {
-            llvm::outs() << '"' << entry.first << '"' << ":" << entry.second << ",\n";
-        }
-        llvm::outs() << "}\n";
+        json PPM_Specs_Json = PPM_Specs;
+        llvm::outs() << PPM_Specs_Json.dump(4) << "\n";
         return;
     }
 
