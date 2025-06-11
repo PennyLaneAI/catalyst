@@ -453,7 +453,11 @@ class QFuncPlxprInterpreter(SubroutineInterpreter):
     def setup(self):
         """Initialize the stateref and bind the device."""
         if self.stateref is None:
-            device_init_p.bind(self._shots, **_get_device_kwargs(self._device))
+            device_init_p.bind(
+                self._shots,
+                auto_qubit_management=(self._device.wires is None),
+                **_get_device_kwargs(self._device),
+            )
             self.stateref = {"qreg": qalloc_p.bind(len(self._device.wires)), "wire_map": {}}
 
     # pylint: disable=attribute-defined-outside-init
