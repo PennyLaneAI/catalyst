@@ -299,6 +299,10 @@
 
 * Upgraded action runners from Ubuntu22.04 to Ubuntu24.04. [(#1728)](https://github.com/PennyLaneAI/catalyst/pull/1728)
 
+* Refactored pass names from snake_case to kebab-case in MLIR passes to align with MLIR conventions.
+  Class names and tests were updated accordingly. Example: `--to_ppr` is now `--to-ppr`.
+  [(#1802)](https://github.com/PennyLaneAI/catalyst/pull/1802)
+
 <h3>Documentation 📝</h3>
 
 * The header (logo+title) images in the README and in the overview on RtD have been updated,
