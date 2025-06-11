@@ -1,4 +1,4 @@
-name: Run Catalyst pytests for flaky test checking
+name: Run Catalyst pytests for weekly flaky test checking
 
 permissions:
   contents: read
@@ -17,8 +17,8 @@ on:
   workflow_dispatch:
 
 jobs:
-  install-dependencies:
-    name: Install dependencies
+  weekly-flaky-test-run:
+    name: Run weekly flaky tests
     runs-on: ubuntu-24.04
 
     steps:

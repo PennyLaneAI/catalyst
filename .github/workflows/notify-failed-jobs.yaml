@@ -3,13 +3,15 @@ on:
   workflow_run:
     branches:
       - main
+      - paul0403/add_flaky_runs # just testing, remove later
     types:
       - completed
     workflows:
-      - Build Catalyst Wheel on Linux (arm64)
-      - Build Catalyst Wheel on Linux (x86_64)
-      - Build Catalyst Wheel on macOS (arm64)
-      - Build nightly Catalyst releases for TestPyPI
+      # - Build Catalyst Wheel on Linux (arm64)
+      # - Build Catalyst Wheel on Linux (x86_64)
+      # - Build Catalyst Wheel on macOS (arm64)
+      # - Build nightly Catalyst releases for TestPyPI
+      - Run Catalyst pytests for weekly flaky test checking
 
 jobs:
   on-failure:
