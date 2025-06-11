@@ -304,9 +304,7 @@ Let's add the pattern-matching logic to the ``matchAndRewrite`` method:
         // base `Operation` class
         // https://mlir.llvm.org/doxygen/classmlir_1_1Operation.html
         // To use the specific methods and the auto-generated getters for
-        // the specific `QubitUnitaryOp`, we need to cast it
-        // This is just how c++ behaves: base class objects are unaware of methods
-        // in child classes.
+        // the specific `QubitUnitaryOp`, we need to cast it first.
         QubitUnitaryOp parentOp = cast<QubitUnitaryOp>(parent);
         ValueRange parentQbs = parentOp.getOutQubits();
 
