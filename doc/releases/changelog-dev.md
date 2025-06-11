@@ -322,6 +322,10 @@
 * The unused helper function `genArgMapFunction` in the `--lower-gradients` pass is removed.
   [(#1753)](https://github.com/PennyLaneAI/catalyst/pull/1753)
 
+* Base components of QFuncPLxPRInterpreter have been moved into a base class called SubroutineInterpreter.
+  This is to reduce code duplication once we have support for quantum subroutines.
+  [(#1787)](https://github.com/PennyLaneAI/catalyst/pull/1787)
+
 * The `qml.measure()` operation for mid-circuit measurements can now be used in QJIT-compiled
   circuits with program capture enabled.
   [(#1766)](https://github.com/PennyLaneAI/catalyst/pull/1766)
