@@ -660,10 +660,11 @@ TEST_CASE("Test __catalyst__rt__device_init registering the OpenQasm device", "[
     char device_aws[30] = "braket.aws.qubit";
 
 #if __has_include("OpenQasmDevice.hpp")
-    __catalyst__rt__device_init((int8_t *)device_aws, nullptr, nullptr, 0);
+    __catalyst__rt__device_init((int8_t *)device_aws, nullptr, nullptr, 0, false);
 #else
-    REQUIRE_THROWS_WITH(__catalyst__rt__device_init((int8_t *)device_aws, nullptr, nullptr, 0),
-                        ContainsSubstring("cannot open shared object file"));
+    REQUIRE_THROWS_WITH(
+        __catalyst__rt__device_init((int8_t *)device_aws, nullptr, nullptr, 0, false),
+        ContainsSubstring("cannot open shared object file"));
 #endif
 
     __catalyst__rt__finalize();
@@ -673,10 +674,11 @@ TEST_CASE("Test __catalyst__rt__device_init registering the OpenQasm device", "[
     char device_local[30] = "braket.local.qubit";
 
 #if __has_include("OpenQasmDevice.hpp")
-    __catalyst__rt__device_init((int8_t *)device_local, nullptr, nullptr, 0);
+    __catalyst__rt__device_init((int8_t *)device_local, nullptr, nullptr, 0, false);
 #else
-    REQUIRE_THROWS_WITH(__catalyst__rt__device_init((int8_t *)(int8_t *), nullptr, nullptr, 0),
-                        ContainsSubstring("cannot open shared object file"));
+    REQUIRE_THROWS_WITH(
+        __catalyst__rt__device_init((int8_t *)(int8_t *), nullptr, nullptr, 0, false),
+        ContainsSubstring("cannot open shared object file"));
 #endif
 
     __catalyst__rt__finalize();
