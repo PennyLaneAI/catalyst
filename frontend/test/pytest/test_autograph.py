@@ -75,6 +75,7 @@ class Failing:
 
 @pytest.fixture(autouse=True)
 def reset_Failing():
+    """Reset class variable on `Failing` class after each test"""
     save = Failing.triggered.copy()
     yield
     Failing.triggered = save
