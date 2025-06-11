@@ -316,6 +316,9 @@ class SubroutineInterpreter(PlxprInterpreter):
         """
         self.actualized = True
         for orig_wire, wire in self.wire_map.items():
+            # Note: since `getattr` checks specifically for qreg, we can't
+            # define qreg inside the init function.
+            # pylint: disable-next=attribute-defined-outside-init
             self.qreg = qinsert_p.bind(self.qreg, orig_wire, wire)
 
     def interpret_operation(self, op):
