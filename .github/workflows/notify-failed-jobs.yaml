@@ -3,14 +3,13 @@ on:
   workflow_run:
     branches:
       - main
-      - refs/remotes/pull/1799/merge # just testing, remove later
     types:
       - completed
     workflows:
-      # - Build Catalyst Wheel on Linux (arm64)
-      # - Build Catalyst Wheel on Linux (x86_64)
-      # - Build Catalyst Wheel on macOS (arm64)
-      # - Build nightly Catalyst releases for TestPyPI
+      - Build Catalyst Wheel on Linux (arm64)
+      - Build Catalyst Wheel on Linux (x86_64)
+      - Build Catalyst Wheel on macOS (arm64)
+      - Build nightly Catalyst releases for TestPyPI
       - Run Catalyst pytests for weekly flaky test checking
 
 jobs:
