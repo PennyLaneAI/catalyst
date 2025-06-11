@@ -72,8 +72,11 @@ class PassPipelineWrapper(QNodeWrapper):
     def __call__(self, *args, **kwargs):
         if EvaluationContext.is_tracing():
             pass_pipeline = kwargs.pop("pass_pipeline", [])
-            pass_pipeline += dictionary_to_list_of_passes(
-                self.pass_name_or_pipeline, *self.flags, **self.valued_options
+            pass_pipeline = (
+                dictionary_to_list_of_passes(
+                    self.pass_name_or_pipeline, *self.flags, **self.valued_options
+                )
+                + pass_pipeline
             )
             kwargs["pass_pipeline"] = pass_pipeline
         return super().__call__(*args, **kwargs)
