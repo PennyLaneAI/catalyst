@@ -30,10 +30,7 @@ func.func @boo(%q1 : !quantum.bit) {
 }
 
 func.func @magic() {
-    %0 = qec.fabricate magic T : !quantum.bit
-    %0 = qec.fabricate magic CCZ : !quantum.bit
-
-    
+    %0 = qec.fabricate magic : !quantum.bit
     %1 = qec.fabricate magic_conj : !quantum.bit
     %2 = qec.fabricate plus_i : !quantum.bit
     %3 = qec.fabricate minus_i : !quantum.bit
