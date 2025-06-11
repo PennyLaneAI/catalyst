@@ -141,10 +141,74 @@ class TreeTraversal(RewritePattern):
             inputs, outputs = self.gather_segment_io(segment.ops, missing_input_values)
             segment.inputs, segment.outputs = inputs, outputs
 
+        all_segment_io = [*missing_input_values]  # results of the "0th" segment (until Alloc)
+        values_as_io_index = {v: k for k, v in enumerate(all_segment_io)}
         for idx, segment in enumerate(quantum_segments):
             segment.fun = self.clone_ops_into_func(segment, idx, rewriter)
+            values_as_io_index.update(
+                (x, i + len(all_segment_io)) for i, x in enumerate(segment.outputs)
+            )
+            all_segment_io.extend(segment.outputs)
 
-        # Generate a function table to select the right program segment.
+        self.generate_function_table(all_segment_io, values_as_io_index, rewriter)
+
+    def generate_function_table(
+        self,
+        all_segment_io: list[SSAValue],
+        values_as_io_index: dict[SSAValue, int],
+        rewriter: PatternRewriter,
+    ):
+        """Create a program segment dispatcher via a large function table switch statement.
+
+        The dispatcher needs the entire segment IO as arguments/results in order to properly
+        wire the input & output of each segment together, since the dispatcher is invoked
+        dynamically but call arguments & results are static SSA values. An alternative would be
+        to pass around segment IO via memory, but this requires additional IR operations & types
+        not available in builtin dialects.
+        """
+
+        # function op
+        all_io_types = [val.type for val in all_segment_io]
+        fun_type = builtin.FunctionType.from_lists(
+            [builtin.IndexType(), *all_io_types], all_io_types
+        )
+        funcTableOp = func.FuncOp("segment_table", fun_type)
+        rewriter.insert_op(funcTableOp, InsertPoint.at_end(self.module.body.block))
+
+        # function body
+        fun_index = funcTableOp.args[0]
+        io_args = funcTableOp.args[1:]
+
+        cases = builtin.DenseArrayBase.from_list(builtin.i64, range(len(self.quantum_segments)))
+        switchOp = scf.IndexSwitchOp(
+            fun_index,
+            cases,
+            Region(Block()),
+            [Region(Block()) for _ in range(len(cases))],
+            all_io_types,
+        )
+        returnOp = func.ReturnOp(*switchOp.results)
+
+        for op in (switchOp, returnOp):
+            rewriter.insert_op(op, InsertPoint.at_end(funcTableOp.body.block))
+
+        # switch op base case
+        rewriter.insert_op(scf.YieldOp(*io_args), InsertPoint.at_end(switchOp.default_region.block))
+
+        # switch op match cases
+        for case, segment in enumerate(self.quantum_segments):
+            args = [io_args[values_as_io_index[value]] for value in segment.inputs]
+            res_types = [res.type for res in segment.outputs]
+            callOp = func.CallOp(self.quantum_segments[case].fun.sym_name.data, args, res_types)
+
+            updated_results = list(io_args)
+            for new_res, ref in zip(callOp.results, segment.outputs):
+                updated_results[values_as_io_index[ref]] = new_res
+
+            yieldOp = scf.YieldOp(*updated_results)
+
+            rewriter.insert_op(callOp, InsertPoint.at_end(switchOp.case_regions[case].block))
+            rewriter.insert_op(yieldOp, InsertPoint.at_end(switchOp.case_regions[case].block))
 
     def clone_ops_into_func(self, segment: ProgramSegment, id: int, rewriter: PatternRewriter):
         """Clone a set of ops into a new function."""
@@ -494,8 +558,8 @@ class TTPass(ModulePass):
 
         self.apply_on_qnode(module, TreeTraversal())
 
-        module.verify()
         print(module)
+        module.verify()
 
     def apply_on_qnode(self, module: builtin.ModuleOp, pattern: RewritePattern):
         """Apply given pattern once to the QNode function in this module."""
