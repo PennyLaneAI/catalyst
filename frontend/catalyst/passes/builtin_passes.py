@@ -27,7 +27,7 @@ def get_ppm_spec(QJIT):
     if QJIT.mlir is not None:
         # aot mode
         raw_result = _quantum_opt(
-            ("--pass-pipeline", "builtin.module(ppm_specs)"), [], stdin=QJIT.mlir
+            ("--pass-pipeline", "builtin.module(ppm_specs)"), [], stdin=QJIT.mlir_opt
         )
 
         # breakpoint()

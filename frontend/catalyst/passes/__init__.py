@@ -36,13 +36,13 @@ as load and run external MLIR passes from plugins.
 from catalyst.passes.builtin_passes import (
     cancel_inverses,
     commute_ppr,
+    get_ppm_spec,
     ions_decomposition,
     merge_ppr_ppm,
     merge_rotations,
     ppm_compilation,
     ppr_to_ppm,
     to_ppr,
-    get_ppm_spec,
 )
 from catalyst.passes.pass_api import Pass, PassPlugin, apply_pass, apply_pass_plugin
 

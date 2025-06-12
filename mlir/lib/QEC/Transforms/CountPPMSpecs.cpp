@@ -22,6 +22,7 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 
+#include "Quantum/IR/QuantumOps.h"
 #include "QEC/IR/QECDialect.h"
 
 using namespace llvm;
@@ -56,10 +57,8 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
             StringRef gate_name = op->getName().getStringRef();
 
             if (gate_name == "quantum.alloc") {
-                auto num_qubits_attr = op->getAttrOfType<mlir::IntegerAttr>("nqubits_attr");
-                assert(num_qubits_attr == nullptr && "num_qubits_attr is a dynamic SSA value");
-                u_int64_t num_qubits =
-                    num_qubits_attr ? static_cast<u_int64_t>(num_qubits_attr.getInt()) : 0;
+                uint64_t num_qubits = cast<quantum::AllocOp>(op).getNqubitsAttr().value_or(0); 
+                assert(num_qubits != 0 && "PPM specs with dynamic number of qubits is not implemented");
                 PPM_Specs["num_logical_qubits"] = num_qubits;
             }
 
