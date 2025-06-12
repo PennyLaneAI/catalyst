@@ -177,9 +177,7 @@ class WorkflowInterpreter(PlxprInterpreter):
 
 # pylint: disable=unused-argument, too-many-arguments
 @WorkflowInterpreter.register_primitive(qnode_prim)
-def handle_qnode(
-    self, *args, qnode, shots, device, execution_config, qfunc_jaxpr, batch_dims=None
-):
+def handle_qnode(self, *args, qnode, shots, device, execution_config, qfunc_jaxpr, batch_dims=None):
     """Handle the conversion from plxpr to Catalyst jaxpr for the qnode primitive"""
 
     f = partial(QFuncPlxprInterpreter(device, shots).eval, qfunc_jaxpr, [])
