@@ -35,9 +35,7 @@ def get_ppm_spec(QJIT):
         return regex_search_for_json.group(0)
 
     else:
-        raise NotImplementedError(
-                "PPM passes only support AOT (Ahead-Of-Time) compilation mode."
-            )
+        raise NotImplementedError("PPM passes only support AOT (Ahead-Of-Time) compilation mode.")
 
 
 ## API ##
