@@ -16,12 +16,10 @@ MLIR/LLVM representations.
 """
 import glob
 import importlib
-import json
 import logging
 import os
 import pathlib
 import platform
-import re
 import shutil
 import subprocess
 import sys
