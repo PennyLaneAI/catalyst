@@ -373,31 +373,7 @@ def to_mlir_opt(*args, stdin=None, options: Optional[CompileOptions] = None):
         return _quantum_opt(*args, stdin=stdin)
 
     opts = _options_to_cli_flags(options)
-    raw_result = _quantum_opt(*opts, *args, stdin=stdin)
-    regex_search_for_json = re.search(r"\{.*?\}", raw_result, re.DOTALL)
-
-    # No ppm_specs json is found
-    if regex_search_for_json is None:
-        return raw_result
-
-    raw_result = raw_result.replace(regex_search_for_json.group(0), "")
-    return raw_result
-
-
-def to_ppm_spec(*args, stdin=None, options: Optional[CompileOptions] = None):
-    """echo ${input} | catalyst --tool=opt *args *opts -"""
-    # These are the options that may affect compilation
-    if not options:
-        return _quantum_opt(*args, stdin=stdin)
-
-    opts = _options_to_cli_flags(options)
-
-    raw_json_format = _quantum_opt(*opts, *args, stdin=stdin)
-    regex_search_for_json = re.search(r"\{.*?\}", raw_json_format, re.DOTALL)
-    json_ppm_specs = regex_search_for_json.group(0)
-    json_ppm_specs = json_ppm_specs.replace(",\n}", "\n}")
-    json_ppm_specs = json.loads(json_ppm_specs)
-    return json_ppm_specs
+    return _quantum_opt(*opts, *args, stdin=stdin)
 
 
 class Compiler:

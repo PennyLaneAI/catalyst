@@ -15,8 +15,27 @@
 """This module exposes built-in Catalyst MLIR passes to the frontend."""
 
 import functools
+import re
 
+from catalyst.compiler import _quantum_opt
 from catalyst.passes.pass_api import PassPipelineWrapper
+
+
+def get_ppm_spec(QJIT):
+    """TODO: docstring"""
+
+    if QJIT.mlir is not None:
+        # aot mode
+        raw_result = _quantum_opt(
+            ("--pass-pipeline", "builtin.module(ppm_specs)"), [], stdin=QJIT.mlir
+        )
+
+        # breakpoint()
+        regex_search_for_json = re.search(r"\{.*?\}", raw_result, re.DOTALL)
+        return regex_search_for_json.group(0)
+
+    else:
+        raise "ppm passes only support aot mode, please make sure ..."
 
 
 ## API ##
@@ -781,8 +800,3 @@ def ppm_compilation(
         )
 
     return PassPipelineWrapper(qnode, passes)
-
-
-def ppm_specs(qnode):
-    # TODO: Add docstring
-    return PassPipelineWrapper(qnode, "ppm_specs")
