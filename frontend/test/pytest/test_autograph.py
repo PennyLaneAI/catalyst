@@ -55,7 +55,33 @@ check_cache = TRANSFORMER.has_cache
 
 
 class Failing:
-    """Test class that emulates failures in user-code"""
+    """
+    Test class that emulates failures in user-code.
+
+    When autograph fails to convert, it will fall back to native python control flow execution.
+    In such cases autograph would raise a warning.
+
+    We want to test that this warning is properly raised, but if we use an actual error to trigger
+    the autograph fallback, the pytest would fail. Therefore, we manually raise an exception.
+
+    This Failing class has a class-level dictionary to keep track of what labels it has already
+    seen. When it sees a new label for the first time, it raises an exception. In all other cases,
+    it just silently lets the input value flow through.
+
+    For example, consider this code
+        @qjit(autograph=True)
+        def f1():
+            acc = 0
+            while acc < 5:
+                acc = Failing(acc, "while").val + 1
+            return acc
+
+    When tracing, the first Failing instance will encounter an unseen label "while".
+    This raises an exception and fails autograph, causing it to fallback.
+    Then in the actual python while loop, future Failing instances will encounter the same "while"
+    label. Since the label is not new, no new exception is raised, and the test finishes without
+    errors.
+    """
 
     triggered = defaultdict(bool)
 
@@ -75,10 +101,9 @@ class Failing:
 
 @pytest.fixture(autouse=True)
 def reset_Failing():
-    """Reset class variable on `Failing` class after each test"""
-    save = Failing.triggered.copy()
+    """Reset class variable on `Failing` class before each test"""
+    Failing.triggered = defaultdict(bool)
     yield
-    Failing.triggered = save
 
 
 class TestSourceCodeInfo:
