@@ -12,15 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt --ppm_compilation --split-input-file -verify-diagnostics %s > %t.ppm
-// RUN: quantum-opt --to_ppr --commute_ppr --merge_ppr_ppm --decompose_non_clifford_ppr --decompose_clifford_ppr --split-input-file -verify-diagnostics %s > %t.ppr
+// RUN: quantum-opt --ppm-compilation --split-input-file -verify-diagnostics %s > %t.ppm
+// RUN: quantum-opt --to-ppr --commute-ppr --merge-ppr-ppm --decompose-non-clifford-ppr --decompose-clifford-ppr --split-input-file -verify-diagnostics %s > %t.ppr
 // RUN: test -s %t.ppm
 // RUN: test -s %t.ppr
 // RUN: diff %t.ppm %t.ppr
 
 // With decompose-method=clifford-corrected and avoid-y-measure=false and max-pauli-size=3
-// RUN: quantum-opt --ppm_compilation="decompose-method=clifford-corrected avoid-y-measure=false max-pauli-size=3" --split-input-file -verify-diagnostics %s > %t.ppm.params
-// RUN: quantum-opt --to_ppr --commute_ppr="max-pauli-size=3" --merge_ppr_ppm="max-pauli-size=3" --decompose_non_clifford_ppr="decompose-method=clifford-corrected" --decompose_clifford_ppr="avoid-y-measure=false" --split-input-file -verify-diagnostics %s > %t.ppr.params
+// RUN: quantum-opt --ppm-compilation="decompose-method=clifford-corrected avoid-y-measure=false max-pauli-size=3" --split-input-file -verify-diagnostics %s > %t.ppm.params
+// RUN: quantum-opt --to-ppr --commute-ppr="max-pauli-size=3" --merge-ppr-ppm="max-pauli-size=3" --decompose-non-clifford-ppr="decompose-method=clifford-corrected" --decompose-clifford-ppr="avoid-y-measure=false" --split-input-file -verify-diagnostics %s > %t.ppr.params
 // RUN: test -s %t.ppm.params
 // RUN: test -s %t.ppr.params
 // RUN: diff %t.ppm.params %t.ppr.params

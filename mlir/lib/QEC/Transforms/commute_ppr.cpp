@@ -12,9 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#define DEBUG_TYPE "commute_ppr"
-
-#include "llvm/Support/Debug.h"
+#define DEBUG_TYPE "commute-ppr"
 
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
@@ -31,18 +29,18 @@ using namespace catalyst::qec;
 namespace catalyst {
 namespace qec {
 
-#define GEN_PASS_DEF_COMMUTECLIFFORDTPPRPASS
-#define GEN_PASS_DECL_COMMUTECLIFFORDTPPRPASS
+#define GEN_PASS_DEF_COMMUTEPPRPASS
+#define GEN_PASS_DECL_COMMUTEPPRPASS
 #include "QEC/Transforms/Passes.h.inc"
 
-struct CommuteCliffordTPPRPass : public impl::CommuteCliffordTPPRPassBase<CommuteCliffordTPPRPass> {
-    using CommuteCliffordTPPRPassBase::CommuteCliffordTPPRPassBase;
+struct CommutePPRPass : public impl::CommutePPRPassBase<CommutePPRPass> {
+    using CommutePPRPassBase::CommutePPRPassBase;
 
     void runOnOperation() final
     {
         RewritePatternSet patterns(&getContext());
 
-        populateCommuteCliffordTPPRPatterns(patterns, max_pauli_size);
+        populateCommutePPRPatterns(patterns, maxPauliSize);
 
         if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
             return signalPassFailure();
@@ -52,9 +50,6 @@ struct CommuteCliffordTPPRPass : public impl::CommuteCliffordTPPRPassBase<Commut
 
 } // namespace qec
 
-std::unique_ptr<Pass> createCommuteCliffordTPPRPass()
-{
-    return std::make_unique<CommuteCliffordTPPRPass>();
-}
+std::unique_ptr<Pass> createCommutePPRPass() { return std::make_unique<CommutePPRPass>(); }
 
 } // namespace catalyst

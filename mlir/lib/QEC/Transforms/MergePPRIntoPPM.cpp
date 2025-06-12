@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#define DEBUG_TYPE "merge_ppr_ppm"
+#define DEBUG_TYPE "merge-ppr-ppm"
+
+#include "llvm/Support/Casting.h"
 
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Analysis/TopologicalSortUtils.h"
-#include "llvm/Support/Casting.h"
-#include "llvm/Support/Debug.h"
 
 #include "QEC/IR/QECDialect.h"
 #include "QEC/IR/QECOpInterfaces.h"
@@ -169,14 +169,13 @@ bool shouldRemovePPR(PPRotationOp op)
     return true;
 }
 
-struct CommuteCliffordPastPPM : public OpRewritePattern<PPMeasurementOp> {
+struct MergePPRIntoPPM : public OpRewritePattern<PPMeasurementOp> {
     using OpRewritePattern::OpRewritePattern;
 
     size_t MAX_PAULI_SIZE;
 
-    CommuteCliffordPastPPM(mlir::MLIRContext *context, size_t max_pauli_size,
-                           PatternBenefit benefit)
-        : OpRewritePattern(context, benefit), MAX_PAULI_SIZE(max_pauli_size)
+    MergePPRIntoPPM(mlir::MLIRContext *context, size_t maxPauliSize, PatternBenefit benefit)
+        : OpRewritePattern(context, benefit), MAX_PAULI_SIZE(maxPauliSize)
     {
     }
 
@@ -224,10 +223,9 @@ struct RemoveDeadPPR : public OpRewritePattern<PPRotationOp> {
 namespace catalyst {
 namespace qec {
 
-void populateCommuteCliffordPastPPMPatterns(RewritePatternSet &patterns,
-                                            unsigned int max_pauli_size)
+void populateMergePPRIntoPPMPatterns(RewritePatternSet &patterns, unsigned int maxPauliSize)
 {
-    patterns.add<CommuteCliffordPastPPM>(patterns.getContext(), max_pauli_size, 1);
+    patterns.add<MergePPRIntoPPM>(patterns.getContext(), maxPauliSize, 1);
     patterns.add<RemoveDeadPPR>(patterns.getContext(), 1);
 }
 
