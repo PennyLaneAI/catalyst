@@ -54,20 +54,18 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
             if (isa<ModuleOp>(op))
                 return;
 
-            StringRef gate_name = op->getName().getStringRef();
-
-            if (gate_name == "quantum.alloc") {
+            if (isa<quantum::AllocOp>(op)) {
                 uint64_t num_qubits = cast<quantum::AllocOp>(op).getNqubitsAttr().value_or(0);
                 assert(num_qubits != 0 &&
                        "PPM specs with dynamic number of qubits is not implemented");
                 PPM_Specs["num_logical_qubits"] = num_qubits;
             }
 
-            if (gate_name == "qec.ppm") {
+            else if (isa<qec::PPMeasurementOp>(op)) {
                 PPM_Specs["num_of_ppm"]++;
             }
 
-            if (gate_name == "qec.ppr") {
+            else if (isa<qec::PPRotationOp>(op)) {
                 int16_t rotation_kind =
                     cast<qec::PPRotationOp>(op).getRotationKindAttr().getValue().getZExtValue();
                 auto pauli_product_attr = cast<qec::PPRotationOp>(op).getPauliProductAttr();
