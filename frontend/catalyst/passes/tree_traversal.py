@@ -115,7 +115,7 @@ class TreeTraversal(RewritePattern):
         while (op := next(op_iter, None)) and not isinstance(op, quantum.AllocOp):
             rewriter.insert(op.clone(value_mapper))
         assert op is not None, "didn't find an alloc op"
-        self.alloc_op = rewriter.insert(op.clone(value_mapper))
+        cloned_alloc = rewriter.insert(op.clone(value_mapper))
 
         # Split ops into segments divided by measurements.
         quantum_segments = [ProgramSegment()]
@@ -151,6 +151,11 @@ class TreeTraversal(RewritePattern):
             all_segment_io.extend(segment.outputs)
 
         self.generate_function_table(all_segment_io, values_as_io_index, rewriter)
+
+        # store some useful values for later
+        self.alloc_op = cloned_alloc
+        self.all_segment_io = all_segment_io
+        self.values_as_io_index = values_as_io_index
 
     def generate_function_table(
         self,
@@ -323,17 +328,22 @@ class TreeTraversal(RewritePattern):
         depth_init = arith.ConstantOp.from_int_and_width(0, builtin.IndexType())
         restore_init = arith.ConstantOp.from_int_and_width(0, 1)
 
-        conditionBlock = Block(arg_types=(depth_init.result.type, restore_init.result.type))
-        bodyBlock = Block(arg_types=conditionBlock.arg_types)
-        traversalOp = scf.WhileOp(
-            (depth_init, restore_init), conditionBlock.arg_types, (conditionBlock,), (bodyBlock,)
-        )
+        segment_io_types = [val.type for val in self.all_segment_io]
+        segment_io_inits = self.initialize_values_from_types(segment_io_types)
+        iter_arg_types = [depth_init.result.type, restore_init.result.type, *segment_io_types]
+        iter_arg_inits = [depth_init, restore_init, *segment_io_inits]
+        conditionBlock = Block(arg_types=iter_arg_types)
+        bodyBlock = Block(arg_types=iter_arg_types)
+        traversalOp = scf.WhileOp(iter_arg_inits, iter_arg_types, (conditionBlock,), (bodyBlock,))
 
-        for op in (depth_init, restore_init, traversalOp):
-            rewriter.insert(op)
+        for op in (depth_init, restore_init, *segment_io_inits, traversalOp):
+            if isinstance(op, Operation):  # bypass "ops" that are already SSA values
+                rewriter.insert(op)
 
         # condition block of the while loop
-        current_depth, needs_restore = self.check_if_leaf(*conditionBlock.args, rewriter)
+        current_depth, needs_restore = conditionBlock.args[:2]
+        current_depth, needs_restore = self.check_if_leaf(current_depth, needs_restore, rewriter)
+        segment_iter_args = conditionBlock.args[2:]
 
         c0 = arith.ConstantOp.from_int_and_width(0, builtin.IndexType())
         c2 = arith.ConstantOp.from_int_and_width(2, builtin.IndexType())
@@ -345,13 +355,14 @@ class TreeTraversal(RewritePattern):
         not_fully_traversed = arith.CmpiOp(visited_sum, max_sum, "ne")
 
         final_condition = arith.AndIOp(positive_depth, not_fully_traversed)
-        condOp = scf.ConditionOp(final_condition, current_depth, needs_restore)
+        condOp = scf.ConditionOp(final_condition, current_depth, needs_restore, *segment_iter_args)
 
         for op in (c0, c2, positive_depth, max_sum, not_fully_traversed, final_condition, condOp):
             rewriter.insert_op(op, InsertPoint.at_end(conditionBlock))
 
         # body block of the while
-        current_depth, needs_restore = bodyBlock.args
+        current_depth, needs_restore = bodyBlock.args[:2]
+        segment_iter_args = bodyBlock.args[2:]
 
         node_status = memref.LoadOp.get(self.visited_stack, (current_depth,))
         casted_status = arith.IndexCastOp(node_status, builtin.IndexType())
@@ -362,15 +373,48 @@ class TreeTraversal(RewritePattern):
             cases,
             Region(Block()),
             [Region(Block()) for _ in range(len(cases))],
-            (current_depth.type, needs_restore.type),
+            (current_depth.type, needs_restore.type, *segment_io_types),
         )
 
-        self.process_node(switchOp, current_depth, needs_restore, rewriter)
+        self.process_node(switchOp, current_depth, needs_restore, segment_iter_args, rewriter)
 
         yieldOp = scf.YieldOp(*switchOp.results)
 
         for op in (node_status, casted_status, switchOp, yieldOp):
             rewriter.insert_op(op, InsertPoint.at_end(bodyBlock))
+
+    def initialize_values_from_types(self, types):
+        """Generate dummy values for the provided types. Quantum types are treated specially and
+        will make use of the quantum.AllocOp reference collected at an earlier stage."""
+
+        # TODO: handling quantum dummy values can be tricky, let's try this for now
+        qureg_stub = self.alloc_op.results[0]
+        qubit_stub = quantum.ExtractOp(qureg_stub, 0)
+        qubit_stub_used = False
+
+        ops = []
+        for ty in types:
+            match ty:
+                case builtin.IndexType() | builtin.IntegerType():
+                    ops.append(arith.ConstantOp(builtin.IntegerAttr(0, ty)))
+                case builtin._FloatType():
+                    ops.append(arith.ConstantOp(builtin.FloatAttr(0.0, ty)))
+                case builtin.ComplexType():
+                    assert False, "Complex type unsupported"
+                case builtin.TensorType():
+                    ops.append(tensor.EmptyOp((), ty))  # assume no dynamic dim
+                case builtin.MemRefType():
+                    ops.append(memref.AllocaOp.get(ty))  # assume this is not called in a loop
+                case quantum.QubitType():
+                    if qubit_stub_used:
+                        ops.append(qubit_stub.results[0])
+                    else:
+                        ops.append(qubit_stub)
+                        qubit_stub_used = True
+                case quantum.QuregType():
+                    ops.append(self.alloc_op.results[0])
+
+        return ops
 
     def check_if_leaf(
         self, current_depth: SSAValue, needs_restore: SSAValue, rewriter: PatternRewriter
@@ -413,6 +457,7 @@ class TreeTraversal(RewritePattern):
         switchOp: scf.IndexSwitchOp,
         current_depth: SSAValue,
         needs_restore: SSAValue,
+        segment_iter_args: list[SSAValue],
         rewriter: PatternRewriter,
     ):
         """Update data structures and effect transition from one node to the next."""
@@ -425,14 +470,19 @@ class TreeTraversal(RewritePattern):
         c1 = arith.ConstantOp.from_int_and_width(1, self.visited_stack.type.element_type)
         storeOp = memref.StoreOp.get(c1, self.visited_stack, (current_depth,))
 
-        # TODO: add simulation segment
+        # run a simulation segment
+        callOp = func.CallOp(
+            "segment_table",
+            [current_depth, *segment_iter_args],
+            [val.type for val in segment_iter_args],
+        )
 
         c1_ = arith.ConstantOp.from_int_and_width(1, current_depth.type)
         updated_depth = arith.AddiOp(current_depth, c1_)
 
-        yieldOp = scf.YieldOp(updated_depth, needs_restore)
+        yieldOp = scf.YieldOp(updated_depth, needs_restore, *callOp.results)
 
-        for op in (c1, c1_, storeOp, updated_depth, yieldOp):
+        for op in (c1, c1_, storeOp, callOp, updated_depth, yieldOp):
             rewriter.insert_op(op, InsertPoint.at_end(unvisitedBlock))
 
         # handle left visited region: need to go right
@@ -445,14 +495,19 @@ class TreeTraversal(RewritePattern):
         )
         self.handle_restore(needs_restore, current_depth, trueBlock, falseBlock, rewriter)
 
-        # TODO: add simulation segment
+        # run a simulation segment
+        callOp = func.CallOp(
+            "segment_table",
+            [current_depth, *segment_iter_args],
+            [val.type for val in segment_iter_args],
+        )
 
         c1 = arith.ConstantOp.from_int_and_width(1, current_depth.type)
         updated_depth = arith.AddiOp(current_depth, c1)
 
-        yieldOp = scf.YieldOp(updated_depth, updated_restore)
+        yieldOp = scf.YieldOp(updated_depth, updated_restore, *callOp.results)
 
-        for op in (c1, c2, storeOp, updated_restore, updated_depth, yieldOp):
+        for op in (c1, c2, storeOp, updated_restore, callOp, updated_depth, yieldOp):
             rewriter.insert_op(op, InsertPoint.at_end(leftVisitedBlock))
 
         # handle right visited region: need to go back up
@@ -462,14 +517,14 @@ class TreeTraversal(RewritePattern):
         c1 = arith.ConstantOp.from_int_and_width(1, current_depth.type)
         updated_depth = arith.SubiOp(current_depth, c1)
 
-        yieldOp = scf.YieldOp(updated_depth, needs_restore)
+        yieldOp = scf.YieldOp(updated_depth, needs_restore, *segment_iter_args)
 
         for op in (c0, c1, storeOp, updated_depth, yieldOp):
             rewriter.insert_op(op, InsertPoint.at_end(rightVisitedBlock))
 
         # handle default region, TODO: ideally should raise a runtime exception here
         cm1 = arith.ConstantOp.from_int_and_width(-1, current_depth.type)  # will end traversal
-        yieldOp = scf.YieldOp(cm1, needs_restore)
+        yieldOp = scf.YieldOp(cm1, needs_restore, *segment_iter_args)
 
         for op in (cm1, yieldOp):
             rewriter.insert_op(op, InsertPoint.at_end(defaultBlock))
