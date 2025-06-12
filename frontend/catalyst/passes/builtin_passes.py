@@ -29,8 +29,6 @@ def get_ppm_spec(QJIT):
         raw_result = _quantum_opt(
             ("--pass-pipeline", "builtin.module(ppm_specs)"), [], stdin=QJIT.mlir_opt
         )
-
-        # breakpoint()
         regex_search_for_json = re.search(r"\{.*?\}", raw_result, re.DOTALL)
         return regex_search_for_json.group(0)
 

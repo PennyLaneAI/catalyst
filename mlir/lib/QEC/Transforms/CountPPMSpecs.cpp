@@ -68,10 +68,9 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
             }
 
             if (gate_name == "qec.ppr") {
-                auto rotation_attr = op->getAttrOfType<mlir::IntegerAttr>("rotation_kind");
-                auto pauli_product_attr = op->getAttrOfType<mlir::ArrayAttr>("pauli_product");
                 int16_t rotation_kind =
-                    rotation_attr ? static_cast<int16_t>(rotation_attr.getInt()) : 0;
+                    cast<qec::PPRotationOp>(op).getRotationKindAttr().getValue().getZExtValue();
+                auto pauli_product_attr = cast<qec::PPRotationOp>(op).getPauliProductAttr();
                 if (rotation_kind) {
                     llvm::StringSaver saver(string_allocator);
                     StringRef num_pi_key =
@@ -94,7 +93,8 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
         });
 
         json PPM_Specs_Json = PPM_Specs;
-        llvm::outs() << PPM_Specs_Json.dump(4) << "\n";
+        llvm::outs() << PPM_Specs_Json.dump(4)
+                     << "\n"; // dump(4) makes an indent with 4 spaces when printing JSON
         return;
     }
 
