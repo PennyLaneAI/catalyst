@@ -48,7 +48,6 @@ from catalyst.device import (
 from catalyst.jax_extras import jaxpr_pad_consts, make_jaxpr2, transient_jax_config
 from catalyst.jax_primitives import (
     AbstractQbit,
-    AbstractQreg,
     MeasurementPlane,
     compbasis_p,
     cond_p,
