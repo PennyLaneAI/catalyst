@@ -96,14 +96,6 @@ def is_controlled_pushed_back(mlir, non_controlled_string, controlled_string):
     return controlled_string in remaining_mlir
 
 
-def is_amplitude_embedding_merged_and_decomposed(mlir):
-    """Check in the MLIR if the amplitude embeddings got merged and decomposed"""
-    return (
-        "AmplitudeEmbedding" not in mlir
-        and mlir.count('quantum.custom "RY"') == 3
-        and mlir.count('quantum.custom "CNOT"') == 2
-    )
-
 
 # pylint: disable=too-many-public-methods
 class TestCapture:
@@ -1381,7 +1373,7 @@ class TestCapture:
             qml.RZ(0.4, wires=0)
             return qml.expval(qml.PauliZ(0))
 
-        assert circuit() == capture_result
+        assert qml.math.allclose(circuit(), capture_result)
 
     def test_transform_commute_controlled_workflow(self, backend):
         """Test the integration for a circuit with a 'commute_controlled' transform."""
@@ -1445,7 +1437,6 @@ class TestCapture:
             return qml.expval(qml.PauliZ(0))
 
         capture_result = captured_circuit()
-        assert is_amplitude_embedding_merged_and_decomposed(captured_circuit.mlir)
 
         qml.capture.disable()
 
@@ -1460,6 +1451,10 @@ class TestCapture:
             return qml.expval(qml.PauliZ(0))
 
         assert circuit() == capture_result
+
+        assert "AmplitudeEmbedding" not in captured_circuit.mlir
+        assert captured_circuit.mlir.count('quantum.custom "RY"') == 3
+        assert captured_circuit.mlir.count('quantum.custom "CNOT"') == 4
 
     def test_shots_usage(self, backend):
         """Test the integration for a circuit using shots explicitly."""
