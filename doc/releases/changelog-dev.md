@@ -255,6 +255,10 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* `from_plxpr` updated to match a change in the `qnode_prim` in pennylane. consts are now treated as 
+  dynamic variables instead of static variables, matching standard catalyst behavior.
+  [(#1801)](https://github.com/PennyLaneAI/catalyst/pull/1801)
+
 * `null.qubit` can now support an optional `track_resources` argument which allows it to record which gates are executed.
   [(#1619)](https://github.com/PennyLaneAI/catalyst/pull/1619)
 
