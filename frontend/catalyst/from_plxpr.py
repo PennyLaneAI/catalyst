@@ -551,7 +551,7 @@ def handle_cond(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
 
         if plxpr_branch is None:
             # Emit a new Catalyst jaxpr branch that simply returns a qreg
-            converted_jaxpr_branch = jax.make_jaxpr(lambda x: x)(AbstractQreg()).jaxpr
+            converted_jaxpr_branch = jax.make_jaxpr(lambda x: x)(*args_plus_qreg).jaxpr
         else:
             # Convert branch from plxpr to Catalyst jaxpr
             converted_func = partial(
