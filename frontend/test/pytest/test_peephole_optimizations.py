@@ -14,8 +14,6 @@
 
 """Test the quantum peephole passes"""
 
-import json
-
 import numpy as np
 import pennylane as qml
 import pytest
@@ -219,6 +217,7 @@ def test_convert_clifford_to_ppr():
     assert ppm_specs["f_0"]["num_pi8_gates"] == 1
     assert ppm_specs["f_0"]["max_weight_pi8"] == 1
 
+
 def test_commute_ppr():
 
     pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
@@ -252,6 +251,7 @@ def test_commute_ppr():
     assert ppm_specs["f_0"]["num_pi8_gates"] == 1
     assert ppm_specs["f_0"]["max_weight_pi8"] == 1
 
+
 def test_merge_ppr_ppm():
 
     pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
@@ -279,6 +279,7 @@ def test_merge_ppr_ppm():
     ppm_specs = get_ppm_spec(test_merge_ppr_ppm_workflow)
     assert ppm_specs["f_0"]["num_of_ppm"] == 2
     assert ppm_specs["f_0"]["num_logical_qubits"] == 2
+
 
 def test_ppr_to_ppm():
 
@@ -320,6 +321,7 @@ def test_ppr_to_ppm():
     assert ppm_specs["f_0"]["num_pi2_gates"] == 8
     assert ppm_specs["f_0"]["max_weight_pi2"] == 2
 
+
 def test_ppr_to_ppm_inject_magic_state():
 
     pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
@@ -355,6 +357,7 @@ def test_ppr_to_ppm_inject_magic_state():
     assert ppm_specs["f_0"]["num_logical_qubits"] == 2
     assert ppm_specs["f_0"]["num_pi2_gates"] == 9
     assert ppm_specs["f_0"]["max_weight_pi2"] == 2
+
 
 def test_commute_ppr_and_merge_ppr_ppm_with_max_pauli_size():
 
@@ -414,6 +417,7 @@ def test_commute_ppr_and_merge_ppr_ppm_with_max_pauli_size():
     ppm_specs["g_0"]["num_pi8_gates"] = 2
     ppm_specs["g_0"]["max_weight_pi8"] = 1
 
+
 def test_clifford_to_ppm():
 
     pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
@@ -459,6 +463,7 @@ def test_clifford_to_ppm():
     ppm_specs["f_0"]["max_weight_pi2"] = 2
 
     ppm_specs["g_0"]["num_logical_qubits"] = 2
+
 
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
