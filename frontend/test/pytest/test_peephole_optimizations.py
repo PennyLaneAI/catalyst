@@ -405,17 +405,17 @@ def test_commute_ppr_and_merge_ppr_ppm_with_max_pauli_size():
 
     ppm_specs = get_ppm_spec(test_convert_clifford_to_ppr_workflow)
 
-    ppm_specs["f_0"]["num_logical_qubits"] == 2
-    ppm_specs["f_0"]["num_of_ppm"] == 2
-    ppm_specs["f_0"]["num_pi8_gates"] == 1
-    ppm_specs["f_0"]["max_weight_pi8"] == 1
+    assert ppm_specs["f_0"]["num_logical_qubits"] == 2
+    assert ppm_specs["f_0"]["num_of_ppm"] == 2
+    assert ppm_specs["f_0"]["num_pi8_gates"] == 1
+    assert ppm_specs["f_0"]["max_weight_pi8"] == 1
 
-    ppm_specs["g_0"]["num_logical_qubits"] == 2
-    ppm_specs["g_0"]["num_of_ppm"] == 2
-    ppm_specs["g_0"]["num_pi4_gates"] == 2
-    ppm_specs["g_0"]["max_weight_pi4"] == 3
-    ppm_specs["g_0"]["num_pi8_gates"] == 2
-    ppm_specs["g_0"]["max_weight_pi8"] == 1
+    assert ppm_specs["g_0"]["num_logical_qubits"] == 2
+    assert ppm_specs["g_0"]["num_of_ppm"] == 2
+    assert ppm_specs["g_0"]["num_pi4_gates"] == 3
+    assert ppm_specs["g_0"]["max_weight_pi4"] == 2
+    assert ppm_specs["g_0"]["num_pi8_gates"] == 2
+    assert ppm_specs["g_0"]["max_weight_pi8"] == 1
 
 
 def test_clifford_to_ppm():
@@ -457,12 +457,12 @@ def test_clifford_to_ppm():
 
     ppm_specs = get_ppm_spec(test_clifford_to_ppm_workflow)
 
-    ppm_specs["f_0"]["num_logical_qubits"] == 2
-    ppm_specs["f_0"]["num_of_ppm"] == 7
-    ppm_specs["f_0"]["num_pi2_gates"] == 2
-    ppm_specs["f_0"]["max_weight_pi2"] == 2
+    assert ppm_specs["f_0"]["num_logical_qubits"] == 2
+    assert ppm_specs["f_0"]["num_of_ppm"] == 7
+    assert ppm_specs["f_0"]["num_pi2_gates"] == 2
+    assert ppm_specs["f_0"]["max_weight_pi2"] == 2
 
-    ppm_specs["g_0"]["num_logical_qubits"] == 2
+    assert ppm_specs["g_0"]["num_logical_qubits"] == 2
 
 
 if __name__ == "__main__":
