@@ -1460,7 +1460,7 @@ class TestWhileLoops:
         assert f1() == sum([1, 1, 2, 2])
 
     @pytest.mark.filterwarnings("error")
-    def test_whileloop_no_warning(self, monkeypatch):
+    def test_whileloop_no_warning(self):
         """Test the absence of warnings if fallbacks are ignored."""
 
         @qjit(autograph=True)
