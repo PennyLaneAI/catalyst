@@ -315,7 +315,13 @@ class SubroutineInterpreter(PlxprInterpreter):
             # Note: since `getattr` checks specifically for qreg, we can't
             # define qreg inside the init function.
             # pylint: disable-next=attribute-defined-outside-init
-            self.qreg = qinsert_p.bind(self.qreg, orig_wire, wire)
+
+            # Lazy impl: just tie actualize to the global qreg
+            # Probably make this work with any qreg
+            # The idea is simple: we just keep track of all the qregs
+            # And there's no need to distinguish.
+            if orig_wire < len(self._device.wires):
+                self.qreg = qinsert_p.bind(self.qreg, orig_wire, wire)
 
     def interpret_operation(self, op):
         """Re-bind a pennylane operation as a catalyst instruction."""
@@ -519,9 +525,10 @@ def handle_qml_dealloc(self, *wires, reset_to_original=False):
     # I am also dealing with the simple case, where an qml.allocate is never launched within another
     # So I just insert back all qubits whose indices are not covered by the global qreg
 
+    num_qubits_global_qreg = len(self._device.wires)
     for wire in wires:
         self.stateref["dyn_qreg"] = qinsert_p.bind(
-            self.stateref["dyn_qreg"], wire, self.wire_map[wire]
+            self.stateref["dyn_qreg"], wire - num_qubits_global_qreg, self.wire_map[wire]
         )
     # breakpoint()
     qdealloc_p.bind(self.stateref["dyn_qreg"])
