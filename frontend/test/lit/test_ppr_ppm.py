@@ -45,7 +45,7 @@ def test_convert_clifford_to_ppr():
     print(circuit.mlir_opt)
 
 
-# CHECK-NOT: transform.apply_registered_pass "to_ppr"
+# CHECK-NOT: transform.apply_registered_pass "to-ppr"
 # CHECK: qec.ppr
 # CHECK: qec.ppm
 test_convert_clifford_to_ppr()
