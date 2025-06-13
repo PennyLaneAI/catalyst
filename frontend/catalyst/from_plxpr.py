@@ -183,9 +183,7 @@ def handle_qnode(
     consts = args[:n_consts]
     non_const_args = args[n_consts:]
 
-    def flat_fun(*args):
-        closed_jaxpr = ClosedJaxpr(qfunc_jaxpr, consts)
-        return jaxpr_as_fun(closed_jaxpr)(*args)
+    closed_jaxpr = ClosedJaxpr(qfunc_jaxpr, consts)
 
     def extract_shots_value(shots: qml.measurements.Shots | int):
         """Extract the shots value according to the type"""
@@ -206,7 +204,7 @@ def handle_qnode(
         )
         qreg = qalloc_p.bind(len(device.wires))
         converter = PLxPRToQuantumJaxprInterpreter(device, shots, qreg)
-        retvals = converter(flat_fun, *args)
+        retvals = converter(closed_jaxpr, *args)
         if not converter.actualized:
             converter.actualize_qreg()
         qdealloc_p.bind(converter.qreg)
@@ -421,13 +419,12 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
 
         return shots.total_shots if shots else 0
 
-    def __call__(self, fun, *args):
+    def __call__(self, jaxpr, *args):
         """
         Execute this interpreter with this arguments.
         We expect this to be a flat function (i.e., always takes *args as inputs
         and no **kwargs) and the results is a sequence of values
         """
-        jaxpr = jax.make_jaxpr(fun)(*args)
         return self.eval(jaxpr.jaxpr, jaxpr.consts, *args)
 
 
@@ -501,16 +498,14 @@ def handle_cond(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
             converted_jaxpr_branch = jax.make_jaxpr(lambda x: x)(*args_plus_qreg).jaxpr
         else:
 
-            def flat_fun(*args):
-                closed_jaxpr = ClosedJaxpr(plxpr_branch, branch_consts)
-                return jaxpr_as_fun(closed_jaxpr)(*args)
+            closed_jaxpr = ClosedJaxpr(plxpr_branch, branch_consts)
 
             def calling_convention(*args_plus_qreg):
                 *args, qreg = args_plus_qreg
                 device = self.device
                 shots = self.shots
                 converter = PLxPRToQuantumJaxprInterpreter(device, shots, qreg)
-                retval = converter(flat_fun, *args)
+                retval = converter(closed_jaxpr, *args)
                 # We need to define a subroutine interpreter here.
                 # That takes the qreg as an input.
                 converter.actualize_qreg()
@@ -570,16 +565,14 @@ def handle_for_loop(
 
     consts = plxpr_invals[consts_slice]
 
-    def flat_fun(*args):
-        jaxpr = ClosedJaxpr(jaxpr_body_fn, consts)
-        return jaxpr_as_fun(jaxpr)(*args)
+    jaxpr = ClosedJaxpr(jaxpr_body_fn, consts)
 
     def calling_convention(*args_plus_qreg):
         *args, qreg = args_plus_qreg
         device = self.device
         shots = self.shots
         converter = PLxPRToQuantumJaxprInterpreter(device, shots, qreg)
-        retvals = converter(flat_fun, *args)
+        retvals = converter(jaxpr, *args)
         converter.actualize_qreg()
         return *retvals, converter.qreg
 
@@ -627,16 +620,14 @@ def handle_while_loop(
     args = plxpr_invals[args_slice]
     args_plus_qreg = [*args, self.qreg]  # Add the qreg to the args
 
-    def flat_fun(*args):
-        jaxpr = ClosedJaxpr(jaxpr_body_fn, consts_body)
-        return jaxpr_as_fun(jaxpr)(*args)
+    jaxpr = ClosedJaxpr(jaxpr_body_fn, consts_body)
 
     def calling_convention(*args_plus_qreg):
         *args, qreg = args_plus_qreg
         device = self.device
         shots = self.shots
         converter = PLxPRToQuantumJaxprInterpreter(device, shots, qreg)
-        retvals = converter(flat_fun, *args)
+        retvals = converter(jaxpr, *args)
         converter.actualize_qreg()
         return *retvals, converter.qreg
 
@@ -652,16 +643,14 @@ def handle_while_loop(
 
     # So let's just remove the quantum register here at the end
 
-    def flat_fun_2(*args):
-        jaxpr = ClosedJaxpr(jaxpr_cond_fn, consts_cond)
-        return jaxpr_as_fun(jaxpr)(*args)
+    jaxpr = ClosedJaxpr(jaxpr_cond_fn, consts_cond)
 
     def remove_qreg(*args_plus_qreg):
         *args, qreg = args_plus_qreg
         device = self.device
         shots = self.shots
         converter = PLxPRToQuantumJaxprInterpreter(device, shots, qreg)
-        return converter(flat_fun_2, *args)
+        return converter(jaxpr, *args)
 
     converted_cond_jaxpr_branch = jax.make_jaxpr(remove_qreg)(*args_plus_qreg).jaxpr
     converted_cond_closed_jaxpr_branch = ClosedJaxpr(
