@@ -54,7 +54,7 @@ def compare_call_jaxprs(jaxpr1, jaxpr2, skip_eqns=(), ignore_order=False):
         assert ov1.aval == ov2.aval
     assert len(jaxpr1.eqns) == len(
         jaxpr2.eqns
-    ), f"Number of equations differ: {len(jaxpr1.eqns)} vs {len(jaxpr2.eqns)}"
+    ), f"Number of equations differ: {len(jaxpr1.eqns)} vs {len(jaxpr2.eqns)}, {jaxpr1.eqns} vs {jaxpr2.eqns}"
 
     if not ignore_order:
         # Assert that equations in both jaxprs are equivalent and in same order

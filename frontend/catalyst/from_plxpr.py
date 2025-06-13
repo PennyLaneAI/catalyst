@@ -208,7 +208,8 @@ def handle_qnode(
         qreg = qalloc_p.bind(len(device.wires))
         converter = PLxPRToQuantumJaxprInterpreter(device, shots, qreg)
         retvals = converter(flat_fun, *args)
-        #converter.actualize_qreg()
+        if not converter.actualized:
+            converter.actualize_qreg()
         qdealloc_p.bind(converter.qreg)
         device_release_p.bind()
         return retvals
