@@ -19,6 +19,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 
@@ -41,58 +42,64 @@ namespace qec {
 struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass> {
     using CountPPMSpecsPassBase::CountPPMSpecsPassBase;
 
-    llvm::DenseMap<StringRef, int> countLogicalQubit(Operation *op,
-                                                     llvm::DenseMap<StringRef, int> PPMSpecs)
+    llvm::DenseMap<StringRef, llvm::DenseMap<StringRef, int>>
+    countLogicalQubit(Operation *op,
+                      llvm::DenseMap<StringRef, llvm::DenseMap<StringRef, int>> PPMSpecs)
     {
         uint64_t numQubits = cast<quantum::AllocOp>(op).getNqubitsAttr().value_or(0);
         assert(numQubits != 0 && "PPM specs with dynamic number of qubits is not implemented");
-        PPMSpecs["num_logical_qubits"] = numQubits;
+        auto parentFuncOp = op->getParentOfType<func::FuncOp>();
+        PPMSpecs[parentFuncOp.getName()]["num_logical_qubits"] = numQubits;
         return PPMSpecs;
     }
-    llvm::DenseMap<StringRef, int> countPPR(Operation *op, llvm::DenseMap<StringRef, int> PPMSpecs,
-                                            llvm::BumpPtrAllocator *stringAllocator)
+
+    llvm::DenseMap<StringRef, llvm::DenseMap<StringRef, int>>
+    countPPM(Operation *op, llvm::DenseMap<StringRef, llvm::DenseMap<StringRef, int>> PPMSpecs)
+    {
+        auto parentFuncOp = op->getParentOfType<func::FuncOp>();
+        PPMSpecs[parentFuncOp.getName()]["num_of_ppm"]++;
+        return PPMSpecs;
+    }
+
+    llvm::DenseMap<StringRef, llvm::DenseMap<StringRef, int>>
+    countPPR(Operation *op, llvm::DenseMap<StringRef, llvm::DenseMap<StringRef, int>> PPMSpecs,
+             llvm::BumpPtrAllocator *stringAllocator)
     {
         int16_t rotationKind =
             cast<qec::PPRotationOp>(op).getRotationKindAttr().getValue().getZExtValue();
         auto PauliProductAttr = cast<qec::PPRotationOp>(op).getPauliProductAttr();
+        auto parentFuncOp = op->getParentOfType<func::FuncOp>();
+        StringRef funcName = parentFuncOp.getName();
         if (rotationKind) {
             llvm::StringSaver saver(*stringAllocator);
             StringRef numRotationKindKey =
                 saver.save("num_pi" + std::to_string(abs(rotationKind)) + "_gates");
             StringRef maxWeightRotationKindKey =
                 saver.save("max_weight_pi" + std::to_string(abs(rotationKind)));
-
-            if (PPMSpecs.find(llvm::StringRef(numRotationKindKey)) == PPMSpecs.end()) {
-                PPMSpecs[numRotationKindKey] = 1;
-                PPMSpecs[maxWeightRotationKindKey] = static_cast<int>(PauliProductAttr.size());
-            }
-            else {
-                PPMSpecs[numRotationKindKey]++;
-                PPMSpecs[maxWeightRotationKindKey] = std::max(
-                    PPMSpecs[maxWeightRotationKindKey], static_cast<int>(PauliProductAttr.size()));
-            }
+            PPMSpecs[funcName][numRotationKindKey]++;
+            PPMSpecs[funcName][maxWeightRotationKindKey] =
+                std::max(PPMSpecs[funcName][maxWeightRotationKindKey],
+                         static_cast<int>(PauliProductAttr.size()));
         }
         return PPMSpecs;
     }
     void printSpecs()
     {
         llvm::BumpPtrAllocator stringAllocator;
-        llvm::DenseMap<StringRef, int> PPMSpecs;
-        PPMSpecs["num_logical_qubits"] = 0;
-        PPMSpecs["num_of_ppm"] = 0;
-
+        llvm::DenseMap<StringRef, llvm::DenseMap<StringRef, int>> PPMSpecs;
+        // StringRef funcName;
         // Walk over all operations in the IR (could be ModuleOp or FuncOp)
         getOperation()->walk([&](Operation *op) {
             // Skip top-level container ops if desired
             if (isa<ModuleOp>(op))
                 return;
 
-            if (isa<quantum::AllocOp>(op)) {
+            else if (isa<quantum::AllocOp>(op)) {
                 PPMSpecs = countLogicalQubit(op, PPMSpecs);
             }
 
             else if (isa<qec::PPMeasurementOp>(op)) {
-                PPMSpecs["num_of_ppm"]++;
+                PPMSpecs = countPPM(op, PPMSpecs);
             }
 
             else if (isa<qec::PPRotationOp>(op)) {
