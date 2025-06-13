@@ -125,7 +125,7 @@ def PPMCompilationPass : Pass<"ppm-compilation"> {
     let options = [MaxPauliSizeOption, DecomposeMethodOption, AvoidYMeasureOption];
 }
 
-def CountPPMSpecsPass : Pass<"ppm_specs"> {
+def CountPPMSpecsPass : Pass<"ppm-specs"> {
     let summary = "Count specs in Pauli Product Measurement operations.";
     
     let constructor = "catalyst::createCountPPMSpecsPass()";

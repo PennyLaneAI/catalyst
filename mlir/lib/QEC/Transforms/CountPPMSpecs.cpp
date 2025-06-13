@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#define DEBUG_TYPE "PPMSpecs"
+#define DEBUG_TYPE "ppm-specs"
 
 #include <algorithm>
 #include <string>
