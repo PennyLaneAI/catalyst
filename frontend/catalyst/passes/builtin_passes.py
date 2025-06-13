@@ -382,7 +382,7 @@ def to_ppr(qnode):
         import pennylane as qml
         from catalyst import qjit, measure
 
-        ppm_passes = [("PPM", ["to_ppr"])]
+        ppm_passes = [("PPM", ["to-ppr"])]
 
         @qjit(pipelines=ppm_passes, keep_intermediate=True, target="mlir")
         @qml.qnode(qml.device("null.qubit", wires=2))
@@ -413,7 +413,7 @@ def to_ppr(qnode):
         . . .
 
     """
-    return PassPipelineWrapper(qnode, "to_ppr")
+    return PassPipelineWrapper(qnode, "to-ppr")
 
 
 def commute_ppr(qnode=None, *, max_pauli_size=0):
@@ -449,7 +449,7 @@ def commute_ppr(qnode=None, *, max_pauli_size=0):
         import pennylane as qml
         from catalyst import qjit, measure
 
-        ppm_passes = [("PPM", ["to_ppr", "commute_ppr"])]
+        ppm_passes = [("PPM", ["to-ppr", "commute-ppr"])]
 
         @qjit(pipelines=ppm_passes, keep_intermediate=True, target="mlir")
         @qml.qnode(qml.device("null.qubit", wires=1))
@@ -541,7 +541,7 @@ def merge_ppr_ppm(qnode=None, *, max_pauli_size=0):
         import pennylane as qml
         from catalyst import qjit, measure
 
-        ppm_passes = [("PPM",["to_ppr", "commute_ppr","merge_ppr_ppm",])]
+        ppm_passes = [("PPM",["to-ppr", "commute-ppr","merge-ppr-ppm",])]
 
         @qjit(pipelines=ppm_passes, keep_intermediate=True, target="mlir")
         @qml.qnode(qml.device("lightning.qubit", wires=1))
@@ -570,7 +570,6 @@ def merge_ppr_ppm(qnode=None, *, max_pauli_size=0):
         from catalyst.passes import to_ppr, merge_ppr_ppm
 
         pips = [("pipe", ["enforce-runtime-invariants-pipeline"])]
-
 
         @qjit(pipelines=pips, target="mlir")
         @to_ppr
@@ -782,7 +781,7 @@ def ppm_compilation(
 
     """
     passes = {
-        "ppm_compilation": {
+        "ppm-compilation": {
             "decompose-method": decompose_method,
             "avoid-y-measure": avoid_y_measure,
             "max-pauli-size": max_pauli_size,

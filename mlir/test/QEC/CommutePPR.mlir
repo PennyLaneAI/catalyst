@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt --commute_ppr --split-input-file -verify-diagnostics %s | FileCheck %s
-// RUN: quantum-opt --commute_ppr="max-pauli-size=3" --split-input-file -verify-diagnostics %s | FileCheck %s --check-prefixes=CHECK-MPS
+// RUN: quantum-opt --commute-ppr --split-input-file -verify-diagnostics %s | FileCheck %s
+// RUN: quantum-opt --commute-ppr="max-pauli-size=3" --split-input-file -verify-diagnostics %s | FileCheck %s --check-prefixes=CHECK-MPS
 
 func.func @test_commute_1(%q1 : !quantum.bit){
     

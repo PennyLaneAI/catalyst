@@ -4,17 +4,17 @@ set(LIBRARY_NAME qec-transforms)
 file(GLOB SRC
     CliffordTToPPR.cpp
     clifford_t_to_ppr.cpp
-    CommuteCliffordTPPR.cpp
-    commute_clifford_t_ppr.cpp
-    CommuteCliffordPastPPM.cpp
-    commute_clifford_past_ppm.cpp
+    CommutePPR.cpp
+    commute_ppr.cpp
+    MergePPRIntoPPM.cpp
+    merge_ppr_into_ppm.cpp
     CountPPMSpecs.cpp
     decompose_non_clifford_ppr.cpp
     DecomposeNonCliffordPPR.cpp
     decompose_clifford_ppr.cpp
     DecomposeCliffordPPR.cpp
     PPRDecomposeUtils.cpp
-    clifford_t_to_ppm.cpp
+    ppm_compilation.cpp
 )
 
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)
