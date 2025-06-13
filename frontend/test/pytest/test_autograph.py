@@ -1459,11 +1459,9 @@ class TestWhileLoops:
 
         assert f1() == sum([1, 1, 2, 2])
 
-    @pytest.mark.xfail(reason="this won't run warning-free until we fix the resource warning issue")
     @pytest.mark.filterwarnings("error")
     def test_whileloop_no_warning(self, monkeypatch):
         """Test the absence of warnings if fallbacks are ignored."""
-        monkeypatch.setattr("catalyst.autograph_ignore_fallbacks", True)
 
         @qjit(autograph=True)
         def f():
