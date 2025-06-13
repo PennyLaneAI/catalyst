@@ -836,13 +836,20 @@ def handle_while_loop(
     args = plxpr_invals[args_slice]
     args_plus_qreg = [*args, self.qreg]  # Add the qreg to the args
 
-    # Convert for while body from plxpr to Catalyst jaxpr
-    converted_body_func = partial(
-        BranchPlxprInterpreter(self.device, self.shots).eval,
-        jaxpr_body_fn,
-        consts_body,
-    )
-    converted_body_jaxpr_branch = jax.make_jaxpr(converted_body_func)(*args_plus_qreg).jaxpr
+    def flat_fun(*args):
+        jaxpr = ClosedJaxpr(jaxpr_body_fn, consts_body)
+        return jaxpr_as_fun(jaxpr)(*args)
+
+    def calling_convention(*args_plus_qreg):
+        *args, qreg = args_plus_qreg
+        device = self.device
+        shots = self.shots
+        converter = PLxPRToQuantumJaxprInterpreter(device, shots, qreg)
+        retvals = converter(flat_fun, *args)
+        converter.actualize_qreg()
+        return *retvals, converter.qreg
+
+    converted_body_jaxpr_branch = jax.make_jaxpr(calling_convention)(*args_plus_qreg).jaxpr
     converted_body_closed_jaxpr_branch = ClosedJaxpr(
         convert_constvars_jaxpr(converted_body_jaxpr_branch), ()
     )
@@ -937,64 +944,6 @@ def handle_measure_in_basis(self, angle, wire, plane, reset, postselect):
     self.wire_map[wire] = out_wire
 
     return result
-
-
-# Derived interpreters must be declared after the primitive registrations of their
-# parents or be placed in a separate file, in order to access those registrations.
-# This is due to the registrations being done outside the parent class definition.
-
-
-class BranchPlxprInterpreter(QFuncPlxprInterpreter):
-    """An interpreter that converts a plxpr branch into catalyst-variant jaxpr branch.
-
-    Args:
-        device (qml.devices.Device)
-        shots (qml.measurements.Shots)
-    """
-
-    def __init__(self, device, shots: qml.measurements.Shots):
-        self._parent_qreg = None
-        super().__init__(device, shots)
-
-    def setup(self):
-        """Initialize the stateref."""
-        if self.stateref is None:
-            self.stateref = {"qreg": self._parent_qreg, "wire_map": {}}
-
-    def cleanup(self):
-        """Reinsert extracted qubits."""
-        for orig_wire, wire in self.wire_map.items():
-            # pylint: disable=attribute-defined-outside-init
-            self.qreg = qinsert_p.bind(self.qreg, orig_wire, wire)
-
-    # pylint: disable=too-many-branches
-    def eval(self, jaxpr: "jax.core.Jaxpr", consts: Sequence, *args) -> list:
-        """Evaluate a jaxpr.
-
-        Args:
-            jaxpr (jax.core.Jaxpr): the jaxpr to evaluate
-            consts (list[TensorLike]): the constant variables for the jaxpr
-            *args (tuple[TensorLike]): The arguments for the jaxpr.
-
-        Returns:
-            list[TensorLike]: the results of the execution.
-
-        """
-
-        # We assume we have at least one argument (the qreg)
-        assert len(args) > 0
-
-        self._parent_qreg = args[-1]
-
-        # Send the original args (without the qreg)
-        outvals = super().eval(jaxpr, consts, *args[:-1])
-
-        # Add the qreg to the output values
-        outvals = [*outvals, self.qreg]
-
-        self.stateref = None
-
-        return outvals
 
 
 # pylint: disable=too-many-positional-arguments
