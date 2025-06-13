@@ -33,18 +33,11 @@ set(DEPENDS
 add_mlir_library(${LIBRARY_NAME} STATIC ${SRC} LINK_LIBS PRIVATE ${LIBS} DEPENDS ${DEPENDS})
 target_compile_features(${LIBRARY_NAME} PUBLIC cxx_std_20)
 
-include(FetchContent)
-FetchContent_Declare(json
-    URL https://github.com/nlohmann/json/releases/download/v3.11.3/json.tar.xz
-    URL_HASH  SHA256=d6c65aca6b1ed68e7a182f4757257b107ae403032760ed6ef121c9d55e81757d
-    DOWNLOAD_EXTRACT_TIMESTAMP true
-    SYSTEM
-)
-FetchContent_MakeAvailable(json)
 target_link_libraries(${LIBRARY_NAME} 
     PRIVATE nlohmann_json::nlohmann_json
 )
 
+# Disable warning from json library
 if(CMAKE_CXX_COMPILER_ID MATCHES ".*Clang")
 set_source_files_properties(
     CountPPMSpecs.cpp
