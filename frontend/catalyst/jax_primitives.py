@@ -338,6 +338,19 @@ def subroutine(func):
     """
     from catalyst.tracing.contexts import EvaluationContext
 
+    old_pjit = jax._src.pjit.pjit_p
+
+    @functools.wraps(func)
+    def inside(*args, **kwargs):
+        with Patcher(
+            (
+                jax._src.pjit,
+                "pjit_p",
+                old_pjit,
+            ),
+        ):
+            return func(*args, **kwargs)
+
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         with Patcher(
@@ -347,7 +360,7 @@ def subroutine(func):
                 quantum_subroutine_p,
             ),
         ):
-            return jax.jit(func)(*args, **kwargs)
+            return jax.jit(inside)(*args, **kwargs)
 
     return wrapper
 

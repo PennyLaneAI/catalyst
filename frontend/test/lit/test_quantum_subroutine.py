@@ -98,3 +98,33 @@ def test_quantum_subroutine_gate_param_param():
 
 
 test_quantum_subroutine_gate_param_param()
+
+def test_quantum_subroutine_with_control_flow():
+
+    import catalyst
+
+    qml.capture.enable()
+
+    @subroutine
+    def conditional_RX(param: float):
+
+        def true_path():
+            qml.RX(param, wires=[0])
+
+        def false_path():
+            ...
+
+        qml.cond(param != 0., true_path, false_path)()
+
+
+    @qml.qjit(autograph=False)
+    @qml.qnode(qml.device("lightning.qubit", wires=1), autograph=False)
+    def subroutine_test_3():
+        conditional_RX(3.14)
+        return qml.probs()
+
+    print(subroutine_test_3.mlir)
+    qml.capture.disable()
+
+test_quantum_subroutine_with_control_flow()
+
