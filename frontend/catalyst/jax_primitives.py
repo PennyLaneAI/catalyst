@@ -15,6 +15,7 @@
 of quantum operations, measurements, and observables to JAXPR.
 """
 
+import functools
 import sys
 from dataclasses import dataclass
 from enum import Enum
@@ -139,13 +140,13 @@ class AbstractQbit(AbstractValue):
         return self.hash_value
 
 
-class ConcreteQbit(AbstractQbit):
+class ConcreteQbit:
     """Concrete Qbit."""
 
 
 def _qbit_lowering(aval):
     assert isinstance(aval, AbstractQbit)
-    return (ir.OpaqueType.get("quantum", "bit"),)
+    return ir.OpaqueType.get("quantum", "bit")
 
 
 #
@@ -163,13 +164,13 @@ class AbstractQreg(AbstractValue):
         return self.hash_value
 
 
-class ConcreteQreg(AbstractQreg):
+class ConcreteQreg:
     """Concrete quantum register."""
 
 
 def _qreg_lowering(aval):
     assert isinstance(aval, AbstractQreg)
-    return (ir.OpaqueType.get("quantum", "reg"),)
+    return ir.OpaqueType.get("quantum", "reg")
 
 
 #
@@ -306,6 +307,65 @@ quantum_kernel_p = core.CallPrimitive("quantum_kernel")
 quantum_kernel_p.multiple_results = True
 measure_in_basis_p = Primitive("measure_in_basis")
 measure_in_basis_p.multiple_results = True
+
+import copy
+
+from jax._src.pjit import _pjit_lowering
+from jax.experimental.pjit import pjit_p
+
+from catalyst.utils.patching import Patcher
+
+quantum_subroutine_p = copy.deepcopy(pjit_p)
+quantum_subroutine_p.name = "quantum_subroutine_p"
+
+subroutine_cache: dict[callable, callable] = {}
+
+
+def subroutine(func):
+    """TODO:
+
+    This is technical debt. pjit_p is the only primitive that will not hoist
+    jaxpr_consts outside of its definition. Here, we are creating a new primitive
+    called quantum_subroutine_p that is essentially equivalent to pjit_p.
+
+    The problem with this approach is that it will also change the definitions of jax.jit
+    which may be purely classical. The best solutions would be to have two primitives.
+
+    But in order to have two primitives, we would need to replace pjit_p selectively,
+    depending on whether or not we are inside of a qml.qjit context. This would involve
+    rewriting some methods inside JAX or copying them and modifying that one key aspect.
+
+    I, @erick-xanadu, am currently unsure about what is the best way to do this.
+    Maybe this is sufficiently good?
+    """
+    from catalyst.tracing.contexts import EvaluationContext
+
+    old_pjit = jax._src.pjit.pjit_p
+
+    @functools.wraps(func)
+    def inside(*args, **kwargs):
+        with Patcher(
+            (
+                jax._src.pjit,
+                "pjit_p",
+                old_pjit,
+            ),
+        ):
+            return func(*args, **kwargs)
+
+    @functools.wraps(inside)
+    def wrapper(*args, **kwargs):
+
+        with Patcher(
+            (
+                jax._src.pjit,
+                "pjit_p",
+                quantum_subroutine_p,
+            ),
+        ):
+            return jax.jit(inside)(*args, **kwargs)
+
+    return wrapper
 
 
 def _assert_jaxpr_without_constants(jaxpr: ClosedJaxpr):
@@ -2333,6 +2393,11 @@ def _cos_lowering2(ctx, x, accuracy):
     return _nary_lower_hlo(hlo.cosine, ctx, x, accuracy=accuracy)
 
 
+def subroutine_lowering(*args, **kwargs):
+    retval = _pjit_lowering(*args, **kwargs)
+    return retval
+
+
 CUSTOM_LOWERING_RULES = (
     (zne_p, _zne_lowering),
     (device_init_p, _device_init_lowering),
@@ -2374,6 +2439,7 @@ CUSTOM_LOWERING_RULES = (
     (sin_p, _sin_lowering2),
     (cos_p, _cos_lowering2),
     (quantum_kernel_p, _quantum_kernel_lowering),
+    (quantum_subroutine_p, subroutine_lowering),
     (measure_in_basis_p, _measure_in_basis_lowering),
 )
 
@@ -2387,3 +2453,5 @@ def _scalar_abstractify(t):
 
 pytype_aval_mappings[type] = _scalar_abstractify
 pytype_aval_mappings[jax._src.numpy.scalar_types._ScalarMeta] = _scalar_abstractify
+pytype_aval_mappings[ConcreteQbit] = lambda _: AbstractQbit()
+pytype_aval_mappings[ConcreteQreg] = lambda _: AbstractQreg()
