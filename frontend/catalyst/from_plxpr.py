@@ -309,7 +309,7 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         self.shots = shots
         self.wire_map = {}
         self.qreg = qreg
-        self.actualize = True
+        self.actualized = True
         super().__init__()
 
     def get_wire(self, wire_value) -> AbstractQbit:
