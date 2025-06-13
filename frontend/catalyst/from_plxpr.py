@@ -778,13 +778,20 @@ def handle_for_loop(
 
     consts = plxpr_invals[consts_slice]
 
-    # Convert for loop body from plxpr to Catalyst jaxpr
-    converted_func = partial(
-        BranchPlxprInterpreter(self.device, self.shots).eval,
-        jaxpr_body_fn,
-        consts,
-    )
-    converted_jaxpr_branch = jax.make_jaxpr(converted_func)(*start_plus_args_plus_qreg).jaxpr
+    def flat_fun(*args):
+        jaxpr = ClosedJaxpr(jaxpr_body_fn, consts)
+        return jaxpr_as_fun(jaxpr)(*args)
+
+    def calling_convention(*args_plus_qreg):
+        *args, qreg = args_plus_qreg
+        device = self.device
+        shots = self.shots
+        converter = PLxPRToQuantumJaxprInterpreter(device, shots, qreg)
+        retvals = converter(flat_fun, *args)
+        converter.actualize_qreg()
+        return *retvals, converter.qreg
+
+    converted_jaxpr_branch = jax.make_jaxpr(calling_convention)(*start_plus_args_plus_qreg).jaxpr
     converted_closed_jaxpr_branch = ClosedJaxpr(convert_constvars_jaxpr(converted_jaxpr_branch), ())
 
     # Build Catalyst compatible input values
