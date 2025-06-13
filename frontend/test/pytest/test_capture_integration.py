@@ -96,7 +96,6 @@ def is_controlled_pushed_back(mlir, non_controlled_string, controlled_string):
     return controlled_string in remaining_mlir
 
 
-
 # pylint: disable=too-many-public-methods
 class TestCapture:
     """Integration tests for Catalyst adjoint functionality."""
