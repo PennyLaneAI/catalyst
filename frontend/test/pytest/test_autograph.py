@@ -62,7 +62,7 @@ class Failing:
     In such cases autograph would raise a warning.
 
     We want to test that this warning is properly raised, but if we use an actual error to trigger
-    the autograph fallback, the pytest would fail. Therefore, we manually raise an exception.
+    the autograph fallback, the fallback would also fail. Therefore, we raise an exception in a controlled fashion.
 
     This Failing class has a class-level dictionary to keep track of what labels it has already
     seen. When it sees a new label for the first time, it raises an exception. In all other cases,
