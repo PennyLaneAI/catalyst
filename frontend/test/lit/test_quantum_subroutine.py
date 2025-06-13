@@ -174,3 +174,24 @@ def test_nested_subroutine_call():
     qml.capture.disable()
 
 test_nested_subroutine_call()
+
+def test_two_callsites():
+
+    qml.capture.enable()
+
+    # CHECK: func.func private @identity()
+    # CHECK-NOT: func.func private @identity()
+    @subroutine
+    def identity(): ...
+
+    @qml.qjit(autograph=False)
+    def subroutine_test_5():
+        identity()
+        identity()
+
+    print(subroutine_test_5.mlir)
+    qml.capture.disable()
+
+test_two_callsites()
+
+
