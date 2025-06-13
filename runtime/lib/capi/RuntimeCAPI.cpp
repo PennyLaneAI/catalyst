@@ -389,9 +389,13 @@ void __catalyst__rt__qubit_release(QUBIT *qubit)
 
 static int __catalyst__rt__qubit_release_array__impl(QirArray *qubit_array)
 {
-    getQuantumDevicePtr()->ReleaseAllQubits();
+    //getQuantumDevicePtr()->ReleaseAllQubits();
     std::vector<QubitIdType> *qubit_array_ptr =
         reinterpret_cast<std::vector<QubitIdType> *>(qubit_array);
+    for (QubitIdType qubit : *qubit_array_ptr) {
+        std::cout << "releasing..." << "\n";
+        getQuantumDevicePtr()->ReleaseQubit(qubit);
+    }
     delete qubit_array_ptr;
     return 0;
 }
@@ -971,6 +975,7 @@ void __catalyst__qis__Probs(MemRefT_double_1d *result, int64_t numQubits, ...)
                              result_p->strides);
 
     if (wires.empty()) {
+        std::cout << "num wires at probs: " << __catalyst__rt__num_qubits() << "\n";
         getQuantumDevicePtr()->Probs(view);
     }
     else {
