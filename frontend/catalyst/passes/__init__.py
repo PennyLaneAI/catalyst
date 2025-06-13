@@ -50,6 +50,7 @@ __all__ = (
     "to_ppr",
     "commute_ppr",
     "cancel_inverses",
+    "get_ppm_spec",
     "ions_decomposition",
     "merge_rotations",
     "Pass",
@@ -59,5 +60,4 @@ __all__ = (
     "merge_ppr_ppm",
     "ppr_to_ppm",
     "ppm_compilation",
-    "get_ppm_spec",
 )

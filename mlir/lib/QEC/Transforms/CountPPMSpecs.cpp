@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#define DEBUG_TYPE "ppm_specs"
+#define DEBUG_TYPE "PPMSpecs"
 
 #include <algorithm>
 #include <string>
@@ -41,12 +41,45 @@ namespace qec {
 struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass> {
     using CountPPMSpecsPassBase::CountPPMSpecsPassBase;
 
-    void print_specs()
+    llvm::DenseMap<StringRef, int> countLogicalQubit(Operation *op,
+                                                     llvm::DenseMap<StringRef, int> PPMSpecs)
     {
-        llvm::BumpPtrAllocator string_allocator;
-        llvm::DenseMap<StringRef, int> PPM_Specs;
-        PPM_Specs["num_logical_qubits"] = 0;
-        PPM_Specs["num_of_ppm"] = 0;
+        uint64_t numQubits = cast<quantum::AllocOp>(op).getNqubitsAttr().value_or(0);
+        assert(numQubits != 0 && "PPM specs with dynamic number of qubits is not implemented");
+        PPMSpecs["num_logical_qubits"] = numQubits;
+        return PPMSpecs;
+    }
+    llvm::DenseMap<StringRef, int> countPPR(Operation *op, llvm::DenseMap<StringRef, int> PPMSpecs,
+                                            llvm::BumpPtrAllocator *stringAllocator)
+    {
+        int16_t rotationKind =
+            cast<qec::PPRotationOp>(op).getRotationKindAttr().getValue().getZExtValue();
+        auto PauliProductAttr = cast<qec::PPRotationOp>(op).getPauliProductAttr();
+        if (rotationKind) {
+            llvm::StringSaver saver(*stringAllocator);
+            StringRef numRotationKindKey =
+                saver.save("num_pi" + std::to_string(abs(rotationKind)) + "_gates");
+            StringRef maxWeightRotationKindKey =
+                saver.save("max_weight_pi" + std::to_string(abs(rotationKind)));
+
+            if (PPMSpecs.find(llvm::StringRef(numRotationKindKey)) == PPMSpecs.end()) {
+                PPMSpecs[numRotationKindKey] = 1;
+                PPMSpecs[maxWeightRotationKindKey] = static_cast<int>(PauliProductAttr.size());
+            }
+            else {
+                PPMSpecs[numRotationKindKey]++;
+                PPMSpecs[maxWeightRotationKindKey] = std::max(
+                    PPMSpecs[maxWeightRotationKindKey], static_cast<int>(PauliProductAttr.size()));
+            }
+        }
+        return PPMSpecs;
+    }
+    void printSpecs()
+    {
+        llvm::BumpPtrAllocator stringAllocator;
+        llvm::DenseMap<StringRef, int> PPMSpecs;
+        PPMSpecs["num_logical_qubits"] = 0;
+        PPMSpecs["num_of_ppm"] = 0;
 
         // Walk over all operations in the IR (could be ModuleOp or FuncOp)
         getOperation()->walk([&](Operation *op) {
@@ -55,48 +88,25 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
                 return;
 
             if (isa<quantum::AllocOp>(op)) {
-                uint64_t num_qubits = cast<quantum::AllocOp>(op).getNqubitsAttr().value_or(0);
-                assert(num_qubits != 0 &&
-                       "PPM specs with dynamic number of qubits is not implemented");
-                PPM_Specs["num_logical_qubits"] = num_qubits;
+                PPMSpecs = countLogicalQubit(op, PPMSpecs);
             }
 
             else if (isa<qec::PPMeasurementOp>(op)) {
-                PPM_Specs["num_of_ppm"]++;
+                PPMSpecs["num_of_ppm"]++;
             }
 
             else if (isa<qec::PPRotationOp>(op)) {
-                int16_t rotation_kind =
-                    cast<qec::PPRotationOp>(op).getRotationKindAttr().getValue().getZExtValue();
-                auto pauli_product_attr = cast<qec::PPRotationOp>(op).getPauliProductAttr();
-                if (rotation_kind) {
-                    llvm::StringSaver saver(string_allocator);
-                    StringRef num_pi_key =
-                        saver.save("num_pi" + std::to_string(abs(rotation_kind)) + "_gates");
-                    StringRef max_weight_pi_key =
-                        saver.save("max_weight_pi" + std::to_string(abs(rotation_kind)));
-
-                    if (PPM_Specs.find(llvm::StringRef(num_pi_key)) == PPM_Specs.end()) {
-                        PPM_Specs[num_pi_key] = 1;
-                        PPM_Specs[max_weight_pi_key] = static_cast<int>(pauli_product_attr.size());
-                    }
-                    else {
-                        PPM_Specs[num_pi_key]++;
-                        PPM_Specs[max_weight_pi_key] =
-                            std::max(PPM_Specs[max_weight_pi_key],
-                                     static_cast<int>(pauli_product_attr.size()));
-                    }
-                }
+                PPMSpecs = countPPR(op, PPMSpecs, &stringAllocator);
             }
         });
 
-        json PPM_Specs_Json = PPM_Specs;
-        llvm::outs() << PPM_Specs_Json.dump(4)
+        json PPMSpecsJson = PPMSpecs;
+        llvm::outs() << PPMSpecsJson.dump(4)
                      << "\n"; // dump(4) makes an indent with 4 spaces when printing JSON
         return;
     }
 
-    void runOnOperation() final { print_specs(); }
+    void runOnOperation() final { printSpecs(); }
 };
 
 } // namespace qec
