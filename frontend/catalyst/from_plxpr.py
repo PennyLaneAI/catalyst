@@ -289,15 +289,11 @@ class SubroutineInterpreter(PlxprInterpreter):
 
     def __getattr__(self, key):
         if key in {"qreg", "wire_map"}:
-            if self.stateref is None:
-                raise AttributeError("execution is not yet initialized.")
             return self.stateref[key]
         raise AttributeError(f"no attribute {key}")
 
     def __setattr__(self, __name: str, __value) -> None:
         if __name in {"qreg", "wire_map"}:
-            if self.stateref is None:
-                raise AttributeError("execution is not yet initialized.")
             self.stateref[__name] = __value
         else:
             super().__setattr__(__name, __value)
