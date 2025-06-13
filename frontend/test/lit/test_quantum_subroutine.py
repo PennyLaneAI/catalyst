@@ -105,6 +105,19 @@ def test_quantum_subroutine_with_control_flow():
 
     qml.capture.enable()
 
+    # CHECK: func.func private @conditional_RX([[QREG:%.+]]: !quantum.reg, [[PARAM_TENSOR:%.+]]: tensor<f64>) 
+    # CHECK-NEXT: [[ZERO:%.+]] = stablehlo.constant dense<0.000000e+00> : tensor<f64>
+    # CHECK-NEXT: [[COND_TENSOR:%.+]] = stablehlo.compare  NE, [[PARAM_TENSOR]], [[ZERO]],  FLOAT : (tensor<f64>, tensor<f64>) -> tensor<i1>
+    # CHECK-NEXT: [[COND:%.+]] = tensor.extract [[COND_TENSOR]][] : tensor<i1>
+    # CHECK-NEXT: [[RETVAL:%.+]] = scf.if [[COND]]
+    # CHECK-DAG:        [[QUBIT:%.+]] = quantum.extract [[QREG]][ 0] : !quantum.reg -> !quantum.bit
+    # CHECK-DAG:        [[PARAM:%.+]] = tensor.extract [[PARAM_TENSOR]][] : tensor<f64>
+    # CHECK:            [[QUBIT_0:%.+]] = quantum.custom "RX"([[PARAM]]) [[QUBIT]] : !quantum.bit
+    # CHECK-NEXT:       [[QREG_0:%.+]] = quantum.insert [[QREG]][ 0], [[QUBIT_0]] : !quantum.reg, !quantum.bit
+    # CHECK-NEXT:       scf.yield [[QREG_0]] : !quantum.reg
+    # CHECK-NEXT: else
+    # CHECK:            scf.yield [[QREG]] : !quantum.reg
+    # CHECK:      return [[RETVAL]]
     @subroutine
     def conditional_RX(param: float):
 
