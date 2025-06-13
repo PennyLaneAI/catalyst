@@ -318,6 +318,8 @@ from catalyst.utils.patching import Patcher
 quantum_subroutine_p = copy.deepcopy(pjit_p)
 quantum_subroutine_p.name = "quantum_subroutine_p"
 
+subroutine_cache: dict[callable, callable] = {}
+
 
 def subroutine(func):
     """TODO:
@@ -351,8 +353,9 @@ def subroutine(func):
         ):
             return func(*args, **kwargs)
 
-    @functools.wraps(func)
+    @functools.wraps(inside)
     def wrapper(*args, **kwargs):
+
         with Patcher(
             (
                 jax._src.pjit,

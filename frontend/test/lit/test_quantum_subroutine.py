@@ -99,13 +99,14 @@ def test_quantum_subroutine_gate_param_param():
 
 test_quantum_subroutine_gate_param_param()
 
+
 def test_quantum_subroutine_with_control_flow():
 
     import catalyst
 
     qml.capture.enable()
 
-    # CHECK: func.func private @conditional_RX([[QREG:%.+]]: !quantum.reg, [[PARAM_TENSOR:%.+]]: tensor<f64>) 
+    # CHECK: func.func private @conditional_RX([[QREG:%.+]]: !quantum.reg, [[PARAM_TENSOR:%.+]]: tensor<f64>)
     # CHECK-NEXT: [[ZERO:%.+]] = stablehlo.constant dense<0.000000e+00> : tensor<f64>
     # CHECK-NEXT: [[COND_TENSOR:%.+]] = stablehlo.compare  NE, [[PARAM_TENSOR]], [[ZERO]],  FLOAT : (tensor<f64>, tensor<f64>) -> tensor<i1>
     # CHECK-NEXT: [[COND:%.+]] = tensor.extract [[COND_TENSOR]][] : tensor<i1>
@@ -124,11 +125,9 @@ def test_quantum_subroutine_with_control_flow():
         def true_path():
             qml.RX(param, wires=[0])
 
-        def false_path():
-            ...
+        def false_path(): ...
 
-        qml.cond(param != 0., true_path, false_path)()
-
+        qml.cond(param != 0.0, true_path, false_path)()
 
     @qml.qjit(autograph=False)
     @qml.qnode(qml.device("lightning.qubit", wires=1), autograph=False)
@@ -139,13 +138,15 @@ def test_quantum_subroutine_with_control_flow():
     print(subroutine_test_3.mlir)
     qml.capture.disable()
 
+
 test_quantum_subroutine_with_control_flow()
+
 
 def test_nested_subroutine_call():
 
     qml.capture.enable()
 
-    # CHECK: func.func private @Hadamard_caller([[QREG:%.+]]: !quantum.reg) -> !quantum.reg 
+    # CHECK: func.func private @Hadamard_caller([[QREG:%.+]]: !quantum.reg) -> !quantum.reg
     # CHECK-NEXT: [[QREG_1:%.+]] = call @Hadamard_subroutine([[QREG]]) : (!quantum.reg) -> !quantum.reg
     # CHECK-NEXT: return [[QREG_1]]
 
@@ -163,7 +164,6 @@ def test_nested_subroutine_call():
     def Hadamard_caller():
         Hadamard_subroutine()
 
-
     @qml.qjit(autograph=False)
     @qml.qnode(qml.device("lightning.qubit", wires=1), autograph=False)
     def subroutine_test_4():
@@ -173,7 +173,9 @@ def test_nested_subroutine_call():
     print(subroutine_test_4.mlir)
     qml.capture.disable()
 
+
 test_nested_subroutine_call()
+
 
 def test_two_callsites():
 
@@ -192,6 +194,27 @@ def test_two_callsites():
     print(subroutine_test_5.mlir)
     qml.capture.disable()
 
+
 test_two_callsites()
 
 
+def test_two_callsites_quantum():
+
+    qml.capture.enable()
+
+    # CHECK-NOT: func.func private @identity_0
+    @subroutine
+    def identity(): ...
+
+    @qml.qjit(autograph=False)
+    @qml.qnode(qml.device("lightning.qubit", wires=1), autograph=False)
+    def subroutine_test_6():
+        identity()
+        identity()
+        return qml.probs()
+
+    print(subroutine_test_6.mlir)
+    qml.capture.disable()
+
+
+test_two_callsites_quantum()
