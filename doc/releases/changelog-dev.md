@@ -351,6 +351,10 @@
   For measurements whose shapes depend on the number of qubits, they now properly retrieve the
   number of qubits through this new operation when it is dynamic.
 
+* Refactored PPR/PPM pass names from snake_case to kebab-case in MLIR passes to align with MLIR conventions.
+  Class names and tests were updated accordingly. Example: `--to_ppr` is now `--to-ppr`.
+  [(#1802)](https://github.com/PennyLaneAI/catalyst/pull/1802)
+
 <h3>Documentation 📝</h3>
 
 * The header (logo+title) images in the README and in the overview on RtD have been updated,
