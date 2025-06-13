@@ -282,5 +282,4 @@ def BufferDeallocation : Pass<"buffer-deallocation", "func::FuncOp"> {
   let constructor = "mlir::bufferization::createBufferDeallocationPass()";
 }
 
-
 #endif // CATALYST_PASSES
