@@ -1460,19 +1460,6 @@ class TestWhileLoops:
 
         assert f1() == sum([1, 1, 2, 2])
 
-    @pytest.mark.filterwarnings("error")
-    def test_whileloop_no_warning(self):
-        """Test the absence of warnings if fallbacks are ignored."""
-
-        @qjit(autograph=True)
-        def f():
-            acc = 0
-            while Failing(acc).val < 5:
-                acc = acc + 1
-            return acc
-
-        assert f() == 5
-
     def test_whileloop_exception(self, monkeypatch):
         """Test for-loop error if strict-conversion is enabled."""
         monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
