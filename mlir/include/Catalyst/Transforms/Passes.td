@@ -282,4 +282,10 @@ def BufferDeallocation : Pass<"buffer-deallocation", "func::FuncOp"> {
   let constructor = "mlir::bufferization::createBufferDeallocationPass()";
 }
 
+def DecomposePass : Pass<"decompose"> {
+    let summary = "A prototype for graph-based decomposition pass.";
+
+    let constructor = "catalyst::createDecomposePass()";
+}
+
 #endif // CATALYST_PASSES
