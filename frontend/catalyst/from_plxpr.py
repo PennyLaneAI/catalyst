@@ -184,10 +184,33 @@ def handle_qnode(
     consts = args[:n_consts]
     non_const_args = args[n_consts:]
 
-    f = partial(QFuncPlxprInterpreter(device, shots).eval, qfunc_jaxpr, consts)
+    def flat_fun(*args):
+        closed_jaxpr = ClosedJaxpr(qfunc_jaxpr, consts)
+        return jaxpr_as_fun(closed_jaxpr)(*args)
+
+    def extract_shots_value(shots: qml.measurements.Shots | int):
+        """Extract the shots value according to the type"""
+        if isinstance(shots, int):
+            return shots
+
+        assert isinstance(shots, qml.measurements.Shots)
+
+        return shots.total_shots if shots else 0
+
+    shots = extract_shots_value(shots)
+
+    def calling_convention(*args):
+        device_init_p.bind(
+            shots,
+            auto_qubit_management=(device.wires is None),
+            **_get_device_kwargs(device),
+        )
+        qreg = qalloc_p.bind(len(device.wires))
+        converter = PLxPRToQuantumJaxprInterpreter(device, shots, qreg)
+        return converter(flat_fun, *args)
 
     return quantum_kernel_p.bind(
-        wrap_init(f, debug_info=qfunc_jaxpr.debug_info),
+        wrap_init(calling_convention, debug_info=qfunc_jaxpr.debug_info),
         *non_const_args,
         qnode=qnode,
         pipeline=self._pass_pipeline,
