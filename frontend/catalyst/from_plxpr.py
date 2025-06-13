@@ -15,8 +15,8 @@
 This submodule defines a utility for converting plxpr into Catalyst jaxpr.
 """
 # pylint: disable=protected-access
-from functools import partial, wraps
-from typing import Callable, Sequence
+from functools import partial
+from typing import Callable
 
 import jax
 import jax.core
@@ -207,7 +207,11 @@ def handle_qnode(
         )
         qreg = qalloc_p.bind(len(device.wires))
         converter = PLxPRToQuantumJaxprInterpreter(device, shots, qreg)
-        return converter(flat_fun, *args)
+        retvals = converter(flat_fun, *args)
+        #converter.actualize_qreg()
+        qdealloc_p.bind(converter.qreg)
+        device_release_p.bind()
+        return retvals
 
     return quantum_kernel_p.bind(
         wrap_init(calling_convention, debug_info=qfunc_jaxpr.debug_info),
