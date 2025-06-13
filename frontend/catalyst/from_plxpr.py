@@ -847,9 +847,16 @@ def handle_while_loop(
 
     # So let's just remove the quantum register here at the end
 
+    def flat_fun(*args):
+        jaxpr = ClosedJaxpr(jaxpr_cond_fn, consts_cond)
+        return jaxpr_as_fun(jaxpr)(*args)
+
     def remove_qreg(*args_plus_qreg):
-        args = args_plus_qreg[:-1]
-        return jaxpr_as_fun(ClosedJaxpr(jaxpr_cond_fn, consts_cond))(*args)
+        *args, qreg = args_plus_qreg
+        device = self.device
+        shots = self.shots
+        converter = PLxPRToQuantumJaxprInterpreter(device, shots, qreg)
+        return converter(flat_fun, *args)
 
     converted_cond_jaxpr_branch = jax.make_jaxpr(remove_qreg)(*args_plus_qreg).jaxpr
     converted_cond_closed_jaxpr_branch = ClosedJaxpr(
