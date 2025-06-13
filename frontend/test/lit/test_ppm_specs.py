@@ -22,7 +22,14 @@ are correctly lowered."""
 import pennylane as qml
 
 from catalyst import measure, qjit
-from catalyst.passes import commute_ppr, merge_ppr_ppm, ppm_compilation, ppr_to_ppm, to_ppr, get_ppm_spec
+from catalyst.passes import (
+    commute_ppr,
+    get_ppm_spec,
+    merge_ppr_ppm,
+    ppm_compilation,
+    ppr_to_ppm,
+    to_ppr,
+)
 
 
 def test_convert_clifford_to_ppr():
@@ -44,6 +51,7 @@ def test_convert_clifford_to_ppr():
         return measure(0)
 
     print(get_ppm_spec(circuit))
+
 
 # CHECK: {'circuit_0': {'max_weight_pi4': 2, 'max_weight_pi8': 1, 'num_logical_qubits': 2, 'num_of_ppm': 1, 'num_pi4_gates': 7, 'num_pi8_gates': 1}}
 test_convert_clifford_to_ppr()
@@ -70,6 +78,7 @@ def test_commute_ppr():
         return measure(0), measure(1)
 
     print(get_ppm_spec(cir_commute_ppr))
+
 
 # CHECK: {'cir_commute_ppr_0': {'max_weight_pi4': 2, 'max_weight_pi8': 1, 'num_logical_qubits': 2, 'num_of_ppm': 2, 'num_pi4_gates': 7, 'num_pi8_gates': 2}}
 test_commute_ppr()
@@ -99,6 +108,7 @@ def test_commute_ppr_max_pauli_size():
 
     print(get_ppm_spec(cir_commute_ppr_max_pauli_size))
 
+
 # CHECK: {'cir_commute_ppr_max_pauli_size_0': {'max_weight_pi4': 2, 'max_weight_pi8': 2, 'num_logical_qubits': 2, 'num_of_ppm': 2, 'num_pi4_gates': 10, 'num_pi8_gates': 3}}
 test_commute_ppr_max_pauli_size()
 
@@ -122,6 +132,7 @@ def test_merge_ppr_ppm():
         return measure(0), measure(1)
 
     print(get_ppm_spec(cir_merge_ppr_ppm))
+
 
 # CHECK: {'cir_merge_ppr_ppm_0': {'num_logical_qubits': 2, 'num_of_ppm': 2}}
 test_merge_ppr_ppm()
@@ -147,6 +158,7 @@ def test_merge_ppr_ppm_max_pauli_size():
         return measure(0), measure(1)
 
     print(get_ppm_spec(cir_merge_ppr_ppm_max_pauli_size))
+
 
 # CHECK: {'cir_merge_ppr_ppm_max_pauli_size_0': {'max_weight_pi4': 2, 'max_weight_pi8': 1, 'num_logical_qubits': 2, 'num_of_ppm': 2, 'num_pi4_gates': 3, 'num_pi8_gates': 2}}
 test_merge_ppr_ppm_max_pauli_size()
@@ -181,6 +193,7 @@ def test_ppr_to_ppm():
         return cir_default(), cir_inject_magic_state()
 
     print(get_ppm_spec(circuit_ppr_to_ppm))
+
 
 # CHECK: {'cir_default_0': {'max_weight_pi2': 1, 'num_logical_qubits': 2, 'num_of_ppm': 2, 'num_pi2_gates': 1}, 'cir_inject_magic_state_0': {'max_weight_pi2': 2, 'num_logical_qubits': 2, 'num_of_ppm': 10, 'num_pi2_gates': 5}}
 test_ppr_to_ppm()
@@ -225,5 +238,6 @@ def test_clifford_to_ppm():
 
     print(get_ppm_spec(test_clifford_to_ppm_workflow))
 
-# CHECK: meow {'cir_clifford_to_ppm_0': {'max_weight_pi2': 2, 'num_logical_qubits': 2, 'num_of_ppm': 8, 'num_pi2_gates': 2}, 'cir_clifford_to_ppm_with_params_0': {'max_weight_pi2': 2, 'num_logical_qubits': 5, 'num_of_ppm': 119, 'num_pi2_gates': 57}}
+
+# CHECK: {'cir_clifford_to_ppm_0': {'max_weight_pi2': 2, 'num_logical_qubits': 2, 'num_of_ppm': 8, 'num_pi2_gates': 2}, 'cir_clifford_to_ppm_with_params_0': {'max_weight_pi2': 2, 'num_logical_qubits': 5, 'num_of_ppm': 119, 'num_pi2_gates': 57}}
 test_clifford_to_ppm()
