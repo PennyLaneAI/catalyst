@@ -15,14 +15,14 @@
 This submodule defines a utility for converting plxpr into Catalyst jaxpr.
 """
 # pylint: disable=protected-access
-from functools import partial
+from functools import partial, wraps
 from typing import Callable, Sequence
 
 import jax
 import jax.core
 import jax.numpy as jnp
 import pennylane as qml
-from jax.extend.core import ClosedJaxpr, Jaxpr
+from jax.extend.core import ClosedJaxpr, Jaxpr, jaxpr_as_fun
 from jax.extend.linear_util import wrap_init
 from jax.interpreters.partial_eval import convert_constvars_jaxpr
 from pennylane.capture import PlxprInterpreter, qnode_prim
@@ -675,12 +675,17 @@ def handle_while_loop(
     )
 
     # Convert for condition from plxpr to Catalyst jaxpr
-    converted_cond_func = partial(
-        PredicatePlxprInterpreter().eval,
-        jaxpr_cond_fn,
-        consts_cond,
-    )
-    converted_cond_jaxpr_branch = jax.make_jaxpr(converted_cond_func)(*args_plus_qreg).jaxpr
+    # We need to be able to handle arbitrary plxpr here.
+    # But we want to be able to create a state where:
+    # * We do not pass the quantum register as an argument.
+
+    # So let's just remove the quantum register here at the end
+
+    def remove_qreg(*args_plus_qreg):
+        args = args_plus_qreg[:-1]
+        return jaxpr_as_fun(ClosedJaxpr(jaxpr_cond_fn, consts_cond))(*args)
+
+    converted_cond_jaxpr_branch = jax.make_jaxpr(remove_qreg)(*args_plus_qreg).jaxpr
     converted_cond_closed_jaxpr_branch = ClosedJaxpr(
         convert_constvars_jaxpr(converted_cond_jaxpr_branch), ()
     )
@@ -806,34 +811,6 @@ class BranchPlxprInterpreter(QFuncPlxprInterpreter):
         outvals = [*outvals, self.qreg]
 
         self.stateref = None
-
-        return outvals
-
-
-class PredicatePlxprInterpreter(PlxprInterpreter):
-    """An interpreter that converts a plxpr predicate into catalyst-variant jaxpr branch."""
-
-    # pylint: disable=too-many-branches
-    def eval(self, jaxpr: "jax.core.Jaxpr", consts: Sequence, *args) -> list:
-        """Evaluate a jaxpr.
-
-        Args:
-            jaxpr (jax.core.Jaxpr): the jaxpr to evaluate
-            consts (list[TensorLike]): the constant variables for the jaxpr
-            *args (tuple[TensorLike]): The arguments for the jaxpr.
-
-        Returns:
-            list[TensorLike]: the results of the execution.
-
-        In order to comply with the Catalyst jaxpr, the input vars include the qreg
-        although it is not used.
-        """
-
-        # We assume we have at least one argument (the qreg)
-        assert len(args) > 0
-
-        # Send the original args (without the qreg)
-        outvals = super().eval(jaxpr, consts, *args[:-1])
 
         return outvals
 
