@@ -267,6 +267,155 @@ for pl_transform, (pass_name, decomposition) in transforms_to_passes.items():
     register_transform(pl_transform, pass_name, decomposition)
 
 
+class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
+    """
+    Unlike the previous interpreters which modified the getattr and setattr
+    and maintained a stack of references to the quantum register to be used
+    as an access path in stack allocated objects, this translator receives
+    the qreg over which qubits will be taken and inserted into as a parameter
+    during initialization.
+    """
+
+    def __init__(self, device, shots, qreg):
+        self.device = device
+        self.shots = shots
+        self.wire_map = {}
+        self.qreg = qreg
+        self.actualize = True
+        super().__init__()
+
+    def get_wire(self, wire_value) -> AbstractQbit:
+        """Get the ``AbstractQbit`` corresponding to a wire value."""
+        if wire_value in self.wire_map:
+            return self.wire_map[wire_value]
+        self.actualized = False
+        return qextract_p.bind(self.qreg, wire_value)
+
+    def actualize_qreg(self):
+        """
+        Insert all end qubits back into a qreg,
+        and produce the product qreg jaxpr variable.
+        """
+        self.actualized = True
+        for orig_wire, wire in self.wire_map.items():
+            # Note: since `getattr` checks specifically for qreg, we can't
+            # define qreg inside the init function.
+            # pylint: disable-next=attribute-defined-outside-init
+            self.qreg = qinsert_p.bind(self.qreg, orig_wire, wire)
+
+    def interpret_operation(self, op):
+        """Re-bind a pennylane operation as a catalyst instruction."""
+
+        in_qubits = [self.get_wire(w) for w in op.wires]
+        out_qubits = qinst_p.bind(
+            *[*in_qubits, *op.data],
+            op=op.name,
+            qubits_len=len(op.wires),
+            params_len=len(op.data),
+            ctrl_len=0,
+            adjoint=False,
+        )
+        for wire_values, new_wire in zip(op.wires, out_qubits):
+            self.wire_map[wire_values] = new_wire
+
+        return out_qubits
+
+    def _obs(self, obs):
+        """Interpret the observable equation corresponding to a measurement equation's input."""
+        if obs.arithmetic_depth > 0:
+            raise NotImplementedError("operator arithmetic not yet supported for conversion.")
+        wires = [self.get_wire(w) for w in obs.wires]
+        return namedobs_p.bind(*wires, *obs.data, kind=obs.name)
+
+    def _compbasis_obs(self, *wires):
+        """Add a computational basis sampling observable."""
+        if wires:
+            qubits = [self.get_wire(w) for w in wires]
+            return compbasis_p.bind(*qubits)
+        else:
+            self.actualize_qreg()
+            return compbasis_p.bind(self.qreg, qreg_available=True)
+
+    def interpret_measurement(self, measurement):
+        """Rebind a measurement as a catalyst instruction."""
+        if type(measurement) not in measurement_map:
+            raise NotImplementedError(
+                f"measurement {measurement} not yet supported for conversion."
+            )
+
+        if measurement._eigvals is not None:
+            raise NotImplementedError(
+                "from_plxpr does not yet support measurements with manual eigvals."
+            )
+        if (
+            measurement.mv is not None
+            or measurement.obs is not None
+            and not isinstance(measurement.obs, qml.operation.Operator)
+        ):
+            raise NotImplementedError("Measurements of mcms are not yet supported.")
+
+        if measurement.obs:
+            obs = self._obs(measurement.obs)
+        else:
+            obs = self._compbasis_obs(*measurement.wires)
+
+        shape, dtype = measurement._abstract_eval(
+            n_wires=len(measurement.wires),
+            shots=self.device.shots.total_shots,
+            num_device_wires=len(self.device.wires),
+        )
+
+        prim = measurement_map[type(measurement)]
+        assert (
+            prim is not counts_p
+        ), "CountsMP returns a dictionary, which is not compatible with capture"
+        if prim is sample_p:
+            num_qubits = len(measurement.wires) or len(self.device.wires)
+            sample_shape = (self.shots, num_qubits)
+            dyn_dims, static_shape = jax._src.lax.lax._extract_tracers_dyn_shape(sample_shape)
+            mval = sample_p.bind(obs, *dyn_dims, static_shape=tuple(static_shape))
+        elif prim in {expval_p, var_p}:
+            mval = prim.bind(obs, shape=shape)
+        else:
+            dyn_dims, static_shape = jax._src.lax.lax._extract_tracers_dyn_shape(shape)
+            mval = prim.bind(obs, *dyn_dims, static_shape=tuple(static_shape))
+
+        # sample_p returns floats, so we need to converted it back to the expected integers here
+        if dtype != mval.dtype:
+            return jax.lax.convert_element_type(mval, dtype)
+        return mval
+
+    def _extract_shots_value(self, shots: qml.measurements.Shots | int):
+        """Extract the shots value according to the type"""
+        if isinstance(shots, int):
+            return shots
+
+        assert isinstance(shots, qml.measurements.Shots)
+
+        return shots.total_shots if shots else 0
+
+    def actualize_qreg(self):
+        """
+        Insert all end qubits back into a qreg,
+        and produce the product qreg jaxpr variable.
+        """
+        self.actualized = True
+        for orig_wire, wire in self.wire_map.items():
+            # Note: since `getattr` checks specifically for qreg, we can't
+            # define qreg inside the init function.
+            # pylint: disable-next=attribute-defined-outside-init
+            self.qreg = qinsert_p.bind(self.qreg, orig_wire, wire)
+
+    def __call__(self, fun, *args):
+        """
+        Execute this interpreter with this arguments.
+        We expect this to be a flat function (i.e., always takes *args as inputs
+        and no **kwargs) and the results is a sequence of values
+        """
+        jaxpr = jax.make_jaxpr(fun)(*args)
+        return self.eval(jaxpr.jaxpr, jaxpr.consts, *args)
+
+
 class SubroutineInterpreter(PlxprInterpreter):
     """Base interpreter for quantum operations.
 
@@ -281,8 +430,8 @@ class SubroutineInterpreter(PlxprInterpreter):
     """
 
     def __init__(self, device, shots: qml.measurements.Shots | int):
-        self._device = device
-        self._shots = self._extract_shots_value(shots)
+        self.device = device
+        self.shots = self._extract_shots_value(shots)
         self.stateref = None
         self.actualized = False
         super().__init__()
@@ -375,8 +524,8 @@ class SubroutineInterpreter(PlxprInterpreter):
 
         shape, dtype = measurement._abstract_eval(
             n_wires=len(measurement.wires),
-            shots=self._device.shots.total_shots,
-            num_device_wires=len(self._device.wires),
+            shots=self.device.shots.total_shots,
+            num_device_wires=len(self.device.wires),
         )
 
         prim = measurement_map[type(measurement)]
@@ -384,8 +533,8 @@ class SubroutineInterpreter(PlxprInterpreter):
             prim is not counts_p
         ), "CountsMP returns a dictionary, which is not compatible with capture"
         if prim is sample_p:
-            num_qubits = len(measurement.wires) or len(self._device.wires)
-            sample_shape = (self._shots, num_qubits)
+            num_qubits = len(measurement.wires) or len(self.device.wires)
+            sample_shape = (self.shots, num_qubits)
             dyn_dims, static_shape = jax._src.lax.lax._extract_tracers_dyn_shape(sample_shape)
             mval = sample_p.bind(obs, *dyn_dims, static_shape=tuple(static_shape))
         elif prim in {expval_p, var_p}:
@@ -453,11 +602,11 @@ class QFuncPlxprInterpreter(SubroutineInterpreter):
         """Initialize the stateref and bind the device."""
         if self.stateref is None:
             device_init_p.bind(
-                self._shots,
-                auto_qubit_management=(self._device.wires is None),
-                **_get_device_kwargs(self._device),
+                self.shots,
+                auto_qubit_management=(self.device.wires is None),
+                **_get_device_kwargs(self.device),
             )
-            self.stateref = {"qreg": qalloc_p.bind(len(self._device.wires)), "wire_map": {}}
+            self.stateref = {"qreg": qalloc_p.bind(len(self.device.wires)), "wire_map": {}}
 
     # pylint: disable=attribute-defined-outside-init
     def cleanup(self):
@@ -484,6 +633,7 @@ class QFuncPlxprInterpreter(SubroutineInterpreter):
         return PlxprInterpreter.eval(self, jaxpr, consts, *args)
 
 
+@PLxPRToQuantumJaxprInterpreter.register_primitive(qml.QubitUnitary._primitive)
 @QFuncPlxprInterpreter.register_primitive(qml.QubitUnitary._primitive)
 def handle_qubit_unitary(self, *invals, n_wires):
     """Handle the conversion from plxpr to Catalyst jaxpr for the QubitUnitary primitive"""
@@ -494,12 +644,14 @@ def handle_qubit_unitary(self, *invals, n_wires):
 
 
 # pylint: disable=unused-argument
+@PLxPRToQuantumJaxprInterpreter.register_primitive(qml.GlobalPhase._primitive)
 @QFuncPlxprInterpreter.register_primitive(qml.GlobalPhase._primitive)
 def handle_global_phase(self, phase, *wires, n_wires):
     """Handle the conversion from plxpr to Catalyst jaxpr for the GlobalPhase primitive"""
     gphase_p.bind(phase, ctrl_len=0, adjoint=False)
 
 
+@PLxPRToQuantumJaxprInterpreter.register_primitive(qml.BasisState._primitive)
 @QFuncPlxprInterpreter.register_primitive(qml.BasisState._primitive)
 def handle_basis_state(self, *invals, n_wires):
     """Handle the conversion from plxpr to Catalyst jaxpr for the BasisState primitive"""
@@ -515,6 +667,7 @@ def handle_basis_state(self, *invals, n_wires):
 
 
 # pylint: disable=unused-argument
+@PLxPRToQuantumJaxprInterpreter.register_primitive(qml.StatePrep._primitive)
 @QFuncPlxprInterpreter.register_primitive(qml.StatePrep._primitive)
 def handle_state_prep(self, *invals, n_wires, **kwargs):
     """Handle the conversion from plxpr to Catalyst jaxpr for the StatePrep primitive"""
@@ -532,6 +685,7 @@ def handle_state_prep(self, *invals, n_wires, **kwargs):
 
 
 # pylint: disable=unused-argument, too-many-arguments
+@PLxPRToQuantumJaxprInterpreter.register_primitive(plxpr_cond_prim)
 @QFuncPlxprInterpreter.register_primitive(plxpr_cond_prim)
 def handle_cond(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
     """Handle the conversion from plxpr to Catalyst jaxpr for the cond primitive"""
@@ -553,13 +707,23 @@ def handle_cond(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
             # Emit a new Catalyst jaxpr branch that simply returns a qreg
             converted_jaxpr_branch = jax.make_jaxpr(lambda x: x)(*args_plus_qreg).jaxpr
         else:
-            # Convert branch from plxpr to Catalyst jaxpr
-            converted_func = partial(
-                BranchPlxprInterpreter(self._device, self._shots).eval,
-                plxpr_branch,
-                branch_consts,
-            )
-            converted_jaxpr_branch = jax.make_jaxpr(converted_func)(*args_plus_qreg).jaxpr
+
+            def flat_fun(*args):
+                closed_jaxpr = ClosedJaxpr(plxpr_branch, branch_consts)
+                return jaxpr_as_fun(closed_jaxpr)(*args)
+
+            def calling_convention(*args_plus_qreg):
+                *args, qreg = args_plus_qreg
+                device = self.device
+                shots = self.shots
+                converter = PLxPRToQuantumJaxprInterpreter(device, shots, qreg)
+                retval = converter(flat_fun, *args)
+                # We need to define a subroutine interpreter here.
+                # That takes the qreg as an input.
+                converter.actualize_qreg()
+                return *retval, converter.qreg
+
+            converted_jaxpr_branch = jax.make_jaxpr(calling_convention)(*args_plus_qreg).jaxpr
 
         converted_jaxpr_branches.append(converted_jaxpr_branch)
 
@@ -588,6 +752,7 @@ def handle_cond(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
 
 
 # pylint: disable=unused-argument, too-many-arguments
+@PLxPRToQuantumJaxprInterpreter.register_primitive(plxpr_for_loop_prim)
 @QFuncPlxprInterpreter.register_primitive(plxpr_for_loop_prim)
 def handle_for_loop(
     self,
@@ -615,7 +780,7 @@ def handle_for_loop(
 
     # Convert for loop body from plxpr to Catalyst jaxpr
     converted_func = partial(
-        BranchPlxprInterpreter(self._device, self._shots).eval,
+        BranchPlxprInterpreter(self.device, self.shots).eval,
         jaxpr_body_fn,
         consts,
     )
@@ -647,6 +812,7 @@ def handle_for_loop(
 
 
 # pylint: disable=unused-argument, too-many-arguments
+@PLxPRToQuantumJaxprInterpreter.register_primitive(plxpr_while_loop_prim)
 @QFuncPlxprInterpreter.register_primitive(plxpr_while_loop_prim)
 def handle_while_loop(
     self,
@@ -665,7 +831,7 @@ def handle_while_loop(
 
     # Convert for while body from plxpr to Catalyst jaxpr
     converted_body_func = partial(
-        BranchPlxprInterpreter(self._device, self._shots).eval,
+        BranchPlxprInterpreter(self.device, self.shots).eval,
         jaxpr_body_fn,
         consts_body,
     )
@@ -712,6 +878,7 @@ def handle_while_loop(
     return outvals
 
 
+@PLxPRToQuantumJaxprInterpreter.register_primitive(plxpr_measure_prim)
 @QFuncPlxprInterpreter.register_primitive(plxpr_measure_prim)
 def handle_measure(self, wire, reset, postselect):
     """Handle the conversion from plxpr to Catalyst jaxpr for the mid-circuit measure primitive."""
@@ -737,6 +904,7 @@ def handle_measure(self, wire, reset, postselect):
 
 
 # pylint: disable=unused-argument, too-many-positional-arguments
+@PLxPRToQuantumJaxprInterpreter.register_primitive(plxpr_measure_in_basis_prim)
 @QFuncPlxprInterpreter.register_primitive(plxpr_measure_in_basis_prim)
 def handle_measure_in_basis(self, angle, wire, plane, reset, postselect):
     """Handle the conversion from plxpr to Catalyst jaxpr for the measure_in_basis primitive"""
