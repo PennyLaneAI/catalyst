@@ -177,18 +177,14 @@ class WorkflowInterpreter(PlxprInterpreter):
 
 # pylint: disable=unused-argument, too-many-arguments
 @WorkflowInterpreter.register_primitive(qnode_prim)
-def handle_qnode(
-    self, *args, qnode, shots, device, execution_config, qfunc_jaxpr, n_consts, batch_dims=None
-):
+def handle_qnode(self, *args, qnode, shots, device, execution_config, qfunc_jaxpr, batch_dims=None):
     """Handle the conversion from plxpr to Catalyst jaxpr for the qnode primitive"""
-    consts = args[:n_consts]
-    non_const_args = args[n_consts:]
 
-    f = partial(QFuncPlxprInterpreter(device, shots).eval, qfunc_jaxpr, consts)
+    f = partial(QFuncPlxprInterpreter(device, shots).eval, qfunc_jaxpr, [])
 
     return quantum_kernel_p.bind(
         wrap_init(f, debug_info=qfunc_jaxpr.debug_info),
-        *non_const_args,
+        *args,
         qnode=qnode,
         pipeline=self._pass_pipeline,
     )
@@ -319,7 +315,13 @@ class SubroutineInterpreter(PlxprInterpreter):
             # Note: since `getattr` checks specifically for qreg, we can't
             # define qreg inside the init function.
             # pylint: disable-next=attribute-defined-outside-init
-            self.qreg = qinsert_p.bind(self.qreg, orig_wire, wire)
+
+            # Lazy impl: just tie actualize to the global qreg
+            # Probably make this work with any qreg
+            # The idea is simple: we just keep track of all the qregs
+            # And there's no need to distinguish.
+            if orig_wire < len(self._device.wires):
+                self.qreg = qinsert_p.bind(self.qreg, orig_wire, wire)
 
     def interpret_operation(self, op):
         """Re-bind a pennylane operation as a catalyst instruction."""
@@ -486,6 +488,52 @@ class QFuncPlxprInterpreter(SubroutineInterpreter):
         added by the setup function.
         """
         return PlxprInterpreter.eval(self, jaxpr, consts, *args)
+
+
+@QFuncPlxprInterpreter.register_primitive(qml.allocation._get_allocate_prim())
+def handle_qml_alloc(self, *, num_wires, require_zeros=True):
+    """Handle the conversion from plxpr to Catalyst jaxpr for the qml.allocate primitive"""
+    num_qubits_global_qreg = len(self._device.wires)
+    new_qreg = qalloc_p.bind(num_wires)
+    # TODO: what if another qml.alloc is encountered when the previous one is not dealloced??
+    self.stateref["dyn_qreg"] = new_qreg
+    qubits = []
+    for i, wire_value in enumerate(
+        range(num_qubits_global_qreg, num_qubits_global_qreg + num_wires)
+    ):
+        print(wire_value)
+        # Lazy impl: just extract all new work wires for now, this is easier to implement
+        # TODO: what if another qml.alloc is encountered when the previous one is not dealloced??
+        # Be more careful about global indices....
+        # But now, let's just get a basic thing out the door
+        new_qubit = qextract_p.bind(new_qreg, i)
+        self.wire_map[wire_value] = new_qubit
+        # qubits.append(new_qubit)
+        qubits.append(wire_value)
+    # breakpoint()
+    return qubits
+
+
+@QFuncPlxprInterpreter.register_primitive(qml.allocation._get_deallocate_prim())
+def handle_qml_dealloc(self, *wires, reset_to_original=False):
+    """Handle the conversion from plxpr to Catalyst jaxpr for the qml.deallocate primitive"""
+    # breakpoint()
+    # Insert back all dangling qubits from the work qreg
+    # Ideally we expand the functionality of the qreg actualization to work with temp qregs
+    # instead of just the initial global qreg
+    # But again, I'm just trying to build a simple impl now as a first draft
+    # I am also dealing with the simple case, where an qml.allocate is never launched within another
+    # So I just insert back all qubits whose indices are not covered by the global qreg
+
+    num_qubits_global_qreg = len(self._device.wires)
+    for wire in wires:
+        self.stateref["dyn_qreg"] = qinsert_p.bind(
+            self.stateref["dyn_qreg"], wire - num_qubits_global_qreg, self.wire_map[wire]
+        )
+    # breakpoint()
+    qdealloc_p.bind(self.stateref["dyn_qreg"])
+    # breakpoint()
+    return []
 
 
 @QFuncPlxprInterpreter.register_primitive(qml.QubitUnitary._primitive)
@@ -867,6 +915,8 @@ def trace_from_pennylane(fn, static_argnums, abstracted_axes, sig, kwargs, debug
         args = sig
 
         plxpr, out_type, out_treedef = make_jaxpr2(fn, **make_jaxpr_kwargs)(*args, **kwargs)
+        # breakpoint()
         jaxpr = from_plxpr(plxpr)(*args, **kwargs)
+        # breakpoint()
 
     return jaxpr, out_type, out_treedef, sig
