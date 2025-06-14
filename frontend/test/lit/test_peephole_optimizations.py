@@ -29,7 +29,7 @@ from utils import print_jaxpr, print_mlir
 
 from catalyst import pipeline, qjit
 from catalyst.debug import get_compilation_stage
-from catalyst.passes import apply_pass, cancel_inverses, merge_rotations, decompose
+from catalyst.passes import apply_pass, cancel_inverses, decompose, merge_rotations
 
 
 def flush_peephole_opted_mlir_to_iostream(QJIT):
