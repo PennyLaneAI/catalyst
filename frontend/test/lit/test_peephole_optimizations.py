@@ -29,7 +29,7 @@ from utils import print_jaxpr, print_mlir
 
 from catalyst import pipeline, qjit
 from catalyst.debug import get_compilation_stage
-from catalyst.passes import apply_pass, cancel_inverses, merge_rotations
+from catalyst.passes import apply_pass, cancel_inverses, merge_rotations, decompose
 
 
 def flush_peephole_opted_mlir_to_iostream(QJIT):
@@ -864,3 +864,47 @@ def test_merge_rotations_tracing_and_lowering():
 
 
 test_merge_rotations_tracing_and_lowering()
+
+
+#
+# decompose
+#
+
+
+def test_decompose_tracing_and_lowering():
+    """
+    Test decompose during tracing and lowering
+    """
+
+    @qjit
+    def test_decompose_tracing_and_lowering_workflow(xx: float):
+
+        @decompose
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def f(x: float):
+            qml.RX(x, wires=0)
+            qml.RY(x, wires=0)
+            return qml.expval(qml.PauliZ(0))
+
+        _f = f(xx)
+        return _f
+
+    # CHECK: quantum_kernel
+    # CHECK: pipeline=(decompose,)
+    # CHECK: quantum_kernel
+    # CHECK: pipeline=(decompose,)
+    # CHECK: quantum_kernel
+    print_jaxpr(test_decompose_tracing_and_lowering_workflow, 1.1)
+
+    # CHECK: module @test_decompose_tracing_and_lowering_workflow
+    # CHECK: transform.named_sequence @__transform_main
+    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "decompose" to {{%.+}}
+    # CHECK-NEXT: transform.yield
+    # CHECK: transform.named_sequence @__transform_main
+    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "decompose" to {{%.+}}
+    # CHECK-NOT: {{%.+}} = transform.apply_registered_pass "decompose" to {{%.+}}
+    # CHECK-NEXT: transform.yield
+    print_mlir(test_decompose_tracing_and_lowering_workflow, 1.1)
+
+
+test_decompose_tracing_and_lowering()
