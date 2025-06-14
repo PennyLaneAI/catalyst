@@ -38,6 +38,7 @@ void catalyst::registerAllCatalystPasses()
     mlir::registerPass(catalyst::createPPMCompilationPass);
     mlir::registerPass(catalyst::createDecomposeNonCliffordPPRPass);
     mlir::registerPass(catalyst::createDecomposeCliffordPPRPass);
+    mlir::registerPass(catalyst::createCountPPMSpecsPass);
     mlir::registerPass(catalyst::createDetensorizeSCFPass);
     mlir::registerPass(catalyst::createDisableAssertionPass);
     mlir::registerPass(catalyst::createDisentangleCNOTPass);
