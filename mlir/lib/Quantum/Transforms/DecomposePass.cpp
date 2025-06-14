@@ -21,40 +21,16 @@ namespace catalyst {
 #define GEN_PASS_DECL_DECOMPOSEPASS
 #include "Quantum/Transforms/Passes.h.inc"
 
-struct SleepOnceOnCustomOp : public OpRewritePattern<quantum::CustomOp> {
+struct DecomposeCustomOp : public OpRewritePattern<quantum::CustomOp> {
     using mlir::OpRewritePattern<quantum::CustomOp>::OpRewritePattern;
-
-    // The above boilerplate instructs the pattern to be applied
-    // to all operations of type `CustomOp` in the input mlir
-
-    // quantum::CustomOp createSimpleOneBitGate(StringRef gateName, const Value &inQubit,
-    //                                          const Value &outQubit, mlir::IRRewriter &builder,
-    //                                          Location &loc,
-    //                                          const quantum::CustomOp &insert_after_gate)
-    // {
-    //     OpBuilder::InsertionGuard insertionGuard(builder);
-    //     builder.setInsertionPointAfter(insert_after_gate);
-    //     quantum::CustomOp newGate =
-    //         builder.create<quantum::CustomOp>(loc,
-    //                                           /*out_qubits=*/mlir::TypeRange({outQubit.getType()}),
-    //                                           /*out_ctrl_qubits=*/mlir::TypeRange(),
-    //                                           /*params=*/mlir::ValueRange(),
-    //                                           /*in_qubits=*/mlir::ValueRange({inQubit}),
-    //                                           /*gate_name=*/gateName,
-    //                                           /*adjoint=*/false,
-    //                                           /*in_ctrl_qubits=*/mlir::ValueRange(),
-    //                                           /*in_ctrl_values=*/mlir::ValueRange());
-
-    //     return newGate;
-    // }
 
     LogicalResult matchAndRewrite(quantum::CustomOp op, PatternRewriter &rewriter) const override
     {
-        llvm::errs() << "Replacing a CustomOp at ";
-        op->getLoc().print(llvm::errs());
-        llvm::errs() << "\n";
+        llvm::outs() << "Replacing a CustomOp at ";
+        op->getLoc().print(llvm::outs());
+        llvm::outs() << "\n";
 
-        if (op->hasAttr("processed"))
+        if (op->hasAttr("already decomposed"))
             return failure();
 
         auto loc = op.getLoc();
@@ -68,13 +44,15 @@ struct SleepOnceOnCustomOp : public OpRewritePattern<quantum::CustomOp> {
         ValueRange inCtrlQubits = op.getInCtrlQubits();
         ValueRange inCtrlValues = op.getInCtrlValues();
 
-        auto newOp = rewriter.create<quantum::CustomOp>(
-            loc,
-            TypeRange(outQubits.getTypes()), // result types
-            TypeRange(outCtrlQubits.getTypes()), params, inQubits, gateName, adjoint, inCtrlQubits,
-            inCtrlValues);
+        if (gateName == rewriter.getStringAttr("RX")) {
+            gateName = rewriter.getStringAttr("RY");
+        }
 
-        newOp->setAttr("processed", rewriter.getUnitAttr());
+        auto newOp = rewriter.create<quantum::CustomOp>(
+            loc, TypeRange(outQubits.getTypes()), TypeRange(outCtrlQubits.getTypes()), params,
+            inQubits, gateName, adjoint, inCtrlQubits, inCtrlValues);
+
+        newOp->setAttr("already decomposed", rewriter.getUnitAttr());
         rewriter.replaceOp(op, newOp->getResults());
         return success();
     }
@@ -88,7 +66,7 @@ struct DecomposePass : public impl::DecomposePassBase<DecomposePass> {
         LLVM_DEBUG(llvm::dbgs() << "Decompose Pass running\n");
 
         RewritePatternSet patterns(&getContext());
-        patterns.add<SleepOnceOnCustomOp>(&getContext());
+        patterns.add<DecomposeCustomOp>(&getContext());
 
         if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
             return signalPassFailure();

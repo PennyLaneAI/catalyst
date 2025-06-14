@@ -19,6 +19,7 @@ func.func @test_decompose(%arg0: f64, %arg1: f64) -> !quantum.bit {
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
     // CHECK: [[reg:%.+]] = quantum.alloc( 1) : !quantum.reg
     // CHECK: [[qubit:%.+]] = quantum.extract [[reg]][ 0] : !quantum.reg -> !quantum.bit
+    // CHECK: quantum.custom "RY"(%arg0) [[qubit]] {"already decomposed"} : !quantum.bit
     %2 = quantum.custom "RX"(%arg0) %1 : !quantum.bit
     return %2 : !quantum.bit
 }
