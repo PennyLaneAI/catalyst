@@ -36,6 +36,7 @@ as load and run external MLIR passes from plugins.
 from catalyst.passes.builtin_passes import (
     cancel_inverses,
     commute_ppr,
+    decompose,
     ions_decomposition,
     merge_ppr_ppm,
     merge_rotations,
@@ -58,4 +59,5 @@ __all__ = (
     "merge_ppr_ppm",
     "ppr_to_ppm",
     "ppm_compilation",
+    "decompose",
 )
