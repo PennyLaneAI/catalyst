@@ -25,6 +25,7 @@ import jax
 from jax._src.core import shaped_abstractify
 from jax._src.interpreters.partial_eval import infer_lambda_input_type
 from jax._src.pjit import _flat_axes_specs
+from jax.core import AbstractValue
 from jax.tree_util import tree_flatten, tree_unflatten
 
 from catalyst.jax_extras import get_aval2
@@ -56,7 +57,7 @@ def params_are_annotated(fn: Callable):
     are_annotated = all(annotation is not inspect.Parameter.empty for annotation in annotations)
     if not are_annotated:
         return False
-    return all(isinstance(annotation, (type, jax.core.ShapedArray)) for annotation in annotations)
+    return all(isinstance(annotation, (type, AbstractValue)) for annotation in annotations)
 
 
 def get_type_annotations(fn: Callable):
