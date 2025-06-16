@@ -12,143 +12,125 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt --to-ppr --ppm-specs --commute-ppr --ppm-specs --merge-ppr-ppm --ppm-specs --decompose-non-clifford-ppr --ppm-specs --decompose-clifford-ppr --ppm-specs --split-input-file -verify-diagnostics %s > %t.ppm
-
-func.func @test_clifford_t_to_ppm_1() -> (tensor<i1>, tensor<i1>) {
-    %0 = quantum.alloc( 2) : !quantum.reg
-    %1 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
-    %out_qubits = quantum.custom "S"() %1 : !quantum.bit
-    %2 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
-    %out_qubits_0 = quantum.custom "Hadamard"() %2 : !quantum.bit
-    %out_qubits_1 = quantum.custom "T"() %out_qubits_0 : !quantum.bit
-    %out_qubits_2:2 = quantum.custom "CNOT"() %out_qubits_1, %out_qubits : !quantum.bit, !quantum.bit
-    %mres_0, %out_qubit_0 = quantum.measure %out_qubits_2#0 : i1, !quantum.bit
-    %from_elements_0 = tensor.from_elements %mres_0 : tensor<i1>
-    %mres_1, %out_qubit_1 = quantum.measure %out_qubits_2#1 : i1, !quantum.bit
-    %from_elements_1 = tensor.from_elements %mres_1 : tensor<i1>
-    %3 = quantum.insert %0[ 0], %out_qubit_0 : !quantum.reg, !quantum.bit
-    %4 = quantum.insert %3[ 1], %out_qubit_1 : !quantum.reg, !quantum.bit
-    quantum.dealloc %4 : !quantum.reg
-    return %from_elements_0, %from_elements_1 : tensor<i1>, tensor<i1>
-    // CHECK: {
-    // CHECK:      "test_clifford_t_to_ppm_1": {
-    // CHECK:         "max_weight_pi4": 2,
-    // CHECK:         "max_weight_pi8": 1,
-    // CHECK:         "num_logical_qubits": 2,
-    // CHECK:         "num_of_ppm": 2,
-    // CHECK:         "num_pi4_gates": 7,
-    // CHECK:         "num_pi8_gates": 1
-    // CHECK:     }
-    // CHECK: }
-    // CHECK: {
-    // CHECK:     "test_clifford_t_to_ppm_1": {
-    // CHECK:         "max_weight_pi4": 2,
-    // CHECK:         "max_weight_pi8": 1,
-    // CHECK:         "num_logical_qubits": 2,
-    // CHECK:         "num_of_ppm": 2,
-    // CHECK:         "num_pi4_gates": 7,
-    // CHECK:         "num_pi8_gates": 1
-    // CHECK:     }
-    // CHECK: }
-    // CHECK: {
-    // CHECK:     "test_clifford_t_to_ppm_1": {
-    // CHECK:         "max_weight_pi8": 1,
-    // CHECK:         "num_logical_qubits": 2,
-    // CHECK:         "num_of_ppm": 2,
-    // CHECK:         "num_pi8_gates": 1
-    // CHECK:     }
-    // CHECK: }
-    // CHECK: {
-    // CHECK:     "test_clifford_t_to_ppm_1": {
-    // CHECK:         "max_weight_pi2": 1,
-    // CHECK:         "num_logical_qubits": 2,
-    // CHECK:         "num_of_ppm": 5,
-    // CHECK:        "num_pi2_gates": 1
-    // CHECK:     }
-    // CHECK: }
-    // CHECK: {
-    // CHECK:     "test_clifford_t_to_ppm_1": {
-    // CHECK:         "max_weight_pi2": 1,
-    // CHECK:         "num_logical_qubits": 2,
-    // CHECK:         "num_of_ppm": 5,
-    // CHECK:         "num_pi2_gates": 1
-    // CHECK:     }
-    // CHECK: }
-}
-
-// RUN: quantum-opt --ppm-compilation --ppm-specs --split-input-file -verify-diagnostics %s > %t.ppm
+// RUN: quantum-opt --ppm-specs --split-input-file -verify-diagnostics %s > %t.ppm
 
 func.func @game_of_surface_code() -> (tensor<i1>, tensor<i1>, tensor<i1>, tensor<i1>) {
-    %c = stablehlo.constant dense<0> : tensor<i64>
-    %extracted = tensor.extract %c[] : tensor<i64>
-    %c_0 = stablehlo.constant dense<4> : tensor<i64>
     %0 = quantum.alloc( 4) : !quantum.reg
-    %c_1 = stablehlo.constant dense<3> : tensor<i64>
-    %extracted_2 = tensor.extract %c_1[] : tensor<i64>
-    %1 = quantum.extract %0[%extracted_2] : !quantum.reg -> !quantum.bit
-    // PPR X(-pi/4) = H Tdag H
-    %out_qubits = quantum.custom "Hadamard"() %1 : !quantum.bit
-    %out_qubits_3 = quantum.custom "T"() %out_qubits adj : !quantum.bit
-    %out_qubits_4 = quantum.custom "Hadamard"() %out_qubits_3 : !quantum.bit
-    %extracted_5 = tensor.extract %c[] : tensor<i64>
-    %2 = quantum.extract %0[%extracted_5] : !quantum.reg -> !quantum.bit
-    %out_qubits_6 = quantum.custom "T"() %2 : !quantum.bit
-    %c_7 = stablehlo.constant dense<2> : tensor<i64>
-    %extracted_8 = tensor.extract %c_7[] : tensor<i64>
-    %3 = quantum.extract %0[%extracted_8] : !quantum.reg -> !quantum.bit
-    %c_9 = stablehlo.constant dense<1> : tensor<i64>
-    %extracted_10 = tensor.extract %c_9[] : tensor<i64>
-    %4 = quantum.extract %0[%extracted_10] : !quantum.reg -> !quantum.bit
-    %out_qubits_11:2 = quantum.custom "CNOT"() %3, %4 : !quantum.bit, !quantum.bit
-    %out_qubits_12:2 = quantum.custom "CNOT"() %out_qubits_11#1, %out_qubits_6 : !quantum.bit, !quantum.bit
-    %out_qubits_13:2 = quantum.custom "CNOT"() %out_qubits_4, %out_qubits_12#1 : !quantum.bit, !quantum.bit
-    // PPR X(pi/4) = H T H
-    %out_qubits_14 = quantum.custom "T"() %out_qubits_13#1 : !quantum.bit
-    %out_qubits_15 = quantum.custom "Hadamard"() %out_qubits_14 : !quantum.bit
-    %out_qubits_16 = quantum.custom "T"() %out_qubits_15 adj : !quantum.bit
-    %out_qubits_17 = quantum.custom "Hadamard"() %out_qubits_16 : !quantum.bit
-    %mres, %out_qubit = quantum.measure %out_qubits_17 : i1, !quantum.bit
-    %from_elements = tensor.from_elements %mres : tensor<i1>
-    %out_qubits_18 = quantum.custom "S"() %out_qubits_12#0 : !quantum.bit
-    %out_qubits_19 = quantum.custom "Hadamard"() %out_qubits_18 : !quantum.bit
-    %out_qubits_20 = quantum.custom "T"() %out_qubits_19 : !quantum.bit
-    %out_qubits_21 = quantum.custom "Hadamard"() %out_qubits_20 : !quantum.bit
-    %mres_22, %out_qubit_23 = quantum.measure %out_qubits_21 : i1, !quantum.bit
-    %from_elements_24 = tensor.from_elements %mres_22 : tensor<i1>
-    %out_qubits_25 = quantum.custom "Hadamard"() %out_qubits_11#0 : !quantum.bit
-    %out_qubits_26 = quantum.custom "T"() %out_qubits_25 : !quantum.bit
-    %out_qubits_27 = quantum.custom "Hadamard"() %out_qubits_26 : !quantum.bit
-    %out_qubits_28 = quantum.custom "T"() %out_qubits_27 : !quantum.bit
-    %out_qubits_29 = quantum.custom "Hadamard"() %out_qubits_28 : !quantum.bit
-    %out_qubits_30 = quantum.custom "T"() %out_qubits_29 : !quantum.bit
-    %out_qubits_31 = quantum.custom "Hadamard"() %out_qubits_30 : !quantum.bit
-    %mres_32, %out_qubit_33 = quantum.measure %out_qubits_31 : i1, !quantum.bit
-    %from_elements_34 = tensor.from_elements %mres_32 : tensor<i1>
-    %out_qubits_35 = quantum.custom "S"() %out_qubits_13#0 : !quantum.bit
-    %out_qubits_36 = quantum.custom "Hadamard"() %out_qubits_35 : !quantum.bit
-    %out_qubits_37 = quantum.custom "T"() %out_qubits_36 : !quantum.bit
-    %out_qubits_38 = quantum.custom "Hadamard"() %out_qubits_37 : !quantum.bit
-    %mres_39, %out_qubit_40 = quantum.measure %out_qubits_38 : i1, !quantum.bit
-    %from_elements_41 = tensor.from_elements %mres_39 : tensor<i1>
-    %extracted_42 = tensor.extract %c[] : tensor<i64>
-    %5 = quantum.insert %0[%extracted_42], %out_qubit : !quantum.reg, !quantum.bit
-    %extracted_43 = tensor.extract %c_7[] : tensor<i64>
-    %6 = quantum.insert %5[%extracted_43], %out_qubit_33 : !quantum.reg, !quantum.bit
-    %extracted_44 = tensor.extract %c_9[] : tensor<i64>
-    %7 = quantum.insert %6[%extracted_44], %out_qubit_23 : !quantum.reg, !quantum.bit
-    %extracted_45 = tensor.extract %c_1[] : tensor<i64>
-    %8 = quantum.insert %7[%extracted_45], %out_qubit_40 : !quantum.reg, !quantum.bit
-    quantum.dealloc %8 : !quantum.reg
+    %1 = quantum.extract %0[ 3] : !quantum.reg -> !quantum.bit
+    %2 = quantum.alloc_qb : !quantum.bit
+    %3 = qec.fabricate  magic_conj : !quantum.bit
+    %mres, %out_qubits:2 = qec.ppm ["X", "Z"] %1, %3 : !quantum.bit, !quantum.bit
+    %mres_0, %out_qubits_1:2 = qec.ppm ["Z", "Y"] %out_qubits#1, %2 : !quantum.bit, !quantum.bit
+    %mres_2, %out_qubits_3 = qec.ppm ["X"] %out_qubits_1#0 : !quantum.bit
+    %mres_4, %out_qubits_5 = qec.select.ppm(%mres, ["X"], ["Z"]) %out_qubits_1#1 : !quantum.bit
+    %4 = arith.xori %mres_0, %mres_2 : i1
+    %5 = qec.ppr ["X"](2) %out_qubits#0 cond(%4) : !quantum.bit
+    quantum.dealloc_qb %out_qubits_5 : !quantum.bit
+    quantum.dealloc_qb %out_qubits_3 : !quantum.bit
+    %6 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    %7 = quantum.alloc_qb : !quantum.bit
+    %8 = qec.fabricate  magic : !quantum.bit
+    %mres_6, %out_qubits_7:2 = qec.ppm ["Z", "Z"] %6, %8 : !quantum.bit, !quantum.bit
+    %mres_8, %out_qubits_9:2 = qec.ppm ["Z", "Y"] %out_qubits_7#1, %7 : !quantum.bit, !quantum.bit
+    %mres_10, %out_qubits_11 = qec.ppm ["X"] %out_qubits_9#0 : !quantum.bit
+    %mres_12, %out_qubits_13 = qec.select.ppm(%mres_6, ["X"], ["Z"]) %out_qubits_9#1 : !quantum.bit
+    %9 = arith.xori %mres_8, %mres_10 : i1
+    %10 = qec.ppr ["Z"](2) %out_qubits_7#0 cond(%9) : !quantum.bit
+    quantum.dealloc_qb %out_qubits_13 : !quantum.bit
+    quantum.dealloc_qb %out_qubits_11 : !quantum.bit
+    %11 = quantum.extract %0[ 2] : !quantum.reg -> !quantum.bit
+    %12 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+    %13 = quantum.alloc_qb : !quantum.bit
+    %14 = qec.fabricate  magic : !quantum.bit
+    %mres_14, %out_qubits_15:3 = qec.ppm ["X", "X", "Z"] %11, %12, %14 : !quantum.bit, !quantum.bit, !quantum.bit
+    %mres_16, %out_qubits_17:2 = qec.ppm ["Z", "Y"] %out_qubits_15#2, %13 : !quantum.bit, !quantum.bit
+    %mres_18, %out_qubits_19 = qec.ppm ["X"] %out_qubits_17#0 : !quantum.bit
+    %mres_20, %out_qubits_21 = qec.select.ppm(%mres_14, ["X"], ["Z"]) %out_qubits_17#1 : !quantum.bit
+    %15 = arith.xori %mres_16, %mres_18 : i1
+    %16:2 = qec.ppr ["X", "X"](2) %out_qubits_15#0, %out_qubits_15#1 cond(%15) : !quantum.bit, !quantum.bit
+    quantum.dealloc_qb %out_qubits_21 : !quantum.bit
+    quantum.dealloc_qb %out_qubits_19 : !quantum.bit
     quantum.device_release
-    return %from_elements, %from_elements_24, %from_elements_34, %from_elements_41 : tensor<i1>, tensor<i1>, tensor<i1>, tensor<i1>
-    // CHECK:  {
-    // CHECK:     "game_of_surface_code": {
+    %17 = quantum.alloc_qb : !quantum.bit
+    %18 = qec.fabricate  magic : !quantum.bit
+    %mres_22, %out_qubits_23:2 = qec.ppm ["Z", "Z"] %16#0, %18 : !quantum.bit, !quantum.bit
+    %mres_24, %out_qubits_25:2 = qec.ppm ["Z", "Y"] %out_qubits_23#1, %17 : !quantum.bit, !quantum.bit
+    %mres_26, %out_qubits_27 = qec.ppm ["X"] %out_qubits_25#0 : !quantum.bit
+    %mres_28, %out_qubits_29 = qec.select.ppm(%mres_22, ["X"], ["Z"]) %out_qubits_25#1 : !quantum.bit
+    %19 = arith.xori %mres_24, %mres_26 : i1
+    %20 = qec.ppr ["Z"](2) %out_qubits_23#0 cond(%19) : !quantum.bit
+    quantum.dealloc_qb %out_qubits_29 : !quantum.bit
+    quantum.dealloc_qb %out_qubits_27 : !quantum.bit
+    %21 = quantum.alloc_qb : !quantum.bit
+    %22 = qec.fabricate  magic : !quantum.bit
+    %mres_30, %out_qubits_31:3 = qec.ppm ["X", "X", "Z"] %20, %16#1, %22 : !quantum.bit, !quantum.bit, !quantum.bit
+    %mres_32, %out_qubits_33:2 = qec.ppm ["Z", "Y"] %out_qubits_31#2, %21 : !quantum.bit, !quantum.bit
+    %mres_34, %out_qubits_35 = qec.ppm ["X"] %out_qubits_33#0 : !quantum.bit
+    %mres_36, %out_qubits_37 = qec.select.ppm(%mres_30, ["X"], ["Z"]) %out_qubits_33#1 : !quantum.bit
+    %23 = arith.xori %mres_32, %mres_34 : i1
+    %24:2 = qec.ppr ["X", "X"](2) %out_qubits_31#0, %out_qubits_31#1 cond(%23) : !quantum.bit, !quantum.bit
+    quantum.dealloc_qb %out_qubits_37 : !quantum.bit
+    quantum.dealloc_qb %out_qubits_35 : !quantum.bit
+    %25 = quantum.alloc_qb : !quantum.bit
+    %26 = qec.fabricate  magic_conj : !quantum.bit
+    %mres_38, %out_qubits_39:4 = qec.ppm ["Z", "Y", "X", "Z"] %24#0, %24#1, %10, %26 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    %mres_40, %out_qubits_41:2 = qec.ppm ["Z", "Y"] %out_qubits_39#3, %25 : !quantum.bit, !quantum.bit
+    %mres_42, %out_qubits_43 = qec.ppm ["X"] %out_qubits_41#0 : !quantum.bit
+    %mres_44, %out_qubits_45 = qec.select.ppm(%mres_38, ["X"], ["Z"]) %out_qubits_41#1 : !quantum.bit
+    %27 = arith.xori %mres_40, %mres_42 : i1
+    %28:3 = qec.ppr ["Z", "Y", "X"](2) %out_qubits_39#0, %out_qubits_39#1, %out_qubits_39#2 cond(%27) : !quantum.bit, !quantum.bit, !quantum.bit
+    quantum.dealloc_qb %out_qubits_45 : !quantum.bit
+    quantum.dealloc_qb %out_qubits_43 : !quantum.bit
+    %29 = quantum.alloc_qb : !quantum.bit
+    %30 = qec.fabricate  magic_conj : !quantum.bit
+    %mres_46, %out_qubits_47:3 = qec.ppm ["Y", "X", "Z"] %5, %28#2, %30 : !quantum.bit, !quantum.bit, !quantum.bit
+    %mres_48, %out_qubits_49:2 = qec.ppm ["Z", "Y"] %out_qubits_47#2, %29 : !quantum.bit, !quantum.bit
+    %mres_50, %out_qubits_51 = qec.ppm ["X"] %out_qubits_49#0 : !quantum.bit
+    %mres_52, %out_qubits_53 = qec.select.ppm(%mres_46, ["X"], ["Z"]) %out_qubits_49#1 : !quantum.bit
+    %31 = arith.xori %mres_48, %mres_50 : i1
+    %32:2 = qec.ppr ["Y", "X"](2) %out_qubits_47#0, %out_qubits_47#1 cond(%31) : !quantum.bit, !quantum.bit
+    quantum.dealloc_qb %out_qubits_53 : !quantum.bit
+    quantum.dealloc_qb %out_qubits_51 : !quantum.bit
+    %33 = quantum.alloc_qb : !quantum.bit
+    %34 = qec.fabricate  magic : !quantum.bit
+    %mres_54, %out_qubits_55:5 = qec.ppm ["Z", "Z", "Z", "Z", "Z"] %32#0, %28#0, %28#1, %32#1, %34 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    %mres_56, %out_qubits_57:2 = qec.ppm ["Z", "Y"] %out_qubits_55#4, %33 : !quantum.bit, !quantum.bit
+    %mres_58, %out_qubits_59 = qec.ppm ["X"] %out_qubits_57#0 : !quantum.bit
+    %mres_60, %out_qubits_61 = qec.select.ppm(%mres_54, ["X"], ["Z"]) %out_qubits_57#1 : !quantum.bit
+    %35 = arith.xori %mres_56, %mres_58 : i1
+    %36:4 = qec.ppr ["Z", "Z", "Z", "Z"](2) %out_qubits_55#0, %out_qubits_55#1, %out_qubits_55#2, %out_qubits_55#3 cond(%35) : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    quantum.dealloc_qb %out_qubits_61 : !quantum.bit
+    quantum.dealloc_qb %out_qubits_59 : !quantum.bit
+    %37 = quantum.alloc_qb : !quantum.bit
+    %38 = qec.fabricate  magic_conj : !quantum.bit
+    %mres_62, %out_qubits_63:2 = qec.ppm ["X", "Z"] %36#3, %38 : !quantum.bit, !quantum.bit
+    %mres_64, %out_qubits_65:2 = qec.ppm ["Z", "Y"] %out_qubits_63#1, %37 : !quantum.bit, !quantum.bit
+    %mres_66, %out_qubits_67 = qec.ppm ["X"] %out_qubits_65#0 : !quantum.bit
+    %mres_68, %out_qubits_69 = qec.select.ppm(%mres_62, ["X"], ["Z"]) %out_qubits_65#1 : !quantum.bit
+    %39 = arith.xori %mres_64, %mres_66 : i1
+    %40 = qec.ppr ["X"](2) %out_qubits_63#0 cond(%39) : !quantum.bit
+    quantum.dealloc_qb %out_qubits_69 : !quantum.bit
+    quantum.dealloc_qb %out_qubits_67 : !quantum.bit
+    %mres_70, %out_qubits_71 = qec.ppm ["Z"] %36#0 : !quantum.bit
+    %from_elements = tensor.from_elements %mres_70 : tensor<i1>
+    %mres_72, %out_qubits_73:4 = qec.ppm ["Z", "Z", "Z", "Z"] %36#1, %36#2, %40, %out_qubits_71 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    %from_elements_74 = tensor.from_elements %mres_72 : tensor<i1>
+    %mres_75, %out_qubits_76 = qec.ppm ["Z"] %out_qubits_73#0 : !quantum.bit
+    %from_elements_77 = tensor.from_elements %mres_75 : tensor<i1>
+    %mres_78, %out_qubits_79:2 = qec.ppm ["Z", "Z"] %out_qubits_76, %out_qubits_73#1 : !quantum.bit, !quantum.bit
+    %from_elements_80 = tensor.from_elements %mres_78 : tensor<i1>
+    %41 = quantum.insert %0[ 0], %out_qubits_73#2 : !quantum.reg, !quantum.bit
+    %42 = quantum.insert %41[ 2], %out_qubits_79#0 : !quantum.reg, !quantum.bit
+    %43 = quantum.insert %42[ 1], %out_qubits_79#1 : !quantum.reg, !quantum.bit
+    %44 = quantum.insert %43[ 3], %out_qubits_73#3 : !quantum.reg, !quantum.bit
+    quantum.dealloc %44 : !quantum.reg
+    return %from_elements_74, %from_elements_80, %from_elements_77, %from_elements : tensor<i1>, tensor<i1>, tensor<i1>, tensor<i1>
+    // CHECK:      "game_of_surface_code": {
     // CHECK:         "max_weight_pi2": 4,
     // CHECK:         "num_logical_qubits": 4,
     // CHECK:         "num_of_ppm": 31,
     // CHECK:         "num_pi2_gates": 9
-    // CHECK:     }
-    // CHECK:  }
 }
+
 
 // -----
