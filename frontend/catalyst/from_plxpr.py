@@ -45,6 +45,7 @@ from catalyst.device import (
     extract_backend_info,
     get_device_capabilities,
 )
+from catalyst.tracing.type_signatures import filter_static_args
 from catalyst.jax_extras import jaxpr_pad_consts, make_jaxpr2, transient_jax_config
 from catalyst.jax_primitives import (
     AbstractQbit,
@@ -722,7 +723,9 @@ def handle_measure_in_basis(self, angle, wire, plane, reset, postselect):
 
 
 # pylint: disable=too-many-positional-arguments
-def trace_from_pennylane(fn, static_argnums, abstracted_axes, sig, kwargs, debug_info=None):
+def trace_from_pennylane(
+    fn, static_argnums, dynamic_argnums, abstracted_axes, sig, kwargs, debug_info=None
+):
     """Capture the JAX program representation (JAXPR) of the wrapped function, using
     PL capure module.
 
@@ -746,6 +749,6 @@ def trace_from_pennylane(fn, static_argnums, abstracted_axes, sig, kwargs, debug
         args = sig
 
         plxpr, out_type, out_treedef = make_jaxpr2(fn, **make_jaxpr_kwargs)(*args, **kwargs)
-        jaxpr = from_plxpr(plxpr)(*args, **kwargs)
+        jaxpr = from_plxpr(plxpr)(*dynamic_argnums, **kwargs)
 
     return jaxpr, out_type, out_treedef, sig
