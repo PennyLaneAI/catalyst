@@ -1,0 +1,28 @@
+name: Run Catalyst pytests for weekly flaky test checking
+
+permissions:
+  contents: read
+
+on:
+  schedule:
+    # Run every weekend on Saturday at 23:40 EDT (cron is in UTC)
+    # https://crontab.cronhub.io/
+    - cron: "40 23 * * SAT"
+
+jobs:
+  weekly-flaky-test-run:
+    name: Run weekly flaky tests
+    runs-on: ubuntu-24.04
+
+    steps:
+    - name: Checkout Catalyst repo
+      uses: actions/checkout@v4
+
+    - name: Install Deps
+      run: |
+        python3 -m pip install -r requirements.txt
+        pip install --pre -U --extra-index-url https://test.pypi.org/simple/ PennyLane-Catalyst
+
+    - name: Run Python Pytest Tests with flaky Checks
+      run: |
+        make pytest ENABLE_FLAKY=ON
