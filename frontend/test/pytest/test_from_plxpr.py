@@ -31,7 +31,7 @@ pytestmark = pytest.mark.usefixtures("disable_capture")
 def catalyst_execute_jaxpr(jaxpr):
     """Create a function capable of executing the provided catalyst-variant jaxpr."""
 
-    # pylint: disable=too-few-public-methods
+    # pylint: disable=arguments-differ, too-few-public-methods
     class JAXPRRunner(catalyst.QJIT):
         """A variant of catalyst.QJIT with a pre-constructed jaxpr."""
 
