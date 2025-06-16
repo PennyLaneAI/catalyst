@@ -326,6 +326,7 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
             # Note: since `getattr` checks specifically for qreg, we can't
             # define qreg inside the init function.
             self.qreg = qinsert_p.bind(self.qreg, orig_wire, wire)
+        self.wire_map = {}
 
     def interpret_operation(self, op):
         """Re-bind a pennylane operation as a catalyst instruction."""
