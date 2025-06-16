@@ -498,7 +498,7 @@ def handle_cond(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
 
             closed_jaxpr = ClosedJaxpr(plxpr_branch, branch_consts)
 
-            def calling_convention(*args_plus_qreg, closed_jaxpr=closed_jaxpr):
+            def calling_convention(*args_plus_qreg):
                 *args, qreg = args_plus_qreg
                 device = self.device
                 shots = self.shots
