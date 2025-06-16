@@ -42,27 +42,24 @@ namespace qec {
 struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass> {
     using CountPPMSpecsPassBase::CountPPMSpecsPassBase;
 
-    llvm::DenseMap<StringRef, llvm::DenseMap<StringRef, int>>
-    countLogicalQubit(Operation *op,
-                      llvm::DenseMap<StringRef, llvm::DenseMap<StringRef, int>> PPMSpecs)
+    void countLogicalQubit(Operation *op,
+                      llvm::DenseMap<StringRef, llvm::DenseMap<StringRef, int>> *PPMSpecs)
     {
         uint64_t numQubits = cast<quantum::AllocOp>(op).getNqubitsAttr().value_or(0);
         assert(numQubits != 0 && "PPM specs with dynamic number of qubits is not implemented");
         auto parentFuncOp = op->getParentOfType<func::FuncOp>();
-        PPMSpecs[parentFuncOp.getName()]["num_logical_qubits"] = numQubits;
-        return PPMSpecs;
+        (*PPMSpecs)[parentFuncOp.getName()]["num_logical_qubits"] = numQubits;
+        return;
     }
 
-    llvm::DenseMap<StringRef, llvm::DenseMap<StringRef, int>>
-    countPPM(Operation *op, llvm::DenseMap<StringRef, llvm::DenseMap<StringRef, int>> PPMSpecs)
+    void countPPM(Operation *op, llvm::DenseMap<StringRef, llvm::DenseMap<StringRef, int>> *PPMSpecs)
     {
         auto parentFuncOp = op->getParentOfType<func::FuncOp>();
-        PPMSpecs[parentFuncOp.getName()]["num_of_ppm"]++;
-        return PPMSpecs;
+        (*PPMSpecs)[parentFuncOp.getName()]["num_of_ppm"]++;
+        return;
     }
 
-    llvm::DenseMap<StringRef, llvm::DenseMap<StringRef, int>>
-    countPPR(Operation *op, llvm::DenseMap<StringRef, llvm::DenseMap<StringRef, int>> PPMSpecs,
+    void countPPR(Operation *op, llvm::DenseMap<StringRef, llvm::DenseMap<StringRef, int>> *PPMSpecs,
              llvm::BumpPtrAllocator *stringAllocator)
     {
         int16_t rotationKind =
@@ -76,12 +73,12 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
                 saver.save("num_pi" + std::to_string(abs(rotationKind)) + "_gates");
             StringRef maxWeightRotationKindKey =
                 saver.save("max_weight_pi" + std::to_string(abs(rotationKind)));
-            PPMSpecs[funcName][numRotationKindKey]++;
-            PPMSpecs[funcName][maxWeightRotationKindKey] =
-                std::max(PPMSpecs[funcName][maxWeightRotationKindKey],
+            (*PPMSpecs)[funcName][numRotationKindKey]++;
+            (*PPMSpecs)[funcName][maxWeightRotationKindKey] =
+                std::max((*PPMSpecs)[funcName][maxWeightRotationKindKey],
                          static_cast<int>(PauliProductAttr.size()));
         }
-        return PPMSpecs;
+        return;
     }
     void printSpecs()
     {
@@ -95,15 +92,15 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
                 return;
 
             else if (isa<quantum::AllocOp>(op)) {
-                PPMSpecs = countLogicalQubit(op, PPMSpecs);
+                countLogicalQubit(op, &PPMSpecs);
             }
 
             else if (isa<qec::PPMeasurementOp>(op)) {
-                PPMSpecs = countPPM(op, PPMSpecs);
+                countPPM(op, &PPMSpecs);
             }
 
             else if (isa<qec::PPRotationOp>(op)) {
-                PPMSpecs = countPPR(op, PPMSpecs, &stringAllocator);
+                countPPR(op, &PPMSpecs, &stringAllocator);
             }
         });
 
