@@ -45,7 +45,6 @@ from catalyst.device import (
     extract_backend_info,
     get_device_capabilities,
 )
-from catalyst.tracing.type_signatures import filter_static_args
 from catalyst.jax_extras import jaxpr_pad_consts, make_jaxpr2, transient_jax_config
 from catalyst.jax_primitives import (
     AbstractQbit,
