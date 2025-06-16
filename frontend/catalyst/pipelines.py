@@ -125,12 +125,12 @@ class CompileOptions:
 
         if self.pass_plugins is None:
             self.pass_plugins = set()
-        elif isinstance(self.pass_plugins, (list, tuple, set)):
+        else:
             self.pass_plugins = set(self.pass_plugins)
 
         if self.dialect_plugins is None:
             self.dialect_plugins = set()
-        elif isinstance(self.dialect_plugins, (list, tuple, set)):
+        else:
             self.dialect_plugins = set(self.dialect_plugins)
 
     def __deepcopy__(self, memo):
