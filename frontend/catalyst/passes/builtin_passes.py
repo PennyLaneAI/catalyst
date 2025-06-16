@@ -21,7 +21,7 @@ from catalyst.compiler import _quantum_opt
 from catalyst.passes.pass_api import PassPipelineWrapper
 
 
-def get_ppm_spec(QJIT):
+def get_ppm_specs(QJIT):
     """TODO: docstring"""
 
     if QJIT.mlir is not None:
