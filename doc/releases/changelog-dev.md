@@ -37,6 +37,9 @@
   Use this pass via the :func:`~.passes.ppm_compilation` decorator to compile circuits 
   in a single pipeline.
 
+  * Function `get_ppm_specs` to get the specs in a JSON object after a PPR/PPM compilations is ran
+  [(#1794)](https://github.com/PennyLaneAI/catalyst/pull/1794). 
+  
   Example below shows an input circuit and corresponding PPM specs.
 
   ```python
@@ -61,9 +64,6 @@
   ```pycon
   {'circuit_0': {'num_logical_qubits': 2, 'num_of_ppm': 2}}
   ```
-
-* Function `get_ppm_specs` to get the specs in a JSON object after a PPR/PPM compilations is ran
-  [(#1794)](https://github.com/PennyLaneAI/catalyst/pull/1794). 
 
 * Support for :class:`qml.Snapshot <pennylane.Snapshot>` to capture quantum states at any 
   point in a circuit has been added to Catalyst [(#1741)](https://github.com/PennyLaneAI/catalyst/pull/1741).
