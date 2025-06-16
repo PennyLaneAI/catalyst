@@ -77,7 +77,7 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
         (*PPMSpecs)[funcName][numRotationKindKey]++;
         (*PPMSpecs)[funcName][maxWeightRotationKindKey] =
             std::max((*PPMSpecs)[funcName][maxWeightRotationKindKey],
-                        static_cast<int>(PauliProductAttr.size()));
+                     static_cast<int>(PauliProductAttr.size()));
         return;
     }
     void printSpecs()
@@ -90,7 +90,7 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
             if (isa<ModuleOp>(op)) {
                 return;
             }
-                
+
             else if (isa<quantum::AllocOp>(op)) {
                 countLogicalQubit(op, &PPMSpecs);
             }

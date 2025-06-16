@@ -21,22 +21,6 @@ from catalyst.compiler import _quantum_opt
 from catalyst.passes.pass_api import PassPipelineWrapper
 
 
-def get_ppm_specs(QJIT):
-    """TODO: docstring"""
-
-    if QJIT.mlir is not None:
-        # aot mode
-        raw_result = _quantum_opt(
-            ("--pass-pipeline", "builtin.module(ppm-specs)"), [], stdin=QJIT.mlir_opt
-        )
-        return json.loads(
-            raw_result[: raw_result.index("module")]
-        )  # remove MLIR starting with substring "module..."
-
-    else:
-        raise NotImplementedError("PPM passes only support AOT (Ahead-Of-Time) compilation mode.")
-
-
 ## API ##
 def cancel_inverses(qnode):
     """
@@ -798,3 +782,112 @@ def ppm_compilation(
         )
 
     return PassPipelineWrapper(qnode, passes)
+
+
+def get_ppm_specs(QJIT):
+    print("Type:", type(QJIT))
+    R"""
+    This pass gets the following PPM specs in a JSON object for each function in a qnode:
+    {
+        "func_name" : {
+                "num_logical_qubits": num_logical_qubits,
+                "num_of_ppm": num_of_ppm,
+                "num_pi8_gates": num_pi8_gates,
+                "num_pi4_gates": num_pi4_gates,
+                "num_pi2_gates": num_pi2_gates,
+                "max_weight_pi8": max_weight_pi8,
+                "max_weight_pi4": max_weight_pi4,
+                "max_weight_pi2": max_weight_pi2,
+        }
+    }
+
+    PPM Specs are returned when either of the following compilation passes are run
+    - :func:`~.passes.ppm_compilation` : Converts  lifford+T gates into Pauli Product Measurements (PPM)
+    - :func:`~.passes.to_ppr` : Converts gates into Pauli Product Rotations (PPRs)
+    - :func:`~.passes.commute_ppr` : Commutes PPRs past non-Clifford PPRs
+    - :func:`~.passes.merge_ppr_ppm` : Merges PPRs into Pauli Product Measurements (PPMs)
+    - :func:`~.passes.ppr_to_ppm` : Decomposes PPRs into PPMs
+
+
+    Args:
+        catalyst.jit.QJIT: QJIT object for which ppm_specs need to be printed.
+
+    Returns:
+        JSON : Returns a json object for PPM specs of all functions in QJIT.
+
+    **Example**
+
+    .. code-block:: python
+
+        import pennylane as qml
+        from catalyst import qjit, measure
+        from catalyst.passes import get_ppm_specs, to_ppr, merge_ppr_ppm, commute_ppr
+
+        pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+
+        @qjit(pipelines=pipe, target="mlir")
+        def test_convert_clifford_to_ppr_workflow():
+
+            device = qml.device("lightning.qubit", wires=2)
+
+            @merge_ppr_ppm
+            @commute_ppr(max_pauli_size=2)
+            @to_ppr
+            @qml.qnode(device)
+            def f():
+                qml.CNOT([0, 2])
+                qml.T(0)
+                return measure(0), measure(1)
+
+            @merge_ppr_ppm(max_pauli_size=1)
+            @commute_ppr
+            @to_ppr
+            @qml.qnode(device)
+            def g():
+                qml.CNOT([0, 2])
+                qml.T(0)
+                qml.T(1)
+                qml.CNOT([0, 1])
+                return measure(0), measure(1)
+
+            return f(), g()
+            
+        ppm_specs = get_ppm_specs(test_convert_clifford_to_ppr_workflow)
+        print(ppm_specs)
+
+    Example PPM Specs:
+
+    .. code-block:: pycon
+
+        . . .
+        {
+            'f_0': {
+                        'max_weight_pi8': 1, 
+                        'num_logical_qubits': 2, 
+                        'num_of_ppm': 2, 
+                        'num_pi8_gates': 1
+                    }, 
+            'g_0': {
+                        'max_weight_pi4': 2,
+                        'max_weight_pi8': 1, 
+                        'num_logical_qubits': 2, 
+                        'num_of_ppm': 2, 
+                        'num_pi4_gates': 3, 
+                        'num_pi8_gates': 2
+                    }
+        }
+        . . .
+
+    """
+
+    if QJIT.mlir is not None:
+        # aot mode
+        raw_result = _quantum_opt(
+            ("--pass-pipeline", "builtin.module(ppm-specs)"), [], stdin=QJIT.mlir_opt
+        )
+        return json.loads(
+            raw_result[: raw_result.index("module")]
+        )  # remove MLIR starting with substring "module..."
+
+    else:
+        raise NotImplementedError("PPM passes only support AOT (Ahead-Of-Time) compilation mode.")
