@@ -43,7 +43,7 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
     using CountPPMSpecsPassBase::CountPPMSpecsPassBase;
 
     void countLogicalQubit(Operation *op,
-                      llvm::DenseMap<StringRef, llvm::DenseMap<StringRef, int>> *PPMSpecs)
+                           llvm::DenseMap<StringRef, llvm::DenseMap<StringRef, int>> *PPMSpecs)
     {
         uint64_t numQubits = cast<quantum::AllocOp>(op).getNqubitsAttr().value_or(0);
         assert(numQubits != 0 && "PPM specs with dynamic number of qubits is not implemented");
@@ -52,15 +52,17 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
         return;
     }
 
-    void countPPM(Operation *op, llvm::DenseMap<StringRef, llvm::DenseMap<StringRef, int>> *PPMSpecs)
+    void countPPM(Operation *op,
+                  llvm::DenseMap<StringRef, llvm::DenseMap<StringRef, int>> *PPMSpecs)
     {
         auto parentFuncOp = op->getParentOfType<func::FuncOp>();
         (*PPMSpecs)[parentFuncOp.getName()]["num_of_ppm"]++;
         return;
     }
 
-    void countPPR(Operation *op, llvm::DenseMap<StringRef, llvm::DenseMap<StringRef, int>> *PPMSpecs,
-             llvm::BumpPtrAllocator *stringAllocator)
+    void countPPR(Operation *op,
+                  llvm::DenseMap<StringRef, llvm::DenseMap<StringRef, int>> *PPMSpecs,
+                  llvm::BumpPtrAllocator *stringAllocator)
     {
         int16_t rotationKind =
             cast<qec::PPRotationOp>(op).getRotationKindAttr().getValue().getZExtValue();
@@ -88,9 +90,10 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
         // Walk over all operations in the IR (could be ModuleOp or FuncOp)
         getOperation()->walk([&](Operation *op) {
             // Skip top-level container ops if desired
-            if (isa<ModuleOp>(op))
+            if (isa<ModuleOp>(op)) {
                 return;
-
+            }
+                
             else if (isa<quantum::AllocOp>(op)) {
                 countLogicalQubit(op, &PPMSpecs);
             }
