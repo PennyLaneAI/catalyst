@@ -37,6 +37,34 @@
   Use this pass via the :func:`~.passes.ppm_compilation` decorator to compile circuits 
   in a single pipeline.
 
+  Example below shows an input circuit and corresponding PPM specs.
+
+  ```python
+  import pennylane as qml
+  from catalyst import qjit, measure
+  from catalyst.passes import get_ppm_specs, ppm_compilation
+
+  pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+  device = qml.device("lightning.qubit", wires=2)
+
+  @qjit(pipelines=pipe, target="mlir")
+  @ppm_compilation
+  @qml.qnode(device)
+  def circuit():
+      qml.H(0)
+      qml.CNOT([0,1])
+      return measure(0), measure(1)
+
+  print(get_ppm_specs(circuit))
+  ```
+  Output:
+  ```pycon
+  {'circuit_0': {'num_logical_qubits': 2, 'num_of_ppm': 2}}
+  ```
+
+* Function `get_ppm_specs` to get the specs in a JSON object after a PPR/PPM compilations is ran
+  [(#1794)](https://github.com/PennyLaneAI/catalyst/pull/1794). 
+
 * Support for :class:`qml.Snapshot <pennylane.Snapshot>` to capture quantum states at any 
   point in a circuit has been added to Catalyst [(#1741)](https://github.com/PennyLaneAI/catalyst/pull/1741).
   For example, the code below is capturing 
