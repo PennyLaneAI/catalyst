@@ -800,13 +800,7 @@ def get_ppm_specs(QJIT):
         }
     }
 
-    PPM Specs are returned when either of the following compilation passes are run
-    - :func:`~.passes.ppm_compilation` : Converts  lifford+T gates into Pauli Product Measurements (PPM)
-    - :func:`~.passes.to_ppr` : Converts gates into Pauli Product Rotations (PPRs)
-    - :func:`~.passes.commute_ppr` : Commutes PPRs past non-Clifford PPRs
-    - :func:`~.passes.merge_ppr_ppm` : Merges PPRs into Pauli Product Measurements (PPMs)
-    - :func:`~.passes.ppr_to_ppm` : Decomposes PPRs into PPMs
-
+    PPM Specs are returned after the last compilation passe is run
 
     Args:
         catalyst.jit.QJIT: QJIT object for which ppm_specs need to be printed.
