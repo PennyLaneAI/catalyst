@@ -215,6 +215,7 @@ def test_ppr_to_ppm():
 
         return cir_default(), cir_inject_magic_state()
 
+    print(circuit_ppr_to_ppm.mlir_opt)
     print(get_ppm_specs(circuit_ppr_to_ppm))
 
 
