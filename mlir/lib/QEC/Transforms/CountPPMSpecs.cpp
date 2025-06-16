@@ -69,24 +69,21 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
         auto PauliProductAttr = cast<qec::PPRotationOp>(op).getPauliProductAttr();
         auto parentFuncOp = op->getParentOfType<func::FuncOp>();
         StringRef funcName = parentFuncOp.getName();
-        if (rotationKind) {
-            llvm::StringSaver saver(*stringAllocator);
-            StringRef numRotationKindKey =
-                saver.save("num_pi" + std::to_string(abs(rotationKind)) + "_gates");
-            StringRef maxWeightRotationKindKey =
-                saver.save("max_weight_pi" + std::to_string(abs(rotationKind)));
-            (*PPMSpecs)[funcName][numRotationKindKey]++;
-            (*PPMSpecs)[funcName][maxWeightRotationKindKey] =
-                std::max((*PPMSpecs)[funcName][maxWeightRotationKindKey],
-                         static_cast<int>(PauliProductAttr.size()));
-        }
+        llvm::StringSaver saver(*stringAllocator);
+        StringRef numRotationKindKey =
+            saver.save("num_pi" + std::to_string(abs(rotationKind)) + "_gates");
+        StringRef maxWeightRotationKindKey =
+            saver.save("max_weight_pi" + std::to_string(abs(rotationKind)));
+        (*PPMSpecs)[funcName][numRotationKindKey]++;
+        (*PPMSpecs)[funcName][maxWeightRotationKindKey] =
+            std::max((*PPMSpecs)[funcName][maxWeightRotationKindKey],
+                        static_cast<int>(PauliProductAttr.size()));
         return;
     }
     void printSpecs()
     {
         llvm::BumpPtrAllocator stringAllocator;
         llvm::DenseMap<StringRef, llvm::DenseMap<StringRef, int>> PPMSpecs;
-        // StringRef funcName;
         // Walk over all operations in the IR (could be ModuleOp or FuncOp)
         getOperation()->walk([&](Operation *op) {
             // Skip top-level container ops if desired
