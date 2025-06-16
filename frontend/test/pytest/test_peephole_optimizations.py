@@ -420,5 +420,23 @@ def test_clifford_to_ppm():
     assert ppm_specs["g_0"]["num_logical_qubits"] == 2
 
 
+def test_jit_not_implemented_capture():
+    """Make sure get_ppm_specs only works in AOT (Ahead of Time) compilation"""
+    with pytest.raises(
+        NotImplementedError,
+        match="PPM passes only support AOT \(Ahead-Of-Time\) compilation mode.",
+    ):
+        dev = qml.device("lightning.qubit", wires=2)
+
+        @qjit
+        @qml.qnode(dev)
+        def circuit(x):  # JIT mode since x is unknown
+            qml.H(x)
+            qml.CNOT(wires=[0, 1])
+            return qml.probs()
+
+        get_ppm_specs(circuit)
+
+
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
