@@ -424,7 +424,7 @@ def test_jit_not_implemented_capture():
     """Make sure get_ppm_specs only works in AOT (Ahead of Time) compilation"""
     with pytest.raises(
         NotImplementedError,
-        match="PPM passes only support AOT \(Ahead-Of-Time\) compilation mode.",
+        match=r"PPM passes only support AOT \(Ahead-Of-Time\) compilation mode.",
     ):
         dev = qml.device("lightning.qubit", wires=2)
 
