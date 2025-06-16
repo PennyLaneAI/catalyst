@@ -3,7 +3,7 @@ set(LIBRARY_NAME ion-transforms)
 file(GLOB SRC
     ion-to-llvm.cpp
     ConversionPatterns.cpp
-    quantum_to_ion.cpp
+    gates_to_pulses.cpp
     QuantumToIonPatterns.cpp
 )
 
@@ -54,7 +54,7 @@ if(CMAKE_CXX_COMPILER_ID MATCHES ".*Clang")
 set_source_files_properties(
     ion-to-llvm.cpp
     ConversionPatterns.cpp
-    quantum_to_ion.cpp
+    gates_to_pulses.cpp
     QuantumToIonPatterns.cpp
     PROPERTIES
     COMPILE_FLAGS "-Wno-covered-switch-default"

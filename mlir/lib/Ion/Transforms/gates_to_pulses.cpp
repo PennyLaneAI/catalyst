@@ -1,4 +1,4 @@
-// Copyright 2022-2023 Xanadu Quantum Technologies Inc.
+// Copyright 2025 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -34,12 +34,12 @@ using namespace mlir;
 namespace catalyst {
 namespace ion {
 
-#define GEN_PASS_DECL_QUANTUMTOIONPASS
-#define GEN_PASS_DEF_QUANTUMTOIONPASS
+#define GEN_PASS_DECL_GATESTOPULSESPASS
+#define GEN_PASS_DEF_GATESTOPULSESPASS
 #include "Ion/Transforms/Passes.h.inc"
 
-struct QuantumToIonPass : impl::QuantumToIonPassBase<QuantumToIonPass> {
-    using QuantumToIonPassBase::QuantumToIonPassBase;
+struct GatesToPulsesPass : impl::GatesToPulsesPassBase<GatesToPulsesPass> {
+    using GatesToPulsesPassBase::GatesToPulsesPassBase;
 
     LevelAttr getLevelAttr(MLIRContext *ctx, IRRewriter &builder, Level level)
     {
@@ -80,6 +80,8 @@ struct QuantumToIonPass : impl::QuantumToIonPassBase<QuantumToIonPass> {
         auto &context = getContext();
         ConversionTarget target(context);
 
+        // Only quantum gate ops (CustomOp) must be eliminated; other quantum
+        // ops are allowed to remain.
         target.addIllegalOp<catalyst::quantum::CustomOp>();
         target.addLegalDialect<IonDialect>();
         target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });
@@ -130,6 +132,6 @@ struct QuantumToIonPass : impl::QuantumToIonPassBase<QuantumToIonPass> {
 
 } // namespace ion
 
-std::unique_ptr<Pass> createQuantumToIonPass() { return std::make_unique<ion::QuantumToIonPass>(); }
+std::unique_ptr<Pass> createGatesToPulsesPass(){ return std::make_unique<ion::GatesToPulsesPass>(); }
 
 } // namespace catalyst
