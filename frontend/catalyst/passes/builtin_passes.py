@@ -785,7 +785,6 @@ def ppm_compilation(
 
 
 def get_ppm_specs(QJIT):
-    print("Type:", type(QJIT))
     R"""
     This pass gets the following PPM specs in a JSON object for each function in a qnode:
     {
