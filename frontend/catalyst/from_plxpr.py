@@ -22,7 +22,7 @@ import jax
 import jax.core
 import jax.numpy as jnp
 import pennylane as qml
-from jax.extend.core import ClosedJaxpr, Jaxpr, jaxpr_as_fun
+from jax.extend.core import ClosedJaxpr, Jaxpr
 from jax.extend.linear_util import wrap_init
 from jax.interpreters.partial_eval import convert_constvars_jaxpr
 from pennylane.capture import PlxprInterpreter, qnode_prim
@@ -239,7 +239,7 @@ transforms_to_passes = {
 def register_transform(pl_transform, pass_name, decomposition):
     """Register pennylane transforms and their conversion to Catalyst transforms"""
 
-    # pylint: disable=unused-argument, too-many-arguments, cell-var-from-loop
+    # pylint: disable=too-many-arguments
     @WorkflowInterpreter.register_primitive(pl_transform._primitive)
     def handle_transform(
         self,
@@ -325,7 +325,6 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         for orig_wire, wire in self.wire_map.items():
             # Note: since `getattr` checks specifically for qreg, we can't
             # define qreg inside the init function.
-            # pylint: disable-next=attribute-defined-outside-init
             self.qreg = qinsert_p.bind(self.qreg, orig_wire, wire)
 
     def interpret_operation(self, op):
@@ -475,7 +474,6 @@ def handle_state_prep(self, *invals, n_wires, **kwargs):
         self.wire_map[wire_values] = new_wire
 
 
-# pylint: disable=unused-argument, too-many-arguments
 @PLxPRToQuantumJaxprInterpreter.register_primitive(plxpr_cond_prim)
 def handle_cond(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
     """Handle the conversion from plxpr to Catalyst jaxpr for the cond primitive"""
@@ -500,7 +498,7 @@ def handle_cond(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
 
             closed_jaxpr = ClosedJaxpr(plxpr_branch, branch_consts)
 
-            def calling_convention(*args_plus_qreg):
+            def calling_convention(*args_plus_qreg, closed_jaxpr=closed_jaxpr):
                 *args, qreg = args_plus_qreg
                 device = self.device
                 shots = self.shots
@@ -603,7 +601,7 @@ def handle_for_loop(
     return outvals
 
 
-# pylint: disable=unused-argument, too-many-arguments
+# pylint: disable=too-many-arguments
 @PLxPRToQuantumJaxprInterpreter.register_primitive(plxpr_while_loop_prim)
 def handle_while_loop(
     self,
