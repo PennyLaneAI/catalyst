@@ -478,6 +478,7 @@ def handle_state_prep(self, *invals, n_wires, **kwargs):
 def handle_cond(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
     """Handle the conversion from plxpr to Catalyst jaxpr for the cond primitive"""
     args = plxpr_invals[args_slice]
+    self.actualize_qreg()
     args_plus_qreg = [*args, self.qreg]  # Add the qreg to the args
     converted_jaxpr_branches = []
     all_consts = []
@@ -554,6 +555,7 @@ def handle_for_loop(
     args = plxpr_invals[args_slice]
 
     # Add the iteration start and the qreg to the args
+    self.actualize_qreg()
     start_plus_args_plus_qreg = [
         start,
         *args,
@@ -612,6 +614,7 @@ def handle_while_loop(
     args_slice,
 ):
     """Handle the conversion from plxpr to Catalyst jaxpr for the while loop primitive"""
+    self.actualize_qreg()
     consts_body = plxpr_invals[body_slice]
     consts_cond = plxpr_invals[cond_slice]
     args = plxpr_invals[args_slice]
