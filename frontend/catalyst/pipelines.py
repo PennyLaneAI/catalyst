@@ -126,12 +126,12 @@ class CompileOptions:
         if self.pass_plugins is None:
             self.pass_plugins = set()
         elif isinstance(self.pass_plugins, (list, tuple, set)):
-            self.pass_plugins = {plugin for plugin in self.pass_plugins}
+            self.pass_plugins = set(self.pass_plugins)
 
         if self.dialect_plugins is None:
             self.dialect_plugins = set()
         elif isinstance(self.dialect_plugins, (list, tuple, set)):
-            self.dialect_plugins = {plugin for plugin in self.dialect_plugins}
+            self.dialect_plugins = set(self.dialect_plugins)
 
     def __deepcopy__(self, memo):
         """Make a deep copy of all fields of a CompileOptions object except the logfile, which is
