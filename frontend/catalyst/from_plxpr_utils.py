@@ -51,18 +51,34 @@ from catalyst.jax_primitives import (
 class Qreg:
     """
     A manager that handles converting plxpr wire indices into catalyst jaxpr qreg.
-    Note: No dynamic wire indices for now in from_plxpr.
+
+    There are two ways a new qreg SSA value can be created in catalyst jaxpr:
+    1. As the result of an allocation call;
+    2. As a block argument for a subscope. For us, this means a qreg passed in as an argument on a
+    subroutine, or a control flow's branch region.
+
+    There are no quantum registers in plxpr. Instead, plxpr contains a list of gates and
+    measurements applied to wires, with the wires being explicit numerical indices.
+    To convert to catalyst jaxpr's qubit semantics, the central question is the following:
+
+    * When an op on a given wire index is encountered in plxpr, what's the corresponding
+    * SSA qubit value for that index in catalyst jaxpr?
+
+    It is clear that at any point in the program, each wire (a qreg indexed into by a number)
+    must have exactly one live qubit SSA value. In other words, when a gate acts on an index `i`,
+    it should update the qubit value at index `i` on this register.
+
+    This class keeps that map from the numerical indices to the SSA qubit values.
     """
 
     abstract_qreg_val: AbstractQreg
-    wire_map: dict[int, AbstractQbit]
+    wire_map: dict[int, AbstractQbit]  # Note: No dynamic wire indices for now in from_plxpr.
 
-    def __init__(self, num_qubits):
+    def __init__(self, num_qubits, qreg_tracer=None):
         self.num_qubits = num_qubits
-        self.abstract_qreg_val = None
 
-        # plxpr always uses wire index (numbers)
-        # This map would record the wire index to the corrsponding "newest" abstract qubit value.
+        # For qreg coming in as block arguments, the SSA qreg value would exist already.
+        self.abstract_qreg_val = qreg_tracer
         self.wire_map = {}
 
     def get(self):
@@ -98,6 +114,7 @@ class Qreg:
         Create the insert primitive.
         """
         self.abstract_qreg_val = qinsert_p.bind(self.abstract_qreg_val, index, qubit)
+        self.wire_map.pop(index)
 
     def insert_all_dangling_qubits(self):
         """
@@ -107,7 +124,8 @@ class Qreg:
         or when passing qregs into and out of scopes like control flow.
         """
         for index, qubit in self.wire_map.items():
-            self.insert(index, qubit)
+            self.abstract_qreg_val = qinsert_p.bind(self.abstract_qreg_val, index, qubit)
+        self.wire_map.clear()
 
     def get_qubit_val_at_wire(self, wire: int) -> AbstractQbit:
         """Get the newest ``AbstractQbit`` corresponding to a wire index."""
