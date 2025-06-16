@@ -1500,3 +1500,36 @@ class TestCapture:
             return qml.sample()
 
         assert jnp.allclose(circuit(), capture_result)
+
+    def test_static_variable_qnode(self, backend):
+        """Test the integration for a circuit with a static variable."""
+
+        qml.capture.enable()
+
+        # Capture in qnode level
+        @qjit(static_argnums=(0,))
+        @qml.qnode(qml.device(backend, wires=1))
+        def captured_circuit_1(x, y):
+            qml.RX(x, wires=0)
+            qml.RY(y, wires=0)
+            return qml.expval(qml.PauliZ(0))
+
+        # Ignore static_argnums in the qnode
+        @qjit(static_argnums=1)
+        @qml.qnode(qml.device(backend, wires=1), static_argnums=0)
+        def captured_circuit_2(x, y):
+            qml.RX(x, wires=0)
+            qml.RY(y, wires=0)
+            return qml.expval(qml.PauliZ(0))
+
+        result_1 = captured_circuit_1(1.5, 2.0)
+        assert "stablehlo.constant dense<1.500000e+00>" in captured_circuit_1.mlir
+        assert "stablehlo.constant dense<2.000000e+00>" not in captured_circuit_1.mlir
+
+        result_2 = captured_circuit_2(1.5, 2.0)
+        assert "stablehlo.constant dense<1.500000e+00>" not in captured_circuit_2.mlir
+        assert "stablehlo.constant dense<2.000000e+00>" in captured_circuit_2.mlir
+
+        assert result_1 == result_2
+
+        qml.capture.disable()
