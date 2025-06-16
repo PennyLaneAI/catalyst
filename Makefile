@@ -21,6 +21,7 @@ TEST_BACKEND ?= "lightning.qubit"
 TEST_BRAKET ?= NONE
 ENABLE_ASAN ?= OFF
 TOML_SPECS ?= $(shell find ./runtime ./frontend -name '*.toml' -not -name 'pyproject.toml')
+ENABLE_FLAKY ?= OFF
 
 PLATFORM := $(shell uname -s)
 ifeq ($(PLATFORM),Linux)
@@ -54,7 +55,11 @@ endif
 # with the ASAN runtime. Since we don't exert much control over the "user" compiler, skip them.
 TEST_EXCLUDES := -k "not test_executable_generation"
 endif
-PYTEST_FLAGS := $(PARALLELIZE) $(TEST_EXCLUDES)
+FLAKY :=
+ifeq ($(ENABLE_FLAKY),ON)
+FLAKY := --force-flaky --max-runs=5 --min-passes=5
+endif
+PYTEST_FLAGS := $(PARALLELIZE) $(TEST_EXCLUDES) $(FLAKY)
 
 # TODO: Find out why we have container overflow on macOS.
 ASAN_OPTIONS := ASAN_OPTIONS="detect_leaks=0,detect_container_overflow=0"
