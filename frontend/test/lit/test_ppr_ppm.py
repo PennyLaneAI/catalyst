@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""This file performs the frontend tests that the PPR and PPM passes are correctly lowered, 
+"""This file performs the frontend tests that the PPR and PPM passes are correctly lowered,
 and also checks the PPM specs captured using get_ppm_specs."""
 
 # RUN: %PYTHON %s | FileCheck %s
@@ -22,7 +22,14 @@ and also checks the PPM specs captured using get_ppm_specs."""
 import pennylane as qml
 
 from catalyst import measure, qjit
-from catalyst.passes import commute_ppr, merge_ppr_ppm, ppm_compilation, ppr_to_ppm, to_ppr, get_ppm_specs
+from catalyst.passes import (
+    commute_ppr,
+    get_ppm_specs,
+    merge_ppr_ppm,
+    ppm_compilation,
+    ppr_to_ppm,
+    to_ppr,
+)
 
 
 def test_convert_clifford_to_ppr():

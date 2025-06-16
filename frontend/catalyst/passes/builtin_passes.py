@@ -844,7 +844,7 @@ def get_ppm_specs(QJIT):
                 return measure(0), measure(1)
 
             return f(), g()
-            
+
         ppm_specs = get_ppm_specs(test_convert_clifford_to_ppr_workflow)
         print(ppm_specs)
 
@@ -855,17 +855,17 @@ def get_ppm_specs(QJIT):
         . . .
         {
             'f_0': {
-                        'max_weight_pi8': 1, 
-                        'num_logical_qubits': 2, 
-                        'num_of_ppm': 2, 
+                        'max_weight_pi8': 1,
+                        'num_logical_qubits': 2,
+                        'num_of_ppm': 2,
                         'num_pi8_gates': 1
-                    }, 
+                    },
             'g_0': {
                         'max_weight_pi4': 2,
-                        'max_weight_pi8': 1, 
-                        'num_logical_qubits': 2, 
-                        'num_of_ppm': 2, 
-                        'num_pi4_gates': 3, 
+                        'max_weight_pi8': 1,
+                        'num_logical_qubits': 2,
+                        'num_of_ppm': 2,
+                        'num_pi4_gates': 3,
                         'num_pi8_gates': 2
                     }
         }
