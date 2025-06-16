@@ -22,7 +22,7 @@ import pytest
 
 import catalyst
 from catalyst import qjit
-from catalyst.from_plxpr import QFuncPlxprInterpreter, from_plxpr
+from catalyst.from_plxpr import from_plxpr
 from catalyst.jax_primitives import get_call_jaxpr
 
 pytestmark = pytest.mark.usefixtures("disable_capture")
@@ -31,7 +31,7 @@ pytestmark = pytest.mark.usefixtures("disable_capture")
 def catalyst_execute_jaxpr(jaxpr):
     """Create a function capable of executing the provided catalyst-variant jaxpr."""
 
-    # pylint: disable=too-few-public-methods
+    # pylint: disable=arguments-differ, too-few-public-methods
     class JAXPRRunner(catalyst.QJIT):
         """A variant of catalyst.QJIT with a pre-constructed jaxpr."""
 
@@ -54,7 +54,10 @@ def compare_call_jaxprs(jaxpr1, jaxpr2, skip_eqns=(), ignore_order=False):
         assert ov1.aval == ov2.aval
     assert len(jaxpr1.eqns) == len(
         jaxpr2.eqns
-    ), f"Number of equations differ: {len(jaxpr1.eqns)} vs {len(jaxpr2.eqns)}"
+    ), f"""
+    Number of equations differ: {len(jaxpr1.eqns)} vs {len(jaxpr2.eqns)},
+    {jaxpr1.eqns} vs {jaxpr2.eqns}
+    """
 
     if not ignore_order:
         # Assert that equations in both jaxprs are equivalent and in same order
@@ -99,24 +102,6 @@ def compare_eqns(eqn1, eqn2):
     for ov1, ov2 in zip(eqn1.outvars, eqn2.outvars):
         assert type(ov1) == type(ov2)  # pylint: disable=unidiomatic-typecheck
         assert ov1.aval == ov2.aval
-
-
-class TestPrivateBehavior:
-    """Tests for behavior that should not be visible to the user."""
-
-    def test_uninitialization_errors(self):
-        """Test that QFuncPlxprInterpreter raises errors if properties are not yet set."""
-
-        interpreter = QFuncPlxprInterpreter(qml.device("lightning.qubit", wires=1), shots=0)
-
-        with pytest.raises(AttributeError, match=r"execution is not yet initialized"):
-            _ = interpreter.qreg
-
-        with pytest.raises(AttributeError, match=r"execution is not yet initialized"):
-            _ = interpreter.wire_map
-
-        with pytest.raises(AttributeError, match=r"execution is not yet initialized"):
-            interpreter.wire_map = {1: 2}
 
 
 class TestErrors:
