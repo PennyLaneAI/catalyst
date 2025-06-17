@@ -1,4 +1,4 @@
-# Copyright 2022-2023 Xanadu Quantum Technologies Inc.
+# Copyright 2025 Xanadu Quantum Technologies Inc.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,8 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Version information.
-Version number (major.minor.patch[-label])
-"""
+"""Conversion from plxpr to catalyst jaxpr"""
 
-__version__ = "0.12.0-dev57"
+from catalyst.from_plxpr.control_flow import handle_cond, handle_for_loop, handle_while_loop
+from catalyst.from_plxpr.from_plxpr import from_plxpr, trace_from_pennylane

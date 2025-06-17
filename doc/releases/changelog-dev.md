@@ -253,6 +253,9 @@
 * Stacked python decorators for built-in catalyst passes are now applied in the correct order.
   [(#1798)](https://github.com/PennyLaneAI/catalyst/pull/1798)
 
+* MLIR plugins can now be specified via lists and tuples, not just sets.
+  [(#1812)](https://github.com/PennyLaneAI/catalyst/pull/1812)
+
 <h3>Internal changes ⚙️</h3>
 
 * `from_plxpr` updated to match a change in the `qnode_prim` in pennylane. consts are now treated as 
@@ -358,6 +361,12 @@
 * Refactored PPR/PPM pass names from snake_case to kebab-case in MLIR passes to align with MLIR conventions.
   Class names and tests were updated accordingly. Example: `--to_ppr` is now `--to-ppr`.
   [(#1802)](https://github.com/PennyLaneAI/catalyst/pull/1802)
+
+* A new internal python module `catalyst.from_plxpr` is created to better organize the code for plxpr capture integration.
+  [(#1813)](https://github.com/PennyLaneAI/catalyst/pull/1813)
+
+* A new `from_plxpr.QregManager` is created to handle converting plxpr wire index semantics into catalyst qubit value semantics.
+  [(#1813)](https://github.com/PennyLaneAI/catalyst/pull/1813)
 
 <h3>Documentation 📝</h3>
 
