@@ -16,12 +16,7 @@
 Qreg manager for from_plxpr conversion.
 """
 
-from catalyst.jax_primitives import (
-    AbstractQbit,
-    AbstractQreg,
-    qextract_p,
-    qinsert_p,
-)
+from catalyst.jax_primitives import AbstractQbit, AbstractQreg, qextract_p, qinsert_p
 
 
 class QregManager:
