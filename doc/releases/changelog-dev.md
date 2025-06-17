@@ -281,6 +281,9 @@
 * Stacked python decorators for built-in catalyst passes are now applied in the correct order.
   [(#1798)](https://github.com/PennyLaneAI/catalyst/pull/1798)
 
+* MLIR plugins can now be specified via lists and tuples, not just sets.
+  [(#1812)](https://github.com/PennyLaneAI/catalyst/pull/1812)
+
 <h3>Internal changes ⚙️</h3>
 
 * `null.qubit` can now support an optional `track_resources` argument which allows it to record which gates are executed.
