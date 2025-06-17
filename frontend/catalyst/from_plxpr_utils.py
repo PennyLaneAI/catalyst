@@ -19,66 +19,74 @@ Helpers for the from_plxpr conversion.
 from catalyst.jax_primitives import (
     AbstractQbit,
     AbstractQreg,
-    MeasurementPlane,
-    compbasis_p,
-    cond_p,
-    counts_p,
-    device_init_p,
-    device_release_p,
-    expval_p,
-    for_p,
-    gphase_p,
-    measure_in_basis_p,
-    measure_p,
-    namedobs_p,
-    probs_p,
     qalloc_p,
     qdealloc_p,
     qextract_p,
     qinsert_p,
-    qinst_p,
-    quantum_kernel_p,
-    sample_p,
-    set_basis_state_p,
-    set_state_p,
-    state_p,
-    unitary_p,
-    var_p,
-    while_p,
 )
 
 
-class Qreg:
+class QregManager:
     """
     A manager that handles converting plxpr wire indices into catalyst jaxpr qreg.
 
-    There are two ways a new qreg SSA value can be created in catalyst jaxpr:
-    1. As the result of an allocation call;
-    2. As a block argument for a subscope. For us, this means a qreg passed in as an argument on a
-    subroutine, or a control flow's branch region.
+    The fundamental challenge in from_plxpr is that Plxpr (and frontend PennyLane) uses wire index
+    semantics, but Catalyst jaxpr uses qubit value semantics.
 
-    There are no quantum registers in plxpr. Instead, plxpr contains a list of gates and
-    measurements applied to wires, with the wires being explicit numerical indices.
-    To convert to catalyst jaxpr's qubit semantics, the central question is the following:
+    In plxpr, there is the notion of an implicit global state, and each operation (gates, or meta-
+    ops like control flow or adjoint) is essentially an update to the global state. At any time,
+    the target of an operation is the implicit global state. This is also in line with devices:
+    most simulators have a global state vector, and hardware has the one piece of hardware that
+    gates are applied to.
 
-    * When an op on a given wire index is encountered in plxpr, what's the corresponding
-    * SSA qubit value for that index in catalyst jaxpr?
+    However, in Catalyst no such global state exists. Each (pure) operation consumes an SSA qubit
+    (or qreg for meta ops) value and return a new qubit (or qreg) value. The target of an operation,
+    while expressed by a plain wire index in plxpr, needs to be converted to the **current**
+    SSA qubit value at that index in catalyst jaxpr.
 
-    It is clear that at any point in the program, each wire (a qreg indexed into by a number)
-    must have exactly one live qubit SSA value. In other words, when a gate acts on an index `i`,
-    it should update the qubit value at index `i` on this register.
+    For example, the RX operation in the snippet (pseudo code)
+        qreg:AbstractQreg() = ...
+        q0:AbstractQbit() = qextract qreg 0
+        q1:AbstractQbit() = qinst[
+           op=RX
+        ] q0 3.14
+    would update the current qubit value on index 0 of register qreg from q0 to q1.
 
-    This class keeps that map from the numerical indices to the SSA qubit values.
+    The same goes for registers. The for loop operation in this snippet (pseudo code)
+        qreg0:AbstractQreg() = qalloc 3
+        qreg1:AbstractQreg() = for_loop[
+            body_jaxpr={ lambda ; d:i64[] e:AbstractQreg(). let
+                ...
+                yield:AbstractQreg() = ...
+              in (yield,) }
+        ] ...for_loop_args... qreg0
+    would update the current qreg value for that particular allocation from qreg0 to qreg1.
+
+    There are two places where a fresh, new qreg value (i.e. the root qreg value of a def-use
+    chain) can appear in catalyst jaxpr:
+    1. From a brand new allocation, i.e. the result of a qalloc primitive.
+    2. From an argument of the current scope's jaxpr.
+
+    With the above in mind, this `QregManager` class promises the following:
+    1. An instance of this class will always be tied to one root qreg value.
+    2. At any moment during the from_plxpr conversion:
+       - `QregManager.get()` returns the current catalyst qreg SSA value for the managed
+          root register on that instance;
+       - `QregManager[i]` returns the current catalyst qubit SSA value for the i-th index
+          on the managed root register on that instance. If none exists, a new qubit will be
+          extracted.
+
+    To achieve the above, users of this class are expected to:
+    1. Initialize an instance with the qreg SSA value from a new allocation or a new block argument;
+    2. Whenever a new meta-op/op is bind-ed, update the current qreg/qubit SSA value with:
+       - `QubitManager.set(new_qreg_value)`
+       - `QubitManager[i] = new_qubit_value`
     """
 
-    abstract_qreg_val: AbstractQreg
     wire_map: dict[int, AbstractQbit]  # Note: No dynamic wire indices for now in from_plxpr.
 
-    def __init__(self, num_qubits, qreg_tracer=None):
-        self.num_qubits = num_qubits
-
-        # For qreg coming in as block arguments, the SSA qreg value would exist already.
-        self.abstract_qreg_val = qreg_tracer
+    def __init__(self, root_qreg_value: AbstractQreg):
+        self.abstract_qreg_val = root_qreg_value
         self.wire_map = {}
 
     def get(self):
@@ -92,21 +100,13 @@ class Qreg:
         """
         self.abstract_qreg_val = qreg
 
-    def alloc(self):
-        """Create the AbstractQreg from an alloc primitive"""
-        self.abstract_qreg_val = qalloc_p.bind(self.num_qubits)
-
-    def dealloc(self):
-        """Create the dealloc primitive"""
-        qdealloc_p.bind(self.abstract_qreg_val)
-
-    def extract(self, wire: int) -> AbstractQbit:
+    def extract(self, index: int) -> AbstractQbit:
         """Create the extract primitive that produces an AbstractQbit value."""
 
         # extract must be fresh
-        assert wire not in self.wire_map
-        extracted_qubit = qextract_p.bind(self.abstract_qreg_val, wire)
-        self.wire_map[wire] = extracted_qubit
+        assert index not in self.wire_map
+        extracted_qubit = qextract_p.bind(self.abstract_qreg_val, index)
+        self.wire_map[index] = extracted_qubit
         return extracted_qubit
 
     def insert(self, index: int, qubit: AbstractQbit):
@@ -127,22 +127,18 @@ class Qreg:
             self.abstract_qreg_val = qinsert_p.bind(self.abstract_qreg_val, index, qubit)
         self.wire_map.clear()
 
-    def get_qubit_val_at_wire(self, wire: int) -> AbstractQbit:
-        """Get the newest ``AbstractQbit`` corresponding to a wire index."""
-        return self.wire_map[wire]
-
-    def get_or_extract_val_at_wire(self, wire: int) -> AbstractQbit:
+    def __getitem__(self, index: int) -> AbstractQbit:
         """
         Get the newest ``AbstractQbit`` corresponding to a wire index.
         If the qubit value does not exist yet at this index, extract the fresh qubit.
         """
-        if wire in self.wire_map:
-            return self.get_qubit_val_at_wire(wire)
-        return self.extract(wire)
+        if index in self.wire_map:
+            return self.wire_map[index]
+        return self.extract(index)
 
-    def update_qubit_val_at_wire(self, wire: int, qubit: AbstractQbit):
+    def __setitem__(self, index: int, qubit: AbstractQbit):
         """
         Update the wire_map when a new qubit value for a wire index is produced,
         for example by gates.
         """
-        self.wire_map[wire] = qubit
+        self.wire_map[index] = qubit
