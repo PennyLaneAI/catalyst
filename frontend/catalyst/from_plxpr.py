@@ -503,9 +503,8 @@ def handle_cond(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
                 device = self.device
                 shots = self.shots
                 converter = PLxPRToQuantumJaxprInterpreter(device, shots, qreg)
+                # pylint: disable-next=cell-var-from-loop
                 retval = converter(closed_jaxpr, *args)
-                # We need to define a subroutine interpreter here.
-                # That takes the qreg as an input.
                 converter.actualize_qreg()
                 return *retval, converter.qreg
 
