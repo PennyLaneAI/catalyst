@@ -19,8 +19,8 @@ the default behaviour and replacing it with a function-like "QNode" primitive.
 """
 import logging
 from copy import copy
-from typing import Callable, Sequence
 from dataclasses import replace
+from typing import Callable, Sequence
 
 import jax.numpy as jnp
 import pennylane as qml

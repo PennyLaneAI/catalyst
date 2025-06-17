@@ -15,12 +15,12 @@
 """Test built-in differentiation support in Catalyst."""
 
 import platform
+from dataclasses import replace
 
 import jax
 import numpy as np
 import pennylane as qml
 import pytest
-from dataclasses import replace
 from jax import numpy as jnp
 from jax.tree_util import tree_all, tree_flatten, tree_map, tree_structure
 
