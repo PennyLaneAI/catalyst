@@ -878,9 +878,13 @@ def get_ppm_specs(QJIT):
         raw_result = _quantum_opt(
             ("--pass-pipeline", "builtin.module(ppm-specs)"), [], stdin=QJIT.mlir_opt
         )
-        return json.loads(
-            raw_result[: raw_result.index("module")]
-        )  # remove MLIR starting with substring "module..."
+        try:
+            return json.loads(
+                raw_result[: raw_result.index("module")]
+            )  # remove MLIR starting with substring "module..."
+        except Exception as e:
+            print(e)
+            raise
 
     else:
         raise NotImplementedError("PPM passes only support AOT (Ahead-Of-Time) compilation mode.")
