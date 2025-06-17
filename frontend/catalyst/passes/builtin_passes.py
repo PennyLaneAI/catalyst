@@ -883,11 +883,11 @@ def get_ppm_specs(QJIT):
             return json.loads(
                 raw_result[: raw_result.index("module")]
             )  # remove MLIR starting with substring "module..."
-        except:
+        except Exception as e:
             raise CompileError(
                 f"Invalid json format encountered in get_ppm_specs. Got \
-                               {raw_result[: raw_result.index("module")]}"
-            )
+                    {raw_result[: raw_result.index("module")]}"
+            ) from e
 
     else:
         raise NotImplementedError("PPM passes only support AOT (Ahead-Of-Time) compilation mode.")
