@@ -507,12 +507,13 @@ def handle_cond(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
 
             closed_jaxpr = ClosedJaxpr(plxpr_branch, branch_consts)
 
-            def calling_convention(*args_plus_qreg, closed_jaxpr=closed_jaxpr):
+            def calling_convention(*args_plus_qreg):
                 *args, qreg = args_plus_qreg
                 device = self.device
                 shots = self.shots
                 qreg_manager = Qreg(self.scope_arg_qreg.num_qubits, qreg)
                 converter = PLxPRToQuantumJaxprInterpreter(device, shots, qreg_manager)
+                # pylint: disable-next=cell-var-from-loop
                 retvals = converter(closed_jaxpr, *args)
                 qreg_manager.insert_all_dangling_qubits()
                 return *retvals, converter.scope_arg_qreg.get()
@@ -633,6 +634,7 @@ def handle_while_loop(
         *args, qreg = args_plus_qreg
         device = self.device
         shots = self.shots
+
         # converter = PLxPRToQuantumJaxprInterpreter(device, shots, qreg)
         # retvals = converter(jaxpr, *args)
         # converter.actualize_qreg()
@@ -665,6 +667,7 @@ def handle_while_loop(
         # return converter(jaxpr, *args)
         qreg_manager = Qreg(self.scope_arg_qreg.num_qubits, qreg)
         converter = PLxPRToQuantumJaxprInterpreter(device, shots, qreg_manager)
+
         return converter(jaxpr, *args)
 
     converted_cond_jaxpr_branch = jax.make_jaxpr(remove_qreg)(*args_plus_qreg).jaxpr
