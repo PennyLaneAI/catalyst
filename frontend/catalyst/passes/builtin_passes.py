@@ -883,7 +883,7 @@ def get_ppm_specs(QJIT):
             return json.loads(
                 raw_result[: raw_result.index("module")]
             )  # remove MLIR starting with substring "module..."
-        except Exception as e:
+        except:
             raise CompileError(
                 f"Invalid json format encountered in get_ppm_specs. Got \
                                {raw_result[: raw_result.index("module")]}"
