@@ -14,15 +14,18 @@
 
 # RUN: %PYTHON %s | FileCheck %s
 
+"""Lit tests for the PLxPR to JAXPR with quantum primitives pipeline"""
+
 import pennylane as qml
-import catalyst
+
 
 def test_conditional_capture():
+    """Test an if statement"""
 
     qml.capture.enable()
 
     @qml.qnode(qml.device("lightning.qubit", wires=1))
-    def captured_circuit(x: float):
+    def captured_circuit():
         m = qml.measure(0)
         # CHECK: [[QREG:%.+]] = quantum.insert
         # CHECK: [[QREG_3:%.+]] = scf.if
@@ -35,22 +38,25 @@ def test_conditional_capture():
         return qml.state()
 
     @qml.qjit
-    def main(x: float):
-        return captured_circuit(x)
+    def main():
+        return captured_circuit()
 
     print(main.mlir)
 
     qml.capture.enable()
 
+
 test_conditional_capture()
 
+
 def test_loop_capture():
+    """Test a for loop"""
 
     qml.capture.enable()
 
     @qml.qnode(qml.device("lightning.qubit", wires=1))
-    def captured_circuit(x: float):
-        m = qml.measure(0)
+    def captured_circuit():
+        _ = qml.measure(0)
 
         # CHECK: [[QREG:%.+]] = quantum.insert
         # CHECK: [[QREG_4:%.+]] = scf.for {{.*}} iter_args([[QREG_2:%.+]] = [[QREG]]
@@ -66,19 +72,21 @@ def test_loop_capture():
         return qml.state()
 
     @qml.qjit
-    def main(x: float):
-        return captured_circuit(x)
+    def main():
+        return captured_circuit()
 
     print(main.mlir)
 
     qml.capture.disable()
 
+
 test_loop_capture()
 
+
 def test_while_capture():
+    """Test a while loop"""
 
     qml.capture.enable()
-
 
     # CHECK: [[QREG:%.+]] = quantum.insert
     # CHECK: [[PAIR:%.+]]:2 = scf.while {{.*}} [[QREG2:%.+]] = [[QREG]]
@@ -86,8 +94,8 @@ def test_while_capture():
     # CHECK:     scf.yield {{.*}} [[QREG3]]
     # CHECK: quantum.compbasis qreg [[PAIR]]#1
     @qml.qnode(qml.device("null.qubit", wires=1))
-    def captured_circuit(x: float):
-        m = qml.measure(0)
+    def captured_circuit():
+        _ = qml.measure(0)
 
         def less_than_10(x):
             return x[0] < 10
@@ -99,15 +107,14 @@ def test_while_capture():
 
         loop((0, 1))
         return qml.state()
-        
 
     @qml.qjit
-    def main(x: float):
-        return captured_circuit(x)
+    def main():
+        return captured_circuit()
 
     print(main.mlir)
 
     qml.capture.disable()
 
-test_while_capture()
 
+test_while_capture()
