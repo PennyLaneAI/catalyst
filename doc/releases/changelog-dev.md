@@ -256,6 +256,9 @@
 * MLIR plugins can now be specified via lists and tuples, not just sets.
   [(#1812)](https://github.com/PennyLaneAI/catalyst/pull/1812)
 
+* Fixes the conversion of PLxPR to JAXPR with quantum primitives when using control flow.
+  [(#1809)](https://github.com/PennyLaneAI/catalyst/pull/1809)
+
 <h3>Internal changes ⚙️</h3>
 
 * `null.qubit` can now support an optional `track_resources` argument which allows it to record which gates are executed.
