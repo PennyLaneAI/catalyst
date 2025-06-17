@@ -20,6 +20,7 @@ import jax
 import numpy as np
 import pennylane as qml
 import pytest
+from dataclasses import replace
 from jax import numpy as jnp
 from jax.tree_util import tree_all, tree_flatten, tree_map, tree_structure
 
@@ -1858,7 +1859,7 @@ class TestGradientMethodErrors:
             def preprocess(self, execution_config=None):
                 """Device preprocessing function."""
                 program, config = lightning_device.preprocess(execution_config)
-                config.gradient_method = grad_method
+                config = replace(config, gradient_method=grad_method)
                 return program, config
 
             @staticmethod

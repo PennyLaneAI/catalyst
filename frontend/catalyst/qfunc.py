@@ -20,6 +20,7 @@ the default behaviour and replacing it with a function-like "QNode" primitive.
 import logging
 from copy import copy
 from typing import Callable, Sequence
+from dataclasses import replace
 
 import jax.numpy as jnp
 import pennylane as qml
@@ -59,11 +60,13 @@ logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
 
-def _validate_mcm_config(mcm_config, shots):
-    """Helper function for validating that the mcm_config is valid for executing."""
-    mcm_config.postselect_mode = mcm_config.postselect_mode if shots else None
+def _resolve_mcm_config(mcm_config, shots):
+    """Helper function for resolving and validating that the mcm_config is valid for executing."""
+    updated_values = {}
+
+    updated_values["postselect_mode"] = mcm_config.postselect_mode if shots else None
     if mcm_config.mcm_method is None:
-        mcm_config.mcm_method = (
+        updated_values["mcm_method"] = (
             "one-shot" if mcm_config.postselect_mode == "hw-like" else "single-branch-statistics"
         )
     if mcm_config.mcm_method == "deferred":
@@ -79,6 +82,8 @@ def _validate_mcm_config(mcm_config, shots):
         raise ValueError(
             "Cannot use the 'one-shot' method for mid-circuit measurements with analytic mode."
         )
+
+    return replace(mcm_config, **updated_values)
 
 
 class QFunc:
@@ -119,10 +124,12 @@ class QFunc:
                 )
             )
             total_shots = get_device_shots(self.device)
-            _validate_mcm_config(mcm_config, total_shots)
+            mcm_config = _resolve_mcm_config(mcm_config, total_shots)
 
             if mcm_config.mcm_method == "one-shot":
-                mcm_config.postselect_mode = mcm_config.postselect_mode or "hw-like"
+                mcm_config = replace(
+                    mcm_config, postselect_mode=mcm_config.postselect_mode or "hw-like"
+                )
                 return Function(dynamic_one_shot(self, mcm_config=mcm_config))(*args, **kwargs)
 
         qjit_device = QJITDevice(self.device)
