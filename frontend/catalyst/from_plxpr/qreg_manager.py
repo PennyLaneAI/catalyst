@@ -13,14 +13,12 @@
 # limitations under the License.
 
 """
-Helpers for the from_plxpr conversion.
+Qreg manager for from_plxpr conversion.
 """
 
 from catalyst.jax_primitives import (
     AbstractQbit,
     AbstractQreg,
-    qalloc_p,
-    qdealloc_p,
     qextract_p,
     qinsert_p,
 )
