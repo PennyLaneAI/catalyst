@@ -78,9 +78,10 @@ class QregManager:
 
     wire_map: dict[int, AbstractQbit]  # Note: No dynamic wire indices for now in from_plxpr.
 
-    def __init__(self, root_qreg_value: AbstractQreg):
+    def __init__(self, root_qreg_value: AbstractQreg, root_hash=0):
         self.abstract_qreg_val = root_qreg_value
         self.wire_map = {}
+        self.root_hash = root_hash
 
     def get(self):
         """Return the current AbstractQreg value."""
@@ -98,7 +99,7 @@ class QregManager:
 
         # extract must be fresh
         assert index not in self.wire_map
-        extracted_qubit = qextract_p.bind(self.abstract_qreg_val, index)
+        extracted_qubit = qextract_p.bind(self.abstract_qreg_val, index - self.root_hash)
         self.wire_map[index] = extracted_qubit
         return extracted_qubit
 
@@ -106,7 +107,9 @@ class QregManager:
         """
         Create the insert primitive.
         """
-        self.abstract_qreg_val = qinsert_p.bind(self.abstract_qreg_val, index, qubit)
+        self.abstract_qreg_val = qinsert_p.bind(
+            self.abstract_qreg_val, index - self.root_hash, qubit
+        )
         self.wire_map.pop(index)
 
     def insert_all_dangling_qubits(self):
@@ -117,7 +120,9 @@ class QregManager:
         or when passing qregs into and out of scopes like control flow.
         """
         for index, qubit in self.wire_map.items():
-            self.abstract_qreg_val = qinsert_p.bind(self.abstract_qreg_val, index, qubit)
+            self.abstract_qreg_val = qinsert_p.bind(
+                self.abstract_qreg_val, index - self.root_hash, qubit
+            )
         self.wire_map.clear()
 
     def __getitem__(self, index: int) -> AbstractQbit:

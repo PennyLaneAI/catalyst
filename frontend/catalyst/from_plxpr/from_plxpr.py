@@ -41,6 +41,7 @@ from catalyst.device import extract_backend_info, get_device_capabilities
 from catalyst.from_plxpr.qreg_manager import QregManager
 from catalyst.jax_extras import jaxpr_pad_consts, make_jaxpr2, transient_jax_config
 from catalyst.jax_primitives import (
+    AbstractQbit,
     MeasurementPlane,
     compbasis_p,
     cond_p,
@@ -65,6 +66,7 @@ from catalyst.jax_primitives import (
     var_p,
 )
 from catalyst.passes.pass_api import Pass
+from catalyst.utils.exceptions import CompileError
 
 measurement_map = {
     qml.measurements.SampleMP: sample_p,
@@ -169,7 +171,7 @@ class WorkflowInterpreter(PlxprInterpreter):
 def handle_qnode(self, *args, qnode, shots, device, execution_config, qfunc_jaxpr, batch_dims=None):
     """Handle the conversion from plxpr to Catalyst jaxpr for the qnode primitive"""
 
-    closed_jaxpr = ClosedJaxpr(qfunc_jaxpr, consts)
+    closed_jaxpr = ClosedJaxpr(qfunc_jaxpr, [])
 
     def extract_shots_value(shots: qml.measurements.Shots | int):
         """Extract the shots value according to the type"""
@@ -199,7 +201,7 @@ def handle_qnode(self, *args, qnode, shots, device, execution_config, qfunc_jaxp
 
     return quantum_kernel_p.bind(
         wrap_init(calling_convention, debug_info=qfunc_jaxpr.debug_info),
-        *non_const_args,
+        *args,
         qnode=qnode,
         pipeline=self._pass_pipeline,
     )
@@ -290,15 +292,36 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
     def __init__(self, device, shots, qreg_manager):
         self.device = device
         self.shots = shots
-        # TODO: we assume the qreg value passed into a scope is the unique qreg in the scope
-        # In other words, we assume no new qreg will be allocated in the scope
-        self.qreg_manager = qreg_manager
+        self.qregs = {"global": qreg_manager}
+        self.qreg_manager = self.qregs["global"]
         super().__init__()
+
+    def _get_wire_value_and_qreg(self, wire: int):
+        """
+        Get the qubit SSA value from the unique index.
+        Also return the qreg manager containing the qubit for convenience.
+
+        Note that wire indices in plxpr are global.
+        The global register has "regular" indices like 0,1,2,...
+        The dynamically allocated registers have hashed indices (i.e. big numbers).
+        """
+        if wire < len(self.device.wires):
+            return self.qreg_manager[wire], self.qreg_manager
+
+        for qreg_manager in self.qregs.values():
+            if wire in qreg_manager.wire_map:
+                return qreg_manager[wire], qreg_manager
 
     def interpret_operation(self, op):
         """Re-bind a pennylane operation as a catalyst instruction."""
 
-        in_qubits = [self.qreg_manager[w] for w in op.wires]
+        in_qubits_and_qregs = [self._get_wire_value_and_qreg(w) for w in op.wires]
+        in_qubits = []
+        in_qregs = []
+        for in_qubit, in_qreg in in_qubits_and_qregs:
+            in_qubits.append(in_qubit)
+            in_qregs.append(in_qreg)
+
         out_qubits = qinst_p.bind(
             *[*in_qubits, *op.data],
             op=op.name,
@@ -307,8 +330,8 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
             ctrl_len=0,
             adjoint=False,
         )
-        for wire_values, new_wire in zip(op.wires, out_qubits):
-            self.qreg_manager[wire_values] = new_wire
+        for in_qreg, wire_values, new_wire in zip(in_qregs, op.wires, out_qubits):
+            in_qreg[wire_values] = new_wire
 
         return out_qubits
 
@@ -395,49 +418,32 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         return self.eval(jaxpr.jaxpr, jaxpr.consts, *args)
 
 
-@QFuncPlxprInterpreter.register_primitive(qml.allocation._get_allocate_prim())
+@PLxPRToQuantumJaxprInterpreter.register_primitive(qml.allocation._get_allocate_prim())
 def handle_qml_alloc(self, *, num_wires, require_zeros=True):
     """Handle the conversion from plxpr to Catalyst jaxpr for the qml.allocate primitive"""
-    num_qubits_global_qreg = len(self._device.wires)
+
     new_qreg = qalloc_p.bind(num_wires)
-    # TODO: what if another qml.alloc is encountered when the previous one is not dealloced??
-    self.stateref["dyn_qreg"] = new_qreg
+
+    # use hash to guarantee indices are unique integers
+    root_hash = hash(new_qreg)
+    self.qregs[new_qreg] = QregManager(new_qreg, root_hash)
+
+    # The plxpr alloc primitive returns the list of all indices available in the new qreg
+    # So let's extract all qubits and return them
     qubits = []
-    for i, wire_value in enumerate(
-        range(num_qubits_global_qreg, num_qubits_global_qreg + num_wires)
-    ):
-        print(wire_value)
-        # Lazy impl: just extract all new work wires for now, this is easier to implement
-        # TODO: what if another qml.alloc is encountered when the previous one is not dealloced??
-        # Be more careful about global indices....
-        # But now, let's just get a basic thing out the door
-        new_qubit = qextract_p.bind(new_qreg, i)
-        self.wire_map[wire_value] = new_qubit
-        # qubits.append(new_qubit)
-        qubits.append(wire_value)
-    # breakpoint()
+    for i in range(num_wires):
+        unique_index = root_hash + i
+        self.qregs[new_qreg].extract(unique_index)
+        qubits.append(unique_index)
     return qubits
 
 
-@QFuncPlxprInterpreter.register_primitive(qml.allocation._get_deallocate_prim())
+@PLxPRToQuantumJaxprInterpreter.register_primitive(qml.allocation._get_deallocate_prim())
 def handle_qml_dealloc(self, *wires, reset_to_original=False):
     """Handle the conversion from plxpr to Catalyst jaxpr for the qml.deallocate primitive"""
-    # breakpoint()
-    # Insert back all dangling qubits from the work qreg
-    # Ideally we expand the functionality of the qreg actualization to work with temp qregs
-    # instead of just the initial global qreg
-    # But again, I'm just trying to build a simple impl now as a first draft
-    # I am also dealing with the simple case, where an qml.allocate is never launched within another
-    # So I just insert back all qubits whose indices are not covered by the global qreg
-
-    num_qubits_global_qreg = len(self._device.wires)
-    for wire in wires:
-        self.stateref["dyn_qreg"] = qinsert_p.bind(
-            self.stateref["dyn_qreg"], wire - num_qubits_global_qreg, self.wire_map[wire]
-        )
-    # breakpoint()
-    qdealloc_p.bind(self.stateref["dyn_qreg"])
-    # breakpoint()
+    qreg = self._get_wire_value_and_qreg(wires[0])[1]
+    qreg.insert_all_dangling_qubits()
+    qdealloc_p.bind(qreg.get())
     return []
 
 
