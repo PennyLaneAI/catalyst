@@ -815,38 +815,20 @@ def get_ppm_specs(QJIT):
 
         import pennylane as qml
         from catalyst import qjit, measure
-        from catalyst.passes import get_ppm_specs, to_ppr, merge_ppr_ppm, commute_ppr
+        from catalyst.passes import get_ppm_specs, ppm_compilation
 
         pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+        device = qml.device("lightning.qubit", wires=2)
 
         @qjit(pipelines=pipe, target="mlir")
-        def test_convert_clifford_to_ppr_workflow():
+        @ppm_compilation
+        @qml.qnode(device)
+        def circuit():
+            qml.H(0)
+            qml.CNOT([0,1])
+            return measure(0), measure(1)
 
-            device = qml.device("lightning.qubit", wires=2)
-
-            @merge_ppr_ppm
-            @commute_ppr(max_pauli_size=2)
-            @to_ppr
-            @qml.qnode(device)
-            def f():
-                qml.CNOT([0, 2])
-                qml.T(0)
-                return measure(0), measure(1)
-
-            @merge_ppr_ppm(max_pauli_size=1)
-            @commute_ppr
-            @to_ppr
-            @qml.qnode(device)
-            def g():
-                qml.CNOT([0, 2])
-                qml.T(0)
-                qml.T(1)
-                qml.CNOT([0, 1])
-                return measure(0), measure(1)
-
-            return f(), g()
-
-        ppm_specs = get_ppm_specs(test_convert_clifford_to_ppr_workflow)
+        ppm_specs = get_ppm_specs(circuit)
         print(ppm_specs)
 
     Example PPM Specs:
@@ -855,20 +837,10 @@ def get_ppm_specs(QJIT):
 
         . . .
         {
-            'f_0': {
-                        'max_weight_pi8': 1,
+            'circuit_0': {
                         'num_logical_qubits': 2,
                         'num_of_ppm': 2,
-                        'num_pi8_gates': 1
                     },
-            'g_0': {
-                        'max_weight_pi4': 2,
-                        'max_weight_pi8': 1,
-                        'num_logical_qubits': 2,
-                        'num_of_ppm': 2,
-                        'num_pi4_gates': 3,
-                        'num_pi8_gates': 2
-                    }
         }
         . . .
 
