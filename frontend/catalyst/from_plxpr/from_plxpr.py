@@ -305,6 +305,13 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         The global register has "regular" indices like 0,1,2,...
         The dynamically allocated registers have hashed indices (i.e. big numbers).
         """
+
+        # Bail out for dynamic case
+        # What about pre-extracting all the global reg's wires?
+        # That would make life so much easier......
+        if not isinstance(wire, int):
+            return self.qreg_manager[wire], self.qreg_manager
+
         if wire < len(self.device.wires):
             return self.qreg_manager[wire], self.qreg_manager
 
