@@ -37,7 +37,7 @@
   Use this pass via the :func:`~.passes.ppm_compilation` decorator to compile circuits 
   in a single pipeline.
 
-  * Function `get_ppm_specs` to get the specs in a JSON object after a PPR/PPM compilations is ran
+  * A new function `get_ppm_specs` to get the result statistics after a PPR/PPM compilations is available. The statistics is returned in a Python dictionary.
   [(#1794)](https://github.com/PennyLaneAI/catalyst/pull/1794). 
   
   Example below shows an input circuit and corresponding PPM specs.

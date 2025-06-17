@@ -19,6 +19,7 @@ import json
 
 from catalyst.compiler import _quantum_opt
 from catalyst.passes.pass_api import PassPipelineWrapper
+from catalyst.utils.exceptions import CompileError
 
 
 ## API ##
@@ -883,8 +884,10 @@ def get_ppm_specs(QJIT):
                 raw_result[: raw_result.index("module")]
             )  # remove MLIR starting with substring "module..."
         except Exception as e:
-            print(e)
-            raise
+            raise CompileError(
+                f"Invalid json format encountered in get_ppm_specs. Got \
+                               {raw_result[: raw_result.index("module")]}"
+            )
 
     else:
         raise NotImplementedError("PPM passes only support AOT (Ahead-Of-Time) compilation mode.")

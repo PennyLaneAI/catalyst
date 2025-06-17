@@ -12,8 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""This file performs the frontend tests that the PPR and PPM passes are correctly lowered,
-and also checks the PPM specs captured using get_ppm_specs."""
+"""This file performs the frontend tests that the PPR and PPM passes are correctly lowered."""
 
 # RUN: %PYTHON %s | FileCheck %s
 
@@ -22,14 +21,7 @@ and also checks the PPM specs captured using get_ppm_specs."""
 import pennylane as qml
 
 from catalyst import measure, qjit
-from catalyst.passes import (
-    commute_ppr,
-    get_ppm_specs,
-    merge_ppr_ppm,
-    ppm_compilation,
-    ppr_to_ppm,
-    to_ppr,
-)
+from catalyst.passes import commute_ppr, merge_ppr_ppm, ppm_compilation, ppr_to_ppm, to_ppr
 
 
 def test_convert_clifford_to_ppr():
@@ -51,13 +43,11 @@ def test_convert_clifford_to_ppr():
         return measure(0)
 
     print(circuit.mlir_opt)
-    print(get_ppm_specs(circuit))
 
 
 # CHECK-NOT: transform.apply_registered_pass "to-ppr"
 # CHECK: qec.ppr
 # CHECK: qec.ppm
-# CHECK: {'circuit_0': {'max_weight_pi4': 2, 'max_weight_pi8': 1, 'num_logical_qubits': 2, 'num_of_ppm': 1, 'num_pi4_gates': 7, 'num_pi8_gates': 1}}
 test_convert_clifford_to_ppr()
 
 
@@ -82,7 +72,6 @@ def test_commute_ppr():
         return measure(0), measure(1)
 
     print(cir_commute_ppr.mlir_opt)
-    print(get_ppm_specs(cir_commute_ppr))
 
 
 # CHECK-LABEL: public @cir_commute_ppr
@@ -90,7 +79,6 @@ def test_commute_ppr():
 # CHECK: qec.ppr ["Z"](8)
 # CHECK: qec.ppr ["Z"](4)
 # CHECK: qec.ppr ["Z"](4)
-# CHECK: {'cir_commute_ppr_0': {'max_weight_pi4': 2, 'max_weight_pi8': 1, 'num_logical_qubits': 2, 'num_of_ppm': 2, 'num_pi4_gates': 7, 'num_pi8_gates': 2}}
 test_commute_ppr()
 
 
@@ -117,13 +105,11 @@ def test_commute_ppr_max_pauli_size():
         return measure(0), measure(1)
 
     print(cir_commute_ppr_max_pauli_size.mlir_opt)
-    print(get_ppm_specs(cir_commute_ppr_max_pauli_size))
 
 
 # CHECK-LABEL: public @cir_commute_ppr_max_pauli_size
 # CHECK-NOT: qec.ppr ["Y", "X", "X"](-8)
 # CHECK: qec.ppr ["X", "X"](8)
-# CHECK: {'cir_commute_ppr_max_pauli_size_0': {'max_weight_pi4': 2, 'max_weight_pi8': 2, 'num_logical_qubits': 2, 'num_of_ppm': 2, 'num_pi4_gates': 10, 'num_pi8_gates': 3}}
 test_commute_ppr_max_pauli_size()
 
 
@@ -146,14 +132,12 @@ def test_merge_ppr_ppm():
         return measure(0), measure(1)
 
     print(cir_merge_ppr_ppm.mlir_opt)
-    print(get_ppm_specs(cir_merge_ppr_ppm))
 
 
 # CHECK-LABEL: public @cir_merge_ppr_ppm
 # CHECK-NOT: qec.ppr
 # CHECK: qec.ppm ["Z", "X"]
 # CHECK: qec.ppm ["X"]
-# CHECK: {'cir_merge_ppr_ppm_0': {'num_logical_qubits': 2, 'num_of_ppm': 2}}
 test_merge_ppr_ppm()
 
 
@@ -177,13 +161,11 @@ def test_merge_ppr_ppm_max_pauli_size():
         return measure(0), measure(1)
 
     print(cir_merge_ppr_ppm_max_pauli_size.mlir_opt)
-    print(get_ppm_specs(cir_merge_ppr_ppm_max_pauli_size))
 
 
 # CHECK-LABEL: public @cir_merge_ppr_ppm_max_pauli_size
 # CHECK-NOT: qec.ppm ["Z", "Z"]
 # CHECK:  qec.ppm ["Y"](-1)
-# CHECK: {'cir_merge_ppr_ppm_max_pauli_size_0': {'max_weight_pi4': 2, 'max_weight_pi8': 1, 'num_logical_qubits': 2, 'num_of_ppm': 2, 'num_pi4_gates': 3, 'num_pi8_gates': 2}}
 test_merge_ppr_ppm_max_pauli_size()
 
 
@@ -216,7 +198,6 @@ def test_ppr_to_ppm():
         return cir_default(), cir_inject_magic_state()
 
     print(circuit_ppr_to_ppm.mlir_opt)
-    print(get_ppm_specs(circuit_ppr_to_ppm))
 
 
 # CHECK-LABEL: public @cir_default_0
@@ -244,7 +225,6 @@ def test_ppr_to_ppm():
 # CHECK: qec.ppm ["X"] {{.+}} : !quantum.bit
 # CHECK: arith.xori
 # CHECK: qec.ppr ["Z", "X"](2) {{.+}},{{.+}} cond({{.+}})
-# CHECK: {'cir_default_0': {'max_weight_pi2': 1, 'num_logical_qubits': 2, 'num_of_ppm': 2, 'num_pi2_gates': 1}, 'cir_inject_magic_state_0': {'max_weight_pi2': 2, 'num_logical_qubits': 2, 'num_of_ppm': 10, 'num_pi2_gates': 5}}
 test_ppr_to_ppm()
 
 
@@ -286,7 +266,6 @@ def test_clifford_to_ppm():
         return cir_clifford_to_ppm(), cir_clifford_to_ppm_with_params()
 
     print(test_clifford_to_ppm_workflow.mlir_opt)
-    print(get_ppm_specs(test_clifford_to_ppm_workflow))
 
 
 # CHECK-LABEL: public @cir_clifford_to_ppm
@@ -303,5 +282,4 @@ def test_clifford_to_ppm():
 # CHECK-NOT: qec.ppm [{{.+}}, {{.+}}, {{.+}}, {{.+}}]
 # It can be decomposed to three pauli strings in decomposing ppr to ppm
 # CHECK: qec.ppm [{{.+}}, {{.+}}, {{.+}}]
-# CHECK: {'cir_clifford_to_ppm_0': {'max_weight_pi2': 2, 'num_logical_qubits': 2, 'num_of_ppm': 8, 'num_pi2_gates': 2}, 'cir_clifford_to_ppm_with_params_0': {'max_weight_pi2': 2, 'num_logical_qubits': 5, 'num_of_ppm': 119, 'num_pi2_gates': 57}}
 test_clifford_to_ppm()

@@ -210,6 +210,13 @@ def test_convert_clifford_to_ppr():
     assert 'transform.apply_registered_pass "to-ppr"' not in optimized_ir
     assert "qec.ppr" in optimized_ir
 
+    ppm_specs = get_ppm_specs(test_convert_clifford_to_ppr_workflow)
+    assert ppm_specs["f_0"]["num_logical_qubits"] == 2
+    assert ppm_specs["f_0"]["num_pi4_gates"] == 7
+    assert ppm_specs["f_0"]["max_weight_pi4"] == 2
+    assert ppm_specs["f_0"]["num_pi8_gates"] == 1
+    assert ppm_specs["f_0"]["max_weight_pi8"] == 1
+
 
 def test_commute_ppr():
 
@@ -236,6 +243,14 @@ def test_commute_ppr():
     assert "qec.ppr" in optimized_ir
     assert "qec.ppm" in optimized_ir
 
+    ppm_specs = get_ppm_specs(test_commute_ppr_workflow)
+    assert ppm_specs["f_0"]["num_of_ppm"] == 2
+    assert ppm_specs["f_0"]["num_logical_qubits"] == 2
+    assert ppm_specs["f_0"]["num_pi4_gates"] == 7
+    assert ppm_specs["f_0"]["max_weight_pi4"] == 2
+    assert ppm_specs["f_0"]["num_pi8_gates"] == 1
+    assert ppm_specs["f_0"]["max_weight_pi8"] == 1
+
 
 def test_merge_ppr_ppm():
 
@@ -260,6 +275,10 @@ def test_merge_ppr_ppm():
     assert 'transform.apply_registered_pass "merge-ppr-ppm"' not in optimized_ir
     assert 'qec.ppm ["Z", "X"]' in optimized_ir
     assert 'qec.ppm ["X"]' in optimized_ir
+
+    ppm_specs = get_ppm_specs(test_merge_ppr_ppm_workflow)
+    assert ppm_specs["f_0"]["num_of_ppm"] == 2
+    assert ppm_specs["f_0"]["num_logical_qubits"] == 2
 
 
 def test_ppr_to_ppm():
@@ -296,6 +315,12 @@ def test_ppr_to_ppm():
     assert "qec.select.ppm" in optimized_ir
     assert 'qec.ppr ["X"]' in optimized_ir
 
+    ppm_specs = get_ppm_specs(test_ppr_to_ppm_workflow)
+    assert ppm_specs["f_0"]["num_of_ppm"] == 19
+    assert ppm_specs["f_0"]["num_logical_qubits"] == 2
+    assert ppm_specs["f_0"]["num_pi2_gates"] == 8
+    assert ppm_specs["f_0"]["max_weight_pi2"] == 2
+
 
 def test_ppr_to_ppm_inject_magic_state():
 
@@ -326,6 +351,12 @@ def test_ppr_to_ppm_inject_magic_state():
     optimized_ir = test_ppr_to_ppm_workflow.mlir_opt
     assert 'transform.apply_registered_pass "decompose-non-clifford-ppr"' not in optimized_ir
     assert 'transform.apply_registered_pass "decompose-clifford-ppr"' not in optimized_ir
+
+    ppm_specs = get_ppm_specs(test_ppr_to_ppm_workflow)
+    assert ppm_specs["f_0"]["num_of_ppm"] == 20
+    assert ppm_specs["f_0"]["num_logical_qubits"] == 2
+    assert ppm_specs["f_0"]["num_pi2_gates"] == 9
+    assert ppm_specs["f_0"]["max_weight_pi2"] == 2
 
 
 def test_commute_ppr_and_merge_ppr_ppm_with_max_pauli_size():
@@ -371,6 +402,20 @@ def test_commute_ppr_and_merge_ppr_ppm_with_max_pauli_size():
     optimized_ir = test_convert_clifford_to_ppr_workflow.mlir_opt
     assert 'transform.apply_registered_pass "commute-ppr"' not in optimized_ir
     assert 'transform.apply_registered_pass "merge-ppr-ppm"' not in optimized_ir
+
+    ppm_specs = get_ppm_specs(test_convert_clifford_to_ppr_workflow)
+
+    assert ppm_specs["f_0"]["num_logical_qubits"] == 2
+    assert ppm_specs["f_0"]["num_of_ppm"] == 2
+    assert ppm_specs["f_0"]["num_pi8_gates"] == 1
+    assert ppm_specs["f_0"]["max_weight_pi8"] == 1
+
+    assert ppm_specs["g_0"]["num_logical_qubits"] == 2
+    assert ppm_specs["g_0"]["num_of_ppm"] == 2
+    assert ppm_specs["g_0"]["num_pi4_gates"] == 3
+    assert ppm_specs["g_0"]["max_weight_pi4"] == 2
+    assert ppm_specs["g_0"]["num_pi8_gates"] == 2
+    assert ppm_specs["g_0"]["max_weight_pi8"] == 1
 
 
 def test_clifford_to_ppm():
