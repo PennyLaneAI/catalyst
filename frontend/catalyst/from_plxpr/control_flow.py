@@ -16,66 +16,19 @@
 Conversion from control flow plxpr primitives.
 """
 
-from functools import partial
-from typing import Callable
 
 import jax
 import jax.core
-import jax.numpy as jnp
-import pennylane as qml
-from jax.extend.core import ClosedJaxpr, Jaxpr
-from jax.extend.linear_util import wrap_init
+from jax.extend.core import ClosedJaxpr
 from jax.interpreters.partial_eval import convert_constvars_jaxpr
-from pennylane.capture import PlxprInterpreter, qnode_prim
-from pennylane.capture.expand_transforms import ExpandTransformsInterpreter
 from pennylane.capture.primitives import cond_prim as plxpr_cond_prim
 from pennylane.capture.primitives import for_loop_prim as plxpr_for_loop_prim
-from pennylane.capture.primitives import measure_prim as plxpr_measure_prim
 from pennylane.capture.primitives import while_loop_prim as plxpr_while_loop_prim
-from pennylane.ftqc.primitives import measure_in_basis_prim as plxpr_measure_in_basis_prim
-from pennylane.ops.functions.map_wires import _map_wires_transform as pl_map_wires
-from pennylane.transforms import cancel_inverses as pl_cancel_inverses
-from pennylane.transforms import commute_controlled as pl_commute_controlled
-from pennylane.transforms import decompose as pl_decompose
-from pennylane.transforms import merge_amplitude_embedding as pl_merge_amplitude_embedding
-from pennylane.transforms import merge_rotations as pl_merge_rotations
-from pennylane.transforms import single_qubit_fusion as pl_single_qubit_fusion
-from pennylane.transforms import unitary_to_rot as pl_unitary_to_rot
 
-from catalyst.device import extract_backend_info, get_device_capabilities
 from catalyst.from_plxpr.from_plxpr import PLxPRToQuantumJaxprInterpreter
 from catalyst.from_plxpr.qreg_manager import QregManager
-from catalyst.jax_extras import jaxpr_pad_consts, make_jaxpr2, transient_jax_config
-from catalyst.jax_primitives import (
-    AbstractQbit,
-    MeasurementPlane,
-    compbasis_p,
-    cond_p,
-    counts_p,
-    device_init_p,
-    device_release_p,
-    expval_p,
-    for_p,
-    gphase_p,
-    measure_in_basis_p,
-    measure_p,
-    namedobs_p,
-    probs_p,
-    qalloc_p,
-    qdealloc_p,
-    qextract_p,
-    qinsert_p,
-    qinst_p,
-    quantum_kernel_p,
-    sample_p,
-    set_basis_state_p,
-    set_state_p,
-    state_p,
-    unitary_p,
-    var_p,
-    while_p,
-)
-from catalyst.passes.pass_api import Pass
+from catalyst.jax_extras import jaxpr_pad_consts
+from catalyst.jax_primitives import cond_p, for_p, while_p
 
 
 @PLxPRToQuantumJaxprInterpreter.register_primitive(plxpr_cond_prim)
