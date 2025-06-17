@@ -358,6 +358,12 @@
   Class names and tests were updated accordingly. Example: `--to_ppr` is now `--to-ppr`.
   [(#1802)](https://github.com/PennyLaneAI/catalyst/pull/1802)
 
+* A new internal python module `catalyst.from_plxpr` is created to better organize the code for plxpr capture integration.
+  [(#1813)](https://github.com/PennyLaneAI/catalyst/pull/1813)
+
+* A new `from_plxpr.QregManager` is created to handle converting plxpr wire index semantics into catalyst qubit value semantics.
+  [(#1813)](https://github.com/PennyLaneAI/catalyst/pull/1813)
+
 <h3>Documentation 📝</h3>
 
 * The header (logo+title) images in the README and in the overview on RtD have been updated,
