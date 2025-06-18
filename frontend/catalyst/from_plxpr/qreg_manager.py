@@ -93,6 +93,13 @@ class QregManager:
         """
         self.abstract_qreg_val = qreg
 
+        # The old qreg SSA value is no longer usable since a new one has appeared
+        # Therefore all dangling qubits from the old one needs to be inserted back
+        # TODO: wait for
+        #  https://github.com/PennyLaneAI/catalyst/pull/1809
+        # to go in first
+        # self.insert_all_dangling_qubits()
+
     def extract(self, index: int) -> AbstractQbit:
         """Create the extract primitive that produces an AbstractQbit value."""
 
