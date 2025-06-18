@@ -38,7 +38,7 @@ from pennylane.transforms import single_qubit_fusion as pl_single_qubit_fusion
 from pennylane.transforms import unitary_to_rot as pl_unitary_to_rot
 
 from catalyst.device import extract_backend_info, get_device_capabilities
-from catalyst.from_plxpr.qreg_manager import QregManager
+from catalyst.from_plxpr.qreg_manager import QregManager, QubitIndexRecorder
 from catalyst.jax_extras import jaxpr_pad_consts, make_jaxpr2, transient_jax_config
 from catalyst.jax_primitives import (
     AbstractQbit,
@@ -154,15 +154,18 @@ def from_plxpr(plxpr: ClosedJaxpr) -> Callable[..., Jaxpr]:
         in (b,) }
 
     """
-    return jax.make_jaxpr(partial(WorkflowInterpreter().eval, plxpr.jaxpr, plxpr.consts))
+    return jax.make_jaxpr(
+        partial(WorkflowInterpreter(QubitIndexRecorder()).eval, plxpr.jaxpr, plxpr.consts)
+    )
 
 
 class WorkflowInterpreter(PlxprInterpreter):
     """An interpreter that converts a qnode primitive from a plxpr variant to a catalxpr variant."""
 
-    def __init__(self):
+    def __init__(self, qubit_index_recorder: QubitIndexRecorder):
         self._pass_pipeline = []
         self.global_qreg = None
+        self.qubit_index_recorder = qubit_index_recorder
         super().__init__()
 
 
@@ -190,9 +193,15 @@ def handle_qnode(self, *args, qnode, shots, device, execution_config, qfunc_jaxp
             auto_qubit_management=(device.wires is None),
             **_get_device_kwargs(device),
         )
+
         qreg = qalloc_p.bind(len(device.wires))
-        self.global_qreg = QregManager(qreg)
-        converter = PLxPRToQuantumJaxprInterpreter(device, shots, self.global_qreg)
+        self.global_qreg = QregManager(qreg, self.qubit_index_recorder)
+        # Special: distinguish the global qreg by forcing a hash of zero
+        self.global_qreg.root_hash = 0
+
+        converter = PLxPRToQuantumJaxprInterpreter(
+            device, shots, self.global_qreg, self.qubit_index_recorder
+        )
         retvals = converter(closed_jaxpr, *args)
         self.global_qreg.insert_all_dangling_qubits()
         qdealloc_p.bind(self.global_qreg.get())
@@ -289,11 +298,12 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
     during initialization.
     """
 
-    def __init__(self, device, shots, qreg_manager):
+    def __init__(self, device, shots, qreg_manager, qubit_index_recorder):
         self.device = device
         self.shots = shots
         self.qregs = {"global": qreg_manager}
         self.qreg_manager = self.qregs["global"]
+        self.qubit_index_recorder = qubit_index_recorder
         super().__init__()
 
     def _get_wire_value_and_qreg(self, wire: int):
@@ -322,12 +332,27 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
     def interpret_operation(self, op):
         """Re-bind a pennylane operation as a catalyst instruction."""
 
-        in_qubits_and_qregs = [self._get_wire_value_and_qreg(w) for w in op.wires]
         in_qubits = []
         in_qregs = []
-        for in_qubit, in_qreg in in_qubits_and_qregs:
-            in_qubits.append(in_qubit)
-            in_qregs.append(in_qreg)
+        for w in op.wires:
+            # Note: `w` is the plxpr global wire index
+
+            # Special: first gate on a wire on the global register do not have pre-extracted
+            # qubit SSA values
+            if w not in self.qubit_index_recorder.map:
+                # small protection: assert that this is indeed a wire on the global reg
+                # bail out for dynamic...
+                if isinstance(w, int):
+                    assert w < len(self.device.wires)
+                in_qubits.append(
+                    self.qreg_manager[self.qreg_manager.global_index_to_local_index(w)]
+                )
+                in_qregs.append(self.qreg_manager)
+
+            else:
+                in_qreg = self.qubit_index_recorder[w]
+                in_qregs.append(in_qreg)
+                in_qubits.append(in_qreg[in_qreg.global_index_to_local_index(w)])
 
         out_qubits = qinst_p.bind(
             *[*in_qubits, *op.data],
@@ -337,8 +362,8 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
             ctrl_len=0,
             adjoint=False,
         )
-        for in_qreg, wire_values, new_wire in zip(in_qregs, op.wires, out_qubits):
-            in_qreg[wire_values] = new_wire
+        for in_qreg, w, new_wire in zip(in_qregs, op.wires, out_qubits):
+            in_qreg[in_qreg.global_index_to_local_index(w)] = new_wire
 
         return out_qubits
 
@@ -431,24 +456,21 @@ def handle_qml_alloc(self, *, num_wires, require_zeros=True):
 
     new_qreg = qalloc_p.bind(num_wires)
 
-    # use hash to guarantee indices are unique integers
-    root_hash = hash(new_qreg)
-    self.qregs[new_qreg] = QregManager(new_qreg, root_hash)
+    self.qregs[new_qreg] = QregManager(new_qreg, self.qubit_index_recorder)
 
     # The plxpr alloc primitive returns the list of all indices available in the new qreg
     # So let's extract all qubits and return them
     qubits = []
     for i in range(num_wires):
-        unique_index = root_hash + i
-        self.qregs[new_qreg].extract(unique_index)
-        qubits.append(unique_index)
-    return qubits
+        self.qregs[new_qreg].extract(i)
+
+    return self.qregs[new_qreg].get_all_current_global_indices()
 
 
 @PLxPRToQuantumJaxprInterpreter.register_primitive(qml.allocation._get_deallocate_prim())
 def handle_qml_dealloc(self, *wires, reset_to_original=False):
     """Handle the conversion from plxpr to Catalyst jaxpr for the qml.deallocate primitive"""
-    qreg = self._get_wire_value_and_qreg(wires[0])[1]
+    qreg = self.qubit_index_recorder[wires[0]]
     qreg.insert_all_dangling_qubits()
     qdealloc_p.bind(qreg.get())
     return []
@@ -457,6 +479,7 @@ def handle_qml_dealloc(self, *wires, reset_to_original=False):
 @PLxPRToQuantumJaxprInterpreter.register_primitive(qml.QubitUnitary._primitive)
 def handle_qubit_unitary(self, *invals, n_wires):
     """Handle the conversion from plxpr to Catalyst jaxpr for the QubitUnitary primitive"""
+    # TODO: update all of the ops' in and out wires
     wires = [self.qreg_manager[w] for w in invals[1:]]
     outvals = unitary_p.bind(invals[0], *wires, qubits_len=n_wires, ctrl_len=0, adjoint=False)
     for wire_values, new_wire in zip(invals[1:], outvals):
@@ -571,7 +594,6 @@ def trace_from_pennylane(fn, static_argnums, abstracted_axes, sig, kwargs, debug
         args = sig
 
         plxpr, out_type, out_treedef = make_jaxpr2(fn, **make_jaxpr_kwargs)(*args, **kwargs)
-        # breakpoint()
         jaxpr = from_plxpr(plxpr)(*args, **kwargs)
         # breakpoint()
 
