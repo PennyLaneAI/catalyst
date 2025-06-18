@@ -4,15 +4,11 @@
 #include "Catalyst/IR/CatalystDialect.h"
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/IR/QuantumOps.h"
-#include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Rewrite/PatternApplicator.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Debug.h"
-// #include <unordered_map>
 #include "llvm/ADT/DenseMap.h"
 
 struct Modifiers {
@@ -46,10 +42,14 @@ struct DecomposePass : public impl::DecomposePassBase<DecomposePass> {
 
     void runOnOperation() override
     {
-        std::vector<Modifiers> modifiers;
         llvm::DenseMap<mlir::Value, unsigned> qregs_map;
+        std::vector<Modifiers> CollectedCustomOps;
+        // We optionally reserve space to avoid memory reallocations
+        CollectedCustomOps.reserve(32);
 
-        getOperation()->walk([&](quantum::ExtractOp extractOp) {
+        auto module = getOperation();
+
+        module->walk([&](quantum::ExtractOp extractOp) {
             auto IdxAttr = extractOp.getIdxAttr();
             if (!IdxAttr)
                 return;
@@ -57,13 +57,13 @@ struct DecomposePass : public impl::DecomposePassBase<DecomposePass> {
             qregs_map[extractOp.getResult()] = wireIndex;
         });
 
-        getOperation()->walk([&](quantum::CustomOp op) {
-            Modifiers m;
-            m.gateName = op.getGateName();
-            m.adjoint = op.getAdjoint();
-            m.numCtrlQubits = op.getInCtrlQubits().size();
-            m.numCtrlValues = op.getInCtrlValues().size();
-            modifiers.push_back(m);
+        module->walk([&](quantum::CustomOp op) {
+            Modifiers collected_op;
+            collected_op.gateName = op.getGateName();
+            collected_op.adjoint = op.getAdjoint();
+            collected_op.numCtrlQubits = op.getInCtrlQubits().size();
+            collected_op.numCtrlValues = op.getInCtrlValues().size();
+            CollectedCustomOps.push_back(collected_op);
 
             auto inQubits = op.getInQubits();
             auto outQubits = op.getOutQubits();
