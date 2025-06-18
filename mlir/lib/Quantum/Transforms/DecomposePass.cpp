@@ -7,10 +7,20 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Pass/Pass.h"
-#include "llvm/Support/Debug.h"
-
 #include "mlir/Rewrite/PatternApplicator.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/Debug.h"
+// #include <unordered_map>
+#include "llvm/ADT/DenseMap.h"
+
+struct Modifiers {
+    std::string gateName;
+    bool adjoint;
+    unsigned numCtrlQubits;
+    unsigned numCtrlValues;
+};
 
 using namespace llvm;
 using namespace mlir;
@@ -26,44 +36,46 @@ struct DecomposeCustomOp : public OpRewritePattern<quantum::CustomOp> {
 
     LogicalResult matchAndRewrite(quantum::CustomOp op, PatternRewriter &rewriter) const override
     {
-        llvm::outs() << "Replacing a CustomOp at ";
-        op->getLoc().print(llvm::outs());
-        llvm::outs() << "\n";
-
-        if (op->hasAttr("already decomposed"))
-            return failure();
-
-        auto loc = op.getLoc();
-
-        ValueRange outQubits = op.getOutQubits();
-        ValueRange outCtrlQubits = op.getOutCtrlQubits();
-        ValueRange params = op.getParams();
-        ValueRange inQubits = op.getInQubits();
-        StringRef gateName = op.getGateName();
-        bool adjoint = op.getAdjoint();
-        ValueRange inCtrlQubits = op.getInCtrlQubits();
-        ValueRange inCtrlValues = op.getInCtrlValues();
-
-        if (gateName == rewriter.getStringAttr("RX")) {
-            gateName = rewriter.getStringAttr("RY");
-        }
-
-        auto newOp = rewriter.create<quantum::CustomOp>(
-            loc, TypeRange(outQubits.getTypes()), TypeRange(outCtrlQubits.getTypes()), params,
-            inQubits, gateName, adjoint, inCtrlQubits, inCtrlValues);
-
-        newOp->setAttr("already decomposed", rewriter.getUnitAttr());
-        rewriter.replaceOp(op, newOp->getResults());
-        return success();
+        // TODO: Implement the actual decomposition logic.
+        return failure();
     }
 };
 
 struct DecomposePass : public impl::DecomposePassBase<DecomposePass> {
     using impl::DecomposePassBase<DecomposePass>::DecomposePassBase;
 
-    void runOnOperation() final
+    void runOnOperation() override
     {
-        LLVM_DEBUG(llvm::dbgs() << "Decompose Pass running\n");
+        std::vector<Modifiers> modifiers;
+        llvm::DenseMap<mlir::Value, unsigned> qregs_map;
+
+        getOperation()->walk([&](quantum::ExtractOp extractOp) {
+            auto IdxAttr = extractOp.getIdxAttr();
+            if (!IdxAttr)
+                return;
+            unsigned wireIndex = static_cast<unsigned>(IdxAttr.value());
+            qregs_map[extractOp.getResult()] = wireIndex;
+        });
+
+        getOperation()->walk([&](quantum::CustomOp op) {
+            Modifiers m;
+            m.gateName = op.getGateName();
+            m.adjoint = op.getAdjoint();
+            m.numCtrlQubits = op.getInCtrlQubits().size();
+            m.numCtrlValues = op.getInCtrlValues().size();
+            modifiers.push_back(m);
+
+            auto inQubits = op.getInQubits();
+            auto outQubits = op.getOutQubits();
+            assert(inQubits.size() == outQubits.size());
+
+            for (unsigned i = 0; i < inQubits.size(); ++i) {
+                auto it = qregs_map.find(inQubits[i]);
+                if (it == qregs_map.end())
+                    continue;
+                qregs_map[outQubits[i]] = it->second;
+            }
+        });
 
         RewritePatternSet patterns(&getContext());
         patterns.add<DecomposeCustomOp>(&getContext());
