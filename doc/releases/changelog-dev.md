@@ -258,6 +258,9 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Use `dataclass.replace` to update `ExecutionConfig` and `MCMConfig` rather than mutating properties.
+  [(#1814)](https://github.com/PennyLaneAI/catalyst/pull/1814)
+
 * `null.qubit` can now support an optional `track_resources` argument which allows it to record which gates are executed.
   [(#1619)](https://github.com/PennyLaneAI/catalyst/pull/1619)
 

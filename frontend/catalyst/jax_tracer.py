@@ -20,7 +20,7 @@ import itertools
 import logging
 import weakref
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import Enum
 from functools import partial, reduce
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
@@ -143,7 +143,7 @@ def _make_execution_config(qnode):
 
     execution_config = qml.devices.ExecutionConfig()
     if qnode:
-        execution_config.gradient_method = _in_gradient_tracing(qnode)
+        execution_config = replace(execution_config, gradient_method=_in_gradient_tracing(qnode))
 
     return execution_config
 
