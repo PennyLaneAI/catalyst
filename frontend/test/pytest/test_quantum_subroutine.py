@@ -1,7 +1,6 @@
-import pennylane as qml
-import numpy as np
 import jax
-
+import numpy as np
+import pennylane as qml
 
 from catalyst.jax_primitives import subroutine
 
@@ -34,8 +33,9 @@ def test_quantum_subroutine():
         Hadamard0(c)
         return qml.state()
 
-    assert np,allclose(subroutine_test(0), jax.numpy.array([0.70710678+0.j, 0.70710678+0.j]))
+    assert np, allclose(subroutine_test(0), jax.numpy.array([0.70710678 + 0.0j, 0.70710678 + 0.0j]))
     qml.capture.disable()
+
 
 def test_quantum_subroutine_self_inverses():
 
@@ -52,9 +52,12 @@ def test_quantum_subroutine_self_inverses():
         Hadamard0(c)
         return qml.state()
 
-    assert np.allclose(subroutine_test(0), jax.numpy.array([complex(1., 0), complex(0., 0.)], dtype=complex))
+    assert np.allclose(
+        subroutine_test(0), jax.numpy.array([complex(1.0, 0), complex(0.0, 0.0)], dtype=complex)
+    )
 
     qml.capture.disable()
+
 
 def test_quantum_subroutine_conditional():
 
@@ -63,8 +66,7 @@ def test_quantum_subroutine_conditional():
         def true_path():
             qml.Hadamard(wires=[wire])
 
-        def false_path():
-            ...
+        def false_path(): ...
 
         qml.cond(wire != 0, true_path, false_path)()
 
@@ -76,9 +78,6 @@ def test_quantum_subroutine_conditional():
         Hadamard0(c)
         return qml.state()
 
-    assert np.allclose(subroutine_test(0), jax.numpy.array([1., 0.], dtype=complex))
-    assert np,allclose(subroutine_test(0), jax.numpy.array([0.70710678+0.j, 0.70710678+0.j]))
+    assert np.allclose(subroutine_test(0), jax.numpy.array([1.0, 0.0], dtype=complex))
+    assert np, allclose(subroutine_test(0), jax.numpy.array([0.70710678 + 0.0j, 0.70710678 + 0.0j]))
     qml.capture.disable()
-
-
-

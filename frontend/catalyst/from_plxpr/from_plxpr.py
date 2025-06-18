@@ -22,6 +22,7 @@ import jax
 import jax.core
 import jax.numpy as jnp
 import pennylane as qml
+from jax._src.sharding_impls import UNSPECIFIED
 from jax.extend.core import ClosedJaxpr, Jaxpr
 from jax.extend.linear_util import wrap_init
 from pennylane.capture import PlxprInterpreter, qnode_prim
@@ -154,10 +155,6 @@ def from_plxpr(plxpr: ClosedJaxpr) -> Callable[..., Jaxpr]:
 
     """
     return jax.make_jaxpr(partial(WorkflowInterpreter().eval, plxpr.jaxpr, plxpr.consts))
-
-
-def from_subroutine(jaxpr):
-    return jax.make_jaxpr(partial(SubroutineInterpreter(None, 0).eval, jaxpr.jaxpr, jaxpr.consts))
 
 
 class WorkflowInterpreter(PlxprInterpreter):
@@ -404,24 +401,15 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         return self.eval(jaxpr.jaxpr, jaxpr.consts, *args)
 
 
-from catalyst.jax_primitives import qinsert_p
-
 subroutine_cache = {}
-
-from jax._src.core import jaxpr_as_fun
-from jax._src.sharding_impls import UNSPECIFIED, UnspecifiedValue
-from jax.experimental.pjit import pjit_p
-
-from catalyst.jax_primitives import AbstractQreg, qextract_p, qinsert_p
 
 
 @PLxPRToQuantumJaxprInterpreter.register_primitive(quantum_subroutine_p)
 def handle_subroutine(self, *args, **kwargs):
-    # We need to pass the wire as an argument...
-    # And we somehow need to start another interpreter
-    # but only in case it is not yet already available...
+    """
+    Transform the subroutine from PLxPR into JAXPR with quantum primitives"""
 
-    backup = {orig_wire: wire for orig_wire, wire in self.wire_map.items()}
+    backup = dict(self.wire_map.items())
 
     # Make sure the quantum register is updated
     self.actualize_qreg()
