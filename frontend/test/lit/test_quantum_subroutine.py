@@ -20,6 +20,7 @@ import pennylane as qml
 
 from catalyst.jax_primitives import subroutine
 
+# pylint: disable=line-too-long
 
 def test_subroutine_classical():
     """Test that a subroutine is just jax.jit
