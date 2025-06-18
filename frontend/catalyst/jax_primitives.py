@@ -15,6 +15,7 @@
 of quantum operations, measurements, and observables to JAXPR.
 """
 
+import copy
 import functools
 import sys
 from dataclasses import dataclass
@@ -31,7 +32,9 @@ from jax._src.interpreters import partial_eval as pe
 from jax._src.lax.lax import _merge_dyn_shape, _nary_lower_hlo, cos_p, sin_p
 from jax._src.lib.mlir import ir
 from jax._src.lib.mlir.dialects import hlo
+from jax._src.pjit import _pjit_lowering
 from jax.core import AbstractValue
+from jax.experimental.pjit import pjit_p
 from jax.extend.core import Primitive
 from jax.interpreters import mlir
 from jax.tree_util import PyTreeDef, tree_unflatten
@@ -116,6 +119,7 @@ from catalyst.jax_primitives_utils import (
 )
 from catalyst.utils.calculate_grad_shape import Signature, calculate_grad_shape
 from catalyst.utils.extra_bindings import FromElementsOp, TensorExtractOp
+from catalyst.utils.patching import Patcher
 from catalyst.utils.types import convert_shaped_arrays_to_tensors
 
 # pylint: disable=unused-argument,too-many-lines,too-many-statements,protected-access
@@ -307,14 +311,6 @@ quantum_kernel_p = core.CallPrimitive("quantum_kernel")
 quantum_kernel_p.multiple_results = True
 measure_in_basis_p = Primitive("measure_in_basis")
 measure_in_basis_p.multiple_results = True
-
-import copy
-
-from jax._src.pjit import _pjit_lowering
-from jax.experimental.pjit import pjit_p
-
-from catalyst.utils.patching import Patcher
-
 quantum_subroutine_p = copy.deepcopy(pjit_p)
 quantum_subroutine_p.name = "quantum_subroutine_p"
 
@@ -322,8 +318,7 @@ subroutine_cache: dict[callable, callable] = {}
 
 
 def subroutine(func):
-    """TODO:
-
+    """
     This is technical debt. pjit_p is the only primitive that will not hoist
     jaxpr_consts outside of its definition. Here, we are creating a new primitive
     called quantum_subroutine_p that is essentially equivalent to pjit_p.
@@ -338,7 +333,6 @@ def subroutine(func):
     I, @erick-xanadu, am currently unsure about what is the best way to do this.
     Maybe this is sufficiently good?
     """
-    from catalyst.tracing.contexts import EvaluationContext
 
     old_pjit = jax._src.pjit.pjit_p
 
@@ -2394,6 +2388,10 @@ def _cos_lowering2(ctx, x, accuracy):
 
 
 def subroutine_lowering(*args, **kwargs):
+    """This is just a method that forwards arguments to _pjit_lowering
+
+    Useful for testing.
+    """
     retval = _pjit_lowering(*args, **kwargs)
     return retval
 

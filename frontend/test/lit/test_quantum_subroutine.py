@@ -14,6 +14,8 @@
 
 # RUN: %PYTHON %s | FileCheck %s
 
+"""Lit tests for quantum subroutines"""
+
 import pennylane as qml
 
 from catalyst.jax_primitives import subroutine
@@ -57,11 +59,11 @@ def test_quantum_subroutine_identity():
 
     @qml.qjit
     @qml.qnode(qml.device("lightning.qubit", wires=1))
-    def foo():
+    def main():
         identity()
         return qml.probs()
 
-    print(foo.mlir)
+    print(main.mlir)
     qml.capture.disable()
 
 
