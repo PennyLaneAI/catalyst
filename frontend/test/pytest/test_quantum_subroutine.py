@@ -50,7 +50,7 @@ def test_quantum_subroutine():
         Hadamard0(c)
         return qml.state()
 
-    assert np, allclose(subroutine_test(0), jax.numpy.array([0.70710678 + 0.0j, 0.70710678 + 0.0j]))
+    assert np.allclose(subroutine_test(0), jax.numpy.array([0.70710678 + 0.0j, 0.70710678 + 0.0j]))
     qml.capture.disable()
 
 
