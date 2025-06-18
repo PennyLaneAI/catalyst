@@ -19,7 +19,33 @@ import pennylane as qml
 from catalyst.jax_primitives import subroutine
 
 
+def test_subroutine_classical():
+    """Test that a subroutine is just jax.jit
+    when used in a classical setting.
+
+    A desirable behaviour may be to error.
+    """
+
+    @subroutine
+    def add_one(x):
+        return x + 1
+
+    qml.capture.enable()
+
+    @qml.qjit
+    def main():
+        # CHECK: %{{.*}} = call @add_one(%{{.*}}) : (tensor<i64>) -> tensor<i64>
+        return add_one(0)
+
+    print(main.mlir)
+    qml.capture.disable()
+
+
+test_subroutine_classical()
+
+
 def test_quantum_subroutine_identity():
+    """Test that a subroutine receives a register as a parameter and returns a register"""
 
     # CHECK: func.func private @identity([[REG:%.+]]: !quantum.reg) -> !quantum.reg
     # CHECK-NEXT: return [[REG]] : !quantum.reg
@@ -43,6 +69,7 @@ test_quantum_subroutine_identity()
 
 
 def test_quantum_subroutine_wire_param():
+    """Pass a parameter that is a wire/integer"""
 
     # CHECK: func.func private @Hadamard0([[REG:%.+]]: !quantum.reg, [[WIRE_IDX_TENSOR:%.+]]: tensor<i64>) -> !quantum.reg
     # CHECK-NEXT: [[WIRE_IDX:%.+]] = tensor.extract [[WIRE_IDX_TENSOR]][] : tensor<i64>
@@ -73,6 +100,7 @@ test_quantum_subroutine_wire_param()
 
 
 def test_quantum_subroutine_gate_param_param():
+    """Test passing a regular parameter"""
 
     # CHECK: func.func private @RX_on_wire_0([[REG:%.+]]: !quantum.reg, [[PARAM_TENSOR:%.+]]: tensor<f64>) -> !quantum.reg
     # CHECK-NEXT: [[QUBIT:%.+]] = quantum.extract [[REG]][ 0] : !quantum.reg -> !quantum.bit
@@ -101,8 +129,7 @@ test_quantum_subroutine_gate_param_param()
 
 
 def test_quantum_subroutine_with_control_flow():
-
-    import catalyst
+    """Test control flow inside the subroutine"""
 
     qml.capture.enable()
 
@@ -143,6 +170,7 @@ test_quantum_subroutine_with_control_flow()
 
 
 def test_nested_subroutine_call():
+    """Test nested subroutine call"""
 
     qml.capture.enable()
 
@@ -178,6 +206,8 @@ test_nested_subroutine_call()
 
 
 def test_two_callsites():
+    """Test that two calls won't give multiple definitions
+    in the classical setting"""
 
     qml.capture.enable()
 
@@ -199,6 +229,8 @@ test_two_callsites()
 
 
 def test_two_callsites_quantum():
+    """Test that two calls won't give multiple definitions
+    int the quantum setting"""
 
     qml.capture.enable()
 
