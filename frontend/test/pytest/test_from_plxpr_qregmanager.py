@@ -33,7 +33,6 @@ Quoted from the object's docstring:
        - `QubitManager[i] = new_qubit_value`
 """
 
-import jax
 import pytest
 from jax.api_util import debug_info as jdb
 from jax.core import set_current_trace, take_current_trace
