@@ -34,55 +34,225 @@ Quoted from the object's docstring:
 """
 
 import jax
-from jax.core import set_current_trace
-from jax.interpreters.partial_eval import DynamicJaxprTrace
-import numpy as np
-import pennylane as qml
 import pytest
+from jax.api_util import debug_info as jdb
+from jax.core import set_current_trace, take_current_trace
+from jax.extend.core import Primitive
+from jax.interpreters.partial_eval import DynamicJaxprTrace
 
 from catalyst.from_plxpr.qreg_manager import QregManager
-from catalyst.jax_primitives import (
-    MeasurementPlane,
-    compbasis_p,
-    cond_p,
-    counts_p,
-    device_init_p,
-    device_release_p,
-    expval_p,
-    gphase_p,
-    measure_in_basis_p,
-    measure_p,
-    namedobs_p,
-    probs_p,
-    qalloc_p,
-    qdealloc_p,
-    qinst_p,
-    quantum_kernel_p,
-    sample_p,
-    set_basis_state_p,
-    set_state_p,
-    state_p,
-    unitary_p,
-    var_p,
-)
+from catalyst.jax_primitives import qalloc_p, qextract_p, qinst_p
 
-def aloha():
-    trace = DynamicJaxprTrace(debug_info=None)
+
+@pytest.fixture(autouse=True)
+def launch_empty_jaxpr_interpreter():
+    """
+    Start an empty interpreter for each test.
+    The interpreter we want is a DynamicJaxprTrace, which is an interpreter for creating jaxprs.
+    """
+    # Note that DynamicJaxprTrace requires a `debug_info` object
+    # We just pass an empty one
+    trace = DynamicJaxprTrace(debug_info=jdb("qreg_manager_from_plxpr_test", None, [], {}))
     with set_current_trace(trace):
+        yield
+    del trace
+
+
+# A mock primitive that takes in a qreg and returns a qreg
+qreg_mock_op_p = Primitive("qreg_mock_op")
+
+
+@qreg_mock_op_p.def_abstract_eval
+def _qreg_mock_op_abstract_eval(qreg):
+    return qreg
+
+
+class TestQregGetSet:
+    """Unit test for getter and setter for the managed qreg"""
+
+    def test_getter_setter(self):
+        """Test getter and setter"""
+        qreg_manager = QregManager(None)
+        qreg_manager.set("monkey_mock_qreg")
+        assert qreg_manager.get() is "monkey_mock_qreg"
+        assert qreg_manager.get() is "monkey_mock_qreg"  # test that getter does not set
+
+        qreg_manager.set("donkey_mock_qreg")
+        assert qreg_manager.get() is "donkey_mock_qreg"
+
+
+class TestQregManagerInitialization:
+    """Test initialization of QregManager objects."""
+
+    def test_new_alloc(self):
+        """Test qregs from new alloc"""
         qreg = qalloc_p.bind(42)
         qreg_manager = QregManager(qreg)
+        assert qreg_manager.get() is qreg
+        assert qreg_manager.wire_map == {}
 
-        wires = [0,1]
+    def test_scope_arg(self):
+        """Test qregs from a scope argument"""
+
+        def f(qreg):
+            qreg_manager = QregManager(qreg)
+            assert qreg_manager.get() is qreg
+            assert qreg_manager.wire_map == {}
+            return
+
+        outer_scope_qreg = qalloc_p.bind(42)
+        f(outer_scope_qreg)
+
+
+class TestQubitValues:
+    """Test QregManager correctly updates qubit SSA values."""
+
+    def _interpret_operation(self, wires, gate_name, qreg_manager):
+        """
+        Convenience helper for binding a mock gate.
+        Note that this helper follows plxpr semantics, so gate targets are only specified
+        by a global wire index.
+        """
         in_qubits = [qreg_manager[w] for w in wires]
         out_qubits = qinst_p.bind(
             *[*in_qubits],
-            op="my_gate",
+            op=gate_name,
             qubits_len=len(wires),
             params_len=0,
             ctrl_len=0,
             adjoint=False,
         )
 
+        # Update the qubit values.
+        # This is user code. This is point 2 of the "users are expected to" in the
+        # QregManager specs.
+        for wire, out_qubit in zip(wires, out_qubits):
+            qreg_manager[wire] = out_qubit
 
-    breakpoint()
-aloha()
+        return out_qubits
+
+    def test_auto_extract(self):
+        """Test that a new qubit is extracted when indexing into a new wire"""
+        qreg = qalloc_p.bind(42)
+        qreg_manager = QregManager(qreg)
+        new_qubit = qreg_manager[0]
+
+        assert list(qreg_manager.wire_map.keys()) == [0]
+        assert qreg_manager[0] is new_qubit
+        with take_current_trace() as trace:
+            # Check that an extract primitive is added
+            assert trace.frame.eqns[-1].primitive is qextract_p
+
+            # Check that the extract primitive follows the wire index in the qreg manager
+            # __getitem__ method
+            extract_p_index_invar = trace.frame.eqns[-1].invars[-1]
+            assert trace.frame.constvar_to_val[extract_p_index_invar] == 0
+
+    def test_no_overwriting_extract(self):
+        """Test that no new qubit is extracted when indexing into an existing wire"""
+        qreg = qalloc_p.bind(42)
+        qreg_manager = QregManager(qreg)
+        new_qubit = qreg_manager[0]
+        not_a_new_qubit = qreg_manager[0]
+
+        assert not_a_new_qubit is new_qubit
+
+    def test_simple_gate(self):
+        """Test a simple qubit opertaion"""
+        qreg = qalloc_p.bind(42)
+        qreg_manager = QregManager(qreg)
+
+        wires = [0, 1]
+        out_qubits = self._interpret_operation(wires, "my_gate", qreg_manager)
+
+        # Check that qubit-level ops do not affect the managed qreg
+        assert qreg_manager.get() is qreg
+
+        # First check with python handle variables
+        assert qreg_manager[0] is out_qubits[0]
+        assert qreg_manager[1] is out_qubits[1]
+
+        # Also check with actual jaxpr variables
+        with take_current_trace() as trace:
+            var_to_tracer = dict((v, t_id) for t_id, v in trace.frame.tracer_to_var.items())
+            gate_out_qubits = trace.frame.eqns[-1].outvars
+            assert id(qreg_manager[0]) == var_to_tracer[gate_out_qubits[0]]
+            assert id(qreg_manager[1]) == var_to_tracer[gate_out_qubits[1]]
+
+    def test_chained_gate(self):
+        """Test two chained qubit opertaions"""
+        qreg = qalloc_p.bind(42)
+        qreg_manager = QregManager(qreg)
+
+        wires = [0, 1]
+        _ = self._interpret_operation(wires, "my_gate", qreg_manager)
+        out_qubits = self._interpret_operation(wires, "my_other_gate", qreg_manager)
+
+        # Check that qubit-level ops do not affect the managed qreg
+        assert qreg_manager.get() is qreg
+
+        # First check with python handle variables
+        assert qreg_manager[0] is out_qubits[0]
+        assert qreg_manager[1] is out_qubits[1]
+
+        # Also check with actual jaxpr variables
+        with take_current_trace() as trace:
+            var_to_tracer = dict((v, t_id) for t_id, v in trace.frame.tracer_to_var.items())
+            gate_out_qubits = trace.frame.eqns[-1].outvars
+            assert id(qreg_manager[0]) == var_to_tracer[gate_out_qubits[0]]
+            assert id(qreg_manager[1]) == var_to_tracer[gate_out_qubits[1]]
+
+    def test_insert_all_dangling_qubits(self):
+        """
+        Test insert_all_dangling_qubits.
+        Note: In the non-plxpr tracing pipeline, this is the `actualize` method from the
+        QregPromise object.
+        """
+        qreg = qalloc_p.bind(42)
+        qreg_manager = QregManager(qreg)
+
+        # Extract some qubits
+        _ = [qreg_manager[i] for i in range(3)]
+        assert list(qreg_manager.wire_map.keys()) == [0, 1, 2]
+
+        qreg_manager.insert_all_dangling_qubits()
+        assert qreg_manager.wire_map == {}
+        assert qreg_manager.get() is not qreg  # test that inserts update the qreg SSA value
+
+        with take_current_trace() as trace:
+            # Checking via jaxpr internals is a bit tedious here
+            # So let's just check the string...
+            observed_jaxpr = str(trace.to_jaxpr([], None)[0])
+            expected = """{ lambda ; . let
+    a:AbstractQreg() = qalloc 42
+    b:AbstractQbit() = qextract a 0
+    c:AbstractQbit() = qextract a 1
+    d:AbstractQbit() = qextract a 2
+    e:AbstractQreg() = qinsert a 0 b
+    f:AbstractQreg() = qinsert e 1 c
+    _:AbstractQreg() = qinsert f 2 d
+  in () }"""
+            assert observed_jaxpr == expected
+
+
+class TestQregValues:
+    """Test QregManager correctly updates qreg SSA values."""
+
+    def test_qreg_op(self):
+        """Test that a qreg operation correctly updates the managed qreg SSA value."""
+        qreg = qalloc_p.bind(42)
+        qreg_manager = QregManager(qreg)
+        _ = qreg_manager[0]  # extract something
+        new_qreg = qreg_mock_op_p.bind(qreg)
+
+        # Update the qreg values.
+        # This is user code. This is point 1 of the "users are expected to" in the
+        # QregManager specs.
+        qreg_manager.set(new_qreg)
+
+        # Check that managed qreg value is updated
+        assert qreg_manager.get() is new_qreg
+
+
+if __name__ == "__main__":
+    pytest.main(["-x", __file__])
