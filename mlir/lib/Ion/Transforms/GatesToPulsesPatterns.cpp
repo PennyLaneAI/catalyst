@@ -525,7 +525,7 @@ struct GatesToPulsesRewritePattern : public mlir::OpConversionPattern<CustomOp> 
 };
 
 void populateGatesToPulsesPatterns(RewritePatternSet &patterns,
-                                  const OQDDatabaseManager &dataManager)
+                                   const OQDDatabaseManager &dataManager)
 {
     patterns.add<GatesToPulsesRewritePattern>(patterns.getContext(), dataManager);
 }
