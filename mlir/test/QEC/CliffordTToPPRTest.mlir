@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt --to_ppr --split-input-file -verify-diagnostics %s | FileCheck %s
+// RUN: quantum-opt --to-ppr --split-input-file -verify-diagnostics %s | FileCheck %s
 
 func.func @test_clifford_t_to_ppr(%q1 : !quantum.bit, %q2 : !quantum.bit){
     // pi / 4 = 0.78539816

@@ -29,12 +29,13 @@ void catalyst::registerAllCatalystPasses()
     mlir::registerPass(catalyst::createAnnotateFunctionPass);
     mlir::registerPass(catalyst::createApplyTransformSequencePass);
     mlir::registerPass(catalyst::createArrayListToMemRefPass);
+    mlir::registerPass(catalyst::createBufferDeallocationPass);
     mlir::registerPass(catalyst::createCatalystConversionPass);
     mlir::registerPass(catalyst::createCopyGlobalMemRefPass);
-    mlir::registerPass(catalyst::createCommuteCliffordTPPRPass);
+    mlir::registerPass(catalyst::createCommutePPRPass);
     mlir::registerPass(catalyst::createCliffordTToPPRPass);
-    mlir::registerPass(catalyst::createCommuteCliffordPastPPMPass);
-    mlir::registerPass(catalyst::createCliffordTToPPMPass);
+    mlir::registerPass(catalyst::createMergePPRIntoPPMPass);
+    mlir::registerPass(catalyst::createPPMCompilationPass);
     mlir::registerPass(catalyst::createDecomposeNonCliffordPPRPass);
     mlir::registerPass(catalyst::createDecomposeCliffordPPRPass);
     mlir::registerPass(catalyst::createDetensorizeSCFPass);

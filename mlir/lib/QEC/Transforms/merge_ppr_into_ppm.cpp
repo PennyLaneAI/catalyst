@@ -12,9 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#define DEBUG_TYPE "merge_ppr_ppm"
-
-#include "llvm/Support/Debug.h"
+#define DEBUG_TYPE "merge-ppr-ppm"
 
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
@@ -30,21 +28,20 @@ using namespace catalyst::qec;
 
 namespace catalyst {
 namespace qec {
-#define GEN_PASS_DEF_COMMUTECLIFFORDPASTPPMPASS
-#define GEN_PASS_DECL_COMMUTECLIFFORDPASTPPMPASS
+#define GEN_PASS_DEF_MERGEPPRINTOPPMPASS
+#define GEN_PASS_DECL_MERGEPPRINTOPPMPASS
 #include "QEC/Transforms/Passes.h.inc"
 
-struct CommuteCliffordPastPPMPass
-    : public impl::CommuteCliffordPastPPMPassBase<CommuteCliffordPastPPMPass> {
-    using CommuteCliffordPastPPMPassBase::CommuteCliffordPastPPMPassBase;
+struct MergePPRIntoPPMPass : public impl::MergePPRIntoPPMPassBase<MergePPRIntoPPMPass> {
+    using MergePPRIntoPPMPassBase::MergePPRIntoPPMPassBase;
 
     void runOnOperation() final
     {
         RewritePatternSet patterns(&getContext());
 
-        populateCommuteCliffordPastPPMPatterns(patterns, max_pauli_size);
+        populateMergePPRIntoPPMPatterns(patterns, maxPauliSize);
 
-        if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
+        if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
             return signalPassFailure();
         }
     }
@@ -52,9 +49,9 @@ struct CommuteCliffordPastPPMPass
 
 } // namespace qec
 
-std::unique_ptr<Pass> createCommuteCliffordPastPPMPass()
+std::unique_ptr<Pass> createMergePPRIntoPPMPass()
 {
-    return std::make_unique<CommuteCliffordPastPPMPass>();
+    return std::make_unique<MergePPRIntoPPMPass>();
 }
 
 } // namespace catalyst

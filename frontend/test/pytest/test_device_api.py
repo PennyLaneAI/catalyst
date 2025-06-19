@@ -57,17 +57,6 @@ def test_qjit_device():
         device_qjit.execute(10, 2)
 
 
-def test_qjit_device_no_wires():
-    """Test the qjit device from a device using the new api without wires set."""
-    device = NullQubit(shots=2032)
-
-    with pytest.raises(
-        AttributeError, match="Catalyst does not support device instances without set wires."
-    ):
-        # Create qjit device
-        QJITDevice(device)
-
-
 @pytest.mark.parametrize(
     "wires",
     (

@@ -80,6 +80,7 @@ struct QuantumConversionPass : impl::QuantumConversionPassBase<QuantumConversion
         RewritePatternSet patterns(context);
         cf::populateControlFlowToLLVMConversionPatterns(typeConverter, patterns);
         populateFuncToLLVMConversionPatterns(typeConverter, patterns);
+        cf::populateAssertToLLVMConversionPattern(typeConverter, patterns);
         populateQIRConversionPatterns(typeConverter, patterns);
 
         LLVMConversionTarget target(*context);

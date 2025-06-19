@@ -505,12 +505,45 @@ class TestOptionsToCliFlags:
         flags = _options_to_cli_flags(options)
         assert ("--load-pass-plugin", path) in flags
 
+    def test_options_pass_plugin_list(self):
+        """Test pass plugin option when passed in as a list"""
+        path = pathlib.Path("/path/to/plugin")
+        options = CompileOptions(pass_plugins=[path, path])
+        flags = _options_to_cli_flags(options)
+        assert ("--load-pass-plugin", path) in flags
+        assert isinstance(options.pass_plugins, set)
+
+    def test_options_pass_plugin_tuple(self):
+        """Test pass plugin option when passed in as a tuple"""
+        path = pathlib.Path("/path/to/plugin")
+        options = CompileOptions(pass_plugins=(path, path))
+        flags = _options_to_cli_flags(options)
+        assert ("--load-pass-plugin", path) in flags
+        assert isinstance(options.pass_plugins, set)
+
     def test_option_dialect_plugin(self):
         """Test dialect plugin option"""
         path = pathlib.Path("/path/to/plugin")
         options = CompileOptions(dialect_plugins={path})
         flags = _options_to_cli_flags(options)
         assert ("--load-dialect-plugin", path) in flags
+        assert isinstance(options.pass_plugins, set)
+
+    def test_option_dialect_plugin_list(self):
+        """Test dialect plugin option"""
+        path = pathlib.Path("/path/to/plugin")
+        options = CompileOptions(dialect_plugins=[path, path])
+        flags = _options_to_cli_flags(options)
+        assert ("--load-dialect-plugin", path) in flags
+        assert isinstance(options.dialect_plugins, set)
+
+    def test_option_dialect_plugin_tuple(self):
+        """Test dialect plugin option"""
+        path = pathlib.Path("/path/to/plugin")
+        options = CompileOptions(dialect_plugins=(path, path))
+        flags = _options_to_cli_flags(options)
+        assert ("--load-dialect-plugin", path) in flags
+        assert isinstance(options.dialect_plugins, set)
 
     def test_option_not_lower_to_llvm(self):
         """Test not lower to llvm"""

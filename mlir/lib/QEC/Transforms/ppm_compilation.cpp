@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#define DEBUG_TYPE "ppm_compilation"
+#define DEBUG_TYPE "ppm-compilation"
 
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
@@ -30,12 +30,12 @@ using namespace catalyst::qec;
 namespace catalyst {
 namespace qec {
 
-#define GEN_PASS_DEF_CLIFFORDTTOPPMPASS
-#define GEN_PASS_DECL_CLIFFORDTTOPPMPASS
+#define GEN_PASS_DEF_PPMCOMPILATIONPASS
+#define GEN_PASS_DECL_PPMCOMPILATIONPASS
 #include "QEC/Transforms/Passes.h.inc"
 
-struct CliffordTToPPMPass : public impl::CliffordTToPPMPassBase<CliffordTToPPMPass> {
-    using CliffordTToPPMPassBase::CliffordTToPPMPassBase;
+struct PPMCompilationPass : public impl::PPMCompilationPassBase<PPMCompilationPass> {
+    using PPMCompilationPassBase::PPMCompilationPassBase;
 
     void runOnOperation() final
     {
@@ -63,9 +63,9 @@ struct CliffordTToPPMPass : public impl::CliffordTToPPMPassBase<CliffordTToPPMPa
         // Phase 2: Commute Clifford gates past T gates using PPR representation
         {
             RewritePatternSet patterns(ctx);
-            populateCommuteCliffordTPPRPatterns(patterns, max_pauli_size);
+            populateCommutePPRPatterns(patterns, maxPauliSize);
 
-            if (failed(applyPatternsAndFoldGreedily(module, std::move(patterns)))) {
+            if (failed(applyPatternsGreedily(module, std::move(patterns)))) {
                 return signalPassFailure();
             }
         }
@@ -73,9 +73,9 @@ struct CliffordTToPPMPass : public impl::CliffordTToPPMPassBase<CliffordTToPPMPa
         // Phase 3: Absorb Clifford gates into measurement operations
         {
             RewritePatternSet patterns(ctx);
-            populateCommuteCliffordPastPPMPatterns(patterns, max_pauli_size);
+            populateMergePPRIntoPPMPatterns(patterns, maxPauliSize);
 
-            if (failed(applyPatternsAndFoldGreedily(module, std::move(patterns)))) {
+            if (failed(applyPatternsGreedily(module, std::move(patterns)))) {
                 return signalPassFailure();
             }
         }
@@ -85,7 +85,7 @@ struct CliffordTToPPMPass : public impl::CliffordTToPPMPassBase<CliffordTToPPMPa
             RewritePatternSet patterns(ctx);
             populateDecomposeNonCliffordPPRPatterns(patterns, decomposeMethod, avoidYMeasure);
 
-            if (failed(applyPatternsAndFoldGreedily(module, std::move(patterns)))) {
+            if (failed(applyPatternsGreedily(module, std::move(patterns)))) {
                 return signalPassFailure();
             }
         }
@@ -95,7 +95,7 @@ struct CliffordTToPPMPass : public impl::CliffordTToPPMPassBase<CliffordTToPPMPa
             RewritePatternSet patterns(ctx);
             populateDecomposeCliffordPPRPatterns(patterns, avoidYMeasure);
 
-            if (failed(applyPatternsAndFoldGreedily(module, std::move(patterns)))) {
+            if (failed(applyPatternsGreedily(module, std::move(patterns)))) {
                 return signalPassFailure();
             }
         }
@@ -104,6 +104,6 @@ struct CliffordTToPPMPass : public impl::CliffordTToPPMPassBase<CliffordTToPPMPa
 
 } // namespace qec
 
-std::unique_ptr<Pass> createCliffordTToPPMPass() { return std::make_unique<CliffordTToPPMPass>(); }
+std::unique_ptr<Pass> createPPMCompilationPass() { return std::make_unique<PPMCompilationPass>(); }
 
 } // namespace catalyst

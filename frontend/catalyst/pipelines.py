@@ -72,8 +72,8 @@ class CompileOptions:
             A dictionary that specifies the quantum circuit transformation pass pipeline order,
             and optionally arguments for each pass in the pipeline.
             Default is None.
-        pass_plugins (Optional[Set[Path]]): List of paths to pass plugins.
-        dialect_plugins (Optional[Set[Path]]): List of paths to dialect plugins.
+        pass_plugins (Optional[Iterable[Path]]): List of paths to pass plugins.
+        dialect_plugins (Optional[Iterable[Path]]): List of paths to dialect plugins.
     """
 
     verbose: Optional[bool] = False
@@ -122,10 +122,16 @@ class CompileOptions:
             self.static_argnums = (static_argnums,)
         elif isinstance(static_argnums, Iterable):
             self.static_argnums = tuple(static_argnums)
+
         if self.pass_plugins is None:
             self.pass_plugins = set()
+        else:
+            self.pass_plugins = set(self.pass_plugins)
+
         if self.dialect_plugins is None:
             self.dialect_plugins = set()
+        else:
+            self.dialect_plugins = set(self.dialect_plugins)
 
     def __deepcopy__(self, memo):
         """Make a deep copy of all fields of a CompileOptions object except the logfile, which is
@@ -240,6 +246,7 @@ def get_bufferization_stage(options: CompileOptions) -> List[str]:
         "func.func(buffer-hoisting)",
         "func.func(buffer-loop-hoisting)",
         "func.func(promote-buffers-to-stack)",
+        # TODO: migrate to new buffer deallocation "buffer-deallocation-pipeline"
         "func.func(buffer-deallocation)",
         "convert-arraylist-to-memref",
         "convert-bufferization-to-memref",

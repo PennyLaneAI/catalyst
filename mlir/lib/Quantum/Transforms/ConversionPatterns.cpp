@@ -187,16 +187,18 @@ struct DeviceInitOpPattern : public OpConversionPattern<DeviceInitOp> {
 
         Type charPtrType = LLVM::LLVMPointerType::get(rewriter.getContext());
         Type int64Type = IntegerType::get(rewriter.getContext(), 64);
+        Type int1Type = IntegerType::get(rewriter.getContext(), 1);
         Type qirSignature = LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx),
                                                         {/* rtd_lib = */ charPtrType,
                                                          /* rtd_name = */ charPtrType,
                                                          /* rtd_kwargs = */ charPtrType,
-                                                         /* shots = */ int64Type});
+                                                         /* shots = */ int64Type,
+                                                         /*auto_qubit_management = */ int1Type});
         LLVM::LLVMFuncOp fnDecl =
             catalyst::ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
 
         auto rtd_lib = op.getLib().str();
-        auto rtd_name = op.getName().str();
+        auto rtd_name = op.getDeviceName().str();
         auto rtd_kwargs = op.getKwargs().str();
 
         auto rtd_lib_gs = getGlobalString(loc, rewriter, rtd_lib,
@@ -217,6 +219,10 @@ struct DeviceInitOpPattern : public OpConversionPattern<DeviceInitOp> {
             operands.push_back(shots);
         }
 
+        Value autoQubitManagement = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI1Type(),
+                                                                      op.getAutoQubitManagement());
+        operands.push_back(autoQubitManagement);
+
         rewriter.create<LLVM::CallOp>(loc, fnDecl, operands);
 
         rewriter.eraseOp(op);
@@ -236,6 +242,27 @@ struct DeviceReleaseOpPattern : public OpConversionPattern<DeviceReleaseOp> {
         StringRef qirName = "__catalyst__rt__device_release";
 
         Type qirSignature = LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx), {});
+
+        LLVM::LLVMFuncOp fnDecl =
+            catalyst::ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+
+        rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, fnDecl, ValueRange{});
+
+        return success();
+    }
+};
+
+struct NumQubitsOpPattern : public OpConversionPattern<NumQubitsOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(NumQubitsOp op, NumQubitsOpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+        MLIRContext *ctx = this->getContext();
+
+        StringRef qirName = "__catalyst__rt__num_qubits";
+
+        Type qirSignature = LLVM::LLVMFunctionType::get(IntegerType::get(ctx, 64), {});
 
         LLVM::LLVMFuncOp fnDecl =
             catalyst::ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
@@ -919,7 +946,8 @@ struct SetStateOpPattern : public OpConversionPattern<SetStateOp> {
         auto ptrTy = LLVM::LLVMPointerType::get(rewriter.getContext());
         ModuleOp moduleOp = op->getParentOfType<ModuleOp>();
         auto func = mlir::LLVM::lookupOrCreateFn(moduleOp, "__catalyst__qis__SetState",
-                                                 {ptrTy, i64}, voidTy, isVarArg);
+                                                 {ptrTy, i64}, voidTy, isVarArg)
+                        .value();
 
         SmallVector<Value> args;
 
@@ -958,7 +986,8 @@ struct SetBasisStateOpPattern : public OpConversionPattern<SetBasisStateOp> {
         auto ptrTy = LLVM::LLVMPointerType::get(rewriter.getContext());
         ModuleOp moduleOp = op->getParentOfType<ModuleOp>();
         auto func = mlir::LLVM::lookupOrCreateFn(moduleOp, "__catalyst__qis__SetBasisState",
-                                                 {ptrTy, i64}, voidTy, isVarArg);
+                                                 {ptrTy, i64}, voidTy, isVarArg)
+                        .value();
 
         SmallVector<Value> args;
 
@@ -995,6 +1024,7 @@ void populateQIRConversionPatterns(TypeConverter &typeConverter, RewritePatternS
     patterns.add<RTBasedPattern<FinalizeOp>>(typeConverter, patterns.getContext());
     patterns.add<DeviceInitOpPattern>(typeConverter, patterns.getContext());
     patterns.add<DeviceReleaseOpPattern>(typeConverter, patterns.getContext());
+    patterns.add<NumQubitsOpPattern>(typeConverter, patterns.getContext());
     patterns.add<AllocOpPattern>(typeConverter, patterns.getContext());
     patterns.add<DeallocOpPattern>(typeConverter, patterns.getContext());
     patterns.add<ExtractOpPattern>(typeConverter, patterns.getContext());

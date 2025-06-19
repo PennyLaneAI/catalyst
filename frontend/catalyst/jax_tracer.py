@@ -20,7 +20,7 @@ import itertools
 import logging
 import weakref
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import Enum
 from functools import partial, reduce
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
@@ -86,6 +86,7 @@ from catalyst.jax_primitives import (
     hamiltonian_p,
     hermitian_p,
     namedobs_p,
+    num_qubits_p,
     probs_p,
     qalloc_p,
     qdealloc_p,
@@ -142,7 +143,7 @@ def _make_execution_config(qnode):
 
     execution_config = qml.devices.ExecutionConfig()
     if qnode:
-        execution_config.gradient_method = _in_gradient_tracing(qnode)
+        execution_config = replace(execution_config, gradient_method=_in_gradient_tracing(qnode))
 
     return execution_config
 
@@ -984,11 +985,13 @@ def trace_quantum_measurements(
                     "Use qml.sample() instead."
                 )
 
-            d_wires = (
-                device.wires[0]
-                if catalyst.device.qjit_device.is_dynamic_wires(device.wires)
-                else len(device.wires)
-            )
+            if device.wires is None:
+                d_wires = num_qubits_p.bind()
+            elif catalyst.device.qjit_device.is_dynamic_wires(device.wires):
+                d_wires = num_qubits_p.bind()
+            else:
+                d_wires = len(device.wires)
+
             m_wires = output.wires if output.wires else None
             obs_tracers, nqubits = trace_observables(output.obs, qrp, m_wires)
             nqubits = d_wires if nqubits is None else nqubits
@@ -1410,11 +1413,16 @@ def trace_quantum_function(
                 device_shots = get_device_shots(device) or 0
                 device_init_p.bind(
                     device_shots,
+                    auto_qubit_management=(device.wires is None),
                     rtd_lib=device.backend_lib,
                     rtd_name=device.backend_name,
                     rtd_kwargs=str(device.backend_kwargs),
                 )
-                if catalyst.device.qjit_device.is_dynamic_wires(device.wires):
+                if device.wires is None:
+                    # Automatic qubit management mode
+                    # We start with 0 wires and allocate new wires in runtime as we encounter them.
+                    qreg_in = qalloc_p.bind(0)
+                elif catalyst.device.qjit_device.is_dynamic_wires(device.wires):
                     # When device has dynamic wires, the device.wires iterable object
                     # has a single value, which is the tracer for the number of wires
                     qreg_in = qalloc_p.bind(device.wires[0])

@@ -87,7 +87,6 @@ class CustomDevice(Device):
 
     def __init__(self, wires, shots=1024):
         super().__init__(wires=wires, shots=shots)
-        self.capabilities.operations.pop("BlockEncode")
         self.qjit_capabilities = self.capabilities
 
     @staticmethod
@@ -104,6 +103,9 @@ class CustomDevice(Device):
     def execute(self, circuits, execution_config):
         """Execution."""
         raise NotImplementedError
+
+
+CustomDevice.capabilities.operations.pop("BlockEncode")
 
 
 class TestDecomposition:
