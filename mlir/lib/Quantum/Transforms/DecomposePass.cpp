@@ -64,72 +64,120 @@ struct DecomposeCustomOp : public OpRewritePattern<quantum::CustomOp> {
     }
 };
 
+// This is a function to display all the CustomOpData for debugging purposes.
+static void printCustomOpData(const CustomOpData &op)
+{
+    llvm::outs() << "CustomOpData:\n";
+    llvm::outs() << "  Gate Name: " << op.gateName << "\n";
+    llvm::outs() << "  Adjoint: " << (op.adjoint ? "true" : "false") << "\n";
+    llvm::outs() << "  Params: ";
+    for (const auto &param : op.params) {
+        if (param.type == Param::ParamType::Float)
+            llvm::outs() << param.f << " ";
+    }
+    llvm::outs() << "\n";
+    llvm::outs() << "  Wire Indices: ";
+    for (unsigned idx : op.wireIndices)
+        llvm::outs() << idx << " ";
+    llvm::outs() << "\n";
+    llvm::outs() << "  Control Qubit Indices: ";
+    for (unsigned idx : op.ctrlQubitIndices)
+        llvm::outs() << idx << " ";
+    llvm::outs() << "\n";
+    llvm::outs() << "  Control Values: ";
+    for (int64_t val : op.ctrlValues)
+        llvm::outs() << val << " ";
+    llvm::outs() << "\n";
+}
+
+// This is a function to display the content of qregs_map for debugging purposes.
+static void printQregsMap(const llvm::DenseMap<Value, unsigned> &qregs_map)
+{
+    llvm::outs() << "Qregs Map:\n";
+    for (const auto &pair : qregs_map) {
+        llvm::outs() << "  Value: " << pair.first << ", Index: " << pair.second << "\n";
+    }
+}
+
 struct DecomposePass : public impl::DecomposePassBase<DecomposePass> {
     using impl::DecomposePassBase<DecomposePass>::DecomposePassBase;
 
     void runOnOperation() override
     {
-        llvm::DenseMap<mlir::Value, unsigned> qregs_map;
-        std::vector<CustomOpData> CollectedCustomOps;
-        CollectedCustomOps.reserve(32);
 
         auto module = getOperation();
 
-        module->walk([&](quantum::ExtractOp extractOp) {
-            auto IdxAttr = extractOp.getIdxAttr();
-            if (!IdxAttr) {
-                extractOp.emitWarning("ExtractOp without index attribute, skipping");
-                return;
-            }
-            unsigned wireIndex = static_cast<unsigned>(IdxAttr.value());
-            qregs_map[extractOp.getResult()] = wireIndex;
+        llvm::DenseMap<Value, unsigned> qregs_map;
+
+        module->walk([&](quantum::ExtractOp ex) {
+            if (auto idx = ex.getIdxAttr())
+                qregs_map[ex.getResult()] = (unsigned)idx.value();
+            else
+                ex.emitWarning("ExtractOp without index, skipping");
         });
 
+        std::vector<CustomOpData> CollectedCustomOps;
+        // TODO: this reserve is arbitrary to avoid reallocations.
+        // We can adjust it based on expected number of CustomOps
+        // if it turns out to be a performance bottleneck.
+        CollectedCustomOps.reserve(32);
+
         module->walk([&](quantum::CustomOp op) {
-            CustomOpData collected_op;
-            collected_op.gateName = op.getGateName();
-            collected_op.adjoint = op.getAdjoint();
-            collected_op.numCtrlQubits = op.getInCtrlQubits().size();
-            collected_op.numCtrlValues = op.getInCtrlValues().size();
-            CollectedCustomOps.push_back(collected_op);
+            CustomOpData op_data;
+            op_data.gateName = op.getGateName();
+            op_data.adjoint = op.getAdjoint();
 
-            // Collect the parameters of the custom operation
-            auto rawParams = op.getParams();
-            collected_op.params.reserve(rawParams.size());
+            op_data.params.reserve(op.getParams().size());
+            op_data.ctrlQubitIndices.reserve(op.getInCtrlQubits().size());
+            op_data.wireIndices.reserve(op.getInQubits().size());
+            op_data.ctrlValues.reserve(op.getInCtrlValues().size());
 
-            for (auto pv : rawParams) {
+            for (Value pv : op.getParams()) {
                 if (auto p = extractParam(pv))
-                    collected_op.params.push_back(*p);
+                    op_data.params.push_back(*p);
                 else
                     op.emitWarning("Non-constant parameter skipped");
             }
 
-            // Collect the control qubits
-            for (auto cq : op.getInCtrlQubits()) {
-                auto it = qregs_map.find(cq);
-                if (it != qregs_map.end())
-                    collected_op.ctrlQubitIndices.push_back(it->second);
+            for (Value cq : op.getInCtrlQubits()) {
+                if (auto it = qregs_map.find(cq); it != qregs_map.end())
+                    op_data.ctrlQubitIndices.push_back(it->second);
+                else
+                    op.emitWarning("Control qubit not in map");
             }
 
-            // Collect the wires in the qregs_map
-            auto inQubits = op.getInQubits();
-            auto outQubits = op.getOutQubits();
-            assert(inQubits.size() == outQubits.size());
+            for (Value cv : op.getInCtrlValues()) {
+                if (auto constOp = cv.getDefiningOp<arith::ConstantOp>())
+                    if (auto ia = mlir::dyn_cast<IntegerAttr>(constOp.getValue()))
+                        op_data.ctrlValues.push_back(ia.getValue().getSExtValue());
+            }
 
-            for (unsigned i = 0; i < inQubits.size(); ++i) {
-                auto it = qregs_map.find(inQubits[i]);
-                if (it == qregs_map.end())
+            auto inQ = op.getInQubits();
+            auto outQ = op.getOutQubits();
+            assert(inQ.size() == outQ.size());
+
+            for (size_t i = 0; i < inQ.size(); ++i) {
+                auto inVal = inQ[i];
+                auto outVal = outQ[i];
+                auto it = qregs_map.find(inVal);
+                if (it == qregs_map.end()) {
+                    op.emitWarning("Input qubit not in map");
                     continue;
-                qregs_map[outQubits[i]] = it->second;
+                }
+                unsigned idx = it->second;
+                op_data.wireIndices.push_back(idx);
+                qregs_map[outVal] = idx;
             }
 
-            // Collect the wires (TODO: combine with above)
-            for (auto q : op.getInQubits()) {
-                auto it = qregs_map.find(q);
-                if (it != qregs_map.end())
-                    collected_op.wireIndices.push_back(it->second);
-            }
+            CollectedCustomOps.emplace_back(std::move(op_data));
         });
+
+        for (const auto &data : CollectedCustomOps) {
+            printCustomOpData(data);
+            llvm::outs() << "\n";
+        }
+
+        printQregsMap(qregs_map);
 
         RewritePatternSet patterns(&getContext());
         patterns.add<DecomposeCustomOp>(&getContext());
@@ -142,4 +190,4 @@ struct DecomposePass : public impl::DecomposePassBase<DecomposePass> {
 
 std::unique_ptr<Pass> createDecomposePass() { return std::make_unique<DecomposePass>(); }
 
-} // namespace catalyst
+}
