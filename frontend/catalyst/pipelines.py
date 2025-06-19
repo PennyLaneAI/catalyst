@@ -47,13 +47,13 @@ class KeepIntermediateLevel(enum.IntEnum):
 
 
 def _parse_keep_intermediate(
-    level: Union[str, int, bool],
+    level: Union[str, int, bool, None],
 ) -> KeepIntermediateLevel:
     """Parse the keep_intermediate value into a KeepIntermediateLevel enum."""
     match level:
         case 0 | 1 | 2:
             return KeepIntermediateLevel(level)
-        case "none":
+        case "none" | None:
             return KeepIntermediateLevel.NONE
         case "pipeline":
             return KeepIntermediateLevel.PIPELINE

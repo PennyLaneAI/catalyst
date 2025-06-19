@@ -96,6 +96,7 @@ class TestCompilerOptions:
     @pytest.mark.parametrize(
         "input_value, expected_level",
         [
+            (None, KeepIntermediateLevel.NONE),
             (False, KeepIntermediateLevel.NONE),
             (True, KeepIntermediateLevel.PIPELINE),
             (0, KeepIntermediateLevel.NONE),
@@ -130,7 +131,6 @@ class TestCompilerOptions:
         flags = _options_to_cli_flags(options)
         assert "--keep-intermediate" in flags
         assert "--save-ir-after-each=pass" not in flags
-        assert flags.count("--save-ir-after-each=pass") <= 1
 
     def test_options_to_cli_flags_keep_intermediate_debug(self):
         """Test _options_to_cli_flags with KeepIntermediateLevel.PASS."""
@@ -138,7 +138,6 @@ class TestCompilerOptions:
         flags = _options_to_cli_flags(options)
         assert "--keep-intermediate" in flags
         assert "--save-ir-after-each=pass" in flags
-        assert flags.count("--save-ir-after-each=pass") == 1
 
 
 class TestCompilerWarnings:

@@ -119,7 +119,7 @@ def qjit(
             QNodes asynchronously, if supported by the device runtime.
         target (str): the compilation target
         keep_intermediate (Union[str, int, bool]): Level controlling intermediate file generation.
-            - ``False`` or ``0`` or ``"none"`` (default): No intermediate files are kept.
+            - ``False`` or ``0`` or ``"none"`` or ``None`` (default): No intermediate file is kept.
             - ``True`` or ``1`` or ``"pipeline"``: Intermediate files are saved after each pipeline.
             - ``2`` or ``"pass"``: Intermediate files are saved after each pass.
             If enabled, intermediate representations are available via the following attributes:

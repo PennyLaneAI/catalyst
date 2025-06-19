@@ -342,17 +342,17 @@ def _options_to_cli_flags(options):
     if not options.lower_to_llvm:
         extra_args += [("--tool", "opt")]
 
-    if options.keep_intermediate >= KeepIntermediateLevel.PIPELINE:
+    if options.keep_intermediate:
         extra_args += ["--keep-intermediate"]
+        
+    if options.keep_intermediate >= KeepIntermediateLevel.PASS:
+        extra_args += ["--save-ir-after-each=pass"]
 
     if options.verbose:
         extra_args += ["--verbose"]
 
     if options.async_qnodes:  # pragma: nocover
         extra_args += ["--async-qnodes"]
-
-    if options.keep_intermediate >= KeepIntermediateLevel.PASS:
-        extra_args += ["--save-ir-after-each=pass"]
 
     return extra_args
 
