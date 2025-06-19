@@ -122,7 +122,7 @@ struct GatesToPulsesPass : impl::GatesToPulsesPassBase<GatesToPulsesPass> {
         }
 
         RewritePatternSet ionPatterns(&getContext());
-        populateQuantumToIonPatterns(ionPatterns, dataManager);
+        populateGatesToPulsesPatterns(ionPatterns, dataManager);
 
         if (failed(applyPartialConversion(op, target, std::move(ionPatterns)))) {
             return signalPassFailure();

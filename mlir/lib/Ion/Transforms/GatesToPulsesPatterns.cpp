@@ -485,14 +485,14 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
     }
 };
 
-struct QuantumToIonRewritePattern : public mlir::OpConversionPattern<CustomOp> {
+struct GatesToPulsesRewritePattern : public mlir::OpConversionPattern<CustomOp> {
     using mlir::OpConversionPattern<CustomOp>::OpConversionPattern;
 
     std::vector<Beam> beams1;
     std::vector<Beam> beams2;
     std::vector<Phonon> phonons;
 
-    QuantumToIonRewritePattern(mlir::MLIRContext *ctx, const OQDDatabaseManager &dataManager)
+    GatesToPulsesRewritePattern(mlir::MLIRContext *ctx, const OQDDatabaseManager &dataManager)
         : mlir::OpConversionPattern<CustomOp>::OpConversionPattern(ctx)
     {
         beams1 = dataManager.getBeams1Params();
@@ -524,10 +524,10 @@ struct QuantumToIonRewritePattern : public mlir::OpConversionPattern<CustomOp> {
     }
 };
 
-void populateQuantumToIonPatterns(RewritePatternSet &patterns,
+void populateGatesToPulsesPatterns(RewritePatternSet &patterns,
                                   const OQDDatabaseManager &dataManager)
 {
-    patterns.add<QuantumToIonRewritePattern>(patterns.getContext(), dataManager);
+    patterns.add<GatesToPulsesRewritePattern>(patterns.getContext(), dataManager);
 }
 
 } // namespace ion

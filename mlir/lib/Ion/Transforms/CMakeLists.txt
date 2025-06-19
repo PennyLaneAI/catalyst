@@ -4,7 +4,7 @@ file(GLOB SRC
     ion-to-llvm.cpp
     ConversionPatterns.cpp
     gates_to_pulses.cpp
-    QuantumToIonPatterns.cpp
+    GatesToPulsesPatterns.cpp
 )
 
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)
@@ -55,7 +55,7 @@ set_source_files_properties(
     ion-to-llvm.cpp
     ConversionPatterns.cpp
     gates_to_pulses.cpp
-    QuantumToIonPatterns.cpp
+    GatesToPulsesPatterns.cpp
     PROPERTIES
     COMPILE_FLAGS "-Wno-covered-switch-default"
 )
