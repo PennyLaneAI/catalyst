@@ -63,7 +63,7 @@ For example, the `qml.allocate()` would trace to the following primitive:
 and the integer indices `b, c, d` are logically a register, corresponding to a catalyst qreg value.
 
 Therefore, the two central questions we wish to answer is:
-1. Given a plain wire index in plxpr, which logical catalyst register does this wire belong to?
+1. Given a plain global wire index in plxpr, which logical catalyst register does this wire belong to?
 2. Given a logical catalyst register, what is its current qreg SSA value, and what are its current
    qubit SSA values on its wires?
 """

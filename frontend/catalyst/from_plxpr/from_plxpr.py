@@ -153,18 +153,15 @@ def from_plxpr(plxpr: ClosedJaxpr) -> Callable[..., Jaxpr]:
         in (b,) }
 
     """
-    return jax.make_jaxpr(
-        partial(WorkflowInterpreter(QubitIndexRecorder()).eval, plxpr.jaxpr, plxpr.consts)
-    )
+    return jax.make_jaxpr(partial(WorkflowInterpreter().eval, plxpr.jaxpr, plxpr.consts))
 
 
 class WorkflowInterpreter(PlxprInterpreter):
     """An interpreter that converts a qnode primitive from a plxpr variant to a catalxpr variant."""
 
-    def __init__(self, qubit_index_recorder: QubitIndexRecorder):
+    def __init__(self):
         self._pass_pipeline = []
         self.global_qreg = None
-        self.qubit_index_recorder = qubit_index_recorder
         super().__init__()
 
 
@@ -172,7 +169,7 @@ class WorkflowInterpreter(PlxprInterpreter):
 @WorkflowInterpreter.register_primitive(qnode_prim)
 def handle_qnode(self, *args, qnode, shots, device, execution_config, qfunc_jaxpr, batch_dims=None):
     """Handle the conversion from plxpr to Catalyst jaxpr for the qnode primitive"""
-
+    self.qubit_index_recorder = QubitIndexRecorder()
     closed_jaxpr = ClosedJaxpr(qfunc_jaxpr, [])
 
     def extract_shots_value(shots: qml.measurements.Shots | int):
