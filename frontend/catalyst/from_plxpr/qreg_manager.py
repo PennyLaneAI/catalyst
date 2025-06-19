@@ -69,6 +69,7 @@ Therefore, the two central questions we wish to answer is:
 """
 
 from catalyst.jax_primitives import AbstractQbit, AbstractQreg, qextract_p, qinsert_p
+from catalyst.utils.exceptions import CompileError
 
 
 class QubitIndexRecorder:
