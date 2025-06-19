@@ -256,6 +256,9 @@
 * MLIR plugins can now be specified via lists and tuples, not just sets.
   [(#1812)](https://github.com/PennyLaneAI/catalyst/pull/1812)
 
+* Fixes the conversion of PLxPR to JAXPR with quantum primitives when using control flow.
+  [(#1809)](https://github.com/PennyLaneAI/catalyst/pull/1809)
+
 <h3>Internal changes ⚙️</h3>
 
 * Use `dataclass.replace` to update `ExecutionConfig` and `MCMConfig` rather than mutating properties.
