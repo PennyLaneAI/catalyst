@@ -17,6 +17,7 @@ Qreg manager for from_plxpr conversion.
 """
 
 from catalyst.jax_primitives import AbstractQbit, AbstractQreg, qextract_p, qinsert_p
+from catalyst.utils.exceptions import CompileError
 
 
 class QregManager:
@@ -91,14 +92,14 @@ class QregManager:
         Set the current AbstractQreg value.
         This is needed, for example, when existing regions, like submodules and control flow.
         """
-        self.abstract_qreg_val = qreg
-
         # The old qreg SSA value is no longer usable since a new one has appeared
-        # Therefore all dangling qubits from the old one needs to be inserted back
-        # TODO: wait for
-        #  https://github.com/PennyLaneAI/catalyst/pull/1809
-        # to go in first
-        # self.insert_all_dangling_qubits()
+        # Therefore all dangling qubits from the old one also all expire
+        # These dangling qubit values will be dead, so there must be none.
+        if len(self.wire_map) != 0:
+            raise CompileError(
+                "Setting new qreg value, but the previous one still has dangling qubits."
+            )
+        self.abstract_qreg_val = qreg
 
     def extract(self, index: int) -> AbstractQbit:
         """Create the extract primitive that produces an AbstractQbit value."""

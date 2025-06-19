@@ -32,6 +32,7 @@ Quoted from the object's docstring:
        - `QubitManager.set(new_qreg_value)`
        - `QubitManager[i] = new_qubit_value`
 """
+import copy
 
 import pytest
 from jax.api_util import debug_info as jdb
@@ -41,6 +42,7 @@ from jax.interpreters.partial_eval import DynamicJaxprTrace
 
 from catalyst.from_plxpr.qreg_manager import QregManager
 from catalyst.jax_primitives import qalloc_p, qextract_p, qinst_p
+from catalyst.utils.exceptions import CompileError
 
 
 @pytest.fixture(autouse=True)
@@ -63,7 +65,9 @@ qreg_mock_op_p = Primitive("qreg_mock_op")
 
 @qreg_mock_op_p.def_abstract_eval
 def _qreg_mock_op_abstract_eval(qreg):
-    return qreg
+    # Use a copy so the mock returns a completely independent, second qreg object
+    # This is to mimic real ops
+    return copy.copy(qreg)
 
 
 class TestQregGetSet:
@@ -241,7 +245,6 @@ class TestQregValues:
         """Test that a qreg operation correctly updates the managed qreg SSA value."""
         qreg = qalloc_p.bind(42)
         qreg_manager = QregManager(qreg)
-        _ = qreg_manager[0]  # extract something
         new_qreg = qreg_mock_op_p.bind(qreg)
 
         # Update the qreg values.
@@ -251,6 +254,20 @@ class TestQregValues:
 
         # Check that managed qreg value is updated
         assert qreg_manager.get() is new_qreg
+
+    def test_qreg_op_with_dangling_qubits(self):
+        """Test that dangling qubits are correctly disallowed when new qreg values appear."""
+        qreg = qalloc_p.bind(42)
+        qreg_manager = QregManager(qreg)
+        _ = qreg_manager[0]  # extract something
+        assert 0 in qreg_manager.wire_map
+        new_qreg = qreg_mock_op_p.bind(qreg)  # a qreg op when the qreg still has dangling qubits
+
+        with pytest.raises(
+            CompileError,
+            match="Setting new qreg value, but the previous one still has dangling qubits.",
+        ):
+            qreg_manager.set(new_qreg)
 
 
 if __name__ == "__main__":
