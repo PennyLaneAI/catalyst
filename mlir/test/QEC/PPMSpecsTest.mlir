@@ -16,7 +16,7 @@
 
 //CHECK:     "test_no_ppr_ppm": {
 //CHECK:         "num_logical_qubits": 2
-//CHECK:     }
+//     }
 func.func public @test_no_ppr_ppm() {
     %c0_i64 = arith.constant 0 : i64
     %0 = quantum.alloc( 2) : !quantum.reg
@@ -42,7 +42,7 @@ func.func public @test_no_ppr_ppm() {
 //CHECK:         "num_logical_qubits": 2,
 //CHECK:         "num_pi4_gates": 7,
 //CHECK:         "num_pi8_gates": 1
-//CHECK:     }
+//     }
 func.func public @test_to_ppr() {
     %c0_i64 = arith.constant 0 : i64
     %0 = quantum.alloc( 2) : !quantum.reg
@@ -72,7 +72,7 @@ func.func public @test_to_ppr() {
 //CHECK:         "num_of_ppm": 2,
 //CHECK:         "num_pi4_gates": 7,
 //CHECK:         "num_pi8_gates": 1
-//CHECK:     }
+//     }
 func.func public @test_commute_ppr() {
     %c0_i64 = arith.constant 0 : i64
     %0 = quantum.alloc( 2) : !quantum.reg
@@ -102,7 +102,7 @@ func.func public @test_commute_ppr() {
 //CHECK:     "test_merge_ppr_ppm": {
 //CHECK:         "num_logical_qubits": 2,
 //CHECK:         "num_of_ppm": 2
-//CHECK:     }
+//     }
 func.func public @test_merge_ppr_ppm() {
     %c0_i64 = arith.constant 0 : i64
     %0 = quantum.alloc( 2) : !quantum.reg
@@ -126,7 +126,7 @@ func.func public @test_merge_ppr_ppm() {
 //CHECK:         "num_logical_qubits": 2,
 //CHECK:         "num_of_ppm": 19,
 //CHECK:         "num_pi2_gates": 8
-//CHECK:     }
+//     }
 func.func public @test_ppr_to_ppm() {
     %c0_i64 = arith.constant 0 : i64
     %0 = quantum.alloc( 2) : !quantum.reg
@@ -205,7 +205,7 @@ func.func public @test_ppr_to_ppm() {
 //CHECK:     },
 //CHECK:     "test_ppm_compilation_2": {
 //CHECK:         "num_logical_qubits": 2
-//CHECK:     }
+//     }
 func.func public @test_ppm_compilation_1() {
     %c0_i64 = arith.constant 0 : i64
     %0 = quantum.alloc( 2) : !quantum.reg
@@ -276,7 +276,7 @@ func.func public @test_ppm_compilation_2() {
 //CHECK:         "num_of_ppm": 4,
 //CHECK:         "num_pi4_gates": 17,
 //CHECK:         "num_pi8_gates": 4
-//CHECK:     }
+//     }
 func.func public @game_of_surface_code(%arg0: !quantum.bit, %arg1: !quantum.bit, %arg2: !quantum.bit, %arg3: !quantum.bit) {
 
     %0 = qec.ppr ["Z"](8) %arg0 : !quantum.bit
