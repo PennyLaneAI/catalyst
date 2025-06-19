@@ -852,7 +852,7 @@ def get_ppm_specs(QJIT):
         new_options = copy.copy(QJIT.compile_options)
         if new_options.pipelines is None:
             raise CompileError("No pipeline found")
-        new_options.pipelines[0][1].append("ppm-specs")  # add ppm-spec pass to existing pipeline
+        new_options.pipelines[-1][-1].append("ppm-specs")  # add ppm-spec pass at the end to existing pipeline
         new_options = _options_to_cli_flags(new_options)
         raw_result = _quantum_opt(*new_options, [], stdin=str(QJIT.mlir_module))
 
