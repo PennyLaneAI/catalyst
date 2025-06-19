@@ -233,12 +233,13 @@ mlir::LogicalResult oneQubitGateToPulse(CustomOp op, mlir::PatternRewriter &rewr
         auto qubits = op.getInQubits();
         MLIRContext *ctx = op.getContext();
 
+        auto angle = op.getParams().front();
+        auto time = computePulseDuration(rewriter, loc, angle, beam.rabi, beam.detuning);
+
         auto ppOp = rewriter.create<ion::ParallelProtocolOp>(
             loc, qubits, [&](OpBuilder &builder, Location loc, ValueRange qubits) {
                 mlir::FloatAttr phase1Attr = builder.getF64FloatAttr(phase1);
                 mlir::FloatAttr phase2Attr = builder.getF64FloatAttr(phase2);
-                auto angle = op.getParams().front();
-                auto time = computePulseDuration(rewriter, loc, angle, beam.rabi, beam.detuning);
                 auto qubit = qubits.front();
                 builder.create<ion::PulseOp>(loc, PulseType::get(ctx), time, qubit, beam0toEAttr,
                                              phase1Attr);
@@ -315,6 +316,9 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
             auto loc = op.getLoc();
             auto qubits = op.getInQubits();
 
+            auto angle = op.getParams().front();
+            auto time = computePulseDuration(rewriter, loc, angle, beam.rabi, beam.detuning);
+
             // Helper function to flip the sign of each element in a vector,
             // e.g. [a, b, c] -> [-a, -b, -c]
             auto flipSign = [](const std::vector<int64_t> &v) -> std::vector<int64_t> {
@@ -326,9 +330,6 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
             auto ppOp = rewriter.create<ion::ParallelProtocolOp>(
                 loc, qubits, [&](OpBuilder &builder, Location loc, ValueRange qubits) {
                     mlir::FloatAttr phase0Attr = builder.getF64FloatAttr(0.0);
-                    auto angle = op.getParams().front();
-                    auto time =
-                        computePulseDuration(rewriter, loc, angle, beam.rabi, beam.detuning);
                     auto qubit0 = qubits.front();
                     auto qubit1 = qubits.back();
 
@@ -484,14 +485,14 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
     }
 };
 
-struct QuantumToIonRewritePattern : public mlir::OpConversionPattern<CustomOp> {
+struct GatesToPulsesRewritePattern : public mlir::OpConversionPattern<CustomOp> {
     using mlir::OpConversionPattern<CustomOp>::OpConversionPattern;
 
     std::vector<Beam> beams1;
     std::vector<Beam> beams2;
     std::vector<Phonon> phonons;
 
-    QuantumToIonRewritePattern(mlir::MLIRContext *ctx, const OQDDatabaseManager &dataManager)
+    GatesToPulsesRewritePattern(mlir::MLIRContext *ctx, const OQDDatabaseManager &dataManager)
         : mlir::OpConversionPattern<CustomOp>::OpConversionPattern(ctx)
     {
         beams1 = dataManager.getBeams1Params();
@@ -523,10 +524,10 @@ struct QuantumToIonRewritePattern : public mlir::OpConversionPattern<CustomOp> {
     }
 };
 
-void populateQuantumToIonPatterns(RewritePatternSet &patterns,
-                                  const OQDDatabaseManager &dataManager)
+void populateGatesToPulsesPatterns(RewritePatternSet &patterns,
+                                   const OQDDatabaseManager &dataManager)
 {
-    patterns.add<QuantumToIonRewritePattern>(patterns.getContext(), dataManager);
+    patterns.add<GatesToPulsesRewritePattern>(patterns.getContext(), dataManager);
 }
 
 } // namespace ion

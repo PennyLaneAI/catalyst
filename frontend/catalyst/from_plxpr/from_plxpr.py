@@ -24,13 +24,9 @@ import jax.numpy as jnp
 import pennylane as qml
 from jax.extend.core import ClosedJaxpr, Jaxpr
 from jax.extend.linear_util import wrap_init
-from jax.interpreters.partial_eval import convert_constvars_jaxpr
 from pennylane.capture import PlxprInterpreter, qnode_prim
 from pennylane.capture.expand_transforms import ExpandTransformsInterpreter
-from pennylane.capture.primitives import cond_prim as plxpr_cond_prim
-from pennylane.capture.primitives import for_loop_prim as plxpr_for_loop_prim
 from pennylane.capture.primitives import measure_prim as plxpr_measure_prim
-from pennylane.capture.primitives import while_loop_prim as plxpr_while_loop_prim
 from pennylane.ftqc.primitives import measure_in_basis_prim as plxpr_measure_in_basis_prim
 from pennylane.ops.functions.map_wires import _map_wires_transform as pl_map_wires
 from pennylane.transforms import cancel_inverses as pl_cancel_inverses
@@ -41,13 +37,10 @@ from pennylane.transforms import merge_rotations as pl_merge_rotations
 from pennylane.transforms import single_qubit_fusion as pl_single_qubit_fusion
 from pennylane.transforms import unitary_to_rot as pl_unitary_to_rot
 
-from catalyst.device import (
-    extract_backend_info,
-    get_device_capabilities,
-)
+from catalyst.device import extract_backend_info, get_device_capabilities
+from catalyst.from_plxpr.qreg_manager import QregManager
 from catalyst.jax_extras import jaxpr_pad_consts, make_jaxpr2, transient_jax_config
 from catalyst.jax_primitives import (
-    AbstractQbit,
     MeasurementPlane,
     compbasis_p,
     cond_p,
@@ -55,7 +48,6 @@ from catalyst.jax_primitives import (
     device_init_p,
     device_release_p,
     expval_p,
-    for_p,
     gphase_p,
     measure_in_basis_p,
     measure_p,
@@ -63,8 +55,6 @@ from catalyst.jax_primitives import (
     probs_p,
     qalloc_p,
     qdealloc_p,
-    qextract_p,
-    qinsert_p,
     qinst_p,
     quantum_kernel_p,
     sample_p,
@@ -73,7 +63,6 @@ from catalyst.jax_primitives import (
     state_p,
     unitary_p,
     var_p,
-    while_p,
 )
 from catalyst.passes.pass_api import Pass
 
@@ -171,6 +160,7 @@ class WorkflowInterpreter(PlxprInterpreter):
 
     def __init__(self):
         self._pass_pipeline = []
+        self.global_qreg = None
         super().__init__()
 
 
@@ -203,11 +193,11 @@ def handle_qnode(
             **_get_device_kwargs(device),
         )
         qreg = qalloc_p.bind(len(device.wires))
-        converter = PLxPRToQuantumJaxprInterpreter(device, shots, qreg)
+        self.global_qreg = QregManager(qreg)
+        converter = PLxPRToQuantumJaxprInterpreter(device, shots, self.global_qreg)
         retvals = converter(closed_jaxpr, *args)
-        if not converter.actualized:
-            converter.actualize_qreg()
-        qdealloc_p.bind(converter.qreg)
+        self.global_qreg.insert_all_dangling_qubits()
+        qdealloc_p.bind(self.global_qreg.get())
         device_release_p.bind()
         return retvals
 
@@ -301,37 +291,18 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
     during initialization.
     """
 
-    def __init__(self, device, shots, qreg):
+    def __init__(self, device, shots, qreg_manager):
         self.device = device
         self.shots = shots
-        self.wire_map = {}
-        self.qreg = qreg
-        self.actualized = True
+        # TODO: we assume the qreg value passed into a scope is the unique qreg in the scope
+        # In other words, we assume no new qreg will be allocated in the scope
+        self.qreg_manager = qreg_manager
         super().__init__()
-
-    def get_wire(self, wire_value) -> AbstractQbit:
-        """Get the ``AbstractQbit`` corresponding to a wire value."""
-        if wire_value in self.wire_map:
-            return self.wire_map[wire_value]
-        self.actualized = False
-        return qextract_p.bind(self.qreg, wire_value)
-
-    def actualize_qreg(self):
-        """
-        Insert all end qubits back into a qreg,
-        and produce the product qreg jaxpr variable.
-        """
-        self.actualized = True
-        for orig_wire, wire in self.wire_map.items():
-            # Note: since `getattr` checks specifically for qreg, we can't
-            # define qreg inside the init function.
-            self.qreg = qinsert_p.bind(self.qreg, orig_wire, wire)
-        self.wire_map = {}
 
     def interpret_operation(self, op):
         """Re-bind a pennylane operation as a catalyst instruction."""
 
-        in_qubits = [self.get_wire(w) for w in op.wires]
+        in_qubits = [self.qreg_manager[w] for w in op.wires]
         out_qubits = qinst_p.bind(
             *[*in_qubits, *op.data],
             op=op.name,
@@ -341,7 +312,7 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
             adjoint=False,
         )
         for wire_values, new_wire in zip(op.wires, out_qubits):
-            self.wire_map[wire_values] = new_wire
+            self.qreg_manager[wire_values] = new_wire
 
         return out_qubits
 
@@ -349,17 +320,17 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         """Interpret the observable equation corresponding to a measurement equation's input."""
         if obs.arithmetic_depth > 0:
             raise NotImplementedError("operator arithmetic not yet supported for conversion.")
-        wires = [self.get_wire(w) for w in obs.wires]
+        wires = [self.qreg_manager[w] for w in obs.wires]
         return namedobs_p.bind(*wires, *obs.data, kind=obs.name)
 
     def _compbasis_obs(self, *wires):
         """Add a computational basis sampling observable."""
         if wires:
-            qubits = [self.get_wire(w) for w in wires]
+            qubits = [self.qreg_manager[w] for w in wires]
             return compbasis_p.bind(*qubits)
         else:
-            self.actualize_qreg()
-            return compbasis_p.bind(self.qreg, qreg_available=True)
+            self.qreg_manager.insert_all_dangling_qubits()
+            return compbasis_p.bind(self.qreg_manager.get(), qreg_available=True)
 
     def interpret_measurement(self, measurement):
         """Rebind a measurement as a catalyst instruction."""
@@ -431,10 +402,10 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
 @PLxPRToQuantumJaxprInterpreter.register_primitive(qml.QubitUnitary._primitive)
 def handle_qubit_unitary(self, *invals, n_wires):
     """Handle the conversion from plxpr to Catalyst jaxpr for the QubitUnitary primitive"""
-    wires = [self.get_wire(w) for w in invals[1:]]
+    wires = [self.qreg_manager[w] for w in invals[1:]]
     outvals = unitary_p.bind(invals[0], *wires, qubits_len=n_wires, ctrl_len=0, adjoint=False)
     for wire_values, new_wire in zip(invals[1:], outvals):
-        self.wire_map[wire_values] = new_wire
+        self.qreg_manager[wire_values] = new_wire
 
 
 # pylint: disable=unused-argument
@@ -451,11 +422,11 @@ def handle_basis_state(self, *invals, n_wires):
     wires_inval = invals[1:]
 
     state = jax.lax.convert_element_type(state_inval, jnp.dtype(jnp.bool))
-    wires = [self.get_wire(w) for w in wires_inval]
+    wires = [self.qreg_manager[w] for w in wires_inval]
     out_wires = set_basis_state_p.bind(*wires, state)
 
     for wire_values, new_wire in zip(wires_inval, out_wires):
-        self.wire_map[wire_values] = new_wire
+        self.qreg_manager[wire_values] = new_wire
 
 
 # pylint: disable=unused-argument
@@ -468,223 +439,18 @@ def handle_state_prep(self, *invals, n_wires, **kwargs):
     # jnp.complex128 is the top element in the type promotion lattice so it is ok to do this:
     # https://jax.readthedocs.io/en/latest/type_promotion.html
     state = jax.lax.convert_element_type(state_inval, jnp.dtype(jnp.complex128))
-    wires = [self.get_wire(w) for w in wires_inval]
+    wires = [self.qreg_manager[w] for w in wires_inval]
     out_wires = set_state_p.bind(*wires, state)
 
     for wire_values, new_wire in zip(wires_inval, out_wires):
-        self.wire_map[wire_values] = new_wire
-
-
-@PLxPRToQuantumJaxprInterpreter.register_primitive(plxpr_cond_prim)
-def handle_cond(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
-    """Handle the conversion from plxpr to Catalyst jaxpr for the cond primitive"""
-    args = plxpr_invals[args_slice]
-    self.actualize_qreg()
-    args_plus_qreg = [*args, self.qreg]  # Add the qreg to the args
-    converted_jaxpr_branches = []
-    all_consts = []
-
-    # Convert each branch from plxpr to jaxpr
-    for const_slice, plxpr_branch in zip(consts_slices, jaxpr_branches):
-
-        # Store all branches consts in a flat list
-        branch_consts = plxpr_invals[const_slice]
-        all_consts = all_consts + [*branch_consts]
-
-        converted_jaxpr_branch = None
-
-        if plxpr_branch is None:
-            # Emit a new Catalyst jaxpr branch that simply returns a qreg
-            converted_jaxpr_branch = jax.make_jaxpr(lambda x: x)(*args_plus_qreg).jaxpr
-        else:
-
-            closed_jaxpr = ClosedJaxpr(plxpr_branch, branch_consts)
-
-            def calling_convention(*args_plus_qreg):
-                *args, qreg = args_plus_qreg
-                device = self.device
-                shots = self.shots
-                converter = PLxPRToQuantumJaxprInterpreter(device, shots, qreg)
-                # pylint: disable-next=cell-var-from-loop
-                retval = converter(closed_jaxpr, *args)
-                converter.actualize_qreg()
-                return *retval, converter.qreg
-
-            converted_jaxpr_branch = jax.make_jaxpr(calling_convention)(*args_plus_qreg).jaxpr
-
-        converted_jaxpr_branches.append(converted_jaxpr_branch)
-
-    # The slice [0,1) of the plxpr input values contains the true predicate of the plxpr cond,
-    # whereas the slice [1,2) refers to the false predicate, which is always True.
-    # We extract the true predicate and discard the false one.
-    predicate_slice = slice(0, 1)
-    predicate = plxpr_invals[predicate_slice]
-
-    # Build Catalyst compatible input values
-    cond_invals = [*predicate, *all_consts, *args_plus_qreg]
-
-    # Perform the binding
-    outvals = cond_p.bind(
-        *cond_invals,
-        branch_jaxprs=jaxpr_pad_consts(converted_jaxpr_branches),
-        nimplicit_outputs=None,
-    )
-
-    # We assume the last output value is the returned qreg.
-    # Update the current qreg and remove it from the output values.
-    self.qreg = outvals.pop()
-
-    # Return only the output values that match the plxpr output values
-    return outvals
-
-
-# pylint: disable=unused-argument, too-many-arguments
-@PLxPRToQuantumJaxprInterpreter.register_primitive(plxpr_for_loop_prim)
-def handle_for_loop(
-    self,
-    start,
-    stop,
-    step,
-    *plxpr_invals,
-    jaxpr_body_fn,
-    consts_slice,
-    args_slice,
-    abstract_shapes_slice,
-):
-    """Handle the conversion from plxpr to Catalyst jaxpr for the for loop primitive"""
-    assert jaxpr_body_fn is not None
-    args = plxpr_invals[args_slice]
-
-    # Add the iteration start and the qreg to the args
-    self.actualize_qreg()
-    start_plus_args_plus_qreg = [
-        start,
-        *args,
-        self.qreg,
-    ]
-
-    consts = plxpr_invals[consts_slice]
-
-    jaxpr = ClosedJaxpr(jaxpr_body_fn, consts)
-
-    def calling_convention(*args_plus_qreg):
-        *args, qreg = args_plus_qreg
-        device = self.device
-        shots = self.shots
-        converter = PLxPRToQuantumJaxprInterpreter(device, shots, qreg)
-        retvals = converter(jaxpr, *args)
-        converter.actualize_qreg()
-        return *retvals, converter.qreg
-
-    converted_jaxpr_branch = jax.make_jaxpr(calling_convention)(*start_plus_args_plus_qreg).jaxpr
-    converted_closed_jaxpr_branch = ClosedJaxpr(convert_constvars_jaxpr(converted_jaxpr_branch), ())
-
-    # Build Catalyst compatible input values
-    for_loop_invals = [*consts, start, stop, step, *start_plus_args_plus_qreg]
-
-    # Config additional for loop settings
-    apply_reverse_transform = isinstance(step, int) and step < 0
-
-    # Perform the binding
-    outvals = for_p.bind(
-        *for_loop_invals,
-        body_jaxpr=converted_closed_jaxpr_branch,
-        body_nconsts=len(consts),
-        apply_reverse_transform=apply_reverse_transform,
-        nimplicit=0,
-        preserve_dimensions=True,
-    )
-
-    # We assume the last output value is the returned qreg.
-    # Update the current qreg and remove it from the output values.
-    self.qreg = outvals.pop()
-
-    # Return only the output values that match the plxpr output values
-    return outvals
-
-
-# pylint: disable=too-many-arguments
-@PLxPRToQuantumJaxprInterpreter.register_primitive(plxpr_while_loop_prim)
-def handle_while_loop(
-    self,
-    *plxpr_invals,
-    jaxpr_body_fn,
-    jaxpr_cond_fn,
-    body_slice,
-    cond_slice,
-    args_slice,
-):
-    """Handle the conversion from plxpr to Catalyst jaxpr for the while loop primitive"""
-    self.actualize_qreg()
-    consts_body = plxpr_invals[body_slice]
-    consts_cond = plxpr_invals[cond_slice]
-    args = plxpr_invals[args_slice]
-    args_plus_qreg = [*args, self.qreg]  # Add the qreg to the args
-
-    jaxpr = ClosedJaxpr(jaxpr_body_fn, consts_body)
-
-    def calling_convention(*args_plus_qreg):
-        *args, qreg = args_plus_qreg
-        device = self.device
-        shots = self.shots
-        converter = PLxPRToQuantumJaxprInterpreter(device, shots, qreg)
-        retvals = converter(jaxpr, *args)
-        converter.actualize_qreg()
-        return *retvals, converter.qreg
-
-    converted_body_jaxpr_branch = jax.make_jaxpr(calling_convention)(*args_plus_qreg).jaxpr
-    converted_body_closed_jaxpr_branch = ClosedJaxpr(
-        convert_constvars_jaxpr(converted_body_jaxpr_branch), ()
-    )
-
-    # Convert for condition from plxpr to Catalyst jaxpr
-    # We need to be able to handle arbitrary plxpr here.
-    # But we want to be able to create a state where:
-    # * We do not pass the quantum register as an argument.
-
-    # So let's just remove the quantum register here at the end
-
-    jaxpr = ClosedJaxpr(jaxpr_cond_fn, consts_cond)
-
-    def remove_qreg(*args_plus_qreg):
-        *args, qreg = args_plus_qreg
-        device = self.device
-        shots = self.shots
-        converter = PLxPRToQuantumJaxprInterpreter(device, shots, qreg)
-        return converter(jaxpr, *args)
-
-    converted_cond_jaxpr_branch = jax.make_jaxpr(remove_qreg)(*args_plus_qreg).jaxpr
-    converted_cond_closed_jaxpr_branch = ClosedJaxpr(
-        convert_constvars_jaxpr(converted_cond_jaxpr_branch), ()
-    )
-
-    # Build Catalyst compatible input values
-    while_loop_invals = [*consts_cond, *consts_body, *args_plus_qreg]
-
-    # Perform the binding
-    outvals = while_p.bind(
-        *while_loop_invals,
-        cond_jaxpr=converted_cond_closed_jaxpr_branch,
-        body_jaxpr=converted_body_closed_jaxpr_branch,
-        cond_nconsts=len(consts_cond),
-        body_nconsts=len(consts_body),
-        nimplicit=0,
-        preserve_dimensions=True,
-    )
-
-    # We assume the last output value is the returned qreg.
-    # Update the current qreg and remove it from the output values.
-    self.qreg = outvals.pop()
-
-    # Return only the output values that match the plxpr output values
-    return outvals
+        self.qreg_manager[wire_values] = new_wire
 
 
 @PLxPRToQuantumJaxprInterpreter.register_primitive(plxpr_measure_prim)
 def handle_measure(self, wire, reset, postselect):
     """Handle the conversion from plxpr to Catalyst jaxpr for the mid-circuit measure primitive."""
 
-    in_wire = self.get_wire(wire)
+    in_wire = self.qreg_manager[wire]
 
     result, out_wire = measure_p.bind(in_wire, postselect=postselect)
 
@@ -700,7 +466,7 @@ def handle_measure(self, wire, reset, postselect):
             result, in_wire, out_wire, branch_jaxprs=correction, nimplicit_outputs=None
         )[0]
 
-    self.wire_map[wire] = out_wire
+    self.qreg_manager[wire] = out_wire
     return result
 
 
@@ -717,10 +483,10 @@ def handle_measure_in_basis(self, angle, wire, plane, reset, postselect):
             f"Measurement plane must be one of {[plane.value for plane in MeasurementPlane]}"
         ) from e
 
-    in_wire = self.get_wire(wire)
+    in_wire = self.qreg_manager[wire]
     result, out_wire = measure_in_basis_p.bind(_angle, in_wire, plane=_plane, postselect=postselect)
 
-    self.wire_map[wire] = out_wire
+    self.qreg_manager[wire] = out_wire
 
     return result
 

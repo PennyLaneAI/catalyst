@@ -353,6 +353,9 @@
   target gate set.
   [(#1763)](https://github.com/PennyLaneAI/catalyst/pull/1763)
 
+* The `quantum-to-ion` pass is renamed to `gates-to-pulses`.
+  [(#1818)](https://github.com/PennyLaneAI/catalyst/pull/1818)
+
 * The runtime CAPI function `__catalyst__rt__num_qubits` now has a corresponding jax primitive
   `num_qubits_p` and quantum dialect operation `NumQubitsOp`.
   [(#1793)](https://github.com/PennyLaneAI/catalyst/pull/1793)
@@ -363,6 +366,12 @@
 * Refactored PPR/PPM pass names from snake_case to kebab-case in MLIR passes to align with MLIR conventions.
   Class names and tests were updated accordingly. Example: `--to_ppr` is now `--to-ppr`.
   [(#1802)](https://github.com/PennyLaneAI/catalyst/pull/1802)
+
+* A new internal python module `catalyst.from_plxpr` is created to better organize the code for plxpr capture integration.
+  [(#1813)](https://github.com/PennyLaneAI/catalyst/pull/1813)
+
+* A new `from_plxpr.QregManager` is created to handle converting plxpr wire index semantics into catalyst qubit value semantics.
+  [(#1813)](https://github.com/PennyLaneAI/catalyst/pull/1813)
 
 <h3>Documentation 📝</h3>
 
