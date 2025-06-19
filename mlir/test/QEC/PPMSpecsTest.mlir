@@ -17,9 +17,8 @@
 //CHECK:     "test_no_ppr_ppm": {
 //CHECK:         "num_logical_qubits": 2
 //CHECK:     }
-func.func public @test_no_ppr_ppm() attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode} {
+func.func public @test_no_ppr_ppm() {
     %c0_i64 = arith.constant 0 : i64
-    quantum.device shots(%c0_i64) ["/Users/ritu.thombre/Desktop/catalyst/.venv/lib/python3.12/site-packages/pennylane_lightning/liblightning_qubit_catalyst.dylib", "LightningSimulator", "{'mcmc': False, 'num_burnin': 0, 'kernel_name': None}"]
     %0 = quantum.alloc( 2) : !quantum.reg
     %1 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
     %out_qubits = quantum.custom "S"() %1 : !quantum.bit
@@ -44,9 +43,8 @@ func.func public @test_no_ppr_ppm() attributes {diff_method = "parameter-shift",
 //CHECK:         "num_pi4_gates": 7,
 //CHECK:         "num_pi8_gates": 1
 //CHECK:     }
-func.func public @test_to_ppr() attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode} {
+func.func public @test_to_ppr() {
     %c0_i64 = arith.constant 0 : i64
-    quantum.device shots(%c0_i64) ["/Users/ritu.thombre/Desktop/catalyst/.venv/lib/python3.12/site-packages/pennylane_lightning/liblightning_qubit_catalyst.dylib", "LightningSimulator", "{'mcmc': False, 'num_burnin': 0, 'kernel_name': None}"]
     %0 = quantum.alloc( 2) : !quantum.reg
     %1 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
     %2 = qec.ppr ["Z"](4) %1 : !quantum.bit
@@ -75,9 +73,8 @@ func.func public @test_to_ppr() attributes {diff_method = "parameter-shift", llv
 //CHECK:         "num_pi4_gates": 7,
 //CHECK:         "num_pi8_gates": 1
 //CHECK:     }
-func.func public @test_commute_ppr() -> (tensor<i1>, tensor<i1>) attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode} {
+func.func public @test_commute_ppr() {
     %c0_i64 = arith.constant 0 : i64
-    quantum.device shots(%c0_i64) ["/Users/ritu.thombre/Desktop/catalyst/.venv/lib/python3.12/site-packages/pennylane_lightning/liblightning_qubit_catalyst.dylib", "LightningSimulator", "{'mcmc': False, 'num_burnin': 0, 'kernel_name': None}"]
     %0 = quantum.alloc( 2) : !quantum.reg
     %1 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
     %2 = qec.ppr ["Z"](4) %1 : !quantum.bit
@@ -97,7 +94,7 @@ func.func public @test_commute_ppr() -> (tensor<i1>, tensor<i1>) attributes {dif
     %11 = quantum.insert %0[ 0], %out_qubits : !quantum.reg, !quantum.bit
     %12 = quantum.insert %11[ 1], %out_qubits_1 : !quantum.reg, !quantum.bit
     quantum.dealloc %12 : !quantum.reg
-    return %from_elements, %from_elements_2 : tensor<i1>, tensor<i1>
+    return
 }
 
 // -----
@@ -106,9 +103,8 @@ func.func public @test_commute_ppr() -> (tensor<i1>, tensor<i1>) attributes {dif
 //CHECK:         "num_logical_qubits": 2,
 //CHECK:         "num_of_ppm": 2
 //CHECK:     }
-func.func public @test_merge_ppr_ppm() -> (tensor<i1>, tensor<i1>) attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode} {
+func.func public @test_merge_ppr_ppm() {
     %c0_i64 = arith.constant 0 : i64
-    quantum.device shots(%c0_i64) ["/Users/ritu.thombre/Desktop/catalyst/.venv/lib/python3.12/site-packages/pennylane_lightning/liblightning_qubit_catalyst.dylib", "LightningSimulator", "{'mcmc': False, 'num_burnin': 0, 'kernel_name': None}"]
     %0 = quantum.alloc( 2) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
     %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
@@ -120,7 +116,7 @@ func.func public @test_merge_ppr_ppm() -> (tensor<i1>, tensor<i1>) attributes {d
     %3 = quantum.insert %0[ 0], %out_qubits_1 : !quantum.reg, !quantum.bit
     %4 = quantum.insert %3[ 1], %out_qubits#0 : !quantum.reg, !quantum.bit
     quantum.dealloc %4 : !quantum.reg
-    return %from_elements_2, %from_elements : tensor<i1>, tensor<i1>
+    return
 }
 
 // -----
@@ -131,9 +127,8 @@ func.func public @test_merge_ppr_ppm() -> (tensor<i1>, tensor<i1>) attributes {d
 //CHECK:         "num_of_ppm": 19,
 //CHECK:         "num_pi2_gates": 8
 //CHECK:     }
-func.func public @test_ppr_to_ppm() -> (tensor<i1>, tensor<i1>) attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode} {
+func.func public @test_ppr_to_ppm() {
     %c0_i64 = arith.constant 0 : i64
-    quantum.device shots(%c0_i64) ["/Users/ritu.thombre/Desktop/catalyst/.venv/lib/python3.12/site-packages/pennylane_lightning/liblightning_qubit_catalyst.dylib", "LightningSimulator", "{'mcmc': False, 'num_burnin': 0, 'kernel_name': None}"]
     %0 = quantum.alloc( 2) : !quantum.reg
     %1 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
     %2 = quantum.alloc_qb : !quantum.bit
@@ -197,7 +192,7 @@ func.func public @test_ppr_to_ppm() -> (tensor<i1>, tensor<i1>) attributes {diff
     %29 = quantum.insert %28[ 1], %out_qubits_37 : !quantum.reg, !quantum.bit
     quantum.dealloc %29 : !quantum.reg
     quantum.device_release
-    return %from_elements, %from_elements_38 : tensor<i1>, tensor<i1>
+    return
 }
 
 // -----
@@ -211,9 +206,8 @@ func.func public @test_ppr_to_ppm() -> (tensor<i1>, tensor<i1>) attributes {diff
 //CHECK:     "test_ppm_compilation_2": {
 //CHECK:         "num_logical_qubits": 2
 //CHECK:     }
-func.func public @test_ppm_compilation_1() -> tensor<i1> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode} {
+func.func public @test_ppm_compilation_1() {
     %c0_i64 = arith.constant 0 : i64
-    quantum.device shots(%c0_i64) ["/Users/ritu.thombre/Desktop/catalyst/.venv/lib/python3.12/site-packages/pennylane_lightning/liblightning_qubit_catalyst.dylib", "LightningSimulator", "{'mcmc': False, 'num_burnin': 0, 'kernel_name': None}"]
     %0 = quantum.alloc( 2) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
     %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
@@ -251,12 +245,11 @@ func.func public @test_ppm_compilation_1() -> tensor<i1> attributes {diff_method
     %19 = quantum.insert %18[ 4], %5 : !quantum.reg, !quantum.bit
     %20 = quantum.insert %19[ 5], %6 : !quantum.reg, !quantum.bit
     quantum.dealloc %20 : !quantum.reg
-    return %from_elements : tensor<i1>
+    return 
 }  
   
-func.func public @test_ppm_compilation_2() attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode} {
+func.func public @test_ppm_compilation_2() {
     %c0_i64 = arith.constant 0 : i64
-    quantum.device shots(%c0_i64) ["/Users/ritu.thombre/Desktop/catalyst/.venv/lib/python3.12/site-packages/pennylane_lightning/liblightning_qubit_catalyst.dylib", "LightningSimulator", "{'mcmc': False, 'num_burnin': 0, 'kernel_name': None}"]
     %0 = quantum.alloc( 2) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
     %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
