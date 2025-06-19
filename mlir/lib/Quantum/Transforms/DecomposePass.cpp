@@ -25,11 +25,9 @@ struct Param {
 struct CustomOpData {
     std::string gateName;
     bool adjoint;
-    unsigned numCtrlQubits;
-    unsigned numCtrlValues;
     std::vector<Param> params;
-    std::vector<unsigned> wireIndices;
-    std::vector<unsigned> ctrlQubitIndices;
+    std::vector<unsigned> wires;
+    std::vector<unsigned> ctrlQubits;
     std::vector<int64_t> ctrlValues;
 };
 
@@ -76,12 +74,12 @@ static void printCustomOpData(const CustomOpData &op)
             llvm::outs() << param.f << " ";
     }
     llvm::outs() << "\n";
-    llvm::outs() << "  Wire Indices: ";
-    for (unsigned idx : op.wireIndices)
+    llvm::outs() << "  Wires: ";
+    for (unsigned idx : op.wires)
         llvm::outs() << idx << " ";
     llvm::outs() << "\n";
-    llvm::outs() << "  Control Qubit Indices: ";
-    for (unsigned idx : op.ctrlQubitIndices)
+    llvm::outs() << "  Control Qubits: ";
+    for (unsigned idx : op.ctrlQubits)
         llvm::outs() << idx << " ";
     llvm::outs() << "\n";
     llvm::outs() << "  Control Values: ";
@@ -128,8 +126,8 @@ struct DecomposePass : public impl::DecomposePassBase<DecomposePass> {
             op_data.adjoint = op.getAdjoint();
 
             op_data.params.reserve(op.getParams().size());
-            op_data.ctrlQubitIndices.reserve(op.getInCtrlQubits().size());
-            op_data.wireIndices.reserve(op.getInQubits().size());
+            op_data.ctrlQubits.reserve(op.getInCtrlQubits().size());
+            op_data.wires.reserve(op.getInQubits().size());
             op_data.ctrlValues.reserve(op.getInCtrlValues().size());
 
             for (Value pv : op.getParams()) {
@@ -141,7 +139,7 @@ struct DecomposePass : public impl::DecomposePassBase<DecomposePass> {
 
             for (Value cq : op.getInCtrlQubits()) {
                 if (auto it = qregs_map.find(cq); it != qregs_map.end())
-                    op_data.ctrlQubitIndices.push_back(it->second);
+                    op_data.ctrlQubits.push_back(it->second);
                 else
                     op.emitWarning("Control qubit not in map");
             }
@@ -165,18 +163,18 @@ struct DecomposePass : public impl::DecomposePassBase<DecomposePass> {
                     continue;
                 }
                 unsigned idx = it->second;
-                op_data.wireIndices.push_back(idx);
+                op_data.wires.push_back(idx);
                 qregs_map[outVal] = idx;
             }
 
             CollectedCustomOps.emplace_back(std::move(op_data));
         });
 
+        // Print collected CustomOp data and qregs_map for debugging.
         for (const auto &data : CollectedCustomOps) {
             printCustomOpData(data);
             llvm::outs() << "\n";
         }
-
         printQregsMap(qregs_map);
 
         RewritePatternSet patterns(&getContext());
