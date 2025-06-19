@@ -57,7 +57,7 @@ def OQDDevicePipeline(device, qubit, gate):
             "oqd_pipeline",
             [
                 "func.func(ions-decomposition)",
-                "func.func(quantum-to-ion{"
+                "func.func(gates-to-pulses{"
                 + "device-toml-loc="
                 + device
                 + " qubit-toml-loc="
