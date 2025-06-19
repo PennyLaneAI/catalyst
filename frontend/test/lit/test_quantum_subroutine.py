@@ -254,3 +254,36 @@ def test_two_callsites_quantum():
 
 
 test_two_callsites_quantum()
+
+
+def test_two_qnodes_one_subroutine():
+    """Test whether the cache correctly cleans up after each
+    qnode tracing"""
+
+    @subroutine
+    def identity(): ...
+
+    @qml.qnode(qml.device("lightning.qubit", wires=1), autograph=False)
+    def subroutine_test_7():
+        # CHECK: func.func private @identity
+        identity()
+        return qml.probs()
+
+    @qml.qnode(qml.device("null.qubit", wires=1), autograph=False)
+    def subroutine_test_8():
+        # CHECK: func.func private @identity_0
+        identity()
+        return qml.probs()
+
+    qml.capture.enable()
+
+    @qml.qjit(autograph=False)
+    def main():
+        return subroutine_test_7() + subroutine_test_8()
+
+    print(main.mlir)
+
+    qml.capture.disable()
+
+
+test_two_qnodes_one_subroutine()
