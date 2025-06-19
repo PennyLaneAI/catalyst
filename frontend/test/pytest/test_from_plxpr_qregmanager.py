@@ -32,6 +32,7 @@ Quoted from the object's docstring:
        - `QubitManager.set(new_qreg_value)`
        - `QubitManager[i] = new_qubit_value`
 """
+# pylint: disable=use-implicit-booleaness-not-comparison
 import copy
 
 import pytest
@@ -77,11 +78,11 @@ class TestQregGetSet:
         """Test getter and setter"""
         qreg_manager = QregManager(None)
         qreg_manager.set("monkey_mock_qreg")
-        assert qreg_manager.get() is "monkey_mock_qreg"
-        assert qreg_manager.get() is "monkey_mock_qreg"  # test that getter does not set
+        assert qreg_manager.get() == "monkey_mock_qreg"
+        assert qreg_manager.get() == "monkey_mock_qreg"  # test that getter does not set
 
         qreg_manager.set("donkey_mock_qreg")
-        assert qreg_manager.get() is "donkey_mock_qreg"
+        assert qreg_manager.get() == "donkey_mock_qreg"
 
 
 class TestQregManagerInitialization:
@@ -101,7 +102,6 @@ class TestQregManagerInitialization:
             qreg_manager = QregManager(qreg)
             assert qreg_manager.get() is qreg
             assert qreg_manager.wire_map == {}
-            return
 
         outer_scope_qreg = qalloc_p.bind(42)
         f(outer_scope_qreg)
