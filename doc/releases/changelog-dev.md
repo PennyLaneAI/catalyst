@@ -356,8 +356,6 @@
 * The `quantum-to-ion` pass is renamed to `gates-to-pulses`.
   [(#1818)](https://github.com/PennyLaneAI/catalyst/pull/1818)
 
-* Upgraded action runners from Ubuntu22.04 to Ubuntu24.04. [(#1728)](https://github.com/PennyLaneAI/catalyst/pull/1728)
-
 * The runtime CAPI function `__catalyst__rt__num_qubits` now has a corresponding jax primitive
   `num_qubits_p` and quantum dialect operation `NumQubitsOp`.
   [(#1793)](https://github.com/PennyLaneAI/catalyst/pull/1793)
