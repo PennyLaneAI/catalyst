@@ -34,6 +34,7 @@ Quoted from the object's docstring:
 """
 # pylint: disable=use-implicit-booleaness-not-comparison
 import copy
+import textwrap
 
 import pytest
 from jax.api_util import debug_info as jdb
@@ -226,15 +227,17 @@ class TestQubitValues:
             # Checking via jaxpr internals is a bit tedious here
             # So let's just check the string...
             observed_jaxpr = str(trace.to_jaxpr([], None)[0])
-            expected = """{ lambda ; . let
-    a:AbstractQreg() = qalloc 42
-    b:AbstractQbit() = qextract a 0
-    c:AbstractQbit() = qextract a 1
-    d:AbstractQbit() = qextract a 2
-    e:AbstractQreg() = qinsert a 0 b
-    f:AbstractQreg() = qinsert e 1 c
-    _:AbstractQreg() = qinsert f 2 d
-  in () }"""
+            expected = """\
+            { lambda ; . let
+                a:AbstractQreg() = qalloc 42
+                b:AbstractQbit() = qextract a 0
+                c:AbstractQbit() = qextract a 1
+                d:AbstractQbit() = qextract a 2
+                e:AbstractQreg() = qinsert a 0 b
+                f:AbstractQreg() = qinsert e 1 c
+                _:AbstractQreg() = qinsert f 2 d
+              in () }"""
+            expected = textwrap.dedent(expected)
             assert observed_jaxpr == expected
 
 
