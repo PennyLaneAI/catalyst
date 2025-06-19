@@ -302,29 +302,6 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         self.qubit_index_recorder = qubit_index_recorder
         super().__init__()
 
-    def _get_wire_value_and_qreg(self, wire: int):
-        """
-        Get the qubit SSA value from the unique index.
-        Also return the qreg manager containing the qubit for convenience.
-
-        Note that wire indices in plxpr are global.
-        The global register has "regular" indices like 0,1,2,...
-        The dynamically allocated registers have hashed indices (i.e. big numbers).
-        """
-
-        # Bail out for dynamic case
-        # What about pre-extracting all the global reg's wires?
-        # That would make life so much easier......
-        if not isinstance(wire, int):
-            return self.qreg_manager[wire], self.qreg_manager
-
-        if wire < len(self.device.wires):
-            return self.qreg_manager[wire], self.qreg_manager
-
-        for qreg_manager in self.qregs.values():
-            if wire in qreg_manager.wire_map:
-                return qreg_manager[wire], qreg_manager
-
     def interpret_operation(self, op):
         """Re-bind a pennylane operation as a catalyst instruction."""
 
