@@ -196,7 +196,7 @@ def handle_qnode(
         )
         qreg = qalloc_p.bind(len(device.wires))
         self.global_qreg = QregManager(qreg)
-        converter = PLxPRToQuantumJaxprInterpreter(device, shots, self.global_qreg)
+        converter = PLxPRToQuantumJaxprInterpreter(device, shots, self.global_qreg, {})
         retvals = converter(closed_jaxpr, *args)
         self.global_qreg.insert_all_dangling_qubits()
         qdealloc_p.bind(self.global_qreg.get())
@@ -299,6 +299,7 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         # TODO: we assume the qreg value passed into a scope is the unique qreg in the scope
         # In other words, we assume no new qreg will be allocated in the scope
         self.qreg_manager = qreg_manager
+        self.subroutine_cache = {}
         super().__init__()
 
     def interpret_operation(self, op):
@@ -401,9 +402,6 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         return self.eval(jaxpr.jaxpr, jaxpr.consts, *args)
 
 
-subroutine_cache = {}
-
-
 @PLxPRToQuantumJaxprInterpreter.register_primitive(quantum_subroutine_p)
 def handle_subroutine(self, *args, **kwargs):
     """
@@ -414,12 +412,12 @@ def handle_subroutine(self, *args, **kwargs):
     # Make sure the quantum register is updated
     self.actualize_qreg()
     plxpr = kwargs["jaxpr"]
-    transformed = subroutine_cache.get(plxpr)
+    transformed = self.subroutine_cache.get(plxpr)
 
     def wrapper(qreg, *args):
         device = self.device
         shots = self.shots
-        converter = PLxPRToQuantumJaxprInterpreter(device, shots, qreg)
+        converter = PLxPRToQuantumJaxprInterpreter(device, shots, qreg, self.subroutine_cache)
         retvals = converter(plxpr, *args)
         converter.actualize_qreg()
         return converter.qreg, *retvals
@@ -429,7 +427,7 @@ def handle_subroutine(self, *args, **kwargs):
         converted_closed_jaxpr_branch = ClosedJaxpr(
             convert_constvars_jaxpr(converted_jaxpr_branch), ()
         )
-        subroutine_cache[plxpr] = converted_closed_jaxpr_branch
+        self.subroutine_cache[plxpr] = converted_closed_jaxpr_branch
     else:
         converted_closed_jaxpr_branch = transformed
     # jaxpr = from_plxpr(jaxpr)(AbstractQreg(), *args)
