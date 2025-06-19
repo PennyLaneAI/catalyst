@@ -14,10 +14,11 @@
 
 """This module exposes built-in Catalyst MLIR passes to the frontend."""
 
+import copy
 import functools
 import json
 
-from catalyst.compiler import _quantum_opt
+from catalyst.compiler import _options_to_cli_flags, _quantum_opt
 from catalyst.passes.pass_api import PassPipelineWrapper
 from catalyst.utils.exceptions import CompileError
 
@@ -848,9 +849,13 @@ def get_ppm_specs(QJIT):
 
     if QJIT.mlir is not None:
         # aot mode
-        raw_result = _quantum_opt(
-            ("--pass-pipeline", "builtin.module(ppm-specs)"), [], stdin=QJIT.mlir_opt
-        )
+        new_options = copy.copy(QJIT.compile_options)
+        if new_options.pipelines is None:
+            raise CompileError("No pipeline found")
+        new_options.pipelines[0][1].append("ppm-specs")  # add ppm-spec pass to existing pipeline
+        new_options = _options_to_cli_flags(new_options)
+        raw_result = _quantum_opt(*new_options, [], stdin=str(QJIT.mlir_module))
+
         try:
             return json.loads(
                 raw_result[: raw_result.index("module")]
