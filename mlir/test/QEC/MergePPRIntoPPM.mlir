@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt --merge_ppr_ppm --split-input-file -verify-diagnostics %s | FileCheck %s
-// RUN: quantum-opt --merge_ppr_ppm="max-pauli-size=3" --split-input-file -verify-diagnostics %s | FileCheck %s --check-prefixes=CHECK-MPS
+// RUN: quantum-opt --merge-ppr-ppm --split-input-file -verify-diagnostics %s | FileCheck %s
+// RUN: quantum-opt --merge-ppr-ppm="max-pauli-size=3" --split-input-file -verify-diagnostics %s | FileCheck %s --check-prefixes=CHECK-MPS
 
 func.func public @merge_ppr_ppm_test_1(%q1: !quantum.bit) -> tensor<i1> {
 

@@ -83,6 +83,7 @@ from mlir_quantum.dialects.quantum import (
     MeasureOp,
     MultiRZOp,
     NamedObsOp,
+    NumQubitsOp,
     ProbsOp,
     QubitUnitaryOp,
     SampleOp,
@@ -247,6 +248,7 @@ device_init_p = Primitive("device_init")
 device_init_p.multiple_results = True
 device_release_p = Primitive("device_release")
 device_release_p.multiple_results = True
+num_qubits_p = Primitive("num_qubits")
 qalloc_p = Primitive("qalloc")
 qdealloc_p = Primitive("qdealloc")
 qdealloc_p.multiple_results = True
@@ -811,12 +813,18 @@ def _zne_lowering(ctx, *args, folding, jaxpr, fn):
 # device_init
 #
 @device_init_p.def_abstract_eval
-def _device_init_abstract_eval(shots, rtd_lib, rtd_name, rtd_kwargs):
+def _device_init_abstract_eval(shots, auto_qubit_management, rtd_lib, rtd_name, rtd_kwargs):
     return ()
 
 
+# pylint: disable=too-many-arguments, too-many-positional-arguments
 def _device_init_lowering(
-    jax_ctx: mlir.LoweringRuleContext, shots: ir.Value, rtd_lib, rtd_name, rtd_kwargs
+    jax_ctx: mlir.LoweringRuleContext,
+    shots: ir.Value,
+    auto_qubit_management,
+    rtd_lib,
+    rtd_name,
+    rtd_kwargs,
 ):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
@@ -827,6 +835,7 @@ def _device_init_lowering(
         ir.StringAttr.get(rtd_name),
         ir.StringAttr.get(rtd_kwargs),
         shots=shots_value,
+        auto_qubit_management=auto_qubit_management,
     )
 
     return ()
@@ -843,6 +852,26 @@ def _device_release_abstract_eval():
 def _device_release_lowering(jax_ctx: mlir.LoweringRuleContext):
     DeviceReleaseOp()  # end of qnode
     return ()
+
+
+#
+# num_qubits_p
+#
+@num_qubits_p.def_abstract_eval
+def _num_qubits_abstract_eval():
+    return core.ShapedArray((), jax.numpy.int64)
+
+
+def _num_qubits_lowering(jax_ctx: mlir.LoweringRuleContext):
+    ctx = jax_ctx.module_context.context
+    ctx.allow_unregistered_dialects = True
+
+    result_type = ir.IntegerType.get_signless(64, ctx)
+    nqubits = NumQubitsOp(result_type).result
+
+    result_from_elements_op = ir.RankedTensorType.get((), result_type)
+    from_elements_op = FromElementsOp(result_from_elements_op, nqubits)
+    return from_elements_op.results
 
 
 #
@@ -2313,6 +2342,7 @@ CUSTOM_LOWERING_RULES = (
     (qextract_p, _qextract_lowering),
     (qinsert_p, _qinsert_lowering),
     (qinst_p, _qinst_lowering),
+    (num_qubits_p, _num_qubits_lowering),
     (gphase_p, _gphase_lowering),
     (unitary_p, _unitary_lowering),
     (measure_p, _measure_lowering),

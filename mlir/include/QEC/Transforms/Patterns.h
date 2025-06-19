@@ -25,10 +25,11 @@ namespace catalyst {
 namespace qec {
 
 void populateCliffordTToPPRPatterns(mlir::RewritePatternSet &);
-void populateCommuteCliffordTPPRPatterns(mlir::RewritePatternSet &, unsigned int max_pauli_size);
-void populateCommuteCliffordPastPPMPatterns(mlir::RewritePatternSet &, unsigned int max_pauli_size);
-void populateDecomposeNonCliffordPPRPatterns(mlir::RewritePatternSet &, DecomposeMethod, bool);
-void populateDecomposeCliffordPPRPatterns(mlir::RewritePatternSet &, bool);
+void populateCommutePPRPatterns(mlir::RewritePatternSet &, unsigned int maxPauliSize);
+void populateMergePPRIntoPPMPatterns(mlir::RewritePatternSet &, unsigned int maxPauliSize);
+void populateDecomposeNonCliffordPPRPatterns(mlir::RewritePatternSet &,
+                                             DecomposeMethod decomposeMethod, bool avoidYMeasure);
+void populateDecomposeCliffordPPRPatterns(mlir::RewritePatternSet &, bool avoidYMeasure);
 
 } // namespace qec
 } // namespace catalyst

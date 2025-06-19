@@ -850,6 +850,10 @@ class TestControlledMiscMethods:
         control_wires = qml.wires.Wires((1, 2))
         control_values = (False, False)  # (0, 0)
         work_wires = qml.wires.Wires(3)
+        # A work_wire_type will be kept until dynamic qubit allocation is supported in PL
+        # Default value is "dirty"
+        # https://github.com/PennyLaneAI/pennylane/pull/7612
+        work_wire_type = "dirty"
 
         op = C_ctrl(target, control_wires, control_values=control_values, work_wires=work_wires)
 
@@ -857,10 +861,11 @@ class TestControlledMiscMethods:
         assert data[0] is target
         assert len(data) == 1
 
-        assert len(metadata) == 3
+        assert len(metadata) == 4
         assert metadata[0] == control_wires
         assert metadata[1] == control_values
         assert metadata[2] == work_wires
+        assert metadata[3] == work_wire_type
 
         assert hash(metadata)
 

@@ -26,7 +26,7 @@ TEST_CASE("Test __catalyst__mbqc__measure_in_basis, device=null.qubit", "[MBQC]"
     __catalyst__rt__initialize(nullptr);
 
     const std::string rtd_name{"null.qubit"};
-    __catalyst__rt__device_init((int8_t *)rtd_name.c_str(), nullptr, nullptr, 0);
+    __catalyst__rt__device_init((int8_t *)rtd_name.c_str(), nullptr, nullptr, 0, false);
 
     const size_t num_qubits = 1;
     QirArray *qs = __catalyst__rt__qubit_allocate_array(num_qubits);

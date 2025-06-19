@@ -166,6 +166,7 @@ class RTDevice {
     std::string rtd_lib;
     std::string rtd_name;
     std::string rtd_kwargs;
+    bool auto_qubit_management;
 
     std::unique_ptr<SharedLibraryManager> rtd_dylib{nullptr};
     std::unique_ptr<QuantumDevice> rtd_qdevice{nullptr};
@@ -208,16 +209,17 @@ class RTDevice {
 
   public:
     explicit RTDevice(std::string _rtd_lib, std::string _rtd_name = {},
-                      std::string _rtd_kwargs = {})
+                      std::string _rtd_kwargs = {}, bool _auto_qubit_management = false)
         : rtd_lib(std::move(_rtd_lib)), rtd_name(std::move(_rtd_name)),
-          rtd_kwargs(std::move(_rtd_kwargs))
+          rtd_kwargs(std::move(_rtd_kwargs)), auto_qubit_management(_auto_qubit_management)
     {
         _pl2runtime_device_info(rtd_lib, rtd_name);
     }
 
     explicit RTDevice(std::string_view _rtd_lib, std::string_view _rtd_name,
-                      std::string_view _rtd_kwargs)
-        : rtd_lib(_rtd_lib), rtd_name(_rtd_name), rtd_kwargs(_rtd_kwargs)
+                      std::string_view _rtd_kwargs, bool _auto_qubit_management)
+        : rtd_lib(_rtd_lib), rtd_name(_rtd_name), rtd_kwargs(_rtd_kwargs),
+          auto_qubit_management(_auto_qubit_management)
     {
         _pl2runtime_device_info(rtd_lib, rtd_name);
     }
@@ -231,7 +233,8 @@ class RTDevice {
     auto operator==(const RTDevice &other) const -> bool
     {
         return (this->rtd_lib == other.rtd_lib && this->rtd_name == other.rtd_name) &&
-               this->rtd_kwargs == other.rtd_kwargs;
+               this->rtd_kwargs == other.rtd_kwargs &&
+               this->auto_qubit_management == other.auto_qubit_management;
     }
 
     [[nodiscard]] auto getQuantumDevicePtr() -> const std::unique_ptr<QuantumDevice> &
@@ -250,21 +253,25 @@ class RTDevice {
         return rtd_qdevice;
     }
 
-    [[nodiscard]] auto getDeviceInfo() const -> std::tuple<std::string, std::string, std::string>
+    [[nodiscard]] auto getDeviceInfo() const
+        -> std::tuple<std::string, std::string, std::string, bool>
     {
-        return {rtd_lib, rtd_name, rtd_kwargs};
+        return {rtd_lib, rtd_name, rtd_kwargs, auto_qubit_management};
     }
 
     [[nodiscard]] auto getDeviceName() const -> const std::string & { return rtd_name; }
 
     void setDeviceStatus(RTDeviceStatus new_status) noexcept { status = new_status; }
 
+    bool getQubitManagementMode() { return auto_qubit_management; }
+
     [[nodiscard]] auto getDeviceStatus() const -> RTDeviceStatus { return status; }
 
     friend std::ostream &operator<<(std::ostream &os, const RTDevice &device)
     {
         os << "RTD, name: " << device.rtd_name << " lib: " << device.rtd_lib
-           << " kwargs: " << device.rtd_kwargs;
+           << " kwargs: " << device.rtd_kwargs
+           << "auto_qubit_management: " << device.auto_qubit_management;
         return os;
     }
 };
@@ -313,12 +320,13 @@ class ExecutionContext final {
     }
 
     [[nodiscard]] auto getOrCreateDevice(std::string_view rtd_lib, std::string_view rtd_name,
-                                         std::string_view rtd_kwargs)
+                                         std::string_view rtd_kwargs, bool auto_qubit_management)
         -> const std::shared_ptr<RTDevice> &
     {
         std::lock_guard<std::mutex> lock(pool_mu);
 
-        auto device = std::make_shared<RTDevice>(rtd_lib, rtd_name, rtd_kwargs);
+        auto device =
+            std::make_shared<RTDevice>(rtd_lib, rtd_name, rtd_kwargs, auto_qubit_management);
 
         const size_t key = device_pool.size();
         for (size_t i = 0; i < key; i++) {
@@ -344,13 +352,13 @@ class ExecutionContext final {
         return device_pool[key];
     }
 
-    [[nodiscard]] auto getOrCreateDevice(const std::string &rtd_lib,
-                                         const std::string &rtd_name = {},
-                                         const std::string &rtd_kwargs = {})
+    [[nodiscard]] auto
+    getOrCreateDevice(const std::string &rtd_lib, const std::string &rtd_name = {},
+                      const std::string &rtd_kwargs = {}, bool auto_qubit_management = false)
         -> const std::shared_ptr<RTDevice> &
     {
         return getOrCreateDevice(std::string_view{rtd_lib}, std::string_view{rtd_name},
-                                 std::string_view{rtd_kwargs});
+                                 std::string_view{rtd_kwargs}, auto_qubit_management);
     }
 
     [[nodiscard]] auto getDevice(size_t device_key) -> const std::shared_ptr<RTDevice> &

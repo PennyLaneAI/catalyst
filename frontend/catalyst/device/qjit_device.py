@@ -548,6 +548,8 @@ def is_dynamic_wires(wires: qml.wires.Wires):
     If the number of wires is dynamic, the Wires object contains a single tracer that
     represents the number of wires.
     """
+    # Automatic qubit management mode should not encounter this query
+    assert wires is not None
     return (len(wires) == 1) and (isinstance(wires[0], DynamicJaxprTracer))
 
 
@@ -555,7 +557,8 @@ def check_device_wires(wires):
     """Validate requirements Catalyst imposes on device wires."""
 
     if wires is None:
-        raise AttributeError("Catalyst does not support device instances without set wires.")
+        # Automatic qubit management mode, nothing to check
+        return
 
     if len(wires) >= 2 or (not is_dynamic_wires(wires)):
         # A dynamic number of wires correspond to a single tracer for the number
