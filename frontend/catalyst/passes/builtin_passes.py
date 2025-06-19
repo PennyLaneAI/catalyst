@@ -847,7 +847,7 @@ def get_ppm_specs(QJIT):
 
     """
 
-    if QJIT.mlir is not None:
+    if QJIT.mlir_module is not None:
         # aot mode
         new_options = copy.copy(QJIT.compile_options)
         if new_options.pipelines is None:
