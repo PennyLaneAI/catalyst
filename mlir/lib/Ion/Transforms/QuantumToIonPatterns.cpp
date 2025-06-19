@@ -317,8 +317,7 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
             auto qubits = op.getInQubits();
 
             auto angle = op.getParams().front();
-            auto time =
-                computePulseDuration(rewriter, loc, angle, beam.rabi, beam.detuning);
+            auto time = computePulseDuration(rewriter, loc, angle, beam.rabi, beam.detuning);
 
             // Helper function to flip the sign of each element in a vector,
             // e.g. [a, b, c] -> [-a, -b, -c]

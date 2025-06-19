@@ -132,6 +132,9 @@ struct GatesToPulsesPass : impl::GatesToPulsesPassBase<GatesToPulsesPass> {
 
 } // namespace ion
 
-std::unique_ptr<Pass> createGatesToPulsesPass(){ return std::make_unique<ion::GatesToPulsesPass>(); }
+std::unique_ptr<Pass> createGatesToPulsesPass()
+{
+    return std::make_unique<ion::GatesToPulsesPass>();
+}
 
 } // namespace catalyst
