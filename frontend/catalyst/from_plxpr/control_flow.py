@@ -35,6 +35,7 @@ from catalyst.jax_primitives import cond_p, for_p, while_p
 def handle_cond(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
     """Handle the conversion from plxpr to Catalyst jaxpr for the cond primitive"""
     args = plxpr_invals[args_slice]
+    self.qreg_manager.insert_all_dangling_qubits()
     args_plus_qreg = [*args, self.qreg_manager.get()]  # Add the qreg to the args
     converted_jaxpr_branches = []
     all_consts = []
@@ -115,6 +116,8 @@ def handle_for_loop(
     args = plxpr_invals[args_slice]
 
     # Add the iteration start and the qreg to the args
+
+    self.qreg_manager.insert_all_dangling_qubits()
     start_plus_args_plus_qreg = [
         start,
         *args,
@@ -177,6 +180,8 @@ def handle_while_loop(
     args_slice,
 ):
     """Handle the conversion from plxpr to Catalyst jaxpr for the while loop primitive"""
+
+    self.qreg_manager.insert_all_dangling_qubits()
     consts_body = plxpr_invals[body_slice]
     consts_cond = plxpr_invals[cond_slice]
     args = plxpr_invals[args_slice]

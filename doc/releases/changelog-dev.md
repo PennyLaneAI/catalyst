@@ -256,11 +256,17 @@
 * MLIR plugins can now be specified via lists and tuples, not just sets.
   [(#1812)](https://github.com/PennyLaneAI/catalyst/pull/1812)
 
+* Fixes the conversion of PLxPR to JAXPR with quantum primitives when using control flow.
+  [(#1809)](https://github.com/PennyLaneAI/catalyst/pull/1809)
+
 <h3>Internal changes ⚙️</h3>
 
-* `from_plxpr` updated to match a change in the `qnode_prim` in pennylane. consts are now treated as 
+* `from_plxpr` updated to match a change in the `qnode_prim` in pennylane. consts are now treated as
   dynamic variables instead of static variables, matching standard catalyst behavior.
   [(#1801)](https://github.com/PennyLaneAI/catalyst/pull/1801)
+
+* Use `dataclass.replace` to update `ExecutionConfig` and `MCMConfig` rather than mutating properties.
+  [(#1814)](https://github.com/PennyLaneAI/catalyst/pull/1814)
 
 * `null.qubit` can now support an optional `track_resources` argument which allows it to record which gates are executed.
   [(#1619)](https://github.com/PennyLaneAI/catalyst/pull/1619)
@@ -350,6 +356,9 @@
 * The OQD device toml file is modified to only include gates that are decomposable to the OQD device
   target gate set.
   [(#1763)](https://github.com/PennyLaneAI/catalyst/pull/1763)
+
+* The `quantum-to-ion` pass is renamed to `gates-to-pulses`.
+  [(#1818)](https://github.com/PennyLaneAI/catalyst/pull/1818)
 
 * The runtime CAPI function `__catalyst__rt__num_qubits` now has a corresponding jax primitive
   `num_qubits_p` and quantum dialect operation `NumQubitsOp`.

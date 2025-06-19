@@ -41,7 +41,6 @@ from catalyst.device import extract_backend_info, get_device_capabilities
 from catalyst.from_plxpr.qreg_manager import QregManager, QubitIndexRecorder
 from catalyst.jax_extras import jaxpr_pad_consts, make_jaxpr2, transient_jax_config
 from catalyst.jax_primitives import (
-    AbstractQbit,
     MeasurementPlane,
     compbasis_p,
     cond_p,
@@ -479,7 +478,9 @@ def handle_qml_dealloc(self, *wires, reset_to_original=False):
 @PLxPRToQuantumJaxprInterpreter.register_primitive(qml.QubitUnitary._primitive)
 def handle_qubit_unitary(self, *invals, n_wires):
     """Handle the conversion from plxpr to Catalyst jaxpr for the QubitUnitary primitive"""
+
     # TODO: update all of the ops' in and out wires
+
     wires = [self.qreg_manager[w] for w in invals[1:]]
     outvals = unitary_p.bind(invals[0], *wires, qubits_len=n_wires, ctrl_len=0, adjoint=False)
     for wire_values, new_wire in zip(invals[1:], outvals):

@@ -147,6 +147,13 @@ class QregManager:
         Set the current AbstractQreg value.
         This is needed, for example, when existing regions, like submodules and control flow.
         """
+        # The old qreg SSA value is no longer usable since a new one has appeared
+        # Therefore all dangling qubits from the old one also all expire
+        # These dangling qubit values will be dead, so there must be none.
+        if len(self.wire_map) != 0:
+            raise CompileError(
+                "Setting new qreg value, but the previous one still has dangling qubits."
+            )
         self.current_qreg_value = qreg
 
     def extract(self, index: int) -> AbstractQbit:
@@ -163,6 +170,7 @@ class QregManager:
         # extract and update current qubit value
         extracted_qubit = qextract_p.bind(self.current_qreg_value, index)
         self.wire_map[global_index] = extracted_qubit
+
         return extracted_qubit
 
     def insert(self, index: int, qubit: AbstractQbit):
@@ -212,6 +220,7 @@ class QregManager:
         global_index = self.local_index_to_global_index(index)
         if global_index in self.wire_map:
             return self.wire_map[global_index]
+
         return self.extract(index)
 
     def __setitem__(self, index: int, qubit: AbstractQbit):
