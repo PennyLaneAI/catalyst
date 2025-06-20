@@ -29,6 +29,7 @@ from catalyst.passes import (
     ppr_to_ppm,
     to_ppr,
 )
+from catalyst.utils.exceptions import CompileError
 
 # pylint: disable=missing-function-docstring
 
@@ -465,22 +466,42 @@ def test_clifford_to_ppm():
     assert ppm_specs["g_0"]["num_logical_qubits"] == 2
 
 
-def test_jit_not_implemented_capture():
-    """Make sure get_ppm_specs only works in AOT (Ahead of Time) compilation"""
-    with pytest.raises(
-        NotImplementedError,
-        match=r"PPM passes only support AOT \(Ahead-Of-Time\) compilation mode.",
-    ):
-        dev = qml.device("lightning.qubit", wires=2)
+# def test_get_ppm_specs_error():
+class TestPPMSpecsErrors:
 
-        @qjit
-        @qml.qnode(dev)
-        def circuit(x):  # JIT mode since x is unknown
-            qml.H(x)
-            qml.CNOT(wires=[0, 1])
-            return qml.probs()
+    """Make sure get_ppm_specs only works in AOT (Ahead of Time) compilation
+    and when the pipeline is present"""
 
-        get_ppm_specs(circuit)
+    dev = qml.device("lightning.qubit", wires=2)
+
+    @qjit(target="mlir")
+    @qml.qnode(dev)
+    def jit_circuit(x):  # JIT mode since x is unknown
+        qml.H(x)
+        qml.CNOT(wires=[0, 1])
+        return qml.probs()
+
+    @qjit(target="mlir")
+    @qml.qnode(dev)
+    def circuit_with_no_pipeline():  # Pipeline absent
+        qml.H(0)
+        qml.CNOT(wires=[0, 1])
+        return qml.probs()
+    
+    testdata = [
+                    (jit_circuit, 
+                     NotImplementedError, 
+                     r"PPM passes only support AOT \(Ahead-Of-Time\) compilation mode."
+                    ),
+                    (circuit_with_no_pipeline, 
+                     CompileError, 
+                     r"No pipeline found"
+                    ),
+                ]
+    @pytest.mark.parametrize("circuit, error_type, error_message", testdata)
+    def test_get_ppm_specs_error(self, circuit, error_type, error_message):
+        with pytest.raises(error_type, match=error_message):
+            get_ppm_specs(circuit)
 
 
 if __name__ == "__main__":

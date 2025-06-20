@@ -789,14 +789,14 @@ def ppm_compilation(
 def get_ppm_specs(QJIT):
     R"""
     This function returns following PPM specs in a dictionary:
-        - _Pi/4 PPR (count the number of clifford PPRs)_
-        - _Pi/8 PPR (count the number of non-clifford PPRs)_
-        - _Pi/2 PPR (count the number of classical PPRs)_
-        - _Max weight for pi/8 PPRs._
-        - _Max weight for pi/4 PPRs._
-        - _Max weight for pi/2 PPRs._
-        - _Number of logical qubits._
-        - _Number of PPMs._
+        - Pi/4 PPR (count the number of clifford PPRs)
+        - Pi/8 PPR (count the number of non-clifford PPRs)
+        - Pi/2 PPR (count the number of classical PPRs)
+        - Max weight for pi/8 PPRs.
+        - Max weight for pi/4 PPRs.
+        - Max weight for pi/2 PPRs.
+        - Number of logical qubits.
+        - Number of PPMs.
 
     PPM Specs are returned after the last PPM compilation pass is run
 
@@ -860,7 +860,7 @@ def get_ppm_specs(QJIT):
             return json.loads(
                 raw_result[: raw_result.index("module")]
             )  # remove MLIR starting with substring "module..."
-        except Exception as e:
+        except Exception as e: # pragma: nocover
             raise CompileError(
                 "Invalid json format encountered in get_ppm_specs. "
                 f" but got {raw_result[: raw_result.index('module')]}"
