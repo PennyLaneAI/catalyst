@@ -14,9 +14,13 @@
 
 """This module exposes built-in Catalyst MLIR passes to the frontend."""
 
+import copy
 import functools
+import json
 
+from catalyst.compiler import _options_to_cli_flags, _quantum_opt
 from catalyst.passes.pass_api import PassPipelineWrapper
+from catalyst.utils.exceptions import CompileError
 
 
 ## API ##
@@ -780,3 +784,87 @@ def ppm_compilation(
         )
 
     return PassPipelineWrapper(qnode, passes)
+
+
+def get_ppm_specs(fn):
+    R"""
+    This function returns following PPM specs in a dictionary:
+        - Pi/4 PPR (count the number of clifford PPRs)
+        - Pi/8 PPR (count the number of non-clifford PPRs)
+        - Pi/2 PPR (count the number of classical PPRs)
+        - Max weight for pi/8 PPRs
+        - Max weight for pi/4 PPRs
+        - Max weight for pi/2 PPRs
+        - Number of logical qubits
+        - Number of PPMs
+
+    PPM Specs are returned after the last PPM compilation pass is run
+
+    Args:
+        fn (QJIT): qjit-decorated function for which ppm_specs need to be printed
+
+    Returns:
+        dict : Returns a Python dictionary containing PPM specs of all functions in QJIT
+
+    **Example**
+
+    .. code-block:: python
+
+        import pennylane as qml
+        from catalyst import qjit, measure
+        from catalyst.passes import get_ppm_specs, ppm_compilation
+
+        pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+        device = qml.device("lightning.qubit", wires=2)
+
+        @qjit(pipelines=pipe, target="mlir")
+        @ppm_compilation
+        @qml.qnode(device)
+        def circuit():
+            qml.H(0)
+            qml.CNOT([0,1])
+            return measure(0), measure(1)
+
+        ppm_specs = get_ppm_specs(circuit)
+        print(ppm_specs)
+
+    Example PPM Specs:
+
+    .. code-block:: pycon
+
+        . . .
+        {
+            'circuit_0': {
+                        'num_logical_qubits': 2,
+                        'num_of_ppm': 2,
+                    },
+        }
+        . . .
+
+    """
+
+    if fn.mlir_module is not None:
+        # aot mode
+        new_options = copy.copy(fn.compile_options)
+        if new_options.pipelines is None:
+            raise CompileError("No pipeline found")
+
+        # add ppm-spec pass at the end to existing pipeline
+        _, pass_list = new_options.pipelines[0]  # first pipeline runs the user passes
+        pass_list.append("ppm-specs")
+
+        new_options = _options_to_cli_flags(new_options)
+        raw_result = _quantum_opt(*new_options, [], stdin=str(fn.mlir_module))
+
+        try:
+            return json.loads(
+                raw_result[: raw_result.index("module")]
+            )  # remove MLIR starting with substring "module..."
+        except Exception as e:  # pragma: nocover
+            raise CompileError(
+                "Invalid json format encountered in get_ppm_specs. "
+                f" but got {raw_result[: raw_result.index('module')]}"
+            ) from e
+
+    else:
+        raise NotImplementedError("PPM passes only support AOT (Ahead-Of-Time) compilation mode.")
