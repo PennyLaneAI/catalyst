@@ -25,6 +25,7 @@ This module contains the pipelines that are used to compile a quantum function t
 
 """
 
+import enum
 import sys
 from copy import deepcopy
 from dataclasses import dataclass
@@ -37,6 +38,34 @@ from typing import Any, Dict, Iterable, List, Optional, Set, Tuple, Union
 from catalyst.utils.exceptions import CompileError
 
 
+class KeepIntermediateLevel(enum.IntEnum):
+    """Enum to control the level of intermediate file keeping."""
+
+    NONE = 0  # No intermediate files are kept.
+    PIPELINE = 1  # Intermediate files are saved after each pipeline.
+    PASS = 2  # Intermediate files are saved after each pass.
+
+
+def _parse_keep_intermediate(
+    level: Union[str, int, bool, None],
+) -> KeepIntermediateLevel:
+    """Parse the keep_intermediate value into a KeepIntermediateLevel enum."""
+    match level:
+        case 0 | 1 | 2:
+            return KeepIntermediateLevel(level)
+        case "none" | None:
+            return KeepIntermediateLevel.NONE
+        case "pipeline":
+            return KeepIntermediateLevel.PIPELINE
+        case "pass":
+            return KeepIntermediateLevel.PASS
+        case _:
+            raise ValueError(
+                f"Invalid value for keep_intermediate: {level}. "
+                "Valid values are True, False, 0, 1, 2, 'none', 'pipeline', 'pass'."
+            )
+
+
 # pylint: disable=too-many-instance-attributes
 @dataclass
 class CompileOptions:
@@ -47,8 +76,11 @@ class CompileOptions:
             Default is ``False``
         logfile (Optional[TextIOWrapper]): the logfile to write output to.
             Default is ``sys.stderr``
-        keep_intermediate (Optional[bool]): flag indicating whether to keep intermediate results.
-            Default is ``False``
+        keep_intermediate (Optional[Union[str, int, bool]]): Level controlling intermediate file
+        generation.
+            - ``False`` or ``0`` or ``"none"`` (default): No intermediate files are kept.
+            - ``True`` or ``1`` or ``"pipeline"``: Intermediate files are saved after each pipeline.
+            - ``2`` or ``"pass"``: Intermediate files are saved after each pass.
         pipelines (Optional[List[Tuple[str,List[str]]]]): A list of tuples. The first entry of the
             tuple corresponds to the name of a pipeline. The second entry of the tuple corresponds
             to a list of MLIR passes.
@@ -79,7 +111,7 @@ class CompileOptions:
     verbose: Optional[bool] = False
     logfile: Optional[TextIOWrapper] = sys.stderr
     target: Optional[str] = "binary"
-    keep_intermediate: Optional[bool] = False
+    keep_intermediate: Optional[Union[str, int, bool, KeepIntermediateLevel]] = False
     pipelines: Optional[List[Any]] = None
     autograph: Optional[bool] = False
     autograph_include: Optional[Iterable[str]] = ()
@@ -96,6 +128,9 @@ class CompileOptions:
     dialect_plugins: Optional[Set[Path]] = None
 
     def __post_init__(self):
+        # Convert keep_intermediate to Enum
+        self.keep_intermediate = _parse_keep_intermediate(self.keep_intermediate)
+
         # Check that async runs must not be seeded
         if self.async_qnodes and self.seed is not None:
             raise CompileError(
