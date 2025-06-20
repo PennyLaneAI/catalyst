@@ -466,40 +466,39 @@ def test_clifford_to_ppm():
     assert ppm_specs["g_0"]["num_logical_qubits"] == 2
 
 
-# def test_get_ppm_specs_error():
 class TestPPMSpecsErrors:
-    """Make sure get_ppm_specs only works in AOT (Ahead of Time) compilation
-    and when the pipeline is present"""
+    """Test if errors are caught when calling get_ppm_specs"""
 
-    dev = qml.device("lightning.qubit", wires=2)
-
-    @qjit(target="mlir")
-    @qml.qnode(dev)
-    def jit_circuit(x):  # JIT mode since x is unknown
-        qml.H(x)
-        qml.CNOT(wires=[0, 1])
-        return qml.probs()
-
-    @qjit(target="mlir")
-    @qml.qnode(dev)
-    def circuit_with_no_pipeline():  # Pipeline absent
-        qml.H(0)
-        qml.CNOT(wires=[0, 1])
-        return qml.probs()
-
-    testdata = [
-        (
-            jit_circuit,
+    def test_jit_mode_error(self):
+        """Make sure get_ppm_specs only works in AOT (Ahead of Time) compilation"""
+        with pytest.raises(
             NotImplementedError,
-            r"PPM passes only support AOT \(Ahead-Of-Time\) compilation mode.",
-        ),
-        (circuit_with_no_pipeline, CompileError, r"No pipeline found"),
-    ]
+            match=r"PPM passes only support AOT \(Ahead-Of-Time\) compilation mode.",
+        ):
+            dev = qml.device("lightning.qubit", wires=2)
 
-    @pytest.mark.parametrize("circuit, error_type, error_message", testdata)
-    def test_get_ppm_specs_error(self, circuit, error_type, error_message):
-        with pytest.raises(error_type, match=error_message):
-            get_ppm_specs(circuit)
+            @qjit(target="mlir")
+            @qml.qnode(dev)
+            def jit_circuit(x):  # JIT mode since x is unknown
+                qml.H(x)
+                qml.CNOT(wires=[0, 1])
+                return qml.probs()
+
+            get_ppm_specs(jit_circuit)
+
+    def test_no_pipeline_error(self):
+        """Make sure get_ppm_specs only works when pipeline is present"""
+        with pytest.raises(CompileError, match=r"No pipeline found"):
+            dev = qml.device("lightning.qubit", wires=2)
+
+            @qjit(target="mlir")
+            @qml.qnode(dev)
+            def circuit_with_no_pipeline():  # JIT mode since x is unknown
+                qml.H(0)
+                qml.CNOT(wires=[0, 1])
+                return qml.probs()
+
+            get_ppm_specs(circuit_with_no_pipeline)
 
 
 if __name__ == "__main__":
