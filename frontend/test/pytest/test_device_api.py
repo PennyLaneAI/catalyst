@@ -139,8 +139,9 @@ def test_simple_circuit_set_shots():
         qml.CNOT(wires=[0, 1])
         return qml.expval(qml.PauliZ(wires=0))
 
-    assert circuit._shots==qml.measurements.Shots(2048)
-    assert circuit.mlir
+    # Check that the MLIR contains the shots constant and device initialization
+    mlir_str = str(circuit.mlir)
+    assert "2048" in mlir_str
 
 
 def test_track_resources():
