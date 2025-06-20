@@ -788,19 +788,15 @@ def ppm_compilation(
 
 def get_ppm_specs(QJIT):
     R"""
-    This pass gets the following PPM specs in a JSON object for each function in a qnode:
-    {
-        "func_name" : {
-                "num_logical_qubits": num_logical_qubits,
-                "num_of_ppm": num_of_ppm,
-                "num_pi8_gates": num_pi8_gates,
-                "num_pi4_gates": num_pi4_gates,
-                "num_pi2_gates": num_pi2_gates,
-                "max_weight_pi8": max_weight_pi8,
-                "max_weight_pi4": max_weight_pi4,
-                "max_weight_pi2": max_weight_pi2,
-        }
-    }
+    This function returns following PPM specs in a dictionary:
+        - _Pi/4 PPR (count the number of clifford PPRs)_
+        - _Pi/8 PPR (count the number of non-clifford PPRs)_
+        - _Pi/2 PPR (count the number of classical PPRs)_
+        - _Max weight for pi/8 PPRs._
+        - _Max weight for pi/4 PPRs._
+        - _Max weight for pi/2 PPRs._
+        - _Number of logical qubits._
+        - _Number of PPMs._
 
     PPM Specs are returned after the last PPM compilation pass is run
 
