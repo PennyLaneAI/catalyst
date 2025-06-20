@@ -35,13 +35,13 @@ def test_dynamic_sample_backend_functionality():
         # qml.device still needs concrete shots
         device = qml.device("lightning.qubit", wires=1)
 
-        @partial(qml.set_shots, shots=shots)
         @qml.qnode(device)
         def circuit():
             qml.RX(1.5, 0)
             return qml.sample()
 
-        return circuit()
+        circuit_with_shots = qml.set_shots(circuit, shots=shots)
+        return circuit_with_shots()
 
     workflow_dyn_sample(10)
     # old_ir = get_compilation_stage(workflow_dyn_sample, "mlir")
