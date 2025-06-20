@@ -1523,12 +1523,14 @@ class TestCapture:
             return qml.expval(qml.PauliZ(0))
 
         result_1 = captured_circuit_1(1.5, 2.0)
-        assert "stablehlo.constant dense<1.500000e+00>" in captured_circuit_1.mlir
-        assert "stablehlo.constant dense<2.000000e+00>" not in captured_circuit_1.mlir
+        captured_circuit_1_mlir = captured_circuit_1.mlir
+        assert "stablehlo.constant dense<1.500000e+00>" in captured_circuit_1_mlir
+        assert "stablehlo.constant dense<2.000000e+00>" not in captured_circuit_1_mlir
 
         result_2 = captured_circuit_2(1.5, 2.0)
-        assert "stablehlo.constant dense<1.500000e+00>" not in captured_circuit_2.mlir
-        assert "stablehlo.constant dense<2.000000e+00>" in captured_circuit_2.mlir
+        captured_circuit_2_mlir = captured_circuit_2.mlir
+        assert "stablehlo.constant dense<1.500000e+00>" not in captured_circuit_2_mlir
+        assert "stablehlo.constant dense<2.000000e+00>" in captured_circuit_2_mlir
 
         assert result_1 == result_2
 
