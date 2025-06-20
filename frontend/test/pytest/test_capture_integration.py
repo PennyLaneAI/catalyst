@@ -1536,4 +1536,20 @@ class TestCapture:
 
         assert result_1 == result_2
 
+        # Test under a non qnode workflow function
+        @qjit(static_argnums=(0,))
+        def workflow(x, y):
+            @qml.qnode(qml.device(backend, wires=1))
+            def c():
+                qml.RX(x, wires=0)
+                qml.RY(y, wires=0)
+                return qml.expval(qml.PauliZ(0))
+
+            return c()
+
+        result_3 = workflow(1.5, 2.0)
+        captured_circuit_3_mlir = workflow.mlir
+        assert "%cst = arith.constant 1.5" in captured_circuit_3_mlir
+        assert 'quantum.custom "RX"(%cst)' in captured_circuit_3_mlir
+
         qml.capture.disable()
