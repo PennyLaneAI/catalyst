@@ -499,10 +499,27 @@ def trace_from_pennylane(
     PL capure module.
 
     Args:
-        args (Iterable): arguments to use for program capture
+        fn(Callable): the user function to be traced
+        static_argnums(int or Seqence[Int]): an index or a sequence of indices that specifies the
+            positions of static arguments.
+        dynamic_argnums(int or Seqence[Int]): an index or a sequence of indices that specifies the
+            positions of dynamic arguments.
+        abstracted_axes (Sequence[Sequence[str]] or Dict[int, str] or Sequence[Dict[int, str]]):
+            An experimental option to specify dynamic tensor shapes.
+            This option affects the compilation of the annotated function.
+            Function arguments with ``abstracted_axes`` specified will be compiled to ranked tensors
+            with dynamic shapes. For more details, please see the Dynamically-shaped Arrays section
+            below.
+        sig(Sequence[Any]): a tuple indicating the argument signature of the function. Static arguments
+            are indicated with their literal values, and dynamic arguments are indicated by abstract
+            values.
+        kwargs(Dict[str, Any]): keyword argumemts to the function.
+        debug_info(jax.api_util.debug_info): a source debug information object required by jaxprs.
 
     Returns:
         ClosedJaxpr: captured JAXPR
+        Tuple[Tuple[ShapedArray, bool]]: the return type of the captured JAXPR.
+            The boolean indicates whether each result is a value returned by the user function.
         PyTreeDef: PyTree metadata of the function output
         Tuple[Any]: the dynamic argument signature
     """
