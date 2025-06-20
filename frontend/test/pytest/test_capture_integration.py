@@ -1547,7 +1547,7 @@ class TestCapture:
 
             return c()
 
-        result_3 = workflow(1.5, 2.0)
+        _ = workflow(1.5, 2.0)
         captured_circuit_3_mlir = workflow.mlir
         assert "%cst = arith.constant 1.5" in captured_circuit_3_mlir
         assert 'quantum.custom "RX"(%cst)' in captured_circuit_3_mlir
