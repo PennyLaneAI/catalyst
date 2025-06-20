@@ -808,7 +808,7 @@ def get_ppm_specs(QJIT):
         catalyst.jit.QJIT: QJIT object for which ppm_specs need to be printed.
 
     Returns:
-        JSON : Returns a json object for PPM specs of all functions in QJIT.
+        dict : Returns a Python dictionary containing PPM specs of all functions in QJIT.
 
     **Example**
 
@@ -854,7 +854,8 @@ def get_ppm_specs(QJIT):
             raise CompileError("No pipeline found")
 
         # add ppm-spec pass at the end to existing pipeline
-        new_options.pipelines[-1][-1].append("ppm-specs")
+        _, pass_list = new_options.pipelines[0]  # first pipeline runs the user passes
+        pass_list.append("ppm-specs")
 
         new_options = _options_to_cli_flags(new_options)
         raw_result = _quantum_opt(*new_options, [], stdin=str(QJIT.mlir_module))
