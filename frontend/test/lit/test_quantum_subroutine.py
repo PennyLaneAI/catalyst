@@ -294,17 +294,26 @@ def test_two_qnodes_one_subroutine():
     @subroutine
     def identity(): ...
 
+    # CHECK: module @main
+
     @qml.qnode(qml.device("lightning.qubit", wires=1), autograph=False)
     def subroutine_test_7():
-        # CHECK: func.func private @identity
+        # CHECK: [[QREG:%.+]] = quantum.alloc
+        # CHECK: [[QREG_1:%.+]] = call @identity([[QREG]]) : (!quantum.reg) -> !quantum.reg
         identity()
+        # CHECK: quantum.compbasis qreg [[QREG_1]] : !quantum.obs
         return qml.probs()
+
+        # CHECK: func.func private @identity
 
     @qml.qnode(qml.device("null.qubit", wires=1), autograph=False)
     def subroutine_test_8():
-        # CHECK: func.func private @identity_0
+        # CHECK: [[QREG:%.+]] = quantum.alloc
+        # CHECK: [[QREG_1:%.+]] = call @identity_0([[QREG]]) : (!quantum.reg) -> !quantum.reg
         identity()
+        # CHECK: quantum.compbasis qreg [[QREG_1]] : !quantum.obs
         return qml.probs()
+        # CHECK: func.func private @identity_0
 
     qml.capture.enable()
 
