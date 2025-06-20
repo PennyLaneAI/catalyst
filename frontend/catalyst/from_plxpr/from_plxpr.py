@@ -452,8 +452,7 @@ def handle_subroutine(self, *args, **kwargs):
         compiler_options_kvs=kwargs["compiler_options_kvs"],
     )
 
-    self.qreg = vals_out[0]
-    self.qreg_manager = QregManager(self.qreg)
+    self.qreg_manager.set(vals_out[0])
     vals_out = vals_out[1:]
 
     for orig_wire in backup.keys():
