@@ -786,7 +786,7 @@ def ppm_compilation(
     return PassPipelineWrapper(qnode, passes)
 
 
-def get_ppm_specs(QJIT):
+def get_ppm_specs(fn):
     R"""
     This function returns following PPM specs in a dictionary:
         - Pi/4 PPR (count the number of clifford PPRs)
@@ -801,10 +801,10 @@ def get_ppm_specs(QJIT):
     PPM Specs are returned after the last PPM compilation pass is run
 
     Args:
-        catalyst.jit.QJIT: QJIT object for which ppm_specs need to be printed.
+        fn (QJIT): qjit-decorated function for which ppm_specs need to be printed
 
     Returns:
-        dict : Returns a Python dictionary containing PPM specs of all functions in QJIT.
+        dict : Returns a Python dictionary containing PPM specs of all functions in QJIT
 
     **Example**
 
@@ -843,9 +843,9 @@ def get_ppm_specs(QJIT):
 
     """
 
-    if QJIT.mlir_module is not None:
+    if fn.mlir_module is not None:
         # aot mode
-        new_options = copy.copy(QJIT.compile_options)
+        new_options = copy.copy(fn.compile_options)
         if new_options.pipelines is None:
             raise CompileError("No pipeline found")
 
@@ -854,7 +854,7 @@ def get_ppm_specs(QJIT):
         pass_list.append("ppm-specs")
 
         new_options = _options_to_cli_flags(new_options)
-        raw_result = _quantum_opt(*new_options, [], stdin=str(QJIT.mlir_module))
+        raw_result = _quantum_opt(*new_options, [], stdin=str(fn.mlir_module))
 
         try:
             return json.loads(
