@@ -185,6 +185,9 @@
   performance by eliminating indirect conversion.
   [(#1738)](https://github.com/PennyLaneAI/catalyst/pull/1738)
 
+* `static_argnums` on `qjit` can now be specified with program capture through PLxPR.
+  [(#1810)](https://github.com/PennyLaneAI/catalyst/pull/1810)
+
 <h3>Breaking changes 💔</h3>
 
 * (Device Developers Only) The `QuantumDevice` interface in the Catalyst Runtime plugin system
