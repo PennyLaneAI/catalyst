@@ -432,10 +432,6 @@ def handle_subroutine(self, *args, **kwargs):
         self.subroutine_cache[plxpr] = converted_closed_jaxpr_branch
     else:
         converted_closed_jaxpr_branch = transformed
-    # jaxpr = from_plxpr(jaxpr)(AbstractQreg(), *args)
-    # So, what I need to do here is transform this jaxpr
-    # With `from_plxpr` to but we need to make sure that
-    # the first argument is treated as the qreg...
 
     # quantum_subroutine_p.bind
     # is just pjit_p with a different name.
