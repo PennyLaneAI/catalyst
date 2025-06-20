@@ -409,6 +409,7 @@ def handle_subroutine(self, *args, **kwargs):
     Transform the subroutine from PLxPR into JAXPR with quantum primitives"""
 
     backup = dict(self.qreg_manager)
+    self.qreg_manager.insert_all_dangling_qubits()
 
     # Make sure the quantum register is updated
     plxpr = kwargs["jaxpr"]
@@ -454,7 +455,7 @@ def handle_subroutine(self, *args, **kwargs):
     self.qreg_manager = QregManager(self.qreg)
     vals_out = vals_out[1:]
 
-    for orig_wire, _ in backup:
+    for orig_wire in backup.keys():
         self.qreg_manager.extract(orig_wire)
 
     return vals_out
