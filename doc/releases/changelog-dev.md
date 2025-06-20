@@ -108,6 +108,13 @@
 
 <h3>Improvements 🛠</h3>
 
+* The package name of the Catalyst distribution has been updated to be inline with
+  [PyPA standarts](https://packaging.python.org/en/latest/specifications/binary-distribution-format/#file-name-convention),
+  from `PennyLane-Catalyst` to `pennylane_catalyst`. This change is not expected to
+  affect users, besides for instance the installation directory name, as tools in the
+  Python ecosystem (e.g. `pip`) already handle both versions through normalization.
+  [(#1817)](https://github.com/PennyLaneAI/catalyst/pull/1817)
+
 * The behaviour of measurement processes executed on `null.qubit` with QJIT is now more in line with
   their behaviour on `null.qubit` *without* QJIT.
   [(#1598)](https://github.com/PennyLaneAI/catalyst/pull/1598)
