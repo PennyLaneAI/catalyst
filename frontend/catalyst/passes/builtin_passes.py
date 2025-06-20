@@ -802,7 +802,7 @@ def get_ppm_specs(QJIT):
         }
     }
 
-    PPM Specs are returned after the last compilation passe is run
+    PPM Specs are returned after the last PPM compilation pass is run
 
     Args:
         catalyst.jit.QJIT: QJIT object for which ppm_specs need to be printed.
