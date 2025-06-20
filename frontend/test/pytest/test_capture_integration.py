@@ -1532,7 +1532,7 @@ class TestCapture:
         captured_circuit_2_mlir = captured_circuit_2.mlir
         assert "%cst = arith.constant 2.0" in captured_circuit_2_mlir
         assert 'quantum.custom "RY"(%cst)' in captured_circuit_2_mlir
-        assert "%cst = arith.constant 1.5" not in captured_circuit_1_mlir
+        assert "%cst = arith.constant 1.5" not in captured_circuit_2_mlir
 
         assert result_1 == result_2
 
