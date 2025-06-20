@@ -109,7 +109,7 @@
 <h3>Improvements 🛠</h3>
 
 * The package name of the Catalyst distribution has been updated to be inline with
-  [PyPA standarts](https://packaging.python.org/en/latest/specifications/binary-distribution-format/#file-name-convention),
+  [PyPA standards](https://packaging.python.org/en/latest/specifications/binary-distribution-format/#file-name-convention),
   from `PennyLane-Catalyst` to `pennylane_catalyst`. This change is not expected to
   affect users, besides for instance the installation directory name, as tools in the
   Python ecosystem (e.g. `pip`) already handle both versions through normalization.
