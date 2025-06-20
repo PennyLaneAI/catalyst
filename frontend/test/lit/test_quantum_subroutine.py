@@ -49,6 +49,38 @@ def test_subroutine_classical():
 test_subroutine_classical()
 
 
+def test_quantum_subroutine_identity_restore_wires():
+    """Test that a subroutine receives a register as a parameter and returns a register"""
+
+    @subroutine
+    def identity(): ...
+
+    qml.capture.enable()
+
+    @qml.qjit
+    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    # CHECK: module @main
+    def main():
+        qml.Hadamard(wires=[0])
+        # CHECK: [[QUBIT:%.+]] = quantum.custom "Hadamard"
+        # CHECK: [[QREG:%.+]] = quantum.insert {{.*}}
+        # CHECK: [[QREG_1:%.+]] = call @identity([[QREG]]) : (!quantum.reg) -> !quantum.reg
+        # CHECK: [[QUBIT_1:%.+]] = quantum.extract [[QREG_1]][ 0]
+        # CHECK: quantum.custom "Hadamard"() [[QUBIT_1]]
+        identity()
+        qml.Hadamard(wires=[0])
+        return qml.probs()
+
+    # CHECK: func.func private @identity([[REG:%.+]]: !quantum.reg) -> !quantum.reg
+    # CHECK-NEXT: return [[REG]] : !quantum.reg
+
+    print(main.mlir)
+    qml.capture.disable()
+
+
+test_quantum_subroutine_identity_restore_wires()
+
+
 def test_quantum_subroutine_identity():
     """Test that a subroutine receives a register as a parameter and returns a register"""
 
