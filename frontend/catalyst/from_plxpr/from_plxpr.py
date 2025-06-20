@@ -493,7 +493,7 @@ def handle_measure_in_basis(self, angle, wire, plane, reset, postselect):
 
 # pylint: disable=too-many-positional-arguments
 def trace_from_pennylane(
-    fn, static_argnums, dynamic_argnums, abstracted_axes, sig, kwargs, debug_info=None
+    fn, static_argnums, dynamic_args, abstracted_axes, sig, kwargs, debug_info=None
 ):
     """Capture the JAX program representation (JAXPR) of the wrapped function, using
     PL capure module.
@@ -502,8 +502,7 @@ def trace_from_pennylane(
         fn(Callable): the user function to be traced
         static_argnums(int or Seqence[Int]): an index or a sequence of indices that specifies the
             positions of static arguments.
-        dynamic_argnums(int or Seqence[Int]): an index or a sequence of indices that specifies the
-            positions of dynamic arguments.
+        dynamic_args(Seqence[Any]): the abstract values of the dynamic arguments.
         abstracted_axes (Sequence[Sequence[str]] or Dict[int, str] or Sequence[Dict[int, str]]):
             An experimental option to specify dynamic tensor shapes.
             This option affects the compilation of the annotated function.
@@ -534,7 +533,15 @@ def trace_from_pennylane(
 
         args = sig
 
+        if isinstance(fn, qml.QNode) and static_argnums:
+            # `make_jaxpr2` sees the qnode
+            # The static_argnum on the wrapped function takes precedence over the
+            # one in `make_jaxpr`
+            # https://github.com/jax-ml/jax/blob/636691bba40b936b8b64a4792c1d2158296e9dd4/jax/_src/linear_util.py#L231
+            # Therefore we need to coordinate them manually
+            fn.static_argnums = static_argnums
+
         plxpr, out_type, out_treedef = make_jaxpr2(fn, **make_jaxpr_kwargs)(*args, **kwargs)
-        jaxpr = from_plxpr(plxpr)(*dynamic_argnums, **kwargs)
+        jaxpr = from_plxpr(plxpr)(*dynamic_args, **kwargs)
 
     return jaxpr, out_type, out_treedef, sig

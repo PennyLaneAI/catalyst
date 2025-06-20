@@ -1506,7 +1506,7 @@ class TestCapture:
 
         qml.capture.enable()
 
-        # Capture in qnode level
+        # Basic test
         @qjit(static_argnums=(0,))
         @qml.qnode(qml.device(backend, wires=1))
         def captured_circuit_1(x, y):
@@ -1514,23 +1514,25 @@ class TestCapture:
             qml.RY(y, wires=0)
             return qml.expval(qml.PauliZ(0))
 
-        # Ignore static_argnums in the qnode
+        result_1 = captured_circuit_1(1.5, 2.0)
+        captured_circuit_1_mlir = captured_circuit_1.mlir
+        assert "%cst = arith.constant 1.5" in captured_circuit_1_mlir
+        assert 'quantum.custom "RX"(%cst)' in captured_circuit_1_mlir
+        assert "%cst = arith.constant 2.0" not in captured_circuit_1_mlir
+
+        # Test that qjit static_argnums takes precedence over the one on the qnode
         @qjit(static_argnums=1)
-        @qml.qnode(qml.device(backend, wires=1), static_argnums=0)
+        @qml.qnode(qml.device(backend, wires=1), static_argnums=0)  # should be ignored
         def captured_circuit_2(x, y):
             qml.RX(x, wires=0)
             qml.RY(y, wires=0)
             return qml.expval(qml.PauliZ(0))
 
-        result_1 = captured_circuit_1(1.5, 2.0)
-        captured_circuit_1_mlir = captured_circuit_1.mlir
-        assert "stablehlo.constant dense<1.500000e+00>" in captured_circuit_1_mlir
-        assert "stablehlo.constant dense<2.000000e+00>" not in captured_circuit_1_mlir
-
         result_2 = captured_circuit_2(1.5, 2.0)
         captured_circuit_2_mlir = captured_circuit_2.mlir
-        assert "stablehlo.constant dense<1.500000e+00>" not in captured_circuit_2_mlir
-        assert "stablehlo.constant dense<2.000000e+00>" in captured_circuit_2_mlir
+        assert "%cst = arith.constant 2.0" in captured_circuit_2_mlir
+        assert 'quantum.custom "RY"(%cst)' in captured_circuit_2_mlir
+        assert "%cst = arith.constant 1.5" not in captured_circuit_1_mlir
 
         assert result_1 == result_2
 
