@@ -118,12 +118,6 @@ test_quantum_subroutine_wire_param()
 def test_quantum_subroutine_gate_param_param():
     """Test passing a regular parameter"""
 
-    # CHECK: func.func private @RX_on_wire_0([[REG:%.+]]: !quantum.reg, [[PARAM_TENSOR:%.+]]: tensor<f64>) -> !quantum.reg
-    # CHECK-NEXT: [[QUBIT:%.+]] = quantum.extract [[REG]][ 0] : !quantum.reg -> !quantum.bit
-    # CHECK-NEXT: [[PARAM:%.+]] = tensor.extract [[PARAM_TENSOR]][] : tensor<f64>
-    # CHECK-NEXT: [[QUBIT_1:%.+]] = quantum.custom "RX"([[PARAM]]) [[QUBIT]] : !quantum.bit
-    # CHECK-NEXT: [[REG_1:%.+]] = quantum.insert [[REG]][ 0], [[QUBIT_1]] : !quantum.reg, !quantum.bit
-    # CHECK-NEXT: return [[REG_1]] : !quantum.reg
     @subroutine
     def RX_on_wire_0(param):
         qml.RX(param, wires=[0])
@@ -132,10 +126,21 @@ def test_quantum_subroutine_gate_param_param():
 
     @qml.qjit
     @qml.qnode(qml.device("lightning.qubit", wires=1))
+    # CHECK: module @subroutine_test_2
     def subroutine_test_2():
+        # CHECK-DAG: [[CST:%.+]] = stablehlo.constant dense<3.140000e+00>
+        # CHECK-DAG: [[QREG:%.+]] = quantum.alloc
+        # CHECK: [[QREG_1:%.+]] = call @RX_on_wire_0([[QREG]], [[CST]]) : (!quantum.reg, tensor<f64>) -> !quantum.reg
+        # CHECK: quantum.compbasis qreg [[QREG_1]] : !quantum.obs
         RX_on_wire_0(3.14)
         return qml.probs()
 
+    # CHECK: func.func private @RX_on_wire_0([[REG:%.+]]: !quantum.reg, [[PARAM_TENSOR:%.+]]: tensor<f64>) -> !quantum.reg
+    # CHECK-NEXT: [[QUBIT:%.+]] = quantum.extract [[REG]][ 0] : !quantum.reg -> !quantum.bit
+    # CHECK-NEXT: [[PARAM:%.+]] = tensor.extract [[PARAM_TENSOR]][] : tensor<f64>
+    # CHECK-NEXT: [[QUBIT_1:%.+]] = quantum.custom "RX"([[PARAM]]) [[QUBIT]] : !quantum.bit
+    # CHECK-NEXT: [[REG_1:%.+]] = quantum.insert [[REG]][ 0], [[QUBIT_1]] : !quantum.reg, !quantum.bit
+    # CHECK-NEXT: return [[REG_1]] : !quantum.reg
     print(subroutine_test_2.mlir)
 
     qml.capture.disable()
