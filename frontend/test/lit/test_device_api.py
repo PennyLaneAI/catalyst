@@ -124,7 +124,7 @@ test_preprocess()
 
 def test_simple_circuit_set_shots():
     """Test that a circuit with the new device API is compiling to MLIR."""
-    dev = CustomDevice(wires=2)
+    dev = qml.device("lightning.qubit", wires=2)
 
     @qjit(target="mlir")
     @partial(qml.set_shots, shots=2048)
@@ -133,8 +133,9 @@ def test_simple_circuit_set_shots():
         qml.Hadamard(wires=0)
         qml.CNOT(wires=[0, 1])
         return qml.expval(qml.PauliZ(wires=0))
+    #breakpoint()
 
-    # CHECK: [[shots:%.+]] = arith.constant 1024 : i64
+    # CHECK: [[shots:%.+]] = arith.constant 2048 : i64
     # CHECK: quantum.device shots([[shots]]) {{.*}}
     print(circuit.mlir)
 
