@@ -456,7 +456,7 @@ def handle_subroutine(self, *args, **kwargs):
     vals_out = vals_out[1:]
 
     for orig_wire, _ in backup:
-        self.qreg_manager[orig_wire] = qextract_p.bind(self.qreg_manager.get(), orig_wire)
+        self.qreg_manager.extract(orig_wire)
 
     return vals_out
 
