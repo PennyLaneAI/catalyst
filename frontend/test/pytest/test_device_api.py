@@ -13,7 +13,6 @@
 # limitations under the License.
 """Test for the device API."""
 import platform
-from functools import partial
 
 import pennylane as qml
 import pytest
