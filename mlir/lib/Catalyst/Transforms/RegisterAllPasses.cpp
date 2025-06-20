@@ -62,6 +62,7 @@ void catalyst::registerAllCatalystPasses()
     mlir::registerPass(catalyst::createScatterLoweringPass);
     mlir::registerPass(catalyst::createSplitMultipleTapesPass);
     mlir::registerPass(catalyst::createTestPass);
+    mlir::registerPass(catalyst::createGraphDecompositionPass);
     mlir::registerPass(catalyst::createIonsDecompositionPass);
     mlir::registerPass(catalyst::createGatesToPulsesPass);
     mlir::registerPass(catalyst::createLoopBoundaryOptimizationPass);
