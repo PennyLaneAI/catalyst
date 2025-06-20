@@ -154,6 +154,27 @@ def test_quantum_subroutine_with_control_flow():
 
     qml.capture.enable()
 
+    @subroutine
+    def conditional_RX(param: float):
+
+        def true_path():
+            qml.RX(param, wires=[0])
+
+        def false_path(): ...
+
+        qml.cond(param != 0.0, true_path, false_path)()
+
+    @qml.qjit(autograph=False)
+    @qml.qnode(qml.device("lightning.qubit", wires=1), autograph=False)
+    # CHECK: module @subroutine_test_3
+    def subroutine_test_3():
+        # CHECK-DAG: [[CST:%.+]] = stablehlo.constant dense<3.140000e+00>
+        # CHECK-DAG: [[QREG:%.+]] = quantum.alloc
+        # CHECK: [[QREG_1:%.+]] = call @conditional_RX([[QREG]], [[CST]]) : (!quantum.reg, tensor<f64>) -> !quantum.reg
+        # CHECK: quantum.compbasis qreg [[QREG_1]] : !quantum.obs
+        conditional_RX(3.14)
+        return qml.probs()
+
     # CHECK: func.func private @conditional_RX([[QREG:%.+]]: !quantum.reg, [[PARAM_TENSOR:%.+]]: tensor<f64>)
     # CHECK-NEXT: [[ZERO:%.+]] = stablehlo.constant dense<0.000000e+00> : tensor<f64>
     # CHECK-NEXT: [[COND_TENSOR:%.+]] = stablehlo.compare  NE, [[PARAM_TENSOR]], [[ZERO]],  FLOAT : (tensor<f64>, tensor<f64>) -> tensor<i1>
@@ -167,22 +188,6 @@ def test_quantum_subroutine_with_control_flow():
     # CHECK-NEXT: else
     # CHECK:            scf.yield [[QREG]] : !quantum.reg
     # CHECK:      return [[RETVAL]]
-    @subroutine
-    def conditional_RX(param: float):
-
-        def true_path():
-            qml.RX(param, wires=[0])
-
-        def false_path(): ...
-
-        qml.cond(param != 0.0, true_path, false_path)()
-
-    @qml.qjit(autograph=False)
-    @qml.qnode(qml.device("lightning.qubit", wires=1), autograph=False)
-    def subroutine_test_3():
-        conditional_RX(3.14)
-        return qml.probs()
-
     print(subroutine_test_3.mlir)
     qml.capture.disable()
 
