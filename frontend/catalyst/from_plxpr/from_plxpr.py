@@ -25,6 +25,7 @@ import pennylane as qml
 from jax._src.sharding_impls import UNSPECIFIED
 from jax.extend.core import ClosedJaxpr, Jaxpr
 from jax.extend.linear_util import wrap_init
+from jax.interpreters.partial_eval import convert_constvars_jaxpr
 from pennylane.capture import PlxprInterpreter, qnode_prim
 from pennylane.capture.expand_transforms import ExpandTransformsInterpreter
 from pennylane.capture.primitives import measure_prim as plxpr_measure_prim
@@ -293,13 +294,13 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
     during initialization.
     """
 
-    def __init__(self, device, shots, qreg_manager):
+    def __init__(self, device, shots, qreg_manager, cache):
         self.device = device
         self.shots = shots
         # TODO: we assume the qreg value passed into a scope is the unique qreg in the scope
         # In other words, we assume no new qreg will be allocated in the scope
         self.qreg_manager = qreg_manager
-        self.subroutine_cache = {}
+        self.subroutine_cache = cache
         super().__init__()
 
     def interpret_operation(self, op):
@@ -407,23 +408,23 @@ def handle_subroutine(self, *args, **kwargs):
     """
     Transform the subroutine from PLxPR into JAXPR with quantum primitives"""
 
-    backup = dict(self.wire_map.items())
+    backup = {k: v for k, v in self.qreg_manager}
 
     # Make sure the quantum register is updated
-    self.actualize_qreg()
     plxpr = kwargs["jaxpr"]
     transformed = self.subroutine_cache.get(plxpr)
 
     def wrapper(qreg, *args):
         device = self.device
         shots = self.shots
-        converter = PLxPRToQuantumJaxprInterpreter(device, shots, qreg, self.subroutine_cache)
+        manager = QregManager(qreg)
+        converter = PLxPRToQuantumJaxprInterpreter(device, shots, manager, self.subroutine_cache)
         retvals = converter(plxpr, *args)
-        converter.actualize_qreg()
-        return converter.qreg, *retvals
+        converter.qreg_manager.insert_all_dangling_qubits()
+        return converter.qreg_manager.get(), *retvals
 
     if not transformed:
-        converted_jaxpr_branch = jax.make_jaxpr(wrapper)(self.qreg, *args).jaxpr
+        converted_jaxpr_branch = jax.make_jaxpr(wrapper)(self.qreg_manager.get(), *args).jaxpr
         converted_closed_jaxpr_branch = ClosedJaxpr(
             convert_constvars_jaxpr(converted_jaxpr_branch), ()
         )
@@ -438,7 +439,7 @@ def handle_subroutine(self, *args, **kwargs):
     # quantum_subroutine_p.bind
     # is just pjit_p with a different name.
     vals_out = quantum_subroutine_p.bind(
-        self.qreg,
+        self.qreg_manager.get(),
         *args,
         jaxpr=converted_closed_jaxpr_branch,
         in_shardings=(UNSPECIFIED, *kwargs["in_shardings"]),
@@ -454,10 +455,11 @@ def handle_subroutine(self, *args, **kwargs):
     )
 
     self.qreg = vals_out[0]
+    self.qreg_manager = QregManager(self.qreg)
     vals_out = vals_out[1:]
 
     for orig_wire, _ in backup:
-        self.wire_map[orig_wire] = qextract_p.bind(self.qreg, orig_wire)
+        self.qreg_manager[orig_wire] = qextract_p.bind(self.qreg_manager.get(), orig_wire)
 
     return vals_out
 
