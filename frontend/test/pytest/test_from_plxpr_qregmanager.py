@@ -192,7 +192,7 @@ class TestQubitValues:
         for x in range(3):
             target_dictionary[x] = qreg_manager[x]
 
-        assert {k: v for k, v in qreg_manager} == {k: v for k, v in target_dictionary.items()}
+        assert dict(qreg_manager) == target_dictionary
 
     def test_chained_gate(self):
         """Test two chained qubit opertaions"""
