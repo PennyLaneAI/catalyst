@@ -143,3 +143,7 @@ class QregManager:
         for example by gates.
         """
         self.wire_map[index] = qubit
+
+    def __iter__(self):
+        """Iterate over wires map dictionary"""
+        return iter(self.wire_map.items())
