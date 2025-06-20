@@ -37,6 +37,7 @@ def test_subroutine_classical():
     qml.capture.enable()
 
     @qml.qjit
+    # CHECK: module @main
     def main():
         # CHECK: %{{.*}} = call @add_one(%{{.*}}) : (tensor<i64>) -> tensor<i64>
         return add_one(0)
@@ -51,8 +52,6 @@ test_subroutine_classical()
 def test_quantum_subroutine_identity():
     """Test that a subroutine receives a register as a parameter and returns a register"""
 
-    # CHECK: func.func private @identity([[REG:%.+]]: !quantum.reg) -> !quantum.reg
-    # CHECK-NEXT: return [[REG]] : !quantum.reg
 
     @subroutine
     def identity(): ...
@@ -61,9 +60,16 @@ def test_quantum_subroutine_identity():
 
     @qml.qjit
     @qml.qnode(qml.device("lightning.qubit", wires=1))
+    # CHECK: module @main
     def main():
+        # CHECK: [[QREG:%.+]] = quantum.alloc
+        # CHECK: [[QREG_1:%.+]] = call @identity([[QREG]]) : (!quantum.reg) -> !quantum.reg
+        # CHECK: quantum.compbasis qreg [[QREG_1]] : !quantum.obs
         identity()
         return qml.probs()
+
+    # CHECK: func.func private @identity([[REG:%.+]]: !quantum.reg) -> !quantum.reg
+    # CHECK-NEXT: return [[REG]] : !quantum.reg
 
     print(main.mlir)
     qml.capture.disable()
@@ -75,13 +81,6 @@ test_quantum_subroutine_identity()
 def test_quantum_subroutine_wire_param():
     """Pass a parameter that is a wire/integer"""
 
-    # CHECK: func.func private @Hadamard0([[REG:%.+]]: !quantum.reg, [[WIRE_IDX_TENSOR:%.+]]: tensor<i64>) -> !quantum.reg
-    # CHECK-NEXT: [[WIRE_IDX:%.+]] = tensor.extract [[WIRE_IDX_TENSOR]][] : tensor<i64>
-    # CHECK-NEXT: [[QUBIT:%.+]] = quantum.extract [[REG]][[[WIRE_IDX]]] : !quantum.reg -> !quantum.bit
-    # CHECK-NEXT: [[QUBIT_1:%.+]] = quantum.custom "Hadamard"() [[QUBIT]] : !quantum.bit
-    # CHECK-NEXT: [[WIRE_IDX:%.+]] = tensor.extract [[WIRE_IDX_TENSOR]][] : tensor<i64>
-    # CHECK-NEXT: [[REG_1:%.+]] = quantum.insert [[REG]][[[WIRE_IDX]]], [[QUBIT_1]] : !quantum.reg, !quantum.bit
-    # CHECK-NEXT: return [[REG_1]] : !quantum.reg
 
     @subroutine
     def Hadamard0(wire):
@@ -91,9 +90,22 @@ def test_quantum_subroutine_wire_param():
 
     @qml.qjit
     @qml.qnode(qml.device("lightning.qubit", wires=1))
+    # CHECK: module @subroutine_test
     def subroutine_test(c: int):
+        # CHECK: func.func public @subroutine_test([[ARG0:%.+]]
+        # CHECK: [[QREG:%.+]] = quantum.alloc
+        # CHECK: [[QREG_1:%.+]] = call @Hadamard0([[QREG]], [[ARG0:%.+]]) : (!quantum.reg, tensor<i64>) -> !quantum.reg
+        # CHECK: quantum.compbasis qreg [[QREG_1]] : !quantum.obs
         Hadamard0(c)
         return qml.probs()
+
+    # CHECK: func.func private @Hadamard0([[REG:%.+]]: !quantum.reg, [[WIRE_IDX_TENSOR:%.+]]: tensor<i64>) -> !quantum.reg
+    # CHECK-NEXT: [[WIRE_IDX:%.+]] = tensor.extract [[WIRE_IDX_TENSOR]][] : tensor<i64>
+    # CHECK-NEXT: [[QUBIT:%.+]] = quantum.extract [[REG]][[[WIRE_IDX]]] : !quantum.reg -> !quantum.bit
+    # CHECK-NEXT: [[QUBIT_1:%.+]] = quantum.custom "Hadamard"() [[QUBIT]] : !quantum.bit
+    # CHECK-NEXT: [[WIRE_IDX:%.+]] = tensor.extract [[WIRE_IDX_TENSOR]][] : tensor<i64>
+    # CHECK-NEXT: [[REG_1:%.+]] = quantum.insert [[REG]][[[WIRE_IDX]]], [[QUBIT_1]] : !quantum.reg, !quantum.bit
+    # CHECK-NEXT: return [[REG_1]] : !quantum.reg
 
     print(subroutine_test.mlir)
 
