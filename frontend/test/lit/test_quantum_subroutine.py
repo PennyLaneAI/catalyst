@@ -52,7 +52,6 @@ test_subroutine_classical()
 def test_quantum_subroutine_identity():
     """Test that a subroutine receives a register as a parameter and returns a register"""
 
-
     @subroutine
     def identity(): ...
 
@@ -80,7 +79,6 @@ test_quantum_subroutine_identity()
 
 def test_quantum_subroutine_wire_param():
     """Pass a parameter that is a wire/integer"""
-
 
     @subroutine
     def Hadamard0(wire):
@@ -199,7 +197,6 @@ def test_nested_subroutine_call():
     """Test nested subroutine call"""
 
     qml.capture.enable()
-
 
     @subroutine
     def Hadamard_subroutine():
