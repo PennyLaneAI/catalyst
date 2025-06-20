@@ -127,4 +127,10 @@ def LoopBoundaryOptimizationPass : Pass<"loop-boundary"> {
 }
 // ----- Quantum circuit transformation passes end ----- //
 
+def DecomposePass : Pass<"decompose"> {
+    let summary = "A prototype for graph-based decomposition pass.";
+
+    let constructor = "catalyst::createDecomposePass()";
+}
+
 #endif // QUANTUM_PASSES

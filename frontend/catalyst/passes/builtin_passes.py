@@ -780,3 +780,10 @@ def ppm_compilation(
         )
 
     return PassPipelineWrapper(qnode, passes)
+
+
+def decompose(qnode):
+    """
+    TODO: add docstring
+    """
+    return PassPipelineWrapper(qnode, "decompose")
