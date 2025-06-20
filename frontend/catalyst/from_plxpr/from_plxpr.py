@@ -406,7 +406,8 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
 @PLxPRToQuantumJaxprInterpreter.register_primitive(quantum_subroutine_p)
 def handle_subroutine(self, *args, **kwargs):
     """
-    Transform the subroutine from PLxPR into JAXPR with quantum primitives"""
+    Transform the subroutine from PLxPR into JAXPR with quantum primitives.
+    """
 
     backup = dict(self.qreg_manager)
     self.qreg_manager.insert_all_dangling_qubits()
