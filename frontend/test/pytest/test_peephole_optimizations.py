@@ -468,7 +468,6 @@ def test_clifford_to_ppm():
 
 # def test_get_ppm_specs_error():
 class TestPPMSpecsErrors:
-
     """Make sure get_ppm_specs only works in AOT (Ahead of Time) compilation
     and when the pipeline is present"""
 
@@ -487,17 +486,16 @@ class TestPPMSpecsErrors:
         qml.H(0)
         qml.CNOT(wires=[0, 1])
         return qml.probs()
-    
+
     testdata = [
-                    (jit_circuit, 
-                     NotImplementedError, 
-                     r"PPM passes only support AOT \(Ahead-Of-Time\) compilation mode."
-                    ),
-                    (circuit_with_no_pipeline, 
-                     CompileError, 
-                     r"No pipeline found"
-                    ),
-                ]
+        (
+            jit_circuit,
+            NotImplementedError,
+            r"PPM passes only support AOT \(Ahead-Of-Time\) compilation mode.",
+        ),
+        (circuit_with_no_pipeline, CompileError, r"No pipeline found"),
+    ]
+
     @pytest.mark.parametrize("circuit, error_type, error_message", testdata)
     def test_get_ppm_specs_error(self, circuit, error_type, error_message):
         with pytest.raises(error_type, match=error_message):
