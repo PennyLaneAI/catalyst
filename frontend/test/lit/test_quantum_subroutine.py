@@ -241,16 +241,16 @@ def test_two_callsites():
 
     qml.capture.enable()
 
-    # CHECK: func.func private @identity()
-    # CHECK-NOT: func.func private @identity()
     @subroutine
     def identity(): ...
 
     @qml.qjit(autograph=False)
+    # CHECK: module @subroutine_test_5
     def subroutine_test_5():
         identity()
         identity()
 
+    # CHECK-NOT: func.func private @identity_0()
     print(subroutine_test_5.mlir)
     qml.capture.disable()
 
@@ -264,17 +264,22 @@ def test_two_callsites_quantum():
 
     qml.capture.enable()
 
-    # CHECK-NOT: func.func private @identity_0
     @subroutine
     def identity(): ...
 
     @qml.qjit(autograph=False)
     @qml.qnode(qml.device("lightning.qubit", wires=1), autograph=False)
+    # CHECK: module @subroutine_test_6
     def subroutine_test_6():
+        # CHECK: [[QREG:%.+]] = quantum.alloc
+        # CHECK: [[QREG_1:%.+]] = call @identity([[QREG]]) : (!quantum.reg) -> !quantum.reg
         identity()
+        # CHECK: [[QREG_2:%.+]] = call @identity([[QREG_1]]) : (!quantum.reg) -> !quantum.reg
         identity()
+        # CHECK: quantum.compbasis qreg [[QREG_2]] : !quantum.obs
         return qml.probs()
 
+    # CHECK-NOT: func.func private @identity_0
     print(subroutine_test_6.mlir)
     qml.capture.disable()
 
