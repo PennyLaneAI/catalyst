@@ -183,6 +183,17 @@ class TestQubitValues:
             assert id(qreg_manager[0]) == var_to_tracer[gate_out_qubits[0]]
             assert id(qreg_manager[1]) == var_to_tracer[gate_out_qubits[1]]
 
+    def test_iter(self):
+        """Test __iter__ in the qreg manager"""
+        qreg = qalloc_p.bind(42)
+        qreg_manager = QregManager(qreg)
+
+        target_dictionary = {}
+        for x in range(3):
+            target_dictionary[x] = qreg_manager[x]
+
+        assert {k: v for k, v in qreg_manager} == {k: v for k, v in target_dictionary.items()}
+
     def test_chained_gate(self):
         """Test two chained qubit opertaions"""
         qreg = qalloc_p.bind(42)
