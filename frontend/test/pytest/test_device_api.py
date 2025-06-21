@@ -22,6 +22,8 @@ from catalyst import qjit
 from catalyst.device import QJITDevice, get_device_capabilities, qjit_device
 from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
 
+from functools import partial
+
 # pylint:disable = protected-access,attribute-defined-outside-init
 
 
