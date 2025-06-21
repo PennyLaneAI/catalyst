@@ -725,6 +725,7 @@ class QJIT(CatalystCallable):
                 return trace_from_pennylane(
                     self.user_function,
                     static_argnums,
+                    dynamic_args,
                     abstracted_axes,
                     full_sig,
                     kwargs,
