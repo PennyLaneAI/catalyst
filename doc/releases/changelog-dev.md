@@ -37,6 +37,57 @@
   Use this pass via the :func:`~.passes.ppm_compilation` decorator to compile circuits 
   in a single pipeline.
 
+  * A new function :func:`~.passes.get_ppm_specs` to get the result statistics after a PPR/PPM compilations is available. The statistics is returned in a Python dictionary.
+  [(#1794)](https://github.com/PennyLaneAI/catalyst/pull/1794). 
+  
+  Example below shows an input circuit and corresponding PPM specs.
+
+  ```python
+  import pennylane as qml
+  from catalyst import qjit, measure
+  from catalyst.passes import get_ppm_specs, to_ppr, merge_ppr_ppm, commute_ppr
+
+  pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+
+  @qjit(pipelines=pipe, target="mlir")
+  def test_convert_clifford_to_ppr_workflow():
+
+      device = qml.device("lightning.qubit", wires=2)
+
+      @merge_ppr_ppm
+      @commute_ppr(max_pauli_size=2)
+      @to_ppr
+      @qml.qnode(device)
+      def f():
+          qml.CNOT([0, 2])
+          qml.T(0)
+          return measure(0), measure(1)
+
+      @merge_ppr_ppm(max_pauli_size=1)
+      @commute_ppr
+      @to_ppr
+      @qml.qnode(device)
+      def g():
+          qml.CNOT([0, 2])
+          qml.T(0)
+          qml.T(1)
+          qml.CNOT([0, 1])
+          return measure(0), measure(1)
+
+      return f(), g()
+
+  ppm_specs = get_ppm_specs(test_convert_clifford_to_ppr_workflow)
+  print(ppm_specs)
+
+  ```
+  Output:
+  ```pycon
+  {
+  'f_0': {'max_weight_pi8': 1, 'num_logical_qubits': 2, 'num_of_ppm': 2, 'num_pi8_gates': 1}, 
+  'g_0': {'max_weight_pi4': 2, 'max_weight_pi8': 1, 'num_logical_qubits': 2, 'num_of_ppm': 2, 'num_pi4_gates': 3, 'num_pi8_gates': 2}
+  }
+  ```
+
 * Support for :class:`qml.Snapshot <pennylane.Snapshot>` to capture quantum states at any 
   point in a circuit has been added to Catalyst [(#1741)](https://github.com/PennyLaneAI/catalyst/pull/1741).
   For example, the code below is capturing 
@@ -108,6 +159,13 @@
 
 <h3>Improvements 🛠</h3>
 
+* The package name of the Catalyst distribution has been updated to be inline with
+  [PyPA standards](https://packaging.python.org/en/latest/specifications/binary-distribution-format/#file-name-convention),
+  from `PennyLane-Catalyst` to `pennylane_catalyst`. This change is not expected to
+  affect users, besides for instance the installation directory name, as tools in the
+  Python ecosystem (e.g. `pip`) already handle both versions through normalization.
+  [(#1817)](https://github.com/PennyLaneAI/catalyst/pull/1817)
+
 * The behaviour of measurement processes executed on `null.qubit` with QJIT is now more in line with
   their behaviour on `null.qubit` *without* QJIT.
   [(#1598)](https://github.com/PennyLaneAI/catalyst/pull/1598)
@@ -126,6 +184,9 @@
   the phase gate adjoint (`S†`), and the π/8 gate adjoint (`T†`). This extension improves
   performance by eliminating indirect conversion.
   [(#1738)](https://github.com/PennyLaneAI/catalyst/pull/1738)
+
+* `static_argnums` on `qjit` can now be specified with program capture through PLxPR.
+  [(#1810)](https://github.com/PennyLaneAI/catalyst/pull/1810)
 
 <h3>Breaking changes 💔</h3>
 
