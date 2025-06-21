@@ -1333,7 +1333,8 @@ def trace_quantum_function(
 
     with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
         # (1) - Classical tracing
-        quantum_tape = QuantumTape(shots=device.shots)
+        quantum_tape = QuantumTape(shots=qnode._shots)  # pylint: disable=protected-access
+        device._shots = qnode._shots  # pylint: disable=protected-access
         with EvaluationContext.frame_tracing_context(debug_info=debug_info) as trace:
             wffa, in_avals, keep_inputs, out_tree_promise = deduce_avals(
                 f, args, kwargs, static_argnums, debug_info
@@ -1385,7 +1386,7 @@ def trace_quantum_function(
 
                 # TODO: device shots is now always a concrete integer or None
                 # When PennyLane allows dynamic shots, update tracing to accept dynamic shots too
-                device_shots = get_device_shots(device) or 0
+                device_shots = qnode._shots.total_shots if qnode._shots else 0
                 device_init_p.bind(
                     device_shots,
                     auto_qubit_management=(device.wires is None),

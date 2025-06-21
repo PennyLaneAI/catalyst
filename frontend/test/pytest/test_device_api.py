@@ -22,6 +22,8 @@ from catalyst import qjit
 from catalyst.device import QJITDevice, get_device_capabilities, qjit_device
 from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
 
+from functools import partial
+
 # pylint:disable = protected-access,attribute-defined-outside-init
 
 
@@ -124,6 +126,23 @@ def test_simple_circuit():
         return qml.expval(qml.PauliZ(wires=0))
 
     assert circuit.mlir
+
+
+def test_simple_circuit_set_shots():
+    """Test that a circuit with the new device API is compiling to MLIR."""
+    dev = NullQubit(wires=2)
+
+    @qjit(target="mlir")
+    @partial(qml.set_shots, shots=2048)
+    @qml.qnode(device=dev)
+    def circuit():
+        qml.Hadamard(wires=0)
+        qml.CNOT(wires=[0, 1])
+        return qml.expval(qml.PauliZ(wires=0))
+
+    # Check that the MLIR contains the shots constant and device initialization
+    mlir_str = str(circuit.mlir)
+    assert "2048" in mlir_str
 
 
 def test_track_resources():
