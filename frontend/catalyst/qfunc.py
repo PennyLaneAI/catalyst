@@ -123,7 +123,7 @@ class QFunc:
                     mcm_method=self.execute_kwargs["mcm_method"],
                 )
             )
-            total_shots = get_device_shots(self.device)
+            total_shots = self._shots.total_shots
             mcm_config = _resolve_mcm_config(mcm_config, total_shots)
 
             if mcm_config.mcm_method == "one-shot":
@@ -132,6 +132,7 @@ class QFunc:
                 )
                 return Function(dynamic_one_shot(self, mcm_config=mcm_config))(*args, **kwargs)
 
+        self.device._shots = self._shots
         qjit_device = QJITDevice(self.device)
 
         static_argnums = kwargs.pop("static_argnums", ())
@@ -214,7 +215,7 @@ def dynamic_one_shot(qnode, **kwargs):
     mcm_config = kwargs.pop("mcm_config", None)
 
     def transform_to_single_shot(qnode):
-        if not qnode.device.shots:
+        if not qnode._shots:
             raise exceptions.QuantumFunctionError(
                 "dynamic_one_shot is only supported with finite shots."
             )
@@ -259,7 +260,7 @@ def dynamic_one_shot(qnode, **kwargs):
         single_shot_qnode.execute_kwargs["mcm_method"] = mcm_config.mcm_method
     single_shot_qnode._dynamic_one_shot_called = True
     dev = qnode.device
-    total_shots = get_device_shots(dev)
+    total_shots = qnode._shots.total_shots
 
     new_dev = copy(dev)
     if isinstance(new_dev, qml.devices.LegacyDeviceFacade):
