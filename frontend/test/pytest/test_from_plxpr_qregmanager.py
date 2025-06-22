@@ -72,6 +72,31 @@ def _qreg_mock_op_abstract_eval(qreg):
     return copy.copy(qreg)
 
 
+def _interpret_operation(wires, gate_name, qreg_manager):
+    """
+    Convenience helper for binding a mock gate.
+    Note that this helper follows plxpr semantics, so gate targets are only specified
+    by a global wire index.
+    """
+    in_qubits = [qreg_manager[w] for w in wires]
+    out_qubits = qinst_p.bind(
+        *[*in_qubits],
+        op=gate_name,
+        qubits_len=len(wires),
+        params_len=0,
+        ctrl_len=0,
+        adjoint=False,
+    )
+
+    # Update the qubit values.
+    # This is user code. This is point 2 of the "users are expected to" in the
+    # QregManager specs.
+    for wire, out_qubit in zip(wires, out_qubits):
+        qreg_manager[wire] = out_qubit
+
+    return out_qubits
+
+
 class TestQregGetSet:
     """Unit test for getter and setter for the managed qreg"""
 
@@ -111,30 +136,6 @@ class TestQregManagerInitialization:
 class TestQubitValues:
     """Test QregManager correctly updates qubit SSA values."""
 
-    def _interpret_operation(self, wires, gate_name, qreg_manager):
-        """
-        Convenience helper for binding a mock gate.
-        Note that this helper follows plxpr semantics, so gate targets are only specified
-        by a global wire index.
-        """
-        in_qubits = [qreg_manager[w] for w in wires]
-        out_qubits = qinst_p.bind(
-            *[*in_qubits],
-            op=gate_name,
-            qubits_len=len(wires),
-            params_len=0,
-            ctrl_len=0,
-            adjoint=False,
-        )
-
-        # Update the qubit values.
-        # This is user code. This is point 2 of the "users are expected to" in the
-        # QregManager specs.
-        for wire, out_qubit in zip(wires, out_qubits):
-            qreg_manager[wire] = out_qubit
-
-        return out_qubits
-
     def test_auto_extract(self):
         """Test that a new qubit is extracted when indexing into a new wire"""
         qreg = qalloc_p.bind(42)
@@ -167,7 +168,7 @@ class TestQubitValues:
         qreg_manager = QregManager(qreg)
 
         wires = [0, 1]
-        out_qubits = self._interpret_operation(wires, "my_gate", qreg_manager)
+        out_qubits = _interpret_operation(wires, "my_gate", qreg_manager)
 
         # Check that qubit-level ops do not affect the managed qreg
         assert qreg_manager.get() is qreg
@@ -189,8 +190,8 @@ class TestQubitValues:
         qreg_manager = QregManager(qreg)
 
         wires = [0, 1]
-        _ = self._interpret_operation(wires, "my_gate", qreg_manager)
-        out_qubits = self._interpret_operation(wires, "my_other_gate", qreg_manager)
+        _ = _interpret_operation(wires, "my_gate", qreg_manager)
+        out_qubits = _interpret_operation(wires, "my_other_gate", qreg_manager)
 
         # Check that qubit-level ops do not affect the managed qreg
         assert qreg_manager.get() is qreg
@@ -271,6 +272,44 @@ class TestQregValues:
             match="Setting new qreg value, but the previous one still has dangling qubits.",
         ):
             qreg_manager.set(new_qreg)
+
+
+class TestQregAndQubit:
+    """Test QregManager behaves correctly in full circuits with both qubit and qreg ops."""
+
+    def test_qreg_and_qubit(self):
+        """
+        Test QregManager behaves correctly in full circuits with both qubit and qreg ops.
+        This is the end-to-end system test for the QregManager.
+        """
+
+        qreg = qalloc_p.bind(42)
+        qreg_manager = QregManager(qreg)
+        assert qreg_manager.get() is qreg
+        assert qreg_manager.wire_map == {}
+
+        wires = [0, 1]
+        out_qubits = _interpret_operation(wires, "my_gate", qreg_manager)
+        assert qreg_manager.get() is qreg
+        assert list(qreg_manager.wire_map.keys()) == [0, 1]
+        assert qreg_manager[0] is out_qubits[0]
+        assert qreg_manager[1] is out_qubits[1]
+
+        # Must actualize before expiring an old qreg value as an operand
+        qreg_manager.insert_all_dangling_qubits()
+        assert qreg_manager.get() is not qreg  # insert creates new qreg result values
+        assert qreg_manager.wire_map == {}
+
+        new_qreg = qreg_mock_op_p.bind(qreg)
+        qreg_manager.set(new_qreg)
+        assert qreg_manager.get() is new_qreg
+        assert qreg_manager.wire_map == {}
+
+        wires = [0]
+        other_out_qubits = _interpret_operation(wires, "my_other_gate", qreg_manager)
+        assert qreg_manager.get() is new_qreg
+        assert list(qreg_manager.wire_map.keys()) == [0]
+        assert qreg_manager[0] is other_out_qubits[0]
 
 
 if __name__ == "__main__":
