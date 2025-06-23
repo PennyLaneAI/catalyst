@@ -139,7 +139,7 @@ class QFunc:
                     mcm_method=self.execute_kwargs["mcm_method"],
                 )
             )
-            total_shots = self._shots.total_shots
+            total_shots = get_device_shots(self.device, self)
             mcm_config = _resolve_mcm_config(mcm_config, total_shots)
 
             if mcm_config.mcm_method == "one-shot":
@@ -276,7 +276,7 @@ def dynamic_one_shot(qnode, **kwargs):
         single_shot_qnode.execute_kwargs["mcm_method"] = mcm_config.mcm_method
     single_shot_qnode._dynamic_one_shot_called = True
     dev = qnode.device
-    total_shots = qnode._shots.total_shots
+    total_shots = get_device_shots(dev, qnode)
 
     new_dev = copy(dev)
     if isinstance(new_dev, qml.devices.LegacyDeviceFacade):
@@ -284,6 +284,7 @@ def dynamic_one_shot(qnode, **kwargs):
     else:
         new_dev._shots = qml.measurements.Shots(1)
     single_shot_qnode.device = new_dev
+    single_shot_qnode._shots = qml.measurements.Shots(1)
 
     def one_shot_wrapper(*args, **kwargs):
         def wrap_single_shot_qnode(*_):
