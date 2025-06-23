@@ -24,6 +24,7 @@ import pytest
 import catalyst
 from catalyst.debug import get_compilation_stage, replace_ir
 
+from functools import partial
 
 def test_dynamic_sample_backend_functionality():
     """Test that a `sample` program with dynamic shots can be executed correctly."""
@@ -31,8 +32,9 @@ def test_dynamic_sample_backend_functionality():
     @catalyst.qjit(keep_intermediate=True)
     def workflow_dyn_sample(shots):  # pylint: disable=unused-argument
         # qml.device still needs concrete shots
-        device = qml.device("lightning.qubit", wires=1, shots=10)
+        device = qml.device("lightning.qubit", wires=1)
 
+        @partial(qml.set_shots, shots=10)
         @qml.qnode(device)
         def circuit():
             qml.RX(1.5, 0)
