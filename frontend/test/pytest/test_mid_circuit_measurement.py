@@ -552,26 +552,12 @@ class TestDynamicOneShotIntegration:
         reason="Midcircuit measurements with sampling is unseeded and hence this test is flaky"
     )
     @pytest.mark.parametrize("shots", [10000])
-    @pytest.mark.parametrize("postselect", [0])
-    @pytest.mark.parametrize("measure_f", [
-        # qml.counts,
-        # qml.expval, 
-        # qml.probs,
-        qml.sample, 
-        # qml.var,
-        ])
+    @pytest.mark.parametrize("postselect", [None, 0, 1])
+    @pytest.mark.parametrize("measure_f", [qml.counts, qml.expval, qml.probs, qml.sample, qml.var])
     @pytest.mark.parametrize(
-        "meas_obj", [
-            # qml.PauliZ(0),
-            # qml.Hadamard(0) @ qml.PauliZ(1),
-            [0], [0, 1], 
-            # "mcm",
-            ]
+        "meas_obj", [qml.PauliZ(0), qml.Hadamard(0) @ qml.PauliZ(1), [0], [0, 1], "mcm"]
     )
-    @pytest.mark.parametrize("postselect_mode", [
-        "fill-shots",
-        "hw-like",
-        ])
+    @pytest.mark.parametrize("postselect_mode", ["fill-shots", "hw-like"])
     # pylint: disable=too-many-arguments
     def test_dynamic_one_shot_several_mcms(
         self, backend, shots, postselect, measure_f, meas_obj, postselect_mode
