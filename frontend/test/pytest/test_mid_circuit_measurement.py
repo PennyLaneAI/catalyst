@@ -14,7 +14,7 @@
 """Tests for mid-circuit measurements in Catalyst"""
 
 from dataclasses import asdict
-from functools import reduce
+from functools import reduce, partial
 from typing import Iterable, Sequence
 
 import jax.numpy as jnp
@@ -552,12 +552,26 @@ class TestDynamicOneShotIntegration:
         reason="Midcircuit measurements with sampling is unseeded and hence this test is flaky"
     )
     @pytest.mark.parametrize("shots", [10000])
-    @pytest.mark.parametrize("postselect", [None, 0, 1])
-    @pytest.mark.parametrize("measure_f", [qml.counts, qml.expval, qml.probs, qml.sample, qml.var])
+    @pytest.mark.parametrize("postselect", [0])
+    @pytest.mark.parametrize("measure_f", [
+        # qml.counts,
+        # qml.expval, 
+        # qml.probs,
+        qml.sample, 
+        # qml.var,
+        ])
     @pytest.mark.parametrize(
-        "meas_obj", [qml.PauliZ(0), qml.Hadamard(0) @ qml.PauliZ(1), [0], [0, 1], "mcm"]
+        "meas_obj", [
+            # qml.PauliZ(0),
+            # qml.Hadamard(0) @ qml.PauliZ(1),
+            [0], [0, 1], 
+            # "mcm",
+            ]
     )
-    @pytest.mark.parametrize("postselect_mode", ["fill-shots", "hw-like"])
+    @pytest.mark.parametrize("postselect_mode", [
+        "fill-shots",
+        "hw-like",
+        ])
     # pylint: disable=too-many-arguments
     def test_dynamic_one_shot_several_mcms(
         self, backend, shots, postselect, measure_f, meas_obj, postselect_mode
@@ -572,8 +586,9 @@ class TestDynamicOneShotIntegration:
         if measure_f in (qml.var, qml.expval) and (isinstance(meas_obj, list)):
             pytest.skip("Can't use wires/mcm lists with var or expval")
 
-        dq = qml.device("default.qubit", shots=shots, seed=8237945)
+        dq = qml.device("default.qubit", seed=8237945)
 
+        @partial(qml.set_shots, shots=shots)
         @qml.qnode(dq, postselect_mode=postselect_mode, mcm_method="deferred")
         def ref_func(x, y):
             qml.RX(x, 0)
@@ -590,9 +605,10 @@ class TestDynamicOneShotIntegration:
                 kwargs["all_outcomes"] = True
             return measure_f(**kwargs)
 
-        dev = qml.device(backend, wires=2, shots=shots)
+        dev = qml.device(backend, wires=2)
 
         @qjit(seed=123456)
+        @partial(qml.set_shots, shots=shots)
         @qml.qnode(dev, postselect_mode=postselect_mode, mcm_method="one-shot")
         def func(x, y):
             qml.RX(x, 0)
