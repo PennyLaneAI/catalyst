@@ -2390,7 +2390,8 @@ def _cos_lowering2(ctx, x, accuracy):
 def subroutine_lowering(*args, **kwargs):
     """This is just a method that forwards arguments to _pjit_lowering
 
-    Useful for testing.
+    Even though we could register the `pjit_p` lowering directly, this makes the code origin
+    apparent in stack traces and similar use cases.
     """
     retval = _pjit_lowering(*args, **kwargs)
     return retval
