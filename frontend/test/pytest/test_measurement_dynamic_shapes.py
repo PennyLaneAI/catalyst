@@ -34,7 +34,7 @@ def test_dynamic_sample_backend_functionality():
         # qml.device still needs concrete shots
         device = qml.device("lightning.qubit", wires=1)
 
-        @partial(qml.set_shots, shots=10)
+        @partial(qml.set_shots, shots=shots)
         @qml.qnode(device)
         def circuit():
             qml.RX(1.5, 0)
