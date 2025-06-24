@@ -33,7 +33,6 @@ Quoted from the object's docstring:
        - `QubitManager[i] = new_qubit_value`
 """
 # pylint: disable=use-implicit-booleaness-not-comparison
-import copy
 import textwrap
 
 import pytest
@@ -43,7 +42,7 @@ from jax.extend.core import Primitive
 from jax.interpreters.partial_eval import DynamicJaxprTrace
 
 from catalyst.from_plxpr.qreg_manager import QregManager
-from catalyst.jax_primitives import qalloc_p, qextract_p
+from catalyst.jax_primitives import AbstractQbit, AbstractQreg, qalloc_p, qextract_p
 from catalyst.utils.exceptions import CompileError
 
 
@@ -66,10 +65,10 @@ qreg_mock_op_p = Primitive("qreg_mock_op")
 
 
 @qreg_mock_op_p.def_abstract_eval
-def _qreg_mock_op_abstract_eval(qreg):
-    # Use a copy so the mock returns a completely independent, second qreg object
+def _qreg_mock_op_abstract_eval(qreg):  # pylint: disable=unused-argument
+    # Return a completely independent, second qreg object
     # This is to mimic real ops
-    return copy.copy(qreg)
+    return AbstractQreg()
 
 
 # A mock primitive that takes in a qubit and returns a qubit
@@ -79,9 +78,9 @@ qubit_mock_op_p.multiple_results = True
 
 @qubit_mock_op_p.def_abstract_eval
 def _qubit_mock_op_abstract_eval(*qubits):
-    # Use a copy so the mock returns a completely independent, second qubit object
+    # Return a completely independent, second list of qubit objects
     # This is to mimic real ops
-    return [copy.copy(qubit) for qubit in qubits]
+    return [AbstractQbit()] * len(qubits)
 
 
 def _interpret_operation(wires, qreg_manager):
