@@ -136,8 +136,10 @@ def cancel_inverses(qnode):
     """
     return PassPipelineWrapper(qnode, "remove-chained-self-inverse")
 
+
 def disentangle_cnot(qnode):
     return PassPipelineWrapper(qnode, "disentangle-CNOT")
+
 
 def disentangle_swap(qnode):
     return PassPipelineWrapper(qnode, "disentangle-SWAP")
