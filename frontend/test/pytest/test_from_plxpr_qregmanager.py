@@ -33,7 +33,6 @@ Quoted from the object's docstring:
        - `QubitManager[i] = new_qubit_value`
 """
 # pylint: disable=use-implicit-booleaness-not-comparison
-import copy
 import textwrap
 
 import pytest
@@ -43,7 +42,7 @@ from jax.extend.core import Primitive
 from jax.interpreters.partial_eval import DynamicJaxprTrace
 
 from catalyst.from_plxpr.qreg_manager import QregManager
-from catalyst.jax_primitives import qalloc_p, qextract_p, qinst_p
+from catalyst.jax_primitives import AbstractQbit, AbstractQreg, qalloc_p, qextract_p
 from catalyst.utils.exceptions import CompileError
 
 
@@ -66,10 +65,40 @@ qreg_mock_op_p = Primitive("qreg_mock_op")
 
 
 @qreg_mock_op_p.def_abstract_eval
-def _qreg_mock_op_abstract_eval(qreg):
-    # Use a copy so the mock returns a completely independent, second qreg object
+def _qreg_mock_op_abstract_eval(qreg):  # pylint: disable=unused-argument
+    # Return a completely independent, second qreg object
     # This is to mimic real ops
-    return copy.copy(qreg)
+    return AbstractQreg()
+
+
+# A mock primitive that takes in a qubit and returns a qubit
+qubit_mock_op_p = Primitive("qubit_mock_op")
+qubit_mock_op_p.multiple_results = True
+
+
+@qubit_mock_op_p.def_abstract_eval
+def _qubit_mock_op_abstract_eval(*qubits):
+    # Return a completely independent, second list of qubit objects
+    # This is to mimic real ops
+    return [AbstractQbit()] * len(qubits)
+
+
+def _interpret_operation(wires, qreg_manager):
+    """
+    Convenience helper for binding a mock gate.
+    Note that this helper follows plxpr semantics, so gate targets are only specified
+    by a global wire index.
+    """
+    in_qubits = [qreg_manager[w] for w in wires]
+    out_qubits = qubit_mock_op_p.bind(*in_qubits)
+
+    # Update the qubit values.
+    # This is user code. This is point 2 of the "users are expected to" in the
+    # QregManager specs.
+    for wire, out_qubit in zip(wires, out_qubits):
+        qreg_manager[wire] = out_qubit
+
+    return out_qubits
 
 
 class TestQregGetSet:
@@ -111,30 +140,6 @@ class TestQregManagerInitialization:
 class TestQubitValues:
     """Test QregManager correctly updates qubit SSA values."""
 
-    def _interpret_operation(self, wires, gate_name, qreg_manager):
-        """
-        Convenience helper for binding a mock gate.
-        Note that this helper follows plxpr semantics, so gate targets are only specified
-        by a global wire index.
-        """
-        in_qubits = [qreg_manager[w] for w in wires]
-        out_qubits = qinst_p.bind(
-            *[*in_qubits],
-            op=gate_name,
-            qubits_len=len(wires),
-            params_len=0,
-            ctrl_len=0,
-            adjoint=False,
-        )
-
-        # Update the qubit values.
-        # This is user code. This is point 2 of the "users are expected to" in the
-        # QregManager specs.
-        for wire, out_qubit in zip(wires, out_qubits):
-            qreg_manager[wire] = out_qubit
-
-        return out_qubits
-
     def test_auto_extract(self):
         """Test that a new qubit is extracted when indexing into a new wire"""
         qreg = qalloc_p.bind(42)
@@ -167,7 +172,7 @@ class TestQubitValues:
         qreg_manager = QregManager(qreg)
 
         wires = [0, 1]
-        out_qubits = self._interpret_operation(wires, "my_gate", qreg_manager)
+        out_qubits = _interpret_operation(wires, qreg_manager)
 
         # Check that qubit-level ops do not affect the managed qreg
         assert qreg_manager.get() is qreg
@@ -200,8 +205,8 @@ class TestQubitValues:
         qreg_manager = QregManager(qreg)
 
         wires = [0, 1]
-        _ = self._interpret_operation(wires, "my_gate", qreg_manager)
-        out_qubits = self._interpret_operation(wires, "my_other_gate", qreg_manager)
+        _ = _interpret_operation(wires, qreg_manager)
+        out_qubits = _interpret_operation(wires, qreg_manager)
 
         # Check that qubit-level ops do not affect the managed qreg
         assert qreg_manager.get() is qreg
@@ -282,6 +287,62 @@ class TestQregValues:
             match="Setting new qreg value, but the previous one still has dangling qubits.",
         ):
             qreg_manager.set(new_qreg)
+
+
+class TestQregAndQubit:
+    """Test QregManager behaves correctly in full circuits with both qubit and qreg ops."""
+
+    def test_qreg_and_qubit(self):
+        """
+        Test QregManager behaves correctly in full circuits with both qubit and qreg ops.
+        This is the end-to-end system test for the QregManager.
+        """
+
+        qreg = qalloc_p.bind(42)
+        qreg_manager = QregManager(qreg)
+        assert qreg_manager.get() is qreg
+        assert qreg_manager.wire_map == {}
+
+        wires = [0, 1]
+        out_qubits = _interpret_operation(wires, qreg_manager)
+        assert qreg_manager.get() is qreg
+        assert list(qreg_manager.wire_map.keys()) == [0, 1]
+        assert qreg_manager[0] is out_qubits[0]
+        assert qreg_manager[1] is out_qubits[1]
+
+        # Must actualize before expiring an old qreg value as an operand
+        qreg_manager.insert_all_dangling_qubits()
+        assert qreg_manager.get() is not qreg  # insert creates new qreg result values
+        assert qreg_manager.wire_map == {}
+
+        new_qreg = qreg_mock_op_p.bind(qreg_manager.get())
+        qreg_manager.set(new_qreg)
+        assert qreg_manager.get() is new_qreg
+        assert qreg_manager.wire_map == {}
+
+        wires = [0]
+        other_out_qubits = _interpret_operation(wires, qreg_manager)
+        assert qreg_manager.get() is new_qreg
+        assert list(qreg_manager.wire_map.keys()) == [0]
+        assert qreg_manager[0] is other_out_qubits[0]
+
+        with take_current_trace() as trace:
+            # Check full jaxpr
+            observed_jaxpr = str(trace.to_jaxpr([], None)[0])
+            expected = """\
+            { lambda ; . let
+                a:AbstractQreg() = qalloc 42
+                b:AbstractQbit() = qextract a 0
+                c:AbstractQbit() = qextract a 1
+                d:AbstractQbit() e:AbstractQbit() = qubit_mock_op b c
+                f:AbstractQreg() = qinsert a 0 d
+                g:AbstractQreg() = qinsert f 1 e
+                h:AbstractQreg() = qreg_mock_op g
+                i:AbstractQbit() = qextract h 0
+                _:AbstractQbit() = qubit_mock_op i
+              in () }"""
+            expected = textwrap.dedent(expected)
+            assert observed_jaxpr == expected
 
 
 if __name__ == "__main__":
