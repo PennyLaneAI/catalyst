@@ -319,19 +319,38 @@ subroutine_cache: dict[callable, callable] = {}
 
 def subroutine(func):
     """
-    This is technical debt. pjit_p is the only primitive that will not hoist
-    jaxpr_consts outside of its definition. Here, we are creating a new primitive
-    called quantum_subroutine_p that is essentially equivalent to pjit_p.
+    Denotes the creation of a function in the intermediate representation.
 
-    The problem with this approach is that it will also change the definitions of jax.jit
-    which may be purely classical. The best solutions would be to have two primitives.
+    May be used to reduce compilation times. Instead of repeatedly compiling
+    inlined versions of the function passed as a parameter, when functions
+    are annotated with a subroutine, a single version of the function
+    will be compiled and called from potentially multiple callsites.
 
-    But in order to have two primitives, we would need to replace pjit_p selectively,
-    depending on whether or not we are inside of a qml.qjit context. This would involve
-    rewriting some methods inside JAX or copying them and modifying that one key aspect.
+    .. note::
 
-    I, @erick-xanadu, am currently unsure about what is the best way to do this.
-    Maybe this is sufficiently good?
+        Subroutines are only available when using the PLxPR program capture
+        interface.
+
+
+    **Example**
+
+    .. code-block:: python
+
+        @subroutine
+        def Hadamard_on_wire_0():
+            qml.Hadamard(0)
+
+        qml.capture.enable()
+
+        @qjit
+        @qml.qnode(dev)
+        def main():
+            Hadamard_on_wire_0()
+            Hadamard_on_wire_0()
+            return qml.state()
+
+        print(main.mlir)
+        qml.capture.disable()
     """
 
     old_pjit = jax._src.pjit.pjit_p
