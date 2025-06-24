@@ -37,6 +37,57 @@
   Use this pass via the :func:`~.passes.ppm_compilation` decorator to compile circuits 
   in a single pipeline.
 
+  * A new function :func:`~.passes.get_ppm_specs` to get the result statistics after a PPR/PPM compilations is available. The statistics is returned in a Python dictionary.
+  [(#1794)](https://github.com/PennyLaneAI/catalyst/pull/1794). 
+  
+  Example below shows an input circuit and corresponding PPM specs.
+
+  ```python
+  import pennylane as qml
+  from catalyst import qjit, measure
+  from catalyst.passes import get_ppm_specs, to_ppr, merge_ppr_ppm, commute_ppr
+
+  pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+
+  @qjit(pipelines=pipe, target="mlir")
+  def test_convert_clifford_to_ppr_workflow():
+
+      device = qml.device("lightning.qubit", wires=2)
+
+      @merge_ppr_ppm
+      @commute_ppr(max_pauli_size=2)
+      @to_ppr
+      @qml.qnode(device)
+      def f():
+          qml.CNOT([0, 2])
+          qml.T(0)
+          return measure(0), measure(1)
+
+      @merge_ppr_ppm(max_pauli_size=1)
+      @commute_ppr
+      @to_ppr
+      @qml.qnode(device)
+      def g():
+          qml.CNOT([0, 2])
+          qml.T(0)
+          qml.T(1)
+          qml.CNOT([0, 1])
+          return measure(0), measure(1)
+
+      return f(), g()
+
+  ppm_specs = get_ppm_specs(test_convert_clifford_to_ppr_workflow)
+  print(ppm_specs)
+
+  ```
+  Output:
+  ```pycon
+  {
+  'f_0': {'max_weight_pi8': 1, 'num_logical_qubits': 2, 'num_of_ppm': 2, 'num_pi8_gates': 1}, 
+  'g_0': {'max_weight_pi4': 2, 'max_weight_pi8': 1, 'num_logical_qubits': 2, 'num_of_ppm': 2, 'num_pi4_gates': 3, 'num_pi8_gates': 2}
+  }
+  ```
+
 * Support for :class:`qml.Snapshot <pennylane.Snapshot>` to capture quantum states at any 
   point in a circuit has been added to Catalyst [(#1741)](https://github.com/PennyLaneAI/catalyst/pull/1741).
   For example, the code below is capturing 
@@ -74,7 +125,46 @@
   Array([0.25, 0.25, 0.25, 0.25], dtype=float64))
   ```
 
+* Catalyst now supports automatic qubit management.
+  [(#1788)](https://github.com/PennyLaneAI/catalyst/pull/1788)
+
+  The number of wires does not need to be speficied during device initialization,
+  and instead will be automatically managed by the Catalyst Runtime.
+
+  ```python
+  @qjit
+  def workflow():
+      dev = qml.device("lightning.qubit") # no wires here!
+      @qml.qnode(dev)
+      def circuit():
+          qml.PauliX(wires=2)
+          return qml.probs()
+      return circuit()
+
+  print(workflow())
+  ```
+
+  ```pycon
+  [0. 1. 0. 0. 0. 0. 0. 0.]
+  ```
+
+  In this example, the number of wires is not specified at device initialization.
+  When we encounter an X gate on `wires=2`, catalyst automatically expands the size
+  of the qubit register to include the requested wire index.
+  Here, the register will contain (at least) 3 qubits after the X operation.
+  As a result, we can see the QNode returning the probabilities for the state |001>,
+  meaning 3 wires were allocated in total.
+
+  This feature can be turned on by omitting the `wires` argument to the device.
+
 <h3>Improvements 🛠</h3>
+
+* The package name of the Catalyst distribution has been updated to be inline with
+  [PyPA standards](https://packaging.python.org/en/latest/specifications/binary-distribution-format/#file-name-convention),
+  from `PennyLane-Catalyst` to `pennylane_catalyst`. This change is not expected to
+  affect users, besides for instance the installation directory name, as tools in the
+  Python ecosystem (e.g. `pip`) already handle both versions through normalization.
+  [(#1817)](https://github.com/PennyLaneAI/catalyst/pull/1817)
 
 * The behaviour of measurement processes executed on `null.qubit` with QJIT is now more in line with
   their behaviour on `null.qubit` *without* QJIT.
@@ -102,6 +192,9 @@
   * `2` or `"pass"`: Intermediate files are saved after each pass.
   The default value is `False`.
   [(#1791)](https://github.com/PennyLaneAI/catalyst/pull/1791)
+
+* `static_argnums` on `qjit` can now be specified with program capture through PLxPR.
+  [(#1810)](https://github.com/PennyLaneAI/catalyst/pull/1810)
 
 <h3>Breaking changes 💔</h3>
 
@@ -226,7 +319,19 @@
 * `make all` now correctly compiles the standalone plugin with the same compiler used to compile LLVM and MLIR.
   [(#1768)](https://github.com/PennyLaneAI/catalyst/pull/1768)
 
+* Stacked python decorators for built-in catalyst passes are now applied in the correct order.
+  [(#1798)](https://github.com/PennyLaneAI/catalyst/pull/1798)
+
+* MLIR plugins can now be specified via lists and tuples, not just sets.
+  [(#1812)](https://github.com/PennyLaneAI/catalyst/pull/1812)
+
+* Fixes the conversion of PLxPR to JAXPR with quantum primitives when using control flow.
+  [(#1809)](https://github.com/PennyLaneAI/catalyst/pull/1809)
+
 <h3>Internal changes ⚙️</h3>
+
+* Use `dataclass.replace` to update `ExecutionConfig` and `MCMConfig` rather than mutating properties.
+  [(#1814)](https://github.com/PennyLaneAI/catalyst/pull/1814)
 
 * `null.qubit` can now support an optional `track_resources` argument which allows it to record which gates are executed.
   [(#1619)](https://github.com/PennyLaneAI/catalyst/pull/1619)
@@ -256,6 +361,10 @@
 
   This runtime stub is currently for mock execution only and should be treated as a placeholder
   operation. Internally, it functions just as a computational-basis measurement instruction.
+
+* Support for quantum subroutines was added.
+  This feature is expected to improve compilation times for large quantum programs.
+  [(#1774)](https://github.com/PennyLaneAI/catalyst/pull/1774)
 
 * PennyLane's arbitrary-basis measurement operations, such as
   :func:`qml.ftqc.measure_arbitrary_basis() <pennylane.ftqc.measure_arbitrary_basis>`, are now
@@ -295,6 +404,10 @@
 * The unused helper function `genArgMapFunction` in the `--lower-gradients` pass is removed.
   [(#1753)](https://github.com/PennyLaneAI/catalyst/pull/1753)
 
+* Base components of QFuncPLxPRInterpreter have been moved into a base class called SubroutineInterpreter.
+  This is to reduce code duplication once we have support for quantum subroutines.
+  [(#1787)](https://github.com/PennyLaneAI/catalyst/pull/1787)
+
 * The `qml.measure()` operation for mid-circuit measurements can now be used in QJIT-compiled
   circuits with program capture enabled.
   [(#1766)](https://github.com/PennyLaneAI/catalyst/pull/1766)
@@ -313,7 +426,25 @@
   target gate set.
   [(#1763)](https://github.com/PennyLaneAI/catalyst/pull/1763)
 
-* Upgraded action runners from Ubuntu22.04 to Ubuntu24.04. [(#1728)](https://github.com/PennyLaneAI/catalyst/pull/1728)
+* The `quantum-to-ion` pass is renamed to `gates-to-pulses`.
+  [(#1818)](https://github.com/PennyLaneAI/catalyst/pull/1818)
+
+* The runtime CAPI function `__catalyst__rt__num_qubits` now has a corresponding jax primitive
+  `num_qubits_p` and quantum dialect operation `NumQubitsOp`.
+  [(#1793)](https://github.com/PennyLaneAI/catalyst/pull/1793)
+
+  For measurements whose shapes depend on the number of qubits, they now properly retrieve the
+  number of qubits through this new operation when it is dynamic.
+
+* Refactored PPR/PPM pass names from snake_case to kebab-case in MLIR passes to align with MLIR conventions.
+  Class names and tests were updated accordingly. Example: `--to_ppr` is now `--to-ppr`.
+  [(#1802)](https://github.com/PennyLaneAI/catalyst/pull/1802)
+
+* A new internal python module `catalyst.from_plxpr` is created to better organize the code for plxpr capture integration.
+  [(#1813)](https://github.com/PennyLaneAI/catalyst/pull/1813)
+
+* A new `from_plxpr.QregManager` is created to handle converting plxpr wire index semantics into catalyst qubit value semantics.
+  [(#1813)](https://github.com/PennyLaneAI/catalyst/pull/1813)
 
 <h3>Documentation 📝</h3>
 

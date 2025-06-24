@@ -72,8 +72,11 @@ class PassPipelineWrapper(QNodeWrapper):
     def __call__(self, *args, **kwargs):
         if EvaluationContext.is_tracing():
             pass_pipeline = kwargs.pop("pass_pipeline", [])
-            pass_pipeline += dictionary_to_list_of_passes(
-                self.pass_name_or_pipeline, *self.flags, **self.valued_options
+            pass_pipeline = (
+                dictionary_to_list_of_passes(
+                    self.pass_name_or_pipeline, *self.flags, **self.valued_options
+                )
+                + pass_pipeline
             )
             kwargs["pass_pipeline"] = pass_pipeline
         return super().__call__(*args, **kwargs)
@@ -374,9 +377,10 @@ def _API_name_to_pass_name():
         "cancel_inverses": "remove-chained-self-inverse",
         "merge_rotations": "merge-rotations",
         "ions_decomposition": "ions-decomposition",
-        "to_ppr": "to_ppr",
-        "commute_ppr": "commute_ppr",
-        "merge_ppr_ppm": "merge_ppr_ppm",
-        "ppr_to_ppm": "ppr_to_ppm",
-        "ppm_compilation": "ppm_compilation",
+        "to_ppr": "to-ppr",
+        "commute_ppr": "commute-ppr",
+        "merge_ppr_ppm": "merge-ppr-ppm",
+        "decompose_non_clifford_ppr": "decompose-non-clifford-ppr",
+        "decompose_clifford_ppr": "decompose-clifford-ppr",
+        "ppm_compilation": "ppm-compilation",
     }

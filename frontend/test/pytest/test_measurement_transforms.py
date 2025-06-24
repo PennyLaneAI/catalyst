@@ -50,7 +50,6 @@ class CustomDevice(Device):
 
     def __init__(self, wires, shots=1024):
         super().__init__(wires=wires, shots=shots)
-        self.capabilities.operations.pop("BlockEncode")
 
     @staticmethod
     def get_c_interface():
@@ -67,6 +66,9 @@ class CustomDevice(Device):
     def execute(self, circuits, execution_config):
         """Execution."""
         return circuits, execution_config
+
+
+CustomDevice.capabilities.operations.pop("BlockEncode")
 
 
 class CustomDeviceLimitedMPs(Device):

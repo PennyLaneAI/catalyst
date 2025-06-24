@@ -21,6 +21,7 @@ TEST_BACKEND ?= "lightning.qubit"
 TEST_BRAKET ?= NONE
 ENABLE_ASAN ?= OFF
 TOML_SPECS ?= $(shell find ./runtime ./frontend -name '*.toml' -not -name 'pyproject.toml')
+ENABLE_FLAKY ?= OFF
 
 PLATFORM := $(shell uname -s)
 ifeq ($(PLATFORM),Linux)
@@ -54,7 +55,11 @@ endif
 # with the ASAN runtime. Since we don't exert much control over the "user" compiler, skip them.
 TEST_EXCLUDES := -k "not test_executable_generation"
 endif
-PYTEST_FLAGS := $(PARALLELIZE) $(TEST_EXCLUDES)
+FLAKY :=
+ifeq ($(ENABLE_FLAKY),ON)
+FLAKY := --force-flaky --max-runs=5 --min-passes=5
+endif
+PYTEST_FLAGS := $(PARALLELIZE) $(TEST_EXCLUDES) $(FLAKY)
 
 # TODO: Find out why we have container overflow on macOS.
 ASAN_OPTIONS := ASAN_OPTIONS="detect_leaks=0,detect_container_overflow=0"
@@ -112,7 +117,7 @@ frontend:
 	# versions of a package with the same version tag (e.g. 0.38-dev0).
 	$(PYTHON) -m pip uninstall -y pennylane
 	$(PYTHON) -m pip install -e . --extra-index-url https://test.pypi.org/simple $(PIP_VERBOSE_FLAG)
-	rm -r frontend/PennyLane_Catalyst.egg-info
+	rm -r frontend/pennylane_catalyst.egg-info
 
 .PHONY: mlir llvm mhlo enzyme dialects runtime oqc
 mlir:
@@ -237,7 +242,7 @@ wheel:
 	$(PYTHON) -m pip wheel --no-deps . -w dist
 
 	rm -r $(MK_DIR)/build
-	rm -r frontend/PennyLane_Catalyst.egg-info
+	rm -r frontend/pennylane_catalyst.egg-info
 
 plugin-wheel: plugin
 	mkdir -p $(MK_DIR)/standalone_plugin_wheel/standalone_plugin/lib

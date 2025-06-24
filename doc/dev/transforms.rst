@@ -299,6 +299,12 @@ Let's add the pattern-matching logic to the ``matchAndRewrite`` method:
             return failure();
         }
 
+        // In the line `Operation *parent = qbs[0].getDefiningOp();`,
+        // we retrived the parent `Operation`, which only has methods on the
+        // base `Operation` class
+        // https://mlir.llvm.org/doxygen/classmlir_1_1Operation.html
+        // To use the specific methods and the auto-generated getters for
+        // the specific `QubitUnitaryOp`, we need to cast it first.
         QubitUnitaryOp parentOp = cast<QubitUnitaryOp>(parent);
         ValueRange parentQbs = parentOp.getOutQubits();
 
@@ -308,10 +314,11 @@ Let's add the pattern-matching logic to the ``matchAndRewrite`` method:
             return failure();
         }
 
-        for (auto [qb1, qb2] : llvm::zip(qbs, parentQbs))
+        for (auto [qb1, qb2] : llvm::zip(qbs, parentQbs)) {
             if (qb1 != qb2) {
                 return failure();
             }
+        }
 
         // Rewrite logic
         // ... We have matched the pattern, now rewrite the IR here
@@ -370,9 +377,9 @@ In C++ it will look as follows:
         // Pattern matching logic
         // ... match the pattern
 
+        //////////////////////////////////////////////////
+
         // Rewrite logic
-        ValueRange qbs = op.getInQubits();
-        QubitUnitaryOp parentOp = cast<QubitUnitaryOp>(qbs[0].getDefiningOp());
 
         // In the tablegen definition of `QubitUnitaryOp`, there is a
         // field called `$matrix`, storing the matrix for the unitary gate.
@@ -536,7 +543,7 @@ fixed point is reached.
 
     If you are encoutering issues, or would like to quickly try out the merge unitary pass described in this
     section, you can have a look at or cherry-pick this commit which includes all changes described
-    in this section: https://github.com/PennyLaneAI/catalyst/commit/9afcc3500e12e5a51b78dda76cd4d27bdf4c8905
+    in this section: https://github.com/PennyLaneAI/catalyst/commit/2c84b2402cb67c62a6de5137bbf5b41afaa5a328
 
 
 Writing more general transformations

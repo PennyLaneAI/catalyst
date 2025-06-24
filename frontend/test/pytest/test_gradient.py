@@ -15,6 +15,7 @@
 """Test built-in differentiation support in Catalyst."""
 
 import platform
+from dataclasses import replace
 
 import jax
 import numpy as np
@@ -1858,7 +1859,7 @@ class TestGradientMethodErrors:
             def preprocess(self, execution_config=None):
                 """Device preprocessing function."""
                 program, config = lightning_device.preprocess(execution_config)
-                config.gradient_method = grad_method
+                config = replace(config, gradient_method=grad_method)
                 return program, config
 
             @staticmethod
