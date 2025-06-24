@@ -112,6 +112,7 @@ class CompileOptions:
     logfile: Optional[TextIOWrapper] = sys.stderr
     target: Optional[str] = "binary"
     keep_intermediate: Optional[Union[str, int, bool, KeepIntermediateLevel]] = False
+    enable_debug_info: Optional[bool] = False
     pipelines: Optional[List[Any]] = None
     autograph: Optional[bool] = False
     autograph_include: Optional[Iterable[str]] = ()
@@ -344,6 +345,8 @@ def get_convert_to_llvm_stage(options: CompileOptions) -> List[str]:
         "gep-inbounds",
         "register-inactive-callback",
     ]
+    if options.enable_debug_info:
+        convert_to_llvm.append("ensure-debug-info-scope-on-llvm-func")
     return list(filter(partial(is_not, None), convert_to_llvm))
 
 
