@@ -210,23 +210,35 @@ def test_disentangle_passes():
     """
 
     @qjit()
-    @disentangle_cnot
-    @disentangle_swap
     @qml.qnode(qml.device("lightning.qubit", wires=2))
-    def test_chained_apply_passes_workflow():
+    def circuit_with_no_disentangle_passes():
         # first qubit in |1>
         qml.X(0)
         # current state : |10>
         qml.CNOT(wires=[0, 1])  # state after CNOT |11>
         qml.SWAP(wires=[0, 1])  # state after SWAP |11>
-        return qml.expval(qml.PauliY(wires=0))
+        return qml.state()
 
-    assert "disentangle-CNOT" in test_chained_apply_passes_workflow.mlir
-    assert "disentangle-SWAP" in test_chained_apply_passes_workflow.mlir
+    @qjit()
+    @disentangle_cnot
+    @disentangle_swap
+    @qml.qnode(qml.device("lightning.qubit", wires=2))
+    def circuit_with_disentangle_passes():
+        # first qubit in |1>
+        qml.X(0)
+        # current state : |10>
+        qml.CNOT(wires=[0, 1])  # state after CNOT |11>
+        qml.SWAP(wires=[0, 1])  # state after SWAP |11>
+        return qml.state()
+
+    assert "disentangle-CNOT" in circuit_with_disentangle_passes.mlir
+    assert "disentangle-SWAP" in circuit_with_disentangle_passes.mlir
 
     # both SWAP and CNOT should be removed by the disentangle passes
-    assert "CNOT" not in test_chained_apply_passes_workflow.mlir_opt
-    assert "SWAP" not in test_chained_apply_passes_workflow.mlir_opt
+    assert "CNOT" not in circuit_with_disentangle_passes.mlir_opt
+    assert "SWAP" not in circuit_with_disentangle_passes.mlir_opt
+
+    assert np.allclose(circuit_with_no_disentangle_passes(), circuit_with_disentangle_passes())
 
 
 def test_convert_clifford_to_ppr():
