@@ -184,6 +184,9 @@ def disentangle_cnot(qnode):
     after the ``"QuantumCompilationPass"`` stage:
 
     >>> print(get_compilation_stage(circuit, stage="QuantumCompilationPass"))
+
+    .. code-block:: mlir
+
     module @circuit {
         func.func public @jit_circuit() -> tensor<4xcomplex<f64>> attributes {llvm.emit_c_interface} {
             %0 = call @circuit_0() : () -> tensor<4xcomplex<f64>>
@@ -271,6 +274,9 @@ def disentangle_swap(qnode):
     after the ``"QuantumCompilationPass"`` stage:
 
     >>> print(get_compilation_stage(circuit, stage="QuantumCompilationPass"))
+
+    .. code-block:: mlir
+
     module @circuit {
         func.func public @jit_circuit() -> tensor<4xcomplex<f64>> attributes {llvm.emit_c_interface} {
             %0 = call @circuit_0() : () -> tensor<4xcomplex<f64>>
