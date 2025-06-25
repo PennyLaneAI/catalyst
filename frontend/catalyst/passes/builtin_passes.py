@@ -22,6 +22,7 @@ from catalyst.compiler import _options_to_cli_flags, _quantum_opt
 from catalyst.passes.pass_api import PassPipelineWrapper
 from catalyst.utils.exceptions import CompileError
 
+# pylint: line-too-long
 
 ## API ##
 def cancel_inverses(qnode):
