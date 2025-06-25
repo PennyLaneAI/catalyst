@@ -15,6 +15,8 @@
 of quantum operations, measurements, and observables to JAXPR.
 """
 
+import copy
+import functools
 import sys
 from dataclasses import dataclass
 from enum import Enum
@@ -30,7 +32,9 @@ from jax._src.interpreters import partial_eval as pe
 from jax._src.lax.lax import _merge_dyn_shape, _nary_lower_hlo, cos_p, sin_p
 from jax._src.lib.mlir import ir
 from jax._src.lib.mlir.dialects import hlo
+from jax._src.pjit import _pjit_lowering
 from jax.core import AbstractValue
+from jax.experimental.pjit import pjit_p
 from jax.extend.core import Primitive
 from jax.interpreters import mlir
 from jax.tree_util import PyTreeDef, tree_unflatten
@@ -115,6 +119,7 @@ from catalyst.jax_primitives_utils import (
 )
 from catalyst.utils.calculate_grad_shape import Signature, calculate_grad_shape
 from catalyst.utils.extra_bindings import FromElementsOp, TensorExtractOp
+from catalyst.utils.patching import Patcher
 from catalyst.utils.types import convert_shaped_arrays_to_tensors
 
 # pylint: disable=unused-argument,too-many-lines,too-many-statements,protected-access
@@ -139,13 +144,13 @@ class AbstractQbit(AbstractValue):
         return self.hash_value
 
 
-class ConcreteQbit(AbstractQbit):
+class ConcreteQbit:
     """Concrete Qbit."""
 
 
 def _qbit_lowering(aval):
     assert isinstance(aval, AbstractQbit)
-    return (ir.OpaqueType.get("quantum", "bit"),)
+    return ir.OpaqueType.get("quantum", "bit")
 
 
 #
@@ -163,13 +168,13 @@ class AbstractQreg(AbstractValue):
         return self.hash_value
 
 
-class ConcreteQreg(AbstractQreg):
+class ConcreteQreg:
     """Concrete quantum register."""
 
 
 def _qreg_lowering(aval):
     assert isinstance(aval, AbstractQreg)
-    return (ir.OpaqueType.get("quantum", "reg"),)
+    return ir.OpaqueType.get("quantum", "reg")
 
 
 #
@@ -306,6 +311,74 @@ quantum_kernel_p = core.CallPrimitive("quantum_kernel")
 quantum_kernel_p.multiple_results = True
 measure_in_basis_p = Primitive("measure_in_basis")
 measure_in_basis_p.multiple_results = True
+quantum_subroutine_p = copy.deepcopy(pjit_p)
+quantum_subroutine_p.name = "quantum_subroutine_p"
+
+subroutine_cache: dict[callable, callable] = {}
+
+
+def subroutine(func):
+    """
+    Denotes the creation of a function in the intermediate representation.
+
+    May be used to reduce compilation times. Instead of repeatedly compiling
+    inlined versions of the function passed as a parameter, when functions
+    are annotated with a subroutine, a single version of the function
+    will be compiled and called from potentially multiple callsites.
+
+    .. note::
+
+        Subroutines are only available when using the PLxPR program capture
+        interface.
+
+
+    **Example**
+
+    .. code-block:: python
+
+        @subroutine
+        def Hadamard_on_wire_0():
+            qml.Hadamard(0)
+
+        qml.capture.enable()
+
+        @qjit
+        @qml.qnode(dev)
+        def main():
+            Hadamard_on_wire_0()
+            Hadamard_on_wire_0()
+            return qml.state()
+
+        print(main.mlir)
+        qml.capture.disable()
+    """
+
+    old_pjit = jax._src.pjit.pjit_p
+
+    @functools.wraps(func)
+    def inside(*args, **kwargs):
+        with Patcher(
+            (
+                jax._src.pjit,
+                "pjit_p",
+                old_pjit,
+            ),
+        ):
+            return func(*args, **kwargs)
+
+    @functools.wraps(inside)
+    def wrapper(*args, **kwargs):
+
+        with Patcher(
+            (
+                jax._src.pjit,
+                "pjit_p",
+                quantum_subroutine_p,
+            ),
+        ):
+            return jax.jit(inside)(*args, **kwargs)
+
+    return wrapper
 
 
 def _assert_jaxpr_without_constants(jaxpr: ClosedJaxpr):
@@ -2333,6 +2406,16 @@ def _cos_lowering2(ctx, x, accuracy):
     return _nary_lower_hlo(hlo.cosine, ctx, x, accuracy=accuracy)
 
 
+def subroutine_lowering(*args, **kwargs):
+    """This is just a method that forwards arguments to _pjit_lowering
+
+    Even though we could register the `pjit_p` lowering directly, this makes the code origin
+    apparent in stack traces and similar use cases.
+    """
+    retval = _pjit_lowering(*args, **kwargs)
+    return retval
+
+
 CUSTOM_LOWERING_RULES = (
     (zne_p, _zne_lowering),
     (device_init_p, _device_init_lowering),
@@ -2374,6 +2457,7 @@ CUSTOM_LOWERING_RULES = (
     (sin_p, _sin_lowering2),
     (cos_p, _cos_lowering2),
     (quantum_kernel_p, _quantum_kernel_lowering),
+    (quantum_subroutine_p, subroutine_lowering),
     (measure_in_basis_p, _measure_in_basis_lowering),
 )
 
@@ -2387,3 +2471,5 @@ def _scalar_abstractify(t):
 
 pytype_aval_mappings[type] = _scalar_abstractify
 pytype_aval_mappings[jax._src.numpy.scalar_types._ScalarMeta] = _scalar_abstractify
+pytype_aval_mappings[ConcreteQbit] = lambda _: AbstractQbit()
+pytype_aval_mappings[ConcreteQreg] = lambda _: AbstractQreg()
