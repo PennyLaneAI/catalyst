@@ -22,6 +22,8 @@ from catalyst import measure, pipeline, qjit
 from catalyst.passes import (
     cancel_inverses,
     commute_ppr,
+    disentangle_cnot,
+    disentangle_swap,
     get_ppm_specs,
     merge_ppr_ppm,
     merge_rotations,
@@ -166,6 +168,18 @@ def test_cancel_inverses_bad_usages():
         ):
             merge_rotations(classical_func)
 
+        with pytest.raises(
+            TypeError,
+            match="A QNode is expected, got the classical function",
+        ):
+            disentangle_cnot(classical_func)
+
+        with pytest.raises(
+            TypeError,
+            match="A QNode is expected, got the classical function",
+        ):
+            disentangle_swap(classical_func)
+
     test_cancel_inverses_not_on_qnode()
 
 
@@ -187,6 +201,32 @@ def test_chained_passes():
 
     assert "remove-chained-self-inverse" in test_chained_apply_passes_workflow.mlir
     assert "merge-rotations" in test_chained_apply_passes_workflow.mlir
+
+
+def test_disentangle_passes():
+    """
+    Test that disentangle passes are present in the transform passes
+    and are applied correctly.
+    """
+
+    @qjit()
+    @disentangle_cnot
+    @disentangle_swap
+    @qml.qnode(qml.device("lightning.qubit", wires=2))
+    def test_chained_apply_passes_workflow():
+        # first qubit in |1>
+        qml.X(0)
+        # current state : |10>
+        qml.CNOT(wires=[0, 1])  # state after CNOT |11>
+        qml.SWAP(wires=[0, 1])  # state after SWAP |11>
+        return qml.expval(qml.PauliY(wires=0))
+
+    assert "disentangle-CNOT" in test_chained_apply_passes_workflow.mlir
+    assert "disentangle-SWAP" in test_chained_apply_passes_workflow.mlir
+
+    # both SWAP and CNOT should be removed by the disentangle passes
+    assert "CNOT" not in test_chained_apply_passes_workflow.mlir_opt
+    assert "SWAP" not in test_chained_apply_passes_workflow.mlir_opt
 
 
 def test_convert_clifford_to_ppr():

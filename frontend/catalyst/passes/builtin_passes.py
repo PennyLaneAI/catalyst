@@ -189,7 +189,7 @@ def disentangle_cnot(qnode):
         }
         func.func public @circuit_0() -> tensor<4xcomplex<f64>> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode} {
             %c0_i64 = arith.constant 0 : i64
-            quantum.device shots(%c0_i64) ["/Users/ritu.thombre/Desktop/catalyst/.venv/lib/python3.12/site-packages/pennylane_lightning/liblightning_qubit_catalyst.dylib", "LightningSimulator", "{'mcmc': False, 'num_burnin': 0, 'kernel_name': None}"]
+            quantum.device["catalyst/utils/../lib/librtd_lightning.dylib", "LightningSimulator", "{'shots': 0, 'mcmc': False, 'num_burnin': 0, 'kernel_name': None}"]
             %0 = quantum.alloc( 2) : !quantum.reg
             %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
             %out_qubits = quantum.custom "PauliX"() %1 : !quantum.bit
@@ -277,10 +277,10 @@ def disentangle_swap(qnode):
         func.func public @circuit_0() -> tensor<4xcomplex<f64>> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode} {
             %c0_i64 = arith.constant 0 : i64
             %cst = arith.constant 0.78539816339744828 : f64
-            quantum.device shots(%c0_i64) ["/Users/ritu.thombre/Desktop/catalyst/.venv/lib/python3.12/site-packages/pennylane_lightning/liblightning_qubit_catalyst.dylib", "LightningSimulator", "{'mcmc': False, 'num_burnin': 0, 'kernel_name': None}"]
+            quantum.device["catalyst/utils/../lib/librtd_lightning.dylib", "LightningSimulator", "{'shots': 0, 'mcmc': False, 'num_burnin': 0, 'kernel_name': None}"]
             %0 = quantum.alloc( 2) : !quantum.reg
             %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
-            %out_qubits = quantum.custom "PauliX"() %1 : !quantum.bit
+            %out_qubits = quantum.custom "PauliX"() %1 : !quantum.bit5
             %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
             %out_qubits_0 = quantum.custom "RX"(%cst) %2 : !quantum.bit
             %out_qubits_1 = quantum.custom "PauliX"() %out_qubits_0 : !quantum.bit
@@ -308,6 +308,11 @@ def disentangle_swap(qnode):
 
     .. code-block:: mlir
 
+        %0 = quantum.alloc( 2) : !quantum.reg
+        %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+        %out_qubits = quantum.custom "PauliX"() %1 : !quantum.bit5
+        %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+        %out_qubits_0 = quantum.custom "RX"(%cst) %2 : !quantum.bit
         %out_qubits_1 = quantum.custom "PauliX"() %out_qubits_0 : !quantum.bit
         %out_qubits_2:2 = quantum.custom "CNOT"() %out_qubits_1, %out_qubits : !quantum.bit, !quantum.bit
         %out_qubits_3:2 = quantum.custom "CNOT"() %out_qubits_2#1, %out_qubits_2#0 : !quantum.bit, !quantum.bit
