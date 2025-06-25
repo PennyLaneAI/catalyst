@@ -179,3 +179,38 @@ __all__ = (
     *_api_extension_list,
     *_autograph_functions,
 )
+
+
+import subprocess
+from viztracer import VizTracer
+
+class profiler:
+    def __init__(self, mode, tracer_entries=0, num_samples=0):
+        self.mode = None
+        self.py_tracer = None
+        if mode == "python":
+            self.mode = "python"
+            self.tracer_entries = tracer_entries
+        elif mode == "cpp":
+            pass
+        else:
+            raise "bad mode"
+
+    def __enter__(self):
+        if self.mode == "python":
+            self.py_tracer = VizTracer(tracer_entries=self.tracer_entries)
+            self.py_tracer.start()
+        elif self.mode == "cpp":
+            pass
+        else:
+            raise "bad mode"
+
+    def __exit__(self, *_, **__):
+        if self.mode == "python":
+            self.py_tracer.stop()
+            self.py_tracer.save("__py_result.json")
+            subprocess.run("vizviewer __py_result.json", shell=True)
+        elif self.mode == "cpp":
+            pass
+        else:
+            raise "bad mode"

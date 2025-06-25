@@ -31,3 +31,5 @@ nbmake
 pennylane-lightning-kokkos
 amazon-braket-pennylane-plugin>1.27.1
 xdsl
+
+viztracer
