@@ -575,7 +575,7 @@ LogicalResult runPipeline(PassManager &pm, const CompilerOptions &options, Compi
         llvm::raw_string_ostream s{tmp};
         OpPrintingFlags printFlags = OpPrintingFlags();
         if (options.emitDebugInfo) {
-            printFlags.enableDebugInfo(true, true);
+            printFlags.enableDebugInfo(true, false);
             printFlags.printValueUsers();
         }
         AsmState state(moduleOp, printFlags);
@@ -594,7 +594,7 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
         llvm::raw_string_ostream s{tmp};
         OpPrintingFlags printFlags = OpPrintingFlags();
         if (options.emitDebugInfo) {
-            printFlags.enableDebugInfo(true, true);
+            printFlags.enableDebugInfo(true, false);
             printFlags.printValueUsers();
         }
         AsmState state(moduleOp, printFlags);
@@ -743,7 +743,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         if (options.keepIntermediate) {
             OpPrintingFlags printFlags = OpPrintingFlags();
             if (options.emitDebugInfo) {
-                printFlags.enableDebugInfo(true, true);
+                printFlags.enableDebugInfo(true, false);
                 printFlags.printValueUsers();
             }
             AsmState state(*mlirModule, printFlags);
