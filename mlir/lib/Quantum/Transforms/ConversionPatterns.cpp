@@ -11,7 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
+static bool _showStats = false;
 #include <string>
 
 #include "mlir/Dialect/LLVMIR/FunctionCallUtils.h"
@@ -128,10 +128,14 @@ Value getModifiersPtr(Location loc, RewriterBase &rewriter, const TypeConverter 
 template <typename T> struct RTBasedPattern : public OpConversionPattern<T> {
     using OpConversionPattern<T>::OpConversionPattern;
 
-    bool _showStats;
+    // bool _showStats;
 
-    RTBasedPattern(TypeConverter &typeConverter, MLIRContext ctx, bool showStats) : RTBasedPattern(typeConverter, ctx), _showStats(showStats) {
-    }
+    // RTBasedPattern(TypeConverter &typeConverter, MLIRContext ctx, bool showStats)
+    // //: RTBasedPattern(typeConverter, ctx), _showStats(showStats) {
+    // : OpConversionPattern<T>(typeConverter, ctx)
+    // {
+    //     llvm::errs() << "pattern init: " << showStats << _showStats << "\n";
+    // }
 
     LogicalResult matchAndRewrite(T op, typename T::Adaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
@@ -170,7 +174,8 @@ template <typename T> struct RTBasedPattern : public OpConversionPattern<T> {
             qirName = "__catalyst__rt__finalize";
             auto i64 = IntegerType::get(ctx, 64);
             Location loc = op->getLoc();
-            auto showStats = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(this->_showStats));
+            //llvm::errs() << "show stats? " << _showStats << "\n";
+            auto showStats = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(_showStats));
             Type qirSignature = LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx), {i64});
             LLVM::LLVMFuncOp fnDecl =
                 catalyst::ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
@@ -1028,8 +1033,9 @@ namespace quantum {
 
 void populateQIRConversionPatterns(TypeConverter &typeConverter, RewritePatternSet &patterns, bool showStats)
 {
-    patterns.add<RTBasedPattern<InitializeOp>>(typeConverter, patterns.getContext(), showStats);
-    patterns.add<RTBasedPattern<FinalizeOp>>(typeConverter, patterns.getContext(), showStats);
+    _showStats = showStats;
+    patterns.add<RTBasedPattern<InitializeOp>>(typeConverter, patterns.getContext());
+    patterns.add<RTBasedPattern<FinalizeOp>>(typeConverter, patterns.getContext());
     patterns.add<DeviceInitOpPattern>(typeConverter, patterns.getContext());
     patterns.add<DeviceReleaseOpPattern>(typeConverter, patterns.getContext());
     patterns.add<NumQubitsOpPattern>(typeConverter, patterns.getContext());

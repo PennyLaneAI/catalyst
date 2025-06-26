@@ -721,6 +721,7 @@ class QJIT(CatalystCallable):
         dbg = debug_info("qjit_capture", self.user_function, args, kwargs)
 
         if qml.capture.enabled():
+            #breakpoint()
             with Patcher(
                 (
                     jax._src.interpreters.partial_eval,  # pylint: disable=protected-access
@@ -744,12 +745,13 @@ class QJIT(CatalystCallable):
             params["_out_tree_expected"] = []
             default_pass_pipeline = self.compile_options.circuit_transform_pipeline
             from catalyst import profiler
-            from catalyst.passes.xdsl_plugin import getXDSLPluginAbsolutePath
             if profiler.memory_mode:
+                raise RuntimeError("profiler's memory mode only supports from_plxpr pipeline")
+                from catalyst.passes.xdsl_plugin import getXDSLPluginAbsolutePath
                 self.compile_options.pass_plugins.update({getXDSLPluginAbsolutePath()})
             pass_pipeline = params.get("pass_pipeline", default_pass_pipeline)
-            from catalyst.passes.xdsl_plugin.transforms import ProfileMemory
             if profiler.memory_mode:
+                from catalyst.passes.xdsl_plugin.transforms import ProfileMemory
                 if pass_pipeline:
                     pass_pipeline = (*pass_pipeline, "profile-memory")
                 else:
