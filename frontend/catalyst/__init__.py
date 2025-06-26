@@ -185,32 +185,56 @@ import subprocess
 from viztracer import VizTracer
 
 class profiler:
-    def __init__(self, mode, tracer_entries=0, num_samples=0):
-        self.mode = None
+    def __init__(self, mode="idle", tracer_entries=5000000, num_samples=0):
+        self.mode = mode
+        if self.mode == "idle":
+            return
+
         self.py_tracer = None
         if mode == "python":
             self.mode = "python"
             self.tracer_entries = tracer_entries
+
         elif mode == "cpp":
-            pass
+            self.mode = "cpp"
+
         else:
             raise "bad mode"
 
     def __enter__(self):
+        if self.mode == "idle":
+            return
+
         if self.mode == "python":
             self.py_tracer = VizTracer(tracer_entries=self.tracer_entries)
             self.py_tracer.start()
+
         elif self.mode == "cpp":
             pass
+
         else:
             raise "bad mode"
 
     def __exit__(self, *_, **__):
+        if self.mode == "idle":
+            return
+
         if self.mode == "python":
             self.py_tracer.stop()
-            self.py_tracer.save("__py_result.json")
-            subprocess.run("vizviewer __py_result.json", shell=True)
+            filename = "__py_result.json"
+            self.py_tracer.save(filename)
+            subprocess.run(f"vizviewer {filename}", shell=True)
+
         elif self.mode == "cpp":
-            pass
+            filename = "perf_output.txt"
+            subprocess.run("sudo perf script -i __perf_qopt.data > perf_output.txt", shell=True)
+            print(f"""
+                To view the cpp profile, navigate to https://ui.perfetto.dev and
+                upload the {filename} file into the UI.
+                Once the trace opens, you should be able select either individual CPU samples
+                or ranges of time containing CPU samples to get a flamegraph of all the samples
+                in that region.
+                """)
+
         else:
             raise "bad mode"
