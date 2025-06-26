@@ -165,17 +165,25 @@ void __catalyst__host__rt__unrecoverable_error()
     RT_FAIL("Unrecoverable error from asynchronous execution of multiple quantum programs.");
 }
 
+
 void *_mlir_memref_to_llvm_alloc(size_t size)
 {
+    total_memory_consumption += size >> 3;
+    memory_tracker += size >> 3;
+    peak_memory_consumption = memory_tracker > peak_memory_consumption ? memory_tracker : peak_memory_consumption;
     void *ptr = malloc(size);
-    CTX->getMemoryManager()->insert(ptr);
+    CTX->getMemoryManager()->insert(ptr, size >> 3);
     return ptr;
 }
 
 void *_mlir_memref_to_llvm_aligned_alloc(size_t alignment, size_t size)
 {
+    total_memory_consumption += size >> 3;
+    memory_tracker += size >> 3;
+    peak_memory_consumption = memory_tracker > peak_memory_consumption ? memory_tracker : peak_memory_consumption;
     void *ptr = aligned_alloc(alignment, size);
-    CTX->getMemoryManager()->insert(ptr);
+    // Not really, true. Just approximation.
+    CTX->getMemoryManager()->insert(ptr, size >> 3);
     return ptr;
 }
 
@@ -190,6 +198,7 @@ bool _mlir_memory_transfer(void *ptr)
 
 void _mlir_memref_to_llvm_free(void *ptr)
 {
+    memory_tracker -= CTX->getMemoryManager()->at(ptr);
     CTX->getMemoryManager()->erase(ptr);
     free(ptr);
 }
@@ -246,10 +255,19 @@ void __catalyst__rt__print_tensor(OpaqueMemRefT *c_memref, bool printDescriptor)
 
 void __catalyst__rt__fail_cstr(const char *cstr) { RT_FAIL(cstr); }
 
-void __catalyst__rt__initialize(uint32_t *seed) { CTX = std::make_unique<ExecutionContext>(seed); }
+void __catalyst__rt__initialize(uint32_t *seed) { 
+    call_tree = new Tree("<main>");
+    CTX = std::make_unique<ExecutionContext>(seed);
+}
 
 void __catalyst__rt__finalize()
 {
+    delete call_tree;
+    fprintf(stdout, "\ntotal_memory_consumption = %lld bytes\n", total_memory_consumption << 3);
+    fprintf(stdout, "peak_memory_consumption = %lld bytes\n", peak_memory_consumption << 3);
+    total_memory_consumption = 0;
+    peak_memory_consumption = 0;
+    memory_tracker = 0;
     RTD_PTR = nullptr;
     CTX.reset(nullptr);
 }
