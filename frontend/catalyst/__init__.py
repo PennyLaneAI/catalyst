@@ -205,7 +205,18 @@ class profiler:
             self.mode = "passes"
 
         else:
-            raise "bad mode"
+            print("""
+    Unexpected mode.
+    Currently, catalyst.profiler supports the following modes:
+    - "python": returns the python profile. Non-python processes, for example the mlir passes,
+                the cpp runtime, and the internal device processes, are treated as blackboxes
+                from their corresponding Python callsites.
+    - "passes": returns the profile for the mlir passes in the Catalyst compiler.
+    - "ir": ...
+    - "cpp": ...
+    - "memory": ...
+            """)
+            raise RuntimeError("Bad mode")
 
     def __enter__(self):
         if self.mode == "idle":
@@ -218,8 +229,6 @@ class profiler:
         elif self.mode == "passes":
             pass
 
-        else:
-            raise "bad mode"
 
     def __exit__(self, *_, **__):
         if self.mode == "idle":
@@ -244,5 +253,3 @@ class profiler:
                 in that region.
                 """)
 
-        else:
-            raise "bad mode"
