@@ -299,6 +299,7 @@ def get_convert_to_llvm_stage(options: CompileOptions) -> List[str]:
     """Returns the list of passes that lowers MLIR upstream dialects to LLVM Dialect"""
 
     convert_to_llvm = [
+        "profiling",
         "qnode-to-async-lowering" if options.async_qnodes else None,
         "async-func-to-async-runtime" if options.async_qnodes else None,
         "async-to-async-runtime" if options.async_qnodes else None,
