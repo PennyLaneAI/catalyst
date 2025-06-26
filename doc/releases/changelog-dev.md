@@ -196,8 +196,9 @@
 * `static_argnums` on `qjit` can now be specified with program capture through PLxPR.
   [(#1810)](https://github.com/PennyLaneAI/catalyst/pull/1810)
 
-* Python frontend functions added to Catalyst for two MLIR passes and can be used to decorate a 
-  QNode using: :func:`~.passes.disentangle_cnot` and :func:`~.passes.disentangle_swap`. 
+* Two new Python pass decorators, :func:`~.passes.disentangle_cnot` and 
+  :func:`~.passes.disentangle_swap`, have been added. They apply their corresponding MLIR passes 
+  `--disentangle-CNOT` and `--disentangle-SWAP` respectively. 
   [(#1823)](https://github.com/PennyLaneAI/catalyst/pull/1823)
 
 <h3>Breaking changes 💔</h3>

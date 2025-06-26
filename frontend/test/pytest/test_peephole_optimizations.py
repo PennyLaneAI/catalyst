@@ -141,12 +141,12 @@ def test_pipeline_functionality(theta, backend):
 
 
 ### Test bad usages of pass decorators ###
-def test_cancel_inverses_bad_usages():
+def test_passes_bad_usages():
     """
     Tests that an error is raised when cancel_inverses is not used properly
     """
 
-    def test_cancel_inverses_not_on_qnode():
+    def test_passes_not_on_qnode():
         def classical_func():
             return 42.42
 
@@ -180,7 +180,7 @@ def test_cancel_inverses_bad_usages():
         ):
             disentangle_swap(classical_func)
 
-    test_cancel_inverses_not_on_qnode()
+    test_passes_not_on_qnode()
 
 
 def test_chained_passes():
@@ -231,12 +231,14 @@ def test_disentangle_passes():
         qml.SWAP(wires=[0, 1])  # state after SWAP |11>
         return qml.state()
 
-    assert "disentangle-CNOT" in circuit_with_disentangle_passes.mlir
-    assert "disentangle-SWAP" in circuit_with_disentangle_passes.mlir
+    input_mlir_string = circuit_with_disentangle_passes.mlir
+    assert "disentangle-CNOT" in input_mlir_string
+    assert "disentangle-SWAP" in input_mlir_string
 
     # both SWAP and CNOT should be removed by the disentangle passes
-    assert "CNOT" not in circuit_with_disentangle_passes.mlir_opt
-    assert "SWAP" not in circuit_with_disentangle_passes.mlir_opt
+    transformed_mlir_string = circuit_with_disentangle_passes.mlir_opt
+    assert "CNOT" not in transformed_mlir_string
+    assert "SWAP" not in transformed_mlir_string
 
     assert np.allclose(circuit_with_no_disentangle_passes(), circuit_with_disentangle_passes())
 
