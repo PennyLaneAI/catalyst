@@ -85,7 +85,6 @@ def qjit(
     async_qnodes=False,
     target="binary",
     keep_intermediate=False,
-    enable_debug_info=False,
     verbose=False,
     logfile=None,
     pipelines=None,

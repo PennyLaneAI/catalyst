@@ -338,7 +338,13 @@ def _options_to_cli_flags(options):
         extra_args += [("--load-dialect-plugin", plugin)]
     if options.checkpoint_stage:
         extra_args += [("--checkpoint-stage", options.checkpoint_stage)]
-    if options.enable_debug_info:
+    try:
+        f = open("__mode.txt", "r")
+        profiler_mode = f.read()
+        f.close()
+    except:
+        profiler_mode = "idle"
+    if profiler_mode == "ir":
         extra_args += ["--enable-debug-info"]
 
     if not options.lower_to_llvm:
@@ -533,12 +539,18 @@ class Compiler:
 
             compiler = PythonCompiler()
             mlir_module = compiler.run(mlir_module)
+        try:
+            f = open("__mode.txt", "r")
+            profiler_mode = f.read()
+            f.close()
+        except:
+            profiler_mode = "idle"
         return self.run_from_ir(
             mlir_module.operation.get_asm(
                 binary=False,
                 print_generic_op_form=False,
                 assume_verified=True,
-                enable_debug_info=self.options.enable_debug_info,
+                enable_debug_info=profiler_mode == "ir",
             ),
             str(mlir_module.operation.attributes["sym_name"]).replace('"', ""),
             *args,
