@@ -190,6 +190,12 @@ class profiler:
         if self.mode == "idle":
             return
 
+        # Just communicate the mode through OS
+        # This is hackweek, no need for fancy context managers...
+        file = open("__mode.txt", 'w')
+        file.write(self.mode)
+        file.close()
+
         self.py_tracer = None
         if mode == "python":
             self.mode = "python"
@@ -218,6 +224,8 @@ class profiler:
     def __exit__(self, *_, **__):
         if self.mode == "idle":
             return
+
+        subprocess.run("rm -rf __mode.txt", shell=True)
 
         if self.mode == "python":
             self.py_tracer.stop()
