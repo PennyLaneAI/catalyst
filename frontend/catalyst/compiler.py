@@ -445,6 +445,7 @@ class Compiler:
         try:
             f = open("__mode.txt", "r")
             profiler_mode = f.read()
+            f.close()
         except:
             profiler_mode = "idle"
         if profiler_mode == "passes":
