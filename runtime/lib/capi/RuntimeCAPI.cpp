@@ -165,17 +165,33 @@ void __catalyst__host__rt__unrecoverable_error()
     RT_FAIL("Unrecoverable error from asynchronous execution of multiple quantum programs.");
 }
 
+void add_new_frame_0(const char* name) {
+    call_tree = call_tree->add_child(call_tree->_frame_name + "/" + std::string(name));
+}
+
+void rm_frame_0() {
+    call_tree = call_tree->_parent;
+}
+
+
 void *_mlir_memref_to_llvm_alloc(size_t size)
 {
+    call_tree->_total_memory_consumption += size >> 3;
+    call_tree->_memory_tracker += size >> 3;
+    call_tree->_peak_memory_consumption = call_tree->_memory_tracker > call_tree->_peak_memory_consumption ? call_tree->_memory_tracker : call_tree->_peak_memory_consumption;
     void *ptr = malloc(size);
-    CTX->getMemoryManager()->insert(ptr);
+    CTX->getMemoryManager()->insert(ptr, size >> 3);
     return ptr;
 }
 
 void *_mlir_memref_to_llvm_aligned_alloc(size_t alignment, size_t size)
 {
+    call_tree->_total_memory_consumption += size >> 3;
+    call_tree->_memory_tracker += size >> 3;
+    call_tree->_peak_memory_consumption = call_tree->_memory_tracker > call_tree->_peak_memory_consumption ? call_tree->_memory_tracker : call_tree->_peak_memory_consumption;
     void *ptr = aligned_alloc(alignment, size);
-    CTX->getMemoryManager()->insert(ptr);
+    // Not really, true. Just approximation.
+    CTX->getMemoryManager()->insert(ptr, size >> 3);
     return ptr;
 }
 
@@ -190,6 +206,7 @@ bool _mlir_memory_transfer(void *ptr)
 
 void _mlir_memref_to_llvm_free(void *ptr)
 {
+    call_tree->_memory_tracker -= CTX->getMemoryManager()->at(ptr);
     CTX->getMemoryManager()->erase(ptr);
     free(ptr);
 }
@@ -246,10 +263,17 @@ void __catalyst__rt__print_tensor(OpaqueMemRefT *c_memref, bool printDescriptor)
 
 void __catalyst__rt__fail_cstr(const char *cstr) { RT_FAIL(cstr); }
 
-void __catalyst__rt__initialize(uint32_t *seed) { CTX = std::make_unique<ExecutionContext>(seed); }
+void __catalyst__rt__initialize(uint32_t *seed) { 
+    call_tree = new Tree("<main>");
+    CTX = std::make_unique<ExecutionContext>(seed);
+}
 
-void __catalyst__rt__finalize()
+void __catalyst__rt__finalize(bool showStats)
 {
+    if (showStats) {
+        call_tree->show_stats();
+    }
+    delete call_tree;
     RTD_PTR = nullptr;
     CTX.reset(nullptr);
 }

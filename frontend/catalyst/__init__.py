@@ -185,6 +185,8 @@ import subprocess
 from viztracer import VizTracer
 
 class profiler:
+    memory_mode = None
+
     def __init__(self, mode="idle", tracer_entries=5000000, num_samples=0):
         self.mode = mode
         if self.mode == "idle":
@@ -203,6 +205,9 @@ class profiler:
 
         elif mode == "passes":
             self.mode = "passes"
+
+        elif mode == "memory":
+            profiler.memory_mode = "memory"
 
         else:
             print("""

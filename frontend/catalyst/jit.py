@@ -496,6 +496,7 @@ def qjit(
     kwargs = copy.copy(locals())
     kwargs.pop("fn")
 
+
     if fn is None:
         return functools.partial(qjit, **kwargs)
 
@@ -742,7 +743,17 @@ class QJIT(CatalystCallable):
             params["static_argnums"] = kwargs.pop("static_argnums", static_argnums)
             params["_out_tree_expected"] = []
             default_pass_pipeline = self.compile_options.circuit_transform_pipeline
+            from catalyst import profiler
+            from catalyst.passes.xdsl_plugin import getXDSLPluginAbsolutePath
+            if profiler.memory_mode:
+                self.compile_options.pass_plugins.update({getXDSLPluginAbsolutePath()})
             pass_pipeline = params.get("pass_pipeline", default_pass_pipeline)
+            from catalyst.passes.xdsl_plugin.transforms import ProfileMemory
+            if profiler.memory_mode:
+                if pass_pipeline:
+                    pass_pipeline = (*pass_pipeline, "profile-memory")
+                else:
+                    pass_pipeline = ("profile-memory")
             params["pass_pipeline"] = pass_pipeline
             params["debug_info"] = dbg
 

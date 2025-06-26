@@ -426,10 +426,7 @@ def handle_subroutine(self, *args, **kwargs):
         return converter.qreg_manager.get(), *retvals
 
     if not transformed:
-        converted_jaxpr_branch = jax.make_jaxpr(wrapper)(self.qreg_manager.get(), *args).jaxpr
-        converted_closed_jaxpr_branch = ClosedJaxpr(
-            convert_constvars_jaxpr(converted_jaxpr_branch), ()
-        )
+        converted_closed_jaxpr_branch = jax.make_jaxpr(wrapper)(self.qreg_manager.get(), *args)
         self.subroutine_cache[plxpr] = converted_closed_jaxpr_branch
     else:
         converted_closed_jaxpr_branch = transformed
