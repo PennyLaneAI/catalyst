@@ -26,11 +26,14 @@ with catalyst.profiler("memory"):
 # Currently only works with PLxPR due to the use
 # of subroutines
 with catalyst.profiler("memory"):
+
     qml.capture.enable()
+
     @qml.qjit
     @qml.qnode(qml.device("null.qubit", wires=1))
     def foo():
         return qml.probs()
 
     foo()
+
     qml.capture.disable()
