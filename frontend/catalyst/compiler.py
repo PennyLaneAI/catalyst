@@ -443,6 +443,20 @@ class Compiler:
         output_ir_name = os.path.join(str(workspace), f"{module_name}.ll")
 
         cmd = self.get_cli_command(tmp_infile_name, output_ir_name, module_name, workspace)
+
+        try:
+            f = open("__mode.txt", "r")
+            profiler_mode = f.read()
+            f.close()
+        except:
+            profiler_mode = "idle"
+        if profiler_mode == "passes":
+            # perf command is
+            # sudo -E perf record -F 999 -g --call-graph dwarf -o perf.data python3 play.py
+            _perf_cmd = ['sudo', '-E', 'perf', 'record', '-F', '999', '-g', '--call-graph',
+                            'dwarf', '-o', '__perf_qopt.data']
+            cmd = _perf_cmd + cmd
+
         try:
             if self.options.verbose:
                 print(f"[SYSTEM] {' '.join(cmd)}", file=self.options.logfile)
