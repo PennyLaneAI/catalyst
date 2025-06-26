@@ -268,9 +268,11 @@ void __catalyst__rt__initialize(uint32_t *seed) {
     CTX = std::make_unique<ExecutionContext>(seed);
 }
 
-void __catalyst__rt__finalize()
+void __catalyst__rt__finalize(bool showStats)
 {
-    call_tree->show_stats();
+    if (showStats) {
+        call_tree->show_stats();
+    }
     delete call_tree;
     RTD_PTR = nullptr;
     CTX.reset(nullptr);

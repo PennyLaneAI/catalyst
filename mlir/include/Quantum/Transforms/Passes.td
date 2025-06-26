@@ -21,8 +21,13 @@ def QuantumConversionPass : Pass<"convert-quantum-to-llvm"> {
     let summary = "Perform a dialect conversion from Quantum to LLVM (QIR).";
 
     let dependentDialects = ["LLVM::LLVMDialect"];
-
     let constructor = "catalyst::createQuantumConversionPass()";
+    let options = [
+    Option<"ShowStats", "show-stats",
+           "bool", /*default=*/"false",
+           "print heap allocations.">,
+    ];
+
 }
 
 def EmitCatalystPyInterfacePass : Pass<"emit-catalyst-py-interface"> {

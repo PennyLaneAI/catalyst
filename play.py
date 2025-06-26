@@ -25,7 +25,7 @@ with catalyst.profiler("memory"):
 
 # Currently only works with PLxPR due to the use
 # of subroutines
-with catalyst.profiler("memory"):
+with catalyst.profiler():
 
     qml.capture.enable()
 
