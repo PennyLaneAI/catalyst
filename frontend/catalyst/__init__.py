@@ -201,8 +201,8 @@ class profiler:
             self.mode = "python"
             self.tracer_entries = tracer_entries
 
-        elif mode == "cpp":
-            self.mode = "cpp"
+        elif mode == "passes":
+            self.mode = "passes"
 
         else:
             raise "bad mode"
@@ -215,7 +215,7 @@ class profiler:
             self.py_tracer = VizTracer(tracer_entries=self.tracer_entries)
             self.py_tracer.start()
 
-        elif self.mode == "cpp":
+        elif self.mode == "passes":
             pass
 
         else:
@@ -233,11 +233,11 @@ class profiler:
             self.py_tracer.save(filename)
             subprocess.run(f"vizviewer {filename}", shell=True)
 
-        elif self.mode == "cpp":
+        elif self.mode == "passes":
             filename = "perf_output.txt"
             subprocess.run("sudo perf script -i __perf_qopt.data > perf_output.txt", shell=True)
             print(f"""
-                To view the cpp profile, navigate to https://ui.perfetto.dev and
+                To view the profile, navigate to https://ui.perfetto.dev and
                 upload the {filename} file into the UI.
                 Once the trace opens, you should be able select either individual CPU samples
                 or ranges of time containing CPU samples to get a flamegraph of all the samples

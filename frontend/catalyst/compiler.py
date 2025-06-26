@@ -447,7 +447,7 @@ class Compiler:
             profiler_mode = f.read()
         except:
             profiler_mode = "idle"
-        if profiler_mode == "cpp":
+        if profiler_mode == "passes":
             # perf command is
             # sudo -E perf record -F 999 -g --call-graph dwarf -o perf.data python3 play.py
             _perf_cmd = ['sudo', '-E', 'perf', 'record', '-F', '999', '-g', '--call-graph',
