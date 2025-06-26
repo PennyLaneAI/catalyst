@@ -22,6 +22,45 @@
 extern "C" {
 #endif
 
+static long long total_memory_consumption = 0;
+static long long memory_tracker = 0;
+static long long peak_memory_consumption = 0;
+static int pystdout = 0;
+
+struct Tree {
+  std::string _frame_name;
+  long long _total_memory_consumption;
+  long long _memory_tracker;
+  long long _peak_memory_consumption;
+  std::vector<Tree *> _children;
+  Tree *_parent;
+  Tree(std::string name) : _frame_name(name),
+	_total_memory_consumption(0),
+	_memory_tracker(0),
+	_peak_memory_consumption(0),
+	_parent(nullptr)
+  {
+  }
+
+  ~Tree() {
+    for (auto child: _children) {
+        delete child;
+    }
+  }
+
+  Tree *add_child(std::string child_name) {
+    auto child = new Tree(child_name);
+    _children.push_back(child);
+    return child;
+  }
+};
+
+struct Tree* call_tree = nullptr;
+
+void set_pystdout(int _stdout) {
+	pystdout = _stdout;
+}
+
 // Quantum Runtime Instructions
 void __catalyst__rt__fail_cstr(const char *);
 void __catalyst__rt__initialize(uint32_t *);
