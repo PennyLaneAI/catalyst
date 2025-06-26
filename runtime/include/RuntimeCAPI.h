@@ -50,16 +50,21 @@ struct Tree {
 
   Tree *add_child(std::string child_name) {
     auto child = new Tree(child_name);
+    child->_parent = this;
     _children.push_back(child);
     return child;
+  }
+
+  void show_stats() {
+    fprintf(stdout, "%s total memory %lld\n", this->_frame_name.c_str(), this->_total_memory_consumption << 3);
+    fprintf(stdout, "%s peak memory %lld\n", this->_frame_name.c_str(), this->_peak_memory_consumption << 3);
+    for (auto child: _children) {
+	 child->show_stats();
+    }
   }
 };
 
 struct Tree* call_tree = nullptr;
-
-void set_pystdout(int _stdout) {
-	pystdout = _stdout;
-}
 
 // Quantum Runtime Instructions
 void __catalyst__rt__fail_cstr(const char *);

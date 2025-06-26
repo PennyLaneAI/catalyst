@@ -165,12 +165,20 @@ void __catalyst__host__rt__unrecoverable_error()
     RT_FAIL("Unrecoverable error from asynchronous execution of multiple quantum programs.");
 }
 
+void add_new_frame_0(const char* name) {
+    call_tree = call_tree->add_child(call_tree->_frame_name + "/" + std::string(name));
+}
+
+void rm_frame_0() {
+    call_tree = call_tree->_parent;
+}
+
 
 void *_mlir_memref_to_llvm_alloc(size_t size)
 {
-    total_memory_consumption += size >> 3;
-    memory_tracker += size >> 3;
-    peak_memory_consumption = memory_tracker > peak_memory_consumption ? memory_tracker : peak_memory_consumption;
+    call_tree->_total_memory_consumption += size >> 3;
+    call_tree->_memory_tracker += size >> 3;
+    call_tree->_peak_memory_consumption = call_tree->_memory_tracker > call_tree->_peak_memory_consumption ? call_tree->_memory_tracker : call_tree->_peak_memory_consumption;
     void *ptr = malloc(size);
     CTX->getMemoryManager()->insert(ptr, size >> 3);
     return ptr;
@@ -178,9 +186,9 @@ void *_mlir_memref_to_llvm_alloc(size_t size)
 
 void *_mlir_memref_to_llvm_aligned_alloc(size_t alignment, size_t size)
 {
-    total_memory_consumption += size >> 3;
-    memory_tracker += size >> 3;
-    peak_memory_consumption = memory_tracker > peak_memory_consumption ? memory_tracker : peak_memory_consumption;
+    call_tree->_total_memory_consumption += size >> 3;
+    call_tree->_memory_tracker += size >> 3;
+    call_tree->_peak_memory_consumption = call_tree->_memory_tracker > call_tree->_peak_memory_consumption ? call_tree->_memory_tracker : call_tree->_peak_memory_consumption;
     void *ptr = aligned_alloc(alignment, size);
     // Not really, true. Just approximation.
     CTX->getMemoryManager()->insert(ptr, size >> 3);
@@ -198,7 +206,7 @@ bool _mlir_memory_transfer(void *ptr)
 
 void _mlir_memref_to_llvm_free(void *ptr)
 {
-    memory_tracker -= CTX->getMemoryManager()->at(ptr);
+    call_tree->_memory_tracker -= CTX->getMemoryManager()->at(ptr);
     CTX->getMemoryManager()->erase(ptr);
     free(ptr);
 }
@@ -262,12 +270,8 @@ void __catalyst__rt__initialize(uint32_t *seed) {
 
 void __catalyst__rt__finalize()
 {
+    call_tree->show_stats();
     delete call_tree;
-    fprintf(stdout, "\ntotal_memory_consumption = %lld bytes\n", total_memory_consumption << 3);
-    fprintf(stdout, "peak_memory_consumption = %lld bytes\n", peak_memory_consumption << 3);
-    total_memory_consumption = 0;
-    peak_memory_consumption = 0;
-    memory_tracker = 0;
     RTD_PTR = nullptr;
     CTX.reset(nullptr);
 }
