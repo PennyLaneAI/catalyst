@@ -25,7 +25,6 @@ import pennylane as qml
 from jax._src.sharding_impls import UNSPECIFIED
 from jax.extend.core import ClosedJaxpr, Jaxpr
 from jax.extend.linear_util import wrap_init
-from jax.interpreters.partial_eval import convert_constvars_jaxpr
 from pennylane.capture import PlxprInterpreter, qnode_prim
 from pennylane.capture.expand_transforms import ExpandTransformsInterpreter
 from pennylane.capture.primitives import measure_prim as plxpr_measure_prim
