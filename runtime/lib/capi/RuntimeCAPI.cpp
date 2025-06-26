@@ -21,6 +21,10 @@
 #include <stdexcept>
 #include <string_view>
 #include <tuple>
+#include <chrono>
+#include <unordered_map>
+#include <iostream>
+#include <iomanip>
 
 #include "mlir/ExecutionEngine/CRunnerUtils.h"
 
@@ -46,6 +50,9 @@ static std::unique_ptr<ExecutionContext> CTX = nullptr;
  * @brief Thread local device pointer with internal linkage.
  */
 thread_local static RTDevice *RTD_PTR = nullptr;
+
+// Profiler globals
+static std::unordered_map<std::string, int64_t> profiler_location_stats;
 
 bool getModifiersAdjoint(const Modifiers *modifiers)
 {
@@ -109,8 +116,7 @@ static void autoQubitManagementAllocate(std::vector<QubitIdType> *qubit_vector_p
     // and encountered a new user wire index
     // `idx` is the new user wire index from frontend pennylane
     // number of currently allocated qubits is `qubit_vector_ptr->size()`
-    QirArray *new_qubits = __catalyst__rt__qubit_allocate_array(
-        idx + 1 - static_cast<int64_t>(qubit_vector_ptr->size()));
+    QirArray *new_qubits = __catalyst__rt__qubit_allocate_array(idx + 1 - static_cast<int64_t>(qubit_vector_ptr->size()));
     std::vector<QubitIdType> *new_qubits_vector =
         reinterpret_cast<std::vector<QubitIdType> *>(new_qubits);
     qubit_vector_ptr->insert(qubit_vector_ptr->end(), new_qubits_vector->begin(),
@@ -414,6 +420,70 @@ RESULT *__catalyst__rt__result_get_one() { return const_cast<RESULT *>(&GLOBAL_R
 RESULT *__catalyst__rt__result_get_zero()
 {
     return const_cast<RESULT *>(&GLOBAL_RESULT_FALSE_CONST);
+}
+
+// Profiler Runtime Functions
+int64_t __catalyst__rt__profiler_get_timestamp()
+{
+    auto now = std::chrono::high_resolution_clock::now();
+    auto duration = now.time_since_epoch();
+    return std::chrono::duration_cast<std::chrono::nanoseconds>(duration).count();
+}
+
+void __catalyst__rt__profiler_record(const char* file_name, uint32_t line, uint32_t column, int64_t start_time, int64_t end_time) {
+    int64_t duration = end_time - start_time;
+    
+    std::string identifier(file_name ? file_name : "unknown");
+    auto it = profiler_location_stats.find(identifier);
+    if (it != profiler_location_stats.end()) {
+        it->second += duration;
+    } else {
+        profiler_location_stats[identifier] = duration;
+    }
+}
+
+void __catalyst__rt__profiler_print_stats()
+{    
+    std::cout << "\n=== PROFILER STATISTICS (by Operation Type) ===" << std::endl;
+    if (profiler_location_stats.empty()) {
+        std::cout << "No profiling data collected." << std::endl;
+        return;
+    }
+    
+    // Calculate total time across all locations
+    int64_t total_time = 0;
+    for (const auto& pair : profiler_location_stats) {
+        total_time += pair.second;
+    }
+    
+    // Sort by total time
+    std::vector<std::pair<std::string, int64_t>> sorted_stats;
+    for (const auto& pair : profiler_location_stats) {
+        sorted_stats.push_back(pair);
+    }
+    std::sort(sorted_stats.begin(), sorted_stats.end(), 
+              [](const auto& a, const auto& b) { return a.second > b.second; });
+    
+    std::cout << std::left << std::setw(100) << "Operation & Location" 
+              << std::right << std::setw(15) << "Total Time (ms)" 
+              << std::setw(15) << "Percentage" << std::endl;
+    std::cout << std::string(130, '-') << std::endl;
+    
+    for (const auto& pair : sorted_stats) {
+        double time_ms = static_cast<double>(pair.second) / 1e6;
+        double percentage = (static_cast<double>(pair.second) / total_time) * 100.0;
+        
+        std::string identifier = pair.first;        
+        std::cout << std::left << std::setw(100) << identifier
+                  << std::right << std::setw(15) << std::fixed << std::setprecision(3) << time_ms
+                  << std::setw(15) << std::fixed << std::setprecision(2) << percentage << "%" << std::endl;
+    }
+    std::cout << std::string(130, '-') << std::endl;
+    double total_ms = static_cast<double>(total_time) / 1e6;
+    std::cout << std::left << std::setw(100) << "TOTAL"
+              << std::right << std::setw(15) << std::fixed << std::setprecision(3) << total_ms
+              << std::setw(15) << "100.00%" << std::endl;
+    std::cout << "================================================" << std::endl << std::endl;
 }
 
 void __catalyst__qis__Gradient(int64_t numResults, /* results = */...)
