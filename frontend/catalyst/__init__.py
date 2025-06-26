@@ -253,3 +253,8 @@ class profiler:
                 in that region.
                 """)
 
+import jax
+import pennylane
+
+jax.extend.source_info_util.register_exclusion(dirname(__file__))
+jax.extend.source_info_util.register_exclusion(dirname(pennylane.__file__))
