@@ -204,6 +204,9 @@ class profiler:
         elif mode == "passes":
             self.mode = "passes"
 
+        elif mode == "memory":
+            self.mode = "memory"
+
         else:
             print("""
     Unexpected mode.
