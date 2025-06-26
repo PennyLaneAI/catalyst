@@ -521,7 +521,10 @@ class Compiler:
             mlir_module = compiler.run(mlir_module)
         return self.run_from_ir(
             mlir_module.operation.get_asm(
-                binary=False, print_generic_op_form=False, assume_verified=True, enable_debug_info=self.options.enable_debug_info
+                binary=False,
+                print_generic_op_form=False,
+                assume_verified=True,
+                enable_debug_info=self.options.enable_debug_info,
             ),
             str(mlir_module.operation.attributes["sym_name"]).replace('"', ""),
             *args,

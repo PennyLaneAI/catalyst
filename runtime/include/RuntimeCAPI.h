@@ -38,7 +38,8 @@ int8_t *__catalyst__rt__array_get_element_ptr_1d(QirArray *, int64_t);
 
 // Profiling functions
 int64_t __catalyst__rt__profiler_get_timestamp();
-void __catalyst__rt__profiler_record(const char* file_name, uint32_t line, uint32_t column, int64_t start_time, int64_t end_time);
+void __catalyst__rt__profiler_record(const char *file_name, uint32_t line, uint32_t column,
+                                     int64_t start_time, int64_t end_time);
 void __catalyst__rt__profiler_print_stats();
 
 QUBIT *__catalyst__rt__qubit_allocate();

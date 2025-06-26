@@ -579,7 +579,7 @@ LogicalResult runPipeline(PassManager &pm, const CompilerOptions &options, Compi
             printFlags.printValueUsers();
         }
         AsmState state(moduleOp, printFlags);
-            moduleOp->print(s, state);
+        moduleOp->print(s, state);
         dumpToFile(options, output.nextPipelineDumpFilename(pipeline.getName(), ".mlir"), tmp);
     }
     return success();
