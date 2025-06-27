@@ -61,6 +61,8 @@ struct CompilerOptions {
     llvm::raw_ostream &diagnosticStream;
     /// If specified, the driver will output the module after each pipeline or each pass.
     SaveTemps keepIntermediate;
+    /// If true, the driver will emit debug information in the LLVM IR.
+    bool emitDebugInfo;
     /// If true, the llvm.coroutine will be lowered.
     bool asyncQnodes;
     /// Sets the verbosity level to use when printing messages.

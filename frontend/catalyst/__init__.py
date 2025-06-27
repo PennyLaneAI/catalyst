@@ -205,6 +205,9 @@ class profiler:
 
         elif mode == "passes":
             self.mode = "passes"
+            
+        elif mode == "ir":
+            self.mode = "ir"
 
         elif mode == "memory":
             profiler.memory_mode = "memory"
@@ -217,7 +220,7 @@ class profiler:
                 the cpp runtime, and the internal device processes, are treated as blackboxes
                 from their corresponding Python callsites.
     - "passes": returns the profile for the mlir passes in the Catalyst compiler.
-    - "ir": ...
+    - "ir": returns the runtime profile for the mlir IR based on debug location information.
     - "cpp": ...
     - "memory": ...
             """)
@@ -232,6 +235,9 @@ class profiler:
             self.py_tracer.start()
 
         elif self.mode == "passes":
+            pass
+        
+        elif self.mode == "ir":
             pass
 
 
@@ -258,3 +264,8 @@ class profiler:
                 in that region.
                 """)
 
+import jax
+import pennylane
+
+jax.extend.source_info_util.register_exclusion(dirname(__file__))
+jax.extend.source_info_util.register_exclusion(dirname(pennylane.__file__))

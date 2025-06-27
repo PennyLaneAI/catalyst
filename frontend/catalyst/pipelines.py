@@ -238,6 +238,14 @@ def get_hlo_lowering_stage(_options: CompileOptions) -> List[str]:
         "detensorize-scf",
         "canonicalize",
     ]
+    try:
+        f = open("__mode.txt", "r")
+        profiler_mode = f.read()
+        f.close()
+    except:
+        profiler_mode = "idle"
+    if profiler_mode == "ir":
+        hlo_lowering.insert(0, "profiling")
     return hlo_lowering
 
 
@@ -245,12 +253,20 @@ def get_quantum_compilation_stage(options: CompileOptions) -> List[str]:
     """Returns the list of passes that performs quantum transformations"""
 
     quantum_compilation = [
-        "annotate-function",
+        # "annotate-function",
         "lower-mitigation",
         "lower-gradients",
         "adjoint-lowering",
         "disable-assertion" if options.disable_assertions else None,
     ]
+    try:
+        f = open("__mode.txt", "r")
+        profiler_mode = f.read()
+        f.close()
+    except:
+        profiler_mode = "idle"
+    if profiler_mode != "ir":
+        quantum_compilation.insert(0, "annotate-function")
     return list(filter(partial(is_not, None), quantum_compilation))
 
 
@@ -347,6 +363,14 @@ def get_convert_to_llvm_stage(options: CompileOptions) -> List[str]:
         "gep-inbounds",
         "register-inactive-callback",
     ]
+    try:
+        f = open("__mode.txt", "r")
+        profiler_mode = f.read()
+        f.close()
+    except:
+        profiler_mode = "idle"
+    if profiler_mode == "ir":
+        convert_to_llvm.append("ensure-debug-info-scope-on-llvm-func")        
     return list(filter(partial(is_not, None), convert_to_llvm))
 
 
