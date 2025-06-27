@@ -344,7 +344,7 @@ def _options_to_cli_flags(options):
         f.close()
     except:
         profiler_mode = "idle"
-    if profiler_mode == "ir":
+    if profiler_mode == "user runtime":
         extra_args += ["--enable-debug-info"]
 
     if not options.lower_to_llvm:
@@ -456,7 +456,7 @@ class Compiler:
             f.close()
         except:
             profiler_mode = "idle"
-        if profiler_mode == "passes":
+        if profiler_mode == "compiler":
             # perf command is
             # sudo -E perf record -F 999 -g --call-graph dwarf -o perf.data python3 play.py
             _perf_cmd = [
@@ -561,7 +561,7 @@ class Compiler:
                 binary=False,
                 print_generic_op_form=False,
                 assume_verified=True,
-                enable_debug_info=profiler_mode == "ir",
+                enable_debug_info=profiler_mode == "user runtime",
             ),
             str(mlir_module.operation.attributes["sym_name"]).replace('"', ""),
             *args,

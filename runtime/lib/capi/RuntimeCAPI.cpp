@@ -181,28 +181,22 @@ void rm_frame_0() { call_tree = call_tree->_parent; }
 
 void *_mlir_memref_to_llvm_alloc(size_t size)
 {
-    call_tree->_total_memory_consumption += size >> 3;
-    call_tree->_memory_tracker += size >> 3;
-    call_tree->_peak_memory_consumption =
-        call_tree->_memory_tracker > call_tree->_peak_memory_consumption
-            ? call_tree->_memory_tracker
-            : call_tree->_peak_memory_consumption;
+    call_tree->_total_memory_consumption += size;
+    call_tree->_memory_tracker += size;
+    call_tree->_peak_memory_consumption = call_tree->_memory_tracker > call_tree->_peak_memory_consumption ? call_tree->_memory_tracker : call_tree->_peak_memory_consumption;
     void *ptr = malloc(size);
-    CTX->getMemoryManager()->insert(ptr, size >> 3);
+    CTX->getMemoryManager()->insert(ptr, size);
     return ptr;
 }
 
 void *_mlir_memref_to_llvm_aligned_alloc(size_t alignment, size_t size)
 {
-    call_tree->_total_memory_consumption += size >> 3;
-    call_tree->_memory_tracker += size >> 3;
-    call_tree->_peak_memory_consumption =
-        call_tree->_memory_tracker > call_tree->_peak_memory_consumption
-            ? call_tree->_memory_tracker
-            : call_tree->_peak_memory_consumption;
+    call_tree->_total_memory_consumption += size;
+    call_tree->_memory_tracker += size;
+    call_tree->_peak_memory_consumption = call_tree->_memory_tracker > call_tree->_peak_memory_consumption ? call_tree->_memory_tracker : call_tree->_peak_memory_consumption;
     void *ptr = aligned_alloc(alignment, size);
     // Not really, true. Just approximation.
-    CTX->getMemoryManager()->insert(ptr, size >> 3);
+    CTX->getMemoryManager()->insert(ptr, size);
     return ptr;
 }
 
@@ -477,7 +471,7 @@ void __catalyst__rt__profiler_record(const char *file_name, uint32_t line, uint3
 
 void __catalyst__rt__profiler_print_stats()
 {
-    std::cout << "\n=== PROFILER STATISTICS (by Operation Type) ===" << std::endl;
+    std::cout << "\n=== PROFILER STATISTICS ===" << std::endl;
     if (profiler_location_stats.empty()) {
         std::cout << "No profiling data collected." << std::endl;
         return;

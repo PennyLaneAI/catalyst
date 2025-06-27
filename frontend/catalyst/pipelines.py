@@ -244,7 +244,7 @@ def get_hlo_lowering_stage(_options: CompileOptions) -> List[str]:
         f.close()
     except:
         profiler_mode = "idle"
-    if profiler_mode == "ir":
+    if profiler_mode == "user runtime":
         hlo_lowering.insert(0, "profiling")
     return hlo_lowering
 
@@ -265,7 +265,7 @@ def get_quantum_compilation_stage(options: CompileOptions) -> List[str]:
         f.close()
     except:
         profiler_mode = "idle"
-    if profiler_mode != "ir":
+    if profiler_mode != "user runtime":
         quantum_compilation.insert(0, "annotate-function")
     return list(filter(partial(is_not, None), quantum_compilation))
 
@@ -314,8 +314,7 @@ def get_convert_to_llvm_stage(options: CompileOptions) -> List[str]:
     """Returns the list of passes that lowers MLIR upstream dialects to LLVM Dialect"""
 
     from catalyst import profiler
-
-    profile_memory = "{show-stats}" if profiler.memory_mode == "memory" else ""
+    profile_memory = "{show-stats}" if profiler.memory_mode == "user memory" else ""
 
     convert_to_llvm = [
         "qnode-to-async-lowering" if options.async_qnodes else None,
@@ -370,8 +369,8 @@ def get_convert_to_llvm_stage(options: CompileOptions) -> List[str]:
         f.close()
     except:
         profiler_mode = "idle"
-    if profiler_mode == "ir":
-        convert_to_llvm.append("ensure-debug-info-scope-on-llvm-func")
+    if profiler_mode == "user runtime":
+        convert_to_llvm.append("ensure-debug-info-scope-on-llvm-func")        
     return list(filter(partial(is_not, None), convert_to_llvm))
 
 
