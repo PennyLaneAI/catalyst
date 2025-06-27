@@ -45,10 +45,7 @@ from pennylane.transforms import merge_rotations
 
 from catalyst import measure, qjit
 from catalyst.device import QJITDevice
-from catalyst.device.decomposition import (
-    measurements_from_counts,
-    measurements_from_samples,
-)
+from catalyst.device.decomposition import measurements_from_counts, measurements_from_samples
 from catalyst.utils.exceptions import CompileError
 
 # pylint: disable=too-many-lines,line-too-long

@@ -93,7 +93,7 @@ test_runner: configure
 
 .PHONY: test
 test: CODE_COVERAGE=OFF
-test: BUILD_TYPE?=RelWithDebInfo
+test: BUILD_TYPE?=DEBUG
 test: test_runner
 	@echo "Catalyst runtime test suite - NullQubit"
 	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_qir_runtime

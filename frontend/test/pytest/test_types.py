@@ -20,10 +20,7 @@ import pytest
 from jax._src.lib.mlir import ir
 from jax.core import ShapedArray
 
-from catalyst.utils.types import (
-    convert_numpy_dtype_to_mlir,
-    convert_pytype_to_shaped_array,
-)
+from catalyst.utils.types import convert_numpy_dtype_to_mlir, convert_pytype_to_shaped_array
 
 ctx = ir.Context()
 f64 = ir.F64Type.get(ctx)

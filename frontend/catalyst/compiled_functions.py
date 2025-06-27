@@ -16,6 +16,9 @@
 
 import ctypes
 import logging
+import os
+import subprocess
+import sys
 from dataclasses import dataclass
 from typing import Tuple
 
@@ -23,11 +26,7 @@ import jax.numpy as jnp
 import numpy as np
 from jax.interpreters import mlir
 from jax.tree_util import PyTreeDef, tree_flatten, tree_unflatten
-from mlir_quantum.runtime import (
-    as_ctype,
-    make_nd_memref_descriptor,
-    make_zero_d_memref_descriptor,
-)
+from mlir_quantum.runtime import as_ctype, make_nd_memref_descriptor, make_zero_d_memref_descriptor
 
 from catalyst.jax_extras import get_implicit_and_explicit_flat_args
 from catalyst.logging import debug_logger_init
@@ -44,6 +43,9 @@ from catalyst.utils.jnp_to_memref import get_ranked_memref_descriptor
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
+
+
+import sys
 
 
 class SharedObjectManager:
@@ -341,6 +343,60 @@ class CompiledFunction:
         abi_args, _buffer = self.args_to_memref_descs(self.restype, dynamic_args, **kwargs)
 
         numpy_dict = {nparr.ctypes.data: nparr for nparr in _buffer}
+
+        from catalyst import profiler
+
+        if profiler.device_mode == "device":
+            current_process = os.getpid()
+            print(f"Current process ID: {current_process}")
+
+            perf_command = [
+                "sudo",
+                "perf",
+                "record",
+                "-p",
+                str(current_process),  # Attach to the current process
+                "-g",  # Collect call graphs
+                "--call-graph",
+                "dwarf",  # Use DWARF for unwinding
+                "-F",
+                "99",
+                "--output",
+                "__perf_device.data",
+            ]
+
+            # Set PYTHONPERFSUPPORT for Python 3.12+ to see Python symbols
+            env = os.environ.copy()
+            env["PYTHONPERFSUPPORT"] = "1"
+
+            try:
+                perf_process = subprocess.Popen(
+                    perf_command, env=env, stdout=sys.stdout, stderr=sys.stderr
+                )
+
+                result = CompiledFunction._exec(
+                    self.shared_object,
+                    self.restype,
+                    self.out_type,
+                    numpy_dict,
+                    *abi_args,
+                )
+
+                perf_process.terminate()
+
+                if perf_process.returncode:
+                    print(f"perf record failed with exit code {perf_process.returncode}")
+
+                subprocess.run("sudo perf script -i __perf_device.data > perf_output.txt", shell=True)
+
+                return result
+
+            except FileNotFoundError:
+                print(
+                    "Error: 'perf' command not found. Make sure perf is installed and in your PATH."
+                )
+            except Exception as e:
+                print(f"An unexpected error occurred: {e}")
 
         result = CompiledFunction._exec(
             self.shared_object,

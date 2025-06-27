@@ -43,5 +43,3 @@ def name2pass(name):
     to mlir-facing pass names.
     """
     return getXDSLPluginAbsolutePath(), name
-
-

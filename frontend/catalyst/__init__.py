@@ -77,11 +77,7 @@ from catalyst.compiler import CompileOptions
 from catalyst.debug.assertion import debug_assert
 from catalyst.jit import QJIT, qjit
 from catalyst.passes.pass_api import pipeline
-from catalyst.utils.exceptions import (
-    AutoGraphError,
-    CompileError,
-    DifferentiableCompileError,
-)
+from catalyst.utils.exceptions import AutoGraphError, CompileError, DifferentiableCompileError
 
 autograph_ignore_fallbacks = False
 """bool: Specify whether AutoGraph should avoid raising
@@ -182,10 +178,13 @@ __all__ = (
 
 
 import subprocess
+
 from viztracer import VizTracer
+
 
 class profiler:
     memory_mode = None
+    device_mode = None
 
     def __init__(self, mode="idle", tracer_entries=5000000, num_samples=0):
         self.mode = mode
@@ -194,7 +193,7 @@ class profiler:
 
         # Just communicate the mode through OS
         # This is hackweek, no need for fancy context managers...
-        file = open("__mode.txt", 'w')
+        file = open("__mode.txt", "w")
         file.write(self.mode)
         file.close()
 
@@ -205,15 +204,20 @@ class profiler:
 
         elif mode == "compiler":
             self.mode = "compiler"
-            
+
         elif mode == "user runtime":
             self.mode = "user runtime"
 
         elif mode == "user memory":
             profiler.memory_mode = "user memory"
 
+        elif mode == "device":
+            self.mode = "device"
+            profiler.device_mode = "device"
+
         else:
-            print("""
+            print(
+                """
     Unexpected mode.
     Currently, catalyst.profiler supports the following modes:
     - "python": returns the python profile. Non-python processes, for example the mlir passes,
@@ -221,8 +225,10 @@ class profiler:
                 from their corresponding Python callsites.
     - "compiler": returns the profile for the mlir passes in the Catalyst compiler.
     - "user runtime": returns the runtime profile for the mlir IR based on debug location information.
+    - "device": returns the runtime profile for the C++ functions, which includes the Catalyst runtime and the C++ devices.
     - "user memory": ...
-            """)
+            """
+            )
             raise RuntimeError("Bad mode")
 
     def __enter__(self):
@@ -230,15 +236,19 @@ class profiler:
             return
 
         if self.mode == "python":
+            # Start the VizTracer
+            # This will trace all Python calls, including the MLIR python bindings
             self.py_tracer = VizTracer(tracer_entries=self.tracer_entries)
             self.py_tracer.start()
 
         elif self.mode == "compiler":
             pass
-        
-        elif self.mode == "user runtime":
+
+        elif self.mode == "device":
             pass
 
+        elif self.mode == "user runtime":
+            pass
 
     def __exit__(self, *_, **__):
         if self.mode == "idle":
@@ -251,17 +261,19 @@ class profiler:
             filename = "__py_result.json"
             self.py_tracer.save(filename)
             subprocess.run(f"vizviewer {filename}", shell=True)
-
         elif self.mode == "compiler":
             filename = "perf_output.txt"
             subprocess.run("sudo perf script -i __perf_qopt.data > perf_output.txt", shell=True)
-            print(f"""
+            print(
+                f"""
                 To view the profile, navigate to https://ui.perfetto.dev and
                 upload the {filename} file into the UI.
                 Once the trace opens, you should be able select either individual CPU samples
                 or ranges of time containing CPU samples to get a flamegraph of all the samples
                 in that region.
-                """)
+                """
+            )
+
 
 import jax
 import pennylane

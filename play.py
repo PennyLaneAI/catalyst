@@ -1,15 +1,13 @@
-import catalyst
-from catalyst import qjit
-import pennylane as qml
 import jax
+import pennylane as qml
 
 from catalyst.jax_primitives import subroutine
 
-#with catalyst.profiler("python"):
-#with catalyst.profiler():
+# with catalyst.profiler("python"):
+# with catalyst.profiler():
 with catalyst.profiler():
-#with catalyst.profiler("user memory"):  # breaks for non plxpr
-#with catalyst.profiler("fake mode"):  # breaks
+    # with catalyst.profiler("user memory"):  # breaks for non plxpr
+    # with catalyst.profiler("fake mode"):  # breaks
     @qjit
     def workflow(wires):
         @qml.qnode(qml.device("lightning.qubit", wires=5, shots=20))
@@ -21,13 +19,11 @@ with catalyst.profiler():
                 qml.Hadamard(wires=0)
                 qml.Hadamard(wires=1)
             return qml.sample()
-        return circuit()
 
+        return circuit()
 
     res = workflow(5)
     print(res)
-
-
 
 
 # # Currently only works with PLxPR due to the use
