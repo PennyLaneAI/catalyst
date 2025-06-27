@@ -203,14 +203,14 @@ class profiler:
             self.mode = "python"
             self.tracer_entries = tracer_entries
 
-        elif mode == "passes":
-            self.mode = "passes"
+        elif mode == "compiler":
+            self.mode = "compiler"
             
-        elif mode == "ir":
-            self.mode = "ir"
+        elif mode == "user runtime":
+            self.mode = "user runtime"
 
-        elif mode == "memory":
-            profiler.memory_mode = "memory"
+        elif mode == "user memory":
+            profiler.memory_mode = "user memory"
 
         else:
             print("""
@@ -219,10 +219,9 @@ class profiler:
     - "python": returns the python profile. Non-python processes, for example the mlir passes,
                 the cpp runtime, and the internal device processes, are treated as blackboxes
                 from their corresponding Python callsites.
-    - "passes": returns the profile for the mlir passes in the Catalyst compiler.
-    - "ir": returns the runtime profile for the mlir IR based on debug location information.
-    - "cpp": ...
-    - "memory": ...
+    - "compiler": returns the profile for the mlir passes in the Catalyst compiler.
+    - "user runtime": returns the runtime profile for the mlir IR based on debug location information.
+    - "user memory": ...
             """)
             raise RuntimeError("Bad mode")
 
@@ -234,10 +233,10 @@ class profiler:
             self.py_tracer = VizTracer(tracer_entries=self.tracer_entries)
             self.py_tracer.start()
 
-        elif self.mode == "passes":
+        elif self.mode == "compiler":
             pass
         
-        elif self.mode == "ir":
+        elif self.mode == "user runtime":
             pass
 
 
@@ -253,7 +252,7 @@ class profiler:
             self.py_tracer.save(filename)
             subprocess.run(f"vizviewer {filename}", shell=True)
 
-        elif self.mode == "passes":
+        elif self.mode == "compiler":
             filename = "perf_output.txt"
             subprocess.run("sudo perf script -i __perf_qopt.data > perf_output.txt", shell=True)
             print(f"""

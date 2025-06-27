@@ -472,7 +472,7 @@ void __catalyst__rt__profiler_record(const char *file_name, uint32_t line, uint3
 
 void __catalyst__rt__profiler_print_stats()
 {
-    std::cout << "\n=== PROFILER STATISTICS (by Operation Type) ===" << std::endl;
+    std::cout << "\n=== PROFILER STATISTICS ===" << std::endl;
     if (profiler_location_stats.empty()) {
         std::cout << "No profiling data collected." << std::endl;
         return;
