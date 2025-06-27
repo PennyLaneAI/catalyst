@@ -29,16 +29,19 @@ def gen_setup(ctx, seed):
     if seed != None:
         txt = f"""
 func.func @setup() -> () {{
-    "quantum.init"() {{seed = {seed} : i32}} : () -> ()
-    return
-}}
+    "quantum.init"() {{seed = {seed} : i32}} : () -> () loc(#loc_setup)
+    return loc(#loc_setup)
+}} loc(#loc_setup)
+
+#loc_setup = loc("quantum.init")
 """
     else:
         txt = """
 func.func @setup() -> () {
-    "quantum.init"() : () -> ()
-    return
-}
+    "quantum.init"() : () -> () loc(#loc_setup)
+    return loc(#loc_setup)
+} loc(#loc_setup)
+#loc_setup = loc("quantum.init")
 """
     return ir.Module.parse(txt, ctx)
 
@@ -51,9 +54,10 @@ def gen_teardown(ctx):
     """
     txt = """
 func.func @teardown () -> () {
-    "quantum.finalize"() : () -> ()
-    return
-}
+    "quantum.finalize"() : () -> () loc(#loc_teardown)
+    return loc(#loc_teardown)
+} loc(#loc_teardown)
+#loc_teardown = loc("quantum.finalize")
 """
     return ir.Module.parse(txt, ctx)
 
