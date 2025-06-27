@@ -56,8 +56,8 @@ struct Tree {
   }
 
   void show_stats() {
-    fprintf(stdout, "%s total memory %lld\n", this->_frame_name.c_str(), this->_total_memory_consumption << 3);
-    fprintf(stdout, "%s peak memory %lld\n", this->_frame_name.c_str(), this->_peak_memory_consumption << 3);
+    fprintf(stdout, "%s total memory %lld\n", this->_frame_name.c_str(), this->_total_memory_consumption);
+    fprintf(stdout, "%s peak memory %lld\n", this->_frame_name.c_str(), this->_peak_memory_consumption);
     for (auto child: _children) {
 	 child->show_stats();
     }
