@@ -4,8 +4,9 @@ import pennylane as qml
 
 #with catalyst.profiler("python"):
 #with catalyst.profiler():
-#with catalyst.profiler("passes"):
-with catalyst.profiler("memory"):
+with catalyst.profiler("passes"):
+#with catalyst.profiler("memory"):  # breaks for non plxpr
+#with catalyst.profiler("fake mode"):  # breaks
     @qjit
     def workflow(wires):
         @qml.qnode(qml.device("lightning.qubit", wires=5, shots=20))
@@ -23,17 +24,21 @@ with catalyst.profiler("memory"):
     res = workflow(5)
     print(res)
 
-# Currently only works with PLxPR due to the use
-# of subroutines
-with catalyst.profiler():
 
-    qml.capture.enable()
 
-    @qml.qjit
-    @qml.qnode(qml.device("null.qubit", wires=1))
-    def foo():
-        return qml.probs()
 
-    foo()
+# # Currently only works with PLxPR due to the use
+# # # of subroutines
+# #with catalyst.profiler():
+# with catalyst.profiler("memory"):
 
-    qml.capture.disable()
+#     qml.capture.enable()
+
+#     @qml.qjit
+#     @qml.qnode(qml.device("null.qubit", wires=1))
+#     def foo():
+#         return qml.probs()
+
+#     print(foo())
+
+#     qml.capture.disable()
