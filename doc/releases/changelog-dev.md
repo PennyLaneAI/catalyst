@@ -197,7 +197,7 @@
   [(#1810)](https://github.com/PennyLaneAI/catalyst/pull/1810)
 
 * Two new Python pass decorators, :func:`~.passes.disentangle_cnot` and 
-  :func:`~.passes.disentangle_swap`, have been added. They apply their corresponding MLIR passes 
+  :func:`~.passes.disentangle_swap` have been added. They apply their corresponding MLIR passes 
   `--disentangle-CNOT` and `--disentangle-SWAP` respectively. 
   [(#1823)](https://github.com/PennyLaneAI/catalyst/pull/1823)
 
