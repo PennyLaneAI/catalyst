@@ -22,6 +22,8 @@ from catalyst.compiler import _options_to_cli_flags, _quantum_opt
 from catalyst.passes.pass_api import PassPipelineWrapper
 from catalyst.utils.exceptions import CompileError
 
+# pylint: disable=line-too-long, too-many-lines
+
 
 ## API ##
 def cancel_inverses(qnode):
@@ -135,6 +137,195 @@ def cancel_inverses(qnode):
         %3 = quantum.expval %2 : f64
     """
     return PassPipelineWrapper(qnode, "remove-chained-self-inverse")
+
+
+def disentangle_cnot(qnode):
+    """
+    Specify that the ``-disentangle-CNOT`` MLIR compiler pass
+    for simplifying CNOT gates should be applied to the decorated
+    QNode during :func:`~.qjit` compilation.
+
+    Args:
+        fn (QNode): the QNode to apply the disentangle CNOT compiler pass to
+
+    Returns:
+        ~.QNode:
+
+    **Example**
+
+    .. code-block:: python
+
+        import pennylane as qml
+        from catalyst import qjit
+        from catalyst.debug import get_compilation_stage
+        from catalyst.passes import disentangle_cnot
+
+        dev = qml.device("lightning.qubit", wires=2)
+
+        @qjit(keep_intermediate=True)
+        @disentangle_cnot
+        @qml.qnode(dev)
+        def circuit():
+            # first qubit in |1>
+            qml.X(0)
+            # second qubit in |0>
+            # current state : |10>
+            qml.CNOT([0,1]) # state after CNOT : |11>
+            return qml.state()
+
+    >>> circuit()
+    [0.+0.j  0.+0.j  0.+0.j  1.+0.j]
+
+    Note that the QNode will be unchanged in Python, and will continue
+    to include keep CNOT gates gates when inspected with Python (for example,
+    with :func:`~.draw`).
+
+    To instead view the optimized circuit, the MLIR must be viewed
+    after the ``"QuantumCompilationPass"`` stage:
+
+    >>> print(get_compilation_stage(circuit, stage="QuantumCompilationPass"))
+
+    .. code-block:: mlir
+
+        module @circuit {
+            func.func public @jit_circuit() -> tensor<4xcomplex<f64>> attributes {llvm.emit_c_interface} {
+                %0 = call @circuit_0() : () -> tensor<4xcomplex<f64>>
+                return %0 : tensor<4xcomplex<f64>>
+            }
+            func.func public @circuit_0() -> tensor<4xcomplex<f64>> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode} {
+                %c0_i64 = arith.constant 0 : i64
+                quantum.device["catalyst/utils/../lib/librtd_lightning.dylib", "LightningSimulator", "{'shots': 0, 'mcmc': False, 'num_burnin': 0, 'kernel_name': None}"]
+                %0 = quantum.alloc( 2) : !quantum.reg
+                %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+                %out_qubits = quantum.custom "PauliX"() %1 : !quantum.bit
+                %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+                %out_qubits_0 = quantum.custom "PauliX"() %2 : !quantum.bit
+                %3 = quantum.insert %0[ 0], %out_qubits : !quantum.reg, !quantum.bit
+                %4 = quantum.insert %3[ 1], %out_qubits_0 : !quantum.reg, !quantum.bit
+                %5 = quantum.compbasis qreg %4 : !quantum.obs
+                %6 = quantum.state %5 : tensor<4xcomplex<f64>>
+                quantum.dealloc %4 : !quantum.reg
+                quantum.device_release
+                return %6 : tensor<4xcomplex<f64>>
+            }
+            func.func @setup() {
+                quantum.init
+                return
+            }
+            func.func @teardown() {
+                quantum.finalize
+                return
+            }
+        }
+
+    It can be seen that the CNOT(0,1) has been replaced with X(1)
+
+    .. code-block:: mlir
+
+        %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+        %out_qubits_0 = quantum.custom "PauliX"() %2 : !quantum.bit
+    """
+    return PassPipelineWrapper(qnode, "disentangle-CNOT")
+
+
+def disentangle_swap(qnode):
+    """
+    Specify that the ``-disentangle-SWAP`` MLIR compiler pass
+    for simplifying SWAP gates should be applied to the decorated
+    QNode during :func:`~.qjit` compilation.
+
+    Args:
+        fn (QNode): the QNode to apply the disentangle SWAP compiler pass to
+
+    Returns:
+        ~.QNode:
+
+    **Example**
+
+    .. code-block:: python
+
+        import pennylane as qml
+        from pennylane import numpy as np
+        from catalyst import qjit
+        from catalyst.debug import get_compilation_stage
+        from catalyst.passes import disentangle_swap
+
+        dev = qml.device("lightning.qubit", wires=2)
+
+        @qjit(keep_intermediate=True)
+        @disentangle_swap
+        @qml.qnode(dev)
+        def circuit():
+            # first qubit in |1>
+            qml.X(0)
+            # second qubit in non-basis
+            qml.RX(np.pi/4,1)
+            qml.SWAP([0,1])
+            return qml.state()
+
+    >>> circuit()
+    [0.+0.j  0.92387953+0.j  0.+0.j  0.-0.38268343j]
+
+    Note that the QNode will be unchanged in Python, and will continue
+    to include keep SWAP gates gates when inspected with Python (for example,
+    with :func:`~.draw`).
+
+    To instead view the optimized circuit, the MLIR must be viewed
+    after the ``"QuantumCompilationPass"`` stage:
+
+    >>> print(get_compilation_stage(circuit, stage="QuantumCompilationPass"))
+
+    .. code-block:: mlir
+
+        module @circuit {
+            func.func public @jit_circuit() -> tensor<4xcomplex<f64>> attributes {llvm.emit_c_interface} {
+                %0 = call @circuit_0() : () -> tensor<4xcomplex<f64>>
+                return %0 : tensor<4xcomplex<f64>>
+            }
+            func.func public @circuit_0() -> tensor<4xcomplex<f64>> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode} {
+                %c0_i64 = arith.constant 0 : i64
+                %cst = arith.constant 0.78539816339744828 : f64
+                quantum.device["catalyst/utils/../lib/librtd_lightning.dylib", "LightningSimulator", "{'shots': 0, 'mcmc': False, 'num_burnin': 0, 'kernel_name': None}"]
+                %0 = quantum.alloc( 2) : !quantum.reg
+                %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+                %out_qubits = quantum.custom "PauliX"() %1 : !quantum.bit5
+                %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+                %out_qubits_0 = quantum.custom "RX"(%cst) %2 : !quantum.bit
+                %out_qubits_1 = quantum.custom "PauliX"() %out_qubits_0 : !quantum.bit
+                %out_qubits_2:2 = quantum.custom "CNOT"() %out_qubits_1, %out_qubits : !quantum.bit, !quantum.bit
+                %out_qubits_3:2 = quantum.custom "CNOT"() %out_qubits_2#1, %out_qubits_2#0 : !quantum.bit, !quantum.bit
+                %3 = quantum.insert %0[ 0], %out_qubits_3#0 : !quantum.reg, !quantum.bit
+                %4 = quantum.insert %3[ 1], %out_qubits_3#1 : !quantum.reg, !quantum.bit
+                %5 = quantum.compbasis qreg %4 : !quantum.obs
+                %6 = quantum.state %5 : tensor<4xcomplex<f64>>
+                quantum.dealloc %4 : !quantum.reg
+                quantum.device_release
+                return %6 : tensor<4xcomplex<f64>>
+            }
+            func.func @setup() {
+                quantum.init
+                return
+            }
+            func.func @teardown() {
+                quantum.finalize
+                return
+            }
+        }
+
+    It can be seen that the SWAP(0,1) has been replaced with the folliowing
+
+    .. code-block:: mlir
+
+        %0 = quantum.alloc( 2) : !quantum.reg
+        %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+        %out_qubits = quantum.custom "PauliX"() %1 : !quantum.bit5
+        %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+        %out_qubits_0 = quantum.custom "RX"(%cst) %2 : !quantum.bit
+        %out_qubits_1 = quantum.custom "PauliX"() %out_qubits_0 : !quantum.bit
+        %out_qubits_2:2 = quantum.custom "CNOT"() %out_qubits_1, %out_qubits : !quantum.bit, !quantum.bit
+        %out_qubits_3:2 = quantum.custom "CNOT"() %out_qubits_2#1, %out_qubits_2#0 : !quantum.bit, !quantum.bit
+    """
+    return PassPipelineWrapper(qnode, "disentangle-SWAP")
 
 
 def merge_rotations(qnode):

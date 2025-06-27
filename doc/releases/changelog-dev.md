@@ -196,6 +196,11 @@
 * `static_argnums` on `qjit` can now be specified with program capture through PLxPR.
   [(#1810)](https://github.com/PennyLaneAI/catalyst/pull/1810)
 
+* Two new Python pass decorators, :func:`~.passes.disentangle_cnot` and 
+  :func:`~.passes.disentangle_swap` have been added. They apply their corresponding MLIR passes 
+  `--disentangle-CNOT` and `--disentangle-SWAP` respectively. 
+  [(#1823)](https://github.com/PennyLaneAI/catalyst/pull/1823)
+
 <h3>Breaking changes 💔</h3>
 
 * (Device Developers Only) The `QuantumDevice` interface in the Catalyst Runtime plugin system
