@@ -25,13 +25,7 @@ from catalyst.api_extensions.control_flow import (
     for_loop,
     while_loop,
 )
-from catalyst.api_extensions.differentiation import (
-    grad,
-    jacobian,
-    jvp,
-    value_and_grad,
-    vjp,
-)
+from catalyst.api_extensions.differentiation import grad, jacobian, jvp, value_and_grad, vjp
 from catalyst.api_extensions.error_mitigation import mitigate_with_zne
 from catalyst.api_extensions.function_maps import vmap
 from catalyst.api_extensions.quantum_operators import (

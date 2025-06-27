@@ -102,10 +102,7 @@ from catalyst.jax_primitives import (
     var_p,
 )
 from catalyst.logging import debug_logger, debug_logger_init
-from catalyst.tracing.contexts import (
-    EvaluationContext,
-    EvaluationMode,
-)
+from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
 from catalyst.utils.exceptions import CompileError
 
 logger = logging.getLogger(__name__)
@@ -810,6 +807,7 @@ def trace_quantum_operations(
                 params_len=len(op.parameters),
                 ctrl_len=len(controlled_qubits),
                 adjoint=adjoint,
+                traceback=getattr(op, "traceback", None),
             )
             qrp.insert(op.wires, qubits2[: len(qubits)])
             qrp.insert(controlled_wires, qubits2[len(qubits) :])

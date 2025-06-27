@@ -219,7 +219,6 @@ nb::list wrap(nb::object func, nb::tuple py_args, nb::object result_desc, nb::ob
     auto value1 = py_args.attr("__getitem__")(1);
     void *value1_ptr =
         *reinterpret_cast<void **>(nb::cast<size_t>(ctypes.attr("addressof")(value1)));
-
     {
         nb::gil_scoped_release lock;
         f_ptr(value0_ptr, value1_ptr);

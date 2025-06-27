@@ -82,6 +82,12 @@ def SplitMultipleTapesPass : Pass<"split-multiple-tapes"> {
     let constructor = "catalyst::createSplitMultipleTapesPass()";
 }
 
+def ProfilingPass : Pass<"profiling"> {
+    let summary = "Perform runtime profiling of the user quantum circuit.";
+
+    let constructor = "catalyst::createProfilingPass()";
+}
+
 // ----- Quantum circuit transformation passes begin ----- //
 // For example, automatic compiler peephole opts, etc.
 

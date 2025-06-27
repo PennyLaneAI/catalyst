@@ -77,11 +77,7 @@ from catalyst.compiler import CompileOptions
 from catalyst.debug.assertion import debug_assert
 from catalyst.jit import QJIT, qjit
 from catalyst.passes.pass_api import pipeline
-from catalyst.utils.exceptions import (
-    AutoGraphError,
-    CompileError,
-    DifferentiableCompileError,
-)
+from catalyst.utils.exceptions import AutoGraphError, CompileError, DifferentiableCompileError
 
 autograph_ignore_fallbacks = False
 """bool: Specify whether AutoGraph should avoid raising
@@ -188,6 +184,7 @@ from viztracer import VizTracer
 
 class profiler:
     memory_mode = None
+    device_mode = None
 
     def __init__(self, mode="idle", tracer_entries=5000000, num_samples=0):
         self.mode = mode
@@ -208,11 +205,16 @@ class profiler:
         elif mode == "passes":
             self.mode = "passes"
 
+        elif mode == "ir":
+            self.mode = "ir"
+
         elif mode == "memory":
             profiler.memory_mode = "memory"
 
-        elif mode == "cpp":
-            self.mode = "cpp"
+        elif mode == "device":
+            self.mode = "device"
+            profiler.device_mode = "device"
+
         else:
             print(
                 """
@@ -222,8 +224,8 @@ class profiler:
                 the cpp runtime, and the internal device processes, are treated as blackboxes
                 from their corresponding Python callsites.
     - "passes": returns the profile for the mlir passes in the Catalyst compiler.
-    - "ir": ...
-    - "cpp": The profile for the C++ runtime, which includes the Catalyst runtime and the C++ devices.
+    - "device": returns the runtime profile for the C++ functions, which includes the Catalyst runtime and the C++ devices.
+    - "ir": returns the runtime profile for the mlir IR based on debug location information.
     - "memory": ...
             """
             )
@@ -255,6 +257,8 @@ class profiler:
             subprocess.run(f"vizviewer {filename}", shell=True)
         elif self.mode == "memory":
             pass
+        elif self.mode == "device":
+            pass
         elif self.mode == "passes":
             filename = "perf_output.txt"
             subprocess.run("sudo perf script -i __perf_qopt.data > perf_output.txt", shell=True)
@@ -267,5 +271,10 @@ class profiler:
                 in that region.
                 """
             )
-        elif self.mode == "cpp":
-            pass
+
+
+import jax
+import pennylane
+
+jax.extend.source_info_util.register_exclusion(dirname(__file__))
+jax.extend.source_info_util.register_exclusion(dirname(pennylane.__file__))

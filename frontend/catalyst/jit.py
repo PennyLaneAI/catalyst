@@ -33,13 +33,7 @@ from jax.tree_util import tree_flatten, tree_unflatten
 import catalyst
 from catalyst.autograph import run_autograph
 from catalyst.compiled_functions import CompilationCache, CompiledFunction
-from catalyst.compiler import (
-    CompileOptions,
-    Compiler,
-    canonicalize,
-    to_llvmir,
-    to_mlir_opt,
-)
+from catalyst.compiler import CompileOptions, Compiler, canonicalize, to_llvmir, to_mlir_opt
 from catalyst.debug.instruments import instrument
 from catalyst.from_plxpr import trace_from_pennylane
 from catalyst.jax_extras.patches import get_aval2
@@ -721,6 +715,16 @@ class QJIT(CatalystCallable):
 
         if qml.capture.enabled():
             # breakpoint()
+            from catalyst import profiler
+
+            if profiler.memory_mode:
+                from catalyst.passes.xdsl_plugin import getXDSLPluginAbsolutePath
+
+                self.compile_options.pass_plugins.update({getXDSLPluginAbsolutePath()})
+                from catalyst.passes.xdsl_plugin.transforms import ProfileMemory
+
+                self.user_function = ProfileMemory(self.user_function)
+
             with Patcher(
                 (
                     jax._src.interpreters.partial_eval,  # pylint: disable=protected-access
