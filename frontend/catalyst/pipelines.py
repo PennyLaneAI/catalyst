@@ -314,6 +314,7 @@ def get_convert_to_llvm_stage(options: CompileOptions) -> List[str]:
     """Returns the list of passes that lowers MLIR upstream dialects to LLVM Dialect"""
 
     from catalyst import profiler
+
     profile_memory = "{show-stats}" if profiler.memory_mode == "user memory" else ""
 
     convert_to_llvm = [
@@ -370,7 +371,7 @@ def get_convert_to_llvm_stage(options: CompileOptions) -> List[str]:
     except:
         profiler_mode = "idle"
     if profiler_mode == "user runtime":
-        convert_to_llvm.append("ensure-debug-info-scope-on-llvm-func")        
+        convert_to_llvm.append("ensure-debug-info-scope-on-llvm-func")
     return list(filter(partial(is_not, None), convert_to_llvm))
 
 

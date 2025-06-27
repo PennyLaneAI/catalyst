@@ -6,8 +6,8 @@ from catalyst.jax_primitives import subroutine
 # with catalyst.profiler("python"):
 # with catalyst.profiler():
 with catalyst.profiler():
-#with catalyst.profiler("user memory"):  # breaks for non plxpr
-#with catalyst.profiler("fake mode"):  # breaks
+    # with catalyst.profiler("user memory"):  # breaks for non plxpr
+    # with catalyst.profiler("fake mode"):  # breaks
     @qjit
     def workflow(wires):
         @qml.qnode(qml.device("lightning.qubit", wires=5, shots=20))

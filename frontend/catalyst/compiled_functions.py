@@ -351,6 +351,7 @@ class CompiledFunction:
             print(f"Current process ID: {current_process}")
 
             perf_command = [
+                "sudo",
                 "perf",
                 "record",
                 "-p",
@@ -381,8 +382,12 @@ class CompiledFunction:
                     *abi_args,
                 )
 
+                perf_process.terminate()
+
                 if perf_process.returncode:
                     print(f"perf record failed with exit code {perf_process.returncode}")
+
+                subprocess.run("sudo perf script -i __perf_device.data > perf_output.txt", shell=True)
 
                 return result
 

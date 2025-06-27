@@ -183,7 +183,10 @@ void *_mlir_memref_to_llvm_alloc(size_t size)
 {
     call_tree->_total_memory_consumption += size;
     call_tree->_memory_tracker += size;
-    call_tree->_peak_memory_consumption = call_tree->_memory_tracker > call_tree->_peak_memory_consumption ? call_tree->_memory_tracker : call_tree->_peak_memory_consumption;
+    call_tree->_peak_memory_consumption =
+        call_tree->_memory_tracker > call_tree->_peak_memory_consumption
+            ? call_tree->_memory_tracker
+            : call_tree->_peak_memory_consumption;
     void *ptr = malloc(size);
     CTX->getMemoryManager()->insert(ptr, size);
     return ptr;
@@ -193,7 +196,10 @@ void *_mlir_memref_to_llvm_aligned_alloc(size_t alignment, size_t size)
 {
     call_tree->_total_memory_consumption += size;
     call_tree->_memory_tracker += size;
-    call_tree->_peak_memory_consumption = call_tree->_memory_tracker > call_tree->_peak_memory_consumption ? call_tree->_memory_tracker : call_tree->_peak_memory_consumption;
+    call_tree->_peak_memory_consumption =
+        call_tree->_memory_tracker > call_tree->_peak_memory_consumption
+            ? call_tree->_memory_tracker
+            : call_tree->_peak_memory_consumption;
     void *ptr = aligned_alloc(alignment, size);
     // Not really, true. Just approximation.
     CTX->getMemoryManager()->insert(ptr, size);

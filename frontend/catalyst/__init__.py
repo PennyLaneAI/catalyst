@@ -204,7 +204,7 @@ class profiler:
 
         elif mode == "compiler":
             self.mode = "compiler"
-            
+
         elif mode == "user runtime":
             self.mode = "user runtime"
 
@@ -227,7 +227,8 @@ class profiler:
     - "user runtime": returns the runtime profile for the mlir IR based on debug location information.
     - "device": returns the runtime profile for the C++ functions, which includes the Catalyst runtime and the C++ devices.
     - "user memory": ...
-            """)
+            """
+            )
             raise RuntimeError("Bad mode")
 
     def __enter__(self):
@@ -248,7 +249,6 @@ class profiler:
 
         elif self.mode == "user runtime":
             pass
-
 
     def __exit__(self, *_, **__):
         if self.mode == "idle":
