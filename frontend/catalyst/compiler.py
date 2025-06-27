@@ -451,8 +451,19 @@ class Compiler:
         if profiler_mode == "passes":
             # perf command is
             # sudo -E perf record -F 999 -g --call-graph dwarf -o perf.data python3 play.py
-            _perf_cmd = ['sudo', '-E', 'perf', 'record', '-F', '999', '-g', '--call-graph',
-                            'dwarf', '-o', '__perf_qopt.data']
+            _perf_cmd = [
+                "sudo",
+                "-E",
+                "perf",
+                "record",
+                "-F",
+                "999",
+                "-g",
+                "--call-graph",
+                "dwarf",
+                "-o",
+                "__perf_qopt.data",
+            ]
             cmd = _perf_cmd + cmd
 
         try:

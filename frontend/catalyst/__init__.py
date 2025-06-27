@@ -182,7 +182,9 @@ __all__ = (
 
 
 import subprocess
+
 from viztracer import VizTracer
+
 
 class profiler:
     memory_mode = None
@@ -194,7 +196,7 @@ class profiler:
 
         # Just communicate the mode through OS
         # This is hackweek, no need for fancy context managers...
-        file = open("__mode.txt", 'w')
+        file = open("__mode.txt", "w")
         file.write(self.mode)
         file.close()
 
@@ -209,8 +211,11 @@ class profiler:
         elif mode == "memory":
             profiler.memory_mode = "memory"
 
+        elif mode == "cpp":
+            self.mode = "cpp"
         else:
-            print("""
+            print(
+                """
     Unexpected mode.
     Currently, catalyst.profiler supports the following modes:
     - "python": returns the python profile. Non-python processes, for example the mlir passes,
@@ -220,7 +225,8 @@ class profiler:
     - "ir": ...
     - "cpp": The profile for the C++ runtime, which includes the Catalyst runtime and the C++ devices.
     - "memory": ...
-            """)
+            """
+            )
             raise RuntimeError("Bad mode")
 
     def __enter__(self):
@@ -228,12 +234,13 @@ class profiler:
             return
 
         if self.mode == "python":
+            # Start the VizTracer
+            # This will trace all Python calls, including the MLIR python bindings
             self.py_tracer = VizTracer(tracer_entries=self.tracer_entries)
             self.py_tracer.start()
 
-        elif self.mode == "passes":
+        else:  # cpp, passes, memory
             pass
-
 
     def __exit__(self, *_, **__):
         if self.mode == "idle":
@@ -246,15 +253,19 @@ class profiler:
             filename = "__py_result.json"
             self.py_tracer.save(filename)
             subprocess.run(f"vizviewer {filename}", shell=True)
-
+        elif self.mode == "memory":
+            pass
         elif self.mode == "passes":
             filename = "perf_output.txt"
             subprocess.run("sudo perf script -i __perf_qopt.data > perf_output.txt", shell=True)
-            print(f"""
+            print(
+                f"""
                 To view the profile, navigate to https://ui.perfetto.dev and
                 upload the {filename} file into the UI.
                 Once the trace opens, you should be able select either individual CPU samples
                 or ranges of time containing CPU samples to get a flamegraph of all the samples
                 in that region.
-                """)
-
+                """
+            )
+        elif self.mode == "cpp":
+            pass

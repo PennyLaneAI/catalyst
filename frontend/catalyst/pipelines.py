@@ -298,6 +298,7 @@ def get_convert_to_llvm_stage(options: CompileOptions) -> List[str]:
     """Returns the list of passes that lowers MLIR upstream dialects to LLVM Dialect"""
 
     from catalyst import profiler
+
     profile_memory = "{show-stats}" if profiler.memory_mode == "memory" else ""
 
     convert_to_llvm = [
@@ -329,7 +330,7 @@ def get_convert_to_llvm_stage(options: CompileOptions) -> List[str]:
         "finalize-memref-to-llvm{use-generic-functions}",
         "convert-index-to-llvm",
         "convert-catalyst-to-llvm",
-        "convert-quantum-to-llvm"+profile_memory,
+        "convert-quantum-to-llvm" + profile_memory,
         # There should be no identical code folding
         # (`mergeIdenticalBlocks` in the MLIR source code)
         # between convert-async-to-llvm and

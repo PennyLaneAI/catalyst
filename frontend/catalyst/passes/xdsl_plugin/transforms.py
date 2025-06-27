@@ -1,11 +1,10 @@
+import jax
+import pennylane as qml
+from pennylane.compiler.python_compiler import compiler_transform
 from xdsl import context, passes, pattern_rewriter
 from xdsl.dialects import builtin, func, llvm
 from xdsl.rewriter import InsertPoint, Rewriter
 
-import jax
-
-import pennylane as qml
-from pennylane.compiler.python_compiler import compiler_transform
 
 def add_call_to_add_new_frame(f: func.FuncOp, module):
     rewriter = Rewriter()
@@ -32,6 +31,7 @@ def add_call_to_add_new_frame(f: func.FuncOp, module):
     last = f.body.blocks[0].last_op
     rewriter.insert_op(call_op, InsertPoint.before(first))
     rewriter.insert_op(call_op2, InsertPoint.before(last))
+
 
 @compiler_transform
 class ProfileMemory(passes.ModulePass):
