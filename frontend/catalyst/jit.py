@@ -722,6 +722,13 @@ class QJIT(CatalystCallable):
 
         if qml.capture.enabled():
             #breakpoint()
+            from catalyst import profiler
+            if profiler.memory_mode:
+                from catalyst.passes.xdsl_plugin import getXDSLPluginAbsolutePath
+                self.compile_options.pass_plugins.update({getXDSLPluginAbsolutePath()})
+                from catalyst.passes.xdsl_plugin.transforms import ProfileMemory
+                self.user_function = ProfileMemory(self.user_function)
+
             with Patcher(
                 (
                     jax._src.interpreters.partial_eval,  # pylint: disable=protected-access

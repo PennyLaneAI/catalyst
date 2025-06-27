@@ -1,10 +1,13 @@
 import catalyst
 from catalyst import qjit
 import pennylane as qml
+import jax
+
+from catalyst.jax_primitives import subroutine
 
 #with catalyst.profiler("python"):
 #with catalyst.profiler():
-with catalyst.profiler("passes"):
+with catalyst.profiler():
 #with catalyst.profiler("memory"):  # breaks for non plxpr
 #with catalyst.profiler("fake mode"):  # breaks
     @qjit
@@ -30,15 +33,26 @@ with catalyst.profiler("passes"):
 # # Currently only works with PLxPR due to the use
 # # # of subroutines
 # #with catalyst.profiler():
-# with catalyst.profiler("memory"):
+with catalyst.profiler("memory"):
 
-#     qml.capture.enable()
+    qml.capture.enable()
 
-#     @qml.qjit
-#     @qml.qnode(qml.device("null.qubit", wires=1))
-#     def foo():
-#         return qml.probs()
+    @subroutine
+    def H_0():
+        qml.Hadamard(wires=[0])
 
-#     print(foo())
+    @subroutine
+    def identity_plus(y):
+        return jax.numpy.array([[1, 0], [0, 1]], dtype=complex) + y
 
-#     qml.capture.disable()
+    @qml.qjit(keep_intermediate=True, autograph=False)
+    @qml.qnode(qml.device("null.qubit", wires=1), autograph=False)
+    def foo():
+        H_0()
+        H_0()
+        identity_plus(0)
+        return qml.probs()
+
+    print(foo())
+
+    qml.capture.disable()
