@@ -25,7 +25,6 @@ import pennylane as qml
 from jax._src.sharding_impls import UNSPECIFIED
 from jax.extend.core import ClosedJaxpr, Jaxpr
 from jax.extend.linear_util import wrap_init
-from jax.interpreters.partial_eval import convert_constvars_jaxpr
 from pennylane.capture import PlxprInterpreter, qnode_prim
 from pennylane.capture.expand_transforms import ExpandTransformsInterpreter
 from pennylane.capture.primitives import measure_prim as plxpr_measure_prim
@@ -426,10 +425,7 @@ def handle_subroutine(self, *args, **kwargs):
         return converter.qreg_manager.get(), *retvals
 
     if not transformed:
-        converted_jaxpr_branch = jax.make_jaxpr(wrapper)(self.qreg_manager.get(), *args).jaxpr
-        converted_closed_jaxpr_branch = ClosedJaxpr(
-            convert_constvars_jaxpr(converted_jaxpr_branch), ()
-        )
+        converted_closed_jaxpr_branch = jax.make_jaxpr(wrapper)(self.qreg_manager.get(), *args)
         self.subroutine_cache[plxpr] = converted_closed_jaxpr_branch
     else:
         converted_closed_jaxpr_branch = transformed

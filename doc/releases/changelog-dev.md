@@ -365,6 +365,7 @@
 * Support for quantum subroutines was added.
   This feature is expected to improve compilation times for large quantum programs.
   [(#1774)](https://github.com/PennyLaneAI/catalyst/pull/1774)
+  [(#1828)](https://github.com/PennyLaneAI/catalyst/pull/1828)
 
 * PennyLane's arbitrary-basis measurement operations, such as
   :func:`qml.ftqc.measure_arbitrary_basis() <pennylane.ftqc.measure_arbitrary_basis>`, are now

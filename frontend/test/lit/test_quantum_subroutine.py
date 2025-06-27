@@ -16,6 +16,7 @@
 
 """Lit tests for quantum subroutines"""
 
+import jax
 import pennylane as qml
 
 from catalyst.jax_primitives import subroutine
@@ -356,3 +357,29 @@ def test_two_qnodes_one_subroutine():
 
 
 test_two_qnodes_one_subroutine()
+
+
+def test_with_constant():
+    """Test that constants are not hoisted"""
+
+    @subroutine
+    def Hadamard_plus_1(c):
+        # CHECK: func.func private @Hadamard_plus_1
+        # CHECK-NEXT: %c = stablehlo.constant dense<1> : tensor<i64>
+        one = jax.numpy.array(1)
+        qml.Hadamard(c + one)
+
+    qml.capture.enable()
+
+    @qml.qjit(autograph=False)
+    @qml.qnode(qml.device("null.qubit", wires=2), autograph=False)
+    def circ():
+        Hadamard_plus_1(0)
+        return qml.probs()
+
+    print(circ.mlir)
+
+    qml.capture.disable()
+
+
+test_with_constant()
