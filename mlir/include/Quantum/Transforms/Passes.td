@@ -21,8 +21,13 @@ def QuantumConversionPass : Pass<"convert-quantum-to-llvm"> {
     let summary = "Perform a dialect conversion from Quantum to LLVM (QIR).";
 
     let dependentDialects = ["LLVM::LLVMDialect"];
-
     let constructor = "catalyst::createQuantumConversionPass()";
+    let options = [
+    Option<"ShowStats", "show-stats",
+           "bool", /*default=*/"false",
+           "print heap allocations.">,
+    ];
+
 }
 
 def EmitCatalystPyInterfacePass : Pass<"emit-catalyst-py-interface"> {
@@ -75,6 +80,12 @@ def SplitMultipleTapesPass : Pass<"split-multiple-tapes"> {
     let summary = "Given a qnode containing multiple tapes, split each tape into its own function.";
 
     let constructor = "catalyst::createSplitMultipleTapesPass()";
+}
+
+def ProfilingPass : Pass<"profiling"> {
+    let summary = "Perform runtime profiling of the user quantum circuit.";
+
+    let constructor = "catalyst::createProfilingPass()";
 }
 
 // ----- Quantum circuit transformation passes begin ----- //

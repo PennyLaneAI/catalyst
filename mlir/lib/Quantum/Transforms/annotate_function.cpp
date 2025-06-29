@@ -33,6 +33,7 @@ namespace {
 
 bool isAnnotated(FunctionOpInterface op, const char *attr)
 {
+    return false;
     return (bool)(op->getAttrOfType<UnitAttr>(attr));
 }
 
@@ -119,6 +120,7 @@ std::optional<FunctionOpInterface> getCallee(CallGraphNode::Edge edge, CallGraph
 
 bool anyCalleeIsAnnotated(FunctionOpInterface op, const char *attr, CallGraph &cg)
 {
+    return false;
     Region &region = op->getRegion(0);
     CallGraphNode *node = cg.lookupNode(&region);
     assert(node && "An incorrect region was used to look up a node in the callgraph.");

@@ -39,7 +39,7 @@ class MemoryManager // NOLINT(cppcoreguidelines-special-member-functions,
                     // hicpp-special-member-functions)
     final {
   private:
-    std::unordered_set<void *> _impl;
+    std::unordered_map<void *, size_t> _impl;
     std::mutex mu; // To guard the memory manager
 
   public:
@@ -49,16 +49,16 @@ class MemoryManager // NOLINT(cppcoreguidelines-special-member-functions,
     {
         // Lock the mutex to protect _impl free
         std::lock_guard<std::mutex> lock(mu);
-        for (auto *allocation : _impl) {
-            free(allocation); // NOLINT(cppcoreguidelines-no-malloc, hicpp-no-malloc)
+        for (auto allocation : _impl) {
+            free(allocation.first); // NOLINT(cppcoreguidelines-no-malloc, hicpp-no-malloc)
         }
     }
 
-    void insert(void *ptr)
+    void insert(void *ptr, size_t size)
     {
         // Lock the mutex to protect _impl update
         std::lock_guard<std::mutex> lock(mu);
-        _impl.insert(ptr);
+        _impl.insert({ptr, size});
     }
     void erase(void *ptr)
     {
@@ -71,6 +71,10 @@ class MemoryManager // NOLINT(cppcoreguidelines-special-member-functions,
         // Lock the mutex to protect _impl update
         std::lock_guard<std::mutex> lock(mu);
         return _impl.contains(ptr);
+    }
+
+    size_t at(void *ptr) {
+	return _impl.at(ptr);
     }
 };
 

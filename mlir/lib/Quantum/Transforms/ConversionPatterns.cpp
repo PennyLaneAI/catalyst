@@ -11,7 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
+static bool _showStats = false;
 #include <string>
 
 #include "mlir/Dialect/LLVMIR/FunctionCallUtils.h"
@@ -128,6 +128,15 @@ Value getModifiersPtr(Location loc, RewriterBase &rewriter, const TypeConverter 
 template <typename T> struct RTBasedPattern : public OpConversionPattern<T> {
     using OpConversionPattern<T>::OpConversionPattern;
 
+    // bool _showStats;
+
+    // RTBasedPattern(TypeConverter &typeConverter, MLIRContext ctx, bool showStats)
+    // //: RTBasedPattern(typeConverter, ctx), _showStats(showStats) {
+    // : OpConversionPattern<T>(typeConverter, ctx)
+    // {
+    //     llvm::errs() << "pattern init: " << showStats << _showStats << "\n";
+    // }
+
     LogicalResult matchAndRewrite(T op, typename T::Adaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
@@ -163,10 +172,14 @@ template <typename T> struct RTBasedPattern : public OpConversionPattern<T> {
         }
         else {
             qirName = "__catalyst__rt__finalize";
-            Type qirSignature = LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx), {});
+            auto i64 = IntegerType::get(ctx, 64);
+            Location loc = op->getLoc();
+            //llvm::errs() << "show stats? " << _showStats << "\n";
+            auto showStats = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(_showStats));
+            Type qirSignature = LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx), {i64});
             LLVM::LLVMFuncOp fnDecl =
                 catalyst::ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
-            rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, fnDecl, ValueRange{});
+            rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, fnDecl, ValueRange{showStats});
         }
 
         return success();
@@ -1018,8 +1031,9 @@ struct SetBasisStateOpPattern : public OpConversionPattern<SetBasisStateOp> {
 namespace catalyst {
 namespace quantum {
 
-void populateQIRConversionPatterns(TypeConverter &typeConverter, RewritePatternSet &patterns)
+void populateQIRConversionPatterns(TypeConverter &typeConverter, RewritePatternSet &patterns, bool showStats)
 {
+    _showStats = showStats;
     patterns.add<RTBasedPattern<InitializeOp>>(typeConverter, patterns.getContext());
     patterns.add<RTBasedPattern<FinalizeOp>>(typeConverter, patterns.getContext());
     patterns.add<DeviceInitOpPattern>(typeConverter, patterns.getContext());

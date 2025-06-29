@@ -22,12 +22,56 @@
 extern "C" {
 #endif
 
+static long long total_memory_consumption = 0;
+static long long memory_tracker = 0;
+static long long peak_memory_consumption = 0;
+static int pystdout = 0;
+
+struct Tree {
+  std::string _frame_name;
+  long long _total_memory_consumption;
+  long long _memory_tracker;
+  long long _peak_memory_consumption;
+  std::vector<Tree *> _children;
+  Tree *_parent;
+  Tree(std::string name) : _frame_name(name),
+	_total_memory_consumption(0),
+	_memory_tracker(0),
+	_peak_memory_consumption(0),
+	_parent(nullptr)
+  {
+  }
+
+  ~Tree() {
+    for (auto child: _children) {
+        delete child;
+    }
+  }
+
+  Tree *add_child(std::string child_name) {
+    auto child = new Tree(child_name);
+    child->_parent = this;
+    _children.push_back(child);
+    return child;
+  }
+
+  void show_stats() {
+    fprintf(stdout, "%s total memory %lld\n", this->_frame_name.c_str(), this->_total_memory_consumption);
+    fprintf(stdout, "%s peak memory %lld\n", this->_frame_name.c_str(), this->_peak_memory_consumption);
+    for (auto child: _children) {
+	 child->show_stats();
+    }
+  }
+};
+
+struct Tree* call_tree = nullptr;
+
 // Quantum Runtime Instructions
 void __catalyst__rt__fail_cstr(const char *);
 void __catalyst__rt__initialize(uint32_t *);
 void __catalyst__rt__device_init(int8_t *, int8_t *, int8_t *, int64_t, bool);
 void __catalyst__rt__device_release();
-void __catalyst__rt__finalize();
+void __catalyst__rt__finalize(bool);
 void __catalyst__rt__toggle_recorder(bool);
 void __catalyst__rt__print_state();
 void __catalyst__rt__print_tensor(OpaqueMemRefT *, bool);
@@ -35,6 +79,12 @@ void __catalyst__rt__print_string(char *);
 void __catalyst__rt__assert_bool(bool, char *);
 int64_t __catalyst__rt__array_get_size_1d(QirArray *);
 int8_t *__catalyst__rt__array_get_element_ptr_1d(QirArray *, int64_t);
+
+// Profiling functions
+int64_t __catalyst__rt__profiler_get_timestamp();
+void __catalyst__rt__profiler_record(const char *file_name, uint32_t line, uint32_t column,
+                                     int64_t start_time, int64_t end_time);
+void __catalyst__rt__profiler_print_stats();
 
 QUBIT *__catalyst__rt__qubit_allocate();
 QirArray *__catalyst__rt__qubit_allocate_array(int64_t);

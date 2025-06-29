@@ -179,3 +179,92 @@ __all__ = (
     *_api_extension_list,
     *_autograph_functions,
 )
+
+
+import subprocess
+from viztracer import VizTracer
+
+class profiler:
+    memory_mode = None
+
+    def __init__(self, mode="idle", tracer_entries=5000000, num_samples=0):
+        self.mode = mode
+        if self.mode == "idle":
+            return
+
+        # Just communicate the mode through OS
+        # This is hackweek, no need for fancy context managers...
+        file = open("__mode.txt", 'w')
+        file.write(self.mode)
+        file.close()
+
+        self.py_tracer = None
+        if mode == "python":
+            self.mode = "python"
+            self.tracer_entries = tracer_entries
+
+        elif mode == "compiler":
+            self.mode = "compiler"
+            
+        elif mode == "user runtime":
+            self.mode = "user runtime"
+
+        elif mode == "user memory":
+            profiler.memory_mode = "user memory"
+
+        else:
+            print("""
+    Unexpected mode.
+    Currently, catalyst.profiler supports the following modes:
+    - "python": returns the python profile. Non-python processes, for example the mlir passes,
+                the cpp runtime, and the internal device processes, are treated as blackboxes
+                from their corresponding Python callsites.
+    - "compiler": returns the profile for the mlir passes in the Catalyst compiler.
+    - "user runtime": returns the runtime profile for the mlir IR based on debug location information.
+    - "user memory": ...
+            """)
+            raise RuntimeError("Bad mode")
+
+    def __enter__(self):
+        if self.mode == "idle":
+            return
+
+        if self.mode == "python":
+            self.py_tracer = VizTracer(tracer_entries=self.tracer_entries)
+            self.py_tracer.start()
+
+        elif self.mode == "compiler":
+            pass
+        
+        elif self.mode == "user runtime":
+            pass
+
+
+    def __exit__(self, *_, **__):
+        if self.mode == "idle":
+            return
+
+        subprocess.run("rm -rf __mode.txt", shell=True)
+
+        if self.mode == "python":
+            self.py_tracer.stop()
+            filename = "__py_result.json"
+            self.py_tracer.save(filename)
+            subprocess.run(f"vizviewer {filename}", shell=True)
+
+        elif self.mode == "compiler":
+            filename = "perf_output.txt"
+            subprocess.run("sudo perf script -i __perf_qopt.data > perf_output.txt", shell=True)
+            print(f"""
+                To view the profile, navigate to https://ui.perfetto.dev and
+                upload the {filename} file into the UI.
+                Once the trace opens, you should be able select either individual CPU samples
+                or ranges of time containing CPU samples to get a flamegraph of all the samples
+                in that region.
+                """)
+
+import jax
+import pennylane
+
+jax.extend.source_info_util.register_exclusion(dirname(__file__))
+jax.extend.source_info_util.register_exclusion(dirname(pennylane.__file__))

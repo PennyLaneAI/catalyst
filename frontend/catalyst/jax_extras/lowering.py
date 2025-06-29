@@ -134,7 +134,10 @@ def custom_lower_jaxpr_to_module(
         lowering_parameters=lowering_params,
     )
     ctx.context.allow_unregistered_dialects = True
-    with ctx.context, ir.Location.unknown(ctx.context):
+    func_dbg_info = jaxpr.jaxpr.debug_info
+    loc = ir.Location.file(func_dbg_info.func_filename, func_dbg_info.func_lineno, 0, ctx.context)
+
+    with ctx.context, loc:
         # register_dialect()
         # Remove module name characters that XLA would alter. This ensures that
         # XLA computation preserves the module name.
@@ -150,7 +153,11 @@ def custom_lower_jaxpr_to_module(
             arg_shardings=arg_shardings,
             result_shardings=result_shardings,
             name_stack=name_stack,
+            api_name="qjit",
         )
+        # TODO: we're missing argument names in the debug info
+        # TODO: name stack starts with jit(ok), not the most meaningful
+        # TODO: toplevel function in name stack for jax is "main", for us "jit_<fun name>"
 
         worklist = [*ctx.module.body.operations]
         while worklist:

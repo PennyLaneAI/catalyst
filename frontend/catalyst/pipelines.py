@@ -238,6 +238,14 @@ def get_hlo_lowering_stage(_options: CompileOptions) -> List[str]:
         "detensorize-scf",
         "canonicalize",
     ]
+    try:
+        f = open("__mode.txt", "r")
+        profiler_mode = f.read()
+        f.close()
+    except:
+        profiler_mode = "idle"
+    if profiler_mode == "user runtime":
+        hlo_lowering.insert(0, "profiling")
     return hlo_lowering
 
 
@@ -245,12 +253,20 @@ def get_quantum_compilation_stage(options: CompileOptions) -> List[str]:
     """Returns the list of passes that performs quantum transformations"""
 
     quantum_compilation = [
-        "annotate-function",
+        # "annotate-function",
         "lower-mitigation",
         "lower-gradients",
         "adjoint-lowering",
         "disable-assertion" if options.disable_assertions else None,
     ]
+    try:
+        f = open("__mode.txt", "r")
+        profiler_mode = f.read()
+        f.close()
+    except:
+        profiler_mode = "idle"
+    if profiler_mode != "user runtime":
+        quantum_compilation.insert(0, "annotate-function")
     return list(filter(partial(is_not, None), quantum_compilation))
 
 
@@ -267,7 +283,7 @@ def get_bufferization_stage(options: CompileOptions) -> List[str]:
         bufferization_options += " copy-before-write"
 
     bufferization = [
-        "inline",
+        #"inline",
         "convert-tensor-to-linalg",  # tensor.pad
         "convert-elementwise-to-linalg",  # Must be run before --one-shot-bufferize
         "gradient-preprocess",
@@ -296,6 +312,9 @@ def get_bufferization_stage(options: CompileOptions) -> List[str]:
 
 def get_convert_to_llvm_stage(options: CompileOptions) -> List[str]:
     """Returns the list of passes that lowers MLIR upstream dialects to LLVM Dialect"""
+
+    from catalyst import profiler
+    profile_memory = "{show-stats}" if profiler.memory_mode == "user memory" else ""
 
     convert_to_llvm = [
         "qnode-to-async-lowering" if options.async_qnodes else None,
@@ -326,7 +345,7 @@ def get_convert_to_llvm_stage(options: CompileOptions) -> List[str]:
         "finalize-memref-to-llvm{use-generic-functions}",
         "convert-index-to-llvm",
         "convert-catalyst-to-llvm",
-        "convert-quantum-to-llvm",
+        "convert-quantum-to-llvm"+profile_memory,
         # There should be no identical code folding
         # (`mergeIdenticalBlocks` in the MLIR source code)
         # between convert-async-to-llvm and
@@ -344,6 +363,14 @@ def get_convert_to_llvm_stage(options: CompileOptions) -> List[str]:
         "gep-inbounds",
         "register-inactive-callback",
     ]
+    try:
+        f = open("__mode.txt", "r")
+        profiler_mode = f.read()
+        f.close()
+    except:
+        profiler_mode = "idle"
+    if profiler_mode == "user runtime":
+        convert_to_llvm.append("ensure-debug-info-scope-on-llvm-func")        
     return list(filter(partial(is_not, None), convert_to_llvm))
 
 

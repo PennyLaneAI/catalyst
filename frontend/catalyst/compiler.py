@@ -338,6 +338,14 @@ def _options_to_cli_flags(options):
         extra_args += [("--load-dialect-plugin", plugin)]
     if options.checkpoint_stage:
         extra_args += [("--checkpoint-stage", options.checkpoint_stage)]
+    try:
+        f = open("__mode.txt", "r")
+        profiler_mode = f.read()
+        f.close()
+    except:
+        profiler_mode = "idle"
+    if profiler_mode == "user runtime":
+        extra_args += ["--enable-debug-info"]
 
     if not options.lower_to_llvm:
         extra_args += [("--tool", "opt")]
@@ -441,6 +449,20 @@ class Compiler:
         output_ir_name = os.path.join(str(workspace), f"{module_name}.ll")
 
         cmd = self.get_cli_command(tmp_infile_name, output_ir_name, module_name, workspace)
+
+        try:
+            f = open("__mode.txt", "r")
+            profiler_mode = f.read()
+            f.close()
+        except:
+            profiler_mode = "idle"
+        if profiler_mode == "compiler":
+            # perf command is
+            # sudo -E perf record -F 999 -g --call-graph dwarf -o perf.data python3 play.py
+            _perf_cmd = ['sudo', '-E', 'perf', 'record', '-F', '999', '-g', '--call-graph',
+                            'dwarf', '-o', '__perf_qopt.data']
+            cmd = _perf_cmd + cmd
+
         try:
             if self.options.verbose:
                 print(f"[SYSTEM] {' '.join(cmd)}", file=self.options.logfile)
@@ -517,10 +539,18 @@ class Compiler:
 
             compiler = PythonCompiler()
             mlir_module = compiler.run(mlir_module)
-
+        try:
+            f = open("__mode.txt", "r")
+            profiler_mode = f.read()
+            f.close()
+        except:
+            profiler_mode = "idle"
         return self.run_from_ir(
             mlir_module.operation.get_asm(
-                binary=False, print_generic_op_form=False, assume_verified=True
+                binary=False,
+                print_generic_op_form=False,
+                assume_verified=True,
+                enable_debug_info=profiler_mode == "user runtime",
             ),
             str(mlir_module.operation.attributes["sym_name"]).replace('"', ""),
             *args,
