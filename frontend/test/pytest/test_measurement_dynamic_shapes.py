@@ -24,6 +24,7 @@ import pytest
 import catalyst
 from catalyst.debug import get_compilation_stage, replace_ir
 
+from functools import partial
 
 def test_dynamic_sample_backend_functionality():
     """Test that a `sample` program with dynamic shots can be executed correctly."""
@@ -31,8 +32,9 @@ def test_dynamic_sample_backend_functionality():
     @catalyst.qjit(keep_intermediate=True)
     def workflow_dyn_sample(shots):  # pylint: disable=unused-argument
         # qml.device still needs concrete shots
-        device = qml.device("lightning.qubit", wires=1, shots=10)
+        device = qml.device("lightning.qubit", wires=1)
 
+        @partial(qml.set_shots, shots=shots)
         @qml.qnode(device)
         def circuit():
             qml.RX(1.5, 0)
@@ -41,29 +43,31 @@ def test_dynamic_sample_backend_functionality():
         return circuit()
 
     workflow_dyn_sample(10)
-    old_ir = get_compilation_stage(workflow_dyn_sample, "mlir")
-    workflow_dyn_sample.workspace.cleanup()
-
-    new_ir = old_ir.replace(
-        "catalyst.launch_kernel @module_circuit::@circuit() : () -> tensor<10x1xi64>",
-        "catalyst.launch_kernel @module_circuit::@circuit(%arg0) : (tensor<i64>) -> tensor<?x1xi64>",
-    )
-    new_ir = new_ir.replace(
-        "func.func public @circuit() -> tensor<10x1xi64>",
-        "func.func public @circuit(%arg0: tensor<i64>) -> tensor<?x1xi64>",
-    )
-    new_ir = new_ir.replace(
-        "quantum.device shots(%extracted) [",
-        """%shots = tensor.extract %arg0[] : tensor<i64>
-      quantum.device shots(%shots) [""",
-    )
-    new_ir = new_ir.replace("tensor<10x1x", "tensor<?x1x")
-    new_ir = new_ir.replace("quantum.sample %3 :", "quantum.sample %3 shape %shots:")
-    replace_ir(workflow_dyn_sample, "mlir", new_ir)
     res = workflow_dyn_sample(37)
     assert len(res) == 37
+    # old_ir = get_compilation_stage(workflow_dyn_sample, "mlir")
+    # workflow_dyn_sample.workspace.cleanup()
 
-    workflow_dyn_sample.workspace.cleanup()
+    # new_ir = old_ir.replace(
+    #     "catalyst.launch_kernel @module_circuit::@circuit() : () -> tensor<10x1xi64>",
+    #     "catalyst.launch_kernel @module_circuit::@circuit(%arg0) : (tensor<i64>) -> tensor<?x1xi64>",
+    # )
+    # new_ir = new_ir.replace(
+    #     "func.func public @circuit() -> tensor<10x1xi64>",
+    #     "func.func public @circuit(%arg0: tensor<i64>) -> tensor<?x1xi64>",
+    # )
+    # new_ir = new_ir.replace(
+    #     "quantum.device shots(%extracted) [",
+    #     """%shots = tensor.extract %arg0[] : tensor<i64>
+    #   quantum.device shots(%shots) [""",
+    # )
+    # new_ir = new_ir.replace("tensor<10x1x", "tensor<?x1x")
+    # new_ir = new_ir.replace("quantum.sample %3 :", "quantum.sample %3 shape %shots:")
+    # replace_ir(workflow_dyn_sample, "mlir", new_ir)
+    # res = workflow_dyn_sample(37)
+    # assert len(res) == 37
+
+    # workflow_dyn_sample.workspace.cleanup()
 
 
 def test_dynamic_counts_backend_functionality():

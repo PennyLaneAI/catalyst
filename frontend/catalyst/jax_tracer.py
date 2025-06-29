@@ -148,9 +148,9 @@ def _make_execution_config(qnode):
     return execution_config
 
 
-def get_device_shots(dev):
+def get_device_shots(dev, qnode):
     """Helper function to get device shots."""
-    return dev.shots if isinstance(dev, qml.devices.LegacyDevice) else dev.shots.total_shots
+    return qnode._shots if isinstance(dev, qml.devices.LegacyDevice) else qnode._shots.total_shots
 
 
 def get_device_shot_vector(dev):
@@ -953,6 +953,7 @@ def pauli_word_to_tensor_obs(obs, qrp: QRegPromise) -> List[DynamicJaxprTracer]:
 # pylint: disable=too-many-statements,too-many-branches
 @debug_logger
 def trace_quantum_measurements(
+    qnode,
     device: QubitDevice,
     qrp: QRegPromise,
     outputs: List[Union[MeasurementProcess, DynamicJaxprTracer, Any]],
@@ -972,7 +973,7 @@ def trace_quantum_measurements(
         out_classical_tracers: modified list of JAX classical qnode ouput tracers.
         out_tree: modified PyTree-shape of the qnode output.
     """
-    shots = get_device_shots(device)
+    shots = get_device_shots(device, qnode)
     out_classical_tracers = []
 
     for i, output in enumerate(outputs):
@@ -1333,7 +1334,8 @@ def trace_quantum_function(
 
     with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
         # (1) - Classical tracing
-        quantum_tape = QuantumTape(shots=device.shots)
+        quantum_tape = QuantumTape(shots=qnode._shots)  # pylint: disable=protected-access
+        device._shots = qnode._shots  # pylint: disable=protected-access
         with EvaluationContext.frame_tracing_context(debug_info=debug_info) as trace:
             wffa, in_avals, keep_inputs, out_tree_promise = deduce_avals(
                 f, args, kwargs, static_argnums, debug_info
@@ -1385,7 +1387,9 @@ def trace_quantum_function(
 
                 # TODO: device shots is now always a concrete integer or None
                 # When PennyLane allows dynamic shots, update tracing to accept dynamic shots too
-                device_shots = get_device_shots(device) or 0
+                device_shots = get_device_shots(device, qnode)
+                if device_shots is None:
+                    device_shots = 0
                 device_init_p.bind(
                     device_shots,
                     auto_qubit_management=(device.wires is None),
@@ -1423,7 +1427,7 @@ def trace_quantum_function(
                 qrp_out = trace_quantum_operations(
                     tape, device, qreg_in, ctx, trace, mcm_config, snapshot_results
                 )
-                meas, meas_trees = trace_quantum_measurements(device, qrp_out, output, trees)
+                meas, meas_trees = trace_quantum_measurements(qnode, device, qrp_out, output, trees)
                 qreg_out = qrp_out.actualize()
 
                 # Check if the measurements are nested then apply the to_jaxpr_tracer

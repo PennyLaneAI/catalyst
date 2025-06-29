@@ -127,9 +127,9 @@ SUPPORTED_RT_DEVICES = {
 }
 
 
-def get_device_shots(dev):
+def get_device_shots(dev, qnode):
     """Helper function to get device shots."""
-    return dev.shots.total_shots if isinstance(dev, qml.devices.Device) else dev.shots
+    return qnode._shots.total_shots if isinstance(dev, qml.devices.Device) else qnode._shots
 
 
 @dataclass

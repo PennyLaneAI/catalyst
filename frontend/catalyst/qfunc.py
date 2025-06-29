@@ -22,6 +22,7 @@ from copy import copy
 from dataclasses import replace
 from typing import Callable, Sequence
 
+import jax
 import jax.numpy as jnp
 import pennylane as qml
 from jax.core import eval_jaxpr
@@ -64,7 +65,16 @@ def _resolve_mcm_config(mcm_config, shots):
     """Helper function for resolving and validating that the mcm_config is valid for executing."""
     updated_values = {}
 
-    updated_values["postselect_mode"] = mcm_config.postselect_mode if shots else None
+    # Handle both concrete values and JAX tracers
+    if isinstance(shots, jax.core.Tracer):
+        # For traced values, we can't do boolean conversion at trace time
+        # Assume shots is non-zero if it's being traced (reasonable assumption)
+        shots_is_nonzero = True
+    else:
+        shots_is_nonzero = bool(shots)
+
+    updated_values["postselect_mode"] = mcm_config.postselect_mode if shots_is_nonzero else None
+    
     if mcm_config.mcm_method is None:
         updated_values["mcm_method"] = (
             "one-shot" if mcm_config.postselect_mode == "hw-like" else "single-branch-statistics"
@@ -78,10 +88,16 @@ def _resolve_mcm_config(mcm_config, shots):
         raise ValueError(
             "Cannot use postselect_mode='hw-like' with Catalyst when mcm_method != 'one-shot'."
         )
-    if mcm_config.mcm_method == "one-shot" and shots is None:
-        raise ValueError(
-            "Cannot use the 'one-shot' method for mid-circuit measurements with analytic mode."
-        )
+    
+    # For the shots=None check, we need to be more careful with tracers
+    if mcm_config.mcm_method == "one-shot":
+        if isinstance(shots, jax.core.Tracer):
+            # Can't check if tracer is None at trace time, skip this validation
+            pass
+        elif shots is None:
+            raise ValueError(
+                "Cannot use the 'one-shot' method for mid-circuit measurements with analytic mode."
+            )
 
     return replace(mcm_config, **updated_values)
 
@@ -123,7 +139,7 @@ class QFunc:
                     mcm_method=self.execute_kwargs["mcm_method"],
                 )
             )
-            total_shots = get_device_shots(self.device)
+            total_shots = get_device_shots(self.device, self)
             mcm_config = _resolve_mcm_config(mcm_config, total_shots)
 
             if mcm_config.mcm_method == "one-shot":
@@ -132,6 +148,7 @@ class QFunc:
                 )
                 return Function(dynamic_one_shot(self, mcm_config=mcm_config))(*args, **kwargs)
 
+        self.device._shots = self._shots
         qjit_device = QJITDevice(self.device)
 
         static_argnums = kwargs.pop("static_argnums", ())
@@ -214,7 +231,7 @@ def dynamic_one_shot(qnode, **kwargs):
     mcm_config = kwargs.pop("mcm_config", None)
 
     def transform_to_single_shot(qnode):
-        if not qnode.device.shots:
+        if not qnode._shots:
             raise exceptions.QuantumFunctionError(
                 "dynamic_one_shot is only supported with finite shots."
             )
@@ -259,7 +276,7 @@ def dynamic_one_shot(qnode, **kwargs):
         single_shot_qnode.execute_kwargs["mcm_method"] = mcm_config.mcm_method
     single_shot_qnode._dynamic_one_shot_called = True
     dev = qnode.device
-    total_shots = get_device_shots(dev)
+    total_shots = get_device_shots(dev, qnode)
 
     new_dev = copy(dev)
     if isinstance(new_dev, qml.devices.LegacyDeviceFacade):
@@ -267,6 +284,7 @@ def dynamic_one_shot(qnode, **kwargs):
     else:
         new_dev._shots = qml.measurements.Shots(1)
     single_shot_qnode.device = new_dev
+    single_shot_qnode._shots = qml.measurements.Shots(1)
 
     def one_shot_wrapper(*args, **kwargs):
         def wrap_single_shot_qnode(*_):
