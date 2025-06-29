@@ -15,7 +15,7 @@
   <img src="./doc/_static/pl-catalyst-logo-darkmode.png#gh-dark-mode-only" width="700px" onerror="this.style.display='none'" alt=""/>
 </p>
 
-Catalyst is an experimental package that enables just-in-time (JIT) compilation of hybrid
+Catalyst is a package that enables just-in-time (JIT) compilation of hybrid
 quantum-classical programs.
 
 **Catalyst is currently under heavy development — if you have suggestions on the API or use-cases
