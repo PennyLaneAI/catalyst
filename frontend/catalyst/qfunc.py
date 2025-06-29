@@ -65,9 +65,11 @@ def _resolve_mcm_config(mcm_config, shots):
     updated_values = {}
 
     updated_values["postselect_mode"] = mcm_config.postselect_mode if shots else None
+    catalyst_default_mcm_method = "one-shot" if shots is not None else "single-branch-statistics"
+    #catalyst_default_mcm_method = "single-branch-statistics"
     if mcm_config.mcm_method is None:
         updated_values["mcm_method"] = (
-            "one-shot" if mcm_config.postselect_mode == "hw-like" else "single-branch-statistics"
+            "one-shot" if mcm_config.postselect_mode == "hw-like" else catalyst_default_mcm_method
         )
     if mcm_config.mcm_method == "deferred":
         raise ValueError("mcm_method='deferred' is not supported with Catalyst.")
@@ -287,10 +289,13 @@ def dynamic_one_shot(qnode, **kwargs):
         else:
             for m_count, m in enumerate(cpy_tape.measurements):
                 # Without MCMs and postselection, all samples are valid for use in MP computation.
-                is_valid = jnp.array([True] * len(out[m_count]))
+                #is_valid = jnp.array([True] * len(out[m_count]))
+                full_shape = out[m_count].shape
+                is_valid = jnp.full(full_shape, True)
                 out[m_count] = gather_non_mcm(
                     m, out[m_count], is_valid, postselect_mode="pad-invalid-samples"
                 )
+                out[m_count] = out[m_count].reshape(full_shape[0], full_shape[2])
             out = tuple(out)
         out_tree_expected = kwargs.pop("_out_tree_expected", [])
         out = tree_unflatten(out_tree_expected[0], out)
