@@ -382,7 +382,7 @@ else:
 
 setup(
     classifiers=classifiers,
-    name="PennyLane-Catalyst",
+    name="pennylane_catalyst",
     version=version,
     python_requires=">=3.10",
     entry_points=entry_points,

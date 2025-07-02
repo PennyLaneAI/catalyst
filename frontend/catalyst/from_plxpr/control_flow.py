@@ -63,7 +63,7 @@ def handle_cond(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
                 # `qreg` is the scope argument for the body jaxpr
                 qreg_manager = QregManager(qreg, self.qubit_index_recorder)
                 converter = PLxPRToQuantumJaxprInterpreter(
-                    device, shots, qreg_manager, self.qubit_index_recorder
+                    device, shots, qreg_manager, self.subroutine_cache, self.qubit_index_recorder
                 )
                 # pylint: disable-next=cell-var-from-loop
                 retvals = converter(closed_jaxpr, *args)
@@ -135,7 +135,7 @@ def handle_for_loop(
         # `qreg` is the scope argument for the body jaxpr
         qreg_manager = QregManager(qreg, self.qubit_index_recorder)
         converter = PLxPRToQuantumJaxprInterpreter(
-            device, shots, qreg_manager, self.qubit_index_recorder
+            device, shots, qreg_manager, self.subroutine_cache, self.qubit_index_recorder
         )
         retvals = converter(jaxpr, *args)
         qreg_manager.insert_all_dangling_qubits()
@@ -196,7 +196,7 @@ def handle_while_loop(
         # `qreg` is the scope argument for the body jaxpr
         qreg_manager = QregManager(qreg, self.qubit_index_recorder)
         converter = PLxPRToQuantumJaxprInterpreter(
-            device, shots, qreg_manager, self.qubit_index_recorder
+            device, shots, qreg_manager, self.subroutine_cache, self.qubit_index_recorder
         )
         retvals = converter(jaxpr, *args)
         qreg_manager.insert_all_dangling_qubits()
@@ -223,7 +223,7 @@ def handle_while_loop(
         # `qreg` is the scope argument for the body jaxpr
         qreg_manager = QregManager(qreg, self.qubit_index_recorder)
         converter = PLxPRToQuantumJaxprInterpreter(
-            device, shots, qreg_manager, self.qubit_index_recorder
+            device, shots, qreg_manager, self.subroutine_cache, self.qubit_index_recorder
         )
 
         return converter(jaxpr, *args)

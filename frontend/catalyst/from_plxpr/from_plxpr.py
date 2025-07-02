@@ -22,6 +22,7 @@ import jax
 import jax.core
 import jax.numpy as jnp
 import pennylane as qml
+from jax._src.sharding_impls import UNSPECIFIED
 from jax.extend.core import ClosedJaxpr, Jaxpr
 from jax.extend.linear_util import wrap_init
 from pennylane.capture import PlxprInterpreter, qnode_prim
@@ -57,6 +58,7 @@ from catalyst.jax_primitives import (
     qdealloc_p,
     qinst_p,
     quantum_kernel_p,
+    quantum_subroutine_p,
     sample_p,
     set_basis_state_p,
     set_state_p,
@@ -191,13 +193,15 @@ def handle_qnode(self, *args, qnode, shots, device, execution_config, qfunc_jaxp
         )
 
         qreg = qalloc_p.bind(len(device.wires))
+
         self.global_qreg = QregManager(qreg, self.qubit_index_recorder)
         # Special: distinguish the global qreg by forcing a hash of zero
         self.global_qreg.root_hash = 0
 
         converter = PLxPRToQuantumJaxprInterpreter(
-            device, shots, self.global_qreg, self.qubit_index_recorder
+            device, shots, self.global_qreg, {}, self.qubit_index_recorder
         )
+
         retvals = converter(closed_jaxpr, *args)
         self.global_qreg.insert_all_dangling_qubits()
         qdealloc_p.bind(self.global_qreg.get())
@@ -294,11 +298,12 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
     during initialization.
     """
 
-    def __init__(self, device, shots, qreg_manager, qubit_index_recorder):
+    def __init__(self, device, shots, qreg_manager, cache, qubit_index_recorder):
         self.device = device
         self.shots = shots
         self.qregs = {"global": qreg_manager}
         self.qreg_manager = self.qregs["global"]
+        self.subroutine_cache = cache
         self.qubit_index_recorder = qubit_index_recorder
         super().__init__()
 
@@ -423,6 +428,7 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         return self.eval(jaxpr.jaxpr, jaxpr.consts, *args)
 
 
+<<<<<<< HEAD
 @PLxPRToQuantumJaxprInterpreter.register_primitive(qml.allocation.allocate_prim)
 def handle_qml_alloc(self, *, num_wires, require_zeros=True, restored=False):
     """Handle the conversion from plxpr to Catalyst jaxpr for the qml.allocate primitive"""
@@ -447,6 +453,61 @@ def handle_qml_dealloc(self, *wires):
     qreg.insert_all_dangling_qubits()
     #qdealloc_p.bind(qreg.get())
     return []
+
+
+@PLxPRToQuantumJaxprInterpreter.register_primitive(quantum_subroutine_p)
+def handle_subroutine(self, *args, **kwargs):
+    """
+    Transform the subroutine from PLxPR into JAXPR with quantum primitives.
+    """
+
+    backup = dict(self.qreg_manager)
+    self.qreg_manager.insert_all_dangling_qubits()
+
+    # Make sure the quantum register is updated
+    plxpr = kwargs["jaxpr"]
+    transformed = self.subroutine_cache.get(plxpr)
+
+    def wrapper(qreg, *args):
+        device = self.device
+        shots = self.shots
+        manager = QregManager(qreg)
+        converter = PLxPRToQuantumJaxprInterpreter(device, shots, manager, self.subroutine_cache)
+        retvals = converter(plxpr, *args)
+        converter.qreg_manager.insert_all_dangling_qubits()
+        return converter.qreg_manager.get(), *retvals
+
+    if not transformed:
+        converted_closed_jaxpr_branch = jax.make_jaxpr(wrapper)(self.qreg_manager.get(), *args)
+        self.subroutine_cache[plxpr] = converted_closed_jaxpr_branch
+    else:
+        converted_closed_jaxpr_branch = transformed
+
+    # quantum_subroutine_p.bind
+    # is just pjit_p with a different name.
+    vals_out = quantum_subroutine_p.bind(
+        self.qreg_manager.get(),
+        *args,
+        jaxpr=converted_closed_jaxpr_branch,
+        in_shardings=(UNSPECIFIED, *kwargs["in_shardings"]),
+        out_shardings=(UNSPECIFIED, *kwargs["out_shardings"]),
+        in_layouts=(None, *kwargs["in_layouts"]),
+        out_layouts=(None, *kwargs["out_layouts"]),
+        donated_invars=kwargs["donated_invars"],
+        ctx_mesh=kwargs["ctx_mesh"],
+        name=kwargs["name"],
+        keep_unused=kwargs["keep_unused"],
+        inline=kwargs["inline"],
+        compiler_options_kvs=kwargs["compiler_options_kvs"],
+    )
+
+    self.qreg_manager.set(vals_out[0])
+    vals_out = vals_out[1:]
+
+    for orig_wire in backup.keys():
+        self.qreg_manager.extract(orig_wire)
+
+    return vals_out
 
 
 @PLxPRToQuantumJaxprInterpreter.register_primitive(qml.QubitUnitary._primitive)
@@ -545,15 +606,33 @@ def handle_measure_in_basis(self, angle, wire, plane, reset, postselect):
 
 
 # pylint: disable=too-many-positional-arguments
-def trace_from_pennylane(fn, static_argnums, abstracted_axes, sig, kwargs, debug_info=None):
+def trace_from_pennylane(
+    fn, static_argnums, dynamic_args, abstracted_axes, sig, kwargs, debug_info=None
+):
     """Capture the JAX program representation (JAXPR) of the wrapped function, using
     PL capure module.
 
     Args:
-        args (Iterable): arguments to use for program capture
+        fn(Callable): the user function to be traced
+        static_argnums(int or Seqence[Int]): an index or a sequence of indices that specifies the
+            positions of static arguments.
+        dynamic_args(Seqence[Any]): the abstract values of the dynamic arguments.
+        abstracted_axes (Sequence[Sequence[str]] or Dict[int, str] or Sequence[Dict[int, str]]):
+            An experimental option to specify dynamic tensor shapes.
+            This option affects the compilation of the annotated function.
+            Function arguments with ``abstracted_axes`` specified will be compiled to ranked tensors
+            with dynamic shapes. For more details, please see the Dynamically-shaped Arrays section
+            below.
+        sig(Sequence[Any]): a tuple indicating the argument signature of the function. Static arguments
+            are indicated with their literal values, and dynamic arguments are indicated by abstract
+            values.
+        kwargs(Dict[str, Any]): keyword argumemts to the function.
+        debug_info(jax.api_util.debug_info): a source debug information object required by jaxprs.
 
     Returns:
         ClosedJaxpr: captured JAXPR
+        Tuple[Tuple[ShapedArray, bool]]: the return type of the captured JAXPR.
+            The boolean indicates whether each result is a value returned by the user function.
         PyTreeDef: PyTree metadata of the function output
         Tuple[Any]: the dynamic argument signature
     """
@@ -568,8 +647,16 @@ def trace_from_pennylane(fn, static_argnums, abstracted_axes, sig, kwargs, debug
 
         args = sig
 
+        if isinstance(fn, qml.QNode) and static_argnums:
+            # `make_jaxpr2` sees the qnode
+            # The static_argnum on the wrapped function takes precedence over the
+            # one in `make_jaxpr`
+            # https://github.com/jax-ml/jax/blob/636691bba40b936b8b64a4792c1d2158296e9dd4/jax/_src/linear_util.py#L231
+            # Therefore we need to coordinate them manually
+            fn.static_argnums = static_argnums
+
         plxpr, out_type, out_treedef = make_jaxpr2(fn, **make_jaxpr_kwargs)(*args, **kwargs)
-        jaxpr = from_plxpr(plxpr)(*args, **kwargs)
-        # breakpoint()
+        jaxpr = from_plxpr(plxpr)(*dynamic_args, **kwargs)
+
 
     return jaxpr, out_type, out_treedef, sig

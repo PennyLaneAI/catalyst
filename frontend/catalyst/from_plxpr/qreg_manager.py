@@ -229,5 +229,11 @@ class QregManager:
         Update the wire_map when a new qubit value for a wire index is produced,
         for example by gates.
         """
+
         global_index = self.local_index_to_global_index(index)
         self.wire_map[global_index] = qubit
+
+    def __iter__(self):
+        """Iterate over wires map dictionary"""
+        return iter(self.wire_map.items())
+

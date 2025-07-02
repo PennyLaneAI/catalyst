@@ -132,7 +132,7 @@ LogicalResult InsertOp::canonicalize(InsertOp insert, mlir::PatternRewriter &rew
         bool oneUse = extract.getResult().hasOneUse();
 
         if ((staticallyEqual || dynamicallyEqual) && oneUse) {
-            rewriter.replaceOp(insert, extract.getQreg());
+            rewriter.replaceOp(insert, insert.getInQreg());
             rewriter.eraseOp(extract);
             return success();
         }

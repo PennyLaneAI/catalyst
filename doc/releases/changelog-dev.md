@@ -37,6 +37,57 @@
   Use this pass via the :func:`~.passes.ppm_compilation` decorator to compile circuits 
   in a single pipeline.
 
+  * A new function :func:`~.passes.get_ppm_specs` to get the result statistics after a PPR/PPM compilations is available. The statistics is returned in a Python dictionary.
+  [(#1794)](https://github.com/PennyLaneAI/catalyst/pull/1794). 
+  
+  Example below shows an input circuit and corresponding PPM specs.
+
+  ```python
+  import pennylane as qml
+  from catalyst import qjit, measure
+  from catalyst.passes import get_ppm_specs, to_ppr, merge_ppr_ppm, commute_ppr
+
+  pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+
+  @qjit(pipelines=pipe, target="mlir")
+  def test_convert_clifford_to_ppr_workflow():
+
+      device = qml.device("lightning.qubit", wires=2)
+
+      @merge_ppr_ppm
+      @commute_ppr(max_pauli_size=2)
+      @to_ppr
+      @qml.qnode(device)
+      def f():
+          qml.CNOT([0, 2])
+          qml.T(0)
+          return measure(0), measure(1)
+
+      @merge_ppr_ppm(max_pauli_size=1)
+      @commute_ppr
+      @to_ppr
+      @qml.qnode(device)
+      def g():
+          qml.CNOT([0, 2])
+          qml.T(0)
+          qml.T(1)
+          qml.CNOT([0, 1])
+          return measure(0), measure(1)
+
+      return f(), g()
+
+  ppm_specs = get_ppm_specs(test_convert_clifford_to_ppr_workflow)
+  print(ppm_specs)
+
+  ```
+  Output:
+  ```pycon
+  {
+  'f_0': {'max_weight_pi8': 1, 'num_logical_qubits': 2, 'num_of_ppm': 2, 'num_pi8_gates': 1}, 
+  'g_0': {'max_weight_pi4': 2, 'max_weight_pi8': 1, 'num_logical_qubits': 2, 'num_of_ppm': 2, 'num_pi4_gates': 3, 'num_pi8_gates': 2}
+  }
+  ```
+
 * Support for :class:`qml.Snapshot <pennylane.Snapshot>` to capture quantum states at any 
   point in a circuit has been added to Catalyst [(#1741)](https://github.com/PennyLaneAI/catalyst/pull/1741).
   For example, the code below is capturing 
@@ -108,6 +159,13 @@
 
 <h3>Improvements 🛠</h3>
 
+* The package name of the Catalyst distribution has been updated to be inline with
+  [PyPA standards](https://packaging.python.org/en/latest/specifications/binary-distribution-format/#file-name-convention),
+  from `PennyLane-Catalyst` to `pennylane_catalyst`. This change is not expected to
+  affect users, besides for instance the installation directory name, as tools in the
+  Python ecosystem (e.g. `pip`) already handle both versions through normalization.
+  [(#1817)](https://github.com/PennyLaneAI/catalyst/pull/1817)
+
 * The behaviour of measurement processes executed on `null.qubit` with QJIT is now more in line with
   their behaviour on `null.qubit` *without* QJIT.
   [(#1598)](https://github.com/PennyLaneAI/catalyst/pull/1598)
@@ -126,6 +184,22 @@
   the phase gate adjoint (`S†`), and the π/8 gate adjoint (`T†`). This extension improves
   performance by eliminating indirect conversion.
   [(#1738)](https://github.com/PennyLaneAI/catalyst/pull/1738)
+
+* The `keep_intermediate` argument in the `qjit` decorator now accepts a new value that allows for
+  saving intermediate files after each pass. The updated possible options for this argument are:
+  * `False` or `0` or `"none"` or `None` : No intermediate files are kept.
+  * `True` or `1` or `"pipeline"`: Intermediate files are saved after each pipeline.
+  * `2` or `"pass"`: Intermediate files are saved after each pass.
+  The default value is `False`.
+  [(#1791)](https://github.com/PennyLaneAI/catalyst/pull/1791)
+
+* `static_argnums` on `qjit` can now be specified with program capture through PLxPR.
+  [(#1810)](https://github.com/PennyLaneAI/catalyst/pull/1810)
+
+* Two new Python pass decorators, :func:`~.passes.disentangle_cnot` and 
+  :func:`~.passes.disentangle_swap` have been added. They apply their corresponding MLIR passes 
+  `--disentangle-CNOT` and `--disentangle-SWAP` respectively. 
+  [(#1823)](https://github.com/PennyLaneAI/catalyst/pull/1823)
 
 <h3>Breaking changes 💔</h3>
 
@@ -259,6 +333,9 @@
 * Fixes the conversion of PLxPR to JAXPR with quantum primitives when using control flow.
   [(#1809)](https://github.com/PennyLaneAI/catalyst/pull/1809)
 
+* Fixes canonicalization of insertion and extraction into quantum registers.
+  [(#1840)](https://github.com/PennyLaneAI/catalyst/pull/1840)
+
 <h3>Internal changes ⚙️</h3>
 
 * `from_plxpr` updated to match a change in the `qnode_prim` in pennylane. consts are now treated as
@@ -296,6 +373,11 @@
 
   This runtime stub is currently for mock execution only and should be treated as a placeholder
   operation. Internally, it functions just as a computational-basis measurement instruction.
+
+* Support for quantum subroutines was added.
+  This feature is expected to improve compilation times for large quantum programs.
+  [(#1774)](https://github.com/PennyLaneAI/catalyst/pull/1774)
+  [(#1828)](https://github.com/PennyLaneAI/catalyst/pull/1828)
 
 * PennyLane's arbitrary-basis measurement operations, such as
   :func:`qml.ftqc.measure_arbitrary_basis() <pennylane.ftqc.measure_arbitrary_basis>`, are now
