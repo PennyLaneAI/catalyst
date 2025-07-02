@@ -82,7 +82,7 @@ struct QuantumConversionPass : impl::QuantumConversionPassBase<QuantumConversion
         cf::populateControlFlowToLLVMConversionPatterns(typeConverter, patterns);
         populateFuncToLLVMConversionPatterns(typeConverter, patterns);
         cf::populateAssertToLLVMConversionPattern(typeConverter, patterns);
-        //llvm::errs() << "pass, show stats: " << ShowStats << "\n";
+        // llvm::errs() << "pass, show stats: " << ShowStats << "\n";
         populateQIRConversionPatterns(typeConverter, patterns, ShowStats);
 
         LLVMConversionTarget target(*context);

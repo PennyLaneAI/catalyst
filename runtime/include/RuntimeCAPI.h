@@ -28,43 +28,46 @@ static long long peak_memory_consumption = 0;
 static int pystdout = 0;
 
 struct Tree {
-  std::string _frame_name;
-  long long _total_memory_consumption;
-  long long _memory_tracker;
-  long long _peak_memory_consumption;
-  std::vector<Tree *> _children;
-  Tree *_parent;
-  Tree(std::string name) : _frame_name(name),
-	_total_memory_consumption(0),
-	_memory_tracker(0),
-	_peak_memory_consumption(0),
-	_parent(nullptr)
-  {
-  }
-
-  ~Tree() {
-    for (auto child: _children) {
-        delete child;
+    std::string _frame_name;
+    long long _total_memory_consumption;
+    long long _memory_tracker;
+    long long _peak_memory_consumption;
+    std::vector<Tree *> _children;
+    Tree *_parent;
+    Tree(std::string name)
+        : _frame_name(name), _total_memory_consumption(0), _memory_tracker(0),
+          _peak_memory_consumption(0), _parent(nullptr)
+    {
     }
-  }
 
-  Tree *add_child(std::string child_name) {
-    auto child = new Tree(child_name);
-    child->_parent = this;
-    _children.push_back(child);
-    return child;
-  }
+    ~Tree()
+    {
+        for (auto child : _children) {
+            delete child;
+        }
+    };
 
-  void show_stats() {
-    fprintf(stdout, "%s total memory %lld\n", this->_frame_name.c_str(), this->_total_memory_consumption);
-    fprintf(stdout, "%s peak memory %lld\n", this->_frame_name.c_str(), this->_peak_memory_consumption);
-    for (auto child: _children) {
-	 child->show_stats();
+    Tree *add_child(std::string child_name)
+    {
+        auto child = new Tree(child_name);
+        child->_parent = this;
+        _children.push_back(child);
+        return child;
     }
-  }
+
+    void show_stats()
+    {
+        fprintf(stdout, "%s total memory %lld\n", this->_frame_name.c_str(),
+                this->_total_memory_consumption);
+        fprintf(stdout, "%s peak memory %lld\n", this->_frame_name.c_str(),
+                this->_peak_memory_consumption);
+        for (auto child : _children) {
+            child->show_stats();
+        }
+    }
 };
 
-struct Tree* call_tree = nullptr;
+struct Tree *call_tree = nullptr;
 
 // Quantum Runtime Instructions
 void __catalyst__rt__fail_cstr(const char *);

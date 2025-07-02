@@ -33,13 +33,7 @@ from jax.tree_util import tree_flatten, tree_unflatten
 import catalyst
 from catalyst.autograph import run_autograph
 from catalyst.compiled_functions import CompilationCache, CompiledFunction
-from catalyst.compiler import (
-    CompileOptions,
-    Compiler,
-    canonicalize,
-    to_llvmir,
-    to_mlir_opt,
-)
+from catalyst.compiler import CompileOptions, Compiler, canonicalize, to_llvmir, to_mlir_opt
 from catalyst.debug.instruments import instrument
 from catalyst.from_plxpr import trace_from_pennylane
 from catalyst.jax_extras.patches import get_aval2
@@ -496,7 +490,6 @@ def qjit(
     kwargs = copy.copy(locals())
     kwargs.pop("fn")
 
-
     if fn is None:
         return functools.partial(qjit, **kwargs)
 
@@ -721,12 +714,15 @@ class QJIT(CatalystCallable):
         dbg = debug_info("qjit_capture", self.user_function, args, kwargs)
 
         if qml.capture.enabled():
-            #breakpoint()
+            # breakpoint()
             from catalyst import profiler
+
             if profiler.memory_mode:
                 from catalyst.passes.xdsl_plugin import getXDSLPluginAbsolutePath
+
                 self.compile_options.pass_plugins.update({getXDSLPluginAbsolutePath()})
                 from catalyst.passes.xdsl_plugin.transforms import ProfileMemory
+
                 self.user_function = ProfileMemory(self.user_function)
 
             with Patcher(
@@ -752,17 +748,20 @@ class QJIT(CatalystCallable):
             params["_out_tree_expected"] = []
             default_pass_pipeline = self.compile_options.circuit_transform_pipeline
             from catalyst import profiler
+
             if profiler.memory_mode:
                 raise RuntimeError("profiler's memory mode only supports from_plxpr pipeline")
                 from catalyst.passes.xdsl_plugin import getXDSLPluginAbsolutePath
+
                 self.compile_options.pass_plugins.update({getXDSLPluginAbsolutePath()})
             pass_pipeline = params.get("pass_pipeline", default_pass_pipeline)
             if profiler.memory_mode:
                 from catalyst.passes.xdsl_plugin.transforms import ProfileMemory
+
                 if pass_pipeline:
                     pass_pipeline = (*pass_pipeline, "profile-memory")
                 else:
-                    pass_pipeline = ("profile-memory")
+                    pass_pipeline = "profile-memory"
             params["pass_pipeline"] = pass_pipeline
             params["debug_info"] = dbg
 

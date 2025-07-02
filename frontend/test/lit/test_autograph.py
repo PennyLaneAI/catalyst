@@ -16,13 +16,7 @@
 
 # RUN: %PYTHON %s | FileCheck %s
 
-from catalyst import (
-    AutoGraphError,
-    autograph_source,
-    disable_autograph,
-    qjit,
-    run_autograph,
-)
+from catalyst import AutoGraphError, autograph_source, disable_autograph, qjit, run_autograph
 from catalyst.utils.dummy import dummy_func
 
 

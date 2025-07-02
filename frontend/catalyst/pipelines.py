@@ -283,7 +283,7 @@ def get_bufferization_stage(options: CompileOptions) -> List[str]:
         bufferization_options += " copy-before-write"
 
     bufferization = [
-        #"inline",
+        # "inline",
         "convert-tensor-to-linalg",  # tensor.pad
         "convert-elementwise-to-linalg",  # Must be run before --one-shot-bufferize
         "gradient-preprocess",
@@ -314,6 +314,7 @@ def get_convert_to_llvm_stage(options: CompileOptions) -> List[str]:
     """Returns the list of passes that lowers MLIR upstream dialects to LLVM Dialect"""
 
     from catalyst import profiler
+
     profile_memory = "{show-stats}" if profiler.memory_mode == "user memory" else ""
 
     convert_to_llvm = [
@@ -345,7 +346,7 @@ def get_convert_to_llvm_stage(options: CompileOptions) -> List[str]:
         "finalize-memref-to-llvm{use-generic-functions}",
         "convert-index-to-llvm",
         "convert-catalyst-to-llvm",
-        "convert-quantum-to-llvm"+profile_memory,
+        "convert-quantum-to-llvm" + profile_memory,
         # There should be no identical code folding
         # (`mergeIdenticalBlocks` in the MLIR source code)
         # between convert-async-to-llvm and
@@ -370,7 +371,7 @@ def get_convert_to_llvm_stage(options: CompileOptions) -> List[str]:
     except:
         profiler_mode = "idle"
     if profiler_mode == "user runtime":
-        convert_to_llvm.append("ensure-debug-info-scope-on-llvm-func")        
+        convert_to_llvm.append("ensure-debug-info-scope-on-llvm-func")
     return list(filter(partial(is_not, None), convert_to_llvm))
 
 

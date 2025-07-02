@@ -174,8 +174,9 @@ template <typename T> struct RTBasedPattern : public OpConversionPattern<T> {
             qirName = "__catalyst__rt__finalize";
             auto i64 = IntegerType::get(ctx, 64);
             Location loc = op->getLoc();
-            //llvm::errs() << "show stats? " << _showStats << "\n";
-            auto showStats = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(_showStats));
+            // llvm::errs() << "show stats? " << _showStats << "\n";
+            auto showStats =
+                rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(_showStats));
             Type qirSignature = LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx), {i64});
             LLVM::LLVMFuncOp fnDecl =
                 catalyst::ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
@@ -1031,7 +1032,8 @@ struct SetBasisStateOpPattern : public OpConversionPattern<SetBasisStateOp> {
 namespace catalyst {
 namespace quantum {
 
-void populateQIRConversionPatterns(TypeConverter &typeConverter, RewritePatternSet &patterns, bool showStats)
+void populateQIRConversionPatterns(TypeConverter &typeConverter, RewritePatternSet &patterns,
+                                   bool showStats)
 {
     _showStats = showStats;
     patterns.add<RTBasedPattern<InitializeOp>>(typeConverter, patterns.getContext());

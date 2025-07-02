@@ -73,9 +73,7 @@ class MemoryManager // NOLINT(cppcoreguidelines-special-member-functions,
         return _impl.contains(ptr);
     }
 
-    size_t at(void *ptr) {
-	return _impl.at(ptr);
-    }
+    size_t at(void *ptr) { return _impl.at(ptr); }
 };
 
 class SharedLibraryManager final {

@@ -52,12 +52,7 @@ from jaxlib.mlir.dialects.func import FunctionType
 from jaxlib.mlir.dialects.scf import ConditionOp, ForOp, IfOp, WhileOp, YieldOp
 from jaxlib.mlir.dialects.stablehlo import ConstantOp as StableHLOConstantOp
 from jaxlib.mlir.dialects.stablehlo import ConvertOp as StableHLOConvertOp
-from mlir_quantum.dialects.catalyst import (
-    AssertionOp,
-    CallbackCallOp,
-    CallbackOp,
-    PrintOp,
-)
+from mlir_quantum.dialects.catalyst import AssertionOp, CallbackCallOp, CallbackOp, PrintOp
 from mlir_quantum.dialects.gradient import (
     CustomGradOp,
     ForwardOp,
