@@ -148,8 +148,8 @@ def _make_execution_config(qnode):
     return execution_config
 
 
-def get_device_shots(dev, qnode):
-    """Helper function to get device shots."""
+def get_shots(dev, qnode):
+    """Helper function to get shots."""
     return qnode._shots if isinstance(dev, qml.devices.LegacyDevice) else qnode._shots.total_shots
 
 
@@ -973,7 +973,7 @@ def trace_quantum_measurements(
         out_classical_tracers: modified list of JAX classical qnode ouput tracers.
         out_tree: modified PyTree-shape of the qnode output.
     """
-    shots = get_device_shots(device, qnode)
+    shots = get_shots(device, qnode)
     out_classical_tracers = []
 
     for i, output in enumerate(outputs):
@@ -1387,7 +1387,7 @@ def trace_quantum_function(
 
                 # TODO: device shots is now always a concrete integer or None
                 # When PennyLane allows dynamic shots, update tracing to accept dynamic shots too
-                device_shots = get_device_shots(device, qnode)
+                device_shots = get_shots(device, qnode)
                 if device_shots is None:
                     device_shots = 0
                 device_init_p.bind(

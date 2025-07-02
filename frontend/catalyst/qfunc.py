@@ -43,7 +43,7 @@ from pennylane.transforms.dynamic_one_shot import (
 
 import catalyst
 from catalyst.api_extensions import MidCircuitMeasure
-from catalyst.device import QJITDevice, get_device_shots
+from catalyst.device import QJITDevice, get_shots
 from catalyst.jax_extras import (
     deduce_avals,
     get_implicit_and_explicit_flat_args,
@@ -139,7 +139,7 @@ class QFunc:
                     mcm_method=self.execute_kwargs["mcm_method"],
                 )
             )
-            total_shots = get_device_shots(self.device, self)
+            total_shots = get_shots(self.device, self)
             mcm_config = _resolve_mcm_config(mcm_config, total_shots)
 
             if mcm_config.mcm_method == "one-shot":
@@ -276,7 +276,7 @@ def dynamic_one_shot(qnode, **kwargs):
         single_shot_qnode.execute_kwargs["mcm_method"] = mcm_config.mcm_method
     single_shot_qnode._dynamic_one_shot_called = True
     dev = qnode.device
-    total_shots = get_device_shots(dev, qnode)
+    total_shots = get_shots(dev, qnode)
 
     new_dev = copy(dev)
     if isinstance(new_dev, qml.devices.LegacyDeviceFacade):

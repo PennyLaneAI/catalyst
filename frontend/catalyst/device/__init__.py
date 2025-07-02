@@ -21,7 +21,7 @@ from catalyst.device.qjit_device import (
     QJITDevice,
     extract_backend_info,
     get_device_capabilities,
-    get_device_shots,
+    get_shots,
 )
 
 __all__ = (
@@ -29,5 +29,5 @@ __all__ = (
     "BackendInfo",
     "extract_backend_info",
     "get_device_capabilities",
-    "get_device_shots",
+    "get_shots",
 )
