@@ -17,6 +17,8 @@ This file contains tests for measurement primitives when the return shape is dyn
 
 # pylint: disable=line-too-long
 
+from functools import partial
+
 import numpy as np
 import pennylane as qml
 import pytest
@@ -24,7 +26,6 @@ import pytest
 import catalyst
 from catalyst.debug import get_compilation_stage, replace_ir
 
-from functools import partial
 
 def test_dynamic_sample_backend_functionality():
     """Test that a `sample` program with dynamic shots can be executed correctly."""
