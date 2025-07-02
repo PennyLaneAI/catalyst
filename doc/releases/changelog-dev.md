@@ -338,6 +338,9 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Use `QNode._shots` in qjit devices to retrieve shots information. `qml.set_shots` is also included in several tests.
+  [(#1784)](https://github.com/PennyLaneAI/catalyst/pull/1784)
+
 * Use `dataclass.replace` to update `ExecutionConfig` and `MCMConfig` rather than mutating properties.
   [(#1814)](https://github.com/PennyLaneAI/catalyst/pull/1814)
 
