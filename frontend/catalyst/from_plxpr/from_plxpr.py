@@ -169,10 +169,15 @@ class WorkflowInterpreter(PlxprInterpreter):
 
 # pylint: disable=unused-argument, too-many-arguments
 @WorkflowInterpreter.register_primitive(qnode_prim)
-def handle_qnode(self, *args, qnode, shots, device, execution_config, qfunc_jaxpr, batch_dims=None):
+def handle_qnode(self, *args, qnode, shots, device, execution_config, qfunc_jaxpr, n_consts, batch_dims=None):
     """Handle the conversion from plxpr to Catalyst jaxpr for the qnode primitive"""
+
     self.qubit_index_recorder = QubitIndexRecorder()
-    closed_jaxpr = ClosedJaxpr(qfunc_jaxpr, [])
+
+    consts = args[:n_consts]
+    non_const_args = args[n_consts:]
+
+    closed_jaxpr = ClosedJaxpr(qfunc_jaxpr, consts)
 
     def extract_shots_value(shots: qml.measurements.Shots | int):
         """Extract the shots value according to the type"""
@@ -210,7 +215,7 @@ def handle_qnode(self, *args, qnode, shots, device, execution_config, qfunc_jaxp
 
     return quantum_kernel_p.bind(
         wrap_init(calling_convention, debug_info=qfunc_jaxpr.debug_info),
-        *args,
+        *non_const_args,
         qnode=qnode,
         pipeline=self._pass_pipeline,
     )
@@ -428,7 +433,6 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         return self.eval(jaxpr.jaxpr, jaxpr.consts, *args)
 
 
-<<<<<<< HEAD
 @PLxPRToQuantumJaxprInterpreter.register_primitive(qml.allocation.allocate_prim)
 def handle_qml_alloc(self, *, num_wires, require_zeros=True, restored=False):
     """Handle the conversion from plxpr to Catalyst jaxpr for the qml.allocate primitive"""
