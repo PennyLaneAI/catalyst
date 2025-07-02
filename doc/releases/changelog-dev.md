@@ -185,8 +185,21 @@
   performance by eliminating indirect conversion.
   [(#1738)](https://github.com/PennyLaneAI/catalyst/pull/1738)
 
+* The `keep_intermediate` argument in the `qjit` decorator now accepts a new value that allows for
+  saving intermediate files after each pass. The updated possible options for this argument are:
+  * `False` or `0` or `"none"` or `None` : No intermediate files are kept.
+  * `True` or `1` or `"pipeline"`: Intermediate files are saved after each pipeline.
+  * `2` or `"pass"`: Intermediate files are saved after each pass.
+  The default value is `False`.
+  [(#1791)](https://github.com/PennyLaneAI/catalyst/pull/1791)
+
 * `static_argnums` on `qjit` can now be specified with program capture through PLxPR.
   [(#1810)](https://github.com/PennyLaneAI/catalyst/pull/1810)
+
+* Two new Python pass decorators, :func:`~.passes.disentangle_cnot` and 
+  :func:`~.passes.disentangle_swap` have been added. They apply their corresponding MLIR passes 
+  `--disentangle-CNOT` and `--disentangle-SWAP` respectively. 
+  [(#1823)](https://github.com/PennyLaneAI/catalyst/pull/1823)
 
 <h3>Breaking changes 💔</h3>
 
@@ -320,6 +333,9 @@
 * Fixes the conversion of PLxPR to JAXPR with quantum primitives when using control flow.
   [(#1809)](https://github.com/PennyLaneAI/catalyst/pull/1809)
 
+* Fixes canonicalization of insertion and extraction into quantum registers.
+  [(#1840)](https://github.com/PennyLaneAI/catalyst/pull/1840)
+
 <h3>Internal changes ⚙️</h3>
 
 * Use `dataclass.replace` to update `ExecutionConfig` and `MCMConfig` rather than mutating properties.
@@ -353,6 +369,11 @@
 
   This runtime stub is currently for mock execution only and should be treated as a placeholder
   operation. Internally, it functions just as a computational-basis measurement instruction.
+
+* Support for quantum subroutines was added.
+  This feature is expected to improve compilation times for large quantum programs.
+  [(#1774)](https://github.com/PennyLaneAI/catalyst/pull/1774)
+  [(#1828)](https://github.com/PennyLaneAI/catalyst/pull/1828)
 
 * PennyLane's arbitrary-basis measurement operations, such as
   :func:`qml.ftqc.measure_arbitrary_basis() <pennylane.ftqc.measure_arbitrary_basis>`, are now
