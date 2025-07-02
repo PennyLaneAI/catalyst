@@ -475,8 +475,9 @@ def handle_subroutine(self, *args, **kwargs):
     def wrapper(qreg, *args):
         device = self.device
         shots = self.shots
-        manager = QregManager(qreg)
-        converter = PLxPRToQuantumJaxprInterpreter(device, shots, manager, self.subroutine_cache)
+        manager = QregManager(qreg, self.qubit_index_recorder)
+        manager.root_hash = 0
+        converter = PLxPRToQuantumJaxprInterpreter(device, shots, manager, self.subroutine_cache, QubitIndexRecorder())
         retvals = converter(plxpr, *args)
         converter.qreg_manager.insert_all_dangling_qubits()
         return converter.qreg_manager.get(), *retvals

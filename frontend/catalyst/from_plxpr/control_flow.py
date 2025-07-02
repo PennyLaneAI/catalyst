@@ -26,7 +26,7 @@ from pennylane.capture.primitives import for_loop_prim as plxpr_for_loop_prim
 from pennylane.capture.primitives import while_loop_prim as plxpr_while_loop_prim
 
 from catalyst.from_plxpr.from_plxpr import PLxPRToQuantumJaxprInterpreter
-from catalyst.from_plxpr.qreg_manager import QregManager
+from catalyst.from_plxpr.qreg_manager import QregManager, QubitIndexRecorder
 from catalyst.jax_extras import jaxpr_pad_consts
 from catalyst.jax_primitives import cond_p, for_p, while_p
 
@@ -62,8 +62,9 @@ def handle_cond(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
                 shots = self.shots
                 # `qreg` is the scope argument for the body jaxpr
                 qreg_manager = QregManager(qreg, self.qubit_index_recorder)
+                qreg_manager.root_hash = 0
                 converter = PLxPRToQuantumJaxprInterpreter(
-                    device, shots, qreg_manager, self.subroutine_cache, self.qubit_index_recorder
+                    device, shots, qreg_manager, self.subroutine_cache, QubitIndexRecorder()
                 )
                 # pylint: disable-next=cell-var-from-loop
                 retvals = converter(closed_jaxpr, *args)
@@ -134,8 +135,9 @@ def handle_for_loop(
         shots = self.shots
         # `qreg` is the scope argument for the body jaxpr
         qreg_manager = QregManager(qreg, self.qubit_index_recorder)
+        qreg_manager.root_hash = 0
         converter = PLxPRToQuantumJaxprInterpreter(
-            device, shots, qreg_manager, self.subroutine_cache, self.qubit_index_recorder
+            device, shots, qreg_manager, self.subroutine_cache, QubitIndexRecorder()
         )
         retvals = converter(jaxpr, *args)
         qreg_manager.insert_all_dangling_qubits()
@@ -195,8 +197,9 @@ def handle_while_loop(
         shots = self.shots
         # `qreg` is the scope argument for the body jaxpr
         qreg_manager = QregManager(qreg, self.qubit_index_recorder)
+        qreg_manager.root_hash = 0
         converter = PLxPRToQuantumJaxprInterpreter(
-            device, shots, qreg_manager, self.subroutine_cache, self.qubit_index_recorder
+            device, shots, qreg_manager, self.subroutine_cache, QubitIndexRecorder()
         )
         retvals = converter(jaxpr, *args)
         qreg_manager.insert_all_dangling_qubits()
@@ -222,8 +225,9 @@ def handle_while_loop(
         shots = self.shots
         # `qreg` is the scope argument for the body jaxpr
         qreg_manager = QregManager(qreg, self.qubit_index_recorder)
+        qreg_manager.root_hash = 0
         converter = PLxPRToQuantumJaxprInterpreter(
-            device, shots, qreg_manager, self.subroutine_cache, self.qubit_index_recorder
+            device, shots, qreg_manager, self.subroutine_cache, QubitIndexRecorder()
         )
 
         return converter(jaxpr, *args)
