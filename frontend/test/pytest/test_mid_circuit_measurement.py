@@ -14,7 +14,7 @@
 """Tests for mid-circuit measurements in Catalyst"""
 
 from dataclasses import asdict
-from functools import reduce, partial
+from functools import partial, reduce
 from typing import Iterable, Sequence
 
 import jax.numpy as jnp

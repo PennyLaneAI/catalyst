@@ -13,6 +13,7 @@
 # limitations under the License.
 """Test for the device API."""
 import platform
+from functools import partial
 
 import pennylane as qml
 import pytest
@@ -21,8 +22,6 @@ from pennylane.devices import NullQubit
 from catalyst import qjit
 from catalyst.device import QJITDevice, get_device_capabilities, qjit_device
 from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
-
-from functools import partial
 
 # pylint:disable = protected-access,attribute-defined-outside-init
 
