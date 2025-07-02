@@ -88,16 +88,10 @@ def _resolve_mcm_config(mcm_config, shots):
         raise ValueError(
             "Cannot use postselect_mode='hw-like' with Catalyst when mcm_method != 'one-shot'."
         )
-    
-    # For the shots=None check, we need to be more careful with tracers
-    if mcm_config.mcm_method == "one-shot":
-        if isinstance(shots, jax.core.Tracer):
-            # Can't check if tracer is None at trace time, skip this validation
-            pass
-        elif shots is None:
-            raise ValueError(
-                "Cannot use the 'one-shot' method for mid-circuit measurements with analytic mode."
-            )
+    if mcm_config.mcm_method == "one-shot" and shots is None:
+        raise ValueError(
+            "Cannot use the 'one-shot' method for mid-circuit measurements with analytic mode."
+        )
 
     return replace(mcm_config, **updated_values)
 
