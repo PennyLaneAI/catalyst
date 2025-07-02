@@ -423,8 +423,8 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         return self.eval(jaxpr.jaxpr, jaxpr.consts, *args)
 
 
-@PLxPRToQuantumJaxprInterpreter.register_primitive(qml.allocation._get_allocate_prim())
-def handle_qml_alloc(self, *, num_wires, require_zeros=True):
+@PLxPRToQuantumJaxprInterpreter.register_primitive(qml.allocation.allocate_prim)
+def handle_qml_alloc(self, *, num_wires, require_zeros=True, restored=False):
     """Handle the conversion from plxpr to Catalyst jaxpr for the qml.allocate primitive"""
 
     new_qreg = qalloc_p.bind(num_wires)
@@ -440,12 +440,12 @@ def handle_qml_alloc(self, *, num_wires, require_zeros=True):
     return self.qregs[new_qreg].get_all_current_global_indices()
 
 
-@PLxPRToQuantumJaxprInterpreter.register_primitive(qml.allocation._get_deallocate_prim())
-def handle_qml_dealloc(self, *wires, reset_to_original=False):
+@PLxPRToQuantumJaxprInterpreter.register_primitive(qml.allocation.deallocate_prim)
+def handle_qml_dealloc(self, *wires):
     """Handle the conversion from plxpr to Catalyst jaxpr for the qml.deallocate primitive"""
     qreg = self.qubit_index_recorder[wires[0]]
     qreg.insert_all_dangling_qubits()
-    qdealloc_p.bind(qreg.get())
+    #qdealloc_p.bind(qreg.get())
     return []
 
 
