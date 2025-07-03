@@ -24,8 +24,8 @@ extern "C" {
 
 // Quantum Runtime Instructions
 void __catalyst__rt__fail_cstr(const char *);
-void __catalyst__rt__initialize(uint32_t *seed);
-void __catalyst__rt__device_init(int8_t *, int8_t *, int8_t *, int64_t shots);
+void __catalyst__rt__initialize(uint32_t *);
+void __catalyst__rt__device_init(int8_t *, int8_t *, int8_t *, int64_t, bool);
 void __catalyst__rt__device_release();
 void __catalyst__rt__finalize();
 void __catalyst__rt__toggle_recorder(bool);
@@ -104,6 +104,10 @@ void __catalyst__qis__State(MemRefT_CplxT_double_1d *, int64_t, /*qubits*/...);
 void __catalyst__qis__Gradient(int64_t, /*results*/...);
 void __catalyst__qis__Gradient_params(MemRefT_int64_1d *, int64_t, /*results*/...);
 
+// MBQC operations
+RESULT *__catalyst__mbqc__measure_in_basis(QUBIT *, uint32_t, double, int32_t);
+
+// Async runtime error
 void __catalyst__host__rt__unrecoverable_error();
 
 #ifdef __cplusplus

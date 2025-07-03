@@ -56,17 +56,6 @@ def test_qjit_device():
         device_qjit.execute(10, 2)
 
 
-def test_qjit_device_no_wires():
-    """Test the qjit device from a device using the new api without wires set."""
-    device = NullQubit(shots=2032)
-
-    with pytest.raises(
-        AttributeError, match="Catalyst does not support device instances without set wires."
-    ):
-        # Create qjit device
-        QJITDevice(device)
-
-
 @pytest.mark.parametrize(
     "wires",
     (
@@ -135,6 +124,17 @@ def test_simple_circuit():
         return qml.expval(qml.PauliZ(wires=0))
 
     assert circuit.mlir
+
+
+def test_track_resources():
+    """Test that resource tracking settings get passed to the device."""
+    dev = NullQubit(wires=2)
+    assert "track_resources" in QJITDevice.extract_backend_info(dev, dev.capabilities).kwargs
+    assert QJITDevice.extract_backend_info(dev, dev.capabilities).kwargs["track_resources"] is False
+
+    dev = NullQubit(wires=2, track_resources=True)
+    assert "track_resources" in QJITDevice.extract_backend_info(dev, dev.capabilities).kwargs
+    assert QJITDevice.extract_backend_info(dev, dev.capabilities).kwargs["track_resources"] is True
 
 
 if __name__ == "__main__":

@@ -17,7 +17,6 @@
 
 include "mlir/IR/EnumAttr.td"
 include "mlir/IR/OpBase.td"
-include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Dialect/Bufferization/IR/AllocationOpInterface.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 
@@ -48,8 +47,6 @@ def NamedObservable : I32EnumAttr<"NamedObservable",
 
 def Unitary : NativeOpTrait<"UnitaryTrait">;
 def Hermitian : NativeOpTrait<"HermitianTrait">;
-
-def QuantumMemory : Resource<"QuantumMemory">;
 
 //===----------------------------------------------------------------------===//
 // Quantum dialect attributes.
@@ -84,15 +81,28 @@ def DeviceInitOp : Quantum_Op<"device"> {
 
     let arguments = (ins
         Optional<I64>:$shots,
+        UnitAttr:$auto_qubit_management,
         StrAttr:$lib,
-        StrAttr:$name,
+        StrAttr:$device_name,
         StrAttr:$kwargs
     );
 
     let assemblyFormat = [{
-      (`shots` `(` $shots^ `)`)? `[` $lib `,` $name `,` $kwargs `]` attr-dict
+      (`shots` `(` $shots^ `)`)? `[` $lib `,` $device_name `,` $kwargs `]` attr-dict
     }];
 
+    let builders = [
+        OpBuilder<
+        // Convenience builder for a device not in automatic qubit management mode
+        (ins
+             "mlir::Value":$shots,
+             "mlir::StringAttr":$lib,
+             "mlir::StringAttr":$device_name,
+             "mlir::StringAttr":$kwargs
+        ),[{
+            DeviceInitOp::build($_builder, $_state, shots, false, lib, device_name, kwargs);
+        }]>,
+    ];
 }
 
 def DeviceReleaseOp : Quantum_Op<"device_release"> {
@@ -100,6 +110,18 @@ def DeviceReleaseOp : Quantum_Op<"device_release"> {
 
     let assemblyFormat = [{
         attr-dict
+    }];
+}
+
+def NumQubitsOp : Quantum_Op<"num_qubits"> {
+    let summary = "Get the number of currently allocated qubits.";
+
+    let results = (outs
+        I64:$num_qubits
+    );
+
+    let assemblyFormat = [{
+        attr-dict `:` type(results)
     }];
 }
 
@@ -128,6 +150,49 @@ def AllocOp : Memory_Op<"alloc", [NoMemoryEffect]> {
     }];
 }
 
+def AllocQubitOp : Memory_Op<"alloc_qb"> {
+    let summary = "Allocate a single qubit.";
+    let description = [{
+    }];
+
+    let results = (outs
+        QubitType:$qubit
+    );
+
+    let assemblyFormat = [{
+        attr-dict `:` type(results)
+    }];
+
+    let builders = [
+        OpBuilder<(ins),[{
+            AllocQubitOp::build($_builder, $_state,
+            /*qubit=*/ $_builder.getType<QubitType>()
+            );
+        }]>,
+    ];
+
+    code extraBaseClassDeclaration = [{
+        mlir::OpResult getOutQubit() {
+            return getODSResults(0).front();
+        }
+    }];
+
+    let extraClassDeclaration = extraBaseClassDeclaration;
+}
+
+def DeallocQubitOp : Memory_Op<"dealloc_qb"> {
+    let summary = "Deallocate a single qubit.";
+    let description = [{
+    }];
+
+    let arguments = (ins
+        QubitType:$qubit
+    );
+
+    let assemblyFormat = [{
+        $qubit attr-dict `:` type(operands)
+    }];
+}
 
 def DeallocOp : Memory_Op<"dealloc"> {
     let summary = "Deallocate a quantum register.";
@@ -250,10 +315,14 @@ class UnitaryGate_Op<string mnemonic, list<Trait> traits = []> :
         }
 
         bool getAdjointFlag() {
-            return getAdjoint().has_value() ? getAdjoint().value() : false;
+            return getAdjoint();
         }
         void setAdjointFlag(bool adjoint) {
-            setAdjoint(adjoint);
+            if (adjoint) {
+               (*this)->setAttr("adjoint", mlir::UnitAttr::get(this->getContext()));
+            } else {
+               (*this)->removeAttr("adjoint");
+            }
         };
 
         mlir::ValueRange getCtrlValueOperands() {
@@ -294,7 +363,7 @@ class UnitaryGate_Op<string mnemonic, list<Trait> traits = []> :
     let extraClassDeclaration = extraBaseClassDeclaration;
 }
 
-def SetStateOp : Gate_Op<"set_state", []> {
+def SetStateOp : Gate_Op<"set_state"> {
     let summary = "Set state to a complex vector.";
     let description = [{
         This operation is useful for simulators implementing state preparation.
@@ -325,7 +394,7 @@ def SetStateOp : Gate_Op<"set_state", []> {
 
 }
 
-def SetBasisStateOp : Gate_Op<"set_basis_state", []> {
+def SetBasisStateOp : Gate_Op<"set_basis_state"> {
     let summary = "Set basis state.";
     let description = [{
         This operation is useful for simulators implementing set basis state.
@@ -367,7 +436,7 @@ def CustomOp : UnitaryGate_Op<"custom", [DifferentiableGate, NoMemoryEffect,
         Variadic<F64>:$params,
         Variadic<QubitType>:$in_qubits,
         StrAttr:$gate_name,
-        OptionalAttr<UnitAttr>:$adjoint,
+        UnitAttr:$adjoint,
         Variadic<QubitType>:$in_ctrl_qubits,
         Variadic<I1>:$in_ctrl_values
     );
@@ -446,7 +515,7 @@ def CustomOp : UnitaryGate_Op<"custom", [DifferentiableGate, NoMemoryEffect,
     ];
 
     let assemblyFormat = [{
-        $gate_name `(` $params `)` $in_qubits attr-dict ( `ctrls` `(` $in_ctrl_qubits^ `)` )?  ( `ctrlvals` `(` $in_ctrl_values^ `)` )? `:` type($out_qubits) (`ctrls` type($out_ctrl_qubits)^ )?
+        $gate_name `(` $params `)` $in_qubits (`adj` $adjoint^)? attr-dict ( `ctrls` `(` $in_ctrl_qubits^ `)` )?  ( `ctrlvals` `(` $in_ctrl_values^ `)` )? `:` type($out_qubits) (`ctrls` type($out_ctrl_qubits)^ )?
     }];
 
     let extraClassDeclaration = extraBaseClassDeclaration # [{
@@ -488,7 +557,7 @@ def GlobalPhaseOp : UnitaryGate_Op<"gphase", [DifferentiableGate, AttrSizedOpera
 
     let arguments = (ins
         F64:$params,
-        OptionalAttr<UnitAttr>:$adjoint,
+        UnitAttr:$adjoint,
         Variadic<QubitType>:$in_ctrl_qubits,
         Variadic<I1>:$in_ctrl_values
     );
@@ -530,7 +599,7 @@ def MultiRZOp : UnitaryGate_Op<"multirz", [DifferentiableGate, NoMemoryEffect,
     let arguments = (ins
         F64:$theta,
         Variadic<QubitType>:$in_qubits,
-        OptionalAttr<UnitAttr>:$adjoint,
+        UnitAttr:$adjoint,
         Variadic<QubitType>:$in_ctrl_qubits,
         Variadic<I1>:$in_ctrl_values
     );
@@ -541,7 +610,7 @@ def MultiRZOp : UnitaryGate_Op<"multirz", [DifferentiableGate, NoMemoryEffect,
     );
 
     let assemblyFormat = [{
-        `(` $theta `)` $in_qubits attr-dict ( `ctrls` `(` $in_ctrl_qubits^ `)` )?  ( `ctrlvals` `(` $in_ctrl_values^ `)` )? `:` type($out_qubits) (`ctrls` type($out_ctrl_qubits)^ )?
+        `(` $theta `)` $in_qubits (`adj` $adjoint^)? attr-dict ( `ctrls` `(` $in_ctrl_qubits^ `)` )?  ( `ctrlvals` `(` $in_ctrl_values^ `)` )? `:` type($out_qubits) (`ctrls` type($out_ctrl_qubits)^ )?
     }];
 
     let extraClassDeclaration = extraBaseClassDeclaration # [{
@@ -567,7 +636,7 @@ def QubitUnitaryOp : UnitaryGate_Op<"unitary", [ParametrizedGate, NoMemoryEffect
             2DTensorOf<[Complex<F64>]>, MemRefRankOf<[Complex<F64>], [2]>
         ]>:$matrix,
         Variadic<QubitType>:$in_qubits,
-        OptionalAttr<UnitAttr>:$adjoint,
+        UnitAttr:$adjoint,
         Variadic<QubitType>:$in_ctrl_qubits,
         Variadic<I1>:$in_ctrl_values
     );
@@ -578,7 +647,7 @@ def QubitUnitaryOp : UnitaryGate_Op<"unitary", [ParametrizedGate, NoMemoryEffect
     );
 
     let assemblyFormat = [{
-        `(` $matrix `:` type($matrix) `)` $in_qubits attr-dict ( `ctrls` `(` $in_ctrl_qubits^ `)` )?  ( `ctrlvals` `(` $in_ctrl_values^ `)` )? `:` type($out_qubits) (`ctrls` type($out_ctrl_qubits)^ )?
+        `(` $matrix `:` type($matrix) `)` $in_qubits (`adj` $adjoint^)? attr-dict ( `ctrls` `(` $in_ctrl_qubits^ `)` )?  ( `ctrlvals` `(` $in_ctrl_values^ `)` )? `:` type($out_qubits) (`ctrls` type($out_ctrl_qubits)^ )?
     }];
 
     let extraClassDeclaration = extraBaseClassDeclaration # [{
@@ -619,11 +688,11 @@ def YieldOp : Quantum_Op<"yield", [Pure, ReturnLike, Terminator, ParentOneOf<["A
     let summary = "Return results from quantum program regions";
 
     let arguments = (ins
-        Variadic<AnyTypeOf<[QuregType]>>:$results
+        Variadic<QuregType>:$retvals
     );
 
     let assemblyFormat = [{
-        attr-dict ($results^ `:` type($results))?
+        attr-dict ($retvals ^ `:` type($retvals))?
     }];
 
     let builders = [
@@ -825,7 +894,7 @@ def MeasureOp : Quantum_Op<"measure"> {
     );
 
     let assemblyFormat = [{
-        $in_qubit attr-dict `:` type(results)
+        $in_qubit (`postselect` $postselect^)? attr-dict `:` type(results)
     }];
 }
 

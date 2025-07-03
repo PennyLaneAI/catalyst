@@ -134,14 +134,16 @@ LLVM::LLVMFuncOp AsyncUtils::lookupOrCreatePersonality(ModuleOp moduleOp)
     auto i32Ty = IntegerType::get(ctx, 32);
     bool isVarArg = true;
     return mlir::LLVM::lookupOrCreateFn(moduleOp, AsyncUtilsConstants::personalityName, {}, i32Ty,
-                                        isVarArg);
+                                        isVarArg)
+        .value();
 }
 
 LLVM::LLVMFuncOp AsyncUtils::lookupOrCreateAbort(ModuleOp moduleOp)
 {
     MLIRContext *ctx = moduleOp.getContext();
     auto voidTy = LLVM::LLVMVoidType::get(ctx);
-    return mlir::LLVM::lookupOrCreateFn(moduleOp, AsyncUtilsConstants::abortName, {}, voidTy);
+    return mlir::LLVM::lookupOrCreateFn(moduleOp, AsyncUtilsConstants::abortName, {}, voidTy)
+        .value();
 }
 
 LLVM::LLVMFuncOp AsyncUtils::lookupOrCreateAwaitTokenName(ModuleOp moduleOp)
@@ -150,7 +152,8 @@ LLVM::LLVMFuncOp AsyncUtils::lookupOrCreateAwaitTokenName(ModuleOp moduleOp)
     Type ptrTy = LLVM::LLVMPointerType::get(moduleOp.getContext());
     auto voidTy = LLVM::LLVMVoidType::get(ctx);
     return mlir::LLVM::lookupOrCreateFn(
-        moduleOp, AsyncUtilsConstants::mlirAsyncRuntimeAwaitTokenName, {ptrTy}, voidTy);
+               moduleOp, AsyncUtilsConstants::mlirAsyncRuntimeAwaitTokenName, {ptrTy}, voidTy)
+        .value();
 }
 
 LLVM::LLVMFuncOp AsyncUtils::lookupOrCreateAwaitValueName(ModuleOp moduleOp)
@@ -159,7 +162,8 @@ LLVM::LLVMFuncOp AsyncUtils::lookupOrCreateAwaitValueName(ModuleOp moduleOp)
     Type ptrTy = LLVM::LLVMPointerType::get(moduleOp.getContext());
     auto voidTy = LLVM::LLVMVoidType::get(ctx);
     return mlir::LLVM::lookupOrCreateFn(
-        moduleOp, AsyncUtilsConstants::mlirAsyncRuntimeAwaitValueName, {ptrTy}, voidTy);
+               moduleOp, AsyncUtilsConstants::mlirAsyncRuntimeAwaitValueName, {ptrTy}, voidTy)
+        .value();
 }
 
 LLVM::LLVMFuncOp AsyncUtils::lookupOrCreateDropRef(ModuleOp moduleOp)
@@ -169,7 +173,8 @@ LLVM::LLVMFuncOp AsyncUtils::lookupOrCreateDropRef(ModuleOp moduleOp)
     Type llvmInt64Type = IntegerType::get(moduleOp.getContext(), 64);
     auto voidTy = LLVM::LLVMVoidType::get(ctx);
     return mlir::LLVM::lookupOrCreateFn(moduleOp, AsyncUtilsConstants::mlirAsyncRuntimeDropRefName,
-                                        {ptrTy, llvmInt64Type}, voidTy);
+                                        {ptrTy, llvmInt64Type}, voidTy)
+        .value();
 }
 
 LLVM::LLVMFuncOp AsyncUtils::lookupOrCreateMlirAsyncRuntimeSetValueError(ModuleOp moduleOp)
@@ -178,7 +183,8 @@ LLVM::LLVMFuncOp AsyncUtils::lookupOrCreateMlirAsyncRuntimeSetValueError(ModuleO
     Type ptrTy = LLVM::LLVMPointerType::get(moduleOp.getContext());
     auto voidTy = LLVM::LLVMVoidType::get(ctx);
     return mlir::LLVM::lookupOrCreateFn(
-        moduleOp, AsyncUtilsConstants::mlirAsyncRuntimeSetValueErrorName, {ptrTy}, voidTy);
+               moduleOp, AsyncUtilsConstants::mlirAsyncRuntimeSetValueErrorName, {ptrTy}, voidTy)
+        .value();
 }
 
 LLVM::LLVMFuncOp AsyncUtils::lookupOrCreateMlirAsyncRuntimeSetTokenError(ModuleOp moduleOp)
@@ -187,7 +193,8 @@ LLVM::LLVMFuncOp AsyncUtils::lookupOrCreateMlirAsyncRuntimeSetTokenError(ModuleO
     Type ptrTy = LLVM::LLVMPointerType::get(moduleOp.getContext());
     auto voidTy = LLVM::LLVMVoidType::get(ctx);
     return mlir::LLVM::lookupOrCreateFn(
-        moduleOp, AsyncUtilsConstants::mlirAsyncRuntimeSetTokenErrorName, {ptrTy}, voidTy);
+               moduleOp, AsyncUtilsConstants::mlirAsyncRuntimeSetTokenErrorName, {ptrTy}, voidTy)
+        .value();
 }
 
 LLVM::LLVMFuncOp AsyncUtils::lookupOrCreateUnrecoverableError(ModuleOp moduleOp)
@@ -195,7 +202,8 @@ LLVM::LLVMFuncOp AsyncUtils::lookupOrCreateUnrecoverableError(ModuleOp moduleOp)
     MLIRContext *ctx = moduleOp.getContext();
     auto voidTy = LLVM::LLVMVoidType::get(ctx);
     return mlir::LLVM::lookupOrCreateFn(moduleOp, AsyncUtilsConstants::unrecoverableErrorName, {},
-                                        voidTy);
+                                        voidTy)
+        .value();
 }
 
 std::optional<LLVM::LLVMFuncOp> AsyncUtils::getCalleeSafe(LLVM::CallOp callOp)
@@ -215,7 +223,7 @@ std::optional<LLVM::LLVMFuncOp> AsyncUtils::getCalleeSafe(LLVM::CallOp callOp)
 bool AsyncUtils::isFunctionNamed(LLVM::LLVMFuncOp funcOp, llvm::StringRef expectedName)
 {
     llvm::StringRef observedName = funcOp.getSymName();
-    return observedName.equals(expectedName);
+    return observedName == expectedName;
 }
 
 bool AsyncUtils::isMlirAsyncRuntimeCreateValue(LLVM::LLVMFuncOp funcOp)

@@ -90,7 +90,6 @@ class NoUnitaryDevice(qml.devices.Device):
 
     def __init__(self, shots=None, wires=None):
         super().__init__(wires=wires, shots=shots)
-        self.capabilities.operations.pop("QubitUnitary")
         self.qjit_capabilities = self.capabilities
 
     def apply(self, operations, **kwargs):
@@ -113,6 +112,9 @@ class NoUnitaryDevice(qml.devices.Device):
         return circuits, execution_config
 
 
+NoUnitaryDevice.capabilities.operations.pop("QubitUnitary")
+
+
 class TestControlledDecomposition:
     """Test behaviour around the decomposition of the `Controlled` class."""
 
@@ -123,8 +125,6 @@ class TestControlledDecomposition:
 
         class OpWithNoMatrix(qml.operation.Operation):
             """Op without a matrix"""
-
-            num_wires = qml.operation.AnyWires
 
             def matrix(self):
                 """matrix undefined"""
@@ -143,8 +143,6 @@ class TestControlledDecomposition:
 
         class UnknownOp(qml.operation.Operation):
             """An unknown operation"""
-
-            num_wires = qml.operation.AnyWires
 
             def matrix(self):
                 """The matrix"""

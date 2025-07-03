@@ -21,7 +21,7 @@ jobs:
     name: Determine runner type to use
     uses: ./.github/workflows/determine-workflow-runner.yml
     with:
-      default_runner: ubuntu-22.04
+      default_runner: ubuntu-24.04
 
   constants:
     name: "Set build matrix"
@@ -42,6 +42,11 @@ jobs:
     steps:
       - name: Checkout Catalyst repo
         uses: actions/checkout@v4
+      
+      - name: Set up Python # Ensure python3.10 is used
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ needs.constants.outputs.primary_python_version }}
 
       - name: Install dependencies
         run: |
@@ -140,13 +145,19 @@ jobs:
         path: llvm-build
         key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-ci-build-${{ matrix.compiler }}
 
+    - name: Set up Python # Ensure python3.10 is used
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{needs.constants.outputs.primary_python_version}}
+
     - name: Install Deps
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
       run: |
         sudo apt-get update
         sudo apt-get install -y python3 python3-pip cmake ninja-build clang lld
+
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
-        python3 -m pip install numpy pybind11
+        python3 -m pip install numpy pybind11 nanobind PyYAML
 
     - name: Build LLVM
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
@@ -172,6 +183,11 @@ jobs:
     steps:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
+    
+    - name: Set up Python # Ensure python3.10 is used
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ needs.constants.outputs.primary_python_version }}
 
     - name: Cache MHLO Source
       id: cache-mhlo-source
@@ -194,7 +210,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path: mhlo-build
-        key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-ci-build-${{ matrix.compiler }}
+        key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-ci-build-${{ matrix.compiler }}-0
 
     - name: Get Cached LLVM Source
       id: cache-llvm-source
@@ -242,6 +258,11 @@ jobs:
     steps:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
+
+    - name: Set up Python # Ensure python3.10 is used
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ needs.constants.outputs.primary_python_version }}
 
     - name: Cache Enzyme Source
       id: cache-enzyme-source
@@ -313,6 +334,11 @@ jobs:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
 
+    - name: Set up Python # Ensure python3.10 is used
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ needs.constants.outputs.primary_python_version }}
+
     - name: Install Deps
       run: |
         sudo apt-get update
@@ -351,7 +377,7 @@ jobs:
       uses: actions/cache/restore@v4
       with:
         path: mhlo-build
-        key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-ci-build-${{ matrix.compiler }}
+        key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-ci-build-${{ matrix.compiler }}-0
         fail-on-cache-miss: true
 
     - name: Get Cached Enzyme Source
@@ -432,10 +458,15 @@ jobs:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
 
+    - name: Set up Python # Ensure python3.10 is used
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ needs.constants.outputs.primary_python_version }}
+
     - name: Install Deps
       run: |
         sudo apt-get update
-        sudo apt-get install -y python3 python3-pip libomp-dev libasan6 make ninja-build
+        sudo apt-get install -y libomp-dev libasan6 make ninja-build
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
         # cuda-quantum is added manually here.
@@ -478,17 +509,18 @@ jobs:
         echo "RUNTIME_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
         echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
         echo "OQC_LIB_DIR=$(pwd)/oqc-build" >> $GITHUB_ENV
+        echo "OQD_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
         echo "CATALYST_BIN_DIR=$(pwd)/quantum-build/bin" >> $GITHUB_ENV
         chmod +x $(pwd)/quantum-build/bin/catalyst  # artifact upload does not preserve permissions
 
     - name: Run Python Lit Tests
       run: |
-        llvm-lit -sv frontend/test/lit -j$(nproc)
+        python3 llvm-build/bin/llvm-lit -sv frontend/test/lit -j$(nproc)
 
     - name: Run Python Pytest Tests
       run: |
         COVERAGE_REPORT="xml:coverage.xml -p no:warnings" \
-        make coverage-frontend
+        make coverage-frontend ENABLE_OQD=ON
         mv coverage.xml coverage-${{ github.job }}.xml
 
     - name: Upload to Codecov
@@ -514,10 +546,15 @@ jobs:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
 
+    - name: Set up Python # Ensure python3.10 is used
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ needs.constants.outputs.primary_python_version }}
+
     - name: Install Deps
       run: |
         sudo apt-get update
-        sudo apt-get install -y python3 python3-pip libomp-dev libasan6 make ninja-build
+        sudo apt-get install -y libomp-dev libasan6 make ninja-build
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
         make frontend
@@ -566,6 +603,11 @@ jobs:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
 
+    - name: Set up Python # Ensure python3.10 is used
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ needs.constants.outputs.primary_python_version }}
+
     - name: Install device dependencies (OpenQasm device)
       run: |
         pip install amazon-braket-pennylane-plugin
@@ -574,7 +616,7 @@ jobs:
     - name: Install Deps
       run: |
         sudo apt-get update
-        sudo apt-get install -y python3 python3-pip libomp-dev libasan6 make ninja-build
+        sudo apt-get install -y libomp-dev libasan6 make ninja-build
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
         make frontend
@@ -607,10 +649,6 @@ jobs:
         echo "CATALYST_BIN_DIR=$(pwd)/quantum-build/bin" >> $GITHUB_ENV
         chmod +x $(pwd)/quantum-build/bin/catalyst  # artifact upload does not preserve permissions
 
-    - name: Run Python Pytest Tests
-      run: |
-        make pytest TEST_BRAKET=LOCAL
-
   runtime-device-tests:
     name: Third-Party Device Tests (C++)
     needs: [constants, runtime, determine_runner]
@@ -623,6 +661,11 @@ jobs:
     steps:
       - name: Checkout the repo
         uses: actions/checkout@v4
+
+      - name: Set up Python # Ensure python3.10 is used
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ needs.constants.outputs.primary_python_version }}
 
       - name: Install dependencies
         run: |
@@ -652,15 +695,26 @@ jobs:
       - name: Checkout the repo
         uses: actions/checkout@v4
 
+      - name: Set up Python # Ensure python3.10 is used
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ needs.constants.outputs.primary_python_version }}
+
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get -y -q install cmake ninja-build lcov
+          sudo apt-get -y -q install cmake ninja-build
           python3 -m pip install nanobind pybind11
+
+      - name: Install lcov # Manually install lcov_1.15-1_all
+        run: |
+          wget http://archive.ubuntu.com/ubuntu/pool/universe/l/lcov/lcov_1.15-1_all.deb
+          sudo apt-get install -y ./lcov_1.15-1_all.deb
+          lcov --version 
 
       - name: Install additional dependencies for OpenQasm device
         run: |
-          pip install numpy pybind11 amazon-braket-sdk
+          pip install numpy pybind11 amazon-braket-sdk PyYAML
           echo "AWS_DEFAULT_REGION=us-east-1" >> $GITHUB_ENV
 
       - name: Get Cached LLVM Source

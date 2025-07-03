@@ -12,7 +12,37 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt --quantum-bufferize --split-input-file %s | FileCheck %s
+// RUN: quantum-opt --one-shot-bufferize --split-input-file %s | FileCheck %s
+
+func.func @qubit_unitary(%q0: !quantum.bit, %matrix: tensor<2x2xcomplex<f64>>) {
+    // CHECK: [[memref:%.+]] = bufferization.to_memref %arg1 : tensor<2x2xcomplex<f64>> to memref<2x2xcomplex<f64>>
+    // CHECK: {{%.+}} = quantum.unitary([[memref]] : memref<2x2xcomplex<f64>>) %arg0 : !quantum.bit
+    %out_qubits = quantum.unitary(%matrix : tensor<2x2xcomplex<f64>>) %q0 : !quantum.bit
+
+    func.return
+}
+
+// -----
+
+func.func @hermitian(%q0: !quantum.bit, %matrix: tensor<2x2xcomplex<f64>>) {
+    // CHECK: [[memref:%.+]] = bufferization.to_memref %arg1 : tensor<2x2xcomplex<f64>> to memref<2x2xcomplex<f64>>
+    // CHECK: {{%.+}} = quantum.hermitian([[memref]] : memref<2x2xcomplex<f64>>) %arg0 : !quantum.obs
+    %obs = quantum.hermitian(%matrix : tensor<2x2xcomplex<f64>>) %q0 : !quantum.obs
+
+    func.return
+}
+
+// -----
+
+func.func @hamiltonian(%obs: !quantum.obs, %coeffs: tensor<1xf64>){
+    // CHECK: [[memref:%.+]] = bufferization.to_memref %arg1 : tensor<1xf64> to memref<1xf64>
+    // CHECK: {{%.+}} = quantum.hamiltonian([[memref]] : memref<1xf64>) %arg0 : !quantum.obs
+    %hamil = quantum.hamiltonian(%coeffs: tensor<1xf64>) %obs : !quantum.obs
+
+    func.return
+}
+
+// -----
 
 //////////////////
 // Measurements //
@@ -132,4 +162,3 @@ module @set_basis_state {
     return
   }
 }
-

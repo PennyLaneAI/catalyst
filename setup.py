@@ -107,7 +107,7 @@ jax_version = dep_versions.get("jax")
 pl_version = dep_versions.get("pennylane")
 lq_version = dep_versions.get("lightning")
 
-pl_min_release = "0.40"
+pl_min_release = "0.41.0"
 lq_min_release = pl_min_release
 
 if pl_version is not None:
@@ -147,6 +147,7 @@ entry_points = {
         "cuda_quantum.ops = catalyst.api_extensions",
         "cuda_quantum.qjit = catalyst.third_party.cuda:cudaqjit",
     ],
+    "catalyst.passes_resolution": ["catalyst_xdsl_plugin.passes = catalyst.passes.xdsl_plugin"],
 }
 
 classifiers = [
@@ -381,7 +382,7 @@ else:
 
 setup(
     classifiers=classifiers,
-    name="PennyLane-Catalyst",
+    name="pennylane_catalyst",
     version=version,
     python_requires=">=3.10",
     entry_points=entry_points,

@@ -29,7 +29,7 @@ from os import path
 from typing import List, Optional
 
 from catalyst.logging import debug_logger, debug_logger_init
-from catalyst.pipelines import CompileOptions
+from catalyst.pipelines import CompileOptions, KeepIntermediateLevel
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.filesystem import Directory
 from catalyst.utils.runtime_environment import get_cli_path, get_lib_path
@@ -290,8 +290,11 @@ def _catalyst(*args, stdin=None):
     catalyst *args
     """
     cmd = _get_catalyst_cli_cmd(*args, stdin=stdin)
-    result = subprocess.run(cmd, input=stdin, check=True, capture_output=True, text=True)
-    return result.stdout
+    try:
+        result = subprocess.run(cmd, input=stdin, check=True, capture_output=True, text=True)
+        return result.stdout
+    except subprocess.CalledProcessError as e:
+        raise CompileError(f"catalyst failed with error code {e.returncode}: {e.stderr}") from e
 
 
 def _quantum_opt(*args, stdin=None):
@@ -341,6 +344,9 @@ def _options_to_cli_flags(options):
 
     if options.keep_intermediate:
         extra_args += ["--keep-intermediate"]
+
+    if options.keep_intermediate >= KeepIntermediateLevel.PASS:
+        extra_args += ["--save-ir-after-each=pass"]
 
     if options.verbose:
         extra_args += ["--verbose"]
@@ -465,6 +471,29 @@ class Compiler:
         return output_object_name, out_IR
 
     @debug_logger
+    def is_using_python_compiler(self):
+        """Returns true if we detect that there is an xdsl plugin in use.
+
+        Will also modify self.options.pass_plugins and self.options.dialect_plugins to remove
+        the xdsl plugin.
+        """
+        xdsl_path = pathlib.Path("xdsl-does-not-use-a-real-path")
+        if not (
+            xdsl_path in self.options.pass_plugins or xdsl_path in self.options.dialect_plugins
+        ):
+            return False
+
+        if xdsl_path in self.options.pass_plugins:
+            plugins = self.options.pass_plugins
+            self.options.pass_plugins = tuple(elem for elem in plugins if elem != xdsl_path)
+
+        if xdsl_path in self.options.dialect_plugins:
+            plugins = self.options.dialect_plugins
+            self.options.dialect_plugins = tuple(elem for elem in plugins if elem != xdsl_path)
+
+        return True
+
+    @debug_logger
     def run(self, mlir_module, *args, **kwargs):
         """Compile an MLIR module to a shared object.
 
@@ -479,6 +508,15 @@ class Compiler:
         Returns:
             (str): filename of shared object
         """
+
+        if self.is_using_python_compiler():
+            # We keep this module here to keep xDSL requirement optional
+            # Only move this is it has been decided that xDSL is no longer optional.
+            # pylint: disable-next=import-outside-toplevel
+            from pennylane.compiler.python_compiler import Compiler as PythonCompiler
+
+            compiler = PythonCompiler()
+            mlir_module = compiler.run(mlir_module)
 
         return self.run_from_ir(
             mlir_module.operation.get_asm(

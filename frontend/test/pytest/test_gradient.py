@@ -15,6 +15,7 @@
 """Test built-in differentiation support in Catalyst."""
 
 import platform
+from dataclasses import replace
 
 import jax
 import numpy as np
@@ -1858,7 +1859,7 @@ class TestGradientMethodErrors:
             def preprocess(self, execution_config=None):
                 """Device preprocessing function."""
                 program, config = lightning_device.preprocess(execution_config)
-                config.gradient_method = grad_method
+                config = replace(config, gradient_method=grad_method)
                 return program, config
 
             @staticmethod
@@ -2199,6 +2200,131 @@ class TestParameterShiftVerificationIntegrationTests:
             def circuit(x: float):
                 RX(x, wires=[0])
                 return qml.expval(qml.PauliZ(wires=0))
+
+
+def test_closure_variable_grad():
+    """Test that grad can take closure variables"""
+
+    @qml.qjit
+    def workflow_closure(x, y):
+
+        dev = qml.device("lightning.qubit", wires=1)
+
+        @qml.qnode(dev)
+        def circuit(x):
+            qml.RX(jnp.pi * x, wires=0)
+            qml.RX(jnp.pi * y, wires=0)
+            return qml.expval(qml.PauliY(0))
+
+        g = grad(circuit)
+        return g(x)
+
+    @qml.qjit
+    def workflow_no_closure(x, y):
+
+        dev = qml.device("lightning.qubit", wires=1)
+
+        @qml.qnode(dev)
+        def circuit(x, y):
+            qml.RX(jnp.pi * x, wires=0)
+            qml.RX(jnp.pi * y, wires=0)
+            return qml.expval(qml.PauliY(0))
+
+        g = grad(circuit)
+        return g(x, y)
+
+    expected = workflow_no_closure(1.0, 0.25)
+    observed = workflow_closure(1.0, 0.25)
+    assert np.allclose(expected, observed)
+
+
+def test_closure_variable_value_and_grad():
+    """Test that value and grad can take closure variables"""
+
+    @qml.qjit
+    def workflow_closure(x, y):
+
+        dev = qml.device("lightning.qubit", wires=1)
+
+        @qml.qnode(dev)
+        def circuit(x):
+            qml.RX(jnp.pi * x, wires=0)
+            qml.RX(jnp.pi * y, wires=0)
+            return qml.expval(qml.PauliY(0))
+
+        g = value_and_grad(circuit)
+        return g(x)
+
+    @qml.qjit
+    def workflow_no_closure(x, y):
+
+        dev = qml.device("lightning.qubit", wires=1)
+
+        @qml.qnode(dev)
+        def circuit(x, y):
+            qml.RX(jnp.pi * x, wires=0)
+            qml.RX(jnp.pi * y, wires=0)
+            return qml.expval(qml.PauliY(0))
+
+        g = value_and_grad(circuit)
+        return g(x, y)
+
+    x, y = 1.0, 0.25
+    expected = workflow_no_closure(x, y)
+    observed = workflow_closure(x, y)
+    assert np.allclose(expected, observed)
+
+
+def test_bufferization_inside_tensor_generate(backend):
+    """This tests specifically for an bug already
+    filed in LLVM: https://github.com/llvm/llvm-project/issues/141667
+    The issue is that linalg structured operations cannot be nested
+    but finite differences will generate code like:
+
+    ```
+    %h_val
+    %arg
+    tensor.generate {
+      %shifted = arith.addf %h_val, %arg
+      func.call @func(%shifted)
+    }
+    ```
+
+    which during bufferization will be:
+
+    ```
+    linalg.map {
+      memref.store %arg0, %shifted
+      func.call @func(arg0)
+    }
+    ```
+
+    which means the value of arg0 will be modified
+    after each iteration of linalg.map
+
+    To prevent this, we inserted copies. See
+    https://github.com/PennyLaneAI/catalyst/pull/1769
+    for the implementation.
+    """
+
+    inp = np.array([2.0, 1.0])
+
+    @qjit
+    def workflow(x):
+        @qml.qnode(qml.device(backend, wires=1))
+        def circuit(x):
+            qml.RX(np.pi * x[0], wires=0)
+            qml.RY(x[1], wires=0)
+            return qml.probs()
+
+        g = qml.jacobian(circuit, method="fd", h=0.3)
+        return g(x)
+
+    result = workflow(inp)
+    reference = np.array([[-0.37120096, -0.45467246], [0.37120096, 0.45467246]])
+    assert np.allclose(result, reference)
+    # Also check that the input has not been modified
+    assert np.allclose([2.0, 1.0], inp)
 
 
 if __name__ == "__main__":

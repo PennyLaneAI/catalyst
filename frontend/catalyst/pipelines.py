@@ -25,6 +25,7 @@ This module contains the pipelines that are used to compile a quantum function t
 
 """
 
+import enum
 import sys
 from copy import deepcopy
 from dataclasses import dataclass
@@ -37,6 +38,34 @@ from typing import Any, Dict, Iterable, List, Optional, Set, Tuple, Union
 from catalyst.utils.exceptions import CompileError
 
 
+class KeepIntermediateLevel(enum.IntEnum):
+    """Enum to control the level of intermediate file keeping."""
+
+    NONE = 0  # No intermediate files are kept.
+    PIPELINE = 1  # Intermediate files are saved after each pipeline.
+    PASS = 2  # Intermediate files are saved after each pass.
+
+
+def _parse_keep_intermediate(
+    level: Union[str, int, bool, None],
+) -> KeepIntermediateLevel:
+    """Parse the keep_intermediate value into a KeepIntermediateLevel enum."""
+    match level:
+        case 0 | 1 | 2:
+            return KeepIntermediateLevel(level)
+        case "none" | None:
+            return KeepIntermediateLevel.NONE
+        case "pipeline":
+            return KeepIntermediateLevel.PIPELINE
+        case "pass":
+            return KeepIntermediateLevel.PASS
+        case _:
+            raise ValueError(
+                f"Invalid value for keep_intermediate: {level}. "
+                "Valid values are True, False, 0, 1, 2, 'none', 'pipeline', 'pass'."
+            )
+
+
 # pylint: disable=too-many-instance-attributes
 @dataclass
 class CompileOptions:
@@ -47,8 +76,11 @@ class CompileOptions:
             Default is ``False``
         logfile (Optional[TextIOWrapper]): the logfile to write output to.
             Default is ``sys.stderr``
-        keep_intermediate (Optional[bool]): flag indicating whether to keep intermediate results.
-            Default is ``False``
+        keep_intermediate (Optional[Union[str, int, bool]]): Level controlling intermediate file
+        generation.
+            - ``False`` or ``0`` or ``"none"`` (default): No intermediate files are kept.
+            - ``True`` or ``1`` or ``"pipeline"``: Intermediate files are saved after each pipeline.
+            - ``2`` or ``"pass"``: Intermediate files are saved after each pass.
         pipelines (Optional[List[Tuple[str,List[str]]]]): A list of tuples. The first entry of the
             tuple corresponds to the name of a pipeline. The second entry of the tuple corresponds
             to a list of MLIR passes.
@@ -68,21 +100,18 @@ class CompileOptions:
         disable_assertions (Optional[bool]): disables all assertions. Default is ``False``.
         seed (Optional[int]) : the seed for random operations in a qjit call.
             Default is None.
-        experimental_capture (bool): If set to ``True``,
-            use PennyLane's experimental program capture capabilities
-            to capture the function for compilation.
         circuit_transform_pipeline (Optional[dict[str, dict[str, str]]]):
             A dictionary that specifies the quantum circuit transformation pass pipeline order,
             and optionally arguments for each pass in the pipeline.
             Default is None.
-        pass_plugins (Optional[Set[Path]]): List of paths to pass plugins.
-        dialect_plugins (Optional[Set[Path]]): List of paths to dialect plugins.
+        pass_plugins (Optional[Iterable[Path]]): List of paths to pass plugins.
+        dialect_plugins (Optional[Iterable[Path]]): List of paths to dialect plugins.
     """
 
     verbose: Optional[bool] = False
     logfile: Optional[TextIOWrapper] = sys.stderr
     target: Optional[str] = "binary"
-    keep_intermediate: Optional[bool] = False
+    keep_intermediate: Optional[Union[str, int, bool, KeepIntermediateLevel]] = False
     pipelines: Optional[List[Any]] = None
     autograph: Optional[bool] = False
     autograph_include: Optional[Iterable[str]] = ()
@@ -94,14 +123,16 @@ class CompileOptions:
     checkpoint_stage: Optional[str] = ""
     disable_assertions: Optional[bool] = False
     seed: Optional[int] = None
-    experimental_capture: Optional[bool] = False
     circuit_transform_pipeline: Optional[dict[str, dict[str, str]]] = None
     pass_plugins: Optional[Set[Path]] = None
     dialect_plugins: Optional[Set[Path]] = None
 
     def __post_init__(self):
+        # Convert keep_intermediate to Enum
+        self.keep_intermediate = _parse_keep_intermediate(self.keep_intermediate)
+
         # Check that async runs must not be seeded
-        if self.async_qnodes and self.seed != None:
+        if self.async_qnodes and self.seed is not None:
             raise CompileError(
                 """
                 Seeding has no effect on asynchronous QNodes,
@@ -111,7 +142,7 @@ class CompileOptions:
             )
 
         # Check that seed is 32-bit unsigned int
-        if (self.seed != None) and (self.seed < 0 or self.seed > 2**32 - 1):
+        if (self.seed is not None) and (self.seed < 0 or self.seed > 2**32 - 1):
             raise ValueError(
                 """
                 Seed must be an unsigned 32-bit integer!
@@ -126,10 +157,16 @@ class CompileOptions:
             self.static_argnums = (static_argnums,)
         elif isinstance(static_argnums, Iterable):
             self.static_argnums = tuple(static_argnums)
+
         if self.pass_plugins is None:
             self.pass_plugins = set()
+        else:
+            self.pass_plugins = set(self.pass_plugins)
+
         if self.dialect_plugins is None:
             self.dialect_plugins = set()
+        else:
+            self.dialect_plugins = set(self.dialect_plugins)
 
     def __deepcopy__(self, memo):
         """Make a deep copy of all fields of a CompileOptions object except the logfile, which is
@@ -217,31 +254,34 @@ def get_quantum_compilation_stage(options: CompileOptions) -> List[str]:
     return list(filter(partial(is_not, None), quantum_compilation))
 
 
-def get_bufferization_stage(_options: CompileOptions) -> List[str]:
+def get_bufferization_stage(options: CompileOptions) -> List[str]:
     """Returns the list of passes that performs bufferization"""
+
+    bufferization_options = """bufferize-function-boundaries
+        allow-return-allocs-from-loops
+        function-boundary-type-conversion=identity-layout-map
+        unknown-type-conversion=identity-layout-map""".replace(
+        "\n", " "
+    )
+    if options.async_qnodes:
+        bufferization_options += " copy-before-write"
+
     bufferization = [
-        "one-shot-bufferize{dialect-filter=memref}",
         "inline",
-        "gradient-preprocess",
-        "gradient-bufferize",
-        "scf-bufferize",
         "convert-tensor-to-linalg",  # tensor.pad
-        "convert-elementwise-to-linalg",  # Must be run before --arith-bufferize
-        "arith-bufferize",
-        "empty-tensor-to-alloc-tensor",
-        "func.func(bufferization-bufferize)",
-        "func.func(tensor-bufferize)",
-        "catalyst-bufferize",  # Must be run before -- func.func(linalg-bufferize)
-        "func.func(linalg-bufferize)",
-        "func.func(tensor-bufferize)",
-        "quantum-bufferize",
-        "func-bufferize",
-        "func.func(finalizing-bufferize)",
+        "convert-elementwise-to-linalg",  # Must be run before --one-shot-bufferize
+        "gradient-preprocess",
+        "eliminate-empty-tensors",
+        ####################
+        "one-shot-bufferize{" + bufferization_options + "}",
+        ####################
         "canonicalize",  # Remove dead memrefToTensorOp's
         "gradient-postprocess",
         # introduced during gradient-bufferize of callbacks
         "func.func(buffer-hoisting)",
         "func.func(buffer-loop-hoisting)",
+        "func.func(promote-buffers-to-stack)",
+        # TODO: migrate to new buffer deallocation "buffer-deallocation-pipeline"
         "func.func(buffer-deallocation)",
         "convert-arraylist-to-memref",
         "convert-bufferization-to-memref",
@@ -250,6 +290,7 @@ def get_bufferization_stage(_options: CompileOptions) -> List[str]:
         # "cse",
         "cp-global-memref",
     ]
+
     return bufferization
 
 

@@ -179,10 +179,6 @@ def extract_backend_info(
     if not pathlib.Path(device_lpath).is_file():
         raise CompileError(f"Device at {device_lpath} cannot be found!")
 
-    if hasattr(device, "shots"):
-        shots = get_device_shots(device) or 0
-        device_kwargs["shots"] = shots
-
     if dname == "braket.local.qubit":  # pragma: no cover
         device_kwargs["device_type"] = dname
         device_kwargs["backend"] = (
@@ -268,6 +264,11 @@ def get_qjit_device_capabilities(target_capabilities: DeviceCapabilities) -> Dev
                 )
             }
         )
+
+    # Enable runtime-powered snapshot of quantum state at any particular instance
+    qjit_capabilities.operations.update(
+        {"Snapshot": OperatorProperties(invertible=False, controllable=False, differentiable=False)}
+    )
 
     # TODO: Optionally enable runtime-powered quantum gate controlling once they
     #       are supported natively in MLIR.
@@ -372,7 +373,6 @@ class QJITDevice(qml.devices.Device):
         # measurement transformations, so must occur before decomposition
         measurement_transforms = self._measurement_transform_program()
         config = replace(config, device_options=deepcopy(config.device_options))
-        config.device_options["transforms_modify_measurements"] = bool(measurement_transforms)
         program = program + measurement_transforms
 
         # decomposition to supported ops/measurements
@@ -548,6 +548,8 @@ def is_dynamic_wires(wires: qml.wires.Wires):
     If the number of wires is dynamic, the Wires object contains a single tracer that
     represents the number of wires.
     """
+    # Automatic qubit management mode should not encounter this query
+    assert wires is not None
     return (len(wires) == 1) and (isinstance(wires[0], DynamicJaxprTracer))
 
 
@@ -555,7 +557,8 @@ def check_device_wires(wires):
     """Validate requirements Catalyst imposes on device wires."""
 
     if wires is None:
-        raise AttributeError("Catalyst does not support device instances without set wires.")
+        # Automatic qubit management mode, nothing to check
+        return
 
     if len(wires) >= 2 or (not is_dynamic_wires(wires)):
         # A dynamic number of wires correspond to a single tracer for the number

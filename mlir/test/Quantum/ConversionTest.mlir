@@ -44,7 +44,7 @@ func.func @finalize() {
 
 // -----
 
-// CHECK: llvm.func @__catalyst__rt__device_init(!llvm.ptr, !llvm.ptr, !llvm.ptr, i64)
+// CHECK: llvm.func @__catalyst__rt__device_init(!llvm.ptr, !llvm.ptr, !llvm.ptr, i64, i1)
 
 // CHECK-LABEL: @device
 func.func @device() {
@@ -61,7 +61,8 @@ func.func @device() {
     // CHECK: [[b1:%.+]] = llvm.getelementptr inbounds [[bo]][0, 0] : (!llvm.ptr) -> !llvm.ptr, !llvm.array<16 x i8>
     // CHECK: [[d3:%.+]] = llvm.mlir.addressof @"{my_attr: my_attr_value}" : !llvm.ptr
     // CHECK: [[d4:%.+]] = llvm.getelementptr inbounds [[d3]][0, 0] : (!llvm.ptr) -> !llvm.ptr, !llvm.array<25 x i8>
-    // CHECK: llvm.call @__catalyst__rt__device_init([[d1]], [[b1]], [[d4]], [[shots]]) : (!llvm.ptr, !llvm.ptr, !llvm.ptr, i64) -> ()
+    // CHECK: [[false:%.+]] = llvm.mlir.constant(false) : i1
+    // CHECK: llvm.call @__catalyst__rt__device_init([[d1]], [[b1]], [[d4]], [[shots]], [[false]]) : (!llvm.ptr, !llvm.ptr, !llvm.ptr, i64, i1) -> ()
     %shots = llvm.mlir.constant(1000 : i64) : i64
     quantum.device shots(%shots) ["rtd_lightning.so", "lightning.qubit", "{my_attr: my_attr_value}"]
 
@@ -71,7 +72,8 @@ func.func @device() {
     // CHECK: [[e3:%.+]] = llvm.getelementptr inbounds [[e2]][0, 0] : (!llvm.ptr) -> !llvm.ptr, !llvm.array<17 x i8>
     // CHECK: [[e4:%.+]] = llvm.mlir.addressof @"{my_other_attr: my_other_attr_value}" : !llvm.ptr
     // CHECK: [[e5:%.+]] = llvm.getelementptr inbounds [[e4]][0, 0] : (!llvm.ptr) -> !llvm.ptr, !llvm.array<37 x i8>
-    // CHECK: llvm.call @__catalyst__rt__device_init([[e1]], [[e3]], [[e5]], [[shots]]) : (!llvm.ptr, !llvm.ptr, !llvm.ptr, i64) -> ()
+    // CHECK: [[false:%.+]] = llvm.mlir.constant(false) : i1
+    // CHECK: llvm.call @__catalyst__rt__device_init([[e1]], [[e3]], [[e5]], [[shots]], [[false]]) : (!llvm.ptr, !llvm.ptr, !llvm.ptr, i64, i1) -> ()
 
     quantum.device shots(%shots) ["rtd_lightning.so", "lightning.kokkos", "{my_other_attr: my_other_attr_value}"]
 
@@ -82,9 +84,25 @@ func.func @device() {
     // CHECK: [[d3:%.+]] = llvm.mlir.addressof @"{my_noshots_attr: my_noshots_attr_value}" : !llvm.ptr
     // CHECK: [[d4:%.+]] = llvm.getelementptr inbounds [[d3]][0, 0] : (!llvm.ptr) -> !llvm.ptr, !llvm.array<41 x i8>
     // CHECK: [[zero_shots:%.+]] = llvm.mlir.constant(0 : i64) : i64
-    // CHECK: llvm.call @__catalyst__rt__device_init([[d1]], [[b1]], [[d4]], [[zero_shots]]) : (!llvm.ptr, !llvm.ptr, !llvm.ptr, i64) -> ()
+    // CHECK: [[false:%.+]] = llvm.mlir.constant(false) : i1
+    // CHECK: llvm.call @__catalyst__rt__device_init([[d1]], [[b1]], [[d4]], [[zero_shots]], [[false]]) : (!llvm.ptr, !llvm.ptr, !llvm.ptr, i64, i1) -> ()
     quantum.device ["rtd_lightning.so", "lightning.qubit", "{my_noshots_attr: my_noshots_attr_value}"]
 
+    // CHECK: [[true:%.+]] = llvm.mlir.constant(true) : i1
+    // CHECK: llvm.call @__catalyst__rt__device_init({{%.+}}, {{%.+}}, {{%.+}}, {{%.+}}, [[true]]) : (!llvm.ptr, !llvm.ptr, !llvm.ptr, i64, i1) -> ()
+    quantum.device ["blah.so", "blah.qubit", ""] {auto_qubit_management}
+
+    return
+}
+
+// -----
+
+// CHECK: llvm.func @__catalyst__rt__num_qubits()
+
+// CHECK-LABEL: @num_qubits
+func.func @num_qubits() {
+    // CHECK: {{%.+}} = llvm.call @__catalyst__rt__num_qubits() : () -> i64
+    %0 = quantum.num_qubits : i64
     return
 }
 
@@ -374,14 +392,14 @@ func.func @tensor(%obs : !quantum.obs) {
 // CHECK: llvm.func @__catalyst__qis__HamiltonianObs(!llvm.ptr, i64, ...) -> i64
 // CHECK-LABEL: @hamiltonian
 func.func @hamiltonian(%obs : !quantum.obs, %p1 : memref<1xf64>, %p2 : memref<3xf64>) {
-    // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
-    // CHECK: [[alloca:%.+]] = llvm.alloca [[c1]] x !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
-    // CHECK: [[memrefvar:%.+]] = llvm.mlir.undef
+    // CHECK: [[memrefvar:%.+]] = llvm.mlir.poison
     // CHECK: [[memrefvar0:%.+]] = llvm.insertvalue %arg1, [[memrefvar]][0]
     // CHECK: [[memrefvar1:%.+]] = llvm.insertvalue %arg2, [[memrefvar0]][1]
     // CHECK: [[memrefvar2:%.+]] = llvm.insertvalue %arg3, [[memrefvar1]][2]
     // CHECK: [[memrefvar3:%.+]] = llvm.insertvalue %arg4, [[memrefvar2]][3, 0]
     // CHECK: [[memrefvar4:%.+]] = llvm.insertvalue %arg5, [[memrefvar3]][4, 0]
+    // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
+    // CHECK: [[alloca:%.+]] = llvm.alloca [[c1]] x !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
     // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
     // CHECK: llvm.store [[memrefvar4]], [[alloca]]
     // CHECK: llvm.call @__catalyst__qis__HamiltonianObs([[alloca]], [[c1]], %arg0)
@@ -395,7 +413,7 @@ func.func @hamiltonian(%obs : !quantum.obs, %p1 : memref<1xf64>, %p2 : memref<3x
 
 // CHECK-LABEL: @hamiltonian
 func.func @hamiltonian(%obs : !quantum.obs, %p1 : memref<1xf64>, %p2 : memref<3xf64>) {
-    // CHECK: [[memrefvar:%.+]] = llvm.mlir.undef
+    // CHECK: [[memrefvar:%.+]] = llvm.mlir.poison
     // CHECK: [[memrefvar0:%.+]] = llvm.insertvalue %arg6, [[memrefvar]][0]
     // CHECK: [[memrefvar1:%.+]] = llvm.insertvalue %arg7, [[memrefvar0]][1]
     // CHECK: [[memrefvar2:%.+]] = llvm.insertvalue %arg8, [[memrefvar1]][2]
@@ -440,7 +458,7 @@ func.func @measure(%q : !quantum.bit) -> !quantum.bit {
     // CHECK: [[postselect:%.+]] = llvm.mlir.constant(0 : i32) : i32
 
     // CHECK: llvm.call @__catalyst__qis__Measure(%arg0, [[postselect]])
-    %res, %new_q = quantum.measure %q {postselect = 0 : i32} : i1, !quantum.bit
+    %res, %new_q = quantum.measure %q postselect 0 : i1, !quantum.bit
 
     // CHECK: return %arg0
     return %new_q : !quantum.bit
@@ -580,8 +598,6 @@ func.func @probs(%q : !quantum.bit) {
 
 // CHECK-LABEL: @state
 func.func @state(%q : !quantum.bit) {
-    // CHECK: [[qb:%.+]] = builtin.unrealized_conversion_cast %arg0
-
     %o1 = quantum.compbasis qubits %q : !quantum.obs
 
     // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
@@ -658,7 +674,7 @@ func.func @controlled_circuit(%1 : !quantum.bit, %2 : !quantum.bit, %3 : !quantu
     %cst = llvm.mlir.constant (6.000000e-01 : f64) : f64
     %true = llvm.mlir.constant (1 : i1) :i1
 
-    // CHECK-DAG: [[cst6:%.+]] = llvm.mlir.constant(6.0
+    // CHECK: [[cst6:%.+]] = llvm.mlir.constant(6.0
     // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
     // CHECK: [[alloca0:%.+]] = llvm.alloca [[c1]] x i1
     // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)

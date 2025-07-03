@@ -24,29 +24,16 @@ schema = 3
 #
 [operators.gates]
 
-Identity = { }
 Hadamard = { }
-PauliX = { }
-PauliY = { }
 PauliZ = { }
 S = { }
 T = { }
 CNOT = { }
-Toffoli = { }
-CY = { }
-CZ = { }
-SWAP = { }
-CSWAP = { }
 RX = { }
 RY = { }
 RZ = { }
-CRX = { }
-CRY = { }
-CRZ = { }
 PhaseShift = { }
-U1 = { }
-U2 = { }
-U3 = { }
+MS = {}
 
 [operators.observables]
 

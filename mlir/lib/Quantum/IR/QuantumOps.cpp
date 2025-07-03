@@ -61,7 +61,7 @@ LogicalResult CustomOp::canonicalize(CustomOp op, mlir::PatternRewriter &rewrite
 
             rewriter.replaceOpWithNewOp<CustomOp>(
                 op, op.getOutQubits().getTypes(), op.getOutCtrlQubits().getTypes(), paramsNeg,
-                op.getInQubits(), name, nullptr, op.getInCtrlQubits(), op.getInCtrlValues());
+                op.getInQubits(), name, false, op.getInCtrlQubits(), op.getInCtrlValues());
 
             return success();
         }
@@ -132,7 +132,7 @@ LogicalResult InsertOp::canonicalize(InsertOp insert, mlir::PatternRewriter &rew
         bool oneUse = extract.getResult().hasOneUse();
 
         if ((staticallyEqual || dynamicallyEqual) && oneUse) {
-            rewriter.replaceOp(insert, extract.getQreg());
+            rewriter.replaceOp(insert, insert.getInQreg());
             rewriter.eraseOp(extract);
             return success();
         }

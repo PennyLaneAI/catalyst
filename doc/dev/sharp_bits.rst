@@ -321,6 +321,11 @@ UserWarning: Provided arguments did not match declared signature, recompiling...
 Tracing occurring
 Array(0.16996714, dtype=float64)
 
+.. note::
+
+    An exception to the rule above regarding recompilation is when the dynamically shaped output array is a :ref:`Catalyst-supported terminal measurement <measurements>` and the output shape depends on the number of qubits. Recompilation is not triggered in these cases.
+    See :ref:`qubit-invariant compilation <qubit_invariant_compilation>`.
+
 Specifying compile-time constants
 ---------------------------------
 
@@ -735,7 +740,7 @@ a single RX gate is being applied due to the rotation gate merger:
           g:f64[1] = add d f
           h:f64[1] = slice[limit_indices=(1,) start_indices=(0,) strides=(1,)] g
           i:f64[] = squeeze[dimensions=(0,)] h
-           = qdevice[
+           = device_init[
             rtd_kwargs={'shots': 0, 'mcmc': False}
             rtd_lib=/usr/local/lib/python3.10/dist-packages/catalyst/utils/../lib/librtd_lightning.so
             rtd_name=LightningSimulator
