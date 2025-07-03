@@ -1303,7 +1303,7 @@ def trace_function(
 
 
 @debug_logger
-def trace_quantum_function(
+def trace_quantum_function(  # pylint: disable=too-many-locals,too-many-statements,too-many-branches  # noqa: C901
     f: Callable, device: QubitDevice, args, kwargs, qnode, static_argnums, debug_info
 ) -> Tuple[ClosedJaxpr, Any]:
     """Trace quantum function in a way that allows building a nested quantum tape describing the
@@ -1382,7 +1382,12 @@ def trace_quantum_function(
 
                 # TODO: device shots is now always a concrete integer or None
                 # When PennyLane allows dynamic shots, update tracing to accept dynamic shots too
-                device_shots = qnode._shots.total_shots or 0 # pylint: disable=protected-access
+                # Use JAX-compatible conditional to handle potentially traced values
+                shots_value = qnode._shots.total_shots  # pylint: disable=protected-access
+                if shots_value is None:
+                    device_shots = 0
+                else:
+                    device_shots = shots_value
                 device_init_p.bind(
                     device_shots,
                     auto_qubit_management=(device.wires is None),
