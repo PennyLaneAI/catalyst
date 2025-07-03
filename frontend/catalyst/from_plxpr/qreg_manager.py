@@ -133,6 +133,10 @@ class QregManager:
         Get the newest ``AbstractQbit`` corresponding to a wire index.
         If the qubit value does not exist yet at this index, extract the fresh qubit.
         """
+        if not isinstance(index, (int, AbstractQbit)):
+            self.insert_all_dangling_qubits()
+            return self.extract(index)
+
         if index in self.wire_map:
             return self.wire_map[index]
         return self.extract(index)
