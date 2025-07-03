@@ -305,9 +305,9 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
     def interpret_operation(self, op, is_adjoint=False, control_values=(), control_wires=()):
         """Re-bind a pennylane operation as a catalyst instruction."""
         if isinstance(op, qml.ops.Adjoint):
-            return self.interpret_operation(op.base, is_adjoint=not is_adjoint)
+            return self.interpret_operation(op.base, is_adjoint=not is_adjoint, control_values=control_values, control_wires=control_wires)
         if isinstance(op, qml.ops.Controlled):
-            return self.interpret_operation(op.base, control_values=control_values+tuple(op.control_values), control_wires=control_wires+tuple(op.control_wires))
+            return self.interpret_operation(op.base, is_adjoint=is_adjoint, control_values=control_values+tuple(op.control_values), control_wires=control_wires+tuple(op.control_wires))
 
         in_qubits = [self.qreg_manager[w] for w in op.wires]
         control_qubits = [self.qreg_manager[w] for w in control_wires]
