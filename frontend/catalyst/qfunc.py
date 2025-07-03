@@ -260,7 +260,7 @@ def dynamic_one_shot(qnode, **kwargs):
         single_shot_qnode.execute_kwargs["mcm_method"] = mcm_config.mcm_method
     single_shot_qnode._dynamic_one_shot_called = True
     dev = qnode.device
-    total_shots = qnode._shots.total_shots # pylint: disable=protected-access
+    total_shots = qnode._shots.total_shots  # pylint: disable=protected-access
 
     new_dev = copy(dev)
     if isinstance(new_dev, qml.devices.LegacyDeviceFacade):

@@ -102,10 +102,7 @@ from catalyst.jax_primitives import (
     var_p,
 )
 from catalyst.logging import debug_logger, debug_logger_init
-from catalyst.tracing.contexts import (
-    EvaluationContext,
-    EvaluationMode,
-)
+from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
 from catalyst.utils.exceptions import CompileError
 
 logger = logging.getLogger(__name__)
@@ -1302,13 +1299,12 @@ def trace_function(
         return res_expanded_tracers, in_sig, out_sig
 
 
-@debug_logger
 def _get_shots(qnode) -> int:
     """Extract shots from qnode, handling None case.
-    
+
     Args:
         qnode: The quantum node containing shots information.
-        
+
     Returns:
         int: Device shots value, 0 if None.
     """
