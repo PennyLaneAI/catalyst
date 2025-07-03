@@ -974,7 +974,7 @@ def trace_quantum_measurements(
         out_classical_tracers: modified list of JAX classical qnode ouput tracers.
         out_tree: modified PyTree-shape of the qnode output.
     """
-    shots = get_shots(device, qnode)
+    shots = qnode._shots
     out_classical_tracers = []
 
     for i, output in enumerate(outputs):
@@ -1388,7 +1388,7 @@ def trace_quantum_function(
 
                 # TODO: device shots is now always a concrete integer or None
                 # When PennyLane allows dynamic shots, update tracing to accept dynamic shots too
-                device_shots = get_shots(device, qnode) or 0
+                device_shots = qnode._shots.total_shots or 0 # pylint: disable=protected-access
                 device_init_p.bind(
                     device_shots,
                     auto_qubit_management=(device.wires is None),
