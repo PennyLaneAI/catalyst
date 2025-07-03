@@ -134,6 +134,9 @@ class QregManager:
         If the qubit value does not exist yet at this index, extract the fresh qubit.
         """
         if not isinstance(index, int):
+            if (len(self.wire_map.keys()) == 1) and index in self.wire_map:
+                return self.wire_map[index]
+
             self.insert_all_dangling_qubits()
             return self.extract(index)
 

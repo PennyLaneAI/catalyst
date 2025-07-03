@@ -120,4 +120,18 @@ def test_while_capture():
 test_while_capture()
 
 def test_dynamic_wire():
+    """Test dynamic wires"""
 
+    dev = qml.device("null.qubit", wires=3)
+
+    @qml.qjit(target="mlir")
+    @qml.qnode(dev)
+    def circuit(w1: int):
+        qml.X(0)
+        qml.Y(w1)
+        qml.X(0)
+        return qml.state()
+
+    print(circuit.mlir)
+
+test_dynamic_wire()
