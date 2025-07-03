@@ -1298,14 +1298,8 @@ def trace_function(
         return res_expanded_tracers, in_sig, out_sig
 
 
-def _get_shots(qnode) -> int:
-    """Extract shots from qnode, handling None case.
-
-    Args:
-        qnode: The quantum node containing shots information.
-
-    Returns:
-        int: Device shots value, 0 if None.
+def _get_shots(qnode):
+    """Extract shots from qnode, handling None case and supporting JAX Tracer values mostly.
     """
     # When PennyLane allows dynamic shots, update tracing to accept dynamic shots too
     # Use JAX-compatible conditional to handle potentially traced values
