@@ -968,7 +968,7 @@ def trace_quantum_measurements(
         out_classical_tracers: modified list of JAX classical qnode ouput tracers.
         out_tree: modified PyTree-shape of the qnode output.
     """
-    shots = qnode._shots
+    shots = qnode._shots.total_shots  # pylint: disable=protected-access
     out_classical_tracers = []
 
     for i, output in enumerate(outputs):
