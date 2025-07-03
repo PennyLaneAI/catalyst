@@ -30,6 +30,11 @@ on:
         type: boolean
         required: false
         default: false
+      branch:
+        description: 'Branch to build from'
+        required: true
+        default: 'main'
+        type: string
 
 concurrency:
   group: Build Catalyst Wheel on Linux (x86_64)-${{ github.ref }}
