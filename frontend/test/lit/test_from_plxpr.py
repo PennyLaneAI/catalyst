@@ -119,6 +119,7 @@ def test_while_capture():
 
 test_while_capture()
 
+
 def test_dynamic_wire():
     """Test dynamic wires"""
 
@@ -139,5 +140,6 @@ def test_dynamic_wire():
         return qml.state()
 
     print(circuit.mlir)
+
 
 test_dynamic_wire()
