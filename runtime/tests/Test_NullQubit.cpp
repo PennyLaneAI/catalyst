@@ -26,6 +26,8 @@
 #include "NullQubit.hpp"
 #include "TestUtils.hpp"
 
+using namespace Catch::Matchers;
+
 using namespace Catalyst::Runtime;
 using namespace Catalyst::Runtime::Devices;
 
@@ -48,6 +50,22 @@ TEST_CASE("Test __catalyst__rt__device_init registering device=null.qubit", "[Nu
     __catalyst__rt__device_release();
 
     __catalyst__rt__finalize();
+}
+
+TEST_CASE("Test runtime device kwargs parsing", "[NullQubit]")
+{
+    std::unique_ptr<NullQubit> sim0 = std::make_unique<NullQubit>("{foo : bar}");
+    auto kwargs0 = sim0->GetDeviceKwargs();
+    CHECK(kwargs0["foo"] == "bar");
+
+    std::unique_ptr<NullQubit> sim1 = std::make_unique<NullQubit>("{foo : bar, blah : aloha}");
+    auto kwargs1 = sim1->GetDeviceKwargs();
+    CHECK(kwargs1["foo"] == "bar");
+    CHECK(kwargs1["blah"] == "aloha");
+
+    REQUIRE_THROWS_WITH(
+        std::make_unique<NullQubit>("{foo : {blah:bar}}"),
+        ContainsSubstring("Nested dictionaries in device kwargs are not supported."));
 }
 
 TEST_CASE("Test automatic qubit management", "[NullQubit]")

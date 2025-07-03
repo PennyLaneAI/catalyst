@@ -305,6 +305,9 @@
 * Sphix version has been updated to 8.1. Some other related packages have been updated as well.
   [(#1734)](https://github.com/PennyLaneAI/catalyst/pull/1734)
 
+* The device kwarg parsing in runtime has been updated to disallow nested dictionary formats.
+  [(#1843)](https://github.com/PennyLaneAI/catalyst/pull/1843)
+
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
