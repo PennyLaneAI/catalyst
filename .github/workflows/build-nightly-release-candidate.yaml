@@ -2,25 +2,25 @@ name: Build Release Branch Nightly for TestPyPI
 
 on:
   schedule:
-    # Run from April 8th to April 13th at 02:00 UTC (10:00 PM EDT)
-    - cron: "0 2 8-13 4 *"
+    # Run from July 8th to July 13th at 02:00 UTC (10:00 PM EDT)
+    - cron: "0 2 8-13 7 *"
   workflow_dispatch:
     inputs:
       branch:
         description: 'Branch to build from'
         required: true
-        default: 'v0.11.0-rc'
+        default: 'v0.12.0-rc'
 
 jobs:
   setup:
     name: Setup the release
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04-arm
     outputs:
       branch: ${{ steps.set_branch.outputs.branch }}
     steps:
     - name: Set branch
       id: set_branch
-      run: echo "branch=${{ github.event.inputs.branch || 'v0.11.0-rc' }}" >> $GITHUB_OUTPUT
+      run: echo "branch=${{ github.event.inputs.branch || 'v0.12.0-rc' }}" >> $GITHUB_OUTPUT
 
     - name: Checkout Catalyst repo release branch
       uses: actions/checkout@v4
@@ -63,17 +63,10 @@ jobs:
     with:
       branch: ${{ needs.setup.outputs.branch }}
 
-  # macos-x86:
-  #   name: Build on macOS x86-64
-  #   needs: [setup]
-  #   uses: ./.github/workflows/build-wheel-macos-x86_64.yaml
-  #   with:
-  #     branch: ${{ needs.setup.outputs.branch }}
-
   upload:
     name: Prepare & Upload wheels to TestPyPI
-    needs: [linux-x86, macos-arm, linux-aarch]  #, macos-x86
-    runs-on: ubuntu-22.04
+    needs: [linux-x86, macos-arm, linux-aarch]
+    runs-on: ubuntu-24.04-arm
     permissions:
       id-token: write  # IMPORTANT: mandatory for trusted publishing
 
@@ -91,13 +84,8 @@ jobs:
     - name: Prepare wheels
       run: |
         rename "s/linux/manylinux_2_28/" dist/PennyLane_Catalyst-*
-        rename "s/linux/manylinux_2_28/" dist/pennylane_catalyst-*
-        rename "s/macosx_13_0_universal2/macosx_13_0_x86_64/" dist/PennyLane_Catalyst-*
-        rename "s/macosx_13_0_universal2/macosx_13_0_x86_64/" dist/pennylane_catalyst-*
         rename "s/macosx_14_0_universal2/macosx_13_0_arm64/" dist/PennyLane_Catalyst-*
-        rename "s/macosx_14_0_universal2/macosx_13_0_arm64/" dist/pennylane_catalyst-*
         rename "s/macosx_14/macosx_13/" dist/PennyLane_Catalyst-*
-        rename "s/macosx_14/macosx_13/" dist/pennylane_catalyst-*
 
     - name: Upload wheels
       uses: pypa/gh-action-pypi-publish@release/v1
