@@ -1299,8 +1299,7 @@ def trace_function(
 
 
 def _get_shots(qnode):
-    """Extract shots from qnode, handling None case and supporting JAX Tracer values mostly.
-    """
+    """Extract shots from qnode, handling None case and supporting JAX Tracer values mostly."""
     # When PennyLane allows dynamic shots, update tracing to accept dynamic shots too
     # Use JAX-compatible conditional to handle potentially traced values
     shots_value = qnode._shots.total_shots  # pylint: disable=protected-access

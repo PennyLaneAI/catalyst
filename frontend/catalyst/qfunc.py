@@ -55,7 +55,9 @@ def _resolve_mcm_config(mcm_config, shots):
     """Helper function for resolving and validating that the mcm_config is valid for executing."""
     updated_values = {}
 
-    updated_values["postselect_mode"] = None if isinstance(shots, int) and shots==0 else mcm_config.postselect_mode
+    updated_values["postselect_mode"] = (
+        None if isinstance(shots, int) and shots == 0 else mcm_config.postselect_mode
+    )
     if mcm_config.mcm_method is None:
         updated_values["mcm_method"] = (
             "one-shot" if mcm_config.postselect_mode == "hw-like" else "single-branch-statistics"
