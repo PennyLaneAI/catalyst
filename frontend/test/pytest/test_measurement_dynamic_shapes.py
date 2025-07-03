@@ -43,7 +43,8 @@ def test_dynamic_sample_backend_functionality():
 
         return circuit()
 
-    workflow_dyn_sample(10)
+    res = workflow_dyn_sample(10)
+    assert len(res) == 10
     res = workflow_dyn_sample(37)
     assert len(res) == 37
 
