@@ -22,7 +22,6 @@ from copy import copy
 from dataclasses import replace
 from typing import Callable, Sequence
 
-import jax
 import jax.numpy as jnp
 import pennylane as qml
 from jax.core import eval_jaxpr
