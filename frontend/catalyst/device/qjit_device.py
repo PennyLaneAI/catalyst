@@ -130,7 +130,7 @@ SUPPORTED_RT_DEVICES = {
 def get_shots(dev, qnode):
     """Helper function to get shots."""
     # pylint: disable=protected-access
-    return qnode._shots.total_shots if isinstance(dev, qml.devices.Device) else qnode._shots
+    return qnode._shots.total_shots
 
 
 @dataclass
