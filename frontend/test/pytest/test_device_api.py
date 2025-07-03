@@ -157,24 +157,28 @@ def test_track_resources():
 
 def test_state_with_set_shots_none():
     """Test that qml.set_shots(None) overrides device shots for state measurements."""
+
     @qml.qjit
     @partial(qml.set_shots, shots=None)
-    @qml.qnode(qml.device('lightning.qubit', wires=4, shots=50))
+    @qml.qnode(qml.device("lightning.qubit", wires=4, shots=50))
     def f():
         return qml.state()
+
     result = f()
     assert result.shape == (16,)
 
 
 def test_sample_with_set_shots_10():
     """Test that qml.set_shots(10) overrides device shots for sample measurements."""
+
     @qml.qjit
     @partial(qml.set_shots, shots=10)
-    @qml.qnode(qml.device('lightning.qubit', wires=4))
+    @qml.qnode(qml.device("lightning.qubit", wires=4))
     def f():
         return qml.sample(wires=0)
+
     result = f()
-    assert result.shape == (10, 1)    
+    assert result.shape == (10, 1)
 
 
 if __name__ == "__main__":
