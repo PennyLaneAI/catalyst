@@ -1319,7 +1319,7 @@ def _get_shots(qnode) -> int:
 
 
 @debug_logger
-def trace_quantum_function(  # pylint: disable=too-many-locals,too-many-statements,too-many-branches  # noqa: C901
+def trace_quantum_function(
     f: Callable, device: QubitDevice, args, kwargs, qnode, static_argnums, debug_info
 ) -> Tuple[ClosedJaxpr, Any]:
     """Trace quantum function in a way that allows building a nested quantum tape describing the
@@ -1346,7 +1346,6 @@ def trace_quantum_function(  # pylint: disable=too-many-locals,too-many-statemen
     with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
         # (1) - Classical tracing
         quantum_tape = QuantumTape(shots=qnode._shots)  # pylint: disable=protected-access
-        # device._shots = qnode._shots  # pylint: disable=protected-access
         with EvaluationContext.frame_tracing_context(debug_info=debug_info) as trace:
             wffa, in_avals, keep_inputs, out_tree_promise = deduce_avals(
                 f, args, kwargs, static_argnums, debug_info
@@ -1396,8 +1395,7 @@ def trace_quantum_function(  # pylint: disable=too-many-locals,too-many-statemen
                 # Each tape will be outlined into its own function with mlir pass
                 # -split-multiple-tapes
 
-                # TODO: device shots is now always a concrete integer or None
-                # When PennyLane allows dynamic shots, update tracing to accept dynamic shots too
+                # due to possibility of tracer, we cannot use a simple `or` here to simplify
                 shots = _get_shots(qnode)
                 device_init_p.bind(
                     shots,
