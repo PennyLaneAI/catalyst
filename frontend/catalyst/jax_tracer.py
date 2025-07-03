@@ -1311,7 +1311,7 @@ def trace_function(
 @debug_logger
 def trace_quantum_function(
     f: Callable, device: QubitDevice, args, kwargs, qnode, static_argnums, debug_info
-) -> Tuple[ClosedJaxpr, Any]:
+) -> Tuple[ClosedJaxpr, Any]:  # pylint: disable=too-many-branches,too-many-statements,too-many-locals,too-many-nested-blocks
     """Trace quantum function in a way that allows building a nested quantum tape describing the
     quantum algorithm.
 
