@@ -55,16 +55,7 @@ def _resolve_mcm_config(mcm_config, shots):
     """Helper function for resolving and validating that the mcm_config is valid for executing."""
     updated_values = {}
 
-    # Handle both concrete values and JAX tracers
-    if isinstance(shots, jax.core.Tracer):
-        # For traced values, we can't do boolean conversion at trace time
-        # Assume shots is non-zero if it's being traced (reasonable assumption)
-        shots_is_nonzero = True
-    else:
-        shots_is_nonzero = bool(shots)
-
-    updated_values["postselect_mode"] = mcm_config.postselect_mode if shots_is_nonzero else None
-
+    updated_values["postselect_mode"] = None if isinstance(shots, int) and shots==0 else mcm_config.postselect_mode
     if mcm_config.mcm_method is None:
         updated_values["mcm_method"] = (
             "one-shot" if mcm_config.postselect_mode == "hw-like" else "single-branch-statistics"
