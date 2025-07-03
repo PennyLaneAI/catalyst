@@ -148,12 +148,6 @@ def _make_execution_config(qnode):
     return execution_config
 
 
-def get_shots(dev, qnode):
-    """Helper function to get shots."""
-    # pylint: disable=protected-access
-    return qnode._shots if isinstance(dev, qml.devices.LegacyDevice) else qnode._shots.total_shots
-
-
 def get_device_shot_vector(dev):
     """Helper function to get device shot vector."""
     return [(shot_copy.shots, shot_copy.copies) for shot_copy in dev.shots.shot_vector]
