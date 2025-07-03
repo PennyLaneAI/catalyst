@@ -27,10 +27,10 @@ import catalyst
 from catalyst.debug import get_compilation_stage, replace_ir
 
 
-def test_dynamic_sample_backend_functionality():
+def test_dynamic_sample():
     """Test that a `sample` program with dynamic shots can be executed correctly."""
 
-    @catalyst.qjit(keep_intermediate=True)
+    @catalyst.qjit(keep_intermediate=False)
     def workflow_dyn_sample(shots):  # pylint: disable=unused-argument
         # qml.device still needs concrete shots
         device = qml.device("lightning.qubit", wires=1)
@@ -51,14 +51,15 @@ def test_dynamic_sample_backend_functionality():
     workflow_dyn_sample.workspace.cleanup()
 
 
-def test_dynamic_counts_backend_functionality():
+def test_dynamic_counts():
     """Test that a `counts` program with dynamic shots can be executed correctly."""
 
-    @catalyst.qjit(keep_intermediate=True)
+    @catalyst.qjit(keep_intermediate=False)
     def workflow_dyn_counts(shots):  # pylint: disable=unused-argument
         # qml.device still needs concrete shots
-        device = qml.device("lightning.qubit", wires=1, shots=10)
+        device = qml.device("lightning.qubit", wires=1)
 
+        @partial(qml.set_shots, shots=shots)
         @qml.qnode(device)
         def circuit():
             qml.RX(1.5, 0)
@@ -66,24 +67,9 @@ def test_dynamic_counts_backend_functionality():
 
         return circuit()
 
-    workflow_dyn_counts(10)
-    old_ir = get_compilation_stage(workflow_dyn_counts, "mlir")
-    workflow_dyn_counts.workspace.cleanup()
+    res = workflow_dyn_counts(10)
+    assert res[1][0] + res[1][1] == 10
 
-    new_ir = old_ir.replace(
-        "catalyst.launch_kernel @module_circuit::@circuit() : () ->",
-        "catalyst.launch_kernel @module_circuit::@circuit(%arg0) : (tensor<i64>) ->",
-    )
-    new_ir = new_ir.replace(
-        "func.func public @circuit() ->", "func.func public @circuit(%arg0: tensor<i64>) ->"
-    )
-    new_ir = new_ir.replace(
-        "quantum.device shots(%extracted) [",
-        """%shots = tensor.extract %arg0[] : tensor<i64>
-      quantum.device shots(%shots) [""",
-    )
-
-    replace_ir(workflow_dyn_counts, "mlir", new_ir)
     res = workflow_dyn_counts(4000)
     assert res[1][0] + res[1][1] == 4000
 
