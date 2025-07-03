@@ -971,6 +971,7 @@ void __catalyst__qis__Probs(MemRefT_double_1d *result, int64_t numQubits, ...)
                              result_p->strides);
 
     if (wires.empty()) {
+        std::cout << "num wires at probs: " << __catalyst__rt__num_qubits() << "\n";
         getQuantumDevicePtr()->Probs(view);
     }
     else {

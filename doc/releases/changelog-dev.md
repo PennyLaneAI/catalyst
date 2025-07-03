@@ -341,6 +341,10 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* `from_plxpr` updated to match a change in the `qnode_prim` in pennylane. consts are now treated as
+  dynamic variables instead of static variables, matching standard catalyst behavior.
+  [(#1801)](https://github.com/PennyLaneAI/catalyst/pull/1801)
+
 * Use `dataclass.replace` to update `ExecutionConfig` and `MCMConfig` rather than mutating properties.
   [(#1814)](https://github.com/PennyLaneAI/catalyst/pull/1814)
 
