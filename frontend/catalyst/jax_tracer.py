@@ -945,7 +945,7 @@ def pauli_word_to_tensor_obs(obs, qrp: QRegPromise) -> List[DynamicJaxprTracer]:
 # pylint: disable=too-many-statements,too-many-branches
 @debug_logger
 def trace_quantum_measurements(
-    qnode,
+    shots,
     device: QubitDevice,
     qrp: QRegPromise,
     outputs: List[Union[MeasurementProcess, DynamicJaxprTracer, Any]],
@@ -965,7 +965,6 @@ def trace_quantum_measurements(
         out_classical_tracers: modified list of JAX classical qnode ouput tracers.
         out_tree: modified PyTree-shape of the qnode output.
     """
-    shots = qnode._shots.total_shots  # pylint: disable=protected-access
     out_classical_tracers = []
 
     for i, output in enumerate(outputs):
@@ -1434,7 +1433,7 @@ def trace_quantum_function(
                 qrp_out = trace_quantum_operations(
                     tape, device, qreg_in, ctx, trace, mcm_config, snapshot_results
                 )
-                meas, meas_trees = trace_quantum_measurements(qnode, device, qrp_out, output, trees)
+                meas, meas_trees = trace_quantum_measurements(shots, device, qrp_out, output, trees)
                 qreg_out = qrp_out.actualize()
 
                 # Check if the measurements are nested then apply the to_jaxpr_tracer
