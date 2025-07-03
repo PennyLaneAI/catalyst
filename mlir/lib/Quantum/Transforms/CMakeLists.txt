@@ -61,28 +61,11 @@ FetchContent_Declare(z3
         GIT_TAG        z3-4.15.1
         UPDATE_DISCONNECTED 1
 )
-FetchContent_MakeAvailable(z3)
+FetchContent_Populate(z3)
+execute_process(
+    COMMAND ${GIT_EXECUTABLE} apply --check "${Z3_PATCH_FILE}"
+    WORKING_DIRECTORY "${z3_SOURCE_DIR}"
+    RESULT_VARIABLE CHECK_PATCH_RESULT
+)
 
-# Now, conditionally apply the patch after FetchContent has populated the source
-if(EXISTS "${Z3_PATCH_FILE}")
-    message(STATUS "Patch file found: ${Z3_PATCH_FILE}. Applying patch to Z3 source.")
-    execute_process(
-        COMMAND ${GIT_EXECUTABLE} apply "${Z3_PATCH_FILE}"
-        WORKING_DIRECTORY "${z3_SOURCE_DIR}"
-        RESULT_VARIABLE PATCH_RESULT
-        OUTPUT_VARIABLE PATCH_OUTPUT
-        ERROR_VARIABLE PATCH_ERROR
-    )
-
-    if(NOT PATCH_RESULT EQUAL 0)
-        message(WARNING "Failed to apply Z3 patch. This might be expected if the patch was already 
-                            applied or is not compatible. Error: ${PATCH_ERROR}")
-    else()
-        message(STATUS "Z3 patch applied successfully.")
-    endif()
-else()
-    message(STATUS "Patch file not found: ${Z3_PATCH_FILE}. Skipping Z3 patch application.")
-endif()
-
-include_directories( ${z3_SOURCE_DIR}/src/api )
-target_link_libraries(${LIBRARY_NAME} PRIVATE libz3)
+target_link_libraries(${LIBRARY_NAME} PRIVATE -Wl,-rpath,libz3)
