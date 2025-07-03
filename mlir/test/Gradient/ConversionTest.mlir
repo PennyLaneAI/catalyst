@@ -18,7 +18,7 @@
 // Native Gradients //
 //////////////////////
 
-func.func private @circuit.nodealloc(%arg0: f32) -> (!quantum.reg)
+func.func private @circuit.nodealloc(%arg0: f32) -> (!quantum.reg, f64)
 
 // CHECK-DAG:   llvm.func @__catalyst__rt__toggle_recorder(i1)
 // CHECK-DAG:   llvm.func @__catalyst__qis__Gradient(i64, ...)
@@ -29,7 +29,7 @@ func.func @adjoint(%arg0: f32, %arg1 : index) -> (memref<?xf64>, memref<?xf64>) 
     // CHECK-DAG:   [[F:%.+]] = llvm.mlir.constant(false) : i1
 
     // CHECK:       llvm.call @__catalyst__rt__toggle_recorder([[T]]) : (i1) -> ()
-    // CHECK:       [[QREG:%.+]] = call @circuit.nodealloc(%arg0)
+    // CHECK:       [[QREG_and_expval:%.+]]:2 = call @circuit.nodealloc(%arg0)
     // CHECK:       llvm.call @__catalyst__rt__toggle_recorder([[F]])
 
     // CHECK-DAG:   [[C1:%.+]] = llvm.mlir.constant(1 : i64) : i64
@@ -38,7 +38,7 @@ func.func @adjoint(%arg0: f32, %arg1 : index) -> (memref<?xf64>, memref<?xf64>) 
     // CHECK:       [[GRAD2:%.+]] = llvm.alloca [[C1]] x !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
 
     // CHECK:       llvm.call @__catalyst__qis__Gradient([[C2]], [[GRAD1]], [[GRAD2]])
-    // CHECK:       quantum.dealloc [[QREG]]
+    // CHECK:       quantum.dealloc [[QREG_and_expval]]#0
     %alloc0 = memref.alloc(%arg1) : memref<?xf64>
     %alloc1 = memref.alloc(%arg1) : memref<?xf64>
     gradient.adjoint @circuit.nodealloc(%arg0) size(%arg1) in(%alloc0, %alloc1 : memref<?xf64>, memref<?xf64>) : (f32) -> ()
@@ -62,11 +62,8 @@ module @test0 {
     // CHECK: [[in0struct:%.+]] = llvm.load [[in0ptr]] : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64)>
     // CHECK: [[in0memref:%.+]] = builtin.unrealized_conversion_cast [[in0struct]] : !llvm.struct<(ptr, ptr, i64)> to memref<f64>
     // CHECK: [[diff0struct:%.+]] = llvm.load [[diff0ptr]] : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64)>
-    // CHECK: [[diff0memref:%.+]] = builtin.unrealized_conversion_cast [[diff0struct]] : !llvm.struct<(ptr, ptr, i64)> to memref<f64>
     // CHECK: [[out0struct:%.+]] = llvm.load [[out0ptr]] : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64)>
-    // CHECK: [[out0memref:%.+]] = builtin.unrealized_conversion_cast [[out0struct]] : !llvm.struct<(ptr, ptr, i64)> to memref<f64>
     // CHECK: [[cotan0struct:%.+]] = llvm.load [[cotan0ptr]] : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64)>
-    // CHECK: [[cotan0memref:%.+]] = builtin.unrealized_conversion_cast [[cotan0struct]] : !llvm.struct<(ptr, ptr, i64)> to memref<f64>
     // CHECK: [[results:%.+]]:2 = call @fwd([[in0memref]])
 
     %1:2 = func.call @fwd(%arg0) : (memref<f64>) -> (memref<f64>, memref<f64>)
@@ -117,9 +114,7 @@ module @test1 {
   gradient.reverse @rev.rev(%arg0: memref<f64>, %arg1: memref<f64>, %arg2: memref<f64>, %arg3: memref<f64>, %arg4: memref<f64>) attributes {argc = 1 : i64, implementation = @rev, resc = 1 : i64, tape = 1 : i64} {
 
     // CHECK: [[in0struct:%.+]] = llvm.load [[in0ptr]] : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64)>
-    // CHECK: [[in0memref:%.+]] = builtin.unrealized_conversion_cast [[in0struct]] : !llvm.struct<(ptr, ptr, i64)> to memref<f64>
     // CHECK: [[diff0struct:%.+]] = llvm.load [[diff0ptr]] : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64)>
-    // CHECK: [[diff0memref:%.+]] = builtin.unrealized_conversion_cast [[diff0struct]] : !llvm.struct<(ptr, ptr, i64)> to memref<f64>
     // CHECK: [[out0struct:%.+]] = llvm.load [[out0ptr]] : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64)>
     // CHECK: [[out0memref:%.+]] = builtin.unrealized_conversion_cast [[out0struct]] : !llvm.struct<(ptr, ptr, i64)> to memref<f64>
     // CHECK: [[cotan0struct:%.+]] = llvm.load [[cotan0ptr]] : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64)>

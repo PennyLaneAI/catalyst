@@ -14,6 +14,7 @@
 
 #include "Catalyst/IR/CatalystDialect.h"
 #include "Catalyst/IR/CatalystOps.h"
+#include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/DialectImplementation.h" // needed for generated type parser
 #include "mlir/Interfaces/FunctionImplementation.h"
@@ -40,6 +41,9 @@ void CatalystDialect::initialize()
 #define GET_OP_LIST
 #include "Catalyst/IR/CatalystOps.cpp.inc"
         >();
+
+    declarePromisedInterfaces<bufferization::BufferizableOpInterface, PrintOp, CustomCallOp,
+                              CallbackCallOp, CallbackOp>();
 }
 
 //===----------------------------------------------------------------------===//
@@ -75,7 +79,7 @@ CallInterfaceCallable CallbackCallOp::getCallableForCallee()
 
 void CallbackCallOp::setCalleeFromCallable(CallInterfaceCallable callee)
 {
-    (*this)->setAttr("callee", callee.get<SymbolRefAttr>());
+    (*this)->setAttr("callee", cast<SymbolRefAttr>(callee));
 }
 
 Operation::operand_range CallbackCallOp::getArgOperands() { return getInputs(); }
@@ -93,7 +97,7 @@ CallInterfaceCallable LaunchKernelOp::getCallableForCallee()
 
 void LaunchKernelOp::setCalleeFromCallable(CallInterfaceCallable callee)
 {
-    (*this)->setAttr("callee", callee.get<SymbolRefAttr>());
+    (*this)->setAttr("callee", cast<SymbolRefAttr>(callee));
 }
 
 Operation::operand_range LaunchKernelOp::getArgOperands() { return getInputs(); }

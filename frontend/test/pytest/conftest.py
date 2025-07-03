@@ -41,7 +41,7 @@ def create_temporary_toml_file(request) -> str:
 
 @pytest.fixture(scope="function")
 def disable_capture():
-    """enable and disable capture around each test."""
+    """Safely disable capture after a test, even on failure."""
     try:
         yield
     finally:

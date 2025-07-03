@@ -10,15 +10,36 @@ on:
       - ready_for_review
   push:
     branches: [ main ]
+  schedule:
+    # Thursdays we test the standalone plugin
+    - cron: '35 4 * * 4'
   workflow_dispatch:
+    inputs:
+      build_standalone_plugin:
+        description: 'Build the standalone plugin wheel'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+        required: false
+        default: 'false'
   workflow_call:
-
-env:
-  MACOSX_DEPLOYMENT_TARGET: 14.0
+    inputs:
+      build_standalone_plugin:
+        description: 'Build the standalone plugin wheel'
+        type: boolean
+        required: false
+        default: false
 
 concurrency:
   group: Build Catalyst Wheel on Linux (arm64)-${{ github.ref }}
   cancel-in-progress: true
+
+env:
+  # If the `inputs.build_standalone_plugin` is set to a value (true/false), then that is used.
+  # If the input is empty (meaning this workflow was not triggered by a workflow_call/workflow_dispatch), then check if event_name is schedule.
+  # If event_name is NOT schedule, default to false
+  BUILD_STANDALONE_PLUGIN: ${{ format('{0}', inputs.build_standalone_plugin) || github.event_name == 'schedule' }}
 
 jobs:
   check_if_wheel_build_required:
@@ -33,37 +54,27 @@ jobs:
 
   build-dependencies:
     needs: [constants, check_if_wheel_build_required]
-
     strategy:
       fail-fast: false
       matrix:
-        python_version: [{major_minor: "3.10", patch: "14", package: "python3.10"}]
-        container_img: ["quay.io/pypa/manylinux_2_28_aarch64"]
-        container_name: ["manylinux_2_28_aarch64"]
+        python_version: ["3.10"]
+        container_img: ["manylinux_2_28_aarch64"]
 
-    name: Build Dependencies (Python ${{ matrix.python_version.major_minor }})
-    runs-on:
-      group: 'Office 24th floor M2 Mac'
+    name: Build Dependencies (Python ${{ matrix.python_version }})
+    runs-on: ubuntu-24.04-arm
+    container: quay.io/pypa/${{ matrix.container_img }}
 
     if: needs.check_if_wheel_build_required.outputs.build-wheels == 'true'
-
     steps:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
 
-    - name: Setup Runner Environment
-      id: setup_env
-      uses: ./.github/workflows/utils/setup_self_hosted_macos_env_linux_arm64
-      with:
-        python_version: ${{ matrix.python_version.major_minor }}
-
-    # Cache external project sources
     - name: Cache LLVM Source
       id: cache-llvm-source
       uses: actions/cache@v4
       with:
         path: ${{ github.workspace }}/mlir/llvm-project
-        key: llvm-${{ needs.constants.outputs.llvm_version }}-default-source
+        key: llvm-${{ needs.constants.outputs.llvm_version }}-container-source
         enableCrossOsArchive: True
 
     - name: Cache MHLO Source
@@ -71,7 +82,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path: ${{ github.workspace }}/mlir/mlir-hlo
-        key: mhlo-${{ needs.constants.outputs.mhlo_version }}-default-source
+        key: mhlo-${{ needs.constants.outputs.mhlo_version }}-container-source
         enableCrossOsArchive: True
 
     - name: Cache Enzyme Source
@@ -79,7 +90,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path: ${{ github.workspace }}/mlir/Enzyme
-        key: enzyme-${{ needs.constants.outputs.enzyme_version }}-default-source
+        key: enzyme-${{ needs.constants.outputs.enzyme_version }}-container-source
         enableCrossOsArchive: True
 
     - name: Clone LLVM Submodule
@@ -112,14 +123,14 @@ jobs:
       uses: actions/cache/restore@v4
       with:
         path: ${{ github.workspace }}/llvm-build
-        key: ${{ matrix.container_name }}-llvm-${{ needs.constants.outputs.llvm_version }}-wheel-build
+        key: ${{ matrix.container_img }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{matrix.python_version}}-wheel-build
 
     - name: Restore MHLO Build
       id: cache-mhlo-build
       uses: actions/cache/restore@v4
       with:
         path: ${{ github.workspace }}/mhlo-build
-        key: ${{ matrix.container_name }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-wheel-build
+        key: ${{ matrix.container_img }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-wheel-build
         lookup-only: True
 
     - name: Restore Enzyme Build
@@ -127,20 +138,40 @@ jobs:
       uses: actions/cache/restore@v4
       with:
         path: ${{ github.workspace }}/enzyme-build
-        key: ${{ matrix.container_name }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-wheel-build
+        key: ${{ matrix.container_img }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-wheel-build
         lookup-only: True
+
+    - name: Install dependencies
+      if: |
+        steps.cache-llvm-build.outputs.cache-hit != 'true' ||
+        steps.cache-mhlo-build.outputs.cache-hit != 'true' ||
+        steps.cache-enzyme-build.outputs.cache-hit != 'true'
+      run: |
+        cat /etc/dnf.conf | sed "s/\[main\]/\[main\]\ntimeout=5/g" > /etc/dnf.conf
+        dnf update -y && dnf install -y libzstd-devel gcc-toolset-12
+        # Update env vars valid for all tasks of this job
+        echo '/opt/rh/gcc-toolset-12/root/usr/bin' >> $GITHUB_PATH
+
+    - name: Install Dependencies (Python)
+      run: |
+        python${{ matrix.python_version }} -m pip install numpy nanobind pybind11 PyYAML cmake ninja
+        # Add cmake and ninja to the PATH env var
+        PYTHON_BINS=$(find /opt/_internal/cpython-${{ matrix.python_version }}.*/bin -maxdepth 1 -type d | tr '\n' ':' | sed 's/:$//')
+        echo $PYTHON_BINS >> $GITHUB_PATH
 
     - name: Build LLVM / MLIR
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
       run: |
-        set -x
-        # With GCC 13, LLVM fails some tests, then we use GCC 12 instead
-        export GCC_VERSION=12
-        docker run --rm --platform linux/aarch64 \
-            -v /var/run/docker.sock:/var/run/docker.sock \
-            -v `pwd`:/catalyst \
-            -i ${{ matrix.container_img }} \
-            bash /catalyst/.github/workflows/scripts/linux_arm64/rh8/build_llvm.sh $GCC_VERSION ${{ matrix.python_version.major_minor }} ${{ matrix.python_version.patch }} ${{ matrix.python_version.package }}
+        export PATH=$GITHUB_WORKSPACE/llvm-build/bin:$PATH
+        PYTHON=$(which python${{ matrix.python_version }}) \
+        C_COMPILER=$(which gcc) \
+        CXX_COMPILER=$(which g++) \
+        LLVM_BUILD_DIR="$GITHUB_WORKSPACE/llvm-build" \
+        LLVM_PROJECTS="lld;mlir" \
+        LLVM_TARGETS="lld check-mlir" \
+        ENABLE_ZLIB=FORCE_ON \
+        ENABLE_LLD=OFF \
+        make llvm
 
     - name: Save LLVM Build
       id: save-llvm-build
@@ -148,18 +179,30 @@ jobs:
       uses: actions/cache/save@v4
       with:
         path: ${{ github.workspace }}/llvm-build
-        key: ${{ matrix.container_name }}-llvm-${{ needs.constants.outputs.llvm_version }}-wheel-build
+        key: ${{ matrix.container_img }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{matrix.python_version}}-wheel-build
 
     - name: Build MHLO Dialect
       if: steps.cache-mhlo-build.outputs.cache-hit != 'true'
+      # building with LLD is a strong requirement for mhlo
       run: |
-        set -x
-        export GCC_VERSION=13
-        docker run --rm --platform linux/aarch64 \
-            -v /var/run/docker.sock:/var/run/docker.sock \
-            -v `pwd`:/catalyst \
-            -i ${{ matrix.container_img }} \
-            bash /catalyst/.github/workflows/scripts/linux_arm64/rh8/build_mhlo.sh $GCC_VERSION ${{ matrix.python_version.major_minor }} ${{ matrix.python_version.patch }} ${{ matrix.python_version.package }}
+        export PATH=$GITHUB_WORKSPACE/llvm-build/bin:$PATH
+
+        pushd $GITHUB_WORKSPACE/mlir/mlir-hlo
+        git apply $GITHUB_WORKSPACE/mlir/patches/mhlo-remove-shardy.patch
+        git apply $GITHUB_WORKSPACE/mlir/patches/mhlo-add-back-necessary-passes.patch
+        popd
+
+        cmake -S mlir/mlir-hlo -B $GITHUB_WORKSPACE/mhlo-build -G Ninja \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DLLVM_ENABLE_ASSERTIONS=ON \
+              -DMLIR_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir" \
+              -DPython3_EXECUTABLE=$(which python${{ matrix.python_version }}) \
+              -DLLVM_ENABLE_ZLIB=FORCE_ON \
+              -DLLVM_ENABLE_ZSTD=OFF \
+              -DCMAKE_CXX_VISIBILITY_PRESET=default \
+              -DLLVM_ENABLE_LLD=ON
+
+        LIT_FILTER_OUT="chlo_legalize_to_mhlo" cmake --build $GITHUB_WORKSPACE/mhlo-build --target check-mlir-hlo
 
     - name: Save MHLO Build
       id: save-mhlo-build
@@ -167,18 +210,25 @@ jobs:
       uses: actions/cache/save@v4
       with:
         path: ${{ github.workspace }}/mhlo-build
-        key: ${{ matrix.container_name }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-wheel-build
+        key: ${{ matrix.container_img }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-wheel-build
 
     - name: Build Enzyme
       if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
       run: |
-        set -x
-        export GCC_VERSION=13
-        docker run --rm --platform linux/aarch64 \
-            -v /var/run/docker.sock:/var/run/docker.sock \
-            -v `pwd`:/catalyst \
-            -i ${{ matrix.container_img }} \
-            bash /catalyst/.github/workflows/scripts/linux_arm64/rh8/build_enzyme.sh $GCC_VERSION ${{ matrix.python_version.major_minor }} ${{ matrix.python_version.patch }} ${{ matrix.python_version.package }}
+        export PATH=$GITHUB_WORKSPACE/llvm-build/bin:$PATH
+
+        export TARGET_FILE=mlir/Enzyme/enzyme/Enzyme/TypeAnalysis/TypeAnalysis.cpp
+        export PATCH_FILE=mlir/patches/enzyme-nvvm-fabs-intrinsics.patch
+        if patch --dry-run -p1 -N $TARGET_FILE $PATCH_FILE > /dev/null 2>&1; then patch -p1 $TARGET_FILE $PATCH_FILE; fi
+
+        cmake -S mlir/Enzyme/enzyme -B $GITHUB_WORKSPACE/enzyme-build -G Ninja \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DLLVM_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/llvm" \
+              -DENZYME_STATIC_LIB=ON \
+              -DCMAKE_CXX_VISIBILITY_PRESET=default \
+              -DCMAKE_CXX_FLAGS="-fuse-ld=lld"
+
+        cmake --build $GITHUB_WORKSPACE/enzyme-build --target EnzymeStatic-21
 
     - name: Save Enzyme Build
       id: save-enzyme-build
@@ -186,40 +236,45 @@ jobs:
       uses: actions/cache/save@v4
       with:
         path: ${{ github.workspace }}/enzyme-build
-        key: ${{ matrix.container_name }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-wheel-build
+        key: ${{ matrix.container_img }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-wheel-build
 
   catalyst-linux-wheels-arm64:
     needs: [constants, build-dependencies]
     strategy:
       fail-fast: false
-      max-parallel: 1
       matrix:
-        python_version: [{major_minor: "3.10", patch: "14", package: "python3.10", alternative: "310"},
-                         {major_minor: "3.11", patch: "9",  package: "python3.11", alternative: "311"},
-                         {major_minor: "3.12", patch: "3",  package: "python3.12", alternative: "312"}]
-        container_img: ["quay.io/pypa/manylinux_2_28_aarch64"]
-        container_name: ["manylinux_2_28_aarch64"]
+        python_version: ${{ fromJSON(needs.constants.outputs.python_versions) }}
+        container_img: ["manylinux_2_28_aarch64"]
 
-    name: Build Wheels (Python ${{ matrix.python_version.major_minor }})
-    runs-on:
-      group: 'Office 24th floor M2 Mac'
+    name: Build Wheels (Python ${{ matrix.python_version }})
+    runs-on: ubuntu-24.04-arm
+    container: quay.io/pypa/${{ matrix.container_img }}
 
     steps:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
 
-    - name: Setup Runner Environment
-      id: setup_env
-      uses: ./.github/workflows/utils/setup_self_hosted_macos_env_linux_arm64
-      with:
-        python_version: ${{ matrix.python_version.major_minor }}
+    - name: Install dependencies (AlmaLinux)
+      run: |
+        # Reduce wait time for repos not responding
+        cat /etc/dnf.conf | sed "s/\[main\]/\[main\]\ntimeout=5/g" > /etc/dnf.conf
+        dnf update -y && dnf install -y openmpi-devel libzstd-devel gcc-toolset-12
+        # Update env vars valid for all tasks of this job
+        echo '/opt/rh/gcc-toolset-12/root/usr/bin' >> $GITHUB_PATH
+
+    - name: Install Dependencies (Python)
+      run: |
+        python${{ matrix.python_version }} -m pip install numpy nanobind pybind11 PyYAML cmake ninja
+        # Add cmake and ninja to the PATH env var
+        PYTHON_BINS=$(find /opt/_internal/cpython-${{ matrix.python_version }}.*/bin -maxdepth 1 -type d | tr '\n' ':' | sed 's/:$//')
+        echo $PYTHON_BINS >> $GITHUB_PATH
 
     - name: Get Cached LLVM Source
       id: cache-llvm-source
       uses: actions/cache/restore@v4
       with:
         path: ${{ github.workspace }}/mlir/llvm-project
-        key: llvm-${{ needs.constants.outputs.llvm_version }}-default-source
+        key: llvm-${{ needs.constants.outputs.llvm_version }}-container-source
         enableCrossOsArchive: True
         fail-on-cache-miss: True
 
@@ -228,7 +283,7 @@ jobs:
       uses: actions/cache/restore@v4
       with:
         path: ${{ github.workspace }}/llvm-build
-        key: ${{ matrix.container_name }}-llvm-${{ needs.constants.outputs.llvm_version }}-wheel-build
+        key: ${{ matrix.container_img }}-llvm-${{ needs.constants.outputs.llvm_version }}-3.10-wheel-build
         fail-on-cache-miss: True
 
     - name: Get Cached MHLO Source
@@ -236,7 +291,7 @@ jobs:
       uses: actions/cache/restore@v4
       with:
         path: ${{ github.workspace }}/mlir/mlir-hlo
-        key: mhlo-${{ needs.constants.outputs.mhlo_version }}-default-source
+        key: mhlo-${{ needs.constants.outputs.mhlo_version }}-container-source
         enableCrossOsArchive: True
         fail-on-cache-miss: True
 
@@ -245,7 +300,7 @@ jobs:
       uses: actions/cache/restore@v4
       with:
         path: ${{ github.workspace }}/mhlo-build
-        key: ${{ matrix.container_name }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-wheel-build
+        key: ${{ matrix.container_img }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-wheel-build
         fail-on-cache-miss: True
 
     - name: Get Cached Enzyme Source
@@ -253,7 +308,7 @@ jobs:
       uses: actions/cache/restore@v4
       with:
         path: ${{ github.workspace }}/mlir/Enzyme
-        key: enzyme-${{ needs.constants.outputs.enzyme_version }}-default-source
+        key: enzyme-${{ needs.constants.outputs.enzyme_version }}-container-source
         enableCrossOsArchive: True
         fail-on-cache-miss: True
 
@@ -262,66 +317,166 @@ jobs:
       uses: actions/cache/restore@v4
       with:
         path: ${{ github.workspace }}/enzyme-build
-        key: ${{ matrix.container_name }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-wheel-build
+        key: ${{ matrix.container_img }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-wheel-build
         fail-on-cache-miss: True
 
-    # Build Catalyst Wheel
-    - name: Build Catalyst Wheel
+    - name: Build Catalyst-Runtime
       run: |
-        set -x
-        export GCC_VERSION=13
-        docker run --rm --platform linux/aarch64 \
-            -v /var/run/docker.sock:/var/run/docker.sock \
-            -v `pwd`:/catalyst \
-            -i ${{ matrix.container_img }} \
-            bash /catalyst/.github/workflows/scripts/linux_arm64/rh8/build_catalyst.sh $GCC_VERSION ${{ matrix.python_version.major_minor }} ${{ matrix.python_version.patch }} ${{ matrix.python_version.package }} ${{ matrix.python_version.alternative }}
+        cmake -S runtime -B $GITHUB_WORKSPACE/runtime-build -G Ninja \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DCMAKE_LIBRARY_OUTPUT_DIRECTORY="$GITHUB_WORKSPACE/runtime-build/lib" \
+              -DPython_EXECUTABLE=$(which python${{ matrix.python_version }}) \
+              -DENABLE_OPENQASM=ON \
+              -DENABLE_OQD=OFF \
+              -DMLIR_INCLUDE_DIRS="$GITHUB_WORKSPACE/mlir/llvm-project/mlir/include"
+
+        cmake --build $GITHUB_WORKSPACE/runtime-build --target rt_capi rtd_openqasm rtd_null_qubit
+
+    - name: Build OQC-Runtime
+      run: |
+          C_COMPILER=$(which gcc) \
+          CXX_COMPILER=$(which g++) \
+          OQC_BUILD_DIR="$GITHUB_WORKSPACE/oqc-build" \
+          RT_BUILD_DIR="$GITHUB_WORKSPACE/runtime-build" \
+          PYTHON=$(which python${{ matrix.python_version }}) \
+          make oqc
+
+    # Build Quantum and Gradient Dialects
+    - name: Build MLIR Dialects
+      run: |
+        export PATH=$GITHUB_WORKSPACE/llvm-build/bin:$PATH
+        cmake -S mlir -B $GITHUB_WORKSPACE/quantum-build -G Ninja \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DLLVM_ENABLE_ASSERTIONS=ON \
+              -DQUANTUM_ENABLE_BINDINGS_PYTHON=ON \
+              -DCMAKE_PREFIX_PATH=$GITHUB_WORKSPACE/catalyst/catalyst \
+              -DPython3_EXECUTABLE=$(which python${{ matrix.python_version }}) \
+              -DPython3_NumPy_INCLUDE_DIRS=$(python${{ matrix.python_version }} -c "import numpy as np; print(np.get_include())") \
+              -DMLIR_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir" \
+              -DMHLO_DIR="$GITHUB_WORKSPACE/mhlo-build/lib/cmake/mlir-hlo" \
+              -DMHLO_BINARY_DIR="$GITHUB_WORKSPACE/mhlo-build/bin" \
+              -DEnzyme_DIR="$GITHUB_WORKSPACE/enzyme-build" \
+              -DENZYME_SRC_DIR="$GITHUB_WORKSPACE/mlir/Enzyme" \
+              -DLLVM_ENABLE_ZLIB=FORCE_ON \
+              -DLLVM_ENABLE_ZSTD=OFF \
+              -DLLVM_ENABLE_LLD=ON
+
+        cmake --build $GITHUB_WORKSPACE/quantum-build --target check-dialects catalyst-cli
+
+    - name: Build Plugin wheel
+      # Run only on Thursday at the given time
+      if: env.BUILD_STANDALONE_PLUGIN == 'true'
+      run: |
+        MLIR_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir" \
+        LLVM_BUILD_DIR="$GITHUB_WORKSPACE/llvm-build" \
+        C_COMPILER=$(which gcc) \
+        CXX_COMPILER=$(which g++) \
+        make plugin-wheel
+
+    - name: Build wheel
+      run: |
+        PYTHON=python${{ matrix.python_version }} \
+        LLVM_BUILD_DIR="$GITHUB_WORKSPACE/llvm-build" \
+        MHLO_BUILD_DIR="$GITHUB_WORKSPACE/mhlo-build" \
+        DIALECTS_BUILD_DIR="$GITHUB_WORKSPACE/quantum-build" \
+        RT_BUILD_DIR="$GITHUB_WORKSPACE/runtime-build" \
+        OQC_BUILD_DIR="$GITHUB_WORKSPACE/oqc-build" \
+        ENZYME_BUILD_DIR="$GITHUB_WORKSPACE/enzyme-build" \
+        make wheel
+
+    - name: Repair wheel using auditwheel
+      run: |
+        # exclude libopenblas as we rely on the openblas/lapack library shipped by scipy
+        auditwheel repair dist/*.whl -w ./wheel --no-update-tags --exclude libopenblasp-r0-23e5df77.3.21.dev.so
 
     - name: Upload Wheel Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: catalyst-linux_arm64-wheel-py-${{ matrix.python_version.major_minor}}.zip
+        name: catalyst-linux_arm_64-wheel-py-${{ matrix.python_version }}.zip
         path: ${{ github.workspace }}/wheel/
+        retention-days: 14
+
+    - name: Upload Standalone Plugin Wheel Artifact
+      # Run only on Thursday at the given time
+      if: env.BUILD_STANDALONE_PLUGIN == 'true'
+      uses: actions/upload-artifact@v4
+      with:
+        name: standalone-plugin-linux_arm_64-wheel-py-${{ matrix.python_version }}.zip
+        path: ${{ github.workspace }}/standalone_plugin_wheel/dist
         retention-days: 14
 
   test-wheels:
     needs: [constants, catalyst-linux-wheels-arm64]
     strategy:
       fail-fast: false
-      max-parallel: 1
       matrix:
-        python_version: [{major_minor: "3.10", patch: "14", package: "python3.10"},
-                         {major_minor: "3.11", patch: "9",  package: "python3.11"},
-                         {major_minor: "3.12", patch: "3",  package: "python3.12"}]
-        container_img: ["quay.io/pypa/manylinux_2_28_aarch64"]
-        container_name: ["manylinux_2_28_aarch64"]
+        python_version: ${{ fromJSON(needs.constants.outputs.python_versions) }}
 
     # To check all wheels for supported python3 versions
-    name: Test Wheels (Python ${{ matrix.python_version.major_minor }})
-    runs-on:
-      group: 'Office 24th floor M2 Mac'
+    name: Test Wheels (Python ${{ matrix.python_version }}) on Linux Arm
+    runs-on: ubuntu-24.04-arm
 
     steps:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
 
-    - name: Setup Runner Environment
-      id: setup_env
-      uses: ./.github/workflows/utils/setup_self_hosted_macos_env_linux_arm64
+    - name: Setup Python ${{ matrix.python_version }}
+      uses: actions/setup-python@v5
       with:
-        python_version: ${{ matrix.python_version.major_minor }}
+        python-version: ${{ matrix.python_version }}
 
     - name: Download Wheel Artifact
       uses: actions/download-artifact@v4
       with:
-        name: catalyst-linux_arm64-wheel-py-${{ matrix.python_version.major_minor }}.zip
+        name: catalyst-linux_arm_64-wheel-py-${{ matrix.python_version }}.zip
         path: ${{ github.workspace }}/dist
+
+    - name: Download Standalone Plugin Wheel Artifact
+      # Run only on Thursday at the given time
+      if: env.BUILD_STANDALONE_PLUGIN == 'true'
+      uses: actions/download-artifact@v4
+      with:
+        name: standalone-plugin-linux_arm_64-wheel-py-${{ matrix.python_version }}.zip
+        path: ${{ github.workspace }}/standalone_plugin_wheel/wheel
+
+    - name: Set up Python ${{ matrix.python_version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python_version }}
+
+    - name: Install Python dependencies
+      run: |
+        python${{ matrix.python_version }} -m pip install pytest pytest-xdist pytest-mock
+
+    - name: Install PennyLane Plugins
+      run: |
+        python${{ matrix.python_version }} -m pip install PennyLane-Lightning-Kokkos
+        python${{ matrix.python_version }} -m pip install 'amazon-braket-pennylane-plugin>=1.31.0'
+
+    - name: Install OQC client
+      run: |
+        python${{ matrix.python_version }} -m pip install oqc-qcaas-client
+
+    - name: Install Catalyst
+      run: |
+        python${{ matrix.python_version }} -m pip install dist/*.whl --extra-index-url https://test.pypi.org/simple
+
+    - name: Install Standalone Plugin
+      # Run only on Thursday at the given time
+      if: env.BUILD_STANDALONE_PLUGIN == 'true'
+      run: |
+        python${{ matrix.python_version }} -m pip install standalone_plugin_wheel/wheel/*.whl --no-deps
 
     - name: Run Python Pytest Tests
       run: |
-        set -x
-        export GCC_VERSION=13
-        docker run --rm --platform linux/aarch64 \
-            -v /var/run/docker.sock:/var/run/docker.sock \
-            -v `pwd`:/catalyst \
-            -i ${{ matrix.container_img }} \
-            bash /catalyst/.github/workflows/scripts/linux_arm64/rh8/test_wheels.sh $GCC_VERSION ${{ matrix.python_version.major_minor }} ${{ matrix.python_version.patch }} ${{ matrix.python_version.package }}
+        python${{ matrix.python_version }} -m pytest frontend/test/pytest -n auto
+        python${{ matrix.python_version }} -m pytest frontend/test/pytest --backend="lightning.kokkos" -n auto
+        python${{ matrix.python_version }} -m pytest frontend/test/async_tests
+        python${{ matrix.python_version }} -m pytest frontend/test/pytest --runbraket=LOCAL -n auto || true
+        python${{ matrix.python_version }} -m pytest frontend/test/test_oqc/oqc -n auto
+
+    - name: Run Standalone Plugin Tests
+      # Run only on Thursday at the given time
+      if: env.BUILD_STANDALONE_PLUGIN == 'true'
+      run: |
+        python${{ matrix.python_version }} -m pytest standalone_plugin_wheel/standalone_plugin/test -n auto

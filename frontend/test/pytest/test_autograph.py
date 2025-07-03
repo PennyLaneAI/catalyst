@@ -14,6 +14,7 @@
 
 """PyTests for the AutoGraph source-to-source transformation feature."""
 
+import itertools
 import traceback
 import warnings
 from collections import defaultdict
@@ -26,8 +27,21 @@ import pytest
 from jax.errors import TracerBoolConversionError
 from numpy.testing import assert_allclose
 
-from catalyst import *
-from catalyst import qjit
+from catalyst import AutoGraphError, debug, passes, qjit
+from catalyst.api_extensions import (
+    adjoint,
+    cond,
+    ctrl,
+    for_loop,
+    grad,
+    jacobian,
+    jvp,
+    measure,
+    vjp,
+    vmap,
+    while_loop,
+)
+from catalyst.autograph import autograph_source, disable_autograph, run_autograph
 from catalyst.autograph.transformer import TRANSFORMER
 from catalyst.utils.dummy import dummy_func
 from catalyst.utils.exceptions import CompileError
@@ -41,7 +55,34 @@ check_cache = TRANSFORMER.has_cache
 
 
 class Failing:
-    """Test class that emulates failures in user-code"""
+    """
+    Test class that emulates failures in user-code.
+
+    When autograph fails to convert, it will fall back to native python control flow execution.
+    In such cases autograph would raise a warning.
+
+    We want to test that this warning is properly raised, but if we use an actual error to trigger
+    the autograph fallback, the fallback would also fail. Therefore, we raise an exception in a
+    controlled fashion.
+
+    This Failing class has a class-level dictionary to keep track of what labels it has already
+    seen. When it sees a new label for the first time, it raises an exception. In all other cases,
+    it just silently lets the input value flow through.
+
+    For example, consider this code
+        @qjit(autograph=True)
+        def f1():
+            acc = 0
+            while acc < 5:
+                acc = Failing(acc, "while").val + 1
+            return acc
+
+    When tracing, the first Failing instance will encounter an unseen label "while".
+    This raises an exception and fails autograph, causing it to fallback.
+    Then in the actual python while loop, future Failing instances will encounter the same "while"
+    label. Since the label is not new, no new exception is raised, and the test finishes without
+    errors.
+    """
 
     triggered = defaultdict(bool)
 
@@ -57,6 +98,13 @@ class Failing:
             Failing.triggered[self.label] = True
             raise Exception(f"Emulated failure with label {self.label}")
         return self.ref
+
+
+@pytest.fixture(autouse=True)
+def reset_Failing():
+    """Reset class variable on `Failing` class before each test"""
+    Failing.triggered = defaultdict(bool)
+    yield
 
 
 class TestSourceCodeInfo:
@@ -1288,6 +1336,20 @@ class TestForLoops:
 
         assert f() == 9
 
+    def test_fallback_itertools(self):
+        """Test the AutoGraph fallback when the iteration target has no length, as is for example
+        the case with an itertools.product with constant arguments."""
+
+        @qml.qjit(autograph=True)
+        def f(x: float):
+
+            for i, j in itertools.product(range(2), repeat=2):
+                x += i + j
+
+            return x
+
+        assert f(5) == 9
+
 
 class TestWhileLoops:
     """Test that the autograph transformations produce correct results on while loops."""
@@ -1397,21 +1459,6 @@ class TestWhileLoops:
             return acc
 
         assert f1() == sum([1, 1, 2, 2])
-
-    @pytest.mark.xfail(reason="this won't run warning-free until we fix the resource warning issue")
-    @pytest.mark.filterwarnings("error")
-    def test_whileloop_no_warning(self, monkeypatch):
-        """Test the absence of warnings if fallbacks are ignored."""
-        monkeypatch.setattr("catalyst.autograph_ignore_fallbacks", True)
-
-        @qjit(autograph=True)
-        def f():
-            acc = 0
-            while Failing(acc).val < 5:
-                acc = acc + 1
-            return acc
-
-        assert f() == 5
 
     def test_whileloop_exception(self, monkeypatch):
         """Test for-loop error if strict-conversion is enabled."""

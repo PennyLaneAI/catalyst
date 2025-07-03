@@ -13,11 +13,15 @@
 // limitations under the License.
 
 #include "Driver/Pipelines.h"
+#include "Catalyst/IR/CatalystDialect.h"
 #include "Catalyst/Transforms/Passes.h"
+#include "Gradient/IR/GradientDialect.h"
 #include "Gradient/Transforms/Passes.h"
 #include "Mitigation/Transforms/Passes.h"
+#include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/Transforms/Passes.h"
 #include "mhlo/transforms/passes.h"
+#include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/InitAllDialects.h"
 #include "mlir/InitAllPasses.h"
 #include "mlir/Pass/PassManager.h"
@@ -63,32 +67,29 @@ void createQuantumCompilationPipeline(OpPassManager &pm)
 }
 void createBufferizationPipeline(OpPassManager &pm)
 {
-    mlir::bufferization::OneShotBufferizationOptions options;
-    options.opFilter.allowDialect<mlir::bufferization::BufferizationDialect>();
-    pm.addPass(mlir::bufferization::createOneShotBufferizePass(options));
     pm.addPass(mlir::createInlinerPass());
-    pm.addPass(catalyst::createGradientPreprocessingPass());
-    pm.addPass(catalyst::createGradientBufferizationPass());
-    pm.addPass(mlir::createSCFBufferizePass());
     pm.addPass(mlir::createConvertTensorToLinalgPass());
     pm.addPass(mlir::createConvertElementwiseToLinalgPass());
-    pm.addPass(mlir::arith::createArithBufferizePass());
-    pm.addPass(mlir::bufferization::createEmptyTensorToAllocTensorPass());
-    pm.addNestedPass<mlir::func::FuncOp>(mlir::bufferization::createBufferizationBufferizePass());
-    pm.addNestedPass<mlir::func::FuncOp>(mlir::tensor::createTensorBufferizePass());
-    pm.addPass(catalyst::createCatalystBufferizationPass());
-    pm.addNestedPass<mlir::func::FuncOp>(mlir::createLinalgBufferizePass());
-    pm.addNestedPass<mlir::func::FuncOp>(mlir::tensor::createTensorBufferizePass());
-    pm.addPass(catalyst::createQuantumBufferizationPass());
-    pm.addPass(mlir::func::createFuncBufferizePass());
-    pm.addNestedPass<mlir::func::FuncOp>(mlir::bufferization::createFinalizingBufferizePass());
+    pm.addPass(catalyst::createGradientPreprocessingPass());
+    pm.addPass(mlir::bufferization::createEmptyTensorEliminationPass());
+    ///////////
+    mlir::bufferization::OneShotBufferizePassOptions options;
+    options.bufferizeFunctionBoundaries = true;
+    options.allowReturnAllocsFromLoops = true;
+    options.functionBoundaryTypeConversion =
+        mlir::bufferization::LayoutMapOption::IdentityLayoutMap;
+    options.unknownTypeConversion = mlir::bufferization::LayoutMapOption::IdentityLayoutMap;
+    pm.addPass(mlir::bufferization::createOneShotBufferizePass(options));
+    //////////////
     pm.addPass(mlir::createCanonicalizerPass());
     pm.addPass(catalyst::createGradientPostprocessingPass());
     pm.addNestedPass<mlir::func::FuncOp>(mlir::bufferization::createBufferHoistingPass());
     pm.addNestedPass<mlir::func::FuncOp>(mlir::bufferization::createBufferLoopHoistingPass());
-    pm.addNestedPass<mlir::func::FuncOp>(mlir::bufferization::createBufferDeallocationPass());
+    pm.addNestedPass<mlir::func::FuncOp>(mlir::bufferization::createPromoteBuffersToStackPass());
+    // TODO: migrate to new buffer deallocation "buffer-deallocation-pipeline"
+    pm.addNestedPass<mlir::func::FuncOp>(catalyst::createBufferDeallocationPass());
     pm.addPass(catalyst::createArrayListToMemRefPass());
-    pm.addPass(mlir::createBufferizationToMemRefPass());
+    pm.addPass(mlir::createConvertBufferizationToMemRefPass());
     pm.addPass(mlir::createCanonicalizerPass());
     pm.addPass(catalyst::createCopyGlobalMemRefPass());
 }
@@ -98,7 +99,7 @@ void createLLVMDialectLoweringPipeline(OpPassManager &pm)
     pm.addPass(catalyst::createGradientConversionPass());
     pm.addPass(catalyst::createMemrefCopyToLinalgCopyPass());
     pm.addNestedPass<mlir::func::FuncOp>(mlir::createConvertLinalgToLoopsPass());
-    pm.addPass(mlir::createConvertSCFToCFPass());
+    pm.addPass(mlir::createSCFToControlFlowPass());
     pm.addPass(mlir::memref::createExpandStridedMetadataPass());
     pm.addPass(mlir::createLowerAffinePass());
     pm.addPass(mlir::arith::createArithExpandOpsPass());

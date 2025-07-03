@@ -27,6 +27,7 @@
 #include "Catalyst/IR/CatalystOps.h"
 #include "Catalyst/Transforms/Passes.h"
 #include "Catalyst/Transforms/Patterns.h"
+#include "Catalyst/Utils/EnsureFunctionDeclaration.h"
 #include "Catalyst/Utils/StaticAllocas.h"
 #include "Gradient/IR/GradientDialect.h"
 #include "Gradient/IR/GradientOps.h"
@@ -36,25 +37,6 @@ using namespace mlir;
 using namespace catalyst;
 
 namespace {
-
-LLVM::LLVMFuncOp ensureFunctionDeclaration(PatternRewriter &rewriter, Operation *op,
-                                           StringRef fnSymbol, Type fnType)
-{
-    Operation *fnDecl = SymbolTable::lookupNearestSymbolFrom(op, rewriter.getStringAttr(fnSymbol));
-
-    if (!fnDecl) {
-        PatternRewriter::InsertionGuard insertGuard(rewriter);
-        ModuleOp mod = op->getParentOfType<ModuleOp>();
-        rewriter.setInsertionPointToStart(mod.getBody());
-
-        fnDecl = rewriter.create<LLVM::LLVMFuncOp>(op->getLoc(), fnSymbol, fnType);
-    }
-    else {
-        assert(isa<LLVM::LLVMFuncOp>(fnDecl) && "QIR function declaration is not a LLVMFuncOp");
-    }
-
-    return cast<LLVM::LLVMFuncOp>(fnDecl);
-}
 
 Value getGlobalString(Location loc, OpBuilder &rewriter, StringRef key, StringRef value,
                       ModuleOp mod)
@@ -209,7 +191,7 @@ struct PrintOpPattern : public OpConversionPattern<PrintOp> {
             Type charPtrType = LLVM::LLVMPointerType::get(rewriter.getContext());
             Type qirSignature = LLVM::LLVMFunctionType::get(voidType, charPtrType);
             LLVM::LLVMFuncOp fnDecl =
-                ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+                catalyst::ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
 
             StringRef stringValue = op.getConstVal().value();
             std::string symbolName = std::to_string(std::hash<std::string>()(stringValue.str()));
@@ -234,7 +216,7 @@ struct PrintOpPattern : public OpConversionPattern<PrintOp> {
             SmallVector<Type> argTypes{structPtrType, IntegerType::get(ctx, 1)};
             Type qirSignature = LLVM::LLVMFunctionType::get(voidType, argTypes);
             LLVM::LLVMFuncOp fnDecl =
-                ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+                catalyst::ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
 
             Value memref = op.getVal();
             MemRefType memrefType = cast<MemRefType>(memref.getType());
@@ -275,7 +257,7 @@ struct AssertionOpPattern : public OpConversionPattern<AssertionOp> {
 
         ModuleOp mod = op->getParentOfType<ModuleOp>();
         LLVM::LLVMFuncOp assertFunc =
-            ensureFunctionDeclaration(rewriter, op, qirName, assertSignature);
+            catalyst::ensureFunctionDeclaration(rewriter, op, qirName, assertSignature);
 
         Value assertionDescriptor = adaptor.getAssertion();
 
@@ -352,8 +334,10 @@ struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
         ModuleOp mod = op->getParentOfType<ModuleOp>();
         rewriter.setInsertionPointToStart(mod.getBody());
 
-        LLVM::LLVMFuncOp customCallFnOp = mlir::LLVM::lookupOrCreateFn(
-            mod, op.getCallTargetName(), {/*args=*/ptr, /*rets=*/ptr}, /*ret_type=*/voidType);
+        LLVM::LLVMFuncOp customCallFnOp =
+            mlir::LLVM::lookupOrCreateFn(mod, op.getCallTargetName(), {/*args=*/ptr, /*rets=*/ptr},
+                                         /*ret_type=*/voidType)
+                .value();
         customCallFnOp.setPrivate();
         rewriter.restoreInsertionPoint(point);
 
@@ -453,15 +437,14 @@ struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
 struct DefineCallbackOpPattern : public OpConversionPattern<CallbackOp> {
     using OpConversionPattern::OpConversionPattern;
 
-    LogicalResult match(CallbackOp op) const override
+    LogicalResult matchAndRewrite(CallbackOp op, CallbackOpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
     {
         // Only match with ops without an entry block
-        return !op.empty() ? failure() : success();
-    }
+        if (!op.empty()) {
+            return failure();
+        }
 
-    void rewrite(CallbackOp op, CallbackOpAdaptor adaptor,
-                 ConversionPatternRewriter &rewriter) const override
-    {
         Block *entry;
         rewriter.modifyOpInPlace(op, [&] { entry = op.addEntryBlock(); });
         PatternRewriter::InsertionGuard guard(rewriter);
@@ -483,9 +466,11 @@ struct DefineCallbackOpPattern : public OpConversionPattern<CallbackOp> {
         bool isVarArg = true;
         ModuleOp mod = op->getParentOfType<ModuleOp>();
         auto typeConverter = getTypeConverter();
-        LLVM::LLVMFuncOp customCallFnOp = mlir::LLVM::lookupOrCreateFn(
-            mod, "__catalyst_inactive_callback", {/*args=*/i64, i64, i64},
-            /*ret_type=*/voidType, isVarArg);
+        LLVM::LLVMFuncOp customCallFnOp =
+            mlir::LLVM::lookupOrCreateFn(mod, "__catalyst_inactive_callback",
+                                         {/*args=*/i64, i64, i64},
+                                         /*ret_type=*/voidType, isVarArg)
+                .value();
         SmallVector<Attribute> passthroughs;
         auto keyAttr = StringAttr::get(ctx, "nofree");
         passthroughs.push_back(keyAttr);
@@ -501,20 +486,21 @@ struct DefineCallbackOpPattern : public OpConversionPattern<CallbackOp> {
         }
         rewriter.create<LLVM::CallOp>(loc, customCallFnOp, callArgs);
         rewriter.create<func::ReturnOp>(loc, TypeRange{}, ValueRange{});
+        return success();
     }
 };
 
 struct ReplaceCallbackOpWithFuncOp : public OpConversionPattern<CallbackOp> {
     using OpConversionPattern::OpConversionPattern;
 
-    LogicalResult match(CallbackOp op) const override
+    LogicalResult matchAndRewrite(CallbackOp op, CallbackOpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
     {
         // Only match with ops with an entry block
-        return !op.empty() ? success() : failure();
-    }
-    void rewrite(CallbackOp op, CallbackOpAdaptor adaptor,
-                 ConversionPatternRewriter &rewriter) const override
-    {
+        if (op.empty()) {
+            return failure();
+        }
+
         ModuleOp mod = op->getParentOfType<ModuleOp>();
         rewriter.setInsertionPointToStart(mod.getBody());
 
@@ -529,6 +515,7 @@ struct ReplaceCallbackOpWithFuncOp : public OpConversionPattern<CallbackOp> {
         auto typeConverter = getTypeConverter();
         gradient::wrapMemRefArgsFunc(func, typeConverter, rewriter, op.getLoc());
         rewriter.eraseOp(op);
+        return success();
     }
 };
 
@@ -559,7 +546,8 @@ struct CallbackCallOpPattern : public OpConversionPattern<CallbackCallOp> {
 struct CustomGradOpPattern : public OpConversionPattern<gradient::CustomGradOp> {
     using OpConversionPattern::OpConversionPattern;
 
-    LogicalResult match(gradient::CustomGradOp op) const override
+    LogicalResult matchAndRewrite(gradient::CustomGradOp op, gradient::CustomGradOpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
     {
         // only match after all three are func.func
         auto callee = op.getCalleeAttr();
@@ -570,22 +558,14 @@ struct CustomGradOpPattern : public OpConversionPattern<gradient::CustomGradOp> 
         auto forwardOp = mod.lookupSymbol<func::FuncOp>(forward);
         auto reverseOp = mod.lookupSymbol<func::FuncOp>(reverse);
         auto ready = calleeOp && forwardOp && reverseOp;
-        return ready ? success() : failure();
-    }
+        if (!ready) {
+            return failure();
+        }
 
-    void rewrite(gradient::CustomGradOp op, gradient::CustomGradOpAdaptor adaptor,
-                 ConversionPatternRewriter &rewriter) const override
-    {
         auto loc = op.getLoc();
-        ModuleOp mod = op->getParentOfType<ModuleOp>();
-        auto callee = op.getCalleeAttr();
-        auto forward = op.getForwardAttr();
-        auto reverse = op.getReverseAttr();
-        auto calleeOp = mod.lookupSymbol<func::FuncOp>(callee);
-        auto forwardOp = mod.lookupSymbol<func::FuncOp>(forward);
-        auto reverseOp = mod.lookupSymbol<func::FuncOp>(reverse);
         gradient::insertEnzymeCustomGradient(rewriter, mod, loc, calleeOp, forwardOp, reverseOp);
         rewriter.eraseOp(op);
+        return success();
     }
 };
 

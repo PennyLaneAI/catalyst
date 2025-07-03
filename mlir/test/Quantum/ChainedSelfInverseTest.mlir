@@ -285,7 +285,7 @@ func.func @test_chained_self_inverse(%arg0: tensor<2x2xf64>, %arg1: tensor<f64>)
     %2 = stablehlo.convert %arg0 : (tensor<2x2xf64>) -> tensor<2x2xcomplex<f64>>
     %out_qubits = quantum.unitary(%2 : tensor<2x2xcomplex<f64>>) %1 : !quantum.bit
     %3 = stablehlo.convert %arg0 : (tensor<2x2xf64>) -> tensor<2x2xcomplex<f64>>
-    %out_qubits_1 = quantum.unitary(%3 : tensor<2x2xcomplex<f64>>) %out_qubits {adjoint} : !quantum.bit
+    %out_qubits_1 = quantum.unitary(%3 : tensor<2x2xcomplex<f64>>) %out_qubits adj : !quantum.bit
 
     // CHECK-NOT: quantum.unitary
     // CHECK: return [[IN]]
@@ -308,10 +308,10 @@ func.func @test_chained_self_inverse(%arg0: tensor<f64>) -> !quantum.bit {
     %extracted_0 = tensor.extract %arg0[] : tensor<f64>
     %out_qubits = quantum.custom "RX"(%extracted_0) %1 : !quantum.bit
     %extracted_1 = tensor.extract %arg0[] : tensor<f64>
-    %out_qubits_1 = quantum.custom "RX"(%extracted_1) %out_qubits {adjoint} : !quantum.bit
+    %out_qubits_1 = quantum.custom "RX"(%extracted_1) %out_qubits adj : !quantum.bit
 
 
-    %out_qubits_2 = quantum.custom "RX"(%extracted_0) %out_qubits_1 {adjoint} : !quantum.bit
+    %out_qubits_2 = quantum.custom "RX"(%extracted_0) %out_qubits_1 adj : !quantum.bit
     %out_qubits_3 = quantum.custom "RX"(%extracted_1) %out_qubits_2 : !quantum.bit
 
     // CHECK-NOT: quantum.custom
@@ -333,9 +333,9 @@ func.func @test_chained_self_inverse(%arg0: tensor<f64>) -> !quantum.bit {
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
 
     %extracted_0 = tensor.extract %arg0[] : tensor<f64>
-    %out_qubits = quantum.custom "RX"(%extracted_0) %1 {adjoint} : !quantum.bit
+    %out_qubits = quantum.custom "RX"(%extracted_0) %1 adj : !quantum.bit
     %extracted_1 = tensor.extract %arg0[] : tensor<f64>
-    %out_qubits_1 = quantum.custom "RX"(%extracted_1) %out_qubits {adjoint} : !quantum.bit
+    %out_qubits_1 = quantum.custom "RX"(%extracted_1) %out_qubits adj : !quantum.bit
 
     // CHECK: quantum.custom
     return %out_qubits_1 : !quantum.bit
@@ -356,7 +356,7 @@ func.func @test_chained_self_inverse() -> !quantum.bit {
 
     %cst_0 = stablehlo.constant dense<1.234000e+01> : tensor<f64>
     %extracted_0 = tensor.extract %cst_0[] : tensor<f64>
-    %out_qubits_0 = quantum.custom "RY"(%extracted_0) %1 {adjoint} : !quantum.bit
+    %out_qubits_0 = quantum.custom "RY"(%extracted_0) %1 adj : !quantum.bit
 
     %cst_1 = stablehlo.constant dense<1.234000e+01> : tensor<f64>
     %extracted_1 = tensor.extract %cst_1[] : tensor<f64>
@@ -380,7 +380,7 @@ func.func @test_chained_self_inverse() -> !quantum.bit {
 
     %cst_0 = stablehlo.constant dense<1.234000e+01> : tensor<f64>
     %extracted_0 = tensor.extract %cst_0[] : tensor<f64>
-    %out_qubits_0 = quantum.custom "RY"(%extracted_0) %1 {adjoint} : !quantum.bit
+    %out_qubits_0 = quantum.custom "RY"(%extracted_0) %1 adj : !quantum.bit
 
     %cst_1 = stablehlo.constant dense<5.678000e+01> : tensor<f64>
     %extracted_1 = tensor.extract %cst_1[] : tensor<f64>
@@ -389,7 +389,7 @@ func.func @test_chained_self_inverse() -> !quantum.bit {
     return %out_qubits_1 : !quantum.bit
 }
 
-// CHECK: quantum.custom "RY"{{.+}}{adjoint}
+// CHECK: quantum.custom "RY"{{.+}}adj
 // CHECK: quantum.custom "RY"
 
 
@@ -418,7 +418,7 @@ func.func @test_chained_self_inverse() -> (!quantum.bit, !quantum.bit, !quantum.
     %3 = quantum.extract %reg[ 3] : !quantum.reg -> !quantum.bit
 
     %out_qubits:2, %out_ctrl_qubits:2 = quantum.custom "Rot"(%cst, %cst_0, %cst_1) %0, %1 ctrls(%2, %3) ctrlvals(%true, %false) : !quantum.bit, !quantum.bit ctrls !quantum.bit, !quantum.bit
-    %out_qubits_1:2, %out_ctrl_qubits_1:2 = quantum.custom "Rot"(%cst, %cst_0, %cst_1) %out_qubits#0, %out_qubits#1 {adjoint} ctrls(%out_ctrl_qubits#0, %out_ctrl_qubits#1) ctrlvals(%true, %false) : !quantum.bit, !quantum.bit ctrls !quantum.bit, !quantum.bit
+    %out_qubits_1:2, %out_ctrl_qubits_1:2 = quantum.custom "Rot"(%cst, %cst_0, %cst_1) %out_qubits#0, %out_qubits#1 adj ctrls(%out_ctrl_qubits#0, %out_ctrl_qubits#1) ctrlvals(%true, %false) : !quantum.bit, !quantum.bit ctrls !quantum.bit, !quantum.bit
 
     // CHECK-NOT: quantum.custom
     // CHECK: return [[IN0]], [[IN1]], [[IN2]], [[IN3]]
@@ -452,7 +452,7 @@ func.func @test_chained_self_inverse() -> (!quantum.bit, !quantum.bit, !quantum.
 
     // CHECK: quantum.custom
     %out_qubits:2, %out_ctrl_qubits:2 = quantum.custom "Rot"(%cst, %cst_0, %cst_1) %0, %1 ctrls(%2, %3) ctrlvals(%true, %false) : !quantum.bit, !quantum.bit ctrls !quantum.bit, !quantum.bit
-    %out_qubits_1:2, %out_ctrl_qubits_1:2 = quantum.custom "Rot"(%cst, %cst_0, %cst_1) %out_qubits#1, %out_qubits#0 {adjoint} ctrls(%out_ctrl_qubits#0, %out_ctrl_qubits#1) ctrlvals(%true, %false) : !quantum.bit, !quantum.bit ctrls !quantum.bit, !quantum.bit
+    %out_qubits_1:2, %out_ctrl_qubits_1:2 = quantum.custom "Rot"(%cst, %cst_0, %cst_1) %out_qubits#1, %out_qubits#0 adj ctrls(%out_ctrl_qubits#0, %out_ctrl_qubits#1) ctrlvals(%true, %false) : !quantum.bit, !quantum.bit ctrls !quantum.bit, !quantum.bit
 
 
     return %out_qubits_1#0, %out_qubits_1#1, %out_ctrl_qubits_1#0, %out_ctrl_qubits_1#1 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
@@ -485,7 +485,7 @@ func.func @test_chained_self_inverse() -> (!quantum.bit, !quantum.bit, !quantum.
 
     // CHECK: quantum.custom
     %out_qubits:2, %out_ctrl_qubits:2 = quantum.custom "Rot"(%cst, %cst_0, %cst_1) %0, %1 ctrls(%2, %3) ctrlvals(%true, %false) : !quantum.bit, !quantum.bit ctrls !quantum.bit, !quantum.bit
-    %out_qubits_1:2, %out_ctrl_qubits_1:2 = quantum.custom "Rot"(%cst, %cst_0, %cst_1) %out_qubits#0, %out_qubits#1 {adjoint} ctrls(%out_ctrl_qubits#1, %out_ctrl_qubits#0) ctrlvals(%true, %false) : !quantum.bit, !quantum.bit ctrls !quantum.bit, !quantum.bit
+    %out_qubits_1:2, %out_ctrl_qubits_1:2 = quantum.custom "Rot"(%cst, %cst_0, %cst_1) %out_qubits#0, %out_qubits#1 adj ctrls(%out_ctrl_qubits#1, %out_ctrl_qubits#0) ctrlvals(%true, %false) : !quantum.bit, !quantum.bit ctrls !quantum.bit, !quantum.bit
 
 
     return %out_qubits_1#0, %out_qubits_1#1, %out_ctrl_qubits_1#0, %out_ctrl_qubits_1#1 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
@@ -518,7 +518,7 @@ func.func @test_chained_self_inverse() -> (!quantum.bit, !quantum.bit, !quantum.
 
     // CHECK: quantum.custom
     %out_qubits:2, %out_ctrl_qubits:2 = quantum.custom "Rot"(%cst, %cst_0, %cst_1) %0, %1 ctrls(%2, %3) ctrlvals(%true, %false) : !quantum.bit, !quantum.bit ctrls !quantum.bit, !quantum.bit
-    %out_qubits_1:2, %out_ctrl_qubits_1:2 = quantum.custom "Rot"(%cst, %cst_0, %cst_1) %out_qubits#0, %out_qubits#1 {adjoint} ctrls(%out_ctrl_qubits#0, %out_ctrl_qubits#1) ctrlvals(%false, %true) : !quantum.bit, !quantum.bit ctrls !quantum.bit, !quantum.bit
+    %out_qubits_1:2, %out_ctrl_qubits_1:2 = quantum.custom "Rot"(%cst, %cst_0, %cst_1) %out_qubits#0, %out_qubits#1 adj ctrls(%out_ctrl_qubits#0, %out_ctrl_qubits#1) ctrlvals(%false, %true) : !quantum.bit, !quantum.bit ctrls !quantum.bit, !quantum.bit
 
 
     return %out_qubits_1#0, %out_qubits_1#1, %out_ctrl_qubits_1#0, %out_ctrl_qubits_1#1 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
@@ -551,7 +551,7 @@ func.func @test_chained_self_inverse() -> (!quantum.bit, !quantum.bit, !quantum.
 
     // CHECK: quantum.custom
     %out_qubits:2, %out_ctrl_qubits:2 = quantum.custom "Rot"(%cst, %cst_0, %cst_1) %0, %1 ctrls(%2, %3) ctrlvals(%true, %false) : !quantum.bit, !quantum.bit ctrls !quantum.bit, !quantum.bit
-    %out_qubits_1:2, %out_ctrl_qubits_1:2 = quantum.custom "Rot"(%cst_0, %cst, %cst_1) %out_qubits#0, %out_qubits#1 {adjoint} ctrls(%out_ctrl_qubits#0, %out_ctrl_qubits#1) ctrlvals(%true, %false) : !quantum.bit, !quantum.bit ctrls !quantum.bit, !quantum.bit
+    %out_qubits_1:2, %out_ctrl_qubits_1:2 = quantum.custom "Rot"(%cst_0, %cst, %cst_1) %out_qubits#0, %out_qubits#1 adj ctrls(%out_ctrl_qubits#0, %out_ctrl_qubits#1) ctrlvals(%true, %false) : !quantum.bit, !quantum.bit ctrls !quantum.bit, !quantum.bit
 
 
     return %out_qubits_1#0, %out_qubits_1#1, %out_ctrl_qubits_1#0, %out_ctrl_qubits_1#1 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
@@ -575,7 +575,7 @@ func.func @test_chained_self_inverse(%arg0: f64) -> (!quantum.bit, !quantum.bit,
     %3 = quantum.extract %0[ 2] : !quantum.reg -> !quantum.bit
 
     %mrz:3 = quantum.multirz(%arg0) %1, %2, %3 : !quantum.bit, !quantum.bit, !quantum.bit
-    %mrz_out:3 = quantum.multirz(%arg0) %mrz#0, %mrz#1, %mrz#2 {adjoint} : !quantum.bit, !quantum.bit, !quantum.bit
+    %mrz_out:3 = quantum.multirz(%arg0) %mrz#0, %mrz#1, %mrz#2 adj : !quantum.bit, !quantum.bit, !quantum.bit
 
     // CHECK-NOT: quantum.multirz
     // CHECK: return [[IN0]], [[IN1]], [[IN2]]
@@ -599,7 +599,7 @@ func.func @test_chained_self_inverse(%arg0: f64) -> (!quantum.bit, !quantum.bit,
     %3 = quantum.extract %0[ 2] : !quantum.reg -> !quantum.bit
 
     %mrz:3 = quantum.multirz(%arg0) %1, %2, %3 : !quantum.bit, !quantum.bit, !quantum.bit
-    %mrz_out:3 = quantum.multirz(%arg0) %mrz#1, %mrz#2, %mrz#0 {adjoint} : !quantum.bit, !quantum.bit, !quantum.bit
+    %mrz_out:3 = quantum.multirz(%arg0) %mrz#1, %mrz#2, %mrz#0 adj : !quantum.bit, !quantum.bit, !quantum.bit
 
     // CHECK: quantum.multirz
     return %mrz_out#0, %mrz_out#1, %mrz_out#2 : !quantum.bit, !quantum.bit, !quantum.bit

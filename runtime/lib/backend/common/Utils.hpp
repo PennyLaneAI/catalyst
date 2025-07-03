@@ -35,18 +35,15 @@
     CLASSNAME &operator=(CLASSNAME &&) = delete;
 
 #define QUANTUM_DEVICE_RT_DECLARATIONS                                                             \
-    auto AllocateQubit()->QubitIdType override;                                                    \
-    auto AllocateQubits(size_t num_qubits)->std::vector<QubitIdType> override;                     \
+    auto AllocateQubit() -> QubitIdType override;                                                  \
+    auto AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType> override;                   \
     void ReleaseQubit(QubitIdType q) override;                                                     \
     void ReleaseAllQubits() override;                                                              \
-    [[nodiscard]] auto GetNumQubits() const->size_t override;                                      \
+    [[nodiscard]] auto GetNumQubits() const -> size_t override;                                    \
     void StartTapeRecording() override;                                                            \
     void StopTapeRecording() override;                                                             \
     void SetDeviceShots(size_t shots) override;                                                    \
-    [[nodiscard]] auto GetDeviceShots() const->size_t override;                                    \
-    void PrintState() override;                                                                    \
-    [[nodiscard]] auto Zero() const->Result override;                                              \
-    [[nodiscard]] auto One() const->Result override;
+    [[nodiscard]] auto GetDeviceShots() const -> size_t override;
 
 #define QUANTUM_DEVICE_QIS_DECLARATIONS                                                            \
     void NamedOperation(                                                                           \
@@ -61,26 +58,23 @@
         [[maybe_unused]] const std::vector<QubitIdType> &controlled_wires = {},                    \
         [[maybe_unused]] const std::vector<bool> &controlled_values = {}) override;                \
     auto Observable(ObsId id, const std::vector<std::complex<double>> &matrix,                     \
-                    const std::vector<QubitIdType> &wires)                                         \
-        ->ObsIdType override;                                                                      \
-    auto TensorObservable(const std::vector<ObsIdType> &obs)->ObsIdType override;                  \
+                    const std::vector<QubitIdType> &wires) -> ObsIdType override;                  \
+    auto TensorObservable(const std::vector<ObsIdType> &obs) -> ObsIdType override;                \
     auto HamiltonianObservable(const std::vector<double> &coeffs,                                  \
-                               const std::vector<ObsIdType> &obs)                                  \
-        ->ObsIdType override;                                                                      \
-    auto Expval(ObsIdType obsKey)->double override;                                                \
-    auto Var(ObsIdType obsKey)->double override;                                                   \
+                               const std::vector<ObsIdType> &obs) -> ObsIdType override;           \
+    auto Expval(ObsIdType obsKey) -> double override;                                              \
+    auto Var(ObsIdType obsKey) -> double override;                                                 \
     void State(DataView<std::complex<double>, 1> &state) override;                                 \
     void Probs(DataView<double, 1> &probs) override;                                               \
     void PartialProbs(DataView<double, 1> &probs, const std::vector<QubitIdType> &wires) override; \
-    void Sample(DataView<double, 2> &samples, size_t shots) override;                              \
-    void PartialSample(DataView<double, 2> &samples, const std::vector<QubitIdType> &wires,        \
-                       size_t shots) override;                                                     \
-    void Counts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts, size_t shots)          \
+    void Sample(DataView<double, 2> &samples) override;                                            \
+    void PartialSample(DataView<double, 2> &samples, const std::vector<QubitIdType> &wires)        \
         override;                                                                                  \
+    void Counts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts) override;              \
     void PartialCounts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts,                 \
-                       const std::vector<QubitIdType> &wires, size_t shots) override;              \
+                       const std::vector<QubitIdType> &wires) override;                            \
     auto Measure(QubitIdType wire, std::optional<int32_t> postselect = std::nullopt)               \
-        ->Result override;                                                                         \
+        -> Result override;                                                                        \
     void Gradient(std::vector<DataView<double, 1>> &gradients,                                     \
                   const std::vector<size_t> &trainParams) override;
 
@@ -130,6 +124,25 @@ static inline auto parse_kwargs(std::string kwargs) -> std::unordered_map<std::s
     }
 
     return map;
+}
+
+template <class K, class V>
+void pretty_print_dict(const std::unordered_map<K, V> &map, size_t leadingSpaces = 0,
+                       std::ostream &out = std::cout)
+{
+    const std::string indent(leadingSpaces, ' ');
+    const std::string innerIndent = indent + "  ";
+
+    out << indent << "{\n";
+    auto it = map.begin();
+    while (it != map.end()) {
+        out << innerIndent << "\"" << it->first << "\": " << it->second;
+        if (++it != map.end()) {
+            out << ",";
+        }
+        out << "\n";
+    }
+    out << indent << "}";
 }
 
 enum class MeasurementsT : uint8_t {

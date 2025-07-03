@@ -24,9 +24,9 @@ import numbers
 from typing import Callable, Iterable, List, Optional, Union
 
 import jax
-import jax.numpy as jnp
 from jax._src.api import _dtype
 from jax._src.tree_util import PyTreeDef, tree_flatten, tree_unflatten
+from jax.api_util import debug_info
 from pennylane import QNode
 
 import catalyst
@@ -46,6 +46,7 @@ from catalyst.jax_tracer import Function, mark_gradient_tracing
 from catalyst.tracing.contexts import EvaluationContext, GradContext
 from catalyst.utils.callables import CatalystCallable
 from catalyst.utils.exceptions import DifferentiableCompileError
+from catalyst.utils.types import get_shape
 
 Differentiable = Union[Function, QNode]
 
@@ -474,10 +475,10 @@ def jvp(f: Callable, params, tangents, *, method=None, h=None, argnums=None):
                     f"{_dtype(p)}, but got tangent dtype {_dtype(t)} instead."
                 )
 
-            if jnp.shape(p) != jnp.shape(t):
+            if get_shape(p) != get_shape(t):
                 raise ValueError(
                     "catalyst.jvp called with different function params and tangent shapes; "
-                    f"got function params shape {jnp.shape(p)} and tangent shape {jnp.shape(t)}"
+                    f"got function params shape {get_shape(p)} and tangent shape {get_shape(t)}"
                 )
 
         jaxpr, out_tree = _make_jaxpr_check_differentiable(fn, grad_params, *params)
@@ -584,11 +585,11 @@ def vjp(f: Callable, params, cotangents, *, method=None, h=None, argnums=None):
                     f"{_dtype(p)}, but got cotangent dtype {_dtype(t)} instead."
                 )
 
-            if jnp.shape(p) != jnp.shape(t):
+            if get_shape(p) != get_shape(t):
                 raise ValueError(
                     "catalyst.vjp called with different function output params and cotangent "
-                    f"shapes; got function output params shape {jnp.shape(p)} and cotangent shape "
-                    f"{jnp.shape(t)}"
+                    f"shapes; got function output params shape {get_shape(p)} and cotangent shape "
+                    f"{get_shape(t)}"
                 )
 
         cotangents, _ = tree_flatten(cotangents)
@@ -667,7 +668,7 @@ class GradCallable(CatalystCallable):
 
                     # It always returns list as required by catalyst control-flows
                     results = value_and_grad_p.bind(
-                        *input_data_flat, jaxpr=jaxpr, fn=fn, grad_params=grad_params
+                        *input_data_flat, *jaxpr.consts, jaxpr=jaxpr, fn=fn, grad_params=grad_params
                     )
 
                     # value_and_grad returns two results: the values and the gradients,
@@ -686,7 +687,7 @@ class GradCallable(CatalystCallable):
 
                     # It always returns list as required by catalyst control-flows
                     results = grad_p.bind(
-                        *input_data_flat, jaxpr=jaxpr, fn=fn, grad_params=grad_params
+                        *input_data_flat, *jaxpr.consts, jaxpr=jaxpr, fn=fn, grad_params=grad_params
                     )
 
                     # grad returns only the gradients,
@@ -807,7 +808,9 @@ def _make_jaxpr_check_differentiable(
     return the output tree."""
     method = grad_params.method
     with mark_gradient_tracing(method):
-        jaxpr, _, out_tree = make_jaxpr2(f)(*args, **kwargs)
+        jaxpr, _, out_tree = make_jaxpr2(
+            f, debug_info=debug_info("grad make jaxpr", f, args, kwargs)
+        )(*args, **kwargs)
 
     for pos, arg in enumerate(jaxpr.in_avals):
         if arg.dtype.kind != "f" and pos in grad_params.expanded_argnums:

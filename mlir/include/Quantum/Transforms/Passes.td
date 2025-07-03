@@ -17,17 +17,6 @@
 
 include "mlir/Pass/PassBase.td"
 
-def QuantumBufferizationPass : Pass<"quantum-bufferize"> {
-    let summary = "Bufferize tensors in quantum operations.";
-
-    let dependentDialects = [
-        "bufferization::BufferizationDialect",
-        "memref::MemRefDialect"
-    ];
-
-    let constructor = "catalyst::createQuantumBufferizationPass()";
-}
-
 def QuantumConversionPass : Pass<"convert-quantum-to-llvm"> {
     let summary = "Perform a dialect conversion from Quantum to LLVM (QIR).";
 

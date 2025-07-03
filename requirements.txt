@@ -5,15 +5,16 @@ pip>=22.3
 # Build dependencies for non-Python components
 # Do not allow NumPy 2.0.0 due to a bug with their C API that blocks the usage of the Stable ABI;
 # this bug was fixed in 2.0.1 (https://github.com/numpy/numpy/pull/26995)
-nanobind
 numpy!=2.0.0
+# llvm requires nanobind 2.4 or higher
+nanobind>=2.4
 pybind11>=2.12.0
 PyYAML
 
 # formatting/linting
 black
-clang-format==14.*
-clang-tidy~=16.0
+clang-format~=20.1
+clang-tidy~=20.1
 pylint
 isort
 
@@ -29,3 +30,4 @@ nbmake
 # optional rt/test dependencies
 pennylane-lightning-kokkos
 amazon-braket-pennylane-plugin>1.27.1
+xdsl

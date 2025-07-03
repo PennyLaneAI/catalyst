@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt %s --pass-pipeline="builtin.module(func.func(quantum-to-ion{\
+// RUN: quantum-opt %s --pass-pipeline="builtin.module(func.func(gates-to-pulses{\
 // RUN:    device-toml-loc=%S/oqd_device_parameters.toml \
 // RUN:    qubit-toml-loc=%S/oqd_qubit_parameters.toml \
 // RUN:    gate-to-pulse-toml-loc=%S/oqd_gate_decomposition_parameters.toml}))" \
@@ -115,14 +115,12 @@ func.func @example_ion_two_qubit(%arg0: f64) -> !quantum.bit  attributes {qnode}
     %2 = quantum.extract %1[ 0] : !quantum.reg -> !quantum.bit
     %3 = quantum.extract %1[ 1] : !quantum.reg -> !quantum.bit
 
-    // CHECK: [[rx1out:%.+]] = ion.parallelprotocol([[qubit0]]) : !quantum.bit {
-    // CHECK-NEXT: ^{{.*}}(%arg1: !quantum.bit):
-    // CHECK-NEXT:%cst = arith.constant 12.566370614359172 : f64
-    // CHECK-NEXT:  [[remainder:%.+]] = arith.remf %arg0, %cst : f64
-    // CHECK-NEXT:  %cst_0 = arith.constant 0.000000e+00 : f64
-    // CHECK-NEXT:  [[negative:%.+]] = arith.cmpf olt, [[remainder:%.+]], %cst_0 : f64
+    // CHECK:       [[cst:%.+]] = arith.constant 12.566370614359172 : f64
+    // CHECK-NEXT:  [[remainder:%.+]] = arith.remf %arg0, [[cst:%.+]] : f64
+    // CHECK-NEXT:  [[cst_0:%.+]] = arith.constant 0.000000e+00 : f64
+    // CHECK-NEXT:  [[negative:%.+]] = arith.cmpf olt, [[remainder:%.+]], [[cst_0:%.+]] : f64
     // CHECK-NEXT:  [[normalized_angle:%.+]] = scf.if [[negative:%.+]] -> (f64) {
-    // CHECK-NEXT:    [[adjusted:%.+]] = arith.addf [[remainder:%.+]], %cst : f64
+    // CHECK-NEXT:    [[adjusted:%.+]] = arith.addf [[remainder:%.+]], [[cst:%.+]] : f64
     // CHECK-NEXT:    scf.yield [[adjusted:%.+]] : f64
     // CHECK-NEXT:  } else {
     // CHECK-NEXT:    scf.yield [[remainder:%.+]] : f64
@@ -132,6 +130,8 @@ func.func @example_ion_two_qubit(%arg0: f64) -> !quantum.bit  attributes {qnode}
     // CHECK-NEXT: [[mult:%.+]] = arith.mulf [[normalized_angle:%.+]], [[cst_2:%.+]] : f64
     // CHECK-NEXT: [[square:%.+]] = arith.mulf [[cst_1:%.+]], [[cst_1:%.+]] : f64
     // CHECK-NEXT: [[timerx1:%.+]] = arith.divf [[mult:%.+]], [[square:%.+]] : f64
+    // CHECK-NEXT: [[rx1out:%.+]] = ion.parallelprotocol([[qubit0]]) : !quantum.bit {
+    // CHECK-NEXT: ^{{.*}}(%arg1: !quantum.bit):
     // CHECK-NEXT: ion.pulse([[timerx1]] : f64) %arg1 {
     // CHECK-SAME:     beam = #ion.beam<
     // CHECK-SAME:         transition_index = 0 : i64,
@@ -152,14 +152,12 @@ func.func @example_ion_two_qubit(%arg0: f64) -> !quantum.bit  attributes {qnode}
     // CHECK-NEXT: }
     %4 = quantum.custom "RX"(%arg0) %2 : !quantum.bit
 
-    // CHECK: [[ry1out:%.+]] = ion.parallelprotocol([[rx1out]]) : !quantum.bit {
-    // CHECK-NEXT: ^{{.*}}(%arg1: !quantum.bit):
-    // CHECK-NEXT:%cst = arith.constant 12.566370614359172 : f64
-    // CHECK-NEXT:  [[remainder:%.+]] = arith.remf %arg0, %cst : f64
-    // CHECK-NEXT:  %cst_0 = arith.constant 0.000000e+00 : f64
-    // CHECK-NEXT:  [[negative:%.+]] = arith.cmpf olt, [[remainder:%.+]], %cst_0 : f64
+    // CHECK:       [[cst:%.+]] = arith.constant 12.566370614359172 : f64
+    // CHECK-NEXT:  [[remainder:%.+]] = arith.remf %arg0, [[cst:%.+]] : f64
+    // CHECK-NEXT:  [[cst_0:%.+]] = arith.constant 0.000000e+00 : f64
+    // CHECK-NEXT:  [[negative:%.+]] = arith.cmpf olt, [[remainder:%.+]], [[cst_0:%.+]] : f64
     // CHECK-NEXT:  [[normalized_angle:%.+]] = scf.if [[negative:%.+]] -> (f64) {
-    // CHECK-NEXT:    [[adjusted:%.+]] = arith.addf [[remainder:%.+]], %cst : f64
+    // CHECK-NEXT:    [[adjusted:%.+]] = arith.addf [[remainder:%.+]], [[cst:%.+]] : f64
     // CHECK-NEXT:    scf.yield [[adjusted:%.+]] : f64
     // CHECK-NEXT:  } else {
     // CHECK-NEXT:    scf.yield [[remainder:%.+]] : f64
@@ -169,6 +167,8 @@ func.func @example_ion_two_qubit(%arg0: f64) -> !quantum.bit  attributes {qnode}
     // CHECK-NEXT: [[mult:%.+]] = arith.mulf [[normalized_angle:%.+]], [[cst_2:%.+]] : f64
     // CHECK-NEXT: [[square:%.+]] = arith.mulf [[cst_1:%.+]], [[cst_1:%.+]] : f64
     // CHECK-NEXT: [[timery1:%.+]] = arith.divf [[mult:%.+]], [[square:%.+]] : f64
+    // CHECK-NEXT: [[ry1out:%.+]] = ion.parallelprotocol([[rx1out]]) : !quantum.bit {
+    // CHECK-NEXT: ^{{.*}}(%arg1: !quantum.bit):
     // CHECK-NEXT: ion.pulse([[timery1]] : f64) %arg1 {
     // CHECK-SAME:     beam = #ion.beam<
     // CHECK-SAME:         transition_index = 0 : i64,
@@ -189,14 +189,12 @@ func.func @example_ion_two_qubit(%arg0: f64) -> !quantum.bit  attributes {qnode}
     // CHECK-NEXT: }
     %5 = quantum.custom "RY"(%arg0) %4 : !quantum.bit
 
-    // CHECK: [[rx2out:%.+]] = ion.parallelprotocol([[ry1out]]) : !quantum.bit {
-    // CHECK-NEXT: ^{{.*}}(%arg1: !quantum.bit):
-    // CHECK-NEXT:%cst = arith.constant 12.566370614359172 : f64
-    // CHECK-NEXT:  [[remainder:%.+]] = arith.remf %arg0, %cst : f64
-    // CHECK-NEXT:  %cst_0 = arith.constant 0.000000e+00 : f64
-    // CHECK-NEXT:  [[negative:%.+]] = arith.cmpf olt, [[remainder:%.+]], %cst_0 : f64
+    // CHECK:       [[cst:%.+]] = arith.constant 12.566370614359172 : f64
+    // CHECK-NEXT:  [[remainder:%.+]] = arith.remf %arg0, [[cst:%.+]] : f64
+    // CHECK-NEXT:  [[cst_0:%.+]] = arith.constant 0.000000e+00 : f64
+    // CHECK-NEXT:  [[negative:%.+]] = arith.cmpf olt, [[remainder:%.+]], [[cst_0:%.+]] : f64
     // CHECK-NEXT:  [[normalized_angle:%.+]] = scf.if [[negative:%.+]] -> (f64) {
-    // CHECK-NEXT:    [[adjusted:%.+]] = arith.addf [[remainder:%.+]], %cst : f64
+    // CHECK-NEXT:    [[adjusted:%.+]] = arith.addf [[remainder:%.+]], [[cst:%.+]] : f64
     // CHECK-NEXT:    scf.yield [[adjusted:%.+]] : f64
     // CHECK-NEXT:  } else {
     // CHECK-NEXT:    scf.yield [[remainder:%.+]] : f64
@@ -206,6 +204,8 @@ func.func @example_ion_two_qubit(%arg0: f64) -> !quantum.bit  attributes {qnode}
     // CHECK-NEXT: [[mult:%.+]] = arith.mulf [[normalized_angle:%.+]], [[cst_2:%.+]] : f64
     // CHECK-NEXT: [[square:%.+]] = arith.mulf [[cst_1:%.+]], [[cst_1:%.+]] : f64
     // CHECK-NEXT: [[timerx2:%.+]] = arith.divf [[mult:%.+]], [[square:%.+]] : f64
+    // CHECK-NEXT: [[rx2out:%.+]] = ion.parallelprotocol([[ry1out]]) : !quantum.bit {
+    // CHECK-NEXT: ^{{.*}}(%arg1: !quantum.bit):
     // CHECK-NEXT: ion.pulse([[timerx2]] : f64) %arg1 {
     // CHECK-SAME:     beam = #ion.beam<
     // CHECK-SAME:         transition_index = 0 : i64,
@@ -226,14 +226,12 @@ func.func @example_ion_two_qubit(%arg0: f64) -> !quantum.bit  attributes {qnode}
     // CHECK-NEXT: }
     %6 = quantum.custom "RX"(%arg0) %5 : !quantum.bit
 
-    // CHECK: [[msout:%.+]] = ion.parallelprotocol([[rx2out]], [[qubit1]]) : !quantum.bit, !quantum.bit {
-    // CHECK-NEXT: ^{{.*}}(%arg1: !quantum.bit, %arg2: !quantum.bit):
-    // CHECK-NEXT:%cst = arith.constant 12.566370614359172 : f64
-    // CHECK-NEXT:  [[remainder:%.+]] = arith.remf %arg0, %cst : f64
-    // CHECK-NEXT:  %cst_0 = arith.constant 0.000000e+00 : f64
-    // CHECK-NEXT:  [[negative:%.+]] = arith.cmpf olt, [[remainder:%.+]], %cst_0 : f64
+    // CHECK:       [[cst:%.+]] = arith.constant 12.566370614359172 : f64
+    // CHECK-NEXT:  [[remainder:%.+]] = arith.remf %arg0, [[cst:%.+]] : f64
+    // CHECK-NEXT:  [[cst_0:%.+]] = arith.constant 0.000000e+00 : f64
+    // CHECK-NEXT:  [[negative:%.+]] = arith.cmpf olt, [[remainder:%.+]], [[cst_0:%.+]] : f64
     // CHECK-NEXT:  [[normalized_angle:%.+]] = scf.if [[negative:%.+]] -> (f64) {
-    // CHECK-NEXT:    [[adjusted:%.+]] = arith.addf [[remainder:%.+]], %cst : f64
+    // CHECK-NEXT:    [[adjusted:%.+]] = arith.addf [[remainder:%.+]], [[cst:%.+]] : f64
     // CHECK-NEXT:    scf.yield [[adjusted:%.+]] : f64
     // CHECK-NEXT:  } else {
     // CHECK-NEXT:    scf.yield [[remainder:%.+]] : f64
@@ -243,6 +241,8 @@ func.func @example_ion_two_qubit(%arg0: f64) -> !quantum.bit  attributes {qnode}
     // CHECK-NEXT: [[mult:%.+]] = arith.mulf [[normalized_angle:%.+]], [[cst_2:%.+]] : f64
     // CHECK-NEXT: [[square:%.+]] = arith.mulf [[cst_1:%.+]], [[cst_1:%.+]] : f64
     // CHECK-NEXT: [[timems:%.+]] = arith.divf [[mult:%.+]], [[square:%.+]] : f64
+    // CHECK-NEXT: [[msout:%.+]] = ion.parallelprotocol([[rx2out]], [[qubit1]]) : !quantum.bit, !quantum.bit {
+    // CHECK-NEXT: ^{{.*}}(%arg1: !quantum.bit, %arg2: !quantum.bit):
     // CHECK-NEXT: ion.pulse([[timems]] : f64) %arg1 {
     // CHECK-SAME:     beam = #ion.beam<
     // CHECK-SAME:         transition_index = 0 : i64,
@@ -315,15 +315,12 @@ func.func @example_ion_three_qubit(%arg0: f64) -> (!quantum.bit, !quantum.bit, !
     %3 = quantum.extract %1[ 1] : !quantum.reg -> !quantum.bit
     %4 = quantum.extract %1[ 2] : !quantum.reg -> !quantum.bit
 
-    // CHECK: [[ms1out:%.+]]:2 = ion.parallelprotocol([[qubit0]], [[qubit1]]) : !quantum.bit, !quantum.bit {
-
-    // CHECK-NEXT: ^{{.*}}(%arg1: !quantum.bit, %arg2: !quantum.bit):
-        // CHECK-NEXT:%cst = arith.constant 12.566370614359172 : f64
-    // CHECK-NEXT:  [[remainder:%.+]] = arith.remf %arg0, %cst : f64
-    // CHECK-NEXT:  %cst_0 = arith.constant 0.000000e+00 : f64
-    // CHECK-NEXT:  [[negative:%.+]] = arith.cmpf olt, [[remainder:%.+]], %cst_0 : f64
+    // CHECK:       [[cst:%.+]] = arith.constant 12.566370614359172 : f64
+    // CHECK-NEXT:  [[remainder:%.+]] = arith.remf %arg0, [[cst:%.+]] : f64
+    // CHECK-NEXT:  [[cst_0:%.+]] = arith.constant 0.000000e+00 : f64
+    // CHECK-NEXT:  [[negative:%.+]] = arith.cmpf olt, [[remainder:%.+]], [[cst_0:%.+]] : f64
     // CHECK-NEXT:  [[normalized_angle:%.+]] = scf.if [[negative:%.+]] -> (f64) {
-    // CHECK-NEXT:    [[adjusted:%.+]] = arith.addf [[remainder:%.+]], %cst : f64
+    // CHECK-NEXT:    [[adjusted:%.+]] = arith.addf [[remainder:%.+]], [[cst:%.+]] : f64
     // CHECK-NEXT:    scf.yield [[adjusted:%.+]] : f64
     // CHECK-NEXT:  } else {
     // CHECK-NEXT:    scf.yield [[remainder:%.+]] : f64
@@ -333,6 +330,8 @@ func.func @example_ion_three_qubit(%arg0: f64) -> (!quantum.bit, !quantum.bit, !
     // CHECK-NEXT: [[mult:%.+]] = arith.mulf [[normalized_angle:%.+]], [[cst_2:%.+]] : f64
     // CHECK-NEXT: [[square:%.+]] = arith.mulf [[cst_1:%.+]], [[cst_1:%.+]] : f64
     // CHECK-NEXT: [[timems1:%.+]] = arith.divf [[mult:%.+]], [[square:%.+]] : f64
+    // CHECK-NEXT: [[ms1out:%.+]]:2 = ion.parallelprotocol([[qubit0]], [[qubit1]]) : !quantum.bit, !quantum.bit {
+    // CHECK-NEXT: ^{{.*}}(%arg1: !quantum.bit, %arg2: !quantum.bit):
     // CHECK-NEXT: ion.pulse([[timems1]] : f64) %arg1 {
     // CHECK-SAME:     beam = #ion.beam<
     // CHECK-SAME:         transition_index = 0 : i64,
@@ -385,14 +384,12 @@ func.func @example_ion_three_qubit(%arg0: f64) -> (!quantum.bit, !quantum.bit, !
     // CHECK-NEXT: }
     %5:2 = quantum.custom "MS"(%arg0) %2, %3 : !quantum.bit, !quantum.bit
 
-    // CHECK: [[ms2out:%.+]]:2 = ion.parallelprotocol([[ms1out]]#0, [[qubit2]]) : !quantum.bit, !quantum.bit {
-    // CHECK-NEXT: ^{{.*}}(%arg1: !quantum.bit, %arg2: !quantum.bit):
-    // CHECK-NEXT:%cst = arith.constant 12.566370614359172 : f64
-    // CHECK-NEXT:  [[remainder:%.+]] = arith.remf %arg0, %cst : f64
-    // CHECK-NEXT:  %cst_0 = arith.constant 0.000000e+00 : f64
-    // CHECK-NEXT:  [[negative:%.+]] = arith.cmpf olt, [[remainder:%.+]], %cst_0 : f64
+    // CHECK:       [[cst:%.+]] = arith.constant 12.566370614359172 : f64
+    // CHECK-NEXT:  [[remainder:%.+]] = arith.remf %arg0, [[cst:%.+]] : f64
+    // CHECK-NEXT:  [[cst_0:%.+]] = arith.constant 0.000000e+00 : f64
+    // CHECK-NEXT:  [[negative:%.+]] = arith.cmpf olt, [[remainder:%.+]], [[cst_0:%.+]] : f64
     // CHECK-NEXT:  [[normalized_angle:%.+]] = scf.if [[negative:%.+]] -> (f64) {
-    // CHECK-NEXT:    [[adjusted:%.+]] = arith.addf [[remainder:%.+]], %cst : f64
+    // CHECK-NEXT:    [[adjusted:%.+]] = arith.addf [[remainder:%.+]], [[cst:%.+]] : f64
     // CHECK-NEXT:    scf.yield [[adjusted:%.+]] : f64
     // CHECK-NEXT:  } else {
     // CHECK-NEXT:    scf.yield [[remainder:%.+]] : f64
@@ -402,6 +399,8 @@ func.func @example_ion_three_qubit(%arg0: f64) -> (!quantum.bit, !quantum.bit, !
     // CHECK-NEXT: [[mult:%.+]] = arith.mulf [[normalized_angle:%.+]], [[cst_2:%.+]] : f64
     // CHECK-NEXT: [[square:%.+]] = arith.mulf [[cst_1:%.+]], [[cst_1:%.+]] : f64
     // CHECK-NEXT: [[timems2:%.+]] = arith.divf [[mult:%.+]], [[square:%.+]] : f64
+    // CHECK-NEXT: [[ms2out:%.+]]:2 = ion.parallelprotocol([[ms1out]]#0, [[qubit2]]) : !quantum.bit, !quantum.bit {
+    // CHECK-NEXT: ^{{.*}}(%arg1: !quantum.bit, %arg2: !quantum.bit):
     // CHECK-NEXT: ion.pulse([[timems2]] : f64) %arg1 {
     // CHECK-SAME:     beam = #ion.beam<
     // CHECK-SAME:         transition_index = 0 : i64,
@@ -454,14 +453,12 @@ func.func @example_ion_three_qubit(%arg0: f64) -> (!quantum.bit, !quantum.bit, !
     // CHECK-NEXT: }
     %6:2 = quantum.custom "MS"(%arg0) %5#0, %4 : !quantum.bit, !quantum.bit
 
-    // CHECK: [[ms3out:%.+]]:2 = ion.parallelprotocol([[ms1out]]#1, [[ms2out]]#1) : !quantum.bit, !quantum.bit {
-    // CHECK-NEXT: ^{{.*}}(%arg1: !quantum.bit, %arg2: !quantum.bit):
-    // CHECK-NEXT:%cst = arith.constant 12.566370614359172 : f64
-    // CHECK-NEXT:  [[remainder:%.+]] = arith.remf %arg0, %cst : f64
-    // CHECK-NEXT:  %cst_0 = arith.constant 0.000000e+00 : f64
-    // CHECK-NEXT:  [[negative:%.+]] = arith.cmpf olt, [[remainder:%.+]], %cst_0 : f64
+    // CHECK:       [[cst:%.+]] = arith.constant 12.566370614359172 : f64
+    // CHECK-NEXT:  [[remainder:%.+]] = arith.remf %arg0, [[cst:%.+]] : f64
+    // CHECK-NEXT:  [[cst_0:%.+]] = arith.constant 0.000000e+00 : f64
+    // CHECK-NEXT:  [[negative:%.+]] = arith.cmpf olt, [[remainder:%.+]], [[cst_0:%.+]] : f64
     // CHECK-NEXT:  [[normalized_angle:%.+]] = scf.if [[negative:%.+]] -> (f64) {
-    // CHECK-NEXT:    [[adjusted:%.+]] = arith.addf [[remainder:%.+]], %cst : f64
+    // CHECK-NEXT:    [[adjusted:%.+]] = arith.addf [[remainder:%.+]], [[cst:%.+]] : f64
     // CHECK-NEXT:    scf.yield [[adjusted:%.+]] : f64
     // CHECK-NEXT:  } else {
     // CHECK-NEXT:    scf.yield [[remainder:%.+]] : f64
@@ -471,6 +468,8 @@ func.func @example_ion_three_qubit(%arg0: f64) -> (!quantum.bit, !quantum.bit, !
     // CHECK-NEXT: [[mult:%.+]] = arith.mulf [[normalized_angle:%.+]], [[cst_2:%.+]] : f64
     // CHECK-NEXT: [[square:%.+]] = arith.mulf [[cst_1:%.+]], [[cst_1:%.+]] : f64
     // CHECK-NEXT: [[timems3:%.+]] = arith.divf [[mult:%.+]], [[square:%.+]] : f64
+    // CHECK-NEXT: [[ms3out:%.+]]:2 = ion.parallelprotocol([[ms1out]]#1, [[ms2out]]#1) : !quantum.bit, !quantum.bit {
+    // CHECK-NEXT: ^{{.*}}(%arg1: !quantum.bit, %arg2: !quantum.bit):
     // CHECK-NEXT: [[p1:%.+]] = ion.pulse([[timems3]] : f64) %arg1 {
     // CHECK-SAME:     beam = #ion.beam<
     // CHECK-SAME:         transition_index = 0 : i64,

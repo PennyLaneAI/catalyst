@@ -5,81 +5,50 @@ Custom Devices
 Differences between PennyLane and Catalyst
 ==========================================
 
-PennyLane and Catalyst treat devices a bit differently.
-In PennyLane, one is able to `define devices <https://docs.pennylane.ai/en/stable/development/plugins.html>`_ in Python.
-Catalyst cannot interface with Python devices yet.
-Instead, Catalyst can only interact with devices that implement the `QuantumDevice <../api/file_runtime_include_QuantumDevice.hpp.html>`_ class.
+PennyLane and Catalyst treat devices a bit differently. In PennyLane, one is able to
+`define device plugins <https://docs.pennylane.ai/en/stable/development/plugins.html>`_ in Python.
+Catalyst cannot interface with Python devices, instead the Catalyst Runtime provides a plugin system
+for C++ devices that implement the
+`QuantumDevice <../api/structCatalyst_1_1Runtime_1_1QuantumDevice.html>`_ interface class.
 
-Here is an example of a custom ``QuantumDevice`` in which every single quantum operation is implemented as a no-operation.
-Additionally, all measurements will always return ``true``.
+Below, you can see an example of a very basic custom ``QuantumDevice`` in which quantum operations
+have been stubbed out. For a complete description of the interface check out the header file or its
+`API documentation <../api/structCatalyst_1_1Runtime_1_1QuantumDevice.html>`_.
 
 .. code-block:: c++
 
         #include <QuantumDevice.hpp>
 
         struct CustomDevice final : public Catalyst::Runtime::QuantumDevice {
-            CustomDevice([[maybe_unused]] const std::string &kwargs = "{}") {}
+            // Static device parameters can be passed down from the Python device to the constructor.
+            CustomDevice(const std::string &kwargs = "{}") {}
             ~CustomDevice() = default;
 
-            CustomDevice &operator=(const QuantumDevice &) = delete;
-            CustomDevice(const CustomDevice &) = delete;
-            CustomDevice(CustomDevice &&) = delete;
-            CustomDevice &operator=(QuantumDevice &&) = delete;
+            auto GetNumQubits() const -> size_t override { return device_nqubits; }
+            void SetDeviceShots(size_t shots) override { device_shots = shots; }
+            auto GetDeviceShots() const -> size_t override { return device_shots; }
 
-            auto AllocateQubit() -> QubitIdType override { return 0; }
+            // Allocations produce numeric qubit identifiers that are passed to other operations.
             auto AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType> override {
-                return std::vector<QubitIdType>(num_qubits);
+                std::vector<QubitIdType> ids(num_qubits);
+                std::iota(ids.begin(), ids.end(), 0);
+                device_nqubits = num_qubits;
+                return ids
             }
-            [[nodiscard]] auto Zero() const -> Result override { return NULL; }
-            [[nodiscard]] auto One() const -> Result override { return NULL; }
-            auto Observable(ObsId, const std::vector<std::complex<double>> &,
-                                    const std::vector<QubitIdType> &) -> ObsIdType override {
-                return 0;
-            }
-            auto TensorObservable(const std::vector<ObsIdType> &) -> ObsIdType override { return 0; }
-            auto HamiltonianObservable(const std::vector<double> &, const std::vector<ObsIdType> &)
-                -> ObsIdType override {
-                return 0;
-            }
-            auto Measure(QubitIdType) -> Result override {
-                bool *ret = (bool *)malloc(sizeof(bool));
-                *ret = true;
-                return ret;
-            }
-
-            void ReleaseQubit(QubitIdType) override {}
             void ReleaseAllQubits() override {}
-            [[nodiscard]] auto GetNumQubits() const -> size_t override { return 0; }
-            void SetDeviceShots(size_t shots) override {}
-            [[nodiscard]] auto GetDeviceShots() const -> size_t override { return 0; }
-            void StartTapeRecording() override {}
-            void StopTapeRecording() override {}
-            void PrintState() override {}
-            void NamedOperation(const std::string &, const std::vector<double> &,
-                                        const std::vector<QubitIdType> &,
-                                        bool,
-                                        const std::vector<QubitIdType> &,
-                                        const std::vector<bool> &
-                                        ) override {}
-            void MatrixOperation(const std::vector<std::complex<double>> &,
-                                        const std::vector<QubitIdType> &,
-                                        bool,
-                                        const std::vector<QubitIdType> &,
-                                        const std::vector<bool> &
-                                        ) override{}
-            auto Expval(ObsIdType) -> double override { return 0.0; }
-            auto Var(ObsIdType) -> double override { return 0.0; }
-            void State(DataView<std::complex<double>, 1> &) override {}
-            void Probs(DataView<double, 1> &) override {}
-            void PartialProbs(DataView<double, 1> &, const std::vector<QubitIdType> &) override {}
-            void Sample(DataView<double, 2> &, size_t) override {}
-            void PartialSample(DataView<double, 2> &, const std::vector<QubitIdType> &, size_t) override {}
-            void Counts(DataView<double, 1> &, DataView<int64_t, 1> &, size_t) override {}
 
-            void PartialCounts(DataView<double, 1> &, DataView<int64_t, 1> &,
-                                    const std::vector<QubitIdType> &, size_t) override {}
+            // Here we don't do anything yet.
+            void NamedOperation(const std::string &name, const std::vector<double> &params,
+                                const std::vector<QubitIdType> &wires, bool inverse,
+                                const std::vector<QubitIdType> &controlled_wires,
+                                const std::vector<bool> &controlled_values) override {}
+            auto Measure(QubitIdType wire, std::optional<int32_t> postselect) -> Result override {
+                return static_cast<Result>(malloc(sizeof(bool)));
+            }
 
-            void Gradient(std::vector<DataView<double, 1>> &, const std::vector<size_t> &) override {}
+          private:
+            size_t device_nqubits;
+            size_t device_shots;
         };
 
 In addition to implementing the ``QuantumDevice`` class, one must implement an entry point for the
@@ -115,8 +84,7 @@ Python devices" section further down for details.
 
 ``CustomDevice(kwargs)`` serves as a constructor for your custom device, with ``kwargs``
 as a string of device specifications and options, represented in Python dictionary format.
-An example could be the default number of device shots, encoded as the following string:
-``"{'shots': 1000}"``.
+An example could be some noise parameter or other configurable behaviour: ``"{'noise': 0.5}"``.
 
 Note that these parameters are automatically initialized in the frontend if the library is
 provided as a PennyLane plugin device (see :func:`qml.device() <pennylane.device>`).
@@ -125,14 +93,15 @@ The destructor of ``CustomDevice`` will be automatically called by the runtime.
 
 .. warning::
 
-    This interface might change quickly in the near future.
-    Please check back regularly for updates and to ensure your device is compatible with
-    a specific version of Catalyst.
+    This interface might change quickly in the near future, but breaking changes will be announced
+    in release changelogs. Please check back regularly for updates and to ensure your device is
+    compatible with a specific version of Catalyst.
 
 How to compile custom devices
 =============================
 
-One can follow the ``catalyst/runtime/tests/third_party/CMakeLists.txt`` `as an example. <https://github.com/PennyLaneAI/catalyst/blob/26b412b298f22565fea529d2019554e7ad9b9624/runtime/tests/third_party/CMakeLists.txt>`_
+One can follow the ``catalyst/runtime/tests/third_party/CMakeLists.txt``
+`as an example <https://github.com/PennyLaneAI/catalyst/blob/26b412b298f22565fea529d2019554e7ad9b9624/runtime/tests/third_party/CMakeLists.txt>`_.
 
 .. code-block:: cmake
 
@@ -153,11 +122,17 @@ Integration with Python devices
 There are two things that are needed in order to integrate with PennyLane devices:
 
 * Adding a ``get_c_interface`` method to your ``qml.devices.Device`` class.
-* Adding a ``config_filepath`` class variable pointing to your configuration file. This file should be a `toml file <https://toml.io/en/>`_ with fields that describe what gates and features are supported by your device.
-* Optionally, adding a ``device_kwargs`` dictionary for runtime parameters to pass from the PennyLane device to the ``QuantumDevice`` upon initialization.
+* Adding a ``config_filepath`` class variable pointing to your configuration file. This file should
+  be a `toml file <https://toml.io/en/>`_ with fields that describe what gates and features are
+  supported by your device.
+* Optionally, adding a ``device_kwargs`` dictionary for runtime parameters to pass from the
+  PennyLane device to the ``QuantumDevice`` upon initialization.
 
-If you already have a custom PennyLane device defined in Python and have added a shared object that corresponds to your implementation of the ``QuantumDevice`` class, then all you need to do is to add a ``get_c_interface`` method to your PennyLane device.
-The ``get_c_interface`` method should be a static method that takes no parameters and returns the complete path to your shared library with the ``QuantumDevice`` implementation.
+If you already have a custom PennyLane device defined in Python and have added a shared object that
+corresponds to your implementation of the ``QuantumDevice`` class, then all you need to do is to add
+a ``get_c_interface`` method to your PennyLane device. The ``get_c_interface`` method should be a
+static method that takes no parameters and returns the complete path to your shared library with the
+``QuantumDevice`` implementation.
 
 .. note::
 

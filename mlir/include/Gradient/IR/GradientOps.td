@@ -17,6 +17,8 @@
 
 include "mlir/Interfaces/FunctionInterfaces.td"
 include "mlir/Interfaces/CallInterfaces.td"
+include "mlir/Interfaces/ControlFlowInterfaces.td"
+include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/SymbolInterfaces.td"
 include "mlir/IR/BuiltinAttributes.td"
 include "mlir/IR/OpBase.td"
@@ -57,7 +59,9 @@ def GradOp : Gradient_Op<"grad", [
         SymbolRefAttr:$callee,
         Variadic<AnyType>:$operands,
         OptionalAttr<AnyIntElementsAttr>:$diffArgIndices,
-        OptionalAttr<Builtin_FloatAttr>:$finiteDiffParam
+        OptionalAttr<Builtin_FloatAttr>:$finiteDiffParam,
+        OptionalAttr<DictArrayAttr>:$arg_attrs,
+        OptionalAttr<DictArrayAttr>:$res_attrs
     );
     let results = (outs Variadic<AnyTypeOf<[AnyFloat, RankedTensorOf<[AnyFloat]>]>>);
 
@@ -81,7 +85,9 @@ def ValueAndGradOp : Gradient_Op<"value_and_grad", [
         SymbolRefAttr:$callee,
         Variadic<AnyType>:$operands,
         OptionalAttr<AnyIntElementsAttr>:$diffArgIndices,
-        OptionalAttr<Builtin_FloatAttr>:$finiteDiffParam
+        OptionalAttr<Builtin_FloatAttr>:$finiteDiffParam,
+        OptionalAttr<DictArrayAttr>:$arg_attrs,
+        OptionalAttr<DictArrayAttr>:$res_attrs
     );
 
     let results = (outs
@@ -183,7 +189,9 @@ def JVPOp : Gradient_Op<"jvp", [
         Variadic<AnyType>:$params,
         Variadic<AnyType>:$tangents,
         OptionalAttr<AnyIntElementsAttr>:$diffArgIndices,
-        OptionalAttr<Builtin_FloatAttr>:$finiteDiffParam
+        OptionalAttr<Builtin_FloatAttr>:$finiteDiffParam,
+        OptionalAttr<DictArrayAttr>:$arg_attrs,
+        OptionalAttr<DictArrayAttr>:$res_attrs
     );
 
     let results = (outs
@@ -216,7 +224,9 @@ def VJPOp : Gradient_Op<"vjp", [
         Variadic<AnyType>:$params,
         Variadic<AnyType>:$cotangents,
         OptionalAttr<AnyIntElementsAttr>:$diffArgIndices,
-        OptionalAttr<Builtin_FloatAttr>:$finiteDiffParam
+        OptionalAttr<Builtin_FloatAttr>:$finiteDiffParam,
+        OptionalAttr<DictArrayAttr>:$arg_attrs,
+        OptionalAttr<DictArrayAttr>:$res_attrs
     );
 
     let results = (outs
@@ -306,7 +316,7 @@ def ForwardOp : Gradient_Op<"forward",
      OptionalAttr<DictArrayAttr>: $res_attrs
   );
 
-  let regions = (region AnyRegion: $body);
+  let regions = (region MaxSizedRegion<1>: $body);
 
   let builders = [OpBuilder<(ins
     "mlir::StringRef":$name, "mlir::FunctionType":$type,
@@ -362,7 +372,7 @@ def ReverseOp : Gradient_Op<"reverse",
      OptionalAttr<DictArrayAttr>: $res_attrs
   );
 
-  let regions = (region AnyRegion: $body);
+  let regions = (region MaxSizedRegion<1>: $body);
 
   let builders = [OpBuilder<(ins
     "mlir::StringRef":$name, "mlir::FunctionType":$type,
@@ -388,7 +398,7 @@ def ReverseOp : Gradient_Op<"reverse",
 }
 
 def ReturnOp : Gradient_Op<"return",
-    [Terminator, ParentOneOf<["ForwardOp", "ReverseOp"]>]> {
+    [ReturnLike, Terminator, ParentOneOf<["ForwardOp", "ReverseOp"]>]> {
 
   let summary = "Return tapes or nothing";
 

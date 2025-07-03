@@ -45,6 +45,8 @@ from catalyst.jax_primitives import (
     compbasis_p,
     cond_p,
     counts_p,
+    device_init_p,
+    device_release_p,
     expval_p,
     for_p,
     func_p,
@@ -52,21 +54,20 @@ from catalyst.jax_primitives import (
     hamiltonian_p,
     hermitian_p,
     jvp_p,
-    quantum_kernel_p,
+    measure_p,
     namedobs_p,
     print_p,
     probs_p,
     qalloc_p,
     qdealloc_p,
-    qdevice_p,
     qextract_p,
     qinsert_p,
     qinst_p,
-    qmeasure_p,
-    qunitary_p,
+    quantum_kernel_p,
     sample_p,
     state_p,
     tensorobs_p,
+    unitary_p,
     var_p,
     vjp_p,
     while_p,
@@ -122,7 +123,7 @@ def remove_host_context(jaxpr):
     { lambda ; a:i64[]. let
       b:i64[] = func[
         call_jaxpr={ lambda ; c:i64[]. let
-             = qdevice[
+             = device_init[
               rtd_kwargs={'shots': 0, 'mcmc': False}
               rtd_lib=path/to/runtime...
               rtd_name=LightningSimulator
@@ -139,7 +140,7 @@ def remove_host_context(jaxpr):
     is_single_equation_call = prim in {func_p, quantum_kernel_p}
     is_valid = is_one_equation and is_single_equation_call
     if is_valid:
-        return jaxpr.jaxpr.eqns[0][3]["call_jaxpr"]
+        return jaxpr.jaxpr.eqns[0].params["call_jaxpr"]
     raise CompileError("Cannot translate tapes with context.")
 
 
@@ -205,7 +206,7 @@ class InterpreterContext:  # pylint: disable=too-many-instance-attributes
 
     def read(self, var):
         """Read the value of variable var."""
-        if isinstance(var, jax.core.Literal):
+        if isinstance(var, jax.extend.core.Literal):
             return var.val
         if self.variable_map.get(var):
             var = self.variable_map[var]
@@ -245,7 +246,7 @@ class InterpreterContext:  # pylint: disable=too-many-instance-attributes
 
 
 def change_device_to_cuda_device(ctx):
-    """Map Catalyst's qdevice_p primitive to its equivalent CUDA-quantum primitive
+    """Map Catalyst's device_init_p primitive to its equivalent CUDA-quantum primitive
     as defined in this file.
 
     From here we get shots as well.
@@ -254,14 +255,14 @@ def change_device_to_cuda_device(ctx):
     # The device here might also have some important information for
     # us. For example, the number of shots.
 
-    qdevice_eqn = get_instruction(ctx.jaxpr, qdevice_p)
+    qdevice_eqn = get_instruction(ctx.jaxpr, device_init_p)
 
     # Now we have the number of shots.
     # Shots are specified in PL at the very beginning, but in cuda
     # shots are not needed until the very end.
     # So, we will just return this variable
     # and it is the responsibility of the caller to propagate this information.
-    assert isinstance(qdevice_eqn.invars[0], jax._src.core.Literal)
+    assert isinstance(qdevice_eqn.invars[0], jax.extend.core.Literal)
     shots = qdevice_eqn.invars[0].val
 
     device_name = qdevice_eqn.params.get("rtd_name")
@@ -527,9 +528,9 @@ def change_counts(ctx, eqn):
 
 
 def change_measure(ctx, eqn):
-    """Change Catalyst's qmeasure_p to CUDA-quantum measure."""
+    """Change Catalyst's measure_p to CUDA-quantum measure."""
 
-    assert eqn.primitive == qmeasure_p
+    assert eqn.primitive == measure_p
 
     # Operands to measure_p
     # *qubit
@@ -717,7 +718,7 @@ INST_IMPL = {
     compbasis_p: change_compbasis,
     sample_p: change_sample,
     counts_p: change_counts,
-    qmeasure_p: change_measure,
+    measure_p: change_measure,
     expval_p: change_expval,
     namedobs_p: change_namedobs,
     hamiltonian_p: change_hamiltonian,
@@ -726,11 +727,12 @@ INST_IMPL = {
     # because they have been handled before or they are just
     # not necessary in the CUDA-quantum API.
     qdealloc_p: ignore_impl,
-    qdevice_p: ignore_impl,
+    device_init_p: ignore_impl,
+    device_release_p: ignore_impl,
     qalloc_p: ignore_impl,
     # These are unimplemented at the moment.
     zne_p: unimplemented_impl,
-    qunitary_p: unimplemented_impl,
+    unitary_p: unimplemented_impl,
     hermitian_p: unimplemented_impl,
     tensorobs_p: unimplemented_impl,
     var_p: unimplemented_impl,

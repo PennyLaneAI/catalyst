@@ -19,12 +19,14 @@ the default behaviour and replacing it with a function-like "QNode" primitive.
 """
 import logging
 from copy import copy
+from dataclasses import replace
 from typing import Callable, Sequence
 
 import jax.numpy as jnp
 import pennylane as qml
 from jax.core import eval_jaxpr
 from jax.tree_util import tree_flatten, tree_unflatten
+from pennylane import exceptions
 from pennylane.measurements import (
     CountsMP,
     ExpectationMP,
@@ -58,11 +60,13 @@ logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
 
-def _validate_mcm_config(mcm_config, shots):
-    """Helper function for validating that the mcm_config is valid for executing."""
-    mcm_config.postselect_mode = mcm_config.postselect_mode if shots else None
+def _resolve_mcm_config(mcm_config, shots):
+    """Helper function for resolving and validating that the mcm_config is valid for executing."""
+    updated_values = {}
+
+    updated_values["postselect_mode"] = mcm_config.postselect_mode if shots else None
     if mcm_config.mcm_method is None:
-        mcm_config.mcm_method = (
+        updated_values["mcm_method"] = (
             "one-shot" if mcm_config.postselect_mode == "hw-like" else "single-branch-statistics"
         )
     if mcm_config.mcm_method == "deferred":
@@ -78,6 +82,8 @@ def _validate_mcm_config(mcm_config, shots):
         raise ValueError(
             "Cannot use the 'one-shot' method for mid-circuit measurements with analytic mode."
         )
+
+    return replace(mcm_config, **updated_values)
 
 
 class QFunc:
@@ -118,16 +124,19 @@ class QFunc:
                 )
             )
             total_shots = get_device_shots(self.device)
-            _validate_mcm_config(mcm_config, total_shots)
+            mcm_config = _resolve_mcm_config(mcm_config, total_shots)
 
             if mcm_config.mcm_method == "one-shot":
-                mcm_config.postselect_mode = mcm_config.postselect_mode or "hw-like"
+                mcm_config = replace(
+                    mcm_config, postselect_mode=mcm_config.postselect_mode or "hw-like"
+                )
                 return Function(dynamic_one_shot(self, mcm_config=mcm_config))(*args, **kwargs)
 
         qjit_device = QJITDevice(self.device)
 
         static_argnums = kwargs.pop("static_argnums", ())
         out_tree_expected = kwargs.pop("_out_tree_expected", [])
+        debug_info = kwargs.pop("debug_info", None)
 
         def _eval_quantum(*args, **kwargs):
             closed_jaxpr, out_type, out_tree, out_tree_exp = trace_quantum_function(
@@ -137,6 +146,7 @@ class QFunc:
                 kwargs,
                 self,
                 static_argnums,
+                debug_info,
             )
 
             out_tree_expected.append(out_tree_exp)
@@ -148,7 +158,7 @@ class QFunc:
             return tree_unflatten(out_tree, res_flat)
 
         flattened_fun, _, _, out_tree_promise = deduce_avals(
-            _eval_quantum, args, kwargs, static_argnums
+            _eval_quantum, args, kwargs, static_argnums, debug_info
         )
         dynamic_args = filter_static_args(args, static_argnums)
         args_flat = tree_flatten((dynamic_args, kwargs))[0]
@@ -205,7 +215,9 @@ def dynamic_one_shot(qnode, **kwargs):
 
     def transform_to_single_shot(qnode):
         if not qnode.device.shots:
-            raise qml.QuantumFunctionError("dynamic_one_shot is only supported with finite shots.")
+            raise exceptions.QuantumFunctionError(
+                "dynamic_one_shot is only supported with finite shots."
+            )
 
         @qml.transform
         def dynamic_one_shot_partial(

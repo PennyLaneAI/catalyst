@@ -439,6 +439,8 @@ class TestCProgramGeneration:
     @pytest.mark.parametrize(
         "arg",
         [
+            False,
+            np.array([False, True]),
             5,
             np.ones(5, dtype=int),
             np.ones((5, 2), dtype=int),
@@ -455,6 +457,8 @@ class TestCProgramGeneration:
             return y
 
         ans = str(f(arg).tolist()).replace(" ", "")
+        # bools are printed as integers in the runtime
+        ans = ans.replace("False", "0").replace("True", "1")
 
         binary = compile_executable(f, arg)
         result = subprocess.run(binary, capture_output=True, text=True, check=True)
@@ -501,12 +505,45 @@ class TestOptionsToCliFlags:
         flags = _options_to_cli_flags(options)
         assert ("--load-pass-plugin", path) in flags
 
+    def test_options_pass_plugin_list(self):
+        """Test pass plugin option when passed in as a list"""
+        path = pathlib.Path("/path/to/plugin")
+        options = CompileOptions(pass_plugins=[path, path])
+        flags = _options_to_cli_flags(options)
+        assert ("--load-pass-plugin", path) in flags
+        assert isinstance(options.pass_plugins, set)
+
+    def test_options_pass_plugin_tuple(self):
+        """Test pass plugin option when passed in as a tuple"""
+        path = pathlib.Path("/path/to/plugin")
+        options = CompileOptions(pass_plugins=(path, path))
+        flags = _options_to_cli_flags(options)
+        assert ("--load-pass-plugin", path) in flags
+        assert isinstance(options.pass_plugins, set)
+
     def test_option_dialect_plugin(self):
         """Test dialect plugin option"""
         path = pathlib.Path("/path/to/plugin")
         options = CompileOptions(dialect_plugins={path})
         flags = _options_to_cli_flags(options)
         assert ("--load-dialect-plugin", path) in flags
+        assert isinstance(options.pass_plugins, set)
+
+    def test_option_dialect_plugin_list(self):
+        """Test dialect plugin option"""
+        path = pathlib.Path("/path/to/plugin")
+        options = CompileOptions(dialect_plugins=[path, path])
+        flags = _options_to_cli_flags(options)
+        assert ("--load-dialect-plugin", path) in flags
+        assert isinstance(options.dialect_plugins, set)
+
+    def test_option_dialect_plugin_tuple(self):
+        """Test dialect plugin option"""
+        path = pathlib.Path("/path/to/plugin")
+        options = CompileOptions(dialect_plugins=(path, path))
+        flags = _options_to_cli_flags(options)
+        assert ("--load-dialect-plugin", path) in flags
+        assert isinstance(options.dialect_plugins, set)
 
     def test_option_not_lower_to_llvm(self):
         """Test not lower to llvm"""
@@ -557,6 +594,12 @@ class TestOptionsToCliFlags:
         """
         ).strip()
         assert expected in observed
+
+    def test_catalyst_error(self):
+        mlir = """This is invalid MLIR"""
+        msg = "custom op 'This'"
+        with pytest.raises(CompileError, match=msg):
+            to_mlir_opt(stdin=mlir)
 
 
 if __name__ == "__main__":

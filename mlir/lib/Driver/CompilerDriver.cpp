@@ -56,6 +56,7 @@
 #include "llvm/Transforms/IPO/GlobalDCE.h"
 
 #include "Catalyst/IR/CatalystDialect.h"
+#include "Catalyst/Transforms/BufferizableOpInterfaceImpl.h"
 #include "Catalyst/Transforms/Passes.h"
 #include "Driver/CatalystLLVMTarget.h"
 #include "Driver/CompilerDriver.h"
@@ -63,12 +64,15 @@
 #include "Driver/Support.h"
 #include "Gradient/IR/GradientDialect.h"
 #include "Gradient/IR/GradientInterfaces.h"
+#include "Gradient/Transforms/BufferizableOpInterfaceImpl.h"
 #include "Gradient/Transforms/Passes.h"
 #include "Ion/IR/IonDialect.h"
+#include "MBQC/IR/MBQCDialect.h"
 #include "Mitigation/IR/MitigationDialect.h"
 #include "Mitigation/Transforms/Passes.h"
 #include "QEC/IR/QECDialect.h"
 #include "Quantum/IR/QuantumDialect.h"
+#include "Quantum/Transforms/BufferizableOpInterfaceImpl.h"
 #include "Quantum/Transforms/Passes.h"
 
 #include "Enzyme.h"
@@ -297,6 +301,7 @@ void registerAllCatalystDialects(DialectRegistry &registry)
     registry.insert<CatalystDialect>();
     registry.insert<quantum::QuantumDialect>();
     registry.insert<qec::QECDialect>();
+    registry.insert<mbqc::MBQCDialect>();
     registry.insert<ion::IonDialect>();
     registry.insert<gradient::GradientDialect>();
     registry.insert<mitigation::MitigationDialect>();
@@ -733,7 +738,8 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         TimingScope translateTiming = timing.nest("Translate");
         llvmModule =
             timer::timer(translateModuleToLLVMIR, "translateModuleToLLVMIR",
-                         /* add_endl */ false, *mlirModule, llvmContext, "LLVMDialectModule");
+                         /* add_endl */ false, *mlirModule, llvmContext, "LLVMDialectModule",
+                         /* disableVerification */ true);
         if (!llvmModule) {
             CO_MSG(options, Verbosity::Urgent, "Failed to translate LLVM module\n");
             return failure();
@@ -759,7 +765,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
     if (runLLC && (inType == InputType::LLVMIR)) {
         TimingScope llcTiming = timing.nest("llc");
         // Set data layout before LLVM passes or the default one is used.
-        std::string targetTriple = llvm::sys::getDefaultTargetTriple();
+        llvm::Triple targetTriple(llvm::sys::getDefaultTargetTriple());
 
         llvm::InitializeAllTargetInfos();
         llvm::InitializeAllTargets();
@@ -959,6 +965,11 @@ int QuantumDriverMainFromCL(int argc, char **argv)
     mhlo::registerAllMhloPasses();
     registerAllCatalystDialects(registry);
     registerLLVMTranslations(registry);
+
+    // Register bufferization interfaces
+    catalyst::registerBufferizableOpInterfaceExternalModels(registry);
+    catalyst::gradient::registerBufferizableOpInterfaceExternalModels(registry);
+    catalyst::quantum::registerBufferizableOpInterfaceExternalModels(registry);
 
     // Register and parse command line options.
     std::string inputFilename, outputFilename;

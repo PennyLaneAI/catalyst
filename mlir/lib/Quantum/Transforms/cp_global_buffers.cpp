@@ -166,23 +166,23 @@ void applyCopyGlobalMemRefTransform(func::FuncOp op, PatternRewriter &rewriter)
 struct CopyGlobalMemRefTransform : public OpRewritePattern<func::FuncOp> {
     using OpRewritePattern<func::FuncOp>::OpRewritePattern;
 
-    LogicalResult match(func::FuncOp op) const override;
-    void rewrite(func::FuncOp op, PatternRewriter &rewriter) const override;
+    LogicalResult matchAndRewrite(func::FuncOp op, PatternRewriter &rewriter) const override;
 };
 
-LogicalResult CopyGlobalMemRefTransform::match(func::FuncOp op) const
+LogicalResult CopyGlobalMemRefTransform::matchAndRewrite(func::FuncOp op,
+                                                         PatternRewriter &rewriter) const
 {
     bool isCandidate = hasCWrapperButNoCopyWrapperAttribute(op);
-    if (!isCandidate)
+    if (!isCandidate) {
         return failure();
+    }
+    if (!hasMemRefReturnTypes(op)) {
+        return failure();
+    }
 
-    return hasMemRefReturnTypes(op) ? success() : failure();
-}
-
-void CopyGlobalMemRefTransform::rewrite(func::FuncOp op, PatternRewriter &rewriter) const
-{
     setCopyWrapperAttribute(op, rewriter);
     applyCopyGlobalMemRefTransform(op, rewriter);
+    return success();
 }
 
 } // namespace
@@ -201,7 +201,7 @@ struct CopyGlobalMemRefPass : impl::CopyGlobalMemRefPassBase<CopyGlobalMemRefPas
         RewritePatternSet patterns(context);
         patterns.add<CopyGlobalMemRefTransform>(context);
 
-        if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
+        if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
             signalPassFailure();
         }
     }

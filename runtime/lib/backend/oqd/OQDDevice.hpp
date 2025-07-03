@@ -22,29 +22,16 @@
 
 #include "OQDRuntimeCAPI.h"
 #include "QuantumDevice.hpp"
-
-// catalyst/runtime/lib/backend/common/
-
-#include "CacheManager.hpp"
 #include "QubitManager.hpp"
-#include "Utils.hpp"
-
-#include "OQDRunner.hpp"
 
 namespace Catalyst::Runtime::Device {
 class OQDDevice final : public Catalyst::Runtime::QuantumDevice {
   private:
-    // static constants for RESULT values
-    static constexpr bool GLOBAL_RESULT_TRUE_CONST{true};
-    static constexpr bool GLOBAL_RESULT_FALSE_CONST{false};
-
     Catalyst::Runtime::QubitManager<QubitIdType, size_t> qubit_manager{};
-    std::unique_ptr<OQDRunner> runner;
 
-    Catalyst::Runtime::CacheManager<std::complex<double>> cache_manager{};
-    bool tape_recording{false};
     size_t device_shots;
     std::string ion_specs;
+    std::string openapl_file_name;
     std::vector<std::string> phonon_specs;
 
     std::unordered_map<std::string, std::string> device_kwargs;
@@ -91,16 +78,29 @@ class OQDDevice final : public Catalyst::Runtime::QuantumDevice {
         device_shots = device_kwargs.contains("shots")
                            ? static_cast<size_t>(std::stoll(device_kwargs["shots"]))
                            : 0;
-        runner = std::make_unique<OQDRunner>();
+        openapl_file_name = device_kwargs.contains("openapl_file_name")
+                                ? device_kwargs["openapl_file_name"]
+                                : "__openapl__output.json";
     }
-    ~OQDDevice() { __catalyst__oqd__rt__finalize(); };
+    ~OQDDevice() { __catalyst__oqd__rt__finalize(openapl_file_name); };
 
-    QUANTUM_DEVICE_DEL_DECLARATIONS(OQDDevice);
+    auto AllocateQubits(size_t) -> std::vector<QubitIdType> override;
+    void ReleaseAllQubits() override;
+    auto GetNumQubits() const -> size_t override;
+    void SetDeviceShots(size_t) override;
+    auto GetDeviceShots() const -> size_t override;
 
-    QUANTUM_DEVICE_RT_DECLARATIONS;
-    QUANTUM_DEVICE_QIS_DECLARATIONS;
+    void NamedOperation(const std::string &, const std::vector<double> &,
+                        const std::vector<QubitIdType> &, bool = false,
+                        const std::vector<QubitIdType> & = {},
+                        const std::vector<bool> & = {}) override;
+    auto Measure(QubitIdType, std::optional<int32_t> = std::nullopt) -> Result override;
+
+    void PartialCounts(DataView<double, 1> &, DataView<int64_t, 1> &,
+                       const std::vector<QubitIdType> &) override;
 
     const std::string &getIonSpecs() { return ion_specs; }
     const std::vector<std::string> &getPhononSpecs() { return phonon_specs; }
+    const std::string &getOutputFile() { return openapl_file_name; }
 };
 } // namespace Catalyst::Runtime::Device
