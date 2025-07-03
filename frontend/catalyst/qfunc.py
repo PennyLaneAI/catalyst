@@ -264,10 +264,7 @@ def dynamic_one_shot(qnode, **kwargs):
     total_shots = qnode._shots.total_shots  # pylint: disable=protected-access
 
     new_dev = copy(dev)
-    if isinstance(new_dev, qml.devices.LegacyDeviceFacade):
-        new_dev.target_device.shots = 1  # pragma: no cover
-    else:
-        new_dev._shots = qml.measurements.Shots(1)
+    new_dev._shots = qml.measurements.Shots(1)
     single_shot_qnode.device = new_dev
     single_shot_qnode._set_shots(qml.measurements.Shots(1))  # pylint: disable=protected-access
 
