@@ -24,7 +24,6 @@ import pennylane as qml
 import pytest
 
 import catalyst
-from catalyst.debug import get_compilation_stage, replace_ir
 
 
 def test_dynamic_sample():
