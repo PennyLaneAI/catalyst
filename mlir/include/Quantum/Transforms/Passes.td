@@ -125,6 +125,12 @@ def LoopBoundaryOptimizationPass : Pass<"loop-boundary"> {
 
     let constructor = "catalyst::createLoopBoundaryOptimizationPass()";
 }
+
+def RoutingPass : Pass<"route-circuit"> {
+    let summary = "Perform mapping and routing of quantum circuit to hardware";
+
+    let constructor = "catalyst::createRoutingPass()";
+}
 // ----- Quantum circuit transformation passes end ----- //
 
 #endif // QUANTUM_PASSES
