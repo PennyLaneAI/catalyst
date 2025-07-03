@@ -40,7 +40,6 @@ target_link_libraries(catalyst_runtime_testing INTERFACE
     ${CMAKE_DL_LIBS}  # dlopen from ExecutionContext.h
     ${devices_list}
     rt_capi
-    nlohmann_json::nlohmann_json
 )
 
 if(ENABLE_CODE_COVERAGE)
@@ -112,6 +111,7 @@ if(ENABLE_OQD)
         catalyst_runtime_testing
         rt_OQD_capi
         rtd_oqd_device
+        nlohmann_json::nlohmann_json
     )
 
     catch_discover_tests(runner_tests_oqd)

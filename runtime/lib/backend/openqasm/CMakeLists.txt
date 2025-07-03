@@ -57,8 +57,3 @@ if(NOT APPLE)
 else()
     set_property(TARGET rtd_openqasm APPEND PROPERTY BUILD_RPATH @loader_path)
 endif()
-
-# link to json utils for kwarg parsing
-target_link_libraries(rtd_openqasm
-    PRIVATE nlohmann_json::nlohmann_json
-)

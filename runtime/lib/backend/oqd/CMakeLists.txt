@@ -20,8 +20,3 @@ target_include_directories(rtd_oqd_device
 set_property(TARGET rtd_oqd_device PROPERTY POSITION_INDEPENDENT_CODE ON)
 
 target_link_libraries(rtd_oqd_device PRIVATE rt_OQD_capi)
-
-# link to json utils for kwarg parsing
-target_link_libraries(rtd_oqd_device
-    PRIVATE nlohmann_json::nlohmann_json
-)

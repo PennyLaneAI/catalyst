@@ -16,8 +16,3 @@ target_include_directories(rtd_null_qubit
 )
 
 set_property(TARGET rtd_null_qubit PROPERTY POSITION_INDEPENDENT_CODE ON)
-
-# link to json utils for kwarg parsing
-target_link_libraries(rtd_null_qubit
-    PRIVATE nlohmann_json::nlohmann_json
-)
