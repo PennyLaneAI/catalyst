@@ -118,3 +118,6 @@ def test_while_capture():
 
 
 test_while_capture()
+
+def test_dynamic_wire():
+
