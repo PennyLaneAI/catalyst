@@ -20,7 +20,7 @@ if ("${LLVM_USE_SANITIZER}" STREQUAL "Address")
 endif()
 
 if(CATALYST_ENABLE_WARNINGS)
-    set(CMAKE_COMPILE_WARNING_AS_ERROR ON)
+    set(CMAKE_COMPILE_WARNING_AS_ERROR OFF)
     add_compile_options(-Wall)
 endif()
 

@@ -17,7 +17,7 @@
 
 #define DEBUG_TYPE "routecircuit"
 
-// #include <z3++.h>
+#include "c++/z3++.h"
 
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -32,6 +32,7 @@
 using namespace mlir;
 using namespace catalyst;
 
+namespace z3 {
 namespace catalyst {
 #define GEN_PASS_DEF_ROUTINGPASS
 #define GEN_PASS_DECL_ROUTINGPASS
@@ -42,18 +43,23 @@ struct RoutingPass : public impl::RoutingPassBase<RoutingPass> {
 
     void runOnOperation() override {
         llvm::outs() << "Hello\n"; 
-        // z3::context ctx;
-
-        // Declare a Boolean constant (variable)
-        // z3::expr p = ctx.bool_const("p");
-        // z3::expr q = ctx.bool_const("q");
-
+        z3::context ctx;
         // Create a solver instance
-        // z3::solver s(ctx);
+        z3::solver s(ctx);
 
-        // Add some assertions (constraints) to the solver
-        // Example: p AND q is true
-        // s.add(p && q);
+        // Declare an integer variable 'x'
+        z3::expr x = ctx.int_const("x");
+        // Add assertions to the solver
+        // Assert x > 5
+        s.add(x > 5);
+        // Assert x < 10
+        s.add(x < 10);
+
+        llvm::outs() << "Sat:" << z3::sat << "\n";
+        llvm::outs() << "Unsat:" << z3::unsat << "\n";
+        llvm::outs() << "Unknown:" << z3::unknown << "\n";
+
+
     }
     // void runOnOperation() final
 };
@@ -64,3 +70,4 @@ std::unique_ptr<Pass> createRoutingPass()
 }
 
 } // namespace catalyst
+} // namespace z3

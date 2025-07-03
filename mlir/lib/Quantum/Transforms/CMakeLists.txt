@@ -23,6 +23,15 @@ file(GLOB SRC
     RouteCircuit.cpp
 )
 
+#add_compile_options(-Wno-covered-switch-default)
+#Disable warning from json library
+#if(CMAKE_CXX_COMPILER_ID MATCHES ".*Clang")
+set_source_files_properties(
+    RouteCircuit.cpp
+    COMPILE_FLAGS "-Wno-covered-switch-default"
+)
+#endif()
+
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)
 get_property(conversion_libs GLOBAL PROPERTY MLIR_CONVERSION_LIBS)
 set(LIBS
@@ -42,15 +51,6 @@ target_include_directories(${LIBRARY_NAME} PUBLIC
                            ${PROJECT_SOURCE_DIR}/include
                            ${CMAKE_BINARY_DIR}/include)
 
-# include(FetchContent)
-
-# FetchContent_Declare(z3
-#         GIT_REPOSITORY https://github.com/Z3Prover/z3
-#         GIT_TAG        z3-4.15.1
-#         PATCH_COMMAND  git apply "${CMAKE_CURRENT_LIST_DIR}/z3.patch"
-#         UPDATE_DISCONNECTED 1
-# )
-# FetchContent_MakeAvailable(z3)
 
 
 include(FetchContent)
@@ -86,19 +86,3 @@ endif()
 
 include_directories( ${z3_SOURCE_DIR}/src/api )
 target_link_libraries(${LIBRARY_NAME} PRIVATE libz3)
-
-# get_target_property(EXTLIB_COMPILE_FLAGS libz3 COMPILE_OPTIONS )
-# list(REMOVE_ITEM EXTLIB_COMPILE_FLAGS -Wnocovered-switch-default)
-
-if(TARGET MLIRQuantum)
-  target_compile_options(MLIRQuantum PRIVATE
-    $<$<CXX_COMPILER_ID:GNU>:-w>
-    $<$<CXX_COMPILER_ID:Clang>:-w>
-    $<$<CXX_COMPILER_ID:MSVC>:/w>
-  )
-endif()
-
-
-# target_link_libraries(${LIBRARY_NAME} PRIVATE
-#     libz3::z3
-# )
