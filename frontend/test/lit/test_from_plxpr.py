@@ -127,8 +127,14 @@ def test_dynamic_wire():
     @qml.qjit(target="mlir")
     @qml.qnode(dev)
     def circuit(w1: int):
+        # CHECK: [[QREG:%.+]] = quantum.insert
+        # CHECK-NEXT: [[SCALAR:%.+]] = tensor.extract %arg0
+        # CHECK-NEXT: [[QBIT:%.+]] = quantum.extract [[QREG]][[[SCALAR]]]
+        # CHECK-NEXT: [[QBIT_1:%.+]] = quantum.custom "PauliY"() [[QBIT]]
+        # CHECK-NEXT: [[QBIT_2:%.+]] = quantum.custom "PauliZ"() [[QBIT_1]]
         qml.X(0)
         qml.Y(w1)
+        qml.Z(w1)
         qml.X(0)
         return qml.state()
 
