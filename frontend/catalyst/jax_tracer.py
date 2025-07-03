@@ -1303,6 +1303,26 @@ def trace_function(
 
 
 @debug_logger
+def _get_shots(qnode) -> int:
+    """Extract shots from qnode, handling None case.
+    
+    Args:
+        qnode: The quantum node containing shots information.
+        
+    Returns:
+        int: Device shots value, 0 if None.
+    """
+    # When PennyLane allows dynamic shots, update tracing to accept dynamic shots too
+    # Use JAX-compatible conditional to handle potentially traced values
+    shots_value = qnode._shots.total_shots  # pylint: disable=protected-access
+    if shots_value is None:
+        shots = 0
+    else:
+        shots = shots_value
+    return shots
+
+
+@debug_logger
 def trace_quantum_function(  # pylint: disable=too-many-locals,too-many-statements,too-many-branches  # noqa: C901
     f: Callable, device: QubitDevice, args, kwargs, qnode, static_argnums, debug_info
 ) -> Tuple[ClosedJaxpr, Any]:
@@ -1382,14 +1402,9 @@ def trace_quantum_function(  # pylint: disable=too-many-locals,too-many-statemen
 
                 # TODO: device shots is now always a concrete integer or None
                 # When PennyLane allows dynamic shots, update tracing to accept dynamic shots too
-                # Use JAX-compatible conditional to handle potentially traced values
-                shots_value = qnode._shots.total_shots  # pylint: disable=protected-access
-                if shots_value is None:
-                    device_shots = 0
-                else:
-                    device_shots = shots_value
+                shots = _get_shots(qnode)
                 device_init_p.bind(
-                    device_shots,
+                    shots,
                     auto_qubit_management=(device.wires is None),
                     rtd_lib=device.backend_lib,
                     rtd_name=device.backend_name,
