@@ -127,12 +127,6 @@ SUPPORTED_RT_DEVICES = {
 }
 
 
-def get_shots(dev, qnode):
-    """Helper function to get shots."""
-    # pylint: disable=protected-access
-    return qnode._shots.total_shots
-
-
 @dataclass
 class BackendInfo:
     """Backend information"""
