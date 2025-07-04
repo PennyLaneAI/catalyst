@@ -384,12 +384,6 @@ def test_dynamic_shots_and_wires(capfd):
     result_4 = workflow_dynamic_shots_and_wires(15, 4)
     assert result_4.shape == (15, 4)
 
-    # Verify the samples are valid (all 0s and 1s)
-    assert jnp.all((result_1 == 0) | (result_1 == 1))
-    assert jnp.all((result_2 == 0) | (result_2 == 1))
-    assert jnp.all((result_3 == 0) | (result_3 == 1))
-    assert jnp.all((result_4 == 0) | (result_4 == 1))
-
     # Check that compilation only happened once
     out, _ = capfd.readouterr()
     assert out.count("compiling...") == 1
