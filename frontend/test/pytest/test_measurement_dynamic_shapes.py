@@ -29,9 +29,8 @@ import catalyst
 def test_dynamic_sample():
     """Test that a `sample` program with dynamic shots can be executed correctly."""
 
-    @catalyst.qjit(keep_intermediate=False)
-    def workflow_dyn_sample(shots):  # pylint: disable=unused-argument
-        # qml.device still needs concrete shots
+    @catalyst.qjit
+    def workflow_dyn_sample(shots):
         device = qml.device("lightning.qubit", wires=1)
 
         @partial(qml.set_shots, shots=shots)
@@ -53,9 +52,8 @@ def test_dynamic_sample():
 def test_dynamic_counts():
     """Test that a `counts` program with dynamic shots can be executed correctly."""
 
-    @catalyst.qjit(keep_intermediate=False)
-    def workflow_dyn_counts(shots):  # pylint: disable=unused-argument
-        # qml.device still needs concrete shots
+    @catalyst.qjit
+    def workflow_dyn_counts(shots):
         device = qml.device("lightning.qubit", wires=1)
 
         @partial(qml.set_shots, shots=shots)
