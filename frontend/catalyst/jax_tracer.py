@@ -29,6 +29,7 @@ import jax
 import jax.numpy as jnp
 import pennylane as qml
 from jax._src.lax.lax import _extract_tracers_dyn_shape
+from jax._src.source_info_util import new_source_info
 from jax.api_util import debug_info as jdb
 from jax.core import get_aval
 from pennylane import QubitUnitary, QueuingManager
@@ -230,7 +231,8 @@ def retrace_with_result_types(jaxpr: ClosedJaxpr, target_types: List[ShapedArray
         with EvaluationContext.frame_tracing_context() as trace:
             in_tracers = _input_type_to_tracers(trace.new_arg, jaxpr.in_avals)
             out_tracers = [
-                trace.to_jaxpr_tracer(t) for t in eval_jaxpr(jaxpr.jaxpr, jaxpr.consts, *in_tracers)
+                trace.to_jaxpr_tracer(t, new_source_info())
+                for t in eval_jaxpr(jaxpr.jaxpr, jaxpr.consts, *in_tracers)
             ]
             out_tracers_, target_types_ = (
                 (out_tracers[:-1], target_types[:-1]) if with_qreg else (out_tracers, target_types)
@@ -1260,8 +1262,10 @@ def trace_post_processing(trace, post_processing: Callable, pp_args, debug_info=
 
         # wffa will take as an input a flatten tracers.
         # After wffa is called, then the shape becomes available in out_tree_promise.
-        in_tracers = [trace.to_jaxpr_tracer(t) for t in tree_flatten(pp_args)[0]]
-        out_tracers = [trace.to_jaxpr_tracer(t) for t in wffa.call_wrapped(*in_tracers)]
+        in_tracers = [trace.to_jaxpr_tracer(t, new_source_info()) for t in tree_flatten(pp_args)[0]]
+        out_tracers = [
+            trace.to_jaxpr_tracer(t, new_source_info()) for t in wffa.call_wrapped(*in_tracers)
+        ]
         cur_trace = EvaluationContext.get_current_trace()
         jaxpr, out_type, consts = cur_trace.frame.to_jaxpr2(out_tracers, wffa.debug_info)
         closed_jaxpr = ClosedJaxpr(jaxpr, consts)
@@ -1431,7 +1435,8 @@ def trace_quantum_function(
                     if isinstance(arr, (list, tuple)):
                         return type(arr)(check_full_raise(x, func) for x in arr)
                     else:
-                        return func(arr)
+                        # just hack a source info for now
+                        return func(arr, new_source_info())
 
                 meas_tracers = check_full_raise(meas, trace.to_jaxpr_tracer)
                 if len(snapshot_results) > 0:
