@@ -173,10 +173,12 @@ class TestQubitValues:
         def will_raise_assert(x):
             qreg = qalloc_p.bind(2)
             manager = QregManager(qreg)
+            # pylint: disable-next=pointless-statement
             manager[x]
             # Manually setting this internally
             # in order to trigger failed assertion
             manager.wire_map[x + 1] = 1
+            # pylint: disable-next=pointless-statement
             manager[x]
 
         with pytest.raises(AssertionError):
