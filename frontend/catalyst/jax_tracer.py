@@ -962,7 +962,7 @@ def trace_quantum_measurements(
         out_tree: modified PyTree-shape of the qnode output.
     """
     # Extract total shots and detect if dynamic
-    shots = shots_obj.total_shots if shots_obj else None
+    shots = shots_obj.total_shots
     out_classical_tracers = []
 
     for i, output in enumerate(outputs):
