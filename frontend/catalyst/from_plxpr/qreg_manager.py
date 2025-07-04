@@ -132,9 +132,18 @@ class QregManager:
         """
         Get the newest ``AbstractQbit`` corresponding to a wire index.
         If the qubit value does not exist yet at this index, extract the fresh qubit.
+
+        For the case of dynamic wires the safe approach is to re-insert all wires
+        back into the wire_map. Then extract the dynamic wire.
+
+        There is one small optimization in the case of dynamic wires. And that
+        is if the dynamic wire requested is the only one that is available in
+        the wire_map. This allow us to return the wire in the wire map
+        without an insertion.
         """
         if not isinstance(index, int):
-            if (len(self.wire_map.keys()) == 1) and index in self.wire_map:
+            if index in self.wire_map:
+                assert len(self.wire_map.keys()) == 1, "There should only be one wire in this case"
                 return self.wire_map[index]
 
             self.insert_all_dangling_qubits()
