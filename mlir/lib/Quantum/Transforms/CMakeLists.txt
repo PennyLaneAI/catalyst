@@ -23,6 +23,15 @@ file(GLOB SRC
     RouteCircuit.cpp
 )
 
+#add_compile_options(-Wno-covered-switch-default)
+#Disable warning from json library
+#if(CMAKE_CXX_COMPILER_ID MATCHES ".*Clang")
+set_source_files_properties(
+    RouteCircuit.cpp
+    COMPILE_FLAGS "-Wno-covered-switch-default"
+)
+#endif()
+
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)
 get_property(conversion_libs GLOBAL PROPERTY MLIR_CONVERSION_LIBS)
 set(LIBS
@@ -43,44 +52,41 @@ target_include_directories(${LIBRARY_NAME} PUBLIC
                            ${CMAKE_BINARY_DIR}/include)
 
 
-include(ExternalProject)
-set(Z3_INSTALL_DIR ${CMAKE_BINARY_DIR}/z3)
-set(Z3_LIB_PATH ${Z3_INSTALL_DIR}/lib/libz3.a) 
 
-ExternalProject_Add(
-  z3
-  GIT_REPOSITORY https://github.com/Z3Prover/z3.git
-  GIT_TAG z3-4.15.1
-  PREFIX ${CMAKE_BINARY_DIR}/_deps/z3
-  INSTALL_DIR ${Z3_INSTALL_DIR}
-  CMAKE_ARGS
-    -DCMAKE_INSTALL_PREFIX=${Z3_INSTALL_DIR}
-    -DCMAKE_BUILD_TYPE=Release
-    -DZ3_BUILD_PYTHON_BINDINGS=OFF
-    -DBUILD_SHARED_LIBS=OFF
-  INSTALL_COMMAND cmake --install .
-  BUILD_BYPRODUCTS ${Z3_LIB_PATH}
+include(FetchContent)
+set(Z3_PATCH_FILE "${CMAKE_CURRENT_LIST_DIR}/z3.patch")
+
+FetchContent_Declare(z3
+        GIT_REPOSITORY https://github.com/Z3Prover/z3
+        GIT_TAG        z3-4.15.1
+        UPDATE_DISCONNECTED 1
 )
+FetchContent_MakeAvailable(z3)
 
-# if(NOT EXISTS ${Z3_LIB_PATH})
-#     message(STATUS "Z3 not found at ${Z3_LIB_PATH}, adding ExternalProject")
-#     ExternalProject_Add(
-#         z3
-#         GIT_REPOSITORY https://github.com/Z3Prover/z3.git
-#         GIT_TAG z3-4.15.1
-#         UPDATE_DISCONNECTED TRUE
-#         PREFIX ${CMAKE_BINARY_DIR}/_deps/z3
-#         CMAKE_ARGS
-#             -DCMAKE_INSTALL_PREFIX=${Z3_INSTALL_DIR}
-#             -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
-#             -DZ3_BUILD_PYTHON_BINDINGS=OFF
-#         BUILD_BYPRODUCTS ${Z3_INSTALL_DIR}/lib/libz3.a
-#         INSTALL_DIR ${Z3_INSTALL_DIR}
-#     )
-# else()
-#     message(STATUS "Z3 is already built at ${Z3_LIB_PATH}")
-# endif()
+# Now, conditionally apply the patch after FetchContent has populated the source
+if(EXISTS "${Z3_PATCH_FILE}")
+    message(STATUS "Patch file found: ${Z3_PATCH_FILE}. Applying patch to Z3 source.")
+    execute_process(
+        COMMAND ${GIT_EXECUTABLE} apply "${Z3_PATCH_FILE}"
+        WORKING_DIRECTORY "${z3_SOURCE_DIR}"
+        RESULT_VARIABLE PATCH_RESULT
+        OUTPUT_VARIABLE PATCH_OUTPUT
+        ERROR_VARIABLE PATCH_ERROR
+    )
 
-add_dependencies(${LIBRARY_NAME} z3)
-target_include_directories(${LIBRARY_NAME} PRIVATE ${Z3_INSTALL_DIR}/include)
-target_link_libraries(${LIBRARY_NAME} PRIVATE ${Z3_INSTALL_DIR}/lib/libz3.a)
+    if(NOT PATCH_RESULT EQUAL 0)
+        message(WARNING "Failed to apply Z3 patch. This might be expected if the patch was already 
+                            applied or is not compatible. Error: ${PATCH_ERROR}")
+    else()
+        message(STATUS "Z3 patch applied successfully.")
+    endif()
+else()
+    message(STATUS "Patch file not found: ${Z3_PATCH_FILE}. Skipping Z3 patch application.")
+endif()
+
+set(Z3_LIB_ACTUAL_DIR ${CMAKE_BINARY_DIR}/_deps/z3-build/libz3.dylib)
+message(STATUS "hello: ${Z3_LIB_ACTUAL_DIR}")
+
+include_directories( ${z3_SOURCE_DIR}/src/api)
+# target_link_libraries(${LIBRARY_NAME} PRIVATE libz3)
+target_link_libraries(${LIBRARY_NAME} PRIVATE -Wl,-rpath,libz3)

@@ -17,7 +17,8 @@
 
 #define DEBUG_TYPE "routecircuit"
 
-#include "c++/z3++.h"
+// #include "c++/z3++.h"
+// #include "z3.h"
 
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -32,29 +33,20 @@
 using namespace mlir;
 using namespace catalyst;
 
-using namespace z3;
+// using namespace z3;
 
 namespace catalyst {
 #define GEN_PASS_DEF_ROUTINGPASS
 #define GEN_PASS_DECL_ROUTINGPASS
 #include "Quantum/Transforms/Passes.h.inc"
 
+
 struct RoutingPass : public impl::RoutingPassBase<RoutingPass> {
     using impl::RoutingPassBase<RoutingPass>::RoutingPassBase;
 
     void runOnOperation() override {
         llvm::outs() << "Hello\n"; 
-        z3::context ctx;
-        // // Create a solver instance
-        // z3::solver s(ctx);
-
-        // // Declare an integer variable 'x'
-        // z3::expr x = ctx.int_const("x");
-        // // Add assertions to the solver
-        // // Assert x > 5
-        // s.add(x > 5);
-        // // Assert x < 10
-        // s.add(x < 10);
+        // context c;
 
         // llvm::outs() << "Sat:" << z3::sat << "\n";
         // llvm::outs() << "Unsat:" << z3::unsat << "\n";
