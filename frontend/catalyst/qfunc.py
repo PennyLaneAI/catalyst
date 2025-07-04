@@ -78,6 +78,20 @@ def _resolve_mcm_config(mcm_config, shots):
     return replace(mcm_config, **updated_values)
 
 
+def _get_total_shots(qnode):
+    """
+    Extract total shots from qnode.
+    If shots is None on the qnode, this method returns 0 (static). 
+    This method allows the qnode shots to be either static (python int literals) or dynamic (tracers).
+    """
+    shots_value = qnode._shots.total_shots  # pylint: disable=protected-access
+    if shots_value is None:
+        shots = 0
+    else:
+        shots = shots_value
+    return shots
+
+
 class QFunc:
     """A device specific quantum function.
 
@@ -115,7 +129,7 @@ class QFunc:
                     mcm_method=self.execute_kwargs["mcm_method"],
                 )
             )
-            total_shots = self._shots.total_shots  # pylint: disable=protected-access
+            total_shots = _get_total_shots(self)
             mcm_config = _resolve_mcm_config(mcm_config, total_shots)
 
             if mcm_config.mcm_method == "one-shot":
@@ -253,7 +267,7 @@ def dynamic_one_shot(qnode, **kwargs):
         single_shot_qnode.execute_kwargs["mcm_method"] = mcm_config.mcm_method
     single_shot_qnode._dynamic_one_shot_called = True
     dev = qnode.device
-    total_shots = qnode._shots.total_shots  # pylint: disable=protected-access
+    total_shots = _get_total_shots(qnode)
 
     new_dev = copy(dev)
     new_dev._shots = qml.measurements.Shots(1)
