@@ -1303,6 +1303,7 @@ def _get_total_shots(qnode):
     This method allows the qnode shots to be either static (python int
     literals) or dynamic (tracers).
     """
+    # due to possibility of tracer, we cannot use a simple `or` here to simplify
     shots_value = qnode._shots.total_shots  # pylint: disable=protected-access
     if shots_value is None:
         shots = 0
@@ -1389,7 +1390,6 @@ def trace_quantum_function(
                 # Each tape will be outlined into its own function with mlir pass
                 # -split-multiple-tapes
 
-                # due to possibility of tracer, we cannot use a simple `or` here to simplify
                 total_shots = _get_total_shots(qnode)
                 device_init_p.bind(
                     total_shots,
