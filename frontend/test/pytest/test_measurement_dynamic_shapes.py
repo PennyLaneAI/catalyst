@@ -19,6 +19,7 @@ This file contains tests for measurement primitives when the return shape is dyn
 
 from functools import partial
 
+import jax.numpy as jnp
 import numpy as np
 import pennylane as qml
 import pytest
@@ -339,6 +340,65 @@ def test_wrong_wires_argument(backend, wires):
         AttributeError, match="Number of wires on the device should be a scalar integer."
     ):
         func(wires)
+
+
+def test_dynamic_shots_and_wires(capfd):
+    """Test that a circuit with both dynamic shots and dynamic wires works correctly with qml.sample."""
+
+    @catalyst.qjit
+    def workflow_dynamic_shots_and_wires(num_shots, num_wires):
+        print("compiling...")
+        device = qml.device("lightning.qubit", wires=num_wires)
+
+        @partial(qml.set_shots, shots=num_shots)
+        @qml.qnode(device)
+        def circuit():
+            # Apply Hadamard to all wires
+            @catalyst.for_loop(0, num_wires, 1)
+            def apply_hadamards(i):
+                qml.Hadamard(i)
+
+            apply_hadamards()
+
+            # Apply some entangling gates if we have multiple wires
+            @catalyst.cond(num_wires > 1)
+            def add_entanglement():
+                @catalyst.for_loop(0, num_wires - 1, 1)
+                def apply_cnots(i):
+                    qml.CNOT([i, i + 1])
+
+                apply_cnots()
+
+            add_entanglement()
+
+            return qml.sample()
+
+        return circuit()
+
+    # Test with different combinations of shots and wires - should only compile once
+    result_1 = workflow_dynamic_shots_and_wires(10, 2)
+    assert result_1.shape == (10, 2)
+
+    result_2 = workflow_dynamic_shots_and_wires(20, 3)
+    assert result_2.shape == (20, 3)
+
+    result_3 = workflow_dynamic_shots_and_wires(5, 1)
+    assert result_3.shape == (5, 1)
+
+    result_4 = workflow_dynamic_shots_and_wires(15, 4)
+    assert result_4.shape == (15, 4)
+
+    # Verify the samples are valid (all 0s and 1s)
+    assert jnp.all((result_1 == 0) | (result_1 == 1))
+    assert jnp.all((result_2 == 0) | (result_2 == 1))
+    assert jnp.all((result_3 == 0) | (result_3 == 1))
+    assert jnp.all((result_4 == 0) | (result_4 == 1))
+
+    # Check that compilation only happened once
+    out, _ = capfd.readouterr()
+    assert out.count("compiling...") == 1
+
+    workflow_dynamic_shots_and_wires.workspace.cleanup()
 
 
 if __name__ == "__main__":
