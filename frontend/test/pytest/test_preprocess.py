@@ -122,9 +122,9 @@ class TestDecomposition:
             return qml.state()
 
         mlir = qjit(circuit, target="mlir").mlir
-        assert "PauliX" in mlir
+        assert "Hadamard" in mlir
         assert "CNOT" in mlir
-        assert "ControlledPhaseShift" in mlir
+        assert "RY" in mlir
         assert "SingleExcitationPlus" not in mlir
 
     def test_decompose_ops_to_unitary(self):
