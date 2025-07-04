@@ -14,6 +14,7 @@
 """Test for the device preprocessing."""
 import platform
 from dataclasses import replace
+from typing import List
 
 import numpy as np
 import pennylane as qml
@@ -108,6 +109,42 @@ class CustomDevice(Device):
 CustomDevice.capabilities.operations.pop("BlockEncode")
 
 
+def _get_pennylane_decomposition(op: qml.operation.Operation):
+    """
+    Compute the core PennyLane decomposition for the gate.
+    """
+    params = op.parameters
+    wires = op.wires
+    return op.compute_decomposition(*params, wires)
+
+
+def _check_mlir_gate_strings(decomp: List[qml.operation.Operation], mlir: str):
+    """
+    Check that all ops in a decomposition are covered in an mlir.
+    """
+    ledger = {}
+
+    def _create_or_increment(key):
+        if key in ledger:
+            ledger[key] += 1
+        else:
+            ledger[key] = 1
+
+    for op in decomp:
+        # Three special ops do not go through quantum.custom
+        if isinstance(op, qml.GlobalPhase):
+            _create_or_increment("quantum.gphase")
+        elif isinstance(op, qml.MultiRZ):
+            _create_or_increment("quantum.multirz")
+        elif isinstance(op, qml.QubitUnitary):
+            _create_or_increment("quantum.unitary")
+        else:
+            _create_or_increment(op.name)
+
+    for op_name, count in ledger.items():
+        assert mlir.count(op_name) == count
+
+
 class TestDecomposition:
     """Test the preprocessing transforms implemented in Catalyst."""
 
@@ -115,17 +152,18 @@ class TestDecomposition:
         """Test the decompose transform as part of the Catalyst pipeline."""
         dev = NullQubit(wires=4, shots=None)
 
-        @qjit
         @qml.qnode(dev)
         def circuit(theta: float):
             qml.SingleExcitationPlus(theta, wires=[0, 1])
             return qml.state()
 
+        theta = 0.1
+        op = circuit.construct([theta], {})._ops[0]
+        decomp = _get_pennylane_decomposition(op)
+
         mlir = qjit(circuit, target="mlir").mlir
-        assert "Hadamard" in mlir
-        assert "CNOT" in mlir
-        assert "RY" in mlir
         assert "SingleExcitationPlus" not in mlir
+        _check_mlir_gate_strings(decomp, mlir)
 
     def test_decompose_ops_to_unitary(self):
         """Test the decompose ops to unitary transform."""
@@ -142,12 +180,13 @@ class TestDecomposition:
         """Test the decompose ops to unitary transform as part of the Catalyst pipeline."""
         dev = CustomDevice(wires=4, shots=None)
 
-        @qjit
         @qml.qnode(dev)
         def circuit():
             qml.BlockEncode(np.array([[1, 1, 1], [0, 1, 0]]), wires=[0, 1, 2])
             return qml.state()
 
+        # qml.BlockEncode does not have a well-defined decomposition from core PennyLane
+        # so we check manually
         mlir = qjit(circuit, target="mlir").mlir
         assert "quantum.unitary" in mlir
         assert "BlockEncode" not in mlir
@@ -271,7 +310,6 @@ class TestPreprocessHybridOp:
 
         dev = qml.device("lightning.qubit", wires=1)
 
-        @qjit
         @qml.qnode(dev)
         def circuit(x: float, y: float):
             qml.RY(y, 0)
@@ -293,7 +331,6 @@ class TestPreprocessHybridOp:
 
         dev = qml.device("lightning.qubit", wires=[0, 1])
 
-        @qjit
         @qml.qnode(dev)
         def circuit(phi: float):
             OtherHadamard(wires=0)
