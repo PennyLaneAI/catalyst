@@ -78,9 +78,6 @@ endif()
 
 
 include_directories( ${z3_SOURCE_DIR}/src/api )
-# include_directories( ${z3_SOURCE_DIR}/../z3-build) # libz3.4.15.1.0.dylib located here
 target_link_libraries(${LIBRARY_NAME} PRIVATE -Wl,-rpath,libz3)
 # target_link_libraries(${LIBRARY_NAME} PRIVATE libz3)
 
-get_target_property(Z3_LIB_LOCATION libz3 LOCATION)
-message(STATUS "Z3_LIB_LOCATION : ${Z3_LIB_LOCATION}")

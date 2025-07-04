@@ -32,7 +32,8 @@
 using namespace mlir;
 using namespace catalyst;
 
-namespace z3 {
+using namespace z3;
+
 namespace catalyst {
 #define GEN_PASS_DEF_ROUTINGPASS
 #define GEN_PASS_DECL_ROUTINGPASS
@@ -44,20 +45,20 @@ struct RoutingPass : public impl::RoutingPassBase<RoutingPass> {
     void runOnOperation() override {
         llvm::outs() << "Hello\n"; 
         z3::context ctx;
-        // Create a solver instance
-        z3::solver s(ctx);
+        // // Create a solver instance
+        // z3::solver s(ctx);
 
-        // Declare an integer variable 'x'
-        z3::expr x = ctx.int_const("x");
-        // Add assertions to the solver
-        // Assert x > 5
-        s.add(x > 5);
-        // Assert x < 10
-        s.add(x < 10);
+        // // Declare an integer variable 'x'
+        // z3::expr x = ctx.int_const("x");
+        // // Add assertions to the solver
+        // // Assert x > 5
+        // s.add(x > 5);
+        // // Assert x < 10
+        // s.add(x < 10);
 
-        llvm::outs() << "Sat:" << z3::sat << "\n";
-        llvm::outs() << "Unsat:" << z3::unsat << "\n";
-        llvm::outs() << "Unknown:" << z3::unknown << "\n";
+        // llvm::outs() << "Sat:" << z3::sat << "\n";
+        // llvm::outs() << "Unsat:" << z3::unsat << "\n";
+        // llvm::outs() << "Unknown:" << z3::unknown << "\n";
 
 
     }
@@ -70,4 +71,3 @@ std::unique_ptr<Pass> createRoutingPass()
 }
 
 } // namespace catalyst
-} // namespace z3
