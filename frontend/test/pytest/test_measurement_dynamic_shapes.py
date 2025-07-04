@@ -55,8 +55,6 @@ def test_dynamic_sample(capfd):
     out, _ = capfd.readouterr()
     assert out.count("compiling...") == 1
 
-    workflow_dyn_sample.workspace.cleanup()
-
 
 def test_dynamic_counts(capfd):
     """Test that a `counts` program with dynamic shots can be executed correctly and doesn't recompile."""
@@ -87,8 +85,6 @@ def test_dynamic_counts(capfd):
     # Check that compilation only happened once
     out, _ = capfd.readouterr()
     assert out.count("compiling...") == 1
-
-    workflow_dyn_counts.workspace.cleanup()
 
 
 @pytest.mark.parametrize("readout", [qml.expval, qml.var])
@@ -397,8 +393,6 @@ def test_dynamic_shots_and_wires(capfd):
     # Check that compilation only happened once
     out, _ = capfd.readouterr()
     assert out.count("compiling...") == 1
-
-    workflow_dynamic_shots_and_wires.workspace.cleanup()
 
 
 if __name__ == "__main__":
