@@ -32,18 +32,6 @@ namespace catalyst {
 struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> {
     using mlir::OpRewritePattern<mhlo::ScatterOp>::OpRewritePattern;
 
-    void emitIndicesError(mhlo::ScatterOp op) const
-    {
-        op.emitError()
-            << "Indices are not unique and/or not sorted. Note that when using multiple indices "
-            << "with ``jax.numpy.ndarray.at``, the indices must be sorted and unique. "
-            << "These requirements cannot be checked at compile time and must be explicitly "
-            << "provided using the ``jax.numpy.ndarray.at`` method parameters "
-            << "``indices_are_sorted`` and ``unique_indices``. \n"
-            << "Current state - unique: " << op.getUniqueIndices()
-            << ", sorted: " << op.getIndicesAreSorted();
-    }
-
     mlir::LogicalResult onlyOneInputUpdateAndResult(mhlo::ScatterOp op) const
     {
         // Semantics of scatter:
@@ -168,13 +156,6 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
         // These simple semantics are obscured a bit by too many other details.
         //
         // Let's make some simplifying assumptions
-
-        // Add checks for supported cases (assumptions: no update windows dim, unique indices and
-        // sorted indices)
-        if (!op.getUniqueIndices() || !op.getIndicesAreSorted()) {
-            emitIndicesError(op);
-            return failure();
-        }
 
         // size(%result) == size(%update) == size(%input) == 1
         if (failed(this->onlyOneInputUpdateAndResult(op))) {
@@ -304,12 +285,6 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
         std::string funcName = "__catalyst_update_scatter" + std::to_string(opHash);
 
         Location loc = op.getLoc();
-        // Add checks for supported cases (assumptions: no update windows dim, unique indices and
-        // sorted indices)
-        if (!op.getUniqueIndices() || !op.getIndicesAreSorted()) {
-            emitIndicesError(op);
-            return failure();
-        }
 
         // Extract the block responsible for update
         Region &region = op.getUpdateComputation();
