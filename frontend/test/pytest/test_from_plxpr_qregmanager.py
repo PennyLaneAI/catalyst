@@ -35,6 +35,7 @@ Quoted from the object's docstring:
 # pylint: disable=use-implicit-booleaness-not-comparison
 import textwrap
 
+import jax
 import pytest
 from jax.api_util import debug_info as jdb
 from jax.core import set_current_trace, take_current_trace
@@ -165,6 +166,36 @@ class TestQubitValues:
         not_a_new_qubit = qreg_manager[0]
 
         assert not_a_new_qubit is new_qubit
+
+    def test_dynamic_qubit_cached_assertion_failed(self):
+        """Test that extracting different dynamic qubits leads to an assertion"""
+
+        def will_raise_assert(x):
+            qreg = qalloc_p.bind(2)
+            manager = QregManager(qreg)
+            q = manager[x]
+            # Manually setting this internally
+            # in order to trigger failed assertion
+            manager.wire_map[x + 1] = 1
+            q = manager[x]
+
+        with pytest.raises(AssertionError):
+            jax.make_jaxpr(will_raise_assert)(1)
+
+    def test_dynamic_qubit_cached(self):
+        """Test that extracting the same dynamic qubit leads to the correct value
+
+        There is also a lit-test that makes sure that qubits are not re-inserted back
+        in this case.
+        """
+
+        def will_not_raise(x):
+            qreg = qalloc_p.bind(2)
+            manager = QregManager(qreg)
+            out_qubit = _interpret_operation((x,), manager)
+            out_qubit = _interpret_operation((x,), manager)
+
+        jax.make_jaxpr(will_not_raise)(1)
 
     def test_simple_gate(self):
         """Test a simple qubit opertaion"""
