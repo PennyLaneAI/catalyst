@@ -23,15 +23,6 @@ file(GLOB SRC
     RouteCircuit.cpp
 )
 
-#add_compile_options(-Wno-covered-switch-default)
-#Disable warning from json library
-#if(CMAKE_CXX_COMPILER_ID MATCHES ".*Clang")
-set_source_files_properties(
-    RouteCircuit.cpp
-    COMPILE_FLAGS "-Wno-covered-switch-default"
-)
-#endif()
-
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)
 get_property(conversion_libs GLOBAL PROPERTY MLIR_CONVERSION_LIBS)
 set(LIBS
@@ -61,6 +52,8 @@ FetchContent_Declare(z3
         GIT_TAG        z3-4.15.1
         UPDATE_DISCONNECTED 1
 )
+
+set(Z3_BUILD_LIBZ3_SHARED OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(z3)
 
 # Now, conditionally apply the patch after FetchContent has populated the source
@@ -84,9 +77,5 @@ else()
     message(STATUS "Patch file not found: ${Z3_PATCH_FILE}. Skipping Z3 patch application.")
 endif()
 
-set(Z3_LIB_ACTUAL_DIR ${CMAKE_BINARY_DIR}/_deps/z3-build/libz3.dylib)
-message(STATUS "hello: ${Z3_LIB_ACTUAL_DIR}")
-
 include_directories( ${z3_SOURCE_DIR}/src/api)
-# target_link_libraries(${LIBRARY_NAME} PRIVATE libz3)
-target_link_libraries(${LIBRARY_NAME} PRIVATE -Wl,-rpath,libz3)
+target_link_libraries(${LIBRARY_NAME} PRIVATE libz3)
