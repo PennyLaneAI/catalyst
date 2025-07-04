@@ -14,6 +14,8 @@
 
 # RUN: %PYTHON %s | FileCheck %s
 
+# pylint: disable=line-too-long
+
 """Lit tests for the PLxPR to JAXPR with quantum primitives pipeline"""
 
 import pennylane as qml
