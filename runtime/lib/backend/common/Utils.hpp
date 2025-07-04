@@ -101,8 +101,6 @@ static inline auto parse_kwargs(std::string kwargs) -> std::unordered_map<std::s
     kwargs.erase(std::remove_if(kwargs.begin(), kwargs_end_iter,
                                 [](char c) {
                                     switch (c) {
-                                    case '{':
-                                    case '}':
                                     case ' ':
                                     case '\'':
                                         return true;
@@ -111,6 +109,16 @@ static inline auto parse_kwargs(std::string kwargs) -> std::unordered_map<std::s
                                     }
                                 }),
                  kwargs.end());
+
+    // Remove the beginning and ending curly braces
+    RT_ASSERT(kwargs[0] == '{');
+    kwargs.erase(kwargs.begin());
+    RT_ASSERT(kwargs[kwargs.length() - 1] == '}');
+    kwargs.erase(kwargs.end() - 1);
+
+    RT_FAIL_IF(std::find_if(kwargs.begin(), kwargs.end(),
+                            [](char c) { return c == '{' || c == '}'; }) != kwargs.end(),
+               "Nested dictionaries in device kwargs are not supported.");
 
     // constructing map
     std::istringstream iss(kwargs);
