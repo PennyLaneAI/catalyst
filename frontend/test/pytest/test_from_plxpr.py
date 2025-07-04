@@ -569,32 +569,32 @@ class TestCatalystCompareJaxpr:
 class TestAdjointCtrlOps:
     """Test the conversion of adjoint and control operations."""
 
-    @pytest.mark.parametrize("num_adjoints", (1,2,3))
+    @pytest.mark.parametrize("num_adjoints", (1, 2, 3))
     def test_adjoint_op(self, num_adjoints):
         """Test the conversion of a simple adjoint op."""
         qml.capture.enable()
 
-        @qml.qnode(qml.device('lightning.qubit', wires=4), autograph=False)
+        @qml.qnode(qml.device("lightning.qubit", wires=4), autograph=False)
         def c():
             op = qml.S(0)
             for _ in range(num_adjoints):
                 op = qml.adjoint(op)
-            
+
             return qml.state()
 
         plxpr = jax.make_jaxpr(c)()
         catalyst_xpr = from_plxpr(plxpr)()
-        qfunc_xpr = catalyst_xpr.eqns[0].params['call_jaxpr']
+        qfunc_xpr = catalyst_xpr.eqns[0].params["call_jaxpr"]
 
         assert qfunc_xpr.eqns[-6].primitive == qinst_p
         assert qfunc_xpr.eqns[-6].params == {
-            "adjoint" : num_adjoints % 2 == 1,
+            "adjoint": num_adjoints % 2 == 1,
             "ctrl_len": 0,
             "op": "S",
             "qubits_len": 1,
             "params_len": 0,
         }
-        
+
     @pytest.mark.parametrize("inner_adjoint", (True, False))
     @pytest.mark.parametrize("outer_adjoint", (True, False))
     def test_ctrl_op(self, inner_adjoint, outer_adjoint):
@@ -602,12 +602,12 @@ class TestAdjointCtrlOps:
 
         qml.capture.enable()
 
-        @qml.qnode(qml.device('lightning.qubit', wires=4), autograph=False)
+        @qml.qnode(qml.device("lightning.qubit", wires=4), autograph=False)
         def c(x):
             op = qml.RX(x, 0)
             if inner_adjoint:
                 op = qml.adjoint(op)
-            op = qml.ctrl(op, (1,2,3), [0, 1,0])
+            op = qml.ctrl(op, (1, 2, 3), [0, 1, 0])
             if outer_adjoint:
                 op = qml.adjoint(op)
             return qml.state()
@@ -615,11 +615,11 @@ class TestAdjointCtrlOps:
         plxpr = jax.make_jaxpr(c)(0.5)
         catalyst_xpr = from_plxpr(plxpr)(0.5)
 
-        qfunc_xpr = catalyst_xpr.eqns[0].params['call_jaxpr']
-        eqn = qfunc_xpr.eqns[6] # dev, qreg, four allocations
+        qfunc_xpr = catalyst_xpr.eqns[0].params["call_jaxpr"]
+        eqn = qfunc_xpr.eqns[6]  # dev, qreg, four allocations
         assert eqn.primitive == qinst_p
         assert eqn.params == {
-            "adjoint" : (inner_adjoint+outer_adjoint) % 2 == 1,
+            "adjoint": (inner_adjoint + outer_adjoint) % 2 == 1,
             "ctrl_len": 3,
             "op": "RX",
             "qubits_len": 1,
@@ -628,7 +628,7 @@ class TestAdjointCtrlOps:
         assert eqn.invars[0] is qfunc_xpr.eqns[2].outvars[0]
         assert eqn.invars[1] is qfunc_xpr.invars[0]
         for i in range(3):
-            assert eqn.invars[2+i] is qfunc_xpr.eqns[3+i].outvars[0]
+            assert eqn.invars[2 + i] is qfunc_xpr.eqns[3 + i].outvars[0]
         assert eqn.invars[5].val == False
         assert eqn.invars[6].val == True
         assert eqn.invars[7].val == False
@@ -638,19 +638,19 @@ class TestAdjointCtrlOps:
 
         qml.capture.enable()
 
-        @qml.qnode(qml.device('lightning.qubit', wires=3))
+        @qml.qnode(qml.device("lightning.qubit", wires=3))
         def c():
             qml.ctrl(qml.ctrl(qml.S(0), 1), 2, control_values=[False])
             return qml.state()
-        
+
         plxpr = jax.make_jaxpr(c)()
         catalyst_xpr = from_plxpr(plxpr)()
 
-        qfunc_xpr = catalyst_xpr.eqns[0].params['call_jaxpr']
+        qfunc_xpr = catalyst_xpr.eqns[0].params["call_jaxpr"]
         eqn = qfunc_xpr.eqns[5]
         assert eqn.primitive == qinst_p
         assert eqn.params == {
-            "adjoint" : False,
+            "adjoint": False,
             "ctrl_len": 2,
             "op": "S",
             "qubits_len": 1,
@@ -658,9 +658,9 @@ class TestAdjointCtrlOps:
         }
 
         for i in range(3):
-            assert eqn.invars[i] == qfunc_xpr.eqns[2+i].outvars[0]
+            assert eqn.invars[i] == qfunc_xpr.eqns[2 + i].outvars[0]
         assert eqn.invars[3].val == False
-        assert eqn.invars[4].val == True 
+        assert eqn.invars[4].val == True
 
 
 class TestHybridPrograms:

@@ -305,9 +305,19 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
     def interpret_operation(self, op, is_adjoint=False, control_values=(), control_wires=()):
         """Re-bind a pennylane operation as a catalyst instruction."""
         if isinstance(op, qml.ops.Adjoint):
-            return self.interpret_operation(op.base, is_adjoint=not is_adjoint, control_values=control_values, control_wires=control_wires)
+            return self.interpret_operation(
+                op.base,
+                is_adjoint=not is_adjoint,
+                control_values=control_values,
+                control_wires=control_wires,
+            )
         if type(op) in {qml.ops.Controlled, qml.ops.ControlledOp}:
-            return self.interpret_operation(op.base, is_adjoint=is_adjoint, control_values=control_values+tuple(op.control_values), control_wires=control_wires+tuple(op.control_wires))
+            return self.interpret_operation(
+                op.base,
+                is_adjoint=is_adjoint,
+                control_values=control_values + tuple(op.control_values),
+                control_wires=control_wires + tuple(op.control_wires),
+            )
 
         in_qubits = [self.qreg_manager[w] for w in op.wires]
         control_qubits = [self.qreg_manager[w] for w in control_wires]
@@ -319,9 +329,8 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
             ctrl_len=len(control_wires),
             adjoint=is_adjoint,
         )
-        for wire_values, new_wire in zip(tuple(op.wires)+control_wires, out_qubits, strict=True):
+        for wire_values, new_wire in zip(tuple(op.wires) + control_wires, out_qubits, strict=True):
             self.qreg_manager[wire_values] = new_wire
-    
 
         return out_qubits
 
