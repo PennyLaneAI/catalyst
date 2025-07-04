@@ -970,8 +970,7 @@ def trace_quantum_measurements(
 
             # Check if the measurement is supported shot-vector where num_of_total_copies > 1
             if (
-                shots_obj
-                and shots_obj.num_copies > 1
+                shots_obj.has_partitioned_shots
                 and not isinstance(output, qml.measurements.SampleMP)
             ):
                 raise NotImplementedError(
