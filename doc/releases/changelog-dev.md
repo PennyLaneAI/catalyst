@@ -458,6 +458,7 @@
 
 * A new `from_plxpr.QregManager` is created to handle converting plxpr wire index semantics into catalyst qubit value semantics.
   [(#1813)](https://github.com/PennyLaneAI/catalyst/pull/1813)
+  [(#1842)](https://github.com/PennyLaneAI/catalyst/pull/1842)
 
 <h3>Documentation 📝</h3>
 
