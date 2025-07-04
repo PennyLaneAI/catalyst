@@ -44,6 +44,14 @@ target_include_directories(${LIBRARY_NAME} PUBLIC
 
 
 
+# add_compile_options(
+#     -Wno-covered-switch-default
+#     -Wno-deprecated-copy-with-user-provided-copy
+#     -Wno-missing-field-initializers
+#     -Wno-suggest-override
+#     -Wno-error
+# )
+
 include(FetchContent)
 set(Z3_PATCH_FILE "${CMAKE_CURRENT_LIST_DIR}/z3.patch")
 
@@ -56,7 +64,8 @@ FetchContent_Declare(z3
 set(Z3_BUILD_LIBZ3_SHARED OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(z3)
 
-# Now, conditionally apply the patch after FetchContent has populated the source
+# TODO: This doesn't work properly. The first time build fails but patch is applied
+# i.e. error thrown -> patch applied -> build failed
 if(EXISTS "${Z3_PATCH_FILE}")
     message(STATUS "Patch file found: ${Z3_PATCH_FILE}. Applying patch to Z3 source.")
     execute_process(
