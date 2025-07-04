@@ -70,7 +70,7 @@ def _resolve_mcm_config(mcm_config, shots):
         raise ValueError(
             "Cannot use postselect_mode='hw-like' with Catalyst when mcm_method != 'one-shot'."
         )
-    if mcm_config.mcm_method == "one-shot" and shots is None:
+    if mcm_config.mcm_method == "one-shot" and shots == 0:
         raise ValueError(
             "Cannot use the 'one-shot' method for mid-circuit measurements with analytic mode."
         )
