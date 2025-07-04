@@ -1299,7 +1299,7 @@ def trace_function(
 def _get_total_shots(qnode):
     """
     Extract total shots from qnode.
-    If shots is None on the qnode, this method returns 0 (static). 
+    If shots is None on the qnode, this method returns 0 (static).
     This method allows the qnode shots to be either static (python int literals) or dynamic (tracers).
     """
     shots_value = qnode._shots.total_shots  # pylint: disable=protected-access
