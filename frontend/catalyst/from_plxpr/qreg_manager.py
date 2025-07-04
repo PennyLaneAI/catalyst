@@ -140,6 +140,10 @@ class QregManager:
         is if the dynamic wire requested is the only one that is available in
         the wire_map. This allow us to return the wire in the wire map
         without an insertion.
+
+        In the case where there is only one dynamic wire in the cache
+        and we are getting a static wire, we have to re-insert the dynamic
+        wire back to the register.
         """
         if not isinstance(index, int):
             if index in self.wire_map:
