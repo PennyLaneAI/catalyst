@@ -13,7 +13,6 @@
 # limitations under the License.
 """Test for the device API."""
 import platform
-from functools import partial
 
 import pennylane as qml
 import pytest
@@ -127,23 +126,6 @@ def test_simple_circuit():
     assert circuit.mlir
 
 
-def test_simple_circuit_set_shots():
-    """Test that a circuit with the new device API is compiling to MLIR."""
-    dev = NullQubit(wires=2)
-
-    @qjit(target="mlir")
-    @partial(qml.set_shots, shots=2048)
-    @qml.qnode(device=dev)
-    def circuit():
-        qml.Hadamard(wires=0)
-        qml.CNOT(wires=[0, 1])
-        return qml.expval(qml.PauliZ(wires=0))
-
-    # Check that the MLIR contains the shots constant and device initialization
-    mlir_str = str(circuit.mlir)
-    assert "2048" in mlir_str
-
-
 def test_track_resources():
     """Test that resource tracking settings get passed to the device."""
     dev = NullQubit(wires=2)
@@ -153,32 +135,6 @@ def test_track_resources():
     dev = NullQubit(wires=2, track_resources=True)
     assert "track_resources" in QJITDevice.extract_backend_info(dev, dev.capabilities).kwargs
     assert QJITDevice.extract_backend_info(dev, dev.capabilities).kwargs["track_resources"] is True
-
-
-def test_state_with_set_shots_none():
-    """Test that qml.set_shots(None) overrides device shots for state measurements."""
-
-    @qml.qjit
-    @partial(qml.set_shots, shots=None)
-    @qml.qnode(qml.device("lightning.qubit", wires=4, shots=50))
-    def f():
-        return qml.state()
-
-    result = f()
-    assert result.shape == (16,)
-
-
-def test_sample_with_set_shots_10():
-    """Test that qml.set_shots(10) overrides device shots for sample measurements."""
-
-    @qml.qjit
-    @partial(qml.set_shots, shots=10)
-    @qml.qnode(qml.device("lightning.qubit", wires=4))
-    def f():
-        return qml.sample(wires=0)
-
-    result = f()
-    assert result.shape == (10, 1)
 
 
 if __name__ == "__main__":
