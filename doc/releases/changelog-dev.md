@@ -338,6 +338,8 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* `from_plxpr` now supports adjoint and ctrl operations.
+
 * Use `dataclass.replace` to update `ExecutionConfig` and `MCMConfig` rather than mutating properties.
   [(#1814)](https://github.com/PennyLaneAI/catalyst/pull/1814)
 
