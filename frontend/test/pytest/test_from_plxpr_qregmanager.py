@@ -173,11 +173,11 @@ class TestQubitValues:
         def will_raise_assert(x):
             qreg = qalloc_p.bind(2)
             manager = QregManager(qreg)
-            q = manager[x]
+            manager[x]
             # Manually setting this internally
             # in order to trigger failed assertion
             manager.wire_map[x + 1] = 1
-            q = manager[x]
+            manager[x]
 
         with pytest.raises(AssertionError):
             jax.make_jaxpr(will_raise_assert)(1)
@@ -192,8 +192,8 @@ class TestQubitValues:
         def will_not_raise(x):
             qreg = qalloc_p.bind(2)
             manager = QregManager(qreg)
-            out_qubit = _interpret_operation((x,), manager)
-            out_qubit = _interpret_operation((x,), manager)
+            _interpret_operation((x,), manager)
+            _interpret_operation((x,), manager)
 
         jax.make_jaxpr(will_not_raise)(1)
 
