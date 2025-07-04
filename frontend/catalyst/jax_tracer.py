@@ -145,11 +145,6 @@ def _make_execution_config(qnode):
     return execution_config
 
 
-def _get_shot_vector(shots):
-    """Helper function to get shot vector."""
-    return [(shot_copy.shots, shot_copy.copies) for shot_copy in shots.shot_vector]
-
-
 class Function:
     """An object that represents a compiled function.
 
@@ -1014,10 +1009,8 @@ def trace_quantum_measurements(
                         result = jnp.astype(result, jnp.int64)
 
                     reshaped_result = ()
-                    shot_vector = _get_shot_vector(shots_obj)
+                    shot_vector = shots_obj.shot_vector
                     start_idx = 0  # Start index for slicing
-                    # TODO: shots still can only be static in PL frontend
-                    # TODO: Update to dynamic shots
                     has_shot_vector = len(shot_vector) > 1 or any(
                         copies > 1 for _, copies in shot_vector
                     )
