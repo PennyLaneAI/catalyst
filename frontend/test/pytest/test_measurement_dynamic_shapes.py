@@ -19,7 +19,6 @@ This file contains tests for measurement primitives when the return shape is dyn
 
 from functools import partial
 
-import jax.numpy as jnp
 import numpy as np
 import pennylane as qml
 import pytest
