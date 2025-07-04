@@ -26,11 +26,12 @@ import pytest
 import catalyst
 
 
-def test_dynamic_sample():
-    """Test that a `sample` program with dynamic shots can be executed correctly."""
+def test_dynamic_sample(capfd):
+    """Test that a `sample` program with dynamic shots can be executed correctly and doesn't recompile."""
 
     @catalyst.qjit
     def workflow_dyn_sample(shots):
+        print("compiling...")
         device = qml.device("lightning.qubit", wires=1)
 
         @partial(qml.set_shots, shots=shots)
@@ -41,19 +42,27 @@ def test_dynamic_sample():
 
         return circuit()
 
+    # Test with different shot numbers - should only compile once
     res = workflow_dyn_sample(10)
     assert len(res) == 10
     res = workflow_dyn_sample(37)
     assert len(res) == 37
+    res = workflow_dyn_sample(5)
+    assert len(res) == 5
+
+    # Check that compilation only happened once
+    out, _ = capfd.readouterr()
+    assert out.count("compiling...") == 1
 
     workflow_dyn_sample.workspace.cleanup()
 
 
-def test_dynamic_counts():
-    """Test that a `counts` program with dynamic shots can be executed correctly."""
+def test_dynamic_counts(capfd):
+    """Test that a `counts` program with dynamic shots can be executed correctly and doesn't recompile."""
 
     @catalyst.qjit
     def workflow_dyn_counts(shots):
+        print("compiling...")
         device = qml.device("lightning.qubit", wires=1)
 
         @partial(qml.set_shots, shots=shots)
@@ -64,11 +73,19 @@ def test_dynamic_counts():
 
         return circuit()
 
+    # Test with different shot numbers - should only compile once
     res = workflow_dyn_counts(10)
     assert res[1][0] + res[1][1] == 10
 
     res = workflow_dyn_counts(4000)
     assert res[1][0] + res[1][1] == 4000
+
+    res = workflow_dyn_counts(100)
+    assert res[1][0] + res[1][1] == 100
+
+    # Check that compilation only happened once
+    out, _ = capfd.readouterr()
+    assert out.count("compiling...") == 1
 
     workflow_dyn_counts.workspace.cleanup()
 
@@ -322,84 +339,6 @@ def test_wrong_wires_argument(backend, wires):
         AttributeError, match="Number of wires on the device should be a scalar integer."
     ):
         func(wires)
-
-
-def test_dynamic_shots_no_recompilation(capfd):
-    """Test that dynamic shots work correctly and don't trigger recompilation for different shot values."""
-
-    device = qml.device("lightning.qubit", wires=2)
-
-    @catalyst.qjit
-    def workflow_dynamic_shots(num_shots):
-        print("compiling...")
-
-        @partial(qml.set_shots, shots=num_shots)
-        @qml.qnode(device)
-        def circuit():
-            qml.Hadamard(0)
-            qml.CNOT([0, 1])
-            return qml.sample()
-
-        return circuit()
-
-    # Test with different shot numbers - should only compile once
-    result_3 = workflow_dynamic_shots(3)
-    result_5 = workflow_dynamic_shots(5)
-    result_10 = workflow_dynamic_shots(10)
-    result_37 = workflow_dynamic_shots(37)
-
-    # Verify results have correct shapes
-    assert len(result_3) == 3
-    assert result_3.shape == (3, 2)
-
-    assert len(result_5) == 5
-    assert result_5.shape == (5, 2)
-
-    assert len(result_10) == 10
-    assert result_10.shape == (10, 2)
-
-    assert len(result_37) == 37
-    assert result_37.shape == (37, 2)
-
-    # Check that compilation only happened once
-    out, _ = capfd.readouterr()
-    assert out.count("compiling...") == 1
-
-    workflow_dynamic_shots.workspace.cleanup()
-
-
-def test_dynamic_shots_counts_no_recompilation(capfd):
-    """Test that dynamic shots with counts work correctly and don't trigger recompilation."""
-
-    device = qml.device("lightning.qubit", wires=1)
-
-    @catalyst.qjit
-    def workflow_dynamic_counts(num_shots):
-        print("compiling...")
-
-        @partial(qml.set_shots, shots=num_shots)
-        @qml.qnode(device)
-        def circuit():
-            qml.RX(1.5, 0)
-            return qml.counts()
-
-        return circuit()
-
-    # Test with different shot numbers
-    result_10 = workflow_dynamic_counts(10)
-    result_100 = workflow_dynamic_counts(100)
-    result_1000 = workflow_dynamic_counts(1000)
-
-    # Verify results have correct total counts
-    assert result_10[1][0] + result_10[1][1] == 10
-    assert result_100[1][0] + result_100[1][1] == 100
-    assert result_1000[1][0] + result_1000[1][1] == 1000
-
-    # Check that compilation only happened once
-    out, _ = capfd.readouterr()
-    assert out.count("compiling...") == 1
-
-    workflow_dynamic_counts.workspace.cleanup()
 
 
 if __name__ == "__main__":
