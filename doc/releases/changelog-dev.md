@@ -307,6 +307,7 @@
 
 * The device kwarg parsing in runtime has been updated to disallow nested dictionary formats.
   [(#1843)](https://github.com/PennyLaneAI/catalyst/pull/1843)
+  [(#1846)](https://github.com/PennyLaneAI/catalyst/pull/1846)
 
 <h3>Deprecations 👋</h3>
 

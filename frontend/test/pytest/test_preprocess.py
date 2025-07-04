@@ -337,6 +337,7 @@ class TestPreprocessHybridOp:
 
         dev = qml.device("lightning.qubit", wires=2)
 
+        @qjit
         @qml.qnode(dev)
         def circuit(n: int, x: float):
             OtherHadamard(wires=0)

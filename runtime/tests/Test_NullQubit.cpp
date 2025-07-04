@@ -66,6 +66,9 @@ TEST_CASE("Test runtime device kwargs parsing", "[NullQubit]")
     REQUIRE_THROWS_WITH(
         std::make_unique<NullQubit>("{foo : {blah:bar}}"),
         ContainsSubstring("Nested dictionaries in device kwargs are not supported."));
+
+    REQUIRE_THROWS_WITH(std::make_unique<NullQubit>("}{"),
+                        ContainsSubstring("Device kwargs string is malformed."));
 }
 
 TEST_CASE("Test automatic qubit management", "[NullQubit]")
