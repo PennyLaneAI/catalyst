@@ -20,6 +20,7 @@ with control flow, including conditionals, for loops, and while loops.
 # pylint: disable=too-many-lines
 
 import inspect
+from functools import partial
 from typing import Any, Callable, List
 
 import jax
@@ -62,10 +63,7 @@ from catalyst.jax_tracer import (
     trace_quantum_operations,
     unify_convert_result_types,
 )
-from catalyst.tracing.contexts import (
-    EvaluationContext,
-    EvaluationMode,
-)
+from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
 
 
 ## API ##
@@ -1232,7 +1230,9 @@ class Cond(HybridOp):
         for region in op.regions:
             with EvaluationContext.frame_tracing_context(region.trace):
                 new_qreg = AbstractQreg()
-                qreg_in = _input_type_to_tracers(region.trace.new_arg, [new_qreg])[0]
+                qreg_in = _input_type_to_tracers(
+                    partial(region.trace.new_arg, source_info=new_source_info()), [new_qreg]
+                )[0]
                 qreg_out = trace_quantum_operations(
                     region.quantum_tape, device, qreg_in, ctx, region.trace
                 ).actualize()
@@ -1289,7 +1289,9 @@ class ForLoop(HybridOp):
 
         with EvaluationContext.frame_tracing_context(inner_trace):
             new_qreg = AbstractQreg()
-            qreg_in = _input_type_to_tracers(inner_trace.new_arg, [new_qreg])[0]
+            qreg_in = _input_type_to_tracers(
+                partial(inner_trace.new_arg, source_info=new_source_info()), [new_qreg]
+            )[0]
             qrp_out = trace_quantum_operations(inner_tape, device, qreg_in, ctx, inner_trace)
             qreg_out = qrp_out.actualize()
 
@@ -1368,7 +1370,9 @@ class WhileLoop(HybridOp):
                 res_classical_tracers,
                 expansion_strategy=expansion_strategy,
             )
-            _input_type_to_tracers(cond_trace.new_arg, [AbstractQreg()])
+            _input_type_to_tracers(
+                partial(cond_trace.new_arg, source_info=new_source_info()), [AbstractQreg()]
+            )
             cond_jaxpr, _, cond_consts = trace_to_jaxpr(
                 cond_trace, arg_expanded_classical_tracers, res_expanded_classical_tracers
             )
@@ -1379,7 +1383,9 @@ class WhileLoop(HybridOp):
         with EvaluationContext.frame_tracing_context(body_trace):
             region = self.regions[1]
             res_classical_tracers = region.res_classical_tracers
-            qreg_in = _input_type_to_tracers(body_trace.new_arg, [AbstractQreg()])[0]
+            qreg_in = _input_type_to_tracers(
+                partial(body_trace.new_arg, source_info=new_source_info()), [AbstractQreg()]
+            )[0]
             qrp_out = trace_quantum_operations(body_tape, device, qreg_in, ctx, body_trace)
             qreg_out = qrp_out.actualize()
             arg_expanded_tracers = expand_args(

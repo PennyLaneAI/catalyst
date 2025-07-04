@@ -103,10 +103,7 @@ from catalyst.jax_primitives import (
     var_p,
 )
 from catalyst.logging import debug_logger, debug_logger_init
-from catalyst.tracing.contexts import (
-    EvaluationContext,
-    EvaluationMode,
-)
+from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
 from catalyst.utils.exceptions import CompileError
 
 logger = logging.getLogger(__name__)
@@ -229,7 +226,9 @@ def retrace_with_result_types(jaxpr: ClosedJaxpr, target_types: List[ShapedArray
     with_qreg = isinstance(target_types[-1], AbstractQreg)
     with EvaluationContext(EvaluationMode.CLASSICAL_COMPILATION) as ctx:
         with EvaluationContext.frame_tracing_context() as trace:
-            in_tracers = _input_type_to_tracers(trace.new_arg, jaxpr.in_avals)
+            in_tracers = _input_type_to_tracers(
+                partial(trace.new_arg, source_info=new_source_info()), jaxpr.in_avals
+            )
             out_tracers = [
                 trace.to_jaxpr_tracer(t, new_source_info())
                 for t in eval_jaxpr(jaxpr.jaxpr, jaxpr.consts, *in_tracers)
@@ -1342,7 +1341,9 @@ def trace_quantum_function(
             wffa, in_avals, keep_inputs, out_tree_promise = deduce_avals(
                 f, args, kwargs, static_argnums, debug_info
             )
-            in_classical_tracers = _input_type_to_tracers(trace.new_arg, in_avals)
+            in_classical_tracers = _input_type_to_tracers(
+                partial(trace.new_arg, source_info=new_source_info()), in_avals
+            )
             with QueuingManager.stop_recording(), quantum_tape:
                 # Quantum tape transformations happen at the end of tracing
                 in_classical_tracers = [t for t, k in zip(in_classical_tracers, keep_inputs) if k]
