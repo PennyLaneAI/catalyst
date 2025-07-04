@@ -305,6 +305,11 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
     def interpret_operation(self, op):
         """Re-bind a pennylane operation as a catalyst instruction."""
 
+        for index in op.wires:
+            if not isinstance(index, int):
+                self.qreg_manager.insert_all_dangling_qubits()
+                break
+
         in_qubits = [self.qreg_manager[w] for w in op.wires]
         out_qubits = qinst_p.bind(
             *[*in_qubits, *op.data],
