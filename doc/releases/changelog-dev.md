@@ -342,6 +342,9 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* `qml.qjit` now integrates with the new `qml.set_shots` function.
+  [(#1784)](https://github.com/PennyLaneAI/catalyst/pull/1784)
+
 * Use `dataclass.replace` to update `ExecutionConfig` and `MCMConfig` rather than mutating properties.
   [(#1814)](https://github.com/PennyLaneAI/catalyst/pull/1814)
 
