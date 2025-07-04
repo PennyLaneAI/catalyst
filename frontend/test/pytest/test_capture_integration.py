@@ -16,6 +16,7 @@
 
 from functools import partial
 
+import numpy as np
 import jax.numpy as jnp
 import pennylane as qml
 import pytest
@@ -1381,7 +1382,7 @@ class TestCapture:
             qml.RZ(0.4, wires=0)
             return qml.expval(qml.PauliZ(0))
 
-        assert circuit() == capture_result
+        assert np.allclose(circuit(), capture_result)
 
     def test_transform_commute_controlled_workflow(self, backend):
         """Test the integration for a circuit with a 'commute_controlled' transform."""
