@@ -17,6 +17,12 @@
 
 #define DEBUG_TYPE "routecircuit"
 
+#include <iostream>
+#include <string>
+#include <sstream>
+#include <tuple>
+#include <vector>
+
 #include "c++/z3++.h"
 
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -43,30 +49,75 @@ namespace catalyst {
 struct RoutingPass : public impl::RoutingPassBase<RoutingPass> {
     using impl::RoutingPassBase<RoutingPass>::RoutingPassBase;
 
+    std::vector<std::pair<int, int>> parseHardwareGraph(std::string s, std::string delimiter, std::set<int> *physicalQubits) {
+        size_t pos_start = 0, pos_end, delim_len = delimiter.length();
+        std::string token;
+        std::vector< std::pair<int, int> > res;
+
+        while ((pos_end = s.find(delimiter, pos_start)) != std::string::npos) {
+            token = s.substr (pos_start, pos_end - pos_start);
+            pos_start = pos_end + delim_len;
+
+            size_t commaPos = token.find(',');
+            int u = std::stoi(token.substr(1, commaPos));
+            int v = std::stoi(token.substr(commaPos + 1, token.size() - 2));
+            std::pair<int, int> edge = std::make_pair(u,v);
+            (*physicalQubits).insert(u);
+            (*physicalQubits).insert(v);
+            res.push_back (edge);
+        }
+        return res;
+    }
+
+    int countLogicalQubit(Operation *op)
+    {
+        int numQubits = cast<quantum::AllocOp>(op).getNqubitsAttr().value_or(0);
+        assert(numQubits != 0 && "PPM specs with dynamic number of qubits is not implemented");
+        auto parentFuncOp = op->getParentOfType<func::FuncOp>();
+        return numQubits;
+    }
+
     void runOnOperation() override {
-        llvm::outs() << "Hello\n"; 
-        z3::context c;
 
-        // Declare integer variables x and y
-        z3::expr x = c.int_const("x");
-        z3::expr y = c.int_const("y");
+        std::set<int> physicalQubits;
+        std::vector<std::pair<int, int>> couplingMap = parseHardwareGraph(hardwareGraph, ";", &physicalQubits);
+        int numPhysicalQubits = physicalQubits.size();
+        int numLogicalQubits = physicalQubits.size();
 
-        // Create a solver
-        z3::solver s(c);
+        llvm::outs() << "Number of Physical Qubits on the Hardware : " << numPhysicalQubits << "\n";
+        llvm::outs() << "Physical Qubits on the Hardware :\n";
+        for (auto i : physicalQubits) llvm::outs() << i << "\n";
 
-        // Add constraints: x + y = 10 and x > y
-        s.add(x + y == 10);
-        s.add(x > y);
+        llvm::outs() << "Hardware Topology :\n";
+        for (auto i : couplingMap) llvm::outs() << "(" << i.first << "," << i.second << ")\n";
 
-        // std::cout << s.get_model() << std::endl;
+        getOperation()->walk([&](Operation *op) {
+            // Skip top-level container ops if desired
+            if (isa<ModuleOp>(op)) {
+                return;
+            }
 
-        llvm::outs() << "Sat:" << z3::sat << "\n";
-        llvm::outs() << "Unsat:" << z3::unsat << "\n";
-        llvm::outs() << "Unknown:" << z3::unknown << "\n";
+            else if (isa<quantum::AllocOp>(op)) {
+                numLogicalQubits = countLogicalQubit(op);
+                llvm::outs() << "Number of Logical Qubits in the Circuit : " << numLogicalQubits << "\n";
+            }
+        });
 
+        context c;
+
+        expr x = c.bool_const("x");
+        expr y = c.bool_const("y");
+        expr conjecture = (!(x && y)) == (!x || !y);
+        
+        solver s(c);
+        s.add(!conjecture);
+        llvm::outs() <<  "Z3 result " << s.to_smt2() << "\n";
+        llvm::outs() <<  "Z3 check " << s.check() << "\n";
+        llvm::outs() <<  "sat " << z3::sat << "\n";
+        llvm::outs() <<  "unsat " << z3::unsat << "\n";
+        llvm::outs() <<  "unknown " << z3::unknown << "\n";
 
     }
-    // void runOnOperation() final
 };
 
 std::unique_ptr<Pass> createRoutingPass()
