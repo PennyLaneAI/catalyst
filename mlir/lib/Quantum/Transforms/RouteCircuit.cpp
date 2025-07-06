@@ -18,6 +18,7 @@
 #define DEBUG_TYPE "routecircuit"
 
 #include <iostream>
+#include <random>
 #include <string>
 #include <sstream>
 #include <tuple>
@@ -28,6 +29,7 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Analysis/SliceAnalysis.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/Support/Debug.h"
 
@@ -64,19 +66,42 @@ struct RoutingPass : public impl::RoutingPassBase<RoutingPass> {
             std::pair<int, int> edge = std::make_pair(u,v);
             (*physicalQubits).insert(u);
             (*physicalQubits).insert(v);
-            res.push_back (edge);
+            res.push_back(edge);
         }
         return res;
     }
 
-    int countLogicalQubit(Operation *op)
-    {
+    int countLogicalQubit(Operation *op) {
         int numQubits = cast<quantum::AllocOp>(op).getNqubitsAttr().value_or(0);
         assert(numQubits != 0 && "PPM specs with dynamic number of qubits is not implemented");
-        auto parentFuncOp = op->getParentOfType<func::FuncOp>();
         return numQubits;
     }
 
+    std::vector<int> generateRandomInitialMapping(std::set<int> *physicalQubits, int numLogicalQubits) {
+        std::vector<int> tempVec((*physicalQubits).begin(), (*physicalQubits).end());
+        // Random number generator
+        std::random_device rd;
+        std::mt19937 g(rd());
+        std::shuffle(tempVec.begin(), tempVec.end(), g);
+        std::vector<int> randomInitialMapping(tempVec.begin(), tempVec.begin() + numLogicalQubits);
+        return randomInitialMapping;
+    }
+
+    int getRegisterIndexOfOp(Value operand) {
+        Operation *prevOp = operand.getDefiningOp();
+        if (isa<quantum::ExtractOp>(prevOp)) 
+            return (cast<quantum::ExtractOp>(prevOp)).getIdxAttr().value();
+        else {
+            auto iteratePrevOpResults = prevOp->getResults();
+            for (auto iter = 0; iter < iteratePrevOpResults.size() ; iter++ ) {
+                auto tempOperand = cast<mlir::OpResult>(operand);
+                if (iteratePrevOpResults[iter].getResultNumber() == tempOperand.getResultNumber())
+                    return getRegisterIndexOfOp(prevOp->getOperand(iter));
+            }
+            // }
+        }
+    }
+    
     void runOnOperation() override {
 
         std::set<int> physicalQubits;
@@ -91,17 +116,33 @@ struct RoutingPass : public impl::RoutingPassBase<RoutingPass> {
         llvm::outs() << "Hardware Topology :\n";
         for (auto i : couplingMap) llvm::outs() << "(" << i.first << "," << i.second << ")\n";
 
+        std::vector<int> randomInitialMapping;
         getOperation()->walk([&](Operation *op) {
-            // Skip top-level container ops if desired
-            if (isa<ModuleOp>(op)) {
-                return;
-            }
-
-            else if (isa<quantum::AllocOp>(op)) {
+            if (isa<quantum::AllocOp>(op)) {
                 numLogicalQubits = countLogicalQubit(op);
+                randomInitialMapping =  generateRandomInitialMapping(&physicalQubits, numLogicalQubits);
+
                 llvm::outs() << "Number of Logical Qubits in the Circuit : " << numLogicalQubits << "\n";
+                llvm::outs() << "Random Initial Mapping:\n";
+                for (auto i = 0; i < randomInitialMapping.size(); i++)
+                    llvm::outs() << i << "->" << randomInitialMapping[i] << "\n";
+            }
+            else if (isa<quantum::CustomOp>(op)) {
+
+                StringRef gate = cast<quantum::CustomOp>(op).getGateName();
+                int nQubits = cast<quantum::CustomOp>(op).getInQubits().size();
+                llvm::outs() << "Gate name: " << gate << "\n";
+                llvm::outs() << "Gate Qubits: " << nQubits << "\n";
+                llvm::outs() << *op << "\n";
+                
+                for (auto operand : op->getOperands()) {
+                    int temp = getRegisterIndexOfOp(operand);
+                    llvm::outs() << "Qubit " << temp << "->" << randomInitialMapping[temp] << "\n";
+                } 
+                    
             }
         });
+
 
         context c;
 
@@ -111,7 +152,7 @@ struct RoutingPass : public impl::RoutingPassBase<RoutingPass> {
         
         solver s(c);
         s.add(!conjecture);
-        llvm::outs() <<  "Z3 result " << s.to_smt2() << "\n";
+        // llvm::outs() <<  "Z3 result " << s.to_smt2() << "\n";
         llvm::outs() <<  "Z3 check " << s.check() << "\n";
         llvm::outs() <<  "sat " << z3::sat << "\n";
         llvm::outs() <<  "unsat " << z3::unsat << "\n";
