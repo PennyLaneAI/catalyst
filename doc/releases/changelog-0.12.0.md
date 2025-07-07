@@ -39,7 +39,7 @@
 
   * A new function :func:`~.passes.get_ppm_specs` to get the result statistics after a PPR/PPM compilations is available. The statistics is returned in a Python dictionary.
   [(#1794)](https://github.com/PennyLaneAI/catalyst/pull/1794)
-  [(#???)](https://github.com/PennyLaneAI/catalyst/pull/???)
+  [(#1863)](https://github.com/PennyLaneAI/catalyst/pull/1863)
   
   Example below shows an input circuit and corresponding PPM specs.
 
