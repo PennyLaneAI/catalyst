@@ -18,17 +18,18 @@ Conversion from control flow plxpr primitives.
 
 
 import jax
-import jax.core
 from jax.extend.core import ClosedJaxpr
 from jax.interpreters.partial_eval import convert_constvars_jaxpr
+from jax._src.tree_util import tree_flatten
 from pennylane.capture.primitives import cond_prim as plxpr_cond_prim
 from pennylane.capture.primitives import for_loop_prim as plxpr_for_loop_prim
 from pennylane.capture.primitives import while_loop_prim as plxpr_while_loop_prim
+from pennylane.capture.primitives import adjoint_transform_prim as plxpr_adjoint_transform_prim
 
 from catalyst.from_plxpr.from_plxpr import PLxPRToQuantumJaxprInterpreter
 from catalyst.from_plxpr.qreg_manager import QregManager
 from catalyst.jax_extras import jaxpr_pad_consts
-from catalyst.jax_primitives import cond_p, for_p, while_p
+from catalyst.jax_primitives import cond_p, for_p, while_p, adjoint_p
 
 
 @PLxPRToQuantumJaxprInterpreter.register_primitive(plxpr_cond_prim)
@@ -243,6 +244,61 @@ def handle_while_loop(
         body_nconsts=len(consts_body),
         nimplicit=0,
         preserve_dimensions=True,
+    )
+
+    # We assume the last output value is the returned qreg.
+    # Update the current qreg and remove it from the output values.
+    self.qreg_manager.set(outvals.pop())
+
+    # Return only the output values that match the plxpr output values
+    return outvals
+
+
+# pylint: disable=unused-argument
+@PLxPRToQuantumJaxprInterpreter.register_primitive(plxpr_adjoint_transform_prim)
+def handle_adjoint_transform(
+    self,
+    *plxpr_invals,
+    jaxpr,
+    lazy,
+    n_consts,
+):
+    """Handle the conversion from plxpr to Catalyst jaxpr for the for loop primitive"""
+    assert jaxpr is not None
+    consts = plxpr_invals[:n_consts]
+    args = plxpr_invals[n_consts:]
+
+    # Add the iteration start and the qreg to the args
+    self.qreg_manager.insert_all_dangling_qubits()
+    qreg = self.qreg_manager.get()
+
+    jaxpr = ClosedJaxpr(jaxpr, consts)
+
+    def calling_convention(*args_plus_qreg):
+        *args, qreg = args_plus_qreg
+        device = self.device
+        shots = self.shots
+        # `qreg` is the scope argument for the body jaxpr
+        qreg_manager = QregManager(qreg)
+        converter = PLxPRToQuantumJaxprInterpreter(
+            device, shots, qreg_manager, self.subroutine_cache
+        )
+        retvals = converter(jaxpr, *args)
+        qreg_manager.insert_all_dangling_qubits()
+        return *retvals, converter.qreg_manager.get()
+
+    _, args_tree = tree_flatten((consts, args, [qreg]))
+    converted_jaxpr_branch = jax.make_jaxpr(calling_convention)(*consts, *args, qreg).jaxpr
+
+    converted_closed_jaxpr_branch = ClosedJaxpr(convert_constvars_jaxpr(converted_jaxpr_branch), ())
+
+    # Perform the binding
+    outvals = adjoint_p.bind(
+        *consts,
+        *args,
+        qreg,
+        jaxpr=converted_closed_jaxpr_branch,
+        args_tree=args_tree,
     )
 
     # We assume the last output value is the returned qreg.

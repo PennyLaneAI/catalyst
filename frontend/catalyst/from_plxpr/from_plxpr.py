@@ -15,6 +15,7 @@
 This submodule defines a utility for converting plxpr into Catalyst jaxpr.
 """
 # pylint: disable=protected-access
+from copy import copy
 from functools import partial
 from typing import Callable
 
@@ -28,6 +29,7 @@ from jax.extend.linear_util import wrap_init
 from pennylane.capture import PlxprInterpreter, qnode_prim
 from pennylane.capture.expand_transforms import ExpandTransformsInterpreter
 from pennylane.capture.primitives import measure_prim as plxpr_measure_prim
+from pennylane.capture.primitives import ctrl_transform_prim as plxpr_ctrl_transform_prim
 from pennylane.ftqc.primitives import measure_in_basis_prim as plxpr_measure_in_basis_prim
 from pennylane.ops.functions.map_wires import _map_wires_transform as pl_map_wires
 from pennylane.transforms import cancel_inverses as pl_cancel_inverses
@@ -293,13 +295,18 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
     during initialization.
     """
 
-    def __init__(self, device, shots, qreg_manager, cache):
+    def __init__(self, device, shots, qreg_manager, cache, control_wires=(), control_values=()):
         self.device = device
         self.shots = shots
         # TODO: we assume the qreg value passed into a scope is the unique qreg in the scope
         # In other words, we assume no new qreg will be allocated in the scope
         self.qreg_manager = qreg_manager
         self.subroutine_cache = cache
+        self.control_wires = control_wires
+        """Any control wires used for a subroutine."""
+        self.control_values = control_values
+        """Any control values for executing a subroutine."""
+
         super().__init__()
 
     def interpret_operation(self, op, is_adjoint=False, control_values=(), control_wires=()):
@@ -320,6 +327,8 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
             )
 
         in_qubits = [self.qreg_manager[w] for w in op.wires]
+        control_wires = control_wires + self.control_wires
+        control_values = control_values + self.control_values
         control_qubits = [self.qreg_manager[w] for w in control_wires]
         out_qubits = qinst_p.bind(
             *[*in_qubits, *op.data, *control_qubits, *control_values],
@@ -562,6 +571,19 @@ def handle_measure_in_basis(self, angle, wire, plane, reset, postselect):
     self.qreg_manager[wire] = out_wire
 
     return result
+
+
+# pylint: disable=unused-argument
+@PLxPRToQuantumJaxprInterpreter.register_primitive(plxpr_ctrl_transform_prim)
+def handle_ctrl_transform(self, *invals, jaxpr, n_control, control_values, work_wires, n_consts):
+    consts = invals[:n_consts]
+    args = invals[n_consts:-n_control]
+    control_wires = invals[-n_control:]
+
+    unroller = copy(self)
+    unroller.control_wires += tuple(control_wires)
+    unroller.control_values += tuple(control_values)
+    return unroller.eval(jaxpr, consts, *args)
 
 
 # pylint: disable=too-many-positional-arguments

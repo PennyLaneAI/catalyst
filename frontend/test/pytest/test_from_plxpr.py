@@ -23,7 +23,14 @@ import pytest
 import catalyst
 from catalyst import qjit
 from catalyst.from_plxpr import from_plxpr
-from catalyst.jax_primitives import get_call_jaxpr, qinst_p
+from catalyst.jax_primitives import (
+    get_call_jaxpr,
+    qinst_p,
+    qalloc_p,
+    qinsert_p,
+    qextract_p,
+    adjoint_p,
+)
 
 pytestmark = pytest.mark.usefixtures("disable_capture")
 
@@ -566,7 +573,7 @@ class TestCatalystCompareJaxpr:
         assert qml.math.allclose(samples, np.zeros((100, 1)))
 
 
-class TestAdjointCtrlOps:
+class TestAdjointCtrl:
     """Test the conversion of adjoint and control operations."""
 
     @pytest.mark.parametrize("num_adjoints", (1, 2, 3))
@@ -661,6 +668,33 @@ class TestAdjointCtrlOps:
             assert eqn.invars[i] == qfunc_xpr.eqns[2 + i].outvars[0]
         assert eqn.invars[3].val == False
         assert eqn.invars[4].val == True
+
+    def test_adjoint_transform(self):
+        """Test the adjoint transform."""
+
+        qml.capture.enable()
+
+        def f(x):
+            qml.IsingXX(2 * x, wires=(0, 1))
+
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def c(x):
+            qml.adjoint(f)(x)
+            return qml.state()
+
+        plxpr = jax.make_jaxpr(c)(0.5)
+        catalyst_xpr = from_plxpr(plxpr)(0.5)
+        qfunc_xpr = catalyst_xpr.eqns[0].params["call_jaxpr"]
+
+        assert qfunc_xpr.eqns[1].primitive == qalloc_p
+        assert qfunc_xpr.eqns[2].primitive == qextract_p
+        assert qfunc_xpr.eqns[3].primitive == qinst_p
+        assert qfunc_xpr.eqns[4].primitive == qinsert_p
+
+        eqn = qfunc_xpr.eqns[5]
+        assert eqn.primitive == adjoint_p
+        assert eqn.invars[0] == qfunc_xpr.invars[0]
+        assert eqn.invars[1] == qfunc_xpr[5].outvars[0]  # the qreg
 
 
 class TestHybridPrograms:
