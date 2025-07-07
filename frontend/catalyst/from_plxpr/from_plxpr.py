@@ -315,7 +315,7 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         all_static = all_static_requested and all_static_cached
         if same_number_of_wires and not all_static:
             same_wires = all(wire in self.qreg_manager for wire in op.wires)
-            all_dynamic = all(not isinstance(wire, int) for wire in op.wires)
+            all_dynamic = all(not isinstance(wire[0], int) for wire in op.wires)
             keep_cache = same_wires and all_dynamic
 
         if not (all_static or keep_cache):
