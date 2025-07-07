@@ -118,3 +118,67 @@ def test_while_capture():
 
 
 test_while_capture()
+
+
+def test_dynamic_wire():
+    """Test dynamic wires no re-insertion"""
+
+    dev = qml.device("null.qubit", wires=3)
+
+    @qml.qjit(target="mlir")
+    @qml.qnode(dev)
+    def circuit(w1: int):
+        # CHECK: [[QREG:%.+]] = quantum.insert
+        # CHECK-NEXT: [[SCALAR:%.+]] = tensor.extract %arg0
+        # CHECK-NEXT: [[QBIT:%.+]] = quantum.extract [[QREG]][[[SCALAR]]]
+        # CHECK-NEXT: [[QBIT_1:%.+]] = quantum.custom "PauliY"() [[QBIT]]
+        # CHECK-NEXT: [[QBIT_2:%.+]] = quantum.custom "PauliZ"() [[QBIT_1]]
+        qml.X(0)
+        qml.Y(w1)
+        qml.Z(w1)
+        qml.X(0)
+        return qml.state()
+
+    print(circuit.mlir)
+
+
+test_dynamic_wire()
+
+
+def test_dynamic_wire_reinsertion():
+    """Test dynamic wires re-insertion"""
+
+    dev = qml.device("null.qubit", wires=3)
+
+    @qml.qjit(target="mlir")
+    @qml.qnode(dev)
+    def circuit(w1: int):
+
+        # CHECK: [[QUBIT:%.+]] = quantum.custom "PauliX"() %1 : !quantum.bit
+        # CHECK-NEXT: [[QREG:%.+]] = quantum.insert %0[ 0], [[QUBIT]] : !quantum.reg, !quantum.bit
+        # CHECK-NEXT: [[SCALAR:%.+]] = tensor.extract %arg0[] : tensor<i64>
+        # CHECK-NEXT: [[QUBIT_1:%.+]] = quantum.extract [[QREG]][[[SCALAR]]] : !quantum.reg -> !quantum.bit
+        # CHECK-NEXT: [[QUBIT_2:%.+]] = quantum.custom "PauliY"() [[QUBIT_1]]
+        # CHECK-NEXT: [[SCALAR:%.+]] = tensor.extract %arg0[] : tensor<i64>
+        # CHECK-NEXT: [[QREG_1:%.+]] = quantum.insert [[QREG]][[[SCALAR]]], [[QUBIT_2]] : !quantum.reg, !quantum.bit
+        # CHECK-NEXT: [[QUBIT_3:%.+]] = quantum.extract [[QREG_1]][ 0]
+        # CHECK-NEXT: [[QUBIT_4:%.+]] = quantum.custom "PauliX"() [[QUBIT_3]]
+        # CHECK-NEXT: [[QREG_2:%.+]] = quantum.insert [[QREG_1]][ 0], [[QUBIT_4]]
+        # CHECK-NEXT: [[SCALAR:%.+]] = tensor.extract %arg0[] : tensor<i64>
+        # CHECK-NEXT: [[QUBIT_5:%.+]] = quantum.extract [[QREG_2]][[[SCALAR]]] : !quantum.reg -> !quantum.bit
+        # CHECK-NEXT: [[QUBIT_6:%.+]] = quantum.custom "PauliZ"() [[QUBIT_5]]
+        # CHECK-NEXT: [[SCALAR:%.+]] = tensor.extract %arg0[] : tensor<i64>
+        # CHECK-NEXT: [[QREG_3:%.+]] = quantum.insert [[QREG_2]][[[SCALAR]]], [[QUBIT_6]]
+        # CHECK-NEXT: [[QUBIT_7:%.+]] = quantum.extract [[QREG_3]][ 0]
+        # CHECK-NEXT: [[QUBIT_8:%.+]] = quantum.custom "PauliX"() [[QUBIT_7]]
+        qml.X(0)
+        qml.Y(w1)
+        qml.X(0)
+        qml.Z(w1)
+        qml.X(0)
+        return qml.state()
+
+    print(circuit.mlir)
+
+
+test_dynamic_wire_reinsertion()
