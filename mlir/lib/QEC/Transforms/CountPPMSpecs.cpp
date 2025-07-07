@@ -23,6 +23,7 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 
+#include "Catalyst/Utils/CountStaticForloopIterations.h"
 #include "QEC/IR/QECDialect.h"
 #include "Quantum/IR/QuantumOps.h"
 
@@ -74,7 +75,15 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
             saver.save("num_pi" + std::to_string(abs(rotationKind)) + "_gates");
         StringRef maxWeightRotationKindKey =
             saver.save("max_weight_pi" + std::to_string(abs(rotationKind)));
-        (*PPMSpecs)[funcName][numRotationKindKey]++;
+
+        // Handle when PPR op is in a static for loop
+        // Note that countStaicForloopIterations returns -1 when it bails out for
+        // dynamic loop bounds
+        // When bailing out on dynamic, just add one op.
+        int64_t forLoopMultiplier = countStaicForloopIterations(op);
+        int64_t increment = (forLoopMultiplier == -1) ? 1 : forLoopMultiplier;
+
+        (*PPMSpecs)[funcName][numRotationKindKey] += increment;
         (*PPMSpecs)[funcName][maxWeightRotationKindKey] =
             std::max((*PPMSpecs)[funcName][maxWeightRotationKindKey],
                      static_cast<int>(PauliProductAttr.size()));

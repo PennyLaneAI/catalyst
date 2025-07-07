@@ -1,6 +1,7 @@
 add_mlir_library(MLIRCatalystUtils
     CallGraph.cpp
-    TBAAUtils.cpp
-    StaticAllocas.cpp
+    CountStaticForloopIterations.cpp
     EnsureFunctionDeclaration.cpp
+    StaticAllocas.cpp
+    TBAAUtils.cpp
 )
