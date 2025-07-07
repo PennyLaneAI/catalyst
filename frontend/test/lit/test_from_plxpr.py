@@ -128,7 +128,6 @@ def test_dynamic_wire():
     qml.capture.enable()
     dev = qml.device("null.qubit", wires=3)
 
-
     @qml.qjit(target="mlir")
     @qml.qnode(dev)
     def circuit(w1: int):
@@ -190,6 +189,7 @@ def test_dynamic_wire_reinsertion():
 
 test_dynamic_wire_reinsertion()
 
+
 def test_two_dynamic_CNOTs():
     """Test two dynamic CNOTs"""
 
@@ -212,5 +212,6 @@ def test_two_dynamic_CNOTs():
 
     print(circuit.mlir)
     qml.capture.disable()
+
 
 test_two_dynamic_CNOTs()
