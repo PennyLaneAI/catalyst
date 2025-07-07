@@ -693,8 +693,23 @@ class TestAdjointCtrl:
 
         eqn = qfunc_xpr.eqns[5]
         assert eqn.primitive == adjoint_p
-        assert eqn.invars[0] == qfunc_xpr.invars[0]
-        assert eqn.invars[1] == qfunc_xpr[5].outvars[0]  # the qreg
+        assert eqn.invars[0] == qfunc_xpr.invars[0] # x
+        assert eqn.invars[1] == qfunc_xpr[4].outvars[0]  # the qreg
+        assert eqn.outvars[0] == qfunc_xpr[6].invars[0] # also the qreg
+        assert len(eqn.outvars) == 1
+
+        target_xpr = eqn.params['jaxpr']
+        assert target_xpr.eqns[1].primitive == qextract_p
+        assert target_xpr.eqns[2].primitive == qextract_p
+        assert target_xpr.eqns[3].primitive == qextract_p
+        assert target_xpr.eqns[4].primitive == qinst_p
+        assert target_xpr.eqns[4].params == {
+            "adjoint": False,
+            "ctrl_len": 0,
+            "op": "IsingXX",
+            "params_len": 1,
+            "qubits_len": 2,
+        }
 
 
 class TestHybridPrograms:
