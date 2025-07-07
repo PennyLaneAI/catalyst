@@ -125,7 +125,9 @@ test_while_capture()
 def test_dynamic_wire():
     """Test dynamic wires no re-insertion"""
 
+    qml.capture.enable()
     dev = qml.device("null.qubit", wires=3)
+
 
     @qml.qjit(target="mlir")
     @qml.qnode(dev)
@@ -142,6 +144,7 @@ def test_dynamic_wire():
         return qml.state()
 
     print(circuit.mlir)
+    qml.capture.disable()
 
 
 test_dynamic_wire()
@@ -150,6 +153,7 @@ test_dynamic_wire()
 def test_dynamic_wire_reinsertion():
     """Test dynamic wires re-insertion"""
 
+    qml.capture.enable()
     dev = qml.device("null.qubit", wires=3)
 
     @qml.qjit(target="mlir")
@@ -181,6 +185,32 @@ def test_dynamic_wire_reinsertion():
         return qml.state()
 
     print(circuit.mlir)
+    qml.capture.disable()
 
 
 test_dynamic_wire_reinsertion()
+
+def test_two_dynamic_CNOTs():
+    """Test two dynamic CNOTs"""
+
+    dev = qml.device("null.qubit", wires=3)
+
+    qml.capture.enable()
+
+    @qml.qjit(target="mlir")
+    @qml.qnode(dev)
+    def circuit(w1: int, w2: int):
+        # CHECK: [[SCALAR:%.+]] = tensor.extract %arg0
+        # CHECK-NEXT: [[QUBIT_0:%.+]] = quantum.extract %0[[[SCALAR]]]
+        # CHECK-NEXT: [[SCALAR_2:%.+]] = tensor.extract %arg1
+        # CHECK-NEXT: [[QUBIT_1:%.+]] = quantum.extract %0[[[SCALAR_2]]]
+        # CHECK-NEXT: [[QUBITS:%.+]]:2 = quantum.custom "CNOT"() [[QUBIT_0]], [[QUBIT_1]]
+        # CHECK-NEXT: quantum.custom "CNOT"() [[QUBITS]]#0, [[QUBITS]]#1
+        qml.CNOT(wires=[w1, w2])
+        qml.CNOT(wires=[w1, w2])
+        return qml.state()
+
+    print(circuit.mlir)
+    qml.capture.disable()
+
+test_two_dynamic_CNOTs()
