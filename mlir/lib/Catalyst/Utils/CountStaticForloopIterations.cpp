@@ -36,14 +36,15 @@ static int64_t getIntFromArithConstantOp(arith::ConstantOp op)
 
 // Given an op in a for loop body with a static number of start, end and step,
 // compute the number of iterations that will be executed by the for loop.
-// Returns -1 if any of the above for loop information is not static, or if the
-// input operation is not inside any for loop operations.
+// Returns -1 if any of the above for loop information is not static.
+//
+// Note: if the input op is not inside any for loop operations,
+// this method returns 1, since there would be just one "iteration".
 int64_t countStaicForloopIterations(Operation *op)
 {
     assert(!isa<scf::ForOp>(op));
 
     int64_t count = 1;
-    bool changed = false;
 
     Operation *parent = op->getParentOp();
     while (parent) {
@@ -71,17 +72,11 @@ int64_t countStaicForloopIterations(Operation *op)
             }
             int64_t s = getIntFromArithConstantOp(cast<arith::ConstantOp>(stepOp));
 
-            int64_t numIters = getNumIterations(l, u, s);
-            count *= numIters;
-            changed = true;
+            count *= getNumIterations(l, u, s);
         }
         parent = parent->getParentOp();
     }
 
-    if (!changed) {
-        // Never encountered a for loop
-        return -1;
-    }
     return count;
 }
 

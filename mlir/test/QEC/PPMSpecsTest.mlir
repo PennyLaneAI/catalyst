@@ -375,3 +375,19 @@ func.func public @static_for_loop_nested(%arg0: !quantum.bit) {
 
     return
 }
+
+// -----
+
+func.func public @dynamic_for_loop_error(%arg0: !quantum.bit, %c: index) {
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+
+    %q = scf.for %iter = %c0 to %c step %c1 iter_args(%arg1 = %arg0) -> (!quantum.bit) {
+      %out_qubits = qec.ppr ["Z"](4) %arg1 : !quantum.bit
+      // expected-error@above {{PPM statistics is not available when there are dynamically sized for loops.}}
+      %mres, %out_qubits_1 = qec.ppm ["Z"] %out_qubits : !quantum.bit
+      scf.yield %out_qubits_1 : !quantum.bit
+    }
+
+    return
+}

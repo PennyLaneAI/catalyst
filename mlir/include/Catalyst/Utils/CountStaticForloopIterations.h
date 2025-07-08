@@ -20,8 +20,10 @@ namespace catalyst {
 
 // Given an op in a for loop body with a static number of start, end and step,
 // compute the number of iterations that will be executed by the for loop.
-// Returns -1 if any of the above for loop information is not static, or if the
-// input operation is not inside any for loop operations.
+// Returns -1 if any of the above for loop information is not static.
+//
+// Note: if the input op is not inside any for loop operations,
+// this method returns 1, since there would be just one "iteration".
 int64_t countStaicForloopIterations(Operation *op);
 
 } // namespace catalyst
