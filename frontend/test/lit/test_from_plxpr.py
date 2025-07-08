@@ -201,9 +201,9 @@ def test_two_dynamic_CNOTs():
     @qml.qnode(dev)
     def circuit(w1: int, w2: int):
         # CHECK: [[SCALAR:%.+]] = tensor.extract %arg0
-        # CHECK-NEXT: [[QUBIT_0:%.+]] = quantum.extract %0[[[SCALAR]]]
+        # CHECK-NEXT: [[QUBIT_0:%.+]] = quantum.extract {{%.+}}[[[SCALAR]]]
         # CHECK-NEXT: [[SCALAR_2:%.+]] = tensor.extract %arg1
-        # CHECK-NEXT: [[QUBIT_1:%.+]] = quantum.extract %0[[[SCALAR_2]]]
+        # CHECK-NEXT: [[QUBIT_1:%.+]] = quantum.extract {{%.+}}[[[SCALAR_2]]]
         # CHECK-NEXT: [[QUBITS:%.+]]:2 = quantum.custom "CNOT"() [[QUBIT_0]], [[QUBIT_1]]
         # CHECK-NEXT: quantum.custom "CNOT"() [[QUBITS]]#0, [[QUBITS]]#1
         qml.CNOT(wires=[w1, w2])
@@ -315,13 +315,13 @@ def test_multi_qubit_gates_on_different_dynamic_wires():
     @qml.qnode(dev)
     def circuit(w1: int, w2: int, w3: int):
         # CHECK: [[SCALAR:%.+]] = tensor.extract %arg0
-        # CHECK-NEXT: [[QUBIT_0:%.+]] = quantum.extract %0[[[SCALAR]]]
+        # CHECK-NEXT: [[QUBIT_0:%.+]] = quantum.extract {{%.+}}[[[SCALAR]]]
         # CHECK-NEXT: [[SCALAR_2:%.+]] = tensor.extract %arg1
-        # CHECK-NEXT: [[QUBIT_1:%.+]] = quantum.extract %0[[[SCALAR_2]]]
+        # CHECK-NEXT: [[QUBIT_1:%.+]] = quantum.extract {{%.+}}[[[SCALAR_2]]]
         # CHECK-NEXT: [[QUBITS:%.+]]:2 = quantum.custom "CNOT"() [[QUBIT_0]], [[QUBIT_1]]
         qml.CNOT(wires=[w1, w2])
         # CHECK-NEXT: [[SCALAR:%.+]] = tensor.extract %arg0
-        # CHECK-NEXT: [[QREG:%.+]] = quantum.insert %0[[[SCALAR]]]
+        # CHECK-NEXT: [[QREG:%.+]] = quantum.insert {{%.+}}[[[SCALAR]]]
         # CHECK-NEXT: [[SCALAR_1:%.+]] = tensor.extract %arg1
         # CHECK-NEXT: [[QREG_1:%.+]] = quantum.insert [[QREG]][[[SCALAR_1]]]
         # CHECK-NEXT: [[SCALAR_1:%.+]] = tensor.extract %arg1
