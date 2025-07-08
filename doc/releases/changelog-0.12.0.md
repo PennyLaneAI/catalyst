@@ -2,49 +2,86 @@
 
 <h3>New features since last release</h3>
 
-* Added integration with PennyLane's experimental python compiler based on xDSL.
-  This allows developers and users to write xDSL transformations that can be used with Catalyst.
-  [(#1715)](https://github.com/PennyLaneAI/catalyst/pull/1715)
-
-* A new compilation pass called :func:`~.passes.ppr_to_ppm` has been added to Catalyst
-  to decompose Pauli product rotations (PPRs), :math:`\exp(-iP_{\{x, y, z\}} \theta)`, into
-  Pauli product measurements (PPMs). Non-Clifford PPR (:math:`\theta = \tfrac{\pi}{8}`) requires
-  the consumption of a magic state, while Clifford PPR (:math:`\theta = \tfrac{\pi}{4}`) will not.
-  The methods are implemented as described in [arXiv:1808.02892](https://arxiv.org/abs/1808.02892v3).
-  [(#1664)](https://github.com/PennyLaneAI/catalyst/pull/1664)
-
-  The new compilation pass can be accessed in the frontend from the :mod:`~.passes` module:
-  * :func:`~.passes.ppr_to_ppm`: Decomposes all PPRs into PPMs
-  (except PPR (:math:`\theta = \tfrac{\pi}{2}`)).
-
-  Or via the Catalyst CLI as two separate passes:
-  * `decompose_clifford_ppr`: Decompose Clifford PPR (:math:`\theta = \tfrac{\pi}{4}`)
-  rotations into PPMs.
-  * `decompose_non_clifford_ppr`: Decompose non-Cliford PPR (:math:`\theta = \tfrac{\pi}{8}`)
-  into PPMs using a magic state.
-
-* A new compilation pass called :func:`~.passes.ppm_compilation` has been added to Catalyst to 
-  transform Clifford+T gates into Pauli Product Measurements (PPMs). This high-level pass simplifies
-  circuit transformation and optimization by combining multiple sub-passes into a single step.
+* A new compilation pass called :func:`~.passes.ppm_compilation` has been added to Catalyst to
+  transform Clifford+T gates into Pauli Product Measurements (PPMs) using just one transform.
   [(#1750)](https://github.com/PennyLaneAI/catalyst/pull/1750)
   
-  The sub-passes that make up the :func:`~.passes.ppm_compilation` pass are:
-  * :func:`~.passes.to_ppr`: Converts gates into Pauli Product Rotations (PPRs).
-  * :func:`~.passes.commute_ppr`: Commutes PPRs past non-Clifford PPRs.
-  * :func:`~.passes.merge_ppr_ppm`: Merges Clifford PPRs into PPMs.
-  * :func:`~.passes.ppr_to_ppm`: Decomposes non-Clifford and Clifford PPRs into PPMs.
+  Based on [arXiv:1808.02892](https://arxiv.org/abs/1808.02892v3), this new compilation pass 
+  simplifies circuit transformations and optimizations by combining multiple sub-passes into a 
+  single compilation pass, where Clifford+T gates are compiled down to Pauli product rotations 
+  (PPRs, :math:`\exp(-iP_{\{x, y, z\}} \theta)`) and PPMs:
 
-  Use this pass via the :func:`~.passes.ppm_compilation` decorator to compile circuits 
-  in a single pipeline.
-
-  * A new function :func:`~.passes.get_ppm_specs` to get the result statistics after a PPR/PPM compilations is available. The statistics is returned in a Python dictionary.
-  [(#1794)](https://github.com/PennyLaneAI/catalyst/pull/1794). 
-  
-  Example below shows an input circuit and corresponding PPM specs.
+  * :func:`~.passes.to_ppr`: converts Clifford+T gates into PPRs.
+  * :func:`~.passes.commute_ppr`: commutes PPRs past non-Clifford PPRs.
+  * :func:`~.passes.merge_ppr_ppm`: merges Clifford PPRs into PPMs.
+  * :func:`~.passes.ppr_to_ppm`: decomposes both non-Clifford PPRs 
+  (:math:`\theta = \tfrac{\pi}{8}`), consuming a magic state in the process, and Clifford PPRs 
+  (:math:`\theta = \tfrac{\pi}{4}`) into PPMs.
+  [(#1664)](https://github.com/PennyLaneAI/catalyst/pull/1664)
 
   ```python
   import pennylane as qml
-  from catalyst import qjit, measure
+  from catalyst.passes import ppm_compilation
+
+  pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+
+  @qml.qjit(pipelines=pipeline, target="mlir")
+  @ppm_compilation(decompose_method="clifford-corrected", avoid_y_measure=True, max_pauli_size=2)
+  @qml.qnode(qml.device("null.qubit", wires=2))
+  def circuit():
+      qml.CNOT([0, 1])
+      qml.CNOT([1, 0])
+      qml.adjoint(qml.T)(0)
+      qml.T(1)
+      return catalyst.measure(0), catalyst.measure(1)
+  ```
+
+  ```pycon
+  >>> print(circuit.mlir_opt)
+  ...
+  %m, %out:3 = qec.ppm ["Z", "Z", "Z"] %1, %2, %4 : !quantum.bit, !quantum.bit, !quantum.bit
+  %m_0, %out_1:2 = qec.ppm ["Z", "Y"] %3, %out#2 : !quantum.bit, !quantum.bit
+  %m_2, %out_3 = qec.ppm ["X"] %out_1#1 : !quantum.bit
+  %m_4, %out_5 = qec.select.ppm(%m, ["X"], ["Z"]) %out_1#0 : !quantum.bit
+  %5 = arith.xori %m_0, %m_2 : i1
+  %6:2 = qec.ppr ["Z", "Z"](2) %out#0, %out#1 cond(%5) : !quantum.bit, !quantum.bit
+  quantum.dealloc_qb %out_5 : !quantum.bit
+  quantum.dealloc_qb %out_3 : !quantum.bit
+  %7 = quantum.alloc_qb : !quantum.bit
+  %8 = qec.fabricate  magic_conj : !quantum.bit
+  %m_6, %out_7:2 = qec.ppm ["Z", "Z"] %6#1, %8 : !quantum.bit, !quantum.bit
+  %m_8, %out_9:2 = qec.ppm ["Z", "Y"] %7, %out_7#1 : !quantum.bit, !quantum.bit
+  %m_10, %out_11 = qec.ppm ["X"] %out_9#1 : !quantum.bit
+  %m_12, %out_13 = qec.select.ppm(%m_6, ["X"], ["Z"]) %out_9#0 : !quantum.bit
+  %9 = arith.xori %m_8, %m_10 : i1
+  %10 = qec.ppr ["Z"](2) %out_7#0 cond(%9) : !quantum.bit
+  quantum.dealloc_qb %out_13 : !quantum.bit
+  quantum.dealloc_qb %out_11 : !quantum.bit
+  %m_14, %out_15:2 = qec.ppm ["Z", "Z"] %6#0, %10 : !quantum.bit, !quantum.bit
+  %from_elements = tensor.from_elements %m_14 : tensor<i1>
+  %m_16, %out_17 = qec.ppm ["Z"] %out_15#1 : !quantum.bit
+  ...
+  ```
+
+* A new function called :func:`~.passes.get_ppm_specs` has been added for acquiring 
+  statistics after PPM compilation.
+  [(#1794)](https://github.com/PennyLaneAI/catalyst/pull/1794). 
+  
+  After compiling a workflow with any combination of :func:`~.passes.to_ppr`, 
+  :func:`~.passes.commute_ppr`, :func:`~.passes.merge_ppr_ppm`, :func:`~.passes.ppr_to_ppm`, or
+  :func:`~.passes.ppm_compilation`, use :func:`~.passes.get_ppm_specs` to track useful statistics of
+  the compiled workflow, including: 
+
+  * `num_pi4_gates` : number of Clifford PPRs
+  * `num_pi8_gates` : number of non-Clifford PPRs
+  * `num_pi2_gates` : number of classical PPRs
+  * `max_weight_pi4` : maximum weight of Clifford PPRs
+  * `max_weight_pi8` : maximum weight of non-Clifford PPRs
+  * `max_weight_pi2` : maximum weight of classical PPRs
+  * `num_logical_qubits` : number of logical qubits
+  * `num_of_ppm` : number of PPMs
+
+  ```python
   from catalyst.passes import get_ppm_specs, to_ppr, merge_ppr_ppm, commute_ppr
 
   pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
@@ -75,13 +112,11 @@
           return measure(0), measure(1)
 
       return f(), g()
-
-  ppm_specs = get_ppm_specs(test_convert_clifford_to_ppr_workflow)
-  print(ppm_specs)
-
   ```
-  Output:
+
   ```pycon
+  >>> ppm_specs = get_ppm_specs(test_convert_clifford_to_ppr_workflow)
+  >>> print(ppm_specs)
   {
   'f_0': {'max_weight_pi8': 1, 'num_logical_qubits': 2, 'num_of_ppm': 2, 'num_pi8_gates': 1}, 
   'g_0': {'max_weight_pi4': 2, 'max_weight_pi8': 1, 'num_logical_qubits': 2, 'num_of_ppm': 2, 'num_pi4_gates': 3, 'num_pi8_gates': 2}
@@ -341,6 +376,10 @@
   [(#1840)](https://github.com/PennyLaneAI/catalyst/pull/1840)
 
 <h3>Internal changes ⚙️</h3>
+
+* Added integration with PennyLane's experimental python compiler based on xDSL.
+  This allows developers and users to write xDSL transformations that can be used with Catalyst.
+  [(#1715)](https://github.com/PennyLaneAI/catalyst/pull/1715)
 
 * `qml.qjit` now integrates with the new `qml.set_shots` function.
   [(#1784)](https://github.com/PennyLaneAI/catalyst/pull/1784)
