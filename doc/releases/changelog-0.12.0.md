@@ -478,7 +478,7 @@
 
 This release contains contributions from (in alphabetical order):
 
-Runor Agbaire
+Runor Agbaire,
 Joey Carter,
 Sengthai Heng,
 David Ittah,
@@ -488,5 +488,6 @@ Mehrdad Malekmohammadi,
 Anton Naim Ibrahim,
 Erick Ochoa Lopez,
 Ritu Thombre,
+Raul Torres,
 Paul Haochen Wang,
 Jake Zaia.
