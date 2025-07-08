@@ -58,7 +58,7 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
         return success();
     }
 
-    LogicalResult countPPM(Operation *op,
+    LogicalResult countPPM(qec::PPMeasurementOp op,
                            llvm::DenseMap<StringRef, llvm::DenseMap<StringRef, int>> *PPMSpecs)
     {
         auto parentFuncOp = op->getParentOfType<func::FuncOp>();
@@ -76,13 +76,12 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
         return success();
     }
 
-    LogicalResult countPPR(Operation *op,
+    LogicalResult countPPR(qec::PPRotationOp op,
                            llvm::DenseMap<StringRef, llvm::DenseMap<StringRef, int>> *PPMSpecs,
                            llvm::BumpPtrAllocator *stringAllocator)
     {
-        int16_t rotationKind =
-            cast<qec::PPRotationOp>(op).getRotationKindAttr().getValue().getZExtValue();
-        auto PauliProductAttr = cast<qec::PPRotationOp>(op).getPauliProductAttr();
+        int16_t rotationKind = op.getRotationKindAttr().getValue().getZExtValue();
+        auto PauliProductAttr = op.getPauliProductAttr();
         auto parentFuncOp = op->getParentOfType<func::FuncOp>();
         StringRef funcName = parentFuncOp.getName();
         llvm::StringSaver saver(*stringAllocator);
@@ -122,14 +121,14 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
             }
 
             else if (isa<qec::PPMeasurementOp>(op)) {
-                if (failed(countPPM(op, &PPMSpecs))) {
+                if (failed(countPPM(cast<qec::PPMeasurementOp>(op), &PPMSpecs))) {
                     return WalkResult::interrupt();
                 }
                 return WalkResult::advance();
             }
 
             else if (isa<qec::PPRotationOp>(op)) {
-                if (failed(countPPR(op, &PPMSpecs, &stringAllocator))) {
+                if (failed(countPPR(cast<qec::PPRotationOp>(op), &PPMSpecs, &stringAllocator))) {
                     return WalkResult::interrupt();
                 }
                 return WalkResult::advance();
