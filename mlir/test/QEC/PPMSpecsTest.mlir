@@ -391,3 +391,33 @@ func.func public @dynamic_for_loop_error(%arg0: !quantum.bit, %c: index) {
 
     return
 }
+
+// -----
+
+func.func public @cond_error(%arg0: !quantum.bit, %b: i1) {
+    %out_qubits = scf.if %b -> !quantum.bit {
+        %out_qubits_t = qec.ppr ["Z"](4) %arg0 : !quantum.bit
+        // expected-error@above {{PPM statistics is not available when there are conditionals or while loops.}}
+        scf.yield %out_qubits_t : !quantum.bit
+    } else {
+        scf.yield %arg0 : !quantum.bit
+    }
+
+    return
+}
+
+// -----
+
+func.func public @while_error(%arg0: !quantum.bit, %b: i1) {
+
+    %q = scf.while (%in_qubit = %arg0) : (!quantum.bit) -> (!quantum.bit) {
+        scf.condition(%b) %in_qubit: !quantum.bit
+    } do {
+        ^bb0(%in_qubit: !quantum.bit):
+        %out_qubits = qec.ppr ["Z"](4) %in_qubit : !quantum.bit
+        // expected-error@above {{PPM statistics is not available when there are conditionals or while loops.}}
+        scf.yield %out_qubits : !quantum.bit
+    }
+
+    return
+}

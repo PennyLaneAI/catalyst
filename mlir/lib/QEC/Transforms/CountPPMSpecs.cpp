@@ -23,7 +23,7 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 
-#include "Catalyst/Utils/CountStaticForloopIterations.h"
+#include "Catalyst/Utils/SCFUtils.h"
 #include "QEC/IR/QECDialect.h"
 #include "Quantum/IR/QuantumOps.h"
 
@@ -61,6 +61,11 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
     LogicalResult countPPM(qec::PPMeasurementOp op,
                            llvm::DenseMap<StringRef, llvm::DenseMap<StringRef, int>> *PPMSpecs)
     {
+        if (isOpInIfOp(op) || isOpInWhileOp(op)) {
+            return op->emitOpError(
+                "PPM statistics is not available when there are conditionals or while loops.");
+        }
+
         auto parentFuncOp = op->getParentOfType<func::FuncOp>();
 
         // Handle when PPM op is in a static for loop
@@ -80,6 +85,11 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
                            llvm::DenseMap<StringRef, llvm::DenseMap<StringRef, int>> *PPMSpecs,
                            llvm::BumpPtrAllocator *stringAllocator)
     {
+        if (isOpInIfOp(op) || isOpInWhileOp(op)) {
+            return op->emitOpError(
+                "PPM statistics is not available when there are conditionals or while loops.");
+        }
+
         int16_t rotationKind = op.getRotationKindAttr().getValue().getZExtValue();
         auto PauliProductAttr = op.getPauliProductAttr();
         auto parentFuncOp = op->getParentOfType<func::FuncOp>();

@@ -18,6 +18,12 @@ using namespace mlir;
 
 namespace catalyst {
 
+// Returns true if an operation is nested in a scf.if operation at any depth.
+bool isOpInIfOp(Operation *op);
+
+// Returns true if an operation is nested in a scf.while operation at any depth.
+bool isOpInWhileOp(Operation *op);
+
 // Given an op in a for loop body with a static number of start, end and step,
 // compute the number of iterations that will be executed by the for loop.
 // Returns -1 if any of the above for loop information is not static.

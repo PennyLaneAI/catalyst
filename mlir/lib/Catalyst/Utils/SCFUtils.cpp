@@ -34,6 +34,32 @@ static int64_t getIntFromArithConstantOp(arith::ConstantOp op)
     return cast<IntegerAttr>(op.getValue()).getValue().getSExtValue();
 }
 
+// Returns true if an operation is nested in a scf.if operation at any depth.
+bool isOpInIfOp(Operation *op)
+{
+    Operation *parent = op->getParentOp();
+    while (parent) {
+        if (isa<scf::IfOp>(parent)) {
+            return true;
+        }
+        parent = parent->getParentOp();
+    }
+    return false;
+}
+
+// Returns true if an operation is nested in a scf.while operation at any depth.
+bool isOpInWhileOp(Operation *op)
+{
+    Operation *parent = op->getParentOp();
+    while (parent) {
+        if (isa<scf::WhileOp>(parent)) {
+            return true;
+        }
+        parent = parent->getParentOp();
+    }
+    return false;
+}
+
 // Given an op in a for loop body with a static number of start, end and step,
 // compute the number of iterations that will be executed by the for loop.
 // Returns -1 if any of the above for loop information is not static.
