@@ -69,10 +69,10 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
         auto parentFuncOp = op->getParentOfType<func::FuncOp>();
 
         // Handle when PPM op is in a static for loop
-        // Note that countStaicForloopIterations returns -1 when it bails out for
+        // Note that countStaticForloopIterations returns -1 when it bails out for
         // dynamic loop bounds
         // When bailing out on dynamic, just error.
-        int64_t forLoopMultiplier = countStaicForloopIterations(op);
+        int64_t forLoopMultiplier = countStaticForloopIterations(op);
         if (forLoopMultiplier == -1) {
             return op->emitOpError(
                 "PPM statistics is not available when there are dynamically sized for loops.");
@@ -101,10 +101,10 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
             saver.save("max_weight_pi" + std::to_string(abs(rotationKind)));
 
         // Handle when PPR op is in a static for loop
-        // Note that countStaicForloopIterations returns -1 when it bails out for
+        // Note that countStaticForloopIterations returns -1 when it bails out for
         // dynamic loop bounds
         // When bailing out on dynamic, just error.
-        int64_t forLoopMultiplier = countStaicForloopIterations(op);
+        int64_t forLoopMultiplier = countStaticForloopIterations(op);
         if (forLoopMultiplier == -1) {
             return op->emitOpError(
                 "PPM statistics is not available when there are dynamically sized for loops.");

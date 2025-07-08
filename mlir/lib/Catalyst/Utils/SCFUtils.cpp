@@ -67,7 +67,7 @@ bool isOpInWhileOp(Operation *op)
 //
 // Note: if the input op is not inside any for loop operations,
 // this method returns 1, since there would be just one "iteration".
-int64_t countStaicForloopIterations(Operation *op)
+int64_t countStaticForloopIterations(Operation *op)
 {
     assert(!isa<scf::ForOp>(op));
 
