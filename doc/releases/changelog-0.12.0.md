@@ -123,10 +123,10 @@
   }
   ```
 
-* Support for :class:`qml.Snapshot <pennylane.Snapshot>` to capture quantum states at any 
-  point in a circuit has been added to Catalyst [(#1741)](https://github.com/PennyLaneAI/catalyst/pull/1741).
-  For example, the code below is capturing 
-  two snapshot states:
+* Catalyst now supports `qml.Snapshot`, which captures quantum states at any point in a circuit.
+  [(#1741)](https://github.com/PennyLaneAI/catalyst/pull/1741).
+
+  For example, the code below is capturing two snapshot'd states, all within a qjit'd circuit:
 
   ``` python
   NUM_QUBITS = 2
@@ -149,10 +149,6 @@
   print(results)
   ```
 
-  The output would be a tuple of two elements: 
-    * Array of snapshot states
-    * Tuple of measurements being returned
-
   ```pycon
   >>> print(results)
   ([Array([1.+0.j, 0.+0.j, 0.+0.j, 0.+0.j], dtype=complex128), 
@@ -160,11 +156,9 @@
   Array([0.25, 0.25, 0.25, 0.25], dtype=float64))
   ```
 
-* Catalyst now supports automatic qubit management.
+* Catalyst now supports automatic qubit management, meaning that the number of wires does not need 
+  to be speficied during device initialization.
   [(#1788)](https://github.com/PennyLaneAI/catalyst/pull/1788)
-
-  The number of wires does not need to be speficied during device initialization,
-  and instead will be automatically managed by the Catalyst Runtime.
 
   ```python
   @qjit
@@ -182,15 +176,6 @@
   ```pycon
   [0. 1. 0. 0. 0. 0. 0. 0.]
   ```
-
-  In this example, the number of wires is not specified at device initialization.
-  When we encounter an X gate on `wires=2`, catalyst automatically expands the size
-  of the qubit register to include the requested wire index.
-  Here, the register will contain (at least) 3 qubits after the X operation.
-  As a result, we can see the QNode returning the probabilities for the state |001>,
-  meaning 3 wires were allocated in total.
-
-  This feature can be turned on by omitting the `wires` argument to the device.
 
 <h3>Improvements 🛠</h3>
 
