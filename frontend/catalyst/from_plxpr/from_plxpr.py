@@ -302,9 +302,9 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         self.subroutine_cache = cache
         super().__init__()
 
-    def interpret_operation(self, op):
-        """Re-bind a pennylane operation as a catalyst instruction."""
-
+    def _insert_dynamic_wires(self, op):
+        """Update with insertion and extraction in the
+        presence of dynamic wires"""
         keep_cache = False
 
         same_number_of_wires = len(op.wires) == len(self.qreg_manager)
@@ -314,12 +314,17 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         all_dynamic = False
         all_static = all_static_requested and all_static_cached
         if same_number_of_wires and not all_static:
-            same_wires = all(wire in self.qreg_manager.wire_map.keys() for wire in op.wires)
+            wires_in_cache = all(wire in self.qreg_manager.wire_map.keys() for wire in op.wires)
             all_dynamic = all(not isinstance(wire, int) for wire in op.wires)
-            keep_cache = same_wires and all_dynamic
+            keep_cache = wires_in_cache and all_dynamic
 
         if not (all_static or keep_cache):
             self.qreg_manager.insert_all_dangling_qubits()
+
+    def interpret_operation(self, op):
+        """Re-bind a pennylane operation as a catalyst instruction."""
+
+        self._insert_dynamic_wires(op)
 
         in_qubits = [self.qreg_manager[w] for w in op.wires]
         out_qubits = qinst_p.bind(
