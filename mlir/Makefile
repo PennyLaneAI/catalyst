@@ -56,6 +56,10 @@ all: llvm mhlo enzyme dialects plugin
 
 .PHONY: llvm
 llvm:
+	@if cd llvm-project; git apply --check $(MK_DIR)/patches/llvm*.patch; then \
+		git apply $(MK_DIR)/patches/llvm*.patch; \
+	fi
+
 	@echo "build LLVM and MLIR enabling Python bindings"
 	cmake -G Ninja -S llvm-project/llvm -B $(LLVM_BUILD_DIR) \
 		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
