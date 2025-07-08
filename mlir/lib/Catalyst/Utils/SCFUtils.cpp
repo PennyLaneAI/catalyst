@@ -22,8 +22,9 @@ using namespace mlir;
 
 namespace catalyst {
 
-static int64_t getNumIterations(int64_t lowerBound, int64_t upperBound, int64_t step)
+static int64_t getNumIterations(double lowerBound, double upperBound, double step)
 {
+    assert(upperBound >= lowerBound && step > 0);
     return std::ceil((upperBound - lowerBound) / step);
 }
 

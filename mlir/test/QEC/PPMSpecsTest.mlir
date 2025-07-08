@@ -347,6 +347,30 @@ func.func public @static_for_loop(%arg0: !quantum.bit) {
 // -----
 
 //CHECK: {
+//CHECK:     "static_for_loop_bigstep": {
+//CHECK:         "max_weight_pi4": 1,
+//CHECK:         "num_of_ppm": 3,
+//CHECK:         "num_pi4_gates": 3
+//CHECK:     }
+//CHECK: }
+func.func public @static_for_loop_bigstep(%arg0: !quantum.bit) {
+    %c5 = arith.constant 5 : index
+    %c0 = arith.constant 0 : index
+    %c2 = arith.constant 2 : index
+    // COM: should be 3 iterations (0,2,4)
+
+    %q = scf.for %iter = %c0 to %c5 step %c2 iter_args(%arg1 = %arg0) -> (!quantum.bit) {
+      %out_qubits = qec.ppr ["Z"](4) %arg1 : !quantum.bit
+      %mres, %out_qubits_1 = qec.ppm ["Z"] %out_qubits : !quantum.bit
+      scf.yield %out_qubits_1 : !quantum.bit
+    }
+
+    return
+}
+
+// -----
+
+//CHECK: {
 //CHECK:     "static_for_loop_nested": {
 //CHECK:         "max_weight_pi4": 1,
 //CHECK:         "max_weight_pi8": 1,
