@@ -303,3 +303,36 @@ def test_single_qubit_dynamic_static_interleaved():
 
 
 test_single_qubit_dynamic_static_interleaved()
+
+def test_multi_qubit_gates_on_different_dynamic_wires():
+    """Multi-qubit gates on different dynamic wires."""
+
+    dev = qml.device("null.qubit", wires=3)
+
+    qml.capture.enable()
+
+    @qml.qjit(target="mlir")
+    @qml.qnode(dev)
+    def circuit(w1: int, w2: int, w3: int):
+        # CHECK: [[SCALAR:%.+]] = tensor.extract %arg0
+        # CHECK-NEXT: [[QUBIT_0:%.+]] = quantum.extract %0[[[SCALAR]]]
+        # CHECK-NEXT: [[SCALAR_2:%.+]] = tensor.extract %arg1
+        # CHECK-NEXT: [[QUBIT_1:%.+]] = quantum.extract %0[[[SCALAR_2]]]
+        # CHECK-NEXT: [[QUBITS:%.+]]:2 = quantum.custom "CNOT"() [[QUBIT_0]], [[QUBIT_1]]
+        qml.CNOT(wires=[w1, w2])
+        # CHECK-NEXT: [[SCALAR:%.+]] = tensor.extract %arg0
+        # CHECK-NEXT: [[QREG:%.+]] = quantum.insert %0[[[SCALAR]]]
+        # CHECK-NEXT: [[SCALAR_1:%.+]] = tensor.extract %arg1
+        # CHECK-NEXT: [[QREG_1:%.+]] = quantum.insert [[QREG]][[[SCALAR_1]]]
+        # CHECK-NEXT: [[SCALAR_1:%.+]] = tensor.extract %arg1
+        # CHECK-NEXT: [[QUBIT_2:%.+]] = quantum.extract [[QREG_1]][[[SCALAR_1]]]
+        # CHECK-NEXT: [[SCALAR_2:%.+]] = tensor.extract %arg2
+        # CHECK-NEXT: [[QUBIT_3:%.+]] = quantum.extract [[QREG_1]][[[SCALAR_2]]]
+        # CHECK-NEXT: [[QUBITS:%.+]]:2 = quantum.custom "CNOT"() [[QUBIT_2]], [[QUBIT_3]]
+        qml.CNOT(wires=[w2, w3])
+        return qml.state()
+
+    print(circuit.mlir)
+    qml.capture.disable()
+
+test_multi_qubit_gates_on_different_dynamic_wires()
