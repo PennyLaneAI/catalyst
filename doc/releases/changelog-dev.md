@@ -12,9 +12,13 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* `from_plxpr` now supports adjoint and ctrl operations.
+  [(#1844)](https://github.com/PennyLaneAI/catalyst/pull/1844)
+
 <h3>Documentation 📝</h3>
 
 <h3>Contributors ✍️</h3>
 
 This release contains contributions from (in alphabetical order):
 
+Christina Lee
