@@ -22,8 +22,6 @@ using namespace mlir;
 
 namespace catalyst {
 
-static llvm::DenseMap<scf::ForOp, int64_t> cache;
-
 static int64_t getNumIterations(int64_t lowerBound, int64_t upperBound, int64_t step)
 {
     return std::ceil((upperBound - lowerBound) / step);
@@ -52,37 +50,30 @@ int64_t countStaicForloopIterations(Operation *op)
         if (isa<scf::ForOp>(parent)) {
             scf::ForOp forOp = cast<scf::ForOp>(parent);
 
-            if (cache.contains(forOp)) {
-                count *= cache[forOp];
-                changed = true;
+            Operation *lowerBoundOp = forOp.getLowerBound().getDefiningOp();
+            if (!lowerBoundOp || !isa<arith::ConstantOp>(lowerBoundOp)) {
+                // Dynamic
+                return -1;
             }
-            else {
-                Operation *lowerBoundOp = forOp.getLowerBound().getDefiningOp();
-                if (!isa<arith::ConstantOp>(lowerBoundOp)) {
-                    // Dynamic
-                    return -1;
-                }
-                int64_t l = getIntFromArithConstantOp(cast<arith::ConstantOp>(lowerBoundOp));
+            int64_t l = getIntFromArithConstantOp(cast<arith::ConstantOp>(lowerBoundOp));
 
-                Operation *upperBoundOp = forOp.getUpperBound().getDefiningOp();
-                if (!isa<arith::ConstantOp>(upperBoundOp)) {
-                    // Dynamic
-                    return -1;
-                }
-                int64_t u = getIntFromArithConstantOp(cast<arith::ConstantOp>(upperBoundOp));
-
-                Operation *stepOp = forOp.getStep().getDefiningOp();
-                if (!isa<arith::ConstantOp>(stepOp)) {
-                    // Dynamic
-                    return -1;
-                }
-                int64_t s = getIntFromArithConstantOp(cast<arith::ConstantOp>(stepOp));
-
-                int64_t numIters = getNumIterations(l, u, s);
-                cache[forOp] = numIters;
-                count *= numIters;
-                changed = true;
+            Operation *upperBoundOp = forOp.getUpperBound().getDefiningOp();
+            if (!upperBoundOp || !isa<arith::ConstantOp>(upperBoundOp)) {
+                // Dynamic
+                return -1;
             }
+            int64_t u = getIntFromArithConstantOp(cast<arith::ConstantOp>(upperBoundOp));
+
+            Operation *stepOp = forOp.getStep().getDefiningOp();
+            if (!stepOp || !isa<arith::ConstantOp>(stepOp)) {
+                // Dynamic
+                return -1;
+            }
+            int64_t s = getIntFromArithConstantOp(cast<arith::ConstantOp>(stepOp));
+
+            int64_t numIters = getNumIterations(l, u, s);
+            count *= numIters;
+            changed = true;
         }
         parent = parent->getParentOp();
     }
