@@ -216,6 +216,7 @@ def test_two_dynamic_CNOTs():
 
 test_two_dynamic_CNOTs()
 
+
 def test_single_qubit_dynamic():
     """single qubit gates on two different dynamic wires one after the other"""
 
@@ -228,22 +229,22 @@ def test_single_qubit_dynamic():
     def circuit(w1: int, w2: int):
 
         # CHECK: [[REG:%.+]] = quantum.alloc
-        # CHECK: [[QUBIT_0:%.+]] = quantum.extract [[REG]][ 0]
-        # CHECK: [[QUBIT_0_1:%.+]] = quantum.custom "Hadamard"() [[QUBIT_0]]
-        # CHECK: [[REG_1:%.+]] = quantum.insert [[REG]][ 0], [[QUBIT_0_1]]
-        # CHECK: [[SCALAR:%.+]] = tensor.extract %arg0[]
-        # CHECK: [[QUBIT_W1:%.+]] = quantum.extract [[REG_1]][[[SCALAR]]]
-        # CHECK: [[QUBIT_W1_1:%.+]] = quantum.custom "Hadamard"() [[QUBIT_W1]]
-        # CHECK: [[SCALAR:%.+]] = tensor.extract %arg0[]
-        # CHECK: [[REG_2:%.+]] = quantum.insert [[REG_1]][[[SCALAR]]], [[QUBIT_W1_1]]
-        # CHECK: [[SCALAR_1:%.+]] = tensor.extract %arg1[]
-        # CHECK: [[QUBIT_W2:%.+]] = quantum.extract [[REG_2]][[[SCALAR_1]]]
-        # CHECK: [[QUBIT_W2_1:%.+]] = quantum.custom "Hadamard"() [[QUBIT_W2]]
-        # CHECK: [[SCALAR_1:%.+]] = tensor.extract %arg1[]
-        # CHECK: [[REG_3:%.+]] = quantum.insert [[REG_2]][[[SCALAR_1]]], [[QUBIT_W2_1]]
-        # CHECK: [[QUBIT_0_2:%.+]] = quantum.extract [[REG_3]][ 0]
-        # CHECK: [[QUBIT_0_3:%.+]] = quantum.custom "Hadamard"() [[QUBIT_0_2]]
-        # CHECK: quantum.insert [[REG_3]][ 0], [[QUBIT_0_3]]
+        # CHECK-NEXT: [[QUBIT_0:%.+]] = quantum.extract [[REG]][ 0]
+        # CHECK-NEXT: [[QUBIT_0_1:%.+]] = quantum.custom "Hadamard"() [[QUBIT_0]]
+        # CHECK-NEXT: [[REG_1:%.+]] = quantum.insert [[REG]][ 0], [[QUBIT_0_1]]
+        # CHECK-NEXT: [[SCALAR:%.+]] = tensor.extract %arg0[]
+        # CHECK-NEXT: [[QUBIT_W1:%.+]] = quantum.extract [[REG_1]][[[SCALAR]]]
+        # CHECK-NEXT: [[QUBIT_W1_1:%.+]] = quantum.custom "Hadamard"() [[QUBIT_W1]]
+        # CHECK-NEXT: [[SCALAR:%.+]] = tensor.extract %arg0[]
+        # CHECK-NEXT: [[REG_2:%.+]] = quantum.insert [[REG_1]][[[SCALAR]]], [[QUBIT_W1_1]]
+        # CHECK-NEXT: [[SCALAR_1:%.+]] = tensor.extract %arg1[]
+        # CHECK-NEXT: [[QUBIT_W2:%.+]] = quantum.extract [[REG_2]][[[SCALAR_1]]]
+        # CHECK-NEXT: [[QUBIT_W2_1:%.+]] = quantum.custom "Hadamard"() [[QUBIT_W2]]
+        # CHECK-NEXT: [[SCALAR_1:%.+]] = tensor.extract %arg1[]
+        # CHECK-NEXT: [[REG_3:%.+]] = quantum.insert [[REG_2]][[[SCALAR_1]]], [[QUBIT_W2_1]]
+        # CHECK-NEXT: [[QUBIT_0_2:%.+]] = quantum.extract [[REG_3]][ 0]
+        # CHECK-NEXT: [[QUBIT_0_3:%.+]] = quantum.custom "Hadamard"() [[QUBIT_0_2]]
+        # CHECK-NEXT: quantum.insert [[REG_3]][ 0], [[QUBIT_0_3]]
         qml.Hadamard(0)
         qml.Hadamard(w1)
         qml.Hadamard(w2)
@@ -253,4 +254,52 @@ def test_single_qubit_dynamic():
     print(circuit.mlir)
     qml.capture.disable()
 
+
 test_single_qubit_dynamic()
+
+
+def test_single_qubit_dynamic_static_interleaved():
+    """Single qubit gates on two different dynamic wires interleaved with static wires"""
+
+    dev = qml.device("null.qubit", wires=3)
+
+    qml.capture.enable()
+
+    @qml.qjit(target="mlir")
+    @qml.qnode(dev)
+    def circuit(w1: int, w2: int):
+
+        # CHECK: [[REG:%.+]] = quantum.alloc
+        # CHECK-NEXT: [[QUBIT_0:%.+]] = quantum.extract [[REG]][ 0]
+        # CHECK-NEXT: [[QUBIT_0_1:%.+]] = quantum.custom "Hadamard"() [[QUBIT_0]]
+        # CHECK-NEXT: [[REG_1:%.+]] = quantum.insert [[REG]][ 0], [[QUBIT_0_1]]
+        # CHECK-NEXT: [[SCALAR:%.+]] = tensor.extract %arg0[]
+        # CHECK-NEXT: [[QUBIT_W1:%.+]] = quantum.extract [[REG_1]][[[SCALAR]]]
+        # CHECK-NEXT: [[QUBIT_W1_1:%.+]] = quantum.custom "Hadamard"() [[QUBIT_W1]]
+        # CHECK-NEXT: [[SCALAR:%.+]] = tensor.extract %arg0[]
+        # CHECK-NEXT: [[REG_2:%.+]] = quantum.insert [[REG_1]][[[SCALAR]]], [[QUBIT_W1_1]]
+
+        # CHECK-NEXT: [[QUBIT_0_2:%.+]] = quantum.extract [[REG_2]][ 0]
+        # CHECK-NEXT: [[QUBIT_0_3:%.+]] = quantum.custom "Hadamard"() [[QUBIT_0_2]]
+        # CHECK-NEXT: [[REG_3:%.+]] = quantum.insert [[REG_2]][ 0], [[QUBIT_0_1]]
+
+        # CHECK-NEXT: [[SCALAR_1:%.+]] = tensor.extract %arg1[]
+        # CHECK-NEXT: [[QUBIT_W2:%.+]] = quantum.extract [[REG_3]][[[SCALAR_1]]]
+        # CHECK-NEXT: [[QUBIT_W2_1:%.+]] = quantum.custom "Hadamard"() [[QUBIT_W2]]
+        # CHECK-NEXT: [[SCALAR_1:%.+]] = tensor.extract %arg1[]
+        # CHECK-NEXT: [[REG_4:%.+]] = quantum.insert [[REG_3]][[[SCALAR_1]]], [[QUBIT_W2_1]]
+        # CHECK-NEXT: [[QUBIT_0_2:%.+]] = quantum.extract [[REG_4]][ 0]
+        # CHECK-NEXT: [[QUBIT_0_3:%.+]] = quantum.custom "Hadamard"() [[QUBIT_0_2]]
+        # CHECK-NEXT: quantum.insert [[REG_4]][ 0], [[QUBIT_0_3]]
+        qml.Hadamard(0)
+        qml.Hadamard(w1)
+        qml.Hadamard(0)
+        qml.Hadamard(w2)
+        qml.Hadamard(0)
+        return qml.state()
+
+    print(circuit.mlir)
+    qml.capture.disable()
+
+
+test_single_qubit_dynamic_static_interleaved()
