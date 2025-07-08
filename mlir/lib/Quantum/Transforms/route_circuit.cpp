@@ -48,6 +48,24 @@ namespace catalyst {
 #include "Quantum/Transforms/Passes.h.inc"
 
 
+// struct mapAndRoute : public OpRewritePattern<QubitUnitaryOp>
+// {
+//     ...
+
+//     LogicalResult match(QubitUnitaryOp op) const override {
+//         // The ``match`` method returns ``success()`` if the pattern is a match, failure
+//         // otherwise.
+//     }
+
+//     void rewrite(QubitUnitaryOp op, PatternRewriter &rewriter) {
+//         // The ``rewrite`` method performs mutations on the IR rooted at ``op`` using
+//         // the provided rewriter. All mutations must go through the provided rewriter.
+//     }
+
+//     ...
+// };
+
+
 struct RoutingPass : public impl::RoutingPassBase<RoutingPass> {
     using impl::RoutingPassBase<RoutingPass>::RoutingPassBase;
 
@@ -87,18 +105,17 @@ struct RoutingPass : public impl::RoutingPassBase<RoutingPass> {
         return randomInitialMapping;
     }
 
-    int getRegisterIndexOfOp(Value operand) {
-        Operation *prevOp = operand.getDefiningOp();
+    int getRegisterIndexOfOp(Value inQubit) {
+        Operation *prevOp = inQubit.getDefiningOp();
         if (isa<quantum::ExtractOp>(prevOp)) 
             return (cast<quantum::ExtractOp>(prevOp)).getIdxAttr().value();
         else {
-            auto iteratePrevOpResults = prevOp->getResults();
-            for (auto iter = 0; iter < iteratePrevOpResults.size() ; iter++ ) {
-                auto tempOperand = cast<mlir::OpResult>(operand);
-                if (iteratePrevOpResults[iter].getResultNumber() == tempOperand.getResultNumber())
-                    return getRegisterIndexOfOp(prevOp->getOperand(iter));
+            auto iteratePrevOpOutQubit = cast<quantum::CustomOp>(prevOp).getOutQubits();
+            auto iteratePrevOpInQubit = cast<quantum::CustomOp>(prevOp).getInQubits();
+            for (auto iter = 0; iter < iteratePrevOpOutQubit.size() ; iter++ ) {
+                if (iteratePrevOpOutQubit[iter] == inQubit) 
+                    return getRegisterIndexOfOp(iteratePrevOpInQubit[iter]);
             }
-            // }
         }
     }
     
@@ -117,6 +134,7 @@ struct RoutingPass : public impl::RoutingPassBase<RoutingPass> {
         for (auto i : couplingMap) llvm::outs() << "(" << i.first << "," << i.second << ")\n";
 
         std::vector<int> randomInitialMapping;
+
         getOperation()->walk([&](Operation *op) {
             if (isa<quantum::AllocOp>(op)) {
                 numLogicalQubits = countLogicalQubit(op);
@@ -135,28 +153,26 @@ struct RoutingPass : public impl::RoutingPassBase<RoutingPass> {
                 llvm::outs() << "Gate Qubits: " << nQubits << "\n";
                 llvm::outs() << *op << "\n";
                 
-                for (auto operand : op->getOperands()) {
-                    int temp = getRegisterIndexOfOp(operand);
+                for (auto inQubit : cast<quantum::CustomOp>(op).getInQubits()) {
+                    int temp = getRegisterIndexOfOp(inQubit);
                     llvm::outs() << "Qubit " << temp << "->" << randomInitialMapping[temp] << "\n";
                 } 
                     
             }
         });
+        // context c;
 
-
-        context c;
-
-        expr x = c.bool_const("x");
-        expr y = c.bool_const("y");
-        expr conjecture = (!(x && y)) == (!x || !y);
+        // expr x = c.bool_const("x");
+        // expr y = c.bool_const("y");
+        // expr conjecture = (!(x && y)) == (!x || !y);
         
-        solver s(c);
-        s.add(!conjecture);
-        // llvm::outs() <<  "Z3 result " << s.to_smt2() << "\n";
-        llvm::outs() <<  "Z3 check " << s.check() << "\n";
-        llvm::outs() <<  "sat " << z3::sat << "\n";
-        llvm::outs() <<  "unsat " << z3::unsat << "\n";
-        llvm::outs() <<  "unknown " << z3::unknown << "\n";
+        // solver s(c);
+        // s.add(!conjecture);
+        // // llvm::outs() <<  "Z3 result " << s.to_smt2() << "\n";
+        // llvm::outs() <<  "Z3 check " << s.check() << "\n";
+        // llvm::outs() <<  "sat " << z3::sat << "\n";
+        // llvm::outs() <<  "unsat " << z3::unsat << "\n";
+        // llvm::outs() <<  "unknown " << z3::unknown << "\n";
 
     }
 };
