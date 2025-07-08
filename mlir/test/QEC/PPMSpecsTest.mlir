@@ -326,6 +326,7 @@ func.func public @game_of_surface_code(%arg0: !quantum.bit, %arg1: !quantum.bit,
 //CHECK: {
 //CHECK:     "static_for_loop": {
 //CHECK:         "max_weight_pi4": 1,
+//CHECK:         "num_of_ppm": 5,
 //CHECK:         "num_pi4_gates": 5
 //CHECK:     }
 //CHECK: }
@@ -336,7 +337,8 @@ func.func public @static_for_loop(%arg0: !quantum.bit) {
 
     %q = scf.for %iter = %c0 to %c5 step %c1 iter_args(%arg1 = %arg0) -> (!quantum.bit) {
       %out_qubits = qec.ppr ["Z"](4) %arg1 : !quantum.bit
-      scf.yield %out_qubits : !quantum.bit
+      %mres, %out_qubits_1 = qec.ppm ["Z"] %out_qubits : !quantum.bit
+      scf.yield %out_qubits_1 : !quantum.bit
     }
 
     return
@@ -347,7 +349,10 @@ func.func public @static_for_loop(%arg0: !quantum.bit) {
 //CHECK: {
 //CHECK:     "static_for_loop_nested": {
 //CHECK:         "max_weight_pi4": 1,
-//CHECK:         "num_pi4_gates": 30
+//CHECK:         "max_weight_pi8": 1,
+//CHECK:         "num_of_ppm": 30,
+//CHECK:         "num_pi4_gates": 30,
+//CHECK:         "num_pi8_gates": 6
 //CHECK:     }
 //CHECK: }
 func.func public @static_for_loop_nested(%arg0: !quantum.bit) {
@@ -360,10 +365,12 @@ func.func public @static_for_loop_nested(%arg0: !quantum.bit) {
 
         %q_inner = scf.for %iter_inner = %c0 to %c5 step %c1 iter_args(%arg1_inner = %arg1) -> (!quantum.bit) {
           %out_qubits_inner = qec.ppr ["Z"](4) %arg1_inner : !quantum.bit
-          scf.yield %out_qubits_inner : !quantum.bit
+          %mres, %out_qubits_inner_1 = qec.ppm ["Z"] %out_qubits_inner : !quantum.bit
+          scf.yield %out_qubits_inner_1 : !quantum.bit
         }
 
-        scf.yield %q_inner : !quantum.bit
+        %out_qubits = qec.ppr ["Z"](8) %q_inner : !quantum.bit
+        scf.yield %out_qubits : !quantum.bit
     }
 
     return

@@ -57,7 +57,14 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
                   llvm::DenseMap<StringRef, llvm::DenseMap<StringRef, int>> *PPMSpecs)
     {
         auto parentFuncOp = op->getParentOfType<func::FuncOp>();
-        (*PPMSpecs)[parentFuncOp.getName()]["num_of_ppm"]++;
+
+        // Handle when PPM op is in a static for loop
+        // Note that countStaicForloopIterations returns -1 when it bails out for
+        // dynamic loop bounds
+        // When bailing out on dynamic, just error.
+        int64_t forLoopMultiplier = countStaicForloopIterations(op);
+        int64_t increment = (forLoopMultiplier == -1) ? 1 : forLoopMultiplier;
+        (*PPMSpecs)[parentFuncOp.getName()]["num_of_ppm"] += increment;
         return;
     }
 
@@ -79,7 +86,7 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
         // Handle when PPR op is in a static for loop
         // Note that countStaicForloopIterations returns -1 when it bails out for
         // dynamic loop bounds
-        // When bailing out on dynamic, just add one op.
+        // When bailing out on dynamic, just error.
         int64_t forLoopMultiplier = countStaicForloopIterations(op);
         int64_t increment = (forLoopMultiplier == -1) ? 1 : forLoopMultiplier;
 
