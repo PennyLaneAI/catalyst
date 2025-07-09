@@ -90,6 +90,10 @@ struct RoutingPass : public impl::RoutingPassBase<RoutingPass> {
     }
 
     int countLogicalQubit(Operation *op) {
+        // TODO: This will be 0 in case of automatic_qubit_management, 
+        // in which case consider all physical qubit in the map
+        // with condition being logical qubit count 
+        // should not exceed physical qubit count
         int numQubits = cast<quantum::AllocOp>(op).getNqubitsAttr().value_or(0);
         assert(numQubits != 0 && "PPM specs with dynamic number of qubits is not implemented");
         return numQubits;
@@ -106,6 +110,11 @@ struct RoutingPass : public impl::RoutingPassBase<RoutingPass> {
     }
 
     int getRegisterIndexOfOp(Value inQubit) {
+        // TODO: There's a better way of doing this
+        // instead of backtracking every single CustomOp back to its ExtractOp
+        // Use DenseMap [inQubit] -> ExtractOp
+        // this way, for any CustomOp, we can go to its definingOp's inQubits/outQubits 
+        // and get the ExtractOp from the DenseMap
         Operation *prevOp = inQubit.getDefiningOp();
         if (isa<quantum::ExtractOp>(prevOp)) 
             return (cast<quantum::ExtractOp>(prevOp)).getIdxAttr().value();
