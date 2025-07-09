@@ -24,12 +24,12 @@ import catalyst
 from catalyst import qjit
 from catalyst.from_plxpr import from_plxpr
 from catalyst.jax_primitives import (
-    get_call_jaxpr,
-    qinst_p,
-    qalloc_p,
-    qinsert_p,
-    qextract_p,
     adjoint_p,
+    get_call_jaxpr,
+    qalloc_p,
+    qextract_p,
+    qinsert_p,
+    qinst_p,
 )
 
 pytestmark = pytest.mark.usefixtures("disable_capture")

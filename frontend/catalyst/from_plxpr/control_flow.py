@@ -18,18 +18,18 @@ Conversion from control flow plxpr primitives.
 
 
 import jax
+from jax._src.tree_util import tree_flatten
 from jax.extend.core import ClosedJaxpr
 from jax.interpreters.partial_eval import convert_constvars_jaxpr
-from jax._src.tree_util import tree_flatten
+from pennylane.capture.primitives import adjoint_transform_prim as plxpr_adjoint_transform_prim
 from pennylane.capture.primitives import cond_prim as plxpr_cond_prim
 from pennylane.capture.primitives import for_loop_prim as plxpr_for_loop_prim
 from pennylane.capture.primitives import while_loop_prim as plxpr_while_loop_prim
-from pennylane.capture.primitives import adjoint_transform_prim as plxpr_adjoint_transform_prim
 
 from catalyst.from_plxpr.from_plxpr import PLxPRToQuantumJaxprInterpreter
 from catalyst.from_plxpr.qreg_manager import QregManager
 from catalyst.jax_extras import jaxpr_pad_consts
-from catalyst.jax_primitives import cond_p, for_p, while_p, adjoint_p
+from catalyst.jax_primitives import adjoint_p, cond_p, for_p, while_p
 
 
 @PLxPRToQuantumJaxprInterpreter.register_primitive(plxpr_cond_prim)
