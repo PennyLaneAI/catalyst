@@ -18,6 +18,8 @@
 func.func @test_basic_case(%phase: f64, %q: !quantum.bit, %shots: i64) {
     quantum.device shots(%shots) ["", "", ""] {auto_qubit_management}
 
+    // CHECK: quantum.custom "Hadamard"
+    // CHECK: quantum.gphase(%arg0) :
     quantum.gphase(%phase) :
     %2 = quantum.custom "Hadamard"() %q : !quantum.bit
 
@@ -29,6 +31,9 @@ func.func @test_basic_case(%phase: f64, %q: !quantum.bit, %shots: i64) {
 func.func @test_sandwhiched(%phase: f64, %q: !quantum.bit, %shots: i64) {
     quantum.device shots(%shots) ["", "", ""] {auto_qubit_management}
 
+    // CHECK: quantum.custom "Hadamard"
+    // CHECK: [[phase:%.+]] = arith.addf %arg0, %arg0 : f64
+    // CHECK: quantum.gphase([[phase]]) :
     quantum.gphase(%phase) :
     %2 = quantum.custom "Hadamard"() %q : !quantum.bit
     quantum.gphase(%phase) :
@@ -41,6 +46,10 @@ func.func @test_sandwhiched(%phase: f64, %q: !quantum.bit, %shots: i64) {
 func.func @test_adjoint(%phase: f64, %q: !quantum.bit, %shots: i64) {
     quantum.device shots(%shots) ["", "", ""] {auto_qubit_management}
 
+    // CHECK: quantum.custom "Hadamard"
+    // CHECK: [[adj:%.+]] = arith.negf %arg0 : f64
+    // CHECK: [[phase:%.+]] = arith.addf [[adj]], %arg0 : f64
+    // CHECK: quantum.gphase([[phase]]) :
     quantum.gphase(%phase) {adjoint} :
     quantum.gphase(%phase) :
     %2 = quantum.custom "Hadamard"() %q : !quantum.bit
@@ -53,6 +62,8 @@ func.func @test_adjoint(%phase: f64, %q: !quantum.bit, %shots: i64) {
 func.func @test_not_aqm(%phase: f64, %q: !quantum.bit, %shots: i64) {
     quantum.device shots(%shots) ["", "", ""]
 
+    // CHECK: quantum.gphase
+    // CHECK: quantum.custom "Hadamard"
     quantum.gphase(%phase) :
     %2 = quantum.custom "Hadamard"() %q : !quantum.bit
 

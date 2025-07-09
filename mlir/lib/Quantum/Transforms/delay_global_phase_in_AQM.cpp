@@ -81,7 +81,6 @@ struct DelayGlobalPhaseInAQMPass : impl::DelayGlobalPhaseInAQMPassBase<DelayGlob
 
         // Find the last gate op that's not a globalphase op
         Operation *finalGate = findLastGateOp(module);
-        llvm::errs() << "final: " << *finalGate << "\n";
         builder.setInsertionPointAfter(finalGate);
 
         // Clump all global phases and create one after the last gate op
