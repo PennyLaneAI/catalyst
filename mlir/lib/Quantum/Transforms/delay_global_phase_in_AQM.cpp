@@ -89,7 +89,7 @@ struct DelayGlobalPhaseInAQMPass : impl::DelayGlobalPhaseInAQMPassBase<DelayGlob
         SmallVector<quantum::GlobalPhaseOp> gphaseRemovalWorklist;
         module->walk([&](quantum::GlobalPhaseOp gphaseOp) {
             assert(gphaseOp.getInCtrlQubits().size() == 0 &&
-                   "Gloabl phase ops with control qubits is not yet supported with automatic qubit "
+                   "Global phase ops with control qubits is not yet supported with automatic qubit "
                    "management mode.");
 
             if (gphaseOp.getAdjoint()) {
