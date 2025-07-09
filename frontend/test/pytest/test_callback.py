@@ -30,6 +30,7 @@ from catalyst.utils.patching import Patcher
 
 # pylint: disable=protected-access,too-many-lines
 
+qml.capture.enable()
 
 @pytest.mark.parametrize("arg", [1, 2, 3])
 def test_callback_no_tracing(arg):

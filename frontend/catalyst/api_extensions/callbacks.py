@@ -36,6 +36,8 @@ from jax._src.tree_util import (
     tree_unflatten,
 )
 
+from pennylane.capture import enabled as capture_enabled
+
 from catalyst.jax_extras import transient_jax_config
 from catalyst.jax_primitives import python_callback_p
 from catalyst.tracing.contexts import AccelerateContext, EvaluationContext, GradContext
@@ -512,7 +514,7 @@ def base_callback_impl(func: AnnotatedFunction, device=None, custom_grad=None):
     # Since we are building this feature step by step.
     @functools.wraps(func, assigned=WRAPPER_ASSIGNMENTS)
     def bind_callback(*args, **kwargs):
-        if not EvaluationContext.is_tracing() or AccelerateContext.am_inside_accelerate():
+        if not capture_enabled() and not EvaluationContext.is_tracing() or AccelerateContext.am_inside_accelerate():
             # If we are not in the tracing context, just evaluate the function.
             return func(*args, **kwargs)
 
@@ -688,3 +690,8 @@ def callback_implementation(
         results_aval=tuple(flat_results_aval),
     )
     return tree_unflatten(out_tree, out_flat)
+
+@python_callback_p.def_impl
+def _python_callback_def_impl(*args, callback, custom_grad, results_aval):  # pragma: no cover
+    """Concrete evaluation"""
+    return FlatCallable.__call__(callback, args)
