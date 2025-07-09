@@ -74,6 +74,30 @@ add_subdirectory(lib)
 add_subdirectory(tests)
 
 if(APPLE AND (${CMAKE_SYSTEM_PROCESSOR} STREQUAL arm64))
+
+execute_process(
+    COMMAND bash -c "xcrun --sdk macosx --show-sdk-path"
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    OUTPUT_VARIABLE OSX_SDK_SYMBOL_PATH
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    RESULT_VARIABLE CMD_RESULT
+)
+
+get_filename_component(SEARCH_DIR ${OSX_SDK_SYMBOL_PATH} DIRECTORY)
+file(GLOB CANDIDATE_FILES "${SEARCH_DIR}/MacOSX*.sdk")
+set(HIGHEST_VERSION "0")
+set(OSX_SDK_LATEST_PATH "${OSX_SDK_SYMBOL_PATH}")
+
+foreach(CURRENT_FILE IN LISTS CANDIDATE_FILES)
+    get_filename_component(CURRENT_FILENAME ${CURRENT_FILE} NAME)
+    string(REGEX MATCH [=[MacOSX(.*)\.sdk$]=] _REGEX_DUMMY "${CURRENT_FILENAME}")
+    set(CURRENT_VERSION "${CMAKE_MATCH_1}")
+    if(CURRENT_VERSION VERSION_GREATER HIGHEST_VERSION)
+        set(HIGHEST_VERSION ${CURRENT_VERSION})
+        set(OSX_SDK_PATH ${CURRENT_FILE})
+    endif()
+endforeach()
+
 # Don't rerun external project everytime we configure the runtime build.
 if(NOT EXISTS ${CMAKE_BINARY_DIR}/lib/liblapacke.3.dylib)
     ExternalProject_Add(lapacke-accelerate
@@ -82,6 +106,7 @@ if(NOT EXISTS ${CMAKE_BINARY_DIR}/lib/liblapacke.3.dylib)
         PREFIX _lapacke-accelerate
         CMAKE_ARGS "--preset accelerate-lapacke32"
                    "-DCMAKE_INSTALL_PREFIX=${CMAKE_BINARY_DIR}/_lapacke-accelerate/install"
+                   "-DCMAKE_OSX_SYSROOT=${OSX_SDK_PATH}"
         INSTALL_COMMAND ${CMAKE_COMMAND} --build . --target install
         COMMAND cp ${CMAKE_BINARY_DIR}/_lapacke-accelerate/install/lib/liblapacke.3.dylib ${CMAKE_BINARY_DIR}/lib
         LOG_CONFIGURE ON
