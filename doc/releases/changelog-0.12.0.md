@@ -123,7 +123,8 @@
   }
   ```
 
-* Catalyst now supports `qml.Snapshot`, which captures quantum states at any point in a circuit.
+* Catalyst now supports :class:`qml.Snapshot <pennylane.Snapshot>`, which captures quantum states at 
+  any point in a circuit.
   [(#1741)](https://github.com/PennyLaneAI/catalyst/pull/1741).
 
   For example, the code below is capturing two snapshot'd states, all within a qjit'd circuit:
@@ -212,27 +213,21 @@
 
 <h3>Improvements 🛠</h3>
 
-* The `qml.measure()` operation for mid-circuit measurements can now be used in qjit-compiled
-  circuits with program capture enabled.
+* The :func:`qml.measure <pennylane.measure>` operation for mid-circuit measurements can now be used 
+  in qjit-compiled circuits with program capture enabled.
   [(#1766)](https://github.com/PennyLaneAI/catalyst/pull/1766)
 
-  Note that using `qml.measure()` in this way binds the operation to :func:`catalyst.measure`, which
-  behaves differently than `qml.measure()` in a native PennyLane circuit, as described in the
-  *Functionality differences from PennyLane* section of the
-  :doc:`sharp bits and debugging tips <sharp_bits>` guide. In regular qjit-compiled workflows
-  (without program capture enabled), you must continue to use :func:`catalyst.measure`.
-
-* The package name of the Catalyst distribution has been updated to be inline with
-  [PyPA standards](https://packaging.python.org/en/latest/specifications/binary-distribution-format/#file-name-convention),
-  from `PennyLane-Catalyst` to `pennylane_catalyst`. This change is not expected to affect users as 
-  tools in the Python ecosystem (e.g. `pip`) already handle both versions through normalization. 
-  [(#1817)](https://github.com/PennyLaneAI/catalyst/pull/1817)
+  Note that using :func:`qml.measure <pennylane.measure>` in this way binds the operation to 
+  :func:`catalyst.measure`, which behaves differently than :func:`qml.measure <pennylane.measure>` 
+  in a native PennyLane circuit, as described in the *Functionality differences from PennyLane* 
+  section of the :doc:`sharp bits and debugging tips <sharp_bits>` guide. In regular qjit-compiled 
+  workflows (without program capture enabled), you must continue to use :func:`catalyst.measure`.
 
 * The behaviour of measurement processes executed on `null.qubit` with qjit is now more consistent 
   with their behaviour on `null.qubit` *without* qjit.
   [(#1598)](https://github.com/PennyLaneAI/catalyst/pull/1598)
 
-  Previously, measurement processes like `qml.sample()`, `qml.counts()`, `qml.probs()`, etc.,
+  Previously, measurement processes like `qml.sample`, `qml.counts`, `qml.probs`, etc.,
   returned values from uninitialized memory when executed on `null.qubit` with qjit. This change
   ensures that measurement processes on `null.qubit` always return the value 0 or the result
   corresponding to the '0' state, depending on the context.
@@ -257,10 +252,11 @@
   [(#1791)](https://github.com/PennyLaneAI/catalyst/pull/1791)
 
 * The `static_argnums` keyword argument in the `qjit` decorator is now compatible with PennyLane 
-  program capture enabled (`qml.capture.enable()`).
+  program capture enabled (:func:`qml.capture.enable <pennylane.capture.enable>`).
   [(#1810)](https://github.com/PennyLaneAI/catalyst/pull/1810)
 
-* Catalyst is compatible with the new `qml.set_shots` transform introduced in PennyLane v0.42.
+* Catalyst is compatible with the new :func:`qml.set_shots <pennylane.set_shots>` transform 
+  introduced in PennyLane v0.42.
   [(#1784)](https://github.com/PennyLaneAI/catalyst/pull/1784)
 
 * `null.qubit` can now support an optional `track_resources` argument, which allows it to record 
@@ -305,7 +301,8 @@
   [(#1657)](https://github.com/PennyLaneAI/catalyst/pull/1657)
 
   Instead of enabling program capture with Catalyst via `qjit(experimental_capture=True)`, program
-  capture can be enabled via the global toggle `qml.capture.enable()`:
+  capture can be enabled via the global toggle 
+  :func:`qml.capture.enable() <pennylane.capture.enable>`:
 
   ```python
   import pennylane as qml
@@ -325,7 +322,8 @@
   circuit(0.1)
   ```
 
-  Disabling program capture can be done with `qml.capture.disable()`.
+  Disabling program capture can be done with 
+  :func:`qml.capture.disable() <pennylane.capture.disable>`.
 
 * The `ppr_to_ppm` pass functionality has been moved to a new pass called `merge_ppr_ppm`. The 
   `ppr_to_ppm` functionality now handles direct decomposition of PPRs into PPMs.
@@ -418,8 +416,8 @@
 
 <h3>Internal changes ⚙️</h3>
 
-* Added integration with PennyLane's experimental Python compiler based on xDSL. This allows 
-  developers and users to write xDSL transformations that can be used with Catalyst.
+* Integration with PennyLane's experimental Python compiler based on xDSL has been added. This 
+  allows developers and users to write xDSL transformations that can be used with Catalyst.
   [(#1715)](https://github.com/PennyLaneAI/catalyst/pull/1715)
 
 * An xDSL MLIR plugin has been added to denote whether to use xDSL to execute compilation passes.
@@ -456,8 +454,9 @@
   [(#1774)](https://github.com/PennyLaneAI/catalyst/pull/1774)
   [(#1828)](https://github.com/PennyLaneAI/catalyst/pull/1828)
 
-* PennyLane's arbitrary-basis measurement operations, such as `qml.ftqc.measure_arbitrary_basis()`, 
-  are now qjit-compatible with PennyLane program capture enabled.
+* PennyLane's arbitrary-basis measurement operations, such as 
+  :func:`qml.ftqc.measure_arbitrary_basis <pennylane.ftqc.measure_arbitrary_basis>`, are now 
+  qjit-compatible with PennyLane program capture enabled.
   [(#1645)](https://github.com/PennyLaneAI/catalyst/pull/1645)
   [(#1710)](https://github.com/PennyLaneAI/catalyst/pull/1710)
 
@@ -483,6 +482,12 @@
   [(#1740)](https://github.com/PennyLaneAI/catalyst/pull/1740)
   [(#1751)](https://github.com/PennyLaneAI/catalyst/pull/1751)
   [(#1769)](https://github.com/PennyLaneAI/catalyst/pull/1769)
+
+* The package name of the Catalyst distribution has been updated to be consistent with
+  [PyPA standards](https://packaging.python.org/en/latest/specifications/binary-distribution-format/#file-name-convention),
+  from `PennyLane-Catalyst` to `pennylane_catalyst`. This change is not expected to affect users as 
+  tools in the Python ecosystem (e.g. `pip`) already handle both versions through normalization. 
+  [(#1817)](https://github.com/PennyLaneAI/catalyst/pull/1817)
 
 * The redundant `OptionalAttr` has been removed from the `adjoint` argument in the `QuantumOps.td` 
   TableGen file.
