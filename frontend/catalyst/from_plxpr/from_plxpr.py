@@ -583,7 +583,8 @@ def handle_ctrl_transform(self, *invals, jaxpr, n_control, control_values, work_
     unroller = copy(self)
     unroller.control_wires += tuple(control_wires)
     unroller.control_values += tuple(control_values)
-    return unroller.eval(jaxpr, consts, *args)
+    unroller.eval(jaxpr, consts, *args)
+    return []
 
 
 # pylint: disable=too-many-positional-arguments

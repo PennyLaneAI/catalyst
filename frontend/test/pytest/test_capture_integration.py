@@ -1575,7 +1575,8 @@ def test_adjoint_transform_integration():
     expected = jnp.cos(-2*x)
     assert qml.math.allclose(res, expected)
 
-def test_ctrl_transform_integration():
+@pytest.mark.parametrize("separate_funcs", (True, False))
+def test_ctrl_transform_integration(separate_funcs):
     """Test that the ctrl transform can be applied."""
 
     qml.capture.enable()
@@ -1585,10 +1586,13 @@ def test_ctrl_transform_integration():
         qml.RX(2*x, wires=3)
 
     @qml.qjit
-    @qml.qnode(qml.device('lightning.qubit', wires=4))
+    @qml.qnode(qml.device('lightning.qubit', wires=4), autograph=False)
     def c(x, y):
         qml.X(1)
-        qml.ctrl(f, (0,1), [False, True])(x, y)
+        if separate_funcs:
+            qml.ctrl(qml.ctrl(f, 0, [False]), 1, [True])(x, y)
+        else:
+            qml.ctrl(f, (0,1), [False, True])(x, y)
         return qml.expval(qml.Z(3))
     
     x = jnp.array(0.5)
