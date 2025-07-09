@@ -340,6 +340,9 @@
 * Fixes canonicalization of insertion and extraction into quantum registers.
   [(#1840)](https://github.com/PennyLaneAI/catalyst/pull/1840)
 
+* Fixes the conversion of PLxPR to JAXPR with quantum primitives when using dynamic wires.
+  [(#1842)](https://github.com/PennyLaneAI/catalyst/pull/1842)
+
 <h3>Internal changes ⚙️</h3>
 
 * `qml.qjit` now integrates with the new `qml.set_shots` function.
