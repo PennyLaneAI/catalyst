@@ -1,4 +1,4 @@
-# Release 0.12.0 (development release)
+# Release 0.12.0 (current release)
 
 <h3>New features since last release</h3>
 
@@ -477,7 +477,7 @@
 
 This release contains contributions from (in alphabetical order):
 
-Runor Agbaire
+Runor Agbaire,
 Joey Carter,
 Sengthai Heng,
 David Ittah,
@@ -487,5 +487,6 @@ Mehrdad Malekmohammadi,
 Anton Naim Ibrahim,
 Erick Ochoa Lopez,
 Ritu Thombre,
+Raul Torres,
 Paul Haochen Wang,
 Jake Zaia.
