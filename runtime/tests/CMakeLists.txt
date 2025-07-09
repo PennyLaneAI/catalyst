@@ -11,6 +11,10 @@ if(RUNTIME_ENABLE_WARNINGS AND (CMAKE_CXX_COMPILER_ID STREQUAL "GNU"))
     add_compile_options("-Wno-maybe-uninitialized")
 endif()
 
+# Issue raised by https://github.com/llvm/llvm-project/issues/62836
+# Here to enable the variable-length array extension within the test suite to eliminate the need for C malloc
+add_compile_options("-Wno-vla-extension")
+
 FetchContent_MakeAvailable(Catch2)
 
 # Locate PyBind11
