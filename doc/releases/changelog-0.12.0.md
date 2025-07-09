@@ -414,6 +414,9 @@
   results.
   [(#1840)](https://github.com/PennyLaneAI/catalyst/pull/1840)
 
+* Fixes the conversion of PLxPR to JAXPR with quantum primitives when using dynamic wires.
+  [(#1842)](https://github.com/PennyLaneAI/catalyst/pull/1842)
+
 <h3>Internal changes ⚙️</h3>
 
 * Integration with PennyLane's experimental Python compiler based on xDSL has been added. This 
@@ -550,7 +553,7 @@
 
 This release contains contributions from (in alphabetical order):
 
-Runor Agbaire
+Runor Agbaire,
 Joey Carter,
 Isaac De Vlugt,
 Sengthai Heng,
@@ -561,5 +564,6 @@ Mehrdad Malekmohammadi,
 Anton Naim Ibrahim,
 Erick Ochoa Lopez,
 Ritu Thombre,
+Raul Torres,
 Paul Haochen Wang,
 Jake Zaia.
