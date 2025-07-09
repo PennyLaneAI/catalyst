@@ -151,3 +151,21 @@ def test_state(backend):
     ref, observed = (qjit(qml.qnode(dev)(circuit))() for dev in devices)
     assert ref.shape == observed.shape
     assert np.allclose(ref, observed)
+
+
+def test_global_phase(backend):
+    """
+    Test that a circuit with a global phase operation can be executed
+    correctly with automatic qubit management.
+    """
+
+    def circuit():
+        qml.GlobalPhase(0.123)
+        qml.PauliX(wires=0)
+        return qml.state()
+
+    wires = [1, None]
+    devices = [qml.device(backend, wires=wire) for wire in wires]
+    ref, observed = (qjit(qml.qnode(dev)(circuit))() for dev in devices)
+    assert ref.shape == observed.shape
+    assert np.allclose(ref, observed)

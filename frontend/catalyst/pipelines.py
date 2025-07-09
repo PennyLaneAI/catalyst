@@ -204,6 +204,10 @@ def get_enforce_runtime_invariants_stage(_options: CompileOptions) -> List[str]:
         # tapes will generate multiple qnodes. One for each tape.
         # Split multiple tapes enforces that invariant.
         "split-multiple-tapes",
+        # Automatic qubit management mode must have global phase gates
+        # at the end, otherwise global phase does not know how many qubits
+        # to act on.
+        "delay-global-phase-in-AQM",
         # Run the transform sequence defined in the MLIR module
         "builtin.module(apply-transform-sequence)",
         # Nested modules are something that will be used in the future

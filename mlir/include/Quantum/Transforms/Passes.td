@@ -77,6 +77,12 @@ def SplitMultipleTapesPass : Pass<"split-multiple-tapes"> {
     let constructor = "catalyst::createSplitMultipleTapesPass()";
 }
 
+def DelayGlobalPhaseInAQMPass : Pass<"delay-global-phase-in-AQM"> {
+    let summary = "Move all global phase ops after the final gate op in automatic qubit managing mode";
+
+    let constructor = "catalyst::createDelayGlobalPhaseInAQMPass()";
+}
+
 // ----- Quantum circuit transformation passes begin ----- //
 // For example, automatic compiler peephole opts, etc.
 

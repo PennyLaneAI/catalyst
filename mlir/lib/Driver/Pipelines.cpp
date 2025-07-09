@@ -34,6 +34,7 @@ namespace driver {
 void createEnforceRuntimeInvariantsPipeline(OpPassManager &pm)
 {
     pm.addPass(catalyst::createSplitMultipleTapesPass());
+    pm.addPass(catalyst::createDelayGlobalPhaseInAQMPass());
     pm.addNestedPass<ModuleOp>(catalyst::createApplyTransformSequencePass());
     pm.addPass(catalyst::createInlineNestedModulePass());
 }

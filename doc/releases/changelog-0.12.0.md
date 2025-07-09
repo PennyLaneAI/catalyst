@@ -127,6 +127,7 @@
 
 * Catalyst now supports automatic qubit management.
   [(#1788)](https://github.com/PennyLaneAI/catalyst/pull/1788)
+  [(#???)](https://github.com/PennyLaneAI/catalyst/pull/???)
 
   The number of wires does not need to be speficied during device initialization,
   and instead will be automatically managed by the Catalyst Runtime.
