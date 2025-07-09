@@ -22,6 +22,7 @@
 #include <memory>
 #include <optional>
 #include <random>
+#include <string>
 #include <unordered_map>
 #include <vector>
 
@@ -45,9 +46,11 @@ namespace Catalyst::Runtime::Devices {
  *   of the device; these are used to implement Quantum Instruction Set (QIS) instructions.
  */
 struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
+    std::unordered_map<std::string, std::string> device_kwargs;
+
     NullQubit(const std::string &kwargs = "{}")
     {
-        auto device_kwargs = Catalyst::Runtime::parse_kwargs(kwargs);
+        this->device_kwargs = Catalyst::Runtime::parse_kwargs(kwargs);
         if (device_kwargs.find("track_resources") != device_kwargs.end()) {
             track_resources_ = device_kwargs["track_resources"] == "True";
         }
@@ -58,6 +61,11 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     NullQubit(const NullQubit &) = delete;
     NullQubit(NullQubit &&) = delete;
     NullQubit &operator=(NullQubit &&) = delete;
+
+    /**
+     * @brief Get the device kwargs as a map.
+     */
+    std::unordered_map<std::string, std::string> GetDeviceKwargs() { return this->device_kwargs; }
 
     /**
      * @brief Prints resources that would be used to execute this circuit as a JSON
