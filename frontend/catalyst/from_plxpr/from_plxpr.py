@@ -295,7 +295,7 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
     during initialization.
     """
 
-    def __init__(self, device, shots, qreg_manager, cache, control_wires=(), control_values=()):
+    def __init__(self, device, shots, qreg_manager, cache, *, control_wires=(), control_values=()):
         self.device = device
         self.shots = shots
         # TODO: we assume the qreg value passed into a scope is the unique qreg in the scope
@@ -576,6 +576,7 @@ def handle_measure_in_basis(self, angle, wire, plane, reset, postselect):
 # pylint: disable=unused-argument
 @PLxPRToQuantumJaxprInterpreter.register_primitive(plxpr_ctrl_transform_prim)
 def handle_ctrl_transform(self, *invals, jaxpr, n_control, control_values, work_wires, n_consts):
+    """Interpret a control transform primitive."""
     consts = invals[:n_consts]
     args = invals[n_consts:-n_control]
     control_wires = invals[-n_control:]
