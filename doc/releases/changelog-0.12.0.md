@@ -352,6 +352,10 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Improves compilation time for large workloads by removing a cache in LLVM and
+  disabling an optimization to eliminate empty tensors.
+  [(#1885)](https://github.com/PennyLaneAI/catalyst/pull/1885)
+
 * `qml.qjit` now integrates with the new `qml.set_shots` function.
   [(#1784)](https://github.com/PennyLaneAI/catalyst/pull/1784)
 
