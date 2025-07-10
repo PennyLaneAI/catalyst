@@ -377,9 +377,6 @@
   The Enzyme version has been updated to 
   [v0.0.180](https://github.com/EnzymeAD/Enzyme/releases/tag/v0.0.180).
 
-* The Sphinx version has been updated to v8.1.
-  [(#1734)](https://github.com/PennyLaneAI/catalyst/pull/1734)
-
 * (Device developers only) Device parameters which are forwarded by the Catalyst runtime
  to plugin devices as a string may not contain nested dictionaries. Previously, these would
  be parsed incorrectly, and instead will now raise an error.
@@ -429,6 +426,9 @@
 
 * The clang-format and clang-tidy versions used by Catalyst have been updated to v20.
   [(#1721)](https://github.com/PennyLaneAI/catalyst/pull/1721)
+
+* The Sphinx version has been updated to v8.1.
+  [(#1734)](https://github.com/PennyLaneAI/catalyst/pull/1734)
 
 * Integration with PennyLane's experimental Python compiler based on xDSL has been added. This 
   allows developers and users to write xDSL transformations that can be used with Catalyst.
