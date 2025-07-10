@@ -21,6 +21,7 @@ import copy
 import sys
 from collections.abc import Sized
 from contextlib import nullcontext
+from functools import partial
 from typing import Any, Callable, List, Optional, Union
 
 import jax

@@ -244,7 +244,7 @@ def sort_eqns(eqns: List[JaxprEqn], forced_order_primitives: Set[JaxprPrimitive]
             if not isinstance(v, jax.core.Tracer):
                 # constant literal invar, no need to track def use order
                 continue
-            elif v.count in origin:
+            if v.count in origin:
                 b.parents.append(origin[v.count])
     for i, q in fixedorder:
         for b in boxes[i + 1 :]:
