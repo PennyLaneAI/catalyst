@@ -17,7 +17,6 @@ This submodule defines a utility for converting plxpr into Catalyst jaxpr.
 # pylint: disable=protected-access
 from functools import partial
 from typing import Callable
-from uuid import uuid4
 
 import jax
 import jax.core
@@ -28,7 +27,6 @@ from jax.extend.core import ClosedJaxpr, Jaxpr
 from jax.extend.linear_util import wrap_init
 from pennylane.capture import PlxprInterpreter, pause, qnode_prim
 from pennylane.capture.expand_transforms import ExpandTransformsInterpreter
-from pennylane.capture.primitives import grad_prim as plxpr_grad_prim
 from pennylane.capture.primitives import measure_prim as plxpr_measure_prim
 from pennylane.ftqc.primitives import measure_in_basis_prim as plxpr_measure_in_basis_prim
 from pennylane.ops.functions.map_wires import _map_wires_transform as pl_map_wires
@@ -44,7 +42,6 @@ from catalyst.device import extract_backend_info, get_device_capabilities
 from catalyst.from_plxpr.qreg_manager import QregManager
 from catalyst.jax_extras import jaxpr_pad_consts, make_jaxpr2, transient_jax_config, wrap_init
 from catalyst.jax_primitives import (
-    GradParams,
     MeasurementPlane,
     compbasis_p,
     cond_p,
@@ -52,9 +49,7 @@ from catalyst.jax_primitives import (
     device_init_p,
     device_release_p,
     expval_p,
-    func_p,
     gphase_p,
-    grad_p,
     hamiltonian_p,
     measure_in_basis_p,
     measure_p,
@@ -218,29 +213,6 @@ def handle_qnode(
     )
 
 
-@WorkflowInterpreter.register_primitive(plxpr_grad_prim)
-def _(self, *args, argnum, jaxpr, h, n_consts, method):
-    consts = args[:n_consts]
-    args = args[n_consts:]
-    grad_params = GradParams(
-        method=method or "auto",
-        scalar_out=True,
-        argnums=argnum,
-        expanded_argnums=argnum,
-        h=h,
-    )
-
-    jaxpr = ClosedJaxpr(jaxpr, consts)
-
-    def _eval_jaxpr(*inner_args):
-        return jax.core.eval_jaxpr(jaxpr.jaxpr, jaxpr.consts, *inner_args)
-    
-    def add_in_func_call(*inner_args):
-        return func_p.bind(wrap_init(_eval_jaxpr), *inner_args, call_jaxpr=jaxpr, fn=None)#type(str(uuid4()), (), {}))
-    
-    new_jaxpr = jax.make_jaxpr(add_in_func_call)(*args)
-
-    return grad_p.bind(*args, fn=None, jaxpr=new_jaxpr, grad_params=grad_params)
 # The map below describes the parity between PL transforms and Catalyst passes.
 # PL transforms having a Catalyst pass counterpart will have a name as value,
 # otherwise their value will be None. The second value indicates if the transform
