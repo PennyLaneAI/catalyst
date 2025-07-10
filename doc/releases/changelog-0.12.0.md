@@ -269,11 +269,21 @@
   introduced in PennyLane v0.42.
   [(#1784)](https://github.com/PennyLaneAI/catalyst/pull/1784)
 
-* `null.qubit` can now support an optional `track_resources` argument, which allows it to record 
-  which gates are executed.
+* `null.qubit` can now support an optional `track_resources` keyword argument, which allows it to record 
+  which gates are executed. 
   [(#1619)](https://github.com/PennyLaneAI/catalyst/pull/1619)
 
 <h3>Breaking changes 💔</h3>
+
+* Support for Mac x86 has been removed. This includes Macs running on Intel processors.
+  [(#1716)](https://github.com/PennyLaneAI/catalyst/pull/1716)
+
+  This is because 
+  [JAX has also dropped support for it since 0.5.0](https://github.com/jax-ml/jax/blob/main/CHANGELOG.md#jax-050-jan-17-2025),
+  with the rationale being that such machines are becoming increasingly scarce.
+
+  If support for Mac x86 platforms is still desired, please install Catalyst v0.11.0, PennyLane 
+  v0.41.0, PennyLane-Lightning v0.41.0, and JAX v0.4.28.
 
 * (Device Developers Only) The `QuantumDevice` interface in the Catalyst Runtime plugin system has been modified, which
   requires recompiling plugins for binary compatibility.
@@ -367,19 +377,6 @@
   The Enzyme version has been updated to 
   [v0.0.180](https://github.com/EnzymeAD/Enzyme/releases/tag/v0.0.180).
 
-* The clang-format and clang-tidy versions used by Catalyst have been updated to v20.
-  [(#1721)](https://github.com/PennyLaneAI/catalyst/pull/1721)
-
-* Support for Mac x86 has been removed. This includes Macs running on Intel processors.
-  [(#1716)](https://github.com/PennyLaneAI/catalyst/pull/1716)
-
-  This is because 
-  [JAX has also dropped support for it since 0.5.0](https://github.com/jax-ml/jax/blob/main/CHANGELOG.md#jax-050-jan-17-2025),
-  with the rationale being that such machines are becoming increasingly scarce.
-
-  If support for Mac x86 platforms is still desired, please install Catalyst v0.11.0, PennyLane 
-  v0.41.0, PennyLane-Lightning v0.41.0, and JAX v0.4.28.
-
 * The Sphinx version has been updated to v8.1.
   [(#1734)](https://github.com/PennyLaneAI/catalyst/pull/1734)
 
@@ -391,7 +388,7 @@
 
 <h3>Deprecations 👋</h3>
 
-🦗... 🦗... 
+* Python 3.10 is now deprecated and will not be supported in Catalyst v0.13. Please upgrade to a newer Python version.
 
 <h3>Bug fixes 🐛</h3>
 
@@ -429,6 +426,9 @@
   [(#1842)](https://github.com/PennyLaneAI/catalyst/pull/1842)
 
 <h3>Internal changes ⚙️</h3>
+
+* The clang-format and clang-tidy versions used by Catalyst have been updated to v20.
+  [(#1721)](https://github.com/PennyLaneAI/catalyst/pull/1721)
 
 * Integration with PennyLane's experimental Python compiler based on xDSL has been added. This 
   allows developers and users to write xDSL transformations that can be used with Catalyst.
