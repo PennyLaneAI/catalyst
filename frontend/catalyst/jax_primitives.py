@@ -1591,7 +1591,6 @@ def custom_measurement_staging_rule(
     See jax._src.interpreters.partial_eval.process_primitive and default_process_primitive,
     https://github.com/jax-ml/jax/blob/a54319ec1886ed920d50cacf10e147a743888464/jax/_src/interpreters/partial_eval.py#L1881C7-L1881C24
     """
-
     shape = _merge_dyn_shape(static_shape, dynamic_shape)
     if not dynamic_shape:
         # Some PL transforms, like @qml.batch_params, do not support dynamic shapes yet
@@ -1625,7 +1624,7 @@ def custom_measurement_staging_rule(
 #
 # sample measurement
 #
-def sample_staging_rule(jaxpr_trace, obs, *dynamic_shape, static_shape):
+def sample_staging_rule(jaxpr_trace, _src, obs, *dynamic_shape, static_shape):
     """
     The result shape of `sample_p` is (shots, num_qubits).
     """
@@ -1677,7 +1676,7 @@ def _sample_lowering(
 #
 # counts measurement
 #
-def counts_staging_rule(jaxpr_trace, obs, *dynamic_shape, static_shape):
+def counts_staging_rule(jaxpr_trace, _src, obs, *dynamic_shape, static_shape):
     """
     The result shape of `counts_p` is (tensor<Nxf64>, tensor<Nxi64>)
     where N = 2**number_of_qubits.
@@ -1799,7 +1798,7 @@ def _var_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shape=None):
 #
 # probs measurement
 #
-def probs_staging_rule(jaxpr_trace, obs, *dynamic_shape, static_shape):
+def probs_staging_rule(jaxpr_trace, _src, obs, *dynamic_shape, static_shape):
     """
     The result shape of probs_p is (2^num_qubits,).
     """
@@ -1843,7 +1842,7 @@ def _probs_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, *dynamic_s
 #
 # state measurement
 #
-def state_staging_rule(jaxpr_trace, obs, *dynamic_shape, static_shape):
+def state_staging_rule(jaxpr_trace, _src, obs, *dynamic_shape, static_shape):
     """
     The result shape of state_p is (2^num_qubits,).
     """

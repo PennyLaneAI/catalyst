@@ -32,9 +32,11 @@ from typing import (
     Tuple,
     TypeVar,
 )
+from functools import partial
 
 import jax
 from jax import ShapeDtypeStruct
+from jax._src.source_info_util import current as current_source_info
 from jax._src.core import DBIdx, InDBIdx, InputType, OutDBIdx, OutputType
 from jax._src.interpreters.mlir import _module_name_regex, register_lowering
 from jax._src.interpreters.partial_eval import (
@@ -76,7 +78,7 @@ from jax.tree_util import (
     tree_unflatten,
     treedef_is_leaf,
 )
-from jaxlib.xla_extension import PyTreeRegistry
+from jaxlib._jax.pytree import PyTreeRegistry
 
 from catalyst.jax_extras.patches import gather2_p, get_aval2
 from catalyst.logging import debug_logger
@@ -235,7 +237,15 @@ def sort_eqns(eqns: List[JaxprEqn], forced_order_primitives: Set[JaxprPrimitive]
     for b in boxes:
         origin.update({ov.count: b for ov in b.e.outvars})  # [1]
     for b in boxes:
-        b.parents = [origin[v.count] for v in b.e.invars if v.count in origin]  # [2]
+        # breakpoint()
+        # b.parents = [origin[v.count] for v in b.e.invars if v.count in origin]  # [2]
+        b.parents = []
+        for v in b.e.invars:
+            if not isinstance(v, jax.core.Tracer):
+                # constant literal invar, no need to track def use order
+                continue
+            elif v.count in origin:
+                b.parents.append(origin[v.count])
     for i, q in fixedorder:
         for b in boxes[i + 1 :]:
             b.parents.append(q)  # [3]
@@ -245,7 +255,8 @@ def sort_eqns(eqns: List[JaxprEqn], forced_order_primitives: Set[JaxprPrimitive]
 def jaxpr_pad_consts(jaxprs: List[Jaxpr]) -> List[ClosedJaxpr]:
     """Align the constants of Jaxpr programs. Return the list of corresponding programs accepting
     the same constants."""
-    newvar = gensym("_")
+    # breakpoint()
+    newvar = gensym()
 
     # List of constant variables of all jaxprs, preprended with '_'
     all_mangled_constvars: List[List[Var]] = []
@@ -380,7 +391,7 @@ def deduce_signatures(
     """
     flat_args, in_tree = tree_flatten((args, kwargs))
     trace: DynamicJaxprTrace = find_top_trace(flat_args)
-    flat_tracers = [trace.to_jaxpr_tracer(a) for a in flat_args]
+    flat_tracers = [trace.to_jaxpr_tracer(a, current_source_info()) for a in flat_args]
     in_expanded_args, in_type = expand_args(flat_tracers, expansion_strategy=expansion_strategy)
     wf = wrap_init(f, debug_info=debug_info)
     wf, out_tree_promise = flatten_fun(wf, in_tree)
@@ -735,14 +746,14 @@ def infer_output_type_python(
     """
 
     trace: DynamicJaxprTrace = find_top_trace(expanded_inputs)
-    outputs = [trace.to_jaxpr_tracer(t) for t in outputs]
+    outputs = [trace.to_jaxpr_tracer(t, current_source_info()) for t in outputs]
 
     # Calculate the constants. We need it to set InDBIdx correctly
     _, _, consts = trace_to_jaxpr(trace, expanded_inputs, outputs)
 
     # Calculate output type containing the correct De Brjuin indices
     expanded_outputs, out_type = infer_output_type(
-        [trace.to_jaxpr_tracer(t) for t in consts],
+        [trace.to_jaxpr_tracer(t, current_source_info()) for t in consts],
         expanded_inputs,
         outputs,
         expansion_strategy,
@@ -901,7 +912,7 @@ class DynshapePrimitive(JaxprPrimitive):
         # explicitness.
 
         trace = find_top_trace(args)
-        tracers = map(trace.to_jaxpr_tracer, args)
+        tracers = map(partial(trace.to_jaxpr_tracer, source_info=current_source_info()), args)
         source_info = jax_current()
 
         in_type = infer_lambda_input_type(None, tracers)
