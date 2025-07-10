@@ -73,23 +73,15 @@ struct RoutingPass : public impl::RoutingPassBase<RoutingPass> {
         return res;
     }
 
-    int countLogicalQubit(Operation *op) {
-        // TODO: This will be 0 in case of automatic_qubit_management, 
-        // in which case consider all physical qubit in the map
-        // with condition being logical qubit count 
-        // should not exceed physical qubit count
-        int numQubits = cast<quantum::AllocOp>(op).getNqubitsAttr().value_or(0);
-        assert(numQubits != 0 && "PPM specs with dynamic number of qubits is not implemented");
-        return numQubits;
-    }
+    std::vector<int> generateRandomInitialMapping(std::set<int> *physicalQubits) {
+        std::vector<int> randomInitialMapping((*physicalQubits).begin(), (*physicalQubits).end());
+        // TODO: Generating completely random mapping is inefficient
+        // Replace this with some initial mapping algorithm like BFS or Simulated Annealing
 
-    std::vector<int> generateRandomInitialMapping(std::set<int> *physicalQubits, int numLogicalQubits) {
-        std::vector<int> tempVec((*physicalQubits).begin(), (*physicalQubits).end());
         // Random number generator
         std::random_device rd;
         std::mt19937 g(rd());
-        std::shuffle(tempVec.begin(), tempVec.end(), g);
-        std::vector<int> randomInitialMapping(tempVec.begin(), tempVec.begin() + numLogicalQubits);
+        std::shuffle(randomInitialMapping.begin(), randomInitialMapping.end(), g);
         return randomInitialMapping;
     }
 
@@ -117,7 +109,7 @@ struct RoutingPass : public impl::RoutingPassBase<RoutingPass> {
         std::set<int> physicalQubits;
         llvm::DenseMap<std::pair<int, int>, bool> couplingMap = parseHardwareGraph(hardwareGraph, ";", &physicalQubits);
         int numPhysicalQubits = physicalQubits.size();
-        int numLogicalQubits = physicalQubits.size();
+        int numLogicalQubits = physicalQubits.size(); // works with automatic qubit management
 
         llvm::outs() << "Number of Physical Qubits on the Hardware : " << numPhysicalQubits << "\n";
         llvm::outs() << "Physical Qubits on the Hardware :\n";
@@ -135,8 +127,7 @@ struct RoutingPass : public impl::RoutingPassBase<RoutingPass> {
 
         getOperation()->walk([&](Operation *op) {
             if (isa<quantum::AllocOp>(op)) {
-                numLogicalQubits = countLogicalQubit(op);
-                randomInitialMapping =  generateRandomInitialMapping(&physicalQubits, numLogicalQubits);
+                randomInitialMapping =  generateRandomInitialMapping(&physicalQubits);
 
                 llvm::outs() << "Number of Logical Qubits in the Circuit : " << numLogicalQubits << "\n";
                 llvm::outs() << "Random Initial Mapping:\n";
