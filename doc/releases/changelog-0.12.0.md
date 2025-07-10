@@ -3,7 +3,8 @@
 <h3>New features since last release</h3>
 
 * A new compilation pass called :func:`~.passes.ppm_compilation` has been added to Catalyst to
-  transform Clifford+T gates into Pauli Product Measurements (PPMs) using just one transform.
+  transform Clifford+T gates into Pauli Product Measurements (PPMs) using just one transform, allowing for 
+  exploring representations of programs in a new paradigm in logical quantum compilation.
   [(#1750)](https://github.com/PennyLaneAI/catalyst/pull/1750)
   
   Based on [arXiv:1808.02892](https://arxiv.org/abs/1808.02892v3), this new compilation pass 
@@ -147,7 +148,13 @@
       return qml.probs()
 
   results = circuit()
-  print(results)
+  snapshots, *results = circuit()
+  
+  >>> print(snapshots)
+  [Array([1.+0.j, 0.+0.j, 0.+0.j, 0.+0.j], dtype=complex128), 
+  Array([0.5+0.j, 0.5+0.j, 0.5+0.j, 0.5+0.j], dtype=complex128)]
+  >>> print(results)
+  Array([0.25, 0.25, 0.25, 0.25], dtype=float64)
   ```
 
   ```pycon
@@ -178,9 +185,12 @@
   [0. 1. 0. 0. 0. 0. 0. 0.]
   ```
 
+  While this feature adds a lot of convenience, it may also reduce performance on devices where
+  reallocating resources can be expensive, such as statevector simulators.
+
 * Two new peephole-optimization compilation passes called :func:`~.passes.disentangle_cnot` and 
   :func:`~.passes.disentangle_swap` have been added. Each compilation pass replaces `SWAP` or `CNOT`
-  instructions at the MLIR level with other equivalent elementary gates.
+  instructions with other equivalent elementary gates.
   [(#1823)](https://github.com/PennyLaneAI/catalyst/pull/1823)
 
   As an example, :func:`~.passes.disentangle_cnot` applied to the circuit below will replace the 
@@ -244,7 +254,7 @@
 
 * The `keep_intermediate` argument in the `qjit` decorator now accepts a new value that allows for
   saving intermediate files after each pass. The updated possible options for this argument are:
-  - `False` or `0` or `"none"` or `None` : No intermediate files are kept.
+  - `False` or `0` or `None` : No intermediate files are kept.
   - `True` or `1` or `"pipeline"`: Intermediate files are saved after each pipeline.
   - `2` or `"pass"`: Intermediate files are saved after each pass.
 
@@ -265,7 +275,7 @@
 
 <h3>Breaking changes 💔</h3>
 
-* The `QuantumDevice` interface in the Catalyst Runtime plugin system has been modified, which 
+* (Device Developers Only) The `QuantumDevice` interface in the Catalyst Runtime plugin system has been modified, which
   requires recompiling plugins for binary compatibility.
   [(#1680)](https://github.com/PennyLaneAI/catalyst/pull/1680)
 
@@ -284,7 +294,7 @@
   Finally, the `PrintState` and the `One`/`Zero` utility functions have been removed, since they
   did not serve a convincing purpose.
 
-* Some Catalyst primitives for JAX have been renamed, and the qubit deallocation primitive has been 
+* (Frontend Developers Only) Some Catalyst primitives for JAX have been renamed, and the qubit deallocation primitive has been 
   split into deallocation and a separate device release primitive.
   [(#1720)](https://github.com/PennyLaneAI/catalyst/pull/1720)
 
@@ -373,8 +383,9 @@
 * The Sphinx version has been updated to v8.1.
   [(#1734)](https://github.com/PennyLaneAI/catalyst/pull/1734)
 
-* The device kwarg parsing in the Catalyst runtime has been updated to disallow nested dictionary 
-  formats.
+* (Device developers only) Device parameters which are forwarded by the Catalyst runtime
+ to plugin devices as a string may not contain nested dictionaries. Previously, these would
+ be parsed incorrectly, and instead will now raise an error.
   [(#1843)](https://github.com/PennyLaneAI/catalyst/pull/1843)
   [(#1846)](https://github.com/PennyLaneAI/catalyst/pull/1846)
 
