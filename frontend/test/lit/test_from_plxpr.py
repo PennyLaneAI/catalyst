@@ -304,6 +304,7 @@ def test_single_qubit_dynamic_static_interleaved():
 
 test_single_qubit_dynamic_static_interleaved()
 
+
 def test_multi_qubit_gates_on_different_dynamic_wires():
     """Multi-qubit gates on different dynamic wires."""
 
@@ -334,5 +335,6 @@ def test_multi_qubit_gates_on_different_dynamic_wires():
 
     print(circuit.mlir)
     qml.capture.disable()
+
 
 test_multi_qubit_gates_on_different_dynamic_wires()
