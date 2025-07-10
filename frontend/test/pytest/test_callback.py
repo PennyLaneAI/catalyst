@@ -38,7 +38,7 @@ def test_callback_no_tracing(arg):
     stays the same."""
 
     @base_callback
-    def identity(x):
+    def identity(x) -> int:
         return x
 
     assert identity(arg) == arg

@@ -484,7 +484,7 @@ class CallbackWithPotentialCustomGrad:
         self._bwd = func
 
     def __call__(self, *args, **kwargs):
-        if not EvaluationContext.is_tracing():
+        if not capture_enabled() and not EvaluationContext.is_tracing():
             # If we are not in the tracing context, just evaluate the function.
             return self.func(*args, **kwargs)
 
@@ -689,9 +689,11 @@ def callback_implementation(
         custom_grad=custom_grad,
         results_aval=tuple(flat_results_aval),
     )
-    return tree_unflatten(out_tree, out_flat)
+    return tree_unflatten(out_tree, out_flat) if out_tree else out_flat
 
 @python_callback_p.def_impl
 def _python_callback_def_impl(*args, callback, custom_grad, results_aval):  # pragma: no cover
     """Concrete evaluation"""
-    return FlatCallable.__call__(callback, args)
+
+    out = FlatCallable.__call__(callback, args)
+    return out
