@@ -29,6 +29,7 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
+#include "llvm/ADT/DenseMap.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/Support/Debug.h"
@@ -48,31 +49,14 @@ namespace catalyst {
 #include "Quantum/Transforms/Passes.h.inc"
 
 
-// struct mapAndRoute : public OpRewritePattern<QubitUnitaryOp>
-// {
-//     ...
-
-//     LogicalResult match(QubitUnitaryOp op) const override {
-//         // The ``match`` method returns ``success()`` if the pattern is a match, failure
-//         // otherwise.
-//     }
-
-//     void rewrite(QubitUnitaryOp op, PatternRewriter &rewriter) {
-//         // The ``rewrite`` method performs mutations on the IR rooted at ``op`` using
-//         // the provided rewriter. All mutations must go through the provided rewriter.
-//     }
-
-//     ...
-// };
-
 
 struct RoutingPass : public impl::RoutingPassBase<RoutingPass> {
     using impl::RoutingPassBase<RoutingPass>::RoutingPassBase;
 
-    std::vector<std::pair<int, int>> parseHardwareGraph(std::string s, std::string delimiter, std::set<int> *physicalQubits) {
+    llvm::DenseMap<std::pair<int, int>, bool> parseHardwareGraph(std::string s, std::string delimiter, std::set<int> *physicalQubits) {
         size_t pos_start = 0, pos_end, delim_len = delimiter.length();
         std::string token;
-        std::vector< std::pair<int, int> > res;
+        llvm::DenseMap<std::pair<int, int>, bool> res;
 
         while ((pos_end = s.find(delimiter, pos_start)) != std::string::npos) {
             token = s.substr (pos_start, pos_end - pos_start);
@@ -81,10 +65,10 @@ struct RoutingPass : public impl::RoutingPassBase<RoutingPass> {
             size_t commaPos = token.find(',');
             int u = std::stoi(token.substr(1, commaPos));
             int v = std::stoi(token.substr(commaPos + 1, token.size() - 2));
-            std::pair<int, int> edge = std::make_pair(u,v);
             (*physicalQubits).insert(u);
             (*physicalQubits).insert(v);
-            res.push_back(edge);
+            res[std::make_pair(u,v)] = true;
+            res[std::make_pair(v,u)] = true;
         }
         return res;
     }
@@ -131,7 +115,7 @@ struct RoutingPass : public impl::RoutingPassBase<RoutingPass> {
     void runOnOperation() override {
 
         std::set<int> physicalQubits;
-        std::vector<std::pair<int, int>> couplingMap = parseHardwareGraph(hardwareGraph, ";", &physicalQubits);
+        llvm::DenseMap<std::pair<int, int>, bool> couplingMap = parseHardwareGraph(hardwareGraph, ";", &physicalQubits);
         int numPhysicalQubits = physicalQubits.size();
         int numLogicalQubits = physicalQubits.size();
 
@@ -140,7 +124,12 @@ struct RoutingPass : public impl::RoutingPassBase<RoutingPass> {
         for (auto i : physicalQubits) llvm::outs() << i << "\n";
 
         llvm::outs() << "Hardware Topology :\n";
-        for (auto i : couplingMap) llvm::outs() << "(" << i.first << "," << i.second << ")\n";
+        for (auto& entry : couplingMap) {
+            std::pair<int, int>& key = entry.first;
+            bool value = entry.second;
+            llvm::outs() << "(" << key.first << ", " << key.second << ") => " 
+                    << (value ? "true" : "false") << "\n";
+        }
 
         std::vector<int> randomInitialMapping;
 
@@ -156,16 +145,43 @@ struct RoutingPass : public impl::RoutingPassBase<RoutingPass> {
             }
             else if (isa<quantum::CustomOp>(op)) {
 
-                StringRef gate = cast<quantum::CustomOp>(op).getGateName();
+                StringRef gateName = cast<quantum::CustomOp>(op).getGateName();
                 int nQubits = cast<quantum::CustomOp>(op).getInQubits().size();
-                llvm::outs() << "Gate name: " << gate << "\n";
-                llvm::outs() << "Gate Qubits: " << nQubits << "\n";
-                llvm::outs() << *op << "\n";
+                auto inQubits = cast<quantum::CustomOp>(op).getInQubits();
                 
-                for (auto inQubit : cast<quantum::CustomOp>(op).getInQubits()) {
-                    int temp = getRegisterIndexOfOp(inQubit);
-                    llvm::outs() << "Qubit " << temp << "->" << randomInitialMapping[temp] << "\n";
-                } 
+                if (nQubits == 2) {
+                    llvm::outs() << "Gate name: " << gateName << "\n";
+                    int logical_Qubit_0 = getRegisterIndexOfOp(inQubits[0]);
+                    int logical_Qubit_1 = getRegisterIndexOfOp(inQubits[1]);
+                    std::pair<int, int> logical_Edge = std::make_pair(logical_Qubit_0,logical_Qubit_1);
+                    llvm::outs() << "Logical qubit: (" << logical_Qubit_0 << "," << logical_Qubit_1 << ")\n";
+                    if (couplingMap[logical_Edge])
+                        // If logical qubits are connected, no need to change gate
+                        llvm::outs() << "Physical qubit connected: (" << randomInitialMapping[logical_Qubit_0] << "," << randomInitialMapping[logical_Qubit_1] << ")\n";
+                    else
+                        // ig logical qubits not connected, call Z3 solver to find what SWAPs to insert
+                        llvm::outs() << "Physical qubit not connected: (" << randomInitialMapping[logical_Qubit_0] << "," << randomInitialMapping[logical_Qubit_1] << ")\n";
+                    
+                }
+
+
+                // Rewrite gate
+                // mlir::OpBuilder builder(op); // Create OpBuilder
+                // builder.setInsertionPoint(op);
+
+                // auto loc = op->getLoc();
+                // auto newOp = builder.create<quantum::CustomOp>(loc,
+                //     /*out_qubits=*/mlir::TypeRange({cast<quantum::CustomOp>(op).getOutQubits().getTypes()}),
+                //     /*out_ctrl_qubits=*/mlir::TypeRange(),
+                //     /*params=*/mlir::ValueRange({cast<quantum::CustomOp>(op).getParams()}),
+                //     /*in_qubits=*/mlir::ValueRange({cast<quantum::CustomOp>(op).getInQubits()}),
+                //     /*gate_name=*/gateName,
+                //     /*adjoint=*/false,
+                //     /*in_ctrl_qubits=*/mlir::ValueRange(),
+                //     /*in_ctrl_values=*/mlir::ValueRange());
+
+                // op->replaceAllUsesWith(newOp->getResults());
+                // op->erase();
                     
             }
         });
