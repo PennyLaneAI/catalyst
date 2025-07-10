@@ -96,11 +96,7 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
         StringRef funcName = parentFuncOp.getName();
         llvm::StringSaver saver(*stringAllocator);
         StringRef numRotationKindKey =
-            saver.save("num_pi" +
-
-
-
-                std::to_string(abs(rotationKind)) + "_gates");
+            saver.save("num_pi" + std::to_string(abs(rotationKind)) + "_gates");
         StringRef maxWeightRotationKindKey =
             saver.save("max_weight_pi" + std::to_string(abs(rotationKind)));
 
