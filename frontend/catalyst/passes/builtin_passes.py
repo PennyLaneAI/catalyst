@@ -989,7 +989,11 @@ def get_ppm_specs(fn):
         - Number of logical qubits
         - Number of PPMs
 
-    PPM Specs are returned after the last PPM compilation pass is run
+    PPM Specs are returned after the last PPM compilation pass is run.
+
+    When there is control flow, this function can count the above statistics inside for loops with
+    a statically known number of iterations. For all other cases, including dynamically sized for
+    loops, and any conditionals and while loops, this pass exits with failure.
 
     Args:
         fn (QJIT): qjit-decorated function for which ppm_specs need to be printed
@@ -1002,7 +1006,7 @@ def get_ppm_specs(fn):
     .. code-block:: python
 
         import pennylane as qml
-        from catalyst import qjit, measure
+        from catalyst import qjit, measure, for_loop
         from catalyst.passes import get_ppm_specs, ppm_compilation
 
         pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
@@ -1014,6 +1018,10 @@ def get_ppm_specs(fn):
         def circuit():
             qml.H(0)
             qml.CNOT([0,1])
+            @for_loop(0,10,1)
+            def loop(i):
+                qml.T(1)
+            loop()
             return measure(0), measure(1)
 
         ppm_specs = get_ppm_specs(circuit)
@@ -1026,8 +1034,10 @@ def get_ppm_specs(fn):
         . . .
         {
             'circuit_0': {
+                        'max_weight_pi2': 2,
                         'num_logical_qubits': 2,
-                        'num_of_ppm': 2,
+                        'num_of_ppm': 44,
+                        'num_pi2_gates': 16
                     },
         }
         . . .
