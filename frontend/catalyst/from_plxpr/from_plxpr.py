@@ -50,6 +50,7 @@ from catalyst.jax_primitives import (
     device_release_p,
     expval_p,
     gphase_p,
+    hamiltonian_p,
     measure_in_basis_p,
     measure_p,
     namedobs_p,
@@ -63,6 +64,7 @@ from catalyst.jax_primitives import (
     set_basis_state_p,
     set_state_p,
     state_p,
+    tensorobs_p,
     unitary_p,
     var_p,
 )
@@ -338,8 +340,12 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
 
     def _obs(self, obs):
         """Interpret the observable equation corresponding to a measurement equation's input."""
+        if isinstance(obs, qml.ops.Prod):
+            return tensorobs_p.bind(*(self._obs(t) for t in obs))
         if obs.arithmetic_depth > 0:
-            raise NotImplementedError("operator arithmetic not yet supported for conversion.")
+            coeffs, terms = obs.terms()
+            terms = [self._obs(t) for t in terms]
+            return hamiltonian_p.bind(jnp.stack(coeffs), *terms)
         wires = [self.qreg_manager[w] for w in obs.wires]
         return namedobs_p.bind(*wires, *obs.data, kind=obs.name)
 
