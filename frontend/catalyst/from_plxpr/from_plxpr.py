@@ -326,6 +326,8 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
                 control_wires=control_wires + tuple(op.control_wires),
             )
 
+        self.qreg_manager.insert_dynamic_qubits(op.wires)
+
         in_qubits = [self.qreg_manager[w] for w in op.wires]
         control_wires = control_wires + self.control_wires
         control_values = control_values + self.control_values
