@@ -178,9 +178,6 @@ class QregManager:
             return self.wire_map[index]
         return self.extract(index)
 
-    def __len__(self) -> int:
-        return len(self.wire_map)
-
     def __setitem__(self, index: int, qubit: AbstractQbit):
         """
         Update the wire_map when a new qubit value for a wire index is produced,
