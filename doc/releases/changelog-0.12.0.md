@@ -414,9 +414,8 @@
 * Fixed the conversion of PLxPR to JAXPR with quantum primitives when using control flow.
   [(#1809)](https://github.com/PennyLaneAI/catalyst/pull/1809)
 
-* Fixed a bug that occurred when a qjit'd workflow contained Pythonic control flow and Autograph was 
-  turned off, leading to compilation passes being applied incorrectly and giving incorrect end 
-  results.
+* Fixed a bug in the internal simplification of qubit chains in the compiler, which manifested in 
+  certain transformations like `cancel_inverses ` and lead to incorrect results.
   [(#1840)](https://github.com/PennyLaneAI/catalyst/pull/1840)
 
 * Fixes the conversion of PLxPR to JAXPR with quantum primitives when using dynamic wires.
