@@ -24,10 +24,13 @@ import jax.core
 import jax.numpy as jnp
 import pennylane as qml
 from jax._src.sharding_impls import UNSPECIFIED
+from jax._src.tree_util import tree_flatten
 from jax.extend.core import ClosedJaxpr, Jaxpr
 from jax.extend.linear_util import wrap_init
+from jax.interpreters.partial_eval import convert_constvars_jaxpr
 from pennylane.capture import PlxprInterpreter, qnode_prim
 from pennylane.capture.expand_transforms import ExpandTransformsInterpreter
+from pennylane.capture.primitives import adjoint_transform_prim as plxpr_adjoint_transform_prim
 from pennylane.capture.primitives import ctrl_transform_prim as plxpr_ctrl_transform_prim
 from pennylane.capture.primitives import measure_prim as plxpr_measure_prim
 from pennylane.ftqc.primitives import measure_in_basis_prim as plxpr_measure_in_basis_prim
@@ -45,6 +48,7 @@ from catalyst.from_plxpr.qreg_manager import QregManager
 from catalyst.jax_extras import jaxpr_pad_consts, make_jaxpr2, transient_jax_config
 from catalyst.jax_primitives import (
     MeasurementPlane,
+    adjoint_p,
     compbasis_p,
     cond_p,
     counts_p,
@@ -588,6 +592,61 @@ def handle_ctrl_transform(self, *invals, jaxpr, n_control, control_values, work_
     unroller.control_values += tuple(control_values)
     unroller.eval(jaxpr, consts, *args)
     return []
+
+
+# pylint: disable=unused-argument
+@PLxPRToQuantumJaxprInterpreter.register_primitive(plxpr_adjoint_transform_prim)
+def handle_adjoint_transform(
+    self,
+    *plxpr_invals,
+    jaxpr,
+    lazy,
+    n_consts,
+):
+    """Handle the conversion from plxpr to Catalyst jaxpr for the adjoint primitive"""
+    assert jaxpr is not None
+    consts = plxpr_invals[:n_consts]
+    args = plxpr_invals[n_consts:]
+
+    # Add the iteration start and the qreg to the args
+    self.qreg_manager.insert_all_dangling_qubits()
+    qreg = self.qreg_manager.get()
+
+    jaxpr = ClosedJaxpr(jaxpr, consts)
+
+    def calling_convention(*args_plus_qreg):
+        *args, qreg = args_plus_qreg
+        device = self.device
+        shots = self.shots
+        # `qreg` is the scope argument for the body jaxpr
+        qreg_manager = QregManager(qreg)
+        converter = PLxPRToQuantumJaxprInterpreter(
+            device, shots, qreg_manager, self.subroutine_cache
+        )
+        retvals = converter(jaxpr, *args)
+        qreg_manager.insert_all_dangling_qubits()
+        return *retvals, converter.qreg_manager.get()
+
+    _, args_tree = tree_flatten((consts, args, [qreg]))
+    converted_jaxpr_branch = jax.make_jaxpr(calling_convention)(*consts, *args, qreg).jaxpr
+
+    converted_closed_jaxpr_branch = ClosedJaxpr(convert_constvars_jaxpr(converted_jaxpr_branch), ())
+
+    # Perform the binding
+    outvals = adjoint_p.bind(
+        *consts,
+        *args,
+        qreg,
+        jaxpr=converted_closed_jaxpr_branch,
+        args_tree=args_tree,
+    )
+
+    # We assume the last output value is the returned qreg.
+    # Update the current qreg and remove it from the output values.
+    self.qreg_manager.set(outvals.pop())
+
+    # Return only the output values that match the plxpr output values
+    return outvals
 
 
 # pylint: disable=too-many-positional-arguments
