@@ -87,7 +87,7 @@
 
   pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
 
-  @qjit(pipelines=pipe, target="mlir")
+  @qjit(pipelines=pipe, target="mlir", autograph=True)
   def test_convert_clifford_to_ppr_workflow():
 
       device = qml.device("lightning.qubit", wires=2)
@@ -110,6 +110,8 @@
           qml.T(0)
           qml.T(1)
           qml.CNOT([0, 1])
+          for i in range(10):
+            qml.Hadamard(0)
           return measure(0), measure(1)
 
       return f(), g()
@@ -120,7 +122,7 @@
   >>> print(ppm_specs)
   {
   'f_0': {'max_weight_pi8': 1, 'num_logical_qubits': 2, 'num_of_ppm': 2, 'num_pi8_gates': 1}, 
-  'g_0': {'max_weight_pi4': 2, 'max_weight_pi8': 1, 'num_logical_qubits': 2, 'num_of_ppm': 2, 'num_pi4_gates': 3, 'num_pi8_gates': 2}
+  'g_0': {'max_weight_pi4': 2, 'max_weight_pi8': 1, 'num_logical_qubits': 2, 'num_of_ppm': 2, 'num_pi4_gates': 36, 'num_pi8_gates': 2}
   }
   ```
 
