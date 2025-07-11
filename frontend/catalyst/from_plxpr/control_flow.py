@@ -18,7 +18,6 @@ Conversion from control flow plxpr primitives.
 
 
 import jax
-import jax.core
 from jax.extend.core import ClosedJaxpr
 from jax.interpreters.partial_eval import convert_constvars_jaxpr
 from pennylane.capture.primitives import cond_prim as plxpr_cond_prim
