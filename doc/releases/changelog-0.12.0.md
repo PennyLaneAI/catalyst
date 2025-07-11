@@ -66,7 +66,7 @@
 
 * A new function called :func:`~.passes.get_ppm_specs` has been added for acquiring 
   statistics after PPM compilation.
-  [(#1794)](https://github.com/PennyLaneAI/catalyst/pull/1794). 
+  [(#1794)](https://github.com/PennyLaneAI/catalyst/pull/1794)
   
   After compiling a workflow with any combination of :func:`~.passes.to_ppr`, 
   :func:`~.passes.commute_ppr`, :func:`~.passes.merge_ppr_ppm`, :func:`~.passes.ppr_to_ppm`, or
@@ -227,11 +227,10 @@
   in qjit-compiled circuits with program capture enabled.
   [(#1766)](https://github.com/PennyLaneAI/catalyst/pull/1766)
 
-  Note that using :func:`qml.measure <pennylane.measure>` in this way binds the operation to 
-  :func:`catalyst.measure`, which behaves differently than :func:`qml.measure <pennylane.measure>` 
-  in a native PennyLane circuit, as described in the *Functionality differences from PennyLane* 
-  section of the :doc:`sharp bits and debugging tips <sharp_bits>` guide. In regular qjit-compiled 
-  workflows (without program capture enabled), you must continue to use :func:`catalyst.measure`.
+  Note that the simulation behaviour of mid-circuit measurements can differ between PennyLane and
+  Catalyst, depending on the chosen `mcm_method`. Please see the 
+  *Functionality differences from PennyLane* section in the
+  :doc:`sharp bits and debugging tips page <sharp_bits>` for additional information.
 
 * The behaviour of measurement processes executed on `null.qubit` with qjit is now more consistent 
   with their behaviour on `null.qubit` *without* qjit.
