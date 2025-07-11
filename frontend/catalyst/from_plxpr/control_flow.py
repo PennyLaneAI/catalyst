@@ -263,7 +263,7 @@ def handle_adjoint_transform(
     lazy,
     n_consts,
 ):
-    """Handle the conversion from plxpr to Catalyst jaxpr for the for loop primitive"""
+    """Handle the conversion from plxpr to Catalyst jaxpr for the adjoint primitive"""
     assert jaxpr is not None
     consts = plxpr_invals[:n_consts]
     args = plxpr_invals[n_consts:]
