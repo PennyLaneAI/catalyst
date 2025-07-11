@@ -74,7 +74,6 @@ add_subdirectory(lib)
 add_subdirectory(tests)
 
 if(APPLE AND (${CMAKE_SYSTEM_PROCESSOR} STREQUAL arm64))
-
 # Don't rerun external project everytime we configure the runtime build.
 if(NOT EXISTS ${CMAKE_BINARY_DIR}/lib/liblapacke.3.dylib)
     execute_process(
