@@ -474,31 +474,12 @@ jobs:
         # macOS requirements.txt
         python3 -m pip install cuda-quantum==0.6.0
         python3 -m pip install oqc-qcaas-client
+        # TODO: --- remove workaround before merging to main ----------------- #
+        pip install git+https://github.com/PennyLaneAI/pennylane@v0.42.0-rc0
+        pip install --extra-index-url=https://test.pypi.org/simple/ PennyLane-Lightning==0.42.0
+        pip install --extra-index-url=https://test.pypi.org/simple/ PennyLane-Lightning-Kokkos==0.42.0
+        # -------------------------------------------------------------------- #
         make frontend
-
-    - name: Install PennyLane release candidate
-      if: github.event.pull_request.base.ref == 'v0.12.0-rc'
-      run: |
-        pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@v0.42.0-rc0
-
-    - name: Checkout PennyLane-Lightning release branch
-      if: github.event.pull_request.base.ref == 'v0.12.0-rc'
-      uses: actions/checkout@v4
-      with:
-        repository: PennyLaneAI/pennylane-lightning
-        ref: v0.42.0_rc
-        path: lightning_build
-        fetch-depth: 0
-
-    - name: Install PennyLane-Lightning release candidate
-      if: github.event.pull_request.base.ref == 'v0.12.0-rc'
-      run: |
-        # Lightning-Kokkos can no longer be installed with pip from git
-        cd lightning_build
-        pip install -r requirements.txt
-        pip install --no-deps --force .
-        PL_BACKEND=lightning_kokkos python scripts/configure_pyproject_toml.py
-        pip install --no-deps --force .
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
@@ -581,31 +562,12 @@ jobs:
         sudo apt-get install -y libomp-dev libasan6 make ninja-build
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
+        # TODO: --- remove workaround before merging to main ----------------- #
+        pip install git+https://github.com/PennyLaneAI/pennylane@v0.41.0-rc0
+        pip install --extra-index-url=https://test.pypi.org/simple/ PennyLane-Lightning==0.41.0
+        pip install --extra-index-url=https://test.pypi.org/simple/ PennyLane-Lightning-Kokkos==0.41.0
+        # -------------------------------------------------------------------- #
         make frontend
-
-    - name: Install PennyLane release candidate
-      if: github.event.pull_request.base.ref == 'v0.12.0-rc'
-      run: |
-        pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@v0.42.0-rc0
-
-    - name: Checkout PennyLane-Lightning release branch
-      if: github.event.pull_request.base.ref == 'v0.12.0-rc'
-      uses: actions/checkout@v4
-      with:
-        repository: PennyLaneAI/pennylane-lightning
-        ref: v0.42.0_rc
-        path: lightning_build
-        fetch-depth: 0
-
-    - name: Install PennyLane-Lightning release candidate
-      if: github.event.pull_request.base.ref == 'v0.12.0-rc'
-      run: |
-        # Lightning-Kokkos can no longer be installed with pip from git
-        cd lightning_build
-        pip install -r requirements.txt
-        pip install --no-deps --force .
-        PL_BACKEND=lightning_kokkos python scripts/configure_pyproject_toml.py
-        pip install --no-deps --force .
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
@@ -667,31 +629,12 @@ jobs:
         sudo apt-get install -y libomp-dev libasan6 make ninja-build
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
+        # TODO: --- remove workaround before merging to main ----------------- #
+        pip install git+https://github.com/PennyLaneAI/pennylane@v0.41.0-rc0
+        pip install --extra-index-url=https://test.pypi.org/simple/ PennyLane-Lightning==0.41.0
+        pip install --extra-index-url=https://test.pypi.org/simple/ PennyLane-Lightning-Kokkos==0.41.0
+        # -------------------------------------------------------------------- #
         make frontend
-
-    - name: Install PennyLane release candidate
-      if: github.event.pull_request.base.ref == 'v0.12.0-rc'
-      run: |
-        pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@v0.42.0-rc0
-
-    - name: Checkout PennyLane-Lightning release branch
-      if: github.event.pull_request.base.ref == 'v0.12.0-rc'
-      uses: actions/checkout@v4
-      with:
-        repository: PennyLaneAI/pennylane-lightning
-        ref: v0.42.0_rc
-        path: lightning_build
-        fetch-depth: 0
-
-    - name: Install PennyLane-Lightning release candidate
-      if: github.event.pull_request.base.ref == 'v0.12.0-rc'
-      run: |
-        # Lightning-Kokkos can no longer be installed with pip from git
-        cd lightning_build
-        pip install -r requirements.txt
-        pip install --no-deps --force .
-        PL_BACKEND=lightning_kokkos python scripts/configure_pyproject_toml.py
-        pip install --no-deps --force .
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
