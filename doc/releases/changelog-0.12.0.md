@@ -167,7 +167,7 @@
   ```
 
 * Catalyst now supports automatic qubit management, meaning that the number of wires does not need 
-  to be speficied during device initialization.
+  to be specified during device initialization.
   [(#1788)](https://github.com/PennyLaneAI/catalyst/pull/1788)
 
   ```python
@@ -422,7 +422,7 @@
   [(#1809)](https://github.com/PennyLaneAI/catalyst/pull/1809)
 
 * Fixed a bug in the internal simplification of qubit chains in the compiler, which manifested in 
-  certain transformations like `cancel_inverses ` and lead to incorrect results.
+  certain transformations like `cancel_inverses ` and led to incorrect results.
   [(#1840)](https://github.com/PennyLaneAI/catalyst/pull/1840)
 
 * Fixes the conversion of PLxPR to JAXPR with quantum primitives when using dynamic wires.
