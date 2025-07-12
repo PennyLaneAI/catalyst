@@ -88,9 +88,8 @@ jobs:
       - name: Compilers (All)
         id: compilers
         run: |
-          # TODO: add Clang after https://github.com/actions/runner-images/issues/8659 is fixed
           if [[ $MULTIPLE ]]; then
-            echo 'compilers=["gcc"]' >> $GITHUB_OUTPUT
+            echo 'compilers=["gcc", "clang"]' >> $GITHUB_OUTPUT
           else
             echo 'compilers=["gcc"]' >> $GITHUB_OUTPUT
           fi
