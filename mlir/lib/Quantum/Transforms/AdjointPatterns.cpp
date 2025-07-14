@@ -169,7 +169,9 @@ class AdjointGenerator {
             size_t numParams = params.size();
             SmallVector<Value> cachedParams(numParams);
             // popping gives the parameters in reverse
-            for (auto [idx, param] : llvm::enumerate(llvm::reverse(params))) {
+            auto reversed = llvm::to_vector(llvm::reverse(params));
+            for (size_t idx = 0; idx < reversed.size(); ++idx) {
+                auto param = reversed[idx];
                 Type paramType = param.getType();
                 verifyTypeIsCacheable(paramType, operation);
                 if (paramType.isF64()) {
