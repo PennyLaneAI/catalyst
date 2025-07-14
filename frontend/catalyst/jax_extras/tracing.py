@@ -21,7 +21,6 @@ import logging
 from contextlib import ExitStack, contextmanager
 from copy import copy
 from dataclasses import dataclass
-from functools import partial
 from typing import (
     Any,
     Callable,
@@ -47,7 +46,7 @@ from jax._src.lax.control_flow import _initial_style_jaxpr
 from jax._src.lax.slicing import _gather_lower, gather_p
 from jax._src.linear_util import annotate
 from jax._src.pjit import _extract_implicit_args, _flat_axes_specs
-from jax._src.source_info_util import current as current_source_info
+from jax._src.source_info_util import current as jax_current
 from jax._src.util import safe_map, unzip2, wraps
 from jax.api_util import flatten_fun
 from jax.core import (
@@ -381,7 +380,7 @@ def deduce_signatures(
     """
     flat_args, in_tree = tree_flatten((args, kwargs))
     trace: DynamicJaxprTrace = find_top_trace(flat_args)
-    flat_tracers = [trace.to_jaxpr_tracer(a, source_info=current_source_info()) for a in flat_args]
+    flat_tracers = [trace.to_jaxpr_tracer(a) for a in flat_args]
     in_expanded_args, in_type = expand_args(flat_tracers, expansion_strategy=expansion_strategy)
     wf = wrap_init(f, debug_info=debug_info)
     wf, out_tree_promise = flatten_fun(wf, in_tree)
@@ -435,7 +434,7 @@ def trace_to_jaxpr(
 def new_inner_tracer(trace: DynamicJaxprTrace, aval) -> DynamicJaxprTracer:
     """Create a JAX tracer tracing an abstract value ``aval`, without specifying its source
     primitive."""
-    dt = DynamicJaxprTracer(trace, aval, current_source_info())
+    dt = DynamicJaxprTracer(trace, aval, jax_current())
     trace.frame.tracers.append(dt)
     trace.frame.tracer_to_var[id(dt)] = trace.frame.newvar(aval)
     return dt
@@ -736,14 +735,14 @@ def infer_output_type_python(
     """
 
     trace: DynamicJaxprTrace = find_top_trace(expanded_inputs)
-    outputs = [trace.to_jaxpr_tracer(t, source_info=current_source_info()) for t in outputs]
+    outputs = [trace.to_jaxpr_tracer(t) for t in outputs]
 
     # Calculate the constants. We need it to set InDBIdx correctly
     _, _, consts = trace_to_jaxpr(trace, expanded_inputs, outputs)
 
     # Calculate output type containing the correct De Brjuin indices
     expanded_outputs, out_type = infer_output_type(
-        [trace.to_jaxpr_tracer(t, source_info=current_source_info()) for t in consts],
+        [trace.to_jaxpr_tracer(t) for t in consts],
         expanded_inputs,
         outputs,
         expansion_strategy,
@@ -902,8 +901,8 @@ class DynshapePrimitive(JaxprPrimitive):
         # explicitness.
 
         trace = find_top_trace(args)
-        tracers = map(partial(trace.to_jaxpr_tracer, source_info=current_source_info()), args)
-        source_info = current_source_info()
+        tracers = map(trace.to_jaxpr_tracer, args)
+        source_info = jax_current()
 
         in_type = infer_lambda_input_type(None, tracers)
         out_type, effects = self.abstract_eval(*in_type, **params)
