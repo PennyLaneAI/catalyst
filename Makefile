@@ -117,7 +117,7 @@ frontend:
 	# versions of a package with the same version tag (e.g. 0.38-dev0).
 	$(PYTHON) -m pip uninstall -y pennylane
 	$(PYTHON) -m pip install -e . --extra-index-url https://test.pypi.org/simple $(PIP_VERBOSE_FLAG)
-	rm -r frontend/PennyLane_Catalyst.egg-info
+	rm -r frontend/pennylane_catalyst.egg-info
 
 .PHONY: mlir llvm mhlo enzyme dialects runtime oqc
 mlir:
@@ -242,7 +242,7 @@ wheel:
 	$(PYTHON) -m pip wheel --no-deps . -w dist
 
 	rm -r $(MK_DIR)/build
-	rm -r frontend/PennyLane_Catalyst.egg-info
+	rm -r frontend/pennylane_catalyst.egg-info
 
 plugin-wheel: plugin
 	mkdir -p $(MK_DIR)/standalone_plugin_wheel/standalone_plugin/lib

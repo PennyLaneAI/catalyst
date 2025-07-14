@@ -14,7 +14,7 @@
 """Tests for mid-circuit measurements in Catalyst"""
 
 from dataclasses import asdict
-from functools import reduce
+from functools import partial, reduce
 from typing import Iterable, Sequence
 
 import jax.numpy as jnp
@@ -572,8 +572,9 @@ class TestDynamicOneShotIntegration:
         if measure_f in (qml.var, qml.expval) and (isinstance(meas_obj, list)):
             pytest.skip("Can't use wires/mcm lists with var or expval")
 
-        dq = qml.device("default.qubit", shots=shots, seed=8237945)
+        dq = qml.device("default.qubit", seed=8237945)
 
+        @partial(qml.set_shots, shots=shots)
         @qml.qnode(dq, postselect_mode=postselect_mode, mcm_method="deferred")
         def ref_func(x, y):
             qml.RX(x, 0)
@@ -590,9 +591,10 @@ class TestDynamicOneShotIntegration:
                 kwargs["all_outcomes"] = True
             return measure_f(**kwargs)
 
-        dev = qml.device(backend, wires=2, shots=shots)
+        dev = qml.device(backend, wires=2)
 
         @qjit(seed=123456)
+        @partial(qml.set_shots, shots=shots)
         @qml.qnode(dev, postselect_mode=postselect_mode, mcm_method="one-shot")
         def func(x, y):
             qml.RX(x, 0)

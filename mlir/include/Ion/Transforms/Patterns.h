@@ -23,7 +23,7 @@
 namespace catalyst {
 namespace ion {
 
-void populateQuantumToIonPatterns(mlir::RewritePatternSet &, const OQDDatabaseManager &);
+void populateGatesToPulsesPatterns(mlir::RewritePatternSet &, const OQDDatabaseManager &);
 void populateConversionPatterns(mlir::LLVMTypeConverter &typeConverter,
                                 mlir::RewritePatternSet &patterns);
 

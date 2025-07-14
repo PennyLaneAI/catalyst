@@ -157,3 +157,27 @@ func.func @test_multirz_adjoint_canonicalize(%arg0: f64) -> (!quantum.bit, !quan
     return %3#0, %3#1 : !quantum.bit, !quantum.bit
 }
 
+
+// CHECK-LABEL: test_interleaved_extract_insert
+func.func @test_interleaved_extract_insert() -> tensor<4xf64> {
+  %c1_i64 = arith.constant 1 : i64
+  %c0_i64 = arith.constant 0 : i64
+  quantum.device shots(%c0_i64) ["", "", ""]
+  %0 = quantum.alloc( 2) : !quantum.reg
+  // CHECK: [[QBIT:%.+]] = quantum.extract [[QREG:%.+]][
+  // CHECK: [[QBIT_1:%.+]] = quantum.custom "Hadamard"() [[QBIT]]
+  // CHECK: [[QREG_1:%.+]] = quantum.insert [[QREG]]
+  // CHECK-NOT: quantum.insert 
+  // COM: check that insert op canonicalization correctly removes unnecessary extract/inserts 
+  // CHECK: quantum.compbasis qreg [[QREG_1]]
+  %1 = quantum.extract %0[%c0_i64] : !quantum.reg -> !quantum.bit
+  %out_qubits = quantum.custom "Hadamard"() %1 : !quantum.bit
+  %2 = quantum.extract %0[%c1_i64] : !quantum.reg -> !quantum.bit
+  %3 = quantum.insert %0[%c0_i64], %out_qubits : !quantum.reg, !quantum.bit
+  %4 = quantum.insert %3[%c1_i64], %2 : !quantum.reg, !quantum.bit
+  %5 = quantum.compbasis qreg %4 : !quantum.obs
+  %6 = quantum.probs %5 : tensor<4xf64>
+  quantum.dealloc %4 : !quantum.reg
+  quantum.device_release
+  return %6 : tensor<4xf64>
+}

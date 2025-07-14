@@ -20,7 +20,7 @@
 
 namespace catalyst {
 
-std::unique_ptr<mlir::Pass> createQuantumToIonPass();
+std::unique_ptr<mlir::Pass> createGatesToPulsesPass();
 std::unique_ptr<mlir::Pass> createIonConversionPass();
 
 } // namespace catalyst
