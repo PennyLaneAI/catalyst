@@ -17,7 +17,6 @@ Conversion from control flow plxpr primitives.
 """
 from copy import copy
 
-
 import jax
 from jax.extend.core import ClosedJaxpr
 from jax.interpreters.partial_eval import convert_constvars_jaxpr
