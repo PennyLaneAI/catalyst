@@ -124,6 +124,7 @@ frontend:
 	#0.6.2: 1ad05bb26105f23ee7728b36cca12901fe70e187, Jun.17
 	# Some big milestones:
 	# 1d652ab7f4346a974cf5888ab23713e1a9c2ddba: the "source_info change"
+	pip install git+https://github.com/jax-ml/jax.git@1d652ab7f4346a974cf5888ab23713e1a9c2ddba
 
 .PHONY: mlir llvm mhlo enzyme dialects runtime oqc
 mlir:

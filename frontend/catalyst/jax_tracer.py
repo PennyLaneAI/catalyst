@@ -29,6 +29,7 @@ import jax
 import jax.numpy as jnp
 import pennylane as qml
 from jax._src.lax.lax import _extract_tracers_dyn_shape
+from jax._src.source_info_util import current as current_source_info
 from jax.api_util import debug_info as jdb
 from jax.core import get_aval
 from pennylane import QubitUnitary, QueuingManager
@@ -215,9 +216,12 @@ def retrace_with_result_types(jaxpr: ClosedJaxpr, target_types: List[ShapedArray
     with_qreg = isinstance(target_types[-1], AbstractQreg)
     with EvaluationContext(EvaluationMode.CLASSICAL_COMPILATION) as ctx:
         with EvaluationContext.frame_tracing_context() as trace:
-            in_tracers = _input_type_to_tracers(trace.new_arg, jaxpr.in_avals)
+            in_tracers = _input_type_to_tracers(
+                partial(trace.new_arg, source_info=current_source_info()), jaxpr.in_avals
+            )
             out_tracers = [
-                trace.to_jaxpr_tracer(t) for t in eval_jaxpr(jaxpr.jaxpr, jaxpr.consts, *in_tracers)
+                trace.to_jaxpr_tracer(t, source_info=current_source_info())
+                for t in eval_jaxpr(jaxpr.jaxpr, jaxpr.consts, *in_tracers)
             ]
             out_tracers_, target_types_ = (
                 (out_tracers[:-1], target_types[:-1]) if with_qreg else (out_tracers, target_types)
@@ -1250,8 +1254,14 @@ def trace_post_processing(trace, post_processing: Callable, pp_args, debug_info=
 
         # wffa will take as an input a flatten tracers.
         # After wffa is called, then the shape becomes available in out_tree_promise.
-        in_tracers = [trace.to_jaxpr_tracer(t) for t in tree_flatten(pp_args)[0]]
-        out_tracers = [trace.to_jaxpr_tracer(t) for t in wffa.call_wrapped(*in_tracers)]
+        in_tracers = [
+            trace.to_jaxpr_tracer(t, source_info=current_source_info())
+            for t in tree_flatten(pp_args)[0]
+        ]
+        out_tracers = [
+            trace.to_jaxpr_tracer(t, source_info=current_source_info())
+            for t in wffa.call_wrapped(*in_tracers)
+        ]
         cur_trace = EvaluationContext.get_current_trace()
         jaxpr, out_type, consts = cur_trace.frame.to_jaxpr2(out_tracers, wffa.debug_info)
         closed_jaxpr = ClosedJaxpr(jaxpr, consts)
@@ -1289,7 +1299,9 @@ def trace_function(
 
     with EvaluationContext.frame_tracing_context(debug_info=wfun.debug_info) as trace:
         arg_expanded_tracers = input_type_to_tracers(
-            in_sig.in_type, trace.new_arg, trace.to_jaxpr_tracer
+            in_sig.in_type,
+            partial(trace.new_arg, source_info=current_source_info()),
+            partial(trace.to_jaxpr_tracer, source_info=current_source_info()),
         )
         res_expanded_tracers = wfun.call_wrapped(*arg_expanded_tracers)
 
@@ -1345,7 +1357,9 @@ def trace_quantum_function(
             wffa, in_avals, keep_inputs, out_tree_promise = deduce_avals(
                 f, args, kwargs, static_argnums, debug_info
             )
-            in_classical_tracers = _input_type_to_tracers(trace.new_arg, in_avals)
+            in_classical_tracers = _input_type_to_tracers(
+                partial(trace.new_arg, source_info=current_source_info()), in_avals
+            )
             with QueuingManager.stop_recording(), quantum_tape:
                 # Quantum tape transformations happen at the end of tracing
                 in_classical_tracers = [t for t, k in zip(in_classical_tracers, keep_inputs) if k]
@@ -1438,7 +1452,9 @@ def trace_quantum_function(
                     else:
                         return func(arr)
 
-                meas_tracers = check_full_raise(meas, trace.to_jaxpr_tracer)
+                meas_tracers = check_full_raise(
+                    meas, partial(trace.to_jaxpr_tracer, source_info=current_source_info())
+                )
                 if len(snapshot_results) > 0:
                     # redefine meas_trees PyTree to have same PyTreeRegistry as Snapshot PyTree
                     meas_trees = jax.tree_util.tree_structure(

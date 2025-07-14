@@ -16,15 +16,16 @@
 This module contains public API functions for quantum operators which are not
 included in PennyLane, or whose behaviour needs to be adapted for Catalyst.
 """
-
 import copy
 import sys
 from collections.abc import Sized
 from contextlib import nullcontext
+from functools import partial
 from typing import Any, Callable, List, Optional, Union
 
 import jax
 import pennylane as qml
+from jax._src.source_info_util import current as current_source_info
 from jax._src.tree_util import tree_flatten
 from jax.api_util import debug_info
 from jax.core import get_aval
@@ -427,7 +428,9 @@ class AdjointCallable:
         with EvaluationContext.frame_tracing_context(debug_info=dbg) as inner_trace:
             in_classical_tracers, _ = tree_flatten((args, kwargs))
             wffa, in_avals, _, _ = deduce_avals(self.target, args, kwargs, debug_info=dbg)
-            arg_classical_tracers = _input_type_to_tracers(inner_trace.new_arg, in_avals)
+            arg_classical_tracers = _input_type_to_tracers(
+                partial(inner_trace.new_arg, source_info=current_source_info()), in_avals
+            )
             with QueuingManager.stop_recording(), QuantumTape() as quantum_tape:
                 # FIXME: move all to_jaxpr_tracer calls into a separate function
                 res_classical_tracers = [
@@ -466,7 +469,9 @@ class HybridAdjoint(HybridOp):
             frame_ctx = EvaluationContext.frame_tracing_context(body_trace)
 
         with frame_ctx as body_trace:
-            qreg_in = _input_type_to_tracers(body_trace.new_arg, [AbstractQreg()])[0]
+            qreg_in = _input_type_to_tracers(
+                partial(body_trace.new_arg, source_info=current_source_info()), [AbstractQreg()]
+            )[0]
             qrp_out = trace_quantum_operations(body_tape, device, qreg_in, ctx, body_trace)
             qreg_out = qrp_out.actualize()
             body_jaxpr, _, body_consts = body_trace.frame.to_jaxpr2(
