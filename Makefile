@@ -122,9 +122,11 @@ frontend:
 	# https://github.com/jax-ml/jax/commit/<commit-hash>
 	#0.6.0: 127aa7621868cb77e552b5d1f90e4a42b09c13fa, Apr.16
 	#0.6.2: 1ad05bb26105f23ee7728b36cca12901fe70e187, Jun.17
-	# Some big milestones:
+	#
+	# Some big milestones (this list is completely in chronological order):
 	# 1d652ab7f4346a974cf5888ab23713e1a9c2ddba: the "source_info change"
-	pip install git+https://github.com/jax-ml/jax.git@1d652ab7f4346a974cf5888ab23713e1a9c2ddba
+	# 492cd3d9313cfd45e8bd63a8f51aa63d92924cd5: reverts the source_info change (1d652ab7)
+	pip install git+https://github.com/jax-ml/jax.git@492cd3d9313cfd45e8bd63a8f51aa63d92924cd5
 
 .PHONY: mlir llvm mhlo enzyme dialects runtime oqc
 mlir:
