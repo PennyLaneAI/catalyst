@@ -337,8 +337,6 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         in_qubits = [self.qreg_manager[w] for w in op.wires]
         control_qubits = [self.qreg_manager[w] for w in control_wires]
 
-
-
         out_qubits = qinst_p.bind(
             *[*in_qubits, *op.data, *control_qubits, *control_values],
             op=op.name,

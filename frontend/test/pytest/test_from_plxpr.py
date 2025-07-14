@@ -735,7 +735,7 @@ class TestAdjointCtrl:
             else:
                 qml.ctrl(qml.T(0), wire)
             return qml.state()
-        
+
         plxpr = jax.make_jaxpr(c)(3)
         catalyst_xpr = from_plxpr(plxpr)(3)
 
@@ -743,11 +743,11 @@ class TestAdjointCtrl:
 
         assert qfunc_xpr.eqns[2].primitive == qextract_p
         assert qfunc_xpr.eqns[3].primitive == qextract_p
-        assert qfunc_xpr.eqns[4].primitive == qinst_p # the cnot
-        assert qfunc_xpr.eqns[5].primitive == qinsert_p # sticking back into reg
+        assert qfunc_xpr.eqns[4].primitive == qinst_p  # the cnot
+        assert qfunc_xpr.eqns[5].primitive == qinsert_p  # sticking back into reg
         assert qfunc_xpr.eqns[6].primitive == qinsert_p
         assert qfunc_xpr.eqns[7].primitive == qextract_p
-        assert qfunc_xpr.eqns[8].primitive == qextract_p    
+        assert qfunc_xpr.eqns[8].primitive == qextract_p
 
         assert qfunc_xpr.eqns[9].primitive == qinst_p
         assert qfunc_xpr.eqns[9].params == {
@@ -771,15 +771,14 @@ class TestAdjointCtrl:
         def c():
             qml.ctrl(g, [4, 5])()
             return qml.state()
-        
 
         plxpr = jax.make_jaxpr(c)()
         catalyst_xpr = from_plxpr(plxpr)()
 
         qfunc_xpr = catalyst_xpr.eqns[0].params["call_jaxpr"]
-        for_loop_xpr = qfunc_xpr.eqns[2].params['body_jaxpr']
+        for_loop_xpr = qfunc_xpr.eqns[2].params["body_jaxpr"]
 
-        for i in [0,1,2]:
+        for i in [0, 1, 2]:
             assert for_loop_xpr.eqns[i].primitive == qextract_p
         assert for_loop_xpr.eqns[3].primitive == qinst_p
         assert for_loop_xpr.eqns[3].params == {
@@ -789,7 +788,6 @@ class TestAdjointCtrl:
             "params_len": 0,
             "qubits_len": 1,
         }
-
 
 
 class TestHybridPrograms:
