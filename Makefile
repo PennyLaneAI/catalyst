@@ -118,6 +118,12 @@ frontend:
 	$(PYTHON) -m pip uninstall -y pennylane
 	$(PYTHON) -m pip install -e . --extra-index-url https://test.pypi.org/simple $(PIP_VERBOSE_FLAG)
 	rm -r frontend/pennylane_catalyst.egg-info
+	# View jax commits at
+	# https://github.com/jax-ml/jax/commit/<commit-hash>
+	#0.6.0: 127aa7621868cb77e552b5d1f90e4a42b09c13fa, Apr.16
+	#0.6.2: 1ad05bb26105f23ee7728b36cca12901fe70e187, Jun.17
+	# Some big milestones:
+	# 1d652ab7f4346a974cf5888ab23713e1a9c2ddba: the "source_info change"
 
 .PHONY: mlir llvm mhlo enzyme dialects runtime oqc
 mlir:
