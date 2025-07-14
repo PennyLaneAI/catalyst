@@ -34,6 +34,7 @@ from catalyst.pipelines import CompileOptions
 from catalyst.utils.exceptions import CompileError
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 class TestDebugPrint:
     """Test suite for the runtime print functionality."""
 
@@ -118,9 +119,14 @@ class TestDebugPrint:
     def test_intermediate_values(self, capfd, arg, expected):
         """Test printing of arbitrary JAX tracer values."""
 
+        if qml.capture.enabled():
+            loop_fn = qml.for_loop # TODO: unify qml.for_loop and catalyst.for_loop
+        else:
+            loop_fn = for_loop
+
         @qjit
         def test(n):
-            @for_loop(0, n, 1)
+            @loop_fn(0, n, 1)
             def loop(i):
                 debug.print(i)
 

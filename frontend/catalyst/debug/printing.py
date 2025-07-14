@@ -19,6 +19,8 @@ from functools import partial
 
 import jax
 
+from pennylane.capture import enabled as capture_enabled
+
 from catalyst.debug.callback import callback as debug_callback
 from catalyst.jax_primitives import print_p
 from catalyst.tracing.contexts import EvaluationContext
@@ -132,7 +134,7 @@ def print_memref(x):
 
     Outside a :func:`qjit` compiled function the operation falls back to the Python print statement.
     """
-    if EvaluationContext.is_tracing():
+    if capture_enabled() or EvaluationContext.is_tracing():
         if not isinstance(x, jax.core.Tracer):
             raise TypeError("Arguments to print_memref must be of type jax.core.Tracer")
         print_p.bind(x, memref=True)

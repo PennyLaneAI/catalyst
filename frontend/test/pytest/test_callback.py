@@ -30,8 +30,8 @@ from catalyst.utils.patching import Patcher
 
 # pylint: disable=protected-access,too-many-lines
 
-qml.capture.enable()
 
+@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("arg", [1, 2, 3])
 def test_callback_no_tracing(arg):
     """Test that when there's no tracing the behaviour of identity
@@ -44,6 +44,7 @@ def test_callback_no_tracing(arg):
     assert identity(arg) == arg
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("arg", [1, 2, 3])
 def test_purecallback_no_tracing(arg):
     """Test that when there's no tracing the behaviour of identity
@@ -56,6 +57,7 @@ def test_purecallback_no_tracing(arg):
     assert identity(arg) == arg
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 def test_callback_no_returns_no_params(capsys):
     """Test callback no parameters no returns"""
 
@@ -76,6 +78,7 @@ def test_callback_no_returns_no_params(capsys):
     assert captured.out.strip() == "Hello erick"
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 def test_callback_twice(capsys):
     """Test callback no parameters no returns"""
 
@@ -108,6 +111,7 @@ def test_callback_twice(capsys):
     assert captured.out.strip() == "Hello erick"
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 def test_callback_send_param(capsys):
     """Test callback with parameters no returns"""
 
@@ -125,6 +129,7 @@ def test_callback_send_param(capsys):
     assert captured.out.strip() == "0"
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 def test_kwargs(capsys):
     """Test kwargs returns"""
 
@@ -147,6 +152,7 @@ def test_kwargs(capsys):
         assert string in captured.out
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 def test_simple_increment():
     """Test increment function"""
 
@@ -161,6 +167,7 @@ def test_simple_increment():
     assert np.allclose(cir(0), 1)
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize(
     "arg",
     [0, 3.14, complex(0.0, 1.0), jnp.array(0), jnp.array([1, 2, 3]), jnp.array([[1, 2], [2, 3]])],
@@ -183,6 +190,7 @@ def test_identity_types(arg):
     assert np.allclose(cir(arg), arg)
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize(
     "arg",
     [jnp.array(0), jnp.array(1)],
@@ -201,6 +209,7 @@ def test_identity_types_shaped_array(arg):
     assert np.allclose(cir(arg), arg)
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize(
     "arg",
     [0],
@@ -219,6 +228,7 @@ def test_multiple_returns(arg):
     assert np.allclose(cir(arg), (arg, arg))
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize(
     "arg",
     [jnp.array([0.0, 1.0, 2.0])],
@@ -244,6 +254,7 @@ def test_incorrect_return(arg):
         cir(arg)
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 def test_pure_callback():
     """Test identity pure callback."""
 
@@ -257,6 +268,7 @@ def test_pure_callback():
     assert np.allclose(cir(0.0), 0.0)
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 def test_pure_callback_decorator():
     """Test identity pure callback."""
 
@@ -271,6 +283,7 @@ def test_pure_callback_decorator():
     assert np.allclose(cir(0.0), 0.0)
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 def test_pure_callback_no_return_value():
     """Test identity pure callback no return."""
 
@@ -287,6 +300,7 @@ def test_pure_callback_no_return_value():
         cir(0.0)
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 def test_debug_callback(capsys):
     """Test debug callback"""
 
@@ -306,6 +320,7 @@ def test_debug_callback(capsys):
     assert captured.out.strip() == "0"
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 def test_debug_callback_decorator(capsys):
     """Test debug callback"""
 
@@ -326,6 +341,7 @@ def test_debug_callback_decorator(capsys):
     assert captured.out.strip() == "0"
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 def test_debug_callback_returns_something(capsys):
     """Test io callback returns something"""
 
@@ -353,6 +369,7 @@ def test_debug_callback_returns_something(capsys):
         cir(0)
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 def test_io_callback_modify_global(capsys):
     """Test mutation"""
 
@@ -380,6 +397,7 @@ def test_io_callback_modify_global(capsys):
     assert captured.out.strip() == "0\n1"
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize(
     "arg",
     [0.1, jnp.array(0.1)],
@@ -400,6 +418,7 @@ def test_no_return_list(arg):
     f(arg)
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize(
     "arg",
     [0.1, jnp.array(0.1)],
@@ -422,6 +441,7 @@ def test_dictionary(arg):
     assert np.allclose(f(arg), arg)
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 def test_tuple_out():
     """Test with multiple tuples."""
 
@@ -438,6 +458,7 @@ def test_tuple_out():
     f(0.1)
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 def test_numpy_ufuncs():
     """Test with numpy ufuncs."""
 
@@ -449,6 +470,7 @@ def test_numpy_ufuncs():
     assert np.allclose(np.sin(1.0 / 2.0), f(1.0 / 2.0))
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize(
     "arg",
     [0.1, jnp.array(0.1), jnp.array([0.1]), jnp.array([0.1, 0.2]), jnp.array([[1, 2], [3, 4]])],
@@ -467,6 +489,7 @@ def test_accelerate_device(arg):
     assert np.allclose(qjitted_fn(arg), arg)
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize(
     "arg",
     [0.1, jnp.array(0.1), jnp.array([0.1]), jnp.array([0.1, 0.2]), jnp.array([[1, 2], [3, 4]])],
@@ -485,6 +508,7 @@ def test_accelerate_no_device(arg):
     assert np.allclose(qjitted_fn(arg), arg)
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize(
     "arg",
     [0.1, jnp.array(0.1), jnp.array([0.1]), jnp.array([0.1, 0.2]), jnp.array([[1, 2], [3, 4]])],
@@ -503,6 +527,7 @@ def test_accelerate_no_device_inside(arg):
     assert np.allclose(qjitted_fn(arg), arg)
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize(
     "arg",
     [0.1, jnp.array(0.1), jnp.array([0.1]), jnp.array([0.1, 0.2]), jnp.array([[1, 2], [3, 4]])],
@@ -521,6 +546,7 @@ def test_accelerate_no_device_autograph(arg):
     assert np.allclose(qjitted_fn(arg), arg)
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize(
     "arg",
     [0.1, jnp.array(0.1), jnp.array([0.1]), jnp.array([0.1, 0.2]), jnp.array([[1, 2], [3, 4]])],
@@ -540,6 +566,7 @@ def test_accelerate_manual_jax_jit(arg):
     assert np.allclose(qjitted_fn(arg), arg)
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 def test_jax_jit_returns_nothing(capsys):
     """This is more a question for reviewer"""
 
@@ -560,6 +587,7 @@ def test_jax_jit_returns_nothing(capsys):
     assert captured.out.strip() == "x=1.0"
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 def test_non_jax_jittable():
     """Test that error is raised when jax-jit fails"""
 
@@ -577,6 +605,7 @@ def test_non_jax_jittable():
             return impossible(x)
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 def test_that_jax_jit_is_called():
     """Test that jax.jit is called"""
 
@@ -604,6 +633,7 @@ def test_that_jax_jit_is_called():
     assert called_jax_jit
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 def test_callback_cache():
     """Test callback cache. This test is for coverage."""
 
