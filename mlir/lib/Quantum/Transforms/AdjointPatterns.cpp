@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <llvm/ADT/STLExtras.h>
 #define DEBUG_TYPE "adjoint"
 
 #include <algorithm>
@@ -165,13 +166,11 @@ class AdjointGenerator {
         if (auto parametrizedGate = dyn_cast<quantum::ParametrizedGate>(operation)) {
             OpBuilder::InsertionGuard insertionGuard(builder);
             builder.setInsertionPoint(clone);
-            ValueRange params = parametrizedGate.getAllParams();
+            SmallVector<Value> params = llvm::to_vector(parametrizedGate.getAllParams());
             size_t numParams = params.size();
             SmallVector<Value> cachedParams(numParams);
             // popping gives the parameters in reverse
-            auto reversed = llvm::to_vector(llvm::reverse(params));
-            for (size_t idx = 0; idx < reversed.size(); ++idx) {
-                auto param = reversed[idx];
+            for (auto [idx, param] : llvm::enumerate(llvm::reverse(params))) {
                 Type paramType = param.getType();
                 verifyTypeIsCacheable(paramType, operation);
                 if (paramType.isF64()) {
