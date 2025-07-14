@@ -84,6 +84,14 @@ jobs:
       - name: Runtime Backend Devices
         id: rt_backends
         run: echo 'rt_backends=["lightning", "lightning-kokkos", "openqasm", "oqc", "oqd"]' >> $GITHUB_OUTPUT
+      
+      - name: Print system and compiler info
+        run: |
+          uname -a
+          which clang++
+          which g++
+          clang --version
+          g++ --version
 
       - name: Compilers (All)
         id: compilers
