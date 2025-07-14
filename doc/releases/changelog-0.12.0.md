@@ -276,10 +276,6 @@
   introduced in PennyLane v0.42.
   [(#1784)](https://github.com/PennyLaneAI/catalyst/pull/1784)
 
-* `null.qubit` can now support an optional `track_resources` keyword argument, which allows it to record 
-  which gates are executed. 
-  [(#1619)](https://github.com/PennyLaneAI/catalyst/pull/1619)
-
 <h3>Breaking changes 💔</h3>
 
 * Support for Mac x86 has been removed. This includes Macs running on Intel processors.
@@ -429,6 +425,37 @@
   [(#1842)](https://github.com/PennyLaneAI/catalyst/pull/1842)
 
 <h3>Internal changes ⚙️</h3>
+
+* `null.qubit` can now support an optional `track_resources` keyword argument, which allows it to record 
+  which gates are executed. 
+  [(#1619)](https://github.com/PennyLaneAI/catalyst/pull/1619)
+
+  ```python
+  import json
+  import glob
+
+  dev = qml.device("null.qubit", wires=2, track_resources=True)
+
+  @qml.qjit
+  @qml.qnode(dev)
+  def circuit():
+      for _ in range(5):
+          qml.H(0)
+      qml.CNOT([0, 1])
+      return qml.probs()
+
+  circuit()
+
+  pattern = "./__pennylane_resources_data_*"
+  filepath = glob.glob(pattern)[0]
+  with open(filepath) as f:
+      resources = json.loads(f.read())
+  ```
+
+  ```pycon
+  >>> print(resources)
+  {'num_qubits': 2, 'num_gates': 6, 'gate_types': {'CNOT': 1, 'Hadamard': 5}}
+  ```
 
 * The clang-format and clang-tidy versions used by Catalyst have been updated to v20.
   [(#1721)](https://github.com/PennyLaneAI/catalyst/pull/1721)
