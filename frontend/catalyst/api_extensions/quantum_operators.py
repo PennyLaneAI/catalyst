@@ -434,7 +434,7 @@ class AdjointCallable:
             with QueuingManager.stop_recording(), QuantumTape() as quantum_tape:
                 # FIXME: move all to_jaxpr_tracer calls into a separate function
                 res_classical_tracers = [
-                    inner_trace.to_jaxpr_tracer(t)
+                    inner_trace.to_jaxpr_tracer(t, source_info=current_source_info())
                     for t in wffa.call_wrapped(*arg_classical_tracers)
                     if isinstance(t, DynamicJaxprTracer)
                 ]

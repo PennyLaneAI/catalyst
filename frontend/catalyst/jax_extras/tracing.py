@@ -48,7 +48,6 @@ from jax._src.lax.slicing import _gather_lower, gather_p
 from jax._src.linear_util import annotate
 from jax._src.pjit import _extract_implicit_args, _flat_axes_specs
 from jax._src.source_info_util import current as current_source_info
-from jax._src.source_info_util import current as jax_current
 from jax._src.util import safe_map, unzip2, wraps
 from jax.api_util import flatten_fun
 from jax.core import (
@@ -436,7 +435,7 @@ def trace_to_jaxpr(
 def new_inner_tracer(trace: DynamicJaxprTrace, aval) -> DynamicJaxprTracer:
     """Create a JAX tracer tracing an abstract value ``aval`, without specifying its source
     primitive."""
-    dt = DynamicJaxprTracer(trace, aval, jax_current())
+    dt = DynamicJaxprTracer(trace, aval, current_source_info())
     trace.frame.tracers.append(dt)
     trace.frame.tracer_to_var[id(dt)] = trace.frame.newvar(aval)
     return dt
@@ -904,7 +903,7 @@ class DynshapePrimitive(JaxprPrimitive):
 
         trace = find_top_trace(args)
         tracers = map(partial(trace.to_jaxpr_tracer, source_info=current_source_info()), args)
-        source_info = jax_current()
+        source_info = current_source_info()
 
         in_type = infer_lambda_input_type(None, tracers)
         out_type, effects = self.abstract_eval(*in_type, **params)
