@@ -128,7 +128,7 @@
 
 * Catalyst now supports :class:`qml.Snapshot <pennylane.Snapshot>`, which captures quantum states at 
   any point in a circuit.
-  [(#1741)](https://github.com/PennyLaneAI/catalyst/pull/1741).
+  [(#1741)](https://github.com/PennyLaneAI/catalyst/pull/1741)
 
   For example, the code below is capturing two snapshot'd states, all within a qjit'd circuit:
 
