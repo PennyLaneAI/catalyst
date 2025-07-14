@@ -38,8 +38,13 @@
   in a single pipeline.
 
   * A new function :func:`~.passes.get_ppm_specs` to get the result statistics after a PPR/PPM compilations is available. The statistics is returned in a Python dictionary.
-  [(#1794)](https://github.com/PennyLaneAI/catalyst/pull/1794). 
-  
+  [(#1794)](https://github.com/PennyLaneAI/catalyst/pull/1794)
+  [(#1863)](https://github.com/PennyLaneAI/catalyst/pull/1863)
+
+  When there is control flow, this function can count the statistics inside for loops with
+  a statically known number of iterations. For all other cases, including dynamically sized for
+  loops, and any conditionals and while loops, this pass exits with failure.
+
   Example below shows an input circuit and corresponding PPM specs.
 
   ```python
@@ -49,7 +54,7 @@
 
   pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
 
-  @qjit(pipelines=pipe, target="mlir")
+  @qjit(pipelines=pipe, target="mlir", autograph=True)
   def test_convert_clifford_to_ppr_workflow():
 
       device = qml.device("lightning.qubit", wires=2)
@@ -72,6 +77,8 @@
           qml.T(0)
           qml.T(1)
           qml.CNOT([0, 1])
+          for i in range(10):
+            qml.Hadamard(0)
           return measure(0), measure(1)
 
       return f(), g()
@@ -84,7 +91,7 @@
   ```pycon
   {
   'f_0': {'max_weight_pi8': 1, 'num_logical_qubits': 2, 'num_of_ppm': 2, 'num_pi8_gates': 1}, 
-  'g_0': {'max_weight_pi4': 2, 'max_weight_pi8': 1, 'num_logical_qubits': 2, 'num_of_ppm': 2, 'num_pi4_gates': 3, 'num_pi8_gates': 2}
+  'g_0': {'max_weight_pi4': 2, 'max_weight_pi8': 1, 'num_logical_qubits': 2, 'num_of_ppm': 2, 'num_pi4_gates': 36, 'num_pi8_gates': 2}
   }
   ```
 
