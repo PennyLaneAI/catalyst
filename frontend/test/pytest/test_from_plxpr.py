@@ -610,17 +610,17 @@ class TestAdjointCtrl:
         qml.capture.enable()
 
         @qml.qnode(qml.device("lightning.qubit", wires=4), autograph=False)
-        def c(x):
+        def c(x, wire3):
             op = qml.RX(x, 0)
             if inner_adjoint:
                 op = qml.adjoint(op)
-            op = qml.ctrl(op, (1, 2, 3), [0, 1, 0])
+            op = qml.ctrl(op, (1, 2, wire3), [0, 1, 0])
             if outer_adjoint:
                 op = qml.adjoint(op)
             return qml.state()
 
-        plxpr = jax.make_jaxpr(c)(0.5)
-        catalyst_xpr = from_plxpr(plxpr)(0.5)
+        plxpr = jax.make_jaxpr(c)(0.5, 3)
+        catalyst_xpr = from_plxpr(plxpr)(0.5, 3)
 
         qfunc_xpr = catalyst_xpr.eqns[0].params["call_jaxpr"]
         eqn = qfunc_xpr.eqns[6]  # dev, qreg, four allocations
@@ -720,6 +720,76 @@ class TestAdjointCtrl:
         }
         assert target_xpr.eqns[4].primitive == qinsert_p
         assert target_xpr.eqns[5].primitive == qinsert_p
+
+    @pytest.mark.parametrize("as_qfunc", (True, False))
+    def test_dynamic_control_wires(self, as_qfunc):
+        """Test that dynamic wires are re-inserted if a dynamic wire is present."""
+
+        qml.capture.enable()
+
+        @qml.qnode(qml.device("lightning.qubit", wires=4), autograph=False)
+        def c(wire):
+            qml.CNOT((0, wire))
+            if as_qfunc:
+                qml.ctrl(qml.T, wire)(0)
+            else:
+                qml.ctrl(qml.T(0), wire)
+            return qml.state()
+        
+        plxpr = jax.make_jaxpr(c)(3)
+        catalyst_xpr = from_plxpr(plxpr)(3)
+
+        qfunc_xpr = catalyst_xpr.eqns[0].params["call_jaxpr"]
+
+        assert qfunc_xpr.eqns[2].primitive == qextract_p
+        assert qfunc_xpr.eqns[3].primitive == qextract_p
+        assert qfunc_xpr.eqns[4].primitive == qinst_p # the cnot
+        assert qfunc_xpr.eqns[5].primitive == qinsert_p # sticking back into reg
+        assert qfunc_xpr.eqns[6].primitive == qinsert_p
+        assert qfunc_xpr.eqns[7].primitive == qextract_p
+        assert qfunc_xpr.eqns[8].primitive == qextract_p    
+
+        assert qfunc_xpr.eqns[9].primitive == qinst_p
+        assert qfunc_xpr.eqns[9].params == {
+            "adjoint": False,
+            "ctrl_len": 1,
+            "op": "T",
+            "params_len": 0,
+            "qubits_len": 1,
+        }
+
+    def test_ctrl_around_for_loop(self):
+        """Test that ctrl applied to a for loop."""
+
+        qml.capture.enable()
+
+        @qml.for_loop(3)
+        def g(i):
+            qml.X(i)
+
+        @qml.qnode(qml.device("lightning.qubit", wires=4), autograph=False)
+        def c():
+            qml.ctrl(g, [4, 5])()
+            return qml.state()
+        
+
+        plxpr = jax.make_jaxpr(c)()
+        catalyst_xpr = from_plxpr(plxpr)()
+
+        qfunc_xpr = catalyst_xpr.eqns[0].params["call_jaxpr"]
+        for_loop_xpr = qfunc_xpr.eqns[2].params['body_jaxpr']
+
+        for i in [0,1,2]:
+            assert for_loop_xpr.eqns[i].primitive == qextract_p
+        assert for_loop_xpr.eqns[3].primitive == qinst_p
+        assert for_loop_xpr.eqns[3].params == {
+            "adjoint": False,
+            "ctrl_len": 2,
+            "op": "PauliX",
+            "params_len": 0,
+            "qubits_len": 1,
+        }
+
 
 
 class TestHybridPrograms:

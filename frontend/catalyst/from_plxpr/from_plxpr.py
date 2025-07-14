@@ -330,12 +330,15 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
                 control_wires=control_wires + tuple(op.control_wires),
             )
 
-        self.qreg_manager.insert_dynamic_qubits(op.wires)
-
-        in_qubits = [self.qreg_manager[w] for w in op.wires]
         control_wires = control_wires + self.control_wires
         control_values = control_values + self.control_values
+        self.qreg_manager.insert_dynamic_qubits(op.wires + control_wires)
+
+        in_qubits = [self.qreg_manager[w] for w in op.wires]
         control_qubits = [self.qreg_manager[w] for w in control_wires]
+
+
+
         out_qubits = qinst_p.bind(
             *[*in_qubits, *op.data, *control_qubits, *control_values],
             op=op.name,
@@ -446,10 +449,9 @@ def handle_subroutine(self, *args, **kwargs):
     transformed = self.subroutine_cache.get(plxpr)
 
     def wrapper(qreg, *args):
-        device = self.device
-        shots = self.shots
         manager = QregManager(qreg)
-        converter = PLxPRToQuantumJaxprInterpreter(device, shots, manager, self.subroutine_cache)
+        converter = copy(self)
+        converter.qreg_manager = manager
         retvals = converter(plxpr, *args)
         converter.qreg_manager.insert_all_dangling_qubits()
         return converter.qreg_manager.get(), *retvals
@@ -616,13 +618,10 @@ def handle_adjoint_transform(
 
     def calling_convention(*args_plus_qreg):
         *args, qreg = args_plus_qreg
-        device = self.device
-        shots = self.shots
         # `qreg` is the scope argument for the body jaxpr
         qreg_manager = QregManager(qreg)
-        converter = PLxPRToQuantumJaxprInterpreter(
-            device, shots, qreg_manager, self.subroutine_cache
-        )
+        converter = copy(self)
+        converter.qreg_manager = qreg_manager
         retvals = converter(jaxpr, *args)
         qreg_manager.insert_all_dangling_qubits()
         return *retvals, converter.qreg_manager.get()
