@@ -237,7 +237,6 @@ def sort_eqns(eqns: List[JaxprEqn], forced_order_primitives: Set[JaxprPrimitive]
     for b in boxes:
         origin.update({ov.count: b for ov in b.e.outvars})  # [1]
     for b in boxes:
-        # breakpoint()
         # b.parents = [origin[v.count] for v in b.e.invars if v.count in origin]  # [2]
         b.parents = []
         for v in b.e.invars:
@@ -255,7 +254,6 @@ def sort_eqns(eqns: List[JaxprEqn], forced_order_primitives: Set[JaxprPrimitive]
 def jaxpr_pad_consts(jaxprs: List[Jaxpr]) -> List[ClosedJaxpr]:
     """Align the constants of Jaxpr programs. Return the list of corresponding programs accepting
     the same constants."""
-    # breakpoint()
     newvar = gensym()
 
     # List of constant variables of all jaxprs, preprended with '_'

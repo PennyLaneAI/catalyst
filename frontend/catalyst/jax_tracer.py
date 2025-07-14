@@ -1043,7 +1043,6 @@ def trace_quantum_measurements(
                 else:
                     shape = (2**nqubits,)
                 dyn_dims, static_shape = _extract_tracers_dyn_shape(shape)
-                # breakpoint()
                 result = probs_p.bind(obs_tracers, *dyn_dims, static_shape=tuple(static_shape))
                 out_classical_tracers.append(result)
             elif type(output) is CountsMP:
@@ -1447,12 +1446,10 @@ def trace_quantum_function(
                 # Check if the measurements are nested then apply the to_jaxpr_tracer
                 def check_full_raise(arr, func):
                     if isinstance(arr, (list, tuple)):
-                        # breakpoint()
                         return type(arr)(check_full_raise(x, func) for x in arr)
                     else:
                         return func(arr)
 
-                # breakpoint()
                 meas_tracers = check_full_raise(
                     meas, partial(trace.to_jaxpr_tracer, source_info=current_source_info())
                 )

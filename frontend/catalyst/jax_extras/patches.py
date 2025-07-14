@@ -36,6 +36,7 @@ from jax.core import AbstractValue, Tracer
 
 __all__ = (
     "get_aval2",
+    "_drop_unused_vars2",
     "_no_clean_up_dead_vars",
     "_gather_shape_rule_dynamic",
     "gather2_p",
@@ -51,6 +52,13 @@ def get_aval2(x):
         return x.aval
     else:
         return abstractify(x)
+
+
+def _drop_unused_vars2(jaxpr, constvals):
+    """
+    A patch to not drop unused vars during classical tracing of for loops.
+    """
+    return jaxpr, list(constvals)
 
 
 def _no_clean_up_dead_vars(_eqn, _env, _last_used):
