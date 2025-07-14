@@ -124,9 +124,10 @@ frontend:
 	#0.6.2: 1ad05bb26105f23ee7728b36cca12901fe70e187, Jun.17
 	#
 	# Some big milestones (this list is completely in chronological order):
-	# 1d652ab7f4346a974cf5888ab23713e1a9c2ddba: the "source_info change"
-	# 492cd3d9313cfd45e8bd63a8f51aa63d92924cd5: reverts the source_info change (1d652ab7)
-	pip install git+https://github.com/jax-ml/jax.git@492cd3d9313cfd45e8bd63a8f51aa63d92924cd5
+	# 1d652ab7f4346a974cf5888ab23713e1a9c2ddba (Apr.17): the "source_info change"
+	# 492cd3d9313cfd45e8bd63a8f51aa63d92924cd5 (Apr.18): reverts the source_info change (1d652ab7)
+	# f1803bef692b6d91815b02ec643980d9ab9b5132 (Apr.22): Checkpoint, last commit of Apr.22
+	pip install git+https://github.com/jax-ml/jax.git@f1803bef692b6d91815b02ec643980d9ab9b5132
 
 .PHONY: mlir llvm mhlo enzyme dialects runtime oqc
 mlir:
