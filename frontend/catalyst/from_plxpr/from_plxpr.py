@@ -56,6 +56,7 @@ from catalyst.jax_primitives import (
     device_release_p,
     expval_p,
     gphase_p,
+    hermitian_p,
     measure_in_basis_p,
     measure_p,
     namedobs_p,
@@ -71,7 +72,6 @@ from catalyst.jax_primitives import (
     state_p,
     unitary_p,
     var_p,
-    hermitian_p
 )
 from catalyst.passes.pass_api import Pass
 
