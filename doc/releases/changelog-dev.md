@@ -12,9 +12,11 @@
 
 <h3>Internal changes ⚙️</h3>
 
-* `from_plxpr` now supports adjoint and ctrl operations and transforms.
+* `from_plxpr` now supports adjoint and ctrl operations and transforms,
+  and `Hermitian` obsservables.
   [(#1844)](https://github.com/PennyLaneAI/catalyst/pull/1844)
   [(#1850)](https://github.com/PennyLaneAI/catalyst/pull/1850)
+
 
 <h3>Documentation 📝</h3>
 

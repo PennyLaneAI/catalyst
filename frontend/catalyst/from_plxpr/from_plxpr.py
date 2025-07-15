@@ -71,6 +71,7 @@ from catalyst.jax_primitives import (
     state_p,
     unitary_p,
     var_p,
+    hermitian_p
 )
 from catalyst.passes.pass_api import Pass
 
@@ -355,6 +356,8 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         if obs.arithmetic_depth > 0:
             raise NotImplementedError("operator arithmetic not yet supported for conversion.")
         wires = [self.qreg_manager[w] for w in obs.wires]
+        if obs.name == "Hermitian":
+            return hermitian_p.bind(obs.data[0], *wires)
         return namedobs_p.bind(*wires, *obs.data, kind=obs.name)
 
     def _compbasis_obs(self, *wires):
