@@ -453,12 +453,12 @@ jobs:
       id: python_build_version
       env:
         FORWARD_COMPAT_BASE_VERSION: ${{ needs.constants.outputs.forward_compat_python_version }}
+        IS_VERSION_SUPPORTED: ${{ contains(fromJson(needs.constants.outputs.python_versions), matrix.python_version) }}
       run: |
-        SMALLEST_VERSION=$(printf '%s\n' "${{ matrix.python_version }}" "$FORWARD_COMPAT_BASE_VERSION" | sort -V | head -n 1)
-        if [[ "$SMALLEST_VERSION" == "$FORWARD_COMPAT_BASE_VERSION" && "${{ matrix.python_version }}" != "$FORWARD_COMPAT_BASE_VERSION" ]]; then
-          echo "python_build_version=$FORWARD_COMPAT_BASE_VERSION" >> $GITHUB_OUTPUT
-        else
+        if [[ $IS_VERSION_SUPPORTED == "true" ]]; then
           echo "python_build_version=${{ matrix.python_version }}" >> $GITHUB_OUTPUT
+        else
+          echo "python_build_version=$FORWARD_COMPAT_BASE_VERSION" >> $GITHUB_OUTPUT
         fi
 
     - name: Download Wheel Artifact
