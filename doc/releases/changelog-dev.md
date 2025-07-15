@@ -16,6 +16,7 @@
   and `Hermitian` obsservables.
   [(#1844)](https://github.com/PennyLaneAI/catalyst/pull/1844)
   [(#1850)](https://github.com/PennyLaneAI/catalyst/pull/1850)
+  [(#1903)](https://github.com/PennyLaneAI/catalyst/pull/1903)
 
 
 <h3>Documentation 📝</h3>
