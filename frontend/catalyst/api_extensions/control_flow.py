@@ -54,6 +54,7 @@ from catalyst.jax_extras import (
     unzip2,
     while_loop_expansion_strategy,
 )
+from catalyst.jax_extras.patches import _drop_unused_vars2
 from catalyst.jax_primitives import AbstractQreg, cond_p, for_p, while_p
 from catalyst.jax_tracer import (
     HybridOp,
@@ -67,6 +68,7 @@ from catalyst.tracing.contexts import (
     EvaluationContext,
     EvaluationMode,
 )
+from catalyst.utils.patching import Patcher
 
 
 ## API ##
@@ -677,10 +679,17 @@ class CondCallable:
             assert len(in_sig.in_type) == 0
             with EvaluationContext.frame_tracing_context(debug_info=wfun.debug_info) as inner_trace:
                 with QueuingManager.stop_recording(), quantum_tape:
-                    res_classical_tracers = [
-                        inner_trace.to_jaxpr_tracer(t, source_info=current_source_info())
-                        for t in wfun.call_wrapped()
-                    ]
+                    with Patcher(
+                        (
+                            jax._src.interpreters.partial_eval,  # pylint: disable=protected-access
+                            "_drop_unused_vars",
+                            _drop_unused_vars2,
+                        ),
+                    ):
+                        res_classical_tracers = [
+                            inner_trace.to_jaxpr_tracer(t, source_info=current_source_info())
+                            for t in wfun.call_wrapped()
+                        ]
             explicit_return_tys = collapse(out_sig.out_type(), res_classical_tracers)
             hybridRegion = HybridOpRegion(inner_trace, quantum_tape, [], explicit_return_tys)
             regions.append(hybridRegion)
@@ -936,10 +945,17 @@ class ForLoopCallable:
                 partial(inner_trace.to_jaxpr_tracer, source_info=current_source_info()),
             )
             with QueuingManager.stop_recording(), quantum_tape:
-                res_classical_tracers = [
-                    inner_trace.to_jaxpr_tracer(t, source_info=current_source_info())
-                    for t in wfun.call_wrapped(*arg_classical_tracers)
-                ]
+                with Patcher(
+                    (
+                        jax._src.interpreters.partial_eval,  # pylint: disable=protected-access
+                        "_drop_unused_vars",
+                        _drop_unused_vars2,
+                    ),
+                ):
+                    res_classical_tracers = [
+                        inner_trace.to_jaxpr_tracer(t, source_info=current_source_info())
+                        for t in wfun.call_wrapped(*arg_classical_tracers)
+                    ]
                 out_type = out_sig.out_type()
                 out_tree = out_sig.out_tree()
                 out_consts = out_sig.out_consts()
@@ -1116,10 +1132,17 @@ class WhileLoopCallable:
                 partial(cond_trace.new_arg, source_info=current_source_info()),
                 partial(cond_trace.to_jaxpr_tracer, source_info=current_source_info()),
             )
-            res_classical_tracers = [
-                cond_trace.to_jaxpr_tracer(t, source_info=current_source_info())
-                for t in cond_wffa.call_wrapped(*arg_classical_tracers)
-            ]
+            with Patcher(
+                (
+                    jax._src.interpreters.partial_eval,  # pylint: disable=protected-access
+                    "_drop_unused_vars",
+                    _drop_unused_vars2,
+                ),
+            ):
+                res_classical_tracers = [
+                    cond_trace.to_jaxpr_tracer(t, source_info=current_source_info())
+                    for t in cond_wffa.call_wrapped(*arg_classical_tracers)
+                ]
 
             out_type = cond_out_sig.out_type()
             out_tree = cond_out_sig.out_tree()
@@ -1143,10 +1166,17 @@ class WhileLoopCallable:
 
             quantum_tape = QuantumTape()
             with QueuingManager.stop_recording(), quantum_tape:
-                res_classical_tracers = [
-                    body_trace.to_jaxpr_tracer(t, source_info=current_source_info())
-                    for t in body_wffa.call_wrapped(*arg_classical_tracers)
-                ]
+                with Patcher(
+                    (
+                        jax._src.interpreters.partial_eval,  # pylint: disable=protected-access
+                        "_drop_unused_vars",
+                        _drop_unused_vars2,
+                    ),
+                ):
+                    res_classical_tracers = [
+                        body_trace.to_jaxpr_tracer(t, source_info=current_source_info())
+                        for t in body_wffa.call_wrapped(*arg_classical_tracers)
+                    ]
 
             out_type = out_sig.out_type()
             out_tree = out_sig.out_tree()
