@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <llvm/ADT/STLExtras.h>
 #define DEBUG_TYPE "adjoint"
 
 #include <algorithm>
@@ -177,7 +176,7 @@ class AdjointGenerator {
                 if (paramType.isF64()) {
                     cachedParams[numParams - 1 - idx] =
                         builder.create<ListPopOp>(parametrizedGate.getLoc(), cache.paramVector);
-                    ++idx;
+                    idx++;
                     continue;
                 }
 
@@ -262,7 +261,7 @@ class AdjointGenerator {
 
                 Value recreatedTensor = iForLoop.getResult(0);
                 cachedParams[numParams - 1 - idx] = recreatedTensor;
-                ++idx;
+                idx++;
             }
             MutableOperandRange(clone, parametrizedGate.getParamOperandIdx(), params.size())
                 .assign(cachedParams);
