@@ -107,7 +107,7 @@ def is_amplitude_embedding_merged_and_decomposed(mlir):
 
 # pylint: disable=too-many-public-methods
 class TestCapture:
-    """Integration tests for Catalyst adjoint functionality."""
+    """Integration tests for functionality."""
 
     @pytest.mark.parametrize("theta", (jnp.pi, 0.1, 0.0))
     def test_simple_circuit_aot(self, backend, theta):
@@ -1553,3 +1553,51 @@ class TestCapture:
         assert 'quantum.custom "RX"(%cst)' in captured_circuit_3_mlir
 
         qml.capture.disable()
+
+
+def test_adjoint_transform_integration():
+    """Test that adjoint transforms can be used with capture enabled."""
+
+    qml.capture.enable()
+
+    def f(x):
+        qml.IsingXX(2 * x, wires=(0, 1))
+        qml.H(0)
+
+    @qml.qjit
+    @qml.qnode(qml.device("lightning.qubit", wires=3))
+    def c(x):
+        qml.adjoint(f)(x)
+        return qml.expval(qml.Z(1))
+
+    x = jnp.array(0.7)
+    res = c(x)
+    expected = jnp.cos(-2 * x)
+    assert qml.math.allclose(res, expected)
+
+
+@pytest.mark.parametrize("separate_funcs", (True, False))
+def test_ctrl_transform_integration(separate_funcs):
+    """Test that the ctrl transform can be applied."""
+
+    qml.capture.enable()
+
+    def f(x, y):
+        qml.RY(3 * y, wires=3)
+        qml.RX(2 * x, wires=3)
+
+    @qml.qjit
+    @qml.qnode(qml.device("lightning.qubit", wires=4), autograph=False)
+    def c(x, y):
+        qml.X(1)
+        if separate_funcs:
+            qml.ctrl(qml.ctrl(f, 0, [False]), 1, [True])(x, y)
+        else:
+            qml.ctrl(f, (0, 1), [False, True])(x, y)
+        return qml.expval(qml.Z(3))
+
+    x = jnp.array(0.5)
+    y = jnp.array(0.9)
+    res = c(x, y)
+    expected = jnp.cos(2 * x) * jnp.cos(3 * y)
+    assert qml.math.allclose(res, expected)
