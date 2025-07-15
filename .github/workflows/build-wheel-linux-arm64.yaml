@@ -417,7 +417,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python_version: ${{ fromJSON(needs.constants.outputs.python_versions) }}
+        python_version: ${{ fromJson(needs.constants.outputs.python_test_versions) }}
 
     # To check all wheels for supported python3 versions
     name: Test Wheels (Python ${{ matrix.python_version }}) on Linux Arm
@@ -432,10 +432,23 @@ jobs:
       with:
         python-version: ${{ matrix.python_version }}
 
+    # choose FORWARD_COMPAT_BASE_VERSION if python version > FORWARD_COMPAT_BASE_VERSION
+    - name: Determine which python build version to use
+      id: python_build_version
+      env:
+        FORWARD_COMPAT_BASE_VERSION: ${{ needs.constants.outputs.forward_compat_python_version }}
+      run: |
+        SMALLEST_VERSION=$(printf '%s\n' "${{ matrix.python_version }}" "$FORWARD_COMPAT_BASE_VERSION" | sort -V | head -n 1)
+        if [[ "$SMALLEST_VERSION" == "$FORWARD_COMPAT_BASE_VERSION" && "${{ matrix.python_version }}" != "$FORWARD_COMPAT_BASE_VERSION" ]]; then
+          echo "python_build_version=$FORWARD_COMPAT_BASE_VERSION" >> $GITHUB_OUTPUT
+        else
+          echo "python_build_version=${{ matrix.python_version }}" >> $GITHUB_OUTPUT
+        fi
+
     - name: Download Wheel Artifact
       uses: actions/download-artifact@v4
       with:
-        name: catalyst-linux_arm_64-wheel-py-${{ matrix.python_version }}.zip
+        name: catalyst-linux_arm_64-wheel-py-${{ steps.python_build_version.outputs.python_build_version }}.zip
         path: ${{ github.workspace }}/dist
 
     - name: Download Standalone Plugin Wheel Artifact
@@ -443,7 +456,7 @@ jobs:
       if: env.BUILD_STANDALONE_PLUGIN == 'true'
       uses: actions/download-artifact@v4
       with:
-        name: standalone-plugin-linux_arm_64-wheel-py-${{ matrix.python_version }}.zip
+        name: standalone-plugin-linux_arm_64-wheel-py-${{ steps.python_build_version.outputs.python_build_version }}.zip
         path: ${{ github.workspace }}/standalone_plugin_wheel/wheel
 
     - name: Set up Python ${{ matrix.python_version }}
