@@ -338,14 +338,17 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
 
         return out_qubits
     
-    def _obs(self, obs):
+    def _obs(self, obs, simplify=True):
         """Interpret the observable equation corresponding to a measurement equation's input."""
+        if simplify:
+            with pause():
+                obs = obs.simplify()
         if isinstance(obs, qml.ops.Prod):
-            return tensorobs_p.bind(*(self._obs(t) for t in obs))
+            return tensorobs_p.bind(*(self._obs(t, simplify=False) for t in obs))
         if obs.arithmetic_depth > 0:
             with pause():
                 coeffs, terms = obs.terms()
-            terms = [self._obs(t) for t in terms]
+            terms = [self._obs(t, simplify=False) for t in terms]
             return hamiltonian_p.bind(jnp.stack(coeffs), *terms)
         wires = [self.qreg_manager[w] for w in obs.wires]
         return namedobs_p.bind(*wires, *obs.data, kind=obs.name)

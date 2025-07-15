@@ -28,11 +28,15 @@ from catalyst.utils.runtime_environment import get_lib_path
 # pylint: disable=too-many-lines
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 class TestSample:
     """Test sample."""
 
     def test_sample_on_0qbits(self):
         """Test sample on 0 qubits."""
+
+        if qml.capture.enabled():
+            pytest.xfail("capture doesn't currently support 0 wires.")
 
         @qjit
         @qml.qnode(qml.device("lightning.qubit", wires=0, shots=10))
@@ -166,6 +170,7 @@ class TestCounts:
         assert np.array_equal(observed, expected)
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 class TestExpval:
     def test_named(self, backend):
         """Test expval for named observables."""
@@ -187,6 +192,9 @@ class TestExpval:
     def test_hermitian_1(self, backend):
         """Test expval for Hermitian observable."""
 
+        if qml.capture.enabled():
+            pytest.xfail("capture does not yet support Hermitian")
+
         @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def expval2(x: float):
@@ -204,8 +212,12 @@ class TestExpval:
         observed = expval2(np.pi / 2)
         assert np.isclose(observed, expected)
 
+
     def test_hermitian_2(self, backend):
         """Test expval for Hermitian observable."""
+
+        if qml.capture.enabled():
+            pytest.xfail("capture does not yet support Hermitian")
 
         @qjit
         @qml.qnode(qml.device(backend, wires=2))
@@ -250,6 +262,9 @@ class TestExpval:
 
     def test_tensor_2(self, backend):
         """Test expval for Tensor observable."""
+
+        if qml.capture.enabled():
+            pytest.xfail("capture does not yet support Hermitian")
 
         @qjit
         @qml.qnode(qml.device(backend, wires=3))
@@ -296,6 +311,9 @@ class TestExpval:
 
     def test_hamiltonian_2(self, backend):
         """Test expval for Hamiltonian observable."""
+
+        if qml.capture.enabled():
+            pytest.xfail("capture does not yet support Hermitian")
 
         @qjit
         @qml.qnode(qml.device(backend, wires=2))
@@ -392,6 +410,7 @@ class TestExpval:
         assert np.isclose(observed, expected)
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 class TestVar:
     def test_rx(self, backend):
         """Test var with RX."""
@@ -676,6 +695,7 @@ class TestVar:
         )
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 class TestState:
     """Test state measurement processes."""
 
@@ -705,6 +725,7 @@ class TestState:
         assert np.allclose(observed, expected)
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 class TestProbs:
     """Test probabilities measurement processes."""
 
@@ -734,6 +755,7 @@ class TestProbs:
         assert np.allclose(observed, expected)
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 class TestNewArithmeticOps:
     "Test PennyLane new arithmetic operators"
 
@@ -1039,6 +1061,7 @@ class CustomDevice(qml.devices.Device):
         return circuits, execution_config
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 class TestDensityMatrixMP:
     """Tests for density_matrix"""
 
@@ -1054,6 +1077,7 @@ class TestDensityMatrixMP:
                 return qml.density_matrix([0])
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 class TestVnEntropy:
     """Test vnentropy."""
 
@@ -1073,6 +1097,7 @@ class TestVnEntropy:
         assert circuit_entropy(np.pi / 2) == expected
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 class TestMutualInfo:
     """Test mutualinfo."""
 
@@ -1094,6 +1119,7 @@ class TestMutualInfo:
         assert mutual_info_circuit() == expected
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 class TestShadow:
     """Test shadow."""
 
@@ -1117,6 +1143,7 @@ class TestShadow:
         assert expected_recipes == actual_recipes
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 class TestShadowExpval:
     """Test shadowexpval."""
 
@@ -1139,6 +1166,7 @@ class TestShadowExpval:
         assert shadow_expval_circuit(0, H) == expected
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 class TestPurity:
     """Test purity."""
 
@@ -1157,6 +1185,7 @@ class TestPurity:
         assert purity_circuit() == expected
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 class TestNullQubitMeasurements:
     """Test measurement results with null.qubit."""
 

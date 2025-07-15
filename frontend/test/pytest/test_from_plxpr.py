@@ -23,7 +23,7 @@ import pytest
 import catalyst
 from catalyst import qjit
 from catalyst.from_plxpr import from_plxpr
-from catalyst.jax_primitives import get_call_jaxpr, qinst_p
+from catalyst.jax_primitives import get_call_jaxpr, qinst_p, namedobs_p, hamiltonian_p, expval_p
 
 pytestmark = pytest.mark.usefixtures("disable_capture")
 
@@ -106,24 +106,6 @@ def compare_eqns(eqn1, eqn2):
 
 class TestErrors:
     """Test that errors are raised in unsupported situations."""
-
-    def test_observable_without_n_wires(self):
-        """Test that a NotImplementedError is raised for an observable without n_wires."""
-
-        dev = qml.device("lightning.qubit", wires=2)
-
-        @qml.qnode(dev)
-        def circuit():
-            return qml.expval(qml.X(0) + qml.Y(0))
-
-        qml.capture.enable()
-        jaxpr = jax.make_jaxpr(circuit)()
-
-        with pytest.raises(
-            NotImplementedError, match="operator arithmetic not yet supported for conversion."
-        ):
-            from_plxpr(jaxpr)()
-        qml.capture.disable()
 
     def test_measuring_eigvals_not_supported(self):
         """Test that a NotImplementedError is raised for converting a measurement
@@ -661,6 +643,34 @@ class TestAdjointCtrlOps:
             assert eqn.invars[i] == qfunc_xpr.eqns[2 + i].outvars[0]
         assert eqn.invars[3].val == False
         assert eqn.invars[4].val == True
+
+
+class TestObservables:
+
+    def test_sprod(self):
+
+        qml.capture.enable()
+
+        @qml.qnode(qml.device('lightning.qubit', wires=4))
+        def c():
+            return qml.expval(2*qml.Z(0))
+        
+        jaxpr = jax.make_jaxpr(c)()
+        catalyst_xpr = from_plxpr(jaxpr)()
+
+        qfunc = catalyst_xpr.eqns[0].params['call_jaxpr']
+        assert qfunc.eqns[3].primitive == namedobs_p
+        assert qfunc.eqns[3].params == {"kind": "PauliZ"}
+
+        # 4 is broadcast_in_dim
+        assert qfunc.eqns[4].params['shape'] == (1,)
+
+        assert qfunc.eqns[5].primitive == hamiltonian_p
+        assert qfunc.eqns[5].invars[0] == qfunc.eqns[4].outvars[0]
+        assert qfunc.eqns[5].invars[1] == qfunc.eqns[3].outvars[0]
+
+        assert qfunc.eqns[6].primitive == expval_p
+        assert qfunc.eqns[6].invars[0] == qfunc.eqns[5].outvars[0]
 
 
 class TestHybridPrograms:
