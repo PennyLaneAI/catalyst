@@ -864,6 +864,7 @@ class TestHybridPrograms:
 
 
 class TestObservables:
+    """Groups tests involving different kinds of observables"""
 
     def test_hermitian(self):
         """Test a hermitian can be converted"""
