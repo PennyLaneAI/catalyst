@@ -64,7 +64,7 @@ you are encoutering issues, please consult the detailed guide
       .. code-block:: console
 
         # Install common requirements
-        sudo apt install clang lld ccache ninja-build make cmake
+        sudo apt install clang lld ccache make
 
         # Clone the Catalyst repository
         git clone --recurse-submodules --shallow-submodules https://github.com/PennyLaneAI/catalyst.git
@@ -85,7 +85,6 @@ you are encoutering issues, please consult the detailed guide
 
         # Install XCode Command Line Tools and common requirements
         xcode-select --install
-        pip install cmake'<4' ninja
 
         # If not present yet, install Homebrew (https://brew.sh/)
         brew install ccache gfortran
@@ -128,7 +127,7 @@ installed and available on the path (depending on the platform):
   compiler is required on ARM macOS systems.
 
 - The `Ninja <https://ninja-build.org/>`_, `Make <https://www.gnu.org/software/make/>`_, and
-  `CMake <https://cmake.org/download/>`_ (v3.20 or greater) build tools.
+  `CMake <https://cmake.org/download/>`_ (v3.26 or greater, less than v4) build tools.
 
 - `Python <https://www.python.org/>`_ 3.10 or higher for the Python frontend.
 
@@ -143,12 +142,7 @@ They can be installed via:
 
       .. code-block:: console
 
-        sudo apt install clang lld ccache ninja-build make cmake
-
-      .. note::
-
-        If the CMake version available in your system is too old, you can also install up-to-date
-        versions of it via ``pip install cmake``.
+        sudo apt install clang lld ccache make
 
       .. tabs::
 
@@ -169,14 +163,13 @@ They can be installed via:
 
    .. group-tab:: macOS
 
-      On **macOS**, it is strongly recommended to install the official XCode Command Line Tools (for ``clang`` & ``make``).
-      The remaining packages can then be installed via ``pip`` and ``brew``.
-      If ``brew`` is not present yet, install it from https://brew.sh/:
+      On **macOS**, it is strongly recommended to install the official XCode Command Line Tools
+      (for ``clang`` & ``make``). The remaining packages can then be installed via ``pip`` and
+      ``brew``. If ``brew`` is not present yet, install it from https://brew.sh/:
 
       .. code-block:: console
 
         xcode-select --install
-        pip install cmake'<4' ninja
         brew install ccache gfortran
         export PATH=/usr/local/opt/ccache/libexec:$PATH
 

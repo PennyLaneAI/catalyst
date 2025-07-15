@@ -42,7 +42,7 @@ jobs:
     steps:
       - name: Checkout Catalyst repo
         uses: actions/checkout@v4
-      
+
       - name: Set up Python # Ensure python3.10 is used
         uses: actions/setup-python@v5
         with:
@@ -183,7 +183,7 @@ jobs:
     steps:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
-    
+
     - name: Set up Python # Ensure python3.10 is used
       uses: actions/setup-python@v5
       with:
@@ -466,7 +466,7 @@ jobs:
     - name: Install Deps
       run: |
         sudo apt-get update
-        sudo apt-get install -y libasan6 make ninja-build
+        sudo apt-get install -y libasan6 make
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
         # cuda-quantum is added manually here.
@@ -554,7 +554,7 @@ jobs:
     - name: Install Deps
       run: |
         sudo apt-get update
-        sudo apt-get install -y libasan6 make ninja-build
+        sudo apt-get install -y libasan6 make
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
         make frontend
@@ -616,7 +616,7 @@ jobs:
     - name: Install Deps
       run: |
         sudo apt-get update
-        sudo apt-get install -y libasan6 make ninja-build
+        sudo apt-get install -y libasan6 make
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
         make frontend
@@ -710,7 +710,7 @@ jobs:
         run: |
           wget http://archive.ubuntu.com/ubuntu/pool/universe/l/lcov/lcov_1.15-1_all.deb
           sudo apt-get install -y ./lcov_1.15-1_all.deb
-          lcov --version 
+          lcov --version
 
       - name: Install additional dependencies for OpenQasm device
         run: |
