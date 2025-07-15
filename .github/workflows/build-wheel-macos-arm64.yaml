@@ -253,6 +253,8 @@ jobs:
     steps:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
+      with:
+        ref: ${{ inputs.branch || github.ref }}
 
     # Python 3.10 was dropped from the GH images on macOS arm
     - name: Install Python 3.10
@@ -440,6 +442,8 @@ jobs:
     steps:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
+      with:
+        ref: ${{ inputs.branch || github.ref }}
 
     # Python 3.10 was dropped from the GH images on macOS arm
     - name: Install Python 3.10

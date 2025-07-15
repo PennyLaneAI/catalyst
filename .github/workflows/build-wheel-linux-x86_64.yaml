@@ -283,6 +283,8 @@ jobs:
     steps:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
+      with:
+        ref: ${{ inputs.branch || github.ref }}
 
     - name: Install dependencies (AlmaLinux)
       run: |
@@ -451,6 +453,8 @@ jobs:
     steps:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
+      with:
+        ref: ${{ inputs.branch || github.ref }}
 
     - name: Download Wheel Artifact
       uses: actions/download-artifact@v4
