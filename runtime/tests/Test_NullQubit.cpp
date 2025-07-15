@@ -91,8 +91,9 @@ TEST_CASE("Test automatic qubit management", "[NullQubit]")
     size_t n = __catalyst__rt__num_qubits();
     CHECK(n == 3);
 
-    double buffer[shots * n];
-    MemRefT_double_2d result = {buffer, buffer, 0, {shots, n}, {n, 1}};
+    std::vector<double> buffer(shots * n);
+    MemRefT_double_2d result = {buffer.data(), buffer.data(), 0, {shots, n}, {n, 1}};
+
     __catalyst__qis__Sample(&result, n);
 
     __catalyst__rt__qubit_release_array(qs);
