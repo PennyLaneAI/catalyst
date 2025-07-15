@@ -236,7 +236,13 @@ def sort_eqns(eqns: List[JaxprEqn], forced_order_primitives: Set[JaxprPrimitive]
     for b in boxes:
         origin.update({ov.count: b for ov in b.e.outvars})  # [1]
     for b in boxes:
-        b.parents = [origin[v.count] for v in b.e.invars if v.count in origin]  # [2]
+        b.parents = []
+        for v in b.e.invars:
+            if not isinstance(v, jax._src.core.Var):
+                # constant literal invar, no need to track def use order
+                continue
+            if v.count in origin:
+                b.parents.append(origin[v.count])  # [2]
     for i, q in fixedorder:
         for b in boxes[i + 1 :]:
             b.parents.append(q)  # [3]
