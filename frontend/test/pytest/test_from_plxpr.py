@@ -23,7 +23,7 @@ import pytest
 import catalyst
 from catalyst import qjit
 from catalyst.from_plxpr import from_plxpr
-from catalyst.jax_primitives import get_call_jaxpr, qinst_p
+from catalyst.jax_primitives import get_call_jaxpr, qinst_p, for_p
 
 pytestmark = pytest.mark.usefixtures("disable_capture")
 
@@ -662,6 +662,39 @@ class TestAdjointCtrlOps:
         assert eqn.invars[3].val == False
         assert eqn.invars[4].val == True
 
+
+class TestControlFlow:
+
+    @pytest.mark.parametrize("reverse", (True, False))
+    def test_for_loop_outside_qnode(self, reverse):
+
+        if reverse:
+            start, stop, step = 6, 0, -2 # 6, 4, 2
+        else:
+            start, stop, step = 2, 7, 2 # 2, 4, 6
+
+        def f(i0):
+            @qml.for_loop(start, stop, step)
+            def g(i, x):
+                return i + x
+
+            return g(i0)
+        
+        jaxpr = jax.make_jaxpr(f)(2)
+        catalyst_jaxpr = from_plxpr(jaxpr)(2)
+
+        eqn = catalyst_jaxpr.eqns[0]
+
+        assert eqn.primitive == for_p
+        assert eqn.params['apply_reverse_transform'] == reverse
+        assert eqn.params['body_nconsts'] == 0
+        assert eqn.params['nimplicit'] == 0
+        assert eqn.params['preserve_dimensions'] is True
+
+        assert eqn.invars[0].val == start
+        assert eqn.invars[1].val == stop
+        assert eqn.invars[2].val == step
+        assert eqn.invars[3].val == start
 
 class TestHybridPrograms:
     """from_plxpr conversion tests for hybrid programs."""
