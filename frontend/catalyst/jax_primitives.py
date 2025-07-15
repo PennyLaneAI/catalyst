@@ -388,10 +388,16 @@ def _assert_jaxpr_without_constants(jaxpr: ClosedJaxpr):
     )
 
 
+@python_callback_p.def_abstract_eval
+def _python_callback_abstract_eval(*avals, callback, custom_grad, results_aval):
+    """Abstract evaluation"""
+    return results_aval
+
+
 @python_callback_p.def_impl
-def _python_callback_def_impl(*args, callback, custom_grad, results_aval):  # pragma: no cover
+def _python_callback_def_impl(*avals, callback, custom_grad, results_aval):  # pragma: no cover
     """Concrete evaluation"""
-    return callback(*args)
+    raise NotImplementedError()
 
 
 def _python_callback_lowering(
