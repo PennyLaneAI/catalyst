@@ -77,7 +77,7 @@ from jax.tree_util import (
     tree_unflatten,
     treedef_is_leaf,
 )
-from jaxlib.xla_extension import PyTreeRegistry
+from jaxlib._jax.pytree import PyTreeRegistry
 
 from catalyst.jax_extras.patches import gather2_p, get_aval2
 from catalyst.logging import debug_logger
@@ -252,7 +252,7 @@ def sort_eqns(eqns: List[JaxprEqn], forced_order_primitives: Set[JaxprPrimitive]
 def jaxpr_pad_consts(jaxprs: List[Jaxpr]) -> List[ClosedJaxpr]:
     """Align the constants of Jaxpr programs. Return the list of corresponding programs accepting
     the same constants."""
-    newvar = gensym("_")
+    newvar = gensym()
 
     # List of constant variables of all jaxprs, preprended with '_'
     all_mangled_constvars: List[List[Var]] = []
