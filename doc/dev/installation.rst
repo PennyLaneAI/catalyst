@@ -64,7 +64,7 @@ you are encoutering issues, please consult the detailed guide
       .. code-block:: console
 
         # Install common requirements
-        sudo apt install clang lld ccache libomp-dev ninja-build make cmake
+        sudo apt install clang lld ccache ninja-build make cmake
 
         # Clone the Catalyst repository
         git clone --recurse-submodules --shallow-submodules https://github.com/PennyLaneAI/catalyst.git
@@ -88,7 +88,7 @@ you are encoutering issues, please consult the detailed guide
         pip install cmake'<4' ninja
 
         # If not present yet, install Homebrew (https://brew.sh/)
-        brew install libomp ccache gfortran
+        brew install ccache gfortran
 
         # Add ccache drop-in compiler replacements to the PATH
         export PATH=/usr/local/opt/ccache/libexec:$PATH
@@ -123,10 +123,9 @@ In order to build Catalyst from source, developers need to ensure the following 
 installed and available on the path (depending on the platform):
 
 - The `clang <https://clang.llvm.org/>`_ compiler, `LLD <https://lld.llvm.org/>`_ linker
-  (Linux only), `CCache <https://ccache.dev/>`_ compiler cache (optional, recommended), and
-  `OpenMP <https://www.openmp.org/>`_. Additionaly, the
-  `GFortran <https://fortran-lang.org/en/learn/os_setup/install_gfortran/>`_ compiler is
-  required on ARM macOS systems.
+  (Linux only), `CCache <https://ccache.dev/>`_ compiler cache (optional, recommended).
+  Additionally, the `GFortran <https://fortran-lang.org/en/learn/os_setup/install_gfortran/>`_
+  compiler is required on ARM macOS systems.
 
 - The `Ninja <https://ninja-build.org/>`_, `Make <https://www.gnu.org/software/make/>`_, and
   `CMake <https://cmake.org/download/>`_ (v3.20 or greater) build tools.
@@ -144,7 +143,7 @@ They can be installed via:
 
       .. code-block:: console
 
-        sudo apt install clang lld ccache libomp-dev ninja-build make cmake
+        sudo apt install clang lld ccache ninja-build make cmake
 
       .. note::
 
@@ -178,7 +177,7 @@ They can be installed via:
 
         xcode-select --install
         pip install cmake'<4' ninja
-        brew install libomp ccache gfortran
+        brew install ccache gfortran
         export PATH=/usr/local/opt/ccache/libexec:$PATH
 
 

@@ -263,10 +263,6 @@ jobs:
       with:
         python-version: '3.10'
 
-    - name: Install Dependencies (System)
-      run: |
-        brew install libomp
-
     - name: Setup Python version
       # There are multiple Python versions installed on the GitHub image, 3.10 - 3.12 is already
       # available under /Library/Frameworks/Python.framework/Versions/, but homebrew also provides
