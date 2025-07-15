@@ -36,6 +36,7 @@ Quoted from the object's docstring:
 import textwrap
 
 import pytest
+from jax._src.core import Literal
 from jax.api_util import debug_info as jdb
 from jax.core import set_current_trace, take_current_trace
 from jax.extend.core import Primitive
@@ -155,7 +156,8 @@ class TestQubitValues:
             # Check that the extract primitive follows the wire index in the qreg manager
             # __getitem__ method
             extract_p_index_invar = trace.frame.eqns[-1].invars[-1]
-            assert trace.frame.constvar_to_val[extract_p_index_invar] == 0
+            assert isinstance(extract_p_index_invar, Literal)
+            assert extract_p_index_invar.val == 0
 
     def test_no_overwriting_extract(self):
         """Test that no new qubit is extracted when indexing into an existing wire"""
@@ -183,10 +185,9 @@ class TestQubitValues:
 
         # Also check with actual jaxpr variables
         with take_current_trace() as trace:
-            var_to_tracer = dict((v, t_id) for t_id, v in trace.frame.tracer_to_var.items())
             gate_out_qubits = trace.frame.eqns[-1].outvars
-            assert id(qreg_manager[0]) == var_to_tracer[gate_out_qubits[0]]
-            assert id(qreg_manager[1]) == var_to_tracer[gate_out_qubits[1]]
+            assert trace.frame.tracer_to_var[id(qreg_manager[0])] == gate_out_qubits[0]
+            assert trace.frame.tracer_to_var[id(qreg_manager[1])] == gate_out_qubits[1]
 
     def test_iter(self):
         """Test __iter__ in the qreg manager"""
@@ -217,10 +218,9 @@ class TestQubitValues:
 
         # Also check with actual jaxpr variables
         with take_current_trace() as trace:
-            var_to_tracer = dict((v, t_id) for t_id, v in trace.frame.tracer_to_var.items())
             gate_out_qubits = trace.frame.eqns[-1].outvars
-            assert id(qreg_manager[0]) == var_to_tracer[gate_out_qubits[0]]
-            assert id(qreg_manager[1]) == var_to_tracer[gate_out_qubits[1]]
+            assert trace.frame.tracer_to_var[id(qreg_manager[0])] == gate_out_qubits[0]
+            assert trace.frame.tracer_to_var[id(qreg_manager[1])] == gate_out_qubits[1]
 
     def test_insert_all_dangling_qubits(self):
         """
