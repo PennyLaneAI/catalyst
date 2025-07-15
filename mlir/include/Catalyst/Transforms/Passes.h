@@ -26,6 +26,7 @@ std::unique_ptr<mlir::Pass> createArrayListToMemRefPass();
 std::unique_ptr<mlir::Pass> createBufferDeallocationPass();
 std::unique_ptr<mlir::Pass> createCatalystBufferizationPass();
 std::unique_ptr<mlir::Pass> createCatalystConversionPass();
+std::unique_ptr<mlir::Pass> createDetensorizeFunctionBoundaryPass();
 std::unique_ptr<mlir::Pass> createDetensorizeSCFPass();
 std::unique_ptr<mlir::Pass> createDisableAssertionPass();
 std::unique_ptr<mlir::Pass> createGEPInboundsPass();
