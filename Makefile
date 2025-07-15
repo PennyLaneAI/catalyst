@@ -131,7 +131,7 @@ frontend:
 	# Somewhere here: reverts the "reverts the source_info change (492cd3d9)"
 	#   i.e. source_info is back in
 	# 351c13e5b6dfec90863ef64f137a28da7426f38a (Apr.26): Checkpoint, last commit of Apr.26
-	pip install git+https://github.com/jax-ml/jax.git@351c13e5b6dfec90863ef64f137a28da7426f38a
+	pip install git+https://github.com/jax-ml/jax.git@a49adaca4c402eb77c6336d4f2fb118dd5ff4854
 
 .PHONY: mlir llvm mhlo enzyme dialects runtime oqc
 mlir:
