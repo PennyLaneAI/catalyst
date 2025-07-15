@@ -242,16 +242,16 @@ class TestQubitValues:
         with take_current_trace() as trace:
             # Checking via jaxpr internals is a bit tedious here
             # So let's just check the string...
-            observed_jaxpr = str(trace.to_jaxpr([], None)[0])
+            observed_jaxpr = str(trace.to_jaxpr([], None, None)[0])
             expected = """\
             { lambda ; . let
-                a:AbstractQreg() = qalloc 42
-                b:AbstractQbit() = qextract a 0
-                c:AbstractQbit() = qextract a 1
-                d:AbstractQbit() = qextract a 2
-                e:AbstractQreg() = qinsert a 0 b
-                f:AbstractQreg() = qinsert e 1 c
-                _:AbstractQreg() = qinsert f 2 d
+                a:AbstractQreg() = qalloc 42:i64[]
+                b:AbstractQbit() = qextract a 0:i64[]
+                c:AbstractQbit() = qextract a 1:i64[]
+                d:AbstractQbit() = qextract a 2:i64[]
+                e:AbstractQreg() = qinsert a 0:i64[] b
+                f:AbstractQreg() = qinsert e 1:i64[] c
+                _:AbstractQreg() = qinsert f 2:i64[] d
               in () }"""
             expected = textwrap.dedent(expected)
             assert observed_jaxpr == expected
@@ -328,17 +328,17 @@ class TestQregAndQubit:
 
         with take_current_trace() as trace:
             # Check full jaxpr
-            observed_jaxpr = str(trace.to_jaxpr([], None)[0])
+            observed_jaxpr = str(trace.to_jaxpr([], None, None)[0])
             expected = """\
             { lambda ; . let
-                a:AbstractQreg() = qalloc 42
-                b:AbstractQbit() = qextract a 0
-                c:AbstractQbit() = qextract a 1
+                a:AbstractQreg() = qalloc 42:i64[]
+                b:AbstractQbit() = qextract a 0:i64[]
+                c:AbstractQbit() = qextract a 1:i64[]
                 d:AbstractQbit() e:AbstractQbit() = qubit_mock_op b c
-                f:AbstractQreg() = qinsert a 0 d
-                g:AbstractQreg() = qinsert f 1 e
+                f:AbstractQreg() = qinsert a 0:i64[] d
+                g:AbstractQreg() = qinsert f 1:i64[] e
                 h:AbstractQreg() = qreg_mock_op g
-                i:AbstractQbit() = qextract h 0
+                i:AbstractQbit() = qextract h 0:i64[]
                 _:AbstractQbit() = qubit_mock_op i
               in () }"""
             expected = textwrap.dedent(expected)
