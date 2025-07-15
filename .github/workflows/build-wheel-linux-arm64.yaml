@@ -30,6 +30,11 @@ on:
         type: boolean
         required: false
         default: false
+      branch:
+        description: 'Branch to build from'
+        required: false
+        default: 'main'
+        type: string
 
 concurrency:
   group: Build Catalyst Wheel on Linux (arm64)-${{ github.ref }}
@@ -68,6 +73,8 @@ jobs:
     steps:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
+      with:
+        ref: ${{ inputs.branch || github.ref }}
 
     - name: Cache LLVM Source
       id: cache-llvm-source
@@ -253,6 +260,8 @@ jobs:
     steps:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
+      with:
+        ref: ${{ inputs.branch || github.ref }}
 
     - name: Install dependencies (AlmaLinux)
       run: |
@@ -419,6 +428,8 @@ jobs:
     steps:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
+      with:
+        ref: ${{ inputs.branch || github.ref }}
 
     - name: Setup Python ${{ matrix.python_version }}
       uses: actions/setup-python@v5

@@ -118,10 +118,15 @@ def qjit(
         async_qnodes (bool): Experimental support for automatically executing
             QNodes asynchronously, if supported by the device runtime.
         target (str): the compilation target
-        keep_intermediate (bool): Whether or not to store the intermediate files throughout the
-            compilation. If ``True``, intermediate representations are available via the
-            :attr:`~.QJIT.mlir`, :attr:`~.QJIT.mlir_opt`, :attr:`~.QJIT.jaxpr`,
-            and :attr:`~.QJIT.qir`, representing different stages in the optimization process.
+        keep_intermediate (Union[str, int, bool]): Level controlling intermediate file generation.
+            - ``False`` or ``0`` or ``"none"`` or ``None`` (default): No intermediate file is kept.
+            - ``True`` or ``1`` or ``"pipeline"``: Intermediate files are saved after each pipeline.
+            - ``2`` or ``"pass"``: Intermediate files are saved after each pass.
+            If enabled, intermediate representations are available via the following attributes:
+            - :attr:`~.QJIT.jaxpr`: JAX program representation
+            - :attr:`~.QJIT.mlir`: MLIR representation after canonicalization
+            - :attr:`~.QJIT.mlir_opt`: MLIR representation after optimization
+            - :attr:`~.QJIT.qir`: QIR in LLVM IR form
         verbose (bool): If ``True``, the tools and flags used by Catalyst behind the scenes are
             printed out.
         logfile (Optional[TextIOWrapper]): File object to write verbose messages to (default -
@@ -725,6 +730,7 @@ class QJIT(CatalystCallable):
                 return trace_from_pennylane(
                     self.user_function,
                     static_argnums,
+                    dynamic_args,
                     abstracted_axes,
                     full_sig,
                     kwargs,

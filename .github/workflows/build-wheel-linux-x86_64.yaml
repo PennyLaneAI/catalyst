@@ -30,6 +30,11 @@ on:
         type: boolean
         required: false
         default: false
+      branch:
+        description: 'Branch to build from'
+        required: false
+        default: 'main'
+        type: string
 
 concurrency:
   group: Build Catalyst Wheel on Linux (x86_64)-${{ github.ref }}
@@ -79,6 +84,8 @@ jobs:
     steps:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
+      with:
+        ref: ${{ inputs.branch || github.ref }}
 
     - name: Set Ownership in Container
       run: |
@@ -276,6 +283,8 @@ jobs:
     steps:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
+      with:
+        ref: ${{ inputs.branch || github.ref }}
 
     - name: Install dependencies (AlmaLinux)
       run: |
@@ -444,6 +453,8 @@ jobs:
     steps:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
+      with:
+        ref: ${{ inputs.branch || github.ref }}
 
     - name: Download Wheel Artifact
       uses: actions/download-artifact@v4
