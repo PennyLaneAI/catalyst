@@ -352,7 +352,6 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
             self.qreg_manager[wire_values] = new_wire
 
         return out_qubits
-    
     def _obs(self, obs, simplify=True):
         """Interpret the observable equation corresponding to a measurement equation's input."""
         if simplify:
