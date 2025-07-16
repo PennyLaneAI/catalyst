@@ -172,6 +172,7 @@ class TestCounts:
 
 @pytest.mark.usefixtures("use_both_frontend")
 class TestExpval:
+
     def test_named(self, backend):
         """Test expval for named observables."""
 
@@ -212,12 +213,8 @@ class TestExpval:
         observed = expval2(np.pi / 2)
         assert np.isclose(observed, expected)
 
-
     def test_hermitian_2(self, backend):
         """Test expval for Hermitian observable."""
-
-        if qml.capture.enabled():
-            pytest.xfail("capture does not yet support Hermitian")
 
         @qjit
         @qml.qnode(qml.device(backend, wires=2))
@@ -311,9 +308,6 @@ class TestExpval:
 
     def test_hamiltonian_2(self, backend):
         """Test expval for Hamiltonian observable."""
-
-        if qml.capture.enabled():
-            pytest.xfail("capture does not yet support Hermitian")
 
         @qjit
         @qml.qnode(qml.device(backend, wires=2))
@@ -412,6 +406,7 @@ class TestExpval:
 
 @pytest.mark.usefixtures("use_both_frontend")
 class TestVar:
+
     def test_rx(self, backend):
         """Test var with RX."""
 

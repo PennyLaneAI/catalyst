@@ -27,6 +27,7 @@ from catalyst.jax_primitives import (
     get_call_jaxpr,
     adjoint_p,
     get_call_jaxpr,
+    hermitian_p,
     qalloc_p,
     qextract_p,
     qinsert_p,
@@ -874,6 +875,34 @@ class TestHybridPrograms:
         expected = -np.sin(0.5) + np.cos(1.2)
 
         assert qml.math.allclose(results, expected)
+
+
+class TestObservables:
+    """Groups tests involving different kinds of observables"""
+
+    def test_hermitian(self):
+        """Test a hermitian can be converted"""
+
+        qml.capture.enable()
+
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def c(mat):
+            return qml.expval(qml.Hermitian(mat, wires=(0, 1)))
+
+        mat = (qml.X(0) @ qml.Y(1)).matrix()
+
+        plxpr = jax.make_jaxpr(c)(mat)
+        catalyst_xpr = from_plxpr(plxpr)(mat)
+
+        qfunc = catalyst_xpr.eqns[0].params["call_jaxpr"]
+
+        assert qfunc.eqns[4].primitive == hermitian_p
+        assert qfunc.eqns[4].params == {}
+        assert qfunc.eqns[4].invars[0] == qfunc.invars[0]
+        assert qfunc.eqns[4].invars[1] == qfunc.eqns[2].outvars[0]
+        assert qfunc.eqns[4].invars[2] == qfunc.eqns[3].outvars[0]
+
+        assert qfunc.eqns[5].invars[0] == qfunc.eqns[4].outvars[0]
 
 
 if __name__ == "__main__":

@@ -57,6 +57,7 @@ from catalyst.jax_primitives import (
     expval_p,
     gphase_p,
     hamiltonian_p,
+    hermitian_p,
     measure_in_basis_p,
     measure_p,
     namedobs_p,
@@ -365,6 +366,8 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
             terms = [self._obs(t, simplify=False) for t in terms]
             return hamiltonian_p.bind(jnp.stack(coeffs), *terms)
         wires = [self.qreg_manager[w] for w in obs.wires]
+        if obs.name == "Hermitian":
+            return hermitian_p.bind(obs.data[0], *wires)
         return namedobs_p.bind(*wires, *obs.data, kind=obs.name)
 
     def _compbasis_obs(self, *wires):
