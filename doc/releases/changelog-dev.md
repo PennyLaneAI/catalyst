@@ -6,6 +6,9 @@
 
 <h3>Breaking changes 💔</h3>
 
+* The JAX version used by Catalyst is updated to 0.6.2.
+  [(#1897)](https://github.com/PennyLaneAI/catalyst/pull/1897)
+
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
@@ -25,4 +28,5 @@
 
 This release contains contributions from (in alphabetical order):
 
-Christina Lee
+Christina Lee,
+Paul Haochen Wang.

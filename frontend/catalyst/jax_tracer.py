@@ -57,7 +57,6 @@ from catalyst.jax_extras import (
     InputSignature,
     OutputSignature,
     PyTreeDef,
-    PyTreeRegistry,
     ShapedArray,
     _input_type_to_tracers,
     cond_expansion_strategy,
