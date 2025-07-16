@@ -1103,7 +1103,7 @@ def trace_quantum_measurements(
                             )
                             _, out_tree_def = jax.tree_util.tree_flatten(mock_list)
                         else:
-                            raise CompileError("Unknown pytree node type")
+                            raise CompileError("Unknown pytree node type")  # pragma: no-cover
 
                         return out_tree_def
 
