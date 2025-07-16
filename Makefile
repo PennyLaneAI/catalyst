@@ -133,6 +133,7 @@ frontend:
 	# 351c13e5b6dfec90863ef64f137a28da7426f38a (Apr.26): Checkpoint, last commit of Apr.26
 	# ef015a0d3f8effa3d313c7d692d9241a54a99922 (Apr.29): the "inline literals" change
 	#pip install git+https://github.com/jax-ml/jax.git@603f73016cdd6c576b819524ea270972439ff5c5
+	pip install git+https://github.com/PennyLaneAI/pennylane.git@bump-jax-0.6.2
 
 .PHONY: mlir llvm mhlo enzyme dialects runtime oqc
 mlir:
