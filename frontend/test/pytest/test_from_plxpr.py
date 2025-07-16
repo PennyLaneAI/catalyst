@@ -32,6 +32,7 @@ from catalyst.jax_primitives import (
     qextract_p,
     qinsert_p,
     qinst_p,
+    while_p,
 )
 
 pytestmark = pytest.mark.usefixtures("disable_capture")
@@ -824,6 +825,36 @@ class TestControlFlow:
         assert eqn.invars[1].val == stop
         assert eqn.invars[2].val == step
         assert eqn.invars[3].val == start
+
+    def test_while_loop_outside_qnode(self):
+        """Test that a while loop outside a qnode can be translated."""
+        qml.capture.enable()
+
+        def f(x):
+
+            y = jax.numpy.array([0,1,2])
+            
+            @qml.while_loop(lambda i: jax.numpy.sum(i) < 5*jax.numpy.sum(y))
+            def g(i):
+                return i + y
+
+            return g(jax.numpy.array([0,0,0]))
+
+        plxpr = jax.make_jaxpr(f)(1)
+        catalyst_xpr = from_plxpr(plxpr)(1)
+
+        assert catalyst_xpr.eqns[0].primitive == while_p
+        assert catalyst_xpr.eqns[0].params['body_nconsts'] == 1
+        assert catalyst_xpr.eqns[0].params['cond_nconsts'] == 1
+        assert catalyst_xpr.eqns[0].params['n_implicit'] == 0
+        assert catalyst_xpr.eqns[0].params['preserve_dimensions'] == True
+
+        for kind in ['body_jaxpr', 'cond_jaxpr']:
+            xpr = catalyst_xpr.eqns[0].params[kind]
+            assert isinstance(xpr, jax.core.ClosedJaxpr)
+            assert len(xpr.consts) == 0
+            assert len(xpr.jaxpr.invars) == 2
+            assert len(xpr.jaxpr.outvars) == 1
 
 class TestHybridPrograms:
     """from_plxpr conversion tests for hybrid programs."""
