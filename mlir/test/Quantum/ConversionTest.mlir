@@ -179,11 +179,12 @@ func.func @insert(%r : !quantum.reg, %q : !quantum.bit) -> !quantum.reg {
 
 // CHECK-LABEL: @custom_gate
 module @custom_gate {
-  // CHECK: llvm.func @__catalyst__qis__Identity(!llvm.ptr, !llvm.ptr)
+  // CHECK: llvm.func @__catalyst__qis__Identity(!llvm.ptr, i64, ...)
   // CHECK-LABEL: @test
   func.func @test(%q0: !quantum.bit, %p: f64) -> () {
     // CHECK: [[nullptr:%.+]] = llvm.mlir.zero
-    // CHECK: llvm.call @__catalyst__qis__Identity([[nullptr]], %arg0)
+    // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64) : i64
+    // CHECK: llvm.call @__catalyst__qis__Identity([[nullptr]], [[c1]], %arg0)
     %q1 = quantum.custom "Identity"() %q0 : !quantum.bit
     return
   }
@@ -193,11 +194,12 @@ module @custom_gate {
 
 // CHECK-LABEL: @custom_gate
 module @custom_gate {
-  // CHECK: llvm.func @__catalyst__qis__Identity(!llvm.ptr, !llvm.ptr, !llvm.ptr)
+  // CHECK: llvm.func @__catalyst__qis__Identity(!llvm.ptr, i64, ...)
   // CHECK-LABEL: @test
   func.func @test(%q0: !quantum.bit, %q1: !quantum.bit, %p: f64) -> () {
     // CHECK: [[nullptr:%.+]] = llvm.mlir.zero
-    // CHECK: llvm.call @__catalyst__qis__Identity([[nullptr]], %arg0, %arg1)
+    // CHECK: [[c2:%.+]] = llvm.mlir.constant(2 : i64) : i64
+    // CHECK: llvm.call @__catalyst__qis__Identity([[nullptr]], [[c2]], %arg0, %arg1)
     %q2:2 = quantum.custom "Identity"() %q0, %q1 : !quantum.bit, !quantum.bit
     return
   }

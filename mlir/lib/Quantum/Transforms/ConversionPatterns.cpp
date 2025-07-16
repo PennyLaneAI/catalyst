@@ -398,10 +398,9 @@ struct CustomOpPattern : public OpConversionPattern<CustomOp> {
                         adaptor.getParams().getTypes().end());
         if (hasVariadicInputQbits) {
             // Since input qubits would be extracted through va_list in C,
-            // thus we should place the input qubits at the end of the arguments
+            // thus we should add an additional information for number of qubits
             argTypes.insert(argTypes.end(), modifiersPtr.getType());
-            argTypes.insert(argTypes.end(), adaptor.getInQubits().getTypes().begin(),
-                            adaptor.getInQubits().getTypes().end());
+            argTypes.insert(argTypes.end(), IntegerType::get(ctx, 64));
         }
         else {
             argTypes.insert(argTypes.end(), adaptor.getInQubits().getTypes().begin(),
@@ -409,14 +408,19 @@ struct CustomOpPattern : public OpConversionPattern<CustomOp> {
             argTypes.insert(argTypes.end(), modifiersPtr.getType());
         }
 
-        Type qirSignature = LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx), argTypes);
+        Type qirSignature = LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx), argTypes,
+                                                        /*isVarArg=*/hasVariadicInputQbits);
         LLVM::LLVMFuncOp fnDecl =
             catalyst::ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
 
         SmallVector<Value> args;
         args.insert(args.end(), adaptor.getParams().begin(), adaptor.getParams().end());
         if (hasVariadicInputQbits) {
+            // get the number of qbuits and place the input qubits at the end of the arguments.
+            int64_t numQubits = op.getOutQubits().size();
             args.insert(args.end(), modifiersPtr);
+            args.insert(args.end(), rewriter.create<LLVM::ConstantOp>(
+                                        loc, rewriter.getI64IntegerAttr(numQubits)));
             args.insert(args.end(), adaptor.getInQubits().begin(), adaptor.getInQubits().end());
         }
         else {

@@ -27,6 +27,7 @@ def test_no_parameters(backend):
 
     def circuit():
         qml.Identity(wires=0)
+        qml.Identity(wires=[0, 1])
 
         qml.PauliX(wires=1)
         qml.PauliY(wires=2)
