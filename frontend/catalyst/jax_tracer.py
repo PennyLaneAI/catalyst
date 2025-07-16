@@ -1072,29 +1072,39 @@ def trace_quantum_measurements(
                     meas_return_trees_children[i] = counts_tree
 
                     # Essentially, we want to fill the children into the nodes of the out_tree
+                    # i.e. we want out_tree.children() to be meas_return_trees_children
                     # e.g. if out_tree is PyTreeDef({0: *, 1: *}),
                     # and meas_return_trees_children is [PyTreeDef((*, *)), PyTreeDef(*)],
                     # we want to update out_tree to PyTreeDef({0: (*, *), 1: *})
+                    #
                     # Jax used to have a great util called make_from_node_data_and_children
                     # but they removed it in 0.6.2, so we have to be a bit manual here
                     def _make_from_node_data_and_children(node_data, children):
+
+                        def get_replacement_value(tree_def):
+                            # Create a mock python object whose pytree is tree_def
+                            size = len(tree_def.children())
+                            mock_vals = [0] if size == 0 else (0,) * size
+                            return jax.tree_util.tree_unflatten(tree_def, mock_vals)
+
+                        # Connect with the top-level node_data
                         node_type, node_value = node_data
-
-                        def get_replacement_value(child_tree_def):
-                            size = len(child_tree_def.children())
-                            return 0 if size == 0 else (0,) * size
-
                         if node_type is dict:
                             mock_dict = {
                                 node_key: get_replacement_value(child_tree_def)
                                 for node_key, child_tree_def in zip(node_value, children)
                             }
                             _, out_tree_def = jax.tree_util.tree_flatten(mock_dict)
-                        else:
-                            mock_list = [
-                                get_replacement_value(child_tree_def) for child_tree_def in children
-                            ]
+                        elif node_type in (list, tuple):
+                            mock_list = node_type(
+                                [
+                                    get_replacement_value(child_tree_def)
+                                    for child_tree_def in children
+                                ]
+                            )
                             _, out_tree_def = jax.tree_util.tree_flatten(mock_list)
+                        else:
+                            raise CompileError("Unknown pytree node type")
 
                         return out_tree_def
 
