@@ -129,7 +129,7 @@ def workflow_for_loop(
         start,
         stop,
         step,
-        stop if apply_reverse_transform else start,
+        start,
         *args,
         body_jaxpr=converted_closed_jaxpr_branch,
         body_nconsts=len(consts),
