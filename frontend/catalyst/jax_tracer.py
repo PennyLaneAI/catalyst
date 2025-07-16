@@ -1077,34 +1077,29 @@ def trace_quantum_measurements(
                     # we want to update out_tree to PyTreeDef({0: (*, *), 1: *})
                     # Jax used to have a great util called make_from_node_data_and_children
                     # but they removed it in 0.6.2, so we have to be a bit manual here
-                    def _make_from_node_data_and_children(nodes, children):
-                        if nodes is not None:
-                            # dictionary
-                            mock_dict = dict(zip(nodes, children))
-                            for node_key, child_tree_def in mock_dict.items():
-                                size = len(child_tree_def.children())
-                                if size == 0:
-                                    # No children, just the leave itself
-                                    mock_dict[node_key] = 0
-                                else:
-                                    mock_dict[node_key] = (0,) * size
+                    def _make_from_node_data_and_children(node_data, children):
+                        node_type, node_value = node_data
+
+                        def get_replacement_value(child_tree_def):
+                            size = len(child_tree_def.children())
+                            return 0 if size == 0 else (0,) * size
+
+                        if node_type is dict:
+                            mock_dict = {
+                                node_key: get_replacement_value(child_tree_def)
+                                for node_key, child_tree_def in zip(node_value, children)
+                            }
                             _, out_tree_def = jax.tree_util.tree_flatten(mock_dict)
-                            return out_tree_def
                         else:
-                            # list
-                            mock_list = []
-                            for child_tree_def in children:
-                                size = len(child_tree_def.children())
-                                if size == 0:
-                                    # No children, just the leave itself
-                                    mock_list.append(0)
-                                else:
-                                    mock_list.append((0,) * size)
+                            mock_list = [
+                                get_replacement_value(child_tree_def) for child_tree_def in children
+                            ]
                             _, out_tree_def = jax.tree_util.tree_flatten(mock_list)
-                            return out_tree_def
+
+                        return out_tree_def
 
                     out_tree = _make_from_node_data_and_children(
-                        out_tree.node_data()[1], meas_return_trees_children
+                        out_tree.node_data(), meas_return_trees_children
                     )
 
                 else:
