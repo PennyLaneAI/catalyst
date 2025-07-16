@@ -19,7 +19,6 @@ from copy import copy
 from functools import partial
 
 import jax
-import jax.core
 from jax.extend.core import ClosedJaxpr
 from jax.interpreters.partial_eval import convert_constvars_jaxpr
 from pennylane.capture.primitives import cond_prim as plxpr_cond_prim
@@ -59,13 +58,10 @@ def handle_cond(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
 
             def calling_convention(*args_plus_qreg):
                 *args, qreg = args_plus_qreg
-                device = self.device
-                shots = self.shots
                 # `qreg` is the scope argument for the body jaxpr
                 qreg_manager = QregManager(qreg)
-                converter = PLxPRToQuantumJaxprInterpreter(
-                    device, shots, qreg_manager, self.subroutine_cache
-                )
+                converter = copy(self)
+                converter.qreg_manager = qreg_manager
                 # pylint: disable-next=cell-var-from-loop
                 retvals = converter(closed_jaxpr, *args)
                 qreg_manager.insert_all_dangling_qubits()
@@ -174,13 +170,10 @@ def handle_for_loop(
 
     def calling_convention(*args_plus_qreg):
         *args, qreg = args_plus_qreg
-        device = self.device
-        shots = self.shots
         # `qreg` is the scope argument for the body jaxpr
         qreg_manager = QregManager(qreg)
-        converter = PLxPRToQuantumJaxprInterpreter(
-            device, shots, qreg_manager, self.subroutine_cache
-        )
+        converter = copy(self)
+        converter.qreg_manager = qreg_manager
         retvals = converter(jaxpr, *args)
         qreg_manager.insert_all_dangling_qubits()
         return *retvals, converter.qreg_manager.get()
@@ -275,13 +268,10 @@ def handle_while_loop(
 
     def calling_convention(*args_plus_qreg):
         *args, qreg = args_plus_qreg
-        device = self.device
-        shots = self.shots
         # `qreg` is the scope argument for the body jaxpr
         qreg_manager = QregManager(qreg)
-        converter = PLxPRToQuantumJaxprInterpreter(
-            device, shots, qreg_manager, self.subroutine_cache
-        )
+        converter = copy(self)
+        converter.qreg_manager = qreg_manager
         retvals = converter(jaxpr, *args)
         qreg_manager.insert_all_dangling_qubits()
         return *retvals, converter.qreg_manager.get()
@@ -302,13 +292,10 @@ def handle_while_loop(
 
     def remove_qreg(*args_plus_qreg):
         *args, qreg = args_plus_qreg
-        device = self.device
-        shots = self.shots
         # `qreg` is the scope argument for the body jaxpr
         qreg_manager = QregManager(qreg)
-        converter = PLxPRToQuantumJaxprInterpreter(
-            device, shots, qreg_manager, self.subroutine_cache
-        )
+        converter = copy(self)
+        converter.qreg_manager = qreg_manager
 
         return converter(jaxpr, *args)
 
