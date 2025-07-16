@@ -1564,11 +1564,11 @@ class TestControlFlow:
         qml.capture.enable()
 
         if reverse:
-            start, stop, step = 6, 0, -2 # 6, 4, 2
+            start, stop, step = 6, 0, -2  # 6, 4, 2
         else:
-            start, stop, step = 2, 7, 2 # 2, 4, 6
+            start, stop, step = 2, 7, 2  # 2, 4, 6
 
-        @qml.qnode(qml.device('lightning.qubit', wires=1))
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
         def c(x):
             qml.RX(x, 0)
             return qml.expval(qml.Z(0))
@@ -1580,27 +1580,27 @@ class TestControlFlow:
                 return c(i) + x
 
             return g(i0)
-    
+
         out = f(3.0)
-        assert qml.math.allclose(out, 3+jnp.cos(2)+jnp.cos(4)+jnp.cos(6))
+        assert qml.math.allclose(out, 3 + jnp.cos(2) + jnp.cos(4) + jnp.cos(6))
 
     def test_while_loop(self):
         """Test that a outside a qnode can be executed."""
         qml.capture.enable()
 
-        @qml.qnode(qml.device('lightning.qubit', wires=1))
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
         def circuit(x):
-            qml.RX(x,0)
+            qml.RX(x, 0)
             return qml.expval(qml.Z(0))
 
         @qml.qjit
         def f(x):
 
-            const = jnp.array([0,1,2])
-            
+            const = jnp.array([0, 1, 2])
+
             @qml.while_loop(lambda i, y: i < jnp.sum(const))
             def g(i, y):
-                return i+1, y+circuit(i)
+                return i + 1, y + circuit(i)
 
             return g(0, x)
 
@@ -1608,7 +1608,6 @@ class TestControlFlow:
         assert qml.math.allclose(ind, 3)
         expected = 1.0 + jnp.cos(0) + jnp.cos(1) + jnp.cos(2)
         assert qml.math.allclose(res, expected)
-
 
 
 def test_adjoint_transform_integration():

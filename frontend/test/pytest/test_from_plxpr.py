@@ -794,14 +794,15 @@ class TestAdjointCtrl:
 
 
 class TestControlFlow:
+    """Tests for for and while loops."""
 
     @pytest.mark.parametrize("reverse", (True, False))
     def test_for_loop_outside_qnode(self, reverse):
-
+        """Test the conversion of a for loop outside the qnode."""
         if reverse:
-            start, stop, step = 6, 0, -2 # 6, 4, 2
+            start, stop, step = 6, 0, -2  # 6, 4, 2
         else:
-            start, stop, step = 2, 7, 2 # 2, 4, 6
+            start, stop, step = 2, 7, 2  # 2, 4, 6
 
         def f(i0):
             @qml.for_loop(start, stop, step)
@@ -809,17 +810,17 @@ class TestControlFlow:
                 return i + x
 
             return g(i0)
-        
+
         jaxpr = jax.make_jaxpr(f)(2)
         catalyst_jaxpr = from_plxpr(jaxpr)(2)
 
         eqn = catalyst_jaxpr.eqns[0]
 
         assert eqn.primitive == for_p
-        assert eqn.params['apply_reverse_transform'] == reverse
-        assert eqn.params['body_nconsts'] == 0
-        assert eqn.params['nimplicit'] == 0
-        assert eqn.params['preserve_dimensions'] is True
+        assert eqn.params["apply_reverse_transform"] == reverse
+        assert eqn.params["body_nconsts"] == 0
+        assert eqn.params["nimplicit"] == 0
+        assert eqn.params["preserve_dimensions"] is True
 
         assert eqn.invars[0].val == start
         assert eqn.invars[1].val == stop
@@ -832,29 +833,30 @@ class TestControlFlow:
 
         def f(x):
 
-            y = jax.numpy.array([0,1,2])
-            
-            @qml.while_loop(lambda i: jax.numpy.sum(i) < 5*jax.numpy.sum(y))
+            y = jax.numpy.array([0, 1, 2])
+
+            @qml.while_loop(lambda i: jax.numpy.sum(i) < 5 * jax.numpy.sum(y))
             def g(i):
                 return i + y
 
-            return g(jax.numpy.array([0,0,0]))
+            return g(jax.numpy.array([0, 0, 0]))
 
         plxpr = jax.make_jaxpr(f)(1)
         catalyst_xpr = from_plxpr(plxpr)(1)
 
         assert catalyst_xpr.eqns[0].primitive == while_p
-        assert catalyst_xpr.eqns[0].params['body_nconsts'] == 1
-        assert catalyst_xpr.eqns[0].params['cond_nconsts'] == 1
-        assert catalyst_xpr.eqns[0].params['n_implicit'] == 0
-        assert catalyst_xpr.eqns[0].params['preserve_dimensions'] == True
+        assert catalyst_xpr.eqns[0].params["body_nconsts"] == 1
+        assert catalyst_xpr.eqns[0].params["cond_nconsts"] == 1
+        assert catalyst_xpr.eqns[0].params["n_implicit"] == 0
+        assert catalyst_xpr.eqns[0].params["preserve_dimensions"] == True
 
-        for kind in ['body_jaxpr', 'cond_jaxpr']:
+        for kind in ["body_jaxpr", "cond_jaxpr"]:
             xpr = catalyst_xpr.eqns[0].params[kind]
             assert isinstance(xpr, jax.core.ClosedJaxpr)
             assert len(xpr.consts) == 0
             assert len(xpr.jaxpr.invars) == 2
             assert len(xpr.jaxpr.outvars) == 1
+
 
 class TestHybridPrograms:
     """from_plxpr conversion tests for hybrid programs."""
