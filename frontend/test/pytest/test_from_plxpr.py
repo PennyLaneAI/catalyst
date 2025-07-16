@@ -799,6 +799,8 @@ class TestControlFlow:
     @pytest.mark.parametrize("reverse", (True, False))
     def test_for_loop_outside_qnode(self, reverse):
         """Test the conversion of a for loop outside the qnode."""
+
+        qml.capture.enable()
         if reverse:
             start, stop, step = 6, 0, -2  # 6, 4, 2
         else:
@@ -815,6 +817,8 @@ class TestControlFlow:
         catalyst_jaxpr = from_plxpr(jaxpr)(2)
 
         eqn = catalyst_jaxpr.eqns[0]
+
+        print(catalyst_jaxpr)
 
         assert eqn.primitive == for_p
         assert eqn.params["apply_reverse_transform"] == reverse
@@ -839,20 +843,22 @@ class TestControlFlow:
             def g(i):
                 return i + y
 
-            return g(jax.numpy.array([0, 0, 0]))
+            return g(x)
+        
+        x = jax.numpy.array([0, 0, 0])
 
-        plxpr = jax.make_jaxpr(f)(1)
-        catalyst_xpr = from_plxpr(plxpr)(1)
+        plxpr = jax.make_jaxpr(f)(x)
+        catalyst_xpr = from_plxpr(plxpr)(x)
 
         assert catalyst_xpr.eqns[0].primitive == while_p
         assert catalyst_xpr.eqns[0].params["body_nconsts"] == 1
         assert catalyst_xpr.eqns[0].params["cond_nconsts"] == 1
-        assert catalyst_xpr.eqns[0].params["n_implicit"] == 0
+        assert catalyst_xpr.eqns[0].params["nimplicit"] == 0
         assert catalyst_xpr.eqns[0].params["preserve_dimensions"] == True
 
         for kind in ["body_jaxpr", "cond_jaxpr"]:
             xpr = catalyst_xpr.eqns[0].params[kind]
-            assert isinstance(xpr, jax.core.ClosedJaxpr)
+            assert isinstance(xpr, jax.extend.core.ClosedJaxpr)
             assert len(xpr.consts) == 0
             assert len(xpr.jaxpr.invars) == 2
             assert len(xpr.jaxpr.outvars) == 1

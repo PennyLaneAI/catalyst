@@ -1556,6 +1556,7 @@ class TestCapture:
 
 
 class TestControlFlow:
+    """Integration tests for control flow."""
 
     @pytest.mark.parametrize("reverse", (True, False))
     def test_for_loop_outside_qnode(self, reverse):
