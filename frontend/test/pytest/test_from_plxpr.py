@@ -844,7 +844,7 @@ class TestControlFlow:
                 return i + y
 
             return g(x)
-        
+
         x = jax.numpy.array([0, 0, 0])
 
         plxpr = jax.make_jaxpr(f)(x)
