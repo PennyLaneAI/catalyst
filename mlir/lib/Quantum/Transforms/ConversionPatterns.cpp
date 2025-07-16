@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <llvm/ADT/STLExtras.h>
-#include <llvm/Support/LogicalResult.h>
 #include <string>
 
 #include "mlir/Dialect/LLVMIR/FunctionCallUtils.h"
