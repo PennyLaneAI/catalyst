@@ -930,3 +930,42 @@ class DynshapePrimitive(JaxprPrimitive):
         eqn = new_jaxpr_eqn(invars, outvars, self, params, [], source_info)
         trace.frame.add_eqn(eqn)
         return out_tracers if self.multiple_results else out_tracers.pop()
+
+
+def make_from_node_data_and_children(node_data, children):
+    """
+    A helper to create a PytreeDef from node data and children.
+    Jax used to have a great util called make_from_node_data_and_children,
+    but they removed it in 0.6.2, so we have to be a bit manual here.
+
+    Essentially, we want to fill the `children` into the nodes of the tree we return
+    i.e. we want `out_tree_def.children()` to be `children`
+    e.g. if `out_tree_def` is PyTreeDef({0: *, 1: *}),
+    and `children` is [PyTreeDef((*, *)), PyTreeDef(*)],
+    we want to return PyTreeDef({0: (*, *), 1: *})
+    """
+
+    node_type, node_value = node_data
+    if node_type is dict:
+        mock_dict = {
+            node_key: get_replacement_value(child_tree_def)
+            for node_key, child_tree_def in zip(node_value, children)
+        }
+        _, out_tree_def = jax.tree_util.tree_flatten(mock_dict)
+    elif node_type in (list, tuple):
+        mock_list = node_type(
+            [get_replacement_value(child_tree_def) for child_tree_def in children]
+        )
+        _, out_tree_def = jax.tree_util.tree_flatten(mock_list)
+    else:
+        raise CompileError("Unknown pytree node type")  # pragma: no-cover
+    return out_tree_def
+
+
+def get_replacement_value(tree_def):
+    """
+    Create a mock python object whose pytree is tree_def
+    """
+    size = len(tree_def.children())
+    mock_vals = [0] if size == 0 else (0,) * size
+    return jax.tree_util.tree_unflatten(tree_def, mock_vals)
