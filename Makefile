@@ -118,22 +118,6 @@ frontend:
 	$(PYTHON) -m pip uninstall -y pennylane
 	$(PYTHON) -m pip install -e . --extra-index-url https://test.pypi.org/simple $(PIP_VERBOSE_FLAG)
 	rm -r frontend/pennylane_catalyst.egg-info
-	# View jax commits at
-	# https://github.com/jax-ml/jax/commit/<commit-hash>
-	#0.6.0: 127aa7621868cb77e552b5d1f90e4a42b09c13fa, Apr.16
-	#0.6.2: 1ad05bb26105f23ee7728b36cca12901fe70e187, Jun.17
-	#
-	# Some big milestones (this list is completely in chronological order):
-	# 1d652ab7f4346a974cf5888ab23713e1a9c2ddba (Apr.17): the "source_info change"
-	# 492cd3d9313cfd45e8bd63a8f51aa63d92924cd5 (Apr.18): reverts the source_info change (1d652ab7)
-	# f1803bef692b6d91815b02ec643980d9ab9b5132 (Apr.22): Checkpoint, last commit of Apr.22
-	# d4dd0c4985cd8046a2b97efbd9798e0ebf397c8f (Apr.23): Checkpoint, last commit of Apr.23
-	# Somewhere here: reverts the "reverts the source_info change (492cd3d9)"
-	#   i.e. source_info is back in
-	# 351c13e5b6dfec90863ef64f137a28da7426f38a (Apr.26): Checkpoint, last commit of Apr.26
-	# ef015a0d3f8effa3d313c7d692d9241a54a99922 (Apr.29): the "inline literals" change
-	#pip install git+https://github.com/jax-ml/jax.git@603f73016cdd6c576b819524ea270972439ff5c5
-	pip install git+https://github.com/PennyLaneAI/pennylane.git@875f0693a19fd9217305745bdbf945224151588e
 
 .PHONY: mlir llvm mhlo enzyme dialects runtime oqc
 mlir:
