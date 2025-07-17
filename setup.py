@@ -107,7 +107,7 @@ jax_version = dep_versions.get("jax")
 pl_version = dep_versions.get("pennylane")
 lq_version = dep_versions.get("lightning")
 
-pl_min_release = "0.41.0"
+pl_min_release = "0.42.0"
 lq_min_release = pl_min_release
 
 if pl_version is not None:
@@ -161,6 +161,7 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3 :: Only",
 ]
 

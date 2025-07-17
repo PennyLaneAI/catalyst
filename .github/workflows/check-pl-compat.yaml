@@ -50,7 +50,7 @@ jobs:
       if: ${{ inputs.catalyst != 'stable' }}
       run: |
         sudo apt-get update
-        sudo apt-get install -y cmake ninja-build ccache libomp-dev libasan6 lld
+        sudo apt-get install -y ccache libasan6 lld
 
     - name: Install deps (Python)
       run: |
