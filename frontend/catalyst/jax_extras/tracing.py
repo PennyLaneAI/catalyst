@@ -82,6 +82,7 @@ from jaxlib._jax.pytree import PyTreeRegistry
 from catalyst.jax_extras.patches import gather2_p, get_aval2
 from catalyst.logging import debug_logger
 from catalyst.tracing.type_signatures import verify_static_argnums_type
+from catalyst.utils.exceptions import CompileError
 from catalyst.utils.patching import Patcher
 
 # pylint: disable=protected-access
