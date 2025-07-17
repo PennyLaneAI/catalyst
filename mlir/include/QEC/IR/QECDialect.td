@@ -19,6 +19,8 @@ include "mlir/IR/AttrTypeBase.td"
 include "mlir/IR/DialectBase.td"
 include "mlir/IR/OpBase.td"
 include "mlir/IR/EnumAttr.td"
+include "mlir/Interfaces/ControlFlowInterfaces.td"  // for ReturnLike
+include "mlir/Interfaces/SideEffectInterfaces.td" // for Pure
 
 include "Quantum/IR/QuantumDialect.td"
 include "QEC/IR/QECOpInterfaces.td"
@@ -76,8 +78,12 @@ def LogicalInitKind : I32EnumAttr<"LogicalInitKind",
 // QEC dialect attributes.
 //===----------------------------------------------------------------------===//
 
-def PauliWord : TypedArrayAttrBase<StrAttr, "A product of Pauli operators, aka a Pauli word.">;
-def LogicalInit : EnumAttr<QECDialect, LogicalInitKind, "enum">;
+def PauliWord : TypedArrayAttrBase<StrAttr, "A product of Pauli operators, aka a Pauli word."> {
+    let cppNamespace = "::catalyst::qec";
+}
+def LogicalInit : EnumAttr<QECDialect, LogicalInitKind, "enum"> {
+    let cppNamespace = "::catalyst::qec";
+}
 
 //===----------------------------------------------------------------------===//
 // QEC dialect operations.
@@ -547,4 +553,66 @@ def SelectPPMeasurementOp : QEC_Op<"select.ppm"> {
     
     let hasVerifier = 1;
 }
+
+def LayerOp : QEC_Op<"layer", [SingleBlockImplicitTerminator<"YieldOp">]> {
+    let summary = "A layer operation";
+
+    let description = [{
+    The `qec.layer` operation represent a group of PPR/PPM operations 
+    that mutual commuting each other in the group or acting on different qubits.
+    
+    `qec.layer` operate on carried variables and returns the final values after termination.
+
+    The body region must contain exactly one block that terminates with `qec.yield`.
+
+    Example:
+    ```mlir
+    func.func @layer(%arg0 : !quantum.bit, %arg1 : i1) -> i1{
+        %m, %0 = qec.layer(%q0 = %arg0, %c = %arg1) : !quantum.bit, i1 {
+            %res, %q_1 = qec.ppm ["Z"](4) %q0 cond(%c): !quantum.bit
+            qec.yield %res, %q_1 : i1, !quantum.bit
+        }
+        func.return %m : i1
+    }
+    ```
+    }];
+
+    let arguments = (ins Variadic<AnyType>: $initArgs);
+
+    let results = (outs Variadic<AnyType>:$results);
+    let regions = (region SizedRegion<1>:$region);
+
+   let skipDefaultBuilders = 1;
+    let builders = [
+      OpBuilder<(ins
+        CArg<"mlir::ValueRange", "std::nullopt">:$initArgs,
+        CArg<"llvm::function_ref<void(mlir::OpBuilder &, mlir::Location, mlir::ValueRange)>",
+            "nullptr">)>
+    ];
+
+    let extraClassDeclaration = [{
+      using BodyBuilderFn =
+          llvm::function_ref<void(mlir::OpBuilder &, mlir::Location, mlir::ValueRange)>;
+
+    }];
+
+    let hasCustomAssemblyFormat = 1;
+}
+
+def YieldOp : QEC_Op<"yield", [ Pure, ReturnLike, Terminator, ParentOneOf<["LayerOp"]> ]> {
+    let summary = "Return results from a layer region";
+
+    let arguments = (ins
+        Variadic<AnyType>:$results
+    );
+
+    let assemblyFormat = [{
+        attr-dict ($results^ `:` type($results))?
+    }];
+
+    let builders = [
+        OpBuilder<(ins), [{ /* nothing to do */ }]>
+    ];
+}
+
 #endif // QEC_DIALECT

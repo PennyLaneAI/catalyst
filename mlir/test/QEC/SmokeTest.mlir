@@ -48,3 +48,28 @@ func.func @baz(%q1 : !quantum.bit, %q2 : !quantum.bit) {
     %1:2 = qec.ppr ["Y", "Y"] (4) %0, %q2 cond(%m_0) : !quantum.bit, !quantum.bit
     func.return
 }
+
+func.func @layer(%arg0 : !quantum.bit, %arg1 : !quantum.bit) -> i1{
+
+    %0 = qec.layer(%q0 = %arg0) : !quantum.bit {
+        %q_1 = qec.ppr ["Z"](4) %q0 : !quantum.bit
+        qec.yield %q_1 : !quantum.bit
+    }
+
+    %1:2 = qec.layer(%q0 = %0, %q1 = %arg0): !quantum.bit, !quantum.bit {
+        %q_1:2 = qec.ppr ["X", "Y"](4) %q0, %q1 : !quantum.bit, !quantum.bit
+        qec.yield %q_1#0, %q_1#1 : !quantum.bit, !quantum.bit
+    }
+
+    %res, %2:2 = qec.layer(%q0 = %0, %q1 = %arg0): !quantum.bit, !quantum.bit {
+        %q_1:3 = qec.ppm ["X", "Z"] %1#0, %1#1 : !quantum.bit, !quantum.bit
+        qec.yield %q_1#0, %q_1#1, %q_1#2 : i1, !quantum.bit, !quantum.bit
+    }
+
+    %res_1, %3:2 = qec.layer(%q0 = %2#0, %q1 = %2#1, %m = %res): !quantum.bit, !quantum.bit, i1 {
+        %q_res, %q_1:2 = qec.ppm ["X", "Z"] %q0, %q1 cond(%m): !quantum.bit, !quantum.bit
+        qec.yield %q_res, %q_1#0, %q_1#1 : i1, !quantum.bit, !quantum.bit
+    }
+
+    func.return %res_1 : i1
+}
