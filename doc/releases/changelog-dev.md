@@ -12,8 +12,12 @@
 
 <h3>Internal changes ⚙️</h3>
 
-* `from_plxpr` now supports adjoint and ctrl operations.
+* `from_plxpr` now supports adjoint and ctrl operations and transforms,
+  and `Hermitian` observables.
   [(#1844)](https://github.com/PennyLaneAI/catalyst/pull/1844)
+  [(#1850)](https://github.com/PennyLaneAI/catalyst/pull/1850)
+  [(#1903)](https://github.com/PennyLaneAI/catalyst/pull/1903)
+
 
 * `catalyst.accelerate`, `catalyst.debug.callback`, and `catalyst.pure_callback`, `catalyst.debug.print`, and `catalyst.debug.print_memref` now work when capture is enabled.
   [(#1902)](https://github.com/PennyLaneAI/catalyst/pull/1902)
