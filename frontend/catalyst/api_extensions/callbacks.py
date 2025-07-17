@@ -692,7 +692,7 @@ def callback_implementation(
         custom_grad=custom_grad,
         results_aval=tuple(flat_results_aval),
     )
-    return tree_unflatten(out_tree, out_flat) if out_tree else out_flat
+    return tree_unflatten(out_tree, out_flat)
 
 
 # pylint: disable=unused-argument
