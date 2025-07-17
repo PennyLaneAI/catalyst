@@ -36,4 +36,4 @@ This release contains contributions from (in alphabetical order):
 
 Sengthai Heng,
 Christina Lee,
-Paul Haochen Wang
+Paul Haochen Wang.
