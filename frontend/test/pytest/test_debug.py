@@ -236,6 +236,7 @@ class TestDebugPrint:
         assert expected == out.strip()
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 class TestPrintStage:
     """Test that compilation pipeline results can be printed."""
 
@@ -498,6 +499,7 @@ class TestCProgramGeneration:
         os.remove(directory_path + "/main.c")
 
         assert str(arg) in result.stdout.replace(" ", "").replace("\n", "")
+
 
 
 class TestOptionsToCliFlags:
