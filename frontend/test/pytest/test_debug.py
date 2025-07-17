@@ -120,7 +120,7 @@ class TestDebugPrint:
         """Test printing of arbitrary JAX tracer values."""
 
         if qml.capture.enabled():
-            loop_fn = qml.for_loop # TODO: unify qml.for_loop and catalyst.for_loop
+            loop_fn = qml.for_loop  # TODO: unify qml.for_loop and catalyst.for_loop
         else:
             loop_fn = for_loop
 
@@ -499,7 +499,6 @@ class TestCProgramGeneration:
         os.remove(directory_path + "/main.c")
 
         assert str(arg) in result.stdout.replace(" ", "").replace("\n", "")
-
 
 
 class TestOptionsToCliFlags:

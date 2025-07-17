@@ -18,7 +18,6 @@ import builtins
 from functools import partial
 
 import jax
-
 from pennylane.capture import enabled as capture_enabled
 
 from catalyst.debug.callback import callback as debug_callback
