@@ -22,7 +22,6 @@
   [(#1903)](https://github.com/PennyLaneAI/catalyst/pull/1903)
   [(#1896)](https://github.com/PennyLaneAI/catalyst/pull/1896)
 
-
 * Add `qec.layer` and `qec.yield` operations to the QEC dialect, that represent a group
   of QEC operations. The main use case is to analyze the depth of circuit.
   Also, this is a preliminary step towards supporting parallel execution of QEC layers.
