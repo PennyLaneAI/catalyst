@@ -78,12 +78,8 @@ def LogicalInitKind : I32EnumAttr<"LogicalInitKind",
 // QEC dialect attributes.
 //===----------------------------------------------------------------------===//
 
-def PauliWord : TypedArrayAttrBase<StrAttr, "A product of Pauli operators, aka a Pauli word."> {
-    let cppNamespace = "::catalyst::qec";
-}
-def LogicalInit : EnumAttr<QECDialect, LogicalInitKind, "enum"> {
-    let cppNamespace = "::catalyst::qec";
-}
+def PauliWord : TypedArrayAttrBase<StrAttr, "A product of Pauli operators, aka a Pauli word.">;
+def LogicalInit : EnumAttr<QECDialect, LogicalInitKind, "enum">;
 
 //===----------------------------------------------------------------------===//
 // QEC dialect operations.
