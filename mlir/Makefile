@@ -52,7 +52,7 @@ help:
 	@echo "  format [version=?] to apply C++ formatter; use with 'version={version}' to run clang-format-{version} instead of clang-format"
 
 .PHONY: all
-all: llvm mhlo enzyme dialects plugin
+all: llvm mhlo enzyme dialects dialect-docs plugin
 
 .PHONY: llvm
 llvm:
@@ -188,6 +188,11 @@ dialects:
 
 	cmake --build $(DIALECTS_BUILD_DIR) --target check-dialects quantum-lsp-server catalyst-cli check-unit-tests
 
+.PHONY: dialect-docs
+dialect-docs: dialects
+	@echo "build dialect documentation"
+	cmake --build $(DIALECTS_BUILD_DIR) --target mlir-doc
+
 .PHONY: test
 test:
 	@echo "test the Catalyst MLIR dialects test suite"
@@ -217,6 +222,10 @@ clean-plugin:
 	@echo "clean plugin"
 	rm -rf standalone/build
 	rm -rf $(DIALECTS_BUILD_DIR)/lib/StandalonePlugin.*
+
+clean-dialect-docs:
+	@echo "clean dialect docs"
+	rm -rf $(DIALECTS_BUILD_DIR)/docs
 
 .PHONY: format
 format:
