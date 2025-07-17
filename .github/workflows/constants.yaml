@@ -5,7 +5,7 @@ on:
     inputs:
       multiple_compilers:
         required: false
-        default: false
+        default: true
         type: boolean
       use_release_tag:
         required: false
