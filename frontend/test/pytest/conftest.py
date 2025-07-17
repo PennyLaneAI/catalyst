@@ -49,9 +49,10 @@ def disable_capture():
             qml.capture.disable()
 
 
-@pytest.fixture(params=[True, False], scope="function")
+@pytest.fixture(params=["capture", "no_capture"], scope="function")
 def use_both_frontend(request):
-    if request.param:
+    """Runs the test once with capture enabled and once with it disabled."""
+    if request.param == "capture":
         qml.capture.enable()
         try:
             yield
