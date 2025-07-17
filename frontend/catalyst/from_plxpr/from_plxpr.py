@@ -28,7 +28,7 @@ from jax._src.tree_util import tree_flatten
 from jax.extend.core import ClosedJaxpr, Jaxpr
 from jax.extend.linear_util import wrap_init
 from jax.interpreters.partial_eval import convert_constvars_jaxpr
-from pennylane.capture import PlxprInterpreter, qnode_prim
+from pennylane.capture import PlxprInterpreter, pause, qnode_prim
 from pennylane.capture.expand_transforms import ExpandTransformsInterpreter
 from pennylane.capture.primitives import adjoint_transform_prim as plxpr_adjoint_transform_prim
 from pennylane.capture.primitives import ctrl_transform_prim as plxpr_ctrl_transform_prim
@@ -56,6 +56,7 @@ from catalyst.jax_primitives import (
     device_release_p,
     expval_p,
     gphase_p,
+    hamiltonian_p,
     hermitian_p,
     measure_in_basis_p,
     measure_p,
@@ -70,6 +71,7 @@ from catalyst.jax_primitives import (
     set_basis_state_p,
     set_state_p,
     state_p,
+    tensorobs_p,
     unitary_p,
     var_p,
 )
@@ -350,11 +352,18 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
             self.qreg_manager[wire_values] = new_wire
 
         return out_qubits
-
-    def _obs(self, obs):
+    def _obs(self, obs, simplify=True):
         """Interpret the observable equation corresponding to a measurement equation's input."""
+        if simplify:
+            with pause():
+                obs = obs.simplify()
+        if isinstance(obs, qml.ops.Prod):
+            return tensorobs_p.bind(*(self._obs(t, simplify=False) for t in obs))
         if obs.arithmetic_depth > 0:
-            raise NotImplementedError("operator arithmetic not yet supported for conversion.")
+            with pause():
+                coeffs, terms = obs.terms()
+            terms = [self._obs(t, simplify=False) for t in terms]
+            return hamiltonian_p.bind(jnp.stack(coeffs), *terms)
         wires = [self.qreg_manager[w] for w in obs.wires]
         if obs.name == "Hermitian":
             return hermitian_p.bind(obs.data[0], *wires)
