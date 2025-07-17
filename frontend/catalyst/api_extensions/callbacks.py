@@ -695,9 +695,8 @@ def callback_implementation(
     return tree_unflatten(out_tree, out_flat) if out_tree else out_flat
 
 
+# pylint: disable=unused-argument
 @python_callback_p.def_impl
-def _python_callback_def_impl(*args, callback, custom_grad, results_aval):  # pragma: no cover
+def _python_callback_def_impl(*args, callback, custom_grad, results_aval):
     """Concrete evaluation"""
-
-    out = FlatCallable.__call__(callback, args)
-    return out
+    return FlatCallable.__call__(callback, args)
