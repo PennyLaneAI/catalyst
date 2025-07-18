@@ -61,7 +61,7 @@ def ScatterLoweringPass : Pass<"scatter-lowering"> {
     let dependentDialects = [
         "mlir::func::FuncDialect",
         "index::IndexDialect",
-        "mhlo::MhloDialect",
+        "stablehlo::StablehloDialect",
         "tensor::TensorDialect",
         "scf::SCFDialect"
     ];

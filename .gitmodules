@@ -1,6 +1,6 @@
-[submodule "mlir-hlo"]
-	path = mlir/mlir-hlo
-	url = https://github.com/tensorflow/mlir-hlo.git
+[submodule "stablehlo"]
+	path = mlir/stablehlo
+	url = https://github.com/openxla/stablehlo.git
 	shallow = true
 	ignore = dirty
 [submodule "llvm-project"]
@@ -13,3 +13,6 @@
 	url = https://github.com/EnzymeAD/Enzyme.git
 	shallow = true
 	ignore = dirty
+[submodule "mlir/stablehlo"]
+	path = mlir/stablehlo
+	url = https://github.com/openxla/stablehlo.git

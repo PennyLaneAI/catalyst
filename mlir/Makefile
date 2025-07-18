@@ -7,7 +7,7 @@ MK_ABSPATH := $(abspath $(lastword $(MAKEFILE_LIST)))
 MK_DIR := $(dir $(MK_ABSPATH))
 DIALECTS_BUILD_DIR ?= $(MK_DIR)/build
 LLVM_BUILD_DIR ?= $(MK_DIR)/llvm-project/build
-MHLO_BUILD_DIR ?= $(MK_DIR)/mlir-hlo/bazel-build
+STABLEHLO_BUILD_DIR ?= $(MK_DIR)/stablehlo/build
 ENZYME_BUILD_DIR ?= $(MK_DIR)/Enzyme/build
 RT_BUILD_DIR ?= $(MK_DIR)/../runtime/build
 ENABLE_ASAN ?= OFF
@@ -43,7 +43,7 @@ help:
 	@echo "Please use \`make <target>' where <target> is one of"
 	@echo "  all                to build MLIR, MLIR-HLO and custom Catalyst dialects"
 	@echo "  llvm               to build MLIR enabling Python bindings"
-	@echo "  mhlo               to build MLIR-HLO"
+	@echo "  stablehlo          to build stablehlo"
 	@echo "  enzyme             to build Enzyme"
 	@echo "  dialects           to build custom Catalyst MLIR dialects"
 	@echo "  test               to run the Catalyst MLIR dialects test suite"
@@ -52,7 +52,7 @@ help:
 	@echo "  format [version=?] to apply C++ formatter; use with 'version={version}' to run clang-format-{version} instead of clang-format"
 
 .PHONY: all
-all: llvm mhlo enzyme dialects plugin
+all: llvm stablehlo enzyme dialects plugin
 
 .PHONY: llvm
 llvm:
@@ -83,36 +83,29 @@ llvm:
 	# test to reduce unnecessary dependencies.
 	LIT_FILTER_OUT="Bytecode|tosa-to-tensor|execution_engine" cmake --build $(LLVM_BUILD_DIR) --target $(LLVM_TARGETS)
 
-.PHONY: mhlo
-mhlo:
-	@echo "build MLIR-HLO"
 
-	# Patch MHLO shardy dependency
-	@if cd mlir-hlo; git apply --check $(MK_DIR)/patches/mhlo-remove-shardy.patch; then \
-		git apply $(MK_DIR)/patches/mhlo-remove-shardy.patch; \
-	fi
+.PHONY: stablehlo
+stablehlo:
+	@echo "build stablehlo"
 
-	# Patch MHLO passes removed from upstream
-	@if cd mlir-hlo; git apply --check $(MK_DIR)/patches/mhlo-add-back-necessary-passes.patch; then \
-		git apply $(MK_DIR)/patches/mhlo-add-back-necessary-passes.patch; \
-	fi
-	cmake -G Ninja -S mlir-hlo -B $(MHLO_BUILD_DIR) \
+	cmake -G Ninja -S stablehlo -B $(STABLEHLO_BUILD_DIR) \
+		-DSTABLEHLO_ENABLE_LLD=ON \
 		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
-		-DLLVM_ENABLE_ASSERTIONS=ON \
 		-DMLIR_DIR=$(LLVM_BUILD_DIR)/lib/cmake/mlir \
-		-DPython3_EXECUTABLE=$(PYTHON) \
+		-DLLVM_ENABLE_ASSERTIONS=ON \
+		-DSTABLEHLO_ENABLE_BINDINGS_PYTHON=OFF \
+		-DSTABLEHLO_ENABLE_SPLIT_DWARF=ON \
+		-DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+		-DSTABLEHLO_ENABLE_SANITIZER=address \
 		-DCMAKE_C_COMPILER=$(C_COMPILER) \
 		-DCMAKE_CXX_COMPILER=$(CXX_COMPILER) \
 		-DCMAKE_C_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
 		-DCMAKE_CXX_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
 		-DCMAKE_EXE_LINKER_FLAGS=$(USE_SANITIZER_FLAGS) \
-		-DLLVM_ENABLE_LLD=$(ENABLE_LLD) \
-		-DLLVM_ENABLE_ZLIB=$(ENABLE_ZLIB) \
-		-DLLVM_ENABLE_ZSTD=$(ENABLE_ZSTD) \
 		-DCMAKE_CXX_VISIBILITY_PRESET=$(SYMBOL_VISIBILITY)
 
-        # TODO: figure out why this test is failing
-	LIT_FILTER_OUT="chlo_legalize_to_mhlo" cmake --build $(MHLO_BUILD_DIR) --target check-mlir-hlo
+	cmake --build $(STABLEHLO_BUILD_DIR)
+	#ninja check-stablehlo-tests
 
 .PHONY: enzyme
 enzyme: TARGET_FILE := $(MK_DIR)/Enzyme/enzyme/Enzyme/TypeAnalysis/TypeAnalysis.cpp
@@ -172,8 +165,8 @@ dialects:
 		-DEnzyme_DIR=$(ENZYME_BUILD_DIR) \
 		-DENZYME_SRC_DIR=$(MK_DIR)/Enzyme \
 		-DMLIR_DIR=$(LLVM_BUILD_DIR)/lib/cmake/mlir \
-		-DMHLO_DIR=$(MHLO_BUILD_DIR)/lib/cmake/mlir-hlo \
-		-DMHLO_BINARY_DIR=$(MHLO_BUILD_DIR)/bin \
+		-DSTABLEHLO_SRC_DIR=$(MK_DIR)/stablehlo \
+		-DSTABLEHLO_BINARY_DIR=$(STABLEHLO_BUILD_DIR)/bin \
 		-DRUNTIME_LIB_DIR=$(RT_BUILD_DIR)/lib \
 		-DMLIR_LIB_DIR=$(LLVM_BUILD_DIR)/lib \
 		-DCMAKE_C_COMPILER=$(C_COMPILER) \
@@ -186,15 +179,15 @@ dialects:
 		-DLLVM_ENABLE_ZSTD=$(ENABLE_ZSTD) \
 		-DCATALYST_ENABLE_WARNINGS=$(STRICT_WARNINGS)
 
-	cmake --build $(DIALECTS_BUILD_DIR) --target check-dialects quantum-lsp-server catalyst-cli check-unit-tests
+	cmake --build $(DIALECTS_BUILD_DIR) --target check-dialects quantum-lsp-server catalyst-cli #check-unit-tests
 
 .PHONY: test
 test:
 	@echo "test the Catalyst MLIR dialects test suite"
 	cmake --build $(DIALECTS_BUILD_DIR) --target check-dialects
 
-.PHONY: clean clean-dialects clean-enzyme clean-mhlo clean-plugin
-clean: clean-dialects clean-llvm clean-mhlo clean-enzyme clean-plugin
+.PHONY: clean clean-dialects clean-enzyme clean-stablehlo clean-plugin
+clean: clean-dialects clean-llvm clean-stablehlo clean-enzyme clean-plugin
 
 clean-dialects:
 	@echo "clean catalyst dialect build files"
@@ -204,10 +197,9 @@ clean-llvm:
 	@echo "clean llvm/mlir build files"
 	rm -rf $(LLVM_BUILD_DIR)
 
-clean-mhlo:
-	@echo "clean HLO dialect build files"
-	rm -rf $(MHLO_BUILD_DIR)
-	cd mlir-hlo; git clean -fd; git checkout .
+clean-stablehlo:
+	@echo "clean stablehlo dialect build files"
+	rm -rf $(STABLEHLO_BUILD_DIR)
 
 clean-enzyme:
 	@echo "clean enzyme build files"

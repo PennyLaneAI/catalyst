@@ -12,17 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "mhlo/IR/register.h"
-#include "mhlo/transforms/passes.h"
+
 #include "mlir/Dialect/Func/Extensions/AllExtensions.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/IR/DialectRegistry.h"
 #include "mlir/InitAllDialects.h"
 #include "mlir/InitAllPasses.h"
 #include "mlir/Tools/mlir-opt/MlirOptMain.h"
-#include "stablehlo/dialect/Register.h"
 
-#include "mhlo/IR/hlo_ops.h"
+#include "stablehlo/dialect/Register.h"
+#include "stablehlo/dialect/StablehloOps.h"
+#include "stablehlo/transforms/Passes.h"
+#include "stablehlo/integrations/c/StablehloPasses.h"
 
 #include "Catalyst/IR/CatalystDialect.h"
 #include "Catalyst/Transforms/BufferizableOpInterfaceImpl.h"
@@ -47,12 +48,13 @@ int main(int argc, char **argv)
 {
     mlir::registerAllPasses();
     catalyst::registerAllCatalystPasses();
-    mlir::mhlo::registerAllMhloPasses();
+    //mlir::mhlo::registerAllMhloPasses();
+    mlirRegisterAllStablehloPasses();
 
     mlir::DialectRegistry registry;
     mlir::registerAllDialects(registry);
     test::registerTestDialect(registry);
-    mlir::mhlo::registerAllMhloDialects(registry);
+    //mlir::mhlo::registerAllMhloDialects(registry);
     mlir::stablehlo::registerAllDialects(registry);
     mlir::func::registerAllExtensions(registry);
     registry.insert<catalyst::CatalystDialect>();
@@ -62,7 +64,8 @@ int main(int argc, char **argv)
     registry.insert<catalyst::mbqc::MBQCDialect>();
     registry.insert<catalyst::mitigation::MitigationDialect>();
     registry.insert<catalyst::ion::IonDialect>();
-    registry.insert<mlir::mhlo::MhloDialect>();
+    //registry.insert<mlir::mhlo::MhloDialect>();
+    registry.insert<mlir::stablehlo::StablehloDialect>();
 
     catalyst::registerBufferizableOpInterfaceExternalModels(registry);
     catalyst::gradient::registerBufferizableOpInterfaceExternalModels(registry);
