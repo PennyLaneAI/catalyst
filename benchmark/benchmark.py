@@ -14,6 +14,7 @@
 """Single measurement entry point"""
 import sys
 from argparse import ArgumentParser
+from argparse import BooleanOptionalAction
 from json import dump as json_dump
 from json import load as json_load
 from os import makedirs
@@ -29,7 +30,6 @@ from catalyst_benchmark.measurements import (
     selfcheck,
     with_alarm,
 )
-from catalyst_benchmark.types import BooleanOptionalAction
 
 # fmt: off
 ap = ArgumentParser(prog="python3 benchmark.py")
