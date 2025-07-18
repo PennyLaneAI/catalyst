@@ -10,6 +10,7 @@ numpy!=2.0.0
 nanobind>=2.4
 pybind11>=2.12.0
 PyYAML
+scipy_openblas32
 
 # Compiler toolchain available via PIP
 cmake>=3.26,<4
