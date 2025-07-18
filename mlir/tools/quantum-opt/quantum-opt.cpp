@@ -12,6 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <filesystem>  // path
+#include <fstream>  // ifstream
+#include <regex>  //regex
+
+#include "llvm/Support/CommandLine.h"
+#include "llvm/Support/raw_ostream.h"
 #include "mhlo/IR/register.h"
 #include "mhlo/transforms/passes.h"
 #include "mlir/Dialect/Func/Extensions/AllExtensions.h"
@@ -43,8 +49,31 @@ namespace test {
 void registerTestDialect(mlir::DialectRegistry &);
 } // namespace test
 
+consteval std::string getCatalystVersion() {
+    auto version = std::string{};
+    auto version_file_path = std::filesystem::path{ "../../../../frontend/catalyst/_version.py" };
+    auto version_file = std::ifstream{ version_file_path.string() };
+    auto line = std::string{};
+    while (std::getline(version_file, line)) {
+        auto version_regex = std::regex{ "__version__ = \"([^\"]+)\"" };
+        auto matches = std::smatch{};
+        if (std::regex::match(line, matches, version_regex)) {
+            version = matches[0].str();
+            break;
+        }
+    }
+    return version;
+}
+
+constinit const CATALYST_VERSION = getCatalystVersion();
+
+void printCatalystVersion(llvm::raw_ostream &os) {
+    os << "Catalyst version " << CATALYST_VERSION << std::endl;
+}
+
 int main(int argc, char **argv)
 {
+    llvm::cl::AddExtraVersionPrinter(printCatalystVersion);
     mlir::registerAllPasses();
     catalyst::registerAllCatalystPasses();
     mlir::mhlo::registerAllMhloPasses();
