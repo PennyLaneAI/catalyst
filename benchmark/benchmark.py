@@ -13,8 +13,7 @@
 # limitations under the License.
 """Single measurement entry point"""
 import sys
-from argparse import ArgumentParser
-from argparse import BooleanOptionalAction
+from argparse import ArgumentParser, BooleanOptionalAction
 from json import dump as json_dump
 from json import load as json_load
 from os import makedirs
