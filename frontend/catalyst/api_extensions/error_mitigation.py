@@ -119,7 +119,7 @@ def mitigate_with_zne(
 
     .. code-block:: python
 
-        from pennylane.transforms import exponential_extrapolate
+        from pennylane.noise import exponential_extrapolate
 
         dev = qml.device("lightning.qubit", wires=2, shots=100000)
 
@@ -234,7 +234,7 @@ class ZNECallable(CatalystCallable):
 
 def polynomial_extrapolation(degree):
     """utility to generate polynomial fitting functions of arbitrary degree"""
-    return functools.partial(qml.transforms.poly_extrapolate, order=degree)
+    return functools.partial(qml.noise.poly_extrapolate, order=degree)
 
 
 ## PRIVATE ##
