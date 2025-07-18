@@ -4,11 +4,6 @@
 
 <h3>Improvements 🛠</h3>
 
-* Conversion patterns for the single-qubit `quantum.alloc_qb` and `quantum.dealloc_qb` operations
-  have been added for lowering to the LLVM dialect. These conversion patterns allow for execution of
-  programs containing these operations.
-  [(#1920)](https://github.com/PennyLaneAI/catalyst/pull/1920)
-
 <h3>Breaking changes 💔</h3>
 
 * The JAX version used by Catalyst is updated to 0.6.2.
@@ -31,6 +26,11 @@
   of QEC operations. The main use case is to analyze the depth of a circuit.
   Also, this is a preliminary step towards supporting parallel execution of QEC layers.
   [(#1917)](https://github.com/PennyLaneAI/catalyst/pull/1917)
+
+* Conversion patterns for the single-qubit `quantum.alloc_qb` and `quantum.dealloc_qb` operations
+  have been added for lowering to the LLVM dialect. These conversion patterns allow for execution of
+  programs containing these operations.
+  [(#1920)](https://github.com/PennyLaneAI/catalyst/pull/1920)
 
 <h3>Documentation 📝</h3>
 
