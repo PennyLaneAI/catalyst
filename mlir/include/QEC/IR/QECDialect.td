@@ -554,16 +554,16 @@ def LayerOp : QEC_Op<"layer", [SingleBlockImplicitTerminator<"YieldOp">]> {
     let summary = "A layer operation";
 
     let description = [{
-    The `qec.layer` operation represent a group of PPR/PPM operations 
-    that mutual commuting each other in the group or acting on different qubits.
+    The `qec.layer` operation represents a group of PPR/PPM operations that are
+    either mutually commutative within the group or act on different qubits.
     
-    `qec.layer` operate on carried variables and returns the final values after termination.
+    `qec.layer` operates on carried variables and returns the final values after termination.
 
     The body region must contain exactly one block that terminates with `qec.yield`.
 
     Example:
     ```mlir
-    func.func @layer(%arg0 : !quantum.bit, %arg1 : i1) -> i1{
+    func.func @layer(%arg0 : !quantum.bit, %arg1 : i1) -> i1 {
         %m, %0 = qec.layer(%q0 = %arg0, %c = %arg1) : !quantum.bit, i1 {
             %res, %q_1 = qec.ppm ["Z"](4) %q0 cond(%c): !quantum.bit
             qec.yield %res, %q_1 : i1, !quantum.bit
@@ -578,7 +578,7 @@ def LayerOp : QEC_Op<"layer", [SingleBlockImplicitTerminator<"YieldOp">]> {
     let results = (outs Variadic<AnyType>:$results);
     let regions = (region SizedRegion<1>:$region);
 
-   let skipDefaultBuilders = 1;
+    let skipDefaultBuilders = 1;
     let builders = [
       OpBuilder<(ins
         CArg<"mlir::ValueRange", "std::nullopt">:$initArgs,
