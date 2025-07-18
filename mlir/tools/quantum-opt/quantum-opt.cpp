@@ -45,30 +45,14 @@
 #include "Quantum/Transforms/BufferizableOpInterfaceImpl.h"
 #include "Quantum/Transforms/Passes.h"
 
+#include "frontend_catalyst_version_py.hpp"  // CATALYST_VERSION
+
 namespace test {
 void registerTestDialect(mlir::DialectRegistry &);
 } // namespace test
 
-consteval std::string getCatalystVersion() {
-    auto version = std::string{};
-    auto version_file_path = std::filesystem::path{ "../../../../frontend/catalyst/_version.py" };
-    auto version_file = std::ifstream{ version_file_path.string() };
-    auto line = std::string{};
-    while (std::getline(version_file, line)) {
-        auto version_regex = std::regex{ "__version__ = \"([^\"]+)\"" };
-        auto matches = std::smatch{};
-        if (std::regex::match(line, matches, version_regex)) {
-            version = matches[0].str();
-            break;
-        }
-    }
-    return version;
-}
-
-constinit const CATALYST_VERSION = getCatalystVersion();
-
 void printCatalystVersion(llvm::raw_ostream &os) {
-    os << "Catalyst version " << CATALYST_VERSION << std::endl;
+    os << "Catalyst version " << CATALYST_VERSION << "\n";
 }
 
 int main(int argc, char **argv)
