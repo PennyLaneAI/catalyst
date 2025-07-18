@@ -144,7 +144,7 @@ class BenchmarkResult(BenchmarkResultV1):
 
 
 class BooleanOptionalAction(Action):
-    """Backported from argparse for Python3.10"""
+    """Backported from argparse for Python3.11"""
 
     # pylint: disable=too-many-arguments
 
