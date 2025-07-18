@@ -7,7 +7,6 @@ MK_ABSPATH := $(abspath $(lastword $(MAKEFILE_LIST)))
 MK_DIR := $(dir $(MK_ABSPATH))
 DIALECTS_BUILD_DIR ?= $(MK_DIR)/build
 LLVM_BUILD_DIR ?= $(MK_DIR)/llvm-project/build
-STABLEHLO_BUILD_DIR ?= $(MK_DIR)/stablehlo/build
 ENZYME_BUILD_DIR ?= $(MK_DIR)/Enzyme/build
 RT_BUILD_DIR ?= $(MK_DIR)/../runtime/build
 ENABLE_ASAN ?= OFF
@@ -43,7 +42,6 @@ help:
 	@echo "Please use \`make <target>' where <target> is one of"
 	@echo "  all                to build MLIR, MLIR-HLO and custom Catalyst dialects"
 	@echo "  llvm               to build MLIR enabling Python bindings"
-	@echo "  stablehlo          to build stablehlo"
 	@echo "  enzyme             to build Enzyme"
 	@echo "  dialects           to build custom Catalyst MLIR dialects"
 	@echo "  test               to run the Catalyst MLIR dialects test suite"
@@ -52,7 +50,7 @@ help:
 	@echo "  format [version=?] to apply C++ formatter; use with 'version={version}' to run clang-format-{version} instead of clang-format"
 
 .PHONY: all
-all: llvm stablehlo enzyme dialects plugin
+all: llvm enzyme dialects plugin
 
 .PHONY: llvm
 llvm:
@@ -83,29 +81,6 @@ llvm:
 	# test to reduce unnecessary dependencies.
 	LIT_FILTER_OUT="Bytecode|tosa-to-tensor|execution_engine" cmake --build $(LLVM_BUILD_DIR) --target $(LLVM_TARGETS)
 
-
-.PHONY: stablehlo
-stablehlo:
-	@echo "build stablehlo"
-
-	cmake -G Ninja -S stablehlo -B $(STABLEHLO_BUILD_DIR) \
-		-DSTABLEHLO_ENABLE_LLD=ON \
-		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
-		-DMLIR_DIR=$(LLVM_BUILD_DIR)/lib/cmake/mlir \
-		-DLLVM_ENABLE_ASSERTIONS=ON \
-		-DSTABLEHLO_ENABLE_BINDINGS_PYTHON=OFF \
-		-DSTABLEHLO_ENABLE_SPLIT_DWARF=ON \
-		-DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
-		-DSTABLEHLO_ENABLE_SANITIZER=address \
-		-DCMAKE_C_COMPILER=$(C_COMPILER) \
-		-DCMAKE_CXX_COMPILER=$(CXX_COMPILER) \
-		-DCMAKE_C_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
-		-DCMAKE_CXX_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
-		-DCMAKE_EXE_LINKER_FLAGS=$(USE_SANITIZER_FLAGS) \
-		-DCMAKE_CXX_VISIBILITY_PRESET=$(SYMBOL_VISIBILITY)
-
-	cmake --build $(STABLEHLO_BUILD_DIR)
-	#ninja check-stablehlo-tests
 
 .PHONY: enzyme
 enzyme: TARGET_FILE := $(MK_DIR)/Enzyme/enzyme/Enzyme/TypeAnalysis/TypeAnalysis.cpp
@@ -165,8 +140,6 @@ dialects:
 		-DEnzyme_DIR=$(ENZYME_BUILD_DIR) \
 		-DENZYME_SRC_DIR=$(MK_DIR)/Enzyme \
 		-DMLIR_DIR=$(LLVM_BUILD_DIR)/lib/cmake/mlir \
-		-DSTABLEHLO_SRC_DIR=$(MK_DIR)/stablehlo \
-		-DSTABLEHLO_BINARY_DIR=$(STABLEHLO_BUILD_DIR)/bin \
 		-DRUNTIME_LIB_DIR=$(RT_BUILD_DIR)/lib \
 		-DMLIR_LIB_DIR=$(LLVM_BUILD_DIR)/lib \
 		-DCMAKE_C_COMPILER=$(C_COMPILER) \
@@ -186,8 +159,8 @@ test:
 	@echo "test the Catalyst MLIR dialects test suite"
 	cmake --build $(DIALECTS_BUILD_DIR) --target check-dialects
 
-.PHONY: clean clean-dialects clean-enzyme clean-stablehlo clean-plugin
-clean: clean-dialects clean-llvm clean-stablehlo clean-enzyme clean-plugin
+.PHONY: clean clean-dialects clean-enzyme clean-plugin
+clean: clean-dialects clean-llvm clean-enzyme clean-plugin
 
 clean-dialects:
 	@echo "clean catalyst dialect build files"
@@ -196,10 +169,6 @@ clean-dialects:
 clean-llvm:
 	@echo "clean llvm/mlir build files"
 	rm -rf $(LLVM_BUILD_DIR)
-
-clean-stablehlo:
-	@echo "clean stablehlo dialect build files"
-	rm -rf $(STABLEHLO_BUILD_DIR)
 
 clean-enzyme:
 	@echo "clean enzyme build files"
