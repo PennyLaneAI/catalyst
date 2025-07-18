@@ -13,7 +13,6 @@
 # limitations under the License.
 """Benchmarking data type definitions"""
 
-from argparse import SUPPRESS, Action
 from dataclasses import dataclass
 from multiprocessing import cpu_count
 from os import uname
