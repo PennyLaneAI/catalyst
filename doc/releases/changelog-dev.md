@@ -23,6 +23,9 @@
   [(#1896)](https://github.com/PennyLaneAI/catalyst/pull/1896)
 
 
+* `catalyst.accelerate`, `catalyst.debug.callback`, and `catalyst.pure_callback`, `catalyst.debug.print`, and `catalyst.debug.print_memref` now work when capture is enabled.
+  [(#1902)](https://github.com/PennyLaneAI/catalyst/pull/1902)
+
 <h3>Documentation 📝</h3>
 
 <h3>Contributors ✍️</h3>
