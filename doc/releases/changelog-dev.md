@@ -15,6 +15,9 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Update imports for noise transforms from `pennylane.transforms` to `pennylane.noise`.
+  [(#1918)](https://github.com/PennyLaneAI/catalyst/pull/1918)
+
 * `from_plxpr` now supports adjoint and ctrl operations and transforms,
   `Hermitian` observables, `for_loop` outside qnodes, and `while_loop` outside QNode's.
   [(#1844)](https://github.com/PennyLaneAI/catalyst/pull/1844)
@@ -30,4 +33,5 @@
 This release contains contributions from (in alphabetical order):
 
 Christina Lee,
+Andrija Paurevic,
 Paul Haochen Wang.
