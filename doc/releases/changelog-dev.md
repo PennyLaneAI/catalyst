@@ -27,6 +27,14 @@
   Also, this is a preliminary step towards supporting parallel execution of QEC layers.
   [(#1917)](https://github.com/PennyLaneAI/catalyst/pull/1917)
 
+* Catalyst now includes a new module called `catalyst.passes.builtin_pipelines`, which contains built-in
+  compilation-pass pipelines for common workloads that extend the default Catalyst pass pipeline.
+  [(#1758)](https://github.com/PennyLaneAI/catalyst/pull/1758)
+
+  The built-in pass pipelines include:
+
+  - `mbqc_pipeline()`: for MBQC workloads.
+
 <h3>Documentation 📝</h3>
 
 <h3>Contributors ✍️</h3>
