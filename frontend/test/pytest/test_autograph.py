@@ -2097,6 +2097,23 @@ class TestDecorators:
 
         assert qjit(loop, autograph=True)(0) == n
 
+    def test_prod(self):
+        """Test that AutoGraph doesn't fail in the presence of the qml.prod operator within
+        functional wrappers."""
+
+        @qml.prod
+        def template():
+            qml.H(0)
+            qml.X(0)
+
+        @qjit(autograph=True, target="jaxpr")
+        @qml.qnode(qml.device("null.qubit", wires=0))
+        def circuit():
+            qml.adjoint(template())
+            return qml.state()
+
+        assert circuit.jaxpr is not None
+
 
 class TestJaxIndexOperatorUpdate:
     """Test Jax index operator update"""
