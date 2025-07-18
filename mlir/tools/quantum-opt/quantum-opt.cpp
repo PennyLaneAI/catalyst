@@ -12,12 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <filesystem>  // path
-#include <fstream>  // ifstream
-#include <regex>  //regex
+#include <filesystem> // path
+#include <fstream>    // ifstream
+#include <regex>      //regex
 
-#include "llvm/Support/CommandLine.h"
-#include "llvm/Support/raw_ostream.h"
 #include "mhlo/IR/register.h"
 #include "mhlo/transforms/passes.h"
 #include "mlir/Dialect/Func/Extensions/AllExtensions.h"
@@ -27,6 +25,8 @@
 #include "mlir/InitAllPasses.h"
 #include "mlir/Tools/mlir-opt/MlirOptMain.h"
 #include "stablehlo/dialect/Register.h"
+#include "llvm/Support/CommandLine.h"
+#include "llvm/Support/raw_ostream.h"
 
 #include "mhlo/IR/hlo_ops.h"
 
@@ -45,13 +45,14 @@
 #include "Quantum/Transforms/BufferizableOpInterfaceImpl.h"
 #include "Quantum/Transforms/Passes.h"
 
-#include "frontend_catalyst_version_py.hpp"  // CATALYST_VERSION
+#include "frontend_catalyst_version_py.hpp" // CATALYST_VERSION
 
 namespace test {
 void registerTestDialect(mlir::DialectRegistry &);
 } // namespace test
 
-void printCatalystVersion(llvm::raw_ostream &os) {
+void printCatalystVersion(llvm::raw_ostream &os)
+{
     os << "Catalyst version " << CATALYST_VERSION << "\n";
 }
 
