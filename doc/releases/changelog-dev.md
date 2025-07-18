@@ -4,6 +4,11 @@
 
 <h3>Improvements 🛠</h3>
 
+* Conversion patterns for the single-qubit `quantum.alloc_qb` and `quantum.dealloc_qb` operations
+  have been added for lowering to the LLVM dialect. These conversion patterns allow for execution of
+  programs containing these operations.
+  [(#1920)](https://github.com/PennyLaneAI/catalyst/pull/1920)
+
 <h3>Breaking changes 💔</h3>
 
 * The JAX version used by Catalyst is updated to 0.6.2.
@@ -33,6 +38,7 @@
 
 This release contains contributions from (in alphabetical order):
 
+Joey Carter,
 Sengthai Heng,
 Christina Lee,
 Paul Haochen Wang.
