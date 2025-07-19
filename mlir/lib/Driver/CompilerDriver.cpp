@@ -24,8 +24,10 @@
 #include <string_view>
 #include <unordered_map>
 
-#include "mhlo/IR/register.h"
-#include "mhlo/transforms/passes.h"
+#include "stablehlo/transforms/Passes.h"
+#include "stablehlo/dialect/Register.h"
+#include "stablehlo/integrations/c/StablehloPasses.h"
+
 #include "mlir/IR/DialectRegistry.h"
 #include "mlir/InitAllDialects.h"
 #include "mlir/InitAllExtensions.h"
@@ -34,7 +36,6 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/FileUtilities.h"
 #include "mlir/Target/LLVMIR/Export.h"
-#include "stablehlo/dialect/Register.h"
 #include "llvm/Analysis/CGSCCPassManager.h"
 #include "llvm/Analysis/LoopAnalysisManager.h"
 #include "llvm/IR/LegacyPassManager.h"
@@ -294,7 +295,6 @@ void registerAllCatalystDialects(DialectRegistry &registry)
     registerAllExtensions(registry);
 
     // HLO
-    mhlo::registerAllMhloDialects(registry);
     stablehlo::registerAllDialects(registry);
 
     // Catalyst
@@ -962,7 +962,7 @@ int QuantumDriverMainFromCL(int argc, char **argv)
     registerAllPasses();
     registerAllCatalystPasses();
     registerAllCatalystPipelines();
-    mhlo::registerAllMhloPasses();
+    mlirRegisterAllStablehloPasses();
     registerAllCatalystDialects(registry);
     registerLLVMTranslations(registry);
 

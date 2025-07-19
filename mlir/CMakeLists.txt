@@ -29,11 +29,16 @@ endif()
 #########################
 
 find_package(MLIR REQUIRED CONFIG)
-find_package(MHLO REQUIRED CONFIG)
+#find_package(STABLEHLO REQUIRED CONFIG)
+# add_subdirectory(llvm-project/mlir/cmake/modules)
+
+
+message("hi, stable hlo src dir: ${STABLEHLO_SRC_DIR}")
+#include_directories(PUBLIC ${STABLEHLO_SRC_DIR})
 
 message(STATUS "Using MLIRConfig.cmake in: ${MLIR_DIR}")
 message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
-message(STATUS "Using MHLOConfig.cmake in: ${MHLO_DIR}")
+#message(STATUS "Using STABLEHLOConfig.cmake in: ${STABLEHLO_DIR}")
 
 set(LLVM_RUNTIME_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/bin)
 set(LLVM_LIBRARY_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/lib)
@@ -42,20 +47,21 @@ set(MLIR_BINARY_DIR ${CMAKE_BINARY_DIR})
 # Taken from mlir-hlo/mhlo/transforms/CMakeLists.txt.
 # Unfortunately, AllMhloPasses doesn't appear to be exported.
 set(ALL_MHLO_PASSES
-  ChloPasses
-  MhloPasses
-  StablehloPasses
-  MhloToArithmeticConversion
-  MhloToMemrefConversion
-  HloToLinalgUtils
-  MhloToLinalg
-  MhloToStablehlo
-  StablehloToMhlo
+  # ChloPasses
+  # MhloPasses
+  # StablehloPasses
+  # MhloToArithmeticConversion
+  # MhloToMemrefConversion
+  # HloToLinalgUtils
+  # MhloToLinalg
+  # MhloToStablehlo
+  # StablehloToMhlo
+  # StablehloPasses
 )
 
 list(APPEND CMAKE_MODULE_PATH "${MLIR_CMAKE_DIR}")
 list(APPEND CMAKE_MODULE_PATH "${LLVM_CMAKE_DIR}")
-list(APPEND CMAKE_MODULE_PATH "${MHLO_CMAKE_DIR}")
+# list(APPEND CMAKE_MODULE_PATH "${STABLEHLO_CMAKE_DIR}")
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake/modules")
 
 # Policy CMP0175 was introduced in CMake 4.31 and raises warnings in the upstream CMake modules.
@@ -85,8 +91,8 @@ if(QUANTUM_ENABLE_BINDINGS_PYTHON)
   mlir_configure_python_dev_packages()
 endif()
 
-list(GET MHLO_INCLUDE_DIRS 1 MLIRHLO_DIR)
-list(GET MHLO_INCLUDE_DIRS 2 MLIRHLO_BUILD_DIR)
+# list(GET STABLEHLO_INCLUDE_DIRS 1 MLIRHLO_DIR)
+# list(GET STABLEHLO_INCLUDE_DIRS 2 MLIRHLO_BUILD_DIR)
 
 set(CATALYST_MAIN_INCLUDE_DIR ${PROJECT_SOURCE_DIR}/include)
 set(CATALYST_GEN_INCLUDE_DIR ${PROJECT_BINARY_DIR}/include)
@@ -95,9 +101,9 @@ set(CATALYST_LIB_DIR ${PROJECT_BINARY_DIR})
 include_directories(SYSTEM
   ${LLVM_INCLUDE_DIRS}
   ${MLIR_INCLUDE_DIRS}
-  ${MHLO_INCLUDE_DIRS}
-  ${MLIRHLO_DIR}/stablehlo
-  ${MLIRHLO_BUILD_DIR}/stablehlo
+  #${STABLEHLO_INCLUDE_DIRS}
+  #${MLIRHLO_DIR}/stablehlo
+  #${MLIRHLO_BUILD_DIR}/stablehlo
 )
 link_directories(${LLVM_BUILD_LIBRARY_DIR})
 add_definitions(${LLVM_DEFINITIONS})
@@ -162,53 +168,55 @@ add_subdirectory(cmake/modules)
 
 # Handle unittests when building out-of-tree against an installed version of
 # LLVM/MLIR (not a build tree). Adapted from `llvm/flang/CMakeLists.txt`.
-set(CATALYST_GTEST_AVAILABLE 0)
-if (TARGET llvm_gtest)
-  # Installed gtest, via LLVM_INSTALL_GTEST.  Preferred.
-  message(STATUS "LLVM GTest found, enabling unittests")
-  set(CATALYST_GTEST_AVAILABLE 1)
-else()
-    find_package(Threads REQUIRED)
-    set(LLVM_THIRD_PARTY_DIR llvm-project/third-party)
-    set(UNITTEST_DIR ${LLVM_THIRD_PARTY_DIR}/unittest)
-    if (NOT EXISTS ${UNITTEST_DIR}/googletest/include/gtest/gtest.h)
-      set(UNITTEST_DIR ${CMAKE_CURRENT_SOURCE_DIR}/llvm/third-party/unittest)
-    endif()
-    if (EXISTS ${UNITTEST_DIR}/googletest/include/gtest/gtest.h)
-      add_llvm_library(llvm_gtest
-        ${UNITTEST_DIR}/googletest/src/gtest-all.cc
-        ${UNITTEST_DIR}/googlemock/src/gmock-all.cc
-        LINK_COMPONENTS Support # llvm::raw_ostream
-        BUILDTREE_ONLY
-      )
-      target_include_directories(llvm_gtest SYSTEM
-        PUBLIC
-        "${UNITTEST_DIR}/googletest/include"
-        "${UNITTEST_DIR}/googlemock/include"
-        PRIVATE
-        "${UNITTEST_DIR}/googletest"
-        "${UNITTEST_DIR}/googlemock"
-      )
-      target_link_libraries(llvm_gtest PUBLIC Threads::Threads)
-      add_llvm_library(llvm_gtest_main
-        ${UNITTEST_DIR}/UnitTestMain/TestMain.cpp
-        LINK_LIBS llvm_gtest
-        LINK_COMPONENTS Support # llvm::cl
-        BUILDTREE_ONLY
-      )
-      set(CATALYST_GTEST_AVAILABLE 1)
-    else()
-      message(WARNING "Skipping unittests since LLVM install does not include \
-        gtest headers and libraries")
-      set(CATALYST_GTEST_AVAILABLE 0)
-    endif()
-endif()
-if (CATALYST_GTEST_AVAILABLE)
-  add_subdirectory(unittests)
-endif()
+# set(CATALYST_GTEST_AVAILABLE 0)
+# if (TARGET llvm_gtest)
+#   # Installed gtest, via LLVM_INSTALL_GTEST.  Preferred.
+#   message(STATUS "LLVM GTest found, enabling unittests")
+#   set(CATALYST_GTEST_AVAILABLE 1)
+# else()
+#     find_package(Threads REQUIRED)
+#     set(LLVM_THIRD_PARTY_DIR llvm-project/third-party)
+#     set(UNITTEST_DIR ${LLVM_THIRD_PARTY_DIR}/unittest)
+#     if (NOT EXISTS ${UNITTEST_DIR}/googletest/include/gtest/gtest.h)
+#       set(UNITTEST_DIR ${CMAKE_CURRENT_SOURCE_DIR}/llvm/third-party/unittest)
+#     endif()
+#     if (EXISTS ${UNITTEST_DIR}/googletest/include/gtest/gtest.h)
+#       add_llvm_library(llvm_gtest
+#         ${UNITTEST_DIR}/googletest/src/gtest-all.cc
+#         ${UNITTEST_DIR}/googlemock/src/gmock-all.cc
+#         LINK_COMPONENTS Support # llvm::raw_ostream
+#         BUILDTREE_ONLY
+#       )
+#       target_include_directories(llvm_gtest SYSTEM
+#         PUBLIC
+#         "${UNITTEST_DIR}/googletest/include"
+#         "${UNITTEST_DIR}/googlemock/include"
+#         PRIVATE
+#         "${UNITTEST_DIR}/googletest"
+#         "${UNITTEST_DIR}/googlemock"
+#       )
+#       target_link_libraries(llvm_gtest PUBLIC Threads::Threads)
+#       add_llvm_library(llvm_gtest_main
+#         ${UNITTEST_DIR}/UnitTestMain/TestMain.cpp
+#         LINK_LIBS llvm_gtest
+#         LINK_COMPONENTS Support # llvm::cl
+#         BUILDTREE_ONLY
+#       )
+#       set(CATALYST_GTEST_AVAILABLE 1)
+#     else()
+#       message(WARNING "Skipping unittests since LLVM install does not include \
+#         gtest headers and libraries")
+#       set(CATALYST_GTEST_AVAILABLE 0)
+#     endif()
+# endif()
+# if (CATALYST_GTEST_AVAILABLE)
+#   add_subdirectory(unittests)
+# endif()
 
 ######################
 # End of CIRCT code  #
 ######################
 
 add_subdirectory(test)
+unset(LLVM_USE_LINKER)
+add_subdirectory(stablehlo)
