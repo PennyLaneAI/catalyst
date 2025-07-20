@@ -33,6 +33,7 @@
 #include "Catalyst/IR/CatalystDialect.h"
 #include "Catalyst/Transforms/BufferizableOpInterfaceImpl.h"
 #include "Catalyst/Transforms/Passes.h"
+#include "Catalyst/Utils/PrintVersion.h"
 #include "Gradient/IR/GradientDialect.h"
 #include "Gradient/Transforms/BufferizableOpInterfaceImpl.h"
 #include "Gradient/Transforms/Passes.h"
@@ -45,20 +46,13 @@
 #include "Quantum/Transforms/BufferizableOpInterfaceImpl.h"
 #include "Quantum/Transforms/Passes.h"
 
-#include "frontend_catalyst_version_py.hpp" // CATALYST_VERSION
-
 namespace test {
 void registerTestDialect(mlir::DialectRegistry &);
 } // namespace test
 
-void printCatalystVersion(llvm::raw_ostream &os)
-{
-    os << "Catalyst version " << CATALYST_VERSION << "\n";
-}
-
 int main(int argc, char **argv)
 {
-    llvm::cl::AddExtraVersionPrinter(printCatalystVersion);
+    llvm::cl::AddExtraVersionPrinter(catalyst::printVersion);
     mlir::registerAllPasses();
     catalyst::registerAllCatalystPasses();
     mlir::mhlo::registerAllMhloPasses();
