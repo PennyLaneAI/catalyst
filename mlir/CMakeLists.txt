@@ -125,19 +125,23 @@ FetchContent_MakeAvailable(tomlplusplus)
 ## Generate frontend_catalyst_version_py.h from frontend/catalyst/_version.py ##
 ################################################################################
 
-function(make_version_hpp_file input_file output_file)
-    file(READ ${input_file} input_content)
-    if (input_content MATCHES "__version__ = \"([^\"]+)\"")
-        set(version_number "${CMAKE_MATCH_1}")
+function(make_version_header_file input_file output_file)
+    set(version_number "unknown")
+    if (NOT EXISTS ${input_file})
+        message(WARNING "Could not find ${input_file}")
     else()
-        message(WARNING "Could not find Catalyst version in ${input_file}")
-        set(version_number "unknown")
+        file(READ ${input_file} input_content)
+        if (NOT input_content MATCHES "__version__ = \"([^\"]+)\"")
+            message(WARNING "Could not find Catalyst version in ${input_file}")
+        else()
+            set(version_number "${CMAKE_MATCH_1}")
+        endif()
     endif()
     set(header_content "static constexpr const char *CATALYST_VERSION = \"${version_number}\";")
     file(WRITE ${output_file} "${header_content}")
-endfunction(make_version_hpp_file)
+endfunction(make_version_header_file)
 
-make_version_hpp_file(
+make_version_header_file(
     "${PROJECT_SOURCE_DIR}/../frontend/catalyst/_version.py"
     "${PROJECT_BINARY_DIR}/include/Catalyst/Utils/frontend_catalyst_version_py.h"
 )
