@@ -42,7 +42,7 @@ function(make_version_hpp_file input_file output_file)
         message(WARNING "Could not find version regex in ${input_file}")
         set(version_number "unknown")
     endif()
-    set(header_content "const char* CATALYST_VERSION = \"${version_number}\";")
+    set(header_content "static constexpr const char *CATALYST_VERSION = \"${version_number}\";")
     file(WRITE ${output_file} "${header_content}")
 endfunction(make_version_hpp_file)
 
