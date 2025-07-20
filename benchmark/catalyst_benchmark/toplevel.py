@@ -15,7 +15,7 @@
 and the plotting. Measurement ranges and scales are all defined here as global dictionaries."""
 
 import sys
-from argparse import ArgumentParser
+from argparse import ArgumentParser, BooleanOptionalAction
 from argparse import Namespace as ParsedArguments
 from collections import defaultdict
 from copy import deepcopy
@@ -35,7 +35,6 @@ from altair import Chart
 from catalyst_benchmark.types import (
     BenchmarkResult,
     BenchmarkResultV1,
-    BooleanOptionalAction,
     Sysinfo,
 )
 from pandas import DataFrame
