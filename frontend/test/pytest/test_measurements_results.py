@@ -787,7 +787,7 @@ class TestNewArithmeticOps:
         "meas_fn, expected",
         [
             [
-                lambda : qml.expval(
+                lambda: qml.expval(
                     qml.ops.op_math.Sum(
                         qml.PauliX(wires=0), qml.PauliY(wires=1), qml.PauliZ(wires=2)
                     )
@@ -795,7 +795,7 @@ class TestNewArithmeticOps:
                 np.array(-1.41421356),
             ],
             [
-                lambda : qml.var(
+                lambda: qml.var(
                     qml.ops.op_math.Sum(
                         qml.PauliX(wires=0), qml.PauliY(wires=1), qml.PauliZ(wires=2)
                     )
@@ -803,11 +803,11 @@ class TestNewArithmeticOps:
                 np.array(2.0),
             ],
             [
-                lambda : qml.expval(qml.PauliX(wires=0) + qml.PauliY(wires=1) + qml.PauliZ(wires=2)),
+                lambda: qml.expval(qml.PauliX(wires=0) + qml.PauliY(wires=1) + qml.PauliZ(wires=2)),
                 np.array(-1.41421356),
             ],
             [
-                lambda : qml.var(qml.PauliX(wires=0) + qml.PauliY(wires=1) + qml.PauliZ(wires=2)),
+                lambda: qml.var(qml.PauliX(wires=0) + qml.PauliY(wires=1) + qml.PauliZ(wires=2)),
                 np.array(2.0),
             ],
         ],
@@ -832,7 +832,7 @@ class TestNewArithmeticOps:
         "meas_fn, expected",
         [
             [
-                lambda : qml.expval(
+                lambda: qml.expval(
                     qml.ops.op_math.Sum(
                         qml.PauliX(wires=0),
                         qml.PauliY(wires=1),
@@ -842,7 +842,7 @@ class TestNewArithmeticOps:
                 np.array(-1.06066017),
             ],
             [
-                lambda : qml.var(
+                lambda: qml.var(
                     qml.ops.op_math.Sum(
                         qml.ops.op_math.SProd(0.2, qml.PauliX(wires=0)),
                         qml.ops.op_math.SProd(0.4, qml.PauliY(wires=1)),
@@ -852,11 +852,13 @@ class TestNewArithmeticOps:
                 np.array(0.245),
             ],
             [
-                lambda : qml.expval(qml.PauliX(wires=0) + qml.PauliY(wires=1) + 0.5 * qml.PauliZ(wires=2)),
+                lambda: qml.expval(
+                    qml.PauliX(wires=0) + qml.PauliY(wires=1) + 0.5 * qml.PauliZ(wires=2)
+                ),
                 np.array(-1.06066017),
             ],
             [
-                lambda : qml.var(
+                lambda: qml.var(
                     0.2 * qml.PauliX(wires=0)
                     + 0.4 * qml.PauliY(wires=1)
                     + 0.5 * qml.PauliZ(wires=2)

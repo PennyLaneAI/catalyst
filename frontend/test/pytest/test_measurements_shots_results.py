@@ -22,6 +22,7 @@ from catalyst import CompileError, qjit
 
 pytestmark = pytest.mark.usefixtures("use_both_frontend")
 
+
 class TestExpval:
     "Test expval with shots > 0"
 
@@ -442,7 +443,6 @@ class TestVar:
         n_shots = 10000
         dev = qml.device(backend, wires=n_wires, shots=n_shots)
 
-
         @qml.qjit
         @qml.qnode(dev)
         def circuit(theta, phi, varphi):
@@ -566,7 +566,7 @@ class TestOtherMeasurements:
         @qml.qnode(dev)
         def circuit():
             return meas_fun(wires=0)
-        
+
         if qml.capture.enabled():
             with pytest.raises(ValueError, match="finite shots are required"):
                 qjit(circuit)

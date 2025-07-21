@@ -99,12 +99,14 @@ def _get_device_kwargs(device) -> dict:
         "rtd_name": info.c_interface_name,
     }
 
+
 def _flat_prod_gen(op: qml.ops.Prod):
     for o in op:
         if isinstance(o, qml.ops.Prod):
             yield from _flat_prod_gen(op)
         else:
             yield o
+
 
 # code example has long lines
 # pylint: disable=line-too-long
@@ -358,6 +360,7 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
             self.qreg_manager[wire_values] = new_wire
 
         return out_qubits
+
     def _obs(self, obs):
         """Interpret the observable equation corresponding to a measurement equation's input."""
         if isinstance(obs, qml.ops.Prod):
