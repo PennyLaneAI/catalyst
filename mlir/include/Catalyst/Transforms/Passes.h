@@ -39,6 +39,7 @@ std::unique_ptr<mlir::Pass> createScatterLoweringPass();
 std::unique_ptr<mlir::Pass> createSplitMultipleTapesPass();
 std::unique_ptr<mlir::Pass> createStablehloLegalizeSortPass();
 std::unique_ptr<mlir::Pass> createStablehloLegalizeToStdPass();
+std::unique_ptr<mlir::Pass> createStablehloLegalizeControlFlowPass();
 
 void registerAllCatalystPasses();
 

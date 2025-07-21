@@ -25,6 +25,7 @@ file(GLOB SRC
     scatter_lowering.cpp
     ScatterPatterns.cpp
     SplitMultipleTapes.cpp
+    stablehlo_legalize_control_flow.cpp
     stablehlo_legalize_sort.cpp
     stablehlo_legalize_to_std.cpp
     TBAAPatterns.cpp

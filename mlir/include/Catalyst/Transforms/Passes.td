@@ -315,4 +315,20 @@ def StablehloLegalizeToStandardPass : Pass<"stablehlo-legalize-to-std", "func::F
   let constructor = "createStablehloLegalizeToStdPass()";
 }
 
+// mhlo legalize to control flow pass.
+// mhlo dropped the -legalize-to-control-flow pass when migrating to stablehlo.
+// We manually add it back.
+//
+// This pass has been modified from its original form in the tensorflow/mlir-hlo repository at
+//   https://github.com/tensorflow/mlir-hlo/blob/a5529d99fc4d1132b0c282a053d26c11e6636b3a/mhlo/transforms/mhlo_passes.td
+// released under the Apache License, Version 2.0, with the following copyright notice:
+//
+//   * Licensed under the Apache License, Version 2.0 (the "License");
+
+def StablehloLegalizeControlFlowPass : Pass<"stablehlo-legalize-control-flow", "func::FuncOp"> {
+  let summary = "Legalize from MHLO control flow to SCF control flow.";
+  let constructor = "createStablehloLegalizeControlFlowPass()";
+  let dependentDialects = ["scf::SCFDialect", "tensor::TensorDialect"];
+}
+
 #endif // CATALYST_PASSES

@@ -225,7 +225,7 @@ def get_hlo_lowering_stage(_options: CompileOptions) -> List[str]:
         "canonicalize",
         "func.func(chlo-legalize-to-stablehlo)",
         #"stablehlo-legalize-to-hlo",
-        #"func.func(mhlo-legalize-control-flow)",
+        "func.func(stablehlo-legalize-control-flow)",
         "func.func(stablehlo-legalize-to-linalg)",
         "func.func(stablehlo-legalize-to-std)",
         "func.func(stablehlo-legalize-sort)",
