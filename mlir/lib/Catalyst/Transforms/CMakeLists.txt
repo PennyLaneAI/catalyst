@@ -41,9 +41,7 @@ set(LIBS
 set(DEPENDS
     MLIRCatalystPassIncGen
     StablehloBaseIncGen
-    #StablehloBaseIncGen
-    # StablehloPasses
-    # StablehloOps
+    StablehloOpsIncGen
 )
 
 add_mlir_library(${LIBRARY_NAME} STATIC ${SRC} LINK_LIBS PRIVATE ${LIBS} DEPENDS ${DEPENDS})

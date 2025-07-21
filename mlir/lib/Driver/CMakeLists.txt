@@ -40,11 +40,10 @@ set(LIBS
     mitigation-transforms
     MLIRIon
     ion-transforms
-    #MhloRegisterDialects
     StablehloRegister
     MLIRCatalystTest
-    #${ALL_MHLO_PASSES}
     ${ENZYME_LIB}
+    StablehloCAPI
 )
 
 add_mlir_library(CatalystCompilerDriver
@@ -57,5 +56,4 @@ add_mlir_library(CatalystCompilerDriver
 
     LINK_LIBS PRIVATE
     ${LIBS}
-    #StablehloBase
 )

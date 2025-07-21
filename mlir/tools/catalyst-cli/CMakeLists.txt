@@ -38,10 +38,8 @@ set(LIBS
     mitigation-transforms
     MLIRIon
     ion-transforms
-    #MhloRegisterDialects
-    #StablehloRegister
+    StablehloRegister
     MLIRCatalystTest
-    #${ALL_MHLO_PASSES}
     ${ENZYME_LIB}
     CatalystCompilerDriver
 )

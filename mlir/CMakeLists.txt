@@ -4,7 +4,8 @@ project(Catalyst LANGUAGES CXX C)
 set(CMAKE_BUILD_WITH_INSTALL_NAME_DIR ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-set(CMAKE_CXX_STANDARD 20 CACHE STRING "C++ standard to conform to")
+# stablehlo is still on cpp17
+set(CMAKE_CXX_STANDARD 17 CACHE STRING "C++ standard to conform to")
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Required so as not to always use the cached option from the mlir build.
@@ -29,16 +30,9 @@ endif()
 #########################
 
 find_package(MLIR REQUIRED CONFIG)
-#find_package(STABLEHLO REQUIRED CONFIG)
-# add_subdirectory(llvm-project/mlir/cmake/modules)
-
-
-message("hi, stable hlo src dir: ${STABLEHLO_SRC_DIR}")
-#include_directories(PUBLIC ${STABLEHLO_SRC_DIR})
 
 message(STATUS "Using MLIRConfig.cmake in: ${MLIR_DIR}")
 message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
-#message(STATUS "Using STABLEHLOConfig.cmake in: ${STABLEHLO_DIR}")
 
 set(LLVM_RUNTIME_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/bin)
 set(LLVM_LIBRARY_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/lib)
@@ -46,22 +40,9 @@ set(MLIR_BINARY_DIR ${CMAKE_BINARY_DIR})
 
 # Taken from mlir-hlo/mhlo/transforms/CMakeLists.txt.
 # Unfortunately, AllMhloPasses doesn't appear to be exported.
-set(ALL_MHLO_PASSES
-  # ChloPasses
-  # MhloPasses
-  # StablehloPasses
-  # MhloToArithmeticConversion
-  # MhloToMemrefConversion
-  # HloToLinalgUtils
-  # MhloToLinalg
-  # MhloToStablehlo
-  # StablehloToMhlo
-  # StablehloPasses
-)
 
 list(APPEND CMAKE_MODULE_PATH "${MLIR_CMAKE_DIR}")
 list(APPEND CMAKE_MODULE_PATH "${LLVM_CMAKE_DIR}")
-# list(APPEND CMAKE_MODULE_PATH "${STABLEHLO_CMAKE_DIR}")
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake/modules")
 
 # Policy CMP0175 was introduced in CMake 4.31 and raises warnings in the upstream CMake modules.
@@ -91,9 +72,6 @@ if(QUANTUM_ENABLE_BINDINGS_PYTHON)
   mlir_configure_python_dev_packages()
 endif()
 
-# list(GET STABLEHLO_INCLUDE_DIRS 1 MLIRHLO_DIR)
-# list(GET STABLEHLO_INCLUDE_DIRS 2 MLIRHLO_BUILD_DIR)
-
 set(CATALYST_MAIN_INCLUDE_DIR ${PROJECT_SOURCE_DIR}/include)
 set(CATALYST_GEN_INCLUDE_DIR ${PROJECT_BINARY_DIR}/include)
 set(CATALYST_LIB_DIR ${PROJECT_BINARY_DIR})
@@ -101,9 +79,6 @@ set(CATALYST_LIB_DIR ${PROJECT_BINARY_DIR})
 include_directories(SYSTEM
   ${LLVM_INCLUDE_DIRS}
   ${MLIR_INCLUDE_DIRS}
-  #${STABLEHLO_INCLUDE_DIRS}
-  #${MLIRHLO_DIR}/stablehlo
-  #${MLIRHLO_BUILD_DIR}/stablehlo
 )
 link_directories(${LLVM_BUILD_LIBRARY_DIR})
 add_definitions(${LLVM_DEFINITIONS})
@@ -219,4 +194,5 @@ add_subdirectory(cmake/modules)
 
 add_subdirectory(test)
 unset(LLVM_USE_LINKER)
+set(STABLEHLO_BUILD_EMBEDDED ON)
 add_subdirectory(stablehlo)

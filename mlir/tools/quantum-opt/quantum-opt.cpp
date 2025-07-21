@@ -48,13 +48,11 @@ int main(int argc, char **argv)
 {
     mlir::registerAllPasses();
     catalyst::registerAllCatalystPasses();
-    //mlir::mhlo::registerAllMhloPasses();
     mlirRegisterAllStablehloPasses();
 
     mlir::DialectRegistry registry;
     mlir::registerAllDialects(registry);
     test::registerTestDialect(registry);
-    //mlir::mhlo::registerAllMhloDialects(registry);
     mlir::stablehlo::registerAllDialects(registry);
     mlir::func::registerAllExtensions(registry);
     registry.insert<catalyst::CatalystDialect>();
@@ -64,7 +62,6 @@ int main(int argc, char **argv)
     registry.insert<catalyst::mbqc::MBQCDialect>();
     registry.insert<catalyst::mitigation::MitigationDialect>();
     registry.insert<catalyst::ion::IonDialect>();
-    //registry.insert<mlir::mhlo::MhloDialect>();
     registry.insert<mlir::stablehlo::StablehloDialect>();
 
     catalyst::registerBufferizableOpInterfaceExternalModels(registry);

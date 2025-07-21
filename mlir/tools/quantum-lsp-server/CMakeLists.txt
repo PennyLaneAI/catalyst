@@ -11,7 +11,6 @@ set(LIBS
     MLIRMBQC
     MLIRMitigation
     MLIRIon
-    #MhloRegisterDialects
     StablehloRegister
 )
 

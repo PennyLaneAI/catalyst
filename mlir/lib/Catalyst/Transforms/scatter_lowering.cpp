@@ -18,8 +18,6 @@
 
 #include "llvm/Support/Debug.h"
 
-// #include "mhlo/IR/hlo_ops.h"
-// #include "mhlo/transforms/passes.h"
 #include "stablehlo/dialect/StablehloOps.h"
 #include "stablehlo/transforms/Passes.h"
 

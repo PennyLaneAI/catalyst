@@ -20,13 +20,12 @@ set(LIBS
     mitigation-transforms
     MLIRIon
     ion-transforms
-    #MhloRegisterDialects
     StablehloRegister
     StablehloPasses
     StablehloOps
+    StablehloCAPI
     MLIRCatalystTest
     MLIRTestDialect
-    #${ALL_MHLO_PASSES}
 )
 
 add_mlir_tool(quantum-opt quantum-opt.cpp DEPENDS ${LIBS} SUPPORT_PLUGINS)
