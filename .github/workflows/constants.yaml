@@ -105,13 +105,11 @@ jobs:
       - name: Compilers (All)
         id: compilers
         run: |
-          if [[ $MULTIPLE ]]; then
+          if [[ "${{ inputs.multiple_compilers }}" == "true" ]]; then
             echo 'compilers=["gcc", "clang"]' >> $GITHUB_OUTPUT
           else
             echo 'compilers=["gcc"]' >> $GITHUB_OUTPUT
           fi
-        env:
-          MULTIPLE: ${{ inputs.multiple_compilers }}
 
     outputs:
       llvm_version: ${{ steps.llvm_version.outputs.llvm_version }}
