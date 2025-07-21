@@ -33,7 +33,6 @@ from catalyst.jax_primitives import (
 pytestmark = pytest.mark.usefixtures("disable_capture")
 
 
-
 def test_hermitian():
     """Test a hermitian can be converted"""
 
@@ -57,6 +56,7 @@ def test_hermitian():
     assert qfunc.eqns[4].invars[2] == qfunc.eqns[3].outvars[0]
 
     assert qfunc.eqns[5].invars[0] == qfunc.eqns[4].outvars[0]
+
 
 def test_sprod():
     """Test that an sprod can be converted."""
@@ -83,6 +83,7 @@ def test_sprod():
 
     assert qfunc.eqns[6].primitive == expval_p
     assert qfunc.eqns[6].invars[0] == qfunc.eqns[5].outvars[0]
+
 
 def test_prod():
     """Test the translation of a Prod"""
@@ -121,6 +122,7 @@ def test_prod():
         qfunc_xpr.eqns[5].outvars[0],
         qfunc_xpr.eqns[7].outvars[0],
     ]
+
 
 @pytest.mark.parametrize("as_linear_combination", (True, False))
 def test_sum(as_linear_combination):
