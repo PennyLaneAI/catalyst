@@ -99,6 +99,12 @@ def _get_device_kwargs(device) -> dict:
         "rtd_name": info.c_interface_name,
     }
 
+def _flat_prod_gen(op: qml.ops.Prod):
+    for o in op:
+        if isinstance(o, qml.ops.Prod):
+            yield from _flat_prod_gen(op)
+        else:
+            yield o
 
 # code example has long lines
 # pylint: disable=line-too-long
@@ -352,17 +358,15 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
             self.qreg_manager[wire_values] = new_wire
 
         return out_qubits
-    def _obs(self, obs, simplify=True):
+    def _obs(self, obs):
         """Interpret the observable equation corresponding to a measurement equation's input."""
-        if simplify:
-            with pause():
-                obs = obs.simplify()
         if isinstance(obs, qml.ops.Prod):
-            return tensorobs_p.bind(*(self._obs(t, simplify=False) for t in obs))
+            # catalyst cant handle product of products
+            return tensorobs_p.bind(*(self._obs(t) for t in _flat_prod_gen(obs)))
         if obs.arithmetic_depth > 0:
             with pause():
                 coeffs, terms = obs.terms()
-            terms = [self._obs(t, simplify=False) for t in terms]
+            terms = [self._obs(t) for t in terms]
             return hamiltonian_p.bind(jnp.stack(coeffs), *terms)
         wires = [self.qreg_manager[w] for w in obs.wires]
         if obs.name == "Hermitian":

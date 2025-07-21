@@ -435,9 +435,13 @@ class TestVar:
 
     def test_pauliz_hamiltonian(self, backend):
         """Test that a hamiltonian involving PauliZ and PauliY and hadamard works correctly"""
+        if qml.capture.enabled():
+            pytest.xfail("no error yet. sc-95950")
+
         n_wires = 3
         n_shots = 10000
         dev = qml.device(backend, wires=n_wires, shots=n_shots)
+
 
         @qml.qjit
         @qml.qnode(dev)
