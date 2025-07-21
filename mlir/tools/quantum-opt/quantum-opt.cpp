@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
 #include "mlir/Dialect/Func/Extensions/AllExtensions.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/IR/DialectRegistry.h"
@@ -22,8 +21,9 @@
 
 #include "stablehlo/dialect/Register.h"
 #include "stablehlo/dialect/StablehloOps.h"
-#include "stablehlo/transforms/Passes.h"
 #include "stablehlo/integrations/c/StablehloPasses.h"
+#include "stablehlo/transforms/Passes.h"
+#include "stablehlo/transforms/optimization/Passes.h"
 
 #include "Catalyst/IR/CatalystDialect.h"
 #include "Catalyst/Transforms/BufferizableOpInterfaceImpl.h"
@@ -49,6 +49,7 @@ int main(int argc, char **argv)
     mlir::registerAllPasses();
     catalyst::registerAllCatalystPasses();
     mlirRegisterAllStablehloPasses();
+    mlir::stablehlo::registerOptimizationPasses();
 
     mlir::DialectRegistry registry;
     mlir::registerAllDialects(registry);

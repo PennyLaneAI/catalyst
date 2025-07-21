@@ -22,6 +22,7 @@ set(LIBS
     ion-transforms
     StablehloRegister
     StablehloPasses
+    StablehloOptimizationPasses
     StablehloOps
     StablehloCAPI
     MLIRCatalystTest

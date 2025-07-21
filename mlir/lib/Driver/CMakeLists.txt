@@ -41,6 +41,7 @@ set(LIBS
     MLIRIon
     ion-transforms
     StablehloRegister
+    StablehloOptimizationPasses
     MLIRCatalystTest
     ${ENZYME_LIB}
     StablehloCAPI
@@ -53,6 +54,7 @@ add_mlir_library(CatalystCompilerDriver
 
     DEPENDS
     StablehloBaseIncGen
+    OptimizationPassesIncGen
 
     LINK_LIBS PRIVATE
     ${LIBS}
