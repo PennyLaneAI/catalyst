@@ -158,9 +158,9 @@ classifiers = [
     "Operating System :: POSIX",
     "Operating System :: POSIX :: Linux",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3 :: Only",
 ]
 
@@ -384,7 +384,7 @@ setup(
     classifiers=classifiers,
     name="pennylane_catalyst",
     version=version,
-    python_requires=">=3.10",
+    python_requires=">=3.11",
     entry_points=entry_points,
     install_requires=requirements,
     packages=find_namespace_packages(
