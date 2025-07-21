@@ -13,6 +13,10 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* A bug in the `NullQubit::ReleaseQubit()` method that prevented the deallocation of individual
+  qubits on the `"null.qubit"` device has been fixed.
+  [(#1926)](https://github.com/PennyLaneAI/catalyst/pull/1926)
+
 <h3>Internal changes ⚙️</h3>
 
 * `from_plxpr` now supports adjoint and ctrl operations and transforms,
@@ -33,6 +37,7 @@
 
 This release contains contributions from (in alphabetical order):
 
+Joey Carter,
 Sengthai Heng,
 Christina Lee,
 Paul Haochen Wang.
