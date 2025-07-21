@@ -31,6 +31,11 @@
   Also, this is a preliminary step towards supporting parallel execution of QEC layers.
   [(#1917)](https://github.com/PennyLaneAI/catalyst/pull/1917)
 
+* Conversion patterns for the single-qubit `quantum.alloc_qb` and `quantum.dealloc_qb` operations
+  have been added for lowering to the LLVM dialect. These conversion patterns allow for execution of
+  programs containing these operations.
+  [(#1920)](https://github.com/PennyLaneAI/catalyst/pull/1920)
+
 <h3>Documentation 📝</h3>
 
 <h3>Contributors ✍️</h3>

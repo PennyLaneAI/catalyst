@@ -305,6 +305,27 @@ struct AllocOpPattern : public OpConversionPattern<AllocOp> {
     }
 };
 
+struct AllocQubitOpPattern : public OpConversionPattern<AllocQubitOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(AllocQubitOp op, AllocQubitOpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+        MLIRContext *ctx = getContext();
+        const TypeConverter *conv = getTypeConverter();
+
+        StringRef qirName = "__catalyst__rt__qubit_allocate";
+        Type qirSignature = LLVM::LLVMFunctionType::get(conv->convertType(QubitType::get(ctx)), {});
+
+        LLVM::LLVMFuncOp fnDecl =
+            catalyst::ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+
+        rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, fnDecl, ValueRange{});
+
+        return success();
+    }
+};
+
 struct DeallocOpPattern : public OpConversionPattern<DeallocOp> {
     using OpConversionPattern::OpConversionPattern;
 
@@ -317,6 +338,28 @@ struct DeallocOpPattern : public OpConversionPattern<DeallocOp> {
         StringRef qirName = "__catalyst__rt__qubit_release_array";
         Type qirSignature = LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx),
                                                         conv->convertType(QuregType::get(ctx)));
+
+        LLVM::LLVMFuncOp fnDecl =
+            catalyst::ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+
+        rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, fnDecl, adaptor.getOperands());
+
+        return success();
+    }
+};
+
+struct DeallocQubitOpPattern : public OpConversionPattern<DeallocQubitOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(DeallocQubitOp op, DeallocQubitOpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+        MLIRContext *ctx = getContext();
+        const TypeConverter *conv = getTypeConverter();
+
+        StringRef qirName = "__catalyst__rt__qubit_release";
+        Type qirSignature = LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx),
+                                                        conv->convertType(QubitType::get(ctx)));
 
         LLVM::LLVMFuncOp fnDecl =
             catalyst::ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
@@ -1026,7 +1069,9 @@ void populateQIRConversionPatterns(TypeConverter &typeConverter, RewritePatternS
     patterns.add<DeviceReleaseOpPattern>(typeConverter, patterns.getContext());
     patterns.add<NumQubitsOpPattern>(typeConverter, patterns.getContext());
     patterns.add<AllocOpPattern>(typeConverter, patterns.getContext());
+    patterns.add<AllocQubitOpPattern>(typeConverter, patterns.getContext());
     patterns.add<DeallocOpPattern>(typeConverter, patterns.getContext());
+    patterns.add<DeallocQubitOpPattern>(typeConverter, patterns.getContext());
     patterns.add<ExtractOpPattern>(typeConverter, patterns.getContext());
     patterns.add<InsertOpPattern>(typeConverter, patterns.getContext());
     patterns.add<CustomOpPattern>(typeConverter, patterns.getContext());
