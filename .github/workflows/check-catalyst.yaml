@@ -314,6 +314,14 @@ jobs:
         key: ${{ runner.os }}-ccache-${{ github.run_id }}
         restore-keys: ${{ runner.os }}-ccache-
 
+    # just hard code commit manually, set up this stablehlo dep verisons infra later
+    - name: Clone Stablehlo Submodule
+      uses: actions/checkout@v4
+      with:
+        repository: openxla/stablehlo
+        ref: f1f035fea33dcfdd7c471eb7f39174b344003117
+        path: mlir/stablehlo
+
     - name: Build MLIR Dialects
       run: |
         CCACHE_DIR="$(pwd)/.ccache" \
