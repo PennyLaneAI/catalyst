@@ -61,7 +61,13 @@ jobs:
 
   build-dependencies:
     needs: [constants, check_if_wheel_build_required]
-    name: Build Dependencies (Python ${{ needs.constants.outputs.primary_python_version }})
+
+    strategy:
+      fail-fast: false
+      matrix:
+        python_version: ${{ fromJson(format('["{0}"]', needs.constants.outputs.primary_python_version)) }}
+
+    name: Build Dependencies (Python ${{ matrix.python_version }})
     runs-on: macos-latest
 
     if: needs.check_if_wheel_build_required.outputs.build-wheels == 'true'
@@ -115,6 +121,13 @@ jobs:
         ref: ${{ needs.constants.outputs.mhlo_version }}
         path: ${{ github.workspace }}/mlir/mlir-hlo
 
+    - name: Patch MHLO Source
+      if: steps.cache-mhlo-source.outputs.cache-hit != 'true'
+      run: |
+        cd $GITHUB_WORKSPACE/mlir/mlir-hlo
+        git apply $GITHUB_WORKSPACE/mlir/patches/mhlo-remove-shardy.patch
+        git apply $GITHUB_WORKSPACE/mlir/patches/mhlo-add-back-necessary-passes.patch
+
     - name: Clone Enzyme Submodule
       if: steps.cache-enzyme-source.outputs.cache-hit != 'true'
       uses: actions/checkout@v4
@@ -123,15 +136,22 @@ jobs:
         ref: ${{ needs.constants.outputs.enzyme_version }}
         path: ${{ github.workspace }}/mlir/Enzyme
 
+    - name: Patch Enzyme Source
+      if: steps.cache-enzyme-source.outputs.cache-hit != 'true'
+      run: |
+        export TARGET_FILE=$GITHUB_WORKSPACE/mlir/Enzyme/enzyme/Enzyme/TypeAnalysis/TypeAnalysis.cpp
+        export PATCH_FILE=$GITHUB_WORKSPACE/mlir/patches/enzyme-nvvm-fabs-intrinsics.patch
+        patch -p1 $TARGET_FILE $PATCH_FILE
+
     # Cache external project builds
     - name: Restore LLVM Build
       id: cache-llvm-build
       uses: actions/cache/restore@v4
       with:
         path: ${{ github.workspace }}/llvm-build
-        key: ${{ runner.os }}-${{ runner.arch }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.primary_python_version }}-wheel-build
+        key: ${{ runner.os }}-${{ runner.arch }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{ matrix.python_version }}-wheel-build
 
-    - name: Restore MHLO Build
+    - name: Check MHLO Build Cache
       id: cache-mhlo-build
       uses: actions/cache/restore@v4
       with:
@@ -139,7 +159,7 @@ jobs:
         key: ${{ runner.os }}-${{ runner.arch }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-wheel-build
         lookup-only: True
 
-    - name: Restore Enzyme Build
+    - name: Check Enzyme Build Cache
       id: cache-enzyme-build
       uses: actions/cache/restore@v4
       with:
@@ -173,17 +193,12 @@ jobs:
       uses: actions/cache/save@v4
       with:
         path: ${{ github.workspace }}/llvm-build
-        key: ${{ runner.os }}-${{ runner.arch }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{matrix.python_version}}-wheel-build
+        key: ${{ runner.os }}-${{ runner.arch }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{ matrix.python_version }}-wheel-build
 
     - name: Build MHLO Dialect
       if: steps.cache-mhlo-build.outputs.cache-hit != 'true'
       run: |
         export PATH=$GITHUB_WORKSPACE/llvm-build/bin:$PATH
-
-        pushd $GITHUB_WORKSPACE/mlir/mlir-hlo
-        git apply $GITHUB_WORKSPACE/mlir/patches/mhlo-remove-shardy.patch
-        git apply $GITHUB_WORKSPACE/mlir/patches/mhlo-add-back-necessary-passes.patch
-        popd
 
         cmake -S mlir/mlir-hlo -B $GITHUB_WORKSPACE/mhlo-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
@@ -208,10 +223,6 @@ jobs:
     - name: Build Enzyme
       if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
       run: |
-        export TARGET_FILE=mlir/Enzyme/enzyme/Enzyme/TypeAnalysis/TypeAnalysis.cpp
-        export PATCH_FILE=mlir/patches/enzyme-nvvm-fabs-intrinsics.patch
-        if patch --dry-run -p1 -N $TARGET_FILE $PATCH_FILE > /dev/null 2>&1; then patch -p1 $TARGET_FILE $PATCH_FILE; fi
-
         cmake -S mlir/Enzyme/enzyme -B $GITHUB_WORKSPACE/enzyme-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
               -DLLVM_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/llvm" \
