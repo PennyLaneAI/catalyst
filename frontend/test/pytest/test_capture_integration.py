@@ -1555,6 +1555,62 @@ class TestCapture:
         qml.capture.disable()
 
 
+class TestControlFlow:
+    """Integration tests for control flow."""
+
+    @pytest.mark.parametrize("reverse", (True, False))
+    def test_for_loop_outside_qnode(self, reverse):
+        """Test that a for loop outside qnode can be executed."""
+
+        qml.capture.enable()
+
+        if reverse:
+            start, stop, step = 6, 0, -2  # 6, 4, 2
+        else:
+            start, stop, step = 2, 7, 2  # 2, 4, 6
+
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def c(x):
+            qml.RX(x, 0)
+            return qml.expval(qml.Z(0))
+
+        @qml.qjit
+        def f(i0):
+            @qml.for_loop(start, stop, step)
+            def g(i, x):
+                return c(i) + x
+
+            return g(i0)
+
+        out = f(3.0)
+        assert qml.math.allclose(out, 3 + jnp.cos(2) + jnp.cos(4) + jnp.cos(6))
+
+    def test_while_loop(self):
+        """Test that a outside a qnode can be executed."""
+        qml.capture.enable()
+
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def circuit(x):
+            qml.RX(x, 0)
+            return qml.expval(qml.Z(0))
+
+        @qml.qjit
+        def f(x):
+
+            const = jnp.array([0, 1, 2])
+
+            @qml.while_loop(lambda i, y: i < jnp.sum(const))
+            def g(i, y):
+                return i + 1, y + circuit(i)
+
+            return g(0, x)
+
+        ind, res = f(1.0)
+        assert qml.math.allclose(ind, 3)
+        expected = 1.0 + jnp.cos(0) + jnp.cos(1) + jnp.cos(2)
+        assert qml.math.allclose(res, expected)
+
+
 def test_adjoint_transform_integration():
     """Test that adjoint transforms can be used with capture enabled."""
 
