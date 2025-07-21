@@ -61,13 +61,7 @@ jobs:
 
   build-dependencies:
     needs: [constants, check_if_wheel_build_required]
-
-    strategy:
-      fail-fast: false
-      matrix:
-        python_version: ["3.11"]
-
-    name: Build Dependencies (Python ${{ matrix.python_version }})
+    name: Build Dependencies (Python ${{ needs.constants.outputs.primary_python_version }})
     runs-on: macos-latest
 
     if: needs.check_if_wheel_build_required.outputs.build-wheels == 'true'
@@ -135,7 +129,7 @@ jobs:
       uses: actions/cache/restore@v4
       with:
         path: ${{ github.workspace }}/llvm-build
-        key: ${{ runner.os }}-${{ runner.arch }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{matrix.python_version}}-wheel-build
+        key: ${{ runner.os }}-${{ runner.arch }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.primary_python_version }}-wheel-build
 
     - name: Restore MHLO Build
       id: cache-mhlo-build
@@ -278,7 +272,7 @@ jobs:
       uses: actions/cache/restore@v4
       with:
         path: ${{ github.workspace }}/llvm-build
-        key: ${{ runner.os }}-${{ runner.arch }}-llvm-${{ needs.constants.outputs.llvm_version }}-3.10-wheel-build
+        key: ${{ runner.os }}-${{ runner.arch }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.primary_python_version }}-wheel-build
         fail-on-cache-miss: True
 
     - name: Get Cached MHLO Source
