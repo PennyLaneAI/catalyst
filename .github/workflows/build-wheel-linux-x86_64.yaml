@@ -72,7 +72,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python_version: ["3.10"]
+        python_version: ${{ fromJson(format('["{0}"]', needs.constants.outputs.primary_python_version)) }}
         container_img: ["manylinux_2_28_x86_64"]
 
     name: Build Dependencies (Python ${{ matrix.python_version }})
@@ -135,6 +135,13 @@ jobs:
         ref: ${{ needs.constants.outputs.mhlo_version }}
         path: ${{ github.workspace }}/mlir/mlir-hlo
 
+    - name: Patch MHLO Source
+      if: steps.cache-mhlo-source.outputs.cache-hit != 'true'
+      run: |
+        cd $GITHUB_WORKSPACE/mlir/mlir-hlo
+        git apply $GITHUB_WORKSPACE/mlir/patches/mhlo-remove-shardy.patch
+        git apply $GITHUB_WORKSPACE/mlir/patches/mhlo-add-back-necessary-passes.patch
+
     - name: Clone Enzyme Submodule
       if: steps.cache-enzyme-source.outputs.cache-hit != 'true'
       uses: actions/checkout@v4
@@ -143,15 +150,22 @@ jobs:
         ref: ${{ needs.constants.outputs.enzyme_version }}
         path: ${{ github.workspace }}/mlir/Enzyme
 
+    - name: Patch Enzyme Source
+      if: steps.cache-enzyme-source.outputs.cache-hit != 'true'
+      run: |
+        export TARGET_FILE=$GITHUB_WORKSPACE/mlir/Enzyme/enzyme/Enzyme/TypeAnalysis/TypeAnalysis.cpp
+        export PATCH_FILE=$GITHUB_WORKSPACE/mlir/patches/enzyme-nvvm-fabs-intrinsics.patch
+        patch -p1 $TARGET_FILE $PATCH_FILE
+
     # Cache external project builds
     - name: Restore LLVM Build
       id: cache-llvm-build
       uses: actions/cache/restore@v4
       with:
         path: ${{ github.workspace }}/llvm-build
-        key: ${{ matrix.container_img }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{matrix.python_version}}-wheel-build
+        key: ${{ matrix.container_img }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{ matrix.python_version }}-wheel-build
 
-    - name: Restore MHLO Build
+    - name: Check MHLO Build Cache
       id: cache-mhlo-build
       uses: actions/cache/restore@v4
       with:
@@ -159,7 +173,7 @@ jobs:
         key: ${{ matrix.container_img }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-wheel-build
         lookup-only: True
 
-    - name: Restore Enzyme Build
+    - name: Check Enzyme Build Cache
       id: cache-enzyme-build
       uses: actions/cache/restore@v4
       with:
@@ -217,11 +231,6 @@ jobs:
       run: |
         export PATH=$GITHUB_WORKSPACE/llvm-build/bin:$PATH
 
-        pushd $GITHUB_WORKSPACE/mlir/mlir-hlo
-        git apply $GITHUB_WORKSPACE/mlir/patches/mhlo-remove-shardy.patch
-        git apply $GITHUB_WORKSPACE/mlir/patches/mhlo-add-back-necessary-passes.patch
-        popd
-
         cmake -S mlir/mlir-hlo -B $GITHUB_WORKSPACE/mhlo-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
               -DLLVM_ENABLE_ASSERTIONS=ON \
@@ -246,10 +255,6 @@ jobs:
       if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
       run: |
         export PATH=$GITHUB_WORKSPACE/llvm-build/bin:$PATH
-
-        export TARGET_FILE=mlir/Enzyme/enzyme/Enzyme/TypeAnalysis/TypeAnalysis.cpp
-        export PATCH_FILE=mlir/patches/enzyme-nvvm-fabs-intrinsics.patch
-        if patch --dry-run -p1 -N $TARGET_FILE $PATCH_FILE > /dev/null 2>&1; then patch -p1 $TARGET_FILE $PATCH_FILE; fi
 
         cmake -S mlir/Enzyme/enzyme -B $GITHUB_WORKSPACE/enzyme-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
@@ -283,6 +288,8 @@ jobs:
     steps:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
+      with:
+        ref: ${{ inputs.branch || github.ref }}
 
     - name: Install dependencies (AlmaLinux)
       run: |
@@ -313,7 +320,7 @@ jobs:
       uses: actions/cache/restore@v4
       with:
         path: ${{ github.workspace }}/llvm-build
-        key: ${{ matrix.container_img }}-llvm-${{ needs.constants.outputs.llvm_version }}-3.10-wheel-build
+        key: ${{ matrix.container_img }}-llvm-${{ needs.constants.outputs.llvm_version }}-3.11-wheel-build
         fail-on-cache-miss: True
 
     - name: Get Cached MHLO Source
@@ -442,7 +449,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python_version: ${{ fromJSON(needs.constants.outputs.python_versions) }}
+        python_version: ${{ fromJson(needs.constants.outputs.python_test_versions) }}
 
     # To check all wheels for supported python3 versions
     name: Test Wheels (Python ${{ matrix.python_version }}) on Linux x86
@@ -451,11 +458,26 @@ jobs:
     steps:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
+      with:
+        ref: ${{ inputs.branch || github.ref }}
+
+    # choose FORWARD_COMPAT_BASE_VERSION if python version > FORWARD_COMPAT_BASE_VERSION
+    - name: Determine which python build version to use
+      id: python_build_version
+      env:
+        FORWARD_COMPAT_BASE_VERSION: ${{ needs.constants.outputs.forward_compat_python_version }}
+        IS_VERSION_SUPPORTED: ${{ contains(fromJson(needs.constants.outputs.python_versions), matrix.python_version) }}
+      run: |
+        if [[ $IS_VERSION_SUPPORTED == "true" ]]; then
+          echo "python_build_version=${{ matrix.python_version }}" >> $GITHUB_OUTPUT
+        else
+          echo "python_build_version=$FORWARD_COMPAT_BASE_VERSION" >> $GITHUB_OUTPUT
+        fi
 
     - name: Download Wheel Artifact
       uses: actions/download-artifact@v4
       with:
-        name: catalyst-manylinux_2_28_x86_64-wheel-py-${{ matrix.python_version }}.zip
+        name: catalyst-manylinux_2_28_x86_64-wheel-py-${{ steps.python_build_version.outputs.python_build_version }}.zip
         path: ${{ github.workspace }}/dist
 
     - name: Download Standalone Plugin Wheel Artifact
@@ -463,7 +485,7 @@ jobs:
       if: env.BUILD_STANDALONE_PLUGIN == 'true'
       uses: actions/download-artifact@v4
       with:
-        name: standalone-plugin-manylinux_2_28_x86_64-wheel-py-${{ matrix.python_version }}.zip
+        name: standalone-plugin-manylinux_2_28_x86_64-wheel-py-${{ steps.python_build_version.outputs.python_build_version }}.zip
         path: ${{ github.workspace }}/standalone_plugin_wheel/wheel
 
     - name: Set up Python ${{ matrix.python_version }}
@@ -481,6 +503,7 @@ jobs:
         python${{ matrix.python_version }} -m pip install 'amazon-braket-pennylane-plugin>=1.31.0'
 
     - name: Install OQC client
+      if: matrix.python_version != '3.13'
       run: |
         python${{ matrix.python_version }} -m pip install oqc-qcaas-client
 
