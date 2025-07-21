@@ -65,7 +65,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python_version: fromJson(format('["{0}"]', needs.constants.outputs.primary_python_version))
+        python_version: ${{ fromJson(format('["{0}"]', needs.constants.outputs.primary_python_version)) }}
 
     name: Build Dependencies (Python ${{ matrix.python_version }})
     runs-on: macos-latest
