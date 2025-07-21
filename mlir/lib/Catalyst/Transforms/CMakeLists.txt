@@ -26,6 +26,7 @@ file(GLOB SRC
     ScatterPatterns.cpp
     SplitMultipleTapes.cpp
     stablehlo_legalize_sort.cpp
+    stablehlo_legalize_to_std.cpp
     TBAAPatterns.cpp
     TBAATagsPass.cpp
 )
@@ -41,6 +42,7 @@ set(LIBS
 
 set(DEPENDS
     MLIRCatalystPassIncGen
+    MLIRStablehloLegalizeToStandardIncGen
     StablehloBaseIncGen
     StablehloOpsIncGen
 )

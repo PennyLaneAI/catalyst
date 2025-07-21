@@ -300,4 +300,19 @@ def StablehloLegalizeSortPass : Pass<"stablehlo-legalize-sort", "func::FuncOp"> 
                            "scf::SCFDialect", "tensor::TensorDialect"];
 }
 
+// mhlo legalize to std pass.
+// mhlo dropped the -legalize-to-std pass when migrating to stablehlo.
+// We manually add it back.
+//
+// This pass has been modified from its original form in the tensorflow/mlir-hlo repository at
+//   https://github.com/tensorflow/mlir-hlo/blob/a5529d99fc4d1132b0c282a053d26c11e6636b3a/mhlo/transforms/mhlo_passes.td
+// released under the Apache License, Version 2.0, with the following copyright notice:
+//
+//   * Licensed under the Apache License, Version 2.0 (the "License");
+
+def StablehloLegalizeToStandardPass : Pass<"stablehlo-legalize-to-std", "func::FuncOp"> {
+  let summary = "Legalize from MHLO dialect to standard dialect.";
+  let constructor = "createStablehloLegalizeToStdPass()";
+}
+
 #endif // CATALYST_PASSES

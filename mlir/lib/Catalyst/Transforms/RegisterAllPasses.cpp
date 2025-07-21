@@ -68,4 +68,5 @@ void catalyst::registerAllCatalystPasses()
     mlir::registerPass(catalyst::createLoopBoundaryOptimizationPass);
     mlir::registerPass(catalyst::createMBQCConversionPass);
     mlir::registerPass(catalyst::createStablehloLegalizeSortPass);
+    mlir::registerPass(catalyst::createStablehloLegalizeToStdPass);
 }
