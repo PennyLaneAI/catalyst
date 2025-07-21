@@ -61,7 +61,13 @@ jobs:
 
   build-dependencies:
     needs: [constants, check_if_wheel_build_required]
-    name: Build Dependencies (Python ${{ needs.constants.outputs.primary_python_version }})
+
+    strategy:
+      fail-fast: false
+      matrix:
+        python_version: fromJson(format('["{0}"]', needs.constants.outputs.primary_python_version))
+
+    name: Build Dependencies (Python ${{ matrix.python_version }})
     runs-on: macos-latest
 
     if: needs.check_if_wheel_build_required.outputs.build-wheels == 'true'
@@ -143,7 +149,7 @@ jobs:
       uses: actions/cache/restore@v4
       with:
         path: ${{ github.workspace }}/llvm-build
-        key: ${{ runner.os }}-${{ runner.arch }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.primary_python_version }}-wheel-build
+        key: ${{ runner.os }}-${{ runner.arch }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{ matrix.python_version }}-wheel-build
 
     - name: Check MHLO Build Cache
       id: cache-mhlo-build
@@ -187,7 +193,7 @@ jobs:
       uses: actions/cache/save@v4
       with:
         path: ${{ github.workspace }}/llvm-build
-        key: ${{ runner.os }}-${{ runner.arch }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{matrix.python_version}}-wheel-build
+        key: ${{ runner.os }}-${{ runner.arch }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{ matrix.python_version }}-wheel-build
 
     - name: Build MHLO Dialect
       if: steps.cache-mhlo-build.outputs.cache-hit != 'true'
