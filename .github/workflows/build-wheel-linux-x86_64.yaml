@@ -151,7 +151,7 @@ jobs:
         path: ${{ github.workspace }}/llvm-build
         key: ${{ matrix.container_img }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{matrix.python_version}}-wheel-build
 
-    - name: Restore MHLO Build
+    - name: Check MHLO Build Cache
       id: cache-mhlo-build
       uses: actions/cache/restore@v4
       with:
@@ -159,7 +159,7 @@ jobs:
         key: ${{ matrix.container_img }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-wheel-build
         lookup-only: True
 
-    - name: Restore Enzyme Build
+    - name: Check Enzyme Build Cache
       id: cache-enzyme-build
       uses: actions/cache/restore@v4
       with:
