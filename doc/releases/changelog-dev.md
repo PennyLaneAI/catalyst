@@ -13,6 +13,10 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Fix errors in AutoGraph transformed functions when `qml.prod` is used together with other operator
+  transforms (e.g. `qml.adjoint`).
+  [(#1910)](https://github.com/PennyLaneAI/catalyst/pull/1910)
+
 <h3>Internal changes ⚙️</h3>
 
 * `from_plxpr` now supports adjoint and ctrl operations and transforms,
@@ -34,5 +38,6 @@
 This release contains contributions from (in alphabetical order):
 
 Sengthai Heng,
+David Ittah,
 Christina Lee,
 Paul Haochen Wang.
