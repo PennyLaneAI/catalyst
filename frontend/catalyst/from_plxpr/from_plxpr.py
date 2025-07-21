@@ -103,7 +103,7 @@ def _get_device_kwargs(device) -> dict:
 def _flat_prod_gen(op: qml.ops.Prod):
     for o in op:
         if isinstance(o, qml.ops.Prod):
-            yield from _flat_prod_gen(op)
+            yield from _flat_prod_gen(o)
         else:
             yield o
 
