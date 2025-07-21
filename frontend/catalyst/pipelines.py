@@ -228,7 +228,7 @@ def get_hlo_lowering_stage(_options: CompileOptions) -> List[str]:
         #"func.func(mhlo-legalize-control-flow)",
         "func.func(stablehlo-legalize-to-linalg)",
         #"func.func(mhlo-legalize-to-std)",
-        #"func.func(hlo-legalize-sort)",
+        "func.func(stablehlo-legalize-sort)",
         "stablehlo-convert-to-signless",
         "canonicalize",
         "scatter-lowering",

@@ -25,6 +25,7 @@ file(GLOB SRC
     scatter_lowering.cpp
     ScatterPatterns.cpp
     SplitMultipleTapes.cpp
+    stablehlo_legalize_sort.cpp
     TBAAPatterns.cpp
     TBAATagsPass.cpp
 )

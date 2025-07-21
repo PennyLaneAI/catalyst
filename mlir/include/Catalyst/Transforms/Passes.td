@@ -282,4 +282,22 @@ def BufferDeallocation : Pass<"buffer-deallocation", "func::FuncOp"> {
   let constructor = "mlir::bufferization::createBufferDeallocationPass()";
 }
 
+// mhlo legalize sort pass.
+// mhlo dropped the -legalize-sort pass when migrating to stablehlo.
+// We manually add it back.
+//
+// This pass has been modified from its original form in the tensorflow/mlir-hlo repository at
+//   https://github.com/tensorflow/mlir-hlo/blob/a5529d99fc4d1132b0c282a053d26c11e6636b3a/mhlo/transforms/mhlo_passes.td
+// released under the Apache License, Version 2.0, with the following copyright notice:
+//
+//   * Licensed under the Apache License, Version 2.0 (the "License");
+
+def StablehloLegalizeSortPass : Pass<"stablehlo-legalize-sort", "func::FuncOp"> {
+  let summary = "Legalize from Stablehlo sort to SCF control flow.";
+  let constructor = "createStablehloLegalizeSortPass()";
+  let dependentDialects = ["arith::ArithDialect",
+                           "bufferization::BufferizationDialect",
+                           "scf::SCFDialect", "tensor::TensorDialect"];
+}
+
 #endif // CATALYST_PASSES
