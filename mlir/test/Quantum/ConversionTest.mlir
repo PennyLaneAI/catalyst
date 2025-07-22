@@ -129,6 +129,19 @@ func.func @alloc(%c : i64) {
 
 // -----
 
+// CHECK: llvm.func @__catalyst__rt__qubit_allocate() -> !llvm.ptr
+
+// CHECK-LABEL: @alloc_qb
+func.func @alloc_qb() {
+
+    // CHECK: llvm.call @__catalyst__rt__qubit_allocate()
+    %0 = quantum.alloc_qb : !quantum.bit
+
+    return
+}
+
+// -----
+
 // CHECK: llvm.func @__catalyst__rt__qubit_release_array(!llvm.ptr)
 
 // CHECK-LABEL: @dealloc
@@ -136,6 +149,19 @@ func.func @dealloc(%r : !quantum.reg) {
 
     // CHECK: llvm.call @__catalyst__rt__qubit_release_array(%arg0)
     quantum.dealloc %r : !quantum.reg
+
+    return
+}
+
+// -----
+
+// CHECK: llvm.func @__catalyst__rt__qubit_release(!llvm.ptr)
+
+// CHECK-LABEL: @dealloc_qb
+func.func @dealloc_qb(%q : !quantum.bit) {
+
+    // CHECK: llvm.call @__catalyst__rt__qubit_release(%arg0)
+    quantum.dealloc_qb %q : !quantum.bit
 
     return
 }
