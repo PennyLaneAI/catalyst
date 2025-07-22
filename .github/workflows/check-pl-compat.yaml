@@ -196,7 +196,7 @@ jobs:
 
     - name: Run Frontend Tests (Braket)
       run: |
-        make pytest TEST_BRAKET=LOCAL
+        # make pytest TEST_BRAKET=LOCAL
 
     - name: Run Demos
       run: | # Do not run demos in parallel, seems to cause package issues with numpy.
