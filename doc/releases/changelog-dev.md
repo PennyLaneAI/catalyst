@@ -19,6 +19,9 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Raise warning when subroutines are used without capture enabled.
+  [(#1930)](https://github.com/PennyLaneAI/catalyst/pull/1930)
+
 * Update imports for noise transforms from `pennylane.transforms` to `pennylane.noise`.
   [(#1918)](https://github.com/PennyLaneAI/catalyst/pull/1918)
 
