@@ -76,28 +76,35 @@ add_subdirectory(tests)
 if(APPLE AND (${CMAKE_SYSTEM_PROCESSOR} STREQUAL arm64))
 # Don't rerun external project everytime we configure the runtime build.
 if(NOT EXISTS ${CMAKE_BINARY_DIR}/lib/liblapacke.3.dylib)
-    execute_process(
-        COMMAND bash -c "xcrun --sdk macosx --show-sdk-path"
-        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-        OUTPUT_VARIABLE OSX_SDK_SYMBOL_PATH
-        OUTPUT_STRIP_TRAILING_WHITESPACE
-        RESULT_VARIABLE CMD_RESULT
-    )
+    if(CMAKE_OSX_SYSROOT)
+        get_filename_component(OSX_SDK_PATH ${CMAKE_OSX_SYSROOT} REALPATH)
+    else()
+        message(STATUS "CMAKE_OSX_SYSROOT is not set, using xcrun to get the official SDK path")
 
-    get_filename_component(SEARCH_DIR ${OSX_SDK_SYMBOL_PATH} DIRECTORY)
-    file(GLOB CANDIDATE_FILES "${SEARCH_DIR}/MacOSX*.sdk")
-    set(HIGHEST_VERSION "0")
-    set(OSX_SDK_LATEST_PATH "${OSX_SDK_SYMBOL_PATH}")
+        # Use xcrun to get the official SDK path
+        execute_process(
+            COMMAND xcrun --sdk macosx --show-sdk-path
+            OUTPUT_VARIABLE XCRUN_SDK_PATH
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+            RESULT_VARIABLE XCRUN_RESULT
+        )
 
-    foreach(CURRENT_FILE IN LISTS CANDIDATE_FILES)
-        get_filename_component(CURRENT_FILENAME ${CURRENT_FILE} NAME)
-        string(REGEX MATCH [=[MacOSX(.*)\.sdk$]=] _REGEX_DUMMY "${CURRENT_FILENAME}")
-        set(CURRENT_VERSION "${CMAKE_MATCH_1}")
-        if(CURRENT_VERSION VERSION_GREATER HIGHEST_VERSION)
-            set(HIGHEST_VERSION ${CURRENT_VERSION})
-            set(OSX_SDK_PATH ${CURRENT_FILE})
+        if(XCRUN_RESULT EQUAL 0)
+            # get the realpath of the SDK path
+            get_filename_component(OSX_SDK_PATH ${XCRUN_SDK_PATH} REALPATH)
+        else()
+            # Fallback to the latest SDK available under /Library/Developer/CommandLineTools/SDKs/
+            execute_process(
+                COMMAND ls /Library/Developer/CommandLineTools/SDKs/
+                COMMAND grep "MacOSX[0-9][0-9]*\\.[0-9][0-9]*\\.sdk"
+                COMMAND sort -V
+                COMMAND tail -1
+                OUTPUT_VARIABLE LATEST_SDK_NAME
+                OUTPUT_STRIP_TRAILING_WHITESPACE
+            )
+            set(OSX_SDK_PATH "/Library/Developer/CommandLineTools/SDKs/${LATEST_SDK_NAME}")
         endif()
-    endforeach()
+    endif()
 
     ExternalProject_Add(lapacke-accelerate
         GIT_REPOSITORY https://github.com/lepus2589/accelerate-lapacke.git
