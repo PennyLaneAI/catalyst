@@ -5,7 +5,7 @@
 <h3>Improvements 🛠</h3>
 
 *  Displays Catalyst version in `quantum-opt --version` output.
-  [#1922](https://github.com/PennyLaneAI/catalyst/pull/1922)
+  [(#1922)](https://github.com/PennyLaneAI/catalyst/pull/1922)
 
 <h3>Breaking changes 💔</h3>
 
