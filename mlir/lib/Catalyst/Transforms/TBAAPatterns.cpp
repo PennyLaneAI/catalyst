@@ -41,7 +41,8 @@ bool isFromExtractAlignedPointerAsIndexOp(Operation *op)
     // more than one region
     // https://github.com/llvm/llvm-project/blob/179d30f8c3fddd3c85056fd2b8e877a4a8513158/mlir/lib/Analysis/SliceAnalysis.cpp#L109
     options.omitBlockArguments = true;
-    getBackwardSlice(op, &backwardSlice, options);
+    LogicalResult bsr = getBackwardSlice(op, &backwardSlice, options);
+    assert(bsr.succeeded() && "expected a backward slice");
     bool found = std::find_if(backwardSlice.begin(), backwardSlice.end(), [](const Operation *op) {
                      return isa<memref::ExtractAlignedPointerAsIndexOp>(op);
                  }) != backwardSlice.end();
