@@ -97,6 +97,11 @@ mhlo:
 	@if cd mlir-hlo; git apply --check $(MK_DIR)/patches/mhlo-add-back-necessary-passes.patch; then \
 		git apply $(MK_DIR)/patches/mhlo-add-back-necessary-passes.patch; \
 	fi
+
+	# Patch a MHLO bug with std::sort
+	@if cd mlir-hlo; git apply --check $(MK_DIR)/patches/mhlo-rename-sort.patch; then \
+		git apply $(MK_DIR)/patches/mhlo-rename-sort.patch; \
+	fi
 	cmake -G Ninja -S mlir-hlo -B $(MHLO_BUILD_DIR) \
 		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
 		-DLLVM_ENABLE_ASSERTIONS=ON \
