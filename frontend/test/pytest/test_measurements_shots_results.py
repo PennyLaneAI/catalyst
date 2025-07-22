@@ -586,9 +586,7 @@ class TestOtherMeasurements:
         assert result[0].dtype == np.int64
 
         # qml.counts
-        for r, e in zip(
-            result[1][0], expected(x, qml.counts(all_outcomes=True)).keys()
-        ):
+        for r, e in zip(result[1][0], expected(x, qml.counts(all_outcomes=True)).keys()):
             assert format(int(r), "02b") == e
         assert sum(result[1][1]) == 10000
         assert result[1][0].dtype == np.int64
