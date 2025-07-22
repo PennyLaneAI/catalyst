@@ -63,6 +63,7 @@ from catalyst.jax_primitives import (
     probs_p,
     qalloc_p,
     qdealloc_p,
+    qdef_p,
     qinst_p,
     quantum_kernel_p,
     quantum_subroutine_p,
@@ -307,6 +308,7 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         # In other words, we assume no new qreg will be allocated in the scope
         self.qreg_manager = qreg_manager
         self.subroutine_cache = cache
+        self.qdef_cache = cache  # FIXME: use a different cache arg
         self.control_wires = control_wires
         """Any control wires used for a subroutine."""
         self.control_values = control_values
@@ -441,7 +443,6 @@ def handle_subroutine(self, *args, **kwargs):
     """
     Transform the subroutine from PLxPR into JAXPR with quantum primitives.
     """
-
     backup = dict(self.qreg_manager)
     self.qreg_manager.insert_all_dangling_qubits()
 
@@ -466,6 +467,62 @@ def handle_subroutine(self, *args, **kwargs):
     # quantum_subroutine_p.bind
     # is just pjit_p with a different name.
     vals_out = quantum_subroutine_p.bind(
+        self.qreg_manager.get(),
+        *args,
+        jaxpr=converted_closed_jaxpr_branch,
+        in_shardings=(UNSPECIFIED, *kwargs["in_shardings"]),
+        out_shardings=(UNSPECIFIED, *kwargs["out_shardings"]),
+        in_layouts=(None, *kwargs["in_layouts"]),
+        out_layouts=(None, *kwargs["out_layouts"]),
+        donated_invars=kwargs["donated_invars"],
+        ctx_mesh=kwargs["ctx_mesh"],
+        name=kwargs["name"],
+        keep_unused=kwargs["keep_unused"],
+        inline=kwargs["inline"],
+        compiler_options_kvs=kwargs["compiler_options_kvs"],
+    )
+
+    self.qreg_manager.set(vals_out[0])
+    vals_out = vals_out[1:]
+
+    for orig_wire in backup.keys():
+        self.qreg_manager.extract(orig_wire)
+
+    return vals_out
+
+
+@PLxPRToQuantumJaxprInterpreter.register_primitive(qdef_p)
+def handle_qdef(self, *args, **kwargs):
+    """
+    Transform a quantum definition from PLxPR into JAXPR with quantum primitives.
+    """
+
+    # breakpoint()
+
+    backup = dict(self.qreg_manager)
+    self.qreg_manager.insert_all_dangling_qubits()
+
+    # Make sure the quantum register is updated
+    plxpr = kwargs["jaxpr"]
+    transformed = self.qdef_cache.get(plxpr)
+
+    def wrapper(qreg, *args):
+        manager = QregManager(qreg)
+        converter = copy(self)
+        converter.qreg_manager = manager
+        retvals = converter(plxpr, *args)
+        converter.qreg_manager.insert_all_dangling_qubits()
+        return converter.qreg_manager.get(), *retvals
+
+    if not transformed:
+        converted_closed_jaxpr_branch = jax.make_jaxpr(wrapper)(self.qreg_manager.get(), *args)
+        self.qdef_cache[plxpr] = converted_closed_jaxpr_branch
+    else:
+        converted_closed_jaxpr_branch = transformed
+
+    # qdef_p.bind
+    # is just pjit_p with a different name.
+    vals_out = qdef_p.bind(
         self.qreg_manager.get(),
         *args,
         jaxpr=converted_closed_jaxpr_branch,
