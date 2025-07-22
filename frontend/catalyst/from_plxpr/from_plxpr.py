@@ -492,59 +492,23 @@ def handle_subroutine(self, *args, **kwargs):
 
 
 @PLxPRToQuantumJaxprInterpreter.register_primitive(qdef_p)
-def handle_qdef(self, *args, **kwargs):
+def handle_qdef(self, *, pyfun, func_jaxpr):
     """
     Transform a quantum definition from PLxPR into JAXPR with quantum primitives.
     """
 
-    # breakpoint()
-
-    backup = dict(self.qreg_manager)
-    self.qreg_manager.insert_all_dangling_qubits()
-
-    # Make sure the quantum register is updated
-    plxpr = kwargs["jaxpr"]
-    transformed = self.qdef_cache.get(plxpr)
-
-    def wrapper(qreg, *args):
-        manager = QregManager(qreg)
+    def wrapper(*args):
+        # manager = QregManager(qreg)
         converter = copy(self)
-        converter.qreg_manager = manager
-        retvals = converter(plxpr, *args)
-        converter.qreg_manager.insert_all_dangling_qubits()
-        return converter.qreg_manager.get(), *retvals
+        # converter.qreg_manager = manager
+        converter(func_jaxpr, *args)
+        # converter.qreg_manager.insert_all_dangling_qubits()
+        # return converter.qreg_manager.get()
 
-    if not transformed:
-        converted_closed_jaxpr_branch = jax.make_jaxpr(wrapper)(self.qreg_manager.get(), *args)
-        self.qdef_cache[plxpr] = converted_closed_jaxpr_branch
-    else:
-        converted_closed_jaxpr_branch = transformed
+    converted_closed_jaxpr_branch = jax.make_jaxpr(wrapper)(*func_jaxpr.in_avals)
+    qdef_p.bind(pyfun=pyfun, func_jaxpr=converted_closed_jaxpr_branch)
 
-    # qdef_p.bind
-    # is just pjit_p with a different name.
-    vals_out = qdef_p.bind(
-        self.qreg_manager.get(),
-        *args,
-        jaxpr=converted_closed_jaxpr_branch,
-        in_shardings=(UNSPECIFIED, *kwargs["in_shardings"]),
-        out_shardings=(UNSPECIFIED, *kwargs["out_shardings"]),
-        in_layouts=(None, *kwargs["in_layouts"]),
-        out_layouts=(None, *kwargs["out_layouts"]),
-        donated_invars=kwargs["donated_invars"],
-        ctx_mesh=kwargs["ctx_mesh"],
-        name=kwargs["name"],
-        keep_unused=kwargs["keep_unused"],
-        inline=kwargs["inline"],
-        compiler_options_kvs=kwargs["compiler_options_kvs"],
-    )
-
-    self.qreg_manager.set(vals_out[0])
-    vals_out = vals_out[1:]
-
-    for orig_wire in backup.keys():
-        self.qreg_manager.extract(orig_wire)
-
-    return vals_out
+    return ()
 
 
 @PLxPRToQuantumJaxprInterpreter.register_primitive(qml.QubitUnitary._primitive)

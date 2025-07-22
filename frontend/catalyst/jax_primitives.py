@@ -290,10 +290,8 @@ grad_p.multiple_results = True
 func_p = core.CallPrimitive("func")
 func_p.multiple_results = True
 
-# qdef_p = core.CallPrimitive("qdef")
-# qdef_p.multiple_results = True
-qdef_p = copy.deepcopy(pjit_p)
-qdef_p.name = "qdef_p"
+qdef_p = core.Primitive("qdef")
+qdef_p.multiple_results = True
 
 jvp_p = Primitive("jvp")
 jvp_p.multiple_results = True
@@ -321,7 +319,6 @@ quantum_subroutine_p = copy.deepcopy(pjit_p)
 quantum_subroutine_p.name = "quantum_subroutine_p"
 
 subroutine_cache: dict[callable, callable] = {}
-qdef_cache: dict[callable, callable] = {}
 
 
 def subroutine(func):
@@ -391,71 +388,13 @@ def subroutine(func):
 def qdef(func):
     """
     Denotes the creation of a quantum definition in the intermediate representation.
-
-    May be used to reduce compilation times. Instead of repeatedly compiling
-    inlined versions of the function passed as a parameter, when functions
-    are annotated with a qdef, a single version of the function
-    will be compiled and called from potentially multiple callsites.
-
-    .. note::
-
-        qdef are only available when using the PLxPR program capture
-        interface.
-
-
-    **Example**
-
-    .. code-block:: python
-
-        qml.capture.enable()
-
-        @qjit
-        def workload():
-
-            @qdef
-            def foo(x, wires):
-                qml.Hadamard(wires)
-                qml.RX(x, wires)
-
-            @qml.qnode(dev)
-            def main():
-                qml.PauliX(wires=0)
-                return qml.state()
-            return main()
-
-        print(workload.mlir)
-        qml.capture.disable()
     """
 
-    old_pjit = jax._src.pjit.pjit_p
-
     @functools.wraps(func)
-    def inside(*args, **kwargs):
-        with Patcher(
-            (
-                jax._src.pjit,
-                "pjit_p",
-                old_pjit,
-            ),
-        ):
-            return func(*args, **kwargs)
-
-    print("fqdef: {func=}")
-    print(f"qdef: {inside=}")
-
-    @functools.wraps(inside)
     def wrapper(*args, **kwargs):
+        jaxpr = jax.make_jaxpr(func)(*args, **kwargs)
+        qdef_p.bind(pyfun=func, func_jaxpr=jaxpr)
 
-        with Patcher(
-            (
-                jax._src.pjit,
-                "pjit_p",
-                qdef_p,
-            ),
-        ):
-            return jax.jit(inside)(*args, **kwargs)
-
-    print(f"qdef: {wrapper=}")
     return wrapper
 
 
@@ -623,26 +562,23 @@ def _func_lowering(ctx, *args, call_jaxpr, fn):
     return call_op.results
 
 
-# @qdef_p.def_impl
-# def _qdef_def_impl(*args, call_jaxpr, fn):  # pragma: no cover
-#     raise NotImplementedError()
+#
+# Decomp defs
+#
+@qdef_p.def_abstract_eval
+def _qdef_abstract(*, pyfun, func_jaxpr):
+    return ()
 
 
-# def _qdef_lowering(ctx, *args, call_jaxpr, fn):
-def _qdef_lowering(*args, **kwargs):
+def _qdef_lowering(ctx, *, pyfun, func_jaxpr):
     """Lower a quantum definition into MLIR in a single step process.
     The step is the compilation of the definition of the function fn.
 
     Even though we could register the `pjit_p` lowering directly, this makes the code origin
     apparent in stack traces and similar use cases.
     """
-    # func_op = lower_callable(ctx, fn, call_jaxpr)
-    # print(f"_qdef_lowering: {func_op=}")
-    # call_op = create_call_op(ctx, func_op, *args)
-    # return call_op.results
-
-    retval = _pjit_lowering(*args, **kwargs)
-    return retval
+    lower_callable(ctx, pyfun, func_jaxpr)
+    return ()
 
 
 #
