@@ -164,6 +164,7 @@ def from_plxpr(plxpr: ClosedJaxpr) -> Callable[..., Jaxpr]:
     return jax.make_jaxpr(partial(WorkflowInterpreter().eval, plxpr.jaxpr, plxpr.consts))
 
 
+
 class WorkflowInterpreter(PlxprInterpreter):
     """An interpreter that converts a qnode primitive from a plxpr variant to a catalxpr variant."""
 

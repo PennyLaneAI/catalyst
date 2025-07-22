@@ -2412,7 +2412,17 @@ def subroutine_lowering(*args, **kwargs):
     Even though we could register the `pjit_p` lowering directly, this makes the code origin
     apparent in stack traces and similar use cases.
     """
-    retval = _pjit_lowering(*args, **kwargs)
+    try:
+        retval = _pjit_lowering(*args, **kwargs)
+    except NotImplementedError as e:
+        if "MLIR translation rule for primitive" in str(e):
+            msg = str(e) + """
+                This error sometimes occurs when using quantum operations
+                inside subroutines but calling them outside a qnode
+            """
+            raise NotImplementedError(msg) from e
+        raise e
+
     return retval
 
 
