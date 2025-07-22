@@ -108,7 +108,7 @@ def test_quantum_subroutine_conditional():
 
 
 def test_quantum_subroutine_no_capture_enabled():
-    """Test error is raised"""
+    """Test that an error is raised if using subroutines with capture disabled."""
 
     @subroutine
     def will_error_out(): ...
