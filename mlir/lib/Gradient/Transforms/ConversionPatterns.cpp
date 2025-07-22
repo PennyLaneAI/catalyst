@@ -290,7 +290,9 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
             SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
         assert(callee && "Expected a valid callee of type func.func");
 
-        catalyst::convertToDestinationPassingStyle(callee, rewriter);
+        if (failed(catalyst::convertToDestinationPassingStyle(callee, rewriter))) {
+            return failure();
+        }
         SymbolTableCollection symbolTable;
         catalyst::traverseCallGraph(callee, &symbolTable, [&](func::FuncOp func) {
             // Register custom gradients of quantum functions
@@ -304,7 +306,9 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
                 if (!func->hasAttr("unwrapped_type")) {
                     func->setAttr("unwrapped_type", TypeAttr::get(func.getFunctionType()));
                 }
-                catalyst::convertToDestinationPassingStyle(func, rewriter);
+                if (failed(catalyst::convertToDestinationPassingStyle(func, rewriter))) {
+                    return failure();
+                }
 
                 wrapMemRefArgs(func, getTypeConverter(), rewriter, loc, /*volatileArgs=*/true);
 
