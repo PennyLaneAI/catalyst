@@ -29,12 +29,12 @@ struct GEPOpRewritePattern : public mlir::OpRewritePattern<LLVM::GEPOp> {
                                         mlir::PatternRewriter &rewriter) const override
     {
         auto defOp = op.getBase().getDefiningOp();
-        if (op.getNoWrapFlags() == LLVM::GEPNoWrapFlags::inbounds() ||
+        if (op.getNoWrapFlags() == LLVM::GEPNoWrapFlags::inbounds ||
             (defOp && isa<LLVM::ZeroOp>(defOp))) {
             return failure();
         }
         rewriter.startOpModification(op);
-        op.setNoWrapFlags(LLVM::GEPNoWrapFlags::inbounds());
+        op.setNoWrapFlags(LLVM::GEPNoWrapFlags::inbounds);
         rewriter.finalizeOpModification(op);
         return success();
     }
