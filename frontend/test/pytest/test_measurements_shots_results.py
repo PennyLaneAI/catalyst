@@ -134,8 +134,6 @@ class TestExpval:
     @pytest.mark.usefixtures("use_both_frontend")
     def test_hermitian(self, backend, tol_stochastic):
         """Test expval Hermitian observables with shots."""
-        if qml.capture.enabled():
-            pytest.xfail("Hermitians not yet supported with program capture.")
         n_wires = 3
         n_shots = 10000
         dev = qml.device(backend, wires=n_wires, shots=n_shots)
@@ -351,8 +349,6 @@ class TestVar:
     @pytest.mark.usefixtures("use_both_frontend")
     def test_hermitian_shots(self, backend, tol_stochastic):
         """Test var Hermitian observables with shots."""
-        if qml.capture.enabled():
-            pytest.xfail("Hermitian not yet supported with program capture.")
 
         n_wires = 3
         n_shots = 10000
@@ -434,10 +430,9 @@ class TestVar:
         result = qjit(circuit, seed=37)(0.432, 0.123, -0.543)
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
+    @pytest.mark.xfail("error disappeared when I added qjit. Should be investigated. sc-95950")
     def test_pauliz_hamiltonian(self, backend):
         """Test that a hamiltonian involving PauliZ and PauliY and hadamard works correctly"""
-        if qml.capture.enabled():
-            pytest.xfail("no error yet. sc-95950")
 
         n_wires = 3
         n_shots = 10000

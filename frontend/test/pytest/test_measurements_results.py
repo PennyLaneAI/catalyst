@@ -193,9 +193,6 @@ class TestExpval:
     def test_hermitian_1(self, backend):
         """Test expval for Hermitian observable."""
 
-        if qml.capture.enabled():
-            pytest.xfail("capture does not yet support Hermitian")
-
         @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def expval2(x: float):
@@ -259,9 +256,6 @@ class TestExpval:
 
     def test_tensor_2(self, backend):
         """Test expval for Tensor observable."""
-
-        if qml.capture.enabled():
-            pytest.xfail("capture does not yet support Hermitian")
 
         @qjit
         @qml.qnode(qml.device(backend, wires=3))
