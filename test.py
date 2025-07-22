@@ -7,17 +7,18 @@ from catalyst.jax_primitives import AbstractQbit, qdef
 qml.capture.enable()
 
 
-@qdef
-def decomp(x, y, w):
-    jax.debug.print("hello add {} and {}", x, y)
-    qml.GlobalPhase(0.1)
+@qdef(num_params=2)
+def decomp(x, y, w1, w2):
+    qml.GlobalPhase(x + y)
+    qml.H(w1)
+    qml.CNOT([w1, w2])
 
 
 @qjit
 @qml.qnode(qml.device("lightning.qubit", wires=1))
 def circuit(x: float):
     qml.RX(x, wires=0)
-    decomp(float, float, AbstractQbit())
+    decomp(float, float, int, int)
     return qml.expval(qml.PauliZ(0))
 
 
