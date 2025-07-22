@@ -314,14 +314,11 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
                 if (!func->hasAttr("unwrapped_type")) {
                     func->setAttr("unwrapped_type", TypeAttr::get(func.getFunctionType()));
                 }
-                if (failed(catalyst::convertToDestinationPassingStyle(func, rewriter))) {
-                    return failure();
-                }
-
-                if (failed(wrapMemRefArgs(func, getTypeConverter(), rewriter, loc,
-                                          /*volatileArgs=*/true))) {
-                    return failure();
-                }
+                LogicalResult dpsr = catalyst::convertToDestinationPassingStyle(func, rewriter);
+                assert(dpsr.succeeded() && "failed to rewrite backpropOp to destination style");
+                LogicalResult wmar = wrapMemRefArgs(func, getTypeConverter(), rewriter, loc,
+                                                    /*volatileArgs=*/true);
+                assert(wmar.succeeded() && "failed to wrap backpropOp's memref args");
 
                 func::FuncOp augFwd = genAugmentedForward(func, rewriter);
                 func::FuncOp customQGrad =
@@ -329,7 +326,6 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
                 insertEnzymeCustomGradient(rewriter, func->getParentOfType<ModuleOp>(),
                                            func.getLoc(), func, augFwd, customQGrad);
             }
-            return success();
         });
 
         LowerToLLVMOptions options = getTypeConverter()->getOptions();
