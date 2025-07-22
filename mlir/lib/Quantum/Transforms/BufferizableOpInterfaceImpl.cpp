@@ -58,7 +58,8 @@ struct QubitUnitaryOpInterface
     }
 
     LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
-                            const bufferization::BufferizationOptions &options) const
+                            const bufferization::BufferizationOptions &options,
+                            bufferization::BufferizationState &state) const
     {
         auto qubitUnitaryOp = cast<QubitUnitaryOp>(op);
         Location loc = op->getLoc();
@@ -101,7 +102,8 @@ struct HermitianOpInterface
     }
 
     LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
-                            const bufferization::BufferizationOptions &options) const
+                            const bufferization::BufferizationOptions &options,
+                            bufferization::BufferizationState &state) const
     {
         auto hermitianOp = cast<HermitianOp>(op);
         Location loc = op->getLoc();
@@ -143,7 +145,8 @@ struct HamiltonianOpInterface
     }
 
     LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
-                            const bufferization::BufferizationOptions &options) const
+                            const bufferization::BufferizationOptions &options,
+                            bufferization::BufferizationState &state) const
     {
         auto hamiltonianOp = cast<HamiltonianOp>(op);
         Location loc = op->getLoc();
@@ -187,7 +190,8 @@ struct SampleOpInterface
     }
 
     LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
-                            const bufferization::BufferizationOptions &options) const
+                            const bufferization::BufferizationOptions &options,
+                            bufferization::BufferizationState &state) const
     {
         auto sampleOp = cast<SampleOp>(op);
         Location loc = op->getLoc();
@@ -237,7 +241,8 @@ struct CountsOpInterface
     }
 
     LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
-                            const bufferization::BufferizationOptions &options) const
+                            const bufferization::BufferizationOptions &options,
+                            bufferization::BufferizationState &state) const
     {
         auto countsOp = cast<CountsOp>(op);
         Location loc = op->getLoc();
@@ -297,7 +302,8 @@ struct ProbsOpInterface
     }
 
     LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
-                            const bufferization::BufferizationOptions &options) const
+                            const bufferization::BufferizationOptions &options,
+                            bufferization::BufferizationState &state) const
     {
         auto probsOp = cast<ProbsOp>(op);
         Location loc = op->getLoc();
@@ -350,7 +356,8 @@ struct StateOpInterface
     }
 
     LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
-                            const bufferization::BufferizationOptions &options) const
+                            const bufferization::BufferizationOptions &options,
+                            bufferization::BufferizationState &state) const
     {
         auto stateOp = cast<StateOp>(op);
         Location loc = op->getLoc();
@@ -401,7 +408,8 @@ struct SetStateOpInterface
     }
 
     LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
-                            const bufferization::BufferizationOptions &options) const
+                            const bufferization::BufferizationOptions &options,
+                            bufferization::BufferizationState &state) const
     {
         auto setStateOp = cast<SetStateOp>(op);
         Location loc = op->getLoc();
@@ -443,7 +451,8 @@ struct SetBasisStateOpInterface
     }
 
     LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
-                            const bufferization::BufferizationOptions &options) const
+                            const bufferization::BufferizationOptions &options,
+                            bufferization::BufferizationState &state) const
     {
         auto setBasisStateOp = cast<SetBasisStateOp>(op);
         Location loc = op->getLoc();
