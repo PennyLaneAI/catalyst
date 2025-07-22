@@ -19,7 +19,7 @@ import jax
 import numpy as np
 import pennylane as qml
 import pytest
-from pennylane.transforms import exponential_extrapolate
+from pennylane.noise import exponential_extrapolate, poly_extrapolate
 
 import catalyst
 from catalyst.api_extensions.error_mitigation import (
@@ -356,7 +356,7 @@ def test_zne_with_extrap_kwargs():
         return catalyst.mitigate_with_zne(
             circuit,
             scale_factors=[1, 3, 5, 7],
-            extrapolate=qml.transforms.poly_extrapolate,
+            extrapolate=poly_extrapolate,
             extrapolate_kwargs={"order": 2},
         )()
 
@@ -381,7 +381,7 @@ def test_exponential_extrapolation_with_kwargs():
         return catalyst.mitigate_with_zne(
             circuit,
             scale_factors=[1, 3, 5, 7],
-            extrapolate=qml.transforms.exponential_extrapolate,
+            extrapolate=exponential_extrapolate,
             extrapolate_kwargs={"asymptote": 3},
         )()
 
