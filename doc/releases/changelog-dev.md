@@ -13,7 +13,14 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* A bug in the `NullQubit::ReleaseQubit()` method that prevented the deallocation of individual
+  qubits on the `"null.qubit"` device has been fixed.
+  [(#1926)](https://github.com/PennyLaneAI/catalyst/pull/1926)
+
 <h3>Internal changes ⚙️</h3>
+
+* Update imports for noise transforms from `pennylane.transforms` to `pennylane.noise`.
+  [(#1918)](https://github.com/PennyLaneAI/catalyst/pull/1918)
 
 * `from_plxpr` now supports adjoint and ctrl operations and transforms,
   `Hermitian` observables, `for_loop` outside qnodes, and `while_loop` outside QNode's.
@@ -22,6 +29,15 @@
   [(#1903)](https://github.com/PennyLaneAI/catalyst/pull/1903)
   [(#1896)](https://github.com/PennyLaneAI/catalyst/pull/1896)
 
+* The `qec.layer` and `qec.yield` operations have been added to the QEC dialect to represent a group
+  of QEC operations. The main use case is to analyze the depth of a circuit.
+  Also, this is a preliminary step towards supporting parallel execution of QEC layers.
+  [(#1917)](https://github.com/PennyLaneAI/catalyst/pull/1917)
+
+* Conversion patterns for the single-qubit `quantum.alloc_qb` and `quantum.dealloc_qb` operations
+  have been added for lowering to the LLVM dialect. These conversion patterns allow for execution of
+  programs containing these operations.
+  [(#1920)](https://github.com/PennyLaneAI/catalyst/pull/1920)
 
 <h3>Documentation 📝</h3>
 
@@ -29,5 +45,8 @@
 
 This release contains contributions from (in alphabetical order):
 
+Joey Carter,
+Sengthai Heng,
 Christina Lee,
+Andrija Paurevic,
 Paul Haochen Wang.
