@@ -308,7 +308,6 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         # In other words, we assume no new qreg will be allocated in the scope
         self.qreg_manager = qreg_manager
         self.subroutine_cache = cache
-        self.qdef_cache = cache  # FIXME: use a different cache arg
         self.control_wires = control_wires
         """Any control wires used for a subroutine."""
         self.control_values = control_values
@@ -497,18 +496,33 @@ def handle_qdef(self, *, pyfun, func_jaxpr):
     Transform a quantum definition from PLxPR into JAXPR with quantum primitives.
     """
 
-    def wrapper(*args):
-        # manager = QregManager(qreg)
-        converter = copy(self)
-        # converter.qreg_manager = manager
-        converter(func_jaxpr, *args)
-        # converter.qreg_manager.insert_all_dangling_qubits()
-        # return converter.qreg_manager.get()
+    # Update the qubit register manager to include all dangling qubits
+    backup = dict(self.qreg_manager)
+    self.qreg_manager.insert_all_dangling_qubits()
 
-    converted_closed_jaxpr_branch = jax.make_jaxpr(wrapper)(*func_jaxpr.in_avals)
-    qdef_p.bind(pyfun=pyfun, func_jaxpr=converted_closed_jaxpr_branch)
+    def wrapper(qreg, *args):
+        manager = QregManager(qreg)
+        converter = copy(self)
+        converter.qreg_manager = manager
+        converter(func_jaxpr, *args)
+        converter.qreg_manager.insert_all_dangling_qubits()
+        return converter.qreg_manager.get()
+
+
+    converted_closed_jaxpr_branch = jax.make_jaxpr(wrapper)(self.qreg_manager.get(), *func_jaxpr.in_avals)
+    qdef_p.bind(
+        # self.qreg_manager.get(),
+        pyfun=pyfun,
+        func_jaxpr=converted_closed_jaxpr_branch)
 
     return ()
+    # self.qreg_manager.set(vals_out[0])
+    # vals_out = vals_out[1:]
+
+    # for orig_wire in backup.keys():
+    #     self.qreg_manager.extract(orig_wire)
+
+    # return vals_out
 
 
 @PLxPRToQuantumJaxprInterpreter.register_primitive(qml.QubitUnitary._primitive)

@@ -289,10 +289,8 @@ grad_p = Primitive("grad")
 grad_p.multiple_results = True
 func_p = core.CallPrimitive("func")
 func_p.multiple_results = True
-
 qdef_p = core.Primitive("qdef")
 qdef_p.multiple_results = True
-
 jvp_p = Primitive("jvp")
 jvp_p.multiple_results = True
 vjp_p = Primitive("vjp")
@@ -556,8 +554,6 @@ def _func_lowering(ctx, *args, call_jaxpr, fn):
       fn: the function being compiled
     """
     func_op = lower_callable(ctx, fn, call_jaxpr)
-    print(f"_func_lowering: {func_op=}")
-
     call_op = create_call_op(ctx, func_op, *args)
     return call_op.results
 
