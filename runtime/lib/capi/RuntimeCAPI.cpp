@@ -18,6 +18,9 @@
 #include <ctime>
 #include <memory>
 #include <ostream>
+#include <limits>
+#include <set>
+#include <map>
 #include <stdexcept>
 #include <string_view>
 #include <tuple>
@@ -46,6 +49,11 @@ static std::unique_ptr<ExecutionContext> CTX = nullptr;
  * @brief Thread local device pointer with internal linkage.
  */
 thread_local static RTDevice *RTD_PTR = nullptr;
+
+const int MAXIMUM = 1e9;
+std::set<int> physical_qubits;
+std::map<std::pair<int,int>, bool> coupling_map;
+std::map<std::pair<int,int>, int> distance_matrix;
 
 bool getModifiersAdjoint(const Modifiers *modifiers)
 {
@@ -256,7 +264,7 @@ void __catalyst__rt__finalize()
 
 static int __catalyst__rt__device_init__impl(int8_t *rtd_lib, int8_t *rtd_name, int8_t *rtd_kwargs,
                                              int64_t shots, bool auto_qubit_management)
-{
+{   
     // Device library cannot be a nullptr
     RT_FAIL_IF(!rtd_lib, "Invalid device library");
     RT_FAIL_IF(!CTX, "Invalid use of the global driver before initialization");
@@ -272,6 +280,81 @@ static int __catalyst__rt__device_init__impl(int8_t *rtd_lib, int8_t *rtd_name, 
     if (CTX->getDeviceRecorderStatus()) {
         getQuantumDevicePtr()->StartTapeRecording();
     }
+
+    // Extract coupling map from the kwargs passed 
+    // If coupling map is provided then it takes in the form {...,'coupling_map' ((a,b),(b,c))}
+    // else {...,'coupling_map' (a,b,c)}
+    size_t start = args[2].find("coupling_map': ") + 15; // Find key and opening parenthesis
+    size_t end = args[2].find("}", start); // Find closing parenthesis
+    std::string tuple_str = std::string(args[2].substr(start, end - start));
+
+    // std::vector<std::pair<int, int>> coupling_map;
+    // std::set<int> physical_qubits;
+    // Extract provided coupling map
+    if (tuple_str.find("((") != std::string::npos) {
+        auto string_index = 1;
+        while(string_index < tuple_str.size() - 1)
+        {
+            size_t next_closing_bracket = tuple_str.find(")", string_index); 
+            std::string curr_tuple_str = std::string(tuple_str.substr(string_index+1, next_closing_bracket - string_index - 1));
+            std::istringstream iss(curr_tuple_str);
+            int first_int, second_int;
+            char comma; 
+            iss >> first_int >> comma && comma == ',' && iss >> second_int;
+            physical_qubits.insert(first_int);
+            physical_qubits.insert(second_int);
+            coupling_map[std::make_pair(first_int, second_int)] = true;
+            coupling_map[std::make_pair(second_int, first_int)] = true;
+            string_index = next_closing_bracket + 3;
+        }
+    } 
+    // No coupling map provided so all-to-all connectivity
+    else {
+        std::string delimiter = ",";
+        size_t start = 1;
+        size_t end = tuple_str.find(delimiter);
+        while (end < tuple_str.size() - 1) {
+            physical_qubits.insert(std::stoi(tuple_str.substr(start, end - start)));
+            start = end + delimiter.length();
+            end = tuple_str.find(delimiter, start);
+        }
+        physical_qubits.insert(std::stoi(tuple_str.substr(start)));
+        // all-to-all connectivity
+        for (auto i_itr = physical_qubits.begin(); i_itr != physical_qubits.end(); ++i_itr)
+        {
+            for (auto j_itr = physical_qubits.begin(); j_itr != i_itr; ++j_itr ) 
+            {
+                coupling_map[std::make_pair(*i_itr, *j_itr)] = true;
+                coupling_map[std::make_pair(*j_itr, *i_itr)] = true;
+            }
+        }
+    }
+
+    // initial distances maximum
+    for (auto i_itr = physical_qubits.begin(); i_itr != physical_qubits.end(); i_itr++)
+        for (auto j_itr = physical_qubits.begin(); j_itr != physical_qubits.end(); j_itr++)
+            distance_matrix[std::make_pair(*i_itr, *j_itr)] = MAXIMUM;
+    // self-distances : 0
+    for (auto i_itr = physical_qubits.begin(); i_itr != physical_qubits.end(); i_itr++)
+        distance_matrix[std::make_pair(*i_itr, *i_itr)] = 0;
+    // edge-distances : 1
+    for (auto& entry : coupling_map) {
+        const std::pair<int, int>& key = entry.first;
+        bool value = entry.second;
+        if (value)
+            distance_matrix[std::make_pair(key.first, key.second)] = 1;
+    }
+    // run floyd-warshall
+    for (auto i_itr = physical_qubits.begin(); i_itr != physical_qubits.end(); i_itr++)
+        for (auto j_itr = physical_qubits.begin(); j_itr != physical_qubits.end(); j_itr++ ) 
+            for (auto k_itr = physical_qubits.begin(); k_itr != physical_qubits.end(); k_itr++ ) 
+                if (distance_matrix[std::make_pair(*j_itr,*i_itr)] + distance_matrix[std::make_pair(*i_itr,*k_itr)] < distance_matrix[std::make_pair(*j_itr,*k_itr)] )
+                    distance_matrix[std::make_pair(*j_itr,*k_itr)] = distance_matrix[std::make_pair(*j_itr,*i_itr)] + distance_matrix[std::make_pair(*i_itr,*k_itr)];
+
+    std::cout << "Distance matrix: \n";
+    for (auto i_itr = physical_qubits.begin(); i_itr != physical_qubits.end(); i_itr++)
+        for (auto j_itr = physical_qubits.begin(); j_itr != physical_qubits.end(); j_itr++ ) 
+            std::cout << "i: " << *i_itr << " j: " << *j_itr << " Distance: " << distance_matrix[std::make_pair(*i_itr,*j_itr)] << "\n";
     return 0;
 }
 

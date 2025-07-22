@@ -191,6 +191,7 @@ def extract_backend_info(
     for k, v in getattr(device, "device_kwargs", {}).items():
         if k not in device_kwargs:  # pragma: no branch
             device_kwargs[k] = v
+    device_kwargs["coupling_map"] = capabilities.__getattribute__("coupling_map")
 
     return BackendInfo(dname, device_name, device_lpath, device_kwargs)
 
@@ -306,9 +307,19 @@ class QJITDevice(qml.devices.Device):
         for key, value in original_device.__dict__.items():
             self.__setattr__(key, value)
 
-        check_device_wires(original_device.wires)
-
-        super().__init__(wires=original_device.wires, shots=original_device.shots)
+        if any([isinstance(wire_label, tuple) and (len(wire_label) >= 2) for wire_label in original_device.wires.labels]):
+            print("This is a coupling map")
+            wires_from_cmap = set()
+            for wire_label in original_device.wires.labels:
+                wires_from_cmap.add(wire_label[0])
+                wires_from_cmap.add(wire_label[1])
+            wires_from_cmap = qml.wires.Wires(list(wires_from_cmap))
+            # check_device_wires(wires_from_cmap) not called
+            # since automatic qubit management
+            super().__init__(wires=wires_from_cmap, shots=original_device.shots)
+        else:
+            check_device_wires(original_device.wires)
+            super().__init__(wires=original_device.wires, shots=original_device.shots)
 
         # Capability loading
         device_capabilities = get_device_capabilities(original_device)
@@ -322,6 +333,8 @@ class QJITDevice(qml.devices.Device):
                 raise CompileError(
                     "The device that specifies to_matrix_ops must support QubitUnitary."
                 )
+        
+        setattr(device_capabilities, "coupling_map", original_device.wires.labels)
 
         backend = QJITDevice.extract_backend_info(original_device, device_capabilities)
 
