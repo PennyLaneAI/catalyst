@@ -318,10 +318,10 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
 
         LowerToLLVMOptions options = getTypeConverter()->getOptions();
         if (options.useGenericFunctions) {
-            LLVM::LLVMFuncOp allocFn =
-                LLVM::lookupOrCreateGenericAllocFn(moduleOp, getTypeConverter()->getIndexType())
-                    .value();
-            LLVM::LLVMFuncOp freeFn = LLVM::lookupOrCreateGenericFreeFn(moduleOp).value();
+            LLVM::LLVMFuncOp allocFn = LLVM::lookupOrCreateGenericAllocFn(
+                                           rewriter, moduleOp, getTypeConverter()->getIndexType())
+                                           .value();
+            LLVM::LLVMFuncOp freeFn = LLVM::lookupOrCreateGenericFreeFn(rewriter, moduleOp).value();
 
             // Register the previous functions as llvm globals (for Enzyme)
             // With the following piece of metadata, shadow memory is allocated with
