@@ -19,9 +19,6 @@
 
 <h3>Internal changes ⚙️</h3>
 
-* Remove all the `Observable` related tests since it has been removed from PennyLane.
-  [(#1929)](https://github.com/PennyLaneAI/catalyst/pull/1929)
-
 * Update imports for noise transforms from `pennylane.transforms` to `pennylane.noise`.
   [(#1918)](https://github.com/PennyLaneAI/catalyst/pull/1918)
 
