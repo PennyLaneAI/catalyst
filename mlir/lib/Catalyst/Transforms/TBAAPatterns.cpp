@@ -132,8 +132,8 @@ struct MemrefLoadTBAARewritePattern : public ConvertOpToLLVMPattern<memref::Load
     {
         auto type = loadOp.getMemRefType();
         auto baseType = type.getElementType();
-        Value dataPtr = getStridedElementPtr(loadOp.getLoc(), type, adaptor.getMemref(),
-                                             adaptor.getIndices(), rewriter);
+        Value dataPtr = getStridedElementPtr(rewriter, loadOp.getLoc(), type, adaptor.getMemref(),
+                                             adaptor.getIndices());
         auto op = rewriter.replaceOpWithNewOp<LLVM::LoadOp>(
             loadOp, typeConverter->convertType(type.getElementType()), dataPtr, 0, false,
             loadOp.getNontemporal());
@@ -170,8 +170,8 @@ struct MemrefStoreTBAARewritePattern : public ConvertOpToLLVMPattern<memref::Sto
         auto type = storeOp.getMemRefType();
         auto baseType = type.getElementType();
 
-        Value dataPtr = getStridedElementPtr(storeOp.getLoc(), type, adaptor.getMemref(),
-                                             adaptor.getIndices(), rewriter);
+        Value dataPtr = getStridedElementPtr(rewriter, storeOp.getLoc(), type, adaptor.getMemref(),
+                                             adaptor.getIndices());
         auto op = rewriter.replaceOpWithNewOp<LLVM::StoreOp>(storeOp, adaptor.getValue(), dataPtr,
                                                              0, false, storeOp.getNontemporal());
 
