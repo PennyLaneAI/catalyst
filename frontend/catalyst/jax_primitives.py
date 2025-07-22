@@ -354,6 +354,7 @@ def subroutine(func):
         qml.capture.disable()
     """
 
+    # pylint: disable-next=import-outside-toplevel
     from catalyst.api_extensions.callbacks import WRAPPER_ASSIGNMENTS
 
     old_pjit = jax._src.pjit.pjit_p
