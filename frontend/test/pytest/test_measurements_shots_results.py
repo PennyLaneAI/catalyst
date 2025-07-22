@@ -430,7 +430,7 @@ class TestVar:
         result = qjit(circuit, seed=37)(0.432, 0.123, -0.543)
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
-    @pytest.mark.xfail("error disappeared when I added qjit. Should be investigated. sc-95950")
+    @pytest.mark.xfail(reason="error disappeared when I added qjit. Should be investigated. sc-95950")
     def test_pauliz_hamiltonian(self, backend):
         """Test that a hamiltonian involving PauliZ and PauliY and hadamard works correctly"""
 
