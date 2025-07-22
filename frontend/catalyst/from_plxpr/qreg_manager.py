@@ -188,3 +188,107 @@ class QregManager:
     def __iter__(self):
         """Iterate over wires map dictionary"""
         return iter(self.wire_map.items())
+
+
+class QbitManager:
+    """
+    A manager that handles converting plxpr wire indices into catalyst jaxpr qubits.
+
+    The fundamental challenge in from_plxpr is that Plxpr (and frontend PennyLane) uses wire index
+    semantics, but Catalyst jaxpr uses qubit value semantics.
+
+    In plxpr, there is the notion of an implicit global state, and each operation (gates, or meta-
+    ops like control flow or adjoint) is essentially an update to the global state. At any time,
+    the target of an operation is the implicit global state. This is also in line with devices:
+    most simulators have a global state vector, and hardware has the one piece of hardware that
+    gates are applied to.
+
+    However, in Catalyst no such global state exists. Each (pure) operation consumes an SSA qubit
+    (or qreg for meta ops) value and return a new qubit (or qreg) value. The target of an operation,
+    while expressed by a plain wire index in plxpr, needs to be converted to the **current**
+    SSA qubit value at that index in catalyst jaxpr.
+
+    This class is a modified version of the QregManager that doesn't use a register. Instead,
+    qubit values are obtained from a context (typically function arguments).
+    """
+
+    wire_map: dict[int, AbstractQbit]  # Note: No dynamic wire indices for now in from_plxpr.
+
+    def __init__(self, init_qubit_refs: list[AbstractQbit]):
+        self.qubit_indices = init_qubit_refs
+        # oddly enough we want to map the refs to themselves initially, because when we interpret
+        # the plxpr it is done with the argument types we want for the catalyst jaxpr (i.e.
+        # AbstractQbits), so the original int[] invars are mapped to qubit tracers during the eval,
+        # and each gate using the integer wires originally is interpreted with qubit wires instead
+        self.wire_map = dict(zip(init_qubit_refs, init_qubit_refs))
+
+    def get_final_qubits(self) -> list[AbstractQbit]:
+        """Return the final qubit states."""
+        return [self.wire_map[idx] for idx in self.qubit_indices]
+
+    def get(self):
+        """Return the current AbstractQreg value."""
+        raise NotImplementedError()
+
+    def set(self, qreg: AbstractQreg):
+        """
+        Set the current AbstractQreg value.
+        This is needed, for example, when existing regions, like submodules and control flow.
+        """
+        raise NotImplementedError()
+
+    def extract(self, index: int) -> AbstractQbit:
+        """Create the extract primitive that produces an AbstractQbit value."""
+        raise NotImplementedError()
+
+    def insert(self, index: int, qubit: AbstractQbit):
+        """
+        Create the insert primitive.
+        """
+        raise NotImplementedError()
+
+    def insert_all_dangling_qubits(self):
+        """
+        Insert all dangling qubits back into a qreg.
+
+        This is necessary, for example, at the end of the qreg lifetime before deallocing,
+        or when passing qregs into and out of scopes like control flow.
+        """
+        raise NotImplementedError()
+
+    def insert_dynamic_qubits(self, wires):
+        """
+        When wire label is dynamic, such gates will need to interrupt analysis like cancel inverses:
+           qml.X(wires=0)
+           qml.Hadamard(wires=w)
+           qml.X(wires=0)
+        In the above, because we don't know whether `w` is `0` or not until runtime, we must not
+        cancel the inverse PauliX gates on `0`.
+
+        Thus in the IR def use chain we need to interrupt the first X gate's %out_qubit to be used
+        as the second X gate's qubit operand directly.
+        To do this, for the dynamic wire gate we insert back to the register.
+        """
+        # do not do anything since we don't deal with dynamic wires
+        pass
+
+    def __getitem__(self, index: int) -> AbstractQbit:
+        """
+        Get the newest ``AbstractQbit`` corresponding to a wire index.
+        If the qubit value does not exist yet at this index, extract the fresh qubit.
+        """
+        if index in self.wire_map:
+            return self.wire_map[index]
+
+        assert False, f"Unknown Qubit index {index}"
+
+    def __setitem__(self, index: int, qubit: AbstractQbit):
+        """
+        Update the wire_map when a new qubit value for a wire index is produced,
+        for example by gates.
+        """
+        self.wire_map[index] = qubit
+
+    def __iter__(self):
+        """Iterate over wires map dictionary"""
+        return iter(self.wire_map.items())

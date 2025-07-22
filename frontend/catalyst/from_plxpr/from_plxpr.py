@@ -43,10 +43,11 @@ from pennylane.transforms import merge_rotations as pl_merge_rotations
 from pennylane.transforms import single_qubit_fusion as pl_single_qubit_fusion
 from pennylane.transforms import unitary_to_rot as pl_unitary_to_rot
 
-from catalyst.device import extract_backend_info, get_device_capabilities
-from catalyst.from_plxpr.qreg_manager import QregManager
+from catalyst.device import extract_backend_info
+from catalyst.from_plxpr.qreg_manager import QbitManager, QregManager
 from catalyst.jax_extras import jaxpr_pad_consts, make_jaxpr2, transient_jax_config
 from catalyst.jax_primitives import (
+    AbstractQbit,
     MeasurementPlane,
     adjoint_p,
     compbasis_p,
@@ -506,24 +507,22 @@ def handle_subroutine(self, *args, **kwargs):
 
 
 @PLxPRToQuantumJaxprInterpreter.register_primitive(decomposition_rule_p)
-def handle_decomposition_rule(self, *, pyfun, func_jaxpr):
+def handle_decomposition_rule(self, *, pyfun, func_jaxpr, num_params):
     """
     Transform a quantum decomposition rule from PLxPR into JAXPR with quantum primitives.
     """
 
-    self.qreg_manager.insert_all_dangling_qubits()
-
-    def wrapper(qreg, *args):
-        manager = QregManager(qreg)
+    def wrapper(*args):
+        manager = QbitManager(args[num_params:])
         converter = copy(self)
         converter.qreg_manager = manager
         converter(func_jaxpr, *args)
-        converter.qreg_manager.insert_all_dangling_qubits()
-        return converter.qreg_manager.get()
+        return converter.qreg_manager.get_final_qubits()
 
-    converted_closed_jaxpr_branch = jax.make_jaxpr(wrapper)(
-        self.qreg_manager.get(), *func_jaxpr.in_avals
-    )
+    new_in_avals = func_jaxpr.in_avals[:num_params] + [
+        AbstractQbit() for _ in func_jaxpr.in_avals[num_params:]
+    ]
+    converted_closed_jaxpr_branch = jax.make_jaxpr(wrapper)(*new_in_avals)
     decomposition_rule_p.bind(pyfun=pyfun, func_jaxpr=converted_closed_jaxpr_branch)
 
     return ()
