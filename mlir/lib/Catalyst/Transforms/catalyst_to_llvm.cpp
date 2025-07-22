@@ -335,7 +335,8 @@ struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
         rewriter.setInsertionPointToStart(mod.getBody());
 
         LLVM::LLVMFuncOp customCallFnOp =
-            mlir::LLVM::lookupOrCreateFn(mod, op.getCallTargetName(), {/*args=*/ptr, /*rets=*/ptr},
+            mlir::LLVM::lookupOrCreateFn(rewriter, mod, op.getCallTargetName(),
+                                         {/*args=*/ptr, /*rets=*/ptr},
                                          /*ret_type=*/voidType)
                 .value();
         customCallFnOp.setPrivate();
@@ -467,7 +468,7 @@ struct DefineCallbackOpPattern : public OpConversionPattern<CallbackOp> {
         ModuleOp mod = op->getParentOfType<ModuleOp>();
         auto typeConverter = getTypeConverter();
         LLVM::LLVMFuncOp customCallFnOp =
-            mlir::LLVM::lookupOrCreateFn(mod, "__catalyst_inactive_callback",
+            mlir::LLVM::lookupOrCreateFn(rewriter, mod, "__catalyst_inactive_callback",
                                          {/*args=*/i64, i64, i64},
                                          /*ret_type=*/voidType, isVarArg)
                 .value();
