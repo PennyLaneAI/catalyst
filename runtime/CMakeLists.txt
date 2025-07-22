@@ -93,16 +93,8 @@ if(NOT EXISTS ${CMAKE_BINARY_DIR}/lib/liblapacke.3.dylib)
             # get the realpath of the SDK path
             get_filename_component(OSX_SDK_PATH ${XCRUN_SDK_PATH} REALPATH)
         else()
-            # Fallback to the latest SDK available under /Library/Developer/CommandLineTools/SDKs/
-            execute_process(
-                COMMAND ls /Library/Developer/CommandLineTools/SDKs/
-                COMMAND grep "MacOSX[0-9][0-9]*\\.[0-9][0-9]*\\.sdk"
-                COMMAND sort -V
-                COMMAND tail -1
-                OUTPUT_VARIABLE LATEST_SDK_NAME
-                OUTPUT_STRIP_TRAILING_WHITESPACE
-            )
-            set(OSX_SDK_PATH "/Library/Developer/CommandLineTools/SDKs/${LATEST_SDK_NAME}")
+            message(FATAL_ERROR "Failed to get the official SDK path since xcrun failed, try to run "
+                    "`xcrun --sdk macosx --show-sdk-path` for more information")
         endif()
     endif()
 
