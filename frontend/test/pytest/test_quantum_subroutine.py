@@ -17,6 +17,7 @@
 import jax
 import numpy as np
 import pennylane as qml
+import pytest
 
 from catalyst.jax_primitives import subroutine
 
@@ -75,6 +76,23 @@ def test_quantum_subroutine_self_inverses():
     )
 
     qml.capture.disable()
+
+
+def test_quantum_subroutine_error_message():
+    """Test error message for quantum operations outside of qnode."""
+
+    @subroutine
+    def Hadamard0():
+        qml.Hadamard(wires=[0])
+
+    qml.capture.enable()
+
+    msg = "inside subroutine"
+    with pytest.raises(NotImplementedError, match=msg):
+
+        @qml.qjit(autograph=False)
+        def subroutine_test():
+            Hadamard0()
 
 
 def test_quantum_subroutine_conditional():
