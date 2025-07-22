@@ -49,8 +49,8 @@ using namespace catalyst::gradient;
 
 namespace catalyst {
 namespace gradient {
-void wrapMemRefArgsFunc(func::FuncOp func, const TypeConverter *typeConverter,
-                        RewriterBase &rewriter, Location loc, bool volatileArgs = false)
+LogicalResult wrapMemRefArgsFunc(func::FuncOp func, const TypeConverter *typeConverter,
+                                 RewriterBase &rewriter, Location loc, bool volatileArgs = false)
 {
     MLIRContext *ctx = rewriter.getContext();
     auto ptrType = LLVM::LLVMPointerType::get(ctx);
@@ -59,7 +59,9 @@ void wrapMemRefArgsFunc(func::FuncOp func, const TypeConverter *typeConverter,
     for (const auto [idx, argType] : llvm::enumerate(func.getArgumentTypes())) {
         if (auto memrefType = dyn_cast<MemRefType>(argType)) {
             BlockArgument memrefArg = func.getArgument(idx);
-            func.insertArgument(idx, ptrType, DictionaryAttr::get(ctx), loc);
+            if (failed(func.insertArgument(idx, ptrType, DictionaryAttr::get(ctx), loc))) {
+                return failure();
+            }
             Value wrappedMemref = func.getArgument(idx);
             Type structType = typeConverter->convertType(memrefType);
 
@@ -78,9 +80,12 @@ void wrapMemRefArgsFunc(func::FuncOp func, const TypeConverter *typeConverter,
                 rewriter.create<UnrealizedConversionCastOp>(loc, argType, replacedMemref)
                     .getResult(0);
             memrefArg.replaceAllUsesWith(replacedMemref);
-            func.eraseArgument(memrefArg.getArgNumber());
+            if (failed(func.eraseArgument(memrefArg.getArgNumber()))) {
+                return failure();
+            }
         }
     }
+    return success();
 }
 
 void wrapMemRefArgsCallsites(func::FuncOp func, const TypeConverter *typeConverter,
@@ -171,16 +176,19 @@ LLVM::GlobalOp insertEnzymeCustomGradient(OpBuilder &builder, ModuleOp moduleOp,
 /// functions where MemRefs are passed via wrapped pointers (!llvm.ptr<struct(ptr, ptr, i64, ...)>)
 /// rather than having their fields unpacked. This function automatically transforms MemRef
 /// arguments of a function to wrapped pointers.
-void wrapMemRefArgs(func::FuncOp func, const TypeConverter *typeConverter, RewriterBase &rewriter,
-                    Location loc, bool volatileArgs = false)
+LogicalResult wrapMemRefArgs(func::FuncOp func, const TypeConverter *typeConverter,
+                             RewriterBase &rewriter, Location loc, bool volatileArgs = false)
 {
     if (llvm::none_of(func.getArgumentTypes(),
                       [](Type argType) { return isa<MemRefType>(argType); })) {
         // The memref arguments are already wrapped
-        return;
+        return success();
     }
-    wrapMemRefArgsFunc(func, typeConverter, rewriter, loc, volatileArgs);
+    if (failed(wrapMemRefArgsFunc(func, typeConverter, rewriter, loc, volatileArgs))) {
+        return failure();
+    }
     wrapMemRefArgsCallsites(func, typeConverter, rewriter, loc, volatileArgs);
+    return success();
 }
 } // namespace gradient
 } // namespace catalyst
@@ -310,7 +318,10 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
                     return failure();
                 }
 
-                wrapMemRefArgs(func, getTypeConverter(), rewriter, loc, /*volatileArgs=*/true);
+                if (failed(wrapMemRefArgs(func, getTypeConverter(), rewriter, loc,
+                                          /*volatileArgs=*/true))) {
+                    return failure();
+                }
 
                 func::FuncOp augFwd = genAugmentedForward(func, rewriter);
                 func::FuncOp customQGrad =
@@ -318,6 +329,7 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
                 insertEnzymeCustomGradient(rewriter, func->getParentOfType<ModuleOp>(),
                                            func.getLoc(), func, augFwd, customQGrad);
             }
+            return success();
         });
 
         LowerToLLVMOptions options = getTypeConverter()->getOptions();
@@ -866,7 +878,10 @@ struct ForwardOpPattern : public ConvertOpToLLVMPattern<ForwardOp> {
         func->setAttr("passthrough", ArrayAttr::get(ctx, passthrough));
 
         rewriter.inlineRegionBefore(op.getRegion(), func.getBody(), func.end());
-        catalyst::gradient::wrapMemRefArgsFunc(func, typeConverter, rewriter, op.getLoc());
+        if (failed(catalyst::gradient::wrapMemRefArgsFunc(func, typeConverter, rewriter,
+                                                          op.getLoc()))) {
+            return failure();
+        }
         rewriter.eraseOp(op);
         return success();
     }
@@ -990,7 +1005,10 @@ struct ReverseOpPattern : public ConvertOpToLLVMPattern<ReverseOp> {
         Block &firstBlock = func.getRegion().getBlocks().front();
         Block &lastBlock = func.getRegion().getBlocks().back();
         rewriter.mergeBlocks(&lastBlock, &firstBlock);
-        catalyst::gradient::wrapMemRefArgsFunc(func, typeConverter, rewriter, op.getLoc());
+        if (failed(catalyst::gradient::wrapMemRefArgsFunc(func, typeConverter, rewriter,
+                                                          op.getLoc()))) {
+            return failure();
+        }
 
         rewriter.eraseOp(op);
         return success();
