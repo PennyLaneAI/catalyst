@@ -35,7 +35,7 @@ static Value genSelectiveShift(PatternRewriter &rewriter, Location loc, Value pa
     }
 
     // Make sure all active iteration variables match the selectors.
-    Value shiftCondition = rewriter.create<arith::ConstantIntOp>(loc, true, 1);
+    Value shiftCondition = rewriter.create<arith::ConstantIntOp>(loc, 1, true);
     for (auto &[iteration, selector] : selectors) {
         Value iterationMatch =
             rewriter.create<arith::CmpIOp>(loc, arith::CmpIPredicate::eq, iteration, selector);
