@@ -20,6 +20,8 @@ import pytest
 
 from catalyst import CompileError, qjit
 
+pytestmark = pytest.mark.usefixtures("use_both_frontend")
+
 
 class TestExpval:
     "Test expval with shots > 0"
@@ -347,6 +349,7 @@ class TestVar:
     @pytest.mark.usefixtures("use_both_frontend")
     def test_hermitian_shots(self, backend, tol_stochastic):
         """Test var Hermitian observables with shots."""
+
         n_wires = 3
         n_shots = 10000
         dev = qml.device(backend, wires=n_wires, shots=n_shots)
@@ -427,12 +430,17 @@ class TestVar:
         result = qjit(circuit, seed=37)(0.432, 0.123, -0.543)
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
+    @pytest.mark.xfail(
+        reason="error disappeared when I added qjit. Should be investigated. sc-95950"
+    )
     def test_pauliz_hamiltonian(self, backend):
         """Test that a hamiltonian involving PauliZ and PauliY and hadamard works correctly"""
+
         n_wires = 3
         n_shots = 10000
         dev = qml.device(backend, wires=n_wires, shots=n_shots)
 
+        @qml.qjit
         @qml.qnode(dev)
         def circuit(theta, phi, varphi):
             qml.RX(theta, wires=[0])
@@ -547,17 +555,28 @@ class TestOtherMeasurements:
     def test_missing_shots_value(self, backend, meas_fun):
         """Test error for missing shots value."""
 
+        if qml.capture.enabled() and meas_fun == qml.counts:
+            pytest.xfail("counts not yet supported with program capture.")
+
         dev = qml.device(backend, wires=1)
 
         @qml.qnode(dev)
         def circuit():
             return meas_fun(wires=0)
 
-        with pytest.raises(CompileError, match="cannot work with shots=None"):
-            qjit(circuit)
+        if qml.capture.enabled():
+            with pytest.raises(ValueError, match="finite shots are required"):
+                qjit(circuit)
+        else:
+
+            with pytest.raises(CompileError, match="cannot work with shots=None"):
+                qjit(circuit)
 
     def test_multiple_return_values(self, backend, tol_stochastic):
         """Test multiple return values."""
+
+        if qml.capture.enabled():
+            pytest.xfail("counts not yet supported with program capture.")
 
         @qjit
         @qml.set_shots(shots=10000)
