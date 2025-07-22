@@ -381,11 +381,6 @@ def SetStateOp : Gate_Op<"set_state"> {
         This operation is useful for simulators implementing state preparation.
         Instead of decomposing state preparation into multiple operations, this
         operation shortcuts all of that into a single operation.
-
-        .. note::
-
-            This operation should be the first quantum operation of the entry point of
-            a quantum module.
     }];
 
     let arguments = (ins
@@ -419,11 +414,6 @@ def SetBasisStateOp : Gate_Op<"set_basis_state"> {
         operation shortcuts all of that into a single operation.
         This signature matches the one in pennylane-lightning which expects
         only a single integer as opposed to a binary digit.
-
-        .. note::
-
-            This operation should be the first quantum operation of the entry point of
-            a quantum module.
     }];
 
     let arguments = (ins
@@ -578,10 +568,6 @@ def GlobalPhaseOp : UnitaryGate_Op<"gphase", [DifferentiableGate, AttrSizedOpera
     let description = [{
     	Applies global phase to the current system.
 
-    	.. note::
-
-            With the introduction of dynamic qubit allocation, applying a global
-            phase and then creating a new qubit results in undefined behaviour.
     }];
 
     let arguments = (ins
