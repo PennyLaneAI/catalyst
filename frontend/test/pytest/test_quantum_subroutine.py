@@ -17,8 +17,10 @@
 import jax
 import numpy as np
 import pennylane as qml
+import pytest
 
 from catalyst.jax_primitives import subroutine
+from catalyst.utils.exceptions import CompileError
 
 
 def test_classical_subroutine():
@@ -28,11 +30,14 @@ def test_classical_subroutine():
     def identity(x):
         return x
 
+    qml.capture.enable()
+
     @qml.qjit
     def subroutine_test():
         return identity(1)
 
     assert subroutine_test() == 1
+    qml.capture.disable()
 
 
 def test_quantum_subroutine():
@@ -100,3 +105,16 @@ def test_quantum_subroutine_conditional():
     assert np.allclose(subroutine_test(0), jax.numpy.array([1.0, 0.0], dtype=complex))
     assert np.allclose(subroutine_test(1), jax.numpy.array([0.70710678 + 0.0j, 0.70710678 + 0.0j]))
     qml.capture.disable()
+
+
+def test_quantum_subroutine_no_capture_enabled():
+
+    @subroutine
+    def will_error_out(): ...
+
+    with pytest.raises(CompileError, match="Subroutine is only available with capture enabled"):
+
+        @qml.qjit
+        def subroutine_test():
+            will_error_out()
+            return 1

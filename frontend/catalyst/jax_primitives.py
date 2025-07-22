@@ -354,7 +354,6 @@ def subroutine(func):
         qml.capture.disable()
     """
 
-
     from catalyst.api_extensions.callbacks import WRAPPER_ASSIGNMENTS
 
     old_pjit = jax._src.pjit.pjit_p
