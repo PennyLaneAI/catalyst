@@ -169,7 +169,7 @@ struct CustomCallOpInterface
             MemRefType memrefType =
                 MemRefType::get(tensorType.getShape(), tensorType.getElementType());
             auto newBuffer =
-                rewriter.create<bufferization::ToMemrefOp>(op->getLoc(), memrefType, *tensorAlloc);
+                rewriter.create<bufferization::ToBufferOp>(op->getLoc(), memrefType, *tensorAlloc);
             bufferArgs.push_back(newBuffer);
         }
 
@@ -314,8 +314,8 @@ struct CallbackCallOpInterface
             auto shape = tensorTy.getShape();
             auto elementTy = tensorTy.getElementType();
             auto memrefType = MemRefType::get(shape, elementTy);
-            auto toMemrefOp = rewriter.create<bufferization::ToMemrefOp>(loc, memrefType, tensor);
-            auto memref = toMemrefOp.getResult();
+            auto toBufferOp = rewriter.create<bufferization::ToBufferOp>(loc, memrefType, tensor);
+            auto memref = toBufferOp.getResult();
             outmemrefs.push_back(memref);
             newInputs.push_back(memref);
         }

@@ -64,9 +64,9 @@ struct QubitUnitaryOpInterface
         Location loc = op->getLoc();
         auto tensorType = cast<RankedTensorType>(qubitUnitaryOp.getMatrix().getType());
         MemRefType memrefType = MemRefType::get(tensorType.getShape(), tensorType.getElementType());
-        auto toMemrefOp =
-            rewriter.create<bufferization::ToMemrefOp>(loc, memrefType, qubitUnitaryOp.getMatrix());
-        auto memref = toMemrefOp.getResult();
+        auto toBufferOp =
+            rewriter.create<bufferization::ToBufferOp>(loc, memrefType, qubitUnitaryOp.getMatrix());
+        auto memref = toBufferOp.getResult();
         bufferization::replaceOpWithNewBufferizedOp<QubitUnitaryOp>(
             rewriter, op, qubitUnitaryOp.getOutQubits().getTypes(),
             qubitUnitaryOp.getOutCtrlQubits().getTypes(), memref, qubitUnitaryOp.getInQubits(),
@@ -107,9 +107,9 @@ struct HermitianOpInterface
         Location loc = op->getLoc();
         auto tensorType = cast<RankedTensorType>(hermitianOp.getMatrix().getType());
         MemRefType memrefType = MemRefType::get(tensorType.getShape(), tensorType.getElementType());
-        auto toMemrefOp =
-            rewriter.create<bufferization::ToMemrefOp>(loc, memrefType, hermitianOp.getMatrix());
-        auto memref = toMemrefOp.getResult();
+        auto toBufferOp =
+            rewriter.create<bufferization::ToBufferOp>(loc, memrefType, hermitianOp.getMatrix());
+        auto memref = toBufferOp.getResult();
         auto newHermitianOp = rewriter.create<HermitianOp>(loc, hermitianOp.getType(), memref,
                                                            hermitianOp.getQubits());
         bufferization::replaceOpWithBufferizedValues(rewriter, op, newHermitianOp.getObs());
@@ -149,9 +149,9 @@ struct HamiltonianOpInterface
         Location loc = op->getLoc();
         auto tensorType = cast<RankedTensorType>(hamiltonianOp.getCoeffs().getType());
         MemRefType memrefType = MemRefType::get(tensorType.getShape(), tensorType.getElementType());
-        auto toMemrefOp =
-            rewriter.create<bufferization::ToMemrefOp>(loc, memrefType, hamiltonianOp.getCoeffs());
-        auto memref = toMemrefOp.getResult();
+        auto toBufferOp =
+            rewriter.create<bufferization::ToBufferOp>(loc, memrefType, hamiltonianOp.getCoeffs());
+        auto memref = toBufferOp.getResult();
         auto newHamiltonianOp = rewriter.create<HamiltonianOp>(loc, hamiltonianOp.getType(), memref,
                                                                hamiltonianOp.getTerms());
         bufferization::replaceOpWithBufferizedValues(rewriter, op, newHamiltonianOp.getObs());
@@ -408,9 +408,9 @@ struct SetStateOpInterface
         auto tensorType = cast<RankedTensorType>(setStateOp.getInState().getType());
         MemRefType memrefType = MemRefType::get(tensorType.getShape(), tensorType.getElementType());
 
-        auto toMemrefOp =
-            rewriter.create<bufferization::ToMemrefOp>(loc, memrefType, setStateOp.getInState());
-        auto memref = toMemrefOp.getResult();
+        auto toBufferOp =
+            rewriter.create<bufferization::ToBufferOp>(loc, memrefType, setStateOp.getInState());
+        auto memref = toBufferOp.getResult();
         auto newSetStateOp = rewriter.create<SetStateOp>(loc, setStateOp.getOutQubits().getTypes(),
                                                          memref, setStateOp.getInQubits());
         bufferization::replaceOpWithBufferizedValues(rewriter, op, newSetStateOp.getOutQubits());
@@ -450,9 +450,9 @@ struct SetBasisStateOpInterface
         auto tensorType = cast<RankedTensorType>(setBasisStateOp.getBasisState().getType());
         MemRefType memrefType = MemRefType::get(tensorType.getShape(), tensorType.getElementType());
 
-        auto toMemrefOp = rewriter.create<bufferization::ToMemrefOp>(
+        auto toBufferOp = rewriter.create<bufferization::ToBufferOp>(
             loc, memrefType, setBasisStateOp.getBasisState());
-        auto memref = toMemrefOp.getResult();
+        auto memref = toBufferOp.getResult();
         auto newSetStateOp = rewriter.create<SetBasisStateOp>(
             loc, setBasisStateOp.getOutQubits().getTypes(), memref, setBasisStateOp.getInQubits());
         bufferization::replaceOpWithBufferizedValues(rewriter, op, newSetStateOp.getOutQubits());

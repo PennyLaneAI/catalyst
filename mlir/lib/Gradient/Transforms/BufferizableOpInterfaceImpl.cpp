@@ -473,9 +473,9 @@ struct ForwardOpInterface
             // away.
             BaseMemRefType resultType = options.unknownTypeConverterFn(
                 returnVal, *options.defaultMemorySpaceFn(tensorType), options);
-            Value toMemrefOp =
-                rewriter.create<bufferization::ToMemrefOp>(loc, resultType, returnVal);
-            returnValues.push_back(toMemrefOp);
+            Value toBufferOp =
+                rewriter.create<bufferization::ToBufferOp>(loc, resultType, returnVal);
+            returnValues.push_back(toBufferOp);
         }
 
         // 3. Rewrite the terminator.
@@ -579,9 +579,9 @@ struct ReverseOpInterface
             // away.
             BaseMemRefType resultType = options.unknownTypeConverterFn(
                 returnVal, *options.defaultMemorySpaceFn(tensorType), options);
-            Value toMemrefOp =
-                rewriter.create<bufferization::ToMemrefOp>(loc, resultType, returnVal);
-            returnValues.push_back(toMemrefOp);
+            Value toBufferOp =
+                rewriter.create<bufferization::ToBufferOp>(loc, resultType, returnVal);
+            returnValues.push_back(toBufferOp);
         }
 
         // 3. Rewrite the terminator.

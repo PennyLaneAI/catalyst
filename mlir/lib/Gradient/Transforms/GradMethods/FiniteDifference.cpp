@@ -163,10 +163,10 @@ void FiniteDiffLowering::computeFiniteDiff(PatternRewriter &rewriter, Location l
                     auto tensorTy = diffArg.getType();
                     auto memrefTy = bufferization::getMemRefTypeWithStaticIdentityLayout(
                         cast<TensorType>(tensorTy));
-                    auto toMemrefOp =
-                        rewriter.create<bufferization::ToMemrefOp>(loc, memrefTy, diffArg);
+                    auto toBufferOp =
+                        rewriter.create<bufferization::ToBufferOp>(loc, memrefTy, diffArg);
 
-                    auto cloneOp = rewriter.create<bufferization::CloneOp>(loc, toMemrefOp);
+                    auto cloneOp = rewriter.create<bufferization::CloneOp>(loc, toBufferOp);
 
                     auto toTensorOp =
                         rewriter.create<bufferization::ToTensorOp>(loc, cloneOp, true);
