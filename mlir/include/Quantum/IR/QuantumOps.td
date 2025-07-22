@@ -567,7 +567,6 @@ def GlobalPhaseOp : UnitaryGate_Op<"gphase", [DifferentiableGate, AttrSizedOpera
 
     let description = [{
     	Applies global phase to the current system.
-
     }];
 
     let arguments = (ins
@@ -1147,10 +1146,9 @@ def ProbsOp : Measurement_Op<"probs", [AttrSizedOperandSegments]> {
         }
         ```
 
-
         .. note::
 
-            The optional operand state_in is only used after bufferization.
+            The optional operand ``state_in`` is only used after bufferization.
     }];
 
     let arguments = (ins
