@@ -34,13 +34,17 @@ class TestLoopToJaxpr:
             """
             { lambda ; a:f64[]. let
                 b:i64[] c:f64[] = while_loop[
-                  body_jaxpr={ lambda ; d:i64[] e:f64[]. let f:i64[] = add d 1 in (f, e) }
+                  body_jaxpr={ lambda ; d:i64[] e:f64[]. let
+                      f:i64[] = add d 1:i64[]
+                    in (f, e) }
                   body_nconsts=0
-                  cond_jaxpr={ lambda ; g:i64[] h:f64[]. let i:bool[] = lt g 10 in (i,) }
+                  cond_jaxpr={ lambda ; g:i64[] h:f64[]. let
+                      i:bool[] = lt g 10:i64[]
+                    in (i,) }
                   cond_nconsts=0
                   nimplicit=0
                   preserve_dimensions=True
-                ] 0 a
+                ] 0:i64[] a
               in (b, c) }
             """
         )
@@ -64,12 +68,12 @@ class TestLoopToJaxpr:
                 c:i64[] d:f64[] = for_loop[
                   apply_reverse_transform=False
                   body_jaxpr={ lambda ; e:i64[] f:i64[] g:f64[]. let
-                      h:i64[] = add f 1
+                      h:i64[] = add f 1:i64[]
                     in (h, g) }
                   body_nconsts=0
                   nimplicit=0
                   preserve_dimensions=True
-                ] 0 b 1 0 0 a
+                ] 0:i64[] b 1:i64[] 0:i64[] 0:i64[] a
               in (c, d) }
         """
         )
