@@ -26,6 +26,7 @@ set(LIBS
     ${extension_libs}
     ${translation_libs}
     MLIROptLib
+    MLIRSCFTestPasses
     MLIRCatalyst
     catalyst-transforms
     MLIRQuantum
