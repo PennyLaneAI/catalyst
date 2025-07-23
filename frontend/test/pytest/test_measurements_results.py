@@ -28,11 +28,15 @@ from catalyst.utils.runtime_environment import get_lib_path
 # pylint: disable=too-many-lines
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 class TestSample:
     """Test sample."""
 
     def test_sample_on_0qbits(self):
         """Test sample on 0 qubits."""
+
+        if qml.capture.enabled():
+            pytest.xfail("capture doesn't currently support 0 wires.")
 
         @qjit
         @qml.qnode(qml.device("lightning.qubit", wires=0, shots=10))
@@ -166,9 +170,9 @@ class TestCounts:
         assert np.array_equal(observed, expected)
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 class TestExpval:
 
-    @pytest.mark.usefixtures("use_both_frontend")
     def test_named(self, backend):
         """Test expval for named observables."""
 
@@ -186,7 +190,6 @@ class TestExpval:
         observed = expval1(np.pi)
         assert np.isclose(observed, expected)
 
-    @pytest.mark.usefixtures("use_both_frontend")
     def test_hermitian_1(self, backend):
         """Test expval for Hermitian observable."""
 
@@ -207,7 +210,6 @@ class TestExpval:
         observed = expval2(np.pi / 2)
         assert np.isclose(observed, expected)
 
-    @pytest.mark.usefixtures("use_both_frontend")
     def test_hermitian_2(self, backend):
         """Test expval for Hermitian observable."""
 
@@ -396,9 +398,9 @@ class TestExpval:
         assert np.isclose(observed, expected)
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 class TestVar:
 
-    @pytest.mark.usefixtures("use_both_frontend")
     def test_rx(self, backend):
         """Test var with RX."""
 
@@ -414,7 +416,6 @@ class TestVar:
         observed = var1(np.pi)
         assert np.isclose(observed, expected)
 
-    @pytest.mark.usefixtures("use_both_frontend")
     def test_hadamard(self, backend):
         """Test var with Hadamard."""
 
@@ -430,7 +431,6 @@ class TestVar:
         observed = var2(np.pi)
         assert np.isclose(observed, expected)
 
-    @pytest.mark.usefixtures("use_both_frontend")
     def test_hermitian_1(self, backend):
         """Test variance for Hermitian observable."""
 
@@ -451,7 +451,6 @@ class TestVar:
         observed = circuit(np.pi / 2)
         assert np.isclose(observed, expected)
 
-    @pytest.mark.usefixtures("use_both_frontend")
     def test_hermitian_2(self, backend):
         """Test variance for Hermitian observable."""
 
@@ -685,11 +684,15 @@ class TestVar:
         )
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 class TestState:
     """Test state measurement processes."""
 
     def test_state_on_0qbits(self):
         """Test state on 0 qubits."""
+
+        if qml.capture.enabled():
+            pytest.xfail("capture doesn't currently support 0 wires.")
 
         @qjit
         @qml.qnode(qml.device("lightning.qubit", wires=0))
@@ -714,11 +717,15 @@ class TestState:
         assert np.allclose(observed, expected)
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 class TestProbs:
     """Test probabilities measurement processes."""
 
     def test_probs_on_0qbits(self):
         """Test probs on 0 qubits."""
+
+        if qml.capture.enabled():
+            pytest.xfail("capture doesn't currently support 0 wires.")
 
         @qjit
         @qml.qnode(qml.device("lightning.qubit", wires=0))
@@ -743,6 +750,7 @@ class TestProbs:
         assert np.allclose(observed, expected)
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 class TestNewArithmeticOps:
     "Test PennyLane new arithmetic operators"
 
@@ -770,10 +778,10 @@ class TestNewArithmeticOps:
         assert np.allclose(expected, result)
 
     @pytest.mark.parametrize(
-        "meas, expected",
+        "meas_fn, expected",
         [
             [
-                qml.expval(
+                lambda: qml.expval(
                     qml.ops.op_math.Sum(
                         qml.PauliX(wires=0), qml.PauliY(wires=1), qml.PauliZ(wires=2)
                     )
@@ -781,7 +789,7 @@ class TestNewArithmeticOps:
                 np.array(-1.41421356),
             ],
             [
-                qml.var(
+                lambda: qml.var(
                     qml.ops.op_math.Sum(
                         qml.PauliX(wires=0), qml.PauliY(wires=1), qml.PauliZ(wires=2)
                     )
@@ -789,16 +797,16 @@ class TestNewArithmeticOps:
                 np.array(2.0),
             ],
             [
-                qml.expval(qml.PauliX(wires=0) + qml.PauliY(wires=1) + qml.PauliZ(wires=2)),
+                lambda: qml.expval(qml.PauliX(wires=0) + qml.PauliY(wires=1) + qml.PauliZ(wires=2)),
                 np.array(-1.41421356),
             ],
             [
-                qml.var(qml.PauliX(wires=0) + qml.PauliY(wires=1) + qml.PauliZ(wires=2)),
+                lambda: qml.var(qml.PauliX(wires=0) + qml.PauliY(wires=1) + qml.PauliZ(wires=2)),
                 np.array(2.0),
             ],
         ],
     )
-    def test_sum_xyz(self, meas, expected, backend):
+    def test_sum_xyz(self, meas_fn, expected, backend):
         """Test ``qml.ops.op_math.Sum`` and ``+`` converting to HamiltonianObs.
         with integer coefficients."""
 
@@ -809,16 +817,16 @@ class TestNewArithmeticOps:
             qml.RX(y, wires=1)
             qml.RX(x + y, wires=2)
             qml.CNOT(wires=[0, 1])
-            return meas
+            return meas_fn()
 
         result = circuit(np.pi / 4, np.pi / 2)
         assert np.allclose(expected, result)
 
     @pytest.mark.parametrize(
-        "meas, expected",
+        "meas_fn, expected",
         [
             [
-                qml.expval(
+                lambda: qml.expval(
                     qml.ops.op_math.Sum(
                         qml.PauliX(wires=0),
                         qml.PauliY(wires=1),
@@ -828,7 +836,7 @@ class TestNewArithmeticOps:
                 np.array(-1.06066017),
             ],
             [
-                qml.var(
+                lambda: qml.var(
                     qml.ops.op_math.Sum(
                         qml.ops.op_math.SProd(0.2, qml.PauliX(wires=0)),
                         qml.ops.op_math.SProd(0.4, qml.PauliY(wires=1)),
@@ -838,11 +846,13 @@ class TestNewArithmeticOps:
                 np.array(0.245),
             ],
             [
-                qml.expval(qml.PauliX(wires=0) + qml.PauliY(wires=1) + 0.5 * qml.PauliZ(wires=2)),
+                lambda: qml.expval(
+                    qml.PauliX(wires=0) + qml.PauliY(wires=1) + 0.5 * qml.PauliZ(wires=2)
+                ),
                 np.array(-1.06066017),
             ],
             [
-                qml.var(
+                lambda: qml.var(
                     0.2 * qml.PauliX(wires=0)
                     + 0.4 * qml.PauliY(wires=1)
                     + 0.5 * qml.PauliZ(wires=2)
@@ -851,7 +861,7 @@ class TestNewArithmeticOps:
             ],
         ],
     )
-    def test_sum_sprod_xyz(self, meas, expected, backend):
+    def test_sum_sprod_xyz(self, meas_fn, expected, backend):
         """Test ``qml.ops.op_math.Sum`` (``+``) and ``qml.ops.op_math.SProd`` (``*``)."""
 
         @qjit
@@ -861,7 +871,7 @@ class TestNewArithmeticOps:
             qml.RX(y, wires=1)
             qml.RX(x + y, wires=2)
             qml.CNOT(wires=[0, 1])
-            return meas
+            return meas_fn()
 
         result = circuit(np.pi / 4, np.pi / 2)
         assert np.allclose(expected, result)
@@ -1063,6 +1073,7 @@ class TestDensityMatrixMP:
                 return qml.density_matrix([0])
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 class TestVnEntropy:
     """Test vnentropy."""
 
@@ -1082,6 +1093,7 @@ class TestVnEntropy:
         assert circuit_entropy(np.pi / 2) == expected
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 class TestMutualInfo:
     """Test mutualinfo."""
 
@@ -1103,6 +1115,7 @@ class TestMutualInfo:
         assert mutual_info_circuit() == expected
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 class TestShadow:
     """Test shadow."""
 
@@ -1126,6 +1139,7 @@ class TestShadow:
         assert expected_recipes == actual_recipes
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 class TestShadowExpval:
     """Test shadowexpval."""
 
@@ -1148,6 +1162,7 @@ class TestShadowExpval:
         assert shadow_expval_circuit(0, H) == expected
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 class TestPurity:
     """Test purity."""
 
