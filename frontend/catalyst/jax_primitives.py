@@ -289,8 +289,6 @@ grad_p = Primitive("grad")
 grad_p.multiple_results = True
 func_p = core.CallPrimitive("func")
 func_p.multiple_results = True
-qdef_p = core.Primitive("qdef")
-qdef_p.multiple_results = True
 jvp_p = Primitive("jvp")
 jvp_p.multiple_results = True
 vjp_p = Primitive("vjp")
@@ -313,9 +311,11 @@ quantum_kernel_p = core.CallPrimitive("quantum_kernel")
 quantum_kernel_p.multiple_results = True
 measure_in_basis_p = Primitive("measure_in_basis")
 measure_in_basis_p.multiple_results = True
+decomposition_rule_p = core.Primitive("decomposition_rule")
+decomposition_rule_p.multiple_results = True
+
 quantum_subroutine_p = copy.deepcopy(pjit_p)
 quantum_subroutine_p.name = "quantum_subroutine_p"
-
 subroutine_cache: dict[callable, callable] = {}
 
 
@@ -383,7 +383,7 @@ def subroutine(func):
     return wrapper
 
 
-def qdef(func):
+def decomposition_rule(func):
     """
     Denotes the creation of a quantum definition in the intermediate representation.
     """
@@ -391,7 +391,7 @@ def qdef(func):
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         jaxpr = jax.make_jaxpr(func)(*args, **kwargs)
-        qdef_p.bind(pyfun=func, func_jaxpr=jaxpr)
+        decomposition_rule_p.bind(pyfun=func, func_jaxpr=jaxpr)
 
     return wrapper
 
@@ -559,19 +559,16 @@ def _func_lowering(ctx, *args, call_jaxpr, fn):
 
 
 #
-# Decomp defs
+# Decomp rule
 #
-@qdef_p.def_abstract_eval
-def _qdef_abstract(*, pyfun, func_jaxpr):
+@decomposition_rule_p.def_abstract_eval
+def _decomposition_rule_abstract(*, pyfun, func_jaxpr):
     return ()
 
 
-def _qdef_lowering(ctx, *, pyfun, func_jaxpr):
-    """Lower a quantum definition into MLIR in a single step process.
+def _decomposition_rule_lowering(ctx, *, pyfun, func_jaxpr):
+    """Lower a quantum decomposition rule into MLIR in a single step process.
     The step is the compilation of the definition of the function fn.
-
-    Even though we could register the `pjit_p` lowering directly, this makes the code origin
-    apparent in stack traces and similar use cases.
     """
     lower_callable(ctx, pyfun, func_jaxpr)
     return ()
@@ -2479,7 +2476,6 @@ CUSTOM_LOWERING_RULES = (
     (for_p, _for_loop_lowering),
     (grad_p, _grad_lowering),
     (func_p, _func_lowering),
-    (qdef_p, _qdef_lowering),
     (jvp_p, _jvp_lowering),
     (vjp_p, _vjp_lowering),
     (adjoint_p, _adjoint_lowering),
@@ -2494,6 +2490,7 @@ CUSTOM_LOWERING_RULES = (
     (quantum_kernel_p, _quantum_kernel_lowering),
     (quantum_subroutine_p, subroutine_lowering),
     (measure_in_basis_p, _measure_in_basis_lowering),
+    (decomposition_rule_p, _decomposition_rule_lowering),
 )
 
 

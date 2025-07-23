@@ -63,7 +63,7 @@ from catalyst.jax_primitives import (
     probs_p,
     qalloc_p,
     qdealloc_p,
-    qdef_p,
+    decomposition_rule_p,
     qinst_p,
     quantum_kernel_p,
     quantum_subroutine_p,
@@ -490,14 +490,12 @@ def handle_subroutine(self, *args, **kwargs):
     return vals_out
 
 
-@PLxPRToQuantumJaxprInterpreter.register_primitive(qdef_p)
-def handle_qdef(self, *, pyfun, func_jaxpr):
+@PLxPRToQuantumJaxprInterpreter.register_primitive(decomposition_rule_p)
+def handle_decomposition_rule(self, *, pyfun, func_jaxpr):
     """
-    Transform a quantum definition from PLxPR into JAXPR with quantum primitives.
+    Transform a quantum decomposition rule from PLxPR into JAXPR with quantum primitives.
     """
 
-    # Update the qubit register manager to include all dangling qubits
-    backup = dict(self.qreg_manager)
     self.qreg_manager.insert_all_dangling_qubits()
 
     def wrapper(qreg, *args):
@@ -508,21 +506,12 @@ def handle_qdef(self, *, pyfun, func_jaxpr):
         converter.qreg_manager.insert_all_dangling_qubits()
         return converter.qreg_manager.get()
 
-
-    converted_closed_jaxpr_branch = jax.make_jaxpr(wrapper)(self.qreg_manager.get(), *func_jaxpr.in_avals)
-    qdef_p.bind(
-        # self.qreg_manager.get(),
-        pyfun=pyfun,
-        func_jaxpr=converted_closed_jaxpr_branch)
+    converted_closed_jaxpr_branch = jax.make_jaxpr(wrapper)(
+        self.qreg_manager.get(), *func_jaxpr.in_avals
+    )
+    decomposition_rule_p.bind(pyfun=pyfun, func_jaxpr=converted_closed_jaxpr_branch)
 
     return ()
-    # self.qreg_manager.set(vals_out[0])
-    # vals_out = vals_out[1:]
-
-    # for orig_wire in backup.keys():
-    #     self.qreg_manager.extract(orig_wire)
-
-    # return vals_out
 
 
 @PLxPRToQuantumJaxprInterpreter.register_primitive(qml.QubitUnitary._primitive)
