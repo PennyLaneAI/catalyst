@@ -190,8 +190,7 @@ dialects:
 		-DLLVM_ENABLE_LLD=$(ENABLE_LLD) \
 		-DLLVM_ENABLE_ZLIB=$(ENABLE_ZLIB) \
 		-DLLVM_ENABLE_ZSTD=$(ENABLE_ZSTD) \
-		-DCATALYST_ENABLE_WARNINGS=$(STRICT_WARNINGS) \
-		-DNB_SUPPRESS_WARNINGS=ON
+		-DCATALYST_ENABLE_WARNINGS=$(STRICT_WARNINGS)
 
 	cmake --build $(DIALECTS_BUILD_DIR) --target check-dialects quantum-lsp-server catalyst-cli check-unit-tests
 
