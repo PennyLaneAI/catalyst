@@ -293,7 +293,7 @@ class Pass:
         """
         options_dict = {}
         for option in self.options:
-            options_dict[str(option)] = ir.BoolAttr.get(True)
+            options_dict[str(option)] = get_mlir_attribute_from_pyval(True)
 
         for option, value in self.valued_options.items():
             options_dict[str(option)] = get_mlir_attribute_from_pyval(value)
