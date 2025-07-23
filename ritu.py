@@ -19,14 +19,17 @@ from jax.interpreters import mlir
 class jitting(passes.ModulePass):
 
     name = "jitting-through-callback"
+
     def apply(self, _ctx: context.Context, module: builtin.ModuleOp) -> None:
 
         qml.capture.disable()
 
         @qml.qjit
-        def foo(wire: int):
+        def runtime_function(wire: int):
+
             @pure_callback
-            def callback(wire: int) -> jax.core.ShapedArray([2], float):
+            def callback(wire: int) -> jax.core.ShapedArray([4], float):
+                # INSIDE HERE WE ARE RUNNING...
 
                 # TODO:
                 # * Add arguments to callback
@@ -35,21 +38,22 @@ class jitting(passes.ModulePass):
                 # * automatically update the return values
                 # * Better names
                 # * automatically make callback arguments same as the ones from the original function.
-                program = """
-                    func.func public @foobar() -> tensor<2xf64> attributes {diff_method = "parameter-shift", llvm.emit_c_interface, qnode} {
+                program = f"""
+                    func.func public @foobar() -> tensor<4xf64> attributes {{diff_method = "parameter-shift", llvm.emit_c_interface, qnode}} {{
+                        // SPECIALIZING THE WIRE AT RUNTIME
+                        %dyn_wire = arith.constant {wire} : i64
                         %c0_i64 = arith.constant 0 : i64
-                        quantum.device shots(%c0_i64) ["/home/ubuntu/Code/env2/lib/python3.12/site-packages/pennylane_lightning/liblightning_qubit_catalyst.so", "LightningSimulator", "{'mcmc': False, 'num_burnin': 0, 'kernel_name': None}"]
-                        %0 = quantum.alloc( 1) : !quantum.reg
-                        %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+                        quantum.device shots(%c0_i64) ["/home/ubuntu/Code/env2/lib/python3.12/site-packages/pennylane_lightning/liblightning_qubit_catalyst.so", "LightningSimulator", "{{'mcmc': False, 'num_burnin': 0, 'kernel_name': None}}"]
+                        %0 = quantum.alloc( 2) : !quantum.reg
+                        %1 = quantum.extract %0[ %dyn_wire] : !quantum.reg -> !quantum.bit
                         %out_qubits = quantum.custom "Hadamard"() %1 : !quantum.bit
-                        %out_qubits_1 = quantum.custom "Hadamard"() %out_qubits : !quantum.bit
-                        %2 = quantum.insert %0[ 0], %out_qubits_1 : !quantum.reg, !quantum.bit
+                        %2 = quantum.insert %0[ %dyn_wire], %out_qubits : !quantum.reg, !quantum.bit
                         %3 = quantum.compbasis qreg %2 : !quantum.obs
-                        %4 = quantum.probs %3 : tensor<2xf64>
+                        %4 = quantum.probs %3 : tensor<4xf64>
                         quantum.dealloc %2 : !quantum.reg
                         quantum.device_release
-                        return %4 : tensor<2xf64>
-                }
+                        return %4 : tensor<4xf64>
+                }}
                 """
                 import os
                 dir_path = os.path.dirname(os.path.realpath(__file__))
@@ -62,18 +66,19 @@ class jitting(passes.ModulePass):
                 with mlir.ir.Context(), mlir.ir.Location.unknown():
                     f64 = mlir.ir.F64Type.get()
                     from catalyst.compiled_functions import CompiledFunction
-                    compiled_function = CompiledFunction(output_object_name, "foobar", [mlir.ir.RankedTensorType.get((2,), f64)], None, None)
+                    compiled_function = CompiledFunction(output_object_name, "foobar", [mlir.ir.RankedTensorType.get((4,), f64)], None, None)
                 return compiled_function()
+
             return callback(wire)
 
-        generic = foo.mlir_module.operation.get_asm(binary=False, print_generic_op_form=True, assume_verified=True)
+        generic = runtime_function.mlir_module.operation.get_asm(binary=False, print_generic_op_form=True, assume_verified=True)
         ctx = context.Context(allow_unregistered=True)
         xdsl_module = QuantumParser(ctx, generic).parse_module()
         for operation in xdsl_module.walk():
             if isinstance(operation, catalyst.CallbackOp):
                 callback = operation
 
-        func = SymbolTable.lookup_symbol(xdsl_module, "jit_foo")
+        func = SymbolTable.lookup_symbol(xdsl_module, "jit_runtime_function")
         current_function = SymbolTable.lookup_symbol(module, "foo")
         rewriter = Rewriter()
         func.detach()
@@ -84,10 +89,11 @@ class jitting(passes.ModulePass):
 
 qml.capture.enable()
 
+#@qml.qjit
 @qml.qjit(pass_plugins=[getXDSLPluginAbsolutePath()])
 @jitting
-@qml.qnode(qml.device("null.qubit", wires=1))
+@qml.qnode(qml.device("null.qubit", wires=2))
 def foo(wire: int):
     return qml.probs()
 
-print(foo(1))
+print(foo(0))
