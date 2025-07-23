@@ -22,6 +22,9 @@
 * Update imports for noise transforms from `pennylane.transforms` to `pennylane.noise`.
   [(#1918)](https://github.com/PennyLaneAI/catalyst/pull/1918)
 
+* Improve error message for quantum subroutines when used outside a quantum context.
+  [(#1932)](https://github.com/PennyLaneAI/catalyst/pull/1932)
+
 * `from_plxpr` now supports adjoint and ctrl operations and transforms, operator
   arithemtic observables, `Hermitian` observables, `for_loop` outside qnodes,
   and `while_loop` outside QNode's.
