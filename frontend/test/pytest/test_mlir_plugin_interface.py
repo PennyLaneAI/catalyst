@@ -77,22 +77,23 @@ def test_get_options():
     ApplyRegisteredPassOp expects options to be a dictionary from strings to attributes.
     See https://github.com/llvm/llvm-project/pull/143159
     """
-    options = catalyst.passes.Pass("example-pass", "single-option").get_options()
-    assert isinstance(options, dict)
-    assert isinstance(options["single-option"], ir.BoolAttr)
-    assert options["single-option"].value == True
+    with ir.Context(), ir.Location.unknown():
+        options = catalyst.passes.Pass("example-pass", "single-option").get_options()
+        assert isinstance(options, dict)
+        assert isinstance(options["single-option"], ir.BoolAttr)
+        assert options["single-option"].value == True
 
-    options = catalyst.passes.Pass("example-pass", "an-option", "bn-option").get_options()
-    assert isinstance(options, dict)
-    assert isinstance(options["an-option"], ir.BoolAttr)
-    assert options["an-option"].value == True
-    assert isinstance(options["bn-option"], ir.BoolAttr)
-    assert options["bn-option"].value == True
+        options = catalyst.passes.Pass("example-pass", "an-option", "bn-option").get_options()
+        assert isinstance(options, dict)
+        assert isinstance(options["an-option"], ir.BoolAttr)
+        assert options["an-option"].value == True
+        assert isinstance(options["bn-option"], ir.BoolAttr)
+        assert options["bn-option"].value == True
 
-    options = catalyst.passes.Pass("example-pass", option=True).get_options()
-    assert isinstance(options, dict)
-    assert isinstance(options["option"], ir.BoolAttr)
-    assert options["option"].value == True
+        options = catalyst.passes.Pass("example-pass", option=True).get_options()
+        assert isinstance(options, dict)
+        assert isinstance(options["option"], ir.BoolAttr)
+        assert options["option"].value == True
 
 
 @pytest.mark.skip(reason="xdsl not installed in ci cd yet")
