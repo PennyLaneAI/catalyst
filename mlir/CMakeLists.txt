@@ -137,7 +137,7 @@ function(make_version_header_file input_file output_file)
             set(version_number "${CMAKE_MATCH_1}")
         endif()
     endif()
-    set(header_content "static constexpr const char *CATALYST_VERSION = \"${version_number}\";")
+    set(header_content "#pragma once\n\nstatic constexpr const char *CATALYST_VERSION = \"${version_number}\";\n")
     file(WRITE ${output_file} "${header_content}")
 endfunction(make_version_header_file)
 
