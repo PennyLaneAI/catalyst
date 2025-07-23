@@ -38,6 +38,7 @@ from jaxlib.mlir.dialects.func import FuncOp
 
 import catalyst
 from catalyst.logging import debug_logger
+from catalyst.utils.exceptions import CompileError
 from catalyst.utils.patching import Patcher
 
 # pylint: disable=protected-access
@@ -165,3 +166,54 @@ def custom_lower_jaxpr_to_module(
                 worklist += [*op.body.operations]
 
     return ctx.module, ctx.context
+
+
+with ir.Context() as ctx:
+    with ir.Location.unknown(ctx) as loc:
+
+        def get_mlir_attribute_from_pyval(value):
+            """
+            Given a value of any type, construct an mlir attribute of corresponding type.
+
+            We set up the context and location outside because recursive calls to this function
+            will segfault if multiple `Context()`s are instantiated.
+            """
+
+            if isinstance(value, bool):
+                return ir.BoolAttr.get(value, ctx)
+
+            elif isinstance(value, int):
+                if value < 0:
+                    return ir.IntegerAttr.get(ir.IntegerType.get_signed(64, ctx), value)
+                else:
+                    return ir.IntegerAttr.get(ir.IntegerType.get_signless(64, ctx), value)
+
+            elif isinstance(value, float):
+                return ir.FloatAttr.get(ir.F64Type.get(ctx), value, loc=loc)
+
+            elif isinstance(value, str):
+                return ir.StringAttr.get(value, ctx)
+
+            elif isinstance(value, (list, tuple)):
+                element_attrs = [get_mlir_attribute_from_pyval(elem) for elem in value]
+                return ir.ArrayAttr.get(element_attrs, ctx)
+
+            elif isinstance(value, dict):
+                named_attrs = {}
+                for k, v in value.items():
+                    if not isinstance(k, str):
+                        raise ValueError(
+                            f"Dictionary keys for MLIR DictionaryAttr must be strings, got: {type(k)}"
+                        )
+                    named_attrs[k] = get_mlir_attribute_from_pyval(v)
+                return ir.DictAttr.get(named_attrs, ctx)
+
+            elif value is None:
+                # MLIR has a UnitAttr for representing a void or "none" value
+                # TODO: is `None` the best flag here?
+                return ir.UnitAttr.get(ctx)
+
+            else:
+                raise CompileError(
+                    f"Cannot convert Python type {type(value)} to an MLIR attribute."
+                )
