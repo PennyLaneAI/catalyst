@@ -27,6 +27,12 @@ class jitting(passes.ModulePass):
         def foo():
             @pure_callback
             def callback() -> jax.core.ShapedArray([2], float):
+                # TODO:
+                # * Add arguments to callback
+                # * Make this arguments literals into the program below
+                # * Obtain the program from str(module) but change the function to have no parameters
+                # * automatically update the return values
+                # * Better names
                 program = """
                     func.func public @foobar() -> tensor<2xf64> attributes {diff_method = "parameter-shift", llvm.emit_c_interface, qnode} {
                         %c0_i64 = arith.constant 0 : i64
