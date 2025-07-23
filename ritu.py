@@ -24,15 +24,17 @@ class jitting(passes.ModulePass):
         qml.capture.disable()
 
         @qml.qjit
-        def foo():
+        def foo(wire: int):
             @pure_callback
-            def callback() -> jax.core.ShapedArray([2], float):
+            def callback(wire: int) -> jax.core.ShapedArray([2], float):
+
                 # TODO:
                 # * Add arguments to callback
                 # * Make this arguments literals into the program below
                 # * Obtain the program from str(module) but change the function to have no parameters
                 # * automatically update the return values
                 # * Better names
+                # * automatically make callback arguments same as the ones from the original function.
                 program = """
                     func.func public @foobar() -> tensor<2xf64> attributes {diff_method = "parameter-shift", llvm.emit_c_interface, qnode} {
                         %c0_i64 = arith.constant 0 : i64
@@ -40,7 +42,8 @@ class jitting(passes.ModulePass):
                         %0 = quantum.alloc( 1) : !quantum.reg
                         %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
                         %out_qubits = quantum.custom "Hadamard"() %1 : !quantum.bit
-                        %2 = quantum.insert %0[ 0], %out_qubits : !quantum.reg, !quantum.bit
+                        %out_qubits_1 = quantum.custom "Hadamard"() %out_qubits : !quantum.bit
+                        %2 = quantum.insert %0[ 0], %out_qubits_1 : !quantum.reg, !quantum.bit
                         %3 = quantum.compbasis qreg %2 : !quantum.obs
                         %4 = quantum.probs %3 : tensor<2xf64>
                         quantum.dealloc %2 : !quantum.reg
@@ -61,7 +64,7 @@ class jitting(passes.ModulePass):
                     from catalyst.compiled_functions import CompiledFunction
                     compiled_function = CompiledFunction(output_object_name, "foobar", [mlir.ir.RankedTensorType.get((2,), f64)], None, None)
                 return compiled_function()
-            return callback()
+            return callback(wire)
 
         generic = foo.mlir_module.operation.get_asm(binary=False, print_generic_op_form=True, assume_verified=True)
         ctx = context.Context(allow_unregistered=True)
@@ -69,6 +72,7 @@ class jitting(passes.ModulePass):
         for operation in xdsl_module.walk():
             if isinstance(operation, catalyst.CallbackOp):
                 callback = operation
+
         func = SymbolTable.lookup_symbol(xdsl_module, "jit_foo")
         current_function = SymbolTable.lookup_symbol(module, "foo")
         rewriter = Rewriter()
@@ -83,7 +87,7 @@ qml.capture.enable()
 @qml.qjit(pass_plugins=[getXDSLPluginAbsolutePath()])
 @jitting
 @qml.qnode(qml.device("null.qubit", wires=1))
-def foo():
+def foo(wire: int):
     return qml.probs()
 
-print(foo())
+print(foo(1))
