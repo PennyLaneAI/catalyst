@@ -492,56 +492,90 @@ class TestJAXRecompilation:
         jax.grad(circuit, argnums=0)(params, 3)
 
 
+ctx = ir.Context()
+loc = ir.Location.unknown(ctx)
+
+
 class TestJAXMLIRAttributeGetter:
     """
     Test catalyst.jax_extras.lowering.get_mlir_attribute_from_pyval
     """
 
     def test_unit_attr(self):
-        attr = get_mlir_attribute_from_pyval(None)
-        assert isinstance(attr, ir.UnitAttr)
+        """
+        Test unit attribute.
+        """
+        with ctx, loc:
+            attr = get_mlir_attribute_from_pyval(None)
+            assert isinstance(attr, ir.UnitAttr)
 
     def test_bool_attr(self):
-        attr = get_mlir_attribute_from_pyval(True)
-        assert isinstance(attr, ir.BoolAttr)
-        assert attr.value == True
+        """
+        Test bool attribute.
+        """
+        with ctx, loc:
+            attr = get_mlir_attribute_from_pyval(True)
+            assert isinstance(attr, ir.BoolAttr)
+            assert attr.value == True
 
     def test_str_attr(self):
-        attr = get_mlir_attribute_from_pyval("hello catalyst!")
-        assert isinstance(attr, ir.StringAttr)
-        assert attr.value == "hello catalyst!"
+        """
+        Test string attribute.
+        """
+        with ctx, loc:
+            attr = get_mlir_attribute_from_pyval("hello catalyst!")
+            assert isinstance(attr, ir.StringAttr)
+            assert attr.value == "hello catalyst!"
 
     @pytest.mark.parametrize("number", (37, -37))
     def test_int_attr(self, number):
-        attr = get_mlir_attribute_from_pyval(number)
-        assert isinstance(attr, ir.IntegerAttr)
-        assert attr.value == number
+        """
+        Test integer attribute.
+        """
+        with ctx, loc:
+            attr = get_mlir_attribute_from_pyval(number)
+            assert isinstance(attr, ir.IntegerAttr)
+            assert attr.value == number
 
     @pytest.mark.parametrize("number", (3.7, -3.7))
     def test_float_attr(self, number):
-        attr = get_mlir_attribute_from_pyval(number)
-        assert isinstance(attr, ir.FloatAttr)
-        assert attr.value == number
+        """
+        Test float attribute.
+        """
+        with ctx, loc:
+            attr = get_mlir_attribute_from_pyval(number)
+            assert isinstance(attr, ir.FloatAttr)
+            assert attr.value == number
 
     @pytest.mark.parametrize("array", ([1, 2, 3], (4, 5, 6)))
-    def test_float_attr(self, array):
-        attr = get_mlir_attribute_from_pyval(array)
-        assert isinstance(attr, ir.ArrayAttr)
-        assert len(attr) == len(array)
+    def test_array_attr(self, array):
+        """
+        Test array attribute.
+        """
+        with ctx, loc:
+            attr = get_mlir_attribute_from_pyval(array)
+            assert isinstance(attr, ir.ArrayAttr)
+            assert len(attr) == len(array)
 
-        for attr_val, py_val in zip(attr, array):
-            assert isinstance(attr_val, ir.IntegerAttr)
-            assert attr_val.value == py_val
+            for attr_val, py_val in zip(attr, array):
+                assert isinstance(attr_val, ir.IntegerAttr)
+                assert attr_val.value == py_val
 
     def test_dict_attr(self):
-        attr = get_mlir_attribute_from_pyval({"device": "lightning.qubit", "wire_capacity": 100})
-        assert isinstance(attr, ir.DictAttr)
+        """
+        Test dictionary attribute.
+        """
+        with ctx, loc:
+            attr = get_mlir_attribute_from_pyval(
+                {"device": "lightning.qubit", "wire_capacity": 100}
+            )
+            assert isinstance(attr, ir.DictAttr)
 
-        assert isinstance(attr["device"], ir.StringAttr)
-        assert attr["device"].value == "lightning.qubit"
+            assert isinstance(attr["device"], ir.StringAttr)
+            assert attr["device"].value == "lightning.qubit"
 
-        assert isinstance(attr["wire_capacity"], ir.IntegerAttr)
-        assert attr["wire_capacity"].value == 100
+            assert isinstance(attr["wire_capacity"], ir.IntegerAttr)
+            assert attr["wire_capacity"].value == 100
 
 
 if __name__ == "__main__":
