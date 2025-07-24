@@ -4,6 +4,9 @@
 
 <h3>Improvements 🛠</h3>
 
+*  Displays Catalyst version in `quantum-opt --version` output.
+  [(#1922)](https://github.com/PennyLaneAI/catalyst/pull/1922)
+
 <h3>Breaking changes 💔</h3>
 
 * The JAX version used by Catalyst is updated to 0.6.2.
@@ -57,4 +60,5 @@ Joey Carter,
 Sengthai Heng,
 Christina Lee,
 Andrija Paurevic,
+Roberto Turrado,
 Paul Haochen Wang.
