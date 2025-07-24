@@ -19,15 +19,23 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Raise warning when subroutines are used without capture enabled.
+  [(#1930)](https://github.com/PennyLaneAI/catalyst/pull/1930)
+
 * Update imports for noise transforms from `pennylane.transforms` to `pennylane.noise`.
   [(#1918)](https://github.com/PennyLaneAI/catalyst/pull/1918)
 
-* `from_plxpr` now supports adjoint and ctrl operations and transforms,
-  `Hermitian` observables, `for_loop` outside qnodes, and `while_loop` outside QNode's.
+* Improve error message for quantum subroutines when used outside a quantum context.
+  [(#1932)](https://github.com/PennyLaneAI/catalyst/pull/1932)
+
+* `from_plxpr` now supports adjoint and ctrl operations and transforms, operator
+  arithemtic observables, `Hermitian` observables, `for_loop` outside qnodes,
+  and `while_loop` outside QNode's.
   [(#1844)](https://github.com/PennyLaneAI/catalyst/pull/1844)
   [(#1850)](https://github.com/PennyLaneAI/catalyst/pull/1850)
   [(#1903)](https://github.com/PennyLaneAI/catalyst/pull/1903)
   [(#1896)](https://github.com/PennyLaneAI/catalyst/pull/1896)
+  [(#1889)](https://github.com/PennyLaneAI/catalyst/pull/1889)
 
 * The `qec.layer` and `qec.yield` operations have been added to the QEC dialect to represent a group
   of QEC operations. The main use case is to analyze the depth of a circuit.
