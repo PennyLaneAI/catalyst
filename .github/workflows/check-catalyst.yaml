@@ -515,8 +515,13 @@ jobs:
 
     - name: Run Python Lit Tests
       run: |
-        python3 llvm-build/bin/llvm-lit -sv frontend/test/lit -j$(nproc)
+        ENABLE_LIT_COVERAGE=1 COVERAGE_FILE=.coverage.lit python3 llvm-build/bin/llvm-lit -sv frontend/test/lit -j$(nproc)
+        if [ -f .coverage.lit ]; then
+          echo "Converting Lit Coverage to XML"
+          coverage xml --data-file=.coverage.lit -o coverage-lit.xml
+        fi
 
+       
     - name: Run Python Pytest Tests
       run: |
         COVERAGE_REPORT="xml:coverage.xml -p no:warnings" \

@@ -298,6 +298,10 @@ clean-oqc:
 .PHONY: coverage coverage-frontend coverage-runtime
 coverage: coverage-frontend coverage-runtime
 
+lit-coverage:
+	@echo "Running lit tests with coverage"
+	ENABLE_LIT_COVERAGE=1 cmake --build $(DIALECTS_BUILD_DIR) --target check-frontend
+
 coverage-frontend:
 ifeq ($(ENABLE_ASAN),ON)
 ifneq ($(findstring clang,$(C_COMPILER)),clang)
@@ -306,10 +310,18 @@ ifneq ($(findstring clang,$(C_COMPILER)),clang)
 endif
 endif
 	@echo "Generating coverage report for the frontend"
-	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/pytest $(PYTEST_FLAGS) --cov=catalyst --tb=native --cov-report=$(COVERAGE_REPORT)
-	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/test_oqc/oqc $(PYTEST_FLAGS) --cov=catalyst --cov-append --tb=native --cov-report=$(COVERAGE_REPORT)
+	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/pytest $(PYTEST_FLAGS) --cov=catalyst --tb=native --cov-report=
+	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/test_oqc/oqc $(PYTEST_FLAGS) --cov=catalyst --cov-append --tb=native --cov-report=
 ifeq ($(ENABLE_OQD), ON)
-	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/test_oqd/oqd $(PYTEST_FLAGS) --cov=catalyst --cov-append --tb=native --cov-report=$(COVERAGE_REPORT)
+	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/test_oqd/oqd $(PYTEST_FLAGS) --cov=catalyst --cov-append --tb=native --cov-report=
+endif
+	$(ASAN_COMMAND) $(MAKE) lit-coverage
+	coverage combine .coverage.lit .coverage
+	@echo "=== Generating final coverage report with format: $(COVERAGE_REPORT) ==="
+ifeq ($(COVERAGE_REPORT),term-missing)
+	$(PYTHON) -m coverage report --show-missing
+else
+	$(PYTHON) -m coverage report --$(COVERAGE_REPORT)
 endif
 ifeq ($(TEST_BRAKET), NONE)
 	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/async_tests --tb=native --backend=$(TEST_BACKEND) --tb=native
