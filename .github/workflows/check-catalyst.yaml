@@ -515,7 +515,7 @@ jobs:
        
     - name: Run Python Pytest/Lit Tests
       run: |
-        COVERAGE_REPORT="coverage.xml" \
+        COVERAGE_REPORT=".coverage" \
         DIALECTS_BUILD_DIR="$(pwd)/quantum-build" \
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \
         make coverage-frontend ENABLE_OQD=ON

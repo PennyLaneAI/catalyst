@@ -321,7 +321,7 @@ endif
 ifeq ($(COVERAGE_REPORT),term-missing)
 	$(PYTHON) -m coverage report --show-missing
 else
-	$(PYTHON) -m coverage report --data-file=$(COVERAGE_REPORT)
+	$(PYTHON) -m coverage xml --data-file=$(COVERAGE_REPORT)
 endif
 ifeq ($(TEST_BRAKET), NONE)
 	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/async_tests --tb=native --backend=$(TEST_BACKEND) --tb=native
