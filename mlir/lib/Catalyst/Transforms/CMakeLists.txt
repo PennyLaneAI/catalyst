@@ -8,6 +8,7 @@ file(GLOB SRC
     BufferizableOpInterfaceImpl.cpp
     catalyst_to_llvm.cpp
     DetectQNodes.cpp
+    DetensorizeFunctionBoundaryPass.cpp
     DetensorizeSCFPass.cpp
     disable_assertion.cpp
     DisableAssertionPatterns.cpp
