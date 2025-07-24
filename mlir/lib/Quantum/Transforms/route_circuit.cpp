@@ -44,10 +44,17 @@ namespace catalyst {
 #define GEN_PASS_DECL_ROUTINGPASS
 #include "Quantum/Transforms/Passes.h.inc"
 
+const int MAXIMUM = 1e9;
 
 
 struct RoutingPass : public impl::RoutingPassBase<RoutingPass> {
     using impl::RoutingPassBase<RoutingPass>::RoutingPassBase;
+
+    int countLogicalQubit(Operation *op) {
+        int numQubits = cast<quantum::AllocOp>(op).getNqubitsAttr().value_or(-1);
+        assert(numQubits != -1 && "PPM specs with dynamic number of qubits is not implemented");
+        return numQubits;
+    }
 
     llvm::DenseMap<std::pair<int, int>, bool> parseHardwareGraph(std::string s, std::string delimiter, std::set<int> *physicalQubits) {
         size_t pos_start = 0, pos_end, delim_len = delimiter.length();
@@ -98,82 +105,211 @@ struct RoutingPass : public impl::RoutingPassBase<RoutingPass> {
         }
         return -1; // to avoid Werror 
     }
+
+    void preProcessing(std::set<int> *physicalQubits, std::vector<int> *randomInitialMapping, std::set<quantum::CustomOp> *frontLayer, int *dagLogicalQubits) {
+        getOperation()->walk([&](Operation *op) {
+            if (isa<quantum::AllocOp>(op)) {
+                *dagLogicalQubits = countLogicalQubit(op);
+                *randomInitialMapping =  generateRandomInitialMapping(physicalQubits);
+            }
+            else if (isa<quantum::CustomOp>(op)) {
+                // StringRef gateName = cast<quantum::CustomOp>(op).getGateName();
+                int nQubits = cast<quantum::CustomOp>(op).getInQubits().size();
+                auto inQubits = cast<quantum::CustomOp>(op).getInQubits();
+            
+                if (nQubits == 2) {
+                    Operation *prevOp_0 = inQubits[0].getDefiningOp();
+                    Operation *prevOp_1 = inQubits[1].getDefiningOp();
+                    if (isa<quantum::ExtractOp>(prevOp_0) && isa<quantum::ExtractOp>(prevOp_1)) 
+                        (*frontLayer).insert(cast<quantum::CustomOp>(op));
+                }
+                else if (nQubits == 1) {
+                    Operation *prevOp_0 = inQubits[0].getDefiningOp();
+                    if (isa<quantum::ExtractOp>(prevOp_0)) 
+                        (*frontLayer).insert(cast<quantum::CustomOp>(op));
+                }
+            }
+        }
+    );
+    return;
+}
+
+    void distanceMatrices(std::set<int> *physicalQubits, llvm::DenseMap<std::pair<int,int>, int> &distanceMatrix, llvm::DenseMap<std::pair<int,int>, int> &predecessorMatrix, llvm::DenseMap<std::pair<int, int>, bool> &couplingMap) {
+        // initial distances between non-connected physical qubits maximum
+        for (auto i_itr = (*physicalQubits).begin(); i_itr != (*physicalQubits).end(); i_itr++)
+        {
+            for (auto j_itr = (*physicalQubits).begin(); j_itr != (*physicalQubits).end(); j_itr++)
+            {
+                distanceMatrix[std::make_pair(*i_itr, *j_itr)] = MAXIMUM;
+                predecessorMatrix[std::make_pair(*i_itr, *j_itr)] = -1; 
+            }
+        }
+
+        // distance from self to self -> 0
+        for (auto i : (*physicalQubits))
+        {
+            predecessorMatrix[std::make_pair(i,i)] = i;
+            distanceMatrix[std::make_pair(i, i)] = 0;
+        }
+        
+        // distance between physical qubits connected by edge => 1s
+        for (auto& entry : couplingMap) {
+            std::pair<int, int>& key = entry.first;
+            if(entry.second)
+            {
+                distanceMatrix[std::make_pair(key.first, key.second)] = 1;
+                predecessorMatrix[std::make_pair(key.first, key.second)] = key.first;
+            }
+        }
+
+        // All-pair-shortest-path
+        for (auto i_itr = (*physicalQubits).begin(); i_itr != (*physicalQubits).end(); i_itr++)
+        {
+            for (auto j_itr = (*physicalQubits).begin(); j_itr != (*physicalQubits).end(); j_itr++ ) 
+            {
+                for (auto k_itr = (*physicalQubits).begin(); k_itr != (*physicalQubits).end(); k_itr++ ) 
+                {
+                    if (distanceMatrix[std::make_pair(*j_itr,*i_itr)] + distanceMatrix[std::make_pair(*i_itr,*k_itr)] < distanceMatrix[std::make_pair(*j_itr,*k_itr)] )
+                    {
+                        distanceMatrix[std::make_pair(*j_itr,*k_itr)] = distanceMatrix[std::make_pair(*j_itr,*i_itr)] + distanceMatrix[std::make_pair(*i_itr,*k_itr)];
+                        predecessorMatrix[std::make_pair(*j_itr,*k_itr)] = predecessorMatrix[std::make_pair(*i_itr,*k_itr)];
+                    }
+                }
+            }
+        }
+        return;
+    }
     
+    std::vector<int> getShortestPath(int source, int target, llvm::DenseMap<std::pair<int,int>, int> &predecessorMatrix) {
+        std::vector<int> path;
+        if ( predecessorMatrix[std::make_pair(source, target)] == -1 && source != target) {
+            return path;
+        }
+
+        int current = target;
+        while (current != source) {
+            path.push_back(current);
+            current = predecessorMatrix[std::make_pair(source, current)];
+            if (current == -1 && path.size() > 0) 
+            { 
+                path.clear(); 
+                return path;
+            }
+        }
+        path.push_back(source);
+        std::reverse(path.begin(), path.end()); 
+        return path;
+    }
+    
+    void getExecuteGateList(std::set<quantum::CustomOp> *frontLayer, std::vector<quantum::CustomOp> *executeGateList, llvm::DenseMap<std::pair<int, int>, bool> &couplingMap, std::vector<int> *randomInitialMapping) {
+        for(auto op : *frontLayer) {
+            int nQubits = op.getInQubits().size(); 
+            if (nQubits == 1)
+                (*executeGateList).push_back(op);
+            else if (nQubits == 2) {
+                auto inQubits = op.getInQubits();
+                int physical_Qubit_0 = (*randomInitialMapping)[getRegisterIndexOfOp(inQubits[0])];
+                int physical_Qubit_1 = (*randomInitialMapping)[getRegisterIndexOfOp(inQubits[1])];
+
+                std::pair<int, int> is_physical_Edge = std::make_pair(physical_Qubit_0,physical_Qubit_1);
+                if (couplingMap[is_physical_Edge])
+                    (*executeGateList).push_back(op);
+            }
+        }
+        return;
+    }
+
     void runOnOperation() override {
 
         std::set<int> physicalQubits;
         llvm::DenseMap<std::pair<int, int>, bool> couplingMap = parseHardwareGraph(hardwareGraph, ";", &physicalQubits);
-        int numPhysicalQubits = physicalQubits.size();
-        int numLogicalQubits = physicalQubits.size(); // works with automatic qubit management
+        int dagLogicalQubits;
+        // int numLogicalQubits = physicalQubits.size(); // works with automatic qubit management
 
-        llvm::outs() << "Number of Physical Qubits on the Hardware : " << numPhysicalQubits << "\n";
-        llvm::outs() << "Physical Qubits on the Hardware :\n";
-        for (auto i : physicalQubits) llvm::outs() << i << "\n";
-
-        llvm::outs() << "Hardware Topology :\n";
-        for (auto& entry : couplingMap) {
-            std::pair<int, int>& key = entry.first;
-            bool value = entry.second;
-            llvm::outs() << "(" << key.first << ", " << key.second << ") => " 
-                    << (value ? "true" : "false") << "\n";
-        }
+        // distance matrix
+        llvm::DenseMap<std::pair<int,int>, int> distanceMatrix;
+        llvm::DenseMap<std::pair<int,int>, int> predecessorMatrix;
+        distanceMatrices(&physicalQubits, distanceMatrix, predecessorMatrix, couplingMap);
 
         std::vector<int> randomInitialMapping;
+        std::set<quantum::CustomOp> frontLayer;
+        preProcessing(&physicalQubits, &randomInitialMapping, &frontLayer, &dagLogicalQubits);
+        
 
-        getOperation()->walk([&](Operation *op) {
-            if (isa<quantum::AllocOp>(op)) {
-                randomInitialMapping =  generateRandomInitialMapping(&physicalQubits);
+        for (auto iterate_op : frontLayer) llvm::outs() << iterate_op << "\n";
+        std::vector<StringRef> compiledGateNames;
+        std::vector<std::vector<int>> compiledGateQubits;
+        std::vector<quantum::CustomOp> executeGateList;
+        int search_steps = 0;
+        int max_iterations_without_progress = 10 * dagLogicalQubits;
+        while( frontLayer.size() ) {
+            getExecuteGateList(&frontLayer, &executeGateList, couplingMap, &randomInitialMapping);
+            if (executeGateList.size()) {
+                for (auto op : executeGateList)
+                {
+                    compiledGateNames.push_back(op.getGateName());
+                    std::vector<int> currOpPhysicalQubits;
+                    for(auto currOpInQubit : op.getInQubits())
+                        currOpPhysicalQubits.push_back(randomInitialMapping[getRegisterIndexOfOp(currOpInQubit)]);
+                    compiledGateQubits.push_back(currOpPhysicalQubits);
 
-                llvm::outs() << "Number of Logical Qubits in the Circuit : " << numLogicalQubits << "\n";
-                llvm::outs() << "Random Initial Mapping:\n";
-                for (auto iterQubit : randomInitialMapping)
-                    llvm::outs() << iterQubit << "\n";
-            }
-            else if (isa<quantum::CustomOp>(op)) {
-
-                StringRef gateName = cast<quantum::CustomOp>(op).getGateName();
-                int nQubits = cast<quantum::CustomOp>(op).getInQubits().size();
-                auto inQubits = cast<quantum::CustomOp>(op).getInQubits();
-                
-                if (nQubits == 2) {
-                    llvm::outs() << "Gate name: " << gateName << "\n";
-                    int logical_Qubit_0 = getRegisterIndexOfOp(inQubits[0]);
-                    int logical_Qubit_1 = getRegisterIndexOfOp(inQubits[1]);
-                    std::pair<int, int> logical_Edge = std::make_pair(logical_Qubit_0,logical_Qubit_1);
-                    llvm::outs() << "Logical qubit: (" << logical_Qubit_0 << "," << logical_Qubit_1 << ")\n";
-                    if (couplingMap[logical_Edge])
-                        // If logical qubits are connected, no need to change gate
-                        llvm::outs() << "Physical qubit connected: (" << randomInitialMapping[logical_Qubit_0] << "," << randomInitialMapping[logical_Qubit_1] << ")\n";
-                    else
-                        // ig logical qubits not connected, call Z3 solver to find what SWAPs to insert
-                        llvm::outs() << "Physical qubit not connected: (" << randomInitialMapping[logical_Qubit_0] << "," << randomInitialMapping[logical_Qubit_1] << ")\n";
-                    
+                    // remove the executed op from front layer
+                    frontLayer.erase(op);
+                    // get successor of op
+                    auto outQubits = op.getOutQubits();
+                    for (auto outQubit : outQubits) {
+                        for (auto &use : outQubit.getUses()) {
+                            Operation *successorOp = use.getOwner();
+                            if (isa<quantum::CustomOp>(*successorOp)) 
+                                frontLayer.insert(cast<quantum::CustomOp>(*successorOp));
+                        }
+                    }
                 }
-
-
-                // Rewrite gate
-                // mlir::OpBuilder builder(op); // Create OpBuilder
-                // builder.setInsertionPoint(op);
-
-                // auto loc = op->getLoc();
-                // auto newOp = builder.create<quantum::CustomOp>(loc,
-                //     /*out_qubits=*/mlir::TypeRange({cast<quantum::CustomOp>(op).getOutQubits().getTypes()}),
-                //     /*out_ctrl_qubits=*/mlir::TypeRange(),
-                //     /*params=*/mlir::ValueRange({cast<quantum::CustomOp>(op).getParams()}),
-                //     /*in_qubits=*/mlir::ValueRange({cast<quantum::CustomOp>(op).getInQubits()}),
-                //     /*gate_name=*/gateName,
-                //     /*adjoint=*/false,
-                //     /*in_ctrl_qubits=*/mlir::ValueRange(),
-                //     /*in_ctrl_values=*/mlir::ValueRange());
-
-                // op->replaceAllUsesWith(newOp->getResults());
-                // op->erase();
-                    
+                executeGateList.clear(); // clear execute gate list
             }
-        });
-
+            else if (search_steps >= max_iterations_without_progress) {
+                search_steps = 0;
+                while (compiledGateNames.back() == "SWAP")
+                {
+                    compiledGateNames.pop_back();
+                    compiledGateQubits.pop_back();
+                    // insert shortest SWAP path
+            }
+            else {
+                for(auto op : frontLayer) {
+                    auto inQubits = op.getInQubits();
+                    int physical_Qubit_0 = randomInitialMapping[getRegisterIndexOfOp(inQubits[0])];
+                    int physical_Qubit_1 = randomInitialMapping[getRegisterIndexOfOp(inQubits[1])];
+                    llvm::outs() << "Shortest path from " << physical_Qubit_0 << " and " << physical_Qubit_1 << "\n";
+                    std::vector<int> swapPath = getShortestPath(physical_Qubit_0, physical_Qubit_1, predecessorMatrix);
+                    for (auto swap_itr : swapPath) llvm::outs() << swap_itr << "-> ";
+                    llvm::outs() << "\n";
+                
+                }
+                frontLayer.clear();
+                search_steps++;
+            }
+        }
     }
 };
+
+        // Rewrite gate
+        // mlir::OpBuilder builder(op); // Create OpBuilder
+        // builder.setInsertionPoint(op);
+
+        // auto loc = op->getLoc();
+        // auto newOp = builder.create<quantum::CustomOp>(loc,
+        //     /*out_qubits=*/mlir::TypeRange({cast<quantum::CustomOp>(op).getOutQubits().getTypes()}),
+        //     /*out_ctrl_qubits=*/mlir::TypeRange(),
+        //     /*params=*/mlir::ValueRange({cast<quantum::CustomOp>(op).getParams()}),
+        //     /*in_qubits=*/mlir::ValueRange({cast<quantum::CustomOp>(op).getInQubits()}),
+        //     /*gate_name=*/gateName,
+        //     /*adjoint=*/false,
+        //     /*in_ctrl_qubits=*/mlir::ValueRange(),
+        //     /*in_ctrl_values=*/mlir::ValueRange());
+
+        // op->replaceAllUsesWith(newOp->getResults());
+        // op->erase();
 
 std::unique_ptr<Pass> createRoutingPass()
 {
