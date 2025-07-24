@@ -20,7 +20,7 @@
 #include "Mitigation/Transforms/Passes.h"
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/Transforms/Passes.h"
-#include "mhlo/transforms/passes.h"
+#include "stablehlo/transforms/Passes.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/InitAllDialects.h"
 #include "mlir/InitAllPasses.h"
@@ -40,13 +40,13 @@ void createEnforceRuntimeInvariantsPipeline(OpPassManager &pm)
 void createHloLoweringPipeline(OpPassManager &pm)
 {
     pm.addPass(mlir::createCanonicalizerPass());
-    pm.addNestedPass<mlir::func::FuncOp>(mhlo::createChloLegalizeToHloPass());
-    pm.addPass(mlir::mhlo::createStablehloLegalizeToHloPass());
-    pm.addNestedPass<mlir::func::FuncOp>(mhlo::createLegalizeControlFlowPass());
-    pm.addNestedPass<mlir::func::FuncOp>(mhlo::createLegalizeHloToLinalgPass());
-    pm.addNestedPass<mlir::func::FuncOp>(mhlo::createLegalizeToStdPass());
-    pm.addNestedPass<mlir::func::FuncOp>(mhlo::createLegalizeSortPass());
-    pm.addPass(mlir::mhlo::createConvertToSignlessPass());
+    pm.addNestedPass<mlir::func::FuncOp>(stablehlo::createChloLegalizeToStablehloPass());
+    //pm.addPass(stablehlo::createStablehloLegalizeToHloPass());
+    pm.addNestedPass<mlir::func::FuncOp>(catalyst::createStablehloLegalizeControlFlowPass());
+    // (?) pm.addNestedPass<mlir::func::FuncOp>(stablehlo::createStablehloLegalizeToLinalgPass());
+    pm.addNestedPass<mlir::func::FuncOp>(catalyst::createStablehloLegalizeToStdPass());
+    pm.addNestedPass<mlir::func::FuncOp>(catalyst::createStablehloLegalizeSortPass());
+    // (!) pm.addPass(stablehlo::createConvertToSignlessPass());
     pm.addPass(mlir::createCanonicalizerPass());
     pm.addPass(catalyst::createScatterLoweringPass());
     pm.addPass(catalyst::createHloCustomCallLoweringPass());
