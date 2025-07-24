@@ -63,6 +63,8 @@ llvm:
 	# https://github.com/llvm/llvm-project/issues/150441
 	@if cd llvm-project; git apply --check $(MK_DIR)/patches/llvm-bufferization-segfault.patch; then \
 		git apply $(MK_DIR)/patches/llvm-bufferization-segfault.patch; \
+		echo "llvm patch success!"; \
+		cat $(MK_DIR)/llvm-project/mlir/lib/Dialect/Bufferization/Transforms/FuncBufferizableOpInterfaceImpl.cpp; \
 	fi
 
 	cmake -G Ninja -S llvm-project/llvm -B $(LLVM_BUILD_DIR) \
