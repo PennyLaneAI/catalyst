@@ -24,8 +24,6 @@
 #include <tuple>
 #include <vector>
 
-#include "c++/z3++.h"
-
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
@@ -40,8 +38,6 @@
 
 using namespace mlir;
 using namespace catalyst;
-
-using namespace z3;
 
 namespace catalyst {
 #define GEN_PASS_DEF_ROUTINGPASS
@@ -94,14 +90,13 @@ struct RoutingPass : public impl::RoutingPassBase<RoutingPass> {
         Operation *prevOp = inQubit.getDefiningOp();
         if (isa<quantum::ExtractOp>(prevOp)) 
             return (cast<quantum::ExtractOp>(prevOp)).getIdxAttr().value();
-        else {
-            auto iteratePrevOpOutQubit = cast<quantum::CustomOp>(prevOp).getOutQubits();
-            auto iteratePrevOpInQubit = cast<quantum::CustomOp>(prevOp).getInQubits();
-            for (auto iter = 0; iter < iteratePrevOpOutQubit.size() ; iter++ ) {
-                if (iteratePrevOpOutQubit[iter] == inQubit) 
-                    return getRegisterIndexOfOp(iteratePrevOpInQubit[iter]);
-            }
+        auto iteratePrevOpOutQubit = cast<quantum::CustomOp>(prevOp).getOutQubits();
+        auto iteratePrevOpInQubit = cast<quantum::CustomOp>(prevOp).getInQubits();
+        for (size_t iter = 0; iter < (iteratePrevOpOutQubit.size()) ; iter++ ) {
+            if (iteratePrevOpOutQubit[iter] == inQubit) 
+                return getRegisterIndexOfOp(iteratePrevOpInQubit[iter]);
         }
+        return -1; // to avoid Werror 
     }
     
     void runOnOperation() override {
@@ -131,8 +126,8 @@ struct RoutingPass : public impl::RoutingPassBase<RoutingPass> {
 
                 llvm::outs() << "Number of Logical Qubits in the Circuit : " << numLogicalQubits << "\n";
                 llvm::outs() << "Random Initial Mapping:\n";
-                for (auto i = 0; i < randomInitialMapping.size(); i++)
-                    llvm::outs() << i << "->" << randomInitialMapping[i] << "\n";
+                for (auto iterQubit : randomInitialMapping)
+                    llvm::outs() << iterQubit << "\n";
             }
             else if (isa<quantum::CustomOp>(op)) {
 
@@ -176,19 +171,6 @@ struct RoutingPass : public impl::RoutingPassBase<RoutingPass> {
                     
             }
         });
-        // context c;
-
-        // expr x = c.bool_const("x");
-        // expr y = c.bool_const("y");
-        // expr conjecture = (!(x && y)) == (!x || !y);
-        
-        // solver s(c);
-        // s.add(!conjecture);
-        // // llvm::outs() <<  "Z3 result " << s.to_smt2() << "\n";
-        // llvm::outs() <<  "Z3 check " << s.check() << "\n";
-        // llvm::outs() <<  "sat " << z3::sat << "\n";
-        // llvm::outs() <<  "unsat " << z3::unsat << "\n";
-        // llvm::outs() <<  "unknown " << z3::unknown << "\n";
 
     }
 };
