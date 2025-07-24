@@ -22,6 +22,8 @@ import pytest
 from catalyst.jax_primitives import subroutine
 from catalyst.utils.exceptions import CompileError
 
+pytestmark = pytest.mark.usefixtures("disable_capture")
+
 
 def test_classical_subroutine():
     """Dummy test"""
