@@ -57,6 +57,14 @@ all: llvm mhlo enzyme dialects plugin
 .PHONY: llvm
 llvm:
 	@echo "build LLVM and MLIR enabling Python bindings"
+
+	# Patch mlir one shot bufferization segfault
+	# Remove patch after bug is resolved upstream
+	# https://github.com/llvm/llvm-project/issues/150441
+	@if cd llvm-project; git apply --check $(MK_DIR)/patches/llvm-bufferization-segfault.patch; then \
+		git apply $(MK_DIR)/patches/llvm-bufferization-segfault.patch; \
+	fi
+
 	cmake -G Ninja -S llvm-project/llvm -B $(LLVM_BUILD_DIR) \
 		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
 		-DLLVM_BUILD_EXAMPLES=OFF \
@@ -209,6 +217,11 @@ clean-dialects:
 clean-llvm:
 	@echo "clean llvm/mlir build files"
 	rm -rf $(LLVM_BUILD_DIR)
+	cd llvm-project; git clean -fd; git checkout .
+
+reset-llvm:
+	@echo "reset llvm git state to the commit tracked in .dep-versions without deleting llvm builds"
+	cd llvm-project; git clean -fd; git checkout .
 
 clean-mhlo:
 	@echo "clean HLO dialect build files"
