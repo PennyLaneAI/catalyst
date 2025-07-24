@@ -300,7 +300,7 @@ coverage: coverage-frontend coverage-runtime
 
 lit-coverage:
 	@echo "Running lit tests with coverage"
-	ENABLE_LIT_COVERAGE=1 cmake --build $(DIALECTS_BUILD_DIR) --target check-frontend
+	ENABLE_LIT_COVERAGE=1 COVERAGE_FILE=.coverage.lit $(LLVM_BUILD_DIR)/bin/llvm-lit -sv frontend/test/lit -j$(shell nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 1)
 
 coverage-frontend:
 ifeq ($(ENABLE_ASAN),ON)
