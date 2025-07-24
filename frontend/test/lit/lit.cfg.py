@@ -59,7 +59,9 @@ if (
 
 if os.environ.get("ENABLE_LIT_COVERAGE", "0") == "1":
     project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../"))
-    config.environment["COVERAGE_FILE"] = os.environ.get("COVERAGE_FILE", os.path.join(project_root, ".coverage.lit"))
+    config.environment["COVERAGE_FILE"] = os.environ.get(
+        "COVERAGE_FILE", os.path.join(project_root, ".coverage.lit")
+    )
     python_executable = f"{python_executable} -m coverage run --source=catalyst --append"
 
 config.substitutions.append(("%PYTHON", python_executable))
