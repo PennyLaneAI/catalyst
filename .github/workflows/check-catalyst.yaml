@@ -525,6 +525,7 @@ jobs:
     - name: Run Python Pytest Tests
       run: |
         COVERAGE_REPORT="xml:coverage.xml -p no:warnings" \
+        DIALECTS_BUILD_DIR="$(pwd)/quantum-build" \
         make coverage-frontend ENABLE_OQD=ON
         mv coverage.xml coverage-${{ github.job }}.xml
 
