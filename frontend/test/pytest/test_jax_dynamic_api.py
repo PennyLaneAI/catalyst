@@ -20,6 +20,7 @@ import numpy as np
 import pennylane as qml
 import pytest
 from jax import numpy as jnp
+from jax._src.source_info_util import current as current_source_info
 from numpy import array_equal
 from numpy.testing import assert_allclose
 
@@ -1124,9 +1125,14 @@ def test_trace_to_jaxpr():
             return i < 3
 
         with EvaluationContext.frame_tracing_context() as trace:
-            sz2 = trace.to_jaxpr_tracer(sz)
-            i = trace.new_arg(ShapedArray(shape=[], dtype=jnp.dtype("int64")))
-            a = trace.new_arg(DShapedArray(shape=[sz2], dtype=jnp.dtype("float64")))
+            sz2 = trace.to_jaxpr_tracer(sz, source_info=current_source_info())
+            i = trace.new_arg(
+                ShapedArray(shape=[], dtype=jnp.dtype("int64")), source_info=current_source_info()
+            )
+            a = trace.new_arg(
+                DShapedArray(shape=[sz2], dtype=jnp.dtype("float64")),
+                source_info=current_source_info(),
+            )
             r = f(i, a)
 
             jaxpr, _, _ = trace_to_jaxpr(trace, [i, a], [r])

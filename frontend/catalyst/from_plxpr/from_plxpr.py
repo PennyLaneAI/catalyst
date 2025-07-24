@@ -28,7 +28,7 @@ from jax._src.tree_util import tree_flatten
 from jax.extend.core import ClosedJaxpr, Jaxpr
 from jax.extend.linear_util import wrap_init
 from jax.interpreters.partial_eval import convert_constvars_jaxpr
-from pennylane.capture import PlxprInterpreter, qnode_prim
+from pennylane.capture import PlxprInterpreter, pause, qnode_prim
 from pennylane.capture.expand_transforms import ExpandTransformsInterpreter
 from pennylane.capture.primitives import adjoint_transform_prim as plxpr_adjoint_transform_prim
 from pennylane.capture.primitives import ctrl_transform_prim as plxpr_ctrl_transform_prim
@@ -56,6 +56,8 @@ from catalyst.jax_primitives import (
     device_release_p,
     expval_p,
     gphase_p,
+    hamiltonian_p,
+    hermitian_p,
     measure_in_basis_p,
     measure_p,
     namedobs_p,
@@ -69,6 +71,7 @@ from catalyst.jax_primitives import (
     set_basis_state_p,
     set_state_p,
     state_p,
+    tensorobs_p,
     unitary_p,
     var_p,
 )
@@ -95,6 +98,14 @@ def _get_device_kwargs(device) -> dict:
         "rtd_lib": info.lpath,
         "rtd_name": info.c_interface_name,
     }
+
+
+def _flat_prod_gen(op: qml.ops.Prod):
+    for o in op:
+        if isinstance(o, qml.ops.Prod):
+            yield from _flat_prod_gen(o)
+        else:
+            yield o
 
 
 # code example has long lines
@@ -352,9 +363,17 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
 
     def _obs(self, obs):
         """Interpret the observable equation corresponding to a measurement equation's input."""
+        if isinstance(obs, qml.ops.Prod):
+            # catalyst cant handle product of products
+            return tensorobs_p.bind(*(self._obs(t) for t in _flat_prod_gen(obs)))
         if obs.arithmetic_depth > 0:
-            raise NotImplementedError("operator arithmetic not yet supported for conversion.")
+            with pause():
+                coeffs, terms = obs.terms()
+            terms = [self._obs(t) for t in terms]
+            return hamiltonian_p.bind(jnp.stack(coeffs), *terms)
         wires = [self.qreg_manager[w] for w in obs.wires]
+        if obs.name == "Hermitian":
+            return hermitian_p.bind(obs.data[0], *wires)
         return namedobs_p.bind(*wires, *obs.data, kind=obs.name)
 
     def _compbasis_obs(self, *wires):

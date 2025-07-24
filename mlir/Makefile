@@ -64,6 +64,7 @@ llvm:
 		-DLLVM_ENABLE_PROJECTS="$(LLVM_PROJECTS)" \
 		-DLLVM_ENABLE_ASSERTIONS=ON \
 		-DMLIR_ENABLE_BINDINGS_PYTHON=ON \
+		-DPython_EXECUTABLE=$(PYTHON) \
 		-DPython3_EXECUTABLE=$(PYTHON) \
 		-DPython3_NumPy_INCLUDE_DIRS=$$($(PYTHON) -c "import numpy as np; print(np.get_include())") \
 		-DCMAKE_C_COMPILER=$(C_COMPILER) \
