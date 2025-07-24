@@ -235,13 +235,15 @@ struct RoutingPass : public impl::RoutingPassBase<RoutingPass> {
         std::set<quantum::CustomOp> frontLayer;
         preProcessing(&physicalQubits, &randomInitialMapping, &frontLayer, &dagLogicalQubits);
         
-
-        for (auto iterate_op : frontLayer) llvm::outs() << iterate_op << "\n";
+        // print init mapping
+        for (size_t logical_qubit_index = 0; logical_qubit_index < randomInitialMapping.size(); logical_qubit_index++) 
+            llvm::outs() << logical_qubit_index << "->" << randomInitialMapping[logical_qubit_index] << "\n";
+        
         std::vector<StringRef> compiledGateNames;
         std::vector<std::vector<int>> compiledGateQubits;
         std::vector<quantum::CustomOp> executeGateList;
-        int search_steps = 0;
-        int max_iterations_without_progress = 10 * dagLogicalQubits;
+        // int search_steps = 0;
+        // int max_iterations_without_progress = 10 * dagLogicalQubits;
         while( frontLayer.size() ) {
             getExecuteGateList(&frontLayer, &executeGateList, couplingMap, &randomInitialMapping);
             if (executeGateList.size()) {
@@ -267,28 +269,54 @@ struct RoutingPass : public impl::RoutingPassBase<RoutingPass> {
                 }
                 executeGateList.clear(); // clear execute gate list
             }
-            else if (search_steps >= max_iterations_without_progress) {
-                search_steps = 0;
-                while (compiledGateNames.back() == "SWAP")
+            else {//if (search_steps >= max_iterations_without_progress) {
+                // search_steps = 0;
+                // while (compiledGateNames.back() == "SWAP")
+                // {
+                //     compiledGateNames.pop_back();
+                //     compiledGateQubits.pop_back();
+                // }   
+                auto greedyGate = *(frontLayer.begin());
+                auto inQubits = greedyGate.getInQubits();
+                int physical_Qubit_0 = randomInitialMapping[getRegisterIndexOfOp(inQubits[0])];
+                int physical_Qubit_1 = randomInitialMapping[getRegisterIndexOfOp(inQubits[1])];
+                std::vector<int> swapPath = getShortestPath(physical_Qubit_0, physical_Qubit_1, predecessorMatrix);
+                for(size_t i = 1; i<swapPath.size()-1; i++)
                 {
-                    compiledGateNames.pop_back();
-                    compiledGateQubits.pop_back();
-                    // insert shortest SWAP path
-            }
-            else {
-                for(auto op : frontLayer) {
-                    auto inQubits = op.getInQubits();
-                    int physical_Qubit_0 = randomInitialMapping[getRegisterIndexOfOp(inQubits[0])];
-                    int physical_Qubit_1 = randomInitialMapping[getRegisterIndexOfOp(inQubits[1])];
-                    llvm::outs() << "Shortest path from " << physical_Qubit_0 << " and " << physical_Qubit_1 << "\n";
-                    std::vector<int> swapPath = getShortestPath(physical_Qubit_0, physical_Qubit_1, predecessorMatrix);
-                    for (auto swap_itr : swapPath) llvm::outs() << swap_itr << "-> ";
-                    llvm::outs() << "\n";
-                
+                    int u = swapPath[i-1];
+                    int v = swapPath[i];
+                    compiledGateNames.push_back("SWAP");
+                    compiledGateQubits.push_back({u,v});
+                    //update mapping 
+                    for (size_t random_init_mapping_index = 0; random_init_mapping_index < randomInitialMapping.size(); random_init_mapping_index++)
+                    {
+                        if(randomInitialMapping[random_init_mapping_index] == u)
+                            randomInitialMapping[random_init_mapping_index] = v;
+                        else if(randomInitialMapping[random_init_mapping_index] == v)
+                            randomInitialMapping[random_init_mapping_index] = u;
+                    }
                 }
-                frontLayer.clear();
-                search_steps++;
             }
+            // else {
+            //     for(auto op : frontLayer) {
+            //         auto inQubits = op.getInQubits();
+            //         int physical_Qubit_0 = randomInitialMapping[getRegisterIndexOfOp(inQubits[0])];
+            //         int physical_Qubit_1 = randomInitialMapping[getRegisterIndexOfOp(inQubits[1])];
+            //         llvm::outs() << "Shortest path from " << physical_Qubit_0 << " and " << physical_Qubit_1 << "\n";
+            //         std::vector<int> swapPath = getShortestPath(physical_Qubit_0, physical_Qubit_1, predecessorMatrix);
+            //         for (auto swap_itr : swapPath) llvm::outs() << swap_itr << "-> ";
+            //         llvm::outs() << "\n";
+                
+            //     }
+            //     frontLayer.clear();
+            //     search_steps++;
+            // }
+        }
+        for (size_t compile_gate_index = 0; compile_gate_index < compiledGateNames.size(); compile_gate_index++) {
+            llvm::outs() << compiledGateNames[compile_gate_index] << ": ";
+            for (auto compile_qubits : compiledGateQubits[compile_gate_index]) 
+                llvm::outs() << compile_qubits << " ";
+            llvm::outs() << "\n";
         }
     }
 };
