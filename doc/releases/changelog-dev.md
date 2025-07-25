@@ -50,6 +50,24 @@
   programs containing these operations.
   [(#1920)](https://github.com/PennyLaneAI/catalyst/pull/1920)
 
+* The default compilation pipeline is now available as `catalyst.pipelines.default_pipeline()`. The
+  function `catalyst.pipelines.get_stages()` has also been removed as it was not used and duplicated
+  the `CompileOptions.get_stages()` method.
+
+* Utility functions for modifying an existing compilation pipeline have been added to the
+  `catalyst.pipelines` module.
+
+  These functions provide a simple interface to insert passes and stages into a compilation
+  pipeline. For example,
+
+  ```pycon
+  >>> from catalyst.pipelines import insert_pass_after
+  >>> pipeline = ["pass1", "pass2"]
+  >>> insert_pass_after(pipeline, "new_pass", ref_pass="pass1")
+  >>> pipeline
+  ['pass1', 'new_pass', 'pass2']
+  ```
+
 <h3>Documentation 📝</h3>
 
 <h3>Contributors ✍️</h3>
