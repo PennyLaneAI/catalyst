@@ -60,7 +60,8 @@
   [(#1941)](https://github.com/PennyLaneAI/catalyst/pull/1941)
 
   These functions provide a simple interface to insert passes and stages into a compilation
-  pipeline. For example,
+  pipeline. The available functions are `insert_pass_after`, `insert_pass_before`,
+  `insert_stage_after`, and `insert_stage_before`. For example,
 
   ```pycon
   >>> from catalyst.pipelines import insert_pass_after
