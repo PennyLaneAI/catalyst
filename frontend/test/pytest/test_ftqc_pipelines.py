@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Test suite for the Catalyst FTQC built-in compilation pipelines."""
+
 from catalyst.ftqc import mbqc_pipeline
 from catalyst.pipelines import default_pipeline
 
