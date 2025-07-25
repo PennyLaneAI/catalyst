@@ -72,8 +72,11 @@
   ```
 
 * A new built-in compilation pipeline for experimental MBQC workloads has been added, available as
-  `catalyst.ftqc.mbqc_pipeline()`. The output of this function can be used directly as input to the
-  `pipelines` argument of :func:`~.qjit`, for example,
+  `catalyst.ftqc.mbqc_pipeline()`.
+  [(#1942)](https://github.com/PennyLaneAI/catalyst/pull/1942)
+
+  The output of this function can be used directly as input to the `pipelines` argument of
+  :func:`~.qjit`, for example,
 
   ```python
   from catalyst.ftqc import mbqc_pipeline
