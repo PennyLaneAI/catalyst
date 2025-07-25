@@ -71,6 +71,19 @@
   ['pass1', 'new_pass', 'pass2']
   ```
 
+* A new built-in compilation pipeline for experimental MBQC workloads has been added, available as
+  `catalyst.ftqc.mbqc_pipeline()`. The output of this function can be used directly as input to the
+  `pipelines` argument of :func:`~.qjit`, for example,
+
+  ```python
+  from catalyst.ftqc import mbqc_pipeline
+
+  @qjit(pipelines=mbqc_pipeline())
+  @qml.qnode(dev)
+  def workload():
+      ...
+  ```
+
 <h3>Documentation 📝</h3>
 
 <h3>Contributors ✍️</h3>
