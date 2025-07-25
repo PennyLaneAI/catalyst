@@ -61,6 +61,7 @@ FetchContent_Declare(z3
         UPDATE_DISCONNECTED 1
 )
 
+# Z3 warnings will be thrown as errors if this is not OFF
 set(Z3_BUILD_LIBZ3_SHARED OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(z3)
 
