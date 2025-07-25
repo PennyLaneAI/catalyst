@@ -316,7 +316,7 @@ ifeq ($(ENABLE_OQD), ON)
 	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/test_oqd/oqd $(PYTEST_FLAGS) --cov=catalyst --cov-append --tb=native --cov-report=
 endif
 	$(ASAN_COMMAND) $(MAKE) lit-coverage
-	coverage combine .coverage.lit .coverage
+	coverage combine --append .coverage.lit .coverage
 	@echo "=== Generating final coverage report with format: $(COVERAGE_REPORT) ==="
 ifeq ($(COVERAGE_REPORT),term-missing)
 	$(PYTHON) -m coverage report --show-missing

@@ -63,7 +63,9 @@ if os.environ.get("ENABLE_LIT_COVERAGE", "0") == "1":
     config.environment["COVERAGE_FILE"] = os.environ.get(
         "COVERAGE_FILE", os.path.join(project_root, ".coverage.lit")
     )
-    python_executable = f"{python_executable} -m coverage run --source={catalyst_source} --append"
+    python_executable = (
+        f"{python_executable} -m coverage run --source={catalyst_source} --append --branch"
+    )
 
 config.substitutions.append(("%PYTHON", python_executable))
 
@@ -92,6 +94,21 @@ try:
 except AttributeError:
     from lit.llvm.config import LLVMConfig  # fmt:skip
     llvm_config = LLVMConfig(lit_config, config)
+
+    # When running outside CMake context (e.g., make lit-coverage),
+    # we need to manually set up the LLVM tools path
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../"))
+    llvm_tools_dir = os.path.join(project_root, "mlir", "llvm-project", "build", "bin")
+    quantum_bin_dir = os.path.join(project_root, "mlir", "build", "bin")
+
+    if os.path.exists(llvm_tools_dir):
+        llvm_config.with_environment("PATH", llvm_tools_dir, append_path=True)
+        # Add tool substitutions to ensure we use the right FileCheck
+        llvm_config.add_tool_substitutions(["FileCheck"], [llvm_tools_dir])
+
+    if os.path.exists(quantum_bin_dir):
+        llvm_config.with_environment("PATH", quantum_bin_dir, append_path=True)
+
     llvm_config.with_system_environment("PYTHONPATH")
     llvm_config.with_system_environment("RUNTIME_LIB_DIR")
     llvm_config.with_system_environment("MLIR_LIB_DIR")
