@@ -201,11 +201,11 @@ struct RoutingPass : public impl::RoutingPassBase<RoutingPass> {
         return path;
     }
     
-    void getExecuteGateList(std::set<quantum::CustomOp> *frontLayer, std::vector<quantum::CustomOp> *executeGateList, llvm::DenseMap<std::pair<int, int>, bool> &couplingMap, std::vector<int> *randomInitialMapping) {
+    void getExecuteGateList(std::set<quantum::CustomOp> *frontLayer, std::set<quantum::CustomOp> *executeGateList, llvm::DenseMap<std::pair<int, int>, bool> &couplingMap, std::vector<int> *randomInitialMapping) {
         for(auto op : *frontLayer) {
             int nQubits = op.getInQubits().size(); 
             if (nQubits == 1)
-                (*executeGateList).push_back(op);
+                (*executeGateList).insert(op);
             else if (nQubits == 2) {
                 auto inQubits = op.getInQubits();
                 int physical_Qubit_0 = (*randomInitialMapping)[getRegisterIndexOfOp(inQubits[0])];
@@ -213,7 +213,7 @@ struct RoutingPass : public impl::RoutingPassBase<RoutingPass> {
 
                 std::pair<int, int> is_physical_Edge = std::make_pair(physical_Qubit_0,physical_Qubit_1);
                 if (couplingMap[is_physical_Edge])
-                    (*executeGateList).push_back(op);
+                    (*executeGateList).insert(op);
             }
         }
         return;
@@ -261,12 +261,13 @@ struct RoutingPass : public impl::RoutingPassBase<RoutingPass> {
         preProcessing(&physicalQubits, &randomInitialMapping, &frontLayer, &dagLogicalQubits);
         
         // print init mapping
+        llvm::outs() << "Random Initial Mapping: \n";
         for (size_t logical_qubit_index = 0; logical_qubit_index < randomInitialMapping.size(); logical_qubit_index++) 
             llvm::outs() << logical_qubit_index << "->" << randomInitialMapping[logical_qubit_index] << "\n";
         
         std::vector<StringRef> compiledGateNames;
         std::vector<std::vector<int>> compiledGateQubits;
-        std::vector<quantum::CustomOp> executeGateList;
+        std::set<quantum::CustomOp> executeGateList;
         int search_steps = 0;
         int max_iterations_without_progress = 10 * dagLogicalQubits;
         while( frontLayer.size() ) {
