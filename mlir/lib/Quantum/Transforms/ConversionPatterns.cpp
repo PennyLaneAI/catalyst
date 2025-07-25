@@ -305,6 +305,27 @@ struct AllocOpPattern : public OpConversionPattern<AllocOp> {
     }
 };
 
+struct AllocQubitOpPattern : public OpConversionPattern<AllocQubitOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(AllocQubitOp op, AllocQubitOpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+        MLIRContext *ctx = getContext();
+        const TypeConverter *conv = getTypeConverter();
+
+        StringRef qirName = "__catalyst__rt__qubit_allocate";
+        Type qirSignature = LLVM::LLVMFunctionType::get(conv->convertType(QubitType::get(ctx)), {});
+
+        LLVM::LLVMFuncOp fnDecl =
+            catalyst::ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+
+        rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, fnDecl, ValueRange{});
+
+        return success();
+    }
+};
+
 struct DeallocOpPattern : public OpConversionPattern<DeallocOp> {
     using OpConversionPattern::OpConversionPattern;
 
@@ -317,6 +338,28 @@ struct DeallocOpPattern : public OpConversionPattern<DeallocOp> {
         StringRef qirName = "__catalyst__rt__qubit_release_array";
         Type qirSignature = LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx),
                                                         conv->convertType(QuregType::get(ctx)));
+
+        LLVM::LLVMFuncOp fnDecl =
+            catalyst::ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+
+        rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, fnDecl, adaptor.getOperands());
+
+        return success();
+    }
+};
+
+struct DeallocQubitOpPattern : public OpConversionPattern<DeallocQubitOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(DeallocQubitOp op, DeallocQubitOpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+        MLIRContext *ctx = getContext();
+        const TypeConverter *conv = getTypeConverter();
+
+        StringRef qirName = "__catalyst__rt__qubit_release";
+        Type qirSignature = LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx),
+                                                        conv->convertType(QubitType::get(ctx)));
 
         LLVM::LLVMFuncOp fnDecl =
             catalyst::ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
@@ -388,21 +431,45 @@ struct CustomOpPattern : public OpConversionPattern<CustomOp> {
         auto modifiersPtr = getModifiersPtr(loc, rewriter, conv, op.getAdjointFlag(),
                                             adaptor.getInCtrlQubits(), adaptor.getInCtrlValues());
 
+        // TODO: Might be better to have corresponding attribute for those custom op with variadic
+        // input qubits, so we don't need to explicity check any op gate name here
+        const auto hasVariadicInputQbits = (op.getGateName() == "Identity");
+
         std::string qirName = "__catalyst__qis__" + op.getGateName().str();
         SmallVector<Type> argTypes;
         argTypes.insert(argTypes.end(), adaptor.getParams().getTypes().begin(),
                         adaptor.getParams().getTypes().end());
-        argTypes.insert(argTypes.end(), adaptor.getInQubits().getTypes().begin(),
-                        adaptor.getInQubits().getTypes().end());
-        argTypes.insert(argTypes.end(), modifiersPtr.getType());
-        Type qirSignature = LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx), argTypes);
+        if (hasVariadicInputQbits) {
+            // Since input qubits would be extracted through va_list in C,
+            // thus we should add an additional information for number of qubits
+            argTypes.insert(argTypes.end(), modifiersPtr.getType());
+            argTypes.insert(argTypes.end(), IntegerType::get(ctx, 64));
+        }
+        else {
+            argTypes.insert(argTypes.end(), adaptor.getInQubits().getTypes().begin(),
+                            adaptor.getInQubits().getTypes().end());
+            argTypes.insert(argTypes.end(), modifiersPtr.getType());
+        }
+
+        Type qirSignature = LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx), argTypes,
+                                                        /*isVarArg=*/hasVariadicInputQbits);
         LLVM::LLVMFuncOp fnDecl =
             catalyst::ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
 
         SmallVector<Value> args;
         args.insert(args.end(), adaptor.getParams().begin(), adaptor.getParams().end());
-        args.insert(args.end(), adaptor.getInQubits().begin(), adaptor.getInQubits().end());
-        args.insert(args.end(), modifiersPtr);
+        if (hasVariadicInputQbits) {
+            // get the number of qbuits and place the input qubits at the end of the arguments.
+            int64_t numQubits = op.getOutQubits().size();
+            args.insert(args.end(), modifiersPtr);
+            args.insert(args.end(), rewriter.create<LLVM::ConstantOp>(
+                                        loc, rewriter.getI64IntegerAttr(numQubits)));
+            args.insert(args.end(), adaptor.getInQubits().begin(), adaptor.getInQubits().end());
+        }
+        else {
+            args.insert(args.end(), adaptor.getInQubits().begin(), adaptor.getInQubits().end());
+            args.insert(args.end(), modifiersPtr);
+        }
 
         rewriter.create<LLVM::CallOp>(loc, fnDecl, args);
         SmallVector<Value> values;
@@ -1026,7 +1093,9 @@ void populateQIRConversionPatterns(TypeConverter &typeConverter, RewritePatternS
     patterns.add<DeviceReleaseOpPattern>(typeConverter, patterns.getContext());
     patterns.add<NumQubitsOpPattern>(typeConverter, patterns.getContext());
     patterns.add<AllocOpPattern>(typeConverter, patterns.getContext());
+    patterns.add<AllocQubitOpPattern>(typeConverter, patterns.getContext());
     patterns.add<DeallocOpPattern>(typeConverter, patterns.getContext());
+    patterns.add<DeallocQubitOpPattern>(typeConverter, patterns.getContext());
     patterns.add<ExtractOpPattern>(typeConverter, patterns.getContext());
     patterns.add<InsertOpPattern>(typeConverter, patterns.getContext());
     patterns.add<CustomOpPattern>(typeConverter, patterns.getContext());

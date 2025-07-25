@@ -61,6 +61,7 @@ jobs:
           # Exclude some files known to be divergent during the release process from the PR
           git checkout origin/main -- frontend/catalyst/_version.py
           git checkout origin/main -- doc/dev/release_notes.rst
+          git checkout origin/main -- .github/workflows/check-catalyst.yaml
           git config user.name "GitHub Actions Bot"
           git config user.email "<>"
           git commit -m "exclude files from pr"

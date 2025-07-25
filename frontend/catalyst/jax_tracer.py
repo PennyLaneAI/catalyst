@@ -29,6 +29,7 @@ import jax
 import jax.numpy as jnp
 import pennylane as qml
 from jax._src.lax.lax import _extract_tracers_dyn_shape
+from jax._src.source_info_util import current as current_source_info
 from jax.api_util import debug_info as jdb
 from jax.core import get_aval
 from pennylane import QubitUnitary, QueuingManager
@@ -56,7 +57,6 @@ from catalyst.jax_extras import (
     InputSignature,
     OutputSignature,
     PyTreeDef,
-    PyTreeRegistry,
     ShapedArray,
     _input_type_to_tracers,
     cond_expansion_strategy,
@@ -66,6 +66,7 @@ from catalyst.jax_extras import (
     eval_jaxpr,
     input_type_to_tracers,
     jaxpr_to_mlir,
+    make_from_node_data_and_children,
     make_jaxpr2,
     sort_eqns,
     transient_jax_config,
@@ -102,10 +103,7 @@ from catalyst.jax_primitives import (
     var_p,
 )
 from catalyst.logging import debug_logger, debug_logger_init
-from catalyst.tracing.contexts import (
-    EvaluationContext,
-    EvaluationMode,
-)
+from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
 from catalyst.utils.exceptions import CompileError
 
 logger = logging.getLogger(__name__)
@@ -146,16 +144,6 @@ def _make_execution_config(qnode):
         execution_config = replace(execution_config, gradient_method=_in_gradient_tracing(qnode))
 
     return execution_config
-
-
-def get_device_shots(dev):
-    """Helper function to get device shots."""
-    return dev.shots if isinstance(dev, qml.devices.LegacyDevice) else dev.shots.total_shots
-
-
-def get_device_shot_vector(dev):
-    """Helper function to get device shot vector."""
-    return [(shot_copy.shots, shot_copy.copies) for shot_copy in dev.shots.shot_vector]
 
 
 class Function:
@@ -228,9 +216,12 @@ def retrace_with_result_types(jaxpr: ClosedJaxpr, target_types: List[ShapedArray
     with_qreg = isinstance(target_types[-1], AbstractQreg)
     with EvaluationContext(EvaluationMode.CLASSICAL_COMPILATION) as ctx:
         with EvaluationContext.frame_tracing_context() as trace:
-            in_tracers = _input_type_to_tracers(trace.new_arg, jaxpr.in_avals)
+            in_tracers = _input_type_to_tracers(
+                partial(trace.new_arg, source_info=current_source_info()), jaxpr.in_avals
+            )
             out_tracers = [
-                trace.to_jaxpr_tracer(t) for t in eval_jaxpr(jaxpr.jaxpr, jaxpr.consts, *in_tracers)
+                trace.to_jaxpr_tracer(t, source_info=current_source_info())
+                for t in eval_jaxpr(jaxpr.jaxpr, jaxpr.consts, *in_tracers)
             ]
             out_tracers_, target_types_ = (
                 (out_tracers[:-1], target_types[:-1]) if with_qreg else (out_tracers, target_types)
@@ -953,6 +944,7 @@ def pauli_word_to_tensor_obs(obs, qrp: QRegPromise) -> List[DynamicJaxprTracer]:
 # pylint: disable=too-many-statements,too-many-branches
 @debug_logger
 def trace_quantum_measurements(
+    shots_obj,
     device: QubitDevice,
     qrp: QRegPromise,
     outputs: List[Union[MeasurementProcess, DynamicJaxprTracer, Any]],
@@ -962,24 +954,28 @@ def trace_quantum_measurements(
     the quantum measurement outputs, leave other outputs as-is.
 
     Args:
+        shots_obj: Shots object containing shots information (total_shots, shot_vector, num_copies).
+                  The total_shots can be an int or JAX tracer for dynamic shots.
         device (QubitDevice): PennyLane quantum device to use for quantum measurements.
         qrp (QRegPromise): Quantum register tracer with cached qubits
         outputs (List of quantum function results): List of qnode output JAX tracers to process.
         out_tree (PyTreeDef): PyTree-shape of the outputs.
-        quantum_tape: PennyLane quantum tape.
 
     Returns:
         out_classical_tracers: modified list of JAX classical qnode ouput tracers.
         out_tree: modified PyTree-shape of the qnode output.
     """
-    shots = get_device_shots(device)
+    # Extract total shots and detect if dynamic
+    shots = shots_obj.total_shots
     out_classical_tracers = []
 
     for i, output in enumerate(outputs):
         if isinstance(output, MeasurementProcess):
 
             # Check if the measurement is supported shot-vector where num_of_total_copies > 1
-            if device.shots.num_copies > 1 and not isinstance(output, qml.measurements.SampleMP):
+            if shots_obj.has_partitioned_shots and not isinstance(
+                output, qml.measurements.SampleMP
+            ):
                 raise NotImplementedError(
                     f"Measurement {type(output).__name__} is not supported a shot-vector. "
                     "Use qml.sample() instead."
@@ -1015,10 +1011,8 @@ def trace_quantum_measurements(
                         result = jnp.astype(result, jnp.int64)
 
                     reshaped_result = ()
-                    shot_vector = get_device_shot_vector(device)
+                    shot_vector = shots_obj.shot_vector
                     start_idx = 0  # Start index for slicing
-                    # TODO: shots still can only be static in PL frontend
-                    # TODO: Update to dynamic shots
                     has_shot_vector = len(shot_vector) > 1 or any(
                         copies > 1 for _, copies in shot_vector
                     )
@@ -1076,11 +1070,11 @@ def trace_quantum_measurements(
                 meas_return_trees_children = out_tree.children()
                 if len(meas_return_trees_children):
                     meas_return_trees_children[i] = counts_tree
-                    out_tree = out_tree.make_from_node_data_and_children(
-                        PyTreeRegistry(),
-                        out_tree.node_data(),
-                        meas_return_trees_children,
+
+                    out_tree = make_from_node_data_and_children(
+                        out_tree.node_data(), meas_return_trees_children
                     )
+
                 else:
                     out_tree = counts_tree
             elif type(output) is StateMP:
@@ -1260,8 +1254,14 @@ def trace_post_processing(trace, post_processing: Callable, pp_args, debug_info=
 
         # wffa will take as an input a flatten tracers.
         # After wffa is called, then the shape becomes available in out_tree_promise.
-        in_tracers = [trace.to_jaxpr_tracer(t) for t in tree_flatten(pp_args)[0]]
-        out_tracers = [trace.to_jaxpr_tracer(t) for t in wffa.call_wrapped(*in_tracers)]
+        in_tracers = [
+            trace.to_jaxpr_tracer(t, source_info=current_source_info())
+            for t in tree_flatten(pp_args)[0]
+        ]
+        out_tracers = [
+            trace.to_jaxpr_tracer(t, source_info=current_source_info())
+            for t in wffa.call_wrapped(*in_tracers)
+        ]
         cur_trace = EvaluationContext.get_current_trace()
         jaxpr, out_type, consts = cur_trace.frame.to_jaxpr2(out_tracers, wffa.debug_info)
         closed_jaxpr = ClosedJaxpr(jaxpr, consts)
@@ -1299,11 +1299,29 @@ def trace_function(
 
     with EvaluationContext.frame_tracing_context(debug_info=wfun.debug_info) as trace:
         arg_expanded_tracers = input_type_to_tracers(
-            in_sig.in_type, trace.new_arg, trace.to_jaxpr_tracer
+            in_sig.in_type,
+            partial(trace.new_arg, source_info=current_source_info()),
+            partial(trace.to_jaxpr_tracer, source_info=current_source_info()),
         )
         res_expanded_tracers = wfun.call_wrapped(*arg_expanded_tracers)
 
         return res_expanded_tracers, in_sig, out_sig
+
+
+def _get_total_shots(qnode):
+    """
+    Extract total shots from qnode.
+    If shots is None on the qnode, this method returns 0 (static).
+    This method allows the qnode shots to be either static (python int
+    literals) or dynamic (tracers).
+    """
+    # due to possibility of tracer, we cannot use a simple `or` here to simplify
+    shots_value = qnode._shots.total_shots  # pylint: disable=protected-access
+    if shots_value is None:
+        shots = 0
+    else:
+        shots = shots_value
+    return shots
 
 
 @debug_logger
@@ -1333,12 +1351,15 @@ def trace_quantum_function(
 
     with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
         # (1) - Classical tracing
-        quantum_tape = QuantumTape(shots=device.shots)
+        shots = qnode._shots  # pylint: disable=protected-access
+        quantum_tape = QuantumTape(shots=shots)  # pylint: disable=protected-access
         with EvaluationContext.frame_tracing_context(debug_info=debug_info) as trace:
             wffa, in_avals, keep_inputs, out_tree_promise = deduce_avals(
                 f, args, kwargs, static_argnums, debug_info
             )
-            in_classical_tracers = _input_type_to_tracers(trace.new_arg, in_avals)
+            in_classical_tracers = _input_type_to_tracers(
+                partial(trace.new_arg, source_info=current_source_info()), in_avals
+            )
             with QueuingManager.stop_recording(), quantum_tape:
                 # Quantum tape transformations happen at the end of tracing
                 in_classical_tracers = [t for t, k in zip(in_classical_tracers, keep_inputs) if k]
@@ -1383,11 +1404,9 @@ def trace_quantum_function(
                 # Each tape will be outlined into its own function with mlir pass
                 # -split-multiple-tapes
 
-                # TODO: device shots is now always a concrete integer or None
-                # When PennyLane allows dynamic shots, update tracing to accept dynamic shots too
-                device_shots = get_device_shots(device) or 0
+                total_shots = _get_total_shots(qnode)
                 device_init_p.bind(
-                    device_shots,
+                    total_shots,
                     auto_qubit_management=(device.wires is None),
                     rtd_lib=device.backend_lib,
                     rtd_name=device.backend_name,
@@ -1423,7 +1442,7 @@ def trace_quantum_function(
                 qrp_out = trace_quantum_operations(
                     tape, device, qreg_in, ctx, trace, mcm_config, snapshot_results
                 )
-                meas, meas_trees = trace_quantum_measurements(device, qrp_out, output, trees)
+                meas, meas_trees = trace_quantum_measurements(shots, device, qrp_out, output, trees)
                 qreg_out = qrp_out.actualize()
 
                 # Check if the measurements are nested then apply the to_jaxpr_tracer
@@ -1433,7 +1452,9 @@ def trace_quantum_function(
                     else:
                         return func(arr)
 
-                meas_tracers = check_full_raise(meas, trace.to_jaxpr_tracer)
+                meas_tracers = check_full_raise(
+                    meas, partial(trace.to_jaxpr_tracer, source_info=current_source_info())
+                )
                 if len(snapshot_results) > 0:
                     # redefine meas_trees PyTree to have same PyTreeRegistry as Snapshot PyTree
                     meas_trees = jax.tree_util.tree_structure(
