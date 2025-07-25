@@ -176,39 +176,43 @@ def get_mlir_attribute_from_pyval(value):
     will segfault if multiple `Context()`s are instantiated.
     """
 
-    if isinstance(value, bool):
-        return ir.BoolAttr.get(value)
+    attr = None
+    match value:
+        case bool():
+            attr = ir.BoolAttr.get(value)
 
-    elif isinstance(value, int):
-        if value < 0:
-            return ir.IntegerAttr.get(ir.IntegerType.get_signed(64), value)
-        else:
-            return ir.IntegerAttr.get(ir.IntegerType.get_signless(64), value)
+        case int():
+            if value < 0:
+                attr = ir.IntegerAttr.get(ir.IntegerType.get_signed(64), value)
+            else:
+                attr = ir.IntegerAttr.get(ir.IntegerType.get_signless(64), value)
 
-    elif isinstance(value, float):
-        return ir.FloatAttr.get(ir.F64Type.get(), value)
+        case float():
+            attr = ir.FloatAttr.get(ir.F64Type.get(), value)
 
-    elif isinstance(value, str):
-        return ir.StringAttr.get(value)
+        case str():
+            attr = ir.StringAttr.get(value)
 
-    elif isinstance(value, (list, tuple)):
-        element_attrs = [get_mlir_attribute_from_pyval(elem) for elem in value]
-        return ir.ArrayAttr.get(element_attrs)
+        case list() | tuple():
+            element_attrs = [get_mlir_attribute_from_pyval(elem) for elem in value]
+            attr = ir.ArrayAttr.get(element_attrs)
 
-    elif isinstance(value, dict):
-        named_attrs = {}
-        for k, v in value.items():
-            if not isinstance(k, str):
-                raise ValueError(
-                    f"Dictionary keys for MLIR DictionaryAttr must be strings, got: {type(k)}"
-                )
-            named_attrs[k] = get_mlir_attribute_from_pyval(v)
-        return ir.DictAttr.get(named_attrs)
+        case dict():
+            named_attrs = {}
+            for k, v in value.items():
+                if not isinstance(k, str):
+                    raise ValueError(
+                        f"Dictionary keys for MLIR DictionaryAttr must be strings, got: {type(k)}"
+                    )
+                named_attrs[k] = get_mlir_attribute_from_pyval(v)
+            attr = ir.DictAttr.get(named_attrs)
 
-    elif value is None:
-        # MLIR has a UnitAttr for representing a void or "none" value
-        # TODO: is `None` the best flag here?
-        return ir.UnitAttr.get()
+        case None:
+            # MLIR has a UnitAttr for representing a void or "none" value
+            # TODO: is `None` the best flag here?
+            attr = ir.UnitAttr.get()
 
-    else:
-        raise CompileError(f"Cannot convert Python type {type(value)} to an MLIR attribute.")
+        case _:
+            raise CompileError(f"Cannot convert Python type {type(value)} to an MLIR attribute.")
+
+    return attr
