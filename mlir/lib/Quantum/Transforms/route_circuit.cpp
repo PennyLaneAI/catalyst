@@ -219,6 +219,31 @@ struct RoutingPass : public impl::RoutingPassBase<RoutingPass> {
         return;
     }
 
+    void Heuristic(std::set<quantum::CustomOp> *frontLayer, llvm::DenseMap<std::pair<int,int>, int> &swap_candidates, std::vector<int> *randomInitialMapping, llvm::DenseMap<std::pair<int,int>, int> &distanceMatrix) {
+        
+        for (auto& entry : swap_candidates) {
+            std::pair<int, int> &swap_pair = entry.first;
+            std::vector<int> temp_mapping(*randomInitialMapping);
+            
+            //update temp mapping 
+            for (size_t temp_mapping_index = 0; temp_mapping_index < temp_mapping.size(); temp_mapping_index++)
+            {
+                if(temp_mapping[temp_mapping_index] == swap_pair.first)
+                    temp_mapping[temp_mapping_index] = swap_pair.second;
+                else if(temp_mapping[temp_mapping_index] == swap_pair.second)
+                    temp_mapping[temp_mapping_index] = swap_pair.first;
+            }
+            int temp_score = 0;
+            for(auto op : *frontLayer) {
+                auto inQubits = op.getInQubits();
+                int physical_Qubit_0 = temp_mapping[getRegisterIndexOfOp(inQubits[0])];
+                int physical_Qubit_1 = temp_mapping[getRegisterIndexOfOp(inQubits[1])];
+                temp_score = temp_score + distanceMatrix[std::make_pair(physical_Qubit_0,physical_Qubit_1)];
+            }
+            swap_candidates[swap_pair] = std::min(swap_candidates[swap_pair], temp_score);
+        }
+    }
+    
     void runOnOperation() override {
 
         std::set<int> physicalQubits;
@@ -242,8 +267,8 @@ struct RoutingPass : public impl::RoutingPassBase<RoutingPass> {
         std::vector<StringRef> compiledGateNames;
         std::vector<std::vector<int>> compiledGateQubits;
         std::vector<quantum::CustomOp> executeGateList;
-        // int search_steps = 0;
-        // int max_iterations_without_progress = 10 * dagLogicalQubits;
+        int search_steps = 0;
+        int max_iterations_without_progress = 10 * dagLogicalQubits;
         while( frontLayer.size() ) {
             getExecuteGateList(&frontLayer, &executeGateList, couplingMap, &randomInitialMapping);
             if (executeGateList.size()) {
@@ -269,13 +294,13 @@ struct RoutingPass : public impl::RoutingPassBase<RoutingPass> {
                 }
                 executeGateList.clear(); // clear execute gate list
             }
-            else {//if (search_steps >= max_iterations_without_progress) {
-                // search_steps = 0;
-                // while (compiledGateNames.back() == "SWAP")
-                // {
-                //     compiledGateNames.pop_back();
-                //     compiledGateQubits.pop_back();
-                // }   
+            else if (search_steps >= max_iterations_without_progress) {
+                search_steps = 0;
+                while (compiledGateNames.back() == "SWAP")
+                {
+                    compiledGateNames.pop_back();
+                    compiledGateQubits.pop_back();
+                }   
                 auto greedyGate = *(frontLayer.begin());
                 auto inQubits = greedyGate.getInQubits();
                 int physical_Qubit_0 = randomInitialMapping[getRegisterIndexOfOp(inQubits[0])];
@@ -297,20 +322,40 @@ struct RoutingPass : public impl::RoutingPassBase<RoutingPass> {
                     }
                 }
             }
-            // else {
-            //     for(auto op : frontLayer) {
-            //         auto inQubits = op.getInQubits();
-            //         int physical_Qubit_0 = randomInitialMapping[getRegisterIndexOfOp(inQubits[0])];
-            //         int physical_Qubit_1 = randomInitialMapping[getRegisterIndexOfOp(inQubits[1])];
-            //         llvm::outs() << "Shortest path from " << physical_Qubit_0 << " and " << physical_Qubit_1 << "\n";
-            //         std::vector<int> swapPath = getShortestPath(physical_Qubit_0, physical_Qubit_1, predecessorMatrix);
-            //         for (auto swap_itr : swapPath) llvm::outs() << swap_itr << "-> ";
-            //         llvm::outs() << "\n";
-                
-            //     }
-            //     frontLayer.clear();
-            //     search_steps++;
-            // }
+            else {
+                llvm::DenseMap<std::pair<int,int>, int> swap_candidates;
+                for(auto op : frontLayer) {
+                    auto inQubits = op.getInQubits();
+                    for (auto logivalQubitToBeRouted :inQubits) {
+                        int firstPhysicalQubitToBeRouted = randomInitialMapping[getRegisterIndexOfOp(logivalQubitToBeRouted)];
+                        for (auto secondPhysicalQubitToBeRouted : physicalQubits)
+                            if (distanceMatrix[std::make_pair(firstPhysicalQubitToBeRouted, secondPhysicalQubitToBeRouted)] == 1)
+                                swap_candidates[std::make_pair(firstPhysicalQubitToBeRouted, secondPhysicalQubitToBeRouted)] = MAXIMUM;
+                    }
+                }
+                Heuristic(&frontLayer, swap_candidates, &randomInitialMapping, distanceMatrix);
+                int min_dist_swap = MAXIMUM;
+                std::pair<int, int> min_swap;
+                for (auto& entry : swap_candidates) {
+                    std::pair<int, int> &key = entry.first;
+                    if (entry.second < min_dist_swap) {
+                        min_swap = key;
+                        min_dist_swap = entry.second;
+                    }
+                }
+                // add the min SWAP
+                compiledGateNames.push_back("SWAP");
+                compiledGateQubits.push_back({min_swap.first,min_swap.second});
+                //update mapping 
+                for (size_t random_init_mapping_index = 0; random_init_mapping_index < randomInitialMapping.size(); random_init_mapping_index++)
+                {
+                    if(randomInitialMapping[random_init_mapping_index] == min_swap.first)
+                        randomInitialMapping[random_init_mapping_index] = min_swap.second;
+                    else if(randomInitialMapping[random_init_mapping_index] == min_swap.second)
+                        randomInitialMapping[random_init_mapping_index] = min_swap.first;
+                }
+                search_steps++;
+            }
         }
         for (size_t compile_gate_index = 0; compile_gate_index < compiledGateNames.size(); compile_gate_index++) {
             llvm::outs() << compiledGateNames[compile_gate_index] << ": ";
