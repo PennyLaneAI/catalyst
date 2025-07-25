@@ -19,4 +19,4 @@ This module provides access to compilation tools for experimental fault-tolerant
 
 from .pipelines import mbqc_pipeline
 
-__all__ = "mbqc_pipeline"
+__all__ = ("mbqc_pipeline",)
