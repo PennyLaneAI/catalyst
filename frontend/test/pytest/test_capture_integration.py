@@ -107,7 +107,7 @@ def is_amplitude_embedding_merged_and_decomposed(mlir):
 
 # pylint: disable=too-many-public-methods
 class TestCapture:
-    """Integration tests for Catalyst adjoint functionality."""
+    """Integration tests for functionality."""
 
     @pytest.mark.parametrize("theta", (jnp.pi, 0.1, 0.0))
     def test_simple_circuit_aot(self, backend, theta):
@@ -376,7 +376,7 @@ class TestCapture:
 
         qml.capture.disable()
 
-        assert capture_result == expected
+        assert jnp.allclose(capture_result, expected)
 
     def test_measure_postselect(self, backend):
         """Test the integration for a circuit with a mid-circuit measurement using postselect.
@@ -400,7 +400,7 @@ class TestCapture:
 
         expected_result = -1
 
-        assert capture_result == expected_result
+        assert jnp.allclose(capture_result, expected_result)
 
     @pytest.mark.parametrize("theta", (jnp.pi, 0.1, 0.0))
     def test_forloop(self, backend, theta):
@@ -481,7 +481,7 @@ class TestCapture:
 
             return qml.expval(qml.Z(0))
 
-        assert circuit(10, 0.3) == capture_result
+        assert jnp.allclose(circuit(10, 0.3), capture_result)
 
     def test_nested_loops(self, backend):
         """Test the integration for a circuit with a nested for loop primitive."""
@@ -602,9 +602,9 @@ class TestCapture:
 
             return qml.expval(qml.Z(0))
 
-        assert circuit(0) == capture_result_10_iterations
-        assert circuit(9) == capture_result_1_iteration
-        assert circuit(11) == capture_result_0_iterations
+        assert jnp.allclose(circuit(0), capture_result_10_iterations)
+        assert jnp.allclose(circuit(9), capture_result_1_iteration)
+        assert jnp.allclose(circuit(11), capture_result_0_iterations)
 
     def test_while_loop_workflow_closure(self, backend):
         """Test the integration for a circuit with a while_loop primitive using
@@ -656,7 +656,7 @@ class TestCapture:
 
             return qml.expval(qml.Z(0))
 
-        assert circuit(0, 2) == capture_result
+        assert jnp.allclose(circuit(0, 2), capture_result)
 
     def test_while_loop_workflow_nested(self, backend):
         """Test the integration for a circuit with a nested while_loop primitive."""
@@ -721,7 +721,7 @@ class TestCapture:
 
             return qml.expval(qml.Z(0))
 
-        assert circuit(0, 0) == capture_result
+        assert jnp.allclose(circuit(0, 0), capture_result)
 
     def test_cond_workflow_if_else(self, backend):
         """Test the integration for a circuit with a cond primitive with true and false branches."""
@@ -766,7 +766,7 @@ class TestCapture:
 
             return qml.expval(qml.Z(0))
 
-        assert circuit(0.1) == capture_result
+        assert jnp.allclose(circuit(0.1), capture_result)
 
     def test_cond_workflow_if(self, backend):
         """Test the integration for a circuit with a cond primitive with a true branch only."""
@@ -805,7 +805,7 @@ class TestCapture:
 
             return qml.expval(qml.Z(0))
 
-        assert circuit(1.5) == capture_result
+        assert jnp.allclose(circuit(1.5), capture_result)
 
     def test_cond_workflow_with_custom_primitive(self, backend):
         """Test the integration for a circuit with a cond primitive containing a custom
@@ -855,7 +855,7 @@ class TestCapture:
 
             return qml.expval(qml.Z(0))
 
-        assert circuit(0.1) == capture_result
+        assert jnp.allclose(circuit(0.1), capture_result)
 
     def test_cond_workflow_with_abstract_measurement(self, backend):
         """Test the integration for a circuit with a cond primitive containing an
@@ -905,7 +905,7 @@ class TestCapture:
 
             return qml.expval(qml.Z(0))
 
-        assert circuit(0.1) == capture_result
+        assert jnp.allclose(circuit(0.1), capture_result)
 
     def test_cond_workflow_with_simple_primitive(self, backend):
         """Test the integration for a circuit with a cond primitive containing an
@@ -955,7 +955,7 @@ class TestCapture:
 
             return qml.expval(qml.Z(0))
 
-        assert circuit(0.1) == capture_result
+        assert jnp.allclose(circuit(0.1), capture_result)
 
     def test_cond_workflow_nested(self, backend):
         """Test the integration for a circuit with a nested cond primitive."""
@@ -1014,7 +1014,7 @@ class TestCapture:
 
             return qml.expval(qml.Z(0))
 
-        assert circuit(0.1, 1.5) == capture_result
+        assert jnp.allclose(circuit(0.1, 1.5), capture_result)
 
     def test_cond_workflow_operator(self, backend):
         """Test the integration for a circuit with a cond primitive returning
@@ -1046,7 +1046,7 @@ class TestCapture:
 
             return qml.expval(qml.Z(0))
 
-        assert circuit(0.1) == capture_result
+        assert jnp.allclose(circuit(0.1), capture_result)
 
     def test_transform_cancel_inverses_workflow(self, backend):
         """Test the integration for a circuit with a 'cancel_inverses' transform."""
@@ -1082,7 +1082,7 @@ class TestCapture:
             qml.Hadamard(wires=0)
             return qml.expval(qml.PauliZ(0))
 
-        assert circuit(0.1) == capture_result
+        assert jnp.allclose(circuit(0.1), capture_result)
 
     def test_transform_merge_rotations_workflow(self, backend):
         """Test the integration for a circuit with a 'merge_rotations' transform."""
@@ -1116,7 +1116,7 @@ class TestCapture:
             qml.Hadamard(wires=0)
             return qml.expval(qml.PauliZ(0))
 
-        assert circuit(0.1) == capture_result
+        assert jnp.allclose(circuit(0.1), capture_result)
 
     def test_chained_catalyst_transforms_workflow(self, backend):
         """Test the integration for a circuit with a combination of 'merge_rotations'
@@ -1204,7 +1204,7 @@ class TestCapture:
             qml.QubitUnitary(U, 0)
             return qml.expval(qml.Z(0))
 
-        assert circuit(U.matrix()) == capture_result
+        assert jnp.allclose(circuit(U.matrix()), capture_result)
 
     def test_mixed_transforms_workflow(self, backend):
         """Test the integration for a circuit with a combination of 'unitary_to_rot'
@@ -1311,7 +1311,7 @@ class TestCapture:
             qml.Rot(x, y, z, 0)
             return qml.expval(qml.PauliZ(0))
 
-        assert circuit(1.5, 2.5, 3.5) == capture_result
+        assert jnp.allclose(circuit(1.5, 2.5, 3.5), capture_result)
 
     def test_transform_map_wires_workflow(self, backend):
         """Test the integration for a circuit with a 'map_wires' transform."""
@@ -1342,7 +1342,7 @@ class TestCapture:
             qml.RX(x, 0)
             return qml.expval(qml.PauliZ(0))
 
-        assert circuit(1.5) == capture_result
+        assert jnp.allclose(circuit(1.5), capture_result)
 
     def test_transform_single_qubit_fusion_workflow(self, backend):
         """Test the integration for a circuit with a 'single_qubit_fusion' transform."""
@@ -1381,7 +1381,7 @@ class TestCapture:
             qml.RZ(0.4, wires=0)
             return qml.expval(qml.PauliZ(0))
 
-        assert circuit() == capture_result
+        assert jnp.allclose(circuit(), capture_result)
 
     def test_transform_commute_controlled_workflow(self, backend):
         """Test the integration for a circuit with a 'commute_controlled' transform."""
@@ -1427,7 +1427,7 @@ class TestCapture:
             qml.PauliX(wires=1)
             return qml.expval(qml.PauliZ(0))
 
-        assert circuit() == capture_result
+        assert jnp.allclose(circuit(), capture_result)
 
     def test_transform_merge_amplitude_embedding_workflow(self, backend):
         """Test the integration for a circuit with a 'merge_amplitude_embedding' transform."""
@@ -1459,7 +1459,7 @@ class TestCapture:
             qml.AmplitudeEmbedding(jnp.array([0.0, 1.0]), wires=1)
             return qml.expval(qml.PauliZ(0))
 
-        assert circuit() == capture_result
+        assert jnp.allclose(circuit(), capture_result)
 
     def test_shots_usage(self, backend):
         """Test the integration for a circuit using shots explicitly."""
@@ -1534,7 +1534,7 @@ class TestCapture:
         assert 'quantum.custom "RY"(%cst)' in captured_circuit_2_mlir
         assert "%cst = arith.constant 1.5" not in captured_circuit_2_mlir
 
-        assert result_1 == result_2
+        assert jnp.allclose(result_1, result_2)
 
         # Test under a non qnode workflow function
         @qjit(static_argnums=(0,))
@@ -1553,3 +1553,107 @@ class TestCapture:
         assert 'quantum.custom "RX"(%cst)' in captured_circuit_3_mlir
 
         qml.capture.disable()
+
+
+class TestControlFlow:
+    """Integration tests for control flow."""
+
+    @pytest.mark.parametrize("reverse", (True, False))
+    def test_for_loop_outside_qnode(self, reverse):
+        """Test that a for loop outside qnode can be executed."""
+
+        qml.capture.enable()
+
+        if reverse:
+            start, stop, step = 6, 0, -2  # 6, 4, 2
+        else:
+            start, stop, step = 2, 7, 2  # 2, 4, 6
+
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def c(x):
+            qml.RX(x, 0)
+            return qml.expval(qml.Z(0))
+
+        @qml.qjit
+        def f(i0):
+            @qml.for_loop(start, stop, step)
+            def g(i, x):
+                return c(i) + x
+
+            return g(i0)
+
+        out = f(3.0)
+        assert qml.math.allclose(out, 3 + jnp.cos(2) + jnp.cos(4) + jnp.cos(6))
+
+    def test_while_loop(self):
+        """Test that a outside a qnode can be executed."""
+        qml.capture.enable()
+
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def circuit(x):
+            qml.RX(x, 0)
+            return qml.expval(qml.Z(0))
+
+        @qml.qjit
+        def f(x):
+
+            const = jnp.array([0, 1, 2])
+
+            @qml.while_loop(lambda i, y: i < jnp.sum(const))
+            def g(i, y):
+                return i + 1, y + circuit(i)
+
+            return g(0, x)
+
+        ind, res = f(1.0)
+        assert qml.math.allclose(ind, 3)
+        expected = 1.0 + jnp.cos(0) + jnp.cos(1) + jnp.cos(2)
+        assert qml.math.allclose(res, expected)
+
+
+def test_adjoint_transform_integration():
+    """Test that adjoint transforms can be used with capture enabled."""
+
+    qml.capture.enable()
+
+    def f(x):
+        qml.IsingXX(2 * x, wires=(0, 1))
+        qml.H(0)
+
+    @qml.qjit
+    @qml.qnode(qml.device("lightning.qubit", wires=3))
+    def c(x):
+        qml.adjoint(f)(x)
+        return qml.expval(qml.Z(1))
+
+    x = jnp.array(0.7)
+    res = c(x)
+    expected = jnp.cos(-2 * x)
+    assert qml.math.allclose(res, expected)
+
+
+@pytest.mark.parametrize("separate_funcs", (True, False))
+def test_ctrl_transform_integration(separate_funcs):
+    """Test that the ctrl transform can be applied."""
+
+    qml.capture.enable()
+
+    def f(x, y):
+        qml.RY(3 * y, wires=3)
+        qml.RX(2 * x, wires=3)
+
+    @qml.qjit
+    @qml.qnode(qml.device("lightning.qubit", wires=4), autograph=False)
+    def c(x, y):
+        qml.X(1)
+        if separate_funcs:
+            qml.ctrl(qml.ctrl(f, 0, [False]), 1, [True])(x, y)
+        else:
+            qml.ctrl(f, (0, 1), [False, True])(x, y)
+        return qml.expval(qml.Z(3))
+
+    x = jnp.array(0.5)
+    y = jnp.array(0.9)
+    res = c(x, y)
+    expected = jnp.cos(2 * x) * jnp.cos(3 * y)
+    assert qml.math.allclose(res, expected)

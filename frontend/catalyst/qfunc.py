@@ -27,13 +27,7 @@ import pennylane as qml
 from jax.core import eval_jaxpr
 from jax.tree_util import tree_flatten, tree_unflatten
 from pennylane import exceptions
-from pennylane.measurements import (
-    CountsMP,
-    ExpectationMP,
-    ProbabilityMP,
-    SampleMP,
-    VarianceMP,
-)
+from pennylane.measurements import CountsMP, ExpectationMP, ProbabilityMP, SampleMP, VarianceMP
 from pennylane.transforms.dynamic_one_shot import (
     gather_non_mcm,
     init_auxiliary_tape,
@@ -42,12 +36,8 @@ from pennylane.transforms.dynamic_one_shot import (
 
 import catalyst
 from catalyst.api_extensions import MidCircuitMeasure
-from catalyst.device import QJITDevice, get_device_shots
-from catalyst.jax_extras import (
-    deduce_avals,
-    get_implicit_and_explicit_flat_args,
-    unzip2,
-)
+from catalyst.device import QJITDevice
+from catalyst.jax_extras import deduce_avals, get_implicit_and_explicit_flat_args, unzip2
 from catalyst.jax_primitives import quantum_kernel_p
 from catalyst.jax_tracer import Function, trace_quantum_function
 from catalyst.logging import debug_logger
@@ -64,7 +54,9 @@ def _resolve_mcm_config(mcm_config, shots):
     """Helper function for resolving and validating that the mcm_config is valid for executing."""
     updated_values = {}
 
-    updated_values["postselect_mode"] = mcm_config.postselect_mode if shots else None
+    updated_values["postselect_mode"] = (
+        None if isinstance(shots, int) and shots == 0 else mcm_config.postselect_mode
+    )
     if mcm_config.mcm_method is None:
         updated_values["mcm_method"] = (
             "one-shot" if mcm_config.postselect_mode == "hw-like" else "single-branch-statistics"
@@ -78,12 +70,28 @@ def _resolve_mcm_config(mcm_config, shots):
         raise ValueError(
             "Cannot use postselect_mode='hw-like' with Catalyst when mcm_method != 'one-shot'."
         )
-    if mcm_config.mcm_method == "one-shot" and shots is None:
+    if mcm_config.mcm_method == "one-shot" and shots == 0:
         raise ValueError(
             "Cannot use the 'one-shot' method for mid-circuit measurements with analytic mode."
         )
 
     return replace(mcm_config, **updated_values)
+
+
+def _get_total_shots(qnode):
+    """
+    Extract total shots from qnode.
+    If shots is None on the qnode, this method returns 0 (static).
+    This method allows the qnode shots to be either static (python int
+    literals) or dynamic (tracers).
+    """
+    # due to possibility of tracer, we cannot use a simple `or` here to simplify
+    shots_value = qnode._shots.total_shots  # pylint: disable=protected-access
+    if shots_value is None:
+        shots = 0
+    else:
+        shots = shots_value
+    return shots
 
 
 class QFunc:
@@ -123,7 +131,7 @@ class QFunc:
                     mcm_method=self.execute_kwargs["mcm_method"],
                 )
             )
-            total_shots = get_device_shots(self.device)
+            total_shots = _get_total_shots(self)
             mcm_config = _resolve_mcm_config(mcm_config, total_shots)
 
             if mcm_config.mcm_method == "one-shot":
@@ -132,7 +140,9 @@ class QFunc:
                 )
                 return Function(dynamic_one_shot(self, mcm_config=mcm_config))(*args, **kwargs)
 
-        qjit_device = QJITDevice(self.device)
+        new_device = copy(self.device)
+        new_device._shots = self._shots  # pylint: disable=protected-access
+        qjit_device = QJITDevice(new_device)
 
         static_argnums = kwargs.pop("static_argnums", ())
         out_tree_expected = kwargs.pop("_out_tree_expected", [])
@@ -214,7 +224,7 @@ def dynamic_one_shot(qnode, **kwargs):
     mcm_config = kwargs.pop("mcm_config", None)
 
     def transform_to_single_shot(qnode):
-        if not qnode.device.shots:
+        if not qnode._shots:
             raise exceptions.QuantumFunctionError(
                 "dynamic_one_shot is only supported with finite shots."
             )
@@ -259,14 +269,12 @@ def dynamic_one_shot(qnode, **kwargs):
         single_shot_qnode.execute_kwargs["mcm_method"] = mcm_config.mcm_method
     single_shot_qnode._dynamic_one_shot_called = True
     dev = qnode.device
-    total_shots = get_device_shots(dev)
+    total_shots = _get_total_shots(qnode)
 
     new_dev = copy(dev)
-    if isinstance(new_dev, qml.devices.LegacyDeviceFacade):
-        new_dev.target_device.shots = 1  # pragma: no cover
-    else:
-        new_dev._shots = qml.measurements.Shots(1)
+    new_dev._shots = qml.measurements.Shots(1)
     single_shot_qnode.device = new_dev
+    single_shot_qnode._set_shots(qml.measurements.Shots(1))  # pylint: disable=protected-access
 
     def one_shot_wrapper(*args, **kwargs):
         def wrap_single_shot_qnode(*_):

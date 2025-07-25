@@ -30,6 +30,11 @@ on:
         type: boolean
         required: false
         default: false
+      branch:
+        description: 'Branch to build from'
+        required: false
+        default: 'main'
+        type: string
 
 env:
   MACOSX_DEPLOYMENT_TARGET: 14.0
@@ -60,7 +65,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python_version: ["3.10"]
+        python_version: ["3.11"]
 
     name: Build Dependencies (Python ${{ matrix.python_version }})
     runs-on: macos-latest
@@ -70,12 +75,8 @@ jobs:
     steps:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
-
-    # Python 3.10 was dropped from the GH images on macOS arm
-    - name: Install Python 3.10
-      uses: actions/setup-python@v5
       with:
-        python-version: '3.10'
+        ref: ${{ inputs.branch || github.ref }}
 
     # Cache external project sources
     # Hopefully these can be shared with the main check-catalyst action since we don't run this
@@ -153,7 +154,7 @@ jobs:
         lookup-only: True
 
     - name: Setup Python version
-      # There are multiple Python versions installed on the GitHub image, 3.10 - 3.12 is already
+      # There are multiple Python versions installed on the GitHub image, 3.11 - 3.12 is already
       # available under /Library/Frameworks/Python.framework/Versions/, but homebrew also provides
       # 3.11 and 3.12. Make sure to consistently use the system versions.
       run: |
@@ -246,20 +247,11 @@ jobs:
     steps:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
-
-    # Python 3.10 was dropped from the GH images on macOS arm
-    - name: Install Python 3.10
-      uses: actions/setup-python@v5
-      if: ${{ matrix.python_version }} == '3.10'
       with:
-        python-version: '3.10'
-
-    - name: Install Dependencies (System)
-      run: |
-        brew install libomp
+        ref: ${{ inputs.branch || github.ref }}
 
     - name: Setup Python version
-      # There are multiple Python versions installed on the GitHub image, 3.10 - 3.12 is already
+      # There are multiple Python versions installed on the GitHub image, 3.11 - 3.12 is already
       # available under /Library/Frameworks/Python.framework/Versions/, but homebrew also provides
       # 3.11 and 3.12. Make sure to consistently use the system versions.
       run: |
@@ -424,7 +416,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python_version: ${{ fromJson(needs.constants.outputs.python_versions) }}
+        python_version: ${{ fromJson(needs.constants.outputs.python_test_versions) }}
 
     # To check all wheels for supported python3 versions
     name: Test Wheels (Python ${{ matrix.python_version }}) on Mac arm64
@@ -433,18 +425,26 @@ jobs:
     steps:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
-
-    # Python 3.10 was dropped from the GH images on macOS arm
-    - name: Install Python 3.10
-      uses: actions/setup-python@v5
-      if: ${{ matrix.python_version }} == '3.10'
       with:
-        python-version: '3.10'
+        ref: ${{ inputs.branch || github.ref }}
+
+    # choose FORWARD_COMPAT_BASE_VERSION if python version > FORWARD_COMPAT_BASE_VERSION
+    - name: Determine which python build version to use
+      id: python_build_version
+      env:
+        FORWARD_COMPAT_BASE_VERSION: ${{ needs.constants.outputs.forward_compat_python_version }}
+        IS_VERSION_SUPPORTED: ${{ contains(fromJson(needs.constants.outputs.python_versions), matrix.python_version) }}
+      run: |
+        if [[ $IS_VERSION_SUPPORTED == "true" ]]; then
+          echo "python_build_version=${{ matrix.python_version }}" >> $GITHUB_OUTPUT
+        else
+          echo "python_build_version=$FORWARD_COMPAT_BASE_VERSION" >> $GITHUB_OUTPUT
+        fi
 
     - name: Download Wheel Artifact
       uses: actions/download-artifact@v4
       with:
-        name: catalyst-macos_arm64-wheel-py-${{ matrix.python_version }}.zip
+        name: catalyst-macos_arm64-wheel-py-${{ steps.python_build_version.outputs.python_build_version }}.zip
         path: ${{ github.workspace }}/dist
 
     - name: Download Standalone Plugin Wheel Artifact
@@ -452,11 +452,11 @@ jobs:
       if: env.BUILD_STANDALONE_PLUGIN == 'true'
       uses: actions/download-artifact@v4
       with:
-        name: standalone-plugin-macos_arm64-wheel-py-${{ matrix.python_version }}.zip
+        name: standalone-plugin-macos_arm64-wheel-py-${{ steps.python_build_version.outputs.python_build_version }}.zip
         path: ${{ github.workspace }}/standalone_plugin_wheel/wheel
 
     - name: Setup Python version
-      # There are multiple Python versions installed on the GitHub image, 3.10 - 3.12 is already
+      # There are multiple Python versions installed on the GitHub image, 3.11 - 3.12 is already
       # available under /Library/Frameworks/Python.framework/Versions/, but homebrew also provides
       # 3.11 and 3.12. Make sure to consistently use the system versions.
       run: |
@@ -472,6 +472,7 @@ jobs:
         python${{ matrix.python_version }} -m pip install 'amazon-braket-pennylane-plugin>1.27.1'
 
     - name: Install OQC client
+      if: matrix.python_version != '3.13'
       run: |
         python${{ matrix.python_version }} -m pip install oqc-qcaas-client
 

@@ -30,6 +30,11 @@ on:
         type: boolean
         required: false
         default: false
+      branch:
+        description: 'Branch to build from'
+        required: false
+        default: 'main'
+        type: string
 
 concurrency:
   group: Build Catalyst Wheel on Linux (arm64)-${{ github.ref }}
@@ -57,7 +62,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python_version: ["3.10"]
+        python_version: ["3.11"]
         container_img: ["manylinux_2_28_aarch64"]
 
     name: Build Dependencies (Python ${{ matrix.python_version }})
@@ -68,6 +73,8 @@ jobs:
     steps:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
+      with:
+        ref: ${{ inputs.branch || github.ref }}
 
     - name: Cache LLVM Source
       id: cache-llvm-source
@@ -253,6 +260,8 @@ jobs:
     steps:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
+      with:
+        ref: ${{ inputs.branch || github.ref }}
 
     - name: Install dependencies (AlmaLinux)
       run: |
@@ -283,7 +292,7 @@ jobs:
       uses: actions/cache/restore@v4
       with:
         path: ${{ github.workspace }}/llvm-build
-        key: ${{ matrix.container_img }}-llvm-${{ needs.constants.outputs.llvm_version }}-3.10-wheel-build
+        key: ${{ matrix.container_img }}-llvm-${{ needs.constants.outputs.llvm_version }}-3.11-wheel-build
         fail-on-cache-miss: True
 
     - name: Get Cached MHLO Source
@@ -410,7 +419,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python_version: ${{ fromJSON(needs.constants.outputs.python_versions) }}
+        python_version: ${{ fromJson(needs.constants.outputs.python_test_versions) }}
 
     # To check all wheels for supported python3 versions
     name: Test Wheels (Python ${{ matrix.python_version }}) on Linux Arm
@@ -419,16 +428,31 @@ jobs:
     steps:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
+      with:
+        ref: ${{ inputs.branch || github.ref }}
 
     - name: Setup Python ${{ matrix.python_version }}
       uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python_version }}
 
+    # choose FORWARD_COMPAT_BASE_VERSION if python version > FORWARD_COMPAT_BASE_VERSION
+    - name: Determine which python build version to use
+      id: python_build_version
+      env:
+        FORWARD_COMPAT_BASE_VERSION: ${{ needs.constants.outputs.forward_compat_python_version }}
+        IS_VERSION_SUPPORTED: ${{ contains(fromJson(needs.constants.outputs.python_versions), matrix.python_version) }}
+      run: |
+        if [[ $IS_VERSION_SUPPORTED == "true" ]]; then
+          echo "python_build_version=${{ matrix.python_version }}" >> $GITHUB_OUTPUT
+        else
+          echo "python_build_version=$FORWARD_COMPAT_BASE_VERSION" >> $GITHUB_OUTPUT
+        fi
+
     - name: Download Wheel Artifact
       uses: actions/download-artifact@v4
       with:
-        name: catalyst-linux_arm_64-wheel-py-${{ matrix.python_version }}.zip
+        name: catalyst-linux_arm_64-wheel-py-${{ steps.python_build_version.outputs.python_build_version }}.zip
         path: ${{ github.workspace }}/dist
 
     - name: Download Standalone Plugin Wheel Artifact
@@ -436,7 +460,7 @@ jobs:
       if: env.BUILD_STANDALONE_PLUGIN == 'true'
       uses: actions/download-artifact@v4
       with:
-        name: standalone-plugin-linux_arm_64-wheel-py-${{ matrix.python_version }}.zip
+        name: standalone-plugin-linux_arm_64-wheel-py-${{ steps.python_build_version.outputs.python_build_version }}.zip
         path: ${{ github.workspace }}/standalone_plugin_wheel/wheel
 
     - name: Set up Python ${{ matrix.python_version }}
@@ -454,6 +478,7 @@ jobs:
         python${{ matrix.python_version }} -m pip install 'amazon-braket-pennylane-plugin>=1.31.0'
 
     - name: Install OQC client
+      if: matrix.python_version != '3.13'
       run: |
         python${{ matrix.python_version }} -m pip install oqc-qcaas-client
 

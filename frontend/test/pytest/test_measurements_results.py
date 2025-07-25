@@ -167,6 +167,8 @@ class TestCounts:
 
 
 class TestExpval:
+
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_named(self, backend):
         """Test expval for named observables."""
 
@@ -184,6 +186,7 @@ class TestExpval:
         observed = expval1(np.pi)
         assert np.isclose(observed, expected)
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_hermitian_1(self, backend):
         """Test expval for Hermitian observable."""
 
@@ -204,6 +207,7 @@ class TestExpval:
         observed = expval2(np.pi / 2)
         assert np.isclose(observed, expected)
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_hermitian_2(self, backend):
         """Test expval for Hermitian observable."""
 
@@ -393,6 +397,8 @@ class TestExpval:
 
 
 class TestVar:
+
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_rx(self, backend):
         """Test var with RX."""
 
@@ -408,6 +414,7 @@ class TestVar:
         observed = var1(np.pi)
         assert np.isclose(observed, expected)
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_hadamard(self, backend):
         """Test var with Hadamard."""
 
@@ -423,6 +430,7 @@ class TestVar:
         observed = var2(np.pi)
         assert np.isclose(observed, expected)
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_hermitian_1(self, backend):
         """Test variance for Hermitian observable."""
 
@@ -443,6 +451,7 @@ class TestVar:
         observed = circuit(np.pi / 2)
         assert np.isclose(observed, expected)
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_hermitian_2(self, backend):
         """Test variance for Hermitian observable."""
 
