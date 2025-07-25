@@ -479,7 +479,7 @@ def insert_stage_after(stages: PipelineStages, new_stage: PipelineStage, ref_sta
     except ValueError as e:
         raise ValueError(
             f"Cannot insert stage '{new_stage[0]}' into sequence of stages; "
-            f"reference pass '{ref_stage}' not found"
+            f"reference stage '{ref_stage}' not found"
         ) from e
 
     stages.insert(ref_index + 1, new_stage)
@@ -497,7 +497,7 @@ def insert_stage_before(stages: PipelineStages, new_stage: PipelineStage, ref_st
         new_stage (PipelineStage): The new compilation stage, given as a tuple where the first
             element is the stage name and the second is a list of strings corresponding to
             compilation pass names.
-        ref_stage (str): The name of the reference stage after which the new stage is inserted.
+        ref_stage (str): The name of the reference stage before which the new stage is inserted.
 
     Raises:
         ValueError: If `ref_stage` is not found in the pass pipeline.
@@ -519,7 +519,7 @@ def insert_stage_before(stages: PipelineStages, new_stage: PipelineStage, ref_st
     except ValueError as e:
         raise ValueError(
             f"Cannot insert stage '{new_stage[0]}' into sequence of stages; "
-            f"reference pass '{ref_stage}' not found"
+            f"reference stage '{ref_stage}' not found"
         ) from e
 
     stages.insert(ref_index, new_stage)
