@@ -10,3 +10,4 @@ function(add_catalyst_unittest test_dirname)
 endfunction()
 
 add_subdirectory(Example)
+add_subdirectory(Utils)
