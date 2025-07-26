@@ -108,6 +108,14 @@ jobs:
         ref: ${{ needs.constants.outputs.llvm_version }}
         path: ${{ github.workspace }}/mlir/llvm-project
 
+    - name: Patch LLVM Source
+      if: steps.cache-mhlo-source.outputs.cache-hit != 'true'
+      run: |
+        cd $GITHUB_WORKSPACE/mlir/llvm-project
+        if git apply --check $GITHUB_WORKSPACE/mlir/patches/llvm-bufferization-segfault.patch; then \
+          git apply $GITHUB_WORKSPACE/mlir/patches/llvm-bufferization-segfault.patch; \
+        fi
+
     - name: Clone MHLO Submodule
       if: steps.cache-mhlo-source.outputs.cache-hit != 'true'
       uses: actions/checkout@v4
@@ -120,8 +128,12 @@ jobs:
       if: steps.cache-mhlo-source.outputs.cache-hit != 'true'
       run: |
         cd $GITHUB_WORKSPACE/mlir/mlir-hlo
-        git apply $GITHUB_WORKSPACE/mlir/patches/mhlo-remove-shardy.patch
-        git apply $GITHUB_WORKSPACE/mlir/patches/mhlo-add-back-necessary-passes.patch
+        if git apply --check $GITHUB_WORKSPACE/mlir/patches/mhlo-remove-shardy.patch; then \
+          git apply $GITHUB_WORKSPACE/mlir/patches/mhlo-remove-shardy.patch; \
+        fi
+        if git apply --check $GITHUB_WORKSPACE/mlir/patches/mhlo-add-back-necessary-passes.patch; then \
+          git apply $GITHUB_WORKSPACE/mlir/patches/mhlo-add-back-necessary-passes.patch; \
+        fi
 
     - name: Clone Enzyme Submodule
       if: steps.cache-enzyme-source.outputs.cache-hit != 'true'
