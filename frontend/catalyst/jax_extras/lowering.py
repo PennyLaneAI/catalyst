@@ -201,7 +201,7 @@ def get_mlir_attribute_from_pyval(value):
             named_attrs = {}
             for k, v in value.items():
                 if not isinstance(k, str):
-                    raise ValueError(
+                    raise CompileError(
                         f"Dictionary keys for MLIR DictionaryAttr must be strings, got: {type(k)}"
                     )
                 named_attrs[k] = get_mlir_attribute_from_pyval(v)

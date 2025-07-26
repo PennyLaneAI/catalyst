@@ -25,6 +25,7 @@ from jax.interpreters.mlir import ir
 from catalyst import for_loop, measure, qjit
 from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
 from catalyst.jit import JAX_QJIT
+from catalyst.utils.exceptions import CompileError
 
 
 class TestJAXJIT:
@@ -576,6 +577,28 @@ class TestJAXMLIRAttributeGetter:
 
             assert isinstance(attr["wire_capacity"], ir.IntegerAttr)
             assert attr["wire_capacity"].value == 100
+
+    def test_dict_attr_with_bad_keys(self):
+        """
+        Test dictionary attribute with non-string keys.
+        """
+        with pytest.raises(
+            CompileError, match="Dictionary keys for MLIR DictionaryAttr must be strings"
+        ):
+            with ctx, loc:
+                attr = get_mlir_attribute_from_pyval({37: 42})
+
+    def test_bad_type(self):
+        """
+        Test an error is correctly raised on a python type not convertible to mlir attribute.
+        """
+
+        class Foo:
+            pass
+
+        with pytest.raises(CompileError, match="Cannot convert Python type"):
+            with ctx, loc:
+                attr = get_mlir_attribute_from_pyval(Foo())
 
 
 if __name__ == "__main__":
