@@ -899,16 +899,12 @@ struct ReverseOpPattern : public ConvertOpToLLVMPattern<ReverseOp> {
         auto params = op.getArguments();
 
         for (size_t i = 0; i < argc * 2; i++) {
-            bool isDup = (i % 2) != 0;
-            Value val = params[i];
-            isDup ? differentials.push_back(val) : inputs.push_back(val);
+            fillValueAndShadowWithDedup(i, params, differentials, inputs);
         }
 
         auto upperLimit = (argc * 2) + (resc * 2);
         for (size_t i = argc * 2; i < upperLimit; i++) {
-            bool isDup = (i % 2) != 0;
-            Value val = params[i];
-            isDup ? cotangents.push_back(val) : outputs.push_back(val);
+            fillValueAndShadowWithDedup(i, params, cotangents, outputs);
         }
 
         auto tapeCount = op.getTape();
@@ -918,16 +914,7 @@ struct ReverseOpPattern : public ConvertOpToLLVMPattern<ReverseOp> {
         }
 
         SmallVector<Type> newFuncInputTys;
-
-        for (auto [in, diff] : llvm::zip(inputs, differentials)) {
-            newFuncInputTys.push_back(in.getType());
-            newFuncInputTys.push_back(diff.getType());
-        }
-
-        for (auto [out, cotan] : llvm::zip(outputs, cotangents)) {
-            newFuncInputTys.push_back(out.getType());
-            newFuncInputTys.push_back(cotan.getType());
-        }
+        getNewFuncInputTys(inputs, outputs, differentials, cotangents, newFuncInputTys);
 
         SmallVector<Type> tapeStructs;
         auto converter = getTypeConverter();
@@ -1008,6 +995,32 @@ struct ReverseOpPattern : public ConvertOpToLLVMPattern<ReverseOp> {
 
         rewriter.eraseOp(op);
         return success();
+    }
+
+  private:
+    static void getNewFuncInputTys(const SmallVector<Value> &inputs,
+                                   const SmallVector<Value> &outputs,
+                                   const SmallVector<Value> &differentials,
+                                   const SmallVector<Value> &cotangents,
+                                   SmallVector<Type> &newFuncInputTys)
+    {
+        for (auto [in, diff] : llvm::zip(inputs, differentials)) {
+            newFuncInputTys.push_back(in.getType());
+            newFuncInputTys.push_back(diff.getType());
+        }
+
+        for (auto [out, cotan] : llvm::zip(outputs, cotangents)) {
+            newFuncInputTys.push_back(out.getType());
+            newFuncInputTys.push_back(cotan.getType());
+        }
+    }
+
+    static void fillValueAndShadowWithDedup(size_t i, ValueRange params, SmallVector<Value> &values,
+                                            SmallVector<Value> &shadows)
+    {
+        bool isDup = (i % 2) != 0;
+        Value val = params[i];
+        isDup ? shadows.push_back(val) : values.push_back(val);
     }
 };
 
