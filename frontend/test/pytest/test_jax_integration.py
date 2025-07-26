@@ -586,19 +586,20 @@ class TestJAXMLIRAttributeGetter:
             CompileError, match="Dictionary keys for MLIR DictionaryAttr must be strings"
         ):
             with ctx, loc:
-                attr = get_mlir_attribute_from_pyval({37: 42})
+                _ = get_mlir_attribute_from_pyval({37: 42})
 
     def test_bad_type(self):
         """
         Test an error is correctly raised on a python type not convertible to mlir attribute.
         """
 
+        # pylint: disable=missing-class-docstring
         class Foo:
             pass
 
         with pytest.raises(CompileError, match="Cannot convert Python type"):
             with ctx, loc:
-                attr = get_mlir_attribute_from_pyval(Foo())
+                _ = get_mlir_attribute_from_pyval(Foo())
 
 
 if __name__ == "__main__":
