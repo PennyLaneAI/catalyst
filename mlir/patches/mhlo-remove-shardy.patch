@@ -84,7 +84,7 @@ index cabd6a9f..2e64b4ed 100644
            patterns->add<RefineDynamicReduceWindowOpPattern>(context);
            patterns->add<RefineDynamicRngBitGeneratorOpPattern>(context);
            patterns->add<RefineDynamicTopKOpPattern>(context);
--          populateSdyShapeRefinementPatterns(patterns, context);
+-          populateSdyShapeRefinementPatterns(context, patterns);
          };
  
      if (failed(stablehlo::refineEntryFunction(*context, func,
@@ -92,7 +92,7 @@ index cabd6a9f..2e64b4ed 100644
    patterns->add<RefineDynamicReduceWindowOpPattern>(context);
    patterns->add<RefineDynamicRngBitGeneratorOpPattern>(context);
    patterns->add<RefineDynamicTopKOpPattern>(context);
--  populateSdyShapeRefinementPatterns(patterns, context);
+-  populateSdyShapeRefinementPatterns(context, patterns);
  }
  
  }  // namespace stablehlo_ext

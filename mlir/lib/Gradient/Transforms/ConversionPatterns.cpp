@@ -49,8 +49,8 @@ using namespace catalyst::gradient;
 
 namespace catalyst {
 namespace gradient {
-void wrapMemRefArgsFunc(func::FuncOp func, const TypeConverter *typeConverter,
-                        RewriterBase &rewriter, Location loc, bool volatileArgs = false)
+LogicalResult wrapMemRefArgsFunc(func::FuncOp func, const TypeConverter *typeConverter,
+                                 RewriterBase &rewriter, Location loc, bool volatileArgs = false)
 {
     MLIRContext *ctx = rewriter.getContext();
     auto ptrType = LLVM::LLVMPointerType::get(ctx);
@@ -59,7 +59,9 @@ void wrapMemRefArgsFunc(func::FuncOp func, const TypeConverter *typeConverter,
     for (const auto [idx, argType] : llvm::enumerate(func.getArgumentTypes())) {
         if (auto memrefType = dyn_cast<MemRefType>(argType)) {
             BlockArgument memrefArg = func.getArgument(idx);
-            func.insertArgument(idx, ptrType, DictionaryAttr::get(ctx), loc);
+            if (failed(func.insertArgument(idx, ptrType, DictionaryAttr::get(ctx), loc))) {
+                return failure();
+            }
             Value wrappedMemref = func.getArgument(idx);
             Type structType = typeConverter->convertType(memrefType);
 
@@ -78,9 +80,12 @@ void wrapMemRefArgsFunc(func::FuncOp func, const TypeConverter *typeConverter,
                 rewriter.create<UnrealizedConversionCastOp>(loc, argType, replacedMemref)
                     .getResult(0);
             memrefArg.replaceAllUsesWith(replacedMemref);
-            func.eraseArgument(memrefArg.getArgNumber());
+            if (failed(func.eraseArgument(memrefArg.getArgNumber()))) {
+                return failure();
+            }
         }
     }
+    return success();
 }
 
 void wrapMemRefArgsCallsites(func::FuncOp func, const TypeConverter *typeConverter,
@@ -171,16 +176,19 @@ LLVM::GlobalOp insertEnzymeCustomGradient(OpBuilder &builder, ModuleOp moduleOp,
 /// functions where MemRefs are passed via wrapped pointers (!llvm.ptr<struct(ptr, ptr, i64, ...)>)
 /// rather than having their fields unpacked. This function automatically transforms MemRef
 /// arguments of a function to wrapped pointers.
-void wrapMemRefArgs(func::FuncOp func, const TypeConverter *typeConverter, RewriterBase &rewriter,
-                    Location loc, bool volatileArgs = false)
+LogicalResult wrapMemRefArgs(func::FuncOp func, const TypeConverter *typeConverter,
+                             RewriterBase &rewriter, Location loc, bool volatileArgs = false)
 {
     if (llvm::none_of(func.getArgumentTypes(),
                       [](Type argType) { return isa<MemRefType>(argType); })) {
         // The memref arguments are already wrapped
-        return;
+        return success();
     }
-    wrapMemRefArgsFunc(func, typeConverter, rewriter, loc, volatileArgs);
+    if (failed(wrapMemRefArgsFunc(func, typeConverter, rewriter, loc, volatileArgs))) {
+        return failure();
+    }
     wrapMemRefArgsCallsites(func, typeConverter, rewriter, loc, volatileArgs);
+    return success();
 }
 } // namespace gradient
 } // namespace catalyst
@@ -290,7 +298,9 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
             SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
         assert(callee && "Expected a valid callee of type func.func");
 
-        catalyst::convertToDestinationPassingStyle(callee, rewriter);
+        if (failed(catalyst::convertToDestinationPassingStyle(callee, rewriter))) {
+            return failure();
+        }
         SymbolTableCollection symbolTable;
         catalyst::traverseCallGraph(callee, &symbolTable, [&](func::FuncOp func) {
             // Register custom gradients of quantum functions
@@ -304,9 +314,11 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
                 if (!func->hasAttr("unwrapped_type")) {
                     func->setAttr("unwrapped_type", TypeAttr::get(func.getFunctionType()));
                 }
-                catalyst::convertToDestinationPassingStyle(func, rewriter);
-
-                wrapMemRefArgs(func, getTypeConverter(), rewriter, loc, /*volatileArgs=*/true);
+                LogicalResult dpsr = catalyst::convertToDestinationPassingStyle(func, rewriter);
+                assert(dpsr.succeeded() && "failed to rewrite backpropOp to destination style");
+                LogicalResult wmar = wrapMemRefArgs(func, getTypeConverter(), rewriter, loc,
+                                                    /*volatileArgs=*/true);
+                assert(wmar.succeeded() && "failed to wrap backpropOp's memref args");
 
                 func::FuncOp augFwd = genAugmentedForward(func, rewriter);
                 func::FuncOp customQGrad =
@@ -318,10 +330,10 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
 
         LowerToLLVMOptions options = getTypeConverter()->getOptions();
         if (options.useGenericFunctions) {
-            LLVM::LLVMFuncOp allocFn =
-                LLVM::lookupOrCreateGenericAllocFn(moduleOp, getTypeConverter()->getIndexType())
-                    .value();
-            LLVM::LLVMFuncOp freeFn = LLVM::lookupOrCreateGenericFreeFn(moduleOp).value();
+            LLVM::LLVMFuncOp allocFn = LLVM::lookupOrCreateGenericAllocFn(
+                                           rewriter, moduleOp, getTypeConverter()->getIndexType())
+                                           .value();
+            LLVM::LLVMFuncOp freeFn = LLVM::lookupOrCreateGenericFreeFn(rewriter, moduleOp).value();
 
             // Register the previous functions as llvm globals (for Enzyme)
             // With the following piece of metadata, shadow memory is allocated with
@@ -862,7 +874,10 @@ struct ForwardOpPattern : public ConvertOpToLLVMPattern<ForwardOp> {
         func->setAttr("passthrough", ArrayAttr::get(ctx, passthrough));
 
         rewriter.inlineRegionBefore(op.getRegion(), func.getBody(), func.end());
-        catalyst::gradient::wrapMemRefArgsFunc(func, typeConverter, rewriter, op.getLoc());
+        if (failed(catalyst::gradient::wrapMemRefArgsFunc(func, typeConverter, rewriter,
+                                                          op.getLoc()))) {
+            return failure();
+        }
         rewriter.eraseOp(op);
         return success();
     }
@@ -884,16 +899,12 @@ struct ReverseOpPattern : public ConvertOpToLLVMPattern<ReverseOp> {
         auto params = op.getArguments();
 
         for (size_t i = 0; i < argc * 2; i++) {
-            bool isDup = (i % 2) != 0;
-            Value val = params[i];
-            isDup ? differentials.push_back(val) : inputs.push_back(val);
+            fillValueAndShadowWithDedup(i, params, differentials, inputs);
         }
 
         auto upperLimit = (argc * 2) + (resc * 2);
         for (size_t i = argc * 2; i < upperLimit; i++) {
-            bool isDup = (i % 2) != 0;
-            Value val = params[i];
-            isDup ? cotangents.push_back(val) : outputs.push_back(val);
+            fillValueAndShadowWithDedup(i, params, cotangents, outputs);
         }
 
         auto tapeCount = op.getTape();
@@ -903,16 +914,7 @@ struct ReverseOpPattern : public ConvertOpToLLVMPattern<ReverseOp> {
         }
 
         SmallVector<Type> newFuncInputTys;
-
-        for (auto [in, diff] : llvm::zip(inputs, differentials)) {
-            newFuncInputTys.push_back(in.getType());
-            newFuncInputTys.push_back(diff.getType());
-        }
-
-        for (auto [out, cotan] : llvm::zip(outputs, cotangents)) {
-            newFuncInputTys.push_back(out.getType());
-            newFuncInputTys.push_back(cotan.getType());
-        }
+        getNewFuncInputTys(inputs, outputs, differentials, cotangents, newFuncInputTys);
 
         SmallVector<Type> tapeStructs;
         auto converter = getTypeConverter();
@@ -986,10 +988,39 @@ struct ReverseOpPattern : public ConvertOpToLLVMPattern<ReverseOp> {
         Block &firstBlock = func.getRegion().getBlocks().front();
         Block &lastBlock = func.getRegion().getBlocks().back();
         rewriter.mergeBlocks(&lastBlock, &firstBlock);
-        catalyst::gradient::wrapMemRefArgsFunc(func, typeConverter, rewriter, op.getLoc());
+        if (failed(catalyst::gradient::wrapMemRefArgsFunc(func, typeConverter, rewriter,
+                                                          op.getLoc()))) {
+            return failure();
+        }
 
         rewriter.eraseOp(op);
         return success();
+    }
+
+  private:
+    static void getNewFuncInputTys(const SmallVector<Value> &inputs,
+                                   const SmallVector<Value> &outputs,
+                                   const SmallVector<Value> &differentials,
+                                   const SmallVector<Value> &cotangents,
+                                   SmallVector<Type> &newFuncInputTys)
+    {
+        for (auto [in, diff] : llvm::zip(inputs, differentials)) {
+            newFuncInputTys.push_back(in.getType());
+            newFuncInputTys.push_back(diff.getType());
+        }
+
+        for (auto [out, cotan] : llvm::zip(outputs, cotangents)) {
+            newFuncInputTys.push_back(out.getType());
+            newFuncInputTys.push_back(cotan.getType());
+        }
+    }
+
+    static void fillValueAndShadowWithDedup(size_t i, ValueRange params, SmallVector<Value> &values,
+                                            SmallVector<Value> &shadows)
+    {
+        bool isDup = (i % 2) != 0;
+        Value val = params[i];
+        isDup ? shadows.push_back(val) : values.push_back(val);
     }
 };
 

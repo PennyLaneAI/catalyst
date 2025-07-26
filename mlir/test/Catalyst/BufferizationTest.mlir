@@ -23,7 +23,7 @@
 
 func.func @dbprint_val(%arg0: tensor<?xf64>) {
 
-    // CHECK: %0 = bufferization.to_memref %arg0
+    // CHECK: %0 = bufferization.to_buffer %arg0
     // CHECK: "catalyst.print"(%0) : (memref<?xf64>) -> ()
     "catalyst.print"(%arg0) : (tensor<?xf64>) -> ()
 
@@ -34,7 +34,7 @@ func.func @dbprint_val(%arg0: tensor<?xf64>) {
 
 func.func @dbprint_memref(%arg0: tensor<?xf64>) {
 
-    // CHECK: %0 = bufferization.to_memref %arg0
+    // CHECK: %0 = bufferization.to_buffer %arg0
     // CHECK: "catalyst.print"(%0) <{print_descriptor}> : (memref<?xf64>) -> ()
     "catalyst.print"(%arg0) {print_descriptor} : (tensor<?xf64>) -> ()
 
@@ -54,7 +54,7 @@ func.func @dbprint_str() {
 // -----
 
 func.func @custom_call(%arg0: tensor<3x3xf64>) -> tensor<3x3xf64> {
-    // CHECK: [[sourceAlloc:%.+]] = bufferization.to_memref %arg0
+    // CHECK: [[sourceAlloc:%.+]] = bufferization.to_buffer %arg0
     // CHECK: [[destAlloc:%.+]] = memref.alloc() {{.*}}: memref<3x3xf64>
     // CHECK: catalyst.custom_call fn("lapack_dgesdd") ([[sourceAlloc]], [[destAlloc]]) {number_original_arg = array<i32: 1>} :
     // CHECK-SAME: (memref<3x3xf64>, memref<3x3xf64>) -> ()
@@ -72,7 +72,7 @@ func.func @custom_call_copy(%arg0: tensor<2x3xf64>) -> tensor<2x2xf64> {
     // COM: e.g. coming from tensor subviews
     // COM: a copy needs to be performed because the kernels only allow for contiguous arrays as inputs
     //
-    // CHECK: [[sourceAlloc:%.+]] = bufferization.to_memref %arg0
+    // CHECK: [[sourceAlloc:%.+]] = bufferization.to_buffer %arg0
     // CHECK: [[subview:%.+]] = memref.subview [[sourceAlloc]]
     // CHECK-SAME: memref<2x3xf64> to memref<2x2xf64, strided<[3, 1]>>
     // CHECK: [[copyAlloc:%.+]] = memref.alloc() : memref<2x2xf64>
@@ -106,7 +106,7 @@ module @test1 {
   // CHECK-LABEL: @foo(
   // CHECK-SAME: [[arg0:%.+]]: tensor<f64>)
   func.func private @foo(%arg0: tensor<f64>) -> tensor<f64> {
-    // CHECK-DAG: [[memref0:%.+]] = bufferization.to_memref [[arg0]] : tensor<f64> to memref<f64>
+    // CHECK-DAG: [[memref0:%.+]] = bufferization.to_buffer [[arg0]] : tensor<f64> to memref<f64>
     // CHECK-DAG: [[resAlloc:%.+]] = memref.alloc() {{.*}}: memref<f64>
     // CHECK:     catalyst.callback_call @callback_1([[memref0]], [[resAlloc]]) : (memref<f64>, memref<f64>) -> ()
     %1 = catalyst.callback_call @callback_1(%arg0) : (tensor<f64>) -> (tensor<f64>)

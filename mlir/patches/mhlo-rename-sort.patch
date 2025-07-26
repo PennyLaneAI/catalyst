@@ -1,0 +1,33 @@
+diff --git a/utils/cycle_detector.cc b/utils/cycle_detector.cc
+index e3901ae88..0ae666b11 100644
+--- a/utils/cycle_detector.cc
++++ b/utils/cycle_detector.cc
+@@ -100,7 +100,7 @@ void GraphCycles::RemoveEdge(int32_t x, int32_t y) {
+ static bool forwardDfs(GraphCycles::Rep* r, int32_t n, int32_t upperBound);
+ static void backwardDfs(GraphCycles::Rep* r, int32_t n, int32_t lowerBound);
+ static void reorder(GraphCycles::Rep* r);
+-static void sort(const Vec<Node*>&, Vec<int32_t>* delta);
++static void mysort(const Vec<Node*>&, Vec<int32_t>* delta);
+ static void moveToList(GraphCycles::Rep* r, Vec<int32_t>* src,
+                        Vec<int32_t>* dst);
+ static void clearVisitedBits(GraphCycles::Rep* r, const Vec<int32_t>& nodes);
+@@ -199,8 +199,8 @@ static void backwardDfs(GraphCycles::Rep* r, int32_t n, int32_t lowerBound) {
+ // Recomputes rank assignments to make them compatible with the edges (producer
+ // has smaller rank than its consumer)
+ static void reorder(GraphCycles::Rep* r) {
+-  sort(r->nodes, &r->deltab);
+-  sort(r->nodes, &r->deltaf);
++  mysort(r->nodes, &r->deltab);
++  mysort(r->nodes, &r->deltaf);
+ 
+   // Adds contents of delta lists to list (backwards deltas first).
+   r->list.clear();
+@@ -219,7 +219,7 @@ static void reorder(GraphCycles::Rep* r) {
+ }
+ 
+ // Sorts nodes in the vector according to their ranks. Small rank first.
+-static void sort(const Vec<Node*>& nodes, Vec<int32_t>* delta) {
++static void mysort(const Vec<Node*>& nodes, Vec<int32_t>* delta) {
+   struct ByRank {
+     const Vec<Node*>* nodes;
+     bool operator()(int32_t a, int32_t b) const {

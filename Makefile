@@ -282,6 +282,9 @@ clean-plugin:
 clean-llvm:
 	$(MAKE) -C mlir clean-llvm
 
+reset-llvm:
+	$(MAKE) -C mlir reset-llvm
+
 clean-mhlo:
 	$(MAKE) -C mlir clean-mhlo
 

@@ -1,0 +1,27 @@
+diff --git a/mlir/lib/Dialect/Bufferization/Transforms/FuncBufferizableOpInterfaceImpl.cpp b/mlir/lib/Dialect/Bufferization/Transforms/FuncBufferizableOpInterfaceImpl.cpp
+index 453ed43bcad..dff994729a4 100644
+--- a/mlir/lib/Dialect/Bufferization/Transforms/FuncBufferizableOpInterfaceImpl.cpp
++++ b/mlir/lib/Dialect/Bufferization/Transforms/FuncBufferizableOpInterfaceImpl.cpp
+@@ -89,16 +89,12 @@ static FuncOp getCalledFunction(CallOpInterface callOp,
+ /// Return the FuncOp called by `callOp`.
+ static FuncOp getCalledFunction(CallOpInterface callOp,
+                                 const AnalysisState &state) {
+-  auto &oneShotAnalysisState = static_cast<const OneShotAnalysisState &>(state);
+-
+-  if (auto *funcAnalysisState =
+-          oneShotAnalysisState.getExtension<FuncAnalysisState>()) {
+-    // Use the cached symbol tables.
+-    return getCalledFunction(callOp, funcAnalysisState->symbolTables);
+-  }
+-
+-  SymbolTableCollection symbolTables;
+-  return getCalledFunction(callOp, symbolTables);
++  SymbolRefAttr sym =
++      llvm::dyn_cast_if_present<SymbolRefAttr>(callOp.getCallableForCallee());
++  if (!sym)
++    return nullptr;
++  return dyn_cast_or_null<FuncOp>(
++      SymbolTable::lookupNearestSymbolFrom(callOp, sym));
+ }
+ 
+ /// Get FuncAnalysisState.

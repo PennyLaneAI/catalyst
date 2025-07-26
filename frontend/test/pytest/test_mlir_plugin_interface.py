@@ -19,6 +19,7 @@ from tempfile import NamedTemporaryFile
 
 import pennylane as qml
 import pytest
+from jax.interpreters.mlir import ir
 
 import catalyst
 from catalyst import qjit
@@ -73,24 +74,26 @@ def test_get_options():
     """
     Test get_options from Pass
 
-      ApplyRegisteredPassOp expects options to be a single StringAttr
-      which follows the same format as the one used with mlir-opt.
-
-    https://mlir.llvm.org/docs/Dialects/Transform/#transformapply_registered_pass-transformapplyregisteredpassop
-
-      Options passed to a pass are specified via the syntax {option1=value1 option2=value2 ...},
-      i.e., use space-separated key=value pairs for each option.
-
-    https://mlir.llvm.org/docs/Tutorials/MlirOpt/#running-a-pass-with-options
-
-    However, experimentally we found that single-options also work without values.
+    ApplyRegisteredPassOp expects options to be a dictionary from strings to attributes.
+    See https://github.com/llvm/llvm-project/pull/143159
     """
-    assert catalyst.passes.Pass("example-pass", "single-option").get_options() == "single-option"
-    assert (
-        catalyst.passes.Pass("example-pass", "an-option", "bn-option").get_options()
-        == "an-option bn-option"
-    )
-    assert catalyst.passes.Pass("example-pass", option=True).get_options() == "option=True"
+    with ir.Context(), ir.Location.unknown():
+        options = catalyst.passes.Pass("example-pass", "single-option").get_options()
+        assert isinstance(options, dict)
+        assert isinstance(options["single-option"], ir.BoolAttr)
+        assert options["single-option"].value == True
+
+        options = catalyst.passes.Pass("example-pass", "an-option", "bn-option").get_options()
+        assert isinstance(options, dict)
+        assert isinstance(options["an-option"], ir.BoolAttr)
+        assert options["an-option"].value == True
+        assert isinstance(options["bn-option"], ir.BoolAttr)
+        assert options["bn-option"].value == True
+
+        options = catalyst.passes.Pass("example-pass", option=True).get_options()
+        assert isinstance(options, dict)
+        assert isinstance(options["option"], ir.BoolAttr)
+        assert options["option"].value == True
 
 
 @pytest.mark.skip(reason="xdsl not installed in ci cd yet")

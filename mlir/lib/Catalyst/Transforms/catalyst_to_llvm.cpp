@@ -51,7 +51,8 @@ Value getGlobalString(Location loc, OpBuilder &rewriter, StringRef key, StringRe
     }
     return rewriter.create<LLVM::GEPOp>(loc, LLVM::LLVMPointerType::get(rewriter.getContext()),
                                         type, rewriter.create<LLVM::AddressOfOp>(loc, glb),
-                                        ArrayRef<LLVM::GEPArg>{0, 0}, true);
+                                        ArrayRef<LLVM::GEPArg>{0, 0},
+                                        LLVM::GEPNoWrapFlags::inbounds);
 }
 
 enum NumericType : int8_t {
@@ -309,7 +310,8 @@ Value EncodeDataMemRef(Location loc, PatternRewriter &rewriter, MemRefType memre
     MemRefDescriptor desc = MemRefDescriptor(memrefLlvm);
     Value c0 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(0));
     Value data = rewriter.create<LLVM::GEPOp>(loc, ptr, memrefType.getElementType(),
-                                              desc.alignedPtr(rewriter, loc), c0, true);
+                                              desc.alignedPtr(rewriter, loc), c0,
+                                              LLVM::GEPNoWrapFlags::inbounds);
     memref = rewriter.create<LLVM::InsertValueOp>(loc, memref, data, 1);
 
     // Dtype
@@ -335,7 +337,8 @@ struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
         rewriter.setInsertionPointToStart(mod.getBody());
 
         LLVM::LLVMFuncOp customCallFnOp =
-            mlir::LLVM::lookupOrCreateFn(mod, op.getCallTargetName(), {/*args=*/ptr, /*rets=*/ptr},
+            mlir::LLVM::lookupOrCreateFn(rewriter, mod, op.getCallTargetName(),
+                                         {/*args=*/ptr, /*rets=*/ptr},
                                          /*ret_type=*/voidType)
                 .value();
         customCallFnOp.setPrivate();
@@ -467,7 +470,7 @@ struct DefineCallbackOpPattern : public OpConversionPattern<CallbackOp> {
         ModuleOp mod = op->getParentOfType<ModuleOp>();
         auto typeConverter = getTypeConverter();
         LLVM::LLVMFuncOp customCallFnOp =
-            mlir::LLVM::lookupOrCreateFn(mod, "__catalyst_inactive_callback",
+            mlir::LLVM::lookupOrCreateFn(rewriter, mod, "__catalyst_inactive_callback",
                                          {/*args=*/i64, i64, i64},
                                          /*ret_type=*/voidType, isVarArg)
                 .value();

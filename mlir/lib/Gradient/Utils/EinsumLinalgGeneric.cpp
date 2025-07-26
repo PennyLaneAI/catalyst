@@ -44,7 +44,7 @@ Value buildTensorLinalgGeneric(OpBuilder &builder, Location loc, ValueRange oper
     // Initialize the result tensor
     FloatType elementType = cast<FloatType>(resultType.getElementType());
     Value zero = builder.create<arith::ConstantFloatOp>(
-        loc, APFloat::getZero(elementType.getFloatSemantics()), elementType);
+        loc, elementType, APFloat::getZero(elementType.getFloatSemantics()));
     Value result =
         builder.create<tensor::EmptyOp>(loc, resultType.getShape(), resultType.getElementType());
     result = builder.create<linalg::FillOp>(loc, zero, result).getResult(0);

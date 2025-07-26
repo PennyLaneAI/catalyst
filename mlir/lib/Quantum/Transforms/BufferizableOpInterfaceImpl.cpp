@@ -58,15 +58,16 @@ struct QubitUnitaryOpInterface
     }
 
     LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
-                            const bufferization::BufferizationOptions &options) const
+                            const bufferization::BufferizationOptions &options,
+                            bufferization::BufferizationState &state) const
     {
         auto qubitUnitaryOp = cast<QubitUnitaryOp>(op);
         Location loc = op->getLoc();
         auto tensorType = cast<RankedTensorType>(qubitUnitaryOp.getMatrix().getType());
         MemRefType memrefType = MemRefType::get(tensorType.getShape(), tensorType.getElementType());
-        auto toMemrefOp =
-            rewriter.create<bufferization::ToMemrefOp>(loc, memrefType, qubitUnitaryOp.getMatrix());
-        auto memref = toMemrefOp.getResult();
+        auto toBufferOp =
+            rewriter.create<bufferization::ToBufferOp>(loc, memrefType, qubitUnitaryOp.getMatrix());
+        auto memref = toBufferOp.getResult();
         bufferization::replaceOpWithNewBufferizedOp<QubitUnitaryOp>(
             rewriter, op, qubitUnitaryOp.getOutQubits().getTypes(),
             qubitUnitaryOp.getOutCtrlQubits().getTypes(), memref, qubitUnitaryOp.getInQubits(),
@@ -101,15 +102,16 @@ struct HermitianOpInterface
     }
 
     LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
-                            const bufferization::BufferizationOptions &options) const
+                            const bufferization::BufferizationOptions &options,
+                            bufferization::BufferizationState &state) const
     {
         auto hermitianOp = cast<HermitianOp>(op);
         Location loc = op->getLoc();
         auto tensorType = cast<RankedTensorType>(hermitianOp.getMatrix().getType());
         MemRefType memrefType = MemRefType::get(tensorType.getShape(), tensorType.getElementType());
-        auto toMemrefOp =
-            rewriter.create<bufferization::ToMemrefOp>(loc, memrefType, hermitianOp.getMatrix());
-        auto memref = toMemrefOp.getResult();
+        auto toBufferOp =
+            rewriter.create<bufferization::ToBufferOp>(loc, memrefType, hermitianOp.getMatrix());
+        auto memref = toBufferOp.getResult();
         auto newHermitianOp = rewriter.create<HermitianOp>(loc, hermitianOp.getType(), memref,
                                                            hermitianOp.getQubits());
         bufferization::replaceOpWithBufferizedValues(rewriter, op, newHermitianOp.getObs());
@@ -143,15 +145,16 @@ struct HamiltonianOpInterface
     }
 
     LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
-                            const bufferization::BufferizationOptions &options) const
+                            const bufferization::BufferizationOptions &options,
+                            bufferization::BufferizationState &state) const
     {
         auto hamiltonianOp = cast<HamiltonianOp>(op);
         Location loc = op->getLoc();
         auto tensorType = cast<RankedTensorType>(hamiltonianOp.getCoeffs().getType());
         MemRefType memrefType = MemRefType::get(tensorType.getShape(), tensorType.getElementType());
-        auto toMemrefOp =
-            rewriter.create<bufferization::ToMemrefOp>(loc, memrefType, hamiltonianOp.getCoeffs());
-        auto memref = toMemrefOp.getResult();
+        auto toBufferOp =
+            rewriter.create<bufferization::ToBufferOp>(loc, memrefType, hamiltonianOp.getCoeffs());
+        auto memref = toBufferOp.getResult();
         auto newHamiltonianOp = rewriter.create<HamiltonianOp>(loc, hamiltonianOp.getType(), memref,
                                                                hamiltonianOp.getTerms());
         bufferization::replaceOpWithBufferizedValues(rewriter, op, newHamiltonianOp.getObs());
@@ -187,7 +190,8 @@ struct SampleOpInterface
     }
 
     LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
-                            const bufferization::BufferizationOptions &options) const
+                            const bufferization::BufferizationOptions &options,
+                            bufferization::BufferizationState &state) const
     {
         auto sampleOp = cast<SampleOp>(op);
         Location loc = op->getLoc();
@@ -237,7 +241,8 @@ struct CountsOpInterface
     }
 
     LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
-                            const bufferization::BufferizationOptions &options) const
+                            const bufferization::BufferizationOptions &options,
+                            bufferization::BufferizationState &state) const
     {
         auto countsOp = cast<CountsOp>(op);
         Location loc = op->getLoc();
@@ -297,7 +302,8 @@ struct ProbsOpInterface
     }
 
     LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
-                            const bufferization::BufferizationOptions &options) const
+                            const bufferization::BufferizationOptions &options,
+                            bufferization::BufferizationState &state) const
     {
         auto probsOp = cast<ProbsOp>(op);
         Location loc = op->getLoc();
@@ -350,7 +356,8 @@ struct StateOpInterface
     }
 
     LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
-                            const bufferization::BufferizationOptions &options) const
+                            const bufferization::BufferizationOptions &options,
+                            bufferization::BufferizationState &state) const
     {
         auto stateOp = cast<StateOp>(op);
         Location loc = op->getLoc();
@@ -401,16 +408,17 @@ struct SetStateOpInterface
     }
 
     LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
-                            const bufferization::BufferizationOptions &options) const
+                            const bufferization::BufferizationOptions &options,
+                            bufferization::BufferizationState &state) const
     {
         auto setStateOp = cast<SetStateOp>(op);
         Location loc = op->getLoc();
         auto tensorType = cast<RankedTensorType>(setStateOp.getInState().getType());
         MemRefType memrefType = MemRefType::get(tensorType.getShape(), tensorType.getElementType());
 
-        auto toMemrefOp =
-            rewriter.create<bufferization::ToMemrefOp>(loc, memrefType, setStateOp.getInState());
-        auto memref = toMemrefOp.getResult();
+        auto toBufferOp =
+            rewriter.create<bufferization::ToBufferOp>(loc, memrefType, setStateOp.getInState());
+        auto memref = toBufferOp.getResult();
         auto newSetStateOp = rewriter.create<SetStateOp>(loc, setStateOp.getOutQubits().getTypes(),
                                                          memref, setStateOp.getInQubits());
         bufferization::replaceOpWithBufferizedValues(rewriter, op, newSetStateOp.getOutQubits());
@@ -443,16 +451,17 @@ struct SetBasisStateOpInterface
     }
 
     LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
-                            const bufferization::BufferizationOptions &options) const
+                            const bufferization::BufferizationOptions &options,
+                            bufferization::BufferizationState &state) const
     {
         auto setBasisStateOp = cast<SetBasisStateOp>(op);
         Location loc = op->getLoc();
         auto tensorType = cast<RankedTensorType>(setBasisStateOp.getBasisState().getType());
         MemRefType memrefType = MemRefType::get(tensorType.getShape(), tensorType.getElementType());
 
-        auto toMemrefOp = rewriter.create<bufferization::ToMemrefOp>(
+        auto toBufferOp = rewriter.create<bufferization::ToBufferOp>(
             loc, memrefType, setBasisStateOp.getBasisState());
-        auto memref = toMemrefOp.getResult();
+        auto memref = toBufferOp.getResult();
         auto newSetStateOp = rewriter.create<SetBasisStateOp>(
             loc, setBasisStateOp.getOutQubits().getTypes(), memref, setBasisStateOp.getInQubits());
         bufferization::replaceOpWithBufferizedValues(rewriter, op, newSetStateOp.getOutQubits());

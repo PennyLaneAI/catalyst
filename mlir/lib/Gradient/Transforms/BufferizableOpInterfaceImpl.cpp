@@ -177,7 +177,8 @@ struct AdjointOpInterface
     }
 
     LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
-                            const bufferization::BufferizationOptions &options) const
+                            const bufferization::BufferizationOptions &options,
+                            bufferization::BufferizationState &state) const
     {
         auto adjointOp = cast<AdjointOp>(op);
         Location loc = adjointOp.getLoc();
@@ -207,7 +208,7 @@ struct AdjointOpInterface
         ValueRange operands = adjointOp.getArgs();
         for (Value operand : operands) {
             if (isa<TensorType>(operand.getType())) {
-                FailureOr<Value> opBuffer = getBuffer(rewriter, operand, options);
+                FailureOr<Value> opBuffer = getBuffer(rewriter, operand, options, state);
                 if (failed(opBuffer)) {
                     return failure();
                 }
@@ -276,7 +277,8 @@ struct BackpropOpInterface
     }
 
     LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
-                            const bufferization::BufferizationOptions &options) const
+                            const bufferization::BufferizationOptions &options,
+                            bufferization::BufferizationState &state) const
     {
         auto backpropOp = cast<BackpropOp>(op);
         Location loc = backpropOp.getLoc();
@@ -293,7 +295,7 @@ struct BackpropOpInterface
         ValueRange operands = backpropOp.getArgs();
         for (Value operand : operands) {
             if (isa<TensorType>(operand.getType())) {
-                FailureOr<Value> opBuffer = getBuffer(rewriter, operand, options);
+                FailureOr<Value> opBuffer = getBuffer(rewriter, operand, options, state);
                 if (failed(opBuffer)) {
                     return failure();
                 }
@@ -333,7 +335,7 @@ struct BackpropOpInterface
         ValueRange cotangents = backpropOp.getCotangents();
         SmallVector<Value> bufferCotangents;
         for (Value operand : cotangents) {
-            FailureOr<Value> opBuffer = getBuffer(rewriter, operand, options);
+            FailureOr<Value> opBuffer = getBuffer(rewriter, operand, options, state);
             if (failed(opBuffer)) {
                 return failure();
             }
@@ -402,6 +404,7 @@ struct ForwardOpInterface
 
     FailureOr<BaseMemRefType> getBufferType(Operation *op, Value value,
                                             const bufferization::BufferizationOptions &options,
+                                            const bufferization::BufferizationState &state,
                                             SmallVector<Value> &invocationStack) const
     {
         // The getBufferType() method is called on either BlockArguments or OpResults.
@@ -426,11 +429,12 @@ struct ForwardOpInterface
             return getBufferizedFunctionArgType(forwardOp, bbArg.getArgNumber(), options);
         }
 
-        return bufferization::detail::defaultGetBufferType(value, options, invocationStack);
+        return bufferization::detail::defaultGetBufferType(value, options, state, invocationStack);
     }
 
     LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
-                            const bufferization::BufferizationOptions &options) const
+                            const bufferization::BufferizationOptions &options,
+                            bufferization::BufferizationState &state) const
     {
         auto forwardOp = cast<ForwardOp>(op);
         FunctionType funcType = forwardOp.getFunctionType();
@@ -451,7 +455,7 @@ struct ForwardOpInterface
 
         // 1. Bufferize every block.
         for (Block &block : forwardOp.getBody()) {
-            if (failed(bufferization::bufferizeBlockSignature(&block, rewriter, options))) {
+            if (failed(bufferization::bufferizeBlockSignature(&block, rewriter, options, state))) {
                 return failure();
             }
         }
@@ -471,11 +475,12 @@ struct ForwardOpInterface
 
             // Note: If `inferFunctionResultLayout = true`, cast are later folded
             // away.
-            BaseMemRefType resultType = options.unknownTypeConverterFn(
-                returnVal, *options.defaultMemorySpaceFn(tensorType), options);
-            Value toMemrefOp =
-                rewriter.create<bufferization::ToMemrefOp>(loc, resultType, returnVal);
-            returnValues.push_back(toMemrefOp);
+            BaseMemRefType resultType =
+                options.unknownTypeConverterFn(cast<TensorType>(returnVal.getType()),
+                                               *options.defaultMemorySpaceFn(tensorType), options);
+            Value toBufferOp =
+                rewriter.create<bufferization::ToBufferOp>(loc, resultType, returnVal);
+            returnValues.push_back(toBufferOp);
         }
 
         // 3. Rewrite the terminator.
@@ -523,6 +528,7 @@ struct ReverseOpInterface
 
     FailureOr<BaseMemRefType> getBufferType(Operation *op, Value value,
                                             const bufferization::BufferizationOptions &options,
+                                            const bufferization::BufferizationState &state,
                                             SmallVector<Value> &invocationStack) const
     {
         // See comment on the getBufferType() method on forward op.
@@ -534,11 +540,12 @@ struct ReverseOpInterface
             return getBufferizedFunctionArgType(reverseOp, bbArg.getArgNumber(), options);
         }
 
-        return bufferization::detail::defaultGetBufferType(value, options, invocationStack);
+        return bufferization::detail::defaultGetBufferType(value, options, state, invocationStack);
     }
 
     LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
-                            const bufferization::BufferizationOptions &options) const
+                            const bufferization::BufferizationOptions &options,
+                            bufferization::BufferizationState &state) const
     {
         auto reverseOp = cast<ReverseOp>(op);
         FunctionType funcType = reverseOp.getFunctionType();
@@ -559,7 +566,7 @@ struct ReverseOpInterface
 
         // 1. Bufferize every block.
         for (Block &block : reverseOp.getBody())
-            if (failed(bufferization::bufferizeBlockSignature(&block, rewriter, options)))
+            if (failed(bufferization::bufferizeBlockSignature(&block, rewriter, options, state)))
                 return failure();
 
         // 2. For each result, keep track of which inplace argument it reuses.
@@ -577,11 +584,12 @@ struct ReverseOpInterface
 
             // Note: If `inferFunctionResultLayout = true`, cast are later folded
             // away.
-            BaseMemRefType resultType = options.unknownTypeConverterFn(
-                returnVal, *options.defaultMemorySpaceFn(tensorType), options);
-            Value toMemrefOp =
-                rewriter.create<bufferization::ToMemrefOp>(loc, resultType, returnVal);
-            returnValues.push_back(toMemrefOp);
+            BaseMemRefType resultType =
+                options.unknownTypeConverterFn(cast<TensorType>(returnVal.getType()),
+                                               *options.defaultMemorySpaceFn(tensorType), options);
+            Value toBufferOp =
+                rewriter.create<bufferization::ToBufferOp>(loc, resultType, returnVal);
+            returnValues.push_back(toBufferOp);
         }
 
         // 3. Rewrite the terminator.

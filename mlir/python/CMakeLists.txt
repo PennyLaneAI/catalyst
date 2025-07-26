@@ -3,6 +3,8 @@ include(AddMLIRPython)
 # TODO: Add an upstream cmake param for this vs having a global here.
 add_compile_definitions("MLIR_PYTHON_PACKAGE_PREFIX=mlir_quantum.")
 
+# Ignore nanobind warnings
+add_compile_options(-w)
 
 ################################################################################
 # Declare Dialect Sources
