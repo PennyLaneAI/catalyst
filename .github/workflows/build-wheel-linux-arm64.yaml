@@ -134,6 +134,9 @@ jobs:
         if git apply --check $GITHUB_WORKSPACE/mlir/patches/mhlo-add-back-necessary-passes.patch; then \
           git apply $GITHUB_WORKSPACE/mlir/patches/mhlo-add-back-necessary-passes.patch; \
         fi
+        if git apply --check $GITHUB_WORKSPACE/mlir/patches/mhlo-rename-sort.patch; then \
+          git apply $GITHUB_WORKSPACE/mlir/patches/mhlo-rename-sort.patch; \
+        fi
 
     - name: Clone Enzyme Submodule
       if: steps.cache-enzyme-source.outputs.cache-hit != 'true'
