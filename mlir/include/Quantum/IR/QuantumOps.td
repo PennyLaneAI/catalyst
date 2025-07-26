@@ -938,10 +938,10 @@ def SampleOp : Measurement_Op<"sample", [AttrSizedOperandSegments]> {
         {
             quantum.device shots(%shots) ["rtd_lightning.so", "lightning.qubit", "{my_attr: my_attr_value}"]
             %obs1 = quantum.compbasis %q0, %q1 : !quantum.obs
-            %samples = quantum.samples %obs1 : tensor<?xf64>
+            %samples = quantum.sample %obs1 : tensor<?xf64>
 
             %obs2 = quantum.pauli %q0[3], %q1[1] : !quantum.obs
-            %samples2 = quantum.samples %obs2 : tensor<?x2xf64>
+            %samples2 = quantum.sample %obs2 : tensor<?x2xf64>
 
             func.return
         }
