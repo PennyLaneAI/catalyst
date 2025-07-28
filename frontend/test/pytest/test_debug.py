@@ -122,7 +122,7 @@ class TestDebugPrint:
 
         @qjit
         def test(n):
-            @loop_fn(0, n, 1)
+            @for_loop(0, n, 1)
             def loop(i):
                 debug.print(i)
 
