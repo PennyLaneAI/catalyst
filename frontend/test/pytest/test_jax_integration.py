@@ -14,6 +14,7 @@
 
 """Test QJIT compatibility with JAX transformations such as jax.jit and jax.grad."""
 
+import textwrap
 from functools import partial
 
 import jax
@@ -600,6 +601,22 @@ class TestJAXMLIRAttributeGetter:
         with pytest.raises(CompileError, match="Cannot convert Python type"):
             with ctx, loc:
                 _ = get_mlir_attribute_from_pyval(Foo())
+
+    def test_int_attr_overflow(self):
+        """
+        Test int attribute with overflow correctly raises error.
+        """
+        with pytest.raises(
+            CompileError,
+            match=textwrap.dedent(
+                """
+            Large interger attributes currently not supported in MLIR,
+            see https://github.com/llvm/llvm-project/issues/128072
+            """
+            ),
+        ):
+            with ctx, loc:
+                _ = get_mlir_attribute_from_pyval(2**100)
 
 
 if __name__ == "__main__":
