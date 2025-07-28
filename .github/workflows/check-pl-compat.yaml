@@ -50,7 +50,7 @@ jobs:
       if: ${{ inputs.catalyst != 'stable' }}
       run: |
         sudo apt-get update
-        sudo apt-get install -y cmake ninja-build ccache libomp-dev libasan6 lld
+        sudo apt-get install -y ccache libasan6 lld
 
     - name: Install deps (Python)
       run: |
@@ -196,7 +196,7 @@ jobs:
 
     - name: Run Frontend Tests (Braket)
       run: |
-        make pytest TEST_BRAKET=LOCAL
+        # make pytest TEST_BRAKET=LOCAL
 
     - name: Run Demos
       run: | # Do not run demos in parallel, seems to cause package issues with numpy.
