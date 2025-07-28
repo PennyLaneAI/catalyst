@@ -217,11 +217,6 @@ def get_mlir_attribute_from_pyval(value):
                 named_attrs[k] = get_mlir_attribute_from_pyval(v)
             attr = ir.DictAttr.get(named_attrs)
 
-        case None:
-            # MLIR has a UnitAttr for representing a void or "none" value
-            # TODO: is `None` the best flag here?
-            attr = ir.UnitAttr.get()
-
         case _:
             raise CompileError(f"Cannot convert Python type {type(value)} to an MLIR attribute.")
 

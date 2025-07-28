@@ -503,14 +503,6 @@ class TestJAXMLIRAttributeGetter:
     Test catalyst.jax_extras.lowering.get_mlir_attribute_from_pyval
     """
 
-    def test_unit_attr(self):
-        """
-        Test unit attribute.
-        """
-        with ctx, loc:
-            attr = get_mlir_attribute_from_pyval(None)
-            assert isinstance(attr, ir.UnitAttr)
-
     def test_bool_attr(self):
         """
         Test bool attribute.
