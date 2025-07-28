@@ -120,11 +120,6 @@ class TestDebugPrint:
     def test_intermediate_values(self, capfd, arg, expected):
         """Test printing of arbitrary JAX tracer values."""
 
-        if qml.capture.enabled():
-            loop_fn = qml.for_loop  # TODO: unify qml.for_loop and catalyst.for_loop
-        else:
-            loop_fn = for_loop
-
         @qjit
         def test(n):
             @loop_fn(0, n, 1)
