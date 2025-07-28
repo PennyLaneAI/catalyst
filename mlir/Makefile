@@ -134,8 +134,8 @@ enzyme: PATCH_FILE := $(MK_DIR)/patches/enzyme-nvvm-fabs-intrinsics.patch
 enzyme:
 	@echo "build enzyme"
 	# Patch enzyme's dependency on nvidia fabs llvm intrinsics
-	@if patch --dry-run -p1 -N $(TARGET_FILE) $(PATCH_FILE) > /dev/null 2>&1; then \
-		patch -p1 $(TARGET_FILE) $(PATCH_FILE); \
+	@if cd Enzyme; git apply --check $(MK_DIR)/patches/enzyme-nvvm-fabs-intrinsics.patch; then \
+		git apply $(MK_DIR)/patches/enzyme-nvvm-fabs-intrinsics.patch; \
 	fi
 	cmake -G Ninja -S Enzyme/enzyme -B $(ENZYME_BUILD_DIR) \
 		-DENZYME_STATIC_LIB=ON \
@@ -231,6 +231,7 @@ clean-mhlo:
 clean-enzyme:
 	@echo "clean enzyme build files"
 	rm -rf $(ENZYME_BUILD_DIR)
+	cd Enzyme; git clean -fd; git checkout .
 
 clean-plugin:
 	@echo "clean plugin"

@@ -168,9 +168,10 @@ jobs:
     - name: Patch Enzyme Source
       if: steps.cache-enzyme-source.outputs.cache-hit != 'true'
       run: |
-        export TARGET_FILE=$GITHUB_WORKSPACE/mlir/Enzyme/enzyme/Enzyme/TypeAnalysis/TypeAnalysis.cpp
-        export PATCH_FILE=$GITHUB_WORKSPACE/mlir/patches/enzyme-nvvm-fabs-intrinsics.patch
-        patch -p1 $TARGET_FILE $PATCH_FILE
+        cd $GITHUB_WORKSPACE/mlir/Enzyme
+        if git apply --check $GITHUB_WORKSPACE/mlir/patches/enzyme-nvvm-fabs-intrinsics.patch; then \
+          git apply $GITHUB_WORKSPACE/mlir/patches/enzyme-nvvm-fabs-intrinsics.patch; \
+        fi
 
     # Cache external project builds
     - name: Restore LLVM Build
