@@ -112,9 +112,7 @@ jobs:
       if: steps.cache-mhlo-source.outputs.cache-hit != 'true'
       run: |
         cd $GITHUB_WORKSPACE/mlir/llvm-project
-        if git apply --check $GITHUB_WORKSPACE/mlir/patches/llvm-bufferization-segfault.patch; then \
-          git apply $GITHUB_WORKSPACE/mlir/patches/llvm-bufferization-segfault.patch; \
-        fi
+        git apply $GITHUB_WORKSPACE/mlir/patches/llvm-bufferization-segfault.patch
 
     - name: Clone MHLO Submodule
       if: steps.cache-mhlo-source.outputs.cache-hit != 'true'
@@ -128,15 +126,9 @@ jobs:
       if: steps.cache-mhlo-source.outputs.cache-hit != 'true'
       run: |
         cd $GITHUB_WORKSPACE/mlir/mlir-hlo
-        if git apply --check $GITHUB_WORKSPACE/mlir/patches/mhlo-remove-shardy.patch; then \
-          git apply $GITHUB_WORKSPACE/mlir/patches/mhlo-remove-shardy.patch; \
-        fi
-        if git apply --check $GITHUB_WORKSPACE/mlir/patches/mhlo-add-back-necessary-passes.patch; then \
-          git apply $GITHUB_WORKSPACE/mlir/patches/mhlo-add-back-necessary-passes.patch; \
-        fi
-        if git apply --check $GITHUB_WORKSPACE/mlir/patches/mhlo-rename-sort.patch; then \
-          git apply $GITHUB_WORKSPACE/mlir/patches/mhlo-rename-sort.patch; \
-        fi
+        git apply $GITHUB_WORKSPACE/mlir/patches/mhlo-remove-shardy.patch
+        git apply $GITHUB_WORKSPACE/mlir/patches/mhlo-add-back-necessary-passes.patch
+        git apply $GITHUB_WORKSPACE/mlir/patches/mhlo-rename-sort.patch
 
     - name: Clone Enzyme Submodule
       if: steps.cache-enzyme-source.outputs.cache-hit != 'true'
@@ -150,9 +142,7 @@ jobs:
       if: steps.cache-enzyme-source.outputs.cache-hit != 'true'
       run: |
         cd $GITHUB_WORKSPACE/mlir/Enzyme
-        if git apply --check $GITHUB_WORKSPACE/mlir/patches/enzyme-nvvm-fabs-intrinsics.patch; then \
-          git apply $GITHUB_WORKSPACE/mlir/patches/enzyme-nvvm-fabs-intrinsics.patch; \
-        fi
+        git apply $GITHUB_WORKSPACE/mlir/patches/enzyme-nvvm-fabs-intrinsics.patch
 
     # Cache external project builds
     - name: Restore LLVM Build
