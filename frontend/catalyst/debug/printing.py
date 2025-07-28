@@ -134,9 +134,12 @@ def print_memref(x):
     Outside a :func:`qjit` compiled function the operation falls back to the Python print statement.
     """
     if capture_enabled() or EvaluationContext.is_tracing():
-        if not isinstance(x, jax.core.Tracer):
+        if not capture_enabled() and not isinstance(x, jax.core.Tracer):
             raise TypeError("Arguments to print_memref must be of type jax.core.Tracer")
-        print_p.bind(x, memref=True)
+        try:
+            print_p.bind(x, memref=True)
+        except TypeError as e:
+            raise TypeError("Arguments to print_memref must be of type jax.core.Tracer") from e
     else:
         # Dispatch to Python print outside a qjit context.
         builtins.print(x)

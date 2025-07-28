@@ -19,10 +19,11 @@ import textwrap
 import jax.numpy as jnp
 import numpy as np
 import pennylane as qml
+from pennylane import for_loop
 import pytest
 from jax.tree_util import register_pytree_node_class
 
-from catalyst import debug, for_loop, qjit, value_and_grad
+from catalyst import debug, qjit, value_and_grad
 from catalyst.compiler import _options_to_cli_flags, to_llvmir, to_mlir_opt
 from catalyst.debug import (
     compile_executable,
