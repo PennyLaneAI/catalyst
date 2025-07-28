@@ -287,7 +287,7 @@ class Pass:
 
     def get_options(self):
         """
-        Stringify options according to what mlir-opt expects.
+        Build a dictionary mapping option names to MLIR attributes.
         ApplyRegisteredPassOp expects options to be a dictionary from strings to attributes.
         See https://github.com/llvm/llvm-project/pull/143159
         """
