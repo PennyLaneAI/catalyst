@@ -7,12 +7,12 @@ Subject: [PATCH] restore the removed mhlo passes we need:
 ---
  mhlo/transforms/CMakeLists.txt                |   6 +
  .../legalize_control_flow.cc                  | 288 +++++++++
- .../transforms/legalize_sort/legalize_sort.cc | 577 ++++++++++++++++++
+ .../transforms/legalize_sort/legalize_sort.cc | 578 ++++++++++++++++++
  .../legalize_to_standard.cc                   | 243 ++++++++
  .../legalize_to_standard_patterns.td          |  92 +++
  mhlo/transforms/mhlo_passes.td                |  19 +
  mhlo/transforms/passes.h                      |   4 +
- 7 files changed, 1229 insertions(+)
+ 7 files changed, 1230 insertions(+)
  create mode 100644 mhlo/transforms/legalize_control_flow/legalize_control_flow.cc
  create mode 100644 mhlo/transforms/legalize_sort/legalize_sort.cc
  create mode 100644 mhlo/transforms/legalize_to_standard/legalize_to_standard.cc
@@ -342,7 +342,7 @@ new file mode 100644
 index 00000000..8ba9de9a
 --- /dev/null
 +++ b/mhlo/transforms/legalize_sort/legalize_sort.cc
-@@ -0,0 +1,577 @@
+@@ -0,0 +1,578 @@
 +/* Copyright 2019 The OpenXLA Authors.
 +
 +Licensed under the Apache License, Version 2.0 (the "License");
@@ -883,8 +883,9 @@ index 00000000..8ba9de9a
 +
 +    SmallVector<Value> outputTensors;
 +    for (auto [out0, out1] : llvm::zip(outputMemrefs, scratchMemrefs)) {
++      Value s = b.create<SelectOp>(parity, out1, out0).getResult();
 +      outputTensors.push_back(b.create<bufferization::ToTensorOp>(
-+          b.create<SelectOp>(parity, out1, out0), /*restrict=*/true));
++          memref::getTensorTypeFromMemRefType(s.getType()), s, /*restrict=*/true));
 +    }
 +
 +    rewriter.replaceOp(op, outputTensors);

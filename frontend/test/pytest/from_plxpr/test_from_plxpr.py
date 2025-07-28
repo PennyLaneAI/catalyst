@@ -25,11 +25,13 @@ from catalyst import qjit
 from catalyst.from_plxpr import from_plxpr
 from catalyst.jax_primitives import (
     adjoint_p,
+    for_p,
     get_call_jaxpr,
     qalloc_p,
     qextract_p,
     qinsert_p,
     qinst_p,
+    while_p,
 )
 
 pytestmark = pytest.mark.usefixtures("disable_capture")
@@ -113,24 +115,6 @@ def compare_eqns(eqn1, eqn2):
 
 class TestErrors:
     """Test that errors are raised in unsupported situations."""
-
-    def test_observable_without_n_wires(self):
-        """Test that a NotImplementedError is raised for an observable without n_wires."""
-
-        dev = qml.device("lightning.qubit", wires=2)
-
-        @qml.qnode(dev)
-        def circuit():
-            return qml.expval(qml.X(0) + qml.Y(0))
-
-        qml.capture.enable()
-        jaxpr = jax.make_jaxpr(circuit)()
-
-        with pytest.raises(
-            NotImplementedError, match="operator arithmetic not yet supported for conversion."
-        ):
-            from_plxpr(jaxpr)()
-        qml.capture.disable()
 
     def test_measuring_eigvals_not_supported(self):
         """Test that a NotImplementedError is raised for converting a measurement
@@ -788,6 +772,77 @@ class TestAdjointCtrl:
             "params_len": 0,
             "qubits_len": 1,
         }
+
+
+class TestControlFlow:
+    """Tests for for and while loops."""
+
+    @pytest.mark.parametrize("reverse", (True, False))
+    def test_for_loop_outside_qnode(self, reverse):
+        """Test the conversion of a for loop outside the qnode."""
+
+        qml.capture.enable()
+        if reverse:
+            start, stop, step = 6, 0, -2  # 6, 4, 2
+        else:
+            start, stop, step = 2, 7, 2  # 2, 4, 6
+
+        def f(i0):
+            @qml.for_loop(start, stop, step)
+            def g(i, x):
+                return i + x
+
+            return g(i0)
+
+        jaxpr = jax.make_jaxpr(f)(2)
+        catalyst_jaxpr = from_plxpr(jaxpr)(2)
+
+        eqn = catalyst_jaxpr.eqns[0]
+
+        print(catalyst_jaxpr)
+
+        assert eqn.primitive == for_p
+        assert eqn.params["apply_reverse_transform"] == reverse
+        assert eqn.params["body_nconsts"] == 0
+        assert eqn.params["nimplicit"] == 0
+        assert eqn.params["preserve_dimensions"] is True
+
+        assert eqn.invars[0].val == start
+        assert eqn.invars[1].val == stop
+        assert eqn.invars[2].val == step
+        assert eqn.invars[3].val == start
+
+    def test_while_loop_outside_qnode(self):
+        """Test that a while loop outside a qnode can be translated."""
+        qml.capture.enable()
+
+        def f(x):
+
+            y = jax.numpy.array([0, 1, 2])
+
+            @qml.while_loop(lambda i: jax.numpy.sum(i) < 5 * jax.numpy.sum(y))
+            def g(i):
+                return i + y
+
+            return g(x)
+
+        x = jax.numpy.array([0, 0, 0])
+
+        plxpr = jax.make_jaxpr(f)(x)
+        catalyst_xpr = from_plxpr(plxpr)(x)
+
+        assert catalyst_xpr.eqns[0].primitive == while_p
+        assert catalyst_xpr.eqns[0].params["body_nconsts"] == 1
+        assert catalyst_xpr.eqns[0].params["cond_nconsts"] == 1
+        assert catalyst_xpr.eqns[0].params["nimplicit"] == 0
+        assert catalyst_xpr.eqns[0].params["preserve_dimensions"] == True
+
+        for kind in ["body_jaxpr", "cond_jaxpr"]:
+            xpr = catalyst_xpr.eqns[0].params[kind]
+            assert isinstance(xpr, jax.extend.core.ClosedJaxpr)
+            assert len(xpr.consts) == 0
+            assert len(xpr.jaxpr.invars) == 2
+            assert len(xpr.jaxpr.outvars) == 1
 
 
 class TestHybridPrograms:
