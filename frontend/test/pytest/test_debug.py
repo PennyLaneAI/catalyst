@@ -73,6 +73,17 @@ class TestDebugPrint:
         expected = str(arg)
         assert expected == out.strip()
 
+    def test_memref_outside_qjit(self, capfd):
+        """Test that memref can be used outside qjit."""
+
+        def test(x):
+            debug.print_memref(x)
+
+        test(2)
+        out, err = capfd.readouterr()
+        assert err == ""
+        assert out == "2\n"
+
     def test_optional_descriptor(self, capfd):
         """Test the optional memref descriptor functionality."""
 
