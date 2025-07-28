@@ -14,15 +14,19 @@
 
 """Test QJIT compatibility with JAX transformations such as jax.jit and jax.grad."""
 
+import textwrap
 from functools import partial
 
 import jax
 import jax.numpy as jnp
 import pennylane as qml
 import pytest
+from jax.interpreters.mlir import ir
 
 from catalyst import for_loop, measure, qjit
+from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
 from catalyst.jit import JAX_QJIT
+from catalyst.utils.exceptions import CompileError
 
 
 class TestJAXJIT:
@@ -488,6 +492,123 @@ class TestJAXRecompilation:
         jax.grad(circuit, argnums=0)(params, 2)
         params = jnp.array([0.54, 0.3154, 0.654, 0.123, 0.1, 0.2])
         jax.grad(circuit, argnums=0)(params, 3)
+
+
+ctx = ir.Context()
+loc = ir.Location.unknown(ctx)
+
+
+class TestJAXMLIRAttributeGetter:
+    """
+    Test catalyst.jax_extras.lowering.get_mlir_attribute_from_pyval
+    """
+
+    def test_bool_attr(self):
+        """
+        Test bool attribute.
+        """
+        with ctx, loc:
+            attr = get_mlir_attribute_from_pyval(True)
+            assert isinstance(attr, ir.BoolAttr)
+            assert attr.value == True
+
+    def test_str_attr(self):
+        """
+        Test string attribute.
+        """
+        with ctx, loc:
+            attr = get_mlir_attribute_from_pyval("hello catalyst!")
+            assert isinstance(attr, ir.StringAttr)
+            assert attr.value == "hello catalyst!"
+
+    @pytest.mark.parametrize("number", (37, -37))
+    def test_int_attr(self, number):
+        """
+        Test integer attribute.
+        """
+        with ctx, loc:
+            attr = get_mlir_attribute_from_pyval(number)
+            assert isinstance(attr, ir.IntegerAttr)
+            assert attr.value == number
+
+    @pytest.mark.parametrize("number", (3.7, -3.7))
+    def test_float_attr(self, number):
+        """
+        Test float attribute.
+        """
+        with ctx, loc:
+            attr = get_mlir_attribute_from_pyval(number)
+            assert isinstance(attr, ir.FloatAttr)
+            assert attr.value == number
+
+    @pytest.mark.parametrize("array", ([1, 2, 3], (4, 5, 6)))
+    def test_array_attr(self, array):
+        """
+        Test array attribute.
+        """
+        with ctx, loc:
+            attr = get_mlir_attribute_from_pyval(array)
+            assert isinstance(attr, ir.ArrayAttr)
+            assert len(attr) == len(array)
+
+            for attr_val, py_val in zip(attr, array):
+                assert isinstance(attr_val, ir.IntegerAttr)
+                assert attr_val.value == py_val
+
+    def test_dict_attr(self):
+        """
+        Test dictionary attribute.
+        """
+        with ctx, loc:
+            attr = get_mlir_attribute_from_pyval(
+                {"device": "lightning.qubit", "wire_capacity": 100}
+            )
+            assert isinstance(attr, ir.DictAttr)
+
+            assert isinstance(attr["device"], ir.StringAttr)
+            assert attr["device"].value == "lightning.qubit"
+
+            assert isinstance(attr["wire_capacity"], ir.IntegerAttr)
+            assert attr["wire_capacity"].value == 100
+
+    def test_dict_attr_with_bad_keys(self):
+        """
+        Test dictionary attribute with non-string keys.
+        """
+        with pytest.raises(
+            CompileError, match="Dictionary keys for MLIR DictionaryAttr must be strings"
+        ):
+            with ctx, loc:
+                _ = get_mlir_attribute_from_pyval({37: 42})
+
+    def test_bad_type(self):
+        """
+        Test an error is correctly raised on a python type not convertible to mlir attribute.
+        """
+
+        # pylint: disable=missing-class-docstring
+        class Foo:
+            pass
+
+        with pytest.raises(CompileError, match="Cannot convert Python type"):
+            with ctx, loc:
+                _ = get_mlir_attribute_from_pyval(Foo())
+
+    def test_int_attr_overflow(self):
+        """
+        Test int attribute with overflow correctly raises error.
+        """
+        with pytest.raises(
+            CompileError,
+            match=textwrap.dedent(
+                """
+            Large interger attributes currently not supported in MLIR,
+            see https://github.com/llvm/llvm-project/issues/128072
+            """
+            ),
+        ):
+            with ctx, loc:
+                _ = get_mlir_attribute_from_pyval(2**100)
 
 
 if __name__ == "__main__":
