@@ -100,7 +100,6 @@ namespace catalyst {
 
 } // namespace catalyst
 
-
 using namespace mlir;
 using namespace mlir::bufferization;
 
