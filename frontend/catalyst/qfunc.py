@@ -59,7 +59,9 @@ def _resolve_mcm_config(mcm_config, shots):
     )
     if mcm_config.mcm_method is None:
         updated_values["mcm_method"] = (
-            "one-shot" if mcm_config.postselect_mode == "hw-like" else "single-branch-statistics"
+            "one-shot"
+            if mcm_config.postselect_mode == "hw-like" or (isinstance(shots, int) and shots > 0)
+            else "single-branch-statistics"
         )
     if mcm_config.mcm_method == "deferred":
         raise ValueError("mcm_method='deferred' is not supported with Catalyst.")
