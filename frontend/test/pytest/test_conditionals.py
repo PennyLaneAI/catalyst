@@ -465,10 +465,7 @@ class TestCond:
 
             # Verify the error message is specific and helpful
             error_msg = str(exc_info.value)
-            assert (
-                "catalyst.cond is not supported with PennyLane's capture enabled"
-                in error_msg
-            )
+            assert "catalyst.cond is not supported with PennyLane's capture enabled" in error_msg
 
         finally:
             # Always disable capture mode after test
@@ -494,10 +491,7 @@ class TestCond:
 
             # Verify the error message is specific and helpful
             error_msg = str(exc_info.value)
-            assert (
-                "catalyst.cond is not supported with PennyLane's capture enabled"
-                in error_msg
-            )
+            assert "catalyst.cond is not supported with PennyLane's capture enabled" in error_msg
 
         finally:
             # Always disable capture mode after test

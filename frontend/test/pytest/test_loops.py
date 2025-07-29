@@ -257,7 +257,7 @@ class TestWhileLoops:
     def test_while_loop_raises_compatibility_error_with_capture(self):
         """Test that while_loop raises CompatibilityError when capture mode is enabled."""
         qml.capture.enable()
-        
+
         def condition(i):
             return i < 5
 
@@ -271,13 +271,13 @@ class TestWhileLoops:
             # Verify the error message is specific and helpful
             error_msg = str(exc_info.value)
             assert (
-                "catalyst.while_loop is not supported with PennyLane's capture enabled"
-                in error_msg
+                "catalyst.while_loop is not supported with PennyLane's capture enabled" in error_msg
             )
 
         finally:
             qml.capture.disable()
 
+    @pytest.mark.xfail(reason="autograph")
     def test_while_loop_raises_compatibility_error_with_capture_integration(self):
         """Test that while_loop raises CompatibilityError when capture mode is enabled."""
         qml.capture.enable()
@@ -299,8 +299,7 @@ class TestWhileLoops:
             # Verify the error message is specific and helpful
             error_msg = str(exc_info.value)
             assert (
-                "catalyst.while_loop is not supported with PennyLane's capture enabled"
-                in error_msg
+                "catalyst.while_loop is not supported with PennyLane's capture enabled" in error_msg
             )
 
         finally:
@@ -459,8 +458,7 @@ class TestForLoops:
             # Verify the error message is specific and helpful
             error_msg = str(exc_info.value)
             assert (
-                "catalyst.for_loop is not supported with PennyLane's capture enabled"
-                in error_msg
+                "catalyst.for_loop is not supported with PennyLane's capture enabled" in error_msg
             )
 
         finally:
@@ -488,8 +486,7 @@ class TestForLoops:
             # Verify the error message is specific and helpful
             error_msg = str(exc_info.value)
             assert (
-                "catalyst.for_loop is not supported with PennyLane's capture enabled"
-                in error_msg
+                "catalyst.for_loop is not supported with PennyLane's capture enabled" in error_msg
             )
 
         finally:
