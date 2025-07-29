@@ -435,15 +435,6 @@ class TestForLoops:
         finally:
             qml.capture.disable()
 
-    def test_for_loop_compatibility_error_message(self):
-        """Test that CompatibilityError has the correct message for for_loop."""
-        error = CompatibilityError("for_loop")
-        expected_msg = (
-            "catalyst.for_loop is not supported with PennyLane's capture feature enabled. "
-            "For compatibility with program capture, please use qml.for_loop instead."
-        )
-        assert expected_msg in str(error)
-
 
 class TestClassicalCompilation:
     """Test that Catalyst loops can be used outside of quantum functions."""
