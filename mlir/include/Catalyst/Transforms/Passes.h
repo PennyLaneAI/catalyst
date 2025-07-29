@@ -18,6 +18,8 @@
 
 #include "mlir/Pass/Pass.h"
 
+#include "Catalyst/mlir-hlo/Passes.h"
+
 namespace catalyst {
 
 std::unique_ptr<mlir::Pass> createAddExceptionHandlingPass();
@@ -33,9 +35,6 @@ std::unique_ptr<mlir::Pass> createHloCustomCallLoweringPass();
 std::unique_ptr<mlir::Pass> createInlineNestedModulePass();
 std::unique_ptr<mlir::Pass> createMemrefCopyToLinalgCopyPass();
 std::unique_ptr<mlir::Pass> createMemrefToLLVMWithTBAAPass();
-std::unique_ptr<mlir::Pass> createMhloLegalizeSortPass();
-std::unique_ptr<mlir::Pass> createMhloLegalizeToStdPass();
-std::unique_ptr<mlir::Pass> createMhloLegalizeControlFlowPass();
 std::unique_ptr<mlir::Pass> createQnodeToAsyncLoweringPass();
 std::unique_ptr<mlir::Pass> createRegisterInactiveCallbackPass();
 std::unique_ptr<mlir::Pass> createScatterLoweringPass();

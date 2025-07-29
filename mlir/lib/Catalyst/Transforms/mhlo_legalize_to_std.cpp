@@ -70,7 +70,7 @@ namespace catalyst {
 // #define GEN_PASS_DEF_STABLEHLOLEGALIZETOSTANDARDPASS
 // #define GEN_PASS_DECL_STABLEHLOLEGALIZETOSTANDARDPASS
 #include "Catalyst/Transforms/Passes.h.inc"
-#include "Catalyst/Transforms/generated_mhlo_legalize_to_standard.cpp.inc"
+#include "Catalyst/mlir-hlo/generated_mhlo_legalize_to_standard.cpp.inc"
 
 } // namespace catalyst
 

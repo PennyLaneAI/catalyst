@@ -17,6 +17,8 @@
 
 include "mlir/Pass/PassBase.td"
 
+include "Catalyst/mlir-hlo/Passes.td"
+
 def DetensorizeSCFPass : Pass<"detensorize-scf"> {
     let summary = "Detensorize for, if, while operations from the SCF dialect.";
 
@@ -280,55 +282,6 @@ def BufferDeallocation : Pass<"buffer-deallocation", "func::FuncOp"> {
 
   }];
   let constructor = "mlir::bufferization::createBufferDeallocationPass()";
-}
-
-// mhlo legalize sort pass.
-// mhlo dropped the -legalize-sort pass when migrating to stablehlo.
-// We manually add it back.
-//
-// This pass has been modified from its original form in the tensorflow/mlir-hlo repository at
-//   https://github.com/tensorflow/mlir-hlo/blob/a5529d99fc4d1132b0c282a053d26c11e6636b3a/mhlo/transforms/mhlo_passes.td
-// released under the Apache License, Version 2.0, with the following copyright notice:
-//
-//   * Licensed under the Apache License, Version 2.0 (the "License");
-
-def MhloLegalizeSortPass : Pass<"mhlo-legalize-sort", "func::FuncOp"> {
-  let summary = "Legalize from Mhlo sort to SCF control flow.";
-  let constructor = "createMhloLegalizeSortPass()";
-  let dependentDialects = ["arith::ArithDialect",
-                           "bufferization::BufferizationDialect",
-                           "scf::SCFDialect", "tensor::TensorDialect"];
-}
-
-// mhlo legalize to std pass.
-// mhlo dropped the -legalize-to-std pass when migrating to stablehlo.
-// We manually add it back.
-//
-// This pass has been modified from its original form in the tensorflow/mlir-hlo repository at
-//   https://github.com/tensorflow/mlir-hlo/blob/a5529d99fc4d1132b0c282a053d26c11e6636b3a/mhlo/transforms/mhlo_passes.td
-// released under the Apache License, Version 2.0, with the following copyright notice:
-//
-//   * Licensed under the Apache License, Version 2.0 (the "License");
-
-def MhloLegalizeToStandardPass : Pass<"mhlo-legalize-to-std", "func::FuncOp"> {
-  let summary = "Legalize from MHLO dialect to standard dialect.";
-  let constructor = "createMhloLegalizeToStdPass()";
-}
-
-// mhlo legalize to control flow pass.
-// mhlo dropped the -legalize-to-control-flow pass when migrating to stablehlo.
-// We manually add it back.
-//
-// This pass has been modified from its original form in the tensorflow/mlir-hlo repository at
-//   https://github.com/tensorflow/mlir-hlo/blob/a5529d99fc4d1132b0c282a053d26c11e6636b3a/mhlo/transforms/mhlo_passes.td
-// released under the Apache License, Version 2.0, with the following copyright notice:
-//
-//   * Licensed under the Apache License, Version 2.0 (the "License");
-
-def MhloLegalizeControlFlowPass : Pass<"mhlo-legalize-control-flow", "func::FuncOp"> {
-  let summary = "Legalize from MHLO control flow to SCF control flow.";
-  let constructor = "createMhloLegalizeControlFlowPass()";
-  let dependentDialects = ["scf::SCFDialect", "tensor::TensorDialect"];
 }
 
 #endif // CATALYST_PASSES
