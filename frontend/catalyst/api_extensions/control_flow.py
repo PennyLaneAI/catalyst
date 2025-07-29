@@ -68,6 +68,7 @@ from catalyst.tracing.contexts import (
     EvaluationContext,
     EvaluationMode,
 )
+from catalyst.utils.exceptions import CompatibilityError
 from catalyst.utils.patching import Patcher
 
 
@@ -239,7 +240,32 @@ def cond(pred: DynamicJaxprTracer):
         ...     return cond_fn()
         >>> f(1.6)
         Array(2.56, dtype=float64)
+
+    .. note::
+
+        Currently, ``catalyst.cond`` is not supported in program capture mode.
+        If you are using ``qml.qnode`` with PennyLane's ``capture`` feature, you
+        should use ``qml.cond`` instead:
+
+        .. code-block:: python
+
+            # This will raise an error with capture mode
+            @qjit
+            def func(x):
+                @catalyst.cond(x > 1.0)
+                def cond_fn():
+                    return x ** 2
+                return cond_fn()
+
+            # Use this instead for capture mode compatibility
+            @qml.qnode(device, interface="jax")
+            def circuit(x):
+                def cond_fn():
+                    return x ** 2
+                return qml.cond(x > 1.0)(cond_fn)()
     """
+    if qml.capture.enabled():
+        raise CompatibilityError("cond")
 
     def _decorator(true_fn: Callable):
 
@@ -388,7 +414,32 @@ def for_loop(lower_bound, upper_bound, step, allow_array_resizing=False):
     between arrays of the same size are not supported.
 
     For more details on dynamically-shaped arrays, please see :ref:`dynamic-arrays`.
+
+    .. note::
+
+        Currently, ``catalyst.for_loop`` is not supported in program capture mode.
+        If you are using ``qml.qnode`` with PennyLane's ``capture`` feature, you
+        should use ``qml.for_loop`` instead:
+
+        .. code-block:: python
+
+            # This will raise an error with capture mode
+            @qjit
+            def func():
+                @catalyst.for_loop(0, 10, 1)
+                def loop_fn(v):
+                    return v + 1
+                return loop_fn(0)
+
+            # Use this instead for capture mode compatibility
+            @qml.qnode(device, interface="jax")
+            def circuit():
+                def loop_fn(v):
+                    return v + 1
+                return qml.for_loop(0, 10, 1)(loop_fn)(0)
     """
+    if qml.capture.enabled():
+        raise CompatibilityError("for_loop")
 
     def _decorator(body_fn):
         return ForLoopCallable(lower_bound, upper_bound, step, body_fn, not allow_array_resizing)
@@ -503,7 +554,32 @@ def while_loop(cond_fn, allow_array_resizing: bool = False):
     between arrays of the same size are not supported.
 
     For more details on dynamically-shaped arrays, please see :ref:`dynamic-arrays`.
+
+    .. note::
+
+        Currently, ``catalyst.while_loop`` is not supported in program capture mode.
+        If you are using ``qml.qnode`` with PennyLane's ``capture`` feature, you
+        should use ``qml.while_loop`` instead:
+
+        .. code-block:: python
+
+            # This will raise an error with capture mode
+            @qjit
+            def func():
+                @catalyst.while_loop(lambda x: x < 5)
+                def loop_fn(x):
+                    return x + 1
+                return loop_fn(0)
+
+            # Use this instead for capture mode compatibility
+            @qml.qnode(device, interface="jax")
+            def circuit():
+                def loop_fn(x):
+                    return x + 1
+                return qml.while_loop(lambda x: x < 5)(loop_fn)(0)
     """
+    if qml.capture.enabled():
+        raise CompatibilityError("while_loop")
 
     def _decorator(body_fn):
         return WhileLoopCallable(cond_fn, body_fn, not allow_array_resizing)

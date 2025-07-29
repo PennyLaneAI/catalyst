@@ -20,6 +20,7 @@ import pennylane as qml
 import pytest
 
 from catalyst import api_extensions, cond, measure, qjit
+from catalyst.utils.exceptions import CompatibilityError
 
 # pylint: disable=missing-function-docstring
 
@@ -450,6 +451,28 @@ class TestCond:
             match="Conditional 'else if' function can have arguments only if it is a PennyLane gate.",  # pylint:disable=line-too-long
         ):
             qjit(h)
+
+    def test_cond_raises_compatibility_error_with_capture(self):
+        """Test that cond raises CompatibilityError when capture mode is enabled."""
+        qml.capture.enable()
+
+        try:
+            with pytest.raises(CompatibilityError) as exc_info:
+
+                @cond(True)
+                def cond_fn():
+                    return 1
+
+            # Verify the error message is specific and helpful
+            error_msg = str(exc_info.value)
+            assert (
+                "catalyst.cond is not supported with PennyLane's capture feature enabled"
+                in error_msg
+            )
+
+        finally:
+            # Always disable capture mode after test
+            qml.capture.disable()
 
 
 class TestInterpretationConditional:

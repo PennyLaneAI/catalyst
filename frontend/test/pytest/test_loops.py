@@ -20,6 +20,7 @@ import pennylane as qml
 import pytest
 
 from catalyst import api_extensions, for_loop, measure, qjit, while_loop
+from catalyst.utils.exceptions import CompatibilityError
 
 # pylint: disable=no-value-for-parameter,unused-argument
 
@@ -253,6 +254,27 @@ class TestWhileLoops:
         assert circuit(5, 6) == 30  # 5 * 6
         assert circuit(4, 7) == 28  # 4 * 7
 
+    def test_while_loop_raises_compatibility_error_with_capture(self):
+        """Test that while_loop raises CompatibilityError when capture mode is enabled."""
+        qml.capture.enable()
+
+        try:
+            with pytest.raises(CompatibilityError) as exc_info:
+
+                @while_loop(lambda x: x < 5)
+                def loop_fn(x):
+                    return x + 1
+
+            # Verify the error message is specific and helpful
+            error_msg = str(exc_info.value)
+            assert (
+                "catalyst.while_loop is not supported with PennyLane's capture feature enabled"
+                in error_msg
+            )
+
+        finally:
+            qml.capture.disable()
+
 
 class TestForLoops:
     """Test the Catalyst for_loop operation."""
@@ -390,6 +412,37 @@ class TestForLoops:
 
         assert circuit(1)
         assert not circuit(0)
+
+    def test_for_loop_raises_compatibility_error_with_capture(self):
+        """Test that for_loop raises CompatibilityError when capture mode is enabled."""
+        # Enable capture mode
+        qml.capture.enable()
+
+        try:
+            with pytest.raises(CompatibilityError) as exc_info:
+
+                @for_loop(0, 3, 1)
+                def loop_fn(i, acc):
+                    return acc + i
+
+            # Verify the error message is specific and helpful
+            error_msg = str(exc_info.value)
+            assert (
+                "catalyst.for_loop is not supported with PennyLane's capture feature enabled"
+                in error_msg
+            )
+
+        finally:
+            qml.capture.disable()
+
+    def test_for_loop_compatibility_error_message(self):
+        """Test that CompatibilityError has the correct message for for_loop."""
+        error = CompatibilityError("for_loop")
+        expected_msg = (
+            "catalyst.for_loop is not supported with PennyLane's capture feature enabled. "
+            "For compatibility with program capture, please use qml.for_loop instead."
+        )
+        assert expected_msg in str(error)
 
 
 class TestClassicalCompilation:
