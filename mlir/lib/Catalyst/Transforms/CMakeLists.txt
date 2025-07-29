@@ -18,6 +18,9 @@ file(GLOB SRC
     InlineNestedModules.cpp
     MemrefCopyToLinalgCopyPass.cpp
     MemrefCopyToLinalgCopyPatterns.cpp
+    mhlo_legalize_control_flow.cpp
+    mhlo_legalize_sort.cpp
+    mhlo_legalize_to_std.cpp
     qnode_to_async_lowering.cpp
     QnodeToAsyncPatterns.cpp
     RegisterAllPasses.cpp
@@ -38,6 +41,7 @@ set(LIBS
 
 set(DEPENDS
     MLIRCatalystPassIncGen
+    MLIRMhloLegalizeToStandardIncGen
 )
 
 add_mlir_library(${LIBRARY_NAME} STATIC ${SRC} LINK_LIBS PRIVATE ${LIBS} DEPENDS ${DEPENDS})

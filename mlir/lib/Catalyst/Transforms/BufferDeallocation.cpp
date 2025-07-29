@@ -89,7 +89,6 @@
 #include "Catalyst/IR/CatalystDialect.h"
 #include "Catalyst/Transforms/Passes.h"
 
-// using namespace llvm;
 using namespace mlir;
 using namespace catalyst;
 
@@ -101,12 +100,6 @@ namespace catalyst {
 
 } // namespace catalyst
 
-// namespace mlir {
-// namespace bufferization {
-// #define GEN_PASS_DEF_BUFFERDEALLOCATION
-// #include "mlir/Dialect/Bufferization/Transforms/Passes.h.inc"
-// } // namespace bufferization
-// } // namespace mlir
 
 using namespace mlir;
 using namespace mlir::bufferization;

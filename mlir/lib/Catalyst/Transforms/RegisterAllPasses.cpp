@@ -44,6 +44,7 @@ void catalyst::registerAllCatalystPasses()
     mlir::registerPass(catalyst::createDisentangleCNOTPass);
     mlir::registerPass(catalyst::createDisentangleSWAPPass);
     mlir::registerPass(catalyst::createEmitCatalystPyInterfacePass);
+    mlir::registerPass(catalyst::createGatesToPulsesPass);
     mlir::registerPass(catalyst::createGEPInboundsPass);
     mlir::registerPass(catalyst::createGradientConversionPass);
     mlir::registerPass(catalyst::createGradientPreprocessingPass);
@@ -52,8 +53,14 @@ void catalyst::registerAllCatalystPasses()
     mlir::registerPass(catalyst::createHloCustomCallLoweringPass);
     mlir::registerPass(catalyst::createInlineNestedModulePass);
     mlir::registerPass(catalyst::createIonConversionPass);
+    mlir::registerPass(catalyst::createIonsDecompositionPass);
+    mlir::registerPass(catalyst::createLoopBoundaryOptimizationPass);
+    mlir::registerPass(catalyst::createMBQCConversionPass);
     mlir::registerPass(catalyst::createMemrefCopyToLinalgCopyPass);
     mlir::registerPass(catalyst::createMemrefToLLVMWithTBAAPass);
+    mlir::registerPass(catalyst::createMhloLegalizeSortPass);
+    mlir::registerPass(catalyst::createMhloLegalizeToStdPass);
+    mlir::registerPass(catalyst::createMhloLegalizeControlFlowPass);
     mlir::registerPass(catalyst::createMitigationLoweringPass);
     mlir::registerPass(catalyst::createQnodeToAsyncLoweringPass);
     mlir::registerPass(catalyst::createQuantumConversionPass);
@@ -63,8 +70,4 @@ void catalyst::registerAllCatalystPasses()
     mlir::registerPass(catalyst::createScatterLoweringPass);
     mlir::registerPass(catalyst::createSplitMultipleTapesPass);
     mlir::registerPass(catalyst::createTestPass);
-    mlir::registerPass(catalyst::createIonsDecompositionPass);
-    mlir::registerPass(catalyst::createGatesToPulsesPass);
-    mlir::registerPass(catalyst::createLoopBoundaryOptimizationPass);
-    mlir::registerPass(catalyst::createMBQCConversionPass);
 }
