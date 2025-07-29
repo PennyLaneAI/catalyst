@@ -484,7 +484,7 @@ class TestCond:
                 @qml.qjit
                 @qml.qnode(qml.device("lightning.qubit", wires=3))
                 def test(n):
-                    @catalyst.cond(n < 5)
+                    @cond(n < 5)
                     def loop(n):
                         qml.X(n)
 

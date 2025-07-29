@@ -285,7 +285,7 @@ class TestWhileLoops:
                 @qml.qjit
                 @qml.qnode(qml.device("lightning.qubit", wires=3))
                 def test(n):
-                    @catalyst.while_loop(lambda i: i < n)
+                    @while_loop(lambda i: i < n)
                     def loop(i):
                         qml.X(i)
 
@@ -474,7 +474,7 @@ class TestForLoops:
                 @qml.qjit
                 @qml.qnode(qml.device("lightning.qubit", wires=3))
                 def test(n):
-                    @catalyst.for_loop(0, n, 1)
+                    @for_loop(0, n, 1)
                     def loop(i):
                         qml.X(i)
 
