@@ -257,11 +257,14 @@ class TestWhileLoops:
     def test_while_loop_raises_compatibility_error_with_capture(self):
         """Test that while_loop raises CompatibilityError when capture mode is enabled."""
         qml.capture.enable()
+        
+        def condition(i):
+            return i < 5
 
         try:
             with pytest.raises(CompatibilityError) as exc_info:
 
-                @while_loop(lambda x: x < 5)
+                @while_loop(condition)
                 def loop_fn(x):
                     return x + 1
 
