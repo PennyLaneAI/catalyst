@@ -26,6 +26,10 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Fix errors in AutoGraph transformed functions when `qml.prod` is used together with other operator
+  transforms (e.g. `qml.adjoint`).
+  [(#1910)](https://github.com/PennyLaneAI/catalyst/pull/1910)
+
 * A bug in the `NullQubit::ReleaseQubit()` method that prevented the deallocation of individual
   qubits on the `"null.qubit"` device has been fixed.
   [(#1926)](https://github.com/PennyLaneAI/catalyst/pull/1926)
@@ -105,6 +109,7 @@ This release contains contributions from (in alphabetical order):
 
 Joey Carter,
 Sengthai Heng,
+David Ittah,
 Christina Lee,
 Andrija Paurevic,
 Roberto Turrado,
