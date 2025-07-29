@@ -13,7 +13,6 @@
 // limitations under the License.
 
 #include "Catalyst/Transforms/Passes.h"
-#include "mlir-hlo/Passes.h"
 #include "Gradient/Transforms/Passes.h"
 #include "Ion/Transforms/Passes.h"
 #include "MBQC/Transforms/Passes.h"
@@ -21,6 +20,7 @@
 #include "QEC/Transforms/Passes.h"
 #include "Quantum/Transforms/Passes.h"
 #include "Test/Transforms/Passes.h"
+#include "mlir-hlo/Passes.h"
 #include "mlir/Pass/PassRegistry.h"
 
 void catalyst::registerAllCatalystPasses()
