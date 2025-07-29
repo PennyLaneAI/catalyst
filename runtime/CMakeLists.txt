@@ -76,12 +76,35 @@ add_subdirectory(tests)
 if(APPLE AND (${CMAKE_SYSTEM_PROCESSOR} STREQUAL arm64))
 # Don't rerun external project everytime we configure the runtime build.
 if(NOT EXISTS ${CMAKE_BINARY_DIR}/lib/liblapacke.3.dylib)
+    if(CMAKE_OSX_SYSROOT)
+        get_filename_component(OSX_SDK_PATH ${CMAKE_OSX_SYSROOT} REALPATH)
+    else()
+        message(STATUS "CMAKE_OSX_SYSROOT is not set, using xcrun to get the official SDK path")
+
+        # Use xcrun to get the official SDK path
+        execute_process(
+            COMMAND xcrun --sdk macosx --show-sdk-path
+            OUTPUT_VARIABLE XCRUN_SDK_PATH
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+            RESULT_VARIABLE XCRUN_RESULT
+        )
+
+        if(XCRUN_RESULT EQUAL 0)
+            # get the realpath of the SDK path
+            get_filename_component(OSX_SDK_PATH ${XCRUN_SDK_PATH} REALPATH)
+        else()
+            message(FATAL_ERROR "Failed to get the official SDK path since xcrun failed, try to run "
+                    "`xcrun --sdk macosx --show-sdk-path` for more information")
+        endif()
+    endif()
+
     ExternalProject_Add(lapacke-accelerate
         GIT_REPOSITORY https://github.com/lepus2589/accelerate-lapacke.git
         GIT_TAG master
         PREFIX _lapacke-accelerate
         CMAKE_ARGS "--preset accelerate-lapacke32"
                    "-DCMAKE_INSTALL_PREFIX=${CMAKE_BINARY_DIR}/_lapacke-accelerate/install"
+                   "-DCMAKE_OSX_SYSROOT=${OSX_SDK_PATH}"
         INSTALL_COMMAND ${CMAKE_COMMAND} --build . --target install
         COMMAND cp ${CMAKE_BINARY_DIR}/_lapacke-accelerate/install/lib/liblapacke.3.dylib ${CMAKE_BINARY_DIR}/lib
         LOG_CONFIGURE ON

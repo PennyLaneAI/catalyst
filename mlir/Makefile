@@ -55,6 +55,14 @@ all: llvm enzyme dialects plugin
 .PHONY: llvm
 llvm:
 	@echo "build LLVM and MLIR enabling Python bindings"
+
+	# Patch mlir one shot bufferization segfault
+	# Remove patch after bug is resolved upstream
+	# https://github.com/llvm/llvm-project/issues/150441
+	@if cd llvm-project; git apply --check $(MK_DIR)/patches/llvm-bufferization-segfault.patch; then \
+		git apply $(MK_DIR)/patches/llvm-bufferization-segfault.patch; \
+	fi
+
 	cmake -G Ninja -S llvm-project/llvm -B $(LLVM_BUILD_DIR) \
 		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
 		-DLLVM_BUILD_EXAMPLES=OFF \
@@ -89,8 +97,8 @@ enzyme: PATCH_FILE := $(MK_DIR)/patches/enzyme-nvvm-fabs-intrinsics.patch
 enzyme:
 	@echo "build enzyme"
 	# Patch enzyme's dependency on nvidia fabs llvm intrinsics
-	@if patch --dry-run -p1 -N $(TARGET_FILE) $(PATCH_FILE) > /dev/null 2>&1; then \
-		patch -p1 $(TARGET_FILE) $(PATCH_FILE); \
+	@if cd Enzyme; git apply --check $(MK_DIR)/patches/enzyme-nvvm-fabs-intrinsics.patch; then \
+		git apply $(MK_DIR)/patches/enzyme-nvvm-fabs-intrinsics.patch; \
 	fi
 	cmake -G Ninja -S Enzyme/enzyme -B $(ENZYME_BUILD_DIR) \
 		-DENZYME_STATIC_LIB=ON \
@@ -170,10 +178,16 @@ clean-dialects:
 clean-llvm:
 	@echo "clean llvm/mlir build files"
 	rm -rf $(LLVM_BUILD_DIR)
+	cd llvm-project; git clean -fd; git checkout .
+
+reset-llvm:
+	@echo "reset llvm git state to the commit tracked in .dep-versions without deleting llvm builds"
+	cd llvm-project; git clean -fd; git checkout .
 
 clean-enzyme:
 	@echo "clean enzyme build files"
 	rm -rf $(ENZYME_BUILD_DIR)
+	cd Enzyme; git clean -fd; git checkout .
 
 clean-plugin:
 	@echo "clean plugin"

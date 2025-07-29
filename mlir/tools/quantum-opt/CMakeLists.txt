@@ -26,6 +26,7 @@ set(LIBS
     StablehloOps
     StablehloCAPI
     MLIRCatalystTest
+    MLIRCatalystUtils
     MLIRTestDialect
 )
 
