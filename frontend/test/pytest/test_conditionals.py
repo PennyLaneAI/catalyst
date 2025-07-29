@@ -474,6 +474,35 @@ class TestCond:
             # Always disable capture mode after test
             qml.capture.disable()
 
+    def test_cond_raises_compatibility_error_with_capture_integration(self):
+        """Test that cond raises CompatibilityError when capture mode is enabled."""
+        qml.capture.enable()
+
+        try:
+            with pytest.raises(CompatibilityError) as exc_info:
+
+                @qml.qjit
+                @qml.qnode(qml.device("lightning.qubit", wires=3))
+                def test(n):
+                    @catalyst.cond(n < 5)
+                    def loop(n):
+                        qml.X(n)
+
+                    loop()
+
+                test(4)
+
+            # Verify the error message is specific and helpful
+            error_msg = str(exc_info.value)
+            assert (
+                "catalyst.cond is not supported with PennyLane's capture feature enabled"
+                in error_msg
+            )
+
+        finally:
+            # Always disable capture mode after test
+            qml.capture.disable()
+
 
 class TestInterpretationConditional:
     """Test that the conditional operation's execution is semantically equivalent

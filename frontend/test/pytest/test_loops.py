@@ -275,6 +275,34 @@ class TestWhileLoops:
         finally:
             qml.capture.disable()
 
+    def test_while_loop_raises_compatibility_error_with_capture_integration(self):
+        """Test that while_loop raises CompatibilityError when capture mode is enabled."""
+        qml.capture.enable()
+
+        try:
+            with pytest.raises(CompatibilityError) as exc_info:
+
+                @qml.qjit
+                @qml.qnode(qml.device("lightning.qubit", wires=3))
+                def test(n):
+                    @catalyst.while_loop(lambda i: i < n)
+                    def loop(i):
+                        qml.X(i)
+
+                    loop()
+
+                test(4)
+
+            # Verify the error message is specific and helpful
+            error_msg = str(exc_info.value)
+            assert (
+                "catalyst.while_loop is not supported with PennyLane's capture feature enabled"
+                in error_msg
+            )
+
+        finally:
+            qml.capture.disable()
+
 
 class TestForLoops:
     """Test the Catalyst for_loop operation."""
@@ -424,6 +452,35 @@ class TestForLoops:
                 @for_loop(0, 3, 1)
                 def loop_fn(i, acc):
                     return acc + i
+
+            # Verify the error message is specific and helpful
+            error_msg = str(exc_info.value)
+            assert (
+                "catalyst.for_loop is not supported with PennyLane's capture feature enabled"
+                in error_msg
+            )
+
+        finally:
+            qml.capture.disable()
+
+    def test_for_loop_raises_compatibility_error_with_capture_integration(self):
+        """Test that for_loop raises CompatibilityError when capture mode is enabled."""
+        # Enable capture mode
+        qml.capture.enable()
+
+        try:
+            with pytest.raises(CompatibilityError) as exc_info:
+
+                @qml.qjit
+                @qml.qnode(qml.device("lightning.qubit", wires=3))
+                def test(n):
+                    @catalyst.for_loop(0, n, 1)
+                    def loop(i):
+                        qml.X(i)
+
+                    loop()
+
+                test(4)
 
             # Verify the error message is specific and helpful
             error_msg = str(exc_info.value)
