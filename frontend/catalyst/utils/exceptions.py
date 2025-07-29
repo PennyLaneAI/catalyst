@@ -34,33 +34,10 @@ class CompatibilityError(Exception):
     the corresponding PennyLane functions instead for compatibility with capture functionality.
     """
 
-    def __init__(self, control_flow_type="control flow", message=None):
-        if message is None:
-            if control_flow_type == "for_loop":
-                message = (
-                    "catalyst.for_loop is not supported with PennyLane's capture feature enabled. "
-                    "For compatibility with program capture, please use qml.for_loop instead. "
-                    "See the documentation for more information on using qml.for_loop with "
-                    "captured quantum programs."
-                )
-            elif control_flow_type == "while_loop":
-                message = (
-                    "catalyst.while_loop is not supported with PennyLane's capture feature enabled. "
-                    "For compatibility with program capture, please use qml.while_loop instead. "
-                    "See the documentation for more information on using qml.while_loop with "
-                    "captured quantum programs."
-                )
-            elif control_flow_type == "cond":
-                message = (
-                    "catalyst.cond is not supported with PennyLane's capture feature enabled. "
-                    "For compatibility with program capture, please use qml.cond instead. "
-                    "See the documentation for more information on using qml.cond with "
-                    "captured quantum programs."
-                )
-            else:
-                message = (
-                    f"catalyst.{control_flow_type} is not supported with PennyLane's capture feature enabled. "
-                    "For compatibility with program capture, please use the corresponding PennyLane "
-                    "function instead. See the documentation for more information."
-                )
+    def __init__(self, control_flow_type="control flow"):
+        message = (
+            f"catalyst.{control_flow_type} is not supported with PennyLane's capture feature enabled. "
+            "For compatibility with program capture, please use the corresponding PennyLane "
+            "function instead. See the documentation for more information."
+        )
         super().__init__(message)
