@@ -55,7 +55,6 @@ limitations under the License.
 // #include "stablehlo/dialect/StablehloOps.h"
 // #include "stablehlo/transforms/Passes.h"
 
-#include "Catalyst/IR/CatalystDialect.h"
 #include "mlir-hlo/Passes.h"
 
 using namespace mlir;
