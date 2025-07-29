@@ -101,11 +101,6 @@ mhlo:
 		git apply $(MK_DIR)/patches/mhlo-remove-shardy.patch; \
 	fi
 
-	# Patch MHLO passes removed from upstream
-	@if cd mlir-hlo; git apply --check $(MK_DIR)/patches/mhlo-add-back-necessary-passes.patch; then \
-		git apply $(MK_DIR)/patches/mhlo-add-back-necessary-passes.patch; \
-	fi
-
 	# Patch a MHLO bug with std::sort
 	@if cd mlir-hlo; git apply --check $(MK_DIR)/patches/mhlo-rename-sort.patch; then \
 		git apply $(MK_DIR)/patches/mhlo-rename-sort.patch; \
