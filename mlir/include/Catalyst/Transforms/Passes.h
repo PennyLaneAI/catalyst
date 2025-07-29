@@ -18,8 +18,6 @@
 
 #include "mlir/Pass/Pass.h"
 
-#include "Catalyst/mlir-hlo/Passes.h"
-
 namespace catalyst {
 
 std::unique_ptr<mlir::Pass> createAddExceptionHandlingPass();

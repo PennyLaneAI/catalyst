@@ -15,7 +15,7 @@
 #include "Driver/Pipelines.h"
 #include "Catalyst/IR/CatalystDialect.h"
 #include "Catalyst/Transforms/Passes.h"
-#include "Catalyst/mlir-hlo/Passes.h"
+#include "mlir-hlo/Passes.h"
 #include "Gradient/IR/GradientDialect.h"
 #include "Gradient/Transforms/Passes.h"
 #include "Mitigation/Transforms/Passes.h"

@@ -34,7 +34,7 @@
 #include "Catalyst/Transforms/BufferizableOpInterfaceImpl.h"
 #include "Catalyst/Transforms/Passes.h"
 #include "Catalyst/Utils/PrintVersion.h"
-#include "Catalyst/mlir-hlo/Passes.h"
+#include "mlir-hlo/Passes.h"
 #include "Gradient/IR/GradientDialect.h"
 #include "Gradient/Transforms/BufferizableOpInterfaceImpl.h"
 #include "Gradient/Transforms/Passes.h"

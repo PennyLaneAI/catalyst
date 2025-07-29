@@ -17,8 +17,6 @@
 
 include "mlir/Pass/PassBase.td"
 
-include "Catalyst/mlir-hlo/Passes.td"
-
 def DetensorizeSCFPass : Pass<"detensorize-scf"> {
     let summary = "Detensorize for, if, while operations from the SCF dialect.";
 

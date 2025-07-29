@@ -1,3 +1,7 @@
+set(LLVM_TARGET_DEFINITIONS Passes.td)
+mlir_tablegen(Passes.h.inc -gen-pass-decls -name mlir-hlo)
+add_public_tablegen_target(MLIRHLOCatalystPassIncGen)
+
 # The following is taken from mhlo to build the --legalize-to-std pass
 set(LLVM_TARGET_DEFINITIONS mhlo_legalize_to_standard_patterns.td)
 include_directories(

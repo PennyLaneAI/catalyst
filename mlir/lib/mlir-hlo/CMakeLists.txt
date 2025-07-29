@@ -15,6 +15,7 @@ set(LIBS
 
 set(DEPENDS
     MLIRCatalystPassIncGen
+    MLIRHLOCatalystPassIncGen
     MLIRMhloLegalizeToStandardIncGen
 )
 

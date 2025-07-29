@@ -56,7 +56,7 @@ limitations under the License.
 // #include "stablehlo/transforms/Passes.h"
 
 #include "Catalyst/IR/CatalystDialect.h"
-#include "Catalyst/Transforms/Passes.h"
+#include "mlir-hlo/Passes.h"
 
 using namespace mlir;
 using namespace mhlo;
@@ -69,8 +69,8 @@ namespace catalyst {
 #define GEN_PASS_DECL_MHLOLEGALIZETOSTANDARDPASS
 // #define GEN_PASS_DEF_STABLEHLOLEGALIZETOSTANDARDPASS
 // #define GEN_PASS_DECL_STABLEHLOLEGALIZETOSTANDARDPASS
-#include "Catalyst/Transforms/Passes.h.inc"
-#include "Catalyst/mlir-hlo/generated_mhlo_legalize_to_standard.cpp.inc"
+#include "mlir-hlo/Passes.h.inc"
+#include "mlir-hlo/generated_mhlo_legalize_to_standard.cpp.inc"
 
 } // namespace catalyst
 

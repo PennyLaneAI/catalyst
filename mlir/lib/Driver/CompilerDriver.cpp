@@ -58,7 +58,7 @@
 #include "Catalyst/IR/CatalystDialect.h"
 #include "Catalyst/Transforms/BufferizableOpInterfaceImpl.h"
 #include "Catalyst/Transforms/Passes.h"
-#include "Catalyst/mlir-hlo/Passes.h"
+#include "mlir-hlo/Passes.h"
 #include "Driver/CatalystLLVMTarget.h"
 #include "Driver/CompilerDriver.h"
 #include "Driver/Pipelines.h"

@@ -31,6 +31,10 @@
 //    limitations under the License.
 //    ==============================================================================*/
 
+#ifndef CATALYST_MLIRHLO_PASSES
+#define CATALYST_MLIRHLO_PASSES
+
+include "mlir/Pass/PassBase.td"
 
 // mhlo legalize sort pass.
 def MhloLegalizeSortPass : Pass<"mhlo-legalize-sort", "func::FuncOp"> {
@@ -53,3 +57,5 @@ def MhloLegalizeControlFlowPass : Pass<"mhlo-legalize-control-flow", "func::Func
   let constructor = "createMhloLegalizeControlFlowPass()";
   let dependentDialects = ["scf::SCFDialect", "tensor::TensorDialect"];
 }
+
+#endif // CATALYST_MLIRHLO_PASSES
