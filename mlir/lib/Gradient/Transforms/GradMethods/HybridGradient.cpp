@@ -86,9 +86,9 @@ void initializeCotangents(TypeRange primalResultTypes, unsigned activeResult, Va
                             : activeResultType);
 
     Value zero = builder.create<arith::ConstantFloatOp>(
-        loc, APFloat(elementType.getFloatSemantics(), 0), elementType);
-    Value one = builder.create<arith::ConstantFloatOp>(
-        loc, APFloat(elementType.getFloatSemantics(), 1), elementType);
+        loc, elementType, APFloat(elementType.getFloatSemantics(), 0));
+    Value one = builder.create<arith::ConstantFloatOp>(loc, elementType,
+                                                       APFloat(elementType.getFloatSemantics(), 1));
 
     Value zeroTensor;
     if (auto activeResultTensor = dyn_cast<RankedTensorType>(activeResultType)) {
@@ -397,7 +397,7 @@ static func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc,
                 }
                 else {
                     jacobians.push_back(rewriter.create<arith::ConstantFloatOp>(
-                        loc, APFloat(0.0), cast<FloatType>(jacobianType)));
+                        loc, cast<FloatType>(jacobianType), APFloat(0.0)));
                 }
             }
 
