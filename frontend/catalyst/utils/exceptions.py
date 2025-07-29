@@ -36,8 +36,8 @@ class CompatibilityError(Exception):
 
     def __init__(self, control_flow_type="control flow"):
         message = (
-            f"catalyst.{control_flow_type} is not supported with PennyLane's capture feature enabled. "
-            "For compatibility with program capture, please use the corresponding PennyLane "
-            "function instead. See the documentation for more information."
+            f"catalyst.{control_flow_type} is not supported with PennyLane's capture enabled. "
+            "For compatibility with program capture, please use the corresponding "
+            f"qml.{control_flow_type} instead. See the documentation for more information."
         )
         super().__init__(message)
