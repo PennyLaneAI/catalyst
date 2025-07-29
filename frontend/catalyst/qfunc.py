@@ -295,13 +295,41 @@ def dynamic_one_shot(qnode, **kwargs):
             if len(cpy_tape.measurements) == 1:
                 out = (out,)
         else:
-            for m_count, m in enumerate(cpy_tape.measurements):
+            new_out = []
+            idx = 0
+            for m in cpy_tape.measurements:
+                # CountsMP would have two elements need to process
+                # the keys and the corresponding counts
+                if isinstance(m, CountsMP):
+                    keys = out[idx]
+                    counts = out[idx + 1]
+                    # example of 3 shots
+                    # counts = [[1, 0, 0, 0],  # Shot 1
+                    #           [0, 0, 0, 1],  # Shot 2
+                    #           [1, 0, 0, 0]]  # Shot 3
+                    # aggregate counts = [[2, 0, 0, 1]]
+                    aggregated_counts = jnp.sum(counts, axis=0)
+                    counts_result = (keys[0], aggregated_counts)
+                    new_out.append(counts_result)
+                    idx += 2
+                    continue
+
+
+                result = jnp.squeeze(out[idx])
+                max_ndim = min(len(out[idx].shape), 2)
+                if result.ndim == 1 and max_ndim == 2:
+                    result = jnp.expand_dims(result, axis=1)
+
+
                 # Without MCMs and postselection, all samples are valid for use in MP computation.
-                is_valid = jnp.array([True] * len(out[m_count]))
-                out[m_count] = gather_non_mcm(
-                    m, out[m_count], is_valid, postselect_mode="pad-invalid-samples"
+                is_valid = jnp.full((result.shape[0],), True)
+                processed_result = gather_non_mcm(
+                    m, result, is_valid, postselect_mode="pad-invalid-samples"
                 )
-            out = tuple(out)
+                new_out.append(processed_result)
+                idx += 1
+
+            out = tuple(new_out)
         out_tree_expected = kwargs.pop("_out_tree_expected", [])
         out = tree_unflatten(out_tree_expected[0], out)
         return out
