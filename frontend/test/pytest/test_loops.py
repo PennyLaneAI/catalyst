@@ -268,7 +268,7 @@ class TestWhileLoops:
             # Verify the error message is specific and helpful
             error_msg = str(exc_info.value)
             assert (
-                "catalyst.while_loop is not supported with PennyLane's capture feature enabled"
+                "catalyst.while_loop is not supported with PennyLane's capture enabled"
                 in error_msg
             )
 
@@ -296,7 +296,7 @@ class TestWhileLoops:
             # Verify the error message is specific and helpful
             error_msg = str(exc_info.value)
             assert (
-                "catalyst.while_loop is not supported with PennyLane's capture feature enabled"
+                "catalyst.while_loop is not supported with PennyLane's capture enabled"
                 in error_msg
             )
 
@@ -456,7 +456,7 @@ class TestForLoops:
             # Verify the error message is specific and helpful
             error_msg = str(exc_info.value)
             assert (
-                "catalyst.for_loop is not supported with PennyLane's capture feature enabled"
+                "catalyst.for_loop is not supported with PennyLane's capture enabled"
                 in error_msg
             )
 
@@ -485,7 +485,7 @@ class TestForLoops:
             # Verify the error message is specific and helpful
             error_msg = str(exc_info.value)
             assert (
-                "catalyst.for_loop is not supported with PennyLane's capture feature enabled"
+                "catalyst.for_loop is not supported with PennyLane's capture enabled"
                 in error_msg
             )
 
