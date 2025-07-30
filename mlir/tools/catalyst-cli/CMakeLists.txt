@@ -26,7 +26,7 @@ set(LIBS
     MLIROptLib
     MLIRCatalyst
     catalyst-transforms
-    catalyst-mhlo-transforms
+    catalyst-stablehlo-transforms
     MLIRQuantum
     quantum-transforms
     MLIRQEC

@@ -31,31 +31,31 @@
 //    limitations under the License.
 //    ==============================================================================*/
 
-#ifndef CATALYST_MLIRHLO_PASSES
-#define CATALYST_MLIRHLO_PASSES
+#ifndef CATALYST_STABLEHLO_PASSES
+#define CATALYST_STABLEHLO_PASSES
 
 include "mlir/Pass/PassBase.td"
 
-// mhlo legalize sort pass.
-def MhloLegalizeSortPass : Pass<"mhlo-legalize-sort", "func::FuncOp"> {
-  let summary = "Legalize from Mhlo sort to SCF control flow.";
-  let constructor = "createMhloLegalizeSortPass()";
+// stablehlo legalize sort pass.
+def StablehloLegalizeSortPass : Pass<"stablehlo-legalize-sort", "func::FuncOp"> {
+  let summary = "Legalize from Stablehlo sort to SCF control flow.";
+  let constructor = "createStablehloLegalizeSortPass()";
   let dependentDialects = ["arith::ArithDialect",
                            "bufferization::BufferizationDialect",
                            "scf::SCFDialect", "tensor::TensorDialect"];
 }
 
-// mhlo legalize to std pass.
-def MhloLegalizeToStandardPass : Pass<"mhlo-legalize-to-std", "func::FuncOp"> {
-  let summary = "Legalize from MHLO dialect to standard dialect.";
-  let constructor = "createMhloLegalizeToStdPass()";
+// stablehlo legalize to std pass.
+def StablehloLegalizeToStandardPass : Pass<"stablehlo-legalize-to-std", "func::FuncOp"> {
+  let summary = "Legalize from Stablehlo dialect to standard dialect.";
+  let constructor = "createStablehloLegalizeToStdPass()";
 }
 
-// mhlo legalize to control flow pass.
-def MhloLegalizeControlFlowPass : Pass<"mhlo-legalize-control-flow", "func::FuncOp"> {
-  let summary = "Legalize from MHLO control flow to SCF control flow.";
-  let constructor = "createMhloLegalizeControlFlowPass()";
+// stablehlo legalize to control flow pass.
+def StablehloLegalizeControlFlowPass : Pass<"stablehlo-legalize-control-flow", "func::FuncOp"> {
+  let summary = "Legalize from Stablehlo control flow to SCF control flow.";
+  let constructor = "createStablehloLegalizeControlFlowPass()";
   let dependentDialects = ["scf::SCFDialect", "tensor::TensorDialect"];
 }
 
-#endif // CATALYST_MLIRHLO_PASSES
+#endif // CATALYST_STABLEHLO_PASSES

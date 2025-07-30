@@ -44,10 +44,10 @@ void createHloLoweringPipeline(OpPassManager &pm)
 
     pm.addNestedPass<mlir::func::FuncOp>(mhlo::createChloLegalizeToHloPass());
     pm.addPass(mlir::mhlo::createStablehloLegalizeToHloPass());
-    pm.addNestedPass<mlir::func::FuncOp>(catalyst::createMhloLegalizeControlFlowPass());
+    pm.addNestedPass<mlir::func::FuncOp>(catalyst::createStablehloLegalizeControlFlowPass());
     pm.addNestedPass<mlir::func::FuncOp>(mhlo::createLegalizeHloToLinalgPass());
-    pm.addNestedPass<mlir::func::FuncOp>(catalyst::createMhloLegalizeToStdPass());
-    pm.addNestedPass<mlir::func::FuncOp>(catalyst::createMhloLegalizeSortPass());
+    pm.addNestedPass<mlir::func::FuncOp>(catalyst::createStablehloLegalizeToStdPass());
+    pm.addNestedPass<mlir::func::FuncOp>(catalyst::createStablehloLegalizeSortPass());
     pm.addPass(mlir::mhlo::createConvertToSignlessPass());
 
     pm.addPass(mlir::createCanonicalizerPass());

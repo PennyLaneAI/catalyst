@@ -1,9 +1,9 @@
-set(LIBRARY_NAME catalyst-mhlo-transforms)
+set(LIBRARY_NAME catalyst-stablehlo-transforms)
 
 file(GLOB SRC
-    mhlo_legalize_control_flow.cpp
-    mhlo_legalize_sort.cpp
-    mhlo_legalize_to_std.cpp
+    stablehlo_legalize_control_flow.cpp
+    stablehlo_legalize_sort.cpp
+    stablehlo_legalize_to_std.cpp
 )
 
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)
@@ -15,8 +15,8 @@ set(LIBS
 
 set(DEPENDS
     MLIRCatalystPassIncGen
-    MLIRHLOCatalystPassIncGen
-    MLIRMhloLegalizeToStandardIncGen
+    STABLEHLOCatalystPassIncGen
+    MLIRStablehloLegalizeToStandardIncGen
 )
 
 add_mlir_library(${LIBRARY_NAME} STATIC ${SRC} LINK_LIBS PRIVATE ${LIBS} DEPENDS ${DEPENDS})
