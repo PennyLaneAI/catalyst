@@ -214,6 +214,7 @@ add_subdirectory(cmake/modules)
 ######################
 
 add_subdirectory(test)
+
 unset(LLVM_USE_LINKER)
 set(STABLEHLO_BUILD_EMBEDDED ON)
 set(CMAKE_COMPILE_WARNING_AS_ERROR OFF)
