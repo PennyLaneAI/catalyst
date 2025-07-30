@@ -98,7 +98,7 @@ class TestBraketGates:
 
             return qml.expval(qml.PauliZ(0) @ qml.PauliZ(1))
 
-        qjit_fn = qjit()(qml.qnode(device)(circuit))
+        qjit_fn = qjit(qml.qnode(device)(circuit))
         qml_fn = qml.qnode(qml.device("default.qubit", wires=3))(circuit)
 
         assert np.allclose(qjit_fn(), qml_fn())
@@ -134,7 +134,7 @@ class TestBraketGates:
 
             return qml.var(qml.PauliZ(0) @ qml.PauliZ(1) @ qml.PauliZ(2))
 
-        qjit_fn = qjit()(qml.qnode(device)(circuit))
+        qjit_fn = qjit(qml.qnode(device)(circuit))
         qml_fn = qml.qnode(qml.device("default.qubit", wires=3))(circuit)
 
         assert np.allclose(qjit_fn(3.14, 0.6), qml_fn(3.14, 0.6))

@@ -84,12 +84,12 @@ class TestAssertion:
             return True
 
         with pytest.raises(RuntimeError, match="Always raise"):
-            qjit()(circuit)()
+            qjit(circuit)()
 
         assert qjit(disable_assertions=True)(circuit)() == True
 
         with pytest.raises(RuntimeError, match="Always raise"):
-            qjit()(circuit)()
+            qjit(circuit)()
 
         assert qjit(disable_assertions=True)(circuit)() == True
 

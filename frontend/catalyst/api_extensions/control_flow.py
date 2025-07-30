@@ -373,7 +373,7 @@ def for_loop(lower_bound, upper_bound, step, allow_array_resizing=False):
     However, if you wish to have the for loop return differently sized arrays
     at each iteration, set ``allow_array_resizing`` to ``True``:
 
-    >>> @qjit()
+    >>> @qjit
     ... def f(N):
     ...     a = jnp.ones([N], dtype=float)
     ...     @for_loop(0, 10, 1, allow_array_resizing=True)
