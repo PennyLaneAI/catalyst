@@ -257,7 +257,7 @@ def cond(pred: DynamicJaxprTracer):
                 return cond_fn()
 
             # Use this instead for capture mode compatibility
-            @qml.qnode(device, interface="jax")
+            @qml.qnode(device)
             def circuit(x):
                 def cond_fn():
                     return x ** 2
@@ -430,7 +430,7 @@ def for_loop(lower_bound, upper_bound, step, allow_array_resizing=False):
                 return loop_fn(0)
 
             # Use this instead for capture mode compatibility
-            @qml.qnode(device, interface="jax")
+            @qml.qnode(device)
             def circuit():
                 def loop_fn(v):
                     return v + 1
@@ -569,7 +569,7 @@ def while_loop(cond_fn, allow_array_resizing: bool = False):
                 return loop_fn(0)
 
             # Use this instead for capture mode compatibility
-            @qml.qnode(device, interface="jax")
+            @qml.qnode(device)
             def circuit():
                 def loop_fn(x):
                     return x + 1
