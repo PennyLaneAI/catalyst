@@ -257,7 +257,7 @@ def cond(pred: DynamicJaxprTracer):
                 return cond_fn()
 
             # Use this instead for capture mode compatibility
-            @qml.qnode(device)
+            @qjit
             def circuit(x):
                 def cond_fn():
                     return x ** 2
