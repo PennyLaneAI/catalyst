@@ -27,7 +27,7 @@ from catalyst.device.qjit_device import QJITDevice
 def test_variable_capture(_in, _out):
     """Test closures (outer-scope variable capture) for quantum functions."""
 
-    @qjit()
+    @qjit
     def workflow(n: int):
         @qml.qnode(qml.device("lightning.qubit", wires=2))
         def f(x: float):
@@ -54,7 +54,7 @@ def test_variable_capture(_in, _out):
 def test_variable_capture_multiple_devices(_in, _out, backend):
     """Test variable capture using multiple backend devices."""
 
-    @qjit()
+    @qjit
     def workflow(n: int):
         @qml.qnode(qml.device("lightning.qubit", wires=2))
         def f(x: float):

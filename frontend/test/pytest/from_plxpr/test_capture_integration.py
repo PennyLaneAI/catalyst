@@ -32,7 +32,7 @@ def circuit_aot_builder(dev):
 
     qml.capture.enable()
 
-    @catalyst.qjit()
+    @catalyst.qjit
     @qml.qnode(device=dev)
     def catalyst_circuit_aot(x: float):
         qml.Hadamard(wires=0)
@@ -136,7 +136,7 @@ class TestCapture:
 
         qml.capture.enable()
 
-        @catalyst.qjit()
+        @catalyst.qjit
         @qml.qnode(device=dev)
         def captured_circuit(x):
             qml.Hadamard(wires=0)
