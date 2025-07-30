@@ -417,7 +417,7 @@ def for_loop(lower_bound, upper_bound, step, allow_array_resizing=False):
     .. note::
 
        ``catalyst.for_loop`` is not supported in program capture mode. If ``qml.capture`` is enabled,
-	        please use ``qml.for_loop`` instead.
+                please use ``qml.for_loop`` instead.
 
         .. code-block:: python
 
