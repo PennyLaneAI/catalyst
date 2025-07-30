@@ -146,7 +146,6 @@ jobs:
       run: |
         cd $GITHUB_WORKSPACE/mlir/mlir-hlo
         git apply $GITHUB_WORKSPACE/mlir/patches/mhlo-remove-shardy.patch
-        git apply $GITHUB_WORKSPACE/mlir/patches/mhlo-add-back-necessary-passes.patch
         git apply $GITHUB_WORKSPACE/mlir/patches/mhlo-rename-sort.patch
 
     - name: Clone Enzyme Submodule
