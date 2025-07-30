@@ -63,8 +63,8 @@ namespace catalyst {
 
 #define GEN_PASS_DEF_STABLEHLOLEGALIZETOSTANDARDPASS
 #define GEN_PASS_DECL_STABLEHLOLEGALIZETOSTANDARDPASS
-#include "mlir-hlo/Passes.h.inc"
-#include "mlir-hlo/generated_stablehlo_legalize_to_standard.cpp.inc"
+#include "stablehlo/Passes.h.inc"
+#include "stablehlo/generated_stablehlo_legalize_to_standard.cpp.inc"
 
 } // namespace catalyst
 

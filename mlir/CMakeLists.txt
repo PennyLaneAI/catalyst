@@ -42,6 +42,11 @@ list(APPEND CMAKE_MODULE_PATH "${MLIR_CMAKE_DIR}")
 list(APPEND CMAKE_MODULE_PATH "${LLVM_CMAKE_DIR}")
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake/modules")
 
+unset(LLVM_USE_LINKER)
+set(STABLEHLO_BUILD_EMBEDDED ON)
+set(CMAKE_COMPILE_WARNING_AS_ERROR OFF)
+add_subdirectory(stablehlo)
+
 # Policy CMP0175 was introduced in CMake 4.31 and raises warnings in the upstream CMake modules.
 # Policy CMP0177 was introduced in CMake 4.31 and raises warnings in the upstream CMake modules.
 # TODO: Remove once they (and us) have updated their code to deal with it.
@@ -214,8 +219,3 @@ add_subdirectory(cmake/modules)
 ######################
 
 add_subdirectory(test)
-
-unset(LLVM_USE_LINKER)
-set(STABLEHLO_BUILD_EMBEDDED ON)
-set(CMAKE_COMPILE_WARNING_AS_ERROR OFF)
-add_subdirectory(stablehlo)
