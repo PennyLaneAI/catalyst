@@ -421,6 +421,7 @@ def for_loop(lower_bound, upper_bound, step, allow_array_resizing=False):
 
         .. code-block:: python
 
+            qml.capture.enable()
             # This will raise an error with capture mode
             @qjit
             def func():
