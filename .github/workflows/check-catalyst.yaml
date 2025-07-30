@@ -319,7 +319,7 @@ jobs:
       uses: actions/checkout@v4
       with:
         repository: openxla/stablehlo
-        ref: f1f035fea33dcfdd7c471eb7f39174b344003117
+        ref: 69d6dae46e1c7de36e6e6973654754f05353cba5
         path: mlir/stablehlo
 
     - name: Build MLIR Dialects
