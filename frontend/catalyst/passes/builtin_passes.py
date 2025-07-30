@@ -343,6 +343,8 @@ def merge_rotations(qnode):
     :class:`qml.CRZ <pennylane.CRZ>`,
     :class:`qml.PhaseShift <pennylane.PhaseShift>`,
     :class:`qml.ControlledPhaseShift <pennylane.ControlledPhaseShift>`,
+    :class:`qml.Rot <pennylane.Rot>`,
+    :class:`qml.CRot <pennylane.CRot>`,
     :class:`qml.MultiRZ <pennylane.MultiRZ>`.
 
 
