@@ -14,8 +14,6 @@
 
 // RUN: quantum-opt --detensorize-function-boundary --canonicalize --split-input-file %s | FileCheck %s
 
-//---
-
 // CHECK-LABEL: func.func public @shortname(
 // CHECK-SAME:                              %[[ARG0:.+]]: i64
 // CHECK-SAME:                            ) -> i64 {

@@ -1,4 +1,4 @@
-#define DEBUG_TYPE "myhelloworld"
+#define DEBUG_TYPE "detensorize-func-boundary"
 
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Func/Transforms/FuncConversions.h"
@@ -20,8 +20,18 @@ struct DetensorizeExtractPattern : public OpConversionPattern<tensor::ExtractOp>
     LogicalResult matchAndRewrite(tensor::ExtractOp op, OpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
-        rewriter.replaceOp(op, adaptor.getTensor());
-        return success();
+        mlir::Value tensor = op.getTensor();
+        mlir::Operation *definingOp = tensor.getDefiningOp();
+
+        if (mlir::isa<mlir::BlockArgument>(tensor) ||
+            (definingOp && mlir::isa<mlir::func::CallOp>(definingOp))) {
+            llvm::errs() << "matched detensorized extract\n";
+            rewriter.replaceOp(op, adaptor.getTensor());
+            return success();
+        }
+        llvm::errs() << "not matched detensorized extract\n";
+
+        return failure();
     }
 };
 
@@ -31,9 +41,24 @@ struct DetensorizeFromElementsPattern : public OpConversionPattern<tensor::FromE
     LogicalResult matchAndRewrite(tensor::FromElementsOp op, OpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
-        assert(adaptor.getElements().size() == 1);
-        rewriter.replaceOp(op, adaptor.getElements()[0]);
-        return success();
+        if (op.getOperands().size() != 1) {
+            llvm::errs() << "FromElementsOp has more than one operand, cannot detensorize\n";
+            return failure();
+        }
+        mlir::Value result = op.getResult();
+
+        if (!result.hasOneUse()) {
+            llvm::errs() << "result.hasOneUse() " << result.hasOneUse() << "\n";
+            return failure();
+        }
+        mlir::Operation *user = *result.user_begin();
+
+        if (mlir::isa<mlir::func::ReturnOp>(user) || mlir::isa<mlir::func::CallOp>(user)) {
+            rewriter.replaceOp(op, adaptor.getElements()[0]);
+            return success();
+        }
+
+        return failure();
     }
 };
 
@@ -63,8 +88,8 @@ struct DetensorizeFunctionBoundaryPass
             return type;
         });
 
-        typeConverter.addArgumentMaterialization([](OpBuilder &builder, RankedTensorType resultType,
-                                                    ValueRange inputs, Location loc) -> Value {
+        typeConverter.addTargetMaterialization([](OpBuilder &builder, RankedTensorType resultType,
+                                                  ValueRange inputs, Location loc) -> Value {
             if (resultType.getRank() == 0) {
                 return builder.create<tensor::FromElementsOp>(loc, resultType, inputs).getResult();
             }
@@ -84,18 +109,50 @@ struct DetensorizeFunctionBoundaryPass
             return Value();
         });
 
+        // target.addDynamicallyLegalOp<tensor::FromElementsOp>([](tensor::FromElementsOp op) {
+        //     if (auto rankedType = dyn_cast<RankedTensorType>(op.getResult().getType())) {
+        //         return rankedType.getRank() != 0;
+        //     }
+        //     return true;
+        // });
+
+        // target.addDynamicallyLegalOp<tensor::ExtractOp>([](tensor::ExtractOp op) {
+        //     if (auto rankedType = dyn_cast<RankedTensorType>(op.getTensor().getType())) {
+        //         return rankedType.getRank() != 0;
+        //     }
+        //     return true;
+        // });
+
         target.addDynamicallyLegalOp<tensor::FromElementsOp>([](tensor::FromElementsOp op) {
-            if (auto rankedType = dyn_cast<RankedTensorType>(op.getResult().getType())) {
-                return rankedType.getRank() != 0;
+            if (op.getOperands().size() != 1) {
+                return true; // Is Legal.
             }
-            return true;
+
+            mlir::Value result = op.getResult();
+            if (!result.hasOneUse()) {
+                return true; // Is Legal.
+            }
+
+            mlir::Operation *user = *result.user_begin();
+
+            bool patternWillMatch =
+                mlir::isa<mlir::func::ReturnOp>(user) || mlir::isa<mlir::func::CallOp>(user);
+
+            return !patternWillMatch;
         });
 
         target.addDynamicallyLegalOp<tensor::ExtractOp>([](tensor::ExtractOp op) {
-            if (auto rankedType = dyn_cast<RankedTensorType>(op.getTensor().getType())) {
-                return rankedType.getRank() != 0;
+            mlir::Value tensor = op.getTensor();
+            auto tensorType = dyn_cast<RankedTensorType>(tensor.getType());
+
+            if (!tensorType || tensorType.getRank() != 0) {
+                return true;
             }
-            return true;
+            mlir::Operation *definingOp = tensor.getDefiningOp();
+            bool patternWouldMatch = mlir::isa<mlir::BlockArgument>(tensor) ||
+                                     (definingOp && mlir::isa<mlir::func::CallOp>(definingOp));
+
+            return !patternWouldMatch;
         });
 
         target.addDynamicallyLegalOp<func::FuncOp>(
