@@ -17,7 +17,9 @@
 #include "mlir/IR/OpImplementation.h"
 #include "llvm/ADT/TypeSwitch.h" // needed for enums
 #include <llvm/Support/LogicalResult.h>
+#include <mlir/IR/IRMapping.h>
 #include <mlir/IR/OperationSupport.h>
+#include <mlir/IR/Region.h>
 
 #include "QEC/IR/QECDialect.h"
 #include "Quantum/IR/QuantumDialect.h"
@@ -121,6 +123,31 @@ LogicalResult FabricateOp::verify()
         return emitOpError("Logical state should not be fabricated, use `PrepareStateOp` instead.");
     }
     return mlir::success();
+}
+
+void LayerOp::build(OpBuilder &builder, OperationState &result, ValueRange inValues,
+                    ValueRange outValues, BodyBuilderFn bodyBuilder)
+{
+    OpBuilder::InsertionGuard guard(builder);
+    Location loc = result.location;
+
+    // Set the operands of the layer op
+    result.addOperands(inValues);
+
+    // Set the result types of the layer op
+    for (Value v : outValues) {
+        result.addTypes(v.getType());
+    }
+
+    // Create the body region of the layer op
+    Region *bodyRegion = result.addRegion();
+    Block *bodyBlock = builder.createBlock(bodyRegion);
+    for (Value v : inValues) {
+        bodyBlock->addArgument(v.getType(), v.getLoc());
+    }
+
+    builder.setInsertionPointToStart(bodyBlock);
+    bodyBuilder(builder, loc, bodyBlock->getArguments(), outValues);
 }
 
 ParseResult LayerOp::parse(OpAsmParser &parser, OperationState &result)

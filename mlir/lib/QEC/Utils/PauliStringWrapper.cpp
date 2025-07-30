@@ -49,6 +49,16 @@ PauliStringWrapper PauliStringWrapper::from_pauli_word(const PauliWord &pauliWor
     return PauliStringWrapper(stim::FlexPauliString::from_text(pauliStringStr));
 }
 
+PauliStringWrapper PauliStringWrapper::from_qec_op(QECOpInterface op)
+{
+    std::string pauliStringStr;
+    for (auto pauli : op.getPauliProduct()) {
+        auto pauliStr = mlir::cast<mlir::StringAttr>(pauli).getValue();
+        pauliStringStr += pauliStr;
+    }
+    return PauliStringWrapper(stim::FlexPauliString::from_text(pauliStringStr));
+}
+
 bool PauliStringWrapper::isNegative() const { return pauliString->value.sign; }
 bool PauliStringWrapper::isImaginary() const { return pauliString->imag; }
 
@@ -88,9 +98,8 @@ PauliStringWrapper::computeCommutationRulesWith(const PauliStringWrapper &rhs) c
     return PauliStringWrapper(std::move(result));
 }
 
-template <typename T>
-PauliWord expandPauliWord(const llvm::SetVector<Value> &operands, const T &inOutOperands,
-                          QECOpInterface op)
+template <typename T, typename U>
+PauliWord expandPauliWord(const T &operands, const U &inOutOperands, QECOpInterface op)
 {
     PauliWord pauliWord(operands.size(), "I");
     for (auto [qubit, pauli] : llvm::zip(inOutOperands, op.getPauliProduct())) {
@@ -104,6 +113,11 @@ PauliWord expandPauliWord(const llvm::SetVector<Value> &operands, const T &inOut
     }
     return pauliWord;
 }
+
+// Template definition
+template PauliWord
+expandPauliWord<llvm::SetVector<int>, std::vector<int>>(const llvm::SetVector<int> &,
+                                                        const std::vector<int> &, QECOpInterface);
 
 PauliWordPair normalizePPROps(QECOpInterface lhs, QECOpInterface rhs)
 {
