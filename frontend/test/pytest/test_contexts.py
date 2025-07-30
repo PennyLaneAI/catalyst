@@ -184,7 +184,7 @@ class TestTracing:
     def test_fixed_tracing(self, backend):
         """Test fixed tracing."""
 
-        @qjit()
+        @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def circuit():
             m = measure(wires=0)
@@ -211,7 +211,7 @@ class TestTracing:
 
             return m
 
-        @qjit()
+        @qjit
         @qml.qnode(qml.device(backend, wires=3))
         def circuit(n):
             @while_loop(lambda i: i < n)
@@ -233,7 +233,7 @@ class TestTracing:
     def test_discarded_measurements(self, backend):
         """Test discarded measurements."""
 
-        @qjit()
+        @qjit
         @qml.qnode(qml.device(backend, wires=2))
         def circuit():
             qml.state()
@@ -244,7 +244,7 @@ class TestTracing:
     def test_mixed_result_types(self, backend):
         """Test mixed result types."""
 
-        @qjit()
+        @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def circuit():
             @while_loop(lambda _, repeat: repeat)
