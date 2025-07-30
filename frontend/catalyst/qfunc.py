@@ -134,13 +134,33 @@ class QFunc:
                 )
             )
             total_shots = _get_total_shots(self)
+            user_specified_mcm_method = mcm_config.mcm_method
             mcm_config = _resolve_mcm_config(mcm_config, total_shots)
 
             if mcm_config.mcm_method == "one-shot":
                 mcm_config = replace(
                     mcm_config, postselect_mode=mcm_config.postselect_mode or "hw-like"
                 )
-                return Function(dynamic_one_shot(self, mcm_config=mcm_config))(*args, **kwargs)
+                try:
+                    return Function(dynamic_one_shot(self, mcm_config=mcm_config))(*args, **kwargs)
+                except (TypeError, ValueError, CompileError) as e:
+                    if user_specified_mcm_method is not None:
+                        raise
+
+                    # Fallback only if mcm was auto-determined
+                    error_msg = str(e)
+                    unsupported_measurement_error = any(pattern in error_msg for pattern in [
+                        "Native mid-circuit measurement mode does not support",
+                        "qml.var(obs) cannot be returned when `mcm_method='one-shot'`"
+                    ])
+
+                    # Fallback if error is related to unsupported measurements
+                    if unsupported_measurement_error:
+                        logger.debug("Fallback to single-branch-statistics: %s", e)
+                        mcm_config = replace(mcm_config, mcm_method="single-branch-statistics")
+                    else:
+                        # unknown error, re-raise
+                        raise
 
         new_device = copy(self.device)
         new_device._shots = self._shots  # pylint: disable=protected-access
