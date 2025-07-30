@@ -25,9 +25,6 @@ file(GLOB SRC
     scatter_lowering.cpp
     ScatterPatterns.cpp
     SplitMultipleTapes.cpp
-    stablehlo_legalize_control_flow.cpp
-    stablehlo_legalize_sort.cpp
-    stablehlo_legalize_to_std.cpp
     TBAAPatterns.cpp
     TBAATagsPass.cpp
 )
@@ -37,15 +34,10 @@ get_property(conversion_libs GLOBAL PROPERTY MLIR_CONVERSION_LIBS)
 set(LIBS
     ${dialect_libs}
     ${conversion_libs}
-    StablehloPasses
-    StablehloOps
 )
 
 set(DEPENDS
     MLIRCatalystPassIncGen
-    MLIRStablehloLegalizeToStandardIncGen
-    StablehloBaseIncGen
-    StablehloOpsIncGen
 )
 
 add_mlir_library(${LIBRARY_NAME} STATIC ${SRC} LINK_LIBS PRIVATE ${LIBS} DEPENDS ${DEPENDS})
