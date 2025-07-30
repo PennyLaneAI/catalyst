@@ -243,9 +243,8 @@ def cond(pred: DynamicJaxprTracer):
 
     .. note::
 
-        Currently, ``catalyst.cond`` is not supported in program capture mode.
-        If you are using ``qml.qnode`` with PennyLane's ``capture`` feature, you
-        should use ``qml.cond`` instead:
+       ``catalyst.cond`` is not supported in program capture mode. If ``qml.capture`` is enabled,
+        please use ``qml.cond`` instead.
 
         .. code-block:: python
 
