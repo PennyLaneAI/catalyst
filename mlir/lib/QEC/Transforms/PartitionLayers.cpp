@@ -1,4 +1,3 @@
-
 // Copyright 2025 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -34,15 +33,14 @@ namespace qec {
 // TODO: Move this class outside the pass
 // - Add deconstructor
 class QECLayer {
-
     static inline llvm::DenseMap<Value, int> qubitValueToIndex;
     static inline llvm::DenseMap<Operation *, std::vector<int>> opToIndex;
     static inline int MAX_INDEX;
 
   public:
     std::vector<QECOpInterface> ops;
-    llvm::SetVector<Value> inOperandVals;
-    llvm::SetVector<Value> outResultVals;
+    llvm::SetVector<Value> operands;
+    llvm::SetVector<Value> results;
 
     QECLayer() {}
     QECLayer(std::vector<QECOpInterface> ops) : ops(ops) {}
@@ -53,7 +51,7 @@ class QECLayer {
 
     bool empty() { return ops.empty(); }
 
-    std::vector<int> getQubitIndexBy(QECOpInterface op)
+    std::vector<int> getQubitIndexFrom(QECOpInterface op)
     {
         std::vector<int> qubitIndexes;
 
@@ -82,11 +80,11 @@ class QECLayer {
 
     bool actOnSameQubits(QECOpInterface op)
     {
-        auto qubitIndex = getQubitIndexBy(op);
+        auto qubitIndex = getQubitIndexFrom(op);
         std::set<int> layerIndexes;
 
         for (auto layerOp : ops) {
-            auto layerOpQubitIndex = getQubitIndexBy(layerOp);
+            auto layerOpQubitIndex = getQubitIndexFrom(layerOp);
             std::set<int> indexSet(layerOpQubitIndex.begin(), layerOpQubitIndex.end());
             layerIndexes.insert(indexSet.begin(), indexSet.end());
         }
@@ -100,17 +98,18 @@ class QECLayer {
         return false;
     }
 
-    bool isOpCommuteWithOtherOp(QECOpInterface op, QECOpInterface anotherOp)
+    // Commute two ops if they act on the same qubits based on qubit indexes on that layer
+    bool commute(QECOpInterface fromOp, QECOpInterface toOp)
     {
-        auto lhs_qubit_indexes = getQubitIndexBy(op);
-        auto rhs_qubit_indexes = getQubitIndexBy(anotherOp);
+        auto lhsQubitIndexes = getQubitIndexFrom(fromOp);
+        auto rhsQubitIndexes = getQubitIndexFrom(toOp);
 
         llvm::SetVector<int> qubits;
-        qubits.insert(lhs_qubit_indexes.begin(), lhs_qubit_indexes.end());
-        qubits.insert(rhs_qubit_indexes.begin(), rhs_qubit_indexes.end());
+        qubits.insert(lhsQubitIndexes.begin(), lhsQubitIndexes.end());
+        qubits.insert(rhsQubitIndexes.begin(), rhsQubitIndexes.end());
 
-        PauliWord lhsPauliWord = expandPauliWord(qubits, lhs_qubit_indexes, op);
-        PauliWord rhsPauliWord = expandPauliWord(qubits, rhs_qubit_indexes, anotherOp);
+        PauliWord lhsPauliWord = expandPauliWord(qubits, lhsQubitIndexes, fromOp);
+        PauliWord rhsPauliWord = expandPauliWord(qubits, rhsQubitIndexes, toOp);
 
         auto lhsPSWrapper = PauliStringWrapper::from_pauli_word(lhsPauliWord);
         auto rhsPSWrapper = PauliStringWrapper::from_pauli_word(rhsPauliWord);
@@ -118,10 +117,11 @@ class QECLayer {
         return lhsPSWrapper.commutes(rhsPSWrapper);
     }
 
-    bool isOpCommuteToAllOpsInLayer(QECOpInterface op)
+    // Commute an op to all the ops in the layer
+    bool commuteToLayer(QECOpInterface op)
     {
         for (auto layerOp : ops) {
-            if (!isOpCommuteWithOtherOp(op, layerOp)) {
+            if (!commute(op, layerOp)) {
                 return false;
             }
         }
@@ -133,7 +133,7 @@ class QECLayer {
         // Gate can be inserted if:
         // 1. It acts on the different qubits that gates in the layer act on
         // 2. Or it commutes with all the gates in the layer
-        if (!actOnSameQubits(op) || isOpCommuteToAllOpsInLayer(op)) {
+        if (!actOnSameQubits(op) || commuteToLayer(op)) {
             ops.emplace_back(op);
             setInOutOperands(op);
             return true;
@@ -150,7 +150,6 @@ class QECLayer {
     {
         for (auto [operandValOpt, resultValOpt] :
              llvm::zip_longest(op->getOperands(), op->getResults())) {
-
             Value operandValue = operandValOpt.value_or(nullptr);
             Value resultValue = resultValOpt.value_or(nullptr);
 
@@ -164,7 +163,7 @@ class QECLayer {
                 }
                 else {
                     outToInValue[resultValue] = operandValue;
-                    inOperandVals.insert(operandValue);
+                    operands.insert(operandValue);
                 }
             }
 
@@ -177,7 +176,7 @@ class QECLayer {
                 }
                 else {
                     inToOutValue[operandValue] = resultValue;
-                    outResultVals.insert(resultValue);
+                    results.insert(resultValue);
                 }
             }
         }
@@ -190,14 +189,15 @@ bool constructLayer(QECLayer layer, IRRewriter &writer)
         return false;
 
     auto loc = layer.ops.front().getLoc();
-    auto inOperands = ValueRange(layer.inOperandVals.getArrayRef());
-    auto outResults = ValueRange(layer.outResultVals.getArrayRef());
+    auto inOperands = ValueRange(layer.operands.getArrayRef());
+    auto outResults = ValueRange(layer.results.getArrayRef());
 
     writer.setInsertionPointAfter(layer.ops.back());
 
     auto layerOp = writer.create<qec::LayerOp>(
         loc, inOperands, outResults,
         [&](OpBuilder &builder, Location loc, ValueRange operands, ValueRange results) {
+            // Map the input operands to the layerOp's arguments
             IRMapping mapper;
             mapper.map(inOperands, operands);
             llvm::SmallVector<Value> newResults(results.begin(), results.end());
@@ -241,12 +241,14 @@ struct PartitionLayersPass : public impl::PartitionLayersPassBase<PartitionLayer
 
         QECLayer currentLayer;
 
-        // 1. Group the ops into layers in memory
+        // Group the ops into layers in memory
         getOperation()->walk([&](QECOpInterface op) {
-            // check if the parent is a layer op
+            // Skip if the parent is a layer op
             if (isa<LayerOp>(op->getParentOp())) {
                 return WalkResult::skip();
             }
+
+            // TODO: Handle the case where the its parent is control flow or any container op
 
             if (currentLayer.insert(op)) {
                 return WalkResult::advance();
