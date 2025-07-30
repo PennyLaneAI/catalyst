@@ -786,7 +786,7 @@ class TestCondPredicateConversion:
     def test_conversion_integer(self):
         """Test entry predicate conversion from integer to bool."""
 
-        @qjit()
+        @qjit
         def workflow(x):
             n = 1
 
@@ -806,7 +806,7 @@ class TestCondPredicateConversion:
     def test_conversion_float(self):
         """Test entry predicate conversion from float to bool."""
 
-        @qjit()
+        @qjit
         def workflow(x):
             n = 2.0
 
@@ -826,7 +826,7 @@ class TestCondPredicateConversion:
     def test_jax_bool(self):
         """Test entry predicate with a JAX bool."""
 
-        @qjit()
+        @qjit
         def workflow(x):
             n = jnp.bool_(True)
 
@@ -846,7 +846,7 @@ class TestCondPredicateConversion:
     def test_else_if_conversion_integer(self):
         """Test else_if predicate conversion from integer to bool."""
 
-        @qjit()
+        @qjit
         def workflow(x):
             n = 1
 

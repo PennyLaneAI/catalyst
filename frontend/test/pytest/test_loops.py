@@ -353,7 +353,7 @@ class TestForLoops:
     def test_dynamic_wires(self, backend):
         """Test for loops with iteration index-dependant wires."""
 
-        @qjit()
+        @qjit
         @qml.qnode(qml.device(backend, wires=6))
         def circuit(n: int):
             qml.Hadamard(wires=0)
