@@ -4,14 +4,31 @@
 
 <h3>Improvements 🛠</h3>
 
+*  Displays Catalyst version in `quantum-opt --version` output.
+  [(#1922)](https://github.com/PennyLaneAI/catalyst/pull/1922)
+
 <h3>Breaking changes 💔</h3>
 
 * The JAX version used by Catalyst is updated to 0.6.2.
   [(#1897)](https://github.com/PennyLaneAI/catalyst/pull/1897)
 
+* The version of LLVM, mlir-hlo, and Enzyme used by Catalyst has been updated.
+  [(#1916)](https://github.com/PennyLaneAI/catalyst/pull/1916)
+
+  The LLVM version has been updated to
+  [commit f8cb798](https://github.com/llvm/llvm-project/tree/f8cb7987c64dcffb72414a40560055cb717dbf74).
+  The mlir-hlo version has been updated to
+  [commit 1dd2e71](https://github.com/tensorflow/mlir-hlo/tree/1dd2e71331014ae0373f6bf900ce6be393357190).
+  The Enzyme version has been updated to
+  [v0.0.186](https://github.com/EnzymeAD/Enzyme/releases/tag/v0.0.186).
+
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
+
+* Fix errors in AutoGraph transformed functions when `qml.prod` is used together with other operator
+  transforms (e.g. `qml.adjoint`).
+  [(#1910)](https://github.com/PennyLaneAI/catalyst/pull/1910)
 
 * A bug in the `NullQubit::ReleaseQubit()` method that prevented the deallocation of individual
   qubits on the `"null.qubit"` device has been fixed.
@@ -47,6 +64,46 @@
   programs containing these operations.
   [(#1920)](https://github.com/PennyLaneAI/catalyst/pull/1920)
 
+* The default compilation pipeline is now available as `catalyst.pipelines.default_pipeline()`. The
+  function `catalyst.pipelines.get_stages()` has also been removed as it was not used and duplicated
+  the `CompileOptions.get_stages()` method.
+  [(#1941)](https://github.com/PennyLaneAI/catalyst/pull/1941)
+
+* Utility functions for modifying an existing compilation pipeline have been added to the
+  `catalyst.pipelines` module.
+  [(#1941)](https://github.com/PennyLaneAI/catalyst/pull/1941)
+
+  These functions provide a simple interface to insert passes and stages into a compilation
+  pipeline. The available functions are `insert_pass_after`, `insert_pass_before`,
+  `insert_stage_after`, and `insert_stage_before`. For example,
+
+  ```pycon
+  >>> from catalyst.pipelines import insert_pass_after
+  >>> pipeline = ["pass1", "pass2"]
+  >>> insert_pass_after(pipeline, "new_pass", ref_pass="pass1")
+  >>> pipeline
+  ['pass1', 'new_pass', 'pass2']
+  ```
+
+* A new built-in compilation pipeline for experimental MBQC workloads has been added, available as
+  `catalyst.ftqc.mbqc_pipeline()`.
+  [(#1942)](https://github.com/PennyLaneAI/catalyst/pull/1942)
+
+  The output of this function can be used directly as input to the `pipelines` argument of
+  :func:`~.qjit`, for example,
+
+  ```python
+  from catalyst.ftqc import mbqc_pipeline
+
+  @qjit(pipelines=mbqc_pipeline())
+  @qml.qnode(dev)
+  def workload():
+      ...
+  ```
+
+* `catalyst.accelerate`, `catalyst.debug.callback`, and `catalyst.pure_callback`, `catalyst.debug.print`, and `catalyst.debug.print_memref` now work when capture is enabled.
+  [(#1902)](https://github.com/PennyLaneAI/catalyst/pull/1902)
+
 <h3>Documentation 📝</h3>
 
 <h3>Contributors ✍️</h3>
@@ -55,6 +112,8 @@ This release contains contributions from (in alphabetical order):
 
 Joey Carter,
 Sengthai Heng,
+David Ittah,
 Christina Lee,
 Andrija Paurevic,
+Roberto Turrado,
 Paul Haochen Wang.

@@ -8,6 +8,7 @@ set(LIBS
     MLIROptLib
     MLIRCatalyst
     catalyst-transforms
+    catalyst-mhlo-transforms
     MLIRQuantum
     quantum-transforms
     MLIRQEC
@@ -23,6 +24,7 @@ set(LIBS
     MhloRegisterDialects
     StablehloRegister
     MLIRCatalystTest
+    MLIRCatalystUtils
     MLIRTestDialect
     ${ALL_MHLO_PASSES}
 )
