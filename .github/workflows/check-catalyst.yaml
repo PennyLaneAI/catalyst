@@ -314,12 +314,11 @@ jobs:
         key: ${{ runner.os }}-ccache-${{ github.run_id }}
         restore-keys: ${{ runner.os }}-ccache-
 
-    # just hard code commit manually, set up this stablehlo dep verisons infra later
     - name: Clone Stablehlo Submodule
       uses: actions/checkout@v4
       with:
         repository: openxla/stablehlo
-        ref: 69d6dae46e1c7de36e6e6973654754f05353cba5
+        ref: ${{ needs.constants.outputs.stablehlo_version }}
         path: mlir/stablehlo
 
     - name: Build MLIR Dialects
