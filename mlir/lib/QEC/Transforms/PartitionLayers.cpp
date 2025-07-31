@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <cstddef>
 #define DEBUG_TYPE "partition-layers"
 #include "mlir/IR/IRMapping.h"
 #include "mlir/IR/PatternMatch.h"
@@ -50,6 +51,14 @@ class QECLayer {
     }
 
     bool empty() { return ops.empty(); }
+
+    Operation *getParentLayer()
+    {
+        if (ops.empty())
+            return nullptr;
+
+        return ops.back()->getParentOp();
+    }
 
     std::vector<int> getQubitIndexFrom(QECOpInterface op)
     {
@@ -128,23 +137,36 @@ class QECLayer {
         return true;
     }
 
+    bool isSameBlock(QECOpInterface op) { return empty() || op->getParentOp() == getParentLayer(); }
+
     bool insert(QECOpInterface op)
     {
         // Gate can be inserted if:
         // 1. It acts on the different qubits that gates in the layer act on
         // 2. Or it commutes with all the gates in the layer
-        if (!actOnSameQubits(op) || commuteToLayer(op)) {
-            ops.emplace_back(op);
-            setInOutOperands(op);
-            return true;
-        }
+        // 3. And it is must be in the same block
+        if (!isSameBlock(op))
+            return false;
+
+        // TODO: switch order of these two cases may improve the performance
+        if (!actOnSameQubits(op))
+            return insertToLayer(op);
+
+        if (commuteToLayer(op))
+            return insertToLayer(op);
 
         return false;
     }
 
   private:
-    llvm::DenseMap<Value, Value> inToOutValue;
     llvm::DenseMap<Value, Value> outToInValue;
+
+    bool inline insertToLayer(QECOpInterface op)
+    {
+        ops.emplace_back(op);
+        setInOutOperands(op);
+        return true;
+    }
 
     void setInOutOperands(QECOpInterface op)
     {
@@ -169,15 +191,10 @@ class QECLayer {
 
             // Set outResult
             if (resultValue != nullptr) {
-                if (inToOutValue.contains(resultValue)) {
-                    auto lastOutValue = inToOutValue[resultValue];
-                    inToOutValue[operandValue] = lastOutValue;
-                    inToOutValue.erase(resultValue);
+                if (results.contains(operandValue)) {
+                    results.remove(operandValue);
                 }
-                else {
-                    inToOutValue[operandValue] = resultValue;
-                    results.insert(resultValue);
-                }
+                results.insert(resultValue);
             }
         }
     }
@@ -223,12 +240,34 @@ bool constructLayer(QECLayer layer, IRRewriter &writer)
         prevResult.replaceAllUsesWith(newResult);
     }
 
-    // Erase original operations outside the layer
-    for (auto op : layer.ops) {
-        writer.eraseOp(op);
+    // Erase the ops in the layer one by one
+    auto maxIter = layer.ops.size() * 2;
+    while (!layer.ops.empty() || maxIter < 0) {
+        for (auto op : llvm::reverse(layer.ops)) {
+            if (op->use_empty()) {
+                writer.eraseOp(op);
+                layer.ops.erase(std::remove(layer.ops.begin(), layer.ops.end(), op),
+                                layer.ops.end());
+            }
+        }
+        maxIter--;
     }
 
     return true;
+}
+
+bool shouldSkip(QECOpInterface op, QECLayer &currentLayer)
+{
+    // Skip if the ancestor(s) is a layer op
+    auto parentOp = op->getParentOp();
+    while (parentOp != nullptr) {
+        if (isa<LayerOp>(parentOp))
+            return true;
+
+        parentOp = parentOp->getParentOp();
+    }
+
+    return false;
 }
 
 struct PartitionLayersPass : public impl::PartitionLayersPassBase<PartitionLayersPass> {
@@ -244,20 +283,17 @@ struct PartitionLayersPass : public impl::PartitionLayersPassBase<PartitionLayer
         // Group the ops into layers in memory
         getOperation()->walk([&](QECOpInterface op) {
             // Skip if the parent is a layer op
-            if (isa<LayerOp>(op->getParentOp())) {
+            if (shouldSkip(op, currentLayer))
                 return WalkResult::skip();
-            }
 
-            // TODO: Handle the case where the its parent is control flow or any container op
-
-            if (currentLayer.insert(op)) {
+            // Try to insert the op into the current layer
+            if (currentLayer.insert(op))
                 return WalkResult::advance();
-            }
 
-            if (!currentLayer.empty()) {
-                constructLayer(currentLayer, writer);
-            }
+            // Construct the current layer
+            constructLayer(currentLayer, writer);
 
+            // Reset the current layer and insert the op
             currentLayer = QECLayer();
             currentLayer.insert(op);
 
@@ -265,9 +301,7 @@ struct PartitionLayersPass : public impl::PartitionLayersPassBase<PartitionLayer
         });
 
         // Construct the last layer
-        if (!currentLayer.empty()) {
-            constructLayer(currentLayer, writer);
-        }
+        constructLayer(currentLayer, writer);
     };
 };
 } // namespace qec
