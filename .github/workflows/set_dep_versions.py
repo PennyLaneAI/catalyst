@@ -71,7 +71,7 @@ quote = '"'
 # Update each version using sed
 cmds = [
     f"sed -i '' 's/^jax=.*/jax={jax_version}/' {dep_versions_path}",
-    f"sed -i '' 's/^mhlo=.*/mhlo={hlo_commit}/' {dep_versions_path}",
+    f"sed -i '' 's/^stablehlo=.*/stablehlo={hlo_commit}/' {dep_versions_path}",
     f"sed -i '' 's/^llvm=.*/llvm={llvm_commit}/' {dep_versions_path}",
     # Update jaxlib version in __init__.py
     rf"sed -i '' 's/_jaxlib_version = {quote}\([0-9.]\+\){quote}/_jaxlib_version = {quote}{jax_version}{quote}/g' {catalyst_init_path}",
