@@ -68,7 +68,7 @@ from catalyst.tracing.contexts import (
     EvaluationContext,
     EvaluationMode,
 )
-from catalyst.utils.exceptions import CompatibilityError
+from catalyst.utils.exceptions import PlxprCaptureCFCompatibilityError
 from catalyst.utils.patching import Patcher
 
 
@@ -264,7 +264,7 @@ def cond(pred: DynamicJaxprTracer):
                 return qml.cond(x > 1.0)(cond_fn)()
     """
     if qml.capture.enabled():
-        raise CompatibilityError("cond")
+        raise PlxprCaptureCFCompatibilityError("cond")
 
     def _decorator(true_fn: Callable):
 
@@ -438,7 +438,7 @@ def for_loop(lower_bound, upper_bound, step, allow_array_resizing=False):
                 return qml.for_loop(0, 10, 1)(loop_fn)(0)
     """
     if qml.capture.enabled():
-        raise CompatibilityError("for_loop")
+        raise PlxprCaptureCFCompatibilityError("for_loop")
 
     def _decorator(body_fn):
         return ForLoopCallable(lower_bound, upper_bound, step, body_fn, not allow_array_resizing)
@@ -577,7 +577,7 @@ def while_loop(cond_fn, allow_array_resizing: bool = False):
                 return qml.while_loop(lambda x: x < 5)(loop_fn)(0)
     """
     if qml.capture.enabled():
-        raise CompatibilityError("while_loop")
+        raise PlxprCaptureCFCompatibilityError("while_loop")
 
     def _decorator(body_fn):
         return WhileLoopCallable(cond_fn, body_fn, not allow_array_resizing)

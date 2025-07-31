@@ -26,7 +26,7 @@ class DifferentiableCompileError(CompileError):
     """An error indicating an invalid differentiation configuration."""
 
 
-class CompatibilityError(Exception):
+class PlxprCaptureCFCompatibilityError(Exception):
     """Error raised when Catalyst control flow is used with PennyLane capture enabled.
 
     This error indicates that Catalyst's control flow functions (for_loop, while_loop, cond)

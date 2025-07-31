@@ -79,7 +79,7 @@ from catalyst.jit import QJIT, qjit
 from catalyst.passes.pass_api import pipeline
 from catalyst.utils.exceptions import (
     AutoGraphError,
-    CompatibilityError,
+    PlxprCaptureCFCompatibilityError,
     CompileError,
     DifferentiableCompileError,
 )
@@ -170,7 +170,7 @@ __all__ = (
     "autograph_ignore_fallbacks",
     "autograph_strict_conversion",
     "AutoGraphError",
-    "CompatibilityError",
+    "PlxprCaptureCFCompatibilityError",
     "CompileError",
     "DifferentiableCompileError",
     "debug_assert",

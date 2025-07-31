@@ -20,7 +20,7 @@ import pennylane as qml
 import pytest
 
 from catalyst import api_extensions, for_loop, measure, qjit, while_loop
-from catalyst.utils.exceptions import CompatibilityError
+from catalyst.utils.exceptions import PlxprCaptureCFCompatibilityError
 
 # pylint: disable=no-value-for-parameter,unused-argument
 
@@ -256,13 +256,13 @@ class TestWhileLoops:
 
     @pytest.mark.usefixtures("disable_capture")
     def test_while_loop_raises_compatibility_error_with_capture(self):
-        """Test that while_loop raises CompatibilityError when capture mode is enabled."""
+        """Test that while_loop raises PlxprCaptureCFCompatibilityError when capture mode is enabled."""
         qml.capture.enable()
 
         def condition(i):
             return i < 5
 
-        with pytest.raises(CompatibilityError) as exc_info:
+        with pytest.raises(PlxprCaptureCFCompatibilityError) as exc_info:
 
             @while_loop(condition)
             def loop_fn(x):
@@ -274,10 +274,10 @@ class TestWhileLoops:
 
     @pytest.mark.usefixtures("disable_capture")
     def test_while_loop_raises_compatibility_error_with_capture_integration(self):
-        """Test that while_loop raises CompatibilityError when capture mode is enabled."""
+        """Test that while_loop raises PlxprCaptureCFCompatibilityError when capture mode is enabled."""
         qml.capture.enable()
 
-        with pytest.raises(CompatibilityError) as exc_info:
+        with pytest.raises(PlxprCaptureCFCompatibilityError) as exc_info:
 
             @qml.qjit
             @qml.qnode(qml.device("lightning.qubit", wires=3))
@@ -437,11 +437,11 @@ class TestForLoops:
 
     @pytest.mark.usefixtures("disable_capture")
     def test_for_loop_raises_compatibility_error_with_capture(self):
-        """Test that for_loop raises CompatibilityError when capture mode is enabled."""
+        """Test that for_loop raises PlxprCaptureCFCompatibilityError when capture mode is enabled."""
         # Enable capture mode
         qml.capture.enable()
 
-        with pytest.raises(CompatibilityError) as exc_info:
+        with pytest.raises(PlxprCaptureCFCompatibilityError) as exc_info:
 
             @for_loop(0, 3, 1)
             def loop_fn(i, acc):
@@ -453,11 +453,11 @@ class TestForLoops:
 
     @pytest.mark.usefixtures("disable_capture")
     def test_for_loop_raises_compatibility_error_with_capture_integration(self):
-        """Test that for_loop raises CompatibilityError when capture mode is enabled."""
+        """Test that for_loop raises PlxprCaptureCFCompatibilityError when capture mode is enabled."""
         # Enable capture mode
         qml.capture.enable()
 
-        with pytest.raises(CompatibilityError) as exc_info:
+        with pytest.raises(PlxprCaptureCFCompatibilityError) as exc_info:
 
             @qml.qjit
             @qml.qnode(qml.device("lightning.qubit", wires=3))
