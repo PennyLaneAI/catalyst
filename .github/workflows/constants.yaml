@@ -19,9 +19,9 @@ on:
       llvm_version:
         description: "LLVM version"
         value: ${{ jobs.set-constants.outputs.llvm_version }}
-      mhlo_version:
-        description: "MHLO version"
-        value: ${{ jobs.set-constants.outputs.mhlo_version }}
+      stablehlo_version:
+        description: "Stablehlo version"
+        value: ${{ jobs.set-constants.outputs.stablehlo_version }}
       enzyme_version:
         description: "Enzyme version"
         value: ${{ jobs.set-constants.outputs.enzyme_version }}
@@ -69,9 +69,9 @@ jobs:
         id: llvm_version
         run: echo "llvm_version=$(grep llvm .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
 
-      - name: MHLO version
-        id: mhlo_version
-        run: echo "mhlo_version=$(grep mhlo .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
+      - name: Stablehlo version
+        id: stablehlo_version
+        run: echo "stablehlo_version=$(grep stablehlo .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
 
       - name: Enzyme version
         id: enzyme_version
@@ -113,7 +113,7 @@ jobs:
 
     outputs:
       llvm_version: ${{ steps.llvm_version.outputs.llvm_version }}
-      mhlo_version: ${{ steps.mhlo_version.outputs.mhlo_version }}
+      stablehlo_version: ${{ steps.stablehlo_version.outputs.stablehlo_version }}
       enzyme_version: ${{ steps.enzyme_version.outputs.enzyme_version }}
       python_versions: ${{ steps.python_versions.outputs.python_versions }}
       python_test_versions: ${{ steps.python_test_versions.outputs.python_test_versions }}
