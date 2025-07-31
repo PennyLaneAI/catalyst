@@ -272,7 +272,6 @@ class TestWhileLoops:
         error_msg = str(exc_info.value)
         assert "catalyst.while_loop is not supported with PennyLane's capture enabled" in error_msg
 
-    @pytest.mark.xfail(reason="autograph")
     @pytest.mark.usefixtures("disable_capture")
     def test_while_loop_raises_compatibility_error_with_capture_integration(self):
         """Test that while_loop raises CompatibilityError when capture mode is enabled."""
@@ -283,7 +282,10 @@ class TestWhileLoops:
             @qml.qjit
             @qml.qnode(qml.device("lightning.qubit", wires=3))
             def test(n):
-                @while_loop(lambda i: i < n)
+                def condition(x):
+                    return x < n
+
+                @while_loop(condition)
                 def loop(i):
                     qml.X(i)
 
