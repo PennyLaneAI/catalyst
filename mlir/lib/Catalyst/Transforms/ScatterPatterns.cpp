@@ -25,7 +25,6 @@
 
 #include "stablehlo/dialect/StablehloOps.h"
 
-
 using namespace mlir;
 
 namespace catalyst {

@@ -21,8 +21,8 @@
 #include "Mitigation/Transforms/Passes.h"
 #include "QEC/Transforms/Passes.h"
 #include "Quantum/Transforms/Passes.h"
-#include "stablehlo/Passes.h"
 #include "Test/Transforms/Passes.h"
+#include "stablehlo/Passes.h"
 
 void catalyst::registerAllCatalystPasses()
 {

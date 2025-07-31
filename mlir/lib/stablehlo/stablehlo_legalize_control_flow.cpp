@@ -41,7 +41,6 @@ limitations under the License.
 #include <optional>
 #include <utility>
 
-#include "llvm/Support/Casting.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h" // TF:llvm-project
@@ -57,6 +56,7 @@ limitations under the License.
 #include "mlir/Transforms/DialectConversion.h"
 #include "stablehlo/dialect/StablehloOps.h"
 #include "stablehlo/transforms/Passes.h"
+#include "llvm/Support/Casting.h"
 
 #include "stablehlo/Passes.h"
 
@@ -189,7 +189,8 @@ struct WhileOpPattern : public OpConversionPattern<stablehlo::WhileOp> {
         // needs to be extracted and used with an scf.condition.
         rewriter.inlineRegionBefore(op.getCond(), newWhileOp.getBefore(),
                                     newWhileOp.getBefore().end());
-        auto conditionReturn = cast<stablehlo::ReturnOp>(newWhileOp.getBefore().front().getTerminator());
+        auto conditionReturn =
+            cast<stablehlo::ReturnOp>(newWhileOp.getBefore().front().getTerminator());
         rewriter.setInsertionPointToEnd(&newWhileOp.getBefore().front());
         Value i1 = extractTensorValue(rewriter, conditionReturn->getOperand(0));
         rewriter.replaceOpWithNewOp<scf::ConditionOp>(conditionReturn, i1,
@@ -243,16 +244,16 @@ struct CaseOpPattern : public OpConversionPattern<stablehlo::CaseOp> {
         auto scfIf = outerBuilder.create<scf::IfOp>(
             loc, op.getResultTypes(),
             extractTensorValue(outerBuilder,
-                               outerBuilder.create<stablehlo::CompareOp>(loc, idxValue, currentIdxVal,
-                                                                    ComparisonDirection::EQ)),
+                               outerBuilder.create<stablehlo::CompareOp>(
+                                   loc, idxValue, currentIdxVal, ComparisonDirection::EQ)),
             /*withElseRegion=*/true);
         inlineStablehloRegionIntoSCFRegion(outerBuilder, op.getBranches()[currentIdx],
-                                      scfIf.getThenRegion());
+                                           scfIf.getThenRegion());
         int nextIdx = currentIdx + 1;
         // Don't recurse for the final default block.
         if (currentIdx == static_cast<int64_t>(finalIdx)) {
             inlineStablehloRegionIntoSCFRegion(outerBuilder, op.getBranches()[nextIdx],
-                                          scfIf.getElseRegion());
+                                               scfIf.getElseRegion());
         }
         else {
             PatternRewriter::InsertionGuard guard(outerBuilder);
@@ -285,7 +286,8 @@ struct CaseOpPattern : public OpConversionPattern<stablehlo::CaseOp> {
 };
 
 struct StablehloLegalizeControlFlowPass
-    : public catalyst::impl::StablehloLegalizeControlFlowPassBase<StablehloLegalizeControlFlowPass> {
+    : public catalyst::impl::StablehloLegalizeControlFlowPassBase<
+          StablehloLegalizeControlFlowPass> {
     // Perform the lowering to MLIR control flow.
     void runOnOperation() override
     {

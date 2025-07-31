@@ -61,9 +61,9 @@ limitations under the License.
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
-#include "llvm/ADT/STLExtras.h"
 #include "stablehlo/dialect/StablehloOps.h"
 #include "stablehlo/transforms/Passes.h"
+#include "llvm/ADT/STLExtras.h"
 
 #include "stablehlo/Passes.h"
 
@@ -72,7 +72,6 @@ using namespace stablehlo;
 using namespace catalyst;
 
 namespace catalyst {
-
 
 #define GEN_PASS_DEF_STABLEHLOLEGALIZESORTPASS
 #define GEN_PASS_DECL_STABLEHLOLEGALIZESORTPASS

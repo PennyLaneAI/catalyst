@@ -47,8 +47,9 @@ void createHloLoweringPipeline(OpPassManager &pm)
 
     pm.addNestedPass<mlir::func::FuncOp>(stablehlo::createChloLegalizeToStablehloPass());
     pm.addNestedPass<mlir::func::FuncOp>(catalyst::createStablehloLegalizeControlFlowPass());
-    //(how do I call this??)pm.addNestedPass<mlir::func::FuncOp>(stablehlo::createStablehloLegalizeToLinalgPass());
-    //pm.addNestedPass<mlir::func::FuncOp>(std::make_unique<stablehlo::StablehloLegalizeToLinalgPass>());
+    //(how do I call
+    //this??)pm.addNestedPass<mlir::func::FuncOp>(stablehlo::createStablehloLegalizeToLinalgPass());
+    // pm.addNestedPass<mlir::func::FuncOp>(std::make_unique<stablehlo::StablehloLegalizeToLinalgPass>());
     pm.addNestedPass<mlir::func::FuncOp>(catalyst::createStablehloLegalizeToStdPass());
     pm.addNestedPass<mlir::func::FuncOp>(catalyst::createStablehloLegalizeSortPass());
     pm.addPass(stablehlo::createStablehloConvertToSignlessPass());
