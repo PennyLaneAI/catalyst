@@ -256,7 +256,8 @@ class TestWhileLoops:
 
     @pytest.mark.usefixtures("disable_capture")
     def test_while_loop_raises_compatibility_error_with_capture(self):
-        """Test that while_loop raises PlxprCaptureCFCompatibilityError when capture mode is enabled."""
+        """Test that while_loop raises PlxprCaptureCFCompatibilityError when capture mode is enabled.
+        """
         qml.capture.enable()
 
         def condition(i):
@@ -274,7 +275,8 @@ class TestWhileLoops:
 
     @pytest.mark.usefixtures("disable_capture")
     def test_while_loop_raises_compatibility_error_with_capture_integration(self):
-        """Test that while_loop raises PlxprCaptureCFCompatibilityError when capture mode is enabled."""
+        """Test that while_loop raises PlxprCaptureCFCompatibilityError when capture mode is enabled.
+        """
         qml.capture.enable()
 
         with pytest.raises(PlxprCaptureCFCompatibilityError) as exc_info:
@@ -437,7 +439,8 @@ class TestForLoops:
 
     @pytest.mark.usefixtures("disable_capture")
     def test_for_loop_raises_compatibility_error_with_capture(self):
-        """Test that for_loop raises PlxprCaptureCFCompatibilityError when capture mode is enabled."""
+        """Test that for_loop raises PlxprCaptureCFCompatibilityError when capture mode is enabled.
+        """
         # Enable capture mode
         qml.capture.enable()
 
@@ -453,7 +456,8 @@ class TestForLoops:
 
     @pytest.mark.usefixtures("disable_capture")
     def test_for_loop_raises_compatibility_error_with_capture_integration(self):
-        """Test that for_loop raises PlxprCaptureCFCompatibilityError when capture mode is enabled."""
+        """Test that for_loop raises PlxprCaptureCFCompatibilityError when capture mode is enabled.
+        """
         # Enable capture mode
         qml.capture.enable()
 
