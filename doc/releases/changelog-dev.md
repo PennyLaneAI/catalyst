@@ -4,6 +4,9 @@
 
 <h3>Improvements 🛠</h3>
 
+* Workflows `for_loop`, `while_loop` and `cond` now error out if `qml.capture` is enabled.
+  [(#1945)](https://github.com/PennyLaneAI/catalyst/pull/1945)
+
 *  Displays Catalyst version in `quantum-opt --version` output.
   [(#1922)](https://github.com/PennyLaneAI/catalyst/pull/1922)
 
@@ -25,6 +28,10 @@
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
+
+* Fix errors in AutoGraph transformed functions when `qml.prod` is used together with other operator
+  transforms (e.g. `qml.adjoint`).
+  [(#1910)](https://github.com/PennyLaneAI/catalyst/pull/1910)
 
 * A bug in the `NullQubit::ReleaseQubit()` method that prevented the deallocation of individual
   qubits on the `"null.qubit"` device has been fixed.
@@ -97,6 +104,9 @@
       ...
   ```
 
+* `catalyst.accelerate`, `catalyst.debug.callback`, and `catalyst.pure_callback`, `catalyst.debug.print`, and `catalyst.debug.print_memref` now work when capture is enabled.
+  [(#1902)](https://github.com/PennyLaneAI/catalyst/pull/1902)
+
 <h3>Documentation 📝</h3>
 
 <h3>Contributors ✍️</h3>
@@ -105,6 +115,7 @@ This release contains contributions from (in alphabetical order):
 
 Joey Carter,
 Sengthai Heng,
+David Ittah,
 Christina Lee,
 Andrija Paurevic,
 Roberto Turrado,

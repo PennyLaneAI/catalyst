@@ -81,6 +81,7 @@ from catalyst.utils.exceptions import (
     AutoGraphError,
     CompileError,
     DifferentiableCompileError,
+    PlxprCaptureCFCompatibilityError,
 )
 
 autograph_ignore_fallbacks = False
@@ -169,6 +170,7 @@ __all__ = (
     "autograph_ignore_fallbacks",
     "autograph_strict_conversion",
     "AutoGraphError",
+    "PlxprCaptureCFCompatibilityError",
     "CompileError",
     "DifferentiableCompileError",
     "debug_assert",
