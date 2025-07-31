@@ -270,7 +270,10 @@ class TestWhileLoops:
 
         # Verify the error message is specific and helpful
         error_msg = str(exc_info.value)
-        assert "catalyst.while_loop is not supported with PennyLane's capture enabled" in error_msg
+        assert (
+            "catalyst.while_loop is not supported with PennyLane's capture enabled"
+            in error_msg
+        )
 
     @pytest.mark.usefixtures("disable_capture")
     def test_while_loop_raises_compatibility_error_with_capture_integration(self):
@@ -295,7 +298,10 @@ class TestWhileLoops:
 
         # Verify the error message is specific and helpful
         error_msg = str(exc_info.value)
-        assert "catalyst.while_loop is not supported with PennyLane's capture enabled" in error_msg
+        assert (
+            "catalyst.while_loop is not supported with PennyLane's capture enabled"
+            in error_msg
+        )
 
 
 class TestForLoops:
@@ -449,7 +455,10 @@ class TestForLoops:
 
         # Verify the error message is specific and helpful
         error_msg = str(exc_info.value)
-        assert "catalyst.for_loop is not supported with PennyLane's capture enabled" in error_msg
+        assert (
+            "catalyst.for_loop is not supported with PennyLane's capture enabled"
+            in error_msg
+        )
 
     @pytest.mark.usefixtures("disable_capture")
     def test_for_loop_raises_compatibility_error_with_capture_integration(self):
@@ -472,7 +481,10 @@ class TestForLoops:
 
         # Verify the error message is specific and helpful
         error_msg = str(exc_info.value)
-        assert "catalyst.for_loop is not supported with PennyLane's capture enabled" in error_msg
+        assert (
+            "catalyst.for_loop is not supported with PennyLane's capture enabled"
+            in error_msg
+        )
 
 
 class TestClassicalCompilation:
