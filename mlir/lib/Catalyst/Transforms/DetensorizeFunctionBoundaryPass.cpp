@@ -47,11 +47,13 @@ struct DetensorizeFuncPattern : public OpRewritePattern<func::FuncOp> {
         bool needsConversion = false;
 
         for (Type type : funcType.getInputs()) {
-            if (isZeroDRankedTensor(type)) needsConversion = true;
+            if (isZeroDRankedTensor(type))
+                needsConversion = true;
             newArgTypes.push_back(getScalarType(type));
         }
         for (Type type : funcType.getResults()) {
-            if (isZeroDRankedTensor(type)) needsConversion = true;
+            if (isZeroDRankedTensor(type))
+                needsConversion = true;
             newResultTypes.push_back(getScalarType(type));
         }
 
@@ -70,8 +72,8 @@ struct DetensorizeFuncPattern : public OpRewritePattern<func::FuncOp> {
 
         // Create the new function with the updated signature and preserved attributes
         auto newFuncType = FunctionType::get(getContext(), newArgTypes, newResultTypes);
-        auto newFuncOp = rewriter.create<func::FuncOp>(funcOp.getLoc(), funcOp.getName(),
-                                                       newFuncType, newAttrs);
+        auto newFuncOp =
+            rewriter.create<func::FuncOp>(funcOp.getLoc(), funcOp.getName(), newFuncType, newAttrs);
 
         // Create the entry block with the new argument types
         Block *newEntryBlock = newFuncOp.addEntryBlock();
@@ -88,7 +90,8 @@ struct DetensorizeFuncPattern : public OpRewritePattern<func::FuncOp> {
                 auto fromElementsOp = rewriter.create<tensor::FromElementsOp>(
                     funcOp.getLoc(), oldArg.getType(), newArg);
                 mapper.map(oldArg, fromElementsOp.getResult());
-            } else {
+            }
+            else {
                 mapper.map(oldArg, newArg);
             }
         }
@@ -133,7 +136,8 @@ struct DetensorizeReturnPattern : public OpRewritePattern<func::ReturnOp> {
                 auto extractOp =
                     rewriter.create<tensor::ExtractOp>(returnOp.getLoc(), operand, ValueRange{});
                 newOperands.push_back(extractOp.getResult());
-            } else {
+            }
+            else {
                 newOperands.push_back(operand);
             }
         }
@@ -142,7 +146,6 @@ struct DetensorizeReturnPattern : public OpRewritePattern<func::ReturnOp> {
         return success();
     }
 };
-
 
 struct DetensorizeCallPattern : public OpRewritePattern<func::CallOp> {
     using OpRewritePattern<func::CallOp>::OpRewritePattern;
@@ -169,7 +172,8 @@ struct DetensorizeCallPattern : public OpRewritePattern<func::CallOp> {
                 auto extractOp =
                     rewriter.create<tensor::ExtractOp>(callOp.getLoc(), operand, ValueRange{});
                 newOperands.push_back(extractOp.getResult());
-            } else {
+            }
+            else {
                 newOperands.push_back(operand);
             }
         }
@@ -185,7 +189,8 @@ struct DetensorizeCallPattern : public OpRewritePattern<func::CallOp> {
                 auto fromElementsOp = rewriter.create<tensor::FromElementsOp>(
                     callOp.getLoc(), oldResult.getType(), newResult);
                 newResults.push_back(fromElementsOp.getResult());
-            } else {
+            }
+            else {
                 newResults.push_back(newResult);
             }
         }
@@ -194,7 +199,6 @@ struct DetensorizeCallPattern : public OpRewritePattern<func::CallOp> {
         return success();
     }
 };
-
 
 struct FoldExtractFromElementsPattern : public OpRewritePattern<tensor::ExtractOp> {
     using OpRewritePattern<tensor::ExtractOp>::OpRewritePattern;
