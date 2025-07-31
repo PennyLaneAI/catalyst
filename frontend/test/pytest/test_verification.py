@@ -564,7 +564,7 @@ class TestObservableValidation:
         """Test that the validate_measurements transform raises an error (or not) as expected
         for different base observables."""
 
-        dev = qml.device(backend, wires=3, shots=2048)
+        dev = qml.device(backend, wires=3)
         qjit_capabilities = get_device_capabilities(dev)
 
         tape = qml.tape.QuantumScript([], measurements=measurements)
@@ -660,7 +660,7 @@ class TestMeasurementTypeValidation:
         """Test that the validate_measurements transform raises a CompileError as
         expected for an unsupported MeasurementProcess"""
 
-        dev = qml.device("lightning.qubit", wires=1, shots=shots)
+        dev = qml.device("lightning.qubit", wires=1)
         tape = qml.tape.QuantumScript([], measurements=[measurement])
 
         qjit_capabilities = get_device_capabilities(dev)
@@ -674,8 +674,9 @@ class TestMeasurementTypeValidation:
         raises a CompileError informing the user that shots must be None for
         state based measurements"""
 
-        dev = qml.device("lightning.qubit", wires=1, shots=100)
+        dev = qml.device("lightning.qubit", wires=1)
 
+        @qml.set_shots(100)
         @qml.qnode(dev)
         def f():
             qml.RX(1.23, 0)
@@ -690,8 +691,9 @@ class TestMeasurementTypeValidation:
         without shots raises a CompileError informing the user that a
         finite number of shots is needed for sampling"""
 
-        dev = qml.device("lightning.qubit", wires=1, shots=None)
+        dev = qml.device("lightning.qubit", wires=1)
 
+        @qml.set_shots(None)
         @qml.qnode(dev)
         def f():
             qml.RX(1.23, 0)
@@ -704,7 +706,7 @@ class TestMeasurementTypeValidation:
         """Test that trying to use a measurement type that is generally unsupported by
         the device raises a CompileError"""
 
-        dev = qml.device("lightning.qubit", wires=1, shots=100)
+        dev = qml.device("lightning.qubit", wires=1)
 
         class MyMeasurement(qml.measurements.SampleMeasurement):
             """A custom measurement (not supported on lightning.qubit)"""
@@ -720,6 +722,7 @@ class TestMeasurementTypeValidation:
                 """overwrite ABC method"""
                 raise NotImplementedError
 
+        @qml.set_shots(100)
         @qml.qnode(dev)
         def f():
             qml.RX(1.23, 0)

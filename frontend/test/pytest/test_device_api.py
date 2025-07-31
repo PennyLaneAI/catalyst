@@ -83,7 +83,7 @@ def test_qjit_device_measurements(shots, mocker):
 
     spy = mocker.spy(qjit_device, "get_device_capabilities")
 
-    dev = qml.device("lightning.qubit", wires=2, shots=shots)
+    dev = qml.device("lightning.qubit", wires=2)
     state_measurements = {"StateMP"}
     finite_shot_measurements = {"CountsMP", "SampleMP"}
 
@@ -102,6 +102,7 @@ def test_qjit_device_measurements(shots, mocker):
     spy = mocker.spy(qjit_device, "get_qjit_device_capabilities")
 
     @qjit
+    @qml.set_shots(shots)
     @qml.qnode(dev)
     def circuit():
         qml.X(0)

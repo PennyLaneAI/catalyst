@@ -35,8 +35,8 @@ class TestSample:
     def test_sample_on_0qbits(self):
         """Test sample on 0 qubits."""
 
-        if qml.capture.enabled():
-            pytest.xfail("capture doesn't currently support 0 wires.")
+        # if qml.capture.enabled():
+        #     pytest.xfail("capture doesn't currently support 0 wires.")
 
         @qjit
         @qml.qnode(qml.device("lightning.qubit", wires=0, shots=10))
