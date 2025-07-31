@@ -19,7 +19,9 @@
 #include "mlir/InitAllPasses.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/Passes.h"
+#include "stablehlo/conversions/linalg/transforms/Passes.h"
 #include "stablehlo/transforms/Passes.h"
+#include "stablehlo/transforms/optimization/Passes.h"
 
 #include "Catalyst/IR/CatalystDialect.h"
 #include "Catalyst/Transforms/Passes.h"
@@ -47,20 +49,20 @@ void createHloLoweringPipeline(OpPassManager &pm)
 
     pm.addNestedPass<mlir::func::FuncOp>(stablehlo::createChloLegalizeToStablehloPass());
     pm.addNestedPass<mlir::func::FuncOp>(catalyst::createStablehloLegalizeControlFlowPass());
-    //(how do I call
-    //this??)pm.addNestedPass<mlir::func::FuncOp>(stablehlo::createStablehloLegalizeToLinalgPass());
-    // pm.addNestedPass<mlir::func::FuncOp>(std::make_unique<stablehlo::StablehloLegalizeToLinalgPass>());
+    stablehlo::StablehloAggressiveSimplificationPassOptions ASoptions;
+    pm.addNestedPass<mlir::func::FuncOp>(
+        stablehlo::createStablehloAggressiveSimplificationPass(ASoptions));
+    pm.addNestedPass<mlir::func::FuncOp>(stablehlo::createStablehloLegalizeToLinalgPass());
     pm.addNestedPass<mlir::func::FuncOp>(catalyst::createStablehloLegalizeToStdPass());
     pm.addNestedPass<mlir::func::FuncOp>(catalyst::createStablehloLegalizeSortPass());
     pm.addPass(stablehlo::createStablehloConvertToSignlessPass());
-
     pm.addPass(mlir::createCanonicalizerPass());
     pm.addPass(catalyst::createScatterLoweringPass());
     pm.addPass(catalyst::createHloCustomCallLoweringPass());
     pm.addPass(mlir::createCSEPass());
-    mlir::LinalgDetensorizePassOptions options;
-    options.aggressiveMode = true;
-    pm.addNestedPass<mlir::func::FuncOp>(mlir::createLinalgDetensorizePass(options));
+    mlir::LinalgDetensorizePassOptions LDoptions;
+    LDoptions.aggressiveMode = true;
+    pm.addNestedPass<mlir::func::FuncOp>(mlir::createLinalgDetensorizePass(LDoptions));
     pm.addPass(catalyst::createDetensorizeSCFPass());
     pm.addPass(mlir::createCanonicalizerPass());
 }
