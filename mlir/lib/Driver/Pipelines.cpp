@@ -12,16 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "stablehlo/transforms/Passes.h"
+#include <memory>
+
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/InitAllDialects.h"
 #include "mlir/InitAllPasses.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/Passes.h"
+#include "stablehlo/transforms/Passes.h"
 
-#include "Driver/Pipelines.h"
 #include "Catalyst/IR/CatalystDialect.h"
 #include "Catalyst/Transforms/Passes.h"
+#include "Driver/Pipelines.h"
 #include "Gradient/IR/GradientDialect.h"
 #include "Gradient/Transforms/Passes.h"
 #include "Mitigation/Transforms/Passes.h"
@@ -44,9 +46,9 @@ void createHloLoweringPipeline(OpPassManager &pm)
     pm.addPass(mlir::createCanonicalizerPass());
 
     pm.addNestedPass<mlir::func::FuncOp>(stablehlo::createChloLegalizeToStablehloPass());
-    //pm.addPass(mlir::mhlo::createStablehloLegalizeToHloPass());
     pm.addNestedPass<mlir::func::FuncOp>(catalyst::createStablehloLegalizeControlFlowPass());
     //(how do I call this??)pm.addNestedPass<mlir::func::FuncOp>(stablehlo::createStablehloLegalizeToLinalgPass());
+    //pm.addNestedPass<mlir::func::FuncOp>(std::make_unique<stablehlo::StablehloLegalizeToLinalgPass>());
     pm.addNestedPass<mlir::func::FuncOp>(catalyst::createStablehloLegalizeToStdPass());
     pm.addNestedPass<mlir::func::FuncOp>(catalyst::createStablehloLegalizeSortPass());
     pm.addPass(stablehlo::createStablehloConvertToSignlessPass());
