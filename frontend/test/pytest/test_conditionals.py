@@ -20,6 +20,7 @@ import pennylane as qml
 import pytest
 
 from catalyst import api_extensions, cond, measure, qjit
+from catalyst.utils.exceptions import PlxprCaptureCFCompatibilityError
 
 # pylint: disable=missing-function-docstring
 
@@ -450,6 +451,43 @@ class TestCond:
             match="Conditional 'else if' function can have arguments only if it is a PennyLane gate.",  # pylint:disable=line-too-long
         ):
             qjit(h)
+
+    @pytest.mark.usefixtures("disable_capture")
+    def test_cond_raises_compatibility_error_with_capture(self):
+        """Test that cond raises PlxprCaptureCFCompatibilityError when capture mode is enabled."""
+        qml.capture.enable()
+
+        with pytest.raises(PlxprCaptureCFCompatibilityError) as exc_info:
+
+            @cond(True)
+            def cond_fn():
+                return 1
+
+        # Verify the error message is specific and helpful
+        error_msg = str(exc_info.value)
+        assert "catalyst.cond is not supported with PennyLane's capture enabled" in error_msg
+
+    @pytest.mark.usefixtures("disable_capture")
+    def test_cond_raises_compatibility_error_with_capture_integration(self):
+        """Test that cond raises PlxprCaptureCFCompatibilityError when capture mode is enabled."""
+        qml.capture.enable()
+
+        with pytest.raises(PlxprCaptureCFCompatibilityError) as exc_info:
+
+            @qml.qjit
+            @qml.qnode(qml.device("lightning.qubit", wires=3))
+            def test(n):
+                @cond(n < 5)
+                def loop(n):
+                    qml.X(n)
+
+                loop()
+
+            test(4)
+
+        # Verify the error message is specific and helpful
+        error_msg = str(exc_info.value)
+        assert "catalyst.cond is not supported with PennyLane's capture enabled" in error_msg
 
 
 class TestInterpretationConditional:
