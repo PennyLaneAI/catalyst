@@ -53,12 +53,11 @@ std::array<std::optional<double>, 3> getStaticValuesOrNothing(const SmallVector<
 {
     assert(values.size() == 3 && "found Rot or CRot operation should have exactly 3 parameters");
     auto staticValues = std::array<std::optional<double>, 3>{};
-    auto i = size_t{};
-    for (mlir::Value value : values) {
+    for (auto [index, value] : llvm::enumerate(values)) {
         if (auto constOp = value.getDefiningOp();
             constOp && constOp->hasTrait<mlir::OpTrait::ConstantLike>()) {
             if (auto floatAttr = constOp->getAttrOfType<mlir::FloatAttr>("value")) {
-                staticValues[i++] = floatAttr.getValueAsDouble();
+                staticValues[index] = floatAttr.getValueAsDouble();
             }
         }
     }
@@ -107,50 +106,6 @@ struct MergeRotationsRewritePattern : public mlir::OpRewritePattern<OpType> {
     }
 
     // Arbitrary single rotations require more complex maths to be merged
-    //
-    // TODO: do we allow Unicode in comments? what about in code?
-    //
-    // Algorithm
-    // =========
-    //
-    // Parent params are ϕ1, θ1, and ω1
-    // Params are ϕ2, θ2, and ω2
-    //
-    // Special cases
-    // -------------
-    //
-    // 1. if (ω1 == 0 && ϕ2 == 0) { ϕF = ϕ1; θF = θ1 + θ2; ωF = ω2; }
-    // 2a. if (θ1 == 0 && θ2 == 0) { ϕF = ϕ1 + ϕ2 + ω1 + ω2; θF = 0; ωF = 0; }
-    // 2b. if (θ1 == 0) { ϕF = ϕ1 + ϕ2 + ω1; θF = θ2; ωF = ω2; }
-    // 2c. if (θ2 == 0) { ϕF = ϕ1; θF = θ1; ωF = ω1 + ω2 + ϕ2; }
-    //
-    // Else
-    // ----
-    //
-    // α1 = (ϕ1 + ω1)/2, α2 = (ϕ2 + ω2)/2
-    // β1 = (ϕ1 - ω1)/2, β2 = (ϕ2 - ω2)/2
-    //
-    // c1 = cos(θ1/2), c2 = cos(θ2/2)
-    // s1 = sin(θ1/2), s2 = sin(θ2/2)
-    //
-    // cF = sqrt(c1^2 * c2^2 + s1^2 * s2^2 - 2 * c1 * c2 * s1 * s2 * cos(ω1 + ϕ2))
-    //
-    // Problematic scenarios for differentiability
-    // -------------------------------------------
-    //
-    // 1. if (is_close_to(cF, 0)) { /* sqrt not differentiable at 0 */ return failure(); }
-    // 2. if (is_close_to(cF, 1)) { /* acos not differentiable at 1 */ return failure(); }
-    //
-    // θF = 2 * acos(cF)
-    //
-    // αF = - atan((- c1 * c2 * sin(α1 + α2) - s1 * s2 * sin(β2 - β1)) /
-    //             (  c1 * c2 * cos(α1 + α2) - s1 * s2 * cos(β2 - β1)))
-    //
-    // βF = - atan((- c1 * s2 * sin(α1 + β2) + s1 * c2 * sin(α2 - β1)) /
-    //             (  c1 * s2 * cos(α1 + β2) + s1 * c2 * cos(α2 - β1)))
-    //
-    // ϕF = αF + βF
-    // ωF = αF - βF
     mlir::LogicalResult
     matchAndRewriteArbitrarySingleRotation(OpType op, mlir::PatternRewriter &rewriter) const
     {
@@ -168,6 +123,7 @@ struct MergeRotationsRewritePattern : public mlir::OpRewritePattern<OpType> {
         auto parentParams = convertOpParamsToValues(parentOp, rewriter);
         auto params = convertOpParamsToValues(op, rewriter);
 
+        // TODO: do we allow Unicode in comments? what about in code?
         // Parent params are ϕ1, θ1, and ω1
         // Params are ϕ2, θ2, and ω2
         mlir::Value phi1 = parentParams[0];
