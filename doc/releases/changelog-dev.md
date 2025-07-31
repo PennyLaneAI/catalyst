@@ -40,6 +40,7 @@
 <h3>Internal changes ⚙️</h3>
 
 * Updates use of `qml.transforms.dynamic_one_shot.parse_native_mid_circuit_measurements` to improved signature.
+  [(#1953)](https://github.com/PennyLaneAI/catalyst/pull/1953)
 
 * Raise warning when subroutines are used without capture enabled.
   [(#1930)](https://github.com/PennyLaneAI/catalyst/pull/1930)
