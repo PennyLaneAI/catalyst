@@ -242,7 +242,7 @@ bool constructLayer(QECLayer layer, IRRewriter &writer)
 
     // Erase the ops in the layer one by one
     auto maxIter = layer.ops.size() * 2;
-    while (!layer.ops.empty() || maxIter < 0) {
+    while (!layer.ops.empty() || maxIter > 0) {
         for (auto op : llvm::reverse(layer.ops)) {
             if (op->use_empty()) {
                 writer.eraseOp(op);
@@ -252,6 +252,8 @@ bool constructLayer(QECLayer layer, IRRewriter &writer)
         }
         maxIter--;
     }
+
+    assert(layer.ops.empty() && "Layer ops should be empty after construction");
 
     return true;
 }
