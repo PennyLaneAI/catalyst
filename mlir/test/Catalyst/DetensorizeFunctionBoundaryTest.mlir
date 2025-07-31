@@ -57,6 +57,10 @@ module {
 // CHECK-NEXT:    return [[CALL]]#0, [[CALL]]#1 : f32, tensor<2xf32>
 module {
   func.func public @callee_mixed(%arg0: tensor<f32>, %arg1: tensor<2xf32>) -> (tensor<f32>, tensor<2xf32>) {
+    %c1 = arith.constant 1.0 : f32
+    %extracted_val = tensor.extract %arg0[] : tensor<f32>
+    %added_val = arith.addf %extracted_val, %c1 : f32
+    %tensor_result = tensor.from_elements %added_val : tensor<f32>
     return %arg0, %arg1 : tensor<f32>, tensor<2xf32>
   }
 

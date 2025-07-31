@@ -14,7 +14,6 @@ using namespace llvm;
 using namespace mlir;
 using namespace catalyst;
 
-// A helper function to check if a type is a 0-D tensor.
 static bool isZeroDRankedTensor(Type type)
 {
     if (auto rankedType = dyn_cast<RankedTensorType>(type)) {
@@ -23,7 +22,6 @@ static bool isZeroDRankedTensor(Type type)
     return false;
 }
 
-// A helper function to get the scalar element type from a 0-D tensor type.
 static Type getScalarType(Type type)
 {
     if (auto rankedType = dyn_cast<RankedTensorType>(type)) {
@@ -34,14 +32,15 @@ static Type getScalarType(Type type)
     return type;
 }
 
-// This pattern converts a function's signature and body arguments.
-// It replaces 0-D tensor types in arguments with their scalar equivalents,
-// and inserts `tensor.from_elements` at the function entry to maintain correctness.
 struct DetensorizeFuncPattern : public OpRewritePattern<func::FuncOp> {
     using OpRewritePattern<func::FuncOp>::OpRewritePattern;
 
     LogicalResult matchAndRewrite(func::FuncOp funcOp, PatternRewriter &rewriter) const override
     {
+        if (funcOp->hasAttr("llvm.emit_c_interface")) {
+            return failure();
+        }
+
         FunctionType funcType = funcOp.getFunctionType();
         SmallVector<Type> newArgTypes;
         SmallVector<Type> newResultTypes;
@@ -60,20 +59,25 @@ struct DetensorizeFuncPattern : public OpRewritePattern<func::FuncOp> {
             return failure();
         }
 
-        // 1. Create the new function with the updated signature.
-        auto newFuncType = FunctionType::get(getContext(), newArgTypes, newResultTypes);
-        auto newFuncOp =
-            rewriter.create<func::FuncOp>(funcOp.getLoc(), funcOp.getName(), newFuncType);
+        // Collect all attributes of the original function
+        SmallVector<NamedAttribute> newAttrs;
+        for (const NamedAttribute &attr : funcOp->getAttrs()) {
+            if (attr.getName() != funcOp.getSymNameAttrName() &&
+                attr.getName() != funcOp.getFunctionTypeAttrName()) {
+                newAttrs.push_back(attr);
+            }
+        }
 
-        // 2. Create the entry block with the correct (new) argument types.
-        // This avoids verifier errors by ensuring the block signature matches the
-        // function signature from the start.
+        // Create the new function with the updated signature and preserved attributes
+        auto newFuncType = FunctionType::get(getContext(), newArgTypes, newResultTypes);
+        auto newFuncOp = rewriter.create<func::FuncOp>(funcOp.getLoc(), funcOp.getName(),
+                                                       newFuncType, newAttrs);
+
+        // Create the entry block with the new argument types
         Block *newEntryBlock = newFuncOp.addEntryBlock();
         rewriter.setInsertionPointToStart(newEntryBlock);
 
-        // 3. Map the old block arguments to the new values. For tensor->scalar
-        // conversions, we create a `tensor.from_elements` op and map the old
-        // tensor argument to its result.
+        // Map the old block arguments to the new values.
         IRMapping mapper;
         Block &oldEntryBlock = funcOp.front();
         for (unsigned i = 0; i < oldEntryBlock.getNumArguments(); ++i) {
@@ -89,9 +93,7 @@ struct DetensorizeFuncPattern : public OpRewritePattern<func::FuncOp> {
             }
         }
 
-        // 4. Clone the operations from the old function's body into the new one.
-        // The mapper will automatically handle remapping the uses of the old
-        // arguments to the correct new values.
+        // Clone the operations from the old function's body into the new one
         for (Operation &op : oldEntryBlock.getOperations()) {
             rewriter.clone(op, mapper);
         }
@@ -101,9 +103,6 @@ struct DetensorizeFuncPattern : public OpRewritePattern<func::FuncOp> {
     }
 };
 
-// This pattern updates `func.return` operations. If the function signature expects
-// a scalar but the return op provides a 0-D tensor, this pattern inserts a
-// `tensor.extract` to convert the value.
 struct DetensorizeReturnPattern : public OpRewritePattern<func::ReturnOp> {
     using OpRewritePattern<func::ReturnOp>::OpRewritePattern;
 
@@ -144,8 +143,7 @@ struct DetensorizeReturnPattern : public OpRewritePattern<func::ReturnOp> {
     }
 };
 
-// This pattern updates `func.call` operations to match the new, detensorized
-// function signatures. It inserts casts around the call site.
+
 struct DetensorizeCallPattern : public OpRewritePattern<func::CallOp> {
     using OpRewritePattern<func::CallOp>::OpRewritePattern;
 
@@ -197,7 +195,7 @@ struct DetensorizeCallPattern : public OpRewritePattern<func::CallOp> {
     }
 };
 
-// This pattern simplifies `tensor.extract(tensor.from_elements(x)) -> x`.
+
 struct FoldExtractFromElementsPattern : public OpRewritePattern<tensor::ExtractOp> {
     using OpRewritePattern<tensor::ExtractOp>::OpRewritePattern;
 
@@ -218,8 +216,6 @@ struct FoldExtractFromElementsPattern : public OpRewritePattern<tensor::ExtractO
     }
 };
 
-// This pattern simplifies `tensor.from_elements(tensor.extract(t)) -> t`,
-// where t is a 0-D tensor.
 struct FoldFromElementsExtractPattern : public OpRewritePattern<tensor::FromElementsOp> {
     using OpRewritePattern<tensor::FromElementsOp>::OpRewritePattern;
 
