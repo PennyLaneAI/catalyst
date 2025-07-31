@@ -79,9 +79,9 @@ from catalyst.jit import QJIT, qjit
 from catalyst.passes.pass_api import pipeline
 from catalyst.utils.exceptions import (
     AutoGraphError,
-    PlxprCaptureCFCompatibilityError,
     CompileError,
     DifferentiableCompileError,
+    PlxprCaptureCFCompatibilityError,
 )
 
 autograph_ignore_fallbacks = False
