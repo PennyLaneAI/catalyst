@@ -313,18 +313,18 @@ ifneq ($(findstring clang,$(C_COMPILER)),clang)
 endif
 endif
 	@echo "Generating coverage report for the frontend"
-	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/pytest $(PYTEST_FLAGS) --cov=catalyst --tb=native --cov-report=
-	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/test_oqc/oqc $(PYTEST_FLAGS) --cov=catalyst --cov-append --tb=native --cov-report=
+	COVERAGE_FILE=$(MK_DIR)/.coverage.pytest $(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/pytest $(PYTEST_FLAGS) --cov=catalyst --tb=native --cov-report=
+	COVERAGE_FILE=$(MK_DIR)/.coverage.pytest $(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/test_oqc/oqc $(PYTEST_FLAGS) --cov=catalyst --cov-append --tb=native --cov-report=
 ifeq ($(ENABLE_OQD), ON)
-	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/test_oqd/oqd $(PYTEST_FLAGS) --cov=catalyst --cov-append --tb=native --cov-report=
+	COVERAGE_FILE=$(MK_DIR)/.coverage.pytest $(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/test_oqd/oqd $(PYTEST_FLAGS) --cov=catalyst --cov-append --tb=native --cov-report=
 endif
 	$(ASAN_COMMAND) $(MAKE) lit-coverage
-	coverage combine --append .coverage.lit .coverage
+	$(PYTHON) -m coverage combine --data-file=$(MK_DIR)/.coverage.combined $(MK_DIR)/.coverage.lit $(MK_DIR)/.coverage.pytest
 	@echo "=== Generating final coverage report with format: $(COVERAGE_REPORT) ==="
 ifeq ($(COVERAGE_REPORT),term-missing)
-	$(PYTHON) -m coverage report --show-missing
+	$(PYTHON) -m coverage report --data-file=$(MK_DIR)/.coverage.combined --show-missing
 else
-	$(PYTHON) -m coverage xml --data-file=$(COVERAGE_REPORT)
+	$(PYTHON) -m coverage $(COVERAGE_REPORT) --data-file=$(MK_DIR)/.coverage.combined
 endif
 ifeq ($(TEST_BRAKET), NONE)
 	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/async_tests --tb=native --backend=$(TEST_BACKEND) --tb=native
