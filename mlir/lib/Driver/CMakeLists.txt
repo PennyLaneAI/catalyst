@@ -40,10 +40,9 @@ set(LIBS
     mitigation-transforms
     MLIRIon
     ion-transforms
-    StablehloRegister
-    StablehloOptimizationPasses
     MLIRCatalystTest
     ${ENZYME_LIB}
+    StablehloRegister
     StablehloCAPI
 )
 
@@ -51,10 +50,6 @@ add_mlir_library(CatalystCompilerDriver
     CompilerDriver.cpp
     CatalystLLVMTarget.cpp
     Pipelines.cpp
-
-    DEPENDS
-    StablehloBaseIncGen
-    OptimizationPassesIncGen
 
     LINK_LIBS PRIVATE
     ${LIBS}
