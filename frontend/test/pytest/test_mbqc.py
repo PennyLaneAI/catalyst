@@ -25,36 +25,19 @@ import pennylane.ftqc as plft
 import pytest
 
 from catalyst import qjit
+from catalyst.ftqc import mbqc_pipeline as catalyst_mbqc_pipeline
 from catalyst.utils.exceptions import CompileError
 
 pytestmark = pytest.mark.usefixtures("disable_capture")
 
-mbqc_pipeline = [
-    (
-        "default-pipeline",
-        [
-            "enforce-runtime-invariants-pipeline",
-            "hlo-lowering-pipeline",
-            "quantum-compilation-pipeline",
-            "bufferization-pipeline",
-        ],
-    ),
-    (
-        "mbqc-pipeline",
-        [
-            "convert-mbqc-to-llvm",
-        ],
-    ),
-    (
-        "llvm-dialect-lowering-pipeline",
-        [
-            "llvm-dialect-lowering-pipeline",
-        ],
-    ),
-]
+
+@pytest.fixture(scope="module", name="mbqc_pipeline")
+def fixture_mbqc_pipeline():
+    """Fixture that returns the compilation pipeline for MBQC workloads."""
+    return catalyst_mbqc_pipeline()
 
 
-def test_measure_x():
+def test_measure_x(mbqc_pipeline):
     """Test the compilation of the qml.ftqc.measure_x function, which performs a mid-circuit
     measurement in the Pauli X basis.
 
@@ -80,7 +63,7 @@ def test_measure_x():
     assert -1.0 <= result <= 1.0
 
 
-def test_measure_y():
+def test_measure_y(mbqc_pipeline):
     """Test the compilation of the qml.ftqc.measure_y function, which performs a mid-circuit
     measurement in the Pauli Y basis.
 
@@ -106,7 +89,7 @@ def test_measure_y():
     assert -1.0 <= result <= 1.0
 
 
-def test_measure_z():
+def test_measure_z(mbqc_pipeline):
     """Test the compilation of the qml.ftqc.measure_z function, which performs a mid-circuit
     measurement in the Pauli Z basis. Including for completeness; measure_z() dispatches directly to
     qml.measure().
@@ -135,7 +118,7 @@ def test_measure_z():
 
 @pytest.mark.parametrize("angle", [-np.pi / 2, 0.0, np.pi / 2])
 @pytest.mark.parametrize("plane", ["XY", "ZX", "YZ"])
-def test_measure_measure_arbitrary_basis(angle, plane):
+def test_measure_measure_arbitrary_basis(angle, plane, mbqc_pipeline):
     """Test the compilation of the qml.ftqc.measure_arbitrary_basis function, which performs a
     mid-circuit measurement in an arbitrary basis defined by a plane and rotation angle about that
     plane on the supplied qubit.
@@ -163,7 +146,7 @@ def test_measure_measure_arbitrary_basis(angle, plane):
 
 
 @pytest.mark.parametrize("postselect", [0, 1])
-def test_measure_measure_arbitrary_basis_postselect(postselect):
+def test_measure_measure_arbitrary_basis_postselect(postselect, mbqc_pipeline):
     """Test the compilation of the qml.ftqc.measure_arbitrary_basis function with a postselect
     argument.
 
@@ -186,7 +169,7 @@ def test_measure_measure_arbitrary_basis_postselect(postselect):
     assert -1.0 <= result <= 1.0
 
 
-def test_measure_measure_arbitrary_basis_invalid_plane():
+def test_measure_measure_arbitrary_basis_invalid_plane(mbqc_pipeline):
     """Test that inputting an invalid ``plane`` parameter to qml.ftqc.measure_arbitrary_basis raises
     a ValueError.
     """
@@ -208,7 +191,7 @@ def test_measure_measure_arbitrary_basis_invalid_plane():
 
 
 @pytest.mark.parametrize("postselect", [-1, 2])
-def test_measure_measure_arbitrary_basis_invalid_postselect(postselect):
+def test_measure_measure_arbitrary_basis_invalid_postselect(postselect, mbqc_pipeline):
     """Test that inputting an invalid ``postselect`` parameter to qml.ftqc.measure_arbitrary_basis
     raises a CompileError.
     """
@@ -237,7 +220,7 @@ def test_measure_measure_arbitrary_basis_invalid_postselect(postselect):
 
 
 @pytest.mark.parametrize("rz_angle", [0.5])
-def test_explicit_rz_in_mbqc(rz_angle):
+def test_explicit_rz_in_mbqc(rz_angle, mbqc_pipeline):
     """Test the compilation of a circuit implementing the RZ gate in the MBQC representation
     following the pattern from
 
@@ -298,7 +281,7 @@ def test_explicit_rz_in_mbqc(rz_angle):
     assert -1.0 <= expval_z <= 1.0
 
 
-def test_cnot_in_mbqc_representation():
+def test_cnot_in_mbqc_representation(mbqc_pipeline):
     """Test the compilation of a circuit implementing the CNOT gate in the MBQC representation
     following the pattern from
 

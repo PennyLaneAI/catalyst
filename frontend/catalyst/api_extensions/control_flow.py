@@ -68,6 +68,7 @@ from catalyst.tracing.contexts import (
     EvaluationContext,
     EvaluationMode,
 )
+from catalyst.utils.exceptions import PlxprCaptureCFCompatibilityError
 from catalyst.utils.patching import Patcher
 
 
@@ -239,7 +240,31 @@ def cond(pred: DynamicJaxprTracer):
         ...     return cond_fn()
         >>> f(1.6)
         Array(2.56, dtype=float64)
+
+    .. note::
+
+       ``catalyst.cond`` is not supported in program capture mode. If ``qml.capture`` is enabled,
+        please use ``qml.cond`` instead.
+
+        .. code-block:: python
+
+            # This will raise an error with capture mode
+            @qjit
+            def func(x):
+                @catalyst.cond(x > 1.0)
+                def cond_fn():
+                    return x ** 2
+                return cond_fn()
+
+            # Use this instead for capture mode compatibility
+            @qjit
+            def circuit(x):
+                def cond_fn():
+                    return x ** 2
+                return qml.cond(x > 1.0)(cond_fn)()
     """
+    if qml.capture.enabled():
+        raise PlxprCaptureCFCompatibilityError("cond")
 
     def _decorator(true_fn: Callable):
 
@@ -373,7 +398,7 @@ def for_loop(lower_bound, upper_bound, step, allow_array_resizing=False):
     However, if you wish to have the for loop return differently sized arrays
     at each iteration, set ``allow_array_resizing`` to ``True``:
 
-    >>> @qjit()
+    >>> @qjit
     ... def f(N):
     ...     a = jnp.ones([N], dtype=float)
     ...     @for_loop(0, 10, 1, allow_array_resizing=True)
@@ -388,7 +413,32 @@ def for_loop(lower_bound, upper_bound, step, allow_array_resizing=False):
     between arrays of the same size are not supported.
 
     For more details on dynamically-shaped arrays, please see :ref:`dynamic-arrays`.
+
+    .. note::
+
+       ``catalyst.for_loop`` is not supported in program capture mode.
+       If ``qml.capture`` is enabled, please use ``qml.for_loop`` instead.
+
+        .. code-block:: python
+
+            qml.capture.enable()
+            # This will raise an error with capture mode
+            @qjit
+            def func():
+                @catalyst.for_loop(0, 10, 1)
+                def loop_fn(v):
+                    return v + 1
+                return loop_fn(0)
+
+            # Use this instead for capture mode compatibility
+            @qml.qnode(device)
+            def circuit():
+                def loop_fn(v):
+                    return v + 1
+                return qml.for_loop(0, 10, 1)(loop_fn)(0)
     """
+    if qml.capture.enabled():
+        raise PlxprCaptureCFCompatibilityError("for_loop")
 
     def _decorator(body_fn):
         return ForLoopCallable(lower_bound, upper_bound, step, body_fn, not allow_array_resizing)
@@ -503,7 +553,31 @@ def while_loop(cond_fn, allow_array_resizing: bool = False):
     between arrays of the same size are not supported.
 
     For more details on dynamically-shaped arrays, please see :ref:`dynamic-arrays`.
+
+    .. note::
+
+       ``catalyst.while_loop`` is not supported in program capture mode.
+       If ``qml.capture`` is enabled, please use ``qml.while_loop`` instead.
+
+        .. code-block:: python
+
+            # This will raise an error with capture mode
+            @qjit
+            def func():
+                @catalyst.while_loop(lambda x: x < 5)
+                def loop_fn(x):
+                    return x + 1
+                return loop_fn(0)
+
+            # Use this instead for capture mode compatibility
+            @qml.qnode(device)
+            def circuit():
+                def loop_fn(x):
+                    return x + 1
+                return qml.while_loop(lambda x: x < 5)(loop_fn)(0)
     """
+    if qml.capture.enabled():
+        raise PlxprCaptureCFCompatibilityError("while_loop")
 
     def _decorator(body_fn):
         return WhileLoopCallable(cond_fn, body_fn, not allow_array_resizing)
