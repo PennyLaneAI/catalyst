@@ -133,7 +133,7 @@ LogicalResult AddExceptionHandlingTransform::matchAndRewrite(LLVM::CallOp callOp
     auto moduleOp = callOp->getParentOfType<ModuleOp>();
     // Here, we are adding a reference to the personality declaration.
     // From the documentation: https://llvm.org/docs/ExceptionHandling.html#exception-tables
-    auto personality = AsyncUtils::lookupOrCreatePersonality(moduleOp);
+    auto personality = AsyncUtils::lookupOrCreatePersonality(rewriter, moduleOp);
 
     // We annotate the body of the function containing the callop to have a reference
     // to the personality.
@@ -294,7 +294,7 @@ RemoveAbortAndPutsInsertCallTransform::matchAndRewrite(LLVM::CallOp callOp,
     // Here, we are declaring an external function which is available in the Catalyst runtime.
     //     llvm.func @__catalyst__host__rt__unrecoverable_error()
     auto moduleOp = callOp->getParentOfType<ModuleOp>();
-    auto unrecoverableError = AsyncUtils::lookupOrCreateUnrecoverableError(moduleOp);
+    auto unrecoverableError = AsyncUtils::lookupOrCreateUnrecoverableError(rewriter, moduleOp);
 
     auto callee = maybeCallee.value();
     rewriter.modifyOpInPlace(callee, [&] { callee.setLinkage(LLVM::Linkage::Internal); });
@@ -516,8 +516,8 @@ LogicalResult LivenessAnalysisDropRef::matchAndRewrite(LLVM::CallOp sink,
     //     llvm.func @mlirAsyncRuntimeAwaitValue(!llvm.ptr)
     //     llvm.func @mlirAsyncRuntimeAwaitToken(!llvm.ptr)
     //     llvm.func @mlirAsyncRuntimeDropRef(!llvm.ptr, i64)
-    auto awaitFnDecl = AsyncUtils::lookupOrCreateAwaitTokenName(moduleOp);
-    auto dropRefFnDecl = AsyncUtils::lookupOrCreateDropRef(moduleOp);
+    auto awaitFnDecl = AsyncUtils::lookupOrCreateAwaitTokenName(rewriter, moduleOp);
+    auto dropRefFnDecl = AsyncUtils::lookupOrCreateDropRef(rewriter, moduleOp);
 
     Type llvmInt64Type = IntegerType::get(sink->getContext(), 64);
     auto one = rewriter.getIntegerAttr(llvmInt64Type, 1);
@@ -871,9 +871,9 @@ void insertErrorCalls(std::vector<Value> tokens, std::vector<Value> values, Bloc
     auto moduleOp = landingPad->getParentOfType<ModuleOp>();
 
     LLVM::LLVMFuncOp setTokenError =
-        AsyncUtils::lookupOrCreateMlirAsyncRuntimeSetTokenError(moduleOp);
+        AsyncUtils::lookupOrCreateMlirAsyncRuntimeSetTokenError(rewriter, moduleOp);
     LLVM::LLVMFuncOp setValueError =
-        AsyncUtils::lookupOrCreateMlirAsyncRuntimeSetValueError(moduleOp);
+        AsyncUtils::lookupOrCreateMlirAsyncRuntimeSetValueError(rewriter, moduleOp);
     for (auto token : tokens) {
         insertCallToMlirAsyncRuntimeErrorFunction(token, setTokenError, failBlock, rewriter);
     }
@@ -918,11 +918,8 @@ struct AddExceptionHandlingPass : impl::AddExceptionHandlingPassBase<AddExceptio
         patterns1.add<DetectCallsInAsyncRegionsTransform>(context);
 
         GreedyRewriteConfig config;
-        config.strictMode = GreedyRewriteStrictness::ExistingOps;
-        config.enableRegionSimplification = mlir::GreedySimplifyRegionLevel::Disabled;
-        // TODO: Update to the following lines the next time we update llvm
-        // config.setStrictness(GreedyRewriteStrictness::ExistingOps);
-        // config.setRegionSimplificationLevel(mlir::GreedySimplifyRegionLevel::Disabled);
+        config.setStrictness(GreedyRewriteStrictness::ExistingOps);
+        config.setRegionSimplificationLevel(mlir::GreedySimplifyRegionLevel::Disabled);
 
         if (failed(applyPatternsGreedily(getOperation(), std::move(patterns1), config))) {
             signalPassFailure();

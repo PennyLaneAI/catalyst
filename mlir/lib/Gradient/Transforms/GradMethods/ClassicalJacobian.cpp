@@ -148,7 +148,8 @@ func::FuncOp genSplitPreprocessed(PatternRewriter &rewriter, Location loc, func:
         PatternRewriter::InsertionGuard insertGuard(rewriter);
         rewriter.setInsertionPointToStart(&splitFn.getBody().front());
         Value paramsBuffer = rewriter.create<memref::AllocOp>(loc, paramsBufferType, paramCount);
-        Value paramsTensor = rewriter.create<bufferization::ToTensorOp>(loc, paramsBuffer, true);
+        Value paramsTensor = rewriter.create<bufferization::ToTensorOp>(
+            loc, memref::getTensorTypeFromMemRefType(paramsBuffer.getType()), paramsBuffer, true);
 
         qnodeQuantumArgs.push_back(paramsTensor);
         MemRefType paramsProcessedType = MemRefType::get({}, rewriter.getIndexType());

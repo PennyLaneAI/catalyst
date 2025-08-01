@@ -1,0 +1,15 @@
+diff --git a/utils/cycle_detector.cc b/utils/cycle_detector.cc
+index e3901ae88..890f39654 100644
+--- a/utils/cycle_detector.cc
++++ b/utils/cycle_detector.cc
+@@ -199,8 +199,8 @@ static void backwardDfs(GraphCycles::Rep* r, int32_t n, int32_t lowerBound) {
+ // Recomputes rank assignments to make them compatible with the edges (producer
+ // has smaller rank than its consumer)
+ static void reorder(GraphCycles::Rep* r) {
+-  sort(r->nodes, &r->deltab);
+-  sort(r->nodes, &r->deltaf);
++  mlir::sort(r->nodes, &r->deltab);
++  mlir::sort(r->nodes, &r->deltaf);
+ 
+   // Adds contents of delta lists to list (backwards deltas first).
+   r->list.clear();

@@ -113,6 +113,12 @@ jobs:
         ref: ${{ needs.constants.outputs.llvm_version }}
         path: ${{ github.workspace }}/mlir/llvm-project
 
+    - name: Patch LLVM Source
+      if: steps.cache-mhlo-source.outputs.cache-hit != 'true'
+      run: |
+        cd $GITHUB_WORKSPACE/mlir/llvm-project
+        git apply $GITHUB_WORKSPACE/mlir/patches/llvm-bufferization-segfault.patch
+
     - name: Clone MHLO Submodule
       if: steps.cache-mhlo-source.outputs.cache-hit != 'true'
       uses: actions/checkout@v4
@@ -126,7 +132,7 @@ jobs:
       run: |
         cd $GITHUB_WORKSPACE/mlir/mlir-hlo
         git apply $GITHUB_WORKSPACE/mlir/patches/mhlo-remove-shardy.patch
-        git apply $GITHUB_WORKSPACE/mlir/patches/mhlo-add-back-necessary-passes.patch
+        git apply $GITHUB_WORKSPACE/mlir/patches/mhlo-rename-sort.patch
 
     - name: Clone Enzyme Submodule
       if: steps.cache-enzyme-source.outputs.cache-hit != 'true'
@@ -139,9 +145,8 @@ jobs:
     - name: Patch Enzyme Source
       if: steps.cache-enzyme-source.outputs.cache-hit != 'true'
       run: |
-        export TARGET_FILE=$GITHUB_WORKSPACE/mlir/Enzyme/enzyme/Enzyme/TypeAnalysis/TypeAnalysis.cpp
-        export PATCH_FILE=$GITHUB_WORKSPACE/mlir/patches/enzyme-nvvm-fabs-intrinsics.patch
-        patch -p1 $TARGET_FILE $PATCH_FILE
+        cd $GITHUB_WORKSPACE/mlir/Enzyme
+        git apply $GITHUB_WORKSPACE/mlir/patches/enzyme-nvvm-fabs-intrinsics.patch
 
     # Cache external project builds
     - name: Restore LLVM Build
