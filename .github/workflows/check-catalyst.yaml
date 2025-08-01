@@ -193,7 +193,7 @@ jobs:
       id: cache-stablehlo-source
       uses: actions/cache@v4
       with:
-        path: mlir/mlir-hlo
+        path: mlir/stablehlo
         key: stablehlo-${{ needs.constants.outputs.stablehlo_version }}-default-source
         enableCrossOsArchive: true
 
@@ -366,7 +366,7 @@ jobs:
       id: cache-stablehlo-source
       uses: actions/cache/restore@v4
       with:
-        path: mlir/mlir-hlo
+        path: mlir/stablehlo
         key: stablehlo-${{ needs.constants.outputs.stablehlo_version }}-default-source
         enableCrossOsArchive: true
         fail-on-cache-miss: true

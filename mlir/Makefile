@@ -41,7 +41,7 @@ LLVM_TARGETS ?= check-mlir llvm-symbolizer
 .PHONY: help
 help:
 	@echo "Please use \`make <target>' where <target> is one of"
-	@echo "  all                to build MLIR, MLIR-HLO and custom Catalyst dialects"
+	@echo "  all                to build MLIR, Stablehlo and custom Catalyst dialects"
 	@echo "  llvm               to build MLIR enabling Python bindings"
 	@echo "  stablehlo          to build stablehlo"
 	@echo "  enzyme             to build Enzyme"
