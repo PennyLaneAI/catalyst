@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Test for the device API."""
-import platform
-
 import pennylane as qml
 import pytest
 from pennylane.devices import NullQubit
@@ -129,12 +127,12 @@ def test_simple_circuit():
 def test_track_resources():
     """Test that resource tracking settings get passed to the device."""
     dev = NullQubit(wires=2)
-    assert "track_resources" in QJITDevice.extract_backend_info(dev, dev.capabilities).kwargs
-    assert QJITDevice.extract_backend_info(dev, dev.capabilities).kwargs["track_resources"] is False
+    assert "track_resources" in QJITDevice.extract_backend_info(dev).kwargs
+    assert QJITDevice.extract_backend_info(dev).kwargs["track_resources"] is False
 
     dev = NullQubit(wires=2, track_resources=True)
-    assert "track_resources" in QJITDevice.extract_backend_info(dev, dev.capabilities).kwargs
-    assert QJITDevice.extract_backend_info(dev, dev.capabilities).kwargs["track_resources"] is True
+    assert "track_resources" in QJITDevice.extract_backend_info(dev).kwargs
+    assert QJITDevice.extract_backend_info(dev).kwargs["track_resources"] is True
 
 
 if __name__ == "__main__":
