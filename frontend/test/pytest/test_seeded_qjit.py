@@ -115,10 +115,11 @@ def test_seeded_sample(seed, shots, readout, backend):
             "Sample seeding is only supported on lightning.qubit, lightning.kokkos and lightning.gpu"
         )
 
-    dev = qml.device(backend, wires=2, shots=shots)
+    dev = qml.device(backend, wires=2)
 
     @qjit(seed=seed)
     def workflow():
+        @qml.set_shots(shots)
         @qml.qnode(dev)
         def circuit():
             qml.Hadamard(wires=[0])
@@ -129,6 +130,7 @@ def test_seeded_sample(seed, shots, readout, backend):
 
     @qjit(seed=seed)
     def workflow1():
+        @qml.set_shots(shots)
         @qml.qnode(dev)
         def circuit():
             qml.Hadamard(wires=[0])
@@ -163,10 +165,11 @@ def test_seeded_probs(seed, shots, backend):
             "Probs seeding is only supported on lightning.qubit, lightning.kokkos and lightning.gpu"
         )
 
-    dev = qml.device(backend, wires=2, shots=shots)
+    dev = qml.device(backend, wires=2)
 
     @qjit(seed=seed)
     def workflow():
+        @qml.set_shots(shots)
         @qml.qnode(dev)
         def circuit():
             qml.RY(0.7, wires=0)
@@ -177,6 +180,7 @@ def test_seeded_probs(seed, shots, backend):
 
     @qjit(seed=seed)
     def workflow1():
+        @qml.set_shots(shots)
         @qml.qnode(dev)
         def circuit():
             qml.RY(0.7, wires=0)
@@ -212,10 +216,11 @@ def test_seeded_expval(seed, shots, backend):
             "and lightning.gpu"
         )
 
-    dev = qml.device(backend, wires=2, shots=shots)
+    dev = qml.device(backend, wires=2)
 
     @qjit(seed=seed)
     def workflow():
+        @qml.set_shots(shots)
         @qml.qnode(dev)
         def circuit():
             qml.RY(0.7, wires=0)
@@ -225,6 +230,7 @@ def test_seeded_expval(seed, shots, backend):
 
     @qjit(seed=seed)
     def workflow1():
+        @qml.set_shots(shots)
         @qml.qnode(dev)
         def circuit():
             qml.RY(0.7, wires=0)
@@ -259,10 +265,11 @@ def test_seeded_var(seed, shots, backend):
             "Var seeding is only supported on lightning.qubit, lightning.kokkos and lightning.gpu"
         )
 
-    dev = qml.device(backend, wires=2, shots=shots)
+    dev = qml.device(backend, wires=2)
 
     @qjit(seed=seed)
     def workflow():
+        @qml.set_shots(shots)
         @qml.qnode(dev)
         def circuit():
             qml.RY(0.7, wires=0)
@@ -272,6 +279,7 @@ def test_seeded_var(seed, shots, backend):
 
     @qjit(seed=seed)
     def workflow1():
+        @qml.set_shots(shots)
         @qml.qnode(dev)
         def circuit():
             qml.RY(0.7, wires=0)

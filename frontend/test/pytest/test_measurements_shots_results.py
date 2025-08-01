@@ -31,11 +31,12 @@ class TestExpval:
         """Test that identity expectation value (i.e. the trace) is 1."""
         n_wires = 2
         n_shots = 10000
-        dev = qml.device(backend, wires=n_wires, shots=n_shots)
+        dev = qml.device(backend, wires=n_wires)
 
         theta = 0.432
         phi = 0.123
 
+        @qml.set_shots(n_shots)
         @qml.qnode(dev)
         def circuit():
             qml.RX(theta, wires=[0])
@@ -52,11 +53,12 @@ class TestExpval:
         """Test that PauliZ expectation value is correct"""
         n_wires = 2
         n_shots = 10000
-        dev = qml.device(backend, wires=n_wires, shots=n_shots)
+        dev = qml.device(backend, wires=n_wires)
 
         theta = 0.432
         phi = 0.123
 
+        @qml.set_shots(n_shots)
         @qml.qnode(dev)
         def circuit():
             qml.RX(theta, wires=[0])
@@ -73,11 +75,12 @@ class TestExpval:
         """Test that PauliX expectation value is correct"""
         n_wires = 2
         n_shots = 10000
-        dev = qml.device(backend, wires=n_wires, shots=n_shots)
+        dev = qml.device(backend, wires=n_wires)
 
         theta = 0.432
         phi = 0.123
 
+        @qml.set_shots(n_shots)
         @qml.qnode(dev)
         def circuit():
             qml.RY(theta, wires=[0])
@@ -94,11 +97,12 @@ class TestExpval:
         """Test that PauliY expectation value is correct"""
         n_wires = 2
         n_shots = 10000
-        dev = qml.device(backend, wires=n_wires, shots=n_shots)
+        dev = qml.device(backend, wires=n_wires)
 
         theta = 0.432
         phi = 0.123
 
+        @qml.set_shots(n_shots)
         @qml.qnode(dev)
         def circuit():
             qml.RX(theta, wires=[0])
@@ -115,11 +119,12 @@ class TestExpval:
         """Test that Hadamard expectation value is correct"""
         n_wires = 2
         n_shots = 10000
-        dev = qml.device(backend, wires=n_wires, shots=n_shots)
+        dev = qml.device(backend, wires=n_wires)
 
         theta = 0.432
         phi = 0.123
 
+        @qml.set_shots(n_shots)
         @qml.qnode(dev)
         def circuit():
             qml.RY(theta, wires=[0])
@@ -136,8 +141,9 @@ class TestExpval:
         """Test expval Hermitian observables with shots."""
         n_wires = 3
         n_shots = 10000
-        dev = qml.device(backend, wires=n_wires, shots=n_shots)
+        dev = qml.device(backend, wires=n_wires)
 
+        @qml.set_shots(n_shots)
         @qml.qnode(dev)
         def circuit(x, y):
             qml.RX(x, wires=0)
@@ -157,12 +163,13 @@ class TestExpval:
         """Test that a tensor product involving PauliX and PauliY works correctly"""
         n_wires = 3
         n_shots = 100000
-        dev = qml.device(backend, wires=n_wires, shots=n_shots)
+        dev = qml.device(backend, wires=n_wires)
 
         theta = 0.432
         phi = 0.123
         varphi = -0.543
 
+        @qml.set_shots(n_shots)
         @qml.qnode(dev)
         def circuit():
             qml.RX(theta, wires=[0])
@@ -180,8 +187,9 @@ class TestExpval:
         """Test that a tensor product involving PauliZ and PauliY works correctly"""
         n_wires = 3
         n_shots = 10000
-        dev = qml.device(backend, wires=n_wires, shots=n_shots)
+        dev = qml.device(backend, wires=n_wires)
 
+        @qml.set_shots(n_shots)
         @qml.qnode(dev)
         def circuit(theta, phi, varphi):
             qml.RX(theta, wires=[0])
@@ -199,8 +207,9 @@ class TestExpval:
         """Test that a hamiltonian involving PauliZ and PauliY and hadamard works correctly"""
         n_wires = 3
         n_shots = 10000
-        dev = qml.device(backend, wires=n_wires, shots=n_shots)
+        dev = qml.device(backend, wires=n_wires)
 
+        @qml.set_shots(n_shots)
         @qml.qnode(dev)
         def circuit(theta, phi, varphi):
             qml.RX(theta, wires=[0])
@@ -220,8 +229,9 @@ class TestExpval:
         """Test that a hamiltonian involving PauliZ and Hadamard @ PauliX works correctly"""
         n_wires = 3
         n_shots = 10000
-        dev = qml.device(backend, wires=n_wires, shots=n_shots)
+        dev = qml.device(backend, wires=n_wires)
 
+        @qml.set_shots(n_shots)
         @qml.qnode(dev)
         def circuit(theta, phi, varphi):
             qml.RX(theta, wires=[0])
@@ -246,11 +256,12 @@ class TestVar:
         """Test that identity variance value (i.e. the trace) is 1."""
         n_wires = 2
         n_shots = 10000
-        dev = qml.device(backend, wires=n_wires, shots=n_shots)
+        dev = qml.device(backend, wires=n_wires)
 
         theta = 0.432
         phi = 0.123
 
+        @qml.set_shots(n_shots)
         @qml.qnode(dev)
         def circuit():
             qml.RX(theta, wires=[0])
@@ -267,11 +278,12 @@ class TestVar:
         """Test that PauliZ variance value is correct"""
         n_wires = 2
         n_shots = 10000
-        dev = qml.device(backend, wires=n_wires, shots=n_shots)
+        dev = qml.device(backend, wires=n_wires)
 
         theta = 0.432
         phi = 0.123
 
+        @qml.set_shots(n_shots)
         @qml.qnode(dev)
         def circuit():
             qml.RX(theta, wires=[0])
@@ -288,11 +300,12 @@ class TestVar:
         """Test that PauliX variance value is correct"""
         n_wires = 2
         n_shots = 10000
-        dev = qml.device(backend, wires=n_wires, shots=n_shots)
+        dev = qml.device(backend, wires=n_wires)
 
         theta = 0.432
         phi = 0.123
 
+        @qml.set_shots(n_shots)
         @qml.qnode(dev)
         def circuit():
             qml.RY(theta, wires=[0])
@@ -309,11 +322,12 @@ class TestVar:
         """Test that PauliY variance value is correct"""
         n_wires = 2
         n_shots = 10000
-        dev = qml.device(backend, wires=n_wires, shots=n_shots)
+        dev = qml.device(backend, wires=n_wires)
 
         theta = 0.432
         phi = 0.123
 
+        @qml.set_shots(n_shots)
         @qml.qnode(dev)
         def circuit():
             qml.RX(theta, wires=[0])
@@ -330,11 +344,12 @@ class TestVar:
         """Test that Hadamard variance value is correct"""
         n_wires = 2
         n_shots = 10000
-        dev = qml.device(backend, wires=n_wires, shots=n_shots)
+        dev = qml.device(backend, wires=n_wires)
 
         theta = 0.432
         phi = 0.123
 
+        @qml.set_shots(n_shots)
         @qml.qnode(dev)
         def circuit():
             qml.RY(theta, wires=[0])
@@ -352,8 +367,9 @@ class TestVar:
 
         n_wires = 3
         n_shots = 10000
-        dev = qml.device(backend, wires=n_wires, shots=n_shots)
+        dev = qml.device(backend, wires=n_wires)
 
+        @qml.set_shots(n_shots)
         @qml.qnode(dev)
         def circuit(x, y):
             qml.RX(x, wires=0)
@@ -373,12 +389,13 @@ class TestVar:
         """Test that a tensor product involving PauliX and PauliY works correctly"""
         n_wires = 3
         n_shots = 10000
-        dev = qml.device(backend, wires=n_wires, shots=n_shots)
+        dev = qml.device(backend, wires=n_wires)
 
         theta = 0.432
         phi = 0.123
         varphi = -0.543
 
+        @qml.set_shots(n_shots)
         @qml.qnode(dev)
         def circuit():
             qml.RX(theta, wires=[0])
@@ -396,8 +413,9 @@ class TestVar:
         """Test that a tensor product involving Hadamard and PauliY works correctly"""
         n_wires = 3
         n_shots = 10000
-        dev = qml.device(backend, wires=n_wires, shots=n_shots)
+        dev = qml.device(backend, wires=n_wires)
 
+        @qml.set_shots(n_shots)
         @qml.qnode(dev)
         def circuit(theta, phi, varphi):
             qml.RX(theta, wires=[0])
@@ -415,8 +433,9 @@ class TestVar:
         """Test that a tensor product involving PauliZ and PauliY works correctly"""
         n_wires = 3
         n_shots = 10000
-        dev = qml.device(backend, wires=n_wires, shots=n_shots)
+        dev = qml.device(backend, wires=n_wires)
 
+        @qml.set_shots(n_shots)
         @qml.qnode(dev)
         def circuit(theta, phi, varphi):
             qml.RX(theta, wires=[0])
@@ -438,9 +457,10 @@ class TestVar:
 
         n_wires = 3
         n_shots = 10000
-        dev = qml.device(backend, wires=n_wires, shots=n_shots)
+        dev = qml.device(backend, wires=n_wires)
 
         @qml.qjit
+        @qml.set_shots(n_shots)
         @qml.qnode(dev)
         def circuit(theta, phi, varphi):
             qml.RX(theta, wires=[0])
@@ -473,8 +493,9 @@ class TestProbs:
 
         n_wires = 2
         n_shots = 10000
-        dev = qml.device(backend, wires=n_wires, shots=n_shots)
+        dev = qml.device(backend, wires=n_wires)
 
+        @qml.set_shots(n_shots)
         @qml.qnode(dev)
         def circuit(theta):
             qml.RX(theta, wires=[0])
@@ -490,8 +511,9 @@ class TestProbs:
 
         n_wires = 2
         n_shots = 10000
-        dev = qml.device(backend, wires=n_wires, shots=n_shots)
+        dev = qml.device(backend, wires=n_wires)
 
+        @qml.set_shots(n_shots)
         @qml.qnode(dev)
         def circuit(theta):
             qml.RX(theta, wires=[0])
@@ -510,9 +532,10 @@ class TestShadow:
     def test_shadow(self):
         """Test that Shadow can be used with Catalyst."""
 
-        dev = qml.device("lightning.qubit", wires=range(2), shots=10000)
+        dev = qml.device("lightning.qubit", wires=range(2))
 
         @qjit
+        @qml.set_shots(10000)
         @qml.qnode(dev)
         def classical_shadow_circuit():
             qml.Hadamard(0)
@@ -533,9 +556,10 @@ class TestShadowExpval:
     def test_shadow_expval(self):
         """Test that ShadowExpVal can be used with Catalyst."""
 
-        dev = qml.device("lightning.qubit", wires=range(2), shots=10000)
+        dev = qml.device("lightning.qubit", wires=range(2))
 
         @qjit
+        @qml.set_shots(10000)
         @qml.qnode(dev)
         def shadow_expval_circuit(x, obs):
             qml.Hadamard(0)

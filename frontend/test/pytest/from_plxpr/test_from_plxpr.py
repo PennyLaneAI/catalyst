@@ -120,8 +120,9 @@ class TestErrors:
         """Test that a NotImplementedError is raised for converting a measurement
         specified via eigvals and wires."""
 
-        dev = qml.device("lightning.qubit", wires=2, shots=50)
+        dev = qml.device("lightning.qubit", wires=2)
 
+        @qml.set_shots(50)
         @qml.qnode(dev)
         def circuit():
             return qml.measurements.SampleMP(
@@ -364,8 +365,9 @@ class TestCatalystCompareJaxpr:
     def test_sample(self):
         """Test comparison and execution of a jaxpr returning samples."""
 
-        dev = qml.device("lightning.qubit", wires=2, shots=50)
+        dev = qml.device("lightning.qubit", wires=2)
 
+        @qml.set_shots(50)
         @qml.qnode(dev)
         def circuit():
             qml.X(0)
@@ -397,8 +399,9 @@ class TestCatalystCompareJaxpr:
     def test_counts(self):
         """Test comparison and execution of a jaxpr returning counts."""
 
-        dev = qml.device("lightning.qubit", wires=2, shots=50)
+        dev = qml.device("lightning.qubit", wires=2)
 
+        @qml.set_shots(50)
         @qml.qnode(dev)
         def circuit():
             qml.X(0)
@@ -537,8 +540,9 @@ class TestCatalystCompareJaxpr:
     def test_dynamic_shots(self):
         """Test that shots can be specified on qnode call."""
 
-        dev = qml.device("lightning.qubit", wires=2, shots=50)
+        dev = qml.device("lightning.qubit", wires=2)
 
+        @qml.set_shots(50)
         @qml.qnode(dev)
         def circuit():
             return qml.sample(wires=0)

@@ -138,8 +138,9 @@ class TestMeasurementTransforms:
         """Test the transforms for measurements_from_counts to other measurement types
         as part of the Catalyst pipeline."""
 
-        dev = qml.device("lightning.qubit", wires=4, shots=5000)
+        dev = qml.device("lightning.qubit", wires=4)
 
+        @qml.set_shots(5000)
         @qml.qnode(dev)
         def basic_circuit(theta: float):
             qml.RY(theta, 0)
@@ -191,8 +192,9 @@ class TestMeasurementTransforms:
         """Test the transform measurements_from_samples with multiple measurement types
         as part of the Catalyst pipeline."""
 
-        dev = qml.device("lightning.qubit", wires=4, shots=5000)
+        dev = qml.device("lightning.qubit", wires=4)
 
+        @qml.set_shots(5000)
         @qml.qnode(dev)
         def basic_circuit(theta: float):
             qml.RY(theta, 0)
@@ -247,7 +249,7 @@ class TestMeasurementTransforms:
         measurement_from_counts transform is applied if the device only supports counts. If
         both are supported, sample takes precedence."""
 
-        dev = qml.device("lightning.qubit", wires=4, shots=100)
+        dev = qml.device("lightning.qubit", wires=4)
 
         config = get_device_capabilities(dev)
         config.observables = {}
@@ -268,6 +270,7 @@ class TestMeasurementTransforms:
 
             # MLIR only contains target measurement
             @qjit
+            @qml.set_shots(100)
             @qml.qnode(dev)
             def circuit(theta: float):
                 qml.X(0)
@@ -376,8 +379,9 @@ class TestMeasurementTransforms:
         """Test the measurment_from_counts transform with a single counts measurement as part of
         the Catalyst pipeline."""
 
-        dev = qml.device("lightning.qubit", wires=4, shots=3000)
+        dev = qml.device("lightning.qubit", wires=4)
 
+        @qml.set_shots(3000)
         @qml.qnode(dev)
         def circuit(theta: float):
             qml.RX(theta, 0)
@@ -430,8 +434,9 @@ class TestMeasurementTransforms:
         """Test the measurment_from_counts transform with a single counts measurement as part of
         the Catalyst pipeline."""
 
-        dev = qml.device("lightning.qubit", wires=4, shots=3000)
+        dev = qml.device("lightning.qubit", wires=4)
 
+        @qml.set_shots(3000)
         @qml.qnode(dev)
         def circuit(theta: float):
             qml.RX(theta, 0)
@@ -447,7 +452,7 @@ class TestMeasurementTransforms:
         # lightning.qubit does not support seeding.
         # To resolve flakiness, we put the non qjit reference run on default.qubit,
         # which can be seeded
-        ref_dev = qml.device("default.qubit", wires=4, shots=3000, seed=42)
+        ref_dev = qml.device("default.qubit", wires=4, seed=42)
         samples_expected = qml.qnode(ref_dev)(circuit.func)(theta)
 
         assert res.shape == samples_expected.shape
@@ -489,10 +494,11 @@ class TestMeasurementTransforms:
         Catalyst pipeline, for measurements whose outcome can be directly compared to an expected
         analytic result."""
 
-        dev = qml.device("lightning.qubit", wires=4, shots=shots)
+        dev = qml.device("lightning.qubit", wires=4)
 
         @qjit(seed=37)
         @partial(measurements_from_samples, device_wires=dev.wires)
+        @qml.set_shots(shots)
         @qml.qnode(dev)
         def circuit(theta: float):
             qml.RX(theta, 0)
@@ -543,10 +549,11 @@ class TestMeasurementTransforms:
         Catalyst pipeline, for measurements whose outcome can be directly compared to an expected
         analytic result."""
 
-        dev = qml.device("lightning.qubit", wires=4, shots=3000)
+        dev = qml.device("lightning.qubit", wires=4)
 
         @qjit(seed=37)
         @partial(measurements_from_counts, device_wires=dev.wires)
+        @qml.set_shots(3000)
         @qml.qnode(dev)
         def circuit(theta: float):
             qml.RX(theta, 0)
@@ -569,9 +576,10 @@ class TestMeasurementTransforms:
         """Test that an measurement not supported by the measurements_from_counts or
         measurements_from_samples transform raises a NotImplementedError"""
 
-        dev = qml.device("lightning.qubit", wires=4, shots=1000)
+        dev = qml.device("lightning.qubit", wires=4)
 
         @partial(measurements_from_counts, device_wires=dev.wires)
+        @qml.set_shots(1000)
         @qml.qnode(dev)
         def circuit(theta: float):
             qml.RX(theta, 0)
@@ -586,9 +594,10 @@ class TestMeasurementTransforms:
         """Test that an measurement not supported by the measurements_from_counts or
         measurements_from_samples transform raises a NotImplementedError"""
 
-        dev = qml.device("lightning.qubit", wires=4, shots=1000)
+        dev = qml.device("lightning.qubit", wires=4)
 
         @partial(measurements_from_samples, device_wires=dev.wires)
+        @qml.set_shots(1000)
         @qml.qnode(dev)
         def circuit(theta: float):
             qml.RX(theta, 0)
@@ -693,7 +702,7 @@ class TestMeasurementTransforms:
         preprocess when diagonalizing some observables, regarless of the non_commuting_observables
         flag"""
 
-        dev = qml.device("lightning.qubit", wires=4, shots=1000)
+        dev = qml.device("lightning.qubit", wires=4)
 
         config = get_device_capabilities(dev)
 
@@ -722,7 +731,7 @@ class TestMeasurementTransforms:
         preprocess when diagonalizing all observables, regarless of the non_commuting_observables
         flag"""
 
-        dev = qml.device("lightning.qubit", wires=4, shots=1000)
+        dev = qml.device("lightning.qubit", wires=4)
 
         config = get_device_capabilities(dev)
 
@@ -886,10 +895,11 @@ class TestTransform:
 
     def test_measurements_from_counts(self):
         """Test the transfom measurements_from_counts."""
-        device = qml.device("lightning.qubit", wires=4, shots=1000)
+        device = qml.device("lightning.qubit", wires=4)
 
         @qjit
         @partial(measurements_from_counts, device_wires=device.wires)
+        @qml.set_shots(1000)
         @qml.qnode(device=device)
         def circuit(a: float):
             qml.X(0)

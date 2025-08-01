@@ -1111,9 +1111,10 @@ class TestTransformValidity:
         original_preprocess = QJITDevice.preprocess
         monkeypatch.setattr(QJITDevice, "preprocess", inject_device_transforms)
 
-        dev = qml.device(backend, wires=2, shots=5)
+        dev = qml.device(backend, wires=2)
 
         @partial(transform, device_wires=dev.wires)
+        @qml.set_shots(5)
         @qml.qnode(dev)
         def qfunc():
             qml.X(0)
