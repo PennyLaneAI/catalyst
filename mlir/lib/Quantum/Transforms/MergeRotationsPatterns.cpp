@@ -30,8 +30,9 @@ using llvm::dbgs;
 using namespace mlir;
 using namespace catalyst::quantum;
 
-static const mlir::StringSet<> rotationsSet = {"RX",  "RY",  "RZ",  "PhaseShift",           "Rot",
-                                               "CRX", "CRY", "CRZ", "ControlledPhaseShift", "CRot"};
+static const mlir::StringSet<> fixedRotationsAndPhaseShiftsSet = {
+    "RX", "RY", "RZ", "PhaseShift", "CRX", "CRY", "CRZ", "ControlledPhaseShift"};
+static const mlir::StringSet<> arbitraryRotationsSet = {"Rot", "CRot"};
 
 namespace {
 
@@ -72,7 +73,7 @@ struct MergeRotationsRewritePattern : public mlir::OpRewritePattern<OpType> {
 
     // Fixed single rotations and phase shifts can be merged just by adding the angle parameters
     mlir::LogicalResult
-    matchAndRewriteFixedSingleRotationOrPhaseShift(OpType op, mlir::PatternRewriter &rewriter) const
+    matchAndRewriteFixedRotationOrPhaseShift(OpType op, mlir::PatternRewriter &rewriter) const
     {
         ValueRange inQubits = op.getInQubits();
         auto parentOp = dyn_cast_or_null<ParentOpType>(inQubits[0].getDefiningOp());
@@ -106,8 +107,8 @@ struct MergeRotationsRewritePattern : public mlir::OpRewritePattern<OpType> {
     }
 
     // Arbitrary single rotations require more complex maths to be merged
-    mlir::LogicalResult
-    matchAndRewriteArbitrarySingleRotation(OpType op, mlir::PatternRewriter &rewriter) const
+    mlir::LogicalResult matchAndRewriteArbitraryRotation(OpType op,
+                                                         mlir::PatternRewriter &rewriter) const
     {
         ValueRange inQubits = op.getInQubits();
         auto parentOp = dyn_cast_or_null<ParentOpType>(inQubits[0].getDefiningOp());
@@ -148,8 +149,8 @@ struct MergeRotationsRewritePattern : public mlir::OpRewritePattern<OpType> {
 
         auto loc = op.getLoc();
 
-		// Special cases:
-		//
+        // Special cases:
+        //
         // 1. if (ω1 == 0 && ϕ2 == 0) { ϕF = ϕ1; θF = θ1 + θ2; ωF = ω2; }
         // 2a. if (θ1 == 0 && θ2 == 0) { ϕF = ϕ1 + ϕ2 + ω1 + ω2; θF = 0; ωF = 0; }
         // 2b. if (θ1 == 0) { ϕF = ϕ1 + ϕ2 + ω1; θF = θ2; ωF = ω2; }
@@ -237,8 +238,8 @@ struct MergeRotationsRewritePattern : public mlir::OpRewritePattern<OpType> {
                          rewriter.create<arith::AddFOp>(loc, secondAddend, thirdAddend)));
 
             // TODO: can we check these problematic scenarios for differentiability by code?
-			// Problematic scenarios for differentiability:
-			//
+            // Problematic scenarios for differentiability:
+            //
             // 1. if (is_close_to(cF, 0)) { /* sqrt not differentiable at 0 */ return failure(); }
             // 2. if (is_close_to(cF, 1)) { /* acos not differentiable at 1 */ return failure(); }
 
@@ -311,7 +312,8 @@ struct MergeRotationsRewritePattern : public mlir::OpRewritePattern<OpType> {
         LLVM_DEBUG(dbgs() << "Simplifying the following operation:\n" << op << "\n");
 
         StringRef opGateName = op.getGateName();
-        if (!rotationsSet.contains(opGateName))
+        if (!fixedRotationsAndPhaseShifts.contains(opGateName) &&
+            !arbitraryRotations.contains(opGateName))
             return failure();
 
         VerifyHeterogeneousParentGateAndNameAnalysis<OpType, ParentOpType> vpga(op);
@@ -319,10 +321,10 @@ struct MergeRotationsRewritePattern : public mlir::OpRewritePattern<OpType> {
             return failure();
         }
 
-        if (opGateName == "Rot" || opGateName == "CRot") {
-            return matchAndRewriteArbitrarySingleRotation(op, rewriter);
+        if (fixedRotationsAndPhaseShifts.contains(opGateName)) {
+            return matchAndRewriteFixedRotationOrPhaseShift(op, rewriter);
         }
-        return matchAndRewriteFixedSingleRotationOrPhaseShift(op, rewriter);
+        return matchAndRewriteArbitraryRotation(op, rewriter);
     }
 };
 
