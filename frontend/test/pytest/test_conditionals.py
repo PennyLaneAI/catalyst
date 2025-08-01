@@ -18,12 +18,13 @@ import jax.numpy as jnp
 import numpy as np
 import pennylane as qml
 import pytest
+from pennylane import cond
 
-from catalyst import api_extensions, cond, measure, qjit
+from catalyst import api_extensions, measure, qjit
 from catalyst.utils.exceptions import PlxprCaptureCFCompatibilityError
 
 # pylint: disable=missing-function-docstring
-
+pytestmark = pytest.mark.usefixtures("use_both_frontend")
 
 class TestCondToJaxpr:
     """Run tests on the generated JAXPR of conditionals."""
@@ -455,6 +456,9 @@ class TestCond:
     @pytest.mark.usefixtures("disable_capture")
     def test_cond_raises_compatibility_error_with_capture(self):
         """Test that cond raises PlxprCaptureCFCompatibilityError when capture mode is enabled."""
+        if not qml.capture.enable():
+            pytest.skip("capture only test")
+
         qml.capture.enable()
 
         with pytest.raises(PlxprCaptureCFCompatibilityError) as exc_info:
@@ -470,6 +474,9 @@ class TestCond:
     @pytest.mark.usefixtures("disable_capture")
     def test_cond_raises_compatibility_error_with_capture_integration(self):
         """Test that cond raises PlxprCaptureCFCompatibilityError when capture mode is enabled."""
+        if not qml.capture.enable():
+            pytest.skip("capture only test")
+
         qml.capture.enable()
 
         with pytest.raises(PlxprCaptureCFCompatibilityError) as exc_info:

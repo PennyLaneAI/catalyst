@@ -26,7 +26,6 @@ pytestmark = pytest.mark.usefixtures("use_both_frontend")
 class TestExpval:
     "Test expval with shots > 0"
 
-    @pytest.mark.usefixtures("use_both_frontend")
     def test_identity(self, backend, tol_stochastic):
         """Test that identity expectation value (i.e. the trace) is 1."""
         n_wires = 2
@@ -47,7 +46,6 @@ class TestExpval:
         result = qjit(circuit, seed=37)()
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
-    @pytest.mark.usefixtures("use_both_frontend")
     def test_pauliz(self, backend, tol_stochastic):
         """Test that PauliZ expectation value is correct"""
         n_wires = 2
@@ -68,7 +66,6 @@ class TestExpval:
         result = qjit(circuit, seed=37)()
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
-    @pytest.mark.usefixtures("use_both_frontend")
     def test_paulix(self, backend, tol_stochastic):
         """Test that PauliX expectation value is correct"""
         n_wires = 2
@@ -89,7 +86,6 @@ class TestExpval:
         result = qjit(circuit, seed=37)()
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
-    @pytest.mark.usefixtures("use_both_frontend")
     def test_pauliy(self, backend, tol_stochastic):
         """Test that PauliY expectation value is correct"""
         n_wires = 2
@@ -110,7 +106,6 @@ class TestExpval:
         result = qjit(circuit, seed=37)()
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
-    @pytest.mark.usefixtures("use_both_frontend")
     def test_hadamard(self, backend, tol_stochastic):
         """Test that Hadamard expectation value is correct"""
         n_wires = 2
@@ -131,7 +126,6 @@ class TestExpval:
         result = qjit(circuit, seed=37)()
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
-    @pytest.mark.usefixtures("use_both_frontend")
     def test_hermitian(self, backend, tol_stochastic):
         """Test expval Hermitian observables with shots."""
         n_wires = 3
@@ -241,7 +235,6 @@ class TestExpval:
 class TestVar:
     "Test var with shots > 0"
 
-    @pytest.mark.usefixtures("use_both_frontend")
     def test_identity(self, backend, tol_stochastic):
         """Test that identity variance value (i.e. the trace) is 1."""
         n_wires = 2
@@ -262,7 +255,6 @@ class TestVar:
         result = qjit(circuit, seed=37)()
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
-    @pytest.mark.usefixtures("use_both_frontend")
     def test_pauliz(self, backend, tol_stochastic):
         """Test that PauliZ variance value is correct"""
         n_wires = 2
@@ -283,7 +275,6 @@ class TestVar:
         result = qjit(circuit, seed=37)()
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
-    @pytest.mark.usefixtures("use_both_frontend")
     def test_paulix(self, backend, tol_stochastic):
         """Test that PauliX variance value is correct"""
         n_wires = 2
@@ -304,7 +295,6 @@ class TestVar:
         result = qjit(circuit, seed=37)()
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
-    @pytest.mark.usefixtures("use_both_frontend")
     def test_pauliy(self, backend, tol_stochastic):
         """Test that PauliY variance value is correct"""
         n_wires = 2
@@ -325,7 +315,6 @@ class TestVar:
         result = qjit(circuit, seed=37)()
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
-    @pytest.mark.usefixtures("use_both_frontend")
     def test_hadamard(self, backend, tol_stochastic):
         """Test that Hadamard variance value is correct"""
         n_wires = 2
@@ -346,7 +335,6 @@ class TestVar:
         result = qjit(circuit, seed=37)()
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
-    @pytest.mark.usefixtures("use_both_frontend")
     def test_hermitian_shots(self, backend, tol_stochastic):
         """Test var Hermitian observables with shots."""
 

@@ -30,6 +30,26 @@ from catalyst.from_plxpr.qreg_manager import QregManager
 from catalyst.jax_extras import jaxpr_pad_consts
 from catalyst.jax_primitives import cond_p, for_p, while_p
 
+def _get_converted_jaxpr_branch(self, plxpr_branch, args_plus_qreg, branch_consts):
+    if plxpr_branch is None:
+        # Emit a new Catalyst jaxpr branch that simply returns a qreg
+        return jax.make_jaxpr(lambda x: x)(*args_plus_qreg).jaxpr
+
+    closed_jaxpr = ClosedJaxpr(plxpr_branch, branch_consts)
+
+    def calling_convention(*args_plus_qreg):
+        *args, qreg = args_plus_qreg
+        # `qreg` is the scope argument for the body jaxpr
+        qreg_manager = QregManager(qreg)
+        converter = copy(self)
+        converter.qreg_manager = qreg_manager
+        # pylint: disable-next=cell-var-from-loop
+        retvals = converter(closed_jaxpr, *args)
+        qreg_manager.insert_all_dangling_qubits()
+        return *retvals, converter.qreg_manager.get()
+
+    return jax.make_jaxpr(calling_convention)(*args_plus_qreg).jaxpr
+
 
 @PLxPRToQuantumJaxprInterpreter.register_primitive(plxpr_cond_prim)
 def handle_cond(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
@@ -47,35 +67,12 @@ def handle_cond(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
         branch_consts = plxpr_invals[const_slice]
         all_consts = all_consts + [*branch_consts]
 
-        converted_jaxpr_branch = None
-
-        if plxpr_branch is None:
-            # Emit a new Catalyst jaxpr branch that simply returns a qreg
-            converted_jaxpr_branch = jax.make_jaxpr(lambda x: x)(*args_plus_qreg).jaxpr
-        else:
-
-            closed_jaxpr = ClosedJaxpr(plxpr_branch, branch_consts)
-
-            def calling_convention(*args_plus_qreg):
-                *args, qreg = args_plus_qreg
-                # `qreg` is the scope argument for the body jaxpr
-                qreg_manager = QregManager(qreg)
-                converter = copy(self)
-                converter.qreg_manager = qreg_manager
-                # pylint: disable-next=cell-var-from-loop
-                retvals = converter(closed_jaxpr, *args)
-                qreg_manager.insert_all_dangling_qubits()
-                return *retvals, converter.qreg_manager.get()
-
-            converted_jaxpr_branch = jax.make_jaxpr(calling_convention)(*args_plus_qreg).jaxpr
-
-        converted_jaxpr_branches.append(converted_jaxpr_branch)
+        converted_jaxpr_branches.append(_get_converted_jaxpr_branch(self, plxpr_branch, args_plus_qreg, branch_consts))
 
     # The slice [0,1) of the plxpr input values contains the true predicate of the plxpr cond,
     # whereas the slice [1,2) refers to the false predicate, which is always True.
     # We extract the true predicate and discard the false one.
-    predicate_slice = slice(0, 1)
-    predicate = plxpr_invals[predicate_slice]
+    predicate = plxpr_invals[0:len(jaxpr_branches)-1]
 
     # Build Catalyst compatible input values
     cond_invals = [*predicate, *all_consts, *args_plus_qreg]
