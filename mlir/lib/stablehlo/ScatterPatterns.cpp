@@ -22,7 +22,6 @@
 #include "mlir/Dialect/Index/IR/IndexOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
-
 #include "stablehlo/dialect/StablehloOps.h"
 
 using namespace mlir;

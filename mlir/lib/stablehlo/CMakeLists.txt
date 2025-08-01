@@ -1,6 +1,10 @@
 set(LIBRARY_NAME catalyst-stablehlo-transforms)
 
 file(GLOB SRC
+    hlo_custom_call_lowering.cpp
+    HloCustomCallPatterns.cpp
+    scatter_lowering.cpp
+    ScatterPatterns.cpp
     stablehlo_legalize_control_flow.cpp
     stablehlo_legalize_sort.cpp
     stablehlo_legalize_to_std.cpp
@@ -14,8 +18,8 @@ set(LIBS
 )
 
 set(DEPENDS
-    MLIRCatalystPassIncGen
     STABLEHLOCatalystPassIncGen
+    MLIRCatalystPassIncGen
     MLIRStablehloLegalizeToStandardIncGen
 )
 

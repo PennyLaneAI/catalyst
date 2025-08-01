@@ -36,6 +36,35 @@
 
 include "mlir/Pass/PassBase.td"
 
+// -------------------- Catalyst's own hlo-related passes ------------------------ //
+
+def ScatterLoweringPass : Pass<"scatter-lowering"> {
+    let summary = "Lower scatter op from Stable HLO to loops.";
+
+    let dependentDialects = [
+        "mlir::func::FuncDialect",
+        "index::IndexDialect",
+        "stablehlo::StablehloDialect",
+        "tensor::TensorDialect",
+        "scf::SCFDialect"
+    ];
+
+    let constructor = "catalyst::createScatterLoweringPass()";
+}
+
+def HloCustomCallLoweringPass : Pass<"hlo-custom-call-lowering"> {
+    let summary = "Lower custom calls op from Stable HLO to CallOp.";
+
+    let dependentDialects = [
+        "index::IndexDialect",
+        "mlir::func::FuncDialect",
+        "catalyst::CatalystDialect",
+    ];
+
+    let constructor = "catalyst::createHloCustomCallLoweringPass()";
+}
+
+// -------------------- upstream mhlo passes removed in stablehlo ------------------------ //
 // stablehlo legalize sort pass.
 def StablehloLegalizeSortPass : Pass<"stablehlo-legalize-sort", "func::FuncOp"> {
   let summary = "Legalize from Stablehlo sort to SCF control flow.";

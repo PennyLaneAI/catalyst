@@ -13,8 +13,6 @@ file(GLOB SRC
     DisableAssertionPatterns.cpp
     GEPInboundsPass.cpp
     GEPInboundsPatterns.cpp
-    hlo_custom_call_lowering.cpp
-    HloCustomCallPatterns.cpp
     InlineNestedModules.cpp
     MemrefCopyToLinalgCopyPass.cpp
     MemrefCopyToLinalgCopyPatterns.cpp
@@ -22,8 +20,6 @@ file(GLOB SRC
     QnodeToAsyncPatterns.cpp
     RegisterAllPasses.cpp
     RegisterInactiveCallbackPass.cpp
-    scatter_lowering.cpp
-    ScatterPatterns.cpp
     SplitMultipleTapes.cpp
     TBAAPatterns.cpp
     TBAATagsPass.cpp
@@ -45,4 +41,3 @@ target_include_directories(${LIBRARY_NAME} PUBLIC
                            .
                            ${PROJECT_SOURCE_DIR}/include
                            ${CMAKE_BINARY_DIR}/include)
-target_link_libraries(${LIBRARY_NAME} PRIVATE ExternalStablehloLib)
