@@ -445,7 +445,7 @@ def test_finite_diff(inp, backend):
         qml.RX(x, wires=0)
         return qml.expval(qml.PauliY(0))
 
-    @qjit()
+    @qjit
     def compiled_grad_default(x: float):
         g = qml.qnode(qml.device(backend, wires=1))(f)
         h = grad(g, method="fd")
@@ -468,7 +468,7 @@ def test_finite_diff_mul(inp, backend):
         qml.RX(3 * x, wires=0)
         return qml.expval(qml.PauliY(0))
 
-    @qjit()
+    @qjit
     def compiled_grad_default(x: float):
         g = qml.qnode(qml.device(backend, wires=1))(f)
         h = grad(g, method="fd")
@@ -518,7 +518,7 @@ def test_adj(inp, backend):
         qml.RX(x, wires=0)
         return qml.expval(qml.PauliY(0))
 
-    @qjit()
+    @qjit
     def compiled(x: float):
         g = qml.qnode(qml.device(backend, wires=1), diff_method="adjoint")(f)
         h = grad(g, method="auto")
@@ -541,7 +541,7 @@ def test_adj_mult(inp, backend):
         qml.RX(x * 2, wires=0)
         return qml.expval(qml.PauliY(0))
 
-    @qjit()
+    @qjit
     def compiled(x: float):
         g = qml.qnode(qml.device(backend, wires=1), diff_method="adjoint")(f)
         h = grad(g, method="auto")
@@ -565,7 +565,7 @@ def test_adj_in_loop(inp, backend):
         qml.RX(3 * x, wires=0)
         return qml.expval(qml.PauliY(0))
 
-    @qjit()
+    @qjit
     def compiled_grad_default(params, ntrials):
         diff = grad(f, argnums=0, method="auto")
 
@@ -591,7 +591,7 @@ def test_ps(inp, backend):
         qml.RX(x * 2, wires=0)
         return qml.expval(qml.PauliY(0))
 
-    @qjit()
+    @qjit
     def compiled(x: float):
         g = qml.qnode(qml.device(backend, wires=1), diff_method="parameter-shift")(f)
         h = grad(g, method="auto")
@@ -629,7 +629,7 @@ def test_ps_conditionals(inp, backend):
             qml.RX(x, wires=0)
         return qml.expval(qml.PauliY(0))
 
-    @qjit()
+    @qjit
     def compiled(x: float, y: float):
         g = qml.qnode(qml.device(backend, wires=1), diff_method="parameter-shift")(f_compiled)
         h = grad(g, method="auto", argnums=0)
@@ -662,7 +662,7 @@ def test_ps_for_loops(inp, backend):
             qml.RX(x * i * 1.5, wires=0)
         return qml.expval(qml.PauliY(0))
 
-    @qjit()
+    @qjit
     def compiled(x: float, y: int):
         g = qml.qnode(qml.device(backend, wires=1), diff_method="parameter-shift")(f_compiled)
         h = grad(g, method="auto", argnums=0)
@@ -704,7 +704,7 @@ def test_ps_for_loops_entangled(inp, backend):
             qml.CNOT(wires=[0, i])
         return qml.expval(qml.PauliY(z))
 
-    @qjit()
+    @qjit
     def compiled(x: float, y: int, z: int):
         g = qml.qnode(qml.device(backend, wires=3), diff_method="parameter-shift")(f_compiled)
         h = grad(g, method="auto", argnums=0)
@@ -762,7 +762,7 @@ def test_ps_qft(inp, backend):
 
         return qml.expval(qml.PauliZ(z))
 
-    @qjit()
+    @qjit
     def compiled(x: float, y: int, z: int):
         g = qml.qnode(qml.device(backend, wires=3), diff_method="parameter-shift")(qft_compiled)
         h = grad(g, method="auto", argnums=0)
@@ -825,7 +825,7 @@ def test_finite_diff_h(inp, backend):
         qml.RX(x, wires=0)
         return qml.expval(qml.PauliY(0))
 
-    @qjit()
+    @qjit
     def compiled_grad_h(x: float):
         g = qml.qnode(qml.device(backend, wires=1))(f)
         h = grad(g, method="fd", h=0.1)
@@ -848,7 +848,7 @@ def test_finite_diff_argnum(inp, backend):
         qml.RX(x**y, wires=0)
         return qml.expval(qml.PauliY(0))
 
-    @qjit()
+    @qjit
     def compiled_grad_argnum(x: float):
         g = qml.qnode(qml.device(backend, wires=1))(f2)
         h = grad(g, method="fd", argnums=1)
@@ -871,7 +871,7 @@ def test_finite_diff_argnum_list(inp, backend):
         qml.RX(x**y, wires=0)
         return qml.expval(qml.PauliY(0))
 
-    @qjit()
+    @qjit
     def compiled_grad_argnum_list(x: float):
         g = qml.qnode(qml.device(backend, wires=1))(f2)
         h = grad(g, method="fd", argnums=[1])
@@ -898,7 +898,7 @@ def test_finite_grad_range_change(inp, backend):
         qml.RX(x**y, wires=0)
         return qml.expval(qml.PauliY(0))
 
-    @qjit()
+    @qjit
     def compiled_grad_range_change(x: float):
         g = qml.qnode(qml.device(backend, wires=1))(f2)
         h = grad(g, method="fd", argnums=[0, 1])
@@ -921,7 +921,7 @@ def test_ps_grad_range_change(inp, backend):
         qml.RX(x**y, wires=0)
         return qml.expval(qml.PauliY(0))
 
-    @qjit()
+    @qjit
     def compiled_grad_range_change(x: float):
         g = qml.qnode(qml.device(backend, wires=1), diff_method="parameter-shift")(f2)
         h = grad(g, method="auto", argnums=[0, 1])
@@ -944,7 +944,7 @@ def test_ps_tensorinp(inp, backend):
         qml.RX(x[0] ** y, wires=0)
         return qml.expval(qml.PauliY(0))
 
-    @qjit()
+    @qjit
     def compiled(x: jax.core.ShapedArray([1], float)):
         g = qml.qnode(qml.device(backend, wires=1), diff_method="parameter-shift")(f2)
         h = grad(g, method="auto", argnums=[0, 1])
@@ -968,7 +968,7 @@ def test_adjoint_grad_range_change(inp, backend):
         qml.RX(x**y, wires=0)
         return qml.expval(qml.PauliY(0))
 
-    @qjit()
+    @qjit
     def compiled_grad_range_change(x: float):
         g = qml.qnode(qml.device(backend, wires=1), diff_method="adjoint")(f2)
         h = grad(g, method="auto", argnums=[0, 1])
@@ -993,7 +993,7 @@ def test_assert_no_higher_order_without_fd(method, backend):
 
     with pytest.raises(DifferentiableCompileError, match="higher order derivatives"):
 
-        @qjit()
+        @qjit
         def workflow(x: float):
             g = qml.qnode(qml.device(backend, wires=1), diff_method=method)(f)
             h = grad(g, method="auto")
@@ -1010,7 +1010,7 @@ def test_assert_invalid_diff_method():
 
     with pytest.raises(ValueError, match="Invalid differentiation method"):
 
-        @qjit()
+        @qjit
         def workflow(x: float):
             g = qml.qnode(qml.device("lightning.qubit", wires=1))(f)
             h = grad(g, method="non-existent method")
@@ -1026,7 +1026,7 @@ def test_assert_invalid_h_type():
 
     with pytest.raises(ValueError, match="Invalid h value"):
 
-        @qjit()
+        @qjit
         def workflow(x: float):
             g = qml.qnode(qml.device("lightning.qubit", wires=1))(f)
             h = grad(g, method="fd", h="non-integer")
@@ -1065,7 +1065,7 @@ def test_finite_diff_higher_order(inp, backend):
         qml.RX(x, wires=0)
         return qml.expval(qml.PauliY(0))
 
-    @qjit()
+    @qjit
     def compiled_grad2_default(x: float):
         g = qml.qnode(qml.device(backend, wires=1))(f)
         h = grad(g, method="fd")
@@ -1095,7 +1095,7 @@ def test_jax_consts(h_coeffs, g_method, backend):
         h_obs = [qml.PauliX(0) @ qml.PauliZ(1), qml.PauliZ(0) @ qml.Hadamard(2)]
         return qml.expval(qml.Hamiltonian(h_coeffs, h_obs))
 
-    @qjit()
+    @qjit
     def compile_grad(params):
         diff_method = "adjoint" if g_method == "auto" else "finite-diff"
         g = qml.qnode(qml.device(backend, wires=3), diff_method=diff_method)(circuit)
@@ -1168,7 +1168,7 @@ def test_finite_diff_multiple_devices(inp, diff_method, backend):
         qml.RX(3 * x, wires=0)
         return qml.expval(qml.PauliY(0))
 
-    @qjit()
+    @qjit
     def compiled_grad_default(params, ntrials):
         d_f = grad(f, argnums=0, method=diff_method)
 
@@ -1482,7 +1482,7 @@ def test_adj_qubitunitary(inp, backend):
         qml.QubitUnitary(U1, wires=0)
         return qml.expval(qml.PauliY(0))
 
-    @qjit()
+    @qjit
     def compiled(x: float):
         g = qml.qnode(qml.device(backend, wires=1), diff_method="adjoint")(f)
         h = grad(g, method="auto")

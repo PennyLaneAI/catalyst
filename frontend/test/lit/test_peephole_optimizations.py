@@ -284,7 +284,7 @@ def test_chained_pipeline_lowering():
         "merge_rotations": {},
     }
 
-    @qjit()
+    @qjit
     @pipeline(pipeline1)
     @pipeline(pipeline2)
     @qml.qnode(qml.device("lightning.qubit", wires=2))
@@ -330,7 +330,7 @@ def test_chained_pipeline_lowering_keep_original():
     f_pipeline1 = pipeline(pipeline1)(f)
     f_pipeline2 = pipeline(pipeline2)(f_pipeline1)
 
-    @qjit()
+    @qjit
     def test_chained_pipeline_lowering_keep_original_workflow(x: float):
         return f(x), f_pipeline1(x), f_pipeline2(x)
 
@@ -357,7 +357,7 @@ def test_chained_apply_passes():
     Test that chained passes are correctly applied in sequence using apply_pass.
     """
 
-    @qjit()
+    @qjit
     @apply_pass("merge-rotations")
     @apply_pass("remove-chained-self-inverse")
     @qml.qnode(qml.device("lightning.qubit", wires=2))
@@ -395,7 +395,7 @@ def test_chained_apply_passes_keep_original():
     f_pass1 = apply_pass("remove-chained-self-inverse")(f)
     f_pass2 = apply_pass("merge-rotations")(f_pass1)
 
-    @qjit()
+    @qjit
     def test_chained_apply_passes_keep_original_workflow(x: float):
         return f(x), f_pass1(x), f_pass2(x)
 
@@ -420,7 +420,7 @@ def test_chained_peephole_passes():
     Test that chained peephole passes are correctly applied in sequence.
     """
 
-    @qjit()
+    @qjit
     @merge_rotations
     @cancel_inverses
     @qml.qnode(qml.device("lightning.qubit", wires=2))
@@ -458,7 +458,7 @@ def test_chained_peephole_passes_keep_original():
     f_pass1 = cancel_inverses(f)
     f_pass2 = merge_rotations(f_pass1)
 
-    @qjit()
+    @qjit
     def test_chained_peephole_passes_keep_original_workflow(x: float):
         return f(x), f_pass1(x), f_pass2(x)
 

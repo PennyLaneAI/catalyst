@@ -44,7 +44,8 @@ Value getGlobalString(Location loc, OpBuilder &rewriter, StringRef key, StringRe
     }
     return rewriter.create<LLVM::GEPOp>(loc, LLVM::LLVMPointerType::get(rewriter.getContext()),
                                         type, rewriter.create<LLVM::AddressOfOp>(loc, glb),
-                                        ArrayRef<LLVM::GEPArg>{0, 0}, true);
+                                        ArrayRef<LLVM::GEPArg>{0, 0},
+                                        LLVM::GEPNoWrapFlags::inbounds);
 }
 
 /**
@@ -80,13 +81,17 @@ Value getModifiersPtr(Location loc, RewriterBase &rewriter, const TypeConverter 
     auto structType = LLVM::LLVMStructType::getLiteral(ctx, {boolType, sizeType, ptrType, ptrType});
     auto modifiersPtr = catalyst::getStaticAlloca(loc, rewriter, structType, 1).getResult();
     auto adjointPtr = rewriter.create<LLVM::GEPOp>(loc, ptrType, structType, modifiersPtr,
-                                                   llvm::ArrayRef<LLVM::GEPArg>{0, 0}, true);
+                                                   llvm::ArrayRef<LLVM::GEPArg>{0, 0},
+                                                   LLVM::GEPNoWrapFlags::inbounds);
     auto numControlledPtr = rewriter.create<LLVM::GEPOp>(loc, ptrType, structType, modifiersPtr,
-                                                         llvm::ArrayRef<LLVM::GEPArg>{0, 1}, true);
-    auto controlledWiresPtr = rewriter.create<LLVM::GEPOp>(
-        loc, ptrType, structType, modifiersPtr, llvm::ArrayRef<LLVM::GEPArg>{0, 2}, true);
-    auto controlledValuesPtr = rewriter.create<LLVM::GEPOp>(
-        loc, ptrType, structType, modifiersPtr, llvm::ArrayRef<LLVM::GEPArg>{0, 3}, true);
+                                                         llvm::ArrayRef<LLVM::GEPArg>{0, 1},
+                                                         LLVM::GEPNoWrapFlags::inbounds);
+    auto controlledWiresPtr = rewriter.create<LLVM::GEPOp>(loc, ptrType, structType, modifiersPtr,
+                                                           llvm::ArrayRef<LLVM::GEPArg>{0, 2},
+                                                           LLVM::GEPNoWrapFlags::inbounds);
+    auto controlledValuesPtr = rewriter.create<LLVM::GEPOp>(loc, ptrType, structType, modifiersPtr,
+                                                            llvm::ArrayRef<LLVM::GEPArg>{0, 3},
+                                                            LLVM::GEPNoWrapFlags::inbounds);
 
     Value ctrlPtr = nullPtr;
     Value valuePtr = nullPtr;
@@ -98,13 +103,15 @@ Value getModifiersPtr(Location loc, RewriterBase &rewriter, const TypeConverter 
         for (int i = 0; static_cast<size_t>(i) < controlledQubits.size(); i++) {
             {
                 auto itemPtr = rewriter.create<LLVM::GEPOp>(loc, ptrType, ptrType, ctrlPtr,
-                                                            llvm::ArrayRef<LLVM::GEPArg>{i}, true);
+                                                            llvm::ArrayRef<LLVM::GEPArg>{i},
+                                                            LLVM::GEPNoWrapFlags::inbounds);
                 auto qubit = controlledQubits[i];
                 rewriter.create<LLVM::StoreOp>(loc, qubit, itemPtr);
             }
             {
                 auto itemPtr = rewriter.create<LLVM::GEPOp>(loc, ptrType, boolType, valuePtr,
-                                                            llvm::ArrayRef<LLVM::GEPArg>{i}, true);
+                                                            llvm::ArrayRef<LLVM::GEPArg>{i},
+                                                            LLVM::GEPNoWrapFlags::inbounds);
                 auto value = controlledValues[i];
                 rewriter.create<LLVM::StoreOp>(loc, value, itemPtr);
             }
@@ -1012,7 +1019,7 @@ struct SetStateOpPattern : public OpConversionPattern<SetStateOp> {
         auto voidTy = LLVM::LLVMVoidType::get(ctx);
         auto ptrTy = LLVM::LLVMPointerType::get(rewriter.getContext());
         ModuleOp moduleOp = op->getParentOfType<ModuleOp>();
-        auto func = mlir::LLVM::lookupOrCreateFn(moduleOp, "__catalyst__qis__SetState",
+        auto func = mlir::LLVM::lookupOrCreateFn(rewriter, moduleOp, "__catalyst__qis__SetState",
                                                  {ptrTy, i64}, voidTy, isVarArg)
                         .value();
 
@@ -1052,9 +1059,10 @@ struct SetBasisStateOpPattern : public OpConversionPattern<SetBasisStateOp> {
         auto voidTy = LLVM::LLVMVoidType::get(ctx);
         auto ptrTy = LLVM::LLVMPointerType::get(rewriter.getContext());
         ModuleOp moduleOp = op->getParentOfType<ModuleOp>();
-        auto func = mlir::LLVM::lookupOrCreateFn(moduleOp, "__catalyst__qis__SetBasisState",
-                                                 {ptrTy, i64}, voidTy, isVarArg)
-                        .value();
+        auto func =
+            mlir::LLVM::lookupOrCreateFn(rewriter, moduleOp, "__catalyst__qis__SetBasisState",
+                                         {ptrTy, i64}, voidTy, isVarArg)
+                .value();
 
         SmallVector<Value> args;
 
