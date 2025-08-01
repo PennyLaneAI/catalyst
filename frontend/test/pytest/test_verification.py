@@ -564,7 +564,7 @@ class TestObservableValidation:
         """Test that the validate_measurements transform raises an error (or not) as expected
         for different base observables."""
 
-        dev = qml.device(backend, wires=3)
+        dev = qml.device(backend, wires=3, shots=2048)
         qjit_capabilities = get_device_capabilities(dev)
 
         tape = qml.tape.QuantumScript([], measurements=measurements)
@@ -667,7 +667,7 @@ class TestMeasurementTypeValidation:
         qjit_capabilities.measurement_processes.pop("ExpectationMP")
 
         with pytest.raises(CompileError, match=msg):
-            validate_measurements(tape, qjit_capabilities, dev.name, dev.shots)
+            validate_measurements(tape, qjit_capabilities, dev.name, shots)
 
     def test_state_measurements_rejected_with_shots(self):
         """Test that trying to measure a state on a device with finite shots
