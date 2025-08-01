@@ -23,6 +23,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import pennylane as qml
+from pennylane.capture.autograph.transformer import TRANSFORMER as capture_TRANSFORMER
 import pytest
 from jax.errors import TracerBoolConversionError
 from numpy.testing import assert_allclose
@@ -46,7 +47,13 @@ from catalyst.autograph.transformer import TRANSFORMER
 from catalyst.utils.dummy import dummy_func
 from catalyst.utils.exceptions import CompileError
 
-check_cache = TRANSFORMER.has_cache
+#check_cache = TRANSFORMER.has_cache
+
+def check_cache(*args):
+    if qml.capture.enabled():
+        print(args)
+        return capture_TRANSFORMER.has_cache(*args)
+    return TRANSFORMER.has_cache(*args)
 
 # pylint: disable=import-outside-toplevel
 # pylint: disable=unnecessary-lambda-assignment
@@ -205,6 +212,7 @@ class TestIntegration:
         with pytest.raises(AutoGraphError, match="Unsupported object for transformation"):
             run_autograph(fn)
 
+
     def test_callable_object(self):
         """Test qjit applied to a callable object."""
 
@@ -220,6 +228,7 @@ class TestIntegration:
 
         assert qjit(autograph=True)(fn)(3) == 9
 
+
     def test_lambda(self):
         """Test autograph on a lambda function."""
 
@@ -229,6 +238,7 @@ class TestIntegration:
         assert hasattr(fn.user_function, "ag_unconverted")
         assert check_cache(fn.original_function)
         assert fn(4) == 16
+
 
     def test_classical_function(self):
         """Test autograph on a purely classical function."""
@@ -240,6 +250,7 @@ class TestIntegration:
         assert hasattr(fn.user_function, "ag_unconverted")
         assert check_cache(fn.original_function)
         assert fn(4) == 16
+
 
     def test_nested_function(self):
         """Test autograph on nested classical functions."""
@@ -256,6 +267,7 @@ class TestIntegration:
         assert check_cache(inner)
         assert fn(4) == 16
 
+
     def test_qnode(self):
         """Test autograph on a QNode."""
 
@@ -268,6 +280,7 @@ class TestIntegration:
         assert hasattr(fn.user_function, "ag_unconverted")
         assert check_cache(fn.original_function.func)
         assert fn(np.pi) == -1
+
 
     def test_indirect_qnode(self):
         """Test autograph on a QNode called from within a classical function."""
@@ -285,6 +298,7 @@ class TestIntegration:
         assert check_cache(fn.original_function)
         assert check_cache(inner.func)
         assert fn(np.pi) == -1
+
 
     def test_multiple_qnode(self):
         """Test autograph on multiple QNodes called from different classical functions."""
@@ -309,6 +323,7 @@ class TestIntegration:
         assert check_cache(inner2.func)
         assert fn(np.pi) == -2
 
+
     def test_nested_qjit(self):
         """Test autograph on a QJIT function called from within the compilation entry point."""
 
@@ -327,6 +342,7 @@ class TestIntegration:
         assert check_cache(inner.user_function.func)
         assert fn(np.pi) == -1
 
+
     @pytest.mark.parametrize("adjoint_fn", [adjoint, qml.adjoint])
     def test_adjoint_wrapper(self, adjoint_fn):
         """Test conversion is happening succesfully on functions wrapped with 'adjoint'."""
@@ -343,6 +359,7 @@ class TestIntegration:
         assert hasattr(fn.user_function, "ag_unconverted")
         assert check_cache(inner)
         assert np.allclose(fn(np.pi), [0.0, 1.0])
+
 
     @pytest.mark.parametrize("ctrl_fn", [ctrl, qml.ctrl])
     def test_ctrl_wrapper(self, ctrl_fn):
@@ -619,6 +636,7 @@ class TestCodePrinting:
         assert autograph_source(inner)
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 class TestConditionals:
     """Test that the autograph transformations produce correct results on conditionals.
     These tests are adapted from the test_conditionals.TestCond class of tests."""
@@ -685,6 +703,9 @@ class TestConditionals:
     def test_qubit_manipulation_cond(self, backend):
         """Test conditional with quantum operation."""
 
+        if qml.capture.enabled():
+            pytest.skip("cant return mcm with capture.")
+
         @qjit(autograph=True)
         @qml.qnode(qml.device(backend, wires=1))
         def circuit(x):
@@ -703,30 +724,38 @@ class TestConditionals:
         """
         # pylint: disable=using-constant-test
 
+        m = qml.measure if qml.capture.enabled() else measure
+
         def circuit():
             if True:
-                res = measure(wires=0)
+                res = m(wires=0)
 
             return res
 
+        err_type = qml.exceptions.AutoGraphError if qml.capture.enabled() else AutoGraphError
+
         with pytest.raises(
-            AutoGraphError, match="Some branches did not define a value for variable 'res'"
+            err_type, match="Some branches did not define a value for variable 'res'"
         ):
             qjit(autograph=True)(qml.qnode(qml.device(backend, wires=1))(circuit))
 
     def test_branch_no_multi_return_mismatch(self, backend):
         """Test that case when the return types of all branches do not match."""
         # pylint: disable=using-constant-test
+        if qml.capture.enabled():
+            pytest.xfail("different return types across branches")
+
+        m = qml.measure if qml.capture.enabled() else measure
 
         @qjit(autograph=True)
         @qml.qnode(qml.device(backend, wires=1))
         def circuit():
             if True:
-                res = measure(wires=0)
+                res = m(wires=0)
             elif False:
                 res = 0.0
             else:
-                res = measure(wires=0)
+                res = m(wires=0)
 
             return res
 
@@ -748,12 +777,17 @@ class TestConditionals:
     def test_multiple_return_early(self, backend, capfd):
         """Test that returning early is possible."""
 
+        if qml.capture.enabled():
+            pytest.xfail("cant return classical values from qnode.")
+
+        _measure = qml.measure if qml.capture.enabled() else measure
+
         @qjit(autograph=True)
         @qml.qnode(qml.device(backend, wires=1))
         def f(x: float):
             qml.RY(x, wires=0)
 
-            m = measure(0)
+            m = _measure(0)
             if not m:
                 return 0
 
@@ -773,6 +807,9 @@ class TestConditionals:
     def test_multiple_return_mismatched_type(self):
         """Test that different obervables cannot be used in different branches."""
 
+        if qml.capture.enabled():
+            pytest.xfail("this is actually fine with program capture.")
+
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def f(switch: bool):
             if switch:
@@ -784,6 +821,7 @@ class TestConditionals:
             qjit(autograph=True)(f)
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 class TestForLoops:
     """Test that the autograph transformations produce correct results on for loops."""
 
@@ -860,6 +898,9 @@ class TestForLoops:
         """Test for loop over a Python list that is *not* convertible to an array.
         The behaviour should fall back to standard Python."""
 
+        if qml.capture.enabled():
+            pytest.xfail("capture autograph has no fallback.")
+
         @qjit(autograph=True)
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def f():
@@ -883,7 +924,8 @@ class TestForLoops:
                 qml.RY(int(x) / 4 * jnp.pi, wires=0)
             return qml.expval(qml.PauliZ(0))
 
-        with pytest.raises(AutoGraphError, match="Could not convert the iteration target"):
+        err_type = qml.exceptions.AutoGraphError if qml.capture.enabled() else AutoGraphError
+        with pytest.raises(err_type, match="Could not convert the iteration target"):
             qjit(autograph=True)(f)
 
     def test_for_in_static_range(self):
