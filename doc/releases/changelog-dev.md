@@ -25,15 +25,8 @@
   which looks like the following line in the MLIR:
 
   ```pycon
-  module attributes {transform.with_named_sequence} {
-      transform.named_sequence @__transform_main(%arg0: !transform.op<"builtin.module">) {
-        %0 = transform.apply_registered_pass "some-pass" with options = {"an-option" = true, "maxValue" = 1 : i64, "multi-word-option" = 1 : i64} to %arg0 : (!transform.op<"builtin.module">) -> !transform.op<"builtin.module">
-        transform.yield 
-      }
-    }
+  %0 = transform.apply_registered_pass "some-pass" with options = {"an-option" = true, "maxValue" = 1 : i64, "multi-word-option" = 1 : i64}
   ```
-
-For example, ...
 
 <h3>Breaking changes 💔</h3>
 
