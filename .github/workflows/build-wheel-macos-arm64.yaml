@@ -363,7 +363,7 @@ jobs:
               -DPython3_NumPy_INCLUDE_DIRS=$(python${{ matrix.python_version }} -c "import numpy as np; print(np.get_include())") \
               -DMLIR_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir" \
               -DSTABLEHLO_DIR="$GITHUB_WORKSPACE/mlir/stablehlo" \
-              -DSTABLEHLO_LIBS_DIR="$GITHUB_WORKSPACE/stablehlo-build/lib" \
+              -DSTABLEHLO_BUILD_DIR="$GITHUB_WORKSPACE/stablehlo-build" \
               -DEnzyme_DIR="$GITHUB_WORKSPACE/enzyme-build" \
               -DENZYME_SRC_DIR="$GITHUB_WORKSPACE/mlir/Enzyme" \
               -DLLVM_ENABLE_ZLIB=FORCE_ON \
