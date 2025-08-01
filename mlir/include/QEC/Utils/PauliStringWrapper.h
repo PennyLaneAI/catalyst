@@ -15,6 +15,7 @@
 #pragma once
 
 #include "QEC/IR/QECDialect.h"
+#include "QEC/IR/QECOpInterfaces.h"
 #include "QEC/Transforms/Patterns.h"
 #include "llvm/ADT/SetVector.h"
 
@@ -70,6 +71,7 @@ struct PauliStringWrapper {
     PauliStringWrapper &operator=(PauliStringWrapper &&data) = delete;
 
     static PauliStringWrapper from_pauli_word(const PauliWord &pauliWord);
+    static PauliStringWrapper from_qec_op(QECOpInterface op);
 
     bool isNegative() const;
     bool isImaginary() const;
@@ -108,10 +110,12 @@ using PauliWordPair = std::pair<PauliStringWrapper, PauliStringWrapper>;
  * @param op QECOpInterface
  * @return PauliWord of the expanded pauliWord
  */
-template <typename T>
-PauliWord expandPauliWord(const llvm::SetVector<Value> &operands, const T &inOutOperands,
-                          QECOpInterface op);
-
+template <typename T, typename U>
+PauliWord expandPauliWord(const T &operands, const U &inOutOperands, QECOpInterface op);
+// After the template declaration
+extern template PauliWord
+expandPauliWord<llvm::SetVector<int>, std::vector<int>>(const llvm::SetVector<int> &,
+                                                        const std::vector<int> &, QECOpInterface);
 /**
  * @brief Normalize the qubits of the two operations.
  *        The goal is to normalize the operations of the two operations to the same order and

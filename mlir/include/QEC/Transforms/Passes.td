@@ -131,4 +131,10 @@ def CountPPMSpecsPass : Pass<"ppm-specs"> {
     let constructor = "catalyst::createCountPPMSpecsPass()";
 }
 
+def PartitionLayersPass : Pass<"partition-layers"> {
+    let summary = "Partition layers of Pauli Product Measurement operations.";
+    
+    let constructor = "catalyst::createPartitionLayersPass()";
+}
+
 #endif // QEC_PASSES
