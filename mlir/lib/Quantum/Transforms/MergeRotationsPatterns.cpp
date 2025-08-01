@@ -123,7 +123,7 @@ struct MergeRotationsRewritePattern : public mlir::OpRewritePattern<OpType> {
         auto parentParams = convertOpParamsToValues(parentOp, rewriter);
         auto params = convertOpParamsToValues(op, rewriter);
 
-        // TODO: do we allow Unicode in comments? what about in code?
+        // TODO: do we allow Unicode in comments? What about in code?
         // Parent params are ϕ1, θ1, and ω1
         // Params are ϕ2, θ2, and ω2
         mlir::Value phi1 = parentParams[0];
@@ -148,6 +148,8 @@ struct MergeRotationsRewritePattern : public mlir::OpRewritePattern<OpType> {
 
         auto loc = op.getLoc();
 
+		// Special cases:
+		//
         // 1. if (ω1 == 0 && ϕ2 == 0) { ϕF = ϕ1; θF = θ1 + θ2; ωF = ω2; }
         // 2a. if (θ1 == 0 && θ2 == 0) { ϕF = ϕ1 + ϕ2 + ω1 + ω2; θF = 0; ωF = 0; }
         // 2b. if (θ1 == 0) { ϕF = ϕ1 + ϕ2 + ω1; θF = θ2; ωF = ω2; }
@@ -235,6 +237,8 @@ struct MergeRotationsRewritePattern : public mlir::OpRewritePattern<OpType> {
                          rewriter.create<arith::AddFOp>(loc, secondAddend, thirdAddend)));
 
             // TODO: can we check these problematic scenarios for differentiability by code?
+			// Problematic scenarios for differentiability:
+			//
             // 1. if (is_close_to(cF, 0)) { /* sqrt not differentiable at 0 */ return failure(); }
             // 2. if (is_close_to(cF, 1)) { /* acos not differentiable at 1 */ return failure(); }
 

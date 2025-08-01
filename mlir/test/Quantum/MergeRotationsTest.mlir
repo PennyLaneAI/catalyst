@@ -207,7 +207,7 @@ func.func @test_merge_rotations(%arg0: f64, %arg1: f64, %arg2: f64) -> !quantum.
 // Expected output: a single Rot { ϕF = ϕ1 = arg0; θF = θ1 + θ2 = 2 * arg1; ωF = ω2 = arg2; }
 
 func.func @test_merge_rotations(%arg0: f64, %arg1: f64, %arg2: f64) -> !quantum.bit {
-    %zeroConst = arith.constant 0.0 : f64
+    %zeroConst = arith.constant 0.000000e+00 : f64
 
     // CHECK: [[reg:%.+]] = quantum.alloc( 1) : !quantum.reg
     // CHECK: [[qubit:%.+]] = quantum.extract [[reg]][ 0] : !quantum.reg -> !quantum.bit
@@ -219,6 +219,91 @@ func.func @test_merge_rotations(%arg0: f64, %arg1: f64, %arg2: f64) -> !quantum.
     // CHECK-NOT: quantum.custom "Rot"
     %2 = quantum.custom "Rot"(%arg0, %arg1, %zeroConst) %1 : !quantum.bit
     %3 = quantum.custom "Rot"(%zeroConst, %arg1, %arg2) %2 : !quantum.bit
+
+    // CHECK: return [[ret]]
+    return %3 : !quantum.bit
+}
+
+// -----
+
+// Special case 2a: θ1 = θ2 = 0.0
+//
+// Rot(arg0, 0.0, arg2) <--- parent params ϕ1, θ1, and ω1
+// Rot(arg0, 0.0, arg2) <--- params ϕ2, θ2, and ω2
+//
+// Expected output: a single Rot { ϕF = ϕ1 + ϕ2 + ω1 + ω2 = arg0 + arg0 + arg1 + arg1; θF = 0.0; ωF = 0.0; }
+
+func.func @test_merge_rotations(%arg0: f64, %arg1: f64) -> !quantum.bit {
+    // CHECK: [[zeroConst:%.+]] = arith.constant 0.000000e+00 : f64
+    // CHECK: [[reg:%.+]] = quantum.alloc( 1) : !quantum.reg
+    // CHECK: [[qubit:%.+]] = quantum.extract [[reg]][ 0] : !quantum.reg -> !quantum.bit
+    %zeroConst = arith.constant 0.000000e+00 : f64
+    %0 = quantum.alloc( 1) : !quantum.reg
+    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+
+    // CHECK: [[arg0PlusArg0:%.+]] = arith.addf %arg0, %arg0 : f64
+    // CHECK: [[arg1PlusArg1:%.+]] = arith.addf %arg1, %arg1 : f64
+    // CHECK: [[arg0sPlusArg1s:%.+]] = arith.addf [[arg0PlusArg0]], [[arg1PlusArg1]] : f64
+    // CHECK: [[ret:%.+]] = quantum.custom "Rot"([[arg0sPlusArg1s]], [[zeroConst]], [[zeroConst]]) [[qubit]] : !quantum.bit
+    // CHECK-NOT: quantum.custom "Rot"
+    %2 = quantum.custom "Rot"(%arg0, %zeroConst, %arg1) %1 : !quantum.bit
+    %3 = quantum.custom "Rot"(%arg0, %zeroConst, %arg1) %2 : !quantum.bit
+
+    // CHECK: return [[ret]]
+    return %3 : !quantum.bit
+}
+
+// -----
+
+// Special case 2b: θ1 = 0.0
+//
+// Rot(arg0, 0.0, arg2) <--- parent params ϕ1, θ1, and ω1
+// Rot(arg0, arg1, arg2) <--- params ϕ2, θ2, and ω2
+//
+// Expected output: a single Rot { ϕF = ϕ1 + ϕ2 + ω1 = arg0 + arg0 + arg1; θF = θ2 = arg1; ωF = ω2 = arg2; }
+
+func.func @test_merge_rotations(%arg0: f64, %arg1: f64, %arg2: f64) -> !quantum.bit {
+    %zeroConst = arith.constant 0.000000e+00 : f64
+
+    // CHECK: [[reg:%.+]] = quantum.alloc( 1) : !quantum.reg
+    // CHECK: [[qubit:%.+]] = quantum.extract [[reg]][ 0] : !quantum.reg -> !quantum.bit
+    %0 = quantum.alloc( 1) : !quantum.reg
+    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+
+    // CHECK: [[arg0PlusArg0:%.+]] = arith.addf %arg0, %arg0 : f64
+    // CHECK: [[arg0sPlusArg1:%.+]] = arith.addf [[arg0PlusArg0]], %arg1 : f64
+    // CHECK: [[ret:%.+]] = quantum.custom "Rot"([[arg0sPlusArg1]], %arg1, %arg2) [[qubit]] : !quantum.bit
+    // CHECK-NOT: quantum.custom "Rot"
+    %2 = quantum.custom "Rot"(%arg0, %zeroConst, %arg1) %1 : !quantum.bit
+    %3 = quantum.custom "Rot"(%arg0, %arg1, %arg2) %2 : !quantum.bit
+
+    // CHECK: return [[ret]]
+    return %3 : !quantum.bit
+}
+
+// -----
+
+// Special case 2c: θ2 = 0.0
+//
+// Rot(arg0, arg1, arg2) <--- parent params ϕ1, θ1, and ω1
+// Rot(arg0, 0.0, arg2) <--- params ϕ2, θ2, and ω2
+//
+// Expected output: a single Rot { ϕF = ϕ1 = arg0; θF = θ1 = arg1; ωF = ω1 + ω2 + ϕ2 = arg2 + arg2 + arg0; }
+
+func.func @test_merge_rotations(%arg0: f64, %arg1: f64, %arg2: f64) -> !quantum.bit {
+    %zeroConst = arith.constant 0.000000e+00 : f64
+
+    // CHECK: [[reg:%.+]] = quantum.alloc( 1) : !quantum.reg
+    // CHECK: [[qubit:%.+]] = quantum.extract [[reg]][ 0] : !quantum.reg -> !quantum.bit
+    %0 = quantum.alloc( 1) : !quantum.reg
+    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+
+    // CHECK: [[arg2PlusArg2:%.+]] = arith.addf %arg2, %arg2 : f64
+    // CHECK: [[arg2sPlusArg0:%.+]] = arith.addf [[arg2PlusArg2]], %arg0 : f64
+    // CHECK: [[ret:%.+]] = quantum.custom "Rot"(%arg0, %arg1, [[arg2sPlusArg0]]) [[qubit]] : !quantum.bit
+    // CHECK-NOT: quantum.custom "Rot"
+    %2 = quantum.custom "Rot"(%arg0, %arg1, %arg2) %1 : !quantum.bit
+    %3 = quantum.custom "Rot"(%arg0, %zeroConst, %arg2) %2 : !quantum.bit
 
     // CHECK: return [[ret]]
     return %3 : !quantum.bit
