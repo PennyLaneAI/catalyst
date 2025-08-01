@@ -59,7 +59,9 @@ def _resolve_mcm_config(mcm_config, shots):
     )
     if mcm_config.mcm_method is None:
         updated_values["mcm_method"] = (
-            "one-shot" if mcm_config.postselect_mode == "hw-like" else "single-branch-statistics"
+            "one-shot"
+            if mcm_config.postselect_mode == "hw-like" or (isinstance(shots, int) and shots > 0)
+            else "single-branch-statistics"
         )
     if mcm_config.mcm_method == "deferred":
         raise ValueError("mcm_method='deferred' is not supported with Catalyst.")
@@ -93,6 +95,26 @@ def _get_total_shots(qnode):
         shots = shots_value
     return shots
 
+
+def _uses_transform(qnode, transform_name):
+    """
+    Detect if a QNode uses specific transform that is specified by `transform_name`.
+
+    Returns:
+        bool: True if `transform_name` is detected, False otherwise
+    """
+    if hasattr(qnode, "transform_program") and qnode.transform_program:
+        return any(
+            hasattr(transform_func, "__name__")
+            and transform_name in transform_func.__name__
+            for transform_func in [
+                transform_container.transform
+                for transform_container in qnode.transform_program
+                if hasattr(transform_container, "transform")
+            ]
+        )
+
+    return False
 
 class QFunc:
     """A device specific quantum function.
@@ -132,13 +154,52 @@ class QFunc:
                 )
             )
             total_shots = _get_total_shots(self)
+            user_specified_mcm_method = mcm_config.mcm_method
             mcm_config = _resolve_mcm_config(mcm_config, total_shots)
 
+            # Check if measurements_from_{samples/counts} is being used
+            uses_measurements_from_samples = _uses_transform(self, "measurements_from_samples")
+            uses_measurements_from_counts = _uses_transform(self, "measurements_from_counts")
+
+            # Fallback to single-branch-statistics if measurements_from_samples is detected
+            if (
+                (uses_measurements_from_samples or uses_measurements_from_counts)
+                and user_specified_mcm_method is None
+                and mcm_config.mcm_method == "one-shot"
+            ):
+                mcm_config = replace(mcm_config, mcm_method="single-branch-statistics")
+
             if mcm_config.mcm_method == "one-shot":
+                # If measurements_from_samples while one-shot is used, raise an error
+                if uses_measurements_from_samples:
+                    raise CompileError("measurements_from_samples is not supported with one-shot")
+
+                if uses_measurements_from_counts:
+                    raise CompileError("measurements_from_counts is not supported with one-shot")
+
                 mcm_config = replace(
                     mcm_config, postselect_mode=mcm_config.postselect_mode or "hw-like"
                 )
-                return Function(dynamic_one_shot(self, mcm_config=mcm_config))(*args, **kwargs)
+                try:
+                    return Function(dynamic_one_shot(self, mcm_config=mcm_config))(*args, **kwargs)
+                except (TypeError, ValueError, CompileError) as e:
+                    if user_specified_mcm_method is not None:
+                        raise
+
+                    # Fallback only if mcm was auto-determined
+                    error_msg = str(e)
+                    unsupported_measurement_error = any(pattern in error_msg for pattern in [
+                        "Native mid-circuit measurement mode does not support",
+                        "qml.var(obs) cannot be returned when `mcm_method='one-shot'`"
+                    ])
+
+                    # Fallback if error is related to unsupported measurements
+                    if unsupported_measurement_error:
+                        logger.debug("Fallback to single-branch-statistics: %s", e)
+                        mcm_config = replace(mcm_config, mcm_method="single-branch-statistics")
+                    else:
+                        # unknown error, re-raise
+                        raise
 
         new_device = copy(self.device)
         new_device._shots = self._shots  # pylint: disable=protected-access
@@ -237,6 +298,10 @@ def dynamic_one_shot(qnode, **kwargs):
             cpy_tape = tape
             nonlocal aux_tapes
 
+            # Check if using shot vector with non-SampleMP measurements
+            shot_vector = qnode._shots.shot_vector if qnode._shots else []
+            has_shot_vector = len(shot_vector) > 1 or any(copies > 1 for _, copies in shot_vector)
+
             for m in tape.measurements:
                 if not isinstance(
                     m, (CountsMP, ExpectationMP, ProbabilityMP, SampleMP, VarianceMP)
@@ -245,6 +310,14 @@ def dynamic_one_shot(qnode, **kwargs):
                         f"Native mid-circuit measurement mode does not support {type(m).__name__} "
                         "measurements."
                     )
+
+                # Check if the measurement is supported with shot-vector
+                if has_shot_vector and not isinstance(m, SampleMP):
+                    raise NotImplementedError(
+                        f"Measurement {type(m).__name__} is not supported a shot-vector. "
+                        "Use qml.sample() instead."
+                    )
+
                 if isinstance(m, VarianceMP) and m.obs:
                     raise TypeError(
                         "qml.var(obs) cannot be returned when `mcm_method='one-shot'` because "
@@ -286,20 +359,63 @@ def dynamic_one_shot(qnode, **kwargs):
             results = results[0]
         has_mcm = any(isinstance(op, MidCircuitMeasure) for op in cpy_tape.operations)
         out = list(results)
-        if has_mcm:
+
+        # Get shot vector information for proper result reshaping
+        shot_vector = qnode._shots.shot_vector if qnode._shots else []
+        has_shot_vector = len(shot_vector) > 1 or any(copies > 1 for _, copies in shot_vector)
+
+        if has_mcm and len(cpy_tape.measurements) > 0:
             out = parse_native_mid_circuit_measurements(
                 cpy_tape, aux_tapes, results, postselect_mode="pad-invalid-samples"
             )
             if len(cpy_tape.measurements) == 1:
                 out = (out,)
-        else:
-            for m_count, m in enumerate(cpy_tape.measurements):
+        elif len(cpy_tape.measurements) > 0:
+            new_out = []
+            idx = 0
+            for m in cpy_tape.measurements:
+                # CountsMP would have two elements need to process
+                # the keys and the corresponding counts
+                if isinstance(m, CountsMP):
+                    keys = out[idx]
+                    counts = out[idx + 1]
+                    aggregated_counts = jnp.sum(counts, axis=0)
+                    counts_result = (keys[0], aggregated_counts)
+                    new_out.append(counts_result)
+                    idx += 2
+                    continue
+
+                result = jnp.squeeze(out[idx])
+                max_ndim = min(len(out[idx].shape), 2)
+                if result.ndim == 1 and max_ndim == 2:
+                    result = jnp.expand_dims(result, axis=1)
+
                 # Without MCMs and postselection, all samples are valid for use in MP computation.
-                is_valid = jnp.array([True] * len(out[m_count]))
-                out[m_count] = gather_non_mcm(
-                    m, out[m_count], is_valid, postselect_mode="pad-invalid-samples"
+                is_valid = jnp.full((result.shape[0],), True)
+                processed_result = gather_non_mcm(
+                    m, result, is_valid, postselect_mode="pad-invalid-samples"
                 )
-            out = tuple(out)
+
+                                # Handle shot vector reshaping for SampleMP after gather_non_mcm
+                if isinstance(m, SampleMP) and has_shot_vector:
+                    # Calculate the shape for reshaping based on shot vector
+                    result_list = []
+                    start_idx = 0
+                    for shot, copies in shot_vector:
+                        # Reshape this segment to (copies, shot, n_wires)
+                        segment = processed_result[start_idx:start_idx + shot * copies]
+                        if copies > 1:
+                            segment_shape = (copies, shot, processed_result.shape[-1])
+                            segment = jnp.reshape(segment, segment_shape)
+                            result_list.extend([segment[i] for i in range(copies)])
+                        else:
+                            result_list.append(segment)
+                        start_idx += shot * copies
+                    processed_result = tuple(result_list)
+                new_out.append(processed_result)
+                idx += 1
+
+            out = tuple(new_out)
         out_tree_expected = kwargs.pop("_out_tree_expected", [])
         out = tree_unflatten(out_tree_expected[0], out)
         return out
