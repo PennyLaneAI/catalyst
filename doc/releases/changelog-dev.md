@@ -50,6 +50,9 @@
   programs containing these operations.
   [(#1920)](https://github.com/PennyLaneAI/catalyst/pull/1920)
 
+* Add merge rotation patterns for `qml.Rot` and `qml.CRot`.
+  [(#1955)](https://github.com/PennyLaneAI/catalyst/pull/1955)
+
 <h3>Documentation 📝</h3>
 
 <h3>Contributors ✍️</h3>
