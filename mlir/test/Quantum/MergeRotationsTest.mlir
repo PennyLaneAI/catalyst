@@ -396,7 +396,6 @@ func.func @test_merge_rotations(%arg0: f64) -> (!quantum.bit, !quantum.bit, !qua
 
 // -----
 
-
 func.func @test_merge_rotations(%arg0: f64, %arg1: f64) -> !quantum.bit {
     %0 = quantum.alloc( 1) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
@@ -414,7 +413,6 @@ func.func @test_merge_rotations(%arg0: f64, %arg1: f64) -> !quantum.bit {
 }
 
 // -----
-
 
 func.func @test_merge_rotations(%arg0: f64, %arg1: f64, %arg2: f64) -> (!quantum.bit, !quantum.bit) {
     // CHECK: [[reg:%.+]] = quantum.alloc( 2) : !quantum.reg
@@ -450,7 +448,7 @@ func.func @test_merge_rotations(%arg0: f64) -> !quantum.bit {
     // CHECK: [[ret:%.+]] = quantum.custom "RX"([[sum2]]) [[qubit]] : !quantum.bit
     %cst = arith.constant 1.000000e-01 : f64
     %2 = quantum.custom "RX"(%arg0) %1 : !quantum.bit
-    %3 = quantum.custom "RX" (%cst) %2 : !quantum.bit
+    %3 = quantum.custom "RX"(%cst) %2 : !quantum.bit
     %4 = quantum.custom "RX"(%x2) %3 : !quantum.bit
 
     // CHECK: return [[ret]]
@@ -459,8 +457,7 @@ func.func @test_merge_rotations(%arg0: f64) -> !quantum.bit {
 
 // -----
 
-func.func @test_merge_rotations(%arg0: f64, %arg1: i1, %arg2: i1) -> (!quantum.bit, !quantum.bit, !quantum.bit)
-{
+func.func @test_merge_rotations(%arg0: f64, %arg1: i1, %arg2: i1) -> (!quantum.bit, !quantum.bit, !quantum.bit) {
     // CHECK: [[cst:%.+]] = arith.constant 1.000000e-01 : f64
     // CHECK: [[reg:%.+]] = quantum.alloc( 3) : !quantum.reg
     // CHECK: [[qubit:%.+]] = quantum.extract [[reg]][ 0] : !quantum.reg -> !quantum.bit
@@ -479,7 +476,7 @@ func.func @test_merge_rotations(%arg0: f64, %arg1: i1, %arg2: i1) -> (!quantum.b
     // CHECK: [[ret:%.+]], [[ctrl_ret:%.+]]:2 = quantum.custom "RX"([[sum2]]) [[qubit]] ctrls([[ctrl0]], [[ctrl1]]) ctrlvals(%arg1, %arg2) : !quantum.bit ctrls !quantum.bit, !quantum.bit
     %cst = arith.constant 1.000000e-01 : f64
     %out_0, %ctrl_out_0:2 = quantum.custom "RX"(%arg0) %0 ctrls(%1, %2) ctrlvals(%arg1, %arg2) : !quantum.bit ctrls !quantum.bit, !quantum.bit
-    %out_1, %ctrl_out_1:2 = quantum.custom "RX" (%cst) %out_0 ctrls(%ctrl_out_0#0, %ctrl_out_0#1) ctrlvals(%arg1, %arg2) : !quantum.bit ctrls !quantum.bit, !quantum.bit
+    %out_1, %ctrl_out_1:2 = quantum.custom "RX"(%cst) %out_0 ctrls(%ctrl_out_0#0, %ctrl_out_0#1) ctrlvals(%arg1, %arg2) : !quantum.bit ctrls !quantum.bit, !quantum.bit
     %out_2, %ctrl_out_2:2 = quantum.custom "RX"(%x2) %out_1 ctrls(%ctrl_out_1#0, %ctrl_out_1#1) ctrlvals(%arg1, %arg2) : !quantum.bit ctrls !quantum.bit, !quantum.bit
 
     // CHECK: return [[ret]], [[ctrl_ret]]#0, [[ctrl_ret]]#1
@@ -489,14 +486,13 @@ func.func @test_merge_rotations(%arg0: f64, %arg1: i1, %arg2: i1) -> (!quantum.b
 // -----
 
 func.func @test_loop_boundary_rotation(%q0: !quantum.bit, %q1: !quantum.bit) -> (!quantum.bit, !quantum.bit) {
-
     %stop = arith.constant 10 : index
     %one = arith.constant 1 : index
     %theta = arith.constant 0.2 : f64
     %beta = arith.constant 0.3 : f64
 
     // Quantum circuit:           // Expected output:
-    // RX(beta) Q0               // RX(beta+theta) Q0
+    // RX(beta) Q0                // RX(beta+theta) Q0
     //                            // 
     // for _ in range(n)          // for _ in range(n):
     //    RX(theta) Q0      ->    //
