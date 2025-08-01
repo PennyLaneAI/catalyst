@@ -234,7 +234,6 @@ struct FoldExtractFromElementsPattern : public OpRewritePattern<tensor::ExtractO
     LogicalResult matchAndRewrite(tensor::ExtractOp extractOp,
                                   PatternRewriter &rewriter) const override
     {
-
         if (!extractOp.getIndices().empty()) {
             return failure();
         }
