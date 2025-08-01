@@ -4,6 +4,8 @@
 
 <h3>Improvements 🛠</h3>
 
+* QJitDevice helper `extract_backend_info` removed its redundant `capabilities` argument.
+
 * Workflows `for_loop`, `while_loop` and `cond` now error out if `qml.capture` is enabled.
   [(#1945)](https://github.com/PennyLaneAI/catalyst/pull/1945)
 
