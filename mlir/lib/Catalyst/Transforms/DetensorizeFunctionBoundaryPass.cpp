@@ -14,7 +14,8 @@ using namespace llvm;
 using namespace mlir;
 using namespace catalyst;
 
-static bool isZeroDRankedTensor(Type type)
+namespace {
+bool isScalarTensor(Type type)
 {
     if (auto rankedType = dyn_cast<RankedTensorType>(type)) {
         return rankedType.getRank() == 0;
@@ -22,14 +23,34 @@ static bool isZeroDRankedTensor(Type type)
     return false;
 }
 
-static Type getScalarType(Type type)
+Type getScalarType(Type type)
 {
-    if (auto rankedType = dyn_cast<RankedTensorType>(type)) {
-        if (rankedType.getRank() == 0) {
-            return rankedType.getElementType();
+    if (isScalarTensor(type)) {
+        return dyn_cast<RankedTensorType>(type).getElementType();
+    }
+    else {
+        return type;
+    }
+}
+
+bool hasScalarTensorArguments(func::FuncOp funcOp)
+{
+    for (Type type : funcOp.getFunctionType().getInputs()) {
+        if (isScalarTensor(type)) {
+            return true;
         }
     }
-    return type;
+    return false;
+}
+
+bool hasScalarTensorResults(func::FuncOp funcOp)
+{
+    for (Type type : funcOp.getFunctionType().getResults()) {
+        if (isScalarTensor(type)) {
+            return true;
+        }
+    }
+    return false;
 }
 
 struct DetensorizeFuncPattern : public OpRewritePattern<func::FuncOp> {
@@ -37,28 +58,25 @@ struct DetensorizeFuncPattern : public OpRewritePattern<func::FuncOp> {
 
     LogicalResult matchAndRewrite(func::FuncOp funcOp, PatternRewriter &rewriter) const override
     {
+        // Skip for main function
         if (funcOp->hasAttr("llvm.emit_c_interface")) {
             return failure();
         }
 
+        if (!hasScalarTensorArguments(funcOp) && !hasScalarTensorResults(funcOp)) {
+            return failure();
+        }
+
+        // Collect the argument and result types
         FunctionType funcType = funcOp.getFunctionType();
         SmallVector<Type> newArgTypes;
         SmallVector<Type> newResultTypes;
-        bool needsConversion = false;
 
         for (Type type : funcType.getInputs()) {
-            if (isZeroDRankedTensor(type))
-                needsConversion = true;
             newArgTypes.push_back(getScalarType(type));
         }
         for (Type type : funcType.getResults()) {
-            if (isZeroDRankedTensor(type))
-                needsConversion = true;
             newResultTypes.push_back(getScalarType(type));
-        }
-
-        if (!needsConversion) {
-            return failure();
         }
 
         // Collect all attributes of the original function
@@ -79,14 +97,15 @@ struct DetensorizeFuncPattern : public OpRewritePattern<func::FuncOp> {
         Block *newEntryBlock = newFuncOp.addEntryBlock();
         rewriter.setInsertionPointToStart(newEntryBlock);
 
-        // Map the old block arguments to the new values.
+        // Map the old block arguments to the new values
         IRMapping mapper;
-        Block &oldEntryBlock = funcOp.front();
-        for (unsigned i = 0; i < oldEntryBlock.getNumArguments(); ++i) {
-            Value oldArg = oldEntryBlock.getArgument(i);
+        Block *oldEntryBlock = &funcOp.front();
+        for (unsigned i = 0; i < oldEntryBlock->getNumArguments(); ++i) {
+            Value oldArg = oldEntryBlock->getArgument(i);
             Value newArg = newEntryBlock->getArgument(i);
 
-            if (isZeroDRankedTensor(oldArg.getType())) {
+            if (isScalarTensor(oldArg.getType())) {
+                // Insert a FromElements op to bridge scalar argument to tensor
                 auto fromElementsOp = rewriter.create<tensor::FromElementsOp>(
                     funcOp.getLoc(), oldArg.getType(), newArg);
                 mapper.map(oldArg, fromElementsOp.getResult());
@@ -97,7 +116,7 @@ struct DetensorizeFuncPattern : public OpRewritePattern<func::FuncOp> {
         }
 
         // Clone the operations from the old function's body into the new one
-        for (Operation &op : oldEntryBlock.getOperations()) {
+        for (Operation &op : oldEntryBlock->getOperations()) {
             rewriter.clone(op, mapper);
         }
 
@@ -106,33 +125,40 @@ struct DetensorizeFuncPattern : public OpRewritePattern<func::FuncOp> {
     }
 };
 
+bool hasScalarTensorOperandAndMismatchFuncResultType(func::ReturnOp returnOp)
+{
+    auto funcOp = returnOp->getParentOfType<func::FuncOp>();
+    FunctionType funcType = funcOp.getFunctionType();
+
+    for (unsigned i = 0; i < returnOp.getNumOperands(); ++i) {
+        auto returnOperandType = returnOp.getOperand(i).getType();
+        auto funcResultType = funcType.getResult(i);
+        if (isScalarTensor(returnOperandType) && returnOperandType != funcResultType) {
+            return true;
+        }
+    }
+    return false;
+}
+
 struct DetensorizeReturnPattern : public OpRewritePattern<func::ReturnOp> {
     using OpRewritePattern<func::ReturnOp>::OpRewritePattern;
 
     LogicalResult matchAndRewrite(func::ReturnOp returnOp, PatternRewriter &rewriter) const override
     {
-        auto funcOp = returnOp->getParentOfType<func::FuncOp>();
-        FunctionType funcType = funcOp.getFunctionType();
-        bool needsConversion = false;
-
-        for (unsigned i = 0; i < returnOp.getNumOperands(); ++i) {
-            if (isZeroDRankedTensor(returnOp.getOperand(i).getType()) &&
-                returnOp.getOperand(i).getType() != funcType.getResult(i)) {
-                needsConversion = true;
-                break;
-            }
-        }
-
-        if (!needsConversion) {
+        if (!hasScalarTensorOperandAndMismatchFuncResultType(returnOp)) {
             return failure();
         }
 
+        // Create new return operation with detensorized operands
         SmallVector<Value> newOperands;
         newOperands.reserve(returnOp.getNumOperands());
+        auto funcOp = returnOp->getParentOfType<func::FuncOp>();
+        FunctionType funcType = funcOp.getFunctionType();
+
         for (unsigned i = 0; i < returnOp.getNumOperands(); ++i) {
             Value operand = returnOp.getOperand(i);
-            if (isZeroDRankedTensor(operand.getType()) &&
-                operand.getType() != funcType.getResult(i)) {
+            if (isScalarTensor(operand.getType()) && operand.getType() != funcType.getResult(i)) {
+                // Insert a tensor extract operation to bridge scalar tensor to scalar for return
                 auto extractOp =
                     rewriter.create<tensor::ExtractOp>(returnOp.getLoc(), operand, ValueRange{});
                 newOperands.push_back(extractOp.getResult());
@@ -152,6 +178,7 @@ struct DetensorizeCallPattern : public OpRewritePattern<func::CallOp> {
 
     LogicalResult matchAndRewrite(func::CallOp callOp, PatternRewriter &rewriter) const override
     {
+        // Only update the call op if it differs from the function signature
         auto module = callOp->getParentOfType<ModuleOp>();
         auto funcOp = module.lookupSymbol<func::FuncOp>(callOp.getCallee());
         if (!funcOp) {
@@ -167,8 +194,8 @@ struct DetensorizeCallPattern : public OpRewritePattern<func::CallOp> {
         SmallVector<Value> newOperands;
         for (unsigned i = 0; i < callOp.getNumOperands(); ++i) {
             Value operand = callOp.getOperand(i);
-            if (isZeroDRankedTensor(operand.getType()) &&
-                operand.getType() != funcType.getInput(i)) {
+            if (isScalarTensor(operand.getType()) && operand.getType() != funcType.getInput(i)) {
+                // Insert extract op if the operand is converted from tensor to scalar
                 auto extractOp =
                     rewriter.create<tensor::ExtractOp>(callOp.getLoc(), operand, ValueRange{});
                 newOperands.push_back(extractOp.getResult());
@@ -184,8 +211,8 @@ struct DetensorizeCallPattern : public OpRewritePattern<func::CallOp> {
         for (unsigned i = 0; i < callOp.getNumResults(); ++i) {
             Value oldResult = callOp.getResult(i);
             Value newResult = newCallOp.getResult(i);
-            if (isZeroDRankedTensor(oldResult.getType()) &&
-                oldResult.getType() != newResult.getType()) {
+            if (isScalarTensor(oldResult.getType()) && oldResult.getType() != newResult.getType()) {
+                // Insert FromElement op if result is converted from tensor to scalar
                 auto fromElementsOp = rewriter.create<tensor::FromElementsOp>(
                     callOp.getLoc(), oldResult.getType(), newResult);
                 newResults.push_back(fromElementsOp.getResult());
@@ -200,26 +227,33 @@ struct DetensorizeCallPattern : public OpRewritePattern<func::CallOp> {
     }
 };
 
+// Remove from_elements -> extract
 struct FoldExtractFromElementsPattern : public OpRewritePattern<tensor::ExtractOp> {
     using OpRewritePattern<tensor::ExtractOp>::OpRewritePattern;
 
     LogicalResult matchAndRewrite(tensor::ExtractOp extractOp,
                                   PatternRewriter &rewriter) const override
     {
+
+        if (!extractOp.getIndices().empty()) {
+            return failure();
+        }
+
         auto fromElementsOp = extractOp.getTensor().getDefiningOp<tensor::FromElementsOp>();
         if (!fromElementsOp) {
             return failure();
         }
 
-        if (fromElementsOp.getElements().size() == 1 && extractOp.getIndices().empty()) {
-            rewriter.replaceOp(extractOp, fromElementsOp.getElements()[0]);
-            return success();
+        if (fromElementsOp.getElements().size() != 1) {
+            return failure();
         }
 
-        return failure();
+        rewriter.replaceOp(extractOp, fromElementsOp.getElements()[0]);
+        return success();
     }
 };
 
+// Remove extract -> from_elements
 struct FoldFromElementsExtractPattern : public OpRewritePattern<tensor::FromElementsOp> {
     using OpRewritePattern<tensor::FromElementsOp>::OpRewritePattern;
 
@@ -235,14 +269,16 @@ struct FoldFromElementsExtractPattern : public OpRewritePattern<tensor::FromElem
             return failure();
         }
 
-        if (extractOp.getTensor().getType() == fromElementsOp.getType()) {
-            rewriter.replaceOp(fromElementsOp, extractOp.getTensor());
-            return success();
+        if (extractOp.getTensor().getType() != fromElementsOp.getType()) {
+            return failure();
         }
 
-        return failure();
+        rewriter.replaceOp(fromElementsOp, extractOp.getTensor());
+        return success();
     }
 };
+
+} // namespace
 
 namespace catalyst {
 #define GEN_PASS_DEF_DETENSORIZEFUNCTIONBOUNDARYPASS
