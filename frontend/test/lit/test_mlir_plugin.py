@@ -107,7 +107,7 @@ def test_pass_options():
 
     @qjit(target="mlir")
     # CHECK: options = {"an-option" = true, "maxValue" = 1 : i64, "mlir-option" = 1 : i64}
-    @catalyst.passes.apply_pass("some-pass", "an-option", maxValue=1, mlir_option = 1)
+    @catalyst.passes.apply_pass("some-pass", "an-option", maxValue=1, mlir_option=1)
     @qml.qnode(qml.device("null.qubit", wires=1))
     def example():
         return qml.state()

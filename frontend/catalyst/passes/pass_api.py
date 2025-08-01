@@ -296,9 +296,9 @@ class Pass:
             options_dict[str(option)] = get_mlir_attribute_from_pyval(True)
 
         for option, value in self.valued_options.items():
-            # MLIR options are either CamelCase 
+            # MLIR options are either CamelCase
             # or spinal-case (kebab-case) which is not allowed in python
-            mlir_option = str(option).replace("_","-") 
+            mlir_option = str(option).replace("_", "-")
             options_dict[mlir_option] = get_mlir_attribute_from_pyval(value)
 
         return options_dict
