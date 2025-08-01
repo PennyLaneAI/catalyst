@@ -10,9 +10,30 @@
 *  Displays Catalyst version in `quantum-opt --version` output.
   [(#1922)](https://github.com/PennyLaneAI/catalyst/pull/1922)
 
-* :func:`~.passes.apply_pass` can now take in `valued_options` whose names consist of multiple words as
-  snake_case post-processed to hyphens `-` when passing to MLIR pass.
-  [(#1954)](https://github.com/PennyLaneAI/catalyst/pull/1954)
+* Snakecased keyword arguments to :func:`catalyst.passes.apply_pass()` are now correctly parsed 
+  to kebab-case pass options [(#1954)](https://github.com/PennyLaneAI/catalyst/pull/1954).
+  For example:
+
+  ```python
+  @qjit(target="mlir")
+  @catalyst.passes.apply_pass("some-pass", "an-option", maxValue=1, multi_word_option=1)
+  @qml.qnode(qml.device("null.qubit", wires=1))
+  def example():
+      return qml.state()
+  ```
+
+  which looks like the following line in the MLIR:
+
+  ```pycon
+  module attributes {transform.with_named_sequence} {
+      transform.named_sequence @__transform_main(%arg0: !transform.op<"builtin.module">) {
+        %0 = transform.apply_registered_pass "some-pass" with options = {"an-option" = true, "maxValue" = 1 : i64, "multi-word-option" = 1 : i64} to %arg0 : (!transform.op<"builtin.module">) -> !transform.op<"builtin.module">
+        transform.yield 
+      }
+    }
+  ```
+
+For example, ...
 
 <h3>Breaking changes 💔</h3>
 
