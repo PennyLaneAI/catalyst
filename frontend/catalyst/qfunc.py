@@ -377,12 +377,18 @@ def dynamic_one_shot(qnode, **kwargs):
                 # CountsMP would have two elements need to process
                 # the keys and the corresponding counts
                 if isinstance(m, CountsMP):
-                    keys = out[idx]
-                    counts = out[idx + 1]
+                    if isinstance(out[idx], tuple) and len(out[idx]) == 2:
+                        # Need extract the keys and counts from the tuple
+                        keys, counts = out[idx]
+                        idx += 1
+                    else:
+                        # Normally, keys and counts are stored in consecutive elements
+                        keys = out[idx]
+                        counts = out[idx + 1]
+                        idx += 2
                     aggregated_counts = jnp.sum(counts, axis=0)
                     counts_result = (keys[0], aggregated_counts)
                     new_out.append(counts_result)
-                    idx += 2
                     continue
 
                 result = jnp.squeeze(out[idx])
@@ -396,7 +402,7 @@ def dynamic_one_shot(qnode, **kwargs):
                     m, result, is_valid, postselect_mode="pad-invalid-samples"
                 )
 
-                                # Handle shot vector reshaping for SampleMP after gather_non_mcm
+                # Handle shot vector reshaping for SampleMP
                 if isinstance(m, SampleMP) and has_shot_vector:
                     # Calculate the shape for reshaping based on shot vector
                     result_list = []
