@@ -11,10 +11,10 @@ set(LIBS
     MLIRMBQC
     MLIRMitigation
     MLIRIon
-    StablehloRegister
 )
 
 add_llvm_executable(quantum-lsp-server quantum-lsp-server.cpp)
 target_link_libraries(quantum-lsp-server PRIVATE ${LIBS})
+target_link_libraries(quantum-lsp-server PRIVATE ExternalStablehloLib)
 llvm_update_compile_flags(quantum-lsp-server)
 mlir_check_all_link_libraries(quantum-lsp-server)

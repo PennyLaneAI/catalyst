@@ -42,10 +42,49 @@ list(APPEND CMAKE_MODULE_PATH "${MLIR_CMAKE_DIR}")
 list(APPEND CMAKE_MODULE_PATH "${LLVM_CMAKE_DIR}")
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake/modules")
 
-unset(LLVM_USE_LINKER)
-set(STABLEHLO_BUILD_EMBEDDED ON)
-set(CMAKE_COMPILE_WARNING_AS_ERROR OFF)
-add_subdirectory(stablehlo)
+
+# Discover stablehlo libraries and bundle them into a cmake target for catalyst to link to
+# This is because stablehlo does not have a Config.cmake
+# so we cannot use find_package(stablehlo) and have to do this manually
+set(STABLEHLO_LIBS
+    ChloCAPI
+    ChloOps
+    StablehloAssemblyFormat
+    StablehloBase
+    StablehloBroadcastUtils
+    StablehloCAPI
+    StablehloLinalgTransforms
+    StablehloOps
+    StablehloOptimizationPasses
+    StablehloPasses
+    StablehloPassUtils
+    StablehloRegister
+    StablehloTypeConversion
+    StablehloTypeInference
+    Version
+    VhloCAPI
+    VhloOps
+    VhloTypes
+)
+
+set(STABLEHLO_LIBS_DIR ${PROJECT_SOURCE_DIR}/stablehlo/build/lib)
+foreach(STABLEHLO_LIB IN LISTS STABLEHLO_LIBS)
+    add_library(${STABLEHLO_LIB} STATIC IMPORTED GLOBAL)
+    set_property(TARGET ${STABLEHLO_LIB} PROPERTY
+        IMPORTED_LOCATION "${STABLEHLO_LIBS_DIR}/lib${STABLEHLO_LIB}.a"
+    )
+endforeach()
+
+add_library(ExternalStablehloLib INTERFACE)
+
+foreach(STABLEHLO_LIB IN LISTS STABLEHLO_LIBS)
+    target_link_libraries(ExternalStablehloLib INTERFACE ${STABLEHLO_LIB})
+endforeach()
+
+target_include_directories(ExternalStablehloLib INTERFACE
+  ${PROJECT_SOURCE_DIR}/stablehlo
+  ${PROJECT_SOURCE_DIR}/stablehlo/build
+)
 
 # Policy CMP0175 was introduced in CMake 4.31 and raises warnings in the upstream CMake modules.
 # Policy CMP0177 was introduced in CMake 4.31 and raises warnings in the upstream CMake modules.

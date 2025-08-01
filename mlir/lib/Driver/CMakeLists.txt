@@ -42,8 +42,6 @@ set(LIBS
     ion-transforms
     MLIRCatalystTest
     ${ENZYME_LIB}
-    StablehloRegister
-    StablehloCAPI
 )
 
 add_mlir_library(CatalystCompilerDriver
@@ -54,3 +52,5 @@ add_mlir_library(CatalystCompilerDriver
     LINK_LIBS PRIVATE
     ${LIBS}
 )
+
+target_link_libraries(CatalystCompilerDriver PRIVATE ExternalStablehloLib)

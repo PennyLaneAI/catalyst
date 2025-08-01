@@ -1,6 +1,8 @@
 set(LLVM_TARGET_DEFINITIONS Passes.td)
 mlir_tablegen(Passes.h.inc -gen-pass-decls -name stablehlo)
-add_public_tablegen_target(STABLEHLOCatalystPassIncGen)
+add_public_tablegen_target(STABLEHLOCatalystPassIncGen
+    DEPENDS ExternalStablehloLib
+)
 
 # The following is modified from the
 #   tensorflow/mlir-hlo
