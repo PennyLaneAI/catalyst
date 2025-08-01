@@ -27,6 +27,7 @@ import pytest
 from conftest import CONFIG_CUSTOM_DEVICE
 from pennylane.devices import Device
 from pennylane.devices.capabilities import OperatorProperties
+from pennylane.exceptions import PennyLaneDeprecationWarning
 from pennylane.transforms import split_non_commuting, split_to_single_terms
 
 from catalyst import qjit
@@ -48,8 +49,8 @@ class CustomDevice(Device):
 
     _to_matrix_ops = {"BlockEncode": OperatorProperties(False, False, False)}
 
-    def __init__(self, wires, shots=1024):
-        super().__init__(wires=wires, shots=shots)
+    def __init__(self, wires):
+        super().__init__(wires=wires)
 
     @staticmethod
     def get_c_interface():
@@ -76,11 +77,11 @@ class CustomDeviceLimitedMPs(Device):
 
     config_filepath = CONFIG_CUSTOM_DEVICE
 
-    def __init__(self, wires, shots=1024, allow_counts=False, allow_samples=False):
+    def __init__(self, wires, allow_counts=False, allow_samples=False):
         self.allow_samples = allow_samples
         self.allow_counts = allow_counts
 
-        super().__init__(wires=wires, shots=shots)
+        super().__init__(wires=wires)
 
     @staticmethod
     def get_c_interface():
@@ -309,7 +310,7 @@ class TestMeasurementTransforms:
         allow_counts = "counts" in device_measurements
 
         with CustomDeviceLimitedMPs(
-            wires=4, shots=1000, allow_counts=allow_counts, allow_samples=allow_sample
+            wires=4, allow_counts=allow_counts, allow_samples=allow_sample
         ) as dev:
 
             # transform is added to transform program
@@ -323,6 +324,7 @@ class TestMeasurementTransforms:
 
             # MLIR only contains target measurement
             @qjit
+            @qml.set_shots(1000)
             @qml.qnode(dev)
             def circuit(theta: float):
                 qml.X(0)
@@ -436,7 +438,7 @@ class TestMeasurementTransforms:
 
         dev = qml.device("lightning.qubit", wires=4)
 
-        @qml.set_shots(3000)
+        @qml.set_shots(shots=3000)
         @qml.qnode(dev)
         def circuit(theta: float):
             qml.RX(theta, 0)
@@ -453,7 +455,7 @@ class TestMeasurementTransforms:
         # To resolve flakiness, we put the non qjit reference run on default.qubit,
         # which can be seeded
         ref_dev = qml.device("default.qubit", wires=4, seed=42)
-        samples_expected = qml.qnode(ref_dev)(circuit.func)(theta)
+        samples_expected = qml.set_shots(qml.qnode(ref_dev)(circuit.func), shots=3000)(theta)
 
         assert res.shape == samples_expected.shape
         assert np.allclose(np.mean(res, axis=0), np.mean(samples_expected, axis=0), atol=0.05)
@@ -567,8 +569,8 @@ class TestMeasurementTransforms:
         theta = 2.5
         res = circuit(theta)
 
-        if len(dev.shots.shot_vector) != 1:
-            assert len(res) == len(dev.shots.shot_vector)
+        if len(circuit._shots.shot_vector) != 1:
+            assert len(res) == len(circuit._shots.shot_vector)
 
         assert np.allclose(res, expected_res(theta), atol=0.05)
 
@@ -757,7 +759,7 @@ class TestMeasurementTransforms:
         are added to the transform program from preprocess as expected, based on the
         sum_observables_flag and the non_commuting_observables_flag"""
 
-        dev = CustomDevice(wires=4, shots=1000)
+        dev = CustomDevice(wires=4)
 
         # dev1 supports non-commuting observables and sum observables - no splitting
         qjit_dev1 = QJITDevice(dev)
