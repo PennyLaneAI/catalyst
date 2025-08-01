@@ -62,8 +62,7 @@ def test_custom_device_load():
             raise NotImplementedError
 
     device = CustomDevice(wires=1)
-    capabilities = get_device_capabilities(device)
-    backend_info = extract_backend_info(device, capabilities)
+    backend_info = extract_backend_info(device)
     assert backend_info.kwargs["option1"] == 42
     assert backend_info.kwargs["option2"] == 38
 

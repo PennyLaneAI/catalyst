@@ -571,9 +571,9 @@ class TestObservableValidation:
 
         if invalid_op:
             with pytest.raises(CompileError, match=f"{invalid_op}.*not supported as an observable"):
-                validate_measurements(tape, qjit_capabilities, dev.name, dev.shots)
+                validate_measurements(tape, qjit_capabilities, dev.name, tape.shots)
         else:
-            validate_measurements(tape, qjit_capabilities, dev.name, dev.shots)
+            validate_measurements(tape, qjit_capabilities, dev.name, tape.shots)
 
     @pytest.mark.parametrize(
         "obs, obs_type",
@@ -596,11 +596,11 @@ class TestObservableValidation:
         tape = qml.tape.QuantumScript([], measurements=[qml.expval(obs)])
 
         # all good
-        validate_measurements(tape, qjit_capabilities, dev.name, dev.shots)
+        validate_measurements(tape, qjit_capabilities, dev.name, tape.shots)
 
         del qjit_capabilities.observables[obs_type]
         with pytest.raises(CompileError, match="not supported as an observable"):
-            validate_measurements(tape, qjit_capabilities, dev.name, dev.shots)
+            validate_measurements(tape, qjit_capabilities, dev.name, tape.shots)
 
     def test_non_qjit_observables_raise_error(self, backend):
         """Test that an observable that is supported by the backend according to the
@@ -618,7 +618,7 @@ class TestObservableValidation:
         tape = qml.tape.QuantumScript([], measurements=[qml.expval(PauliX2(0))])
 
         with pytest.raises(CompileError, match="PauliX2 is not supported as an observable"):
-            validate_measurements(tape, qjit_capabilities, dev.name, dev.shots)
+            validate_measurements(tape, qjit_capabilities, dev.name, tape.shots)
 
     @pytest.mark.parametrize(
         "measurement", [qml.expval(qml.X(0)), qml.var(qml.X(0)), qml.sample(qml.X(0))]
@@ -634,13 +634,13 @@ class TestObservableValidation:
         tape = qml.tape.QuantumScript([], measurements=[measurement])
 
         if isinstance(measurement, (ExpectationMP, VarianceMP)):
-            validate_measurements(tape, qjit_capabilities, dev.name, dev.shots)
+            validate_measurements(tape, qjit_capabilities, dev.name, tape.shots)
         else:
             with pytest.raises(
                 CompileError,
                 match="Only expectation value and variance measurements can accept observables",
             ):
-                validate_measurements(tape, qjit_capabilities, dev.name, dev.shots)
+                validate_measurements(tape, qjit_capabilities, dev.name, tape.shots)
 
 
 class TestMeasurementTypeValidation:

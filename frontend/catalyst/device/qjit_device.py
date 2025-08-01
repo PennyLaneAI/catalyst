@@ -140,7 +140,7 @@ class BackendInfo:
 # pylint: disable=too-many-branches
 @debug_logger
 def extract_backend_info(
-    device: qml.devices.QubitDevice, capabilities: DeviceCapabilities
+    device: qml.devices.QubitDevice
 ) -> BackendInfo:
     """Extract the backend info from a quantum device. The device is expected to carry a reference
     to a valid TOML config file."""
@@ -295,9 +295,9 @@ class QJITDevice(qml.devices.Device):
 
     @staticmethod
     @debug_logger
-    def extract_backend_info(device, capabilities: DeviceCapabilities) -> BackendInfo:
+    def extract_backend_info(device) -> BackendInfo:
         """Wrapper around extract_backend_info in the runtime module."""
-        return extract_backend_info(device, capabilities)
+        return extract_backend_info(device)
 
     @debug_logger_init
     def __init__(self, original_device):
@@ -311,7 +311,7 @@ class QJITDevice(qml.devices.Device):
         super().__init__(wires=original_device.wires, shots=original_device.shots)
 
         # Capability loading
-        device_capabilities = get_device_capabilities(original_device)
+        device_capabilities = get_device_capabilities(original_device, self.shots)
 
         # TODO: This is a temporary measure to ensure consistency of behaviour. Remove this
         #       when customizable multi-pathway decomposition is implemented. (Epic 74474)
@@ -323,7 +323,7 @@ class QJITDevice(qml.devices.Device):
                     "The device that specifies to_matrix_ops must support QubitUnitary."
                 )
 
-        backend = QJITDevice.extract_backend_info(original_device, device_capabilities)
+        backend = QJITDevice.extract_backend_info(original_device)
 
         self.backend_name = backend.c_interface_name
         self.backend_lib = backend.lpath
@@ -522,12 +522,12 @@ def _load_device_capabilities(device) -> DeviceCapabilities:
     return capabilities
 
 
-def get_device_capabilities(device) -> DeviceCapabilities:
+def get_device_capabilities(device, shots) -> DeviceCapabilities:
     """Get or load the original DeviceCapabilities from device"""
 
     assert not isinstance(device, QJITDevice)
 
-    shots_present = bool(device.shots)
+    shots_present = bool(shots)
     device_capabilities = _load_device_capabilities(device)
 
     return device_capabilities.filter(finite_shots=shots_present)
