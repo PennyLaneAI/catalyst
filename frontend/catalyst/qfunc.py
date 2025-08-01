@@ -157,12 +157,13 @@ class QFunc:
             user_specified_mcm_method = mcm_config.mcm_method
             mcm_config = _resolve_mcm_config(mcm_config, total_shots)
 
-            # Check if measurements_from_samples is being used
+            # Check if measurements_from_{samples/counts} is being used
             uses_measurements_from_samples = _uses_transform(self, "measurements_from_samples")
+            uses_measurements_from_counts = _uses_transform(self, "measurements_from_counts")
 
             # Fallback to single-branch-statistics if measurements_from_samples is detected
             if (
-                uses_measurements_from_samples
+                (uses_measurements_from_samples or uses_measurements_from_counts)
                 and user_specified_mcm_method is None
                 and mcm_config.mcm_method == "one-shot"
             ):
@@ -172,6 +173,9 @@ class QFunc:
                 # If measurements_from_samples while one-shot is used, raise an error
                 if uses_measurements_from_samples:
                     raise CompileError("measurements_from_samples is not supported with one-shot")
+
+                if uses_measurements_from_counts:
+                    raise CompileError("measurements_from_counts is not supported with one-shot")
 
                 mcm_config = replace(
                     mcm_config, postselect_mode=mcm_config.postselect_mode or "hw-like"
@@ -294,6 +298,10 @@ def dynamic_one_shot(qnode, **kwargs):
             cpy_tape = tape
             nonlocal aux_tapes
 
+            # Check if using shot vector with non-SampleMP measurements
+            shot_vector = qnode._shots.shot_vector if qnode._shots else []
+            has_shot_vector = len(shot_vector) > 1 or any(copies > 1 for _, copies in shot_vector)
+
             for m in tape.measurements:
                 if not isinstance(
                     m, (CountsMP, ExpectationMP, ProbabilityMP, SampleMP, VarianceMP)
@@ -302,6 +310,14 @@ def dynamic_one_shot(qnode, **kwargs):
                         f"Native mid-circuit measurement mode does not support {type(m).__name__} "
                         "measurements."
                     )
+
+                # Check if the measurement is supported with shot-vector
+                if has_shot_vector and not isinstance(m, SampleMP):
+                    raise NotImplementedError(
+                        f"Measurement {type(m).__name__} is not supported a shot-vector. "
+                        "Use qml.sample() instead."
+                    )
+
                 if isinstance(m, VarianceMP) and m.obs:
                     raise TypeError(
                         "qml.var(obs) cannot be returned when `mcm_method='one-shot'` because "
@@ -344,6 +360,10 @@ def dynamic_one_shot(qnode, **kwargs):
         has_mcm = any(isinstance(op, MidCircuitMeasure) for op in cpy_tape.operations)
         out = list(results)
 
+        # Get shot vector information for proper result reshaping
+        shot_vector = qnode._shots.shot_vector if qnode._shots else []
+        has_shot_vector = len(shot_vector) > 1 or any(copies > 1 for _, copies in shot_vector)
+
         if has_mcm and len(cpy_tape.measurements) > 0:
             out = parse_native_mid_circuit_measurements(
                 cpy_tape, aux_tapes, results, postselect_mode="pad-invalid-samples"
@@ -375,6 +395,23 @@ def dynamic_one_shot(qnode, **kwargs):
                 processed_result = gather_non_mcm(
                     m, result, is_valid, postselect_mode="pad-invalid-samples"
                 )
+
+                                # Handle shot vector reshaping for SampleMP after gather_non_mcm
+                if isinstance(m, SampleMP) and has_shot_vector:
+                    # Calculate the shape for reshaping based on shot vector
+                    result_list = []
+                    start_idx = 0
+                    for shot, copies in shot_vector:
+                        # Reshape this segment to (copies, shot, n_wires)
+                        segment = processed_result[start_idx:start_idx + shot * copies]
+                        if copies > 1:
+                            segment_shape = (copies, shot, processed_result.shape[-1])
+                            segment = jnp.reshape(segment, segment_shape)
+                            result_list.extend([segment[i] for i in range(copies)])
+                        else:
+                            result_list.append(segment)
+                        start_idx += shot * copies
+                    processed_result = tuple(result_list)
                 new_out.append(processed_result)
                 idx += 1
 
