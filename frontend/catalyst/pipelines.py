@@ -239,6 +239,7 @@ def get_hlo_lowering_stage(_options: CompileOptions) -> List[str]:
         "cse",
         "func.func(linalg-detensorize{aggressive-mode})",
         "detensorize-scf",
+        "detensorize-function-boundary",
         "canonicalize",
     ]
     return hlo_lowering
