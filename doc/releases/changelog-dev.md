@@ -10,7 +10,7 @@
 *  Displays Catalyst version in `quantum-opt --version` output.
   [(#1922)](https://github.com/PennyLaneAI/catalyst/pull/1922)
 
-* `~.passes.apply_pass` can now take in `valued_options` whose names consist of multiple words as
+* :func:`~.passes.apply_pass` can now take in `valued_options` whose names consist of multiple words as
   snake_case post-processed to hyphens `-` when passing to MLIR pass.
   [(#1954)](https://github.com/PennyLaneAI/catalyst/pull/1954)
 
