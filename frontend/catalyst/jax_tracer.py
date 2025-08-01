@@ -1194,7 +1194,26 @@ def apply_transforms(
         # TODO: Ideally we should allow qnode transforms that don't modify the measurements to
         # operate in the permissive tracing mode, but that currently leads to a small number of
         # test failures due to the different result format produced in trace_quantum_function.
-        if has_classical_outputs(flat_results):
+
+        # Special case: dynamic_one_shot with classical outputs
+        # This is allowed because dynamic_one_shot doesn't modify the semantic of measurements,
+        # it just changes how it is executed (via vmap over single shots)
+        is_dynamic_one_shot = (
+            len(qnode_program) and
+            all(hasattr(qnode, "transform") and
+                hasattr(qnode.transform, "__name__") and
+                "dynamic_one_shot_partial" in str(qnode.transform)
+                for qnode in qnode_program)
+        )
+
+        # if is_dynamic_one_shot and have_measurements_changed(tape, tapes[0]):
+        #     msg = (
+        #         "`one-shot` is not supported with measurements transform"
+        #     )
+        #     raise CompileError(msg)
+
+        # Allow dynamic_one_shot with classical outputs regardless of measurement changes
+        if has_classical_outputs(flat_results) and not is_dynamic_one_shot:
             msg = (
                 "Transforming MeasurementProcesses is unsupported with non-MeasurementProcess "
                 "QNode outputs. The selected device, options, or applied QNode transforms, may be "

@@ -96,6 +96,26 @@ def _get_total_shots(qnode):
     return shots
 
 
+def _uses_transform(qnode, transform_name):
+    """
+    Detect if a QNode uses specific transform that is specified by `transform_name`.
+
+    Returns:
+        bool: True if `transform_name` is detected, False otherwise
+    """
+    if hasattr(qnode, "transform_program") and qnode.transform_program:
+        return any(
+            hasattr(transform_func, "__name__")
+            and transform_name in transform_func.__name__
+            for transform_func in [
+                transform_container.transform
+                for transform_container in qnode.transform_program
+                if hasattr(transform_container, "transform")
+            ]
+        )
+
+    return False
+
 class QFunc:
     """A device specific quantum function.
 
@@ -137,7 +157,22 @@ class QFunc:
             user_specified_mcm_method = mcm_config.mcm_method
             mcm_config = _resolve_mcm_config(mcm_config, total_shots)
 
+            # Check if measurements_from_samples is being used
+            uses_measurements_from_samples = _uses_transform(self, "measurements_from_samples")
+
+            # Fallback to single-branch-statistics if measurements_from_samples is detected
+            if (
+                uses_measurements_from_samples
+                and user_specified_mcm_method is None
+                and mcm_config.mcm_method == "one-shot"
+            ):
+                mcm_config = replace(mcm_config, mcm_method="single-branch-statistics")
+
             if mcm_config.mcm_method == "one-shot":
+                # If measurements_from_samples while one-shot is used, raise an error
+                if uses_measurements_from_samples:
+                    raise CompileError("measurements_from_samples is not supported with one-shot")
+
                 mcm_config = replace(
                     mcm_config, postselect_mode=mcm_config.postselect_mode or "hw-like"
                 )
@@ -308,13 +343,14 @@ def dynamic_one_shot(qnode, **kwargs):
             results = results[0]
         has_mcm = any(isinstance(op, MidCircuitMeasure) for op in cpy_tape.operations)
         out = list(results)
-        if has_mcm:
+
+        if has_mcm and len(cpy_tape.measurements) > 0:
             out = parse_native_mid_circuit_measurements(
                 cpy_tape, aux_tapes, results, postselect_mode="pad-invalid-samples"
             )
             if len(cpy_tape.measurements) == 1:
                 out = (out,)
-        else:
+        elif len(cpy_tape.measurements) > 0:
             new_out = []
             idx = 0
             for m in cpy_tape.measurements:
@@ -323,23 +359,16 @@ def dynamic_one_shot(qnode, **kwargs):
                 if isinstance(m, CountsMP):
                     keys = out[idx]
                     counts = out[idx + 1]
-                    # example of 3 shots
-                    # counts = [[1, 0, 0, 0],  # Shot 1
-                    #           [0, 0, 0, 1],  # Shot 2
-                    #           [1, 0, 0, 0]]  # Shot 3
-                    # aggregate counts = [[2, 0, 0, 1]]
                     aggregated_counts = jnp.sum(counts, axis=0)
                     counts_result = (keys[0], aggregated_counts)
                     new_out.append(counts_result)
                     idx += 2
                     continue
 
-
                 result = jnp.squeeze(out[idx])
                 max_ndim = min(len(out[idx].shape), 2)
                 if result.ndim == 1 and max_ndim == 2:
                     result = jnp.expand_dims(result, axis=1)
-
 
                 # Without MCMs and postselection, all samples are valid for use in MP computation.
                 is_valid = jnp.full((result.shape[0],), True)
