@@ -84,6 +84,14 @@ jobs:
         key: llvm-${{ needs.constants.outputs.llvm_version }}-container-source
         enableCrossOsArchive: True
 
+    - name: Cache Stablehlo Source
+      id: cache-stablehlo-source
+      uses: actions/cache@v4
+      with:
+        path: ${{ github.workspace }}/mlir/stablehlo
+        key: stablehlo-${{ needs.constants.outputs.stablehlo_version }}-container-source
+        enableCrossOsArchive: True
+
     - name: Cache Enzyme Source
       id: cache-enzyme-source
       uses: actions/cache@v4
@@ -105,6 +113,14 @@ jobs:
       run: |
         cd $GITHUB_WORKSPACE/mlir/llvm-project
         git apply $GITHUB_WORKSPACE/mlir/patches/llvm-bufferization-segfault.patch
+
+    - name: Clone Stablehlo Submodule
+      if: steps.cache-stablehlo-source.outputs.cache-hit != 'true'
+      uses: actions/checkout@v4
+      with:
+        repository: openxla/stablehlo
+        ref: ${{ needs.constants.outputs.stablehlo_version }}
+        path: mlir/stablehlo
 
     - name: Clone Enzyme Submodule
       if: steps.cache-enzyme-source.outputs.cache-hit != 'true'
@@ -128,6 +144,14 @@ jobs:
         path: ${{ github.workspace }}/llvm-build
         key: ${{ matrix.container_img }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{ matrix.python_version }}-wheel-build
 
+    - name: Check Stablehlo Build Cache
+      id: cache-stablehlo-build
+      uses: actions/cache/restore@v4
+      with:
+        path: ${{ github.workspace }}/stablehlo-build
+        key: ${{ matrix.container_img }}-stablehlo-${{ needs.constants.outputs.stablehlo_version }}-wheel-build
+        lookup-only: True
+
     - name: Check Enzyme Build Cache
       id: cache-enzyme-build
       uses: actions/cache/restore@v4
@@ -139,6 +163,7 @@ jobs:
     - name: Install dependencies
       if: |
         steps.cache-llvm-build.outputs.cache-hit != 'true' ||
+        steps.cache-stablehlo-build.outputs.cache-hit != 'true' ||
         steps.cache-enzyme-build.outputs.cache-hit != 'true'
       run: |
         cat /etc/dnf.conf | sed "s/\[main\]/\[main\]\ntimeout=5/g" > /etc/dnf.conf
@@ -174,6 +199,30 @@ jobs:
       with:
         path: ${{ github.workspace }}/llvm-build
         key: ${{ matrix.container_img }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{matrix.python_version}}-wheel-build
+
+    - name: Build Stablehlo Dialect
+      if: steps.cache-stablehlo-build.outputs.cache-hit != 'true'
+      run: |
+        export PATH=$GITHUB_WORKSPACE/llvm-build/bin:$PATH
+        cmake -S mlir/stablehlo -B $GITHUB_WORKSPACE/stablehlo-build -G Ninja \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DLLVM_ENABLE_ASSERTIONS=ON \
+              -DMLIR_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir" \
+              -DSTABLEHLO_ENABLE_LLD=ON \
+              -DSTABLEHLO_ENABLE_BINDINGS_PYTHON=OFF \
+              -DSTABLEHLO_ENABLE_SPLIT_DWARF=ON \
+              -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+              -DCMAKE_CXX_VISIBILITY_PRESET=default
+
+        cmake --build $GITHUB_WORKSPACE/stablehlo-build
+
+    - name: Save Stablehlo Build
+      id: save-stablehlo-build
+      if: steps.cache-stablehlo-build.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: ${{ github.workspace }}/stablehlo-build
+        key: ${{ matrix.container_img }}-stablehlo-${{ needs.constants.outputs.stablehlo_version }}-wheel-build
 
     - name: Build Enzyme
       if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
@@ -247,6 +296,23 @@ jobs:
         key: ${{ matrix.container_img }}-llvm-${{ needs.constants.outputs.llvm_version }}-3.11-wheel-build
         fail-on-cache-miss: True
 
+    - name: Get Cached Stablehlo Source
+      id: cache-stablehlo-source
+      uses: actions/cache/restore@v4
+      with:
+        path: ${{ github.workspace }}/mlir/stablehlo
+        key: stablehlo-${{ needs.constants.outputs.stablehlo_version }}-container-source
+        enableCrossOsArchive: True
+        fail-on-cache-miss: True
+
+    - name: Get Cached Stablehlo Build
+      id: cache-stablehlo-build
+      uses: actions/cache/restore@v4
+      with:
+        path: ${{ github.workspace }}/stablehlo-build
+        key: ${{ matrix.container_img }}-stablehlo-${{ needs.constants.outputs.stablehlo_version }}-wheel-build
+        fail-on-cache-miss: True
+
     - name: Get Cached Enzyme Source
       id: cache-enzyme-source
       uses: actions/cache/restore@v4
@@ -285,13 +351,6 @@ jobs:
           PYTHON=$(which python${{ matrix.python_version }}) \
           make oqc
 
-    - name: Clone Stablehlo Submodule
-      uses: actions/checkout@v4
-      with:
-        repository: openxla/stablehlo
-        ref: ${{ needs.constants.outputs.stablehlo_version }}
-        path: mlir/stablehlo
-
     # Build Quantum and Gradient Dialects
     - name: Build MLIR Dialects
       run: |
@@ -304,6 +363,8 @@ jobs:
               -DPython3_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -DPython3_NumPy_INCLUDE_DIRS=$(python${{ matrix.python_version }} -c "import numpy as np; print(np.get_include())") \
               -DMLIR_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir" \
+              -DSTABLEHLO_DIR="$GITHUB_WORKSPACE/mlir/stablehlo" \
+              -DSTABLEHLO_LIBS_DIR="$GITHUB_WORKSPACE/stablehlo-build/lib" \
               -DEnzyme_DIR="$GITHUB_WORKSPACE/enzyme-build" \
               -DENZYME_SRC_DIR="$GITHUB_WORKSPACE/mlir/Enzyme" \
               -DLLVM_ENABLE_ZLIB=FORCE_ON \
@@ -326,6 +387,7 @@ jobs:
       run: |
         PYTHON=python${{ matrix.python_version }} \
         LLVM_BUILD_DIR="$GITHUB_WORKSPACE/llvm-build" \
+        STABLEHLO_BUILD_DIR="$GITHUB_WORKSPACE/stablehlo-build" \
         DIALECTS_BUILD_DIR="$GITHUB_WORKSPACE/quantum-build" \
         RT_BUILD_DIR="$GITHUB_WORKSPACE/runtime-build" \
         OQC_BUILD_DIR="$GITHUB_WORKSPACE/oqc-build" \
