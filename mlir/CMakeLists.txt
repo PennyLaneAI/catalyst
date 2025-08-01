@@ -67,7 +67,6 @@ set(STABLEHLO_LIBS
     VhloTypes
 )
 
-set(STABLEHLO_LIBS_DIR ${PROJECT_SOURCE_DIR}/stablehlo/build/lib)
 foreach(STABLEHLO_LIB IN LISTS STABLEHLO_LIBS)
     add_library(${STABLEHLO_LIB} STATIC IMPORTED GLOBAL)
     set_property(TARGET ${STABLEHLO_LIB} PROPERTY
@@ -82,8 +81,8 @@ foreach(STABLEHLO_LIB IN LISTS STABLEHLO_LIBS)
 endforeach()
 
 target_include_directories(ExternalStablehloLib INTERFACE
-  ${PROJECT_SOURCE_DIR}/stablehlo
-  ${PROJECT_SOURCE_DIR}/stablehlo/build
+  ${STABLEHLO_DIR}
+  ${STABLEHLO_DIR}/build # for the generated .inc files
 )
 
 # Policy CMP0175 was introduced in CMake 4.31 and raises warnings in the upstream CMake modules.
