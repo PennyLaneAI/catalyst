@@ -26,7 +26,7 @@ set(LIBS
     MLIROptLib
     MLIRCatalyst
     catalyst-transforms
-    catalyst-mhlo-transforms
+    catalyst-stablehlo-transforms
     MLIRQuantum
     quantum-transforms
     MLIRQEC
@@ -39,16 +39,14 @@ set(LIBS
     mitigation-transforms
     MLIRIon
     ion-transforms
-    MhloRegisterDialects
-    StablehloRegister
     MLIRCatalystTest
-    ${ALL_MHLO_PASSES}
     ${ENZYME_LIB}
     CatalystCompilerDriver
 )
 
 add_mlir_tool(catalyst-cli catalyst-cli.cpp SUPPORT_PLUGINS)
 target_link_libraries(catalyst-cli PRIVATE ${LIBS})
+target_link_libraries(catalyst-cli PRIVATE ExternalStablehloLib)
 llvm_update_compile_flags(catalyst-cli)
 mlir_check_all_link_libraries(catalyst-cli)
 export_executable_symbols_for_plugins(catalyst-cli)

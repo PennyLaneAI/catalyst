@@ -18,8 +18,8 @@
 
 #include "llvm/Support/Debug.h"
 
-#include "mhlo/IR/hlo_ops.h"
-#include "mhlo/transforms/passes.h"
+#include "stablehlo/dialect/StablehloOps.h"
+#include "stablehlo/transforms/Passes.h"
 
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Index/IR/IndexDialect.h"
@@ -28,7 +28,8 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-#include "Catalyst/Transforms/Patterns.h"
+#include "stablehlo/Passes.h"
+#include "stablehlo/Patterns.h"
 
 using namespace llvm;
 using namespace mlir;
@@ -36,7 +37,7 @@ using namespace catalyst;
 
 namespace catalyst {
 #define GEN_PASS_DEF_SCATTERLOWERINGPASS
-#include "Catalyst/Transforms/Passes.h.inc"
+#include "stablehlo/Passes.h.inc"
 
 struct ScatterLoweringPass : impl::ScatterLoweringPassBase<ScatterLoweringPass> {
     using ScatterLoweringPassBase::ScatterLoweringPassBase;
