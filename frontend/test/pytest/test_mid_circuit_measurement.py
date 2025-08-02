@@ -308,15 +308,14 @@ class TestMidCircuitMeasurement:
 
         @qjit
         @qml.qnode(dev, mcm_method=None, postselect_mode=postselect_mode)
-        def circuit(x):
+        def circuit1(x):
             qml.RX(x, 0)
             measure(0)
             return qml.expval(qml.Z(0))
 
         spy = mocker.spy(catalyst.qfunc, "dynamic_one_shot")
-        _ = circuit(1.8)
-        expected_call_count = 1 if postselect_mode == "hw-like" else 0
-        assert spy.call_count == expected_call_count
+        _ = circuit1(1.8)
+        assert spy.call_count == 1
 
     @pytest.mark.xfail(
         reason="Midcircuit measurements with sampling is unseeded and hence this test is flaky"

@@ -1487,11 +1487,15 @@ def trace_quantum_function(
 
                 # TODO: Allow the user to return whatever types they specify.
                 if tracing_mode == TracingMode.TRANSFORM:
-                    assert isinstance(meas_results, list)
-                    if len(meas_results) == 1:
-                        transformed_results.append(meas_results[0])
+                    # Support any return type (list, dict, tuple, etc.) instead of forcing list
+                    if isinstance(meas_results, list):
+                        if len(meas_results) == 1:
+                            transformed_results.append(meas_results[0])
+                        else:
+                            transformed_results.append(tuple(meas_results))
                     else:
-                        transformed_results.append(tuple(meas_results))
+                        # For non-list types (dict, tuple, etc.), append as-is
+                        transformed_results.append(meas_results)
                 else:
                     transformed_results.append(meas_results)
 

@@ -349,6 +349,50 @@ def dynamic_one_shot(qnode, **kwargs):
     single_shot_qnode.device = new_dev
     single_shot_qnode._set_shots(qml.measurements.Shots(1))  # pylint: disable=protected-access
 
+    def get_shot_vector(qnode):
+        shot_vector = qnode._shots.shot_vector if qnode._shots else []
+        return (
+            shot_vector
+            if len(shot_vector) > 1 or any(copies > 1 for _, copies in shot_vector)
+            else None
+        )
+
+    def get_snapshot_results(tape, out):
+        # Check if snapshots are present by examining the tape operations
+        if not any(isinstance(op, qml.Snapshot) for op in tape.operations):
+            return None, out
+
+        # Snapshots present: out[0] = snapshots, out[1] = measurements
+        assert len(out) == 2
+        snapshot_results, measurement_results = out
+
+        # Take first shot for each snapshot
+        processed_snapshots = []
+        for snapshot in snapshot_results:
+            if hasattr(snapshot, 'shape') and len(snapshot.shape) > 1:
+                processed_snapshots.append(snapshot[0])
+            else:
+                processed_snapshots.append(snapshot)
+
+        return processed_snapshots, measurement_results
+
+    def process_sample_shot_vector(result, shot_vector):
+        # Calculate the shape for reshaping based on shot vector
+        result_list = []
+        start_idx = 0
+        for shot, copies in shot_vector:
+            # Reshape this segment to (copies, shot, n_wires)
+            segment = result[start_idx:start_idx + shot * copies]
+            if copies > 1:
+                segment_shape = (copies, shot, result.shape[-1])
+                segment = jnp.reshape(segment, segment_shape)
+                result_list.extend([segment[i] for i in range(copies)])
+            else:
+                result_list.append(segment)
+            start_idx += shot * copies
+        result = tuple(result_list)
+        return result
+
     def one_shot_wrapper(*args, **kwargs):
         def wrap_single_shot_qnode(*_):
             return single_shot_qnode(*args, **kwargs)
@@ -361,8 +405,8 @@ def dynamic_one_shot(qnode, **kwargs):
         out = list(results)
 
         # Get shot vector information for proper result reshaping
-        shot_vector = qnode._shots.shot_vector if qnode._shots else []
-        has_shot_vector = len(shot_vector) > 1 or any(copies > 1 for _, copies in shot_vector)
+        shot_vector = get_shot_vector(qnode)
+        snapshots, out = get_snapshot_results(cpy_tape, out)
 
         if has_mcm and len(cpy_tape.measurements) > 0:
             out = parse_native_mid_circuit_measurements(
@@ -378,16 +422,21 @@ def dynamic_one_shot(qnode, **kwargs):
                 # the keys and the corresponding counts
                 if isinstance(m, CountsMP):
                     if isinstance(out[idx], tuple) and len(out[idx]) == 2:
-                        # Need extract the keys and counts from the tuple
+                        # CountsMP result is stored as (keys, counts) tuple
                         keys, counts = out[idx]
                         idx += 1
                     else:
-                        # Normally, keys and counts are stored in consecutive elements
                         keys = out[idx]
                         counts = out[idx + 1]
                         idx += 2
-                    aggregated_counts = jnp.sum(counts, axis=0)
-                    counts_result = (keys[0], aggregated_counts)
+
+                    if snapshots is not None:
+                        counts_array = jnp.stack(counts, axis=0)
+                        aggregated_counts = jnp.sum(counts_array, axis=0)
+                        counts_result = (keys, aggregated_counts)
+                    else:
+                        aggregated_counts = jnp.sum(counts, axis=0)
+                        counts_result = (keys[0], aggregated_counts)
                     new_out.append(counts_result)
                     continue
 
@@ -403,27 +452,26 @@ def dynamic_one_shot(qnode, **kwargs):
                 )
 
                 # Handle shot vector reshaping for SampleMP
-                if isinstance(m, SampleMP) and has_shot_vector:
-                    # Calculate the shape for reshaping based on shot vector
-                    result_list = []
-                    start_idx = 0
-                    for shot, copies in shot_vector:
-                        # Reshape this segment to (copies, shot, n_wires)
-                        segment = processed_result[start_idx:start_idx + shot * copies]
-                        if copies > 1:
-                            segment_shape = (copies, shot, processed_result.shape[-1])
-                            segment = jnp.reshape(segment, segment_shape)
-                            result_list.extend([segment[i] for i in range(copies)])
-                        else:
-                            result_list.append(segment)
-                        start_idx += shot * copies
-                    processed_result = tuple(result_list)
+                if isinstance(m, SampleMP) and shot_vector is not None:
+                    processed_result = process_sample_shot_vector(processed_result, shot_vector)
+
                 new_out.append(processed_result)
                 idx += 1
 
             out = tuple(new_out)
+
+            # If snapshots were present, combine them with measurements
+            if snapshots is not None:
+                out = (snapshots, out)
+
         out_tree_expected = kwargs.pop("_out_tree_expected", [])
-        out = tree_unflatten(out_tree_expected[0], out)
+
+        if snapshots is not None:
+            assert len(out_tree_expected) == 2
+            out = (out[0], tree_unflatten(out_tree_expected[1], out[1]))
+        else:
+            out = tree_unflatten(out_tree_expected[0], out)
+
         return out
 
     return one_shot_wrapper
