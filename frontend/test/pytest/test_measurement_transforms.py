@@ -33,10 +33,7 @@ from pennylane.transforms import split_non_commuting, split_to_single_terms
 from catalyst import qjit
 from catalyst.compiler import get_lib_path
 from catalyst.device import QJITDevice, get_device_capabilities
-from catalyst.device.decomposition import (
-    measurements_from_counts,
-    measurements_from_samples,
-)
+from catalyst.device.decomposition import measurements_from_counts, measurements_from_samples
 from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
 
 # pylint: disable=attribute-defined-outside-init
@@ -49,8 +46,8 @@ class CustomDevice(Device):
 
     _to_matrix_ops = {"BlockEncode": OperatorProperties(False, False, False)}
 
-    def __init__(self, wires):
-        super().__init__(wires=wires)
+    def __init__(self, wires, shots=1024):
+        super().__init__(wires=wires, shots=shots)
 
     @staticmethod
     def get_c_interface():
@@ -77,11 +74,11 @@ class CustomDeviceLimitedMPs(Device):
 
     config_filepath = CONFIG_CUSTOM_DEVICE
 
-    def __init__(self, wires, allow_counts=False, allow_samples=False):
+    def __init__(self, wires, shots=1024, allow_counts=False, allow_samples=False):
         self.allow_samples = allow_samples
         self.allow_counts = allow_counts
 
-        super().__init__(wires=wires)
+        super().__init__(wires=wires, shots=shots)
 
     @staticmethod
     def get_c_interface():
@@ -252,7 +249,7 @@ class TestMeasurementTransforms:
 
         dev = qml.device("lightning.qubit", wires=4)
 
-        config = get_device_capabilities(dev)
+        config = get_device_capabilities(dev, shots=100)
         config.observables = {}
         if unsupported_measurement:
             del config.measurement_processes[unsupported_measurement]
@@ -310,7 +307,7 @@ class TestMeasurementTransforms:
         allow_counts = "counts" in device_measurements
 
         with CustomDeviceLimitedMPs(
-            wires=4, allow_counts=allow_counts, allow_samples=allow_sample
+            wires=4, shots=1000, allow_counts=allow_counts, allow_samples=allow_sample
         ) as dev:
 
             # transform is added to transform program
@@ -324,7 +321,6 @@ class TestMeasurementTransforms:
 
             # MLIR only contains target measurement
             @qjit
-            @qml.set_shots(1000)
             @qml.qnode(dev)
             def circuit(theta: float):
                 qml.X(0)
@@ -514,8 +510,9 @@ class TestMeasurementTransforms:
         theta = 2.5
         res = circuit(theta)
 
-        if len(dev.shots.shot_vector) != 1:
-            assert len(res) == len(dev.shots.shot_vector)
+        shot_vector = qml.measurements.Shots(shots).shot_vector
+        if shots and len(shot_vector) != 1:
+            assert len(res) == len(shot_vector)
 
         assert np.allclose(res, expected_res(theta), atol=0.05)
 
@@ -735,7 +732,7 @@ class TestMeasurementTransforms:
 
         dev = qml.device("lightning.qubit", wires=4)
 
-        config = get_device_capabilities(dev)
+        config = get_device_capabilities(dev, shots=1000)
 
         config.observables = {}
         config.non_commuting_observables = non_commuting_flag
