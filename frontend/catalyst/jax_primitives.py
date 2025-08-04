@@ -493,7 +493,8 @@ def _print_abstract_eval(*args, string=None, memref=False):
 
 @print_p.def_impl
 def _print_def_impl(*args, string=None, memref=False):  # pragma: no cover
-    raise NotImplementedError()
+    print(*args)
+    return ()
 
 
 def _print_lowering(jax_ctx: mlir.LoweringRuleContext, *args, string=None, memref=False):

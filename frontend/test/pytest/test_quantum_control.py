@@ -434,7 +434,7 @@ class TestCatalystControlled:
             qml.ctrl(qml.PauliZ(wires=[0]), control=[1, 2, 3])
             return qml.state()
 
-        compiled = qjit()(native_controlled)
+        compiled = qjit(native_controlled)
         assert all(sign in compiled.mlir for sign in ["ctrls", "ctrlvals"])
         result = compiled()
         expected = native_controlled()
@@ -461,7 +461,7 @@ class TestCatalystControlled:
             )
             return qml.state()
 
-        compiled = qjit()(native_controlled)
+        compiled = qjit(native_controlled)
         result = compiled()
         expected = native_controlled()
         assert_allclose(result, expected, atol=1e-5, rtol=1e-5)

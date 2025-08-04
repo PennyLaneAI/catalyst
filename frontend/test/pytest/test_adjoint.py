@@ -1609,7 +1609,7 @@ class TestMidCircuitMeasurementAfterAdjoint:
         def subroutine():
             qml.Hadamard(wires=1)
 
-        @qjit()
+        @qjit
         @qml.qnode(qml.device("lightning.qubit", wires=2))
         def circuit():
             # Comment/uncomment to toggle bug

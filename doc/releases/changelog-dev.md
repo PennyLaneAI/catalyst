@@ -4,8 +4,29 @@
 
 <h3>Improvements 🛠</h3>
 
+* Workflows `for_loop`, `while_loop` and `cond` now error out if `qml.capture` is enabled.
+  [(#1945)](https://github.com/PennyLaneAI/catalyst/pull/1945)
+
 *  Displays Catalyst version in `quantum-opt --version` output.
   [(#1922)](https://github.com/PennyLaneAI/catalyst/pull/1922)
+
+* Snakecased keyword arguments to :func:`catalyst.passes.apply_pass()` are now correctly parsed 
+  to kebab-case pass options [(#1954)](https://github.com/PennyLaneAI/catalyst/pull/1954).
+  For example:
+
+  ```python
+  @qjit(target="mlir")
+  @catalyst.passes.apply_pass("some-pass", "an-option", maxValue=1, multi_word_option=1)
+  @qml.qnode(qml.device("null.qubit", wires=1))
+  def example():
+      return qml.state()
+  ```
+
+  which looks like the following line in the MLIR:
+
+  ```pycon
+  %0 = transform.apply_registered_pass "some-pass" with options = {"an-option" = true, "maxValue" = 1 : i64, "multi-word-option" = 1 : i64}
+  ```
 
 <h3>Breaking changes 💔</h3>
 
@@ -100,6 +121,9 @@
   def workload():
       ...
   ```
+
+* `catalyst.accelerate`, `catalyst.debug.callback`, and `catalyst.pure_callback`, `catalyst.debug.print`, and `catalyst.debug.print_memref` now work when capture is enabled.
+  [(#1902)](https://github.com/PennyLaneAI/catalyst/pull/1902)
 
 <h3>Documentation 📝</h3>
 
