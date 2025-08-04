@@ -128,7 +128,8 @@
 * `catalyst.accelerate`, `catalyst.debug.callback`, and `catalyst.pure_callback`, `catalyst.debug.print`, and `catalyst.debug.print_memref` now work when capture is enabled.
   [(#1902)](https://github.com/PennyLaneAI/catalyst/pull/1902)
 
-* Add merge rotation patterns for `qml.Rot` and `qml.CRot`.
+* The merge rotation pass in Catalyst (:func:`~.passes.merge_rotations`) now also considers
+  `qml.Rot` and `qml.CRot`.
   [(#1955)](https://github.com/PennyLaneAI/catalyst/pull/1955)
 
 <h3>Documentation 📝</h3>
