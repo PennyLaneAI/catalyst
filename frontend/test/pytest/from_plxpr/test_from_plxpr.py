@@ -119,10 +119,12 @@ class TestErrors:
     def test_measuring_eigvals_not_supported(self):
         """Test that a NotImplementedError is raised for converting a measurement
         specified via eigvals and wires."""
+        with pytest.warns(
+            qml.exceptions.PennyLaneDeprecationWarning,
+            match="deprecated",
+        ):
+            dev = qml.device("lightning.qubit", wires=2, shots=50)
 
-        dev = qml.device("lightning.qubit", wires=2)
-
-        @qml.set_shots(50)
         @qml.qnode(dev)
         def circuit():
             return qml.measurements.SampleMP(
@@ -365,9 +367,12 @@ class TestCatalystCompareJaxpr:
     def test_sample(self):
         """Test comparison and execution of a jaxpr returning samples."""
 
-        dev = qml.device("lightning.qubit", wires=2)
+        with pytest.warns(
+            qml.exceptions.PennyLaneDeprecationWarning,
+            match="deprecated",
+        ):
+            dev = qml.device("lightning.qubit", wires=2, shots=50)
 
-        @qml.set_shots(50)
         @qml.qnode(dev)
         def circuit():
             qml.X(0)
@@ -540,9 +545,12 @@ class TestCatalystCompareJaxpr:
     def test_dynamic_shots(self):
         """Test that shots can be specified on qnode call."""
 
-        dev = qml.device("lightning.qubit", wires=2)
+        with pytest.warns(
+            qml.exceptions.PennyLaneDeprecationWarning,
+            match="deprecated",
+        ):
+            dev = qml.device("lightning.qubit", wires=2, shots=50)
 
-        @qml.set_shots(50)
         @qml.qnode(dev)
         def circuit():
             return qml.sample(wires=0)
