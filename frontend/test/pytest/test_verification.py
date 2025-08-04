@@ -567,7 +567,7 @@ class TestObservableValidation:
         dev = qml.device(backend, wires=3)
         qjit_capabilities = get_device_capabilities(dev, shots=2048)
 
-        tape = qml.tape.QuantumScript([], measurements=measurements)
+        tape = qml.tape.QuantumScript([], measurements=measurements, shots=2048)
 
         if invalid_op:
             with pytest.raises(CompileError, match=f"{invalid_op}.*not supported as an observable"):
