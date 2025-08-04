@@ -57,6 +57,9 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* QJitDevice helper `extract_backend_info` removed its redundant `capabilities` argument.
+  [(#1956)](https://github.com/PennyLaneAI/catalyst/pull/1956)
+
 * Raise warning when subroutines are used without capture enabled.
   [(#1930)](https://github.com/PennyLaneAI/catalyst/pull/1930)
 

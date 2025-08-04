@@ -88,8 +88,7 @@ measurement_map = {
 
 def _get_device_kwargs(device) -> dict:
     """Calulcate the params for a device equation."""
-    capabilities = get_device_capabilities(device)
-    info = extract_backend_info(device, capabilities)
+    info = extract_backend_info(device)
     # Note that the value of rtd_kwargs is a string version of
     # the info kwargs, not the info kwargs itself
     # this is due to ease of serialization to MLIR
