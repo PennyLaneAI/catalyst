@@ -138,9 +138,9 @@ struct MergeRotationsRewritePattern : public mlir::OpRewritePattern<OpType> {
         auto [phi1Opt, theta1Opt, omega1Opt] = getStaticValuesOrNothing(parentParams);
         auto [phi2Opt, theta2Opt, omega2Opt] = getStaticValuesOrNothing(params);
 
-        auto phiF = mlir::Value{};
-        auto thetaF = mlir::Value{};
-        auto omegaF = mlir::Value{};
+        mlir::Value phiF;
+        mlir::Value thetaF;
+        mlir::Value omegaF;
 
         // TODO: use an epsilon for double comparison here?
         bool omega1IsZero = omega1Opt.has_value() && omega1Opt.value() == 0.0;
