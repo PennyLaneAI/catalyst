@@ -349,7 +349,7 @@ def dynamic_one_shot(qnode, **kwargs):
     single_shot_qnode.device = new_dev
     single_shot_qnode._set_shots(qml.measurements.Shots(1))  # pylint: disable=protected-access
 
-    def get_shot_vector(qnode):
+    def _get_shot_vector(qnode):
         shot_vector = qnode._shots.shot_vector if qnode._shots else []
         return (
             shot_vector
@@ -357,8 +357,20 @@ def dynamic_one_shot(qnode, **kwargs):
             else None
         )
 
-    def get_snapshot_results(tape, out):
-        # Check if snapshots are present by examining the tape operations
+    def _get_snapshot_results(tape, out):
+        """
+        Get the snapshot results from the tape.
+
+        Args:
+            tape: The tape to get the snapshot results from.
+            out: The output of the tape.
+
+        Returns:
+            processed_snapshots: The extracted snapshot results if available;
+                                 otherwise, returns the original output.
+            measurement_results: The corresponding measurement results.
+        """
+        # if no snapshot are present, return None, out
         if not any(isinstance(op, qml.Snapshot) for op in tape.operations):
             return None, out
 
@@ -367,16 +379,16 @@ def dynamic_one_shot(qnode, **kwargs):
         snapshot_results, measurement_results = out
 
         # Take first shot for each snapshot
-        processed_snapshots = []
-        for snapshot in snapshot_results:
-            if hasattr(snapshot, 'shape') and len(snapshot.shape) > 1:
-                processed_snapshots.append(snapshot[0])
-            else:
-                processed_snapshots.append(snapshot)
+        processed_snapshots = [
+            snapshot[0] if hasattr(snapshot, 'shape') and len(snapshot.shape) > 1 else snapshot
+            for snapshot in snapshot_results
+        ]
 
         return processed_snapshots, measurement_results
 
-    def process_sample_shot_vector(result, shot_vector):
+
+
+    def _reshape_for_sample_shot_vector(result, shot_vector):
         # Calculate the shape for reshaping based on shot vector
         result_list = []
         start_idx = 0
@@ -405,8 +417,8 @@ def dynamic_one_shot(qnode, **kwargs):
         out = list(results)
 
         # Get shot vector information for proper result reshaping
-        shot_vector = get_shot_vector(qnode)
-        snapshots, out = get_snapshot_results(cpy_tape, out)
+        shot_vector = _get_shot_vector(qnode)
+        snapshots, out = _get_snapshot_results(cpy_tape, out)
 
         if has_mcm and len(cpy_tape.measurements) > 0:
             out = parse_native_mid_circuit_measurements(
@@ -453,7 +465,9 @@ def dynamic_one_shot(qnode, **kwargs):
 
                 # Handle shot vector reshaping for SampleMP
                 if isinstance(m, SampleMP) and shot_vector is not None:
-                    processed_result = process_sample_shot_vector(processed_result, shot_vector)
+                    processed_result = _reshape_for_sample_shot_vector(
+                        processed_result, shot_vector
+                    )
 
                 new_out.append(processed_result)
                 idx += 1
