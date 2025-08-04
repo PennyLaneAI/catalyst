@@ -68,7 +68,7 @@ def get_custom_device(
 
         def __init__(self, shots=None, wires=None):
             super().__init__(wires=wires, shots=shots)
-            lightning_capabilities = get_device_capabilities(lightning_device)
+            lightning_capabilities = get_device_capabilities(lightning_device, shots=shots)
             custom_capabilities = deepcopy(lightning_capabilities)
             for gate in native_gates:
                 custom_capabilities.operations[gate] = OperatorProperties(True, True, True)
@@ -564,8 +564,8 @@ class TestObservableValidation:
         """Test that the validate_measurements transform raises an error (or not) as expected
         for different base observables."""
 
-        dev = qml.device(backend, wires=3, shots=2048)
-        qjit_capabilities = get_device_capabilities(dev)
+        dev = qml.device(backend, wires=3)
+        qjit_capabilities = get_device_capabilities(dev, shots=2048)
 
         tape = qml.tape.QuantumScript([], measurements=measurements)
 
@@ -590,7 +590,7 @@ class TestObservableValidation:
         type is supported/unsupported."""
 
         dev = qml.device(backend, wires=1)
-        dev_capabilities = get_device_capabilities(dev)
+        dev_capabilities = get_device_capabilities(dev, shots=None)
         qjit_capabilities = get_qjit_device_capabilities(dev_capabilities)
 
         tape = qml.tape.QuantumScript([], measurements=[qml.expval(obs)])
@@ -628,7 +628,7 @@ class TestObservableValidation:
         than expval and var that include observables, and raises an error"""
 
         dev = qml.device("lightning.qubit", wires=1)
-        dev_capabilities = get_device_capabilities(dev)
+        dev_capabilities = get_device_capabilities(dev, shots=None)
         qjit_capabilities = get_qjit_device_capabilities(dev_capabilities)
 
         tape = qml.tape.QuantumScript([], measurements=[measurement])

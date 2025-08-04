@@ -520,7 +520,7 @@ def _load_device_capabilities(device) -> DeviceCapabilities:
     return capabilities
 
 
-def get_device_capabilities(device, shots) -> DeviceCapabilities:
+def get_device_capabilities(device, shots=None) -> DeviceCapabilities:
     """Get or load the original DeviceCapabilities from device"""
 
     assert not isinstance(device, QJITDevice)
