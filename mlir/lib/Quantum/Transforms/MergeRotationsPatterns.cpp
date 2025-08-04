@@ -312,8 +312,8 @@ struct MergeRotationsRewritePattern : public mlir::OpRewritePattern<OpType> {
         LLVM_DEBUG(dbgs() << "Simplifying the following operation:\n" << op << "\n");
 
         StringRef opGateName = op.getGateName();
-        if (!fixedRotationsAndPhaseShifts.contains(opGateName) &&
-            !arbitraryRotations.contains(opGateName))
+        if (!fixedRotationsAndPhaseShiftsSet.contains(opGateName) &&
+            !arbitraryRotationsSet.contains(opGateName))
             return failure();
 
         VerifyHeterogeneousParentGateAndNameAnalysis<OpType, ParentOpType> vpga(op);
@@ -321,7 +321,7 @@ struct MergeRotationsRewritePattern : public mlir::OpRewritePattern<OpType> {
             return failure();
         }
 
-        if (fixedRotationsAndPhaseShifts.contains(opGateName)) {
+        if (fixedRotationsAndPhaseShiftsSet.contains(opGateName)) {
             return matchAndRewriteFixedRotationOrPhaseShift(op, rewriter);
         }
         return matchAndRewriteArbitraryRotation(op, rewriter);
