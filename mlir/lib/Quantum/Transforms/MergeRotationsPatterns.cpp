@@ -14,17 +14,18 @@
 
 #define DEBUG_TYPE "merge-rotations"
 
-#include "Quantum/IR/QuantumOps.h"
-#include "Quantum/Transforms/Patterns.h"
-#include "VerifyParentGateAnalysis.hpp"
+#include <array>
+#include <cassert> // assert
+
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Errc.h"
 
-#include <array>
-#include <cassert> // assert
+#include "Quantum/IR/QuantumOps.h"
+#include "Quantum/Transforms/Patterns.h"
+#include "VerifyParentGateAnalysis.hpp"
 
 using llvm::dbgs;
 using namespace mlir;
