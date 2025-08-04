@@ -24,7 +24,7 @@ bool isScalarTensor(Type type)
     return false;
 }
 
-Type getScalarType(Type type)
+Type getScalarOrOriginalType(Type type)
 {
     if (isScalarTensor(type)) {
         return dyn_cast<RankedTensorType>(type).getElementType();
@@ -128,10 +128,10 @@ struct DetensorizeFuncPattern : public OpRewritePattern<func::FuncOp> {
         SmallVector<Type> newResultTypes;
 
         for (Type type : funcType.getInputs()) {
-            newArgTypes.push_back(getScalarType(type));
+            newArgTypes.push_back(getScalarOrOriginalType(type));
         }
         for (Type type : funcType.getResults()) {
-            newResultTypes.push_back(getScalarType(type));
+            newResultTypes.push_back(getScalarOrOriginalType(type));
         }
 
         // Collect all attributes of the original function
@@ -281,57 +281,6 @@ struct DetensorizeCallPattern : public OpRewritePattern<func::CallOp> {
         return success();
     }
 };
-
-// Remove from_elements -> extract
-struct FoldExtractFromElementsPattern : public OpRewritePattern<tensor::ExtractOp> {
-    using OpRewritePattern<tensor::ExtractOp>::OpRewritePattern;
-
-    LogicalResult matchAndRewrite(tensor::ExtractOp extractOp,
-                                  PatternRewriter &rewriter) const override
-    {
-        if (!extractOp.getIndices().empty()) {
-            return failure();
-        }
-
-        auto fromElementsOp = extractOp.getTensor().getDefiningOp<tensor::FromElementsOp>();
-        if (!fromElementsOp) {
-            return failure();
-        }
-
-        if (fromElementsOp.getElements().size() != 1) {
-            return failure();
-        }
-
-        rewriter.replaceOp(extractOp, fromElementsOp.getElements()[0]);
-        return success();
-    }
-};
-
-// Remove extract -> from_elements
-struct FoldFromElementsExtractPattern : public OpRewritePattern<tensor::FromElementsOp> {
-    using OpRewritePattern<tensor::FromElementsOp>::OpRewritePattern;
-
-    LogicalResult matchAndRewrite(tensor::FromElementsOp fromElementsOp,
-                                  PatternRewriter &rewriter) const override
-    {
-        if (fromElementsOp.getElements().size() != 1) {
-            return failure();
-        }
-
-        auto extractOp = fromElementsOp.getElements()[0].getDefiningOp<tensor::ExtractOp>();
-        if (!extractOp) {
-            return failure();
-        }
-
-        if (extractOp.getTensor().getType() != fromElementsOp.getType()) {
-            return failure();
-        }
-
-        rewriter.replaceOp(fromElementsOp, extractOp.getTensor());
-        return success();
-    }
-};
-
 } // namespace
 
 namespace catalyst {
@@ -352,8 +301,7 @@ struct DetensorizeFunctionBoundaryPass
         findAndExcludeGradientMitigationCallChains(module, functionsToExclude);
 
         patterns.add<DetensorizeFuncPattern>(context, functionsToExclude);
-        patterns.add<DetensorizeReturnPattern, DetensorizeCallPattern,
-                     FoldExtractFromElementsPattern, FoldFromElementsExtractPattern>(context);
+        patterns.add<DetensorizeReturnPattern, DetensorizeCallPattern>(context);
 
         GreedyRewriteConfig config;
         if (failed(applyPatternsGreedily(getOperation(), std::move(patterns), config))) {
