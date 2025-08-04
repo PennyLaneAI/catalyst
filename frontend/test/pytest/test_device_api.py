@@ -85,7 +85,7 @@ def test_qjit_device_measurements(shots, mocker):
     state_measurements = {"StateMP"}
     finite_shot_measurements = {"CountsMP", "SampleMP"}
 
-    dev_capabilities = get_device_capabilities(dev)
+    dev_capabilities = get_device_capabilities(dev, shots)
     expected_measurements = dev_capabilities.measurement_processes
 
     if shots is None:
@@ -113,9 +113,10 @@ def test_qjit_device_measurements(shots, mocker):
 
 def test_simple_circuit():
     """Test that a circuit with the new device API is compiling to MLIR."""
-    dev = NullQubit(wires=2, shots=2048)
+    dev = NullQubit(wires=2)
 
     @qjit(target="mlir")
+    @qml.set_shots(shots=2048)
     @qml.qnode(device=dev)
     def circuit():
         qml.Hadamard(wires=0)
