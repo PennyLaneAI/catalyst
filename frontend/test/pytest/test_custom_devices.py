@@ -20,7 +20,7 @@ from conftest import CONFIG_CUSTOM_DEVICE
 
 from catalyst import measure, qjit
 from catalyst.compiler import get_lib_path
-from catalyst.device import QJITDevice, extract_backend_info, get_device_capabilities
+from catalyst.device import QJITDevice, extract_backend_info
 from catalyst.utils.exceptions import CompileError
 
 RUNTIME_LIB_PATH = get_lib_path("runtime", "RUNTIME_LIB_DIR")
