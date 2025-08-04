@@ -313,8 +313,9 @@ struct MergeRotationsRewritePattern : public mlir::OpRewritePattern<OpType> {
 
         StringRef opGateName = op.getGateName();
         if (!fixedRotationsAndPhaseShiftsSet.contains(opGateName) &&
-            !arbitraryRotationsSet.contains(opGateName))
+            !arbitraryRotationsSet.contains(opGateName)) {
             return failure();
+        }
 
         VerifyHeterogeneousParentGateAndNameAnalysis<OpType, ParentOpType> vpga(op);
         if (!vpga.getVerifierResult()) {
