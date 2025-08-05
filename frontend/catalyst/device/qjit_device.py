@@ -369,7 +369,7 @@ class QJITDevice(qml.devices.Device):
 
         # measurement transforms may change operations on the tape to accommodate
         # measurement transformations, so must occur before decomposition
-        measurement_transforms = self._measurement_transform_program()
+        measurement_transforms = self._measurement_transform_program(capabilities)
         config = replace(config, device_options=deepcopy(config.device_options))
         program = program + measurement_transforms
 
@@ -389,6 +389,7 @@ class QJITDevice(qml.devices.Device):
             validate_measurements,
             capabilities,
             self.original_device.name,
+            shots,
         )
 
         if config.gradient_method is not None:
@@ -400,47 +401,48 @@ class QJITDevice(qml.devices.Device):
 
         return program, config
 
-    def _measurement_transform_program(self):
+    def _measurement_transform_program(self, capabilities=None):
 
+        capabilities = capabilities or self.capabilities
         measurement_program = TransformProgram()
         if isinstance(self.original_device, SoftwareQQPP):
             return measurement_program
 
-        supports_sum_observables = "Sum" in self.capabilities.observables
+        supports_sum_observables = "Sum" in capabilities.observables
 
-        if self.capabilities.non_commuting_observables is False:
+        if capabilities.non_commuting_observables is False:
             measurement_program.add_transform(split_non_commuting)
         elif not supports_sum_observables:
             measurement_program.add_transform(split_to_single_terms)
 
         # if no observables are supported, we apply a transform to convert *everything* to the
         # readout basis, using either sample or counts based on device specification
-        if not self.capabilities.observables:
+        if not capabilities.observables:
             if not split_non_commuting in measurement_program:
                 # this *should* be redundant, a TOML that doesn't have observables should have
                 # a False non_commuting_observables flag, but we aren't enforcing that
                 measurement_program.add_transform(split_non_commuting)
-            if "SampleMP" in self.capabilities.measurement_processes:
+            if "SampleMP" in capabilities.measurement_processes:
                 measurement_program.add_transform(measurements_from_samples, self.wires)
-            elif "CountsMP" in self.capabilities.measurement_processes:
+            elif "CountsMP" in capabilities.measurement_processes:
                 measurement_program.add_transform(measurements_from_counts, self.wires)
             else:
                 raise RuntimeError("The device does not support observables or sample/counts")
 
-        elif not self.capabilities.measurement_processes.keys() - {"CountsMP", "SampleMP"}:
+        elif not capabilities.measurement_processes.keys() - {"CountsMP", "SampleMP"}:
             # ToDo: this branch should become unnecessary when selective conversion of
             # unsupported MPs is finished, see ToDo below
             if not split_non_commuting in measurement_program:  # pragma: no branch
                 measurement_program.add_transform(split_non_commuting)
             mp_transform = (
                 measurements_from_samples
-                if "SampleMP" in self.capabilities.measurement_processes
+                if "SampleMP" in capabilities.measurement_processes
                 else measurements_from_counts
             )
             measurement_program.add_transform(mp_transform, self.wires)
 
         # if only some observables are supported, we try to diagonalize those that aren't
-        elif not {"PauliX", "PauliY", "PauliZ", "Hadamard"}.issubset(self.capabilities.observables):
+        elif not {"PauliX", "PauliY", "PauliZ", "Hadamard"}.issubset(capabilities.observables):
             if not split_non_commuting in measurement_program:
                 # the device might support non commuting measurements but not all the
                 # Pauli + Hadamard observables, so here it is needed
@@ -453,7 +455,7 @@ class QJITDevice(qml.devices.Device):
             }
             # checking which base observables are unsupported and need to be diagonalized
             supported_observables = {"PauliX", "PauliY", "PauliZ", "Hadamard"}.intersection(
-                self.capabilities.observables
+                capabilities.observables
             )
             supported_observables = [_obs_dict[obs] for obs in supported_observables]
 
