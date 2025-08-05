@@ -17,12 +17,11 @@
 
 include "mlir/Pass/PassBase.td"
 
-def DetensorizeFunctionBoundaryPass : Pass<"detensorize-function-boundary", "mlir::ModuleOp"> {
+def DetensorizeFunctionBoundaryPass : Pass<"detensorize-function-boundary"> {
     let summary = "Detensorize across function boundary.";
 
     let dependentDialects = [
         "tensor::TensorDialect",
-        "mlir::func::FuncDialect"
     ];
 
     let constructor = "catalyst::createDetensorizeFunctionBoundaryPass()";

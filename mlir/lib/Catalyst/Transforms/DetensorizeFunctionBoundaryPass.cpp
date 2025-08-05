@@ -54,52 +54,8 @@ bool hasScalarTensorResults(func::FuncOp funcOp)
     return false;
 }
 
-// Exclude functions that are part of the any gradient or mitigation call chain
-// through attributes e.g. `implementation` or `callee`
-void findAndExcludeGradientMitigationCallChains(ModuleOp module,
-                                                llvm::DenseSet<StringRef> &excludeSet)
-{
-    SmallVector<StringRef> worklist;
-
-    module.walk([&](Operation *op) {
-        if (op->getDialect() && (op->getDialect()->getNamespace() == "gradient" ||
-                                 op->getDialect()->getNamespace() == "mitigation")) {
-            for (const NamedAttribute &attr : op->getAttrs()) {
-                if (auto symbolRef = dyn_cast<SymbolRefAttr>(attr.getValue())) {
-                    StringRef funcName = symbolRef.getRootReference();
-
-                    if (excludeSet.find(funcName) == excludeSet.end()) {
-                        excludeSet.insert(funcName);
-                        worklist.push_back(funcName);
-                    }
-                }
-            }
-        }
-    });
-
-    for (size_t i = 0; i < worklist.size(); ++i) {
-        StringRef funcName = worklist[i];
-        func::FuncOp func = module.lookupSymbol<func::FuncOp>(funcName);
-        if (!func) {
-            continue;
-        }
-
-        func.walk([&](func::CallOp callOp) {
-            StringRef calleeName = callOp.getCallee();
-            if (excludeSet.find(calleeName) == excludeSet.end()) {
-                excludeSet.insert(calleeName);
-                worklist.push_back(calleeName);
-            }
-        });
-    }
-}
-
 struct DetensorizeFuncPattern : public OpRewritePattern<func::FuncOp> {
-    const llvm::DenseSet<StringRef> &excludedFunctions;
-    DetensorizeFuncPattern(MLIRContext *context, const llvm::DenseSet<StringRef> &excluded)
-        : OpRewritePattern<func::FuncOp>(context), excludedFunctions(excluded)
-    {
-    }
+    using OpRewritePattern<func::FuncOp>::OpRewritePattern;
 
     LogicalResult matchAndRewrite(func::FuncOp funcOp, PatternRewriter &rewriter) const override
     {
@@ -108,17 +64,23 @@ struct DetensorizeFuncPattern : public OpRewritePattern<func::FuncOp> {
             return failure();
         }
 
+        // Skip if function does not have scalar tensor arguments or results
         if (!hasScalarTensorArguments(funcOp) && !hasScalarTensorResults(funcOp)) {
             return failure();
         }
 
-        ModuleOp module = funcOp->getParentOfType<ModuleOp>();
-        if (!module) {
-            return failure();
+        // Skip if not used directly used func call (e.g. gradient VJP or mitigation ZNE)
+        auto module = funcOp->getParentOfType<ModuleOp>();
+        if (auto uses = mlir::SymbolTable::getSymbolUses(funcOp, module)) {
+            for (const mlir::SymbolTable::SymbolUse &use : *uses) {
+                if (!isa<func::CallOp>(use.getUser())) {
+                    return failure();
+                }
+            }
         }
 
-        // Skip if function is excluded for gradient/mitigation call chain
-        if (excludedFunctions.count(funcOp.getSymName())) {
+        // Skip if used by gradient
+        if (funcOp->hasAttr("diff_method")) {
             return failure();
         }
 
@@ -296,12 +258,9 @@ struct DetensorizeFunctionBoundaryPass
         MLIRContext *context = &getContext();
         RewritePatternSet patterns(context);
 
-        ModuleOp module = getOperation();
-        llvm::DenseSet<StringRef> functionsToExclude;
-        findAndExcludeGradientMitigationCallChains(module, functionsToExclude);
-
-        patterns.add<DetensorizeFuncPattern>(context, functionsToExclude);
-        patterns.add<DetensorizeReturnPattern, DetensorizeCallPattern>(context);
+        patterns.add<DetensorizeFuncPattern>(context);
+        patterns.add<DetensorizeReturnPattern>(context);
+        patterns.add<DetensorizeCallPattern>(context);
 
         GreedyRewriteConfig config;
         if (failed(applyPatternsGreedily(getOperation(), std::move(patterns), config))) {
