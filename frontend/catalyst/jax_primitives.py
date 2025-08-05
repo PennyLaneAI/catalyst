@@ -118,6 +118,7 @@ from catalyst.jax_primitives_utils import (
     lower_jaxpr,
 )
 from catalyst.utils.calculate_grad_shape import Signature, calculate_grad_shape
+from catalyst.utils.exceptions import CompileError
 from catalyst.utils.extra_bindings import FromElementsOp, TensorExtractOp
 from catalyst.utils.patching import Patcher
 from catalyst.utils.types import convert_shaped_arrays_to_tensors
@@ -353,9 +354,12 @@ def subroutine(func):
         qml.capture.disable()
     """
 
+    # pylint: disable-next=import-outside-toplevel
+    from catalyst.api_extensions.callbacks import WRAPPER_ASSIGNMENTS
+
     old_pjit = jax._src.pjit.pjit_p
 
-    @functools.wraps(func)
+    @functools.wraps(func, assigned=WRAPPER_ASSIGNMENTS)
     def inside(*args, **kwargs):
         with Patcher(
             (
@@ -366,8 +370,12 @@ def subroutine(func):
         ):
             return func(*args, **kwargs)
 
-    @functools.wraps(inside)
+    @functools.wraps(inside, assigned=WRAPPER_ASSIGNMENTS)
     def wrapper(*args, **kwargs):
+
+        if not qml.capture.enabled():
+            msg = "Subroutine is only available with capture enabled."
+            raise CompileError(msg)
 
         with Patcher(
             (
@@ -485,7 +493,8 @@ def _print_abstract_eval(*args, string=None, memref=False):
 
 @print_p.def_impl
 def _print_def_impl(*args, string=None, memref=False):  # pragma: no cover
-    raise NotImplementedError()
+    print(*args)
+    return ()
 
 
 def _print_lowering(jax_ctx: mlir.LoweringRuleContext, *args, string=None, memref=False):
@@ -1625,7 +1634,7 @@ def custom_measurement_staging_rule(
 #
 # sample measurement
 #
-def sample_staging_rule(jaxpr_trace, obs, *dynamic_shape, static_shape):
+def sample_staging_rule(jaxpr_trace, _src, obs, *dynamic_shape, static_shape):
     """
     The result shape of `sample_p` is (shots, num_qubits).
     """
@@ -1677,7 +1686,7 @@ def _sample_lowering(
 #
 # counts measurement
 #
-def counts_staging_rule(jaxpr_trace, obs, *dynamic_shape, static_shape):
+def counts_staging_rule(jaxpr_trace, _src, obs, *dynamic_shape, static_shape):
     """
     The result shape of `counts_p` is (tensor<Nxf64>, tensor<Nxi64>)
     where N = 2**number_of_qubits.
@@ -1799,7 +1808,7 @@ def _var_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shape=None):
 #
 # probs measurement
 #
-def probs_staging_rule(jaxpr_trace, obs, *dynamic_shape, static_shape):
+def probs_staging_rule(jaxpr_trace, _src, obs, *dynamic_shape, static_shape):
     """
     The result shape of probs_p is (2^num_qubits,).
     """
@@ -1843,7 +1852,7 @@ def _probs_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, *dynamic_s
 #
 # state measurement
 #
-def state_staging_rule(jaxpr_trace, obs, *dynamic_shape, static_shape):
+def state_staging_rule(jaxpr_trace, _src, obs, *dynamic_shape, static_shape):
     """
     The result shape of state_p is (2^num_qubits,).
     """
@@ -2412,7 +2421,20 @@ def subroutine_lowering(*args, **kwargs):
     Even though we could register the `pjit_p` lowering directly, this makes the code origin
     apparent in stack traces and similar use cases.
     """
-    retval = _pjit_lowering(*args, **kwargs)
+    try:
+        retval = _pjit_lowering(*args, **kwargs)
+    except NotImplementedError as e:
+        if "MLIR translation rule for primitive" in str(e):
+            msg = (
+                str(e)
+                + """
+                This error sometimes occurs when using quantum operations
+                inside subroutines but calling them outside a qnode
+            """
+            )
+            raise NotImplementedError(msg) from e
+        raise e
+
     return retval
 
 

@@ -70,7 +70,7 @@ def test_add_noise(backend):
 
         noise_model = qml.NoiseModel({fcond1: noise1, fcond2: noise2}, t1=2.0, t2=0.2)
 
-        @partial(qml.transforms.add_noise, noise_model=noise_model)
+        @partial(qml.noise.add_noise, noise_model=noise_model)
         @qml.qnode(qml.device(device_name, wires=2), interface="jax")
         def qfunc(w, x, y, z):
             qml.RX(w, wires=0)
@@ -372,7 +372,7 @@ def test_insert(backend):
     def qnode_builder(device_name):
         """Builder"""
 
-        @partial(qml.transforms.insert, op=qml.X, op_args=(), position="end")
+        @partial(qml.noise.insert, op=qml.X, op_args=(), position="end")
         @qml.qnode(qml.device(device_name, wires=2), interface="jax")
         def qfunc(w, x, y, z):
             qml.RX(w, wires=0)
@@ -653,10 +653,10 @@ class TestMitigate:
             """Builder"""
 
             @partial(
-                qml.transforms.mitigate_with_zne,
+                qml.noise.mitigate_with_zne,
                 scale_factors=[1.0, 2.0, 3.0],
-                folding=qml.transforms.fold_global,
-                extrapolate=qml.transforms.poly_extrapolate,
+                folding=qml.noise.fold_global,
+                extrapolate=qml.noise.poly_extrapolate,
                 extrapolate_kwargs={"order": 2},
             )
             @qml.qnode(qml.device(device_name, wires=2), interface="jax")
