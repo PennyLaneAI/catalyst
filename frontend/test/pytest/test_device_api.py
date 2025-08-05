@@ -111,8 +111,7 @@ def test_qjit_device_measurements(shots, mocker):
 
     circuit()
 
-    # We don't use device.shots as the source of information any more
-    assert spy.spy_return.measurement_processes == get_device_capabilities(dev, None).measurement_processes
+    assert spy.spy_return.measurement_processes == expected_measurements
 
 
 def test_simple_circuit():
