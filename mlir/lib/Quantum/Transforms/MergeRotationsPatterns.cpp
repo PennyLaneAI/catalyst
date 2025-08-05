@@ -38,7 +38,7 @@ static const mlir::StringSet<> arbitraryRotationsSet = {"Rot", "CRot"};
 namespace {
 
 // convertOpParamsToValues: helper function for extracting CustomOp parameters as mlir::Values
-SmallVector<mlir::Value> convertOpParamsToValues(CustomOp &op, mlir::PatternRewriter &rewriter)
+SmallVector<mlir::Value> convertOpParamsToValues(CustomOp &op, PatternRewriter &rewriter)
 {
     SmallVector<mlir::Value> values;
     auto params = op.getParams();
@@ -57,8 +57,8 @@ std::array<std::optional<double>, 3> getStaticValuesOrNothing(const SmallVector<
     auto staticValues = std::array<std::optional<double>, 3>{};
     for (auto [index, value] : llvm::enumerate(values)) {
         if (auto constOp = value.getDefiningOp();
-            constOp && constOp->hasTrait<mlir::OpTrait::ConstantLike>()) {
-            if (auto floatAttr = constOp->getAttrOfType<mlir::FloatAttr>("value")) {
+            constOp && constOp->hasTrait<OpTrait::ConstantLike>()) {
+            if (auto floatAttr = constOp->getAttrOfType<FloatAttr>("value")) {
                 staticValues[index] = floatAttr.getValueAsDouble();
             }
         }
@@ -67,14 +67,14 @@ std::array<std::optional<double>, 3> getStaticValuesOrNothing(const SmallVector<
 }
 
 template <typename ParentOpType, typename OpType>
-struct MergeRotationsRewritePattern : public mlir::OpRewritePattern<OpType> {
+struct MergeRotationsRewritePattern : public OpRewritePattern<OpType> {
     // Merge rotation patterns where at least one operand is non-static.
     // The result is a non-static CustomOp, as at least one operand is not known at compile time.
-    using mlir::OpRewritePattern<OpType>::OpRewritePattern;
+    using OpRewritePattern<OpType>::OpRewritePattern;
 
     // Fixed single rotations and phase shifts can be merged just by adding the angle parameters
-    mlir::LogicalResult
-    matchAndRewriteFixedRotationOrPhaseShift(OpType op, mlir::PatternRewriter &rewriter) const
+    LogicalResult matchAndRewriteFixedRotationOrPhaseShift(OpType op,
+                                                           PatternRewriter &rewriter) const
     {
         ValueRange inQubits = op.getInQubits();
         auto parentOp = dyn_cast_or_null<ParentOpType>(inQubits[0].getDefiningOp());
@@ -108,8 +108,7 @@ struct MergeRotationsRewritePattern : public mlir::OpRewritePattern<OpType> {
     }
 
     // Arbitrary single rotations require more complex maths to be merged
-    mlir::LogicalResult matchAndRewriteArbitraryRotation(OpType op,
-                                                         mlir::PatternRewriter &rewriter) const
+    LogicalResult matchAndRewriteArbitraryRotation(OpType op, PatternRewriter &rewriter) const
     {
         ValueRange inQubits = op.getInQubits();
         auto parentOp = dyn_cast_or_null<ParentOpType>(inQubits[0].getDefiningOp());
@@ -307,7 +306,7 @@ struct MergeRotationsRewritePattern : public mlir::OpRewritePattern<OpType> {
         return success();
     }
 
-    mlir::LogicalResult matchAndRewrite(OpType op, mlir::PatternRewriter &rewriter) const override
+    LogicalResult matchAndRewrite(OpType op, PatternRewriter &rewriter) const override
     {
         LLVM_DEBUG(dbgs() << "Simplifying the following operation:\n" << op << "\n");
 
@@ -329,11 +328,10 @@ struct MergeRotationsRewritePattern : public mlir::OpRewritePattern<OpType> {
     }
 };
 
-struct MergeMultiRZRewritePattern : public mlir::OpRewritePattern<MultiRZOp> {
-    using mlir::OpRewritePattern<MultiRZOp>::OpRewritePattern;
+struct MergeMultiRZRewritePattern : public OpRewritePattern<MultiRZOp> {
+    using OpRewritePattern<MultiRZOp>::OpRewritePattern;
 
-    mlir::LogicalResult matchAndRewrite(MultiRZOp op,
-                                        mlir::PatternRewriter &rewriter) const override
+    LogicalResult matchAndRewrite(MultiRZOp op, PatternRewriter &rewriter) const override
     {
         LLVM_DEBUG(dbgs() << "Simplifying the following operation:\n" << op << "\n");
         auto loc = op.getLoc();
