@@ -389,6 +389,35 @@ struct RoutingPass : public impl::RoutingPassBase<RoutingPass> {
                 llvm::outs() << compile_qubits << " ";
             llvm::outs() << "\n";
         }
+        // Operation *allocOp = nullptr;
+        // Operation *deallocOp = nullptr;
+        // mlir::Block *block = nullptr;
+        // getOperation()->walk([&](Operation *op) {
+        //     if (isa<quantum::AllocOp>(op)) 
+        //     {
+        //         allocOp = op;
+        //         auto func = op->getParentOfType<func::FuncOp>();
+        //         block = &func.front();
+
+        //     }
+        //     if (isa<quantum::DeallocOp>(op)) 
+        //         deallocOp = op;
+        // });
+        // auto allocIt = std::find_if(block->begin(), block->end(), [&](mlir::Operation &op) {
+        //     return &op == allocOp;
+        // });
+
+        // auto deallocIt = std::find_if(block->begin(), block->end(), [&](mlir::Operation &op) {
+        //     return &op == deallocOp;
+        // });
+
+        // if (allocIt == block->end() || deallocIt == block->end())
+        //     return;
+
+        // for (auto it = std::next(allocIt); it != deallocIt;) {
+        //     auto toErase = it++;
+        //     toErase->erase();
+        // }
     }
 };
 
