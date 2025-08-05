@@ -125,7 +125,6 @@ struct MergeRotationsRewritePattern : public mlir::OpRewritePattern<OpType> {
         auto parentParams = convertOpParamsToValues(parentOp, rewriter);
         auto params = convertOpParamsToValues(op, rewriter);
 
-        // TODO: do we allow Unicode in comments? What about in code?
         // Parent params are ϕ1, θ1, and ω1
         // Params are ϕ2, θ2, and ω2
         mlir::Value phi1 = parentParams[0];
