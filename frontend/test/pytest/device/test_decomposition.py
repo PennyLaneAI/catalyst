@@ -156,8 +156,9 @@ class TestControlledDecomposition:
                     dtype=np.complex128,
                 )
 
-        dev = NoUnitaryDevice(4, wires=4)
+        dev = NoUnitaryDevice(wires=4)
 
+        @qml.set_shots(4)
         @qml.qnode(dev)
         def f():
             ctrl(UnknownOp(wires=[0, 1]), control=[2, 3])
