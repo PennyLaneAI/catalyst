@@ -57,9 +57,13 @@ class jitting(passes.ModulePass):
                 """
                 import os
                 dir_path = os.path.dirname(os.path.realpath(__file__))
+
                 inp = dir_path + "/input.mlir"
+                quantum_opt_path = "/Users/ritu.thombre/Desktop/catalyst/mlir/build/bin/quantum-opt"
+                result = subprocess.run(quantum_opt_path+' --route-circuit="hardware-graph=(0,1);(1,2);(2,3);(3,4);" '+inp, shell=True, capture_output=True, text=True, check=True)
+    
                 with open(inp, "w") as file:
-                    file.write(program)
+                    file.write(result.stdout)
                 out1 = _catalyst(("--tool=all"), ("--workspace", str(dir_path) + "/"), ("--keep-intermediate",), ("--verbose",), ("-o", dir_path + "/jit.so"), (inp,))
                 shared_object = LinkerDriver.run(pathlib.Path(dir_path + "/catalyst_module.o").absolute())
                 output_object_name = str(pathlib.Path(shared_object).absolute())
