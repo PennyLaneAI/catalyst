@@ -23,7 +23,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, replace
 from enum import Enum
 from functools import partial, reduce
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Union
 
 import jax
 import jax.numpy as jnp
@@ -38,6 +38,7 @@ from pennylane.measurements import (
     CountsMP,
     ExpectationMP,
     MeasurementProcess,
+    MidMeasureMP,
     ProbabilityMP,
     StateMP,
     VarianceMP,
@@ -207,6 +208,42 @@ PAULI_NAMED_MAP = {
     "Z": "PauliZ",
 }
 
+@debug_logger
+def uses_transform(qnode, transform_name, mode: Literal["only_one", "any"] = "any"):
+    """
+    Detect if a QNode uses specific transform that is specified by `transform_name`.
+
+    Args:
+        qnode: The quantum node to check
+        transform_name: Name of the transform to look for
+        mode: If "only_one", returns True only if transform_name is the ONLY transform
+                 in the program. If "any", returns True if transform_name is present in the program.
+
+    Returns:
+        bool: True if `transform_name` is detected (and is only one if only_one=True),
+              False otherwise
+    """
+    if not (hasattr(qnode, "transform_program") and qnode.transform_program):
+        return False
+
+    transform_funcs = [
+        transform_container.transform
+        for transform_container in qnode.transform_program
+        if hasattr(transform_container, "transform")
+    ]
+
+    matching_transforms = [
+        func
+        for func in transform_funcs
+        if hasattr(func, "__name__") and transform_name in func.__name__
+    ]
+
+    has_target_transform = len(matching_transforms) > 0
+
+    if mode == "only_one":
+        return has_target_transform and len(transform_funcs) == 1
+    elif mode == "any":
+        return has_target_transform
 
 @debug_logger
 def retrace_with_result_types(jaxpr: ClosedJaxpr, target_types: List[ShapedArray]) -> ClosedJaxpr:
@@ -1206,12 +1243,6 @@ def apply_transforms(
                 for qnode in qnode_program)
         )
 
-        # if is_dynamic_one_shot and have_measurements_changed(tape, tapes[0]):
-        #     msg = (
-        #         "`one-shot` is not supported with measurements transform"
-        #     )
-        #     raise CompileError(msg)
-
         # Allow dynamic_one_shot with classical outputs regardless of measurement changes
         if has_classical_outputs(flat_results) and not is_dynamic_one_shot:
             msg = (
@@ -1416,6 +1447,8 @@ def trace_quantum_function(
 
         # (2) - Quantum tracing
         transformed_results = []
+        classical_return_indices = []
+        num_mcm = 0
         with EvaluationContext.frame_tracing_context(trace):
             for tape in tapes:
                 # Set up quantum register for the current tape.
@@ -1447,7 +1480,27 @@ def trace_quantum_function(
                 # changed the output. See `split_non_commuting`
                 if tracing_mode == TracingMode.TRANSFORM:
                     # TODO: In the future support arbitrary output from the user function.
-                    output = tape.measurements
+                    # Currently, only dynamic one-shot is supported.
+                    if uses_transform(qnode, "dynamic_one_shot_partial", mode="only_one"):
+                        classical_values = []
+                        num_mcm = sum(1 for _ in tape.measurements if isinstance(_, MidMeasureMP))
+                        normal_measurements = []
+                        for i, value in enumerate(return_values_flat):
+                            if not isinstance(value, qml.measurements.MeasurementProcess):
+                                classical_values.append(value)
+                                classical_return_indices.append(i)
+                            elif hasattr(value, "mv") and value.mv is None:
+                                normal_measurements.append(value)
+
+                        # It's important to note that we need to memorize the indices of the
+                        # classical values and num_mcm, since we need to insert value back to the
+                        # results after the measurements are processed, and num_mcm would be used
+                        # to remove the rest of mcms if they already inserted with classical values
+                        output = (
+                            classical_values + normal_measurements + tape.measurements[-num_mcm:]
+                        )
+                    else:
+                        output = tape.measurements
                     _, trees = jax.tree_util.tree_flatten(output, is_leaf=is_leaf)
                 else:
                     output = return_values_flat
@@ -1508,4 +1561,4 @@ def trace_quantum_function(
         )
         # TODO: `check_jaxpr` complains about the `AbstractQreg` type. Consider fixing.
         # check_jaxpr(jaxpr)
-    return closed_jaxpr, out_type, out_tree, return_values_tree
+    return closed_jaxpr, out_type, out_tree, return_values_tree, classical_return_indices, num_mcm

@@ -39,7 +39,7 @@ from catalyst.api_extensions import MidCircuitMeasure
 from catalyst.device import QJITDevice
 from catalyst.jax_extras import deduce_avals, get_implicit_and_explicit_flat_args, unzip2
 from catalyst.jax_primitives import quantum_kernel_p
-from catalyst.jax_tracer import Function, trace_quantum_function
+from catalyst.jax_tracer import Function, trace_quantum_function, uses_transform
 from catalyst.logging import debug_logger
 from catalyst.passes.pass_api import dictionary_to_list_of_passes
 from catalyst.tracing.contexts import EvaluationContext
@@ -95,27 +95,6 @@ def _get_total_shots(qnode):
         shots = shots_value
     return shots
 
-
-def _uses_transform(qnode, transform_name):
-    """
-    Detect if a QNode uses specific transform that is specified by `transform_name`.
-
-    Returns:
-        bool: True if `transform_name` is detected, False otherwise
-    """
-    if hasattr(qnode, "transform_program") and qnode.transform_program:
-        return any(
-            hasattr(transform_func, "__name__")
-            and transform_name in transform_func.__name__
-            for transform_func in [
-                transform_container.transform
-                for transform_container in qnode.transform_program
-                if hasattr(transform_container, "transform")
-            ]
-        )
-
-    return False
-
 class QFunc:
     """A device specific quantum function.
 
@@ -158,8 +137,8 @@ class QFunc:
             mcm_config = _resolve_mcm_config(mcm_config, total_shots)
 
             # Check if measurements_from_{samples/counts} is being used
-            uses_measurements_from_samples = _uses_transform(self, "measurements_from_samples")
-            uses_measurements_from_counts = _uses_transform(self, "measurements_from_counts")
+            uses_measurements_from_samples = uses_transform(self, "measurements_from_samples")
+            uses_measurements_from_counts = uses_transform(self, "measurements_from_counts")
 
             # Fallback to single-branch-statistics if measurements_from_samples is detected
             if (
@@ -207,20 +186,26 @@ class QFunc:
 
         static_argnums = kwargs.pop("static_argnums", ())
         out_tree_expected = kwargs.pop("_out_tree_expected", [])
+        classical_return_indices = kwargs.pop("_classical_return_indices", [])
+        num_mcm_expected = kwargs.pop("_num_mcm_expected", [])
         debug_info = kwargs.pop("debug_info", None)
 
         def _eval_quantum(*args, **kwargs):
-            closed_jaxpr, out_type, out_tree, out_tree_exp = trace_quantum_function(
-                self.func,
-                qjit_device,
-                args,
-                kwargs,
-                self,
-                static_argnums,
-                debug_info,
+            closed_jaxpr, out_type, out_tree, out_tree_exp, cls_ret_idx, num_mcm = (
+                trace_quantum_function(
+                    self.func,
+                    qjit_device,
+                    args,
+                    kwargs,
+                    self,
+                    static_argnums,
+                    debug_info,
+                )
             )
 
             out_tree_expected.append(out_tree_exp)
+            classical_return_indices.append(cls_ret_idx)
+            num_mcm_expected.append(num_mcm)
             dynamic_args = filter_static_args(args, static_argnums)
             args_expanded = get_implicit_and_explicit_flat_args(None, *dynamic_args, **kwargs)
             res_expanded = eval_jaxpr(closed_jaxpr.jaxpr, closed_jaxpr.consts, *args_expanded)
@@ -386,9 +371,7 @@ def dynamic_one_shot(qnode, **kwargs):
 
         return processed_snapshots, measurement_results
 
-
-
-    def _reshape_for_sample_shot_vector(result, shot_vector):
+    def _reshape_for_shot_vector(result, shot_vector):
         # Calculate the shape for reshaping based on shot vector
         result_list = []
         start_idx = 0
@@ -405,6 +388,39 @@ def dynamic_one_shot(qnode, **kwargs):
         result = tuple(result_list)
         return result
 
+    def _reconstruct_output_with_classical_values(
+        measurement_results, classical_values, classical_return_indices
+    ):
+        """
+        Reconstruct the output values from the classical values and measurement results.
+
+        Args:
+            out: Output from measurement processing
+            classical_values: Classical values
+            classical_return_indices: Indices of classical values
+
+        Returns:
+            results: Reconstructed output with classical values inserted
+        """
+        if not classical_values:
+            return measurement_results
+
+        total_expected = len(classical_values) + len(measurement_results)
+
+        classical_iter = iter(classical_values)
+        measurement_iter = iter(measurement_results)
+
+        def get_next_value(idx):
+            return (
+                next(classical_iter)
+                if idx in classical_return_indices
+                else next(measurement_iter)
+            )
+
+        results = [get_next_value(i) for i in range(total_expected)]
+
+        return results
+
     def one_shot_wrapper(*args, **kwargs):
         def wrap_single_shot_qnode(*_):
             return single_shot_qnode(*args, **kwargs)
@@ -414,6 +430,17 @@ def dynamic_one_shot(qnode, **kwargs):
         if isinstance(results[0], tuple) and len(results) == 1:
             results = results[0]
         has_mcm = any(isinstance(op, MidCircuitMeasure) for op in cpy_tape.operations)
+
+        classical_return_indices = kwargs.pop("_classical_return_indices", [])[0]
+        num_mcm = kwargs.pop("_num_mcm_expected", [0])[0]
+
+        # Results contain: [classical_values*, measurement_results*, mcms*].
+        # We split the results into [classical_values*] and [measurement_results, mcms*].
+        # The classical_values will be inserted back to the results after the measurements are
+        # processed
+        num_classical_return_indices = len(classical_return_indices)
+        classical_values = results[:num_classical_return_indices]
+        results = results[num_classical_return_indices:]
         out = list(results)
 
         # Get shot vector information for proper result reshaping
@@ -465,7 +492,7 @@ def dynamic_one_shot(qnode, **kwargs):
 
                 # Handle shot vector reshaping for SampleMP
                 if isinstance(m, SampleMP) and shot_vector is not None:
-                    processed_result = _reshape_for_sample_shot_vector(
+                    processed_result = _reshape_for_shot_vector(
                         processed_result, shot_vector
                     )
 
@@ -477,13 +504,22 @@ def dynamic_one_shot(qnode, **kwargs):
             # If snapshots were present, combine them with measurements
             if snapshots is not None:
                 out = (snapshots, out)
+        elif len(cpy_tape.measurements) == 0:
+            # Remove the rest of mcms, since they are already inserted with classical values
+            out = out[:-num_mcm]
 
         out_tree_expected = kwargs.pop("_out_tree_expected", [])
 
         if snapshots is not None:
             assert len(out_tree_expected) == 2
-            out = (out[0], tree_unflatten(out_tree_expected[1], out[1]))
+            tmp_out = _reconstruct_output_with_classical_values(
+                out[1], classical_values, classical_return_indices
+            )
+            out = (out[0], tree_unflatten(out_tree_expected[1], tmp_out))
         else:
+            out = _reconstruct_output_with_classical_values(
+                out, classical_values, classical_return_indices
+            )
             out = tree_unflatten(out_tree_expected[0], out)
 
         return out

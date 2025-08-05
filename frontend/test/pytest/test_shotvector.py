@@ -153,7 +153,7 @@ class TestShotVector:
 
         assert list(circuit().keys()) == ["first", "second", "third"]
         assert jnp.array(circuit()["first"]).shape == (4, 3, 1)
-        assert circuit()["second"][0] == 100
+        assert jnp.allclose(circuit()["second"][0], jnp.full(12, 100))
         assert jnp.array(circuit()["second"][1]).shape == (4, 3, 1)
         assert jnp.array(circuit()["third"]).shape == (2, 4, 3, 1)
 
