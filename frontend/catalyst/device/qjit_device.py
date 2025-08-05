@@ -305,7 +305,12 @@ class QJITDevice(qml.devices.Device):
         for key, value in original_device.__dict__.items():
             self.__setattr__(key, value)
 
-        if any([isinstance(wire_label, tuple) and (len(wire_label) >= 2) for wire_label in original_device.wires.labels]):
+        if any(
+            [
+                isinstance(wire_label, tuple) and (len(wire_label) >= 2)
+                for wire_label in original_device.wires.labels
+            ]
+        ):
             wires_from_cmap = set()
             for wire_label in original_device.wires.labels:
                 wires_from_cmap.add(wire_label[0])
@@ -330,7 +335,7 @@ class QJITDevice(qml.devices.Device):
                 raise CompileError(
                     "The device that specifies to_matrix_ops must support QubitUnitary."
                 )
-        
+
         setattr(device_capabilities, "coupling_map", original_device.wires.labels)
 
         backend = QJITDevice.extract_backend_info(original_device)
