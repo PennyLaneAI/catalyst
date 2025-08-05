@@ -1482,23 +1482,17 @@ def trace_quantum_function(
                     # TODO: In the future support arbitrary output from the user function.
                     # Currently, only dynamic one-shot is supported.
                     if uses_transform(qnode, "dynamic_one_shot_partial", mode="only_one"):
-                        classical_values = []
-                        num_mcm = sum(1 for _ in tape.measurements if isinstance(_, MidMeasureMP))
-                        normal_measurements = []
-                        for i, value in enumerate(return_values_flat):
-                            if not isinstance(value, qml.measurements.MeasurementProcess):
-                                classical_values.append(value)
-                                classical_return_indices.append(i)
-                            elif hasattr(value, "mv") and value.mv is None:
-                                normal_measurements.append(value)
-
                         # It's important to note that we need to memorize the indices of the
                         # classical values and num_mcm, since we need to insert value back to the
                         # results after the measurements are processed, and num_mcm would be used
                         # to remove the rest of mcms if they already inserted with classical values
-                        output = (
-                            classical_values + normal_measurements + tape.measurements[-num_mcm:]
-                        )
+                        classical_values = []
+                        num_mcm = sum(1 for _ in tape.measurements if isinstance(_, MidMeasureMP))
+                        for i, value in enumerate(return_values_flat):
+                            if not isinstance(value, qml.measurements.MeasurementProcess):
+                                classical_values.append(value)
+                                classical_return_indices.append(i)
+                        output = classical_values + tape.measurements
                     else:
                         output = tape.measurements
                     _, trees = jax.tree_util.tree_flatten(output, is_leaf=is_leaf)
