@@ -384,7 +384,6 @@ class QJITDevice(qml.devices.Device):
             validate_measurements,
             self.capabilities,
             self.original_device.name,
-            self.original_device.shots,
         )
 
         if config.gradient_method is not None:

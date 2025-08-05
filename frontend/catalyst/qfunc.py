@@ -141,7 +141,6 @@ class QFunc:
                 return Function(dynamic_one_shot(self, mcm_config=mcm_config))(*args, **kwargs)
 
         new_device = copy(self.device)
-        new_device._shots = self._shots  # pylint: disable=protected-access
         qjit_device = QJITDevice(new_device)
 
         static_argnums = kwargs.pop("static_argnums", ())
