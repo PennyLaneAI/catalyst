@@ -77,7 +77,7 @@ struct MergeRotationsRewritePattern : public OpRewritePattern<OpType> {
                                                            PatternRewriter &rewriter) const
     {
         ValueRange inQubits = op.getInQubits();
-        auto parentOp = dyn_cast_or_null<ParentOpType>(inQubits[0].getDefiningOp());
+        auto parentOp = llvm::cast<ParentOpType>(inQubits[0].getDefiningOp());
 
         TypeRange outQubitsTypes = op.getOutQubits().getTypes();
         TypeRange outQubitsCtrlTypes = op.getOutCtrlQubits().getTypes();
@@ -111,7 +111,7 @@ struct MergeRotationsRewritePattern : public OpRewritePattern<OpType> {
     LogicalResult matchAndRewriteArbitraryRotation(OpType op, PatternRewriter &rewriter) const
     {
         ValueRange inQubits = op.getInQubits();
-        auto parentOp = dyn_cast_or_null<ParentOpType>(inQubits[0].getDefiningOp());
+        auto parentOp = llvm::cast<ParentOpType>(inQubits[0].getDefiningOp());
 
         TypeRange outQubitsTypes = op.getOutQubits().getTypes();
         TypeRange outQubitsCtrlTypes = op.getOutCtrlQubits().getTypes();
@@ -342,9 +342,7 @@ struct MergeMultiRZRewritePattern : public OpRewritePattern<MultiRZOp> {
         }
 
         ValueRange inQubits = op.getInQubits();
-        auto parentOp = dyn_cast_or_null<MultiRZOp>(inQubits[0].getDefiningOp());
-        if (!parentOp)
-            return failure();
+        auto parentOp = llvm::cast<MultiRZOp>(inQubits[0].getDefiningOp());
 
         TypeRange outQubitsTypes = op.getOutQubits().getTypes();
         TypeRange outQubitsCtrlTypes = op.getOutCtrlQubits().getTypes();
