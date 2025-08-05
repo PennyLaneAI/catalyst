@@ -333,6 +333,7 @@ class QJITDevice(qml.devices.Device):
         self,
         ctx,
         execution_config: Optional[qml.devices.ExecutionConfig] = None,
+        shots = None,
     ):
         """This function defines the device transform program to be applied and an updated device
         configuration. The transform program will be created and applied to the tape before
@@ -361,6 +362,10 @@ class QJITDevice(qml.devices.Device):
         _, config = self.original_device.preprocess(execution_config)
 
         program = TransformProgram()
+        if shots is None:
+            capabilities = self.capabilities
+        else:
+            capabilities = get_qjit_device_capabilities(get_device_capabilities(self.original_device, shots))
 
         # measurement transforms may change operations on the tape to accommodate
         # measurement transformations, so must occur before decomposition
@@ -372,7 +377,7 @@ class QJITDevice(qml.devices.Device):
         program.add_transform(
             catalyst_decompose,
             ctx=ctx,
-            capabilities=self.capabilities,
+            capabilities=capabilities,
             grad_method=config.gradient_method,
         )
 
@@ -382,7 +387,7 @@ class QJITDevice(qml.devices.Device):
         )
         program.add_transform(
             validate_measurements,
-            self.capabilities,
+            capabilities,
             self.original_device.name,
         )
 

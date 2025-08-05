@@ -1382,7 +1382,7 @@ def trace_quantum_function(
             )
             if isinstance(device, qml.devices.Device):
                 config = _make_execution_config(qnode)
-                device_program, config = device.preprocess(ctx, config)
+                device_program, config = device.preprocess(ctx, config, shots=shots)
             else:
                 device_program = TransformProgram()
 

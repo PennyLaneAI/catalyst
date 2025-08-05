@@ -287,7 +287,7 @@ def validate_measurements(
         CompileError: if a measurement is not supported by the given device with Catalyst
 
     """
-    shots = shots if shots else tape.shots
+    shots = tape.shots if shots is None else Shots(shots)
 
     def _obs_checker(obs):
         if not obs.name in capabilities.observables:
