@@ -5,7 +5,6 @@ config.python_executable = "@Python3_EXECUTABLE@"
 config.frontend_test_dir = "@CMAKE_BINARY_DIR@" + "/test/frontend"
 config.quantum_bin_dir = "@CMAKE_BINARY_DIR@" + "/bin"
 config.mlir_bindings_dir = "@CMAKE_BINARY_DIR@" + "/python_packages/quantum"
-config.mhlo_bin_dir = "@MHLO_BINARY_DIR@"
 config.lrt_lib_dir = "@RUNTIME_LIB_DIR@"
 config.mlir_lib_dir = "@MLIR_LIB_DIR@"
 

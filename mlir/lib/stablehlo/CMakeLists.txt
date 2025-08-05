@@ -1,9 +1,13 @@
-set(LIBRARY_NAME catalyst-mhlo-transforms)
+set(LIBRARY_NAME catalyst-stablehlo-transforms)
 
 file(GLOB SRC
-    mhlo_legalize_control_flow.cpp
-    mhlo_legalize_sort.cpp
-    mhlo_legalize_to_std.cpp
+    hlo_custom_call_lowering.cpp
+    HloCustomCallPatterns.cpp
+    scatter_lowering.cpp
+    ScatterPatterns.cpp
+    stablehlo_legalize_control_flow.cpp
+    stablehlo_legalize_sort.cpp
+    stablehlo_legalize_to_std.cpp
 )
 
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)
@@ -14,9 +18,9 @@ set(LIBS
 )
 
 set(DEPENDS
+    STABLEHLOCatalystPassIncGen
     MLIRCatalystPassIncGen
-    MLIRHLOCatalystPassIncGen
-    MLIRMhloLegalizeToStandardIncGen
+    MLIRStablehloLegalizeToStandardIncGen
 )
 
 add_mlir_library(${LIBRARY_NAME} STATIC ${SRC} LINK_LIBS PRIVATE ${LIBS} DEPENDS ${DEPENDS})
@@ -25,3 +29,4 @@ target_include_directories(${LIBRARY_NAME} PUBLIC
                            .
                            ${PROJECT_SOURCE_DIR}/include
                            ${CMAKE_BINARY_DIR}/include)
+target_link_libraries(${LIBRARY_NAME} PRIVATE ExternalStablehloLib)

@@ -76,15 +76,15 @@ jobs:
     - uses: actions/cache/restore@v4
       if: ${{ inputs.catalyst != 'stable' }}
       with:
-        path: mlir/mlir-hlo
-        key: mhlo-${{ needs.constants.outputs.mhlo_version }}-default-source
+        path: mlir/stablehlo
+        key: stablehlo-${{ needs.constants.outputs.stablehlo_version }}-default-source
         enableCrossOsArchive: True
         fail-on-cache-miss: True
     - uses: actions/cache/restore@v4
       if: ${{ inputs.catalyst != 'stable' }}
       with:
-        path: mhlo-build
-        key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-ci-build-gcc
+        path: stablehlo-build
+        key: ${{ runner.os }}-stablehlo-${{ needs.constants.outputs.stablehlo_version }}-ci-build-gcc
         fail-on-cache-miss: True
     - uses: actions/cache/restore@v4
       if: ${{ inputs.catalyst != 'stable' }}
@@ -120,7 +120,7 @@ jobs:
         ENABLE_LLD=ON \
         RT_BUILD_DIR="$(pwd)/runtime-build" \
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \
-        MHLO_BUILD_DIR="$(pwd)/mhlo-build" \
+        STABLEHLO_BUILD_DIR="$(pwd)/stablehlo-build" \
         ENZYME_BUILD_DIR="$(pwd)/enzyme-build" \
         DIALECTS_BUILD_DIR="$(pwd)/quantum-build" \
         ENABLE_OPENQASM=ON \
