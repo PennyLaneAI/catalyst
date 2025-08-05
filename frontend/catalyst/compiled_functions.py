@@ -338,7 +338,7 @@ class CompiledFunction:
         return get_template(self.func_name, self.restype, *buffer)
 
     def __call__(self, *args, **kwargs):
-        static_argnums = self.compile_options.static_argnums if self.compile_options else None
+        static_argnums = self.compile_options.static_argnums if self.compile_options else ()
         dynamic_args = filter_static_args(args, static_argnums)
 
         if self.compile_options and self.compile_options.abstracted_axes is not None:
