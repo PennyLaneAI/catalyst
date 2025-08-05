@@ -27,6 +27,7 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/IR/Value.h"
 #include "llvm/ADT/DenseMap.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "llvm/ADT/DenseMap.h"
@@ -88,34 +89,45 @@ struct RoutingPass : public impl::RoutingPassBase<RoutingPass> {
         return randomInitialMapping;
     }
 
-    int getRegisterIndexOfOp(Value inQubit) {
-        // TODO: There's a better way of doing this
-        // instead of backtracking every single CustomOp back to its ExtractOp
-        // Use DenseMap [inQubit] -> ExtractOp
-        // this way, for any CustomOp, we can go to its definingOp's inQubits/outQubits 
-        // and get the ExtractOp from the DenseMap
+    quantum::ExtractOp getRegisterIndexOfOp(Value inQubit) {
         Operation *prevOp = inQubit.getDefiningOp();
         if (isa<quantum::ExtractOp>(prevOp)) 
-            return (cast<quantum::ExtractOp>(prevOp)).getIdxAttr().value();
-        auto iteratePrevOpOutQubit = cast<quantum::CustomOp>(prevOp).getOutQubits();
-        auto iteratePrevOpInQubit = cast<quantum::CustomOp>(prevOp).getInQubits();
-        for (size_t iter = 0; iter < (iteratePrevOpOutQubit.size()) ; iter++ ) {
-            if (iteratePrevOpOutQubit[iter] == inQubit) 
-                return getRegisterIndexOfOp(iteratePrevOpInQubit[iter]);
+            return (cast<quantum::ExtractOp>(prevOp));
+        else {
+            auto iteratePrevOpOutQubit = cast<quantum::CustomOp>(prevOp).getOutQubits();
+            auto iteratePrevOpInQubit = cast<quantum::CustomOp>(prevOp).getInQubits();
+            for (size_t iter = 0; iter < (iteratePrevOpOutQubit.size()) ; iter++ ) {
+                if (iteratePrevOpOutQubit[iter] == inQubit) 
+                    return getRegisterIndexOfOp(iteratePrevOpInQubit[iter]);
+            }
         }
-        return -1; // to avoid Werror 
+        return nullptr;
     }
 
-    void preProcessing(std::set<int> *physicalQubits, std::vector<int> *randomInitialMapping, std::set<quantum::CustomOp> *frontLayer, int *dagLogicalQubits) {
+    void preProcessing(
+        std::set<int> *physicalQubits, std::vector<int> *randomInitialMapping, 
+        std::set<quantum::CustomOp> *frontLayer, 
+        llvm::DenseMap<quantum::CustomOp, std::vector<quantum::ExtractOp>> &OpLogicalQubitMap, 
+        llvm::DenseMap<quantum::ExtractOp, int> &ExtractOpMap, 
+        int *dagLogicalQubits) {
+        auto logicalQubitIndex = 0;
         getOperation()->walk([&](Operation *op) {
             if (isa<quantum::AllocOp>(op)) {
                 *dagLogicalQubits = countLogicalQubit(op);
                 *randomInitialMapping =  generateRandomInitialMapping(physicalQubits);
             }
+            else if (isa<quantum::ExtractOp>(op)) {
+                ExtractOpMap[cast<quantum::ExtractOp>(op)] = logicalQubitIndex;
+                logicalQubitIndex = logicalQubitIndex + 1;
+            }
             else if (isa<quantum::CustomOp>(op)) {
                 // StringRef gateName = cast<quantum::CustomOp>(op).getGateName();
                 int nQubits = cast<quantum::CustomOp>(op).getInQubits().size();
                 auto inQubits = cast<quantum::CustomOp>(op).getInQubits();
+
+                for (auto inQubit :inQubits) {
+                    OpLogicalQubitMap[cast<quantum::CustomOp>(op)].push_back(getRegisterIndexOfOp(inQubit));
+                }
             
                 if (nQubits == 2) {
                     Operation *prevOp_0 = inQubits[0].getDefiningOp();
@@ -131,8 +143,8 @@ struct RoutingPass : public impl::RoutingPassBase<RoutingPass> {
             }
         }
     );
-    return;
-}
+        return;
+    }
 
     void distanceMatrices(std::set<int> *physicalQubits, llvm::DenseMap<std::pair<int,int>, int> &distanceMatrix, llvm::DenseMap<std::pair<int,int>, int> &predecessorMatrix, llvm::DenseMap<std::pair<int, int>, bool> &couplingMap) {
         // initial distances between non-connected physical qubits maximum
@@ -201,15 +213,21 @@ struct RoutingPass : public impl::RoutingPassBase<RoutingPass> {
         return path;
     }
     
-    void getExecuteGateList(std::set<quantum::CustomOp> *frontLayer, std::set<quantum::CustomOp> *executeGateList, llvm::DenseMap<std::pair<int, int>, bool> &couplingMap, std::vector<int> *randomInitialMapping) {
+    void getExecuteGateList(
+            std::set<quantum::CustomOp> *frontLayer, 
+            std::set<quantum::CustomOp> *executeGateList, 
+            llvm::DenseMap<std::pair<int, int>, bool> &couplingMap, 
+            std::vector<int> *randomInitialMapping,
+            llvm::DenseMap<quantum::CustomOp, std::vector<quantum::ExtractOp>> &OpLogicalQubitMap,
+            llvm::DenseMap<quantum::ExtractOp, int> &ExtractOpMap) {
         for(auto op : *frontLayer) {
             int nQubits = op.getInQubits().size(); 
             if (nQubits == 1)
                 (*executeGateList).insert(op);
             else if (nQubits == 2) {
-                auto inQubits = op.getInQubits();
-                int physical_Qubit_0 = (*randomInitialMapping)[getRegisterIndexOfOp(inQubits[0])];
-                int physical_Qubit_1 = (*randomInitialMapping)[getRegisterIndexOfOp(inQubits[1])];
+                auto extractOps = OpLogicalQubitMap[op];
+                int physical_Qubit_0 = (*randomInitialMapping)[ExtractOpMap[extractOps[0]]];
+                int physical_Qubit_1 = (*randomInitialMapping)[ExtractOpMap[extractOps[1]]];
 
                 std::pair<int, int> is_physical_Edge = std::make_pair(physical_Qubit_0,physical_Qubit_1);
                 if (couplingMap[is_physical_Edge])
@@ -219,7 +237,13 @@ struct RoutingPass : public impl::RoutingPassBase<RoutingPass> {
         return;
     }
 
-    void Heuristic(std::set<quantum::CustomOp> *frontLayer, llvm::DenseMap<std::pair<int,int>, int> &swap_candidates, std::vector<int> *randomInitialMapping, llvm::DenseMap<std::pair<int,int>, int> &distanceMatrix) {
+    void Heuristic(
+        std::set<quantum::CustomOp> *frontLayer, 
+        llvm::DenseMap<std::pair<int,int>, int> &swap_candidates, 
+        std::vector<int> *randomInitialMapping, 
+        llvm::DenseMap<std::pair<int,int>, int> &distanceMatrix,
+        llvm::DenseMap<quantum::CustomOp, std::vector<quantum::ExtractOp>> &OpLogicalQubitMap,
+        llvm::DenseMap<quantum::ExtractOp, int> &ExtractOpMap) {
         
         for (auto& entry : swap_candidates) {
             std::pair<int, int> &swap_pair = entry.first;
@@ -235,9 +259,9 @@ struct RoutingPass : public impl::RoutingPassBase<RoutingPass> {
             }
             int temp_score = 0;
             for(auto op : *frontLayer) {
-                auto inQubits = op.getInQubits();
-                int physical_Qubit_0 = temp_mapping[getRegisterIndexOfOp(inQubits[0])];
-                int physical_Qubit_1 = temp_mapping[getRegisterIndexOfOp(inQubits[1])];
+                auto extractOps = OpLogicalQubitMap[op];
+                int physical_Qubit_0 = temp_mapping[ExtractOpMap[extractOps[0]]];
+                int physical_Qubit_1 = temp_mapping[ExtractOpMap[extractOps[1]]];
                 temp_score = temp_score + distanceMatrix[std::make_pair(physical_Qubit_0,physical_Qubit_1)];
             }
             swap_candidates[swap_pair] = std::min(swap_candidates[swap_pair], temp_score);
@@ -258,7 +282,9 @@ struct RoutingPass : public impl::RoutingPassBase<RoutingPass> {
 
         std::vector<int> randomInitialMapping;
         std::set<quantum::CustomOp> frontLayer;
-        preProcessing(&physicalQubits, &randomInitialMapping, &frontLayer, &dagLogicalQubits);
+        llvm::DenseMap<quantum::CustomOp, std::vector<quantum::ExtractOp>> OpLogicalQubitMap;
+        llvm::DenseMap<quantum::ExtractOp, int> ExtractOpMap;
+        preProcessing(&physicalQubits, &randomInitialMapping, &frontLayer, OpLogicalQubitMap, ExtractOpMap, &dagLogicalQubits);
         
         // print init mapping
         llvm::outs() << "Random Initial Mapping: \n";
@@ -271,14 +297,14 @@ struct RoutingPass : public impl::RoutingPassBase<RoutingPass> {
         int search_steps = 0;
         int max_iterations_without_progress = 10 * dagLogicalQubits;
         while( frontLayer.size() ) {
-            getExecuteGateList(&frontLayer, &executeGateList, couplingMap, &randomInitialMapping);
+            getExecuteGateList(&frontLayer, &executeGateList, couplingMap, &randomInitialMapping, OpLogicalQubitMap, ExtractOpMap);
             if (executeGateList.size()) {
                 for (auto op : executeGateList)
                 {
                     compiledGateNames.push_back(op.getGateName());
                     std::vector<int> currOpPhysicalQubits;
-                    for(auto currOpInQubit : op.getInQubits())
-                        currOpPhysicalQubits.push_back(randomInitialMapping[getRegisterIndexOfOp(currOpInQubit)]);
+                    for(auto currOpExtract : OpLogicalQubitMap[op])
+                        currOpPhysicalQubits.push_back(randomInitialMapping[ExtractOpMap[currOpExtract]]);
                     compiledGateQubits.push_back(currOpPhysicalQubits);
 
                     // remove the executed op from front layer
@@ -303,9 +329,9 @@ struct RoutingPass : public impl::RoutingPassBase<RoutingPass> {
                     compiledGateQubits.pop_back();
                 }   
                 auto greedyGate = *(frontLayer.begin());
-                auto inQubits = greedyGate.getInQubits();
-                int physical_Qubit_0 = randomInitialMapping[getRegisterIndexOfOp(inQubits[0])];
-                int physical_Qubit_1 = randomInitialMapping[getRegisterIndexOfOp(inQubits[1])];
+                auto inExtract = OpLogicalQubitMap[greedyGate];
+                int physical_Qubit_0 = randomInitialMapping[ExtractOpMap[inExtract[0]]];
+                int physical_Qubit_1 = randomInitialMapping[ExtractOpMap[inExtract[1]]];
                 std::vector<int> swapPath = getShortestPath(physical_Qubit_0, physical_Qubit_1, predecessorMatrix);
                 for(size_t i = 1; i<swapPath.size()-1; i++)
                 {
@@ -326,15 +352,14 @@ struct RoutingPass : public impl::RoutingPassBase<RoutingPass> {
             else {
                 llvm::DenseMap<std::pair<int,int>, int> swap_candidates;
                 for(auto op : frontLayer) {
-                    auto inQubits = op.getInQubits();
-                    for (auto logivalQubitToBeRouted :inQubits) {
-                        int firstPhysicalQubitToBeRouted = randomInitialMapping[getRegisterIndexOfOp(logivalQubitToBeRouted)];
+                    for (auto logivalQubitExtractToBeRouted : OpLogicalQubitMap[op]) {
+                        int firstPhysicalQubitToBeRouted = randomInitialMapping[ExtractOpMap[logivalQubitExtractToBeRouted]];
                         for (auto secondPhysicalQubitToBeRouted : physicalQubits)
                             if (distanceMatrix[std::make_pair(firstPhysicalQubitToBeRouted, secondPhysicalQubitToBeRouted)] == 1)
                                 swap_candidates[std::make_pair(firstPhysicalQubitToBeRouted, secondPhysicalQubitToBeRouted)] = MAXIMUM;
                     }
                 }
-                Heuristic(&frontLayer, swap_candidates, &randomInitialMapping, distanceMatrix);
+                Heuristic(&frontLayer, swap_candidates, &randomInitialMapping, distanceMatrix, OpLogicalQubitMap, ExtractOpMap);
                 int min_dist_swap = MAXIMUM;
                 std::pair<int, int> min_swap;
                 for (auto& entry : swap_candidates) {
