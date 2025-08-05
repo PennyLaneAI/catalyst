@@ -43,7 +43,7 @@ class jitting(passes.ModulePass):
                         // SPECIALIZING THE WIRE AT RUNTIME
                         %dyn_wire = arith.constant {wire} : i64
                         %c0_i64 = arith.constant 0 : i64
-                        quantum.device shots(%c0_i64) ["/home/ubuntu/Code/env2/lib/python3.12/site-packages/pennylane_lightning/liblightning_qubit_catalyst.so", "LightningSimulator", "{{'mcmc': False, 'num_burnin': 0, 'kernel_name': None}}"]
+                        quantum.device shots(%c0_i64) ["/Users/ritu.thombre/Desktop/catalyst/.venv/lib/python3.12/site-packages/pennylane_lightning/liblightning_qubit_catalyst.dylib", "LightningSimulator", "{{'mcmc': False, 'num_burnin': 0, 'kernel_name': None}}"]
                         %0 = quantum.alloc( 2) : !quantum.reg
                         %1 = quantum.extract %0[ %dyn_wire] : !quantum.reg -> !quantum.bit
                         %out_qubits = quantum.custom "Hadamard"() %1 : !quantum.bit
@@ -57,11 +57,11 @@ class jitting(passes.ModulePass):
                 """
                 import os
                 dir_path = os.path.dirname(os.path.realpath(__file__))
-                inp = dir_path + "/ritu_dir/input.mlir"
+                inp = dir_path + "/input.mlir"
                 with open(inp, "w") as file:
                     file.write(program)
-                out1 = _catalyst(("--tool=all"), ("--workspace", str(dir_path) + "/ritu_dir"), ("--keep-intermediate",), ("--verbose",), ("-o", dir_path + "/jit.so"), (inp,))
-                shared_object = LinkerDriver.run(pathlib.Path(dir_path + "/ritu_dir/catalyst_module.o").absolute())
+                out1 = _catalyst(("--tool=all"), ("--workspace", str(dir_path) + "/"), ("--keep-intermediate",), ("--verbose",), ("-o", dir_path + "/jit.so"), (inp,))
+                shared_object = LinkerDriver.run(pathlib.Path(dir_path + "/catalyst_module.o").absolute())
                 output_object_name = str(pathlib.Path(shared_object).absolute())
                 with mlir.ir.Context(), mlir.ir.Location.unknown():
                     f64 = mlir.ir.F64Type.get()
