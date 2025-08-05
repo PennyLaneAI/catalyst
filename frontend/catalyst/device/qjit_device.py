@@ -365,7 +365,12 @@ class QJITDevice(qml.devices.Device):
         if shots is None:
             capabilities = self.capabilities
         else:
-            capabilities = get_qjit_device_capabilities(get_device_capabilities(self.original_device, shots))
+            device_caps = get_device_capabilities(self.original_device, shots)
+            # Preserve to_matrix_ops attribute from original device
+            if hasattr(self.original_device, "_to_matrix_ops"):
+                _to_matrix_ops = getattr(self.original_device, "_to_matrix_ops")
+                setattr(device_caps, "to_matrix_ops", _to_matrix_ops)
+            capabilities = get_qjit_device_capabilities(device_caps)
 
         # measurement transforms may change operations on the tape to accommodate
         # measurement transformations, so must occur before decomposition
