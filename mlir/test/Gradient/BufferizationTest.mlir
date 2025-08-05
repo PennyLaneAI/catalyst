@@ -63,7 +63,7 @@ func.func private @circuit(%arg0: tensor<2xf64>)
 // CHECK-LABEL: @adjoint_with_tensor_arg
 func.func @adjoint_with_tensor_arg(%arg0: tensor<2xf64>, %arg1: index) {
 
-    // CHECK:   [[argBuffer:%.+]] = bufferization.to_memref %arg0 : tensor<2xf64> to memref<2xf64>
+    // CHECK:   [[argBuffer:%.+]] = bufferization.to_buffer %arg0 : tensor<2xf64> to memref<2xf64>
     // CHECK:   [[alloc:%.+]] = memref.alloc(%arg1) : memref<?xf64>
     // CHECK:   gradient.adjoint @circuit([[argBuffer]]) size(%arg1) in([[alloc]] : memref<?xf64>) : (memref<2xf64>) -> ()
     %grad = gradient.adjoint @circuit(%arg0) size(%arg1) : (tensor<2xf64>) -> tensor<?xf64>
@@ -77,7 +77,7 @@ func.func private @circuit(%arg0: tensor<2xf64>)
 // CHECK-LABEL: @adjoint_with_multiple_results
 func.func @adjoint_with_multiple_results(%arg0: tensor<2xf64>, %arg1: index) {
 
-    // CHECK:   [[argBuffer:%.+]] = bufferization.to_memref %arg0 : tensor<2xf64> to memref<2xf64>
+    // CHECK:   [[argBuffer:%.+]] = bufferization.to_buffer %arg0 : tensor<2xf64> to memref<2xf64>
     // CHECK:   [[alloc0:%.+]] = memref.alloc(%arg1) : memref<?xf64>
     // CHECK:   [[alloc1:%.+]] = memref.alloc(%arg1) : memref<?xf32>
     // CHECK:   gradient.adjoint @circuit([[argBuffer]]) size(%arg1) in([[alloc0]], [[alloc1]]
@@ -93,7 +93,7 @@ func.func private @circuit(%arg0: f64)
 // CHECK-LABEL: @backprop_scalar_in
 func.func @backprop_scalar_in(%arg0: f64, %arg1: tensor<?xf64>) {
 
-    // CHECK:   [[cotangentSource:%.+]] = bufferization.to_memref %arg1 : tensor<?xf64> to memref<?xf64>
+    // CHECK:   [[cotangentSource:%.+]] = bufferization.to_buffer %arg1 : tensor<?xf64> to memref<?xf64>
     // CHECK:   [[dim1:%.+]] = memref.dim [[cotangentSource]]
     // CHECK:   [[cotangentRes:%.+]] = memref.alloc([[dim1]]) {alignment = 64 : i64} : memref<?xf64>
     // CHECK:   memref.copy [[cotangentSource]], [[cotangentRes]]
@@ -115,8 +115,8 @@ func.func private @circuit(%arg0: tensor<?x2xf64>)
 // CHECK-LABEL: @backprop_tensor_in
 func.func @backprop_tensor_in(%arg0: tensor<?x2xf64>, %arg1: tensor<?xf64>) {
 
-    // CHECK-DAG:   [[argSource:%.+]] = bufferization.to_memref %arg0 : tensor<?x2xf64> to memref<?x2xf64>
-    // CHECK-DAG:   [[cotangentSource:%.+]] = bufferization.to_memref %arg1 : tensor<?xf64> to memref<?xf64>
+    // CHECK-DAG:   [[argSource:%.+]] = bufferization.to_buffer %arg0 : tensor<?x2xf64> to memref<?x2xf64>
+    // CHECK-DAG:   [[cotangentSource:%.+]] = bufferization.to_buffer %arg1 : tensor<?xf64> to memref<?xf64>
     // CHECK:   [[dim2:%.+]] = memref.dim [[cotangentSource]]
     // CHECK:   [[cotangentRes:%.+]] = memref.alloc([[dim2]]) {alignment = 64 : i64} : memref<?xf64>
     // CHECK:   memref.copy [[cotangentSource]], [[cotangentRes]]
@@ -141,8 +141,8 @@ func.func private @circuit(%arg0: tensor<10xf64>, %arg1: tensor<2xf64>)
 // CHECK-LABEL: @backprop_multiple_tensors_in
 func.func @backprop_multiple_tensors_in(%arg0: tensor<10xf64>, %arg1: tensor<2xf64>, %arg2: tensor<?xf64>) {
 
-    // CHECK-DAG:   [[argSource0:%.+]] = bufferization.to_memref %arg0 : tensor<10xf64> to memref<10xf64>
-    // CHECK-DAG:   [[argSource1:%.+]] = bufferization.to_memref %arg1 : tensor<2xf64> to memref<2xf64>
+    // CHECK-DAG:   [[argSource0:%.+]] = bufferization.to_buffer %arg0 : tensor<10xf64> to memref<10xf64>
+    // CHECK-DAG:   [[argSource1:%.+]] = bufferization.to_buffer %arg1 : tensor<2xf64> to memref<2xf64>
     // CHECK:   memref.alloc
     // CHECK:   memref.copy
     // CHECK:   [[argShadow1:%.+]] = memref.alloc() : memref<10xf64>
@@ -171,8 +171,8 @@ gradient.forward @callback_fn_fwd.fwd(%arg0: tensor<2xf64>) -> (tensor<f64>, ten
 
     // CHECK: [[in:%.+]] = bufferization.to_tensor %arg0 : memref<2xf64>
     // CHECK: [[callOut:%.+]]:2 = func.call @callback_fn_fwd([[in]]) : (tensor<2xf64>) -> (tensor<f64>, tensor<2xf64>)
-    // CHECK: [[res0:%.+]] = bufferization.to_memref [[callOut]]#0 : tensor<f64> to memref<f64>
-    // CHECK: [[res1:%.+]] = bufferization.to_memref [[callOut]]#1 : tensor<2xf64> to memref<2xf64>
+    // CHECK: [[res0:%.+]] = bufferization.to_buffer [[callOut]]#0 : tensor<f64> to memref<f64>
+    // CHECK: [[res1:%.+]] = bufferization.to_buffer [[callOut]]#1 : tensor<2xf64> to memref<2xf64>
     // CHECK: gradient.return {empty = false} [[res0]], [[res1]] : memref<f64>, memref<2xf64>
 
     %0:2 = func.call @callback_fn_fwd(%arg0) : (tensor<2xf64>) -> (tensor<f64>, tensor<2xf64>)
@@ -192,7 +192,7 @@ gradient.reverse @callback_fn_vjp.rev(%arg0: tensor<f64>, %arg1: tensor<2xf64>) 
     // CHECK: [[in1:%.+]] = bufferization.to_tensor %arg1 : memref<2xf64>
     // CHECK: [[in0:%.+]] = bufferization.to_tensor %arg0 : memref<f64>
     // CHECK: [[callOut:%.+]] = func.call @callback_fn_vjp([[in1]], [[in0]]) : (tensor<2xf64>, tensor<f64>) -> tensor<2xf64>
-    // CHECK: [[res:%.+]] = bufferization.to_memref [[callOut]] : tensor<2xf64> to memref<2xf64>
+    // CHECK: [[res:%.+]] = bufferization.to_buffer [[callOut]] : tensor<2xf64> to memref<2xf64>
     // CHECK: gradient.return {empty = true} [[res]] : memref<2xf64>
 
     %0 = func.call @callback_fn_vjp(%arg1, %arg0) : (tensor<2xf64>, tensor<f64>) -> tensor<2xf64>
