@@ -584,3 +584,62 @@ func.func @test_loop_boundary_rotation(%q0: !quantum.bit, %q1: !quantum.bit) -> 
     // CHECK: [[qubit_6:%.+]] = {{.*}} "RX"([[cst]]) [[scf]]#0
     func.return %scf#0, %scf#1 : !quantum.bit, !quantum.bit
 }
+
+// -----
+
+// Negative tests, case 1: fixed single rotations of different names don't merge
+
+func.func @test_merge_rotations(%arg0: f64, %arg1: f64) -> !quantum.bit {
+    // CHECK: [[reg:%.+]] = quantum.alloc( 1) : !quantum.reg
+    // CHECK: [[qubit:%.+]] = quantum.extract [[reg]][ 0] : !quantum.reg -> !quantum.bit
+    %0 = quantum.alloc( 1) : !quantum.reg
+    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+
+    // CHECK: [[ret:%.+]] = quantum.custom "RX"(%arg0) [[qubit]] : !quantum.bit
+    // CHECK: [[ret_0:%.+]] = quantum.custom "RZ"(%arg1) [[ret]] : !quantum.bit
+    %2 = quantum.custom "RX"(%arg0) %1 : !quantum.bit
+    %3 = quantum.custom "RZ"(%arg1) %2 : !quantum.bit
+
+    // CHECK: return [[ret_0]]
+    return %3 : !quantum.bit
+}
+
+// -----
+
+// Negative tests, case 2: fixed single rotations and arbitrary rotations don't merge
+
+func.func @test_merge_rotations(%arg0: f64, %arg1: f64) -> !quantum.bit {
+    // CHECK: [[reg:%.+]] = quantum.alloc( 1) : !quantum.reg
+    // CHECK: [[qubit:%.+]] = quantum.extract [[reg]][ 0] : !quantum.reg -> !quantum.bit
+    %0 = quantum.alloc( 1) : !quantum.reg
+    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+
+    // CHECK: [[ret:%.+]] = quantum.custom "RX"(%arg0) [[qubit]] : !quantum.bit
+    // CHECK: [[ret_0:%.+]] = quantum.custom "Rot"(%arg1) [[ret]] : !quantum.bit
+    %2 = quantum.custom "RX"(%arg0) %1 : !quantum.bit
+    %3 = quantum.custom "Rot"(%arg1) %2 : !quantum.bit
+
+    // CHECK: return [[ret_0]]
+    return %3 : !quantum.bit
+}
+
+// -----
+
+// Negative tests, case 3: MultiRZ and CRot don't merge
+
+func.func @test_merge_rotations(%arg0: f64, %arg1: f64) -> (!quantum.bit, !quantum.bit) {
+    // CHECK: [[reg:%.+]] = quantum.alloc( 2) : !quantum.reg
+    // CHECK: [[qubit1:%.+]] = quantum.extract [[reg]][ 0] : !quantum.reg -> !quantum.bit
+    // CHECK: [[qubit2:%.+]] = quantum.extract [[reg]][ 1] : !quantum.reg -> !quantum.bit
+    %0 = quantum.alloc( 2) : !quantum.reg
+    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+
+    // CHECK: [[ret:%.+]]:2 = quantum.multirz(%arg0) [[qubit1]], [[qubit2]] : !quantum.bit, !quantum.bit
+    // CHECK: [[ret_0:%.+]]:2 = quantum.custom "CRot"(%arg1) [[ret]]#0, [[ret]]#1 : !quantum.bit, !quantum.bit
+    %3:2 = quantum.multirz (%arg0) %1, %2 : !quantum.bit, !quantum.bit
+    %4:2 = quantum.custom "CRot"(%arg1) %3#0, %3#1 : !quantum.bit, !quantum.bit
+
+    // CHECK: return [[ret_0]]#0, [[ret_0]]#1
+    return %4#0, %4#1 : !quantum.bit, !quantum.bit
+}
