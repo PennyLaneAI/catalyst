@@ -69,7 +69,7 @@ struct DetensorizeFuncPattern : public OpRewritePattern<func::FuncOp> {
             return failure();
         }
 
-        // Skip if not used directly used func call (e.g. gradient VJP or mitigation ZNE)
+        // Skip if not used directly by func call (e.g. gradient VJP or mitigation ZNE)
         auto module = funcOp->getParentOfType<ModuleOp>();
         if (auto uses = mlir::SymbolTable::getSymbolUses(funcOp, module)) {
             for (const mlir::SymbolTable::SymbolUse &use : *uses) {
