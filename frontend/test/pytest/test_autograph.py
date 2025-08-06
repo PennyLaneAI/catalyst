@@ -47,8 +47,6 @@ from catalyst.autograph.transformer import TRANSFORMER
 from catalyst.utils.dummy import dummy_func
 from catalyst.utils.exceptions import CompileError
 
-#check_cache = TRANSFORMER.has_cache
-
 def check_cache(*args):
     if qml.capture.enabled():
         return capture_TRANSFORMER.has_cache(*args)
