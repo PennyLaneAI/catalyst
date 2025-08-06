@@ -76,7 +76,7 @@ class TestSample:
         with pytest.warns(
             qml.exceptions.PennyLaneDeprecationWarning, match="shots on device is deprecated"
         ):
-            device = qml.device(backend, wires=1, shots=1000)
+            device = qml.device(backend, wires=2, shots=1000)
 
         @qjit
         @qml.qnode(device)
