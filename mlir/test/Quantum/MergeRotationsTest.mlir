@@ -295,8 +295,8 @@ func.func @test_merge_rotations(%arg0: f64, %arg1: f64) -> !quantum.bit {
     %0 = quantum.alloc( 1) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
 
-    // CHECK: [[arg0PlusArg0:%.+]] = arith.addf %arg0, %arg0 : f64
-    // CHECK: [[arg1PlusArg1:%.+]] = arith.addf %arg1, %arg1 : f64
+    // CHECK-DAG: [[arg0PlusArg0:%.+]] = arith.addf %arg0, %arg0 : f64
+    // CHECK-DAG: [[arg1PlusArg1:%.+]] = arith.addf %arg1, %arg1 : f64
     // CHECK: [[arg0sPlusArg1s:%.+]] = arith.addf [[arg0PlusArg0]], [[arg1PlusArg1]] : f64
     // CHECK: [[ret:%.+]] = quantum.custom "Rot"([[arg0sPlusArg1s]], [[zeroConst]], [[zeroConst]]) [[qubit]] : !quantum.bit
     // CHECK-NOT: quantum.custom "Rot"
