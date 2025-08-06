@@ -1278,7 +1278,7 @@ def test_pytrees_return_qnode(backend):
     num_wires = 1
     dev = qml.device(backend, wires=num_wires)
 
-    @qml.qnode(dev, diff_method="parameter-shift")
+    @qml.qnode(dev)
     def circuit(phi, psi):
         qml.RY(phi, wires=0)
         qml.RX(psi, wires=0)
