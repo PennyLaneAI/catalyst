@@ -306,7 +306,7 @@ class TestMeasurementTransforms:
         allow_counts = "counts" in device_measurements
 
         with CustomDeviceLimitedMPs(
-            wires=4, allow_counts=allow_counts, allow_samples=allow_sample
+            wires=4, allow_counts=allow_counts, allow_samples=allow_sample, shots=None
         ) as dev:
 
             # transform is added to transform program
@@ -758,7 +758,11 @@ class TestMeasurementTransforms:
         are added to the transform program from preprocess as expected, based on the
         sum_observables_flag and the non_commuting_observables_flag"""
 
-        dev = CustomDevice(wires=4)
+        with pytest.warns(
+            qml.exceptions.PennyLaneDeprecationWarning,
+            match="shots on device is deprecated",
+        ):
+            dev = CustomDevice(wires=4)
 
         # dev1 supports non-commuting observables and sum observables - no splitting
         qjit_dev1 = QJITDevice(dev)

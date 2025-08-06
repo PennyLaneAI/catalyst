@@ -55,7 +55,8 @@ class TestCudaQ:
         with pytest.raises(NotImplementedError, match="cannot return measurements directly"):
 
             @cjit
-            @qml.qnode(qml.device("softwareq.qpp", wires=1, shots=30))
+            @qml.set_shots(30)
+            @qml.qnode(qml.device("softwareq.qpp", wires=1))
             def circuit():
                 qml.RX(jnp.pi / 4, wires=[0])
                 return measure(0)
