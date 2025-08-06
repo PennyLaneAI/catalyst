@@ -12,8 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt --partition-layers --split-input-file -verify-diagnostics %s | FileCheck %s
-
+// RUN: quantum-opt --partition-layers --split-input-file --verify-diagnostics %s | FileCheck %s
 
 func.func @test_partition_layers_0(%qr0 : !quantum.bit, %qr1 : !quantum.bit, %qr2 : !quantum.bit) -> i1 {
     
@@ -35,13 +34,14 @@ func.func @test_partition_layers_0(%qr0 : !quantum.bit, %qr1 : !quantum.bit, %qr
 func.func @test_partition_layers_1(%qr0 : !quantum.bit, %qr1 : !quantum.bit, %qr2 : !quantum.bit, %qr3 : !quantum.bit) -> i1 {
 
     // CHECK:test_partition_layers_1([[qr0:%.+]]: !quantum.bit, [[qr1:%.+]]: !quantum.bit, [[qr2:%.+]]: !quantum.bit, [[qr3:%.+]]: !quantum.bit)
+    
+    // Layer 1: Two ops are not commutes and they act on disjoint qubits, so they can be partitioned into two layers.
     // CHECK: [[Q0:%.+]]:4 = qec.layer([[A0:%.+]] = [[qr0]], [[A1:%.+]] = [[qr1]], [[A2:%.+]] = [[qr2]], [[A3:%.+]] = [[qr3]])
     // CHECK:       [[QL0:%.+]]:2 = qec.ppr ["X", "Z"](-8) [[A0]], [[A1]]
-    // CHECK:       [[QL1:%.+]]:2 = qec.ppr ["Y", "X"](8) [[A2]], [[A3]]
+    // CHECK:       [[QL1:%.+]]:2 = qec.ppr ["Y", "Z"](8) [[A2]], [[A3]]
     // CHECK:  qec.yield [[QL0]]#0, [[QL0]]#1, [[QL1]]#0, [[QL1]]#1
-    
-    %0:2= qec.ppr ["X", "Z"] (-8) %qr0, %qr1 : !quantum.bit, !quantum.bit // X Z (0, 1) pi/8 
-    %1:2 = qec.ppr ["Y", "X"] (8) %qr2, %qr3 : !quantum.bit, !quantum.bit // Y X (2, 3) pi/8
+    %0:2 = qec.ppr ["X", "Z"] (-8) %qr0, %qr1 : !quantum.bit, !quantum.bit // X Z (0, 1) pi/8 
+    %1:2 = qec.ppr ["Y", "Z"] (8) %qr2, %qr3 : !quantum.bit, !quantum.bit // Y Z (2, 3) pi/8
 
     // CHECK: [[Q1:%.+]]:4 = qec.layer([[A0:%.+]] = [[Q0]]#3, [[A1:%.+]] = [[Q0]]#0, [[A2:%.+]] = [[Q0]]#1, [[A3:%.+]] = [[Q0]]#2)
     // CHECK:   [[QL2:%.+]] = qec.ppr ["Y"](8) [[A0]]
@@ -109,4 +109,40 @@ func.func @test_partition_layers_2(%q0: !quantum.bit, %q1: !quantum.bit) -> (i1,
 
     // CHECK:   return [[Q1]]#0, [[Q1]]#1, [[Q1]]#2 : i1, !quantum.bit, !quantum.bit
     func.return %qq#0, %qq#1, %qq#2 : i1, !quantum.bit, !quantum.bit
+}
+
+// -----
+
+func.func @test_partition_layers_3(%qr0 : !quantum.bit, %qr1 : !quantum.bit, %qr2 : !quantum.bit, %qr3 : !quantum.bit) {
+    // CHECK: func.func @test_partition_layers_3([[qr0:%.+]]: !quantum.bit, [[qr1:%.+]]: !quantum.bit, [[qr2:%.+]]: !quantum.bit, [[qr3:%.+]]: !quantum.bit)
+
+    // Layer 1
+    // CHECK: [[Q0:%.+]]:4 = qec.layer([[A0:%.+]] = [[qr0]], [[A1:%.+]] = [[qr1]], [[A2:%.+]] = [[qr2]], [[A3:%.+]] = [[qr3]])
+    // CHECK:   [[QL0:%.+]]:4 = qec.ppr ["I", "Z", "I", "I"](-8) [[A0]], [[A1]], [[A2]], [[A3]]
+    // CHECK:   qec.yield [[QL0]]#0, [[QL0]]#1, [[QL0]]#2, [[QL0]]#3
+    %0:4 = qec.ppr ["I", "Z", "I", "I"] (-8) %qr0, %qr1, %qr2, %qr3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+
+    // Layer 2
+    // CHECK: [[Q1:%.+]]:4 = qec.layer([[A0:%.+]] = [[Q0]]#0, [[A1:%.+]] = [[Q0]]#1, [[A2:%.+]] = [[Q0]]#2, [[A3:%.+]] = [[Q0]]#3)
+    // CHECK:   [[QL1:%.+]]:4 = qec.ppr ["X", "Y", "Z", "Y"](8) [[A0]], [[A1]], [[A2]], [[A3]]
+    // CHECK:   [[QL2:%.+]]:4 = qec.ppr ["X", "I", "Y", "Z"](8) [[QL1]]#0, [[QL1]]#1, [[QL1]]#2, [[QL1]]#3
+    // CHECK:   qec.yield [[QL2]]#0, [[QL2]]#1, [[QL2]]#2, [[QL2]]#3
+    %1:4 = qec.ppr ["X", "Y", "Z", "Y"] (8) %0#0, %0#1, %0#2, %0#3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    %2:4 = qec.ppr ["X", "I", "Y", "Z"] (8) %1#0, %1#1, %1#2, %1#3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+
+    // Layer 3
+    // CHECK: [[Q2:%.+]]:4 = qec.layer([[A0:%.+]] = [[Q1]]#0, [[A1:%.+]] = [[Q1]]#1, [[A2:%.+]] = [[Q1]]#2, [[A3:%.+]] = [[Q1]]#3)
+    // CHECK:   [[QL3:%.+]]:4 = qec.ppr ["X", "Z", "I", "X"](-8) [[A0]], [[A1]], [[A2]], [[A3]]
+    // CHECK:   [[QL4:%.+]]:4 = qec.ppr ["X", "Z", "Y", "I"](8) [[QL3]]#0, [[QL3]]#1, [[QL3]]#2, [[QL3]]#3
+    // CHECK:   qec.yield [[QL4]]#0, [[QL4]]#1, [[QL4]]#2, [[QL4]]#3
+    %3:4 = qec.ppr ["X", "Z", "I", "X"] (-8) %2#0, %2#1, %2#2, %2#3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    %4:4 = qec.ppr ["X", "Z", "Y", "I"] (8) %3#0, %3#1, %3#2, %3#3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+
+    // Layer 4
+    // CHECK: [[Q3:%.+]]:4 = qec.layer([[A0:%.+]] = [[Q2]]#0, [[A1:%.+]] = [[Q2]]#1, [[A2:%.+]] = [[Q2]]#2, [[A3:%.+]] = [[Q2]]#3)
+    // CHECK:   [[QL5:%.+]]:4 = qec.ppr ["Y", "I", "Y", "Y"](8) [[A0]], [[A1]], [[A2]], [[A3]]
+    // CHECK:   qec.yield [[QL5]]#0, [[QL5]]#1, [[QL5]]#2, [[QL5]]#3
+    %5:4 = qec.ppr ["Y", "I", "Y", "Y"] (8) %4#0, %4#1, %4#2, %4#3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+
+    func.return
 }

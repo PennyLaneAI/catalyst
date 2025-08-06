@@ -12,14 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <cstddef>
 #define DEBUG_TYPE "partition-layers"
 #include "mlir/IR/IRMapping.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 
-#include "QEC/IR/QECDialect.h"
-#include "QEC/Utils/PauliStringWrapper.h"
+#include "QEC/Utils/QECLayer.h"
 
 using namespace mlir;
 using namespace catalyst::qec;
@@ -31,179 +29,30 @@ namespace qec {
 #define GEN_PASS_DECL_PARTITIONLAYERSPASS
 #include "QEC/Transforms/Passes.h.inc"
 
-// TODO: Move this class outside the pass
-// - Add deconstructor
-class QECLayer {
-    static inline llvm::DenseMap<Value, int> qubitValueToIndex;
-    static inline llvm::DenseMap<Operation *, std::vector<int>> opToIndex;
-    static inline int MAX_INDEX;
-
-  public:
-    std::vector<QECOpInterface> ops;
-    llvm::SetVector<Value> operands;
-    llvm::SetVector<Value> results;
-
-    QECLayer() {}
-    QECLayer(std::vector<QECOpInterface> ops) : ops(ops) {}
-    QECLayer(LayerOp layer)
-    {
-        // TODO: Initialize by LayerOp
-    }
-
-    bool empty() { return ops.empty(); }
-
-    Operation *getParentLayer()
-    {
-        if (ops.empty())
-            return nullptr;
-
-        return ops.back()->getParentOp();
-    }
-
-    std::vector<int> getQubitIndexFrom(QECOpInterface op)
-    {
-        std::vector<int> qubitIndexes;
-
-        if (opToIndex.contains(op)) {
-            return opToIndex.at(op);
-        }
-
-        for (auto [inQubit, outQubit] : llvm::zip(op.getInQubits(), op.getOutQubits())) {
-            if (qubitValueToIndex.contains(inQubit)) {
-                int index = qubitValueToIndex.at(inQubit);
-                qubitIndexes.push_back(index);
-                qubitValueToIndex[outQubit] = index;
-            }
-            else {
-                // TODO: Implement to handle quantum.extract op
-                qubitValueToIndex[outQubit] = MAX_INDEX;
-                qubitIndexes.push_back(MAX_INDEX);
-                MAX_INDEX++;
+void eraseUnusedOps(QECLayer &layer, IRRewriter &writer)
+{
+    // Erase standalone QEC ops in the layer one by one
+    // Max iteration is set to avoid infinite loop
+    int maxIter = layer.ops.size() * 2;
+    while (!layer.ops.empty() && maxIter > 0) {
+        for (auto op : llvm::reverse(layer.ops)) {
+            // Only erase if not part of register operation and not used
+            if (op->use_empty()) {
+                writer.eraseOp(op);
+                layer.ops.erase(std::remove(layer.ops.begin(), layer.ops.end(), op),
+                                layer.ops.end());
             }
         }
-
-        opToIndex[op] = qubitIndexes;
-
-        return qubitIndexes;
+        maxIter--;
     }
 
-    bool actOnSameQubits(QECOpInterface op)
-    {
-        auto qubitIndex = getQubitIndexFrom(op);
-        std::set<int> layerIndexes;
+    assert(layer.ops.empty() && "Layer ops should be empty after construction");
+}
 
-        for (auto layerOp : ops) {
-            auto layerOpQubitIndex = getQubitIndexFrom(layerOp);
-            std::set<int> indexSet(layerOpQubitIndex.begin(), layerOpQubitIndex.end());
-            layerIndexes.insert(indexSet.begin(), indexSet.end());
-        }
-
-        for (auto idx : qubitIndex) {
-            if (layerIndexes.count(idx) > 0) {
-                return true; // Found an overlap
-            }
-        }
-
-        return false;
-    }
-
-    // Commute two ops if they act on the same qubits based on qubit indexes on that layer
-    bool commute(QECOpInterface fromOp, QECOpInterface toOp)
-    {
-        auto lhsQubitIndexes = getQubitIndexFrom(fromOp);
-        auto rhsQubitIndexes = getQubitIndexFrom(toOp);
-
-        llvm::SetVector<int> qubits;
-        qubits.insert(lhsQubitIndexes.begin(), lhsQubitIndexes.end());
-        qubits.insert(rhsQubitIndexes.begin(), rhsQubitIndexes.end());
-
-        PauliWord lhsPauliWord = expandPauliWord(qubits, lhsQubitIndexes, fromOp);
-        PauliWord rhsPauliWord = expandPauliWord(qubits, rhsQubitIndexes, toOp);
-
-        auto lhsPSWrapper = PauliStringWrapper::from_pauli_word(lhsPauliWord);
-        auto rhsPSWrapper = PauliStringWrapper::from_pauli_word(rhsPauliWord);
-
-        return lhsPSWrapper.commutes(rhsPSWrapper);
-    }
-
-    // Commute an op to all the ops in the layer
-    bool commuteToLayer(QECOpInterface op)
-    {
-        for (auto layerOp : ops) {
-            if (!commute(op, layerOp)) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    bool isSameBlock(QECOpInterface op) { return empty() || op->getParentOp() == getParentLayer(); }
-
-    bool insert(QECOpInterface op)
-    {
-        // Gate can be inserted if:
-        // 1. It acts on the different qubits that gates in the layer act on
-        // 2. Or it commutes with all the gates in the layer
-        // 3. And it is must be in the same block
-        if (!isSameBlock(op))
-            return false;
-
-        // TODO: switch order of these two cases may improve the performance
-        if (!actOnSameQubits(op))
-            return insertToLayer(op);
-
-        if (commuteToLayer(op))
-            return insertToLayer(op);
-
-        return false;
-    }
-
-  private:
-    llvm::DenseMap<Value, Value> outToInValue;
-
-    bool inline insertToLayer(QECOpInterface op)
-    {
-        ops.emplace_back(op);
-        setInOutOperands(op);
-        return true;
-    }
-
-    void setInOutOperands(QECOpInterface op)
-    {
-        for (auto [operandValOpt, resultValOpt] :
-             llvm::zip_longest(op->getOperands(), op->getResults())) {
-            Value operandValue = operandValOpt.value_or(nullptr);
-            Value resultValue = resultValOpt.value_or(nullptr);
-
-            // TODO: Optimize these two cases
-            // Set inOperand
-            if (operandValue != nullptr) {
-                if (outToInValue.contains(operandValue)) {
-                    auto originValue = outToInValue[operandValue];
-                    outToInValue[resultValue] = originValue;
-                    outToInValue.erase(operandValue);
-                }
-                else {
-                    outToInValue[resultValue] = operandValue;
-                    operands.insert(operandValue);
-                }
-            }
-
-            // Set outResult
-            if (resultValue != nullptr) {
-                if (results.contains(operandValue)) {
-                    results.remove(operandValue);
-                }
-                results.insert(resultValue);
-            }
-        }
-    }
-};
-
-bool constructLayer(QECLayer layer, IRRewriter &writer)
+void constructLayer(QECLayer layer, IRRewriter &writer)
 {
     if (layer.empty())
-        return false;
+        return;
 
     auto loc = layer.ops.front().getLoc();
     auto inOperands = ValueRange(layer.operands.getArrayRef());
@@ -241,24 +90,10 @@ bool constructLayer(QECLayer layer, IRRewriter &writer)
     }
 
     // Erase the ops in the layer one by one
-    auto maxIter = layer.ops.size() * 2;
-    while (!layer.ops.empty() || maxIter > 0) {
-        for (auto op : llvm::reverse(layer.ops)) {
-            if (op->use_empty()) {
-                writer.eraseOp(op);
-                layer.ops.erase(std::remove(layer.ops.begin(), layer.ops.end(), op),
-                                layer.ops.end());
-            }
-        }
-        maxIter--;
-    }
-
-    assert(layer.ops.empty() && "Layer ops should be empty after construction");
-
-    return true;
+    eraseUnusedOps(layer, writer);
 }
 
-bool shouldSkip(QECOpInterface op, QECLayer &currentLayer)
+bool isParentLayerOp(QECOpInterface op)
 {
     // Skip if the ancestor(s) is a layer op
     auto parentOp = op->getParentOp();
@@ -280,12 +115,14 @@ struct PartitionLayersPass : public impl::PartitionLayersPassBase<PartitionLayer
         MLIRContext *context = &getContext();
         mlir::IRRewriter writer(context);
 
-        QECLayer currentLayer;
+        // Create thread-local context for this pass instance
+        QECLayerContext layerContext;
+        QECLayer currentLayer(&layerContext);
 
         // Group the ops into layers in memory
         getOperation()->walk([&](QECOpInterface op) {
             // Skip if the parent is a layer op
-            if (shouldSkip(op, currentLayer))
+            if (isParentLayerOp(op))
                 return WalkResult::skip();
 
             // Try to insert the op into the current layer
@@ -296,7 +133,7 @@ struct PartitionLayersPass : public impl::PartitionLayersPassBase<PartitionLayer
             constructLayer(currentLayer, writer);
 
             // Reset the current layer and insert the op
-            currentLayer = QECLayer();
+            currentLayer = QECLayer(&layerContext);
             currentLayer.insert(op);
 
             return WalkResult::advance();
