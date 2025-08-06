@@ -23,10 +23,10 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import pennylane as qml
-from pennylane.capture.autograph.transformer import TRANSFORMER as capture_TRANSFORMER
 import pytest
 from jax.errors import TracerBoolConversionError
 from numpy.testing import assert_allclose
+from pennylane.capture.autograph.transformer import TRANSFORMER as capture_TRANSFORMER
 
 from catalyst import AutoGraphError, debug, passes, qjit
 from catalyst.api_extensions import (
