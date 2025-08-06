@@ -23,11 +23,7 @@ from jax._src.lib.mlir import ir
 from jax.interpreters import mlir
 from jaxlib.mlir.dialects.builtin import ModuleOp
 from jaxlib.mlir.dialects.func import CallOp
-from mlir_quantum.dialects._transform_ops_gen import (
-    ApplyRegisteredPassOp,
-    NamedSequenceOp,
-    YieldOp,
-)
+from mlir_quantum.dialects._transform_ops_gen import ApplyRegisteredPassOp, NamedSequenceOp, YieldOp
 from mlir_quantum.dialects.catalyst import LaunchKernelOp
 
 
@@ -113,17 +109,18 @@ def lower_callable_to_funcop(ctx, callable_, call_jaxpr):
 
     if isinstance(callable_, qml.QNode):
         func_op.attributes["qnode"] = ir.UnitAttr.get()
-        
+
         diff_method = str(callable_.diff_method)
 
         if diff_method == "best":
+
             def only_expval():
                 for eqn in call_jaxpr.eqns:
                     if eqn.primitive.name in ("probs", "var", "state", "counts", "sample"):
                         return False
                 return True
-        
-            device_name = getattr(getattr(callable_, 'device', None), 'name', None)
+
+            device_name = getattr(getattr(callable_, "device", None), "name", None)
 
             if device_name and "lightning" in device_name and only_expval():
                 diff_method = "adjoint"
@@ -131,7 +128,6 @@ def lower_callable_to_funcop(ctx, callable_, call_jaxpr):
                 diff_method = "parameter-shift"
 
         func_op.attributes["diff_method"] = ir.StringAttr.get(diff_method)
-        
 
     return func_op
 
