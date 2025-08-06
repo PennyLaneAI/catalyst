@@ -133,7 +133,7 @@ enzyme:
 	$(MAKE) -C mlir enzyme
 
 dialects:
-	$(MAKE) -C mlir dialects dialect-doc
+	$(MAKE) -C mlir dialects dialect-docs
 
 runtime:
 	$(MAKE) -C runtime runtime ENABLE_OQD=$(ENABLE_OQD)
