@@ -810,7 +810,8 @@ class TestDynamicOneShotIntegration:
 
         @qjit
         def workflow1(x: float):
-            @qml.qnode(qml.device("lightning.qubit", wires=3, shots=10), mcm_method="one-shot")
+            @qml.set_shots(10)
+            @qml.qnode(qml.device("lightning.qubit", wires=3), mcm_method="one-shot")
             def circuit1():
                 qml.CNOT(wires=[0, 1])
                 qml.RX(0, wires=[2])
@@ -820,7 +821,8 @@ class TestDynamicOneShotIntegration:
 
         @qjit
         def workflow2(x: float):
-            @qml.qnode(qml.device("lightning.qubit", wires=3, shots=10))
+            @qml.set_shots(10)
+            @qml.qnode(qml.device("lightning.qubit", wires=3))
             def circuit2():
                 qml.CNOT(wires=[0, 1])
                 qml.RX(0, wires=[2])

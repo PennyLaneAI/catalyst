@@ -271,7 +271,6 @@ def dynamic_one_shot(qnode, **kwargs):
     total_shots = _get_total_shots(qnode)
 
     new_dev = copy(dev)
-    new_dev._shots = qml.measurements.Shots(1)
     single_shot_qnode.device = new_dev
     single_shot_qnode._set_shots(qml.measurements.Shots(1))  # pylint: disable=protected-access
 
