@@ -46,13 +46,14 @@ help:
 	@echo "  mhlo               to build MLIR-HLO"
 	@echo "  enzyme             to build Enzyme"
 	@echo "  dialects           to build custom Catalyst MLIR dialects"
+	@echo "  dialect-doc        to build custom Catalyst MLIR dialect documentation"
 	@echo "  test               to run the Catalyst MLIR dialects test suite"
 	@echo "  clean              to delete all temporary, cache, and build files"
 	@echo "  format [check=1]   to apply C++ formatter; use with 'check=1' to check instead of modify (requires clang-format)"
 	@echo "  format [version=?] to apply C++ formatter; use with 'version={version}' to run clang-format-{version} instead of clang-format"
 
 .PHONY: all
-all: llvm mhlo enzyme dialects dialect-docs plugin
+all: llvm mhlo enzyme dialects dialect-doc plugin
 
 .PHONY: llvm
 llvm:
@@ -169,7 +170,7 @@ plugin:
 	cp standalone/build/lib/StandalonePlugin.* $(DIALECTS_BUILD_DIR)/lib
 
 .PHONY: dialects
-dialects:
+dialects: dialect-doc
 
 	@echo "build quantum-lsp and dialects"
 	cmake -G Ninja -S . -B $(DIALECTS_BUILD_DIR) \
@@ -197,8 +198,8 @@ dialects:
 
 	cmake --build $(DIALECTS_BUILD_DIR) --target check-dialects quantum-lsp-server catalyst-cli check-unit-tests
 
-.PHONY: dialect-docs
-dialect-docs: dialects
+.PHONY: dialect-doc
+dialect-doc:
 	@echo "build dialect documentation"
 	cmake --build $(DIALECTS_BUILD_DIR) --target mlir-doc
 
@@ -238,7 +239,7 @@ clean-plugin:
 	rm -rf standalone/build
 	rm -rf $(DIALECTS_BUILD_DIR)/lib/StandalonePlugin.*
 
-clean-dialect-docs:
+clean-dialect-doc:
 	@echo "clean dialect docs"
 	rm -rf $(DIALECTS_BUILD_DIR)/docs
 
