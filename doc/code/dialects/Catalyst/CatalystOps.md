@@ -92,7 +92,7 @@ takes `inputs` and and produces `results`.
 A custom call invokes code external to Catalyst. The `inputs` are passed to the
 external code, and the external code is expected to produce a result of the
 given type.
-```
+
 
 Interfaces: `MemoryEffectOpInterface`
 
