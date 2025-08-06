@@ -27,7 +27,7 @@ build:
     - clang
     - make
   jobs:
-    pre-build: # ensure dialects are generated and copied across before site gen
+    pre_build: # ensure dialects are generated and copied across before site gen
       - make -C mlir dialect-docs
       - cp mlir/build/docs/*Passes.md ./docs/code/passes
       - find ./mlir/build/docs -type d -exec cp -r "{}" "./docs/code/dialects/" \
