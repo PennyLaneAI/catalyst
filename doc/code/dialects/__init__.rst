@@ -1,7 +1,7 @@
-MLIR dialects
-=============
+Catalyst MLIR dialects
+======================
 
-This document contains the respective custom MLIR dialects, and their associated operations and interfaces.
+This document contains the respective Catalyst-defined MLIR dialects, and their associated operations and interfaces.
 
 .. toctree::
    :maxdepth: 1
