@@ -1468,38 +1468,45 @@ class TestCapture:
 
         qml.capture.enable()
 
-        @qjit(target="mlir")
-        @qml.qnode(qml.device(backend, wires=2, shots=10))
-        def captured_circuit():
-            @qml.for_loop(0, 2, 1)
-            def loop_0(i):
-                qml.RX(0, wires=i)
+        with pytest.warns(
+            qml.exceptions.PennyLaneDeprecationWarning, match="shots on device is deprecated"
+        ):
 
-            loop_0()
+            @qjit(target="mlir")
+            @qml.qnode(qml.device(backend, wires=2, shots=10))
+            def captured_circuit():
+                @qml.for_loop(0, 2, 1)
+                def loop_0(i):
+                    qml.RX(0, wires=i)
 
-            qml.RX(0, wires=0)
-            return qml.sample()
+                loop_0()
 
-        capture_result = captured_circuit()
+                qml.RX(0, wires=0)
+                return qml.sample()
+
+            capture_result = captured_circuit()
         assert "shots(%" in captured_circuit.mlir
 
         qml.capture.disable()
 
         # Capture disabled
+        with pytest.warns(
+            qml.exceptions.PennyLaneDeprecationWarning, match="shots on device is deprecated"
+        ):
 
-        @qjit
-        @qml.qnode(qml.device(backend, wires=2, shots=10))
-        def circuit():
-            @qml.for_loop(0, 2, 1)
-            def loop_0(i):
-                qml.RX(0, wires=i)
+            @qjit
+            @qml.qnode(qml.device(backend, wires=2, shots=10))
+            def circuit():
+                @qml.for_loop(0, 2, 1)
+                def loop_0(i):
+                    qml.RX(0, wires=i)
 
-            loop_0()
+                loop_0()
 
-            qml.RX(0, wires=0)
-            return qml.sample()
+                qml.RX(0, wires=0)
+                return qml.sample()
 
-        assert jnp.allclose(circuit(), capture_result)
+            assert jnp.allclose(circuit(), capture_result)
 
     def test_static_variable_qnode(self, backend):
         """Test the integration for a circuit with a static variable."""

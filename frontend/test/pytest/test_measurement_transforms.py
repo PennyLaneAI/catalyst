@@ -306,7 +306,7 @@ class TestMeasurementTransforms:
         allow_counts = "counts" in device_measurements
 
         with CustomDeviceLimitedMPs(
-            wires=4, shots=1000, allow_counts=allow_counts, allow_samples=allow_sample
+            wires=4, allow_counts=allow_counts, allow_samples=allow_sample
         ) as dev:
 
             # transform is added to transform program
@@ -320,6 +320,7 @@ class TestMeasurementTransforms:
 
             # MLIR only contains target measurement
             @qjit
+            @qml.set_shots(1000)
             @qml.qnode(dev)
             def circuit(theta: float):
                 qml.X(0)

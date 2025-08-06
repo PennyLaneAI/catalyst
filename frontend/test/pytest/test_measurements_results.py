@@ -39,7 +39,8 @@ class TestSample:
             pytest.xfail("capture doesn't currently support 0 wires.")
 
         @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=0, shots=10))
+        @qml.set_shots(10)
+        @qml.qnode(qml.device("lightning.qubit", wires=0))
         def sample_0qbit():
             return qml.sample()
 
@@ -51,7 +52,8 @@ class TestSample:
         """Test sample on 1 qubit."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=1, shots=1000))
+        @qml.set_shots(1000)
+        @qml.qnode(qml.device(backend, wires=1))
         def sample_1qbit(x: float):
             qml.RX(x, wires=0)
             return qml.sample()
@@ -68,7 +70,8 @@ class TestSample:
         """Test sample on 2 qubits."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=2, shots=1000))
+        @qml.set_shots(1000)
+        @qml.qnode(qml.device(backend, wires=2))
         def sample_2qbits(x: float):
             qml.RX(x, wires=0)
             qml.RY(x, wires=1)
@@ -89,7 +92,8 @@ class TestCounts:
         """Test counts on 0 qubits."""
 
         @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=0, shots=10))
+        @qml.set_shots(10)
+        @qml.qnode(qml.device("lightning.qubit", wires=0))
         def counts_0qbit():
             return qml.counts()
 
@@ -101,7 +105,8 @@ class TestCounts:
         """Test counts on 1 qubits."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=1, shots=1000))
+        @qml.set_shots(1000)
+        @qml.qnode(qml.device(backend, wires=1))
         def counts_1qbit(x: float):
             qml.RX(x, wires=0)
             return qml.counts()
@@ -118,7 +123,8 @@ class TestCounts:
         """Test counts on 2 qubits."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=2, shots=1000))
+        @qml.set_shots(1000)
+        @qml.qnode(qml.device(backend, wires=2))
         def counts_2qbit(x: float):
             qml.RX(x, wires=0)
             qml.RY(x, wires=1)
@@ -136,7 +142,8 @@ class TestCounts:
         """Test counts on 2 qubits with check for endianness."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=2, shots=1000))
+        @qml.set_shots(1000)
+        @qml.qnode(qml.device(backend, wires=2))
         def counts_2qbit(x: float, y: float):
             qml.RX(x, wires=0)
             qml.RX(y, wires=1)
@@ -155,7 +162,8 @@ class TestCounts:
         """Test counts with all_outcomes=True."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=2, shots=1000))
+        @qml.set_shots(1000)
+        @qml.qnode(qml.device(backend, wires=2))
         def counts_2qbit(x: float):
             qml.RX(x, wires=0)
             qml.RY(x, wires=1)
@@ -1191,7 +1199,8 @@ class TestNullQubitMeasurements:
         """Test qml.sample() on null.qubit device."""
 
         @qjit
-        @qml.qnode(qml.device("null.qubit", wires=n_qubits, shots=self.n_shots))
+        @qml.set_shots(self.n_shots)
+        @qml.qnode(qml.device("null.qubit", wires=n_qubits))
         def circuit_sample():
             for i in range(n_qubits):
                 qml.Hadamard(wires=i)
@@ -1207,7 +1216,8 @@ class TestNullQubitMeasurements:
         """Test qml.sample() on null.qubit device, returning results per wire."""
 
         @qjit
-        @qml.qnode(qml.device("null.qubit", wires=2, shots=self.n_shots))
+        @qml.set_shots(self.n_shots)
+        @qml.qnode(qml.device("null.qubit", wires=2))
         def circuit_sample():
             qml.Hadamard(wires=0)
             qml.Hadamard(wires=1)
@@ -1225,7 +1235,8 @@ class TestNullQubitMeasurements:
         """Test qml.counts() on null.qubit device."""
 
         @qjit
-        @qml.qnode(qml.device("null.qubit", wires=n_qubits, shots=self.n_shots))
+        @qml.set_shots(self.n_shots)
+        @qml.qnode(qml.device("null.qubit", wires=n_qubits))
         def circuit_counts():
             for i in range(n_qubits):
                 qml.Hadamard(wires=i)
@@ -1245,7 +1256,8 @@ class TestNullQubitMeasurements:
         """Test qml.counts() on null.qubit device, returning results per wire."""
 
         @qjit
-        @qml.qnode(qml.device("null.qubit", wires=2, shots=self.n_shots))
+        @qml.set_shots(self.n_shots)
+        @qml.qnode(qml.device("null.qubit", wires=2))
         def circuit_counts():
             qml.Hadamard(wires=0)
             qml.Hadamard(wires=1)
@@ -1266,7 +1278,8 @@ class TestNullQubitMeasurements:
     def test_nullq_probs(self, n_qubits):
         """Test qml.probs() on null.qubit device."""
 
-        @qml.qnode(qml.device("null.qubit", wires=n_qubits, shots=self.n_shots))
+        @qml.set_shots(self.n_shots)
+        @qml.qnode(qml.device("null.qubit", wires=n_qubits))
         def circuit_probs():
             for i in range(n_qubits):
                 qml.Hadamard(wires=i)
@@ -1279,7 +1292,8 @@ class TestNullQubitMeasurements:
     def test_nullq_probs_per_wire(self):
         """Test qml.probs() on null.qubit device, returning results per wire."""
 
-        @qml.qnode(qml.device("null.qubit", wires=2, shots=self.n_shots))
+        @qml.set_shots(self.n_shots)
+        @qml.qnode(qml.device("null.qubit", wires=2))
         def circuit_probs():
             qml.Hadamard(wires=0)
             qml.Hadamard(wires=1)
@@ -1293,7 +1307,8 @@ class TestNullQubitMeasurements:
     def test_nullq_state(self, n_qubits):
         """Test qml.state() on null.qubit device."""
 
-        @qml.qnode(qml.device("null.qubit", wires=n_qubits, shots=None))
+        @qml.set_shots(None)
+        @qml.qnode(qml.device("null.qubit", wires=n_qubits))
         def circuit_state():
             for i in range(n_qubits):
                 qml.Hadamard(wires=i)
@@ -1307,7 +1322,8 @@ class TestNullQubitMeasurements:
     def test_nullq_expval(self, n_qubits):
         """Test qml.expval() on null.qubit device."""
 
-        @qml.qnode(qml.device("null.qubit", wires=n_qubits, shots=self.n_shots))
+        @qml.set_shots(self.n_shots)
+        @qml.qnode(qml.device("null.qubit", wires=n_qubits))
         def circuit_expval():
             for i in range(n_qubits):
                 qml.Hadamard(wires=i)
@@ -1322,7 +1338,8 @@ class TestNullQubitMeasurements:
     def test_nullq_var(self, n_qubits):
         """Test qml.var() on null.qubit device."""
 
-        @qml.qnode(qml.device("null.qubit", wires=n_qubits, shots=self.n_shots))
+        @qml.set_shots(self.n_shots)
+        @qml.qnode(qml.device("null.qubit", wires=n_qubits))
         def circuit_var():
             for i in range(n_qubits):
                 qml.Hadamard(wires=i)

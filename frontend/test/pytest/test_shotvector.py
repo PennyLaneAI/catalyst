@@ -31,7 +31,8 @@ class TestShotVector:
         """Test shot-vector as parameter with single sample measurment"""
 
         @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=1, shots=shots))
+        @qml.set_shots(shots)
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
         def circuit():
             qml.Hadamard(0)
             return qml.sample()
