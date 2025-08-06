@@ -1309,7 +1309,7 @@ def test_classical_kwargs():
     assert np.allclose(expected, result)
 
 
-def test_calssical_kwargs_switched_arg_order():
+def test_classical_kwargs_switched_arg_order():
     """Test the gradient on classical function with keyword arguments and switched argument order"""
 
     @qjit
