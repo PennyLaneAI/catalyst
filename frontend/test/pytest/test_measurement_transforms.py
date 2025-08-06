@@ -764,23 +764,23 @@ class TestMeasurementTransforms:
         ):
             dev = CustomDevice(wires=4)
 
-        # dev1 supports non-commuting observables and sum observables - no splitting
-        qjit_dev1 = QJITDevice(dev)
-        assert "Sum" in qjit_dev1.capabilities.observables
-        assert qjit_dev1.capabilities.non_commuting_observables is True
+            # dev1 supports non-commuting observables and sum observables - no splitting
+            qjit_dev1 = QJITDevice(dev)
+            assert "Sum" in qjit_dev1.capabilities.observables
+            assert qjit_dev1.capabilities.non_commuting_observables is True
 
-        # dev2 supports non-commuting observables but NOT sums - split_to_single_terms
-        qjit_dev2 = QJITDevice(dev)
-        del qjit_dev2.capabilities.observables["Sum"]
+            # dev2 supports non-commuting observables but NOT sums - split_to_single_terms
+            qjit_dev2 = QJITDevice(dev)
+            del qjit_dev2.capabilities.observables["Sum"]
 
-        # dev3 supports does not support non-commuting observables OR sums - split_non_commuting
-        qjit_dev3 = QJITDevice(dev)
-        del qjit_dev3.capabilities.observables["Sum"]
-        qjit_dev3.capabilities.non_commuting_observables = False
+            # dev3 supports does not support non-commuting observables OR sums - split_non_commuting
+            qjit_dev3 = QJITDevice(dev)
+            del qjit_dev3.capabilities.observables["Sum"]
+            qjit_dev3.capabilities.non_commuting_observables = False
 
-        # dev4 supports sums but NOT non-commuting observables - split_non_commuting
-        qjit_dev4 = QJITDevice(dev)
-        qjit_dev4.capabilities.non_commuting_observables = False
+            # dev4 supports sums but NOT non-commuting observables - split_non_commuting
+            qjit_dev4 = QJITDevice(dev)
+            qjit_dev4.capabilities.non_commuting_observables = False
 
         # Check the preprocess
         with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:

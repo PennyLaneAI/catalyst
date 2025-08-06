@@ -56,11 +56,11 @@ class TestSample:
         ):
             device = qml.device(backend, wires=1, shots=1000)
 
-        @qjit
-        @qml.qnode(device)
-        def sample_1qbit(x: float):
-            qml.RX(x, wires=0)
-            return qml.sample()
+            @qjit
+            @qml.qnode(device)
+            def sample_1qbit(x: float):
+                qml.RX(x, wires=0)
+                return qml.sample()
 
         expected = np.array([[0]] * 1000)
         observed = sample_1qbit(0.0)
@@ -78,12 +78,12 @@ class TestSample:
         ):
             device = qml.device(backend, wires=2, shots=1000)
 
-        @qjit
-        @qml.qnode(device)
-        def sample_2qbits(x: float):
-            qml.RX(x, wires=0)
-            qml.RY(x, wires=1)
-            return qml.sample()
+            @qjit
+            @qml.qnode(device)
+            def sample_2qbits(x: float):
+                qml.RX(x, wires=0)
+                qml.RY(x, wires=1)
+                return qml.sample()
 
         expected = np.array([[0, 0]] * 1000)
         observed = sample_2qbits(0.0)

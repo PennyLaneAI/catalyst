@@ -118,12 +118,14 @@ class TestCudaQ:
     def test_samples(self):
         """Test SoftwareQQPP."""
 
-        @qml.qnode(qml.device("softwareq.qpp", wires=1, shots=100))
+        @qml.set_shots(100)
+        @qml.qnode(qml.device("softwareq.qpp", wires=1))
         def circuit(a):
             qml.RX(a, wires=[0])
             return qml.sample()
 
-        @qml.qnode(qml.device("lightning.qubit", wires=1, shots=100))
+        @qml.set_shots(100)
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
         def circuit_lightning(a):
             qml.RX(a, wires=[0])
             return qml.sample()
@@ -137,12 +139,14 @@ class TestCudaQ:
     def test_counts(self):
         """Test SoftwareQQPP."""
 
-        @qml.qnode(qml.device("softwareq.qpp", wires=1, shots=100))
+        @qml.set_shots(100)
+        @qml.qnode(qml.device("softwareq.qpp", wires=1))
         def circuit(a):
             qml.RX(a, wires=[0])
             return qml.counts()
 
-        @qml.qnode(qml.device("lightning.qubit", wires=1, shots=100))
+        @qml.set_shots(100)
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
         def circuit_lightning(a):
             qml.RX(a, wires=[0])
             return qml.counts()

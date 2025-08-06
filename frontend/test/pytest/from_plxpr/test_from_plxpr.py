@@ -369,14 +369,14 @@ class TestCatalystCompareJaxpr:
 
         with pytest.warns(
             qml.exceptions.PennyLaneDeprecationWarning,
-            match="deprecated",
+            match="shots on device is deprecated",
         ):
             dev = qml.device("lightning.qubit", wires=2, shots=50)
 
-        @qml.qnode(dev)
-        def circuit():
-            qml.X(0)
-            return qml.sample()
+            @qml.qnode(dev)
+            def circuit():
+                qml.X(0)
+                return qml.sample()
 
         qml.capture.enable()
         plxpr = jax.make_jaxpr(circuit)()
