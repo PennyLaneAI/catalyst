@@ -313,7 +313,7 @@ class TestMeasurementTransforms:
             qjit_dev = QJITDevice(dev)
 
             with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
-                transform_program, _ = qjit_dev.preprocess(ctx)
+                transform_program, _ = qjit_dev.preprocess(ctx, shots=1000)
 
             assert split_non_commuting in transform_program
             assert measurement_transform in transform_program
