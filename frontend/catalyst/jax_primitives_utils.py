@@ -22,11 +22,7 @@ from jax._src import core, util
 from jax._src.lib.mlir import ir
 from jax.interpreters import mlir
 from jaxlib.mlir.dialects.builtin import ModuleOp
-from jax.extend.core import Primitive
-from jax._src import core
-from pennylane import QNode
 from jaxlib.mlir.dialects.func import CallOp
-from catalyst.jax_extras import Jaxpr
 from mlir_quantum.dialects._transform_ops_gen import (
     ApplyRegisteredPassOp,
     NamedSequenceOp,

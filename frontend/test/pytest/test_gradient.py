@@ -1698,7 +1698,7 @@ def test_paramshift_with_gates(gate, state):
     dev = qml.device("lightning.qubit", wires=1)
 
     @grad
-    @qml.qnode(dev)
+    @qml.qnode(dev, diff_method="parameter-shift")
     def cost(x):
         gate(state, wires=0)
         qml.RY(x, wires=0)
