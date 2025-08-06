@@ -10,6 +10,24 @@
 *  Displays Catalyst version in `quantum-opt --version` output.
   [(#1922)](https://github.com/PennyLaneAI/catalyst/pull/1922)
 
+* Snakecased keyword arguments to :func:`catalyst.passes.apply_pass()` are now correctly parsed 
+  to kebab-case pass options [(#1954)](https://github.com/PennyLaneAI/catalyst/pull/1954).
+  For example:
+
+  ```python
+  @qjit(target="mlir")
+  @catalyst.passes.apply_pass("some-pass", "an-option", maxValue=1, multi_word_option=1)
+  @qml.qnode(qml.device("null.qubit", wires=1))
+  def example():
+      return qml.state()
+  ```
+
+  which looks like the following line in the MLIR:
+
+  ```pycon
+  %0 = transform.apply_registered_pass "some-pass" with options = {"an-option" = true, "maxValue" = 1 : i64, "multi-word-option" = 1 : i64}
+  ```
+
 <h3>Breaking changes 💔</h3>
 
 * The JAX version used by Catalyst is updated to 0.6.2.
@@ -41,6 +59,9 @@
 
 * When capture is enabled, `qjit(autograph=True)` will use capture autograph instead of catalyst autograph.
   [(#1960)](https://github.com/PennyLaneAI/catalyst/pull/1960)
+
+* QJitDevice helper `extract_backend_info` removed its redundant `capabilities` argument.
+  [(#1956)](https://github.com/PennyLaneAI/catalyst/pull/1956)
 
 * Raise warning when subroutines are used without capture enabled.
   [(#1930)](https://github.com/PennyLaneAI/catalyst/pull/1930)
