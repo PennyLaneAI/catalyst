@@ -170,7 +170,7 @@ plugin:
 	cp standalone/build/lib/StandalonePlugin.* $(DIALECTS_BUILD_DIR)/lib
 
 .PHONY: dialects
-dialects: dialect-doc
+dialects:
 
 	@echo "build quantum-lsp and dialects"
 	cmake -G Ninja -S . -B $(DIALECTS_BUILD_DIR) \
@@ -196,10 +196,10 @@ dialects: dialect-doc
 		-DLLVM_ENABLE_ZSTD=$(ENABLE_ZSTD) \
 		-DCATALYST_ENABLE_WARNINGS=$(STRICT_WARNINGS)
 
-	cmake --build $(DIALECTS_BUILD_DIR) --target check-dialects quantum-lsp-server catalyst-cli check-unit-tests
+	cmake --build $(DIALECTS_BUILD_DIR) --target check-dialects quantum-lsp-server catalyst-cli check-unit-tests mlir-doc
 
 .PHONY: dialect-doc
-dialect-doc:
+dialect-doc: dialects
 	@echo "build dialect documentation"
 	cmake --build $(DIALECTS_BUILD_DIR) --target mlir-doc
 
