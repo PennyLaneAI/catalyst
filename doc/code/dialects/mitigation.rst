@@ -6,6 +6,7 @@ Operations
 
 .. toctree::
    :name: _mitigation_dialect
+   :maxdepth: 1
    
    Mitigation/MitigationOps.md
 

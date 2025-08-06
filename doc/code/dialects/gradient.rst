@@ -6,6 +6,7 @@ Operations
 
 .. toctree::
    :name: _gradient_dialect
+   :maxdepth: 1
    
    Gradient/GradientInterfaces.md
    Gradient/GradientOps.md
