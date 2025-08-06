@@ -21,8 +21,9 @@ import numpy as np
 import pennylane as qml
 import pytest
 from jax.tree_util import register_pytree_node_class
+from pennylane import for_loop
 
-from catalyst import debug, for_loop, qjit, value_and_grad
+from catalyst import debug, qjit, value_and_grad
 from catalyst.compiler import _options_to_cli_flags, to_llvmir, to_mlir_opt
 from catalyst.debug import (
     compile_executable,
@@ -34,6 +35,7 @@ from catalyst.pipelines import CompileOptions
 from catalyst.utils.exceptions import CompileError
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 class TestDebugPrint:
     """Test suite for the runtime print functionality."""
 
@@ -70,6 +72,17 @@ class TestDebugPrint:
         assert err == ""
         expected = str(arg)
         assert expected == out.strip()
+
+    def test_memref_outside_qjit(self, capfd):
+        """Test that memref can be used outside qjit."""
+
+        def test(x):
+            debug.print_memref(x)
+
+        test(2)
+        out, err = capfd.readouterr()
+        assert err == ""
+        assert out == "2\n"
 
     def test_optional_descriptor(self, capfd):
         """Test the optional memref descriptor functionality."""
@@ -230,6 +243,7 @@ class TestDebugPrint:
         assert expected == out.strip()
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 class TestPrintStage:
     """Test that compilation pipeline results can be printed."""
 

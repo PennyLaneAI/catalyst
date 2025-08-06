@@ -512,14 +512,12 @@ jobs:
         echo "OQD_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
         echo "CATALYST_BIN_DIR=$(pwd)/quantum-build/bin" >> $GITHUB_ENV
         chmod +x $(pwd)/quantum-build/bin/catalyst  # artifact upload does not preserve permissions
-
-    - name: Run Python Lit Tests
+       
+    - name: Run Python Pytest/Lit Tests
       run: |
-        python3 llvm-build/bin/llvm-lit -sv frontend/test/lit -j$(nproc)
-
-    - name: Run Python Pytest Tests
-      run: |
-        COVERAGE_REPORT="xml:coverage.xml -p no:warnings" \
+        COVERAGE_REPORT="xml" \
+        DIALECTS_BUILD_DIR="$(pwd)/quantum-build" \
+        LLVM_BUILD_DIR="$(pwd)/llvm-build" \
         make coverage-frontend ENABLE_OQD=ON
         mv coverage.xml coverage-${{ github.job }}.xml
 

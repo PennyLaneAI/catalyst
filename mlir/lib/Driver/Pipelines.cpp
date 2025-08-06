@@ -21,6 +21,7 @@
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/Transforms/Passes.h"
 #include "mhlo/transforms/passes.h"
+#include "mlir-hlo/Passes.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/InitAllDialects.h"
 #include "mlir/InitAllPasses.h"
@@ -42,10 +43,10 @@ void createHloLoweringPipeline(OpPassManager &pm)
     pm.addPass(mlir::createCanonicalizerPass());
     pm.addNestedPass<mlir::func::FuncOp>(mhlo::createChloLegalizeToHloPass());
     pm.addPass(mlir::mhlo::createStablehloLegalizeToHloPass());
-    pm.addNestedPass<mlir::func::FuncOp>(mhlo::createLegalizeControlFlowPass());
+    pm.addNestedPass<mlir::func::FuncOp>(catalyst::createMhloLegalizeControlFlowPass());
     pm.addNestedPass<mlir::func::FuncOp>(mhlo::createLegalizeHloToLinalgPass());
-    pm.addNestedPass<mlir::func::FuncOp>(mhlo::createLegalizeToStdPass());
-    pm.addNestedPass<mlir::func::FuncOp>(mhlo::createLegalizeSortPass());
+    pm.addNestedPass<mlir::func::FuncOp>(catalyst::createMhloLegalizeToStdPass());
+    pm.addNestedPass<mlir::func::FuncOp>(catalyst::createMhloLegalizeSortPass());
     pm.addPass(mlir::mhlo::createConvertToSignlessPass());
     pm.addPass(mlir::createCanonicalizerPass());
     pm.addPass(catalyst::createScatterLoweringPass());

@@ -25,15 +25,15 @@ gradient.forward @callback_fn_fwd.fwd(%arg0: memref<2xf64>) -> (memref<f64>, mem
 
     // CHECK: [[in:%.+]] = bufferization.to_tensor %arg0 : memref<2xf64> to tensor<2xf64>
     // CHECK: [[callOut:%.+]]:2 = func.call @callback_fn_fwd([[in]]) : (tensor<2xf64>) -> (tensor<f64>, tensor<2xf64>)
-    // CHECK: [[res0:%.+]] = bufferization.to_memref [[callOut]]#0 : tensor<f64> to memref<f64>
-    // CHECK: [[res1:%.+]] = bufferization.to_memref [[callOut]]#1 : tensor<2xf64> to memref<2xf64>
+    // CHECK: [[res0:%.+]] = bufferization.to_buffer [[callOut]]#0 : tensor<f64> to memref<f64>
+    // CHECK: [[res1:%.+]] = bufferization.to_buffer [[callOut]]#1 : tensor<2xf64> to memref<2xf64>
     // CHECK: memref.copy [[res0]], %arg2 : memref<f64> to memref<f64>
     // CHECK: gradient.return {empty = false} [[res1]] : memref<2xf64>
 
 	%0 = bufferization.to_tensor %arg0 : memref<2xf64> to tensor<2xf64>
 	%1:2 = func.call @callback_fn_fwd(%0) : (tensor<2xf64>) -> (tensor<f64>, tensor<2xf64>)
-	%2 = bufferization.to_memref %1#0 : tensor<f64> to memref<f64>
-	%3 = bufferization.to_memref %1#1 : tensor<2xf64> to memref<2xf64>
+	%2 = bufferization.to_buffer %1#0 : tensor<f64> to memref<f64>
+	%3 = bufferization.to_buffer %1#1 : tensor<2xf64> to memref<2xf64>
 	gradient.return {empty = false} %2, %3 : memref<f64>, memref<2xf64>
 }
 
@@ -50,13 +50,13 @@ gradient.reverse @callback_fn_vjp.rev(%arg0: memref<f64>, %arg1: memref<2xf64>) 
     // CHECK: [[tape:%.+]] = bufferization.to_tensor %arg4 : memref<2xf64> to tensor<2xf64>
     // CHECK: [[cotan:%.+]] = bufferization.to_tensor %arg3 : memref<f64> to tensor<f64>
     // CHECK: [[callOut:%.+]] = func.call @callback_fn_vjp([[tape]], [[cotan]]) : (tensor<2xf64>, tensor<f64>) -> tensor<2xf64>
-    // CHECK: [[res:%.+]] = bufferization.to_memref [[callOut]] : tensor<2xf64> to memref<2xf64>
+    // CHECK: [[res:%.+]] = bufferization.to_buffer [[callOut]] : tensor<2xf64> to memref<2xf64>
     // CHECK: memref.copy [[res]], %arg1 : memref<2xf64> to memref<2xf64>
     // CHECK: gradient.return {empty = true}
 
 	%0 = bufferization.to_tensor %arg1 : memref<2xf64> to tensor<2xf64>
 	%1 = bufferization.to_tensor %arg0 : memref<f64> to tensor<f64>
 	%2 = func.call @callback_fn_vjp(%0, %1) : (tensor<2xf64>, tensor<f64>) -> tensor<2xf64>
-	%3 = bufferization.to_memref %2 : tensor<2xf64> to memref<2xf64>
+	%3 = bufferization.to_buffer %2 : tensor<2xf64> to memref<2xf64>
 	gradient.return {empty = true} %3 : memref<2xf64>
 }

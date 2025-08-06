@@ -20,6 +20,7 @@ import pennylane as qml
 import pytest
 
 from catalyst import api_extensions, cond, measure, qjit
+from catalyst.utils.exceptions import PlxprCaptureCFCompatibilityError
 
 # pylint: disable=missing-function-docstring
 
@@ -451,6 +452,43 @@ class TestCond:
         ):
             qjit(h)
 
+    @pytest.mark.usefixtures("disable_capture")
+    def test_cond_raises_compatibility_error_with_capture(self):
+        """Test that cond raises PlxprCaptureCFCompatibilityError when capture mode is enabled."""
+        qml.capture.enable()
+
+        with pytest.raises(PlxprCaptureCFCompatibilityError) as exc_info:
+
+            @cond(True)
+            def cond_fn():
+                return 1
+
+        # Verify the error message is specific and helpful
+        error_msg = str(exc_info.value)
+        assert "catalyst.cond is not supported with PennyLane's capture enabled" in error_msg
+
+    @pytest.mark.usefixtures("disable_capture")
+    def test_cond_raises_compatibility_error_with_capture_integration(self):
+        """Test that cond raises PlxprCaptureCFCompatibilityError when capture mode is enabled."""
+        qml.capture.enable()
+
+        with pytest.raises(PlxprCaptureCFCompatibilityError) as exc_info:
+
+            @qml.qjit
+            @qml.qnode(qml.device("lightning.qubit", wires=3))
+            def test(n):
+                @cond(n < 5)
+                def loop(n):
+                    qml.X(n)
+
+                loop()
+
+            test(4)
+
+        # Verify the error message is specific and helpful
+        error_msg = str(exc_info.value)
+        assert "catalyst.cond is not supported with PennyLane's capture enabled" in error_msg
+
 
 class TestInterpretationConditional:
     """Test that the conditional operation's execution is semantically equivalent
@@ -748,7 +786,7 @@ class TestCondPredicateConversion:
     def test_conversion_integer(self):
         """Test entry predicate conversion from integer to bool."""
 
-        @qjit()
+        @qjit
         def workflow(x):
             n = 1
 
@@ -768,7 +806,7 @@ class TestCondPredicateConversion:
     def test_conversion_float(self):
         """Test entry predicate conversion from float to bool."""
 
-        @qjit()
+        @qjit
         def workflow(x):
             n = 2.0
 
@@ -788,7 +826,7 @@ class TestCondPredicateConversion:
     def test_jax_bool(self):
         """Test entry predicate with a JAX bool."""
 
-        @qjit()
+        @qjit
         def workflow(x):
             n = jnp.bool_(True)
 
@@ -808,7 +846,7 @@ class TestCondPredicateConversion:
     def test_else_if_conversion_integer(self):
         """Test else_if predicate conversion from integer to bool."""
 
-        @qjit()
+        @qjit
         def workflow(x):
             n = 1
 
