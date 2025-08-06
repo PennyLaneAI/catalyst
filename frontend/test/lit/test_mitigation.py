@@ -32,7 +32,7 @@ def mcm_method_with_zne():
         return qml.expval(qml.PauliZ(0))
 
     s = [1, 3]
-    g = qml.set_shots(qml.QNode(circuit, dev, mcm_method="one-shot"), shots = 5)
+    g = qml.set_shots(qml.QNode(circuit, dev, mcm_method="one-shot"), shots=5)
     return mitigate_with_zne(g, scale_factors=s)()
 
 

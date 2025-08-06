@@ -27,7 +27,6 @@ import pytest
 from conftest import CONFIG_CUSTOM_DEVICE
 from pennylane.devices import Device
 from pennylane.devices.capabilities import OperatorProperties
-from pennylane.exceptions import PennyLaneDeprecationWarning
 from pennylane.transforms import split_non_commuting, split_to_single_terms
 
 from catalyst import qjit
@@ -566,8 +565,10 @@ class TestMeasurementTransforms:
         theta = 2.5
         res = circuit(theta)
 
-        if len(circuit._shots.shot_vector) != 1:
-            assert len(res) == len(circuit._shots.shot_vector)
+        shots = 3000  # From @qml.set_shots(3000) decorator
+        shot_vector = qml.measurements.Shots(shots).shot_vector
+        if len(shot_vector) != 1:
+            assert len(res) == len(shot_vector)
 
         assert np.allclose(res, expected_res(theta), atol=0.05)
 

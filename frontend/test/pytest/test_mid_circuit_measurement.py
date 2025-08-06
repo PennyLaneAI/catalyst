@@ -854,12 +854,12 @@ class TestDynamicOneShotIntegration:
 
         @qjit
         def C_workflow():
-            f = qml.set_shots(qml.QNode(circuit_rx, device=dev, mcm_method="one-shot"), shots = 5)
+            f = qml.set_shots(qml.QNode(circuit_rx, device=dev, mcm_method="one-shot"), shots=5)
             return C_jvp(f, x, t, method=diff_method, argnum=list(range(len(x))))
 
         @qjit
         def J_workflow():
-            f = qml.set_shots(qml.QNode(circuit_rx, device=dev), shots = 5)
+            f = qml.set_shots(qml.QNode(circuit_rx, device=dev), shots=5)
             return C_jvp(f, x, t, method=diff_method, argnum=list(range(len(x))))
 
         r1 = C_workflow()
@@ -890,12 +890,12 @@ class TestDynamicOneShotIntegration:
 
         @qjit
         def C_workflow():
-            f = qml.set_shots(qml.QNode(circuit_rx, device=dev, mcm_method="one-shot"), shots = 5)
+            f = qml.set_shots(qml.QNode(circuit_rx, device=dev, mcm_method="one-shot"), shots=5)
             return C_vjp(f, x, ct, method=diff_method, argnum=list(range(len(x))))
 
         @qjit
         def J_workflow():
-            f = qml.set_shots(qml.QNode(circuit_rx, device=dev), shots = 5)
+            f = qml.set_shots(qml.QNode(circuit_rx, device=dev), shots=5)
             return C_vjp(f, x, ct, method=diff_method, argnum=list(range(len(x))))
 
         r1 = C_workflow()

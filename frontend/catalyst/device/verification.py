@@ -17,7 +17,7 @@ This module contains the functions to verify quantum tapes are fully compatible
 with the compiler and device.
 """
 
-from typing import Any, Callable, List, Sequence, Union
+from typing import Any, Callable, List, Sequence
 
 from pennylane import transform
 from pennylane.devices.capabilities import DeviceCapabilities, OperatorProperties
