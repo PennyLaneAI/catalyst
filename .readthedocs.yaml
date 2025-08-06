@@ -25,6 +25,12 @@ build:
     - cmake
     - ninja-build
     - clang
+    - make
+  jobs:
+    pre-build: # ensure dialects are generated and copied across before site gen
+      - make -C mlir dialect-docs
+      - cp mlir/build/docs/*Passes.md ./docs/code/passes
+      - find ./mlir/build/docs -type d -exec cp -r "{}" "./docs/code/dialects/" \
 
 # Optionally set the version of Python and requirements required to build your docs
 python:
