@@ -10,6 +10,5 @@ This document contains the respective Catalyst-defined MLIR dialects, and their 
    gradient
    ion
    mbqc
-   mbqc
    mitigation
    quantum
