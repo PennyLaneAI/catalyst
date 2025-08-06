@@ -1,6 +1,6 @@
 add_mlir_dialect(IonOps ion)
 add_mlir_interface(IonInterfaces)
-add_mlir_doc(IonDialect IonDialect -gen-dialect-doc Ion/)
+add_mlir_doc(IonDialect IonDialect Ion/ -gen-dialect-doc)
 add_mlir_doc(IonOps IonOps Ion/ -gen-op-doc)
 add_mlir_doc(IonInterfaces  IonInterfaces Ion/ -gen-op-interface-docs)
 

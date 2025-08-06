@@ -197,6 +197,24 @@ dialects:
 
 	cmake --build $(DIALECTS_BUILD_DIR) --target check-dialects quantum-lsp-server catalyst-cli check-unit-tests
 
+.PHONY: dialect-docs
+dialect-docs:
+
+	@echo "build quantum-lsp and dialects"
+	cmake -G Ninja -S . -B $(DIALECTS_BUILD_DIR) \
+		-DLLVM_ENABLE_ASSERTIONS=ON \
+		-DQUANTUM_ENABLE_BINDINGS_PYTHON=ON \
+		-DPython3_EXECUTABLE=$(PYTHON) \
+		-DPython3_NumPy_INCLUDE_DIRS=$(shell $(PYTHON) -c "import numpy as np; print(np.get_include())") \
+		-DEnzyme_DIR=$(ENZYME_BUILD_DIR) \
+		-DENZYME_SRC_DIR=$(MK_DIR)/Enzyme \
+		-DMLIR_DIR=$(LLVM_BUILD_DIR)/lib/cmake/mlir \
+		-DRUNTIME_LIB_DIR=$(RT_BUILD_DIR)/lib \
+		-DMLIR_LIB_DIR=$(LLVM_BUILD_DIR)/lib \
+		-DCATALYST_DOCS_ONLY=ON
+
+	cmake --build $(DIALECTS_BUILD_DIR) --target mlir-doc
+
 .PHONY: test
 test:
 	@echo "test the Catalyst MLIR dialects test suite"
