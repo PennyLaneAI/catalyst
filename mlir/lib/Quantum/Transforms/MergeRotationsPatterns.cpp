@@ -140,7 +140,7 @@ struct MergeRotationsRewritePattern : public OpRewritePattern<OpType> {
         mlir::Value thetaF;
         mlir::Value omegaF;
 
-        // TODO: use an epsilon for double comparison here?
+        // TODO: should we use an epsilon for comparing doubles here?
         bool omega1IsZero = omega1Opt.has_value() && omega1Opt.value() == 0.0;
         bool phi2IsZero = phi2Opt.has_value() && phi2Opt.value() == 0.0;
         bool theta1IsZero = theta1Opt.has_value() && theta1Opt.value() == 0.0;
@@ -157,14 +157,6 @@ struct MergeRotationsRewritePattern : public OpRewritePattern<OpType> {
         auto zeroConst = rewriter.create<arith::ConstantOp>(loc, rewriter.getF64FloatAttr(0.0));
         if (omega1IsZero && phi2IsZero) {
             phiF = phi1;
-            // TODO: is it worth programming constant folding here?
-            // if (theta1Opt.has_value() && theta2Opt.has_value()) {
-            //     auto thetaFValue = theta1Opt.value() + theta2Opt.value();
-            //     auto thetaFAttr = rewriter.getF64FloatAttr(thetaFValue);
-            //     thetaF = rewriter.create<arith::ConstantOp>(loc, thetaFAttr);
-            // } else {
-            //     thetaF = rewriter.create<arith::AddFOp>(loc, theta1, theta2);
-            // }
             thetaF = rewriter.create<arith::AddFOp>(loc, theta1, theta2);
             omegaF = omega2;
         }
@@ -239,8 +231,8 @@ struct MergeRotationsRewritePattern : public OpRewritePattern<OpType> {
             // TODO: can we check these problematic scenarios for differentiability by code?
             // Problematic scenarios for differentiability:
             //
-            // 1. if (is_close_to(cF, 0)) { /* sqrt not differentiable at 0 */ return failure(); }
-            // 2. if (is_close_to(cF, 1)) { /* acos not differentiable at 1 */ return failure(); }
+            // 1. if (cF == 0) { /* sqrt not differentiable at 0 */ return failure(); }
+            // 2. if (cF == 1) { /* acos not differentiable at 1 */ return failure(); }
 
             // θF = 2 * acos(cF)
             auto acosCF = rewriter.create<math::AcosOp>(loc, cF);
