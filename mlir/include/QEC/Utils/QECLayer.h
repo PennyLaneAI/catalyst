@@ -55,7 +55,6 @@ class QECLayerContext {
 };
 
 class QECLayer {
-
   private:
     llvm::DenseMap<mlir::Value, mlir::Value> resultToOperand;
     QECLayerContext *context; // Reference to thread-local context
