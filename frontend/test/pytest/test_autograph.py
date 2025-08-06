@@ -47,10 +47,13 @@ from catalyst.autograph.transformer import TRANSFORMER
 from catalyst.utils.dummy import dummy_func
 from catalyst.utils.exceptions import CompileError
 
+
 def check_cache(*args):
+    """Dispatches between the two transform has cache calls."""
     if qml.capture.enabled():
         return capture_TRANSFORMER.has_cache(*args)
     return TRANSFORMER.has_cache(*args)
+
 
 # pylint: disable=import-outside-toplevel
 # pylint: disable=unnecessary-lambda-assignment
@@ -209,7 +212,6 @@ class TestIntegration:
         with pytest.raises(AutoGraphError, match="Unsupported object for transformation"):
             run_autograph(fn)
 
-
     def test_callable_object(self):
         """Test qjit applied to a callable object."""
 
@@ -225,7 +227,6 @@ class TestIntegration:
 
         assert qjit(autograph=True)(fn)(3) == 9
 
-
     def test_lambda(self):
         """Test autograph on a lambda function."""
 
@@ -235,7 +236,6 @@ class TestIntegration:
         assert hasattr(fn.user_function, "ag_unconverted")
         assert check_cache(fn.original_function)
         assert fn(4) == 16
-
 
     def test_classical_function(self):
         """Test autograph on a purely classical function."""
@@ -247,7 +247,6 @@ class TestIntegration:
         assert hasattr(fn.user_function, "ag_unconverted")
         assert check_cache(fn.original_function)
         assert fn(4) == 16
-
 
     def test_nested_function(self):
         """Test autograph on nested classical functions."""
@@ -264,7 +263,6 @@ class TestIntegration:
         assert check_cache(inner)
         assert fn(4) == 16
 
-
     def test_qnode(self):
         """Test autograph on a QNode."""
 
@@ -277,7 +275,6 @@ class TestIntegration:
         assert hasattr(fn.user_function, "ag_unconverted")
         assert check_cache(fn.original_function.func)
         assert fn(np.pi) == -1
-
 
     def test_indirect_qnode(self):
         """Test autograph on a QNode called from within a classical function."""
@@ -295,7 +292,6 @@ class TestIntegration:
         assert check_cache(fn.original_function)
         assert check_cache(inner.func)
         assert fn(np.pi) == -1
-
 
     def test_multiple_qnode(self):
         """Test autograph on multiple QNodes called from different classical functions."""
@@ -320,7 +316,6 @@ class TestIntegration:
         assert check_cache(inner2.func)
         assert fn(np.pi) == -2
 
-
     def test_nested_qjit(self):
         """Test autograph on a QJIT function called from within the compilation entry point."""
 
@@ -339,7 +334,6 @@ class TestIntegration:
         assert check_cache(inner.user_function.func)
         assert fn(np.pi) == -1
 
-
     @pytest.mark.parametrize("adjoint_fn", [adjoint, qml.adjoint])
     def test_adjoint_wrapper(self, adjoint_fn):
         """Test conversion is happening succesfully on functions wrapped with 'adjoint'."""
@@ -356,7 +350,6 @@ class TestIntegration:
         assert hasattr(fn.user_function, "ag_unconverted")
         assert check_cache(inner)
         assert np.allclose(fn(np.pi), [0.0, 1.0])
-
 
     @pytest.mark.parametrize("ctrl_fn", [ctrl, qml.ctrl])
     def test_ctrl_wrapper(self, ctrl_fn):
@@ -1562,7 +1555,7 @@ class TestWhileLoops:
                 x = 3
 
             return x
-        
+
         err_type = qml.exceptions.AutoGraphError if qml.capture.enabled() else AutoGraphError
 
         with pytest.raises(err_type, match="'x' was initialized with type <class 'str'>"):
@@ -1578,10 +1571,10 @@ class TestWhileLoops:
 
             while pred:
                 x = 3
-                pred=False
+                pred = False
 
             return x
-        
+
         err_type = qml.exceptions.AutoGraphError if qml.capture.enabled() else AutoGraphError
 
         with pytest.raises(err_type, match="'x' was initialized with the wrong type"):
@@ -1790,7 +1783,6 @@ class TestMixed:
 
             assert f1() == 0 + 1 + sum([1, 2, 3])
 
-    
     @pytest.mark.usefixtures("use_both_frontend")
     def test_no_python_loops(self):
         """Test AutoGraph behaviour on function with Catalyst loops."""
@@ -1936,6 +1928,20 @@ class TestAutographInclude:
 
         assert dummy_func(6) == 36
         assert dummy_func(4) == 64
+
+    @pytest.mark.usefixtures("disable_capture")
+    def test_error_if_capture_and_autograph_include(self):
+        """Test that an error is raised if autograph include is set."""
+
+        qml.capture.enable()
+
+        with pytest.raises(NotImplementedError, match="autograph_include"):
+
+            @qjit(autograph=True, autograph_include=["catalyst.utils.dummy"])
+            def included(x: float, n: int):
+                for _ in range(n):
+                    x = x + dummy_func(6)
+                return x
 
     def test_autograph_included_module(self):
         """Test autograph included module."""
