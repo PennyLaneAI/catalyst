@@ -9,7 +9,7 @@ sphinx:
 
 # Exclude all submodules
 submodules:
-  include: all
+  exclude: all
 
 # Optionally build your docs in additional formats such as PDF and ePub
 formats:
@@ -25,12 +25,6 @@ build:
     - cmake
     - ninja-build
     - clang
-    - make
-  jobs:
-    pre_build: # ensure dialects are generated and copied across before site gen
-      - make -C mlir dialect-docs
-      - cp mlir/build/docs/*Passes.md ./docs/code/passes
-      - find ./mlir/build/docs -type d -exec cp -r "{}" "./docs/code/dialects/" \
 
 # Optionally set the version of Python and requirements required to build your docs
 python:
