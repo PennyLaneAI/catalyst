@@ -182,6 +182,12 @@ class WorkflowInterpreter(PlxprInterpreter):
         super().__init__()
 
 
+def _decompose_jaxpr_to_gateset(qfunc_jaxpr, consts, device):
+    gate_set = set(device.capabilities.operations)
+    targs = ()
+    tkwargs = {"gate_set": gate_set}
+    return qml.transforms.decompose.plxpr_transform(qfunc_jaxpr, consts, targs, tkwargs)
+
 # pylint: disable=unused-argument, too-many-arguments
 @WorkflowInterpreter.register_primitive(qnode_prim)
 def handle_qnode(
@@ -191,7 +197,8 @@ def handle_qnode(
     consts = args[:n_consts]
     non_const_args = args[n_consts:]
 
-    closed_jaxpr = ClosedJaxpr(qfunc_jaxpr, consts)
+    # hopefully this patch stays patchy and doesn't become permanent
+    closed_jaxpr = _decompose_jaxpr_to_gateset(qfunc_jaxpr, consts, device)
 
     def extract_shots_value(shots: qml.measurements.Shots | int):
         """Extract the shots value according to the type"""
