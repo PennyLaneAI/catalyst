@@ -40,6 +40,7 @@
 <h3>Internal changes ⚙️</h3>
 
 * When capture is enabled, `qjit(autograph=True)` will use capture autograph instead of catalyst autograph.
+  [(#1960)](https://github.com/PennyLaneAI/catalyst/pull/1960)
 
 * Raise warning when subroutines are used without capture enabled.
   [(#1930)](https://github.com/PennyLaneAI/catalyst/pull/1930)
