@@ -1274,11 +1274,11 @@ def test_loop_with_dyn_wires(backend):
 
 
 def test_pytrees_return_qnode(backend):
-    """Test the gradient on a function with a return including list and dictionnaries"""
+    """Test the gradient on a function with a return including list and dictionaries"""
     num_wires = 1
     dev = qml.device(backend, wires=num_wires)
 
-    @qml.qnode(dev)
+    @qml.qnode(dev, diff_method="parameter-shift")
     def circuit(phi, psi):
         qml.RY(phi, wires=0)
         qml.RX(psi, wires=0)
@@ -1297,7 +1297,7 @@ def test_pytrees_return_qnode(backend):
     assert len(result[1]) == 2
 
 
-def test_calssical_kwargs():
+def test_classical_kwargs():
     """Test the gradient on a classical function with keyword arguments"""
 
     @qjit
@@ -1698,7 +1698,7 @@ def test_paramshift_with_gates(gate, state):
     dev = qml.device("lightning.qubit", wires=1)
 
     @grad
-    @qml.qnode(dev, diff_method="parameter-shift")
+    @qml.qnode(dev)
     def cost(x):
         gate(state, wires=0)
         qml.RY(x, wires=0)

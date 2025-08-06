@@ -22,7 +22,11 @@ from jax._src import core, util
 from jax._src.lib.mlir import ir
 from jax.interpreters import mlir
 from jaxlib.mlir.dialects.builtin import ModuleOp
+from jax.extend.core import Primitive
+from jax._src import core
+from pennylane import QNode
 from jaxlib.mlir.dialects.func import CallOp
+from catalyst.jax_extras import Jaxpr
 from mlir_quantum.dialects._transform_ops_gen import (
     ApplyRegisteredPassOp,
     NamedSequenceOp,
@@ -113,14 +117,25 @@ def lower_callable_to_funcop(ctx, callable_, call_jaxpr):
 
     if isinstance(callable_, qml.QNode):
         func_op.attributes["qnode"] = ir.UnitAttr.get()
-        # "best", the default option in PennyLane, chooses backprop on the device
-        # if supported and parameter-shift otherwise. Emulating the same behaviour
-        # would require generating code to query the device.
-        # For simplicity, Catalyst instead defaults to parameter-shift.
-        diff_method = (
-            "parameter-shift" if callable_.diff_method == "best" else str(callable_.diff_method)
-        )
+        
+        diff_method = str(callable_.diff_method)
+
+        if diff_method == "best":
+            def only_expval():
+                for eqn in call_jaxpr.eqns:
+                    if eqn.primitive.name in ("probs", "var", "state", "counts", "sample"):
+                        return False
+                return True
+        
+            device_name = getattr(getattr(callable_, 'device', None), 'name', None)
+
+            if device_name and "lightning" in device_name and only_expval():
+                diff_method = "adjoint"
+            else:
+                diff_method = "parameter-shift"
+
         func_op.attributes["diff_method"] = ir.StringAttr.get(diff_method)
+        
 
     return func_op
 
