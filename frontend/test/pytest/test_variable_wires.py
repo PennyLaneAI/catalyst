@@ -92,8 +92,8 @@ class TestBasicCircuits:
         result = qjit(qml.set_shots(qml.qnode(qml.device(backend, wires=3))(circuit), shots=10))(
             *args
         )
-        expected = qml.set_shots(qml.qnode(qml.device("default.qubit", wires=3)), shots=10)(
-            circuit
+        expected = qml.set_shots(
+            qml.qnode(qml.device("default.qubit", wires=3))(circuit), shots=10
         )(*args)
         assert np.allclose(result, expected)
 

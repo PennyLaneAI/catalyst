@@ -51,9 +51,13 @@ class TestSample:
     def test_sample_on_1qbit(self, backend):
         """Test sample on 1 qubit."""
 
+        with pytest.warns(
+            qml.exceptions.PennyLaneDeprecationWarning, match="shots on device is deprecated"
+        ):
+            device = qml.device(backend, wires=1, shots=1000)
+
         @qjit
-        @qml.set_shots(1000)
-        @qml.qnode(qml.device(backend, wires=1))
+        @qml.qnode(device)
         def sample_1qbit(x: float):
             qml.RX(x, wires=0)
             return qml.sample()
@@ -69,9 +73,13 @@ class TestSample:
     def test_sample_on_2qbits(self, backend):
         """Test sample on 2 qubits."""
 
+        with pytest.warns(
+            qml.exceptions.PennyLaneDeprecationWarning, match="shots on device is deprecated"
+        ):
+            device = qml.device(backend, wires=1, shots=1000)
+
         @qjit
-        @qml.set_shots(1000)
-        @qml.qnode(qml.device(backend, wires=2))
+        @qml.qnode(device)
         def sample_2qbits(x: float):
             qml.RX(x, wires=0)
             qml.RY(x, wires=1)

@@ -135,7 +135,7 @@ class TestPyTreesReturnValues:
         assert isinstance(result[0], tuple)
         assert jnp.allclose(result[1], expected_expval, atol=tol_stochastic, rtol=tol_stochastic)
 
-        @qml.set_shots(1000)
+        @qml.set_shots(None)
         @qml.qnode(qml.device(backend, wires=2))
         def circuit4(params):
             qml.RX(params[0], wires=0)
