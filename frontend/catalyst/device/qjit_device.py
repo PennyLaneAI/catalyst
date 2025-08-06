@@ -358,7 +358,7 @@ class QJITDevice(qml.devices.Device):
 
         if execution_config is None:
             execution_config = qml.devices.ExecutionConfig()
-        # Use shots parameter instead of execution_config.shots since ExecutionConfig doesn't have shots field
+        shots = execution_config.shots
         _, config = self.original_device.preprocess(execution_config)
 
         program = TransformProgram()
