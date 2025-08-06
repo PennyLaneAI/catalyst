@@ -358,7 +358,6 @@ class QJITDevice(qml.devices.Device):
 
         if execution_config is None:
             execution_config = qml.devices.ExecutionConfig()
-        shots = execution_config.shots
         _, config = self.original_device.preprocess(execution_config)
 
         program = TransformProgram()
