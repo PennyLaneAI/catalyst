@@ -51,7 +51,6 @@ from catalyst.utils.exceptions import CompileError
 
 def check_cache(*args):
     if qml.capture.enabled():
-        print(args)
         return capture_TRANSFORMER.has_cache(*args)
     return TRANSFORMER.has_cache(*args)
 
