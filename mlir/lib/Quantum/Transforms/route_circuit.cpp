@@ -28,6 +28,7 @@
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/IR/Value.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "llvm/ADT/DenseMap.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "llvm/ADT/DenseMap.h"
@@ -273,7 +274,7 @@ struct RoutingPass : public impl::RoutingPassBase<RoutingPass> {
         std::set<int> physicalQubits;
         llvm::DenseMap<std::pair<int, int>, bool> couplingMap = parseHardwareGraph(hardwareGraph, ";", &physicalQubits);
         int dagLogicalQubits;
-        // int numLogicalQubits = physicalQubits.size(); // works with automatic qubit management
+        int numLogicalQubits = physicalQubits.size(); // works with automatic qubit management
 
         // distance matrix
         llvm::DenseMap<std::pair<int,int>, int> distanceMatrix;
@@ -389,37 +390,75 @@ struct RoutingPass : public impl::RoutingPassBase<RoutingPass> {
                 llvm::outs() << compile_qubits << " ";
             llvm::outs() << "\n";
         }
-        // Operation *allocOp = nullptr;
-        // Operation *deallocOp = nullptr;
-        // mlir::Block *block = nullptr;
-        // getOperation()->walk([&](Operation *op) {
-        //     if (isa<quantum::AllocOp>(op)) 
-        //     {
-        //         allocOp = op;
-        //         auto func = op->getParentOfType<func::FuncOp>();
-        //         block = &func.front();
+        mlir::func::FuncOp func;
+        getOperation()->walk([&](Operation *op) {
+            if (isa<quantum::AllocOp>(op)) 
+                func = op->getParentOfType<func::FuncOp>();
+        });
 
-        //     }
-        //     if (isa<quantum::DeallocOp>(op)) 
-        //         deallocOp = op;
-        // });
-        // auto allocIt = std::find_if(block->begin(), block->end(), [&](mlir::Operation &op) {
-        //     return &op == allocOp;
-        // });
+        mlir::ModuleOp module = func->getParentOfType<mlir::ModuleOp>();
+        mlir::MLIRContext *context = &getContext();
+        mlir::OpBuilder builder(context);
+        builder.setInsertionPointToEnd(module.getBody());
+        mlir::FunctionType funcType = builder.getFunctionType(
+            /*inputs=*/{}, /*results=*/{});
+        mlir::func::FuncOp newFunc = builder.create<mlir::func::FuncOp>(
+            builder.getUnknownLoc(), (func.getName().str() + "_routed"), funcType);
 
-        // auto deallocIt = std::find_if(block->begin(), block->end(), [&](mlir::Operation &op) {
-        //     return &op == deallocOp;
-        // });
+        // changing signature of new func
+        // mlir::FunctionType originalFuncType = func.getFunctionType();
+        // mlir::TypeRange originalResultTypes = originalFuncType.getResults();
+        // mlir::TypeRange newFuncInputTypes = newFunc.getFunctionType().getInputs();
+        // mlir::FunctionType newFuncType = builder.getFunctionType(
+        //     func.getFunctionType(),      
+        //     originalResultTypes
+        // );
+        // newFunc.setType(newFuncType);
 
-        // if (allocIt == block->end() || deallocIt == block->end())
-        //     return;
+        // insert allocs
+        newFunc.addEntryBlock();
+        builder.setInsertionPointToStart(&newFunc.getBody().front());
 
-        // for (auto it = std::next(allocIt); it != deallocIt;) {
-        //     auto toErase = it++;
-        //     toErase->erase();
-        // }
+        // 3. Create the AllocOp and other operations for the new function's body.
+        Type quregType = builder.getType<catalyst::quantum::QuregType>();
+        IntegerAttr numQubitsAttr = builder.getI64IntegerAttr(numLogicalQubits);
+        mlir::Operation *allocOp = builder.create<quantum::AllocOp>(builder.getUnknownLoc(), quregType, mlir::Value{}, numQubitsAttr);
+
+        builder.setInsertionPointAfter(allocOp);
+        mlir::Operation *extractOp = builder.create<quantum::ExtractOp>(
+            builder.getUnknownLoc(), 
+            builder.getType<quantum::QubitType>(), 
+            allocOp->getResult(0),
+            nullptr,
+            builder.getI64IntegerAttr(1)
+        );
+
+        mlir::Value qubitValue = extractOp->getResult(0);
+        llvm::SmallVector<mlir::Type, 4> resultTypes = {builder.getType<quantum::QubitType>()};
+        builder.create<quantum::CustomOp>(
+            builder.getUnknownLoc(), 
+            resultTypes, 
+            TypeRange(),
+            ValueRange(), qubitValue, "Hadamard",
+            false, ValueRange(), ValueRange()
+        );
+
+        // Use the builder to insert operations *after* allocOp.
+        builder.create<quantum::DeallocOp>(builder.getUnknownLoc(), allocOp->getResult(0));
+        builder.create<mlir::func::ReturnOp>(builder.getUnknownLoc());
+
     }
 };
+
+        // change type signature of a func
+        // mlir::FunctionType originalFuncType = func.getFunctionType();
+        // mlir::TypeRange originalResultTypes = originalFuncType.getResults();
+        // mlir::TypeRange newFuncInputTypes = newFunc.getFunctionType().getInputs();
+        // mlir::FunctionType newFuncNewType = builder.getFunctionType(
+        //     func.getFunctionType(),      
+        //     originalResultTypes
+        // );
+        // newFunc.setType(newFuncNewType);
 
         // Rewrite gate
         // mlir::OpBuilder builder(op); // Create OpBuilder
