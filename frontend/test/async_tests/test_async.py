@@ -58,7 +58,7 @@ def test_qnode_execution(backend):
     params = jnp.array([1.0, 2.0])
     compiled = qjit(async_qnodes=True)(multiple_qnodes)
     observed = compiled(params)
-    expected = qjit()(multiple_qnodes)(params)
+    expected = qjit(multiple_qnodes)(params)
     assert "async_execute_fn" in compiled.qir
     assert np.allclose(expected, observed)
 

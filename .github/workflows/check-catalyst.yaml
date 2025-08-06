@@ -43,7 +43,7 @@ jobs:
       - name: Checkout Catalyst repo
         uses: actions/checkout@v4
 
-      - name: Set up Python # Ensure python3.10 is used
+      - name: Set up Python # Ensure the "primary" python version is used
         uses: actions/setup-python@v5
         with:
           python-version: ${{ needs.constants.outputs.primary_python_version }}
@@ -56,7 +56,7 @@ jobs:
 
       - name: Get Cached LLVM Source
         id: cache-llvm-source
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: mlir/llvm-project
           key: llvm-${{ needs.constants.outputs.llvm_version }}-default-source
@@ -145,7 +145,7 @@ jobs:
         path: llvm-build
         key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-ci-build-${{ matrix.compiler }}
 
-    - name: Set up Python # Ensure python3.10 is used
+    - name: Set up Python # Ensure the "primary" python version is used
       uses: actions/setup-python@v5
       with:
         python-version: ${{needs.constants.outputs.primary_python_version}}
@@ -184,7 +184,7 @@ jobs:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
 
-    - name: Set up Python # Ensure python3.10 is used
+    - name: Set up Python # Ensure the "primary" python version is used
       uses: actions/setup-python@v5
       with:
         python-version: ${{ needs.constants.outputs.primary_python_version }}
@@ -259,7 +259,7 @@ jobs:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
 
-    - name: Set up Python # Ensure python3.10 is used
+    - name: Set up Python # Ensure the "primary" python version is used
       uses: actions/setup-python@v5
       with:
         python-version: ${{ needs.constants.outputs.primary_python_version }}
@@ -334,7 +334,7 @@ jobs:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
 
-    - name: Set up Python # Ensure python3.10 is used
+    - name: Set up Python # Ensure the "primary" python version is used
       uses: actions/setup-python@v5
       with:
         python-version: ${{ needs.constants.outputs.primary_python_version }}
@@ -458,7 +458,7 @@ jobs:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
 
-    - name: Set up Python # Ensure python3.10 is used
+    - name: Set up Python # Ensure the "primary" python version is used
       uses: actions/setup-python@v5
       with:
         python-version: ${{ needs.constants.outputs.primary_python_version }}
@@ -512,14 +512,12 @@ jobs:
         echo "OQD_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
         echo "CATALYST_BIN_DIR=$(pwd)/quantum-build/bin" >> $GITHUB_ENV
         chmod +x $(pwd)/quantum-build/bin/catalyst  # artifact upload does not preserve permissions
-
-    - name: Run Python Lit Tests
+       
+    - name: Run Python Pytest/Lit Tests
       run: |
-        python3 llvm-build/bin/llvm-lit -sv frontend/test/lit -j$(nproc)
-
-    - name: Run Python Pytest Tests
-      run: |
-        COVERAGE_REPORT="xml:coverage.xml -p no:warnings" \
+        COVERAGE_REPORT="xml" \
+        DIALECTS_BUILD_DIR="$(pwd)/quantum-build" \
+        LLVM_BUILD_DIR="$(pwd)/llvm-build" \
         make coverage-frontend ENABLE_OQD=ON
         mv coverage.xml coverage-${{ github.job }}.xml
 
@@ -546,7 +544,7 @@ jobs:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
 
-    - name: Set up Python # Ensure python3.10 is used
+    - name: Set up Python # Ensure the "primary" python version is used
       uses: actions/setup-python@v5
       with:
         python-version: ${{ needs.constants.outputs.primary_python_version }}
@@ -603,7 +601,7 @@ jobs:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
 
-    - name: Set up Python # Ensure python3.10 is used
+    - name: Set up Python # Ensure the "primary" python version is used
       uses: actions/setup-python@v5
       with:
         python-version: ${{ needs.constants.outputs.primary_python_version }}
@@ -662,7 +660,7 @@ jobs:
       - name: Checkout the repo
         uses: actions/checkout@v4
 
-      - name: Set up Python # Ensure python3.10 is used
+      - name: Set up Python # Ensure the "primary" python version is used
         uses: actions/setup-python@v5
         with:
           python-version: ${{ needs.constants.outputs.primary_python_version }}
@@ -695,7 +693,7 @@ jobs:
       - name: Checkout the repo
         uses: actions/checkout@v4
 
-      - name: Set up Python # Ensure python3.10 is used
+      - name: Set up Python # Ensure the "primary" python version is used
         uses: actions/setup-python@v5
         with:
           python-version: ${{ needs.constants.outputs.primary_python_version }}

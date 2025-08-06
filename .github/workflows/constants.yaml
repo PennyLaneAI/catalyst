@@ -80,17 +80,17 @@ jobs:
       - name: Python versions
         id: python_versions
         run: |
-          echo 'python_versions=["3.10", "3.11", "3.12"]' >> $GITHUB_OUTPUT
+          echo 'python_versions=["3.11", "3.12"]' >> $GITHUB_OUTPUT
 
       - name: Python test versions
         id: python_test_versions
         run: |
-          echo 'python_test_versions=["3.10", "3.11", "3.12", "3.13"]' >> $GITHUB_OUTPUT
+          echo 'python_test_versions=["3.11", "3.12", "3.13"]' >> $GITHUB_OUTPUT
 
       - name: Primary Python version
         id: primary_python_version
         run: |
-          echo 'primary_python_version=3.10' >> $GITHUB_OUTPUT
+          echo 'primary_python_version=3.11' >> $GITHUB_OUTPUT
 
       - name: Get last build python version for forward compatibility
         id: forward_compat_python_version
@@ -105,13 +105,11 @@ jobs:
       - name: Compilers (All)
         id: compilers
         run: |
-          if [[ $MULTIPLE ]]; then
+          if [[ "${{ inputs.multiple_compilers }}" == "true" ]]; then
             echo 'compilers=["gcc", "clang"]' >> $GITHUB_OUTPUT
           else
             echo 'compilers=["gcc"]' >> $GITHUB_OUTPUT
           fi
-        env:
-          MULTIPLE: ${{ inputs.multiple_compilers }}
 
     outputs:
       llvm_version: ${{ steps.llvm_version.outputs.llvm_version }}

@@ -132,7 +132,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      */
     void ReleaseQubit(QubitIdType q)
     {
-        if (!num_qubits_) {
+        if (num_qubits_) {
             num_qubits_--;
             this->qubit_manager.Release(q);
         }

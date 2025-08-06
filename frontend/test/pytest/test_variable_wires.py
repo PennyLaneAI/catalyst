@@ -155,7 +155,7 @@ class TestControlFlow:
     def test_conditional(self, args, expected, backend):
         """Test conditional."""
 
-        @qjit()
+        @qjit
         @qml.qnode(qml.device(backend, wires=2))
         def circuit(x: int, y: int):
             @cond(x > 4)
@@ -177,7 +177,7 @@ class TestControlFlow:
     def test_while_loop_with_func_arg_wires(self, args, expected, backend):
         """Test while loop with func arg wires."""
 
-        @qjit()
+        @qjit
         @qml.qnode(qml.device(backend, wires=2))
         def circuit(n: int, m: int):
             @while_loop(lambda v: v[0] < v[1])
@@ -204,7 +204,7 @@ class TestControlFlow:
     def test_while_loop_with_loop_arg_wires(self, args, expected, backend):
         """Test while loop with loop arg wires."""
 
-        @qjit()
+        @qjit
         @qml.qnode(qml.device(backend, wires=5))
         def circuit(n: int, m: int):
             qml.RX(jnp.pi, wires=0)

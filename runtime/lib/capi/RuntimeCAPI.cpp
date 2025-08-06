@@ -525,10 +525,19 @@ void __catalyst__qis__SetBasisState(MemRefT_int8_1d *data, uint64_t numQubits, .
     getQuantumDevicePtr()->SetBasisState(data_view, wires);
 }
 
-void __catalyst__qis__Identity(QUBIT *qubit, const Modifiers *modifiers)
+void __catalyst__qis__Identity(const Modifiers *modifiers, int64_t numQubits, ...)
 {
-    getQuantumDevicePtr()->NamedOperation("Identity", {}, {reinterpret_cast<QubitIdType>(qubit)},
-                                          MODIFIERS_ARGS(modifiers));
+    RT_ASSERT(numQubits >= 0);
+    va_list args;
+    va_start(args, numQubits);
+    std::vector<QubitIdType> wires(numQubits);
+    for (int64_t i = 0; i < numQubits; i++) {
+        wires[i] = va_arg(args, QubitIdType);
+    }
+    va_end(args);
+
+    getQuantumDevicePtr()->NamedOperation("Identity", {}, wires,
+                                          /* modifiers */ MODIFIERS_ARGS(modifiers));
 }
 
 void __catalyst__qis__PauliX(QUBIT *qubit, const Modifiers *modifiers)

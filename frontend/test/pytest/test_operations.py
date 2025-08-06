@@ -27,6 +27,7 @@ def test_no_parameters(backend):
 
     def circuit():
         qml.Identity(wires=0)
+        qml.Identity(wires=[0, 1])
 
         qml.PauliX(wires=1)
         qml.PauliY(wires=2)
@@ -88,7 +89,7 @@ def test_no_parameters(backend):
 
         return qml.state()
 
-    qjit_fn = qjit()(qml.qnode(qml.device(backend, wires=4))(circuit))
+    qjit_fn = qjit(qml.qnode(qml.device(backend, wires=4))(circuit))
     qml_fn = qml.qnode(qml.device("default.qubit", wires=4))(circuit)
 
     assert np.allclose(qjit_fn(), qml_fn())
@@ -143,7 +144,7 @@ def test_param(backend):
 
         return qml.state()
 
-    qjit_fn = qjit()(qml.qnode(qml.device(backend, wires=4))(circuit))
+    qjit_fn = qjit(qml.qnode(qml.device(backend, wires=4))(circuit))
     qml_fn = qml.qnode(qml.device("default.qubit", wires=4))(circuit)
 
     assert np.allclose(qjit_fn(3.14, 0.6), qml_fn(3.14, 0.6))
@@ -196,7 +197,7 @@ def test_hybrid_op_repr(backend):
                 assert not has_nested_tapes(op)
         return qml.state()
 
-    qjit()(qml.qnode(qml.device(backend, wires=4))(circuit))(1)
+    qjit(qml.qnode(qml.device(backend, wires=4))(circuit))(1)
 
 
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
@@ -209,7 +210,7 @@ def test_qubitunitary_complex(inp, backend):
         qml.QubitUnitary(U1, wires=0)
         return qml.expval(qml.PauliY(0))
 
-    @qjit()
+    @qjit
     def compiled(x: float):
         g = qml.qnode(qml.device(backend, wires=1))(f)
         return g(x)

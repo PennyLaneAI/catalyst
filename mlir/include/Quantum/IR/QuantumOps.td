@@ -63,6 +63,12 @@ class Quantum_Op<string mnemonic, list<Trait> traits = []> : Op<QuantumDialect, 
 def InitializeOp : Quantum_Op<"init"> {
     let summary = "Initialize the quantum runtime.";
 
+    let description = [{
+        The execution of this operation corresponds to the execution of Catalyst's runtime function
+        ``__catalyst__rt__initialize`` which is the first function that will be called for the duration
+        of the whole compiled object.
+    }];
+
     let assemblyFormat = [{
         attr-dict
     }];
@@ -70,6 +76,12 @@ def InitializeOp : Quantum_Op<"init"> {
 
 def FinalizeOp : Quantum_Op<"finalize"> {
     let summary = "Teardown the quantum runtime.";
+
+    let description = [{
+        Executing this instruction concretely corresponds to executing the
+        ``__catalyst__rt__finalize`` function in the runtime which is expected
+        to be the very last thing executed by the library.
+    }];
 
     let assemblyFormat = [{
         attr-dict
@@ -552,7 +564,9 @@ def CustomOp : UnitaryGate_Op<"custom", [DifferentiableGate, NoMemoryEffect,
 
 def GlobalPhaseOp : UnitaryGate_Op<"gphase", [DifferentiableGate, AttrSizedOperandSegments]> {
     let summary = "Global Phase.";
+
     let description = [{
+    	Applies global phase to the current system.
     }];
 
     let arguments = (ins
@@ -594,6 +608,11 @@ def MultiRZOp : UnitaryGate_Op<"multirz", [DifferentiableGate, NoMemoryEffect,
     let description = [{
         The `quantum.multirz` operation applies an arbitrary multi Z rotation to the state-vector.
         The arguments are the rotation angle `theta` and a set of qubits the operation acts on.
+
+        .. note::
+            This operation is one of the few quantum operations that is not applied via
+            ``quantum.custom``. The reason for this is that it needs to be handled in a special
+            way during the lowering due to its C function being variadic on the number of qubits.
     }];
 
     let arguments = (ins
@@ -919,14 +938,25 @@ def SampleOp : Measurement_Op<"sample", [AttrSizedOperandSegments]> {
         {
             quantum.device shots(%shots) ["rtd_lightning.so", "lightning.qubit", "{my_attr: my_attr_value}"]
             %obs1 = quantum.compbasis %q0, %q1 : !quantum.obs
-            %samples = quantum.samples %obs1 : tensor<?xf64>
+            %samples = quantum.sample %obs1 : tensor<?xf64>
 
             %obs2 = quantum.pauli %q0[3], %q1[1] : !quantum.obs
-            %samples2 = quantum.samples %obs2 : tensor<?x2xf64>
+            %samples2 = quantum.sample %obs2 : tensor<?x2xf64>
 
             func.return
         }
         ```
+
+        .. note::
+
+            The return value type depends on the type of observable provided. Computational
+            basis samples are returned as a 2D array of shape (shot number, number of qubits), with all
+            other obversables the output is a 1D array of lenth equal to the shot number.
+
+        .. note::
+
+            The ``in_data`` field is needed only after bufferization. It is an implementation detail that
+            transform writers are unlikely to be worried about.
     }];
 
     let arguments = (ins
@@ -1115,6 +1145,10 @@ def ProbsOp : Measurement_Op<"probs", [AttrSizedOperandSegments]> {
             func.return
         }
         ```
+
+        .. note::
+
+            The optional operand ``state_in`` is only used after bufferization.
     }];
 
     let arguments = (ins
@@ -1158,7 +1192,8 @@ def StateOp : Measurement_Op<"state", [AttrSizedOperandSegments]> {
         ```mlir
         func.func @foo(%q0: !quantum.bit, %q1: !quantum.bit)
         {
-            %state = quantum.state %q0, %q1 : tensor<4xcomplex<f64>>
+            %obs = quantum.compbasis qubits %q0, %q1 : !quantum.obs
+            %state = quantum.state %obs : tensor<4xcomplex<f64>>
             func.return
         }
         ```

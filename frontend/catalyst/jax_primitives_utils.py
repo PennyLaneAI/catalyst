@@ -280,7 +280,11 @@ def transform_named_sequence_lowering(jax_ctx: mlir.LoweringRuleContext, pipelin
             for _pass in pipeline:
                 options = _pass.get_options()
                 apply_registered_pass_op = ApplyRegisteredPassOp(
-                    result=transform_mod_type, target=target, pass_name=_pass.name, options=options
+                    result=transform_mod_type,
+                    target=target,
+                    pass_name=_pass.name,
+                    options=options,
+                    dynamic_options={},
                 )
                 target = apply_registered_pass_op.result
             transform_yield_op = YieldOp(operands_=[])  # pylint: disable=unused-variable

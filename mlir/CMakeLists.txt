@@ -121,6 +121,30 @@ FetchContent_Declare(tomlplusplus
 )
 FetchContent_MakeAvailable(tomlplusplus)
 
+################################################################################
+## Generate frontend_catalyst_version_py.h from frontend/catalyst/_version.py ##
+################################################################################
+
+function(make_version_header_file input_file output_file)
+    set(version_number "unknown")
+    if (NOT EXISTS ${input_file})
+        message(WARNING "Could not find ${input_file}")
+    else()
+        file(READ ${input_file} input_content)
+        if (NOT input_content MATCHES "__version__ = \"([^\"]+)\"")
+            message(WARNING "Could not find Catalyst version in ${input_file}")
+        else()
+            set(version_number "${CMAKE_MATCH_1}")
+        endif()
+    endif()
+    set(header_content "#pragma once\n\nstatic constexpr const char *CATALYST_VERSION = \"${version_number}\";\n")
+    file(WRITE ${output_file} "${header_content}")
+endfunction(make_version_header_file)
+
+make_version_header_file(
+    "${PROJECT_SOURCE_DIR}/../frontend/catalyst/_version.py"
+    "${PROJECT_BINARY_DIR}/include/Catalyst/Utils/frontend_catalyst_version_py.h"
+)
 
 ######################
 ## Catalyst Sources ##

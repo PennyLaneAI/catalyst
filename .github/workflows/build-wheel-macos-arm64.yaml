@@ -65,7 +65,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python_version: ["3.10"]
+        python_version: ${{ fromJson(format('["{0}"]', needs.constants.outputs.primary_python_version)) }}
 
     name: Build Dependencies (Python ${{ matrix.python_version }})
     runs-on: macos-latest
@@ -77,12 +77,6 @@ jobs:
       uses: actions/checkout@v4
       with:
         ref: ${{ inputs.branch || github.ref }}
-
-    # Python 3.10 was dropped from the GH images on macOS arm
-    - name: Install Python 3.10
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.10'
 
     # Cache external project sources
     # Hopefully these can be shared with the main check-catalyst action since we don't run this
@@ -119,6 +113,12 @@ jobs:
         ref: ${{ needs.constants.outputs.llvm_version }}
         path: ${{ github.workspace }}/mlir/llvm-project
 
+    - name: Patch LLVM Source
+      if: steps.cache-mhlo-source.outputs.cache-hit != 'true'
+      run: |
+        cd $GITHUB_WORKSPACE/mlir/llvm-project
+        git apply $GITHUB_WORKSPACE/mlir/patches/llvm-bufferization-segfault.patch
+
     - name: Clone MHLO Submodule
       if: steps.cache-mhlo-source.outputs.cache-hit != 'true'
       uses: actions/checkout@v4
@@ -126,6 +126,13 @@ jobs:
         repository: tensorflow/mlir-hlo
         ref: ${{ needs.constants.outputs.mhlo_version }}
         path: ${{ github.workspace }}/mlir/mlir-hlo
+
+    - name: Patch MHLO Source
+      if: steps.cache-mhlo-source.outputs.cache-hit != 'true'
+      run: |
+        cd $GITHUB_WORKSPACE/mlir/mlir-hlo
+        git apply $GITHUB_WORKSPACE/mlir/patches/mhlo-remove-shardy.patch
+        git apply $GITHUB_WORKSPACE/mlir/patches/mhlo-rename-sort.patch
 
     - name: Clone Enzyme Submodule
       if: steps.cache-enzyme-source.outputs.cache-hit != 'true'
@@ -135,15 +142,21 @@ jobs:
         ref: ${{ needs.constants.outputs.enzyme_version }}
         path: ${{ github.workspace }}/mlir/Enzyme
 
+    - name: Patch Enzyme Source
+      if: steps.cache-enzyme-source.outputs.cache-hit != 'true'
+      run: |
+        cd $GITHUB_WORKSPACE/mlir/Enzyme
+        git apply $GITHUB_WORKSPACE/mlir/patches/enzyme-nvvm-fabs-intrinsics.patch
+
     # Cache external project builds
     - name: Restore LLVM Build
       id: cache-llvm-build
       uses: actions/cache/restore@v4
       with:
         path: ${{ github.workspace }}/llvm-build
-        key: ${{ runner.os }}-${{ runner.arch }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{matrix.python_version}}-wheel-build
+        key: ${{ runner.os }}-${{ runner.arch }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{ matrix.python_version }}-wheel-build
 
-    - name: Restore MHLO Build
+    - name: Check MHLO Build Cache
       id: cache-mhlo-build
       uses: actions/cache/restore@v4
       with:
@@ -151,7 +164,7 @@ jobs:
         key: ${{ runner.os }}-${{ runner.arch }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-wheel-build
         lookup-only: True
 
-    - name: Restore Enzyme Build
+    - name: Check Enzyme Build Cache
       id: cache-enzyme-build
       uses: actions/cache/restore@v4
       with:
@@ -160,7 +173,7 @@ jobs:
         lookup-only: True
 
     - name: Setup Python version
-      # There are multiple Python versions installed on the GitHub image, 3.10 - 3.12 is already
+      # There are multiple Python versions installed on the GitHub image, 3.11 - 3.12 is already
       # available under /Library/Frameworks/Python.framework/Versions/, but homebrew also provides
       # 3.11 and 3.12. Make sure to consistently use the system versions.
       run: |
@@ -185,17 +198,12 @@ jobs:
       uses: actions/cache/save@v4
       with:
         path: ${{ github.workspace }}/llvm-build
-        key: ${{ runner.os }}-${{ runner.arch }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{matrix.python_version}}-wheel-build
+        key: ${{ runner.os }}-${{ runner.arch }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{ matrix.python_version }}-wheel-build
 
     - name: Build MHLO Dialect
       if: steps.cache-mhlo-build.outputs.cache-hit != 'true'
       run: |
         export PATH=$GITHUB_WORKSPACE/llvm-build/bin:$PATH
-
-        pushd $GITHUB_WORKSPACE/mlir/mlir-hlo
-        git apply $GITHUB_WORKSPACE/mlir/patches/mhlo-remove-shardy.patch
-        git apply $GITHUB_WORKSPACE/mlir/patches/mhlo-add-back-necessary-passes.patch
-        popd
 
         cmake -S mlir/mlir-hlo -B $GITHUB_WORKSPACE/mhlo-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
@@ -220,10 +228,6 @@ jobs:
     - name: Build Enzyme
       if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
       run: |
-        export TARGET_FILE=mlir/Enzyme/enzyme/Enzyme/TypeAnalysis/TypeAnalysis.cpp
-        export PATCH_FILE=mlir/patches/enzyme-nvvm-fabs-intrinsics.patch
-        if patch --dry-run -p1 -N $TARGET_FILE $PATCH_FILE > /dev/null 2>&1; then patch -p1 $TARGET_FILE $PATCH_FILE; fi
-
         cmake -S mlir/Enzyme/enzyme -B $GITHUB_WORKSPACE/enzyme-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
               -DLLVM_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/llvm" \
@@ -256,15 +260,8 @@ jobs:
       with:
         ref: ${{ inputs.branch || github.ref }}
 
-    # Python 3.10 was dropped from the GH images on macOS arm
-    - name: Install Python 3.10
-      uses: actions/setup-python@v5
-      if: ${{ matrix.python_version }} == '3.10'
-      with:
-        python-version: '3.10'
-
     - name: Setup Python version
-      # There are multiple Python versions installed on the GitHub image, 3.10 - 3.12 is already
+      # There are multiple Python versions installed on the GitHub image, 3.11 - 3.12 is already
       # available under /Library/Frameworks/Python.framework/Versions/, but homebrew also provides
       # 3.11 and 3.12. Make sure to consistently use the system versions.
       run: |
@@ -291,7 +288,7 @@ jobs:
       uses: actions/cache/restore@v4
       with:
         path: ${{ github.workspace }}/llvm-build
-        key: ${{ runner.os }}-${{ runner.arch }}-llvm-${{ needs.constants.outputs.llvm_version }}-3.10-wheel-build
+        key: ${{ runner.os }}-${{ runner.arch }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.primary_python_version }}-wheel-build
         fail-on-cache-miss: True
 
     - name: Get Cached MHLO Source
@@ -441,13 +438,6 @@ jobs:
       with:
         ref: ${{ inputs.branch || github.ref }}
 
-    # Python 3.10 was dropped from the GH images on macOS arm
-    - name: Install Python 3.10
-      uses: actions/setup-python@v5
-      if: ${{ matrix.python_version }} == '3.10'
-      with:
-        python-version: '3.10'
-
     # choose FORWARD_COMPAT_BASE_VERSION if python version > FORWARD_COMPAT_BASE_VERSION
     - name: Determine which python build version to use
       id: python_build_version
@@ -476,7 +466,7 @@ jobs:
         path: ${{ github.workspace }}/standalone_plugin_wheel/wheel
 
     - name: Setup Python version
-      # There are multiple Python versions installed on the GitHub image, 3.10 - 3.12 is already
+      # There are multiple Python versions installed on the GitHub image, 3.11 - 3.12 is already
       # available under /Library/Frameworks/Python.framework/Versions/, but homebrew also provides
       # 3.11 and 3.12. Make sure to consistently use the system versions.
       run: |

@@ -16,6 +16,8 @@
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/OpImplementation.h"
 #include "llvm/ADT/TypeSwitch.h" // needed for enums
+#include <llvm/Support/LogicalResult.h>
+#include <mlir/IR/OperationSupport.h>
 
 #include "QEC/IR/QECDialect.h"
 #include "Quantum/IR/QuantumDialect.h"
@@ -119,4 +121,89 @@ LogicalResult FabricateOp::verify()
         return emitOpError("Logical state should not be fabricated, use `PrepareStateOp` instead.");
     }
     return mlir::success();
+}
+
+ParseResult LayerOp::parse(OpAsmParser &parser, OperationState &result)
+{
+    auto &builder = parser.getBuilder();
+
+    // Parse the optional initial iteration arguments.
+    SmallVector<OpAsmParser::Argument, 4> regionArgs;
+    SmallVector<Type, 4> regionTypes;
+    SmallVector<OpAsmParser::UnresolvedOperand, 4> operands;
+
+    // Parse assignment list and results type list.
+    if (parser.parseAssignmentList(regionArgs, operands) ||
+        parser.parseColonTypeList(regionTypes)) {
+        return failure();
+    }
+
+    if (regionArgs.size() != regionTypes.size()) {
+        return parser.emitError(parser.getNameLoc(),
+                                "mismatch in number of region-carried values and defined values");
+    }
+
+    // Set block argument types, so that they are known when parsing the region.
+    for (auto [iterArg, type] : llvm::zip_equal(regionArgs, regionTypes)) {
+        iterArg.type = type;
+    }
+
+    // Parse the body region
+    Region *body = result.addRegion();
+    if (parser.parseRegion(*body, regionArgs)) {
+        return failure();
+    }
+
+    if (!body->hasOneBlock()) {
+        return parser.emitError(parser.getNameLoc(), "LayerOp must have exactly one block");
+    }
+
+    // Get last operation in the first block and check if it is a qec.yield op
+    auto &block = body->front();
+    auto yieldOp = dyn_cast<YieldOp>(block.getTerminator());
+    if (!yieldOp) {
+        return parser.emitError(parser.getNameLoc(),
+                                "LayerOp must have a qec.yield op as its terminator");
+    }
+
+    result.addTypes(yieldOp.getOperandTypes());
+
+    LayerOp::ensureTerminator(*body, builder, result.location);
+
+    // Resolve input operands. This should be done after parsing the region to
+    // catch invalid IR where operands were defined inside of the region.
+    for (auto argOperandType : llvm::zip_equal(regionArgs, operands, regionTypes)) {
+        Type type = std::get<2>(argOperandType);
+        std::get<0>(argOperandType).type = type;
+        if (parser.resolveOperand(std::get<1>(argOperandType), type, result.operands)) {
+            return failure();
+        }
+    }
+
+    return success();
+}
+
+void LayerOp::print(OpAsmPrinter &p)
+{
+    // Prints the initialization list in the form of
+    // (%inner = %outer, %inner2 = %outer2, <...>)
+    // where 'inner' values are assumed to be region arguments and 'outer' values
+    // are regular SSA values.
+    Block::BlockArgListType blocksArgs = getBody()->getArguments();
+    ValueRange initializers = getInitArgs();
+
+    p << '(';
+    llvm::interleaveComma(llvm::zip(blocksArgs, initializers), p,
+                          [&](auto it) { p << std::get<0>(it) << " = " << std::get<1>(it); });
+    p << ')';
+
+    // Print type(s) that corresponds to the initialization list
+    if (!getInitArgs().empty())
+        p << " : " << getInitArgs().getTypes();
+    p << ' ';
+
+    // Print the regions
+    p.printRegion(getRegion(),
+                  /*printEntryBlockArgs=*/false,
+                  /*printBlockTerminators=*/!getInitArgs().empty());
 }
