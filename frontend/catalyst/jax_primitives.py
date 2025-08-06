@@ -396,7 +396,7 @@ def decomposition_rule(func=None, *, num_params=0):
     Denotes the creation of a quantum definition in the intermediate representation.
     """
     if func is None:
-        return functools.partial(decomposition_rule_p, num_params=num_params)
+        return functools.partial(decomposition_rule, num_params=num_params)
 
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
