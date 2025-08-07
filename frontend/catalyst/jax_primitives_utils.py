@@ -114,15 +114,21 @@ def lower_callable_to_funcop(ctx, callable_, call_jaxpr):
 
         if diff_method == "best":
 
-            def only_expval():
+            def only_single_expval():
+                found_expval = False
                 for eqn in call_jaxpr.eqns:
-                    if eqn.primitive.name in ("probs", "var", "state", "counts", "sample"):
+                    name = eqn.primitive.name
+                    if name in {"probs", "counts", "sample"}:
                         return False
+                    elif name == "expval":
+                        if found_expval:
+                            return False
+                        found_expval = True
                 return True
 
             device_name = getattr(getattr(callable_, "device", None), "name", None)
 
-            if device_name and "lightning" in device_name and only_expval():
+            if device_name and "lightning" in device_name and only_single_expval():
                 diff_method = "adjoint"
             else:
                 diff_method = "parameter-shift"

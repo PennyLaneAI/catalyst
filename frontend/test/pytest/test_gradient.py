@@ -1352,7 +1352,7 @@ def test_qnode_kwargs_switched_arg_order(backend):
 
 
 def test_pytrees_return_classical_function(backend):
-    """Test the jacobian on a qnode with a return including list and dictionnaries."""
+    """Test the jacobian on a qnode with a return including list and dictionaries."""
     num_wires = 1
     dev = qml.device(backend, wires=num_wires)
 
@@ -1376,7 +1376,7 @@ def test_pytrees_return_classical_function(backend):
 
 
 def test_pytrees_return_classical():
-    """Test the jacobian on a function with a return including list and dictionnaries."""
+    """Test the jacobian on a function with a return including list and dictionaries."""
 
     def f(x, y):
         return [x, {"a": x**2}, x + y]
@@ -1395,7 +1395,7 @@ def test_pytrees_return_classical():
 
 
 def test_pytrees_args_classical():
-    """Test the jacobian on a function with a return including list and dictionnaries."""
+    """Test the jacobian on a function with a return including list and dictionaries."""
 
     def f(x, y):
         return x["res1"], x["res2"] + y
@@ -2301,6 +2301,78 @@ def test_bufferization_inside_tensor_generate(backend):
     assert np.allclose(result, reference)
     # Also check that the input has not been modified
     assert np.allclose([2.0, 1.0], inp)
+
+
+def test_best_diff_method_single_expval():
+    """Test the diff_method for differentiating a single expval."""
+    num_wires = 1
+    dev = qml.device("lightning.qubit", wires=num_wires)
+
+    @qml.qnode(dev, diff_method="best")
+    def circuit(phi, psi):
+        qml.RY(phi, wires=0)
+        qml.RX(psi, wires=0)
+        return qml.expval(qml.PauliZ(0))
+
+    qjit_grad = qjit(grad(circuit, argnums=[0, 1]))
+    _ = qjit_grad(0.1, 0.2)
+
+    assert "adjoint" in qjit_grad.mlir
+    assert "parameter-shift" not in qjit_grad.mlir
+
+
+def test_best_diff_method_single_probs():
+    """Test the diff_method for differentiating a single probs."""
+    num_wires = 1
+    dev = qml.device("lightning.qubit", wires=num_wires)
+
+    @qml.qnode(dev, diff_method="best")
+    def circuit(phi, psi):
+        qml.RY(phi, wires=0)
+        qml.RX(psi, wires=0)
+        return qml.probs(0)
+
+    qjit_jacobian = qjit(jacobian(circuit, argnums=[0, 1]))
+    _ = qjit_jacobian(0.1, 0.2)
+
+    assert "parameter-shift" in qjit_jacobian.mlir
+    assert "adjoint" not in qjit_jacobian.mlir
+
+
+def test_best_diff_method_multi_expval():
+    """Test the diff_method for differentiating multiple expval."""
+    num_wires = 1
+    dev = qml.device("lightning.qubit", wires=num_wires)
+
+    @qml.qnode(dev, diff_method="best")
+    def circuit(phi, psi):
+        qml.RY(phi, wires=0)
+        qml.RX(psi, wires=0)
+        return [{"expval0": qml.expval(qml.PauliZ(0))}, qml.expval(qml.PauliZ(0))]
+
+    qjit_jacobian = qjit(jacobian(circuit, argnums=[0, 1]))
+    _ = qjit_jacobian(0.1, 0.2)
+
+    assert "parameter-shift" in qjit_jacobian.mlir
+    assert "adjoint" not in qjit_jacobian.mlir
+
+
+def test_best_diff_method_mixed_return():
+    """Test the diff_method for differentiating mixed return."""
+    num_wires = 1
+    dev = qml.device("lightning.qubit", wires=num_wires)
+
+    @qml.qnode(dev, diff_method="best")
+    def circuit(phi, psi):
+        qml.RY(phi, wires=0)
+        qml.RX(psi, wires=0)
+        return [qml.expval(qml.PauliZ(0)), qml.probs(0)]
+
+    qjit_jacobian = qjit(jacobian(circuit, argnums=[0, 1]))
+    _ = qjit_jacobian(0.1, 0.2)
+
+    assert "parameter-shift" in qjit_jacobian.mlir
+    assert "adjoint" not in qjit_jacobian.mlir
 
 
 if __name__ == "__main__":
