@@ -9,3 +9,11 @@ Operations
    
    Quantum/QuantumInterface.md
    Quantum/QuantumOps.md
+
+Passes
+------
+
+.. toctree::
+   :maxdepth: 1
+   
+   Quantum/QuantumPasses

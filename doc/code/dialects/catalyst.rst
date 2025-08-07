@@ -1,7 +1,7 @@
 .. mdinclude:: Catalyst/CatalystDialect.md
 
 Operations
-~~~~~~~~~~
+----------
 
 .. toctree::
    :name: _catalyst_dialect
@@ -9,3 +9,10 @@ Operations
    
    Catalyst/CatalystOps.md
 
+Passes
+------
+
+.. toctree::
+   :maxdepth: 1
+   
+   Catalyst/CatalystPasses

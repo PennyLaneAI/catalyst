@@ -10,3 +10,10 @@ Operations
    
    Mitigation/MitigationOps.md
 
+Passes
+------
+
+.. toctree::
+   :maxdepth: 1
+   
+   Mitigation/MitigationPasses
