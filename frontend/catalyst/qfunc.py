@@ -32,6 +32,7 @@ from pennylane.transforms.dynamic_one_shot import (
     gather_non_mcm,
     init_auxiliary_tape,
     parse_native_mid_circuit_measurements,
+    fill_in_value,
 )
 
 import catalyst
@@ -45,6 +46,22 @@ from catalyst.passes.pass_api import dictionary_to_list_of_passes
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.tracing.type_signatures import filter_static_args
 from catalyst.utils.exceptions import CompileError
+
+# TEMPORARY WORKAROUND: Fix PennyLane dynamic_one_shot shape broadcasting bug
+# This fixes a bug in PennyLane commit dae01199ba04099af999b4ef1b34bec609208348
+# where _gather_samples only reshapes is_valid for 2D samples but not 3D samples
+def _fixed_gather_samples(measurement: SampleMP, samples, is_valid, postselect_mode=None):
+    """Fixed version of PennyLane's _gather_samples that handles multi-dimensional samples correctly."""
+    if postselect_mode == "pad-invalid-samples" and samples.ndim >= 2:  # Fix: >= 2 instead of == 2
+        is_valid = qml.math.reshape(is_valid, (-1,) + (1,) * (samples.ndim - 1))
+    if postselect_mode == "pad-invalid-samples":
+        return qml.math.where(is_valid, samples, fill_in_value)
+    if qml.math.shape(samples) == ():  # single shot case
+        samples = qml.math.reshape(samples, (-1, 1))
+    return samples[is_valid]
+
+# Apply the monkey patch
+gather_non_mcm.register(SampleMP)(_fixed_gather_samples)
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
