@@ -9,3 +9,10 @@ Operations
    
    Catalyst/CatalystOps.md
 
+Passes
+------
+
+.. toctree::
+   :maxdepth: 1
+   
+   Catalyst/CatalystPasses

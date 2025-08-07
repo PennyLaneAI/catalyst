@@ -10,3 +10,11 @@ Operations
    
    Gradient/GradientInterfaces.md
    Gradient/GradientOps.md
+
+Passes
+------
+
+.. toctree::
+   :maxdepth: 1
+   
+   Gradient/GradientPasses

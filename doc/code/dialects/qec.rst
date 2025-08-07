@@ -10,4 +10,10 @@ Operations
    
    QEC/QECOpInterfaces.md
 
+Passes
+------
 
+.. toctree::
+   :maxdepth: 1
+   
+   QEC/QECPasses

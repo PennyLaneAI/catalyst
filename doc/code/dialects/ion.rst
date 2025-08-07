@@ -8,3 +8,11 @@ Operations
    :maxdepth: 1
    
    Ion/IonOps.md
+
+Passes
+------
+
+.. toctree::
+   :maxdepth: 1
+   
+   Ion/IonPasses

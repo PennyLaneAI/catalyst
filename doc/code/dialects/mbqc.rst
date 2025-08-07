@@ -10,3 +10,10 @@ Operations
    
    MBQC/MBQCOps.md
 
+Passes
+------
+
+.. toctree::
+   :maxdepth: 1
+   
+   MBQC/MBQCPasses
