@@ -309,7 +309,7 @@ class QJITDevice(qml.devices.Device):
         super().__init__(wires=original_device.wires)
 
         # Capability loading
-        device_capabilities = get_device_capabilities(original_device, self.shots)
+        device_capabilities = get_device_capabilities(original_device, self.original_device.shots)
 
         backend = QJITDevice.extract_backend_info(original_device)
 

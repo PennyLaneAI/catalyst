@@ -35,11 +35,17 @@ class TestSample:
     def test_sample_on_0qbits(self):
         """Test sample on 0 qubits."""
 
-        @qjit
-        @qml.set_shots(10)
-        @qml.qnode(qml.device("lightning.qubit", wires=0))
-        def sample_0qbit():
-            return qml.sample()
+        # TODO: try set_shots after capture work is completed
+        with pytest.warns(
+            qml.exceptions.PennyLaneDeprecationWarning, match="shots on device is deprecated"
+        ):
+            device = qml.device("lightning.qubit", wires=0, shots=10)
+
+            @qjit
+            @qml.set_shots(10)
+            @qml.qnode(device)
+            def sample_0qbit():
+                return qml.sample()
 
         expected = np.empty(shape=(10, 0), dtype=int)
         observed = sample_0qbit()
@@ -48,6 +54,7 @@ class TestSample:
     def test_sample_on_1qbit(self, backend):
         """Test sample on 1 qubit."""
 
+        # TODO: try set_shots after capture work is completed
         with pytest.warns(
             qml.exceptions.PennyLaneDeprecationWarning, match="shots on device is deprecated"
         ):
@@ -70,6 +77,7 @@ class TestSample:
     def test_sample_on_2qbits(self, backend):
         """Test sample on 2 qubits."""
 
+        # TODO: try set_shots after capture work is completed
         with pytest.warns(
             qml.exceptions.PennyLaneDeprecationWarning, match="shots on device is deprecated"
         ):
