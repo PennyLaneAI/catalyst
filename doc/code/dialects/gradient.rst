@@ -2,7 +2,7 @@
    :end-line: -3
 
 Operations
-~~~~~~~~~~
+----------
 
 .. toctree::
    :name: _gradient_dialect
