@@ -216,12 +216,14 @@ func.func @test_anticommute_11(%q1 : !quantum.bit, %q2 : !quantum.bit, %q3 : !qu
     // Pauli rules:
     //
     // XZ = -ZX
-    // XYZ(2) commutes with XZY(8) because XX commute, and YZ and ZY are two anti-commuting pairs
-    // XYZ(2) anti-commutes with ZYZ(8) because YY and ZZ commute, and XZ is one anti-commuting pair
+    //
+    // P and P' commute if there is an even number of anti-commuting single-qubit pairs.
+    // Otherwise, they anti-commute.
+
 
     // XYZ(2) * XZY(8) * ZYZ(8)
-    // -> XZY(8) * XYZ(2) * ZYZ(8)
-    // -> XZY(8) * ZYZ(-8) * XYZ(2)
+    // -> XZY(8) * XYZ(2) * ZYZ(8)   // XYZ(2) and XZY(8) commute (XX commute, YZ and ZY anti-commute)
+    // -> XZY(8) * ZYZ(-8) * XYZ(2)  // XYZ(2) and ZYZ(8) anti-commute (XZ anti-commutes, YY and ZZ commute)
 
     // CHECK: [[q1_0:%.+]]:3 = qec.ppr ["X", "Z", "Y"](8) %arg0, %arg1, %arg2
     // CHECK: [[q1_1:%.+]]:3 = qec.ppr ["Z", "Y", "Z"](-8) [[q1_0]]#0, [[q1_0]]#1, [[q1_0]]#2

@@ -85,11 +85,11 @@ struct PauliStringWrapper {
 
     // Commutation Rules
     // P is Clifford, P' is non-Clifford
-    //   P can have a π/2 and π/4 rotation
+    //   P can have a π/2 or π/4 rotation
     // if P commutes with P' then PP' = P'P
     // if P anti-commutes with P' then
     //   if P has a π/2 rotation then PP' = -P'P
-    //   if P has a π/4 rotation then PP' = -iPP' P
+    //   if P has a π/4 rotation then PP' = -iPP'P
     // In here, P and P' are lhs and rhs, respectively.
     PauliStringWrapper computeCommutationRulesWith(const PauliStringWrapper &rhs) const;
 };
