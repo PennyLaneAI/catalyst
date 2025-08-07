@@ -10,7 +10,7 @@
 *  Displays Catalyst version in `quantum-opt --version` output.
   [(#1922)](https://github.com/PennyLaneAI/catalyst/pull/1922)
 
-* Snakecased keyword arguments to :func:`catalyst.passes.apply_pass()` are now correctly parsed 
+* Snakecased keyword arguments to :func:`catalyst.passes.apply_pass()` are now correctly parsed
   to kebab-case pass options [(#1954)](https://github.com/PennyLaneAI/catalyst/pull/1954).
   For example:
 
@@ -124,6 +124,11 @@
   def workload():
       ...
   ```
+
+* The `mbqc.graph_state_prep` operation has been added to the MBQC dialect. This operation prepares
+  a graph state with arbitrary qubit connectivity, specified by an input adjacency-matrix operand,
+  for use in MBQC workloads.
+  [(#TODO)](https://github.com/PennyLaneAI/catalyst/pull/TODO)
 
 * `catalyst.accelerate`, `catalyst.debug.callback`, and `catalyst.pure_callback`, `catalyst.debug.print`, and `catalyst.debug.print_memref` now work when capture is enabled.
   [(#1902)](https://github.com/PennyLaneAI/catalyst/pull/1902)
