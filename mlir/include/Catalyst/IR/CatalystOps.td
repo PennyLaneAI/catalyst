@@ -100,7 +100,6 @@ def CustomCallOp: Catalyst_Op<"custom_call",
     A custom call invokes code external to Catalyst. The `inputs` are passed to the
     external code, and the external code is expected to produce a result of the
     given type.
-    ```
   }];
   let arguments = (ins
     Variadic<AnyType>:$inputs,

@@ -134,6 +134,10 @@ enzyme:
 
 dialects:
 	$(MAKE) -C mlir dialects
+	
+.PHONY: dialect-docs
+dialect-docs:
+	$(MAKE) -C mlir dialect-docs
 
 runtime:
 	$(MAKE) -C runtime runtime ENABLE_OQD=$(ENABLE_OQD)
@@ -221,6 +225,7 @@ wheel:
 	mkdir -p $(MK_DIR)/frontend/bin
 	cp $(COPY_FLAGS) $(DIALECTS_BUILD_DIR)/bin/catalyst $(MK_DIR)/frontend/bin/
 	find $(MK_DIR)/frontend -type d -name __pycache__ -exec rm -rf {} +
+
 
 	# Copy selected headers to `frontend/include' to include them in the wheel
 	mkdir -p $(MK_DIR)/frontend/catalyst/include
