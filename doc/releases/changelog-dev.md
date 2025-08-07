@@ -4,6 +4,9 @@
 
 <h3>Improvements 🛠</h3>
 
+* Adjoint differentiation is used by default when executing on lightning devices.
+  [(#1961)](https://github.com/PennyLaneAI/catalyst/pull/1961)
+
 * Workflows `for_loop`, `while_loop` and `cond` now error out if `qml.capture` is enabled.
   [(#1945)](https://github.com/PennyLaneAI/catalyst/pull/1945)
 
