@@ -91,4 +91,27 @@ def MeasureInBasisOp : MBQC_Op<"measure_in_basis"> {
     }];
 }
 
+def GraphStatePrepOp : MBQC_Op<"graph_state_prep"> {
+    let summary = "TODO";
+    let description = [{
+        TODO
+    }];
+
+    let arguments = (ins
+        AnyTypeOf<[
+            1DTensorOf<[I1]>, MemRefRankOf<[I1], [1]>
+        ]>:$adj_matrix,
+        StrAttr:$init_op,
+        StrAttr:$entangle_op
+    );
+
+    let results = (outs
+        QuregType:$qreg
+    );
+
+    let assemblyFormat = [{
+        `(` $adj_matrix `:` type($adj_matrix) `)` `[` `init` $init_op `,` `entangle` $entangle_op `]` attr-dict `:` type(results)
+    }];
+}
+
 #endif // MBQC_OPS
