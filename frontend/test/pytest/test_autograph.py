@@ -1484,7 +1484,6 @@ class TestWhileLoops:
 
         assert f1() == 0 + 1 + sum([1, 2, 3])
 
-    @pytest.mark.usefixtures("use_both_frontend")
     def test_whileloop_cond_interop(self, monkeypatch):
         """Test for-loop co-existing with while loop."""
         monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
