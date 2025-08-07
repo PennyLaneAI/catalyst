@@ -128,7 +128,7 @@
 * The `mbqc.graph_state_prep` operation has been added to the MBQC dialect. This operation prepares
   a graph state with arbitrary qubit connectivity, specified by an input adjacency-matrix operand,
   for use in MBQC workloads.
-  [(#TODO)](https://github.com/PennyLaneAI/catalyst/pull/TODO)
+  [(#1965)](https://github.com/PennyLaneAI/catalyst/pull/1965)
 
 * `catalyst.accelerate`, `catalyst.debug.callback`, and `catalyst.pure_callback`, `catalyst.debug.print`, and `catalyst.debug.print_memref` now work when capture is enabled.
   [(#1902)](https://github.com/PennyLaneAI/catalyst/pull/1902)
