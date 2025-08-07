@@ -82,6 +82,7 @@ void __catalyst__qis__MultiRZ(double, const Modifiers *, int64_t, /*qubits*/...)
 void __catalyst__qis__GlobalPhase(double, const Modifiers *);
 void __catalyst__qis__ISWAP(QUBIT *, QUBIT *, const Modifiers *);
 void __catalyst__qis__PSWAP(double, QUBIT *, QUBIT *, const Modifiers *);
+void __catalyst__qis__SingleExcitation(double, QUBIT *, QUBIT *, const Modifiers *);
 
 // Struct pointer arguments for these instructions represent real arguments,
 // as passing structs by value is too unreliable / compiler dependant.
