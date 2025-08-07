@@ -112,3 +112,4 @@ Catalyst
    code/__init__
    catalyst-cli/catalyst-cli.rst
    Runtime Device Interface <api/structCatalyst_1_1Runtime_1_1QuantumDevice>
+   code/dialects/__init__
