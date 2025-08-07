@@ -522,7 +522,7 @@ def get_device_capabilities(device, shots=None) -> DeviceCapabilities:
     assert not isinstance(device, QJITDevice)
 
     shots_present = bool(shots)
-    device_capabilities = _load_device_capabilities(device)
+    device_capabilities = _load_device_capabilities(device).filter(finite_shots=shots_present)
 
     # TODO: This is a temporary measure to ensure consistency of behaviour. Remove this
     #       when customizable multi-pathway decomposition is implemented. (Epic 74474)
@@ -534,7 +534,7 @@ def get_device_capabilities(device, shots=None) -> DeviceCapabilities:
                 "The device that specifies to_matrix_ops must support QubitUnitary."
             )
 
-    return device_capabilities.filter(finite_shots=shots_present)
+    return device_capabilities
 
 
 def is_dynamic_wires(wires: qml.wires.Wires):
