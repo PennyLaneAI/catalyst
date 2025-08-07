@@ -7,5 +7,3 @@ _A dialect for classical & quantum gradients._
 This dialect contains operations to represent gradients on classical
 and quantum functions, as well as lowering mechanisms to compute the
 gradients.
-
-[TOC]

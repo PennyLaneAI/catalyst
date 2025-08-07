@@ -7,8 +7,6 @@ _A dialect supporting core Catalyst functionality._
 The catalyst dialect serves as a standard library for the Catalyst compiler. It
 contains data structures that support core compiler functionality.
 
-[TOC]
-
 ## Types
 
 ### ArrayListType

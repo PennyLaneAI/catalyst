@@ -17,8 +17,6 @@ qubit values are consumed and produced by operations, instead of operations mere
 qubit references. This exposes the dataflow of the quantum program in the SSA graph of the
 MLIR. See [QIRO: An SSA-based Quantum IR for Optimization](https://doi.org/10.1145/3491247).
 
-[TOC]
-
 ## Types
 
 ### ObservableType

@@ -7,8 +7,6 @@ _A trapped ions dialect with value semantics._
 The ion dialect extends core MLIR with the necessary types and operations to form
 the IR for trapped ions quantum computers.
 
-[TOC]
-
 ## Types
 
 ### IonType

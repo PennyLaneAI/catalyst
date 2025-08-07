@@ -15,5 +15,3 @@ arXiv:[quant-ph/0301052](https://arxiv.org/abs/quant-ph/0301052)
 > [!IMPORTANT]
 > The MBQC dialect is experimental and and will not maintain API stability between releases.
 > Use at your own risk.
-
-[TOC]

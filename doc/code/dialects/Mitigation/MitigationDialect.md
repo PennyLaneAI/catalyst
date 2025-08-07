@@ -6,5 +6,3 @@ _A dialect for quantum mitigation._
 
 This dialect contains operations to represent mitigation on quantum functions,
 as well as lowering mechanisms to compute the mitigated expectation value.
-
-[TOC]
