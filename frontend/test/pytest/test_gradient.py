@@ -2348,7 +2348,7 @@ def test_best_diff_method_multi_expval():
     def circuit(phi, psi):
         qml.RY(phi, wires=0)
         qml.RX(psi, wires=0)
-        return [{"expval0": qml.expval(qml.PauliZ(0))}, qml.expval(qml.PauliZ(0))]
+        return [qml.expval(qml.PauliZ(0)), qml.expval(qml.PauliY(0))]
 
     qjit_jacobian = qjit(jacobian(circuit, argnums=[0, 1]))
     _ = qjit_jacobian(0.1, 0.2)
