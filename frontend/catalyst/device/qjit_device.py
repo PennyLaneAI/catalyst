@@ -530,9 +530,7 @@ def get_device_capabilities(device, shots=None) -> DeviceCapabilities:
         _to_matrix_ops = getattr(device, "_to_matrix_ops")
         setattr(device_capabilities, "to_matrix_ops", _to_matrix_ops)
         if _to_matrix_ops and not device_capabilities.supports_operation("QubitUnitary"):
-            raise CompileError(
-                "The device that specifies to_matrix_ops must support QubitUnitary."
-            )
+            raise CompileError("The device that specifies to_matrix_ops must support QubitUnitary.")
 
     return device_capabilities
 
