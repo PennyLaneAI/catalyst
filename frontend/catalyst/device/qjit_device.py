@@ -311,16 +311,6 @@ class QJITDevice(qml.devices.Device):
         # Capability loading
         device_capabilities = get_device_capabilities(original_device, self.shots)
 
-        # TODO: This is a temporary measure to ensure consistency of behaviour. Remove this
-        #       when customizable multi-pathway decomposition is implemented. (Epic 74474)
-        if hasattr(original_device, "_to_matrix_ops"):
-            _to_matrix_ops = getattr(original_device, "_to_matrix_ops")
-            setattr(device_capabilities, "to_matrix_ops", _to_matrix_ops)
-            if _to_matrix_ops and not device_capabilities.supports_operation("QubitUnitary"):
-                raise CompileError(
-                    "The device that specifies to_matrix_ops must support QubitUnitary."
-                )
-
         backend = QJITDevice.extract_backend_info(original_device)
 
         self.backend_name = backend.c_interface_name
@@ -365,10 +355,6 @@ class QJITDevice(qml.devices.Device):
             capabilities = self.capabilities
         else:
             device_caps = get_device_capabilities(self.original_device, shots)
-            # Preserve to_matrix_ops attribute from original device
-            if hasattr(self.original_device, "_to_matrix_ops"):
-                _to_matrix_ops = getattr(self.original_device, "_to_matrix_ops")
-                setattr(device_caps, "to_matrix_ops", _to_matrix_ops)
             capabilities = get_qjit_device_capabilities(device_caps)
 
         # measurement transforms may change operations on the tape to accommodate
@@ -537,6 +523,16 @@ def get_device_capabilities(device, shots=None) -> DeviceCapabilities:
 
     shots_present = bool(shots)
     device_capabilities = _load_device_capabilities(device)
+
+    # TODO: This is a temporary measure to ensure consistency of behaviour. Remove this
+    #       when customizable multi-pathway decomposition is implemented. (Epic 74474)
+    if hasattr(device, "_to_matrix_ops"):
+        _to_matrix_ops = getattr(device, "_to_matrix_ops")
+        setattr(device_capabilities, "to_matrix_ops", _to_matrix_ops)
+        if _to_matrix_ops and not device_capabilities.supports_operation("QubitUnitary"):
+            raise CompileError(
+                "The device that specifies to_matrix_ops must support QubitUnitary."
+            )
 
     return device_capabilities.filter(finite_shots=shots_present)
 
