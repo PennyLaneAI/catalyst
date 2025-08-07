@@ -626,7 +626,6 @@ class TestCodePrinting:
         assert autograph_source(inner)
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 class TestConditionals:
     """Test that the autograph transformations produce correct results on conditionals.
     These tests are adapted from the test_conditionals.TestCond class of tests."""
@@ -693,9 +692,6 @@ class TestConditionals:
     def test_qubit_manipulation_cond(self, backend):
         """Test conditional with quantum operation."""
 
-        if qml.capture.enabled():
-            pytest.skip("cant return mcm with capture.")
-
         @qjit(autograph=True)
         @qml.qnode(qml.device(backend, wires=1))
         def circuit(x):
@@ -708,6 +704,7 @@ class TestConditionals:
         assert circuit(3) == False
         assert circuit(6) == True
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_branch_return_mismatch(self, backend):
         """Test that an exception is raised when the true branch returns a value without an else
         branch.
@@ -732,9 +729,6 @@ class TestConditionals:
     def test_branch_no_multi_return_mismatch(self, backend):
         """Test that case when the return types of all branches do not match."""
         # pylint: disable=using-constant-test
-        if qml.capture.enabled():
-            pytest.xfail("different return types across branches")
-
         m = qml.measure if qml.capture.enabled() else measure
 
         @qjit(autograph=True)
@@ -767,9 +761,6 @@ class TestConditionals:
     def test_multiple_return_early(self, backend, capfd):
         """Test that returning early is possible."""
 
-        if qml.capture.enabled():
-            pytest.xfail("cant return classical values from qnode.")
-
         _measure = qml.measure if qml.capture.enabled() else measure
 
         @qjit(autograph=True)
@@ -796,9 +787,6 @@ class TestConditionals:
 
     def test_multiple_return_mismatched_type(self):
         """Test that different obervables cannot be used in different branches."""
-
-        if qml.capture.enabled():
-            pytest.xfail("this is actually fine with program capture.")
 
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def f(switch: bool):
@@ -1799,7 +1787,6 @@ class TestMixed:
 
         assert f() == 3
 
-    @pytest.mark.usefixtures("use_both_frontend")
     def test_cond_if_for_loop_for(self, monkeypatch):
         """Test Python conditionals and loops together with their Catalyst counterparts."""
         monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
