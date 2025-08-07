@@ -34,7 +34,8 @@ def test_qjit_device():
         device_qjit = QJITDevice(device)
 
     # Check attributes of the new device
-    assert device_qjit.shots == qml.measurements.Shots(2032)
+    # Since shots are not used in the new API, we expect None
+    assert device_qjit.shots == qml.measurements.Shots(None)
     assert device_qjit.wires == qml.wires.Wires(range(0, 10))
 
     # Check the preprocess of the new device

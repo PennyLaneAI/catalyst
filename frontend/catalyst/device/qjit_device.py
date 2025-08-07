@@ -306,7 +306,7 @@ class QJITDevice(qml.devices.Device):
 
         check_device_wires(original_device.wires)
 
-        super().__init__(wires=original_device.wires, shots=original_device.shots)
+        super().__init__(wires=original_device.wires)
 
         # Capability loading
         device_capabilities = get_device_capabilities(original_device, self.shots)
