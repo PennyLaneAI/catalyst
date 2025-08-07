@@ -119,6 +119,7 @@ class TestErrors:
     def test_measuring_eigvals_not_supported(self):
         """Test that a NotImplementedError is raised for converting a measurement
         specified via eigvals and wires."""
+        # TODO: try set_shots after capture work is completed
         with pytest.warns(
             qml.exceptions.PennyLaneDeprecationWarning,
             match="deprecated",
@@ -367,6 +368,7 @@ class TestCatalystCompareJaxpr:
     def test_sample(self):
         """Test comparison and execution of a jaxpr returning samples."""
 
+        # TODO: try set_shots after capture work is completed
         with pytest.warns(
             qml.exceptions.PennyLaneDeprecationWarning,
             match="shots on device is deprecated",
@@ -545,6 +547,7 @@ class TestCatalystCompareJaxpr:
     def test_dynamic_shots(self):
         """Test that shots can be specified on qnode call."""
 
+        # TODO: try set_shots after capture work is completed
         with pytest.warns(
             qml.exceptions.PennyLaneDeprecationWarning,
             match="deprecated",
