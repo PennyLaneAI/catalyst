@@ -120,7 +120,7 @@ func.func @test_anticommute_5(%q1 : !quantum.bit, %q2 : !quantum.bit){
 
 func.func @test_anticommute_6(%q1 : !quantum.bit, %q2 : !quantum.bit){
     
-    // XY commuts with ZZ
+    // XY commutes with ZZ
 
     // XY(4) * ZZ(8) * ZY(8)
     // -> ZZ(8) * XY(4) * ZY(8)
@@ -183,6 +183,52 @@ func.func @test_anticommute_9(%q1 : !quantum.bit, %q2 : !quantum.bit, %q3 : !qua
     %2 = qec.ppr ["Y"](4) %1#1 : !quantum.bit
     %3:2 = qec.ppr ["Z", "X"](8) %1#0, %2 : !quantum.bit, !quantum.bit
     %4 = qec.ppr ["X"](8) %1#2 : !quantum.bit
+    func.return
+}
+
+// -----
+
+func.func @test_anticommute_10(%q1 : !quantum.bit){
+
+    // Pauli rule:
+    // YZ = -ZY
+
+    // Y(2) * Z(8) * Y(2) * Z(8)
+    // -> Z(-8) * Y(2) * Y(2) * Z(8)
+    // -> Z(-8) * Y(2) * Z(-8) * Y(2)
+    // -> Z(-8) * Z(8) * Y(2) * Y(2)
+
+    // CHECK: [[q1_0:%.+]] = qec.ppr ["Z"](-8) %arg0
+    // CHECK: [[q1_1:%.+]] = qec.ppr ["Z"](8) [[q1_0]]
+    // CHECK: [[q1_2:%.+]] = qec.ppr ["Y"](2) [[q1_1]]
+    // CHECK: [[q1_3:%.+]] = qec.ppr ["Y"](2) [[q1_2]]
+    %0 = qec.ppr ["Y"](2) %q1 : !quantum.bit
+    %1 = qec.ppr ["Z"](8) %0 : !quantum.bit
+    %2 = qec.ppr ["Y"](2) %1 : !quantum.bit
+    %3 = qec.ppr ["Z"](8) %2 : !quantum.bit
+    func.return
+}
+
+// -----
+
+func.func @test_anticommute_11(%q1 : !quantum.bit, %q2 : !quantum.bit, %q3 : !quantum.bit){
+
+    // Pauli rules:
+    //
+    // XZ = -ZX
+    // XYZ(2) commutes with XZY(8) because XX commute, and YZ and ZY are two anti-commuting pairs
+    // XYZ(2) anti-commutes with ZYZ(8) because YY and ZZ commute, and XZ is one anti-commuting pair
+
+    // XYZ(2) * XZY(8) * ZYZ(8)
+    // -> XZY(8) * XYZ(2) * ZYZ(8)
+    // -> XZY(8) * ZYZ(-8) * XYZ(2)
+
+    // CHECK: [[q1_0:%.+]]:3 = qec.ppr ["X", "Z", "Y"](8) %arg0, %arg1, %arg2
+    // CHECK: [[q1_1:%.+]]:3 = qec.ppr ["Z", "Y", "Z"](-8) [[q1_0]]#0, [[q1_0]]#1, [[q1_0]]#2
+    // CHECK: [[q1_2:%.+]]:3 = qec.ppr ["X", "Y", "Z"](2) [[q1_1]]#0, [[q1_1]]#1, [[q1_1]]#2
+    %0:3 = qec.ppr ["X", "Y", "Z"](2) %q1, %q2, %q3 : !quantum.bit, !quantum.bit, !quantum.bit
+    %1:3 = qec.ppr ["X", "Z", "Y"](8) %0#0, %0#1, %0#2 : !quantum.bit, !quantum.bit, !quantum.bit
+    %2:3 = qec.ppr ["Z", "Y", "Z"](8) %1#0, %1#1, %1#2 : !quantum.bit, !quantum.bit, !quantum.bit
     func.return
 }
 

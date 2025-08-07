@@ -528,7 +528,7 @@ def to_ppr(qnode):
 
     .. note::
 
-        The circuit that generated from this pass are currently
+        The circuits that generated from this pass are currently
         only not executable in any backend. This pass is only for analysis
         and potential future execution when a suitable backend is available.
 

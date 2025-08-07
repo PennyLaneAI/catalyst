@@ -16,9 +16,8 @@
 #include <stim/stabilizers/flex_pauli_string.h>
 #include <stim/stabilizers/pauli_string.h>
 
-#include "Quantum/IR/QuantumOps.h" // for quantum::AllocQubitOp
-
 #include "QEC/Utils/PauliStringWrapper.h"
+#include "Quantum/IR/QuantumOps.h" // for quantum::AllocQubitOp
 
 namespace catalyst {
 namespace qec {
@@ -51,6 +50,18 @@ PauliStringWrapper PauliStringWrapper::from_pauli_word(const PauliWord &pauliWor
 
 bool PauliStringWrapper::isNegative() const { return pauliString->value.sign; }
 bool PauliStringWrapper::isImaginary() const { return pauliString->imag; }
+bool PauliStringWrapper::hasPiOverTwoRotation() const
+{
+    auto op_copy = this->op;
+    auto rotationKind = static_cast<int16_t>(op_copy.getRotationKind());
+    return rotationKind == 2 || rotationKind == -2;
+}
+bool PauliStringWrapper::hasPiOverFourRotation() const
+{
+    auto op_copy = this->op;
+    auto rotationKind = static_cast<int16_t>(op_copy.getRotationKind());
+    return rotationKind == 4 || rotationKind == -4;
+}
 
 void PauliStringWrapper::updateSign(bool sign) { pauliString->value.sign = sign; }
 
@@ -79,12 +90,18 @@ bool PauliStringWrapper::commutes(const PauliStringWrapper &other) const
 PauliStringWrapper
 PauliStringWrapper::computeCommutationRulesWith(const PauliStringWrapper &rhs) const
 {
-    // P * P' * i
-    stim::FlexPauliString result =
-        (*this->pauliString) * (*rhs.pauliString) * stim::FlexPauliString::from_text("i");
-
+    stim::FlexPauliString result = *rhs.pauliString;
+    if (this->hasPiOverTwoRotation()) {
+        // -P'
+        result.value.sign = !result.value.sign;
+    }
+    else {
+        assert(this->hasPiOverFourRotation() &&
+               "Rotation of Clifford gate is neither pi/2 nor pi/4");
+        // P * P' * i
+        result = (*this->pauliString) * result * stim::FlexPauliString::from_text("i");
+    }
     assert(!result.imag && "Resulting Pauli string should be real");
-
     return PauliStringWrapper(std::move(result));
 }
 
