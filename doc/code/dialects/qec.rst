@@ -9,6 +9,7 @@ Operations
    :maxdepth: 1
    
    QEC/QECOpInterfaces.md
+   QEC/QECOps.md
 
 Passes
 ------
