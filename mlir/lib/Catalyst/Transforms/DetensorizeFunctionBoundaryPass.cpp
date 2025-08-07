@@ -86,47 +86,50 @@ struct DetensorizeFuncPattern : public OpRewritePattern<func::FuncOp> {
         FunctionType funcType = funcOp.getFunctionType();
         SmallVector<Type> newArgTypes;
         SmallVector<Type> newResultTypes;
+        {
+            for (Type type : funcType.getInputs()) {
+                newArgTypes.push_back(getScalarOrOriginalType(type));
+            }
+            for (Type type : funcType.getResults()) {
+                newResultTypes.push_back(getScalarOrOriginalType(type));
+            }
 
-        for (Type type : funcType.getInputs()) {
-            newArgTypes.push_back(getScalarOrOriginalType(type));
-        }
-        for (Type type : funcType.getResults()) {
-            newResultTypes.push_back(getScalarOrOriginalType(type));
-        }
-
-        // Collect all attributes of the original function
-        SmallVector<NamedAttribute> newAttrs;
-        for (const NamedAttribute &attr : funcOp->getAttrs()) {
-            if (attr.getName() != funcOp.getSymNameAttrName() &&
-                attr.getName() != funcOp.getFunctionTypeAttrName()) {
-                newAttrs.push_back(attr);
+            // Collect all attributes of the original function
+            SmallVector<NamedAttribute> newAttrs;
+            for (const NamedAttribute &attr : funcOp->getAttrs()) {
+                if (attr.getName() != funcOp.getSymNameAttrName() &&
+                    attr.getName() != funcOp.getFunctionTypeAttrName()) {
+                    newAttrs.push_back(attr);
+                }
             }
         }
 
         // Create the new function with the updated signature and preserved attributes
-        auto newFuncType = FunctionType::get(getContext(), newArgTypes, newResultTypes);
-        auto newFuncOp =
-            rewriter.create<func::FuncOp>(funcOp.getLoc(), funcOp.getName(), newFuncType, newAttrs);
+        {
+            auto newFuncType = FunctionType::get(getContext(), newArgTypes, newResultTypes);
+            auto newFuncOp = rewriter.create<func::FuncOp>(funcOp.getLoc(), funcOp.getName(),
+                                                           newFuncType, newAttrs);
 
-        // Create the entry block with the new argument types
-        Block *newEntryBlock = newFuncOp.addEntryBlock();
-        rewriter.setInsertionPointToStart(newEntryBlock);
+            // Create the entry block with the new argument types
+            Block *newEntryBlock = newFuncOp.addEntryBlock();
+            rewriter.setInsertionPointToStart(newEntryBlock);
 
-        // Map the old block arguments to the new values
-        IRMapping mapper;
-        Block *oldEntryBlock = &funcOp.front();
-        for (unsigned i = 0; i < oldEntryBlock->getNumArguments(); ++i) {
-            Value oldArg = oldEntryBlock->getArgument(i);
-            Value newArg = newEntryBlock->getArgument(i);
+            // Map the old block arguments to the new values
+            IRMapping mapper;
+            Block *oldEntryBlock = &funcOp.front();
+            for (unsigned i = 0; i < oldEntryBlock->getNumArguments(); ++i) {
+                Value oldArg = oldEntryBlock->getArgument(i);
+                Value newArg = newEntryBlock->getArgument(i);
 
-            if (isScalarTensor(oldArg.getType())) {
-                // Insert a FromElements op to bridge scalar argument to tensor
-                auto fromElementsOp = rewriter.create<tensor::FromElementsOp>(
-                    funcOp.getLoc(), oldArg.getType(), newArg);
-                mapper.map(oldArg, fromElementsOp.getResult());
-            }
-            else {
-                mapper.map(oldArg, newArg);
+                if (isScalarTensor(oldArg.getType())) {
+                    // Insert a FromElements op to bridge scalar argument to tensor
+                    auto fromElementsOp = rewriter.create<tensor::FromElementsOp>(
+                        funcOp.getLoc(), oldArg.getType(), newArg);
+                    mapper.map(oldArg, fromElementsOp.getResult());
+                }
+                else {
+                    mapper.map(oldArg, newArg);
+                }
             }
         }
 
