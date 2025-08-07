@@ -8,8 +8,6 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include "Catalyst/IR/CatalystDialect.h"
-#include "Gradient/IR/GradientOps.h"
-#include "Mitigation/IR/MitigationOps.h"
 
 using namespace llvm;
 using namespace mlir;
