@@ -92,9 +92,53 @@ def MeasureInBasisOp : MBQC_Op<"measure_in_basis"> {
 }
 
 def GraphStatePrepOp : MBQC_Op<"graph_state_prep"> {
-    let summary = "TODO";
+    let summary = "Allocate resources for a new graph state.";
     let description = [{
-        TODO
+        This operation allocates the resources for a new quantum *graph state* for use in MBQC
+        workloads. A graph state is a highly entangled group of qubits arranged according to an
+        arbitrary graph structure, where each qubit is represented by a vertex of the graph and
+        where there is an edge between every interacting pair of neighbouring qubits.
+
+        A graph state requires three parameters to be fully expressed:
+
+        1. A graph representing the qubit connectivity.
+        2. The qubit initial state. All qubits in the graph state are assumed to be initialized
+           to the same state. This parameter is expressed as the name of the one-qubit gate that
+           would have to be applied to the :math:`|0\rangle` state to realize the desired state.
+        3. The type of entangling interaction along each edge. All interactions between
+           neighbouring qubits are assumed to be the same. This parameter is expressed as the name
+           of the two-qubit gate that would have to be applied to the pairs of neighbouring qubits
+           to realize the desired entangled state.
+
+        A *densely packed adjacency matrix* is used to represent the graph structure. This
+        representations is a more compact form of the familiar adjacency matrix graph
+        representation, where only the lower-triangular part of the matrix is stored (since the
+        graph is undirected) and where the diagonal elements are excluded (since there are no qubit
+        self-interactions). The matrix values are then packed into a flat array. For example, the
+        following graph structure,
+
+        .. code-block::
+
+            0 -- 1 -- 2 -- 3
+
+        has the adjacency matrix representation (with row and column indices shown for reference):
+
+        .. code-block::
+
+                 0  1  2  3
+
+            0    0  1  0  0
+            1    1  0  1  0
+            2    0  1  0  1
+            3    0  0  1  0
+
+        The equivalent densely packed adjacency matrix has the lower-triangular part of the above
+        matrix packed into a flat array using row-major order as follows (with extra space added
+        between sequences of values to indicate the rows of the matrix):
+
+        .. code-block::
+
+            [1,   0, 1,   0, 0, 1]
     }];
 
     let arguments = (ins
