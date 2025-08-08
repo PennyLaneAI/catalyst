@@ -51,6 +51,39 @@ def _get_converted_jaxpr_branch(self, plxpr_branch, args_plus_qreg, branch_const
     return jax.make_jaxpr(calling_convention)(*args_plus_qreg).jaxpr
 
 
+@WorkflowInterpreter.register_primitive(plxpr_cond_prim)
+def _(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
+    """Handle the conversion from plxpr to Catalyst jaxpr for the cond primitive"""
+    args = plxpr_invals[args_slice]
+    converted_jaxpr_branches = []
+    all_consts = []
+
+    # Convert each branch from plxpr to jaxpr
+    for const_slice, plxpr_branch in zip(consts_slices, jaxpr_branches):
+
+        # Store all branches consts in a flat list
+        branch_consts = plxpr_invals[const_slice]
+        all_consts = all_consts + [*branch_consts]
+
+        evaluator = partial(copy(self).eval, plxpr_branch, branch_consts)
+        new_jaxpr = jax.make_jaxpr(evaluator)(*args)
+        converted_closed = ClosedJaxpr(convert_constvars_jaxpr(new_jaxpr.jaxpr), ())
+
+        converted_jaxpr_branches.append(converted_closed)
+
+    predicate = plxpr_invals[:len(jaxpr_branches)-1]
+
+    # Build Catalyst compatible input values
+    cond_invals = [*predicate, *all_consts, *args]
+
+    return cond_p.bind(
+        *cond_invals,
+        branch_jaxprs=jaxpr_pad_consts(converted_jaxpr_branches),
+        nimplicit_outputs=None,
+    )
+
+
+
 @PLxPRToQuantumJaxprInterpreter.register_primitive(plxpr_cond_prim)
 def handle_cond(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
     """Handle the conversion from plxpr to Catalyst jaxpr for the cond primitive"""
@@ -69,10 +102,7 @@ def handle_cond(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
 
         converted_jaxpr_branches.append(_get_converted_jaxpr_branch(self, plxpr_branch, args_plus_qreg, branch_consts))
 
-    # The slice [0,1) of the plxpr input values contains the true predicate of the plxpr cond,
-    # whereas the slice [1,2) refers to the false predicate, which is always True.
-    # We extract the true predicate and discard the false one.
-    predicate = plxpr_invals[0:len(jaxpr_branches)-1]
+    predicate = plxpr_invals[:len(jaxpr_branches)-1]
 
     # Build Catalyst compatible input values
     cond_invals = [*predicate, *all_consts, *args_plus_qreg]
