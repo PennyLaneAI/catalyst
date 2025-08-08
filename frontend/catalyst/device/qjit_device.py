@@ -306,8 +306,8 @@ class QJITDevice(qml.devices.Device):
             self.__setattr__(key, value)
 
         if any(
-                isinstance(wire_label, tuple) and (len(wire_label) >= 2)
-                for wire_label in original_device.wires.labels
+            isinstance(wire_label, tuple) and (len(wire_label) >= 2)
+            for wire_label in original_device.wires.labels
         ):
             wires_from_cmap = set()
             for wire_label in original_device.wires.labels:
