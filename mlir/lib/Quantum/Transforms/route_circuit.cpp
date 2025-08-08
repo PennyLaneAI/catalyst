@@ -124,7 +124,6 @@ struct RoutingPass : public impl::RoutingPassBase<RoutingPass> {
                 logicalQubitIndex = logicalQubitIndex + 1;
             }
             else if (isa<quantum::CustomOp>(op)) {
-                // StringRef gateName = cast<quantum::CustomOp>(op).getGateName();
                 int nQubits = cast<quantum::CustomOp>(op).getInQubits().size();
                 auto inQubits = cast<quantum::CustomOp>(op).getInQubits();
 
@@ -469,7 +468,6 @@ struct RoutingPass : public impl::RoutingPassBase<RoutingPass> {
                 builder.getUnknownLoc(),
                 /*out_qubits=*/resultTypes,
                 /*out_ctrl_qubits=*/mlir::TypeRange({}),
-                // /*params=*/mlir::ValueRange(),
                 /*params=*/compiledGateParams[gateIndex],
                 /*in_qubits=*/in_qubits_to_curr_op,
                 /*gate_name=*/compiledGateNames[gateIndex],
@@ -483,9 +481,14 @@ struct RoutingPass : public impl::RoutingPassBase<RoutingPass> {
         }
 
         // Create compbasis observable from input qreg
+        llvm::SmallVector<mlir::Value> currStateValuesVector;
+        for (int qubitIndex = 0; qubitIndex < numLogicalQubits; qubitIndex++)
+            currStateValuesVector.push_back(qubitToValue[qubitIndex]);
+        mlir::ValueRange currStateValues(currStateValuesVector);
+
         Type obsType = builder.getType<quantum::ObservableType>();
         mlir::Operation *compBasisOp = builder.create<quantum::ComputationalBasisOp>(
-            builder.getUnknownLoc(), obsType, ValueRange{}, allocOp->getResult(0));
+            builder.getUnknownLoc(), obsType, currStateValues, mlir::Value{});
         // Get the size of the state vector
         RankedTensorType constTensorType = RankedTensorType::get({}, builder.getI64Type());
         DenseIntElementsAttr oneValue = DenseIntElementsAttr::get(constTensorType, APInt(64, 1));
