@@ -391,17 +391,24 @@ def subroutine(func):
     return wrapper
 
 
-def decomposition_rule(func=None, *, num_params=0):
+def decomposition_rule(func=None, *, is_qreg=False, num_params=0):
     """
     Denotes the creation of a quantum definition in the intermediate representation.
     """
+
+    assert not is_qreg or (
+        is_qreg and num_params == 0
+    ), "Decomposition rules with `qreg` do not require `num_params`."
+
     if func is None:
-        return functools.partial(decomposition_rule, num_params=num_params)
+        return functools.partial(decomposition_rule, is_qreg=is_qreg, num_params=num_params)
 
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         jaxpr = jax.make_jaxpr(func)(*args, **kwargs)
-        decomposition_rule_p.bind(pyfun=func, func_jaxpr=jaxpr, num_params=num_params)
+        decomposition_rule_p.bind(
+            pyfun=func, func_jaxpr=jaxpr, is_qreg=is_qreg, num_params=num_params
+        )
 
     return wrapper
 
@@ -573,7 +580,7 @@ def _func_lowering(ctx, *args, call_jaxpr, fn):
 # Decomp rule
 #
 @decomposition_rule_p.def_abstract_eval
-def _decomposition_rule_abstract(*, pyfun, func_jaxpr, num_params=None):
+def _decomposition_rule_abstract(*, pyfun, func_jaxpr, is_qreg=False, num_params=None):
     return ()
 
 

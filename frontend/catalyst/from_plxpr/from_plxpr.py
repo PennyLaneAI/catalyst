@@ -507,22 +507,39 @@ def handle_subroutine(self, *args, **kwargs):
 
 
 @PLxPRToQuantumJaxprInterpreter.register_primitive(decomposition_rule_p)
-def handle_decomposition_rule(self, *, pyfun, func_jaxpr, num_params):
+def handle_decomposition_rule(self, *, pyfun, func_jaxpr, is_qreg, num_params):
     """
     Transform a quantum decomposition rule from PLxPR into JAXPR with quantum primitives.
     """
 
-    def wrapper(*args):
-        manager = QbitManager(args[num_params:])
-        converter = copy(self)
-        converter.qreg_manager = manager
-        converter(func_jaxpr, *args)
-        return converter.qreg_manager.get_final_qubits()
+    if is_qreg:
+        self.qreg_manager.insert_all_dangling_qubits()
 
-    new_in_avals = func_jaxpr.in_avals[:num_params] + [
-        AbstractQbit() for _ in func_jaxpr.in_avals[num_params:]
-    ]
-    converted_closed_jaxpr_branch = jax.make_jaxpr(wrapper)(*new_in_avals)
+        def wrapper(qreg, *args):
+            manager = QregManager(qreg)
+            converter = copy(self)
+            converter.qreg_manager = manager
+            converter(func_jaxpr, *args)
+            converter.qreg_manager.insert_all_dangling_qubits()
+            return converter.qreg_manager.get()
+
+        converted_closed_jaxpr_branch = jax.make_jaxpr(wrapper)(
+            self.qreg_manager.get(), *func_jaxpr.in_avals
+        )
+    else:
+
+        def wrapper(*args):
+            manager = QbitManager(args[num_params:])
+            converter = copy(self)
+            converter.qreg_manager = manager
+            converter(func_jaxpr, *args)
+            return converter.qreg_manager.get_final_qubits()
+
+        new_in_avals = func_jaxpr.in_avals[:num_params] + [
+            AbstractQbit() for _ in func_jaxpr.in_avals[num_params:]
+        ]
+        converted_closed_jaxpr_branch = jax.make_jaxpr(wrapper)(*new_in_avals)
+
     decomposition_rule_p.bind(pyfun=pyfun, func_jaxpr=converted_closed_jaxpr_branch)
 
     return ()

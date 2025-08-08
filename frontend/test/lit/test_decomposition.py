@@ -7,6 +7,8 @@ from copy import deepcopy
 import jax
 import pennylane as qml
 from pennylane.devices.capabilities import OperatorProperties
+from pennylane.typing import TensorLike
+from pennylane.wires import WiresLike
 
 from catalyst import measure, qjit
 from catalyst.compiler import get_lib_path
@@ -230,7 +232,7 @@ def test_decomposition_rule_wire_param():
     """Test decomposition rule with passing a parameter that is a wire/integer"""
 
     @decomposition_rule
-    def Hadamard0(wire):
+    def Hadamard0(wire: WiresLike):
         qml.Hadamard(wire)
 
     qml.capture.enable()
@@ -238,7 +240,7 @@ def test_decomposition_rule_wire_param():
     @qml.qjit
     @qml.qnode(qml.device("lightning.qubit", wires=1))
     # CHECK: module @circuit
-    def circuit(c: int):
+    def circuit(_: float):
         # CHECK: func.func public @circuit([[ARG0:%.+]]
         # CHECK: [[QREG:%.+]] = quantum.alloc
         Hadamard0(int)
@@ -260,7 +262,7 @@ def test_decomposition_rule_gate_param_param():
     """Test decomposition rule with passing a regular parameter"""
 
     @decomposition_rule(num_params=1)
-    def RX_on_wire_0(param, w0):
+    def RX_on_wire_0(param: TensorLike, w0: WiresLike):
         qml.RX(param, wires=w0)
 
     qml.capture.enable()
@@ -268,7 +270,7 @@ def test_decomposition_rule_gate_param_param():
     @qml.qjit
     @qml.qnode(qml.device("lightning.qubit", wires=1))
     # CHECK: module @circuit_2
-    def circuit_2(param: float):
+    def circuit_2(_: float):
         RX_on_wire_0(float, int)
         return qml.probs()
 
@@ -293,22 +295,21 @@ def test_multiple_decomposition_rules():
     def identity(): ...
 
     @decomposition_rule(num_params=1)
-    def all_wires_rx(param, w0, w1, w2):
+    def all_wires_rx(param: TensorLike, w0: WiresLike, w1: WiresLike, w2: WiresLike):
         qml.RX(param, wires=w0)
         qml.RX(param, wires=w1)
         qml.RX(param, wires=w2)
 
     @qml.qjit
     @qml.qnode(qml.device("lightning.qubit", wires=1))
-    # CHECK: module @circuit_3
     def circuit_3(_: float):
-        # CHECK-DAG: [[QREG:%.+]] = quantum.alloc
+        # CHECK: [[QREG:%.+]] = quantum.alloc
         # CHECK-NEXT: [[QUBIT:%.+]] = quantum.extract [[QREG]][ 0] : !quantum.reg -> !quantum.bit
         # CHECK-NEXT: [[QUBIT_1:%.+]] = quantum.custom "Hadamard"() [[QUBIT]] : !quantum.bit
         # CHECK-NEXT: [[QREG_1:%.+]] = quantum.insert [[QREG]][ 0], [[QUBIT_1]] : !quantum.reg, !quantum.bit
         # CHECK-NEXT: quantum.compbasis qreg [[QREG_1]] : !quantum.obs
         identity()
-        all_wires_rx(int, float, float, float)
+        all_wires_rx(float, int, int, int)
         qml.Hadamard(0)
         return qml.probs()
 
@@ -320,3 +321,30 @@ def test_multiple_decomposition_rules():
 
 
 test_multiple_decomposition_rules()
+
+
+def test_decomposition_rule_shaped_wires():
+    """Test decomposition rule with passing a shaped array of wires"""
+
+    qml.capture.enable()
+
+    @decomposition_rule(is_qreg=True)
+    def shaped_wires_rule(param: TensorLike, wires: WiresLike):
+        qml.RX(param, wires=wires[0])
+        qml.RX(param, wires=wires[1])
+        qml.RX(param, wires=wires[2])
+
+    @qml.qjit
+    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    def circuit_4(_: float):
+        # CHECK: module @circuit_4
+        shaped_wires_rule(float, jax.core.ShapedArray((3,), int))
+        qml.Hadamard(0)
+        return qml.probs()
+
+    # CHECK: func.func private @shaped_wires_rule
+    print(circuit_4.mlir)
+    qml.capture.disable()
+
+
+test_decomposition_rule_shaped_wires()
