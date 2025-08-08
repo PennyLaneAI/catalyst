@@ -28,6 +28,8 @@
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/IR/Value.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "stablehlo/dialect/StablehloOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "llvm/ADT/DenseMap.h"
 #include "mlir/Analysis/SliceAnalysis.h"
@@ -294,6 +296,7 @@ struct RoutingPass : public impl::RoutingPassBase<RoutingPass> {
         
         std::vector<StringRef> compiledGateNames;
         std::vector<std::vector<int>> compiledGateQubits;
+        std::vector<mlir::ValueRange> compiledGateParams;
         std::set<quantum::CustomOp> executeGateList;
         int search_steps = 0;
         int max_iterations_without_progress = 10 * dagLogicalQubits;
@@ -303,6 +306,7 @@ struct RoutingPass : public impl::RoutingPassBase<RoutingPass> {
                 for (auto op : executeGateList)
                 {
                     compiledGateNames.push_back(op.getGateName());
+                    compiledGateParams.push_back(op.getParams());
                     std::vector<int> currOpPhysicalQubits;
                     for(auto currOpExtract : OpToExtractMap[op])
                         currOpPhysicalQubits.push_back(randomInitialMapping[ExtractOpToQubitMap[currOpExtract]]);
@@ -328,6 +332,7 @@ struct RoutingPass : public impl::RoutingPassBase<RoutingPass> {
                 {
                     compiledGateNames.pop_back();
                     compiledGateQubits.pop_back();
+                    compiledGateParams.pop_back();
                 }   
                 auto greedyGate = *(frontLayer.begin());
                 auto inExtract = OpToExtractMap[greedyGate];
@@ -340,6 +345,7 @@ struct RoutingPass : public impl::RoutingPassBase<RoutingPass> {
                     int v = swapPath[i];
                     compiledGateNames.push_back("SWAP");
                     compiledGateQubits.push_back({u,v});
+                    compiledGateParams.push_back(mlir::ValueRange());
                     //update mapping 
                     for (size_t random_init_mapping_index = 0; random_init_mapping_index < randomInitialMapping.size(); random_init_mapping_index++)
                     {
@@ -373,6 +379,7 @@ struct RoutingPass : public impl::RoutingPassBase<RoutingPass> {
                 // add the min SWAP
                 compiledGateNames.push_back("SWAP");
                 compiledGateQubits.push_back({min_swap.first,min_swap.second});
+                compiledGateParams.push_back(mlir::ValueRange());
                 //update mapping 
                 for (size_t random_init_mapping_index = 0; random_init_mapping_index < randomInitialMapping.size(); random_init_mapping_index++)
                 {
@@ -384,18 +391,16 @@ struct RoutingPass : public impl::RoutingPassBase<RoutingPass> {
                 search_steps++;
             }
         }
-        for (size_t compile_gate_index = 0; compile_gate_index < compiledGateNames.size(); compile_gate_index++) {
-            llvm::outs() << compiledGateNames[compile_gate_index] << ": ";
-            for (auto compile_qubits : compiledGateQubits[compile_gate_index]) 
-                llvm::outs() << compile_qubits << " ";
-            llvm::outs() << "\n";
-        }
-        mlir::func::FuncOp func;
-        getOperation()->walk([&](Operation *op) {
-            if (isa<quantum::AllocOp>(op)) 
-                func = op->getParentOfType<func::FuncOp>();
-        });
 
+        // insert gates into new MLIR
+        mlir::func::FuncOp func;
+        quantum::DeviceInitOp device;
+        getOperation()->walk([&](Operation *op) {
+            if (isa<quantum::DeviceInitOp>(op)) {
+                func = op->getParentOfType<func::FuncOp>();
+                device = cast<quantum::DeviceInitOp>(op);
+            }
+        });
         mlir::ModuleOp module = func->getParentOfType<mlir::ModuleOp>();
         mlir::MLIRContext *context = &getContext();
         mlir::OpBuilder builder(context);
@@ -405,78 +410,130 @@ struct RoutingPass : public impl::RoutingPassBase<RoutingPass> {
         mlir::func::FuncOp newFunc = builder.create<mlir::func::FuncOp>(
             builder.getUnknownLoc(), (func.getName().str() + "_routed"), funcType);
 
-        // changing signature of new func
-        // mlir::FunctionType originalFuncType = func.getFunctionType();
-        // mlir::TypeRange originalResultTypes = originalFuncType.getResults();
-        // mlir::TypeRange newFuncInputTypes = newFunc.getFunctionType().getInputs();
-        // mlir::FunctionType newFuncType = builder.getFunctionType(
-        //     func.getFunctionType(),      
-        //     originalResultTypes
-        // );
-        // newFunc.setType(newFuncType);
-
-        // insert allocs
+        // insertion point at new function
         newFunc.addEntryBlock();
         builder.setInsertionPointToStart(&newFunc.getBody().front());
 
+        // insert device
+        mlir::Operation *newDeviceOp = builder.create<quantum::DeviceInitOp>(
+                                builder.getUnknownLoc(), 
+                                mlir::Value{0},
+                                builder.getStringAttr(device.getLib()),
+                                builder.getStringAttr(device.getDeviceName()),
+                                builder.getStringAttr(device.getKwargs())
+                            );
+        
+        
         // 3. Create the AllocOp and other operations for the new function's body.
+        builder.setInsertionPointAfter(newDeviceOp);
         Type quregType = builder.getType<catalyst::quantum::QuregType>();
         IntegerAttr numQubitsAttr = builder.getI64IntegerAttr(numLogicalQubits);
         mlir::Operation *allocOp = builder.create<quantum::AllocOp>(builder.getUnknownLoc(), quregType, mlir::Value{}, numQubitsAttr);
 
         builder.setInsertionPointAfter(allocOp);
-        mlir::Operation *extractOp = builder.create<quantum::ExtractOp>(
-            builder.getUnknownLoc(), 
-            builder.getType<quantum::QubitType>(), 
-            allocOp->getResult(0),
-            nullptr,
-            builder.getI64IntegerAttr(1)
-        );
 
-        mlir::Value qubitValue = extractOp->getResult(0);
-        llvm::SmallVector<mlir::Type, 4> resultTypes = {builder.getType<quantum::QubitType>()};
-        builder.create<quantum::CustomOp>(
+        // insert ExtractOps
+        mlir::Operation *extractOp;
+        llvm::DenseMap<int,mlir::Value> qubitToValue;
+        for (int qubitIndex = 0; qubitIndex < numLogicalQubits; qubitIndex++)
+        {
+            extractOp = builder.create<quantum::ExtractOp>(
+                builder.getUnknownLoc(), 
+                builder.getType<quantum::QubitType>(), 
+                allocOp->getResult(0),
+                nullptr,
+                builder.getI64IntegerAttr(qubitIndex)
+            );
+            qubitToValue[qubitIndex] = extractOp->getResult(0);
+            builder.setInsertionPointAfter(extractOp);
+        }
+        // insert Gates
+        for (size_t gateIndex = 0; gateIndex < compiledGateNames.size(); gateIndex++)
+        {
+            std::vector<int> mappedQubits = compiledGateQubits[gateIndex];
+            llvm::SmallVector<mlir::Type, 4> resultTypes;
+            if (mappedQubits.size() == 1) {
+                resultTypes.push_back(builder.getType<quantum::QubitType>());
+            } else if (mappedQubits.size() == 2) {
+                resultTypes.push_back(builder.getType<quantum::QubitType>());
+                resultTypes.push_back(builder.getType<quantum::QubitType>());
+            }
+            llvm::SmallVector<mlir::Value, 2> values;
+            if (mappedQubits.size() == 1)
+                values = {qubitToValue[mappedQubits[0]]};
+            else
+                values = {qubitToValue[mappedQubits[0]], qubitToValue[mappedQubits[1]]};
+            mlir::ValueRange in_qubits_to_curr_op(values);
+
+            mlir::Operation *currOp = builder.create<quantum::CustomOp>(
+                builder.getUnknownLoc(),
+                /*out_qubits=*/resultTypes,
+                /*out_ctrl_qubits=*/mlir::TypeRange({}),
+                // /*params=*/mlir::ValueRange(),
+                /*params=*/compiledGateParams[gateIndex],
+                /*in_qubits=*/in_qubits_to_curr_op,
+                /*gate_name=*/compiledGateNames[gateIndex],
+                /*adjoint=*/false,
+                /*in_ctrl_qubits=*/mlir::ValueRange({}),
+                /*in_ctrl_values=*/mlir::ValueRange());
+            builder.setInsertionPointAfter(currOp);
+            qubitToValue[mappedQubits[0]] = currOp->getResult(0);
+            if (mappedQubits.size() == 2)
+                qubitToValue[mappedQubits[1]] = currOp->getResult(1);
+        }
+
+        // Create compbasis observable from input qreg
+        Type obsType = builder.getType<quantum::ObservableType>();
+        mlir::Operation *compBasisOp = builder.create<quantum::ComputationalBasisOp>(
+            builder.getUnknownLoc(), obsType, ValueRange{}, allocOp->getResult(0));
+        // Get the size of the state vector
+        RankedTensorType constTensorType = RankedTensorType::get({}, builder.getI64Type());
+        DenseIntElementsAttr oneValue = DenseIntElementsAttr::get(constTensorType, APInt(64, 1));
+        mlir::Operation *constOneOp = builder.create<stablehlo::ConstantOp>(
+            builder.getUnknownLoc(), constTensorType, oneValue);
+
+        mlir::Operation *numQubitsOp = builder.create<quantum::NumQubitsOp>(
+            builder.getUnknownLoc(), builder.getI64Type());
+        
+        mlir::Operation *fromElementsOp = builder.create<tensor::FromElementsOp>(
             builder.getUnknownLoc(), 
-            resultTypes, 
-            TypeRange(),
-            ValueRange(), qubitValue, "Hadamard",
-            false, ValueRange(), ValueRange()
-        );
+            RankedTensorType::get({}, builder.getI64Type()),
+            numQubitsOp->getResult(0));
+        
+        mlir::Operation *shiftLeftOp = builder.create<stablehlo::ShiftLeftOp>(
+            builder.getUnknownLoc(), constTensorType, 
+            constOneOp->getResult(0), fromElementsOp->getResult(0));
+        
+        mlir::Operation *stateShapeOp = builder.create<tensor::ExtractOp>(
+            builder.getUnknownLoc(), builder.getI64Type(),
+            shiftLeftOp->getResult(0), ValueRange{});  
+            
+        // Create quantum state
+        RankedTensorType stateType = RankedTensorType::get({ShapedType::kDynamic}, 
+            ComplexType::get(builder.getF64Type()));
+        mlir::Operation *stateOp = builder.create<quantum::StateOp>(
+            builder.getUnknownLoc(), stateType,
+            compBasisOp->getResult(0), stateShapeOp->getResult(0), Value{});
 
         // Use the builder to insert operations *after* allocOp.
         builder.create<quantum::DeallocOp>(builder.getUnknownLoc(), allocOp->getResult(0));
-        builder.create<mlir::func::ReturnOp>(builder.getUnknownLoc());
+        builder.create<quantum::DeviceReleaseOp>(builder.getUnknownLoc());
+
+        // update return types
+        SmallVector<Type> newReturnTypes;
+        newReturnTypes.push_back(shiftLeftOp->getResult(0).getType());
+        newReturnTypes.push_back(stateOp->getResult(0).getType());
+        auto newFuncType = FunctionType::get(newFunc.getContext(),
+                                    newFunc.getFunctionType().getInputs(),
+                                    newReturnTypes);
+        newFunc.setType(newFuncType);
+
+        SmallVector<Value> returnValues = {shiftLeftOp->getResult(0), stateOp->getResult(0)};
+        builder.create<mlir::func::ReturnOp>(builder.getUnknownLoc(), returnValues);
 
     }
 };
 
-        // change type signature of a func
-        // mlir::FunctionType originalFuncType = func.getFunctionType();
-        // mlir::TypeRange originalResultTypes = originalFuncType.getResults();
-        // mlir::TypeRange newFuncInputTypes = newFunc.getFunctionType().getInputs();
-        // mlir::FunctionType newFuncNewType = builder.getFunctionType(
-        //     func.getFunctionType(),      
-        //     originalResultTypes
-        // );
-        // newFunc.setType(newFuncNewType);
-
-        // Rewrite gate
-        // mlir::OpBuilder builder(op); // Create OpBuilder
-        // builder.setInsertionPoint(op);
-
-        // auto loc = op->getLoc();
-        // auto newOp = builder.create<quantum::CustomOp>(loc,
-        //     /*out_qubits=*/mlir::TypeRange({cast<quantum::CustomOp>(op).getOutQubits().getTypes()}),
-        //     /*out_ctrl_qubits=*/mlir::TypeRange(),
-        //     /*params=*/mlir::ValueRange({cast<quantum::CustomOp>(op).getParams()}),
-        //     /*in_qubits=*/mlir::ValueRange({cast<quantum::CustomOp>(op).getInQubits()}),
-        //     /*gate_name=*/gateName,
-        //     /*adjoint=*/false,
-        //     /*in_ctrl_qubits=*/mlir::ValueRange(),
-        //     /*in_ctrl_values=*/mlir::ValueRange());
-
-        // op->replaceAllUsesWith(newOp->getResults());
-        // op->erase();
 
 std::unique_ptr<Pass> createRoutingPass()
 {
