@@ -139,6 +139,19 @@ def GraphStatePrepOp : MBQC_Op<"graph_state_prep"> {
         .. code-block::
 
             [1,   0, 1,   0, 0, 1]
+
+        In this representation, the number of vertices, :math:`N`, in the graph is related to the
+        number of elements, :math:`m`, in the densely packed adjacency matrix via
+
+        .. math::
+
+            m = N(N - 1) / 2,
+
+        or inversely,
+
+        .. math::
+
+            N = (1 + \sqrt{1 + 8m}) / 2.
     }];
 
     let arguments = (ins
