@@ -26,20 +26,22 @@
 namespace catalyst {
 namespace qec {
 
+class QECLayer;
 /// Thread-safe context for QEC layer operations.
 /// Each pass instance should create its own context to ensure
 /// thread safety and deterministic behavior.
 class QECLayerContext {
   public:
-    llvm::MapVector<mlir::Value, int> qubitValueToIndex;
-    llvm::MapVector<mlir::Operation *, std::vector<int>> opToIndex;
-    int MAX_INDEX = 0; // Maximum index assigned so far
+    llvm::MapVector<LayerOp, std::unique_ptr<QECLayer>> layers;
+    // Map current qubit SSA value to its canonical entry/origin qubit value
+    llvm::MapVector<mlir::Value, mlir::Value> qubitValueToEntry;
+    // Cache per-op canonical entry qubits in operand order
+    llvm::MapVector<mlir::Operation *, std::vector<mlir::Value>> opToEntryQubits;
 
     void clear()
     {
-        qubitValueToIndex.clear();
-        opToIndex.clear();
-        MAX_INDEX = 0;
+        qubitValueToEntry.clear();
+        opToEntryQubits.clear();
     }
 
     QECLayerContext() = default;
@@ -59,8 +61,8 @@ class QECLayer {
     llvm::DenseMap<mlir::Value, mlir::Value> resultToOperand;
     QECLayerContext *context; // Reference to thread-local context
 
-    // Cached qubit index set
-    llvm::DenseSet<int> layerQubitIndexes;
+    // Cached canonical entry qubit set for the layer
+    llvm::DenseSet<mlir::Value> layerEntryQubits;
 
     void insertToLayer(QECOpInterface op);
     void updateResultAndOperand(QECOpInterface op);
@@ -69,15 +71,31 @@ class QECLayer {
     std::vector<QECOpInterface> ops;
     llvm::SetVector<mlir::Value> operands;
     llvm::SetVector<mlir::Value> results;
+    LayerOp layerOp;
 
     QECLayer(QECLayerContext *ctx) : context(ctx) {}
     QECLayer(QECLayerContext *ctx, std::vector<QECOpInterface> ops) : context(ctx), ops(ops)
     {
         // Initialize the cached index set for existing ops
         for (auto op : ops) {
-            auto qubitIndexes = getQubitIndexFrom(op);
-            layerQubitIndexes.insert(qubitIndexes.begin(), qubitIndexes.end());
+            insertToLayer(op);
         }
+    }
+
+    QECLayer(QECLayerContext *ctx, LayerOp layerOp) : context(ctx)
+    {
+        layerOp->walk([&](QECOpInterface op) { insertToLayer(op); });
+        this->layerOp = layerOp;
+    }
+
+    static QECLayer build(QECLayerContext *ctx, LayerOp layerOp)
+    {
+        if (ctx->layers.contains(layerOp)) {
+            return *ctx->layers[layerOp];
+        }
+        auto layer = std::make_unique<QECLayer>(ctx, layerOp);
+        ctx->layers[layerOp] = std::move(layer);
+        return *ctx->layers[layerOp];
     }
 
     ~QECLayer()
@@ -86,15 +104,15 @@ class QECLayer {
         ops.clear();
         operands.clear();
         results.clear();
-        layerQubitIndexes.clear();
+        layerEntryQubits.clear();
     }
 
     inline bool empty() { return ops.empty(); }
 
     mlir::Operation *getParentLayer();
 
-    std::vector<int> getQubitIndexFrom(QECOpInterface op);
-    void setQubitIndexFrom(QECOpInterface op);
+    std::vector<mlir::Value> getEntryQubitsFrom(QECOpInterface op);
+    void setEntryQubitsFrom(QECOpInterface op);
 
     bool actOnDisjointQubits(QECOpInterface op);
 

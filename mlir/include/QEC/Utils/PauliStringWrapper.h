@@ -14,10 +14,8 @@
 
 #pragma once
 
-#include "QEC/IR/QECDialect.h"
 #include "QEC/IR/QECOpInterfaces.h"
-#include "QEC/Transforms/Patterns.h"
-#include "llvm/ADT/SetVector.h"
+#include "mlir/IR/PatternMatch.h"
 
 using namespace mlir;
 
@@ -112,10 +110,10 @@ using PauliWordPair = std::pair<PauliStringWrapper, PauliStringWrapper>;
  */
 template <typename T, typename U>
 PauliWord expandPauliWord(const T &operands, const U &inOutOperands, QECOpInterface op);
-// After the template declaration
-extern template PauliWord
-expandPauliWord<llvm::SetVector<int>, std::vector<int>>(const llvm::SetVector<int> &,
-                                                        const std::vector<int> &, QECOpInterface);
+
+// Explicit extern to ensure a single instantiation is emitted in the .cpp
+extern template PauliWord expandPauliWord<llvm::SetVector<mlir::Value>, std::vector<mlir::Value>>(
+    const llvm::SetVector<mlir::Value> &, const std::vector<mlir::Value> &, QECOpInterface);
 /**
  * @brief Normalize the qubits of the two operations.
  *        The goal is to normalize the operations of the two operations to the same order and

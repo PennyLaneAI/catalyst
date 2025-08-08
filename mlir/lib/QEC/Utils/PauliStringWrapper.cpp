@@ -16,8 +16,6 @@
 #include <stim/stabilizers/flex_pauli_string.h>
 #include <stim/stabilizers/pauli_string.h>
 
-#include "Quantum/IR/QuantumOps.h" // for quantum::AllocQubitOp
-
 #include "QEC/Utils/PauliStringWrapper.h"
 
 namespace catalyst {
@@ -114,10 +112,9 @@ PauliWord expandPauliWord(const T &operands, const U &inOutOperands, QECOpInterf
     return pauliWord;
 }
 
-// Template definition
-template PauliWord
-expandPauliWord<llvm::SetVector<int>, std::vector<int>>(const llvm::SetVector<int> &,
-                                                        const std::vector<int> &, QECOpInterface);
+// Emit explicit instantiation for the Value-based specialization used by QECLayer
+template PauliWord expandPauliWord<llvm::SetVector<Value>, std::vector<Value>>(
+    const llvm::SetVector<Value> &, const std::vector<Value> &, QECOpInterface);
 
 PauliWordPair normalizePPROps(QECOpInterface lhs, QECOpInterface rhs)
 {
