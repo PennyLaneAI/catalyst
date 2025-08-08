@@ -26,9 +26,9 @@ void QECLayer::insertToLayer(QECOpInterface op)
     ops.emplace_back(op);
     updateResultAndOperand(op);
 
-    // Update the cached qubit index set when inserting
-    auto qubitIndexes = getQubitIndexFrom(op);
-    layerQubitIndexes.insert(qubitIndexes.begin(), qubitIndexes.end());
+    // Update the cached entry qubit set when inserting
+    auto entryQubits = getEntryQubitsFrom(op);
+    layerEntryQubits.insert(entryQubits.begin(), entryQubits.end());
 }
 
 void QECLayer::updateResultAndOperand(QECOpInterface op)
@@ -69,44 +69,43 @@ Operation *QECLayer::getParentLayer()
     return ops.back()->getParentOp();
 }
 
-void QECLayer::setQubitIndexFrom(QECOpInterface op)
+void QECLayer::setEntryQubitsFrom(QECOpInterface op)
 {
     assert(context != nullptr && "QECLayerContext cannot be null");
-    std::vector<int> qubitIndexes;
+    std::vector<Value> entryQubits;
 
     for (auto [inQubit, outQubit] : llvm::zip(op.getInQubits(), op.getOutQubits())) {
-        if (context->qubitValueToIndex.contains(inQubit)) {
-            int index = context->qubitValueToIndex[inQubit];
-            qubitIndexes.push_back(index);
-            context->qubitValueToIndex[outQubit] = index;
+        if (context->qubitValueToEntry.contains(inQubit)) {
+            Value entry = context->qubitValueToEntry[inQubit];
+            entryQubits.push_back(entry);
+            context->qubitValueToEntry[outQubit] = entry;
         }
         else {
-            context->qubitValueToIndex[outQubit] = context->MAX_INDEX;
-            qubitIndexes.push_back(context->MAX_INDEX);
-            context->MAX_INDEX++;
+            context->qubitValueToEntry[outQubit] = inQubit;
+            entryQubits.push_back(inQubit);
         }
     }
-    context->opToIndex[op] = qubitIndexes;
+    context->opToEntryQubits[op] = entryQubits;
 }
 
-std::vector<int> QECLayer::getQubitIndexFrom(QECOpInterface op)
+std::vector<Value> QECLayer::getEntryQubitsFrom(QECOpInterface op)
 {
     assert(context != nullptr && "QECLayerContext cannot be null");
-    if (context->opToIndex.contains(op)) {
-        return context->opToIndex[op];
+    if (context->opToEntryQubits.contains(op)) {
+        return context->opToEntryQubits[op];
     }
 
-    setQubitIndexFrom(op);
-    return context->opToIndex[op];
+    setEntryQubitsFrom(op);
+    return context->opToEntryQubits[op];
 }
 
 bool QECLayer::actOnDisjointQubits(QECOpInterface op)
 {
-    auto qubitIndexes = getQubitIndexFrom(op);
+    auto entryQubits = getEntryQubitsFrom(op);
 
     // Check for overlap with cached index set
-    for (auto idx : qubitIndexes) {
-        if (layerQubitIndexes.contains(idx)) {
+    for (auto q : entryQubits) {
+        if (layerEntryQubits.contains(q)) {
             return false; // Found an overlap
         }
     }
@@ -117,15 +116,15 @@ bool QECLayer::actOnDisjointQubits(QECOpInterface op)
 // Commute two ops if they act on the same qubits based on qubit indexes on that layer
 bool QECLayer::commute(QECOpInterface fromOp, QECOpInterface toOp)
 {
-    auto lhsQubitIndexes = getQubitIndexFrom(fromOp);
-    auto rhsQubitIndexes = getQubitIndexFrom(toOp);
+    auto lhsEntryQubits = getEntryQubitsFrom(fromOp);
+    auto rhsEntryQubits = getEntryQubitsFrom(toOp);
 
-    llvm::SetVector<int> qubits;
-    qubits.insert(lhsQubitIndexes.begin(), lhsQubitIndexes.end());
-    qubits.insert(rhsQubitIndexes.begin(), rhsQubitIndexes.end());
+    llvm::SetVector<Value> qubits;
+    qubits.insert(lhsEntryQubits.begin(), lhsEntryQubits.end());
+    qubits.insert(rhsEntryQubits.begin(), rhsEntryQubits.end());
 
-    PauliWord lhsPauliWord = expandPauliWord(qubits, lhsQubitIndexes, fromOp);
-    PauliWord rhsPauliWord = expandPauliWord(qubits, rhsQubitIndexes, toOp);
+    PauliWord lhsPauliWord = expandPauliWord(qubits, lhsEntryQubits, fromOp);
+    PauliWord rhsPauliWord = expandPauliWord(qubits, rhsEntryQubits, toOp);
 
     auto lhsPSWrapper = PauliStringWrapper::from_pauli_word(lhsPauliWord);
     auto rhsPSWrapper = PauliStringWrapper::from_pauli_word(rhsPauliWord);
