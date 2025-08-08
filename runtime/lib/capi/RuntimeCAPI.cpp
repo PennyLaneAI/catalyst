@@ -16,11 +16,11 @@
 #include <cstdarg>
 #include <cstdlib>
 #include <ctime>
+#include <limits>
+#include <map>
 #include <memory>
 #include <ostream>
-#include <limits>
 #include <set>
-#include <map>
 #include <stdexcept>
 #include <string_view>
 #include <tuple>
@@ -52,12 +52,12 @@ thread_local static RTDevice *RTD_PTR = nullptr;
 
 const int MAXIMUM = 1e9;
 std::set<int> physicalQubits;
-std::map<int,int> wireMap;
-std::map<std::pair<int,int>, bool> couplingMap;
-std::map<std::pair<int,int>, int> distanceMatrix;
+std::map<int, int> wireMap;
+std::map<std::pair<int, int>, bool> couplingMap;
+std::map<std::pair<int, int>, int> distanceMatrix;
 std::map<std::pair<int, int>, int> predecessorMatrix;
 
-std::vector<int> getShortestPath(int source, int target) 
+std::vector<int> getShortestPath(int source, int target)
 {
     std::vector<int> path;
     if (predecessorMatrix.at(std::make_pair(source, target)) == -1 && source != target) {
@@ -68,14 +68,13 @@ std::vector<int> getShortestPath(int source, int target)
     while (current != source) {
         path.push_back(current);
         current = predecessorMatrix.at(std::make_pair(source, current));
-        if (current == -1 && path.size() > 0) 
-        { 
-             path.clear(); 
-             return path;
+        if (current == -1 && path.size() > 0) {
+            path.clear();
+            return path;
         }
     }
     path.push_back(source);
-    std::reverse(path.begin(), path.end()); 
+    std::reverse(path.begin(), path.end());
     return path;
 }
 
@@ -286,32 +285,29 @@ void __catalyst__rt__finalize()
     CTX.reset(nullptr);
 }
 
-
-static std::pair<int,int> getRoutedQubits(QUBIT *control, QUBIT *target, const Modifiers *modifiers)
+static std::pair<int, int> getRoutedQubits(QUBIT *control, QUBIT *target,
+                                           const Modifiers *modifiers)
 {
     // Similar to qml.transpile implementation
     // https://docs.pennylane.ai/en/stable/_modules/pennylane/transforms/transpile.html
     int firstQubit = reinterpret_cast<QubitIdType>(control);
     int secondQubit = reinterpret_cast<QubitIdType>(target);
-    
-    if (couplingMap[std::make_pair(firstQubit, secondQubit)])
-    {
+
+    if (couplingMap[std::make_pair(firstQubit, secondQubit)]) {
         // since in each iteration, we adjust indices of each op,
         // we reset logical -> phyiscal mapping
         for (auto it = wireMap.begin(); it != wireMap.end(); ++it) {
             wireMap[it->second] = it->second;
         }
     }
-    else 
-    {
+    else {
         std::vector<int> swapPath = getShortestPath(firstQubit, secondQubit);
         //  i<swapPath.size()-1 since l;ast qubit is already our target
-        for(auto i = 1; i<swapPath.size()-1; i++)
-        {
-            int u = swapPath[i-1];
+        for (auto i = 1; i < swapPath.size() - 1; i++) {
+            int u = swapPath[i - 1];
             int v = swapPath[i];
-            getQuantumDevicePtr()->NamedOperation("SWAP", {}, {u,v}, MODIFIERS_ARGS(modifiers));
-            
+            getQuantumDevicePtr()->NamedOperation("SWAP", {}, {u, v}, MODIFIERS_ARGS(modifiers));
+
             for (auto it = wireMap.begin(); it != wireMap.end(); ++it) {
                 // update logical -> phyiscal mapping
                 if (wireMap[it->first] == u)
@@ -319,7 +315,6 @@ static std::pair<int,int> getRoutedQubits(QUBIT *control, QUBIT *target, const M
                 else if (wireMap[it->first] == v)
                     wireMap[it->first] = u;
             }
-
         }
         firstQubit = wireMap[firstQubit];
         secondQubit = wireMap[secondQubit];
@@ -329,7 +324,7 @@ static std::pair<int,int> getRoutedQubits(QUBIT *control, QUBIT *target, const M
 
 static int __catalyst__rt__device_init__impl(int8_t *rtd_lib, int8_t *rtd_name, int8_t *rtd_kwargs,
                                              int64_t shots, bool auto_qubit_management)
-{   
+{
     // Device library cannot be a nullptr
     RT_FAIL_IF(!rtd_lib, "Invalid device library");
     RT_FAIL_IF(!CTX, "Invalid use of the global driver before initialization");
@@ -346,31 +341,31 @@ static int __catalyst__rt__device_init__impl(int8_t *rtd_lib, int8_t *rtd_name, 
         getQuantumDevicePtr()->StartTapeRecording();
     }
 
-    // Extract coupling map from the kwargs passed 
+    // Extract coupling map from the kwargs passed
     // If coupling map is provided then it takes in the form {...,'couplingMap' ((a,b),(b,c))}
     // else {...,'couplingMap' (a,b,c)}
     size_t start = args[2].find("coupling_map': ") + 15; // Find key and opening parenthesis
-    size_t end = args[2].find("}", start); // Find closing parenthesis
+    size_t end = args[2].find("}", start);               // Find closing parenthesis
     std::string tuple_str = std::string(args[2].substr(start, end - start));
 
     // Extract provided coupling map
     if (tuple_str.find("((") != std::string::npos) {
         auto string_index = 1;
-        while(string_index < tuple_str.size() - 1)
-        {
-            size_t next_closing_bracket = tuple_str.find(")", string_index); 
-            std::string curr_tuple_str = std::string(tuple_str.substr(string_index+1, next_closing_bracket - string_index - 1));
+        while (string_index < tuple_str.size() - 1) {
+            size_t next_closing_bracket = tuple_str.find(")", string_index);
+            std::string curr_tuple_str = std::string(
+                tuple_str.substr(string_index + 1, next_closing_bracket - string_index - 1));
             std::istringstream iss(curr_tuple_str);
             int first_int, second_int;
-            char comma; 
-            iss >> first_int >> comma && comma == ',' && iss >> second_int;
+            char comma;
+            iss >> first_int >> comma &&comma == ',' && iss >> second_int;
             physicalQubits.insert(first_int);
             physicalQubits.insert(second_int);
             couplingMap[std::make_pair(first_int, second_int)] = true;
             couplingMap[std::make_pair(second_int, first_int)] = true;
             string_index = next_closing_bracket + 3;
         }
-    } 
+    }
     // No coupling map provided so all-to-all connectivity
     else {
         std::string delimiter = ",";
@@ -383,18 +378,15 @@ static int __catalyst__rt__device_init__impl(int8_t *rtd_lib, int8_t *rtd_name, 
         }
         physicalQubits.insert(std::stoi(tuple_str.substr(start)));
         // all-to-all connectivity
-        for (auto i_itr = physicalQubits.begin(); i_itr != physicalQubits.end(); ++i_itr)
-        {
-            for (auto j_itr = physicalQubits.begin(); j_itr != i_itr; ++j_itr ) 
-            {
+        for (auto i_itr = physicalQubits.begin(); i_itr != physicalQubits.end(); ++i_itr) {
+            for (auto j_itr = physicalQubits.begin(); j_itr != i_itr; ++j_itr) {
                 couplingMap[std::make_pair(*i_itr, *j_itr)] = true;
                 couplingMap[std::make_pair(*j_itr, *i_itr)] = true;
             }
         }
     }
-    
-    for (auto i_itr = physicalQubits.begin(); i_itr != physicalQubits.end(); i_itr++)
-    {
+
+    for (auto i_itr = physicalQubits.begin(); i_itr != physicalQubits.end(); i_itr++) {
         // initial mapping i->i
         wireMap[*i_itr] = *i_itr;
         // self-distances : 0
@@ -404,37 +396,34 @@ static int __catalyst__rt__device_init__impl(int8_t *rtd_lib, int8_t *rtd_name, 
     }
 
     // initial distances maximum
-    for (auto i_itr = physicalQubits.begin(); i_itr != physicalQubits.end(); i_itr++)
-    {
-        for (auto j_itr = physicalQubits.begin(); j_itr != physicalQubits.end(); j_itr++)
-        {
+    for (auto i_itr = physicalQubits.begin(); i_itr != physicalQubits.end(); i_itr++) {
+        for (auto j_itr = physicalQubits.begin(); j_itr != physicalQubits.end(); j_itr++) {
             distanceMatrix[std::make_pair(*i_itr, *j_itr)] = MAXIMUM;
-            predecessorMatrix[std::make_pair(*i_itr, *j_itr)] = -1; 
+            predecessorMatrix[std::make_pair(*i_itr, *j_itr)] = -1;
         }
     }
-        
+
     // edge-distances : 1
-    for (auto& entry : couplingMap) 
-    {
-        const std::pair<int, int>& key = entry.first;
+    for (auto &entry : couplingMap) {
+        const std::pair<int, int> &key = entry.first;
         bool value = entry.second;
-        if (value)
-        {
+        if (value) {
             distanceMatrix[std::make_pair(key.first, key.second)] = 1;
             predecessorMatrix[std::make_pair(key.first, key.second)] = key.first;
         }
     }
     // run floyd-warshall
-    for (auto i_itr = physicalQubits.begin(); i_itr != physicalQubits.end(); i_itr++)
-    {
-        for (auto j_itr = physicalQubits.begin(); j_itr != physicalQubits.end(); j_itr++ ) 
-        {
-            for (auto k_itr = physicalQubits.begin(); k_itr != physicalQubits.end(); k_itr++ ) 
-            {
-                if (distanceMatrix[std::make_pair(*j_itr,*i_itr)] + distanceMatrix[std::make_pair(*i_itr,*k_itr)] < distanceMatrix[std::make_pair(*j_itr,*k_itr)] )
-                {
-                    distanceMatrix[std::make_pair(*j_itr,*k_itr)] = distanceMatrix[std::make_pair(*j_itr,*i_itr)] + distanceMatrix[std::make_pair(*i_itr,*k_itr)];
-                    predecessorMatrix[std::make_pair(*j_itr,*k_itr)] = predecessorMatrix[std::make_pair(*i_itr,*k_itr)];
+    for (auto i_itr = physicalQubits.begin(); i_itr != physicalQubits.end(); i_itr++) {
+        for (auto j_itr = physicalQubits.begin(); j_itr != physicalQubits.end(); j_itr++) {
+            for (auto k_itr = physicalQubits.begin(); k_itr != physicalQubits.end(); k_itr++) {
+                if (distanceMatrix[std::make_pair(*j_itr, *i_itr)] +
+                        distanceMatrix[std::make_pair(*i_itr, *k_itr)] <
+                    distanceMatrix[std::make_pair(*j_itr, *k_itr)]) {
+                    distanceMatrix[std::make_pair(*j_itr, *k_itr)] =
+                        distanceMatrix[std::make_pair(*j_itr, *i_itr)] +
+                        distanceMatrix[std::make_pair(*i_itr, *k_itr)];
+                    predecessorMatrix[std::make_pair(*j_itr, *k_itr)] =
+                        predecessorMatrix[std::make_pair(*i_itr, *k_itr)];
                 }
             }
         }
@@ -779,13 +768,12 @@ void __catalyst__qis__CNOT(QUBIT *control, QUBIT *target, const Modifiers *modif
 {
     RT_FAIL_IF(control == target,
                "Invalid input for CNOT gate. Control and target qubit operands must be distinct.");
-    
-    std::pair<int,int> routedQubits = getRoutedQubits(control, target, modifiers);
+
+    std::pair<int, int> routedQubits = getRoutedQubits(control, target, modifiers);
     getQuantumDevicePtr()->NamedOperation("CNOT", {},
                                           {/* control = */ routedQubits.first,
                                            /* target = */ routedQubits.second},
                                           /* modifiers */ MODIFIERS_ARGS(modifiers));
-
 }
 
 void __catalyst__qis__CY(QUBIT *control, QUBIT *target, const Modifiers *modifiers)
