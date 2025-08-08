@@ -74,8 +74,6 @@ struct PauliStringWrapper {
 
     bool isNegative() const;
     bool isImaginary() const;
-    bool hasPiOverTwoRotation() const;
-    bool hasPiOverFourRotation() const;
 
     void updateSign(bool sign);
 

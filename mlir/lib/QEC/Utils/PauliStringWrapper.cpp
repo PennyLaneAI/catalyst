@@ -50,18 +50,6 @@ PauliStringWrapper PauliStringWrapper::from_pauli_word(const PauliWord &pauliWor
 
 bool PauliStringWrapper::isNegative() const { return pauliString->value.sign; }
 bool PauliStringWrapper::isImaginary() const { return pauliString->imag; }
-bool PauliStringWrapper::hasPiOverTwoRotation() const
-{
-    auto op_copy = this->op;
-    auto rotationKind = static_cast<int16_t>(op_copy.getRotationKind());
-    return rotationKind == 2 || rotationKind == -2;
-}
-bool PauliStringWrapper::hasPiOverFourRotation() const
-{
-    auto op_copy = this->op;
-    auto rotationKind = static_cast<int16_t>(op_copy.getRotationKind());
-    return rotationKind == 4 || rotationKind == -4;
-}
 
 void PauliStringWrapper::updateSign(bool sign) { pauliString->value.sign = sign; }
 
@@ -91,12 +79,13 @@ PauliStringWrapper
 PauliStringWrapper::computeCommutationRulesWith(const PauliStringWrapper &rhs) const
 {
     stim::FlexPauliString result = *rhs.pauliString;
-    if (this->hasPiOverTwoRotation()) {
+    assert(llvm::isa<PPRotationOp>(this->op) && "Clifford Operation is not PPRotationOp");
+    if (auto this_op = llvm::cast<PPRotationOp>(this->op); this_op.hasPiOverTwoRotation()) {
         // -P'
         result.value.sign = !result.value.sign;
     }
     else {
-        assert(this->hasPiOverFourRotation() &&
+        assert(this_op.hasPiOverFourRotation() &&
                "Rotation of Clifford gate is neither pi/2 nor pi/4");
         // P * P' * i
         result = (*this->pauliString) * result * stim::FlexPauliString::from_text("i");
