@@ -139,7 +139,7 @@ class BackendInfo:
 
 # pylint: disable=too-many-branches
 @debug_logger
-def extract_backend_info(device: qml.devices.QubitDevice, device_capabilities) -> BackendInfo:
+def extract_backend_info(device: qml.devices.QubitDevice, device_capabilities = None) -> BackendInfo:
     """Extract the backend info from a quantum device. The device is expected to carry a reference
     to a valid TOML config file."""
 
@@ -294,7 +294,7 @@ class QJITDevice(qml.devices.Device):
 
     @staticmethod
     @debug_logger
-    def extract_backend_info(device, device_capabilities) -> BackendInfo:
+    def extract_backend_info(device, device_capabilities = None) -> BackendInfo:
         """Wrapper around extract_backend_info in the runtime module."""
         return extract_backend_info(device, device_capabilities)
 
