@@ -41,7 +41,8 @@ def f_aot_builder(backend, wires=1, shots=1000):
     """Test AOT builder."""
 
     @qjit
-    @qml.qnode(qml.device(backend, wires=wires, shots=shots))
+    @qml.set_shots(shots)
+    @qml.qnode(qml.device(backend, wires=wires))
     def f(x: float) -> bool:
         qml.RY(x, wires=0)
         return measure(wires=0)
@@ -53,7 +54,8 @@ def f_jit_builder(backend, wires=1, shots=1000):
     """Test JIT builder."""
 
     @qjit
-    @qml.qnode(qml.device(backend, wires=wires, shots=shots))
+    @qml.set_shots(shots)
+    @qml.qnode(qml.device(backend, wires=wires))
     def f(x):
         qml.RY(x, wires=0)
         return measure(wires=0)
@@ -65,7 +67,8 @@ def fsample_aot_builder(backend, wires=1, shots=1000):
     """Test AOT builder with the sample measurement process."""
 
     @qjit
-    @qml.qnode(qml.device(backend, wires=wires, shots=shots))
+    @qml.set_shots(shots)
+    @qml.qnode(qml.device(backend, wires=wires))
     def f(x: float):
         qml.RY(x, wires=0)
         return qml.sample()

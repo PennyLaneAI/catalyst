@@ -1099,8 +1099,8 @@ class TestTransformValidity:
         """Test verification for transforms that are non-batching but modify tape measurements
         while returning classical values."""
 
-        def inject_device_transforms(self, ctx, execution_config=None):
-            program, config = original_preprocess(self, ctx, execution_config)
+        def inject_device_transforms(self, ctx, execution_config=None, shots=None):
+            program, config = original_preprocess(self, ctx, execution_config, shots=shots)
 
             program.add_transform(transform, self.wires)
 
@@ -1111,9 +1111,10 @@ class TestTransformValidity:
         original_preprocess = QJITDevice.preprocess
         monkeypatch.setattr(QJITDevice, "preprocess", inject_device_transforms)
 
-        dev = qml.device(backend, wires=2, shots=5)
+        dev = qml.device(backend, wires=2)
 
         @partial(transform, device_wires=dev.wires)
+        @qml.set_shots(5)
         @qml.qnode(dev)
         def qfunc():
             qml.X(0)
@@ -1131,8 +1132,8 @@ class TestTransformValidity:
         """Test verification for transforms that are non-batching and in-principle can modify tape
         measurements but don't, while returning classical values."""
 
-        def inject_device_transforms(self, ctx, execution_config=None):
-            program, config = original_preprocess(self, ctx, execution_config)
+        def inject_device_transforms(self, ctx, execution_config=None, shots=None):
+            program, config = original_preprocess(self, ctx, execution_config, shots=shots)
 
             program.add_transform(transform, self.wires)
 

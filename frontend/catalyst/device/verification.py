@@ -17,7 +17,7 @@ This module contains the functions to verify quantum tapes are fully compatible
 with the compiler and device.
 """
 
-from typing import Any, Callable, List, Sequence, Union
+from typing import Any, Callable, List, Sequence
 
 from pennylane import transform
 from pennylane.devices.capabilities import DeviceCapabilities, OperatorProperties
@@ -30,7 +30,7 @@ from pennylane.measurements import (
     VarianceMP,
     VnEntropyMP,
 )
-from pennylane.measurements.shots import Shots
+from pennylane.measurements.shots import Shots, ShotsLike
 from pennylane.operation import Operation
 from pennylane.ops import (
     Adjoint,
@@ -268,7 +268,7 @@ def validate_observables_adjoint_diff(tape: QuantumTape, qjit_device):
 
 @transform
 def validate_measurements(
-    tape: QuantumTape, capabilities: DeviceCapabilities, name: str, shots: Union[int, Shots]
+    tape: QuantumTape, capabilities: DeviceCapabilities, name: str, shots: ShotsLike = None
 ) -> (Sequence[QuantumTape], Callable):
     """Validates the observables and measurements for a circuit against the capabilites
     from the TOML file.
@@ -287,6 +287,7 @@ def validate_measurements(
         CompileError: if a measurement is not supported by the given device with Catalyst
 
     """
+    shots = tape.shots if shots is None else Shots(shots)
 
     def _obs_checker(obs):
         if not obs.name in capabilities.observables:

@@ -194,8 +194,9 @@ def test_dynamic_wires_sample_with_wires(shots, backend, capfd):
 
     def ref(num_qubits):
         print("compiling...")
-        dev = qml.device(backend, wires=num_qubits, shots=shots)
+        dev = qml.device(backend, wires=num_qubits)
 
+        @qml.set_shots(shots)
         @qml.qnode(dev)
         def circ():
             @catalyst.for_loop(0, num_qubits, 1)
@@ -228,8 +229,9 @@ def test_dynamic_wires_sample_without_wires(shots, backend, capfd):
 
     def ref(num_qubits):
         print("compiling...")
-        dev = qml.device(backend, wires=num_qubits, shots=shots)
+        dev = qml.device(backend, wires=num_qubits)
 
+        @qml.set_shots(shots)
         @qml.qnode(dev)
         def circ():
             @catalyst.for_loop(0, num_qubits, 1)
@@ -264,8 +266,9 @@ def test_dynamic_wires_counts_with_wires(backend, capfd):
     @catalyst.qjit
     def func(num_qubits):
         print("compiling...")
-        dev = qml.device(backend, wires=num_qubits, shots=1000)
+        dev = qml.device(backend, wires=num_qubits)
 
+        @qml.set_shots(1000)
         @qml.qnode(dev)
         def circ():
             qml.RX(0.0, wires=num_qubits - 1)
@@ -293,8 +296,9 @@ def test_dynamic_wires_counts_without_wires(backend, capfd):
     @catalyst.qjit
     def func(num_qubits):
         print("compiling...")
-        dev = qml.device(backend, wires=num_qubits, shots=1000)
+        dev = qml.device(backend, wires=num_qubits)
 
+        @qml.set_shots(1000)
         @qml.qnode(dev)
         def circ():
             qml.RX(0.0, wires=num_qubits - 1)

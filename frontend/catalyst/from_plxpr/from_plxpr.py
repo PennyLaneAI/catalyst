@@ -43,7 +43,7 @@ from pennylane.transforms import merge_rotations as pl_merge_rotations
 from pennylane.transforms import single_qubit_fusion as pl_single_qubit_fusion
 from pennylane.transforms import unitary_to_rot as pl_unitary_to_rot
 
-from catalyst.device import extract_backend_info, get_device_capabilities
+from catalyst.device import extract_backend_info
 from catalyst.from_plxpr.qreg_manager import QregManager
 from catalyst.jax_extras import jaxpr_pad_consts, make_jaxpr2, transient_jax_config
 from catalyst.jax_primitives import (

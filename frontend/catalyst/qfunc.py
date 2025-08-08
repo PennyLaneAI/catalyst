@@ -141,7 +141,6 @@ class QFunc:
                 return Function(dynamic_one_shot(self, mcm_config=mcm_config))(*args, **kwargs)
 
         new_device = copy(self.device)
-        new_device._shots = self._shots  # pylint: disable=protected-access
         qjit_device = QJITDevice(new_device)
 
         static_argnums = kwargs.pop("static_argnums", ())
@@ -272,7 +271,6 @@ def dynamic_one_shot(qnode, **kwargs):
     total_shots = _get_total_shots(qnode)
 
     new_dev = copy(dev)
-    new_dev._shots = qml.measurements.Shots(1)
     single_shot_qnode.device = new_dev
     single_shot_qnode._set_shots(qml.measurements.Shots(1))  # pylint: disable=protected-access
 

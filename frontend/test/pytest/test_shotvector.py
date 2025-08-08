@@ -31,7 +31,8 @@ class TestShotVector:
         """Test shot-vector as parameter with single sample measurment"""
 
         @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=1, shots=shots))
+        @qml.set_shots(shots)
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
         def circuit():
             qml.Hadamard(0)
             return qml.sample()
@@ -44,9 +45,10 @@ class TestShotVector:
     def test_multiple_sample_measurement(self, shots):
         """Test shot-vector with mulitple samples measurment"""
 
-        dev = qml.device("lightning.qubit", wires=1, shots=shots)
+        dev = qml.device("lightning.qubit", wires=1)
 
         @qjit
+        @qml.set_shots(shots)
         @qml.qnode(dev)
         def circuit_list():
             qml.Hadamard(0)
@@ -57,6 +59,7 @@ class TestShotVector:
         assert jnp.array(circuit_list()[1]).shape == (4, 3, 1)
 
         @qjit
+        @qml.set_shots(shots)
         @qml.qnode(dev)
         def circuit_dict():
             qml.X(0)
@@ -69,9 +72,10 @@ class TestShotVector:
     def test_shot_vector_with_mixes_shots_and_without_copies(self):
         """Test shot-vector with mixes shots and without copies"""
 
-        dev = qml.device("lightning.qubit", wires=1, shots=((20, 5), 100, (101, 2)))
+        dev = qml.device("lightning.qubit", wires=1)
 
         @qjit
+        @qml.set_shots(((20, 5), 100, (101, 2)))
         @qml.qnode(dev)
         def circuit():
             qml.Hadamard(0)
@@ -89,7 +93,7 @@ class TestShotVector:
     def test_shot_vector_with_different_measurement(self):
         """Test a NotImplementedError is raised when using a shot-vector with a measurement that is not qml.sample()"""
 
-        dev = qml.device("lightning.qubit", wires=1, shots=((3, 4)))
+        dev = qml.device("lightning.qubit", wires=1)
 
         with pytest.raises(
             NotImplementedError,
@@ -99,6 +103,7 @@ class TestShotVector:
         ):
 
             @qjit
+            @qml.set_shots(((3, 4)))
             @qml.qnode(dev)
             def circuit():
                 qml.Hadamard(0)
@@ -114,6 +119,7 @@ class TestShotVector:
         ):
 
             @qjit
+            @qml.set_shots(((3, 4)))
             @qml.qnode(dev)
             def circuit():
                 qml.Hadamard(0)
@@ -129,6 +135,7 @@ class TestShotVector:
         ):
 
             @qjit
+            @qml.set_shots(((3, 4)))
             @qml.qnode(dev)
             def circuit():
                 qml.Hadamard(0)
@@ -139,9 +146,10 @@ class TestShotVector:
     def test_shot_vector_with_complex_container_sample(self):
         """Test shot-vector with complex container sample"""
 
-        dev = qml.device("lightning.qubit", wires=1, shots=((3, 4),))
+        dev = qml.device("lightning.qubit", wires=1)
 
         @qjit
+        @qml.set_shots(((3, 4),))
         @qml.qnode(dev)
         def circuit():
             qml.Hadamard(0)

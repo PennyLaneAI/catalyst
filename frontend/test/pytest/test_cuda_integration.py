@@ -55,7 +55,8 @@ class TestCudaQ:
         with pytest.raises(NotImplementedError, match="cannot return measurements directly"):
 
             @cjit
-            @qml.qnode(qml.device("softwareq.qpp", wires=1, shots=30))
+            @qml.set_shots(30)
+            @qml.qnode(qml.device("softwareq.qpp", wires=1))
             def circuit():
                 qml.RX(jnp.pi / 4, wires=[0])
                 return measure(0)
@@ -117,12 +118,14 @@ class TestCudaQ:
     def test_samples(self):
         """Test SoftwareQQPP."""
 
-        @qml.qnode(qml.device("softwareq.qpp", wires=1, shots=100))
+        @qml.set_shots(100)
+        @qml.qnode(qml.device("softwareq.qpp", wires=1))
         def circuit(a):
             qml.RX(a, wires=[0])
             return qml.sample()
 
-        @qml.qnode(qml.device("lightning.qubit", wires=1, shots=100))
+        @qml.set_shots(100)
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
         def circuit_lightning(a):
             qml.RX(a, wires=[0])
             return qml.sample()
@@ -136,12 +139,14 @@ class TestCudaQ:
     def test_counts(self):
         """Test SoftwareQQPP."""
 
-        @qml.qnode(qml.device("softwareq.qpp", wires=1, shots=100))
+        @qml.set_shots(100)
+        @qml.qnode(qml.device("softwareq.qpp", wires=1))
         def circuit(a):
             qml.RX(a, wires=[0])
             return qml.counts()
 
-        @qml.qnode(qml.device("lightning.qubit", wires=1, shots=100))
+        @qml.set_shots(100)
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
         def circuit_lightning(a):
             qml.RX(a, wires=[0])
             return qml.counts()
@@ -460,7 +465,8 @@ class TestCudaQ:
         from catalyst.third_party.cuda import cudaqjit as cjit
 
         @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=2, shots=10))
+        @qml.set_shots(10)
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
         def circuit1(a):
             qml.RX(a, wires=0)
             return qml.sample()
@@ -468,7 +474,8 @@ class TestCudaQ:
         expected = circuit1(3.14)
 
         @cjit
-        @qml.qnode(qml.device("softwareq.qpp", wires=2, shots=10))
+        @qml.set_shots(10)
+        @qml.qnode(qml.device("softwareq.qpp", wires=2))
         def circuit2(a):
             qml.RX(a, wires=0)
             return qml.sample()

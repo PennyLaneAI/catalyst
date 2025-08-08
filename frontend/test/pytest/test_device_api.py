@@ -25,13 +25,17 @@ from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
 
 def test_qjit_device():
     """Test the qjit device from a device using the new api."""
-    device = NullQubit(wires=10, shots=2032)
+    with pytest.warns(
+        qml.exceptions.PennyLaneDeprecationWarning, match="shots on device is deprecated"
+    ):
+        device = NullQubit(wires=10, shots=2032)
 
-    # Create qjit device
-    device_qjit = QJITDevice(device)
+        # Create qjit device
+        device_qjit = QJITDevice(device)
 
     # Check attributes of the new device
-    assert device_qjit.shots == qml.measurements.Shots(2032)
+    # Since shots are not used in the new API, we expect None
+    assert device_qjit.shots == qml.measurements.Shots(None)
     assert device_qjit.wires == qml.wires.Wires(range(0, 10))
 
     # Check the preprocess of the new device
@@ -64,7 +68,7 @@ def test_qjit_device():
 )
 def test_qjit_device_invalid_wires(wires):
     """Test the qjit device from a device using the new api without wires set."""
-    device = NullQubit(shots=2032)
+    device = NullQubit()
     device._wires = wires
 
     with pytest.raises(
@@ -81,11 +85,11 @@ def test_qjit_device_measurements(shots, mocker):
 
     spy = mocker.spy(qjit_device, "get_device_capabilities")
 
-    dev = qml.device("lightning.qubit", wires=2, shots=shots)
+    dev = qml.device("lightning.qubit", wires=2)
     state_measurements = {"StateMP"}
     finite_shot_measurements = {"CountsMP", "SampleMP"}
 
-    dev_capabilities = get_device_capabilities(dev)
+    dev_capabilities = get_device_capabilities(dev, shots)
     expected_measurements = dev_capabilities.measurement_processes
 
     if shots is None:
@@ -100,6 +104,7 @@ def test_qjit_device_measurements(shots, mocker):
     spy = mocker.spy(qjit_device, "get_qjit_device_capabilities")
 
     @qjit
+    @qml.set_shots(shots)
     @qml.qnode(dev)
     def circuit():
         qml.X(0)
@@ -112,9 +117,10 @@ def test_qjit_device_measurements(shots, mocker):
 
 def test_simple_circuit():
     """Test that a circuit with the new device API is compiling to MLIR."""
-    dev = NullQubit(wires=2, shots=2048)
+    dev = NullQubit(wires=2)
 
     @qjit(target="mlir")
+    @qml.set_shots(shots=2048)
     @qml.qnode(device=dev)
     def circuit():
         qml.Hadamard(wires=0)

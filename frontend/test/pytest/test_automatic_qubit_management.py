@@ -45,8 +45,8 @@ def test_partial_sample(backend):
         return qml.sample(wires=[0, 2])
 
     wires = [4, None]
-    devices = [qml.device(backend, shots=10, wires=wire) for wire in wires]
-    ref, observed = (qjit(qml.qnode(dev)(circuit))() for dev in devices)
+    devices = [qml.device(backend, wires=wire) for wire in wires]
+    ref, observed = (qjit(qml.set_shots(qml.qnode(dev)(circuit), shots=10))() for dev in devices)
     assert ref.shape == observed.shape
     assert np.allclose(ref, observed)
 
@@ -62,8 +62,8 @@ def test_partial_counts(backend):
         return qml.counts(wires=[0, 2])
 
     wires = [4, None]
-    devices = [qml.device(backend, shots=10, wires=wire) for wire in wires]
-    ref, observed = (qjit(qml.qnode(dev)(circuit))() for dev in devices)
+    devices = [qml.device(backend, wires=wire) for wire in wires]
+    ref, observed = (qjit(qml.set_shots(qml.qnode(dev)(circuit), shots=10))() for dev in devices)
     assert (ref[i].shape == observed[i].shape for i in (0, 1))
     assert np.allclose(ref, observed)
 
@@ -80,7 +80,7 @@ def test_partial_probs(backend):
 
     wires = [4, None]
     devices = [qml.device(backend, wires=wire) for wire in wires]
-    ref, observed = (qjit(qml.qnode(dev)(circuit))() for dev in devices)
+    ref, observed = (qjit(qml.set_shots(qml.qnode(dev)(circuit), shots=10))() for dev in devices)
     assert ref.shape == observed.shape
     assert np.allclose(ref, observed)
 
@@ -96,8 +96,8 @@ def test_sample(backend):
         return qml.sample()
 
     wires = [4, None]
-    devices = [qml.device(backend, shots=10, wires=wire) for wire in wires]
-    ref, observed = (qjit(qml.qnode(dev)(circuit))() for dev in devices)
+    devices = [qml.device(backend, wires=wire) for wire in wires]
+    ref, observed = (qjit(qml.set_shots(qml.qnode(dev)(circuit), shots=10))() for dev in devices)
     assert ref.shape == observed.shape
     assert np.allclose(ref, observed)
 
@@ -113,8 +113,8 @@ def test_counts(backend):
         return qml.counts()
 
     wires = [4, None]
-    devices = [qml.device(backend, shots=10, wires=wire) for wire in wires]
-    ref, observed = (qjit(qml.qnode(dev)(circuit))() for dev in devices)
+    devices = [qml.device(backend, wires=wire) for wire in wires]
+    ref, observed = (qjit(qml.set_shots(qml.qnode(dev)(circuit), shots=10))() for dev in devices)
     assert (ref[i].shape == observed[i].shape for i in (0, 1))
     assert np.allclose(ref, observed)
 

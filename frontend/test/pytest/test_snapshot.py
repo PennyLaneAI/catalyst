@@ -45,9 +45,10 @@ class TestSnapshot:
             match=r"qml.Snapshot\(\) only supports qml.state\(\) when used from within Catalyst,"
             + f" but encountered {type(operation_passed_to_snapshot)}",
         ):
-            dev = qml.device("lightning.qubit", wires=1, shots=5)
+            dev = qml.device("lightning.qubit", wires=1)
 
             @qjit
+            @qml.set_shots(5)
             @qml.qnode(dev)
             def circuit():
                 qml.Snapshot(measurement=operation_passed_to_snapshot)
@@ -93,8 +94,9 @@ class TestSnapshot:
 
     def test_snapshot_on_two_wire(self):
         """Test qml.Snapshot on two qubits with shots"""
-        dev = qml.device("lightning.qubit", wires=2, shots=5)
+        dev = qml.device("lightning.qubit", wires=2)
 
+        @qml.set_shots(5)
         @qml.qnode(dev)
         def circuit():
             qml.Snapshot()  # |00>
