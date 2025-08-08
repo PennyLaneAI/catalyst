@@ -407,7 +407,7 @@ struct RoutingPass : public impl::RoutingPassBase<RoutingPass> {
         mlir::FunctionType funcType = builder.getFunctionType(
             /*inputs=*/{}, /*results=*/{});
         mlir::func::FuncOp newFunc = builder.create<mlir::func::FuncOp>(
-            builder.getUnknownLoc(), (func.getName().str() + "_routed"), funcType);
+            builder.getUnknownLoc(), func.getName().str(), funcType);
 
         // insertion point at new function
         newFunc.addEntryBlock();
@@ -533,6 +533,11 @@ struct RoutingPass : public impl::RoutingPassBase<RoutingPass> {
 
         SmallVector<Value> returnValues = {shiftLeftOp->getResult(0), stateOp->getResult(0)};
         builder.create<mlir::func::ReturnOp>(builder.getUnknownLoc(), returnValues);
+
+        func->replaceAllUsesWith(newFunc);
+        func->erase();
+        // builder.replaceAllUsesWith(func, newFunc);
+        // builder.eraseOp(func);
 
     }
 };
