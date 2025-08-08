@@ -22,14 +22,14 @@ import pathlib
 import platform
 import re
 from copy import deepcopy
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from typing import Any, Dict
 
 import pennylane as qml
-from pennylane.devices.execution_config import ExecutionConfig
 
 from jax.interpreters.partial_eval import DynamicJaxprTracer
 from pennylane.devices.capabilities import DeviceCapabilities, OperatorProperties
+from pennylane.devices.execution_config import ExecutionConfig
 from pennylane.transforms import (
     diagonalize_measurements,
     split_non_commuting,
