@@ -52,16 +52,25 @@ struct DetensorizeCallSitePattern : public OpRewritePattern<func::CallOp> {
 
     LogicalResult matchAndRewrite(func::CallOp callOp, PatternRewriter &rewriter) const override
     {
+        auto funcOp =
+            SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(callOp, callOp.getCalleeAttr());
 
-        auto funcOp = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(callOp, callOp.getCalleeAttr());
-        auto module = callOp->getParentOfType<ModuleOp>();
+        // Skip for main function
+        if (!funcOp || funcOp->hasAttr("llvm.emit_c_interface")) {
+            return failure();
+        }
 
-        if (!funcOp || funcOp->hasAttr("llvm.emit_c_interface") ||
-            !hasScalarTensorSignature(funcOp) || funcOp->hasAttr("qnode")) {
+        if (!hasScalarTensorSignature(funcOp)) {
+            return failure();
+        }
+
+        // Skip for QNodes (for gradients boundaries)
+        if (funcOp->hasAttr("qnode")) {
             return failure();
         }
 
         // Create detensorized FuncOp if it does not already exist
+        auto module = callOp->getParentOfType<ModuleOp>();
         std::string newFuncName = funcOp.getName().str() + ".detensorized";
         auto newFuncOp = module.lookupSymbol<func::FuncOp>(newFuncName);
 
@@ -69,80 +78,58 @@ struct DetensorizeCallSitePattern : public OpRewritePattern<func::CallOp> {
             OpBuilder::InsertionGuard guard(rewriter);
             rewriter.setInsertionPointToEnd(module.getBody());
 
-            // Create the new function with a detensorized signature.
+            // Create the new function with a detensorized signature
             FunctionType funcType = funcOp.getFunctionType();
             SmallVector<Type> newArgTypes, newResultTypes;
-            for (Type type : funcType.getInputs()) {
-                newArgTypes.push_back(getScalarOrOriginalType(type));
-            }
-            for (Type type : funcType.getResults()) {
-                newResultTypes.push_back(getScalarOrOriginalType(type));
-            }
-            auto newFuncType = FunctionType::get(getContext(), newArgTypes, newResultTypes);
-
-            // Collect all attributes from the original function
             SmallVector<NamedAttribute> newAttrs;
-            for (const NamedAttribute &attr : funcOp->getAttrs()) {
-                if (attr.getName() == funcOp.getSymNameAttrName() ||
-                    attr.getName() == funcOp.getFunctionTypeAttrName()) {
-                    continue;
-                }
-                newAttrs.push_back(attr);
-            }
+            extractDetensorizedOpSignature(funcType, funcOp, newArgTypes, newResultTypes, newAttrs);
 
-            // Create the new function, passing the collected attributes
-            newFuncOp = rewriter.create<func::FuncOp>(funcOp.getLoc(), newFuncName, newFuncType, newAttrs);
+            // Create the new function, passing the collected signature
+            auto newFuncType = FunctionType::get(getContext(), newArgTypes, newResultTypes);
+            newFuncOp =
+                rewriter.create<func::FuncOp>(funcOp.getLoc(), newFuncName, newFuncType, newAttrs);
 
+            // Map FuncOp body and return operation
             Block *newEntryBlock = newFuncOp.addEntryBlock();
-
-            // Map old arguments to new arguments 
             IRMapping mapper;
-            rewriter.setInsertionPointToStart(newEntryBlock);
-            for (const auto &it : llvm::enumerate(funcOp.getArguments())) {
-                Value oldArg = it.value();
-                Value newArg = newEntryBlock->getArgument(it.index());
-
-                if (isScalarTensor(oldArg.getType())) {
-                    // Insert a FromElementsOp if the old argument is a scalar tensor
-                    auto fromElementsOp = rewriter.create<tensor::FromElementsOp>(
-                        newArg.getLoc(), oldArg.getType(), newArg);
-                    mapper.map(oldArg, fromElementsOp.getResult());
-                }
-                else {
-                    mapper.map(oldArg, newArg);
-                }
-            }
-
-            // Clone the operations from the body of old function (excluding the old return)
-            rewriter.setInsertionPointToEnd(newEntryBlock);
-            for (Operation &op : funcOp.front().without_terminator()) {
-                rewriter.clone(op, mapper);
-            }
-
-            // Create the new return operation
-            auto oldReturnOp = cast<func::ReturnOp>(funcOp.front().getTerminator());
-            SmallVector<Value> newReturnOperands;
-            newReturnOperands.reserve(oldReturnOp.getNumOperands());
-            for (Value operand : oldReturnOp.getOperands()) {
-                Value newOperand = mapper.lookup(operand);
-                if (isScalarTensor(newOperand.getType())) {
-                    // Insert ExtractOp if the operand is a scalar tensor
-                    auto extractOp = rewriter.create<tensor::ExtractOp>(
-                        oldReturnOp.getLoc(), newOperand, ValueRange{});
-                    newReturnOperands.push_back(extractOp.getResult());
-                }
-                else {
-                    newReturnOperands.push_back(newOperand);
-                }
-            }
-            rewriter.create<func::ReturnOp>(oldReturnOp.getLoc(), newReturnOperands);
+            mapFuncOpBodyAndReturnOp(rewriter, newEntryBlock, funcOp, mapper);
         }
 
-        // Rewrite the original call site to use the new detensorized function.
+        // Rewrite the original call site to use the new detensorized function
+        replaceCallOp(rewriter, callOp, newFuncOp);
+        return success();
+    }
+
+    void extractDetensorizedOpSignature(FunctionType &funcType, func::FuncOp &funcOp,
+                                        SmallVector<Type> &newArgTypes,
+                                        SmallVector<Type> &newResultTypes,
+                                        SmallVector<NamedAttribute> &newAttrs) const
+    {
+        for (Type type : funcType.getInputs()) {
+            newArgTypes.push_back(getScalarOrOriginalType(type));
+        }
+        for (Type type : funcType.getResults()) {
+            newResultTypes.push_back(getScalarOrOriginalType(type));
+        }
+
+        // Collect all attributes from the original function
+        for (const NamedAttribute &attr : funcOp->getAttrs()) {
+            if (attr.getName() == funcOp.getSymNameAttrName() ||
+                attr.getName() == funcOp.getFunctionTypeAttrName()) {
+                continue;
+            }
+            newAttrs.push_back(attr);
+        }
+    }
+
+    void replaceCallOp(PatternRewriter &rewriter, func::CallOp &callOp,
+                       func::FuncOp &newFuncOp) const
+    {
         rewriter.setInsertionPoint(callOp);
         SmallVector<Value> newOperands;
         for (Value operand : callOp.getOperands()) {
-            // Insert ExtractOp if the old operand is a scalar tensor to bridge the detensorized function
+            // Insert ExtractOp if the old operand is a scalar tensor to bridge the detensorized
+            // function
             if (isScalarTensor(operand.getType())) {
                 auto extractOp =
                     rewriter.create<tensor::ExtractOp>(callOp.getLoc(), operand, ValueRange{});
@@ -160,7 +147,8 @@ struct DetensorizeCallSitePattern : public OpRewritePattern<func::CallOp> {
             Value oldResult = callOp.getResult(i);
             Value newResult = newCallOp.getResult(i);
             if (isScalarTensor(oldResult.getType())) {
-                // Insert a FromElementsOp if the old result is a scalar tensor to bridge the detensorized function
+                // Insert a FromElementsOp if the old result is a scalar tensor to bridge the
+                // detensorized function
                 auto fromElementsOp = rewriter.create<tensor::FromElementsOp>(
                     callOp.getLoc(), oldResult.getType(), newResult);
                 newResults.push_back(fromElementsOp.getResult());
@@ -171,7 +159,50 @@ struct DetensorizeCallSitePattern : public OpRewritePattern<func::CallOp> {
         }
 
         rewriter.replaceOp(callOp, newResults);
-        return success();
+    }
+
+    void mapFuncOpBodyAndReturnOp(PatternRewriter &rewriter, Block *newEntryBlock,
+                                  func::FuncOp &funcOp, IRMapping &mapper) const
+    {
+        rewriter.setInsertionPointToStart(newEntryBlock);
+        for (const auto &it : llvm::enumerate(funcOp.getArguments())) {
+            Value oldArg = it.value();
+            Value newArg = newEntryBlock->getArgument(it.index());
+
+            if (isScalarTensor(oldArg.getType())) {
+                // Insert a FromElementsOp if the old argument is a scalar tensor
+                auto fromElementsOp = rewriter.create<tensor::FromElementsOp>(
+                    newArg.getLoc(), oldArg.getType(), newArg);
+                mapper.map(oldArg, fromElementsOp.getResult());
+            }
+            else {
+                mapper.map(oldArg, newArg);
+            }
+        }
+
+        // Clone the operations from the body of old function (excluding the old return)
+        rewriter.setInsertionPointToEnd(newEntryBlock);
+        for (Operation &op : funcOp.front().without_terminator()) {
+            rewriter.clone(op, mapper);
+        }
+
+        // Create a new return operation with the mapped results
+        auto oldReturnOp = cast<func::ReturnOp>(funcOp.front().getTerminator());
+        SmallVector<Value> newReturnOperands;
+        newReturnOperands.reserve(oldReturnOp.getNumOperands());
+        for (Value operand : oldReturnOp.getOperands()) {
+            Value newOperand = mapper.lookup(operand);
+            if (isScalarTensor(newOperand.getType())) {
+                // Insert ExtractOp if the operand is a scalar tensor
+                auto extractOp = rewriter.create<tensor::ExtractOp>(oldReturnOp.getLoc(),
+                                                                    newOperand, ValueRange{});
+                newReturnOperands.push_back(extractOp.getResult());
+            }
+            else {
+                newReturnOperands.push_back(newOperand);
+            }
+        }
+        rewriter.create<func::ReturnOp>(oldReturnOp.getLoc(), newReturnOperands);
     }
 };
 } // namespace
