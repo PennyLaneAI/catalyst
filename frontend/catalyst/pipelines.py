@@ -241,6 +241,7 @@ def get_hlo_lowering_stage(_options: CompileOptions) -> List[str]:
         "detensorize-scf",
         "detensorize-function-boundary",
         "canonicalize",
+        "symbol-dce",
     ]
     return hlo_lowering
 
