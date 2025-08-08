@@ -335,7 +335,7 @@ class QJITDevice(qml.devices.Device):
         self,
         ctx,
         execution_config: ExecutionConfig | None = None,
-    ) -> TransformProgram, ExecutionConfig:
+    ) -> tuple[TransformProgram, ExecutionConfig]:
         """This function defines the device transform program to be applied and an updated device
         configuration. The transform program will be created and applied to the tape before
         compilation, in order to modify the operations and measurements to meet device
