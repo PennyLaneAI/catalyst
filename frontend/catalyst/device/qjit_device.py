@@ -139,7 +139,7 @@ class BackendInfo:
 
 # pylint: disable=too-many-branches
 @debug_logger
-def extract_backend_info(device: qml.devices.QubitDevice) -> BackendInfo:
+def extract_backend_info(device: qml.devices.QubitDevice, device_capabilities) -> BackendInfo:
     """Extract the backend info from a quantum device. The device is expected to carry a reference
     to a valid TOML config file."""
 
@@ -189,7 +189,7 @@ def extract_backend_info(device: qml.devices.QubitDevice) -> BackendInfo:
     for k, v in getattr(device, "device_kwargs", {}).items():
         if k not in device_kwargs:  # pragma: no branch
             device_kwargs[k] = v
-    device_kwargs["coupling_map"] = capabilities.__getattribute__("coupling_map")
+    device_kwargs["coupling_map"] = getattr(device_capabilities, "coupling_map")
 
     return BackendInfo(dname, device_name, device_lpath, device_kwargs)
 
@@ -294,9 +294,9 @@ class QJITDevice(qml.devices.Device):
 
     @staticmethod
     @debug_logger
-    def extract_backend_info(device) -> BackendInfo:
+    def extract_backend_info(device, device_capabilities) -> BackendInfo:
         """Wrapper around extract_backend_info in the runtime module."""
-        return extract_backend_info(device)
+        return extract_backend_info(device, device_capabilities)
 
     @debug_logger_init
     def __init__(self, original_device):
@@ -306,10 +306,8 @@ class QJITDevice(qml.devices.Device):
             self.__setattr__(key, value)
 
         if any(
-            [
                 isinstance(wire_label, tuple) and (len(wire_label) >= 2)
                 for wire_label in original_device.wires.labels
-            ]
         ):
             wires_from_cmap = set()
             for wire_label in original_device.wires.labels:
@@ -338,7 +336,7 @@ class QJITDevice(qml.devices.Device):
 
         setattr(device_capabilities, "coupling_map", original_device.wires.labels)
 
-        backend = QJITDevice.extract_backend_info(original_device)
+        backend = QJITDevice.extract_backend_info(original_device, device_capabilities)
 
         self.backend_name = backend.c_interface_name
         self.backend_lib = backend.lpath
