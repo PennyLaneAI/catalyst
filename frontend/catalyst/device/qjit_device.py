@@ -26,7 +26,6 @@ from dataclasses import dataclass
 from typing import Any, Dict
 
 import pennylane as qml
-
 from jax.interpreters.partial_eval import DynamicJaxprTracer
 from pennylane.devices.capabilities import DeviceCapabilities, OperatorProperties
 from pennylane.devices.execution_config import ExecutionConfig
