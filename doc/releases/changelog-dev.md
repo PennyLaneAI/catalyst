@@ -57,6 +57,12 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* When capture is enabled, `qjit(autograph=True)` will use capture autograph instead of catalyst autograph.
+  [(#1960)](https://github.com/PennyLaneAI/catalyst/pull/1960)
+
+* QJitDevice helper `extract_backend_info` removed its redundant `capabilities` argument.
+  [(#1956)](https://github.com/PennyLaneAI/catalyst/pull/1956)
+
 * Raise warning when subroutines are used without capture enabled.
   [(#1930)](https://github.com/PennyLaneAI/catalyst/pull/1930)
 
@@ -124,6 +130,10 @@
 
 * `catalyst.accelerate`, `catalyst.debug.callback`, and `catalyst.pure_callback`, `catalyst.debug.print`, and `catalyst.debug.print_memref` now work when capture is enabled.
   [(#1902)](https://github.com/PennyLaneAI/catalyst/pull/1902)
+
+* The merge rotation pass in Catalyst (:func:`~.passes.merge_rotations`) now also considers
+  `qml.Rot` and `qml.CRot`.
+  [(#1955)](https://github.com/PennyLaneAI/catalyst/pull/1955)
 
 <h3>Documentation 📝</h3>
 
