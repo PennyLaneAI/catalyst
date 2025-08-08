@@ -37,6 +37,7 @@ from pennylane.transforms.dynamic_one_shot import (
 import catalyst
 from catalyst.api_extensions import MidCircuitMeasure
 from catalyst.device import QJITDevice
+from catalyst.device.qjit_device import is_dynamic_wires
 from catalyst.jax_extras import deduce_avals, get_implicit_and_explicit_flat_args, unzip2
 from catalyst.jax_primitives import quantum_kernel_p
 from catalyst.jax_tracer import Function, trace_quantum_function, uses_transform
@@ -161,7 +162,7 @@ class QFunc:
                 )
                 try:
                     return Function(dynamic_one_shot(self, mcm_config=mcm_config))(*args, **kwargs)
-                except (TypeError, ValueError, CompileError) as e:
+                except (TypeError, ValueError, CompileError, NotImplementedError) as e:
                     if user_specified_mcm_method is not None:
                         raise
 
@@ -169,7 +170,8 @@ class QFunc:
                     error_msg = str(e)
                     unsupported_measurement_error = any(pattern in error_msg for pattern in [
                         "Native mid-circuit measurement mode does not support",
-                        "qml.var(obs) cannot be returned when `mcm_method='one-shot'`"
+                        "qml.var(obs) cannot be returned when `mcm_method='one-shot'`",
+                        "empty wires is not supported with dynamic wires in one-shot mode",
                     ])
 
                     # Fallback if error is related to unsupported measurements
@@ -286,6 +288,7 @@ def dynamic_one_shot(qnode, **kwargs):
             # Check if using shot vector with non-SampleMP measurements
             shot_vector = qnode._shots.shot_vector if qnode._shots else []
             has_shot_vector = len(shot_vector) > 1 or any(copies > 1 for _, copies in shot_vector)
+            has_wires = qnode.device.wires is not None and not is_dynamic_wires(qnode.device.wires)
 
             for m in tape.measurements:
                 if not isinstance(
@@ -301,6 +304,17 @@ def dynamic_one_shot(qnode, **kwargs):
                     raise NotImplementedError(
                         f"Measurement {type(m).__name__} is not supported a shot-vector. "
                         "Use qml.sample() instead."
+                    )
+
+                if (
+                    not has_wires
+                    and (isinstance(m, SampleMP) or isinstance(m, CountsMP))
+                    and (m.wires.tolist() == [])
+                ):
+                    raise NotImplementedError(
+                        f"Measurement {type(m).__name__} with empty wires is not supported with "
+                        "dynamic wires in one-shot mode. Please specify constant wires when "
+                        "creating the device."
                     )
 
                 if isinstance(m, VarianceMP) and m.obs:
