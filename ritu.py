@@ -3,6 +3,8 @@ import os
 from copy import copy
 from pathlib import Path
 
+import jax
+import jax.numpy as jnp
 import numpy as np
 import pennylane as qml
 from jax.interpreters import mlir
@@ -51,6 +53,7 @@ def jitting(qnode):
             # eliminate setup/teardown functions which will mess with the runtime
             for _ in range(2):
                 mlir_module.body.operations[-1].erase()
+            print(mlir_module)
 
             # get some properties of the entry point function
             entry_point = mlir_module.body.operations[0]
