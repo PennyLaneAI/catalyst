@@ -23,9 +23,11 @@ import platform
 import re
 from copy import deepcopy
 from dataclasses import dataclass, replace
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 import pennylane as qml
+from pennylane.devices.execution_config import ExecutionConfig
+
 from jax.interpreters.partial_eval import DynamicJaxprTracer
 from pennylane.devices.capabilities import DeviceCapabilities, OperatorProperties
 from pennylane.transforms import (
@@ -332,8 +334,8 @@ class QJITDevice(qml.devices.Device):
     def preprocess(
         self,
         ctx,
-        execution_config: Optional[qml.devices.ExecutionConfig] = None,
-    ):
+        execution_config: ExecutionConfig | None = None,
+    ) -> TransformProgram, ExecutionConfig:
         """This function defines the device transform program to be applied and an updated device
         configuration. The transform program will be created and applied to the tape before
         compilation, in order to modify the operations and measurements to meet device
@@ -342,7 +344,7 @@ class QJITDevice(qml.devices.Device):
         The final transforms verify that the resulting tape is supported.
 
         Args:
-            execution_config (Union[ExecutionConfig, Sequence[ExecutionConfig]]): A data structure
+            execution_config (ExecutionConfig | None): A data structure
                 describing parameters of the execution.
 
         Returns:
@@ -356,7 +358,7 @@ class QJITDevice(qml.devices.Device):
         """
 
         if execution_config is None:
-            execution_config = qml.devices.ExecutionConfig()
+            execution_config = ExecutionConfig()
 
         _, config = self.original_device.preprocess(execution_config)
 
@@ -365,7 +367,6 @@ class QJITDevice(qml.devices.Device):
         # measurement transforms may change operations on the tape to accommodate
         # measurement transformations, so must occur before decomposition
         measurement_transforms = self._measurement_transform_program()
-        config = replace(config, device_options=deepcopy(config.device_options))
         program = program + measurement_transforms
 
         # decomposition to supported ops/measurements
