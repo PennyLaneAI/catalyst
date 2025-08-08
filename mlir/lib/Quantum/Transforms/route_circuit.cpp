@@ -534,11 +534,9 @@ struct RoutingPass : public impl::RoutingPassBase<RoutingPass> {
         SmallVector<Value> returnValues = {shiftLeftOp->getResult(0), stateOp->getResult(0)};
         builder.create<mlir::func::ReturnOp>(builder.getUnknownLoc(), returnValues);
 
+        // replace original func with the routed func
         func->replaceAllUsesWith(newFunc);
         func->erase();
-        // builder.replaceAllUsesWith(func, newFunc);
-        // builder.eraseOp(func);
-
     }
 };
 
