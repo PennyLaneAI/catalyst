@@ -245,7 +245,8 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
         // Print to see what naive router does on Null qubits
         std::cout << "Name:" << name << "\n";
         std::cout << "Wires : ";
-        for(auto i : wires) std::cout << i << ",";
+        for (auto i : wires)
+            std::cout << i << ",";
         std::cout << "\n";
         if (this->track_resources_) {
             std::string prefix = "";
