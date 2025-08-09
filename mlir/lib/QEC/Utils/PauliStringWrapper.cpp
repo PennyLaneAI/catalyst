@@ -16,8 +16,6 @@
 #include <stim/stabilizers/flex_pauli_string.h>
 #include <stim/stabilizers/pauli_string.h>
 
-#include "Quantum/IR/QuantumOps.h" // for quantum::AllocQubitOp
-
 #include "QEC/Utils/PauliStringWrapper.h"
 
 namespace catalyst {
@@ -45,6 +43,16 @@ PauliStringWrapper PauliStringWrapper::from_pauli_word(const PauliWord &pauliWor
     std::string pauliStringStr;
     for (auto pauli : pauliWord) {
         pauliStringStr += pauli;
+    }
+    return PauliStringWrapper(stim::FlexPauliString::from_text(pauliStringStr));
+}
+
+PauliStringWrapper PauliStringWrapper::from_qec_op(QECOpInterface op)
+{
+    std::string pauliStringStr;
+    for (auto pauli : op.getPauliProduct()) {
+        auto pauliStr = mlir::cast<mlir::StringAttr>(pauli).getValue();
+        pauliStringStr += pauliStr;
     }
     return PauliStringWrapper(stim::FlexPauliString::from_text(pauliStringStr));
 }
@@ -88,9 +96,8 @@ PauliStringWrapper::computeCommutationRulesWith(const PauliStringWrapper &rhs) c
     return PauliStringWrapper(std::move(result));
 }
 
-template <typename T>
-PauliWord expandPauliWord(const llvm::SetVector<Value> &operands, const T &inOutOperands,
-                          QECOpInterface op)
+template <typename T, typename U>
+PauliWord expandPauliWord(const T &operands, const U &inOutOperands, QECOpInterface op)
 {
     PauliWord pauliWord(operands.size(), "I");
     for (auto [qubit, pauli] : llvm::zip(inOutOperands, op.getPauliProduct())) {
@@ -104,6 +111,10 @@ PauliWord expandPauliWord(const llvm::SetVector<Value> &operands, const T &inOut
     }
     return pauliWord;
 }
+
+// Emit explicit instantiation for the Value-based specialization used by QECLayer
+template PauliWord expandPauliWord<llvm::SetVector<Value>, std::vector<Value>>(
+    const llvm::SetVector<Value> &, const std::vector<Value> &, QECOpInterface);
 
 PauliWordPair normalizePPROps(QECOpInterface lhs, QECOpInterface rhs)
 {
