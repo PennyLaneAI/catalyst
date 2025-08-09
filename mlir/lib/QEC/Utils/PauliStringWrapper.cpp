@@ -85,11 +85,12 @@ PauliStringWrapper::computeCommutationRulesWith(const PauliStringWrapper &rhs) c
         // -P'
         result.value.sign = !result.value.sign;
     }
-    else {
-        assert(this_op.hasPiOverFourRotation() &&
-               "Rotation of Clifford gate is neither pi/2 nor pi/4");
+    else if (this_op.hasPiOverFourRotation()) {
         // P * P' * i
         result = (*this->pauliString) * result * stim::FlexPauliString::from_text("i");
+    }
+    else {
+       llvm_unreachable("Clifford rotation should be π/2 or π/4");
     }
     assert(!result.imag && "Resulting Pauli string should be real");
     return PauliStringWrapper(std::move(result));
