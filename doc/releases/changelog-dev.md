@@ -28,6 +28,9 @@
   %0 = transform.apply_registered_pass "some-pass" with options = {"an-option" = true, "maxValue" = 1 : i64, "multi-word-option" = 1 : i64}
   ```
 
+*  `Commuting Clifford Pauli Product Rotation (PPR) operations, past non-Clifford PPRs, now supports P(π/2) Cliffords in addition to P(π/4)`
+   [(#1966)](https://github.com/PennyLaneAI/catalyst/pull/1966)
+
 <h3>Breaking changes 💔</h3>
 
 * The JAX version used by Catalyst is updated to 0.6.2.
