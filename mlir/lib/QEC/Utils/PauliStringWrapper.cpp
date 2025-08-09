@@ -80,7 +80,8 @@ PauliStringWrapper::computeCommutationRulesWith(const PauliStringWrapper &rhs) c
 {
     stim::FlexPauliString result = *rhs.pauliString;
     assert(llvm::isa<PPRotationOp>(this->op) && "Clifford Operation is not PPRotationOp");
-    if (auto this_op = llvm::cast<PPRotationOp>(this->op); this_op.hasPiOverTwoRotation()) {
+    auto this_op = llvm::cast<PPRotationOp>(this->op); 
+    if (this_op.hasPiOverTwoRotation()) {
         // -P'
         result.value.sign = !result.value.sign;
     }
