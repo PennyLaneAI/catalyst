@@ -92,6 +92,39 @@ func.func public @merge_ppr_ppm_test_6(%q1: !quantum.bit, %q2: !quantum.bit) -> 
     return %from_elements, %out_qubits#0 : tensor<i1>, !quantum.bit
 }
 
+func.func public @merge_ppr_ppm_test_7(%q1: !quantum.bit) -> tensor<i1> {
+
+    // CHECK-NOT: qec.ppr ["X"]
+    // CHECK: qec.ppm ["X"] %
+    // CHECK-NOT: qec.ppr ["X"]
+    %0 = qec.ppr ["X"](2) %q1: !quantum.bit
+    %m, %out_qubits = qec.ppm ["X"] %0 : !quantum.bit
+    %from_elements = tensor.from_elements %m : tensor<i1>
+    return %from_elements : tensor<i1>
+}
+
+func.func public @merge_ppr_ppm_test_8(%q1: !quantum.bit) -> (tensor<i1>, !quantum.bit) {
+
+    // CHECK-NOT: qec.ppr ["X"]
+    // CHECK: qec.ppm ["Z"] %
+    // CHECK-NOT: qec.ppr ["X"]
+    %0 = qec.ppr ["X"](2) %q1: !quantum.bit
+    %m, %out_qubits = qec.ppm ["Y"] %0 : !quantum.bit
+    %from_elements = tensor.from_elements %m : tensor<i1>
+    return %from_elements, %out_qubits : tensor<i1>, !quantum.bit
+}
+
+func.func public @merge_ppr_ppm_test_9(%q1: !quantum.bit) -> (tensor<i1>, !quantum.bit) {
+
+    // CHECK-NOT: qec.ppr ["X"]
+    // CHECK: qec.ppm ["Y"] %
+    // CHECK-NOT: qec.ppr ["X"]
+    %0 = qec.ppr ["X"](-2) %q1: !quantum.bit
+    %m, %out_qubits = qec.ppm ["Z"](-1) %0 : !quantum.bit
+    %from_elements = tensor.from_elements %m : tensor<i1>
+    return %from_elements, %out_qubits : tensor<i1>, !quantum.bit
+}
+
 func.func public @game_of_surface_code(%arg0: !quantum.bit, %arg1: !quantum.bit, %arg2: !quantum.bit, %arg3: !quantum.bit) {
 
     // q1
