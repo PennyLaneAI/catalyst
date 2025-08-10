@@ -135,10 +135,10 @@ func.func public @game_of_surface_code(%arg0: !quantum.bit, %arg1: !quantum.bit,
     // CHECK: [[q2:%.+]]:2 = qec.ppr ["Y", "X"](8) %arg2, %arg1
 
     // q3, q2, q4, q1
-    // CHECK: [[q3:%.+]]:4 = qec.ppr ["Z", "Z", "Y", "Z"](-8) [[q2]]#0, [[q2]]#1, [[q1]], [[q0]] 
-    
+    // CHECK: [[q3:%.+]]:4 = qec.ppr ["Z", "Z", "Y", "Z"](-8) [[q2]]#0, [[q2]]#1, [[q1]], [[q0]]
+
     // q3, q2, q1, q4
-    // CHECK: [[m1:%.+]], [[o1:%.+]]:4 = qec.ppm ["Z", "Z", "Y", "Y"] [[q3]]#0, [[q3]]#1, [[q3]]#3, [[q3]]#2 
+    // CHECK: [[m1:%.+]], [[o1:%.+]]:4 = qec.ppm ["Z", "Z", "Y", "Y"] [[q3]]#0, [[q3]]#1, [[q3]]#3, [[q3]]#2
 
     // q2, q1
     // CHECK: [[m2:%.+]], [[o2:%.+]]:2 = qec.ppm ["X", "X"] [[o1]]#1, [[o1]]#2
