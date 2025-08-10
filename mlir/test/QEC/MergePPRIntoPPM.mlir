@@ -182,7 +182,6 @@ func.func public @game_of_surface_code(%arg0: !quantum.bit, %arg1: !quantum.bit,
     return
 }
 
-
 func.func public @circuit_transformed_0() -> (tensor<i1>, tensor<i1>) {
 
     // CHECK: [[qreg:%.+]] = quantum.alloc( 2) : !quantum.reg
