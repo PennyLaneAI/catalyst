@@ -30,26 +30,16 @@ from catalyst.from_plxpr.qreg_manager import QregManager
 from catalyst.jax_extras import jaxpr_pad_consts
 from catalyst.jax_primitives import cond_p, for_p, while_p
 
-def _get_converted_jaxpr_branch(self, plxpr_branch, args_plus_qreg, branch_consts):
-    if plxpr_branch is None:
-        # Emit a new Catalyst jaxpr branch that simply returns a qreg
-        return jax.make_jaxpr(lambda x: x)(*args_plus_qreg).jaxpr
-
-    closed_jaxpr = ClosedJaxpr(plxpr_branch, branch_consts)
-
-    def calling_convention(*args_plus_qreg):
-        *args, qreg = args_plus_qreg
-        # `qreg` is the scope argument for the body jaxpr
-        qreg_manager = QregManager(qreg)
-        converter = copy(self)
-        converter.qreg_manager = qreg_manager
-        # pylint: disable-next=cell-var-from-loop
-        retvals = converter(closed_jaxpr, *args)
-        qreg_manager.insert_all_dangling_qubits()
-        return *retvals, converter.qreg_manager.get()
-
-    return jax.make_jaxpr(calling_convention)(*args_plus_qreg).jaxpr
-
+def _calling_convention(interpreter, closed_jaxpr, *args_plus_qreg):
+    *args, qreg = args_plus_qreg
+    # `qreg` is the scope argument for the body jaxpr
+    qreg_manager = QregManager(qreg)
+    converter = copy(interpreter)
+    converter.qreg_manager = qreg_manager
+    # pylint: disable-next=cell-var-from-loop
+    retvals = converter(closed_jaxpr, *args)
+    qreg_manager.insert_all_dangling_qubits()
+    return *retvals, converter.qreg_manager.get()
 
 @WorkflowInterpreter.register_primitive(plxpr_cond_prim)
 def _(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
@@ -65,11 +55,13 @@ def _(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
         branch_consts = plxpr_invals[const_slice]
         all_consts = all_consts + [*branch_consts]
 
-        evaluator = partial(copy(self).eval, plxpr_branch, branch_consts)
-        new_jaxpr = jax.make_jaxpr(evaluator)(*args)
-        converted_closed = ClosedJaxpr(convert_constvars_jaxpr(new_jaxpr.jaxpr), ())
+        if plxpr_branch is None:
+            new_jaxpr = jax.make_jaxpr(lambda *x: x)(*args)
+        else:
+            evaluator = partial(copy(self).eval, plxpr_branch, branch_consts)
+            new_jaxpr = jax.make_jaxpr(evaluator)(*args)
 
-        converted_jaxpr_branches.append(converted_closed)
+        converted_jaxpr_branches.append(new_jaxpr.jaxpr)
 
     predicate = plxpr_invals[:len(jaxpr_branches)-1]
 
@@ -79,8 +71,9 @@ def _(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
     return cond_p.bind(
         *cond_invals,
         branch_jaxprs=jaxpr_pad_consts(converted_jaxpr_branches),
-        nimplicit_outputs=None,
+        nimplicit_outputs=0,
     )
+
 
 
 
@@ -100,7 +93,19 @@ def handle_cond(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
         branch_consts = plxpr_invals[const_slice]
         all_consts = all_consts + [*branch_consts]
 
-        converted_jaxpr_branches.append(_get_converted_jaxpr_branch(self, plxpr_branch, args_plus_qreg, branch_consts))
+        converted_jaxpr_branch = None
+
+        if plxpr_branch is None:
+            # Emit a new Catalyst jaxpr branch that simply returns a qreg
+            converted_jaxpr_branch = jax.make_jaxpr(lambda *x: x)(*args_plus_qreg).jaxpr
+        else:
+
+            closed_jaxpr = ClosedJaxpr(plxpr_branch, branch_consts)
+
+            f = partial(_calling_convention, self, closed_jaxpr)
+            converted_jaxpr_branch = jax.make_jaxpr(f)(*args_plus_qreg).jaxpr
+
+        converted_jaxpr_branches.append(converted_jaxpr_branch)
 
     predicate = plxpr_invals[:len(jaxpr_branches)-1]
 
@@ -120,7 +125,6 @@ def handle_cond(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
 
     # Return only the output values that match the plxpr output values
     return outvals
-
 
 # pylint: disable=unused-argument, too-many-arguments
 @WorkflowInterpreter.register_primitive(plxpr_for_loop_prim)
@@ -194,17 +198,8 @@ def handle_for_loop(
 
     jaxpr = ClosedJaxpr(jaxpr_body_fn, consts)
 
-    def calling_convention(*args_plus_qreg):
-        *args, qreg = args_plus_qreg
-        # `qreg` is the scope argument for the body jaxpr
-        qreg_manager = QregManager(qreg)
-        converter = copy(self)
-        converter.qreg_manager = qreg_manager
-        retvals = converter(jaxpr, *args)
-        qreg_manager.insert_all_dangling_qubits()
-        return *retvals, converter.qreg_manager.get()
-
-    converted_jaxpr_branch = jax.make_jaxpr(calling_convention)(*start_plus_args_plus_qreg).jaxpr
+    f = partial(_calling_convention, self, jaxpr)
+    converted_jaxpr_branch = jax.make_jaxpr(f)(*start_plus_args_plus_qreg).jaxpr
     converted_closed_jaxpr_branch = ClosedJaxpr(convert_constvars_jaxpr(converted_jaxpr_branch), ())
 
     # Build Catalyst compatible input values
@@ -292,17 +287,8 @@ def handle_while_loop(
 
     jaxpr = ClosedJaxpr(jaxpr_body_fn, consts_body)
 
-    def calling_convention(*args_plus_qreg):
-        *args, qreg = args_plus_qreg
-        # `qreg` is the scope argument for the body jaxpr
-        qreg_manager = QregManager(qreg)
-        converter = copy(self)
-        converter.qreg_manager = qreg_manager
-        retvals = converter(jaxpr, *args)
-        qreg_manager.insert_all_dangling_qubits()
-        return *retvals, converter.qreg_manager.get()
-
-    converted_body_jaxpr_branch = jax.make_jaxpr(calling_convention)(*args_plus_qreg).jaxpr
+    f = partial(_calling_convention, self, jaxpr)
+    converted_body_jaxpr_branch = jax.make_jaxpr(f)(*args_plus_qreg).jaxpr
     converted_body_closed_jaxpr_branch = ClosedJaxpr(
         convert_constvars_jaxpr(converted_body_jaxpr_branch), ()
     )
