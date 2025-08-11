@@ -193,7 +193,9 @@ def handle_qnode(
     consts = args[:n_consts]
     non_const_args = args[n_consts:]
 
-    closed_jaxpr = ClosedJaxpr(qfunc_jaxpr, consts)
+    # closed_jaxpr = ClosedJaxpr(qfunc_jaxpr, consts)
+    gate_set = set(device.capabilities.operations)
+    closed_jaxpr = qml.transforms.decompose.plxpr_transform(qfunc_jaxpr, consts, (), {"gate_set": gate_set, "level": "mlir"})
 
     def extract_shots_value(shots: qml.measurements.Shots | int):
         """Extract the shots value according to the type"""
