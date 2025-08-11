@@ -142,7 +142,7 @@ def _configure_mcm(qnode, args, kwargs):
         # Check if measurements_from_{samples/counts} is being used
         uses_measurements_from_samples = uses_transform(qnode, "measurements_from_samples")
         uses_measurements_from_counts = uses_transform(qnode, "measurements_from_counts")
-        applied_value_and_grad = hasattr(qnode.fn, "grad_params")
+        applied_value_and_grad = hasattr(qnode, "fn") and hasattr(qnode.fn, "grad_params")
 
         # Fallback to single-branch-statistics if measurements_from_samples is detected
         if (
