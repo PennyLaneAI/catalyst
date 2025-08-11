@@ -152,6 +152,11 @@ def _configure_mcm(qnode, args, kwargs):
             mcm_config = replace(mcm_config, mcm_method="single-branch-statistics")
 
         if mcm_config.mcm_method == "one-shot":
+            # Unsupport one-shot for softwareq.qpp
+            if qnode.device.name == "softwareq.qpp":
+                mcm_config = replace(mcm_config, mcm_method="single-branch-statistics")
+                return None
+
             # If measurements_from_samples while one-shot is used, raise an error
             if uses_measurements_from_samples:
                 raise CompileError("measurements_from_samples is not supported with one-shot")
