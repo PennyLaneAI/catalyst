@@ -38,7 +38,6 @@ from pennylane.measurements import (
     CountsMP,
     ExpectationMP,
     MeasurementProcess,
-    MidMeasureMP,
     ProbabilityMP,
     StateMP,
     VarianceMP,
@@ -1167,7 +1166,7 @@ def has_midcircuit_measurement(tape):
 
 @debug_logger
 def num_midcircuit_measurement(tape):
-    """Check if the tape contains any mid-circuit measurements."""
+    """Number of mid-circuit measurements."""
 
     def is_midcircuit_measurement(op):
         """Only to avoid 100 character per line limit."""
