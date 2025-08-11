@@ -1384,6 +1384,56 @@ def _construct_output_with_classical_values(tape, return_values_flat):
     output = classical_values + tape.measurements
     return output, classical_return_indices, num_mcm
 
+def _setup_device_program(device, qnode, ctx):
+    """Set up device and qnode programs for transformation."""
+    if isinstance(device, qml.devices.Device):
+        config = _make_execution_config(qnode)
+        device_program, config = device.preprocess(ctx, config)
+    else:
+        device_program = TransformProgram()
+
+    qnode_program = qnode.transform_program if qnode else TransformProgram()
+    return device_program, qnode_program
+
+
+def _setup_quantum_register(device):
+    """Set up quantum register based on device wire configuration."""
+    if device.wires is None:
+        # Automatic qubit management mode
+        # We start with 0 wires and allocate new wires in runtime as we encounter them.
+        return qalloc_p.bind(0)
+    elif catalyst.device.qjit_device.is_dynamic_wires(device.wires):
+        # When device has dynamic wires, the device.wires iterable object
+        # has a single value, which is the tracer for the number of wires
+        return qalloc_p.bind(device.wires[0])
+    else:
+        return qalloc_p.bind(len(device.wires))
+
+
+def _process_measurement_tracers(meas, trace, snapshot_results, meas_trees):
+    """Process measurement tracers and handle snapshots."""
+    def check_full_raise(arr, func):
+        if isinstance(arr, (list, tuple)):
+            return type(arr)(check_full_raise(x, func) for x in arr)
+        else:
+            return func(arr)
+
+    meas_tracers = check_full_raise(
+        meas, partial(trace.to_jaxpr_tracer, source_info=current_source_info())
+    )
+
+    if len(snapshot_results) > 0:
+        # redefine meas_trees PyTree to have same PyTreeRegistry as Snapshot PyTree
+        meas_trees = jax.tree_util.tree_structure(
+            jax.tree_util.tree_unflatten(meas_trees, meas_tracers)
+        )
+        meas_trees = jax.tree_util.treedef_tuple(
+            [tree_structure(snapshot_results), meas_trees]
+        )
+        meas_tracers = snapshot_results + meas_tracers
+
+    return meas_tracers, meas_trees
+
 @debug_logger
 def trace_quantum_function(
     f: Callable, device: QubitDevice, args, kwargs, qnode, static_argnums, debug_info
@@ -1440,13 +1490,7 @@ def trace_quantum_function(
             return_values_flat, return_values_tree = jax.tree_util.tree_flatten(
                 return_values, is_leaf=is_leaf
             )
-            if isinstance(device, qml.devices.Device):
-                config = _make_execution_config(qnode)
-                device_program, config = device.preprocess(ctx, config)
-            else:
-                device_program = TransformProgram()
-
-            qnode_program = qnode.transform_program if qnode else TransformProgram()
+            device_program, qnode_program = _setup_device_program(device, qnode, ctx)
 
             tapes, post_processing, tracing_mode = apply_transforms(
                 qnode_program,
@@ -1474,16 +1518,7 @@ def trace_quantum_function(
                     rtd_name=device.backend_name,
                     rtd_kwargs=str(device.backend_kwargs),
                 )
-                if device.wires is None:
-                    # Automatic qubit management mode
-                    # We start with 0 wires and allocate new wires in runtime as we encounter them.
-                    qreg_in = qalloc_p.bind(0)
-                elif catalyst.device.qjit_device.is_dynamic_wires(device.wires):
-                    # When device has dynamic wires, the device.wires iterable object
-                    # has a single value, which is the tracer for the number of wires
-                    qreg_in = qalloc_p.bind(device.wires[0])
-                else:
-                    qreg_in = qalloc_p.bind(len(device.wires))
+                qreg_in = _setup_quantum_register(device)
 
                 # If the program is batched, that means that it was transformed.
                 # If it was transformed, that means that the program might have
@@ -1514,25 +1549,9 @@ def trace_quantum_function(
                 meas, meas_trees = trace_quantum_measurements(shots, device, qrp_out, output, trees)
                 qreg_out = qrp_out.actualize()
 
-                # Check if the measurements are nested then apply the to_jaxpr_tracer
-                def check_full_raise(arr, func):
-                    if isinstance(arr, (list, tuple)):
-                        return type(arr)(check_full_raise(x, func) for x in arr)
-                    else:
-                        return func(arr)
-
-                meas_tracers = check_full_raise(
-                    meas, partial(trace.to_jaxpr_tracer, source_info=current_source_info())
+                meas_tracers, meas_trees = _process_measurement_tracers(
+                    meas, trace, snapshot_results, meas_trees
                 )
-                if len(snapshot_results) > 0:
-                    # redefine meas_trees PyTree to have same PyTreeRegistry as Snapshot PyTree
-                    meas_trees = jax.tree_util.tree_structure(
-                        jax.tree_util.tree_unflatten(meas_trees, meas_tracers)
-                    )
-                    meas_trees = jax.tree_util.treedef_tuple(
-                        [tree_structure(snapshot_results), meas_trees]
-                    )
-                    meas_tracers = snapshot_results + meas_tracers
                 meas_results = tree_unflatten(meas_trees, meas_tracers)
 
                 # TODO: Allow the user to return whatever types they specify.
