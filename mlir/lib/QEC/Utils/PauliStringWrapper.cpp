@@ -80,7 +80,7 @@ PauliStringWrapper::computeCommutationRulesWith(const PauliStringWrapper &rhs) c
 {
     stim::FlexPauliString result = *rhs.pauliString;
     assert(llvm::isa<PPRotationOp>(this->op) && "Clifford Operation is not PPRotationOp");
-    auto this_op = llvm::cast<PPRotationOp>(this->op); 
+    auto this_op = llvm::cast<PPRotationOp>(this->op);
     if (this_op.hasPiOverTwoRotation()) {
         // -P'
         result.value.sign = !result.value.sign;
@@ -90,7 +90,7 @@ PauliStringWrapper::computeCommutationRulesWith(const PauliStringWrapper &rhs) c
         result = (*this->pauliString) * result * stim::FlexPauliString::from_text("i");
     }
     else {
-       llvm_unreachable("Clifford rotation should be π/2 or π/4");
+        llvm_unreachable("Clifford rotation should be π/2 or π/4");
     }
     assert(!result.imag && "Resulting Pauli string should be real");
     return PauliStringWrapper(std::move(result));
