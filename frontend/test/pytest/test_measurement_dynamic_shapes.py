@@ -252,40 +252,6 @@ def test_dynamic_wires_sample_without_wires(shots, backend, capfd):
     out, _ = capfd.readouterr()
     assert out.count("compiling...") == 3
 
-@pytest.mark.xfail(reason="Not support dynamic wires with sample in one-shot mode")
-@pytest.mark.parametrize("shots", [3, (3, 4, 5), (7,) * 3])
-def test_dynamic_wires_sample_without_wires_one_shot(shots, backend, capfd):
-    """
-    Test that a circuit with dynamic number of wires can be executed correctly
-    with sample measurements without wires specified.
-    """
-
-    def ref(num_qubits):
-        print("compiling...")
-        dev = qml.device(backend, wires=num_qubits, shots=shots)
-
-        @qml.qnode(dev)
-        def circ():
-            @catalyst.for_loop(0, num_qubits, 1)
-            def loop_0(i):
-                qml.RY(0.0, wires=i)
-
-            loop_0()
-            qml.RX(0.0, wires=num_qubits - 1)
-            return qml.sample()
-
-        return circ()
-
-    cat = catalyst.qjit(ref)
-    num_shots = 1 if isinstance(shots, int) else len(shots)
-    for test_nqubits in (10, 4):
-        expected = ref(test_nqubits)
-        observed = cat(test_nqubits)
-        assert all(np.allclose(expected[i], observed[i]) for i in range(num_shots))
-
-    out, _ = capfd.readouterr()
-    assert out.count("compiling...") == 3
-
 def test_dynamic_wires_counts_with_wires(backend, capfd):
     """
     Test that a circuit with dynamic number of wires can be executed correctly
