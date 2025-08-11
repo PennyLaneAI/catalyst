@@ -342,9 +342,96 @@ def test_decomposition_rule_shaped_wires():
         qml.Hadamard(0)
         return qml.probs()
 
-    # CHECK: func.func private @shaped_wires_rule
+    # CHECK: func.func private @shaped_wires_rule([[QREG:%.+]]: !quantum.reg, [[PARAM_TENSOR:%.+]]: tensor<f64>, [[QUBITS:%.+]]: tensor<3xi64>) -> !quantum.reg
+    # CHECK-NEXT: [[IDX_0:%.+]] = stablehlo.slice [[QUBITS]] [0:1] : (tensor<3xi64>) -> tensor<1xi64>
+    # CHECK-NEXT: [[RIDX_0: %.+]] = stablehlo.reshape [[IDX_0]] : (tensor<1xi64>) -> tensor<i64>
+    # CHECK-NEXT: [[EXTRACTED: %.+]] = tensor.extract %1[] : tensor<i64>
+    # CHECK-NEXT: [[QUBIT:%.+]] = quantum.extract [[QREG]][%extracted] : !quantum.reg -> !quantum.bit
+    # CHECK-NEXT: [[EXTRACTED_0:%.+]] = tensor.extract [[PARAM_TENSOR]][] : tensor<f64>
+    # CHECK-NEXT: [[OUT_QUBITS:%.+]] = quantum.custom "RX"([[EXTRACTED_0]]) [[QUBIT]] : !quantum.bit
+
     print(circuit_4.mlir)
     qml.capture.disable()
 
 
 test_decomposition_rule_shaped_wires()
+
+
+def test_decomposition_rule_with_cond():
+    """Test decomposition rule with a conditional path"""
+
+    qml.capture.enable()
+
+    @decomposition_rule(is_qreg=True)
+    def cond_RX(param: TensorLike, w0: WiresLike):
+
+        def true_path():
+            qml.RX(param, wires=w0)
+
+        def false_path(): ...
+
+        qml.cond(param != 0.0, true_path, false_path)()
+
+    @qml.qjit(autograph=False)
+    @qml.qnode(qml.device("lightning.qubit", wires=1), autograph=False)
+    def circuit_5():
+        # CHECK: module @circuit_5
+        cond_RX(float, jax.core.ShapedArray((1,), int))
+        return qml.probs()
+
+    # CHECK: func.func private @cond_RX([[QREG:%.+]]: !quantum.reg, [[PARAM_TENSOR:%.+]]: tensor<f64>, [[QUBITS:%.+]]: tensor<1xi64>) -> !quantum.reg
+    # CHECK-NEXT: [[ZERO:%.+]] = stablehlo.constant dense<0.000000e+00> : tensor<f64>
+    # CHECK-NEXT: [[COND_TENSOR:%.+]] = stablehlo.compare  NE, [[PARAM_TENSOR]], [[ZERO]],  FLOAT : (tensor<f64>, tensor<f64>) -> tensor<i1>
+    # CHECK-NEXT: [[COND:%.+]] = tensor.extract [[COND_TENSOR]][] : tensor<i1>
+    # CHECK-NEXT: [[RETVAL:%.+]] = scf.if [[COND]]
+    # CHECK-DAG:        [[QUBIT:%.+]] = quantum.extract [[QREG]][%extracted_0] : !quantum.reg -> !quantum.bit
+    # CHECK-DAG:        [[PARAM:%.+]] = tensor.extract [[PARAM_TENSOR]][] : tensor<f64>
+    # CHECK:            [[QUBIT_0:%.+]] = quantum.custom "RX"([[PARAM]]) [[QUBIT]] : !quantum.bit
+    # CHECK:            [[QREG_0:%.+]] = quantum.insert [[QREG]][%extracted_2], [[QUBIT_0]] : !quantum.reg, !quantum.bit
+    # CHECK-NEXT:       scf.yield [[QREG_0]] : !quantum.reg
+    # CHECK-NEXT: else
+    # CHECK:            scf.yield [[QREG]] : !quantum.reg
+    # CHECK:      return [[RETVAL]]
+
+    print(circuit_5.mlir)
+    qml.capture.disable()
+
+
+test_decomposition_rule_with_cond()
+
+
+def test_decomposition_rule_caller():
+    """Test decomposition rules with a caller"""
+
+    qml.capture.enable()
+
+    @decomposition_rule(is_qreg=True)
+    def Op1_decomp(_: TensorLike, wires: WiresLike):
+        qml.Hadamard(wires=wires[0])
+        qml.Hadamard(wires=[1])
+
+    @decomposition_rule(is_qreg=True)
+    def Op2_decomp(param: TensorLike, wires: WiresLike):
+        qml.RX(param, wires=wires[0])
+
+    def decomps_caller(param: TensorLike, wires: WiresLike):
+        Op1_decomp(param, wires)
+        Op2_decomp(param, wires)
+
+    @qml.qjit(autograph=False)
+    @qml.qnode(qml.device("lightning.qubit", wires=1), autograph=False)
+    # CHECK: module @circuit_6
+    def circuit_6():
+        # CHECK: [[QREG:%.+]] = quantum.alloc
+        # CHECK: quantum.compbasis qreg [[QREG]] : !quantum.obs
+        decomps_caller(float, jax.core.ShapedArray((2,), int))
+        return qml.probs()
+
+    # CHECK: func.func private @Op1_decomp(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<2xi64>) -> !quantum.reg
+    # CHECK: func.func private @Op2_decomp(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<2xi64>) -> !quantum.reg
+
+    print(circuit_6.mlir)
+    qml.capture.disable()
+
+
+test_decomposition_rule_caller()
