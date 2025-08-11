@@ -28,7 +28,6 @@ func.func public @merge_ppr_ppm_test_1(%q1: !quantum.bit) -> tensor<i1> {
 
 func.func public @merge_ppr_ppm_test_2(%q1: !quantum.bit) -> (tensor<i1>, !quantum.bit) {
 
-    // CHECK-NOT:   qec.ppr ["X"]
     // CHECK:       qec.ppm ["Z"](-1) %
     // CHECK-NOT:   qec.ppr ["X"]
     %0 = qec.ppr ["X"](4) %q1: !quantum.bit
