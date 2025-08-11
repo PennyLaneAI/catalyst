@@ -20,7 +20,7 @@ import jax.numpy as jnp
 import pennylane as qml
 import pytest
 
-from catalyst import qjit, measure
+from catalyst import qjit
 
 
 class TestShotVector:

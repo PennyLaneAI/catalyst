@@ -242,8 +242,8 @@ def uses_transform(qnode, transform_name, mode: Literal["only_one", "any"] = "an
 
     if mode == "only_one":
         return has_target_transform and len(transform_funcs) == 1
-    elif mode == "any":
-        return has_target_transform
+
+    return has_target_transform
 
 @debug_logger
 def retrace_with_result_types(jaxpr: ClosedJaxpr, target_types: List[ShapedArray]) -> ClosedJaxpr:
@@ -1482,10 +1482,6 @@ def trace_quantum_function(
                     # TODO: In the future support arbitrary output from the user function.
                     # Currently, only dynamic one-shot is supported.
                     if uses_transform(qnode, "dynamic_one_shot_partial", mode="only_one"):
-                        # It's important to note that we need to memorize the indices of the
-                        # classical values and num_mcm, since we need to insert value back to the
-                        # results after the measurements are processed, and num_mcm would be used
-                        # to remove the rest of mcms if they already inserted with classical values
                         classical_values = []
                         num_mcm = sum(1 for _ in tape.measurements if isinstance(_, MidMeasureMP))
                         for i, value in enumerate(return_values_flat):
@@ -1533,16 +1529,10 @@ def trace_quantum_function(
                 meas_results = tree_unflatten(meas_trees, meas_tracers)
 
                 # TODO: Allow the user to return whatever types they specify.
-                if tracing_mode == TracingMode.TRANSFORM:
-                    # Support any return type (list, dict, tuple, etc.) instead of forcing list
-                    if isinstance(meas_results, list):
-                        if len(meas_results) == 1:
-                            transformed_results.append(meas_results[0])
-                        else:
-                            transformed_results.append(tuple(meas_results))
-                    else:
-                        # For non-list types (dict, tuple, etc.), append as-is
-                        transformed_results.append(meas_results)
+                # In transform mode, convert lists to appropriate format; otherwise use as-is
+                if tracing_mode == TracingMode.TRANSFORM and isinstance(meas_results, list):
+                    result = meas_results[0] if len(meas_results) == 1 else tuple(meas_results)
+                    transformed_results.append(result)
                 else:
                     transformed_results.append(meas_results)
 
