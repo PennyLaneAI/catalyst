@@ -63,7 +63,7 @@ def _(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
 
         converted_jaxpr_branches.append(new_jaxpr.jaxpr)
 
-    predicate = plxpr_invals[:len(jaxpr_branches)-1]
+    predicate = [jax.numpy.bool(p) for p in plxpr_invals[:len(jaxpr_branches)-1]]
 
     # Build Catalyst compatible input values
     cond_invals = [*predicate, *all_consts, *args]
@@ -107,7 +107,7 @@ def handle_cond(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
 
         converted_jaxpr_branches.append(converted_jaxpr_branch)
 
-    predicate = plxpr_invals[:len(jaxpr_branches)-1]
+    predicate = [jax.numpy.bool(p) for p in plxpr_invals[:len(jaxpr_branches)-1]]
 
     # Build Catalyst compatible input values
     cond_invals = [*predicate, *all_consts, *args_plus_qreg]

@@ -999,11 +999,15 @@ class TestCondPredicateConversion:
 
             return y
 
-        with pytest.raises(
-            TypeError,
-            match="Conditional predicates are required to be of bool, integer or float type",
-        ):
-            workflow(3)
+        if qml.capture.enabled():
+            with pytest.raises(TypeError, match="is not a valid JAX type"):
+                workflow(3)
+        else:
+            with pytest.raises(
+                TypeError,
+                match="Conditional predicates are required to be of bool, integer or float type",
+            ):
+                workflow(3)
 
     def test_array_conversion_failed(self):
         """Test failure at converting array to bool using Autograph."""
