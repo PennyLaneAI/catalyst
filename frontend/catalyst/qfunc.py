@@ -616,7 +616,7 @@ def dynamic_one_shot(qnode, **kwargs):
         # Extract configuration parameters
         classical_return_indices = kwargs.pop("_classical_return_indices", [[]])[0]
         num_mcm = kwargs.pop("_num_mcm_expected", [0])[0]
-        out_tree_expected = kwargs.pop("_out_tree_expected", [])
+        out_tree_expected = kwargs.pop("_out_tree_expected", [[]])
 
         # Split results into classical and measurement parts
         classical_values, results = _extract_classical_and_measurement_results(
