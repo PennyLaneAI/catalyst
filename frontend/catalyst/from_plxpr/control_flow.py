@@ -56,7 +56,7 @@ def _(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
         all_consts = all_consts + [*branch_consts]
 
         if plxpr_branch is None:
-            new_jaxpr = jax.make_jaxpr(lambda *x: x)(*args)
+            new_jaxpr = jax.make_jaxpr(lambda *x: [])(*args)
         else:
             evaluator = partial(copy(self).eval, plxpr_branch, branch_consts)
             new_jaxpr = jax.make_jaxpr(evaluator)(*args)
@@ -97,7 +97,7 @@ def handle_cond(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
 
         if plxpr_branch is None:
             # Emit a new Catalyst jaxpr branch that simply returns a qreg
-            converted_jaxpr_branch = jax.make_jaxpr(lambda *x: x)(*args_plus_qreg).jaxpr
+            converted_jaxpr_branch = jax.make_jaxpr(lambda *x: x[-1])(*args_plus_qreg).jaxpr
         else:
 
             closed_jaxpr = ClosedJaxpr(plxpr_branch, branch_consts)
