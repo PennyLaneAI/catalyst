@@ -13,4 +13,4 @@ pennylane @ git+https://github.com/PennyLaneAI/pennylane.git@shots-decopuling/de
 
 # For a custom LQ/LK version, update the package version here and at
 # 'doc/requirements.txt'
-lightning=0.43.0.dev4
+lightning=0.43.0.dev12

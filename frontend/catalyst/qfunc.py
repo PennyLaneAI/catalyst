@@ -286,7 +286,7 @@ def dynamic_one_shot(qnode, **kwargs):
         out = list(results)
         if has_mcm:
             out = parse_native_mid_circuit_measurements(
-                cpy_tape, aux_tapes, results, postselect_mode="pad-invalid-samples"
+                cpy_tape, results=results, postselect_mode="pad-invalid-samples"
             )
             if len(cpy_tape.measurements) == 1:
                 out = (out,)
