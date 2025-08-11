@@ -43,4 +43,3 @@ def mcm_method_with_zne():
 # CHECK: scf.for
 # CHECK: catalyst.launch_kernel @module_circuit::@circuit() : () -> tensor<f64>
 print(mcm_method_with_zne.mlir)
-
