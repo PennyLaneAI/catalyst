@@ -148,7 +148,8 @@ def _configure_mcm(qnode, args, kwargs):
             (
                 uses_measurements_from_samples
                 or uses_measurements_from_counts
-                or qnode.device.name not in [
+                or qnode.device.name
+                not in [
                     "lightning.qubit",
                     "lightning.kokkos",
                     "lightning.gpu",

@@ -35,7 +35,9 @@ from catalyst.jax_primitives import compbasis_p, counts_p, sample_p
 try:
     # COM: CHECK-LABEL: public @sample1(
     @qjit(target="mlir")
-    @qml.qnode(qml.device("lightning.qubit", wires=2, shots=1000))
+    @qml.qnode(
+        qml.device("lightning.qubit", wires=2, shots=1000), mcm_method="single-branch-statistics"
+    )
     def sample1(x: float, y: float):
         qml.RX(x, wires=0)
         qml.RY(y, wires=1)
@@ -50,7 +52,9 @@ try:
 
     # COM: CHECK-LABEL: public @sample2(
     @qjit(target="mlir")
-    @qml.qnode(qml.device("lightning.qubit", wires=2, shots=1000))
+    @qml.qnode(
+        qml.device("lightning.qubit", wires=2, shots=1000), mcm_method="single-branch-statistics"
+    )
     def sample2(x: float, y: float):
         qml.RX(x, wires=0)
         # COM: CHECK: [[q1:%.+]] = quantum.custom "RY"
@@ -71,7 +75,9 @@ except CompileError:
 
 # CHECK-LABEL: public @sample3(
 @qjit(target="mlir")
-@qml.qnode(qml.device("lightning.qubit", wires=2, shots=1000))
+@qml.qnode(
+    qml.device("lightning.qubit", wires=2, shots=1000), mcm_method="single-branch-statistics"
+)
 # CHECK: [[shots:%.+]] = arith.constant 1000 : i64
 # CHECK: quantum.device shots([[shots]]) [{{.+}}]
 def sample3(x: float, y: float):
@@ -139,7 +145,10 @@ print(test_sample_dynamic.mlir)
 # CHECK-LABEL: @sample_dynamic_qubits
 @qjit(target="mlir")
 def sample_dynamic_qubits(num_qubits):
-    @qml.qnode(qml.device("lightning.qubit", wires=num_qubits, shots=37))
+    @qml.qnode(
+        qml.device("lightning.qubit", wires=num_qubits, shots=37),
+        mcm_method="single-branch-statistics",
+    )
     def circ():
         # CHECK: [[nqubits:%.+]] = quantum.num_qubits : i64
         # CHECK: quantum.compbasis
@@ -165,7 +174,9 @@ try:
 
     # COM: CHECK-LABEL: public @counts1(
     @qjit(target="mlir")
-    @qml.qnode(qml.device("lightning.qubit", wires=2, shots=1000))
+    @qml.qnode(
+        qml.device("lightning.qubit", wires=2, shots=1000), mcm_method="single-branch-statistics"
+    )
     def counts1(x: float, y: float):
         qml.RX(x, wires=0)
         qml.RY(y, wires=1)
@@ -179,7 +190,9 @@ try:
     print(counts1.mlir)
 
     @qjit(target="mlir")
-    @qml.qnode(qml.device("lightning.qubit", wires=2, shots=1000))
+    @qml.qnode(
+        qml.device("lightning.qubit", wires=2, shots=1000), mcm_method="single-branch-statistics"
+    )
     def counts2(x: float, y: float):
         qml.RX(x, wires=0)
         # COM: CHECK: [[q1:%.+]] = "quantum.custom"({{%.+}}, {{%.+}}) {gate_name = "RY"
@@ -200,7 +213,9 @@ except:
 
 # CHECK-LABEL: public @counts3(
 @qjit(target="mlir")
-@qml.qnode(qml.device("lightning.qubit", wires=2, shots=1000))
+@qml.qnode(
+    qml.device("lightning.qubit", wires=2, shots=1000), mcm_method="single-branch-statistics"
+)
 # CHECK: [[shots:%.+]] = arith.constant 1000 : i64
 # CHECK: quantum.device shots([[shots]]) [{{.+}}]
 def counts3(x: float, y: float):
@@ -240,7 +255,10 @@ print(test_counts_static.mlir)
 # CHECK-LABEL: @counts_dynamic_qubits
 @qjit(target="mlir")
 def counts_dynamic_qubits(num_qubits):
-    @qml.qnode(qml.device("lightning.qubit", wires=num_qubits, shots=37))
+    @qml.qnode(
+        qml.device("lightning.qubit", wires=num_qubits, shots=37),
+        mcm_method="single-branch-statistics",
+    )
     def circ():
         # CHECK: [[one:%.+]] = stablehlo.constant dense<1> : tensor<i64>
         # CHECK: [[nqubits:%.+]] = quantum.num_qubits : i64
