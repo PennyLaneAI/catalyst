@@ -190,7 +190,7 @@ class QregManager:
         return iter(self.wire_map.items())
 
 
-class QbitManager:
+class QubitValueMap:
     """
     A manager that handles converting plxpr wire indices into catalyst jaxpr qubits.
 
