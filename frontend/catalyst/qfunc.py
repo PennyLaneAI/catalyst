@@ -19,7 +19,7 @@ the default behaviour and replacing it with a function-like "QNode" primitive.
 """
 import logging
 from copy import copy
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from typing import Callable, Sequence
 
 import jax.numpy as jnp
@@ -49,6 +49,27 @@ from catalyst.utils.exceptions import CompileError
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
+
+
+@dataclass
+class OutputContext:
+    """Context containing parameters needed for finalizing quantum function output."""
+    snapshots: any
+    classical_values: any
+    classical_return_indices: any
+    out_tree_expected: any
+    num_mcm: int
+
+
+@dataclass
+class MeasurementContext:
+    """Context containing parameters needed for measurement processing."""
+    cpy_tape: any
+    aux_tapes: any
+    results: any
+    snapshots: any
+    has_mcm: bool
+    shot_vector: any
 
 
 def _resolve_mcm_config(mcm_config, shots):
@@ -96,6 +117,70 @@ def _get_total_shots(qnode):
         shots = shots_value
     return shots
 
+
+def _configure_mcm(qnode, args, kwargs):
+    """Configure mid-circuit measurement settings and handle one-shot execution."""
+    dynamic_one_shot_called = getattr(qnode, "_dynamic_one_shot_called", False)
+    if not dynamic_one_shot_called:
+        mcm_config = copy(
+            qml.devices.MCMConfig(
+                postselect_mode=qnode.execute_kwargs["postselect_mode"],
+                mcm_method=qnode.execute_kwargs["mcm_method"],
+            )
+        )
+        total_shots = _get_total_shots(qnode)
+        user_specified_mcm_method = mcm_config.mcm_method
+        mcm_config = _resolve_mcm_config(mcm_config, total_shots)
+
+        # Check if measurements_from_{samples/counts} is being used
+        uses_measurements_from_samples = uses_transform(qnode, "measurements_from_samples")
+        uses_measurements_from_counts = uses_transform(qnode, "measurements_from_counts")
+
+        # Fallback to single-branch-statistics if measurements_from_samples is detected
+        if (
+            (uses_measurements_from_samples or uses_measurements_from_counts)
+            and user_specified_mcm_method is None
+            and mcm_config.mcm_method == "one-shot"
+        ):
+            mcm_config = replace(mcm_config, mcm_method="single-branch-statistics")
+
+        if mcm_config.mcm_method == "one-shot":
+            # If measurements_from_samples while one-shot is used, raise an error
+            if uses_measurements_from_samples:
+                raise CompileError("measurements_from_samples is not supported with one-shot")
+
+            if uses_measurements_from_counts:
+                raise CompileError("measurements_from_counts is not supported with one-shot")
+
+            mcm_config = replace(
+                mcm_config, postselect_mode=mcm_config.postselect_mode or "hw-like"
+            )
+            try:
+                return Function(dynamic_one_shot(qnode, mcm_config=mcm_config))(*args, **kwargs)
+            except (TypeError, ValueError, CompileError, NotImplementedError) as e:
+                if user_specified_mcm_method is not None:
+                    raise
+
+                # Fallback only if mcm was auto-determined
+                error_msg = str(e)
+                unsupported_measurement_error = any(
+                    pattern in error_msg
+                    for pattern in [
+                        "Native mid-circuit measurement mode does not support",
+                        "qml.var(obs) cannot be returned when `mcm_method='one-shot'`",
+                        "empty wires is not supported with dynamic wires in one-shot mode",
+                    ]
+                )
+
+                # Fallback if error is related to unsupported measurements
+                if unsupported_measurement_error:
+                    logger.debug("Fallback to single-branch-statistics: %s", e)
+                    mcm_config = replace(mcm_config, mcm_method="single-branch-statistics")
+                else:
+                    raise
+    return None
+
+
 class QFunc:
     """A device specific quantum function.
 
@@ -124,62 +209,11 @@ class QFunc:
         pass_pipeline = dictionary_to_list_of_passes(pass_pipeline)
 
         # Mid-circuit measurement configuration/execution
-        dynamic_one_shot_called = getattr(self, "_dynamic_one_shot_called", False)
-        if not dynamic_one_shot_called:
-            mcm_config = copy(
-                qml.devices.MCMConfig(
-                    postselect_mode=self.execute_kwargs["postselect_mode"],
-                    mcm_method=self.execute_kwargs["mcm_method"],
-                )
-            )
-            total_shots = _get_total_shots(self)
-            user_specified_mcm_method = mcm_config.mcm_method
-            mcm_config = _resolve_mcm_config(mcm_config, total_shots)
+        fn = _configure_mcm(self, args, kwargs)
+        if fn is not None:
+            return fn
 
-            # Check if measurements_from_{samples/counts} is being used
-            uses_measurements_from_samples = uses_transform(self, "measurements_from_samples")
-            uses_measurements_from_counts = uses_transform(self, "measurements_from_counts")
-
-            # Fallback to single-branch-statistics if measurements_from_samples is detected
-            if (
-                (uses_measurements_from_samples or uses_measurements_from_counts)
-                and user_specified_mcm_method is None
-                and mcm_config.mcm_method == "one-shot"
-            ):
-                mcm_config = replace(mcm_config, mcm_method="single-branch-statistics")
-
-            if mcm_config.mcm_method == "one-shot":
-                # If measurements_from_samples while one-shot is used, raise an error
-                if uses_measurements_from_samples:
-                    raise CompileError("measurements_from_samples is not supported with one-shot")
-
-                if uses_measurements_from_counts:
-                    raise CompileError("measurements_from_counts is not supported with one-shot")
-
-                mcm_config = replace(
-                    mcm_config, postselect_mode=mcm_config.postselect_mode or "hw-like"
-                )
-                try:
-                    return Function(dynamic_one_shot(self, mcm_config=mcm_config))(*args, **kwargs)
-                except (TypeError, ValueError, CompileError, NotImplementedError) as e:
-                    if user_specified_mcm_method is not None:
-                        raise
-
-                    # Fallback only if mcm was auto-determined
-                    error_msg = str(e)
-                    unsupported_measurement_error = any(pattern in error_msg for pattern in [
-                        "Native mid-circuit measurement mode does not support",
-                        "qml.var(obs) cannot be returned when `mcm_method='one-shot'`",
-                        "empty wires is not supported with dynamic wires in one-shot mode",
-                    ])
-
-                    # Fallback if error is related to unsupported measurements
-                    if unsupported_measurement_error:
-                        logger.debug("Fallback to single-branch-statistics: %s", e)
-                        mcm_config = replace(mcm_config, mcm_method="single-branch-statistics")
-                    else:
-                        raise
-
+        # Setup device and parameters
         new_device = copy(self.device)
         new_device._shots = self._shots  # pylint: disable=protected-access
         qjit_device = QJITDevice(new_device)
@@ -513,45 +547,55 @@ def dynamic_one_shot(qnode, **kwargs):
 
         return tuple(new_out)
 
-    def _handle_measurements(cpy_tape, aux_tapes, results, out, snapshots, has_mcm, shot_vector):
-        """Handle measurement processing based on whether MCMs are present."""
-        if has_mcm and len(cpy_tape.measurements) > 0:
+    def _handle_measurements(out, ctx: MeasurementContext):
+        """
+        Handle measurement results
+
+        Args:
+            out: The output to process
+            ctx: MeasurementContext containing all necessary parameters for measurement processing
+        """
+        if ctx.has_mcm and len(ctx.cpy_tape.measurements) > 0:
             out = parse_native_mid_circuit_measurements(
-                cpy_tape, aux_tapes, results, postselect_mode="pad-invalid-samples"
+                ctx.cpy_tape, ctx.aux_tapes, ctx.results, postselect_mode="pad-invalid-samples"
             )
-            if len(cpy_tape.measurements) == 1:
+            if len(ctx.cpy_tape.measurements) == 1:
                 out = (out,)
-        elif len(cpy_tape.measurements) > 0:
-            out = _process_measurements_without_mcm(cpy_tape, out, snapshots, shot_vector)
+        elif len(ctx.cpy_tape.measurements) > 0:
+            out = _process_measurements_without_mcm(
+                ctx.cpy_tape, out, ctx.snapshots, ctx.shot_vector
+            )
 
             # If snapshots were present, combine them with measurements results
-            if snapshots is not None:
-                out = (snapshots, out)
+            if ctx.snapshots is not None:
+                out = (ctx.snapshots, out)
 
         return out
 
-    def _finalize_output(
-        out, snapshots, classical_values, classical_return_indices, out_tree_expected, num_mcm
-    ):
+    def _finalize_output(out, ctx: OutputContext):
         """
         Finalize the output by reconstructing with classical values and unflattening to the
         expected tree structure.
+
+        Args:
+            out: The output to finalize
+            context: OutputContext containing all necessary parameters for finalization
         """
         # Handle case with no measurements
         if len(cpy_tape.measurements) == 0:
-            out = out[:-num_mcm]
+            out = out[: -ctx.num_mcm]
 
-        if snapshots is not None:
-            assert len(out_tree_expected) == 2
+        if ctx.snapshots is not None:
+            assert len(ctx.out_tree_expected) == 2
             tmp_out = _reconstruct_output_with_classical_values(
-                out[1], classical_values, classical_return_indices
+                out[1], ctx.classical_values, ctx.classical_return_indices
             )
-            out = (out[0], tree_unflatten(out_tree_expected[1], tmp_out))
+            out = (out[0], tree_unflatten(ctx.out_tree_expected[1], tmp_out))
         else:
             out = _reconstruct_output_with_classical_values(
-                out, classical_values, classical_return_indices
+                out, ctx.classical_values, ctx.classical_return_indices
             )
-            out = tree_unflatten(out_tree_expected[0], out)
+            out = tree_unflatten(ctx.out_tree_expected[0], out)
 
         return out
 
@@ -575,13 +619,24 @@ def dynamic_one_shot(qnode, **kwargs):
 
         # Process measurements
         has_mcm = any(isinstance(op, MidCircuitMeasure) for op in cpy_tape.operations)
-        out = _handle_measurements(
-            cpy_tape, aux_tapes, results, out, snapshots, has_mcm, shot_vector
+        measurement_context = MeasurementContext(
+            cpy_tape=cpy_tape,
+            aux_tapes=aux_tapes,
+            results=results,
+            snapshots=snapshots,
+            has_mcm=has_mcm,
+            shot_vector=shot_vector,
         )
+        out = _handle_measurements(out, measurement_context)
 
         # Finalize and return output
-        return _finalize_output(
-            out, snapshots, classical_values, classical_return_indices, out_tree_expected, num_mcm
+        output_context = OutputContext(
+            snapshots=snapshots,
+            classical_values=classical_values,
+            classical_return_indices=classical_return_indices,
+            out_tree_expected=out_tree_expected,
+            num_mcm=num_mcm,
         )
+        return _finalize_output(out, output_context)
 
     return one_shot_wrapper
