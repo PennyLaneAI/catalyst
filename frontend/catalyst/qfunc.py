@@ -35,12 +35,16 @@ from pennylane.transforms.dynamic_one_shot import (
 )
 
 import catalyst
-from catalyst.api_extensions import MidCircuitMeasure
 from catalyst.device import QJITDevice
 from catalyst.device.qjit_device import is_dynamic_wires
 from catalyst.jax_extras import deduce_avals, get_implicit_and_explicit_flat_args, unzip2
 from catalyst.jax_primitives import quantum_kernel_p
-from catalyst.jax_tracer import Function, trace_quantum_function, uses_transform
+from catalyst.jax_tracer import (
+    Function,
+    has_midcircuit_measurement,
+    trace_quantum_function,
+    uses_transform,
+)
 from catalyst.logging import debug_logger
 from catalyst.passes.pass_api import dictionary_to_list_of_passes
 from catalyst.tracing.contexts import EvaluationContext
@@ -357,7 +361,7 @@ def _extract_classical_and_measurement_results(results, classical_return_indices
     num_classical_return_indices = len(classical_return_indices)
     classical_values = results[:num_classical_return_indices]
     measurement_results = results[num_classical_return_indices:]
-    return classical_values, list(measurement_results)
+    return classical_values, measurement_results
 
 
 def _process_counts_measurement(out, idx, has_snapshots):
@@ -610,27 +614,27 @@ def dynamic_one_shot(qnode, **kwargs):
         results = _execute_vmap_shots(*args, **kwargs)
 
         # Extract configuration parameters
-        classical_return_indices = kwargs.pop("_classical_return_indices", [])[0]
+        classical_return_indices = kwargs.pop("_classical_return_indices", [[]])[0]
         num_mcm = kwargs.pop("_num_mcm_expected", [0])[0]
         out_tree_expected = kwargs.pop("_out_tree_expected", [])
 
         # Split results into classical and measurement parts
-        classical_values, out = _extract_classical_and_measurement_results(
+        classical_values, results = _extract_classical_and_measurement_results(
             results, classical_return_indices
         )
+        out = list(results)
 
         # Get shot vector and snapshot information
         shot_vector = _get_shot_vector(qnode)
         snapshots, out = _get_snapshot_results(cpy_tape, out)
 
         # Process measurements
-        has_mcm = any(isinstance(op, MidCircuitMeasure) for op in cpy_tape.operations)
         measurement_context = MeasurementContext(
             cpy_tape=cpy_tape,
             aux_tapes=aux_tapes,
             results=results,
             snapshots=snapshots,
-            has_mcm=has_mcm,
+            has_mcm=has_midcircuit_measurement(cpy_tape),
             shot_vector=shot_vector,
         )
         out = _handle_measurements(out, measurement_context)

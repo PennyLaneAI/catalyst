@@ -1165,6 +1165,17 @@ def has_midcircuit_measurement(tape):
     return any(map(is_midcircuit_measurement, tape.operations))
 
 
+@debug_logger
+def num_midcircuit_measurement(tape):
+    """Check if the tape contains any mid-circuit measurements."""
+
+    def is_midcircuit_measurement(op):
+        """Only to avoid 100 character per line limit."""
+        return isinstance(op, catalyst.api_extensions.MidCircuitMeasure)
+
+    return sum(map(is_midcircuit_measurement, tape.operations))
+
+
 class TracingMode(Enum):
     """Enumerate the tracing modes supported by the quantum function tracer:
 
@@ -1378,7 +1389,7 @@ def _get_total_shots(qnode):
 def _construct_output_with_classical_values(tape, return_values_flat):
     classical_values = []
     classical_return_indices = []
-    num_mcm = sum(1 for _ in tape.measurements if isinstance(_, MidMeasureMP))
+    num_mcm = num_midcircuit_measurement(tape)
     for i, value in enumerate(return_values_flat):
         if not isinstance(value, qml.measurements.MeasurementProcess):
             classical_values.append(value)
