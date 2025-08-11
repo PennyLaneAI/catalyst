@@ -80,12 +80,6 @@ def SplitMultipleTapesPass : Pass<"split-multiple-tapes"> {
 // ----- Quantum circuit transformation passes begin ----- //
 // For example, automatic compiler peephole opts, etc.
 
-def GraphDecompositionPass : Pass<"graph-decomposition"> {
-    let summary = "Decompose the gates using PennyLane graph-decomposition framework";
-
-    let constructor = "catalyst::createGraphDecompositionPass()";
-}
-
 def IonsDecompositionPass : Pass<"ions-decomposition"> {
     let summary = "Decompose the gates to the set {RX, RY, MS}";
 

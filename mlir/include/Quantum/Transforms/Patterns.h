@@ -25,7 +25,6 @@ void populateQIRConversionPatterns(mlir::TypeConverter &, mlir::RewritePatternSe
 void populateAdjointPatterns(mlir::RewritePatternSet &);
 void populateSelfInversePatterns(mlir::RewritePatternSet &);
 void populateMergeRotationsPatterns(mlir::RewritePatternSet &);
-void populateGraphDecompositionPatterns(mlir::RewritePatternSet &);
 void populateIonsDecompositionPatterns(mlir::RewritePatternSet &);
 void populateLoopBoundaryPatterns(mlir::RewritePatternSet &, unsigned int mode);
 

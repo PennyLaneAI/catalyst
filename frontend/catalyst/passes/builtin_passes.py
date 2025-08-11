@@ -394,23 +394,6 @@ def merge_rotations(qnode):
     return PassPipelineWrapper(qnode, "merge-rotations")
 
 
-def graph_decomposition(qnode):
-    """
-    Specify that the ``-graph-decomposition`` MLIR compiler pass
-    should be applied to the decorated QNode during :func:`~.qjit`
-    compilation.
-
-    This compiler pass leverages the graph-based decomposition framework
-    in PennyLane to decompose the circuit into a gateset that is compatible with
-    the MLIR quantum dialect.
-
-    You can read more about the graph-based decomposition framework
-    in PennyLane :class:`pennylane.decomposition.DecompositionGraph`.
-    """
-
-    return PassPipelineWrapper(qnode, "graph-decomposition")
-
-
 def ions_decomposition(qnode):  # pragma: nocover
     """
     Specify that the ``--ions-decomposition`` MLIR compiler pass should be

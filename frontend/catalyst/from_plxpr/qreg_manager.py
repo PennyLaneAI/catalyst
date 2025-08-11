@@ -270,7 +270,6 @@ class QubitValueMap:
         To do this, for the dynamic wire gate we insert back to the register.
         """
         # do not do anything since we don't deal with dynamic wires
-        pass
 
     def __getitem__(self, index: int) -> AbstractQbit:
         """

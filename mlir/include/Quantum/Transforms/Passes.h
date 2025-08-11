@@ -32,7 +32,6 @@ std::unique_ptr<mlir::Pass> createSplitMultipleTapesPass();
 std::unique_ptr<mlir::Pass> createMergeRotationsPass();
 std::unique_ptr<mlir::Pass> createDisentangleCNOTPass();
 std::unique_ptr<mlir::Pass> createDisentangleSWAPPass();
-std::unique_ptr<mlir::Pass> createGraphDecompositionPass();
 std::unique_ptr<mlir::Pass> createIonsDecompositionPass();
 std::unique_ptr<mlir::Pass> createLoopBoundaryOptimizationPass();
 

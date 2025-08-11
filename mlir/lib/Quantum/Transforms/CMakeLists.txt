@@ -16,8 +16,6 @@ file(GLOB SRC
     MergeRotationsPatterns.cpp
     DisentangleSWAP.cpp
     DisentangleCNOT.cpp
-    graph_decomposition.cpp
-    GraphDecompositionPatterns.cpp
     ions_decompositions.cpp
     IonsDecompositionPatterns.cpp
     loop_boundary_optimization.cpp
