@@ -148,7 +148,13 @@ def _configure_mcm(qnode, args, kwargs):
             (
                 uses_measurements_from_samples
                 or uses_measurements_from_counts
-                or qnode.device.name not in ["lightning.qubit", "default.qubit", "null.qubit"]
+                or qnode.device.name not in [
+                    "lightning.qubit",
+                    "lightning.kokkos",
+                    "lightning.gpu",
+                    "default.qubit",
+                    "null.qubit",
+                ]
             )
             and user_specified_mcm_method is None
             and mcm_config.mcm_method == "one-shot"
