@@ -153,7 +153,7 @@ def _configure_mcm(qnode, args, kwargs):
 
         if mcm_config.mcm_method == "one-shot":
             # Unsupport one-shot for softwareq.qpp
-            if qnode.device.name == "softwareq.qpp":
+            if qnode.device.name in ["lightning.qubit", "default.qubit", "null.qubit"]:
                 mcm_config = replace(mcm_config, mcm_method="single-branch-statistics")
                 return None
 
