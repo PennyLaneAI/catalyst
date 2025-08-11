@@ -10,7 +10,7 @@
 *  Displays Catalyst version in `quantum-opt --version` output.
   [(#1922)](https://github.com/PennyLaneAI/catalyst/pull/1922)
 
-* Snakecased keyword arguments to :func:`catalyst.passes.apply_pass()` are now correctly parsed 
+* Snakecased keyword arguments to :func:`catalyst.passes.apply_pass()` are now correctly parsed
   to kebab-case pass options [(#1954)](https://github.com/PennyLaneAI/catalyst/pull/1954).
   For example:
 
@@ -56,6 +56,12 @@
   [(#1926)](https://github.com/PennyLaneAI/catalyst/pull/1926)
 
 <h3>Internal changes ⚙️</h3>
+
+* Updates use of `qml.transforms.dynamic_one_shot.parse_native_mid_circuit_measurements` to improved signature.
+  [(#1953)](https://github.com/PennyLaneAI/catalyst/pull/1953)
+
+* When capture is enabled, `qjit(autograph=True)` will use capture autograph instead of catalyst autograph.
+  [(#1960)](https://github.com/PennyLaneAI/catalyst/pull/1960)
 
 * QJitDevice helper `extract_backend_info` removed its redundant `capabilities` argument.
   [(#1956)](https://github.com/PennyLaneAI/catalyst/pull/1956)
@@ -125,8 +131,17 @@
       ...
   ```
 
+* The `mbqc.graph_state_prep` operation has been added to the MBQC dialect. This operation prepares
+  a graph state with arbitrary qubit connectivity, specified by an input adjacency-matrix operand,
+  for use in MBQC workloads.
+  [(#1965)](https://github.com/PennyLaneAI/catalyst/pull/1965)
+
 * `catalyst.accelerate`, `catalyst.debug.callback`, and `catalyst.pure_callback`, `catalyst.debug.print`, and `catalyst.debug.print_memref` now work when capture is enabled.
   [(#1902)](https://github.com/PennyLaneAI/catalyst/pull/1902)
+
+* The merge rotation pass in Catalyst (:func:`~.passes.merge_rotations`) now also considers
+  `qml.Rot` and `qml.CRot`.
+  [(#1955)](https://github.com/PennyLaneAI/catalyst/pull/1955)
 
 <h3>Documentation 📝</h3>
 

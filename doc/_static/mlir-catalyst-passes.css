@@ -1,0 +1,6 @@
+/* Custom CSS to override header fonts for MLIR Catalyst documentation */
+
+/* restyle the #### Options header since it appears too large*/
+h2 {
+    font-size: large;
+}
