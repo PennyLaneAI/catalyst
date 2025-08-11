@@ -320,6 +320,9 @@ struct RoutingPass : public impl::RoutingPassBase<RoutingPass> {
             if (executeGateList.size()) {
                 for (auto op : executeGateList) {
                     compiledGateNames.push_back(op.getGateName());
+                    // this doesn't work as Params are SSA values
+                    // when original function is deleted, they are lost
+                    // Runtime segmentation fault occurs if parametric gates are used
                     compiledGateParams.push_back(op.getParams());
                     std::vector<int> currOpPhysicalQubits;
                     for (auto currOpExtract : OpToExtractMap[op])
