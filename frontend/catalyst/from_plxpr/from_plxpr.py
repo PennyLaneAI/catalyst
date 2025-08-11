@@ -44,7 +44,7 @@ from pennylane.transforms import single_qubit_fusion as pl_single_qubit_fusion
 from pennylane.transforms import unitary_to_rot as pl_unitary_to_rot
 
 from catalyst.device import extract_backend_info
-from catalyst.from_plxpr.qreg_manager import QubitValueMap, QregManager
+from catalyst.from_plxpr.qreg_manager import QregManager, QubitValueMap
 from catalyst.jax_extras import jaxpr_pad_consts, make_jaxpr2, transient_jax_config
 from catalyst.jax_primitives import (
     AbstractQbit,
@@ -53,7 +53,7 @@ from catalyst.jax_primitives import (
     compbasis_p,
     cond_p,
     counts_p,
-    decomposition_rule_p,
+    decomprule_p,
     device_init_p,
     device_release_p,
     expval_p,
@@ -506,7 +506,7 @@ def handle_subroutine(self, *args, **kwargs):
     return vals_out
 
 
-@PLxPRToQuantumJaxprInterpreter.register_primitive(decomposition_rule_p)
+@PLxPRToQuantumJaxprInterpreter.register_primitive(decomprule_p)
 def handle_decomposition_rule(self, *, pyfun, func_jaxpr, is_qreg, num_params):
     """
     Transform a quantum decomposition rule from PLxPR into JAXPR with quantum primitives.
@@ -540,7 +540,7 @@ def handle_decomposition_rule(self, *, pyfun, func_jaxpr, is_qreg, num_params):
         ]
         converted_closed_jaxpr_branch = jax.make_jaxpr(wrapper)(*new_in_avals)
 
-    decomposition_rule_p.bind(pyfun=pyfun, func_jaxpr=converted_closed_jaxpr_branch)
+    decomprule_p.bind(pyfun=pyfun, func_jaxpr=converted_closed_jaxpr_branch)
 
     return ()
 

@@ -357,6 +357,37 @@ def test_decomposition_rule_shaped_wires():
 test_decomposition_rule_shaped_wires()
 
 
+def test_decomposition_rule_expanded_wires():
+    """Test decomposition rule with passing expanding wires as a Python list"""
+
+    qml.capture.enable()
+
+    def shaped_wires_rule(param: TensorLike, wires: WiresLike):
+        qml.RX(param, wires=wires[0])
+        qml.RX(param, wires=wires[1])
+        qml.RX(param, wires=wires[2])
+
+    @decomposition_rule(num_params=1, is_qreg=False)
+    def expanded_wires_rule(param: TensorLike, w1, w2, w3):
+        shaped_wires_rule(param, [w1, w2, w3])
+
+    @qml.qjit
+    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    def circuit_5(_: float):
+        # CHECK: module @circuit_5
+        expanded_wires_rule(float, int, int, int)
+        qml.Hadamard(0)
+        return qml.probs()
+
+    # CHECK: func.func private @expanded_wires_rule(%arg0: tensor<f64>, %arg1: !quantum.bit, %arg2: !quantum.bit, %arg3: !quantum.bit) -> (!quantum.bit, !quantum.bit, !quantum.bit)
+
+    print(circuit_5.mlir)
+    qml.capture.disable()
+
+
+test_decomposition_rule_expanded_wires()
+
+
 def test_decomposition_rule_with_cond():
     """Test decomposition rule with a conditional path"""
 
@@ -374,8 +405,8 @@ def test_decomposition_rule_with_cond():
 
     @qml.qjit(autograph=False)
     @qml.qnode(qml.device("lightning.qubit", wires=1), autograph=False)
-    def circuit_5():
-        # CHECK: module @circuit_5
+    def circuit_6():
+        # CHECK: module @circuit_6
         cond_RX(float, jax.core.ShapedArray((1,), int))
         return qml.probs()
 
@@ -393,7 +424,7 @@ def test_decomposition_rule_with_cond():
     # CHECK:            scf.yield [[QREG]] : !quantum.reg
     # CHECK:      return [[RETVAL]]
 
-    print(circuit_5.mlir)
+    print(circuit_6.mlir)
     qml.capture.disable()
 
 
@@ -420,8 +451,8 @@ def test_decomposition_rule_caller():
 
     @qml.qjit(autograph=False)
     @qml.qnode(qml.device("lightning.qubit", wires=1), autograph=False)
-    # CHECK: module @circuit_6
-    def circuit_6():
+    # CHECK: module @circuit_7
+    def circuit_7():
         # CHECK: [[QREG:%.+]] = quantum.alloc
         # CHECK: quantum.compbasis qreg [[QREG]] : !quantum.obs
         decomps_caller(float, jax.core.ShapedArray((2,), int))
@@ -430,7 +461,7 @@ def test_decomposition_rule_caller():
     # CHECK: func.func private @Op1_decomp(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<2xi64>) -> !quantum.reg
     # CHECK: func.func private @Op2_decomp(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<2xi64>) -> !quantum.reg
 
-    print(circuit_6.mlir)
+    print(circuit_7.mlir)
     qml.capture.disable()
 
 

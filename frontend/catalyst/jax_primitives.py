@@ -312,8 +312,8 @@ quantum_kernel_p = core.CallPrimitive("quantum_kernel")
 quantum_kernel_p.multiple_results = True
 measure_in_basis_p = Primitive("measure_in_basis")
 measure_in_basis_p.multiple_results = True
-decomposition_rule_p = core.Primitive("decomposition_rule")
-decomposition_rule_p.multiple_results = True
+decomprule_p = core.Primitive("decomposition_rule")
+decomprule_p.multiple_results = True
 
 quantum_subroutine_p = copy.deepcopy(pjit_p)
 quantum_subroutine_p.name = "quantum_subroutine_p"
@@ -406,9 +406,7 @@ def decomposition_rule(func=None, *, is_qreg=False, num_params=0):
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         jaxpr = jax.make_jaxpr(func)(*args, **kwargs)
-        decomposition_rule_p.bind(
-            pyfun=func, func_jaxpr=jaxpr, is_qreg=is_qreg, num_params=num_params
-        )
+        decomprule_p.bind(pyfun=func, func_jaxpr=jaxpr, is_qreg=is_qreg, num_params=num_params)
 
     return wrapper
 
@@ -579,7 +577,7 @@ def _func_lowering(ctx, *args, call_jaxpr, fn):
 #
 # Decomp rule
 #
-@decomposition_rule_p.def_abstract_eval
+@decomprule_p.def_abstract_eval
 def _decomposition_rule_abstract(*, pyfun, func_jaxpr, is_qreg=False, num_params=None):
     return ()
 
@@ -2521,7 +2519,7 @@ CUSTOM_LOWERING_RULES = (
     (quantum_kernel_p, _quantum_kernel_lowering),
     (quantum_subroutine_p, subroutine_lowering),
     (measure_in_basis_p, _measure_in_basis_lowering),
-    (decomposition_rule_p, _decomposition_rule_lowering),
+    (decomprule_p, _decomposition_rule_lowering),
 )
 
 
