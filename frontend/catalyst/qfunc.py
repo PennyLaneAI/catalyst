@@ -145,18 +145,17 @@ def _configure_mcm(qnode, args, kwargs):
 
         # Fallback to single-branch-statistics if measurements_from_samples is detected
         if (
-            (uses_measurements_from_samples or uses_measurements_from_counts)
+            (
+                uses_measurements_from_samples
+                or uses_measurements_from_counts
+                or qnode.device.name not in ["lightning.qubit", "default.qubit", "null.qubit"]
+            )
             and user_specified_mcm_method is None
             and mcm_config.mcm_method == "one-shot"
         ):
             mcm_config = replace(mcm_config, mcm_method="single-branch-statistics")
 
         if mcm_config.mcm_method == "one-shot":
-            # Unsupport one-shot for softwareq.qpp
-            if qnode.device.name in ["lightning.qubit", "default.qubit", "null.qubit"]:
-                mcm_config = replace(mcm_config, mcm_method="single-branch-statistics")
-                return None
-
             # If measurements_from_samples while one-shot is used, raise an error
             if uses_measurements_from_samples:
                 raise CompileError("measurements_from_samples is not supported with one-shot")
