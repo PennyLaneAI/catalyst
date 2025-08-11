@@ -252,6 +252,7 @@ def test_dynamic_wires_sample_without_wires(shots, backend, capfd):
     out, _ = capfd.readouterr()
     assert out.count("compiling...") == 3
 
+
 @pytest.mark.xfail(reason="Not support dynamic wires with sample in one-shot mode")
 @pytest.mark.parametrize("shots", [3, (3, 4, 5), (7,) * 3])
 def test_dynamic_wires_sample_without_wires_one_shot(shots, backend, capfd):
@@ -264,7 +265,7 @@ def test_dynamic_wires_sample_without_wires_one_shot(shots, backend, capfd):
         print("compiling...")
         dev = qml.device(backend, wires=num_qubits, shots=shots)
 
-        @qml.qnode(dev, mcm_method='one-shot')
+        @qml.qnode(dev, mcm_method="one-shot")
         def circ():
             @catalyst.for_loop(0, num_qubits, 1)
             def loop_0(i):
@@ -285,6 +286,7 @@ def test_dynamic_wires_sample_without_wires_one_shot(shots, backend, capfd):
 
     out, _ = capfd.readouterr()
     assert out.count("compiling...") == 3
+
 
 def test_dynamic_wires_counts_with_wires(backend, capfd):
     """
@@ -313,6 +315,7 @@ def test_dynamic_wires_counts_with_wires(backend, capfd):
 
     out, _ = capfd.readouterr()
     assert out.count("compiling...") == 1
+
 
 def test_dynamic_wires_counts_without_wires(backend, capfd):
     """
@@ -345,6 +348,7 @@ def test_dynamic_wires_counts_without_wires(backend, capfd):
     out, _ = capfd.readouterr()
     assert out.count("compiling...") == 1
 
+
 @pytest.mark.xfail(reason="Not support dynamic wires with counts in one-shot mode")
 def test_dynamic_wires_counts_without_wires_one_shot(backend, capfd):
     """
@@ -359,7 +363,7 @@ def test_dynamic_wires_counts_without_wires_one_shot(backend, capfd):
         print("compiling...")
         dev = qml.device(backend, wires=num_qubits, shots=1000)
 
-        @qml.qnode(dev, mcm_method='one-shot')
+        @qml.qnode(dev, mcm_method="one-shot")
         def circ():
             qml.RX(0.0, wires=num_qubits - 1)
             return qml.counts()

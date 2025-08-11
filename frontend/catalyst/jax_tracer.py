@@ -208,6 +208,7 @@ PAULI_NAMED_MAP = {
     "Z": "PauliZ",
 }
 
+
 @debug_logger
 def uses_transform(qnode, transform_name, mode: Literal["only_one", "any"] = "any"):
     """
@@ -244,6 +245,7 @@ def uses_transform(qnode, transform_name, mode: Literal["only_one", "any"] = "an
         return has_target_transform and len(transform_funcs) == 1
 
     return has_target_transform
+
 
 @debug_logger
 def retrace_with_result_types(jaxpr: ClosedJaxpr, target_types: List[ShapedArray]) -> ClosedJaxpr:
@@ -1235,12 +1237,11 @@ def apply_transforms(
         # Special case: dynamic_one_shot with classical outputs
         # This is allowed because dynamic_one_shot doesn't modify the semantic of measurements,
         # it just changes how it is executed (via vmap over single shots)
-        is_dynamic_one_shot = (
-            len(qnode_program) and
-            all(hasattr(qnode, "transform") and
-                hasattr(qnode.transform, "__name__") and
-                "dynamic_one_shot_partial" in str(qnode.transform)
-                for qnode in qnode_program)
+        is_dynamic_one_shot = len(qnode_program) and all(
+            hasattr(qnode, "transform")
+            and hasattr(qnode.transform, "__name__")
+            and "dynamic_one_shot_partial" in str(qnode.transform)
+            for qnode in qnode_program
         )
 
         # Allow dynamic_one_shot with classical outputs regardless of measurement changes
@@ -1373,6 +1374,7 @@ def _get_total_shots(qnode):
         shots = shots_value
     return shots
 
+
 def _construct_output_with_classical_values(tape, return_values_flat):
     classical_values = []
     classical_return_indices = []
@@ -1383,6 +1385,7 @@ def _construct_output_with_classical_values(tape, return_values_flat):
             classical_return_indices.append(i)
     output = classical_values + tape.measurements
     return output, classical_return_indices, num_mcm
+
 
 def _setup_device_program(device, qnode, ctx):
     """Set up device and qnode programs for transformation."""
@@ -1412,6 +1415,7 @@ def _setup_quantum_register(device):
 
 def _process_measurement_tracers(meas, trace, snapshot_results, meas_trees):
     """Process measurement tracers and handle snapshots."""
+
     def check_full_raise(arr, func):
         if isinstance(arr, (list, tuple)):
             return type(arr)(check_full_raise(x, func) for x in arr)
@@ -1427,12 +1431,11 @@ def _process_measurement_tracers(meas, trace, snapshot_results, meas_trees):
         meas_trees = jax.tree_util.tree_structure(
             jax.tree_util.tree_unflatten(meas_trees, meas_tracers)
         )
-        meas_trees = jax.tree_util.treedef_tuple(
-            [tree_structure(snapshot_results), meas_trees]
-        )
+        meas_trees = jax.tree_util.treedef_tuple([tree_structure(snapshot_results), meas_trees])
         meas_tracers = snapshot_results + meas_tracers
 
     return meas_tracers, meas_trees
+
 
 @debug_logger
 def trace_quantum_function(
@@ -1527,8 +1530,8 @@ def trace_quantum_function(
                     # TODO: In the future support arbitrary output from the user function.
                     # Currently, only dynamic one-shot is supported.
                     if uses_transform(qnode, "dynamic_one_shot_partial", mode="only_one"):
-                        output, cls_ret_indices, num_mcm = (
-                            _construct_output_with_classical_values(tape, return_values_flat)
+                        output, cls_ret_indices, num_mcm = _construct_output_with_classical_values(
+                            tape, return_values_flat
                         )
                         classical_return_indices.extend(cls_ret_indices)
                     else:

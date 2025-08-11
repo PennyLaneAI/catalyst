@@ -930,6 +930,7 @@ class TestTransform:
         with pytest.raises(
             CompileError, match="measurements_from_samples is not supported with one-shot"
         ):
+
             @qjit
             @partial(measurements_from_samples, device_wires=device.wires)
             @qml.qnode(device=device, mcm_method="one-shot")

@@ -54,6 +54,7 @@ logger.addHandler(logging.NullHandler())
 @dataclass
 class OutputContext:
     """Context containing parameters needed for finalizing quantum function output."""
+
     cpy_tape: any
     snapshots: any
     classical_values: any
@@ -65,6 +66,7 @@ class OutputContext:
 @dataclass
 class MeasurementContext:
     """Context containing parameters needed for measurement processing."""
+
     cpy_tape: any
     aux_tapes: any
     results: any
@@ -258,6 +260,7 @@ class QFunc:
         )
         return tree_unflatten(out_tree_promise(), res_flat)[0]
 
+
 # pylint: disable=protected-access
 def _get_shot_vector(qnode):
     shot_vector = qnode._shots.shot_vector if qnode._shots else []
@@ -266,6 +269,7 @@ def _get_shot_vector(qnode):
         if len(shot_vector) > 1 or any(copies > 1 for _, copies in shot_vector)
         else None
     )
+
 
 def _get_snapshot_results(tape, out):
     """
@@ -290,11 +294,12 @@ def _get_snapshot_results(tape, out):
 
     # Take first shot for each snapshot
     processed_snapshots = [
-        snapshot[0] if hasattr(snapshot, 'shape') and len(snapshot.shape) > 1 else snapshot
+        snapshot[0] if hasattr(snapshot, "shape") and len(snapshot.shape) > 1 else snapshot
         for snapshot in snapshot_results
     ]
 
     return processed_snapshots, measurement_results
+
 
 def _reshape_for_shot_vector(result, shot_vector):
     # Calculate the shape for reshaping based on shot vector
@@ -302,7 +307,7 @@ def _reshape_for_shot_vector(result, shot_vector):
     start_idx = 0
     for shot, copies in shot_vector:
         # Reshape this segment to (copies, shot, n_wires)
-        segment = result[start_idx:start_idx + shot * copies]
+        segment = result[start_idx : start_idx + shot * copies]
         if copies > 1:
             segment_shape = (copies, shot, result.shape[-1])
             segment = jnp.reshape(segment, segment_shape)
@@ -312,6 +317,7 @@ def _reshape_for_shot_vector(result, shot_vector):
         start_idx += shot * copies
     result = tuple(result_list)
     return result
+
 
 def _reconstruct_output_with_classical_values(
     measurement_results, classical_values, classical_return_indices
@@ -336,15 +342,12 @@ def _reconstruct_output_with_classical_values(
     measurement_iter = iter(measurement_results)
 
     def get_next_value(idx):
-        return (
-            next(classical_iter)
-            if idx in classical_return_indices
-            else next(measurement_iter)
-        )
+        return next(classical_iter) if idx in classical_return_indices else next(measurement_iter)
 
     results = [get_next_value(i) for i in range(total_expected)]
 
     return results
+
 
 def _extract_classical_and_measurement_results(results, classical_return_indices):
     """
@@ -355,6 +358,7 @@ def _extract_classical_and_measurement_results(results, classical_return_indices
     classical_values = results[:num_classical_return_indices]
     measurement_results = results[num_classical_return_indices:]
     return classical_values, list(measurement_results)
+
 
 def _process_counts_measurement(out, idx, has_snapshots):
     """Process CountsMP measurement and return the result and updated index."""
@@ -377,6 +381,7 @@ def _process_counts_measurement(out, idx, has_snapshots):
 
     return counts_result, idx
 
+
 def _process_regular_measurement(m, out, idx, shot_vector):
     """Process measurements and return the result."""
     result = jnp.squeeze(out[idx])
@@ -386,15 +391,14 @@ def _process_regular_measurement(m, out, idx, shot_vector):
 
     # Without MCMs and postselection, all samples are valid for use in MP computation.
     is_valid = jnp.full((result.shape[0],), True)
-    processed_result = gather_non_mcm(
-        m, result, is_valid, postselect_mode="pad-invalid-samples"
-    )
+    processed_result = gather_non_mcm(m, result, is_valid, postselect_mode="pad-invalid-samples")
 
     # Handle shot vector reshaping for SampleMP
     if isinstance(m, SampleMP) and shot_vector is not None:
         processed_result = _reshape_for_shot_vector(processed_result, shot_vector)
 
     return processed_result
+
 
 def _process_measurements_without_mcm(cpy_tape, out, snapshots, shot_vector):
     """Process measurements when there are no mid-circuit measurements."""
@@ -413,6 +417,7 @@ def _process_measurements_without_mcm(cpy_tape, out, snapshots, shot_vector):
 
     return tuple(new_out)
 
+
 def _handle_measurements(out, ctx: MeasurementContext):
     """
     Handle measurement results
@@ -428,15 +433,14 @@ def _handle_measurements(out, ctx: MeasurementContext):
         if len(ctx.cpy_tape.measurements) == 1:
             out = (out,)
     elif len(ctx.cpy_tape.measurements) > 0:
-        out = _process_measurements_without_mcm(
-            ctx.cpy_tape, out, ctx.snapshots, ctx.shot_vector
-        )
+        out = _process_measurements_without_mcm(ctx.cpy_tape, out, ctx.snapshots, ctx.shot_vector)
 
         # If snapshots were present, combine them with measurements results
         if ctx.snapshots is not None:
             out = (ctx.snapshots, out)
 
     return out
+
 
 def _finalize_output(out, ctx: OutputContext):
     """
@@ -464,6 +468,7 @@ def _finalize_output(out, ctx: OutputContext):
         out = tree_unflatten(ctx.out_tree_expected[0], out)
 
     return out
+
 
 # pylint: disable=protected-access,no-member,not-callable
 def dynamic_one_shot(qnode, **kwargs):
@@ -599,7 +604,6 @@ def dynamic_one_shot(qnode, **kwargs):
             results = results[0]
 
         return results
-
 
     def one_shot_wrapper(*args, **kwargs):
         # Execute shots and get results
