@@ -423,7 +423,7 @@ def _handle_measurements(out, ctx: MeasurementContext):
     """
     if ctx.has_mcm and len(ctx.cpy_tape.measurements) > 0:
         out = parse_native_mid_circuit_measurements(
-            ctx.cpy_tape, ctx.aux_tapes, ctx.results, postselect_mode="pad-invalid-samples"
+            ctx.cpy_tape, results=ctx.results, postselect_mode="pad-invalid-samples"
         )
         if len(ctx.cpy_tape.measurements) == 1:
             out = (out,)
