@@ -1373,6 +1373,16 @@ def _get_total_shots(qnode):
         shots = shots_value
     return shots
 
+def _construct_output_with_classical_values(tape, return_values_flat):
+    classical_values = []
+    classical_return_indices = []
+    num_mcm = sum(1 for _ in tape.measurements if isinstance(_, MidMeasureMP))
+    for i, value in enumerate(return_values_flat):
+        if not isinstance(value, qml.measurements.MeasurementProcess):
+            classical_values.append(value)
+            classical_return_indices.append(i)
+    output = classical_values + tape.measurements
+    return output, classical_return_indices, num_mcm
 
 @debug_logger
 def trace_quantum_function(
@@ -1482,13 +1492,10 @@ def trace_quantum_function(
                     # TODO: In the future support arbitrary output from the user function.
                     # Currently, only dynamic one-shot is supported.
                     if uses_transform(qnode, "dynamic_one_shot_partial", mode="only_one"):
-                        classical_values = []
-                        num_mcm = sum(1 for _ in tape.measurements if isinstance(_, MidMeasureMP))
-                        for i, value in enumerate(return_values_flat):
-                            if not isinstance(value, qml.measurements.MeasurementProcess):
-                                classical_values.append(value)
-                                classical_return_indices.append(i)
-                        output = classical_values + tape.measurements
+                        output, cls_ret_indices, num_mcm = (
+                            _construct_output_with_classical_values(tape, return_values_flat)
+                        )
+                        classical_return_indices.extend(cls_ret_indices)
                     else:
                         output = tape.measurements
                     _, trees = jax.tree_util.tree_flatten(output, is_leaf=is_leaf)
