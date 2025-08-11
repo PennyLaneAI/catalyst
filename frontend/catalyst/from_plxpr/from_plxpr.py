@@ -44,7 +44,7 @@ from pennylane.transforms import single_qubit_fusion as pl_single_qubit_fusion
 from pennylane.transforms import unitary_to_rot as pl_unitary_to_rot
 
 from catalyst.device import extract_backend_info
-from catalyst.from_plxpr.qreg_manager import QbitManager, QregManager
+from catalyst.from_plxpr.qreg_manager import QubitValueMap, QregManager
 from catalyst.jax_extras import jaxpr_pad_consts, make_jaxpr2, transient_jax_config
 from catalyst.jax_primitives import (
     AbstractQbit,
@@ -529,7 +529,7 @@ def handle_decomposition_rule(self, *, pyfun, func_jaxpr, is_qreg, num_params):
     else:
 
         def wrapper(*args):
-            manager = QbitManager(args[num_params:])
+            manager = QubitValueMap(args[num_params:])
             converter = copy(self)
             converter.qreg_manager = manager
             converter(func_jaxpr, *args)
