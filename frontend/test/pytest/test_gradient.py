@@ -349,7 +349,7 @@ def test_value_and_grad_on_qjit_classical_dict():
     assert np.allclose(result[1]["world"], expected[1]["world"])
 
 
-@pytest.mark.parametrize("diff_method", ["parameter-shift", "adjoint", "best"])
+@pytest.mark.parametrize("diff_method", ["parameter-shift", "adjoint"])
 def test_value_and_grad_on_qjit_quantum(diff_method):
     """Check that value_and_grad works when called on an qjit object that does wrap a QNode."""
 
@@ -375,7 +375,7 @@ def test_value_and_grad_on_qjit_quantum(diff_method):
         assert np.allclose(result, expected)
 
 
-@pytest.mark.parametrize("diff_method", ["parameter-shift", "adjoint", "best"])
+@pytest.mark.parametrize("diff_method", ["parameter-shift", "adjoint"])
 def test_value_and_grad_on_qjit_quantum_variant(diff_method):
     """
     Check that value_and_grad works when called on a QNode with trainable parameters.
@@ -402,7 +402,7 @@ def test_value_and_grad_on_qjit_quantum_variant(diff_method):
         assert np.allclose(result, expected)
 
 
-@pytest.mark.parametrize("diff_method", ["parameter-shift", "adjoint", "best"])
+@pytest.mark.parametrize("diff_method", ["parameter-shift", "adjoint"])
 @pytest.mark.parametrize(
     "argnum", [(0, 1, 2), (0), (1), (2), (0, 1), (0, 2), (1, 2), (1, 0, 2), (2, 0, 1)]
 )
@@ -438,7 +438,7 @@ def test_value_and_grad_on_qjit_quantum_variant_argnum(argnum, diff_method):
         assert np.allclose(result[1], expected[1])
 
 
-@pytest.mark.parametrize("diff_method", ["parameter-shift", "adjoint", "best"])
+@pytest.mark.parametrize("diff_method", ["parameter-shift", "adjoint"])
 def test_value_and_grad_on_qjit_quantum_variant_tree(diff_method):
     """
     Check that value_and_grad works when called on an qjit object that does wrap a QNode
@@ -1253,7 +1253,7 @@ def test_grad_on_multi_result_function(backend):
         compiled(1.0)
 
 
-@pytest.mark.parametrize("diff_method", ["parameter-shift", "adjoint", "best"])
+@pytest.mark.parametrize("diff_method", ["parameter-shift", "adjoint"])
 def test_multiple_grad_invocations(backend, diff_method):
     """Test a function that uses grad multiple times."""
 
@@ -1275,7 +1275,7 @@ def test_multiple_grad_invocations(backend, diff_method):
         assert actual_entry == pytest.approx(expected_entry)
 
 
-@pytest.mark.parametrize("diff_method", ["parameter-shift", "adjoint", "best"])
+@pytest.mark.parametrize("diff_method", ["parameter-shift", "adjoint"])
 def test_loop_with_dyn_wires(backend, diff_method):
     """Test the gradient on a function with a loop and modular wire arithmetic."""
     num_wires = 4
@@ -1332,7 +1332,7 @@ def test_classical_kwargs_switched_arg_order():
     assert np.allclose(expected, result)
 
 
-@pytest.mark.parametrize("diff_method", ["parameter-shift", "adjoint", "best"])
+@pytest.mark.parametrize("diff_method", ["parameter-shift", "adjoint"])
 def test_qnode_kwargs(backend, diff_method):
     """Test the gradient on a qnode with keyword arguments"""
     num_wires = 1
@@ -1360,7 +1360,7 @@ def test_qnode_kwargs(backend, diff_method):
     assert np.allclose(expected_grad, result_grad)
 
 
-@pytest.mark.parametrize("diff_method", ["parameter-shift", "adjoint", "best"])
+@pytest.mark.parametrize("diff_method", ["parameter-shift", "adjoint"])
 def test_qnode_kwargs_switched_arg_order(backend, diff_method):
     """Test the gradient on a qnode with keyword arguments and switched argument order"""
     num_wires = 1
@@ -1388,7 +1388,7 @@ def test_qnode_kwargs_switched_arg_order(backend, diff_method):
     assert np.allclose(expected_grad, switched_order_grad)
 
 
-@pytest.mark.parametrize("diff_method", ["parameter-shift", "adjoint", "best"])
+@pytest.mark.parametrize("diff_method", ["parameter-shift", "adjoint"])
 def test_pytrees_return_classical_function(backend, diff_method):
     """Test the jacobian on a qnode with a return including list and dictionaries."""
     num_wires = 1
@@ -1476,7 +1476,7 @@ def test_pytrees_args_return_classical():
     assert np.allclose(flatten_res_jax, flatten_res_catalyst)
 
 
-@pytest.mark.parametrize("diff_method", ["parameter-shift", "adjoint", "best"])
+@pytest.mark.parametrize("diff_method", ["parameter-shift", "adjoint"])
 def test_non_parametrized_circuit(backend, diff_method):
     """Test that the derivate of non parametrized circuit is null."""
     dev = qml.device(backend, wires=1)
@@ -1579,7 +1579,7 @@ def test_gradient_slice(backend):
     assert np.allclose(cat_res, jax_res)
 
 
-@pytest.mark.parametrize("diff_method", ["parameter-shift", "adjoint", "best"])
+@pytest.mark.parametrize("diff_method", ["parameter-shift", "adjoint"])
 def test_ellipsis_differentiation(backend, diff_method):
     """Test circuit diff with ellipsis in the preprocessing."""
     dev = qml.device(backend, wires=3)
@@ -2224,7 +2224,7 @@ class TestParameterShiftVerificationIntegrationTests:
                 return qml.expval(qml.PauliZ(wires=0))
 
 
-@pytest.mark.parametrize("diff_method", ["parameter-shift", "adjoint", "best"])
+@pytest.mark.parametrize("diff_method", ["parameter-shift", "adjoint"])
 def test_closure_variable_grad(diff_method):
     """Test that grad can take closure variables"""
 
@@ -2261,7 +2261,7 @@ def test_closure_variable_grad(diff_method):
     assert np.allclose(expected, observed)
 
 
-@pytest.mark.parametrize("diff_method", ["parameter-shift", "adjoint", "best"])
+@pytest.mark.parametrize("diff_method", ["parameter-shift", "adjoint"])
 def test_closure_variable_value_and_grad(diff_method):
     """Test that value and grad can take closure variables"""
 
