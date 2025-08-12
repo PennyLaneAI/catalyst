@@ -64,7 +64,9 @@ struct DetensorizeCallSitePattern : public OpRewritePattern<func::CallOp> {
             return failure();
         }
 
-        // Skip for QNodes (for gradients boundaries)
+        // Skip for QNodes
+        // Some Gradient boundaries only work for Tensor signatures
+        // and not scalar ones, hence we skip them here.
         if (funcOp->hasAttr("qnode")) {
             return failure();
         }
@@ -122,45 +124,6 @@ struct DetensorizeCallSitePattern : public OpRewritePattern<func::CallOp> {
         }
     }
 
-    void replaceCallOp(PatternRewriter &rewriter, func::CallOp &callOp,
-                       func::FuncOp &newFuncOp) const
-    {
-        rewriter.setInsertionPoint(callOp);
-        SmallVector<Value> newOperands;
-        for (Value operand : callOp.getOperands()) {
-            // Insert ExtractOp if the old operand is a scalar tensor to bridge the detensorized
-            // function
-            if (isScalarTensor(operand.getType())) {
-                auto extractOp =
-                    rewriter.create<tensor::ExtractOp>(callOp.getLoc(), operand, ValueRange{});
-                newOperands.push_back(extractOp.getResult());
-            }
-            else {
-                newOperands.push_back(operand);
-            }
-        }
-
-        auto newCallOp = rewriter.create<func::CallOp>(callOp.getLoc(), newFuncOp, newOperands);
-
-        SmallVector<Value> newResults;
-        for (size_t i = 0; i < callOp.getNumResults(); ++i) {
-            Value oldResult = callOp.getResult(i);
-            Value newResult = newCallOp.getResult(i);
-            if (isScalarTensor(oldResult.getType())) {
-                // Insert a FromElementsOp if the old result is a scalar tensor to bridge the
-                // detensorized function
-                auto fromElementsOp = rewriter.create<tensor::FromElementsOp>(
-                    callOp.getLoc(), oldResult.getType(), newResult);
-                newResults.push_back(fromElementsOp.getResult());
-            }
-            else {
-                newResults.push_back(newResult);
-            }
-        }
-
-        rewriter.replaceOp(callOp, newResults);
-    }
-
     void mapFuncOpBodyAndReturnOp(PatternRewriter &rewriter, Block *newEntryBlock,
                                   func::FuncOp &funcOp, IRMapping &mapper) const
     {
@@ -203,6 +166,45 @@ struct DetensorizeCallSitePattern : public OpRewritePattern<func::CallOp> {
             }
         }
         rewriter.create<func::ReturnOp>(oldReturnOp.getLoc(), newReturnOperands);
+    }
+
+    void replaceCallOp(PatternRewriter &rewriter, func::CallOp &callOp,
+                       func::FuncOp &newFuncOp) const
+    {
+        rewriter.setInsertionPoint(callOp);
+        SmallVector<Value> newOperands;
+        for (Value operand : callOp.getOperands()) {
+            // Insert ExtractOp if the old operand is a scalar tensor to bridge the detensorized
+            // function
+            if (isScalarTensor(operand.getType())) {
+                auto extractOp =
+                    rewriter.create<tensor::ExtractOp>(callOp.getLoc(), operand, ValueRange{});
+                newOperands.push_back(extractOp.getResult());
+            }
+            else {
+                newOperands.push_back(operand);
+            }
+        }
+
+        auto newCallOp = rewriter.create<func::CallOp>(callOp.getLoc(), newFuncOp, newOperands);
+
+        SmallVector<Value> newResults;
+        for (size_t i = 0; i < callOp.getNumResults(); ++i) {
+            Value oldResult = callOp.getResult(i);
+            Value newResult = newCallOp.getResult(i);
+            if (isScalarTensor(oldResult.getType())) {
+                // Insert a FromElementsOp if the old result is a scalar tensor to bridge the
+                // detensorized function
+                auto fromElementsOp = rewriter.create<tensor::FromElementsOp>(
+                    callOp.getLoc(), oldResult.getType(), newResult);
+                newResults.push_back(fromElementsOp.getResult());
+            }
+            else {
+                newResults.push_back(newResult);
+            }
+        }
+
+        rewriter.replaceOp(callOp, newResults);
     }
 };
 } // namespace
