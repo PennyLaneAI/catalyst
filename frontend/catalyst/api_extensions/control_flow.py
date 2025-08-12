@@ -57,10 +57,10 @@ from catalyst.jax_extras import (
 from catalyst.jax_extras.patches import _drop_unused_vars2
 from catalyst.jax_primitives import AbstractQreg, cond_p, for_p, while_p
 from catalyst.jax_tracer import (
-    _promote_jaxpr_types,
     HybridOp,
     HybridOpRegion,
     QRegPromise,
+    _promote_jaxpr_types,
     trace_function,
     trace_quantum_operations,
     unify_convert_result_types,
