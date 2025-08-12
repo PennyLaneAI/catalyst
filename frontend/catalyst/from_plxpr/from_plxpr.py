@@ -184,6 +184,8 @@ class WorkflowInterpreter(PlxprInterpreter):
 
 def _decompose_jaxpr_to_gateset(qfunc_jaxpr, consts, device):
     gate_set = set(get_device_capabilities(device).operations)
+    if get_device_capabilities(device).initial_state_prep:
+        gate_set.add("StatePrep")
     targs = ()
     tkwargs = {"gate_set": gate_set}
     return qml.transforms.decompose.plxpr_transform(qfunc_jaxpr, consts, targs, tkwargs)
