@@ -777,7 +777,8 @@ void __catalyst__qis__PSWAP(double phi, QUBIT *wire0, QUBIT *wire1, const Modifi
         MODIFIERS_ARGS(modifiers));
 }
 
-void __catalyst__qis__SingleExcitation(double phi, QUBIT *wire0, QUBIT *wire1, const Modifiers *modifiers)
+void __catalyst__qis__SingleExcitation(double phi, QUBIT *wire0, QUBIT *wire1,
+                                       const Modifiers *modifiers)
 {
     getQuantumDevicePtr()->NamedOperation(
         "SingleExcitation", {phi},

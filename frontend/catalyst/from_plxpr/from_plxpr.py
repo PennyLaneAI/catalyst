@@ -190,6 +190,7 @@ def _decompose_jaxpr_to_gateset(qfunc_jaxpr, consts, device):
     tkwargs = {"gate_set": gate_set}
     return qml.transforms.decompose.plxpr_transform(qfunc_jaxpr, consts, targs, tkwargs)
 
+
 # pylint: disable=unused-argument, too-many-arguments
 @WorkflowInterpreter.register_primitive(qnode_prim)
 def handle_qnode(
