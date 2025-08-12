@@ -30,6 +30,7 @@ from catalyst.from_plxpr.qreg_manager import QregManager
 from catalyst.jax_extras import jaxpr_pad_consts
 from catalyst.jax_primitives import cond_p, for_p, while_p
 
+
 def _calling_convention(interpreter, closed_jaxpr, *args_plus_qreg):
     *args, qreg = args_plus_qreg
     # `qreg` is the scope argument for the body jaxpr
@@ -40,6 +41,7 @@ def _calling_convention(interpreter, closed_jaxpr, *args_plus_qreg):
     retvals = converter(closed_jaxpr, *args)
     qreg_manager.insert_all_dangling_qubits()
     return *retvals, converter.qreg_manager.get()
+
 
 def _to_bool_if_not(arg):
     if getattr(arg, "dtype", None) == jax.numpy.bool:
@@ -69,7 +71,7 @@ def _(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
 
         converted_jaxpr_branches.append(new_jaxpr.jaxpr)
 
-    predicate = [_to_bool_if_not(p) for p in plxpr_invals[:len(jaxpr_branches)-1]]
+    predicate = [_to_bool_if_not(p) for p in plxpr_invals[: len(jaxpr_branches) - 1]]
 
     # Build Catalyst compatible input values
     cond_invals = [*predicate, *all_consts, *args]
@@ -79,8 +81,6 @@ def _(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
         branch_jaxprs=jaxpr_pad_consts(converted_jaxpr_branches),
         nimplicit_outputs=0,
     )
-
-
 
 
 @PLxPRToQuantumJaxprInterpreter.register_primitive(plxpr_cond_prim)
@@ -113,7 +113,7 @@ def handle_cond(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
 
         converted_jaxpr_branches.append(converted_jaxpr_branch)
 
-    predicate = [_to_bool_if_not(p) for p in plxpr_invals[:len(jaxpr_branches)-1]]
+    predicate = [_to_bool_if_not(p) for p in plxpr_invals[: len(jaxpr_branches) - 1]]
 
     # Build Catalyst compatible input values
     cond_invals = [*predicate, *all_consts, *args_plus_qreg]
@@ -131,6 +131,7 @@ def handle_cond(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
 
     # Return only the output values that match the plxpr output values
     return outvals
+
 
 # pylint: disable=unused-argument, too-many-arguments
 @WorkflowInterpreter.register_primitive(plxpr_for_loop_prim)

@@ -20,17 +20,20 @@ import pennylane as qml
 import pytest
 from pennylane import cond
 
-from catalyst import api_extensions, qjit
+from catalyst import api_extensions
 from catalyst import measure as catalyst_measure
+from catalyst import qjit
 from catalyst.utils.exceptions import PlxprCaptureCFCompatibilityError
 
 # pylint: disable=missing-function-docstring
 pytestmark = pytest.mark.usefixtures("use_both_frontend")
 
+
 def measure(*args, **kwargs):
     if qml.capture.enabled():
         return qml.measure(*args, **kwargs)
     return catalyst_measure(*args, **kwargs)
+
 
 class TestCondToJaxpr:
     """Run tests on the generated JAXPR of conditionals."""
@@ -213,7 +216,8 @@ class TestCond:
         """
 
         if qml.capture.enabled():
-            pytest.xfail("We forgot about this case and will fix it in pl-core.") #[sc-97385]
+            pytest.xfail("We forgot about this case and will fix it in pl-core.")  # [sc-97385]
+
         def circuit():
             @cond(True)
             def cond_fn():
@@ -244,7 +248,9 @@ class TestCond:
             return cond_fn()
 
         if qml.capture.enabled():
-            with pytest.raises(ValueError, match="false branch must be provided if the true branch"):
+            with pytest.raises(
+                ValueError, match="false branch must be provided if the true branch"
+            ):
                 qjit(qml.qnode(qml.device(backend, wires=1), autograph=False)(circuit))
         else:
 
@@ -342,7 +348,7 @@ class TestCond:
         """Test that unification happens before the results of the cond primitve is available."""
 
         if qml.capture.enabled():
-            pytest.xfail("capture requires same dtype across all branches") # [sc-97050]
+            pytest.xfail("capture requires same dtype across all branches")  # [sc-97050]
 
         @qjit
         def circuit():
@@ -704,7 +710,11 @@ class TestClassicalCompilation:
 
             return branch()
 
-        match = "missing 1 required positional argument" if qml.capture.enabled() else "Conditional 'True'"
+        match = (
+            "missing 1 required positional argument"
+            if qml.capture.enabled()
+            else "Conditional 'True'"
+        )
         with pytest.raises(TypeError, match=match):
             qjit(arithc2)
 
@@ -719,7 +729,11 @@ class TestClassicalCompilation:
 
             return branch()  # pylint: disable=no-value-for-parameter
 
-        match = "missing 1 required positional argument" if qml.capture.enabled() else "Conditional 'False'"
+        match = (
+            "missing 1 required positional argument"
+            if qml.capture.enabled()
+            else "Conditional 'False'"
+        )
         with pytest.raises(TypeError, match=match):
             qjit(arithc1)
 
