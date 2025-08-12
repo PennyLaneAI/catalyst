@@ -57,6 +57,7 @@ from catalyst.jax_extras import (
 from catalyst.jax_extras.patches import _drop_unused_vars2
 from catalyst.jax_primitives import AbstractQreg, cond_p, for_p, while_p
 from catalyst.jax_tracer import (
+    _promote_jaxpr_types,
     HybridOp,
     HybridOpRegion,
     QRegPromise,
@@ -774,18 +775,19 @@ class CondCallable:
         out_tree = out_sigs[-1].out_tree()
         all_consts = [s.out_consts() for s in out_sigs]
         out_types = [s.out_type() for s in out_sigs]
-        # FIXME: We want to perform the result unificaiton here:
-        # all_jaxprs = [s.out_initial_jaxpr() for s in out_sigs]
-        # all_noimplouts = [s.num_implicit_outputs() for s in out_sigs]
-        # _, out_type, _, all_consts = unify_convert_result_types(
-        #     all_jaxprs, all_consts, all_noimplouts
-        # )
-        # Unfortunately, we can not do this beacuse some tracers (specifically, the results of
-        # ``qml.measure``) might not have their source Jaxpr equation yet. Thus, we delay the
-        # unification until the quantum tracing is done. The consequence of that: we have to guess
-        # the output type now and if we fail to do so, we might face MLIR type error down the
-        # pipeline.
+
+        # Update the output types of all branches to the same dtype
         out_type = out_types[-1]
+        branch_avals = [[aval for aval, _ in branch_out_type] for branch_out_type in out_types]
+        promoted_dtypes = _promote_jaxpr_types(branch_avals)
+        out_type = next(
+            (
+                out_types[i]
+                for i, promoted_dtype in enumerate(promoted_dtypes)
+                if out_types[0][i][0].dtype == promoted_dtype
+            ),
+            out_types[-1],
+        )
 
         # Create output tracers in the outer tracing context
         out_expanded_classical_tracers = output_type_to_tracers(
