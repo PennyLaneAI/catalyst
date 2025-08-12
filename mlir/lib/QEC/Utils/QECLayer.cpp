@@ -69,34 +69,41 @@ Operation *QECLayer::getParentLayer()
     return ops.back()->getParentOp();
 }
 
-void QECLayer::setEntryQubitsFrom(QECOpInterface op)
+void QECLayer::computeAndCacheEntryQubitsForOp(QECOpInterface op)
 {
-    assert(context != nullptr && "QECLayerContext cannot be null");
     std::vector<Value> entryQubits;
+    entryQubits.reserve(op.getInQubits().size());
 
     for (auto [inQubit, outQubit] : llvm::zip(op.getInQubits(), op.getOutQubits())) {
-        if (context->qubitValueToEntry.contains(inQubit)) {
-            Value entry = context->qubitValueToEntry[inQubit];
-            entryQubits.push_back(entry);
-            context->qubitValueToEntry[outQubit] = entry;
+        // Resolve entry for inQubit within this layer
+        Value entry;
+        if (localQubitToEntry.contains(inQubit)) {
+            entry = localQubitToEntry[inQubit];
         }
         else {
-            context->qubitValueToEntry[outQubit] = inQubit;
-            entryQubits.push_back(inQubit);
+            // If inQubit is a region argument of this layer, it is the entry;
+            // otherwise, if it is produced by a previous op in this layer,
+            // we should have mapped its defining value to an entry already.
+            // Fallback: use inQubit itself.
+            entry = inQubit;
         }
+
+        entryQubits.push_back(entry);
+        // Propagate the entry to the result value inside this layer
+        localQubitToEntry[outQubit] = entry;
     }
-    context->opToEntryQubits[op] = entryQubits;
+
+    localOpToEntryQubits[op] = std::move(entryQubits);
 }
 
 std::vector<Value> QECLayer::getEntryQubitsFrom(QECOpInterface op)
 {
-    assert(context != nullptr && "QECLayerContext cannot be null");
-    if (context->opToEntryQubits.contains(op)) {
-        return context->opToEntryQubits[op];
+    if (localOpToEntryQubits.contains(op)) {
+        return localOpToEntryQubits[op];
     }
 
-    setEntryQubitsFrom(op);
-    return context->opToEntryQubits[op];
+    computeAndCacheEntryQubitsForOp(op);
+    return localOpToEntryQubits[op];
 }
 
 bool QECLayer::actOnDisjointQubits(QECOpInterface op)

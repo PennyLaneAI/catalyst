@@ -18,6 +18,7 @@
 #include "mlir/IR/Value.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SetVector.h"
 
 #include "QEC/IR/QECDialect.h"
@@ -33,16 +34,9 @@ class QECLayer;
 class QECLayerContext {
   public:
     llvm::MapVector<LayerOp, std::unique_ptr<QECLayer>> layers;
-    // Map current qubit SSA value to its canonical entry/origin qubit value
-    llvm::MapVector<mlir::Value, mlir::Value> qubitValueToEntry;
-    // Cache per-op canonical entry qubits in operand order
-    llvm::MapVector<mlir::Operation *, std::vector<mlir::Value>> opToEntryQubits;
 
-    void clear()
-    {
-        qubitValueToEntry.clear();
-        opToEntryQubits.clear();
-    }
+    // Clear all per-pass cached layer objects.
+    void clear() { layers.clear(); }
 
     QECLayerContext() = default;
     ~QECLayerContext() = default;
@@ -64,6 +58,15 @@ class QECLayer {
     // Cached canonical entry qubit set for the layer
     llvm::DenseSet<mlir::Value> layerEntryQubits;
 
+    // Per-layer deterministic mapping from any seen qubit value to its
+    // canonical entry (the region argument it originated from in this layer)
+    llvm::DenseMap<mlir::Value, mlir::Value> localQubitToEntry;
+    // Cache per-op entry qubits in operand order for this layer only
+    llvm::DenseMap<mlir::Operation *, std::vector<mlir::Value>> localOpToEntryQubits;
+
+    // Compute and cache entry qubits for an op using only per-layer state
+    void computeAndCacheEntryQubitsForOp(QECOpInterface op);
+
     void insertToLayer(QECOpInterface op);
     void updateResultAndOperand(QECOpInterface op);
 
@@ -74,10 +77,10 @@ class QECLayer {
     LayerOp layerOp;
 
     QECLayer(QECLayerContext *ctx) : context(ctx) {}
-    QECLayer(QECLayerContext *ctx, std::vector<QECOpInterface> ops) : context(ctx), ops(ops)
+    QECLayer(QECLayerContext *ctx, const std::vector<QECOpInterface> &initialOps) : context(ctx)
     {
         // Initialize the cached index set for existing ops
-        for (auto op : ops) {
+        for (auto op : initialOps) {
             insertToLayer(op);
         }
     }
@@ -88,7 +91,7 @@ class QECLayer {
         this->layerOp = layerOp;
     }
 
-    static QECLayer build(QECLayerContext *ctx, LayerOp layerOp)
+    static QECLayer &build(QECLayerContext *ctx, LayerOp layerOp)
     {
         if (ctx->layers.contains(layerOp)) {
             return *ctx->layers[layerOp];
@@ -112,7 +115,6 @@ class QECLayer {
     mlir::Operation *getParentLayer();
 
     std::vector<mlir::Value> getEntryQubitsFrom(QECOpInterface op);
-    void setEntryQubitsFrom(QECOpInterface op);
 
     bool actOnDisjointQubits(QECOpInterface op);
 
