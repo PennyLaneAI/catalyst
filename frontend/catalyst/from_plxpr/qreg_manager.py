@@ -279,7 +279,7 @@ class QubitValueMap:
         if index in self.wire_map:
             return self.wire_map[index]
 
-        assert False, f"Unknown Qubit index {index}"
+        raise KeyError(f"Unknown Qubit index {index}")
 
     def __setitem__(self, index: int, qubit: AbstractQbit):
         """
