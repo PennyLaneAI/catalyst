@@ -776,7 +776,7 @@ class CondCallable:
         all_consts = [s.out_consts() for s in out_sigs]
         out_types = [s.out_type() for s in out_sigs]
 
-        # Update the output types of all branches to the same dtype
+        # Select the output type of the one with the promoted dtype among all branches
         out_type = out_types[-1]
         branch_avals = [[aval for aval, _ in branch_out_type] for branch_out_type in out_types]
         promoted_dtypes = _promote_jaxpr_types(branch_avals)
