@@ -1,4 +1,4 @@
-#define DEBUG_TYPE "myhelloworld"
+#define DEBUG_TYPE "detensorize-scf"
 
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"

@@ -4,6 +4,9 @@
 
 <h3>Improvements 🛠</h3>
 
+* Added `detensorizefunctionboundary` pass to remove scalar tensors across function boundaries and enabled `symbol-dce` pass to remove dead functions, reducing the number of instructions for compilation.
+  [(#1904)](https://github.com/PennyLaneAI/catalyst/pull/1904)
+
 * Workflows `for_loop`, `while_loop` and `cond` now error out if `qml.capture` is enabled.
   [(#1945)](https://github.com/PennyLaneAI/catalyst/pull/1945)
 
@@ -27,6 +30,9 @@
   ```pycon
   %0 = transform.apply_registered_pass "some-pass" with options = {"an-option" = true, "maxValue" = 1 : i64, "multi-word-option" = 1 : i64}
   ```
+
+*  `Commuting Clifford Pauli Product Rotation (PPR) operations, past non-Clifford PPRs, now supports P(π/2) Cliffords in addition to P(π/4)`
+   [(#1966)](https://github.com/PennyLaneAI/catalyst/pull/1966)
 
 <h3>Breaking changes 💔</h3>
 
