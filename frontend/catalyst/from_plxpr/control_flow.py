@@ -41,6 +41,12 @@ def _calling_convention(interpreter, closed_jaxpr, *args_plus_qreg):
     qreg_manager.insert_all_dangling_qubits()
     return *retvals, converter.qreg_manager.get()
 
+def _to_bool_if_not(arg):
+    if getattr(arg, "dtype", None) == jax.numpy.bool:
+        return arg
+    return jax.numpy.bool(arg)
+
+
 @WorkflowInterpreter.register_primitive(plxpr_cond_prim)
 def _(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
     """Handle the conversion from plxpr to Catalyst jaxpr for the cond primitive"""
@@ -63,7 +69,7 @@ def _(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
 
         converted_jaxpr_branches.append(new_jaxpr.jaxpr)
 
-    predicate = [jax.numpy.bool(p) for p in plxpr_invals[:len(jaxpr_branches)-1]]
+    predicate = [_to_bool_if_not(p) for p in plxpr_invals[:len(jaxpr_branches)-1]]
 
     # Build Catalyst compatible input values
     cond_invals = [*predicate, *all_consts, *args]
@@ -107,7 +113,7 @@ def handle_cond(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
 
         converted_jaxpr_branches.append(converted_jaxpr_branch)
 
-    predicate = [jax.numpy.bool(p) for p in plxpr_invals[:len(jaxpr_branches)-1]]
+    predicate = [_to_bool_if_not(p) for p in plxpr_invals[:len(jaxpr_branches)-1]]
 
     # Build Catalyst compatible input values
     cond_invals = [*predicate, *all_consts, *args_plus_qreg]
