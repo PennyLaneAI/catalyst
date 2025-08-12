@@ -79,13 +79,14 @@
   [(#1932)](https://github.com/PennyLaneAI/catalyst/pull/1932)
 
 * `from_plxpr` now supports adjoint and ctrl operations and transforms, operator
-  arithemtic observables, `Hermitian` observables, `for_loop` outside qnodes,
-  and `while_loop` outside QNode's.
+  arithmetic observables, `Hermitian` observables, `for_loop` outside qnodes, `cond` outside qnodes,
+  `while_loop` outside QNode's, and `cond` with elif branches.
   [(#1844)](https://github.com/PennyLaneAI/catalyst/pull/1844)
   [(#1850)](https://github.com/PennyLaneAI/catalyst/pull/1850)
   [(#1903)](https://github.com/PennyLaneAI/catalyst/pull/1903)
   [(#1896)](https://github.com/PennyLaneAI/catalyst/pull/1896)
   [(#1889)](https://github.com/PennyLaneAI/catalyst/pull/1889)
+  [(#1973)](https://github.com/PennyLaneAI/catalyst/pull/1973)
 
 * The `qec.layer` and `qec.yield` operations have been added to the QEC dialect to represent a group
   of QEC operations. The main use case is to analyze the depth of a circuit.

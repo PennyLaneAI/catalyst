@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+# pylint: disable=too-many-lines
 from textwrap import dedent
 
 import jax.numpy as jnp
@@ -20,6 +20,7 @@ import pennylane as qml
 import pytest
 from pennylane import cond
 
+import catalyst
 from catalyst import api_extensions
 from catalyst import measure as catalyst_measure
 from catalyst import qjit
@@ -283,9 +284,10 @@ class TestCond:
                 qjit(circuit)
         else:
 
+            m = "Conditional requires a consistent array shape per result across all branches"
             with pytest.raises(
                 TypeError,
-                match="Conditional requires a consistent array shape per result across all branches",
+                match=m,
             ):
                 qjit(circuit)
 
@@ -311,10 +313,10 @@ class TestCond:
             ):
                 qjit(qml.qnode(qml.device(backend, wires=1), autograph=False)(circuit))
         else:
-
+            m = "Conditional requires a consistent array shape per result across all branches"
             with pytest.raises(
                 TypeError,
-                match="Conditional requires a consistent array shape per result across all branches",
+                match=m,
             ):
                 qjit(qml.qnode(qml.device(backend, wires=1))(circuit))
 
@@ -509,9 +511,10 @@ class TestCond:
             with pytest.raises(ValueError, match="Mismatch in output abstract values"):
                 qjit(g)
         else:
+            m = "Conditional 'False' function can have arguments only if it is a PennyLane gate."
             with pytest.raises(
                 TypeError,
-                match="Conditional 'False' function can have arguments only if it is a PennyLane gate.",
+                match=m,
             ):
                 qjit(g)
 
@@ -771,9 +774,11 @@ class TestCondOperatorAccess:
     def test_cond_access_classical(self):
         """Test Cond operation access in classical context."""
 
+        c = cond if qml.capture.enabled() else catalyst.cond
+
         @qjit
         def circuit(x):
-            @cond(x > 4.8)
+            @c(x > 4.8)
             def cond_fn():
                 return x * 16
 
@@ -810,8 +815,10 @@ class TestCondOperatorAccess:
     def test_cond_access_interpreted(self):
         """Test Cond operation access in interpreted context."""
 
+        c = cond if qml.capture.enabled() else catalyst.cond
+
         def func(flag: bool):
-            @cond(flag)
+            @c(flag)
             def branch_t():
                 return 1
 
