@@ -6,6 +6,7 @@ COMPILER_LAUNCHER ?= $(shell which ccache)
 MK_ABSPATH := $(abspath $(lastword $(MAKEFILE_LIST)))
 MK_DIR := $(dir $(MK_ABSPATH))
 DIALECTS_BUILD_DIR ?= $(MK_DIR)/build
+DIALECTS_DOCS_BUILD_DIR ?= $(MK_DIR)/build-docs
 LLVM_BUILD_DIR ?= $(MK_DIR)/llvm-project/build
 MHLO_BUILD_DIR ?= $(MK_DIR)/mlir-hlo/bazel-build
 ENZYME_BUILD_DIR ?= $(MK_DIR)/Enzyme/build
@@ -201,8 +202,8 @@ dialects:
 .PHONY: dialect-docs
 dialect-docs:
 
-	@echo "build quantum-lsp and dialects"
-	cmake -G Ninja -S . -B $(DIALECTS_BUILD_DIR) \
+	@echo "build dialect documentation"
+	cmake -G Ninja -S . -B $(DIALECTS_DOCS_BUILD_DIR) \
 		-DLLVM_ENABLE_ASSERTIONS=ON \
 		-DQUANTUM_ENABLE_BINDINGS_PYTHON=ON \
 		-DPython3_EXECUTABLE=$(PYTHON) \
@@ -214,14 +215,14 @@ dialect-docs:
 		-DMLIR_LIB_DIR=$(LLVM_BUILD_DIR)/lib \
 		-DCATALYST_DOCS_ONLY=ON
 
-	cmake --build $(DIALECTS_BUILD_DIR) --target mlir-doc
+	cmake --build $(DIALECTS_DOCS_BUILD_DIR) --target mlir-doc
 
 .PHONY: test
 test:
 	@echo "test the Catalyst MLIR dialects test suite"
 	cmake --build $(DIALECTS_BUILD_DIR) --target check-dialects
 
-.PHONY: clean clean-dialects clean-enzyme clean-mhlo clean-plugin
+.PHONY: clean clean-dialects clean-enzyme clean-mhlo clean-plugin clean-dialect-docs
 clean: clean-dialects clean-llvm clean-mhlo clean-enzyme clean-plugin
 
 clean-dialects:
@@ -254,7 +255,7 @@ clean-plugin:
 
 clean-dialect-docs:
 	@echo "clean dialect docs"
-	rm -rf $(DIALECTS_BUILD_DIR)/docs
+	rm -rf $(DIALECTS_DOCS_BUILD_DIR)/docs
 
 .PHONY: format
 format:
