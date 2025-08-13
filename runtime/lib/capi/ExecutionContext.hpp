@@ -289,6 +289,7 @@ class ExecutionContext final {
 
     // PRNG
     uint32_t *seed;
+    bool enable_routing{false};
     std::mt19937 gen;
 
   public:
@@ -308,6 +309,8 @@ class ExecutionContext final {
     ExecutionContext &operator=(ExecutionContext &&other) = delete;
 
     void setDeviceRecorderStatus(bool status) noexcept { initial_tape_recorder_status = status; }
+    void setRoutingEnable() noexcept { this->enable_routing = true; }
+    bool getRoutingStatus() noexcept { return this->enable_routing; }
 
     [[nodiscard]] auto getDeviceRecorderStatus() const -> bool
     {
