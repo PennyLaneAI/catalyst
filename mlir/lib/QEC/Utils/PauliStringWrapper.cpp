@@ -16,9 +16,8 @@
 #include <stim/stabilizers/flex_pauli_string.h>
 #include <stim/stabilizers/pauli_string.h>
 
-#include "Quantum/IR/QuantumOps.h" // for quantum::AllocQubitOp
-
 #include "QEC/Utils/PauliStringWrapper.h"
+#include "Quantum/IR/QuantumOps.h" // for quantum::AllocQubitOp
 
 namespace catalyst {
 namespace qec {
@@ -79,12 +78,21 @@ bool PauliStringWrapper::commutes(const PauliStringWrapper &other) const
 PauliStringWrapper
 PauliStringWrapper::computeCommutationRulesWith(const PauliStringWrapper &rhs) const
 {
-    // P * P' * i
-    stim::FlexPauliString result =
-        (*this->pauliString) * (*rhs.pauliString) * stim::FlexPauliString::from_text("i");
-
+    stim::FlexPauliString result = *rhs.pauliString;
+    assert(llvm::isa<PPRotationOp>(this->op) && "Clifford Operation is not PPRotationOp");
+    auto this_op = llvm::cast<PPRotationOp>(this->op);
+    if (this_op.hasPiOverTwoRotation()) {
+        // -P'
+        result.value.sign = !result.value.sign;
+    }
+    else if (this_op.hasPiOverFourRotation()) {
+        // P * P' * i
+        result = (*this->pauliString) * result * stim::FlexPauliString::from_text("i");
+    }
+    else {
+        llvm_unreachable("Clifford rotation should be π/2 or π/4");
+    }
     assert(!result.imag && "Resulting Pauli string should be real");
-
     return PauliStringWrapper(std::move(result));
 }
 
