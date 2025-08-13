@@ -329,7 +329,11 @@ class TestCond:
                 return False
 
             r = cond_fn()
-            assert r.dtype is jnp.dtype("float64") if jax.config.values["jax_enable_x64"] else r.dtype is jnp.dtype("float32") 
+            assert (
+                r.dtype is jnp.dtype("float64")
+                if jax.config.values["jax_enable_x64"]
+                else r.dtype is jnp.dtype("float32")
+            )
             return r
 
         assert 0.5 == circuit(False, True)
