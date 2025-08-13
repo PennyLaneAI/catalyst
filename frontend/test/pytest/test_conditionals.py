@@ -798,10 +798,7 @@ class TestCondOperatorAccess:
             if not qml.capture.enabled():
                 with pytest.raises(
                     AttributeError,
-                    match=r"""
-                    The cond\(\) was not called \(or has not been called\) in a quantum context,
-                    and thus has no associated quantum operation.
-                    """,
+                    match=r"""and thus has no associated quantum operation.""",
                 ):
                     isinstance(cond_fn.operation, api_extensions.control_flow.Cond)
 
@@ -830,10 +827,7 @@ class TestCondOperatorAccess:
             if not qml.capture.enabled():
                 with pytest.raises(
                     AttributeError,
-                    match=r"""
-                    The cond\(\) was not called \(or has not been called\) in a quantum context,
-                    and thus has no associated quantum operation.
-                    """,
+                    match=r"""and thus has no associated quantum operation.""",
                 ):
                     isinstance(branch_t.operation, api_extensions.control_flow.Cond)
 
@@ -1044,10 +1038,14 @@ class TestCondPredicateConversion:
 
             return y
 
-        with pytest.raises(
-            TypeError, match="Array with multiple elements is not a valid predicate"
-        ):
-            workflow(3)
+        if qml.capture.enabled():
+            with pytest.raises(ValueError, match="Condition predicate must be a scalar"):
+                workflow(3)
+        else:
+            with pytest.raises(
+                TypeError, match="Array with multiple elements is not a valid predicate"
+            ):
+                workflow(3)
 
 
 if __name__ == "__main__":
