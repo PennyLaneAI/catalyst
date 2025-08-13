@@ -14,6 +14,7 @@
 
 from textwrap import dedent
 
+import jax
 import jax.numpy as jnp
 import numpy as np
 import pennylane as qml
