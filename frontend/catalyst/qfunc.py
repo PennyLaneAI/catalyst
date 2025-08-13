@@ -263,16 +263,12 @@ def dynamic_one_shot(qnode, **kwargs):
         return dynamic_one_shot_partial(qnode)
 
     single_shot_qnode = transform_to_single_shot(qnode)
+    single_shot_qnode = qml.set_shots(single_shot_qnode, shots=1)
     if mcm_config is not None:
         single_shot_qnode.execute_kwargs["postselect_mode"] = mcm_config.postselect_mode
         single_shot_qnode.execute_kwargs["mcm_method"] = mcm_config.mcm_method
     single_shot_qnode._dynamic_one_shot_called = True
-    dev = qnode.device
     total_shots = _get_total_shots(qnode)
-
-    new_dev = copy(dev)
-    single_shot_qnode.device = new_dev
-    single_shot_qnode._set_shots(qml.measurements.Shots(1))  # pylint: disable=protected-access
 
     def one_shot_wrapper(*args, **kwargs):
         def wrap_single_shot_qnode(*_):
