@@ -202,7 +202,7 @@ dialects:
 .PHONY: dialect-docs
 dialect-docs:
 
-	@echo "build quantum-lsp and dialects"
+	@echo "build dialect documentation"
 	cmake -G Ninja -S . -B $(DIALECTS_DOCS_BUILD_DIR) \
 		-DLLVM_ENABLE_ASSERTIONS=ON \
 		-DQUANTUM_ENABLE_BINDINGS_PYTHON=ON \
