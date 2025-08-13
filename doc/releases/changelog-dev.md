@@ -66,6 +66,9 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Add `__catalyst__qis__SingleExcitation` to RuntimeCAPI.
+  [(#19XX)](https://github.com/PennyLaneAI/catalyst/pull/19XX)
+
 * Updates use of `qml.transforms.dynamic_one_shot.parse_native_mid_circuit_measurements` to improved signature.
   [(#1953)](https://github.com/PennyLaneAI/catalyst/pull/1953)
 

@@ -70,6 +70,7 @@ void __catalyst__qis__IsingXX(double, QUBIT *, QUBIT *, const Modifiers *);
 void __catalyst__qis__IsingYY(double, QUBIT *, QUBIT *, const Modifiers *);
 void __catalyst__qis__IsingXY(double, QUBIT *, QUBIT *, const Modifiers *);
 void __catalyst__qis__IsingZZ(double, QUBIT *, QUBIT *, const Modifiers *);
+void __catalyst__qis__SingleExcitation(double, QUBIT *, QUBIT *, const Modifiers *);
 void __catalyst__qis__ControlledPhaseShift(double, QUBIT *, QUBIT *, const Modifiers *);
 void __catalyst__qis__CRX(double, QUBIT *, QUBIT *, const Modifiers *);
 void __catalyst__qis__CRY(double, QUBIT *, QUBIT *, const Modifiers *);
