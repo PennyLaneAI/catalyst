@@ -481,7 +481,7 @@ class TestMeasurementTransforms:
             ),
         ],
     )
-    @pytest.mark.parametrize("shots", [3000, (3000, 4000), (3000, 3500, 4000)])
+    @pytest.mark.parametrize("shots", [3000, (3000, 3000), (3000, 4000), (3000, 3500, 4000)])
     def test_measurement_from_samples_single_measurement_analytic(
         self,
         input_measurement,
