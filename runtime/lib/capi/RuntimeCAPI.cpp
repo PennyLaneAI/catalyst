@@ -940,7 +940,7 @@ void __catalyst__qis__MultiRZ(double theta, const Modifiers *modifiers, int64_t 
 void __catalyst__qis__ISWAP(QUBIT *wire0, QUBIT *wire1, const Modifiers *modifiers)
 {
     if (CTX->getRoutingStatus()) {
-        std::pair<int, int> routedQubits = RUNTIME_ROUTER->getRoutedQubits(
+        std::pair<QubitIdType, QubitIdType> routedQubits = RUNTIME_ROUTER->getRoutedQubits(
             wire0, wire1, modifiers, RTD_PTR, MODIFIERS_ARGS(modifiers));
         getQuantumDevicePtr()->NamedOperation("ISWAP", {},
                                               {/* control = */ routedQubits.first,
