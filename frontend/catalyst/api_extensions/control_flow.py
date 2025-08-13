@@ -780,14 +780,16 @@ class CondCallable:
         out_type = out_types[-1]
         branch_avals = [[aval for aval, _ in branch_out_type] for branch_out_type in out_types]
         promoted_dtypes = _promote_jaxpr_types(branch_avals)
-        out_type = next(
-            (
-                out_types[i]
-                for i, promoted_dtype in enumerate(promoted_dtypes)
-                if out_types[0][i][0].dtype == promoted_dtype
-            ),
-            out_types[-1],
-        )
+
+        if promoted_dtypes:
+            out_type = next(
+                (
+                    cand_out_type
+                    for cand_out_type in out_types
+                    if cand_out_type[0][0].dtype == promoted_dtypes[0]
+                ),
+                out_types[-1],
+            )
 
         # Create output tracers in the outer tracing context
         out_expanded_classical_tracers = output_type_to_tracers(
