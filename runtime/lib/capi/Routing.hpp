@@ -40,11 +40,11 @@ const int MAXIMUM = 1e9;
 namespace Catalyst::Runtime {
 class RoutingPass final {
   private:
-    std::set<int> physicalQubits;
-    std::map<int, int> wireMap;
-    std::map<std::pair<int, int>, bool> couplingMap;
-    std::map<std::pair<int, int>, int> distanceMatrix;
-    std::map<std::pair<int, int>, int> predecessorMatrix;
+    std::set<QubitIdType> physicalQubits;
+    std::map<QubitIdType, QubitIdType> wireMap;
+    std::map<std::pair<QubitIdType, QubitIdType>, bool> couplingMap;
+    std::map<std::pair<QubitIdType, QubitIdType>, int> distanceMatrix;
+    std::map<std::pair<QubitIdType, QubitIdType>, int> predecessorMatrix;
 
   public:
     RoutingPass(std::string tuple_str)
@@ -55,13 +55,13 @@ class RoutingPass final {
             std::string curr_tuple_str = std::string(
                 tuple_str.substr(string_index + 1, next_closing_bracket - string_index - 1));
             std::istringstream iss(curr_tuple_str);
-            int first_int, second_int;
+            QubitIdType first_qubit_id, second_qubit_id;
             char comma;
-            iss >> first_int >> comma &&comma == ',' && iss >> second_int;
-            this->physicalQubits.insert(first_int);
-            this->physicalQubits.insert(second_int);
-            this->couplingMap[std::make_pair(first_int, second_int)] = true;
-            this->couplingMap[std::make_pair(second_int, first_int)] = true;
+            iss >> first_qubit_id >> comma &&comma == ',' && iss >> second_qubit_id;
+            this->physicalQubits.insert(first_qubit_id);
+            this->physicalQubits.insert(second_qubit_id);
+            this->couplingMap[std::make_pair(first_qubit_id, second_qubit_id)] = true;
+            this->couplingMap[std::make_pair(second_qubit_id, first_qubit_id)] = true;
             string_index = next_closing_bracket + 3;
         }
         for (auto i_itr = this->physicalQubits.begin(); i_itr != this->physicalQubits.end();
@@ -86,7 +86,7 @@ class RoutingPass final {
 
         // edge-distances : 1
         for (auto &entry : this->couplingMap) {
-            const std::pair<int, int> &key = entry.first;
+            const std::pair<QubitIdType, QubitIdType> &key = entry.first;
             bool value = entry.second;
             if (value) {
                 this->distanceMatrix[std::make_pair(key.first, key.second)] = 1;
@@ -114,14 +114,14 @@ class RoutingPass final {
         }
     }
 
-    std::vector<int> getShortestPath(int source, int target)
+    std::vector<QubitIdType> getShortestPath(QubitIdType source, QubitIdType target)
     {
-        std::vector<int> path;
+        std::vector<QubitIdType> path;
         if (this->predecessorMatrix.at(std::make_pair(source, target)) == -1 && source != target) {
             return path;
         }
 
-        int current = target;
+        QubitIdType current = target;
         while (current != source) {
             path.push_back(current);
             current = this->predecessorMatrix.at(std::make_pair(source, current));
@@ -135,15 +135,15 @@ class RoutingPass final {
         return path;
     }
 
-    std::pair<int, int> getRoutedQubits(QUBIT *control, QUBIT *target, const Modifiers *modifiers,
-                                        RTDevice *RTD_PTR, bool adjoint,
-                                        const std::vector<QubitIdType> controlledWires,
-                                        const std::vector<bool> controlledValues)
+    std::pair<QubitIdType, QubitIdType>
+    getRoutedQubits(QUBIT *control, QUBIT *target, const Modifiers *modifiers, RTDevice *RTD_PTR,
+                    bool adjoint, const std::vector<QubitIdType> controlledWires,
+                    const std::vector<bool> controlledValues)
     {
         // Similar to qml.transpile implementation
         // https://docs.pennylane.ai/en/stable/_modules/pennylane/transforms/transpile.html
-        int firstQubit = reinterpret_cast<QubitIdType>(control);
-        int secondQubit = reinterpret_cast<QubitIdType>(target);
+        QubitIdType firstQubit = reinterpret_cast<QubitIdType>(control);
+        QubitIdType secondQubit = reinterpret_cast<QubitIdType>(target);
 
         if (this->couplingMap[std::make_pair(firstQubit, secondQubit)]) {
             // since in each iteration, we adjust indices of each op,
@@ -153,11 +153,11 @@ class RoutingPass final {
             }
         }
         else {
-            std::vector<int> swapPath = this->getShortestPath(firstQubit, secondQubit);
+            std::vector<QubitIdType> swapPath = this->getShortestPath(firstQubit, secondQubit);
             //  i<swapPath.size()-1 since last qubit is already our target
             for (auto i = 1; i < swapPath.size() - 1; i++) {
-                int u = swapPath[i - 1];
-                int v = swapPath[i];
+                QubitIdType u = swapPath[i - 1];
+                QubitIdType v = swapPath[i];
                 RTD_PTR->getQuantumDevicePtr()->NamedOperation("SWAP", {}, {u, v}, adjoint,
                                                                controlledWires, controlledValues);
 
