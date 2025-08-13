@@ -125,6 +125,22 @@ def LoopBoundaryOptimizationPass : Pass<"loop-boundary"> {
 
     let constructor = "catalyst::createLoopBoundaryOptimizationPass()";
 }
+
+def RoutingPass : Pass<"route-circuit"> {
+    let summary = "Perform mapping and routing of quantum circuit to a hardware.";
+
+    let constructor = "catalyst::createRoutingPass()";
+
+  let options = [
+    Option<
+      /*C++ variable name=*/"hardwareGraph",
+      /*CLI argument=*/"hardware-graph",
+      /*type=*/"std::string",
+      /*default=*/"",
+      /*description=*/"Hardware graph represented by a list of edges connecting physical qubits."
+    >,
+  ];
+}
 // ----- Quantum circuit transformation passes end ----- //
 
 #endif // QUANTUM_PASSES
