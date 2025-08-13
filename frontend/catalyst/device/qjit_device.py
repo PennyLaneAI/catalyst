@@ -354,6 +354,7 @@ class QJITDevice(qml.devices.Device):
         if shots is None:
             capabilities = self.capabilities
         else:
+            # recompute device capabilities if shots were provided dynamically (through set_shots)
             device_caps = get_device_capabilities(self.original_device, shots)
             capabilities = get_qjit_device_capabilities(device_caps)
 
