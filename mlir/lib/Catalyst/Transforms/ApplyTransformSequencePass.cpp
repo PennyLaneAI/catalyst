@@ -51,7 +51,7 @@ static std::string getTransformOpName(mlir::transform::TransformOpInterface tran
 
     // convert "." to "_"
     std::replace(baseName.begin(), baseName.end(), '.', '_');
-    return baseName
+    return baseName;
 }
 
 /// A fake pass wrapper that represents a single transform operation. Allowing it to be tracked by
