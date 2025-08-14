@@ -582,7 +582,7 @@ def _decomposition_rule_abstract(*, pyfun, func_jaxpr, is_qreg=False, num_params
     return ()
 
 
-def _decomposition_rule_lowering(ctx, *, pyfun, func_jaxpr):
+def _decomposition_rule_lowering(ctx, *, pyfun, func_jaxpr, **_):
     """Lower a quantum decomposition rule into MLIR in a single step process.
     The step is the compilation of the definition of the function fn.
     """
