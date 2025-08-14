@@ -10,6 +10,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Required so as not to always use the cached option from the mlir build.
 option(QUANTUM_ENABLE_BINDINGS_PYTHON "Enable quantum dialect python bindings" OFF)
 option(CATALYST_ENABLE_WARNINGS "Enable -Wall and -Werror" ON)
+option(CATALYST_DOCS_ONLY "Disable targets that require built dependencies" OFF)
 
 message(STATUS "LLVM_USE_SANITIZER is ${LLVM_USE_SANITIZER}.")
 message(STATUS "CATALYST_ENABLE_WARNINGS is ${CATALYST_ENABLE_WARNINGS}.")
@@ -177,7 +178,9 @@ include_directories(
 
 add_subdirectory(include)
 add_subdirectory(lib)
-add_subdirectory(tools)
+if(NOT CATALYST_DOCS_ONLY)
+  add_subdirectory(tools)
+endif()
 
 if(QUANTUM_ENABLE_BINDINGS_PYTHON)
   message(STATUS "Enabling Python API")
@@ -255,4 +258,6 @@ endif()
 # End of CIRCT code  #
 ######################
 
-add_subdirectory(test)
+if(NOT CATALYST_DOCS_ONLY)
+  add_subdirectory(test)
+endif()

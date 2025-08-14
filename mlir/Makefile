@@ -6,6 +6,7 @@ COMPILER_LAUNCHER ?= $(shell which ccache)
 MK_ABSPATH := $(abspath $(lastword $(MAKEFILE_LIST)))
 MK_DIR := $(dir $(MK_ABSPATH))
 DIALECTS_BUILD_DIR ?= $(MK_DIR)/build
+DIALECTS_DOCS_BUILD_DIR ?= $(MK_DIR)/build-docs
 LLVM_BUILD_DIR ?= $(MK_DIR)/llvm-project/build
 STABLEHLO_BUILD_DIR ?= $(MK_DIR)/stablehlo/build
 ENZYME_BUILD_DIR ?= $(MK_DIR)/Enzyme/build
@@ -46,13 +47,14 @@ help:
 	@echo "  stablehlo          to build stablehlo"
 	@echo "  enzyme             to build Enzyme"
 	@echo "  dialects           to build custom Catalyst MLIR dialects"
+	@echo "  dialect-docs       to build custom Catalyst MLIR dialect documentation"
 	@echo "  test               to run the Catalyst MLIR dialects test suite"
 	@echo "  clean              to delete all temporary, cache, and build files"
 	@echo "  format [check=1]   to apply C++ formatter; use with 'check=1' to check instead of modify (requires clang-format)"
 	@echo "  format [version=?] to apply C++ formatter; use with 'version={version}' to run clang-format-{version} instead of clang-format"
 
 .PHONY: all
-all: llvm stablehlo enzyme dialects plugin
+all: llvm stablehlo enzyme dialects dialect-docs plugin
 
 .PHONY: llvm
 llvm:
@@ -187,12 +189,30 @@ dialects:
 
 	cmake --build $(DIALECTS_BUILD_DIR) --target check-dialects quantum-lsp-server catalyst-cli check-unit-tests
 
+.PHONY: dialect-docs
+dialect-docs:
+
+	@echo "build dialect documentation"
+	cmake -G Ninja -S . -B $(DIALECTS_DOCS_BUILD_DIR) \
+		-DLLVM_ENABLE_ASSERTIONS=ON \
+		-DQUANTUM_ENABLE_BINDINGS_PYTHON=ON \
+		-DPython3_EXECUTABLE=$(PYTHON) \
+		-DPython3_NumPy_INCLUDE_DIRS=$(shell $(PYTHON) -c "import numpy as np; print(np.get_include())") \
+		-DEnzyme_DIR=$(ENZYME_BUILD_DIR) \
+		-DENZYME_SRC_DIR=$(MK_DIR)/Enzyme \
+		-DMLIR_DIR=$(LLVM_BUILD_DIR)/lib/cmake/mlir \
+		-DRUNTIME_LIB_DIR=$(RT_BUILD_DIR)/lib \
+		-DMLIR_LIB_DIR=$(LLVM_BUILD_DIR)/lib \
+		-DCATALYST_DOCS_ONLY=ON
+
+	cmake --build $(DIALECTS_DOCS_BUILD_DIR) --target mlir-doc
+
 .PHONY: test
 test:
 	@echo "test the Catalyst MLIR dialects test suite"
 	cmake --build $(DIALECTS_BUILD_DIR) --target check-dialects
 
-.PHONY: clean clean-dialects clean-enzyme clean-stablehlo clean-plugin
+.PHONY: clean clean-dialects clean-enzyme clean-stablehlo clean-plugin clean-dialect-docs
 clean: clean-dialects clean-llvm clean-stablehlo clean-enzyme clean-plugin
 
 clean-dialects:
@@ -222,6 +242,10 @@ clean-plugin:
 	@echo "clean plugin"
 	rm -rf standalone/build
 	rm -rf $(DIALECTS_BUILD_DIR)/lib/StandalonePlugin.*
+
+clean-dialect-docs:
+	@echo "clean dialect docs"
+	rm -rf $(DIALECTS_DOCS_BUILD_DIR)/docs
 
 .PHONY: format
 format:
