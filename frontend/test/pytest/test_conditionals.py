@@ -339,6 +339,38 @@ class TestCond:
 
         assert 0.5 == circuit(False, True)
 
+    def test_branch_multi_return_type_unification_qjit_3(self):
+        """Test that unification happens before the results of the cond primitve is available."""
+
+        @qjit
+        def circuit(cond1, cond2):
+            @cond(cond1)
+            def cond_fn():
+                return {0: True, 1: 0.5}
+
+            @cond_fn.else_if(cond2)
+            def cond_fn_2():
+                return {0: 0.7, 1: True}
+
+            @cond_fn.otherwise
+            def cond_fn_3():
+                return {0: True, 1: False}
+
+            r = cond_fn()
+            assert (
+                r[0].dtype is jnp.dtype("float64")
+                if jax.config.values["jax_enable_x64"]
+                else r[0].dtype is jnp.dtype("float32")
+            )
+            assert (
+                r[1].dtype is jnp.dtype("float64")
+                if jax.config.values["jax_enable_x64"]
+                else r[1].dtype is jnp.dtype("float32")
+            )
+            return r
+
+        assert {0: 0.7, 1: 1.0} == circuit(False, True)
+
     @pytest.mark.xfail(
         reason="Inability to apply Jax transformations before the quantum traing is complete"
     )
