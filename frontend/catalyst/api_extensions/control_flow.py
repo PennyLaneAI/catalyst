@@ -782,31 +782,10 @@ class CondCallable:
         promoted_dtypes = _promote_jaxpr_types(branch_avals)
 
         if promoted_dtypes:
-            columns = list(zip(*out_types))
-
-            def get_promoted_dtype(i):
-                return promoted_dtypes[i] if i < len(promoted_dtypes) else None
-
-            def get_cand_dtype(cand_type):
-                return getattr(cand_type[0], "dtype", None)
-
-            # match the dtype of each element in the out_type with the corresponding promoted dtype,
-            # and construct the out_type from the matched elements
-            out_type = tuple(
-                (
-                    next(
-                        (
-                            cand_type
-                            for cand_type in cand_types
-                            if get_cand_dtype(cand_type) == get_promoted_dtype(i)
-                        ),
-                        out_type[i],
-                    )
-                    if get_promoted_dtype(i) is not None
-                    else out_type[i]
-                )
-                for i, cand_types in enumerate(columns)
-            )
+            out_type = [
+                (aval.update(dtype=dtype), expl)
+                for dtype, (aval, expl) in zip(promoted_dtypes, out_type)
+            ]
 
         # Create output tracers in the outer tracing context
         out_expanded_classical_tracers = output_type_to_tracers(
