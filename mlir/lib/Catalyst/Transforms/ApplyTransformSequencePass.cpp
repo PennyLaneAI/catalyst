@@ -88,15 +88,14 @@ class TransformOpSubPass : public OperationPass<> {
 /// execution that mirrors the logic in NamedSequenceOp::apply but with instrumentation.
 /// ref: transform::NamedSequenceOp::apply in
 /// /path/to/mlir/llvm-project/mlir/lib/Dialect/Transform/IR/TransformOps.cpp
-LogicalResult applyTransformsWithSubpassTracking(Operation *payload, Operation *namedSequence,
+LogicalResult applyTransformsWithSubpassTracking(Operation *payload,
+                                                 mlir::transform::NamedSequenceOp namedSequence,
                                                  PassInstrumentor *passInstrumentor)
 {
-    auto namedSeqOp = dyn_cast<mlir::transform::NamedSequenceOp>(namedSequence);
-    if (!namedSeqOp || namedSeqOp.getBody().empty()) {
-        return success();
-    }
+    assert(namedSequence.getBody().hasOneBlock() &&
+           "Expected exactly one transform op in the sequence block");
 
-    Block &sequenceBlock = namedSeqOp.getBody().front();
+    Block &sequenceBlock = namedSequence.getBody().front();
     if (sequenceBlock.without_terminator().empty()) {
         return success();
     }
@@ -108,9 +107,9 @@ LogicalResult applyTransformsWithSubpassTracking(Operation *payload, Operation *
     // Note: this is the same implementation as PossibleTopLevelTransformOp but
     // without attaching the interface / trait since that is tailored to a
     // dangling top-level op that does not get "called".
-    auto scope = state.make_region_scope(namedSeqOp.getBody());
+    auto scope = state.make_region_scope(namedSequence.getBody());
     if (failed(mlir::transform::detail::mapPossibleTopLevelTransformOpBlockArguments(
-            state, namedSequence, namedSeqOp.getBody()))) {
+            state, namedSequence, namedSequence.getBody()))) {
         return failure();
     }
 
@@ -190,9 +189,12 @@ struct ApplyTransformSequencePass
 
         if (auto *passInstrumentor = getAnalysisManager().getPassInstrumentor(); passInstrumentor) {
             // Manually execute the transform sequence with individual subpass tracking
-            if (failed(applyTransformsWithSubpassTracking(payload, transformer_main_sequence,
-                                                          passInstrumentor))) {
-                return signalPassFailure();
+            if (auto namedSequence =
+                    dyn_cast<mlir::transform::NamedSequenceOp>(transformer_main_sequence)) {
+                if (failed(applyTransformsWithSubpassTracking(payload, namedSequence,
+                                                              passInstrumentor))) {
+                    return signalPassFailure();
+                }
             }
         }
         else {
