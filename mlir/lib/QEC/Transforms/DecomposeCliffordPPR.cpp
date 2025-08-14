@@ -18,12 +18,11 @@
 #include <mlir/IR/Builders.h>
 #include <mlir/IR/Value.h>
 
-#include "Quantum/IR/QuantumOps.h"
-
 #include "QEC/IR/QECDialect.h"
 #include "QEC/Transforms/PPRDecomposeUtils.h"
 #include "QEC/Transforms/Patterns.h"
 #include "QEC/Utils/PauliStringWrapper.h"
+#include "Quantum/IR/QuantumOps.h"
 
 using namespace mlir;
 using namespace catalyst::qec;
@@ -105,7 +104,7 @@ struct DecomposeCliffordPPR : public OpRewritePattern<PPRotationOp> {
 
     LogicalResult matchAndRewrite(PPRotationOp op, PatternRewriter &rewriter) const override
     {
-        if (op.isClifford()) {
+        if (op.hasPiOverFourRotation()) {
             decompose_pi_over_four_flattening(avoidPauliYMeasure, op, op.getCondition(), rewriter);
             return success();
         }

@@ -14,8 +14,13 @@
 
 #pragma once
 
-#include "QEC/IR/QECOpInterfaces.h"
+#include "llvm/ADT/SetVector.h"
+
 #include "mlir/IR/PatternMatch.h"
+
+#include "QEC/IR/QECDialect.h"
+#include "QEC/Transforms/Patterns.h"
+#include "QEC/IR/QECOpInterfaces.h"
 
 using namespace mlir;
 
@@ -82,8 +87,11 @@ struct PauliStringWrapper {
 
     // Commutation Rules
     // P is Clifford, P' is non-Clifford
+    //   P can have a π/2 or π/4 rotation
     // if P commutes with P' then PP' = P'P
-    // if P anti-commutes with P' then PP' = -iPP' P
+    // if P anti-commutes with P' then
+    //   if P has a π/2 rotation then PP' = -P'P
+    //   if P has a π/4 rotation then PP' = -iPP'P
     // In here, P and P' are lhs and rhs, respectively.
     PauliStringWrapper computeCommutationRulesWith(const PauliStringWrapper &rhs) const;
 };
@@ -95,7 +103,7 @@ struct PauliStringWrapper {
 using PauliWordPair = std::pair<PauliStringWrapper, PauliStringWrapper>;
 
 /**
- * @brief Expland the op's operands to the set of operands.
+ * @brief Expand the op's operands to the set of operands.
  *        - Initialize the new pauliWord with "I" for each qubit.
  *        - Find location of inOutOperands in set of operands
  *        - Assign the inOutOperands' pauli word to new pauliWord in that location
@@ -103,7 +111,7 @@ using PauliWordPair = std::pair<PauliStringWrapper, PauliStringWrapper>;
  *        -> ["I", "X", "Y"]
  *
  * @tparam T either mlir::Operation::operand_range or mlir::Operation::result_range
- * @param qubits set of combination of qubit operands
+ * @param operands set of combination of qubit operands
  * @param inOutOperands either value from.inQubits or .outQubits from op
  * @param op QECOpInterface
  * @return PauliWord of the expanded pauliWord
@@ -155,7 +163,7 @@ SmallVector<Value> replaceValueWithOperands(const PauliStringWrapper &lhsPauliWr
 /**
  * @brief Update the pauliWord of the right hand side operation.
  *
- * @param rhsOp QECOpInterface of the right hand side
+ * @param op QECOpInterface of the right hand side
  * @param newPauliWord PauliWord of the new pauliWord
  * @param rewriter PatternRewriter
  */
