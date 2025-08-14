@@ -50,7 +50,7 @@ def _to_bool_if_not(arg):
 
 
 @WorkflowInterpreter.register_primitive(plxpr_cond_prim)
-def _(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
+def workflow_cond(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
     """Handle the conversion from plxpr to Catalyst jaxpr for the cond primitive"""
     args = plxpr_invals[args_slice]
     converted_jaxpr_branches = []
