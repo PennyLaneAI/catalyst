@@ -76,6 +76,7 @@
   [(#1960)](https://github.com/PennyLaneAI/catalyst/pull/1960)
 
 * `from_plxpr` can now handle dynamic shots and overridden device shots.
+  [(#1983)](https://github.com/PennyLaneAI/catalyst/pull/1983/)
 
 * QJitDevice helper `extract_backend_info` removed its redundant `capabilities` argument.
   [(#1956)](https://github.com/PennyLaneAI/catalyst/pull/1956)
