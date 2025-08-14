@@ -64,6 +64,7 @@ void catalyst::registerAllCatalystPasses()
     mlir::registerPass(catalyst::createMhloLegalizeToStdPass);
     mlir::registerPass(catalyst::createMhloLegalizeControlFlowPass);
     mlir::registerPass(catalyst::createMitigationLoweringPass);
+    mlir::registerPass(catalyst::createPartitionLayersPass);
     mlir::registerPass(catalyst::createQnodeToAsyncLoweringPass);
     mlir::registerPass(catalyst::createQuantumConversionPass);
     mlir::registerPass(catalyst::createRegisterInactiveCallbackPass);

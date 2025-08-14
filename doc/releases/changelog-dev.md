@@ -2,6 +2,11 @@
 
 <h3>New features since last release</h3>
 
+* A new pass `--partition-layers` has been added to group PPR/PPM operations into `qec.layer`
+  operations based on qubit interactive and commutativity, enabling circuit analysis and
+  potentially to support parallel execution.
+  [(#1951)](https://github.com/PennyLaneAI/catalyst/pull/1951)
+
 <h3>Improvements 🛠</h3>
 
 * Adjoint differentiation is used by default when executing on lightning devices, significantly reduces gradient computation time.

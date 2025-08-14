@@ -16,6 +16,7 @@ target_compile_options(libstim PRIVATE -w)
 
 add_library(QECUtils STATIC
     PauliStringWrapper.cpp
+    QECLayer.cpp
 )
 
 # features required by Stim
