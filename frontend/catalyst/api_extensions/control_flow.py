@@ -770,11 +770,12 @@ class CondCallable:
             regions.append(hybridRegion)
             in_sigs.append(in_sig)
             out_sigs.append(out_sig)
+        out_types = [s.out_type() for s in out_sigs]
+        _assert_cond_explict_flags([s.out_type() for s in out_sigs])
         _assert_cond_result_structure([s.out_tree() for s in out_sigs])
         _assert_cond_result_types([[t[0] for t in s.out_type()] for s in out_sigs])
         out_tree = out_sigs[-1].out_tree()
         all_consts = [s.out_consts() for s in out_sigs]
-        out_types = [s.out_type() for s in out_sigs]
 
         # Select the output type of the one with the promoted dtype among all branches
         out_type = out_types[-1]
@@ -1555,6 +1556,16 @@ class WhileLoop(HybridOp):
 
 
 ## PRIVATE ##
+def _assert_cond_explict_flags(out_types: List[List[AbstractValue]]):
+    """Ensure a consistent explict flags across branches."""
+    if any(pair[0][1] != pair[1][1] for pair in list(zip(*out_types))):
+        raise TypeError(
+            "Conditional requires consistent dynamic/constant shape type sequence as return "
+            "values across branches. Might have some branches that return dynamic shape and some "
+            "that return constant shape."
+        )
+
+
 def _assert_cond_result_structure(trees: List[PyTreeDef]):
     """Ensure a consistent container structure across branch results."""
     expected_tree = trees[0]
@@ -1571,7 +1582,7 @@ def _assert_cond_result_types(signatures: List[List[AbstractValue]]):
     num_results = len(signatures[0])
 
     if not all(len(sig) == num_results for sig in signatures):
-        raise TypeError("mismatch: number of results")
+        raise TypeError("Conditional requires a consistent number of results across all branches!")
 
     for i in range(num_results):
         aval_slice = [avals[i] for avals in signatures]
