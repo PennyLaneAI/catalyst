@@ -330,10 +330,8 @@ class TestCond:
                 return False
 
             r = cond_fn()
-            assert (
-                r.dtype is jnp.dtype("float64")
-                if jax.config.values["jax_enable_x64"]
-                else r.dtype is jnp.dtype("float32")
+            assert r.dtype is jnp.dtype(
+                "float64" if jax.config.values["jax_enable_x64"] else "float32"
             )
             return r
 
@@ -357,16 +355,10 @@ class TestCond:
                 return {0: True, 1: False}
 
             r = cond_fn()
-            assert (
-                r[0].dtype is jnp.dtype("float64")
-                if jax.config.values["jax_enable_x64"]
-                else r[0].dtype is jnp.dtype("float32")
+            expected_dtype = jnp.dtype(
+                "float64" if jax.config.values["jax_enable_x64"] else "float32"
             )
-            assert (
-                r[1].dtype is jnp.dtype("float64")
-                if jax.config.values["jax_enable_x64"]
-                else r[1].dtype is jnp.dtype("float32")
-            )
+            assert all(r[i].dtype is expected_dtype for i in range(len(r)))
             return r
 
         assert {0: 0.7, 1: 1.0} == circuit(False, True)
