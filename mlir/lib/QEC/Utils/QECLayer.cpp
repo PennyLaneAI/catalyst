@@ -106,6 +106,37 @@ std::vector<Value> QECLayer::getEntryQubitsFrom(QECOpInterface op)
     return localOpToEntryQubits[op];
 }
 
+std::vector<Value> QECLayer::getEntryQubitsFrom(YieldOp yieldOp)
+{
+    std::vector<Value> entries;
+    entries.reserve(yieldOp->getNumOperands());
+    for (Value yOperand : yieldOp->getOperands()) {
+        if (!llvm::isa<catalyst::quantum::QubitType>(yOperand.getType())) {
+            continue;
+        }
+        Value entry = yOperand;
+        if (localQubitToEntry.contains(yOperand)) {
+            entry = localQubitToEntry[yOperand];
+        }
+        else if (resultToOperand.contains(yOperand)) {
+            entry = resultToOperand[yOperand];
+        }
+        entries.push_back(entry);
+    }
+    return entries;
+}
+
+std::vector<Value> QECLayer::getEntryQubitsFrom(Operation *op)
+{
+    if (auto qecIface = llvm::dyn_cast<QECOpInterface>(op)) {
+        return getEntryQubitsFrom(qecIface);
+    }
+    if (auto yield = llvm::dyn_cast<YieldOp>(op)) {
+        return getEntryQubitsFrom(yield);
+    }
+    return {};
+}
+
 bool QECLayer::actOnDisjointQubits(QECOpInterface op)
 {
     auto entryQubits = getEntryQubitsFrom(op);

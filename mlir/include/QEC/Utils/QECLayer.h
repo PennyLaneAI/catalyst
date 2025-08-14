@@ -23,6 +23,10 @@
 
 #include "QEC/IR/QECDialect.h"
 #include "QEC/IR/QECOpInterfaces.h"
+// For quantum::QubitType and mlir::BlockArgument
+#include "Quantum/IR/QuantumDialect.h"
+#include "mlir/IR/Block.h"
+#include "llvm/Support/Casting.h"
 
 namespace catalyst {
 namespace qec {
@@ -89,6 +93,28 @@ class QECLayer {
     {
         layerOp->walk([&](QECOpInterface op) { insertToLayer(op); });
         this->layerOp = layerOp;
+
+        // Also consider qubit-typed operands of the layer terminator (qec.yield)
+        // as entries to seed local and layer-level mappings.
+        if (auto *term = layerOp.getBody()->getTerminator()) {
+            if (auto yield = llvm::dyn_cast<YieldOp>(term)) {
+                for (mlir::Value yOperand : yield->getOperands()) {
+                    if (!llvm::isa<catalyst::quantum::QubitType>(yOperand.getType())) {
+                        continue;
+                    }
+
+                    mlir::Value entry = yOperand;
+                    if (resultToOperand.contains(yOperand)) {
+                        entry = resultToOperand[yOperand];
+                    }
+
+                    localQubitToEntry[yOperand] = entry;
+                    if (llvm::isa<mlir::BlockArgument>(entry)) {
+                        layerEntryQubits.insert(entry);
+                    }
+                }
+            }
+        }
     }
 
     static QECLayer &build(QECLayerContext *ctx, LayerOp layerOp)
@@ -115,6 +141,8 @@ class QECLayer {
     mlir::Operation *getParentLayer();
 
     std::vector<mlir::Value> getEntryQubitsFrom(QECOpInterface op);
+    std::vector<mlir::Value> getEntryQubitsFrom(YieldOp yieldOp);
+    std::vector<mlir::Value> getEntryQubitsFrom(mlir::Operation *op);
 
     bool actOnDisjointQubits(QECOpInterface op);
 
