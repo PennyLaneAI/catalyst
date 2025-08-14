@@ -64,6 +64,7 @@ class TestCondToJaxpr:
 
         assert asline(expected) == asline(circuit.jaxpr)
 
+
 # pylint: disable=too-many-public-methods
 class TestCond:
     """Test suite for the Cond functionality in Catalyst."""
