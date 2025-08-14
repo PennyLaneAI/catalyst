@@ -4,6 +4,9 @@
 
 <h3>Improvements 🛠</h3>
 
+* Adjoint differentiation is used by default when executing on lightning devices, significantly reduces gradient computation time.
+  [(#1961)](https://github.com/PennyLaneAI/catalyst/pull/1961)
+
 * Added `detensorizefunctionboundary` pass to remove scalar tensors across function boundaries and enabled `symbol-dce` pass to remove dead functions, reducing the number of instructions for compilation.
   [(#1904)](https://github.com/PennyLaneAI/catalyst/pull/1904)
 
@@ -52,6 +55,9 @@
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
+
+* Fix wrong handling of partitioned shots in the decomposition pass of `measurements_from_samples`.
+  [(#1981)](https://github.com/PennyLaneAI/catalyst/pull/1981)
 
 * Fix errors in AutoGraph transformed functions when `qml.prod` is used together with other operator
   transforms (e.g. `qml.adjoint`).
