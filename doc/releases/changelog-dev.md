@@ -56,6 +56,9 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Fix wrong handling of partitioned shots in the decomposition pass of `measurements_from_samples`.
+  [(#1981)](https://github.com/PennyLaneAI/catalyst/pull/1981)
+
 * Fix errors in AutoGraph transformed functions when `qml.prod` is used together with other operator
   transforms (e.g. `qml.adjoint`).
   [(#1910)](https://github.com/PennyLaneAI/catalyst/pull/1910)
