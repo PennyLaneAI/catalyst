@@ -132,6 +132,8 @@ extern template PauliWord expandPauliWord<llvm::SetVector<mlir::Value>, std::vec
  * @return PauliWordPair of the normalized pair of PauliStringWrapper
  */
 PauliWordPair normalizePPROps(QECOpInterface lhs, QECOpInterface rhs);
+PauliWordPair normalizePPROps(QECOpInterface lhs, QECOpInterface rhs, std::vector<Value> lhsQubits,
+                              std::vector<Value> rhsQubits);
 
 // Remove Identity from the op's Pauli product and corresponding qubits from the list/
 // The size of op.pauliProduct and qubits is assumed to be the same.
