@@ -19,8 +19,8 @@ from typing import Type, TypeVar
 
 import jax
 import pennylane as qml
-import pennylane.compiler.python_compiler.quantum_dialect as quantum
-from pennylane.compiler.python_compiler.transforms import xdsl_transform
+from pennylane.compiler.python_compiler import compiler_transform
+from pennylane.compiler.python_compiler.dialects import quantum
 from xdsl.context import Context
 from xdsl.dialects import arith, builtin, func, memref, scf, tensor
 from xdsl.ir import Block, Operation, Region, SSAValue
@@ -599,7 +599,7 @@ class TreeTraversal(RewritePattern):
         return casted_sum
 
 
-@xdsl_transform
+@compiler_transform
 class TTPass(ModulePass):
     name = "tree-traversal"
 
