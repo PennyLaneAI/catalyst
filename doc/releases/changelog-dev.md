@@ -4,6 +4,14 @@
 
 <h3>Improvements 🛠</h3>
 
+* Allow to apply instrumentation to each pass within NamedSequenceOp.
+  [(#1978)](https://github.com/PennyLaneAI/catalyst/pull/1978)
+  For example:
+  ```
+  quantum-opt ... --apply-transform-sequence --mlir-print-ir-after-all
+  ```
+  should also dump the IR result for each subpass within NamedSequeceOp
+
 * Added `detensorizefunctionboundary` pass to remove scalar tensors across function boundaries and enabled `symbol-dce` pass to remove dead functions, reducing the number of instructions for compilation.
   [(#1904)](https://github.com/PennyLaneAI/catalyst/pull/1904)
 
