@@ -162,10 +162,11 @@ bool QECLayer::extractsAreBeforeExistingOps(QECOpInterface op) const
         for (auto operand : op->getOperands()) {
             auto defOp = operand.getDefiningOp();
             // Only meaningful to compare within the same block
-            if (auto extractOp = llvm::dyn_cast_or_null<quantum::ExtractOp>(defOp);
-                extractOp->getBlock() == existingOp->getBlock() &&
-                !extractOp->isBeforeInBlock(existingOp)) {
-                return false;
+            if (auto extractOp = llvm::dyn_cast_or_null<quantum::ExtractOp>(defOp)) {
+                if (extractOp->getBlock() == existingOp->getBlock() &&
+                    !extractOp->isBeforeInBlock(existingOp)) {
+                    return false;
+                }
             }
         }
     }
@@ -178,10 +179,11 @@ bool QECLayer::insertsAreAfterExistingOps(QECOpInterface op) const
     for (auto existingOp : ops) {
         for (auto result : op->getResults()) {
             for (auto user : result.getUsers()) {
-                if (auto insertOp = llvm::dyn_cast<quantum::InsertOp>(user);
-                    insertOp->getBlock() == existingOp->getBlock() &&
-                    insertOp->isBeforeInBlock(existingOp)) {
-                    return false;
+                if (auto insertOp = llvm::dyn_cast<quantum::InsertOp>(user)) {
+                    if (insertOp->getBlock() == existingOp->getBlock() &&
+                        insertOp->isBeforeInBlock(existingOp)) {
+                        return false;
+                    }
                 }
             }
         }
