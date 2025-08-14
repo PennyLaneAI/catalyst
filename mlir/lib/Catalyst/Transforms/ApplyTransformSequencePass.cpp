@@ -187,7 +187,7 @@ struct ApplyTransformSequencePass
             }
         });
 
-        if (auto *passInstrumentor = getAnalysisManager().getPassInstrumentor(); passInstrumentor) {
+        if (PassInstrumentor *passInstrumentor = getAnalysisManager().getPassInstrumentor()) {
             // Manually execute the transform sequence with individual subpass tracking
             if (auto namedSequence =
                     dyn_cast<mlir::transform::NamedSequenceOp>(transformer_main_sequence)) {
