@@ -12,14 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <algorithm>
-#include <cstddef>
-#include <iterator>
-#include <llvm/ADT/STLExtras.h>
-#include <llvm/ADT/SetVector.h>
-#include <map>
-#include <mlir/Support/WalkResult.h>
 #define DEBUG_TYPE "t-layer-reduction"
+
+#include <algorithm>
+
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 
