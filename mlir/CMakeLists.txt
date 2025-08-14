@@ -80,7 +80,7 @@ foreach(STABLEHLO_LIB IN LISTS STABLEHLO_LIBS)
     target_link_libraries(ExternalStablehloLib INTERFACE ${STABLEHLO_LIB})
 endforeach()
 
-target_include_directories(ExternalStablehloLib INTERFACE
+target_include_directories(ExternalStablehloLib SYSTEM INTERFACE
   ${STABLEHLO_DIR}
   ${STABLEHLO_BUILD_DIR} # for the generated .inc files
 )
