@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #define DEBUG_TYPE "partition-layers"
+
 #include "mlir/IR/IRMapping.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
@@ -31,48 +32,52 @@ namespace qec {
 
 void eraseUnusedOps(QECLayer &layer, IRRewriter &writer)
 {
-    // Erase standalone QEC ops in the layer one by one
-    // Max iteration is set to avoid infinite loop
-    int maxIter = layer.ops.size() * 2;
-    while (!layer.ops.empty() && maxIter > 0) {
-        for (auto op : llvm::reverse(layer.ops)) {
-            // Only erase if not part of register operation and not used
+    // Erase original QEC ops from the block after wiring the layer results
+    // Bound iterations to avoid pathological loops
+    int maxIter = static_cast<int>(layer.getOps().size()) * 2;
+    while (!layer.getOps().empty() && maxIter > 0) {
+        for (auto op : llvm::reverse(layer.getOps())) {
+            // Only erase if now unused
             if (op->use_empty()) {
                 writer.eraseOp(op);
-                layer.ops.erase(std::remove(layer.ops.begin(), layer.ops.end(), op),
-                                layer.ops.end());
+                layer.removeOpRecord(op);
             }
         }
         maxIter--;
     }
 
-    assert(layer.ops.empty() && "Layer ops should be empty after construction");
+    assert(layer.getOps().empty() && "Expected no remaining ops after layer erasure");
 }
 
-void constructLayer(QECLayer layer, IRRewriter &writer)
+void constructLayer(QECLayer &layer, IRRewriter &writer)
 {
     if (layer.empty())
         return;
 
-    auto loc = layer.ops.front().getLoc();
-    auto inOperands = ValueRange(layer.operands.getArrayRef());
-    auto outResults = ValueRange(layer.results.getArrayRef());
+    auto loc = layer.getOps().front()->getLoc();
+    auto inOperands = ValueRange(layer.getOperands().getArrayRef());
+    llvm::SmallVector<Value> orderedResults = layer.getResultsOrderedByTypeThenOperand();
+    auto outResults = ValueRange(orderedResults);
 
-    writer.setInsertionPointAfter(layer.ops.back());
+    OpBuilder::InsertionGuard guard(writer);
+    writer.setInsertionPointAfter(layer.getOps().back());
 
     auto layerOp = writer.create<qec::LayerOp>(
         loc, inOperands, outResults,
         [&](OpBuilder &builder, Location loc, ValueRange operands, ValueRange results) {
-            // Map the input operands to the layerOp's arguments
+            // Map input operands to the layer's block arguments (block arguments are entries)
             IRMapping mapper;
             mapper.map(inOperands, operands);
             llvm::SmallVector<Value> newResults(results.begin(), results.end());
 
-            for (auto op : layer.ops) {
+            for (const auto &op : layer.getOps()) {
                 auto newOp = op->clone(mapper);
                 builder.insert(newOp);
 
-                // Config the output results and map to the yield op
+                // Ensure subsequent clones remap uses of this op's results
+                mapper.map(op->getResults(), newOp->getResults());
+
+                // Rewrite yield operands to the cloned results where applicable
                 for (auto [i, result] : llvm::enumerate(outResults)) {
                     for (auto [j, newResult] : llvm::enumerate(op->getResults())) {
                         if (result == newResult) {
@@ -84,18 +89,18 @@ void constructLayer(QECLayer layer, IRRewriter &writer)
             builder.create<qec::YieldOp>(loc, newResults);
         });
 
-    // Replace the use of the original operations outside the layer with the new results
+    // Replace all uses of the original SSA results with the new layer results
     for (auto [prevResult, newResult] : llvm::zip(outResults, layerOp->getResults())) {
         prevResult.replaceAllUsesWith(newResult);
     }
 
-    // Erase the ops in the layer one by one
+    // Erase the original ops now that uses are replaced
     eraseUnusedOps(layer, writer);
 }
 
 bool isParentLayerOp(QECOpInterface op)
 {
-    // Skip if the ancestor(s) is a layer op
+    // Skip ops nested inside an existing qec.layer region
     auto parentOp = op->getParentOp();
     while (parentOp != nullptr) {
         if (isa<LayerOp>(parentOp))
@@ -115,13 +120,13 @@ struct PartitionLayersPass : public impl::PartitionLayersPassBase<PartitionLayer
         MLIRContext *context = &getContext();
         mlir::IRRewriter writer(context);
 
-        // Create thread-local context for this pass instance
+        // Create per-pass context for layer construction
         QECLayerContext layerContext;
         QECLayer currentLayer(&layerContext);
 
-        // Group the ops into layers in memory
+        // Accumulate consecutive QEC ops into a layer
         getOperation()->walk([&](QECOpInterface op) {
-            // Skip if the parent is a layer op
+            // Skip ops nested inside an existing qec.layer region
             if (isParentLayerOp(op))
                 return WalkResult::skip();
 
@@ -129,17 +134,15 @@ struct PartitionLayersPass : public impl::PartitionLayersPassBase<PartitionLayer
             if (currentLayer.insert(op))
                 return WalkResult::advance();
 
-            // Construct the current layer
             constructLayer(currentLayer, writer);
 
-            // Reset the current layer and insert the op
+            // Start a new layer and insert the op
             currentLayer = QECLayer(&layerContext);
             currentLayer.insert(op);
 
             return WalkResult::advance();
         });
 
-        // Construct the last layer
         constructLayer(currentLayer, writer);
     };
 };

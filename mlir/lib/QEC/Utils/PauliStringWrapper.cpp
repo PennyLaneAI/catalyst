@@ -17,6 +17,7 @@
 #include <stim/stabilizers/pauli_string.h>
 
 #include "QEC/Utils/PauliStringWrapper.h"
+#include "Quantum/IR/QuantumOps.h" // for quantum::AllocQubitOp
 
 namespace catalyst {
 namespace qec {
@@ -87,12 +88,21 @@ bool PauliStringWrapper::commutes(const PauliStringWrapper &other) const
 PauliStringWrapper
 PauliStringWrapper::computeCommutationRulesWith(const PauliStringWrapper &rhs) const
 {
-    // P * P' * i
-    stim::FlexPauliString result =
-        (*this->pauliString) * (*rhs.pauliString) * stim::FlexPauliString::from_text("i");
-
+    stim::FlexPauliString result = *rhs.pauliString;
+    assert(llvm::isa<PPRotationOp>(this->op) && "Clifford Operation is not PPRotationOp");
+    auto this_op = llvm::cast<PPRotationOp>(this->op);
+    if (this_op.hasPiOverTwoRotation()) {
+        // -P'
+        result.value.sign = !result.value.sign;
+    }
+    else if (this_op.hasPiOverFourRotation()) {
+        // P * P' * i
+        result = (*this->pauliString) * result * stim::FlexPauliString::from_text("i");
+    }
+    else {
+        llvm_unreachable("Clifford rotation should be π/2 or π/4");
+    }
     assert(!result.imag && "Resulting Pauli string should be real");
-
     return PauliStringWrapper(std::move(result));
 }
 
@@ -118,9 +128,16 @@ template PauliWord expandPauliWord<llvm::SetVector<Value>, std::vector<Value>>(
 
 PauliWordPair normalizePPROps(QECOpInterface lhs, QECOpInterface rhs)
 {
-    auto lhsQubits = lhs.getOutQubits();
-    auto rhsQubits = rhs.getInQubits();
+    // Materialize std::vector<Value> from the operand/result ranges
+    std::vector<Value> lhsQubits(lhs.getOutQubits().begin(), lhs.getOutQubits().end());
+    std::vector<Value> rhsQubits(rhs.getInQubits().begin(), rhs.getInQubits().end());
 
+    return normalizePPROps(lhs, rhs, lhsQubits, rhsQubits);
+}
+
+PauliWordPair normalizePPROps(QECOpInterface lhs, QECOpInterface rhs, std::vector<Value> lhsQubits,
+                              std::vector<Value> rhsQubits)
+{
     llvm::SetVector<Value> qubits;
     qubits.insert(lhsQubits.begin(), lhsQubits.end());
     qubits.insert(rhsQubits.begin(), rhsQubits.end());
