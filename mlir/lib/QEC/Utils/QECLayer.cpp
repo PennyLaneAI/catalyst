@@ -33,32 +33,41 @@ void QECLayer::insertToLayer(QECOpInterface op)
 
 void QECLayer::updateResultAndOperand(QECOpInterface op)
 {
-    for (auto [operandValOpt, resultValOpt] :
-         llvm::zip_longest(op->getOperands(), op->getResults())) {
-        Value operandValue = operandValOpt.value_or(nullptr);
-        Value resultValue = resultValOpt.value_or(nullptr);
+    // Ensure layer operand set contains canonical origins for any input qubits
+    llvm::SmallVector<Value> inQubits(op.getInQubits().begin(), op.getInQubits().end());
+    llvm::SmallVector<Value> outQubits(op.getOutQubits().begin(), op.getOutQubits().end());
 
-        // update operands
-        if (operandValue != nullptr) {
-            if (resultToOperand.contains(operandValue)) {
-                auto originValue = resultToOperand[operandValue];
-                resultToOperand[resultValue] = originValue;
-                resultToOperand.erase(operandValue);
-            }
-            else {
-                resultToOperand[resultValue] = operandValue;
-                operands.insert(operandValue);
-            }
+    // Map each input qubit to its canonical origin (entry) for this layer
+    llvm::SmallVector<Value> inputOrigins;
+    inputOrigins.reserve(inQubits.size());
+    for (Value in : inQubits) {
+        // If the operand was a previously exposed result, remove it from layer results
+        if (results.contains(in)) {
+            results.remove(in);
         }
 
-        // update results
-        if (resultValue != nullptr) {
-            if (results.contains(operandValue)) {
-                results.remove(operandValue);
-            }
-            results.insert(resultValue);
+        Value origin = in;
+        if (resultToOperand.contains(in)) {
+            origin = resultToOperand[in];
+        }
+        inputOrigins.push_back(origin);
+        operands.insert(origin);
+    }
+
+    // Insert non-qubit results first (e.g., classical measurements)
+    for (Value r : op->getResults()) {
+        if (!llvm::isa<catalyst::quantum::QubitType>(r.getType())) {
+            results.insert(r);
         }
     }
+
+    // Pair qubit outputs with corresponding input origins and update mappings
+    for (auto [origin, out] : llvm::zip(inputOrigins, outQubits)) {
+        resultToOperand[out] = origin;
+        results.insert(out);
+    }
+
+    // For QEC ops, number of out qubits matches number of in qubits.
 }
 
 Operation *QECLayer::getParentLayer()
@@ -242,6 +251,32 @@ bool QECLayer::insert(QECOpInterface op)
     }
 
     return false;
+}
+
+llvm::SmallVector<mlir::Value> QECLayer::getResultsOrderedByTypeThenOperand() const
+{
+    llvm::SmallVector<mlir::Value> ordered;
+
+    // 1. Classical first (stable)
+    for (mlir::Value v : results) {
+        if (!llvm::isa<catalyst::quantum::QubitType>(v.getType())) {
+            ordered.push_back(v);
+        }
+    }
+
+    // 2. Qubits grouped by operand order via origin mapping (stable nested scan)
+    for (mlir::Value operand : operands) {
+        for (mlir::Value v : results) {
+            if (!llvm::isa<catalyst::quantum::QubitType>(v.getType()))
+                continue;
+            auto it = resultToOperand.find(v);
+            if (it != resultToOperand.end() && it->second == operand) {
+                ordered.push_back(v);
+            }
+        }
+    }
+
+    return ordered;
 }
 
 } // namespace qec

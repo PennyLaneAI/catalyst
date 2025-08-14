@@ -56,7 +56,8 @@ void constructLayer(QECLayer layer, IRRewriter &writer)
 
     auto loc = layer.ops.front().getLoc();
     auto inOperands = ValueRange(layer.operands.getArrayRef());
-    auto outResults = ValueRange(layer.results.getArrayRef());
+    llvm::SmallVector<Value> orderedResults = layer.getResultsOrderedByTypeThenOperand();
+    auto outResults = ValueRange(orderedResults);
 
     writer.setInsertionPointAfter(layer.ops.back());
 

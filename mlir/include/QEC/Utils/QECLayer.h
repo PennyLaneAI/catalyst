@@ -14,19 +14,16 @@
 
 #pragma once
 
+#include "llvm/ADT/SetVector.h"
+// #include "llvm/Support/Casting.h"
+
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/Value.h"
-#include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/DenseSet.h"
-#include "llvm/ADT/MapVector.h"
-#include "llvm/ADT/SetVector.h"
 
 #include "QEC/IR/QECDialect.h"
 #include "QEC/IR/QECOpInterfaces.h"
-// For quantum::QubitType and mlir::BlockArgument
 #include "Quantum/IR/QuantumDialect.h"
 #include "mlir/IR/Block.h"
-#include "llvm/Support/Casting.h"
 
 namespace catalyst {
 namespace qec {
@@ -166,6 +163,11 @@ class QECLayer {
 
     // Get the current context (for debugging)
     QECLayerContext *getContext() const { return context; }
+
+    // Return layer results ordered as:
+    //  1. All non-qubit (classical) results first, preserving program order
+    //  2. Followed by qubit results ordered to match the order of layer operands
+    llvm::SmallVector<mlir::Value> getResultsOrderedByTypeThenOperand() const;
 };
 
 } // namespace qec
