@@ -124,6 +124,9 @@ def test_param(backend):
         qml.IsingZZ(x, wires=[0, 1])
         qml.IsingZZ(y, wires=[1, 2])
 
+        qml.SingleExcitation(x, wires=[0, 1])
+        qml.SingleExcitation(y, wires=[1, 2])
+
         qml.CRX(x, wires=[0, 1])
         qml.CRY(x, wires=[0, 1])
         qml.CRZ(x, wires=[0, 1])

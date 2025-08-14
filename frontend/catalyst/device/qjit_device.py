@@ -71,6 +71,7 @@ RUNTIME_OPERATIONS = [
     "IsingXY",
     "IsingYY",
     "IsingZZ",
+    "SingleExcitation",
     "ISWAP",
     "MultiRZ",
     "PauliX",
