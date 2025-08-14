@@ -99,7 +99,7 @@ stablehlo:
 	@echo "build stablehlo"
 
 	cmake -G Ninja -S stablehlo -B $(STABLEHLO_BUILD_DIR) \
-		-DSTABLEHLO_ENABLE_LLD=ON \
+		-DSTABLEHLO_ENABLE_LLD=$(ENABLE_LLD) \
 		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
 		-DMLIR_DIR=$(LLVM_BUILD_DIR)/lib/cmake/mlir \
 		-DLLVM_ENABLE_ASSERTIONS=ON \
