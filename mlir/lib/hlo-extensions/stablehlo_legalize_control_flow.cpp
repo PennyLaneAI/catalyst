@@ -41,6 +41,7 @@ limitations under the License.
 #include <optional>
 #include <utility>
 
+#include "llvm/Support/Casting.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h" // TF:llvm-project
@@ -56,9 +57,8 @@ limitations under the License.
 #include "mlir/Transforms/DialectConversion.h"
 #include "stablehlo/dialect/StablehloOps.h"
 #include "stablehlo/transforms/Passes.h"
-#include "llvm/Support/Casting.h"
 
-#include "stablehlo/Passes.h"
+#include "hlo-extensions/Passes.h"
 
 using namespace mlir;
 using namespace stablehlo;
@@ -68,7 +68,7 @@ namespace catalyst {
 
 #define GEN_PASS_DEF_STABLEHLOLEGALIZECONTROLFLOWPASS
 #define GEN_PASS_DECL_STABLEHLOLEGALIZECONTROLFLOWPASS
-#include "stablehlo/Passes.h.inc"
+#include "hlo-extensions/Passes.h.inc"
 
 } // namespace catalyst
 

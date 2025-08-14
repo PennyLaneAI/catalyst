@@ -31,7 +31,7 @@
 #include "Mitigation/Transforms/Passes.h"
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/Transforms/Passes.h"
-#include "stablehlo/Passes.h"
+#include "hlo-extensions/Passes.h"
 
 using namespace mlir;
 namespace catalyst {

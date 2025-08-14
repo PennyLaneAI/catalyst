@@ -14,11 +14,11 @@
 
 #define DEBUG_TYPE "scatter"
 
+#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/PatternMatch.h"
 #include "stablehlo/dialect/StablehloOps.h"
-#include "llvm/Support/Debug.h"
 
 #include "Catalyst/IR/CatalystOps.h"
 

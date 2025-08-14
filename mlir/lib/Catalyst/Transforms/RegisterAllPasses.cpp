@@ -22,7 +22,7 @@
 #include "QEC/Transforms/Passes.h"
 #include "Quantum/Transforms/Passes.h"
 #include "Test/Transforms/Passes.h"
-#include "stablehlo/Passes.h"
+#include "hlo-extensions/Passes.h"
 
 void catalyst::registerAllCatalystPasses()
 {
