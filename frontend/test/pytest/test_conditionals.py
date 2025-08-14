@@ -359,7 +359,7 @@ class TestCond:
             expected_dtype = jnp.dtype(
                 "float64" if jax.config.values["jax_enable_x64"] else "float32"
             )
-            assert all(r[i].dtype is expected_dtype for i in range(len(r)))
+            assert all(v.dtype is expected_dtype for _, v in r.items())
             return r
 
         assert {0: 0.7, 1: 1.0} == circuit(False, True)
