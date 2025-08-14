@@ -19,8 +19,8 @@
 #include "mlir/IR/PatternMatch.h"
 
 #include "QEC/IR/QECDialect.h"
-#include "QEC/Transforms/Patterns.h"
 #include "QEC/IR/QECOpInterfaces.h"
+#include "QEC/Transforms/Patterns.h"
 
 using namespace mlir;
 
