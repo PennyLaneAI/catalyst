@@ -203,8 +203,8 @@ jobs:
     - name: Build Stablehlo Dialect
       if: steps.cache-stablehlo-build.outputs.cache-hit != 'true'
       run: |
-        C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
-        CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
+        C_COMPILER=$(which gcc) \
+        CXX_COMPILER=$(which g++) \
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \
         STABLEHLO_BUILD_DIR="$GITHUB_WORKSPACE/stablehlo-build" \
         COMPILER_LAUNCHER="" \

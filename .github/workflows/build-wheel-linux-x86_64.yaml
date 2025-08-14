@@ -225,18 +225,12 @@ jobs:
     - name: Build Stablehlo Dialect
       if: steps.cache-stablehlo-build.outputs.cache-hit != 'true'
       run: |
-        export PATH=$GITHUB_WORKSPACE/llvm-build/bin:$PATH
-        cmake -S $GITHUB_WORKSPACE/mlir/stablehlo -B $GITHUB_WORKSPACE/stablehlo-build -G Ninja \
-              -DCMAKE_BUILD_TYPE=Release \
-              -DLLVM_ENABLE_ASSERTIONS=ON \
-              -DMLIR_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir" \
-              -DSTABLEHLO_ENABLE_LLD=ON \
-              -DSTABLEHLO_ENABLE_BINDINGS_PYTHON=OFF \
-              -DSTABLEHLO_ENABLE_SPLIT_DWARF=ON \
-              -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
-              -DCMAKE_CXX_VISIBILITY_PRESET=default
-
-        cmake --build $GITHUB_WORKSPACE/stablehlo-build
+        C_COMPILER=$(which gcc) \
+        CXX_COMPILER=$(which g++) \
+        LLVM_BUILD_DIR="$(pwd)/llvm-build" \
+        STABLEHLO_BUILD_DIR="$GITHUB_WORKSPACE/stablehlo-build" \
+        COMPILER_LAUNCHER="" \
+        make stablehlo
 
     - name: Save Stablehlo Build
       id: save-stablehlo-build
