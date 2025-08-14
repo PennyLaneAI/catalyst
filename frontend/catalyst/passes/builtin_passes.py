@@ -343,6 +343,8 @@ def merge_rotations(qnode):
     :class:`qml.CRZ <pennylane.CRZ>`,
     :class:`qml.PhaseShift <pennylane.PhaseShift>`,
     :class:`qml.ControlledPhaseShift <pennylane.ControlledPhaseShift>`,
+    :class:`qml.Rot <pennylane.Rot>`,
+    :class:`qml.CRot <pennylane.CRot>`,
     :class:`qml.MultiRZ <pennylane.MultiRZ>`.
 
 
@@ -528,7 +530,7 @@ def to_ppr(qnode):
 
     .. note::
 
-        The circuit that generated from this pass are currently
+        The circuits that generated from this pass are currently
         only not executable in any backend. This pass is only for analysis
         and potential future execution when a suitable backend is available.
 

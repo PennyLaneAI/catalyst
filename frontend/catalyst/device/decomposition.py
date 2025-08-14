@@ -348,7 +348,7 @@ def measurements_from_samples(tape, device_wires):
         results_processed = []
         for m in tape.measurements:
             if isinstance(m, (ExpectationMP, VarianceMP, ProbabilityMP, SampleMP)):
-                if len(tape.shots.shot_vector) > 1:
+                if tape.shots.has_partitioned_shots:
                     res = tuple(m.process_samples(s, measured_wires) for s in samples)
                 else:
                     res = m.process_samples(samples, measured_wires)
