@@ -15,6 +15,7 @@ get_property(conversion_libs GLOBAL PROPERTY MLIR_CONVERSION_LIBS)
 set(LIBS
     ${dialect_libs}
     ${conversion_libs}
+    ExternalStablehloLib
 )
 
 set(DEPENDS
@@ -29,4 +30,3 @@ target_include_directories(${LIBRARY_NAME} PUBLIC
                            .
                            ${PROJECT_SOURCE_DIR}/include
                            ${CMAKE_BINARY_DIR}/include)
-target_link_libraries(${LIBRARY_NAME} PRIVATE ExternalStablehloLib)

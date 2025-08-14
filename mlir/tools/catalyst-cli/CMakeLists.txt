@@ -23,6 +23,7 @@ set(LIBS
     ${dialect_libs}
     ${conversion_libs}
     ${extension_libs}
+    ExternalStablehloLib
     MLIROptLib
     MLIRCatalyst
     catalyst-transforms
@@ -46,7 +47,6 @@ set(LIBS
 
 add_mlir_tool(catalyst-cli catalyst-cli.cpp SUPPORT_PLUGINS)
 target_link_libraries(catalyst-cli PRIVATE ${LIBS})
-target_link_libraries(catalyst-cli PRIVATE ExternalStablehloLib)
 llvm_update_compile_flags(catalyst-cli)
 mlir_check_all_link_libraries(catalyst-cli)
 export_executable_symbols_for_plugins(catalyst-cli)

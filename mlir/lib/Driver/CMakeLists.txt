@@ -25,6 +25,7 @@ set(LIBS
     ${conversion_libs}
     ${extension_libs}
     ${translation_libs}
+    ExternalStablehloLib
     MLIROptLib
     MLIRCatalyst
     catalyst-transforms
@@ -52,5 +53,3 @@ add_mlir_library(CatalystCompilerDriver
     LINK_LIBS PRIVATE
     ${LIBS}
 )
-
-target_link_libraries(CatalystCompilerDriver PRIVATE ExternalStablehloLib)
