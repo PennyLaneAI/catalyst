@@ -127,6 +127,9 @@ def test_param(backend):
         qml.SingleExcitation(x, wires=[0, 1])
         qml.SingleExcitation(y, wires=[1, 2])
 
+        qml.DoubleExcitation(x, wires=[0, 1, 2, 3])
+        qml.DoubleExcitation(y, wires=[2, 3, 0, 1])
+
         qml.CRX(x, wires=[0, 1])
         qml.CRY(x, wires=[0, 1])
         qml.CRZ(x, wires=[0, 1])
