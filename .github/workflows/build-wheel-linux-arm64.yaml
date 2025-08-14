@@ -208,6 +208,7 @@ jobs:
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \
         STABLEHLO_BUILD_DIR="$GITHUB_WORKSPACE/stablehlo-build" \
         COMPILER_LAUNCHER="" \
+        ENABLE_LLD=OFF \
         make stablehlo
 
     - name: Save Stablehlo Build
