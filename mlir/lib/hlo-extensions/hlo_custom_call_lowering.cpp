@@ -16,13 +16,13 @@
 
 #include <vector>
 
-#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Index/IR/IndexDialect.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "stablehlo/dialect/StablehloOps.h"
 #include "stablehlo/transforms/Passes.h"
+#include "llvm/Support/Debug.h"
 
 #include "Catalyst/IR/CatalystDialect.h"
 #include "hlo-extensions/Passes.h"

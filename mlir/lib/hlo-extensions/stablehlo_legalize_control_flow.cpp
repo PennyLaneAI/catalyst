@@ -41,7 +41,6 @@ limitations under the License.
 #include <optional>
 #include <utility>
 
-#include "llvm/Support/Casting.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h" // TF:llvm-project
@@ -57,6 +56,7 @@ limitations under the License.
 #include "mlir/Transforms/DialectConversion.h"
 #include "stablehlo/dialect/StablehloOps.h"
 #include "stablehlo/transforms/Passes.h"
+#include "llvm/Support/Casting.h"
 
 #include "hlo-extensions/Passes.h"
 

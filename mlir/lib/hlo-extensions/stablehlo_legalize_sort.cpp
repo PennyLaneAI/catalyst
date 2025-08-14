@@ -41,7 +41,6 @@ limitations under the License.
 #include <memory>
 #include <utility>
 
-#include "llvm/ADT/STLExtras.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
@@ -64,6 +63,7 @@ limitations under the License.
 #include "mlir/Transforms/DialectConversion.h"
 #include "stablehlo/dialect/StablehloOps.h"
 #include "stablehlo/transforms/Passes.h"
+#include "llvm/ADT/STLExtras.h"
 
 #include "hlo-extensions/Passes.h"
 
