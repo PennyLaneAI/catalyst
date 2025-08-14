@@ -137,4 +137,10 @@ def PartitionLayersPass : Pass<"partition-layers"> {
     let constructor = "catalyst::createPartitionLayersPass()";
 }
 
+def TLayerReductionPass : Pass<"t-layer-reduction"> {
+    let summary = "Reduce T layers to PPR operations.";
+    
+    let constructor = "catalyst::createTLayerReductionPass()";
+}
+
 #endif // QEC_PASSES

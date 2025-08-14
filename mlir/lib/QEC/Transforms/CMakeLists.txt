@@ -16,6 +16,7 @@ file(GLOB SRC
     PPRDecomposeUtils.cpp
     ppm_compilation.cpp
     PartitionLayers.cpp
+    TLayerReduction.cpp
 )
 
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)
