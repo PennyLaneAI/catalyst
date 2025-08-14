@@ -47,6 +47,9 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Fix type promotion on branch
+  [(#1977)](https://github.com/PennyLaneAI/catalyst/pull/1977)
+
 * Fix errors in AutoGraph transformed functions when `qml.prod` is used together with other operator
   transforms (e.g. `qml.adjoint`).
   [(#1910)](https://github.com/PennyLaneAI/catalyst/pull/1910)
