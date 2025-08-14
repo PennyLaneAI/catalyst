@@ -13,7 +13,7 @@
 # limitations under the License.
 
 """
-This module tests the from_plxpr QregManager object.
+This module tests the from_plxpr QregManager and QubitValueMap objects.
 
 Quoted from the object's docstring:
 
@@ -42,7 +42,7 @@ from jax.core import set_current_trace, take_current_trace
 from jax.extend.core import Primitive
 from jax.interpreters.partial_eval import DynamicJaxprTrace
 
-from catalyst.from_plxpr.qreg_manager import QregManager
+from catalyst.from_plxpr.qreg_manager import QregManager, QubitValueMap
 from catalyst.jax_primitives import AbstractQbit, AbstractQreg, qalloc_p, qextract_p
 from catalyst.utils.exceptions import CompileError
 
@@ -343,6 +343,75 @@ class TestQregAndQubit:
               in () }"""
             expected = textwrap.dedent(expected)
             assert observed_jaxpr == expected
+
+
+class TestQubitValueMap:
+    """Unit test for QubitValueMap."""
+
+    def test_getter_setter(self):
+        """Test getter and setter"""
+
+        qbit_map = QubitValueMap([])
+
+        with pytest.raises(NotImplementedError):
+            qbit_map.set("monkey_mock_qreg")
+            qbit_map.get()
+
+    def test_extract(self):
+        """Test that extracting a qubit from a QubitValueMap raises NotImplementedError"""
+        qbit_map = QubitValueMap([])
+
+        with pytest.raises(NotImplementedError):
+            qbit_map.extract(0)
+
+    def test_insert(self):
+        """Test that inserting a qubit into a QubitValueMap raises NotImplementedError"""
+        qbit_map = QubitValueMap([])
+
+        with pytest.raises(NotImplementedError):
+            qbit_map.insert(0, "monkey_mock_qubit")
+
+        with pytest.raises(NotImplementedError):
+            qbit_map.insert_all_dangling_qubits()
+
+        assert qbit_map.insert_dynamic_qubits(0) is None
+
+    def test_get_final_qubits(self):
+        """Test that getting final qubits from a QubitValueMap raises NotImplementedError"""
+        q0 = AbstractQbit()
+        q1 = AbstractQbit()
+        qbit_map = QubitValueMap([q0, q1])
+
+        assert qbit_map.get_final_qubits() == [q0, q1]
+
+        qbit_map = QubitValueMap([])
+        assert qbit_map.get_final_qubits() == []
+
+    def test_getitem_setitem(self):
+        """Test that getting and setting items in a QubitValueMap raises NotImplementedError"""
+        q0 = AbstractQbit()
+        qbit_map = QubitValueMap([q0])
+
+        assert qbit_map[q0] == q0
+
+        with pytest.raises(KeyError, match="Unknown Qubit index"):
+            _ = qbit_map[0]
+
+        q1 = AbstractQbit()
+        qbit_map[q1] = q1
+        assert qbit_map[q1] == q1
+
+        qbit_map[0] = q1
+        assert qbit_map[0] == q1
+
+    def test_iter(self):
+        """Test that iterating over a QubitValueMap works as expected"""
+        q0 = AbstractQbit()
+        q1 = AbstractQbit()
+        qbit_map = QubitValueMap([q0, q1])
+
+        target_dictionary = {q0: q0, q1: q1}
+        assert dict(qbit_map) == target_dictionary
 
 
 if __name__ == "__main__":
