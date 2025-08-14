@@ -38,7 +38,6 @@ static std::string getTransformOpName(mlir::transform::TransformOpInterface tran
 {
     std::string baseName = transformOp->getName().getStringRef().str();
 
-
     if (auto applyPassOp =
             dyn_cast<mlir::transform::ApplyRegisteredPassOp>(transformOp.getOperation())) {
         if (auto passName = applyPassOp.getPassName(); !passName.empty()) {
