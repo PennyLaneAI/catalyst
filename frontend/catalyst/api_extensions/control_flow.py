@@ -1569,7 +1569,9 @@ def _assert_cond_result_structure(trees: List[PyTreeDef]):
 def _assert_cond_result_types(signatures: List[List[AbstractValue]]):
     """Ensure a consistent type signature across branch results."""
     num_results = len(signatures[0])
-    assert all(len(sig) == num_results for sig in signatures), "mismatch: number or results"
+
+    if not all(len(sig) == num_results for sig in signatures):
+        raise TypeError("mismatch: number of results")
 
     for i in range(num_results):
         aval_slice = [avals[i] for avals in signatures]
