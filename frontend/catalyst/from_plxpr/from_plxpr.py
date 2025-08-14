@@ -399,7 +399,7 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
 
         shape, dtype = measurement._abstract_eval(
             n_wires=len(measurement.wires),
-            shots=self.device.shots.total_shots,
+            shots=self.shots,
             num_device_wires=len(self.device.wires),
         )
 
