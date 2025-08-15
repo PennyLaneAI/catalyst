@@ -308,15 +308,14 @@ class TestMidCircuitMeasurement:
 
         @qjit
         @qml.qnode(dev, mcm_method=None, postselect_mode=postselect_mode)
-        def circuit(x):
+        def circuit1(x):
             qml.RX(x, 0)
             measure(0)
             return qml.expval(qml.Z(0))
 
         spy = mocker.spy(catalyst.qfunc, "dynamic_one_shot")
-        _ = circuit(1.8)
-        expected_call_count = 1 if postselect_mode == "hw-like" else 0
-        assert spy.call_count == expected_call_count
+        _ = circuit1(1.8)
+        assert spy.call_count == 1
 
     @pytest.mark.xfail(
         reason="Midcircuit measurements with sampling is unseeded and hence this test is flaky"
@@ -796,7 +795,10 @@ class TestDynamicOneShotIntegration:
 
         @qjit
         def workflow2(x: float):
-            @qml.qnode(qml.device("lightning.qubit", wires=3, shots=10))
+            @qml.qnode(
+                qml.device("lightning.qubit", wires=3, shots=10),
+                mcm_method="single-branch-statistics",
+            )
             def circuit2():
                 qml.CNOT(wires=[0, 1])
                 qml.RX(0, wires=[2])
