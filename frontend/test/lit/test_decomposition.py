@@ -169,6 +169,48 @@ def test_decompose_qubitunitary():
 test_decompose_qubitunitary()
 
 
+def test_decompose_singleexcitation():
+    """
+    Test that single excitation is not decomposed.
+    """
+    dev = get_custom_device_without(2)
+
+    @qjit(target="mlir")
+    @qml.qnode(dev)
+    # CHECK-LABEL: public @jit_decompose_singleexcitation
+    def decompose_singleexcitation(theta: float):
+        # CHECK: quantum.custom "SingleExcitation"
+
+        qml.SingleExcitation(theta, wires=[0, 1])
+        return measure(wires=0)
+
+    print(decompose_singleexcitation.mlir)
+
+
+test_decompose_singleexcitation()
+
+
+def test_decompose_doubleexcitation():
+    """
+    Test that Double excitation is not decomposed.
+    """
+    dev = get_custom_device_without(4)
+
+    @qjit(target="mlir")
+    @qml.qnode(dev)
+    # CHECK-LABEL: public @jit_decompose_doubleexcitation
+    def decompose_doubleexcitation(theta: float):
+        # CHECK: quantum.custom "DoubleExcitation"
+
+        qml.DoubleExcitation(theta, wires=[0, 1, 2, 3])
+        return measure(wires=0)
+
+    print(decompose_doubleexcitation.mlir)
+
+
+test_decompose_doubleexcitation()
+
+
 def test_decompose_singleexcitationplus():
     """
     Test decomposition of single excitation plus.
