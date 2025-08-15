@@ -30,8 +30,11 @@
 
 using namespace mlir;
 using namespace catalyst;
+using namespace catalyst::quantum;
 
 namespace catalyst {
+namespace quantum {
+
 #define GEN_PASS_DEF_DISENTANGLESWAPPASS
 #define GEN_PASS_DECL_DISENTANGLESWAPPASS
 #include "Quantum/Transforms/Passes.h.inc"
@@ -503,9 +506,5 @@ struct DisentangleSWAPPass : public impl::DisentangleSWAPPassBase<DisentangleSWA
     }
 };
 
-std::unique_ptr<Pass> createDisentangleSWAPPass()
-{
-    return std::make_unique<DisentangleSWAPPass>();
-}
-
+} // namespace quantum
 } // namespace catalyst

@@ -31,8 +31,8 @@ using namespace catalyst::ion;
 namespace catalyst {
 namespace ion {
 
-#define GEN_PASS_DECL_IONCONVERSIONPASS
 #define GEN_PASS_DEF_IONCONVERSIONPASS
+#define GEN_PASS_DECL_IONCONVERSIONPASS
 #include "Ion/Transforms/Passes.h.inc"
 
 struct IonTypeConverter : public LLVMTypeConverter {
@@ -74,10 +74,4 @@ struct IonConversionPass : impl::IonConversionPassBase<IonConversionPass> {
 };
 
 } // namespace ion
-
-std::unique_ptr<Pass> createIonConversionPass()
-{
-    return std::make_unique<ion::IonConversionPass>();
-}
-
 } // namespace catalyst

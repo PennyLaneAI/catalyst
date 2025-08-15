@@ -19,8 +19,11 @@
 #include "mlir/Pass/Pass.h"
 
 namespace catalyst {
+namespace ion {
 
-std::unique_ptr<mlir::Pass> createGatesToPulsesPass();
-std::unique_ptr<mlir::Pass> createIonConversionPass();
+#define GEN_PASS_DECL
+#define GEN_PASS_REGISTRATION
+#include "Ion/Transforms/Passes.h.inc"
 
+} // namespace ion
 } // namespace catalyst

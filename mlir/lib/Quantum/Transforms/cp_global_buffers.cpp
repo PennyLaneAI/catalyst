@@ -188,8 +188,10 @@ LogicalResult CopyGlobalMemRefTransform::matchAndRewrite(func::FuncOp op,
 } // namespace
 
 namespace catalyst {
+namespace quantum {
 
 #define GEN_PASS_DEF_COPYGLOBALMEMREFPASS
+#define GEN_PASS_DECL_COPYGLOBALMEMREFPASS
 #include "Quantum/Transforms/Passes.h.inc"
 
 struct CopyGlobalMemRefPass : impl::CopyGlobalMemRefPassBase<CopyGlobalMemRefPass> {
@@ -207,9 +209,5 @@ struct CopyGlobalMemRefPass : impl::CopyGlobalMemRefPassBase<CopyGlobalMemRefPas
     }
 };
 
-std::unique_ptr<Pass> createCopyGlobalMemRefPass()
-{
-    return std::make_unique<CopyGlobalMemRefPass>();
-}
-
+} // namespace quantum
 } // namespace catalyst

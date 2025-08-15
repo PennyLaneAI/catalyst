@@ -103,7 +103,4 @@ struct PPMCompilationPass : public impl::PPMCompilationPassBase<PPMCompilationPa
 };
 
 } // namespace qec
-
-std::unique_ptr<Pass> createPPMCompilationPass() { return std::make_unique<PPMCompilationPass>(); }
-
 } // namespace catalyst

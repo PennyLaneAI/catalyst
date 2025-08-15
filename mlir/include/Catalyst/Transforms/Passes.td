@@ -23,8 +23,6 @@ def DetensorizeSCFPass : Pass<"detensorize-scf"> {
     let dependentDialects = [
         "tensor::TensorDialect"
     ];
-
-    let constructor = "catalyst::createDetensorizeSCFPass()";
 }
 
 def ArrayListToMemRefPass : Pass<"convert-arraylist-to-memref"> {
@@ -40,8 +38,6 @@ def ArrayListToMemRefPass : Pass<"convert-arraylist-to-memref"> {
         "mlir::memref::MemRefDialect",
         "mlir::scf::SCFDialect"
     ];
-
-    let constructor = "catalyst::createArrayListToMemRefPass()";
 }
 
 def CatalystConversionPass : Pass<"convert-catalyst-to-llvm"> {
@@ -51,8 +47,6 @@ def CatalystConversionPass : Pass<"convert-catalyst-to-llvm"> {
         "mlir::func::FuncDialect",
         "mlir::LLVM::LLVMDialect",
     ];
-
-    let constructor = "catalyst::createCatalystConversionPass()";
 }
 
 def ScatterLoweringPass : Pass<"scatter-lowering"> {
@@ -65,8 +59,6 @@ def ScatterLoweringPass : Pass<"scatter-lowering"> {
         "tensor::TensorDialect",
         "scf::SCFDialect"
     ];
-
-    let constructor = "catalyst::createScatterLoweringPass()";
 }
 
 def HloCustomCallLoweringPass : Pass<"hlo-custom-call-lowering"> {
@@ -77,8 +69,6 @@ def HloCustomCallLoweringPass : Pass<"hlo-custom-call-lowering"> {
         "mlir::func::FuncDialect",
         "catalyst::CatalystDialect",
     ];
-
-    let constructor = "catalyst::createHloCustomCallLoweringPass()";
 }
 
 def QnodeToAsyncLoweringPass : Pass<"qnode-to-async-lowering"> {
@@ -89,14 +79,10 @@ def QnodeToAsyncLoweringPass : Pass<"qnode-to-async-lowering"> {
         "mlir::memref::MemRefDialect",
         "bufferization::BufferizationDialect"
     ];
-
-    let constructor = "catalyst::QnodeToAsyncLoweringPass()";
 }
 
 def DisableAssertionPass : Pass<"disable-assertion"> {
     let summary = "Disable all catalyst_assertions.";
-
-    let constructor = "catalyst::createDisableAssertionPass()";
 }
 
 def AddExceptionHandlingPass : Pass<"add-exception-handling"> {
@@ -115,8 +101,6 @@ def AddExceptionHandlingPass : Pass<"add-exception-handling"> {
         "mlir::LLVM::LLVMDialect",
     ];
 
-    let constructor = "catalyst::createAddExceptionHandlingPass()";
-
     let options = [
         Option<
             /*C++ var name=*/"stopAfterStep",
@@ -133,8 +117,6 @@ def AddExceptionHandlingPass : Pass<"add-exception-handling"> {
 
 def GEPInboundsPass : Pass<"gep-inbounds"> {
     let summary = "Mark GEPOp inbounds.";
-
-    let constructor = "catalyst::GEPInboundsPass()";
 }
 
 def MemrefCopyToLinalgCopyPass : Pass<"memrefcpy-to-linalgcpy"> {
@@ -144,8 +126,6 @@ def MemrefCopyToLinalgCopyPass : Pass<"memrefcpy-to-linalgcpy"> {
         "memref::MemRefDialect",
         "linalg::LinalgDialect"
     ];
-
-    let constructor = "catalyst::MemrefCopyToLinalgCopyPass()";
 }
 
 def RegisterInactiveCallbackPass : Pass<"register-inactive-callback", "ModuleOp"> {
@@ -154,9 +134,6 @@ def RegisterInactiveCallbackPass : Pass<"register-inactive-callback", "ModuleOp"
     let dependentDialects = [
         "mlir::LLVM::LLVMDialect"
     ];
-
-    let constructor = "catalyst::createRegisterInactiveCallbackPass()";
-
 }
 
 def MemrefToLLVMWithTBAAPass : Pass<"memref-to-llvm-tbaa", "mlir::ModuleOp"> {
@@ -165,14 +142,10 @@ def MemrefToLLVMWithTBAAPass : Pass<"memref-to-llvm-tbaa", "mlir::ModuleOp"> {
   let dependentDialects = [
         "mlir::LLVM::LLVMDialect"
   ];
-
-  let constructor = "::catalyst::createMemrefToLLVMWithTBAAPass()";
 }
 
 def ApplyTransformSequencePass : Pass<"apply-transform-sequence"> {
     let summary = "Apply the passes scheduled with the transform dialect.";
-
-    let constructor = "catalyst::createApplyTransformSequencePass()";
 }
 
 def InlineNestedModulePass : Pass<"inline-nested-module"> {
@@ -181,8 +154,6 @@ def InlineNestedModulePass : Pass<"inline-nested-module"> {
     let dependentDialects = [
         "mlir::func::FuncDialect"
     ];
-
-    let constructor = "catalyst::createInlineNestedModulePass()";
 
     let options = [
         Option<
@@ -209,7 +180,7 @@ def InlineNestedModulePass : Pass<"inline-nested-module"> {
 //   * See https://llvm.org/LICENSE.txt for license information.
 //   * SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-def BufferDeallocation : Pass<"buffer-deallocation", "func::FuncOp"> {
+def BufferDeallocationPass : Pass<"buffer-deallocation", "func::FuncOp"> {
   let summary = "Adds all required dealloc operations for all allocations in "
                 "the input program";
   let description = [{
@@ -279,7 +250,6 @@ def BufferDeallocation : Pass<"buffer-deallocation", "func::FuncOp"> {
     ```
 
   }];
-  let constructor = "mlir::bufferization::createBufferDeallocationPass()";
 }
 
 #endif // CATALYST_PASSES

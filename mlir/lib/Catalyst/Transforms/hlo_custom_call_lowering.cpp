@@ -53,8 +53,4 @@ struct HloCustomCallLoweringPass : impl::HloCustomCallLoweringPassBase<HloCustom
     }
 };
 
-std::unique_ptr<Pass> createHloCustomCallLoweringPass()
-{
-    return std::make_unique<HloCustomCallLoweringPass>();
-}
 } // namespace catalyst

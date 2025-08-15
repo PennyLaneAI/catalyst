@@ -49,7 +49,4 @@ struct CommutePPRPass : public impl::CommutePPRPassBase<CommutePPRPass> {
 };
 
 } // namespace qec
-
-std::unique_ptr<Pass> createCommutePPRPass() { return std::make_unique<CommutePPRPass>(); }
-
 } // namespace catalyst

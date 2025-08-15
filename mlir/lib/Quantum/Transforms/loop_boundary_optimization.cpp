@@ -60,10 +60,4 @@ struct LoopBoundaryOptimizationPass
 };
 
 } // namespace quantum
-
-std::unique_ptr<Pass> createLoopBoundaryOptimizationPass()
-{
-    return std::make_unique<quantum::LoopBoundaryOptimizationPass>();
-}
-
 } // namespace catalyst

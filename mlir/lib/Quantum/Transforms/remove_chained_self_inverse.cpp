@@ -76,10 +76,4 @@ struct RemoveChainedSelfInversePass
 };
 
 } // namespace quantum
-
-std::unique_ptr<Pass> createRemoveChainedSelfInversePass()
-{
-    return std::make_unique<quantum::RemoveChainedSelfInversePass>();
-}
-
 } // namespace catalyst

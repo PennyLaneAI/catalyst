@@ -64,10 +64,4 @@ struct MBQCConversionPass : impl::MBQCConversionPassBase<MBQCConversionPass> {
 };
 
 } // namespace mbqc
-
-std::unique_ptr<Pass> createMBQCConversionPass()
-{
-    return std::make_unique<mbqc::MBQCConversionPass>();
-}
-
 } // namespace catalyst

@@ -596,8 +596,3 @@ struct MhloLegalizeSortPass
 };
 
 } // namespace
-
-std::unique_ptr<Pass> catalyst::createMhloLegalizeSortPass()
-{
-    return std::make_unique<MhloLegalizeSortPass>();
-}

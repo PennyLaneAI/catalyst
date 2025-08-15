@@ -15,10 +15,10 @@
 #define DEBUG_TYPE "decompose-non-clifford-ppr"
 
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include "QEC/IR/QECDialect.h"
-#include "QEC/Transforms/Passes.h"
 #include "QEC/Transforms/Patterns.h"
 
 using namespace llvm;
@@ -28,6 +28,7 @@ using namespace catalyst::qec;
 
 namespace catalyst {
 namespace qec {
+
 #define GEN_PASS_DEF_DECOMPOSENONCLIFFORDPPRPASS
 #define GEN_PASS_DECL_DECOMPOSENONCLIFFORDPPRPASS
 #include "QEC/Transforms/Passes.h.inc"
@@ -49,10 +50,4 @@ struct DecomposeNonCliffordPPRPass
 };
 
 } // namespace qec
-
-std::unique_ptr<Pass> createDecomposeNonCliffordPPRPass()
-{
-    return std::make_unique<DecomposeNonCliffordPPRPass>();
-}
-
 } // namespace catalyst

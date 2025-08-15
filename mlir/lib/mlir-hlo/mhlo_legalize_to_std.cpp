@@ -260,9 +260,5 @@ struct MhloLegalizeToStandardPass
             return signalPassFailure();
     }
 };
-} // end anonymous namespace
 
-std::unique_ptr<Pass> catalyst::createMhloLegalizeToStdPass()
-{
-    return std::make_unique<MhloLegalizeToStandardPass>();
-}
+} // namespace

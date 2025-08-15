@@ -14,14 +14,27 @@
 
 #pragma once
 
-#include <memory>
-
-#include "mlir/Pass/Pass.h"
+#include "Catalyst/Transforms/Passes.h"
+#include "Gradient/Transforms/Passes.h"
+#include "Ion/Transforms/Passes.h"
+#include "MBQC/Transforms/Passes.h"
+#include "Mitigation/Transforms/Passes.h"
+#include "QEC/Transforms/Passes.h"
+#include "Quantum/Transforms/Passes.h"
+#include "Test/Transforms/Passes.h"
 
 namespace catalyst {
 
-#define GEN_PASS_DECL
-#define GEN_PASS_REGISTRATION
-#include "Catalyst/Transforms/Passes.h.inc"
+inline void registerAllPasses()
+{
+    registerCatalystPasses();
+    gradient::registerGradientPasses();
+    ion::registerIonPasses();
+    mbqc::registerMBQCPasses();
+    mitigation::registerMitigationPasses();
+    qec::registerQECPasses();
+    quantum::registerQuantumPasses();
+    test::registerTestPasses();
+}
 
 } // namespace catalyst

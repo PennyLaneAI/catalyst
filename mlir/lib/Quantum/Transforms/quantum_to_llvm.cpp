@@ -22,7 +22,6 @@
 #include "mlir/Transforms/DialectConversion.h"
 
 #include "Quantum/IR/QuantumDialect.h"
-#include "Quantum/Transforms/Passes.h"
 #include "Quantum/Transforms/Patterns.h"
 
 using namespace mlir;
@@ -32,6 +31,7 @@ namespace catalyst {
 namespace quantum {
 
 #define GEN_PASS_DEF_QUANTUMCONVERSIONPASS
+#define GEN_PASS_DECL_QUANTUMCONVERSIONPASS
 #include "Quantum/Transforms/Passes.h.inc"
 
 struct QIRTypeConverter : public LLVMTypeConverter {
@@ -93,10 +93,4 @@ struct QuantumConversionPass : impl::QuantumConversionPassBase<QuantumConversion
 };
 
 } // namespace quantum
-
-std::unique_ptr<Pass> createQuantumConversionPass()
-{
-    return std::make_unique<quantum::QuantumConversionPass>();
-}
-
 } // namespace catalyst

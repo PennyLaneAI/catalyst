@@ -45,6 +45,7 @@ namespace catalyst {
 namespace quantum {
 
 #define GEN_PASS_DEF_ADJOINTLOWERINGPASS
+#define GEN_PASS_DECL_ADJOINTLOWERINGPASS
 #include "Quantum/Transforms/Passes.h.inc"
 
 struct AdjointLoweringPass : impl::AdjointLoweringPassBase<AdjointLoweringPass> {
@@ -64,10 +65,4 @@ struct AdjointLoweringPass : impl::AdjointLoweringPassBase<AdjointLoweringPass> 
 };
 
 } // namespace quantum
-
-std::unique_ptr<Pass> createAdjointLoweringPass()
-{
-    return std::make_unique<quantum::AdjointLoweringPass>();
-}
-
 } // namespace catalyst
