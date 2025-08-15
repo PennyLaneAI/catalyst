@@ -86,8 +86,9 @@ class TransformOpSubPass : public OperationPass<> {
 /// Apply transforms with individual subpass tracking by executing each transform operation
 /// individually with instrumentation hooks. This implements a custom sequence
 /// execution that mirrors the logic in NamedSequenceOp::apply but with instrumentation.
-/// reference to transform::NamedSequenceOp::apply in
-/// https://github.com/llvm/llvm-project/blob/main/mlir/lib/Dialect/Transform/IR/TransformOps.cpp
+/// Reference to transform::NamedSequenceOp::apply in
+/// https://github.com/llvm/llvm-project/blob/334e9bf2dd01fbbfe785624c0de477b725cde6f2/mlir/lib/
+/// Dialect/Transform/IR/TransformOps.cpp#L2378
 LogicalResult applyTransformsWithSubpassTracking(Operation *payload,
                                                  mlir::transform::NamedSequenceOp namedSequence,
                                                  PassInstrumentor *passInstrumentor)
