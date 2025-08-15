@@ -410,7 +410,8 @@ class TestCond:
             return c
 
         with pytest.raises(
-            TypeError, match="Conditional requires a consistent number of results across all branches"
+            TypeError,
+            match="Conditional requires a consistent number of results across all branches",
         ):
             f(True, 3)
 
