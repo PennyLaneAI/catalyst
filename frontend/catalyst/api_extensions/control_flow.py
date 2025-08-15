@@ -192,7 +192,8 @@ def cond(pred: DynamicJaxprTracer):
         returning ``None``) but not in others will result in an error.
 
         However, the return values of all branches of :func:`~.cond` can be different data types.
-        In this case, the return types will automatically be promoted to the next common larger type.
+        In this case, the return types will automatically be promoted to the next common larger
+        type.
 
         >>> @qjit
         ... def f(x: float):
