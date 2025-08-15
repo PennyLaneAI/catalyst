@@ -389,6 +389,31 @@ class TestCond:
 
         assert {0: 0.7, 1: 1.0} == circuit(False, True)
 
+    def test_qnode_cond_inconsistent_return_types(self, backend):
+        """Test that catalyst raises an error when the conditional has inconsistent return types."""
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=4))
+        def f(flag, sz):
+            a = jnp.ones([sz], dtype=float)
+            b = jnp.zeros([3], dtype=float)
+
+            @cond(flag)
+            def case():
+                return a
+
+            @case.otherwise
+            def case():
+                return b
+
+            c = case()
+            return c
+
+        with pytest.raises(
+            TypeError, match="Conditional requires a consistent number of results across all branches"
+        ):
+            f(True, 3)
+
     @pytest.mark.xfail(
         reason="Inability to apply Jax transformations before the quantum traing is complete"
     )
