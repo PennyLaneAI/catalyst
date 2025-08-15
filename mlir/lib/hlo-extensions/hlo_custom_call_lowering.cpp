@@ -12,51 +12,48 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#define DEBUG_TYPE "scatter"
+#define DEBUG_TYPE "hlocustomcalls"
 
 #include <vector>
 
-#include "llvm/Support/Debug.h"
-
-#include "mhlo/IR/hlo_ops.h"
-#include "mhlo/transforms/passes.h"
-
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Index/IR/IndexDialect.h"
-#include "mlir/Dialect/SCF/IR/SCF.h"
-#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "stablehlo/dialect/StablehloOps.h"
+#include "stablehlo/transforms/Passes.h"
+#include "llvm/Support/Debug.h"
 
-#include "Catalyst/Transforms/Patterns.h"
+#include "Catalyst/IR/CatalystDialect.h"
+#include "hlo-extensions/Passes.h"
+#include "hlo-extensions/Patterns.h"
 
 using namespace llvm;
 using namespace mlir;
 using namespace catalyst;
 
 namespace catalyst {
-#define GEN_PASS_DEF_SCATTERLOWERINGPASS
-#include "Catalyst/Transforms/Passes.h.inc"
+#define GEN_PASS_DEF_HLOCUSTOMCALLLOWERINGPASS
+#include "hlo-extensions/Passes.h.inc"
 
-struct ScatterLoweringPass : impl::ScatterLoweringPassBase<ScatterLoweringPass> {
-    using ScatterLoweringPassBase::ScatterLoweringPassBase;
+struct HloCustomCallLoweringPass : impl::HloCustomCallLoweringPassBase<HloCustomCallLoweringPass> {
+    using HloCustomCallLoweringPassBase::HloCustomCallLoweringPassBase;
 
     void runOnOperation() final
     {
-        LLVM_DEBUG(dbgs() << "scatter lowering pass"
+        LLVM_DEBUG(dbgs() << "hlo custom call lowering pass"
                           << "\n");
 
         RewritePatternSet patterns(&getContext());
-        populateScatterPatterns(patterns);
+        populateHloCustomCallPatterns(patterns);
         if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
             return signalPassFailure();
         }
     }
 };
 
-std::unique_ptr<Pass> createScatterLoweringPass()
+std::unique_ptr<Pass> createHloCustomCallLoweringPass()
 {
-    return std::make_unique<ScatterLoweringPass>();
+    return std::make_unique<HloCustomCallLoweringPass>();
 }
-
 } // namespace catalyst

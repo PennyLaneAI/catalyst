@@ -30,36 +30,60 @@ endif()
 #########################
 
 find_package(MLIR REQUIRED CONFIG)
-if(NOT CATALYST_DOCS_ONLY)
-  find_package(MHLO REQUIRED CONFIG)
-endif()
 
 message(STATUS "Using MLIRConfig.cmake in: ${MLIR_DIR}")
 message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
-message(STATUS "Using MHLOConfig.cmake in: ${MHLO_DIR}")
 
 set(LLVM_RUNTIME_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/bin)
 set(LLVM_LIBRARY_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/lib)
 set(MLIR_BINARY_DIR ${CMAKE_BINARY_DIR})
 
-# Taken from mlir-hlo/mhlo/transforms/CMakeLists.txt.
-# Unfortunately, AllMhloPasses doesn't appear to be exported.
-set(ALL_MHLO_PASSES
-  ChloPasses
-  MhloPasses
-  StablehloPasses
-  MhloToArithmeticConversion
-  MhloToMemrefConversion
-  HloToLinalgUtils
-  MhloToLinalg
-  MhloToStablehlo
-  StablehloToMhlo
-)
-
 list(APPEND CMAKE_MODULE_PATH "${MLIR_CMAKE_DIR}")
 list(APPEND CMAKE_MODULE_PATH "${LLVM_CMAKE_DIR}")
-list(APPEND CMAKE_MODULE_PATH "${MHLO_CMAKE_DIR}")
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake/modules")
+
+
+# Discover stablehlo libraries and bundle them into a cmake target for catalyst to link to
+# This is because stablehlo does not have a Config.cmake
+# so we cannot use find_package(stablehlo) and have to do this manually
+set(STABLEHLO_LIBS
+    ChloCAPI
+    ChloOps
+    StablehloAssemblyFormat
+    StablehloBase
+    StablehloBroadcastUtils
+    StablehloCAPI
+    StablehloLinalgTransforms
+    StablehloOps
+    StablehloOptimizationPasses
+    StablehloPasses
+    StablehloPassUtils
+    StablehloRegister
+    StablehloTypeConversion
+    StablehloTypeInference
+    Version
+    VhloCAPI
+    VhloOps
+    VhloTypes
+)
+
+foreach(STABLEHLO_LIB IN LISTS STABLEHLO_LIBS)
+    add_library(${STABLEHLO_LIB} STATIC IMPORTED GLOBAL)
+    set_property(TARGET ${STABLEHLO_LIB} PROPERTY
+        IMPORTED_LOCATION "${STABLEHLO_BUILD_DIR}/lib/lib${STABLEHLO_LIB}.a"
+    )
+endforeach()
+
+add_library(ExternalStablehloLib INTERFACE)
+
+foreach(STABLEHLO_LIB IN LISTS STABLEHLO_LIBS)
+    target_link_libraries(ExternalStablehloLib INTERFACE ${STABLEHLO_LIB})
+endforeach()
+
+target_include_directories(ExternalStablehloLib SYSTEM INTERFACE
+  ${STABLEHLO_DIR}
+  ${STABLEHLO_BUILD_DIR} # for the generated .inc files
+)
 
 # Policy CMP0175 was introduced in CMake 4.31 and raises warnings in the upstream CMake modules.
 # Policy CMP0177 was introduced in CMake 4.31 and raises warnings in the upstream CMake modules.
@@ -88,9 +112,6 @@ if(QUANTUM_ENABLE_BINDINGS_PYTHON)
   mlir_configure_python_dev_packages()
 endif()
 
-list(GET MHLO_INCLUDE_DIRS 1 MLIRHLO_DIR)
-list(GET MHLO_INCLUDE_DIRS 2 MLIRHLO_BUILD_DIR)
-
 set(CATALYST_MAIN_INCLUDE_DIR ${PROJECT_SOURCE_DIR}/include)
 set(CATALYST_GEN_INCLUDE_DIR ${PROJECT_BINARY_DIR}/include)
 set(CATALYST_LIB_DIR ${PROJECT_BINARY_DIR})
@@ -98,9 +119,6 @@ set(CATALYST_LIB_DIR ${PROJECT_BINARY_DIR})
 include_directories(SYSTEM
   ${LLVM_INCLUDE_DIRS}
   ${MLIR_INCLUDE_DIRS}
-  ${MHLO_INCLUDE_DIRS}
-  ${MLIRHLO_DIR}/stablehlo
-  ${MLIRHLO_BUILD_DIR}/stablehlo
 )
 link_directories(${LLVM_BUILD_LIBRARY_DIR})
 add_definitions(${LLVM_DEFINITIONS})

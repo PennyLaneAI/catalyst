@@ -33,18 +33,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
-// The modifications are porting the pass from the upstream MHLO namespace to
+// The modifications are porting the pass from the upstream stablehlo namespace to
 // catalyst namespace.
 
-// This file implements logic for lowering MHLO dialect to Standard dialect.
+// This file implements logic for lowering Stablehlo dialect to Standard dialect.
 
 #include <memory>
 #include <optional>
 #include <utility>
 
-#include "mhlo/IR/hlo_ops.h"
-#include "mhlo/transforms/passes.h"
-#include "mhlo/transforms/rewriters.h" // (??)
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Math/IR/Math.h"
@@ -52,34 +49,31 @@ limitations under the License.
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-// #include "stablehlo/dialect/StablehloOps.h"
-// #include "stablehlo/transforms/Passes.h"
+#include "stablehlo/dialect/StablehloOps.h"
+#include "stablehlo/transforms/Passes.h"
 
-#include "mlir-hlo/Passes.h"
+#include "hlo-extensions/Passes.h"
 
 using namespace mlir;
-using namespace mhlo;
-// using namespace stablehlo;
+using namespace stablehlo;
 using namespace catalyst;
 
 namespace catalyst {
 
-#define GEN_PASS_DEF_MHLOLEGALIZETOSTANDARDPASS
-#define GEN_PASS_DECL_MHLOLEGALIZETOSTANDARDPASS
-// #define GEN_PASS_DEF_STABLEHLOLEGALIZETOSTANDARDPASS
-// #define GEN_PASS_DECL_STABLEHLOLEGALIZETOSTANDARDPASS
-#include "mlir-hlo/Passes.h.inc"
-#include "mlir-hlo/generated_mhlo_legalize_to_standard.cpp.inc"
+#define GEN_PASS_DEF_STABLEHLOLEGALIZETOSTANDARDPASS
+#define GEN_PASS_DECL_STABLEHLOLEGALIZETOSTANDARDPASS
+#include "hlo-extensions/Passes.h.inc"
+#include "hlo-extensions/generated_stablehlo_legalize_to_standard.cpp.inc"
 
 } // namespace catalyst
 
 namespace {
 
-class CompareIConvert : public OpRewritePattern<mhlo::CompareOp> {
+class CompareIConvert : public OpRewritePattern<stablehlo::CompareOp> {
   public:
     using OpRewritePattern::OpRewritePattern;
 
-    LogicalResult matchAndRewrite(mhlo::CompareOp op, PatternRewriter &rewriter) const override
+    LogicalResult matchAndRewrite(stablehlo::CompareOp op, PatternRewriter &rewriter) const override
     {
         auto lhs = op.getLhs();
         auto rhs = op.getRhs();
@@ -124,11 +118,11 @@ class CompareIConvert : public OpRewritePattern<mhlo::CompareOp> {
     }
 };
 
-class CompareFConvert : public OpRewritePattern<mhlo::CompareOp> {
+class CompareFConvert : public OpRewritePattern<stablehlo::CompareOp> {
   public:
     using OpRewritePattern::OpRewritePattern;
 
-    LogicalResult matchAndRewrite(mhlo::CompareOp op, PatternRewriter &rewriter) const override
+    LogicalResult matchAndRewrite(stablehlo::CompareOp op, PatternRewriter &rewriter) const override
     {
         auto lhs = op.getLhs();
         auto rhs = op.getRhs();
@@ -177,11 +171,11 @@ class CompareFConvert : public OpRewritePattern<mhlo::CompareOp> {
 // convert the integer constant to iota result type. For complex types, the real
 // part is replaced with the generated constant and the imaginary part is
 // replaced with zero tensor.
-class ConvertIotaOp : public OpRewritePattern<mhlo::IotaOp> {
+class ConvertIotaOp : public OpRewritePattern<stablehlo::IotaOp> {
   public:
     using OpRewritePattern::OpRewritePattern;
 
-    LogicalResult matchAndRewrite(mhlo::IotaOp op, PatternRewriter &rewriter) const override
+    LogicalResult matchAndRewrite(stablehlo::IotaOp op, PatternRewriter &rewriter) const override
     {
         auto outputType = mlir::cast<ShapedType>(op.getType());
         auto outputSize = outputType.getNumElements();
@@ -233,19 +227,19 @@ class ConvertIotaOp : public OpRewritePattern<mhlo::IotaOp> {
         auto zeroes = rewriter.create<mlir::arith::ConstantOp>(
             loc, DenseIntElementsAttr::get(intShapeType, APInt(bitwidth, 0)));
         auto imagZeroes = rewriter.create<ConvertOp>(loc, intOrFloatShapeTy, zeroes);
-        rewriter.replaceOpWithNewOp<mhlo::ComplexOp>(op, iotaConst, imagZeroes);
+        rewriter.replaceOpWithNewOp<stablehlo::ComplexOp>(op, iotaConst, imagZeroes);
         return success();
     }
 };
 
-void populateMhloToStdPatterns(RewritePatternSet *patterns, mlir::MLIRContext *ctx)
+void populateStablehloToStdPatterns(RewritePatternSet *patterns, mlir::MLIRContext *ctx)
 {
     populateWithGenerated(*patterns);
     patterns->add<CompareFConvert, CompareIConvert, ConvertIotaOp>(ctx);
 }
 
-struct MhloLegalizeToStandardPass
-    : public catalyst::impl::MhloLegalizeToStandardPassBase<MhloLegalizeToStandardPass> {
+struct StablehloLegalizeToStandardPass
+    : public catalyst::impl::StablehloLegalizeToStandardPassBase<StablehloLegalizeToStandardPass> {
     void getDependentDialects(DialectRegistry &registry) const override
     {
         registry.insert<arith::ArithDialect, math::MathDialect, func::FuncDialect>();
@@ -255,14 +249,14 @@ struct MhloLegalizeToStandardPass
     void runOnOperation() override
     {
         RewritePatternSet patterns(&getContext());
-        populateMhloToStdPatterns(&patterns, &getContext());
+        populateStablehloToStdPatterns(&patterns, &getContext());
         if (failed(applyPatternsGreedily(getOperation(), std::move(patterns))))
             return signalPassFailure();
     }
 };
 } // end anonymous namespace
 
-std::unique_ptr<Pass> catalyst::createMhloLegalizeToStdPass()
+std::unique_ptr<Pass> catalyst::createStablehloLegalizeToStdPass()
 {
-    return std::make_unique<MhloLegalizeToStandardPass>();
+    return std::make_unique<StablehloLegalizeToStandardPass>();
 }

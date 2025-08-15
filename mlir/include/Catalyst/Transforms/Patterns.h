@@ -21,10 +21,6 @@
 
 namespace catalyst {
 
-void populateScatterPatterns(mlir::RewritePatternSet &);
-
-void populateHloCustomCallPatterns(mlir::RewritePatternSet &);
-
 void populateQnodeToAsyncPatterns(mlir::RewritePatternSet &);
 
 void populateDisableAssertionPatterns(mlir::RewritePatternSet &);

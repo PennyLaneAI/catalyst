@@ -33,16 +33,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
-// The modifications are porting the pass from the upstream MHLO namespace to
+// The modifications are porting the pass from the upstream stablehlo namespace to
 // catalyst namespace.
 
-// This file implements logic for lowering MHLO dialect to SCF dialect.
+// This file implements logic for lowering Stablehlo dialect to SCF dialect.
 #include <memory>
 #include <optional>
 #include <utility>
 
-#include "mhlo/IR/hlo_ops.h"
-#include "mhlo/transforms/passes.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h" // TF:llvm-project
@@ -56,38 +54,35 @@ limitations under the License.
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
-// #include "stablehlo/dialect/StablehloOps.h"
-// #include "stablehlo/transforms/Passes.h"
+#include "stablehlo/dialect/StablehloOps.h"
+#include "stablehlo/transforms/Passes.h"
 #include "llvm/Support/Casting.h"
 
-#include "mlir-hlo/Passes.h"
+#include "hlo-extensions/Passes.h"
 
 using namespace mlir;
-using namespace mhlo;
-// using namespace stablehlo;
+using namespace stablehlo;
 using namespace catalyst;
 
 namespace catalyst {
 
-#define GEN_PASS_DEF_MHLOLEGALIZECONTROLFLOWPASS
-#define GEN_PASS_DECL_MHLOLEGALIZECONTROLFLOWPASS
-// #define GEN_PASS_DEF_STABLEHLOLEGALIZECONTROLFLOWPASS
-// #define GEN_PASS_DECL_STABLEHLOLEGALIZECONTROLFLOWPASS
-#include "mlir-hlo/Passes.h.inc"
+#define GEN_PASS_DEF_STABLEHLOLEGALIZECONTROLFLOWPASS
+#define GEN_PASS_DECL_STABLEHLOLEGALIZECONTROLFLOWPASS
+#include "hlo-extensions/Passes.h.inc"
 
 } // namespace catalyst
 
 namespace {
 
-// All transformations in this file take mhlo blocks which end with
+// All transformations in this file take stablehlo blocks which end with
 // stablehlo::ReturnOp and lower to SCF ops which end with scf::YieldOp. Inline an
 // entire block with the only change being return -> yield.
-void inlineMhloRegionIntoSCFRegion(PatternRewriter &rewriter, Region &mhlo, Region &scf)
+void inlineStablehloRegionIntoSCFRegion(PatternRewriter &rewriter, Region &r, Region &scf)
 {
     // Remove an existing block, then move the region over.
     if (!scf.empty())
         rewriter.eraseBlock(&scf.back());
-    rewriter.inlineRegionBefore(mhlo, scf, scf.end());
+    rewriter.inlineRegionBefore(r, scf, scf.end());
     // Fix up the terminator.
     PatternRewriter::InsertionGuard guard(rewriter);
     rewriter.setInsertionPointToEnd(&scf.back());
@@ -95,7 +90,7 @@ void inlineMhloRegionIntoSCFRegion(PatternRewriter &rewriter, Region &mhlo, Regi
     rewriter.replaceOpWithNewOp<scf::YieldOp>(terminator, terminator->getOperands());
 }
 
-// mhlo ops need inputs to be tensors, but scalar values can be a scalar tensor
+// stablehlo ops need inputs to be tensors, but scalar values can be a scalar tensor
 // or a 1 element tensor. To handle this, collapse shape before extracting the
 // scalar value when necessary.
 Value extractTensorValue(OpBuilder &b, Value tensor)
@@ -116,7 +111,7 @@ struct ScfForBounds {
     unsigned indexArgIndex;
 };
 
-std::optional<ScfForBounds> extractForBounds(mhlo::WhileOp op)
+std::optional<ScfForBounds> extractForBounds(stablehlo::WhileOp op)
 {
     auto &cond = op.getCond().front();
     auto &body = op.getBody().front();
@@ -129,10 +124,10 @@ std::optional<ScfForBounds> extractForBounds(mhlo::WhileOp op)
         return mlir::cast<BlockArgument>(v).getArgNumber();
     };
 
-    auto compare = llvm::dyn_cast<mhlo::CompareOp>(cond.front());
+    auto compare = llvm::dyn_cast<stablehlo::CompareOp>(cond.front());
     // If the rhs of the comapare is defined outside the block, it's a constant
     // within the loop.
-    if (!compare || compare.getComparisonDirection() != mhlo::ComparisonDirection::LT ||
+    if (!compare || compare.getComparisonDirection() != stablehlo::ComparisonDirection::LT ||
         compare.getRhs().getParentBlock() == &cond ||
         !getElementTypeOrSelf(compare.getLhs().getType()).isSignlessIntOrIndex()) {
         return std::nullopt;
@@ -142,7 +137,7 @@ std::optional<ScfForBounds> extractForBounds(mhlo::WhileOp op)
     if (!iterArg)
         return std::nullopt;
 
-    auto add = llvm::dyn_cast_or_null<mhlo::AddOp>(
+    auto add = llvm::dyn_cast_or_null<stablehlo::AddOp>(
         body.getTerminator()->getOperand(*iterArg).getDefiningOp());
     if (!add || matchBbArg(add.getLhs(), body) != iterArg ||
         add.getRhs().getParentBlock() == &body) {
@@ -158,10 +153,10 @@ std::optional<ScfForBounds> extractForBounds(mhlo::WhileOp op)
 }
 
 // Rewrites `stablehlo.while` to `scf.while` or `scf.for`.
-struct WhileOpPattern : public OpConversionPattern<mhlo::WhileOp> {
+struct WhileOpPattern : public OpConversionPattern<stablehlo::WhileOp> {
     using OpConversionPattern<WhileOp>::OpConversionPattern;
 
-    LogicalResult matchAndRewrite(mhlo::WhileOp op, OpAdaptor adaptor,
+    LogicalResult matchAndRewrite(stablehlo::WhileOp op, OpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
         auto loc = op.getLoc();
@@ -173,8 +168,8 @@ struct WhileOpPattern : public OpConversionPattern<mhlo::WhileOp> {
                 extractTensorValue(rewriter, bounds->step), adaptor.getOperands());
 
             rewriter.setInsertionPointToEnd(newForOp.getBody());
-            // Inline while body, and only replace the mhlo.return with an scf.yield.
-            inlineMhloRegionIntoSCFRegion(rewriter, op.getBody(), newForOp.getRegion());
+            // Inline while body, and only replace the stablehlo.return with an scf.yield.
+            inlineStablehloRegionIntoSCFRegion(rewriter, op.getBody(), newForOp.getRegion());
             auto indexArg = newForOp.getRegion().insertArgument(
                 unsigned{0}, newForOp.getLowerBound().getType(), loc);
             auto oldIndexArg = newForOp.getRegion().getArgument(1 + bounds->indexArgIndex);
@@ -194,39 +189,40 @@ struct WhileOpPattern : public OpConversionPattern<mhlo::WhileOp> {
         // needs to be extracted and used with an scf.condition.
         rewriter.inlineRegionBefore(op.getCond(), newWhileOp.getBefore(),
                                     newWhileOp.getBefore().end());
-        auto conditionReturn = cast<mhlo::ReturnOp>(newWhileOp.getBefore().front().getTerminator());
+        auto conditionReturn =
+            cast<stablehlo::ReturnOp>(newWhileOp.getBefore().front().getTerminator());
         rewriter.setInsertionPointToEnd(&newWhileOp.getBefore().front());
         Value i1 = extractTensorValue(rewriter, conditionReturn->getOperand(0));
         rewriter.replaceOpWithNewOp<scf::ConditionOp>(conditionReturn, i1,
                                                       newWhileOp.getBeforeArguments());
 
-        // Inline while body, and only replace the mhlo.return with an scf.yield.
-        inlineMhloRegionIntoSCFRegion(rewriter, op.getBody(), newWhileOp.getAfter());
+        // Inline while body, and only replace the stablehlo.return with an scf.yield.
+        inlineStablehloRegionIntoSCFRegion(rewriter, op.getBody(), newWhileOp.getAfter());
 
         rewriter.replaceOp(op, newWhileOp.getResults());
         return success();
     }
 };
 
-// Rewrites `mhlo.if` to `scf.if`.
-struct IfOpPattern : public OpConversionPattern<mhlo::IfOp> {
+// Rewrites `stablehlo.if` to `scf.if`.
+struct IfOpPattern : public OpConversionPattern<stablehlo::IfOp> {
     using OpConversionPattern<IfOp>::OpConversionPattern;
 
-    LogicalResult matchAndRewrite(mhlo::IfOp op, OpAdaptor adaptor,
+    LogicalResult matchAndRewrite(stablehlo::IfOp op, OpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
         auto scfIf = rewriter.create<scf::IfOp>(op.getLoc(), op.getResultTypes(),
                                                 extractTensorValue(rewriter, adaptor.getPred()),
                                                 /*withElseRegion=*/true);
-        inlineMhloRegionIntoSCFRegion(rewriter, op.getTrueBranch(), scfIf.getThenRegion());
-        inlineMhloRegionIntoSCFRegion(rewriter, op.getFalseBranch(), scfIf.getElseRegion());
+        inlineStablehloRegionIntoSCFRegion(rewriter, op.getTrueBranch(), scfIf.getThenRegion());
+        inlineStablehloRegionIntoSCFRegion(rewriter, op.getFalseBranch(), scfIf.getElseRegion());
         rewriter.replaceOp(op, scfIf.getResults());
         return success();
     }
 };
 
-// Rewrites `mhlo.case` to a nested `scf.if`.
-struct CaseOpPattern : public OpConversionPattern<mhlo::CaseOp> {
+// Rewrites `stablehlo.case` to a nested `scf.if`.
+struct CaseOpPattern : public OpConversionPattern<stablehlo::CaseOp> {
     using OpConversionPattern<CaseOp>::OpConversionPattern;
 
     // Recursively create if/else ops to handle each possible value in a case op.
@@ -243,21 +239,21 @@ struct CaseOpPattern : public OpConversionPattern<mhlo::CaseOp> {
         auto constAttr = DenseElementsAttr::get(
             shapedType, {mlir::cast<mlir::Attribute>(outerBuilder.getI32IntegerAttr(currentIdx))});
         Value currentIdxVal =
-            outerBuilder.create<mhlo::ConstantOp>(loc, idxValue.getType(), constAttr);
+            outerBuilder.create<stablehlo::ConstantOp>(loc, idxValue.getType(), constAttr);
 
         auto scfIf = outerBuilder.create<scf::IfOp>(
             loc, op.getResultTypes(),
             extractTensorValue(outerBuilder,
-                               outerBuilder.create<mhlo::CompareOp>(loc, idxValue, currentIdxVal,
-                                                                    ComparisonDirection::EQ)),
+                               outerBuilder.create<stablehlo::CompareOp>(
+                                   loc, idxValue, currentIdxVal, ComparisonDirection::EQ)),
             /*withElseRegion=*/true);
-        inlineMhloRegionIntoSCFRegion(outerBuilder, op.getBranches()[currentIdx],
-                                      scfIf.getThenRegion());
+        inlineStablehloRegionIntoSCFRegion(outerBuilder, op.getBranches()[currentIdx],
+                                           scfIf.getThenRegion());
         int nextIdx = currentIdx + 1;
         // Don't recurse for the final default block.
         if (currentIdx == static_cast<int64_t>(finalIdx)) {
-            inlineMhloRegionIntoSCFRegion(outerBuilder, op.getBranches()[nextIdx],
-                                          scfIf.getElseRegion());
+            inlineStablehloRegionIntoSCFRegion(outerBuilder, op.getBranches()[nextIdx],
+                                               scfIf.getElseRegion());
         }
         else {
             PatternRewriter::InsertionGuard guard(outerBuilder);
@@ -268,14 +264,14 @@ struct CaseOpPattern : public OpConversionPattern<mhlo::CaseOp> {
         return scfIf;
     }
 
-    LogicalResult matchAndRewrite(mhlo::CaseOp op, OpAdaptor adaptor,
+    LogicalResult matchAndRewrite(stablehlo::CaseOp op, OpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
         // Inline the op if there is only a default block.
         if (op.getBranches().size() == 1) {
             Block &block = op.getBranches().front().front();
             auto results = block.getTerminator()->getOperands();
-            // Remove the mhlo.return terminator, then inline the block.
+            // Remove the stablehlo.return terminator, then inline the block.
             rewriter.eraseOp(block.getTerminator());
             rewriter.inlineBlockBefore(/*source=*/&block, /*dest=*/op.getOperation(),
                                        /*argValues=*/{});
@@ -289,8 +285,9 @@ struct CaseOpPattern : public OpConversionPattern<mhlo::CaseOp> {
     }
 };
 
-struct MhloLegalizeControlFlowPass
-    : public catalyst::impl::MhloLegalizeControlFlowPassBase<MhloLegalizeControlFlowPass> {
+struct StablehloLegalizeControlFlowPass
+    : public catalyst::impl::StablehloLegalizeControlFlowPassBase<
+          StablehloLegalizeControlFlowPass> {
     // Perform the lowering to MLIR control flow.
     void runOnOperation() override
     {
@@ -302,7 +299,7 @@ struct MhloLegalizeControlFlowPass
 
         mlir::ConversionTarget target(*ctx);
         target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });
-        target.addIllegalOp<mhlo::IfOp, mhlo::WhileOp, mhlo::CaseOp>();
+        target.addIllegalOp<stablehlo::IfOp, stablehlo::WhileOp, stablehlo::CaseOp>();
 
         if (failed(applyPartialConversion(f, target, std::move(patterns)))) {
             signalPassFailure();
@@ -312,7 +309,7 @@ struct MhloLegalizeControlFlowPass
 
 } // namespace
 
-std::unique_ptr<Pass> catalyst::createMhloLegalizeControlFlowPass()
+std::unique_ptr<Pass> catalyst::createStablehloLegalizeControlFlowPass()
 {
-    return std::make_unique<MhloLegalizeControlFlowPass>();
+    return std::make_unique<StablehloLegalizeControlFlowPass>();
 }
