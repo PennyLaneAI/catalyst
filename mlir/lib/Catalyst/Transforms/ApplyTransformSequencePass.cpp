@@ -34,12 +34,11 @@ using namespace mlir;
 namespace catalyst {
 
 /// Generate a meaningful name for a transform operation for pass instrumentation
-static std::string getTransformOpName(mlir::transform::TransformOpInterface transformOp)
+static std::string getTransformOpName(transform::TransformOpInterface transformOp)
 {
     std::string baseName = transformOp->getName().getStringRef().str();
 
-    if (auto applyPassOp =
-            dyn_cast<mlir::transform::ApplyRegisteredPassOp>(transformOp.getOperation())) {
+    if (auto applyPassOp = dyn_cast<transform::ApplyRegisteredPassOp>(transformOp.getOperation())) {
         if (auto passName = applyPassOp.getPassName(); !passName.empty()) {
             return "transform_" + passName.str();
         }
@@ -54,13 +53,13 @@ static std::string getTransformOpName(mlir::transform::TransformOpInterface tran
 /// pass instrumentation.
 class TransformOpSubPass : public OperationPass<> {
   private:
-    mlir::transform::TransformOpInterface transformOp;
+    transform::TransformOpInterface transformOp;
     std::string opNameStr;
 
   public:
     MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(TransformOpSubPass)
 
-    TransformOpSubPass(mlir::transform::TransformOpInterface op)
+    TransformOpSubPass(transform::TransformOpInterface op)
         : OperationPass(TypeID::get<TransformOpSubPass>()), transformOp(op),
           opNameStr(getTransformOpName(op))
     {
@@ -80,7 +79,7 @@ class TransformOpSubPass : public OperationPass<> {
         return std::make_unique<TransformOpSubPass>(transformOp);
     }
 
-    mlir::transform::TransformOpInterface getTransformOp() const { return transformOp; }
+    transform::TransformOpInterface getTransformOp() const { return transformOp; }
 };
 
 /// Apply transforms with individual subpass tracking by executing each transform operation
@@ -90,7 +89,7 @@ class TransformOpSubPass : public OperationPass<> {
 /// https://github.com/llvm/llvm-project/blob/334e9bf2dd01fbbfe785624c0de477b725cde6f2/mlir/lib/
 /// Dialect/Transform/IR/TransformOps.cpp#L2378
 LogicalResult applyTransformsWithSubpassTracking(Operation *payload,
-                                                 mlir::transform::NamedSequenceOp namedSequence,
+                                                 transform::NamedSequenceOp namedSequence,
                                                  PassInstrumentor *passInstrumentor)
 {
     // TODO: We currently only expect to have a single block in the sequence. It may change in the
@@ -103,22 +102,21 @@ LogicalResult applyTransformsWithSubpassTracking(Operation *payload,
         return success();
     }
 
-    mlir::transform::TransformState state = mlir::transform::detail::makeTransformStateForTesting(
-        namedSequence->getParentRegion(), payload);
+    transform::TransformState state =
+        transform::detail::makeTransformStateForTesting(namedSequence->getParentRegion(), payload);
 
     // Map the entry block argument to the list of operations.
     // Note: this is the same implementation as PossibleTopLevelTransformOp but
     // without attaching the interface / trait since that is tailored to a
     // dangling top-level op that does not get "called".
     auto scope = state.make_region_scope(namedSequence.getBody());
-    if (failed(mlir::transform::detail::mapPossibleTopLevelTransformOpBlockArguments(
+    if (failed(transform::detail::mapPossibleTopLevelTransformOpBlockArguments(
             state, namedSequence, namedSequence.getBody()))) {
         return failure();
     }
 
     for (Operation &transformOp : sequenceBlock.without_terminator()) {
-        if (auto transformInterface =
-                dyn_cast<mlir::transform::TransformOpInterface>(transformOp)) {
+        if (auto transformInterface = dyn_cast<transform::TransformOpInterface>(transformOp)) {
             auto subPass = std::make_unique<TransformOpSubPass>(transformInterface);
 
             // hook before pass
@@ -193,7 +191,7 @@ struct ApplyTransformSequencePass
         if (PassInstrumentor *passInstrumentor = getAnalysisManager().getPassInstrumentor()) {
             // Manually execute the transform sequence with individual subpass tracking
             if (auto namedSequence =
-                    dyn_cast<mlir::transform::NamedSequenceOp>(transformer_main_sequence)) {
+                    dyn_cast<transform::NamedSequenceOp>(transformer_main_sequence)) {
                 if (failed(applyTransformsWithSubpassTracking(payload, namedSequence,
                                                               passInstrumentor))) {
                     return signalPassFailure();
@@ -201,9 +199,9 @@ struct ApplyTransformSequencePass
             }
         }
         else {
-            if (failed(mlir::transform::applyTransforms(
-                    payload, cast<mlir::transform::TransformOpInterface>(transformer_main_sequence),
-                    {}, mlir::transform::TransformOptions(), false))) {
+            if (failed(transform::applyTransforms(
+                    payload, cast<transform::TransformOpInterface>(transformer_main_sequence), {},
+                    transform::TransformOptions(), false))) {
                 return signalPassFailure();
             }
         }
