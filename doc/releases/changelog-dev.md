@@ -56,6 +56,10 @@
 
 <h3>Deprecations 👋</h3>
 
+* Deprecated usages of `Device.shots` along with setting `device(..., shots=...)`.
+  Heavily adjusted frontend pipelines within qfunc, tracer, verification and QJITDevice to account for this change.
+  [(#1952)](https://github.com/PennyLaneAI/catalyst/pull/1952)
+
 <h3>Bug fixes 🐛</h3>
 
 * Fix wrong handling of partitioned shots in the decomposition pass of `measurements_from_samples`.
@@ -164,6 +168,7 @@
 This release contains contributions from (in alphabetical order):
 
 Joey Carter,
+Yushao Chen,
 Sengthai Heng,
 David Ittah,
 Christina Lee,
