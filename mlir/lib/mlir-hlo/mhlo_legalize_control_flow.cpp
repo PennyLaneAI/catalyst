@@ -311,8 +311,3 @@ struct MhloLegalizeControlFlowPass
 };
 
 } // namespace
-
-std::unique_ptr<Pass> catalyst::createMhloLegalizeControlFlowPass()
-{
-    return std::make_unique<MhloLegalizeControlFlowPass>();
-}

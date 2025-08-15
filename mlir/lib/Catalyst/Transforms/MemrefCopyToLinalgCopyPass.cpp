@@ -29,7 +29,9 @@ using namespace mlir;
 using namespace catalyst;
 
 namespace catalyst {
+
 #define GEN_PASS_DEF_MEMREFCOPYTOLINALGCOPYPASS
+#define GEN_PASS_DECL_MEMREFCOPYTOLINALGCOPYPASS
 #include "Catalyst/Transforms/Passes.h.inc"
 
 struct MemrefCopyToLinalgCopyPass
@@ -49,10 +51,5 @@ struct MemrefCopyToLinalgCopyPass
         }
     }
 };
-
-std::unique_ptr<Pass> createMemrefCopyToLinalgCopyPass()
-{
-    return std::make_unique<MemrefCopyToLinalgCopyPass>();
-}
 
 } // namespace catalyst

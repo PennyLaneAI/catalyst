@@ -27,6 +27,7 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "llvm/Support/Debug.h"
 
 #include "Catalyst/Transforms/Patterns.h"
 
@@ -35,7 +36,9 @@ using namespace mlir;
 using namespace catalyst;
 
 namespace catalyst {
+
 #define GEN_PASS_DEF_SCATTERLOWERINGPASS
+#define GEN_PASS_DECL_SCATTERLOWERINGPASS
 #include "Catalyst/Transforms/Passes.h.inc"
 
 struct ScatterLoweringPass : impl::ScatterLoweringPassBase<ScatterLoweringPass> {
@@ -53,10 +56,5 @@ struct ScatterLoweringPass : impl::ScatterLoweringPassBase<ScatterLoweringPass> 
         }
     }
 };
-
-std::unique_ptr<Pass> createScatterLoweringPass()
-{
-    return std::make_unique<ScatterLoweringPass>();
-}
 
 } // namespace catalyst

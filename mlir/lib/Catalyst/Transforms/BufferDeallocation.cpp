@@ -87,15 +87,14 @@
 #include "llvm/ADT/SetOperations.h"
 
 #include "Catalyst/IR/CatalystDialect.h"
-#include "Catalyst/Transforms/Passes.h"
 
 using namespace mlir;
 using namespace catalyst;
 
 namespace catalyst {
 
-#define GEN_PASS_DEF_BUFFERDEALLOCATION
-#define GEN_PASS_DECL_BUFFERDEALLOCATION
+#define GEN_PASS_DEF_BUFFERDEALLOCATIONPASS
+#define GEN_PASS_DECL_BUFFERDEALLOCATIONOPASS
 #include "Catalyst/Transforms/Passes.h.inc"
 
 } // namespace catalyst
@@ -668,7 +667,7 @@ class BufferDeallocation : public BufferPlacementTransformationBase {
 /// into the right positions. Furthermore, it inserts additional clones if
 /// necessary. It uses the algorithm described at the top of the file.
 struct BufferDeallocationPass
-    : public catalyst::impl::BufferDeallocationBase<BufferDeallocationPass> {
+    : public catalyst::impl::BufferDeallocationPassBase<BufferDeallocationPass> {
     void getDependentDialects(DialectRegistry &registry) const override
     {
         registry.insert<bufferization::BufferizationDialect>();
@@ -724,12 +723,3 @@ struct BufferDeallocationPass
 };
 
 } // namespace
-
-//===----------------------------------------------------------------------===//
-// BufferDeallocationPass construction
-//===----------------------------------------------------------------------===//
-
-std::unique_ptr<Pass> catalyst::createBufferDeallocationPass()
-{
-    return std::make_unique<BufferDeallocationPass>();
-}

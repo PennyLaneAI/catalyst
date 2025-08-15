@@ -199,8 +199,10 @@ LogicalResult EmitCatalystPyInterfaceTransform::matchAndRewrite(LLVM::LLVMFuncOp
 } // namespace
 
 namespace catalyst {
+namespace quantum {
 
 #define GEN_PASS_DEF_EMITCATALYSTPYINTERFACEPASS
+#define GEN_PASS_DECL_EMITCATALYSTPYINTERFACEPASS
 #include "Quantum/Transforms/Passes.h.inc"
 
 struct EmitCatalystPyInterfacePass
@@ -228,9 +230,5 @@ struct EmitCatalystPyInterfacePass
     }
 };
 
-std::unique_ptr<Pass> createEmitCatalystPyInterfacePass()
-{
-    return std::make_unique<EmitCatalystPyInterfacePass>();
-}
-
+} // namespace quantum
 } // namespace catalyst

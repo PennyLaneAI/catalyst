@@ -21,10 +21,10 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/Pass/Pass.h"
 
 #include "Gradient/IR/GradientDialect.h"
 #include "Gradient/IR/GradientOps.h"
-#include "Gradient/Transforms/Passes.h"
 #include "Gradient/Transforms/Patterns.h"
 #include "Quantum/IR/QuantumDialect.h"
 
@@ -34,8 +34,8 @@ using namespace catalyst::gradient;
 namespace catalyst {
 namespace gradient {
 
-#define GEN_PASS_DECL_GRADIENTCONVERSIONPASS
 #define GEN_PASS_DEF_GRADIENTCONVERSIONPASS
+#define GEN_PASS_DECL_GRADIENTCONVERSIONPASS
 #include "Gradient/Transforms/Passes.h.inc"
 
 struct GradientConversionPass : impl::GradientConversionPassBase<GradientConversionPass> {
@@ -76,10 +76,4 @@ struct GradientConversionPass : impl::GradientConversionPassBase<GradientConvers
 };
 
 } // namespace gradient
-
-std::unique_ptr<Pass> createGradientConversionPass()
-{
-    return std::make_unique<gradient::GradientConversionPass>();
-}
-
 } // namespace catalyst

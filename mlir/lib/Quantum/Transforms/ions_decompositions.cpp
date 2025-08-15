@@ -58,10 +58,4 @@ struct IonsDecompositionPass : impl::IonsDecompositionPassBase<IonsDecomposition
 };
 
 } // namespace quantum
-
-std::unique_ptr<Pass> createIonsDecompositionPass()
-{
-    return std::make_unique<quantum::IonsDecompositionPass>();
-}
-
 } // namespace catalyst

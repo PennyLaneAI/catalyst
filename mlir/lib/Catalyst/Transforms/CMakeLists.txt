@@ -21,7 +21,6 @@ file(GLOB SRC
     MemrefCopyToLinalgCopyPatterns.cpp
     qnode_to_async_lowering.cpp
     QnodeToAsyncPatterns.cpp
-    RegisterAllPasses.cpp
     RegisterInactiveCallbackPass.cpp
     scatter_lowering.cpp
     ScatterPatterns.cpp

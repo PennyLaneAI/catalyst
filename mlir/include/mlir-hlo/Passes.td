@@ -39,7 +39,6 @@ include "mlir/Pass/PassBase.td"
 // mhlo legalize sort pass.
 def MhloLegalizeSortPass : Pass<"mhlo-legalize-sort", "func::FuncOp"> {
   let summary = "Legalize from Mhlo sort to SCF control flow.";
-  let constructor = "createMhloLegalizeSortPass()";
   let dependentDialects = ["arith::ArithDialect",
                            "bufferization::BufferizationDialect",
                            "scf::SCFDialect", "tensor::TensorDialect"];
@@ -48,13 +47,11 @@ def MhloLegalizeSortPass : Pass<"mhlo-legalize-sort", "func::FuncOp"> {
 // mhlo legalize to std pass.
 def MhloLegalizeToStandardPass : Pass<"mhlo-legalize-to-std", "func::FuncOp"> {
   let summary = "Legalize from MHLO dialect to standard dialect.";
-  let constructor = "createMhloLegalizeToStdPass()";
 }
 
 // mhlo legalize to control flow pass.
 def MhloLegalizeControlFlowPass : Pass<"mhlo-legalize-control-flow", "func::FuncOp"> {
   let summary = "Legalize from MHLO control flow to SCF control flow.";
-  let constructor = "createMhloLegalizeControlFlowPass()";
   let dependentDialects = ["scf::SCFDialect", "tensor::TensorDialect"];
 }
 

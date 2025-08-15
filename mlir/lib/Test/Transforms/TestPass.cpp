@@ -17,20 +17,14 @@
 #include <memory>
 #include <vector>
 
-#include "llvm/Support/Debug.h"
-#include "llvm/Support/Errc.h"
-
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
-#include "mlir/Dialect/Index/IR/IndexDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
-#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
-#include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Pass/Pass.h"
-#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "llvm/Support/Debug.h"
 
 using namespace llvm;
 using namespace mlir;
@@ -39,6 +33,7 @@ namespace catalyst {
 namespace test {
 
 #define GEN_PASS_DEF_TESTPASS
+#define GEN_PASS_DECL_TESTPASS
 #include "Test/Transforms/Passes.h.inc"
 
 struct TestPass : impl::TestPassBase<TestPass> {
@@ -56,7 +51,4 @@ struct TestPass : impl::TestPassBase<TestPass> {
 };
 
 } // namespace test
-
-std::unique_ptr<Pass> createTestPass() { return std::make_unique<test::TestPass>(); }
-
 } // namespace catalyst

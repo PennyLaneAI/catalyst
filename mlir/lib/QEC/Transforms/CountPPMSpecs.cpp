@@ -167,8 +167,4 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
 };
 
 } // namespace qec
-
-/// Create a pass for lowering operations in the `QECDialect`.
-std::unique_ptr<Pass> createCountPPMSpecsPass() { return std::make_unique<CountPPMSpecsPass>(); }
-
 } // namespace catalyst

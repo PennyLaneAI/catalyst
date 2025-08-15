@@ -22,7 +22,6 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include "Gradient/IR/GradientOps.h"
-#include "Gradient/Transforms/Passes.h"
 #include "Gradient/Transforms/Patterns.h"
 
 using namespace mlir;
@@ -32,6 +31,7 @@ namespace catalyst {
 namespace gradient {
 
 #define GEN_PASS_DEF_GRADIENTPREPROCESSINGPASS
+#define GEN_PASS_DECL_GRADIENTPREPROCESSINGPASS
 #include "Gradient/Transforms/Passes.h.inc"
 
 struct GradientPreprocessingPass : impl::GradientPreprocessingPassBase<GradientPreprocessingPass> {
@@ -49,10 +49,4 @@ struct GradientPreprocessingPass : impl::GradientPreprocessingPassBase<GradientP
 };
 
 } // namespace gradient
-
-std::unique_ptr<Pass> createGradientPreprocessingPass()
-{
-    return std::make_unique<gradient::GradientPreprocessingPass>();
-}
-
 } // namespace catalyst

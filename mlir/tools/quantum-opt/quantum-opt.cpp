@@ -32,29 +32,26 @@
 
 #include "Catalyst/IR/CatalystDialect.h"
 #include "Catalyst/Transforms/BufferizableOpInterfaceImpl.h"
-#include "Catalyst/Transforms/Passes.h"
 #include "Catalyst/Utils/PrintVersion.h"
 #include "Gradient/IR/GradientDialect.h"
 #include "Gradient/Transforms/BufferizableOpInterfaceImpl.h"
-#include "Gradient/Transforms/Passes.h"
 #include "Ion/IR/IonDialect.h"
 #include "MBQC/IR/MBQCDialect.h"
 #include "Mitigation/IR/MitigationDialect.h"
-#include "Mitigation/Transforms/Passes.h"
 #include "QEC/IR/QECDialect.h"
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/Transforms/BufferizableOpInterfaceImpl.h"
-#include "Quantum/Transforms/Passes.h"
+#include "RegisterAllPasses.h"
 
 namespace test {
-void registerTestDialect(mlir::DialectRegistry &);
+void registerTestDialect(DialectRegistry &);
 } // namespace test
 
 int main(int argc, char **argv)
 {
     llvm::cl::AddExtraVersionPrinter(catalyst::printVersion);
     mlir::registerAllPasses();
-    catalyst::registerAllCatalystPasses();
+    catalyst::registerAllPasses();
     mlir::mhlo::registerAllMhloPasses();
 
     mlir::DialectRegistry registry;

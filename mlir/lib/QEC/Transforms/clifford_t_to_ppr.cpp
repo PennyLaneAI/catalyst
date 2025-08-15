@@ -58,11 +58,4 @@ struct CliffordTToPPRPass : impl::CliffordTToPPRPassBase<CliffordTToPPRPass> {
 };
 
 } // namespace qec
-
-/// Create a pass for lowering operations in the `QECDialect`.
-std::unique_ptr<mlir::Pass> createCliffordTToPPRPass()
-{
-    return std::make_unique<qec::CliffordTToPPRPass>();
-}
-
 } // namespace catalyst

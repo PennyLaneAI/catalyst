@@ -33,7 +33,9 @@ using namespace mlir;
 using namespace catalyst;
 
 namespace catalyst {
+
 #define GEN_PASS_DEF_APPLYTRANSFORMSEQUENCEPASS
+#define GEN_PASS_DECL_APPLYTRANSFORMSEQUENCEPASS
 #include "Catalyst/Transforms/Passes.h.inc"
 
 struct ApplyTransformSequencePass
@@ -89,10 +91,5 @@ struct ApplyTransformSequencePass
         transformer.erase();
     }
 };
-
-std::unique_ptr<Pass> createApplyTransformSequencePass()
-{
-    return std::make_unique<ApplyTransformSequencePass>();
-}
 
 } // namespace catalyst

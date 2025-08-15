@@ -19,7 +19,9 @@
 #include "mlir/Pass/Pass.h"
 
 namespace catalyst {
-	std::unique_ptr<mlir::Pass> createMhloLegalizeSortPass();
-	std::unique_ptr<mlir::Pass> createMhloLegalizeToStdPass();
-	std::unique_ptr<mlir::Pass> createMhloLegalizeControlFlowPass();
-}
+
+#define GEN_PASS_DECL
+#define GEN_PASS_REGISTRATION
+#include "mlir-hlo/Passes.h.inc"
+
+} // namespace catalyst

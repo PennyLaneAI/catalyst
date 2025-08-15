@@ -105,7 +105,6 @@ include_directories(SYSTEM
 link_directories(${LLVM_BUILD_LIBRARY_DIR})
 add_definitions(${LLVM_DEFINITIONS})
 
-
 # Include json and toml dependency
 include(FetchContent)
 
