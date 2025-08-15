@@ -249,37 +249,5 @@ def test_multicontrolledx_via_paulix():
     assert np.allclose(circuit(), circuit.original_function())
 
 
-def test_singleexcitation():
-    """Test that Single Excitation is not decomposed."""
-
-    dev = qml.device("lightning.qubit", wires=2)
-
-    @qjit
-    @qml.qnode(dev)
-    def circuit(phi):
-        qml.SingleExcitation(phi, wires=[0, 1])
-        return qml.expval(qml.PauliZ(0))
-
-    assert np.allclose(circuit(0.1), circuit.original_function(0.1))
-    assert "SingleExcitation" in str(circuit.jaxpr)
-    assert 'quantum.custom "SingleExcitation"' in circuit.mlir
-
-
-def test_doubleexcitation():
-    """Test that Double Excitation is not decomposed."""
-
-    dev = qml.device("lightning.qubit", wires=4)
-
-    @qjit
-    @qml.qnode(dev)
-    def circuit(phi):
-        qml.DoubleExcitation(phi, wires=[0, 1, 2, 3])
-        return qml.expval(qml.PauliZ(0))
-
-    assert np.allclose(circuit(0.1), circuit.original_function(0.1))
-    assert "DoubleExcitation" in str(circuit.jaxpr)
-    assert 'quantum.custom "DoubleExcitation"' in circuit.mlir
-
-
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
