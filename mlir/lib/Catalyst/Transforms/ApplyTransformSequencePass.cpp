@@ -92,6 +92,8 @@ LogicalResult applyTransformsWithSubpassTracking(Operation *payload,
                                                  mlir::transform::NamedSequenceOp namedSequence,
                                                  PassInstrumentor *passInstrumentor)
 {
+    // TODO: We currently only expect to have a single block in the sequence. It may change in the
+    // future.
     assert(namedSequence.getBody().hasOneBlock() &&
            "Expected exactly one transform op in the sequence block");
 
