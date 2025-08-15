@@ -1552,7 +1552,8 @@ def _assert_cond_result_structure(trees: List[PyTreeDef]):
         if tree != expected_tree:
             raise TypeError(
                 "Conditional requires a consistent return structure across all branches! "
-                f"Got {tree} and {expected_tree}."
+                f"Got {tree} and {expected_tree}. Please specify an else branch if PyTreeDef(None) "
+                "was specified."
             )
 
 
