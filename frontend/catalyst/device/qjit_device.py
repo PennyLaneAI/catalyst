@@ -393,7 +393,6 @@ class QJITDevice(qml.devices.Device):
         return program, config
 
     def _measurement_transform_program(self, capabilities=None):
-        # in case of dynamically supplied shots
         capabilities = capabilities or self.capabilities
         measurement_program = TransformProgram()
         if isinstance(self.original_device, SoftwareQQPP):
