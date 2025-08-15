@@ -323,7 +323,7 @@ class QJITDevice(qml.devices.Device):
         self,
         ctx,
         execution_config: Optional[qml.devices.ExecutionConfig] = None,
-        shots=None,  # dynamically set shots are provided here
+        shots=None,
     ):
         """This function defines the device transform program to be applied and an updated device
         configuration. The transform program will be created and applied to the tape before
