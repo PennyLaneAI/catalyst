@@ -262,7 +262,7 @@ def test_singleexcitation():
 
     assert np.allclose(circuit(0.1), circuit.original_function(0.1))
     assert "SingleExcitation" in str(circuit.jaxpr)
-    assert "SingleExcitation" in circuit.mlir
+    assert 'quantum.custom "SingleExcitation"' in circuit.mlir
 
 
 def test_doubleexcitation():
@@ -278,7 +278,7 @@ def test_doubleexcitation():
 
     assert np.allclose(circuit(0.1), circuit.original_function(0.1))
     assert "DoubleExcitation" in str(circuit.jaxpr)
-    assert "DoubleExcitation" in circuit.mlir
+    assert "quantum.custom "DoubleExcitation"" in circuit.mlir
 
 
 if __name__ == "__main__":
