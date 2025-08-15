@@ -35,4 +35,3 @@ nbmake
 pennylane-lightning-kokkos
 amazon-braket-pennylane-plugin>1.27.1
 xdsl
-pennylane @ git+https://github.com/PennyLaneAI/pennylane.git@shots-decopuling/deprecate_device_shots2
