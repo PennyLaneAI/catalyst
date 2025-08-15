@@ -218,7 +218,8 @@ def cond(pred: DynamicJaxprTracer):
         ...         return x ** 2
         ...     return cond_fn()
         TypeError: Conditional requires a consistent return structure across all branches! Got
-        PyTreeDef(None) and PyTreeDef(*).
+        PyTreeDef(None) and PyTreeDef(*). Please specify an else branch if PyTreeDef(None) was
+        specified.
 
         >>> @qjit
         ... def f(x: float):
