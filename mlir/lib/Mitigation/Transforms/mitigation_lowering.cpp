@@ -31,7 +31,6 @@ using namespace catalyst::mitigation;
 namespace catalyst {
 namespace mitigation {
 
-#define GEN_PASS_DECL_MITIGATIONLOWERINGPASS
 #define GEN_PASS_DEF_MITIGATIONLOWERINGPASS
 #include "Mitigation/Transforms/Passes.h.inc"
 

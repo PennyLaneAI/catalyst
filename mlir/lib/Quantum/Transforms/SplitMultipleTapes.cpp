@@ -38,7 +38,6 @@ namespace catalyst {
 namespace quantum {
 
 #define GEN_PASS_DEF_SPLITMULTIPLETAPESPASS
-#define GEN_PASS_DECL_SPLITMULTIPLETAPESPASS
 #include "Quantum/Transforms/Passes.h.inc"
 
 struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMultipleTapesPass> {

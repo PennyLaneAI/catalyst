@@ -135,8 +135,8 @@ Now we write the pass itself. Create a new file ``mlir/lib/Catalyst/Transforms/M
     using namespace catalyst;
 
     namespace catalyst {
-    #define GEN_PASS_DEF_MYHELLOWORLDPASS
     #define GEN_PASS_DECL_MYHELLOWORLDPASS
+    #define GEN_PASS_DEF_MYHELLOWORLDPASS
     #include "Catalyst/Transforms/Passes.h.inc"
 
     struct MyHelloWorldPass : public impl::MyHelloWorldPassBase<MyHelloWorldPass> {

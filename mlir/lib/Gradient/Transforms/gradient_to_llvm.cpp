@@ -34,8 +34,8 @@ using namespace catalyst::gradient;
 namespace catalyst {
 namespace gradient {
 
-#define GEN_PASS_DEF_GRADIENTCONVERSIONPASS
 #define GEN_PASS_DECL_GRADIENTCONVERSIONPASS
+#define GEN_PASS_DEF_GRADIENTCONVERSIONPASS
 #include "Gradient/Transforms/Passes.h.inc"
 
 struct GradientConversionPass : impl::GradientConversionPassBase<GradientConversionPass> {

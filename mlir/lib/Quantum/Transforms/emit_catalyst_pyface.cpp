@@ -202,7 +202,6 @@ namespace catalyst {
 namespace quantum {
 
 #define GEN_PASS_DEF_EMITCATALYSTPYINTERFACEPASS
-#define GEN_PASS_DECL_EMITCATALYSTPYINTERFACEPASS
 #include "Quantum/Transforms/Passes.h.inc"
 
 struct EmitCatalystPyInterfacePass

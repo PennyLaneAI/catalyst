@@ -31,7 +31,6 @@ namespace catalyst {
 namespace gradient {
 
 #define GEN_PASS_DEF_GRADIENTPOSTPROCESSINGPASS
-#define GEN_PASS_DECL_GRADIENTPOSTPROCESSINGPASS
 #include "Gradient/Transforms/Passes.h.inc"
 
 struct GradientPostprocessingPass

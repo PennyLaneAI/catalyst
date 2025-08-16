@@ -342,7 +342,6 @@ struct DetensorizeWhileOp : public OpRewritePattern<scf::WhileOp> {
 namespace catalyst {
 
 #define GEN_PASS_DEF_DETENSORIZESCFPASS
-#define GEN_PASS_DECL_DETENSORIZESCFPASS
 #include "Catalyst/Transforms/Passes.h.inc"
 
 struct DetensorizeSCFPass : public impl::DetensorizeSCFPassBase<DetensorizeSCFPass> {

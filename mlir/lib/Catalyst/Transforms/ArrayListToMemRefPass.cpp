@@ -12,7 +12,6 @@ using namespace catalyst;
 
 namespace catalyst {
 #define GEN_PASS_DEF_ARRAYLISTTOMEMREFPASS
-#define GEN_PASS_DECL_ARRAYLISTTOMEMREFPASS
 #include "Catalyst/Transforms/Passes.h.inc"
 } // namespace catalyst
 

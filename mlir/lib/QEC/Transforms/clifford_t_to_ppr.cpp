@@ -29,7 +29,6 @@ namespace catalyst {
 namespace qec {
 
 #define GEN_PASS_DEF_CLIFFORDTTOPPRPASS
-#define GEN_PASS_DECL_CLIFFORDTTOPPRPASS
 #include "QEC/Transforms/Passes.h.inc"
 
 struct CliffordTToPPRPass : impl::CliffordTToPPRPassBase<CliffordTToPPRPass> {

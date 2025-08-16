@@ -38,7 +38,6 @@ using namespace catalyst;
 namespace catalyst {
 
 #define GEN_PASS_DEF_SCATTERLOWERINGPASS
-#define GEN_PASS_DECL_SCATTERLOWERINGPASS
 #include "Catalyst/Transforms/Passes.h.inc"
 
 struct ScatterLoweringPass : impl::ScatterLoweringPassBase<ScatterLoweringPass> {

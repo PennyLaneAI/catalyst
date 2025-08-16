@@ -34,7 +34,6 @@ namespace catalyst {
 namespace quantum {
 
 #define GEN_PASS_DEF_MERGEROTATIONSPASS
-#define GEN_PASS_DECL_MERGEROTATIONSPASS
 #include "Quantum/Transforms/Passes.h.inc"
 
 struct MergeRotationsPass : impl::MergeRotationsPassBase<MergeRotationsPass> {

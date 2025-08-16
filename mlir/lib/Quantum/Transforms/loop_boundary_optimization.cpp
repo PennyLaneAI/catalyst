@@ -36,7 +36,6 @@ namespace catalyst {
 namespace quantum {
 
 #define GEN_PASS_DEF_LOOPBOUNDARYOPTIMIZATIONPASS
-#define GEN_PASS_DECL_LOOPBOUNDARYOPTIMIZATIONPASS
 #include "Quantum/Transforms/Passes.h.inc"
 
 struct LoopBoundaryOptimizationPass

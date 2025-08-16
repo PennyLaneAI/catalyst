@@ -31,7 +31,6 @@ namespace catalyst {
 namespace quantum {
 
 #define GEN_PASS_DEF_QUANTUMCONVERSIONPASS
-#define GEN_PASS_DECL_QUANTUMCONVERSIONPASS
 #include "Quantum/Transforms/Passes.h.inc"
 
 struct QIRTypeConverter : public LLVMTypeConverter {

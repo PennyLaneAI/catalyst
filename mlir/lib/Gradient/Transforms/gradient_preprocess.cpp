@@ -31,7 +31,6 @@ namespace catalyst {
 namespace gradient {
 
 #define GEN_PASS_DEF_GRADIENTPREPROCESSINGPASS
-#define GEN_PASS_DECL_GRADIENTPREPROCESSINGPASS
 #include "Gradient/Transforms/Passes.h.inc"
 
 struct GradientPreprocessingPass : impl::GradientPreprocessingPassBase<GradientPreprocessingPass> {

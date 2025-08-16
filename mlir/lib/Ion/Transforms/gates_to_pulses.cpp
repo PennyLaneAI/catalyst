@@ -33,8 +33,8 @@ using namespace mlir;
 namespace catalyst {
 namespace ion {
 
-#define GEN_PASS_DEF_GATESTOPULSESPASS
 #define GEN_PASS_DECL_GATESTOPULSESPASS
+#define GEN_PASS_DEF_GATESTOPULSESPASS
 #include "Ion/Transforms/Passes.h.inc"
 
 struct GatesToPulsesPass : impl::GatesToPulsesPassBase<GatesToPulsesPass> {

@@ -31,7 +31,6 @@ using namespace catalyst;
 namespace catalyst {
 
 #define GEN_PASS_DEF_MEMREFCOPYTOLINALGCOPYPASS
-#define GEN_PASS_DECL_MEMREFCOPYTOLINALGCOPYPASS
 #include "Catalyst/Transforms/Passes.h.inc"
 
 struct MemrefCopyToLinalgCopyPass

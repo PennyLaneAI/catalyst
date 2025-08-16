@@ -40,7 +40,6 @@ namespace catalyst {
 namespace gradient {
 
 #define GEN_PASS_DEF_GRADIENTLOWERINGPASS
-#define GEN_PASS_DECL_GRADIENTLOWERINGPASS
 #include "Gradient/Transforms/Passes.h.inc"
 
 struct GradientLoweringPass : impl::GradientLoweringPassBase<GradientLoweringPass> {
