@@ -60,6 +60,9 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Fix type promotion on conditional branches, where the return values from `cond` should be the promoted one.
+  [(#1977)](https://github.com/PennyLaneAI/catalyst/pull/1977)
+
 * Fix wrong handling of partitioned shots in the decomposition pass of `measurements_from_samples`.
   [(#1981)](https://github.com/PennyLaneAI/catalyst/pull/1981)
 
