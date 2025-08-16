@@ -29,8 +29,8 @@ using namespace catalyst::qec;
 namespace catalyst {
 namespace qec {
 
-#define GEN_PASS_DEF_COMMUTEPPRPASS
 #define GEN_PASS_DECL_COMMUTEPPRPASS
+#define GEN_PASS_DEF_COMMUTEPPRPASS
 #include "QEC/Transforms/Passes.h.inc"
 
 struct CommutePPRPass : public impl::CommutePPRPassBase<CommutePPRPass> {

@@ -29,8 +29,8 @@ using namespace catalyst::qec;
 namespace catalyst {
 namespace qec {
 
-#define GEN_PASS_DEF_MERGEPPRINTOPPMPASS
 #define GEN_PASS_DECL_MERGEPPRINTOPPMPASS
+#define GEN_PASS_DEF_MERGEPPRINTOPPMPASS
 #include "QEC/Transforms/Passes.h.inc"
 
 struct MergePPRIntoPPMPass : public impl::MergePPRIntoPPMPassBase<MergePPRIntoPPMPass> {

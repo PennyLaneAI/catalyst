@@ -902,8 +902,8 @@ void insertBranchFromFailToSuccessor(Block *fail, Block *success, PatternRewrite
 
 namespace catalyst {
 
-#define GEN_PASS_DEF_ADDEXCEPTIONHANDLINGPASS
 #define GEN_PASS_DECL_ADDEXCEPTIONHANDLINGPASS
+#define GEN_PASS_DEF_ADDEXCEPTIONHANDLINGPASS
 #include "Catalyst/Transforms/Passes.h.inc"
 
 struct AddExceptionHandlingPass : impl::AddExceptionHandlingPassBase<AddExceptionHandlingPass> {

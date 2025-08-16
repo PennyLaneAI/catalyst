@@ -29,8 +29,8 @@ using namespace catalyst::qec;
 namespace catalyst {
 namespace qec {
 
-#define GEN_PASS_DEF_DECOMPOSENONCLIFFORDPPRPASS
 #define GEN_PASS_DECL_DECOMPOSENONCLIFFORDPPRPASS
+#define GEN_PASS_DEF_DECOMPOSENONCLIFFORDPPRPASS
 #include "QEC/Transforms/Passes.h.inc"
 
 struct DecomposeNonCliffordPPRPass

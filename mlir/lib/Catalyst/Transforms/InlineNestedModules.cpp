@@ -475,8 +475,8 @@ struct InlineNestedSymbolTablePass : PassWrapper<InlineNestedSymbolTablePass, Op
     }
 };
 
-#define GEN_PASS_DEF_INLINENESTEDMODULEPASS
 #define GEN_PASS_DECL_INLINENESTEDMODULEPASS
+#define GEN_PASS_DEF_INLINENESTEDMODULEPASS
 #include "Catalyst/Transforms/Passes.h.inc"
 
 struct InlineNestedModulePass : impl::InlineNestedModulePassBase<InlineNestedModulePass> {

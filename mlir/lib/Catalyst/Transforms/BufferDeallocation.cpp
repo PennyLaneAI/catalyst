@@ -94,7 +94,6 @@ using namespace catalyst;
 namespace catalyst {
 
 #define GEN_PASS_DEF_BUFFERDEALLOCATIONPASS
-#define GEN_PASS_DECL_BUFFERDEALLOCATIONOPASS
 #include "Catalyst/Transforms/Passes.h.inc"
 
 } // namespace catalyst

@@ -35,8 +35,8 @@ using namespace catalyst::quantum;
 namespace catalyst {
 namespace quantum {
 
-#define GEN_PASS_DEF_DISENTANGLESWAPPASS
 #define GEN_PASS_DECL_DISENTANGLESWAPPASS
+#define GEN_PASS_DEF_DISENTANGLESWAPPASS
 #include "Quantum/Transforms/Passes.h.inc"
 
 struct DisentangleSWAPPass : public impl::DisentangleSWAPPassBase<DisentangleSWAPPass> {

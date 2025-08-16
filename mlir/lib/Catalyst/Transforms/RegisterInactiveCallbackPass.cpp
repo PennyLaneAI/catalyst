@@ -24,7 +24,6 @@ using namespace mlir;
 namespace catalyst {
 
 #define GEN_PASS_DEF_REGISTERINACTIVECALLBACKPASS
-#define GEN_PASS_DECL_REGISTERINACTIVECALLBACKPASS
 #include "Catalyst/Transforms/Passes.h.inc"
 
 struct RegisterInactiveCallbackPass

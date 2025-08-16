@@ -33,7 +33,6 @@ namespace catalyst {
 namespace test {
 
 #define GEN_PASS_DEF_TESTPASS
-#define GEN_PASS_DECL_TESTPASS
 #include "Test/Transforms/Passes.h.inc"
 
 struct TestPass : impl::TestPassBase<TestPass> {

@@ -191,7 +191,6 @@ namespace catalyst {
 namespace quantum {
 
 #define GEN_PASS_DEF_COPYGLOBALMEMREFPASS
-#define GEN_PASS_DECL_COPYGLOBALMEMREFPASS
 #include "Quantum/Transforms/Passes.h.inc"
 
 struct CopyGlobalMemRefPass : impl::CopyGlobalMemRefPassBase<CopyGlobalMemRefPass> {

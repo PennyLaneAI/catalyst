@@ -29,7 +29,6 @@ using namespace mlir;
 namespace catalyst {
 
 #define GEN_PASS_DEF_MEMREFTOLLVMWITHTBAAPASS
-#define GEN_PASS_DECL_MEMREFTOLLVMWITHTBAAPASS
 #include "Catalyst/Transforms/Passes.h.inc"
 
 } // namespace catalyst

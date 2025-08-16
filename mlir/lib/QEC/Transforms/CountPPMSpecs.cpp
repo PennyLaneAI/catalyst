@@ -37,7 +37,6 @@ namespace catalyst {
 namespace qec {
 
 #define GEN_PASS_DEF_COUNTPPMSPECSPASS
-#define GEN_PASS_DECL_COUNTPPMSPECSPASS
 #include "QEC/Transforms/Passes.h.inc"
 
 struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass> {

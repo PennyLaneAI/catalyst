@@ -35,7 +35,6 @@ using namespace catalyst;
 namespace catalyst {
 
 #define GEN_PASS_DEF_APPLYTRANSFORMSEQUENCEPASS
-#define GEN_PASS_DECL_APPLYTRANSFORMSEQUENCEPASS
 #include "Catalyst/Transforms/Passes.h.inc"
 
 struct ApplyTransformSequencePass
