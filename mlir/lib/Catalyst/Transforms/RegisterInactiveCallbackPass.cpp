@@ -13,8 +13,8 @@
 // limitations under the License.
 
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
-#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include "Catalyst/Transforms/Patterns.h"
 #include "Gradient/Transforms/EnzymeConstants.h"
