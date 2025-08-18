@@ -338,7 +338,7 @@ jobs:
         export FC=gfortran-14
         sw_vers
         #softwareupdate --install "Command Line Tools for Xcode 16.4"
-        xcode-select --switch /Applications/Xcode_16.4.app
+        sudo xcode-select --switch /Applications/Xcode_16.4.app
         cmake -S runtime -B $GITHUB_WORKSPACE/runtime-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
               -DCMAKE_LIBRARY_OUTPUT_DIRECTORY="$GITHUB_WORKSPACE/runtime-build/lib" \
