@@ -543,8 +543,9 @@ class TestCatalyst:
             subsubroutine()
             qml.adjoint(qml.ctrl(subsubroutine, control=0))()
 
-        dev = qml.device(backend, wires=4, shots=500)
+        dev = qml.device(backend, wires=4)
 
+        @qml.set_shots(shots=500)
         @qml.qnode(dev)
         def circuit():
             qml.adjoint(subroutine)()

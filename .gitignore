@@ -27,6 +27,7 @@ frontend/catalyst/include
 # Documentation
 doc/_build
 doc/code/api
+mlir/build-docs
 .ipynb*
 
 # Development
