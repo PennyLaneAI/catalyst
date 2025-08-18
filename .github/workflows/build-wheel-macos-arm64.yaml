@@ -399,7 +399,7 @@ jobs:
               -DLLVM_ENABLE_ZSTD=OFF \
               -DLLVM_ENABLE_LLD=OFF \
               -DLLVM_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/llvm" \
-              -DCMAKE_CXX_FLAGS="-Xclang -fno-module-validate-system-headers"
+              -DCMAKE_CXX_FLAGS="-Xclang -fno-modules-validate-system-headers"
 
         # xcode >= 16 turns on verifier after building every translation unit
         # This will verify all llvm builds and take a huge amount of time
