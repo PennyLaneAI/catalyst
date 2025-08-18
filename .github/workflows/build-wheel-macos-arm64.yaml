@@ -37,7 +37,7 @@ on:
         type: string
 
 env:
-  MACOSX_DEPLOYMENT_TARGET: 15.5
+  MACOSX_DEPLOYMENT_TARGET: 15.0
 
   # If the `inputs.build_standalone_plugin` is set to a value (true/false), then that is used.
   # If the input is empty (meaning this workflow was not triggered by a workflow_call/workflow_dispatch), then check if event_name is schedule.
