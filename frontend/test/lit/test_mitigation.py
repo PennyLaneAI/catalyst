@@ -26,13 +26,13 @@ from catalyst import mitigate_with_zne, qjit
 @qjit(target="mlir")
 def mcm_method_with_zne():
     """Test that the dynamic_one_shot works with ZNE."""
-    dev = qml.device("lightning.qubit", wires=1, shots=5)
+    dev = qml.device("lightning.qubit", wires=1)
 
     def circuit():
         return qml.expval(qml.PauliZ(0))
 
     s = [1, 3]
-    g = qml.QNode(circuit, dev, mcm_method="one-shot")
+    g = qml.set_shots(qml.QNode(circuit, dev, mcm_method="one-shot"), shots=5)
     return mitigate_with_zne(g, scale_factors=s)()
 
 
