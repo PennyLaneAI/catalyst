@@ -67,21 +67,20 @@ limitations under the License.
 // #include "stablehlo/dialect/StablehloOps.h"
 // #include "stablehlo/transforms/Passes.h"
 
-#include "mlir-hlo/Passes.h"
-
 using namespace mlir;
 using namespace mhlo;
 // using namespace stablehlo;
-using namespace catalyst;
 
 namespace catalyst {
+namespace mhlo {
 
 #define GEN_PASS_DEF_MHLOLEGALIZESORTPASS
 #define GEN_PASS_DECL_MHLOLEGALIZESORTPASS
 // #define GEN_PASS_DEF_STABLEHLOLEGALIZESORTPASS
 // #define GEN_PASS_DECL_STABLEHLOLEGALIZESORTPASS
-#include "mlir-hlo/Passes.h.inc"
+#include "mlir-hlo/Transforms/Passes.h.inc"
 
+} // namespace mhlo
 } // namespace catalyst
 
 namespace {
@@ -575,7 +574,7 @@ struct SortOpPattern : public OpRewritePattern<SortOp> {
 };
 
 struct MhloLegalizeSortPass
-    : public catalyst::impl::MhloLegalizeSortPassBase<MhloLegalizeSortPass> {
+    : public catalyst::mhlo::impl::MhloLegalizeSortPassBase<MhloLegalizeSortPass> {
     // Perform the lowering to MLIR control flow.
     void runOnOperation() override
     {

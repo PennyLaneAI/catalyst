@@ -55,22 +55,21 @@ limitations under the License.
 // #include "stablehlo/dialect/StablehloOps.h"
 // #include "stablehlo/transforms/Passes.h"
 
-#include "mlir-hlo/Passes.h"
-
 using namespace mlir;
 using namespace mhlo;
 // using namespace stablehlo;
-using namespace catalyst;
 
 namespace catalyst {
+namespace mhlo {
 
 #define GEN_PASS_DEF_MHLOLEGALIZETOSTANDARDPASS
 #define GEN_PASS_DECL_MHLOLEGALIZETOSTANDARDPASS
 // #define GEN_PASS_DEF_STABLEHLOLEGALIZETOSTANDARDPASS
 // #define GEN_PASS_DECL_STABLEHLOLEGALIZETOSTANDARDPASS
-#include "mlir-hlo/Passes.h.inc"
-#include "mlir-hlo/generated_mhlo_legalize_to_standard.cpp.inc"
+#include "mlir-hlo/Transforms/Passes.h.inc"
+#include "mlir-hlo/Transforms/generated_mhlo_legalize_to_standard.cpp.inc"
 
+} // namespace mhlo
 } // namespace catalyst
 
 namespace {
@@ -238,14 +237,14 @@ class ConvertIotaOp : public OpRewritePattern<mhlo::IotaOp> {
     }
 };
 
-void populateMhloToStdPatterns(RewritePatternSet *patterns, mlir::MLIRContext *ctx)
+void populateMhloToStandardPatterns(RewritePatternSet *patterns, mlir::MLIRContext *ctx)
 {
-    populateWithGenerated(*patterns);
+    catalyst::mhlo::populateWithGenerated(*patterns);
     patterns->add<CompareFConvert, CompareIConvert, ConvertIotaOp>(ctx);
 }
 
 struct MhloLegalizeToStandardPass
-    : public catalyst::impl::MhloLegalizeToStandardPassBase<MhloLegalizeToStandardPass> {
+    : public catalyst::mhlo::impl::MhloLegalizeToStandardPassBase<MhloLegalizeToStandardPass> {
     void getDependentDialects(DialectRegistry &registry) const override
     {
         registry.insert<arith::ArithDialect, math::MathDialect, func::FuncDialect>();
@@ -255,7 +254,7 @@ struct MhloLegalizeToStandardPass
     void runOnOperation() override
     {
         RewritePatternSet patterns(&getContext());
-        populateMhloToStdPatterns(&patterns, &getContext());
+        populateMhloToStandardPatterns(&patterns, &getContext());
         if (failed(applyPatternsGreedily(getOperation(), std::move(patterns))))
             return signalPassFailure();
     }

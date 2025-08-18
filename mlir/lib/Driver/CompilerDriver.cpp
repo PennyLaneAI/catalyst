@@ -292,7 +292,7 @@ void registerAllCatalystDialects(DialectRegistry &registry)
     registerAllExtensions(registry);
 
     // HLO
-    mhlo::registerAllMhloDialects(registry);
+    mlir::mhlo::registerAllMhloDialects(registry);
     stablehlo::registerAllDialects(registry);
 
     // Catalyst
@@ -958,9 +958,9 @@ int QuantumDriverMainFromCL(int argc, char **argv)
     // Create dialect registry
     DialectRegistry registry;
     mlir::registerAllPasses();
+    mlir::mhlo::registerAllMhloPasses();
     catalyst::registerAllPasses();
     registerAllCatalystPipelines();
-    mhlo::registerAllMhloPasses();
     registerAllCatalystDialects(registry);
     registerLLVMTranslations(registry);
 
