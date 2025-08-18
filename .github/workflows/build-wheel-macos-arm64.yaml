@@ -332,6 +332,7 @@ jobs:
         # On GH images, gfortran is only available as a specific version.
         export FC=gfortran-14
         sw_vers
+        xcode-select intsall
         cmake -S runtime -B $GITHUB_WORKSPACE/runtime-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
               -DCMAKE_LIBRARY_OUTPUT_DIRECTORY="$GITHUB_WORKSPACE/runtime-build/lib" \
