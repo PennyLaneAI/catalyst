@@ -23,8 +23,6 @@ def DetensorizeFunctionBoundaryPass : Pass<"detensorize-function-boundary"> {
     let dependentDialects = [
         "tensor::TensorDialect",
     ];
-
-    let constructor = "catalyst::createDetensorizeFunctionBoundaryPass()";
 }
 
 def DetensorizeSCFPass : Pass<"detensorize-scf"> {
