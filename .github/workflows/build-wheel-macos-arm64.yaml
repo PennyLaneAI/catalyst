@@ -331,6 +331,7 @@ jobs:
       run: |
         # On GH images, gfortran is only available as a specific version.
         export FC=gfortran-14
+        sw_vers
         cmake -S runtime -B $GITHUB_WORKSPACE/runtime-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
               -DCMAKE_LIBRARY_OUTPUT_DIRECTORY="$GITHUB_WORKSPACE/runtime-build/lib" \
@@ -344,7 +345,7 @@ jobs:
     - name: Error log on failure
       if: failure() && steps.runtime-build.outcome == 'failure'
       run: |
-        cat $GITHUB_WORKSPACE/runtime-build/_lapacke-accelerate/src/lapacke-accelerate-stamp/*-err.log 2>/dev/null || True
+        cat $GITHUB_WORKSPACE/runtime-build/_lapacke-accelerate/src/lapacke-accelerate-stamp/*-err.log || True
 
     - name: Test Catalyst-Runtime
       run: |
