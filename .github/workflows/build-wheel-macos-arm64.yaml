@@ -397,9 +397,8 @@ jobs:
               -DENZYME_SRC_DIR="$GITHUB_WORKSPACE/mlir/Enzyme" \
               -DLLVM_ENABLE_ZLIB=FORCE_ON \
               -DLLVM_ENABLE_ZSTD=OFF \
-              -DLLVM_ENABLE_LLD=OFF \
-              -DLLVM_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/llvm" \
-              -DCMAKE_CXX_FLAGS="-Xclang -fno-modules-validate-system-headers"
+              -DLLVM_ENABLE_LLD=ON \
+              -DLLVM_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/llvm"
 
         # xcode >= 16 turns on verifier after building every translation unit
         # This will verify all llvm builds and take a huge amount of time
