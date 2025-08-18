@@ -37,7 +37,7 @@ on:
         type: string
 
 env:
-  MACOSX_DEPLOYMENT_TARGET: 14.0
+  MACOSX_DEPLOYMENT_TARGET: 15.5
 
   # If the `inputs.build_standalone_plugin` is set to a value (true/false), then that is used.
   # If the input is empty (meaning this workflow was not triggered by a workflow_call/workflow_dispatch), then check if event_name is schedule.
@@ -336,11 +336,22 @@ jobs:
       run: |
         # On GH images, gfortran is only available as a specific version.
         export FC=gfortran-14
-        sw_vers
-        #softwareupdate --install "Command Line Tools for Xcode 16.4"
+
+        # On GH images, MacOS is current 15.5
+        # This macos works with xcode 16.4
         sudo xcode-select --switch /Applications/Xcode_16.4.app
-        sudo mv /Applications/Xcode_16.4.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk /Applications/Xcode_16.4.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX16.4.sdk
-        sudo ln -sn /Applications/Xcode_16.4.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX16.4.sdk /Applications/Xcode_16.4.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk
+
+        # Starting xcode 16, the xcode version is no longer appended to the MacOSX<version>.sdk filename
+        # but instead is appened to the upper directory as Xcode_16.4.app
+        # This breaks the version parsing inside lapack: they still get the version from the .sdk's filename
+        #   https://github.com/lepus2589/accelerate-lapack/blob/5b1a99ae8c4c682a90d4318ae5bb7b465e9dbb66/CMakeLists.txt#L75
+        # To resolve this, we manually make a .sdk file with the version
+        # We need to `find` instead of `xcrun` because `xcrun` returns the symbolic path
+        export MAC_SDK_FILE=$(find / -name "MacOSX.sdk" 2>/dev/null)
+        export MAC_SDK_PATH=$(dirname $MAC_SDK_FILE)
+        sudo mv $MAC_SDK_FILE $MAC_SDK_PATH/MacOSX16.4.sdk
+        sudo ln -sn $MAC_SDK_PATH/MacOSX16.4.sdk $MAC_SDK_FILE
+
         cmake -S runtime -B $GITHUB_WORKSPACE/runtime-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
               -DCMAKE_LIBRARY_OUTPUT_DIRECTORY="$GITHUB_WORKSPACE/runtime-build/lib" \
@@ -354,7 +365,7 @@ jobs:
     - name: Error log on failure
       if: failure() && steps.runtime-build.outcome == 'failure'
       run: |
-        cat $GITHUB_WORKSPACE/runtime-build/_lapacke-accelerate/src/lapacke-accelerate-stamp/*-err.log || True
+        cat $GITHUB_WORKSPACE/runtime-build/_lapacke-accelerate/src/lapacke-accelerate-stamp/*-err.log 2>/dev/null || True
 
     - name: Test Catalyst-Runtime
       run: |
