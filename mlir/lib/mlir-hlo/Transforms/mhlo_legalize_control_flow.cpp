@@ -64,18 +64,6 @@ using namespace mlir;
 using namespace mhlo;
 // using namespace stablehlo;
 
-namespace catalyst {
-namespace mhlo {
-
-#define GEN_PASS_DEF_MHLOLEGALIZECONTROLFLOWPASS
-#define GEN_PASS_DECL_MHLOLEGALIZECONTROLFLOWPASS
-// #define GEN_PASS_DEF_STABLEHLOLEGALIZECONTROLFLOWPASS
-// #define GEN_PASS_DECL_STABLEHLOLEGALIZECONTROLFLOWPASS
-#include "mlir-hlo/Transforms/Passes.h.inc"
-
-} // namespace mhlo
-} // namespace catalyst
-
 namespace {
 
 // All transformations in this file take mhlo blocks which end with
@@ -288,8 +276,18 @@ struct CaseOpPattern : public OpConversionPattern<mhlo::CaseOp> {
     }
 };
 
+} // namespace
+
+namespace catalyst {
+namespace mhlo {
+
+#define GEN_PASS_DEF_MHLOLEGALIZECONTROLFLOWPASS
+// #define GEN_PASS_DEF_STABLEHLOLEGALIZECONTROLFLOWPASS
+// #define GEN_PASS_DECL_STABLEHLOLEGALIZECONTROLFLOWPASS
+#include "mlir-hlo/Transforms/Passes.h.inc"
+
 struct MhloLegalizeControlFlowPass
-    : public catalyst::mhlo::impl::MhloLegalizeControlFlowPassBase<MhloLegalizeControlFlowPass> {
+    : public impl::MhloLegalizeControlFlowPassBase<MhloLegalizeControlFlowPass> {
     // Perform the lowering to MLIR control flow.
     void runOnOperation() override
     {
@@ -301,7 +299,7 @@ struct MhloLegalizeControlFlowPass
 
         mlir::ConversionTarget target(*ctx);
         target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });
-        target.addIllegalOp<mhlo::IfOp, mhlo::WhileOp, mhlo::CaseOp>();
+        target.addIllegalOp<mlir::mhlo::IfOp, mlir::mhlo::WhileOp, mlir::mhlo::CaseOp>();
 
         if (failed(applyPartialConversion(f, target, std::move(patterns)))) {
             signalPassFailure();
@@ -309,4 +307,5 @@ struct MhloLegalizeControlFlowPass
     }
 };
 
-} // namespace
+} // namespace mhlo
+} // namespace catalyst

@@ -71,18 +71,6 @@ using namespace mlir;
 using namespace mhlo;
 // using namespace stablehlo;
 
-namespace catalyst {
-namespace mhlo {
-
-#define GEN_PASS_DEF_MHLOLEGALIZESORTPASS
-#define GEN_PASS_DECL_MHLOLEGALIZESORTPASS
-// #define GEN_PASS_DEF_STABLEHLOLEGALIZESORTPASS
-// #define GEN_PASS_DECL_STABLEHLOLEGALIZESORTPASS
-#include "mlir-hlo/Transforms/Passes.h.inc"
-
-} // namespace mhlo
-} // namespace catalyst
-
 namespace {
 
 using ::mlir::arith::AddIOp;
@@ -573,8 +561,18 @@ struct SortOpPattern : public OpRewritePattern<SortOp> {
     }
 };
 
+} // namespace
+
+namespace catalyst {
+namespace mhlo {
+
+#define GEN_PASS_DEF_MHLOLEGALIZESORTPASS
+// #define GEN_PASS_DEF_STABLEHLOLEGALIZESORTPASS
+// #define GEN_PASS_DECL_STABLEHLOLEGALIZESORTPASS
+#include "mlir-hlo/Transforms/Passes.h.inc"
+
 struct MhloLegalizeSortPass
-    : public catalyst::mhlo::impl::MhloLegalizeSortPassBase<MhloLegalizeSortPass> {
+    : public impl::MhloLegalizeSortPassBase<MhloLegalizeSortPass> {
     // Perform the lowering to MLIR control flow.
     void runOnOperation() override
     {
@@ -586,7 +584,7 @@ struct MhloLegalizeSortPass
 
         mlir::ConversionTarget target(*ctx);
         target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });
-        target.addIllegalOp<mhlo::SortOp>();
+        target.addIllegalOp<mlir::mhlo::SortOp>();
 
         if (failed(applyPartialConversion(f, target, std::move(patterns)))) {
             signalPassFailure();
@@ -594,4 +592,5 @@ struct MhloLegalizeSortPass
     }
 };
 
-} // namespace
+} // namespace mhlo
+} // namespace catalyst

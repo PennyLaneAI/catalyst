@@ -59,19 +59,6 @@ using namespace mlir;
 using namespace mhlo;
 // using namespace stablehlo;
 
-namespace catalyst {
-namespace mhlo {
-
-#define GEN_PASS_DEF_MHLOLEGALIZETOSTANDARDPASS
-#define GEN_PASS_DECL_MHLOLEGALIZETOSTANDARDPASS
-// #define GEN_PASS_DEF_STABLEHLOLEGALIZETOSTANDARDPASS
-// #define GEN_PASS_DECL_STABLEHLOLEGALIZETOSTANDARDPASS
-#include "mlir-hlo/Transforms/Passes.h.inc"
-#include "mlir-hlo/Transforms/generated_mhlo_legalize_to_standard.cpp.inc"
-
-} // namespace mhlo
-} // namespace catalyst
-
 namespace {
 
 class CompareIConvert : public OpRewritePattern<mhlo::CompareOp> {
@@ -237,6 +224,17 @@ class ConvertIotaOp : public OpRewritePattern<mhlo::IotaOp> {
     }
 };
 
+} // namespace
+
+namespace catalyst {
+namespace mhlo {
+
+#define GEN_PASS_DEF_MHLOLEGALIZETOSTANDARDPASS
+// #define GEN_PASS_DEF_STABLEHLOLEGALIZETOSTANDARDPASS
+// #define GEN_PASS_DECL_STABLEHLOLEGALIZETOSTANDARDPASS
+#include "mlir-hlo/Transforms/Passes.h.inc"
+#include "mlir-hlo/Transforms/generated_mhlo_legalize_to_standard.cpp.inc"
+
 void populateMhloToStandardPatterns(RewritePatternSet *patterns, mlir::MLIRContext *ctx)
 {
     catalyst::mhlo::populateWithGenerated(*patterns);
@@ -244,7 +242,7 @@ void populateMhloToStandardPatterns(RewritePatternSet *patterns, mlir::MLIRConte
 }
 
 struct MhloLegalizeToStandardPass
-    : public catalyst::mhlo::impl::MhloLegalizeToStandardPassBase<MhloLegalizeToStandardPass> {
+    : public impl::MhloLegalizeToStandardPassBase<MhloLegalizeToStandardPass> {
     void getDependentDialects(DialectRegistry &registry) const override
     {
         registry.insert<arith::ArithDialect, math::MathDialect, func::FuncDialect>();
@@ -260,4 +258,5 @@ struct MhloLegalizeToStandardPass
     }
 };
 
-} // namespace
+} // namespace mhlo
+} // namespace catalyst
