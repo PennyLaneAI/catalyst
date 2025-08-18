@@ -94,7 +94,8 @@ class TreeTraversal(RewritePattern):
         """Complete the function and ensure it's correctly formed, e.g. returning proper results."""
         rewriter.insertion_point = InsertPoint.at_end(self.ttOp.body.block)
 
-        # For now return nothing from the Tree-Traversal function to satisfy the verifier.
+        # For now we return empty values from the traversal function to satisfy the verifier.
+        # TODO: Return the original function results computed via TT.
         result_vals = []
         for resType in self.ttOp.function_type.outputs:
             assert isinstance(resType, builtin.TensorType)
@@ -129,17 +130,17 @@ class TreeTraversal(RewritePattern):
         self.quantum_segments = quantum_segments
 
         # Go through the rest of the function to initialize the missing input values set.
-        terminal_segment = []
+        terminal_segment = ProgramSegment(ops=[op])  # dealloc op
         while op := next(op_iter, None):
-            terminal_segment.append(op)
+            terminal_segment.ops.append(op)
+        # TODO: do something with the terminal program segment (copy into traversal function?)
 
         # Generate new functions for each segment separated by a measure op.
         # We traverse them bottom up first to correctly determine the I/O of each segment.
-        missing_input_values, _ = self.gather_segment_io(terminal_segment)
+        missing_input_values = set()
+        self.populate_segment_io(terminal_segment, missing_input_values)
         for segment in reversed(quantum_segments):
-            missing_input_values.update(getattr(segment.mcm, "operands", ()))
-            inputs, outputs = self.gather_segment_io(segment.ops, missing_input_values)
-            segment.inputs, segment.outputs = inputs, outputs
+            self.populate_segment_io(segment, missing_input_values)  # inplace
 
         all_segment_io = [*missing_input_values]  # results of the "0th" segment (until Alloc)
         values_as_io_index = {v: k for k, v in enumerate(all_segment_io)}
@@ -210,12 +211,28 @@ class TreeTraversal(RewritePattern):
             for new_res, ref in zip(callOp.results, segment.outputs):
                 updated_results[values_as_io_index[ref]] = new_res
 
-            yieldOp = scf.YieldOp(*updated_results)
-
             rewriter.insert_op(callOp, InsertPoint.at_end(switchOp.case_regions[case].block))
+
+            # perform a state projection for the branch we're about to take
+            # TODO: The postselect value has to be static in our dialect, so we need an if statement
+            # here to convert it to static information. An alternative would be to create the
+            # MCM inside the case statement deciding wether to walk left, right, or up, but there
+            # we don't have access to the right qubit value of the MCM which is tied to the current
+            # segment.
+            # if segment.mcm:
+            #     mcm_qubit_idx = list(segment.outputs).index(segment.mcm.in_qubit)
+            #     mcm_qubit_in = callOp.results[mcm_qubit_idx]
+            #     measureOp = quantum.MeasureOp(mcm_qubit_in, postselect=0)
+
+            #     updated_results[values_as_io_index[segment.mcm.mres]] = measureOp.mres
+            #     updated_results[values_as_io_index[segment.mcm.out_qubit]] = measureOp.out_qubit
+
+            #     rewriter.insert_op(measureOp, InsertPoint.at_end(switchOp.case_regions[case].block))
+
+            yieldOp = scf.YieldOp(*updated_results)
             rewriter.insert_op(yieldOp, InsertPoint.at_end(switchOp.case_regions[case].block))
 
-    def clone_ops_into_func(self, segment: ProgramSegment, id: int, rewriter: PatternRewriter):
+    def clone_ops_into_func(self, segment: ProgramSegment, counter: int, rewriter: PatternRewriter):
         """Clone a set of ops into a new function."""
         op_list, input_vals, output_vals = segment.ops, segment.inputs, segment.outputs
         if not op_list:
@@ -224,7 +241,7 @@ class TreeTraversal(RewritePattern):
         fun_type = builtin.FunctionType.from_lists(
             [arg.type for arg in input_vals], [res.type for res in output_vals]
         )
-        new_func = func.FuncOp(f"quantum_segment_{id}", fun_type)
+        new_func = func.FuncOp(f"quantum_segment_{counter}", fun_type)
 
         value_mapper = dict(zip(input_vals, new_func.args))
         for op in op_list:
@@ -238,20 +255,18 @@ class TreeTraversal(RewritePattern):
         return new_func
 
     @staticmethod
-    def gather_segment_io(
-        op_list: list[Operation], missing_inputs: set[SSAValue] = None
+    def populate_segment_io(
+        segment: ProgramSegment, missing_inputs: set[SSAValue]
     ) -> tuple[set[SSAValue], set[SSAValue]]:
         """Gather SSA values that need to be passed in and out of the segment to be outlined."""
         inputs = set()
         outputs = set()
-        if missing_inputs is None:
-            missing_inputs = set()
 
         # The segment only needs to return values produced here (i.e. in all op.results) and
         # required by segments further down (i.e. in missing_inputs).
         # The inputs are determined straightforwardly by all operands not defined in this segment.
         # TODO: We might need to be more careful with qubit/register values in the future.
-        for op in reversed(op_list):
+        for op in reversed(segment.ops):
             inputs.update(op.operands)
             inputs.difference_update(op.results)
 
@@ -259,10 +274,11 @@ class TreeTraversal(RewritePattern):
         outputs.intersection_update(missing_inputs)
 
         # Update the information used in subsequent calls.
-        missing_inputs.difference_update(outputs)
-        missing_inputs.update(inputs)
+        segment.inputs = inputs
+        segment.outputs = outputs
 
-        return inputs, outputs
+        missing_inputs.difference_update(segment.outputs)
+        missing_inputs.update(segment.inputs)
 
     def initialize_data_structures(self, rewriter: PatternRewriter):
         """Create data structures in the IR required for the dynamic tree traversal."""
@@ -471,18 +487,14 @@ class TreeTraversal(RewritePattern):
         storeOp = memref.StoreOp.get(c1, self.visited_stack, (current_depth,))
 
         # run a simulation segment
-        callOp = func.CallOp(
-            "segment_table",
-            [current_depth, *segment_iter_args],
-            [val.type for val in segment_iter_args],
-        )
+        sim_ops, callOp = self.simulate(current_depth, segment_iter_args)
 
         c1_ = arith.ConstantOp.from_int_and_width(1, current_depth.type)
         updated_depth = arith.AddiOp(current_depth, c1_)
 
         yieldOp = scf.YieldOp(updated_depth, needs_restore, *callOp.results)
 
-        for op in (c1, c1_, storeOp, callOp, updated_depth, yieldOp):
+        for op in (c1, c1_, storeOp, updated_depth, *sim_ops, callOp, yieldOp):
             rewriter.insert_op(op, InsertPoint.at_end(unvisitedBlock))
 
         # handle left visited region: need to go right
@@ -496,18 +508,14 @@ class TreeTraversal(RewritePattern):
         self.handle_restore(needs_restore, current_depth, trueBlock, falseBlock, rewriter)
 
         # run a simulation segment
-        callOp = func.CallOp(
-            "segment_table",
-            [current_depth, *segment_iter_args],
-            [val.type for val in segment_iter_args],
-        )
+        sim_ops, callOp = self.simulate(current_depth, segment_iter_args)
 
         c1 = arith.ConstantOp.from_int_and_width(1, current_depth.type)
         updated_depth = arith.AddiOp(current_depth, c1)
 
         yieldOp = scf.YieldOp(updated_depth, updated_restore, *callOp.results)
 
-        for op in (c1, c2, storeOp, updated_restore, callOp, updated_depth, yieldOp):
+        for op in (c1, c2, storeOp, updated_restore, updated_depth, *sim_ops, callOp, yieldOp):
             rewriter.insert_op(op, InsertPoint.at_end(leftVisitedBlock))
 
         # handle right visited region: need to go back up
@@ -529,6 +537,28 @@ class TreeTraversal(RewritePattern):
         for op in (cm1, yieldOp):
             rewriter.insert_op(op, InsertPoint.at_end(defaultBlock))
 
+    def simulate(self, current_depth: SSAValue, segment_iter_args: SSAValue):
+        """This function is called when going down the tree (left or right), which requires
+        backing up the statevector, storing mcm probabilities, projecting the state, and running
+        a simulation segment."""
+
+        # TODO: we need the refilled register here
+        # quantum.ComputationalBasisOp()
+        # quantum.StateOp()
+
+        # quantum.ComputationalBasisOp()
+        # quantum.ProbsOp()
+
+        # quantum.MeasureOp(..., postselect=)
+
+        callOp = func.CallOp(
+            "segment_table",
+            [current_depth, *segment_iter_args],
+            [val.type for val in segment_iter_args],
+        )
+
+        return (), callOp
+
     def handle_restore(
         self,
         needs_restore: SSAValue,
@@ -548,7 +578,10 @@ class TreeTraversal(RewritePattern):
         statevec = memref.SubviewOp.get(
             self.statevec_stack, (current_depth, 0), (1, self.statevec_size), (1, 1), targetType
         )
-        # TODO: do something with the statevector (quantum op)
+
+        # TODO: I think we need to refill the register between each segment or there is no way of
+        # correctly preserving the dataflow within the loop and grabbing the right qubits here.
+        # quantum.SetStateOp(operands=[statevec, ])
 
         false = arith.ConstantOp.from_int_and_width(0, 1)
         yieldOp = scf.YieldOp(false)
