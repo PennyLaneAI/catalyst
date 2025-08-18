@@ -400,7 +400,10 @@ jobs:
               -DLLVM_ENABLE_LLD=OFF \
               -DLLVM_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/llvm"
 
-        cmake --build $GITHUB_WORKSPACE/quantum-build --target check-dialects catalyst-cli
+        # xcode >= 16 turns on verifier after building every translation unit
+        # This will verify all llvm builds and take a huge amount of time
+        # To turn it off, we need to set ENABLE_MODULE_VERIFIER
+        cmake --build $GITHUB_WORKSPACE/quantum-build --target check-dialects catalyst-cli -- -sdk macosx ENABLE_MODULE_VERIFIER=NO
 
     - name: Build Plugin wheel
       # Run only on Thursday at the given time
