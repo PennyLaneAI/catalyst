@@ -23,8 +23,8 @@ from pennylane import cond
 
 import catalyst
 from catalyst import api_extensions
-from catalyst import measure as catalyst_measure
 from catalyst import cond as catalyst_cond
+from catalyst import measure as catalyst_measure
 from catalyst import qjit
 from catalyst.utils.exceptions import PlxprCaptureCFCompatibilityError
 
