@@ -23,6 +23,7 @@ from pennylane import cond
 import catalyst
 from catalyst import api_extensions
 from catalyst import measure as catalyst_measure
+from catalyst import cond as catalyst_cond
 from catalyst import qjit
 from catalyst.utils.exceptions import PlxprCaptureCFCompatibilityError
 
@@ -534,17 +535,18 @@ class TestCond:
             ):
                 qjit(h)
 
+
     @pytest.mark.usefixtures("disable_capture")
     def test_cond_raises_compatibility_error_with_capture(self):
         """Test that cond raises PlxprCaptureCFCompatibilityError when capture mode is enabled."""
-        if not qml.capture.enable():
+        if not qml.capture.enabled():
             pytest.skip("capture only test")
 
         qml.capture.enable()
 
         with pytest.raises(PlxprCaptureCFCompatibilityError) as exc_info:
 
-            @cond(True)
+            @catalyst_cond(True)
             def cond_fn():
                 return 1
 
@@ -555,17 +557,15 @@ class TestCond:
     @pytest.mark.usefixtures("disable_capture")
     def test_cond_raises_compatibility_error_with_capture_integration(self):
         """Test that cond raises PlxprCaptureCFCompatibilityError when capture mode is enabled."""
-        if not qml.capture.enable():
+        if not qml.capture.enabled():
             pytest.skip("capture only test")
-
-        qml.capture.enable()
 
         with pytest.raises(PlxprCaptureCFCompatibilityError) as exc_info:
 
             @qml.qjit
             @qml.qnode(qml.device("lightning.qubit", wires=3))
             def test(n):
-                @cond(n < 5)
+                @catalyst_cond(n < 5)
                 def loop(n):
                     qml.X(n)
 
