@@ -347,7 +347,7 @@ jobs:
         #   https://github.com/lepus2589/accelerate-lapack/blob/5b1a99ae8c4c682a90d4318ae5bb7b465e9dbb66/CMakeLists.txt#L75
         # To resolve this, we manually make a .sdk file with the version
         # We need to `find` instead of `xcrun` because `xcrun` returns the symbolic path
-        export MAC_SDK_FILE=$(find / -name "MacOSX.sdk" 2>/dev/null)
+        export MAC_SDK_FILE=$(find $MD_APPLE_SDK_ROOT -name "MacOSX.sdk" 2>/dev/null)
         export MAC_SDK_PATH=$(dirname $MAC_SDK_FILE)
         sudo mv $MAC_SDK_FILE $MAC_SDK_PATH/MacOSX16.4.sdk
         sudo ln -sn $MAC_SDK_PATH/MacOSX16.4.sdk $MAC_SDK_FILE
