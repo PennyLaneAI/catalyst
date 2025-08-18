@@ -9,7 +9,7 @@ enzyme=v0.0.186
 # Always remove custom PL/LQ versions before release.
 
 # For a custom PL version, update the package version here and at
-pennylane=0.43.0.dev28
+pennylane=0.43.0.dev31
 
 # For a custom LQ/LK version, update the package version here and at
 # 'doc/requirements.txt'
