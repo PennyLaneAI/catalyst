@@ -23,7 +23,7 @@ namespace mhlo {
 
 #define GEN_PASS_DECL
 #define GEN_PASS_REGISTRATION
-#include "mlir-hlo/Passes.h.inc"
+#include "mlir-hlo/Transforms/Passes.h.inc"
 
 } // namespace mhlo
 } // namespace catalyst
