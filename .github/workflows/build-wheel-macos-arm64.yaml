@@ -339,7 +339,7 @@ jobs:
 
         # On GH images, MacOS is current 15.5
         # This macos works with xcode 16.4
-        sudo xcode-select --switch /Applications/Xcode_16.4.app
+        sudo xcode-select --switch /Applications/Xcode_15.5.app
 
         # Starting xcode 16, the xcode version is no longer appended to the MacOSX<version>.sdk filename
         # but instead is appened to the upper directory as Xcode_16.4.app
@@ -349,8 +349,8 @@ jobs:
         # We need to `find` instead of `xcrun` because `xcrun` returns the symbolic path
         export MAC_SDK_FILE=$(find $MD_APPLE_SDK_ROOT -name "MacOSX.sdk" 2>/dev/null)
         export MAC_SDK_PATH=$(dirname $MAC_SDK_FILE)
-        sudo mv $MAC_SDK_FILE $MAC_SDK_PATH/MacOSX16.4.sdk
-        sudo ln -sn $MAC_SDK_PATH/MacOSX16.4.sdk $MAC_SDK_FILE
+        sudo mv $MAC_SDK_FILE $MAC_SDK_PATH/MacOSX15.5.sdk
+        sudo ln -sn $MAC_SDK_PATH/MacOSX15.5.sdk $MAC_SDK_FILE
 
         cmake -S runtime -B $GITHUB_WORKSPACE/runtime-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
