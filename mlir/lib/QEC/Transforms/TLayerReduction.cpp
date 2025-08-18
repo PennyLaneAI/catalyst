@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <llvm/ADT/STLExtras.h>
 #define DEBUG_TYPE "t-layer-reduction"
 
 #include <algorithm>
@@ -88,7 +89,7 @@ bool commute(QECOpInterface op, QECLayer &rhsLayer, QECLayer &lhsLayer)
         opEntriesDst.emplace_back(mappedOpDst);
     };
 
-    for (auto dstOp : lhsLayer.ops) {
+    for (auto dstOp : lhsLayer.getOps()) {
         std::vector<Value> dstEntries;
 
         for (auto dstArg : lhsLayer.getEntryQubitsFrom(dstOp)) {
@@ -124,8 +125,8 @@ void moveOpToLayer(QECOpInterface rhsOp, QECLayer &rhsLayer, QECLayer &lhsLayer,
     std::transform(rhsRegion.begin(), rhsRegion.end(), std::back_inserter(rhsOperands),
                    [&](Value v) { return rhsRegionToEntry.lookupOrNull(v); });
 
-    auto lhsOperandSize =
-        std::max(rhsOperands.size(), static_cast<size_t>(lhsLayerOp->getNumResults()));
+    auto lhsLayerOpResultSize = static_cast<size_t>(lhsLayerOp->getNumResults());
+    auto lhsOperandSize = std::max(rhsOperands.size(), lhsLayerOpResultSize);
 
     std::vector<Value> lhsOperandForRhsOp;
     lhsOperandForRhsOp.reserve(lhsOperandSize);
@@ -144,6 +145,15 @@ void moveOpToLayer(QECOpInterface rhsOp, QECLayer &rhsLayer, QECLayer &lhsLayer,
         }
     }
 
+    auto yieldOp = llvm::cast_or_null<qec::YieldOp>(lhsLayerOp.getBody()->getTerminator());
+    auto yieldEntryQubits = lhsLayer.getEntryQubitsFrom(yieldOp);
+
+    IRMapping yieldOpndMapper;
+    yieldOpndMapper.map(yieldEntryQubits, yieldOp.getOperands());
+
+    assert(yieldOp->getNumOperands() == yieldEntryQubits.size() &&
+           "yieldOp->getNumOperands() == yieldEntryQubits.size()");
+
     // For each desired outer operand, use the existing block argument if present;
     // otherwise append a new operand and matching block argument.
     auto lhsArgToOperand = getArgMapper(lhsLayerOp);
@@ -155,7 +165,9 @@ void moveOpToLayer(QECOpInterface rhsOp, QECLayer &rhsLayer, QECLayer &lhsLayer,
         for (BlockArgument ba : lhsLayerOp.getBody()->getArguments()) {
             Value mapped = lhsArgToOperand.lookupOrNull(ba);
             if (mapped && mapped == lhsOperand) {
-                entryArg = ba;
+                if (auto v = yieldOpndMapper.lookupOrNull(ba)) {
+                    entryArg = v;
+                }
                 break;
             }
         }
@@ -169,28 +181,32 @@ void moveOpToLayer(QECOpInterface rhsOp, QECLayer &rhsLayer, QECLayer &lhsLayer,
             BlockArgument newEntry =
                 lhsLayerOp.getBody()->addArgument(lhsOperand.getType(), lhsOperand.getLoc());
             rhsOpOperands.emplace_back(newEntry);
+            yieldOp->insertOperands(yieldOp.getNumOperands(), newEntry);
         }
     }
 
     auto cloneRhsOp = rhsOp->clone();
+    cloneRhsOp->setOperands(rhsOpOperands);
     writer.setInsertionPoint(lhsLayerOp.getBody()->getTerminator());
     writer.insert(cloneRhsOp);
-    // Maintain operand segment sizes for ops with AttrSizedOperandSegments
-    if (auto ppr = llvm::dyn_cast<PPRotationOp>(cloneRhsOp)) {
-        ppr.getInQubitsMutable().assign(rhsOpOperands);
+
+    // Update yield operands
+    for (auto [idx, v] :
+         llvm::enumerate(llvm::zip(cloneRhsOp->getOperands(), cloneRhsOp->getResults()))) {
+        auto &[opnd, res] = v;
+        for (auto y_opnd : yieldOp.getOperands()) {
+            if (y_opnd == opnd) {
+                lhsLayerOp.getBody()->getTerminator()->setOperand(idx, res);
+            }
+        }
     }
-    else {
-        cloneRhsOp->setOperands(rhsOpOperands);
-    }
-    auto yieldOp = lhsLayerOp.getBody()->getTerminator();
-    yieldOp->setOperands(cloneRhsOp->getResults());
 
     // Rewire the next (rhs) layer to consume the results of the lhs layer.
     // For each entry block argument used by the moved op in rhs layer, set the
     // corresponding operand of the rhs LayerOp to the matching result of lhs LayerOp.
     // This ensures %argX in the next layer header is sourced from %0#X rather than
     // the original outer SSA value when appropriate.
-    if (!rhsLayer.ops.empty()) {
+    if (!rhsLayer.getOps().empty()) {
         auto rhsRegion = rhsLayer.getEntryQubitsFrom(rhsOp);
         for (auto [i, entry] : llvm::enumerate(rhsRegion)) {
             if (auto ba = llvm::dyn_cast<BlockArgument>(entry)) {
@@ -205,7 +221,7 @@ void moveOpToLayer(QECOpInterface rhsOp, QECLayer &rhsLayer, QECLayer &lhsLayer,
     writer.replaceAllUsesWith(rhsOp->getResults(), rhsOp->getOperands());
 
     lhsLayer.insert(llvm::cast<QECOpInterface>(cloneRhsOp));
-    std::erase(rhsLayer.ops, rhsOp);
+    rhsLayer.removeOpRecord(rhsOp);
     writer.eraseOp(rhsOp);
 }
 
@@ -236,7 +252,7 @@ struct TLayerReductionPass : impl::TLayerReductionPassBase<TLayerReductionPass> 
                         WalkResult::skip();
 
                     QECLayer &nextLayer = QECLayer::build(&layerContext, nextLayerOp);
-                    for (QECOpInterface op : nextLayer.ops) {
+                    for (QECOpInterface op : nextLayer.getOps()) {
                         if (commute(op, nextLayer, currentLayer)) {
                             moveOpToLayer(op, nextLayer, currentLayer, writer);
                             isChange = true;
