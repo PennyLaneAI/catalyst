@@ -53,6 +53,60 @@ PauliStringWrapper buildPauliStringWrapper(llvm::SetVector<Value> qubits,
     PauliWord pauliWord = expandPauliWord(qubits, entryOperands, op);
     return PauliStringWrapper::from_pauli_word(pauliWord);
 }
+qec::LayerOp rebuildLayerToMatchYield(qec::LayerOp oldLayer, mlir::IRRewriter &rewriter)
+{
+    using namespace mlir;
+    auto *ctx = rewriter.getContext();
+    auto loc = oldLayer.getLoc();
+
+    auto *oldBody = oldLayer.getBody();
+    auto oldYield = llvm::cast<qec::YieldOp>(oldBody->getTerminator());
+    TypeRange newResultTypes = oldYield.getOperandTypes();
+
+    // Prepare a fresh operation state with the new result types.
+    OperationState state(loc, qec::LayerOp::getOperationName());
+    state.addOperands(oldLayer->getOperands());
+    state.addTypes(newResultTypes);
+    Region *newRegion = state.addRegion();
+
+    // Build the new single-block region and clone body.
+    auto *newBlock = new Block();
+    newRegion->push_back(newBlock);
+    for (Value v : oldLayer.getInitArgs())
+        newBlock->addArgument(v.getType(), v.getLoc());
+
+    IRMapping map;
+    map.map(oldBody->getArguments(), newBlock->getArguments());
+    OpBuilder b(ctx);
+    b.setInsertionPointToStart(newBlock);
+
+    for (Operation &op : oldBody->getOperations()) {
+        if (llvm::isa<qec::YieldOp>(op))
+            continue;
+        b.clone(op, map);
+    }
+
+    SmallVector<Value> newYieldOperands;
+    newYieldOperands.reserve(oldYield->getNumOperands());
+    for (Value v : oldYield->getOperands())
+        newYieldOperands.push_back(map.lookupOrDefault(v));
+    b.create<qec::YieldOp>(loc, newYieldOperands);
+
+    // Materialize the new op and insert next to the old one.
+    Operation *newOpGeneric = Operation::create(state);
+    rewriter.setInsertionPoint(oldLayer);
+    rewriter.insert(newOpGeneric);
+    auto newLayer = llvm::cast<qec::LayerOp>(newOpGeneric);
+
+    // Replace uses of old results (for the overlapping prefix) and erase old op.
+    unsigned nOld = oldLayer->getNumResults();
+    unsigned nNew = newLayer->getNumResults();
+    for (unsigned i = 0; i < std::min(nOld, nNew); ++i)
+        oldLayer->getResult(i).replaceAllUsesWith(newLayer->getResult(i));
+
+    rewriter.eraseOp(oldLayer);
+    return newLayer;
+}
 
 bool commute(QECOpInterface op, QECLayer &rhsLayer, QECLayer &lhsLayer)
 {
@@ -223,6 +277,7 @@ void moveOpToLayer(QECOpInterface rhsOp, QECLayer &rhsLayer, QECLayer &lhsLayer,
     lhsLayer.insert(llvm::cast<QECOpInterface>(cloneRhsOp));
     rhsLayer.removeOpRecord(rhsOp);
     writer.eraseOp(rhsOp);
+    rebuildLayerToMatchYield(lhsLayerOp, writer);
 }
 
 struct TLayerReductionPass : impl::TLayerReductionPassBase<TLayerReductionPass> {
