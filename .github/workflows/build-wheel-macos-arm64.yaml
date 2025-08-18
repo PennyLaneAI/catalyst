@@ -325,6 +325,11 @@ jobs:
         key: ${{ runner.os }}-${{ runner.arch }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-wheel-build
         fail-on-cache-miss: True
 
+    - name: Setup Xcode
+      uses: maxim-lobanov/setup-xcode@v1
+      with:
+        xcode-version: latest-stable
+
     # Build Catalyst-Runtime
     - name: Build Catalyst-Runtime
       id: runtime-build
@@ -332,7 +337,8 @@ jobs:
         # On GH images, gfortran is only available as a specific version.
         export FC=gfortran-14
         sw_vers
-        softwareupdate --install "Command Line Tools for Xcode 16.4"
+        #softwareupdate --install "Command Line Tools for Xcode 16.4"
+        xcode-select --switch /Applications/Xcode_16.4.app
         cmake -S runtime -B $GITHUB_WORKSPACE/runtime-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
               -DCMAKE_LIBRARY_OUTPUT_DIRECTORY="$GITHUB_WORKSPACE/runtime-build/lib" \
