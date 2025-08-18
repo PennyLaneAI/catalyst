@@ -15,6 +15,7 @@
 """Implementation of the Tree-Traversal MCM simulation method as an xDSL transform in Catalyst."""
 
 from dataclasses import dataclass, field
+from itertools import chain
 from typing import Type, TypeVar
 
 import jax
@@ -48,6 +49,8 @@ class ProgramSegment:
 
     ops: list[Operation] = field(default_factory=list)
     mcm: quantum.MeasureOp = None
+    reg_in: SSAValue = None
+    reg_out: SSAValue = None
     inputs: set[SSAValue] = None
     outputs: set[SSAValue] = None
     fun: func.FuncOp = None
@@ -70,15 +73,91 @@ class TreeTraversal(RewritePattern):
         assert self.module is not None, "got orphaned qnode function"
 
         # Start with creating a new QNode function that will perform the tree traversal simulation.
-        self.setup_traversal_function(funcOp, rewriter)
+        # We prep the original QNode by ensuring measure boundaries are also register boundaries.
+        cloned_func = self.simplify_quantum_io(funcOp, rewriter)
 
-        self.split_traversal_segments(funcOp, rewriter)
+        self.setup_traversal_function(cloned_func, rewriter)
+
+        self.split_traversal_segments(cloned_func, rewriter)
 
         self.initialize_data_structures(rewriter)
 
         self.generate_traversal_code(rewriter)
 
         self.finalize_traversal_function(rewriter)
+
+    def simplify_quantum_io(self, funcOp: func.FuncOp, rewriter: PatternRewriter) -> func.FuncOp:
+        """In order to facilitate quantum value handling, we will reinsert all extracted qubits
+        into the register at the end of each segment, and only allow the register as quantum
+        input and output of segments.
+
+        This pass guarantees that each measure op is preceded by exactly 1 ExtractOp, and whose
+        input is a fully "reassembled" register ready to be passed across difficult program
+        boundaries (e.g. control flow, function calls).
+        """
+        cloned_fun = funcOp.clone()
+        cloned_fun.sym_name = builtin.StringAttr(funcOp.sym_name.data + ".simple_io")
+        rewriter.insert_op(cloned_fun, InsertPoint.after(funcOp))
+
+        current_reg = None
+        qubit_to_reg_idx = {}
+        for op in cloned_fun.body.ops:
+            match op:
+                case quantum.AllocOp():
+                    current_reg = op.qreg
+                case quantum.ExtractOp():
+                    qubit_to_reg_idx[op.qubit] = op.idx if op.idx else op.idx_attr
+                    # update register since it might have changed
+                    op.operands = (current_reg, op.idx)
+                case quantum.CustomOp():
+                    for i, qb in enumerate(chain(op.in_qubits, op.in_ctrl_qubits)):
+                        qubit_to_reg_idx[op.results[i]] = qubit_to_reg_idx[qb]
+                        del qubit_to_reg_idx[qb]
+                case quantum.InsertOp():
+                    assert qubit_to_reg_idx[op.qubit] is op.idx_attr if op.idx_attr else True
+                    del qubit_to_reg_idx[op.qubit]
+                    # update register since it might have changed
+                    op.operands = (current_reg, op.idx, op.qubit)
+                    current_reg = op.out_qreg
+                case quantum.MeasureOp():
+                    # create a register boundary before the measure
+                    rewriter.insertion_point = InsertPoint.before(op)
+                    for qb, idx in qubit_to_reg_idx.items():
+                        insertOp = quantum.InsertOp(current_reg, idx, qb)
+                        rewriter.insert(insertOp)
+                        current_reg = insertOp.out_qreg
+
+                    # update the map to process the measure qubit (similar to a gate)
+                    mcm_idx = qubit_to_reg_idx[op.in_qubit]
+                    qubit_to_reg_idx[op.out_qubit] = mcm_idx
+                    del qubit_to_reg_idx[op.in_qubit]
+
+                    # restore qubit values from before the register boundary
+                    rewriter.insertion_point = InsertPoint.after(op)
+                    for qb, idx in list(qubit_to_reg_idx.items()):
+                        extractOp = quantum.ExtractOp(current_reg, idx)
+                        rewriter.insert(extractOp)
+                        rewriter.replace_all_uses_with(qb, extractOp.qubit)
+                        qubit_to_reg_idx[extractOp.qubit] = idx
+                        del qubit_to_reg_idx[qb]
+
+                    # insert an extract op as a way to store the mcm qubit index for later
+                    # extractOp = quantum.ExtractOp(current_reg, mcm_idx)
+                    # rewriter.insert_op(extractOp, InsertPoint.before(op))
+                    # op.operands = (extractOp.qubit,)
+                    # insertOp = quantum.InsertOp(current_reg, mcm_idx, op.out_qubit)
+
+                    # current_reg.replace_by_if(
+                    #     insertOp.out_qreg, lambda use: use.operation not in (extractOp, insertOp)
+                    # )
+                    # current_reg = insertOp.out_qreg
+
+                    # rewriter.insert_op(insertOp, InsertPoint.after(op))
+                case _:
+                    # TODO: handle other ops which might use qubits
+                    pass
+
+        return cloned_fun
 
     def setup_traversal_function(self, funcOp: func.FuncOp, rewriter: RewritePattern):
         """Setup a clone of the original QNode function, which will instead perform TT."""
@@ -105,7 +184,11 @@ class TreeTraversal(RewritePattern):
         rewriter.insert(func.ReturnOp(*result_vals))
 
     def split_traversal_segments(self, funcOp: func.FuncOp, rewriter: PatternRewriter):
-        """Split the quantum function into segments separated by measure operations."""
+        """Split the quantum function into segments separated by measure operations.
+
+        Due to the pre-processing of the QNode, we can assume the register is the only
+        quantum value going between segments.
+        """
         rewriter.insertion_point = InsertPoint.at_start(self.ttOp.body.block)
 
         # Ideally try to iterate over the function only once.
@@ -119,14 +202,18 @@ class TreeTraversal(RewritePattern):
         cloned_alloc = rewriter.insert(op.clone(value_mapper))
 
         # Split ops into segments divided by measurements.
-        quantum_segments = [ProgramSegment()]
+        quantum_segments = [ProgramSegment(reg_in=op.qreg)]
         while (op := next(op_iter, None)) and not isinstance(op, quantum.DeallocOp):
             if isinstance(op, quantum.MeasureOp):
                 quantum_segments[-1].mcm = op
-                quantum_segments.append(ProgramSegment())
+                last_op = quantum_segments[-1].ops[-1]
+                assert isinstance(last_op, quantum.InsertOp)
+                quantum_segments[-1].reg_out = last_op.out_qreg
+                quantum_segments.append(ProgramSegment(reg_in=last_op.out_qreg))
             else:
                 quantum_segments[-1].ops.append(op)
         assert op is not None, "didn't find a dealloc op"
+        quantum_segments[-1].reg_out = op.qreg
         self.quantum_segments = quantum_segments
 
         # Go through the rest of the function to initialize the missing input values set.
@@ -142,7 +229,8 @@ class TreeTraversal(RewritePattern):
         for segment in reversed(quantum_segments):
             self.populate_segment_io(segment, missing_input_values)  # inplace
 
-        all_segment_io = [*missing_input_values]  # results of the "0th" segment (until Alloc)
+        # contains the inputs to the first segment + all MCM results
+        all_segment_io = [quantum_segments[0].reg_in, *missing_input_values]
         values_as_io_index = {v: k for k, v in enumerate(all_segment_io)}
         for idx, segment in enumerate(quantum_segments):
             segment.fun = self.clone_ops_into_func(segment, idx, rewriter)
@@ -203,12 +291,13 @@ class TreeTraversal(RewritePattern):
 
         # switch op match cases
         for case, segment in enumerate(self.quantum_segments):
-            args = [io_args[values_as_io_index[value]] for value in segment.inputs]
-            res_types = [res.type for res in segment.outputs]
+            args = [io_args[0]] + [io_args[values_as_io_index[value]] for value in segment.inputs]
+            res_types = [quantum.QuregType()] + [res.type for res in segment.outputs]
             callOp = func.CallOp(self.quantum_segments[case].fun.sym_name.data, args, res_types)
 
             updated_results = list(io_args)
-            for new_res, ref in zip(callOp.results, segment.outputs):
+            updated_results[0] = callOp.results[0]
+            for new_res, ref in zip(callOp.results[1:], segment.outputs):
                 updated_results[values_as_io_index[ref]] = new_res
 
             rewriter.insert_op(callOp, InsertPoint.at_end(switchOp.case_regions[case].block))
@@ -235,6 +324,8 @@ class TreeTraversal(RewritePattern):
     def clone_ops_into_func(self, segment: ProgramSegment, counter: int, rewriter: PatternRewriter):
         """Clone a set of ops into a new function."""
         op_list, input_vals, output_vals = segment.ops, segment.inputs, segment.outputs
+        input_vals = [segment.reg_in] + input_vals
+        output_vals = [segment.reg_out] + output_vals
         if not op_list:
             return
 
@@ -274,8 +365,8 @@ class TreeTraversal(RewritePattern):
         outputs.intersection_update(missing_inputs)
 
         # Update the information used in subsequent calls.
-        segment.inputs = inputs
-        segment.outputs = outputs
+        segment.inputs = [inp for inp in inputs if not isinstance(inp.type, quantum.QuregType)]
+        segment.outputs = [out for out in outputs if not isinstance(out.type, quantum.QuregType)]
 
         missing_inputs.difference_update(segment.outputs)
         missing_inputs.update(segment.inputs)
