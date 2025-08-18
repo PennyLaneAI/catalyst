@@ -639,7 +639,6 @@ class TestCond:
             ):
                 qjit(h)
 
-
     @pytest.mark.usefixtures("disable_capture")
     def test_cond_raises_compatibility_error_with_capture(self):
         """Test that cond raises PlxprCaptureCFCompatibilityError when capture mode is enabled."""
