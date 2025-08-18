@@ -4,13 +4,19 @@
 
 <h3>Improvements 🛠</h3>
 
+* Adjoint differentiation is used by default when executing on lightning devices, significantly reduces gradient computation time.
+  [(#1961)](https://github.com/PennyLaneAI/catalyst/pull/1961)
+
+* Added `detensorizefunctionboundary` pass to remove scalar tensors across function boundaries and enabled `symbol-dce` pass to remove dead functions, reducing the number of instructions for compilation.
+  [(#1904)](https://github.com/PennyLaneAI/catalyst/pull/1904)
+
 * Workflows `for_loop`, `while_loop` and `cond` now error out if `qml.capture` is enabled.
   [(#1945)](https://github.com/PennyLaneAI/catalyst/pull/1945)
 
 *  Displays Catalyst version in `quantum-opt --version` output.
   [(#1922)](https://github.com/PennyLaneAI/catalyst/pull/1922)
 
-* Snakecased keyword arguments to :func:`catalyst.passes.apply_pass()` are now correctly parsed 
+* Snakecased keyword arguments to :func:`catalyst.passes.apply_pass()` are now correctly parsed
   to kebab-case pass options [(#1954)](https://github.com/PennyLaneAI/catalyst/pull/1954).
   For example:
 
@@ -27,6 +33,9 @@
   ```pycon
   %0 = transform.apply_registered_pass "some-pass" with options = {"an-option" = true, "maxValue" = 1 : i64, "multi-word-option" = 1 : i64}
   ```
+
+*  `Commuting Clifford Pauli Product Rotation (PPR) operations, past non-Clifford PPRs, now supports P(π/2) Cliffords in addition to P(π/4)`
+   [(#1966)](https://github.com/PennyLaneAI/catalyst/pull/1966)
 
 <h3>Breaking changes 💔</h3>
 
@@ -45,7 +54,14 @@
 
 <h3>Deprecations 👋</h3>
 
+* Deprecated usages of `Device.shots` along with setting `device(..., shots=...)`.
+  Heavily adjusted frontend pipelines within qfunc, tracer, verification and QJITDevice to account for this change.
+  [(#1952)](https://github.com/PennyLaneAI/catalyst/pull/1952)
+
 <h3>Bug fixes 🐛</h3>
+
+* Fix wrong handling of partitioned shots in the decomposition pass of `measurements_from_samples`.
+  [(#1981)](https://github.com/PennyLaneAI/catalyst/pull/1981)
 
 * Fix errors in AutoGraph transformed functions when `qml.prod` is used together with other operator
   transforms (e.g. `qml.adjoint`).
@@ -131,6 +147,11 @@
       ...
   ```
 
+* The `mbqc.graph_state_prep` operation has been added to the MBQC dialect. This operation prepares
+  a graph state with arbitrary qubit connectivity, specified by an input adjacency-matrix operand,
+  for use in MBQC workloads.
+  [(#1965)](https://github.com/PennyLaneAI/catalyst/pull/1965)
+
 * `catalyst.accelerate`, `catalyst.debug.callback`, and `catalyst.pure_callback`, `catalyst.debug.print`, and `catalyst.debug.print_memref` now work when capture is enabled.
   [(#1902)](https://github.com/PennyLaneAI/catalyst/pull/1902)
 
@@ -145,6 +166,7 @@
 This release contains contributions from (in alphabetical order):
 
 Joey Carter,
+Yushao Chen,
 Sengthai Heng,
 David Ittah,
 Christina Lee,
