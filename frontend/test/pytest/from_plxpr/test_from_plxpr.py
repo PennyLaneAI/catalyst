@@ -559,7 +559,7 @@ class TestCatalystCompareJaxpr:
             return qml.sample(wires=0)
 
         def f():
-            return circuit(shots=100)
+            return qml.set_shots(circuit, shots=100)()
 
         qml.capture.enable()
         jaxpr = jax.make_jaxpr(f)()

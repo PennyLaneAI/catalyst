@@ -22,7 +22,6 @@ import pytest
 
 from catalyst import qjit
 
-
 class TestShotVector:
     """Test shot-vector"""
 

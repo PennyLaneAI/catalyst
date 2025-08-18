@@ -188,6 +188,10 @@ def handle_qnode(
     self, *args, qnode, device, shots_len, execution_config, qfunc_jaxpr, n_consts, batch_dims=None
 ):
     """Handle the conversion from plxpr to Catalyst jaxpr for the qnode primitive"""
+
+    if shots_len > 1:
+        raise NotImplementedError("shot vectors are not yet supported for catalyst conversion.")
+
     shots = sum(args[:shots_len])
     consts = args[shots_len:n_consts+shots_len]
     non_const_args = args[shots_len+n_consts:]
