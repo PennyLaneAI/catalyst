@@ -328,6 +328,8 @@ jobs:
     - name: Setup Xcode
       uses: maxim-lobanov/setup-xcode@v1
       with:
+        # On GH images, MacOS is current 15.5
+        # This macos works with xcode 16.4
         xcode-version: '16.4.0'
 
     # Build Catalyst-Runtime
@@ -336,22 +338,7 @@ jobs:
       run: |
         # On GH images, gfortran is only available as a specific version.
         export FC=gfortran-14
-
-        # On GH images, MacOS is current 15.5
-        # This macos works with xcode 16.4
         sudo xcode-select --switch /Library/Developer/CommandLineTools
-
-        # Starting xcode 16, the xcode version is no longer appended to the MacOSX<version>.sdk filename
-        # but instead is appened to the upper directory as Xcode_16.4.app
-        # This breaks the version parsing inside lapack: they still get the version from the .sdk's filename
-        #   https://github.com/lepus2589/accelerate-lapack/blob/5b1a99ae8c4c682a90d4318ae5bb7b465e9dbb66/CMakeLists.txt#L75
-        # To resolve this, we manually make a .sdk file with the version
-        # We need to `find` instead of `xcrun` because `xcrun` returns the symbolic path
-        # export MAC_SDK_FILE=$(find $MD_APPLE_SDK_ROOT -name "MacOSX.sdk" 2>/dev/null)
-        # export MAC_SDK_PATH=$(dirname $MAC_SDK_FILE)
-        # sudo mv $MAC_SDK_FILE $MAC_SDK_PATH/MacOSX16.4.sdk
-        # sudo ln -sn $MAC_SDK_PATH/MacOSX16.4.sdk $MAC_SDK_FILE
-
         cmake -S runtime -B $GITHUB_WORKSPACE/runtime-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
               -DCMAKE_LIBRARY_OUTPUT_DIRECTORY="$GITHUB_WORKSPACE/runtime-build/lib" \
@@ -400,12 +387,8 @@ jobs:
               -DLLVM_ENABLE_ZLIB=FORCE_ON \
               -DLLVM_ENABLE_ZSTD=OFF \
               -DLLVM_ENABLE_LLD=OFF \
-              -DLLVM_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/llvm" \
-              -DENABLE_MODULE_VERIFIER=NO
+              -DLLVM_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/llvm"
 
-        # xcode >= 16 turns on verifier after building every translation unit
-        # This will verify all llvm builds and take a huge amount of time
-        # To turn it off, we need to set ENABLE_MODULE_VERIFIER
         cmake --build $GITHUB_WORKSPACE/quantum-build --target check-dialects catalyst-cli -- -j 1
 
     - name: Build Plugin wheel
