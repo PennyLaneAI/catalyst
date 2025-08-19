@@ -387,9 +387,7 @@ jobs:
         sudo xcode-select --switch /Library/Developer/CommandLineTools
         cmake -S mlir -B $GITHUB_WORKSPACE/quantum-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
-              -DCMAKE_OSX_SYSROOT=$(xcrun --show-sdk-path) \
               -DLLVM_ENABLE_ASSERTIONS=ON \
-              -DLLVM_USE_SANITIZER=OFF \
               -DQUANTUM_ENABLE_BINDINGS_PYTHON=ON \
               -DPython3_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -DPython3_NumPy_INCLUDE_DIRS=$(python${{ matrix.python_version }} -c "import numpy as np; print(np.get_include())") \
@@ -407,7 +405,7 @@ jobs:
         # xcode >= 16 turns on verifier after building every translation unit
         # This will verify all llvm builds and take a huge amount of time
         # To turn it off, we need to set ENABLE_MODULE_VERIFIER
-        cmake --build $GITHUB_WORKSPACE/quantum-build --target check-dialects catalyst-cli
+        cmake --build $GITHUB_WORKSPACE/quantum-build --target check-dialects catalyst-cli -- -j 4
 
     - name: Build Plugin wheel
       # Run only on Thursday at the given time
