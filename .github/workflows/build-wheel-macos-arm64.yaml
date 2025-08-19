@@ -385,10 +385,9 @@ jobs:
               -DLLVM_ENABLE_LLD=OFF \
               -DLLVM_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/llvm"
 
-        # TODO: xcode >=16 builds significantly slower when multithreaded
+        # xcode >=16 builds significantly slower when multithreaded
         # So we force single-thread build
-        # cmake --build $GITHUB_WORKSPACE/quantum-build --target check-dialects catalyst-cli -- -j 1
-        cmake --build $GITHUB_WORKSPACE/quantum-build --target check-dialects catalyst-cli
+        cmake --build $GITHUB_WORKSPACE/quantum-build --target check-dialects catalyst-cli -- -j 1
 
     - name: Build Plugin wheel
       # Run only on Thursday at the given time
