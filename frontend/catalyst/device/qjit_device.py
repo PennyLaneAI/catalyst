@@ -76,6 +76,7 @@ RUNTIME_OPERATIONS = [
     "PauliX",
     "PauliY",
     "PauliZ",
+    "PCPhase",
     "PhaseShift",
     "PSWAP",
     "QubitUnitary",

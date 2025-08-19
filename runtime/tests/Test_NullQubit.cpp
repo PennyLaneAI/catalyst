@@ -353,7 +353,7 @@ TEST_CASE("Test NullQubit state vector after AllocateQubits", "[NullQubit]")
 
     CHECK(sim->AllocateQubits(0).size() == 0);
 
-    auto &&q = sim->AllocateQubits(2);
+    sim->AllocateQubits(2);
 
     CHECK(sim->GetNumQubits() == 2);
 

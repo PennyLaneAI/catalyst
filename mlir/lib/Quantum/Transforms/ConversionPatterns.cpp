@@ -558,6 +558,48 @@ struct MultiRZOpPattern : public OpConversionPattern<MultiRZOp> {
     }
 };
 
+struct PCPhaseOpPattern : public OpConversionPattern<PCPhaseOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(PCPhaseOp op, PCPhaseOpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+        Location loc = op.getLoc();
+        MLIRContext *ctx = getContext();
+        const TypeConverter *conv = getTypeConverter();
+        auto modifiersPtr = getModifiersPtr(loc, rewriter, conv, op.getAdjointFlag(),
+                                            adaptor.getInCtrlQubits(), adaptor.getInCtrlValues());
+
+        std::string qirName = "__catalyst__qis__PCPhase";
+        Type qirSignature =
+            LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx),
+                                        {Float64Type::get(ctx), Float64Type::get(ctx),
+                                         modifiersPtr.getType(), IntegerType::get(ctx, 64)},
+                                        /*isVarArg=*/true);
+
+        LLVM::LLVMFuncOp fnDecl =
+            catalyst::ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+
+        int64_t numQubits = op.getOutQubits().size();
+        SmallVector<Value> args;
+        args.insert(args.end(), adaptor.getTheta());
+        args.insert(args.end(), adaptor.getDim());
+        args.insert(args.end(), modifiersPtr);
+        args.insert(args.end(),
+                    rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(numQubits)));
+        args.insert(args.end(), adaptor.getInQubits().begin(), adaptor.getInQubits().end());
+        rewriter.create<LLVM::CallOp>(loc, fnDecl, args);
+
+        SmallVector<Value> values;
+        values.insert(values.end(), adaptor.getInQubits().begin(), adaptor.getInQubits().end());
+        values.insert(values.end(), adaptor.getInCtrlQubits().begin(),
+                      adaptor.getInCtrlQubits().end());
+        rewriter.replaceOp(op, values);
+
+        return success();
+    }
+};
+
 struct QubitUnitaryOpPattern : public OpConversionPattern<QubitUnitaryOp> {
     using OpConversionPattern::OpConversionPattern;
 
@@ -1108,6 +1150,7 @@ void populateQIRConversionPatterns(TypeConverter &typeConverter, RewritePatternS
     patterns.add<InsertOpPattern>(typeConverter, patterns.getContext());
     patterns.add<CustomOpPattern>(typeConverter, patterns.getContext());
     patterns.add<MultiRZOpPattern>(typeConverter, patterns.getContext());
+    patterns.add<PCPhaseOpPattern>(typeConverter, patterns.getContext());
     patterns.add<GlobalPhaseOpPattern>(typeConverter, patterns.getContext());
     patterns.add<QubitUnitaryOpPattern>(typeConverter, patterns.getContext());
     patterns.add<MeasureOpPattern>(typeConverter, patterns.getContext());

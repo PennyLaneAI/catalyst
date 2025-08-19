@@ -53,6 +53,8 @@ struct MergeRotationsPass : impl::MergeRotationsPassBase<MergeRotationsPass> {
                                                                  &getContext());
         catalyst::quantum::MultiRZOp::getCanonicalizationPatterns(patternsCanonicalization,
                                                                   &getContext());
+        catalyst::quantum::PCPhaseOp::getCanonicalizationPatterns(patternsCanonicalization,
+                                                                  &getContext());
         if (failed(applyPatternsGreedily(module, std::move(patternsCanonicalization)))) {
             return signalPassFailure();
         }

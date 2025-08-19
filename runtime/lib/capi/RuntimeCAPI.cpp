@@ -504,6 +504,29 @@ void __catalyst__qis__SetState(MemRefT_CplxT_double_1d *data, uint64_t numQubits
     getQuantumDevicePtr()->SetState(data_view, wires);
 }
 
+void __catalyst__qis__PCPhase(double theta, double dim, const Modifiers *modifiers,
+                              int64_t numQubits, ...)
+{
+    RT_ASSERT(numQubits >= 0);
+
+    // Compute the abs value to support adjoint
+    // Note this will be revisited once we have a better solution
+    // for capturing generic PL gates. Currently, this is the optimal
+    // workaround to reduce type casting throughout the pipeline.
+    dim = dim < 0 ? -dim : dim;
+
+    va_list args;
+    va_start(args, numQubits);
+    std::vector<QubitIdType> wires(numQubits);
+    for (int64_t i = 0; i < numQubits; i++) {
+        wires[i] = va_arg(args, QubitIdType);
+    }
+    va_end(args);
+
+    getQuantumDevicePtr()->NamedOperation("PCPhase", {theta, dim}, wires,
+                                          /* modifiers */ MODIFIERS_ARGS(modifiers));
+}
+
 void __catalyst__qis__SetBasisState(MemRefT_int8_1d *data, uint64_t numQubits, ...)
 {
     RT_ASSERT(numQubits > 0);

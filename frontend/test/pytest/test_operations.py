@@ -136,6 +136,8 @@ def test_param(backend):
 
         qml.MultiRZ(x, wires=[0, 1, 2, 3])
 
+        qml.PCPhase(x, dim=2, wires=[0, 1, 2, 3])
+
         # Unsupported:
         # qml.PauliRot(x, 'IXYZ', wires=[0,1,2,3])
         # qml.U1(x, wires=0)
