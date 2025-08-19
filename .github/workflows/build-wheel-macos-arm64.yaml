@@ -332,7 +332,8 @@ jobs:
         # This macos works with xcode 16.4
         # xcode-version: '16.4.0'
       run:
-        sudo xcode-select -s /Applications/Xcode_16.4.app
+        #sudo xcode-select -s /Applications/Xcode_16.4.app
+        sudo xcode-select --switch /Library/Developer/CommandLineTools
 
     # Build Catalyst-Runtime
     - name: Build Catalyst-Runtime
@@ -340,7 +341,7 @@ jobs:
       run: |
         # On GH images, gfortran is only available as a specific version.
         export FC=gfortran-14
-        sudo xcode-select --switch /Library/Developer/CommandLineTools
+        #sudo xcode-select --switch /Library/Developer/CommandLineTools
         cmake -S runtime -B $GITHUB_WORKSPACE/runtime-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
               -DCMAKE_LIBRARY_OUTPUT_DIRECTORY="$GITHUB_WORKSPACE/runtime-build/lib" \
@@ -374,7 +375,7 @@ jobs:
     - name: Build MLIR Dialects
       run: |
         sudo mdutil -i off /Users
-        sudo xcode-select --switch /Library/Developer/CommandLineTools
+        #sudo xcode-select --switch /Library/Developer/CommandLineTools
         cmake -S mlir -B $GITHUB_WORKSPACE/quantum-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
               -DLLVM_ENABLE_ASSERTIONS=ON \
