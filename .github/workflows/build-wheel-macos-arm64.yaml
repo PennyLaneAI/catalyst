@@ -325,9 +325,10 @@ jobs:
         key: ${{ runner.os }}-${{ runner.arch }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-wheel-build
         fail-on-cache-miss: True
 
-    - name: Setup Xcode
-      run:
-        sudo xcode-select --switch /Library/Developer/CommandLineTools
+    # TODO: uncomment the setup xcode action when updating to MacOS 15 in the github runner images
+    # - name: Setup Xcode
+    #   run:
+    #     sudo xcode-select --switch /Library/Developer/CommandLineTools
 
     # Build Catalyst-Runtime
     - name: Build Catalyst-Runtime
@@ -368,7 +369,8 @@ jobs:
     - name: Build MLIR Dialects
       run: |
         # xcode 16 builds very slow if we don't turn off spotlight
-        sudo mdutil -i off /Users
+        # TODO: uncomment the below when updating to MacOS 15 in the github runner images
+        # sudo mdutil -i off /Users
         cmake -S mlir -B $GITHUB_WORKSPACE/quantum-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
               -DLLVM_ENABLE_ASSERTIONS=ON \
@@ -386,8 +388,8 @@ jobs:
               -DLLVM_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/llvm"
 
         # xcode >=16 builds significantly slower when multithreaded
-        # So we force single-thread build
-        cmake --build $GITHUB_WORKSPACE/quantum-build --target check-dialects catalyst-cli -- -j 1
+        # TODO: force single-thread build (-- -j 1) when updating to MacOS 15 in the github runner images
+        cmake --build $GITHUB_WORKSPACE/quantum-build --target check-dialects catalyst-cli
 
     - name: Build Plugin wheel
       # Run only on Thursday at the given time
