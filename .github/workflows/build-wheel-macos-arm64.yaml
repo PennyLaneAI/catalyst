@@ -368,9 +368,8 @@ jobs:
     # Build Quantum and Gradient Dialects
     - name: Build MLIR Dialects
       run: |
-        # xcode 16 builds very slow if we don't turn off spotlight
-        # TODO: uncomment the below when updating to MacOS 15 in the github runner images
-        # sudo mdutil -i off /Users
+        # xcode builds very slow if we don't turn off spotlight
+        sudo mdutil -i off /Users
         cmake -S mlir -B $GITHUB_WORKSPACE/quantum-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
               -DLLVM_ENABLE_ASSERTIONS=ON \
