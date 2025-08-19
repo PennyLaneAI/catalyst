@@ -14,6 +14,7 @@
 
 from textwrap import dedent
 
+import jax
 import jax.numpy as jnp
 import numpy as np
 import pennylane as qml
@@ -64,6 +65,7 @@ class TestCondToJaxpr:
         assert asline(expected) == asline(circuit.jaxpr)
 
 
+# pylint: disable=too-many-public-methods,too-many-lines
 class TestCond:
     """Test suite for the Cond functionality in Catalyst."""
 
@@ -310,6 +312,108 @@ class TestCond:
             return r
 
         assert 0 == circuit()
+
+    def test_branch_multi_return_type_unification_qjit_2(self):
+        """Test that unification happens before the results of the cond primitve is available."""
+
+        @qjit
+        def circuit(cond1, cond2):
+            @cond(cond1)
+            def cond_fn():
+                return False
+
+            @cond_fn.else_if(cond2)
+            def cond_fn_2():
+                return 0.5
+
+            @cond_fn.otherwise
+            def cond_fn_3():
+                return False
+
+            r = cond_fn()
+            assert r.dtype is jnp.dtype(
+                "float64" if jax.config.values["jax_enable_x64"] else "float32"
+            )
+            return r
+
+        assert 0.5 == circuit(False, True)
+
+    def test_branch_multi_return_type_unification_qjit_3(self):
+        """Test that unification happens before the results of the cond primitve is available."""
+
+        @qjit
+        def circuit(cond1, cond2):
+            @cond(cond1)
+            def cond_fn():
+                return False
+
+            @cond_fn.else_if(cond2)
+            def cond_fn_2():
+                return False
+
+            @cond_fn.otherwise
+            def cond_fn_3():
+                return 0.5
+
+            r = cond_fn()
+            assert r.dtype is jnp.dtype(
+                "float64" if jax.config.values["jax_enable_x64"] else "float32"
+            )
+            return r
+
+        assert 0.0 == circuit(False, True)
+
+    def test_branch_multi_return_type_unification_qjit_4(self):
+        """Test that unification happens before the results of the cond primitve is available."""
+
+        @qjit
+        def circuit(cond1, cond2):
+            @cond(cond1)
+            def cond_fn():
+                return {0: True, 1: 0.5}
+
+            @cond_fn.else_if(cond2)
+            def cond_fn_2():
+                return {0: 0.7, 1: True}
+
+            @cond_fn.otherwise
+            def cond_fn_3():
+                return {0: True, 1: False}
+
+            r = cond_fn()
+            expected_dtype = jnp.dtype(
+                "float64" if jax.config.values["jax_enable_x64"] else "float32"
+            )
+            assert all(v.dtype is expected_dtype for _, v in r.items())
+            return r
+
+        assert {0: 0.7, 1: 1.0} == circuit(False, True)
+
+    def test_qnode_cond_inconsistent_return_types(self, backend):
+        """Test that catalyst raises an error when the conditional has inconsistent return types."""
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=4))
+        def f(flag, sz):
+            a = jnp.ones([sz], dtype=float)
+            b = jnp.zeros([3], dtype=float)
+
+            @cond(flag)
+            def case():
+                return a
+
+            @case.otherwise
+            def case():
+                return b
+
+            c = case()
+            return c
+
+        with pytest.raises(
+            TypeError,
+            match="Conditional requires a consistent number of results across all branches",
+        ):
+            f(True, 3)
 
     @pytest.mark.xfail(
         reason="Inability to apply Jax transformations before the quantum traing is complete"
