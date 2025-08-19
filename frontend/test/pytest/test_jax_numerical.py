@@ -14,6 +14,7 @@
 
 """Test that numerical jax functions produce correct results when compiled with catalyst.qjit"""
 
+import jax
 import numpy as np
 import pennylane as qml
 import pytest
@@ -77,6 +78,54 @@ class TestArgsortNumerical:
         expected = jnp.argsort(inp)
 
         assert np.allclose(observed, expected)
+
+
+class TestBincount:
+    """Test that jax.numpy.bincount can be qjit compiled and that its functionality is correct"""
+
+    @pytest.mark.parametrize(
+        "x, length",
+        [
+            (jnp.array([0]), 1),
+            (jnp.array([1]), 2),
+            (jnp.array([0, 1]), 2),
+            (jnp.array([2]), 3),
+            (jnp.array([1, 2]), 3),
+            (jnp.array([0, 1, 2]), 3),
+        ],
+    )
+    def test_bincount(self, x, length):
+        """Test that jnp.bincount returns same results using jax.jit and qjit"""
+
+        def my_bincount(x_):
+            return jnp.bincount(x_, length=length)
+
+        observed = qjit(my_bincount)(x)
+        expected = jax.jit(my_bincount)(x)
+
+        assert jnp.allclose(observed, expected)
+
+    @pytest.mark.parametrize(
+        "x, weights, length",
+        [
+            (jnp.array([0]), jnp.array([1]), 1),
+            (jnp.array([0]), jnp.array([0.1]), 1),
+            (jnp.array([0, 1]), jnp.array([1, 2]), 2),
+            (jnp.array([0, 1]), jnp.array([0.1, 0.2]), 2),
+            (jnp.array([0, 1, 2]), jnp.array([1, 2, 3]), 3),
+            (jnp.array([0, 1, 2]), jnp.array([0.1, 0.2, 0.3]), 3),
+        ],
+    )
+    def test_bincount_with_weights(self, x, weights, length):
+        """Test that jnp.bincount with weights returns same results using jax.jit and qjit"""
+
+        def my_bincount(x_, weights_):
+            return jnp.bincount(x_, weights_, length=length)
+
+        observed = qjit(my_bincount)(x, weights)
+        expected = jax.jit(my_bincount)(x, weights)
+
+        assert jnp.allclose(observed, expected)
 
 
 if __name__ == "__main__":
