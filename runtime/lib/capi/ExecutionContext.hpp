@@ -18,6 +18,7 @@
 
 #include <cstdio>
 #include <functional>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <random>
@@ -168,6 +169,11 @@ class RTDevice {
     std::string rtd_kwargs;
     bool auto_qubit_management;
 
+    // Each device instance carries a map from the user wire labels to the indices
+    // that will be sent into  __catalyst__rt__array_get_element_ptr_1d(idx)
+    // This is to be used for runtime resolution of dynamic wire labels.
+    std::map<int64_t, int64_t> wire_labels_map = {{37,42}, {100,69}};
+
     std::unique_ptr<SharedLibraryManager> rtd_dylib{nullptr};
     std::unique_ptr<QuantumDevice> rtd_qdevice{nullptr};
 
@@ -264,6 +270,10 @@ class RTDevice {
     void setDeviceStatus(RTDeviceStatus new_status) noexcept { status = new_status; }
 
     bool getQubitManagementMode() { return auto_qubit_management; }
+
+    std::map<int64_t, int64_t>& getWireLabelsMap() {
+        return wire_labels_map;
+    }
 
     [[nodiscard]] auto getDeviceStatus() const -> RTDeviceStatus { return status; }
 

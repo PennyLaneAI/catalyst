@@ -748,6 +748,37 @@ TEST_CASE("Test NullQubit device shots methods", "[NullQubit]")
     }
 }
 
+TEST_CASE("Test runtime dynamic wire label resolution", "[NullQubit]")
+{
+    constexpr size_t shots = 10;
+    const auto [rtd_lib, rtd_name, rtd_kwargs] =
+        std::array<std::string, 3>{"null.qubit", "null_qubit", ""};
+    __catalyst__rt__initialize(nullptr);
+    __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
+                                (int8_t *)rtd_kwargs.c_str(), shots,
+                                /*auto_qubit_management=*/false);
+
+    QirArray *qs = __catalyst__rt__qubit_allocate_array(37);
+
+    std::cout << __catalyst__rt__resolve_dynamic_wire_index() << " hiii! \n";
+    // QUBIT **target = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 2);
+
+    // __catalyst__qis__Hadamard(*target, NO_MODIFIERS);
+
+    // size_t n = __catalyst__rt__num_qubits();
+    // CHECK(n == 3);
+
+    // std::vector<double> buffer(shots * n);
+    // MemRefT_double_2d result = {buffer.data(), buffer.data(), 0, {shots, n}, {n, 1}};
+
+    // __catalyst__qis__Sample(&result, n);
+
+    __catalyst__rt__qubit_release_array(qs);
+
+    __catalyst__rt__device_release();
+    __catalyst__rt__finalize();
+}
+
 TEST_CASE("Test NullQubit device resource tracking", "[NullQubit]")
 {
     // The name of the file where the resource usage data is stored

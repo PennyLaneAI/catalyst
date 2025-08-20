@@ -1076,6 +1076,16 @@ int64_t __catalyst__rt__array_get_size_1d(QirArray *ptr)
     return qubit_vector_ptr->size();
 }
 
+int64_t __catalyst__rt__resolve_dynamic_wire_index(){
+    std::cout << "__catalyst__rt__resolve_dynamic_wire_index, welcome\n";
+    std::cout << "current map: \n";
+    for (const auto& pair : RTD_PTR->getWireLabelsMap()) {
+        std::cout << "Key: " << pair.first << ", Value: " << pair.second << std::endl;
+    }
+
+    return 0;
+}
+
 int8_t *__catalyst__rt__array_get_element_ptr_1d(QirArray *ptr, int64_t idx)
 {
     std::vector<QubitIdType> *qubit_vector_ptr = reinterpret_cast<std::vector<QubitIdType> *>(ptr);
