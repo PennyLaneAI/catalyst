@@ -701,6 +701,25 @@ void __catalyst__qis__IsingZZ(double theta, QUBIT *control, QUBIT *target,
                                           /* modifiers */ MODIFIERS_ARGS(modifiers));
 }
 
+void __catalyst__qis__SingleExcitation(double phi, QUBIT *wire0, QUBIT *wire1,
+                                       const Modifiers *modifiers)
+{
+    getQuantumDevicePtr()->NamedOperation(
+        "SingleExcitation", {phi},
+        {reinterpret_cast<QubitIdType>(wire0), reinterpret_cast<QubitIdType>(wire1)},
+        MODIFIERS_ARGS(modifiers));
+}
+
+void __catalyst__qis__DoubleExcitation(double phi, QUBIT *wire0, QUBIT *wire1, QUBIT *wire2,
+                                       QUBIT *wire3, const Modifiers *modifiers)
+{
+    getQuantumDevicePtr()->NamedOperation(
+        "DoubleExcitation", {phi},
+        {reinterpret_cast<QubitIdType>(wire0), reinterpret_cast<QubitIdType>(wire1),
+         reinterpret_cast<QubitIdType>(wire2), reinterpret_cast<QubitIdType>(wire3)},
+        MODIFIERS_ARGS(modifiers));
+}
+
 void __catalyst__qis__ControlledPhaseShift(double theta, QUBIT *control, QUBIT *target,
                                            const Modifiers *modifiers)
 {

@@ -68,7 +68,7 @@ jobs:
         python_version: ${{ fromJson(format('["{0}"]', needs.constants.outputs.primary_python_version)) }}
 
     name: Build Dependencies (Python ${{ matrix.python_version }})
-    runs-on: macos-latest
+    runs-on: macos-14
 
     if: needs.check_if_wheel_build_required.outputs.build-wheels == 'true'
 
@@ -252,7 +252,7 @@ jobs:
         python_version: ${{ fromJson(needs.constants.outputs.python_versions) }}
 
     name: Build Wheels (Python ${{ matrix.python_version }})
-    runs-on: macos-latest
+    runs-on: macos-14
 
     steps:
     - name: Checkout Catalyst repo
@@ -325,6 +325,11 @@ jobs:
         key: ${{ runner.os }}-${{ runner.arch }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-wheel-build
         fail-on-cache-miss: True
 
+    # TODO: uncomment the setup xcode action when updating to MacOS 15 in the github runner images
+    # - name: Setup Xcode
+    #   run:
+    #     sudo xcode-select --switch /Library/Developer/CommandLineTools
+
     # Build Catalyst-Runtime
     - name: Build Catalyst-Runtime
       id: runtime-build
@@ -363,6 +368,8 @@ jobs:
     # Build Quantum and Gradient Dialects
     - name: Build MLIR Dialects
       run: |
+        # xcode builds very slow if we don't turn off spotlight
+        sudo mdutil -i off /Users
         cmake -S mlir -B $GITHUB_WORKSPACE/quantum-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
               -DLLVM_ENABLE_ASSERTIONS=ON \
@@ -379,7 +386,8 @@ jobs:
               -DLLVM_ENABLE_LLD=OFF \
               -DLLVM_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/llvm"
 
-        cmake --build $GITHUB_WORKSPACE/quantum-build --target check-dialects catalyst-cli
+        # xcode builds significantly slower when multithreaded
+        cmake --build $GITHUB_WORKSPACE/quantum-build --target check-dialects catalyst-cli -- -j 1
 
     - name: Build Plugin wheel
       # Run only on Thursday at the given time
@@ -430,7 +438,7 @@ jobs:
 
     # To check all wheels for supported python3 versions
     name: Test Wheels (Python ${{ matrix.python_version }}) on Mac arm64
-    runs-on: macos-latest
+    runs-on: macos-14
 
     steps:
     - name: Checkout Catalyst repo
