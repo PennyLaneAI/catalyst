@@ -27,6 +27,7 @@
 using namespace mlir;
 
 namespace catalyst {
+namespace hlo {
 
 struct ScatterOpRewritePattern : public mlir::OpRewritePattern<stablehlo::ScatterOp> {
     using mlir::OpRewritePattern<stablehlo::ScatterOp>::OpRewritePattern;
@@ -756,7 +757,8 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<stablehlo::Scatte
 
 void populateScatterPatterns(RewritePatternSet &patterns)
 {
-    patterns.add<catalyst::ScatterOpRewritePattern>(patterns.getContext(), 1);
+    patterns.add<ScatterOpRewritePattern>(patterns.getContext(), 1);
 }
 
+} // namespace hlo
 } // namespace catalyst

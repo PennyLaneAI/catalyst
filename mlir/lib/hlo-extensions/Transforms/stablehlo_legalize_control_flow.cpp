@@ -58,25 +58,8 @@ limitations under the License.
 #include "stablehlo/transforms/Passes.h"
 #include "llvm/Support/Casting.h"
 
-<<<<<<<< HEAD:mlir/lib/mlir-hlo/Transforms/mhlo_legalize_control_flow.cpp
-using namespace mlir;
-using namespace mhlo;
-// using namespace stablehlo;
-========
-#include "hlo-extensions/Passes.h"
-
 using namespace mlir;
 using namespace stablehlo;
-using namespace catalyst;
-
-namespace catalyst {
-
-#define GEN_PASS_DEF_STABLEHLOLEGALIZECONTROLFLOWPASS
-#define GEN_PASS_DECL_STABLEHLOLEGALIZECONTROLFLOWPASS
-#include "hlo-extensions/Passes.h.inc"
-
-} // namespace catalyst
->>>>>>>> main:mlir/lib/hlo-extensions/stablehlo_legalize_control_flow.cpp
 
 namespace {
 
@@ -291,24 +274,16 @@ struct CaseOpPattern : public OpConversionPattern<stablehlo::CaseOp> {
     }
 };
 
-<<<<<<<< HEAD:mlir/lib/mlir-hlo/Transforms/mhlo_legalize_control_flow.cpp
 } // namespace
 
 namespace catalyst {
-namespace mhlo {
+namespace hlo {
 
-#define GEN_PASS_DEF_MHLOLEGALIZECONTROLFLOWPASS
-// #define GEN_PASS_DEF_STABLEHLOLEGALIZECONTROLFLOWPASS
-// #define GEN_PASS_DECL_STABLEHLOLEGALIZECONTROLFLOWPASS
-#include "mlir-hlo/Transforms/Passes.h.inc"
+#define GEN_PASS_DEF_STABLEHLOLEGALIZECONTROLFLOWPASS
+#include "hlo-extensions/Transforms/Passes.h.inc"
 
-struct MhloLegalizeControlFlowPass
-    : public impl::MhloLegalizeControlFlowPassBase<MhloLegalizeControlFlowPass> {
-========
 struct StablehloLegalizeControlFlowPass
-    : public catalyst::impl::StablehloLegalizeControlFlowPassBase<
-          StablehloLegalizeControlFlowPass> {
->>>>>>>> main:mlir/lib/hlo-extensions/stablehlo_legalize_control_flow.cpp
+    : public impl::StablehloLegalizeControlFlowPassBase<StablehloLegalizeControlFlowPass> {
     // Perform the lowering to MLIR control flow.
     void runOnOperation() override
     {
@@ -320,11 +295,7 @@ struct StablehloLegalizeControlFlowPass
 
         mlir::ConversionTarget target(*ctx);
         target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });
-<<<<<<<< HEAD:mlir/lib/mlir-hlo/Transforms/mhlo_legalize_control_flow.cpp
-        target.addIllegalOp<mlir::mhlo::IfOp, mlir::mhlo::WhileOp, mlir::mhlo::CaseOp>();
-========
         target.addIllegalOp<stablehlo::IfOp, stablehlo::WhileOp, stablehlo::CaseOp>();
->>>>>>>> main:mlir/lib/hlo-extensions/stablehlo_legalize_control_flow.cpp
 
         if (failed(applyPartialConversion(f, target, std::move(patterns)))) {
             signalPassFailure();
@@ -332,14 +303,5 @@ struct StablehloLegalizeControlFlowPass
     }
 };
 
-<<<<<<<< HEAD:mlir/lib/mlir-hlo/Transforms/mhlo_legalize_control_flow.cpp
-} // namespace mhlo
+} // namespace hlo
 } // namespace catalyst
-========
-} // namespace
-
-std::unique_ptr<Pass> catalyst::createStablehloLegalizeControlFlowPass()
-{
-    return std::make_unique<StablehloLegalizeControlFlowPass>();
-}
->>>>>>>> main:mlir/lib/hlo-extensions/stablehlo_legalize_control_flow.cpp

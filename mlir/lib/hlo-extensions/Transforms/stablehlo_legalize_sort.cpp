@@ -65,25 +65,8 @@ limitations under the License.
 #include "stablehlo/transforms/Passes.h"
 #include "llvm/ADT/STLExtras.h"
 
-<<<<<<<< HEAD:mlir/lib/mlir-hlo/Transforms/mhlo_legalize_sort.cpp
-using namespace mlir;
-using namespace mhlo;
-// using namespace stablehlo;
-========
-#include "hlo-extensions/Passes.h"
-
 using namespace mlir;
 using namespace stablehlo;
-using namespace catalyst;
-
-namespace catalyst {
-
-#define GEN_PASS_DEF_STABLEHLOLEGALIZESORTPASS
-#define GEN_PASS_DECL_STABLEHLOLEGALIZESORTPASS
-#include "hlo-extensions/Passes.h.inc"
-
-} // namespace catalyst
->>>>>>>> main:mlir/lib/hlo-extensions/stablehlo_legalize_sort.cpp
 
 namespace {
 
@@ -575,23 +558,16 @@ struct SortOpPattern : public OpRewritePattern<SortOp> {
     }
 };
 
-<<<<<<<< HEAD:mlir/lib/mlir-hlo/Transforms/mhlo_legalize_sort.cpp
 } // namespace
 
 namespace catalyst {
-namespace mhlo {
+namespace hlo {
 
-#define GEN_PASS_DEF_MHLOLEGALIZESORTPASS
-// #define GEN_PASS_DEF_STABLEHLOLEGALIZESORTPASS
-// #define GEN_PASS_DECL_STABLEHLOLEGALIZESORTPASS
-#include "mlir-hlo/Transforms/Passes.h.inc"
+#define GEN_PASS_DEF_STABLEHLOLEGALIZESORTPASS
+#include "hlo-extensions/Transforms/Passes.h.inc"
 
-struct MhloLegalizeSortPass
-    : public impl::MhloLegalizeSortPassBase<MhloLegalizeSortPass> {
-========
 struct StablehloLegalizeSortPass
-    : public catalyst::impl::StablehloLegalizeSortPassBase<StablehloLegalizeSortPass> {
->>>>>>>> main:mlir/lib/hlo-extensions/stablehlo_legalize_sort.cpp
+    : public impl::StablehloLegalizeSortPassBase<StablehloLegalizeSortPass> {
     // Perform the lowering to MLIR control flow.
     void runOnOperation() override
     {
@@ -603,11 +579,7 @@ struct StablehloLegalizeSortPass
 
         mlir::ConversionTarget target(*ctx);
         target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });
-<<<<<<<< HEAD:mlir/lib/mlir-hlo/Transforms/mhlo_legalize_sort.cpp
-        target.addIllegalOp<mlir::mhlo::SortOp>();
-========
         target.addIllegalOp<stablehlo::SortOp>();
->>>>>>>> main:mlir/lib/hlo-extensions/stablehlo_legalize_sort.cpp
 
         if (failed(applyPartialConversion(f, target, std::move(patterns)))) {
             signalPassFailure();
@@ -615,14 +587,5 @@ struct StablehloLegalizeSortPass
     }
 };
 
-<<<<<<<< HEAD:mlir/lib/mlir-hlo/Transforms/mhlo_legalize_sort.cpp
-} // namespace mhlo
+} // namespace hlo
 } // namespace catalyst
-========
-} // namespace
-
-std::unique_ptr<Pass> catalyst::createStablehloLegalizeSortPass()
-{
-    return std::make_unique<StablehloLegalizeSortPass>();
-}
->>>>>>>> main:mlir/lib/hlo-extensions/stablehlo_legalize_sort.cpp

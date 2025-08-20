@@ -12,46 +12,46 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#define DEBUG_TYPE "scatter"
+#define DEBUG_TYPE "hlocustomcalls"
 
 #include <vector>
 
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Index/IR/IndexDialect.h"
-#include "mlir/Dialect/SCF/IR/SCF.h"
-#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "stablehlo/dialect/StablehloOps.h"
 #include "stablehlo/transforms/Passes.h"
 #include "llvm/Support/Debug.h"
 
-#include "hlo-extensions/Passes.h"
-#include "hlo-extensions/Patterns.h"
+#include "Catalyst/IR/CatalystDialect.h"
+#include "hlo-extensions/Transforms/Patterns.h"
 
 using namespace llvm;
 using namespace mlir;
 using namespace catalyst;
 
 namespace catalyst {
+namespace hlo {
 
-#define GEN_PASS_DEF_SCATTERLOWERINGPASS
-#include "hlo-extensions/Passes.h.inc"
+#define GEN_PASS_DEF_HLOCUSTOMCALLLOWERINGPASS
+#include "hlo-extensions/Transforms/Passes.h.inc"
 
-struct ScatterLoweringPass : impl::ScatterLoweringPassBase<ScatterLoweringPass> {
-    using ScatterLoweringPassBase::ScatterLoweringPassBase;
+struct HloCustomCallLoweringPass : impl::HloCustomCallLoweringPassBase<HloCustomCallLoweringPass> {
+    using HloCustomCallLoweringPassBase::HloCustomCallLoweringPassBase;
 
     void runOnOperation() final
     {
-        LLVM_DEBUG(dbgs() << "scatter lowering pass"
+        LLVM_DEBUG(dbgs() << "hlo custom call lowering pass"
                           << "\n");
 
         RewritePatternSet patterns(&getContext());
-        populateScatterPatterns(patterns);
+        populateHloCustomCallPatterns(patterns);
         if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
             return signalPassFailure();
         }
     }
 };
 
+} // namespace hlo
 } // namespace catalyst

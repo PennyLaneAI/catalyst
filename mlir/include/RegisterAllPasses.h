@@ -14,8 +14,6 @@
 
 #pragma once
 
-#include "mlir/Pass/PassRegistry.h"
-
 #include "Catalyst/Transforms/Passes.h"
 #include "Gradient/Transforms/Passes.h"
 #include "Ion/Transforms/Passes.h"
@@ -24,7 +22,7 @@
 #include "QEC/Transforms/Passes.h"
 #include "Quantum/Transforms/Passes.h"
 #include "Test/Transforms/Passes.h"
-#include "hlo-extensions/Passes.h"
+#include "hlo-extensions/Transforms/Passes.h"
 
 namespace catalyst {
 
@@ -32,9 +30,9 @@ inline void registerAllPasses()
 {
     registerCatalystPasses();
     gradient::registerGradientPasses();
+    hlo::registerStablehloPasses();
     ion::registerIonPasses();
     mbqc::registerMBQCPasses();
-    hlo::registerHloPasses();
     mitigation::registerMitigationPasses();
     qec::registerQECPasses();
     quantum::registerQuantumPasses();

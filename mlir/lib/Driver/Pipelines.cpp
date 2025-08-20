@@ -32,7 +32,7 @@
 #include "Mitigation/Transforms/Passes.h"
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/Transforms/Passes.h"
-#include "hlo-extensions/Passes.h"
+#include "hlo-extensions/Transforms/Passes.h"
 
 using namespace mlir;
 
@@ -49,17 +49,17 @@ void createHloLoweringPipeline(OpPassManager &pm)
 {
     pm.addPass(mlir::createCanonicalizerPass());
     pm.addNestedPass<mlir::func::FuncOp>(stablehlo::createChloLegalizeToStablehloPass());
-    pm.addNestedPass<mlir::func::FuncOp>(catalyst::createStablehloLegalizeControlFlowPass());
+    pm.addNestedPass<mlir::func::FuncOp>(catalyst::hlo::createStablehloLegalizeControlFlowPass());
     stablehlo::StablehloAggressiveSimplificationPassOptions ASoptions;
     pm.addNestedPass<mlir::func::FuncOp>(
         stablehlo::createStablehloAggressiveSimplificationPass(ASoptions));
     pm.addNestedPass<mlir::func::FuncOp>(stablehlo::createStablehloLegalizeToLinalgPass());
-    pm.addNestedPass<mlir::func::FuncOp>(catalyst::createStablehloLegalizeToStdPass());
-    pm.addNestedPass<mlir::func::FuncOp>(catalyst::createStablehloLegalizeSortPass());
+    pm.addNestedPass<mlir::func::FuncOp>(catalyst::hlo::createStablehloLegalizeToStandardPass());
+    pm.addNestedPass<mlir::func::FuncOp>(catalyst::hlo::createStablehloLegalizeSortPass());
     pm.addPass(stablehlo::createStablehloConvertToSignlessPass());
     pm.addPass(mlir::createCanonicalizerPass());
-    pm.addPass(catalyst::createScatterLoweringPass());
-    pm.addPass(catalyst::createHloCustomCallLoweringPass());
+    pm.addPass(catalyst::hlo::createScatterLoweringPass());
+    pm.addPass(catalyst::hlo::createHloCustomCallLoweringPass());
     pm.addPass(mlir::createCSEPass());
     mlir::LinalgDetensorizePassOptions LDoptions;
     LDoptions.aggressiveMode = true;
