@@ -76,6 +76,9 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Add `SingleExcitation` and `DoubleExcitation` to native `RUNTIME_OPERATIONS` and `RuntimeCAPI`.
+  [(#1980)](https://github.com/PennyLaneAI/catalyst/pull/1980)
+
 * Updates use of `qml.transforms.dynamic_one_shot.parse_native_mid_circuit_measurements` to improved signature.
   [(#1953)](https://github.com/PennyLaneAI/catalyst/pull/1953)
 
@@ -173,6 +176,7 @@ Yushao Chen,
 Sengthai Heng,
 David Ittah,
 Christina Lee,
+Joseph Lee,
 Andrija Paurevic,
 Roberto Turrado,
 Paul Haochen Wang.
