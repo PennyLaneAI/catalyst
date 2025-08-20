@@ -774,16 +774,6 @@ class TreeTraversal(RewritePattern):
             self.statevec_stack, (current_depth, 0), (1, self.statevec_size), (1, 1), targetType
         )
 
-        # TODO: I think we need to refill the register between each segment or there is no way of
-        # correctly preserving the dataflow within the loop and grabbing the right qubits here.
-        # quantum.SetStateOp(operands=[statevec, ])
-
-        false = arith.ConstantOp.from_int_and_width(0, 1)
-        yieldOp = scf.YieldOp(false)
-
-        for op in (false, statevec, yieldOp):
-            rewriter.insert_op(op, InsertPoint.at_end(trueBlock))
-
         rewriter.insert_op(statevec, InsertPoint.at_end(insert_block))
 
     @staticmethod
