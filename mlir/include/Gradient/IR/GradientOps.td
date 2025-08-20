@@ -37,7 +37,7 @@ def GradOp : Gradient_Op<"grad", [
         using the finite difference method.
 
         This operation acts much like the `func.call` operation, taking a
-        symbol reference and arguments to the original functionan as input.
+        symbol reference and arguments to the original function as input.
         However, instead of the function result, the gradient of the function
         is returned.
 
@@ -245,7 +245,7 @@ def VJPOp : Gradient_Op<"vjp", [
 def ForwardOp : Gradient_Op<"forward",
     [FunctionOpInterface, IsolatedFromAbove]> {
 
-  let summary = "Operation denoting the forwrad pass that is registered with Enzyme.";
+  let summary = "Operation denoting the forward pass that is registered with Enzyme.";
 
   let description = [{
     Wrapper around the concrete function. This wrapper ensures calling convention.
