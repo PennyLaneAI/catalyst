@@ -775,7 +775,7 @@ class Observable_Op<string mnemonic, list<Trait> traits = []> :
         Quantum_Op<mnemonic, traits # [Pure]>;
 
 def ComputationalBasisOp : Observable_Op<"compbasis", [AttrSizedOperandSegments]> {
-    let summary = "Define a pseudo-obeservable of the computational basis for use in measurements";
+    let summary = "Define a pseudo-observable of the computational basis for use in measurements";
     let description = [{
         The `quantum.compbasis` operation defines a quantum observable to be used by other
         operations such as measurement processes. The specific observable defined here is a
@@ -979,7 +979,7 @@ def SampleOp : Measurement_Op<"sample", [AttrSizedOperandSegments]> {
 
         Note that the return value type depends on the type of observable provided. Computational
         basis samples are returned as a 2D array of shape (shot number, number of qubits), with all
-        other obversables the output is a 1D array of lenth equal to the shot number.
+        other observables the output is a 1D array of length equal to the shot number.
 
         Example:
 
@@ -1001,7 +1001,7 @@ def SampleOp : Measurement_Op<"sample", [AttrSizedOperandSegments]> {
 
             The return value type depends on the type of observable provided. Computational
             basis samples are returned as a 2D array of shape (shot number, number of qubits), with all
-            other obversables the output is a 1D array of lenth equal to the shot number.
+            other observables the output is a 1D array of length equal to the shot number.
 
         .. note::
 
