@@ -26,13 +26,9 @@ class TestOQDDevice:
     def test_initialization(self):
         """Test the initialization."""
 
-        with pytest.warns(
-            qml.deprecations.PennyLaneDeprecationWarning,
-            match="shots on device is deprecated"
-        ):
-            device = OQDDevice(
-                backend="default", shots=1000, wires=8, openapl_file_name="test_openapl_generation.json"
-            )
+        device = OQDDevice(
+            backend="default", wires=8, openapl_file_name="test_openapl_generation.json"
+        )
 
         assert device.openapl_file_name == "test_openapl_generation.json"
         assert device.backend == "default"
