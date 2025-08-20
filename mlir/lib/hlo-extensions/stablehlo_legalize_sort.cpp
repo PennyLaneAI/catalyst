@@ -33,7 +33,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
-// The modifications are porting the pass from the upstream MHLO namespace to
+// The modifications are porting the pass from the upstream stablehlo namespace to
 // catalyst namespace.
 
 // This file implements logic for lowering stablehlo.sort to the SCF dialect.
@@ -41,8 +41,6 @@ limitations under the License.
 #include <memory>
 #include <utility>
 
-#include "mhlo/IR/hlo_ops.h"
-#include "mhlo/transforms/passes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
@@ -63,24 +61,21 @@ limitations under the License.
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
+#include "stablehlo/dialect/StablehloOps.h"
+#include "stablehlo/transforms/Passes.h"
 #include "llvm/ADT/STLExtras.h"
-// #include "stablehlo/dialect/StablehloOps.h"
-// #include "stablehlo/transforms/Passes.h"
 
-#include "mlir-hlo/Passes.h"
+#include "hlo-extensions/Passes.h"
 
 using namespace mlir;
-using namespace mhlo;
-// using namespace stablehlo;
+using namespace stablehlo;
 using namespace catalyst;
 
 namespace catalyst {
 
-#define GEN_PASS_DEF_MHLOLEGALIZESORTPASS
-#define GEN_PASS_DECL_MHLOLEGALIZESORTPASS
-// #define GEN_PASS_DEF_STABLEHLOLEGALIZESORTPASS
-// #define GEN_PASS_DECL_STABLEHLOLEGALIZESORTPASS
-#include "mlir-hlo/Passes.h.inc"
+#define GEN_PASS_DEF_STABLEHLOLEGALIZESORTPASS
+#define GEN_PASS_DECL_STABLEHLOLEGALIZESORTPASS
+#include "hlo-extensions/Passes.h.inc"
 
 } // namespace catalyst
 
@@ -574,8 +569,8 @@ struct SortOpPattern : public OpRewritePattern<SortOp> {
     }
 };
 
-struct MhloLegalizeSortPass
-    : public catalyst::impl::MhloLegalizeSortPassBase<MhloLegalizeSortPass> {
+struct StablehloLegalizeSortPass
+    : public catalyst::impl::StablehloLegalizeSortPassBase<StablehloLegalizeSortPass> {
     // Perform the lowering to MLIR control flow.
     void runOnOperation() override
     {
@@ -587,7 +582,7 @@ struct MhloLegalizeSortPass
 
         mlir::ConversionTarget target(*ctx);
         target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });
-        target.addIllegalOp<mhlo::SortOp>();
+        target.addIllegalOp<stablehlo::SortOp>();
 
         if (failed(applyPartialConversion(f, target, std::move(patterns)))) {
             signalPassFailure();
@@ -597,7 +592,7 @@ struct MhloLegalizeSortPass
 
 } // namespace
 
-std::unique_ptr<Pass> catalyst::createMhloLegalizeSortPass()
+std::unique_ptr<Pass> catalyst::createStablehloLegalizeSortPass()
 {
-    return std::make_unique<MhloLegalizeSortPass>();
+    return std::make_unique<StablehloLegalizeSortPass>();
 }
