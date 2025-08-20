@@ -645,7 +645,7 @@ def PCPhaseOp : UnitaryGate_Op<"pcphase", [DifferentiableGate, NoMemoryEffect,
                                            AttrSizedOperandSegments, AttrSizedResultSegments]> {
     let summary = "Apply a projector-controlled phase gate";
     let description = [{
-        This gate is built from simpler gates like PhaseShift and PauliX and acts on a group
+        This gate is built from simpler gates like `PhaseShift` and `PauliX` and acts on a group
         of wires and takes a rotation angle.
         It also takes another number, an integer called `dim`, which defines a specific part
         of the quantum state. The gate then applies a positive phase shift to a portion of the

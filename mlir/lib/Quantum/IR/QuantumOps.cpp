@@ -88,11 +88,10 @@ LogicalResult PCPhaseOp::canonicalize(PCPhaseOp op, mlir::PatternRewriter &rewri
 {
     if (op.getAdjoint()) {
         auto paramNeg = rewriter.create<mlir::arith::NegFOp>(op.getLoc(), op.getTheta());
-        auto paramDim = rewriter.create<mlir::arith::NegFOp>(op.getLoc(), op.getDim());
 
         rewriter.replaceOpWithNewOp<PCPhaseOp>(
-            op, op.getOutQubits().getTypes(), op.getOutCtrlQubits().getTypes(), paramNeg, paramDim,
-            op.getInQubits(), nullptr, op.getInCtrlQubits(), op.getInCtrlValues());
+            op, op.getOutQubits().getTypes(), op.getOutCtrlQubits().getTypes(), paramNeg,
+            op.getDim(), op.getInQubits(), nullptr, op.getInCtrlQubits(), op.getInCtrlValues());
 
         return success();
     };

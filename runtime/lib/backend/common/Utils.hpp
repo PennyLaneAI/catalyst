@@ -220,7 +220,6 @@ enum class SimulatorGate : uint8_t {
     Toffoli,
     // n-qubit
     MultiRZ,
-    PCPhase,
 };
 
 constexpr std::array simulator_observable_support = {
@@ -269,7 +268,6 @@ constexpr std::array simulator_gate_info = {
     GateInfoTupleT{SimulatorGate::Toffoli, "Toffoli", 3, 0},
     // n-qubit
     GateInfoTupleT{SimulatorGate::MultiRZ, "MultiRZ", 0, 1},
-    GateInfoTupleT{SimulatorGate::PCPhase, "PCPhase", 0, 2},
 };
 
 constexpr size_t simulator_gate_info_size = simulator_gate_info.size();

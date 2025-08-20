@@ -508,12 +508,7 @@ void __catalyst__qis__PCPhase(double theta, double dim, const Modifiers *modifie
                               int64_t numQubits, ...)
 {
     RT_ASSERT(numQubits >= 0);
-
-    // Compute the abs value to support adjoint
-    // Note this will be revisited once we have a better solution
-    // for capturing generic PL gates. Currently, this is the optimal
-    // workaround to reduce type casting throughout the pipeline.
-    dim = dim < 0 ? -dim : dim;
+    RT_ASSERT(dim >= 0 && dim == static_cast<int64_t>(dim));
 
     va_list args;
     va_start(args, numQubits);

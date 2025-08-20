@@ -436,6 +436,24 @@ TEST_CASE("Mix Gate test R(X,Y,Z) num_qubits=4", "[NullQubit]")
     CHECK(view(0).imag() == Catch::Approx(0.0).epsilon(1e-5));
 }
 
+TEST_CASE("Gate PCPhase num_qubits=3", "[NullQubit]")
+{
+    std::unique_ptr<NullQubit> sim = std::make_unique<NullQubit>();
+
+    std::vector<QubitIdType> Qs = sim->AllocateQubits(3);
+
+    sim->NamedOperation("PCPhase", {0.123, 1}, {Qs[0], Qs[1], Qs[2]}, false);
+    sim->NamedOperation("PCPhase", {0.123, 2}, {Qs[1], Qs[2]}, true);
+
+    std::vector<std::complex<double>> state(1U << sim->GetNumQubits());
+    DataView<std::complex<double>, 1> view(state);
+    sim->State(view);
+
+    CHECK(view.size() == 8);
+    CHECK(view(0).real() == Catch::Approx(1.0).epsilon(1e-5));
+    CHECK(view(0).imag() == Catch::Approx(0.0).epsilon(1e-5));
+}
+
 TEST_CASE("Test __catalyst__qis__Gradient_params Op=[Hadamard,RZ,RY,RZ,S,T,ParamShift], "
           "Obs=[X]",
           "[Gradient]")
