@@ -76,7 +76,10 @@
 
 <h3>Internal changes ⚙️</h3>
 
-* Updates use of `qml.transforms.dynamic_one_shot.parse_native_mid_circuit_measurements` to improved signature.
+* Add `PCPhase` native compiler and runtime operator support.
+  [(#1987)](https://github.com/PennyLaneAI/catalyst/pull/1987)
+
+* Update use of `qml.transforms.dynamic_one_shot.parse_native_mid_circuit_measurements` to improved signature.
   [(#1953)](https://github.com/PennyLaneAI/catalyst/pull/1953)
 
 * When capture is enabled, `qjit(autograph=True)` will use capture autograph instead of catalyst autograph.
