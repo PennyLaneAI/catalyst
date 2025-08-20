@@ -12,7 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "QEC/IR/QECOpInterfaces.h"
+#include <iterator>
+#include <llvm/ADT/CachedHashString.h>
 #include <llvm/ADT/STLExtras.h>
+#include <llvm/ADT/SetVector.h>
+#include <llvm/Support/Casting.h>
+#include <map>
+#include <mlir/Dialect/Utils/StructuredOpsUtils.h>
+#include <mlir/IR/ValueRange.h>
+#include <mlir/Support/WalkResult.h>
+#include <utility>
+#include <vector>
 #define DEBUG_TYPE "t-layer-reduction"
 
 #include <algorithm>
@@ -35,132 +46,75 @@ namespace qec {
 #define GEN_PASS_DECL_TLAYERREDUCTIONPASS
 #include "QEC/Transforms/Passes.h.inc"
 
-mlir::IRMapping getArgMapper(LayerOp layerOp)
+Value findPredecessorValueOfOp(Value qubit, QECOpInterface op)
 {
-    // layerOp.getBody()->getArguments() are the arguments that used in body
-    // layerOp.getOperands() are from outside
+    assert(qubit != nullptr && "Qubit should not be nullptr");
 
-    /// Map layer block arguments (body arguments) -> LayerOp operands (outer SSA values).
-    /// Note: getInitArgs() equals getOperands() for this op.
-    mlir::IRMapping mapper;
-    mapper.map(layerOp.getBody()->getArguments(), layerOp.getOperands());
-    return mapper;
-}
+    auto defOp = qubit.getDefiningOp();
 
-PauliStringWrapper buildPauliStringWrapper(llvm::SetVector<Value> qubits,
-                                           std::vector<Value> entryOperands, QECOpInterface op)
-{
-    PauliWord pauliWord = expandPauliWord(qubits, entryOperands, op);
-    return PauliStringWrapper::from_pauli_word(pauliWord);
-}
-qec::LayerOp rebuildLayerToMatchYield(qec::LayerOp oldLayer, mlir::IRRewriter &rewriter)
-{
-    using namespace mlir;
-    auto *ctx = rewriter.getContext();
-    auto loc = oldLayer.getLoc();
+    if (!defOp)
+        return qubit;
 
-    auto *oldBody = oldLayer.getBody();
-    auto oldYield = llvm::cast<qec::YieldOp>(oldBody->getTerminator());
-    TypeRange newResultTypes = oldYield.getOperandTypes();
-
-    // Prepare a fresh operation state with the new result types.
-    OperationState state(loc, qec::LayerOp::getOperationName());
-    state.addOperands(oldLayer->getOperands());
-    state.addTypes(newResultTypes);
-    Region *newRegion = state.addRegion();
-
-    // Build the new single-block region and clone body.
-    auto *newBlock = new Block();
-    newRegion->push_back(newBlock);
-    for (Value v : oldLayer.getInitArgs())
-        newBlock->addArgument(v.getType(), v.getLoc());
-
-    IRMapping map;
-    map.map(oldBody->getArguments(), newBlock->getArguments());
-    OpBuilder b(ctx);
-    b.setInsertionPointToStart(newBlock);
-
-    for (Operation &op : oldBody->getOperations()) {
-        if (llvm::isa<qec::YieldOp>(op))
-            continue;
-        b.clone(op, map);
+    if (defOp->isBeforeInBlock(op)) {
+        return qubit;
     }
 
-    SmallVector<Value> newYieldOperands;
-    newYieldOperands.reserve(oldYield->getNumOperands());
-    for (Value v : oldYield->getOperands())
-        newYieldOperands.push_back(map.lookupOrDefault(v));
-    b.create<qec::YieldOp>(loc, newYieldOperands);
+    auto qecOp = llvm::dyn_cast<QECOpInterface>(defOp);
 
-    // Materialize the new op and insert next to the old one.
-    Operation *newOpGeneric = Operation::create(state);
-    rewriter.setInsertionPoint(oldLayer);
-    rewriter.insert(newOpGeneric);
-    auto newLayer = llvm::cast<qec::LayerOp>(newOpGeneric);
+    if (!qecOp)
+        return nullptr;
 
-    // Replace uses of old results (for the overlapping prefix) and erase old op.
-    unsigned nOld = oldLayer->getNumResults();
-    unsigned nNew = newLayer->getNumResults();
-    for (unsigned i = 0; i < std::min(nOld, nNew); ++i)
-        oldLayer->getResult(i).replaceAllUsesWith(newLayer->getResult(i));
+    IRMapping outInMap;
+    outInMap.map(qecOp.getOutQubits(), qecOp.getInQubits());
 
-    rewriter.eraseOp(oldLayer);
-    return newLayer;
+    auto inQubit = outInMap.lookup(qubit);
+
+    if (qecOp == op) {
+        return inQubit;
+    }
+
+    return findPredecessorValueOfOp(inQubit, op);
 }
 
-bool commute(QECOpInterface op, QECLayer &rhsLayer, QECLayer &lhsLayer)
+bool commute(QECOpInterface lhsOp, QECOpInterface rhsOp)
 {
-    // Resolve in-region values to outer SSA values via the layer interface:
-    // op-local values -> layer block arguments (entry qubits) -> LayerOp operands.
-    // Example:
-    //   rhsLayer = layerOp(A=q0, B=q1){
-    //       K:2 = PPR["X","Y"](8) A, B
-    //       M:2 = PPR["Z","Z"](8) K#0, K#1   <-
-    //   }
-    //
-    // Map K#0 -> A (block arg), then A -> q0 (LayerOp operand).
+    if (!lhsOp->isBeforeInBlock(rhsOp))
+        return false;
 
-    /// Build a mapper from layer block arguments to LayerOp operands.
-    auto srcBlockArgToOperand = getArgMapper(rhsLayer.layerOp);
-    auto dstBlockArgToOperand = getArgMapper(lhsLayer.layerOp);
+    std::vector<Value> lhsInQubits(lhsOp.getInQubits().begin(), lhsOp.getInQubits().end());
 
-    IRMapping dstResultMap;
-    // assert(lhsLayer.layerOp.getResults().size() == lhsLayer.layerOp->getOperands().size() &&
-    //        "lhsLayer results and operands should have the same size");
-    dstResultMap.map(lhsLayer.layerOp.getResults(), lhsLayer.layerOp->getOperands());
+    // Collect all qubits that are acted on by lhsOp and rhsOp
+    llvm::SetVector<Value> qubits;
+    qubits.insert(lhsInQubits.begin(), lhsInQubits.end());
 
-    std::vector<Value> opEntriesDst;
-    /// Map the op’s entry qubits (src block arguments) to dst LayerOp operands.
-    IRMapping opArgMap;
-    for (auto opArg : rhsLayer.getEntryQubitsFrom(op)) {
-        auto srcOperand = srcBlockArgToOperand.lookupOrNull(opArg);
-        assert(srcOperand && "Current operand's qubit should be found in the layer");
-
-        // It is fine if the qubit is not used in the dst-layer,
-        // so opArgMap value can be nullptr
-        auto mappedOpDst = dstResultMap.lookupOrNull(srcOperand);
-        opArgMap.map(opArg, mappedOpDst);
-        opEntriesDst.emplace_back(mappedOpDst);
-    };
-
-    for (auto dstOp : lhsLayer.getOps()) {
-        std::vector<Value> dstEntries;
-
-        for (auto dstArg : lhsLayer.getEntryQubitsFrom(dstOp)) {
-            auto dstOperand = dstBlockArgToOperand.lookupOrDefault(dstArg);
-            dstEntries.emplace_back(dstOperand);
+    // Track and collect the qubits that are acted on by rhsOp and
+    // are predecessors of qubits acted on by lhsOp
+    std::vector<Value> rhsOpInQubitsFromLhsOp;
+    for (auto inQubit : rhsOp.getInQubits()) {
+        Value v = findPredecessorValueOfOp(inQubit, lhsOp);
+        if (!v) {
+            llvm::outs() << "No predecessor found for " << inQubit << "\n";
+            return false;
         }
+        rhsOpInQubitsFromLhsOp.emplace_back(v);
+    }
+    qubits.insert(rhsOpInQubitsFromLhsOp.begin(), rhsOpInQubitsFromLhsOp.end());
 
-        llvm::SetVector<Value> qubits;
-        qubits.insert(opEntriesDst.begin(), opEntriesDst.end());
-        qubits.insert(dstEntries.begin(), dstEntries.end());
+    // Normalize the ops to get the Pauli strings
+    auto normalizedOps = normalizePPROps(lhsOp, rhsOp, lhsInQubits, rhsOpInQubitsFromLhsOp);
 
-        PauliStringWrapper dstPauli = buildPauliStringWrapper(qubits, dstEntries, dstOp);
-        PauliStringWrapper opPauli = buildPauliStringWrapper(qubits, opEntriesDst, op);
+    return normalizedOps.first.commutes(normalizedOps.second);
+}
 
-        assert(op != dstOp && "op should not be the same as dstOp");
+bool commuteAll(QECOpInterface rhsOp, QECLayer &lhsLayer)
+{
+    for (auto lhsOp : lhsLayer.getOps()) {
+        if (lhsOp->getBlock() != rhsOp->getBlock())
+            return false;
 
-        if (!opPauli.commutes(dstPauli)) {
+        assert(lhsOp != rhsOp && "lshOp and rhsOp should not be equal");
+
+        if (!commute(lhsOp, rhsOp)) {
             return false;
         }
     }
@@ -170,114 +124,43 @@ bool commute(QECOpInterface op, QECLayer &rhsLayer, QECLayer &lhsLayer)
 
 void moveOpToLayer(QECOpInterface rhsOp, QECLayer &rhsLayer, QECLayer &lhsLayer, IRRewriter &writer)
 {
-    auto lhsLayerOp = lhsLayer.layerOp;
 
-    // set the operands
-    auto rhsRegion = rhsLayer.getEntryQubitsFrom(rhsOp);
-    auto rhsRegionToEntry = getArgMapper(rhsLayer.layerOp);
-    std::vector<Value> rhsOperands;
-    std::transform(rhsRegion.begin(), rhsRegion.end(), std::back_inserter(rhsOperands),
-                   [&](Value v) { return rhsRegionToEntry.lookupOrNull(v); });
+    auto lhsOp = lhsLayer.getOps().back();
+    auto newOp = rhsOp.clone();
 
-    auto lhsLayerOpResultSize = static_cast<size_t>(lhsLayerOp->getNumResults());
-    auto lhsOperandSize = std::max(rhsOperands.size(), lhsLayerOpResultSize);
+    // map input to output of lhsOp
+    IRMapping lhsMap;
+    lhsMap.map(lhsOp.getInQubits(), lhsOp.getOutQubits());
 
-    std::vector<Value> lhsOperandForRhsOp;
-    lhsOperandForRhsOp.reserve(lhsOperandSize);
+    std::vector<Value> newOperands;
 
-    for (auto [idx, rhsOperand] : llvm::enumerate(rhsOperands)) {
-        auto lhsOperands = lhsLayerOp->getOperands();
-        auto lhsResults = lhsLayerOp->getResults();
+    for (auto oldOpnd : rhsOp.getInQubits()) {
+        auto val = findPredecessorValueOfOp(oldOpnd, lhsOp);
+        assert(val != nullptr && "Qubit should not be nullptr");
 
-        auto it = std::find(lhsResults.begin(), lhsResults.end(), rhsOperand);
-        if (it != lhsResults.end()) {
-            auto position = std::distance(lhsResults.begin(), it);
-            lhsOperandForRhsOp.emplace_back(lhsOperands[position]);
-        }
-        else {
-            lhsOperandForRhsOp.emplace_back(rhsOperand);
-        }
+        auto out = lhsMap.lookupOrNull(val);
+
+        assert(out != nullptr && "Output should not be nullptr");
+        newOperands.emplace_back(out);
     }
 
-    auto yieldOp = llvm::cast_or_null<qec::YieldOp>(lhsLayerOp.getBody()->getTerminator());
-    auto yieldEntryQubits = lhsLayer.getEntryQubitsFrom(yieldOp);
+    newOp->setOperands(newOperands);
+    IRMapping m;
+    m.map(newOp.getInQubits(), newOp.getOutQubits());
 
-    IRMapping yieldOpndMapper;
-    yieldOpndMapper.map(yieldEntryQubits, yieldOp.getOperands());
-
-    assert(yieldOp->getNumOperands() == yieldEntryQubits.size() &&
-           "yieldOp->getNumOperands() == yieldEntryQubits.size()");
-
-    // For each desired outer operand, use the existing block argument if present;
-    // otherwise append a new operand and matching block argument.
-    auto lhsArgToOperand = getArgMapper(lhsLayerOp);
-    std::vector<Value> rhsOpOperands;
-    rhsOpOperands.reserve(lhsOperandSize);
-
-    for (auto lhsOperand : lhsOperandForRhsOp) {
-        Value entryArg = nullptr;
-        for (BlockArgument ba : lhsLayerOp.getBody()->getArguments()) {
-            Value mapped = lhsArgToOperand.lookupOrNull(ba);
-            if (mapped && mapped == lhsOperand) {
-                if (auto v = yieldOpndMapper.lookupOrNull(ba)) {
-                    entryArg = v;
-                }
-                break;
-            }
-        }
-
-        if (entryArg) {
-            rhsOpOperands.emplace_back(entryArg);
-        }
-        else {
-            // Add new operand to the LayerOp and the corresponding block argument.
-            lhsLayerOp->insertOperands(lhsLayerOp->getNumOperands(), lhsOperand);
-            BlockArgument newEntry =
-                lhsLayerOp.getBody()->addArgument(lhsOperand.getType(), lhsOperand.getLoc());
-            rhsOpOperands.emplace_back(newEntry);
-            yieldOp->insertOperands(yieldOp.getNumOperands(), newEntry);
-        }
+    // TODO: This is a hack to replace the results of the old op with the results of the new op.
+    // some operands may not exist in old op or new op, vice versa.
+    for (auto [newOpnd, oldOpnd] : llvm::zip(newOp->getResults(), lhsOp->getResults())) {
+        writer.replaceAllUsesExcept(oldOpnd, newOpnd, newOp);
     }
 
-    auto cloneRhsOp = rhsOp->clone();
-    cloneRhsOp->setOperands(rhsOpOperands);
-    writer.setInsertionPoint(lhsLayerOp.getBody()->getTerminator());
-    writer.insert(cloneRhsOp);
+    writer.setInsertionPointAfter(lhsOp);
+    writer.insert(newOp);
+    lhsLayer.insert(newOp);
 
-    // Update yield operands
-    for (auto [idx, v] :
-         llvm::enumerate(llvm::zip(cloneRhsOp->getOperands(), cloneRhsOp->getResults()))) {
-        auto &[opnd, res] = v;
-        for (auto y_opnd : yieldOp.getOperands()) {
-            if (y_opnd == opnd) {
-                lhsLayerOp.getBody()->getTerminator()->setOperand(idx, res);
-            }
-        }
-    }
-
-    // Rewire the next (rhs) layer to consume the results of the lhs layer.
-    // For each entry block argument used by the moved op in rhs layer, set the
-    // corresponding operand of the rhs LayerOp to the matching result of lhs LayerOp.
-    // This ensures %argX in the next layer header is sourced from %0#X rather than
-    // the original outer SSA value when appropriate.
-    if (!rhsLayer.getOps().empty()) {
-        auto rhsRegion = rhsLayer.getEntryQubitsFrom(rhsOp);
-        for (auto [i, entry] : llvm::enumerate(rhsRegion)) {
-            if (auto ba = llvm::dyn_cast<BlockArgument>(entry)) {
-                unsigned argIdx = ba.getArgNumber();
-                if (i < lhsLayerOp->getNumResults()) {
-                    rhsLayer.layerOp->setOperand(argIdx, lhsLayerOp->getResult(i));
-                }
-            }
-        }
-    }
-
-    writer.replaceAllUsesWith(rhsOp->getResults(), rhsOp->getOperands());
-
-    lhsLayer.insert(llvm::cast<QECOpInterface>(cloneRhsOp));
     rhsLayer.removeOpRecord(rhsOp);
+    writer.replaceAllUsesWith(rhsOp->getResults(), rhsOp->getOperands());
     writer.eraseOp(rhsOp);
-    rebuildLayerToMatchYield(lhsLayerOp, writer);
 }
 
 struct TLayerReductionPass : impl::TLayerReductionPassBase<TLayerReductionPass> {
@@ -288,43 +171,59 @@ struct TLayerReductionPass : impl::TLayerReductionPassBase<TLayerReductionPass> 
         MLIRContext *context = &getContext();
         IRRewriter writer(context);
         QECLayerContext layerContext;
+        QECLayer currentLayer(&layerContext);
 
-        bool isChange = true;
+        std::vector<QECLayer> layers;
 
-        while (isChange) {
-            isChange = false;
+        getOperation()->walk([&](QECOpInterface op) {
+            if (currentLayer.insert(op))
+                return WalkResult::advance();
 
-            getOperation()->walk([&](LayerOp currentLayerOp) {
-                if (currentLayerOp->getNumOperands() != currentLayerOp->getNumResults())
-                    WalkResult::skip();
+            layers.emplace_back(std::move(currentLayer));
 
-                QECLayer &currentLayer = QECLayer::build(&layerContext, currentLayerOp);
+            // Start a new layer and insert the op
+            currentLayer = QECLayer(&layerContext);
+            currentLayer.insert(op);
 
-                Operation *nextNode = currentLayerOp->getNextNode();
+            return WalkResult::advance();
+        });
+        layers.emplace_back(std::move(currentLayer));
 
-                if (LayerOp nextLayerOp = llvm::dyn_cast_or_null<LayerOp>(nextNode)) {
-                    if (nextLayerOp->getNumOperands() != currentLayerOp.getNumResults())
-                        WalkResult::skip();
+        // for (auto &layer : layers) {
+        //     llvm::outs() << "\nlayer ---------\n";
+        //     for (auto op : layer.getOps()) {
+        //         op->dump();
+        //     }
+        //     llvm::outs() << "\n";
+        // }
 
-                    QECLayer &nextLayer = QECLayer::build(&layerContext, nextLayerOp);
-                    for (QECOpInterface op : nextLayer.getOps()) {
-                        if (commute(op, nextLayer, currentLayer)) {
-                            moveOpToLayer(op, nextLayer, currentLayer, writer);
-                            isChange = true;
-                            break;
+        auto layerSize = layers.size();
+        bool changed = true;
+        while (changed) {
+            changed = false;
+            for (auto [idx, layer] : llvm::enumerate(layers)) {
+                if (idx + 1 >= layerSize)
+                    break;
+
+                auto &nextLayer = layers[idx + 1];
+
+                for (QECOpInterface op : nextLayer.getOps()) {
+                    if (commuteAll(op, layer)) {
+                        // move op to the beginning of next layer
+                        // hoist op to the end of current layer
+                        moveOpToLayer(op, nextLayer, layer, writer);
+                        llvm::outs() << "COMMUTE\n";
+
+                        if (nextLayer.getOps().empty()) {
+                            layers.erase(layers.begin() + idx + 1);
+                            layerSize--;
                         }
+
+                        changed = true;
                     }
                 }
-
-                if (currentLayer.empty()) {
-                    writer.replaceAllUsesWith(currentLayerOp.getResults(),
-                                              currentLayerOp->getOperands());
-                    writer.eraseOp(currentLayerOp);
-                    isChange = true;
-                }
-            });
+            }
         }
-        layerContext.clear();
     };
 };
 } // namespace qec
