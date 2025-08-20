@@ -89,9 +89,7 @@ class TestTargetGates:
 
     def test_RX_gate(self, tmp_openapl_file_name):
         """Test OpenAPL generation for a circuit with a single RX Gate."""
-        oqd_dev = OQDDevice(
-            backend="default", wires=1, openapl_file_name=tmp_openapl_file_name
-        )
+        oqd_dev = OQDDevice(backend="default", wires=1, openapl_file_name=tmp_openapl_file_name)
 
         @qjit(pipelines=OQD_PIPELINES)
         @qml.set_shots(4)
@@ -107,9 +105,7 @@ class TestTargetGates:
 
     def test_RY_gate(self, tmp_openapl_file_name):
         """Test OpenAPL generation for a circuit with a single RY Gate."""
-        oqd_dev = OQDDevice(
-            backend="default", wires=1, openapl_file_name=tmp_openapl_file_name
-        )
+        oqd_dev = OQDDevice(backend="default", wires=1, openapl_file_name=tmp_openapl_file_name)
 
         @qjit(pipelines=OQD_PIPELINES)
         @qml.set_shots(4)
@@ -139,9 +135,7 @@ class TestChainedGates:
 
     def test_RX_RY_gate(self, tmp_openapl_file_name):
         """Test OpenAPL generation for a circuit with a single RX and RY Gate."""
-        oqd_dev = OQDDevice(
-            backend="default", wires=1, openapl_file_name=tmp_openapl_file_name
-        )
+        oqd_dev = OQDDevice(backend="default", wires=1, openapl_file_name=tmp_openapl_file_name)
 
         @qjit(pipelines=OQD_PIPELINES)
         @qml.set_shots(4)
@@ -166,9 +160,7 @@ class TestDecomposableGates:
 
     def test_CNOT_gate(self, tmp_openapl_file_name):
         """Test OpenAPL generation for a circuit with a single CNOT circuit."""
-        oqd_dev = OQDDevice(
-            backend="default", wires=2, openapl_file_name=tmp_openapl_file_name
-        )
+        oqd_dev = OQDDevice(backend="default", wires=2, openapl_file_name=tmp_openapl_file_name)
 
         @qjit(pipelines=OQD_PIPELINES)
         @qml.set_shots(4)
@@ -184,9 +176,7 @@ class TestDecomposableGates:
 
     def test_Hadamard_gate(self, tmp_openapl_file_name):
         """Test OpenAPL generation for a circuit with a single Hadamard gate."""
-        oqd_dev = OQDDevice(
-            backend="default", wires=1, openapl_file_name=tmp_openapl_file_name
-        )
+        oqd_dev = OQDDevice(backend="default", wires=1, openapl_file_name=tmp_openapl_file_name)
 
         @qjit(pipelines=OQD_PIPELINES)
         @qml.set_shots(4)
@@ -206,9 +196,7 @@ class TestDecomposableGates:
 
     def test_PauliZ_gate(self, tmp_openapl_file_name):
         """Test OpenAPL generation for a circuit with a single PauliZ gate."""
-        oqd_dev = OQDDevice(
-            backend="default", wires=1, openapl_file_name=tmp_openapl_file_name
-        )
+        oqd_dev = OQDDevice(backend="default", wires=1, openapl_file_name=tmp_openapl_file_name)
 
         @qjit(pipelines=OQD_PIPELINES)
         @qml.set_shots(4)
@@ -228,9 +216,7 @@ class TestDecomposableGates:
 
     def test_PhaseShift_gate(self, tmp_openapl_file_name):
         """Test OpenAPL generation for a circuit with a single PhaseShift gate."""
-        oqd_dev = OQDDevice(
-            backend="default", wires=1, openapl_file_name=tmp_openapl_file_name
-        )
+        oqd_dev = OQDDevice(backend="default", wires=1, openapl_file_name=tmp_openapl_file_name)
 
         @qjit(pipelines=OQD_PIPELINES)
         @qml.set_shots(4)
@@ -250,9 +236,7 @@ class TestDecomposableGates:
 
     def test_RZ_gate(self, tmp_openapl_file_name):
         """Test OpenAPL generation for a circuit with a single RZ gate."""
-        oqd_dev = OQDDevice(
-            backend="default", wires=1, openapl_file_name=tmp_openapl_file_name
-        )
+        oqd_dev = OQDDevice(backend="default", wires=1, openapl_file_name=tmp_openapl_file_name)
 
         @qjit(pipelines=OQD_PIPELINES)
         @qml.set_shots(4)
@@ -272,9 +256,7 @@ class TestDecomposableGates:
 
     def test_T_gate(self, tmp_openapl_file_name):
         """Test OpenAPL generation for a circuit with a single T gate."""
-        oqd_dev = OQDDevice(
-            backend="default", wires=1, openapl_file_name=tmp_openapl_file_name
-        )
+        oqd_dev = OQDDevice(backend="default", wires=1, openapl_file_name=tmp_openapl_file_name)
 
         @qjit(pipelines=OQD_PIPELINES)
         @qml.set_shots(4)
@@ -294,9 +276,7 @@ class TestDecomposableGates:
 
     def test_S_gate(self, tmp_openapl_file_name):
         """Test OpenAPL generation for a circuit with a single S gate."""
-        oqd_dev = OQDDevice(
-            backend="default", wires=1, openapl_file_name=tmp_openapl_file_name
-        )
+        oqd_dev = OQDDevice(backend="default", wires=1, openapl_file_name=tmp_openapl_file_name)
 
         @qjit(pipelines=OQD_PIPELINES)
         @qml.set_shots(4)
@@ -321,9 +301,7 @@ class TestComplexCircuits:
     def test_2qubit_QFT(self, tmp_openapl_file_name):
         """Test OpenAPL generation for a 2-qubit Quantum Fourier Transform circuit."""
         wires = 2
-        oqd_dev = OQDDevice(
-            backend="default", wires=wires, openapl_file_name=tmp_openapl_file_name
-        )
+        oqd_dev = OQDDevice(backend="default", wires=wires, openapl_file_name=tmp_openapl_file_name)
 
         @qjit(pipelines=OQD_PIPELINES)
         @qml.set_shots(4)
