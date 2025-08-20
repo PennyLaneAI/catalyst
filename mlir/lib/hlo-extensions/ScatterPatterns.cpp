@@ -22,17 +22,16 @@
 #include "mlir/Dialect/Index/IR/IndexOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
-
-#include "mhlo/IR/hlo_ops.h"
+#include "stablehlo/dialect/StablehloOps.h"
 
 using namespace mlir;
 
 namespace catalyst {
 
-struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> {
-    using mlir::OpRewritePattern<mhlo::ScatterOp>::OpRewritePattern;
+struct ScatterOpRewritePattern : public mlir::OpRewritePattern<stablehlo::ScatterOp> {
+    using mlir::OpRewritePattern<stablehlo::ScatterOp>::OpRewritePattern;
 
-    void emitIndicesError(mhlo::ScatterOp op) const
+    void emitIndicesError(stablehlo::ScatterOp op) const
     {
         op.emitError()
             << "Indices are not unique and/or not sorted. Note that when using multiple indices "
@@ -44,7 +43,7 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
             << ", sorted: " << op.getIndicesAreSorted();
     }
 
-    mlir::LogicalResult onlyOneInputUpdateAndResult(mhlo::ScatterOp op) const
+    mlir::LogicalResult onlyOneInputUpdateAndResult(stablehlo::ScatterOp op) const
     {
         // Semantics of scatter:
         // https://github.com/openxla/stablehlo/blob/main/docs/spec.md#scatter
@@ -64,7 +63,7 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
         return op.getResults().size() == 1 ? success() : failure();
     }
 
-    mlir::LogicalResult isAssignment(mhlo::ScatterOp op) const
+    mlir::LogicalResult isAssignment(stablehlo::ScatterOp op) const
     {
         // From:
         // C23: update_computation has type
@@ -90,7 +89,7 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
             return failure();
         }
 
-        mhlo::ReturnOp returnOp = dyn_cast<mhlo::ReturnOp>(block.getTerminator());
+        stablehlo::ReturnOp returnOp = dyn_cast<stablehlo::ReturnOp>(block.getTerminator());
         if (!returnOp) {
             return failure();
         }
@@ -98,7 +97,7 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
         return returnOp.getResults().front() == block.getArgument(1) ? success() : failure();
     }
 
-    mlir::LogicalResult noBatching(mhlo::ScatterOp op) const
+    mlir::LogicalResult noBatching(stablehlo::ScatterOp op) const
     {
         // Ok, now that we know it is an assignment, we need to worry about
         // where exactly are we assigning and what are we assigning.
@@ -123,7 +122,7 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
         //   return scatterDimNumbers.getInputBatchingDims().empty() ? success() : failure();
     }
 
-    mlir::LogicalResult singleFullSlices(mhlo::ScatterOp op) const
+    mlir::LogicalResult singleFullSlices(stablehlo::ScatterOp op) const
     {
         // From:
         //   More formally, for all update_index in index_space(updates[0]):
@@ -144,13 +143,13 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
         return rank == scatterDimNumbers.getUpdateWindowDims().size() ? success() : failure();
     }
 
-    mlir::LogicalResult canBeDoneWithSingleTensorInsertSlice(mhlo::ScatterOp op) const
+    mlir::LogicalResult canBeDoneWithSingleTensorInsertSlice(stablehlo::ScatterOp op) const
     {
         return cast<RankedTensorType>(op.getScatterIndices().getType()).getRank() == 1 ? success()
                                                                                        : failure();
     }
 
-    mlir::LogicalResult lowerToTensorInsertSlice(mhlo::ScatterOp op,
+    mlir::LogicalResult lowerToTensorInsertSlice(stablehlo::ScatterOp op,
                                                  mlir::PatternRewriter &rewriter) const
     {
         // mhlo::ScatterOp is exactly the same as stablehlo::ScatterOp
@@ -284,7 +283,7 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
         return success();
     }
 
-    mlir::LogicalResult matchAndRewrite(mhlo::ScatterOp op,
+    mlir::LogicalResult matchAndRewrite(stablehlo::ScatterOp op,
                                         mlir::PatternRewriter &rewriter) const override
     {
         // FastPath
@@ -457,7 +456,7 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
     };
 
     // Store all the necessary variables for the SCF for op in above defined struct
-    UpdateData getUpdateData(mhlo::ScatterOp &op, mlir::PatternRewriter &rewriter,
+    UpdateData getUpdateData(stablehlo::ScatterOp &op, mlir::PatternRewriter &rewriter,
                              mlir::Location loc) const
     {
         UpdateData data;
