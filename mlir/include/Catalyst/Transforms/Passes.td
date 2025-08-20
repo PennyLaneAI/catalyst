@@ -57,28 +57,6 @@ def CatalystConversionPass : Pass<"convert-catalyst-to-llvm"> {
     ];
 }
 
-def ScatterLoweringPass : Pass<"scatter-lowering"> {
-    let summary = "Lower scatter op from Stable HLO to loops.";
-
-    let dependentDialects = [
-        "mlir::func::FuncDialect",
-        "index::IndexDialect",
-        "mhlo::MhloDialect",
-        "tensor::TensorDialect",
-        "scf::SCFDialect"
-    ];
-}
-
-def HloCustomCallLoweringPass : Pass<"hlo-custom-call-lowering"> {
-    let summary = "Lower custom calls op from Stable HLO to CallOp.";
-
-    let dependentDialects = [
-        "index::IndexDialect",
-        "mlir::func::FuncDialect",
-        "catalyst::CatalystDialect",
-    ];
-}
-
 def QnodeToAsyncLoweringPass : Pass<"qnode-to-async-lowering"> {
     let summary = "Lower Qnode func and call operations to async func and call operations.";
 
