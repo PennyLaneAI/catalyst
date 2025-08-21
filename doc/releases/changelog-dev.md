@@ -42,13 +42,15 @@
 * The JAX version used by Catalyst is updated to 0.6.2.
   [(#1897)](https://github.com/PennyLaneAI/catalyst/pull/1897)
 
-* The version of LLVM, mlir-hlo, and Enzyme used by Catalyst has been updated.
+* The version of LLVM and Enzyme used by Catalyst has been updated.
+  The mlir-hlo dependency has been replaced with stablehlo.
   [(#1916)](https://github.com/PennyLaneAI/catalyst/pull/1916)
+  [(#1921)](https://github.com/PennyLaneAI/catalyst/pull/1921)
 
   The LLVM version has been updated to
   [commit f8cb798](https://github.com/llvm/llvm-project/tree/f8cb7987c64dcffb72414a40560055cb717dbf74).
-  The mlir-hlo version has been updated to
-  [commit 1dd2e71](https://github.com/tensorflow/mlir-hlo/tree/1dd2e71331014ae0373f6bf900ce6be393357190).
+  The stablehlo version has been updated to
+  [commit 69d6dae](https://github.com/openxla/stablehlo/commit/69d6dae46e1c7de36e6e6973654754f05353cba5).
   The Enzyme version has been updated to
   [v0.0.186](https://github.com/EnzymeAD/Enzyme/releases/tag/v0.0.186).
 
@@ -75,6 +77,9 @@
   [(#1926)](https://github.com/PennyLaneAI/catalyst/pull/1926)
 
 <h3>Internal changes ⚙️</h3>
+
+* Add `SingleExcitation` and `DoubleExcitation` to native `RUNTIME_OPERATIONS` and `RuntimeCAPI`.
+  [(#1980)](https://github.com/PennyLaneAI/catalyst/pull/1980)
 
 * Updates use of `qml.transforms.dynamic_one_shot.parse_native_mid_circuit_measurements` to improved signature.
   [(#1953)](https://github.com/PennyLaneAI/catalyst/pull/1953)
@@ -174,6 +179,7 @@ Yushao Chen,
 Sengthai Heng,
 David Ittah,
 Christina Lee,
+Joseph Lee,
 Andrija Paurevic,
 Roberto Turrado,
 Paul Haochen Wang.
