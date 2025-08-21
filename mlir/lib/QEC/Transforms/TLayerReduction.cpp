@@ -147,7 +147,7 @@ void moveOpToLayer(QECOpInterface rhsOp, QECLayer &rhsLayer, QECLayer &lhsLayer,
     writer.insert(newOp);
     lhsLayer.insertToLayer(newOp);
 
-    rhsLayer.removeOpRecord(rhsOp);
+    rhsLayer.eraseOp(rhsOp);
     writer.replaceAllUsesWith(rhsOp->getResults(), rhsOp->getOperands());
     writer.eraseOp(rhsOp);
 }
