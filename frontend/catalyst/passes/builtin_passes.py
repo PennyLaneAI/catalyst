@@ -1071,3 +1071,43 @@ def get_ppm_specs(fn):
 
     else:
         raise NotImplementedError("PPM passes only support AOT (Ahead-Of-Time) compilation mode.")
+
+
+def t_layer_reduction(qnode):
+    R"""
+    Specify that the``--t-layer-reduction`` MLIR compiler pass
+    for reducing the depth and number of non-Clifford PPR
+    operations by commuting adjacent PPRs and finding possible PPRs that can be merged.
+    For more details, see the Figure 6 in [A Game of Surface Code](https://arXiv:1808.02892v3) paper.
+
+    Args:
+        fn (QNode): QNode to apply the pass to
+
+    Returns:
+        ~.QNode: Returns decorated QNode.
+
+    **Example**
+
+    .. code-block:: python
+
+        import pennylane as qml
+        from catalyst import qjit, measure
+        from catalyst.passes import to_ppr, t_layer_reduction
+
+        @qjit(target="mlir")
+        @t_layer_reduction
+        @to_ppr
+        @qml.qnode(qml.device("null.qubit", wires=2))
+        def circuit():
+            qml.T(0)
+            qml.T(1)
+            qml.CNOT([0, 1])
+            return measure(0), measure(1)
+
+        print(circuit.mlir_opt)
+
+    Example MLIR Representation:
+    TODO: Add example MLIR representation.
+    """
+
+    return PassPipelineWrapper(qnode, "t-layer-reduction")

@@ -45,6 +45,7 @@ from catalyst.passes.builtin_passes import (
     ppm_compilation,
     ppr_to_ppm,
     to_ppr,
+    t_layer_reduction,
 )
 from catalyst.passes.pass_api import Pass, PassPlugin, apply_pass, apply_pass_plugin
 
@@ -64,4 +65,5 @@ __all__ = (
     "merge_ppr_ppm",
     "ppr_to_ppm",
     "ppm_compilation",
+    "t_layer_reduction",
 )
