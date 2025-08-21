@@ -190,6 +190,7 @@
 
 This release contains contributions from (in alphabetical order):
 
+Ali Asadi,
 Joey Carter,
 Yushao Chen,
 Sengthai Heng,
