@@ -56,18 +56,16 @@ class QECLayer {
     // Per-layer deterministic mapping from any seen qubit SSA value to its
     // canonical entry (the block argument it originated from in this layer)
     llvm::DenseMap<mlir::Value, mlir::Value> localQubitToEntry;
-    // Cache per-op entry qubits in operand order for this layer only
-    llvm::DenseMap<mlir::Operation *, std::vector<mlir::Value>> localOpToEntryQubits;
 
     // Internal storage
     std::vector<QECOpInterface> ops;
     llvm::SetVector<mlir::Value> operands;
     llvm::SetVector<mlir::Value> results;
 
-    // Compute and cache entry qubits for an op using only per-layer state
-    void computeAndCacheEntryQubitsForOp(QECOpInterface op);
+    // Resolve the canonical entry for a given qubit value by chasing
+    // local and result->operand mappings deterministically.
+    mlir::Value resolveEntry(mlir::Value v) const;
 
-    void insertToLayer(QECOpInterface op);
     void updateResultAndOperand(QECOpInterface op);
 
   public:
@@ -88,43 +86,6 @@ class QECLayer {
                       [this](QECOpInterface op) { insertToLayer(op); });
     }
 
-    QECLayer(QECLayerContext *ctx, LayerOp layerOp) : context(ctx)
-    {
-        layerOp->walk([&](QECOpInterface op) { insertToLayer(op); });
-        this->layerOp = layerOp;
-
-        // Also consider qubit-typed operands of the layer terminator (qec.yield)
-        // as entries to seed local and layer-level mappings.
-        if (auto *term = layerOp.getBody()->getTerminator();
-            auto yield = llvm::dyn_cast<YieldOp>(term)) {
-            for (mlir::Value yOperand : yield->getOperands()) {
-                if (!llvm::isa<catalyst::quantum::QubitType>(yOperand.getType())) {
-                    continue;
-                }
-
-                mlir::Value entry = yOperand;
-                if (resultToOperand.contains(yOperand)) {
-                    entry = resultToOperand[yOperand];
-                }
-
-                localQubitToEntry[yOperand] = entry;
-                if (llvm::isa<mlir::BlockArgument>(entry)) {
-                    layerEntryQubits.insert(entry);
-                }
-            }
-        }
-    }
-
-    static QECLayer &build(QECLayerContext *ctx, LayerOp layerOp)
-    {
-        if (ctx->layers.contains(layerOp)) {
-            return *ctx->layers[layerOp];
-        }
-        auto layer = std::make_unique<QECLayer>(ctx, layerOp);
-        ctx->layers[layerOp] = std::move(layer);
-        return *ctx->layers[layerOp];
-    }
-
     inline bool empty() const { return ops.empty(); }
 
     const std::vector<QECOpInterface> &getOps() const { return ops; }
@@ -132,7 +93,7 @@ class QECLayer {
     const llvm::SetVector<mlir::Value> &getResults() const { return results; }
 
     // Mutator for removing an op record from the layer bookkeeping
-    void removeOpRecord(QECOpInterface op);
+    void eraseOp(QECOpInterface op);
 
     std::vector<mlir::Value> getEntryQubitsFrom(QECOpInterface op);
     std::vector<mlir::Value> getEntryQubitsFrom(YieldOp yieldOp);
@@ -140,6 +101,7 @@ class QECLayer {
     bool actOnDisjointQubits(QECOpInterface op);
 
     // Commute two ops if they act on the same qubits based on qubit indexes on that layer
+    // NOTE: This is used only for QECLayer where LayerOp is present.
     bool commute(QECOpInterface src, QECOpInterface dst);
     bool commuteToLayer(QECOpInterface op);
 
@@ -150,6 +112,9 @@ class QECLayer {
     // no insert users before existing ops
     bool extractsAreBeforeExistingOps(QECOpInterface op) const;
     bool insertsAreAfterExistingOps(QECOpInterface op) const;
+
+    // Directly insert an op to the layer without checking commutation
+    void insertToLayer(QECOpInterface op);
 
     // Op can be inserted into the layer if:
     // 1. It is in the same block
