@@ -374,6 +374,9 @@ class TestCond:
     def test_branch_multi_return_type_unification_qjit_2(self):
         """Test that unification happens before the results of the cond primitve is available."""
 
+        if qml.capture.enabled():
+            pytest.xfail("capture requires same dtype across all branches")  # [sc-97050]
+
         @qjit
         def circuit(cond1, cond2):
             @cond(cond1)
@@ -399,6 +402,9 @@ class TestCond:
     def test_branch_multi_return_type_unification_qjit_3(self):
         """Test that unification happens before the results of the cond primitve is available."""
 
+        if qml.capture.enabled():
+            pytest.xfail("capture requires same dtype across all branches")  # [sc-97050]
+
         @qjit
         def circuit(cond1, cond2):
             @cond(cond1)
@@ -423,6 +429,9 @@ class TestCond:
 
     def test_branch_multi_return_type_unification_qjit_4(self):
         """Test that unification happens before the results of the cond primitve is available."""
+
+        if qml.capture.enabled():
+            pytest.xfail("capture requires same dtype across all branches")  # [sc-97050]
 
         @qjit
         def circuit(cond1, cond2):
@@ -450,6 +459,7 @@ class TestCond:
     def test_qnode_cond_inconsistent_return_types(self, backend):
         """Test that catalyst raises an error when the conditional has inconsistent return types."""
 
+
         @qjit
         @qml.qnode(qml.device(backend, wires=4))
         def f(flag, sz):
@@ -467,11 +477,15 @@ class TestCond:
             c = case()
             return c
 
-        with pytest.raises(
-            TypeError,
-            match="Conditional requires a consistent number of results across all branches",
-        ):
-            f(True, 3)
+        if qml.capture.enabled():
+            with pytest.raises(ValueError, match="Mismatch in number of output variables"):
+                f(True, 3)
+        else:
+            with pytest.raises(
+                TypeError,
+                match="Conditional requires a consistent number of results across all branches",
+            ):
+                f(True, 3)
 
     @pytest.mark.xfail(
         reason="Inability to apply Jax transformations before the quantum traing is complete"
