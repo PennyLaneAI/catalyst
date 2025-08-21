@@ -459,7 +459,6 @@ class TestCond:
     def test_qnode_cond_inconsistent_return_types(self, backend):
         """Test that catalyst raises an error when the conditional has inconsistent return types."""
 
-
         @qjit
         @qml.qnode(qml.device(backend, wires=4))
         def f(flag, sz):
