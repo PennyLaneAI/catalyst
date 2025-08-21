@@ -173,6 +173,25 @@ class TestErrors:
             from_plxpr(jaxpr)()
         qml.capture.disable()
 
+    def test_no_shot_vectors(self):
+        """Test that a NotImplementedError is raised with shot vectors."""
+
+        dev = qml.device("lightning.qubit", wires=1)
+
+        @qml.set_shots((10, 10, 20))
+        @qml.qnode(dev)
+        def c():
+            return qml.sample(wires=0)
+
+        qml.capture.enable()
+        try:
+            jaxpr = jax.make_jaxpr(c)()
+
+            with pytest.raises(NotImplementedError, match="not yet supported"):
+                from_plxpr(jaxpr)()
+        finally:
+            qml.capture.disable()
+
 
 class TestCatalystCompareJaxpr:
     """Test comparing catalyst and pennylane jaxpr for a variety of situations."""
