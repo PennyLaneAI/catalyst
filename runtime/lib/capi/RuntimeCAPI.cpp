@@ -28,7 +28,6 @@
 #include "ExecutionContext.hpp"
 #include "MemRefUtils.hpp"
 #include "QuantumDevice.hpp"
-#include "Routing.hpp"
 #include "Timer.hpp"
 
 #include "RuntimeCAPI.h"
@@ -47,11 +46,6 @@ static std::unique_ptr<ExecutionContext> CTX = nullptr;
  * @brief Thread local device pointer with internal linkage.
  */
 thread_local static RTDevice *RTD_PTR = nullptr;
-
-/**
- * @brief Global routing pass pointer.
- */
-static std::unique_ptr<RoutingPass> RUNTIME_ROUTER = nullptr;
 
 bool getModifiersAdjoint(const Modifiers *modifiers)
 {
@@ -85,6 +79,18 @@ std::vector<bool> getModifiersControlledValues(const Modifiers *modifiers)
                                    std::string_view rtd_kwargs, bool auto_qubit_management)
 {
     auto &&device = CTX->getOrCreateDevice(rtd_lib, rtd_name, rtd_kwargs, auto_qubit_management);
+    if (device) {
+        RTD_PTR = device.get();
+        return RTD_PTR ? true : false;
+    }
+    return false;
+}
+
+[[nodiscard]] bool initRTDevicePtr(std::string_view rtd_lib, std::string_view rtd_name,
+                                   std::string_view rtd_kwargs, bool auto_qubit_management,
+                                   std::string_view coupling_map_str)
+{
+    auto &&device = CTX->getOrCreateDevice(rtd_lib, rtd_name, rtd_kwargs, auto_qubit_management, coupling_map_str);
     if (device) {
         RTD_PTR = device.get();
         return RTD_PTR ? true : false;
@@ -258,7 +264,6 @@ void __catalyst__rt__finalize()
 {
     RTD_PTR = nullptr;
     CTX.reset(nullptr);
-    RUNTIME_ROUTER.reset(nullptr);
 }
 
 static int __catalyst__rt__device_init__impl(int8_t *rtd_lib, int8_t *rtd_name, int8_t *rtd_kwargs,
@@ -273,24 +278,25 @@ static int __catalyst__rt__device_init__impl(int8_t *rtd_lib, int8_t *rtd_name, 
     const std::vector<std::string_view> args{
         reinterpret_cast<char *>(rtd_lib), (rtd_name ? reinterpret_cast<char *>(rtd_name) : ""),
         (rtd_kwargs ? reinterpret_cast<char *>(rtd_kwargs) : "")};
-    RT_FAIL_IF(!initRTDevicePtr(args[0], args[1], args[2], auto_qubit_management),
-               "Failed initialization of the backend device");
-    getQuantumDevicePtr()->SetDeviceShots(shots);
-    if (CTX->getDeviceRecorderStatus()) {
-        getQuantumDevicePtr()->StartTapeRecording();
-    }
-
+    
     // Extract coupling map from the kwargs passed
     // If coupling map is provided then it takes in the form {...,'couplingMap' ((a,b),(b,c))}
     // else {...,'couplingMap' (a,b,c)}
     size_t start = args[2].find("coupling_map': ") + 15; // Find key and opening parenthesis
     size_t end = args[2].find("}", start);               // Find closing parenthesis
-    std::string tuple_str = std::string(args[2].substr(start, end - start));
-
-    // Extract provided coupling map
-    if (tuple_str.find("((") != std::string::npos) {
-        CTX->setRoutingEnable();
-        RUNTIME_ROUTER = std::make_unique<RoutingPass>(tuple_str);
+    std::string coupling_map_str = std::string(args[2].substr(start, end - start));
+    
+    if (coupling_map_str.find("((") != std::string::npos) {
+        RT_FAIL_IF(!initRTDevicePtr(args[0], args[1], args[2], auto_qubit_management, coupling_map_str),
+               "Failed initialization of the backend device");
+    }
+    else {
+        RT_FAIL_IF(!initRTDevicePtr(args[0], args[1], args[2], auto_qubit_management),
+               "Failed initialization of the backend device");
+    }
+    getQuantumDevicePtr()->SetDeviceShots(shots);
+    if (CTX->getDeviceRecorderStatus()) {
+        getQuantumDevicePtr()->StartTapeRecording();
     }
     return 0;
 }
@@ -634,7 +640,7 @@ void __catalyst__qis__CNOT(QUBIT *control, QUBIT *target, const Modifiers *modif
                "Invalid input for CNOT gate. Control and target qubit operands must be distinct.");
 
     if (CTX->getRoutingStatus()) {
-        std::pair<int, int> routedQubits = RUNTIME_ROUTER->getRoutedQubits(
+        std::pair<int, int> routedQubits = RTD_PTR->getRuntimeRouter()->getRoutedQubits(
             control, target, modifiers, RTD_PTR, MODIFIERS_ARGS(modifiers));
         getQuantumDevicePtr()->NamedOperation("CNOT", {},
                                               {/* control = */ routedQubits.first,
@@ -653,7 +659,7 @@ void __catalyst__qis__CNOT(QUBIT *control, QUBIT *target, const Modifiers *modif
 void __catalyst__qis__CY(QUBIT *control, QUBIT *target, const Modifiers *modifiers)
 {
     if (CTX->getRoutingStatus()) {
-        std::pair<int, int> routedQubits = RUNTIME_ROUTER->getRoutedQubits(
+        std::pair<int, int> routedQubits = RTD_PTR->getRuntimeRouter()->getRoutedQubits(
             control, target, modifiers, RTD_PTR, MODIFIERS_ARGS(modifiers));
         getQuantumDevicePtr()->NamedOperation("CY", {},
                                               {/* control = */ routedQubits.first,
@@ -672,7 +678,7 @@ void __catalyst__qis__CY(QUBIT *control, QUBIT *target, const Modifiers *modifie
 void __catalyst__qis__CZ(QUBIT *control, QUBIT *target, const Modifiers *modifiers)
 {
     if (CTX->getRoutingStatus()) {
-        std::pair<int, int> routedQubits = RUNTIME_ROUTER->getRoutedQubits(
+        std::pair<int, int> routedQubits = RTD_PTR->getRuntimeRouter()->getRoutedQubits(
             control, target, modifiers, RTD_PTR, MODIFIERS_ARGS(modifiers));
         getQuantumDevicePtr()->NamedOperation("CZ", {},
                                               {/* control = */ routedQubits.first,
@@ -691,7 +697,7 @@ void __catalyst__qis__CZ(QUBIT *control, QUBIT *target, const Modifiers *modifie
 void __catalyst__qis__SWAP(QUBIT *control, QUBIT *target, const Modifiers *modifiers)
 {
     if (CTX->getRoutingStatus()) {
-        std::pair<int, int> routedQubits = RUNTIME_ROUTER->getRoutedQubits(
+        std::pair<int, int> routedQubits = RTD_PTR->getRuntimeRouter()->getRoutedQubits(
             control, target, modifiers, RTD_PTR, MODIFIERS_ARGS(modifiers));
         getQuantumDevicePtr()->NamedOperation("SWAP", {},
                                               {/* control = */ routedQubits.first,
@@ -711,7 +717,7 @@ void __catalyst__qis__IsingXX(double theta, QUBIT *control, QUBIT *target,
                               const Modifiers *modifiers)
 {
     if (CTX->getRoutingStatus()) {
-        std::pair<int, int> routedQubits = RUNTIME_ROUTER->getRoutedQubits(
+        std::pair<int, int> routedQubits = RTD_PTR->getRuntimeRouter()->getRoutedQubits(
             control, target, modifiers, RTD_PTR, MODIFIERS_ARGS(modifiers));
         getQuantumDevicePtr()->NamedOperation("IsingXX", {theta},
                                               {/* control = */ routedQubits.first,
@@ -731,7 +737,7 @@ void __catalyst__qis__IsingYY(double theta, QUBIT *control, QUBIT *target,
                               const Modifiers *modifiers)
 {
     if (CTX->getRoutingStatus()) {
-        std::pair<int, int> routedQubits = RUNTIME_ROUTER->getRoutedQubits(
+        std::pair<int, int> routedQubits = RTD_PTR->getRuntimeRouter()->getRoutedQubits(
             control, target, modifiers, RTD_PTR, MODIFIERS_ARGS(modifiers));
         getQuantumDevicePtr()->NamedOperation("IsingYY", {theta},
                                               {/* control = */ routedQubits.first,
@@ -751,7 +757,7 @@ void __catalyst__qis__IsingXY(double theta, QUBIT *control, QUBIT *target,
                               const Modifiers *modifiers)
 {
     if (CTX->getRoutingStatus()) {
-        std::pair<int, int> routedQubits = RUNTIME_ROUTER->getRoutedQubits(
+        std::pair<int, int> routedQubits = RTD_PTR->getRuntimeRouter()->getRoutedQubits(
             control, target, modifiers, RTD_PTR, MODIFIERS_ARGS(modifiers));
         getQuantumDevicePtr()->NamedOperation("IsingXY", {theta},
                                               {/* control = */ routedQubits.first,
@@ -771,7 +777,7 @@ void __catalyst__qis__IsingZZ(double theta, QUBIT *control, QUBIT *target,
                               const Modifiers *modifiers)
 {
     if (CTX->getRoutingStatus()) {
-        std::pair<int, int> routedQubits = RUNTIME_ROUTER->getRoutedQubits(
+        std::pair<int, int> routedQubits = RTD_PTR->getRuntimeRouter()->getRoutedQubits(
             control, target, modifiers, RTD_PTR, MODIFIERS_ARGS(modifiers));
         getQuantumDevicePtr()->NamedOperation("IsingZZ", {theta},
                                               {/* control = */ routedQubits.first,
@@ -791,7 +797,7 @@ void __catalyst__qis__ControlledPhaseShift(double theta, QUBIT *control, QUBIT *
                                            const Modifiers *modifiers)
 {
     if (CTX->getRoutingStatus()) {
-        std::pair<int, int> routedQubits = RUNTIME_ROUTER->getRoutedQubits(
+        std::pair<int, int> routedQubits = RTD_PTR->getRuntimeRouter()->getRoutedQubits(
             control, target, modifiers, RTD_PTR, MODIFIERS_ARGS(modifiers));
         getQuantumDevicePtr()->NamedOperation("ControlledPhaseShift", {theta},
                                               {/* control = */ routedQubits.first,
@@ -810,7 +816,7 @@ void __catalyst__qis__ControlledPhaseShift(double theta, QUBIT *control, QUBIT *
 void __catalyst__qis__CRX(double theta, QUBIT *control, QUBIT *target, const Modifiers *modifiers)
 {
     if (CTX->getRoutingStatus()) {
-        std::pair<int, int> routedQubits = RUNTIME_ROUTER->getRoutedQubits(
+        std::pair<int, int> routedQubits = RTD_PTR->getRuntimeRouter()->getRoutedQubits(
             control, target, modifiers, RTD_PTR, MODIFIERS_ARGS(modifiers));
         getQuantumDevicePtr()->NamedOperation("CRX", {theta},
                                               {/* control = */ routedQubits.first,
@@ -829,7 +835,7 @@ void __catalyst__qis__CRX(double theta, QUBIT *control, QUBIT *target, const Mod
 void __catalyst__qis__CRY(double theta, QUBIT *control, QUBIT *target, const Modifiers *modifiers)
 {
     if (CTX->getRoutingStatus()) {
-        std::pair<int, int> routedQubits = RUNTIME_ROUTER->getRoutedQubits(
+        std::pair<int, int> routedQubits = RTD_PTR->getRuntimeRouter()->getRoutedQubits(
             control, target, modifiers, RTD_PTR, MODIFIERS_ARGS(modifiers));
         getQuantumDevicePtr()->NamedOperation("CRY", {theta},
                                               {/* control = */ routedQubits.first,
@@ -848,7 +854,7 @@ void __catalyst__qis__CRY(double theta, QUBIT *control, QUBIT *target, const Mod
 void __catalyst__qis__CRZ(double theta, QUBIT *control, QUBIT *target, const Modifiers *modifiers)
 {
     if (CTX->getRoutingStatus()) {
-        std::pair<int, int> routedQubits = RUNTIME_ROUTER->getRoutedQubits(
+        std::pair<int, int> routedQubits = RTD_PTR->getRuntimeRouter()->getRoutedQubits(
             control, target, modifiers, RTD_PTR, MODIFIERS_ARGS(modifiers));
         getQuantumDevicePtr()->NamedOperation("CRZ", {theta},
                                               {/* control = */ routedQubits.first,
@@ -867,7 +873,7 @@ void __catalyst__qis__CRZ(double theta, QUBIT *control, QUBIT *target, const Mod
 void __catalyst__qis__MS(double theta, QUBIT *control, QUBIT *target, const Modifiers *modifiers)
 {
     if (CTX->getRoutingStatus()) {
-        std::pair<int, int> routedQubits = RUNTIME_ROUTER->getRoutedQubits(
+        std::pair<int, int> routedQubits = RTD_PTR->getRuntimeRouter()->getRoutedQubits(
             control, target, modifiers, RTD_PTR, MODIFIERS_ARGS(modifiers));
         getQuantumDevicePtr()->NamedOperation("MS", {theta},
                                               {/* control = */ routedQubits.first,
@@ -887,7 +893,7 @@ void __catalyst__qis__CRot(double phi, double theta, double omega, QUBIT *contro
                            const Modifiers *modifiers)
 {
     if (CTX->getRoutingStatus()) {
-        std::pair<int, int> routedQubits = RUNTIME_ROUTER->getRoutedQubits(
+        std::pair<int, int> routedQubits = RTD_PTR->getRuntimeRouter()->getRoutedQubits(
             control, target, modifiers, RTD_PTR, MODIFIERS_ARGS(modifiers));
         getQuantumDevicePtr()->NamedOperation("CRot", {phi, theta, omega},
                                               {/* control = */ routedQubits.first,
@@ -940,7 +946,7 @@ void __catalyst__qis__MultiRZ(double theta, const Modifiers *modifiers, int64_t 
 void __catalyst__qis__ISWAP(QUBIT *wire0, QUBIT *wire1, const Modifiers *modifiers)
 {
     if (CTX->getRoutingStatus()) {
-        std::pair<QubitIdType, QubitIdType> routedQubits = RUNTIME_ROUTER->getRoutedQubits(
+        std::pair<QubitIdType, QubitIdType> routedQubits = RTD_PTR->getRuntimeRouter()->getRoutedQubits(
             wire0, wire1, modifiers, RTD_PTR, MODIFIERS_ARGS(modifiers));
         getQuantumDevicePtr()->NamedOperation("ISWAP", {},
                                               {/* control = */ routedQubits.first,
@@ -958,7 +964,7 @@ void __catalyst__qis__ISWAP(QUBIT *wire0, QUBIT *wire1, const Modifiers *modifie
 void __catalyst__qis__PSWAP(double phi, QUBIT *wire0, QUBIT *wire1, const Modifiers *modifiers)
 {
     if (CTX->getRoutingStatus()) {
-        std::pair<int, int> routedQubits = RUNTIME_ROUTER->getRoutedQubits(
+        std::pair<int, int> routedQubits = RTD_PTR->getRuntimeRouter()->getRoutedQubits(
             wire0, wire1, modifiers, RTD_PTR, MODIFIERS_ARGS(modifiers));
         getQuantumDevicePtr()->NamedOperation("PSWAP", {phi},
                                               {/* control = */ routedQubits.first,

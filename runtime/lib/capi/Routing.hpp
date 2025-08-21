@@ -25,21 +25,11 @@
 #include <string_view>
 #include <tuple>
 
-#include "mlir/ExecutionEngine/CRunnerUtils.h"
-
-#include "Exception.hpp"
-#include "ExecutionContext.hpp"
-#include "MemRefUtils.hpp"
-#include "QuantumDevice.hpp"
-#include "Timer.hpp"
-
-#include "RuntimeCAPI.h"
-
-const int MAXIMUM = 1e9;
-
 namespace Catalyst::Runtime {
+
 class RoutingPass final {
   private:
+    const int MAXIMUM = 1e9;
     std::set<QubitIdType> physicalQubits;
     std::map<QubitIdType, QubitIdType> wireMap;
     std::map<std::pair<QubitIdType, QubitIdType>, bool> couplingMap;
@@ -47,7 +37,7 @@ class RoutingPass final {
     std::map<std::pair<QubitIdType, QubitIdType>, int> predecessorMatrix;
 
   public:
-    RoutingPass(std::string tuple_str)
+    RoutingPass(std::string_view tuple_str)
     {
         auto string_index = 1;
         while (string_index < tuple_str.size() - 1) {
