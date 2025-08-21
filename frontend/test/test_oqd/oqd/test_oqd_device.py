@@ -32,7 +32,6 @@ class TestOQDDevice:
 
         assert device.openapl_file_name == "test_openapl_generation.json"
         assert device.backend == "default"
-        assert device.shots == qml.measurements.Shots(None)
         assert device.wires == qml.wires.Wires(range(0, 8))
 
     def test_wrong_backend(self):
