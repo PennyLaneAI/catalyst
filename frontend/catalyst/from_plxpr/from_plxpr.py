@@ -193,8 +193,8 @@ def handle_qnode(
         raise NotImplementedError("shot vectors are not yet supported for catalyst conversion.")
 
     shots = sum(args[:shots_len])
-    consts = args[shots_len:n_consts+shots_len]
-    non_const_args = args[shots_len+n_consts:]
+    consts = args[shots_len : n_consts + shots_len]
+    non_const_args = args[shots_len + n_consts :]
 
     closed_jaxpr = ClosedJaxpr(qfunc_jaxpr, consts)
 

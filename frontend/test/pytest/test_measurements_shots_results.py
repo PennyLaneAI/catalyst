@@ -306,7 +306,7 @@ class TestVar:
             qml.RX(phi, wires=[1])
             qml.CNOT(wires=[0, 1])
             return qml.var(qml.PauliZ(wires=0)), qml.var(qml.PauliZ(wires=1))
-    
+
         result = qjit(circuit, seed=37)()
         qml.capture.disable()
         expected = circuit()
