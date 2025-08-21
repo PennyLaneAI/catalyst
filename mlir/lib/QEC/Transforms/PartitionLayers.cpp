@@ -35,18 +35,18 @@ void eraseUnusedOps(QECLayer &layer, IRRewriter &writer)
     // Erase original QEC ops from the block after wiring the layer results
     // Bound iterations to avoid pathological loops
     int maxIter = static_cast<int>(layer.getOps().size()) * 2;
-    while (!layer.getOps().empty() && maxIter > 0) {
+    while (!layer.empty() && maxIter > 0) {
         for (auto op : llvm::reverse(layer.getOps())) {
             // Only erase if now unused
             if (op->use_empty()) {
                 writer.eraseOp(op);
-                layer.removeOpRecord(op);
+                layer.eraseOp(op);
             }
         }
         maxIter--;
     }
 
-    assert(layer.getOps().empty() && "Expected no remaining ops after layer erasure");
+    assert(layer.empty() && "Expected no remaining ops after layer erasure");
 }
 
 void constructLayer(QECLayer &layer, IRRewriter &writer)
