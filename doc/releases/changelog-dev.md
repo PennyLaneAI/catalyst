@@ -39,6 +39,9 @@
 
 <h3>Breaking changes 💔</h3>
 
+* `OQDDevice` does not have `shots` property anymore.
+  [(#1988)](https://github.com/PennyLaneAI/catalyst/pull/1988)
+
 * The JAX version used by Catalyst is updated to 0.6.2.
   [(#1897)](https://github.com/PennyLaneAI/catalyst/pull/1897)
 
