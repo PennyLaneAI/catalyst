@@ -39,7 +39,7 @@
 
 <h3>Breaking changes 💔</h3>
 
-* `OQDDevice` does not have `shots` property anymore.
+* The `shots` property has been removed from `OQDDevice`. The number of shots for a qnode execution is now set directly on the qnode via `qml.setshots(qnode)`.
   [(#1988)](https://github.com/PennyLaneAI/catalyst/pull/1988)
 
 * The JAX version used by Catalyst is updated to 0.6.2.
