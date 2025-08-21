@@ -12,26 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "QEC/IR/QECOpInterfaces.h"
-#include <iterator>
-#include <llvm/ADT/CachedHashString.h>
-#include <llvm/ADT/STLExtras.h>
-#include <llvm/ADT/SetVector.h>
-#include <llvm/Support/Casting.h>
-#include <map>
-#include <mlir/Dialect/Utils/StructuredOpsUtils.h>
-#include <mlir/IR/ValueRange.h>
-#include <mlir/Support/WalkResult.h>
-#include <utility>
-#include <vector>
 #define DEBUG_TYPE "t-layer-reduction"
-
-#include <algorithm>
 
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 
-#include "QEC/IR/QECDialect.h"
+#include "QEC/IR/QECOpInterfaces.h"
 #include "QEC/Utils/PauliStringWrapper.h"
 #include "QEC/Utils/QECLayer.h"
 #include <mlir/IR/IRMapping.h>
@@ -138,25 +124,22 @@ void moveOpToLayer(QECOpInterface rhsOp, QECLayer &rhsLayer, QECLayer &lhsLayer,
         auto val = findPredecessorValueOfOp(oldOpnd, lhsOp);
         assert(val != nullptr && "Qubit should not be nullptr");
 
-        auto out = lhsMap.lookupOrNull(val);
-
-        assert(out != nullptr && "Output should not be nullptr");
-        newOperands.emplace_back(out);
+        if (auto out = lhsMap.lookupOrNull(val)) {
+            val = out;
+        }
+        newOperands.emplace_back(val);
     }
 
     newOp->setOperands(newOperands);
-    IRMapping m;
-    m.map(newOp.getInQubits(), newOp.getOutQubits());
 
-    // TODO: This is a hack to replace the results of the old op with the results of the new op.
-    // some operands may not exist in old op or new op, vice versa.
-    for (auto [newOpnd, oldOpnd] : llvm::zip(newOp->getResults(), lhsOp->getResults())) {
-        writer.replaceAllUsesExcept(oldOpnd, newOpnd, newOp);
+    // Update users
+    for (auto [inNewOp, outNewOp] : llvm::zip(newOp.getInQubits(), newOp.getOutQubits())) {
+        writer.replaceAllUsesExcept(inNewOp, outNewOp, newOp);
     }
 
     writer.setInsertionPointAfter(lhsOp);
     writer.insert(newOp);
-    lhsLayer.insert(newOp);
+    lhsLayer.insertToLayer(newOp);
 
     rhsLayer.removeOpRecord(rhsOp);
     writer.replaceAllUsesWith(rhsOp->getResults(), rhsOp->getOperands());
@@ -176,8 +159,10 @@ struct TLayerReductionPass : impl::TLayerReductionPassBase<TLayerReductionPass> 
         std::vector<QECLayer> layers;
 
         getOperation()->walk([&](QECOpInterface op) {
-            if (currentLayer.insert(op))
+            if (commuteAll(op, currentLayer)) {
+                currentLayer.insertToLayer(op);
                 return WalkResult::advance();
+            }
 
             layers.emplace_back(std::move(currentLayer));
 
