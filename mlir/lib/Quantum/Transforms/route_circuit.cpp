@@ -109,9 +109,30 @@ struct RoutingPass : public impl::RoutingPassBase<RoutingPass> {
         return nullptr;
     }
 
+    void getFrontLayer(std::set<quantum::CustomOp> *frontLayer) {
+        getOperation()->walk([&](Operation *op) {
+            if (isa<quantum::CustomOp>(op)) {
+                int nQubits = cast<quantum::CustomOp>(op).getInQubits().size();
+                auto inQubits = cast<quantum::CustomOp>(op).getInQubits();
+
+                if (nQubits == 2) {
+                    Operation *prevOp_0 = inQubits[0].getDefiningOp();
+                    Operation *prevOp_1 = inQubits[1].getDefiningOp();
+                    if (isa<quantum::ExtractOp>(prevOp_0) && isa<quantum::ExtractOp>(prevOp_1))
+                        (*frontLayer).insert(cast<quantum::CustomOp>(op));
+                }
+                else if (nQubits == 1) {
+                    Operation *prevOp_0 = inQubits[0].getDefiningOp();
+                    if (isa<quantum::ExtractOp>(prevOp_0))
+                        (*frontLayer).insert(cast<quantum::CustomOp>(op));
+                }
+            }
+        });
+        return;
+    }
+
     void preProcessing(
         std::set<int> *physicalQubits, std::vector<int> *randomInitialMapping,
-        std::set<quantum::CustomOp> *frontLayer,
         llvm::DenseMap<quantum::CustomOp, std::vector<quantum::ExtractOp>> &OpToExtractMap,
         llvm::DenseMap<quantum::ExtractOp, int> &ExtractOpToQubitMap, int *dagLogicalQubits)
     {
@@ -126,24 +147,11 @@ struct RoutingPass : public impl::RoutingPassBase<RoutingPass> {
                 logicalQubitIndex = logicalQubitIndex + 1;
             }
             else if (isa<quantum::CustomOp>(op)) {
-                int nQubits = cast<quantum::CustomOp>(op).getInQubits().size();
                 auto inQubits = cast<quantum::CustomOp>(op).getInQubits();
 
                 for (auto inQubit : inQubits) {
                     OpToExtractMap[cast<quantum::CustomOp>(op)].push_back(
                         getRegisterIndexOfOp(inQubit));
-                }
-
-                if (nQubits == 2) {
-                    Operation *prevOp_0 = inQubits[0].getDefiningOp();
-                    Operation *prevOp_1 = inQubits[1].getDefiningOp();
-                    if (isa<quantum::ExtractOp>(prevOp_0) && isa<quantum::ExtractOp>(prevOp_1))
-                        (*frontLayer).insert(cast<quantum::CustomOp>(op));
-                }
-                else if (nQubits == 1) {
-                    Operation *prevOp_0 = inQubits[0].getDefiningOp();
-                    if (isa<quantum::ExtractOp>(prevOp_0))
-                        (*frontLayer).insert(cast<quantum::CustomOp>(op));
                 }
             }
         });
@@ -279,6 +287,124 @@ struct RoutingPass : public impl::RoutingPassBase<RoutingPass> {
             swap_candidates[swap_pair] = std::min(swap_candidates[swap_pair], temp_score);
         }
     }
+    void sabreIterator(std::set<int> *physicalQubits,
+        std::set<quantum::CustomOp> *frontLayer, std::set<quantum::CustomOp> *executeGateList,
+        llvm::DenseMap<std::pair<int, int>, int> &distanceMatrix,
+        llvm::DenseMap<std::pair<int, int>, int> &predecessorMatrix,
+        llvm::DenseMap<std::pair<int, int>, bool> &couplingMap,
+        std::vector<int> *initialMapping,
+        int *dagLogicalQubits,
+        llvm::DenseMap<quantum::CustomOp, std::vector<quantum::ExtractOp>> &OpToExtractMap,
+        llvm::DenseMap<quantum::ExtractOp, int> &ExtractOpToQubitMap,
+        std::vector<StringRef> *compiledGateNames,
+        std::vector<std::vector<int>> *compiledGateQubits,
+        std::vector<mlir::ValueRange> *compiledGateParams)
+    {
+        int search_steps = 0;
+        int max_iterations_without_progress = 10 * (*dagLogicalQubits);
+        while ((*frontLayer).size()) {
+            getExecuteGateList(frontLayer, executeGateList, couplingMap, initialMapping,
+                               OpToExtractMap, ExtractOpToQubitMap);
+            if ((*executeGateList).size()) {
+                for (auto op : *executeGateList) {
+                    (*compiledGateNames).push_back(op.getGateName());
+                    // this doesn't work as Params are SSA values
+                    // when original function is deleted, they are lost
+                    // Runtime segmentation fault occurs if parametric gates are used
+                    (*compiledGateParams).push_back(op.getParams());
+                    std::vector<int> currOpPhysicalQubits;
+                    for (auto currOpExtract : OpToExtractMap[op])
+                        currOpPhysicalQubits.push_back(
+                            (*initialMapping)[ExtractOpToQubitMap[currOpExtract]]);
+                    (*compiledGateQubits).push_back(currOpPhysicalQubits);
+
+                    // remove the executed op from front layer
+                    (*frontLayer).erase(op);
+                    // get successor of op
+                    auto outQubits = op.getOutQubits();
+                    for (auto outQubit : outQubits) {
+                        for (auto &use : outQubit.getUses()) {
+                            Operation *successorOp = use.getOwner();
+                            if (isa<quantum::CustomOp>(*successorOp))
+                                (*frontLayer).insert(cast<quantum::CustomOp>(*successorOp));
+                        }
+                    }
+                }
+                (*executeGateList).clear(); // clear execute gate list
+            }
+            else if (search_steps >= max_iterations_without_progress) {
+                search_steps = 0;
+                while ((*compiledGateNames).back() == "SWAP") {
+                    (*compiledGateNames).pop_back();
+                    (*compiledGateQubits).pop_back();
+                    (*compiledGateParams).pop_back();
+                }
+                auto greedyGate = *((*frontLayer).begin());
+                auto inExtract = OpToExtractMap[greedyGate];
+                int physical_Qubit_0 = (*initialMapping)[ExtractOpToQubitMap[inExtract[0]]];
+                int physical_Qubit_1 = (*initialMapping)[ExtractOpToQubitMap[inExtract[1]]];
+                std::vector<int> swapPath =
+                    getShortestPath(physical_Qubit_0, physical_Qubit_1, predecessorMatrix);
+                for (size_t i = 1; i < swapPath.size() - 1; i++) {
+                    int u = swapPath[i - 1];
+                    int v = swapPath[i];
+                    (*compiledGateNames).push_back("SWAP");
+                    (*compiledGateQubits).push_back({u, v});
+                    (*compiledGateParams).push_back(mlir::ValueRange());
+                    // update mapping
+                    for (size_t random_init_mapping_index = 0;
+                         random_init_mapping_index < (*initialMapping).size();
+                         random_init_mapping_index++) {
+                        if ((*initialMapping)[random_init_mapping_index] == u)
+                            (*initialMapping)[random_init_mapping_index] = v;
+                        else if ((*initialMapping)[random_init_mapping_index] == v)
+                            (*initialMapping)[random_init_mapping_index] = u;
+                    }
+                }
+            }
+            else {
+                llvm::DenseMap<std::pair<int, int>, int> swap_candidates;
+                for (auto op : *frontLayer) {
+                    for (auto logivalQubitExtractToBeRouted : OpToExtractMap[op]) {
+                        int firstPhysicalQubitToBeRouted = (*initialMapping)
+                            [ExtractOpToQubitMap[logivalQubitExtractToBeRouted]];
+                        for (auto secondPhysicalQubitToBeRouted : *physicalQubits)
+                            if (distanceMatrix[std::make_pair(firstPhysicalQubitToBeRouted,
+                                                              secondPhysicalQubitToBeRouted)] == 1)
+                                swap_candidates[std::make_pair(firstPhysicalQubitToBeRouted,
+                                                               secondPhysicalQubitToBeRouted)] =
+                                    MAXIMUM;
+                    }
+                }
+                Heuristic(frontLayer, swap_candidates, initialMapping, distanceMatrix,
+                          OpToExtractMap, ExtractOpToQubitMap);
+                int min_dist_swap = MAXIMUM;
+                std::pair<int, int> min_swap;
+                for (auto &entry : swap_candidates) {
+                    std::pair<int, int> &key = entry.first;
+                    if (entry.second < min_dist_swap) {
+                        min_swap = key;
+                        min_dist_swap = entry.second;
+                    }
+                }
+                // add the min SWAP
+                (*compiledGateNames).push_back("SWAP");
+                (*compiledGateQubits).push_back({min_swap.first, min_swap.second});
+                (*compiledGateParams).push_back(mlir::ValueRange());
+                // update mapping
+                for (size_t random_init_mapping_index = 0;
+                     random_init_mapping_index < (*initialMapping).size();
+                     random_init_mapping_index++) {
+                    if ((*initialMapping)[random_init_mapping_index] == min_swap.first)
+                        (*initialMapping)[random_init_mapping_index] = min_swap.second;
+                    else if ((*initialMapping)[random_init_mapping_index] == min_swap.second)
+                        (*initialMapping)[random_init_mapping_index] = min_swap.first;
+                }
+                search_steps++;
+            }
+        }
+        return;
+    }
 
     void runOnOperation() override
     {
@@ -298,8 +424,9 @@ struct RoutingPass : public impl::RoutingPassBase<RoutingPass> {
         std::set<quantum::CustomOp> frontLayer;
         llvm::DenseMap<quantum::CustomOp, std::vector<quantum::ExtractOp>> OpToExtractMap;
         llvm::DenseMap<quantum::ExtractOp, int> ExtractOpToQubitMap;
-        preProcessing(&physicalQubits, &randomInitialMapping, &frontLayer, OpToExtractMap,
+        preProcessing(&physicalQubits, &randomInitialMapping, OpToExtractMap,
                       ExtractOpToQubitMap, &dagLogicalQubits);
+        getFrontLayer(&frontLayer);
 
         // print init mapping
         llvm::outs() << "Random Initial Mapping: \n";
@@ -312,109 +439,28 @@ struct RoutingPass : public impl::RoutingPassBase<RoutingPass> {
         std::vector<std::vector<int>> compiledGateQubits;
         std::vector<mlir::ValueRange> compiledGateParams;
         std::set<quantum::CustomOp> executeGateList;
-        int search_steps = 0;
-        int max_iterations_without_progress = 10 * dagLogicalQubits;
-        while (frontLayer.size()) {
-            getExecuteGateList(&frontLayer, &executeGateList, couplingMap, &randomInitialMapping,
-                               OpToExtractMap, ExtractOpToQubitMap);
-            if (executeGateList.size()) {
-                for (auto op : executeGateList) {
-                    compiledGateNames.push_back(op.getGateName());
-                    // this doesn't work as Params are SSA values
-                    // when original function is deleted, they are lost
-                    // Runtime segmentation fault occurs if parametric gates are used
-                    compiledGateParams.push_back(op.getParams());
-                    std::vector<int> currOpPhysicalQubits;
-                    for (auto currOpExtract : OpToExtractMap[op])
-                        currOpPhysicalQubits.push_back(
-                            randomInitialMapping[ExtractOpToQubitMap[currOpExtract]]);
-                    compiledGateQubits.push_back(currOpPhysicalQubits);
-
-                    // remove the executed op from front layer
-                    frontLayer.erase(op);
-                    // get successor of op
-                    auto outQubits = op.getOutQubits();
-                    for (auto outQubit : outQubits) {
-                        for (auto &use : outQubit.getUses()) {
-                            Operation *successorOp = use.getOwner();
-                            if (isa<quantum::CustomOp>(*successorOp))
-                                frontLayer.insert(cast<quantum::CustomOp>(*successorOp));
-                        }
-                    }
-                }
-                executeGateList.clear(); // clear execute gate list
-            }
-            else if (search_steps >= max_iterations_without_progress) {
-                search_steps = 0;
-                while (compiledGateNames.back() == "SWAP") {
-                    compiledGateNames.pop_back();
-                    compiledGateQubits.pop_back();
-                    compiledGateParams.pop_back();
-                }
-                auto greedyGate = *(frontLayer.begin());
-                auto inExtract = OpToExtractMap[greedyGate];
-                int physical_Qubit_0 = randomInitialMapping[ExtractOpToQubitMap[inExtract[0]]];
-                int physical_Qubit_1 = randomInitialMapping[ExtractOpToQubitMap[inExtract[1]]];
-                std::vector<int> swapPath =
-                    getShortestPath(physical_Qubit_0, physical_Qubit_1, predecessorMatrix);
-                for (size_t i = 1; i < swapPath.size() - 1; i++) {
-                    int u = swapPath[i - 1];
-                    int v = swapPath[i];
-                    compiledGateNames.push_back("SWAP");
-                    compiledGateQubits.push_back({u, v});
-                    compiledGateParams.push_back(mlir::ValueRange());
-                    // update mapping
-                    for (size_t random_init_mapping_index = 0;
-                         random_init_mapping_index < randomInitialMapping.size();
-                         random_init_mapping_index++) {
-                        if (randomInitialMapping[random_init_mapping_index] == u)
-                            randomInitialMapping[random_init_mapping_index] = v;
-                        else if (randomInitialMapping[random_init_mapping_index] == v)
-                            randomInitialMapping[random_init_mapping_index] = u;
-                    }
-                }
-            }
-            else {
-                llvm::DenseMap<std::pair<int, int>, int> swap_candidates;
-                for (auto op : frontLayer) {
-                    for (auto logivalQubitExtractToBeRouted : OpToExtractMap[op]) {
-                        int firstPhysicalQubitToBeRouted = randomInitialMapping
-                            [ExtractOpToQubitMap[logivalQubitExtractToBeRouted]];
-                        for (auto secondPhysicalQubitToBeRouted : physicalQubits)
-                            if (distanceMatrix[std::make_pair(firstPhysicalQubitToBeRouted,
-                                                              secondPhysicalQubitToBeRouted)] == 1)
-                                swap_candidates[std::make_pair(firstPhysicalQubitToBeRouted,
-                                                               secondPhysicalQubitToBeRouted)] =
-                                    MAXIMUM;
-                    }
-                }
-                Heuristic(&frontLayer, swap_candidates, &randomInitialMapping, distanceMatrix,
-                          OpToExtractMap, ExtractOpToQubitMap);
-                int min_dist_swap = MAXIMUM;
-                std::pair<int, int> min_swap;
-                for (auto &entry : swap_candidates) {
-                    std::pair<int, int> &key = entry.first;
-                    if (entry.second < min_dist_swap) {
-                        min_swap = key;
-                        min_dist_swap = entry.second;
-                    }
-                }
-                // add the min SWAP
-                compiledGateNames.push_back("SWAP");
-                compiledGateQubits.push_back({min_swap.first, min_swap.second});
-                compiledGateParams.push_back(mlir::ValueRange());
-                // update mapping
-                for (size_t random_init_mapping_index = 0;
-                     random_init_mapping_index < randomInitialMapping.size();
-                     random_init_mapping_index++) {
-                    if (randomInitialMapping[random_init_mapping_index] == min_swap.first)
-                        randomInitialMapping[random_init_mapping_index] = min_swap.second;
-                    else if (randomInitialMapping[random_init_mapping_index] == min_swap.second)
-                        randomInitialMapping[random_init_mapping_index] = min_swap.first;
-                }
-                search_steps++;
-            }
-        }
+        sabreIterator(&physicalQubits, &frontLayer, &executeGateList, 
+                               distanceMatrix, predecessorMatrix,
+                               couplingMap, &randomInitialMapping, &dagLogicalQubits,
+                               OpToExtractMap, ExtractOpToQubitMap, 
+                               &compiledGateNames, &compiledGateQubits, &compiledGateParams);
+        // rerun sabre
+        compiledGateNames.clear();
+        compiledGateQubits.clear();
+        compiledGateParams.clear();
+        executeGateList.clear();
+        frontLayer.clear();
+        llvm::outs() << "Initial Mapping from first SABRE run: \n";
+        for (size_t logical_qubit_index = 0; logical_qubit_index < randomInitialMapping.size();
+             logical_qubit_index++)
+            llvm::outs() << logical_qubit_index << "->" << randomInitialMapping[logical_qubit_index]
+                         << "\n";
+        getFrontLayer(&frontLayer);
+        sabreIterator(&physicalQubits, &frontLayer, &executeGateList, 
+                               distanceMatrix, predecessorMatrix,
+                               couplingMap, &randomInitialMapping, &dagLogicalQubits,
+                               OpToExtractMap, ExtractOpToQubitMap, 
+                               &compiledGateNames, &compiledGateQubits, &compiledGateParams);
 
         // insert gates into new MLIR
         mlir::func::FuncOp func;
