@@ -192,7 +192,7 @@ def handle_qnode(
     if shots_len > 1:
         raise NotImplementedError("shot vectors are not yet supported for catalyst conversion.")
 
-    shots = sum(args[:shots_len])
+    shots = args[0] if shots_len else 0
     consts = args[shots_len : n_consts + shots_len]
     non_const_args = args[shots_len + n_consts :]
 
@@ -709,6 +709,7 @@ def trace_from_pennylane(
             fn.static_argnums = static_argnums
 
         plxpr, out_type, out_treedef = make_jaxpr2(fn, **make_jaxpr_kwargs)(*args, **kwargs)
+        print(plxpr)
         jaxpr = from_plxpr(plxpr)(*dynamic_args, **kwargs)
 
     return jaxpr, out_type, out_treedef, sig
