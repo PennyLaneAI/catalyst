@@ -65,10 +65,7 @@ from catalyst.jax_tracer import (
     trace_quantum_operations,
     unify_convert_result_types,
 )
-from catalyst.tracing.contexts import (
-    EvaluationContext,
-    EvaluationMode,
-)
+from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
 from catalyst.utils.exceptions import PlxprCaptureCFCompatibilityError
 from catalyst.utils.patching import Patcher
 
