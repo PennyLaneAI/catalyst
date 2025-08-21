@@ -618,6 +618,7 @@ class QJIT(CatalystCallable):
             self.jaxpr, self.out_type, self.out_treedef, self.c_sig = self.capture(
                 self.user_sig or ()
             )
+            #breakpoint()
 
         if self.compile_options.target in ("mlir", "binary"):
             self.mlir_module = self.generate_ir()
