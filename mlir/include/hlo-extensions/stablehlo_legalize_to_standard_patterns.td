@@ -36,22 +36,19 @@
 
 
 
-// This is the legalization pattern definition file for MHLO to StandardOps.
+// This is the legalization pattern definition file for Stablehlo to StandardOps.
 
 include "mlir/IR/OpBase.td"
 include "mlir/Dialect/Arith/IR/ArithOps.td"
 include "mlir/Dialect/Math/IR/MathOps.td"
 include "mlir/Dialect/Func/IR/FuncOps.td"
-include "mhlo/IR/hlo_ops.td"
-// TODO: change the above mhlo include line to the following when migrating to stablehlo
-//include "stablehlo/dialect/StablehloOps.td"
+include "stablehlo/dialect/StablehloOps.td"
 
 //===----------------------------------------------------------------------===//
 // Nullary op patterns.
 //===----------------------------------------------------------------------===//
 
-// TODO: update `MHLO_BlahOp` to `StableHLO_BlahOp` when migrating to stablehlo.
-def : Pat<(MHLO_ConstantOp ElementsAttr:$value),
+def : Pat<(StableHLO_ConstantOp ElementsAttr:$value),
           (Arith_ConstantOp $value)>;
 
 //===----------------------------------------------------------------------===//
@@ -77,46 +74,46 @@ def createDenormalIEEE : NativeCodeCall<
 
 
 // Unary Lowering Patterns.
-def : Pat<(MHLO_CeilOp HLO_FpTensor:$i), (Math_CeilOp $i, (createFastMathNone ))>;
+def : Pat<(StableHLO_CeilOp HLO_FpTensor:$i), (Math_CeilOp $i, (createFastMathNone ))>;
 
 // Binary Lowering Patterns.
-def : Pat<(MHLO_AndOp HLO_IntTensor:$l, HLO_IntTensor:$r),
+def : Pat<(StableHLO_AndOp HLO_IntTensor:$l, HLO_IntTensor:$r),
           (Arith_AndIOp $l, $r),
           [(IsSameSizeConstraint $l, $r)]>;
-def : Pat<(MHLO_OrOp HLO_IntTensor:$l, HLO_IntTensor:$r),
+def : Pat<(StableHLO_OrOp HLO_IntTensor:$l, HLO_IntTensor:$r),
           (Arith_OrIOp $l, $r),
           [(IsSameSizeConstraint $l, $r)]>;
-def : Pat<(MHLO_AddOp HLO_FpTensor:$l, HLO_FpTensor:$r),
+def : Pat<(StableHLO_AddOp HLO_FpTensor:$l, HLO_FpTensor:$r),
           (Arith_AddFOp $l, $r, (createFastMathNone )),
           [(IsSameSizeConstraint $l, $r)]>;
-def : Pat<(MHLO_SubtractOp HLO_FpTensor:$l, HLO_FpTensor:$r),
+def : Pat<(StableHLO_SubtractOp HLO_FpTensor:$l, HLO_FpTensor:$r),
           (Arith_SubFOp $l, $r, (createFastMathNone )),
           [(IsSameSizeConstraint $l, $r)]>;
-def : Pat<(MHLO_MulOp HLO_FpTensor:$l, HLO_FpTensor:$r),
+def : Pat<(StableHLO_MulOp HLO_FpTensor:$l, HLO_FpTensor:$r),
           (Arith_MulFOp $l, $r, (createFastMathNone )),
           [(IsSameSizeConstraint $l, $r)]>;
-def : Pat<(MHLO_DivOp HLO_FpTensor:$l, HLO_FpTensor:$r),
+def : Pat<(StableHLO_DivOp HLO_FpTensor:$l, HLO_FpTensor:$r),
           (Arith_DivFOp $l, $r, (createFastMathNone )),
           [(IsSameSizeConstraint $l, $r)]>;
-def : Pat<(MHLO_RemOp HLO_FpTensor:$l, HLO_FpTensor:$r),
+def : Pat<(StableHLO_RemOp HLO_FpTensor:$l, HLO_FpTensor:$r),
           (Arith_RemFOp $l, $r, (createFastMathNone )),
           [(IsSameSizeConstraint $l, $r)]>;
-def : Pat<(MHLO_AddOp HLO_IntTensor:$l, HLO_IntTensor:$r),
+def : Pat<(StableHLO_AddOp HLO_IntTensor:$l, HLO_IntTensor:$r),
           (Arith_AddIOp $l, $r, (createOverflowNone )),
           [(IsSameSizeConstraint $l, $r)]>;
-def : Pat<(MHLO_SubtractOp HLO_IntTensor:$l, HLO_IntTensor:$r),
+def : Pat<(StableHLO_SubtractOp HLO_IntTensor:$l, HLO_IntTensor:$r),
           (Arith_SubIOp $l, $r, (createOverflowNone )),
           [(IsSameSizeConstraint $l, $r)]>;
-def : Pat<(MHLO_MulOp HLO_IntTensor:$l, HLO_IntTensor:$r),
+def : Pat<(StableHLO_MulOp HLO_IntTensor:$l, HLO_IntTensor:$r),
           (Arith_MulIOp $l, $r, (createOverflowNone )),
           [(IsSameSizeConstraint $l, $r)]>;
-def : Pat<(MHLO_DivOp HLO_IntTensor:$l, HLO_IntTensor:$r),
+def : Pat<(StableHLO_DivOp HLO_IntTensor:$l, HLO_IntTensor:$r),
           (Arith_DivSIOp $l, $r),
           [(IsSameSizeConstraint $l, $r)]>;
-def : Pat<(MHLO_RemOp HLO_IntTensor:$l, HLO_IntTensor:$r),
+def : Pat<(StableHLO_RemOp HLO_IntTensor:$l, HLO_IntTensor:$r),
           (Arith_RemSIOp $l, $r),
           [(IsSameSizeConstraint $l, $r)]>;
 
-def : Pat<(MHLO_SelectOp $pred, $tv, $fv),
+def : Pat<(StableHLO_SelectOp $pred, $tv, $fv),
           (SelectOp $pred, $tv, $fv),
           [(IsSameSizeConstraint $pred, $tv), (IsSameSizeConstraint $tv, $fv)]>;

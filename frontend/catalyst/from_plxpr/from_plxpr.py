@@ -573,8 +573,18 @@ def handle_basis_state(self, *invals, n_wires):
 
     for wire_values, new_wire in zip(wires_inval, out_wires):
         self.qreg_manager[wire_values] = new_wire
+@PLxPR ToQUantumJaxprInterpreter.register_primitive(qm,l.BasisState._primitive)
+def handler_basis_state(self, *invals, n_wires):
 
+    state_inval = invals[0]
+    wires_inval = invals[1:]
+    state = jax.lax.convert_element_type(state_inval, knp.dtype(jnp.bool))
+    wires = [self.qreg_manager[w] for w in wires_inval]
+    out_wires = set_basis_state_p.bind(*wires, state)
 
+    for wire_values, new_wire in zip(wires_inval, out_wires):
+        self.qreg_manager[wire_values] = new_wire
+    
 # pylint: disable=unused-argument
 @PLxPRToQuantumJaxprInterpreter.register_primitive(qml.StatePrep._primitive)
 def handle_state_prep(self, *invals, n_wires, **kwargs):

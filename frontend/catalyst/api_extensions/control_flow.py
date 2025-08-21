@@ -60,14 +60,12 @@ from catalyst.jax_tracer import (
     HybridOp,
     HybridOpRegion,
     QRegPromise,
+    _promote_jaxpr_types,
     trace_function,
     trace_quantum_operations,
     unify_convert_result_types,
 )
-from catalyst.tracing.contexts import (
-    EvaluationContext,
-    EvaluationMode,
-)
+from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
 from catalyst.utils.exceptions import PlxprCaptureCFCompatibilityError
 from catalyst.utils.patching import Patcher
 
@@ -162,7 +160,8 @@ def cond(pred: DynamicJaxprTracer):
 
     The conditional function is permitted to also return values.
     Any value that is supported by JAX JIT compilation is supported as a return
-    type.
+    type. If provided, return types need to be identical or at least promotable across both
+    branches.
 
     .. code-block:: python
 
@@ -185,9 +184,13 @@ def cond(pred: DynamicJaxprTracer):
         There are various constraints and restrictions that should be kept in mind
         when working with conditionals in Catalyst.
 
-        The return values of all branches of :func:`~.cond` must be the same type.
-        Returning different types, or ommitting a return value in one branch (e.g.,
+        The return values of all branches of :func:`~.cond` must be the same shape.
+        Returning different shapes, or ommitting a return value in one branch (e.g.,
         returning ``None``) but not in others will result in an error.
+
+        However, the return values of all branches of :func:`~.cond` can be different data types.
+        In this case, the return types will automatically be promoted to the next common larger
+        type.
 
         >>> @qjit
         ... def f(x: float):
@@ -196,20 +199,7 @@ def cond(pred: DynamicJaxprTracer):
         ...         return x ** 2  # float
         ...     @cond_fn.otherwise
         ...     def else_branch():
-        ...         return 6  # int
-        ...     return cond_fn()
-        TypeError: Conditional requires consistent return types across all branches, got:
-        - Branch at index 0: [ShapedArray(float64[], weak_type=True)]
-        - Branch at index 1: [ShapedArray(int64[], weak_type=True)]
-        Please specify an else branch if none was specified.
-        >>> @qjit
-        ... def f(x: float):
-        ...     @cond(x > 1.5)
-        ...     def cond_fn():
-        ...         return x ** 2  # float
-        ...     @cond_fn.otherwise
-        ...     def else_branch():
-        ...         return 6.  # float
+        ...         return 6  # int (promotable to float)
         ...     return cond_fn()
         >>> f(1.5)
         Array(6., dtype=float64)
@@ -224,10 +214,9 @@ def cond(pred: DynamicJaxprTracer):
         ...     def cond_fn():
         ...         return x ** 2
         ...     return cond_fn()
-        TypeError: Conditional requires consistent return types across all branches, got:
-        - Branch at index 0: [ShapedArray(float64[], weak_type=True)]
-        - Branch at index 1: []
-        Please specify an else branch if none was specified.
+        TypeError: Conditional requires a consistent return structure across all branches! Got
+        PyTreeDef(None) and PyTreeDef(*). Please specify an else branch if PyTreeDef(None) was
+        specified.
 
         >>> @qjit
         ... def f(x: float):
@@ -774,18 +763,16 @@ class CondCallable:
         out_tree = out_sigs[-1].out_tree()
         all_consts = [s.out_consts() for s in out_sigs]
         out_types = [s.out_type() for s in out_sigs]
-        # FIXME: We want to perform the result unificaiton here:
-        # all_jaxprs = [s.out_initial_jaxpr() for s in out_sigs]
-        # all_noimplouts = [s.num_implicit_outputs() for s in out_sigs]
-        # _, out_type, _, all_consts = unify_convert_result_types(
-        #     all_jaxprs, all_consts, all_noimplouts
-        # )
-        # Unfortunately, we can not do this beacuse some tracers (specifically, the results of
-        # ``qml.measure``) might not have their source Jaxpr equation yet. Thus, we delay the
-        # unification until the quantum tracing is done. The consequence of that: we have to guess
-        # the output type now and if we fail to do so, we might face MLIR type error down the
-        # pipeline.
+
+        # Select the output type of the one with the promoted dtype among all branches
         out_type = out_types[-1]
+        branch_avals = [[aval for aval, _ in branch_out_type] for branch_out_type in out_types]
+        promoted_dtypes = _promote_jaxpr_types(branch_avals)
+
+        out_type = [
+            (aval.update(dtype=dtype), expl)
+            for dtype, (aval, expl) in zip(promoted_dtypes, out_type)
+        ]
 
         # Create output tracers in the outer tracing context
         out_expanded_classical_tracers = output_type_to_tracers(
@@ -1563,14 +1550,20 @@ def _assert_cond_result_structure(trees: List[PyTreeDef]):
         if tree != expected_tree:
             raise TypeError(
                 "Conditional requires a consistent return structure across all branches! "
-                f"Got {tree} and {expected_tree}."
+                f"Got {tree} and {expected_tree}. Please specify an else branch if PyTreeDef(None) "
+                "was specified."
             )
 
 
 def _assert_cond_result_types(signatures: List[List[AbstractValue]]):
     """Ensure a consistent type signature across branch results."""
     num_results = len(signatures[0])
-    assert all(len(sig) == num_results for sig in signatures), "mismatch: number or results"
+
+    if not all(len(sig) == num_results for sig in signatures):
+        raise TypeError(
+            "Conditional requires a consistent number of results across all branches! It might "
+            "happen when some of the branch returns dynamic shape and some return constant shape."
+        )
 
     for i in range(num_results):
         aval_slice = [avals[i] for avals in signatures]
