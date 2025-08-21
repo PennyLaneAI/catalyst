@@ -32,18 +32,16 @@ namespace qec {
 #define GEN_PASS_DECL_TLAYERREDUCTIONPASS
 #include "QEC/Transforms/Passes.h.inc"
 
+// This aims to find the qubit that may be used by op
+// If not used by op, it returns the qubits that happens before op.
 Value findPredecessorValueOfOp(Value qubit, QECOpInterface op)
 {
     assert(qubit != nullptr && "Qubit should not be nullptr");
 
     auto defOp = qubit.getDefiningOp();
 
-    if (!defOp)
+    if (!defOp || defOp->isBeforeInBlock(op))
         return qubit;
-
-    if (defOp->isBeforeInBlock(op)) {
-        return qubit;
-    }
 
     auto qecOp = llvm::dyn_cast<QECOpInterface>(defOp);
 
@@ -55,17 +53,17 @@ Value findPredecessorValueOfOp(Value qubit, QECOpInterface op)
 
     auto inQubit = outInMap.lookup(qubit);
 
-    if (qecOp == op) {
+    if (qecOp == op)
         return inQubit;
-    }
 
     return findPredecessorValueOfOp(inQubit, op);
 }
 
 bool commute(QECOpInterface lhsOp, QECOpInterface rhsOp)
 {
-    if (!lhsOp->isBeforeInBlock(rhsOp))
-        return false;
+    assert(lhsOp != rhsOp && "lshOp and rhsOp should not be equal");
+    assert(lhsOp->getBlock() == rhsOp->getBlock() && "lhsOp and rhsOp should be in the same block");
+    assert(lhsOp->isBeforeInBlock(rhsOp) && "lhsOp should be before rhsOp");
 
     std::vector<Value> lhsInQubits(lhsOp.getInQubits().begin(), lhsOp.getInQubits().end());
 
@@ -79,7 +77,8 @@ bool commute(QECOpInterface lhsOp, QECOpInterface rhsOp)
     for (auto inQubit : rhsOp.getInQubits()) {
         Value v = findPredecessorValueOfOp(inQubit, lhsOp);
         if (!v) {
-            llvm::outs() << "No predecessor found for " << inQubit << "\n";
+            llvm::outs() << "No predecessor found for " << inQubit << "\n"
+                         << "It can be because there is non-PPR op between lhsOp and rhsOp\n";
             return false;
         }
         rhsOpInQubitsFromLhsOp.emplace_back(v);
@@ -98,8 +97,6 @@ bool commuteAll(QECOpInterface rhsOp, QECLayer &lhsLayer)
         if (lhsOp->getBlock() != rhsOp->getBlock())
             return false;
 
-        assert(lhsOp != rhsOp && "lshOp and rhsOp should not be equal");
-
         if (!commute(lhsOp, rhsOp)) {
             return false;
         }
@@ -110,29 +107,38 @@ bool commuteAll(QECOpInterface rhsOp, QECLayer &lhsLayer)
 
 void moveOpToLayer(QECOpInterface rhsOp, QECLayer &rhsLayer, QECLayer &lhsLayer, IRRewriter &writer)
 {
+    //    lhsLayer   :  rhsLayer
+    //    ┌───────┐  :  ┌───────┐
+    //   ─┤ lhsOp ├──:──┤ rhsOp ├─
+    //    └───────┘  :  └───────┘
+
+    // We want to move rhsOp to the lhsLayer
+    // and replace the uses of the qubits in the rhsOp with the qubits in the lhsOp
 
     auto lhsOp = lhsLayer.getOps().back();
     auto newOp = rhsOp.clone();
 
-    // map input to output of lhsOp
-    IRMapping lhsMap;
-    lhsMap.map(lhsOp.getInQubits(), lhsOp.getOutQubits());
-
+    // Mapped qubits to the corresponding operands of lhsOp
+    // Note: If there are qubits that are not used by lhsOp,
+    // its to use the qubits that are before the `lhsOp` in the IR.
+    // This is required so we can perform the commutation check in `commute`
     std::vector<Value> newOperands;
+    IRMapping lhsInOutQubits;
+    lhsInOutQubits.map(lhsOp.getInQubits(), lhsOp.getOutQubits());
 
-    for (auto oldOpnd : rhsOp.getInQubits()) {
-        auto val = findPredecessorValueOfOp(oldOpnd, lhsOp);
-        assert(val != nullptr && "Qubit should not be nullptr");
+    for (auto opnd : rhsOp.getInQubits()) {
+        auto derivedOpnd = findPredecessorValueOfOp(opnd, lhsOp);
+        assert(derivedOpnd != nullptr && "Qubit should not be nullptr");
 
-        if (auto out = lhsMap.lookupOrNull(val)) {
-            val = out;
+        if (auto out = lhsInOutQubits.lookupOrNull(derivedOpnd)) {
+            derivedOpnd = out;
         }
-        newOperands.emplace_back(val);
+        newOperands.emplace_back(derivedOpnd);
     }
 
     newOp->setOperands(newOperands);
 
-    // Update users
+    // Replace the uses of the qubits in the newOp with the derived operands.
     for (auto [inNewOp, outNewOp] : llvm::zip(newOp.getInQubits(), newOp.getOutQubits())) {
         writer.replaceAllUsesExcept(inNewOp, outNewOp, newOp);
     }
@@ -158,6 +164,7 @@ struct TLayerReductionPass : impl::TLayerReductionPassBase<TLayerReductionPass> 
 
         std::vector<QECLayer> layers;
 
+        // Initialize the layers
         getOperation()->walk([&](QECOpInterface op) {
             if (commuteAll(op, currentLayer)) {
                 currentLayer.insertToLayer(op);
@@ -174,14 +181,7 @@ struct TLayerReductionPass : impl::TLayerReductionPassBase<TLayerReductionPass> 
         });
         layers.emplace_back(std::move(currentLayer));
 
-        // for (auto &layer : layers) {
-        //     llvm::outs() << "\nlayer ---------\n";
-        //     for (auto op : layer.getOps()) {
-        //         op->dump();
-        //     }
-        //     llvm::outs() << "\n";
-        // }
-
+        // Perfrom the depth reduction
         auto layerSize = layers.size();
         bool changed = true;
         while (changed) {
