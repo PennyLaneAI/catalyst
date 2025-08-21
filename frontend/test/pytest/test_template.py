@@ -39,8 +39,8 @@ def test_adder(backend):
         qml.Adder(k, x_wires, mod, work_wires)
         return qml.sample(wires=x_wires)
 
-    device = qml.device(backend, wires=6, shots=2)
-    interpreted_fn = qml.QNode(adder, device)
+    device = qml.device(backend, wires=6)
+    interpreted_fn = qml.set_shots(qml.QNode(adder, device), shots=2)
     jitted_fn = qjit(interpreted_fn)
 
     assert np.allclose(interpreted_fn(), jitted_fn())
@@ -1029,8 +1029,8 @@ def test_multiplier(backend):
         qml.Multiplier(k, x_wires, mod, work_wires)
         return qml.sample(wires=x_wires)
 
-    device = qml.device(backend, wires=8, shots=2)
-    interpreted_fn = qml.QNode(multiplier, device)
+    device = qml.device(backend, wires=8)
+    interpreted_fn = qml.set_shots(qml.QNode(multiplier, device), shots=2)
     jitted_fn = qjit(interpreted_fn)
 
     assert np.allclose(interpreted_fn(), jitted_fn())
@@ -1053,8 +1053,8 @@ def test_out_adder(backend):
         qml.OutAdder(x_wires, y_wires, output_wires, mod, work_wires)
         return qml.sample(wires=output_wires)
 
-    device = qml.device(backend, wires=11, shots=10000)
-    interpreted_fn = qml.QNode(out_adder, device)
+    device = qml.device(backend, wires=11)
+    interpreted_fn = qml.set_shots(qml.QNode(out_adder, device), shots=10000)
     jitted_fn = qjit(interpreted_fn)
 
     assert np.allclose(interpreted_fn(), jitted_fn())
@@ -1077,8 +1077,8 @@ def test_out_multiplier(backend):
         qml.OutMultiplier(x_wires, y_wires, output_wires, mod, work_wires)
         return qml.sample(wires=output_wires)
 
-    device = qml.device(backend, wires=11, shots=2)
-    interpreted_fn = qml.QNode(out_multiplier, device)
+    device = qml.device(backend, wires=11)
+    interpreted_fn = qml.set_shots(qml.QNode(out_multiplier, device), shots=2)
     jitted_fn = qjit(interpreted_fn)
 
     assert np.allclose(interpreted_fn(), jitted_fn())
@@ -1100,8 +1100,8 @@ def test_phase_adder(backend):
         qml.adjoint(qml.QFT)(wires=x_wires)
         return qml.sample(wires=x_wires)
 
-    device = qml.device(backend, wires=range(5), shots=2)
-    interpreted_fn = qml.QNode(phase_adder, device)
+    device = qml.device(backend, wires=range(5))
+    interpreted_fn = qml.set_shots(qml.QNode(phase_adder, device), shots=2)
     jitted_fn = qjit(interpreted_fn)
 
     assert np.allclose(interpreted_fn(), jitted_fn())
