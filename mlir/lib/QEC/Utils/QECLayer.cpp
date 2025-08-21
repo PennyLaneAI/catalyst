@@ -33,7 +33,7 @@ void QECLayer::insertToLayer(QECOpInterface op)
     layerEntryQubits.insert(entryQubits.begin(), entryQubits.end());
 }
 
-void QECLayer::removeOpRecord(QECOpInterface op) { llvm::erase(ops, op); }
+void QECLayer::eraseOp(QECOpInterface op) { llvm::erase(ops, op); }
 
 void QECLayer::updateResultAndOperand(QECOpInterface op)
 {
@@ -73,7 +73,7 @@ void QECLayer::updateResultAndOperand(QECOpInterface op)
     }
 }
 
-void QECLayer::computeAndCacheEntryQubitsForOp(QECOpInterface op)
+std::vector<Value> QECLayer::getEntryQubitsFrom(QECOpInterface op)
 {
     std::vector<Value> entryQubits;
     entryQubits.reserve(op.getInQubits().size());
@@ -91,17 +91,7 @@ void QECLayer::computeAndCacheEntryQubitsForOp(QECOpInterface op)
         localQubitToEntry[outQubit] = entry;
     }
 
-    localOpToEntryQubits[op] = std::move(entryQubits);
-}
-
-std::vector<Value> QECLayer::getEntryQubitsFrom(QECOpInterface op)
-{
-    if (localOpToEntryQubits.contains(op)) {
-        return localOpToEntryQubits[op];
-    }
-
-    computeAndCacheEntryQubitsForOp(op);
-    return localOpToEntryQubits[op];
+    return entryQubits;
 }
 
 std::vector<Value> QECLayer::getEntryQubitsFrom(YieldOp yieldOp)
