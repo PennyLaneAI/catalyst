@@ -237,6 +237,15 @@ class TestCatalyst:
 
         self.verify_catalyst_adjoint_against_pennylane(func, qml.device(backend, wires=2))
 
+    def test_adjoint_pcphase(self, backend):
+        """Ensures that catalyst.adjoint supports PCPhase operations."""
+
+        def func():
+            qml.PauliX(0)
+            qml.PCPhase(np.pi / 2, dim=0, wires=[0, 1])
+
+        self.verify_catalyst_adjoint_against_pennylane(func, qml.device(backend, wires=2))
+
     def test_adjoint_no_measurements(self):
         """Checks that catalyst.adjoint rejects functions containing quantum measurements."""
 

@@ -88,6 +88,7 @@ from mlir_quantum.dialects.quantum import (
     MultiRZOp,
     NamedObsOp,
     NumQubitsOp,
+    PCPhaseOp,
     ProbsOp,
     QubitUnitaryOp,
     SampleOp,
@@ -1211,6 +1212,21 @@ def _qinst_lowering(
             out_qubits=[qubit.type for qubit in qubits],
             out_ctrl_qubits=[qubit.type for qubit in ctrl_qubits],
             theta=float_param,
+            in_qubits=qubits,
+            in_ctrl_qubits=ctrl_qubits,
+            in_ctrl_values=ctrl_values_i1,
+            adjoint=adjoint,
+        ).results
+
+    if name_str == "PCPhase":
+        assert len(float_params) == 2, "PCPhase takes two float parameters"
+        float_param = float_params[0]
+        dim_param = float_params[1]
+        return PCPhaseOp(
+            out_qubits=[qubit.type for qubit in qubits],
+            out_ctrl_qubits=[qubit.type for qubit in ctrl_qubits],
+            theta=float_param,
+            dim=dim_param,
             in_qubits=qubits,
             in_ctrl_qubits=ctrl_qubits,
             in_ctrl_values=ctrl_values_i1,
