@@ -416,7 +416,7 @@ def test_jaxpr_with_const():
 
 def test_mcm_method_with_zne(backend):
     """Test that the dynamic_one_shot works with ZNE."""
-    dev = qml.device(backend, wires=1, shots=5)
+    dev = qml.device(backend, wires=1)
 
     def circuit():
         return qml.expval(qml.PauliZ(0))
@@ -426,12 +426,12 @@ def test_mcm_method_with_zne(backend):
     @catalyst.qjit
     def mitigated_circuit_1():
         s = [1, 3]
-        g = qml.QNode(circuit, dev, mcm_method="one-shot")
+        g = qml.set_shots(qml.QNode(circuit, dev, mcm_method="one-shot"), shots=5)
         return catalyst.mitigate_with_zne(g, scale_factors=s)()
 
     @catalyst.qjit
     def mitigated_circuit_2():
-        g = qml.QNode(circuit, dev)
+        g = qml.set_shots(qml.QNode(circuit, dev), shots=5)
         return catalyst.mitigate_with_zne(g, scale_factors=s)()
 
     observed = mitigated_circuit_1()
