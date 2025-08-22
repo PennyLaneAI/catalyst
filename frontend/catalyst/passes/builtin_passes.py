@@ -1088,26 +1088,58 @@ def t_layer_reduction(qnode):
 
     **Example**
 
+    In this example, after performing the `to_ppr` to `merge_ppr_ppm` passes, the circuit contains
+    a four depth of Non-Clifford PPRs. The `t_layer_reduction` pass reduces the depth to three.
+
+
     .. code-block:: python
 
         import pennylane as qml
         from catalyst import qjit, measure
-        from catalyst.passes import to_ppr, t_layer_reduction
+        from catalyst.passes import to_ppr, commute_ppr, t_layer_reduction, merge_ppr_ppm
 
-        @qjit(target="mlir")
+        pips = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+
+
+        @qjit(pipelines=pips, target="mlir")
         @t_layer_reduction
+        @merge_ppr_ppm
+        @commute_ppr
         @to_ppr
-        @qml.qnode(qml.device("null.qubit", wires=2))
+        @qml.qnode(qml.device("null.qubit", wires=3))
         def circuit():
-            qml.T(0)
-            qml.T(1)
-            qml.CNOT([0, 1])
-            return measure(0), measure(1)
+            n = 3
+            for i in range(n):
+                qml.H(wires=i)
+                qml.S(wires=i)
+                qml.CNOT(wires=[i, (i + 1) % n])
+                qml.T(wires=i)
+                qml.H(wires=i)
+                qml.T(wires=i)
+
+            return [measure(wires=i) for i in range(n)]
+
 
         print(circuit.mlir_opt)
 
     Example MLIR Representation:
-    TODO: Add example MLIR representation.
+
+    .. code-block:: mlir
+        . . .
+        %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+        %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+        // layer 1
+        %3 = qec.ppr ["X"](8) %1 : !quantum.bit
+        %4 = qec.ppr ["X"](8) %2 : !quantum.bit
+        %5 = quantum.extract %0[ 2] : !quantum.reg -> !quantum.bit
+        // layer 2
+        %6:2 = qec.ppr ["Y", "X"](8) %3, %4 : !quantum.bit, !quantum.bit
+        %7:3 = qec.ppr ["X", "Y", "X"](8) %6#0, %6#1, %5 : !quantum.bit, !quantum.bit, !quantum.bit
+        // layer 3
+        %8 = qec.ppr ["X"](8) %7#2 : !quantum.bit
+        %9:3 = qec.ppr ["X", "X", "Y"](8) %7#0, %7#1, %8 : !quantum.bit, !quantum.bit, !quantum.bit
+        . . .
+
     """
 
     return PassPipelineWrapper(qnode, "t-layer-reduction")

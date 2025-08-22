@@ -44,8 +44,8 @@ from catalyst.passes.builtin_passes import (
     merge_rotations,
     ppm_compilation,
     ppr_to_ppm,
-    to_ppr,
     t_layer_reduction,
+    to_ppr,
 )
 from catalyst.passes.pass_api import Pass, PassPlugin, apply_pass, apply_pass_plugin
 
