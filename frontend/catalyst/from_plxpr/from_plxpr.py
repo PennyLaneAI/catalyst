@@ -214,7 +214,9 @@ def handle_qnode(
         )
         qreg = qalloc_p.bind(len(device.wires))
         self.global_qreg = QregManager(qreg, self.qubit_index_recorder, absolute_addressing=True)
-        converter = PLxPRToQuantumJaxprInterpreter(device, shots, self.global_qreg, {}, self.qubit_index_recorder)
+        converter = PLxPRToQuantumJaxprInterpreter(
+            device, shots, self.global_qreg, {}, self.qubit_index_recorder
+        )
         retvals = converter(closed_jaxpr, *args)
         self.global_qreg.insert_all_dangling_qubits()
         qdealloc_p.bind(self.global_qreg.get())
@@ -311,7 +313,17 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
     during initialization.
     """
 
-    def __init__(self, device, shots, qreg_manager, cache, qubit_index_recorder, *, control_wires=(), control_values=()):
+    def __init__(
+        self,
+        device,
+        shots,
+        qreg_manager,
+        cache,
+        qubit_index_recorder,
+        *,
+        control_wires=(),
+        control_values=(),
+    ):
         self.device = device
         self.shots = shots
         self.qregs = {"init_alloc": qreg_manager}
@@ -354,7 +366,6 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
 
             # Special: first gate on a wire on the global register do not have pre-extracted
             # qubit SSA values
-            #breakpoint()
             if w not in self.qubit_index_recorder.map:
                 in_qubits.append(
                     self.qreg_manager[self.qreg_manager.global_index_to_local_index(w)]
@@ -475,7 +486,7 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
 @PLxPRToQuantumJaxprInterpreter.register_primitive(qml.allocation.allocate_prim)
 def handle_qml_alloc(self, *, num_wires, require_zeros=True, restored=False):
     """Handle the conversion from plxpr to Catalyst jaxpr for the qml.allocate primitive"""
-    #breakpoint()
+    # breakpoint()
     new_qreg = qalloc_p.bind(num_wires)
 
     self.qregs[new_qreg] = QregManager(new_qreg, self.qubit_index_recorder)
@@ -493,8 +504,16 @@ def handle_qml_dealloc(self, *wires):
     """Handle the conversion from plxpr to Catalyst jaxpr for the qml.deallocate primitive"""
     qreg = self.qubit_index_recorder[wires[0]]
     qreg.insert_all_dangling_qubits()
-    qdealloc_p.bind(qreg.get())
+
+    # TODO: currently __catalyst__rt__qubit_release_array() in runtime would
+    # call ReleaseAllQubits() on the device
+    # This means we cannot deallocate until the very end
+    # For now we just treat the dynamically allocated qubits in the same way as the
+    # initial ones, and deallocate at the end.
+    # qdealloc_p.bind(qreg.get())
+
     return []
+
 
 @PLxPRToQuantumJaxprInterpreter.register_primitive(quantum_subroutine_p)
 def handle_subroutine(self, *args, **kwargs):
@@ -760,7 +779,7 @@ def trace_from_pennylane(
             fn.static_argnums = static_argnums
 
         plxpr, out_type, out_treedef = make_jaxpr2(fn, **make_jaxpr_kwargs)(*args, **kwargs)
-        #breakpoint()
+        # breakpoint()
         jaxpr = from_plxpr(plxpr)(*dynamic_args, **kwargs)
 
     return jaxpr, out_type, out_treedef, sig

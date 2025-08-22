@@ -18,6 +18,7 @@ Note that this feature is only available under the plxpr pipeline.
 """
 
 import numpy as np
+import pytest
 
 import pennylane as qml
 from pennylane.allocation import allocate, deallocate
@@ -33,18 +34,96 @@ def test_basic_dynamic_wire_alloc():
     def circuit():
         qml.X(1)  # |010>
 
-        wires = allocate(1)  # |010> and |0>
-        qml.X(wires[0])  # |010> and |1>
-        qml.CNOT(wires=[wires[0], 2])  # |011> and |1>
-        deallocate(wires[0])  # |011>
+        q = allocate(1)  # |010> and |0>
+        qml.X(q[0])  # |010> and |1>
+        qml.CNOT(wires=[q[0], 2])  # |011> and |1>
+        deallocate(q[0])  # |011>
 
         return qml.probs(wires=[0, 1, 2])
-
-    #breakpoint()
 
     observed = circuit()
     qml.capture.disable()
 
     expected = [0, 0, 0, 1, 0, 0, 0, 0]
-    #breakpoint()
     assert np.allclose(expected, observed)
+
+
+@pytest.mark.parametrize("cond, expected", [(True, [0, 0, 1, 0]), (False, [0, 1, 0, 0])])
+def test_dynamic_wire_alloc_cond(cond, expected):
+
+    qml.capture.enable()
+
+    @qjit
+    @qml.qnode(qml.device("lightning.qubit", wires=2))
+    def circuit(c):
+        if c:
+            q = allocate(1)[0]
+            qml.X(wires=q)
+            qml.CNOT(wires=[q, 0])
+            deallocate(q)
+        else:
+            q = allocate(1)[0]
+            qml.X(wires=q)
+            qml.CNOT(wires=[q, 1])
+            deallocate(q)
+
+        return qml.probs(wires=[0, 1])
+
+    observed = circuit(cond)
+    qml.capture.disable()
+
+    assert np.allclose(expected, observed)
+
+
+@pytest.mark.parametrize(
+    "num_iter, expected", [(3, [0, 0, 1, 0, 0, 0, 0, 0]), (4, [1, 0, 0, 0, 0, 0, 0, 0])]
+)
+def test_dynamic_wire_alloc_forloop(num_iter, expected):
+
+    qml.capture.enable()
+
+    @qjit
+    @qml.qnode(qml.device("lightning.qubit", wires=3))
+    def circuit(N):
+        for i in range(N):
+            q = allocate(1)[0]
+            qml.X(wires=q)
+            qml.CNOT(wires=[q, 1])
+            deallocate(q)
+
+        return qml.probs(wires=[0, 1, 2])
+
+    observed = circuit(num_iter)
+    qml.capture.disable()
+
+    assert np.allclose(expected, observed)
+
+
+@pytest.mark.parametrize(
+    "num_iter, expected", [(3, [0, 0, 1, 0, 0, 0, 0, 0]), (4, [1, 0, 0, 0, 0, 0, 0, 0])]
+)
+def test_dynamic_wire_alloc_whileloop(num_iter, expected):
+
+    qml.capture.enable()
+
+    @qjit
+    @qml.qnode(qml.device("lightning.qubit", wires=3))
+    def circuit(N):
+        i = 0
+        while i < N:
+            q = allocate(1)[0]
+            qml.X(wires=q)
+            qml.CNOT(wires=[q, 1])
+            deallocate(q)
+            i += 1
+
+        return qml.probs(wires=[0, 1, 2])
+
+    observed = circuit(num_iter)
+    qml.capture.disable()
+
+    assert np.allclose(expected, observed)
+
+
+if __name__ == "__main__":
+    pytest.main(["-x", __file__])

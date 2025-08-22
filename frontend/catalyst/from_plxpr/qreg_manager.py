@@ -125,7 +125,9 @@ class QregManager:
 
     wire_map: dict[int, AbstractQbit]  # Note: No dynamic wire indices for now in from_plxpr.
 
-    def __init__(self, root_qreg_value: AbstractQreg, recorder: QubitIndexRecorder, absolute_addressing=False):
+    def __init__(
+        self, root_qreg_value: AbstractQreg, recorder: QubitIndexRecorder, absolute_addressing=False
+    ):
         self.current_qreg_value = root_qreg_value
         self.recorder = recorder
 
@@ -137,6 +139,7 @@ class QregManager:
         # However, catalyst qreg work with relative indices
         # i.e. extracting and inserting with every new catalyst qreg use indices 0,1,2,...
         # To distinguish between different registers, we require that each one has a hash.
+        # For the first qreg of a scope, absolute addressing is required (why???)
         self.root_hash = hash(root_qreg_value) if not absolute_addressing else 0
 
     def get(self):
@@ -236,7 +239,6 @@ class QregManager:
         Convert a local index of this qreg to the plxpr global index.
         """
         return index + self.root_hash
-
 
     def insert_dynamic_qubits(self, wires):
         """
