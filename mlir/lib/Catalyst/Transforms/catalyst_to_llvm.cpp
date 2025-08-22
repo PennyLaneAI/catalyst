@@ -25,7 +25,6 @@
 #include "mlir/Transforms/DialectConversion.h"
 
 #include "Catalyst/IR/CatalystOps.h"
-#include "Catalyst/Transforms/Passes.h"
 #include "Catalyst/Transforms/Patterns.h"
 #include "Catalyst/Utils/EnsureFunctionDeclaration.h"
 #include "Catalyst/Utils/StaticAllocas.h"
@@ -606,10 +605,5 @@ struct CatalystConversionPass : impl::CatalystConversionPassBase<CatalystConvers
         }
     }
 };
-
-std::unique_ptr<Pass> createCatalystConversionPass()
-{
-    return std::make_unique<catalyst::CatalystConversionPass>();
-}
 
 } // namespace catalyst

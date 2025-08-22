@@ -26,16 +26,17 @@
 #include "stablehlo/transforms/Passes.h"
 #include "llvm/Support/Debug.h"
 
-#include "hlo-extensions/Passes.h"
-#include "hlo-extensions/Patterns.h"
+#include "hlo-extensions/Transforms/Patterns.h"
 
 using namespace llvm;
 using namespace mlir;
 using namespace catalyst;
 
 namespace catalyst {
+namespace hlo {
+
 #define GEN_PASS_DEF_SCATTERLOWERINGPASS
-#include "hlo-extensions/Passes.h.inc"
+#include "hlo-extensions/Transforms/Passes.h.inc"
 
 struct ScatterLoweringPass : impl::ScatterLoweringPassBase<ScatterLoweringPass> {
     using ScatterLoweringPassBase::ScatterLoweringPassBase;
@@ -53,9 +54,5 @@ struct ScatterLoweringPass : impl::ScatterLoweringPassBase<ScatterLoweringPass> 
     }
 };
 
-std::unique_ptr<Pass> createScatterLoweringPass()
-{
-    return std::make_unique<ScatterLoweringPass>();
-}
-
+} // namespace hlo
 } // namespace catalyst
