@@ -23,10 +23,6 @@
 
 <h3>Improvements 🛠</h3>
 
-* The `qml.compiler.python_compiler` module in PennyLane has been renamed `qml.compiler.unified_compiler`.
-  Catalyst has been updated to reflect this change.
-  [(#1997)](https://github.com/PennyLaneAI/pennylane/pull/1997)
-
 * Adjoint differentiation is used by default when executing on lightning devices, significantly reduces gradient computation time.
   [(#1961)](https://github.com/PennyLaneAI/catalyst/pull/1961)
 
@@ -104,6 +100,10 @@
   [(#1926)](https://github.com/PennyLaneAI/catalyst/pull/1926)
 
 <h3>Internal changes ⚙️</h3>
+
+* The `qml.compiler.python_compiler` module in PennyLane has been renamed `qml.compiler.unified_compiler`.
+  Catalyst has been updated to reflect this change.
+  [(#1997)](https://github.com/PennyLaneAI/pennylane/pull/1997)
 
 * Updates use of `qml.transforms.dynamic_one_shot.parse_native_mid_circuit_measurements` to improved signature.
   [(#1953)](https://github.com/PennyLaneAI/catalyst/pull/1953)
