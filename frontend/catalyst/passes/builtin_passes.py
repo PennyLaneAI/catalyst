@@ -1089,7 +1089,8 @@ def t_layer_reduction(qnode):
     **Example**
 
     In this example, after performing the `to_ppr` to `merge_ppr_ppm` passes, the circuit contains
-    a four depth of Non-Clifford PPRs. The `t_layer_reduction` pass reduces the depth to three.
+    a four depth of Non-Clifford PPRs. The `t_layer_reduction` pass move the PPR("X") on qubit Q1
+    to first layer, which results in a three depth of Non-Clifford PPRs.
 
 
     .. code-block:: python
@@ -1131,13 +1132,15 @@ def t_layer_reduction(qnode):
         // layer 1
         %3 = qec.ppr ["X"](8) %1 : !quantum.bit
         %4 = qec.ppr ["X"](8) %2 : !quantum.bit
-        %5 = quantum.extract %0[ 2] : !quantum.reg -> !quantum.bit
+
         // layer 2
+        %5 = quantum.extract %0[ 2] : !quantum.reg -> !quantum.bit
         %6:2 = qec.ppr ["Y", "X"](8) %3, %4 : !quantum.bit, !quantum.bit
-        %7:3 = qec.ppr ["X", "Y", "X"](8) %6#0, %6#1, %5 : !quantum.bit, !quantum.bit, !quantum.bit
+        %7 = qec.ppr ["X"](8) %5 : !quantum.bit
+        %8:3 = qec.ppr ["X", "Y", "X"](8) %6#0, %6#1, %7:!quantum.bit, !quantum.bit, !quantum.bit
+
         // layer 3
-        %8 = qec.ppr ["X"](8) %7#2 : !quantum.bit
-        %9:3 = qec.ppr ["X", "X", "Y"](8) %7#0, %7#1, %8 : !quantum.bit, !quantum.bit, !quantum.bit
+        %9:3 = qec.ppr ["X", "X", "Y"](8) %8#0, %8#1, %8#2:!quantum.bit, !quantum.bit, !quantum.bit
         . . .
 
     """
