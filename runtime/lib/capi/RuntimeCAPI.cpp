@@ -76,19 +76,8 @@ std::vector<bool> getModifiersControlledValues(const Modifiers *modifiers)
  * to the new initialized device pointer.
  */
 [[nodiscard]] bool initRTDevicePtr(std::string_view rtd_lib, std::string_view rtd_name,
-                                   std::string_view rtd_kwargs, bool auto_qubit_management)
-{
-    auto &&device = CTX->getOrCreateDevice(rtd_lib, rtd_name, rtd_kwargs, auto_qubit_management);
-    if (device) {
-        RTD_PTR = device.get();
-        return RTD_PTR ? true : false;
-    }
-    return false;
-}
-
-[[nodiscard]] bool initRTDevicePtr(std::string_view rtd_lib, std::string_view rtd_name,
                                    std::string_view rtd_kwargs, bool auto_qubit_management,
-                                   std::string_view coupling_map_str)
+                                   std::string_view coupling_map_str = {})
 {
     auto &&device = CTX->getOrCreateDevice(rtd_lib, rtd_name, rtd_kwargs, auto_qubit_management, coupling_map_str);
     if (device) {
@@ -1289,6 +1278,8 @@ RESULT *__catalyst__qis__Measure(QUBIT *wire, int32_t postselect)
     if (postselect != 0 && postselect != 1) {
         postselectOpt = std::nullopt;
     }
+    if (RTD_PTR != nullptr && RTD_PTR->getRuntimeRouter() != nullptr)
+        return getQuantumDevicePtr()->Measure(RTD_PTR->getRuntimeRouter()->getMappedWire(reinterpret_cast<QubitIdType>(wire)), postselectOpt);
 
     return getQuantumDevicePtr()->Measure(reinterpret_cast<QubitIdType>(wire), postselectOpt);
 }
@@ -1306,7 +1297,11 @@ void __catalyst__qis__State(MemRefT_CplxT_double_1d *result, int64_t numQubits, 
     va_start(args, numQubits);
     std::vector<QubitIdType> wires(numQubits);
     for (int64_t i = 0; i < numQubits; i++) {
-        wires[i] = va_arg(args, QubitIdType);
+        QubitIdType original_wire = va_arg(args, QubitIdType);
+        if (RTD_PTR != nullptr && RTD_PTR->getRuntimeRouter() != nullptr)
+            wires[i] = RTD_PTR->getRuntimeRouter()->getMappedWire(original_wire);
+        else
+            wires[i] = original_wire;
     }
     va_end(args);
 
@@ -1335,7 +1330,11 @@ void __catalyst__qis__Probs(MemRefT_double_1d *result, int64_t numQubits, ...)
     va_start(args, numQubits);
     std::vector<QubitIdType> wires(numQubits);
     for (int64_t i = 0; i < numQubits; i++) {
-        wires[i] = va_arg(args, QubitIdType);
+        QubitIdType original_wire = va_arg(args, QubitIdType);
+        if (RTD_PTR != nullptr && RTD_PTR->getRuntimeRouter() != nullptr)
+            wires[i] = RTD_PTR->getRuntimeRouter()->getMappedWire(original_wire);
+        else
+            wires[i] = original_wire;
     }
     va_end(args);
 
@@ -1366,7 +1365,11 @@ void __catalyst__qis__Sample(MemRefT_double_2d *result, int64_t numQubits, ...)
     va_start(args, numQubits);
     std::vector<QubitIdType> wires(numQubits);
     for (int64_t i = 0; i < numQubits; i++) {
-        wires[i] = va_arg(args, QubitIdType);
+        QubitIdType original_wire = va_arg(args, QubitIdType);
+        if (RTD_PTR != nullptr && RTD_PTR->getRuntimeRouter() != nullptr)
+            wires[i] = RTD_PTR->getRuntimeRouter()->getMappedWire(original_wire);
+        else
+            wires[i] = original_wire;
     }
     va_end(args);
 
@@ -1397,7 +1400,11 @@ void __catalyst__qis__Counts(PairT_MemRefT_double_int64_1d *result, int64_t numQ
     va_start(args, numQubits);
     std::vector<QubitIdType> wires(numQubits);
     for (int64_t i = 0; i < numQubits; i++) {
-        wires[i] = va_arg(args, QubitIdType);
+        QubitIdType original_wire = va_arg(args, QubitIdType);
+        if (RTD_PTR != nullptr && RTD_PTR->getRuntimeRouter() != nullptr)
+            wires[i] = RTD_PTR->getRuntimeRouter()->getMappedWire(original_wire);
+        else
+            wires[i] = original_wire;
     }
     va_end(args);
 

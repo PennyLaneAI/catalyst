@@ -37,14 +37,14 @@ class RoutingPass final {
     std::map<std::pair<QubitIdType, QubitIdType>, int> predecessorMatrix;
 
   public:
-    RoutingPass(std::string_view tuple_str)
+    RoutingPass(std::string_view coupling_map_str)
     {
         auto string_index = 1;
-        while (string_index < tuple_str.size() - 1) {
-            size_t next_closing_bracket = tuple_str.find(")", string_index);
-            std::string curr_tuple_str = std::string(
-                tuple_str.substr(string_index + 1, next_closing_bracket - string_index - 1));
-            std::istringstream iss(curr_tuple_str);
+        while (string_index < coupling_map_str.size() - 1) {
+            size_t next_closing_bracket = coupling_map_str.find(")", string_index);
+            std::string curr_coupling_map_str = std::string(
+                coupling_map_str.substr(string_index + 1, next_closing_bracket - string_index - 1));
+            std::istringstream iss(curr_coupling_map_str);
             QubitIdType first_qubit_id, second_qubit_id;
             char comma;
             iss >> first_qubit_id >> comma &&comma == ',' && iss >> second_qubit_id;
@@ -124,6 +124,8 @@ class RoutingPass final {
         std::reverse(path.begin(), path.end());
         return path;
     }
+
+    QubitIdType getMappedWire(QubitIdType wire) { return this->wireMap[wire]; }
 
     std::tuple<QubitIdType, QubitIdType, std::vector<QubitIdType>>
     getRoutedQubits(QUBIT *control, QUBIT *target)
