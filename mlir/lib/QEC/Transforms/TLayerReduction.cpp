@@ -56,15 +56,28 @@ Value findPredecessorValueOfOp(Value qubit, QECOpInterface op)
     if (!qecOp)
         return nullptr;
 
-    IRMapping outInMap;
-    outInMap.map(qecOp.getOutQubits(), qecOp.getInQubits());
+    auto outQubits = qecOp.getOutQubits();
+    auto inQubits = qecOp.getInQubits();
+    assert((inQubits.size() == outQubits.size()) &&
+           "PPR op should have the same number of input and output qubits");
 
-    auto inQubit = outInMap.lookup(qubit);
+    auto pos = std::distance(outQubits.begin(), llvm::find(outQubits, qubit));
+    Value inQubit = inQubits[pos];
 
     if (qecOp == op)
         return inQubit;
 
     return findPredecessorValueOfOp(inQubit, op);
+}
+
+std::vector<Value> findDominanceQubits(QECOpInterface fromOp, QECOpInterface toOp)
+{
+    std::vector<Value> dominanceQubits;
+    for (auto inQubit : fromOp.getInQubits()) {
+        Value v = findPredecessorValueOfOp(inQubit, toOp);
+        dominanceQubits.emplace_back(v);
+    }
+    return dominanceQubits;
 }
 
 bool commute(QECOpInterface lhsOp, QECOpInterface rhsOp)
@@ -77,17 +90,13 @@ bool commute(QECOpInterface lhsOp, QECOpInterface rhsOp)
 
     // Track and collect the qubits that are acted on by rhsOp and
     // are predecessors of qubits acted on by lhsOp
-    std::vector<Value> rhsOpInQubitsFromLhsOp;
-    for (auto inQubit : rhsOp.getInQubits()) {
-        Value v = findPredecessorValueOfOp(inQubit, lhsOp);
-        if (!v) {
-            // No predecessor found for the qubit
-            // This means there is a non-PPR op between lhsOp and rhsOp
-            // and the commutation check fails.
-            // TODO: Handle the case where the non-PPR is not directly dominated by lhsOp
-            return false;
-        }
-        rhsOpInQubitsFromLhsOp.emplace_back(v);
+    std::vector<Value> rhsOpInQubitsFromLhsOp = findDominanceQubits(rhsOp, lhsOp);
+    if (llvm::any_of(rhsOpInQubitsFromLhsOp, [](Value qubit) { return qubit == nullptr; })) {
+        // No predecessor found for the qubit
+        // This means there is a non-PPR op between lhsOp and rhsOp
+        // and the commutation check fails.
+        // TODO: Handle the case where the non-PPR is not directly dominated by lhsOp
+        return false;
     }
 
     // Normalize the ops to get the Pauli strings
@@ -98,9 +107,14 @@ bool commute(QECOpInterface lhsOp, QECOpInterface rhsOp)
 
 bool commuteOps(QECOpInterface rhsOp, QECLayer &lhsLayer)
 {
-    return llvm::all_of(lhsLayer.getOps(), [rhsOp](QECOpInterface lhsOp) {
-        return lhsOp->getBlock() == rhsOp->getBlock() && commute(lhsOp, rhsOp);
-    });
+    for (auto lhsOp : lhsLayer.getOps()) {
+        if (lhsOp->getBlock() != rhsOp->getBlock())
+            return false;
+
+        if (!commute(lhsOp, rhsOp))
+            return false;
+    }
+    return true;
 }
 
 void moveOpToLayer(QECOpInterface rhsOp, QECLayer &rhsLayer, QECLayer &lhsLayer, IRRewriter &writer)
