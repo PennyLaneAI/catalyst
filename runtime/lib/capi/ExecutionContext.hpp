@@ -172,7 +172,7 @@ class RTDevice {
     std::unique_ptr<SharedLibraryManager> rtd_dylib{nullptr};
     std::unique_ptr<QuantumDevice> rtd_qdevice{nullptr};
     //device specific routing pass pointer.
-    std::unique_ptr<RoutingPass> RUNTIME_ROUTER = nullptr;
+    std::unique_ptr<RoutingPass> RUNTIME_ROUTER{nullptr};
 
     RTDeviceStatus status{RTDeviceStatus::Inactive};
 
@@ -276,8 +276,8 @@ class RTDevice {
     void setDeviceStatus(RTDeviceStatus new_status) noexcept { status = new_status; }
 
     bool getQubitManagementMode() { return auto_qubit_management; }
-    [[nodiscard]] auto getRuntimeRouter() -> std::unique_ptr<RoutingPass> {
-        return std::move(RUNTIME_ROUTER);
+    [[nodiscard]] auto getRuntimeRouter() -> std::unique_ptr<RoutingPass>& {
+        return RUNTIME_ROUTER;
     }
 
     [[nodiscard]] auto getDeviceStatus() const -> RTDeviceStatus { return status; }
@@ -324,8 +324,6 @@ class ExecutionContext final {
     ExecutionContext &operator=(ExecutionContext &&other) = delete;
 
     void setDeviceRecorderStatus(bool status) noexcept { initial_tape_recorder_status = status; }
-    void setRoutingEnable() noexcept { this->enable_routing = true; }
-    bool getRoutingStatus() noexcept { return this->enable_routing; }
 
     [[nodiscard]] auto getDeviceRecorderStatus() const -> bool
     {

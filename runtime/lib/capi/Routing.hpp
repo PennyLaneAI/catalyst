@@ -125,15 +125,15 @@ class RoutingPass final {
         return path;
     }
 
-    std::pair<QubitIdType, QubitIdType>
-    getRoutedQubits(QUBIT *control, QUBIT *target, const Modifiers *modifiers, RTDevice *RTD_PTR,
-                    bool adjoint, const std::vector<QubitIdType> controlledWires,
-                    const std::vector<bool> controlledValues)
+    std::tuple<QubitIdType, QubitIdType, std::vector<QubitIdType>>
+    getRoutedQubits(QUBIT *control, QUBIT *target)
     {
         // Similar to qml.transpile implementation
         // https://docs.pennylane.ai/en/stable/_modules/pennylane/transforms/transpile.html
+
         QubitIdType firstQubit = reinterpret_cast<QubitIdType>(control);
         QubitIdType secondQubit = reinterpret_cast<QubitIdType>(target);
+        std::vector<QubitIdType> swapPath = {};
 
         if (this->couplingMap[std::make_pair(firstQubit, secondQubit)]) {
             // since in each iteration, we adjust indices of each op,
@@ -143,14 +143,11 @@ class RoutingPass final {
             }
         }
         else {
-            std::vector<QubitIdType> swapPath = this->getShortestPath(firstQubit, secondQubit);
+            swapPath = this->getShortestPath(firstQubit, secondQubit);
             //  i<swapPath.size()-1 since last qubit is already our target
             for (auto i = 1; i < swapPath.size() - 1; i++) {
                 QubitIdType u = swapPath[i - 1];
                 QubitIdType v = swapPath[i];
-                RTD_PTR->getQuantumDevicePtr()->NamedOperation("SWAP", {}, {u, v}, adjoint,
-                                                               controlledWires, controlledValues);
-
                 for (auto it = this->wireMap.begin(); it != this->wireMap.end(); ++it) {
                     // update logical -> phyiscal mapping
                     if (this->wireMap[it->first] == u)
@@ -162,7 +159,7 @@ class RoutingPass final {
             firstQubit = this->wireMap[firstQubit];
             secondQubit = this->wireMap[secondQubit];
         }
-        return std::make_pair(firstQubit, secondQubit);
+        return std::make_tuple(firstQubit, secondQubit, swapPath);
     }
 
     ~RoutingPass() = default;
