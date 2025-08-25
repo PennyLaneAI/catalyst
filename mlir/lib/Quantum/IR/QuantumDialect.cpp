@@ -56,7 +56,8 @@ struct QuantumInlinerInterface : public DialectInlinerInterface {
     }
 
     // Allow to inline operations from decomposition functions.
-    bool isLegalToInline(Operation *op, Region *dest, bool wouldBeCloned, IRMapping &valueMapping) const final
+    bool isLegalToInline(Operation *op, Region *dest, bool wouldBeCloned,
+                         IRMapping &valueMapping) const final
     {
         if (auto funcOp = op->getParentOfType<func::FuncOp>()) {
             return funcOp->hasAttr("catalyst.decomposition");
