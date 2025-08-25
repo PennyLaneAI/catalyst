@@ -18,6 +18,8 @@ file(GLOB SRC
     DisentangleCNOT.cpp
     ions_decompositions.cpp
     IonsDecompositionPatterns.cpp
+    UserDefinedDecompositionPass.cpp
+    UserDefinedDecompositionPatterns.cpp
     loop_boundary_optimization.cpp
     LoopBoundaryOptimizationPatterns.cpp
 )
