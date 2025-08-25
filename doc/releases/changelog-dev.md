@@ -3,7 +3,7 @@
 <h3>New features since last release</h3>
 
 * Support for dynamic wire allocation
-  [(#???)](https://github.com/PennyLaneAI/catalyst/pull/???)
+  [(#1993)](https://github.com/PennyLaneAI/catalyst/pull/1993)
 
 <h3>Improvements 🛠</h3>
 
