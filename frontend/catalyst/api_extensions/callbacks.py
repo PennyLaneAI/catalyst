@@ -132,7 +132,7 @@ def accelerate(func=None, *, dev=None):
     return accelerate_impl(func, dev=dev)
 
 
-def pure_callback(callback_fn, result_type=None):
+def pure_callback(callback_fn=None, *, result_type=None):
     """Execute and return the results of a functionally pure Python
     function from within a qjit-compiled function.
 
@@ -255,6 +255,11 @@ def pure_callback(callback_fn, result_type=None):
         >>> f(jnp.array([0.1, 0.2]))
         Array([-0.01071923,  0.82698717], dtype=float64)
     """
+    # Just for convenience
+    if callback_fn is None:
+        kwargs = copy.copy(locals())
+        kwargs.pop("callback_fn")
+        return functools.partial(pure_callback, **kwargs)
 
     # Verify inputs
     if result_type is None:
