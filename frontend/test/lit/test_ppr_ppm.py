@@ -21,7 +21,14 @@
 import pennylane as qml
 
 from catalyst import measure, qjit
-from catalyst.passes import commute_ppr, merge_ppr_ppm, ppm_compilation, ppr_to_ppm, to_ppr
+from catalyst.passes import (
+    commute_ppr,
+    merge_ppr_ppm,
+    ppm_compilation,
+    ppr_to_ppm,
+    t_layer_reduction,
+    to_ppr,
+)
 
 
 def test_convert_clifford_to_ppr():
@@ -283,3 +290,40 @@ def test_clifford_to_ppm():
 # It can be decomposed to three pauli strings in decomposing ppr to ppm
 # CHECK: qec.ppm [{{.+}}, {{.+}}, {{.+}}]
 test_clifford_to_ppm()
+
+
+def test_t_layer_reduction():
+    """
+    Test the `t_layer_reduction` pass.
+    """
+
+    pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+
+    @qjit(pipelines=pipe, target="mlir")
+    @t_layer_reduction
+    @merge_ppr_ppm
+    @commute_ppr
+    @to_ppr
+    @qml.qnode(qml.device("null.qubit", wires=3))
+    def test_t_layer_reduction_workflow():
+        n = 3
+        for i in range(n):
+            qml.H(wires=i)
+            qml.S(wires=i)
+            qml.CNOT(wires=[i, (i + 1) % n])
+            qml.T(wires=i)
+            qml.H(wires=i)
+            qml.T(wires=i)
+
+        return [measure(wires=i) for i in range(n)]
+
+    print(test_t_layer_reduction_workflow.mlir_opt)
+
+
+# CHECK: qec.ppr ["X"](8)
+# CHECK: qec.ppr ["X"](8)
+# CHECK: qec.ppr ["Y", "X"](8)
+# CHECK: qec.ppr ["X"](8)
+# CHECK: qec.ppr ["X", "Y", "X"](8)
+# CHECK: qec.ppr ["X", "X", "Y"](8)
+test_t_layer_reduction()
