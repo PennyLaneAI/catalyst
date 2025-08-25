@@ -37,14 +37,14 @@ class RoutingPass final {
     std::map<std::pair<QubitIdType, QubitIdType>, int> predecessorMatrix;
 
   public:
-    RoutingPass(std::string_view tuple_str)
+    RoutingPass(std::string_view coupling_map_str)
     {
         auto string_index = 1;
-        while (string_index < tuple_str.size() - 1) {
-            size_t next_closing_bracket = tuple_str.find(")", string_index);
-            std::string curr_tuple_str = std::string(
-                tuple_str.substr(string_index + 1, next_closing_bracket - string_index - 1));
-            std::istringstream iss(curr_tuple_str);
+        while (string_index < coupling_map_str.size() - 1) {
+            size_t next_closing_bracket = coupling_map_str.find(")", string_index);
+            std::string curr_coupling_map_str = std::string(
+                coupling_map_str.substr(string_index + 1, next_closing_bracket - string_index - 1));
+            std::istringstream iss(curr_coupling_map_str);
             QubitIdType first_qubit_id, second_qubit_id;
             char comma;
             iss >> first_qubit_id >> comma &&comma == ',' && iss >> second_qubit_id;
@@ -123,6 +123,50 @@ class RoutingPass final {
         path.push_back(source);
         std::reverse(path.begin(), path.end());
         return path;
+    }
+
+    QubitIdType getMappedWire(QubitIdType wire,  int64_t num_elements) 
+    { 
+        for (auto& pair : this->wireMap) {
+            std::cout << "Log: " << pair.first << "\n";
+            std::cout << "Mapp: " << pair.second << "\n";
+        }
+        QubitIdType numQubits = std::log2(num_elements);
+        std::vector<QubitIdType> binaryVector;
+        if (wire == 0) 
+            binaryVector.push_back(0); 
+        while (wire > 0) {
+            binaryVector.push_back(wire % 2); 
+            wire /= 2; 
+        }
+        while (binaryVector.size() < numQubits)
+            binaryVector.push_back(0);
+        std::reverse(binaryVector.begin(), binaryVector.end());
+        std::vector<QubitIdType> binaryVectorCopy;
+        for(auto i = 0; i < binaryVector.size(); i++) 
+            binaryVectorCopy.push_back(binaryVector[i]);
+
+        for(auto i=0; i<binaryVector.size(); i++)
+        {
+            // for (auto& pair : this->wireMap) {
+            //     if (pair.second == i)
+            //     {
+            //         binaryVector[i] = binaryVectorCopy[pair.first];
+            //         break;
+            //     }
+            // }
+            binaryVector[i] = binaryVectorCopy[this->wireMap[i]];
+        }
+     
+        QubitIdType mapped_wire = 0;
+        int power = 0;
+        for (int i = binaryVector.size() - 1; i >= 0; --i) {
+            if (binaryVector[i] == 1) {
+                mapped_wire += std::pow(2, power);
+            }
+            power++;
+        }
+        return mapped_wire; 
     }
 
     std::tuple<QubitIdType, QubitIdType, std::vector<QubitIdType>>

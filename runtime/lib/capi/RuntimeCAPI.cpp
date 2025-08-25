@@ -76,19 +76,8 @@ std::vector<bool> getModifiersControlledValues(const Modifiers *modifiers)
  * to the new initialized device pointer.
  */
 [[nodiscard]] bool initRTDevicePtr(std::string_view rtd_lib, std::string_view rtd_name,
-                                   std::string_view rtd_kwargs, bool auto_qubit_management)
-{
-    auto &&device = CTX->getOrCreateDevice(rtd_lib, rtd_name, rtd_kwargs, auto_qubit_management);
-    if (device) {
-        RTD_PTR = device.get();
-        return RTD_PTR ? true : false;
-    }
-    return false;
-}
-
-[[nodiscard]] bool initRTDevicePtr(std::string_view rtd_lib, std::string_view rtd_name,
                                    std::string_view rtd_kwargs, bool auto_qubit_management,
-                                   std::string_view coupling_map_str)
+                                   std::string_view coupling_map_str = {})
 {
     auto &&device = CTX->getOrCreateDevice(rtd_lib, rtd_name, rtd_kwargs, auto_qubit_management, coupling_map_str);
     if (device) {
@@ -1289,7 +1278,6 @@ RESULT *__catalyst__qis__Measure(QUBIT *wire, int32_t postselect)
     if (postselect != 0 && postselect != 1) {
         postselectOpt = std::nullopt;
     }
-
     return getQuantumDevicePtr()->Measure(reinterpret_cast<QubitIdType>(wire), postselectOpt);
 }
 
@@ -1315,6 +1303,20 @@ void __catalyst__qis__State(MemRefT_CplxT_double_1d *result, int64_t numQubits, 
 
     if (wires.empty()) {
         getQuantumDevicePtr()->State(view);
+        if (RTD_PTR != nullptr && RTD_PTR->getRuntimeRouter() != nullptr)
+        {
+            // copy the result_p data
+            std::vector<std::complex<double>> tempState;
+            for(int i = 0; i < result_p->sizes[0]; i++) 
+                tempState.push_back(result_p->data_aligned[i]);
+
+            // permute indices
+            for(int i=0; i<result_p->sizes[0]; i++)
+            {
+                QubitIdType mapped_wire = RTD_PTR->getRuntimeRouter()->getMappedWire(i,result_p->sizes[0]);
+                result_p->data_aligned[i] = tempState[mapped_wire];
+            }
+        }
     }
     else {
         RT_FAIL("Partial State-Vector not supported.");

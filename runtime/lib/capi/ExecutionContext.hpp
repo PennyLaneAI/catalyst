@@ -232,7 +232,11 @@ class RTDevice {
         : rtd_lib(_rtd_lib), rtd_name(_rtd_name), rtd_kwargs(_rtd_kwargs),
           auto_qubit_management(_auto_qubit_management)
     {
-        RUNTIME_ROUTER = std::make_unique<RoutingPass>(coupling_map_str);
+        // Extract coupling map from the kwargs passed 
+        // If coupling map is provided then it takes in the form {...,'couplingMap' ((a,b),(b,c))}
+        // else {...,'couplingMap' (a,b,c)}
+        if (coupling_map_str.find("((") != std::string::npos) 
+            RUNTIME_ROUTER = std::make_unique<RoutingPass>(coupling_map_str);
         _pl2runtime_device_info(rtd_lib, rtd_name);
     }
 
