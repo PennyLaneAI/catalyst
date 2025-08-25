@@ -2,6 +2,9 @@
 
 <h3>New features since last release</h3>
 
+* Support for dynamic wire allocation
+  [(#1993)](https://github.com/PennyLaneAI/catalyst/pull/1993)
+
 <h3>Improvements 🛠</h3>
 
 * Adjoint differentiation is used by default when executing on lightning devices, significantly reduces gradient computation time.
