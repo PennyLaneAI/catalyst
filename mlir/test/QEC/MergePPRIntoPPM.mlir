@@ -152,7 +152,7 @@ func.func public @commute_ppr_ppm_pi_2_rotation_test_3(%q1: !quantum.bit) -> (te
 }
 
 // For the following two tests, the PPR can be removed after the commute,
-// because the function no longer returns qubits on which the PPR operates
+// because the PPM is a terminal measurement and has no operations applied to those qubits.
 func.func public @commute_ppr_ppm_pi_2_rotation_test_4() -> tensor<i1> {
 
     // CHECK: qec.ppm ["Z"] %
