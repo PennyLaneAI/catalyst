@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "Exception.hpp"
+#include "Types.h"
 
 #include "OpenQasmDevice.hpp"
 
@@ -46,6 +47,11 @@ void OpenQasmDevice::ReleaseAllQubits()
     else {
         builder = std::make_unique<OpenQasm::OpenQasmBuilder>();
     }
+}
+
+auto OpenQasmDevice::IsQubitActive(QubitIdType q) -> bool
+{
+    return this->qubit_manager.isValidQubitId(q);
 }
 
 auto OpenQasmDevice::GetNumQubits() const -> size_t { return builder->getNumQubits(); }

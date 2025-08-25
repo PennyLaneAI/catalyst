@@ -16,6 +16,7 @@
 #include <cstdarg>
 #include <cstdlib>
 #include <ctime>
+#include <format>
 #include <memory>
 #include <ostream>
 #include <stdexcept>
@@ -24,6 +25,7 @@
 
 #include "mlir/ExecutionEngine/CRunnerUtils.h"
 
+#include "Types.h"
 #include "Exception.hpp"
 #include "ExecutionContext.hpp"
 #include "MemRefUtils.hpp"
@@ -1113,6 +1115,31 @@ int8_t *__catalyst__rt__array_get_element_ptr_1d(QirArray *ptr, int64_t idx)
 
     QubitIdType *data = qubit_vector_ptr->data();
     return (int8_t *)&data[idx];
+}
+
+void __catalyst__rt__insert_element_into_array_1d(QirArray *ptr, int64_t idx, QUBIT *qubit)
+{
+
+    RT_ASSERT(getQuantumDevicePtr() != nullptr);
+    RT_ASSERT(CTX->getMemoryManager() != nullptr);
+    std::vector<QubitIdType> *qubit_vector_ptr = reinterpret_cast<std::vector<QubitIdType> *>(ptr);
+
+    RT_ASSERT(idx >= 0);
+
+    if (static_cast<size_t>(idx) >= qubit_vector_ptr->size()) {
+        std::string error_msg =
+            std::format("The qubit register does not contain the requested wire: {}", idx);
+        RT_FAIL(error_msg.c_str());
+    }
+
+    QubitIdType *data = qubit_vector_ptr->data();
+    if (getQuantumDevicePtr()->IsQubitActive(data[idx])) {
+        std::string error_msg = std::format(
+            "Insertion of qubit into register at position {} would overwrite existing qubit", idx);
+        RT_FAIL(error_msg.c_str());
+    }
+
+    data[idx] = reinterpret_cast<QubitIdType>(qubit);
 }
 
 // -------------------------------------------------------------------------- //
