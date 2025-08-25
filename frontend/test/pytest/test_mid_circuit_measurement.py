@@ -33,7 +33,7 @@ from catalyst import vjp as C_vjp
 
 # TODO: add tests with other measurement processes (e.g. qml.sample, qml.probs, ...)
 
-# pylint: disable=too-many-public-methods
+# pylint: disable=too-many-lines,too-many-public-methods
 
 
 class TestMidCircuitMeasurement:
@@ -432,9 +432,19 @@ class TestDynamicOneShotIntegration:
             (None, False, (1, 1)),
             (0, False, (0, 0)),
             (1, False, (1, 1)),
-            (None, True, (1, 0)),
+            pytest.param(
+                None,
+                True,
+                (1, 0),
+                marks=pytest.mark.xfail(reason="waiting for PennyLane squeeze issue fix"),
+            ),
             (0, True, (0, 0)),
-            (1, True, (1, 0)),
+            pytest.param(
+                1,
+                True,
+                (1, 0),
+                marks=pytest.mark.xfail(reason="waiting for PennyLane squeeze issue fix"),
+            ),
         ],
     )
     @pytest.mark.parametrize("postselect_mode", ["hw-like", "fill-shots"])

@@ -794,11 +794,22 @@ def trace_quantum_operations(
         else:
             qubits = qrp.extract(op.wires)
             controlled_qubits = qrp.extract(controlled_wires)
+
+            # This is a temporary workaround for the PCPhase operation
+            # which does not follow the same pattern as `qinst_p`.
+            # We will revisit this once we have a better solution for
+            # supporting general PL operations in Catalyst.
+            params = (
+                op.parameters + [op.hyperparameters["dimension"][0]]
+                if isinstance(op, qml.PCPhase)
+                else op.parameters
+            )
+
             qubits2 = qinst_p.bind(
-                *[*qubits, *op.parameters, *controlled_qubits, *controlled_values],
+                *[*qubits, *params, *controlled_qubits, *controlled_values],
                 op=op.name,
                 qubits_len=len(qubits),
-                params_len=len(op.parameters),
+                params_len=len(params),
                 ctrl_len=len(controlled_qubits),
                 adjoint=adjoint,
             )
