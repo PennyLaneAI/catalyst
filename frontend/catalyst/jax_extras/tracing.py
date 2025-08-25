@@ -22,17 +22,7 @@ from contextlib import ExitStack, contextmanager
 from copy import copy
 from dataclasses import dataclass
 from functools import partial
-from typing import (
-    Any,
-    Callable,
-    Dict,
-    Generator,
-    List,
-    Optional,
-    Set,
-    Tuple,
-    TypeVar,
-)
+from typing import Any, Callable, Dict, Generator, List, Optional, Set, Tuple, TypeVar
 
 import jax
 from jax import ShapeDtypeStruct
@@ -70,13 +60,7 @@ from jax.interpreters.partial_eval import (
     make_jaxpr_effects,
 )
 from jax.lax import convert_element_type
-from jax.tree_util import (
-    PyTreeDef,
-    tree_flatten,
-    tree_structure,
-    tree_unflatten,
-    treedef_is_leaf,
-)
+from jax.tree_util import PyTreeDef, tree_flatten, tree_structure, tree_unflatten, treedef_is_leaf
 from jaxlib._jax.pytree import PyTreeRegistry
 
 from catalyst.jax_extras.patches import gather2_p, get_aval2
