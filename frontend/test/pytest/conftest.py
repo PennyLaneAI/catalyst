@@ -49,6 +49,15 @@ def disable_capture():
             qml.capture.disable()
 
 
+@pytest.mark.fixture(scope="function")
+def use_capture():
+    qml.capture.enable()
+    try:
+        yield
+    finally:
+        qml.capture.disable()
+
+
 @pytest.fixture(params=["capture", "no_capture"], scope="function")
 def use_both_frontend(request):
     """Runs the test once with capture enabled and once with it disabled."""
