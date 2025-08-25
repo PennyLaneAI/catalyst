@@ -152,14 +152,10 @@ class QubitHandler:
         Create the insert primitive.
         """
         if len(self.qubit_indices):
-            if not index in self.wire_map:
-                raise CompileError(
-                    f"Cannot insert a qubit at index {index} as there is no qreg."
-                    " Consider setting a qreg value first."
-                )
-
-            self.wire_map[index] = qubit
-            return
+            raise CompileError(
+                f"Cannot insert a qubit at index {index} as there is no qreg."
+                " Consider setting a qreg value first."
+            )
 
         self.abstract_qreg_val = qinsert_p.bind(self.abstract_qreg_val, index, qubit)
         self.wire_map.pop(index)
