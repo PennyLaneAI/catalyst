@@ -13,14 +13,64 @@
 // limitations under the License.
 
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/DialectImplementation.h" // needed for generated type parser
-#include "llvm/ADT/TypeSwitch.h"           // needed for generated type parser
+#include "mlir/Transforms/InliningUtils.h"
+#include "llvm/ADT/TypeSwitch.h" // needed for generated type parser
 
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/IR/QuantumOps.h"
 
 using namespace mlir;
 using namespace catalyst::quantum;
+
+//===----------------------------------------------------------------------===//
+// Quantum Dialect Interfaces
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+struct QuantumInlinerInterface : public DialectInlinerInterface {
+    using DialectInlinerInterface::DialectInlinerInterface;
+
+    /// Returns true if the given operation 'callable' can be inlined into the
+    /// position given by the 'call'. Currently, we always inline quantum
+    /// decomposition functions.
+    bool isLegalToInline(Operation *call, Operation *callable, bool wouldBeCloned) const final
+    {
+        if (auto funcOp = dyn_cast<func::FuncOp>(callable)) {
+            return funcOp->hasAttr("catalyst.decomposition");
+        }
+        return false;
+    }
+
+    /// Returns true if the given region 'src' can be inlined into the region
+    /// 'dest'. All quantum operations are pure and can be safely inlined anywhere.
+    bool isLegalToInline(Region *dest, Region *src, bool wouldBeCloned,
+                         IRMapping &valueMapping) const final
+    {
+        return true;
+    }
+
+    /// Operations in quantum dialect are always legal to inline since they are
+    /// pure.
+    bool isLegalToInline(Operation *, Region *, bool, IRMapping &) const final { return true; }
+
+    /// Handle the given inlined terminator by replacing it with a new operation
+    /// as necessary. Required when the region has only one block.
+    void handleTerminator(Operation *op, ValueRange valuesToRepl) const final
+    {
+        auto yieldOp = dyn_cast<YieldOp>(op);
+        if (!yieldOp) {
+            return;
+        }
+
+        for (auto retValue : llvm::zip(valuesToRepl, yieldOp.getOperands())) {
+            std::get<0>(retValue).replaceAllUsesWith(std::get<1>(retValue));
+        }
+    }
+};
+} // namespace
 
 //===----------------------------------------------------------------------===//
 // Quantum dialect definitions.
@@ -44,6 +94,8 @@ void QuantumDialect::initialize()
 #define GET_OP_LIST
 #include "Quantum/IR/QuantumOps.cpp.inc"
         >();
+
+    addInterfaces<QuantumInlinerInterface>();
 
     declarePromisedInterfaces<bufferization::BufferizableOpInterface, QubitUnitaryOp, HermitianOp,
                               HamiltonianOp, SampleOp, CountsOp, ProbsOp, StateOp, SetStateOp,

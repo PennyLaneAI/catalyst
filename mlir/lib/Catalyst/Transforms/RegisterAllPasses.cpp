@@ -57,6 +57,7 @@ void catalyst::registerAllCatalystPasses()
     mlir::registerPass(catalyst::createInlineNestedModulePass);
     mlir::registerPass(catalyst::createIonConversionPass);
     mlir::registerPass(catalyst::createIonsDecompositionPass);
+    mlir::registerPass(catalyst::createUserDefinedDecompositionPass);
     mlir::registerPass(catalyst::createLoopBoundaryOptimizationPass);
     mlir::registerPass(catalyst::createMBQCConversionPass);
     mlir::registerPass(catalyst::createMemrefCopyToLinalgCopyPass);
