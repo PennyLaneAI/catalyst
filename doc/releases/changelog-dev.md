@@ -191,6 +191,7 @@
 * Catalyst now supports *array-backed registers*, meaning that `quantum.insert` operations now allow
   for the insertion of a qubit into an arbitrary position within a register (if the qubit originally
   at that position has been deallocated).
+  [(#2000)](https://github.com/PennyLaneAI/catalyst/pull/2000)
 
 <h3>Documentation 📝</h3>
 
