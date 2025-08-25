@@ -423,7 +423,10 @@ class TestMeasurementTransforms:
         "measurement",
         [
             lambda: qml.sample(),
-            lambda: qml.sample(wires=[0]),
+            pytest.param(
+                lambda: qml.sample(wires=[0]),
+                marks=pytest.mark.xfail(reason="waiting for PennyLane squeeze issue fix"),
+            ),
             lambda: qml.sample(wires=[1, 2]),
             lambda: qml.sample(qml.Y(1) @ qml.Y(0)),
         ],

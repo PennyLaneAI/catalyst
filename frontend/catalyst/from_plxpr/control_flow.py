@@ -59,7 +59,9 @@ def handle_cond(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
             def calling_convention(*args_plus_qreg):
                 *args, qreg = args_plus_qreg
                 # `qreg` is the scope argument for the body jaxpr
-                qreg_manager = QregManager(qreg)
+                qreg_manager = QregManager(
+                    qreg, self.qubit_index_recorder, absolute_addressing=True
+                )
                 converter = copy(self)
                 converter.qreg_manager = qreg_manager
                 # pylint: disable-next=cell-var-from-loop
@@ -170,7 +172,7 @@ def handle_for_loop(
     def calling_convention(*args_plus_qreg):
         *args, qreg = args_plus_qreg
         # `qreg` is the scope argument for the body jaxpr
-        qreg_manager = QregManager(qreg)
+        qreg_manager = QregManager(qreg, self.qubit_index_recorder, absolute_addressing=True)
         converter = copy(self)
         converter.qreg_manager = qreg_manager
         retvals = converter(jaxpr, *args)
@@ -268,7 +270,7 @@ def handle_while_loop(
     def calling_convention(*args_plus_qreg):
         *args, qreg = args_plus_qreg
         # `qreg` is the scope argument for the body jaxpr
-        qreg_manager = QregManager(qreg)
+        qreg_manager = QregManager(qreg, self.qubit_index_recorder, absolute_addressing=True)
         converter = copy(self)
         converter.qreg_manager = qreg_manager
         retvals = converter(jaxpr, *args)
@@ -292,7 +294,7 @@ def handle_while_loop(
     def remove_qreg(*args_plus_qreg):
         *args, qreg = args_plus_qreg
         # `qreg` is the scope argument for the body jaxpr
-        qreg_manager = QregManager(qreg)
+        qreg_manager = QregManager(qreg, self.qubit_index_recorder, absolute_addressing=True)
         converter = copy(self)
         converter.qreg_manager = qreg_manager
 
