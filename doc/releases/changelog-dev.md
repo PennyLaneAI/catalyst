@@ -23,6 +23,17 @@
 
 <h3>Improvements 🛠</h3>
 
+* Added a new JAX primitive to capture and compile the decomposition rule
+  definitions to MLIR. `decomposition_rule` is the decorator integrated
+  with this primitive for development purposes.
+  [(#1820)](https://github.com/PennyLaneAI/catalyst/pull/1820)
+
+* Renamed `QregManager` to `QubitHandler` and extended the class to manage
+  converting PLxPR wire indices into Catalyst JAXPR qubits.
+  This is especially useful for lowering decomposition rules that take
+  in qubits as arguments.
+  [(#1820)](https://github.com/PennyLaneAI/catalyst/pull/1820)
+
 * Adjoint differentiation is used by default when executing on lightning devices, significantly reduces gradient computation time.
   [(#1961)](https://github.com/PennyLaneAI/catalyst/pull/1961)
 
