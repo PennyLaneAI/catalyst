@@ -331,6 +331,35 @@ func.func @multirz(%q0 : !quantum.bit, %p : f64) -> (!quantum.bit, !quantum.bit,
 
 // -----
 
+// CHECK: llvm.func @__catalyst__qis__PCPhase(f64, f64, !llvm.ptr, i64, ...)
+
+// CHECK-LABEL: @pcphase
+func.func @pcphase(%q0 : !quantum.bit, %p : f64, %d: f64) -> (!quantum.bit, !quantum.bit, !quantum.bit) {
+
+    // CHECK: [[d:%.+]] = llvm.mlir.zero : !llvm.ptr
+    // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
+    // CHECK: llvm.call @__catalyst__qis__PCPhase(%arg1, %arg2, [[d]], [[c1]], %arg0)
+    %q1 = quantum.pcphase(%p, %d) %q0 : !quantum.bit
+
+    // CHECK: [[d:%.+]] = llvm.mlir.zero : !llvm.ptr
+    // CHECK: [[c2:%.+]] = llvm.mlir.constant(2 : i64)
+    // CHECK: llvm.call @__catalyst__qis__PCPhase(%arg1, %arg2, [[d]], [[c2]], %arg0, %arg0)
+    %q2:2 = quantum.pcphase(%p, %d) %q1, %q1 : !quantum.bit, !quantum.bit
+
+    // CHECK: [[d:%.+]] = llvm.mlir.zero : !llvm.ptr
+    // CHECK: [[c3:%.+]] = llvm.mlir.constant(3 : i64)
+    // CHECK: llvm.call @__catalyst__qis__PCPhase(%arg1, %arg2, [[d]], [[c3]], %arg0, %arg0, %arg0)
+    %q3:3 = quantum.pcphase(%p, %d) %q2#0, %q2#1, %q2#1 : !quantum.bit, !quantum.bit, !quantum.bit
+
+    // CHECK: [[st1:%.+]] = llvm.insertvalue %arg0
+    // CHECK: [[st2:%.+]] = llvm.insertvalue %arg0, [[st1]]
+    // CHECK: [[st3:%.+]] = llvm.insertvalue %arg0, [[st2]]
+    // CHECK: return [[st3]]
+    return %q3#0, %q3#1, %q3#2 : !quantum.bit, !quantum.bit, !quantum.bit
+}
+
+// -----
+
 // CHECK: llvm.func @__catalyst__qis__QubitUnitary(!llvm.ptr, !llvm.ptr, i64, ...)
 
 // CHECK-LABEL: @qubit_unitary

@@ -5,6 +5,25 @@
 * Support for dynamic wire allocation
   [(#1993)](https://github.com/PennyLaneAI/catalyst/pull/1993)
 
+* Catalyst now provides native support for `SingleExcitation`, `DoubleExcitation`,
+  and `PCPhase` on compatible devices like Lightning simulators.
+  This enhancement avoids unnecessary gate decomposition,
+  leading to reduced compilation time and improved overall performance.
+  [(#1980)](https://github.com/PennyLaneAI/catalyst/pull/1980)
+  [(#1987)](https://github.com/PennyLaneAI/catalyst/pull/1987)
+
+  For example, the code below is captured with `PCPhase` avoiding the
+  decomposition to many `MultiControlledX` and `PhaseShift` gates:
+
+  ```python
+  dev = qml.device("lightning.qubit", wires=3)
+
+  @qml.qnode(dev)
+  def circuit():
+      qml.ctrl(qml.PCPhase(0.5, dim=1, wires=[0, 2]), control=[1])
+      return qml.probs()
+  ```
+
 <h3>Improvements 🛠</h3>
 
 * Adjoint differentiation is used by default when executing on lightning devices, significantly reduces gradient computation time.
@@ -16,7 +35,7 @@
 * Workflows `for_loop`, `while_loop` and `cond` now error out if `qml.capture` is enabled.
   [(#1945)](https://github.com/PennyLaneAI/catalyst/pull/1945)
 
-*  Displays Catalyst version in `quantum-opt --version` output.
+* Displays Catalyst version in `quantum-opt --version` output.
   [(#1922)](https://github.com/PennyLaneAI/catalyst/pull/1922)
 
 * Snakecased keyword arguments to :func:`catalyst.passes.apply_pass()` are now correctly parsed
@@ -41,6 +60,10 @@
    [(#1966)](https://github.com/PennyLaneAI/catalyst/pull/1966)
 
 <h3>Breaking changes 💔</h3>
+
+* The `shots` property has been removed from `OQDDevice`. The number of shots for a qnode execution is now set directly on the qnode via `qml.set_shots`,
+  either used as decorator `@qml.set_shots(num_shots)` or directly on the qnode `qml.set_shots(qnode, shots=num_shots)`.
+  [(#1988)](https://github.com/PennyLaneAI/catalyst/pull/1988)
 
 * The JAX version used by Catalyst is updated to 0.6.2.
   [(#1897)](https://github.com/PennyLaneAI/catalyst/pull/1897)
@@ -81,9 +104,6 @@
 
 <h3>Internal changes ⚙️</h3>
 
-* Add `SingleExcitation` and `DoubleExcitation` to native `RUNTIME_OPERATIONS` and `RuntimeCAPI`.
-  [(#1980)](https://github.com/PennyLaneAI/catalyst/pull/1980)
-
 * Updates use of `qml.transforms.dynamic_one_shot.parse_native_mid_circuit_measurements` to improved signature.
   [(#1953)](https://github.com/PennyLaneAI/catalyst/pull/1953)
 
@@ -103,13 +123,14 @@
   [(#1932)](https://github.com/PennyLaneAI/catalyst/pull/1932)
 
 * `from_plxpr` now supports adjoint and ctrl operations and transforms, operator
-  arithemtic observables, `Hermitian` observables, `for_loop` outside qnodes,
-  and `while_loop` outside QNode's.
+  arithmetic observables, `Hermitian` observables, `for_loop` outside qnodes, `cond` outside qnodes,
+  `while_loop` outside QNode's, and `cond` with elif branches.
   [(#1844)](https://github.com/PennyLaneAI/catalyst/pull/1844)
   [(#1850)](https://github.com/PennyLaneAI/catalyst/pull/1850)
   [(#1903)](https://github.com/PennyLaneAI/catalyst/pull/1903)
   [(#1896)](https://github.com/PennyLaneAI/catalyst/pull/1896)
   [(#1889)](https://github.com/PennyLaneAI/catalyst/pull/1889)
+  [(#1973)](https://github.com/PennyLaneAI/catalyst/pull/1973)
 
 * The `qec.layer` and `qec.yield` operations have been added to the QEC dialect to represent a group
   of QEC operations. The main use case is to analyze the depth of a circuit.
@@ -176,6 +197,7 @@
 
 This release contains contributions from (in alphabetical order):
 
+Ali Asadi,
 Joey Carter,
 Yushao Chen,
 Sengthai Heng,
