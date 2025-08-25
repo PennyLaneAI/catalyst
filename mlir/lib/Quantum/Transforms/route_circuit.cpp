@@ -80,7 +80,9 @@ struct RoutingPass : public impl::RoutingPassBase<RoutingPass> {
         return res;
     }
 
-    std::vector<int> generateRandomInitialMapping(std::set<int> *physicalQubits)
+    std::vector<int> generateRandomInitialMapping
+                                (std::set<int> *physicalQubits, 
+                                llvm::DenseMap<std::pair<int, int>, bool> &couplingMap)
     {
         std::vector<int> randomInitialMapping((*physicalQubits).begin(), (*physicalQubits).end());
         // TODO: Generating completely random mapping is inefficient
@@ -90,6 +92,32 @@ struct RoutingPass : public impl::RoutingPassBase<RoutingPass> {
         std::random_device rd;
         std::mt19937 g(rd());
         std::shuffle(randomInitialMapping.begin(), randomInitialMapping.end(), g);
+        int randomStart = randomInitialMapping[0];
+
+        std::queue<int> q;
+        std::set<int> visited;
+
+        q.push(randomStart);
+        visited.insert(randomStart);
+        randomInitialMapping.clear();
+        while (!q.empty()) {
+            int currentNode = q.front();
+            q.pop();
+            randomInitialMapping.push_back(currentNode);
+            for (const auto& pair : couplingMap) {
+                int neighbor = -1;
+                if (pair.first.first == currentNode && pair.second == true) {
+                    neighbor = pair.first.second;
+                } else if (pair.first.second == currentNode && pair.second == true) {
+                    neighbor = pair.first.first;
+                }
+
+                if (neighbor != -1 && visited.find(neighbor) == visited.end()) {
+                    q.push(neighbor);
+                    visited.insert(neighbor);
+                }
+            }
+        }
         return randomInitialMapping;
     }
 
@@ -144,13 +172,14 @@ struct RoutingPass : public impl::RoutingPassBase<RoutingPass> {
     void preProcessing(
         std::set<int> *physicalQubits, std::vector<int> *randomInitialMapping,
         llvm::DenseMap<quantum::CustomOp, std::vector<quantum::ExtractOp>> &OpToExtractMap,
-        llvm::DenseMap<quantum::ExtractOp, int> &ExtractOpToQubitMap, int *dagLogicalQubits)
+        llvm::DenseMap<quantum::ExtractOp, int> &ExtractOpToQubitMap, int *dagLogicalQubits,
+        llvm::DenseMap<std::pair<int, int>, bool> &couplingMap)
     {
         auto logicalQubitIndex = 0;
         getOperation()->walk([&](Operation *op) {
             if (isa<quantum::AllocOp>(op)) {
                 *dagLogicalQubits = countLogicalQubit(op);
-                *randomInitialMapping = generateRandomInitialMapping(physicalQubits);
+                *randomInitialMapping = generateRandomInitialMapping(physicalQubits, couplingMap);
             }
             else if (isa<quantum::ExtractOp>(op)) {
                 ExtractOpToQubitMap[cast<quantum::ExtractOp>(op)] = logicalQubitIndex;
@@ -579,7 +608,7 @@ struct RoutingPass : public impl::RoutingPassBase<RoutingPass> {
         llvm::DenseMap<quantum::CustomOp, std::vector<quantum::ExtractOp>> OpToExtractMap;
         llvm::DenseMap<quantum::ExtractOp, int> ExtractOpToQubitMap;
         preProcessing(&physicalQubits, &randomInitialMapping, OpToExtractMap,
-                      ExtractOpToQubitMap, &dagLogicalQubits);
+                      ExtractOpToQubitMap, &dagLogicalQubits, couplingMap);
 
         // print init mapping
         llvm::outs() << "Random Initial Mapping: \n";
