@@ -26,6 +26,7 @@ import pytest
 import catalyst
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 def test_dynamic_sample(capfd):
     """Test that a `sample` program with dynamic shots can be executed correctly and doesn't recompile."""
 
