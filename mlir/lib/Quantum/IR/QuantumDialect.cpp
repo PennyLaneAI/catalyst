@@ -45,16 +45,24 @@ struct QuantumInlinerInterface : public DialectInlinerInterface {
     }
 
     /// Returns true if the given region 'src' can be inlined into the region
-    /// 'dest'. All quantum operations are pure and can be safely inlined anywhere.
+    /// 'dest'. Only allow for decomposition functions.
     bool isLegalToInline(Region *dest, Region *src, bool wouldBeCloned,
                          IRMapping &valueMapping) const final
     {
-        return true;
+        if (auto funcOp = src->getParentOfType<func::FuncOp>()) {
+            return funcOp->hasAttr("catalyst.decomposition");
+        }
+        return false;
     }
 
-    /// Operations in quantum dialect are always legal to inline since they are
-    /// pure.
-    bool isLegalToInline(Operation *, Region *, bool, IRMapping &) const final { return true; }
+    // Allow to inline operations from decomposition functions.
+    bool isLegalToInline(Operation *op, Region *dest, bool wouldBeCloned, IRMapping &valueMapping) const final
+    {
+        if (auto funcOp = op->getParentOfType<func::FuncOp>()) {
+            return funcOp->hasAttr("catalyst.decomposition");
+        }
+        return false;
+    }
 
     /// Handle the given inlined terminator by replacing it with a new operation
     /// as necessary. Required when the region has only one block.
