@@ -44,7 +44,7 @@ from pennylane.transforms import single_qubit_fusion as pl_single_qubit_fusion
 from pennylane.transforms import unitary_to_rot as pl_unitary_to_rot
 
 from catalyst.device import extract_backend_info
-from catalyst.from_plxpr.qreg_manager import QregManager
+from catalyst.from_plxpr.qreg_manager import QregManager, QubitIndexRecorder
 from catalyst.jax_extras import jaxpr_pad_consts, make_jaxpr2, transient_jax_config
 from catalyst.jax_primitives import (
     MeasurementPlane,
@@ -193,6 +193,8 @@ def handle_qnode(
 
     closed_jaxpr = ClosedJaxpr(qfunc_jaxpr, consts)
 
+    self.qubit_index_recorder = QubitIndexRecorder()
+
     def extract_shots_value(shots: qml.measurements.Shots | int):
         """Extract the shots value according to the type"""
         if isinstance(shots, int):
@@ -211,8 +213,10 @@ def handle_qnode(
             **_get_device_kwargs(device),
         )
         qreg = qalloc_p.bind(len(device.wires))
-        self.global_qreg = QregManager(qreg)
-        converter = PLxPRToQuantumJaxprInterpreter(device, shots, self.global_qreg, {})
+        self.global_qreg = QregManager(qreg, self.qubit_index_recorder, absolute_addressing=True)
+        converter = PLxPRToQuantumJaxprInterpreter(
+            device, shots, self.global_qreg, {}, self.qubit_index_recorder
+        )
         retvals = converter(closed_jaxpr, *args)
         self.global_qreg.insert_all_dangling_qubits()
         qdealloc_p.bind(self.global_qreg.get())
@@ -309,12 +313,23 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
     during initialization.
     """
 
-    def __init__(self, device, shots, qreg_manager, cache, *, control_wires=(), control_values=()):
+    def __init__(
+        self,
+        device,
+        shots,
+        qreg_manager,
+        cache,
+        qubit_index_recorder,
+        *,
+        control_wires=(),
+        control_values=(),
+    ):
         self.device = device
         self.shots = shots
-        # TODO: we assume the qreg value passed into a scope is the unique qreg in the scope
-        # In other words, we assume no new qreg will be allocated in the scope
-        self.qreg_manager = qreg_manager
+        self.qregs = {"init_alloc": qreg_manager}
+        # TODO: port all uses to track qregs, instead of just acting on the initial qreg
+        self.qreg_manager = self.qregs["init_alloc"]
+        self.qubit_index_recorder = qubit_index_recorder
         self.subroutine_cache = cache
         self.control_wires = control_wires
         """Any control wires used for a subroutine."""
@@ -344,7 +359,24 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         control_values = control_values + self.control_values
         self.qreg_manager.insert_dynamic_qubits(op.wires + control_wires)
 
-        in_qubits = [self.qreg_manager[w] for w in op.wires]
+        in_qubits = []
+        in_qregs = []
+        for w in op.wires:
+            # Note: `w` is the plxpr global wire index
+
+            # Special: first gate on a wire on the global register do not have pre-extracted
+            # qubit SSA values
+            if w not in self.qubit_index_recorder.map:
+                in_qubits.append(
+                    self.qreg_manager[self.qreg_manager.global_index_to_local_index(w)]
+                )
+                in_qregs.append(self.qreg_manager)
+
+            else:
+                in_qreg = self.qubit_index_recorder[w]
+                in_qregs.append(in_qreg)
+                in_qubits.append(in_qreg[in_qreg.global_index_to_local_index(w)])
+
         control_qubits = [self.qreg_manager[w] for w in control_wires]
 
         out_qubits = qinst_p.bind(
@@ -355,8 +387,8 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
             ctrl_len=len(control_wires),
             adjoint=is_adjoint,
         )
-        for wire_values, new_wire in zip(tuple(op.wires) + control_wires, out_qubits, strict=True):
-            self.qreg_manager[wire_values] = new_wire
+        for in_qreg, w, new_wire in zip(in_qregs, op.wires, out_qubits):
+            in_qreg[in_qreg.global_index_to_local_index(w)] = new_wire
 
         return out_qubits
 
@@ -449,6 +481,38 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         and no **kwargs) and the results is a sequence of values
         """
         return self.eval(jaxpr.jaxpr, jaxpr.consts, *args)
+
+
+@PLxPRToQuantumJaxprInterpreter.register_primitive(qml.allocation.allocate_prim)
+def handle_qml_alloc(self, *, num_wires, require_zeros=True, restored=False):
+    """Handle the conversion from plxpr to Catalyst jaxpr for the qml.allocate primitive"""
+    # breakpoint()
+    new_qreg = qalloc_p.bind(num_wires)
+
+    self.qregs[new_qreg] = QregManager(new_qreg, self.qubit_index_recorder)
+
+    # The plxpr alloc primitive returns the list of all indices available in the new qreg
+    # So let's extract all qubits and return them
+    for i in range(num_wires):
+        self.qregs[new_qreg].extract(i)
+
+    return self.qregs[new_qreg].get_all_current_global_indices()
+
+
+@PLxPRToQuantumJaxprInterpreter.register_primitive(qml.allocation.deallocate_prim)
+def handle_qml_dealloc(self, *wires):
+    """Handle the conversion from plxpr to Catalyst jaxpr for the qml.deallocate primitive"""
+    qreg = self.qubit_index_recorder[wires[0]]
+    qreg.insert_all_dangling_qubits()
+
+    # TODO: currently __catalyst__rt__qubit_release_array() in runtime would
+    # call ReleaseAllQubits() on the device
+    # This means we cannot deallocate until the very end
+    # For now we just treat the dynamically allocated qubits in the same way as the
+    # initial ones, and deallocate at the end.
+    # qdealloc_p.bind(qreg.get())
+
+    return []
 
 
 @PLxPRToQuantumJaxprInterpreter.register_primitive(quantum_subroutine_p)
@@ -715,6 +779,7 @@ def trace_from_pennylane(
             fn.static_argnums = static_argnums
 
         plxpr, out_type, out_treedef = make_jaxpr2(fn, **make_jaxpr_kwargs)(*args, **kwargs)
+        # breakpoint()
         jaxpr = from_plxpr(plxpr)(*dynamic_args, **kwargs)
 
     return jaxpr, out_type, out_treedef, sig

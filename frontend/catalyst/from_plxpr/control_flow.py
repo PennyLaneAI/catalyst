@@ -34,7 +34,8 @@ from catalyst.jax_primitives import cond_p, for_p, while_p
 def _calling_convention(interpreter, closed_jaxpr, *args_plus_qreg):
     *args, qreg = args_plus_qreg
     # `qreg` is the scope argument for the body jaxpr
-    qreg_manager = QregManager(qreg)
+    #qreg_manager = QregManager(qreg)
+    qreg_manager = QregManager(qreg, interpreter.qubit_index_recorder, absolute_addressing=True)
     converter = copy(interpreter)
     converter.qreg_manager = qreg_manager
     # pylint: disable-next=cell-var-from-loop
@@ -198,6 +199,7 @@ def handle_for_loop(
 
     f = partial(_calling_convention, self, jaxpr)
     converted_jaxpr_branch = jax.make_jaxpr(f)(*start_plus_args_plus_qreg).jaxpr
+
     converted_closed_jaxpr_branch = ClosedJaxpr(convert_constvars_jaxpr(converted_jaxpr_branch), ())
 
     # Build Catalyst compatible input values
@@ -287,6 +289,7 @@ def handle_while_loop(
 
     f = partial(_calling_convention, self, jaxpr)
     converted_body_jaxpr_branch = jax.make_jaxpr(f)(*args_plus_qreg).jaxpr
+
     converted_body_closed_jaxpr_branch = ClosedJaxpr(
         convert_constvars_jaxpr(converted_body_jaxpr_branch), ()
     )
@@ -303,7 +306,7 @@ def handle_while_loop(
     def remove_qreg(*args_plus_qreg):
         *args, qreg = args_plus_qreg
         # `qreg` is the scope argument for the body jaxpr
-        qreg_manager = QregManager(qreg)
+        qreg_manager = QregManager(qreg, self.qubit_index_recorder, absolute_addressing=True)
         converter = copy(self)
         converter.qreg_manager = qreg_manager
 
