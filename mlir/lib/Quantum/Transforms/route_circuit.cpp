@@ -23,6 +23,7 @@
 #include <string>
 #include <tuple>
 #include <vector>
+#include <queue>
 
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
