@@ -240,5 +240,12 @@ bool exceedPauliSizeLimit(size_t pauliSize, size_t MaxPauliSize)
     return pauliSize > MaxPauliSize;
 }
 
+bool equal(PauliWord lhs, PauliWord rhs) { return llvm::equal(lhs, rhs); }
+
+bool equal(const PauliStringWrapper &lhs, const PauliStringWrapper &rhs)
+{
+    return equal(lhs.get_pauli_word(), rhs.get_pauli_word());
+}
+
 } // namespace qec
 } // namespace catalyst

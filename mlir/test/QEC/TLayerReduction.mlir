@@ -202,3 +202,26 @@ func.func @test_t_layer_opt_4(%arg0: !quantum.bit, %arg1: !quantum.bit, %arg2: !
 }
 
 // -----
+
+func.func @test_t_layer_opt_5(%q0 : !quantum.bit, %q1 : !quantum.bit, %q2 : !quantum.bit) {
+  // Test case where the ["X", "X", "X"] layer is applied to the same qubit twice, so its second PPR
+  // from second layer is moved to after the that first PPR from first layer.
+  // This later will be merged into a single PPR.
+
+  // CHECK: func.func @test_t_layer_opt_5([[Q0:%.+]]: !quantum.bit, [[Q1:%.+]]: !quantum.bit, [[Q2:%.+]]: !quantum.bit)
+  // layer 1
+  // CHECK: [[q0:%.+]]:3 = qec.ppr ["X", "X", "X"](8) [[Q0]], [[Q1]], [[Q2]]
+  // CHECK: [[q1:%.+]]:3 = qec.ppr ["X", "X", "X"](8) [[q0]]#0, [[q0]]#1, [[q0]]#2
+  // CHECK: [[q2:%.+]]:3 = qec.ppr ["X", "Z", "Y"](-8) [[q1]]#0, [[q1]]#1, [[q1]]#
+  
+  // layer 2
+  // CHECK: [[q3:%.+]]:3 = qec.ppr ["Z", "Y", "X"](-8) [[q2]]#0, [[q2]]#1, [[q2]]#2
+
+  %0:3 = qec.ppr ["X", "X", "X"](8) %q0, %q1, %q2 : !quantum.bit, !quantum.bit, !quantum.bit
+  %1:3 = qec.ppr ["X", "Z", "Y"](-8) %0#0, %0#1, %0#2 : !quantum.bit, !quantum.bit, !quantum.bit
+
+  %2:3 = qec.ppr ["Z", "Y", "X"](-8) %1#0, %1#1, %1#2 : !quantum.bit, !quantum.bit, !quantum.bit
+  %3:3 = qec.ppr ["X", "X", "X"](8) %2#0, %2#1, %2#2 : !quantum.bit, !quantum.bit, !quantum.bit
+
+  return
+}

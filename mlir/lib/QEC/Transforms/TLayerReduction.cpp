@@ -25,6 +25,9 @@
 using namespace mlir;
 using namespace catalyst::qec;
 
+// TLayerReduction: layer non-Clifford PPR ops, commute left to reduce depth,
+// and merge equal neighbors where possible.
+
 namespace catalyst {
 namespace qec {
 
@@ -32,9 +35,10 @@ namespace qec {
 #define GEN_PASS_DECL_TLAYERREDUCTIONPASS
 #include "QEC/Transforms/Passes.h.inc"
 
-// This aims to find the qubit that may be used by op
-// If not used by op, it returns the qubits that happens before op.
-Value findPredecessorValueOfOp(Value qubit, QECOpInterface op)
+// Return the SSA value of `qubit` visible at the program point of `op`.
+// Walk back through QEC PPR chains (out->in) until defined before `op` or a
+// block argument. Returns nullptr if a non-QEC op defines it.
+Value getReachingValueAt(Value qubit, QECOpInterface op)
 {
     // We want to find the qubit that is used by op.
     // e.g., op is first PPR, while qubit can be the operands from the third PPR.
@@ -67,79 +71,85 @@ Value findPredecessorValueOfOp(Value qubit, QECOpInterface op)
     if (qecOp == op)
         return inQubit;
 
-    return findPredecessorValueOfOp(inQubit, op);
+    return getReachingValueAt(inQubit, op);
 }
 
-std::vector<Value> findDominanceQubits(QECOpInterface fromOp, QECOpInterface toOp)
+// For each in-qubit of `srcOp`, return the SSA value visible at `dstOp`.
+// One per operand; nullptr if a non-QEC definition intervenes.
+// Precondition: same block with `dstOp` before `srcOp`. Consider caching.
+std::vector<Value> getInQubitReachingValuesAt(QECOpInterface srcOp, QECOpInterface dstOp)
 {
     std::vector<Value> dominanceQubits;
-    for (auto inQubit : fromOp.getInQubits()) {
-        Value v = findPredecessorValueOfOp(inQubit, toOp);
+    for (auto inQubit : srcOp.getInQubits()) {
+        Value v = getReachingValueAt(inQubit, dstOp);
         dominanceQubits.emplace_back(v);
     }
     return dominanceQubits;
 }
 
-bool commute(QECOpInterface lhsOp, QECOpInterface rhsOp)
+std::pair<bool, QECOpInterface> checkCommutationAndFindMerge(QECOpInterface rhsOp,
+                                                             QECLayer &lhsLayer)
 {
-    assert(lhsOp != rhsOp && "lshOp and rhsOp should not be equal");
-    assert(lhsOp->getBlock() == rhsOp->getBlock() && "lhsOp and rhsOp should be in the same block");
-    assert(lhsOp->isBeforeInBlock(rhsOp) && "lhsOp should be before rhsOp");
-
-    std::vector<Value> lhsInQubits(lhsOp.getInQubits().begin(), lhsOp.getInQubits().end());
-
-    // Track and collect the qubits that are acted on by rhsOp and
-    // are predecessors of qubits acted on by lhsOp
-    std::vector<Value> rhsOpInQubitsFromLhsOp = findDominanceQubits(rhsOp, lhsOp);
-    if (llvm::any_of(rhsOpInQubitsFromLhsOp, [](Value qubit) { return qubit == nullptr; })) {
-        // No predecessor found for the qubit
-        // This means there is a non-PPR op between lhsOp and rhsOp
-        // and the commutation check fails.
-        // TODO: Handle the case where the non-PPR is not directly dominated by lhsOp
-        return false;
-    }
-
-    // Normalize the ops to get the Pauli strings
-    auto normalizedOps = normalizePPROps(lhsOp, rhsOp, lhsInQubits, rhsOpInQubitsFromLhsOp);
-
-    return normalizedOps.first.commutes(normalizedOps.second);
-}
-
-bool commuteOps(QECOpInterface rhsOp, QECLayer &lhsLayer)
-{
+    QECOpInterface mergeOp = nullptr;
     for (auto lhsOp : lhsLayer.getOps()) {
         if (lhsOp->getBlock() != rhsOp->getBlock())
-            return false;
+            return std::pair(false, nullptr);
 
-        if (!commute(lhsOp, rhsOp))
-            return false;
+        assert(lhsOp != rhsOp && "lshOp and rhsOp should not be equal");
+        assert(lhsOp->getBlock() == rhsOp->getBlock() &&
+               "lhsOp and rhsOp should be in the same block");
+        assert(lhsOp->isBeforeInBlock(rhsOp) && "lhsOp should be before rhsOp");
+
+        std::vector<Value> lhsInQubits(lhsOp.getInQubits().begin(), lhsOp.getInQubits().end());
+
+        // Reaching in-qubit values of `rhsOp` at the program point of `lhsOp`.
+        std::vector<Value> rhsOpInQubitsFromLhsOp = getInQubitReachingValuesAt(rhsOp, lhsOp);
+        if (llvm::any_of(rhsOpInQubitsFromLhsOp, [](Value qubit) { return qubit == nullptr; })) {
+            // Missing reaching value (intervening non-PPR); commutation fails.
+            // TODO: Handle non-PPR not directly dominated by `lhsOp`.
+            return std::pair(false, nullptr);
+        }
+
+        // Normalize to Pauli strings
+        auto normalizedOps = normalizePPROps(lhsOp, rhsOp, lhsInQubits, rhsOpInQubitsFromLhsOp);
+
+        if (!normalizedOps.first.commutes(normalizedOps.second))
+            return std::pair(false, nullptr);
+
+        // Equal normalized Pauli strings => merge candidate
+        auto canMerge = equal(normalizedOps.first, normalizedOps.second);
+        if (canMerge)
+            mergeOp = lhsOp;
     }
-    return true;
+
+    return std::pair(true, mergeOp);
 }
 
-void moveOpToLayer(QECOpInterface rhsOp, QECLayer &rhsLayer, QECLayer &lhsLayer, IRRewriter &writer)
+void moveOpToLayer(QECOpInterface rhsOp, QECLayer &rhsLayer, QECOpInterface mergeOp,
+                   QECLayer &lhsLayer, IRRewriter &writer)
 {
     //    lhsLayer   :  rhsLayer
     //    ┌───────┐  :  ┌───────┐
     //   ─┤ lhsOp ├──:──┤ rhsOp ├─
     //    └───────┘  :  └───────┘
 
-    // We want to move rhsOp to the lhsLayer
-    // and replace the uses of the qubits in the rhsOp with the qubits in the lhsOp
+    // Move `rhsOp` into `lhsLayer` and remap its operands to values visible at `lhsOp`.
 
     auto lhsOp = lhsLayer.getOps().back();
+
+    if (mergeOp)
+        lhsOp = mergeOp;
+
     auto newOp = rhsOp.clone();
 
-    // Mapped qubits to the corresponding operands of lhsOp
-    // Note: If there are qubits that are not used by lhsOp,
-    // its to use the qubits that are before the `lhsOp` in the IR.
-    // This is required so we can perform the commutation check in `commute`
+    // Map operands via values at `lhsOp`; if unused by `lhsOp`, use the value
+    // available before `lhsOp`.
     std::vector<Value> newOperands;
     IRMapping lhsInOutQubits;
     lhsInOutQubits.map(lhsOp.getInQubits(), lhsOp.getOutQubits());
 
     for (auto opnd : rhsOp.getInQubits()) {
-        auto derivedOpnd = findPredecessorValueOfOp(opnd, lhsOp);
+        auto derivedOpnd = getReachingValueAt(opnd, lhsOp);
         assert(derivedOpnd != nullptr && "Qubit should not be nullptr");
 
         if (auto out = lhsInOutQubits.lookupOrNull(derivedOpnd)) {
@@ -150,7 +160,7 @@ void moveOpToLayer(QECOpInterface rhsOp, QECLayer &rhsLayer, QECLayer &lhsLayer,
 
     newOp->setOperands(newOperands);
 
-    // Replace the uses of the qubits in the newOp with the derived operands.
+    // Replace uses of newOp's in-qubits with its out-qubits.
     for (auto [inNewOp, outNewOp] : llvm::zip(newOp.getInQubits(), newOp.getOutQubits())) {
         writer.replaceAllUsesExcept(inNewOp, outNewOp, newOp);
     }
@@ -160,6 +170,7 @@ void moveOpToLayer(QECOpInterface rhsOp, QECLayer &rhsLayer, QECLayer &lhsLayer,
     lhsLayer.insertToLayer(newOp);
 
     rhsLayer.eraseOp(rhsOp);
+    // Rewire users of the erased `rhsOp` to its original operands.
     writer.replaceAllUsesWith(rhsOp->getResults(), rhsOp->getOperands());
     writer.eraseOp(rhsOp);
 }
@@ -176,12 +187,14 @@ struct TLayerReductionPass : impl::TLayerReductionPassBase<TLayerReductionPass> 
 
         std::vector<QECLayer> layers;
 
-        // 1. Initialize the layers
+        // 1) Build initial layers:
+        // - try to commute non-Clifford PPR into current layer;
+        // - else start a new layer.
         getOperation()->walk([&](PPRotationOp op) {
             if (op.isClifford())
                 return WalkResult::advance();
-
-            if (commuteOps(op, currentLayer)) {
+            auto [isCommute, _] = checkCommutationAndFindMerge(op, currentLayer);
+            if (isCommute) {
                 currentLayer.insertToLayer(op);
                 return WalkResult::advance();
             }
@@ -196,7 +209,7 @@ struct TLayerReductionPass : impl::TLayerReductionPassBase<TLayerReductionPass> 
         });
         layers.emplace_back(std::move(currentLayer));
 
-        // 2. Perform the depth reduction
+        // 2) Reduce depth
         auto layerSize = layers.size();
         bool changed = true;
 
@@ -207,8 +220,9 @@ struct TLayerReductionPass : impl::TLayerReductionPassBase<TLayerReductionPass> 
                 auto &prevLayer = layers[idx - 1];
 
                 for (QECOpInterface op : currentLayer.getOps()) {
-                    if (commuteOps(op, prevLayer)) {
-                        moveOpToLayer(op, currentLayer, prevLayer, writer);
+                    auto [isCommute, mergeOp] = checkCommutationAndFindMerge(op, prevLayer);
+                    if (isCommute) {
+                        moveOpToLayer(op, currentLayer, mergeOp, prevLayer, writer);
                         changed = true;
                     }
                 }
