@@ -175,6 +175,15 @@ void moveOpToLayer(QECOpInterface rhsOp, QECLayer &rhsLayer, QECOpInterface merg
     writer.eraseOp(rhsOp);
 }
 
+void mergePPR(QECOpInterface rhsOp, QECLayer &rhsLayer, QECOpInterface mergeOp, IRRewriter &writer)
+{
+    mergeOp.setRotationKind(mergeOp.getRotationKind() / 2);
+
+    rhsLayer.eraseOp(rhsOp);
+    writer.replaceAllUsesWith(rhsOp->getResults(), rhsOp->getOperands());
+    writer.eraseOp(rhsOp);
+}
+
 struct TLayerReductionPass : impl::TLayerReductionPassBase<TLayerReductionPass> {
     using TLayerReductionPassBase::TLayerReductionPassBase;
 
@@ -221,7 +230,12 @@ struct TLayerReductionPass : impl::TLayerReductionPassBase<TLayerReductionPass> 
 
                 for (QECOpInterface op : currentLayer.getOps()) {
                     auto [isCommute, mergeOp] = checkCommutationAndFindMerge(op, prevLayer);
-                    if (isCommute) {
+
+                    if (isCommute && mergeOp) {
+                        mergePPR(op, currentLayer, mergeOp, writer);
+                        changed = true;
+                    }
+                    else if (isCommute) {
                         moveOpToLayer(op, currentLayer, mergeOp, prevLayer, writer);
                         changed = true;
                     }
