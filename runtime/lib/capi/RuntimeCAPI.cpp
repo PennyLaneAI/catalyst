@@ -25,12 +25,12 @@
 
 #include "mlir/ExecutionEngine/CRunnerUtils.h"
 
-#include "Types.h"
 #include "Exception.hpp"
 #include "ExecutionContext.hpp"
 #include "MemRefUtils.hpp"
 #include "QuantumDevice.hpp"
 #include "Timer.hpp"
+#include "Types.h"
 
 #include "RuntimeCAPI.h"
 
@@ -1119,7 +1119,6 @@ int8_t *__catalyst__rt__array_get_element_ptr_1d(QirArray *ptr, int64_t idx)
 
 void __catalyst__rt__insert_element_into_array_1d(QirArray *ptr, int64_t idx, QUBIT *qubit)
 {
-
     RT_ASSERT(getQuantumDevicePtr() != nullptr);
     RT_ASSERT(CTX->getMemoryManager() != nullptr);
     std::vector<QubitIdType> *qubit_vector_ptr = reinterpret_cast<std::vector<QubitIdType> *>(ptr);

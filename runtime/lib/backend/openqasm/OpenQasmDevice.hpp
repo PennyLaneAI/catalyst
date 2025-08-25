@@ -24,9 +24,9 @@
 #include <unordered_map>
 #include <vector>
 
-#include "Types.h"
 #include "QuantumDevice.hpp"
 #include "QubitManager.hpp"
+#include "Types.h"
 
 #include "OpenQasmBuilder.hpp"
 #include "OpenQasmObsManager.hpp"
