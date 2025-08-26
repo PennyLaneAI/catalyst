@@ -45,7 +45,7 @@ def test_convert_clifford_to_ppr():
     print(circuit.mlir_opt)
 
 
-# CHECK-NOT: transform.apply_registered_pass "to_ppr"
+# CHECK-NOT: transform.apply_registered_pass "to-ppr"
 # CHECK: qec.ppr
 # CHECK: qec.ppm
 test_convert_clifford_to_ppr()
@@ -60,8 +60,8 @@ def test_commute_ppr():
     pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
 
     @qjit(pipelines=pipe, target="mlir")
-    @to_ppr
     @commute_ppr
+    @to_ppr
     @qml.qnode(qml.device("null.qubit", wires=2))
     def cir_commute_ppr():
         qml.H(0)
@@ -91,8 +91,8 @@ def test_commute_ppr_max_pauli_size():
     pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
 
     @qjit(pipelines=pipe, target="mlir")
-    @to_ppr
     @commute_ppr(max_pauli_size=2)
+    @to_ppr
     @qml.qnode(qml.device("null.qubit", wires=2))
     def cir_commute_ppr_max_pauli_size():
         qml.CNOT([0, 2])
@@ -122,8 +122,8 @@ def test_merge_ppr_ppm():
     pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
 
     @qjit(pipelines=pipe, target="mlir")
-    @to_ppr
     @merge_ppr_ppm
+    @to_ppr
     @qml.qnode(qml.device("null.qubit", wires=2))
     def cir_merge_ppr_ppm():
         qml.H(0)
@@ -150,8 +150,8 @@ def test_merge_ppr_ppm_max_pauli_size():
     pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
 
     @qjit(pipelines=pipe, target="mlir")
-    @to_ppr
     @merge_ppr_ppm(max_pauli_size=1)
+    @to_ppr
     @qml.qnode(qml.device("null.qubit", wires=2))
     def cir_merge_ppr_ppm_max_pauli_size():
         qml.CNOT([0, 2])
@@ -182,14 +182,14 @@ def test_ppr_to_ppm():
     @qjit(pipelines=pipe, target="mlir")
     def circuit_ppr_to_ppm():
 
-        @to_ppr
         @ppr_to_ppm
+        @to_ppr
         @qml.qnode(device)
         def cir_default():
             qml.S(0)
 
-        @to_ppr
         @ppr_to_ppm(decompose_method="clifford-corrected", avoid_y_measure=True)
+        @to_ppr
         @qml.qnode(device)
         def cir_inject_magic_state():
             qml.T(0)

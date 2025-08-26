@@ -56,11 +56,12 @@ struct PrintOpInterface
     }
 
     LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
-                            const bufferization::BufferizationOptions &options) const
+                            const bufferization::BufferizationOptions &options,
+                            bufferization::BufferizationState &state) const
     {
         auto printOp = cast<PrintOp>(op);
         if (printOp.getVal()) {
-            FailureOr<Value> source = getBuffer(rewriter, printOp.getVal(), options);
+            FailureOr<Value> source = getBuffer(rewriter, printOp.getVal(), options, state);
             if (failed(source)) {
                 return failure();
             }
@@ -116,7 +117,8 @@ struct CustomCallOpInterface
     }
 
     LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
-                            const bufferization::BufferizationOptions &options) const
+                            const bufferization::BufferizationOptions &options,
+                            bufferization::BufferizationState &state) const
     {
         auto customCallOp = cast<CustomCallOp>(op);
 
@@ -124,7 +126,7 @@ struct CustomCallOpInterface
         SmallVector<Value> bufferArgs;
         ValueRange operands = customCallOp.getOperands();
         for (Value operand : operands) {
-            FailureOr<Value> opBuffer = getBuffer(rewriter, operand, options);
+            FailureOr<Value> opBuffer = getBuffer(rewriter, operand, options, state);
             if (failed(opBuffer)) {
                 return failure();
             }
@@ -165,11 +167,11 @@ struct CustomCallOpInterface
             }
             auto options = bufferization::BufferizationOptions();
             FailureOr<Value> tensorAlloc = bufferization::allocateTensorForShapedValue(
-                rewriter, op->getLoc(), result, options, false);
+                rewriter, op->getLoc(), result, options, state, false);
             MemRefType memrefType =
                 MemRefType::get(tensorType.getShape(), tensorType.getElementType());
             auto newBuffer =
-                rewriter.create<bufferization::ToMemrefOp>(op->getLoc(), memrefType, *tensorAlloc);
+                rewriter.create<bufferization::ToBufferOp>(op->getLoc(), memrefType, *tensorAlloc);
             bufferArgs.push_back(newBuffer);
         }
 
@@ -207,7 +209,8 @@ struct CallbackOpInterface
     }
 
     LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
-                            const bufferization::BufferizationOptions &options) const
+                            const bufferization::BufferizationOptions &options,
+                            bufferization::BufferizationState &state) const
     {
         auto callbackOp = cast<CallbackOp>(op);
 
@@ -279,7 +282,8 @@ struct CallbackCallOpInterface
     }
 
     LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
-                            const bufferization::BufferizationOptions &options) const
+                            const bufferization::BufferizationOptions &options,
+                            bufferization::BufferizationState &state) const
     {
         auto callOp = cast<CallbackCallOp>(op);
 
@@ -292,7 +296,7 @@ struct CallbackCallOpInterface
         SmallVector<Value> newInputs;
         auto operands = callOp.getOperands();
         for (Value operand : operands) {
-            FailureOr<Value> opBuffer = getBuffer(rewriter, operand, options);
+            FailureOr<Value> opBuffer = getBuffer(rewriter, operand, options, state);
             if (failed(opBuffer)) {
                 return failure();
             }
@@ -303,8 +307,8 @@ struct CallbackCallOpInterface
         auto loc = callOp->getLoc();
         SmallVector<Value> outmemrefs;
         for (auto result : results) {
-            FailureOr<Value> tensorAlloc =
-                bufferization::allocateTensorForShapedValue(rewriter, loc, result, options, false);
+            FailureOr<Value> tensorAlloc = bufferization::allocateTensorForShapedValue(
+                rewriter, loc, result, options, state, false);
             if (failed(tensorAlloc)) {
                 return failure();
             }
@@ -314,8 +318,8 @@ struct CallbackCallOpInterface
             auto shape = tensorTy.getShape();
             auto elementTy = tensorTy.getElementType();
             auto memrefType = MemRefType::get(shape, elementTy);
-            auto toMemrefOp = rewriter.create<bufferization::ToMemrefOp>(loc, memrefType, tensor);
-            auto memref = toMemrefOp.getResult();
+            auto toBufferOp = rewriter.create<bufferization::ToBufferOp>(loc, memrefType, tensor);
+            auto memref = toBufferOp.getResult();
             outmemrefs.push_back(memref);
             newInputs.push_back(memref);
         }

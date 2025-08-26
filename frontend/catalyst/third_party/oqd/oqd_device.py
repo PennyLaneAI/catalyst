@@ -57,7 +57,7 @@ def OQDDevicePipeline(device, qubit, gate):
             "oqd_pipeline",
             [
                 "func.func(ions-decomposition)",
-                "func.func(quantum-to-ion{"
+                "func.func(gates-to-pulses{"
                 + "device-toml-loc="
                 + device
                 + " qubit-toml-loc="
@@ -96,12 +96,12 @@ class OQDDevice(Device):
         return "oqd", lib_path
 
     def __init__(
-        self, wires, shots, backend="default", openapl_file_name="__openapl__output.json", **kwargs
+        self, wires, backend="default", openapl_file_name="__openapl__output.json", **kwargs
     ):
         self._backend = backend
         self._openapl_file_name = openapl_file_name
         _check_backend(backend=backend)
-        super().__init__(wires=wires, shots=shots, **kwargs)
+        super().__init__(wires=wires, **kwargs)
         self.device_kwargs = {
             "openapl_file_name": self._openapl_file_name,
         }

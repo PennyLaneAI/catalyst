@@ -90,7 +90,6 @@ class NoUnitaryDevice(qml.devices.Device):
 
     def __init__(self, shots=None, wires=None):
         super().__init__(wires=wires, shots=shots)
-        self.capabilities.operations.pop("QubitUnitary")
         self.qjit_capabilities = self.capabilities
 
     def apply(self, operations, **kwargs):
@@ -111,6 +110,9 @@ class NoUnitaryDevice(qml.devices.Device):
     def execute(self, circuits, execution_config):
         """Execution."""
         return circuits, execution_config
+
+
+NoUnitaryDevice.capabilities.operations.pop("QubitUnitary")
 
 
 class TestControlledDecomposition:
@@ -154,8 +156,9 @@ class TestControlledDecomposition:
                     dtype=np.complex128,
                 )
 
-        dev = NoUnitaryDevice(4, wires=4)
+        dev = NoUnitaryDevice(wires=4)
 
+        @qml.set_shots(4)
         @qml.qnode(dev)
         def f():
             ctrl(UnknownOp(wires=[0, 1]), control=[2, 3])

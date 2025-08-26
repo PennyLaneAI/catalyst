@@ -21,17 +21,8 @@ import logging
 from contextlib import ExitStack, contextmanager
 from copy import copy
 from dataclasses import dataclass
-from typing import (
-    Any,
-    Callable,
-    Dict,
-    Generator,
-    List,
-    Optional,
-    Set,
-    Tuple,
-    TypeVar,
-)
+from functools import partial
+from typing import Any, Callable, Dict, Generator, List, Optional, Set, Tuple, TypeVar
 
 import jax
 from jax import ShapeDtypeStruct
@@ -46,7 +37,7 @@ from jax._src.lax.control_flow import _initial_style_jaxpr
 from jax._src.lax.slicing import _gather_lower, gather_p
 from jax._src.linear_util import annotate
 from jax._src.pjit import _extract_implicit_args, _flat_axes_specs
-from jax._src.source_info_util import current as jax_current
+from jax._src.source_info_util import current as current_source_info
 from jax._src.util import safe_map, unzip2, wraps
 from jax.api_util import flatten_fun
 from jax.core import (
@@ -69,18 +60,13 @@ from jax.interpreters.partial_eval import (
     make_jaxpr_effects,
 )
 from jax.lax import convert_element_type
-from jax.tree_util import (
-    PyTreeDef,
-    tree_flatten,
-    tree_structure,
-    tree_unflatten,
-    treedef_is_leaf,
-)
-from jaxlib.xla_extension import PyTreeRegistry
+from jax.tree_util import PyTreeDef, tree_flatten, tree_structure, tree_unflatten, treedef_is_leaf
+from jaxlib._jax.pytree import PyTreeRegistry
 
 from catalyst.jax_extras.patches import gather2_p, get_aval2
 from catalyst.logging import debug_logger
 from catalyst.tracing.type_signatures import verify_static_argnums_type
+from catalyst.utils.exceptions import CompileError
 from catalyst.utils.patching import Patcher
 
 # pylint: disable=protected-access
@@ -235,7 +221,13 @@ def sort_eqns(eqns: List[JaxprEqn], forced_order_primitives: Set[JaxprPrimitive]
     for b in boxes:
         origin.update({ov.count: b for ov in b.e.outvars})  # [1]
     for b in boxes:
-        b.parents = [origin[v.count] for v in b.e.invars if v.count in origin]  # [2]
+        b.parents = []
+        for v in b.e.invars:
+            if not isinstance(v, jax._src.core.Var):
+                # constant literal invar, no need to track def use order
+                continue
+            if v.count in origin:
+                b.parents.append(origin[v.count])  # [2]
     for i, q in fixedorder:
         for b in boxes[i + 1 :]:
             b.parents.append(q)  # [3]
@@ -245,7 +237,7 @@ def sort_eqns(eqns: List[JaxprEqn], forced_order_primitives: Set[JaxprPrimitive]
 def jaxpr_pad_consts(jaxprs: List[Jaxpr]) -> List[ClosedJaxpr]:
     """Align the constants of Jaxpr programs. Return the list of corresponding programs accepting
     the same constants."""
-    newvar = gensym("_")
+    newvar = gensym()
 
     # List of constant variables of all jaxprs, preprended with '_'
     all_mangled_constvars: List[List[Var]] = []
@@ -380,7 +372,7 @@ def deduce_signatures(
     """
     flat_args, in_tree = tree_flatten((args, kwargs))
     trace: DynamicJaxprTrace = find_top_trace(flat_args)
-    flat_tracers = [trace.to_jaxpr_tracer(a) for a in flat_args]
+    flat_tracers = [trace.to_jaxpr_tracer(a, source_info=current_source_info()) for a in flat_args]
     in_expanded_args, in_type = expand_args(flat_tracers, expansion_strategy=expansion_strategy)
     wf = wrap_init(f, debug_info=debug_info)
     wf, out_tree_promise = flatten_fun(wf, in_tree)
@@ -434,7 +426,7 @@ def trace_to_jaxpr(
 def new_inner_tracer(trace: DynamicJaxprTrace, aval) -> DynamicJaxprTracer:
     """Create a JAX tracer tracing an abstract value ``aval`, without specifying its source
     primitive."""
-    dt = DynamicJaxprTracer(trace, aval, jax_current())
+    dt = DynamicJaxprTracer(trace, aval, current_source_info())
     trace.frame.tracers.append(dt)
     trace.frame.tracer_to_var[id(dt)] = trace.frame.newvar(aval)
     return dt
@@ -735,14 +727,14 @@ def infer_output_type_python(
     """
 
     trace: DynamicJaxprTrace = find_top_trace(expanded_inputs)
-    outputs = [trace.to_jaxpr_tracer(t) for t in outputs]
+    outputs = [trace.to_jaxpr_tracer(t, source_info=current_source_info()) for t in outputs]
 
     # Calculate the constants. We need it to set InDBIdx correctly
     _, _, consts = trace_to_jaxpr(trace, expanded_inputs, outputs)
 
     # Calculate output type containing the correct De Brjuin indices
     expanded_outputs, out_type = infer_output_type(
-        [trace.to_jaxpr_tracer(t) for t in consts],
+        [trace.to_jaxpr_tracer(t, source_info=current_source_info()) for t in consts],
         expanded_inputs,
         outputs,
         expansion_strategy,
@@ -901,8 +893,8 @@ class DynshapePrimitive(JaxprPrimitive):
         # explicitness.
 
         trace = find_top_trace(args)
-        tracers = map(trace.to_jaxpr_tracer, args)
-        source_info = jax_current()
+        tracers = map(partial(trace.to_jaxpr_tracer, source_info=current_source_info()), args)
+        source_info = current_source_info()
 
         in_type = infer_lambda_input_type(None, tracers)
         out_type, effects = self.abstract_eval(*in_type, **params)
@@ -923,3 +915,42 @@ class DynshapePrimitive(JaxprPrimitive):
         eqn = new_jaxpr_eqn(invars, outvars, self, params, [], source_info)
         trace.frame.add_eqn(eqn)
         return out_tracers if self.multiple_results else out_tracers.pop()
+
+
+def make_from_node_data_and_children(node_data, children):
+    """
+    A helper to create a PytreeDef from node data and children.
+    Jax used to have a great util called make_from_node_data_and_children,
+    but they removed it in 0.6.2, so we have to be a bit manual here.
+
+    Essentially, we want to fill the `children` into the nodes of the tree we return
+    i.e. we want `out_tree_def.children()` to be `children`
+    e.g. if `out_tree_def` is PyTreeDef({0: *, 1: *}),
+    and `children` is [PyTreeDef((*, *)), PyTreeDef(*)],
+    we want to return PyTreeDef({0: (*, *), 1: *})
+    """
+
+    node_type, node_value = node_data
+    if node_type is dict:
+        mock_dict = {
+            node_key: get_replacement_value(child_tree_def)
+            for node_key, child_tree_def in zip(node_value, children)
+        }
+        _, out_tree_def = jax.tree_util.tree_flatten(mock_dict)
+    elif node_type in (list, tuple):
+        mock_list = node_type(
+            [get_replacement_value(child_tree_def) for child_tree_def in children]
+        )
+        _, out_tree_def = jax.tree_util.tree_flatten(mock_list)
+    else:
+        raise CompileError("Unknown pytree node type")  # pragma: no-cover
+    return out_tree_def
+
+
+def get_replacement_value(tree_def):
+    """
+    Create a mock python object whose pytree is tree_def
+    """
+    size = len(tree_def.children())
+    mock_vals = [0] if size == 0 else (0,) * size
+    return jax.tree_util.tree_unflatten(tree_def, mock_vals)

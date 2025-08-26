@@ -17,8 +17,8 @@
 
 include "mlir/Pass/PassBase.td"
 
-def QuantumToIonPass : Pass<"quantum-to-ion"> {
-    let summary = "Lower a quantum circuit to an ionic pulse program.";
+def GatesToPulsesPass : Pass<"gates-to-pulses"> {
+    let summary = "Lower quantum gates to ionic pulses.";
 
     let options = [
     Option<"DeviceTomlLoc", "device-toml-loc",
@@ -41,7 +41,7 @@ def QuantumToIonPass : Pass<"quantum-to-ion"> {
         "scf::SCFDialect"
     ];
 
-    let constructor = "catalyst::createQuantumToIonPass()";
+    let constructor = "catalyst::createGatesToPulsesPass()";
 }
 
 def IonConversionPass : Pass<"convert-ion-to-llvm"> {

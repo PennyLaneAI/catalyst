@@ -12,24 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <bitset>
 #include <cstdarg>
 #include <cstdlib>
 #include <ctime>
-
-#include <bitset>
-#include <stdexcept>
-
 #include <memory>
 #include <ostream>
+#include <stdexcept>
 #include <string_view>
+#include <tuple>
 
 #include "mlir/ExecutionEngine/CRunnerUtils.h"
 
 #include "Exception.hpp"
-#include "QuantumDevice.hpp"
-
 #include "ExecutionContext.hpp"
 #include "MemRefUtils.hpp"
+#include "QuantumDevice.hpp"
 #include "Timer.hpp"
 
 #include "RuntimeCAPI.h"
@@ -78,9 +76,9 @@ std::vector<bool> getModifiersControlledValues(const Modifiers *modifiers)
  * to the new initialized device pointer.
  */
 [[nodiscard]] bool initRTDevicePtr(std::string_view rtd_lib, std::string_view rtd_name,
-                                   std::string_view rtd_kwargs)
+                                   std::string_view rtd_kwargs, bool auto_qubit_management)
 {
-    auto &&device = CTX->getOrCreateDevice(rtd_lib, rtd_name, rtd_kwargs);
+    auto &&device = CTX->getOrCreateDevice(rtd_lib, rtd_name, rtd_kwargs, auto_qubit_management);
     if (device) {
         RTD_PTR = device.get();
         return RTD_PTR ? true : false;
@@ -103,6 +101,20 @@ void deactivateDevice()
 {
     CTX->deactivateDevice(RTD_PTR);
     RTD_PTR = nullptr;
+}
+
+static void autoQubitManagementAllocate(std::vector<QubitIdType> *qubit_vector_ptr, int64_t idx)
+{
+    // allocate new qubits if we are in automatic qubit allocation mode
+    // and encountered a new user wire index
+    // `idx` is the new user wire index from frontend pennylane
+    // number of currently allocated qubits is `qubit_vector_ptr->size()`
+    QirArray *new_qubits = __catalyst__rt__qubit_allocate_array(
+        idx + 1 - static_cast<int64_t>(qubit_vector_ptr->size()));
+    std::vector<QubitIdType> *new_qubits_vector =
+        reinterpret_cast<std::vector<QubitIdType> *>(new_qubits);
+    qubit_vector_ptr->insert(qubit_vector_ptr->end(), new_qubits_vector->begin(),
+                             new_qubits_vector->end());
 }
 } // namespace Catalyst::Runtime
 
@@ -243,7 +255,7 @@ void __catalyst__rt__finalize()
 }
 
 static int __catalyst__rt__device_init__impl(int8_t *rtd_lib, int8_t *rtd_name, int8_t *rtd_kwargs,
-                                             int64_t shots)
+                                             int64_t shots, bool auto_qubit_management)
 {
     // Device library cannot be a nullptr
     RT_FAIL_IF(!rtd_lib, "Invalid device library");
@@ -254,7 +266,7 @@ static int __catalyst__rt__device_init__impl(int8_t *rtd_lib, int8_t *rtd_name, 
     const std::vector<std::string_view> args{
         reinterpret_cast<char *>(rtd_lib), (rtd_name ? reinterpret_cast<char *>(rtd_name) : ""),
         (rtd_kwargs ? reinterpret_cast<char *>(rtd_kwargs) : "")};
-    RT_FAIL_IF(!initRTDevicePtr(args[0], args[1], args[2]),
+    RT_FAIL_IF(!initRTDevicePtr(args[0], args[1], args[2], auto_qubit_management),
                "Failed initialization of the backend device");
     getQuantumDevicePtr()->SetDeviceShots(shots);
     if (CTX->getDeviceRecorderStatus()) {
@@ -264,10 +276,10 @@ static int __catalyst__rt__device_init__impl(int8_t *rtd_lib, int8_t *rtd_name, 
 }
 
 void __catalyst__rt__device_init(int8_t *rtd_lib, int8_t *rtd_name, int8_t *rtd_kwargs,
-                                 int64_t shots)
+                                 int64_t shots, bool auto_qubit_management)
 {
     timer::timer(__catalyst__rt__device_init__impl, "device_init", /* add_endl */ true, rtd_lib,
-                 rtd_name, rtd_kwargs, shots);
+                 rtd_name, rtd_kwargs, shots, auto_qubit_management);
 }
 
 static int __catalyst__rt__device_release__impl()
@@ -492,6 +504,24 @@ void __catalyst__qis__SetState(MemRefT_CplxT_double_1d *data, uint64_t numQubits
     getQuantumDevicePtr()->SetState(data_view, wires);
 }
 
+void __catalyst__qis__PCPhase(double theta, double dim, const Modifiers *modifiers,
+                              int64_t numQubits, ...)
+{
+    RT_ASSERT(numQubits >= 0);
+    RT_ASSERT(dim >= 0 && dim == static_cast<int64_t>(dim));
+
+    va_list args;
+    va_start(args, numQubits);
+    std::vector<QubitIdType> wires(numQubits);
+    for (int64_t i = 0; i < numQubits; i++) {
+        wires[i] = va_arg(args, QubitIdType);
+    }
+    va_end(args);
+
+    getQuantumDevicePtr()->NamedOperation("PCPhase", {theta, dim}, wires,
+                                          /* modifiers */ MODIFIERS_ARGS(modifiers));
+}
+
 void __catalyst__qis__SetBasisState(MemRefT_int8_1d *data, uint64_t numQubits, ...)
 {
     RT_ASSERT(numQubits > 0);
@@ -513,10 +543,19 @@ void __catalyst__qis__SetBasisState(MemRefT_int8_1d *data, uint64_t numQubits, .
     getQuantumDevicePtr()->SetBasisState(data_view, wires);
 }
 
-void __catalyst__qis__Identity(QUBIT *qubit, const Modifiers *modifiers)
+void __catalyst__qis__Identity(const Modifiers *modifiers, int64_t numQubits, ...)
 {
-    getQuantumDevicePtr()->NamedOperation("Identity", {}, {reinterpret_cast<QubitIdType>(qubit)},
-                                          MODIFIERS_ARGS(modifiers));
+    RT_ASSERT(numQubits >= 0);
+    va_list args;
+    va_start(args, numQubits);
+    std::vector<QubitIdType> wires(numQubits);
+    for (int64_t i = 0; i < numQubits; i++) {
+        wires[i] = va_arg(args, QubitIdType);
+    }
+    va_end(args);
+
+    getQuantumDevicePtr()->NamedOperation("Identity", {}, wires,
+                                          /* modifiers */ MODIFIERS_ARGS(modifiers));
 }
 
 void __catalyst__qis__PauliX(QUBIT *qubit, const Modifiers *modifiers)
@@ -655,6 +694,25 @@ void __catalyst__qis__IsingZZ(double theta, QUBIT *control, QUBIT *target,
                                           {/* control = */ reinterpret_cast<QubitIdType>(control),
                                            /* target = */ reinterpret_cast<QubitIdType>(target)},
                                           /* modifiers */ MODIFIERS_ARGS(modifiers));
+}
+
+void __catalyst__qis__SingleExcitation(double phi, QUBIT *wire0, QUBIT *wire1,
+                                       const Modifiers *modifiers)
+{
+    getQuantumDevicePtr()->NamedOperation(
+        "SingleExcitation", {phi},
+        {reinterpret_cast<QubitIdType>(wire0), reinterpret_cast<QubitIdType>(wire1)},
+        MODIFIERS_ARGS(modifiers));
+}
+
+void __catalyst__qis__DoubleExcitation(double phi, QUBIT *wire0, QUBIT *wire1, QUBIT *wire2,
+                                       QUBIT *wire3, const Modifiers *modifiers)
+{
+    getQuantumDevicePtr()->NamedOperation(
+        "DoubleExcitation", {phi},
+        {reinterpret_cast<QubitIdType>(wire0), reinterpret_cast<QubitIdType>(wire1),
+         reinterpret_cast<QubitIdType>(wire2), reinterpret_cast<QubitIdType>(wire3)},
+        MODIFIERS_ARGS(modifiers));
 }
 
 void __catalyst__qis__ControlledPhaseShift(double theta, QUBIT *control, QUBIT *target,
@@ -1043,7 +1101,15 @@ int8_t *__catalyst__rt__array_get_element_ptr_1d(QirArray *ptr, int64_t idx)
     RT_ASSERT(idx >= 0);
     std::string error_msg = "The qubit register does not contain the requested wire: ";
     error_msg += std::to_string(idx);
-    RT_FAIL_IF(static_cast<size_t>(idx) >= qubit_vector_ptr->size(), error_msg.c_str());
+
+    if (static_cast<size_t>(idx) >= qubit_vector_ptr->size()) {
+        if (!RTD_PTR->getQubitManagementMode()) {
+            RT_FAIL(error_msg.c_str());
+        }
+        else {
+            autoQubitManagementAllocate(qubit_vector_ptr, idx);
+        }
+    }
 
     QubitIdType *data = qubit_vector_ptr->data();
     return (int8_t *)&data[idx];

@@ -22,6 +22,7 @@
 #include <memory>
 #include <optional>
 #include <random>
+#include <string>
 #include <unordered_map>
 #include <vector>
 
@@ -45,11 +46,14 @@ namespace Catalyst::Runtime::Devices {
  *   of the device; these are used to implement Quantum Instruction Set (QIS) instructions.
  */
 struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
-    NullQubit(const std::string &kwargs = "{}")
+    std::unordered_map<std::string, std::string> device_kwargs;
+
+    NullQubit(const std::string &kwargs = "{}", const std::string &resources_fname = "")
     {
-        auto device_kwargs = Catalyst::Runtime::parse_kwargs(kwargs);
+        this->device_kwargs = Catalyst::Runtime::parse_kwargs(kwargs);
         if (device_kwargs.find("track_resources") != device_kwargs.end()) {
             track_resources_ = device_kwargs["track_resources"] == "True";
+            this->resources_fname_ = resources_fname;
         }
     }
     ~NullQubit() {} // LCOV_EXCL_LINE
@@ -58,6 +62,11 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     NullQubit(const NullQubit &) = delete;
     NullQubit(NullQubit &&) = delete;
     NullQubit &operator=(NullQubit &&) = delete;
+
+    /**
+     * @brief Get the device kwargs as a map.
+     */
+    std::unordered_map<std::string, std::string> GetDeviceKwargs() { return this->device_kwargs; }
 
     /**
      * @brief Prints resources that would be used to execute this circuit as a JSON
@@ -124,7 +133,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      */
     void ReleaseQubit(QubitIdType q)
     {
-        if (!num_qubits_) {
+        if (num_qubits_) {
             num_qubits_--;
             this->qubit_manager.Release(q);
         }
@@ -138,19 +147,24 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
         num_qubits_ = 0;
         this->qubit_manager.ReleaseAll();
         if (this->track_resources_) {
-            auto time = std::chrono::high_resolution_clock::now();
-            auto timestamp =
-                std::chrono::duration_cast<std::chrono::nanoseconds>(time.time_since_epoch())
-                    .count();
-            std::stringstream resources_fname;
-            resources_fname << "__pennylane_resources_data_" << timestamp << ".json";
+            if (this->resources_fname_ == "") {
+                auto time = std::chrono::high_resolution_clock::now();
+                auto timestamp =
+                    std::chrono::duration_cast<std::chrono::nanoseconds>(time.time_since_epoch())
+                        .count();
+                std::stringstream resources_fname;
+                resources_fname << "__pennylane_resources_data_" << timestamp << ".json";
+
+                this->resources_fname_ = resources_fname.str(); // Update written location
+            }
 
             // Need to use FILE* instead of ofstream since ofstream has no way to atomically open a
             // file only if it does not already exist
-            FILE *resources_file = fopen(resources_fname.str().c_str(), "wx");
+            FILE *resources_file = fopen(this->resources_fname_.c_str(), "wx");
             if (resources_file == nullptr) {
-                std::string err_msg = "Error opening file '" + resources_fname.str() + "'.";
-                RT_FAIL(err_msg.c_str());
+                std::string err_msg =
+                    "Error opening file '" + this->resources_fname_ + "'."; // LCOV_EXCL_LINE
+                RT_FAIL(err_msg.c_str());                                   // LCOV_EXCL_LINE
             }
             else {
                 PrintResourceUsage(resources_file);
@@ -467,12 +481,19 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     auto ResourcesGetNumQubits() -> std::size_t { return resource_data_["num_qubits"]; }
 
     /**
+     * @brief Returns the filename where resource tracking information is dumped. Only works if
+     * resource tracking is enabled
+     */
+    auto ResourcesGetFilename() const -> std::string { return resources_fname_; }
+
+    /**
      * @brief Returns whether the device is tracking resources or not.
      */
     auto IsTrackingResources() const -> bool { return track_resources_; }
 
   private:
     bool track_resources_{false};
+    std::string resources_fname_;
     std::size_t num_qubits_{0};
     std::size_t device_shots_{0};
     std::unordered_map<std::string, std::size_t> resource_data_;

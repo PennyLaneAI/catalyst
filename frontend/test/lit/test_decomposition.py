@@ -169,45 +169,73 @@ def test_decompose_qubitunitary():
 test_decompose_qubitunitary()
 
 
+def test_decompose_singleexcitation():
+    """
+    Test that single excitation is not decomposed.
+    """
+    dev = get_custom_device_without(2)
+
+    @qjit(target="mlir")
+    @qml.qnode(dev)
+    # CHECK-LABEL: public @jit_decompose_singleexcitation
+    def decompose_singleexcitation(theta: float):
+        # CHECK: quantum.custom "SingleExcitation"
+
+        qml.SingleExcitation(theta, wires=[0, 1])
+        return measure(wires=0)
+
+    print(decompose_singleexcitation.mlir)
+
+
+test_decompose_singleexcitation()
+
+
+def test_decompose_doubleexcitation():
+    """
+    Test that Double excitation is not decomposed.
+    """
+    dev = get_custom_device_without(4)
+
+    @qjit(target="mlir")
+    @qml.qnode(dev)
+    # CHECK-LABEL: public @jit_decompose_doubleexcitation
+    def decompose_doubleexcitation(theta: float):
+        # CHECK: quantum.custom "DoubleExcitation"
+
+        qml.DoubleExcitation(theta, wires=[0, 1, 2, 3])
+        return measure(wires=0)
+
+    print(decompose_doubleexcitation.mlir)
+
+
+test_decompose_doubleexcitation()
+
+
 def test_decompose_singleexcitationplus():
-    """Test decomposition of single excitation plus."""
+    """
+    Test decomposition of single excitation plus.
+    See
+    https://github.com/PennyLaneAI/pennylane/blob/master/pennylane/ops/qubit/qchem_ops.py
+    for the decomposition of qml.SingleExcitationPlus
+    """
     dev = get_custom_device_without(2, discards={"SingleExcitationPlus", "C(SingleExcitationPlus)"})
 
     @qjit(target="mlir")
     @qml.qnode(dev)
     # CHECK-LABEL: public @jit_decompose_singleexcitationplus
     def decompose_singleexcitationplus(theta: float):
-        # CHECK-NOT: name = "SingleExcitationPlus"
-        # CHECK: [[a_scalar_tensor_float_2:%.+]] = stablehlo.constant dense<2.{{[0]+}}e+00>
-        # CHECK-NOT: name = "SingleExcitationPlus"
-        # CHECK: [[b_theta_div_2:%.+]] = stablehlo.divide %arg0, [[a_scalar_tensor_float_2]]
-        # CHECK-NOT: name = "SingleExcitationPlus"
-        # CHECK: [[a_theta_div_2:%.+]] = stablehlo.divide %arg0, [[a_scalar_tensor_float_2]]
-        # CHECK-NOT: name = "SingleExcitationPlus"
-        # CHECK: [[s0q0:%.+]] = quantum.custom "PauliX"
-        # CHECK-NOT: name = "SingleExcitationPlus"
-        # CHECK: [[s0q1:%.+]] = quantum.custom "PauliX"
-        # CHECK-NOT: name = "SingleExcitationPlus"
-        # CHECK: [[a_theta_div_2_scalar:%.+]] = tensor.extract [[a_theta_div_2]]
-        # CHECK-NOT: name = "SingleExcitationPlus"
-        # CHECK: [[s1:%.+]]:2 = quantum.custom "ControlledPhaseShift"([[a_theta_div_2_scalar]]) [[s0q1]], [[s0q0]]
-        # CHECK-NOT: name = "SingleExcitationPlus"
-        # CHECK: [[s2q1:%.+]] = quantum.custom "PauliX"() [[s1]]#1
-        # CHECK-NOT: name = "SingleExcitationPlus"
-        # CHECK: [[s2q0:%.+]] = quantum.custom "PauliX"() [[s1]]#0
-        # CHECK-NOT: name = "SingleExcitationPlus"
-        # CHECK: [[b_theta_div_2_scalar:%.+]] = tensor.extract [[b_theta_div_2]]
-        # CHECK-NOT: name = "SingleExcitationPlus"
-        # CHECK: [[s3:%.+]]:2 = quantum.custom "ControlledPhaseShift"([[b_theta_div_2_scalar]]) [[s2q1]], [[s2q0]]
-        # CHECK-NOT: name = "SingleExcitationPlus"
-        # CHECK: [[s4:%.+]]:2 = quantum.custom "CNOT"() [[s3]]#0, [[s3]]#1
-        # CHECK-NOT: name = "SingleExcitationPlus"
-        # CHECK: [[theta_scalar:%.+]] = tensor.extract %arg0
-        # CHECK-NOT: name = "SingleExcitationPlus"
-        # CHECK: [[s5:%.+]]:2 = quantum.custom "CRY"([[theta_scalar]]) [[s4]]#1, [[s4]]#0
-        # CHECK-NOT: name = "SingleExcitationPlus"
-        # CHECK: [[s6:%.+]]:2 = quantum.custom "CNOT"() [[s5]]#1, [[s5]]#0
-        # CHECK-NOT: name = "SingleExcitationPlus"
+        # CHECK-NOT: "SingleExcitationPlus"
+        # CHECK: quantum.custom "Hadamard"
+        # CHECK: quantum.custom "CNOT"
+        # CHECK: quantum.custom "RY"
+        # CHECK: quantum.custom "RY"
+        # CHECK: quantum.custom "CY"
+        # CHECK: quantum.custom "S"
+        # CHECK: quantum.custom "Hadamard"
+        # CHECK: quantum.custom "RZ"
+        # CHECK: quantum.custom "CNOT"
+        # CHECK: quantum.gphase
+
         qml.SingleExcitationPlus(theta, wires=[0, 1])
         return measure(wires=0)
 

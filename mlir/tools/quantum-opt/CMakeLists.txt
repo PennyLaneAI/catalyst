@@ -5,9 +5,11 @@ set(LIBS
     ${dialect_libs}
     ${conversion_libs}
     ${extension_libs}
+    ExternalStablehloLib
     MLIROptLib
     MLIRCatalyst
     catalyst-transforms
+    catalyst-stablehlo-transforms
     MLIRQuantum
     quantum-transforms
     MLIRQEC
@@ -20,11 +22,9 @@ set(LIBS
     mitigation-transforms
     MLIRIon
     ion-transforms
-    MhloRegisterDialects
-    StablehloRegister
     MLIRCatalystTest
+    MLIRCatalystUtils
     MLIRTestDialect
-    ${ALL_MHLO_PASSES}
 )
 
 add_mlir_tool(quantum-opt quantum-opt.cpp DEPENDS ${LIBS} SUPPORT_PLUGINS)

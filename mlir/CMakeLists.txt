@@ -10,6 +10,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Required so as not to always use the cached option from the mlir build.
 option(QUANTUM_ENABLE_BINDINGS_PYTHON "Enable quantum dialect python bindings" OFF)
 option(CATALYST_ENABLE_WARNINGS "Enable -Wall and -Werror" ON)
+option(CATALYST_DOCS_ONLY "Disable targets that require built dependencies" OFF)
 
 message(STATUS "LLVM_USE_SANITIZER is ${LLVM_USE_SANITIZER}.")
 message(STATUS "CATALYST_ENABLE_WARNINGS is ${CATALYST_ENABLE_WARNINGS}.")
@@ -29,34 +30,60 @@ endif()
 #########################
 
 find_package(MLIR REQUIRED CONFIG)
-find_package(MHLO REQUIRED CONFIG)
 
 message(STATUS "Using MLIRConfig.cmake in: ${MLIR_DIR}")
 message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
-message(STATUS "Using MHLOConfig.cmake in: ${MHLO_DIR}")
 
 set(LLVM_RUNTIME_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/bin)
 set(LLVM_LIBRARY_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/lib)
 set(MLIR_BINARY_DIR ${CMAKE_BINARY_DIR})
 
-# Taken from mlir-hlo/mhlo/transforms/CMakeLists.txt.
-# Unfortunately, AllMhloPasses doesn't appear to be exported.
-set(ALL_MHLO_PASSES
-  ChloPasses
-  MhloPasses
-  StablehloPasses
-  MhloToArithmeticConversion
-  MhloToMemrefConversion
-  HloToLinalgUtils
-  MhloToLinalg
-  MhloToStablehlo
-  StablehloToMhlo
-)
-
 list(APPEND CMAKE_MODULE_PATH "${MLIR_CMAKE_DIR}")
 list(APPEND CMAKE_MODULE_PATH "${LLVM_CMAKE_DIR}")
-list(APPEND CMAKE_MODULE_PATH "${MHLO_CMAKE_DIR}")
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake/modules")
+
+
+# Discover stablehlo libraries and bundle them into a cmake target for catalyst to link to
+# This is because stablehlo does not have a Config.cmake
+# so we cannot use find_package(stablehlo) and have to do this manually
+set(STABLEHLO_LIBS
+    ChloCAPI
+    ChloOps
+    StablehloAssemblyFormat
+    StablehloBase
+    StablehloBroadcastUtils
+    StablehloCAPI
+    StablehloLinalgTransforms
+    StablehloOps
+    StablehloOptimizationPasses
+    StablehloPasses
+    StablehloPassUtils
+    StablehloRegister
+    StablehloTypeConversion
+    StablehloTypeInference
+    Version
+    VhloCAPI
+    VhloOps
+    VhloTypes
+)
+
+foreach(STABLEHLO_LIB IN LISTS STABLEHLO_LIBS)
+    add_library(${STABLEHLO_LIB} STATIC IMPORTED GLOBAL)
+    set_property(TARGET ${STABLEHLO_LIB} PROPERTY
+        IMPORTED_LOCATION "${STABLEHLO_BUILD_DIR}/lib/lib${STABLEHLO_LIB}.a"
+    )
+endforeach()
+
+add_library(ExternalStablehloLib INTERFACE)
+
+foreach(STABLEHLO_LIB IN LISTS STABLEHLO_LIBS)
+    target_link_libraries(ExternalStablehloLib INTERFACE ${STABLEHLO_LIB})
+endforeach()
+
+target_include_directories(ExternalStablehloLib SYSTEM INTERFACE
+  ${STABLEHLO_DIR}
+  ${STABLEHLO_BUILD_DIR} # for the generated .inc files
+)
 
 # Policy CMP0175 was introduced in CMake 4.31 and raises warnings in the upstream CMake modules.
 # Policy CMP0177 was introduced in CMake 4.31 and raises warnings in the upstream CMake modules.
@@ -85,9 +112,6 @@ if(QUANTUM_ENABLE_BINDINGS_PYTHON)
   mlir_configure_python_dev_packages()
 endif()
 
-list(GET MHLO_INCLUDE_DIRS 1 MLIRHLO_DIR)
-list(GET MHLO_INCLUDE_DIRS 2 MLIRHLO_BUILD_DIR)
-
 set(CATALYST_MAIN_INCLUDE_DIR ${PROJECT_SOURCE_DIR}/include)
 set(CATALYST_GEN_INCLUDE_DIR ${PROJECT_BINARY_DIR}/include)
 set(CATALYST_LIB_DIR ${PROJECT_BINARY_DIR})
@@ -95,12 +119,53 @@ set(CATALYST_LIB_DIR ${PROJECT_BINARY_DIR})
 include_directories(SYSTEM
   ${LLVM_INCLUDE_DIRS}
   ${MLIR_INCLUDE_DIRS}
-  ${MHLO_INCLUDE_DIRS}
-  ${MLIRHLO_DIR}/stablehlo
-  ${MLIRHLO_BUILD_DIR}/stablehlo
 )
 link_directories(${LLVM_BUILD_LIBRARY_DIR})
 add_definitions(${LLVM_DEFINITIONS})
+
+
+# Include json and toml dependency
+include(FetchContent)
+
+FetchContent_Declare(json
+    URL https://github.com/nlohmann/json/releases/download/v3.11.3/json.tar.xz
+    URL_HASH  SHA256=d6c65aca6b1ed68e7a182f4757257b107ae403032760ed6ef121c9d55e81757d
+    DOWNLOAD_EXTRACT_TIMESTAMP true
+    SYSTEM
+)
+FetchContent_MakeAvailable(json)
+
+FetchContent_Declare(tomlplusplus
+    GIT_REPOSITORY https://github.com/marzer/tomlplusplus.git
+    GIT_TAG v3.4.0
+    SYSTEM
+)
+FetchContent_MakeAvailable(tomlplusplus)
+
+################################################################################
+## Generate frontend_catalyst_version_py.h from frontend/catalyst/_version.py ##
+################################################################################
+
+function(make_version_header_file input_file output_file)
+    set(version_number "unknown")
+    if (NOT EXISTS ${input_file})
+        message(WARNING "Could not find ${input_file}")
+    else()
+        file(READ ${input_file} input_content)
+        if (NOT input_content MATCHES "__version__ = \"([^\"]+)\"")
+            message(WARNING "Could not find Catalyst version in ${input_file}")
+        else()
+            set(version_number "${CMAKE_MATCH_1}")
+        endif()
+    endif()
+    set(header_content "#pragma once\n\nstatic constexpr const char *CATALYST_VERSION = \"${version_number}\";\n")
+    file(WRITE ${output_file} "${header_content}")
+endfunction(make_version_header_file)
+
+make_version_header_file(
+    "${PROJECT_SOURCE_DIR}/../frontend/catalyst/_version.py"
+    "${PROJECT_BINARY_DIR}/include/Catalyst/Utils/frontend_catalyst_version_py.h"
+)
 
 ######################
 ## Catalyst Sources ##
@@ -113,7 +178,9 @@ include_directories(
 
 add_subdirectory(include)
 add_subdirectory(lib)
-add_subdirectory(tools)
+if(NOT CATALYST_DOCS_ONLY)
+  add_subdirectory(tools)
+endif()
 
 if(QUANTUM_ENABLE_BINDINGS_PYTHON)
   message(STATUS "Enabling Python API")
@@ -191,4 +258,6 @@ endif()
 # End of CIRCT code  #
 ######################
 
-add_subdirectory(test)
+if(NOT CATALYST_DOCS_ONLY)
+  add_subdirectory(test)
+endif()

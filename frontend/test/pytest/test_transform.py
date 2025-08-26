@@ -45,10 +45,7 @@ from pennylane.transforms import merge_rotations
 
 from catalyst import measure, qjit
 from catalyst.device import QJITDevice
-from catalyst.device.decomposition import (
-    measurements_from_counts,
-    measurements_from_samples,
-)
+from catalyst.device.decomposition import measurements_from_counts, measurements_from_samples
 from catalyst.utils.exceptions import CompileError
 
 # pylint: disable=too-many-lines,line-too-long
@@ -70,7 +67,7 @@ def test_add_noise(backend):
 
         noise_model = qml.NoiseModel({fcond1: noise1, fcond2: noise2}, t1=2.0, t2=0.2)
 
-        @partial(qml.transforms.add_noise, noise_model=noise_model)
+        @partial(qml.noise.add_noise, noise_model=noise_model)
         @qml.qnode(qml.device(device_name, wires=2), interface="jax")
         def qfunc(w, x, y, z):
             qml.RX(w, wires=0)
@@ -372,7 +369,7 @@ def test_insert(backend):
     def qnode_builder(device_name):
         """Builder"""
 
-        @partial(qml.transforms.insert, op=qml.X, op_args=(), position="end")
+        @partial(qml.noise.insert, op=qml.X, op_args=(), position="end")
         @qml.qnode(qml.device(device_name, wires=2), interface="jax")
         def qfunc(w, x, y, z):
             qml.RX(w, wires=0)
@@ -653,10 +650,10 @@ class TestMitigate:
             """Builder"""
 
             @partial(
-                qml.transforms.mitigate_with_zne,
+                qml.noise.mitigate_with_zne,
                 scale_factors=[1.0, 2.0, 3.0],
-                folding=qml.transforms.fold_global,
-                extrapolate=qml.transforms.poly_extrapolate,
+                folding=qml.noise.fold_global,
+                extrapolate=qml.noise.poly_extrapolate,
                 extrapolate_kwargs={"order": 2},
             )
             @qml.qnode(qml.device(device_name, wires=2), interface="jax")
@@ -1099,8 +1096,8 @@ class TestTransformValidity:
         """Test verification for transforms that are non-batching but modify tape measurements
         while returning classical values."""
 
-        def inject_device_transforms(self, ctx, execution_config=None):
-            program, config = original_preprocess(self, ctx, execution_config)
+        def inject_device_transforms(self, ctx, execution_config=None, shots=None):
+            program, config = original_preprocess(self, ctx, execution_config, shots=shots)
 
             program.add_transform(transform, self.wires)
 
@@ -1111,9 +1108,10 @@ class TestTransformValidity:
         original_preprocess = QJITDevice.preprocess
         monkeypatch.setattr(QJITDevice, "preprocess", inject_device_transforms)
 
-        dev = qml.device(backend, wires=2, shots=5)
+        dev = qml.device(backend, wires=2)
 
         @partial(transform, device_wires=dev.wires)
+        @qml.set_shots(5)
         @qml.qnode(dev)
         def qfunc():
             qml.X(0)
@@ -1131,8 +1129,8 @@ class TestTransformValidity:
         """Test verification for transforms that are non-batching and in-principle can modify tape
         measurements but don't, while returning classical values."""
 
-        def inject_device_transforms(self, ctx, execution_config=None):
-            program, config = original_preprocess(self, ctx, execution_config)
+        def inject_device_transforms(self, ctx, execution_config=None, shots=None):
+            program, config = original_preprocess(self, ctx, execution_config, shots=shots)
 
             program.add_transform(transform, self.wires)
 

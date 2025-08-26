@@ -237,6 +237,15 @@ class TestCatalyst:
 
         self.verify_catalyst_adjoint_against_pennylane(func, qml.device(backend, wires=2))
 
+    def test_adjoint_pcphase(self, backend):
+        """Ensures that catalyst.adjoint supports PCPhase operations."""
+
+        def func():
+            qml.PauliX(0)
+            qml.PCPhase(np.pi / 2, dim=0, wires=[0, 1])
+
+        self.verify_catalyst_adjoint_against_pennylane(func, qml.device(backend, wires=2))
+
     def test_adjoint_no_measurements(self):
         """Checks that catalyst.adjoint rejects functions containing quantum measurements."""
 
@@ -543,8 +552,9 @@ class TestCatalyst:
             subsubroutine()
             qml.adjoint(qml.ctrl(subsubroutine, control=0))()
 
-        dev = qml.device(backend, wires=4, shots=500)
+        dev = qml.device(backend, wires=4)
 
+        @qml.set_shots(shots=500)
         @qml.qnode(dev)
         def circuit():
             qml.adjoint(subroutine)()
@@ -628,7 +638,6 @@ class TestInheritanceMixins:
         assert isinstance(op, Adjoint)
         assert isinstance(op, qml.operation.Operator)
         assert not isinstance(op, qml.operation.Operation)
-        assert not isinstance(op, qml.operation.Observable)
         assert not isinstance(op, AdjointOperation)
 
         # checking we can call `dir` without problems
@@ -649,35 +658,11 @@ class TestInheritanceMixins:
         assert isinstance(op, Adjoint)
         assert isinstance(op, qml.operation.Operator)
         assert isinstance(op, qml.operation.Operation)
-        assert not isinstance(op, qml.operation.Observable)
         assert isinstance(op, AdjointOperation)
 
         # check operation-specific properties made it into the mapping
         assert "grad_recipe" in dir(op)
         assert "control_wires" in dir(op)
-
-    def test_observable(self):
-        """Test that when the base is an Observable, Adjoint will also inherit from Observable."""
-
-        # pylint: disable=too-few-public-methods
-        class CustomObs(qml.operation.Observable):
-            num_wires = 1
-            num_params = 0
-
-        base = CustomObs(wires=0)
-        ob0 = adjoint(base)
-
-        assert isinstance(ob0, Adjoint)
-        assert isinstance(ob0, qml.operation.Operator)
-        assert not isinstance(ob0, qml.operation.Operation)
-        assert isinstance(ob0, qml.operation.Observable)
-        assert not isinstance(ob0, AdjointOperation)
-
-        # Check some basic observable functionality
-        assert ob0.compare(ob0)
-
-        # check the dir
-        assert "grad_recipe" not in dir(ob0)
 
 
 class TestInitialization:
@@ -1559,18 +1544,6 @@ class TestAdjointConstructorOutsideofQueuing:
         assert isinstance(out, qml.RX)
         assert out.data == (-x,)
 
-    def test_observable(self):
-        """Test providing a preconstructed Observable outside of a queuing context."""
-
-        base = 1.0 * qml.PauliX(0)
-        obs = adjoint(base)
-
-        assert isinstance(obs, Adjoint)
-        assert isinstance(base, qml.operation.Observable) == isinstance(
-            obs, qml.operation.Observable
-        )
-        assert obs.base is base
-
     def test_single_op_function(self):
         """Test the transform on a single op as a callable outside of a queuing context."""
         x = 1.234
@@ -1646,7 +1619,7 @@ class TestMidCircuitMeasurementAfterAdjoint:
         def subroutine():
             qml.Hadamard(wires=1)
 
-        @qjit()
+        @qjit
         @qml.qnode(qml.device("lightning.qubit", wires=2))
         def circuit():
             # Comment/uncomment to toggle bug

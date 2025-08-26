@@ -57,6 +57,7 @@ from catalyst.jax_extras.tracing import (
     infer_output_type_python,
     input_type_to_tracers,
     jaxpr_pad_consts,
+    make_from_node_data_and_children,
     make_jaxpr2,
     make_jaxpr_effects,
     new_inner_tracer,

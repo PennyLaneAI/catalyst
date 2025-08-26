@@ -29,7 +29,7 @@ from os import path
 from typing import List, Optional
 
 from catalyst.logging import debug_logger, debug_logger_init
-from catalyst.pipelines import CompileOptions
+from catalyst.pipelines import CompileOptions, KeepIntermediateLevel
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.filesystem import Directory
 from catalyst.utils.runtime_environment import get_cli_path, get_lib_path
@@ -345,6 +345,9 @@ def _options_to_cli_flags(options):
     if options.keep_intermediate:
         extra_args += ["--keep-intermediate"]
 
+    if options.keep_intermediate >= KeepIntermediateLevel.PASS:
+        extra_args += ["--save-ir-after-each=pass"]
+
     if options.verbose:
         extra_args += ["--verbose"]
 
@@ -510,7 +513,7 @@ class Compiler:
             # We keep this module here to keep xDSL requirement optional
             # Only move this is it has been decided that xDSL is no longer optional.
             # pylint: disable-next=import-outside-toplevel
-            from pennylane.compiler.python_compiler.impl import Compiler as PythonCompiler
+            from pennylane.compiler.python_compiler import Compiler as PythonCompiler
 
             compiler = PythonCompiler()
             mlir_module = compiler.run(mlir_module)

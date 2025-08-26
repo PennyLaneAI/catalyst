@@ -19,7 +19,7 @@ import jax
 import numpy as np
 import pennylane as qml
 import pytest
-from pennylane.transforms import exponential_extrapolate
+from pennylane.noise import exponential_extrapolate, poly_extrapolate
 
 import catalyst
 from catalyst.api_extensions.error_mitigation import (
@@ -356,7 +356,7 @@ def test_zne_with_extrap_kwargs():
         return catalyst.mitigate_with_zne(
             circuit,
             scale_factors=[1, 3, 5, 7],
-            extrapolate=qml.transforms.poly_extrapolate,
+            extrapolate=poly_extrapolate,
             extrapolate_kwargs={"order": 2},
         )()
 
@@ -381,7 +381,7 @@ def test_exponential_extrapolation_with_kwargs():
         return catalyst.mitigate_with_zne(
             circuit,
             scale_factors=[1, 3, 5, 7],
-            extrapolate=qml.transforms.exponential_extrapolate,
+            extrapolate=exponential_extrapolate,
             extrapolate_kwargs={"asymptote": 3},
         )()
 
@@ -416,7 +416,7 @@ def test_jaxpr_with_const():
 
 def test_mcm_method_with_zne(backend):
     """Test that the dynamic_one_shot works with ZNE."""
-    dev = qml.device(backend, wires=1, shots=5)
+    dev = qml.device(backend, wires=1)
 
     def circuit():
         return qml.expval(qml.PauliZ(0))
@@ -426,12 +426,12 @@ def test_mcm_method_with_zne(backend):
     @catalyst.qjit
     def mitigated_circuit_1():
         s = [1, 3]
-        g = qml.QNode(circuit, dev, mcm_method="one-shot")
+        g = qml.set_shots(qml.QNode(circuit, dev, mcm_method="one-shot"), shots=5)
         return catalyst.mitigate_with_zne(g, scale_factors=s)()
 
     @catalyst.qjit
     def mitigated_circuit_2():
-        g = qml.QNode(circuit, dev)
+        g = qml.set_shots(qml.QNode(circuit, dev), shots=5)
         return catalyst.mitigate_with_zne(g, scale_factors=s)()
 
     observed = mitigated_circuit_1()

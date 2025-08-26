@@ -16,7 +16,6 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
-#include <cstdio>
 
 #include "ExecutionContext.hpp"
 #include "QuantumDevice.hpp"
@@ -25,6 +24,9 @@
 
 #include "NullQubit.hpp"
 #include "TestUtils.hpp"
+#include "Types.h"
+
+using namespace Catch::Matchers;
 
 using namespace Catalyst::Runtime;
 using namespace Catalyst::Runtime::Devices;
@@ -43,10 +45,61 @@ TEST_CASE("Test __catalyst__rt__device_init registering device=null.qubit", "[Nu
     __catalyst__rt__initialize(nullptr);
 
     char rtd_name[11] = "null.qubit";
-    __catalyst__rt__device_init((int8_t *)rtd_name, nullptr, nullptr, 0);
+    __catalyst__rt__device_init((int8_t *)rtd_name, nullptr, nullptr, 0, false);
 
     __catalyst__rt__device_release();
 
+    __catalyst__rt__finalize();
+}
+
+TEST_CASE("Test runtime device kwargs parsing", "[NullQubit]")
+{
+    std::unique_ptr<NullQubit> sim0 = std::make_unique<NullQubit>("{foo : bar}");
+    auto kwargs0 = sim0->GetDeviceKwargs();
+    CHECK(kwargs0["foo"] == "bar");
+
+    std::unique_ptr<NullQubit> sim1 = std::make_unique<NullQubit>("{foo : bar, blah : aloha}");
+    auto kwargs1 = sim1->GetDeviceKwargs();
+    CHECK(kwargs1["foo"] == "bar");
+    CHECK(kwargs1["blah"] == "aloha");
+
+    REQUIRE_THROWS_WITH(
+        std::make_unique<NullQubit>("{foo : {blah:bar}}"),
+        ContainsSubstring("Nested dictionaries in device kwargs are not supported."));
+
+    REQUIRE_THROWS_WITH(std::make_unique<NullQubit>("}{"),
+                        ContainsSubstring("Device kwargs string is malformed."));
+}
+
+TEST_CASE("Test automatic qubit management", "[NullQubit]")
+{
+    constexpr size_t shots = 10;
+    const auto [rtd_lib, rtd_name, rtd_kwargs] =
+        std::array<std::string, 3>{"null.qubit", "null_qubit", ""};
+    __catalyst__rt__initialize(nullptr);
+    __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
+                                (int8_t *)rtd_kwargs.c_str(), shots,
+                                /*auto_qubit_management=*/true);
+
+    QirArray *qs = __catalyst__rt__qubit_allocate_array(0);
+
+    // a new index `2` will mean 3 new allocations
+    QUBIT **target = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 2);
+
+    __catalyst__qis__Hadamard(*target, NO_MODIFIERS);
+
+    size_t n = __catalyst__rt__num_qubits();
+    CHECK(n == 3);
+
+    std::vector<double> buffer(shots * n);
+    MemRefT_double_2d result = {buffer.data(), buffer.data(), 0, {shots, n}, {n, 1}};
+
+    __catalyst__qis__Sample(&result, n);
+
+    __catalyst__rt__qubit_release_array(qs);
+    CHECK(__catalyst__rt__num_qubits() == 0);
+
+    __catalyst__rt__device_release();
     __catalyst__rt__finalize();
 }
 
@@ -177,7 +230,7 @@ TEST_CASE("Test __catalyst__qis__Sample with num_qubits=2 and PartialSample call
         std::array<std::string, 3>{"null.qubit", "null_qubit", ""};
     __catalyst__rt__initialize(nullptr);
     __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
-                                (int8_t *)rtd_kwargs.c_str(), 1000);
+                                (int8_t *)rtd_kwargs.c_str(), 1000, false);
 
     QirArray *qs = __catalyst__rt__qubit_allocate_array(2);
 
@@ -211,26 +264,114 @@ TEST_CASE("Test __catalyst__qis__Sample with num_qubits=2 and PartialSample call
     __catalyst__rt__finalize();
 }
 
-TEST_CASE("NullQubit (no) Basis vector", "[NullQubit]")
+TEST_CASE("Test NullQubit state vector - 0 qubits", "[NullQubit]")
 {
     std::unique_ptr<NullQubit> sim = std::make_unique<NullQubit>();
 
-    QubitIdType q = sim->AllocateQubit();
-    q = sim->AllocateQubit();
-    q = sim->AllocateQubit();
-
-    sim->ReleaseQubit(q);
+    CHECK(sim->GetNumQubits() == 0);
 
     std::vector<std::complex<double>> state(1U << sim->GetNumQubits());
     DataView<std::complex<double>, 1> view(state);
     sim->State(view);
 
-    CHECK(view.size() == 8);
+    CHECK(view.size() == 1);
     CHECK(view(0).real() == Catch::Approx(1.0).epsilon(1e-5));
     CHECK(view(0).imag() == Catch::Approx(0.0).epsilon(1e-5));
 }
 
-TEST_CASE("test AllocateQubits", "[NullQubit]")
+TEST_CASE("Test NullQubit state vector - 1 qubit", "[NullQubit]")
+{
+    std::unique_ptr<NullQubit> sim = std::make_unique<NullQubit>();
+
+    sim->AllocateQubit();
+
+    CHECK(sim->GetNumQubits() == 1);
+
+    std::vector<std::complex<double>> state(1U << sim->GetNumQubits());
+    DataView<std::complex<double>, 1> view(state);
+    sim->State(view);
+
+    CHECK(view.size() == 2);
+    CHECK(view(0).real() == Catch::Approx(1.0).epsilon(1e-5));
+    CHECK(view(0).imag() == Catch::Approx(0.0).epsilon(1e-5));
+    CHECK(view(1).real() == Catch::Approx(0.0).epsilon(1e-5));
+    CHECK(view(1).imag() == Catch::Approx(0.0).epsilon(1e-5));
+}
+
+TEST_CASE("Test NullQubit state vector - 2 qubits", "[NullQubit]")
+{
+    std::unique_ptr<NullQubit> sim = std::make_unique<NullQubit>();
+
+    sim->AllocateQubit();
+    sim->AllocateQubit();
+
+    CHECK(sim->GetNumQubits() == 2);
+
+    std::vector<std::complex<double>> state(1U << sim->GetNumQubits());
+    DataView<std::complex<double>, 1> view(state);
+    sim->State(view);
+
+    CHECK(view.size() == 4);
+    CHECK(view(0).real() == Catch::Approx(1.0).epsilon(1e-5));
+    CHECK(view(0).imag() == Catch::Approx(0.0).epsilon(1e-5));
+    CHECK(view(1).real() == Catch::Approx(0.0).epsilon(1e-5));
+    CHECK(view(1).imag() == Catch::Approx(0.0).epsilon(1e-5));
+    CHECK(view(2).real() == Catch::Approx(0.0).epsilon(1e-5));
+    CHECK(view(2).imag() == Catch::Approx(0.0).epsilon(1e-5));
+    CHECK(view(3).real() == Catch::Approx(0.0).epsilon(1e-5));
+    CHECK(view(3).imag() == Catch::Approx(0.0).epsilon(1e-5));
+}
+
+TEST_CASE("Test NullQubit state vector after ReleaseQubit", "[NullQubit]")
+{
+    std::unique_ptr<NullQubit> sim = std::make_unique<NullQubit>();
+
+    sim->AllocateQubit();
+    QubitIdType q1 = sim->AllocateQubit();
+
+    CHECK(sim->GetNumQubits() == 2);
+
+    sim->ReleaseQubit(q1);
+
+    CHECK(sim->GetNumQubits() == 1);
+
+    std::vector<std::complex<double>> state(1U << sim->GetNumQubits());
+    DataView<std::complex<double>, 1> view(state);
+    sim->State(view);
+
+    CHECK(view.size() == 2);
+    CHECK(view(0).real() == Catch::Approx(1.0).epsilon(1e-5));
+    CHECK(view(0).imag() == Catch::Approx(0.0).epsilon(1e-5));
+    CHECK(view(1).real() == Catch::Approx(0.0).epsilon(1e-5));
+    CHECK(view(1).imag() == Catch::Approx(0.0).epsilon(1e-5));
+}
+
+TEST_CASE("Test NullQubit state vector after AllocateQubits", "[NullQubit]")
+{
+    std::unique_ptr<NullQubit> sim = std::make_unique<NullQubit>();
+
+    CHECK(sim->AllocateQubits(0).size() == 0);
+
+    sim->AllocateQubits(2);
+
+    CHECK(sim->GetNumQubits() == 2);
+
+    std::vector<std::complex<double>> state(1U << sim->GetNumQubits());
+    DataView<std::complex<double>, 1> view(state);
+    sim->State(view);
+
+    CHECK(view.size() == 4);
+    CHECK(view(0).real() == Catch::Approx(1.0).epsilon(1e-5));
+    CHECK(view(0).imag() == Catch::Approx(0.0).epsilon(1e-5));
+    CHECK(view(1).real() == Catch::Approx(0.0).epsilon(1e-5));
+    CHECK(view(1).imag() == Catch::Approx(0.0).epsilon(1e-5));
+    CHECK(view(2).real() == Catch::Approx(0.0).epsilon(1e-5));
+    CHECK(view(2).imag() == Catch::Approx(0.0).epsilon(1e-5));
+    CHECK(view(3).real() == Catch::Approx(0.0).epsilon(1e-5));
+    CHECK(view(3).imag() == Catch::Approx(0.0).epsilon(1e-5));
+}
+
+TEST_CASE("Test NullQubit state vector after AllocateQubits and ReleaseQubit", "[NullQubit]")
 {
     std::unique_ptr<NullQubit> sim = std::make_unique<NullQubit>();
 
@@ -238,15 +379,21 @@ TEST_CASE("test AllocateQubits", "[NullQubit]")
 
     auto &&q = sim->AllocateQubits(2);
 
+    CHECK(sim->GetNumQubits() == 2);
+
     sim->ReleaseQubit(q[0]);
+
+    CHECK(sim->GetNumQubits() == 1);
 
     std::vector<std::complex<double>> state(1U << sim->GetNumQubits());
     DataView<std::complex<double>, 1> view(state);
     sim->State(view);
 
-    CHECK(state.size() == 4);
-    CHECK(state[0].real() == Catch::Approx(1.0).epsilon(1e-5));
-    CHECK(state[0].imag() == Catch::Approx(0.0).epsilon(1e-5));
+    CHECK(view.size() == 2);
+    CHECK(view(0).real() == Catch::Approx(1.0).epsilon(1e-5));
+    CHECK(view(0).imag() == Catch::Approx(0.0).epsilon(1e-5));
+    CHECK(view(1).real() == Catch::Approx(0.0).epsilon(1e-5));
+    CHECK(view(1).imag() == Catch::Approx(0.0).epsilon(1e-5));
 }
 
 TEST_CASE("test AllocateQubits generates a proper std::vector<QubitIdType>", "[NullQubit]")
@@ -288,6 +435,24 @@ TEST_CASE("Mix Gate test R(X,Y,Z) num_qubits=4", "[NullQubit]")
     CHECK(view(0).imag() == Catch::Approx(0.0).epsilon(1e-5));
 }
 
+TEST_CASE("Gate PCPhase num_qubits=3", "[NullQubit]")
+{
+    std::unique_ptr<NullQubit> sim = std::make_unique<NullQubit>();
+
+    std::vector<QubitIdType> Qs = sim->AllocateQubits(3);
+
+    sim->NamedOperation("PCPhase", {0.123, 1}, {Qs[0], Qs[1], Qs[2]}, false);
+    sim->NamedOperation("PCPhase", {0.123, 2}, {Qs[1], Qs[2]}, true);
+
+    std::vector<std::complex<double>> state(1U << sim->GetNumQubits());
+    DataView<std::complex<double>, 1> view(state);
+    sim->State(view);
+
+    CHECK(view.size() == 8);
+    CHECK(view(0).real() == Catch::Approx(1.0).epsilon(1e-5));
+    CHECK(view(0).imag() == Catch::Approx(0.0).epsilon(1e-5));
+}
+
 TEST_CASE("Test __catalyst__qis__Gradient_params Op=[Hadamard,RZ,RY,RZ,S,T,ParamShift], "
           "Obs=[X]",
           "[Gradient]")
@@ -309,7 +474,7 @@ TEST_CASE("Test __catalyst__qis__Gradient_params Op=[Hadamard,RZ,RY,RZ,S,T,Param
         std::array<std::string, 3>{"null.qubit", "null_qubit", ""};
 
     __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
-                                (int8_t *)rtd_kwargs.c_str(), 0);
+                                (int8_t *)rtd_kwargs.c_str(), 0, false);
 
     QUBIT *q0 = __catalyst__rt__qubit_allocate();
     QUBIT *q1 = __catalyst__rt__qubit_allocate();
@@ -372,7 +537,7 @@ TEST_CASE("Test __catalyst__rt__print_state", "[NullQubit]")
     auto [rtd_lib, rtd_name, rtd_kwargs] =
         std::array<std::string, 3>{"null.qubit", "null_qubit", ""};
     __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
-                                (int8_t *)rtd_kwargs.c_str(), 0);
+                                (int8_t *)rtd_kwargs.c_str(), 0, false);
 
     QirArray *qs = __catalyst__rt__qubit_allocate_array(2);
 
@@ -614,7 +779,8 @@ TEST_CASE("Test NullQubit device resource tracking", "[NullQubit]")
     std::unique_ptr<NullQubit> dummy = std::make_unique<NullQubit>();
     CHECK(dummy->IsTrackingResources() == false);
 
-    std::unique_ptr<NullQubit> sim = std::make_unique<NullQubit>("{'track_resources':True}");
+    std::unique_ptr<NullQubit> sim =
+        std::make_unique<NullQubit>("{'track_resources':True}", RESOURCES_FNAME);
     CHECK(sim->IsTrackingResources() == true);
     CHECK(sim->ResourcesGetNumGates() == 0);
     CHECK(sim->ResourcesGetNumQubits() == 0);
@@ -696,7 +862,27 @@ TEST_CASE("Test NullQubit device resource tracking", "[NullQubit]")
 
     // Check that releasing resets
     sim->ReleaseAllQubits();
+    std::remove(RESOURCES_FNAME); // Remove the file automatically created by the device
 
     CHECK(sim->ResourcesGetNumGates() == 0);
     CHECK(sim->ResourcesGetNumQubits() == 0);
+    CHECK(sim->ResourcesGetFilename() == RESOURCES_FNAME);
+}
+
+TEST_CASE("Test resource tracking filename", "[NullQubit]")
+{
+    // Check automatic filename creation
+    std::unique_ptr<NullQubit> dummy = std::make_unique<NullQubit>("{'track_resources':True}");
+    CHECK(dummy->IsTrackingResources() == true);
+    dummy->ReleaseAllQubits();
+
+    const std::string dummy_resources_fname = dummy->ResourcesGetFilename();
+
+    std::cout << "Auto-created resources filename: " << dummy_resources_fname << std::endl;
+
+    CHECK(dummy_resources_fname.rfind("__pennylane_resources_data_") == 0);
+    CHECK(dummy_resources_fname.find(".json") != std::string::npos);
+
+    std::remove(
+        dummy_resources_fname.c_str()); // Remove the file automatically created by the device
 }

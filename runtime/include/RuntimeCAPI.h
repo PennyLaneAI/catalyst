@@ -24,8 +24,8 @@ extern "C" {
 
 // Quantum Runtime Instructions
 void __catalyst__rt__fail_cstr(const char *);
-void __catalyst__rt__initialize(uint32_t *seed);
-void __catalyst__rt__device_init(int8_t *, int8_t *, int8_t *, int64_t shots);
+void __catalyst__rt__initialize(uint32_t *);
+void __catalyst__rt__device_init(int8_t *, int8_t *, int8_t *, int64_t, bool);
 void __catalyst__rt__device_release();
 void __catalyst__rt__finalize();
 void __catalyst__rt__toggle_recorder(bool);
@@ -50,7 +50,7 @@ RESULT *__catalyst__rt__result_get_zero();
 // Quantum Gate Set Instructions
 void __catalyst__qis__SetState(MemRefT_CplxT_double_1d *, uint64_t, ...);
 void __catalyst__qis__SetBasisState(MemRefT_int8_1d *, uint64_t, ...);
-void __catalyst__qis__Identity(QUBIT *, const Modifiers *);
+void __catalyst__qis__Identity(const Modifiers *, int64_t, /* qubits */...);
 void __catalyst__qis__PauliX(QUBIT *, const Modifiers *);
 void __catalyst__qis__PauliY(QUBIT *, const Modifiers *);
 void __catalyst__qis__PauliZ(QUBIT *, const Modifiers *);
@@ -70,6 +70,9 @@ void __catalyst__qis__IsingXX(double, QUBIT *, QUBIT *, const Modifiers *);
 void __catalyst__qis__IsingYY(double, QUBIT *, QUBIT *, const Modifiers *);
 void __catalyst__qis__IsingXY(double, QUBIT *, QUBIT *, const Modifiers *);
 void __catalyst__qis__IsingZZ(double, QUBIT *, QUBIT *, const Modifiers *);
+void __catalyst__qis__SingleExcitation(double, QUBIT *, QUBIT *, const Modifiers *);
+void __catalyst__qis__DoubleExcitation(double, QUBIT *, QUBIT *, QUBIT *, QUBIT *,
+                                       const Modifiers *);
 void __catalyst__qis__ControlledPhaseShift(double, QUBIT *, QUBIT *, const Modifiers *);
 void __catalyst__qis__CRX(double, QUBIT *, QUBIT *, const Modifiers *);
 void __catalyst__qis__CRY(double, QUBIT *, QUBIT *, const Modifiers *);
@@ -80,6 +83,7 @@ void __catalyst__qis__CSWAP(QUBIT *, QUBIT *, QUBIT *, const Modifiers *);
 void __catalyst__qis__Toffoli(QUBIT *, QUBIT *, QUBIT *, const Modifiers *);
 void __catalyst__qis__MultiRZ(double, const Modifiers *, int64_t, /*qubits*/...);
 void __catalyst__qis__GlobalPhase(double, const Modifiers *);
+void __catalyst__qis__PCPhase(double, double, const Modifiers *, int64_t, /*qubits*/...);
 void __catalyst__qis__ISWAP(QUBIT *, QUBIT *, const Modifiers *);
 void __catalyst__qis__PSWAP(double, QUBIT *, QUBIT *, const Modifiers *);
 

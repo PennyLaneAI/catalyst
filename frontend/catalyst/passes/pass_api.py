@@ -19,6 +19,7 @@ from typing import TypeAlias
 
 import pennylane as qml
 
+from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
 from catalyst.tracing.contexts import EvaluationContext
 
 PipelineDict: TypeAlias = dict[str, dict[str, str]]
@@ -72,8 +73,11 @@ class PassPipelineWrapper(QNodeWrapper):
     def __call__(self, *args, **kwargs):
         if EvaluationContext.is_tracing():
             pass_pipeline = kwargs.pop("pass_pipeline", [])
-            pass_pipeline += dictionary_to_list_of_passes(
-                self.pass_name_or_pipeline, *self.flags, **self.valued_options
+            pass_pipeline = (
+                dictionary_to_list_of_passes(
+                    self.pass_name_or_pipeline, *self.flags, **self.valued_options
+                )
+                + pass_pipeline
             )
             kwargs["pass_pipeline"] = pass_pipeline
         return super().__call__(*args, **kwargs)
@@ -283,23 +287,21 @@ class Pass:
 
     def get_options(self):
         """
-        Stringify options according to what mlir-opt expects.
-
-          ApplyRegisteredPassOp expects options to be a single StringAttr
-          which follows the same format as the one used with mlir-opt.
-
-        https://mlir.llvm.org/docs/Dialects/Transform/#transformapply_registered_pass-transformapplyregisteredpassop
-
-          Options passed to a pass are specified via the syntax {option1=value1 option2=value2 ...},
-          i.e., use space-separated key=value pairs for each option.
-
-        https://mlir.llvm.org/docs/Tutorials/MlirOpt/#running-a-pass-with-options
-
-        Experimentally we found that single-options also work without values.
+        Build a dictionary mapping option names to MLIR attributes.
+        ApplyRegisteredPassOp expects options to be a dictionary from strings to attributes.
+        See https://github.com/llvm/llvm-project/pull/143159
         """
-        retval = " ".join(f"{str(option)}" for option in self.options)
-        retval2 = " ".join(f"{str(key)}={str(value)}" for key, value in self.valued_options.items())
-        return " ".join([retval, retval2]).strip()
+        options_dict = {}
+        for option in self.options:
+            options_dict[str(option)] = get_mlir_attribute_from_pyval(True)
+
+        for option, value in self.valued_options.items():
+            # MLIR options are either CamelCase
+            # or spinal-case (kebab-case) which is not allowed in python
+            mlir_option = str(option).replace("_", "-")
+            options_dict[mlir_option] = get_mlir_attribute_from_pyval(value)
+
+        return options_dict
 
     def __repr__(self):
         return (
@@ -372,11 +374,14 @@ def dictionary_to_list_of_passes(pass_pipeline: PipelineDict | str, *flags, **va
 def _API_name_to_pass_name():
     return {
         "cancel_inverses": "remove-chained-self-inverse",
+        "disentangle_cnot": "disentangle-CNOT",
+        "disentangle_swap": "disentangle-SWAP",
         "merge_rotations": "merge-rotations",
         "ions_decomposition": "ions-decomposition",
-        "to_ppr": "to_ppr",
-        "commute_ppr": "commute_ppr",
-        "merge_ppr_ppm": "merge_ppr_ppm",
-        "ppr_to_ppm": "ppr_to_ppm",
-        "ppm_compilation": "ppm_compilation",
+        "to_ppr": "to-ppr",
+        "commute_ppr": "commute-ppr",
+        "merge_ppr_ppm": "merge-ppr-ppm",
+        "decompose_non_clifford_ppr": "decompose-non-clifford-ppr",
+        "decompose_clifford_ppr": "decompose-clifford-ppr",
+        "ppm_compilation": "ppm-compilation",
     }

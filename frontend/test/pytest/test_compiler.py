@@ -30,8 +30,9 @@ import pennylane as qml
 import pytest
 
 from catalyst import qjit
-from catalyst.compiler import CompileOptions, Compiler, LinkerDriver
+from catalyst.compiler import CompileOptions, Compiler, LinkerDriver, _options_to_cli_flags
 from catalyst.debug import instrumentation
+from catalyst.pipelines import KeepIntermediateLevel
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.filesystem import Directory
 
@@ -91,6 +92,52 @@ class TestCompilerOptions:
         capture_result = capsys.readouterr()
         capture = capture_result.out + capture_result.err
         assert "[DIAGNOSTICS]" in capture
+
+    @pytest.mark.parametrize(
+        "input_value, expected_level",
+        [
+            (None, KeepIntermediateLevel.NONE),
+            (False, KeepIntermediateLevel.NONE),
+            (True, KeepIntermediateLevel.PIPELINE),
+            (0, KeepIntermediateLevel.NONE),
+            (1, KeepIntermediateLevel.PIPELINE),
+            (2, KeepIntermediateLevel.PASS),
+            ("none", KeepIntermediateLevel.NONE),
+            ("pipeline", KeepIntermediateLevel.PIPELINE),
+            ("pass", KeepIntermediateLevel.PASS),
+        ],
+    )
+    def test_keep_intermediate_levels_conversion(self, input_value, expected_level):
+        """Test that various inputs for keep_intermediate are correctly converted to Enum."""
+        options = CompileOptions(keep_intermediate=input_value)
+        assert options.keep_intermediate == expected_level
+
+    @pytest.mark.parametrize("invalid_input", [3, -1, "invalid_string", 3.0, []])
+    def test_keep_intermediate_invalid_inputs(self, invalid_input):
+        """Test that invalid inputs for keep_intermediate raise appropriate errors."""
+        with pytest.raises(ValueError, match="Invalid value for keep_intermediate:"):
+            CompileOptions(keep_intermediate=invalid_input)
+
+    def test_options_to_cli_flags_keep_intermediate_none(self):
+        """Test _options_to_cli_flags with KeepIntermediateLevel.NONE."""
+        options = CompileOptions(keep_intermediate=KeepIntermediateLevel.NONE)
+        flags = _options_to_cli_flags(options)
+        assert "--keep-intermediate" not in flags
+        assert "--save-ir-after-each=pass" not in flags
+
+    def test_options_to_cli_flags_keep_intermediate_basic(self):
+        """Test _options_to_cli_flags with KeepIntermediateLevel.PIPELINE."""
+        options = CompileOptions(keep_intermediate=KeepIntermediateLevel.PIPELINE)
+        flags = _options_to_cli_flags(options)
+        assert "--keep-intermediate" in flags
+        assert "--save-ir-after-each=pass" not in flags
+
+    def test_options_to_cli_flags_keep_intermediate_debug(self):
+        """Test _options_to_cli_flags with KeepIntermediateLevel.PASS."""
+        options = CompileOptions(keep_intermediate=KeepIntermediateLevel.PASS)
+        flags = _options_to_cli_flags(options)
+        assert "--keep-intermediate" in flags
+        assert "--save-ir-after-each=pass" in flags
 
 
 class TestCompilerWarnings:

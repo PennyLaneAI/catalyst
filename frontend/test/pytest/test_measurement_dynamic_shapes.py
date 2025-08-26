@@ -17,22 +17,24 @@ This file contains tests for measurement primitives when the return shape is dyn
 
 # pylint: disable=line-too-long
 
+from functools import partial
+
 import numpy as np
 import pennylane as qml
 import pytest
 
 import catalyst
-from catalyst.debug import get_compilation_stage, replace_ir
 
 
-def test_dynamic_sample_backend_functionality():
-    """Test that a `sample` program with dynamic shots can be executed correctly."""
+def test_dynamic_sample(capfd):
+    """Test that a `sample` program with dynamic shots can be executed correctly and doesn't recompile."""
 
-    @catalyst.qjit(keep_intermediate=True)
-    def workflow_dyn_sample(shots):  # pylint: disable=unused-argument
-        # qml.device still needs concrete shots
-        device = qml.device("lightning.qubit", wires=1, shots=10)
+    @catalyst.qjit
+    def workflow_dyn_sample(shots):
+        print("compiling...")
+        device = qml.device("lightning.qubit", wires=1)
 
+        @partial(qml.set_shots, shots=shots)
         @qml.qnode(device)
         def circuit():
             qml.RX(1.5, 0)
@@ -40,40 +42,28 @@ def test_dynamic_sample_backend_functionality():
 
         return circuit()
 
-    workflow_dyn_sample(10)
-    old_ir = get_compilation_stage(workflow_dyn_sample, "mlir")
-    workflow_dyn_sample.workspace.cleanup()
-
-    new_ir = old_ir.replace(
-        "catalyst.launch_kernel @module_circuit::@circuit() : () -> tensor<10x1xi64>",
-        "catalyst.launch_kernel @module_circuit::@circuit(%arg0) : (tensor<i64>) -> tensor<?x1xi64>",
-    )
-    new_ir = new_ir.replace(
-        "func.func public @circuit() -> tensor<10x1xi64>",
-        "func.func public @circuit(%arg0: tensor<i64>) -> tensor<?x1xi64>",
-    )
-    new_ir = new_ir.replace(
-        "quantum.device shots(%extracted) [",
-        """%shots = tensor.extract %arg0[] : tensor<i64>
-      quantum.device shots(%shots) [""",
-    )
-    new_ir = new_ir.replace("tensor<10x1x", "tensor<?x1x")
-    new_ir = new_ir.replace("quantum.sample %3 :", "quantum.sample %3 shape %shots:")
-    replace_ir(workflow_dyn_sample, "mlir", new_ir)
+    # Test with different shot numbers - should only compile once
+    res = workflow_dyn_sample(10)
+    assert len(res) == 10
     res = workflow_dyn_sample(37)
     assert len(res) == 37
+    res = workflow_dyn_sample(5)
+    assert len(res) == 5
 
-    workflow_dyn_sample.workspace.cleanup()
+    # Check that compilation only happened once
+    out, _ = capfd.readouterr()
+    assert out.count("compiling...") == 1
 
 
-def test_dynamic_counts_backend_functionality():
-    """Test that a `counts` program with dynamic shots can be executed correctly."""
+def test_dynamic_counts(capfd):
+    """Test that a `counts` program with dynamic shots can be executed correctly and doesn't recompile."""
 
-    @catalyst.qjit(keep_intermediate=True)
-    def workflow_dyn_counts(shots):  # pylint: disable=unused-argument
-        # qml.device still needs concrete shots
-        device = qml.device("lightning.qubit", wires=1, shots=10)
+    @catalyst.qjit
+    def workflow_dyn_counts(shots):
+        print("compiling...")
+        device = qml.device("lightning.qubit", wires=1)
 
+        @partial(qml.set_shots, shots=shots)
         @qml.qnode(device)
         def circuit():
             qml.RX(1.5, 0)
@@ -81,28 +71,19 @@ def test_dynamic_counts_backend_functionality():
 
         return circuit()
 
-    workflow_dyn_counts(10)
-    old_ir = get_compilation_stage(workflow_dyn_counts, "mlir")
-    workflow_dyn_counts.workspace.cleanup()
+    # Test with different shot numbers - should only compile once
+    res = workflow_dyn_counts(10)
+    assert res[1][0] + res[1][1] == 10
 
-    new_ir = old_ir.replace(
-        "catalyst.launch_kernel @module_circuit::@circuit() : () ->",
-        "catalyst.launch_kernel @module_circuit::@circuit(%arg0) : (tensor<i64>) ->",
-    )
-    new_ir = new_ir.replace(
-        "func.func public @circuit() ->", "func.func public @circuit(%arg0: tensor<i64>) ->"
-    )
-    new_ir = new_ir.replace(
-        "quantum.device shots(%extracted) [",
-        """%shots = tensor.extract %arg0[] : tensor<i64>
-      quantum.device shots(%shots) [""",
-    )
-
-    replace_ir(workflow_dyn_counts, "mlir", new_ir)
     res = workflow_dyn_counts(4000)
     assert res[1][0] + res[1][1] == 4000
 
-    workflow_dyn_counts.workspace.cleanup()
+    res = workflow_dyn_counts(100)
+    assert res[1][0] + res[1][1] == 100
+
+    # Check that compilation only happened once
+    out, _ = capfd.readouterr()
+    assert out.count("compiling...") == 1
 
 
 @pytest.mark.parametrize("readout", [qml.expval, qml.var])
@@ -213,8 +194,9 @@ def test_dynamic_wires_sample_with_wires(shots, backend, capfd):
 
     def ref(num_qubits):
         print("compiling...")
-        dev = qml.device(backend, wires=num_qubits, shots=shots)
+        dev = qml.device(backend, wires=num_qubits)
 
+        @qml.set_shots(shots)
         @qml.qnode(dev)
         def circ():
             @catalyst.for_loop(0, num_qubits, 1)
@@ -247,8 +229,9 @@ def test_dynamic_wires_sample_without_wires(shots, backend, capfd):
 
     def ref(num_qubits):
         print("compiling...")
-        dev = qml.device(backend, wires=num_qubits, shots=shots)
+        dev = qml.device(backend, wires=num_qubits)
 
+        @qml.set_shots(shots)
         @qml.qnode(dev)
         def circ():
             @catalyst.for_loop(0, num_qubits, 1)
@@ -283,8 +266,9 @@ def test_dynamic_wires_counts_with_wires(backend, capfd):
     @catalyst.qjit
     def func(num_qubits):
         print("compiling...")
-        dev = qml.device(backend, wires=num_qubits, shots=1000)
+        dev = qml.device(backend, wires=num_qubits)
 
+        @qml.set_shots(1000)
         @qml.qnode(dev)
         def circ():
             qml.RX(0.0, wires=num_qubits - 1)
@@ -312,8 +296,9 @@ def test_dynamic_wires_counts_without_wires(backend, capfd):
     @catalyst.qjit
     def func(num_qubits):
         print("compiling...")
-        dev = qml.device(backend, wires=num_qubits, shots=1000)
+        dev = qml.device(backend, wires=num_qubits)
 
+        @qml.set_shots(1000)
         @qml.qnode(dev)
         def circ():
             qml.RX(0.0, wires=num_qubits - 1)
@@ -354,6 +339,57 @@ def test_wrong_wires_argument(backend, wires):
         AttributeError, match="Number of wires on the device should be a scalar integer."
     ):
         func(wires)
+
+
+def test_dynamic_shots_and_wires(capfd):
+    """Test that a circuit with both dynamic shots and dynamic wires works correctly with qml.sample."""
+
+    @catalyst.qjit
+    def workflow_dynamic_shots_and_wires(num_shots, num_wires):
+        print("compiling...")
+        device = qml.device("lightning.qubit", wires=num_wires)
+
+        @partial(qml.set_shots, shots=num_shots)
+        @qml.qnode(device)
+        def circuit():
+            # Apply Hadamard to all wires
+            @catalyst.for_loop(0, num_wires, 1)
+            def apply_hadamards(i):
+                qml.Hadamard(i)
+
+            apply_hadamards()
+
+            # Apply some entangling gates if we have multiple wires
+            @catalyst.cond(num_wires > 1)
+            def add_entanglement():
+                @catalyst.for_loop(0, num_wires - 1, 1)
+                def apply_cnots(i):
+                    qml.CNOT([i, i + 1])
+
+                apply_cnots()
+
+            add_entanglement()
+
+            return qml.sample()
+
+        return circuit()
+
+    # Test with different combinations of shots and wires - should only compile once
+    result_1 = workflow_dynamic_shots_and_wires(10, 2)
+    assert result_1.shape == (10, 2)
+
+    result_2 = workflow_dynamic_shots_and_wires(20, 3)
+    assert result_2.shape == (20, 3)
+
+    result_3 = workflow_dynamic_shots_and_wires(5, 1)
+    assert result_3.shape == (5, 1)
+
+    result_4 = workflow_dynamic_shots_and_wires(15, 4)
+    assert result_4.shape == (15, 4)
+
+    # Check that compilation only happened once
+    out, _ = capfd.readouterr()
+    assert out.count("compiling...") == 1
 
 
 if __name__ == "__main__":

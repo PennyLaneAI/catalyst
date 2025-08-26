@@ -8,7 +8,7 @@ BLACKVERSIONMINOR := $(if $(BLACKVERSIONMINOR),$(BLACKVERSIONMINOR),0)
 MK_ABSPATH := $(abspath $(lastword $(MAKEFILE_LIST)))
 MK_DIR := $(dir $(MK_ABSPATH))
 LLVM_BUILD_DIR ?= $(MK_DIR)/mlir/llvm-project/build
-MHLO_BUILD_DIR ?= $(MK_DIR)/mlir/mlir-hlo/bazel-build
+STABLEHLO_BUILD_DIR ?= $(MK_DIR)/mlir/stablehlo/build
 DIALECTS_SRC_DIR ?= $(MK_DIR)/mlir
 DIALECTS_BUILD_DIR ?= $(MK_DIR)/mlir/build
 RT_BUILD_DIR ?= $(MK_DIR)/runtime/build
@@ -21,6 +21,7 @@ TEST_BACKEND ?= "lightning.qubit"
 TEST_BRAKET ?= NONE
 ENABLE_ASAN ?= OFF
 TOML_SPECS ?= $(shell find ./runtime ./frontend -name '*.toml' -not -name 'pyproject.toml')
+ENABLE_FLAKY ?= OFF
 
 PLATFORM := $(shell uname -s)
 ifeq ($(PLATFORM),Linux)
@@ -54,7 +55,11 @@ endif
 # with the ASAN runtime. Since we don't exert much control over the "user" compiler, skip them.
 TEST_EXCLUDES := -k "not test_executable_generation"
 endif
-PYTEST_FLAGS := $(PARALLELIZE) $(TEST_EXCLUDES)
+FLAKY :=
+ifeq ($(ENABLE_FLAKY),ON)
+FLAKY := --force-flaky --max-runs=5 --min-passes=5
+endif
+PYTEST_FLAGS := $(PARALLELIZE) $(TEST_EXCLUDES) $(FLAKY)
 
 # TODO: Find out why we have container overflow on macOS.
 ASAN_OPTIONS := ASAN_OPTIONS="detect_leaks=0,detect_container_overflow=0"
@@ -112,23 +117,27 @@ frontend:
 	# versions of a package with the same version tag (e.g. 0.38-dev0).
 	$(PYTHON) -m pip uninstall -y pennylane
 	$(PYTHON) -m pip install -e . --extra-index-url https://test.pypi.org/simple $(PIP_VERBOSE_FLAG)
-	rm -r frontend/PennyLane_Catalyst.egg-info
+	rm -r frontend/pennylane_catalyst.egg-info
 
-.PHONY: mlir llvm mhlo enzyme dialects runtime oqc
+.PHONY: mlir llvm stablehlo enzyme dialects runtime oqc
 mlir:
 	$(MAKE) -C mlir all
 
 llvm:
 	$(MAKE) -C mlir llvm
 
-mhlo:
-	$(MAKE) -C mlir mhlo
+stablehlo:
+	$(MAKE) -C mlir stablehlo
 
 enzyme:
 	$(MAKE) -C mlir enzyme
 
 dialects:
 	$(MAKE) -C mlir dialects
+	
+.PHONY: dialect-docs
+dialect-docs:
+	$(MAKE) -C mlir dialect-docs
 
 runtime:
 	$(MAKE) -C runtime runtime ENABLE_OQD=$(ENABLE_OQD)
@@ -217,6 +226,7 @@ wheel:
 	cp $(COPY_FLAGS) $(DIALECTS_BUILD_DIR)/bin/catalyst $(MK_DIR)/frontend/bin/
 	find $(MK_DIR)/frontend -type d -name __pycache__ -exec rm -rf {} +
 
+
 	# Copy selected headers to `frontend/include' to include them in the wheel
 	mkdir -p $(MK_DIR)/frontend/catalyst/include
 	find $(DIALECTS_SRC_DIR)/include/Quantum $(DIALECTS_BUILD_DIR)/include/Quantum \
@@ -237,7 +247,7 @@ wheel:
 	$(PYTHON) -m pip wheel --no-deps . -w dist
 
 	rm -r $(MK_DIR)/build
-	rm -r frontend/PennyLane_Catalyst.egg-info
+	rm -r frontend/pennylane_catalyst.egg-info
 
 plugin-wheel: plugin
 	mkdir -p $(MK_DIR)/standalone_plugin_wheel/standalone_plugin/lib
@@ -264,7 +274,7 @@ clean:
 clean-all: clean clean-mlir clean-runtime clean-oqc
 clean-catalyst: clean clean-dialects clean-runtime clean-oqc
 
-.PHONY: clean-mlir clean-dialects clean-plugin clean-llvm clean-mhlo clean-enzyme
+.PHONY: clean-mlir clean-dialects clean-plugin clean-llvm clean-stablehlo clean-enzyme
 clean-mlir:
 	$(MAKE) -C mlir clean
 
@@ -277,8 +287,11 @@ clean-plugin:
 clean-llvm:
 	$(MAKE) -C mlir clean-llvm
 
-clean-mhlo:
-	$(MAKE) -C mlir clean-mhlo
+reset-llvm:
+	$(MAKE) -C mlir reset-llvm
+
+clean-stablehlo:
+	$(MAKE) -C mlir clean-stablehlo
 
 clean-enzyme:
 	$(MAKE) -C mlir clean-enzyme
@@ -293,6 +306,10 @@ clean-oqc:
 .PHONY: coverage coverage-frontend coverage-runtime
 coverage: coverage-frontend coverage-runtime
 
+lit-coverage:
+	@echo "Running lit tests with coverage"
+	ENABLE_LIT_COVERAGE=1 COVERAGE_FILE=$(MK_DIR)/.coverage.lit $(LLVM_BUILD_DIR)/bin/llvm-lit -sv frontend/test/lit -j$(shell nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 1)
+
 coverage-frontend:
 ifeq ($(ENABLE_ASAN),ON)
 ifneq ($(findstring clang,$(C_COMPILER)),clang)
@@ -301,10 +318,18 @@ ifneq ($(findstring clang,$(C_COMPILER)),clang)
 endif
 endif
 	@echo "Generating coverage report for the frontend"
-	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/pytest $(PYTEST_FLAGS) --cov=catalyst --tb=native --cov-report=$(COVERAGE_REPORT)
-	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/test_oqc/oqc $(PYTEST_FLAGS) --cov=catalyst --cov-append --tb=native --cov-report=$(COVERAGE_REPORT)
+	COVERAGE_FILE=$(MK_DIR)/.coverage.pytest $(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/pytest $(PYTEST_FLAGS) --cov=catalyst --tb=native --cov-report=
+	COVERAGE_FILE=$(MK_DIR)/.coverage.pytest $(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/test_oqc/oqc $(PYTEST_FLAGS) --cov=catalyst --cov-append --tb=native --cov-report=
 ifeq ($(ENABLE_OQD), ON)
-	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/test_oqd/oqd $(PYTEST_FLAGS) --cov=catalyst --cov-append --tb=native --cov-report=$(COVERAGE_REPORT)
+	COVERAGE_FILE=$(MK_DIR)/.coverage.pytest $(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/test_oqd/oqd $(PYTEST_FLAGS) --cov=catalyst --cov-append --tb=native --cov-report=
+endif
+	$(ASAN_COMMAND) $(MAKE) lit-coverage
+	$(PYTHON) -m coverage combine --data-file=$(MK_DIR)/.coverage.combined $(MK_DIR)/.coverage.lit $(MK_DIR)/.coverage.pytest
+	@echo "=== Generating final coverage report with format: $(COVERAGE_REPORT) ==="
+ifeq ($(COVERAGE_REPORT),term-missing)
+	$(PYTHON) -m coverage report --data-file=$(MK_DIR)/.coverage.combined --show-missing
+else
+	$(PYTHON) -m coverage $(COVERAGE_REPORT) --data-file=$(MK_DIR)/.coverage.combined
 endif
 ifeq ($(TEST_BRAKET), NONE)
 	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/async_tests --tb=native --backend=$(TEST_BACKEND) --tb=native

@@ -23,11 +23,11 @@
 namespace catalyst {
 
 std::unique_ptr<mlir::Pass> createLowerToQECPass();
-std::unique_ptr<mlir::Pass> createCommuteCliffordTPPRPass();
+std::unique_ptr<mlir::Pass> createCommutePPRPass();
 std::unique_ptr<mlir::Pass> createCliffordTToPPRPass();
-std::unique_ptr<mlir::Pass> createCommuteCliffordPastPPMPass();
+std::unique_ptr<mlir::Pass> createMergePPRIntoPPMPass();
 std::unique_ptr<mlir::Pass> createDecomposeNonCliffordPPRPass();
 std::unique_ptr<mlir::Pass> createDecomposeCliffordPPRPass();
-std::unique_ptr<mlir::Pass> createCliffordTToPPMPass();
-
+std::unique_ptr<mlir::Pass> createPPMCompilationPass();
+std::unique_ptr<mlir::Pass> createCountPPMSpecsPass();
 } // namespace catalyst

@@ -18,41 +18,29 @@
 include "mlir/Pass/PassBase.td"
 include "mlir/IR/EnumAttr.td"
 
-def MaxPauliSizeOption : Option<
-    /*C++ var name=*/"max_pauli_size",
-    /*CLI name=*/"max-pauli-size",
-    /*Type=*/"size_t",
-    /*Default=*/"0", // 0 means no limit
-    /*Description=*/"The maximum size of the Pauli product. 0 means no limit.">;
-
-def CliffordTToPPRPass : Pass<"to_ppr"> {
-    let summary = "Convert quantum dialects to the QEC dialect.";
-
-    let dependentDialects = [
-        "catalyst::qec::QECDialect",
-    ];
-
-    let constructor = "catalyst::createLowerToQECPass()";
-}
-
-def CommuteCliffordTPPRPass : Pass<"commute_ppr"> {
-    let summary = "Commutate CliffordT operations to PPRotation operations.";
-    
-    let dependentDialects = [
-        "catalyst::qec::QECDialect",
-    ];
-    let options = [MaxPauliSizeOption];
-    let constructor = "catalyst::createCommuteCliffordTPPRPass()";
-}
+//===----------------------------------------------------------------------===//
+//                               Enums
+//===----------------------------------------------------------------------===//
 
 def DecomposeMethod : I32EnumAttr<"DecomposeMethod", "Decomposition method", 
     [
-    I32EnumAttrCase<"AutoCorrected", 0, "auto-corrected">,
-    I32EnumAttrCase<"CliffordCorrected", 1, "clifford-corrected">
+        I32EnumAttrCase<"AutoCorrected", 0, "auto-corrected">,
+        I32EnumAttrCase<"CliffordCorrected", 1, "clifford-corrected">
     ]> { 
     let cppNamespace = "catalyst::qec";
     let genSpecializedAttr = 0; 
 }
+
+//===----------------------------------------------------------------------===//
+//                               Options
+//===----------------------------------------------------------------------===//
+
+def MaxPauliSizeOption : Option<
+    /*C++ var name=*/"maxPauliSize",
+    /*CLI name=*/"max-pauli-size",
+    /*Type=*/"size_t",
+    /*Default=*/"0", // 0 means no limit
+    /*Description=*/"The maximum size of the Pauli product. 0 means no limit.">;
 
 def DecomposeMethodOption : Option<
     /*C++ var name=*/"decomposeMethod",
@@ -75,50 +63,72 @@ def AvoidYMeasureOption : Option<
     /*default=*/"false",
     "Avoid Pauli-Y measurements for Clifford rotations. Rather than performing a Pauli-Y measurement for Clifford rotations (sometimes more costly), a Y state is used instead (requires Y state preparation).">;
 
-def CommuteCliffordPastPPMPass : Pass<"merge_ppr_ppm"> {
-    let summary = "Absorb Clifford operations into Pauli Product Measurement operations.";
-    
-    let dependentDialects = [
-        "catalyst::qec::QECDialect",
-    ];
-    let options = [MaxPauliSizeOption];
-    let constructor = "catalyst::createCommuteCliffordPastPPMPass()";
+//===----------------------------------------------------------------------===//
+//                               Passes
+//===----------------------------------------------------------------------===//
+
+def CliffordTToPPRPass : Pass<"to-ppr"> {
+    let summary = "Convert quantum dialects to the QEC dialect.";
+
+    let dependentDialects = [ "catalyst::qec::QECDialect" ];
+
+    let constructor = "catalyst::createLowerToQECPass()";
 }
 
-def DecomposeNonCliffordPPRPass : Pass<"decompose_non_clifford_ppr"> {
+def CommutePPRPass : Pass<"commute-ppr"> {
+    let summary = "Commutate CliffordT operations to PPRotation operations.";
+    
+    let dependentDialects = [ "catalyst::qec::QECDialect" ];
+
+    let options = [MaxPauliSizeOption];
+
+    let constructor = "catalyst::createCommutePPRPass()";
+}
+
+def MergePPRIntoPPMPass : Pass<"merge-ppr-ppm"> {
+    let summary = "Absorb Clifford operations into Pauli Product Measurement operations.";
+    
+    let dependentDialects = [ "catalyst::qec::QECDialect" ];
+
+    let options = [MaxPauliSizeOption];
+
+    let constructor = "catalyst::createMergePPRIntoPPMPass()";
+}
+
+def DecomposeNonCliffordPPRPass : Pass<"decompose-non-clifford-ppr"> {
     let summary = "Decompose non-Clifford PPRotation operations to set of Pauli Product Measurement operations.";
     
-    let dependentDialects = [
-        "catalyst::qec::QECDialect",
-    ];
+    let dependentDialects = [ "catalyst::qec::QECDialect" ];
 
     let constructor = "catalyst::createDecomposeNonCliffordPPRPass()";
 
     let options = [DecomposeMethodOption, AvoidYMeasureOption];
 }
 
-def DecomposeCliffordPPRPass : Pass<"decompose_clifford_ppr"> {
+def DecomposeCliffordPPRPass : Pass<"decompose-clifford-ppr"> {
     let summary = "Decompose Clifford PPRotation operations to set of Pauli Product Measurement operations.";
     
-    let dependentDialects = [
-        "catalyst::qec::QECDialect",
-    ];
+    let dependentDialects = [ "catalyst::qec::QECDialect" ];
 
     let options = [AvoidYMeasureOption];
 
     let constructor = "catalyst::createDecomposeCliffordPPRPass()";
 }
 
-def CliffordTToPPMPass : Pass<"ppm_compilation"> {
+def PPMCompilationPass : Pass<"ppm-compilation"> {
     let summary = "Convert CliffordT operations to Pauli Product Measurement operations.";
     
-    let dependentDialects = [
-        "catalyst::qec::QECDialect",
-    ];
+    let dependentDialects = [ "catalyst::qec::QECDialect" ];
 
-    let constructor = "catalyst::createCliffordTToPPMPass()";
+    let constructor = "catalyst::createPPMCompilationPass()";
 
     let options = [MaxPauliSizeOption, DecomposeMethodOption, AvoidYMeasureOption];
+}
+
+def CountPPMSpecsPass : Pass<"ppm-specs"> {
+    let summary = "Count specs in Pauli Product Measurement operations.";
+    
+    let constructor = "catalyst::createCountPPMSpecsPass()";
 }
 
 #endif // QEC_PASSES

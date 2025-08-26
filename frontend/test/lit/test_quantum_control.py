@@ -158,3 +158,23 @@ def test_native_controlled_multirz():
 
 
 test_native_controlled_multirz()
+
+
+def test_native_controlled_pcphase():
+    """Test native control of the PCPhase operation."""
+    dev = get_custom_qjit_device(3, set(), {"PCPhase": OperatorProperties(True, True, False)})
+
+    @qjit(target="mlir")
+    @qml.qnode(dev)
+    # CHECK-LABEL: public @jit_native_controlled_pcphase
+    def native_controlled_pcphase():
+        # CHECK: [[out:%.+]]:2, [[out_ctrl:%.+]] = quantum.pcphase
+        # CHECK-SAME: ctrls
+        # CHECK-SAME: ctrlvals(%true)
+        qml.ctrl(qml.PCPhase(0.5, dim=2, wires=[0, 2]), control=[1])
+        return qml.state()
+
+    print(native_controlled_pcphase.mlir)
+
+
+test_native_controlled_pcphase()

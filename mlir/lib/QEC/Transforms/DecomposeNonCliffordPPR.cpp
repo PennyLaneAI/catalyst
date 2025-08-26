@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#define DEBUG_TYPE "decompose_non_clifford_ppr"
+#define DEBUG_TYPE "decompose-non-clifford-ppr"
 
 #include <mlir/Dialect/Arith/IR/Arith.h> // for arith::XOrIOp and arith::ConstantOp
 #include <mlir/IR/Builders.h>

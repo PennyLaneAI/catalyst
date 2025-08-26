@@ -380,11 +380,8 @@ struct AnnotateWithFullyQualifiedNamePass
     {
         MLIRContext *context = &getContext();
         GreedyRewriteConfig config;
-        config.strictMode = GreedyRewriteStrictness::ExistingOps;
-        config.enableRegionSimplification = mlir::GreedySimplifyRegionLevel::Disabled;
-        // TODO: Update to the following lines the next time we update llvm
-        // config.setStrictness(GreedyRewriteStrictness::ExistingOps);
-        // config.setRegionSimplificationLevel(mlir::GreedySimplifyRegionLevel::Disabled);
+        config.setStrictness(GreedyRewriteStrictness::ExistingOps);
+        config.setRegionSimplificationLevel(mlir::GreedySimplifyRegionLevel::Disabled);
 
         RewritePatternSet annotate(context);
         auto root = getOperation();
@@ -409,11 +406,8 @@ struct InlineNestedSymbolTablePass : PassWrapper<InlineNestedSymbolTablePass, Op
         MLIRContext *context = &getContext();
 
         GreedyRewriteConfig config;
-        config.strictMode = GreedyRewriteStrictness::ExistingOps;
-        config.enableRegionSimplification = mlir::GreedySimplifyRegionLevel::Disabled;
-        // TODO: Update to the following lines the next time we update llvm
-        // config.setStrictness(GreedyRewriteStrictness::ExistingOps);
-        // config.setRegionSimplificationLevel(mlir::GreedySimplifyRegionLevel::Disabled);
+        config.setStrictness(GreedyRewriteStrictness::ExistingOps);
+        config.setRegionSimplificationLevel(mlir::GreedySimplifyRegionLevel::Disabled);
         RewritePatternSet renameFunctions(context);
 
         // Get all symbol tables in current symbol table. Will be useful for making sure that

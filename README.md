@@ -73,7 +73,7 @@ In addition, we also provide a Python frontend for [PennyLane](https://pennylane
 ## Installation
 
 Catalyst is officially supported on Linux (x86_64, aarch64) and macOS (arm64) platforms,
-and pre-built binaries are being distributed via the Python Package Index (PyPI) for Python versions 3.10 and
+and pre-built binaries are being distributed via the Python Package Index (PyPI) for Python versions 3.11 and
 higher. To install it, simply run the following ``pip`` command:
 
 ```console

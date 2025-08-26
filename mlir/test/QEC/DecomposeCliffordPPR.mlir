@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt --pass-pipeline="builtin.module(decompose_clifford_ppr)" --split-input-file -verify-diagnostics %s | FileCheck %s --check-prefix=CHECK-Z
-// RUN: quantum-opt --pass-pipeline="builtin.module(decompose_clifford_ppr{avoid-y-measure=true})" --split-input-file -verify-diagnostics %s | FileCheck %s --check-prefix=CHECK-Y
+// RUN: quantum-opt --pass-pipeline="builtin.module(decompose-clifford-ppr)" --split-input-file -verify-diagnostics %s | FileCheck %s --check-prefix=CHECK-Z
+// RUN: quantum-opt --pass-pipeline="builtin.module(decompose-clifford-ppr{avoid-y-measure=true})" --split-input-file -verify-diagnostics %s | FileCheck %s --check-prefix=CHECK-Y
 
 func.func @test_ppr_to_ppm(%q1 : !quantum.bit) {
     %0 = qec.ppr ["Z"](4) %q1 : !quantum.bit
