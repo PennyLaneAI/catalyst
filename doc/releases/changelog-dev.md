@@ -23,6 +23,9 @@
 
 <h3>Improvements 🛠</h3>
 
+* Fix resource tracking unit test polluting the environment with output files
+  [(#1861)](https://github.com/PennyLaneAI/catalyst/pull/1861)
+
 * Adjoint differentiation is used by default when executing on lightning devices, significantly reduces gradient computation time.
   [(#1961)](https://github.com/PennyLaneAI/catalyst/pull/1961)
 
@@ -84,9 +87,6 @@
   [(#1952)](https://github.com/PennyLaneAI/catalyst/pull/1952)
 
 <h3>Bug fixes 🐛</h3>
-
-* Fix resource tracking unit test polluting the environment with output files
-  [(#1861)](https://github.com/PennyLaneAI/catalyst/pull/1861)
 
 * Fix type promotion on conditional branches, where the return values from `cond` should be the promoted one.
   [(#1977)](https://github.com/PennyLaneAI/catalyst/pull/1977)

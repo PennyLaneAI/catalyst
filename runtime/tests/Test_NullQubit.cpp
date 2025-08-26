@@ -867,9 +867,12 @@ TEST_CASE("Test NullQubit device resource tracking", "[NullQubit]")
     CHECK(sim->ResourcesGetNumGates() == 0);
     CHECK(sim->ResourcesGetNumQubits() == 0);
     CHECK(sim->ResourcesGetFilename() == RESOURCES_FNAME);
+}
 
+TEST_CASE("Test resource tracking filename", "[NullQubit]")
+{
     // Check automatic filename creation
-    dummy = std::make_unique<NullQubit>("{'track_resources':True}");
+    std::unique_ptr<NullQubit> dummy = std::make_unique<NullQubit>("{'track_resources':True}");
     CHECK(dummy->IsTrackingResources() == true);
     dummy->ReleaseAllQubits();
 
