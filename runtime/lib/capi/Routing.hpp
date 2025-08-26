@@ -127,10 +127,6 @@ class RoutingPass final {
 
     QubitIdType getMappedWire(QubitIdType wire,  int64_t num_elements) 
     { 
-        for (auto& pair : this->wireMap) {
-            std::cout << "Log: " << pair.first << "\n";
-            std::cout << "Mapp: " << pair.second << "\n";
-        }
         QubitIdType numQubits = std::log2(num_elements);
         std::vector<QubitIdType> binaryVector;
         if (wire == 0) 
