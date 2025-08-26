@@ -48,11 +48,12 @@ namespace Catalyst::Runtime::Devices {
 struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     std::unordered_map<std::string, std::string> device_kwargs;
 
-    NullQubit(const std::string &kwargs = "{}")
+    NullQubit(const std::string &kwargs = "{}", const std::string &resources_fname = "")
     {
         this->device_kwargs = Catalyst::Runtime::parse_kwargs(kwargs);
         if (device_kwargs.find("track_resources") != device_kwargs.end()) {
             track_resources_ = device_kwargs["track_resources"] == "True";
+            this->resources_fname_ = resources_fname;
         }
     }
     ~NullQubit() {} // LCOV_EXCL_LINE
@@ -146,18 +147,22 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
         num_qubits_ = 0;
         this->qubit_manager.ReleaseAll();
         if (this->track_resources_) {
-            auto time = std::chrono::high_resolution_clock::now();
-            auto timestamp =
-                std::chrono::duration_cast<std::chrono::nanoseconds>(time.time_since_epoch())
-                    .count();
-            std::stringstream resources_fname;
-            resources_fname << "__pennylane_resources_data_" << timestamp << ".json";
+            if (this->resources_fname_ == "") {
+                auto time = std::chrono::high_resolution_clock::now();
+                auto timestamp =
+                    std::chrono::duration_cast<std::chrono::nanoseconds>(time.time_since_epoch())
+                        .count();
+                std::stringstream resources_fname;
+                resources_fname << "__pennylane_resources_data_" << timestamp << ".json";
+
+                this->resources_fname_ = resources_fname.str(); // Update written location
+            }
 
             // Need to use FILE* instead of ofstream since ofstream has no way to atomically open a
             // file only if it does not already exist
-            FILE *resources_file = fopen(resources_fname.str().c_str(), "wx");
+            FILE *resources_file = fopen(this->resources_fname_.c_str(), "wx");
             if (resources_file == nullptr) {
-                std::string err_msg = "Error opening file '" + resources_fname.str() + "'.";
+                std::string err_msg = "Error opening file '" + this->resources_fname_ + "'.";
                 RT_FAIL(err_msg.c_str());
             }
             else {
@@ -475,12 +480,19 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     auto ResourcesGetNumQubits() -> std::size_t { return resource_data_["num_qubits"]; }
 
     /**
+     * @brief Returns the filename where resource tracking information is dumped. Only works if
+     * resource tracking is enabled
+     */
+    auto ResourcesGetFilename() -> std::string { return resources_fname_; }
+
+    /**
      * @brief Returns whether the device is tracking resources or not.
      */
     auto IsTrackingResources() const -> bool { return track_resources_; }
 
   private:
     bool track_resources_{false};
+    std::string resources_fname_;
     std::size_t num_qubits_{0};
     std::size_t device_shots_{0};
     std::unordered_map<std::string, std::size_t> resource_data_;
