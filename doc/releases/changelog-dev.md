@@ -34,6 +34,9 @@
   in qubits as arguments.
   [(#1820)](https://github.com/PennyLaneAI/catalyst/pull/1820)
 
+* Fix resource tracking unit test polluting the environment with output files
+  [(#1861)](https://github.com/PennyLaneAI/catalyst/pull/1861)
+
 * Adjoint differentiation is used by default when executing on lightning devices, significantly reduces gradient computation time.
   [(#1961)](https://github.com/PennyLaneAI/catalyst/pull/1961)
 
@@ -214,4 +217,5 @@ Christina Lee,
 Joseph Lee,
 Andrija Paurevic,
 Roberto Turrado,
-Paul Haochen Wang.
+Paul Haochen Wang,
+Jake Zaia.
