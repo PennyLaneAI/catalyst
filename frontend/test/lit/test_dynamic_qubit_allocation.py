@@ -19,8 +19,6 @@ Note that this feature is only available under the plxpr pipeline.
 
 # RUN: %PYTHON %s | FileCheck %s
 
-import pennylane as qml
-
 from catalyst import qjit
 from catalyst.jax_primitives import qalloc_p, qdealloc_qb_p, qextract_p
 
