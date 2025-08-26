@@ -19,7 +19,7 @@ the default behaviour and replacing it with a function-like "QNode" primitive.
 """
 import logging
 from copy import copy
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from typing import Callable, Sequence
 
 import jax.numpy as jnp
@@ -48,6 +48,17 @@ from catalyst.utils.exceptions import CompileError
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
+
+
+@dataclass
+class OutputContext:
+    """Context containing parameters needed for finalizing quantum function output."""
+
+    cpy_tape: any
+    classical_values: any
+    classical_return_indices: any
+    out_tree_expected: any
+    num_mcm: int
 
 
 def _resolve_mcm_config(mcm_config, shots):
@@ -92,6 +103,90 @@ def _get_total_shots(qnode):
     else:
         shots = shots_value
     return shots
+
+
+def _reconstruct_output_with_classical_values(
+    measurement_results, classical_values, classical_return_indices
+):
+    """
+    Reconstruct the output values from the classical values and measurement results.
+    Args:
+        out: Output from measurement processing
+        classical_values: Classical values
+        classical_return_indices: Indices of classical values
+    Returns:
+        results: Reconstructed output with classical values inserted
+    """
+    if not classical_values:
+        return measurement_results
+
+    total_expected = len(classical_values) + len(measurement_results)
+    classical_iter = iter(classical_values)
+    measurement_iter = iter(measurement_results)
+
+    def get_next_value(idx):
+        return next(classical_iter) if idx in classical_return_indices else next(measurement_iter)
+
+    results = [get_next_value(i) for i in range(total_expected)]
+    return results
+
+
+def _extract_classical_and_measurement_results(results, classical_return_indices):
+    """
+    Split results into classical values and measurement results.
+    It assume that the results are in the order of classical values and measurement results.
+    """
+    num_classical_return_indices = len(classical_return_indices)
+    classical_values = results[:num_classical_return_indices]
+    measurement_results = results[num_classical_return_indices:]
+    return classical_values, measurement_results
+
+
+def _finalize_output(out, ctx: OutputContext):
+    """
+    Finalize the output by reconstructing with classical values and unflattening to the
+    expected tree structure.
+    Args:
+        out: The output to finalize
+        context: OutputContext containing all necessary parameters for finalization
+    """
+    # Handle case with no measurements
+    if len(ctx.cpy_tape.measurements) == 0:
+        out = out[: -ctx.num_mcm]
+
+    out = _reconstruct_output_with_classical_values(
+        out, ctx.classical_values, ctx.classical_return_indices
+    )
+    out = tree_unflatten(ctx.out_tree_expected[0], out)
+
+    return out
+
+
+def _process_measurements_without_mcm(cpy_tape, out):
+    """Process measurements when there are no mid-circuit measurements."""
+
+    def process_measurement_result(m, out, idx):
+        result = jnp.squeeze(out[idx])
+        max_ndim = min(len(out[idx].shape), 2)
+        if result.ndim == 1 and max_ndim == 2:
+            result = jnp.expand_dims(result, axis=1)
+
+        # Without MCMs and postselection, all samples are valid for use in MP computation.
+        is_valid = jnp.full((result.shape[0],), True)
+        processed_result = gather_non_mcm(
+            m, result, is_valid, postselect_mode="pad-invalid-samples"
+        )
+        return processed_result
+
+    new_out = []
+    idx = 0
+
+    for m in cpy_tape.measurements:
+        processed_result = process_measurement_result(m, out, idx)
+        new_out.append(processed_result)
+        idx += 1
+
+    return tuple(new_out)
 
 
 class QFunc:
@@ -145,20 +240,26 @@ class QFunc:
 
         static_argnums = kwargs.pop("static_argnums", ())
         out_tree_expected = kwargs.pop("_out_tree_expected", [])
+        classical_return_indices = kwargs.pop("_classical_return_indices", [])
+        num_mcm_expected = kwargs.pop("_num_mcm_expected", [])
         debug_info = kwargs.pop("debug_info", None)
 
         def _eval_quantum(*args, **kwargs):
-            closed_jaxpr, out_type, out_tree, out_tree_exp = trace_quantum_function(
-                self.func,
-                qjit_device,
-                args,
-                kwargs,
-                self,
-                static_argnums,
-                debug_info,
+            closed_jaxpr, out_type, out_tree, out_tree_exp, cls_ret_idx, num_mcm = (
+                trace_quantum_function(
+                    self.func,
+                    qjit_device,
+                    args,
+                    kwargs,
+                    self,
+                    static_argnums,
+                    debug_info,
+                )
             )
 
             out_tree_expected.append(out_tree_exp)
+            classical_return_indices.append(cls_ret_idx)
+            num_mcm_expected.append(num_mcm)
             dynamic_args = filter_static_args(args, static_argnums)
             args_expanded = get_implicit_and_explicit_flat_args(None, *dynamic_args, **kwargs)
             res_expanded = eval_jaxpr(closed_jaxpr.jaxpr, closed_jaxpr.consts, *args_expanded)
@@ -279,6 +380,16 @@ def dynamic_one_shot(qnode, **kwargs):
         if isinstance(results[0], tuple) and len(results) == 1:
             results = results[0]
         has_mcm = any(isinstance(op, MidCircuitMeasure) for op in cpy_tape.operations)
+
+        classical_return_indices = kwargs.pop("_classical_return_indices", [[]])[0]
+        num_mcm = kwargs.pop("_num_mcm_expected", [0])[0]
+        out_tree_expected = kwargs.pop("_out_tree_expected", [[]])
+
+        # Split results into classical and measurement parts
+        classical_values, results = _extract_classical_and_measurement_results(
+            results, classical_return_indices
+        )
+
         out = list(results)
         if has_mcm:
             out = parse_native_mid_circuit_measurements(
@@ -287,15 +398,16 @@ def dynamic_one_shot(qnode, **kwargs):
             if len(cpy_tape.measurements) == 1:
                 out = (out,)
         else:
-            for m_count, m in enumerate(cpy_tape.measurements):
-                # Without MCMs and postselection, all samples are valid for use in MP computation.
-                is_valid = jnp.array([True] * len(out[m_count]))
-                out[m_count] = gather_non_mcm(
-                    m, out[m_count], is_valid, postselect_mode="pad-invalid-samples"
-                )
-            out = tuple(out)
-        out_tree_expected = kwargs.pop("_out_tree_expected", [])
-        out = tree_unflatten(out_tree_expected[0], out)
-        return out
+            out = _process_measurements_without_mcm(cpy_tape, out)
+
+        ctx = OutputContext(
+            cpy_tape=cpy_tape,
+            classical_values=classical_values,
+            classical_return_indices=classical_return_indices,
+            out_tree_expected=out_tree_expected,
+            num_mcm=num_mcm,
+        )
+
+        return _finalize_output(out, ctx)
 
     return one_shot_wrapper

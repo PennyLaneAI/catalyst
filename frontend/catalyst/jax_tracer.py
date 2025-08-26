@@ -38,6 +38,7 @@ from pennylane.measurements import (
     CountsMP,
     ExpectationMP,
     MeasurementProcess,
+    MidMeasureMP,
     ProbabilityMP,
     StateMP,
     VarianceMP,
@@ -75,6 +76,7 @@ from catalyst.jax_extras import (
     tree_unflatten,
     wrap_init,
 )
+from catalyst.jax_extras.tracing import uses_transform
 from catalyst.jax_primitives import (
     AbstractQreg,
     compbasis_p,
@@ -1137,6 +1139,16 @@ def has_midcircuit_measurement(tape):
     return any(map(is_midcircuit_measurement, tape.operations))
 
 
+@debug_logger
+def num_midcircuit_measurement(tape):
+    """Number of mid-circuit measurements."""
+
+    def is_midcircuit_measurement(op):
+        return isinstance(op, catalyst.api_extensions.MidCircuitMeasure)
+
+    return sum(map(is_midcircuit_measurement, tape.operations))
+
+
 class TracingMode(Enum):
     """Enumerate the tracing modes supported by the quantum function tracer:
 
@@ -1205,7 +1217,13 @@ def apply_transforms(
         # TODO: Ideally we should allow qnode transforms that don't modify the measurements to
         # operate in the permissive tracing mode, but that currently leads to a small number of
         # test failures due to the different result format produced in trace_quantum_function.
-        if has_classical_outputs(flat_results):
+
+        only_with_dynamic_one_shot = all(
+            "dynamic_one_shot_partial" in str(getattr(qnode, "transform", ""))
+            for qnode in qnode_program
+        )
+
+        if has_classical_outputs(flat_results) and not only_with_dynamic_one_shot:
             msg = (
                 "Transforming MeasurementProcesses is unsupported with non-MeasurementProcess "
                 "QNode outputs. The selected device, options, or applied QNode transforms, may be "
@@ -1335,6 +1353,21 @@ def _get_total_shots(qnode):
     return shots
 
 
+def _construct_output_with_classical_values(
+    tape: QuantumTape, return_values_flat: List[Any]
+) -> Tuple[List[Any], List[int], int]:
+    classical_values = []
+    classical_return_indices = []
+    num_mcm = num_midcircuit_measurement(tape)
+    for i, value in enumerate(return_values_flat):
+        if not isinstance(value, qml.measurements.MeasurementProcess):
+            classical_values.append(value)
+            classical_return_indices.append(i)
+    output = classical_values + tape.measurements
+
+    return output, classical_return_indices, num_mcm
+
+
 @debug_logger
 def trace_quantum_function(
     f: Callable, device: QubitDevice, args, kwargs, qnode, static_argnums, debug_info
@@ -1410,6 +1443,8 @@ def trace_quantum_function(
 
         # (2) - Quantum tracing
         transformed_results = []
+        classical_return_indices = []
+        num_mcm = 0
         with EvaluationContext.frame_tracing_context(trace):
             for tape in tapes:
                 # Set up quantum register for the current tape.
@@ -1441,7 +1476,14 @@ def trace_quantum_function(
                 # changed the output. See `split_non_commuting`
                 if tracing_mode == TracingMode.TRANSFORM:
                     # TODO: In the future support arbitrary output from the user function.
-                    output = tape.measurements
+                    if uses_transform(qnode, "dynamic_one_shot_partial", mode="only_one"):
+                        output, cls_ret_indices, num_mcm = _construct_output_with_classical_values(
+                            tape, return_values_flat
+                        )
+                        classical_return_indices.extend(cls_ret_indices)
+                    else:
+                        output = tape.measurements
+
                     _, trees = jax.tree_util.tree_flatten(output, is_leaf=is_leaf)
                 else:
                     output = return_values_flat
@@ -1498,4 +1540,4 @@ def trace_quantum_function(
         )
         # TODO: `check_jaxpr` complains about the `AbstractQreg` type. Consider fixing.
         # check_jaxpr(jaxpr)
-    return closed_jaxpr, out_type, out_tree, return_values_tree
+    return closed_jaxpr, out_type, out_tree, return_values_tree, classical_return_indices, num_mcm
