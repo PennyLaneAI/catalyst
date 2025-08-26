@@ -170,7 +170,7 @@ def post_process(filename, circuit_name):
         alpha=0.3,
     )
 
-    plt.title("SWAP comparison for "+ circuit_name +"-like circuit to 10x10 grid device")
+    plt.title("SWAP comparison for "+ circuit_name +"-like circuit to 8x8 grid device")
     plt.xlabel("Number of qubits")
     plt.ylabel("SWAPs inserted")
     plt.legend()
