@@ -83,3 +83,49 @@ module @single_hadamard {
       return %out_qubits_1 : !quantum.bit
   }
 }
+
+// -----
+module @recursive {
+  func.func public @test_recursive() -> tensor<4xf64> {
+    %0 = quantum.alloc( 2) : !quantum.reg
+    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    // CHECK: [[CST_PI2:%.+]] = arith.constant 1.5707963267948966 : f64
+    // CHECK: [[CST_PI:%.+]] = arith.constant 3.1415926535897931 : f64
+    // CHECK: [[REG:%.+]] = quantum.alloc( 2) : !quantum.reg
+    // CHECK: [[QUBIT:%.+]] = quantum.extract [[REG]][ 0] : !quantum.reg -> !quantum.bit
+
+    // CHECK: [[QUBIT1:%.+]] = quantum.custom "RZ"([[CST_PI]]) [[QUBIT]] : !quantum.bit
+    // CHECK: [[QUBIT2:%.+]] = quantum.custom "RY"([[CST_PI2]]) [[QUBIT1]] : !quantum.bit
+    // CHECK-NOT: quantum.custom "Hadamard"
+    %out_qubits = quantum.custom "Hadamard"() %1 : !quantum.bit
+
+    // CHECK: [[QUBIT3:%.+]] = quantum.custom "RZ"([[CST_PI]]) [[QUBIT2]] : !quantum.bit
+    // CHECK: [[QUBIT4:%.+]] = quantum.custom "RY"([[CST_PI2]]) [[QUBIT3]] : !quantum.bit
+    // CHECK-NOT: quantum.custom "Hadamard"
+    %out_qubits_0 = quantum.custom "Hadamard"() %out_qubits : !quantum.bit
+
+    // CHECK: [[UPDATED_REG:%.+]] = quantum.insert [[REG]][ 0], [[QUBIT4]] : !quantum.reg, !quantum.bit
+    %2 = quantum.insert %0[ 0], %out_qubits_0 : !quantum.reg, !quantum.bit
+    %3 = quantum.compbasis qreg %2 : !quantum.obs
+    %4 = quantum.probs %3 : tensor<4xf64>
+    quantum.dealloc %2 : !quantum.reg
+    return %4 : tensor<4xf64>
+  }
+
+  // Decomposition function should be applied and removed from the module
+  // CHECK-NOT: func.func private @Hadamard_to_RY_decomp
+  func.func private @Hadamard_to_RY_decomp(%arg0: !quantum.bit) -> !quantum.bit attributes {catalyst.decomposition, catalyst.decomposition.target_op = "Hadamard", llvm.linkage = #llvm.linkage<internal>} {
+    %out_qubits_0 = quantum.custom "RZRY"() %arg0 : !quantum.bit
+    return %out_qubits_0 : !quantum.bit
+  }
+
+  // Decomposition function should be applied and removed from the module
+  // CHECK-NOT: func.func private @RZRY_decomp
+  func.func private @RZRY_decomp(%arg0: !quantum.bit) -> !quantum.bit attributes {catalyst.decomposition, catalyst.decomposition.target_op = "RZRY", llvm.linkage = #llvm.linkage<internal>} {
+    %cst = arith.constant 3.1415926535897931 : f64
+    %cst_0 = arith.constant 1.5707963267948966 : f64
+    %out_qubits_1 = quantum.custom "RZ"(%cst) %arg0 : !quantum.bit
+    %out_qubits_2 = quantum.custom "RY"(%cst_0) %out_qubits_1 : !quantum.bit
+    return %out_qubits_2 : !quantum.bit
+  }
+}
