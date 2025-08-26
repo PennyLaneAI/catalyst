@@ -43,6 +43,10 @@ def circuit(x: float):
     # pylint: disable=line-too-long
     # CHECK: {{%.+}} = quantum.multirz({{%.+}}) {{%.+}}, {{%.+}}, {{%.+}}, {{%.+}}, {{%.+}} : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
     qml.MultiRZ(x, wires=[0, 1, 2, 3, 4])
+
+    # CHECK: {{%.+}} = quantum.pcphase({{%.+}}, {{%.+}}) {{%.+}}, {{%.+}}, {{%.+}} : !quantum.bit, !quantum.bit, !quantum.bit
+    qml.PCPhase(x, dim=0, wires=[0, 1, 2])
+
     return measure(wires=0)
 
 

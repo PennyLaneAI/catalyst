@@ -33,7 +33,7 @@ from catalyst import vjp as C_vjp
 
 # TODO: add tests with other measurement processes (e.g. qml.sample, qml.probs, ...)
 
-# pylint: disable=too-many-public-methods
+# pylint: disable=too-many-lines,too-many-public-methods
 
 
 class TestMidCircuitMeasurement:
@@ -197,9 +197,10 @@ class TestMidCircuitMeasurement:
     def test_return_mcm_with_sample_single(self, backend):
         """Test that a measurement result can be returned with qml.sample and shots."""
 
-        dev = qml.device(backend, wires=1, shots=1)
+        dev = qml.device(backend, wires=1)
 
         @qjit
+        @qml.set_shots(1)
         @qml.qnode(dev)
         def circuit(x):
             qml.RY(x, wires=0)
@@ -213,9 +214,10 @@ class TestMidCircuitMeasurement:
     def test_return_mcm_with_sample_multiple(self, backend):
         """Test that a measurement result can be returned with qml.sample and shots."""
 
-        dev = qml.device(backend, wires=1, shots=10)
+        dev = qml.device(backend, wires=1)
 
         @qjit
+        @qml.set_shots(10)
         @qml.qnode(dev)
         def circuit(x):
             qml.RY(x, wires=0)
@@ -244,9 +246,10 @@ class TestMidCircuitMeasurement:
 
     def test_mcm_method_one_shot_analytic_error(self, backend):
         """Test that an error is raised if using mcm_method="one-shot" without shots."""
-        dev = qml.device(backend, wires=1, shots=None)
+        dev = qml.device(backend, wires=1)
 
         @qjit
+        @qml.set_shots(None)
         @qml.qnode(dev, mcm_method="one-shot")
         def circuit(x):
             qml.RX(x, 0)
@@ -261,9 +264,10 @@ class TestMidCircuitMeasurement:
     def test_single_branch_statistics_hw_like_error(self, backend):
         """Test that an error is raised if using `mcm_method="single-branch-statistics"` and
         `postselect_mode="hw-like"`"""
-        dev = qml.device(backend, wires=1, shots=10)
+        dev = qml.device(backend, wires=1)
 
         @qjit
+        @qml.set_shots(10)
         @qml.qnode(dev, mcm_method="single-branch-statistics", postselect_mode="hw-like")
         def circuit(x):
             qml.RX(x, 0)
@@ -284,13 +288,14 @@ class TestMidCircuitMeasurement:
         if postselect_mode == "hw-like" and mcm_method == "single-branch-statistics":
             pytest.skip("Invalid MCM configuration")
 
-        dev = qml.device(backend, wires=2, shots=10)
+        dev = qml.device(backend, wires=2)
 
         original_config = qml.devices.MCMConfig(
             postselect_mode=postselect_mode, mcm_method=mcm_method
         )
 
         @qjit
+        @qml.set_shots(10)
         @qml.qnode(dev, **asdict(original_config))
         def circuit(x):
             qml.RX(x, 0)
@@ -304,9 +309,10 @@ class TestMidCircuitMeasurement:
     @pytest.mark.parametrize("postselect_mode", [None, "fill-shots", "hw-like"])
     def test_default_mcm_method(self, backend, postselect_mode, mocker):
         """Test that the correct default mcm_method is chosen based on postselect_mode"""
-        dev = qml.device(backend, wires=1, shots=10)
+        dev = qml.device(backend, wires=1)
 
         @qjit
+        @qml.set_shots(10)
         @qml.qnode(dev, mcm_method=None, postselect_mode=postselect_mode)
         def circuit(x):
             qml.RX(x, 0)
@@ -325,9 +331,10 @@ class TestMidCircuitMeasurement:
     @pytest.mark.parametrize("mcm_method", [None, "one-shot"])
     def test_mcm_method_with_dict_output(self, backend, postselect_mode, mcm_method):
         """Test that the correct default mcm_method is chosen based on postselect_mode"""
-        dev = qml.device(backend, wires=1, shots=20)
+        dev = qml.device(backend, wires=1)
 
         @qjit
+        @qml.set_shots(20)
         @qml.qnode(dev, mcm_method=mcm_method, postselect_mode=postselect_mode)
         def circuit(x):
             qml.RX(x, wires=0)
@@ -342,9 +349,10 @@ class TestMidCircuitMeasurement:
     @pytest.mark.parametrize("mcm_method", ["one-shot"])
     def test_mcm_method_with_count_mesurement(self, backend, postselect_mode, mcm_method):
         """Test that the correct default mcm_method is chosen based on postselect_mode"""
-        dev = qml.device(backend, wires=1, shots=20)
+        dev = qml.device(backend, wires=1)
 
         @qjit
+        @qml.set_shots(20)
         @qml.qnode(dev, mcm_method=mcm_method, postselect_mode=postselect_mode)
         def circuit(x):
             qml.RX(x, wires=0)
@@ -367,9 +375,10 @@ class TestMidCircuitMeasurement:
         self, backend, postselect_mode, mcm_method
     ):
         """Test that the correct default mcm_method is chosen based on postselect_mode"""
-        dev = qml.device(backend, wires=1, shots=5)
+        dev = qml.device(backend, wires=1)
 
         @qjit
+        @qml.set_shots(5)
         @qml.qnode(dev, mcm_method=mcm_method, postselect_mode=postselect_mode)
         def circuit(x):
             qml.RX(x, wires=0)
@@ -399,9 +408,10 @@ class TestMidCircuitMeasurement:
     @pytest.mark.parametrize("mcm_method", [None, "single-branch-statistics", "one-shot"])
     def test_invalid_postselect_error(self, backend, mcm_method):
         """Test that an error is raised if postselecting on an invalid value"""
-        dev = qml.device(backend, wires=1, shots=10)
+        dev = qml.device(backend, wires=1)
 
         @qjit
+        @qml.set_shots(10)
         @qml.qnode(dev, mcm_method=mcm_method)
         def circuit(x):
             qml.RX(x, 0)
@@ -422,9 +432,19 @@ class TestDynamicOneShotIntegration:
             (None, False, (1, 1)),
             (0, False, (0, 0)),
             (1, False, (1, 1)),
-            (None, True, (1, 0)),
+            pytest.param(
+                None,
+                True,
+                (1, 0),
+                marks=pytest.mark.xfail(reason="waiting for PennyLane squeeze issue fix"),
+            ),
             (0, True, (0, 0)),
-            (1, True, (1, 0)),
+            pytest.param(
+                1,
+                True,
+                (1, 0),
+                marks=pytest.mark.xfail(reason="waiting for PennyLane squeeze issue fix"),
+            ),
         ],
     )
     @pytest.mark.parametrize("postselect_mode", ["hw-like", "fill-shots"])
@@ -437,9 +457,10 @@ class TestDynamicOneShotIntegration:
                 reason="fill-shots not currently working when postselecting a zero probability state"
             )
 
-        dev = qml.device(backend, wires=1, shots=1)
+        dev = qml.device(backend, wires=1)
 
         @qjit
+        @qml.set_shots(1)
         @qml.qnode(dev, mcm_method="one-shot", postselect_mode=postselect_mode)
         def circuit(x):
             qml.RY(x, wires=0)
@@ -458,10 +479,11 @@ class TestDynamicOneShotIntegration:
     def test_dynamic_one_shot_only_called_once(self, backend, shots, mocker):
         """Test that when using mcm_method="one-shot", dynamic_one_shot does not get
         called multiple times"""
-        dev = qml.device(backend, wires=1, shots=shots)
+        dev = qml.device(backend, wires=1)
         spy = mocker.spy(catalyst.qfunc, "dynamic_one_shot")
 
         @qjit
+        @qml.set_shots(shots)
         @qml.qnode(dev, mcm_method="one-shot")
         def circuit(x):
             qml.RY(x, wires=0)
@@ -476,10 +498,11 @@ class TestDynamicOneShotIntegration:
     def test_dynamic_one_shot_unsupported_measurement(self, backend):
         """Test that circuits with unsupported measurements raise an error."""
         shots = 10
-        dev = qml.device(backend, wires=1, shots=shots)
+        dev = qml.device(backend, wires=1)
         param = np.pi / 4
 
         @qjit
+        @qml.set_shots(shots)
         @qml.qnode(dev, mcm_method="one-shot")
         def func(x):
             qml.RX(x, wires=0)
@@ -494,7 +517,7 @@ class TestDynamicOneShotIntegration:
 
     def test_dynamic_one_shot_unsupported_none_shots(self, backend):
         """Test that `dynamic_one_shot` raises when used with non-finite shots."""
-        dev = qml.device(backend, wires=1, shots=None)
+        dev = qml.device(backend, wires=1)
 
         with pytest.raises(
             exceptions.QuantumFunctionError,
@@ -503,6 +526,7 @@ class TestDynamicOneShotIntegration:
 
             @qjit
             @catalyst.qfunc.dynamic_one_shot
+            @qml.set_shots(None)
             @qml.qnode(dev)
             def _(x, y):
                 qml.RX(x, wires=0)
@@ -513,10 +537,11 @@ class TestDynamicOneShotIntegration:
     def test_dynamic_one_shot_unsupported_broadcast(self, backend):
         """Test that `dynamic_one_shot` raises when used with parameter broadcasting."""
         shots = 10
-        dev = qml.device(backend, wires=1, shots=shots)
+        dev = qml.device(backend, wires=1)
         param = np.pi / 4 * jnp.ones(2)
 
         @qjit
+        @qml.set_shots(shots)
         @qml.qnode(dev, mcm_method="one-shot")
         def func(x, y):
             qml.RX(x, wires=0)
@@ -534,9 +559,10 @@ class TestDynamicOneShotIntegration:
     def test_dynamic_one_shot_with_sample_single(self, backend, param, expected):
         """Test that a measurement result can be returned with qml.sample and shots."""
         shots = 10
-        dev = qml.device(backend, wires=1, shots=shots)
+        dev = qml.device(backend, wires=1)
 
         @qjit
+        @qml.set_shots(shots)
         @qml.qnode(dev, mcm_method="one-shot")
         def circuit(x):
             qml.RY(x, wires=0)
@@ -652,8 +678,9 @@ class TestDynamicOneShotIntegration:
         else:
             obs = qml.PauliY(0)
 
-        dq = qml.device("default.qubit", shots=shots, seed=8237945)
+        dq = qml.device("default.qubit", seed=8237945)
 
+        @qml.set_shots(shots)
         @qml.qnode(dq, postselect_mode=postselect_mode, mcm_method="deferred")
         def ref_func(x, y):
             qml.RX(x, 0)
@@ -674,9 +701,10 @@ class TestDynamicOneShotIntegration:
                 qml.expval(obs),
             )
 
-        dev = qml.device(backend, wires=2, shots=shots)
+        dev = qml.device(backend, wires=2)
 
         @qjit(seed=37)
+        @qml.set_shots(shots)
         @qml.qnode(dev, mcm_method="one-shot", postselect_mode=postselect_mode)
         def func(x, y):
             qml.RX(x, 0)
@@ -738,9 +766,10 @@ class TestDynamicOneShotIntegration:
         """Test that `dynamic_one_shot` can work when there is no mcm and have iterable output."""
         qubits = 3
         shots = 10
-        dev = qml.device(backend, wires=qubits, shots=shots)
+        dev = qml.device(backend, wires=qubits)
 
         @qjit
+        @qml.set_shots(shots)
         @qml.qnode(dev, mcm_method="one-shot")
         def cost():
             qml.Hadamard(0)
@@ -756,13 +785,15 @@ class TestDynamicOneShotIntegration:
     def test_mcm_method_with_grad(self, backend):
         """Test that the dynamic_one_shot works with grad."""
 
-        dev = qml.device(backend, wires=1, shots=5)
+        dev = qml.device(backend, wires=1)
 
+        @qml.set_shots(5)
         @qml.qnode(dev, diff_method="best", mcm_method="one-shot")
         def f(x: float):
             qml.RX(x, wires=0)
             return qml.expval(qml.PauliZ(wires=0))
 
+        @qml.set_shots(5)
         @qml.qnode(dev, diff_method="best")
         def g(x: float):
             qml.RX(x, wires=0)
@@ -786,7 +817,8 @@ class TestDynamicOneShotIntegration:
 
         @qjit
         def workflow1(x: float):
-            @qml.qnode(qml.device("lightning.qubit", wires=3, shots=10), mcm_method="one-shot")
+            @qml.set_shots(10)
+            @qml.qnode(qml.device("lightning.qubit", wires=3), mcm_method="one-shot")
             def circuit1():
                 qml.CNOT(wires=[0, 1])
                 qml.RX(0, wires=[2])
@@ -796,7 +828,8 @@ class TestDynamicOneShotIntegration:
 
         @qjit
         def workflow2(x: float):
-            @qml.qnode(qml.device("lightning.qubit", wires=3, shots=10))
+            @qml.set_shots(10)
+            @qml.qnode(qml.device("lightning.qubit", wires=3))
             def circuit2():
                 qml.CNOT(wires=[0, 1])
                 qml.RX(0, wires=[2])
@@ -814,7 +847,7 @@ class TestDynamicOneShotIntegration:
     )
     def test_mcm_method_with_jvp(self, backend, diff_method):
         """Test that the dynamic_one_shot works with jvp."""
-        dev = qml.device(backend, wires=1, shots=5)
+        dev = qml.device(backend, wires=1)
         x, t = (
             [-0.1, 0.5],
             [0.1, 0.33],
@@ -828,12 +861,12 @@ class TestDynamicOneShotIntegration:
 
         @qjit
         def C_workflow():
-            f = qml.QNode(circuit_rx, device=dev, mcm_method="one-shot")
+            f = qml.set_shots(qml.QNode(circuit_rx, device=dev, mcm_method="one-shot"), shots=5)
             return C_jvp(f, x, t, method=diff_method, argnum=list(range(len(x))))
 
         @qjit
         def J_workflow():
-            f = qml.QNode(circuit_rx, device=dev)
+            f = qml.set_shots(qml.QNode(circuit_rx, device=dev), shots=5)
             return C_jvp(f, x, t, method=diff_method, argnum=list(range(len(x))))
 
         r1 = C_workflow()
@@ -849,7 +882,7 @@ class TestDynamicOneShotIntegration:
     )
     def test_mcm_method_with_jvp(self, backend, diff_method):
         """Test that the dynamic_one_shot works with vjp."""
-        dev = qml.device(backend, wires=1, shots=5)
+        dev = qml.device(backend, wires=1)
 
         def circuit_rx(x1, x2):
             """A test quantum function"""
@@ -864,12 +897,12 @@ class TestDynamicOneShotIntegration:
 
         @qjit
         def C_workflow():
-            f = qml.QNode(circuit_rx, device=dev, mcm_method="one-shot")
+            f = qml.set_shots(qml.QNode(circuit_rx, device=dev, mcm_method="one-shot"), shots=5)
             return C_vjp(f, x, ct, method=diff_method, argnum=list(range(len(x))))
 
         @qjit
         def J_workflow():
-            f = qml.QNode(circuit_rx, device=dev)
+            f = qml.set_shots(qml.QNode(circuit_rx, device=dev), shots=5)
             return C_vjp(f, x, ct, method=diff_method, argnum=list(range(len(x))))
 
         r1 = C_workflow()

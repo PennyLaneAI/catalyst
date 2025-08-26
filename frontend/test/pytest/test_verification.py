@@ -68,7 +68,7 @@ def get_custom_device(
 
         def __init__(self, shots=None, wires=None):
             super().__init__(wires=wires, shots=shots)
-            lightning_capabilities = get_device_capabilities(lightning_device)
+            lightning_capabilities = get_device_capabilities(lightning_device, shots=shots)
             custom_capabilities = deepcopy(lightning_capabilities)
             for gate in native_gates:
                 custom_capabilities.operations[gate] = OperatorProperties(True, True, True)
@@ -564,16 +564,16 @@ class TestObservableValidation:
         """Test that the validate_measurements transform raises an error (or not) as expected
         for different base observables."""
 
-        dev = qml.device(backend, wires=3, shots=2048)
-        qjit_capabilities = get_device_capabilities(dev)
+        dev = qml.device(backend, wires=3)
+        qjit_capabilities = get_device_capabilities(dev, shots=2048)
 
-        tape = qml.tape.QuantumScript([], measurements=measurements)
+        tape = qml.tape.QuantumScript([], measurements=measurements, shots=2048)
 
         if invalid_op:
             with pytest.raises(CompileError, match=f"{invalid_op}.*not supported as an observable"):
-                validate_measurements(tape, qjit_capabilities, dev.name, dev.shots)
+                validate_measurements(tape, qjit_capabilities, dev.name, tape.shots)
         else:
-            validate_measurements(tape, qjit_capabilities, dev.name, dev.shots)
+            validate_measurements(tape, qjit_capabilities, dev.name, tape.shots)
 
     @pytest.mark.parametrize(
         "obs, obs_type",
@@ -590,17 +590,17 @@ class TestObservableValidation:
         type is supported/unsupported."""
 
         dev = qml.device(backend, wires=1)
-        dev_capabilities = get_device_capabilities(dev)
+        dev_capabilities = get_device_capabilities(dev, shots=None)
         qjit_capabilities = get_qjit_device_capabilities(dev_capabilities)
 
         tape = qml.tape.QuantumScript([], measurements=[qml.expval(obs)])
 
         # all good
-        validate_measurements(tape, qjit_capabilities, dev.name, dev.shots)
+        validate_measurements(tape, qjit_capabilities, dev.name, tape.shots)
 
         del qjit_capabilities.observables[obs_type]
         with pytest.raises(CompileError, match="not supported as an observable"):
-            validate_measurements(tape, qjit_capabilities, dev.name, dev.shots)
+            validate_measurements(tape, qjit_capabilities, dev.name, tape.shots)
 
     def test_non_qjit_observables_raise_error(self, backend):
         """Test that an observable that is supported by the backend according to the
@@ -618,7 +618,7 @@ class TestObservableValidation:
         tape = qml.tape.QuantumScript([], measurements=[qml.expval(PauliX2(0))])
 
         with pytest.raises(CompileError, match="PauliX2 is not supported as an observable"):
-            validate_measurements(tape, qjit_capabilities, dev.name, dev.shots)
+            validate_measurements(tape, qjit_capabilities, dev.name, tape.shots)
 
     @pytest.mark.parametrize(
         "measurement", [qml.expval(qml.X(0)), qml.var(qml.X(0)), qml.sample(qml.X(0))]
@@ -628,19 +628,19 @@ class TestObservableValidation:
         than expval and var that include observables, and raises an error"""
 
         dev = qml.device("lightning.qubit", wires=1)
-        dev_capabilities = get_device_capabilities(dev)
+        dev_capabilities = get_device_capabilities(dev, shots=None)
         qjit_capabilities = get_qjit_device_capabilities(dev_capabilities)
 
         tape = qml.tape.QuantumScript([], measurements=[measurement])
 
         if isinstance(measurement, (ExpectationMP, VarianceMP)):
-            validate_measurements(tape, qjit_capabilities, dev.name, dev.shots)
+            validate_measurements(tape, qjit_capabilities, dev.name, tape.shots)
         else:
             with pytest.raises(
                 CompileError,
                 match="Only expectation value and variance measurements can accept observables",
             ):
-                validate_measurements(tape, qjit_capabilities, dev.name, dev.shots)
+                validate_measurements(tape, qjit_capabilities, dev.name, tape.shots)
 
 
 class TestMeasurementTypeValidation:
@@ -660,22 +660,23 @@ class TestMeasurementTypeValidation:
         """Test that the validate_measurements transform raises a CompileError as
         expected for an unsupported MeasurementProcess"""
 
-        dev = qml.device("lightning.qubit", wires=1, shots=shots)
+        dev = qml.device("lightning.qubit", wires=1)
         tape = qml.tape.QuantumScript([], measurements=[measurement])
 
         qjit_capabilities = get_device_capabilities(dev)
         qjit_capabilities.measurement_processes.pop("ExpectationMP")
 
         with pytest.raises(CompileError, match=msg):
-            validate_measurements(tape, qjit_capabilities, dev.name, dev.shots)
+            validate_measurements(tape, qjit_capabilities, dev.name, shots)
 
     def test_state_measurements_rejected_with_shots(self):
         """Test that trying to measure a state on a device with finite shots
         raises a CompileError informing the user that shots must be None for
         state based measurements"""
 
-        dev = qml.device("lightning.qubit", wires=1, shots=100)
+        dev = qml.device("lightning.qubit", wires=1)
 
+        @qml.set_shots(100)
         @qml.qnode(dev)
         def f():
             qml.RX(1.23, 0)
@@ -690,8 +691,9 @@ class TestMeasurementTypeValidation:
         without shots raises a CompileError informing the user that a
         finite number of shots is needed for sampling"""
 
-        dev = qml.device("lightning.qubit", wires=1, shots=None)
+        dev = qml.device("lightning.qubit", wires=1)
 
+        @qml.set_shots(None)
         @qml.qnode(dev)
         def f():
             qml.RX(1.23, 0)
@@ -704,7 +706,7 @@ class TestMeasurementTypeValidation:
         """Test that trying to use a measurement type that is generally unsupported by
         the device raises a CompileError"""
 
-        dev = qml.device("lightning.qubit", wires=1, shots=100)
+        dev = qml.device("lightning.qubit", wires=1)
 
         class MyMeasurement(qml.measurements.SampleMeasurement):
             """A custom measurement (not supported on lightning.qubit)"""
@@ -720,6 +722,7 @@ class TestMeasurementTypeValidation:
                 """overwrite ABC method"""
                 raise NotImplementedError
 
+        @qml.set_shots(100)
         @qml.qnode(dev)
         def f():
             qml.RX(1.23, 0)

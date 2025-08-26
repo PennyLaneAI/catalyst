@@ -16,7 +16,6 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
-#include <cstdio>
 
 #include "ExecutionContext.hpp"
 #include "QuantumDevice.hpp"
@@ -353,7 +352,7 @@ TEST_CASE("Test NullQubit state vector after AllocateQubits", "[NullQubit]")
 
     CHECK(sim->AllocateQubits(0).size() == 0);
 
-    auto &&q = sim->AllocateQubits(2);
+    sim->AllocateQubits(2);
 
     CHECK(sim->GetNumQubits() == 2);
 
@@ -432,6 +431,24 @@ TEST_CASE("Mix Gate test R(X,Y,Z) num_qubits=4", "[NullQubit]")
     sim->State(view);
 
     CHECK(view.size() == 16);
+    CHECK(view(0).real() == Catch::Approx(1.0).epsilon(1e-5));
+    CHECK(view(0).imag() == Catch::Approx(0.0).epsilon(1e-5));
+}
+
+TEST_CASE("Gate PCPhase num_qubits=3", "[NullQubit]")
+{
+    std::unique_ptr<NullQubit> sim = std::make_unique<NullQubit>();
+
+    std::vector<QubitIdType> Qs = sim->AllocateQubits(3);
+
+    sim->NamedOperation("PCPhase", {0.123, 1}, {Qs[0], Qs[1], Qs[2]}, false);
+    sim->NamedOperation("PCPhase", {0.123, 2}, {Qs[1], Qs[2]}, true);
+
+    std::vector<std::complex<double>> state(1U << sim->GetNumQubits());
+    DataView<std::complex<double>, 1> view(state);
+    sim->State(view);
+
+    CHECK(view.size() == 8);
     CHECK(view(0).real() == Catch::Approx(1.0).epsilon(1e-5));
     CHECK(view(0).imag() == Catch::Approx(0.0).epsilon(1e-5));
 }
@@ -762,7 +779,8 @@ TEST_CASE("Test NullQubit device resource tracking", "[NullQubit]")
     std::unique_ptr<NullQubit> dummy = std::make_unique<NullQubit>();
     CHECK(dummy->IsTrackingResources() == false);
 
-    std::unique_ptr<NullQubit> sim = std::make_unique<NullQubit>("{'track_resources':True}");
+    std::unique_ptr<NullQubit> sim =
+        std::make_unique<NullQubit>("{'track_resources':True}", RESOURCES_FNAME);
     CHECK(sim->IsTrackingResources() == true);
     CHECK(sim->ResourcesGetNumGates() == 0);
     CHECK(sim->ResourcesGetNumQubits() == 0);
@@ -844,7 +862,27 @@ TEST_CASE("Test NullQubit device resource tracking", "[NullQubit]")
 
     // Check that releasing resets
     sim->ReleaseAllQubits();
+    std::remove(RESOURCES_FNAME); // Remove the file automatically created by the device
 
     CHECK(sim->ResourcesGetNumGates() == 0);
     CHECK(sim->ResourcesGetNumQubits() == 0);
+    CHECK(sim->ResourcesGetFilename() == RESOURCES_FNAME);
+}
+
+TEST_CASE("Test resource tracking filename", "[NullQubit]")
+{
+    // Check automatic filename creation
+    std::unique_ptr<NullQubit> dummy = std::make_unique<NullQubit>("{'track_resources':True}");
+    CHECK(dummy->IsTrackingResources() == true);
+    dummy->ReleaseAllQubits();
+
+    const std::string dummy_resources_fname = dummy->ResourcesGetFilename();
+
+    std::cout << "Auto-created resources filename: " << dummy_resources_fname << std::endl;
+
+    CHECK(dummy_resources_fname.rfind("__pennylane_resources_data_") == 0);
+    CHECK(dummy_resources_fname.find(".json") != std::string::npos);
+
+    std::remove(
+        dummy_resources_fname.c_str()); // Remove the file automatically created by the device
 }
