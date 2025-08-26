@@ -49,8 +49,9 @@ def disable_capture():
             qml.capture.disable()
 
 
-@pytest.mark.fixture(scope="function")
+@pytest.fixture(scope="function")
 def use_capture():
+    """Enable capture before and disable capture after the test."""
     qml.capture.enable()
     try:
         yield
