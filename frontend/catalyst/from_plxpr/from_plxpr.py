@@ -15,6 +15,7 @@
 This submodule defines a utility for converting plxpr into Catalyst jaxpr.
 """
 # pylint: disable=protected-access
+from copy import copy
 from functools import partial
 from typing import Callable
 
@@ -23,10 +24,14 @@ import jax.core
 import jax.numpy as jnp
 import pennylane as qml
 from jax._src.sharding_impls import UNSPECIFIED
+from jax._src.tree_util import tree_flatten
 from jax.extend.core import ClosedJaxpr, Jaxpr
 from jax.extend.linear_util import wrap_init
-from pennylane.capture import PlxprInterpreter, qnode_prim
+from jax.interpreters.partial_eval import convert_constvars_jaxpr
+from pennylane.capture import PlxprInterpreter, pause, qnode_prim
 from pennylane.capture.expand_transforms import ExpandTransformsInterpreter
+from pennylane.capture.primitives import adjoint_transform_prim as plxpr_adjoint_transform_prim
+from pennylane.capture.primitives import ctrl_transform_prim as plxpr_ctrl_transform_prim
 from pennylane.capture.primitives import measure_prim as plxpr_measure_prim
 from pennylane.ftqc.primitives import measure_in_basis_prim as plxpr_measure_in_basis_prim
 from pennylane.ops.functions.map_wires import _map_wires_transform as pl_map_wires
@@ -38,11 +43,12 @@ from pennylane.transforms import merge_rotations as pl_merge_rotations
 from pennylane.transforms import single_qubit_fusion as pl_single_qubit_fusion
 from pennylane.transforms import unitary_to_rot as pl_unitary_to_rot
 
-from catalyst.device import extract_backend_info, get_device_capabilities
+from catalyst.device import extract_backend_info
 from catalyst.from_plxpr.qreg_manager import QregManager
 from catalyst.jax_extras import jaxpr_pad_consts, make_jaxpr2, transient_jax_config
 from catalyst.jax_primitives import (
     MeasurementPlane,
+    adjoint_p,
     compbasis_p,
     cond_p,
     counts_p,
@@ -50,6 +56,8 @@ from catalyst.jax_primitives import (
     device_release_p,
     expval_p,
     gphase_p,
+    hamiltonian_p,
+    hermitian_p,
     measure_in_basis_p,
     measure_p,
     namedobs_p,
@@ -63,6 +71,7 @@ from catalyst.jax_primitives import (
     set_basis_state_p,
     set_state_p,
     state_p,
+    tensorobs_p,
     unitary_p,
     var_p,
 )
@@ -79,8 +88,7 @@ measurement_map = {
 
 def _get_device_kwargs(device) -> dict:
     """Calulcate the params for a device equation."""
-    capabilities = get_device_capabilities(device)
-    info = extract_backend_info(device, capabilities)
+    info = extract_backend_info(device)
     # Note that the value of rtd_kwargs is a string version of
     # the info kwargs, not the info kwargs itself
     # this is due to ease of serialization to MLIR
@@ -89,6 +97,14 @@ def _get_device_kwargs(device) -> dict:
         "rtd_lib": info.lpath,
         "rtd_name": info.c_interface_name,
     }
+
+
+def _flat_prod_gen(op: qml.ops.Prod):
+    for o in op:
+        if isinstance(o, qml.ops.Prod):
+            yield from _flat_prod_gen(o)
+        else:
+            yield o
 
 
 # code example has long lines
@@ -293,37 +309,70 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
     during initialization.
     """
 
-    def __init__(self, device, shots, qreg_manager, cache):
+    def __init__(self, device, shots, qreg_manager, cache, *, control_wires=(), control_values=()):
         self.device = device
         self.shots = shots
         # TODO: we assume the qreg value passed into a scope is the unique qreg in the scope
         # In other words, we assume no new qreg will be allocated in the scope
         self.qreg_manager = qreg_manager
         self.subroutine_cache = cache
+        self.control_wires = control_wires
+        """Any control wires used for a subroutine."""
+        self.control_values = control_values
+        """Any control values for executing a subroutine."""
+
         super().__init__()
 
-    def interpret_operation(self, op):
+    def interpret_operation(self, op, is_adjoint=False, control_values=(), control_wires=()):
         """Re-bind a pennylane operation as a catalyst instruction."""
+        if isinstance(op, qml.ops.Adjoint):
+            return self.interpret_operation(
+                op.base,
+                is_adjoint=not is_adjoint,
+                control_values=control_values,
+                control_wires=control_wires,
+            )
+        if type(op) in {qml.ops.Controlled, qml.ops.ControlledOp}:
+            return self.interpret_operation(
+                op.base,
+                is_adjoint=is_adjoint,
+                control_values=control_values + tuple(op.control_values),
+                control_wires=control_wires + tuple(op.control_wires),
+            )
+
+        control_wires = control_wires + self.control_wires
+        control_values = control_values + self.control_values
+        self.qreg_manager.insert_dynamic_qubits(op.wires + control_wires)
 
         in_qubits = [self.qreg_manager[w] for w in op.wires]
+        control_qubits = [self.qreg_manager[w] for w in control_wires]
+
         out_qubits = qinst_p.bind(
-            *[*in_qubits, *op.data],
+            *[*in_qubits, *op.data, *control_qubits, *control_values],
             op=op.name,
             qubits_len=len(op.wires),
             params_len=len(op.data),
-            ctrl_len=0,
-            adjoint=False,
+            ctrl_len=len(control_wires),
+            adjoint=is_adjoint,
         )
-        for wire_values, new_wire in zip(op.wires, out_qubits):
+        for wire_values, new_wire in zip(tuple(op.wires) + control_wires, out_qubits, strict=True):
             self.qreg_manager[wire_values] = new_wire
 
         return out_qubits
 
     def _obs(self, obs):
         """Interpret the observable equation corresponding to a measurement equation's input."""
+        if isinstance(obs, qml.ops.Prod):
+            # catalyst cant handle product of products
+            return tensorobs_p.bind(*(self._obs(t) for t in _flat_prod_gen(obs)))
         if obs.arithmetic_depth > 0:
-            raise NotImplementedError("operator arithmetic not yet supported for conversion.")
+            with pause():
+                coeffs, terms = obs.terms()
+            terms = [self._obs(t) for t in terms]
+            return hamiltonian_p.bind(jnp.stack(coeffs), *terms)
         wires = [self.qreg_manager[w] for w in obs.wires]
+        if obs.name == "Hermitian":
+            return hermitian_p.bind(obs.data[0], *wires)
         return namedobs_p.bind(*wires, *obs.data, kind=obs.name)
 
     def _compbasis_obs(self, *wires):
@@ -416,10 +465,9 @@ def handle_subroutine(self, *args, **kwargs):
     transformed = self.subroutine_cache.get(plxpr)
 
     def wrapper(qreg, *args):
-        device = self.device
-        shots = self.shots
         manager = QregManager(qreg)
-        converter = PLxPRToQuantumJaxprInterpreter(device, shots, manager, self.subroutine_cache)
+        converter = copy(self)
+        converter.qreg_manager = manager
         retvals = converter(plxpr, *args)
         converter.qreg_manager.insert_all_dangling_qubits()
         return converter.qreg_manager.get(), *retvals
@@ -547,6 +595,73 @@ def handle_measure_in_basis(self, angle, wire, plane, reset, postselect):
     self.qreg_manager[wire] = out_wire
 
     return result
+
+
+# pylint: disable=unused-argument
+@PLxPRToQuantumJaxprInterpreter.register_primitive(plxpr_ctrl_transform_prim)
+def handle_ctrl_transform(self, *invals, jaxpr, n_control, control_values, work_wires, n_consts):
+    """Interpret a control transform primitive."""
+    consts = invals[:n_consts]
+    args = invals[n_consts:-n_control]
+    control_wires = invals[-n_control:]
+
+    unroller = copy(self)
+    unroller.control_wires += tuple(control_wires)
+    unroller.control_values += tuple(control_values)
+    unroller.eval(jaxpr, consts, *args)
+    return []
+
+
+# pylint: disable=unused-argument
+@PLxPRToQuantumJaxprInterpreter.register_primitive(plxpr_adjoint_transform_prim)
+def handle_adjoint_transform(
+    self,
+    *plxpr_invals,
+    jaxpr,
+    lazy,
+    n_consts,
+):
+    """Handle the conversion from plxpr to Catalyst jaxpr for the adjoint primitive"""
+    assert jaxpr is not None
+    consts = plxpr_invals[:n_consts]
+    args = plxpr_invals[n_consts:]
+
+    # Add the iteration start and the qreg to the args
+    self.qreg_manager.insert_all_dangling_qubits()
+    qreg = self.qreg_manager.get()
+
+    jaxpr = ClosedJaxpr(jaxpr, consts)
+
+    def calling_convention(*args_plus_qreg):
+        *args, qreg = args_plus_qreg
+        # `qreg` is the scope argument for the body jaxpr
+        qreg_manager = QregManager(qreg)
+        converter = copy(self)
+        converter.qreg_manager = qreg_manager
+        retvals = converter(jaxpr, *args)
+        qreg_manager.insert_all_dangling_qubits()
+        return *retvals, converter.qreg_manager.get()
+
+    _, args_tree = tree_flatten((consts, args, [qreg]))
+    converted_jaxpr_branch = jax.make_jaxpr(calling_convention)(*consts, *args, qreg).jaxpr
+
+    converted_closed_jaxpr_branch = ClosedJaxpr(convert_constvars_jaxpr(converted_jaxpr_branch), ())
+
+    # Perform the binding
+    outvals = adjoint_p.bind(
+        *consts,
+        *args,
+        qreg,
+        jaxpr=converted_closed_jaxpr_branch,
+        args_tree=args_tree,
+    )
+
+    # We assume the last output value is the returned qreg.
+    # Update the current qreg and remove it from the output values.
+    self.qreg_manager.set(outvals.pop())
+
+    # Return only the output values that match the plxpr output values
+    return outvals
 
 
 # pylint: disable=too-many-positional-arguments

@@ -27,6 +27,7 @@ def test_no_parameters(backend):
 
     def circuit():
         qml.Identity(wires=0)
+        qml.Identity(wires=[0, 1])
 
         qml.PauliX(wires=1)
         qml.PauliY(wires=2)
@@ -88,7 +89,7 @@ def test_no_parameters(backend):
 
         return qml.state()
 
-    qjit_fn = qjit()(qml.qnode(qml.device(backend, wires=4))(circuit))
+    qjit_fn = qjit(qml.qnode(qml.device(backend, wires=4))(circuit))
     qml_fn = qml.qnode(qml.device("default.qubit", wires=4))(circuit)
 
     assert np.allclose(qjit_fn(), qml_fn())
@@ -123,6 +124,12 @@ def test_param(backend):
         qml.IsingZZ(x, wires=[0, 1])
         qml.IsingZZ(y, wires=[1, 2])
 
+        qml.SingleExcitation(x, wires=[0, 1])
+        qml.SingleExcitation(y, wires=[1, 2])
+
+        qml.DoubleExcitation(x, wires=[0, 1, 2, 3])
+        qml.DoubleExcitation(y, wires=[2, 3, 0, 1])
+
         qml.CRX(x, wires=[0, 1])
         qml.CRY(x, wires=[0, 1])
         qml.CRZ(x, wires=[0, 1])
@@ -135,6 +142,8 @@ def test_param(backend):
 
         qml.MultiRZ(x, wires=[0, 1, 2, 3])
 
+        qml.PCPhase(x, dim=2, wires=[0, 1, 2, 3])
+
         # Unsupported:
         # qml.PauliRot(x, 'IXYZ', wires=[0,1,2,3])
         # qml.U1(x, wires=0)
@@ -143,7 +152,7 @@ def test_param(backend):
 
         return qml.state()
 
-    qjit_fn = qjit()(qml.qnode(qml.device(backend, wires=4))(circuit))
+    qjit_fn = qjit(qml.qnode(qml.device(backend, wires=4))(circuit))
     qml_fn = qml.qnode(qml.device("default.qubit", wires=4))(circuit)
 
     assert np.allclose(qjit_fn(3.14, 0.6), qml_fn(3.14, 0.6))
@@ -196,7 +205,7 @@ def test_hybrid_op_repr(backend):
                 assert not has_nested_tapes(op)
         return qml.state()
 
-    qjit()(qml.qnode(qml.device(backend, wires=4))(circuit))(1)
+    qjit(qml.qnode(qml.device(backend, wires=4))(circuit))(1)
 
 
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
@@ -209,7 +218,7 @@ def test_qubitunitary_complex(inp, backend):
         qml.QubitUnitary(U1, wires=0)
         return qml.expval(qml.PauliY(0))
 
-    @qjit()
+    @qjit
     def compiled(x: float):
         g = qml.qnode(qml.device(backend, wires=1))(f)
         return g(x)

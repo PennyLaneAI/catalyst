@@ -4,7 +4,7 @@ Installation
 
 Catalyst is officially supported on Linux (x86_64, aarch64) and macOS (arm64)
 platforms, and pre-built binaries are being distributed via the Python Package Index (PyPI) for
-Python versions 3.10 and higher. To install it, simply run the following ``pip`` command:
+Python versions 3.11 and higher. To install it, simply run the following ``pip`` command:
 
 .. code-block:: console
 
@@ -64,7 +64,7 @@ you are encoutering issues, please consult the detailed guide
       .. code-block:: console
 
         # Install common requirements
-        sudo apt install clang lld ccache libomp-dev ninja-build make cmake
+        sudo apt install clang lld ccache make
 
         # Clone the Catalyst repository
         git clone --recurse-submodules --shallow-submodules https://github.com/PennyLaneAI/catalyst.git
@@ -85,10 +85,9 @@ you are encoutering issues, please consult the detailed guide
 
         # Install XCode Command Line Tools and common requirements
         xcode-select --install
-        pip install cmake'<4' ninja
 
         # If not present yet, install Homebrew (https://brew.sh/)
-        brew install libomp ccache gfortran
+        brew install ccache gfortran
 
         # Add ccache drop-in compiler replacements to the PATH
         export PATH=/usr/local/opt/ccache/libexec:$PATH
@@ -123,15 +122,14 @@ In order to build Catalyst from source, developers need to ensure the following 
 installed and available on the path (depending on the platform):
 
 - The `clang <https://clang.llvm.org/>`_ compiler, `LLD <https://lld.llvm.org/>`_ linker
-  (Linux only), `CCache <https://ccache.dev/>`_ compiler cache (optional, recommended), and
-  `OpenMP <https://www.openmp.org/>`_. Additionaly, the
-  `GFortran <https://fortran-lang.org/en/learn/os_setup/install_gfortran/>`_ compiler is
-  required on ARM macOS systems.
+  (Linux only), `CCache <https://ccache.dev/>`_ compiler cache (optional, recommended).
+  Additionally, the `GFortran <https://fortran-lang.org/en/learn/os_setup/install_gfortran/>`_
+  compiler is required on ARM macOS systems.
 
 - The `Ninja <https://ninja-build.org/>`_, `Make <https://www.gnu.org/software/make/>`_, and
-  `CMake <https://cmake.org/download/>`_ (v3.20 or greater) build tools.
+  `CMake <https://cmake.org/download/>`_ (v3.26 or greater, less than v4) build tools.
 
-- `Python <https://www.python.org/>`_ 3.10 or higher for the Python frontend.
+- `Python <https://www.python.org/>`_ 3.11 or higher for the Python frontend.
 
 - The Python package manager ``pip`` must be version 22.3 or higher.
 
@@ -144,12 +142,7 @@ They can be installed via:
 
       .. code-block:: console
 
-        sudo apt install clang lld ccache libomp-dev ninja-build make cmake
-
-      .. note::
-
-        If the CMake version available in your system is too old, you can also install up-to-date
-        versions of it via ``pip install cmake``.
+        sudo apt install clang lld ccache make
 
       .. tabs::
 
@@ -170,15 +163,14 @@ They can be installed via:
 
    .. group-tab:: macOS
 
-      On **macOS**, it is strongly recommended to install the official XCode Command Line Tools (for ``clang`` & ``make``).
-      The remaining packages can then be installed via ``pip`` and ``brew``.
-      If ``brew`` is not present yet, install it from https://brew.sh/:
+      On **macOS**, it is strongly recommended to install the official XCode Command Line Tools
+      (for ``clang`` & ``make``). The remaining packages can then be installed via ``pip`` and
+      ``brew``. If ``brew`` is not present yet, install it from https://brew.sh/:
 
       .. code-block:: console
 
         xcode-select --install
-        pip install cmake'<4' ninja
-        brew install libomp ccache gfortran
+        brew install ccache gfortran
         export PATH=/usr/local/opt/ccache/libexec:$PATH
 
 

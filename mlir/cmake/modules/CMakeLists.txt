@@ -24,20 +24,11 @@ set(catalyst_cmake_builddir "${CMAKE_BINARY_DIR}/${CATALYST_INSTALL_PACKAGE_DIR}
 set(LLVM_INSTALL_PACKAGE_DIR lib${LLVM_LIBDIR_SUFFIX}/cmake/llvm)
 set(llvm_cmake_builddir "${LLVM_BINARY_DIR}/${LLVM_INSTALL_PACKAGE_DIR}")
 
-# Since we just use MLIR's cmake functions (add_mlir_library, etc.),
-# MLIR_EXPORTS would have the necessary targets to export.
+# Targets with third party dependencies are not exported.
 get_property(MLIR_EXPORTS GLOBAL PROPERTY MLIR_EXPORTS)
-# JSON for Modern C++ (nlohmann/json) https://github.com/nlohmann/json
-# tomlplusplus https://github.com/marzer/tomlplusplus
-# libstim https://github.com/quantumlib/Stim
-# are used in Catalyst acknowledged here https://github.com/PennyLaneAI/catalyst?tab=readme-ov-file#acknowledgements
-# nlohmann/json and tomlplusplus both have MIT licenses.
-# libstim is Apache version 2.0
-# QECUtils needs to be added manually since it is not in MLIR_EXPORTS
-# todo: the following two lines removed nlohmann_json as export targets, should probably be done for the other extra targets as well
-include(CMakeFindDependencyMacro)
-find_dependency(nlohmann_json)
-export(TARGETS ${MLIR_EXPORTS} QECUtils libstim tomlplusplus_tomlplusplus FILE ${catalyst_cmake_builddir}/CatalystTargets.cmake)
+set(TARGETS_TO_REMOVE nlohmann_json tomlplusplus_tomlplusplus ion-transforms CatalystCompilerDriver QECUtils QuantumCAPI qec-transforms)
+list(REMOVE_ITEM MLIR_EXPORTS ${TARGETS_TO_REMOVE})
+export(TARGETS ${MLIR_EXPORTS} ExternalStablehloLib FILE ${catalyst_cmake_builddir}/CatalystTargets.cmake)
 
 # Generate MlirConfig.cmake for the build tree.
 set(CATALYST_CONFIG_CMAKE_DIR "${catalyst_cmake_builddir}")

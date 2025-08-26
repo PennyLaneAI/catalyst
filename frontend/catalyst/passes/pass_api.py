@@ -19,6 +19,7 @@ from typing import TypeAlias
 
 import pennylane as qml
 
+from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
 from catalyst.tracing.contexts import EvaluationContext
 
 PipelineDict: TypeAlias = dict[str, dict[str, str]]
@@ -286,23 +287,21 @@ class Pass:
 
     def get_options(self):
         """
-        Stringify options according to what mlir-opt expects.
-
-          ApplyRegisteredPassOp expects options to be a single StringAttr
-          which follows the same format as the one used with mlir-opt.
-
-        https://mlir.llvm.org/docs/Dialects/Transform/#transformapply_registered_pass-transformapplyregisteredpassop
-
-          Options passed to a pass are specified via the syntax {option1=value1 option2=value2 ...},
-          i.e., use space-separated key=value pairs for each option.
-
-        https://mlir.llvm.org/docs/Tutorials/MlirOpt/#running-a-pass-with-options
-
-        Experimentally we found that single-options also work without values.
+        Build a dictionary mapping option names to MLIR attributes.
+        ApplyRegisteredPassOp expects options to be a dictionary from strings to attributes.
+        See https://github.com/llvm/llvm-project/pull/143159
         """
-        retval = " ".join(f"{str(option)}" for option in self.options)
-        retval2 = " ".join(f"{str(key)}={str(value)}" for key, value in self.valued_options.items())
-        return " ".join([retval, retval2]).strip()
+        options_dict = {}
+        for option in self.options:
+            options_dict[str(option)] = get_mlir_attribute_from_pyval(True)
+
+        for option, value in self.valued_options.items():
+            # MLIR options are either CamelCase
+            # or spinal-case (kebab-case) which is not allowed in python
+            mlir_option = str(option).replace("_", "-")
+            options_dict[mlir_option] = get_mlir_attribute_from_pyval(value)
+
+        return options_dict
 
     def __repr__(self):
         return (

@@ -17,5 +17,6 @@
 namespace catalyst {
 /// Convert every MemRef-typed return value in `callee` to writing to a new argument in
 /// destination-passing style.
-void convertToDestinationPassingStyle(mlir::func::FuncOp callee, mlir::OpBuilder &builder);
+llvm::LogicalResult convertToDestinationPassingStyle(mlir::func::FuncOp callee,
+                                                     mlir::OpBuilder &builder);
 } // namespace catalyst

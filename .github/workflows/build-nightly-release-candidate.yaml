@@ -1,0 +1,95 @@
+name: Build Release Branch Nightly for TestPyPI
+
+on:
+  schedule:
+    # Run from July 8th to July 13th at 02:00 UTC (10:00 PM EDT)
+    - cron: "0 2 8-13 7 *"
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to build from'
+        required: true
+        default: 'v0.12.0-rc'
+
+jobs:
+  setup:
+    name: Setup the release
+    runs-on: ubuntu-24.04-arm
+    outputs:
+      branch: ${{ steps.set_branch.outputs.branch }}
+    steps:
+    - name: Set branch
+      id: set_branch
+      run: echo "branch=${{ github.event.inputs.branch || 'v0.12.0-rc' }}" >> $GITHUB_OUTPUT
+
+    - name: Checkout Catalyst repo release branch
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ steps.set_branch.outputs.branch }}
+        ssh-key: ${{ secrets.NIGHTLY_VERSION_UPDATE_DEPLOY_KEY }}
+
+    - name: Bump RC version
+      run: |
+        python $GITHUB_WORKSPACE/.github/workflows/set_rc_version.py
+
+    - name: Push new version
+      run: |
+        git config --global user.email '${{ secrets.AUTO_UPDATE_VERSION_RINGO_EMAIL }}'
+        git config --global user.name "ringo-but-quantum"
+        git add $GITHUB_WORKSPACE/frontend/catalyst/_version.py
+        git commit -m "[no ci] bump nightly rc version"
+        git push
+
+  # Only build the most popular configurations on a nightly schedule to save PyPI storage.
+
+  linux-x86:
+    name: Build on Linux x86-64
+    needs: [setup]
+    uses: ./.github/workflows/build-wheel-linux-x86_64.yaml
+    with:
+      branch: ${{ needs.setup.outputs.branch }}
+
+  linux-aarch:
+    name: Build on Linux aarch64
+    needs: [setup]
+    uses: ./.github/workflows/build-wheel-linux-arm64.yaml
+    with:
+      branch: ${{ needs.setup.outputs.branch }}
+
+  macos-arm:
+    name: Build on macOS arm64
+    needs: [setup]
+    uses: ./.github/workflows/build-wheel-macos-arm64.yaml
+    with:
+      branch: ${{ needs.setup.outputs.branch }}
+
+  upload:
+    name: Prepare & Upload wheels to TestPyPI
+    needs: [linux-x86, macos-arm, linux-aarch]
+    runs-on: ubuntu-24.04
+    permissions:
+      id-token: write  # IMPORTANT: mandatory for trusted publishing
+
+    steps:
+    - name: Download wheels
+      uses: actions/download-artifact@v4
+      with:
+        merge-multiple: true
+        path: dist
+
+    - name: Install rename
+      run: |
+        sudo apt install rename
+
+    - name: Prepare wheels
+      run: |
+        rename "s/linux/manylinux_2_28/" dist/pennylane_catalyst-*
+        rename "s/macosx_14_0_universal2/macosx_13_0_arm64/" dist/pennylane_catalyst-*
+        rename "s/macosx_14/macosx_13/" dist/pennylane_catalyst-*
+
+    - name: Upload wheels
+      uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        repository-url: https://test.pypi.org/legacy/
+        packages-dir: dist
+        verbose: true

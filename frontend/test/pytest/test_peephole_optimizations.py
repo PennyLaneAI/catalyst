@@ -188,7 +188,7 @@ def test_chained_passes():
     Test that chained passes are present in the transform passes.
     """
 
-    @qjit()
+    @qjit
     @merge_rotations
     @cancel_inverses
     @qml.qnode(qml.device("lightning.qubit", wires=2))
@@ -209,7 +209,7 @@ def test_disentangle_passes():
     and are applied correctly.
     """
 
-    @qjit()
+    @qjit
     @qml.qnode(qml.device("lightning.qubit", wires=2))
     def circuit_with_no_disentangle_passes():
         # first qubit in |1>
@@ -219,7 +219,7 @@ def test_disentangle_passes():
         qml.SWAP(wires=[0, 1])  # state after SWAP |11>
         return qml.state()
 
-    @qjit()
+    @qjit
     @disentangle_cnot
     @disentangle_swap
     @qml.qnode(qml.device("lightning.qubit", wires=2))

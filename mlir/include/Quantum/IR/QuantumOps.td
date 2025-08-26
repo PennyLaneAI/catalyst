@@ -63,6 +63,12 @@ class Quantum_Op<string mnemonic, list<Trait> traits = []> : Op<QuantumDialect, 
 def InitializeOp : Quantum_Op<"init"> {
     let summary = "Initialize the quantum runtime.";
 
+    let description = [{
+        The execution of this operation corresponds to the execution of Catalyst's runtime function
+        ``__catalyst__rt__initialize`` which is the first function that will be called for the duration
+        of the whole compiled object.
+    }];
+
     let assemblyFormat = [{
         attr-dict
     }];
@@ -70,6 +76,12 @@ def InitializeOp : Quantum_Op<"init"> {
 
 def FinalizeOp : Quantum_Op<"finalize"> {
     let summary = "Teardown the quantum runtime.";
+
+    let description = [{
+        Executing this instruction concretely corresponds to executing the
+        ``__catalyst__rt__finalize`` function in the runtime which is expected
+        to be the very last thing executed by the library.
+    }];
 
     let assemblyFormat = [{
         attr-dict
@@ -537,7 +549,7 @@ def CustomOp : UnitaryGate_Op<"custom", [DifferentiableGate, NoMemoryEffect,
             if (!isStatic()) {
                 return staticValues;
             }
-            
+
             for (mlir::Value param : getParams()) {
                 auto constOp = param.getDefiningOp();
                 if (auto floatAttr = constOp->getAttrOfType<mlir::FloatAttr>("value")) {
@@ -552,7 +564,9 @@ def CustomOp : UnitaryGate_Op<"custom", [DifferentiableGate, NoMemoryEffect,
 
 def GlobalPhaseOp : UnitaryGate_Op<"gphase", [DifferentiableGate, AttrSizedOperandSegments]> {
     let summary = "Global Phase.";
+
     let description = [{
+    	Applies global phase to the current system.
     }];
 
     let arguments = (ins
@@ -594,6 +608,11 @@ def MultiRZOp : UnitaryGate_Op<"multirz", [DifferentiableGate, NoMemoryEffect,
     let description = [{
         The `quantum.multirz` operation applies an arbitrary multi Z rotation to the state-vector.
         The arguments are the rotation angle `theta` and a set of qubits the operation acts on.
+
+        .. note::
+            This operation is one of the few quantum operations that is not applied via
+            ``quantum.custom``. The reason for this is that it needs to be handled in a special
+            way during the lowering due to its C function being variadic on the number of qubits.
     }];
 
     let arguments = (ins
@@ -618,9 +637,59 @@ def MultiRZOp : UnitaryGate_Op<"multirz", [DifferentiableGate, NoMemoryEffect,
             return getODSOperands(getParamOperandIdx());
         }
     }];
-    
+
     let hasCanonicalizeMethod = 1;
 }
+
+def PCPhaseOp : UnitaryGate_Op<"pcphase", [DifferentiableGate, NoMemoryEffect,
+                                           AttrSizedOperandSegments, AttrSizedResultSegments]> {
+    let summary = "Apply a projector-controlled phase gate";
+    let description = [{
+        This gate is built from simpler gates like `PhaseShift` and `PauliX` and acts on a group
+        of wires and takes a rotation angle.
+        It also takes another number, an integer called `dim`, which defines a specific part
+        of the quantum state. The gate then applies a positive phase shift to a portion of the
+        state defined by `dim`. At the same time, it applies a negative phase shift to the rest
+        of the state.
+
+        .. note::
+            This operation is one of the few quantum operations that is not applied via
+            ``quantum.custom``. The reason for this is that it needs to be handled in a special
+            way during the lowering due to its C function being variadic on the number of qubits.
+
+        .. note::
+            `dim` is currently captured as a float number for compatibility with
+            runtime and device integration.
+
+    }];
+
+    let arguments = (ins
+        F64:$theta,
+        F64:$dim,
+        Variadic<QubitType>:$in_qubits,
+        UnitAttr:$adjoint,
+        Variadic<QubitType>:$in_ctrl_qubits,
+        Variadic<I1>:$in_ctrl_values
+    );
+
+    let results = (outs
+        Variadic<QubitType>:$out_qubits,
+        Variadic<QubitType>:$out_ctrl_qubits
+    );
+
+    let assemblyFormat = [{
+        `(` $theta `,` $dim `)` $in_qubits (`adj` $adjoint^)? attr-dict ( `ctrls` `(` $in_ctrl_qubits^ `)` )?  ( `ctrlvals` `(` $in_ctrl_values^ `)` )? `:` type($out_qubits) (`ctrls` type($out_ctrl_qubits)^ )?
+    }];
+
+    let extraClassDeclaration = extraBaseClassDeclaration # [{
+        mlir::ValueRange getAllParams() {
+            return getODSOperands(getParamOperandIdx());
+        }
+    }];
+
+    let hasCanonicalizeMethod = 1;
+}
+
 
 def QubitUnitaryOp : UnitaryGate_Op<"unitary", [ParametrizedGate, NoMemoryEffect,
                                                 AttrSizedOperandSegments, AttrSizedResultSegments]> {
@@ -706,7 +775,7 @@ class Observable_Op<string mnemonic, list<Trait> traits = []> :
         Quantum_Op<mnemonic, traits # [Pure]>;
 
 def ComputationalBasisOp : Observable_Op<"compbasis", [AttrSizedOperandSegments]> {
-    let summary = "Define a pseudo-obeservable of the computational basis for use in measurements";
+    let summary = "Define a pseudo-observable of the computational basis for use in measurements";
     let description = [{
         The `quantum.compbasis` operation defines a quantum observable to be used by other
         operations such as measurement processes. The specific observable defined here is a
@@ -910,7 +979,7 @@ def SampleOp : Measurement_Op<"sample", [AttrSizedOperandSegments]> {
 
         Note that the return value type depends on the type of observable provided. Computational
         basis samples are returned as a 2D array of shape (shot number, number of qubits), with all
-        other obversables the output is a 1D array of lenth equal to the shot number.
+        other observables the output is a 1D array of length equal to the shot number.
 
         Example:
 
@@ -919,14 +988,25 @@ def SampleOp : Measurement_Op<"sample", [AttrSizedOperandSegments]> {
         {
             quantum.device shots(%shots) ["rtd_lightning.so", "lightning.qubit", "{my_attr: my_attr_value}"]
             %obs1 = quantum.compbasis %q0, %q1 : !quantum.obs
-            %samples = quantum.samples %obs1 : tensor<?xf64>
+            %samples = quantum.sample %obs1 : tensor<?xf64>
 
             %obs2 = quantum.pauli %q0[3], %q1[1] : !quantum.obs
-            %samples2 = quantum.samples %obs2 : tensor<?x2xf64>
+            %samples2 = quantum.sample %obs2 : tensor<?x2xf64>
 
             func.return
         }
         ```
+
+        .. note::
+
+            The return value type depends on the type of observable provided. Computational
+            basis samples are returned as a 2D array of shape (shot number, number of qubits), with all
+            other observables the output is a 1D array of length equal to the shot number.
+
+        .. note::
+
+            The ``in_data`` field is needed only after bufferization. It is an implementation detail that
+            transform writers are unlikely to be worried about.
     }];
 
     let arguments = (ins
@@ -1115,6 +1195,10 @@ def ProbsOp : Measurement_Op<"probs", [AttrSizedOperandSegments]> {
             func.return
         }
         ```
+
+        .. note::
+
+            The optional operand ``state_in`` is only used after bufferization.
     }];
 
     let arguments = (ins
@@ -1158,7 +1242,8 @@ def StateOp : Measurement_Op<"state", [AttrSizedOperandSegments]> {
         ```mlir
         func.func @foo(%q0: !quantum.bit, %q1: !quantum.bit)
         {
-            %state = quantum.state %q0, %q1 : tensor<4xcomplex<f64>>
+            %obs = quantum.compbasis qubits %q0, %q1 : !quantum.obs
+            %state = quantum.state %obs : tensor<4xcomplex<f64>>
             func.return
         }
         ```

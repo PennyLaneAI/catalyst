@@ -129,6 +129,19 @@ func.func @alloc(%c : i64) {
 
 // -----
 
+// CHECK: llvm.func @__catalyst__rt__qubit_allocate() -> !llvm.ptr
+
+// CHECK-LABEL: @alloc_qb
+func.func @alloc_qb() {
+
+    // CHECK: llvm.call @__catalyst__rt__qubit_allocate()
+    %0 = quantum.alloc_qb : !quantum.bit
+
+    return
+}
+
+// -----
+
 // CHECK: llvm.func @__catalyst__rt__qubit_release_array(!llvm.ptr)
 
 // CHECK-LABEL: @dealloc
@@ -136,6 +149,19 @@ func.func @dealloc(%r : !quantum.reg) {
 
     // CHECK: llvm.call @__catalyst__rt__qubit_release_array(%arg0)
     quantum.dealloc %r : !quantum.reg
+
+    return
+}
+
+// -----
+
+// CHECK: llvm.func @__catalyst__rt__qubit_release(!llvm.ptr)
+
+// CHECK-LABEL: @dealloc_qb
+func.func @dealloc_qb(%q : !quantum.bit) {
+
+    // CHECK: llvm.call @__catalyst__rt__qubit_release(%arg0)
+    quantum.dealloc_qb %q : !quantum.bit
 
     return
 }
@@ -179,12 +205,28 @@ func.func @insert(%r : !quantum.reg, %q : !quantum.bit) -> !quantum.reg {
 
 // CHECK-LABEL: @custom_gate
 module @custom_gate {
-  // CHECK: llvm.func @__catalyst__qis__Identity(!llvm.ptr, !llvm.ptr)
+  // CHECK: llvm.func @__catalyst__qis__Identity(!llvm.ptr, i64, ...)
   // CHECK-LABEL: @test
   func.func @test(%q0: !quantum.bit, %p: f64) -> () {
     // CHECK: [[nullptr:%.+]] = llvm.mlir.zero
-    // CHECK: llvm.call @__catalyst__qis__Identity(%arg0, [[nullptr]])
+    // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64) : i64
+    // CHECK: llvm.call @__catalyst__qis__Identity([[nullptr]], [[c1]], %arg0)
     %q1 = quantum.custom "Identity"() %q0 : !quantum.bit
+    return
+  }
+}
+
+// -----
+
+// CHECK-LABEL: @custom_gate
+module @custom_gate {
+  // CHECK: llvm.func @__catalyst__qis__Identity(!llvm.ptr, i64, ...)
+  // CHECK-LABEL: @test
+  func.func @test(%q0: !quantum.bit, %q1: !quantum.bit, %p: f64) -> () {
+    // CHECK: [[nullptr:%.+]] = llvm.mlir.zero
+    // CHECK: [[c2:%.+]] = llvm.mlir.constant(2 : i64) : i64
+    // CHECK: llvm.call @__catalyst__qis__Identity([[nullptr]], [[c2]], %arg0, %arg1)
+    %q2:2 = quantum.custom "Identity"() %q0, %q1 : !quantum.bit, !quantum.bit
     return
   }
 }
@@ -279,6 +321,35 @@ func.func @multirz(%q0 : !quantum.bit, %p : f64) -> (!quantum.bit, !quantum.bit,
     // CHECK: [[c3:%.+]] = llvm.mlir.constant(3 : i64)
     // CHECK: llvm.call @__catalyst__qis__MultiRZ(%arg1, [[p]], [[c3]], %arg0, %arg0, %arg0)
     %q3:3 = quantum.multirz(%p) %q2#0, %q2#1, %q2#1 : !quantum.bit, !quantum.bit, !quantum.bit
+
+    // CHECK: [[st1:%.+]] = llvm.insertvalue %arg0
+    // CHECK: [[st2:%.+]] = llvm.insertvalue %arg0, [[st1]]
+    // CHECK: [[st3:%.+]] = llvm.insertvalue %arg0, [[st2]]
+    // CHECK: return [[st3]]
+    return %q3#0, %q3#1, %q3#2 : !quantum.bit, !quantum.bit, !quantum.bit
+}
+
+// -----
+
+// CHECK: llvm.func @__catalyst__qis__PCPhase(f64, f64, !llvm.ptr, i64, ...)
+
+// CHECK-LABEL: @pcphase
+func.func @pcphase(%q0 : !quantum.bit, %p : f64, %d: f64) -> (!quantum.bit, !quantum.bit, !quantum.bit) {
+
+    // CHECK: [[d:%.+]] = llvm.mlir.zero : !llvm.ptr
+    // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
+    // CHECK: llvm.call @__catalyst__qis__PCPhase(%arg1, %arg2, [[d]], [[c1]], %arg0)
+    %q1 = quantum.pcphase(%p, %d) %q0 : !quantum.bit
+
+    // CHECK: [[d:%.+]] = llvm.mlir.zero : !llvm.ptr
+    // CHECK: [[c2:%.+]] = llvm.mlir.constant(2 : i64)
+    // CHECK: llvm.call @__catalyst__qis__PCPhase(%arg1, %arg2, [[d]], [[c2]], %arg0, %arg0)
+    %q2:2 = quantum.pcphase(%p, %d) %q1, %q1 : !quantum.bit, !quantum.bit
+
+    // CHECK: [[d:%.+]] = llvm.mlir.zero : !llvm.ptr
+    // CHECK: [[c3:%.+]] = llvm.mlir.constant(3 : i64)
+    // CHECK: llvm.call @__catalyst__qis__PCPhase(%arg1, %arg2, [[d]], [[c3]], %arg0, %arg0, %arg0)
+    %q3:3 = quantum.pcphase(%p, %d) %q2#0, %q2#1, %q2#1 : !quantum.bit, !quantum.bit, !quantum.bit
 
     // CHECK: [[st1:%.+]] = llvm.insertvalue %arg0
     // CHECK: [[st2:%.+]] = llvm.insertvalue %arg0, [[st1]]

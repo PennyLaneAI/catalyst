@@ -23,11 +23,7 @@ from jax._src.lib.mlir import ir
 from jax.interpreters import mlir
 from jaxlib.mlir.dialects.builtin import ModuleOp
 from jaxlib.mlir.dialects.func import CallOp
-from mlir_quantum.dialects._transform_ops_gen import (
-    ApplyRegisteredPassOp,
-    NamedSequenceOp,
-    YieldOp,
-)
+from mlir_quantum.dialects._transform_ops_gen import ApplyRegisteredPassOp, NamedSequenceOp, YieldOp
 from mlir_quantum.dialects.catalyst import LaunchKernelOp
 
 
@@ -113,13 +109,30 @@ def lower_callable_to_funcop(ctx, callable_, call_jaxpr):
 
     if isinstance(callable_, qml.QNode):
         func_op.attributes["qnode"] = ir.UnitAttr.get()
-        # "best", the default option in PennyLane, chooses backprop on the device
-        # if supported and parameter-shift otherwise. Emulating the same behaviour
-        # would require generating code to query the device.
-        # For simplicity, Catalyst instead defaults to parameter-shift.
-        diff_method = (
-            "parameter-shift" if callable_.diff_method == "best" else str(callable_.diff_method)
-        )
+
+        diff_method = str(callable_.diff_method)
+
+        if diff_method == "best":
+
+            def only_single_expval():
+                found_expval = False
+                for eqn in call_jaxpr.eqns:
+                    name = eqn.primitive.name
+                    if name in {"probs", "counts", "sample"}:
+                        return False
+                    elif name == "expval":
+                        if found_expval:
+                            return False
+                        found_expval = True
+                return True
+
+            device_name = getattr(getattr(callable_, "device", None), "name", None)
+
+            if device_name and "lightning" in device_name and only_single_expval():
+                diff_method = "adjoint"
+            else:
+                diff_method = "parameter-shift"
+
         func_op.attributes["diff_method"] = ir.StringAttr.get(diff_method)
 
     return func_op
@@ -280,7 +293,11 @@ def transform_named_sequence_lowering(jax_ctx: mlir.LoweringRuleContext, pipelin
             for _pass in pipeline:
                 options = _pass.get_options()
                 apply_registered_pass_op = ApplyRegisteredPassOp(
-                    result=transform_mod_type, target=target, pass_name=_pass.name, options=options
+                    result=transform_mod_type,
+                    target=target,
+                    pass_name=_pass.name,
+                    options=options,
+                    dynamic_options={},
                 )
                 target = apply_registered_pass_op.result
             transform_yield_op = YieldOp(operands_=[])  # pylint: disable=unused-variable

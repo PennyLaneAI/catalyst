@@ -23,7 +23,16 @@ import pytest
 import catalyst
 from catalyst import qjit
 from catalyst.from_plxpr import from_plxpr
-from catalyst.jax_primitives import get_call_jaxpr
+from catalyst.jax_primitives import (
+    adjoint_p,
+    for_p,
+    get_call_jaxpr,
+    qalloc_p,
+    qextract_p,
+    qinsert_p,
+    qinst_p,
+    while_p,
+)
 
 pytestmark = pytest.mark.usefixtures("disable_capture")
 
@@ -107,29 +116,15 @@ def compare_eqns(eqn1, eqn2):
 class TestErrors:
     """Test that errors are raised in unsupported situations."""
 
-    def test_observable_without_n_wires(self):
-        """Test that a NotImplementedError is raised for an observable without n_wires."""
-
-        dev = qml.device("lightning.qubit", wires=2)
-
-        @qml.qnode(dev)
-        def circuit():
-            return qml.expval(qml.X(0) + qml.Y(0))
-
-        qml.capture.enable()
-        jaxpr = jax.make_jaxpr(circuit)()
-
-        with pytest.raises(
-            NotImplementedError, match="operator arithmetic not yet supported for conversion."
-        ):
-            from_plxpr(jaxpr)()
-        qml.capture.disable()
-
     def test_measuring_eigvals_not_supported(self):
         """Test that a NotImplementedError is raised for converting a measurement
         specified via eigvals and wires."""
-
-        dev = qml.device("lightning.qubit", wires=2, shots=50)
+        # TODO: try set_shots after capture work is completed
+        with pytest.warns(
+            qml.exceptions.PennyLaneDeprecationWarning,
+            match="deprecated",
+        ):
+            dev = qml.device("lightning.qubit", wires=2, shots=50)
 
         @qml.qnode(dev)
         def circuit():
@@ -373,41 +368,47 @@ class TestCatalystCompareJaxpr:
     def test_sample(self):
         """Test comparison and execution of a jaxpr returning samples."""
 
-        dev = qml.device("lightning.qubit", wires=2, shots=50)
+        # TODO: try set_shots after capture work is completed
+        with pytest.warns(
+            qml.exceptions.PennyLaneDeprecationWarning,
+            match="shots on device is deprecated",
+        ):
+            dev = qml.device("lightning.qubit", wires=2, shots=50)
 
-        @qml.qnode(dev)
-        def circuit():
-            qml.X(0)
-            return qml.sample()
+            @qml.qnode(dev)
+            def circuit():
+                qml.X(0)
+                return qml.sample()
 
-        qml.capture.enable()
-        plxpr = jax.make_jaxpr(circuit)()
+            qml.capture.enable()
+            plxpr = jax.make_jaxpr(circuit)()
 
-        converted = from_plxpr(plxpr)()
-        qml.capture.disable()
+            converted = from_plxpr(plxpr)()
+            qml.capture.disable()
 
-        assert converted.eqns[0].primitive == catalyst.jax_primitives.quantum_kernel_p
-        assert converted.eqns[0].params["qnode"] is circuit
+            assert converted.eqns[0].primitive == catalyst.jax_primitives.quantum_kernel_p
+            assert converted.eqns[0].params["qnode"] is circuit
 
-        catalyst_res = catalyst_execute_jaxpr(converted)()
-        assert len(catalyst_res) == 1
-        expected = np.transpose(np.vstack([np.ones(50), np.zeros(50)]))
-        assert qml.math.allclose(catalyst_res[0], expected)
+            catalyst_res = catalyst_execute_jaxpr(converted)()
+            assert len(catalyst_res) == 1
+            expected = np.transpose(np.vstack([np.ones(50), np.zeros(50)]))
+            assert qml.math.allclose(catalyst_res[0], expected)
 
-        qjit_obj = qjit(circuit)
-        qjit_obj()
-        catalxpr = qjit_obj.jaxpr
-        call_jaxpr_pl = get_call_jaxpr(converted)
-        call_jaxpr_c = get_call_jaxpr(catalxpr)
+            qjit_obj = qjit(circuit)
+            qjit_obj()
+            catalxpr = qjit_obj.jaxpr
+            call_jaxpr_pl = get_call_jaxpr(converted)
+            call_jaxpr_c = get_call_jaxpr(catalxpr)
 
-        compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c)
+            compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c)
 
     @pytest.mark.xfail(reason="CountsMP returns a dictionary, which is not compatible with capture")
     def test_counts(self):
         """Test comparison and execution of a jaxpr returning counts."""
 
-        dev = qml.device("lightning.qubit", wires=2, shots=50)
+        dev = qml.device("lightning.qubit", wires=2)
 
+        @qml.set_shots(50)
         @qml.qnode(dev)
         def circuit():
             qml.X(0)
@@ -546,7 +547,12 @@ class TestCatalystCompareJaxpr:
     def test_dynamic_shots(self):
         """Test that shots can be specified on qnode call."""
 
-        dev = qml.device("lightning.qubit", wires=2, shots=50)
+        # TODO: try set_shots after capture work is completed
+        with pytest.warns(
+            qml.exceptions.PennyLaneDeprecationWarning,
+            match="deprecated",
+        ):
+            dev = qml.device("lightning.qubit", wires=2, shots=50)
 
         @qml.qnode(dev)
         def circuit():
@@ -564,6 +570,294 @@ class TestCatalystCompareJaxpr:
         assert converted.out_avals[0].shape == (100, 1)
         [samples] = catalyst_execute_jaxpr(converted)()
         assert qml.math.allclose(samples, np.zeros((100, 1)))
+
+
+class TestAdjointCtrl:
+    """Test the conversion of adjoint and control operations."""
+
+    @pytest.mark.parametrize("num_adjoints", (1, 2, 3))
+    def test_adjoint_op(self, num_adjoints):
+        """Test the conversion of a simple adjoint op."""
+        qml.capture.enable()
+
+        @qml.qnode(qml.device("lightning.qubit", wires=4), autograph=False)
+        def c():
+            op = qml.S(0)
+            for _ in range(num_adjoints):
+                op = qml.adjoint(op)
+
+            return qml.state()
+
+        plxpr = jax.make_jaxpr(c)()
+        catalyst_xpr = from_plxpr(plxpr)()
+        qfunc_xpr = catalyst_xpr.eqns[0].params["call_jaxpr"]
+
+        assert qfunc_xpr.eqns[-6].primitive == qinst_p
+        assert qfunc_xpr.eqns[-6].params == {
+            "adjoint": num_adjoints % 2 == 1,
+            "ctrl_len": 0,
+            "op": "S",
+            "qubits_len": 1,
+            "params_len": 0,
+        }
+
+    @pytest.mark.parametrize("inner_adjoint", (True, False))
+    @pytest.mark.parametrize("outer_adjoint", (True, False))
+    def test_ctrl_op(self, inner_adjoint, outer_adjoint):
+        """Test the conversion of a simple adjoint op."""
+
+        qml.capture.enable()
+
+        @qml.qnode(qml.device("lightning.qubit", wires=4), autograph=False)
+        def c(x, wire3):
+            op = qml.RX(x, 0)
+            if inner_adjoint:
+                op = qml.adjoint(op)
+            op = qml.ctrl(op, (1, 2, wire3), [0, 1, 0])
+            if outer_adjoint:
+                op = qml.adjoint(op)
+            return qml.state()
+
+        plxpr = jax.make_jaxpr(c)(0.5, 3)
+        catalyst_xpr = from_plxpr(plxpr)(0.5, 3)
+
+        qfunc_xpr = catalyst_xpr.eqns[0].params["call_jaxpr"]
+        eqn = qfunc_xpr.eqns[6]  # dev, qreg, four allocations
+        assert eqn.primitive == qinst_p
+        assert eqn.params == {
+            "adjoint": (inner_adjoint + outer_adjoint) % 2 == 1,
+            "ctrl_len": 3,
+            "op": "RX",
+            "qubits_len": 1,
+            "params_len": 1,
+        }
+        assert eqn.invars[0] is qfunc_xpr.eqns[2].outvars[0]
+        assert eqn.invars[1] is qfunc_xpr.invars[0]
+        for i in range(3):
+            assert eqn.invars[2 + i] is qfunc_xpr.eqns[3 + i].outvars[0]
+        assert eqn.invars[5].val == False
+        assert eqn.invars[6].val == True
+        assert eqn.invars[7].val == False
+
+    @pytest.mark.parametrize("as_qfunc", (True, False))
+    def test_doubly_ctrl(self, as_qfunc):
+        """Test doubly controlled op."""
+
+        qml.capture.enable()
+
+        @qml.qnode(qml.device("lightning.qubit", wires=3), autograph=False)
+        def c():
+            if as_qfunc:
+                qml.ctrl(qml.ctrl(qml.S, 1), 2, control_values=[False])(0)
+            else:
+                qml.ctrl(qml.ctrl(qml.S(0), 1), 2, control_values=[False])
+            return qml.state()
+
+        plxpr = jax.make_jaxpr(c)()
+        catalyst_xpr = from_plxpr(plxpr)()
+
+        qfunc_xpr = catalyst_xpr.eqns[0].params["call_jaxpr"]
+        eqn = qfunc_xpr.eqns[5]
+        assert eqn.primitive == qinst_p
+        assert eqn.params == {
+            "adjoint": False,
+            "ctrl_len": 2,
+            "op": "S",
+            "qubits_len": 1,
+            "params_len": 0,
+        }
+
+        for i in range(3):
+            assert eqn.invars[i] == qfunc_xpr.eqns[2 + i].outvars[0]
+        assert eqn.invars[3].val == False
+        assert eqn.invars[4].val == True
+
+    @pytest.mark.parametrize("with_return", (True, False))
+    def test_adjoint_transform(self, with_return):
+        """Test the adjoint transform."""
+
+        qml.capture.enable()
+
+        # pylint: disable=inconsistent-return-statements
+        def f(x):
+            op = qml.IsingXX(2 * x, wires=(0, 1))
+            if with_return:
+                return op
+
+        @qml.qnode(qml.device("lightning.qubit", wires=2), autograph=False)
+        def c(x):
+            qml.X(0)
+            qml.adjoint(f)(x)
+            return qml.state()
+
+        plxpr = jax.make_jaxpr(c)(0.5)
+        catalyst_xpr = from_plxpr(plxpr)(0.5)
+        qfunc_xpr = catalyst_xpr.eqns[0].params["call_jaxpr"]
+
+        assert qfunc_xpr.eqns[1].primitive == qalloc_p
+        assert qfunc_xpr.eqns[2].primitive == qextract_p
+        assert qfunc_xpr.eqns[3].primitive == qinst_p
+        assert qfunc_xpr.eqns[4].primitive == qinsert_p
+
+        eqn = qfunc_xpr.eqns[5]
+        assert eqn.primitive == adjoint_p
+        assert eqn.invars[0] == qfunc_xpr.invars[0]  # x
+        assert eqn.invars[1] == qfunc_xpr.eqns[4].outvars[0]  # the qreg
+        assert eqn.outvars[0] == qfunc_xpr.eqns[6].invars[0]  # also the qreg
+        assert len(eqn.outvars) == 1
+
+        target_xpr = eqn.params["jaxpr"]
+        assert target_xpr.eqns[1].primitive == qextract_p
+        assert target_xpr.eqns[2].primitive == qextract_p
+        assert target_xpr.eqns[3].primitive == qinst_p
+        assert target_xpr.eqns[3].params == {
+            "adjoint": False,
+            "ctrl_len": 0,
+            "op": "IsingXX",
+            "params_len": 1,
+            "qubits_len": 2,
+        }
+        assert target_xpr.eqns[4].primitive == qinsert_p
+        assert target_xpr.eqns[5].primitive == qinsert_p
+
+    @pytest.mark.parametrize("as_qfunc", (True, False))
+    def test_dynamic_control_wires(self, as_qfunc):
+        """Test that dynamic wires are re-inserted if a dynamic wire is present."""
+
+        qml.capture.enable()
+
+        @qml.qnode(qml.device("lightning.qubit", wires=4), autograph=False)
+        def c(wire):
+            qml.CNOT((0, wire))
+            if as_qfunc:
+                qml.ctrl(qml.T, wire)(0)
+            else:
+                qml.ctrl(qml.T(0), wire)
+            return qml.state()
+
+        plxpr = jax.make_jaxpr(c)(3)
+        catalyst_xpr = from_plxpr(plxpr)(3)
+
+        qfunc_xpr = catalyst_xpr.eqns[0].params["call_jaxpr"]
+
+        assert qfunc_xpr.eqns[2].primitive == qextract_p
+        assert qfunc_xpr.eqns[3].primitive == qextract_p
+        assert qfunc_xpr.eqns[4].primitive == qinst_p  # the cnot
+        assert qfunc_xpr.eqns[5].primitive == qinsert_p  # sticking back into reg
+        assert qfunc_xpr.eqns[6].primitive == qinsert_p
+        assert qfunc_xpr.eqns[7].primitive == qextract_p
+        assert qfunc_xpr.eqns[8].primitive == qextract_p
+
+        assert qfunc_xpr.eqns[9].primitive == qinst_p
+        assert qfunc_xpr.eqns[9].params == {
+            "adjoint": False,
+            "ctrl_len": 1,
+            "op": "T",
+            "params_len": 0,
+            "qubits_len": 1,
+        }
+
+    def test_ctrl_around_for_loop(self):
+        """Test that ctrl applied to a for loop."""
+
+        qml.capture.enable()
+
+        @qml.for_loop(3)
+        def g(i):
+            qml.X(i)
+
+        @qml.qnode(qml.device("lightning.qubit", wires=4), autograph=False)
+        def c():
+            qml.ctrl(g, [4, 5])()
+            return qml.state()
+
+        plxpr = jax.make_jaxpr(c)()
+        catalyst_xpr = from_plxpr(plxpr)()
+
+        qfunc_xpr = catalyst_xpr.eqns[0].params["call_jaxpr"]
+        for_loop_xpr = qfunc_xpr.eqns[2].params["body_jaxpr"]
+
+        for i in [0, 1, 2]:
+            assert for_loop_xpr.eqns[i].primitive == qextract_p
+        assert for_loop_xpr.eqns[3].primitive == qinst_p
+        assert for_loop_xpr.eqns[3].params == {
+            "adjoint": False,
+            "ctrl_len": 2,
+            "op": "PauliX",
+            "params_len": 0,
+            "qubits_len": 1,
+        }
+
+
+class TestControlFlow:
+    """Tests for for and while loops."""
+
+    @pytest.mark.parametrize("reverse", (True, False))
+    def test_for_loop_outside_qnode(self, reverse):
+        """Test the conversion of a for loop outside the qnode."""
+
+        qml.capture.enable()
+        if reverse:
+            start, stop, step = 6, 0, -2  # 6, 4, 2
+        else:
+            start, stop, step = 2, 7, 2  # 2, 4, 6
+
+        def f(i0):
+            @qml.for_loop(start, stop, step)
+            def g(i, x):
+                return i + x
+
+            return g(i0)
+
+        jaxpr = jax.make_jaxpr(f)(2)
+        catalyst_jaxpr = from_plxpr(jaxpr)(2)
+
+        eqn = catalyst_jaxpr.eqns[0]
+
+        print(catalyst_jaxpr)
+
+        assert eqn.primitive == for_p
+        assert eqn.params["apply_reverse_transform"] == reverse
+        assert eqn.params["body_nconsts"] == 0
+        assert eqn.params["nimplicit"] == 0
+        assert eqn.params["preserve_dimensions"] is True
+
+        assert eqn.invars[0].val == start
+        assert eqn.invars[1].val == stop
+        assert eqn.invars[2].val == step
+        assert eqn.invars[3].val == start
+
+    def test_while_loop_outside_qnode(self):
+        """Test that a while loop outside a qnode can be translated."""
+        qml.capture.enable()
+
+        def f(x):
+
+            y = jax.numpy.array([0, 1, 2])
+
+            @qml.while_loop(lambda i: jax.numpy.sum(i) < 5 * jax.numpy.sum(y))
+            def g(i):
+                return i + y
+
+            return g(x)
+
+        x = jax.numpy.array([0, 0, 0])
+
+        plxpr = jax.make_jaxpr(f)(x)
+        catalyst_xpr = from_plxpr(plxpr)(x)
+
+        assert catalyst_xpr.eqns[0].primitive == while_p
+        assert catalyst_xpr.eqns[0].params["body_nconsts"] == 1
+        assert catalyst_xpr.eqns[0].params["cond_nconsts"] == 1
+        assert catalyst_xpr.eqns[0].params["nimplicit"] == 0
+        assert catalyst_xpr.eqns[0].params["preserve_dimensions"] == True
+
+        for kind in ["body_jaxpr", "cond_jaxpr"]:
+            xpr = catalyst_xpr.eqns[0].params[kind]
+            assert isinstance(xpr, jax.extend.core.ClosedJaxpr)
+            assert len(xpr.consts) == 0
+            assert len(xpr.jaxpr.invars) == 2
+            assert len(xpr.jaxpr.outvars) == 1
 
 
 class TestHybridPrograms:

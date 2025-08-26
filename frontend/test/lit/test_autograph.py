@@ -16,13 +16,7 @@
 
 # RUN: %PYTHON %s | FileCheck %s
 
-from catalyst import (
-    AutoGraphError,
-    autograph_source,
-    disable_autograph,
-    qjit,
-    run_autograph,
-)
+from catalyst import AutoGraphError, autograph_source, disable_autograph, qjit, run_autograph
 from catalyst.utils.dummy import dummy_func
 
 
@@ -578,7 +572,9 @@ def f():
 @qjit(autograph=True)
 def disable_autograph_decorator_jax(x: float, n: int):
     """Checks that Autograph is disabled for a given function."""
-    # CHECK: body_jaxpr={ lambda ; d:i64[] e:f64[]. let f:f64[] = add e 36.0 in (f,) }
+    # CHECK: body_jaxpr={ lambda ; d:i64[] e:f64[]. let
+    # CHECK:     f:f64[] = add e 36.0:f64[]
+    # CHECK:   in (f,) }
     for _ in range(n):
         x = x + f()
     return x
@@ -605,7 +601,7 @@ def g():
 @qjit(autograph=True)
 def enable_autograph_decorator_jax(x: float, n: int):
     """Checks that Autograph is enabled for a given function."""
-    # CHECK: branch_jaxprs=[{ lambda ; . let  in (36,) }, { lambda ; . let  in (216,) }]
+    # CHECK: branch_jaxprs=[{ lambda ; . let  in (36:i64[],) }, { lambda ; . let  in (216:i64[],) }]
     for _ in range(n):
         x = x + g()
     return x
@@ -632,7 +628,7 @@ def h():
 @qjit(autograph=True)
 def disable_autograph_context_manager_jax():
     """Checks that Autograph is disabled for a given context."""
-    # CHECK: { lambda ; . let in (36.4,) }
+    # CHECK: { lambda ; . let in (36.4:f64[],) }
     x = 0.4
     with disable_autograph:
         x += h()
@@ -660,7 +656,7 @@ def func():
 @qjit(autograph=True)
 def enable_autograph_context_manager_jax():
     """Checks that Autograph is enabled with no context."""
-    # CHECK: branch_jaxprs=[{ lambda ; . let  in (36,) }, { lambda ; . let  in (216,) }]
+    # CHECK: branch_jaxprs=[{ lambda ; . let  in (36:i64[],) }, { lambda ; . let  in (216:i64[],) }]
     x = 0.4
     x += func()
     return x
@@ -677,7 +673,7 @@ print(enable_autograph_context_manager_jax.jaxpr)
 @qjit(autograph=True, autograph_include=["catalyst.utils.dummy"])
 def include_module_to_autograph(x: float, n: int):
     """Checks that a module is included to Autograph conversion."""
-    # CHECK: branch_jaxprs=[{ lambda ; . let  in (36,) }, { lambda ; . let  in (216,) }]
+    # CHECK: branch_jaxprs=[{ lambda ; . let  in (36:i64[],) }, { lambda ; . let  in (216:i64[],) }]
     for _ in range(n):
         x = x + dummy_func(6)
     return x
@@ -694,7 +690,9 @@ print(include_module_to_autograph.jaxpr)
 @qjit(autograph=True)
 def excluded_module_from_autograph(x: float, n: int):
     """Checks that a module is excluded from Autograph conversion."""
-    # CHECK: body_jaxpr={ lambda ; d:i64[] e:f64[]. let f:f64[] = add e 36.0 in (f,) }
+    # CHECK: body_jaxpr={ lambda ; d:i64[] e:f64[]. let
+    # CHECK:     f:f64[] = add e 36.0:f64[]
+    # CHECK:   in (f,) }
     for _ in range(n):
         x = x + dummy_func(6)
     return x

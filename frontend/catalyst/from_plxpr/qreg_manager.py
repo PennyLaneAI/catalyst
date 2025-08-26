@@ -128,6 +128,47 @@ class QregManager:
             self.abstract_qreg_val = qinsert_p.bind(self.abstract_qreg_val, index, qubit)
         self.wire_map.clear()
 
+    def insert_dynamic_qubits(self, wires):
+        """
+        When wire label is dynamic, such gates will need to interrupt analysis like cancel inverses:
+           qml.X(wires=0)
+           qml.Hadamard(wires=w)
+           qml.X(wires=0)
+        In the above, because we don't know whether `w` is `0` or not until runtime, we must not
+        cancel the inverse PauliX gates on `0`.
+
+        Thus in the IR def use chain we need to interrupt the first X gate's %out_qubit to be used
+        as the second X gate's qubit operand directly.
+        To do this, for the dynamic wire gate we insert back to the register.
+        """
+
+        # Cancel-inverses style passes only work on gates with same number of qubits
+        same_number_of_wires = len(wires) == len(self.wire_map)
+
+        all_static_requested = all(isinstance(wire, int) for wire in wires)
+        all_static_cached = all(isinstance(wire, int) for wire in self.wire_map.keys())
+        all_static = all_static_requested and all_static_cached
+
+        if all_static:
+            # no need to insert back anything if nothing is dynamic
+            return
+
+        all_dynamic = False
+        keep_cache = False
+        if same_number_of_wires:
+            # Notice that we can keep using the current qubit value in the wire_map (if one exists
+            # there) even for dynamic case if they are the same dynamic wire, i.e.
+            #   qml.gate(wires=[w0,w1])
+            #   qml.gate(wires=[w0,w1])
+            # these cases do not need to insert back
+
+            wires_all_in_cache = all(wire in self.wire_map.keys() for wire in wires)
+            all_dynamic = all(not isinstance(wire, int) for wire in wires)
+            keep_cache = wires_all_in_cache and all_dynamic
+
+        if not keep_cache:
+            self.insert_all_dangling_qubits()
+
     def __getitem__(self, index: int) -> AbstractQbit:
         """
         Get the newest ``AbstractQbit`` corresponding to a wire index.

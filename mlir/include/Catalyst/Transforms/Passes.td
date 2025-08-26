@@ -17,6 +17,16 @@
 
 include "mlir/Pass/PassBase.td"
 
+def DetensorizeFunctionBoundaryPass : Pass<"detensorize-function-boundary"> {
+    let summary = "Detensorize across function boundary.";
+
+    let dependentDialects = [
+        "tensor::TensorDialect",
+    ];
+
+    let constructor = "catalyst::createDetensorizeFunctionBoundaryPass()";
+}
+
 def DetensorizeSCFPass : Pass<"detensorize-scf"> {
     let summary = "Detensorize for, if, while operations from the SCF dialect.";
 
@@ -53,32 +63,6 @@ def CatalystConversionPass : Pass<"convert-catalyst-to-llvm"> {
     ];
 
     let constructor = "catalyst::createCatalystConversionPass()";
-}
-
-def ScatterLoweringPass : Pass<"scatter-lowering"> {
-    let summary = "Lower scatter op from Stable HLO to loops.";
-
-    let dependentDialects = [
-        "mlir::func::FuncDialect",
-        "index::IndexDialect",
-        "mhlo::MhloDialect",
-        "tensor::TensorDialect",
-        "scf::SCFDialect"
-    ];
-
-    let constructor = "catalyst::createScatterLoweringPass()";
-}
-
-def HloCustomCallLoweringPass : Pass<"hlo-custom-call-lowering"> {
-    let summary = "Lower custom calls op from Stable HLO to CallOp.";
-
-    let dependentDialects = [
-        "index::IndexDialect",
-        "mlir::func::FuncDialect",
-        "catalyst::CatalystDialect",
-    ];
-
-    let constructor = "catalyst::createHloCustomCallLoweringPass()";
 }
 
 def QnodeToAsyncLoweringPass : Pass<"qnode-to-async-lowering"> {

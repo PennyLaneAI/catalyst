@@ -37,6 +37,9 @@ from typing import Any, Dict, Iterable, List, Optional, Set, Tuple, Union
 
 from catalyst.utils.exceptions import CompileError
 
+PipelineStage = Tuple[str, List[str]]
+PipelineStages = List[PipelineStage]
+
 
 class KeepIntermediateLevel(enum.IntEnum):
     """Enum to control the level of intermediate file keeping."""
@@ -179,13 +182,13 @@ class CompileOptions:
             }
         )
 
-    def get_pipelines(self) -> List[Tuple[str, List[str]]]:
+    def get_pipelines(self) -> PipelineStages:
         """Get effective pipelines"""
         if self.pipelines:
             return self.pipelines
         return self.get_stages()
 
-    def get_stages(self):
+    def get_stages(self) -> PipelineStages:
         """Returns all stages in order for compilation"""
         # Dictionaries in python are ordered
         stages = {}
@@ -223,20 +226,22 @@ def get_hlo_lowering_stage(_options: CompileOptions) -> List[str]:
     """Returns the list of passes to lower StableHLO to upstream MLIR dialects."""
     hlo_lowering = [
         "canonicalize",
-        "func.func(chlo-legalize-to-hlo)",
-        "stablehlo-legalize-to-hlo",
-        "func.func(mhlo-legalize-control-flow)",
-        "func.func(hlo-legalize-to-linalg)",
-        "func.func(mhlo-legalize-to-std)",
-        "func.func(hlo-legalize-sort)",
-        "convert-to-signless",
+        "func.func(chlo-legalize-to-stablehlo)",
+        "func.func(stablehlo-legalize-control-flow)",
+        "func.func(stablehlo-aggressive-simplification)",
+        "stablehlo-legalize-to-linalg",
+        "func.func(stablehlo-legalize-to-std)",
+        "func.func(stablehlo-legalize-sort)",
+        "stablehlo-convert-to-signless",
         "canonicalize",
         "scatter-lowering",
         "hlo-custom-call-lowering",
         "cse",
         "func.func(linalg-detensorize{aggressive-mode})",
         "detensorize-scf",
+        "detensorize-function-boundary",
         "canonicalize",
+        "symbol-dce",
     ]
     return hlo_lowering
 
@@ -271,7 +276,10 @@ def get_bufferization_stage(options: CompileOptions) -> List[str]:
         "convert-tensor-to-linalg",  # tensor.pad
         "convert-elementwise-to-linalg",  # Must be run before --one-shot-bufferize
         "gradient-preprocess",
-        "eliminate-empty-tensors",
+        # "eliminate-empty-tensors",
+        # Keep eliminate-empty-tensors commented out until benchmarks use more structure
+        # and produce functions of reasonable size. Otherwise, eliminate-empty-tensors
+        # will consume a significant amount of compile time along with one-shot-bufferize.
         ####################
         "one-shot-bufferize{" + bufferization_options + "}",
         ####################
@@ -347,13 +355,176 @@ def get_convert_to_llvm_stage(options: CompileOptions) -> List[str]:
     return list(filter(partial(is_not, None), convert_to_llvm))
 
 
-def get_stages(options):
-    """Returns all stages in order for compilation"""
-    # Dictionaries in python are ordered
-    stages = {}
-    stages["EnforceRuntimeInvariantsPass"] = get_enforce_runtime_invariants_stage(options)
-    stages["HLOLoweringPass"] = get_hlo_lowering_stage(options)
-    stages["QuantumCompilationPass"] = get_quantum_compilation_stage(options)
-    stages["BufferizationPass"] = get_bufferization_stage(options)
-    stages["MLIRToLLVMDialect"] = get_convert_to_llvm_stage(options)
-    return list(stages.items())
+def default_pipeline() -> PipelineStages:
+    """Return the pipeline stages for default Catalyst workloads.
+
+    The pipeline stages are returned as a list of tuples in the form
+
+    .. code-block:: python
+
+        [
+            ('stage1', ['pass1a', 'pass1b', ...]),
+            ('stage2', ['pass2a', ...]),
+            ...
+        ]
+
+    where the first entry in the tuple is the stage name and the second entry is a list of MLIR
+    passes.
+
+    Returns:
+        PipelineStages: The list of pipeline stages.
+
+    **Example**
+
+    The sequence of pipeline stages returned by this function can be passed directly to the
+    `pipelines` argument of :func:`~.qjit`. For example,
+
+    >>> my_pipeline = default_pipeline()
+    >>> # <modify my_pipeline as needed>
+    >>> @qjit(pipelines=my_pipeline)
+    ... @qml.qnode(device)
+    ... def circuit():
+    ...     ...
+    """
+    options = CompileOptions()  # Use all default compile options
+    return options.get_stages()
+
+
+def insert_pass_after(pipeline: list[str], new_pass: str, ref_pass: str) -> None:
+    """Insert a pass into an existing pass pipeline at the position after the given reference pass.
+
+    If the reference pass appears multiple times in the pipeline, the new pass is inserted only once
+    after the first occurrence of the reference pass.
+
+    Args:
+        pipeline (list[str]): An existing pass pipeline, given as a list of passes.
+        new_pass (str): The name of the pass to insert.
+        ref_pass (str): The name of the reference pass after which the new pass is inserted.
+
+    Raises:
+        ValueError: If `ref_pass` is not found in the pass pipeline.
+
+    Example:
+        >>> pipeline = ["pass1", "pass2"]
+        >>> insert_pass_after(pipeline, "new_pass", ref_pass="pass1")
+        >>> pipeline
+        ['pass1', 'new_pass', 'pass2']
+    """
+    try:
+        ref_index = pipeline.index(ref_pass)
+    except ValueError as e:
+        raise ValueError(
+            f"Cannot insert pass '{new_pass}' into pipeline; reference pass '{ref_pass}' not found"
+        ) from e
+
+    pipeline.insert(ref_index + 1, new_pass)
+
+
+def insert_pass_before(pipeline: list[str], new_pass: str, ref_pass: str) -> None:
+    """Insert a pass into an existing pass pipeline at the position before the given reference pass.
+
+    If the reference pass appears multiple times in the pipeline, the new pass is inserted only once
+    before the first occurrence of the reference pass.
+
+    Args:
+        pipeline (list[str]): An existing pass pipeline, given as a list of passes.
+        new_pass (str): The name of the pass to insert.
+        ref_pass (str): The name of the reference pass before which the new pass is inserted.
+
+    Raises:
+        ValueError: If `ref_pass` is not found in the pass pipeline.
+
+    Example:
+        >>> pipeline = ["pass1", "pass2"]
+        >>> insert_pass_before(pipeline, "new_pass", ref_pass="pass1")
+        >>> pipeline
+        ['new_pass', 'pass1', 'pass2']
+    """
+    try:
+        ref_index = pipeline.index(ref_pass)
+    except ValueError as e:
+        raise ValueError(
+            f"Cannot insert pass '{new_pass}' into pipeline; reference pass '{ref_pass}' not found"
+        ) from e
+
+    pipeline.insert(ref_index, new_pass)
+
+
+def insert_stage_after(stages: PipelineStages, new_stage: PipelineStage, ref_stage: str) -> None:
+    """Insert a compilation stage into an existing sequence of stages at the position after the
+    given reference stage.
+
+    If the reference stage appears multiple times in the sequence of stages, the new stage is
+    inserted only once after the first occurrence of the reference pass.
+
+    Args:
+        pipeline (PipelineStages): An existing sequence of compilation stages.
+        new_stage (PipelineStage): The new compilation stage, given as a tuple where the first
+            element is the stage name and the second is a list of strings corresponding to
+            compilation pass names.
+        ref_stage (str): The name of the reference stage after which the new stage is inserted.
+
+    Raises:
+        ValueError: If `ref_stage` is not found in the pass pipeline.
+
+    Example:
+        >>> stages = [("stage1", ["s1p1", "s1p2"]), ("stage2", ["s2p1", "s2p2"])]
+        >>> insert_stage_after(stages, ("new_stage", ["p0"]), ref_stage="stage1")
+        >>> stages
+        [('stage1', ['s1p1', 's1p2']), ('new_stage', ['p0']), ('stage2', ['s2p1', 's2p2'])]
+    """
+    if not hasattr(new_stage, "__len__") or len(new_stage) != 2:
+        raise TypeError(
+            "The stage to insert must be a tuple in the form ('stage name', ['pass', 'pass', ...])"
+        )
+
+    stage_names = [stage[0] for stage in stages]
+    try:
+        ref_index = stage_names.index(ref_stage)
+    except ValueError as e:
+        raise ValueError(
+            f"Cannot insert stage '{new_stage[0]}' into sequence of stages; "
+            f"reference stage '{ref_stage}' not found"
+        ) from e
+
+    stages.insert(ref_index + 1, new_stage)
+
+
+def insert_stage_before(stages: PipelineStages, new_stage: PipelineStage, ref_stage: str) -> None:
+    """Insert a compilation stage into an existing sequence of stages at the position before the
+    given reference stage.
+
+    If the reference stage appears multiple times in the sequence of stages, the new stage is
+    inserted only once before the first occurrence of the reference pass.
+
+    Args:
+        pipeline (PipelineStages): An existing sequence of compilation stages.
+        new_stage (PipelineStage): The new compilation stage, given as a tuple where the first
+            element is the stage name and the second is a list of strings corresponding to
+            compilation pass names.
+        ref_stage (str): The name of the reference stage before which the new stage is inserted.
+
+    Raises:
+        ValueError: If `ref_stage` is not found in the pass pipeline.
+
+    Example:
+        >>> stages = [("stage1", ["s1p1", "s1p2"]), ("stage2", ["s2p1", "s2p2"])]
+        >>> insert_stage_before(stages, ("new_stage", ["p0"]), ref_stage="stage1")
+        >>> stages
+        [('new_stage', ['p0']), ('stage1', ['s1p1', 's1p2']), ('stage2', ['s2p1', 's2p2'])]
+    """
+    if not hasattr(new_stage, "__len__") or len(new_stage) != 2:
+        raise TypeError(
+            "The stage to insert must be a tuple in the form ('stage name', ['pass', 'pass', ...])"
+        )
+
+    stage_names = [stage[0] for stage in stages]
+    try:
+        ref_index = stage_names.index(ref_stage)
+    except ValueError as e:
+        raise ValueError(
+            f"Cannot insert stage '{new_stage[0]}' into sequence of stages; "
+            f"reference stage '{ref_stage}' not found"
+        ) from e
+
+    stages.insert(ref_index, new_stage)

@@ -434,7 +434,7 @@ class TestCatalystControlled:
             qml.ctrl(qml.PauliZ(wires=[0]), control=[1, 2, 3])
             return qml.state()
 
-        compiled = qjit()(native_controlled)
+        compiled = qjit(native_controlled)
         assert all(sign in compiled.mlir for sign in ["ctrls", "ctrlvals"])
         result = compiled()
         expected = native_controlled()
@@ -461,7 +461,7 @@ class TestCatalystControlled:
             )
             return qml.state()
 
-        compiled = qjit()(native_controlled)
+        compiled = qjit(native_controlled)
         result = compiled()
         expected = native_controlled()
         assert_allclose(result, expected, atol=1e-5, rtol=1e-5)
@@ -851,9 +851,9 @@ class TestControlledMiscMethods:
         control_values = (False, False)  # (0, 0)
         work_wires = qml.wires.Wires(3)
         # A work_wire_type will be kept until dynamic qubit allocation is supported in PL
-        # Default value is "dirty"
+        # Default value is "borrowed"
         # https://github.com/PennyLaneAI/pennylane/pull/7612
-        work_wire_type = "dirty"
+        work_wire_type = "borrowed"
 
         op = C_ctrl(target, control_wires, control_values=control_values, work_wires=work_wires)
 

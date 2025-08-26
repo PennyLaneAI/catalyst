@@ -32,7 +32,7 @@ def circuit_aot_builder(dev):
 
     qml.capture.enable()
 
-    @catalyst.qjit()
+    @catalyst.qjit
     @qml.qnode(device=dev)
     def catalyst_circuit_aot(x: float):
         qml.Hadamard(wires=0)
@@ -107,7 +107,7 @@ def is_amplitude_embedding_merged_and_decomposed(mlir):
 
 # pylint: disable=too-many-public-methods
 class TestCapture:
-    """Integration tests for Catalyst adjoint functionality."""
+    """Integration tests for functionality."""
 
     @pytest.mark.parametrize("theta", (jnp.pi, 0.1, 0.0))
     def test_simple_circuit_aot(self, backend, theta):
@@ -136,7 +136,7 @@ class TestCapture:
 
         qml.capture.enable()
 
-        @catalyst.qjit()
+        @catalyst.qjit
         @qml.qnode(device=dev)
         def captured_circuit(x):
             qml.Hadamard(wires=0)
@@ -1468,27 +1468,31 @@ class TestCapture:
 
         qml.capture.enable()
 
-        @qjit(target="mlir")
-        @qml.qnode(qml.device(backend, wires=2, shots=10))
-        def captured_circuit():
-            @qml.for_loop(0, 2, 1)
-            def loop_0(i):
-                qml.RX(0, wires=i)
+        # TODO: try set_shots after capture work is completed
+        with pytest.warns(
+            qml.exceptions.PennyLaneDeprecationWarning, match="shots on device is deprecated"
+        ):
 
-            loop_0()
+            @qjit(target="mlir")
+            @qml.qnode(qml.device(backend, wires=2, shots=10))
+            def captured_circuit():
+                @qml.for_loop(0, 2, 1)
+                def loop_0(i):
+                    qml.RX(0, wires=i)
 
-            qml.RX(0, wires=0)
-            return qml.sample()
+                loop_0()
 
-        capture_result = captured_circuit()
+                qml.RX(0, wires=0)
+                return qml.sample()
+
+            capture_result = captured_circuit()
         assert "shots(%" in captured_circuit.mlir
 
         qml.capture.disable()
 
-        # Capture disabled
-
         @qjit
-        @qml.qnode(qml.device(backend, wires=2, shots=10))
+        @qml.set_shots(10)
+        @qml.qnode(qml.device(backend, wires=2))
         def circuit():
             @qml.for_loop(0, 2, 1)
             def loop_0(i):
@@ -1553,3 +1557,107 @@ class TestCapture:
         assert 'quantum.custom "RX"(%cst)' in captured_circuit_3_mlir
 
         qml.capture.disable()
+
+
+class TestControlFlow:
+    """Integration tests for control flow."""
+
+    @pytest.mark.parametrize("reverse", (True, False))
+    def test_for_loop_outside_qnode(self, reverse):
+        """Test that a for loop outside qnode can be executed."""
+
+        qml.capture.enable()
+
+        if reverse:
+            start, stop, step = 6, 0, -2  # 6, 4, 2
+        else:
+            start, stop, step = 2, 7, 2  # 2, 4, 6
+
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def c(x):
+            qml.RX(x, 0)
+            return qml.expval(qml.Z(0))
+
+        @qml.qjit
+        def f(i0):
+            @qml.for_loop(start, stop, step)
+            def g(i, x):
+                return c(i) + x
+
+            return g(i0)
+
+        out = f(3.0)
+        assert qml.math.allclose(out, 3 + jnp.cos(2) + jnp.cos(4) + jnp.cos(6))
+
+    def test_while_loop(self):
+        """Test that a outside a qnode can be executed."""
+        qml.capture.enable()
+
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def circuit(x):
+            qml.RX(x, 0)
+            return qml.expval(qml.Z(0))
+
+        @qml.qjit
+        def f(x):
+
+            const = jnp.array([0, 1, 2])
+
+            @qml.while_loop(lambda i, y: i < jnp.sum(const))
+            def g(i, y):
+                return i + 1, y + circuit(i)
+
+            return g(0, x)
+
+        ind, res = f(1.0)
+        assert qml.math.allclose(ind, 3)
+        expected = 1.0 + jnp.cos(0) + jnp.cos(1) + jnp.cos(2)
+        assert qml.math.allclose(res, expected)
+
+
+def test_adjoint_transform_integration():
+    """Test that adjoint transforms can be used with capture enabled."""
+
+    qml.capture.enable()
+
+    def f(x):
+        qml.IsingXX(2 * x, wires=(0, 1))
+        qml.H(0)
+
+    @qml.qjit
+    @qml.qnode(qml.device("lightning.qubit", wires=3))
+    def c(x):
+        qml.adjoint(f)(x)
+        return qml.expval(qml.Z(1))
+
+    x = jnp.array(0.7)
+    res = c(x)
+    expected = jnp.cos(-2 * x)
+    assert qml.math.allclose(res, expected)
+
+
+@pytest.mark.parametrize("separate_funcs", (True, False))
+def test_ctrl_transform_integration(separate_funcs):
+    """Test that the ctrl transform can be applied."""
+
+    qml.capture.enable()
+
+    def f(x, y):
+        qml.RY(3 * y, wires=3)
+        qml.RX(2 * x, wires=3)
+
+    @qml.qjit
+    @qml.qnode(qml.device("lightning.qubit", wires=4), autograph=False)
+    def c(x, y):
+        qml.X(1)
+        if separate_funcs:
+            qml.ctrl(qml.ctrl(f, 0, [False]), 1, [True])(x, y)
+        else:
+            qml.ctrl(f, (0, 1), [False, True])(x, y)
+        return qml.expval(qml.Z(3))
+
+    x = jnp.array(0.5)
+    y = jnp.array(0.9)
+    res = c(x, y)
+    expected = jnp.cos(2 * x) * jnp.cos(3 * y)
+    assert qml.math.allclose(res, expected)

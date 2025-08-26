@@ -504,6 +504,24 @@ void __catalyst__qis__SetState(MemRefT_CplxT_double_1d *data, uint64_t numQubits
     getQuantumDevicePtr()->SetState(data_view, wires);
 }
 
+void __catalyst__qis__PCPhase(double theta, double dim, const Modifiers *modifiers,
+                              int64_t numQubits, ...)
+{
+    RT_ASSERT(numQubits >= 0);
+    RT_ASSERT(dim >= 0 && dim == static_cast<int64_t>(dim));
+
+    va_list args;
+    va_start(args, numQubits);
+    std::vector<QubitIdType> wires(numQubits);
+    for (int64_t i = 0; i < numQubits; i++) {
+        wires[i] = va_arg(args, QubitIdType);
+    }
+    va_end(args);
+
+    getQuantumDevicePtr()->NamedOperation("PCPhase", {theta, dim}, wires,
+                                          /* modifiers */ MODIFIERS_ARGS(modifiers));
+}
+
 void __catalyst__qis__SetBasisState(MemRefT_int8_1d *data, uint64_t numQubits, ...)
 {
     RT_ASSERT(numQubits > 0);
@@ -525,10 +543,19 @@ void __catalyst__qis__SetBasisState(MemRefT_int8_1d *data, uint64_t numQubits, .
     getQuantumDevicePtr()->SetBasisState(data_view, wires);
 }
 
-void __catalyst__qis__Identity(QUBIT *qubit, const Modifiers *modifiers)
+void __catalyst__qis__Identity(const Modifiers *modifiers, int64_t numQubits, ...)
 {
-    getQuantumDevicePtr()->NamedOperation("Identity", {}, {reinterpret_cast<QubitIdType>(qubit)},
-                                          MODIFIERS_ARGS(modifiers));
+    RT_ASSERT(numQubits >= 0);
+    va_list args;
+    va_start(args, numQubits);
+    std::vector<QubitIdType> wires(numQubits);
+    for (int64_t i = 0; i < numQubits; i++) {
+        wires[i] = va_arg(args, QubitIdType);
+    }
+    va_end(args);
+
+    getQuantumDevicePtr()->NamedOperation("Identity", {}, wires,
+                                          /* modifiers */ MODIFIERS_ARGS(modifiers));
 }
 
 void __catalyst__qis__PauliX(QUBIT *qubit, const Modifiers *modifiers)
@@ -667,6 +694,25 @@ void __catalyst__qis__IsingZZ(double theta, QUBIT *control, QUBIT *target,
                                           {/* control = */ reinterpret_cast<QubitIdType>(control),
                                            /* target = */ reinterpret_cast<QubitIdType>(target)},
                                           /* modifiers */ MODIFIERS_ARGS(modifiers));
+}
+
+void __catalyst__qis__SingleExcitation(double phi, QUBIT *wire0, QUBIT *wire1,
+                                       const Modifiers *modifiers)
+{
+    getQuantumDevicePtr()->NamedOperation(
+        "SingleExcitation", {phi},
+        {reinterpret_cast<QubitIdType>(wire0), reinterpret_cast<QubitIdType>(wire1)},
+        MODIFIERS_ARGS(modifiers));
+}
+
+void __catalyst__qis__DoubleExcitation(double phi, QUBIT *wire0, QUBIT *wire1, QUBIT *wire2,
+                                       QUBIT *wire3, const Modifiers *modifiers)
+{
+    getQuantumDevicePtr()->NamedOperation(
+        "DoubleExcitation", {phi},
+        {reinterpret_cast<QubitIdType>(wire0), reinterpret_cast<QubitIdType>(wire1),
+         reinterpret_cast<QubitIdType>(wire2), reinterpret_cast<QubitIdType>(wire3)},
+        MODIFIERS_ARGS(modifiers));
 }
 
 void __catalyst__qis__ControlledPhaseShift(double theta, QUBIT *control, QUBIT *target,

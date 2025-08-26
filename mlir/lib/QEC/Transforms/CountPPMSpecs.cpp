@@ -23,6 +23,7 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 
+#include "Catalyst/Utils/SCFUtils.h"
 #include "QEC/IR/QECDialect.h"
 #include "Quantum/IR/QuantumOps.h"
 
@@ -42,31 +43,55 @@ namespace qec {
 struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass> {
     using CountPPMSpecsPassBase::CountPPMSpecsPassBase;
 
-    void countLogicalQubit(Operation *op,
-                           llvm::DenseMap<StringRef, llvm::DenseMap<StringRef, int>> *PPMSpecs)
+    LogicalResult
+    countLogicalQubit(Operation *op,
+                      llvm::DenseMap<StringRef, llvm::DenseMap<StringRef, int>> *PPMSpecs)
     {
         uint64_t numQubits = cast<quantum::AllocOp>(op).getNqubitsAttr().value_or(0);
-        assert(numQubits != 0 && "PPM specs with dynamic number of qubits is not implemented");
+
+        if (numQubits == 0) {
+            return op->emitOpError("PPM specs with dynamic number of qubits is not supported");
+        }
+
         auto parentFuncOp = op->getParentOfType<func::FuncOp>();
         (*PPMSpecs)[parentFuncOp.getName()]["num_logical_qubits"] = numQubits;
-        return;
+        return success();
     }
 
-    void countPPM(Operation *op,
-                  llvm::DenseMap<StringRef, llvm::DenseMap<StringRef, int>> *PPMSpecs)
+    LogicalResult countPPM(qec::PPMeasurementOp op,
+                           llvm::DenseMap<StringRef, llvm::DenseMap<StringRef, int>> *PPMSpecs)
     {
+        if (isOpInIfOp(op) || isOpInWhileOp(op)) {
+            return op->emitOpError(
+                "PPM statistics is not available when there are conditionals or while loops.");
+        }
+
         auto parentFuncOp = op->getParentOfType<func::FuncOp>();
-        (*PPMSpecs)[parentFuncOp.getName()]["num_of_ppm"]++;
-        return;
+
+        // Handle when PPM op is in a static for loop
+        // Note that countStaticForloopIterations returns -1 when it bails out for
+        // dynamic loop bounds
+        // When bailing out on dynamic, just error.
+        int64_t forLoopMultiplier = countStaticForloopIterations(op);
+        if (forLoopMultiplier == -1) {
+            return op->emitOpError(
+                "PPM statistics is not available when there are dynamically sized for loops.");
+        }
+        (*PPMSpecs)[parentFuncOp.getName()]["num_of_ppm"] += forLoopMultiplier;
+        return success();
     }
 
-    void countPPR(Operation *op,
-                  llvm::DenseMap<StringRef, llvm::DenseMap<StringRef, int>> *PPMSpecs,
-                  llvm::BumpPtrAllocator *stringAllocator)
+    LogicalResult countPPR(qec::PPRotationOp op,
+                           llvm::DenseMap<StringRef, llvm::DenseMap<StringRef, int>> *PPMSpecs,
+                           llvm::BumpPtrAllocator *stringAllocator)
     {
-        int16_t rotationKind =
-            cast<qec::PPRotationOp>(op).getRotationKindAttr().getValue().getZExtValue();
-        auto PauliProductAttr = cast<qec::PPRotationOp>(op).getPauliProductAttr();
+        if (isOpInIfOp(op) || isOpInWhileOp(op)) {
+            return op->emitOpError(
+                "PPM statistics is not available when there are conditionals or while loops.");
+        }
+
+        int16_t rotationKind = op.getRotationKindAttr().getValue().getZExtValue();
+        auto PauliProductAttr = op.getPauliProductAttr();
         auto parentFuncOp = op->getParentOfType<func::FuncOp>();
         StringRef funcName = parentFuncOp.getName();
         llvm::StringSaver saver(*stringAllocator);
@@ -74,43 +99,71 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
             saver.save("num_pi" + std::to_string(abs(rotationKind)) + "_gates");
         StringRef maxWeightRotationKindKey =
             saver.save("max_weight_pi" + std::to_string(abs(rotationKind)));
-        (*PPMSpecs)[funcName][numRotationKindKey]++;
+
+        // Handle when PPR op is in a static for loop
+        // Note that countStaticForloopIterations returns -1 when it bails out for
+        // dynamic loop bounds
+        // When bailing out on dynamic, just error.
+        int64_t forLoopMultiplier = countStaticForloopIterations(op);
+        if (forLoopMultiplier == -1) {
+            return op->emitOpError(
+                "PPM statistics is not available when there are dynamically sized for loops.");
+        }
+        (*PPMSpecs)[funcName][numRotationKindKey] += forLoopMultiplier;
+
         (*PPMSpecs)[funcName][maxWeightRotationKindKey] =
             std::max((*PPMSpecs)[funcName][maxWeightRotationKindKey],
                      static_cast<int>(PauliProductAttr.size()));
-        return;
+        return success();
     }
-    void printSpecs()
+
+    LogicalResult printSpecs()
     {
         llvm::BumpPtrAllocator stringAllocator;
         llvm::DenseMap<StringRef, llvm::DenseMap<StringRef, int>> PPMSpecs;
         // Walk over all operations in the IR (could be ModuleOp or FuncOp)
-        getOperation()->walk([&](Operation *op) {
-            // Skip top-level container ops if desired
-            if (isa<ModuleOp>(op)) {
-                return;
-            }
-
-            else if (isa<quantum::AllocOp>(op)) {
-                countLogicalQubit(op, &PPMSpecs);
+        WalkResult wr = getOperation()->walk([&](Operation *op) {
+            if (isa<quantum::AllocOp>(op)) {
+                if (failed(countLogicalQubit(op, &PPMSpecs))) {
+                    return WalkResult::interrupt();
+                }
+                return WalkResult::advance();
             }
 
             else if (isa<qec::PPMeasurementOp>(op)) {
-                countPPM(op, &PPMSpecs);
+                if (failed(countPPM(cast<qec::PPMeasurementOp>(op), &PPMSpecs))) {
+                    return WalkResult::interrupt();
+                }
+                return WalkResult::advance();
             }
 
             else if (isa<qec::PPRotationOp>(op)) {
-                countPPR(op, &PPMSpecs, &stringAllocator);
+                if (failed(countPPR(cast<qec::PPRotationOp>(op), &PPMSpecs, &stringAllocator))) {
+                    return WalkResult::interrupt();
+                }
+                return WalkResult::advance();
+            }
+            else {
+                return WalkResult::skip();
             }
         });
+
+        if (wr.wasInterrupted()) {
+            return failure();
+        }
 
         json PPMSpecsJson = PPMSpecs;
         llvm::outs() << PPMSpecsJson.dump(4)
                      << "\n"; // dump(4) makes an indent with 4 spaces when printing JSON
-        return;
+        return success();
     }
 
-    void runOnOperation() final { printSpecs(); }
+    void runOnOperation() final
+    {
+        if (failed(printSpecs())) {
+            signalPassFailure();
+        }
+    }
 };
 
 } // namespace qec

@@ -36,6 +36,7 @@ Quoted from the object's docstring:
 import textwrap
 
 import pytest
+from jax._src.core import Literal
 from jax.api_util import debug_info as jdb
 from jax.core import set_current_trace, take_current_trace
 from jax.extend.core import Primitive
@@ -155,7 +156,8 @@ class TestQubitValues:
             # Check that the extract primitive follows the wire index in the qreg manager
             # __getitem__ method
             extract_p_index_invar = trace.frame.eqns[-1].invars[-1]
-            assert trace.frame.constvar_to_val[extract_p_index_invar] == 0
+            assert isinstance(extract_p_index_invar, Literal)
+            assert extract_p_index_invar.val == 0
 
     def test_no_overwriting_extract(self):
         """Test that no new qubit is extracted when indexing into an existing wire"""
@@ -183,10 +185,9 @@ class TestQubitValues:
 
         # Also check with actual jaxpr variables
         with take_current_trace() as trace:
-            var_to_tracer = dict((v, t_id) for t_id, v in trace.frame.tracer_to_var.items())
             gate_out_qubits = trace.frame.eqns[-1].outvars
-            assert id(qreg_manager[0]) == var_to_tracer[gate_out_qubits[0]]
-            assert id(qreg_manager[1]) == var_to_tracer[gate_out_qubits[1]]
+            assert trace.frame.tracer_to_var[id(qreg_manager[0])] == gate_out_qubits[0]
+            assert trace.frame.tracer_to_var[id(qreg_manager[1])] == gate_out_qubits[1]
 
     def test_iter(self):
         """Test __iter__ in the qreg manager"""
@@ -217,10 +218,9 @@ class TestQubitValues:
 
         # Also check with actual jaxpr variables
         with take_current_trace() as trace:
-            var_to_tracer = dict((v, t_id) for t_id, v in trace.frame.tracer_to_var.items())
             gate_out_qubits = trace.frame.eqns[-1].outvars
-            assert id(qreg_manager[0]) == var_to_tracer[gate_out_qubits[0]]
-            assert id(qreg_manager[1]) == var_to_tracer[gate_out_qubits[1]]
+            assert trace.frame.tracer_to_var[id(qreg_manager[0])] == gate_out_qubits[0]
+            assert trace.frame.tracer_to_var[id(qreg_manager[1])] == gate_out_qubits[1]
 
     def test_insert_all_dangling_qubits(self):
         """
@@ -242,16 +242,16 @@ class TestQubitValues:
         with take_current_trace() as trace:
             # Checking via jaxpr internals is a bit tedious here
             # So let's just check the string...
-            observed_jaxpr = str(trace.to_jaxpr([], None)[0])
+            observed_jaxpr = str(trace.to_jaxpr([], None, None)[0])
             expected = """\
             { lambda ; . let
-                a:AbstractQreg() = qalloc 42
-                b:AbstractQbit() = qextract a 0
-                c:AbstractQbit() = qextract a 1
-                d:AbstractQbit() = qextract a 2
-                e:AbstractQreg() = qinsert a 0 b
-                f:AbstractQreg() = qinsert e 1 c
-                _:AbstractQreg() = qinsert f 2 d
+                a:AbstractQreg() = qalloc 42:i64[]
+                b:AbstractQbit() = qextract a 0:i64[]
+                c:AbstractQbit() = qextract a 1:i64[]
+                d:AbstractQbit() = qextract a 2:i64[]
+                e:AbstractQreg() = qinsert a 0:i64[] b
+                f:AbstractQreg() = qinsert e 1:i64[] c
+                _:AbstractQreg() = qinsert f 2:i64[] d
               in () }"""
             expected = textwrap.dedent(expected)
             assert observed_jaxpr == expected
@@ -328,17 +328,17 @@ class TestQregAndQubit:
 
         with take_current_trace() as trace:
             # Check full jaxpr
-            observed_jaxpr = str(trace.to_jaxpr([], None)[0])
+            observed_jaxpr = str(trace.to_jaxpr([], None, None)[0])
             expected = """\
             { lambda ; . let
-                a:AbstractQreg() = qalloc 42
-                b:AbstractQbit() = qextract a 0
-                c:AbstractQbit() = qextract a 1
+                a:AbstractQreg() = qalloc 42:i64[]
+                b:AbstractQbit() = qextract a 0:i64[]
+                c:AbstractQbit() = qextract a 1:i64[]
                 d:AbstractQbit() e:AbstractQbit() = qubit_mock_op b c
-                f:AbstractQreg() = qinsert a 0 d
-                g:AbstractQreg() = qinsert f 1 e
+                f:AbstractQreg() = qinsert a 0:i64[] d
+                g:AbstractQreg() = qinsert f 1:i64[] e
                 h:AbstractQreg() = qreg_mock_op g
-                i:AbstractQbit() = qextract h 0
+                i:AbstractQbit() = qextract h 0:i64[]
                 _:AbstractQbit() = qubit_mock_op i
               in () }"""
             expected = textwrap.dedent(expected)

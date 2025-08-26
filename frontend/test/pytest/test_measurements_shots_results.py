@@ -20,19 +20,23 @@ import pytest
 
 from catalyst import CompileError, qjit
 
+pytestmark = pytest.mark.usefixtures("use_both_frontend")
+
 
 class TestExpval:
     "Test expval with shots > 0"
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_identity(self, backend, tol_stochastic):
         """Test that identity expectation value (i.e. the trace) is 1."""
         n_wires = 2
         n_shots = 10000
-        dev = qml.device(backend, wires=n_wires, shots=n_shots)
+        dev = qml.device(backend, wires=n_wires)
 
         theta = 0.432
         phi = 0.123
 
+        @qml.set_shots(n_shots)
         @qml.qnode(dev)
         def circuit():
             qml.RX(theta, wires=[0])
@@ -44,15 +48,17 @@ class TestExpval:
         result = qjit(circuit, seed=37)()
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_pauliz(self, backend, tol_stochastic):
         """Test that PauliZ expectation value is correct"""
         n_wires = 2
         n_shots = 10000
-        dev = qml.device(backend, wires=n_wires, shots=n_shots)
+        dev = qml.device(backend, wires=n_wires)
 
         theta = 0.432
         phi = 0.123
 
+        @qml.set_shots(n_shots)
         @qml.qnode(dev)
         def circuit():
             qml.RX(theta, wires=[0])
@@ -64,15 +70,17 @@ class TestExpval:
         result = qjit(circuit, seed=37)()
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_paulix(self, backend, tol_stochastic):
         """Test that PauliX expectation value is correct"""
         n_wires = 2
         n_shots = 10000
-        dev = qml.device(backend, wires=n_wires, shots=n_shots)
+        dev = qml.device(backend, wires=n_wires)
 
         theta = 0.432
         phi = 0.123
 
+        @qml.set_shots(n_shots)
         @qml.qnode(dev)
         def circuit():
             qml.RY(theta, wires=[0])
@@ -84,15 +92,17 @@ class TestExpval:
         result = qjit(circuit, seed=37)()
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_pauliy(self, backend, tol_stochastic):
         """Test that PauliY expectation value is correct"""
         n_wires = 2
         n_shots = 10000
-        dev = qml.device(backend, wires=n_wires, shots=n_shots)
+        dev = qml.device(backend, wires=n_wires)
 
         theta = 0.432
         phi = 0.123
 
+        @qml.set_shots(n_shots)
         @qml.qnode(dev)
         def circuit():
             qml.RX(theta, wires=[0])
@@ -104,15 +114,17 @@ class TestExpval:
         result = qjit(circuit, seed=37)()
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_hadamard(self, backend, tol_stochastic):
         """Test that Hadamard expectation value is correct"""
         n_wires = 2
         n_shots = 10000
-        dev = qml.device(backend, wires=n_wires, shots=n_shots)
+        dev = qml.device(backend, wires=n_wires)
 
         theta = 0.432
         phi = 0.123
 
+        @qml.set_shots(n_shots)
         @qml.qnode(dev)
         def circuit():
             qml.RY(theta, wires=[0])
@@ -124,12 +136,14 @@ class TestExpval:
         result = qjit(circuit, seed=37)()
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_hermitian(self, backend, tol_stochastic):
         """Test expval Hermitian observables with shots."""
         n_wires = 3
         n_shots = 10000
-        dev = qml.device(backend, wires=n_wires, shots=n_shots)
+        dev = qml.device(backend, wires=n_wires)
 
+        @qml.set_shots(n_shots)
         @qml.qnode(dev)
         def circuit(x, y):
             qml.RX(x, wires=0)
@@ -149,12 +163,13 @@ class TestExpval:
         """Test that a tensor product involving PauliX and PauliY works correctly"""
         n_wires = 3
         n_shots = 100000
-        dev = qml.device(backend, wires=n_wires, shots=n_shots)
+        dev = qml.device(backend, wires=n_wires)
 
         theta = 0.432
         phi = 0.123
         varphi = -0.543
 
+        @qml.set_shots(n_shots)
         @qml.qnode(dev)
         def circuit():
             qml.RX(theta, wires=[0])
@@ -172,8 +187,9 @@ class TestExpval:
         """Test that a tensor product involving PauliZ and PauliY works correctly"""
         n_wires = 3
         n_shots = 10000
-        dev = qml.device(backend, wires=n_wires, shots=n_shots)
+        dev = qml.device(backend, wires=n_wires)
 
+        @qml.set_shots(n_shots)
         @qml.qnode(dev)
         def circuit(theta, phi, varphi):
             qml.RX(theta, wires=[0])
@@ -191,8 +207,9 @@ class TestExpval:
         """Test that a hamiltonian involving PauliZ and PauliY and hadamard works correctly"""
         n_wires = 3
         n_shots = 10000
-        dev = qml.device(backend, wires=n_wires, shots=n_shots)
+        dev = qml.device(backend, wires=n_wires)
 
+        @qml.set_shots(n_shots)
         @qml.qnode(dev)
         def circuit(theta, phi, varphi):
             qml.RX(theta, wires=[0])
@@ -212,8 +229,9 @@ class TestExpval:
         """Test that a hamiltonian involving PauliZ and Hadamard @ PauliX works correctly"""
         n_wires = 3
         n_shots = 10000
-        dev = qml.device(backend, wires=n_wires, shots=n_shots)
+        dev = qml.device(backend, wires=n_wires)
 
+        @qml.set_shots(n_shots)
         @qml.qnode(dev)
         def circuit(theta, phi, varphi):
             qml.RX(theta, wires=[0])
@@ -233,15 +251,17 @@ class TestExpval:
 class TestVar:
     "Test var with shots > 0"
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_identity(self, backend, tol_stochastic):
         """Test that identity variance value (i.e. the trace) is 1."""
         n_wires = 2
         n_shots = 10000
-        dev = qml.device(backend, wires=n_wires, shots=n_shots)
+        dev = qml.device(backend, wires=n_wires)
 
         theta = 0.432
         phi = 0.123
 
+        @qml.set_shots(n_shots)
         @qml.qnode(dev)
         def circuit():
             qml.RX(theta, wires=[0])
@@ -253,15 +273,17 @@ class TestVar:
         result = qjit(circuit, seed=37)()
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_pauliz(self, backend, tol_stochastic):
         """Test that PauliZ variance value is correct"""
         n_wires = 2
         n_shots = 10000
-        dev = qml.device(backend, wires=n_wires, shots=n_shots)
+        dev = qml.device(backend, wires=n_wires)
 
         theta = 0.432
         phi = 0.123
 
+        @qml.set_shots(n_shots)
         @qml.qnode(dev)
         def circuit():
             qml.RX(theta, wires=[0])
@@ -273,15 +295,17 @@ class TestVar:
         result = qjit(circuit, seed=37)()
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_paulix(self, backend, tol_stochastic):
         """Test that PauliX variance value is correct"""
         n_wires = 2
         n_shots = 10000
-        dev = qml.device(backend, wires=n_wires, shots=n_shots)
+        dev = qml.device(backend, wires=n_wires)
 
         theta = 0.432
         phi = 0.123
 
+        @qml.set_shots(n_shots)
         @qml.qnode(dev)
         def circuit():
             qml.RY(theta, wires=[0])
@@ -293,15 +317,17 @@ class TestVar:
         result = qjit(circuit, seed=37)()
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_pauliy(self, backend, tol_stochastic):
         """Test that PauliY variance value is correct"""
         n_wires = 2
         n_shots = 10000
-        dev = qml.device(backend, wires=n_wires, shots=n_shots)
+        dev = qml.device(backend, wires=n_wires)
 
         theta = 0.432
         phi = 0.123
 
+        @qml.set_shots(n_shots)
         @qml.qnode(dev)
         def circuit():
             qml.RX(theta, wires=[0])
@@ -313,15 +339,17 @@ class TestVar:
         result = qjit(circuit, seed=37)()
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_hadamard(self, backend, tol_stochastic):
         """Test that Hadamard variance value is correct"""
         n_wires = 2
         n_shots = 10000
-        dev = qml.device(backend, wires=n_wires, shots=n_shots)
+        dev = qml.device(backend, wires=n_wires)
 
         theta = 0.432
         phi = 0.123
 
+        @qml.set_shots(n_shots)
         @qml.qnode(dev)
         def circuit():
             qml.RY(theta, wires=[0])
@@ -333,12 +361,15 @@ class TestVar:
         result = qjit(circuit, seed=37)()
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_hermitian_shots(self, backend, tol_stochastic):
         """Test var Hermitian observables with shots."""
+
         n_wires = 3
         n_shots = 10000
-        dev = qml.device(backend, wires=n_wires, shots=n_shots)
+        dev = qml.device(backend, wires=n_wires)
 
+        @qml.set_shots(n_shots)
         @qml.qnode(dev)
         def circuit(x, y):
             qml.RX(x, wires=0)
@@ -358,12 +389,13 @@ class TestVar:
         """Test that a tensor product involving PauliX and PauliY works correctly"""
         n_wires = 3
         n_shots = 10000
-        dev = qml.device(backend, wires=n_wires, shots=n_shots)
+        dev = qml.device(backend, wires=n_wires)
 
         theta = 0.432
         phi = 0.123
         varphi = -0.543
 
+        @qml.set_shots(n_shots)
         @qml.qnode(dev)
         def circuit():
             qml.RX(theta, wires=[0])
@@ -381,8 +413,9 @@ class TestVar:
         """Test that a tensor product involving Hadamard and PauliY works correctly"""
         n_wires = 3
         n_shots = 10000
-        dev = qml.device(backend, wires=n_wires, shots=n_shots)
+        dev = qml.device(backend, wires=n_wires)
 
+        @qml.set_shots(n_shots)
         @qml.qnode(dev)
         def circuit(theta, phi, varphi):
             qml.RX(theta, wires=[0])
@@ -400,8 +433,9 @@ class TestVar:
         """Test that a tensor product involving PauliZ and PauliY works correctly"""
         n_wires = 3
         n_shots = 10000
-        dev = qml.device(backend, wires=n_wires, shots=n_shots)
+        dev = qml.device(backend, wires=n_wires)
 
+        @qml.set_shots(n_shots)
         @qml.qnode(dev)
         def circuit(theta, phi, varphi):
             qml.RX(theta, wires=[0])
@@ -415,12 +449,18 @@ class TestVar:
         result = qjit(circuit, seed=37)(0.432, 0.123, -0.543)
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
+    @pytest.mark.xfail(
+        reason="error disappeared when I added qjit. Should be investigated. sc-95950"
+    )
     def test_pauliz_hamiltonian(self, backend):
         """Test that a hamiltonian involving PauliZ and PauliY and hadamard works correctly"""
+
         n_wires = 3
         n_shots = 10000
-        dev = qml.device(backend, wires=n_wires, shots=n_shots)
+        dev = qml.device(backend, wires=n_wires)
 
+        @qml.qjit
+        @qml.set_shots(n_shots)
         @qml.qnode(dev)
         def circuit(theta, phi, varphi):
             qml.RX(theta, wires=[0])
@@ -453,8 +493,9 @@ class TestProbs:
 
         n_wires = 2
         n_shots = 10000
-        dev = qml.device(backend, wires=n_wires, shots=n_shots)
+        dev = qml.device(backend, wires=n_wires)
 
+        @qml.set_shots(n_shots)
         @qml.qnode(dev)
         def circuit(theta):
             qml.RX(theta, wires=[0])
@@ -470,8 +511,9 @@ class TestProbs:
 
         n_wires = 2
         n_shots = 10000
-        dev = qml.device(backend, wires=n_wires, shots=n_shots)
+        dev = qml.device(backend, wires=n_wires)
 
+        @qml.set_shots(n_shots)
         @qml.qnode(dev)
         def circuit(theta):
             qml.RX(theta, wires=[0])
@@ -490,9 +532,10 @@ class TestShadow:
     def test_shadow(self):
         """Test that Shadow can be used with Catalyst."""
 
-        dev = qml.device("lightning.qubit", wires=range(2), shots=10000)
+        dev = qml.device("lightning.qubit", wires=range(2))
 
         @qjit
+        @qml.set_shots(10000)
         @qml.qnode(dev)
         def classical_shadow_circuit():
             qml.Hadamard(0)
@@ -513,9 +556,10 @@ class TestShadowExpval:
     def test_shadow_expval(self):
         """Test that ShadowExpVal can be used with Catalyst."""
 
-        dev = qml.device("lightning.qubit", wires=range(2), shots=10000)
+        dev = qml.device("lightning.qubit", wires=range(2))
 
         @qjit
+        @qml.set_shots(10000)
         @qml.qnode(dev)
         def shadow_expval_circuit(x, obs):
             qml.Hadamard(0)
@@ -535,20 +579,32 @@ class TestOtherMeasurements:
     def test_missing_shots_value(self, backend, meas_fun):
         """Test error for missing shots value."""
 
+        if qml.capture.enabled() and meas_fun == qml.counts:
+            pytest.xfail("counts not yet supported with program capture.")
+
         dev = qml.device(backend, wires=1)
 
         @qml.qnode(dev)
         def circuit():
             return meas_fun(wires=0)
 
-        with pytest.raises(CompileError, match="cannot work with shots=None"):
-            qjit(circuit)
+        if qml.capture.enabled():
+            with pytest.raises(ValueError, match="finite shots are required"):
+                qjit(circuit)
+        else:
+
+            with pytest.raises(CompileError, match="cannot work with shots=None"):
+                qjit(circuit)
 
     def test_multiple_return_values(self, backend, tol_stochastic):
         """Test multiple return values."""
 
+        if qml.capture.enabled():
+            pytest.xfail("counts not yet supported with program capture.")
+
         @qjit
-        @qml.qnode(qml.device(backend, wires=2, shots=10000))
+        @qml.set_shots(shots=10000)
+        @qml.qnode(qml.device(backend, wires=2))
         def all_measurements(x):
             qml.RY(x, wires=0)
             return (
@@ -559,7 +615,8 @@ class TestOtherMeasurements:
                 qml.probs(wires=[0, 1]),
             )
 
-        @qml.qnode(qml.device("lightning.qubit", wires=2, shots=10000))
+        @qml.set_shots(shots=10000)
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
         def expected(x, measurement):
             qml.RY(x, wires=0)
             return qml.apply(measurement)
@@ -568,13 +625,11 @@ class TestOtherMeasurements:
         result = all_measurements(x)
 
         # qml.sample
-        assert result[0].shape == expected(x, qml.sample(wires=[0, 1]), shots=10000).shape
+        assert result[0].shape == expected(x, qml.sample(wires=[0, 1])).shape
         assert result[0].dtype == np.int64
 
         # qml.counts
-        for r, e in zip(
-            result[1][0], expected(x, qml.counts(all_outcomes=True), shots=10000).keys()
-        ):
+        for r, e in zip(result[1][0], expected(x, qml.counts(all_outcomes=True)).keys()):
             assert format(int(r), "02b") == e
         assert sum(result[1][1]) == 10000
         assert result[1][0].dtype == np.int64

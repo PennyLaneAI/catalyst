@@ -3,6 +3,7 @@ get_property(conversion_libs GLOBAL PROPERTY MLIR_CONVERSION_LIBS)
 set(LIBS
     ${dialect_libs}
     ${conversion_libs}
+    ExternalStablehloLib
     MLIRLspServerLib
     MLIRCatalyst
     MLIRQuantum
@@ -11,8 +12,6 @@ set(LIBS
     MLIRMBQC
     MLIRMitigation
     MLIRIon
-    MhloRegisterDialects
-    StablehloRegister
 )
 
 add_llvm_executable(quantum-lsp-server quantum-lsp-server.cpp)
