@@ -483,7 +483,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      * @brief Returns the filename where resource tracking information is dumped. Only works if
      * resource tracking is enabled
      */
-    auto ResourcesGetFilename() -> std::string { return resources_fname_; }
+     ResourcesGetFilename() const -> std::string { return resources_fname_; }
 
     /**
      * @brief Returns whether the device is tracking resources or not.
