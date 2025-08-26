@@ -867,4 +867,19 @@ TEST_CASE("Test NullQubit device resource tracking", "[NullQubit]")
     CHECK(sim->ResourcesGetNumGates() == 0);
     CHECK(sim->ResourcesGetNumQubits() == 0);
     CHECK(sim->ResourcesGetFilename() == RESOURCES_FNAME);
+
+    // Check automatic filename creation
+    dummy = std::make_unique<NullQubit>("{'track_resources':True}");
+    CHECK(dummy->IsTrackingResources() == true);
+    dummy->ReleaseAllQubits();
+
+    const std::string dummy_resources_fname = dummy->ResourcesGetFilename();
+
+    std::cout << "Auto-created resources filename: " << dummy_resources_fname << std::endl;
+
+    CHECK(dummy_resources_fname.rfind("__pennylane_resources_data_") == 0);
+    CHECK(dummy_resources_fname.find(".json") != std::string::npos);
+
+    std::remove(
+        dummy_resources_fname.c_str()); // Remove the file automatically created by the device
 }

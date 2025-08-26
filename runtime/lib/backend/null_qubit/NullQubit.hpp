@@ -163,7 +163,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
             FILE *resources_file = fopen(this->resources_fname_.c_str(), "wx");
             if (resources_file == nullptr) {
                 std::string err_msg = "Error opening file '" + this->resources_fname_ + "'.";
-                RT_FAIL(err_msg.c_str());
+                RT_FAIL(err_msg.c_str()); // LCOV_EXCL_LINE
             }
             else {
                 PrintResourceUsage(resources_file);
