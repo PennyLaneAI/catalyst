@@ -814,15 +814,6 @@ void __catalyst__qis__PSWAP(double phi, QUBIT *wire0, QUBIT *wire1, const Modifi
         MODIFIERS_ARGS(modifiers));
 }
 
-void __catalyst__qis__SingleExcitation(double phi, QUBIT *wire0, QUBIT *wire1,
-                                       const Modifiers *modifiers)
-{
-    getQuantumDevicePtr()->NamedOperation(
-        "SingleExcitation", {phi},
-        {reinterpret_cast<QubitIdType>(wire0), reinterpret_cast<QubitIdType>(wire1)},
-        MODIFIERS_ARGS(modifiers));
-}
-
 static void _qubitUnitary_impl(MemRefT_CplxT_double_2d *matrix, int64_t numQubits,
                                std::vector<std::complex<double>> &coeffs,
                                std::vector<QubitIdType> &wires, va_list *args)
