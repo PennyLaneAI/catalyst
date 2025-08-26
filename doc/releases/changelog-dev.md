@@ -85,6 +85,9 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Fix resource tracking unit test polluting the environment with output files
+  [(#1861)](https://github.com/PennyLaneAI/catalyst/pull/1861)
+
 * Fix type promotion on conditional branches, where the return values from `cond` should be the promoted one.
   [(#1977)](https://github.com/PennyLaneAI/catalyst/pull/1977)
 
@@ -203,4 +206,5 @@ Christina Lee,
 Joseph Lee,
 Andrija Paurevic,
 Roberto Turrado,
-Paul Haochen Wang.
+Paul Haochen Wang,
+Jake Zaia.
