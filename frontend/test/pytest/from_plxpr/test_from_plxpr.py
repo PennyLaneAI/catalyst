@@ -113,7 +113,7 @@ def compare_eqns(eqn1, eqn2):
         assert ov1.aval == ov2.aval
 
 
-@pytest.mark.usefixtures("enable_capture")
+@pytest.mark.usefixtures("use_capture")
 class TestErrors:
     """Test that errors are raised in unsupported situations."""
 
