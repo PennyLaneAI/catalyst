@@ -100,7 +100,7 @@ std::pair<bool, QECOpInterface> checkCommutationAndFindMerge(QECOpInterface rhsO
 {
     QECOpInterface mergeOp = nullptr;
     for (auto lhsOp : lhsLayer.getOps()) {
-        if (lhsOp->getBlock() != rhsOp->getBlock()){
+        if (lhsOp->getBlock() != rhsOp->getBlock()) {
             return std::pair(false, nullptr);
         }
 
@@ -120,13 +120,13 @@ std::pair<bool, QECOpInterface> checkCommutationAndFindMerge(QECOpInterface rhsO
         // Normalize to Pauli strings
         auto normalizedOps = normalizePPROps(lhsOp, rhsOp, lhsInQubits, rhsOpInQubitsFromLhsOp);
 
-        if (!normalizedOps.first.commutes(normalizedOps.second)){
+        if (!normalizedOps.first.commutes(normalizedOps.second)) {
             return std::pair(false, nullptr);
         }
 
         // Equal normalized Pauli strings => merge candidate
         auto canMerge = equal(normalizedOps.first, normalizedOps.second);
-        if (canMerge){
+        if (canMerge) {
             mergeOp = lhsOp;
         }
     }
@@ -146,7 +146,7 @@ void moveOpToLayer(QECOpInterface rhsOp, QECLayer &rhsLayer, QECOpInterface merg
 
     auto lhsOp = lhsLayer.getOps().back();
 
-    if (mergeOp){
+    if (mergeOp) {
         lhsOp = mergeOp;
     }
 
