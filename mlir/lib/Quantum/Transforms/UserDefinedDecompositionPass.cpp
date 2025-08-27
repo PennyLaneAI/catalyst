@@ -38,7 +38,35 @@ namespace quantum {
 
 namespace DecompositionUtils {
 
-bool isDecompositionFunction(func::FuncOp func) { return func->hasAttr("catalyst.decomposition"); }
+// Check if a function is a decomposition function
+bool isDecompositionFunction(func::FuncOp func)
+{
+    return func->hasAttr("catalyst.decomposition") &&
+           func->hasAttr("catalyst.decomposition.target_op");
+}
+
+// Update decomposition attributes if function name begins with <Gate>_rule
+void updateDecompositionAttributes(func::FuncOp func, MLIRContext *context)
+{
+    StringRef funcName = func.getSymName();
+
+    // Check if function name follows <Gate>_rule pattern
+    size_t firstUnderscore = funcName.find('_');
+    if (firstUnderscore == StringRef::npos) {
+        return;
+    }
+
+    StringRef afterFirstUnderscore = funcName.substr(firstUnderscore + 1);
+    if ((afterFirstUnderscore.size() >= 4) && (afterFirstUnderscore.substr(0, 4) == "rule")) {
+        if (StringRef gateName = funcName.substr(0, firstUnderscore); !gateName.empty()) {
+            // Set the decomposition attributes
+            func->setAttr("catalyst.decomposition", UnitAttr::get(context));
+            func->setAttr("catalyst.decomposition.target_op", StringAttr::get(context, gateName));
+            return;
+        }
+    }
+    return;
+}
 
 StringRef getTargetOp(func::FuncOp func)
 {
@@ -68,6 +96,8 @@ struct UserDefinedDecompositionPass
         int registeredMappings = 0;
 
         module.walk([&](func::FuncOp func) {
+            DecompositionUtils::updateDecompositionAttributes(func, &getContext());
+
             if (!DecompositionUtils::isDecompositionFunction(func)) {
                 return;
             }
