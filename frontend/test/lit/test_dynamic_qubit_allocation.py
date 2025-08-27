@@ -13,19 +13,40 @@
 # limitations under the License.
 
 """
-Unit tests for the dynamic work wire allocation.
-Note that this feature is only available under the plxpr pipeline.
+Unit tests for the dynamic qubit allocation.
 """
 
 # RUN: %PYTHON %s | FileCheck %s
 
 import pennylane as qml
 from pennylane.allocation import allocate, deallocate
+
 from catalyst import qjit
+from catalyst.jax_primitives import qalloc_p, qdealloc_qb_p, qextract_p
+
+
+@qjit
+def test_single_qubit_dealloc():
+    """
+    Unit test for the single qubit dealloc primitive's lowerings.
+    """
+
+    # CHECK: [[qubit:.]]:AbstractQbit() = qextract {{.+}} 3
+    # CHECK: qdealloc_qb [[qubit]]
+
+    # CHECK: [[qubit:%.+]] = quantum.extract {{.+}} 3
+    # CHECK: quantum.dealloc_qb [[qubit]] : !quantum.bit
+
+    qreg = qalloc_p.bind(10)
+    qubit = qextract_p.bind(qreg, 3)
+    qdealloc_qb_p.bind(qubit)
+
+
+print(test_single_qubit_dealloc.jaxpr)
+print(test_single_qubit_dealloc.mlir)
 
 
 qml.capture.enable()
-
 
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=3))
