@@ -55,12 +55,14 @@
   ```pycon
   %0 = transform.apply_registered_pass "some-pass" with options = {"an-option" = true, "maxValue" = 1 : i64, "multi-word-option" = 1 : i64}
   ```
-
 * Added checks to raise an error when the input qubits to the multi-qubit gates in the runtime CAPI are not all distinct. 
   [(#2006)](https://github.com/PennyLaneAI/catalyst/pull/2006).
 
-*  `Commuting Clifford Pauli Product Rotation (PPR) operations, past non-Clifford PPRs, now supports P(π/2) Cliffords in addition to P(π/4)`
-   [(#1966)](https://github.com/PennyLaneAI/catalyst/pull/1966)
+* Commuting Clifford Pauli Product Rotation (PPR) operations, past non-Clifford PPRs, now supports P(π/2) Cliffords in addition to P(π/4)
+  [(#1966)](https://github.com/PennyLaneAI/catalyst/pull/1966)
+
+* A new jax primitive `qdealloc_qb_p` is available for single qubit deallocations.
+  [(#2005)](https://github.com/PennyLaneAI/catalyst/pull/2005)
 
 <h3>Breaking changes 💔</h3>
 
@@ -112,6 +114,9 @@
 
 * When capture is enabled, `qjit(autograph=True)` will use capture autograph instead of catalyst autograph.
   [(#1960)](https://github.com/PennyLaneAI/catalyst/pull/1960)
+
+* `from_plxpr` can now handle dynamic shots and overridden device shots.
+  [(#1983)](https://github.com/PennyLaneAI/catalyst/pull/1983/)
 
 * QJitDevice helper `extract_backend_info` removed its redundant `capabilities` argument.
   [(#1956)](https://github.com/PennyLaneAI/catalyst/pull/1956)
