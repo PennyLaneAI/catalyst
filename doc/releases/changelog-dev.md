@@ -56,6 +56,9 @@
   %0 = transform.apply_registered_pass "some-pass" with options = {"an-option" = true, "maxValue" = 1 : i64, "multi-word-option" = 1 : i64}
   ```
 
+* Added checks to make sure all the operands in all the multi-qubit gates in `RuntimeCAPI.cpp` are distinct. 
+  [(#2006)](https://github.com/PennyLaneAI/catalyst/pull/2006).
+
 *  `Commuting Clifford Pauli Product Rotation (PPR) operations, past non-Clifford PPRs, now supports P(π/2) Cliffords in addition to P(π/4)`
    [(#1966)](https://github.com/PennyLaneAI/catalyst/pull/1966)
 

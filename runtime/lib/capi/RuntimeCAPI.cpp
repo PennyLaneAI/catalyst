@@ -815,7 +815,7 @@ void __catalyst__qis__CSWAP(QUBIT *control, QUBIT *aswap, QUBIT *bswap, const Mo
 void __catalyst__qis__Toffoli(QUBIT *wire0, QUBIT *wire1, QUBIT *wire2, const Modifiers *modifiers)
 {
     RT_FAIL_IF((wire0 == wire1 || wire1 == wire2 || wire0 == wire2),
-               "Invalid input for Toffoli gate. All three qubit operands must be distinct..");
+               "Invalid input for Toffoli gate. All three qubit operands must be distinct.");
     getQuantumDevicePtr()->NamedOperation("Toffoli", {},
                                           {reinterpret_cast<QubitIdType>(wire0),
                                            reinterpret_cast<QubitIdType>(wire1),
