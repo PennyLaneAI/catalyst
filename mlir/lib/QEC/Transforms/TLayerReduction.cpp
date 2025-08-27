@@ -54,13 +54,15 @@ Value getReachingValueAt(Value qubit, QECOpInterface op)
 
     auto defOp = qubit.getDefiningOp();
 
-    if (!defOp || defOp->isBeforeInBlock(op))
+    if (!defOp || defOp->isBeforeInBlock(op)) {
         return qubit;
+    }
 
     auto qecOp = llvm::dyn_cast<QECOpInterface>(defOp);
 
-    if (!qecOp)
+    if (!qecOp) {
         return nullptr;
+    }
 
     auto outQubits = qecOp.getOutQubits();
     auto inQubits = qecOp.getInQubits();
@@ -70,8 +72,9 @@ Value getReachingValueAt(Value qubit, QECOpInterface op)
     auto pos = std::distance(outQubits.begin(), llvm::find(outQubits, qubit));
     Value inQubit = inQubits[pos];
 
-    if (qecOp == op)
+    if (qecOp == op) {
         return inQubit;
+    }
 
     return getReachingValueAt(inQubit, op);
 }
@@ -97,8 +100,9 @@ std::pair<bool, QECOpInterface> checkCommutationAndFindMerge(QECOpInterface rhsO
 {
     QECOpInterface mergeOp = nullptr;
     for (auto lhsOp : lhsLayer.getOps()) {
-        if (lhsOp->getBlock() != rhsOp->getBlock())
+        if (lhsOp->getBlock() != rhsOp->getBlock()){
             return std::pair(false, nullptr);
+        }
 
         assert(lhsOp != rhsOp && "lshOp and rhsOp should not be equal");
         assert(lhsOp->isBeforeInBlock(rhsOp) && "lhsOp should be before rhsOp");
@@ -116,13 +120,15 @@ std::pair<bool, QECOpInterface> checkCommutationAndFindMerge(QECOpInterface rhsO
         // Normalize to Pauli strings
         auto normalizedOps = normalizePPROps(lhsOp, rhsOp, lhsInQubits, rhsOpInQubitsFromLhsOp);
 
-        if (!normalizedOps.first.commutes(normalizedOps.second))
+        if (!normalizedOps.first.commutes(normalizedOps.second)){
             return std::pair(false, nullptr);
+        }
 
         // Equal normalized Pauli strings => merge candidate
         auto canMerge = equal(normalizedOps.first, normalizedOps.second);
-        if (canMerge)
+        if (canMerge){
             mergeOp = lhsOp;
+        }
     }
 
     return std::pair(true, mergeOp);
@@ -140,8 +146,9 @@ void moveOpToLayer(QECOpInterface rhsOp, QECLayer &rhsLayer, QECOpInterface merg
 
     auto lhsOp = lhsLayer.getOps().back();
 
-    if (mergeOp)
+    if (mergeOp){
         lhsOp = mergeOp;
+    }
 
     auto newOp = rhsOp.clone();
 
@@ -206,8 +213,9 @@ struct TLayerReductionPass : impl::TLayerReductionPassBase<TLayerReductionPass> 
         // - try to commute non-Clifford PPR into current layer;
         // - else start a new layer.
         getOperation()->walk([&](PPRotationOp op) {
-            if (op.isClifford())
+            if (op.isClifford()) {
                 return WalkResult::skip();
+            }
 
             auto [isCommute, _] = checkCommutationAndFindMerge(op, currentLayer);
             if (isCommute) {
