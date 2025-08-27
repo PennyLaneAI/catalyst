@@ -28,15 +28,14 @@ class QubitHandler:
     Args:
         qubit_or_qreg_ref: An `AbstractQreg` value, or a list/tuple of `AbstractQbit` values.
 
-    If `qubit_or_qreg_ref` is an `AbstractQreg`, this handler manages converting the qubits in qreg.
-    The fundamental challenge in from_plxpr is that Plxpr (and frontend PennyLane) uses wire index
-    semantics, but Catalyst jaxpr uses qubit value semantics.
-
+    If `qubit_or_qreg_ref` is an `AbstractQreg`, this handler manages converting the qubits in qreg.     
     However, if `qubit_or_qreg_ref` is a list/tuple of `AbstractQbit` values, this handler
     manages converting the qubits in the list/tuple. This is useful when the qubits
     are passed in as arguments to the function being converted. This feature is mainly
     useful for lowering decomposition rules that take in qubits as arguments.
-
+    
+    The fundamental challenge in from_plxpr is that Plxpr (and frontend PennyLane) uses wire index
+    semantics, but Catalyst jaxpr uses qubit value semantics.
     In plxpr, there is the notion of an implicit global state, and each operation (gates, or meta-
     ops like control flow or adjoint) is essentially an update to the global state. At any time,
     the target of an operation is the implicit global state. This is also in line with devices:
@@ -121,17 +120,20 @@ class QubitHandler:
         # The old qreg SSA value is no longer usable since a new one has appeared
         # Therefore all dangling qubits from the old one also all expire
         # These dangling qubit values will be dead, so there must be none.
-        if len(self.wire_map) != 0 and self.abstract_qreg_val is not None:
-            raise CompileError(
-                "Setting new qreg value, but the previous one still has dangling qubits."
-            )
-
-        # Devalidate the old qubit values if user wants to set a qreg
-        if self.abstract_qreg_val is None:
+        if self.abstract_qreg_val is not None:
+           # qreg mode
+           if len(self.wire_map) != 0:
+               raise CompileError(
+                   "Setting new qreg value, but the previous one still has dangling qubits."
+               )
+           self.abstract_qreg_val = qreg
+        else:
+           # qubits mode
+           # Devalidate the old qubit values if user wants to set a qreg
             self.wire_map = {}
             self.qubit_indices = []
 
-        self.abstract_qreg_val = qreg
+
 
     def extract(self, index: int) -> AbstractQbit:
         """Create the extract primitive that produces an AbstractQbit value."""

@@ -30,8 +30,8 @@
 
 * Renamed `QregManager` to `QubitHandler` and extended the class to manage
   converting PLxPR wire indices into Catalyst JAXPR qubits.
-  This is especially useful for lowering decomposition rules that take
-  in qubits as arguments.
+  This is especially useful for lowering subroutines that take
+  in qubits as arguments, for example decomposition rules.
   [(#1820)](https://github.com/PennyLaneAI/catalyst/pull/1820)
 
 * Fix resource tracking unit test polluting the environment with output files
