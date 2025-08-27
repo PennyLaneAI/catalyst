@@ -14,7 +14,6 @@
 
 """
 Unit tests for the dynamic qubit allocation.
-Note that this feature is only available under the plxpr pipeline.
 """
 
 # RUN: %PYTHON %s | FileCheck %s
