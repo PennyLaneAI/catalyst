@@ -1017,7 +1017,28 @@ void __catalyst__qis__Probs(MemRefT_double_1d *result, int64_t numQubits, ...)
                              result_p->strides);
 
     if (wires.empty()) {
-        getQuantumDevicePtr()->Probs(view);
+        // Need to remap labels to device's cannonical order
+        // When user writes qml.device(wires=3), qml.probs()
+        // They mean qml.probs(wires=[0,1,2])
+        // However, it is not guaranteed that the labels (0,1,2) will correspond
+        // to the device wire indices indices (0,1,2).
+        // We need to find the indices that these labels actually correspond to.
+        int64_t capacity = RTD_PTR->getDeviceCapacity();
+        std::vector<QubitIdType> remappedWires(capacity);
+        for (int64_t i = 0; i < capacity; i++) {
+            remappedWires[i] = i;
+        }
+
+        for (const auto &pair : RTD_PTR->getWireLabelMap()) {
+            int64_t label = pair.first;
+            if ((label < 0) || (label >= capacity)) {
+                RT_FAIL("qml.probs() not supported when dynamic qubit allocation is present. "
+                        "Please specify the target wires for the terminal measurement.");
+            }
+            remappedWires[label] = pair.second;
+        }
+
+        getQuantumDevicePtr()->PartialProbs(view, remappedWires);
     }
     else {
         getQuantumDevicePtr()->PartialProbs(view, wires);
@@ -1094,8 +1115,22 @@ int64_t __catalyst__rt__array_get_size_1d(QirArray *ptr)
     return qubit_vector_ptr->size();
 }
 
-int8_t *__catalyst__rt__array_get_element_ptr_1d(QirArray *ptr, int64_t idx)
+int8_t *__catalyst__rt__array_get_element_ptr_1d(QirArray *ptr, int64_t label)
 {
+    // Isolate automatic qubit management for now
+    // i.e. automatic management still treats labels are actual addresses
+    // and seeing a label of `5` will keep allocating up until there's 6 qubits
+    // TODO: do we update that behavior too now that we move to
+    // "everything is just a label"?
+    bool isAutoManagement = RTD_PTR->getQubitManagementMode();
+    int64_t idx = 0;
+    if (isAutoManagement) {
+        idx = label;
+    }
+    else {
+        idx = RTD_PTR->resolveWireLabelToIndex(label);
+    }
+
     std::vector<QubitIdType> *qubit_vector_ptr = reinterpret_cast<std::vector<QubitIdType> *>(ptr);
 
     RT_ASSERT(idx >= 0);
@@ -1103,7 +1138,7 @@ int8_t *__catalyst__rt__array_get_element_ptr_1d(QirArray *ptr, int64_t idx)
     error_msg += std::to_string(idx);
 
     if (static_cast<size_t>(idx) >= qubit_vector_ptr->size()) {
-        if (!RTD_PTR->getQubitManagementMode()) {
+        if (!isAutoManagement) {
             RT_FAIL(error_msg.c_str());
         }
         else {
