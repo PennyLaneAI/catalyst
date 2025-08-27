@@ -26,6 +26,9 @@
 
 <h3>Improvements 🛠</h3>
 
+* Fix resource tracking unit test polluting the environment with output files
+  [(#1861)](https://github.com/PennyLaneAI/catalyst/pull/1861)
+
 * Adjoint differentiation is used by default when executing on lightning devices, significantly reduces gradient computation time.
   [(#1961)](https://github.com/PennyLaneAI/catalyst/pull/1961)
 
@@ -56,8 +59,12 @@
   %0 = transform.apply_registered_pass "some-pass" with options = {"an-option" = true, "maxValue" = 1 : i64, "multi-word-option" = 1 : i64}
   ```
 
-*  `Commuting Clifford Pauli Product Rotation (PPR) operations, past non-Clifford PPRs, now supports P(π/2) Cliffords in addition to P(π/4)`
-   [(#1966)](https://github.com/PennyLaneAI/catalyst/pull/1966)
+* Commuting Clifford Pauli Product Rotation (PPR) operations, past non-Clifford PPRs, now supports P(π/2) Cliffords in addition to P(π/4)
+  [(#1966)](https://github.com/PennyLaneAI/catalyst/pull/1966)
+
+* A new jax primitive `qdealloc_qb_p` is available for single qubit deallocations.
+  [(#2005)](https://github.com/PennyLaneAI/catalyst/pull/2005)
+
 
 <h3>Breaking changes 💔</h3>
 
@@ -109,6 +116,9 @@
 
 * When capture is enabled, `qjit(autograph=True)` will use capture autograph instead of catalyst autograph.
   [(#1960)](https://github.com/PennyLaneAI/catalyst/pull/1960)
+
+* `from_plxpr` can now handle dynamic shots and overridden device shots.
+  [(#1983)](https://github.com/PennyLaneAI/catalyst/pull/1983/)
 
 * QJitDevice helper `extract_backend_info` removed its redundant `capabilities` argument.
   [(#1956)](https://github.com/PennyLaneAI/catalyst/pull/1956)
@@ -206,4 +216,5 @@ Christina Lee,
 Joseph Lee,
 Andrija Paurevic,
 Roberto Turrado,
-Paul Haochen Wang.
+Paul Haochen Wang,
+Jake Zaia.
