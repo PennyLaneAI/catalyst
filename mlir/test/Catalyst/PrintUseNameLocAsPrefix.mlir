@@ -1,6 +1,6 @@
 // RUN: quantum-opt %s -mlir-use-nameloc-as-prefix -split-input-file | FileCheck %s
 
-func.func @test_alice() {
+func.func @test_alice_qubit() {
     %0 = quantum.alloc( 1) : !quantum.reg
     // CHECK: %alice = quantum.extract
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit loc("alice")
@@ -10,7 +10,7 @@ func.func @test_alice() {
 
 // -----
 
-func.func @test_alice_and_bob() {
+func.func @test_alice_and_bob_qubits() {
     %0 = quantum.alloc( 2) : !quantum.reg
     // CHECK: %alice = quantum.extract
     // CHECK: %bob = quantum.extract
@@ -19,5 +19,13 @@ func.func @test_alice_and_bob() {
     %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit loc("bob")
     %3:2 = quantum.custom "CNOT"() %1, %2 : !quantum.bit, !quantum.bit
     quantum.dealloc %0 : !quantum.reg
+    return
+}
+
+// -----
+
+func.func @test_alice_and_bob_parameters(%arg0 : !quantum.bit loc("alice"), %arg1 : !quantum.bit loc("bob")) {
+    // CHECK: quantum.custom "CNOT"() %alice, %bob
+    %0:2 = quantum.custom "CNOT"() %arg0, %arg1 : !quantum.bit, !quantum.bit
     return
 }
