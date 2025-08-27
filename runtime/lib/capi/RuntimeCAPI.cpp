@@ -1069,7 +1069,22 @@ void __catalyst__qis__Sample(MemRefT_double_2d *result, int64_t numQubits, ...)
                              result_p->strides);
 
     if (wires.empty()) {
-        getQuantumDevicePtr()->Sample(view);
+        int64_t capacity = RTD_PTR->getDeviceCapacity();
+        std::vector<QubitIdType> remappedWires(capacity);
+        for (int64_t i = 0; i < capacity; i++) {
+            remappedWires[i] = i;
+        }
+
+        for (const auto &pair : RTD_PTR->getWireLabelMap()) {
+            int64_t label = pair.first;
+            if ((label < 0) || (label >= capacity)) {
+                RT_FAIL("qml.sample() not supported when dynamic qubit allocation is present. "
+                        "Please specify the target wires for the terminal measurement.");
+            }
+            remappedWires[label] = pair.second;
+        }
+
+        getQuantumDevicePtr()->PartialSample(view, remappedWires);
     }
     else {
         getQuantumDevicePtr()->PartialSample(view, wires);
@@ -1102,7 +1117,22 @@ void __catalyst__qis__Counts(PairT_MemRefT_double_int64_1d *result, int64_t numQ
                                      result_counts_p->sizes, result_counts_p->strides);
 
     if (wires.empty()) {
-        getQuantumDevicePtr()->Counts(eigvals_view, counts_view);
+        int64_t capacity = RTD_PTR->getDeviceCapacity();
+        std::vector<QubitIdType> remappedWires(capacity);
+        for (int64_t i = 0; i < capacity; i++) {
+            remappedWires[i] = i;
+        }
+
+        for (const auto &pair : RTD_PTR->getWireLabelMap()) {
+            int64_t label = pair.first;
+            if ((label < 0) || (label >= capacity)) {
+                RT_FAIL("qml.counts() not supported when dynamic qubit allocation is present. "
+                        "Please specify the target wires for the terminal measurement.");
+            }
+            remappedWires[label] = pair.second;
+        }
+
+        getQuantumDevicePtr()->PartialCounts(eigvals_view, counts_view, remappedWires);
     }
     else {
         getQuantumDevicePtr()->PartialCounts(eigvals_view, counts_view, wires);
