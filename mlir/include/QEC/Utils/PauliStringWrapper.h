@@ -182,7 +182,7 @@ bool isNoSizeLimit(size_t MaxPauliSize);
 bool exceedPauliSizeLimit(size_t pauliSize, size_t MaxPauliSize);
 
 // Check if the two Pauli string are the same
-bool equal(PauliWord lhs, PauliWord rhs);
+bool equal(const PauliWord lhs, const PauliWord rhs);
 bool equal(const PauliStringWrapper &lhs, const PauliStringWrapper &rhs);
 
 } // namespace qec

@@ -14,13 +14,15 @@
 
 #define DEBUG_TYPE "t-layer-reduction"
 
+#include <vector>
+
+#include "mlir/IR/IRMapping.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 
 #include "QEC/IR/QECOpInterfaces.h"
 #include "QEC/Utils/PauliStringWrapper.h"
 #include "QEC/Utils/QECLayer.h"
-#include <mlir/IR/IRMapping.h>
 
 using namespace mlir;
 using namespace catalyst::qec;
@@ -87,6 +89,9 @@ std::vector<Value> getInQubitReachingValuesAt(QECOpInterface srcOp, QECOpInterfa
     return dominanceQubits;
 }
 
+// Check whether `rhsOp` can commute left across every op in `lhsLayer` (same block),
+// and, if so, identify a merge `mergeOp` candidate in `lhsLayer`.
+// This `mergeOp` later on, will be used in `mergePPR` function.
 std::pair<bool, QECOpInterface> checkCommutationAndFindMerge(QECOpInterface rhsOp,
                                                              QECLayer &lhsLayer)
 {
@@ -96,8 +101,6 @@ std::pair<bool, QECOpInterface> checkCommutationAndFindMerge(QECOpInterface rhsO
             return std::pair(false, nullptr);
 
         assert(lhsOp != rhsOp && "lshOp and rhsOp should not be equal");
-        assert(lhsOp->getBlock() == rhsOp->getBlock() &&
-               "lhsOp and rhsOp should be in the same block");
         assert(lhsOp->isBeforeInBlock(rhsOp) && "lhsOp should be before rhsOp");
 
         std::vector<Value> lhsInQubits(lhsOp.getInQubits().begin(), lhsOp.getInQubits().end());
@@ -175,6 +178,9 @@ void moveOpToLayer(QECOpInterface rhsOp, QECLayer &rhsLayer, QECOpInterface merg
     writer.eraseOp(rhsOp);
 }
 
+// Merge `rhsOp` into `mergeOp` in lhsLayer when equal under normalization.
+// To merge this we keep and update the rotation kind of `mergeOp` in lhsLayer,
+// then just remove the `rhsOp` from the rhsLayer.
 void mergePPR(QECOpInterface rhsOp, QECLayer &rhsLayer, QECOpInterface mergeOp, IRRewriter &writer)
 {
     mergeOp.setRotationKind(mergeOp.getRotationKind() / 2);
@@ -201,11 +207,12 @@ struct TLayerReductionPass : impl::TLayerReductionPassBase<TLayerReductionPass> 
         // - else start a new layer.
         getOperation()->walk([&](PPRotationOp op) {
             if (op.isClifford())
-                return WalkResult::advance();
+                return WalkResult::skip();
+
             auto [isCommute, _] = checkCommutationAndFindMerge(op, currentLayer);
             if (isCommute) {
                 currentLayer.insertToLayer(op);
-                return WalkResult::advance();
+                return WalkResult::skip();
             }
 
             layers.emplace_back(std::move(currentLayer));

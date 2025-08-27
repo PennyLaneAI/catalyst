@@ -1075,22 +1075,27 @@ def get_ppm_specs(fn):
 
 def t_layer_reduction(qnode):
     R"""
-    Specify that the``--t-layer-reduction`` MLIR compiler pass
-    for reducing the depth and number of non-Clifford PPR
-    operations by commuting adjacent PPRs and finding possible PPRs that can be merged.
-    For more details, see the Figure 6 in [A Game of Surface Code](https://arXiv:1808.02892v3) paper.
+    Specify that the``--t-layer-reduction`` MLIR compiler pass, which reduces the depth and count of
+    non-Clifford PPRs by commuting adjacent PPRs and merging compatible ones.
+    For details, see the Figure 6 of [A Game of Surface Code](https://arXiv:1808.02892v3) paper.
+
+    A layer is a set of PPRs that mutually commute or act on disjoint qubits.
 
     Args:
-        fn (QNode): QNode to apply the pass to
+        fn (QNode): QNode to apply the pass to.
 
     Returns:
         ~.QNode: Returns decorated QNode.
 
     **Example**
 
-    In this example, after performing the `to_ppr` to `merge_ppr_ppm` passes, the circuit contains
+    In example below, after performing the `to_ppr` to `merge_ppr_ppm` passes, the circuit contains
     a four depth of Non-Clifford PPRs. The `t_layer_reduction` pass move the PPR("X") on qubit Q1
     to first layer, which results in a three depth of Non-Clifford PPRs.
+
+    In the example below, after applying the `to_ppr`, `commute_ppr`, and `merge_ppr_ppm` passes,
+    the circuit has four layers of non-Clifford PPRs. The `t_layer_reduction` pass moves the
+    PPR("X") on qubit 1 into the first layer, reducing the non-Clifford depth from four to three.
 
 
     .. code-block:: python
