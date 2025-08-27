@@ -113,30 +113,25 @@ def compare_eqns(eqn1, eqn2):
         assert ov1.aval == ov2.aval
 
 
+@pytest.mark.usefixtures("use_capture")
 class TestErrors:
     """Test that errors are raised in unsupported situations."""
 
     def test_measuring_eigvals_not_supported(self):
         """Test that a NotImplementedError is raised for converting a measurement
         specified via eigvals and wires."""
-        # TODO: try set_shots after capture work is completed
-        with pytest.warns(
-            qml.exceptions.PennyLaneDeprecationWarning,
-            match="deprecated",
-        ):
-            dev = qml.device("lightning.qubit", wires=2, shots=50)
+        dev = qml.device("lightning.qubit", wires=2)
 
+        @qml.set_shots(50)
         @qml.qnode(dev)
         def circuit():
             return qml.measurements.SampleMP(
                 wires=qml.wires.Wires((0, 1)), eigvals=np.array([-1.0, -1.0, 1.0, 1.0])
             )
 
-        qml.capture.enable()
         jaxpr = jax.make_jaxpr(circuit)()
         with pytest.raises(NotImplementedError, match="does not yet support measurements with"):
             from_plxpr(jaxpr)()
-        qml.capture.disable()
 
     def test_measuring_measurement_values(self):
         """Test that measuring a MeasurementValue raises a NotImplementedError."""
@@ -149,12 +144,10 @@ class TestErrors:
                 obs=2
             )  # classical value like will be used for mcms
 
-        qml.capture.enable()
         jaxpr = jax.make_jaxpr(circuit)()
 
         with pytest.raises(NotImplementedError, match=r"not yet supported"):
             from_plxpr(jaxpr)()
-        qml.capture.disable()
 
     def test_unsupported_measurement(self):
         """Test that a NotImplementedError is raised if a measurement
@@ -166,12 +159,25 @@ class TestErrors:
         def circuit():
             return qml.vn_entropy(wires=0)
 
-        qml.capture.enable()
         jaxpr = jax.make_jaxpr(circuit)()
 
         with pytest.raises(NotImplementedError, match="not yet supported"):
             from_plxpr(jaxpr)()
-        qml.capture.disable()
+
+    def test_no_shot_vectors(self):
+        """Test that a NotImplementedError is raised with shot vectors."""
+
+        dev = qml.device("lightning.qubit", wires=1)
+
+        @qml.set_shots((10, 10, 20))
+        @qml.qnode(dev)
+        def c():
+            return qml.sample(wires=0)
+
+        jaxpr = jax.make_jaxpr(c)()
+
+        with pytest.raises(NotImplementedError, match="not yet supported"):
+            from_plxpr(jaxpr)()
 
 
 class TestCatalystCompareJaxpr:
@@ -368,39 +374,35 @@ class TestCatalystCompareJaxpr:
     def test_sample(self):
         """Test comparison and execution of a jaxpr returning samples."""
 
-        # TODO: try set_shots after capture work is completed
-        with pytest.warns(
-            qml.exceptions.PennyLaneDeprecationWarning,
-            match="shots on device is deprecated",
-        ):
-            dev = qml.device("lightning.qubit", wires=2, shots=50)
+        dev = qml.device("lightning.qubit", wires=2)
 
-            @qml.qnode(dev)
-            def circuit():
-                qml.X(0)
-                return qml.sample()
+        @qml.set_shots(50)
+        @qml.qnode(dev)
+        def circuit():
+            qml.X(0)
+            return qml.sample()
 
-            qml.capture.enable()
-            plxpr = jax.make_jaxpr(circuit)()
+        qml.capture.enable()
+        plxpr = jax.make_jaxpr(circuit)()
 
-            converted = from_plxpr(plxpr)()
-            qml.capture.disable()
+        converted = from_plxpr(plxpr)()
+        qml.capture.disable()
 
-            assert converted.eqns[0].primitive == catalyst.jax_primitives.quantum_kernel_p
-            assert converted.eqns[0].params["qnode"] is circuit
+        assert converted.eqns[0].primitive == catalyst.jax_primitives.quantum_kernel_p
+        assert converted.eqns[0].params["qnode"] is circuit
 
-            catalyst_res = catalyst_execute_jaxpr(converted)()
-            assert len(catalyst_res) == 1
-            expected = np.transpose(np.vstack([np.ones(50), np.zeros(50)]))
-            assert qml.math.allclose(catalyst_res[0], expected)
+        catalyst_res = catalyst_execute_jaxpr(converted)()
+        assert len(catalyst_res) == 1
+        expected = np.transpose(np.vstack([np.ones(50), np.zeros(50)]))
+        assert qml.math.allclose(catalyst_res[0], expected)
 
-            qjit_obj = qjit(circuit)
-            qjit_obj()
-            catalxpr = qjit_obj.jaxpr
-            call_jaxpr_pl = get_call_jaxpr(converted)
-            call_jaxpr_c = get_call_jaxpr(catalxpr)
+        qjit_obj = qjit(circuit)
+        qjit_obj()
+        catalxpr = qjit_obj.jaxpr
+        call_jaxpr_pl = get_call_jaxpr(converted)
+        call_jaxpr_c = get_call_jaxpr(catalxpr)
 
-            compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c)
+        compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c)
 
     @pytest.mark.xfail(reason="CountsMP returns a dictionary, which is not compatible with capture")
     def test_counts(self):
@@ -547,19 +549,15 @@ class TestCatalystCompareJaxpr:
     def test_dynamic_shots(self):
         """Test that shots can be specified on qnode call."""
 
-        # TODO: try set_shots after capture work is completed
-        with pytest.warns(
-            qml.exceptions.PennyLaneDeprecationWarning,
-            match="deprecated",
-        ):
-            dev = qml.device("lightning.qubit", wires=2, shots=50)
+        dev = qml.device("lightning.qubit", wires=2)
 
+        @qml.set_shots(50)
         @qml.qnode(dev)
         def circuit():
             return qml.sample(wires=0)
 
         def f():
-            return circuit(shots=100)
+            return qml.set_shots(circuit, shots=100)()
 
         qml.capture.enable()
         jaxpr = jax.make_jaxpr(f)()
