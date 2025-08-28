@@ -724,7 +724,7 @@ class TestAdjointCtrl:
 
         qml.capture.enable()
 
-        @qml.qnode(qml.device("lightning.qubit", wires=4)
+        @qml.qnode(qml.device("lightning.qubit", wires=4))
         def c(wire):
             qml.CNOT((0, wire))
             if as_qfunc:
