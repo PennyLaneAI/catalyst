@@ -187,24 +187,18 @@ class WorkflowInterpreter(PlxprInterpreter):
 # pylint: disable=unused-argument, too-many-arguments
 @WorkflowInterpreter.register_primitive(qnode_prim)
 def handle_qnode(
-    self, *args, qnode, shots, device, execution_config, qfunc_jaxpr, n_consts, batch_dims=None
+    self, *args, qnode, device, shots_len, execution_config, qfunc_jaxpr, n_consts, batch_dims=None
 ):
     """Handle the conversion from plxpr to Catalyst jaxpr for the qnode primitive"""
-    consts = args[:n_consts]
-    non_const_args = args[n_consts:]
+
+    if shots_len > 1:
+        raise NotImplementedError("shot vectors are not yet supported for catalyst conversion.")
+
+    shots = args[0] if shots_len else 0
+    consts = args[shots_len : n_consts + shots_len]
+    non_const_args = args[shots_len + n_consts :]
 
     closed_jaxpr = ClosedJaxpr(qfunc_jaxpr, consts)
-
-    def extract_shots_value(shots: qml.measurements.Shots | int):
-        """Extract the shots value according to the type"""
-        if isinstance(shots, int):
-            return shots
-
-        assert isinstance(shots, qml.measurements.Shots)
-
-        return shots.total_shots if shots else 0
-
-    shots = extract_shots_value(shots)
 
     def calling_convention(*args):
         device_init_p.bind(
@@ -411,7 +405,7 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
 
         shape, dtype = measurement._abstract_eval(
             n_wires=len(measurement.wires),
-            shots=self.device.shots.total_shots,
+            shots=self.shots,
             num_device_wires=len(self.device.wires),
         )
 
