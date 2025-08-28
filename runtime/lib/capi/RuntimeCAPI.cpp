@@ -116,6 +116,89 @@ static void autoQubitManagementAllocate(std::vector<QubitIdType> *qubit_vector_p
     qubit_vector_ptr->insert(qubit_vector_ptr->end(), new_qubits_vector->begin(),
                              new_qubits_vector->end());
 }
+
+template <typename T> void Remap1DResultWires(T *data_aligned)
+{
+    // Need to remap labels to device's cannonical order
+    // When user writes qml.device(wires=3), qml.state()
+    // They mean qml.state(wires=[0,1,2])
+    // However, it is not guaranteed that the labels (0,1,2) will correspond
+    // to the device wire indices (0,1,2).
+    // We need to find the indices that these labels actually correspond to.
+
+    // Let's walk through with an example.
+    // Say the array of qubit IDs on the device is [100, 200, 300].
+    // This means calling just `State()` on the device,
+    // returns an array where the i-th entry in the array,
+    // i = "abc" in binary (e.g. i=6 means abc=110)
+    // gives the amplitude when device qubit 100, 200, 300 are in |a>, |b> and |c>
+
+    // Let's also say the label-to-index map is {0:1, 1:0, 2:2}.
+    // The user wants qml.state(wires=[0,1,2]), with 0, 1, 2 being labels
+    // So the indices should be [1,0,2], or device qubit IDs [200, 100, 300]
+    // i.e. the user wants an array where the i-th entry gives the amplitude
+    // when qubit 200, 100, 300 are in |a>, |b> and |c>
+    int64_t capacity = RTD_PTR->getDeviceCapacity();
+    RTD_PTR->fillWireLabelMapUpToCapacity();
+    std::vector<T> remappedState(1 << capacity);
+
+    for (int64_t i = 0; i < (1 << capacity); i++) {
+        // say i=6
+        // 1. parse 6 into binary, i.e. abc=110
+        // Use standard int size
+        constexpr int64_t MAX_NUM_QUBITS = 64;
+
+        std::bitset<MAX_NUM_QUBITS> labelBits(i);
+
+        std::string labelBinaryStringLeftPadded = labelBits.to_string();
+        std::string labelBinaryString =
+            labelBinaryStringLeftPadded.substr(MAX_NUM_QUBITS - capacity);
+
+        // 2. This means user wants label 0 in |1>, label 1 in |1>, label 2 in |0>
+        // Get the corresponding indices
+        std::vector<uint64_t> indices(capacity);
+        for (int64_t label = 0; label < labelBinaryString.size(); label++) {
+            char bit = labelBinaryString[label];
+            uint64_t index;
+            if (RTD_PTR->getWireLabelMap().contains(label)) {
+                index = RTD_PTR->getWireLabelMap().at(label);
+            }
+            else {
+                // TODO: this if block will never be hit
+                // if ((label < 0) || (label >= capacity)) {
+                //     RT_FAIL("qml.state() not supported when dynamic qubit allocation is present.
+                //     "
+                //             "Please specify the target wires for the terminal measurement.");
+                // }
+                index = label;
+            }
+            // user wants label 0 in |1>
+            // Map is {0:1}
+            // This means we want qubit index 1, or qubit ID 200, in |1>
+            indices[index] = bit - '0';
+        }
+
+        // 3. Get the index number back from the index bitstream
+        int64_t index_decimal = 0;
+        for (int64_t p = 0; p < capacity; p++) {
+            index_decimal += (1 << (capacity - 1 - p)) * indices[p];
+        }
+        std::cout << "index_decimal " << index_decimal << "\n";
+        remappedState[i] = data_aligned[index_decimal];
+    }
+
+    for (int64_t i = 0; i < remappedState.size(); i++) {
+        data_aligned[i] = remappedState[i];
+    }
+}
+
+void RemapStateResultWires(std::complex<double> *data_aligned)
+{
+    Remap1DResultWires<std::complex<double>>(data_aligned);
+}
+
+void RemapProbsResultWires(double *data_aligned) { Remap1DResultWires<double>(data_aligned); }
+
 } // namespace Catalyst::Runtime
 
 extern "C" {
@@ -989,6 +1072,7 @@ void __catalyst__qis__State(MemRefT_CplxT_double_1d *result, int64_t numQubits, 
 
     if (wires.empty()) {
         getQuantumDevicePtr()->State(view);
+        RemapStateResultWires(result_p->data_aligned);
     }
     else {
         RT_FAIL("Partial State-Vector not supported.");
@@ -1017,28 +1101,8 @@ void __catalyst__qis__Probs(MemRefT_double_1d *result, int64_t numQubits, ...)
                              result_p->strides);
 
     if (wires.empty()) {
-        // Need to remap labels to device's cannonical order
-        // When user writes qml.device(wires=3), qml.probs()
-        // They mean qml.probs(wires=[0,1,2])
-        // However, it is not guaranteed that the labels (0,1,2) will correspond
-        // to the device wire indices indices (0,1,2).
-        // We need to find the indices that these labels actually correspond to.
-        int64_t capacity = RTD_PTR->getDeviceCapacity();
-        std::vector<QubitIdType> remappedWires(capacity);
-        for (int64_t i = 0; i < capacity; i++) {
-            remappedWires[i] = i;
-        }
-
-        for (const auto &pair : RTD_PTR->getWireLabelMap()) {
-            int64_t label = pair.first;
-            if ((label < 0) || (label >= capacity)) {
-                RT_FAIL("qml.probs() not supported when dynamic qubit allocation is present. "
-                        "Please specify the target wires for the terminal measurement.");
-            }
-            remappedWires[label] = pair.second;
-        }
-
-        getQuantumDevicePtr()->PartialProbs(view, remappedWires);
+        getQuantumDevicePtr()->Probs(view);
+        RemapProbsResultWires(result_p->data_aligned);
     }
     else {
         getQuantumDevicePtr()->PartialProbs(view, wires);
