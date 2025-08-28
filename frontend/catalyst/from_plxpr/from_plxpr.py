@@ -44,6 +44,7 @@ from pennylane.transforms import single_qubit_fusion as pl_single_qubit_fusion
 from pennylane.transforms import unitary_to_rot as pl_unitary_to_rot
 
 from catalyst.device import extract_backend_info
+from catalyst.device.qjit_device import COMPILER_OPERATIONS
 from catalyst.from_plxpr.qubit_handler import QubitHandler
 from catalyst.jax_extras import jaxpr_pad_consts, make_jaxpr2, transient_jax_config
 from catalyst.jax_primitives import (
@@ -176,12 +177,52 @@ def from_plxpr(plxpr: ClosedJaxpr) -> Callable[..., Jaxpr]:
 
 
 class WorkflowInterpreter(PlxprInterpreter):
-    """An interpreter that converts a qnode primitive from a plxpr variant to a catalxpr variant."""
+    """An interpreter that converts a qnode primitive from a plxpr variant to a catalyst variant."""
 
     def __init__(self):
         self._pass_pipeline = []
         self.qubit_handler = None
+        self.compiler_decompose = False
         super().__init__()
+
+
+def _extract_shots_value(shots: qml.measurements.Shots | int):
+    """Extract the shots value according to the type"""
+    if isinstance(shots, int):
+        return shots
+
+    assert isinstance(shots, qml.measurements.Shots)
+
+    return shots.total_shots if shots else 0
+
+
+def _decompose_to_compiler_gateset(qfunc_jaxpr, consts, non_const_args):
+
+    # TODO: The compiler should be able to handle all gate
+    # adhering to quantum.custom primitive.This includes
+    # all the gates with parameters of type `TensorLike`
+    # and wires of type `WiresLike` with no hyperparams.
+    # Update `gate_set` to use this as the stopping condition
+    # of the decomposition transform.
+    gate_set = COMPILER_OPERATIONS
+
+    decomp_args = ()
+    decomp_kwargs = {"gate_set": gate_set}
+
+    # disable the graph decomposition optimization
+    graph_decomp_status = False
+    if qml.decomposition.enabled_graph():
+        graph_decomp_status = True
+        qml.decomposition.disable_graph()
+
+    new_jaxpr = qml.transforms.decompose.plxpr_transform(
+        qfunc_jaxpr, consts, decomp_args, decomp_kwargs, *non_const_args
+    )
+
+    if graph_decomp_status:
+        qml.decomposition.enable_graph()
+
+    return new_jaxpr
 
 
 # pylint: disable=unused-argument, too-many-arguments
@@ -190,21 +231,16 @@ def handle_qnode(
     self, *args, qnode, shots, device, execution_config, qfunc_jaxpr, n_consts, batch_dims=None
 ):
     """Handle the conversion from plxpr to Catalyst jaxpr for the qnode primitive"""
+
     consts = args[:n_consts]
     non_const_args = args[n_consts:]
 
-    closed_jaxpr = ClosedJaxpr(qfunc_jaxpr, consts)
+    if self.compiler_decompose:
+        closed_jaxpr = _decompose_to_compiler_gateset(qfunc_jaxpr, consts, non_const_args)
+    else:
+        closed_jaxpr = ClosedJaxpr(qfunc_jaxpr, consts)
 
-    def extract_shots_value(shots: qml.measurements.Shots | int):
-        """Extract the shots value according to the type"""
-        if isinstance(shots, int):
-            return shots
-
-        assert isinstance(shots, qml.measurements.Shots)
-
-        return shots.total_shots if shots else 0
-
-    shots = extract_shots_value(shots)
+    shots = _extract_shots_value(shots)
 
     def calling_convention(*args):
         device_init_p.bind(
@@ -223,7 +259,7 @@ def handle_qnode(
 
     return quantum_kernel_p.bind(
         wrap_init(calling_convention, debug_info=qfunc_jaxpr.debug_info),
-        *non_const_args,
+        *args[n_consts:],
         qnode=qnode,
         pipeline=self._pass_pipeline,
     )
@@ -317,6 +353,7 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         # TODO: we assume the qreg value passed into a scope is the unique qreg in the scope
         # In other words, we assume no new qreg will be allocated in the scope
         self.qubit_handler = qubit_handler
+        self.compiler_decompose = False
         self.subroutine_cache = cache
         self.control_wires = control_wires
         """Any control wires used for a subroutine."""
@@ -434,15 +471,6 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         if dtype != mval.dtype:
             return jax.lax.convert_element_type(mval, dtype)
         return mval
-
-    def _extract_shots_value(self, shots: qml.measurements.Shots | int):
-        """Extract the shots value according to the type"""
-        if isinstance(shots, int):
-            return shots
-
-        assert isinstance(shots, qml.measurements.Shots)
-
-        return shots.total_shots if shots else 0
 
     def __call__(self, jaxpr, *args):
         """

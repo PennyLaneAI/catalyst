@@ -93,6 +93,12 @@ RUNTIME_OPERATIONS = [
     "GlobalPhase",
 ]
 
+# A list of operations that the can be represented
+# in the Catalyst compiler. This is a superset of
+# the operations supported by the runtime.
+COMPILER_OPERATIONS = RUNTIME_OPERATIONS
+
+
 RUNTIME_OBSERVABLES = [
     "Identity",
     "PauliX",
