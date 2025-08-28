@@ -325,7 +325,7 @@ class RTDevice {
 
         // Should not be used with dynamic allocations
         // So the labels are just the repermuted indices
-        for (int64_t label = 0; label < capacity; label++) {
+        for (int64_t label = 0; label < static_cast<int64_t>(capacity); label++) {
             if (!wire_label_to_qirarray_index.contains(label)) {
                 uint64_t popped = *unused_indices.begin();
                 unused_indices.erase(popped);

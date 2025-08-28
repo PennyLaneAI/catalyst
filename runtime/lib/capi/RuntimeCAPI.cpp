@@ -157,7 +157,7 @@ template <typename T> void Remap1DResultWires(T *data_aligned)
         // 2. This means user wants label 0 in |1>, label 1 in |1>, label 2 in |0>
         // Get the corresponding indices
         std::vector<uint64_t> indices(capacity);
-        for (int64_t label = 0; label < labelBinaryString.size(); label++) {
+        for (int64_t label = 0; label < static_cast<int64_t>(labelBinaryString.size()); label++) {
             char bit = labelBinaryString[label];
             uint64_t index;
             if (RTD_PTR->getWireLabelMap().contains(label)) {
@@ -187,7 +187,7 @@ template <typename T> void Remap1DResultWires(T *data_aligned)
         remappedState[i] = data_aligned[index_decimal];
     }
 
-    for (int64_t i = 0; i < remappedState.size(); i++) {
+    for (int64_t i = 0; i < static_cast<int64_t>(remappedState.size()); i++) {
         data_aligned[i] = remappedState[i];
     }
 }
