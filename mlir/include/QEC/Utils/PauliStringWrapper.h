@@ -73,6 +73,13 @@ struct PauliStringWrapper {
     PauliStringWrapper &operator=(const PauliStringWrapper &data) = delete;
     PauliStringWrapper &operator=(PauliStringWrapper &&data) = delete;
 
+    bool operator==(const PauliStringWrapper &rhs) const
+    {
+        return (this->get_pauli_word() == rhs.get_pauli_word()) &&
+               (this->isNegative() == rhs.isNegative());
+    }
+    bool operator!=(const PauliStringWrapper &rhs) const { return !(*this == rhs); }
+
     static PauliStringWrapper from_pauli_word(const PauliWord &pauliWord);
     static PauliStringWrapper from_qec_op(QECOpInterface op);
 
@@ -182,8 +189,8 @@ bool isNoSizeLimit(size_t MaxPauliSize);
 bool exceedPauliSizeLimit(size_t pauliSize, size_t MaxPauliSize);
 
 // Check if the two Pauli string are the same
-bool equal(const PauliWord lhs, const PauliWord rhs);
-bool equal(const PauliStringWrapper &lhs, const PauliStringWrapper &rhs);
+bool operator==(const PauliWord &lhs, const PauliWord &rhs);
+bool operator!=(const PauliWord &lhs, const PauliWord &rhs);
 
 } // namespace qec
 } // namespace catalyst

@@ -236,13 +236,8 @@ bool exceedPauliSizeLimit(size_t pauliSize, size_t MaxPauliSize)
     return pauliSize > MaxPauliSize;
 }
 
-bool equal(const PauliWord lhs, const PauliWord rhs) { return llvm::equal(lhs, rhs); }
-
-bool equal(const PauliStringWrapper &lhs, const PauliStringWrapper &rhs)
-{
-    return equal(lhs.get_pauli_word(), rhs.get_pauli_word()) &&
-           lhs.isNegative() == rhs.isNegative();
-}
+bool operator==(const PauliWord &lhs, const PauliWord &rhs) { return llvm::equal(lhs, rhs); }
+bool operator!=(const PauliWord &lhs, const PauliWord &rhs) { return !(lhs == rhs); }
 
 } // namespace qec
 } // namespace catalyst

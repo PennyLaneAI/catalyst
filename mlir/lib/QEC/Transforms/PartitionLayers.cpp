@@ -132,7 +132,7 @@ struct PartitionLayersPass : public impl::PartitionLayersPassBase<PartitionLayer
 
             // Try to insert the op into the current layer
             if (currentLayer.insert(op))
-                return WalkResult::advance();
+                return WalkResult::skip();
 
             constructLayer(currentLayer, writer);
 

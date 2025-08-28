@@ -126,7 +126,7 @@ std::pair<bool, QECOpInterface> checkCommutationAndFindMerge(QECOpInterface rhsO
         }
 
         // Equal normalized Pauli strings => merge candidate
-        auto canMerge = equal(normalizedOps.first, normalizedOps.second);
+        auto canMerge = normalizedOps.first == normalizedOps.second;
         if (canMerge) {
             mergeOp = lhsOp;
         }
