@@ -118,26 +118,20 @@ class TestExtractInsertWithNoQreg:
         with pytest.raises(CompileError, match="Cannot insert a qubit at index 100"):
             qubit_handler.insert(100, "monkey_mock_qubit")
 
-    def test_do_nothing_insert(self):
-        """Test that insert helper methods do nothing when no qreg is not set"""
-        qbits = [AbstractQbit(), AbstractQbit()]
-        qubit_handler = QubitHandler(qbits)
-        assert qubit_handler.abstract_qreg_val is None
+        with pytest.raises(CompileError, match="Cannot insert qubits back into a qreg"):
+            qubit_handler.insert_all_dangling_qubits()
 
-        # Should do nothing
-        qubit_handler.insert_all_dangling_qubits()
-        assert qubit_handler.abstract_qreg_val is None
-
-        qubit_handler.insert_dynamic_qubits(0)
-        assert qubit_handler.abstract_qreg_val is None
+        with pytest.raises(CompileError, match="Cannot insert dynamic qubits back into a qreg"):
+            qubit_handler.insert_dynamic_qubits(0)
 
 
 class TestQubitHandlerInitGetSet:
     """Unit test for getter and setter for QubitHandler"""
 
     def test_getter_setter(self):
-        """Test getter and setter"""
-        qubit_handler = QubitHandler(None)
+        """Test getter and setter with a qreg"""
+        qreg = qalloc_p.bind(42)
+        qubit_handler = QubitHandler(qreg)
         qubit_handler.set("monkey_mock_qreg")
         assert qubit_handler.get() == "monkey_mock_qreg"
         assert qubit_handler.get() == "monkey_mock_qreg"  # test that getter does not set
@@ -146,6 +140,7 @@ class TestQubitHandlerInitGetSet:
         assert qubit_handler.get() == "donkey_mock_qreg"
 
     def test_getter_setter_no_qreg(self):
+        """Test getter and setter when no qreg is set"""
         qubit_handler = QubitHandler([AbstractQbit(), AbstractQbit()])
 
         assert isinstance(qubit_handler.get(), list)
@@ -153,10 +148,11 @@ class TestQubitHandlerInitGetSet:
         assert len(qubit_handler.get()) == 2
 
         qubit_handler.set("monkey_mock_qubit")
-        assert qubit_handler.get() == "monkey_mock_qubit"
+        assert qubit_handler.get() == []
 
     def test_getitem_setitem(self):
-        """Test that getting and setting items in a QubitHandler raises NotImplementedError"""
+        """Test getting and setting items"""
+
         q0 = AbstractQbit()
         qubit_handler = QubitHandler([q0])
 

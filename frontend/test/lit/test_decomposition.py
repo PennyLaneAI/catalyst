@@ -387,8 +387,8 @@ def test_decomposition_rule_shaped_wires():
     # CHECK: func.func private @shaped_wires_rule([[QREG:%.+]]: !quantum.reg, [[PARAM_TENSOR:%.+]]: tensor<f64>, [[QUBITS:%.+]]: tensor<3xi64>) -> !quantum.reg
     # CHECK-NEXT: [[IDX_0:%.+]] = stablehlo.slice [[QUBITS]] [0:1] : (tensor<3xi64>) -> tensor<1xi64>
     # CHECK-NEXT: [[RIDX_0: %.+]] = stablehlo.reshape [[IDX_0]] : (tensor<1xi64>) -> tensor<i64>
-    # CHECK-NEXT: [[EXTRACTED: %.+]] = tensor.extract [[RIDX_0]][] : tensor<i64>
-    # CHECK-NEXT: [[QUBIT:%.+]] = quantum.extract [[QREG]][[[EXTRACTED]]] : !quantum.reg -> !quantum.bit
+    # CHECK-NEXT: [[EXTRACTED: %.+]] = tensor.extract %1[] : tensor<i64>
+    # CHECK-NEXT: [[QUBIT:%.+]] = quantum.extract [[QREG]][%extracted] : !quantum.reg -> !quantum.bit
     # CHECK-NEXT: [[EXTRACTED_0:%.+]] = tensor.extract [[PARAM_TENSOR]][] : tensor<f64>
     # CHECK-NEXT: [[OUT_QUBITS:%.+]] = quantum.custom "RX"([[EXTRACTED_0]]) [[QUBIT]] : !quantum.bit
 
