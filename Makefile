@@ -23,6 +23,8 @@ ENABLE_ASAN ?= OFF
 TOML_SPECS ?= $(shell find ./runtime ./frontend -name '*.toml' -not -name 'pyproject.toml')
 ENABLE_FLAKY ?= OFF
 
+# Test
+
 PLATFORM := $(shell uname -s)
 ifeq ($(PLATFORM),Linux)
 COPY_FLAGS := --dereference
