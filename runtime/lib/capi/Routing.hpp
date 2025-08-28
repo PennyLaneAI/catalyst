@@ -125,25 +125,24 @@ class RoutingPass final {
         return path;
     }
 
-    QubitIdType getMappedWire(QubitIdType wire,  int64_t num_elements) 
-    { 
+    QubitIdType getMappedWire(QubitIdType wire, int64_t num_elements)
+    {
         QubitIdType numQubits = std::log2(num_elements);
         std::vector<QubitIdType> binaryVector;
-        if (wire == 0) 
-            binaryVector.push_back(0); 
+        if (wire == 0)
+            binaryVector.push_back(0);
         while (wire > 0) {
-            binaryVector.push_back(wire % 2); 
-            wire /= 2; 
+            binaryVector.push_back(wire % 2);
+            wire /= 2;
         }
         while (binaryVector.size() < numQubits)
             binaryVector.push_back(0);
         std::reverse(binaryVector.begin(), binaryVector.end());
         std::vector<QubitIdType> binaryVectorCopy;
-        for(auto i = 0; i < binaryVector.size(); i++) 
+        for (auto i = 0; i < binaryVector.size(); i++)
             binaryVectorCopy.push_back(binaryVector[i]);
 
-        for(auto i=0; i<binaryVector.size(); i++)
-        {
+        for (auto i = 0; i < binaryVector.size(); i++) {
             // for (auto& pair : this->wireMap) {
             //     if (pair.second == i)
             //     {
@@ -153,7 +152,7 @@ class RoutingPass final {
             // }
             binaryVector[i] = binaryVectorCopy[this->wireMap[i]];
         }
-     
+
         QubitIdType mapped_wire = 0;
         int power = 0;
         for (int i = binaryVector.size() - 1; i >= 0; --i) {
@@ -162,11 +161,11 @@ class RoutingPass final {
             }
             power++;
         }
-        return mapped_wire; 
+        return mapped_wire;
     }
 
-    std::tuple<QubitIdType, QubitIdType, std::vector<QubitIdType>>
-    getRoutedQubits(QUBIT *control, QUBIT *target)
+    std::tuple<QubitIdType, QubitIdType, std::vector<QubitIdType>> getRoutedQubits(QUBIT *control,
+                                                                                   QUBIT *target)
     {
         // Similar to qml.transpile implementation
         // https://docs.pennylane.ai/en/stable/_modules/pennylane/transforms/transpile.html
