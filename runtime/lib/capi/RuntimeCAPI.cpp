@@ -159,19 +159,7 @@ template <typename T> void Remap1DResultWires(T *data_aligned)
         std::vector<uint64_t> indices(capacity);
         for (int64_t label = 0; label < static_cast<int64_t>(labelBinaryString.size()); label++) {
             char bit = labelBinaryString[label];
-            uint64_t index;
-            if (RTD_PTR->getWireLabelMap().contains(label)) {
-                index = RTD_PTR->getWireLabelMap().at(label);
-            }
-            else {
-                // TODO: this if block will never be hit
-                // if ((label < 0) || (label >= capacity)) {
-                //     RT_FAIL("qml.state() not supported when dynamic qubit allocation is present.
-                //     "
-                //             "Please specify the target wires for the terminal measurement.");
-                // }
-                index = label;
-            }
+            uint64_t index = RTD_PTR->getWireLabelMap().at(label);
             // user wants label 0 in |1>
             // Map is {0:1}
             // This means we want qubit index 1, or qubit ID 200, in |1>
@@ -183,7 +171,6 @@ template <typename T> void Remap1DResultWires(T *data_aligned)
         for (int64_t p = 0; p < capacity; p++) {
             index_decimal += (1 << (capacity - 1 - p)) * indices[p];
         }
-        std::cout << "index_decimal " << index_decimal << "\n";
         remappedState[i] = data_aligned[index_decimal];
     }
 
@@ -198,6 +185,25 @@ void RemapStateResultWires(std::complex<double> *data_aligned)
 }
 
 void RemapProbsResultWires(double *data_aligned) { Remap1DResultWires<double>(data_aligned); }
+
+// sample() is a lot easier since no binary bit mappings involved
+void RemapSampleResultWires(double *data_aligned, int64_t Nrows, int64_t Ncols)
+{
+    RTD_PTR->fillWireLabelMapUpToCapacity();
+    std::vector<double> remappedSamples(Nrows * Ncols);
+
+    for (int64_t i = 0; i < Nrows; i++) {
+        // Each shot is the same
+        for (int64_t label = 0; label < Ncols; label++) {
+            uint64_t index = RTD_PTR->getWireLabelMap().at(label);
+            remappedSamples[i * Ncols + label] = data_aligned[i * Ncols + index];
+        }
+    }
+
+    for (int64_t i = 0; i < static_cast<int64_t>(remappedSamples.size()); i++) {
+        data_aligned[i] = remappedSamples[i];
+    }
+}
 
 } // namespace Catalyst::Runtime
 
@@ -1133,22 +1139,8 @@ void __catalyst__qis__Sample(MemRefT_double_2d *result, int64_t numQubits, ...)
                              result_p->strides);
 
     if (wires.empty()) {
-        int64_t capacity = RTD_PTR->getDeviceCapacity();
-        std::vector<QubitIdType> remappedWires(capacity);
-        for (int64_t i = 0; i < capacity; i++) {
-            remappedWires[i] = i;
-        }
-
-        for (const auto &pair : RTD_PTR->getWireLabelMap()) {
-            int64_t label = pair.first;
-            if ((label < 0) || (label >= capacity)) {
-                RT_FAIL("qml.sample() not supported when dynamic qubit allocation is present. "
-                        "Please specify the target wires for the terminal measurement.");
-            }
-            remappedWires[label] = pair.second;
-        }
-
-        getQuantumDevicePtr()->PartialSample(view, remappedWires);
+        getQuantumDevicePtr()->Sample(view);
+        RemapSampleResultWires(result_p->data_aligned, result_p->sizes[0], result_p->sizes[1]);
     }
     else {
         getQuantumDevicePtr()->PartialSample(view, wires);
@@ -1181,22 +1173,9 @@ void __catalyst__qis__Counts(PairT_MemRefT_double_int64_1d *result, int64_t numQ
                                      result_counts_p->sizes, result_counts_p->strides);
 
     if (wires.empty()) {
-        int64_t capacity = RTD_PTR->getDeviceCapacity();
-        std::vector<QubitIdType> remappedWires(capacity);
-        for (int64_t i = 0; i < capacity; i++) {
-            remappedWires[i] = i;
-        }
-
-        for (const auto &pair : RTD_PTR->getWireLabelMap()) {
-            int64_t label = pair.first;
-            if ((label < 0) || (label >= capacity)) {
-                RT_FAIL("qml.counts() not supported when dynamic qubit allocation is present. "
-                        "Please specify the target wires for the terminal measurement.");
-            }
-            remappedWires[label] = pair.second;
-        }
-
-        getQuantumDevicePtr()->PartialCounts(eigvals_view, counts_view, remappedWires);
+        getQuantumDevicePtr()->Counts(eigvals_view, counts_view);
+        Remap1DResultWires<double>(result_eigvals_p->data_aligned);
+        Remap1DResultWires<int64_t>(result_counts_p->data_aligned);
     }
     else {
         getQuantumDevicePtr()->PartialCounts(eigvals_view, counts_view, wires);

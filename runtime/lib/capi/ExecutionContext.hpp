@@ -189,7 +189,6 @@ class RTDevice {
     }
     void parse_capacity(std::string &rtd_kwargs)
     {
-        std::cout << "parsing capacity: " << rtd_kwargs << "\n";
         // 1. Find and extract the 'capacity' value
         size_t key_pos = rtd_kwargs.find("'capacity'");
 
@@ -315,6 +314,10 @@ class RTDevice {
 
     void fillWireLabelMapUpToCapacity()
     {
+        if (wire_label_to_qirarray_index.size() == capacity) {
+            return;
+        }
+
         std::set<uint64_t> unused_indices;
         for (uint64_t i = 0; i < capacity; i++) {
             unused_indices.insert(i);
@@ -336,12 +339,9 @@ class RTDevice {
         assert(wire_label_to_qirarray_index.size() == capacity);
     }
 
-    const std::map<int64_t, uint64_t> &getWireLabelMap() { return wire_label_to_qirarray_index; }
-
-    void resetWireLabelMap()
+    const std::map<int64_t, uint64_t> &getWireLabelMap() const
     {
-        current_biggest_wire_index = 0;
-        wire_label_to_qirarray_index = {};
+        return wire_label_to_qirarray_index;
     }
 
     friend std::ostream &operator<<(std::ostream &os, const RTDevice &device)
@@ -449,7 +449,6 @@ class ExecutionContext final {
     {
         std::lock_guard<std::mutex> lock(pool_mu);
         RTD_PTR->setDeviceStatus(RTDeviceStatus::Inactive);
-        RTD_PTR->resetWireLabelMap();
     }
 };
 } // namespace Catalyst::Runtime
