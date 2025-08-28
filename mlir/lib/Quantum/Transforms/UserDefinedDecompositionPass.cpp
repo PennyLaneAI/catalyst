@@ -14,14 +14,19 @@
 
 #define DEBUG_TYPE "user-defined-decomposition"
 
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/UB/IR/UBOps.h"
+#include "mlir/IR/DialectRegistry.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
 #include "llvm/ADT/StringMap.h"
-#include "llvm/Support/Debug.h"
+#include "llvm/ADT/StringSet.h"
+#include "llvm/Support/AllocatorBase.h"
 
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Transforms/Patterns.h"
@@ -39,6 +44,11 @@ namespace quantum {
 namespace DecompositionUtils {
 
 // Check if a function is a decomposition function
+// It's expected that the decomposition function would have these two attributes:
+// `catalyst.decomposition` and `catalyst.decomposition.target_op`
+// And these are set by the `updateDecompositionAttributes` function
+// The decomposition attributes are used to determine if a function is a decomposition function,
+// and target_op is that the decomposition function want to replace
 bool isDecompositionFunction(func::FuncOp func)
 {
     return func->hasAttr("catalyst.decomposition") &&
@@ -46,7 +56,8 @@ bool isDecompositionFunction(func::FuncOp func)
 }
 
 // Update decomposition attributes if function name begins with <Gate>_rule
-void updateDecompositionAttributes(func::FuncOp func, MLIRContext *context)
+// It's name sensitive, will not work if the function name is not following <Gate>_rule pattern
+void markDecompositionAttributes(func::FuncOp func, MLIRContext *context)
 {
     StringRef funcName = func.getSymName();
 
@@ -78,9 +89,20 @@ StringRef getTargetOp(func::FuncOp func)
 
 } // namespace DecompositionUtils
 
+/// A module pass that work through a module, register all decomposition functions, and apply the
+/// decomposition patterns
 struct UserDefinedDecompositionPass
     : impl::UserDefinedDecompositionPassBase<UserDefinedDecompositionPass> {
     using UserDefinedDecompositionPassBase::UserDefinedDecompositionPassBase;
+
+    void getDependentDialects(DialectRegistry &registry) const override
+    {
+        registry.insert<arith::ArithDialect>();
+        registry.insert<func::FuncDialect>();
+        registry.insert<quantum::QuantumDialect>();
+        registry.insert<tensor::TensorDialect>();
+        registry.insert<ub::UBDialect>();
+    }
 
   private:
     llvm::StringMap<func::FuncOp> decompositionRegistry;
@@ -89,44 +111,16 @@ struct UserDefinedDecompositionPass
     void discoverAndRegisterDecompositions(ModuleOp module,
                                            llvm::StringMap<func::FuncOp> &decompositionRegistry)
     {
-        LLVM_DEBUG(llvm::dbgs()
-                   << "========== [DECOMP REGISTRY] Starting decomposition discovery ==========\n");
-
-        int decompFunctions = 0;
-        int registeredMappings = 0;
-
         module.walk([&](func::FuncOp func) {
-            DecompositionUtils::updateDecompositionAttributes(func, &getContext());
-
+            DecompositionUtils::markDecompositionAttributes(func, &getContext());
             if (!DecompositionUtils::isDecompositionFunction(func)) {
                 return;
             }
-            decompFunctions++;
 
-            StringRef targetOp = DecompositionUtils::getTargetOp(func);
-            StringRef funcName = func.getSymName();
-
-            LLVM_DEBUG(llvm::dbgs() << "  [INFO] Decomposition name: '" << funcName << "'\n"
-                                    << "  [INFO] Target operation: '" << targetOp << "'\n";);
-
-            if (!targetOp.empty()) {
-                LLVM_DEBUG(llvm::dbgs() << "  [REGISTER] Mapping gate '" << targetOp
-                                        << "' -> function '" << funcName << "'\n");
+            if (StringRef targetOp = DecompositionUtils::getTargetOp(func); !targetOp.empty()) {
                 decompositionRegistry[targetOp] = func;
-                registeredMappings++;
-            }
-            else {
-                LLVM_DEBUG(llvm::dbgs() << "  [WARNING] No target operation specified for "
-                                           "decomposition function\n";);
             }
         });
-
-        LLVM_DEBUG(
-            llvm::dbgs() << "  [REGISTRY SUMMARY] Discovery completed!\n"
-                         << "    Decomposition functions found: " << decompFunctions << "\n"
-                         << "    Total gate->function mappings registered: " << registeredMappings
-                         << "\n"
-                         << "========== [DECOMP REGISTRY] Discovery completed ==========\n";);
     }
 
   public:
@@ -134,12 +128,13 @@ struct UserDefinedDecompositionPass
     {
         ModuleOp module = cast<ModuleOp>(getOperation());
 
-        // Discover and register all decomposition functions in the module
+        // Step 1: Discover and register all decomposition functions in the module
         discoverAndRegisterDecompositions(module, decompositionRegistry);
         if (decompositionRegistry.empty()) {
             return;
         }
 
+        // Step 2: Canonicalize the module
         RewritePatternSet patternsCanonicalization(&getContext());
         catalyst::quantum::CustomOp::getCanonicalizationPatterns(patternsCanonicalization,
                                                                  &getContext());
@@ -147,14 +142,23 @@ struct UserDefinedDecompositionPass
             return signalPassFailure();
         }
 
+        // TODO: It's expected that the target gate set is extracted from circuit function,
+        // and it's not implemented yet
+        llvm::StringSet<llvm::MallocAllocator> targetGateSet;
+
+        // Step 3: Apply the decomposition patterns
         RewritePatternSet decompositionPatterns(&getContext());
-        populateUserDefinedDecompositionPatterns(decompositionPatterns, decompositionRegistry);
+        populateUserDefinedDecompositionPatterns(decompositionPatterns, decompositionRegistry,
+                                                 targetGateSet);
         if (failed(applyPatternsGreedily(module, std::move(decompositionPatterns)))) {
             return signalPassFailure();
         }
 
+        // Step 4: Inline and canonicalize/CSE the module again
         PassManager pm(&getContext());
         pm.addPass(createInlinerPass());
+        pm.addPass(createCanonicalizerPass());
+        pm.addPass(createCSEPass());
         if (failed(pm.run(module))) {
             return signalPassFailure();
         }

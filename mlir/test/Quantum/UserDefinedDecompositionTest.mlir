@@ -219,3 +219,100 @@ module @param_rxry {
     return %out_qubits_1 : !quantum.bit
   }
 }
+
+// -----
+
+// Test recursive and qreg-based gate decomposition
+module @qreg_base_circuit {
+  func.func public @test_qreg_base_circuit() -> tensor<2xf64> {
+      // CHECK: [[CST:%.+]] = arith.constant 1.000000e+00 : f64
+      %cst = arith.constant 1.000000e+00 : f64
+
+      // CHECK: [[CST_0:%.+]] = stablehlo.constant dense<0.000000e+00> : tensor<f64>
+      // CHECK: [[CST_1:%.+]] = arith.constant dense<0> : tensor<1xi64>
+      // CHECK: [[CST_2:%.+]] = arith.constant dense<1.000000e+00> : tensor<f64>
+      // CHECK: [[REG:%.+]] = quantum.alloc( 1) : !quantum.reg
+      %0 = quantum.alloc( 1) : !quantum.reg
+
+      // CHECK: [[COMPARE:%.+]] = stablehlo.compare  NE, [[CST_2]], [[CST_0]],  FLOAT : (tensor<f64>, tensor<f64>) -> tensor<i1>
+      // CHECK: [[EXTRACTED:%.+]] = tensor.extract [[COMPARE]][] : tensor<i1>
+      // CHECK: [[CONDITIONAL:%.+]] = scf.if [[EXTRACTED]] -> (!quantum.reg) {
+      // CHECK:   [[SLICE1:%.+]] = stablehlo.slice [[CST_1]] [0:1] : (tensor<1xi64>) -> tensor<1xi64>
+      // CHECK:   [[RESHAPE1:%.+]] = stablehlo.reshape [[SLICE1]] : (tensor<1xi64>) -> tensor<i64>
+      // CHECK:   [[EXTRACTED_3:%.+]] = tensor.extract [[RESHAPE1]][] : tensor<i64>
+      // CHECK:   [[FROM_ELEMENTS:%.+]] = tensor.from_elements [[EXTRACTED_3]] : tensor<1xi64>
+      // CHECK:   [[SLICE2:%.+]] = stablehlo.slice [[FROM_ELEMENTS]] [0:1] : (tensor<1xi64>) -> tensor<1xi64>
+      // CHECK:   [[RESHAPE2:%.+]] = stablehlo.reshape [[SLICE2]] : (tensor<1xi64>) -> tensor<i64>
+      // CHECK:   [[EXTRACTED_4:%.+]] = tensor.extract [[RESHAPE2]][] : tensor<i64>
+      // CHECK:   [[EXTRACT1:%.+]] = quantum.extract [[REG]][[[EXTRACTED_4]]] : !quantum.reg -> !quantum.bit
+      // CHECK:   [[RZ1:%.+]] = quantum.custom "RZ"([[CST]]) [[EXTRACT1]] : !quantum.bit
+      // CHECK:   [[INSERT1:%.+]] = quantum.insert [[REG]][[[EXTRACTED_4]]], [[RZ1]] : !quantum.reg, !quantum.bit
+      // CHECK:   [[EXTRACT2:%.+]] = quantum.extract [[INSERT1]][[[EXTRACTED_4]]] : !quantum.reg -> !quantum.bit
+      // CHECK:   [[RZ2:%.+]] = quantum.custom "RZ"([[CST]]) [[EXTRACT2]] : !quantum.bit
+      // CHECK:   [[INSERT2:%.+]] = quantum.insert [[INSERT1]][[[EXTRACTED_4]]], [[RZ2]] : !quantum.reg, !quantum.bit
+      // CHECK:   scf.yield [[INSERT2]] : !quantum.reg
+      // CHECK: } else {
+      // CHECK:   scf.yield [[REG]] : !quantum.reg
+      // CHECK: }
+      // CHECK-NOT: quantum.custom "Test"
+      %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+      %out_qubits = quantum.custom "Test"(%cst) %1 : !quantum.bit
+      %2 = quantum.insert %0[ 0], %out_qubits : !quantum.reg, !quantum.bit
+
+      // CHECK: [[COMPBASIS:%.+]] = quantum.compbasis qreg [[CONDITIONAL]] : !quantum.obs
+      %3 = quantum.compbasis qreg %2 : !quantum.obs
+
+      // CHECK: [[PROBS:%.+]] = quantum.probs [[COMPBASIS]] : tensor<2xf64>
+      %4 = quantum.probs %3 : tensor<2xf64>
+
+      quantum.dealloc %2 : !quantum.reg
+      quantum.device_release
+
+      // CHECK: return [[PROBS]] : tensor<2xf64>
+      return %4 : tensor<2xf64>
+    }
+
+    // Decomposition function should be applied and removed from the module
+    // CHECK-NOT: func.func private @Test_rule_1
+    func.func private @Test_rule_1(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<1xi64>) -> !quantum.reg {
+      %cst = stablehlo.constant dense<0.000000e+00> : tensor<f64>
+      %0 = stablehlo.compare  NE, %arg1, %cst,  FLOAT : (tensor<f64>, tensor<f64>) -> tensor<i1>
+      %extracted = tensor.extract %0[] : tensor<i1>
+      %1 = scf.if %extracted -> (!quantum.reg) {
+        %2 = stablehlo.slice %arg2 [0:1] : (tensor<1xi64>) -> tensor<1xi64>
+        %3 = stablehlo.reshape %2 : (tensor<1xi64>) -> tensor<i64>
+        %extracted_0 = tensor.extract %3[] : tensor<i64>
+        %4 = quantum.extract %arg0[%extracted_0] : !quantum.reg -> !quantum.bit
+        %extracted_1 = tensor.extract %arg1[] : tensor<f64>
+        %out_qubits = quantum.custom "RzDecomp"(%extracted_1) %4 : !quantum.bit
+        %5 = stablehlo.slice %arg2 [0:1] : (tensor<1xi64>) -> tensor<1xi64>
+        %6 = stablehlo.reshape %5 : (tensor<1xi64>) -> tensor<i64>
+        %extracted_2 = tensor.extract %3[] : tensor<i64>
+        %7 = quantum.insert %arg0[%extracted_2], %out_qubits : !quantum.reg, !quantum.bit
+        %extracted_3 = tensor.extract %6[] : tensor<i64>
+        %8 = quantum.extract %7[%extracted_3] : !quantum.reg -> !quantum.bit
+        %extracted_4 = tensor.extract %arg1[] : tensor<f64>
+        %out_qubits_5 = quantum.custom "RzDecomp"(%extracted_4) %8 : !quantum.bit
+        %extracted_6 = tensor.extract %6[] : tensor<i64>
+        %9 = quantum.insert %7[%extracted_6], %out_qubits_5 : !quantum.reg, !quantum.bit
+        scf.yield %9 : !quantum.reg
+      } else {
+        scf.yield %arg0 : !quantum.reg
+      }
+      return %1 : !quantum.reg
+    }
+
+    // Decomposition function should be applied and removed from the module
+    // CHECK-NOT: func.func private @RzDecomp_rule_1
+    func.func private @RzDecomp_rule_1(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<1xi64>) -> !quantum.reg {
+      %0 = stablehlo.slice %arg2 [0:1] : (tensor<1xi64>) -> tensor<1xi64>
+      %1 = stablehlo.reshape %0 : (tensor<1xi64>) -> tensor<i64>
+      %extracted = tensor.extract %1[] : tensor<i64>
+      %2 = quantum.extract %arg0[%extracted] : !quantum.reg -> !quantum.bit
+      %extracted_0 = tensor.extract %arg1[] : tensor<f64>
+      %out_qubits = quantum.custom "RZ"(%extracted_0) %2 : !quantum.bit
+      %extracted_1 = tensor.extract %1[] : tensor<i64>
+      %3 = quantum.insert %arg0[%extracted_1], %out_qubits : !quantum.reg, !quantum.bit
+      return %3 : !quantum.reg
+    }
+}
