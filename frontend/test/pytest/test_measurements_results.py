@@ -35,13 +35,17 @@ class TestSample:
     def test_sample_on_0qbits(self):
         """Test sample on 0 qubits."""
 
-        if qml.capture.enabled():
-            pytest.xfail("capture doesn't currently support 0 wires.")
+        # TODO: try set_shots after capture work is completed
+        with pytest.warns(
+            qml.exceptions.PennyLaneDeprecationWarning, match="shots on device is deprecated"
+        ):
+            device = qml.device("lightning.qubit", wires=0, shots=10)
 
-        @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=0, shots=10))
-        def sample_0qbit():
-            return qml.sample()
+            @qjit
+            @qml.set_shots(10)
+            @qml.qnode(device)
+            def sample_0qbit():
+                return qml.sample()
 
         expected = np.empty(shape=(10, 0), dtype=int)
         observed = sample_0qbit()
@@ -50,11 +54,17 @@ class TestSample:
     def test_sample_on_1qbit(self, backend):
         """Test sample on 1 qubit."""
 
-        @qjit
-        @qml.qnode(qml.device(backend, wires=1, shots=1000))
-        def sample_1qbit(x: float):
-            qml.RX(x, wires=0)
-            return qml.sample()
+        # TODO: try set_shots after capture work is completed
+        with pytest.warns(
+            qml.exceptions.PennyLaneDeprecationWarning, match="shots on device is deprecated"
+        ):
+            device = qml.device(backend, wires=1, shots=1000)
+
+            @qjit
+            @qml.qnode(device)
+            def sample_1qbit(x: float):
+                qml.RX(x, wires=0)
+                return qml.sample()
 
         expected = np.array([[0]] * 1000)
         observed = sample_1qbit(0.0)
@@ -67,12 +77,18 @@ class TestSample:
     def test_sample_on_2qbits(self, backend):
         """Test sample on 2 qubits."""
 
-        @qjit
-        @qml.qnode(qml.device(backend, wires=2, shots=1000))
-        def sample_2qbits(x: float):
-            qml.RX(x, wires=0)
-            qml.RY(x, wires=1)
-            return qml.sample()
+        # TODO: try set_shots after capture work is completed
+        with pytest.warns(
+            qml.exceptions.PennyLaneDeprecationWarning, match="shots on device is deprecated"
+        ):
+            device = qml.device(backend, wires=2, shots=1000)
+
+            @qjit
+            @qml.qnode(device)
+            def sample_2qbits(x: float):
+                qml.RX(x, wires=0)
+                qml.RY(x, wires=1)
+                return qml.sample()
 
         expected = np.array([[0, 0]] * 1000)
         observed = sample_2qbits(0.0)
@@ -89,7 +105,8 @@ class TestCounts:
         """Test counts on 0 qubits."""
 
         @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=0, shots=10))
+        @qml.set_shots(10)
+        @qml.qnode(qml.device("lightning.qubit", wires=0))
         def counts_0qbit():
             return qml.counts()
 
@@ -101,7 +118,8 @@ class TestCounts:
         """Test counts on 1 qubits."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=1, shots=1000))
+        @qml.set_shots(1000)
+        @qml.qnode(qml.device(backend, wires=1))
         def counts_1qbit(x: float):
             qml.RX(x, wires=0)
             return qml.counts()
@@ -118,7 +136,8 @@ class TestCounts:
         """Test counts on 2 qubits."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=2, shots=1000))
+        @qml.set_shots(1000)
+        @qml.qnode(qml.device(backend, wires=2))
         def counts_2qbit(x: float):
             qml.RX(x, wires=0)
             qml.RY(x, wires=1)
@@ -136,7 +155,8 @@ class TestCounts:
         """Test counts on 2 qubits with check for endianness."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=2, shots=1000))
+        @qml.set_shots(1000)
+        @qml.qnode(qml.device(backend, wires=2))
         def counts_2qbit(x: float, y: float):
             qml.RX(x, wires=0)
             qml.RX(y, wires=1)
@@ -155,7 +175,8 @@ class TestCounts:
         """Test counts with all_outcomes=True."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=2, shots=1000))
+        @qml.set_shots(1000)
+        @qml.qnode(qml.device(backend, wires=2))
         def counts_2qbit(x: float):
             qml.RX(x, wires=0)
             qml.RY(x, wires=1)
@@ -1191,7 +1212,8 @@ class TestNullQubitMeasurements:
         """Test qml.sample() on null.qubit device."""
 
         @qjit
-        @qml.qnode(qml.device("null.qubit", wires=n_qubits, shots=self.n_shots))
+        @qml.set_shots(self.n_shots)
+        @qml.qnode(qml.device("null.qubit", wires=n_qubits))
         def circuit_sample():
             for i in range(n_qubits):
                 qml.Hadamard(wires=i)
@@ -1207,7 +1229,8 @@ class TestNullQubitMeasurements:
         """Test qml.sample() on null.qubit device, returning results per wire."""
 
         @qjit
-        @qml.qnode(qml.device("null.qubit", wires=2, shots=self.n_shots))
+        @qml.set_shots(self.n_shots)
+        @qml.qnode(qml.device("null.qubit", wires=2))
         def circuit_sample():
             qml.Hadamard(wires=0)
             qml.Hadamard(wires=1)
@@ -1225,7 +1248,8 @@ class TestNullQubitMeasurements:
         """Test qml.counts() on null.qubit device."""
 
         @qjit
-        @qml.qnode(qml.device("null.qubit", wires=n_qubits, shots=self.n_shots))
+        @qml.set_shots(self.n_shots)
+        @qml.qnode(qml.device("null.qubit", wires=n_qubits))
         def circuit_counts():
             for i in range(n_qubits):
                 qml.Hadamard(wires=i)
@@ -1245,7 +1269,8 @@ class TestNullQubitMeasurements:
         """Test qml.counts() on null.qubit device, returning results per wire."""
 
         @qjit
-        @qml.qnode(qml.device("null.qubit", wires=2, shots=self.n_shots))
+        @qml.set_shots(self.n_shots)
+        @qml.qnode(qml.device("null.qubit", wires=2))
         def circuit_counts():
             qml.Hadamard(wires=0)
             qml.Hadamard(wires=1)
@@ -1266,7 +1291,8 @@ class TestNullQubitMeasurements:
     def test_nullq_probs(self, n_qubits):
         """Test qml.probs() on null.qubit device."""
 
-        @qml.qnode(qml.device("null.qubit", wires=n_qubits, shots=self.n_shots))
+        @qml.set_shots(self.n_shots)
+        @qml.qnode(qml.device("null.qubit", wires=n_qubits))
         def circuit_probs():
             for i in range(n_qubits):
                 qml.Hadamard(wires=i)
@@ -1279,7 +1305,8 @@ class TestNullQubitMeasurements:
     def test_nullq_probs_per_wire(self):
         """Test qml.probs() on null.qubit device, returning results per wire."""
 
-        @qml.qnode(qml.device("null.qubit", wires=2, shots=self.n_shots))
+        @qml.set_shots(self.n_shots)
+        @qml.qnode(qml.device("null.qubit", wires=2))
         def circuit_probs():
             qml.Hadamard(wires=0)
             qml.Hadamard(wires=1)
@@ -1293,7 +1320,8 @@ class TestNullQubitMeasurements:
     def test_nullq_state(self, n_qubits):
         """Test qml.state() on null.qubit device."""
 
-        @qml.qnode(qml.device("null.qubit", wires=n_qubits, shots=None))
+        @qml.set_shots(None)
+        @qml.qnode(qml.device("null.qubit", wires=n_qubits))
         def circuit_state():
             for i in range(n_qubits):
                 qml.Hadamard(wires=i)
@@ -1307,7 +1335,8 @@ class TestNullQubitMeasurements:
     def test_nullq_expval(self, n_qubits):
         """Test qml.expval() on null.qubit device."""
 
-        @qml.qnode(qml.device("null.qubit", wires=n_qubits, shots=self.n_shots))
+        @qml.set_shots(self.n_shots)
+        @qml.qnode(qml.device("null.qubit", wires=n_qubits))
         def circuit_expval():
             for i in range(n_qubits):
                 qml.Hadamard(wires=i)
@@ -1322,7 +1351,8 @@ class TestNullQubitMeasurements:
     def test_nullq_var(self, n_qubits):
         """Test qml.var() on null.qubit device."""
 
-        @qml.qnode(qml.device("null.qubit", wires=n_qubits, shots=self.n_shots))
+        @qml.set_shots(self.n_shots)
+        @qml.qnode(qml.device("null.qubit", wires=n_qubits))
         def circuit_var():
             for i in range(n_qubits):
                 qml.Hadamard(wires=i)

@@ -8,7 +8,7 @@ BLACKVERSIONMINOR := $(if $(BLACKVERSIONMINOR),$(BLACKVERSIONMINOR),0)
 MK_ABSPATH := $(abspath $(lastword $(MAKEFILE_LIST)))
 MK_DIR := $(dir $(MK_ABSPATH))
 LLVM_BUILD_DIR ?= $(MK_DIR)/mlir/llvm-project/build
-MHLO_BUILD_DIR ?= $(MK_DIR)/mlir/mlir-hlo/bazel-build
+STABLEHLO_BUILD_DIR ?= $(MK_DIR)/mlir/stablehlo/build
 DIALECTS_SRC_DIR ?= $(MK_DIR)/mlir
 DIALECTS_BUILD_DIR ?= $(MK_DIR)/mlir/build
 RT_BUILD_DIR ?= $(MK_DIR)/runtime/build
@@ -119,21 +119,25 @@ frontend:
 	$(PYTHON) -m pip install -e . --extra-index-url https://test.pypi.org/simple $(PIP_VERBOSE_FLAG)
 	rm -r frontend/pennylane_catalyst.egg-info
 
-.PHONY: mlir llvm mhlo enzyme dialects runtime oqc
+.PHONY: mlir llvm stablehlo enzyme dialects runtime oqc
 mlir:
 	$(MAKE) -C mlir all
 
 llvm:
 	$(MAKE) -C mlir llvm
 
-mhlo:
-	$(MAKE) -C mlir mhlo
+stablehlo:
+	$(MAKE) -C mlir stablehlo
 
 enzyme:
 	$(MAKE) -C mlir enzyme
 
 dialects:
 	$(MAKE) -C mlir dialects
+	
+.PHONY: dialect-docs
+dialect-docs:
+	$(MAKE) -C mlir dialect-docs
 
 runtime:
 	$(MAKE) -C runtime runtime ENABLE_OQD=$(ENABLE_OQD)
@@ -222,6 +226,7 @@ wheel:
 	cp $(COPY_FLAGS) $(DIALECTS_BUILD_DIR)/bin/catalyst $(MK_DIR)/frontend/bin/
 	find $(MK_DIR)/frontend -type d -name __pycache__ -exec rm -rf {} +
 
+
 	# Copy selected headers to `frontend/include' to include them in the wheel
 	mkdir -p $(MK_DIR)/frontend/catalyst/include
 	find $(DIALECTS_SRC_DIR)/include/Quantum $(DIALECTS_BUILD_DIR)/include/Quantum \
@@ -269,7 +274,7 @@ clean:
 clean-all: clean clean-mlir clean-runtime clean-oqc
 clean-catalyst: clean clean-dialects clean-runtime clean-oqc
 
-.PHONY: clean-mlir clean-dialects clean-plugin clean-llvm clean-mhlo clean-enzyme
+.PHONY: clean-mlir clean-dialects clean-plugin clean-llvm clean-stablehlo clean-enzyme
 clean-mlir:
 	$(MAKE) -C mlir clean
 
@@ -285,8 +290,8 @@ clean-llvm:
 reset-llvm:
 	$(MAKE) -C mlir reset-llvm
 
-clean-mhlo:
-	$(MAKE) -C mlir clean-mhlo
+clean-stablehlo:
+	$(MAKE) -C mlir clean-stablehlo
 
 clean-enzyme:
 	$(MAKE) -C mlir clean-enzyme

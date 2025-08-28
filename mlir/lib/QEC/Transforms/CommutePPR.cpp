@@ -111,7 +111,7 @@ void moveCliffordPastNonClifford(const PauliStringWrapper &lhsPauli,
         updatePauliWordSign(rhs, rhsPauli.isNegative(), rewriter);
     }
 
-    // Fullfill Operands of RHS
+    // Fulfill Operands of RHS
     SmallVector<Value> newRHSOperands = replaceValueWithOperands(lhsPauli, rhsPauli);
 
     // Remove the Identity gate in the Pauli product

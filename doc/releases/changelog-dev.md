@@ -2,15 +2,43 @@
 
 <h3>New features since last release</h3>
 
+* Catalyst now provides native support for `SingleExcitation`, `DoubleExcitation`,
+  and `PCPhase` on compatible devices like Lightning simulators.
+  This enhancement avoids unnecessary gate decomposition,
+  leading to reduced compilation time and improved overall performance.
+  [(#1980)](https://github.com/PennyLaneAI/catalyst/pull/1980)
+  [(#1987)](https://github.com/PennyLaneAI/catalyst/pull/1987)
+
+  For example, the code below is captured with `PCPhase` avoiding the
+  decomposition to many `MultiControlledX` and `PhaseShift` gates:
+
+  ```python
+  dev = qml.device("lightning.qubit", wires=3)
+
+  @qml.qnode(dev)
+  def circuit():
+      qml.ctrl(qml.PCPhase(0.5, dim=1, wires=[0, 2]), control=[1])
+      return qml.probs()
+  ```
+
 <h3>Improvements 🛠</h3>
+
+* Fix resource tracking unit test polluting the environment with output files
+  [(#1861)](https://github.com/PennyLaneAI/catalyst/pull/1861)
+
+* Adjoint differentiation is used by default when executing on lightning devices, significantly reduces gradient computation time.
+  [(#1961)](https://github.com/PennyLaneAI/catalyst/pull/1961)
+
+* Added `detensorizefunctionboundary` pass to remove scalar tensors across function boundaries and enabled `symbol-dce` pass to remove dead functions, reducing the number of instructions for compilation.
+  [(#1904)](https://github.com/PennyLaneAI/catalyst/pull/1904)
 
 * Workflows `for_loop`, `while_loop` and `cond` now error out if `qml.capture` is enabled.
   [(#1945)](https://github.com/PennyLaneAI/catalyst/pull/1945)
 
-*  Displays Catalyst version in `quantum-opt --version` output.
+* Displays Catalyst version in `quantum-opt --version` output.
   [(#1922)](https://github.com/PennyLaneAI/catalyst/pull/1922)
 
-* Snakecased keyword arguments to :func:`catalyst.passes.apply_pass()` are now correctly parsed 
+* Snakecased keyword arguments to :func:`catalyst.passes.apply_pass()` are now correctly parsed
   to kebab-case pass options [(#1954)](https://github.com/PennyLaneAI/catalyst/pull/1954).
   For example:
 
@@ -27,25 +55,49 @@
   ```pycon
   %0 = transform.apply_registered_pass "some-pass" with options = {"an-option" = true, "maxValue" = 1 : i64, "multi-word-option" = 1 : i64}
   ```
+* Added checks to raise an error when the input qubits to the multi-qubit gates in the runtime CAPI are not all distinct. 
+  [(#2006)](https://github.com/PennyLaneAI/catalyst/pull/2006).
+
+* Commuting Clifford Pauli Product Rotation (PPR) operations, past non-Clifford PPRs, now supports P(π/2) Cliffords in addition to P(π/4)
+  [(#1966)](https://github.com/PennyLaneAI/catalyst/pull/1966)
+
+* A new jax primitive `qdealloc_qb_p` is available for single qubit deallocations.
+  [(#2005)](https://github.com/PennyLaneAI/catalyst/pull/2005)
 
 <h3>Breaking changes 💔</h3>
+
+* The `shots` property has been removed from `OQDDevice`. The number of shots for a qnode execution is now set directly on the qnode via `qml.set_shots`,
+  either used as decorator `@qml.set_shots(num_shots)` or directly on the qnode `qml.set_shots(qnode, shots=num_shots)`.
+  [(#1988)](https://github.com/PennyLaneAI/catalyst/pull/1988)
 
 * The JAX version used by Catalyst is updated to 0.6.2.
   [(#1897)](https://github.com/PennyLaneAI/catalyst/pull/1897)
 
-* The version of LLVM, mlir-hlo, and Enzyme used by Catalyst has been updated.
+* The version of LLVM and Enzyme used by Catalyst has been updated.
+  The mlir-hlo dependency has been replaced with stablehlo.
   [(#1916)](https://github.com/PennyLaneAI/catalyst/pull/1916)
+  [(#1921)](https://github.com/PennyLaneAI/catalyst/pull/1921)
 
   The LLVM version has been updated to
   [commit f8cb798](https://github.com/llvm/llvm-project/tree/f8cb7987c64dcffb72414a40560055cb717dbf74).
-  The mlir-hlo version has been updated to
-  [commit 1dd2e71](https://github.com/tensorflow/mlir-hlo/tree/1dd2e71331014ae0373f6bf900ce6be393357190).
+  The stablehlo version has been updated to
+  [commit 69d6dae](https://github.com/openxla/stablehlo/commit/69d6dae46e1c7de36e6e6973654754f05353cba5).
   The Enzyme version has been updated to
   [v0.0.186](https://github.com/EnzymeAD/Enzyme/releases/tag/v0.0.186).
 
 <h3>Deprecations 👋</h3>
 
+* Deprecated usages of `Device.shots` along with setting `device(..., shots=...)`.
+  Heavily adjusted frontend pipelines within qfunc, tracer, verification and QJITDevice to account for this change.
+  [(#1952)](https://github.com/PennyLaneAI/catalyst/pull/1952)
+
 <h3>Bug fixes 🐛</h3>
+
+* Fix type promotion on conditional branches, where the return values from `cond` should be the promoted one.
+  [(#1977)](https://github.com/PennyLaneAI/catalyst/pull/1977)
+
+* Fix wrong handling of partitioned shots in the decomposition pass of `measurements_from_samples`.
+  [(#1981)](https://github.com/PennyLaneAI/catalyst/pull/1981)
 
 * Fix errors in AutoGraph transformed functions when `qml.prod` is used together with other operator
   transforms (e.g. `qml.adjoint`).
@@ -56,6 +108,15 @@
   [(#1926)](https://github.com/PennyLaneAI/catalyst/pull/1926)
 
 <h3>Internal changes ⚙️</h3>
+
+* Updates use of `qml.transforms.dynamic_one_shot.parse_native_mid_circuit_measurements` to improved signature.
+  [(#1953)](https://github.com/PennyLaneAI/catalyst/pull/1953)
+
+* When capture is enabled, `qjit(autograph=True)` will use capture autograph instead of catalyst autograph.
+  [(#1960)](https://github.com/PennyLaneAI/catalyst/pull/1960)
+
+* `from_plxpr` can now handle dynamic shots and overridden device shots.
+  [(#1983)](https://github.com/PennyLaneAI/catalyst/pull/1983/)
 
 * QJitDevice helper `extract_backend_info` removed its redundant `capabilities` argument.
   [(#1956)](https://github.com/PennyLaneAI/catalyst/pull/1956)
@@ -70,13 +131,14 @@
   [(#1932)](https://github.com/PennyLaneAI/catalyst/pull/1932)
 
 * `from_plxpr` now supports adjoint and ctrl operations and transforms, operator
-  arithemtic observables, `Hermitian` observables, `for_loop` outside qnodes,
-  and `while_loop` outside QNode's.
+  arithmetic observables, `Hermitian` observables, `for_loop` outside qnodes, `cond` outside qnodes,
+  `while_loop` outside QNode's, and `cond` with elif branches.
   [(#1844)](https://github.com/PennyLaneAI/catalyst/pull/1844)
   [(#1850)](https://github.com/PennyLaneAI/catalyst/pull/1850)
   [(#1903)](https://github.com/PennyLaneAI/catalyst/pull/1903)
   [(#1896)](https://github.com/PennyLaneAI/catalyst/pull/1896)
   [(#1889)](https://github.com/PennyLaneAI/catalyst/pull/1889)
+  [(#1973)](https://github.com/PennyLaneAI/catalyst/pull/1973)
 
 * The `qec.layer` and `qec.yield` operations have been added to the QEC dialect to represent a group
   of QEC operations. The main use case is to analyze the depth of a circuit.
@@ -125,8 +187,17 @@
       ...
   ```
 
+* The `mbqc.graph_state_prep` operation has been added to the MBQC dialect. This operation prepares
+  a graph state with arbitrary qubit connectivity, specified by an input adjacency-matrix operand,
+  for use in MBQC workloads.
+  [(#1965)](https://github.com/PennyLaneAI/catalyst/pull/1965)
+
 * `catalyst.accelerate`, `catalyst.debug.callback`, and `catalyst.pure_callback`, `catalyst.debug.print`, and `catalyst.debug.print_memref` now work when capture is enabled.
   [(#1902)](https://github.com/PennyLaneAI/catalyst/pull/1902)
+
+* The merge rotation pass in Catalyst (:func:`~.passes.merge_rotations`) now also considers
+  `qml.Rot` and `qml.CRot`.
+  [(#1955)](https://github.com/PennyLaneAI/catalyst/pull/1955)
 
 <h3>Documentation 📝</h3>
 
@@ -134,10 +205,14 @@
 
 This release contains contributions from (in alphabetical order):
 
+Ali Asadi,
 Joey Carter,
+Yushao Chen,
 Sengthai Heng,
 David Ittah,
 Christina Lee,
+Joseph Lee,
 Andrija Paurevic,
 Roberto Turrado,
-Paul Haochen Wang.
+Paul Haochen Wang,
+Jake Zaia.

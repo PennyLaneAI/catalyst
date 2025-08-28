@@ -141,7 +141,6 @@ class QFunc:
                 return Function(dynamic_one_shot(self, mcm_config=mcm_config))(*args, **kwargs)
 
         new_device = copy(self.device)
-        new_device._shots = self._shots  # pylint: disable=protected-access
         qjit_device = QJITDevice(new_device)
 
         static_argnums = kwargs.pop("static_argnums", ())
@@ -264,17 +263,12 @@ def dynamic_one_shot(qnode, **kwargs):
         return dynamic_one_shot_partial(qnode)
 
     single_shot_qnode = transform_to_single_shot(qnode)
+    single_shot_qnode = qml.set_shots(single_shot_qnode, shots=1)
     if mcm_config is not None:
         single_shot_qnode.execute_kwargs["postselect_mode"] = mcm_config.postselect_mode
         single_shot_qnode.execute_kwargs["mcm_method"] = mcm_config.mcm_method
     single_shot_qnode._dynamic_one_shot_called = True
-    dev = qnode.device
     total_shots = _get_total_shots(qnode)
-
-    new_dev = copy(dev)
-    new_dev._shots = qml.measurements.Shots(1)
-    single_shot_qnode.device = new_dev
-    single_shot_qnode._set_shots(qml.measurements.Shots(1))  # pylint: disable=protected-access
 
     def one_shot_wrapper(*args, **kwargs):
         def wrap_single_shot_qnode(*_):
@@ -288,7 +282,7 @@ def dynamic_one_shot(qnode, **kwargs):
         out = list(results)
         if has_mcm:
             out = parse_native_mid_circuit_measurements(
-                cpy_tape, aux_tapes, results, postselect_mode="pad-invalid-samples"
+                cpy_tape, results=results, postselect_mode="pad-invalid-samples"
             )
             if len(cpy_tape.measurements) == 1:
                 out = (out,)

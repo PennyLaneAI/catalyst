@@ -113,26 +113,25 @@ def compare_eqns(eqn1, eqn2):
         assert ov1.aval == ov2.aval
 
 
+@pytest.mark.usefixtures("use_capture")
 class TestErrors:
     """Test that errors are raised in unsupported situations."""
 
     def test_measuring_eigvals_not_supported(self):
         """Test that a NotImplementedError is raised for converting a measurement
         specified via eigvals and wires."""
+        dev = qml.device("lightning.qubit", wires=2)
 
-        dev = qml.device("lightning.qubit", wires=2, shots=50)
-
+        @qml.set_shots(50)
         @qml.qnode(dev)
         def circuit():
             return qml.measurements.SampleMP(
                 wires=qml.wires.Wires((0, 1)), eigvals=np.array([-1.0, -1.0, 1.0, 1.0])
             )
 
-        qml.capture.enable()
         jaxpr = jax.make_jaxpr(circuit)()
         with pytest.raises(NotImplementedError, match="does not yet support measurements with"):
             from_plxpr(jaxpr)()
-        qml.capture.disable()
 
     def test_measuring_measurement_values(self):
         """Test that measuring a MeasurementValue raises a NotImplementedError."""
@@ -145,12 +144,10 @@ class TestErrors:
                 obs=2
             )  # classical value like will be used for mcms
 
-        qml.capture.enable()
         jaxpr = jax.make_jaxpr(circuit)()
 
         with pytest.raises(NotImplementedError, match=r"not yet supported"):
             from_plxpr(jaxpr)()
-        qml.capture.disable()
 
     def test_unsupported_measurement(self):
         """Test that a NotImplementedError is raised if a measurement
@@ -162,12 +159,25 @@ class TestErrors:
         def circuit():
             return qml.vn_entropy(wires=0)
 
-        qml.capture.enable()
         jaxpr = jax.make_jaxpr(circuit)()
 
         with pytest.raises(NotImplementedError, match="not yet supported"):
             from_plxpr(jaxpr)()
-        qml.capture.disable()
+
+    def test_no_shot_vectors(self):
+        """Test that a NotImplementedError is raised with shot vectors."""
+
+        dev = qml.device("lightning.qubit", wires=1)
+
+        @qml.set_shots((10, 10, 20))
+        @qml.qnode(dev)
+        def c():
+            return qml.sample(wires=0)
+
+        jaxpr = jax.make_jaxpr(c)()
+
+        with pytest.raises(NotImplementedError, match="not yet supported"):
+            from_plxpr(jaxpr)()
 
 
 class TestCatalystCompareJaxpr:
@@ -364,8 +374,9 @@ class TestCatalystCompareJaxpr:
     def test_sample(self):
         """Test comparison and execution of a jaxpr returning samples."""
 
-        dev = qml.device("lightning.qubit", wires=2, shots=50)
+        dev = qml.device("lightning.qubit", wires=2)
 
+        @qml.set_shots(50)
         @qml.qnode(dev)
         def circuit():
             qml.X(0)
@@ -397,8 +408,9 @@ class TestCatalystCompareJaxpr:
     def test_counts(self):
         """Test comparison and execution of a jaxpr returning counts."""
 
-        dev = qml.device("lightning.qubit", wires=2, shots=50)
+        dev = qml.device("lightning.qubit", wires=2)
 
+        @qml.set_shots(50)
         @qml.qnode(dev)
         def circuit():
             qml.X(0)
@@ -537,14 +549,15 @@ class TestCatalystCompareJaxpr:
     def test_dynamic_shots(self):
         """Test that shots can be specified on qnode call."""
 
-        dev = qml.device("lightning.qubit", wires=2, shots=50)
+        dev = qml.device("lightning.qubit", wires=2)
 
+        @qml.set_shots(50)
         @qml.qnode(dev)
         def circuit():
             return qml.sample(wires=0)
 
         def f():
-            return circuit(shots=100)
+            return qml.set_shots(circuit, shots=100)()
 
         qml.capture.enable()
         jaxpr = jax.make_jaxpr(f)()

@@ -226,20 +226,22 @@ def get_hlo_lowering_stage(_options: CompileOptions) -> List[str]:
     """Returns the list of passes to lower StableHLO to upstream MLIR dialects."""
     hlo_lowering = [
         "canonicalize",
-        "func.func(chlo-legalize-to-hlo)",
-        "stablehlo-legalize-to-hlo",
-        "func.func(mhlo-legalize-control-flow)",
-        "func.func(hlo-legalize-to-linalg)",
-        "func.func(mhlo-legalize-to-std)",
-        "func.func(mhlo-legalize-sort)",
-        "convert-to-signless",
+        "func.func(chlo-legalize-to-stablehlo)",
+        "func.func(stablehlo-legalize-control-flow)",
+        "func.func(stablehlo-aggressive-simplification)",
+        "stablehlo-legalize-to-linalg",
+        "func.func(stablehlo-legalize-to-std)",
+        "func.func(stablehlo-legalize-sort)",
+        "stablehlo-convert-to-signless",
         "canonicalize",
         "scatter-lowering",
         "hlo-custom-call-lowering",
         "cse",
         "func.func(linalg-detensorize{aggressive-mode})",
         "detensorize-scf",
+        "detensorize-function-boundary",
         "canonicalize",
+        "symbol-dce",
     ]
     return hlo_lowering
 
@@ -274,7 +276,10 @@ def get_bufferization_stage(options: CompileOptions) -> List[str]:
         "convert-tensor-to-linalg",  # tensor.pad
         "convert-elementwise-to-linalg",  # Must be run before --one-shot-bufferize
         "gradient-preprocess",
-        "eliminate-empty-tensors",
+        # "eliminate-empty-tensors",
+        # Keep eliminate-empty-tensors commented out until benchmarks use more structure
+        # and produce functions of reasonable size. Otherwise, eliminate-empty-tensors
+        # will consume a significant amount of compile time along with one-shot-bufferize.
         ####################
         "one-shot-bufferize{" + bufferization_options + "}",
         ####################
