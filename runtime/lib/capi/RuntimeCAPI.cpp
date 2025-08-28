@@ -519,6 +519,24 @@ void __catalyst__qis__SetState(MemRefT_CplxT_double_1d *data, uint64_t numQubits
     getQuantumDevicePtr()->SetState(data_view, wires);
 }
 
+void __catalyst__qis__PCPhase(double theta, double dim, const Modifiers *modifiers,
+                              int64_t numQubits, ...)
+{
+    RT_ASSERT(numQubits >= 0);
+    RT_ASSERT(dim >= 0 && dim == static_cast<int64_t>(dim));
+
+    va_list args;
+    va_start(args, numQubits);
+    std::vector<QubitIdType> wires(numQubits);
+    for (int64_t i = 0; i < numQubits; i++) {
+        wires[i] = va_arg(args, QubitIdType);
+    }
+    va_end(args);
+
+    getQuantumDevicePtr()->NamedOperation("PCPhase", {theta, dim}, wires,
+                                          /* modifiers */ MODIFIERS_ARGS(modifiers));
+}
+
 void __catalyst__qis__SetBasisState(MemRefT_int8_1d *data, uint64_t numQubits, ...)
 {
     RT_ASSERT(numQubits > 0);
@@ -658,6 +676,8 @@ void __catalyst__qis__CNOT(QUBIT *control, QUBIT *target, const Modifiers *modif
 void __catalyst__qis__CY(QUBIT *control, QUBIT *target, const Modifiers *modifiers)
 {
     if (RTD_PTR != nullptr && RTD_PTR->getRuntimeRouter() != nullptr) {
+        RT_FAIL_IF(control == target,
+               "Invalid input for CY gate. Control and target qubit operands must be distinct.");
         std::tuple<QubitIdType, QubitIdType, std::vector<QubitIdType>> resultTuple = RTD_PTR->getRuntimeRouter()->getRoutedQubits(control, target);
         QubitIdType routedQubitFirst = std::get<0>(resultTuple);
         QubitIdType routedQubitSecond = std::get<1>(resultTuple);
@@ -688,6 +708,8 @@ void __catalyst__qis__CY(QUBIT *control, QUBIT *target, const Modifiers *modifie
 void __catalyst__qis__CZ(QUBIT *control, QUBIT *target, const Modifiers *modifiers)
 {
     if (RTD_PTR != nullptr && RTD_PTR->getRuntimeRouter() != nullptr) {
+        RT_FAIL_IF(control == target,
+               "Invalid input for CZ gate. Control and target qubit operands must be distinct.");
         std::tuple<QubitIdType, QubitIdType, std::vector<QubitIdType>> resultTuple = RTD_PTR->getRuntimeRouter()->getRoutedQubits(control, target);
         QubitIdType routedQubitFirst = std::get<0>(resultTuple);
         QubitIdType routedQubitSecond = std::get<1>(resultTuple);
@@ -717,6 +739,8 @@ void __catalyst__qis__CZ(QUBIT *control, QUBIT *target, const Modifiers *modifie
 void __catalyst__qis__SWAP(QUBIT *control, QUBIT *target, const Modifiers *modifiers)
 {
     if (RTD_PTR != nullptr && RTD_PTR->getRuntimeRouter() != nullptr) {
+        RT_FAIL_IF(control == target,
+               "Invalid input for SWAP gate. Control and target qubit operands must be distinct.");
         std::tuple<QubitIdType, QubitIdType, std::vector<QubitIdType>> resultTuple = RTD_PTR->getRuntimeRouter()->getRoutedQubits(control, target);
         QubitIdType routedQubitFirst = std::get<0>(resultTuple);
         QubitIdType routedQubitSecond = std::get<1>(resultTuple);
@@ -747,6 +771,9 @@ void __catalyst__qis__IsingXX(double theta, QUBIT *control, QUBIT *target,
                               const Modifiers *modifiers)
 {
     if (RTD_PTR != nullptr && RTD_PTR->getRuntimeRouter() != nullptr) {
+        RT_FAIL_IF(
+            control == target,
+            "Invalid input for IsingXX gate. Control and target qubit operands must be distinct.");
         std::tuple<QubitIdType, QubitIdType, std::vector<QubitIdType>> resultTuple = RTD_PTR->getRuntimeRouter()->getRoutedQubits(control, target);
         QubitIdType routedQubitFirst = std::get<0>(resultTuple);
         QubitIdType routedQubitSecond = std::get<1>(resultTuple);
@@ -777,6 +804,9 @@ void __catalyst__qis__IsingYY(double theta, QUBIT *control, QUBIT *target,
                               const Modifiers *modifiers)
 {
     if (RTD_PTR != nullptr && RTD_PTR->getRuntimeRouter() != nullptr) {
+        RT_FAIL_IF(
+            control == target,
+            "Invalid input for IsingYY gate. Control and target qubit operands must be distinct.");
         std::tuple<QubitIdType, QubitIdType, std::vector<QubitIdType>> resultTuple = RTD_PTR->getRuntimeRouter()->getRoutedQubits(control, target);
         QubitIdType routedQubitFirst = std::get<0>(resultTuple);
         QubitIdType routedQubitSecond = std::get<1>(resultTuple);
@@ -807,6 +837,9 @@ void __catalyst__qis__IsingXY(double theta, QUBIT *control, QUBIT *target,
                               const Modifiers *modifiers)
 {
     if (RTD_PTR != nullptr && RTD_PTR->getRuntimeRouter() != nullptr) {
+        RT_FAIL_IF(
+            control == target,
+            "Invalid input for IsingXY gate. Control and target qubit operands must be distinct.");
         std::tuple<QubitIdType, QubitIdType, std::vector<QubitIdType>> resultTuple = RTD_PTR->getRuntimeRouter()->getRoutedQubits(control, target);
         QubitIdType routedQubitFirst = std::get<0>(resultTuple);
         QubitIdType routedQubitSecond = std::get<1>(resultTuple);
@@ -837,6 +870,9 @@ void __catalyst__qis__IsingZZ(double theta, QUBIT *control, QUBIT *target,
                               const Modifiers *modifiers)
 {
     if (RTD_PTR != nullptr && RTD_PTR->getRuntimeRouter() != nullptr) {
+        RT_FAIL_IF(
+            control == target,
+            "Invalid input for IsingZZ gate. Control and target qubit operands must be distinct.");
         std::tuple<QubitIdType, QubitIdType, std::vector<QubitIdType>> resultTuple = RTD_PTR->getRuntimeRouter()->getRoutedQubits(control, target);
         QubitIdType routedQubitFirst = std::get<0>(resultTuple);
         QubitIdType routedQubitSecond = std::get<1>(resultTuple);
@@ -863,10 +899,37 @@ void __catalyst__qis__IsingZZ(double theta, QUBIT *control, QUBIT *target,
     }
 }
 
+void __catalyst__qis__SingleExcitation(double phi, QUBIT *wire0, QUBIT *wire1,
+                                       const Modifiers *modifiers)
+{
+    RT_FAIL_IF(wire0 == wire1,
+               "Invalid input for SingleExcitation gate. All two qubit operands must be distinct.");
+    getQuantumDevicePtr()->NamedOperation(
+        "SingleExcitation", {phi},
+        {reinterpret_cast<QubitIdType>(wire0), reinterpret_cast<QubitIdType>(wire1)},
+        MODIFIERS_ARGS(modifiers));
+}
+
+void __catalyst__qis__DoubleExcitation(double phi, QUBIT *wire0, QUBIT *wire1, QUBIT *wire2,
+                                       QUBIT *wire3, const Modifiers *modifiers)
+{
+    RT_FAIL_IF(
+        (wire0 == wire1 || wire0 == wire2 || wire0 == wire3 || wire1 == wire2 || wire1 == wire3 ||
+         wire2 == wire3),
+        "Invalid input for DoubleExcitation gate. All four qubit operands must be distinct.");
+    getQuantumDevicePtr()->NamedOperation(
+        "DoubleExcitation", {phi},
+        {reinterpret_cast<QubitIdType>(wire0), reinterpret_cast<QubitIdType>(wire1),
+         reinterpret_cast<QubitIdType>(wire2), reinterpret_cast<QubitIdType>(wire3)},
+        MODIFIERS_ARGS(modifiers));
+}
+
 void __catalyst__qis__ControlledPhaseShift(double theta, QUBIT *control, QUBIT *target,
                                            const Modifiers *modifiers)
 {
     if (RTD_PTR != nullptr && RTD_PTR->getRuntimeRouter() != nullptr) {
+        RT_FAIL_IF(control == target, "Invalid input for ControlledPhaseShift gate. Control and target "
+                                  "qubit operands must be distinct.");
         std::tuple<QubitIdType, QubitIdType, std::vector<QubitIdType>> resultTuple = RTD_PTR->getRuntimeRouter()->getRoutedQubits(control, target);
         QubitIdType routedQubitFirst = std::get<0>(resultTuple);
         QubitIdType routedQubitSecond = std::get<1>(resultTuple);
@@ -896,6 +959,8 @@ void __catalyst__qis__ControlledPhaseShift(double theta, QUBIT *control, QUBIT *
 void __catalyst__qis__CRX(double theta, QUBIT *control, QUBIT *target, const Modifiers *modifiers)
 {
     if (RTD_PTR != nullptr && RTD_PTR->getRuntimeRouter() != nullptr) {
+        RT_FAIL_IF(control == target,
+               "Invalid input for CRX gate. Control and target qubit operands must be distinct.");
         std::tuple<QubitIdType, QubitIdType, std::vector<QubitIdType>> resultTuple = RTD_PTR->getRuntimeRouter()->getRoutedQubits(control, target);
         QubitIdType routedQubitFirst = std::get<0>(resultTuple);
         QubitIdType routedQubitSecond = std::get<1>(resultTuple);
@@ -925,6 +990,8 @@ void __catalyst__qis__CRX(double theta, QUBIT *control, QUBIT *target, const Mod
 void __catalyst__qis__CRY(double theta, QUBIT *control, QUBIT *target, const Modifiers *modifiers)
 {
     if (RTD_PTR != nullptr && RTD_PTR->getRuntimeRouter() != nullptr) {
+        RT_FAIL_IF(control == target,
+               "Invalid input for CRY gate. Control and target qubit operands must be distinct.");
         std::tuple<QubitIdType, QubitIdType, std::vector<QubitIdType>> resultTuple = RTD_PTR->getRuntimeRouter()->getRoutedQubits(control, target);
         QubitIdType routedQubitFirst = std::get<0>(resultTuple);
         QubitIdType routedQubitSecond = std::get<1>(resultTuple);
@@ -954,6 +1021,8 @@ void __catalyst__qis__CRY(double theta, QUBIT *control, QUBIT *target, const Mod
 void __catalyst__qis__CRZ(double theta, QUBIT *control, QUBIT *target, const Modifiers *modifiers)
 {
     if (RTD_PTR != nullptr && RTD_PTR->getRuntimeRouter() != nullptr) {
+        RT_FAIL_IF(control == target,
+               "Invalid input for CRZ gate. Control and target qubit operands must be distinct.");
         std::tuple<QubitIdType, QubitIdType, std::vector<QubitIdType>> resultTuple = RTD_PTR->getRuntimeRouter()->getRoutedQubits(control, target);
         QubitIdType routedQubitFirst = std::get<0>(resultTuple);
         QubitIdType routedQubitSecond = std::get<1>(resultTuple);
@@ -983,6 +1052,8 @@ void __catalyst__qis__CRZ(double theta, QUBIT *control, QUBIT *target, const Mod
 void __catalyst__qis__MS(double theta, QUBIT *control, QUBIT *target, const Modifiers *modifiers)
 {
     if (RTD_PTR != nullptr && RTD_PTR->getRuntimeRouter() != nullptr) {
+        RT_FAIL_IF(control == target,
+               "Invalid input for MS gate. Control and target qubit operands must be distinct.");
         std::tuple<QubitIdType, QubitIdType, std::vector<QubitIdType>> resultTuple = RTD_PTR->getRuntimeRouter()->getRoutedQubits(control, target);
         QubitIdType routedQubitFirst = std::get<0>(resultTuple);
         QubitIdType routedQubitSecond = std::get<1>(resultTuple);
@@ -1013,6 +1084,8 @@ void __catalyst__qis__CRot(double phi, double theta, double omega, QUBIT *contro
                            const Modifiers *modifiers)
 {
     if (RTD_PTR != nullptr && RTD_PTR->getRuntimeRouter() != nullptr) {
+        RT_FAIL_IF(control == target,
+               "Invalid input for CRot gate. Control and target qubit operands must be distinct.");
         std::tuple<QubitIdType, QubitIdType, std::vector<QubitIdType>> resultTuple = RTD_PTR->getRuntimeRouter()->getRoutedQubits(control, target);
         QubitIdType routedQubitFirst = std::get<0>(resultTuple);
         QubitIdType routedQubitSecond = std::get<1>(resultTuple);
@@ -1041,6 +1114,8 @@ void __catalyst__qis__CRot(double phi, double theta, double omega, QUBIT *contro
 
 void __catalyst__qis__CSWAP(QUBIT *control, QUBIT *aswap, QUBIT *bswap, const Modifiers *modifiers)
 {
+    RT_FAIL_IF((control == aswap || aswap == bswap || control == bswap),
+               "Invalid input for CSWAP gate. Control and target qubit operands must be distinct.");
     getQuantumDevicePtr()->NamedOperation("CSWAP", {},
                                           {reinterpret_cast<QubitIdType>(control),
                                            reinterpret_cast<QubitIdType>(aswap),
@@ -1050,6 +1125,8 @@ void __catalyst__qis__CSWAP(QUBIT *control, QUBIT *aswap, QUBIT *bswap, const Mo
 
 void __catalyst__qis__Toffoli(QUBIT *wire0, QUBIT *wire1, QUBIT *wire2, const Modifiers *modifiers)
 {
+    RT_FAIL_IF((wire0 == wire1 || wire1 == wire2 || wire0 == wire2),
+               "Invalid input for Toffoli gate. All three qubit operands must be distinct.");
     getQuantumDevicePtr()->NamedOperation("Toffoli", {},
                                           {reinterpret_cast<QubitIdType>(wire0),
                                            reinterpret_cast<QubitIdType>(wire1),
@@ -1076,6 +1153,8 @@ void __catalyst__qis__MultiRZ(double theta, const Modifiers *modifiers, int64_t 
 void __catalyst__qis__ISWAP(QUBIT *wire0, QUBIT *wire1, const Modifiers *modifiers)
 {
     if (RTD_PTR != nullptr && RTD_PTR->getRuntimeRouter() != nullptr) {
+        RT_FAIL_IF(wire0 == wire1,
+               "Invalid input for ISWAP gate. Control and target qubit operands must be distinct.");
         std::tuple<QubitIdType, QubitIdType, std::vector<QubitIdType>> resultTuple = RTD_PTR->getRuntimeRouter()->getRoutedQubits(wire0, wire1);
         QubitIdType routedQubitFirst = std::get<0>(resultTuple);
         QubitIdType routedQubitSecond = std::get<1>(resultTuple);
@@ -1104,6 +1183,8 @@ void __catalyst__qis__ISWAP(QUBIT *wire0, QUBIT *wire1, const Modifiers *modifie
 void __catalyst__qis__PSWAP(double phi, QUBIT *wire0, QUBIT *wire1, const Modifiers *modifiers)
 {
     if (RTD_PTR != nullptr && RTD_PTR->getRuntimeRouter() != nullptr) {
+        RT_FAIL_IF(wire0 == wire1,
+               "Invalid input for PSWAP gate. Control and target qubit operands must be distinct.");
         std::tuple<QubitIdType, QubitIdType, std::vector<QubitIdType>> resultTuple = RTD_PTR->getRuntimeRouter()->getRoutedQubits(wire0, wire1);
         QubitIdType routedQubitFirst = std::get<0>(resultTuple);
         QubitIdType routedQubitSecond = std::get<1>(resultTuple);
