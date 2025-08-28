@@ -64,10 +64,4 @@ struct AdjointLoweringPass : impl::AdjointLoweringPassBase<AdjointLoweringPass> 
 };
 
 } // namespace quantum
-
-std::unique_ptr<Pass> createAdjointLoweringPass()
-{
-    return std::make_unique<quantum::AdjointLoweringPass>();
-}
-
 } // namespace catalyst

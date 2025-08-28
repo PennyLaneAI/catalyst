@@ -123,8 +123,10 @@ void disentangleCNOTs(FunctionOpInterface &func, bool verbose)
 } // namespace
 
 namespace catalyst {
-#define GEN_PASS_DEF_DISENTANGLECNOTPASS
+namespace quantum {
+
 #define GEN_PASS_DECL_DISENTANGLECNOTPASS
+#define GEN_PASS_DEF_DISENTANGLECNOTPASS
 #include "Quantum/Transforms/Passes.h.inc"
 
 struct DisentangleCNOTPass : public impl::DisentangleCNOTPassBase<DisentangleCNOTPass> {
@@ -141,9 +143,5 @@ struct DisentangleCNOTPass : public impl::DisentangleCNOTPassBase<DisentangleCNO
     }
 };
 
-std::unique_ptr<Pass> createDisentangleCNOTPass()
-{
-    return std::make_unique<DisentangleCNOTPass>();
-}
-
+} // namespace quantum
 } // namespace catalyst

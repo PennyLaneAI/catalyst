@@ -71,8 +71,6 @@ def CliffordTToPPRPass : Pass<"to-ppr"> {
     let summary = "Convert quantum dialects to the QEC dialect.";
 
     let dependentDialects = [ "catalyst::qec::QECDialect" ];
-
-    let constructor = "catalyst::createLowerToQECPass()";
 }
 
 def CommutePPRPass : Pass<"commute-ppr"> {
@@ -81,8 +79,6 @@ def CommutePPRPass : Pass<"commute-ppr"> {
     let dependentDialects = [ "catalyst::qec::QECDialect" ];
 
     let options = [MaxPauliSizeOption];
-
-    let constructor = "catalyst::createCommutePPRPass()";
 }
 
 def MergePPRIntoPPMPass : Pass<"merge-ppr-ppm"> {
@@ -91,16 +87,12 @@ def MergePPRIntoPPMPass : Pass<"merge-ppr-ppm"> {
     let dependentDialects = [ "catalyst::qec::QECDialect" ];
 
     let options = [MaxPauliSizeOption];
-
-    let constructor = "catalyst::createMergePPRIntoPPMPass()";
 }
 
 def DecomposeNonCliffordPPRPass : Pass<"decompose-non-clifford-ppr"> {
     let summary = "Decompose non-Clifford PPRotation operations to set of Pauli Product Measurement operations.";
     
     let dependentDialects = [ "catalyst::qec::QECDialect" ];
-
-    let constructor = "catalyst::createDecomposeNonCliffordPPRPass()";
 
     let options = [DecomposeMethodOption, AvoidYMeasureOption];
 }
@@ -111,8 +103,6 @@ def DecomposeCliffordPPRPass : Pass<"decompose-clifford-ppr"> {
     let dependentDialects = [ "catalyst::qec::QECDialect" ];
 
     let options = [AvoidYMeasureOption];
-
-    let constructor = "catalyst::createDecomposeCliffordPPRPass()";
 }
 
 def PPMCompilationPass : Pass<"ppm-compilation"> {
@@ -120,15 +110,11 @@ def PPMCompilationPass : Pass<"ppm-compilation"> {
     
     let dependentDialects = [ "catalyst::qec::QECDialect" ];
 
-    let constructor = "catalyst::createPPMCompilationPass()";
-
     let options = [MaxPauliSizeOption, DecomposeMethodOption, AvoidYMeasureOption];
 }
 
 def CountPPMSpecsPass : Pass<"ppm-specs"> {
     let summary = "Count specs in Pauli Product Measurement operations.";
-    
-    let constructor = "catalyst::createCountPPMSpecsPass()";
 }
 
 #endif // QEC_PASSES

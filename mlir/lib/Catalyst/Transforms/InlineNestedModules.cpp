@@ -66,11 +66,11 @@
 #include <deque>
 
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include "Catalyst/IR/CatalystOps.h"
-#include "Catalyst/Transforms/Passes.h"
 #include "Catalyst/Transforms/Patterns.h"
 #include "Gradient/IR/GradientInterfaces.h"
 #include "Mitigation/IR/MitigationOps.h"
@@ -475,8 +475,8 @@ struct InlineNestedSymbolTablePass : PassWrapper<InlineNestedSymbolTablePass, Op
     }
 };
 
-#define GEN_PASS_DEF_INLINENESTEDMODULEPASS
 #define GEN_PASS_DECL_INLINENESTEDMODULEPASS
+#define GEN_PASS_DEF_INLINENESTEDMODULEPASS
 #include "Catalyst/Transforms/Passes.h.inc"
 
 struct InlineNestedModulePass : impl::InlineNestedModulePassBase<InlineNestedModulePass> {
@@ -501,10 +501,5 @@ struct InlineNestedModulePass : impl::InlineNestedModulePassBase<InlineNestedMod
         }
     }
 };
-
-std::unique_ptr<Pass> createInlineNestedModulePass()
-{
-    return std::make_unique<InlineNestedModulePass>();
-}
 
 } // namespace catalyst
