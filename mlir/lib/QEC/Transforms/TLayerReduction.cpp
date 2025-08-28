@@ -182,8 +182,7 @@ void moveOpToLayer(QECOpInterface rhsOp, QECLayer &rhsLayer, QECOpInterface merg
 
     rhsLayer.eraseOp(rhsOp);
     // Rewire users of the erased `rhsOp` to its original operands.
-    writer.replaceAllUsesWith(rhsOp->getResults(), rhsOp->getOperands());
-    writer.eraseOp(rhsOp);
+    writer.replaceOp(rhsOp, rhsOp->getOperands());
 }
 
 // Merge `rhsOp` into `mergeOp` in lhsLayer when equal under normalization.
@@ -194,8 +193,7 @@ void mergePPR(QECOpInterface rhsOp, QECLayer &rhsLayer, QECOpInterface mergeOp, 
     mergeOp.setRotationKind(mergeOp.getRotationKind() / 2);
 
     rhsLayer.eraseOp(rhsOp);
-    writer.replaceAllUsesWith(rhsOp->getResults(), rhsOp->getOperands());
-    writer.eraseOp(rhsOp);
+    writer.replaceOp(rhsOp, rhsOp->getOperands());
 }
 
 struct TLayerReductionPass : impl::TLayerReductionPassBase<TLayerReductionPass> {
