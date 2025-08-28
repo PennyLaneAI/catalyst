@@ -1,6 +1,10 @@
 AutoGraph guide
 ===============
 
+.. contents::
+   :local:
+   :depth: 2
+
 .. figure:: ../_static/catalyst-autograph.png
     :width: 70%
     :alt: AutoGraph Illustration
