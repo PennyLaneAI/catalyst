@@ -128,15 +128,11 @@ template PauliWord expandPauliWord<llvm::SetVector<Value>, std::vector<Value>>(
 
 PauliWordPair normalizePPROps(QECOpInterface lhs, QECOpInterface rhs)
 {
-    // Materialize std::vector<Value> from the operand/result ranges
-    std::vector<Value> lhsQubits(lhs.getOutQubits().begin(), lhs.getOutQubits().end());
-    std::vector<Value> rhsQubits(rhs.getInQubits().begin(), rhs.getInQubits().end());
-
-    return normalizePPROps(lhs, rhs, lhsQubits, rhsQubits);
+    return normalizePPROps(lhs, rhs, lhs.getOutQubits(), rhs.getInQubits());
 }
 
-PauliWordPair normalizePPROps(QECOpInterface lhs, QECOpInterface rhs, std::vector<Value> lhsQubits,
-                              std::vector<Value> rhsQubits)
+PauliWordPair normalizePPROps(QECOpInterface lhs, QECOpInterface rhs, ValueRange lhsQubits,
+                              ValueRange rhsQubits)
 {
     llvm::SetVector<Value> qubits;
     qubits.insert(lhsQubits.begin(), lhsQubits.end());
@@ -238,6 +234,14 @@ bool exceedPauliSizeLimit(size_t pauliSize, size_t MaxPauliSize)
         return false;
     }
     return pauliSize > MaxPauliSize;
+}
+
+bool equal(const PauliWord lhs, const PauliWord rhs) { return llvm::equal(lhs, rhs); }
+
+bool equal(const PauliStringWrapper &lhs, const PauliStringWrapper &rhs)
+{
+    return equal(lhs.get_pauli_word(), rhs.get_pauli_word()) &&
+           lhs.isNegative() == rhs.isNegative();
 }
 
 } // namespace qec

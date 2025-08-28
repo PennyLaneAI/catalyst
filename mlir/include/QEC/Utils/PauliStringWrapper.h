@@ -140,8 +140,8 @@ extern template PauliWord expandPauliWord<llvm::SetVector<mlir::Value>, std::vec
  * @return PauliWordPair of the normalized pair of PauliStringWrapper
  */
 PauliWordPair normalizePPROps(QECOpInterface lhs, QECOpInterface rhs);
-PauliWordPair normalizePPROps(QECOpInterface lhs, QECOpInterface rhs, std::vector<Value> lhsQubits,
-                              std::vector<Value> rhsQubits);
+PauliWordPair normalizePPROps(QECOpInterface lhs, QECOpInterface rhs, ValueRange lhsQubits,
+                              ValueRange rhsQubits);
 
 // Remove Identity from the op's Pauli product and corresponding qubits from the list/
 // The size of op.pauliProduct and qubits is assumed to be the same.
@@ -180,6 +180,10 @@ bool isNoSizeLimit(size_t MaxPauliSize);
 
 // Combine the size check logic in one place
 bool exceedPauliSizeLimit(size_t pauliSize, size_t MaxPauliSize);
+
+// Check if the two Pauli string are the same
+bool equal(const PauliWord lhs, const PauliWord rhs);
+bool equal(const PauliStringWrapper &lhs, const PauliStringWrapper &rhs);
 
 } // namespace qec
 } // namespace catalyst
