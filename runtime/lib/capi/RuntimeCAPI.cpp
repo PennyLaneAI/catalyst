@@ -539,24 +539,6 @@ void __catalyst__qis__PCPhase(double theta, double dim, const Modifiers *modifie
                                           /* modifiers */ MODIFIERS_ARGS(modifiers));
 }
 
-void __catalyst__qis__PCPhase(double theta, double dim, const Modifiers *modifiers,
-                              int64_t numQubits, ...)
-{
-    RT_ASSERT(numQubits >= 0);
-    RT_ASSERT(dim >= 0 && dim == static_cast<int64_t>(dim));
-
-    va_list args;
-    va_start(args, numQubits);
-    std::vector<QubitIdType> wires(numQubits);
-    for (int64_t i = 0; i < numQubits; i++) {
-        wires[i] = va_arg(args, QubitIdType);
-    }
-    va_end(args);
-
-    getQuantumDevicePtr()->NamedOperation("PCPhase", {theta, dim}, wires,
-                                          /* modifiers */ MODIFIERS_ARGS(modifiers));
-}
-
 void __catalyst__qis__SetBasisState(MemRefT_int8_1d *data, uint64_t numQubits, ...)
 {
     RT_ASSERT(numQubits > 0);
@@ -928,31 +910,6 @@ void __catalyst__qis__IsingZZ(double theta, QUBIT *control, QUBIT *target,
              /* target = */ reinterpret_cast<QubitIdType>(target)},
             /* modifiers */ MODIFIERS_ARGS(modifiers));
     }
-}
-
-void __catalyst__qis__SingleExcitation(double phi, QUBIT *wire0, QUBIT *wire1,
-                                       const Modifiers *modifiers)
-{
-    RT_FAIL_IF(wire0 == wire1,
-               "Invalid input for SingleExcitation gate. All two qubit operands must be distinct.");
-    getQuantumDevicePtr()->NamedOperation(
-        "SingleExcitation", {phi},
-        {reinterpret_cast<QubitIdType>(wire0), reinterpret_cast<QubitIdType>(wire1)},
-        MODIFIERS_ARGS(modifiers));
-}
-
-void __catalyst__qis__DoubleExcitation(double phi, QUBIT *wire0, QUBIT *wire1, QUBIT *wire2,
-                                       QUBIT *wire3, const Modifiers *modifiers)
-{
-    RT_FAIL_IF(
-        (wire0 == wire1 || wire0 == wire2 || wire0 == wire3 || wire1 == wire2 || wire1 == wire3 ||
-         wire2 == wire3),
-        "Invalid input for DoubleExcitation gate. All four qubit operands must be distinct.");
-    getQuantumDevicePtr()->NamedOperation(
-        "DoubleExcitation", {phi},
-        {reinterpret_cast<QubitIdType>(wire0), reinterpret_cast<QubitIdType>(wire1),
-         reinterpret_cast<QubitIdType>(wire2), reinterpret_cast<QubitIdType>(wire3)},
-        MODIFIERS_ARGS(modifiers));
 }
 
 void __catalyst__qis__SingleExcitation(double phi, QUBIT *wire0, QUBIT *wire1,
