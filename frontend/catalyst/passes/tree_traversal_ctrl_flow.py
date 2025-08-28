@@ -1,0 +1,343 @@
+# Copyright 2025 Xanadu Quantum Technologies Inc.
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+#     http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+from typing import Type, TypeVar
+
+import jax
+import pennylane as qml
+
+import pennylane.compiler.python_compiler.dialects.quantum as quantum
+from pennylane.compiler.python_compiler.transforms.api import compiler_transform
+
+from xdsl import context, passes, pattern_rewriter, ir
+from xdsl.dialects import arith, builtin, func
+from xdsl.dialects.scf import ForOp, IfOp, WhileOp, YieldOp
+from xdsl.rewriter import InsertPoint
+
+from catalyst.passes.xdsl_plugin import getXDSLPluginAbsolutePath
+
+def print_module(module: builtin.ModuleOp, section: str = ""):
+
+    length_line = 100
+
+    if True:
+        # printer = Printer()
+        print("%"*length_line)
+        print("")
+        print(f"---{section}---"*4)
+        print("")
+        print(module)
+        print("")
+        # print("%"*length_line)
+        # print("")
+
+T = TypeVar("T")
+
+def get_parent_of_type(op: ir.Operation, kind: Type[T]) -> T | None:
+    """Walk up the parent tree until an op of the specified type is found."""
+
+    while (op := op.parent_op()) and not isinstance(op, kind):
+        pass
+
+    return op
+
+
+class TT_ctrl_flow_for_loop(pattern_rewriter.RewritePattern):
+    """RewritePattern for combining all :class:`~pennylane.GlobalPhase` gates within the same region
+    at the last global phase gate."""
+
+    @pattern_rewriter.op_type_rewrite_pattern
+    def match_and_rewrite(
+        self, root: func.FuncOp | IfOp | ForOp | WhileOp, rewriter: pattern_rewriter.PatternRewriter
+    ):  
+        """Rewrite the scf.for operation to handle tree traversal."""
+
+        if not "qnode" in root.attributes:
+            return
+
+        module = get_parent_of_type(root, builtin.ModuleOp)
+        assert module is not None, "got orphaned qnode function"
+
+
+        self.simple_peeling(root, module, rewriter)
+        # self.copy_paste(root, module, rewriter)
+
+    def simple_peeling(self, funcOp: func.FuncOp, module: builtin.ModuleOp, rewriter: pattern_rewriter.PatternRewriter):
+
+        op_iter = funcOp.body.walk()
+        
+        last_quantum_op_before_loop = None
+        
+        for op in op_iter:
+        
+            if isinstance(op, quantum.CustomOp):
+                # Store the last quantum operation before the loop
+                last_quantum_op_before_loop = op
+                continue
+                
+            if isinstance(op, ForOp):
+                # Extract the entire loop block. 
+                for_loop = op
+                break
+        
+        for_loop_block = for_loop.body.clone()
+
+        # Create a list to hold the operations in the loop body
+        fop_list = []
+        for_loop_op_iter = for_loop_block.walk()
+        for fop in for_loop_op_iter:
+            if isinstance(fop, YieldOp):
+                # Stop at the YieldOp
+                break
+
+            if not isinstance(fop, quantum.CustomOp):
+                continue
+
+            fop_list.append(fop)
+            
+        # Copy the operations in the loop body before the loop
+        for for_op_A in fop_list:
+            # Insert the operation before the loop
+            value_mapper = {
+                in_qubit: last_quantum_op_before_loop.out_qubits[0] for in_qubit in for_op_A.in_qubits
+            }
+            clone_for_op_A = for_op_A.clone(value_mapper=value_mapper)
+            
+            print_module(funcOp, "before replace all")
+            
+            # rewriter.replace_all_uses_with(for_op_A.out_qubits[0])
+
+            print_module(funcOp, "after replace")
+
+            rewriter.insert_op(clone_for_op_A, InsertPoint.after(last_quantum_op_before_loop))
+
+        # For loop step
+        step = for_loop.step
+        
+        # Increment the loop by one step
+        lower_bound = for_loop.lb
+        incremented_lower_bound = arith.AddiOp(lower_bound, step)
+        rewriter.insert_op(incremented_lower_bound, InsertPoint.before(for_loop))
+        
+        # Decrement the upper bound by one step
+        upper_bound = for_loop.ub
+        decremented_upper_bound = arith.SubiOp(upper_bound, step)
+        
+        rewriter.insert_op(decremented_upper_bound, InsertPoint.before(for_loop))
+
+
+        # Create a new for loop with the new bounds
+        
+        new_for_loop = ForOp(
+            incremented_lower_bound.result,  # new lower bound
+            decremented_upper_bound.result,  # new upper bound
+            step,                            # same step
+            iter_args=for_loop.iter_args,    # same iteration arguments
+            body=for_loop_block              # the same body block
+        )
+    
+        # Replace the old for loop with the new one
+        rewriter.replace_op(op, new_for_loop)
+        
+        # Add the operation after the loop body
+        
+        for for_op_A in fop_list:
+            value_mapper = {
+                in_qubit: last_quantum_op_before_loop.out_qubits[0] for in_qubit in for_op_A.in_qubits
+            }
+            clone_for_op_A = for_op_A.clone(value_mapper=value_mapper)
+            rewriter.insert_op(clone_for_op_A, InsertPoint.after(new_for_loop))
+
+    def copy_paste(self, funcOp: func.FuncOp, module: builtin.ModuleOp, rewriter: pattern_rewriter.PatternRewriter):
+        
+        op_iter = funcOp.body.walk()
+        
+        op_list = []
+        record = False
+        for op in op_iter:
+            
+            if isinstance(op, quantum.CustomOp) and op.gate_name.data == "Identity":
+                op.attributes["FDX_id"] = builtin.StringAttr("op_IDENTITIY")
+                record = True
+                continue
+
+            if isinstance(op, quantum.CustomOp) and op.gate_name.data == "PauliZ":
+                op.attributes["FDX_id"] = builtin.StringAttr("op_PAULI_Z")
+                record = False
+                continue
+            
+            if record:
+                #op_list.append(op.clone())
+                op_list.append(op)
+                
+        op_iter = funcOp.body.walk()
+        # for op in op_iter:
+            # if isinstance(op, quantum.CustomOp) and op.gate_name.data == "Identity":
+                # op_prev = op.prev_op
+                # op_curr = op
+
+                # self.copy_op_after_target(op_curr, op_list, rewriter)                
+                # self.copy_op_after_target_test(op_curr, op_list, rewriter)
+                
+        identities = [op for op in funcOp.body.walk() if isinstance(op, quantum.CustomOp) and op.gate_name.data == "Identity"]
+        assert len(identities) == 1
+        identity = identities[0]
+        
+        print_module(funcOp, "Annotations")
+
+        while identity.next_op in {*op_list}:
+
+            current_op = identity.next_op
+            
+            print(current_op)
+            
+            # Here, we know that all the operands
+            # of current_op are either defined by identity
+            # or above identity.
+            
+            acts_on_same_wire: bool = current_op.in_qubits[0] == identity.out_qubits[0]
+            if not acts_on_same_wire:
+                # Then we know we can safely move it.
+                current_op.detach()
+                rewriter.insert_op(current_op, InsertPoint.before(identity))
+                
+                print_module(funcOp, "not acts_on_same_wire")
+                
+            if acts_on_same_wire:
+                identity_definition = identity.in_qubits[0].owner
+                print_module(funcOp, "acts_on_same_wire - Identity def")
+                rewriter.replace_all_uses_with(identity.out_qubits[0], identity_definition.out_qubits[0])
+                print_module(funcOp, "acts_on_same_wire - replace all uses")
+                
+                #rewriter.erase_op(identity)
+                identity.detach()
+                # current_op is now where it is supposed to be
+                # we need to insert a new identity after current_op
+                def just_for_test(use):
+                    return use.operation == identity
+                identity.in_qubits[0].replace_by_if(current_op.out_qubits[0], just_for_test)
+            
+                
+                print_module(funcOp, "acts_on_same_wire - replace by if ==")
+            
+                rewriter.insert_op(identity, InsertPoint.after(current_op))
+                
+                print_module(funcOp, "acts_on_same_wire - insert")
+                
+                # print(funcOp)
+
+                def just_for_test(use):
+                    return use.operation != identity
+                current_op.out_qubits[0].replace_by_if(identity.out_qubits[0], just_for_test)
+                
+                print_module(funcOp, "acts_on_same_wire")
+                
+                
+            #    print(identity.next_op)
+            #    breakpoint()     
+
+
+@compiler_transform 
+class TT_for_loop_Pass(passes.ModulePass):
+    name = "tree-traversal"
+    def apply(self, ctx: context.Context, module: builtin.ModuleOp) -> None:
+        
+        print_module(module, "Initial")
+        self.apply_on_qnode(module, TT_ctrl_flow_for_loop())
+        print_module(module, "After first pass")
+        
+
+    def apply_on_qnode(self, module: builtin.ModuleOp, pattern: pattern_rewriter.RewritePattern):
+        rewriter = pattern_rewriter.PatternRewriter(module)
+
+        qnode = None
+        for op in module.ops:
+            if isinstance(op, func.FuncOp) and "qnode" in op.attributes:
+                qnode = op
+                break
+        assert qnode is not None, "expected QNode in module"
+
+        pattern.match_and_rewrite(qnode, rewriter)
+
+###########
+# Example #
+###########
+
+if __name__ == "__main__":
+
+    qml.capture.enable()
+
+    @TT_for_loop_Pass
+    @qml.qnode(qml.device("lightning.qubit", wires=2))
+    def captured_circuit(x: float):
+
+
+        qml.X(0)
+        for i in range(5):
+            qml.H(0)
+        qml.Z(0)
+        
+        # qml.Hadamard(wires=0)
+        # qml.Hadamard(wires=1)
+        
+        # for i in range(3):
+        #     qml.X(0)
+        #     qml.Z(1)
+            
+        #     m = qml.measure(0)
+        #     qml.Y(0)
+        #     qml.Z(1)
+
+
+        # -------------------------------------------------
+        # qml.Hadamard(wires=0)
+        # qml.S(wires=1)
+        
+        # qml.Identity(wires=0)
+
+        # qml.X(wires=0)
+        # qml.Y(wires=0)
+        
+        # qml.X(wires=1)
+        # qml.Y(wires=1)
+        
+
+        # qml.Z(wires=0)
+        # -------------------------------------------------
+        
+        # for i in range(3):
+        #     qml.Hadamard(wires=0)
+        #     qml.PauliX(wires=0)
+        #     qml.PauliY(wires=0)
+        #     m = qml.measure(0)
+        #     qml.Hadamard(wires=0)
+        #     qml.PauliX(wires=0)
+        #     qml.PauliY(wires=0)
+
+
+        # qml.Hadamard(wires=0)
+        # m = qml.measure(0)
+        # qml.RX(x, wires=0)
+        # m = qml.measure(0)
+        # qml.RY(add(x, x), wires=0)
+        # m = qml.measure(0)
+        # qml.cond(m, lambda: qml.X(0))
+
+        return qml.state()
+
+    @qml.qjit(keep_intermediate=False, pass_plugins=[getXDSLPluginAbsolutePath()], autograph=True)
+    def main(x: float):
+        return captured_circuit(x)
+
+    print(main(1.0))
