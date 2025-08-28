@@ -14,7 +14,7 @@ version_information
 sphinx-copybutton
 sphinx-tabs
 markupsafe==3.0.2
-pennylane-sphinx-theme
+pennylane-sphinx-theme @ git+https://github.com/PennyLaneAI/pennylane-sphinx-theme.git@90bca034e1c3b9ca03ac7cededf9794764f829dc
 nbconvert
 pygments
 breathe
