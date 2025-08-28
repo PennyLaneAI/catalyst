@@ -128,15 +128,11 @@ template PauliWord expandPauliWord<llvm::SetVector<Value>, std::vector<Value>>(
 
 PauliWordPair normalizePPROps(QECOpInterface lhs, QECOpInterface rhs)
 {
-    // Materialize std::vector<Value> from the operand/result ranges
-    std::vector<Value> lhsQubits(lhs.getOutQubits().begin(), lhs.getOutQubits().end());
-    std::vector<Value> rhsQubits(rhs.getInQubits().begin(), rhs.getInQubits().end());
-
-    return normalizePPROps(lhs, rhs, lhsQubits, rhsQubits);
+    return normalizePPROps(lhs, rhs, lhs.getOutQubits(), rhs.getInQubits());
 }
 
-PauliWordPair normalizePPROps(QECOpInterface lhs, QECOpInterface rhs, std::vector<Value> lhsQubits,
-                              std::vector<Value> rhsQubits)
+PauliWordPair normalizePPROps(QECOpInterface lhs, QECOpInterface rhs, ValueRange lhsQubits,
+                              ValueRange rhsQubits)
 {
     llvm::SetVector<Value> qubits;
     qubits.insert(lhsQubits.begin(), lhsQubits.end());

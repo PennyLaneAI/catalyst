@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <mlir/IR/ValueRange.h>
 #define DEBUG_TYPE "t-layer-reduction"
 
 #include <vector>
@@ -85,6 +86,7 @@ Value getReachingValueAt(Value qubit, QECOpInterface op)
 std::vector<Value> getInQubitReachingValuesAt(QECOpInterface srcOp, QECOpInterface dstOp)
 {
     std::vector<Value> dominanceQubits;
+    dominanceQubits.reserve(srcOp.getInQubits().size());
     for (auto inQubit : srcOp.getInQubits()) {
         Value v = getReachingValueAt(inQubit, dstOp);
         dominanceQubits.emplace_back(v);
@@ -107,8 +109,6 @@ std::pair<bool, QECOpInterface> checkCommutationAndFindMerge(QECOpInterface rhsO
         assert(lhsOp != rhsOp && "lshOp and rhsOp should not be equal");
         assert(lhsOp->isBeforeInBlock(rhsOp) && "lhsOp should be before rhsOp");
 
-        std::vector<Value> lhsInQubits(lhsOp.getInQubits().begin(), lhsOp.getInQubits().end());
-
         // Reaching in-qubit values of `rhsOp` at the program point of `lhsOp`.
         std::vector<Value> rhsOpInQubitsFromLhsOp = getInQubitReachingValuesAt(rhsOp, lhsOp);
         if (llvm::any_of(rhsOpInQubitsFromLhsOp, [](Value qubit) { return qubit == nullptr; })) {
@@ -118,7 +118,8 @@ std::pair<bool, QECOpInterface> checkCommutationAndFindMerge(QECOpInterface rhsO
         }
 
         // Normalize to Pauli strings
-        auto normalizedOps = normalizePPROps(lhsOp, rhsOp, lhsInQubits, rhsOpInQubitsFromLhsOp);
+        auto normalizedOps =
+            normalizePPROps(lhsOp, rhsOp, lhsOp.getInQubits(), rhsOpInQubitsFromLhsOp);
 
         if (!normalizedOps.first.commutes(normalizedOps.second)) {
             return std::pair(false, nullptr);
