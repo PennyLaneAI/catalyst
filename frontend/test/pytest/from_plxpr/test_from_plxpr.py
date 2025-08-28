@@ -578,7 +578,7 @@ class TestAdjointCtrl:
         """Test the conversion of a simple adjoint op."""
         qml.capture.enable()
 
-        @qml.qnode(qml.device("lightning.qubit", wires=4), autograph=False)
+        @qml.qnode(qml.device("lightning.qubit", wires=4))
         def c():
             op = qml.S(0)
             for _ in range(num_adjoints):
@@ -606,7 +606,7 @@ class TestAdjointCtrl:
 
         qml.capture.enable()
 
-        @qml.qnode(qml.device("lightning.qubit", wires=4), autograph=False)
+        @qml.qnode(qml.device("lightning.qubit", wires=4))
         def c(x, wire3):
             op = qml.RX(x, 0)
             if inner_adjoint:
@@ -643,7 +643,7 @@ class TestAdjointCtrl:
 
         qml.capture.enable()
 
-        @qml.qnode(qml.device("lightning.qubit", wires=3), autograph=False)
+        @qml.qnode(qml.device("lightning.qubit", wires=3))
         def c():
             if as_qfunc:
                 qml.ctrl(qml.ctrl(qml.S, 1), 2, control_values=[False])(0)
@@ -682,7 +682,7 @@ class TestAdjointCtrl:
             if with_return:
                 return op
 
-        @qml.qnode(qml.device("lightning.qubit", wires=2), autograph=False)
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
         def c(x):
             qml.X(0)
             qml.adjoint(f)(x)
@@ -724,7 +724,7 @@ class TestAdjointCtrl:
 
         qml.capture.enable()
 
-        @qml.qnode(qml.device("lightning.qubit", wires=4), autograph=False)
+        @qml.qnode(qml.device("lightning.qubit", wires=4)
         def c(wire):
             qml.CNOT((0, wire))
             if as_qfunc:
@@ -764,7 +764,7 @@ class TestAdjointCtrl:
         def g(i):
             qml.X(i)
 
-        @qml.qnode(qml.device("lightning.qubit", wires=4), autograph=False)
+        @qml.qnode(qml.device("lightning.qubit", wires=4))
         def c():
             qml.ctrl(g, [4, 5])()
             return qml.state()
