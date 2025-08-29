@@ -153,7 +153,6 @@ def extract_backend_info(device: qml.devices.QubitDevice) -> BackendInfo:
     device_name = ""
     device_lpath = ""
     device_kwargs = {}
-    device_kwargs["capacity"] = len(device.wires)
 
     if dname in SUPPORTED_RT_DEVICES:
         # Support backend devices without `get_c_interface`

@@ -171,7 +171,6 @@ class RTDevice {
     uint64_t capacity;
     bool auto_qubit_management;
 
-    uint64_t capacity;
     uint64_t current_biggest_wire_index = 0;
     std::map<int64_t, uint64_t> wire_label_to_qirarray_index;
 
@@ -187,29 +186,6 @@ class RTDevice {
 #elif defined(__APPLE__)
         rtd_lib = "librtd_" + name + ".dylib";
 #endif
-    }
-    void parse_capacity(std::string &rtd_kwargs)
-    {
-        // 1. Find and extract the 'capacity' value
-        size_t key_pos = rtd_kwargs.find("'capacity'");
-
-        if (key_pos != std::string::npos) {
-            size_t colon_pos = rtd_kwargs.find(':', key_pos);
-            size_t comma_pos = rtd_kwargs.find(',', colon_pos);
-
-            if (colon_pos != std::string::npos && comma_pos != std::string::npos) {
-                size_t start_val = colon_pos + 1;
-                std::string value_str = rtd_kwargs.substr(start_val, comma_pos - start_val);
-                this->capacity = std::stoi(value_str);
-            }
-
-            // 2. Remove the 'capacity' field from the string
-            size_t end_of_field = rtd_kwargs.find(',', key_pos);
-            if (end_of_field != std::string::npos) {
-                size_t erase_len = end_of_field - key_pos + 2; // +1 for comma, +1 for space
-                rtd_kwargs.erase(key_pos, erase_len);
-            }
-        }
     }
 
     static void _pl2runtime_device_info(std::string &rtd_lib, std::string &rtd_name) noexcept
@@ -245,7 +221,6 @@ class RTDevice {
           rtd_kwargs(std::move(_rtd_kwargs)), capacity(_capacity),
           auto_qubit_management(_auto_qubit_management)
     {
-        parse_capacity(rtd_kwargs);
         _pl2runtime_device_info(rtd_lib, rtd_name);
     }
 
@@ -254,7 +229,6 @@ class RTDevice {
         : rtd_lib(_rtd_lib), rtd_name(_rtd_name), rtd_kwargs(_rtd_kwargs), capacity(_capacity),
           auto_qubit_management(_auto_qubit_management)
     {
-        parse_capacity(rtd_kwargs);
         _pl2runtime_device_info(rtd_lib, rtd_name);
     }
 
