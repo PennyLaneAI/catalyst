@@ -255,7 +255,8 @@ FlatSymbolRefAttr globalFolding(Location loc, PatternRewriter &rewriter, std::st
     Operation *shotsLocal = shots->clone();
 
     rewriter.insert(shotsLocal);
-    rewriter.create<quantum::DeviceInitOp>(loc, shotsLocal->getResult(0), lib, name, kwargs);
+    rewriter.create<quantum::DeviceInitOp>(loc, numberQubitsValue, shotsLocal->getResult(0), lib,
+                                           name, kwargs);
 
     Value allocQreg = rewriter.create<func::CallOp>(loc, fnAllocOp, numberQubitsValue).getResult(0);
 

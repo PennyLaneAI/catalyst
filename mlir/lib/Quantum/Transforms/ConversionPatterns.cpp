@@ -199,6 +199,7 @@ struct DeviceInitOpPattern : public OpConversionPattern<DeviceInitOp> {
                                                         {/* rtd_lib = */ charPtrType,
                                                          /* rtd_name = */ charPtrType,
                                                          /* rtd_kwargs = */ charPtrType,
+                                                         /* capacity = */ int64Type,
                                                          /* shots = */ int64Type,
                                                          /*auto_qubit_management = */ int1Type});
         LLVM::LLVMFuncOp fnDecl =
@@ -216,6 +217,8 @@ struct DeviceInitOpPattern : public OpConversionPattern<DeviceInitOp> {
             loc, rewriter, rtd_kwargs, StringRef(rtd_kwargs.c_str(), rtd_kwargs.length() + 1), mod);
 
         SmallVector<Value> operands = {rtd_lib_gs, rtd_name_gs, rtd_kwargs_gs};
+
+        operands.push_back(op.getCapacity());
 
         Value shots = op.getShots();
         if (!shots) {

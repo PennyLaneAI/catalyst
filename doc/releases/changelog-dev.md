@@ -4,6 +4,7 @@
 
 * Support for dynamic wire allocation
   [(#1993)](https://github.com/PennyLaneAI/catalyst/pull/1993)
+  [(#2011)](https://github.com/PennyLaneAI/catalyst/pull/2011)
 
 * Catalyst now provides native support for `SingleExcitation`, `DoubleExcitation`,
   and `PCPhase` on compatible devices like Lightning simulators.
@@ -122,6 +123,11 @@
   [(#1926)](https://github.com/PennyLaneAI/catalyst/pull/1926)
 
 <h3>Internal changes ⚙️</h3>
+
+* The signature of the device initialization instructions now take in the
+device capacity. This includes the jax primitive `device_init_p`, the mlir
+operation `DeviceInitOp`, and the runtime CAPI function `__catalyst__rt__device_init`.
+  [(#2011)](https://github.com/PennyLaneAI/catalyst/pull/2011)
 
 * Updates use of `qml.transforms.dynamic_one_shot.parse_native_mid_circuit_measurements` to improved signature.
   [(#1953)](https://github.com/PennyLaneAI/catalyst/pull/1953)
