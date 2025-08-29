@@ -72,8 +72,9 @@ except CompileError:
 # CHECK-LABEL: public @sample3(
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2, shots=1000))
+# CHECK: [[capacity:%.+]] = arith.constant 2 : i64
 # CHECK: [[shots:%.+]] = arith.constant 1000 : i64
-# CHECK: quantum.device shots([[shots]]) [{{.+}}]
+# CHECK: quantum.device capacity([[capacity]]) shots([[shots]]) [{{.+}}]
 def sample3(x: float, y: float):
     # CHECK: [[reg:%.+]] = quantum.alloc( 2) : !quantum.reg
 
@@ -201,8 +202,9 @@ except:
 # CHECK-LABEL: public @counts3(
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2, shots=1000))
+# CHECK: [[capacity:%.+]] = arith.constant 2 : i64
 # CHECK: [[shots:%.+]] = arith.constant 1000 : i64
-# CHECK: quantum.device shots([[shots]]) [{{.+}}]
+# CHECK: quantum.device capacity([[capacity]]) shots([[shots]]) [{{.+}}]
 def counts3(x: float, y: float):
     # CHECK: [[reg:%.+]] = quantum.alloc( 2) : !quantum.reg
 
@@ -516,6 +518,8 @@ def expval11(num_qubits):
         # CHECK-DAG: [[nSub1:%.+]] = stablehlo.subtract %arg0, [[one]] : tensor<i64>
         # CHECK-DAG: [[nSub2:%.+]] = stablehlo.subtract %arg0, [[two]] : tensor<i64>
 
+        # CHECK: [[capacity:%.+]] = tensor.extract %arg0[] : tensor<i64>
+        # CHECK: quantum.device capacity([[capacity]])
         # CHECK: [[deten_nQubits:%.+]] = tensor.extract %arg0[] : tensor<i64>
         # CHECK: [[reg:%.+]] = quantum.alloc([[deten_nQubits]]) : !quantum.reg
 

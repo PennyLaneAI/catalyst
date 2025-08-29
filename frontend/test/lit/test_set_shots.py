@@ -35,7 +35,7 @@ def test_simple_circuit_set_shots():
         return qml.expval(qml.PauliZ(wires=0))
 
     # CHECK: [[shots:%.+]] = arith.constant 2048 : i64
-    # CHECK: quantum.device shots([[shots]]) {{.*}}
+    # CHECK: quantum.device capacity({{.+}}) shots([[shots]]) {{.*}}
     print(circuit.mlir)
 
 
