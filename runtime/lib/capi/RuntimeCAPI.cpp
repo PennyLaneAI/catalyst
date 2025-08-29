@@ -76,9 +76,11 @@ std::vector<bool> getModifiersControlledValues(const Modifiers *modifiers)
  * to the new initialized device pointer.
  */
 [[nodiscard]] bool initRTDevicePtr(std::string_view rtd_lib, std::string_view rtd_name,
-                                   std::string_view rtd_kwargs, bool auto_qubit_management)
+                                   std::string_view rtd_kwargs, int64_t capacity,
+                                   bool auto_qubit_management)
 {
-    auto &&device = CTX->getOrCreateDevice(rtd_lib, rtd_name, rtd_kwargs, auto_qubit_management);
+    auto &&device =
+        CTX->getOrCreateDevice(rtd_lib, rtd_name, rtd_kwargs, capacity, auto_qubit_management);
     if (device) {
         RTD_PTR = device.get();
         return RTD_PTR ? true : false;
@@ -255,7 +257,8 @@ void __catalyst__rt__finalize()
 }
 
 static int __catalyst__rt__device_init__impl(int8_t *rtd_lib, int8_t *rtd_name, int8_t *rtd_kwargs,
-                                             int64_t shots, bool auto_qubit_management)
+                                             int64_t capacity, int64_t shots,
+                                             bool auto_qubit_management)
 {
     // Device library cannot be a nullptr
     RT_FAIL_IF(!rtd_lib, "Invalid device library");
@@ -266,7 +269,7 @@ static int __catalyst__rt__device_init__impl(int8_t *rtd_lib, int8_t *rtd_name, 
     const std::vector<std::string_view> args{
         reinterpret_cast<char *>(rtd_lib), (rtd_name ? reinterpret_cast<char *>(rtd_name) : ""),
         (rtd_kwargs ? reinterpret_cast<char *>(rtd_kwargs) : "")};
-    RT_FAIL_IF(!initRTDevicePtr(args[0], args[1], args[2], auto_qubit_management),
+    RT_FAIL_IF(!initRTDevicePtr(args[0], args[1], args[2], capacity, auto_qubit_management),
                "Failed initialization of the backend device");
     getQuantumDevicePtr()->SetDeviceShots(shots);
     if (CTX->getDeviceRecorderStatus()) {
@@ -276,10 +279,10 @@ static int __catalyst__rt__device_init__impl(int8_t *rtd_lib, int8_t *rtd_name, 
 }
 
 void __catalyst__rt__device_init(int8_t *rtd_lib, int8_t *rtd_name, int8_t *rtd_kwargs,
-                                 int64_t shots, bool auto_qubit_management)
+                                 int64_t capacity, int64_t shots, bool auto_qubit_management)
 {
     timer::timer(__catalyst__rt__device_init__impl, "device_init", /* add_endl */ true, rtd_lib,
-                 rtd_name, rtd_kwargs, shots, auto_qubit_management);
+                 rtd_name, rtd_kwargs, capacity, shots, auto_qubit_management);
 }
 
 static int __catalyst__rt__device_release__impl()
