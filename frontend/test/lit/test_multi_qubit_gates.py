@@ -87,8 +87,8 @@ def get_custom_qjit_device(num_wires, discards, additions):
         name = "lightning.qubit"
         config_filepath = CONFIG_CUSTOM_DEVICE
 
-        def __init__(self, shots=None, wires=None):
-            super().__init__(wires=wires, shots=shots)
+        def __init__(self, wires=None):
+            super().__init__(wires=wires)
             self.qjit_capabilities = get_device_capabilities(self)
             for gate in discards:
                 self.qjit_capabilities.operations.pop(gate, None)
