@@ -793,6 +793,21 @@ class TestDynamicOneShotIntegration:
         result = circuit()
         assert result.shape == (10,)
 
+    def test_dynamic_one_shot_classical_return_values_with_mcm(self):
+        """Test classical return value with one-shot"""
+        @qjit(autograph=True)
+        @qml.set_shots(10)
+        @qml.qnode(qml.device("lightning.qubit", wires=1), mcm_method="one-shot")
+        def circuit():
+            qml.Hadamard(wires=0)
+            if measure(0):
+                return 42
+            else:
+                return 43
+
+        result = circuit()
+        assert result.shape == (10,)
+
     def test_dynamic_one_shot_with_classical_return_values(self):
         """Test classical return values with one-shot"""
         dev = qml.device("lightning.qubit", wires=1, shots=12)
