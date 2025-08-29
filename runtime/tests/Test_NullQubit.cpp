@@ -779,8 +779,8 @@ TEST_CASE("Test NullQubit device resource tracking", "[NullQubit]")
     std::unique_ptr<NullQubit> dummy = std::make_unique<NullQubit>();
     CHECK(dummy->IsTrackingResources() == false);
 
-    std::unique_ptr<NullQubit> sim =
-        std::make_unique<NullQubit>("{'track_resources':True}", RESOURCES_FNAME);
+    std::unique_ptr<NullQubit> sim = std::make_unique<NullQubit>(
+        "{'track_resources':True, 'resources_fname': '" RESOURCES_FNAME "'}");
     CHECK(sim->IsTrackingResources() == true);
     CHECK(sim->ResourcesGetNumGates() == 0);
     CHECK(sim->ResourcesGetNumQubits() == 0);
