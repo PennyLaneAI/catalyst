@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <mlir/IR/ValueRange.h>
 #define DEBUG_TYPE "t-layer-reduction"
 
 #include <vector>
@@ -21,9 +20,9 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 
-#include "QEC/IR/QECOpInterfaces.h"
 #include "QEC/Utils/PauliStringWrapper.h"
 #include "QEC/Utils/QECLayer.h"
+#include "QEC/Utils/QECOpUtils.h"
 
 using namespace mlir;
 using namespace catalyst::qec;
@@ -37,62 +36,6 @@ namespace qec {
 #define GEN_PASS_DEF_TLAYERREDUCTIONPASS
 #define GEN_PASS_DECL_TLAYERREDUCTIONPASS
 #include "QEC/Transforms/Passes.h.inc"
-
-// Return the SSA value of `qubit` visible at the program point of `op`.
-// Walk back through QEC PPR chains (out->in) until defined before `op` or a
-// block argument. Returns nullptr if a non-QEC op defines it.
-Value getReachingValueAt(Value qubit, QECOpInterface op)
-{
-    // We want to find the qubit that is used by op.
-    // e.g., op is first PPR, while qubit can be the operands from the third PPR.
-    // %0_q0, %0_q1 = qec.ppr ["X", "X"](8) %arg0, %arg1 // <- op
-    // %1_q0, %1_q1 = qec.ppr ["Z", "X"](8) %0_q0, %0_q1
-    // %2_q0, %2_q1 = qec.ppr ["X", "X"](8) %1_q0, %1_q1
-    //                                        ^- qubit that is used by op
-    // So if qubit is %1_q0, we want to return %arg0.
-
-    assert(qubit != nullptr && "Qubit should not be nullptr");
-
-    auto defOp = qubit.getDefiningOp();
-
-    if (!defOp || defOp->isBeforeInBlock(op)) {
-        return qubit;
-    }
-
-    auto qecOp = llvm::dyn_cast<QECOpInterface>(defOp);
-
-    if (!qecOp) {
-        return nullptr;
-    }
-
-    auto outQubits = qecOp.getOutQubits();
-    auto inQubits = qecOp.getInQubits();
-    assert((inQubits.size() == outQubits.size()) &&
-           "PPR op should have the same number of input and output qubits");
-
-    auto pos = std::distance(outQubits.begin(), llvm::find(outQubits, qubit));
-    Value inQubit = inQubits[pos];
-
-    if (qecOp == op) {
-        return inQubit;
-    }
-
-    return getReachingValueAt(inQubit, op);
-}
-
-// For each in-qubit of `srcOp`, return the SSA value visible at `dstOp`.
-// One per operand; nullptr if a non-QEC definition intervenes.
-// Precondition: same block with `dstOp` before `srcOp`. Consider caching.
-std::vector<Value> getInQubitReachingValuesAt(QECOpInterface srcOp, QECOpInterface dstOp)
-{
-    std::vector<Value> dominanceQubits;
-    dominanceQubits.reserve(srcOp.getInQubits().size());
-    for (auto inQubit : srcOp.getInQubits()) {
-        Value v = getReachingValueAt(inQubit, dstOp);
-        dominanceQubits.emplace_back(v);
-    }
-    return dominanceQubits;
-}
 
 // Check whether `rhsOp` can commute left across every op in `lhsLayer` (same block),
 // and, if so, identify a merge `mergeOp` candidate in `lhsLayer`.
