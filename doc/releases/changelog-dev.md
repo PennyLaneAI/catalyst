@@ -7,11 +7,6 @@
   For more details, see the Figure 6 in [A Game of Surface Code](https://arXiv:1808.02892v3) paper.
   [(#1975)](https://github.com/PennyLaneAI/catalyst/pull/1975)
 
-* A new pass `--partition-layers` has been added to group PPR/PPM operations into `qec.layer`
-  operations based on qubit interactive and commutativity, enabling circuit analysis and
-  potentially to support parallel execution.
-  [(#1951)](https://github.com/PennyLaneAI/catalyst/pull/1951)
-
 * Catalyst now provides native support for `SingleExcitation`, `DoubleExcitation`,
   and `PCPhase` on compatible devices like Lightning simulators.
   This enhancement avoids unnecessary gate decomposition,
@@ -33,6 +28,11 @@
 
 <h3>Improvements 🛠</h3>
 
+* A new pass `--partition-layers` has been added to group PPR/PPM operations into `qec.layer`
+  operations based on qubit interactive and commutativity, enabling circuit analysis and
+  potentially to support parallel execution.
+  [(#1951)](https://github.com/PennyLaneAI/catalyst/pull/1951)
+  
 * Adjoint differentiation is used by default when executing on lightning devices, significantly reduces gradient computation time.
   [(#1961)](https://github.com/PennyLaneAI/catalyst/pull/1961)
 

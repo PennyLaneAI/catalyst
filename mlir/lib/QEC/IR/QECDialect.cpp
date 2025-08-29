@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "llvm/ADT/TypeSwitch.h" // needed for enums
+#include "llvm/Support/LogicalResult.h"
+
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/OpImplementation.h"
-#include "llvm/ADT/TypeSwitch.h" // needed for enums
-#include <llvm/Support/LogicalResult.h>
-#include <mlir/IR/IRMapping.h>
-#include <mlir/IR/OperationSupport.h>
-#include <mlir/IR/Region.h>
+#include "mlir/IR/OperationSupport.h"
+#include "mlir/IR/Region.h"
 
 #include "QEC/IR/QECDialect.h"
 #include "Quantum/IR/QuantumDialect.h"
