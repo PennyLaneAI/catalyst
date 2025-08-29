@@ -26,6 +26,17 @@
 
 <h3>Improvements 🛠</h3>
 
+* Added a new JAX primitive to capture and compile the decomposition rule
+  definitions to MLIR. `decomposition_rule` is the decorator integrated
+  with this primitive for development purposes.
+  [(#1820)](https://github.com/PennyLaneAI/catalyst/pull/1820)
+
+* Renamed `QregManager` to `QubitHandler` and extended the class to manage
+  converting PLxPR wire indices into Catalyst JAXPR qubits.
+  This is especially useful for lowering subroutines that take
+  in qubits as arguments, for example decomposition rules.
+  [(#1820)](https://github.com/PennyLaneAI/catalyst/pull/1820)
+
 * Fix resource tracking unit test polluting the environment with output files
   [(#1861)](https://github.com/PennyLaneAI/catalyst/pull/1861)
 
@@ -58,13 +69,14 @@
   ```pycon
   %0 = transform.apply_registered_pass "some-pass" with options = {"an-option" = true, "maxValue" = 1 : i64, "multi-word-option" = 1 : i64}
   ```
+* Added checks to raise an error when the input qubits to the multi-qubit gates in the runtime CAPI are not all distinct. 
+  [(#2006)](https://github.com/PennyLaneAI/catalyst/pull/2006).
 
 * Commuting Clifford Pauli Product Rotation (PPR) operations, past non-Clifford PPRs, now supports P(π/2) Cliffords in addition to P(π/4)
   [(#1966)](https://github.com/PennyLaneAI/catalyst/pull/1966)
 
 * A new jax primitive `qdealloc_qb_p` is available for single qubit deallocations.
   [(#2005)](https://github.com/PennyLaneAI/catalyst/pull/2005)
-
 
 <h3>Breaking changes 💔</h3>
 
