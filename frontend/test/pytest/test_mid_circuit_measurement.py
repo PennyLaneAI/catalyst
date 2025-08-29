@@ -793,11 +793,13 @@ class TestDynamicOneShotIntegration:
                 "third": (qml.sample(), qml.sample()),
             }
 
-        assert list(circuit().keys()) == ["first", "second", "third"]
-        assert jnp.array(circuit()["first"]).shape == (12, 1)
-        assert jnp.allclose(circuit()["second"][0], jnp.full(12, 100))
-        assert jnp.array(circuit()["second"][1]).shape == (12, 1)
-        assert jnp.array(circuit()["third"]).shape == (2, 12, 1)
+        result = circuit()
+        
+        assert list(result.keys()) == ["first", "second", "third"]
+        assert jnp.array(result["first"]).shape == (12, 1)
+        assert jnp.allclose(result["second"][0], jnp.full(12, 100))
+        assert jnp.array(result["second"][1]).shape == (12, 1)
+        assert jnp.array(result["third"]).shape == (2, 12, 1)
 
     @pytest.mark.skip(
         reason="grad with dynamic one-shot is not yet supported.",
