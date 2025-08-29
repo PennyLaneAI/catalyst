@@ -15,7 +15,11 @@
 // RUN: quantum-opt --merge-ppr-ppm --split-input-file -verify-diagnostics %s | FileCheck %s
 // RUN: quantum-opt --merge-ppr-ppm="max-pauli-size=3" --split-input-file -verify-diagnostics %s | FileCheck %s --check-prefixes=CHECK-MPS
 
-func.func public @merge_ppr_ppm_test_1(%q1: !quantum.bit) -> tensor<i1> {
+// Merge tests, pi/4 rotations.
+//
+// The PPR can be removed after the commute, because the PPM is a terminal measurement and has no operations applied to those qubits.
+
+func.func public @merge_ppr_ppm_pi_4_rotation_test_1(%q1: !quantum.bit) -> tensor<i1> {
 
     // CHECK-NOT: qec.ppr ["X"]
     // CHECK:     qec.ppm ["X"] %
@@ -26,7 +30,35 @@ func.func public @merge_ppr_ppm_test_1(%q1: !quantum.bit) -> tensor<i1> {
     return %from_elements : tensor<i1>
 }
 
-func.func public @merge_ppr_ppm_test_2(%q1: !quantum.bit) -> (tensor<i1>, !quantum.bit) {
+func.func public @merge_ppr_ppm_pi_4_rotation_test_2() -> tensor<i1> {
+
+    // CHECK: qec.ppm ["Y"] %
+    // CHECK-NOT: qec.ppr ["X"]
+    %0 = quantum.alloc( 1) : !quantum.reg
+    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    %2 = qec.ppr ["X"](-4) %1 : !quantum.bit
+    %m, %out_qubits = qec.ppm ["Z"](-1) %2 : !quantum.bit
+    %from_elements = tensor.from_elements %m : tensor<i1>
+    %3 = quantum.insert %0[ 0], %out_qubits : !quantum.reg, !quantum.bit
+    quantum.dealloc %3 : !quantum.reg
+    return %from_elements : tensor<i1>
+}
+
+func.func public @merge_ppr_ppm_pi_4_rotation_test_3(%q1: !quantum.bit) -> tensor<i1> {
+
+    // CHECK: qec.ppm ["Y"] %
+    // CHECK-NOT: qec.ppr ["X"]
+    %0 = qec.ppr ["X"](-4) %q1 : !quantum.bit
+    %m, %out_qubits = qec.ppm ["Z"](-1) %0 : !quantum.bit
+    %from_elements = tensor.from_elements %m : tensor<i1>
+    return %from_elements : tensor<i1>
+}
+
+// Commute tests, pi/4 rotations.
+//
+// The PPR cannot be removed after the commute, because it operates on qubits that are returned by the function.
+
+func.func public @commute_ppr_ppm_pi_4_rotation_test_1(%q1: !quantum.bit) -> (tensor<i1>, !quantum.bit) {
 
     // CHECK: qec.ppm ["Z"](-1) %
     // CHECK: qec.ppr ["X"](4)
@@ -36,7 +68,7 @@ func.func public @merge_ppr_ppm_test_2(%q1: !quantum.bit) -> (tensor<i1>, !quant
     return %from_elements, %out_qubits : tensor<i1>, !quantum.bit
 }
 
-func.func public @merge_ppr_ppm_test_3(%q1: !quantum.bit) -> (tensor<i1>, !quantum.bit) {
+func.func public @commute_ppr_ppm_pi_4_rotation_test_2(%q1: !quantum.bit) -> (tensor<i1>, !quantum.bit) {
 
     // CHECK: qec.ppm ["Y"] %
     // CHECK: qec.ppr ["X"](-4)
@@ -46,7 +78,7 @@ func.func public @merge_ppr_ppm_test_3(%q1: !quantum.bit) -> (tensor<i1>, !quant
     return %from_elements, %out_qubits : tensor<i1>, !quantum.bit
 }
 
-func.func public @merge_ppr_ppm_test_4(%q1: !quantum.bit, %q2: !quantum.bit) -> (tensor<i1>, !quantum.bit) {
+func.func public @commute_ppr_ppm_pi_4_rotation_test_3(%q1: !quantum.bit, %q2: !quantum.bit) -> (tensor<i1>, !quantum.bit) {
 
     // CHECK:     [[q0:%.+]] = qec.ppr ["X"](8) %arg0 : !quantum.bit
     // CHECK-NOT: ["X"](4)
@@ -61,7 +93,7 @@ func.func public @merge_ppr_ppm_test_4(%q1: !quantum.bit, %q2: !quantum.bit) -> 
     return %from_elements, %out_qubits#0 : tensor<i1>, !quantum.bit
 }
 
-func.func public @merge_ppr_ppm_test_5(%q1: !quantum.bit, %q2: !quantum.bit) -> (tensor<i1>, !quantum.bit) {
+func.func public @commute_ppr_ppm_pi_4_rotation_test_4(%q1: !quantum.bit, %q2: !quantum.bit) -> (tensor<i1>, !quantum.bit) {
 
     // CHECK:     [[q0:%.+]] = qec.ppr ["X"](8) %arg0 : !quantum.bit
     // CHECK-NOT: qec.ppr ["Y"](4)
@@ -76,7 +108,7 @@ func.func public @merge_ppr_ppm_test_5(%q1: !quantum.bit, %q2: !quantum.bit) -> 
     return %from_elements, %out_qubits#0 : tensor<i1>, !quantum.bit
 }
 
-func.func public @merge_ppr_ppm_test_6(%q1: !quantum.bit, %q2: !quantum.bit) -> (tensor<i1>, !quantum.bit) {
+func.func public @commute_ppr_ppm_pi_4_rotation_test_5(%q1: !quantum.bit, %q2: !quantum.bit) -> (tensor<i1>, !quantum.bit) {
 
     // CHECK: [[q1:%.+]]:2 = qec.ppr ["X", "X"](8) %arg0, %arg1
     // CHECK: [[m1:%.+]], [[o1:%.+]]:2 = qec.ppm ["X", "Z"] [[q1]]#0, [[q1]]#1
@@ -90,7 +122,11 @@ func.func public @merge_ppr_ppm_test_6(%q1: !quantum.bit, %q2: !quantum.bit) -> 
     return %from_elements, %out_qubits#0 : tensor<i1>, !quantum.bit
 }
 
-func.func public @merge_ppr_ppm_test_7(%q1: !quantum.bit) -> tensor<i1> {
+// Merge tests, pi/2 rotations.
+//
+// The PPR can be removed after the commute, because the PPM is a terminal measurement and has no operations applied to those qubits.
+
+func.func public @merge_ppr_ppm_pi_2_rotation_test_1(%q1: !quantum.bit) -> tensor<i1> {
 
     // CHECK-NOT: qec.ppr ["X"]
     // CHECK:     qec.ppm ["X"] %
@@ -101,7 +137,35 @@ func.func public @merge_ppr_ppm_test_7(%q1: !quantum.bit) -> tensor<i1> {
     return %from_elements : tensor<i1>
 }
 
-func.func public @merge_ppr_ppm_test_8(%q1: !quantum.bit) -> (tensor<i1>, !quantum.bit) {
+func.func public @merge_ppr_ppm_pi_2_rotation_test_2() -> tensor<i1> {
+
+    // CHECK: qec.ppm ["Z"] %
+    // CHECK-NOT: qec.ppr ["X"]
+    %0 = quantum.alloc( 1) : !quantum.reg
+    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    %2 = qec.ppr ["X"](-2) %1 : !quantum.bit
+    %m, %out_qubits = qec.ppm ["Z"](-1) %2 : !quantum.bit
+    %from_elements = tensor.from_elements %m : tensor<i1>
+    %3 = quantum.insert %0[ 0], %out_qubits : !quantum.reg, !quantum.bit
+    quantum.dealloc %3 : !quantum.reg
+    return %from_elements : tensor<i1>
+}
+
+func.func public @merge_ppr_ppm_pi_2_rotation_test_3(%q1: !quantum.bit) -> tensor<i1> {
+
+    // CHECK: qec.ppm ["Z"] %
+    // CHECK-NOT: qec.ppr ["X"]
+    %0 = qec.ppr ["X"](-2) %q1 : !quantum.bit
+    %m, %out_qubits = qec.ppm ["Z"](-1) %0 : !quantum.bit
+    %from_elements = tensor.from_elements %m : tensor<i1>
+    return %from_elements : tensor<i1>
+}
+
+// Commute tests, pi/2 rotations.
+//
+// The PPR cannot be removed after the commute, because it operates on qubits that are returned by the function.
+
+func.func public @commute_ppr_ppm_pi_2_rotation_test_1(%q1: !quantum.bit) -> (tensor<i1>, !quantum.bit) {
 
     // CHECK: qec.ppm ["Y"](-1) %
     // CHECK: qec.ppr ["X"](2)
@@ -111,7 +175,7 @@ func.func public @merge_ppr_ppm_test_8(%q1: !quantum.bit) -> (tensor<i1>, !quant
     return %from_elements, %out_qubits : tensor<i1>, !quantum.bit
 }
 
-func.func public @merge_ppr_ppm_test_9(%q1: !quantum.bit) -> (tensor<i1>, !quantum.bit) {
+func.func public @commute_ppr_ppm_pi_2_rotation_test_2(%q1: !quantum.bit) -> (tensor<i1>, !quantum.bit) {
 
     // CHECK: qec.ppm ["Z"] %
     // CHECK: qec.ppr ["X"](-2)
