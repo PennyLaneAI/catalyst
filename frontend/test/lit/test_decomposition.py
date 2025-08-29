@@ -446,7 +446,7 @@ def test_decomposition_rule_with_cond():
         qml.cond(param != 0.0, true_path, false_path)()
 
     @qml.qjit(autograph=False)
-    @qml.qnode(qml.device("lightning.qubit", wires=1), autograph=False)
+    @qml.qnode(qml.device("lightning.qubit", wires=1))
     def circuit_6():
         # CHECK: module @circuit_6
         cond_RX(float, jax.core.ShapedArray((1,), int))
@@ -492,7 +492,7 @@ def test_decomposition_rule_caller():
         Op2_decomp(param, wires)
 
     @qml.qjit(autograph=False)
-    @qml.qnode(qml.device("lightning.qubit", wires=1), autograph=False)
+    @qml.qnode(qml.device("lightning.qubit", wires=1))
     # CHECK: module @circuit_7
     def circuit_7():
         # CHECK: [[QREG:%.+]] = quantum.alloc
