@@ -19,7 +19,8 @@ func.func private @workflow_plain() -> tensor<4xcomplex<f64>> attributes {} {
   %val = "test.op" () : () -> (i64)
   %cst = arith.constant 4.000000e-01 : f64
   %c0_i64 = arith.constant 0 : i64
-  quantum.device ["rtd_lightning.so", "LightningQubit", "{shots: 0}"]
+  %capacity = arith.constant 2 : i64
+  quantum.device capacity (%capacity) ["rtd_lightning.so", "LightningQubit", "{shots: 0}"]
   %0 = quantum.alloc( 2) : !quantum.reg
   %1 = quantum.extract %0[%c0_i64] : !quantum.reg -> !quantum.bit
   // CHECK:        RX
@@ -67,7 +68,8 @@ func.func private @workflow_plain() -> tensor<4xcomplex<f64>> attributes {} {
 func.func private @workflow_nested() -> tensor<4xcomplex<f64>> attributes {} {
   %c1_i64 = arith.constant 1 : i64
   %c0_i64 = arith.constant 0 : i64
-  quantum.device ["rtd_lightning.so", "LightningQubit", "{shots: 0}"]
+  %capacity = arith.constant 2 : i64
+  quantum.device capacity (%capacity) ["rtd_lightning.so", "LightningQubit", "{shots: 0}"]
   %0 = quantum.alloc( 2) : !quantum.reg
   %1 = quantum.adjoint(%0) : !quantum.reg {
   ^bb0(%arg0: !quantum.reg):
@@ -120,7 +122,8 @@ func.func @workflow_unhandled() {
 // -----
 
 func.func private @qubit_unitary_test(%arg0: tensor<4x4xcomplex<f64>>) -> tensor<4xcomplex<f64>> {
-    quantum.device ["rtd_lightning.so", "LightningQubit", "{shots: 0}"]
+    %capacity = arith.constant 2 : i64
+    quantum.device capacity (%capacity) ["rtd_lightning.so", "LightningQubit", "{shots: 0}"]
     %0 = quantum.alloc( 2) : !quantum.reg
     %1 = quantum.adjoint(%0) : !quantum.reg {
     ^bb0(%arg1: !quantum.reg):
@@ -199,7 +202,8 @@ func.func private @workflow_adjoint(%arg0: f64) -> tensor<4xcomplex<f64>> attrib
   %c1_i64 = arith.constant 1 : i64
   %cst = arith.constant 4.000000e-01 : f64
   %c0_i64 = arith.constant 0 : i64
-  quantum.device ["rtd_lightning.so", "LightningQubit", "{shots: 0}"]
+  %capacity = arith.constant 2 : i64
+  quantum.device capacity (%capacity) ["rtd_lightning.so", "LightningQubit", "{shots: 0}"]
   %0 = quantum.alloc( 2) : !quantum.reg
   %1 = quantum.extract %0[%c0_i64] : !quantum.reg -> !quantum.bit
   %2 = quantum.custom "RX"(%cst) %1 : !quantum.bit

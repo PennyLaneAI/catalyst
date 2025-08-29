@@ -17,8 +17,9 @@
 // CHECK-LABEL:   func.func private @circuit.folded(%arg0: index) -> tensor<f64> {
     // CHECK:   [[c0:%.+]] = index.constant 0
     // CHECK:   [[c1:%.+]] = index.constant 1
+    // CHECK:   [[capacity:%.+]] = arith.constant 4
     // CHECK:   [[shots:%.+]] = arith.constant 0
-    // CHECK:   quantum.device shots([[shots]]) ["rtd_lightning.so", "LightningQubit", "{}"]
+    // CHECK:   quantum.device capacity([[capacity]]) shots([[shots]]) ["rtd_lightning.so", "LightningQubit", "{}"]
     // CHECK:   [[qReg:%.+]] = quantum.alloc( 4) : !quantum.reg
     // CHECK:   [[q0:%.+]] = quantum.extract [[qReg]][ 0] : !quantum.reg -> !quantum.bit
     // CHECK:   [[q0_out:%.+]] = scf.for %arg1 = [[c0]] to %arg0 step [[c1]] iter_args([[q0_in:%.+]] = [[q0]]) -> (!quantum.bit) {
@@ -58,8 +59,9 @@
 
 //CHECK-LABEL: func.func @circuit() -> tensor<f64> attributes {qnode} {
 func.func @circuit() -> tensor<f64> attributes {qnode} {
+    %capacity = arith.constant 4 : i64
     %shots = arith.constant 0 : i64
-    quantum.device shots(%shots) ["rtd_lightning.so", "LightningQubit", "{}"]
+    quantum.device capacity(%capacity) shots(%shots) ["rtd_lightning.so", "LightningQubit", "{}"]
     %0 = quantum.alloc( 4) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
     %out_qubits = quantum.custom "Hadamard"() %1 : !quantum.bit

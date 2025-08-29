@@ -76,9 +76,11 @@ std::vector<bool> getModifiersControlledValues(const Modifiers *modifiers)
  * to the new initialized device pointer.
  */
 [[nodiscard]] bool initRTDevicePtr(std::string_view rtd_lib, std::string_view rtd_name,
-                                   std::string_view rtd_kwargs, bool auto_qubit_management)
+                                   std::string_view rtd_kwargs, int64_t capacity,
+                                   bool auto_qubit_management)
 {
-    auto &&device = CTX->getOrCreateDevice(rtd_lib, rtd_name, rtd_kwargs, auto_qubit_management);
+    auto &&device =
+        CTX->getOrCreateDevice(rtd_lib, rtd_name, rtd_kwargs, capacity, auto_qubit_management);
     if (device) {
         RTD_PTR = device.get();
         return RTD_PTR ? true : false;
@@ -344,7 +346,8 @@ void __catalyst__rt__finalize()
 }
 
 static int __catalyst__rt__device_init__impl(int8_t *rtd_lib, int8_t *rtd_name, int8_t *rtd_kwargs,
-                                             int64_t shots, bool auto_qubit_management)
+                                             int64_t capacity, int64_t shots,
+                                             bool auto_qubit_management)
 {
     // Device library cannot be a nullptr
     RT_FAIL_IF(!rtd_lib, "Invalid device library");
@@ -355,7 +358,7 @@ static int __catalyst__rt__device_init__impl(int8_t *rtd_lib, int8_t *rtd_name, 
     const std::vector<std::string_view> args{
         reinterpret_cast<char *>(rtd_lib), (rtd_name ? reinterpret_cast<char *>(rtd_name) : ""),
         (rtd_kwargs ? reinterpret_cast<char *>(rtd_kwargs) : "")};
-    RT_FAIL_IF(!initRTDevicePtr(args[0], args[1], args[2], auto_qubit_management),
+    RT_FAIL_IF(!initRTDevicePtr(args[0], args[1], args[2], capacity, auto_qubit_management),
                "Failed initialization of the backend device");
     getQuantumDevicePtr()->SetDeviceShots(shots);
     if (CTX->getDeviceRecorderStatus()) {
@@ -365,10 +368,10 @@ static int __catalyst__rt__device_init__impl(int8_t *rtd_lib, int8_t *rtd_name, 
 }
 
 void __catalyst__rt__device_init(int8_t *rtd_lib, int8_t *rtd_name, int8_t *rtd_kwargs,
-                                 int64_t shots, bool auto_qubit_management)
+                                 int64_t capacity, int64_t shots, bool auto_qubit_management)
 {
     timer::timer(__catalyst__rt__device_init__impl, "device_init", /* add_endl */ true, rtd_lib,
-                 rtd_name, rtd_kwargs, shots, auto_qubit_management);
+                 rtd_name, rtd_kwargs, capacity, shots, auto_qubit_management);
 }
 
 static int __catalyst__rt__device_release__impl()
@@ -727,6 +730,8 @@ void __catalyst__qis__CNOT(QUBIT *control, QUBIT *target, const Modifiers *modif
 
 void __catalyst__qis__CY(QUBIT *control, QUBIT *target, const Modifiers *modifiers)
 {
+    RT_FAIL_IF(control == target,
+               "Invalid input for CY gate. Control and target qubit operands must be distinct.");
     getQuantumDevicePtr()->NamedOperation("CY", {},
                                           {/* control = */ reinterpret_cast<QubitIdType>(control),
                                            /* target = */ reinterpret_cast<QubitIdType>(target)},
@@ -735,6 +740,8 @@ void __catalyst__qis__CY(QUBIT *control, QUBIT *target, const Modifiers *modifie
 
 void __catalyst__qis__CZ(QUBIT *control, QUBIT *target, const Modifiers *modifiers)
 {
+    RT_FAIL_IF(control == target,
+               "Invalid input for CZ gate. Control and target qubit operands must be distinct.");
     getQuantumDevicePtr()->NamedOperation("CZ", {},
                                           {/* control = */ reinterpret_cast<QubitIdType>(control),
                                            /* target = */ reinterpret_cast<QubitIdType>(target)},
@@ -743,6 +750,8 @@ void __catalyst__qis__CZ(QUBIT *control, QUBIT *target, const Modifiers *modifie
 
 void __catalyst__qis__SWAP(QUBIT *control, QUBIT *target, const Modifiers *modifiers)
 {
+    RT_FAIL_IF(control == target,
+               "Invalid input for SWAP gate. Control and target qubit operands must be distinct.");
     getQuantumDevicePtr()->NamedOperation("SWAP", {},
                                           {/* control = */ reinterpret_cast<QubitIdType>(control),
                                            /* target = */ reinterpret_cast<QubitIdType>(target)},
@@ -752,6 +761,9 @@ void __catalyst__qis__SWAP(QUBIT *control, QUBIT *target, const Modifiers *modif
 void __catalyst__qis__IsingXX(double theta, QUBIT *control, QUBIT *target,
                               const Modifiers *modifiers)
 {
+    RT_FAIL_IF(
+        control == target,
+        "Invalid input for IsingXX gate. Control and target qubit operands must be distinct.");
     getQuantumDevicePtr()->NamedOperation("IsingXX", {theta},
                                           {/* control = */ reinterpret_cast<QubitIdType>(control),
                                            /* target = */ reinterpret_cast<QubitIdType>(target)},
@@ -761,6 +773,9 @@ void __catalyst__qis__IsingXX(double theta, QUBIT *control, QUBIT *target,
 void __catalyst__qis__IsingYY(double theta, QUBIT *control, QUBIT *target,
                               const Modifiers *modifiers)
 {
+    RT_FAIL_IF(
+        control == target,
+        "Invalid input for IsingYY gate. Control and target qubit operands must be distinct.");
     getQuantumDevicePtr()->NamedOperation("IsingYY", {theta},
                                           {/* control = */ reinterpret_cast<QubitIdType>(control),
                                            /* target = */ reinterpret_cast<QubitIdType>(target)},
@@ -770,6 +785,9 @@ void __catalyst__qis__IsingYY(double theta, QUBIT *control, QUBIT *target,
 void __catalyst__qis__IsingXY(double theta, QUBIT *control, QUBIT *target,
                               const Modifiers *modifiers)
 {
+    RT_FAIL_IF(
+        control == target,
+        "Invalid input for IsingXY gate. Control and target qubit operands must be distinct.");
     getQuantumDevicePtr()->NamedOperation("IsingXY", {theta},
                                           {/* control = */ reinterpret_cast<QubitIdType>(control),
                                            /* target = */ reinterpret_cast<QubitIdType>(target)},
@@ -779,6 +797,9 @@ void __catalyst__qis__IsingXY(double theta, QUBIT *control, QUBIT *target,
 void __catalyst__qis__IsingZZ(double theta, QUBIT *control, QUBIT *target,
                               const Modifiers *modifiers)
 {
+    RT_FAIL_IF(
+        control == target,
+        "Invalid input for IsingZZ gate. Control and target qubit operands must be distinct.");
     getQuantumDevicePtr()->NamedOperation("IsingZZ", {theta},
                                           {/* control = */ reinterpret_cast<QubitIdType>(control),
                                            /* target = */ reinterpret_cast<QubitIdType>(target)},
@@ -788,6 +809,8 @@ void __catalyst__qis__IsingZZ(double theta, QUBIT *control, QUBIT *target,
 void __catalyst__qis__SingleExcitation(double phi, QUBIT *wire0, QUBIT *wire1,
                                        const Modifiers *modifiers)
 {
+    RT_FAIL_IF(wire0 == wire1,
+               "Invalid input for SingleExcitation gate. All two qubit operands must be distinct.");
     getQuantumDevicePtr()->NamedOperation(
         "SingleExcitation", {phi},
         {reinterpret_cast<QubitIdType>(wire0), reinterpret_cast<QubitIdType>(wire1)},
@@ -797,6 +820,10 @@ void __catalyst__qis__SingleExcitation(double phi, QUBIT *wire0, QUBIT *wire1,
 void __catalyst__qis__DoubleExcitation(double phi, QUBIT *wire0, QUBIT *wire1, QUBIT *wire2,
                                        QUBIT *wire3, const Modifiers *modifiers)
 {
+    RT_FAIL_IF(
+        (wire0 == wire1 || wire0 == wire2 || wire0 == wire3 || wire1 == wire2 || wire1 == wire3 ||
+         wire2 == wire3),
+        "Invalid input for DoubleExcitation gate. All four qubit operands must be distinct.");
     getQuantumDevicePtr()->NamedOperation(
         "DoubleExcitation", {phi},
         {reinterpret_cast<QubitIdType>(wire0), reinterpret_cast<QubitIdType>(wire1),
@@ -807,6 +834,8 @@ void __catalyst__qis__DoubleExcitation(double phi, QUBIT *wire0, QUBIT *wire1, Q
 void __catalyst__qis__ControlledPhaseShift(double theta, QUBIT *control, QUBIT *target,
                                            const Modifiers *modifiers)
 {
+    RT_FAIL_IF(control == target, "Invalid input for ControlledPhaseShift gate. Control and target "
+                                  "qubit operands must be distinct.");
     getQuantumDevicePtr()->NamedOperation("ControlledPhaseShift", {theta},
                                           {/* control = */ reinterpret_cast<QubitIdType>(control),
                                            /* target = */ reinterpret_cast<QubitIdType>(target)},
@@ -815,6 +844,8 @@ void __catalyst__qis__ControlledPhaseShift(double theta, QUBIT *control, QUBIT *
 
 void __catalyst__qis__CRX(double theta, QUBIT *control, QUBIT *target, const Modifiers *modifiers)
 {
+    RT_FAIL_IF(control == target,
+               "Invalid input for CRX gate. Control and target qubit operands must be distinct.");
     getQuantumDevicePtr()->NamedOperation("CRX", {theta},
                                           {/* control = */ reinterpret_cast<QubitIdType>(control),
                                            /* target = */ reinterpret_cast<QubitIdType>(target)},
@@ -823,6 +854,8 @@ void __catalyst__qis__CRX(double theta, QUBIT *control, QUBIT *target, const Mod
 
 void __catalyst__qis__CRY(double theta, QUBIT *control, QUBIT *target, const Modifiers *modifiers)
 {
+    RT_FAIL_IF(control == target,
+               "Invalid input for CRY gate. Control and target qubit operands must be distinct.");
     getQuantumDevicePtr()->NamedOperation("CRY", {theta},
                                           {/* control = */ reinterpret_cast<QubitIdType>(control),
                                            /* target = */ reinterpret_cast<QubitIdType>(target)},
@@ -831,6 +864,8 @@ void __catalyst__qis__CRY(double theta, QUBIT *control, QUBIT *target, const Mod
 
 void __catalyst__qis__CRZ(double theta, QUBIT *control, QUBIT *target, const Modifiers *modifiers)
 {
+    RT_FAIL_IF(control == target,
+               "Invalid input for CRZ gate. Control and target qubit operands must be distinct.");
     getQuantumDevicePtr()->NamedOperation("CRZ", {theta},
                                           {/* control = */ reinterpret_cast<QubitIdType>(control),
                                            /* target = */ reinterpret_cast<QubitIdType>(target)},
@@ -839,6 +874,8 @@ void __catalyst__qis__CRZ(double theta, QUBIT *control, QUBIT *target, const Mod
 
 void __catalyst__qis__MS(double theta, QUBIT *control, QUBIT *target, const Modifiers *modifiers)
 {
+    RT_FAIL_IF(control == target,
+               "Invalid input for MS gate. Control and target qubit operands must be distinct.");
     getQuantumDevicePtr()->NamedOperation("MS", {theta},
                                           {/* control = */ reinterpret_cast<QubitIdType>(control),
                                            /* target = */ reinterpret_cast<QubitIdType>(target)},
@@ -848,6 +885,8 @@ void __catalyst__qis__MS(double theta, QUBIT *control, QUBIT *target, const Modi
 void __catalyst__qis__CRot(double phi, double theta, double omega, QUBIT *control, QUBIT *target,
                            const Modifiers *modifiers)
 {
+    RT_FAIL_IF(control == target,
+               "Invalid input for CRot gate. Control and target qubit operands must be distinct.");
     getQuantumDevicePtr()->NamedOperation("CRot", {phi, theta, omega},
                                           {/* control = */ reinterpret_cast<QubitIdType>(control),
                                            /* target = */ reinterpret_cast<QubitIdType>(target)},
@@ -856,6 +895,8 @@ void __catalyst__qis__CRot(double phi, double theta, double omega, QUBIT *contro
 
 void __catalyst__qis__CSWAP(QUBIT *control, QUBIT *aswap, QUBIT *bswap, const Modifiers *modifiers)
 {
+    RT_FAIL_IF((control == aswap || aswap == bswap || control == bswap),
+               "Invalid input for CSWAP gate. Control and target qubit operands must be distinct.");
     getQuantumDevicePtr()->NamedOperation("CSWAP", {},
                                           {reinterpret_cast<QubitIdType>(control),
                                            reinterpret_cast<QubitIdType>(aswap),
@@ -865,6 +906,8 @@ void __catalyst__qis__CSWAP(QUBIT *control, QUBIT *aswap, QUBIT *bswap, const Mo
 
 void __catalyst__qis__Toffoli(QUBIT *wire0, QUBIT *wire1, QUBIT *wire2, const Modifiers *modifiers)
 {
+    RT_FAIL_IF((wire0 == wire1 || wire1 == wire2 || wire0 == wire2),
+               "Invalid input for Toffoli gate. All three qubit operands must be distinct.");
     getQuantumDevicePtr()->NamedOperation("Toffoli", {},
                                           {reinterpret_cast<QubitIdType>(wire0),
                                            reinterpret_cast<QubitIdType>(wire1),
@@ -890,6 +933,8 @@ void __catalyst__qis__MultiRZ(double theta, const Modifiers *modifiers, int64_t 
 
 void __catalyst__qis__ISWAP(QUBIT *wire0, QUBIT *wire1, const Modifiers *modifiers)
 {
+    RT_FAIL_IF(wire0 == wire1,
+               "Invalid input for ISWAP gate. Control and target qubit operands must be distinct.");
     getQuantumDevicePtr()->NamedOperation(
         "ISWAP", {}, {reinterpret_cast<QubitIdType>(wire0), reinterpret_cast<QubitIdType>(wire1)},
         MODIFIERS_ARGS(modifiers));
@@ -897,6 +942,8 @@ void __catalyst__qis__ISWAP(QUBIT *wire0, QUBIT *wire1, const Modifiers *modifie
 
 void __catalyst__qis__PSWAP(double phi, QUBIT *wire0, QUBIT *wire1, const Modifiers *modifiers)
 {
+    RT_FAIL_IF(wire0 == wire1,
+               "Invalid input for PSWAP gate. Control and target qubit operands must be distinct.");
     getQuantumDevicePtr()->NamedOperation(
         "PSWAP", {phi},
         {reinterpret_cast<QubitIdType>(wire0), reinterpret_cast<QubitIdType>(wire1)},

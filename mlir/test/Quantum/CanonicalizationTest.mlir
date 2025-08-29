@@ -162,7 +162,8 @@ func.func @test_multirz_adjoint_canonicalize(%arg0: f64) -> (!quantum.bit, !quan
 func.func @test_interleaved_extract_insert() -> tensor<4xf64> {
   %c1_i64 = arith.constant 1 : i64
   %c0_i64 = arith.constant 0 : i64
-  quantum.device shots(%c0_i64) ["", "", ""]
+  %capacity = arith.constant 2 : i64
+  quantum.device capacity (%capacity) shots(%c0_i64) ["", "", ""]
   %0 = quantum.alloc( 2) : !quantum.reg
   // CHECK: [[QBIT:%.+]] = quantum.extract [[QREG:%.+]][
   // CHECK: [[QBIT_1:%.+]] = quantum.custom "Hadamard"() [[QBIT]]
