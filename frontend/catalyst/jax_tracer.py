@@ -38,7 +38,6 @@ from pennylane.measurements import (
     CountsMP,
     ExpectationMP,
     MeasurementProcess,
-    MidMeasureMP,
     ProbabilityMP,
     StateMP,
     VarianceMP,
