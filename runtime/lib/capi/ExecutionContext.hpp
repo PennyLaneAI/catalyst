@@ -166,6 +166,7 @@ class RTDevice {
     std::string rtd_lib;
     std::string rtd_name;
     std::string rtd_kwargs;
+    uint64_t capacity;
     bool auto_qubit_management;
 
     std::unique_ptr<SharedLibraryManager> rtd_dylib{nullptr};
