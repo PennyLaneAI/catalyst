@@ -118,6 +118,95 @@ static void autoQubitManagementAllocate(std::vector<QubitIdType> *qubit_vector_p
     qubit_vector_ptr->insert(qubit_vector_ptr->end(), new_qubits_vector->begin(),
                              new_qubits_vector->end());
 }
+
+template <typename T> void Remap1DResultWires(T *data_aligned)
+{
+    // Need to remap labels to device's cannonical order
+    // When user writes qml.device(wires=3), qml.state()
+    // They mean qml.state(wires=[0,1,2])
+    // However, it is not guaranteed that the labels (0,1,2) will correspond
+    // to the device wire indices (0,1,2).
+    // We need to find the indices that these labels actually correspond to.
+
+    // Let's walk through with an example.
+    // Say the array of qubit IDs on the device is [100, 200, 300].
+    // This means calling just `State()` on the device,
+    // returns an array where the i-th entry in the array,
+    // i = "abc" in binary (e.g. i=6 means abc=110)
+    // gives the amplitude when device qubit 100, 200, 300 are in |a>, |b> and |c>
+
+    // Let's also say the label-to-index map is {0:1, 1:0, 2:2}.
+    // The user wants qml.state(wires=[0,1,2]), with 0, 1, 2 being labels
+    // So the indices should be [1,0,2], or device qubit IDs [200, 100, 300]
+    // i.e. the user wants an array where the i-th entry gives the amplitude
+    // when qubit 200, 100, 300 are in |a>, |b> and |c>
+    int64_t capacity = RTD_PTR->getDeviceCapacity();
+    RTD_PTR->fillWireLabelMapUpToCapacity();
+    std::vector<T> remappedState(1 << capacity);
+
+    for (int64_t i = 0; i < (1 << capacity); i++) {
+        // say i=6
+        // 1. parse 6 into binary, i.e. abc=110
+        // Use standard int size
+        constexpr int64_t MAX_NUM_QUBITS = 64;
+
+        std::bitset<MAX_NUM_QUBITS> labelBits(i);
+
+        std::string labelBinaryStringLeftPadded = labelBits.to_string();
+        std::string labelBinaryString =
+            labelBinaryStringLeftPadded.substr(MAX_NUM_QUBITS - capacity);
+
+        // 2. This means user wants label 0 in |1>, label 1 in |1>, label 2 in |0>
+        // Get the corresponding indices
+        std::vector<uint64_t> indices(capacity);
+        for (int64_t label = 0; label < static_cast<int64_t>(labelBinaryString.size()); label++) {
+            char bit = labelBinaryString[label];
+            uint64_t index = RTD_PTR->getWireLabelMap().at(label);
+            // user wants label 0 in |1>
+            // Map is {0:1}
+            // This means we want qubit index 1, or qubit ID 200, in |1>
+            indices[index] = bit - '0';
+        }
+
+        // 3. Get the index number back from the index bitstream
+        int64_t index_decimal = 0;
+        for (int64_t p = 0; p < capacity; p++) {
+            index_decimal += (1 << (capacity - 1 - p)) * indices[p];
+        }
+        remappedState[i] = data_aligned[index_decimal];
+    }
+
+    for (int64_t i = 0; i < static_cast<int64_t>(remappedState.size()); i++) {
+        data_aligned[i] = remappedState[i];
+    }
+}
+
+void RemapStateResultWires(std::complex<double> *data_aligned)
+{
+    Remap1DResultWires<std::complex<double>>(data_aligned);
+}
+
+void RemapProbsResultWires(double *data_aligned) { Remap1DResultWires<double>(data_aligned); }
+
+// sample() is a lot easier since no binary bit mappings involved
+void RemapSampleResultWires(double *data_aligned, int64_t Nrows, int64_t Ncols)
+{
+    RTD_PTR->fillWireLabelMapUpToCapacity();
+    std::vector<double> remappedSamples(Nrows * Ncols);
+
+    for (int64_t i = 0; i < Nrows; i++) {
+        // Each shot is the same
+        for (int64_t label = 0; label < Ncols; label++) {
+            uint64_t index = RTD_PTR->getWireLabelMap().at(label);
+            remappedSamples[i * Ncols + label] = data_aligned[i * Ncols + index];
+        }
+    }
+
+    for (int64_t i = 0; i < static_cast<int64_t>(remappedSamples.size()); i++) {
+        data_aligned[i] = remappedSamples[i];
+    }
+}
+
 } // namespace Catalyst::Runtime
 
 extern "C" {
@@ -1036,6 +1125,7 @@ void __catalyst__qis__State(MemRefT_CplxT_double_1d *result, int64_t numQubits, 
 
     if (wires.empty()) {
         getQuantumDevicePtr()->State(view);
+        RemapStateResultWires(result_p->data_aligned);
     }
     else {
         RT_FAIL("Partial State-Vector not supported.");
@@ -1065,6 +1155,7 @@ void __catalyst__qis__Probs(MemRefT_double_1d *result, int64_t numQubits, ...)
 
     if (wires.empty()) {
         getQuantumDevicePtr()->Probs(view);
+        RemapProbsResultWires(result_p->data_aligned);
     }
     else {
         getQuantumDevicePtr()->PartialProbs(view, wires);
@@ -1096,6 +1187,7 @@ void __catalyst__qis__Sample(MemRefT_double_2d *result, int64_t numQubits, ...)
 
     if (wires.empty()) {
         getQuantumDevicePtr()->Sample(view);
+        RemapSampleResultWires(result_p->data_aligned, result_p->sizes[0], result_p->sizes[1]);
     }
     else {
         getQuantumDevicePtr()->PartialSample(view, wires);
@@ -1129,6 +1221,8 @@ void __catalyst__qis__Counts(PairT_MemRefT_double_int64_1d *result, int64_t numQ
 
     if (wires.empty()) {
         getQuantumDevicePtr()->Counts(eigvals_view, counts_view);
+        Remap1DResultWires<double>(result_eigvals_p->data_aligned);
+        Remap1DResultWires<int64_t>(result_counts_p->data_aligned);
     }
     else {
         getQuantumDevicePtr()->PartialCounts(eigvals_view, counts_view, wires);
@@ -1141,8 +1235,22 @@ int64_t __catalyst__rt__array_get_size_1d(QirArray *ptr)
     return qubit_vector_ptr->size();
 }
 
-int8_t *__catalyst__rt__array_get_element_ptr_1d(QirArray *ptr, int64_t idx)
+int8_t *__catalyst__rt__array_get_element_ptr_1d(QirArray *ptr, int64_t label)
 {
+    // Isolate automatic qubit management for now
+    // i.e. automatic management still treats labels are actual addresses
+    // and seeing a label of `5` will keep allocating up until there's 6 qubits
+    // TODO: do we update that behavior too now that we move to
+    // "everything is just a label"?
+    bool isAutoManagement = RTD_PTR->getQubitManagementMode();
+    int64_t idx = 0;
+    if (isAutoManagement) {
+        idx = label;
+    }
+    else {
+        idx = RTD_PTR->resolveWireLabelToIndex(label);
+    }
+
     std::vector<QubitIdType> *qubit_vector_ptr = reinterpret_cast<std::vector<QubitIdType> *>(ptr);
 
     RT_ASSERT(idx >= 0);
@@ -1150,7 +1258,7 @@ int8_t *__catalyst__rt__array_get_element_ptr_1d(QirArray *ptr, int64_t idx)
     error_msg += std::to_string(idx);
 
     if (static_cast<size_t>(idx) >= qubit_vector_ptr->size()) {
-        if (!RTD_PTR->getQubitManagementMode()) {
+        if (!isAutoManagement) {
             RT_FAIL(error_msg.c_str());
         }
         else {
