@@ -92,6 +92,7 @@ def DeviceInitOp : Quantum_Op<"device"> {
     let summary = "Initialize a quantum device.";
 
     let arguments = (ins
+        I64:$capacity,
         Optional<I64>:$shots,
         UnitAttr:$auto_qubit_management,
         StrAttr:$lib,
@@ -100,19 +101,20 @@ def DeviceInitOp : Quantum_Op<"device"> {
     );
 
     let assemblyFormat = [{
-      (`shots` `(` $shots^ `)`)? `[` $lib `,` $device_name `,` $kwargs `]` attr-dict
+      `capacity` `(` $capacity `)` (`shots` `(` $shots^ `)`)? `[` $lib `,` $device_name `,` $kwargs `]` attr-dict
     }];
 
     let builders = [
         OpBuilder<
         // Convenience builder for a device not in automatic qubit management mode
         (ins
+             "mlir::Value":$capacity,
              "mlir::Value":$shots,
              "mlir::StringAttr":$lib,
              "mlir::StringAttr":$device_name,
              "mlir::StringAttr":$kwargs
         ),[{
-            DeviceInitOp::build($_builder, $_state, shots, false, lib, device_name, kwargs);
+            DeviceInitOp::build($_builder, $_state, capacity, shots, false, lib, device_name, kwargs);
         }]>,
     ];
 }
