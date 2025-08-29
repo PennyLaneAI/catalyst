@@ -35,7 +35,7 @@ void __catalyst__rt__print_string(char *);
 void __catalyst__rt__assert_bool(bool, char *);
 int64_t __catalyst__rt__array_get_size_1d(QirArray *);
 int8_t *__catalyst__rt__array_get_element_ptr_1d(QirArray *, int64_t);
-void __catalyst__rt__insert_element_into_array_1d(QirArray *, int64_t, QUBIT *);
+QirArray *__catalyst__rt__insert_element_into_array_1d(QirArray *, int64_t, QUBIT *);
 
 QUBIT *__catalyst__rt__qubit_allocate();
 QirArray *__catalyst__rt__qubit_allocate_array(int64_t);

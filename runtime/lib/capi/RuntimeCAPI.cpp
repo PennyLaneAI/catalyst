@@ -1117,7 +1117,7 @@ int8_t *__catalyst__rt__array_get_element_ptr_1d(QirArray *ptr, int64_t idx)
     return (int8_t *)&data[idx];
 }
 
-void __catalyst__rt__insert_element_into_array_1d(QirArray *ptr, int64_t idx, QUBIT *qubit)
+QirArray *__catalyst__rt__insert_element_into_array_1d(QirArray *ptr, int64_t idx, QUBIT *qubit)
 {
     RT_ASSERT(getQuantumDevicePtr() != nullptr);
     RT_ASSERT(CTX->getMemoryManager() != nullptr);
@@ -1139,6 +1139,7 @@ void __catalyst__rt__insert_element_into_array_1d(QirArray *ptr, int64_t idx, QU
     }
 
     data[idx] = reinterpret_cast<QubitIdType>(qubit);
+    return reinterpret_cast<QirArray *>(data);
 }
 
 // -------------------------------------------------------------------------- //
