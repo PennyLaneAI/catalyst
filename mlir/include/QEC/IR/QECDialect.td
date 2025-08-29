@@ -594,13 +594,13 @@ def LayerOp : QEC_Op<"layer", [SingleBlockImplicitTerminator<"YieldOp">]> {
       OpBuilder<(ins
         CArg<"mlir::ValueRange", "std::nullopt">:$initArgs,
         CArg<"mlir::ValueRange", "std::nullopt">:$outArgs,
-        CArg<"llvm::function_ref<void(mlir::OpBuilder &, mlir::Location, mlir::ValueRange, mlir::ValueRange&)>",
+        CArg<"llvm::function_ref<void(mlir::OpBuilder &, mlir::Location, mlir::ValueRange, mlir::ValueRange)>",
             "nullptr">)>
     ];
 
     let extraClassDeclaration = [{
       using BodyBuilderFn =
-          llvm::function_ref<void(mlir::OpBuilder &, mlir::Location, mlir::ValueRange, mlir::ValueRange&)>;
+          llvm::function_ref<void(mlir::OpBuilder &, mlir::Location, mlir::ValueRange, mlir::ValueRange)>;
 
     }];
 
