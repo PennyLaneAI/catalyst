@@ -779,8 +779,22 @@ class TestDynamicOneShotIntegration:
         result = cost()
         assert jnp.array(result).shape == (qubits,)
 
+    def test_dynamic_one_shot_mcm_result(self):
+        """Test mcm result with one-shot"""
+        dev = qml.device("lightning.qubit", wires=1)
+
+        @qjit
+        @qml.set_shots(10)
+        @qml.qnode(dev, mcm_method="one-shot")
+        def circuit():
+            qml.Hadamard(0)
+            return measure(0)
+
+        result = circuit()
+        assert result.shape == (10,)
+
     def test_dynamic_one_shot_with_classical_return_values(self):
-        """Test shot-vector with complex container sample"""
+        """Test classical return values with one-shot"""
         dev = qml.device("lightning.qubit", wires=1, shots=12)
 
         @qjit
@@ -794,7 +808,7 @@ class TestDynamicOneShotIntegration:
             }
 
         result = circuit()
-        
+
         assert list(result.keys()) == ["first", "second", "third"]
         assert jnp.array(result["first"]).shape == (12, 1)
         assert jnp.allclose(result["second"][0], jnp.full(12, 100))
