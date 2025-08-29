@@ -190,7 +190,8 @@ void moveOpToLayer(QECOpInterface rhsOp, QECLayer &rhsLayer, QECOpInterface merg
 // then just remove the `rhsOp` from the rhsLayer.
 void mergePPR(QECOpInterface rhsOp, QECLayer &rhsLayer, QECOpInterface mergeOp, IRRewriter &writer)
 {
-    mergeOp.setRotationKind(mergeOp.getRotationKind() / 2);
+    int16_t signedRk = static_cast<int16_t>(mergeOp.getRotationKind());
+    mergeOp.setRotationKind(static_cast<uint16_t>(signedRk / 2));
 
     rhsLayer.eraseOp(rhsOp);
     writer.replaceOp(rhsOp, rhsOp->getOperands());
@@ -226,7 +227,7 @@ struct TLayerReductionPass : impl::TLayerReductionPassBase<TLayerReductionPass> 
 
             // Start a new layer and insert the op
             currentLayer = QECLayer(&layerContext);
-            currentLayer.insert(op);
+            currentLayer.insertToLayer(op);
 
             return WalkResult::advance();
         });
