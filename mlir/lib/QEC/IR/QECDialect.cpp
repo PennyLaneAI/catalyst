@@ -135,9 +135,7 @@ void LayerOp::build(OpBuilder &builder, OperationState &result, ValueRange inVal
     result.addOperands(inValues);
 
     // Set the result types of the layer op
-    for (Value v : outValues) {
-        result.addTypes(v.getType());
-    }
+    result.addTypes(outValues.getTypes());
 
     // Create the body region of the layer op
     Region *bodyRegion = result.addRegion();
