@@ -53,6 +53,10 @@ def get_parent_of_type(op: ir.Operation, kind: Type[T]) -> T | None:
 
     return op
 
+CASE_PASS = "erick_help"
+CASE_PASS = "example_02"
+CASE_PASS = "example_03"
+CASE_PASS = "example_04"
 
 class TT_ctrl_flow_for_loop(pattern_rewriter.RewritePattern):
     """RewritePattern for combining all :class:`~pennylane.GlobalPhase` gates within the same region
@@ -70,9 +74,274 @@ class TT_ctrl_flow_for_loop(pattern_rewriter.RewritePattern):
         module = get_parent_of_type(root, builtin.ModuleOp)
         assert module is not None, "got orphaned qnode function"
 
+        match CASE_PASS:
+            case "erick_help":
+                self.copy_paste(root, module, rewriter)
+            case "example_02":
+                self.simple_peeling(root, module, rewriter)
+            case "example_03":
+                self.select_peeling(root, module, rewriter)
+            case "example_04":
+                self.tt_loop_peeling(root, module, rewriter)
 
-        self.simple_peeling(root, module, rewriter)
-        # self.copy_paste(root, module, rewriter)
+    def tt_loop_peeling(self, funcOp: func.FuncOp, module: builtin.ModuleOp, rewriter: pattern_rewriter.PatternRewriter):
+
+        op_iter = funcOp.body.walk()
+        
+        last_quantum_op_before_loop = None
+        first_quantum_op_after_loop = None
+        
+        record_last_quantum_op_before_loop = True
+        record_first_quantum_op_after_loop = False
+
+        for op in op_iter:
+        
+            if isinstance(op, quantum.CustomOp) and record_last_quantum_op_before_loop:
+                # Store the last quantum operation before the loop
+                last_quantum_op_before_loop = op
+                continue
+
+            if isinstance(op, quantum.CustomOp) and record_first_quantum_op_after_loop:
+                # Store the last quantum operation before the loop
+                first_quantum_op_after_loop = op
+                record_first_quantum_op_after_loop = False
+                continue
+                
+            if isinstance(op, ForOp):
+                # Extract the entire loop block. 
+                record_last_quantum_op_before_loop = False
+                for_loop = op
+
+            if isinstance(op, YieldOp):
+                # Extract the entire loop block. 
+                record_first_quantum_op_after_loop = True
+                continue
+
+        
+        for_loop_block = for_loop.body.clone()
+
+        # Create a list to hold the operations in the loop body
+        fop_list_section_A = []
+        fop_list_section_B = []
+        
+        record_section = "A"
+        
+        for_loop_op_iter = for_loop_block.walk()
+        for fop in for_loop_op_iter:
+
+            if isinstance(fop, quantum.CustomOp) and fop.gate_name.data == "PauliY":
+                record_section = "B"
+                continue
+
+            if isinstance(fop, quantum.CustomOp):
+                if record_section == "A":
+                    fop_list_section_A.append(fop)
+                elif record_section == "B":
+                    fop_list_section_B.append(fop)
+
+        # Copy the operations in the loop body before the loop
+        for for_op_A in fop_list_section_A[::-1]:
+            # # Insert the operation before the loop
+            
+            value_mapper = { for_op_A.in_qubits[0]: last_quantum_op_before_loop.out_qubits[0] }
+
+            clone_for_op_A = for_op_A.clone(value_mapper=value_mapper)
+            clone_for_op_A.attributes["FDX_id"] = builtin.StringAttr("op_BEFORE_LOOP")
+            
+            rewriter.insert_op(clone_for_op_A, InsertPoint.after(last_quantum_op_before_loop))
+
+            print_module(funcOp, "insert_op")
+
+            output_last_op = last_quantum_op_before_loop.out_qubits[0]
+            output_last_op.replace_by_if(clone_for_op_A.out_qubits[0], lambda use: use.operation != clone_for_op_A)
+            
+            print_module(funcOp, "replace_if")
+
+
+        # Add the operation after the loop body
+
+        for for_op_B in fop_list_section_B:
+
+            value_mapper = {
+                for_op_B.in_qubits[0]: first_quantum_op_after_loop.in_qubits[0]
+            }
+            clone_for_op_B = for_op_B.clone(value_mapper=value_mapper)
+            clone_for_op_B.attributes["FDX_id"] = builtin.StringAttr("op_AFTER_LOOP")
+
+            rewriter.insert_op(clone_for_op_B, InsertPoint.before(first_quantum_op_after_loop))
+
+            print_module(funcOp, "insert first op after loop")
+            
+            input_first_op_after_loop = first_quantum_op_after_loop.in_qubits[0]
+            input_first_op_after_loop.replace_by_if(clone_for_op_B.out_qubits[0], lambda use: use.operation == first_quantum_op_after_loop)
+
+            print_module(funcOp, "replace if after loop")
+
+        # For loop step
+        step = for_loop.step
+        
+        # Increment the loop by one step
+        lower_bound = for_loop.lb
+        incremented_lower_bound = arith.AddiOp(lower_bound, step)
+        rewriter.insert_op(incremented_lower_bound, InsertPoint.before(for_loop))
+        
+        # Decrement the upper bound by one step
+        upper_bound = for_loop.ub
+        decremented_upper_bound = arith.SubiOp(upper_bound, step)
+        
+        rewriter.insert_op(decremented_upper_bound, InsertPoint.before(for_loop))
+
+        # Modify the order in the for loop 
+        # for_loop_op_iter = for_loop_block.walk()
+        # for fop in for_loop_op_iter:
+        #     if isinstance(fop, quantum.CustomOp):
+        #         test = fop
+
+        last_last = fop_list_section_B[-1]
+        first_first = fop_list_section_A[0]
+        first_first.detach()
+        rewriter.insert_op(first_first, InsertPoint.after(last_last))
+
+        print_module(funcOp, "rearrange")
+
+
+
+        # Create a new for loop with the new bounds
+        
+        new_for_loop = ForOp(
+            incremented_lower_bound.result,  # new lower bound
+            decremented_upper_bound.result,  # new upper bound
+            step,                            # same step
+            iter_args=for_loop.iter_args,    # same iteration arguments
+            body=for_loop_block              # the same body block
+        )
+
+        # Replace the old for loop with the new one
+        rewriter.replace_op(for_loop, new_for_loop)
+
+    def select_peeling(self, funcOp: func.FuncOp, module: builtin.ModuleOp, rewriter: pattern_rewriter.PatternRewriter):
+
+        op_iter = funcOp.body.walk()
+        
+        last_quantum_op_before_loop = None
+        first_quantum_op_after_loop = None
+        
+        record_last_quantum_op_before_loop = True
+        record_first_quantum_op_after_loop = False
+
+        for op in op_iter:
+        
+            if isinstance(op, quantum.CustomOp) and record_last_quantum_op_before_loop:
+                # Store the last quantum operation before the loop
+                last_quantum_op_before_loop = op
+                record_last_quantum_op_before_loop = False
+                continue
+
+            if isinstance(op, quantum.CustomOp) and record_first_quantum_op_after_loop:
+                # Store the last quantum operation before the loop
+                first_quantum_op_after_loop = op
+                record_first_quantum_op_after_loop = False
+                continue
+                
+            if isinstance(op, ForOp):
+                # Extract the entire loop block. 
+                for_loop = op
+
+            if isinstance(op, YieldOp):
+                # Extract the entire loop block. 
+                record_first_quantum_op_after_loop = True
+                continue
+
+        
+        for_loop_block = for_loop.body.clone()
+
+        # Create a list to hold the operations in the loop body
+        fop_list_section_A = []
+        fop_list_section_B = []
+        
+        record_section = "A"
+        
+        for_loop_op_iter = for_loop_block.walk()
+        for fop in for_loop_op_iter:
+
+            if isinstance(fop, quantum.CustomOp) and fop.gate_name.data == "PauliY":
+                record_section = "B"
+                continue
+
+            if isinstance(fop, quantum.CustomOp):
+                if record_section == "A":
+                    fop_list_section_A.append(fop)
+                elif record_section == "B":
+                    fop_list_section_B.append(fop)
+
+
+
+            
+        # Copy the operations in the loop body before the loop
+        for for_op_A in fop_list_section_A[::-1]:
+            # # Insert the operation before the loop
+            
+            value_mapper = { for_op_A.in_qubits[0]: last_quantum_op_before_loop.out_qubits[0] }
+
+            clone_for_op_A = for_op_A.clone(value_mapper=value_mapper)
+            clone_for_op_A.attributes["FDX_id"] = builtin.StringAttr("op_BEFORE_LOOP")
+            
+            rewriter.insert_op(clone_for_op_A, InsertPoint.after(last_quantum_op_before_loop))
+
+            print_module(funcOp, "insert_op")
+
+            output_last_op = last_quantum_op_before_loop.out_qubits[0]
+            output_last_op.replace_by_if(clone_for_op_A.out_qubits[0], lambda use: use.operation != clone_for_op_A)
+            
+            print_module(funcOp, "replace_if")
+
+
+        # Add the operation after the loop body
+
+        for for_op_B in fop_list_section_B:
+
+            value_mapper = {
+                for_op_B.in_qubits[0]: first_quantum_op_after_loop.in_qubits[0]
+            }
+            clone_for_op_B = for_op_B.clone(value_mapper=value_mapper)
+            clone_for_op_B.attributes["FDX_id"] = builtin.StringAttr("op_AFTER_LOOP")
+
+            rewriter.insert_op(clone_for_op_B, InsertPoint.before(first_quantum_op_after_loop))
+
+            print_module(funcOp, "insert first op after loop")
+            
+            input_first_op_after_loop = first_quantum_op_after_loop.in_qubits[0]
+            input_first_op_after_loop.replace_by_if(clone_for_op_B.out_qubits[0], lambda use: use.operation == first_quantum_op_after_loop)
+
+            print_module(funcOp, "replace if after loop")
+
+        # For loop step
+        step = for_loop.step
+        
+        # Increment the loop by one step
+        lower_bound = for_loop.lb
+        incremented_lower_bound = arith.AddiOp(lower_bound, step)
+        rewriter.insert_op(incremented_lower_bound, InsertPoint.before(for_loop))
+        
+        # Decrement the upper bound by one step
+        upper_bound = for_loop.ub
+        decremented_upper_bound = arith.SubiOp(upper_bound, step)
+        
+        rewriter.insert_op(decremented_upper_bound, InsertPoint.before(for_loop))
+
+
+        # Create a new for loop with the new bounds
+        
+        new_for_loop = ForOp(
+            incremented_lower_bound.result,  # new lower bound
+            decremented_upper_bound.result,  # new upper bound
+            step,                            # same step
+            iter_args=for_loop.iter_args,    # same iteration arguments
+            body=for_loop_block              # the same body block
+        )
+
+        # Replace the old for loop with the new one
+        rewriter.replace_op(for_loop, new_for_loop)
 
     def simple_peeling(self, funcOp: func.FuncOp, module: builtin.ModuleOp, rewriter: pattern_rewriter.PatternRewriter):
 
@@ -108,7 +377,7 @@ class TT_ctrl_flow_for_loop(pattern_rewriter.RewritePattern):
             fop_list.append(fop)
             
         # Copy the operations in the loop body before the loop
-        for for_op_A in fop_list:
+        for for_op_A in fop_list[::-1]:
             # # Insert the operation before the loop
             
             value_mapper = { for_op_A.in_qubits[0]: last_quantum_op_before_loop.out_qubits[0] }
@@ -188,8 +457,7 @@ class TT_ctrl_flow_for_loop(pattern_rewriter.RewritePattern):
         )
 
         # Replace the old for loop with the new one
-        rewriter.replace_op(for_loop, new_for_loop)
-    
+        rewriter.replace_op(for_loop, new_for_loop)    
 
     def copy_paste(self, funcOp: func.FuncOp, module: builtin.ModuleOp, rewriter: pattern_rewriter.PatternRewriter):
         
@@ -309,70 +577,184 @@ if __name__ == "__main__":
 
     qml.capture.enable()
 
-    @TT_for_loop_Pass
-    @qml.qnode(qml.device("lightning.qubit", wires=2))
-    def captured_circuit(x: float):
-
-
-        qml.X(0)
-        # qml.Y(1)
-        for i in range(5):
-            qml.H(0)
-            qml.S(0)
-        qml.Z(0)
-
-        # -------------------------------------------------
+    match CASE_PASS:
         
-        # qml.Hadamard(wires=0)
-        # qml.Hadamard(wires=1)
-        
-        # for i in range(3):
-        #     qml.X(0)
-        #     qml.Z(1)
+        case "erick_help":
+            @TT_for_loop_Pass
+            @qml.qnode(qml.device("lightning.qubit", wires=2))
+            def captured_circuit(x: float):
+                qml.Hadamard(wires=0)
+                qml.S(wires=1)
+                
+                qml.Identity(wires=0)
+
+                qml.X(wires=0)
+                qml.Y(wires=0)
+                
+                qml.X(wires=1)
+                qml.Y(wires=1)
+                
+
+                qml.Z(wires=0)
+                return qml.state()
             
-        #     m = qml.measure(0)
-        #     qml.Y(0)
-        #     qml.Z(1)
+            @qml.qjit(keep_intermediate=False, pass_plugins=[getXDSLPluginAbsolutePath()], autograph=True)
+            def main(x: float):
+                return captured_circuit(x)
+
+            print(main(1.0))
+
+            @qml.qnode(qml.device("lightning.qubit", wires=2))
+            def text_01():
+                qml.Hadamard(wires=0)
+                qml.S(wires=1)
+                
+                qml.X(wires=0)
+                qml.Y(wires=0)
+                
+                qml.X(wires=1)
+                qml.Y(wires=1)
+                
+                qml.Identity(wires=0)
+
+                qml.Z(wires=0)
+                return qml.state()
+
+            print(text_01())
+            
+        case "example_02": 
+
+            @TT_for_loop_Pass
+            @qml.qnode(qml.device("lightning.qubit", wires=2))
+            def captured_circuit(x: float):
+
+                # -------------------------------------------------
+                # Example 01 and 02 
+                qml.X(0)
+                for i in range(5):
+                    qml.H(0)
+                    qml.S(0)
+                qml.Z(0)        
+                return qml.state()
 
 
-        # -------------------------------------------------
-        # qml.Hadamard(wires=0)
-        # qml.S(wires=1)
-        
-        # qml.Identity(wires=0)
+            @qml.qjit(keep_intermediate=False, pass_plugins=[getXDSLPluginAbsolutePath()], autograph=True)
+            def main(x: float):
+                return captured_circuit(x)
 
-        # qml.X(wires=0)
-        # qml.Y(wires=0)
-        
-        # qml.X(wires=1)
-        # qml.Y(wires=1)
-        
+            print(main(1.0))
 
-        # qml.Z(wires=0)
-        # -------------------------------------------------
-        
-        # for i in range(3):
-        #     qml.Hadamard(wires=0)
-        #     qml.PauliX(wires=0)
-        #     qml.PauliY(wires=0)
-        #     m = qml.measure(0)
-        #     qml.Hadamard(wires=0)
-        #     qml.PauliX(wires=0)
-        #     qml.PauliY(wires=0)
+            # After transform 
+
+            @qml.qnode(qml.device("lightning.qubit", wires=2))
+            def text_01():
+                # qml.I(1)
+                qml.X(0); qml.H(0); qml.S(0)
+
+                for i in range(1,4):
+                    qml.H(0)
+                    qml.S(0)
+
+                qml.H(0); qml.S(0); qml.Z(0)
+                return qml.state()
+            
+            print(text_01())
+
+        case "example_03": 
+            @TT_for_loop_Pass
+            @qml.qnode(qml.device("lightning.qubit", wires=2))
+            def captured_circuit(x: float):
+
+                # -------------------------------------------------
+                # Example 03 
+                qml.X(0)
+                for i in range(5):
+                    qml.S(0)
+                    qml.H(0)
+                    qml.Y(0)
+                    qml.H(0)
+                    qml.T(0)
+                qml.Z(0)        
+                return qml.state()
 
 
-        # qml.Hadamard(wires=0)
-        # m = qml.measure(0)
-        # qml.RX(x, wires=0)
-        # m = qml.measure(0)
-        # qml.RY(add(x, x), wires=0)
-        # m = qml.measure(0)
-        # qml.cond(m, lambda: qml.X(0))
+            @qml.qjit(keep_intermediate=False, pass_plugins=[getXDSLPluginAbsolutePath()], autograph=True)
+            def main(x: float):
+                return captured_circuit(x)
 
-        return qml.state()
+            print(main(1.0))
 
-    @qml.qjit(keep_intermediate=False, pass_plugins=[getXDSLPluginAbsolutePath()], autograph=True)
-    def main(x: float):
-        return captured_circuit(x)
+            # After transform 
 
-    print(main(1.0))
+            @qml.qnode(qml.device("lightning.qubit", wires=2))
+            def text_01():
+                # qml.I(1)
+                qml.X(0); qml.S(0); qml.H(0)
+
+                for i in range(1,4):
+                    qml.S(0)
+                    qml.H(0)
+                    
+                    qml.Y(0)
+                    
+                    qml.H(0)
+                    qml.T(0)
+
+                qml.H(0); qml.T(0); qml.Z(0)
+                return qml.state()
+            
+            print(text_01())
+            
+        case "example_04": 
+            @TT_for_loop_Pass
+            @qml.qnode(qml.device("lightning.qubit", wires=2))
+            def captured_circuit(x: float):
+
+                # -------------------------------------------------
+                # Example 03 
+                qml.H(0); qml.H(1)
+                qml.X(0)
+                for i in range(5):
+                    qml.S(0)
+                    qml.Y(0)
+                    qml.T(0)
+                qml.Z(0)        
+                return qml.state()
+
+
+            @qml.qjit(keep_intermediate=False, pass_plugins=[getXDSLPluginAbsolutePath()], autograph=True)
+            def main(x: float):
+                return captured_circuit(x)
+
+            print(main(1.0))
+
+            # After transform 
+
+            @qml.qnode(qml.device("lightning.qubit", wires=2))
+            def text_01():
+                qml.H(0); qml.H(1)
+                qml.X(0); qml.S(0)
+
+                for i in range(0,4):
+                    qml.Y(0)                    
+                    qml.T(0)
+                    qml.S(0)
+
+                qml.Y(0); qml.T(0); qml.Z(0)
+                return qml.state()
+            
+            print(text_01())
+            
+            @qml.qnode(qml.device("lightning.qubit", wires=2))
+            def text_01():
+                qml.H(0); qml.H(1)
+                qml.X(0)
+                for i in range(5):
+                    qml.S(0)
+                    qml.Y(0)
+                    qml.T(0)
+                qml.Z(0)        
+                return qml.state()
+            
+            print(text_01())
+
