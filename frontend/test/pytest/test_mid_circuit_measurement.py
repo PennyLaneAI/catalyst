@@ -795,6 +795,7 @@ class TestDynamicOneShotIntegration:
 
     def test_dynamic_one_shot_classical_return_values_with_mcm(self):
         """Test classical return value with one-shot"""
+
         @qjit(autograph=True)
         @qml.set_shots(10)
         @qml.qnode(qml.device("lightning.qubit", wires=1), mcm_method="one-shot")
