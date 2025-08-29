@@ -19,7 +19,7 @@
 func.func public @ion_op(%arg0: tensor<f64>, %arg1: tensor<f64>) attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode} {
 
     %c0_i64 = arith.constant 0 : i64
-    quantum.device shots(%c0_i64) ["blah.so", "OQD", "{'shots': 0, 'mcmc': False}"]
+    quantum.device capacity(%c0_i64) shots(%c0_i64) ["blah.so", "OQD", "{'shots': 0, 'mcmc': False}"]
 
 // CHECK: quantum.device
 // CHECK-SAME: ["oqd.qubit", "OQD", "{'shots': 0, 'mcmc': False}ION:
