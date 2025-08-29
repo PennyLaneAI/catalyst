@@ -415,8 +415,27 @@ struct InsertOpPattern : public OpConversionPattern<InsertOp> {
     LogicalResult matchAndRewrite(InsertOp op, InsertOpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
-        // Unravel use-def chain of quantum register values, converting back to reference semantics.
-        rewriter.replaceOp(op, adaptor.getInQreg());
+        Location loc = op.getLoc();
+        MLIRContext *ctx = getContext();
+        const TypeConverter *conv = getTypeConverter();
+
+        StringRef qirName = "__catalyst__rt__insert_element_into_array_1d";
+        Type qirSignature = LLVM::LLVMFunctionType::get(
+            LLVM::LLVMPointerType::get(rewriter.getContext()),
+            {conv->convertType(QuregType::get(ctx)), IntegerType::get(ctx, 64),
+             conv->convertType(QubitType::get(ctx))});
+
+        LLVM::LLVMFuncOp fnDecl =
+            catalyst::ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+
+        Value index = adaptor.getIdx();
+        if (!index) {
+            index = rewriter.create<LLVM::ConstantOp>(loc, op.getIdxAttrAttr());
+        }
+        SmallVector<Value> operands = {adaptor.getInQreg(), index, adaptor.getQubit()};
+
+        rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, fnDecl, operands);
+
         return success();
     }
 };
