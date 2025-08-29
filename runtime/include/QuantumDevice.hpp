@@ -143,6 +143,14 @@ struct QuantumDevice {
         RT_FAIL("Dynamic qubit release is unsupported by device");
     }
 
+    /**
+     * @brief Checks if the qubit with the supplied qubit ID is currently active.
+     *
+     * @param q ID of the qubit to query.
+     * @return true if the qubit is currently active; false otherwise.
+     */
+    virtual auto IsQubitActive(QubitIdType q) -> bool = 0;
+
     // ----------------------------------------
     //  EXECUTION MANAGEMENT
     // ----------------------------------------

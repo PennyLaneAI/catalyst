@@ -26,6 +26,7 @@
 
 #include "QuantumDevice.hpp"
 #include "QubitManager.hpp"
+#include "Types.h"
 
 #include "OpenQasmBuilder.hpp"
 #include "OpenQasmObsManager.hpp"
@@ -98,6 +99,7 @@ class OpenQasmDevice final : public Catalyst::Runtime::QuantumDevice {
 
     auto AllocateQubits(size_t) -> std::vector<QubitIdType> override;
     void ReleaseAllQubits() override;
+    auto IsQubitActive(QubitIdType) -> bool override;
     auto GetNumQubits() const -> size_t override;
     void SetDeviceShots(size_t) override;
     auto GetDeviceShots() const -> size_t override;
