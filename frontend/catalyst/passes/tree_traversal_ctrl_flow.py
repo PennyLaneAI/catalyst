@@ -24,6 +24,7 @@ from xdsl import context, passes, pattern_rewriter, ir
 from xdsl.dialects import arith, builtin, func
 from xdsl.dialects.scf import ForOp, IfOp, WhileOp, YieldOp
 from xdsl.rewriter import InsertPoint
+from xdsl.printer import Printer
 
 from catalyst.passes.xdsl_plugin import getXDSLPluginAbsolutePath
 
@@ -37,7 +38,7 @@ def print_module(module: builtin.ModuleOp, section: str = ""):
         print("")
         print(f"---{section}---"*4)
         print("")
-        print(module)
+        Printer().print_op(module)
         print("")
         # print("%"*length_line)
         # print("")
@@ -108,19 +109,58 @@ class TT_ctrl_flow_for_loop(pattern_rewriter.RewritePattern):
             
         # Copy the operations in the loop body before the loop
         for for_op_A in fop_list:
-            # Insert the operation before the loop
+            # # Insert the operation before the loop
+            
+            value_mapper = { for_op_A.in_qubits[0]: last_quantum_op_before_loop.out_qubits[0] }
+
+            clone_for_op_A = for_op_A.clone(value_mapper=value_mapper)
+            clone_for_op_A.attributes["FDX_id"] = builtin.StringAttr("op_BEFORE_LOOP")
+            
+            rewriter.insert_op(clone_for_op_A, InsertPoint.after(last_quantum_op_before_loop))
+
+            print_module(funcOp, "insert_op")
+
+            output_last_op = last_quantum_op_before_loop.out_qubits[0]
+            output_last_op.replace_by_if(clone_for_op_A.out_qubits[0], lambda use: use.operation != clone_for_op_A)
+            
+            print_module(funcOp, "replace_if")
+
+
+        op_iter = funcOp.body.walk()
+        
+        first_quantum_op_after_loop = False
+        
+        for op in op_iter:
+        
+                
+            if isinstance(op, YieldOp):
+                # Extract the entire loop block. 
+                first_quantum_op_after_loop = True
+                continue
+
+            if isinstance(op, quantum.CustomOp) and first_quantum_op_after_loop:
+                # Store the last quantum operation before the loop
+                first_quantum_op_after_loop = op
+                break
+        
+        # Add the operation after the loop body
+        
+        for for_op_A in fop_list:
+    
             value_mapper = {
-                in_qubit: last_quantum_op_before_loop.out_qubits[0] for in_qubit in for_op_A.in_qubits
+                for_op_A.in_qubits[0]: first_quantum_op_after_loop.in_qubits[0]
             }
             clone_for_op_A = for_op_A.clone(value_mapper=value_mapper)
-            
-            print_module(funcOp, "before replace all")
-            
-            # rewriter.replace_all_uses_with(for_op_A.out_qubits[0])
+            clone_for_op_A.attributes["FDX_id"] = builtin.StringAttr("op_BEFORE_LOOP")
 
-            print_module(funcOp, "after replace")
+            rewriter.insert_op(clone_for_op_A, InsertPoint.before(first_quantum_op_after_loop))
 
-            rewriter.insert_op(clone_for_op_A, InsertPoint.after(last_quantum_op_before_loop))
+            print_module(funcOp, "insert first op after loop")
+            
+            input_first_op_after_loop = first_quantum_op_after_loop.in_qubits[0]
+            input_first_op_after_loop.replace_by_if(clone_for_op_A.out_qubits[0], lambda use: use.operation == first_quantum_op_after_loop)
+
+            print_module(funcOp, "replace if after loop")
 
         # For loop step
         step = for_loop.step
@@ -146,18 +186,10 @@ class TT_ctrl_flow_for_loop(pattern_rewriter.RewritePattern):
             iter_args=for_loop.iter_args,    # same iteration arguments
             body=for_loop_block              # the same body block
         )
-    
+
         # Replace the old for loop with the new one
-        rewriter.replace_op(op, new_for_loop)
-        
-        # Add the operation after the loop body
-        
-        for for_op_A in fop_list:
-            value_mapper = {
-                in_qubit: last_quantum_op_before_loop.out_qubits[0] for in_qubit in for_op_A.in_qubits
-            }
-            clone_for_op_A = for_op_A.clone(value_mapper=value_mapper)
-            rewriter.insert_op(clone_for_op_A, InsertPoint.after(new_for_loop))
+        rewriter.replace_op(for_loop, new_for_loop)
+    
 
     def copy_paste(self, funcOp: func.FuncOp, module: builtin.ModuleOp, rewriter: pattern_rewriter.PatternRewriter):
         
@@ -235,7 +267,6 @@ class TT_ctrl_flow_for_loop(pattern_rewriter.RewritePattern):
                 
                 print_module(funcOp, "acts_on_same_wire - insert")
                 
-                # print(funcOp)
 
                 def just_for_test(use):
                     return use.operation != identity
@@ -284,9 +315,13 @@ if __name__ == "__main__":
 
 
         qml.X(0)
+        # qml.Y(1)
         for i in range(5):
             qml.H(0)
+            qml.S(0)
         qml.Z(0)
+
+        # -------------------------------------------------
         
         # qml.Hadamard(wires=0)
         # qml.Hadamard(wires=1)
