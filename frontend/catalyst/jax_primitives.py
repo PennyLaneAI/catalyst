@@ -937,13 +937,16 @@ def _zne_lowering(ctx, *args, folding, jaxpr, fn):
 # device_init
 #
 @device_init_p.def_abstract_eval
-def _device_init_abstract_eval(shots, auto_qubit_management, rtd_lib, rtd_name, rtd_kwargs):
+def _device_init_abstract_eval(
+    capacity, shots, auto_qubit_management, rtd_lib, rtd_name, rtd_kwargs
+):
     return ()
 
 
 # pylint: disable=too-many-arguments, too-many-positional-arguments
 def _device_init_lowering(
     jax_ctx: mlir.LoweringRuleContext,
+    capacity: ir.Value,
     shots: ir.Value,
     auto_qubit_management,
     rtd_lib,
@@ -953,8 +956,10 @@ def _device_init_lowering(
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
+    capacity_value = TensorExtractOp(ir.IntegerType.get_signless(64, ctx), capacity, []).result
     shots_value = TensorExtractOp(ir.IntegerType.get_signless(64, ctx), shots, []).result
     DeviceInitOp(
+        capacity_value,
         ir.StringAttr.get(rtd_lib),
         ir.StringAttr.get(rtd_name),
         ir.StringAttr.get(rtd_kwargs),

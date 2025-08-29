@@ -918,7 +918,7 @@ TEST_CASE("Test OpenAPL Program generation", "[oqd]")
         "energy": 5.5
       })"};
 
-    size_t num_qubits = 2;
+    constexpr size_t num_qubits = 2;
 
     Beam beam1 = {0, 31.41592653589793, 157.07963267948966, {1, 0, 0}, {0, 1, 0}};
     Beam beam2 = {2, 31.41592653589793, 157.07963267948966, {1, 0, 0}, {0, 1, 0}};
@@ -928,7 +928,7 @@ TEST_CASE("Test OpenAPL Program generation", "[oqd]")
 
     __catalyst__rt__initialize(nullptr);
     __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
-                                (int8_t *)rtd_kwargs.c_str(), 1000, false);
+                                (int8_t *)rtd_kwargs.c_str(), num_qubits, 1000, false);
 
     QirArray *qs = __catalyst__rt__qubit_allocate_array(num_qubits);
 

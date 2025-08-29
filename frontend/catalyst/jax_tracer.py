@@ -1417,24 +1417,27 @@ def trace_quantum_function(
                 # Each tape will be outlined into its own function with mlir pass
                 # -split-multiple-tapes
 
+                if device.wires is None:
+                    # Automatic qubit management mode
+                    # We start with 0 wires and allocate new wires in runtime as we encounter them.
+                    capacity = 0
+                elif catalyst.device.qjit_device.is_dynamic_wires(device.wires):
+                    # When device has dynamic wires, the device.wires iterable object
+                    # has a single value, which is the tracer for the number of wires
+                    capacity = device.wires[0]
+                else:
+                    capacity = len(device.wires)
+
                 total_shots = _get_total_shots(qnode)
                 device_init_p.bind(
+                    capacity,
                     total_shots,
                     auto_qubit_management=(device.wires is None),
                     rtd_lib=device.backend_lib,
                     rtd_name=device.backend_name,
                     rtd_kwargs=str(device.backend_kwargs),
                 )
-                if device.wires is None:
-                    # Automatic qubit management mode
-                    # We start with 0 wires and allocate new wires in runtime as we encounter them.
-                    qreg_in = qalloc_p.bind(0)
-                elif catalyst.device.qjit_device.is_dynamic_wires(device.wires):
-                    # When device has dynamic wires, the device.wires iterable object
-                    # has a single value, which is the tracer for the number of wires
-                    qreg_in = qalloc_p.bind(device.wires[0])
-                else:
-                    qreg_in = qalloc_p.bind(len(device.wires))
+                qreg_in = qalloc_p.bind(capacity)
 
                 # If the program is batched, that means that it was transformed.
                 # If it was transformed, that means that the program might have

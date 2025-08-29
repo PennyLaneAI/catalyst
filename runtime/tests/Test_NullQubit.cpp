@@ -45,7 +45,7 @@ TEST_CASE("Test __catalyst__rt__device_init registering device=null.qubit", "[Nu
     __catalyst__rt__initialize(nullptr);
 
     char rtd_name[11] = "null.qubit";
-    __catalyst__rt__device_init((int8_t *)rtd_name, nullptr, nullptr, 0, false);
+    __catalyst__rt__device_init((int8_t *)rtd_name, nullptr, nullptr, 0, 0, false);
 
     __catalyst__rt__device_release();
 
@@ -78,7 +78,7 @@ TEST_CASE("Test automatic qubit management", "[NullQubit]")
         std::array<std::string, 3>{"null.qubit", "null_qubit", ""};
     __catalyst__rt__initialize(nullptr);
     __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
-                                (int8_t *)rtd_kwargs.c_str(), shots,
+                                (int8_t *)rtd_kwargs.c_str(), 0, shots,
                                 /*auto_qubit_management=*/true);
 
     QirArray *qs = __catalyst__rt__qubit_allocate_array(0);
@@ -230,7 +230,7 @@ TEST_CASE("Test __catalyst__qis__Sample with num_qubits=2 and PartialSample call
         std::array<std::string, 3>{"null.qubit", "null_qubit", ""};
     __catalyst__rt__initialize(nullptr);
     __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
-                                (int8_t *)rtd_kwargs.c_str(), 1000, false);
+                                (int8_t *)rtd_kwargs.c_str(), 2, 1000, false);
 
     QirArray *qs = __catalyst__rt__qubit_allocate_array(2);
 
@@ -474,7 +474,7 @@ TEST_CASE("Test __catalyst__qis__Gradient_params Op=[Hadamard,RZ,RY,RZ,S,T,Param
         std::array<std::string, 3>{"null.qubit", "null_qubit", ""};
 
     __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
-                                (int8_t *)rtd_kwargs.c_str(), 0, false);
+                                (int8_t *)rtd_kwargs.c_str(), 2, 0, false);
 
     QUBIT *q0 = __catalyst__rt__qubit_allocate();
     QUBIT *q1 = __catalyst__rt__qubit_allocate();
@@ -537,7 +537,7 @@ TEST_CASE("Test __catalyst__rt__print_state", "[NullQubit]")
     auto [rtd_lib, rtd_name, rtd_kwargs] =
         std::array<std::string, 3>{"null.qubit", "null_qubit", ""};
     __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
-                                (int8_t *)rtd_kwargs.c_str(), 0, false);
+                                (int8_t *)rtd_kwargs.c_str(), 2, 0, false);
 
     QirArray *qs = __catalyst__rt__qubit_allocate_array(2);
 

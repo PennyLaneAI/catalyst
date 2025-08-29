@@ -202,6 +202,7 @@ def handle_qnode(
 
     def calling_convention(*args):
         device_init_p.bind(
+            len(device.wires),
             shots,
             auto_qubit_management=(device.wires is None),
             **_get_device_kwargs(device),
