@@ -38,8 +38,8 @@ void QECLayer::eraseOp(QECOpInterface op) { llvm::erase(ops, op); }
 void QECLayer::updateResultAndOperand(QECOpInterface op)
 {
     // Ensure layer operand set contains canonical origins for any input qubits
-    llvm::SmallVector<Value> inQubits(op.getInQubits().begin(), op.getInQubits().end());
-    llvm::SmallVector<Value> outQubits(op.getOutQubits().begin(), op.getOutQubits().end());
+    ValueRange inQubits = op.getInQubits();
+    ValueRange outQubits = op.getOutQubits();
 
     // Map each input qubit to its canonical origin (entry) for this layer
     llvm::SmallVector<Value> inputOrigins;
@@ -51,12 +51,11 @@ void QECLayer::updateResultAndOperand(QECOpInterface op)
             results.remove(in);
         }
 
-        Value origin = in;
         if (resultToOperand.contains(in)) {
-            origin = resultToOperand[in];
+            in = resultToOperand[in];
         }
-        inputOrigins.push_back(origin);
-        operands.insert(origin);
+        inputOrigins.push_back(in);
+        operands.insert(in);
     }
 
     // Insert non-qubit results first (e.g., classical measurements)
