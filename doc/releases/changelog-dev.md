@@ -224,6 +224,7 @@ David Ittah,
 Christina Lee,
 Joseph Lee,
 Andrija Paurevic,
+Ritu Thombre,
 Roberto Turrado,
 Paul Haochen Wang,
 Jake Zaia.
