@@ -445,3 +445,77 @@ func.func public @while_error(%arg0: !quantum.bit, %b: i1) {
 
     return
 }
+
+// -----
+
+func.func public @game_of_surface_code_t_layers(%qr0 : !quantum.bit, %qr1 : !quantum.bit, %qr2 : !quantum.bit, %qr3 : !quantum.bit) {
+    
+    // CHECK: "test_t_layer_opt_GoSC": {
+    // CHECK:     "depth_pi8_gates": 4,
+    // CHECK:     "max_weight_pi8": 4,
+    // CHECK:     "num_pi8_gates": 6
+    // CHECK: },
+
+    // layer 1 
+    %0:4 = qec.ppr ["I", "Z", "I", "I"](-8) %qr0, %qr1, %qr2, %qr3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+
+    // layer 2
+    %1:4 = qec.ppr ["X", "Y", "Z", "Y"](8) %0#0, %0#1, %0#2, %0#3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    %2:4 = qec.ppr ["X", "I", "Y", "Z"](8) %1#0, %1#1, %1#2, %1#3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+
+    // layer 3
+    %3:4 = qec.ppr ["X", "Z", "I", "X"](-8) %2#0, %2#1, %2#2, %2#3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    %4:4 = qec.ppr ["X", "Z", "Y", "I"](8) %3#0, %3#1, %3#2, %3#3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+
+    // layer 4
+    %5:4 = qec.ppr ["Y", "I", "Y", "Y"](8) %4#0, %4#1, %4#2, %4#3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+
+    func.return
+}
+
+// -----
+
+func.func public @game_of_surface_code_t_layers_no_identity(%qr0 : !quantum.bit, %qr1 : !quantum.bit, %qr2 : !quantum.bit, %qr3 : !quantum.bit) {
+    
+    // CHECK: "game_of_surface_code_t_layers_no_identity": {
+    // CHECK:     "depth_pi8_gates": 4,
+    // CHECK:     "max_weight_pi8": 4,
+    // CHECK:     "num_pi8_gates": 6
+    // CHECK: },
+
+    // layer 1 
+    %0 = qec.ppr ["Z"](-8) %qr1 : !quantum.bit
+
+    // layer 2
+    %1:4 = qec.ppr ["X", "Y", "Z", "Y"](8) %qr0, %0, %qr2, %qr3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    %2:3 = qec.ppr ["X", "Y", "Z"](8) %1#0, %1#2, %1#3 : !quantum.bit, !quantum.bit, !quantum.bit
+
+    // layer 3
+    %3:3 = qec.ppr ["X", "Z", "X"](-8) %2#0, %1#1, %2#2 : !quantum.bit, !quantum.bit, !quantum.bit
+    %4:3 = qec.ppr ["X", "Z", "Y"](8) %3#0, %3#1, %2#1 :  !quantum.bit, !quantum.bit, !quantum.bit
+
+    // layer 4
+    %5:3 = qec.ppr ["Y", "Y", "Y"](8) %4#0, %4#2, %3#2 : !quantum.bit, !quantum.bit, !quantum.bit
+
+    func.return
+}
+
+// -----
+
+
+func.func public @game_of_surface_code_t_layers_opt(%arg0: !quantum.bit, %arg1: !quantum.bit, %arg2: !quantum.bit, %arg3: !quantum.bit) {
+    
+    // CHECK: "game_of_surface_code_t_layers_opt": {
+    // CHECK:     "depth_pi8_gates": 2,
+    // CHECK:     "max_weight_pi8": 4,
+    // CHECK:     "num_pi8_gates": 6
+    // CHECK: },
+
+    %0:4 = qec.ppr ["I", "Z", "I", "I"](-8) %arg0, %arg1, %arg2, %arg3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    %1:4 = qec.ppr ["X", "I", "Y", "Z"](8) %0#0, %0#1, %0#2, %0#3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    %2:4 = qec.ppr ["X", "Z", "Y", "I"](8) %1#0, %1#1, %1#2, %1#3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    %3:4 = qec.ppr ["X", "Y", "Z", "Y"](8) %2#0, %2#1, %2#2, %2#3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    %4:4 = qec.ppr ["X", "Z", "I", "X"](-8) %3#0, %3#1, %3#2, %3#3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    %5:4 = qec.ppr ["Y", "I", "Y", "Y"](8) %4#0, %4#1, %4#2, %4#3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    return
+}

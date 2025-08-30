@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "QEC/IR/QECOpInterfaces.h"
 #define DEBUG_TYPE "ppm-specs"
 
 #include <algorithm>
@@ -25,6 +26,8 @@
 
 #include "Catalyst/Utils/SCFUtils.h"
 #include "QEC/IR/QECDialect.h"
+#include "QEC/Utils/QECLayer.h"
+#include "QEC/Utils/QECOpUtils.h"
 #include "Quantum/IR/QuantumOps.h"
 
 using namespace llvm;
@@ -117,6 +120,78 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
         return success();
     }
 
+    bool commuteToLayer(QECOpInterface rhsOp, QECLayer &lhsLayer)
+    {
+        for (auto lhsOp : lhsLayer.getOps()) {
+            if (!commutes(rhsOp, lhsOp)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    bool isPPR(QECOpInterface op) { return isa<qec::PPRotationOp>(op); }
+    bool isPPM(QECOpInterface op) { return isa<qec::PPMeasurementOp>(op); }
+
+    // Check if two ops have the same rotation kind.
+    bool equalTypes(QECOpInterface lhsOp, QECOpInterface rhsOp)
+    {
+        return (isPPR(lhsOp) == isPPR(rhsOp) || isPPM(lhsOp) == isPPM(rhsOp));
+    }
+
+    // Add op to current layer if it commutes with the last op in the layer and has the same type.
+    bool canAddToCurrentLayer(QECOpInterface op, QECLayer &currentLayer)
+    {
+        if (currentLayer.empty())
+            return true;
+
+        auto lastOp = currentLayer.getOps().back();
+        return equalTypes(lastOp, op) && commuteToLayer(op, currentLayer);
+    }
+
+    LogicalResult
+    countLayerDepths(llvm::DenseMap<StringRef, llvm::DenseMap<StringRef, int>> *PPMSpecs,
+                     llvm::BumpPtrAllocator *stringAllocator)
+    {
+        QECLayerContext layerContext;
+        QECLayer currentLayer(&layerContext);
+        std::vector<QECLayer> layers;
+
+        getOperation()->walk([&](QECOpInterface op) {
+            if (canAddToCurrentLayer(op, currentLayer)) {
+                currentLayer.insertToLayer(op);
+                return WalkResult::skip();
+            }
+
+            layers.emplace_back(std::move(currentLayer));
+
+            currentLayer = QECLayer(&layerContext);
+            currentLayer.insertToLayer(op);
+
+            return WalkResult::advance();
+        });
+
+        // Add the last layer if it is not empty.
+        if (!currentLayer.empty()) {
+            layers.emplace_back(std::move(currentLayer));
+        }
+
+        for (auto &layer : layers) {
+            auto op = layer.getOps().back();
+            int16_t absRk = std::abs(static_cast<int16_t>(op.getRotationKind()));
+            auto parentFuncOp = op->getParentOfType<func::FuncOp>();
+            StringRef funcName = parentFuncOp.getName();
+
+            llvm::StringSaver saver(*stringAllocator);
+            StringRef key = isPPR(op) ? saver.save("depth_pi" + std::to_string(absRk) + "_gates")
+                                      : saver.save("depth_ppm_gates");
+
+            (*PPMSpecs)[funcName][key]++;
+        }
+
+        return success();
+    }
+
     LogicalResult printSpecs()
     {
         llvm::BumpPtrAllocator stringAllocator;
@@ -147,6 +222,10 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
                 return WalkResult::skip();
             }
         });
+
+        if (failed(countLayerDepths(&PPMSpecs, &stringAllocator))) {
+            return failure();
+        }
 
         if (wr.wasInterrupted()) {
             return failure();
