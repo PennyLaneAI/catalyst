@@ -149,55 +149,46 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
         return equalTypes(lastOp, op) && commuteToLayer(op, currentLayer);
     }
 
-    LogicalResult
-    countLayerDepths(llvm::DenseMap<StringRef, llvm::DenseMap<StringRef, int>> *PPMSpecs,
-                     llvm::BumpPtrAllocator *stringAllocator)
+    void countDepths(std::vector<QECLayer> &layers,
+                     llvm::DenseMap<StringRef, llvm::DenseMap<StringRef, int>> *PPMSpecs)
     {
-        QECLayerContext layerContext;
-        QECLayer currentLayer(&layerContext);
-        std::vector<QECLayer> layers;
-
-        getOperation()->walk([&](QECOpInterface op) {
-            if (canAddToCurrentLayer(op, currentLayer)) {
-                currentLayer.insertToLayer(op);
-                return WalkResult::skip();
-            }
-
-            layers.emplace_back(std::move(currentLayer));
-
-            currentLayer = QECLayer(&layerContext);
-            currentLayer.insertToLayer(op);
-
-            return WalkResult::advance();
-        });
-
-        // Add the last layer if it is not empty.
-        if (!currentLayer.empty()) {
-            layers.emplace_back(std::move(currentLayer));
-        }
-
         for (auto &layer : layers) {
+            assert(!layer.empty() && "Layer is empty");
+
             auto op = layer.getOps().back();
             int16_t absRk = std::abs(static_cast<int16_t>(op.getRotationKind()));
             auto parentFuncOp = op->getParentOfType<func::FuncOp>();
             StringRef funcName = parentFuncOp.getName();
-
-            llvm::StringSaver saver(*stringAllocator);
+            llvm::BumpPtrAllocator stringAllocator;
+            llvm::StringSaver saver(stringAllocator);
             StringRef key = isPPR(op) ? saver.save("depth_pi" + std::to_string(absRk) + "_gates")
                                       : saver.save("depth_ppm_gates");
 
             (*PPMSpecs)[funcName][key]++;
         }
-
-        return success();
     }
 
     LogicalResult printSpecs()
     {
         llvm::BumpPtrAllocator stringAllocator;
         llvm::DenseMap<StringRef, llvm::DenseMap<StringRef, int>> PPMSpecs;
+
+        QECLayerContext layerContext;
+        QECLayer currentLayer(&layerContext);
+        std::vector<QECLayer> layers;
+
         // Walk over all operations in the IR (could be ModuleOp or FuncOp)
         WalkResult wr = getOperation()->walk([&](Operation *op) {
+            // Count Depth
+            if (auto qecOp = dyn_cast<QECOpInterface>(op)) {
+                if (!canAddToCurrentLayer(qecOp, currentLayer)) {
+                    layers.emplace_back(std::move(currentLayer));
+                    currentLayer = QECLayer(&layerContext);
+                }
+                currentLayer.insertToLayer(qecOp);
+            }
+
+            // Count Logical Qubit
             if (isa<quantum::AllocOp>(op)) {
                 if (failed(countLogicalQubit(op, &PPMSpecs))) {
                     return WalkResult::interrupt();
@@ -205,6 +196,7 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
                 return WalkResult::advance();
             }
 
+            // Count PPMs
             else if (isa<qec::PPMeasurementOp>(op)) {
                 if (failed(countPPM(cast<qec::PPMeasurementOp>(op), &PPMSpecs))) {
                     return WalkResult::interrupt();
@@ -212,20 +204,26 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
                 return WalkResult::advance();
             }
 
+            // Count PPRs
             else if (isa<qec::PPRotationOp>(op)) {
                 if (failed(countPPR(cast<qec::PPRotationOp>(op), &PPMSpecs, &stringAllocator))) {
                     return WalkResult::interrupt();
                 }
                 return WalkResult::advance();
             }
+
+            // Skip other ops
             else {
                 return WalkResult::skip();
             }
         });
 
-        if (failed(countLayerDepths(&PPMSpecs, &stringAllocator))) {
-            return failure();
+        // Add the last layer if it is not empty.
+        if (!currentLayer.empty()) {
+            layers.emplace_back(std::move(currentLayer));
         }
+
+        countDepths(layers, &PPMSpecs);
 
         if (wr.wasInterrupted()) {
             return failure();
