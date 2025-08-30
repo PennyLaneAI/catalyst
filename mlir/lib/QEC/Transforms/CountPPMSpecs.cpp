@@ -150,7 +150,8 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
     }
 
     void countDepths(std::vector<QECLayer> &layers,
-                     llvm::DenseMap<StringRef, llvm::DenseMap<StringRef, int>> *PPMSpecs)
+                     llvm::DenseMap<StringRef, llvm::DenseMap<StringRef, int>> *PPMSpecs,
+                     llvm::BumpPtrAllocator *stringAllocator)
     {
         for (auto &layer : layers) {
             assert(!layer.empty() && "Layer is empty");
@@ -159,8 +160,7 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
             int16_t absRk = std::abs(static_cast<int16_t>(op.getRotationKind()));
             auto parentFuncOp = op->getParentOfType<func::FuncOp>();
             StringRef funcName = parentFuncOp.getName();
-            llvm::BumpPtrAllocator stringAllocator;
-            llvm::StringSaver saver(stringAllocator);
+            llvm::StringSaver saver(*stringAllocator);
             StringRef key = isPPR(op) ? saver.save("depth_pi" + std::to_string(absRk) + "_ppr")
                                       : saver.save("depth_ppm");
 
@@ -223,7 +223,7 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
             layers.emplace_back(std::move(currentLayer));
         }
 
-        countDepths(layers, &PPMSpecs);
+        countDepths(layers, &PPMSpecs, &stringAllocator);
 
         if (wr.wasInterrupted()) {
             return failure();
