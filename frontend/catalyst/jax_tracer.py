@@ -48,7 +48,6 @@ from pennylane.tape import QuantumTape
 from pennylane.transforms.core import TransformProgram
 
 import catalyst
-from catalyst.api_extensions import MidCircuitMeasure
 from catalyst.api_extensions.callbacks import MemrefCallable
 from catalyst.jax_extras import (
     ClosedJaxpr,
@@ -1132,14 +1131,18 @@ def has_classical_outputs(flat_results):
 def has_midcircuit_measurement(tape):
     """Check if the tape contains any mid-circuit measurements."""
 
-    return any(map(lambda op: isinstance(op, MidCircuitMeasure), tape.operations))
+    return any(
+        map(lambda op: isinstance(op, catalyst.api_extensions.MidCircuitMeasure), tape.operations)
+    )
 
 
 @debug_logger
 def num_midcircuit_measurement(tape):
     """Number of mid-circuit measurements."""
 
-    return sum(map(lambda op: isinstance(op, MidCircuitMeasure), tape.operations))
+    return sum(
+        map(lambda op: isinstance(op, catalyst.api_extensions.MidCircuitMeasure), tape.operations)
+    )
 
 
 class TracingMode(Enum):
