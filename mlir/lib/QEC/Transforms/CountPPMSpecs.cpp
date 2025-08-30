@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "QEC/IR/QECOpInterfaces.h"
 #define DEBUG_TYPE "ppm-specs"
 
 #include <algorithm>
@@ -26,6 +25,7 @@
 
 #include "Catalyst/Utils/SCFUtils.h"
 #include "QEC/IR/QECDialect.h"
+#include "QEC/IR/QECOpInterfaces.h"
 #include "QEC/Utils/QECLayer.h"
 #include "QEC/Utils/QECOpUtils.h"
 #include "Quantum/IR/QuantumOps.h"
