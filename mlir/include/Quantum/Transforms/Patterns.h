@@ -15,8 +15,10 @@
 #pragma once
 
 #include "mlir/Conversion/LLVMCommon/TypeConverter.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/DialectConversion.h"
+#include "llvm/Support/AllocatorBase.h"
 
 namespace catalyst {
 namespace quantum {
@@ -26,6 +28,9 @@ void populateAdjointPatterns(mlir::RewritePatternSet &);
 void populateSelfInversePatterns(mlir::RewritePatternSet &);
 void populateMergeRotationsPatterns(mlir::RewritePatternSet &);
 void populateIonsDecompositionPatterns(mlir::RewritePatternSet &);
+void populateUserDefinedDecompositionPatterns(mlir::RewritePatternSet &,
+                                              const llvm::StringMap<mlir::func::FuncOp> &,
+                                              const llvm::StringSet<llvm::MallocAllocator> &);
 void populateLoopBoundaryPatterns(mlir::RewritePatternSet &, unsigned int mode);
 
 } // namespace quantum
