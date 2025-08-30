@@ -28,6 +28,9 @@
 
 <h3>Improvements 🛠</h3>
 
+* Improve the pass `--ppm-specs` to count the depth of PPRs and PPMs in the circuit.
+  [(#2014)](https://github.com/PennyLaneAI/catalyst/pull/2014)
+
 * A new pass `--partition-layers` has been added to group PPR/PPM operations into `qec.layer`
   operations based on qubit interactive and commutativity, enabling circuit analysis and
   potentially to support parallel execution.
@@ -77,7 +80,7 @@
   %0 = transform.apply_registered_pass "some-pass" with options = {"an-option" = true, "maxValue" = 1 : i64, "multi-word-option" = 1 : i64}
   ```
 
-* Added checks to raise an error when the input qubits to the multi-qubit gates in the runtime CAPI are not all distinct. 
+* Added checks to raise an error when the input qubits to the multi-qubit gates in the runtime CAPI are not all distinct.
   [(#2006)](https://github.com/PennyLaneAI/catalyst/pull/2006).
 
 * Commuting Clifford Pauli Product Rotation (PPR) operations, past non-Clifford PPRs, now supports P(π/2) Cliffords in addition to P(π/4)
@@ -85,7 +88,6 @@
 
 * A new jax primitive `qdealloc_qb_p` is available for single qubit deallocations.
   [(#2005)](https://github.com/PennyLaneAI/catalyst/pull/2005)
-
 
 <h3>Breaking changes 💔</h3>
 
