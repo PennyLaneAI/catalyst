@@ -451,7 +451,7 @@ func.func public @while_error(%arg0: !quantum.bit, %b: i1) {
 func.func public @game_of_surface_code_t_layers(%qr0 : !quantum.bit, %qr1 : !quantum.bit, %qr2 : !quantum.bit, %qr3 : !quantum.bit) {
     
     // CHECK: "game_of_surface_code_t_layers": {
-    // CHECK:     "depth_pi8_gates": 4,
+    // CHECK:     "depth_pi8_ppr": 4,
     // CHECK:     "max_weight_pi8": 4,
     // CHECK:     "num_pi8_gates": 6
     // CHECK: }
@@ -478,7 +478,7 @@ func.func public @game_of_surface_code_t_layers(%qr0 : !quantum.bit, %qr1 : !qua
 func.func public @game_of_surface_code_t_layers_no_identity(%qr0 : !quantum.bit, %qr1 : !quantum.bit, %qr2 : !quantum.bit, %qr3 : !quantum.bit) {
     
     // CHECK: "game_of_surface_code_t_layers_no_identity": {
-    // CHECK:     "depth_pi8_gates": 4,
+    // CHECK:     "depth_pi8_ppr": 4,
     // CHECK:     "max_weight_pi8": 4,
     // CHECK:     "num_pi8_gates": 6
     // CHECK: }
@@ -506,7 +506,7 @@ func.func public @game_of_surface_code_t_layers_no_identity(%qr0 : !quantum.bit,
 func.func public @game_of_surface_code_t_layers_opt(%arg0: !quantum.bit, %arg1: !quantum.bit, %arg2: !quantum.bit, %arg3: !quantum.bit) {
     
     // CHECK: "game_of_surface_code_t_layers_opt": {
-    // CHECK:     "depth_pi8_gates": 2,
+    // CHECK:     "depth_pi8_ppr": 2,
     // CHECK:     "max_weight_pi8": 4,
     // CHECK:     "num_pi8_gates": 6
     // CHECK: }

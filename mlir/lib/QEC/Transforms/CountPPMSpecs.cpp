@@ -161,8 +161,8 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
             StringRef funcName = parentFuncOp.getName();
             llvm::BumpPtrAllocator stringAllocator;
             llvm::StringSaver saver(stringAllocator);
-            StringRef key = isPPR(op) ? saver.save("depth_pi" + std::to_string(absRk) + "_gates")
-                                      : saver.save("depth_ppm_gates");
+            StringRef key = isPPR(op) ? saver.save("depth_pi" + std::to_string(absRk) + "_ppr")
+                                      : saver.save("depth_ppm");
 
             (*PPMSpecs)[funcName][key]++;
         }
