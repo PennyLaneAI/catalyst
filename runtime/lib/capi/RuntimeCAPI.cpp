@@ -231,39 +231,6 @@ void RemapCountsResultWires(double *eigvals_data_aligned, int64_t *counts_data_a
     }
 }
 
-bool explicitLabalsAreAllDeviceWires(const std::vector<QubitIdType> &indices)
-{
-    // Sometimes a user requests explicit labels as
-    //   @qml.qnode(dev)
-    //      ...
-    //      qml.probs(wires=dev.wires)
-    // This would also need to be dispatched to the case where we remap
-    // the labels to indices.
-
-    // This should only need to be handled in the above user use case
-    // i.e. when the map already has all labels on an device instance.
-    std::map<int64_t, uint64_t> wireLabelMap = RTD_PTR->getWireLabelMap();
-    if (wireLabelMap.size() != RTD_PTR->getDeviceCapacity()) {
-        return false;
-    }
-
-    // Get the user labels back from the indices
-    std::vector<int64_t> wires(indices.size());
-    for (int64_t i = 0; i < indices.size(); i++) {
-        QubitIdType index = indices[i];
-        auto labelIt = std::find_if(wireLabelMap.begin(), wireLabelMap.end(),
-                                    [&](const auto &pair) { return pair.second == index; });
-        wires[i] = labelIt->first;
-    }
-
-    for (int64_t i = 0; i < wires.size(); i++) {
-        if (wires[i] != i) {
-            return false;
-        }
-    }
-    return true;
-}
-
 } // namespace Catalyst::Runtime
 
 extern "C" {
@@ -1180,7 +1147,7 @@ void __catalyst__qis__State(MemRefT_CplxT_double_1d *result, int64_t numQubits, 
     DataView<std::complex<double>, 1> view(result_p->data_aligned, result_p->offset,
                                            result_p->sizes, result_p->strides);
 
-    if (wires.empty() || explicitLabalsAreAllDeviceWires(wires)) {
+    if (wires.empty()) {
         getQuantumDevicePtr()->State(view);
         // Automatic management still treats labels as plain wire addresses
         if (!RTD_PTR->getQubitManagementMode()) {
@@ -1213,7 +1180,7 @@ void __catalyst__qis__Probs(MemRefT_double_1d *result, int64_t numQubits, ...)
     DataView<double, 1> view(result_p->data_aligned, result_p->offset, result_p->sizes,
                              result_p->strides);
 
-    if (wires.empty() || explicitLabalsAreAllDeviceWires(wires)) {
+    if (wires.empty()) {
         getQuantumDevicePtr()->Probs(view);
         // Automatic management still treats labels as plain wire addresses
         if (!RTD_PTR->getQubitManagementMode()) {
@@ -1248,7 +1215,7 @@ void __catalyst__qis__Sample(MemRefT_double_2d *result, int64_t numQubits, ...)
     DataView<double, 2> view(result_p->data_aligned, result_p->offset, result_p->sizes,
                              result_p->strides);
 
-    if (wires.empty() || explicitLabalsAreAllDeviceWires(wires)) {
+    if (wires.empty()) {
         getQuantumDevicePtr()->Sample(view);
         // Automatic management still treats labels as plain wire addresses
         if (!RTD_PTR->getQubitManagementMode()) {
@@ -1285,7 +1252,7 @@ void __catalyst__qis__Counts(PairT_MemRefT_double_int64_1d *result, int64_t numQ
     DataView<int64_t, 1> counts_view(result_counts_p->data_aligned, result_counts_p->offset,
                                      result_counts_p->sizes, result_counts_p->strides);
 
-    if (wires.empty() || explicitLabalsAreAllDeviceWires(wires)) {
+    if (wires.empty()) {
         getQuantumDevicePtr()->Counts(eigvals_view, counts_view);
         // Automatic management still treats labels as plain wire addresses
         if (!RTD_PTR->getQubitManagementMode()) {
