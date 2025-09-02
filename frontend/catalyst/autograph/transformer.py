@@ -27,7 +27,6 @@ from malt.core import config
 from pennylane.capture import autograph as pl_autograph
 from pennylane.capture.autograph.transformer import (
     PennyLaneTransformer,
-    disable_autograph,
 )
 
 import catalyst
@@ -96,6 +95,7 @@ def run_autograph(fn, *modules):
 
     return wrapper
 
+disable_autograph = pl_autograph.disable_autograph
 
 def autograph_source(fn):
     """Utility function to retrieve the source code of a function converted by AutoGraph.
