@@ -66,33 +66,13 @@ Catalyst
 
 .. toctree::
    :maxdepth: 2
-   :titlesonly:
+   :caption: Documentation
    :hidden:
 
-   dev/installation
-   dev/quick_start
-   dev/devices
-   dev/autograph
-   dev/sharp_bits
-   dev/jax_integration
-   dev/callbacks
-   dev/release_notes
-
-.. toctree::
-   :maxdepth: 2
-   :caption: Development
-   :hidden:
-
-   dev/architecture
+   dev/index
    PennyLane Frontend <modules/frontend>
    Compiler Core <modules/mlir>
-   MLIR Dialects <dev/dialects>
-   Compiler Passes <dev/transforms>
-   Compiler Plugins <dev/plugins>
    Quantum Runtime <modules/runtime>
-   dev/debugging
-   dev/custom_devices
-   dev/roadmap
 
 .. toctree::
    :maxdepth: 2
