@@ -255,7 +255,7 @@ class TestCond:
             with pytest.raises(
                 ValueError, match="false branch must be provided if the true branch"
             ):
-                qjit(qml.qnode(qml.device(backend, wires=1), autograph=False)(circuit))
+                qjit(qml.qnode(qml.device(backend, wires=1))(circuit))
         else:
 
             with pytest.raises(
@@ -314,7 +314,7 @@ class TestCond:
                 ValueError,
                 match="Mismatch in output abstract values in false branch",
             ):
-                qjit(qml.qnode(qml.device(backend, wires=1), autograph=False)(circuit))
+                qjit(qml.qnode(qml.device(backend, wires=1))(circuit))
         else:
             m = "Conditional requires a consistent array shape per result across all branches"
             with pytest.raises(
@@ -331,7 +331,7 @@ class TestCond:
             pytest.xfail("capture does not allow returning mcm's or classical values")
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=1), autograph=False)
+        @qml.qnode(qml.device(backend, wires=1))
         def circuit():
             @cond(True)
             def cond_fn():
@@ -577,7 +577,7 @@ class TestCond:
         with pytest.raises(
             TypeError, match="Conditional 'else if' function is not allowed to have any arguments"
         ):
-            qjit(qml.qnode(qml.device("lightning.qubit", wires=1), autograph=False)(circuit))
+            qjit(qml.qnode(qml.device("lightning.qubit", wires=1))(circuit))
 
     def test_identical_branch_names(self, backend):
         """Test that branches of the conditional can carry the same function name."""
@@ -586,7 +586,7 @@ class TestCond:
             pytest.xfail("capture does not allow returning mcms")
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=1), autograph=False)
+        @qml.qnode(qml.device(backend, wires=1))
         def circuit(pred: bool):
             @cond(pred)
             def conditional_flip():
@@ -864,7 +864,7 @@ class TestCondOperatorAccess:
         """Test Cond operation access in quantum context."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=1), autograph=False)
+        @qml.qnode(qml.device(backend, wires=1))
         def circuit(n):
             @cond(n > 4)
             def cond_fn():
