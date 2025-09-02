@@ -546,6 +546,8 @@ TEST_CASE_METHOD(
         __catalyst__rt__insert_element_into_array_1d(reg, 3, reinterpret_cast<QUBIT *>(q)));
 }
 
+// TODO: Commenting this test out until the issue in __catalyst__rt__insert_element_into_array_1d
+// is resolved.
 // TEST_CASE_METHOD(
 //     NullQubitRuntimeFixture,
 //     "Test insertion of qubit into register that would overwrite active qubit throws an exception",

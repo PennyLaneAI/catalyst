@@ -1185,6 +1185,11 @@ void __catalyst__rt__insert_element_into_array_1d(QirArray *ptr, int64_t idx, QU
         return;
     }
 
+    // ~~ TODO ~~ //
+    // DANGER!! Ideally we should have a way to check that we are not overwriting an active qubit,
+    // but this does not currently work with lightning.qubit (it does work with null.qubit)
+    // PROCEED WITH CAUTION!
+
     // The ID of the qubit to insert is different from the ID currently at the requested position;
     // we first check that the insertion would not overwrite an active qubit
     // if (getQuantumDevicePtr()->IsQubitActive(current_qubit_id)) {
