@@ -46,8 +46,8 @@ def get_custom_device_without(num_wires, discards=frozenset(), force_matrix=froz
 
         _to_matrix_ops = {}
 
-        def __init__(self, shots=None, wires=None):
-            super().__init__(wires=wires, shots=shots)
+        def __init__(self, wires=None):
+            super().__init__(wires=wires)
             self.qjit_capabilities = deepcopy(get_device_capabilities(self))
             for gate in discards:
                 self.qjit_capabilities.operations.pop(gate, None)
