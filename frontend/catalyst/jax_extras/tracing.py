@@ -22,7 +22,7 @@ from contextlib import ExitStack, contextmanager
 from copy import copy
 from dataclasses import dataclass
 from functools import partial
-from typing import Any, Callable, Dict, Generator, List, Literal, Optional, Set, Tuple, TypeVar
+from typing import Any, Callable, Dict, Generator, List, Optional, Set, Tuple, TypeVar
 
 import jax
 from jax import ShapeDtypeStruct
