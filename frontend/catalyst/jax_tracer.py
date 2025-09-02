@@ -147,6 +147,29 @@ def _make_execution_config(qnode):
     return execution_config
 
 
+@dataclass
+class TraceResult:
+    """Result from tracing a quantum function.
+
+    This class groups related return values from trace_quantum_function
+
+    Args:
+        closed_jaxpr: JAXPR expression of the traced function
+        out_type: JAXPR output type (list of abstract values with explicitness flags)
+        out_tree: PyTree shape of the result
+        return_values_tree: PyTree structure of return values with measurements as leaves
+        classical_return_indices: Indices of classical return values
+        num_mcm: Number of mid-circuit measurements
+    """
+
+    closed_jaxpr: Any
+    out_type: Any
+    out_tree: Any
+    return_values_tree: Any
+    classical_return_indices: List[int]
+    num_mcm: int
+
+
 class Function:
     """An object that represents a compiled function.
 
@@ -1384,9 +1407,13 @@ def trace_quantum_function(
         qnode: The quantum node to be traced, it contains user transforms.
 
     Returns:
-        closed_jaxpr: JAXPR expression of the function ``f``.
-        out_type: JAXPR output type (list of abstract values with explicitness flags).
-        out_tree: PyTree shapen of the result
+        TraceResult: A dataclass containing:
+            - closed_jaxpr: JAXPR expression of the function ``f``
+            - out_type: JAXPR output type (list of abstract values with explicitness flags)
+            - out_tree: PyTree shape of the result
+            - return_values_tree: PyTree structure of return values
+            - classical_return_indices: Indices of classical return values
+            - num_mcm: Number of mid-circuit measurements
     """
 
     with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
@@ -1536,4 +1563,11 @@ def trace_quantum_function(
         )
         # TODO: `check_jaxpr` complains about the `AbstractQreg` type. Consider fixing.
         # check_jaxpr(jaxpr)
-    return closed_jaxpr, out_type, out_tree, return_values_tree, classical_return_indices, num_mcm
+    return TraceResult(
+        closed_jaxpr=closed_jaxpr,
+        out_type=out_type,
+        out_tree=out_tree,
+        return_values_tree=return_values_tree,
+        classical_return_indices=classical_return_indices,
+        num_mcm=num_mcm,
+    )

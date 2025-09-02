@@ -245,17 +245,21 @@ class QFunc:
         debug_info = kwargs.pop("debug_info", None)
 
         def _eval_quantum(*args, **kwargs):
-            closed_jaxpr, out_type, out_tree, out_tree_exp, cls_ret_idx, num_mcm = (
-                trace_quantum_function(
-                    self.func,
-                    qjit_device,
-                    args,
-                    kwargs,
-                    self,
-                    static_argnums,
-                    debug_info,
-                )
+            trace_result = trace_quantum_function(
+                self.func,
+                qjit_device,
+                args,
+                kwargs,
+                self,
+                static_argnums,
+                debug_info,
             )
+            closed_jaxpr = trace_result.closed_jaxpr
+            out_type = trace_result.out_type
+            out_tree = trace_result.out_tree
+            out_tree_exp = trace_result.return_values_tree
+            cls_ret_idx = trace_result.classical_return_indices
+            num_mcm = trace_result.num_mcm
 
             out_tree_expected.append(out_tree_exp)
             classical_return_indices.append(cls_ret_idx)
