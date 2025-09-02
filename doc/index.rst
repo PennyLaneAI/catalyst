@@ -66,7 +66,6 @@ Catalyst
 
 .. toctree::
    :maxdepth: 2
-   :caption: Getting Started
    :hidden:
 
    Installation <dev/installation>
