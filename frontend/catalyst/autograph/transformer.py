@@ -95,7 +95,6 @@ def run_autograph(fn, *modules):
 
     return wrapper
 
-disable_autograph = pl_autograph.disable_autograph
 
 def autograph_source(fn):
     """Utility function to retrieve the source code of a function converted by AutoGraph.
@@ -159,6 +158,9 @@ def autograph_source(fn):
         fn = fn.original_qnode
 
     return pl_autograph.autograph_source(fn)
+
+
+disable_autograph = pl_autograph.disable_autograph
 
 
 # Keep a global instance of the transformer to benefit from caching.
