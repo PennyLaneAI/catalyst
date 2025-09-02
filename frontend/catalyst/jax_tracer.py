@@ -1416,6 +1416,7 @@ def _trace_classical_phase(
     args,
     kwargs,
     qnode,
+    *,
     static_argnums,
     debug_info,
     ctx,
@@ -1650,7 +1651,14 @@ def trace_quantum_function(
     with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
         # (1) - Classical tracing
         cls_result = _trace_classical_phase(
-            f, device, args, kwargs, qnode, static_argnums, debug_info, ctx
+            f,
+            device,
+            args,
+            kwargs,
+            qnode,
+            static_argnums=static_argnums,
+            debug_info=debug_info,
+            ctx=ctx,
         )
 
         # (2) - Quantum tracing
