@@ -151,6 +151,43 @@ class TestCounts:
         observed = counts_2qbit(np.pi)
         assert np.array_equal(observed, expected)
 
+    def test_count_on_1qbit_one_shot(self, backend):
+        """Test counts on 1 qubits."""
+
+        @qjit
+        @qml.set_shots(1000)
+        @qml.qnode(qml.device(backend, wires=1), mcm_method="one-shot")
+        def counts_1qbit(x: float):
+            qml.RX(x, wires=0)
+            return qml.counts()
+
+        expected = [np.array([0, 1]), np.array([1000, 0])]
+        observed = counts_1qbit(0.0)
+        assert np.array_equal(observed, expected)
+
+        expected = [np.array([0, 1]), np.array([0, 1000])]
+        observed = counts_1qbit(np.pi)
+        assert np.array_equal(observed, expected)
+
+    def test_count_on_2qbits_one_shot(self, backend):
+        """Test counts on 2 qubits."""
+
+        @qjit
+        @qml.set_shots(1000)
+        @qml.qnode(qml.device(backend, wires=2), mcm_method='one-shot')
+        def counts_2qbit(x: float):
+            qml.RX(x, wires=0)
+            qml.RY(x, wires=1)
+            return qml.counts()
+
+        expected = [np.array([0, 1, 2, 3]), np.array([1000, 0, 0, 0])]
+        observed = counts_2qbit(0.0)
+        assert np.array_equal(observed, expected)
+
+        expected = [np.array([0, 1, 2, 3]), np.array([0, 0, 0, 1000])]
+        observed = counts_2qbit(np.pi)
+        assert np.array_equal(observed, expected)
+
     def test_count_on_2qbits_endianness(self, backend):
         """Test counts on 2 qubits with check for endianness."""
 

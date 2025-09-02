@@ -177,6 +177,123 @@ class QFunc:
         return tree_unflatten(out_tree_promise(), res_flat)[0]
 
 
+# pylint: disable=protected-access
+def _get_shot_vector(qnode):
+    shot_vector = qnode._shots.shot_vector if qnode._shots else []
+    return (
+        shot_vector
+        if len(shot_vector) > 1 or any(copies > 1 for _, copies in shot_vector)
+        else None
+    )
+
+
+def _get_snapshot_results(tape, out):
+    """
+    Get the snapshot results from the tape.
+    Args:
+        tape: The tape to get the snapshot results from.
+        out: The output of the tape.
+    Returns:
+        processed_snapshots: The extracted snapshot results if available;
+                                otherwise, returns the original output.
+        measurement_results: The corresponding measurement results.
+    """
+    # if no snapshot are present, return None, out
+    if not any(isinstance(op, qml.Snapshot) for op in tape.operations):
+        return None, out
+
+    # Snapshots present: out[0] = snapshots, out[1] = measurements
+    assert len(out) == 2
+    snapshot_results, measurement_results = out
+
+    # Take first shot for each snapshot
+    processed_snapshots = [
+        snapshot[0] if hasattr(snapshot, "shape") and len(snapshot.shape) > 1 else snapshot
+        for snapshot in snapshot_results
+    ]
+
+    return processed_snapshots, measurement_results
+
+
+def _reshape_for_shot_vector(result, shot_vector):
+    # Calculate the shape for reshaping based on shot vector
+    result_list = []
+    start_idx = 0
+    for shot, copies in shot_vector:
+        # Reshape this segment to (copies, shot, n_wires)
+        segment = result[start_idx : start_idx + shot * copies]
+        if copies > 1:
+            segment_shape = (copies, shot, result.shape[-1])
+            segment = jnp.reshape(segment, segment_shape)
+            result_list.extend([segment[i] for i in range(copies)])
+        else:
+            result_list.append(segment)
+        start_idx += shot * copies
+    result = tuple(result_list)
+    return result
+
+
+def _process_counts_measurement(out, idx, has_snapshots):
+    """Process CountsMP measurement and return the result and updated index."""
+    if isinstance(out[idx], tuple) and len(out[idx]) == 2:
+        # CountsMP result is stored as (keys, counts) tuple
+        keys, counts = out[idx]
+        idx += 1
+    else:
+        keys = out[idx]
+        counts = out[idx + 1]
+        idx += 2
+
+    if has_snapshots:
+        counts_array = jnp.stack(counts, axis=0)
+        aggregated_counts = jnp.sum(counts_array, axis=0)
+        counts_result = (keys, aggregated_counts)
+    else:
+        aggregated_counts = jnp.sum(counts, axis=0)
+        counts_result = (keys[0], aggregated_counts)
+
+    return counts_result, idx
+
+
+def _process_regular_measurement(m, out, idx, shot_vector):
+    """Process measurements and return the result."""
+    result = jnp.squeeze(out[idx])
+    max_ndim = min(len(out[idx].shape), 2)
+    if result.ndim == 1 and max_ndim == 2:
+        result = jnp.expand_dims(result, axis=1)
+
+    # Without MCMs and postselection, all samples are valid for use in MP computation.
+    is_valid = jnp.full((result.shape[0],), True)
+    processed_result = gather_non_mcm(m, result, is_valid, postselect_mode="pad-invalid-samples")
+
+    # Handle shot vector reshaping for SampleMP
+    if isinstance(m, SampleMP) and shot_vector is not None:
+        processed_result = _reshape_for_shot_vector(processed_result, shot_vector)
+
+    return processed_result
+
+
+def _process_measurements_without_mcm(cpy_tape, out, snapshots, shot_vector):
+    """Process measurements when there are no mid-circuit measurements."""
+    new_out = []
+    idx = 0
+
+    for m in cpy_tape.measurements:
+        if isinstance(m, CountsMP):
+            counts_result, idx = _process_counts_measurement(out, idx, snapshots is not None)
+            new_out.append(counts_result)
+            continue
+
+        processed_result = _process_regular_measurement(m, out, idx, shot_vector)
+        new_out.append(processed_result)
+        idx += 1
+
+    if snapshots is not None:
+        return (snapshots, tuple(new_out))
+    else:
+        return tuple(new_out)
+
+
 # pylint: disable=protected-access,no-member,not-callable
 def dynamic_one_shot(qnode, **kwargs):
     """Transform a QNode to into several one-shot tapes to support dynamic circuit execution.
@@ -279,21 +396,21 @@ def dynamic_one_shot(qnode, **kwargs):
         if isinstance(results[0], tuple) and len(results) == 1:
             results = results[0]
         has_mcm = any(isinstance(op, MidCircuitMeasure) for op in cpy_tape.operations)
+
         out = list(results)
-        if has_mcm:
+
+        shot_vector = _get_shot_vector(qnode)
+        snapshots, out = _get_snapshot_results(cpy_tape, out)
+
+        if has_mcm and len(cpy_tape.measurements) > 0:
             out = parse_native_mid_circuit_measurements(
                 cpy_tape, results=results, postselect_mode="pad-invalid-samples"
             )
             if len(cpy_tape.measurements) == 1:
                 out = (out,)
-        else:
-            for m_count, m in enumerate(cpy_tape.measurements):
-                # Without MCMs and postselection, all samples are valid for use in MP computation.
-                is_valid = jnp.array([True] * len(out[m_count]))
-                out[m_count] = gather_non_mcm(
-                    m, out[m_count], is_valid, postselect_mode="pad-invalid-samples"
-                )
-            out = tuple(out)
+        elif len(cpy_tape.measurements) > 0:
+            out = _process_measurements_without_mcm(cpy_tape, out, snapshots, shot_vector)
+
         out_tree_expected = kwargs.pop("_out_tree_expected", [])
         out = tree_unflatten(out_tree_expected[0], out)
         return out

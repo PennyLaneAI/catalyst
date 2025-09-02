@@ -69,6 +69,34 @@ class TestShotVector:
         assert jnp.array(circuit_dict()["first"]).shape == (4, 3, 1)
         assert jnp.array(circuit_dict()["second"]).shape == (4, 3, 1)
 
+    @pytest.mark.parametrize("shots", [((3, 4),), (3,) * 4, (3, 3, 3, 3), [3, 3, 3, 3]])
+    def test_multiple_sample_measurement_one_shot(self, shots):
+        """Test shot-vector with mulitple samples measurment"""
+
+        dev = qml.device("lightning.qubit", wires=1)
+
+        @qjit
+        @qml.set_shots(shots)
+        @qml.qnode(dev, mcm_method="one-shot")
+        def circuit_list():
+            qml.Hadamard(0)
+            return [qml.sample(), qml.sample()]
+
+        assert len(circuit_list()) == 2
+        assert jnp.array(circuit_list()[0]).shape == (4, 3, 1)
+        assert jnp.array(circuit_list()[1]).shape == (4, 3, 1)
+
+        @qjit
+        @qml.set_shots(shots)
+        @qml.qnode(dev)
+        def circuit_dict():
+            qml.X(0)
+            return {"first": qml.sample(), "second": qml.sample()}
+
+        assert list(circuit_dict().keys()) == ["first", "second"]
+        assert jnp.array(circuit_dict()["first"]).shape == (4, 3, 1)
+        assert jnp.array(circuit_dict()["second"]).shape == (4, 3, 1)
+
     def test_shot_vector_with_mixes_shots_and_without_copies(self):
         """Test shot-vector with mixes shots and without copies"""
 
