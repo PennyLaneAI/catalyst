@@ -68,39 +68,39 @@ Catalyst
    :maxdepth: 2
    :hidden:
 
-   Installation <dev/installation>
-   Quick Start <dev/quick_start>
-   Devices <dev/devices>
-   Autograph <dev/autograph>
-   Sharp Bits <dev/sharp_bits>
-   JAX Integration <dev/jax_integration>
-   Callbacks <dev/callbacks>
-   Release Notes <dev/release_notes>
+   dev/installation
+   dev/quick_start
+   dev/devices
+   dev/autograph
+   dev/sharp_bits
+   dev/jax_integration
+   dev/callbacks
+   dev/release_notes
 
 .. toctree::
    :maxdepth: 2
    :caption: Development
    :hidden:
 
-   Architecture <dev/architecture>
+   dev/architecture
    PennyLane Frontend <modules/frontend>
    Compiler Core <modules/mlir>
    MLIR Dialects <dev/dialects>
    Compiler Passes <dev/transforms>
    Compiler Plugins <dev/plugins>
    Quantum Runtime <modules/runtime>
-   Debugging <dev/debugging>
-   Custom Devices <dev/custom_devices>
-   Roadmap <dev/roadmap>
+   dev/debugging
+   dev/custom_devices
+   dev/roadmap
 
 .. toctree::
    :maxdepth: 2
    :caption: Examples
    :hidden:
 
-   Magic Distillation <demos/magic_distillation_demo>
-   Adaptive Circuits <demos/adaptive_circuits_demo>
-   Qubit Rotation Tutorial <demos/qml/tutorial_qubit_rotation>
+   demos/magic_distillation_demo
+   demos/adaptive_circuits_demo
+   demos/qml/tutorial_qubit_rotation
    QML Optimization with Optax <demos/qml_optimization>
 
 .. toctree::
@@ -108,7 +108,7 @@ Catalyst
    :caption: API
    :hidden:
 
-   Python API <code/__init__>
-   Command Line Interface <catalyst-cli/catalyst-cli>
+   code/__init__
+   catalyst-cli/catalyst-cli.rst
    Runtime Device Interface <api/structCatalyst_1_1Runtime_1_1QuantumDevice>
-   MLIR Dialects API <code/dialects/__init__>
+   code/dialects/__init__
