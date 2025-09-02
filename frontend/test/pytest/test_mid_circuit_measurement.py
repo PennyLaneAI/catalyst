@@ -809,37 +809,41 @@ class TestDynamicOneShotIntegration:
 
         assert np.allclose(grad_f(1.0), grad_g(1.0))
 
-    @pytest.mark.xfail(
-        reason="value_and_grad with dynamic one-shot is not yet supported.",
-    )
-    def test_mcm_method_with_value_and_grad(self):
-        """Test that the dynamic_one_shot works with value_and_grad."""
+    # value_and_grad now will be supported, but jax has an issue with the current version we use
+    # as it results in a random memory error. https://github.com/tensorflow/tensorflow/pull/97681
+    # It will be fixed in the next jax release. we will re-enable this test when the jax
+    # release is available and tested on our end.
+    # @pytest.mark.xfail(
+    #     reason="value_and_grad with dynamic one-shot is not yet supported.",
+    # )
+    # def test_mcm_method_with_value_and_grad(self):
+    #     """Test that the dynamic_one_shot works with value_and_grad."""
 
-        @qjit
-        def workflow1(x: float):
-            @qml.set_shots(10)
-            @qml.qnode(qml.device("lightning.qubit", wires=3), mcm_method="one-shot")
-            def circuit1():
-                qml.CNOT(wires=[0, 1])
-                qml.RX(0, wires=[2])
-                return qml.probs()  # This is [1, 0, 0, ...]
+    #     @qjit
+    #     def workflow1(x: float):
+    #         @qml.set_shots(10)
+    #         @qml.qnode(qml.device("lightning.qubit", wires=3), mcm_method="one-shot")
+    #         def circuit1():
+    #             qml.CNOT(wires=[0, 1])
+    #             qml.RX(0, wires=[2])
+    #             return qml.probs()  # This is [1, 0, 0, ...]
 
-            return x * (circuit1()[0])
+    #         return x * (circuit1()[0])
 
-        @qjit
-        def workflow2(x: float):
-            @qml.set_shots(10)
-            @qml.qnode(qml.device("lightning.qubit", wires=3))
-            def circuit2():
-                qml.CNOT(wires=[0, 1])
-                qml.RX(0, wires=[2])
-                return qml.probs()  # This is [1, 0, 0, ...]
+    #     @qjit
+    #     def workflow2(x: float):
+    #         @qml.set_shots(10)
+    #         @qml.qnode(qml.device("lightning.qubit", wires=3))
+    #         def circuit2():
+    #             qml.CNOT(wires=[0, 1])
+    #             qml.RX(0, wires=[2])
+    #             return qml.probs()  # This is [1, 0, 0, ...]
 
-            return x * (circuit2()[0])
+    #         return x * (circuit2()[0])
 
-        result1 = qjit(value_and_grad(workflow1))(3.0)
-        result2 = qjit(value_and_grad(workflow2))(3.0)
-        assert np.allclose(result1, result2)
+    #     result1 = qjit(value_and_grad(workflow1))(3.0)
+    #     result2 = qjit(value_and_grad(workflow2))(3.0)
+    #     assert np.allclose(result1, result2)
 
     @pytest.mark.parametrize("diff_method", ["auto", "fd"])
     @pytest.mark.xfail(
