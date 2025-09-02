@@ -58,8 +58,8 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
         if (device_kwargs.find("resources_fname") != device_kwargs.end()) {
             this->resource_tracker_.SetResourcesFname(device_kwargs["resources_fname"]);
         }
-        if (device_kwargs.find("depth") != device_kwargs.end()) {
-            this->resource_tracker_.SetTrackDepth(device_kwargs["depth"] == "True");
+        if (device_kwargs.find("compute_depth") != device_kwargs.end()) {
+            this->resource_tracker_.SetComputeDepth(device_kwargs["compute_depth"] == "True");
         }
     }
     ~NullQubit() {} // LCOV_EXCL_LINE
@@ -203,8 +203,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
                         const std::vector<bool> &controlled_values = {})
     {
         if (this->track_resources_) {
-            this->resource_tracker_.NamedOperation(name, inverse, wires.size(),
-                                                   controlled_wires.size());
+            this->resource_tracker_.NamedOperation(name, inverse, wires, controlled_wires);
         }
     }
 
@@ -218,7 +217,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
                          const std::vector<bool> &controlled_values = {})
     {
         if (this->track_resources_) {
-            this->resource_tracker_.MatrixOperation(inverse, wires.size(), controlled_wires.size());
+            this->resource_tracker_.MatrixOperation(inverse, wires, controlled_wires);
         }
     }
 
