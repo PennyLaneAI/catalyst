@@ -1499,7 +1499,7 @@ def trace_quantum_function(
                 # changed the output. See `split_non_commuting`
                 if tracing_mode == TracingMode.TRANSFORM:
                     # TODO: In the future support arbitrary output from the user function.
-                    if uses_transform(qnode, "dynamic_one_shot_partial", mode="only_one"):
+                    if uses_transform(qnode, "dynamic_one_shot_partial"):
                         output, cls_ret_indices, num_mcm = _construct_output_with_classical_values(
                             tape, return_values_flat
                         )

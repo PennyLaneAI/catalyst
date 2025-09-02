@@ -957,7 +957,7 @@ def get_replacement_value(tree_def):
     return jax.tree_util.tree_unflatten(tree_def, mock_vals)
 
 
-def uses_transform(qnode, transform_name, mode: Literal["only_one", "any"] = "any"):
+def uses_transform(qnode, transform_name):
     """
     Detect if a QNode uses specific transform that is specified by `transform_name`.
     Args:
@@ -972,9 +972,4 @@ def uses_transform(qnode, transform_name, mode: Literal["only_one", "any"] = "an
     transform_program = getattr(qnode, "transform_program", [])
     transform_funcs = [transform_container.transform for transform_container in transform_program]
 
-    num_matching_transforms = sum(transform_name in func.__name__ for func in transform_funcs)
-
-    if mode == "only_one":
-        return num_matching_transforms == 1
-
-    return num_matching_transforms > 0
+    return any(transform_name in func.__name__ for func in transform_funcs)
