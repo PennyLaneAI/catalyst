@@ -28,11 +28,32 @@
 
 <h3>Improvements 🛠</h3>
 
+* Catalyst now supporting classical return values with one-shot mode.
+  For example, the code below will generate 10 values, with an equal probability of 42 and 43
+  appearing. You can also return `measure(0)` as well.
+  [(#2001)](https://github.com/PennyLaneAI/catalyst/pull/2001)
+
+  ```python
+  import pennylane as qml
+  from catalyst import qjit, measure
+  @qjit(autograph=True)
+  @qml.set_shots(10)
+  @qml.qnode(qml.device("lightning.qubit", wires=1), mcm_method="one-shot")
+  def circuit_2():
+      qml.Hadamard(wires=0)
+      if measure(0):
+          return 42
+      else:
+          return 43
+
+  print(circuit_2())
+  ```
+
 * A new pass `--partition-layers` has been added to group PPR/PPM operations into `qec.layer`
   operations based on qubit interactive and commutativity, enabling circuit analysis and
   potentially to support parallel execution.
   [(#1951)](https://github.com/PennyLaneAI/catalyst/pull/1951)
-  
+
 * Added a new JAX primitive to capture and compile the decomposition rule
   definitions to MLIR. `decomposition_rule` is the decorator integrated
   with this primitive for development purposes.
@@ -77,7 +98,7 @@
   %0 = transform.apply_registered_pass "some-pass" with options = {"an-option" = true, "maxValue" = 1 : i64, "multi-word-option" = 1 : i64}
   ```
 
-* Added checks to raise an error when the input qubits to the multi-qubit gates in the runtime CAPI are not all distinct. 
+* Added checks to raise an error when the input qubits to the multi-qubit gates in the runtime CAPI are not all distinct.
   [(#2006)](https://github.com/PennyLaneAI/catalyst/pull/2006).
 
 * Commuting Clifford Pauli Product Rotation (PPR) operations, past non-Clifford PPRs, now supports P(π/2) Cliffords in addition to P(π/4)
@@ -239,4 +260,5 @@ Andrija Paurevic,
 Ritu Thombre,
 Roberto Turrado,
 Paul Haochen Wang,
-Jake Zaia.
+Jake Zaia,
+Hongsheng Zheng.
