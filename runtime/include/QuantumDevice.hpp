@@ -21,6 +21,7 @@
 #include <vector>
 
 #include "DataView.hpp"
+#include "Exception.hpp"
 #include "Types.h"
 
 // A helper template macro to generate the <IDENTIFIER>Factory function by
@@ -149,7 +150,10 @@ struct QuantumDevice {
      * @param q ID of the qubit to query.
      * @return true if the qubit is currently active; false otherwise.
      */
-    virtual auto IsQubitActive(QubitIdType q) -> bool = 0;
+    virtual auto IsQubitActive(QubitIdType q) -> bool
+    {
+        RT_FAIL("Dynamic qubit querying is unsupported by device");
+    }
 
     // ----------------------------------------
     //  EXECUTION MANAGEMENT
