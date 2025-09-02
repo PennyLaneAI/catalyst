@@ -27,6 +27,7 @@ from malt.core import config
 from pennylane.capture import autograph as pl_autograph
 from pennylane.capture.autograph.transformer import (
     PennyLaneTransformer,
+    disable_autograph,
 )
 
 import catalyst
