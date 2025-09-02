@@ -1,3 +1,6 @@
+.. toctree::
+   :hidden:
+
 AutoGraph guide
 ===============
 
