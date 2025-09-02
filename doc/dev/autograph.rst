@@ -1,8 +1,3 @@
-.. toctree::
-   :maxdepth: 2
-   :titlesonly:
-   :hidden:
-
 AutoGraph guide
 ===============
 
