@@ -420,10 +420,10 @@ struct InsertOpPattern : public OpConversionPattern<InsertOp> {
         const TypeConverter *conv = getTypeConverter();
 
         StringRef qirName = "__catalyst__rt__insert_element_into_array_1d";
-        Type qirSignature = LLVM::LLVMFunctionType::get(
-            LLVM::LLVMVoidType::get(ctx),
-            {conv->convertType(QuregType::get(ctx)), IntegerType::get(ctx, 64),
-             conv->convertType(QubitType::get(ctx))});
+        Type qirSignature = LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx),
+                                                        {conv->convertType(QuregType::get(ctx)),
+                                                         IntegerType::get(ctx, 64),
+                                                         conv->convertType(QubitType::get(ctx))});
 
         LLVM::LLVMFuncOp fnDecl =
             catalyst::ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);

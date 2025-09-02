@@ -550,7 +550,8 @@ TEST_CASE_METHOD(
 // is resolved.
 // TEST_CASE_METHOD(
 //     NullQubitRuntimeFixture,
-//     "Test insertion of qubit into register that would overwrite active qubit throws an exception",
+//     "Test insertion of qubit into register that would overwrite active qubit throws an
+//     exception",
 //     "[NullQubit]")
 // {
 //     // Allocate register with three qubits, [0, 1, 2]
