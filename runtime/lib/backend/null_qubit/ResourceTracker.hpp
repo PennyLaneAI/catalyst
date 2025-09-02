@@ -112,9 +112,11 @@ struct ResourceTracker final {
         resources << "  \"num_gates\": " << GetNumGates() << ",\n";
         resources << "  \"gate_types\": ";
         pretty_print_dict(gate_types_, 2, resources);
-        resources << ",\n  " << std::endl;
+        resources << ",\n";
         resources << "  \"gate_sizes\": ";
         pretty_print_dict(gate_sizes_, 2, resources);
+        resources << ",\n";
+        resources << "  \"depth\": null"; // TODO: Put depth into here
         resources << "\n}" << std::endl;
 
         fwrite(resources.str().c_str(), 1, resources.str().size(), resources_file);
