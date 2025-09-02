@@ -174,7 +174,7 @@ class TestCounts:
 
         @qjit
         @qml.set_shots(1000)
-        @qml.qnode(qml.device(backend, wires=2), mcm_method='one-shot')
+        @qml.qnode(qml.device(backend, wires=2), mcm_method="one-shot")
         def counts_2qbit(x: float):
             qml.RX(x, wires=0)
             qml.RY(x, wires=1)
