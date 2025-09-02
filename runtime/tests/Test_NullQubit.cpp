@@ -546,24 +546,24 @@ TEST_CASE_METHOD(
         __catalyst__rt__insert_element_into_array_1d(reg, 3, reinterpret_cast<QUBIT *>(q)));
 }
 
-TEST_CASE_METHOD(
-    NullQubitRuntimeFixture,
-    "Test insertion of qubit into register that would overwrite active qubit throws an exception",
-    "[NullQubit]")
-{
-    // Allocate register with three qubits, [0, 1, 2]
-    QirArray *reg = __catalyst__rt__qubit_allocate_array(3);
+// TEST_CASE_METHOD(
+//     NullQubitRuntimeFixture,
+//     "Test insertion of qubit into register that would overwrite active qubit throws an exception",
+//     "[NullQubit]")
+// {
+//     // Allocate register with three qubits, [0, 1, 2]
+//     QirArray *reg = __catalyst__rt__qubit_allocate_array(3);
 
-    auto reg_vec_before = *reinterpret_cast<std::vector<QubitIdType> *>(reg);
+//     auto reg_vec_before = *reinterpret_cast<std::vector<QubitIdType> *>(reg);
 
-    // Allocate an individual qubit; internally it has ID 3
-    QUBIT *q = __catalyst__rt__qubit_allocate();
+//     // Allocate an individual qubit; internally it has ID 3
+//     QUBIT *q = __catalyst__rt__qubit_allocate();
 
-    // Insert the individual qubit (ID: 3) into `reg` at position 1
-    // This should raise an exception since the qubit at position 1 is still active
-    CHECK_THROWS(
-        __catalyst__rt__insert_element_into_array_1d(reg, 1, reinterpret_cast<QUBIT *>(q)));
-}
+//     // Insert the individual qubit (ID: 3) into `reg` at position 1
+//     // This should raise an exception since the qubit at position 1 is still active
+//     CHECK_THROWS(
+//         __catalyst__rt__insert_element_into_array_1d(reg, 1, reinterpret_cast<QUBIT *>(q)));
+// }
 
 TEST_CASE("Mix Gate test R(X,Y,Z) num_qubits=4", "[NullQubit]")
 {

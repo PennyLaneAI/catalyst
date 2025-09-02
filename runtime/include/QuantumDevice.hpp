@@ -150,10 +150,10 @@ struct QuantumDevice {
      * @param q ID of the qubit to query.
      * @return true if the qubit is currently active; false otherwise.
      */
-    virtual auto IsQubitActive(QubitIdType q) -> bool
-    {
-        RT_FAIL("Dynamic qubit querying is unsupported by device");
-    }
+    // virtual auto IsQubitActive(QubitIdType q) const -> bool
+    // {
+    //     RT_FAIL("Dynamic qubit querying is unsupported by device");
+    // }
 
     // ----------------------------------------
     //  EXECUTION MANAGEMENT

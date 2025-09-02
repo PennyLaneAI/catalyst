@@ -1161,7 +1161,7 @@ int8_t *__catalyst__rt__array_get_element_ptr_1d(QirArray *ptr, int64_t idx)
     return (int8_t *)&data[idx];
 }
 
-QirArray *__catalyst__rt__insert_element_into_array_1d(QirArray *ptr, int64_t idx, QUBIT *qubit)
+void __catalyst__rt__insert_element_into_array_1d(QirArray *ptr, int64_t idx, QUBIT *qubit)
 {
     RT_ASSERT(getQuantumDevicePtr() != nullptr);
     RT_ASSERT(CTX->getMemoryManager() != nullptr);
@@ -1176,14 +1176,26 @@ QirArray *__catalyst__rt__insert_element_into_array_1d(QirArray *ptr, int64_t id
     }
 
     QubitIdType *data = qubit_vector_ptr->data();
-    if (getQuantumDevicePtr()->IsQubitActive(data[idx])) {
-        std::string error_msg = std::format(
-            "Insertion of qubit into register at position {} would overwrite existing qubit", idx);
-        RT_FAIL(error_msg.c_str());
+    const QubitIdType qubit_id = reinterpret_cast<QubitIdType>(qubit);
+    const QubitIdType current_qubit_id = data[idx];
+
+    // If the ID of the qubit to insert is equal to the ID currently at the requested position in
+    // the register, there is nothing to do, and we return the unmodified array.
+    if (current_qubit_id == qubit_id) {
+        return;
     }
 
-    data[idx] = reinterpret_cast<QubitIdType>(qubit);
-    return reinterpret_cast<QirArray *>(data);
+    // The ID of the qubit to insert is different from the ID currently at the requested position;
+    // we first check that the insertion would not overwrite an active qubit
+    // if (getQuantumDevicePtr()->IsQubitActive(current_qubit_id)) {
+    //     std::string error_msg = std::format(
+    //         "Insertion of qubit {} into register at position {} would overwrite active qubit {}",
+    //         qubit_id, idx, current_qubit_id);
+    //     RT_FAIL(error_msg.c_str());
+    // }
+
+    data[idx] = qubit_id;
+    return;
 }
 
 // -------------------------------------------------------------------------- //

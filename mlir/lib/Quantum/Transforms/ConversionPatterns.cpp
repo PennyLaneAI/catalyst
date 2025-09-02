@@ -421,7 +421,7 @@ struct InsertOpPattern : public OpConversionPattern<InsertOp> {
 
         StringRef qirName = "__catalyst__rt__insert_element_into_array_1d";
         Type qirSignature = LLVM::LLVMFunctionType::get(
-            LLVM::LLVMPointerType::get(rewriter.getContext()),
+            LLVM::LLVMVoidType::get(ctx),
             {conv->convertType(QuregType::get(ctx)), IntegerType::get(ctx, 64),
              conv->convertType(QubitType::get(ctx))});
 
@@ -434,7 +434,10 @@ struct InsertOpPattern : public OpConversionPattern<InsertOp> {
         }
         SmallVector<Value> operands = {adaptor.getInQreg(), index, adaptor.getQubit()};
 
-        rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, fnDecl, operands);
+        rewriter.create<LLVM::CallOp>(loc, fnDecl, operands);
+
+        SmallVector<Value> values = {adaptor.getInQreg()};
+        rewriter.replaceOp(op, values);
 
         return success();
     }

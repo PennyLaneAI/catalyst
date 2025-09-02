@@ -180,7 +180,9 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      * @param q ID of the qubit to query.
      * @return true if the qubit is currently active; false otherwise.
      */
-    auto IsQubitActive(QubitIdType q) -> bool { return this->qubit_manager.isValidQubitId(q); }
+    // [[nodiscard]] auto IsQubitActive(QubitIdType q) const -> bool {
+    //     return this->qubit_manager.isValidQubitId(q);
+    // }
 
     /**
      * @brief Get the number of allocated qubits.
