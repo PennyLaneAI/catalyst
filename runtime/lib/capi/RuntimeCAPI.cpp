@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <algorithm>
 #include <bitset>
 #include <cstdarg>
 #include <cstdlib>
@@ -21,6 +22,7 @@
 #include <stdexcept>
 #include <string_view>
 #include <tuple>
+#include <vector>
 
 #include "mlir/ExecutionEngine/CRunnerUtils.h"
 
@@ -204,6 +206,28 @@ void RemapSampleResultWires(double *data_aligned, int64_t Nrows, int64_t Ncols)
 
     for (int64_t i = 0; i < static_cast<int64_t>(remappedSamples.size()); i++) {
         data_aligned[i] = remappedSamples[i];
+    }
+}
+
+void RemapCountsResultWires(double *eigvals_data_aligned, int64_t *counts_data_aligned)
+{
+    Remap1DResultWires<double>(eigvals_data_aligned);
+    Remap1DResultWires<int64_t>(counts_data_aligned);
+
+    // After remapping the order will be some random order
+    // So we need to sort the compbasis counts again
+    int64_t capacity = RTD_PTR->getDeviceCapacity();
+    std::vector<std::pair<double, int64_t>> countsPairs(1 << capacity);
+
+    for (int64_t i = 0; i < (1 << capacity); i++) {
+        countsPairs[i] = std::make_pair(eigvals_data_aligned[i], counts_data_aligned[i]);
+    }
+
+    std::sort(countsPairs.begin(), countsPairs.end());
+
+    for (int64_t i = 0; i < (1 << capacity); i++) {
+        eigvals_data_aligned[i] = countsPairs[i].first;
+        counts_data_aligned[i] = countsPairs[i].second;
     }
 }
 
@@ -1125,7 +1149,10 @@ void __catalyst__qis__State(MemRefT_CplxT_double_1d *result, int64_t numQubits, 
 
     if (wires.empty()) {
         getQuantumDevicePtr()->State(view);
-        RemapStateResultWires(result_p->data_aligned);
+        // Automatic management still treats labels as plain wire addresses
+        if (!RTD_PTR->getQubitManagementMode()) {
+            RemapStateResultWires(result_p->data_aligned);
+        }
     }
     else {
         RT_FAIL("Partial State-Vector not supported.");
@@ -1155,7 +1182,10 @@ void __catalyst__qis__Probs(MemRefT_double_1d *result, int64_t numQubits, ...)
 
     if (wires.empty()) {
         getQuantumDevicePtr()->Probs(view);
-        RemapProbsResultWires(result_p->data_aligned);
+        // Automatic management still treats labels as plain wire addresses
+        if (!RTD_PTR->getQubitManagementMode()) {
+            RemapProbsResultWires(result_p->data_aligned);
+        }
     }
     else {
         getQuantumDevicePtr()->PartialProbs(view, wires);
@@ -1187,7 +1217,10 @@ void __catalyst__qis__Sample(MemRefT_double_2d *result, int64_t numQubits, ...)
 
     if (wires.empty()) {
         getQuantumDevicePtr()->Sample(view);
-        RemapSampleResultWires(result_p->data_aligned, result_p->sizes[0], result_p->sizes[1]);
+        // Automatic management still treats labels as plain wire addresses
+        if (!RTD_PTR->getQubitManagementMode()) {
+            RemapSampleResultWires(result_p->data_aligned, result_p->sizes[0], result_p->sizes[1]);
+        }
     }
     else {
         getQuantumDevicePtr()->PartialSample(view, wires);
@@ -1221,8 +1254,10 @@ void __catalyst__qis__Counts(PairT_MemRefT_double_int64_1d *result, int64_t numQ
 
     if (wires.empty()) {
         getQuantumDevicePtr()->Counts(eigvals_view, counts_view);
-        Remap1DResultWires<double>(result_eigvals_p->data_aligned);
-        Remap1DResultWires<int64_t>(result_counts_p->data_aligned);
+        // Automatic management still treats labels as plain wire addresses
+        if (!RTD_PTR->getQubitManagementMode()) {
+            RemapCountsResultWires(result_eigvals_p->data_aligned, result_counts_p->data_aligned);
+        }
     }
     else {
         getQuantumDevicePtr()->PartialCounts(eigvals_view, counts_view, wires);
