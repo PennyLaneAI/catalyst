@@ -344,6 +344,115 @@ class TestPyTreesReturnValues:
         assert isinstance(result, dict)
         assert result["w"] == 1
 
+    def test_return_value_dict_one_shot(self, backend, tol_stochastic):
+        """Test dictionaries."""
+
+        @qml.qnode(qml.device(backend, wires=2))
+        def circuit1(params):
+            qml.RX(params[0], wires=0)
+            qml.RX(params[1], wires=1)
+            return {
+                "w0": qml.expval(qml.PauliZ(0)),
+                "w1": qml.expval(qml.PauliZ(1)),
+            }
+
+        jitted_fn = qjit(circuit1)
+
+        params = [0.2, 0.6]
+        expected = {"w0": 0.98006658, "w1": 0.82533561}
+        result = jitted_fn(params)
+        assert isinstance(result, dict)
+        assert jnp.allclose(result["w0"], expected["w0"])
+        assert jnp.allclose(result["w1"], expected["w1"])
+
+        @qml.set_shots(1000)
+        @qml.qnode(qml.device(backend, wires=2), mcm_method="one-shot")
+        def circuit2(params):
+            qml.RX(params[0], wires=0)
+            qml.RX(params[1], wires=1)
+            return {
+                "counts": qml.counts(),
+                "expval": {
+                    "z0": qml.expval(qml.PauliZ(0)),
+                },
+            }
+
+        params = [0.5, 0.6]
+        expected_expval = 0.87758256
+
+        jitted_fn = qjit(circuit2)
+        result = jitted_fn(params)
+        assert isinstance(result, dict)
+        assert isinstance(result["counts"], tuple)
+        assert jnp.allclose(
+            result["expval"]["z0"], expected_expval, atol=tol_stochastic, rtol=tol_stochastic
+        )
+
+        @qml.set_shots(1000)
+        @qml.qnode(qml.device(backend, wires=2), mcm_method="one-shot")
+        def circuit2_snapshot(params):
+            qml.Snapshot()
+            qml.RX(params[0], wires=0)
+            qml.RX(params[1], wires=1)
+            qml.Snapshot()
+            return {
+                "counts": qml.counts(),
+                "expval": {
+                    "z0": qml.expval(qml.PauliZ(0)),
+                },
+            }
+
+        params = [0.5, 0.6]
+        expected_expval = 0.87758256
+        expected_snapshot_states = [
+            jnp.array([1.0 + 0.0j, 0.0 + 0.0j, 0.0 + 0.0j, 0.0 + 0.0j], dtype=np.complex128),
+            jnp.array(
+                [0.92563739 + 0.0j, 0.0 - 0.2863332j, 0.0 - 0.23635403j, -0.07311287 + 0.0j],
+                dtype=jnp.complex128,
+            ),
+        ]
+        jitted_fn = qjit(circuit2_snapshot)
+        result = jitted_fn(params)
+        assert isinstance(result, tuple)
+        assert isinstance(result[0], list)
+        assert isinstance(result[1], dict)
+        assert isinstance(result[1]["counts"], tuple)
+        assert all(
+            jnp.allclose(expected_snapshot_states[i], result[0][i]) for i in range(len(result[0]))
+        )
+        assert jnp.allclose(
+            result[1]["expval"]["z0"], expected_expval, atol=tol_stochastic, rtol=tol_stochastic
+        )
+
+        @qml.set_shots(None)
+        @qml.qnode(qml.device(backend, wires=2))
+        def circuit3(params):
+            qml.RX(params[0], wires=0)
+            qml.RX(params[1], wires=1)
+            return {
+                "state": qml.state(),
+                "expval": {
+                    "z0": qml.expval(qml.PauliZ(0)),
+                },
+            }
+
+        params = [0.5, 0.6]
+        expected_expval = 0.87758256
+
+        jitted_fn = qjit(circuit3)
+        result = jitted_fn(params)
+        assert isinstance(result, dict)
+        assert len(result["state"]) == 4
+        assert jnp.allclose(result["expval"]["z0"], expected_expval)
+
+        @qjit
+        def workflow1(param):
+            return {"w": jnp.sin(param), "q": jnp.cos(param)}
+
+        result = workflow1(jnp.pi / 2)
+        assert isinstance(result, dict)
+        assert result["w"] == 1
+
 
 class TestPyTreesFuncArgs:
     """Test QJIT workflows with PyTrees as function arguments."""
