@@ -1205,7 +1205,6 @@ def apply_transforms(
         # TODO: Ideally we should allow qnode transforms that don't modify the measurements to
         # operate in the permissive tracing mode, but that currently leads to a small number of
         # test failures due to the different result format produced in trace_quantum_function.
-
         only_with_dynamic_one_shot = all(
             "dynamic_one_shot_partial" in str(getattr(qnode, "transform", ""))
             for qnode in qnode_program
