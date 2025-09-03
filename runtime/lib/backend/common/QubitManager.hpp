@@ -66,12 +66,12 @@ class QubitManager {
     QubitManager(QubitManager &&) = delete;
     QubitManager &operator=(QubitManager &&) = delete;
 
-    [[nodiscard]] auto isValidQubitId(SimQubitIdType s_idx) const -> bool
+    [[nodiscard]] auto isValidQubitId(SimQubitIdType s_idx) -> bool
     {
         return this->qubits_map.contains(s_idx);
     }
 
-    [[nodiscard]] auto isValidQubitId(const std::vector<SimQubitIdType> &ss_idx) const -> bool
+    [[nodiscard]] auto isValidQubitId(const std::vector<SimQubitIdType> &ss_idx) -> bool
     {
         return std::all_of(ss_idx.begin(), ss_idx.end(),
                            [this](SimQubitIdType s) { return isValidQubitId(s); });

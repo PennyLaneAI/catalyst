@@ -175,16 +175,6 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     }
 
     /**
-     * @brief Checks if the qubit with the supplied qubit ID is currently active.
-     *
-     * @param q ID of the qubit to query.
-     * @return true if the qubit is currently active; false otherwise.
-     */
-    // [[nodiscard]] auto IsQubitActive(QubitIdType q) const -> bool {
-    //     return this->qubit_manager.isValidQubitId(q);
-    // }
-
-    /**
      * @brief Get the number of allocated qubits.
      *
      * @return `size_t`

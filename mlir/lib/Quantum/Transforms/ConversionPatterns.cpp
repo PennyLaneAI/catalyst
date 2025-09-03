@@ -431,7 +431,7 @@ struct InsertOpArrayBackedPattern : public OpConversionPattern<InsertOp> {
         MLIRContext *ctx = getContext();
         const TypeConverter *conv = getTypeConverter();
 
-        StringRef qirName = "__catalyst__rt__insert_element_into_array_1d";
+        StringRef qirName = "__catalyst__rt__array_update_element_1d";
         Type qirSignature = LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx),
                                                         {conv->convertType(QuregType::get(ctx)),
                                                          IntegerType::get(ctx, 64),

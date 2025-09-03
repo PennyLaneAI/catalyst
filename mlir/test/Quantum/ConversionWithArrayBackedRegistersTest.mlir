@@ -16,13 +16,13 @@
 // RUN:   --pass-pipeline="builtin.module(convert-quantum-to-llvm{use-array-backed-registers=true})" \
 // RUN:   --split-input-file %s | FileCheck %s
 
-// CHECK: llvm.func @__catalyst__rt__insert_element_into_array_1d(!llvm.ptr, i64, !llvm.ptr)
+// CHECK: llvm.func @__catalyst__rt__array_update_element_1d(!llvm.ptr, i64, !llvm.ptr)
 
 // CHECK-LABEL: @insert
 func.func @insert(%r : !quantum.reg, %q : !quantum.bit) -> !quantum.reg {
 
     // CHECK: [[c5:%.+]] = llvm.mlir.constant(5 : i64) : i64
-    // CHECK: llvm.call @__catalyst__rt__insert_element_into_array_1d(%arg0, [[c5]], %arg1) : (!llvm.ptr, i64, !llvm.ptr) -> ()
+    // CHECK: llvm.call @__catalyst__rt__array_update_element_1d(%arg0, [[c5]], %arg1) : (!llvm.ptr, i64, !llvm.ptr) -> ()
     %new_r = quantum.insert %r[5], %q : !quantum.reg, !quantum.bit
 
     // CHECK: llvm.return %arg0 : !llvm.ptr

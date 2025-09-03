@@ -1161,7 +1161,7 @@ int8_t *__catalyst__rt__array_get_element_ptr_1d(QirArray *ptr, int64_t idx)
     return (int8_t *)&data[idx];
 }
 
-void __catalyst__rt__insert_element_into_array_1d(QirArray *ptr, int64_t idx, QUBIT *qubit)
+void __catalyst__rt__array_update_element_1d(QirArray *ptr, int64_t idx, QUBIT *qubit)
 {
     RT_ASSERT(getQuantumDevicePtr() != nullptr);
     RT_ASSERT(CTX->getMemoryManager() != nullptr);
@@ -1185,20 +1185,12 @@ void __catalyst__rt__insert_element_into_array_1d(QirArray *ptr, int64_t idx, QU
         return;
     }
 
-    // ~~ TODO ~~ //
-    // DANGER!! Ideally we should have a way to check that we are not overwriting an active qubit,
-    // but this does not currently work with lightning.qubit (it does work with null.qubit)
-    // PROCEED WITH CAUTION!
-
-    // The ID of the qubit to insert is different from the ID currently at the requested position;
-    // we first check that the insertion would not overwrite an active qubit
-    // if (getQuantumDevicePtr()->IsQubitActive(current_qubit_id)) {
-    //     std::string error_msg = std::format(
-    //         "Insertion of qubit {} into register at position {} would overwrite active qubit {}",
-    //         qubit_id, idx, current_qubit_id);
-    //     RT_FAIL(error_msg.c_str());
-    // }
-
+    // TODO
+    // CAUTION: There is a risk here that we overwrite the ID of an active qubit contained in the
+    // register (one that has not been deallocated). Ideally we should be able to query whether a
+    // qubit is active given its ID, but we do not have a general, device-agnostic way to do this
+    // yet. For NullQubit, for example, we can query its `qubit_manager` object to determine if a
+    // given qubit is active, but not all devices implement a qubit manager.
     data[idx] = qubit_id;
     return;
 }
