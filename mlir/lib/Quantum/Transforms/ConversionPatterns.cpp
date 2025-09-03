@@ -409,7 +409,19 @@ struct ExtractOpPattern : public OpConversionPattern<ExtractOp> {
     }
 };
 
-struct InsertOpPattern : public OpConversionPattern<InsertOp> {
+struct InsertOpDefaultPattern : public OpConversionPattern<InsertOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(InsertOp op, InsertOpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+        // Unravel use-def chain of quantum register values, converting back to reference semantics.
+        rewriter.replaceOp(op, adaptor.getInQreg());
+        return success();
+    }
+};
+
+struct InsertOpArrayBackedPattern : public OpConversionPattern<InsertOp> {
     using OpConversionPattern::OpConversionPattern;
 
     LogicalResult matchAndRewrite(InsertOp op, InsertOpAdaptor adaptor,
@@ -1157,7 +1169,8 @@ struct SetBasisStateOpPattern : public OpConversionPattern<SetBasisStateOp> {
 namespace catalyst {
 namespace quantum {
 
-void populateQIRConversionPatterns(TypeConverter &typeConverter, RewritePatternSet &patterns)
+void populateQIRConversionPatterns(TypeConverter &typeConverter, RewritePatternSet &patterns,
+                                   bool useArrayBackedRegisters)
 {
     patterns.add<RTBasedPattern<InitializeOp>>(typeConverter, patterns.getContext());
     patterns.add<RTBasedPattern<FinalizeOp>>(typeConverter, patterns.getContext());
@@ -1169,7 +1182,12 @@ void populateQIRConversionPatterns(TypeConverter &typeConverter, RewritePatternS
     patterns.add<DeallocOpPattern>(typeConverter, patterns.getContext());
     patterns.add<DeallocQubitOpPattern>(typeConverter, patterns.getContext());
     patterns.add<ExtractOpPattern>(typeConverter, patterns.getContext());
-    patterns.add<InsertOpPattern>(typeConverter, patterns.getContext());
+    if (useArrayBackedRegisters) {
+        patterns.add<InsertOpArrayBackedPattern>(typeConverter, patterns.getContext());
+    }
+    else {
+        patterns.add<InsertOpDefaultPattern>(typeConverter, patterns.getContext());
+    }
     patterns.add<CustomOpPattern>(typeConverter, patterns.getContext());
     patterns.add<MultiRZOpPattern>(typeConverter, patterns.getContext());
     patterns.add<PCPhaseOpPattern>(typeConverter, patterns.getContext());
