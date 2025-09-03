@@ -20,7 +20,6 @@
 
 #include "Catalyst/IR/CatalystOps.h"
 #include "Catalyst/Transforms/BufferizableOpInterfaceImpl.h"
-#include <mlir/IR/BuiltinAttributes.h>
 
 using namespace mlir;
 using namespace catalyst;
