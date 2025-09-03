@@ -1480,11 +1480,9 @@ def trace_quantum_function(
                 meas_results = tree_unflatten(meas_trees, meas_tracers)
 
                 # TODO: Allow the user to return whatever types they specify.
-                if tracing_mode == TracingMode.TRANSFORM:
-                    if len(meas_results) == 1:
-                        transformed_results.append(meas_results[0])
-                    else:
-                        transformed_results.append(tuple(meas_results))
+                if tracing_mode == TracingMode.TRANSFORM and isinstance(meas_results, list):
+                    result = meas_results[0] if len(meas_results) == 1 else tuple(meas_results)
+                    transformed_results.append(result)
                 else:
                     transformed_results.append(meas_results)
 
