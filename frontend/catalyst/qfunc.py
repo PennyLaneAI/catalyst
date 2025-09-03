@@ -288,7 +288,7 @@ def _process_measurements_without_mcm(cpy_tape, out, snapshots, shot_vector):
         new_out.append(processed_result)
         idx += 1
 
-    return (snapshots, tuple(new_out)) if snapshots is not None else tuple(new_out)
+    return (snapshots, tuple(new_out)) if snapshots else tuple(new_out)
 
 
 # pylint: disable=protected-access,no-member,not-callable
@@ -413,5 +413,6 @@ def dynamic_one_shot(qnode, **kwargs):
             out = (out[0], tree_unflatten(out_tree_expected[1], out[1]))
         else:
             out = tree_unflatten(out_tree_expected[0], out)
+        return out
 
     return one_shot_wrapper
