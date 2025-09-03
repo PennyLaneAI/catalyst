@@ -100,8 +100,8 @@ def _get_total_shots(qnode):
 
 def _is_one_shot_compatible_device(qnode):
     device_name = qnode.device.name
-    cuda_devices = {"softwareq.qpp", "nvidia.custatevec", "nvidia.cutensornet"}
-    return device_name not in cuda_devices
+    exclude_devices = {"softwareq.qpp", "nvidia.custatevec", "nvidia.cutensornet", "oqd"}
+    return device_name not in exclude_devices
 
 
 def configure_mcm_and_try_one_shot(qnode, args, kwargs):
