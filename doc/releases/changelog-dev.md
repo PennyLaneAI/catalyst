@@ -6,6 +6,11 @@
   [(#1993)](https://github.com/PennyLaneAI/catalyst/pull/1993)
   [(#2011)](https://github.com/PennyLaneAI/catalyst/pull/2011)
 
+* A new pass `--t-layer-reduction` has been added to reduce the depth and number of non-Clifford PPR
+  operations by commuting adjacent PPRs and finding possible PPRs that can be merged.
+  For more details, see the Figure 6 in [A Game of Surface Code](https://arXiv:1808.02892v3) paper.
+  [(#1975)](https://github.com/PennyLaneAI/catalyst/pull/1975)
+
 * Catalyst now provides native support for `SingleExcitation`, `DoubleExcitation`,
   and `PCPhase` on compatible devices like Lightning simulators.
   This enhancement avoids unnecessary gate decomposition,
@@ -26,6 +31,11 @@
   ```
 
 <h3>Improvements 🛠</h3>
+
+* A new pass `--partition-layers` has been added to group PPR/PPM operations into `qec.layer`
+  operations based on qubit interactive and commutativity, enabling circuit analysis and
+  potentially to support parallel execution.
+  [(#1951)](https://github.com/PennyLaneAI/catalyst/pull/1951)
 
 * Added a new JAX primitive to capture and compile the decomposition rule
   definitions to MLIR. `decomposition_rule` is the decorator integrated
@@ -70,6 +80,7 @@
   ```pycon
   %0 = transform.apply_registered_pass "some-pass" with options = {"an-option" = true, "maxValue" = 1 : i64, "multi-word-option" = 1 : i64}
   ```
+
 * Added checks to raise an error when the input qubits to the multi-qubit gates in the runtime CAPI are not all distinct. 
   [(#2006)](https://github.com/PennyLaneAI/catalyst/pull/2006).
 
@@ -78,6 +89,7 @@
 
 * A new jax primitive `qdealloc_qb_p` is available for single qubit deallocations.
   [(#2005)](https://github.com/PennyLaneAI/catalyst/pull/2005)
+
 
 <h3>Breaking changes 💔</h3>
 
@@ -146,6 +158,7 @@ operation `DeviceInitOp`, and the runtime CAPI function `__catalyst__rt__device_
 
 * Update imports for noise transforms from `pennylane.transforms` to `pennylane.noise`.
   [(#1918)](https://github.com/PennyLaneAI/catalyst/pull/1918)
+  [(#2020)](https://github.com/PennyLaneAI/catalyst/pull/2020)
 
 * Improve error message for quantum subroutines when used outside a quantum context.
   [(#1932)](https://github.com/PennyLaneAI/catalyst/pull/1932)
@@ -233,6 +246,7 @@ David Ittah,
 Christina Lee,
 Joseph Lee,
 Andrija Paurevic,
+Ritu Thombre,
 Roberto Turrado,
 Paul Haochen Wang,
 Jake Zaia.

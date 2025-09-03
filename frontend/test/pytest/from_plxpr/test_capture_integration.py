@@ -1647,7 +1647,7 @@ def test_ctrl_transform_integration(separate_funcs):
         qml.RX(2 * x, wires=3)
 
     @qml.qjit
-    @qml.qnode(qml.device("lightning.qubit", wires=4), autograph=False)
+    @qml.qnode(qml.device("lightning.qubit", wires=4))
     def c(x, y):
         qml.X(1)
         if separate_funcs:

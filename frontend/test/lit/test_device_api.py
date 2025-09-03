@@ -39,8 +39,8 @@ class CustomDevice(Device):
 
     config_filepath = CONFIG_CUSTOM_DEVICE
 
-    def __init__(self, wires, shots=1024):
-        super().__init__(wires=wires, shots=shots)
+    def __init__(self, wires):
+        super().__init__(wires=wires)
 
     @staticmethod
     def get_c_interface():
@@ -74,9 +74,10 @@ def test_circuit():
     # CHECK:   [[capacity:%.+]] = arith.constant 2 : i64
     # CHECK:   [[shots:%.+]] = arith.constant 2048 : i64
     # CHECK:   quantum.device capacity([[capacity]]) shots([[shots]]) ["[[PATH:.*]]librtd_null_qubit.{{so|dylib}}", "Custom", "{}"]
-    dev = CustomDevice(wires=2, shots=2048)
+    dev = CustomDevice(wires=2)
 
     @qjit(target="mlir")
+    @qml.set_shots(2048)
     @qml.qnode(device=dev)
     def circuit():
         # CHECK:   quantum.custom "Hadamard"
@@ -101,9 +102,10 @@ def test_preprocess():
     # CHECK:   [[capacity:%.+]] = arith.constant 2 : i64
     # CHECK:   [[shots:%.+]] = arith.constant 2048 : i64
     # CHECK:   quantum.device capacity([[capacity]]) shots([[shots]]) ["[[PATH:.*]]librtd_null_qubit.{{so|dylib}}", "Custom", "{}"]
-    dev = CustomDevice(wires=2, shots=2048)
+    dev = CustomDevice(wires=2)
 
     @qjit(target="mlir")
+    @qml.set_shots(2048)
     @qml.qnode(device=dev)
     def circuit_split():
         qml.Hadamard(wires=0)
