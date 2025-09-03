@@ -16,7 +16,10 @@
 
 #include "llvm/ADT/SetVector.h"
 
+#include "mlir/IR/PatternMatch.h"
+
 #include "QEC/IR/QECDialect.h"
+#include "QEC/IR/QECOpInterfaces.h"
 #include "QEC/Transforms/Patterns.h"
 
 using namespace mlir;
@@ -70,7 +73,15 @@ struct PauliStringWrapper {
     PauliStringWrapper &operator=(const PauliStringWrapper &data) = delete;
     PauliStringWrapper &operator=(PauliStringWrapper &&data) = delete;
 
+    bool operator==(const PauliStringWrapper &rhs) const
+    {
+        return (this->get_pauli_word() == rhs.get_pauli_word()) &&
+               (this->isNegative() == rhs.isNegative());
+    }
+    bool operator!=(const PauliStringWrapper &rhs) const { return !(*this == rhs); }
+
     static PauliStringWrapper from_pauli_word(const PauliWord &pauliWord);
+    static PauliStringWrapper from_qec_op(QECOpInterface op);
 
     bool isNegative() const;
     bool isImaginary() const;
@@ -112,10 +123,12 @@ using PauliWordPair = std::pair<PauliStringWrapper, PauliStringWrapper>;
  * @param op QECOpInterface
  * @return PauliWord of the expanded pauliWord
  */
-template <typename T>
-PauliWord expandPauliWord(const llvm::SetVector<Value> &operands, const T &inOutOperands,
-                          QECOpInterface op);
+template <typename T, typename U>
+PauliWord expandPauliWord(const T &operands, const U &inOutOperands, QECOpInterface op);
 
+// Explicit extern to ensure a single instantiation is emitted in the .cpp
+extern template PauliWord expandPauliWord<llvm::SetVector<mlir::Value>, std::vector<mlir::Value>>(
+    const llvm::SetVector<mlir::Value> &, const std::vector<mlir::Value> &, QECOpInterface);
 /**
  * @brief Normalize the qubits of the two operations.
  *        The goal is to normalize the operations of the two operations to the same order and
@@ -134,6 +147,8 @@ PauliWord expandPauliWord(const llvm::SetVector<Value> &operands, const T &inOut
  * @return PauliWordPair of the normalized pair of PauliStringWrapper
  */
 PauliWordPair normalizePPROps(QECOpInterface lhs, QECOpInterface rhs);
+PauliWordPair normalizePPROps(QECOpInterface lhs, QECOpInterface rhs, ValueRange lhsQubits,
+                              ValueRange rhsQubits);
 
 // Remove Identity from the op's Pauli product and corresponding qubits from the list/
 // The size of op.pauliProduct and qubits is assumed to be the same.
@@ -172,6 +187,10 @@ bool isNoSizeLimit(size_t MaxPauliSize);
 
 // Combine the size check logic in one place
 bool exceedPauliSizeLimit(size_t pauliSize, size_t MaxPauliSize);
+
+// Check if the two Pauli string are the same
+bool operator==(const PauliWord &lhs, const PauliWord &rhs);
+bool operator!=(const PauliWord &lhs, const PauliWord &rhs);
 
 } // namespace qec
 } // namespace catalyst
