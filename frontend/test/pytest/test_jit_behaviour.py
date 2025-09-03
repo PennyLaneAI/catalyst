@@ -55,7 +55,7 @@ def f_jit_builder(backend, wires=1, shots=1000):
 
     @qjit
     @qml.set_shots(shots)
-    @qml.qnode(qml.device(backend, wires=wires))
+    @qml.qnode(qml.device(backend, wires=wires), mcm_method="one-shot")
     def f(x):
         qml.RY(x, wires=0)
         return measure(wires=0)
