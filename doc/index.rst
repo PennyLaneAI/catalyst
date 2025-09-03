@@ -66,7 +66,6 @@ Catalyst
 
 .. toctree::
    :maxdepth: 2
-   :titlesonly:
    :hidden:
 
    dev/installation
