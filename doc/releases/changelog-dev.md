@@ -149,6 +149,7 @@
 
 * Update imports for noise transforms from `pennylane.transforms` to `pennylane.noise`.
   [(#1918)](https://github.com/PennyLaneAI/catalyst/pull/1918)
+  [(#2020)](https://github.com/PennyLaneAI/catalyst/pull/2020)
 
 * Improve error message for quantum subroutines when used outside a quantum context.
   [(#1932)](https://github.com/PennyLaneAI/catalyst/pull/1932)
