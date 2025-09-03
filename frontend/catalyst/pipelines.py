@@ -84,6 +84,7 @@ class CompileOptions:
             - ``False`` or ``0`` or ``"none"`` (default): No intermediate files are kept.
             - ``True`` or ``1`` or ``"pipeline"``: Intermediate files are saved after each pipeline.
             - ``2`` or ``"pass"``: Intermediate files are saved after each pass.
+        use_nameloc (Optional[bool]): If ``True``, add function parameter names to the IR as name locations.
         pipelines (Optional[List[Tuple[str,List[str]]]]): A list of tuples. The first entry of the
             tuple corresponds to the name of a pipeline. The second entry of the tuple corresponds
             to a list of MLIR passes.
@@ -115,6 +116,7 @@ class CompileOptions:
     logfile: Optional[TextIOWrapper] = sys.stderr
     target: Optional[str] = "binary"
     keep_intermediate: Optional[Union[str, int, bool, KeepIntermediateLevel]] = False
+    use_nameloc: Optional[bool] = False
     pipelines: Optional[List[Any]] = None
     autograph: Optional[bool] = False
     autograph_include: Optional[Iterable[str]] = ()

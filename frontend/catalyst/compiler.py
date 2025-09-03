@@ -348,6 +348,9 @@ def _options_to_cli_flags(options):
     if options.keep_intermediate >= KeepIntermediateLevel.PASS:
         extra_args += ["--save-ir-after-each=pass"]
 
+    if options.use_nameloc:
+        extra_args += ["-mlir-use-nameloc-as-prefix"]
+
     if options.verbose:
         extra_args += ["--verbose"]
 

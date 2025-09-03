@@ -85,6 +85,7 @@ def qjit(
     async_qnodes=False,
     target="binary",
     keep_intermediate=False,
+    use_nameloc=False,
     verbose=False,
     logfile=None,
     pipelines=None,
@@ -127,6 +128,7 @@ def qjit(
             - :attr:`~.QJIT.mlir`: MLIR representation after canonicalization
             - :attr:`~.QJIT.mlir_opt`: MLIR representation after optimization
             - :attr:`~.QJIT.qir`: QIR in LLVM IR form
+        use_nameloc (bool): If ``True``, function parameter names are added to the IR as name locations.
         verbose (bool): If ``True``, the tools and flags used by Catalyst behind the scenes are
             printed out.
         logfile (Optional[TextIOWrapper]): File object to write verbose messages to (default -
@@ -779,7 +781,8 @@ class QJIT(CatalystCallable):
             Tuple[ir.Module, str]: the in-memory MLIR module and its string representation
         """
 
-        mlir_module, ctx = lower_jaxpr_to_mlir(self.jaxpr, self.__name__)
+        arg_names = [p.name for p in inspect.signature(self.original_function).parameters.values()]
+        mlir_module, ctx = lower_jaxpr_to_mlir(self.jaxpr, self.__name__, arg_names)
 
         # Inject Runtime Library-specific functions (e.g. setup/teardown).
         inject_functions(mlir_module, ctx, self.compile_options.seed)
