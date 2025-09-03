@@ -227,8 +227,8 @@
   configured to allow for the insertion of a qubit into an arbitrary position within a register.
   [(#2000)](https://github.com/PennyLaneAI/catalyst/pull/2000)
 
-  To enable this feature, configure the pass pipeline to set the `use-array-backed-registers`
-  option of the `convert-quantum-to-llvm` pass to `true`. For example,
+  This feature is disabled by default. To enable it, configure the pass pipeline to set the
+  `use-array-backed-registers` option of the `convert-quantum-to-llvm` pass to `true`. For example,
 
   ```console
   $ quantum-opt --pass-pipeline="builtin.module(convert-quantum-to-llvm{use-array-backed-registers=true})"
