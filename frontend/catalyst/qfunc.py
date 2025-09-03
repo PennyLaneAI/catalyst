@@ -116,10 +116,16 @@ def configure_mcm_and_try_one_shot(qnode, args, kwargs):
         uses_measurements_from_samples = uses_transform(qnode, "measurements_from_samples")
         uses_measurements_from_counts = uses_transform(qnode, "measurements_from_counts")
 
+        exclude_device = ["cudaq"]
+
         # For cases that user are not tend to executed with one-shot, and facing measurement
         # transform, fallback to single-branch-statistics
         if (
-            (uses_measurements_from_samples or uses_measurements_from_counts)
+            (
+                uses_measurements_from_samples
+                or uses_measurements_from_counts
+                or qnode.device.name in exclude_device
+            )
             and user_specified_mcm_method is None
             and mcm_config.mcm_method == "one-shot"
         ):
