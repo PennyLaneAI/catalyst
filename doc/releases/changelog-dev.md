@@ -86,6 +86,8 @@
 * A new jax primitive `qdealloc_qb_p` is available for single qubit deallocations.
   [(#2005)](https://github.com/PennyLaneAI/catalyst/pull/2005)
 
+* Changed the attribute of `number_original_arg` in `CustomCallOp` from dense array to integer.
+  [(#2022)](https://github.com/PennyLaneAI/catalyst/pull/2022)
 
 <h3>Breaking changes 💔</h3>
 
@@ -233,6 +235,7 @@ Joey Carter,
 Yushao Chen,
 Sengthai Heng,
 David Ittah,
+Jeffrey Kam,
 Christina Lee,
 Joseph Lee,
 Andrija Paurevic,
