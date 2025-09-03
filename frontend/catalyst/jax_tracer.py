@@ -1481,7 +1481,6 @@ def trace_quantum_function(
 
                 # TODO: Allow the user to return whatever types they specify.
                 if tracing_mode == TracingMode.TRANSFORM:
-                    assert isinstance(meas_results, list)
                     if len(meas_results) == 1:
                         transformed_results.append(meas_results[0])
                     else:
