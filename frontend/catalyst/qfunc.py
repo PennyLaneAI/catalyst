@@ -98,6 +98,12 @@ def _get_total_shots(qnode):
     return shots
 
 
+def _is_one_shot_compatible_device(qnode):
+    device_name = qnode.device.name
+    cuda_devices = {"softwareq.qpp", "nvidia.custatevec", "nvidia.cutensornet"}
+    return device_name not in cuda_devices
+
+
 def configure_mcm_and_try_one_shot(qnode, args, kwargs):
     """Configure mid-circuit measurement settings and handle one-shot execution."""
     dynamic_one_shot_called = getattr(qnode, "_dynamic_one_shot_called", False)
@@ -116,15 +122,13 @@ def configure_mcm_and_try_one_shot(qnode, args, kwargs):
         uses_measurements_from_samples = uses_transform(qnode, "measurements_from_samples")
         uses_measurements_from_counts = uses_transform(qnode, "measurements_from_counts")
 
-        exclude_device = ["cudaq"]
-
         # For cases that user are not tend to executed with one-shot, and facing measurement
         # transform, fallback to single-branch-statistics
         if (
             (
                 uses_measurements_from_samples
                 or uses_measurements_from_counts
-                or qnode.device.name in exclude_device
+                or not _is_one_shot_compatible_device(qnode)
             )
             and user_specified_mcm_method is None
             and mcm_config.mcm_method == "one-shot"
