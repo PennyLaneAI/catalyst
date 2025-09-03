@@ -219,7 +219,6 @@ module @param_rxry {
     return %out_qubits_1 : !quantum.bit
   }
 }
-
 // -----
 
 // Test recursive and qreg-based gate decomposition
@@ -234,6 +233,9 @@ module @qreg_base_circuit {
       // CHECK: [[REG:%.+]] = quantum.alloc( 1) : !quantum.reg
       %0 = quantum.alloc( 1) : !quantum.reg
 
+      // CHECK: [[EXTRACT_QUBIT:%.+]] = quantum.extract [[REG]][ 0] : !quantum.reg -> !quantum.bit
+      // CHECK: [[MRES:%.+]], [[OUT_QUBIT:%.+]] = quantum.measure [[EXTRACT_QUBIT]] : i1, !quantum.bit
+      // CHECK: [[REG1:%.+]] = quantum.insert [[REG]][ 0], [[OUT_QUBIT]] : !quantum.reg, !quantum.bit
       // CHECK: [[COMPARE:%.+]] = stablehlo.compare  NE, [[CST_2]], [[CST_0]],  FLOAT : (tensor<f64>, tensor<f64>) -> tensor<i1>
       // CHECK: [[EXTRACTED:%.+]] = tensor.extract [[COMPARE]][] : tensor<i1>
       // CHECK: [[CONDITIONAL:%.+]] = scf.if [[EXTRACTED]] -> (!quantum.reg) {
@@ -244,15 +246,15 @@ module @qreg_base_circuit {
       // CHECK:   [[SLICE2:%.+]] = stablehlo.slice [[FROM_ELEMENTS]] [0:1] : (tensor<1xi64>) -> tensor<1xi64>
       // CHECK:   [[RESHAPE2:%.+]] = stablehlo.reshape [[SLICE2]] : (tensor<1xi64>) -> tensor<i64>
       // CHECK:   [[EXTRACTED_4:%.+]] = tensor.extract [[RESHAPE2]][] : tensor<i64>
-      // CHECK:   [[EXTRACT1:%.+]] = quantum.extract [[REG]][[[EXTRACTED_4]]] : !quantum.reg -> !quantum.bit
+      // CHECK:   [[EXTRACT1:%.+]] = quantum.extract [[REG1]][[[EXTRACTED_4]]] : !quantum.reg -> !quantum.bit
       // CHECK:   [[RZ1:%.+]] = quantum.custom "RZ"([[CST]]) [[EXTRACT1]] : !quantum.bit
-      // CHECK:   [[INSERT1:%.+]] = quantum.insert [[REG]][[[EXTRACTED_4]]], [[RZ1]] : !quantum.reg, !quantum.bit
+      // CHECK:   [[INSERT1:%.+]] = quantum.insert [[REG1]][[[EXTRACTED_4]]], [[RZ1]] : !quantum.reg, !quantum.bit
       // CHECK:   [[EXTRACT2:%.+]] = quantum.extract [[INSERT1]][[[EXTRACTED_4]]] : !quantum.reg -> !quantum.bit
       // CHECK:   [[RZ2:%.+]] = quantum.custom "RZ"([[CST]]) [[EXTRACT2]] : !quantum.bit
       // CHECK:   [[INSERT2:%.+]] = quantum.insert [[INSERT1]][[[EXTRACTED_4]]], [[RZ2]] : !quantum.reg, !quantum.bit
       // CHECK:   scf.yield [[INSERT2]] : !quantum.reg
       // CHECK: } else {
-      // CHECK:   scf.yield [[REG]] : !quantum.reg
+      // CHECK:   scf.yield [[REG1]] : !quantum.reg
       // CHECK: }
       // CHECK-NOT: quantum.custom "Test"
       %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
@@ -276,19 +278,22 @@ module @qreg_base_circuit {
     // CHECK-NOT: func.func private @Test_rule_1
     func.func private @Test_rule_1(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<1xi64>) -> !quantum.reg {
       %cst = stablehlo.constant dense<0.000000e+00> : tensor<f64>
+      %10 = quantum.extract %arg0[ 0] : !quantum.reg -> !quantum.bit
+      %mres, %out_qubit = quantum.measure %10 : i1, !quantum.bit
+      %11 = quantum.insert %arg0[ 0], %out_qubit : !quantum.reg, !quantum.bit
       %0 = stablehlo.compare  NE, %arg1, %cst,  FLOAT : (tensor<f64>, tensor<f64>) -> tensor<i1>
       %extracted = tensor.extract %0[] : tensor<i1>
       %1 = scf.if %extracted -> (!quantum.reg) {
         %2 = stablehlo.slice %arg2 [0:1] : (tensor<1xi64>) -> tensor<1xi64>
         %3 = stablehlo.reshape %2 : (tensor<1xi64>) -> tensor<i64>
         %extracted_0 = tensor.extract %3[] : tensor<i64>
-        %4 = quantum.extract %arg0[%extracted_0] : !quantum.reg -> !quantum.bit
+        %4 = quantum.extract %11[%extracted_0] : !quantum.reg -> !quantum.bit
         %extracted_1 = tensor.extract %arg1[] : tensor<f64>
         %out_qubits = quantum.custom "RzDecomp"(%extracted_1) %4 : !quantum.bit
         %5 = stablehlo.slice %arg2 [0:1] : (tensor<1xi64>) -> tensor<1xi64>
         %6 = stablehlo.reshape %5 : (tensor<1xi64>) -> tensor<i64>
         %extracted_2 = tensor.extract %3[] : tensor<i64>
-        %7 = quantum.insert %arg0[%extracted_2], %out_qubits : !quantum.reg, !quantum.bit
+        %7 = quantum.insert %11[%extracted_2], %out_qubits : !quantum.reg, !quantum.bit
         %extracted_3 = tensor.extract %6[] : tensor<i64>
         %8 = quantum.extract %7[%extracted_3] : !quantum.reg -> !quantum.bit
         %extracted_4 = tensor.extract %arg1[] : tensor<f64>
@@ -297,7 +302,7 @@ module @qreg_base_circuit {
         %9 = quantum.insert %7[%extracted_6], %out_qubits_5 : !quantum.reg, !quantum.bit
         scf.yield %9 : !quantum.reg
       } else {
-        scf.yield %arg0 : !quantum.reg
+        scf.yield %11 : !quantum.reg
       }
       return %1 : !quantum.reg
     }
