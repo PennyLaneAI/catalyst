@@ -223,10 +223,16 @@
   `qml.Rot` and `qml.CRot`.
   [(#1955)](https://github.com/PennyLaneAI/catalyst/pull/1955)
 
-* Catalyst now supports *array-backed registers*, meaning that `quantum.insert` operations now allow
-  for the insertion of a qubit into an arbitrary position within a register (if the qubit originally
-  at that position has been deallocated).
+* Catalyst now supports *array-backed registers*, meaning that `quantum.insert` operations can be
+  configured to allow for the insertion of a qubit into an arbitrary position within a register.
   [(#2000)](https://github.com/PennyLaneAI/catalyst/pull/2000)
+
+  To enable this feature, configure the pass pipeline to set the `use-array-backed-registers`
+  option of the `convert-quantum-to-llvm` pass to `true`. For example,
+
+  ```console
+  $ quantum-opt --pass-pipeline="builtin.module(convert-quantum-to-llvm{use-array-backed-registers=true})"
+  ```
 
 <h3>Documentation 📝</h3>
 
