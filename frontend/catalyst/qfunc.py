@@ -187,7 +187,7 @@ def _get_shot_vector(qnode):
     )
 
 
-def _get_snapshot_results(tape, out):
+def _get_snapshot_results(mcm_method, tape, out):
     """
     Get the snapshot results from the tape.
     Args:
@@ -199,6 +199,8 @@ def _get_snapshot_results(tape, out):
         measurement_results: The corresponding measurement results.
     """
     # if no snapshot are present, return None, out
+    assert mcm_method == "one-shot"
+
     if not any(isinstance(op, qml.Snapshot) for op in tape.operations):
         return None, out
 
@@ -386,7 +388,7 @@ def dynamic_one_shot(qnode, **kwargs):
         out = list(results)
 
         shot_vector = _get_shot_vector(qnode)
-        snapshots, out = _get_snapshot_results(cpy_tape, out)
+        snapshots, out = _get_snapshot_results(mcm_config.mcm_method, cpy_tape, out)
 
         if has_mcm and len(cpy_tape.measurements) > 0:
             out = parse_native_mid_circuit_measurements(
