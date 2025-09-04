@@ -284,7 +284,7 @@ def register_transform(pl_transform, pass_name, decomposition):
             return self.eval(final_jaxpr.jaxpr, final_jaxpr.consts, *non_const_args)
         else:
             # Apply the corresponding Catalyst pass counterpart
-            self._pass_pipeline = [Pass(catalyst_pass_name)] + self._pass_pipeline
+            self._pass_pipeline.insert(0, Pass(catalyst_pass_name))
             return self.eval(inner_jaxpr, consts, *non_const_args)
 
 
