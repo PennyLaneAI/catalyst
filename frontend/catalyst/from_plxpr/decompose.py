@@ -576,6 +576,7 @@ def _operator_decomposition_gen(
     acceptance_function: Callable[[qml.operation.Operator], bool],
     max_expansion: int | None = None,
     current_depth=0,
+    decomp_graph_solution: DecompGraphSolution | None = None,
 ) -> Generator[qml.operation.Operator]:
     """A generator that yields the next operation that is accepted."""
 
@@ -587,6 +588,12 @@ def _operator_decomposition_gen(
 
     if acceptance_function(op) or max_depth_reached:
         yield op
+    elif decomp_graph_solution is not None and decomp_graph_solution.is_solved_for(op):
+        op_rule = decomp_graph_solution.decomposition(op)
+        with qml.queuing.AnnotatedQueue() as decomposed_ops:
+            op_rule(*op.parameters, wires=op.wires, **op.hyperparameters)
+        decomp = decomposed_ops.queue
+        current_depth += 1
     else:
         decomp = op.decomposition()
         current_depth += 1
@@ -597,6 +604,7 @@ def _operator_decomposition_gen(
             acceptance_function,
             max_expansion=max_expansion,
             current_depth=current_depth,
+            decomp_graph_solution=decomp_graph_solution,
         )
 
 
