@@ -89,6 +89,8 @@
 * A new jax primitive `qdealloc_qb_p` is available for single qubit deallocations.
   [(#2005)](https://github.com/PennyLaneAI/catalyst/pull/2005)
 
+* Changed the attribute of `number_original_arg` in `CustomCallOp` from dense array to integer.
+  [(#2022)](https://github.com/PennyLaneAI/catalyst/pull/2022)
 
 <h3>Breaking changes 💔</h3>
 
@@ -152,6 +154,7 @@
 
 * Update imports for noise transforms from `pennylane.transforms` to `pennylane.noise`.
   [(#1918)](https://github.com/PennyLaneAI/catalyst/pull/1918)
+  [(#2020)](https://github.com/PennyLaneAI/catalyst/pull/2020)
 
 * Improve error message for quantum subroutines when used outside a quantum context.
   [(#1932)](https://github.com/PennyLaneAI/catalyst/pull/1932)
@@ -236,6 +239,7 @@ Joey Carter,
 Yushao Chen,
 Sengthai Heng,
 David Ittah,
+Jeffrey Kam,
 Christina Lee,
 Joseph Lee,
 Andrija Paurevic,
