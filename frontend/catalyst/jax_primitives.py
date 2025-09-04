@@ -936,6 +936,7 @@ def _zne_lowering(ctx, *args, folding, jaxpr, fn):
 #
 # device_init
 #
+# pylint: disable=too-many-arguments, too-many-positional-arguments
 @device_init_p.def_abstract_eval
 def _device_init_abstract_eval(
     capacity, shots, auto_qubit_management, rtd_lib, rtd_name, rtd_kwargs
