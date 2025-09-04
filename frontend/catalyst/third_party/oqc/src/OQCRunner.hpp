@@ -32,7 +32,7 @@ struct OQCRunner {
                               size_t num_qubits, const std::string &kwargs = "") const
         -> std::vector<size_t>
     {
-        DynamicLibraryLoader libLoader(OQC_PY);
+        DynamicLibraryLoader libLoader(OQC_PY, RTLD_LAZY | RTLD_GLOBAL);
 
         using countsImpl_t =
             void (*)(const char *, const char *, size_t, size_t, const char *, void *);
