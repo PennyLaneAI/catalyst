@@ -35,10 +35,12 @@ struct OQCRunner {
         DynamicLibraryLoader libLoader(OQC_PY);
 
         using countsImpl_t =
-            std::vector<size_t> (*)(const char *, const char *, size_t, const char *);
+            void (*)(const char *, const char *, size_t, size_t, const char *, void *);
         auto countsImpl = libLoader.getSymbol<countsImpl_t>("counts");
 
-        return countsImpl(circuit.c_str(), device.c_str(), shots, kwargs.c_str());
+        std::vector<size_t> results;
+        countsImpl(circuit.c_str(), device.c_str(), shots, num_qubits, kwargs.c_str(), &results);
+        return results;
     }
 };
 
