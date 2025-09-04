@@ -24,10 +24,10 @@ from catalyst.passes import (
     commute_ppr,
     disentangle_cnot,
     disentangle_swap,
-    ppm_specs,
     merge_ppr_ppm,
     merge_rotations,
     ppm_compilation,
+    ppm_specs,
     ppr_to_ppm,
     to_ppr,
 )

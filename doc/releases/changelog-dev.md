@@ -89,6 +89,9 @@
 * Changed the attribute of `number_original_arg` in `CustomCallOp` from dense array to integer.
   [(#2022)](https://github.com/PennyLaneAI/catalyst/pull/2022)
 
+* Renaming `get_ppm_specs` to `ppm_specs` and the corresponding results' properties.
+  [(#2031)](https://github.com/PennyLaneAI/catalyst/pull/2031)
+
 <h3>Breaking changes 💔</h3>
 
 * The `shots` property has been removed from `OQDDevice`. The number of shots for a qnode execution is now set directly on the qnode via `qml.set_shots`,
