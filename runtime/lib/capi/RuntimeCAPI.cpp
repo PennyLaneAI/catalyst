@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <algorithm>
 #include <bitset>
 #include <cstdarg>
 #include <cstdlib>
@@ -21,6 +22,7 @@
 #include <stdexcept>
 #include <string_view>
 #include <tuple>
+#include <vector>
 
 #include "mlir/ExecutionEngine/CRunnerUtils.h"
 
@@ -29,6 +31,7 @@
 #include "MemRefUtils.hpp"
 #include "QuantumDevice.hpp"
 #include "Timer.hpp"
+#include "WireLabelMapping.hpp"
 
 #include "RuntimeCAPI.h"
 
@@ -118,6 +121,7 @@ static void autoQubitManagementAllocate(std::vector<QubitIdType> *qubit_vector_p
     qubit_vector_ptr->insert(qubit_vector_ptr->end(), new_qubits_vector->begin(),
                              new_qubits_vector->end());
 }
+
 } // namespace Catalyst::Runtime
 
 extern "C" {
@@ -1036,6 +1040,10 @@ void __catalyst__qis__State(MemRefT_CplxT_double_1d *result, int64_t numQubits, 
 
     if (wires.empty()) {
         getQuantumDevicePtr()->State(view);
+        // Automatic management still treats labels as plain wire addresses
+        if (!RTD_PTR->getQubitManagementMode()) {
+            RemapStateResultWires(result_p->data_aligned, RTD_PTR);
+        }
     }
     else {
         RT_FAIL("Partial State-Vector not supported.");
@@ -1065,6 +1073,10 @@ void __catalyst__qis__Probs(MemRefT_double_1d *result, int64_t numQubits, ...)
 
     if (wires.empty()) {
         getQuantumDevicePtr()->Probs(view);
+        // Automatic management still treats labels as plain wire addresses
+        if (!RTD_PTR->getQubitManagementMode()) {
+            RemapProbsResultWires(result_p->data_aligned, RTD_PTR);
+        }
     }
     else {
         getQuantumDevicePtr()->PartialProbs(view, wires);
@@ -1096,6 +1108,11 @@ void __catalyst__qis__Sample(MemRefT_double_2d *result, int64_t numQubits, ...)
 
     if (wires.empty()) {
         getQuantumDevicePtr()->Sample(view);
+        // Automatic management still treats labels as plain wire addresses
+        if (!RTD_PTR->getQubitManagementMode()) {
+            RemapSampleResultWires(result_p->data_aligned, result_p->sizes[0], result_p->sizes[1],
+                                   RTD_PTR);
+        }
     }
     else {
         getQuantumDevicePtr()->PartialSample(view, wires);
@@ -1129,6 +1146,11 @@ void __catalyst__qis__Counts(PairT_MemRefT_double_int64_1d *result, int64_t numQ
 
     if (wires.empty()) {
         getQuantumDevicePtr()->Counts(eigvals_view, counts_view);
+        // Automatic management still treats labels as plain wire addresses
+        if (!RTD_PTR->getQubitManagementMode()) {
+            RemapCountsResultWires(result_eigvals_p->data_aligned, result_counts_p->data_aligned,
+                                   RTD_PTR);
+        }
     }
     else {
         getQuantumDevicePtr()->PartialCounts(eigvals_view, counts_view, wires);
@@ -1141,8 +1163,22 @@ int64_t __catalyst__rt__array_get_size_1d(QirArray *ptr)
     return qubit_vector_ptr->size();
 }
 
-int8_t *__catalyst__rt__array_get_element_ptr_1d(QirArray *ptr, int64_t idx)
+int8_t *__catalyst__rt__array_get_element_ptr_1d(QirArray *ptr, int64_t label)
 {
+    // Isolate automatic qubit management for now
+    // i.e. automatic management still treats labels are actual addresses
+    // and seeing a label of `5` will keep allocating up until there's 6 qubits
+    // TODO: do we update that behavior too now that we move to
+    // "everything is just a label"?
+    bool isAutoManagement = RTD_PTR->getQubitManagementMode();
+    int64_t idx = 0;
+    if (isAutoManagement) {
+        idx = label;
+    }
+    else {
+        idx = RTD_PTR->resolveWireLabelToIndex(label);
+    }
+
     std::vector<QubitIdType> *qubit_vector_ptr = reinterpret_cast<std::vector<QubitIdType> *>(ptr);
 
     RT_ASSERT(idx >= 0);
@@ -1150,7 +1186,7 @@ int8_t *__catalyst__rt__array_get_element_ptr_1d(QirArray *ptr, int64_t idx)
     error_msg += std::to_string(idx);
 
     if (static_cast<size_t>(idx) >= qubit_vector_ptr->size()) {
-        if (!RTD_PTR->getQubitManagementMode()) {
+        if (!isAutoManagement) {
             RT_FAIL(error_msg.c_str());
         }
         else {

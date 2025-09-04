@@ -18,9 +18,11 @@
 
 #include <cstdio>
 #include <functional>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <random>
+#include <set>
 #include <string>
 #include <string_view>
 #include <tuple>
@@ -169,6 +171,9 @@ class RTDevice {
     uint64_t capacity;
     bool auto_qubit_management;
 
+    uint64_t current_biggest_wire_index = 0;
+    std::map<int64_t, uint64_t> wire_label_to_qirarray_index;
+
     std::unique_ptr<SharedLibraryManager> rtd_dylib{nullptr};
     std::unique_ptr<QuantumDevice> rtd_qdevice{nullptr};
 
@@ -269,6 +274,52 @@ class RTDevice {
     bool getQubitManagementMode() { return auto_qubit_management; }
 
     [[nodiscard]] auto getDeviceStatus() const -> RTDeviceStatus { return status; }
+
+    uint64_t getDeviceCapacity() { return capacity; }
+
+    uint64_t resolveWireLabelToIndex(int64_t label)
+    {
+        if (wire_label_to_qirarray_index.contains(label)) {
+            return wire_label_to_qirarray_index[label];
+        }
+        else {
+            // TODO: check against capacity
+            wire_label_to_qirarray_index[label] = current_biggest_wire_index;
+            return current_biggest_wire_index++;
+        }
+    }
+
+    void fillWireLabelMapUpToCapacity()
+    {
+        if (wire_label_to_qirarray_index.size() == capacity) {
+            return;
+        }
+
+        std::set<uint64_t> unused_indices;
+        for (uint64_t i = 0; i < capacity; i++) {
+            unused_indices.insert(i);
+        }
+        for (auto pair : wire_label_to_qirarray_index) {
+            unused_indices.erase(pair.second);
+        }
+
+        // Should not be used with dynamic allocations
+        // So the labels are just the repermuted indices
+        for (int64_t label = 0; label < static_cast<int64_t>(capacity); label++) {
+            if (!wire_label_to_qirarray_index.contains(label)) {
+                uint64_t popped = *unused_indices.begin();
+                unused_indices.erase(popped);
+                wire_label_to_qirarray_index[label] = popped;
+            }
+        }
+
+        assert(wire_label_to_qirarray_index.size() == capacity);
+    }
+
+    const std::map<int64_t, uint64_t> &getWireLabelMap() const
+    {
+        return wire_label_to_qirarray_index;
+    }
 
     friend std::ostream &operator<<(std::ostream &os, const RTDevice &device)
     {
