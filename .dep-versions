@@ -14,4 +14,4 @@ pennylane=0.43.0.dev45
 
 # For a custom LQ/LK version, update the package version here and at
 # 'doc/requirements.txt'
-lightning=0.43.0.dev24
+lightning=0.43.0.dev25
