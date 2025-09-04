@@ -277,7 +277,7 @@ def _get_shot_vector(qnode):
     )
 
 
-def _get_snapshot_results(tape, out):
+def _get_snapshot_results(mcm_method, tape, out):
     """
     Get the snapshot results from the tape.
     Args:
@@ -289,6 +289,8 @@ def _get_snapshot_results(tape, out):
         measurement_results: The corresponding measurement results.
     """
     # if no snapshot are present, return None, out
+    assert mcm_method == "one-shot"
+
     if not any(isinstance(op, qml.Snapshot) for op in tape.operations):
         return None, out
 
@@ -304,7 +306,9 @@ def _get_snapshot_results(tape, out):
     return processed_snapshots, measurement_results
 
 
-def _reshape_for_shot_vector(result, shot_vector):
+def _reshape_for_shot_vector(mcm_method, result, shot_vector):
+    assert mcm_method == "one-shot"
+
     # Calculate the shape for reshaping based on shot vector
     result_list = []
     start_idx = 0
@@ -322,8 +326,10 @@ def _reshape_for_shot_vector(result, shot_vector):
     return result
 
 
-def _process_terminal_measurements(cpy_tape, out, snapshots, shot_vector):
+def _process_terminal_measurements(mcm_method, cpy_tape, out, snapshots, shot_vector):
     """Process measurements when there are no mid-circuit measurements."""
+    assert mcm_method == "one-shot"
+
     new_out = []
     idx = 0
 
@@ -362,7 +368,7 @@ def _process_terminal_measurements(cpy_tape, out, snapshots, shot_vector):
 
         # Handle shot vector reshaping for SampleMP
         if isinstance(m, SampleMP) and shot_vector is not None:
-            processed_result = _reshape_for_shot_vector(processed_result, shot_vector)
+            processed_result = _reshape_for_shot_vector(mcm_method, processed_result, shot_vector)
 
         new_out.append(processed_result)
         idx += 1
@@ -498,7 +504,7 @@ def dynamic_one_shot(qnode, **kwargs):
         out = list(results)
 
         shot_vector = _get_shot_vector(qnode)
-        snapshots, out = _get_snapshot_results(cpy_tape, out)
+        snapshots, out = _get_snapshot_results(mcm_config.mcm_method, cpy_tape, out)
 
         if has_mcm and len(cpy_tape.measurements) > 0:
             out = parse_native_mid_circuit_measurements(
@@ -507,7 +513,9 @@ def dynamic_one_shot(qnode, **kwargs):
             if len(cpy_tape.measurements) == 1:
                 out = (out,)
         elif len(cpy_tape.measurements) > 0:
-            out = _process_terminal_measurements(cpy_tape, out, snapshots, shot_vector)
+            out = _process_terminal_measurements(
+                mcm_config.mcm_method, cpy_tape, out, snapshots, shot_vector
+            )
 
         out_tree_expected = kwargs.pop("_out_tree_expected", [])
         if snapshots is not None:

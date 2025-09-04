@@ -37,12 +37,12 @@ from catalyst.utils.exceptions import CompileError
 # pylint: disable=too-many-lines
 
 
-def f_aot_builder(backend, mcm_method, wires=1, shots=1000):
+def f_aot_builder(backend, wires=1, shots=1000):
     """Test AOT builder."""
 
     @qjit
     @qml.set_shots(shots)
-    @qml.qnode(qml.device(backend, wires=wires), mcm_method=mcm_method)
+    @qml.qnode(qml.device(backend, wires=wires))
     def f(x: float) -> bool:
         qml.RY(x, wires=0)
         return measure(wires=0)
@@ -50,12 +50,12 @@ def f_aot_builder(backend, mcm_method, wires=1, shots=1000):
     return f
 
 
-def f_jit_builder(backend, mcm_method, wires=1, shots=1000):
+def f_jit_builder(backend, wires=1, shots=1000):
     """Test JIT builder."""
 
     @qjit
     @qml.set_shots(shots)
-    @qml.qnode(qml.device(backend, wires=wires), mcm_method=mcm_method)
+    @qml.qnode(qml.device(backend, wires=wires))
     def f(x):
         qml.RY(x, wires=0)
         return measure(wires=0)
@@ -397,12 +397,11 @@ class TestTypePromotion:
 
 
 class TestCallsiteCompileVsFunctionDefinitionCompile:
-    @pytest.mark.parametrize("mcm_method", ["single-branch-statistics", "one-shot"])
-    def test_equivalence(self, backend, mcm_method):
+    def test_equivalence(self, backend):
         """Test equivalence."""
 
-        f_jit = f_jit_builder(backend, mcm_method)
-        f_aot = f_aot_builder(backend, mcm_method)
+        f_jit = f_jit_builder(backend)
+        f_aot = f_aot_builder(backend)
         f_jit(0.0)
         assert f_jit.mlir == f_aot.mlir
 
@@ -427,8 +426,7 @@ class TestDecorator:
 
 
 class TestCaching:
-    @pytest.mark.parametrize("mcm_method", ["single-branch-statistics", "one-shot"])
-    def test_function_is_cached(self, backend, mcm_method):
+    def test_function_is_cached(self, backend):
         """Test function is cached."""
 
         @qjit
@@ -438,7 +436,7 @@ class TestCaching:
             return measure(wires=0)
 
         compile_and_run_start = timer()
-        f_jit = f_jit_builder(backend, mcm_method)
+        f_jit = f_jit_builder(backend)
         f_jit(0.0)
         compile_and_run_end = timer()
         compile_and_run_time = compile_and_run_end - compile_and_run_start
