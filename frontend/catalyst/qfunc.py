@@ -273,7 +273,6 @@ def _get_snapshot_results(tape, out):
         return None, out
 
     # Snapshots present: out[0] = snapshots, out[1] = measurements
-    assert len(out) == 2
     snapshot_results, measurement_results = out
 
     # Take first shot for each snapshot
@@ -303,58 +302,48 @@ def _reshape_for_shot_vector(result, shot_vector):
     return result
 
 
-def _process_counts_measurement(out, idx, has_snapshots):
-    """Process CountsMP measurement and return the result and updated index."""
-    if isinstance(out[idx], tuple) and len(out[idx]) == 2:
-        # CountsMP result is stored as (keys, counts) tuple
-        keys, counts = out[idx]
-        idx += 1
-    else:
-        keys = out[idx]
-        counts = out[idx + 1]
-        idx += 2
-
-    if has_snapshots:
-        counts_array = jnp.stack(counts, axis=0)
-        aggregated_counts = jnp.sum(counts_array, axis=0)
-        counts_result = (keys, aggregated_counts)
-    else:
-        aggregated_counts = jnp.sum(counts, axis=0)
-        counts_result = (keys[0], aggregated_counts)
-
-    return counts_result, idx
-
-
-def _process_regular_measurement(m, out, idx, shot_vector):
-    """Process measurements and return the result."""
-    result = jnp.squeeze(out[idx])
-    max_ndim = min(len(out[idx].shape), 2)
-    if result.ndim == 1 and max_ndim == 2:
-        result = jnp.expand_dims(result, axis=1)
-
-    # Without MCMs and postselection, all samples are valid for use in MP computation.
-    is_valid = jnp.full((result.shape[0],), True)
-    processed_result = gather_non_mcm(m, result, is_valid, postselect_mode="pad-invalid-samples")
-
-    # Handle shot vector reshaping for SampleMP
-    if isinstance(m, SampleMP) and shot_vector is not None:
-        processed_result = _reshape_for_shot_vector(processed_result, shot_vector)
-
-    return processed_result
-
-
-def _process_measurements_without_mcm(cpy_tape, out, snapshots, shot_vector):
+def _process_terminal_measurements(cpy_tape, out, snapshots, shot_vector):
     """Process measurements when there are no mid-circuit measurements."""
     new_out = []
     idx = 0
 
     for m in cpy_tape.measurements:
         if isinstance(m, CountsMP):
-            counts_result, idx = _process_counts_measurement(out, idx, snapshots is not None)
+            if isinstance(out[idx], tuple) and len(out[idx]) == 2:
+                # CountsMP result is stored as (keys, counts) tuple
+                keys, counts = out[idx]
+                idx += 1
+            else:
+                keys = out[idx]
+                counts = out[idx + 1]
+                idx += 2
+
+            if snapshots is not None:
+                counts_array = jnp.stack(counts, axis=0)
+                aggregated_counts = jnp.sum(counts_array, axis=0)
+                counts_result = (keys, aggregated_counts)
+            else:
+                aggregated_counts = jnp.sum(counts, axis=0)
+                counts_result = (keys[0], aggregated_counts)
+
             new_out.append(counts_result)
             continue
 
-        processed_result = _process_regular_measurement(m, out, idx, shot_vector)
+        result = jnp.squeeze(out[idx])
+        max_ndim = min(len(out[idx].shape), 2)
+        if result.ndim == 1 and max_ndim == 2:
+            result = jnp.expand_dims(result, axis=1)
+
+        # Without MCMs and postselection, all samples are valid for use in MP computation.
+        is_valid = jnp.full((result.shape[0],), True)
+        processed_result = gather_non_mcm(
+            m, result, is_valid, postselect_mode="pad-invalid-samples"
+        )
+
+        # Handle shot vector reshaping for SampleMP
+        if isinstance(m, SampleMP) and shot_vector is not None:
+            processed_result = _reshape_for_shot_vector(processed_result, shot_vector)
+
         new_out.append(processed_result)
         idx += 1
 
@@ -498,7 +487,7 @@ def dynamic_one_shot(qnode, **kwargs):
             if len(cpy_tape.measurements) == 1:
                 out = (out,)
         elif len(cpy_tape.measurements) > 0:
-            out = _process_measurements_without_mcm(cpy_tape, out, snapshots, shot_vector)
+            out = _process_terminal_measurements(cpy_tape, out, snapshots, shot_vector)
 
         out_tree_expected = kwargs.pop("_out_tree_expected", [])
         if snapshots is not None:
