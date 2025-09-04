@@ -273,7 +273,7 @@ test_decompose_to_matrix()
 def test_decomposition_rule_wire_param():
     """Test decomposition rule with passing a parameter that is a wire/integer"""
 
-    @decomposition_rule
+    @decomposition_rule(is_qreg=False)
     def Hadamard0(wire: WiresLike):
         qml.Hadamard(wire)
 
@@ -303,7 +303,7 @@ test_decomposition_rule_wire_param()
 def test_decomposition_rule_gate_param_param():
     """Test decomposition rule with passing a regular parameter"""
 
-    @decomposition_rule(num_params=1)
+    @decomposition_rule(is_qreg=False)
     def RX_on_wire_0(param: TensorLike, w0: WiresLike):
         qml.RX(param, wires=w0)
 
@@ -336,7 +336,7 @@ def test_multiple_decomposition_rules():
     @decomposition_rule
     def identity(): ...
 
-    @decomposition_rule(num_params=1)
+    @decomposition_rule(is_qreg=True, num_params=1)
     def all_wires_rx(param: TensorLike, w0: WiresLike, w1: WiresLike, w2: WiresLike):
         qml.RX(param, wires=w0)
         qml.RX(param, wires=w1)
@@ -409,7 +409,7 @@ def test_decomposition_rule_expanded_wires():
         qml.RX(param, wires=wires[1])
         qml.RX(param, wires=wires[2])
 
-    @decomposition_rule(num_params=1, is_qreg=False)
+    @decomposition_rule(is_qreg=False, num_params=1)
     def expanded_wires_rule(param: TensorLike, w1, w2, w3):
         shaped_wires_rule(param, [w1, w2, w3])
 

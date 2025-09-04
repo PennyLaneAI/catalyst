@@ -29,15 +29,19 @@ from functools import partial
 import jax
 import pennylane as qml
 
+from pennylane.decomposition.collect_resource_ops import CollectResourceOps
+
 # Support ctrl ops in decomposition (adapted from PL's DecomposeInterpreter)
 from pennylane.capture.primitives import ctrl_transform_prim
 
 # GraphSolutionInterpreter:
 from pennylane.decomposition import DecompositionGraph
-from pennylane.decomposition.collect_resource_ops import CollectResourceOps
 from pennylane.decomposition.decomposition_graph import DecompGraphSolution
 from pennylane.decomposition.utils import translate_op_alias
 from pennylane.operation import Operator
+
+
+CollectResourceOps = CollectResourceOps
 
 
 # pylint: disable=too-many-instance-attributes
@@ -269,7 +273,6 @@ def _(self, *invals, n_control, jaxpr, control_values, work_wires, n_consts):
     jaxpr = jax.make_jaxpr(wrapper)(*args)
     return self.eval(jaxpr.jaxpr, jaxpr.consts, *args)
 
-
 class GraphSolutionInterpreter(qml.capture.PlxprInterpreter):
     """Interpreter for getting the decomposition graph solution
     from a jaxpr when program capture is enabled.
@@ -280,212 +283,94 @@ class GraphSolutionInterpreter(qml.capture.PlxprInterpreter):
     def __init__(
         self,
         *,
+        operations,
         gate_set=None,
         stopping_condition=None,
-        max_expansion=None,
         fixed_decomps=None,
         alt_decomps=None,
     ):  # pylint: disable=too-many-arguments
 
-        self.max_expansion = max_expansion
-        self._current_depth = 0
-
-        if not qml.decomposition.enabled_graph() and (fixed_decomps or alt_decomps):
+        if not qml.decomposition.enabled_graph():
             raise TypeError(
-                "The keyword arguments fixed_decomps and alt_decomps are only available with "
-                "the new experimental graph-based decomposition system. Use qml.decomposition.enable_graph() "
-                "to enable the new system."
+                "The GraphSolutionInterpreter can only be used when graph-based decomposition is enabled."
             )
 
-        self._decomp_graph_solution = None
+        self._operations = operations
+        self._decomp_graph_solution = {}
         self._target_gate_names = None
         self._fixed_decomps, self._alt_decomps = fixed_decomps, alt_decomps
-
-        # We use a ChainMap to store the environment frames, which allows us to push and pop
-        # environments without copying the interpreter instance when we evaluate a jaxpr of
-        # a dynamic decomposition. The name is different from the _env in the parent class
-        # (a dictionary) to avoid confusion.
-        self._env_map = ChainMap()
 
         gate_set, stopping_condition = _resolve_gate_set(gate_set, stopping_condition)
         self._gate_set = gate_set
         self._stopping_condition = stopping_condition
 
-    def setup(self) -> None:
-        """Setup the environment for the interpreter by pushing a new environment frame."""
-
-        # This is the local environment for the jaxpr evaluation, on the top of the stack,
-        # from which the interpreter reads and writes variables.
-        # ChainMap writes to the first dictionary in the chain by default.
-        self._env_map = self._env_map.new_child()
-
-    def cleanup(self) -> None:
-        """Cleanup the environment by popping the top-most environment frame."""
-
-        # We delete the top-most environment frame after the evaluation is done.
-        self._env_map = self._env_map.parents
-
-    def read(self, var):
-        """Extract the value corresponding to a variable."""
-        return var.val if isinstance(var, jax.extend.core.Literal) else self._env_map[var]
-
-    def stopping_condition(self, op: qml.operation.Operator) -> bool:
-        """Function to determine whether an operator needs to be decomposed or not.
+    # pylint: disable=too-many-branches
+    def eval(self, jaxpr: "jax.extend.core.Jaxpr", consts: Sequence, *args) -> list:
+        """Evaluate a jaxpr.
 
         Args:
-            op (qml.operation.Operator): Operator to check.
+            jaxpr (jax.extend.core.Jaxpr): the jaxpr to evaluate
+            consts (list[TensorLike]): the constant variables for the jaxpr
+            *args (tuple[TensorLike]): The arguments for the jaxpr.
 
         Returns:
-            bool: Whether ``op`` is valid or needs to be decomposed. ``True`` means
-                that the operator does not need to be decomposed.
+            list[TensorLike]: the results of the execution.
+
         """
-
-        # If the new graph-based decomposition is enabled,
-        # we don't rely on the has_decomposition attribute.
-        if qml.decomposition.enabled_graph():
-            return self._stopping_condition(op)
-
-        if not op.has_decomposition:
-            if not self._stopping_condition(op):
-                warnings.warn(
-                    f"Operator {op.name} does not define a decomposition and was not "
-                    f"found in the target gate set. To remove this warning, add the operator "
-                    f"name ({op.name}) or type ({type(op)}) to the gate set.",
-                    UserWarning,
-                )
-            return True
-
-        return self._stopping_condition(op)
-
-    def decompose_operation(self, op: qml.operation.Operator):
-        """Decompose a PennyLane operation instance if it does not satisfy the
-        provided gate set.
-
-        Args:
-            op (Operator): a pennylane operator instance
-
-        This method is only called when the operator's output is a dropped variable,
-        so the output will not affect later equations in the circuit.
-
-        See also: :meth:`~.interpret_operation_eqn`, :meth:`~.interpret_operation`.
-        """
-
-        if self._stopping_condition(op):
-            return self.interpret_operation(op)
-
-        max_expansion = (
-            self.max_expansion - self._current_depth if self.max_expansion is not None else None
-        )
-
-        with qml.capture.pause():
-            decomposition = list(
-                _operator_decomposition_gen(
-                    op,
-                    self.stopping_condition,
-                    max_expansion=max_expansion,
-                    decomp_graph_solution=self._decomp_graph_solution,
-                )
-            )
-
-        return [self.interpret_operation(decomp_op) for decomp_op in decomposition]
-
-    def _evaluate_jaxpr_decomposition(self, op: qml.operation.Operator):
-        """Creates and evaluates a Jaxpr of the plxpr decomposition of an operator."""
-
-        if self._stopping_condition(op):
-            return self.interpret_operation(op)
-
-        if self.max_expansion is not None and self._current_depth >= self.max_expansion:
-            return self.interpret_operation(op)
-
-        if qml.decomposition.enabled_graph() and self._decomp_graph_solution.is_solved_for(op):
-
-            rule = self._decomp_graph_solution.decomposition(op)
-            num_wires = len(op.wires)
-
-            def compute_qfunc_decomposition(*_args, **_kwargs):
-                wires = qml.math.array(_args[-num_wires:], like="jax")
-                rule(*_args[:-num_wires], wires=wires, **_kwargs)
-
-        else:
-            compute_qfunc_decomposition = op.compute_qfunc_decomposition
-
-        args = (*op.parameters, *op.wires)
-
-        jaxpr_decomp = qml.capture.make_plxpr(
-            partial(compute_qfunc_decomposition, **op.hyperparameters)
-        )(*args)
-
-        self._current_depth += 1
-        # We don't need to copy the interpreter here, as the jaxpr of the decomposition
-        # is evaluated with a new environment frame placed on top of the stack.
-        out = self.eval(jaxpr_decomp.jaxpr, jaxpr_decomp.consts, *args)
-        self._current_depth -= 1
-
-        return out
-
-    # pylint: disable=too-many-branches
-    def eval(self, jaxpr: jax.extend.core.Jaxpr, consts: Sequence, *args) -> list:
-        """
-        Evaluates a jaxpr, which can also be generated by a dynamic decomposition.
-
-        Args:
-            jaxpr_decomp (jax.extend.core.Jaxpr): the Jaxpr to evaluate
-            consts (list[TensorLike]): the constant variables for the jaxpr
-            *args: the arguments to use in the evaluation
-        """
-
+        self._env = {}
         self.setup()
 
         for arg, invar in zip(args, jaxpr.invars, strict=True):
-            self._env_map[invar] = arg
+            self._env[invar] = arg
         for const, constvar in zip(consts, jaxpr.constvars, strict=True):
-            self._env_map[constvar] = const
+            self._env[constvar] = const
 
-        if qml.decomposition.enabled_graph() and not self._decomp_graph_solution:
+        if self._operations and not self._decomp_graph_solution:
+ 
+            decomp_graph = DecompositionGraph(
+                self._operations,
+                self._gate_set,
+                fixed_decomps=self._fixed_decomps,
+                alt_decomps=self._alt_decomps,
+            )
 
-            with qml.capture.pause():
+            # Find the efficient pathways to the target gate set
+            solutions = decomp_graph.solve()
 
-                collector = CollectResourceOps()
-                collector.eval(jaxpr, consts, *args)
-                operations = collector.state["ops"]
+            def is_solved_for(op):
+                return op in solutions._all_op_indices and solutions._all_op_indices[op] in solutions._visitor.distances
 
-            if operations:
-                self._decomp_graph_solution = _construct_and_solve_decomp_graph(
-                    operations,
-                    self._gate_set,
-                    self._fixed_decomps,
-                    self._alt_decomps,
-                )
+            for op_node, op_node_idx in solutions._all_op_indices.items():
 
-                # for op, decomp in self._decomp_graph_solution.decompositions():
-                #     print(f"Decomposition for {op}: {decomp}")
+                if is_solved_for(op_node) and op_node_idx in solutions._visitor.predecessors:
+                    d_node_idx = solutions._visitor.predecessors[op_node_idx]
+                    self._decomp_graph_solution[op_node] = solutions._graph[d_node_idx].rule
 
-        for eq in jaxpr.eqns:
+            print("[DEBUG PRINT] Decomposition graph solution:", self._decomp_graph_solution)
 
-            prim_type = getattr(eq.primitive, "prim_type", "")
-            custom_handler = self._primitive_registrations.get(eq.primitive, None)
+
+        for eqn in jaxpr.eqns:
+            primitive = eqn.primitive
+            custom_handler = self._primitive_registrations.get(primitive, None)
 
             if custom_handler:
-
-                invals = [self.read(invar) for invar in eq.invars]
-                outvals = custom_handler(self, *invals, **eq.params)
-
-            elif prim_type == "operator":
-                outvals = self.interpret_operation_eqn(eq)
-            elif prim_type == "measurement":
-                outvals = self.interpret_measurement_eqn(eq)
+                invals = [self.read(invar) for invar in eqn.invars]
+                outvals = custom_handler(self, *invals, **eqn.params)
+            elif getattr(primitive, "prim_type", "") == "operator":
+                outvals = self.interpret_operation_eqn(eqn)
+            elif getattr(primitive, "prim_type", "") == "measurement":
+                outvals = self.interpret_measurement_eqn(eqn)
             else:
-                invals = [self.read(invar) for invar in eq.invars]
-                subfuns, params = eq.primitive.get_bind_params(eq.params)
-                outvals = eq.primitive.bind(*subfuns, *invals, **params)
+                invals = [self.read(invar) for invar in eqn.invars]
+                subfuns, params = primitive.get_bind_params(eqn.params)
+                outvals = primitive.bind(*subfuns, *invals, **params)
 
-            if not eq.primitive.multiple_results:
+            if not primitive.multiple_results:
                 outvals = [outvals]
+            for outvar, outval in zip(eqn.outvars, outvals, strict=True):
+                self._env[outvar] = outval
 
-            for outvar, outval in zip(eq.outvars, outvals, strict=True):
-                self._env_map[outvar] = outval
-
+        # Read the final result of the Jaxpr from the environment
         outvals = []
         for var in jaxpr.outvars:
             outval = self.read(var)
@@ -493,44 +378,9 @@ class GraphSolutionInterpreter(qml.capture.PlxprInterpreter):
                 outvals.append(self.interpret_operation(outval))
             else:
                 outvals.append(outval)
-
         self.cleanup()
-
+        self._env = {}
         return outvals
-
-    def interpret_operation_eqn(self, eqn: jax.extend.core.JaxprEqn):
-        """Interpret an equation corresponding to an operator.
-
-        If the operator has a dynamic decomposition defined, this method will
-        create and evaluate the jaxpr of the decomposition using the :meth:`~.eval` method.
-
-        Args:
-            eqn (jax.extend.core.JaxprEqn): a jax equation for an operator.
-
-        See also: :meth:`~.interpret_operation`.
-
-        """
-
-        invals = (self.read(invar) for invar in eqn.invars)
-
-        with qml.QueuingManager.stop_recording():
-            op = eqn.primitive.impl(*invals, **eqn.params)
-
-        if not eqn.outvars[0].__class__.__name__ == "DropVar":
-            return op
-
-        # _evaluate_jaxpr_decomposition should be used when the operator defines a
-        # compute_qfunc_decomposition, or if graph-based decomposition is enabled and
-        # a solution is found for this operator in the graph.
-        if (
-            op.has_qfunc_decomposition
-            or qml.decomposition.enabled_graph()
-            and self._decomp_graph_solution.is_solved_for(op)
-        ):
-            return self._evaluate_jaxpr_decomposition(op)
-
-        return self.decompose_operation(op)
-
 
 # pylint: disable=too-many-arguments
 @GraphSolutionInterpreter.register_primitive(ctrl_transform_prim)

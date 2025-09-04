@@ -45,7 +45,7 @@ from pennylane.transforms import unitary_to_rot as pl_unitary_to_rot
 
 from catalyst.device import extract_backend_info
 from catalyst.device.qjit_device import COMPILER_OPERATIONS
-from catalyst.from_plxpr.decompose import GraphSolutionInterpreter, PreMlirDecomposeInterpreter
+from catalyst.from_plxpr.decompose import GraphSolutionInterpreter, PreMlirDecomposeInterpreter, CollectResourceOps
 from catalyst.from_plxpr.qubit_handler import QubitHandler
 from catalyst.jax_extras import jaxpr_pad_consts, make_jaxpr2, transient_jax_config
 from catalyst.jax_primitives import (
@@ -337,7 +337,13 @@ def register_transform(pl_transform, pass_name, decomposition):
 
             pmd_jaxpr = jax.make_jaxpr(pmd_wrapper)(*args)
 
-            gds_interpreter = GraphSolutionInterpreter(*targs, **tkwargs)
+            ops_collector = CollectResourceOps()
+            ops_collector.eval(pmd_jaxpr.jaxpr, consts, *args)
+            pl_ops = ops_collector.state["ops"]
+
+            print("[DEBUG PRINT] Operations collected for decomposition:", pl_ops)
+
+            gds_interpreter = GraphSolutionInterpreter(*targs, **tkwargs, operations=pl_ops)
 
             def gds_wrapper(*args):
                 return gds_interpreter.eval(pmd_jaxpr.jaxpr, consts, *args)
