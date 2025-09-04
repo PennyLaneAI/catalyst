@@ -234,6 +234,12 @@
 
 <h3>Documentation 📝</h3>
 
+* The Catalyst Command Line Interface documentation incorrectly stated that the `catalyst`
+  executable is available in the `catalyst/bin/` directory relative to the environment's
+  installation directory when installed via pip. The documentation has been updated to point to the
+  correct location, which is the `bin/` directory relative to the environment's installation
+  directory.
+
 <h3>Contributors ✍️</h3>
 
 This release contains contributions from (in alphabetical order):
