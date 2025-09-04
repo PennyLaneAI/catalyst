@@ -142,6 +142,12 @@ device capacity. This includes the jax primitive `device_init_p`, the mlir
 operation `DeviceInitOp`, and the runtime CAPI function `__catalyst__rt__device_init`.
   [(#2011)](https://github.com/PennyLaneAI/catalyst/pull/2011)
 
+* The wire labels provided by the user in python source code, for example
+`qml.gate(wires=labels)`, `qml.measure(wires=labels)`,
+and `qml.probs(wires=labels)`, are now interpreted as plain labels
+instead of absolute wire addresses on the global quantum register for the qnode.
+  [(#2008)](https://github.com/PennyLaneAI/catalyst/pull/2008)
+
 * Updates use of `qml.transforms.dynamic_one_shot.parse_native_mid_circuit_measurements` to improved signature.
   [(#1953)](https://github.com/PennyLaneAI/catalyst/pull/1953)
 
