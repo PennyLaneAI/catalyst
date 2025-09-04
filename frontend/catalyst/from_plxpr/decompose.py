@@ -285,7 +285,6 @@ class GraphSolutionInterpreter(qml.capture.PlxprInterpreter):
         *,
         operations,
         gate_set=None,
-        stopping_condition=None,
         fixed_decomps=None,
         alt_decomps=None,
     ):  # pylint: disable=too-many-arguments
@@ -300,9 +299,8 @@ class GraphSolutionInterpreter(qml.capture.PlxprInterpreter):
         self._target_gate_names = None
         self._fixed_decomps, self._alt_decomps = fixed_decomps, alt_decomps
 
-        gate_set, stopping_condition = _resolve_gate_set(gate_set, stopping_condition)
+        gate_set, _ = _resolve_gate_set(gate_set)
         self._gate_set = gate_set
-        self._stopping_condition = stopping_condition
 
     # pylint: disable=too-many-branches
     def eval(self, jaxpr: "jax.extend.core.Jaxpr", consts: Sequence, *args) -> list:
@@ -344,10 +342,7 @@ class GraphSolutionInterpreter(qml.capture.PlxprInterpreter):
 
                 if is_solved_for(op_node) and op_node_idx in solutions._visitor.predecessors:
                     d_node_idx = solutions._visitor.predecessors[op_node_idx]
-                    self._decomp_graph_solution[op_node] = solutions._graph[d_node_idx].rule
-
-            print("[DEBUG PRINT] Decomposition graph solution:", self._decomp_graph_solution)
-
+                    self._decomp_graph_solution[op_node] = solutions._graph[d_node_idx].rule._impl
 
         for eqn in jaxpr.eqns:
             primitive = eqn.primitive
@@ -517,19 +512,3 @@ def _resolve_gate_set(
 
     return gate_set, _stopping_condition
 
-
-def _construct_and_solve_decomp_graph(
-    operations, target_gates, fixed_decomps, alt_decomps
-) -> DecompGraphSolution:
-    """Create and solve a DecompositionGraph instance to optimize the decomposition."""
-
-    # Create the decomposition graph
-    decomp_graph = DecompositionGraph(
-        operations,
-        target_gates,
-        fixed_decomps=fixed_decomps,
-        alt_decomps=alt_decomps,
-    )
-
-    # Find the efficient pathways to the target gate set
-    return decomp_graph.solve()

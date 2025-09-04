@@ -278,6 +278,33 @@ transforms_to_passes = {
     pl_unitary_to_rot: (None, False),
 }
 
+# pylint: disable=too-many-arguments
+def handle_graph_decomposition(
+    *args, inner_jaxpr, consts, non_const_args, targs, tkwargs
+):
+    """Handle the graph decomposition for a given JAXPR."""
+
+    gate_set = COMPILER_OPERATIONS
+    decomp_kwargs = {"gate_set": gate_set}
+
+    pmd_interpreter = PreMlirDecomposeInterpreter(*targs, **decomp_kwargs)
+
+    def pmd_wrapper(*args):
+        return pmd_interpreter.eval(inner_jaxpr, consts, *args)
+
+    pmd_jaxpr = jax.make_jaxpr(pmd_wrapper)(*args)
+
+    ops_collector = CollectResourceOps()
+    ops_collector.eval(pmd_jaxpr.jaxpr, consts, *args)
+    pl_ops = ops_collector.state["ops"]
+
+    gds_interpreter = GraphSolutionInterpreter(*targs, **tkwargs, operations=pl_ops)
+
+    def gds_wrapper(*args):
+        return gds_interpreter.eval(pmd_jaxpr.jaxpr, consts, *args)
+
+    return jax.make_jaxpr(gds_wrapper)(*args)
+
 
 # pylint: disable-next=redefined-outer-name
 def register_transform(pl_transform, pass_name, decomposition):
@@ -304,12 +331,8 @@ def register_transform(pl_transform, pass_name, decomposition):
         targs = args[targs_slice]
 
         # Check if the transform is a decomposition transform
-        # If so, we'll set the compiler_decompose flag to trigger
-        # 1. Construct the graph with the list of ops and the target gateset
-        # 2. Capture and lower the decomposition qfuncs down to MLIR
-        # 3. Bypass the custom PLxPR DecomposeInterpreter class
         #
-        # Notes:
+        # Note:
         # - The list of target gateset is always taken from the transform's attributes
         #   and passed down to the MLIR lowering as a quantum function attribute.
         if (
@@ -319,40 +342,25 @@ def register_transform(pl_transform, pass_name, decomposition):
         ):
             self.compiler_decompose = True
 
-        # Use PL's ExpandTransformsInterpreter to expand this and any embedded
-        # transform according to PL rules. It works by overriding the primitive
-        # registration, making all embedded transforms follow the PL rules
-        # from now on, hence ignoring the Catalyst pass conversion
-        def wrapper(*args):
-            return ExpandTransformsInterpreter().eval(inner_jaxpr, consts, *args)
-
         if self.compiler_decompose:
-            gate_set = COMPILER_OPERATIONS
-            decomp_kwargs = {"gate_set": gate_set}
-
-            pmd_interpreter = PreMlirDecomposeInterpreter(*targs, **decomp_kwargs)
-
-            def pmd_wrapper(*args):
-                return pmd_interpreter.eval(inner_jaxpr, consts, *args)
-
-            pmd_jaxpr = jax.make_jaxpr(pmd_wrapper)(*args)
-
-            ops_collector = CollectResourceOps()
-            ops_collector.eval(pmd_jaxpr.jaxpr, consts, *args)
-            pl_ops = ops_collector.state["ops"]
-
-            print("[DEBUG PRINT] Operations collected for decomposition:", pl_ops)
-
-            gds_interpreter = GraphSolutionInterpreter(*targs, **tkwargs, operations=pl_ops)
-
-            def gds_wrapper(*args):
-                return gds_interpreter.eval(pmd_jaxpr.jaxpr, consts, *args)
-
-            gds_jaxpr = jax.make_jaxpr(gds_wrapper)(*args)
-
-            return self.eval(gds_jaxpr.jaxpr, gds_jaxpr.consts, *non_const_args)
+            final_jaxpr = handle_graph_decomposition(
+                *args,
+                inner_jaxpr=inner_jaxpr,
+                consts=consts,
+                non_const_args=non_const_args,
+                targs=targs,
+                tkwargs=tkwargs,
+            )
+            return self.eval(final_jaxpr.jaxpr, final_jaxpr.consts, *non_const_args)
 
         if catalyst_pass_name is None:
+            # Use PL's ExpandTransformsInterpreter to expand this and any embedded
+            # transform according to PL rules. It works by overriding the primitive
+            # registration, making all embedded transforms follow the PL rules
+            # from now on, hence ignoring the Catalyst pass conversion
+            def wrapper(*args):
+                return ExpandTransformsInterpreter().eval(inner_jaxpr, consts, *args)
+
             unravelled_jaxpr = jax.make_jaxpr(wrapper)(*non_const_args)
             final_jaxpr = pl_plxpr_transform(
                 unravelled_jaxpr.jaxpr, unravelled_jaxpr.consts, targs, tkwargs, *non_const_args
