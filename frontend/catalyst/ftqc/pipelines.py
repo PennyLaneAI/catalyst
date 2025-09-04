@@ -65,7 +65,6 @@ def mbqc_pipeline() -> PipelineStages:
 
     _, pipeline = stages[llvm_dialect_conversion_stage_index]
 
-    print(pipeline)
     assert len(pipeline) > 0, "Pipeline for stage 'MLIRToLLVMDialect' is empty"
     assert (
         "convert-quantum-to-llvm" in pipeline
