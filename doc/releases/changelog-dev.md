@@ -231,7 +231,7 @@
   `use-array-backed-registers` option of the `convert-quantum-to-llvm` pass to `true`. For example,
 
   ```console
-  $ quantum-opt --pass-pipeline="builtin.module(convert-quantum-to-llvm{use-array-backed-registers=true})"
+  $ catalyst --tool=opt --pass-pipeline="builtin.module(convert-quantum-to-llvm{use-array-backed-registers=true})" <input file>
   ```
 
 <h3>Documentation 📝</h3>
