@@ -6,6 +6,7 @@
   [(#1993)](https://github.com/PennyLaneAI/catalyst/pull/1993)
   [(#2011)](https://github.com/PennyLaneAI/catalyst/pull/2011)
   [(#2008)](https://github.com/PennyLaneAI/catalyst/pull/2008)
+  [(#???)](https://github.com/PennyLaneAI/catalyst/pull/???)
 
 * A new pass `--t-layer-reduction` has been added to reduce the depth and number of non-Clifford PPR
   operations by commuting adjacent PPRs and finding possible PPRs that can be merged.
