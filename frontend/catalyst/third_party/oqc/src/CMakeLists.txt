@@ -39,6 +39,9 @@ find_package(nanobind CONFIG REQUIRED)
 # built (`STABLE_ABI` does nothing on older Python versions).
 nanobind_add_module(oqc_python_module STABLE_ABI oqc_python_module.cpp)
 
+# Link with Python to resolve symbols like PyExc_ValueError
+target_link_libraries(oqc_python_module PRIVATE Python::Python)
+
 # Use a consistant suffix ".so" rather than, e.g. ".abi3.so" (when using the Stable ABI) or
 # ".cpython-3xx-darwin.so". Doing so simplifies the process to locate it when calling
 # `dlopen(OQC_PY)` in frontend/catalyst/third_party/oqc/src/OQCRunner.hpp.
