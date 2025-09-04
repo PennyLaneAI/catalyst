@@ -57,6 +57,7 @@ from catalyst.jax_primitives import (
     device_init_p,
     device_release_p,
     expval_p,
+    qgenerate_wire_labels_p,
     gphase_p,
     hamiltonian_p,
     hermitian_p,
@@ -451,6 +452,23 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         return self.eval(jaxpr.jaxpr, jaxpr.consts, *args)
 
 
+@PLxPRToQuantumJaxprInterpreter.register_primitive(qml.allocation.allocate_prim)
+def handle_qml_alloc(self, *, num_wires, require_zeros=True, restored=False):
+    """Handle the conversion from plxpr to Catalyst jaxpr for the qml.allocate primitive"""
+
+    # allocation size can't be dynamic yet
+    assert isinstance(num_wires, int)
+    labels = qgenerate_wire_labels_p.bind(num_labels=num_wires)
+    return labels
+
+
+
+@PLxPRToQuantumJaxprInterpreter.register_primitive(qml.allocation.deallocate_prim)
+def handle_qml_dealloc(self, *wires):
+    """Handle the conversion from plxpr to Catalyst jaxpr for the qml.deallocate primitive"""
+    # TODO: add a "put labels in clean/dirty pool" primitive
+    return []
+
 @PLxPRToQuantumJaxprInterpreter.register_primitive(quantum_subroutine_p)
 def handle_subroutine(self, *args, **kwargs):
     """
@@ -753,6 +771,8 @@ def trace_from_pennylane(
             fn.static_argnums = static_argnums
 
         plxpr, out_type, out_treedef = make_jaxpr2(fn, **make_jaxpr_kwargs)(*args, **kwargs)
+        breakpoint()
         jaxpr = from_plxpr(plxpr)(*dynamic_args, **kwargs)
+        breakpoint()
 
     return jaxpr, out_type, out_treedef, sig

@@ -81,6 +81,7 @@ from mlir_quantum.dialects.quantum import (
     DeviceReleaseOp,
     ExpvalOp,
     ExtractOp,
+    GenerateWireLabelsOp,
     GlobalPhaseOp,
     HamiltonianOp,
     HermitianOp,
@@ -262,6 +263,8 @@ qdealloc_p = Primitive("qdealloc")
 qdealloc_p.multiple_results = True
 qdealloc_qb_p = Primitive("qdealloc_qb")
 qdealloc_qb_p.multiple_results = True
+qgenerate_wire_labels_p = Primitive("qgenerate_wire_labels")
+#qgenerate_wire_labels_p.multiple_results = True
 qextract_p = Primitive("qextract")
 qinsert_p = Primitive("qinsert")
 gphase_p = Primitive("gphase")
@@ -1069,6 +1072,21 @@ def _qdealloc_qb_lowering(jax_ctx: mlir.LoweringRuleContext, qubit):
     ctx.allow_unregistered_dialects = True
     DeallocQubitOp(qubit)
     return ()
+
+
+#
+# qgenerate_wire_labels_p
+#
+@qgenerate_wire_labels_p.def_abstract_eval
+def _qgenerate_wire_labels_abstract_eval(num_labels=0):
+    return core.ShapedArray((num_labels,), jax.numpy.int64)
+
+
+def _qgenerate_wire_labels_lowering(jax_ctx: mlir.LoweringRuleContext, num_labels: ir.Value):
+    ctx = jax_ctx.module_context.context
+    # TODO
+    return GenerateWireLabelsOp(qreg_type, nqubits=size_value).results
+
 
 
 #
@@ -2523,6 +2541,7 @@ CUSTOM_LOWERING_RULES = (
     (qalloc_p, _qalloc_lowering),
     (qdealloc_p, _qdealloc_lowering),
     (qdealloc_qb_p, _qdealloc_qb_lowering),
+    (qgenerate_wire_labels_p, _qgenerate_wire_labels_lowering),
     (qextract_p, _qextract_lowering),
     (qinsert_p, _qinsert_lowering),
     (qinst_p, _qinst_lowering),

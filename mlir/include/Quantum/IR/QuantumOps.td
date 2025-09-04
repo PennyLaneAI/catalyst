@@ -272,6 +272,22 @@ def InsertOp : Memory_Op<"insert", [NoMemoryEffect]> {
     let hasFolder = 1;
 }
 
+def GenerateWireLabelsOp : Quantum_Op<"generate_wire_labels"> {
+    let summary = "Generate wire labels that will be resolved at runtime.";
+
+    let arguments = (ins
+        I64:$num_labels
+    );
+
+    let results = (outs
+        Variadic<I64>:$labels
+    );
+
+    // let assemblyFormat = [{
+    //     attr-dict `:` type(results)
+    // }];
+}
+
 // -----
 
 class Gate_Op<string mnemonic, list<Trait> traits = []> :
