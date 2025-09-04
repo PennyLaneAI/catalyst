@@ -376,6 +376,54 @@ def _process_terminal_measurements(mcm_method, cpy_tape, out, snapshots, shot_ve
     return (snapshots, tuple(new_out)) if snapshots else tuple(new_out)
 
 
+def _validate_one_shot_measurements(mcm_method, tape: qml.tape.QuantumTape, qnode) -> None:
+    """Validate measurements for one-shot mode.
+
+    Args:
+        tape: The quantum tape containing measurements to validate
+        qnode: The quantum node being transformed
+
+    Raises:
+        TypeError: If unsupported measurement types are used
+        NotImplementedError: If measurement configuration is not supported
+    """
+    assert mcm_method == "one-shot"
+
+    # Check if using shot vector with non-SampleMP measurements
+    shot_vector = qnode._shots.shot_vector if qnode._shots else []
+    has_shot_vector = len(shot_vector) > 1 or any(copies > 1 for _, copies in shot_vector)
+    has_wires = qnode.device.wires is not None and not is_dynamic_wires(qnode.device.wires)
+
+    for m in tape.measurements:
+        # Check if measurement type is supported
+        if not isinstance(m, (CountsMP, ExpectationMP, ProbabilityMP, SampleMP, VarianceMP)):
+            raise TypeError(
+                f"Native mid-circuit measurement mode does not support {type(m).__name__} "
+                "measurements."
+            )
+
+        # Check variance with observable
+        if isinstance(m, VarianceMP) and m.obs:
+            raise TypeError(
+                "qml.var(obs) cannot be returned when `mcm_method='one-shot'` because "
+                "the Catalyst compiler does not handle qml.sample(obs)."
+            )
+
+        # Check if the measurement is supported with shot-vector
+        if has_shot_vector and not isinstance(m, SampleMP):
+            raise NotImplementedError(
+                f"Measurement {type(m).__name__} is not supported a shot-vector. "
+                "Use qml.sample() instead."
+            )
+
+        # Check dynamic wires with empty wires
+        if not has_wires and isinstance(m, (SampleMP, CountsMP)) and (m.wires.tolist() == []):
+            raise NotImplementedError(
+                f"Measurement {type(m).__name__} with empty wires is not supported with "
+                "dynamic wires in one-shot mode. Please specify constant wires on device."
+            )
+
+
 # pylint: disable=protected-access,no-member,not-callable
 def dynamic_one_shot(qnode, **kwargs):
     """Transform a QNode to into several one-shot tapes to support dynamic circuit execution.
@@ -435,41 +483,7 @@ def dynamic_one_shot(qnode, **kwargs):
             cpy_tape = tape
             nonlocal aux_tapes
 
-            # Check if using shot vector with non-SampleMP measurements
-            shot_vector = qnode._shots.shot_vector if qnode._shots else []
-            has_shot_vector = len(shot_vector) > 1 or any(copies > 1 for _, copies in shot_vector)
-            has_wires = qnode.device.wires is not None and not is_dynamic_wires(qnode.device.wires)
-
-            for m in tape.measurements:
-                if not isinstance(
-                    m, (CountsMP, ExpectationMP, ProbabilityMP, SampleMP, VarianceMP)
-                ):
-                    raise TypeError(
-                        f"Native mid-circuit measurement mode does not support {type(m).__name__} "
-                        "measurements."
-                    )
-                if isinstance(m, VarianceMP) and m.obs:
-                    raise TypeError(
-                        "qml.var(obs) cannot be returned when `mcm_method='one-shot'` because "
-                        "the Catalyst compiler does not handle qml.sample(obs)."
-                    )
-
-                # Check if the measurement is supported with shot-vector
-                if has_shot_vector and not isinstance(m, SampleMP):
-                    raise NotImplementedError(
-                        f"Measurement {type(m).__name__} is not supported a shot-vector. "
-                        "Use qml.sample() instead."
-                    )
-
-                if (
-                    not has_wires
-                    and isinstance(m, (SampleMP, CountsMP))
-                    and (m.wires.tolist() == [])
-                ):
-                    raise NotImplementedError(
-                        f"Measurement {type(m).__name__} with empty wires is not supported with "
-                        "dynamic wires in one-shot mode. Please specify constant wires on device."
-                    )
+            _validate_one_shot_measurements(mcm_config.mcm_method, tape, qnode)
 
             if tape.batch_size is not None:
                 raise ValueError("mcm_method='one-shot' is not compatible with broadcasting")
