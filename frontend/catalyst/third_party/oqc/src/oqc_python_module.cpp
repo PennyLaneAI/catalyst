@@ -60,6 +60,7 @@ extern "C" {
     locals["device"] = _device;
     locals["kwargs"] = _kwargs;
     locals["shots"] = shots;
+    locals["num_qubits"] = num_qubits;
     locals["msg"] = "";
 
     // Evaluate in scope of main module
