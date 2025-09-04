@@ -345,7 +345,7 @@ struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
         rewriter.restoreInsertionPoint(point);
 
         // Setup args and res
-        int32_t numberArg = op.getNumberOriginalArgAttr()[0];
+        int32_t numberArg = op.getNumberOriginalArg().value_or(0);
         SmallVector<Value> operands = op.getOperands();
         SmallVector<Value> args = {operands.begin(), operands.begin() + numberArg};
         SmallVector<Value> res = {operands.begin() + numberArg, operands.end()};

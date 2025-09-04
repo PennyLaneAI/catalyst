@@ -235,7 +235,8 @@ class TestPyTreesReturnValues:
         assert res5["cond"][1] == (125, 625)
         assert res5["const"] == 5
 
-    def test_return_value_dict(self, backend, tol_stochastic):
+    @pytest.mark.parametrize("mcm_method", ["single-branch-statistics", "one-shot"])
+    def test_return_value_dict(self, backend, tol_stochastic, mcm_method):
         """Test dictionaries."""
 
         @qml.qnode(qml.device(backend, wires=2))
@@ -257,7 +258,7 @@ class TestPyTreesReturnValues:
         assert jnp.allclose(result["w1"], expected["w1"])
 
         @qml.set_shots(1000)
-        @qml.qnode(qml.device(backend, wires=2))
+        @qml.qnode(qml.device(backend, wires=2), mcm_method=mcm_method)
         def circuit2(params):
             qml.RX(params[0], wires=0)
             qml.RX(params[1], wires=1)
@@ -280,7 +281,7 @@ class TestPyTreesReturnValues:
         )
 
         @qml.set_shots(1000)
-        @qml.qnode(qml.device(backend, wires=2))
+        @qml.qnode(qml.device(backend, wires=2), mcm_method=mcm_method)
         def circuit2_snapshot(params):
             qml.Snapshot()
             qml.RX(params[0], wires=0)
