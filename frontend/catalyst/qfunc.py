@@ -100,8 +100,28 @@ def _get_total_shots(qnode):
 
 def _is_one_shot_compatible_device(qnode):
     device_name = qnode.device.name
-    exclude_devices = {"softwareq.qpp", "nvidia.custatevec", "nvidia.cutensornet", "oqd"}
-    return device_name not in exclude_devices
+    exclude_devices = {"softwareq.qpp", "nvidia.custatevec", "nvidia.cutensornet"}
+
+    # Check device name against exclude list
+    if device_name in exclude_devices:
+        return False
+
+    # Additional check for OQDDevice class to ensure proper detection
+    # Check both the class name and if it has the OQD-specific get_c_interface method
+    device_class_name = qnode.device.__class__.__name__
+    if device_class_name == "OQDDevice":
+        return False
+
+    # Check if device has get_c_interface method returning "oqd"
+    if hasattr(qnode.device, "get_c_interface"):
+        try:
+            c_interface_name, _ = qnode.device.get_c_interface()
+            if c_interface_name == "oqd":
+                return False
+        except (AttributeError, TypeError, ValueError):
+            pass
+
+    return True
 
 
 def configure_mcm_and_try_one_shot(qnode, args, kwargs):
