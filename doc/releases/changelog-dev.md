@@ -239,6 +239,7 @@
   installation directory when installed via pip. The documentation has been updated to point to the
   correct location, which is the `bin/` directory relative to the environment's installation
   directory.
+  [(#2030)](https://github.com/PennyLaneAI/catalyst/pull/2030)
 
 <h3>Contributors ✍️</h3>
 
