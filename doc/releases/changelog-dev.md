@@ -135,7 +135,8 @@
   qubits on the `"null.qubit"` device has been fixed.
   [(#1926)](https://github.com/PennyLaneAI/catalyst/pull/1926)
 
-* Fix ordering of pass decorators when passes are applied with program capture enabled.
+* Stacked Python decorators for built-in Catalyst passes are now applied in the correct order when
+  program capture is enabled.
   [(#2027)](https://github.com/PennyLaneAI/catalyst/pull/2027)
 
 <h3>Internal changes ⚙️</h3>
