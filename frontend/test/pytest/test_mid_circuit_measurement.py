@@ -814,7 +814,7 @@ class TestDynamicOneShotIntegration:
     # It will be fixed in the next jax release. we will re-enable this test when the jax
     # release is available and tested on our end.
     @pytest.mark.skip(
-        reason="value_and_grad with dynamic one-shot is not yet supported.",
+        reason="https://github.com/tensorflow/tensorflow/pull/97681",
     )
     def test_mcm_method_with_value_and_grad(self):
         """Test that the dynamic_one_shot works with value_and_grad."""
