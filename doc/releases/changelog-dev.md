@@ -28,8 +28,9 @@
 
 <h3>Improvements 🛠</h3>
 
-* Add support for one-shot result handling in non-mcm cases, allowing the following items to continue functioning: counts measurement result, shot vector result, snapshot result. And also optimize the arguments passing to one-shot wrapper in MLIR as well.
+* The default mid-circuit measurement method in catalyst has been changed from `"single-branch-statistics"` to `"one-shot"`.
   [[#2017]](https://github.com/PennyLaneAI/catalyst/pull/2017)
+  [[#2019]](https://github.com/PennyLaneAI/catalyst/pull/2019)
 
 * A new pass `--partition-layers` has been added to group PPR/PPM operations into `qec.layer`
   operations based on qubit interactive and commutativity, enabling circuit analysis and
