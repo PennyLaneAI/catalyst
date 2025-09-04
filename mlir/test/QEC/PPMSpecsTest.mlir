@@ -39,9 +39,9 @@ func.func public @test_no_ppr_ppm() {
 
 //CHECK: {
 //CHECK:     "test_to_ppr": {
+//CHECK:         "logical_qubits": 2,
 //CHECK:         "max_weight_pi4": 2,
 //CHECK:         "max_weight_pi8": 1,
-//CHECK:         "logical_qubits": 2,
 //CHECK:         "pi4_ppr": 7,
 //CHECK:         "pi8_ppr": 1
 //CHECK:     }
@@ -70,9 +70,9 @@ func.func public @test_to_ppr() {
 
 //CHECK: {
 //CHECK:     "test_commute_ppr": {
+//CHECK:         "logical_qubits": 2,
 //CHECK:         "max_weight_pi4": 2,
 //CHECK:         "max_weight_pi8": 1,
-//CHECK:         "logical_qubits": 2,
 //CHECK:         "num_of_ppm": 2,
 //CHECK:         "pi4_ppr": 7,
 //CHECK:         "pi8_ppr": 1
@@ -130,8 +130,8 @@ func.func public @test_merge_ppr_ppm() {
 
 //CHECK: {
 //CHECK:     "test_ppr_to_ppm": {
-//CHECK:         "max_weight_pi2": 2,
 //CHECK:         "logical_qubits": 2,
+//CHECK:         "max_weight_pi2": 2,
 //CHECK:         "num_of_ppm": 19,
 //CHECK:         "pi2_ppr": 8
 //CHECK:     }
@@ -208,8 +208,8 @@ func.func public @test_ppr_to_ppm() {
 
 //CHECK: {
 //CHECK:     "test_ppm_compilation_1": {
-//CHECK:         "max_weight_pi2": 2,
 //CHECK:         "logical_qubits": 2,
+//CHECK:         "max_weight_pi2": 2,
 //CHECK:         "num_of_ppm": 7,
 //CHECK:         "pi2_ppr": 2
 //CHECK:     },
