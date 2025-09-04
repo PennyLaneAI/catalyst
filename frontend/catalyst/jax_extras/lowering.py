@@ -53,7 +53,7 @@ logger.addHandler(logging.NullHandler())
 
 
 @debug_logger
-def jaxpr_to_mlir(func_name, jaxpr):
+def jaxpr_to_mlir(func_name, jaxpr, py_attrs=None):
     """Lower a Jaxpr into an MLIR module.
 
     Args:
@@ -81,6 +81,7 @@ def jaxpr_to_mlir(func_name, jaxpr):
             platform="cpu",
             axis_context=axis_context,
             name_stack=name_stack,
+            py_attrs=py_attrs,
         )
 
     return module, context
@@ -99,6 +100,7 @@ def custom_lower_jaxpr_to_module(
     replicated_args=None,
     arg_shardings=None,
     result_shardings=None,
+    py_attrs=None,
 ):
     """Lowers a top-level jaxpr to an MHLO module.
 
@@ -108,6 +110,10 @@ def custom_lower_jaxpr_to_module(
     This function has been modified from its original form in the JAX project at
     https://github.com/google/jax/blob/c4d590b1b640cc9fcfdbe91bf3fe34c47bcde917/jax/interpreters/mlir.py#L625version
     released under the Apache License, Version 2.0, with the following copyright notice:
+
+    Note: We further modified this function to accept `py_attrs`, which allows for the passing
+    of custom attributes from Python to MLIR. This is currently used for passing
+    the target gate set information.
 
     Copyright 2021 The JAX Authors.
     """
@@ -163,6 +169,15 @@ def custom_lower_jaxpr_to_module(
                 continue
             if isinstance(op, FuncOp):
                 op.attributes["llvm.linkage"] = ir.Attribute.parse("#llvm.linkage<internal>")
+                if py_attrs:  # pass custom attributes from Python to MLIR
+                    for attr_name, attr_value in py_attrs.items():
+                        try:
+                            mlir_attr = get_mlir_attribute_from_pyval(list(attr_value))
+                            op.attributes[attr_name] = mlir_attr
+                        except CompileError as e:
+                            raise CompileError(
+                                f"While converting Python attribute '{attr_name}': '{attr_value}' to MLIR: {e}"
+                            ) from e
             if isinstance(op, ModuleOp):
                 worklist += [*op.body.operations]
 

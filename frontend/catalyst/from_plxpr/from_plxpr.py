@@ -44,6 +44,8 @@ from pennylane.transforms import single_qubit_fusion as pl_single_qubit_fusion
 from pennylane.transforms import unitary_to_rot as pl_unitary_to_rot
 
 from catalyst.device import extract_backend_info
+from catalyst.device.qjit_device import COMPILER_OPERATIONS
+from catalyst.from_plxpr.decompose import GraphSolutionInterpreter, PreMlirDecomposeInterpreter
 from catalyst.from_plxpr.qubit_handler import QubitHandler
 from catalyst.jax_extras import jaxpr_pad_consts, make_jaxpr2, transient_jax_config
 from catalyst.jax_primitives import (
@@ -176,12 +178,50 @@ def from_plxpr(plxpr: ClosedJaxpr) -> Callable[..., Jaxpr]:
 
 
 class WorkflowInterpreter(PlxprInterpreter):
-    """An interpreter that converts a qnode primitive from a plxpr variant to a catalxpr variant."""
+    """An interpreter that converts a qnode primitive from a plxpr variant to a catalyst variant."""
 
     def __init__(self):
         self._pass_pipeline = []
         self.qubit_handler = None
+        self.compiler_decompose = False
         super().__init__()
+
+
+def _decompose_to_compiler_gateset(qfunc_jaxpr, consts, non_const_args):
+    """First stage decomposition to compiler gate set.
+
+    Currently, the compiler can only handle a limited set of gates and
+    may not support all generic gates and templates of the original circuit.
+    We perform a first stage decomposition to the compiler gate set, which includes
+    only a subset of the original gates that can be represented in MLIR using the
+    `quantum.custom` primitive.
+    """
+
+    # TODO: The compiler should be able to handle all gate
+    # adhering to quantum.custom primitive.This includes
+    # all the gates with parameters of type `TensorLike`
+    # and wires of type `WiresLike` with no hyperparams.
+    # Update `gate_set` to use this as the stopping condition
+    # of the decomposition transform.
+    gate_set = COMPILER_OPERATIONS
+
+    decomp_args = ()
+    decomp_kwargs = {"gate_set": gate_set}
+
+    # disable the graph decomposition optimization
+    graph_decomp_status = False
+    if qml.decomposition.enabled_graph():
+        graph_decomp_status = True
+        qml.decomposition.disable_graph()
+
+    new_jaxpr = qml.transforms.decompose.plxpr_transform(
+        qfunc_jaxpr, consts, decomp_args, decomp_kwargs, *non_const_args
+    )
+
+    if graph_decomp_status:
+        qml.decomposition.enable_graph()
+
+    return new_jaxpr
 
 
 # pylint: disable=unused-argument, too-many-arguments
@@ -263,14 +303,50 @@ def register_transform(pl_transform, pass_name, decomposition):
         non_const_args = args[args_slice]
         targs = args[targs_slice]
 
-        if catalyst_pass_name is None:
-            # Use PL's ExpandTransformsInterpreter to expand this and any embedded
-            # transform according to PL rules. It works by overriding the primitive
-            # registration, making all embedded transforms follow the PL rules
-            # from now on, hence ignoring the Catalyst pass conversion
-            def wrapper(*args):
-                return ExpandTransformsInterpreter().eval(inner_jaxpr, consts, *args)
+        # Check if the transform is a decomposition transform
+        # If so, we'll set the compiler_decompose flag to trigger
+        # 1. Construct the graph with the list of ops and the target gateset
+        # 2. Capture and lower the decomposition qfuncs down to MLIR
+        # 3. Bypass the custom PLxPR DecomposeInterpreter class
+        #
+        # Notes:
+        # - The list of target gateset is always taken from the transform's attributes
+        #   and passed down to the MLIR lowering as a quantum function attribute.
+        if (
+            hasattr(pl_plxpr_transform, "__name__")
+            and pl_plxpr_transform.__name__ == "decompose_plxpr_to_plxpr"
+            and qml.decomposition.enabled_graph()
+        ):
+            self.compiler_decompose = True
 
+        # Use PL's ExpandTransformsInterpreter to expand this and any embedded
+        # transform according to PL rules. It works by overriding the primitive
+        # registration, making all embedded transforms follow the PL rules
+        # from now on, hence ignoring the Catalyst pass conversion
+        def wrapper(*args):
+            return ExpandTransformsInterpreter().eval(inner_jaxpr, consts, *args)
+
+        if self.compiler_decompose:
+            gate_set = COMPILER_OPERATIONS
+            decomp_kwargs = {"gate_set": gate_set}
+
+            pmd_interpreter = PreMlirDecomposeInterpreter(*targs, **decomp_kwargs)
+
+            def pmd_wrapper(*args):
+                return pmd_interpreter.eval(inner_jaxpr, consts, *args)
+
+            pmd_jaxpr = jax.make_jaxpr(pmd_wrapper)(*args)
+
+            gds_interpreter = GraphSolutionInterpreter(*targs, **tkwargs)
+
+            def gds_wrapper(*args):
+                return gds_interpreter.eval(pmd_jaxpr.jaxpr, consts, *args)
+
+            gds_jaxpr = jax.make_jaxpr(gds_wrapper)(*args)
+
+            return self.eval(gds_jaxpr.jaxpr, gds_jaxpr.consts, *non_const_args)
+
+        if catalyst_pass_name is None:
             unravelled_jaxpr = jax.make_jaxpr(wrapper)(*non_const_args)
             final_jaxpr = pl_plxpr_transform(
                 unravelled_jaxpr.jaxpr, unravelled_jaxpr.consts, targs, tkwargs, *non_const_args
@@ -311,6 +387,7 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         # TODO: we assume the qreg value passed into a scope is the unique qreg in the scope
         # In other words, we assume no new qreg will be allocated in the scope
         self.qubit_handler = qubit_handler
+        self.compiler_decompose = False
         self.subroutine_cache = cache
         self.control_wires = control_wires
         """Any control wires used for a subroutine."""
