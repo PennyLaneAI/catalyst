@@ -28,11 +28,14 @@
 
 <h3>Improvements 🛠</h3>
 
+* The default mid-circuit measurement method in catalyst has been changed from `"single-branch-statistics"` to `"one-shot"`.
+  [[#2017]](https://github.com/PennyLaneAI/catalyst/pull/2017)
+
 * A new pass `--partition-layers` has been added to group PPR/PPM operations into `qec.layer`
   operations based on qubit interactive and commutativity, enabling circuit analysis and
   potentially to support parallel execution.
   [(#1951)](https://github.com/PennyLaneAI/catalyst/pull/1951)
-  
+
 * Added a new JAX primitive to capture and compile the decomposition rule
   definitions to MLIR. `decomposition_rule` is the decorator integrated
   with this primitive for development purposes.
@@ -77,7 +80,7 @@
   %0 = transform.apply_registered_pass "some-pass" with options = {"an-option" = true, "maxValue" = 1 : i64, "multi-word-option" = 1 : i64}
   ```
 
-* Added checks to raise an error when the input qubits to the multi-qubit gates in the runtime CAPI are not all distinct. 
+* Added checks to raise an error when the input qubits to the multi-qubit gates in the runtime CAPI are not all distinct.
   [(#2006)](https://github.com/PennyLaneAI/catalyst/pull/2006).
 
 * Commuting Clifford Pauli Product Rotation (PPR) operations, past non-Clifford PPRs, now supports P(π/2) Cliffords in addition to P(π/4)
@@ -243,4 +246,5 @@ Andrija Paurevic,
 Ritu Thombre,
 Roberto Turrado,
 Paul Haochen Wang,
-Jake Zaia.
+Jake Zaia,
+Hongsheng Zheng
