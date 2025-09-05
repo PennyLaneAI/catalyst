@@ -52,22 +52,22 @@ extern "C" {
 [[gnu::visibility("default")]] void counts(const char *_circuit, const char *_device, size_t shots,
                                            size_t num_qubits, const char *_kwargs, void *_vector)
 {
-    // namespace nb = nanobind;
-    // using namespace nb::literals;
+    namespace nb = nanobind;
+    using namespace nb::literals;
 
-    // nb::gil_scoped_acquire lock;
+    nb::gil_scoped_acquire lock;
 
-    // nb::dict locals;
-    // locals["circuit"] = _circuit;
-    // locals["device"] = _device;
-    // locals["kwargs"] = _kwargs;
-    // locals["shots"] = shots;
-    // locals["num_qubits"] = num_qubits;
-    // locals["msg"] = "";
+    nb::dict locals;
+    locals["circuit"] = _circuit;
+    locals["device"] = _device;
+    locals["kwargs"] = _kwargs;
+    locals["shots"] = shots;
+    locals["num_qubits"] = num_qubits;
+    locals["msg"] = "";
 
-    // // Evaluate in scope of main module
-    // nb::object scope = nb::module_::import_("__main__").attr("__dict__");
-    // nb::exec(nb::str(program.c_str()), scope, locals);
+    // Evaluate in scope of main module
+    nb::object scope = nb::module_::import_("__main__").attr("__dict__");
+    nb::exec(nb::str(program.c_str()), scope, locals);
 
     // auto msg = nb::cast<std::string>(locals["msg"]);
     // RT_FAIL_IF(!msg.empty(), msg.c_str());
