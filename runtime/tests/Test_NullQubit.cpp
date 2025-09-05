@@ -542,7 +542,8 @@ TEST_CASE_METHOD(
 
     // Insert the individual qubit (ID: 3) into `reg` at position 3
     // This should raise an exception position 3 is beyond the size of the register
-    CHECK_THROWS(__catalyst__rt__array_update_element_1d(reg, 3, reinterpret_cast<QUBIT *>(q)));
+    CHECK_THROWS_WITH(__catalyst__rt__array_update_element_1d(reg, 3, reinterpret_cast<QUBIT *>(q)),
+                      ContainsSubstring("qubit register does not contain the requested wire"));
 }
 
 TEST_CASE("Mix Gate test R(X,Y,Z) num_qubits=4", "[NullQubit]")

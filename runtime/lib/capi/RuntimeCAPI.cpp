@@ -1170,8 +1170,8 @@ void __catalyst__rt__array_update_element_1d(QirArray *ptr, int64_t idx, QUBIT *
     RT_ASSERT(idx >= 0);
 
     if (static_cast<size_t>(idx) >= qubit_vector_ptr->size()) {
-        std::string error_msg =
-            std::format("The qubit register does not contain the requested wire: {}", idx);
+        std::string error_msg = "The qubit register does not contain the requested wire: ";
+        error_msg += std::to_string(idx);
         RT_FAIL(error_msg.c_str());
     }
 
