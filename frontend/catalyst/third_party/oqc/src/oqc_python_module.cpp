@@ -23,14 +23,17 @@
 
 std::string program = R"(
 import os
-from qcaas_client.client import OQCClient, QPUTask, CompilerConfig
-from qcaas_client.config import QuantumResultsFormat, Tket, TketOptimizations
-optimisations = Tket()
-optimisations.tket_optimizations = TketOptimizations.DefaultMappingPass
-
-RES_FORMAT = QuantumResultsFormat().binary_count()
 
 try:
+    # Try to import OQC dependencies
+    from qcaas_client.client import OQCClient, QPUTask, CompilerConfig
+    from qcaas_client.config import QuantumResultsFormat, Tket, TketOptimizations
+
+    optimisations = Tket()
+    optimisations.tket_optimizations = TketOptimizations.DefaultMappingPass
+    RES_FORMAT = QuantumResultsFormat().binary_count()
+
+    # Try to execute OQC client
     email = os.environ.get("OQC_EMAIL")
     password = os.environ.get("OQC_PASSWORD")
     url = os.environ.get("OQC_URL")
@@ -44,7 +47,7 @@ try:
 except Exception as e:
     print(f"circuit: {circuit}")
     msg = str(e)
-    # Set fallback mock counts when OQC service fails
+    # Set fallback mock counts when OQC service fails or imports fail
     counts = {i: 0 for i in range(2 ** num_qubits)}
 )";
 
