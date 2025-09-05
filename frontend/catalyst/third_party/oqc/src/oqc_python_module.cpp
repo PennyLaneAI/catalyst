@@ -22,7 +22,6 @@
 #include "Exception.hpp"
 
 std::string program = R"(
-
 try:
     import os
     email = os.environ.get("OQC_EMAIL")
@@ -50,37 +49,47 @@ except Exception as e:
                                                     size_t shots, size_t num_qubits,
                                                     const char *_kwargs, void *_vector)
 {
-    namespace nb = nanobind;
-    using namespace nb::literals;
+    try {
+        namespace nb = nanobind;
+        using namespace nb::literals;
 
-    nb::gil_scoped_acquire lock;
+        nb::gil_scoped_acquire lock;
 
-    nb::dict locals;
-    locals["circuit"] = _circuit;
-    locals["device"] = _device;
-    locals["kwargs"] = _kwargs;
-    locals["shots"] = shots;
-    locals["num_qubits"] = num_qubits;
-    locals["msg"] = "";
+        nb::dict locals;
+        locals["circuit"] = _circuit;
+        locals["device"] = _device;
+        locals["kwargs"] = _kwargs;
+        locals["shots"] = shots;
+        locals["num_qubits"] = num_qubits;
+        locals["msg"] = "";
 
-    // Evaluate in scope of main module
-    nb::object scope = nb::module_::import_("__main__").attr("__dict__");
-    nb::exec(nb::str(program.c_str()), scope, locals);
+        // Evaluate in scope of main module
+        nb::object scope = nb::module_::import_("__main__").attr("__dict__");
+        nb::exec(nb::str(program.c_str()), scope, locals);
 
-    auto msg = nb::cast<std::string>(locals["msg"]);
+        auto msg = nb::cast<std::string>(locals["msg"]);
 
-    RT_FAIL_IF(!msg.empty(), msg.c_str());
+        RT_FAIL_IF(!msg.empty(), msg.c_str());
 
-    // Process counts only if we didn't have credential issues
-    nb::dict results = locals["counts"];
+        // Process counts only if we didn't have credential issues
+        nb::dict results = locals["counts"];
 
-    std::vector<size_t> *counts_value = reinterpret_cast<std::vector<size_t> *>(_vector);
-    for (auto item : results) {
-        auto key = item.first;
-        auto value = item.second;
-        counts_value->push_back(nb::cast<size_t>(value));
+        std::vector<size_t> *counts_value = reinterpret_cast<std::vector<size_t> *>(_vector);
+        if (results.size() > 0) {
+            for (auto item : results) {
+                auto key = item.first;
+                auto value = item.second;
+                counts_value->push_back(nb::cast<size_t>(value));
+            }
+        }
     }
-    return;
+    catch (const std::exception &e) {
+        std::string error_msg = e.what();
+        RT_FAIL(error_msg.c_str());
+    }
+    catch (...) {
+        RT_FAIL("Unknown error occurred in OQC execution");
+    }
 }
 
 [[gnu::visibility("default")]] void (*counts_function_ptr)(const char *, const char *, size_t,
