@@ -558,7 +558,7 @@ class TestCatalyst:
         @qml.qnode(dev)
         def circuit():
             qml.adjoint(subroutine)()
-            return qml.probs(wires=dev.wires)
+            return qml.probs()
 
         expected = circuit()
         observed = qjit(circuit)()

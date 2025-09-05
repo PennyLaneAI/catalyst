@@ -18,9 +18,11 @@
 
 #include <cstdio>
 #include <functional>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <random>
+#include <set>
 #include <string>
 #include <string_view>
 #include <tuple>
@@ -166,7 +168,11 @@ class RTDevice {
     std::string rtd_lib;
     std::string rtd_name;
     std::string rtd_kwargs;
+    uint64_t capacity;
     bool auto_qubit_management;
+
+    uint64_t current_biggest_wire_index = 0;
+    std::map<int64_t, uint64_t> wire_label_to_qirarray_index;
 
     std::unique_ptr<SharedLibraryManager> rtd_dylib{nullptr};
     std::unique_ptr<QuantumDevice> rtd_qdevice{nullptr};
@@ -209,16 +215,18 @@ class RTDevice {
 
   public:
     explicit RTDevice(std::string _rtd_lib, std::string _rtd_name = {},
-                      std::string _rtd_kwargs = {}, bool _auto_qubit_management = false)
+                      std::string _rtd_kwargs = {}, int64_t _capacity = 0,
+                      bool _auto_qubit_management = false)
         : rtd_lib(std::move(_rtd_lib)), rtd_name(std::move(_rtd_name)),
-          rtd_kwargs(std::move(_rtd_kwargs)), auto_qubit_management(_auto_qubit_management)
+          rtd_kwargs(std::move(_rtd_kwargs)), capacity(_capacity),
+          auto_qubit_management(_auto_qubit_management)
     {
         _pl2runtime_device_info(rtd_lib, rtd_name);
     }
 
     explicit RTDevice(std::string_view _rtd_lib, std::string_view _rtd_name,
-                      std::string_view _rtd_kwargs, bool _auto_qubit_management)
-        : rtd_lib(_rtd_lib), rtd_name(_rtd_name), rtd_kwargs(_rtd_kwargs),
+                      std::string_view _rtd_kwargs, int64_t _capacity, bool _auto_qubit_management)
+        : rtd_lib(_rtd_lib), rtd_name(_rtd_name), rtd_kwargs(_rtd_kwargs), capacity(_capacity),
           auto_qubit_management(_auto_qubit_management)
     {
         _pl2runtime_device_info(rtd_lib, rtd_name);
@@ -233,7 +241,7 @@ class RTDevice {
     auto operator==(const RTDevice &other) const -> bool
     {
         return (this->rtd_lib == other.rtd_lib && this->rtd_name == other.rtd_name) &&
-               this->rtd_kwargs == other.rtd_kwargs &&
+               this->rtd_kwargs == other.rtd_kwargs && this->capacity == other.capacity &&
                this->auto_qubit_management == other.auto_qubit_management;
     }
 
@@ -254,9 +262,9 @@ class RTDevice {
     }
 
     [[nodiscard]] auto getDeviceInfo() const
-        -> std::tuple<std::string, std::string, std::string, bool>
+        -> std::tuple<std::string, std::string, std::string, int64_t, bool>
     {
-        return {rtd_lib, rtd_name, rtd_kwargs, auto_qubit_management};
+        return {rtd_lib, rtd_name, rtd_kwargs, capacity, auto_qubit_management};
     }
 
     [[nodiscard]] auto getDeviceName() const -> const std::string & { return rtd_name; }
@@ -267,10 +275,56 @@ class RTDevice {
 
     [[nodiscard]] auto getDeviceStatus() const -> RTDeviceStatus { return status; }
 
+    uint64_t getDeviceCapacity() { return capacity; }
+
+    uint64_t resolveWireLabelToIndex(int64_t label)
+    {
+        if (wire_label_to_qirarray_index.contains(label)) {
+            return wire_label_to_qirarray_index[label];
+        }
+        else {
+            // TODO: check against capacity
+            wire_label_to_qirarray_index[label] = current_biggest_wire_index;
+            return current_biggest_wire_index++;
+        }
+    }
+
+    void fillWireLabelMapUpToCapacity()
+    {
+        if (wire_label_to_qirarray_index.size() == capacity) {
+            return;
+        }
+
+        std::set<uint64_t> unused_indices;
+        for (uint64_t i = 0; i < capacity; i++) {
+            unused_indices.insert(i);
+        }
+        for (auto pair : wire_label_to_qirarray_index) {
+            unused_indices.erase(pair.second);
+        }
+
+        // Should not be used with dynamic allocations
+        // So the labels are just the repermuted indices
+        for (int64_t label = 0; label < static_cast<int64_t>(capacity); label++) {
+            if (!wire_label_to_qirarray_index.contains(label)) {
+                uint64_t popped = *unused_indices.begin();
+                unused_indices.erase(popped);
+                wire_label_to_qirarray_index[label] = popped;
+            }
+        }
+
+        assert(wire_label_to_qirarray_index.size() == capacity);
+    }
+
+    const std::map<int64_t, uint64_t> &getWireLabelMap() const
+    {
+        return wire_label_to_qirarray_index;
+    }
+
     friend std::ostream &operator<<(std::ostream &os, const RTDevice &device)
     {
         os << "RTD, name: " << device.rtd_name << " lib: " << device.rtd_lib
-           << " kwargs: " << device.rtd_kwargs
+           << " kwargs: " << device.rtd_kwargs << " capacity: " << device.capacity
            << "auto_qubit_management: " << device.auto_qubit_management;
         return os;
     }
@@ -320,13 +374,14 @@ class ExecutionContext final {
     }
 
     [[nodiscard]] auto getOrCreateDevice(std::string_view rtd_lib, std::string_view rtd_name,
-                                         std::string_view rtd_kwargs, bool auto_qubit_management)
+                                         std::string_view rtd_kwargs, int64_t capacity,
+                                         bool auto_qubit_management)
         -> const std::shared_ptr<RTDevice> &
     {
         std::lock_guard<std::mutex> lock(pool_mu);
 
-        auto device =
-            std::make_shared<RTDevice>(rtd_lib, rtd_name, rtd_kwargs, auto_qubit_management);
+        auto device = std::make_shared<RTDevice>(rtd_lib, rtd_name, rtd_kwargs, capacity,
+                                                 auto_qubit_management);
 
         const size_t key = device_pool.size();
         for (size_t i = 0; i < key; i++) {
@@ -352,13 +407,14 @@ class ExecutionContext final {
         return device_pool[key];
     }
 
-    [[nodiscard]] auto
-    getOrCreateDevice(const std::string &rtd_lib, const std::string &rtd_name = {},
-                      const std::string &rtd_kwargs = {}, bool auto_qubit_management = false)
+    [[nodiscard]] auto getOrCreateDevice(const std::string &rtd_lib,
+                                         const std::string &rtd_name = {},
+                                         const std::string &rtd_kwargs = {}, int64_t capacity = 0,
+                                         bool auto_qubit_management = false)
         -> const std::shared_ptr<RTDevice> &
     {
         return getOrCreateDevice(std::string_view{rtd_lib}, std::string_view{rtd_name},
-                                 std::string_view{rtd_kwargs}, auto_qubit_management);
+                                 std::string_view{rtd_kwargs}, capacity, auto_qubit_management);
     }
 
     [[nodiscard]] auto getDevice(size_t device_key) -> const std::shared_ptr<RTDevice> &
