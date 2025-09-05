@@ -22,12 +22,12 @@ from ..pipelines import PipelineStages, default_pipeline, insert_pass_before
 def mbqc_pipeline() -> PipelineStages:
     """Return the pipeline stages for MBQC workloads.
 
-    The MBQC pipeline is identical to the default Catalyst pipeline, but where
+    The MBQC pipeline is identical to the default Catalyst pipeline, but with
 
-      * The MBQC-to-LLVM dialect-conversion pass inserted immediately before the Quantum-to-LLVM
-        dialect-conversion pass in the ``MLIRToLLVMDialect`` pipeline stage.
-      * Array-backed registers have been enabled via the ``use-array-backed-registers`` option of
-        the ``convert-quantum-to-llvm`` pass.
+      * the MBQC-to-LLVM dialect-conversion pass inserted immediately before the Quantum-to-LLVM
+        dialect-conversion pass in the ``MLIRToLLVMDialect`` pipeline stage, and
+      * array-backed registers enabled via the ``use-array-backed-registers`` option of the
+        ``convert-quantum-to-llvm`` pass.
 
     Returns:
         PipelineStages: The list of pipeline stages.
@@ -65,10 +65,10 @@ def mbqc_pipeline() -> PipelineStages:
 
     _, pipeline = stages[llvm_dialect_conversion_stage_index]
 
-    assert len(pipeline) > 0, "Pipeline for stage 'MLIRToLLVMDialect' is empty"
-    assert (
-        "convert-quantum-to-llvm" in pipeline
-    ), "Pipeline for stage 'MLIRToLLVMDialect' missing required pass 'convert-quantum-to-llvm'"
+    assert "convert-quantum-to-llvm" in pipeline, (
+        f"Pipeline for stage 'MLIRToLLVMDialect' missing required pass 'convert-quantum-to-llvm'.\n"
+        f"The pipeline for this stage is: {pipeline}"
+    )
 
     # Insert (in-place) the "convert-mbqc-to-llvm" pass immediately before the
     # "convert-quantum-to-llvm" pass in the MLIRToLLVMDialect pipeline
