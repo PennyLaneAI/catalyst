@@ -283,9 +283,9 @@ def GenerateWireLabelsOp : Quantum_Op<"generate_wire_labels"> {
         Variadic<I64>:$labels
     );
 
-    // let assemblyFormat = [{
-    //     attr-dict `:` type(results)
-    // }];
+    let assemblyFormat = [{
+        $num_labels attr-dict `:` type($labels)
+    }];
 }
 
 // -----

@@ -1163,6 +1163,14 @@ int64_t __catalyst__rt__array_get_size_1d(QirArray *ptr)
     return qubit_vector_ptr->size();
 }
 
+void __catalyst__rt__generate_wire_labels(int64_t num_labels, int64_t *results)
+{
+    for (size_t i = 0; i < num_labels; i++) {
+        results[i] = RTD_PTR->generateNewLabel();
+    }
+    return;
+}
+
 int8_t *__catalyst__rt__array_get_element_ptr_1d(QirArray *ptr, int64_t label)
 {
     // Isolate automatic qubit management for now

@@ -277,6 +277,17 @@ class RTDevice {
 
     uint64_t getDeviceCapacity() { return capacity; }
 
+    int64_t generateNewLabel()
+    {
+        int64_t candidate = -1;
+        while (wire_label_to_qirarray_index.contains(candidate)) {
+            candidate--;
+        }
+        wire_label_to_qirarray_index[candidate] = current_biggest_wire_index;
+        current_biggest_wire_index++;
+        return candidate;
+    }
+
     uint64_t resolveWireLabelToIndex(int64_t label)
     {
         if (wire_label_to_qirarray_index.contains(label)) {
