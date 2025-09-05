@@ -338,7 +338,7 @@ class GraphSolutionInterpreter(qml.capture.PlxprInterpreter):
             # Find the efficient pathways to the target gate set
             solutions = decomp_graph.solve()
 
-            def is_solved_for(op):  # pylint: disable==protected-access
+            def is_solved_for(op):
                 return (
                     op in solutions._all_op_indices
                     and solutions._all_op_indices[op] in solutions._visitor.distances
@@ -347,9 +347,7 @@ class GraphSolutionInterpreter(qml.capture.PlxprInterpreter):
             for (
                 op_node,
                 op_node_idx,
-            ) in (
-                solutions._all_op_indices.items()
-            ):  # pylint: disable==protected-access, protected-access
+            ) in solutions._all_op_indices.items():
 
                 if is_solved_for(op_node) and op_node_idx in solutions._visitor.predecessors:
                     d_node_idx = solutions._visitor.predecessors[op_node_idx]
