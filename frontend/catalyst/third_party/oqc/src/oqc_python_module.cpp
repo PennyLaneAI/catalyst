@@ -47,7 +47,6 @@ except Exception as e:
     counts = {i: 0 for i in range(2 ** num_qubits)}
 )";
 
-extern "C" {
 [[gnu::visibility("default")]] void counts(const char *_circuit, const char *_device, size_t shots,
                                            size_t num_qubits, const char *_kwargs, void *_vector)
 {
@@ -81,6 +80,5 @@ extern "C" {
     }
     return;
 }
-} // extern "C"
 
 NB_MODULE(oqc_python_module, m) { m.doc() = "oqc"; }
