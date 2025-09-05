@@ -338,3 +338,27 @@ def test_multi_qubit_gates_on_different_dynamic_wires():
 
 
 test_multi_qubit_gates_on_different_dynamic_wires()
+
+
+def test_pass_application():
+    """Application of pass decorators."""
+
+    dev = qml.device("null.qubit", wires=1)
+
+    qml.capture.enable()
+
+    @qml.qjit(target="mlir")
+    @qml.transforms.cancel_inverses
+    @qml.transforms.merge_rotations
+    @qml.qnode(dev)
+    def circuit():
+        return qml.probs()
+
+    # CHECK: [[first_pass:%.+]] = transform.apply_registered_pass "merge-rotations"
+    # CHECK-NEXT: transform.apply_registered_pass "remove-chained-self-inverse" to [[first_pass]]
+
+    print(circuit.mlir)
+    qml.capture.disable()
+
+
+test_pass_application()
