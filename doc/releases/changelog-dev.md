@@ -92,6 +92,9 @@
 * Changed the attribute of `number_original_arg` in `CustomCallOp` from dense array to integer.
   [(#2022)](https://github.com/PennyLaneAI/catalyst/pull/2022)
 
+* Renaming `get_ppm_specs` to `ppm_specs` and the corresponding results' properties.
+  [(#2031)](https://github.com/PennyLaneAI/catalyst/pull/2031)
+
 <h3>Breaking changes 💔</h3>
 
 * The `shots` property has been removed from `OQDDevice`. The number of shots for a qnode execution is now set directly on the qnode via `qml.set_shots`,
@@ -134,6 +137,10 @@
 * A bug in the `NullQubit::ReleaseQubit()` method that prevented the deallocation of individual
   qubits on the `"null.qubit"` device has been fixed.
   [(#1926)](https://github.com/PennyLaneAI/catalyst/pull/1926)
+
+* Stacked Python decorators for built-in Catalyst passes are now applied in the correct order when
+  program capture is enabled.
+  [(#2027)](https://github.com/PennyLaneAI/catalyst/pull/2027)
 
 <h3>Internal changes ⚙️</h3>
 
@@ -229,6 +236,13 @@
   [(#1955)](https://github.com/PennyLaneAI/catalyst/pull/1955)
 
 <h3>Documentation 📝</h3>
+
+* The Catalyst Command Line Interface documentation incorrectly stated that the `catalyst`
+  executable is available in the `catalyst/bin/` directory relative to the environment's
+  installation directory when installed via pip. The documentation has been updated to point to the
+  correct location, which is the `bin/` directory relative to the environment's installation
+  directory.
+  [(#2030)](https://github.com/PennyLaneAI/catalyst/pull/2030)
 
 <h3>Contributors ✍️</h3>
 
