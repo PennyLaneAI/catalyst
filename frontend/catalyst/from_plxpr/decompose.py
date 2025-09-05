@@ -40,6 +40,8 @@ from pennylane.decomposition.decomposition_graph import DecompGraphSolution
 from pennylane.decomposition.utils import translate_op_alias
 from pennylane.operation import Operator
 
+# decomposition_rule decorator:
+from catalyst.jax_primitives import decomposition_rule
 
 CollectResourceOps = CollectResourceOps
 
@@ -343,6 +345,11 @@ class GraphSolutionInterpreter(qml.capture.PlxprInterpreter):
                 if is_solved_for(op_node) and op_node_idx in solutions._visitor.predecessors:
                     d_node_idx = solutions._visitor.predecessors[op_node_idx]
                     self._decomp_graph_solution[op_node] = solutions._graph[d_node_idx].rule._impl
+
+            print("[DEBUG PRINT] Decomposition graph solution:", self._decomp_graph_solution)
+
+            # for op, op_rule in self._decomp_graph_solution.items():
+            #     decomposition_rule()(op_rule)
 
         for eqn in jaxpr.eqns:
             primitive = eqn.primitive
