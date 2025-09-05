@@ -1291,7 +1291,7 @@ class TestCapture:
         qml.capture.enable()
 
         @qjit(target="mlir")
-        @partial(qml.transforms.decompose, gate_set=[qml.RX, qml.RY, qml.RZ])
+        @partial(qml.transforms.decompose, gate_set=["RX", "RY", "RZ"])
         @qml.qnode(qml.device(backend, wires=2))
         def captured_circuit(x: float, y: float, z: float):
             qml.Rot(x, y, z, 0)
@@ -1305,7 +1305,7 @@ class TestCapture:
         # Capture disabled
 
         @qjit
-        @partial(qml.transforms.decompose, gate_set=[qml.RX, qml.RY, qml.RZ])
+        @partial(qml.transforms.decompose, gate_set=["RX", "RY", "RZ"])
         @qml.qnode(qml.device(backend, wires=2))
         def circuit(x: float, y: float, z: float):
             qml.Rot(x, y, z, 0)

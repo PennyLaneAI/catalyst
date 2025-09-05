@@ -617,7 +617,7 @@ def trace_to_jaxpr(func, static_argnums, abstracted_axes, args, kwargs, debug_in
 
 
 @debug_logger
-def lower_jaxpr_to_mlir(jaxpr, func_name):
+def lower_jaxpr_to_mlir(jaxpr, func_name, py_attrs=None):
     """Lower a JAXPR to MLIR.
 
     Args:
@@ -632,7 +632,7 @@ def lower_jaxpr_to_mlir(jaxpr, func_name):
     MemrefCallable.clearcache()
 
     with transient_jax_config({"jax_dynamic_shapes": True}):
-        mlir_module, ctx = jaxpr_to_mlir(func_name, jaxpr)
+        mlir_module, ctx = jaxpr_to_mlir(func_name, jaxpr, py_attrs=py_attrs)
 
     return mlir_module, ctx
 

@@ -83,6 +83,7 @@ RUNTIME_OPERATIONS = [
     "PSWAP",
     "QubitUnitary",
     "Rot",
+    "RotXZX",
     "RX",
     "RY",
     "RZ",
@@ -107,6 +108,13 @@ RUNTIME_OBSERVABLES = [
 ]
 
 RUNTIME_MPS = ["ExpectationMP", "SampleMP", "VarianceMP", "CountsMP", "StateMP", "ProbabilityMP"]
+
+# A list of operations that the can be represented
+# in the Catalyst compiler. This is a superset of
+# the operations supported by the runtime.
+# FIXME: ops with OpName(params, wires) signatures
+# can be represented in the Catalyst compiler.
+COMPILER_OPERATIONS = RUNTIME_OPERATIONS
 
 # The runtime interface does not care about specific gate properties, so set them all to True.
 RUNTIME_OPERATIONS = {

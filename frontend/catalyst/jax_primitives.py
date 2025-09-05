@@ -395,7 +395,7 @@ def subroutine(func):
     return wrapper
 
 
-def decomposition_rule(func=None, *, is_qreg=False, num_params=0):
+def decomposition_rule(func=None, *, is_qreg=True, num_params=0):
     """
     Denotes the creation of a quantum definition in the intermediate representation.
     """
