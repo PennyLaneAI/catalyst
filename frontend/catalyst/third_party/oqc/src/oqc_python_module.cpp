@@ -68,11 +68,6 @@ extern "C" {
     nb::exec(nb::str(program.c_str()), scope, locals);
 
     auto msg = nb::cast<std::string>(locals["msg"]);
-    if (msg == "OQC credentials not found in environment variables") {
-        std::cout << "[OQC INFO] OQC credentials not configured. No email, password, or url found "
-                     "in environment variables.\n";
-        return;
-    }
 
     RT_FAIL_IF(!msg.empty(), msg.c_str());
 

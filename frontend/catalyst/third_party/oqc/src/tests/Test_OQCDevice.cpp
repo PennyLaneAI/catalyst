@@ -82,5 +82,6 @@ TEST_CASE("Test counts", "[openqasm][counts]")
     DataView<double, 1> eigvals_view(eigvals);
     DataView<int64_t, 1> counts_view(counts);
 
-    REQUIRE_NOTHROW(device->PartialCounts(eigvals_view, counts_view, {wires[0], wires[1]}));
+    REQUIRE_THROWS_WITH(device->PartialCounts(eigvals_view, counts_view, {wires[0], wires[1]}),
+                        Catch::Contains("OQC credentials not found in environment variables"));
 }
