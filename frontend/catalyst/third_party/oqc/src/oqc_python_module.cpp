@@ -22,17 +22,21 @@
 #include "Exception.hpp"
 
 std::string program = R"(
+import os
+email = os.environ.get("OQC_EMAIL")
+password = os.environ.get("OQC_PASSWORD")
+url = os.environ.get("OQC_URL")
+
+if not all([email, password, url]):
+    msg = "OQC_CREDENTIALS_MISSING"
+    raise ValueError("OQC credentials not found in environment variables")
 
 try:
-    import os
     from qcaas_client.client import OQCClient, QPUTask, CompilerConfig
     from qcaas_client.config import QuantumResultsFormat, Tket, TketOptimizations
     optimisations = Tket()
     optimisations.tket_optimizations = TketOptimizations.DefaultMappingPass
     RES_FORMAT = QuantumResultsFormat().binary_count()
-    email = os.environ.get("OQC_EMAIL")
-    password = os.environ.get("OQC_PASSWORD")
-    url = os.environ.get("OQC_URL")
     client = OQCClient(url=url, email=email, password=password)
     client.authenticate()
     oqc_config = CompilerConfig(repeats=shots, results_format=RES_FORMAT, optimizations=optimisations)
@@ -43,8 +47,6 @@ try:
 except Exception as e:
     print(f"circuit: {circuit}")
     msg = str(e)
-    # Set fallback mock counts when OQC service fails or imports fail
-    counts = {i: 0 for i in range(2 ** num_qubits)}
 )";
 
 extern "C" {
@@ -69,8 +71,15 @@ extern "C" {
     nb::exec(nb::str(program.c_str()), scope, locals);
 
     auto msg = nb::cast<std::string>(locals["msg"]);
-    // RT_FAIL_IF(!msg.empty(), msg.c_str());
+    if (msg == "OQC_CREDENTIALS_MISSING") {
+        std::cout << "[OQC INFO] OQC credentials not configured. No email, password, or url found "
+                     "in environment variables.\n";
+        return;
+    }
 
+    RT_FAIL_IF(!msg.empty(), msg.c_str());
+
+    // Process counts only if we didn't have credential issues
     nb::dict results = locals["counts"];
 
     std::vector<size_t> *counts_value = reinterpret_cast<std::vector<size_t> *>(_vector);
