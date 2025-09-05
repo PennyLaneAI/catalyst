@@ -176,7 +176,8 @@ def custom_lower_jaxpr_to_module(
                             op.attributes[attr_name] = mlir_attr
                         except CompileError as e:
                             raise CompileError(
-                                f"While converting Python attribute '{attr_name}': '{attr_value}' to MLIR: {e}"
+                                "While converting Python attribute"
+                                f"'{attr_name}': '{attr_value}' to MLIR: {e}"
                             ) from e
             if isinstance(op, ModuleOp):
                 worklist += [*op.body.operations]
