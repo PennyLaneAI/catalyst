@@ -33,6 +33,7 @@ from pennylane.capture.expand_transforms import ExpandTransformsInterpreter
 from pennylane.capture.primitives import adjoint_transform_prim as plxpr_adjoint_transform_prim
 from pennylane.capture.primitives import ctrl_transform_prim as plxpr_ctrl_transform_prim
 from pennylane.capture.primitives import measure_prim as plxpr_measure_prim
+from pennylane.decomposition.collect_resource_ops import CollectResourceOps
 from pennylane.ftqc.primitives import measure_in_basis_prim as plxpr_measure_in_basis_prim
 from pennylane.ops.functions.map_wires import _map_wires_transform as pl_map_wires
 from pennylane.transforms import cancel_inverses as pl_cancel_inverses
@@ -45,7 +46,10 @@ from pennylane.transforms import unitary_to_rot as pl_unitary_to_rot
 
 from catalyst.device import extract_backend_info
 from catalyst.device.qjit_device import COMPILER_OPERATIONS
-from catalyst.from_plxpr.decompose import GraphSolutionInterpreter, PreMlirDecomposeInterpreter, CollectResourceOps
+from catalyst.from_plxpr.decompose import (
+    GraphSolutionInterpreter,
+    PreMlirDecomposeInterpreter,
+)
 from catalyst.from_plxpr.qubit_handler import QubitHandler
 from catalyst.jax_extras import jaxpr_pad_consts, make_jaxpr2, transient_jax_config
 from catalyst.jax_primitives import (
@@ -278,10 +282,9 @@ transforms_to_passes = {
     pl_unitary_to_rot: (None, False),
 }
 
+
 # pylint: disable=too-many-arguments
-def handle_graph_decomposition(
-    *args, inner_jaxpr, consts, non_const_args, targs, tkwargs
-):
+def handle_graph_decomposition(*args, inner_jaxpr, consts, non_const_args, targs, tkwargs):
     """Handle the graph decomposition for a given JAXPR."""
 
     gate_set = COMPILER_OPERATIONS

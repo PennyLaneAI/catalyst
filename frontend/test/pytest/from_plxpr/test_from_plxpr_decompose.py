@@ -217,9 +217,13 @@ class TestDecomposeGraphEnabled:
 
             @property
             def resource_params(self):
+                """Dummy resource params."""
+
                 return {}
 
             def decomposition(self):
+                """Decomposition of CustomOp into H-CNOT-H."""
+
                 return [qml.H(self.wires[1]), qml.CNOT(self.wires), qml.H(self.wires[1])]
 
         @qml.register_resources({qml.CZ: 1})

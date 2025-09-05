@@ -627,7 +627,7 @@ void __catalyst__qis__Rot(double phi, double theta, double omega, QUBIT *qubit,
 }
 
 void __catalyst__qis__RotXZX(double phi, double theta, double omega, QUBIT *qubit,
-                              const Modifiers *modifiers)
+                             const Modifiers *modifiers)
 {
     getQuantumDevicePtr()->NamedOperation("RotXZX", {phi, theta, omega},
                                           {reinterpret_cast<QubitIdType>(qubit)},

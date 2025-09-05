@@ -29,13 +29,12 @@ from functools import partial
 import jax
 import pennylane as qml
 
-from pennylane.decomposition.collect_resource_ops import CollectResourceOps
-
 # Support ctrl ops in decomposition (adapted from PL's DecomposeInterpreter)
 from pennylane.capture.primitives import ctrl_transform_prim
 
 # GraphSolutionInterpreter:
 from pennylane.decomposition import DecompositionGraph
+from pennylane.decomposition.collect_resource_ops import CollectResourceOps
 from pennylane.decomposition.decomposition_graph import DecompGraphSolution
 from pennylane.decomposition.utils import translate_op_alias
 from pennylane.operation import Operator
@@ -275,6 +274,7 @@ def _(self, *invals, n_control, jaxpr, control_values, work_wires, n_consts):
     jaxpr = jax.make_jaxpr(wrapper)(*args)
     return self.eval(jaxpr.jaxpr, jaxpr.consts, *args)
 
+
 class GraphSolutionInterpreter(qml.capture.PlxprInterpreter):
     """Interpreter for getting the decomposition graph solution
     from a jaxpr when program capture is enabled.
@@ -293,7 +293,8 @@ class GraphSolutionInterpreter(qml.capture.PlxprInterpreter):
 
         if not qml.decomposition.enabled_graph():
             raise TypeError(
-                "The GraphSolutionInterpreter can only be used when graph-based decomposition is enabled."
+                "The GraphSolutionInterpreter can only be used when"
+                "graph-based decomposition is enabled."
             )
 
         self._operations = operations
@@ -304,7 +305,7 @@ class GraphSolutionInterpreter(qml.capture.PlxprInterpreter):
         gate_set, _ = _resolve_gate_set(gate_set)
         self._gate_set = gate_set
 
-    # pylint: disable=too-many-branches
+    # pylint: disable=too-many-branches, complex-method
     def eval(self, jaxpr: "jax.extend.core.Jaxpr", consts: Sequence, *args) -> list:
         """Evaluate a jaxpr.
 
@@ -317,7 +318,7 @@ class GraphSolutionInterpreter(qml.capture.PlxprInterpreter):
             list[TensorLike]: the results of the execution.
 
         """
-        self._env = {}
+        self._env = {}  # pylint: disable=attribute-defined-outside-init
         self.setup()
 
         for arg, invar in zip(args, jaxpr.invars, strict=True):
@@ -326,7 +327,7 @@ class GraphSolutionInterpreter(qml.capture.PlxprInterpreter):
             self._env[constvar] = const
 
         if self._operations and not self._decomp_graph_solution:
- 
+
             decomp_graph = DecompositionGraph(
                 self._operations,
                 self._gate_set,
@@ -337,19 +338,24 @@ class GraphSolutionInterpreter(qml.capture.PlxprInterpreter):
             # Find the efficient pathways to the target gate set
             solutions = decomp_graph.solve()
 
-            def is_solved_for(op):
-                return op in solutions._all_op_indices and solutions._all_op_indices[op] in solutions._visitor.distances
+            def is_solved_for(op):  # pylint: disable==protected-access
+                return (
+                    op in solutions._all_op_indices
+                    and solutions._all_op_indices[op] in solutions._visitor.distances
+                )
 
-            for op_node, op_node_idx in solutions._all_op_indices.items():
+            for (
+                op_node,
+                op_node_idx,
+            ) in (
+                solutions._all_op_indices.items()
+            ):  # pylint: disable==protected-access, protected-access
 
                 if is_solved_for(op_node) and op_node_idx in solutions._visitor.predecessors:
                     d_node_idx = solutions._visitor.predecessors[op_node_idx]
                     self._decomp_graph_solution[op_node] = solutions._graph[d_node_idx].rule._impl
 
-            print("[DEBUG PRINT] Decomposition graph solution:", self._decomp_graph_solution)
-
-            # for op, op_rule in self._decomp_graph_solution.items():
-            #     decomposition_rule()(op_rule)
+            # print("[DEBUG PRINT] Decomposition graph solution:", self._decomp_graph_solution)
 
         for eqn in jaxpr.eqns:
             primitive = eqn.primitive
@@ -383,6 +389,7 @@ class GraphSolutionInterpreter(qml.capture.PlxprInterpreter):
         self.cleanup()
         self._env = {}
         return outvals
+
 
 # pylint: disable=too-many-arguments
 @GraphSolutionInterpreter.register_primitive(ctrl_transform_prim)
@@ -518,4 +525,3 @@ def _resolve_gate_set(
         _stopping_condition = gate_set_contains
 
     return gate_set, _stopping_condition
-
