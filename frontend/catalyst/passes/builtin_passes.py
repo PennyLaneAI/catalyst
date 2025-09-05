@@ -1039,7 +1039,7 @@ def ppm_specs(fn):
                         'max_weight_pi2': 2,
                         'logical_qubits': 2,
                         'num_of_ppm': 44,
-                        'num_pi2_gates': 16
+                        'pi2_ppr': 16
                     },
         }
         . . .
