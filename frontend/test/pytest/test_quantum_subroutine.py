@@ -116,7 +116,7 @@ def test_quantum_subroutine_conditional():
     qml.capture.enable()
 
     @qml.qjit(autograph=False)
-    @qml.qnode(qml.device("lightning.qubit", wires=1), autograph=False)
+    @qml.qnode(qml.device("lightning.qubit", wires=1))
     def subroutine_test(c: int):
         Hadamard0(c)
         return qml.state()
