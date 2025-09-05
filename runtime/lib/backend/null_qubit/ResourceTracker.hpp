@@ -161,7 +161,7 @@ struct ResourceTracker final {
         pretty_print_dict(gate_types_, 2, resources);
         resources << ",\n";
         resources << "  \"gate_sizes\": ";
-        pretty_print_dict(gate_sizes_, 2, resources);
+        pretty_print_dict(gate_sizes_, 2, resources, false);
         resources << ",\n";
         if (compute_depth_) {
             resources << "  \"depth\": " << GetDepth() << "\n";
