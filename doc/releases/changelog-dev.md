@@ -31,11 +31,14 @@
 * Improve the pass `--ppm-specs` to count the depth of PPRs and PPMs in the circuit.
   [(#2014)](https://github.com/PennyLaneAI/catalyst/pull/2014)
 
+* The default mid-circuit measurement method in catalyst has been changed from `"single-branch-statistics"` to `"one-shot"`.
+  [[#2017]](https://github.com/PennyLaneAI/catalyst/pull/2017)
+
 * A new pass `--partition-layers` has been added to group PPR/PPM operations into `qec.layer`
   operations based on qubit interactive and commutativity, enabling circuit analysis and
   potentially to support parallel execution.
   [(#1951)](https://github.com/PennyLaneAI/catalyst/pull/1951)
-  
+
 * Added a new JAX primitive to capture and compile the decomposition rule
   definitions to MLIR. `decomposition_rule` is the decorator integrated
   with this primitive for development purposes.
@@ -89,6 +92,12 @@
 * A new jax primitive `qdealloc_qb_p` is available for single qubit deallocations.
   [(#2005)](https://github.com/PennyLaneAI/catalyst/pull/2005)
 
+* Changed the attribute of `number_original_arg` in `CustomCallOp` from dense array to integer.
+  [(#2022)](https://github.com/PennyLaneAI/catalyst/pull/2022)
+
+* Renaming `get_ppm_specs` to `ppm_specs` and the corresponding results' properties.
+  [(#2031)](https://github.com/PennyLaneAI/catalyst/pull/2031)
+
 <h3>Breaking changes 💔</h3>
 
 * The `shots` property has been removed from `OQDDevice`. The number of shots for a qnode execution is now set directly on the qnode via `qml.set_shots`,
@@ -132,6 +141,10 @@
   qubits on the `"null.qubit"` device has been fixed.
   [(#1926)](https://github.com/PennyLaneAI/catalyst/pull/1926)
 
+* Stacked Python decorators for built-in Catalyst passes are now applied in the correct order when
+  program capture is enabled.
+  [(#2027)](https://github.com/PennyLaneAI/catalyst/pull/2027)
+
 <h3>Internal changes ⚙️</h3>
 
 * Updates use of `qml.transforms.dynamic_one_shot.parse_native_mid_circuit_measurements` to improved signature.
@@ -151,6 +164,7 @@
 
 * Update imports for noise transforms from `pennylane.transforms` to `pennylane.noise`.
   [(#1918)](https://github.com/PennyLaneAI/catalyst/pull/1918)
+  [(#2020)](https://github.com/PennyLaneAI/catalyst/pull/2020)
 
 * Improve error message for quantum subroutines when used outside a quantum context.
   [(#1932)](https://github.com/PennyLaneAI/catalyst/pull/1932)
@@ -226,6 +240,13 @@
 
 <h3>Documentation 📝</h3>
 
+* The Catalyst Command Line Interface documentation incorrectly stated that the `catalyst`
+  executable is available in the `catalyst/bin/` directory relative to the environment's
+  installation directory when installed via pip. The documentation has been updated to point to the
+  correct location, which is the `bin/` directory relative to the environment's installation
+  directory.
+  [(#2030)](https://github.com/PennyLaneAI/catalyst/pull/2030)
+
 <h3>Contributors ✍️</h3>
 
 This release contains contributions from (in alphabetical order):
@@ -235,10 +256,12 @@ Joey Carter,
 Yushao Chen,
 Sengthai Heng,
 David Ittah,
+Jeffrey Kam,
 Christina Lee,
 Joseph Lee,
 Andrija Paurevic,
 Ritu Thombre,
 Roberto Turrado,
 Paul Haochen Wang,
-Jake Zaia.
+Jake Zaia,
+Hongsheng Zheng

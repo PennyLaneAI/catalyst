@@ -41,15 +41,16 @@ class TestShotVector:
         assert len(circuit()) == 4
         assert jnp.array(circuit()).shape == (4, 3, 1)
 
+    @pytest.mark.parametrize("mcm_method", ["single-branch-statistics", "one-shot"])
     @pytest.mark.parametrize("shots", [((3, 4),), (3,) * 4, (3, 3, 3, 3), [3, 3, 3, 3]])
-    def test_multiple_sample_measurement(self, shots):
+    def test_multiple_sample_measurement(self, shots, mcm_method):
         """Test shot-vector with mulitple samples measurment"""
 
         dev = qml.device("lightning.qubit", wires=1)
 
         @qjit
         @qml.set_shots(shots)
-        @qml.qnode(dev)
+        @qml.qnode(dev, mcm_method=mcm_method)
         def circuit_list():
             qml.Hadamard(0)
             return [qml.sample(), qml.sample()]
@@ -60,7 +61,7 @@ class TestShotVector:
 
         @qjit
         @qml.set_shots(shots)
-        @qml.qnode(dev)
+        @qml.qnode(dev, mcm_method=mcm_method)
         def circuit_dict():
             qml.X(0)
             return {"first": qml.sample(), "second": qml.sample()}
@@ -69,14 +70,15 @@ class TestShotVector:
         assert jnp.array(circuit_dict()["first"]).shape == (4, 3, 1)
         assert jnp.array(circuit_dict()["second"]).shape == (4, 3, 1)
 
-    def test_shot_vector_with_mixes_shots_and_without_copies(self):
+    @pytest.mark.parametrize("mcm_method", ["single-branch-statistics", "one-shot"])
+    def test_shot_vector_with_mixes_shots_and_without_copies(self, mcm_method):
         """Test shot-vector with mixes shots and without copies"""
 
         dev = qml.device("lightning.qubit", wires=1)
 
         @qjit
         @qml.set_shots(((20, 5), 100, (101, 2)))
-        @qml.qnode(dev)
+        @qml.qnode(dev, mcm_method=mcm_method)
         def circuit():
             qml.Hadamard(0)
             return qml.sample()
@@ -150,7 +152,7 @@ class TestShotVector:
 
         @qjit
         @qml.set_shots(((3, 4),))
-        @qml.qnode(dev)
+        @qml.qnode(dev, mcm_method="sigle-branch-statistics")
         def circuit():
             qml.Hadamard(0)
             return {

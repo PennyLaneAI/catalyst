@@ -979,7 +979,7 @@ def ppm_compilation(
     return PassPipelineWrapper(qnode, passes)
 
 
-def get_ppm_specs(fn):
+def ppm_specs(fn):
     R"""
     This function returns following PPM specs in a dictionary:
         - Pi/4 PPR (count the number of clifford PPRs)
@@ -1009,7 +1009,7 @@ def get_ppm_specs(fn):
 
         import pennylane as qml
         from catalyst import qjit, measure, for_loop
-        from catalyst.passes import get_ppm_specs, ppm_compilation
+        from catalyst.passes import ppm_specs, ppm_compilation
 
         pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
         device = qml.device("lightning.qubit", wires=2)
@@ -1026,7 +1026,7 @@ def get_ppm_specs(fn):
             loop()
             return measure(0), measure(1)
 
-        ppm_specs = get_ppm_specs(circuit)
+        ppm_specs = ppm_specs(circuit)
         print(ppm_specs)
 
     Example PPM Specs:
@@ -1037,9 +1037,9 @@ def get_ppm_specs(fn):
         {
             'circuit_0': {
                         'max_weight_pi2': 2,
-                        'num_logical_qubits': 2,
+                        'logical_qubits': 2,
                         'num_of_ppm': 44,
-                        'num_pi2_gates': 16
+                        'pi2_ppr': 16
                     },
         }
         . . .
@@ -1065,7 +1065,7 @@ def get_ppm_specs(fn):
             )  # remove MLIR starting with substring "module..."
         except Exception as e:  # pragma: nocover
             raise CompileError(
-                "Invalid json format encountered in get_ppm_specs. "
+                "Invalid json format encountered in ppm_specs. "
                 f" but got {raw_result[: raw_result.index('module')]}"
             ) from e
 
