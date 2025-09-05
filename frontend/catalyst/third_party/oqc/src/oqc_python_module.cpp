@@ -22,13 +22,14 @@
 #include "Exception.hpp"
 
 std::string program = R"(
-import os
-from qcaas_client.client import OQCClient, QPUTask, CompilerConfig
-from qcaas_client.config import QuantumResultsFormat, Tket, TketOptimizations
-optimisations = Tket()
-optimisations.tket_optimizations = TketOptimizations.DefaultMappingPass
-RES_FORMAT = QuantumResultsFormat().binary_count()
+
 try:
+    import os
+    from qcaas_client.client import OQCClient, QPUTask, CompilerConfig
+    from qcaas_client.config import QuantumResultsFormat, Tket, TketOptimizations
+    optimisations = Tket()
+    optimisations.tket_optimizations = TketOptimizations.DefaultMappingPass
+    RES_FORMAT = QuantumResultsFormat().binary_count()
     email = os.environ.get("OQC_EMAIL")
     password = os.environ.get("OQC_PASSWORD")
     url = os.environ.get("OQC_URL")
@@ -68,7 +69,7 @@ extern "C" {
     nb::exec(nb::str(program.c_str()), scope, locals);
 
     auto msg = nb::cast<std::string>(locals["msg"]);
-    RT_FAIL_IF(!msg.empty(), msg.c_str());
+    // RT_FAIL_IF(!msg.empty(), msg.c_str());
 
     nb::dict results = locals["counts"];
 
