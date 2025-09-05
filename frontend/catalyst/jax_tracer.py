@@ -1205,7 +1205,12 @@ def apply_transforms(
         # TODO: Ideally we should allow qnode transforms that don't modify the measurements to
         # operate in the permissive tracing mode, but that currently leads to a small number of
         # test failures due to the different result format produced in trace_quantum_function.
-        if has_classical_outputs(flat_results):
+        only_with_dynamic_one_shot = all(
+            "dynamic_one_shot_partial" in str(getattr(qnode, "transform", ""))
+            for qnode in qnode_program
+        )
+
+        if has_classical_outputs(flat_results) and not only_with_dynamic_one_shot:
             msg = (
                 "Transforming MeasurementProcesses is unsupported with non-MeasurementProcess "
                 "QNode outputs. The selected device, options, or applied QNode transforms, may be "
@@ -1480,12 +1485,9 @@ def trace_quantum_function(
                 meas_results = tree_unflatten(meas_trees, meas_tracers)
 
                 # TODO: Allow the user to return whatever types they specify.
-                if tracing_mode == TracingMode.TRANSFORM:
-                    assert isinstance(meas_results, list)
-                    if len(meas_results) == 1:
-                        transformed_results.append(meas_results[0])
-                    else:
-                        transformed_results.append(tuple(meas_results))
+                if tracing_mode == TracingMode.TRANSFORM and isinstance(meas_results, list):
+                    result = meas_results[0] if len(meas_results) == 1 else tuple(meas_results)
+                    transformed_results.append(result)
                 else:
                     transformed_results.append(meas_results)
 
