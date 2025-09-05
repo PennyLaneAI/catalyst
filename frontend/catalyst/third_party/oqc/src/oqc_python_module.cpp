@@ -44,6 +44,8 @@ try:
 except Exception as e:
     print(f"circuit: {circuit}")
     msg = str(e)
+    # Set fallback mock counts when OQC service fails
+    counts = {i: 0 for i in range(2 ** num_qubits)}
 )";
 
 extern "C" {
