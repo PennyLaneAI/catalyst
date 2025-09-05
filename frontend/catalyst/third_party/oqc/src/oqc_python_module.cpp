@@ -69,6 +69,8 @@ extern "C" {
 
     auto msg = nb::cast<std::string>(locals["msg"]);
 
+    std::cout << "msg: " << msg << "\n";
+
     RT_FAIL_IF(!msg.empty(), msg.c_str());
 
     // Process counts only if we didn't have credential issues
