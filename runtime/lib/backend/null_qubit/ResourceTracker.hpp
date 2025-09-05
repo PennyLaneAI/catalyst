@@ -35,7 +35,7 @@ struct ResourceTracker final {
     std::unordered_map<std::string, std::size_t> gate_types_;
     std::unordered_map<std::size_t, std::size_t> gate_sizes_;
     std::unordered_map<QubitIdType, std::size_t> wire_depths;
-    std::size_t max_num_wires_;
+    QubitIdType max_num_wires_;
     bool static_fname_;
     bool compute_depth_;
     std::string resources_fname_;
@@ -147,7 +147,7 @@ struct ResourceTracker final {
      *
      * @return The highest number of qubits that have been allocated at any point
      */
-    auto GetNumWires() -> std::size_t { return max_num_wires_; }
+    auto GetNumWires() -> QubitIdType { return max_num_wires_; }
 
     /**
      * @brief Returns the filename where resource tracking information is dumped
@@ -201,7 +201,7 @@ struct ResourceTracker final {
      *
      * @param max_wires The current number of allocated wires
      */
-    void SetMaxWires(std::size_t max_wires)
+    void SetMaxWires(QubitIdType max_wires)
     {
         max_num_wires_ = std::max(max_wires, max_num_wires_);
     }
