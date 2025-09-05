@@ -81,6 +81,7 @@ from mlir_quantum.dialects.quantum import (
     DeviceReleaseOp,
     ExpvalOp,
     ExtractOp,
+    GenerateWireLabelsOp,
     GlobalPhaseOp,
     HamiltonianOp,
     HermitianOp,
@@ -262,6 +263,8 @@ qdealloc_p = Primitive("qdealloc")
 qdealloc_p.multiple_results = True
 qdealloc_qb_p = Primitive("qdealloc_qb")
 qdealloc_qb_p.multiple_results = True
+qgenerate_wire_labels_p = Primitive("qgenerate_wire_labels")
+qgenerate_wire_labels_p.multiple_results = True
 qextract_p = Primitive("qextract")
 qinsert_p = Primitive("qinsert")
 gphase_p = Primitive("gphase")
@@ -1072,6 +1075,28 @@ def _qdealloc_qb_lowering(jax_ctx: mlir.LoweringRuleContext, qubit):
 
 
 #
+# qgenerate_wire_labels_p
+#
+@qgenerate_wire_labels_p.def_abstract_eval
+def _qgenerate_wire_labels_abstract_eval(num_labels=0):
+    return [core.ShapedArray((), jax.numpy.int64)] * num_labels
+
+
+def _qgenerate_wire_labels_lowering(jax_ctx: mlir.LoweringRuleContext, num_labels=0):
+    ctx = jax_ctx.module_context.context
+    # i64_type = ir.IntegerType.get_signed(64, ctx)
+    i64_type = ir.IntegerType.get_signless(64, ctx)
+    result_type = [i64_type] * num_labels
+
+    num_labels_np = np.array(num_labels)
+    num_labels_attr = ir.DenseIntElementsAttr.get(num_labels_np)
+    num_labels_tensor = StableHLOConstantOp(num_labels_attr)
+    num_labels_i64 = TensorExtractOp(i64_type, num_labels_tensor, []).result
+
+    return GenerateWireLabelsOp(result_type, num_labels_i64).results
+
+
+#
 # qextract
 #
 @qextract_p.def_impl
@@ -1094,7 +1119,9 @@ def _qextract_lowering(jax_ctx: mlir.LoweringRuleContext, qreg: ir.Value, qubit_
     assert ir.OpaqueType(qreg.type).dialect_namespace == "quantum"
     assert ir.OpaqueType(qreg.type).data == "reg"
 
-    qubit_idx = extract_scalar(qubit_idx, "wires", "index")
+    if not ir.IntegerType.isinstance(qubit_idx.type):
+        qubit_idx = extract_scalar(qubit_idx, "wires", "index")
+
     if not ir.IntegerType.isinstance(qubit_idx.type):
         raise TypeError(f"Operator wires expected to be integers, got {qubit_idx.type}!")
 
@@ -1133,7 +1160,9 @@ def _qinsert_lowering(
     assert ir.OpaqueType(qreg_old.type).dialect_namespace == "quantum"
     assert ir.OpaqueType(qreg_old.type).data == "reg"
 
-    qubit_idx = extract_scalar(qubit_idx, "wires", "index")
+    if not ir.IntegerType.isinstance(qubit_idx.type):
+        qubit_idx = extract_scalar(qubit_idx, "wires", "index")
+
     if not ir.IntegerType.isinstance(qubit_idx.type):
         raise TypeError(f"Operator wires expected to be integers, got {qubit_idx.type}!")
 
@@ -2523,6 +2552,7 @@ CUSTOM_LOWERING_RULES = (
     (qalloc_p, _qalloc_lowering),
     (qdealloc_p, _qdealloc_lowering),
     (qdealloc_qb_p, _qdealloc_qb_lowering),
+    (qgenerate_wire_labels_p, _qgenerate_wire_labels_lowering),
     (qextract_p, _qextract_lowering),
     (qinsert_p, _qinsert_lowering),
     (qinst_p, _qinst_lowering),

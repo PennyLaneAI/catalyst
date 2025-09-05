@@ -380,6 +380,54 @@ struct DeallocQubitOpPattern : public OpConversionPattern<DeallocQubitOp> {
     }
 };
 
+struct GenerateWireLabelsOpPattern : public OpConversionPattern<GenerateWireLabelsOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(GenerateWireLabelsOp op, GenerateWireLabelsOpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+        Location loc = op.getLoc();
+        MLIRContext *ctx = this->getContext();
+
+        StringRef qirName = "__catalyst__rt__generate_wire_labels";
+
+        Type qirSignature = LLVM::LLVMFunctionType::get(
+            LLVM::LLVMVoidType::get(ctx),
+            {IntegerType::get(ctx, 64), LLVM::LLVMPointerType::get(rewriter.getContext())});
+
+        LLVM::LLVMFuncOp fnDecl =
+            catalyst::ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+
+        llvm::errs() << "aloha! \n" << fnDecl << "\n";
+
+        // create result labels array
+        // int64_t numLabels = op->getNumResults();
+        // auto allocaOp = catalyst::getStaticAlloca(loc, rewriter, IntegerType::get(ctx, 64),
+        //     numLabels);
+        auto allocaOp =
+            rewriter.create<LLVM::AllocaOp>(loc, LLVM::LLVMPointerType::get(rewriter.getContext()),
+                                            IntegerType::get(ctx, 64), adaptor.getNumLabels());
+        auto allocaPtr = allocaOp.getResult();
+
+        rewriter.create<LLVM::CallOp>(loc, fnDecl, ValueRange{adaptor.getNumLabels(), allocaPtr});
+
+        // replace use
+        for (size_t i = 0; i < op->getNumResults(); i++) {
+            auto index = rewriter.create<LLVM::ConstantOp>(loc, IntegerType::get(ctx, 64),
+                                                           rewriter.getI64IntegerAttr(i));
+            auto gepOp = rewriter.create<LLVM::GEPOp>(
+                loc, LLVM::LLVMPointerType::get(rewriter.getContext()), IntegerType::get(ctx, 64),
+                allocaPtr, index.getResult());
+
+            auto elem = rewriter.create<LLVM::LoadOp>(loc, IntegerType::get(ctx, 64), gepOp);
+            rewriter.replaceAllUsesWith(op->getResult(i), elem);
+        }
+
+        op->erase();
+        return success();
+    }
+};
+
 struct ExtractOpPattern : public OpConversionPattern<ExtractOp> {
     using OpConversionPattern::OpConversionPattern;
 
@@ -1145,6 +1193,7 @@ void populateQIRConversionPatterns(TypeConverter &typeConverter, RewritePatternS
     patterns.add<DeviceInitOpPattern>(typeConverter, patterns.getContext());
     patterns.add<DeviceReleaseOpPattern>(typeConverter, patterns.getContext());
     patterns.add<NumQubitsOpPattern>(typeConverter, patterns.getContext());
+    patterns.add<GenerateWireLabelsOpPattern>(typeConverter, patterns.getContext());
     patterns.add<AllocOpPattern>(typeConverter, patterns.getContext());
     patterns.add<AllocQubitOpPattern>(typeConverter, patterns.getContext());
     patterns.add<DeallocOpPattern>(typeConverter, patterns.getContext());

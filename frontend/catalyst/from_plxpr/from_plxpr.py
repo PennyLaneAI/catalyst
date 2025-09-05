@@ -66,6 +66,7 @@ from catalyst.jax_primitives import (
     probs_p,
     qalloc_p,
     qdealloc_p,
+    qgenerate_wire_labels_p,
     qinst_p,
     quantum_kernel_p,
     quantum_subroutine_p,
@@ -449,6 +450,23 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         and no **kwargs) and the results is a sequence of values
         """
         return self.eval(jaxpr.jaxpr, jaxpr.consts, *args)
+
+
+@PLxPRToQuantumJaxprInterpreter.register_primitive(qml.allocation.allocate_prim)
+def handle_qml_alloc(self, *, num_wires, require_zeros=True, restored=False):
+    """Handle the conversion from plxpr to Catalyst jaxpr for the qml.allocate primitive"""
+
+    # allocation size can't be dynamic yet
+    assert isinstance(num_wires, int)
+    labels = qgenerate_wire_labels_p.bind(num_labels=num_wires)
+    return labels
+
+
+@PLxPRToQuantumJaxprInterpreter.register_primitive(qml.allocation.deallocate_prim)
+def handle_qml_dealloc(self, *wires):
+    """Handle the conversion from plxpr to Catalyst jaxpr for the qml.deallocate primitive"""
+    # TODO: add a "put labels in clean/dirty pool" primitive
+    return []
 
 
 @PLxPRToQuantumJaxprInterpreter.register_primitive(quantum_subroutine_p)
