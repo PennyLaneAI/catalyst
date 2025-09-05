@@ -476,7 +476,7 @@ TEST_CASE_METHOD(NullQubitRuntimeFixture, "Test insertion of qubit into register
     CHECK(reg_vec_before[2] == 2);
 
     // Release qubit 1; note that array `reg` is still [0, 1, 2]
-    __catalyst__rt__qubit_release(reinterpret_cast<QUBIT *>(1));
+    __catalyst__rt__qubit_release(reinterpret_cast<QUBIT *>(reg_vec_before[1]));
 
     // Allocate an individual qubit; internally it has ID 3
     QUBIT *q = __catalyst__rt__qubit_allocate();
@@ -511,8 +511,8 @@ TEST_CASE_METHOD(NullQubitRuntimeFixture,
     CHECK(reg2_vec[1] == 2);
 
     // Release qubit 0 (from reg1) and qubit 1 (from reg2)
-    __catalyst__rt__qubit_release(reinterpret_cast<QUBIT *>(0));
-    __catalyst__rt__qubit_release(reinterpret_cast<QUBIT *>(1));
+    __catalyst__rt__qubit_release(reinterpret_cast<QUBIT *>(reg1_vec[0]));
+    __catalyst__rt__qubit_release(reinterpret_cast<QUBIT *>(reg2_vec[0]));
 
     // Extract qubit 2 from position 1 in reg2
     QUBIT **q2 = reinterpret_cast<QUBIT **>(__catalyst__rt__array_get_element_ptr_1d(reg2, 1));
