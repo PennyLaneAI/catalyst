@@ -460,16 +460,6 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
                        const std::vector<QubitIdType> &)
     {
         Counts(eigvals, counts);
-    } /**
-       * @brief Doesn't Partial sample with the number of shots on `wires`, returning the
-       * number of counts for each sample.
-       *
-       * Same behaviour as Counts().
-       */
-    void PartialCounts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts,
-                       const std::vector<QubitIdType> &)
-    {
-        Counts(eigvals, counts);
     }
 
     /**
