@@ -139,7 +139,9 @@
   program capture is enabled.
   [(#2027)](https://github.com/PennyLaneAI/catalyst/pull/2027)
 
-* Fix usage of OQC in macOS, include fixing system extension, and fixing wrong type signature of counts
+* Fix usage of OQC device, including:
+   - fix object file system extension on macOS
+   - fix wrong type signature of `Counts` API function
   [(#2032)](https://github.com/PennyLaneAI/catalyst/pull/2032)
 
 <h3>Internal changes ⚙️</h3>
