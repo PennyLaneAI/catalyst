@@ -804,15 +804,15 @@ TEST_CASE("Test NullQubit device resource tracking integration", "[NullQubit]")
     CHECK(resource_file_r.is_open()); // fail-fast if file failed to create
 
     std::vector<std::string> resource_names = {"PauliX",
-                                               "C(Adj(T))",
-                                               "Adj(T)",
+                                               "C(Adjoint(T))",
+                                               "Adjoint(T)",
                                                "C(S)",
                                                "2C(S)",
                                                "S",
                                                "CNOT",
-                                               "Adj(ControlledQubitUnitary)",
+                                               "Adjoint(ControlledQubitUnitary)",
                                                "ControlledQubitUnitary",
-                                               "Adj(QubitUnitary)",
+                                               "Adjoint(QubitUnitary)",
                                                "QubitUnitary"};
 
     // Read full Json, check if num_wires and num_gates are correct

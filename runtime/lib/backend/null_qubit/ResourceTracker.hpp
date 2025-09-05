@@ -6,13 +6,13 @@
 
 #include "Utils.hpp"
 
-namespace Catalyst::Runtime::Devices {
+namespace Catalyst::Runtime {
 
 struct ResourceTracker final {
   private:
     std::unordered_map<std::string, std::size_t> gate_types_;
     std::unordered_map<std::size_t, std::size_t> gate_sizes_;
-    std::vector<size_t> wire_depths;
+    std::unordered_map<QubitIdType, std::size_t> wire_depths;
     std::size_t max_num_wires_;
     bool static_fname_;
     bool compute_depth_;
@@ -21,23 +21,29 @@ struct ResourceTracker final {
     void Operation(const std::string &name, const std::vector<QubitIdType> &wires,
                    const std::vector<QubitIdType> &controlled_wires)
     {
-        gate_types_[name]++;
-        gate_sizes_[wires.size() + controlled_wires.size()]++;
-        if (compute_depth_) {
-            std::size_t max_depth = wire_depths[wires[0]];
-            for (std::size_t i = 1; i < wires.size(); i++) {
-                max_depth = std::max(max_depth, wire_depths[wires[i]]);
+        // Sanity check that wire numbers make sense
+        size_t total_wires = wires.size() + controlled_wires.size();
+        std::vector<QubitIdType> combined_wires = {};
+        combined_wires.insert(combined_wires.end(), wires.begin(), wires.end());
+        combined_wires.insert(combined_wires.end(), controlled_wires.begin(),
+                              controlled_wires.end());
+        for (const auto &i : combined_wires) {
+            if (i >= max_num_wires_) {
+                RT_FAIL(("Wire index " + std::to_string(i) + " exceeds allocated wires").c_str());
             }
-            for (std::size_t i = 0; i < controlled_wires.size(); i++) {
-                max_depth = std::max(max_depth, wire_depths[controlled_wires[i]]);
+        }
+
+        gate_types_[name]++;
+        gate_sizes_[total_wires]++;
+        if (compute_depth_) {
+            std::size_t max_depth = 0;
+            for (const auto &i : combined_wires) {
+                max_depth = std::max(max_depth, wire_depths[i]);
             }
             // All wires used in this operation must now have their depth set based on this max
             max_depth++;
-            for (std::size_t i = 0; i < wires.size(); i++) {
-                wire_depths[wires[i]] = max_depth;
-            }
-            for (std::size_t i = 0; i < controlled_wires.size(); i++) {
-                wire_depths[controlled_wires[i]] = max_depth;
+            for (const auto &i : wires) {
+                wire_depths[i] = max_depth;
             }
         }
     }
@@ -47,6 +53,7 @@ struct ResourceTracker final {
     {
         Reset();
         compute_depth_ = false;
+        static_fname_ = false;
     }
 
     void Reset()
@@ -55,21 +62,28 @@ struct ResourceTracker final {
         gate_sizes_.clear();
         wire_depths.clear();
         max_num_wires_ = 0;
-        static_fname_ = false;
-        resources_fname_ = "";
     }
 
     /**
      * @brief Returns the number of gates used since the last time this object was reset
      */
-    auto GetNumGates() -> std::size_t
+    auto GetNumGates(const std::string &gate_name = "") -> std::size_t
     {
+        if (gate_name != "") {
+            return gate_types_[gate_name];
+        }
+
         size_t num_gates = 0;
         for (const auto &[gate_type, count] : gate_types_) {
             // TODO: Probably a nice functional way to do this
             num_gates += count;
         }
         return num_gates;
+    }
+
+    auto GetNumGatesBySize(const std::size_t &gate_size) -> std::size_t
+    {
+        return gate_sizes_[gate_size];
     }
 
     /**
@@ -82,10 +96,17 @@ struct ResourceTracker final {
      */
     auto GetFilename() const -> std::string { return resources_fname_; }
 
-    auto GetDepth() const -> size_t
+    auto GetComputeDepth() const -> bool { return compute_depth_; }
+
+    auto GetDepth() const -> std::size_t
     {
-        if (compute_depth_) {
-            return *std::max_element(wire_depths.begin(), wire_depths.end());
+        if (compute_depth_ && !wire_depths.empty()) {
+            auto max_pair = std::max_element(wire_depths.begin(), wire_depths.end(),
+                                             [](const std::pair<QubitIdType, std::size_t> &p1,
+                                                const std::pair<QubitIdType, std::size_t> &p2) {
+                                                 return p1.second < p2.second;
+                                             });
+            return max_pair->second;
         }
         return 0;
     }
@@ -100,9 +121,6 @@ struct ResourceTracker final {
     void SetMaxWires(std::size_t max_wires)
     {
         max_num_wires_ = std::max(max_wires, max_num_wires_);
-        if (compute_depth_) {
-            wire_depths.resize(max_num_wires_, 0);
-        }
     }
 
     void SetComputeDepth(const bool compute_depth)
@@ -115,7 +133,7 @@ struct ResourceTracker final {
 
     void NamedOperation(const std::string &name, bool inverse,
                         const std::vector<QubitIdType> &wires,
-                        const std::vector<QubitIdType> &controlled_wires)
+                        const std::vector<QubitIdType> &controlled_wires = {})
     {
         std::string prefix = "";
         std::string suffix = "";
@@ -127,14 +145,14 @@ struct ResourceTracker final {
             suffix += ")";
         }
         if (inverse) {
-            prefix += "Adj(";
+            prefix += "Adjoint(";
             suffix += ")";
         }
         Operation(prefix + name + suffix, wires, controlled_wires);
     }
 
     void MatrixOperation(bool inverse, const std::vector<QubitIdType> &wires,
-                         const std::vector<QubitIdType> &controlled_wires)
+                         const std::vector<QubitIdType> &controlled_wires = {})
     {
         std::string op_name = "QubitUnitary";
 
@@ -142,7 +160,7 @@ struct ResourceTracker final {
             op_name = "Controlled" + op_name;
         }
         if (inverse) {
-            op_name = "Adj(" + op_name + ")";
+            op_name = "Adjoint(" + op_name + ")";
         }
         Operation(op_name, wires, controlled_wires);
     }
@@ -161,17 +179,26 @@ struct ResourceTracker final {
         pretty_print_dict(gate_types_, 2, resources);
         resources << ",\n";
         resources << "  \"gate_sizes\": ";
-        pretty_print_dict(gate_sizes_, 2, resources, false);
+        pretty_print_dict(gate_sizes_, 2, resources);
         resources << ",\n";
         if (compute_depth_) {
-            resources << "  \"depth\": " << GetDepth() << "\n";
+            resources << "  \"depth\": " << GetDepth();
         }
         else {
             resources << "  \"depth\": null";
         }
         resources << "\n}" << std::endl;
 
-        fwrite(resources.str().c_str(), 1, resources.str().size(), resources_file);
+        std::size_t total_bytes = resources.str().size();
+        std::size_t bytes_written = fwrite(resources.str().c_str(), 1, total_bytes, resources_file);
+
+        while (bytes_written < total_bytes) {
+            if (ferror(resources_file)) {
+                RT_FAIL("Error writing resource tracking data to file.");
+            }
+            bytes_written += fwrite(resources.str().c_str() + bytes_written, 1,
+                                    total_bytes - bytes_written, resources_file);
+        }
     }
 
     void WriteOut()
@@ -204,4 +231,4 @@ struct ResourceTracker final {
     }
 };
 
-} // namespace Catalyst::Runtime::Devices
+} // namespace Catalyst::Runtime
