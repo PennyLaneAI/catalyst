@@ -453,7 +453,7 @@ func.func public @game_of_surface_code_t_layers(%qr0 : !quantum.bit, %qr1 : !qua
     // CHECK: "game_of_surface_code_t_layers": {
     // CHECK:     "depth_pi8_ppr": 4,
     // CHECK:     "max_weight_pi8": 4,
-    // CHECK:     "num_pi8_gates": 6
+    // CHECK:     "pi8_ppr": 6
     // CHECK: }
 
     // layer 1 
@@ -480,7 +480,7 @@ func.func public @game_of_surface_code_t_layers_no_identity(%qr0 : !quantum.bit,
     // CHECK: "game_of_surface_code_t_layers_no_identity": {
     // CHECK:     "depth_pi8_ppr": 4,
     // CHECK:     "max_weight_pi8": 4,
-    // CHECK:     "num_pi8_gates": 6
+    // CHECK:     "pi8_ppr": 6
     // CHECK: }
 
     // layer 1 
@@ -508,7 +508,7 @@ func.func public @game_of_surface_code_t_layers_opt(%arg0: !quantum.bit, %arg1: 
     // CHECK: "game_of_surface_code_t_layers_opt": {
     // CHECK:     "depth_pi8_ppr": 2,
     // CHECK:     "max_weight_pi8": 4,
-    // CHECK:     "num_pi8_gates": 6
+    // CHECK:     "pi8_ppr": 6
     // CHECK: }
 
     %0:4 = qec.ppr ["I", "Z", "I", "I"](-8) %arg0, %arg1, %arg2, %arg3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
