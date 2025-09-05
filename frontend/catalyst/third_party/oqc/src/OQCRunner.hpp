@@ -36,7 +36,8 @@ struct OQCRunner {
 
         using countsImpl_t =
             void (*)(const char *, const char *, size_t, size_t, const char *, void *);
-        auto countsImpl = libLoader.getSymbol<countsImpl_t>("counts");
+        auto countsPtr = *libLoader.getSymbol<countsImpl_t *>("counts_function_ptr");
+        auto countsImpl = *countsPtr;
 
         std::vector<size_t> results;
         countsImpl(circuit.c_str(), device.c_str(), shots, num_qubits, kwargs.c_str(), &results);

@@ -46,9 +46,9 @@ except Exception as e:
     msg = str(e)
 )";
 
-extern "C" {
-[[gnu::visibility("default")]] void counts(const char *_circuit, const char *_device, size_t shots,
-                                           size_t num_qubits, const char *_kwargs, void *_vector)
+[[gnu::visibility("default")]] void counts_cpp_impl(const char *_circuit, const char *_device,
+                                                    size_t shots, size_t num_qubits,
+                                                    const char *_kwargs, void *_vector)
 {
     namespace nb = nanobind;
     using namespace nb::literals;
@@ -69,8 +69,6 @@ extern "C" {
 
     auto msg = nb::cast<std::string>(locals["msg"]);
 
-    std::cout << "msg: " << msg << "\n";
-
     RT_FAIL_IF(!msg.empty(), msg.c_str());
 
     // Process counts only if we didn't have credential issues
@@ -84,6 +82,9 @@ extern "C" {
     }
     return;
 }
-} // extern "C"
+
+[[gnu::visibility("default")]] void (*counts_function_ptr)(const char *, const char *, size_t,
+                                                           size_t, const char *,
+                                                           void *) = counts_cpp_impl;
 
 NB_MODULE(oqc_python_module, m) { m.doc() = "oqc"; }

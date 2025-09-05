@@ -72,20 +72,11 @@ void OQCDevice::PartialCounts(DataView<double, 1> &eigvals, DataView<int64_t, 1>
     }
     std::iota(eigvals.begin(), eigvals.end(), 0);
 
-    try {
-        auto &&results = runner->Counts(builder->toOpenQASM2(), "", device_shots, GetNumQubits());
-        int i = 0;
-        for (auto r : results) {
-            counts(i) = r;
-            i++;
-        }
-    }
-    catch (const std::exception& e) {
-        std::string error_msg = e.what();
-        RT_FAIL(error_msg.c_str());
-    }
-    catch (...) {
-        RT_FAIL("Unknown error occurred in OQC execution");
+    auto &&results = runner->Counts(builder->toOpenQASM2(), "", device_shots, GetNumQubits());
+    int i = 0;
+    for (auto r : results) {
+        counts(i) = r;
+        i++;
     }
 }
 
