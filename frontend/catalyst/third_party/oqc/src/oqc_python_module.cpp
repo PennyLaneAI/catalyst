@@ -29,7 +29,7 @@ try:
     password = os.environ.get("OQC_PASSWORD")
     url = os.environ.get("OQC_URL")
     if not all([email, password, url]):
-        raise ValueError("OQC credentials not found in environment variables")
+        raise ValueError("OQC credentials not found in environment variables. Please set the environment variables `OQC_EMAIL`, `OQC_PASSWORD` and `OQC_URL`.")
     from qcaas_client.client import OQCClient, QPUTask, CompilerConfig
     from qcaas_client.config import QuantumResultsFormat, Tket, TketOptimizations
     optimisations = Tket()
