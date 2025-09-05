@@ -471,7 +471,7 @@ class Compiler:
         return output_object_name, out_IR
 
     @debug_logger
-    def is_using_unified_compiler(self):
+    def is_using_compiler_interface(self):
         """Returns true if we detect that there is an xdsl plugin in use.
 
         Will also modify self.options.pass_plugins and self.options.dialect_plugins to remove
@@ -509,13 +509,13 @@ class Compiler:
             (str): filename of shared object
         """
 
-        if self.is_using_unified_compiler():
+        if self.is_using_compiler_interface():
             # We keep this module here to keep xDSL requirement optional
             # Only move this is it has been decided that xDSL is no longer optional.
             # pylint: disable-next=import-outside-toplevel
-            from pennylane.compiler.unified_compiler import Compiler as UnifiedCompiler
+            from pennylane.compiler.interface import Compiler as CompilerInterface
 
-            compiler = UnifiedCompiler()
+            compiler = CompilerInterface()
             mlir_module = compiler.run(mlir_module)
 
         return self.run_from_ir(

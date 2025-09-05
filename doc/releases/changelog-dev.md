@@ -101,7 +101,7 @@
 
 <h3>Internal changes ⚙️</h3>
 
-* The `qml.compiler.python_compiler` module in PennyLane has been renamed `qml.compiler.unified_compiler`.
+* The `qml.compiler.python_compiler` module in PennyLane has been renamed `qml.compiler.interface`.
   Catalyst has been updated to reflect this change.
   [(#1997)](https://github.com/PennyLaneAI/pennylane/pull/1997)
 
