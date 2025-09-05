@@ -377,7 +377,41 @@ class TestCatalystCompareJaxpr:
         dev = qml.device("lightning.qubit", wires=2)
 
         @qml.set_shots(50)
-        @qml.qnode(dev)
+        @qml.qnode(dev, mcm_method="single-branch-statistics")
+        def circuit():
+            qml.X(0)
+            return qml.sample()
+
+        qml.capture.enable()
+        plxpr = jax.make_jaxpr(circuit)()
+
+        converted = from_plxpr(plxpr)()
+        qml.capture.disable()
+
+        assert converted.eqns[0].primitive == catalyst.jax_primitives.quantum_kernel_p
+        assert converted.eqns[0].params["qnode"] is circuit
+
+        catalyst_res = catalyst_execute_jaxpr(converted)()
+        assert len(catalyst_res) == 1
+        expected = np.transpose(np.vstack([np.ones(50), np.zeros(50)]))
+        assert qml.math.allclose(catalyst_res[0], expected)
+
+        qjit_obj = qjit(circuit)
+        qjit_obj()
+        catalxpr = qjit_obj.jaxpr
+        call_jaxpr_pl = get_call_jaxpr(converted)
+        call_jaxpr_c = get_call_jaxpr(catalxpr)
+
+        compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c)
+
+    @pytest.mark.xfail(reason="from_plxpr does not support dynamic shot transform now")
+    def test_sample_one_shot(self):
+        """Test comparison and execution of a jaxpr returning samples."""
+
+        dev = qml.device("lightning.qubit", wires=2)
+
+        @qml.set_shots(50)
+        @qml.qnode(dev, mcm_method="one-shot")
         def circuit():
             qml.X(0)
             return qml.sample()
