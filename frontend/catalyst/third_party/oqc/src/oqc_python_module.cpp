@@ -23,17 +23,12 @@
 
 std::string program = R"(
 import os
-
+from qcaas_client.client import OQCClient, QPUTask, CompilerConfig
+from qcaas_client.config import QuantumResultsFormat, Tket, TketOptimizations
+optimisations = Tket()
+optimisations.tket_optimizations = TketOptimizations.DefaultMappingPass
+RES_FORMAT = QuantumResultsFormat().binary_count()
 try:
-    # Try to import OQC dependencies
-    from qcaas_client.client import OQCClient, QPUTask, CompilerConfig
-    from qcaas_client.config import QuantumResultsFormat, Tket, TketOptimizations
-
-    optimisations = Tket()
-    optimisations.tket_optimizations = TketOptimizations.DefaultMappingPass
-    RES_FORMAT = QuantumResultsFormat().binary_count()
-
-    # Try to execute OQC client
     email = os.environ.get("OQC_EMAIL")
     password = os.environ.get("OQC_PASSWORD")
     url = os.environ.get("OQC_URL")
@@ -72,6 +67,17 @@ extern "C" {
     nb::object scope = nb::module_::import_("__main__").attr("__dict__");
     nb::exec(nb::str(program.c_str()), scope, locals);
 
+    auto msg = nb::cast<std::string>(locals["msg"]);
+    RT_FAIL_IF(!msg.empty(), msg.c_str());
+
+    nb::dict results = locals["counts"];
+
+    std::vector<size_t> *counts_value = reinterpret_cast<std::vector<size_t> *>(_vector);
+    for (auto item : results) {
+        auto key = item.first;
+        auto value = item.second;
+        counts_value->push_back(nb::cast<size_t>(value));
+    }
     return;
 }
 } // extern "C"
