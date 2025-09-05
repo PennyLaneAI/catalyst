@@ -626,6 +626,14 @@ void __catalyst__qis__Rot(double phi, double theta, double omega, QUBIT *qubit,
                                           MODIFIERS_ARGS(modifiers));
 }
 
+void __catalyst__qis__RotXZX(double phi, double theta, double omega, QUBIT *qubit,
+                             const Modifiers *modifiers)
+{
+    getQuantumDevicePtr()->NamedOperation("RotXZX", {phi, theta, omega},
+                                          {reinterpret_cast<QubitIdType>(qubit)},
+                                          MODIFIERS_ARGS(modifiers));
+}
+
 void __catalyst__qis__CNOT(QUBIT *control, QUBIT *target, const Modifiers *modifiers)
 {
     RT_FAIL_IF(control == target,
