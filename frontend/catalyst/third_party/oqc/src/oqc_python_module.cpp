@@ -68,14 +68,14 @@ extern "C" {
     nb::object scope = nb::module_::import_("__main__").attr("__dict__");
     nb::exec(nb::str(program.c_str()), scope, locals);
 
-    // auto msg = nb::cast<std::string>(locals["msg"]);
-    // if (msg == "OQC_CREDENTIALS_MISSING") {
-    //     std::cout << "[OQC INFO] OQC credentials not configured. No email, password, or url found "
-    //                  "in environment variables.\n";
-    //     return;
-    // }
+    auto msg = nb::cast<std::string>(locals["msg"]);
+    if (msg == "OQC credentials not found in environment variables") {
+        std::cout << "[OQC INFO] OQC credentials not configured. No email, password, or url found "
+                     "in environment variables.\n";
+        return;
+    }
 
-    // RT_FAIL_IF(!msg.empty(), msg.c_str());
+    RT_FAIL_IF(!msg.empty(), msg.c_str());
 
     // Process counts only if we didn't have credential issues
     nb::dict results = locals["counts"];
