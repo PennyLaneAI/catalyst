@@ -1,3 +1,17 @@
+// Copyright 2025 Xanadu Quantum Technologies Inc.
+
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+
+//     http://www.apache.org/licenses/LICENSE-2.0
+
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 #include <chrono>
 #include <sstream>
 #include <string>
@@ -8,6 +22,14 @@
 
 namespace Catalyst::Runtime {
 
+/**
+ * @brief A utility class for tracking quantum circuit resource usage including gate counts, wire
+ * usage, and circuit depth
+ *
+ * This class provides comprehensive tracking of quantum circuit resources during execution,
+ * including counting gate types and sizes, tracking maximum wire usage, and optionally
+ * computing circuit depth. It can export the collected data to JSON format for analysis.
+ */
 struct ResourceTracker final {
   private:
     std::unordered_map<std::string, std::size_t> gate_types_;
@@ -18,6 +40,16 @@ struct ResourceTracker final {
     bool compute_depth_;
     std::string resources_fname_;
 
+    /**
+     * @brief Internal method to record an operation being applied to the device
+     *
+     * Updates the gate type and size counts, and if depth tracking is enabled,
+     * updates the depth of the wires involved in the operation.
+     *
+     * @param name The name of the operation being applied
+     * @param wires The wires the operation is being applied to
+     * @param controlled_wires The control wires the operation is being applied to
+     */
     void Operation(const std::string &name, const std::vector<QubitIdType> &wires,
                    const std::vector<QubitIdType> &controlled_wires)
     {
@@ -49,6 +81,12 @@ struct ResourceTracker final {
     }
 
   public:
+    /**
+     * @brief Default constructor that initializes the ResourceTracker with default settings
+     *
+     * Initializes the tracker with depth computation disabled and no static filename set.
+     * Calls Reset() to ensure all tracking data structures are properly initialized.
+     */
     ResourceTracker()
     {
         Reset();
@@ -56,6 +94,13 @@ struct ResourceTracker final {
         static_fname_ = false;
     }
 
+    /**
+     * @brief Resets all tracked resource data to initial state
+     *
+     * Clears all gate type counts, gate size counts, wire depth information,
+     * and resets the maximum wire count to zero. Does not affect configuration
+     * settings like depth computation or filename settings.
+     */
     void Reset()
     {
         gate_types_.clear();
@@ -66,6 +111,11 @@ struct ResourceTracker final {
 
     /**
      * @brief Returns the number of gates used since the last time this object was reset
+     *
+     * @param gate_name Optional specific gate name to count. If empty, returns total count of all
+     * gates
+     * @return The count of gates matching the specified name, or total gate count if no name
+     * provided
      */
     auto GetNumGates(const std::string &gate_name = "") -> std::size_t
     {
@@ -81,6 +131,12 @@ struct ResourceTracker final {
         return num_gates;
     }
 
+    /**
+     * @brief Returns the number of gates of a specific size (number of qubits acted upon)
+     *
+     * @param gate_size The number of qubits that gates of interest act upon
+     * @return The count of gates that act on exactly gate_size qubits
+     */
     auto GetNumGatesBySize(const std::size_t &gate_size) -> std::size_t
     {
         return gate_sizes_[gate_size];
@@ -88,16 +144,30 @@ struct ResourceTracker final {
 
     /**
      * @brief Returns the maximum number of qubits used since the last time this object was reset
+     *
+     * @return The highest number of qubits that have been allocated at any point
      */
     auto GetNumWires() -> std::size_t { return max_num_wires_; }
 
     /**
      * @brief Returns the filename where resource tracking information is dumped
+     *
+     * @return The current filename that will be used for writing resource data
      */
     auto GetFilename() const -> std::string { return resources_fname_; }
 
+    /**
+     * @brief Returns whether circuit depth computation is currently enabled
+     *
+     * @return True if depth tracking is enabled, false otherwise
+     */
     auto GetComputeDepth() const -> bool { return compute_depth_; }
 
+    /**
+     * @brief Returns the current circuit depth if depth computation is enabled
+     *
+     * @return The maximum depth across all wires if depth tracking is enabled, 0 otherwise
+     */
     auto GetDepth() const -> std::size_t
     {
         if (compute_depth_ && !wire_depths.empty()) {
@@ -111,18 +181,39 @@ struct ResourceTracker final {
         return 0;
     }
 
+    /**
+     * @brief Sets a static filename for resource data output.
+     *
+     * Once this function has been called, dynamic filenames will no longer be generated
+     * @param fname The filename to use for writing resource tracking data
+     */
     void SetResourcesFname(const std::string &fname)
     {
         resources_fname_ = fname;
         static_fname_ = true;
     }
 
-    // Store the highest number of qubits allocated at any time since device creation
+    /**
+     * @brief Updates the maximum number of wires tracked
+     *
+     * Stores the highest number of qubits allocated at any time since device creation.
+     * The maximum can only increase, never decrease.
+     *
+     * @param max_wires The current number of allocated wires
+     */
     void SetMaxWires(std::size_t max_wires)
     {
         max_num_wires_ = std::max(max_wires, max_num_wires_);
     }
 
+    /**
+     * @brief Enables or disables circuit depth computation
+     *
+     * Must be run before any qubits have been allocated and any gates have been executed
+     *
+     * @param compute_depth Whether to enable depth tracking
+     * @throws Runtime error if called after qubits have already been allocated
+     */
     void SetComputeDepth(const bool compute_depth)
     {
         if (max_num_wires_ != 0) {
@@ -131,6 +222,19 @@ struct ResourceTracker final {
         this->compute_depth_ = compute_depth;
     }
 
+    /**
+     * @brief Records a named quantum operation for resource tracking
+     *
+     * Tracks a quantum gate with proper handling of controlled and adjoint modifiers.
+     * Automatically formats the operation name with appropriate prefixes and suffixes
+     * based on the modifiers applied.
+     *
+     * @param name The base name of the quantum operation
+     * @param inverse Whether this is an adjoint (inverse) operation
+     * @param wires The target wires the operation acts upon
+     * @param controlled_wires The control wires for controlled operations (empty for
+     * non-controlled)
+     */
     void NamedOperation(const std::string &name, bool inverse,
                         const std::vector<QubitIdType> &wires,
                         const std::vector<QubitIdType> &controlled_wires = {})
@@ -151,6 +255,18 @@ struct ResourceTracker final {
         Operation(prefix + name + suffix, wires, controlled_wires);
     }
 
+    /**
+     * @brief Records a matrix-based quantum operation for resource tracking
+     *
+     * Tracks arbitrary unitary matrix operations with proper handling of
+     * controlled and adjoint modifiers. Used for operations defined by
+     * explicit unitary matrices rather than named gates.
+     *
+     * @param inverse Whether this is an adjoint (inverse) operation
+     * @param wires The target wires the operation acts upon
+     * @param controlled_wires The control wires for controlled operations (empty for
+     * non-controlled)
+     */
     void MatrixOperation(bool inverse, const std::vector<QubitIdType> &wires,
                          const std::vector<QubitIdType> &controlled_wires = {})
     {
@@ -166,7 +282,14 @@ struct ResourceTracker final {
     }
 
     /**
-     * @brief Prints resources that would be used to execute this circuit as a JSON
+     * @brief Prints resource usage statistics in JSON format to the specified file
+     *
+     * Outputs comprehensive resource tracking data including number of wires,
+     * total gate count, breakdown by gate types, breakdown by gate sizes,
+     * and circuit depth (if enabled) in JSON format.
+     *
+     * @param resources_file File pointer where JSON data will be written
+     * @throws Runtime error if file writing fails
      */
     void PrintResourceUsage(FILE *resources_file)
     {
@@ -201,6 +324,16 @@ struct ResourceTracker final {
         }
     }
 
+    /**
+     * @brief Writes resource tracking data to file and resets the tracker
+     *
+     * Creates a timestamped filename if no static filename was set, opens the file
+     * for exclusive writing, prints the resource usage data in JSON format,
+     * and then resets all tracking data. The file is opened with "wx" mode to
+     * prevent overwriting existing files.
+     *
+     * @throws Runtime error if file cannot be opened or written to
+     */
     void WriteOut()
     {
         if (!static_fname_) {

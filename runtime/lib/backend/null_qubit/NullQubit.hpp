@@ -36,19 +36,35 @@
 namespace Catalyst::Runtime::Devices {
 
 /**
- * @brief struct API for a null backend quantum device.
+ * @brief A null quantum device implementation for testing and resource tracking purposes
  *
- * This device API contains several NULL methods:
- * - a set of methods to manage qubit allocations and deallocations, device shot
- *   noise, and quantum tape recording as well as reference values for the result
- *   data-type; these are used to implement Quantum Runtime (QR) instructions.
+ * This device API provides a complete null backend implementation that:
+ * - Manages qubit allocations and deallocations without actual quantum state
+ * - Supports device shot configuration
+ * - Implements all Quantum Runtime (QR) and Quantum Instruction Set (QIS) methods as no-ops
+ * - Optionally tracks resource usage including gate counts, wire usage, and circuit depth
+ * - Returns deterministic "ground state" results for all measurements and observations
  *
- * - a set of methods for quantum operations, observables, measurements, and gradient
- *   of the device; these are used to implement Quantum Instruction Set (QIS) instructions.
+ * The null device is particularly useful for:
+ * - Testing quantum program compilation and execution without quantum simulation overhead
+ * - Resource estimation and circuit analysis
+ * - Validating quantum program structure and control flow
  */
 struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     std::unordered_map<std::string, std::string> device_kwargs;
 
+    /**
+     * @brief Constructs a NullQubit device with optional configuration parameters
+     *
+     * Parses device configuration from JSON-like string format and sets up
+     * resource tracking options if specified. Supported parameters:
+     * - "track_resources": Enable/disable resource tracking ("True"/"False")
+     * - "resources_fname": Static filename for resource output [requires resource tracking]
+     * - "compute_depth": Enable/disable circuit depth computation ("True"/"False") [requires
+     * resource tracking]
+     *
+     * @param kwargs JSON-like string containing device configuration parameters
+     */
     NullQubit(const std::string &kwargs = "{}")
     {
         this->device_kwargs = Catalyst::Runtime::parse_kwargs(kwargs);
@@ -70,14 +86,16 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     NullQubit &operator=(NullQubit &&) = delete;
 
     /**
-     * @brief Get the device kwargs as a map.
+     * @brief Returns the device configuration parameters as a key-value map
+     *
+     * @return Map containing all device configuration parameters passed during construction
      */
     std::unordered_map<std::string, std::string> GetDeviceKwargs() { return this->device_kwargs; }
 
     /**
-     * @brief Allocate a "null" qubit.
+     * @brief Allocates a new "null" qubit and returns its identifier
      *
-     * @return `QubitIdType`
+     * @return QubitIdType The identifier of the newly allocated qubit
      */
     auto AllocateQubit() -> QubitIdType
     {
@@ -89,11 +107,10 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     }
 
     /**
-     * @brief Allocate a vector of "null" qubits.
+     * @brief Allocates a vector of "null" qubits and returns their identifiers
      *
-     * @param num_qubits The number of qubits to allocate.
-     *
-     * @return `std::vector<QubitIdType>`
+     * @param num_qubits The number of qubits to allocate
+     * @return std::vector<QubitIdType> Vector containing identifiers of the newly allocated qubits
      */
     auto AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType>
     {
@@ -106,7 +123,11 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     }
 
     /**
-     * @brief Release a qubit.
+     * @brief Releases a previously allocated qubit
+     *
+     * Decrements the qubit counter and releases the qubit through the qubit manager.
+     *
+     * @param q The identifier of the qubit to release
      */
     void ReleaseQubit(QubitIdType q)
     {
@@ -117,7 +138,10 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     }
 
     /**
-     * @brief Release all qubits.
+     * @brief Releases all allocated qubits and optionally writes resource tracking data
+     *
+     * Resets the qubit counter to zero, releases all qubits through the qubit manager,
+     * and if resource tracking is enabled, writes the collected resource data to file.
      */
     void ReleaseAllQubits()
     {
@@ -129,73 +153,91 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     }
 
     /**
-     * @brief Get the number of allocated qubits.
+     * @brief Returns the current number of allocated qubits
      *
-     * @return `size_t`
+     * @return size_t The number of currently allocated qubits
      */
     [[nodiscard]] auto GetNumQubits() const -> size_t { return num_qubits_; }
 
     /**
-     * @brief Set the number of device shots.
+     * @brief Sets the number of shots for measurement sampling
      *
-     * @param shots The number of noise shots
+     * @param shots The number of measurement shots to configure
      */
     void SetDeviceShots(size_t shots) { device_shots_ = shots; }
 
     /**
-     * @brief Get the number of device shots.
+     * @brief Returns the current number of configured device shots
      *
-     * @return `size_t`
+     * @return size_t The number of shots configured for measurements
      */
     [[nodiscard]] auto GetDeviceShots() const -> size_t { return device_shots_; }
 
     /**
-     * @brief Doesn't set the PRNG of the device.
+     * @brief No-op implementation for setting device PRNG state
      *
-     * The Catalyst runtime enables seeded program execution on non-hardware devices.
-     * A random number generator instance is managed by the runtime to predictably
-     * generate results for non-deterministic programs, such as those involving `Measure`
-     * calls.
-     * Devices implementing support for this feature do not need to use the provided
-     * PRNG instance as their sole source of random numbers, but it is expected that the
-     * the same instance state will predictable and reproducibly generate the same
-     * program results. It is also expected that the provided PRNG state is evolved
-     * sufficiently so that two device executions sharing the same instance do not produce
-     * identical results.
-     * The provided PRNG instance is not thread-locked, and devices wishing to share it
-     * across threads will need to provide their own thread-safety.
+     * The null device doesn't perform any quantum simulation, so PRNG configuration
+     * is not required. This method exists to satisfy the QuantumDevice interface.
+     * In real devices, this would configure the pseudo-random number generator used
+     * for sampling and measurements to enable reproducible results.
+     *
+     * @param gen Pointer to the random number generator (ignored in null device)
      */
     void SetDevicePRNG([[maybe_unused]] std::mt19937 *gen) {}
 
     /**
-     * @brief Doesn't start recording a quantum tape if provided.
+     * @brief No-op implementation for starting quantum tape recording
      *
-     * @note This is backed by the `Catalyst::Runtime::CacheManager<ComplexT>` property in
-     * the device implementation.
+     * The null device doesn't maintain quantum state, so tape recording is not applicable.
+     * This method exists to satisfy the QuantumDevice interface for compatibility with
+     * caching and gradient computation systems.
      */
     void StartTapeRecording() {}
 
     /**
-     * @brief Doesn't stop recording a quantum tape if provided.
+     * @brief No-op implementation for stopping quantum tape recording
      *
-     * @note This is backed by the `Catalyst::Runtime::CacheManager<ComplexT>` property in
-     * the device implementation.
+     * The null device doesn't maintain quantum state, so tape recording is not applicable.
+     * This method exists to satisfy the QuantumDevice interface for compatibility with
+     * caching and gradient computation systems.
      */
     void StopTapeRecording() {}
 
     /**
-     * @brief Doesn't prepare subsystems using the given ket vector in the computational basis.
+     * @brief No-op implementation for state preparation using a statevector
+     *
+     * The null device doesn't maintain quantum state, so state preparation is ignored.
+     * This method exists to satisfy the QuantumDevice interface.
+     *
+     * @param state The state vector data (ignored)
+     * @param wires The qubits to prepare (ignored)
      */
     void SetState(DataView<std::complex<double>, 1> &, std::vector<QubitIdType> &) {}
 
     /**
-     * @brief Doesn't prepare a single computational basis state.
+     * @brief No-op implementation for computational basis state preparation
+     *
+     * The null device doesn't maintain quantum state, so basis state preparation is ignored.
+     * This method exists to satisfy the QuantumDevice interface.
+     *
+     * @param basis_state The computational basis state (ignored)
+     * @param wires The qubits to prepare (ignored)
      */
     void SetBasisState(DataView<int8_t, 1> &, std::vector<QubitIdType> &) {}
 
     /**
-     * @brief Doesn't apply a single gate to the state vector of a device with its name if this is
-     * supported.
+     * @brief Records a named quantum operation for resource tracking (no-op for execution)
+     *
+     * If resource tracking is enabled, records the operation details including name,
+     * parameters, and wire usage. The actual quantum operation is not performed since
+     * this is a null device.
+     *
+     * @param name The name of the quantum operation (e.g., "PauliX", "CNOT", "RZ")
+     * @param params Parameters for parametric gates (ignored)
+     * @param wires The target qubits for the operation
+     * @param inverse Whether this is an adjoint (inverse) operation
+     * @param controlled_wires Control qubits for controlled operations
+     * @param controlled_values Control values for multi-controlled operations
      */
     void NamedOperation(const std::string &name, const std::vector<double> &params,
                         const std::vector<QubitIdType> &wires, bool inverse,
@@ -208,8 +250,16 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     }
 
     /**
-     * @brief Doesn't apply a given matrix directly to the state vector of a device.
+     * @brief Records a matrix-based quantum operation for resource tracking (no-op for execution)
      *
+     * If resource tracking is enabled, records the operation as a general unitary matrix
+     * operation. The actual quantum operation is not performed since this is a null device.
+     *
+     * @param matrix The unitary matrix defining the operation (ignored)
+     * @param wires The target qubits for the operation
+     * @param inverse Whether this is an adjoint (inverse) operation
+     * @param controlled_wires Control qubits for controlled operations
+     * @param controlled_values Control values for multi-controlled operations
      */
     void MatrixOperation(const std::vector<std::complex<double>> &,
                          const std::vector<QubitIdType> &wires, bool inverse,
@@ -222,10 +272,16 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     }
 
     /**
-     * @brief Doesn't construct a named (Identity, PauliX, PauliY, PauliZ, and Hadamard)
-     * or Hermitian observable.
+     * @brief Creates a null observable and returns a dummy identifier
      *
-     * @return `ObsIdType` Index of the constructed observable
+     * The null device doesn't perform actual observable construction or measurement.
+     * This method always returns 0.0 to satisfy the interface requirements.
+     *
+     * @param obs_id The type of observable (Identity, PauliX, PauliY, PauliZ, Hadamard, or
+     * Hermitian)
+     * @param matrix The matrix representation for Hermitian observables (ignored)
+     * @param wires The qubits the observable acts on (ignored)
+     * @return ObsIdType Always returns 0.0
      */
     auto Observable(ObsId, const std::vector<std::complex<double>> &,
                     const std::vector<QubitIdType> &) -> ObsIdType
@@ -234,16 +290,25 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     }
 
     /**
-     * @brief Doesn't construct a tensor product of observables.
+     * @brief Creates a null tensor product observable and returns a dummy identifier
      *
-     * @return `ObsIdType` Index of the constructed observable
+     * The null device doesn't perform actual tensor product construction.
+     * This method always returns 0.0 to satisfy the interface requirements.
+     *
+     * @param obs_ids Vector of observable identifiers to combine (ignored)
+     * @return ObsIdType Always returns 0.0
      */
     auto TensorObservable(const std::vector<ObsIdType> &) -> ObsIdType { return 0.0; }
 
     /**
-     * @brief Doesn't construct a Hamiltonian observable.
+     * @brief Creates a null Hamiltonian observable and returns a dummy identifier
      *
-     * @return `ObsIdType` Index of the constructed observable
+     * The null device doesn't perform actual Hamiltonian construction.
+     * This method always returns 0.0 to satisfy the interface requirements.
+     *
+     * @param coeffs Coefficients for the Hamiltonian terms (ignored)
+     * @param obs_ids Observable identifiers for the Hamiltonian terms (ignored)
+     * @return ObsIdType Always returns 0.0
      */
     auto HamiltonianObservable(const std::vector<double> &, const std::vector<ObsIdType> &)
         -> ObsIdType
@@ -252,28 +317,35 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     }
 
     /**
-     * @brief Doesn't compute the expected value of an observable.
+     * @brief Returns a dummy expectation value (always 0.0)
      *
-     * Always return 0.
+     * The null device doesn't compute actual expectation values since it maintains
+     * no quantum state. Always returns 0.0 for consistency.
      *
-     * @return `double` The expected value
+     * @param obs_id The observable identifier (ignored)
+     * @return double Always returns 0.0
      */
     auto Expval(ObsIdType) -> double { return 0.0; }
 
     /**
-     * @brief Doesn't compute the variance of an observable.
+     * @brief Returns a dummy variance value (always 0.0)
      *
-     * Always return 0.
+     * The null device doesn't compute actual variances since it maintains
+     * no quantum state. Always returns 0.0 for consistency.
      *
-     * @return `double` The variance
+     * @param obs_id The observable identifier (ignored)
+     * @return double Always returns 0.0
      */
     auto Var(ObsIdType) -> double { return 0.0; }
 
     /**
-     * @brief Doesn't get the state-vector of a device.
+     * @brief Fills the state vector with the computational ground state
      *
-     * Always fills the state vector corresponding to the pure ground state, e.g. [1, 0] for a
-     * one-qubit system, [1, 0, 0, 0] for a two-qubit system, etc.
+     * Since the null device doesn't maintain actual quantum state, this method
+     * simulates the pure ground state: |0⟩^⊗n. The first element is set to 1.0
+     * and all remaining elements are set to 0.0.
+     *
+     * @param state The state vector to fill with ground state values
      */
     void State(DataView<std::complex<double>, 1> &state)
     {
@@ -286,10 +358,13 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     }
 
     /**
-     * @brief Doesn't compute the probabilities of each computational basis state.
+     * @brief Fills the probability array with ground state probabilities
      *
-     * Always fills a probability of 1 for the ground basis state, and 0 for all other basis states,
-     * e.g. [1, 0] for a one-qubit system, [1, 0, 0, 0] for a two-qubit system, etc.
+     * Since the null device simulates the ground state |0⟩^⊗n, this method sets
+     * probability 1.0 for the ground basis state and 0.0 for all other states.
+     * Example: [1, 0] for 1 qubit, [1, 0, 0, 0] for 2 qubits.
+     *
+     * @param probs The probability array to fill
      */
     void Probs(DataView<double, 1> &probs)
     {
@@ -302,9 +377,13 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     }
 
     /**
-     * @brief Doesn't compute the probabilities for a subset of the full system.
+     * @brief Fills the partial probability array with ground state probabilities
      *
-     * Same behaviour as Probs().
+     * Behaves identically to Probs() since the null device always simulates
+     * the ground state regardless of which subset of qubits is measured.
+     *
+     * @param probs The probability array to fill
+     * @param wires The subset of qubits to compute probabilities for (ignored)
      */
     void PartialProbs(DataView<double, 1> &probs, const std::vector<QubitIdType> &)
     {
@@ -312,10 +391,12 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     }
 
     /**
-     * @brief Doesn't compute samples with the number of shots on the entire wires,
-     * returning raw samples.
+     * @brief Fills the sample array with ground state measurements (all zeros)
      *
-     * Always fills array of samples with 0.
+     * Since the null device simulates the ground state |0⟩^⊗n, all measurements
+     * return 0. The samples array is filled with zeros for all shots and qubits.
+     *
+     * @param samples The 2D sample array to fill (shape: shots × num_qubits)
      */
     void Sample(DataView<double, 2> &samples)
     {
@@ -326,14 +407,13 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     }
 
     /**
-     * @brief Doesn't Compute partial samples with the number of shots on `wires`,
-     * returning raw samples.
+     * @brief Fills the partial sample array with ground state measurements (all zeros)
      *
-     * Same behaviour as Sample().
+     * Behaves identically to Sample() since the null device always simulates
+     * the ground state regardless of which subset of qubits is measured.
      *
-     * @param samples The pre-allocated `DataView<double, 2>`representing a matrix of
-     * shape `shots * numWires`. The built-in iterator in `DataView<double, 2>`
-     * iterates over all elements of `samples` row-wise.
+     * @param samples The 2D sample array to fill (shape: shots × num_target_wires)
+     * @param wires The subset of qubits to sample from (ignored)
      */
     void PartialSample(DataView<double, 2> &samples, const std::vector<QubitIdType> &)
     {
@@ -341,11 +421,14 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     }
 
     /**
-     * @brief Doesn't sample with the number of shots on the entire wires, returning the
-     * number of counts for each sample.
+     * @brief Generates measurement count statistics for ground state (all shots in state 0)
      *
-     * Always fills eigenvalues with integers ranging from 0, 1, ..., 2**num_qubits
-     * Always sets the first element of counts to `shots` and fills the rest with 0.
+     * Since the null device simulates the ground state |0⟩^⊗n, all measurements yield 0.
+     * The eigenvalues array is filled with integers 0, 1, ..., 2^num_qubits - 1,
+     * while the counts array has all shots in the first position (state 0) and zeros elsewhere.
+     *
+     * @param eigvals Array to fill with possible measurement outcomes (0 to 2^n - 1)
+     * @param counts Array to fill with count statistics (all shots in position 0)
      */
     void Counts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts)
     {
@@ -364,11 +447,25 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     }
 
     /**
-     * @brief Doesn't Partial sample with the number of shots on `wires`, returning the
-     * number of counts for each sample.
+     * @brief Generates partial measurement count statistics for ground state
      *
-     * Same behaviour as Counts().
+     * Behaves identically to Counts() since the null device always simulates
+     * the ground state regardless of which subset of qubits is measured.
+     *
+     * @param eigvals Array to fill with possible measurement outcomes
+     * @param counts Array to fill with count statistics
+     * @param wires The subset of qubits to measure (ignored)
      */
+    void PartialCounts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts,
+                       const std::vector<QubitIdType> &)
+    {
+        Counts(eigvals, counts);
+    } /**
+       * @brief Doesn't Partial sample with the number of shots on `wires`, returning the
+       * number of counts for each sample.
+       *
+       * Same behaviour as Counts().
+       */
     void PartialCounts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts,
                        const std::vector<QubitIdType> &)
     {
@@ -376,9 +473,14 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     }
 
     /**
-     * @brief This is not A general measurement method that acts on a single wire.
+     * @brief Performs a dummy measurement that always returns false
      *
-     * @return `Result` The measurement result
+     * Since the null device simulates the ground state |0⟩^⊗n, all single-qubit
+     * measurements in the computational basis always yield 0 (false).
+     *
+     * @param wire The qubit to measure (ignored)
+     * @param postselect Optional postselection value (ignored)
+     * @return Result Always returns a reference to the global false constant
      */
     auto Measure(QubitIdType, std::optional<int32_t>) -> Result
     {
@@ -386,12 +488,23 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     }
 
     /**
-     * @brief Doesn't Compute the gradient of a quantum tape, that is cached using
-     * `Catalyst::Runtime::Simulator::CacheManager`, for a specific set of trainable
-     * parameters.
+     * @brief No-op implementation for gradient computation
+     *
+     * The null device doesn't maintain quantum state or support gradient computation.
+     * This method exists to satisfy the QuantumDevice interface.
+     *
+     * @param gradients Vector of gradient data views (not modified)
+     * @param trainable_params Indices of trainable parameters (ignored)
      */
     void Gradient(std::vector<DataView<double, 1>> &, const std::vector<size_t> &) {}
 
+    /**
+     * @brief Returns dummy cache manager information
+     *
+     * The null device doesn't support caching, so this returns zero counts and empty vectors.
+     *
+     * @return Tuple containing cache statistics (all zeros/empty)
+     */
     auto CacheManagerInfo()
         -> std::tuple<size_t, size_t, size_t, std::vector<std::string>, std::vector<ObsIdType>>
     {
@@ -399,8 +512,12 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     }
 
     /**
-     * @brief Returns the filename where resource tracking information is dumped. Only works if
-     * resource tracking is enabled
+     * @brief Returns the filename where resource tracking data is written
+     *
+     * Only meaningful when resource tracking is enabled. Returns the configured
+     * or auto-generated filename for resource output.
+     *
+     * @return std::string The resource tracking output filename
      */
     auto GetResourcesFilename() const -> std::string
     {
@@ -408,7 +525,9 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     }
 
     /**
-     * @brief Returns whether the device is tracking resources or not.
+     * @brief Returns whether resource tracking is currently enabled
+     *
+     * @return bool True if resource tracking is enabled, false otherwise
      */
     auto IsTrackingResources() const -> bool { return track_resources_; }
 
