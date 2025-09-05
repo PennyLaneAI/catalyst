@@ -14,3 +14,17 @@
 
 #define CATCH_CONFIG_MAIN
 #include <catch2/catch.hpp>
+#include <Python.h>
+
+// Initialize Python for the test suite
+struct PythonTestInit {
+    PythonTestInit() {
+        if (!Py_IsInitialized()) {
+            Py_Initialize();
+        }
+    }
+    ~PythonTestInit() {
+    }
+};
+
+static PythonTestInit python_init;
