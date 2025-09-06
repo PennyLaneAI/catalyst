@@ -28,6 +28,9 @@
 
 <h3>Improvements 🛠</h3>
 
+* Significantly improved resource tracking with `null.qubit`, allowing integration of `qml.specs()` with `qjit`'d code.
+  [[#2033]](https://github.com/PennyLaneAI/catalyst/pull/2033)
+
 * The default mid-circuit measurement method in catalyst has been changed from `"single-branch-statistics"` to `"one-shot"`.
   [[#2017]](https://github.com/PennyLaneAI/catalyst/pull/2017)
 
