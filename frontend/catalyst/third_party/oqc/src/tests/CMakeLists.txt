@@ -32,16 +32,16 @@ target_include_directories(runner_tests_oqc PRIVATE
 
 target_link_directories(runner_tests_oqc PRIVATE ${runtime_lib})
 
-# Locate PyBind11
+# Locate nanobind
 execute_process(
-    COMMAND "${Python_EXECUTABLE}" -c "import pybind11; print(pybind11.get_cmake_dir())"
-    OUTPUT_VARIABLE pybind11_DIR OUTPUT_STRIP_TRAILING_WHITESPACE
+    COMMAND "${Python_EXECUTABLE}" -c "import nanobind; print(nanobind.cmake_dir())"
+    OUTPUT_VARIABLE nanobind_DIR OUTPUT_STRIP_TRAILING_WHITESPACE
 )
-find_package(pybind11 CONFIG REQUIRED)
+find_package(nanobind CONFIG REQUIRED)
 
 target_link_libraries(runner_tests_oqc PRIVATE
     Catch2::Catch2
-    pybind11::embed
+    Python::Python
     ${OQC_LIBRARIES}
 )
 

@@ -142,6 +142,11 @@
   program capture is enabled.
   [(#2027)](https://github.com/PennyLaneAI/catalyst/pull/2027)
 
+* Fix usage of OQC device, including:
+   - fix object file system extension on macOS
+   - fix wrong type signature of `Counts` API function
+  [(#2032)](https://github.com/PennyLaneAI/catalyst/pull/2032)
+
 <h3>Internal changes ⚙️</h3>
 
 * Updates use of `qml.transforms.dynamic_one_shot.parse_native_mid_circuit_measurements` to improved signature.

@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <algorithm>
+#include <cstring>
 #include <string>
 #include <vector>
 
@@ -22,32 +24,34 @@
 #include "Exception.hpp"
 
 std::string program = R"(
-import os
-from qcaas_client.client import OQCClient, QPUTask, CompilerConfig
-from qcaas_client.config import QuantumResultsFormat, Tket, TketOptimizations
-optimisations = Tket()
-optimisations.tket_optimizations = TketOptimizations.DefaultMappingPass
-
-RES_FORMAT = QuantumResultsFormat().binary_count()
 
 try:
+    import os
     email = os.environ.get("OQC_EMAIL")
     password = os.environ.get("OQC_PASSWORD")
     url = os.environ.get("OQC_URL")
+    if not all([email, password, url]):
+        raise ValueError("OQC credentials not found in environment variables. Please set the environment variables `OQC_EMAIL`, `OQC_PASSWORD` and `OQC_URL`.")
+    from qcaas_client.client import OQCClient, QPUTask, CompilerConfig
+    from qcaas_client.config import QuantumResultsFormat, Tket, TketOptimizations
+    optimisations = Tket()
+    optimisations.tket_optimizations = TketOptimizations.DefaultMappingPass
+    RES_FORMAT = QuantumResultsFormat().binary_count()
     client = OQCClient(url=url, email=email, password=password)
     client.authenticate()
     oqc_config = CompilerConfig(repeats=shots, results_format=RES_FORMAT, optimizations=optimisations)
     oqc_task = QPUTask(circuit, oqc_config)
     res = client.execute_tasks(oqc_task)
     counts = res[0].result["cbits"]
-
 except Exception as e:
     print(f"circuit: {circuit}")
     msg = str(e)
 )";
 
-[[gnu::visibility("default")]] void counts(const char *_circuit, const char *_device, size_t shots,
-                                           size_t num_qubits, const char *_kwargs, void *_vector)
+extern "C" {
+[[gnu::visibility("default")]] int counts(const char *_circuit, const char *_device, size_t shots,
+                                          size_t num_qubits, const char *_kwargs, void *_vector,
+                                          char *error_msg, size_t error_msg_size)
 {
     namespace nb = nanobind;
     using namespace nb::literals;
@@ -59,6 +63,7 @@ except Exception as e:
     locals["device"] = _device;
     locals["kwargs"] = _kwargs;
     locals["shots"] = shots;
+    locals["num_qubits"] = num_qubits;
     locals["msg"] = "";
 
     // Evaluate in scope of main module
@@ -66,8 +71,15 @@ except Exception as e:
     nb::exec(nb::str(program.c_str()), scope, locals);
 
     auto msg = nb::cast<std::string>(locals["msg"]);
-    RT_FAIL_IF(!msg.empty(), msg.c_str());
 
+    if (!msg.empty()) {
+        size_t copy_len = std::min(msg.length(), error_msg_size - 1);
+        memcpy(error_msg, msg.c_str(), copy_len);
+        error_msg[copy_len] = '\0';
+        return -1;
+    }
+
+    // Process counts only if we didn't have credential issues
     nb::dict results = locals["counts"];
 
     std::vector<size_t> *counts_value = reinterpret_cast<std::vector<size_t> *>(_vector);
@@ -76,7 +88,9 @@ except Exception as e:
         auto value = item.second;
         counts_value->push_back(nb::cast<size_t>(value));
     }
-    return;
+
+    return 0; // Success
 }
+} // extern "C"
 
 NB_MODULE(oqc_python_module, m) { m.doc() = "oqc"; }
