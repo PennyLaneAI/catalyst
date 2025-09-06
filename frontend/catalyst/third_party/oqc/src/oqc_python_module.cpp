@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <algorithm>
+#include <cstring>
 #include <string>
 #include <vector>
 
@@ -46,9 +48,10 @@ except Exception as e:
     msg = str(e)
 )";
 
-[[gnu::visibility("default")]] void counts_cpp_impl(const char *_circuit, const char *_device,
-                                                    size_t shots, size_t num_qubits,
-                                                    const char *_kwargs, void *_vector)
+extern "C" {
+[[gnu::visibility("default")]] int counts(const char *_circuit, const char *_device, size_t shots,
+                                          size_t num_qubits, const char *_kwargs, void *_vector,
+                                          char *error_msg, size_t error_msg_size)
 {
     namespace nb = nanobind;
     using namespace nb::literals;
@@ -70,9 +73,10 @@ except Exception as e:
     auto msg = nb::cast<std::string>(locals["msg"]);
 
     if (!msg.empty()) {
-        std::cout << "msg: " << msg << std::endl;
-        // RT_FAIL_IF(!msg.empty(), msg.c_str());
-        return;
+        size_t copy_len = std::min(msg.length(), error_msg_size - 1);
+        memcpy(error_msg, msg.c_str(), copy_len);
+        error_msg[copy_len] = '\0';
+        return -1;
     }
 
     // Process counts only if we didn't have credential issues
@@ -84,11 +88,9 @@ except Exception as e:
         auto value = item.second;
         counts_value->push_back(nb::cast<size_t>(value));
     }
-    return;
-}
 
-[[gnu::visibility("default")]] void (*counts_function_ptr)(const char *, const char *, size_t,
-                                                           size_t, const char *,
-                                                           void *) = counts_cpp_impl;
+    return 0; // Success
+}
+} // extern "C"
 
 NB_MODULE(oqc_python_module, m) { m.doc() = "oqc"; }
