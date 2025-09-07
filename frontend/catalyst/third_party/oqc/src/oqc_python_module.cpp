@@ -17,9 +17,9 @@
 #include <string>
 #include <vector>
 
-#include <nanobind/eval.h>
-#include <nanobind/nanobind.h>
-#include <nanobind/stl/string.h>
+#include <pybind11/eval.h>
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 
 #include "Exception.hpp"
 
@@ -53,12 +53,12 @@ extern "C" {
                                           size_t num_qubits, const char *_kwargs, void *_vector,
                                           char *error_msg, size_t error_msg_size)
 {
-    namespace nb = nanobind;
-    using namespace nb::literals;
+    namespace py = pybind11;
+    using namespace py::literals;
 
-    nb::gil_scoped_acquire lock;
+    py::gil_scoped_acquire lock;
 
-    nb::dict locals;
+    py::dict locals;
     locals["circuit"] = _circuit;
     locals["device"] = _device;
     locals["kwargs"] = _kwargs;
@@ -67,10 +67,10 @@ extern "C" {
     locals["msg"] = "";
 
     // Evaluate in scope of main module
-    nb::object scope = nb::module_::import_("__main__").attr("__dict__");
-    nb::exec(nb::str(program.c_str()), scope, locals);
+    py::object scope = py::module_::import("__main__").attr("__dict__");
+    py::exec(py::str(program.c_str()), scope, locals);
 
-    auto msg = nb::cast<std::string>(locals["msg"]);
+    auto msg = py::cast<std::string>(locals["msg"]);
 
     if (!msg.empty()) {
         size_t copy_len = std::min(msg.length(), error_msg_size - 1);
@@ -80,17 +80,17 @@ extern "C" {
     }
 
     // Process counts only if we didn't have credential issues
-    nb::dict results = locals["counts"];
+    py::dict results = locals["counts"];
 
     std::vector<size_t> *counts_value = reinterpret_cast<std::vector<size_t> *>(_vector);
     for (auto item : results) {
         auto key = item.first;
         auto value = item.second;
-        counts_value->push_back(nb::cast<size_t>(value));
+        counts_value->push_back(py::cast<size_t>(value));
     }
 
     return 0; // Success
 }
 } // extern "C"
 
-NB_MODULE(oqc_python_module, m) { m.doc() = "oqc"; }
+PYBIND11_MODULE(oqc_python_module, m) { m.doc() = "oqc"; }

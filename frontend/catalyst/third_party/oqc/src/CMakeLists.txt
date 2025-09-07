@@ -10,10 +10,6 @@ set(oqc_backend_dir "${OQC_BUILD_DIR}/backend")
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# nanobind suggests including these lines to configure CMake to perform an optimized release build
-# by default unless another build type is specified. Without this addition, binding code may run
-# slowly and produce large binaries.
-# See https://nanobind.readthedocs.io/en/latest/building.html#preliminaries
 if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build." FORCE)
     set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
@@ -27,17 +23,15 @@ find_package(Python REQUIRED
     OPTIONAL_COMPONENTS Development.Embed Development.SABIModule
 )
 
-# Locate nanobind
+# Locate pybind11
 execute_process(
-    COMMAND "${Python_EXECUTABLE}" -c "import nanobind; print(nanobind.cmake_dir())"
-    OUTPUT_VARIABLE nanobind_DIR OUTPUT_STRIP_TRAILING_WHITESPACE
+    COMMAND "${Python_EXECUTABLE}" -c "import pybind11; print(pybind11.get_cmake_dir())"
+    OUTPUT_VARIABLE pybind11_DIR OUTPUT_STRIP_TRAILING_WHITESPACE
 )
-find_package(nanobind CONFIG REQUIRED)
+find_package(pybind11 CONFIG REQUIRED)
 
 # Create the Python `oqc_python_module` module
-# Target the stable ABI for Python 3.12+, which reduces the number of binary wheels that must be
-# built (`STABLE_ABI` does nothing on older Python versions).
-nanobind_add_module(oqc_python_module STABLE_ABI oqc_python_module.cpp)
+pybind11_add_module(oqc_python_module oqc_python_module.cpp)
 
 # Link with Python to resolve symbols like PyExc_ValueError
 target_link_libraries(oqc_python_module PRIVATE Python::Python)
