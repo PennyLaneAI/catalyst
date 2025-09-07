@@ -32,9 +32,9 @@ target_include_directories(runner_tests_oqc PRIVATE
 
 target_link_directories(runner_tests_oqc PRIVATE ${runtime_lib})
 
-# Locate pybind11
+# Locate PyBind11
 execute_process(
-    COMMAND "${Python_EXECUTABLE}" -c "import pybind11; print(pybind11.cmake_dir())"
+    COMMAND "${Python_EXECUTABLE}" -c "import pybind11; print(pybind11.get_cmake_dir())"
     OUTPUT_VARIABLE pybind11_DIR OUTPUT_STRIP_TRAILING_WHITESPACE
 )
 find_package(pybind11 CONFIG REQUIRED)
