@@ -13,18 +13,4 @@
 // limitations under the License.
 
 #define CATCH_CONFIG_MAIN
-#include <Python.h>
 #include <catch2/catch.hpp>
-
-// Initialize Python for the test suite
-struct PythonTestInit {
-    PythonTestInit()
-    {
-        if (!Py_IsInitialized()) {
-            Py_Initialize();
-        }
-    }
-    ~PythonTestInit() {}
-};
-
-static PythonTestInit python_init;
