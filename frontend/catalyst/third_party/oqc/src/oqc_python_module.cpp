@@ -14,9 +14,11 @@
 
 #include <algorithm>
 #include <cstring>
+#include <mutex>
 #include <string>
 #include <vector>
 
+#include <pybind11/embed.h>
 #include <pybind11/eval.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -55,6 +57,17 @@ extern "C" {
 {
     namespace py = pybind11;
     using namespace py::literals;
+
+    static std::once_flag init_flag;
+    static std::unique_ptr<py::scoped_interpreter> interpreter;
+    std::call_once(init_flag, []() {
+        try {
+            py::module_::import("sys");
+        }
+        catch (const py::error_already_set &) {
+            interpreter = std::make_unique<py::scoped_interpreter>();
+        }
+    });
 
     py::gil_scoped_acquire lock;
 
