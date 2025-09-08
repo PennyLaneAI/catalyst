@@ -1020,7 +1020,6 @@ void __catalyst__qis__Probs(MemRefT_double_1d *result, int64_t numQubits, ...)
         getQuantumDevicePtr()->Probs(view);
     }
     else {
-        std::cout << "partial probs! " << numQubits << getQuantumDevicePtr()->GetNumQubits() << "\n";
         getQuantumDevicePtr()->PartialProbs(view, wires);
     }
 }
