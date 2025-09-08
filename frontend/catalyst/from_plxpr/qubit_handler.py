@@ -235,6 +235,7 @@ class QubitHandler:
             qbit = self.wire_map[index]
             if self.disable_wire_caching:
                 self.insert(index, qbit)
+                return self.extract(index)
             return qbit
         return self.extract(index)
 
