@@ -18,6 +18,7 @@
 #include <string>
 #include <vector>
 
+#include <pybind11/embed.h>
 #include <pybind11/eval.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -58,7 +59,6 @@ extern "C" {
     using namespace py::literals;
 
     py::scoped_interpreter guard{}; // start the interpreter and keep it alive
-
 
     py::gil_scoped_acquire lock;
 
