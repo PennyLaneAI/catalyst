@@ -18,8 +18,6 @@ endif()
 # Locate Python
 # The optional component is only used for the C++ test suite (to spin up its own interpreter),
 # and requires libpython.so to be available on the system.
-
-# First try to find Python components, providing better error messages if they fail
 find_package(Python REQUIRED COMPONENTS Interpreter)
 if(DEFINED ENV{CIBUILDWHEEL} OR DEFINED ENV{AUDITWHEEL_PLAT})
     message(STATUS "Detected wheel building environment, attempting to find Python development components...")
