@@ -253,6 +253,8 @@ def handle_qnode(
         qreg = qalloc_p.bind(len(device.wires))
         self.qubit_handler = QubitHandler(qreg)
         converter = PLxPRToQuantumJaxprInterpreter(device, shots, self.qubit_handler, {})
+        if self.compiler_decompose:
+            self.qubit_handler.set_decompose_mode(True)
         retvals = converter(closed_jaxpr, *args)
         self.qubit_handler.insert_all_dangling_qubits()
         qdealloc_p.bind(self.qubit_handler.get())

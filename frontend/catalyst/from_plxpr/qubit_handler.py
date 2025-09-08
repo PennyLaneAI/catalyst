@@ -90,6 +90,10 @@ class QubitHandler:
 
     def __init__(self, qubit_or_qreg_ref: AbstractQreg | list[AbstractQbit] | tuple[AbstractQbit]):
 
+        # Context for decomposition: disable wire caching if qnode has decompose transform
+        # It ensure that extract/insert are visible for the decompose transform.
+        self.disable_wire_caching = False
+
         if isinstance(qubit_or_qreg_ref, (list, tuple)):
             self.abstract_qreg_val = None
             self.qubit_indices = qubit_or_qreg_ref
@@ -106,6 +110,10 @@ class QubitHandler:
         self.abstract_qreg_val = qubit_or_qreg_ref
         self.qubit_indices = []
         self.wire_map = {}
+
+    def set_decompose_mode(self, enable: bool):
+        """Enable/disable wire caching based on whether qnode has decompose transform."""
+        self.disable_wire_caching = enable
 
     def get(self) -> AbstractQreg | list[AbstractQbit]:
         """Return the current AbstractQreg value or final AbstractQbit values
@@ -143,8 +151,7 @@ class QubitHandler:
                 " Consider setting a qreg value first."
             )
 
-        # else, extract must be fresh
-        assert index not in self.wire_map
+        assert self.disable_wire_caching or index not in self.wire_map
         extracted_qubit = qextract_p.bind(self.abstract_qreg_val, index)
         self.wire_map[index] = extracted_qubit
         return extracted_qubit
@@ -225,7 +232,10 @@ class QubitHandler:
         If the qubit value does not exist yet at this index, extract the fresh qubit.
         """
         if index in self.wire_map:
-            return self.wire_map[index]
+            qbit = self.wire_map[index]
+            if self.disable_wire_caching:
+                self.insert(index, qbit)
+            return qbit
         return self.extract(index)
 
     def __setitem__(self, index: int, qubit: AbstractQbit):
