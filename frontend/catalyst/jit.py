@@ -90,6 +90,7 @@ def qjit(
     circuit_transform_pipeline=None,
     pass_plugins=None,
     dialect_plugins=None,
+    debug_compiler=False,
 ):  # pylint: disable=too-many-arguments,unused-argument
     """A just-in-time decorator for PennyLane and JAX programs using Catalyst.
 
@@ -161,6 +162,8 @@ def qjit(
             If not specified, the default pass pipeline will be applied.
         pass_plugins (Optional[List[Path]]): List of paths to pass plugins.
         dialect_plugins (Optional[List[Path]]): List of paths to dialect plugins.
+        debug_compiler (Optional[bool]): Enable external debugger attachment to the compiler
+            driver when launching from an active Python debugging environment.
 
     Returns:
         QJIT object.

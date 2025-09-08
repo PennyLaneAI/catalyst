@@ -21,6 +21,7 @@ import os
 import pathlib
 import platform
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -424,9 +425,9 @@ class Compiler:
             workspace, Directory
         ), f"Compiler expects a Directory type, got {type(workspace)}."
         assert workspace.is_dir(), f"Compiler expects an existing directory, got {workspace}."
-        assert (
-            self.options.lower_to_llvm
-        ), "lower_to_llvm must be set to True in order to compile to a shared object"
+        #assert (
+        #    self.options.lower_to_llvm
+        #), "lower_to_llvm must be set to True in order to compile to a shared object"
 
         if self.options.verbose:
             print(f"[LIB] Running compiler driver in {workspace}", file=self.options.logfile)
@@ -444,12 +445,45 @@ class Compiler:
         try:
             if self.options.verbose:
                 print(f"[SYSTEM] {' '.join(cmd)}", file=self.options.logfile)
-            result = subprocess.run(cmd, check=True, capture_output=True, text=True)
+            #result = subprocess.run(cmd, check=True, capture_output=True, text=True)
+            
+            if self.options.debug_compiler!=True:
+                result = subprocess.run(cmd, check=True, capture_output=True, text=True)
+            if self.options.debug_compiler:
+                with subprocess.Popen(
+                    cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+                ) as p:
+                    # Ensure process creation succeeds
+                    if p.returncode not in {0, None}:
+                        raise subprocess.CalledProcessError(p.returncode, cmd)
+                    if self.options.debug_compiler:
+                        print(f"Compiler PID={p.pid}")
+                        print(
+                            f"""Ensure C++ debugger is attached and running before continuing with:
+                            kill -s SIGCONT {p.pid}"""
+                        )
+                        p.send_signal(signal.SIGSTOP)
+                        res_stdout, res_stderr = p.communicate()
+                        # Ensure process execution succeeds
+                        if p.returncode not in {0, None}:
+                            raise subprocess.CalledProcessError(p.returncode, cmd, res_stdout, res_stderr)
+
             if self.options.verbose or os.getenv("ENABLE_DIAGNOSTICS"):
-                if result.stdout:
-                    print(result.stdout.strip(), file=self.options.logfile)
-                if result.stderr:
-                    print(result.stderr.strip(), file=self.options.logfile)
+                #if result.stdout:
+                #    print(result.stdout.strip(), file=self.options.logfile)
+                #if result.stderr:
+                #    print(result.stderr.strip(), file=self.options.logfile)
+                if self.options.debug_compiler!=True:
+                    if result.stdout:
+                        print(result.stdout.strip(), file=self.options.logfile)
+                    if result.stderr:
+                        print(result.stderr.strip(), file=self.options.logfile)
+                if self.options.debug_compiler:
+                    if res_stdout:
+                        print(res_stdout.strip(), file=self.options.logfile)
+                    if res_stderr:
+                        print(res_stderr.strip(), file=self.options.logfile)
+
         except subprocess.CalledProcessError as e:  # pragma: nocover
             raise CompileError(f"catalyst failed with error code {e.returncode}: {e.stderr}") from e
 
@@ -458,7 +492,7 @@ class Compiler:
                 out_IR = f.read()
         else:
             out_IR = None
-
+        
         output = LinkerDriver.run(output_object_name, options=self.options)
         output_object_name = str(pathlib.Path(output).absolute())
 
