@@ -33,9 +33,6 @@ find_package(pybind11 CONFIG REQUIRED)
 # Create the Python `oqc_python_module` module
 pybind11_add_module(oqc_python_module oqc_python_module.cpp)
 
-# Link with Python to resolve symbols like PyExc_ValueError
-target_link_libraries(oqc_python_module PRIVATE Python::Python)
-
 # Use a consistant suffix ".so" rather than, e.g. ".abi3.so" (when using the Stable ABI) or
 # ".cpython-3xx-darwin.so". Doing so simplifies the process to locate it when calling
 # `dlopen(OQC_PY)` in frontend/catalyst/third_party/oqc/src/OQCRunner.hpp.
