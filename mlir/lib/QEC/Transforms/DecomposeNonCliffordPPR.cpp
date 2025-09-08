@@ -177,7 +177,7 @@ void decompose_inject_magic_state_pi_over_eight(PPRotationOp op, PatternRewriter
         rewriter.create<PPRotationOp>(loc, pauliP, 2, pprPI4.getOutQubits(), ppmX.getMres());
 
     // Deallocate the axillary qubit
-    rewriter.create<DeallocQubitOp>(loc, pprPI2.getOutQubits().back());
+    rewriter.create<DeallocQubitOp>(loc, ppmX.getOutQubits().back());
 
     rewriter.replaceOp(op, pprPI2.getOutQubits());
 }
