@@ -114,7 +114,7 @@ class CompileOptions:
     """
 
     verbose: Optional[bool] = False
-    logfile: Optional[TextIOWrapper] = "test1.txt" #sys.stderr
+    logfile: Optional[TextIOWrapper] = "test1.txt"  # sys.stderr
     target: Optional[str] = "binary"
     keep_intermediate: Optional[Union[str, int, bool, KeepIntermediateLevel]] = False
     pipelines: Optional[List[Any]] = None
@@ -124,7 +124,7 @@ class CompileOptions:
     static_argnums: Optional[Union[int, Iterable[int]]] = None
     static_argnames: Optional[Union[str, Iterable[str]]] = None
     abstracted_axes: Optional[Union[Iterable[Iterable[str]], Dict[int, str]]] = None
-    lower_to_llvm: Optional[bool] = False #"True"
+    lower_to_llvm: Optional[bool] = False  # "True"
     checkpoint_stage: Optional[str] = ""
     disable_assertions: Optional[bool] = True
     seed: Optional[int] = None

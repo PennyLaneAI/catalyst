@@ -14,17 +14,16 @@
 
 #define DEBUG_TYPE "quantum-specs-info"
 
-#include <nlohmann/json.hpp>
-
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Pass/Pass.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/FileSystem.h"
+#include <nlohmann/json.hpp>
 
-#include "Quantum/IR/QuantumDialect.h"
-#include "Quantum/IR/QuantumOps.h"
-#include "Quantum/IR/QuantumInterfaces.h"
 #include "QEC/IR/QECDialect.h"
+#include "Quantum/IR/QuantumDialect.h"
+#include "Quantum/IR/QuantumInterfaces.h"
+#include "Quantum/IR/QuantumOps.h"
 
 using namespace llvm;
 using namespace mlir;
@@ -49,38 +48,31 @@ struct QuantumSpecsInfoPass : public impl::QuantumSpecsInfoPassBase<QuantumSpecs
         llvm::BumpPtrAllocator stringAllocator;
         llvm::DenseMap<StringRef, llvm::DenseMap<StringRef, int>> PPMSpecs;
 
-        int numQuantumGates=0;
-        int numMeasureOp=0;
-        int numPPRotation=0;
-        int numPPMeasurement=0;
-        int numTotal=0;
+        int numQuantumGates = 0;
+        int numMeasureOp = 0;
+        int numPPRotation = 0;
+        int numPPMeasurement = 0;
+        int numTotal = 0;
 
         // Walk over all operations in the IR (could be ModuleOp or FuncOp)
         WalkResult wr = getOperation()->walk([&](Operation *op) {
-
-            //if (auto qOp = dyn_cast<quantum::QuantumGate>(op)) {
-            if (isa<quantum::QuantumGate>(op)) {    
+            if (isa<quantum::QuantumGate>(op)) {
                 auto parentFuncOp = op->getParentOfType<func::FuncOp>();
                 StringRef funcName = parentFuncOp.getName();
-
-                //llvm::errs() << funcName;
+                // llvm::errs() << funcName;
                 PPMSpecs[funcName]["QuantumGate_Count"] = ++numQuantumGates;
                 PPMSpecs[funcName]["Total_Count"] = ++numTotal;
-                //numQuantumGates++;
                 return WalkResult::advance();
             }
 
-            if (isa<quantum::MeasureOp>(op)) {    
+            if (isa<quantum::MeasureOp>(op)) {
                 auto parentFuncOp = op->getParentOfType<func::FuncOp>();
                 StringRef funcName = parentFuncOp.getName();
-
-                //llvm::errs() << funcName;
+                // llvm::errs() << funcName;
                 PPMSpecs[funcName]["MeasureOp_Count"] = ++numMeasureOp;
                 PPMSpecs[funcName]["Total_Count"] = ++numTotal;
-                //numQuantumGates++;
                 return WalkResult::advance();
             }
-
             // Count PPMs
             else if (isa<qec::PPMeasurementOp>(op)) {
                 auto parentFuncOp = op->getParentOfType<func::FuncOp>();
@@ -89,7 +81,6 @@ struct QuantumSpecsInfoPass : public impl::QuantumSpecsInfoPassBase<QuantumSpecs
                 PPMSpecs[funcName]["Total_Count"] = ++numTotal;
                 return WalkResult::advance();
             }
-
             // Count PPRs
             else if (isa<qec::PPRotationOp>(op)) {
                 auto parentFuncOp = op->getParentOfType<func::FuncOp>();
@@ -98,20 +89,17 @@ struct QuantumSpecsInfoPass : public impl::QuantumSpecsInfoPassBase<QuantumSpecs
                 PPMSpecs[funcName]["Total_Count"] = ++numTotal;
                 return WalkResult::advance();
             }
-
             // Skip other ops
             else {
                 return WalkResult::skip();
             }
-
         });
-
         if (wr.wasInterrupted()) {
             return failure();
         }
 
         std::error_code EC;
-        //llvm::raw_fd_ostream fileOutputStream("test.txt", EC, llvm::sys::fs::OF_None);
+        // llvm::raw_fd_ostream fileOutputStream("test.txt", EC, llvm::sys::fs::OF_None);
         llvm::raw_fd_ostream fileOutputStream("test.txt", EC, llvm::sys::fs::OF_Append);
         if (EC) {
             llvm::errs() << "Error opening file: " << EC.message() << "\n";
@@ -121,21 +109,24 @@ struct QuantumSpecsInfoPass : public impl::QuantumSpecsInfoPassBase<QuantumSpecs
         llvm::outs() << PPMSpecsJson.dump(4)
                      << "\n"; // dump(4) makes an indent with 4 spaces when printing JSON
         fileOutputStream << PPMSpecsJson.dump(4)
-                     << "\n"; // dump(4) makes an indent with 4 spaces when printing JSON
+                         << "\n"; // dump(4) makes an indent with 4 spaces when printing JSON
         fileOutputStream.flush();
         return success();
     }
 
-    void runOnOperation() final 
-    { 
+    void runOnOperation() final
+    {
         if (failed(printQuantumSpecs())) {
             signalPassFailure();
         }
     }
 };
 
-} //namespace quantum
+} // namespace quantum
 
-std::unique_ptr<Pass> createQuantumSpecsInfoPass() { return std::make_unique<QuantumSpecsInfoPass>(); }
+std::unique_ptr<Pass> createQuantumSpecsInfoPass()
+{
+    return std::make_unique<QuantumSpecsInfoPass>();
+}
 
 } // namespace catalyst
