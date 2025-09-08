@@ -25,7 +25,8 @@ include "mlir/IR/EnumAttr.td"
 def DecomposeMethod : I32EnumAttr<"DecomposeMethod", "Decomposition method", 
     [
         I32EnumAttrCase<"AutoCorrected", 0, "auto-corrected">,
-        I32EnumAttrCase<"CliffordCorrected", 1, "clifford-corrected">
+        I32EnumAttrCase<"CliffordCorrected", 1, "clifford-corrected">,
+        I32EnumAttrCase<"PauliCorrected", 2, "pauli-corrected">,
     ]> { 
     let cppNamespace = "catalyst::qec";
     let genSpecializedAttr = 0; 
@@ -53,7 +54,10 @@ def DecomposeMethodOption : Option<
                     "auto-corrected", "Decompose using auto-corrected method."),
         clEnumValN(::catalyst::qec::DecomposeMethod::CliffordCorrected,
                     "clifford-corrected",
-                    "Decompose by injecting magic states method.")
+                    "Decompose by injecting magic states method."),
+        clEnumValN(::catalyst::qec::DecomposeMethod::PauliCorrected,
+                    "pauli-corrected",
+                    "Decompose by injecting Pauli states method.")
     )}]>;
 
 def AvoidYMeasureOption : Option<

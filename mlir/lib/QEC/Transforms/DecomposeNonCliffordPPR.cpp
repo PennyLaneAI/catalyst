@@ -40,6 +40,43 @@ LogicalInitKind getMagicState(QECOpInterface op)
     return LogicalInitKind::magic_conj;
 }
 
+/// Decompose the Non-Clifford (pi/8) PPR into PPR and PPMs operations via pauli corrected method
+void decompose_pauli_corrected_pi_over_eight(PPRotationOp op, PatternRewriter &rewriter)
+{
+    auto loc = op.getLoc();
+    auto magic = rewriter.create<FabricateOp>(loc, getMagicState(op));
+
+    SmallVector<StringRef> pauliP = extractPauliString(op); // [P]
+    SmallVector<Value> inQubits = op.getInQubits();         // [input qubits]
+
+    // PPM (P⊗Z) on input qubits and |m⟩
+    SmallVector<StringRef> extendedPauliP = pauliP;
+    extendedPauliP.emplace_back("Z");               // extend Z for the axillary qubit -> [P, Z]
+    inQubits.emplace_back(magic.getOutQubits()[0]); // [input qubits, |m⟩]
+    auto ppmPZ = rewriter.create<PPMeasurementOp>(loc, extendedPauliP, inQubits);
+
+    auto ppmPZResults = ppmPZ.getMres();
+    SmallVector<StringRef> pauliStr = {"X"};
+    if (ppmPZResults) {
+        // TODO: Make sure this is the correct behaviour.
+        pauliStr = {"Y"};
+    }
+    auto ppmPauli = rewriter.create<PPMeasurementOp>(loc, pauliStr, ppmPZ.getOutQubits().back());
+
+    // PPR P(π/2) on input qubits if PPM (X or Y) yields -1
+    SmallVector<Value> outPZQubits = ppmPZ.getOutQubits(); // [input qubits, |m⟩]
+    outPZQubits.pop_back();                                // [input qubits]
+    const uint16_t PI_DENOMINATOR = 2;                     // For rotation of P(PI/2)
+    // TODO: Make sure this is the correct behaviour.
+    auto pprPI2 =
+        rewriter.create<PPRotationOp>(loc, pauliP, PI_DENOMINATOR, outPZQubits, ppmPauli.getMres());
+
+    // Deallocate the axillary qubit
+    rewriter.create<DeallocQubitOp>(loc, ppmPZ.getOutQubits().back());
+
+    rewriter.replaceOp(op, pprPI2.getOutQubits());
+}
+
 /// Decompose the Non-Clifford (pi/8) PPR into PPR and PPMs operations via auto corrected method
 /// as described in Figure 17(b) in the paper: https://arxiv.org/abs/1808.02892
 ///
@@ -152,7 +189,7 @@ void decompose_inject_magic_state_pi_over_eight(PPRotationOp op, PatternRewriter
     // Fabricate the magic state |m⟩
     auto magic = rewriter.create<FabricateOp>(loc, getMagicState(op));
 
-    SmallVector<StringRef> pauliP = extractPauliString(op); // [P]
+    SmallVector<StringRef> pauliP = extractPauliString(op); // [P = n qubit]
     SmallVector<Value> inQubits = op.getInQubits();         // [input qubits]
 
     // PPM (P⊗Z) on input qubits and |m⟩
@@ -203,6 +240,9 @@ struct DecomposeNonCliffordPPR : public OpRewritePattern<PPRotationOp> {
                 break;
             case DecomposeMethod::CliffordCorrected:
                 decompose_inject_magic_state_pi_over_eight(op, rewriter);
+                break;
+            case DecomposeMethod::PauliCorrected:
+                decompose_pauli_corrected_pi_over_eight(op, rewriter);
                 break;
             }
             return success();
