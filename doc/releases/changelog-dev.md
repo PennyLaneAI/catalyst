@@ -251,6 +251,10 @@
   $ catalyst --tool=opt --pass-pipeline="builtin.module(convert-quantum-to-llvm{use-array-backed-registers=true})" <input file>
   ```
 
+* Fix auxiliary qubit deallocation in `decompose-non-clifford-ppr` pass 
+  in the `clifford-corrected` method.
+  [(#2039)](https://github.com/PennyLaneAI/catalyst/pull/2039)
+
 <h3>Documentation 📝</h3>
 
 * The Catalyst Command Line Interface documentation incorrectly stated that the `catalyst`
