@@ -51,7 +51,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get -y -q install ninja-build make cmake clang
+          sudo apt-get -y -q install ninja-build make cmake clang python3-dev libpython3-dev
           python3 -m pip install nanobind pybind11
 
       - name: Get Cached LLVM Source
@@ -511,7 +511,7 @@ jobs:
         echo "OQD_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
         echo "CATALYST_BIN_DIR=$(pwd)/quantum-build/bin" >> $GITHUB_ENV
         chmod +x $(pwd)/quantum-build/bin/catalyst  # artifact upload does not preserve permissions
-       
+
     - name: Run Python Pytest/Lit Tests
       run: |
         COVERAGE_REPORT="xml" \
@@ -666,10 +666,15 @@ jobs:
         with:
           python-version: ${{ needs.constants.outputs.primary_python_version }}
 
+      - name: Verify Python development setup
+        run: |
+          python3 -c "import sysconfig; print('Python executable:', sysconfig.get_config_var('BINDIR')); print('Python include dir:', sysconfig.get_path('include')); print('Python lib dir:', sysconfig.get_config_var('LIBDIR'))"
+          echo "Python3_ROOT_DIR=$(python3 -c 'import sys; print(sys.prefix)')" >> $GITHUB_ENV
+
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get -y -q install cmake ninja-build
+          sudo apt-get -y -q install cmake ninja-build python3-dev libpython3-dev
           python3 -m pip install nanobind pybind11
 
       - name: Download Catalyst-Runtime Artifact
@@ -702,7 +707,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get -y -q install cmake ninja-build
+          sudo apt-get -y -q install cmake ninja-build python3-dev libpython3-dev
           python3 -m pip install nanobind pybind11
 
       - name: Install lcov # Manually install lcov_1.15-1_all

@@ -57,9 +57,8 @@ extern "C" {
     namespace py = pybind11;
     using namespace py::literals;
 
-    if (!Py_IsInitialized()) {
-        Py_Initialize();
-    }
+    py::scoped_interpreter guard{}; // start the interpreter and keep it alive
+
 
     py::gil_scoped_acquire lock;
 
