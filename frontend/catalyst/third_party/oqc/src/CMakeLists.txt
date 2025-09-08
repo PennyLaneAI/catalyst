@@ -18,6 +18,34 @@ endif()
 # Locate Python
 # The optional component is only used for the C++ test suite (to spin up its own interpreter),
 # and requires libpython.so to be available on the system.
+
+# First try to find Python components, providing better error messages if they fail
+find_package(Python REQUIRED COMPONENTS Interpreter)
+if(DEFINED ENV{CIBUILDWHEEL} OR DEFINED ENV{AUDITWHEEL_PLAT})
+    message(STATUS "Detected wheel building environment, attempting to find Python development components...")
+    execute_process(
+        COMMAND "${Python_EXECUTABLE}" -c "import sysconfig; print(sysconfig.get_path('include'))"
+        OUTPUT_VARIABLE Python_INCLUDE_HINT
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET
+    )
+    execute_process(
+        COMMAND "${Python_EXECUTABLE}" -c "import sysconfig; print(sysconfig.get_config_var('LIBDIR'))"
+        OUTPUT_VARIABLE Python_LIBRARY_HINT
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET
+    )
+    if(Python_INCLUDE_HINT)
+        set(Python_INCLUDE_DIR "${Python_INCLUDE_HINT}" CACHE PATH "Python include directory")
+        message(STATUS "Using Python include hint: ${Python_INCLUDE_HINT}")
+    endif()
+
+    if(Python_LIBRARY_HINT)
+        set(Python_LIBRARY_DIR "${Python_LIBRARY_HINT}" CACHE PATH "Python library directory")
+        message(STATUS "Using Python library hint: ${Python_LIBRARY_HINT}")
+    endif()
+endif()
+
 find_package(Python REQUIRED
     COMPONENTS Interpreter Development.Module Development.Embed
     OPTIONAL_COMPONENTS Development.SABIModule
