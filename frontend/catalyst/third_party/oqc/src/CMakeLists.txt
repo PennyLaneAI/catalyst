@@ -20,7 +20,7 @@ endif()
 # and requires libpython.so to be available on the system.
 find_package(Python REQUIRED
     COMPONENTS Interpreter Development.Module
-    OPTIONAL_COMPONENTS Development.SABIModule Development.Embed
+    OPTIONAL_COMPONENTS Development.Embed Development.SABIModule
 )
 
 # Locate pybind11
@@ -33,7 +33,7 @@ find_package(pybind11 CONFIG REQUIRED)
 # Create the Python `oqc_python_module` module
 pybind11_add_module(oqc_python_module oqc_python_module.cpp)
 
-target_link_libraries(example PRIVATE pybind11::embed)
+target_link_libraries(oqc_python_module PRIVATE pybind11::embed)
 
 # Use a consistant suffix ".so" rather than, e.g. ".abi3.so" (when using the Stable ABI) or
 # ".cpython-3xx-darwin.so". Doing so simplifies the process to locate it when calling
