@@ -88,11 +88,15 @@ class QubitHandler:
 
     wire_map: dict[int, AbstractQbit]  # Note: No dynamic wire indices for now in from_plxpr.
 
-    def __init__(self, qubit_or_qreg_ref: AbstractQreg | list[AbstractQbit] | tuple[AbstractQbit]):
+    def __init__(
+        self,
+        qubit_or_qreg_ref: AbstractQreg | list[AbstractQbit] | tuple[AbstractQbit],
+        disable_wire_caching: bool = False,
+    ):
 
         # Context for decomposition: disable wire caching if qnode has decompose transform
         # It ensure that extract/insert are visible for the decompose transform.
-        self.disable_wire_caching = False
+        self.disable_wire_caching = disable_wire_caching
 
         if isinstance(qubit_or_qreg_ref, (list, tuple)):
             self.abstract_qreg_val = None
@@ -212,7 +216,7 @@ class QubitHandler:
 
         all_dynamic = False
         keep_cache = False
-        if same_number_of_wires:
+        if same_number_of_wires and not self.disable_wire_caching:
             # Notice that we can keep using the current qubit value in the wire_map (if one exists
             # there) even for dynamic case if they are the same dynamic wire, i.e.
             #   qml.gate(wires=[w0,w1])

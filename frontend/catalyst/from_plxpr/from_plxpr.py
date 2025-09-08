@@ -251,10 +251,10 @@ def handle_qnode(
             **_get_device_kwargs(device),
         )
         qreg = qalloc_p.bind(len(device.wires))
-        self.qubit_handler = QubitHandler(qreg)
+        self.qubit_handler = QubitHandler(
+            qreg, disable_wire_caching=self.compiler_decompose
+        )
         converter = PLxPRToQuantumJaxprInterpreter(device, shots, self.qubit_handler, {})
-        if self.compiler_decompose:
-            self.qubit_handler.set_decompose_mode(True)
         retvals = converter(closed_jaxpr, *args)
         self.qubit_handler.insert_all_dangling_qubits()
         qdealloc_p.bind(self.qubit_handler.get())
@@ -559,7 +559,9 @@ def handle_subroutine(self, *args, **kwargs):
     transformed = self.subroutine_cache.get(plxpr)
 
     def wrapper(qreg, *args):
-        qubit_handler = QubitHandler(qreg)
+        qubit_handler = QubitHandler(
+            qreg, disable_wire_caching=self.qubit_handler.disable_wire_caching
+        )
         converter = copy(self)
         converter.qubit_handler = qubit_handler
         retvals = converter(plxpr, *args)
@@ -609,7 +611,9 @@ def handle_decomposition_rule(self, *, pyfun, func_jaxpr, is_qreg, num_params):
         self.qubit_handler.insert_all_dangling_qubits()
 
         def wrapper(qreg, *args):
-            qubit_handler = QubitHandler(qreg)
+            qubit_handler = QubitHandler(
+                qreg, disable_wire_caching=self.qubit_handler.disable_wire_caching
+            )
             converter = copy(self)
             converter.qubit_handler = qubit_handler
             converter(func_jaxpr, *args)
@@ -622,7 +626,9 @@ def handle_decomposition_rule(self, *, pyfun, func_jaxpr, is_qreg, num_params):
     else:
 
         def wrapper(*args):
-            qubit_handler = QubitHandler(args[num_params:])
+            qubit_handler = QubitHandler(
+                args[num_params:], disable_wire_caching=self.qubit_handler.disable_wire_caching
+            )
             converter = copy(self)
             converter.qubit_handler = qubit_handler
             converter(func_jaxpr, *args)
@@ -768,7 +774,9 @@ def handle_adjoint_transform(
     def calling_convention(*args_plus_qreg):
         *args, qreg = args_plus_qreg
         # `qreg` is the scope argument for the body jaxpr
-        qubit_handler = QubitHandler(qreg)
+        qubit_handler = QubitHandler(
+            qreg, disable_wire_caching=self.qubit_handler.disable_wire_caching
+        )
         converter = copy(self)
         converter.qubit_handler = qubit_handler
         retvals = converter(jaxpr, *args)
