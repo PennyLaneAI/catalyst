@@ -28,6 +28,9 @@
 
 <h3>Improvements 🛠</h3>
 
+* Improve the pass `--ppm-specs` to count the depth of PPRs and PPMs in the circuit.
+  [(#2014)](https://github.com/PennyLaneAI/catalyst/pull/2014)
+
 * The default mid-circuit measurement method in catalyst has been changed from `"single-branch-statistics"` to `"one-shot"`.
   [[#2017]](https://github.com/PennyLaneAI/catalyst/pull/2017)
 
@@ -250,6 +253,10 @@
   ```console
   $ catalyst --tool=opt --pass-pipeline="builtin.module(convert-quantum-to-llvm{use-array-backed-registers=true})" <input file>
   ```
+
+* Fix auxiliary qubit deallocation in `decompose-non-clifford-ppr` pass 
+  in the `clifford-corrected` method.
+  [(#2039)](https://github.com/PennyLaneAI/catalyst/pull/2039)
 
 <h3>Documentation 📝</h3>
 
