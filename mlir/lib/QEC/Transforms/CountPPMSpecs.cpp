@@ -218,16 +218,16 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
             }
         });
 
+        if (wr.wasInterrupted()) {
+            return failure();
+        }
+
         // Add the last layer if it is not empty.
         if (!currentLayer.empty()) {
             layers.emplace_back(std::move(currentLayer));
         }
 
         countDepths(layers, PPMSpecs, stringAllocator);
-
-        if (wr.wasInterrupted()) {
-            return failure();
-        }
 
         json PPMSpecsJson = PPMSpecs;
         llvm::outs() << PPMSpecsJson.dump(4)
