@@ -16,7 +16,7 @@
 
 //CHECK: {
 //CHECK:     "test_no_ppr_ppm": {
-//CHECK:         "num_logical_qubits": 2
+//CHECK:         "logical_qubits": 2
 //CHECK:     }
 //CHECK: }
 func.func public @test_no_ppr_ppm() {
@@ -39,11 +39,11 @@ func.func public @test_no_ppr_ppm() {
 
 //CHECK: {
 //CHECK:     "test_to_ppr": {
+//CHECK:         "logical_qubits": 2,
 //CHECK:         "max_weight_pi4": 2,
 //CHECK:         "max_weight_pi8": 1,
-//CHECK:         "num_logical_qubits": 2,
-//CHECK:         "num_pi4_gates": 7,
-//CHECK:         "num_pi8_gates": 1
+//CHECK:         "pi4_ppr": 7,
+//CHECK:         "pi8_ppr": 1
 //CHECK:     }
 //CHECK: }
 func.func public @test_to_ppr() {
@@ -70,12 +70,12 @@ func.func public @test_to_ppr() {
 
 //CHECK: {
 //CHECK:     "test_commute_ppr": {
+//CHECK:         "logical_qubits": 2,
 //CHECK:         "max_weight_pi4": 2,
 //CHECK:         "max_weight_pi8": 1,
-//CHECK:         "num_logical_qubits": 2,
 //CHECK:         "num_of_ppm": 2,
-//CHECK:         "num_pi4_gates": 7,
-//CHECK:         "num_pi8_gates": 1
+//CHECK:         "pi4_ppr": 7,
+//CHECK:         "pi8_ppr": 1
 //CHECK:     }
 //CHECK: }
 func.func public @test_commute_ppr() {
@@ -106,7 +106,7 @@ func.func public @test_commute_ppr() {
 
 //CHECK: {
 //CHECK:     "test_merge_ppr_ppm": {
-//CHECK:         "num_logical_qubits": 2,
+//CHECK:         "logical_qubits": 2,
 //CHECK:         "num_of_ppm": 2
 //CHECK:     }
 //CHECK: }
@@ -130,10 +130,10 @@ func.func public @test_merge_ppr_ppm() {
 
 //CHECK: {
 //CHECK:     "test_ppr_to_ppm": {
+//CHECK:         "logical_qubits": 2,
 //CHECK:         "max_weight_pi2": 2,
-//CHECK:         "num_logical_qubits": 2,
 //CHECK:         "num_of_ppm": 19,
-//CHECK:         "num_pi2_gates": 8
+//CHECK:         "pi2_ppr": 8
 //CHECK:     }
 //CHECK: }
 func.func public @test_ppr_to_ppm() {
@@ -208,13 +208,13 @@ func.func public @test_ppr_to_ppm() {
 
 //CHECK: {
 //CHECK:     "test_ppm_compilation_1": {
+//CHECK:         "logical_qubits": 2,
 //CHECK:         "max_weight_pi2": 2,
-//CHECK:         "num_logical_qubits": 2,
 //CHECK:         "num_of_ppm": 7,
-//CHECK:         "num_pi2_gates": 2
+//CHECK:         "pi2_ppr": 2
 //CHECK:     },
 //CHECK:     "test_ppm_compilation_2": {
-//CHECK:         "num_logical_qubits": 2
+//CHECK:         "logical_qubits": 2
 //CHECK:     }
 //CHECK: }
 func.func public @test_ppm_compilation_1() {
@@ -286,8 +286,8 @@ func.func public @test_ppm_compilation_2() {
 //CHECK:         "max_weight_pi4": 2,
 //CHECK:         "max_weight_pi8": 4,
 //CHECK:         "num_of_ppm": 4,
-//CHECK:         "num_pi4_gates": 17,
-//CHECK:         "num_pi8_gates": 4
+//CHECK:         "pi4_ppr": 17,
+//CHECK:         "pi8_ppr": 4
 //CHECK:     }
 //CHECK: }
 func.func public @game_of_surface_code(%arg0: !quantum.bit, %arg1: !quantum.bit, %arg2: !quantum.bit, %arg3: !quantum.bit) {
@@ -327,7 +327,7 @@ func.func public @game_of_surface_code(%arg0: !quantum.bit, %arg1: !quantum.bit,
 //CHECK:     "static_for_loop": {
 //CHECK:         "max_weight_pi4": 1,
 //CHECK:         "num_of_ppm": 5,
-//CHECK:         "num_pi4_gates": 5
+//CHECK:         "pi4_ppr": 5
 //CHECK:     }
 //CHECK: }
 func.func public @static_for_loop(%arg0: !quantum.bit) {
@@ -350,7 +350,7 @@ func.func public @static_for_loop(%arg0: !quantum.bit) {
 //CHECK:     "static_for_loop_bigstep": {
 //CHECK:         "max_weight_pi4": 1,
 //CHECK:         "num_of_ppm": 3,
-//CHECK:         "num_pi4_gates": 3
+//CHECK:         "pi4_ppr": 3
 //CHECK:     }
 //CHECK: }
 func.func public @static_for_loop_bigstep(%arg0: !quantum.bit) {
@@ -375,8 +375,8 @@ func.func public @static_for_loop_bigstep(%arg0: !quantum.bit) {
 //CHECK:         "max_weight_pi4": 1,
 //CHECK:         "max_weight_pi8": 1,
 //CHECK:         "num_of_ppm": 30,
-//CHECK:         "num_pi4_gates": 30,
-//CHECK:         "num_pi8_gates": 6
+//CHECK:         "pi4_ppr": 30,
+//CHECK:         "pi8_ppr": 6
 //CHECK:     }
 //CHECK: }
 func.func public @static_for_loop_nested(%arg0: !quantum.bit) {
@@ -453,7 +453,7 @@ func.func public @game_of_surface_code_t_layers(%qr0 : !quantum.bit, %qr1 : !qua
     // CHECK: "game_of_surface_code_t_layers": {
     // CHECK:     "depth_pi8_ppr": 4,
     // CHECK:     "max_weight_pi8": 4,
-    // CHECK:     "num_pi8_gates": 6
+    // CHECK:     "pi8_ppr": 6
     // CHECK: }
 
     // layer 1 
@@ -480,7 +480,7 @@ func.func public @game_of_surface_code_t_layers_no_identity(%qr0 : !quantum.bit,
     // CHECK: "game_of_surface_code_t_layers_no_identity": {
     // CHECK:     "depth_pi8_ppr": 4,
     // CHECK:     "max_weight_pi8": 4,
-    // CHECK:     "num_pi8_gates": 6
+    // CHECK:     "pi8_ppr": 6
     // CHECK: }
 
     // layer 1 
@@ -508,7 +508,7 @@ func.func public @game_of_surface_code_t_layers_opt(%arg0: !quantum.bit, %arg1: 
     // CHECK: "game_of_surface_code_t_layers_opt": {
     // CHECK:     "depth_pi8_ppr": 2,
     // CHECK:     "max_weight_pi8": 4,
-    // CHECK:     "num_pi8_gates": 6
+    // CHECK:     "pi8_ppr": 6
     // CHECK: }
 
     %0:4 = qec.ppr ["I", "Z", "I", "I"](-8) %arg0, %arg1, %arg2, %arg3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit

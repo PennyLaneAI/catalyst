@@ -66,7 +66,6 @@ Catalyst
 
 .. toctree::
    :maxdepth: 2
-   :titlesonly:
    :hidden:
 
    dev/installation
@@ -99,10 +98,7 @@ Catalyst
    :caption: Examples
    :hidden:
 
-   demos/magic_distillation_demo
-   demos/adaptive_circuits_demo
    demos/qml/tutorial_qubit_rotation
-   QML Optimization with Optax <demos/qml_optimization>
 
 .. toctree::
    :maxdepth: 1

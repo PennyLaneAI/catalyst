@@ -36,7 +36,7 @@ ability to run each stage individually. For example:
     the ``mlir/build/bin/`` directory relative to the root of your Catalyst source directory.
 
     If Catalyst is installed via pip or from wheels, the executable will be located
-    in the ``catalyst/bin/`` directory relative to the environment's installation directory.
+    in the ``bin/`` directory relative to the environment's installation directory.
 
 Usage
 -----
