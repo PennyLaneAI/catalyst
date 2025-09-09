@@ -590,7 +590,10 @@ def _decomposition_rule_lowering(ctx, *, pyfun, func_jaxpr, **_):
     """Lower a quantum decomposition rule into MLIR in a single step process.
     The step is the compilation of the definition of the function fn.
     """
-    lower_callable(ctx, pyfun, func_jaxpr)
+
+    # Set the visibility of the decomposition rule to public
+    # to avoid the elimination by the compiler
+    lower_callable(ctx, pyfun, func_jaxpr, public=True)
     return ()
 
 

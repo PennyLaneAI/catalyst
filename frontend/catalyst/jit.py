@@ -546,26 +546,6 @@ class QJIT(CatalystCallable):
         self.user_sig = get_type_annotations(fn)
         self._validate_configuration()
 
-        # Extract transform python kwargs from the function
-        # with both capture enabled and disabled
-
-        # Note: as we are currently interested in decompose
-        # target gateset, we avoid passing any non-decompose kwargs
-        transform_lists = fn._transform_program if hasattr(fn, "_transform_program") else []
-        decompose_transform_kwargs = [
-            t.kwargs
-            for t in transform_lists
-            if hasattr(t, "plxpr_transform")
-            and hasattr(t.plxpr_transform, "__name__")
-            and "decompose" in t.plxpr_transform.__name__
-        ]
-
-        # TODO: Remove this in the future after enabling multiple decomposition support
-        # in the MLIR rewrite pass.
-        if len(decompose_transform_kwargs) > 1:
-            raise ValueError("Multiple decompose transform is not yet supported.")
-        self.py_attrs = decompose_transform_kwargs[0] if decompose_transform_kwargs else None
-
         # If static_argnames are present, convert them to static_argnums
         if compile_options.static_argnames is not None:
             compile_options.static_argnums = merge_static_argname_into_argnum(
@@ -793,7 +773,7 @@ class QJIT(CatalystCallable):
             Tuple[ir.Module, str]: the in-memory MLIR module and its string representation
         """
 
-        mlir_module, ctx = lower_jaxpr_to_mlir(self.jaxpr, self.__name__, py_attrs=self.py_attrs)
+        mlir_module, ctx = lower_jaxpr_to_mlir(self.jaxpr, self.__name__)
 
         # Inject Runtime Library-specific functions (e.g. setup/teardown).
         inject_functions(mlir_module, ctx, self.compile_options.seed)
