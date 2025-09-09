@@ -106,6 +106,7 @@ struct UserDefinedDecompositionPass
 
   private:
     llvm::StringMap<func::FuncOp> decompositionRegistry;
+    llvm::StringSet<llvm::MallocAllocator> targetGateSet;
 
     // Function to discover and register decomposition functions from a module
     void discoverAndRegisterDecompositions(ModuleOp module,
@@ -121,6 +122,22 @@ struct UserDefinedDecompositionPass
                 decompositionRegistry[targetOp] = func;
             }
         });
+    }
+
+    void findTargetGateSet(ModuleOp module, llvm::StringSet<llvm::MallocAllocator> &targetGateSet)
+    {
+        WalkResult walkResult = module.walk([&](func::FuncOp func) {
+            if (auto gate_set_attr = func->getAttrOfType<ArrayAttr>("gate_set")) {
+                for (auto gate : gate_set_attr.getValue()) {
+                    StringRef gate_name = cast<StringAttr>(gate).getValue();
+                    targetGateSet.insert(gate_name);
+                }
+                return WalkResult::interrupt();
+            }
+            return WalkResult::advance();
+        });
+        if (!walkResult.wasInterrupted()) {
+        }
     }
 
     void removeDecompositionFunctions(ModuleOp module,
@@ -144,6 +161,9 @@ struct UserDefinedDecompositionPass
             return;
         }
 
+        // Step 1.1: Find the target gate set
+        findTargetGateSet(module, targetGateSet);
+
         // Step 2: Canonicalize the module
         RewritePatternSet patternsCanonicalization(&getContext());
         catalyst::quantum::CustomOp::getCanonicalizationPatterns(patternsCanonicalization,
@@ -151,10 +171,6 @@ struct UserDefinedDecompositionPass
         if (failed(applyPatternsGreedily(module, std::move(patternsCanonicalization)))) {
             return signalPassFailure();
         }
-
-        // TODO: It's expected that the target gate set is extracted from circuit function,
-        // and it's not implemented yet
-        llvm::StringSet<llvm::MallocAllocator> targetGateSet;
 
         // Step 3: Apply the decomposition patterns
         RewritePatternSet decompositionPatterns(&getContext());
