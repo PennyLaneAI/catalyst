@@ -904,8 +904,9 @@ TEST_CASE("Test NullQubit device resource tracking integration", "[NullQubit]")
     std::unique_ptr<NullQubit> dummy = std::make_unique<NullQubit>();
     CHECK(dummy->IsTrackingResources() == false);
 
-    std::unique_ptr<NullQubit> sim = std::make_unique<NullQubit>(
-        "{'track_resources':True, 'resources_fname': '" + std::string(RESOURCES_FNAME) + "'}");
+    std::unique_ptr<NullQubit> sim =
+        std::make_unique<NullQubit>("{'track_resources':True, 'resources_fname':'" +
+                                    std::string(RESOURCES_FNAME) + ", 'compute_depth':True'}");
     CHECK(sim->IsTrackingResources() == true);
 
     // Ensure data will be written to the correct place
@@ -939,7 +940,6 @@ TEST_CASE("Test NullQubit device resource tracking integration", "[NullQubit]")
                                                "Adjoint(T)",
                                                "C(S)",
                                                "2C(S)",
-                                               "S",
                                                "CNOT",
                                                "Adjoint(ControlledQubitUnitary)",
                                                "ControlledQubitUnitary",
@@ -957,6 +957,9 @@ TEST_CASE("Test NullQubit device resource tracking integration", "[NullQubit]")
         if (line.find("num_gates") != std::string::npos) {
             CHECK(line.find("10") != std::string::npos);
         }
+        if (line.find("depth") != std::string::npos) {
+            CHECK(line.find("10") != std::string::npos);
+        }
         full_json += line + "\n";
     }
     resource_file_r.close();
@@ -964,6 +967,7 @@ TEST_CASE("Test NullQubit device resource tracking integration", "[NullQubit]")
     // Ensure all expected fields are present
     CHECK(full_json.find("num_wires") != std::string::npos);
     CHECK(full_json.find("num_gates") != std::string::npos);
+    CHECK(full_json.find("depth") != std::string::npos);
     for (const auto &name : resource_names) {
         // Check that all operations applied are present in the data
         CHECK(full_json.find(name) != std::string::npos);
