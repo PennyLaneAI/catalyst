@@ -377,6 +377,7 @@ for pl_transform, (pass_name, decomposition) in transforms_to_passes.items():
     register_transform(pl_transform, pass_name, decomposition)
 
 
+# pylint: disable=too-many-instance-attributes
 class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
     """
     Unlike the previous interpreters which modified the getattr and setattr
