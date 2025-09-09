@@ -449,7 +449,7 @@ class Compiler:
 
             if self.options.debug_compiler != True:
                 result = subprocess.run(cmd, check=True, capture_output=True, text=True)
-            else: # self.options.debug_compiler == True:
+            else:  # self.options.debug_compiler == True:
                 with subprocess.Popen(
                     cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
                 ) as p:
@@ -480,7 +480,7 @@ class Compiler:
                         print(result.stdout.strip(), file=self.options.logfile)
                     if result.stderr:
                         print(result.stderr.strip(), file=self.options.logfile)
-                else: # self.options.debug_compiler == True:
+                else:  # self.options.debug_compiler == True:
                     if res_stdout:
                         print(res_stdout.strip(), file=self.options.logfile)
                     if res_stderr:
