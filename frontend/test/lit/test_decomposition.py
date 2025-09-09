@@ -289,7 +289,7 @@ def test_decomposition_rule_wire_param():
         Hadamard0(int)
         return qml.probs()
 
-    # CHECK: func.func private @Hadamard0([[QBIT:%.+]]: !quantum.bit) -> !quantum.bit
+    # CHECK: func.func public @Hadamard0([[QBIT:%.+]]: !quantum.bit) -> !quantum.bit
     # CHECK-NEXT: [[QUBIT_OUT:%.+]] = quantum.custom "Hadamard"() [[QBIT]] : !quantum.bit
     # CHECK-NEXT: return [[QUBIT_OUT]] : !quantum.bit
 
@@ -317,7 +317,7 @@ def test_decomposition_rule_gate_param_param():
         RX_on_wire_0(float, int)
         return qml.probs()
 
-    # CHECK: func.func private @RX_on_wire_0([[PARAM_TENSOR:%.+]]: tensor<f64>, [[QUBIT:%.+]]: !quantum.bit) -> !quantum.bit
+    # CHECK: func.func public @RX_on_wire_0([[PARAM_TENSOR:%.+]]: tensor<f64>, [[QUBIT:%.+]]: !quantum.bit) -> !quantum.bit
     # CHECK-NEXT: [[PARAM:%.+]] = tensor.extract [[PARAM_TENSOR]][] : tensor<f64>
     # CHECK-NEXT: [[QUBIT_1:%.+]] = quantum.custom "RX"([[PARAM]]) [[QUBIT]] : !quantum.bit
     # CHECK-NEXT: return [[QUBIT_1]] : !quantum.bit
@@ -356,8 +356,8 @@ def test_multiple_decomposition_rules():
         qml.Hadamard(0)
         return qml.probs()
 
-    # CHECK: func.func private @identity
-    # CHECK: func.func private @all_wires_rx
+    # CHECK: func.func public @identity
+    # CHECK: func.func public @all_wires_rx
 
     print(circuit_3.mlir)
     qml.capture.disable()
@@ -385,7 +385,7 @@ def test_decomposition_rule_shaped_wires():
         qml.Hadamard(0)
         return qml.probs()
 
-    # CHECK: func.func private @shaped_wires_rule([[QREG:%.+]]: !quantum.reg, [[PARAM_TENSOR:%.+]]: tensor<f64>, [[QUBITS:%.+]]: tensor<3xi64>) -> !quantum.reg
+    # CHECK: func.func public @shaped_wires_rule([[QREG:%.+]]: !quantum.reg, [[PARAM_TENSOR:%.+]]: tensor<f64>, [[QUBITS:%.+]]: tensor<3xi64>) -> !quantum.reg
     # CHECK-NEXT: [[IDX_0:%.+]] = stablehlo.slice [[QUBITS]] [0:1] : (tensor<3xi64>) -> tensor<1xi64>
     # CHECK-NEXT: [[RIDX_0:%.+]] = stablehlo.reshape [[IDX_0]] : (tensor<1xi64>) -> tensor<i64>
     # CHECK-NEXT: [[EXTRACTED:%.+]] = tensor.extract [[RIDX_0]][] : tensor<i64>
@@ -422,7 +422,7 @@ def test_decomposition_rule_expanded_wires():
         qml.Hadamard(0)
         return qml.probs()
 
-    # CHECK: func.func private @expanded_wires_rule(%arg0: tensor<f64>, %arg1: !quantum.bit, %arg2: !quantum.bit, %arg3: !quantum.bit) -> (!quantum.bit, !quantum.bit, !quantum.bit)
+    # CHECK: func.func public @expanded_wires_rule(%arg0: tensor<f64>, %arg1: !quantum.bit, %arg2: !quantum.bit, %arg3: !quantum.bit) -> (!quantum.bit, !quantum.bit, !quantum.bit)
 
     print(circuit_5.mlir)
     qml.capture.disable()
@@ -453,7 +453,7 @@ def test_decomposition_rule_with_cond():
         cond_RX(float, jax.core.ShapedArray((1,), int))
         return qml.probs()
 
-    # CHECK: func.func private @cond_RX([[QREG:%.+]]: !quantum.reg, [[PARAM_TENSOR:%.+]]: tensor<f64>, [[QUBITS:%.+]]: tensor<1xi64>) -> !quantum.reg
+    # CHECK: func.func public @cond_RX([[QREG:%.+]]: !quantum.reg, [[PARAM_TENSOR:%.+]]: tensor<f64>, [[QUBITS:%.+]]: tensor<1xi64>) -> !quantum.reg
     # CHECK-NEXT: [[ZERO:%.+]] = stablehlo.constant dense<0.000000e+00> : tensor<f64>
     # CHECK-NEXT: [[COND_TENSOR:%.+]] = stablehlo.compare  NE, [[PARAM_TENSOR]], [[ZERO]],  FLOAT : (tensor<f64>, tensor<f64>) -> tensor<i1>
     # CHECK-NEXT: [[COND:%.+]] = tensor.extract [[COND_TENSOR]][] : tensor<i1>
@@ -480,17 +480,17 @@ def test_decomposition_rule_caller():
     qml.capture.enable()
 
     @decomposition_rule(is_qreg=True)
-    def Op1_decomp(_: TensorLike, wires: WiresLike):
+    def Rule_Op1_decomp(_: TensorLike, wires: WiresLike):
         qml.Hadamard(wires=wires[0])
         qml.Hadamard(wires=[1])
 
     @decomposition_rule(is_qreg=True)
-    def Op2_decomp(param: TensorLike, wires: WiresLike):
+    def Rule_Op2_decomp(param: TensorLike, wires: WiresLike):
         qml.RX(param, wires=wires[0])
 
     def decomps_caller(param: TensorLike, wires: WiresLike):
-        Op1_decomp(param, wires)
-        Op2_decomp(param, wires)
+        Rule_Op1_decomp(param, wires)
+        Rule_Op2_decomp(param, wires)
 
     @qml.qjit(autograph=False)
     @qml.qnode(qml.device("lightning.qubit", wires=1))
@@ -501,8 +501,8 @@ def test_decomposition_rule_caller():
         decomps_caller(float, jax.core.ShapedArray((2,), int))
         return qml.probs()
 
-    # CHECK: func.func private @Op1_decomp(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<2xi64>) -> !quantum.reg
-    # CHECK: func.func private @Op2_decomp(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<2xi64>) -> !quantum.reg
+    # CHECK: func.func public @Rule_Op1_decomp(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<2xi64>) -> !quantum.reg
+    # CHECK: func.func public @Rule_Op2_decomp(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<2xi64>) -> !quantum.reg
 
     print(circuit_7.mlir)
     qml.capture.disable()

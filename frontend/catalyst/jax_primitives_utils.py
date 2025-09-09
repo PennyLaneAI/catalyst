@@ -46,7 +46,16 @@ def get_call_equation(jaxpr):
 
 
 def lower_jaxpr(ctx, jaxpr, context=None):
-    """Lowers a call primitive jaxpr, may be either func_p or quantum_kernel_p"""
+    """Lowers a call primitive jaxpr, may be either func_p or quantum_kernel_p
+
+    Args:
+        ctx: LoweringRuleContext
+        jaxpr: JAXPR to be lowered
+        context: additional context to distinguish different FuncOps
+
+    Returns:
+        FuncOp
+    """
     equation = get_call_equation(jaxpr)
     call_jaxpr = equation.params["call_jaxpr"]
     callable_ = equation.params.get("fn")
@@ -56,7 +65,8 @@ def lower_jaxpr(ctx, jaxpr, context=None):
     return lower_callable(ctx, callable_, call_jaxpr, pipeline=pipeline, context=context)
 
 
-def lower_callable(ctx, callable_, call_jaxpr, pipeline=None, context=None):
+# pylint: disable=too-many-arguments
+def lower_callable(ctx, callable_, call_jaxpr, pipeline=None, context=None, public=False):
     """Lowers _callable to MLIR.
 
     If callable_ is a qnode, then we will first create a module, then
@@ -68,6 +78,8 @@ def lower_callable(ctx, callable_, call_jaxpr, pipeline=None, context=None):
       ctx: LoweringRuleContext
       callable_: python function
       call_jaxpr: jaxpr representing callable_
+      public: whether the visibility should be marked public
+
     Returns:
       FuncOp
     """
@@ -75,25 +87,49 @@ def lower_callable(ctx, callable_, call_jaxpr, pipeline=None, context=None):
         pipeline = tuple()
 
     if not isinstance(callable_, qml.QNode):
-        return get_or_create_funcop(ctx, callable_, call_jaxpr, pipeline, context=context)
+        return get_or_create_funcop(
+            ctx, callable_, call_jaxpr, pipeline, context=context, public=public
+        )
 
     return get_or_create_qnode_funcop(ctx, callable_, call_jaxpr, pipeline, context=context)
 
 
-def get_or_create_funcop(ctx, callable_, call_jaxpr, pipeline, context=None):
-    """Get funcOp from cache, or create it from scratch"""
+# pylint: disable=too-many-arguments
+def get_or_create_funcop(ctx, callable_, call_jaxpr, pipeline, context=None, public=False):
+    """Get funcOp from cache, or create it from scratch
+
+    Args:
+        ctx: LoweringRuleContext
+        callable_: python function
+        call_jaxpr: jaxpr representing callable_
+        context: additional context to distinguish different FuncOps
+        public: whether the visibility should be marked public
+
+    Returns:
+        FuncOp
+    """
     if context is None:
         context = tuple()
     key = (callable_, *context, *pipeline)
     if func_op := get_cached(ctx, key):
         return func_op
-    func_op = lower_callable_to_funcop(ctx, callable_, call_jaxpr)
+    func_op = lower_callable_to_funcop(ctx, callable_, call_jaxpr, public=public)
     cache(ctx, key, func_op)
     return func_op
 
 
-def lower_callable_to_funcop(ctx, callable_, call_jaxpr):
-    """Lower callable to either a FuncOp"""
+def lower_callable_to_funcop(ctx, callable_, call_jaxpr, public=False):
+    """Lower callable to either a FuncOp
+
+    Args:
+        ctx: LoweringRuleContext
+        callable_: python function
+        call_jaxpr: jaxpr representing callable_
+        public: whether the visibility should be marked public
+
+    Returns:
+        FuncOp
+    """
     if isinstance(call_jaxpr, core.Jaxpr):
         call_jaxpr = core.ClosedJaxpr(call_jaxpr, ())
 
@@ -107,6 +143,11 @@ def lower_callable_to_funcop(ctx, callable_, call_jaxpr):
     kwargs["jaxpr"] = call_jaxpr
     kwargs["effects"] = []
     kwargs["name_stack"] = ctx.name_stack
+
+    # Make the visibility of the function public=True
+    # to avoid elimination by the compiler
+    kwargs["public"] = public
+
     func_op = mlir.lower_jaxpr_to_fun(**kwargs)
 
     if isinstance(callable_, qml.QNode):
@@ -137,7 +178,8 @@ def lower_callable_to_funcop(ctx, callable_, call_jaxpr):
 
         func_op.attributes["diff_method"] = ir.StringAttr.get(diff_method)
 
-        if gateset := getattr(callable_, "decomp_gateset", []):
+        gateset = getattr(callable_, "decomp_gateset", [])
+        if gateset:
             func_op.attributes["decomp_gateset"] = get_mlir_attribute_from_pyval(gateset)
 
     return func_op

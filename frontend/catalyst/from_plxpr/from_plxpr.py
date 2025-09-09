@@ -365,6 +365,7 @@ def register_transform(pl_transform, pass_name, decomposition):
             # Then, construct and solve the graph-based decomposition
             # to get the optimized rules and lower them to PLxPR
             # to Catalyst JAXPR to MLIR.
+
             final_jaxpr = handle_graph_decomposition(
                 *args,
                 inner_jaxpr=inner_jaxpr,
