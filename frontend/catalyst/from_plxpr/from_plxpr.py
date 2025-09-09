@@ -187,6 +187,7 @@ class WorkflowInterpreter(PlxprInterpreter):
     def __init__(self):
         self._pass_pipeline = []
         self.qubit_handler = None
+        self.compiler_decompose = False
         self.decomp_gateset = []
         super().__init__()
 
@@ -214,7 +215,9 @@ def handle_qnode(
             **_get_device_kwargs(device),
         )
         qreg = qalloc_p.bind(len(device.wires))
-        self.qubit_handler = QubitHandler(qreg)
+        self.qubit_handler = QubitHandler(
+            qreg, disable_wire_caching=self.compiler_decompose
+        )
         converter = PLxPRToQuantumJaxprInterpreter(device, shots, self.qubit_handler, {})
         retvals = converter(closed_jaxpr, *args)
         self.qubit_handler.insert_all_dangling_qubits()
@@ -304,6 +307,8 @@ def register_transform(pl_transform, pass_name, decomposition):
             and pl_plxpr_transform.__name__ == "decompose_plxpr_to_plxpr"
             and qml.decomposition.enabled_graph()
         ):
+            self.compiler_decompose = True
+
             # Update the decomp_gateset to be used by the quantum kernel primitive
             self.decomp_gateset = tkwargs.get("gate_set", [])
 
@@ -386,6 +391,7 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         # TODO: we assume the qreg value passed into a scope is the unique qreg in the scope
         # In other words, we assume no new qreg will be allocated in the scope
         self.qubit_handler = qubit_handler
+        self.compiler_decompose = False
         self.decomp_gateset = []
         self.subroutine_cache = cache
         self.control_wires = control_wires
@@ -539,7 +545,9 @@ def handle_subroutine(self, *args, **kwargs):
     transformed = self.subroutine_cache.get(plxpr)
 
     def wrapper(qreg, *args):
-        qubit_handler = QubitHandler(qreg)
+        qubit_handler = QubitHandler(
+            qreg, disable_wire_caching=self.qubit_handler.disable_wire_caching
+        )
         converter = copy(self)
         converter.qubit_handler = qubit_handler
         retvals = converter(plxpr, *args)
@@ -589,7 +597,9 @@ def handle_decomposition_rule(self, *, pyfun, func_jaxpr, is_qreg, num_params):
         self.qubit_handler.insert_all_dangling_qubits()
 
         def wrapper(qreg, *args):
-            qubit_handler = QubitHandler(qreg)
+            qubit_handler = QubitHandler(
+                qreg, disable_wire_caching=self.qubit_handler.disable_wire_caching
+            )
             converter = copy(self)
             converter.qubit_handler = qubit_handler
             converter(func_jaxpr, *args)
@@ -602,7 +612,9 @@ def handle_decomposition_rule(self, *, pyfun, func_jaxpr, is_qreg, num_params):
     else:
 
         def wrapper(*args):
-            qubit_handler = QubitHandler(args[num_params:])
+            qubit_handler = QubitHandler(
+                args[num_params:], disable_wire_caching=self.qubit_handler.disable_wire_caching
+            )
             converter = copy(self)
             converter.qubit_handler = qubit_handler
             converter(func_jaxpr, *args)
@@ -748,7 +760,9 @@ def handle_adjoint_transform(
     def calling_convention(*args_plus_qreg):
         *args, qreg = args_plus_qreg
         # `qreg` is the scope argument for the body jaxpr
-        qubit_handler = QubitHandler(qreg)
+        qubit_handler = QubitHandler(
+            qreg, disable_wire_caching=self.qubit_handler.disable_wire_caching
+        )
         converter = copy(self)
         converter.qubit_handler = qubit_handler
         retvals = converter(jaxpr, *args)

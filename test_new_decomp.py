@@ -6,6 +6,8 @@ TODO: remove the file after testing
 
 from functools import partial
 
+import jax
+
 import numpy as np
 import pennylane as qml
 from pennylane.ftqc import RotXZX
@@ -61,14 +63,14 @@ def _xzx_decompose(phi, theta, omega, wires, **__):
 def circuit():
     """Circuit to test custom decomposition rules."""
     qml.RY(0.5, wires=0)
-    qml.Rot(0.1, 0.2, 0.3, wires=1)
-    qml.U2(0.4, 0.5, wires=2)
-    RotXZX(0.6, 0.7, 0.8, wires=0)
+    # qml.Rot(0.1, 0.2, 0.3, wires=1)
+    # qml.U2(0.4, 0.5, wires=2)
+    # RotXZX(0.6, 0.7, 0.8, wires=0)
 
-    _ry_to_rz_rx(0, 0)
-    _rot_to_rz_ry_rz(0, 0, 0, 1)
-    _u2_phaseshift_rot(0, 0, 2)
-    _xzx_decompose(0, 0, 0, 0)
+    _ry_to_rz_rx(float, jax.core.ShapedArray((1,), jax.numpy.dtype("int64")))
+    # _rot_to_rz_ry_rz(0, 0, 0, 1)
+    # _u2_phaseshift_rot(0, 0, 2)
+    # _xzx_decompose(0, 0, 0, 0)
 
     return qml.expval(qml.Z(0))
 
@@ -94,6 +96,7 @@ def _rot_to_xzx(phi, theta, omega, wires, **__):
 
 
 @qml.qjit()
+@qml.transforms.cancel_inverses
 @qml.transforms.merge_rotations
 @partial(
     qml.transforms.decompose,
