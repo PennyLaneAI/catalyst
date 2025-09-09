@@ -57,7 +57,8 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      * @brief Constructs a NullQubit device with optional configuration parameters
      *
      * Parses device configuration from JSON-like string format and sets up
-     * resource tracking options if specified. By default, resource tracking is turned off. Supported parameters:
+     * resource tracking options if specified. By default, resource tracking is turned off.
+     * Supported parameters:
      * - "track_resources": Enable/disable resource tracking ("True"/"False")
      * - "resources_fname": Static filename for resource output [requires resource tracking]
      * - "compute_depth": Enable/disable circuit depth computation ("True"/"False") [requires
@@ -68,13 +69,13 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     NullQubit(const std::string &kwargs = "{}")
     {
         this->device_kwargs = Catalyst::Runtime::parse_kwargs(kwargs);
-        if (device_kwargs.find("track_resources") != device_kwargs.end()) {
+        if (device_kwargs.contains("track_resources")) {
             this->track_resources_ = device_kwargs["track_resources"] == "True";
         }
-        if (device_kwargs.find("resources_fname") != device_kwargs.end()) {
+        if (device_kwargs.contains("resources_fname")) {
             this->resource_tracker_.SetResourcesFname(device_kwargs["resources_fname"]);
         }
-        if (device_kwargs.find("compute_depth") != device_kwargs.end()) {
+        if (device_kwargs.contains("compute_depth")) {
             this->resource_tracker_.SetComputeDepth(device_kwargs["compute_depth"] == "True");
         }
     }
@@ -101,7 +102,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     {
         num_qubits_++; // next_id
         if (this->track_resources_) {
-            this->resource_tracker_.SetMaxWires(num_qubits_);
+            this->resource_tracker_.SetMaxWires(static_cast<size_t>(num_qubits_));
         }
         return this->qubit_manager.Allocate(num_qubits_);
     }
@@ -110,7 +111,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      * @brief Allocates a vector of "null" qubits and returns their qubit IDs
      *
      * @param num_qubits The number of qubits to allocate
-     * @return std::vector<QubitIdType> Vector containing identifiers of the newly allocated qubits
+     * @return std::vector<QubitIdType> Vector containing qubit IDs of the newly allocated qubits
      */
     auto AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType>
     {
@@ -127,7 +128,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      *
      * Decrements the qubit counter and releases the qubit through the qubit manager.
      *
-     * @param q The identifier of the qubit to release
+     * @param q The qubit ID of the qubit to release
      */
     void ReleaseQubit(QubitIdType q)
     {
@@ -247,10 +248,10 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     }
 
     /**
-     * @brief Records a matrix-based quantum operation for resource tracking (no-op for execution)
+     * @brief No-op implementation for a generic matrix operation
      *
      * If resource tracking is enabled, records the operation as a general unitary matrix
-     * operation. The actual quantum operation is not performed since this is a null device.
+     * operation.
      *
      * @param matrix The unitary matrix defining the operation (ignored)
      * @param wires The target qubits for the operation
@@ -258,7 +259,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      * @param controlled_wires Control qubits for controlled operations
      * @param controlled_values Control values for multi-controlled operations
      */
-    void MatrixOperation(const std::vector<std::complex<double>> &,
+    void MatrixOperation([[maybe_unused]] const std::vector<std::complex<double>> &matrix,
                          const std::vector<QubitIdType> &wires, bool inverse,
                          const std::vector<QubitIdType> &controlled_wires = {},
                          const std::vector<bool> &controlled_values = {})
@@ -424,7 +425,8 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      * The eigenvalues array is filled with integers 0, 1, ..., 2^num_qubits - 1,
      * while the counts array has all shots in the first position (state 0) and zeros elsewhere.
      *
-     * @param eigvals Array to fill with possible computational basis measurement outcomes (0 to 2^n - 1, inclusive)
+     * @param eigvals Array to fill with possible computational basis measurement outcomes (0 to 2^n
+     * - 1, inclusive)
      * @param counts Array to fill with count statistics (all shots in position 0)
      */
     void Counts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts)
