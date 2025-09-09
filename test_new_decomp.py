@@ -23,7 +23,7 @@ qml.decomposition.enable_graph()
 
 
 @decomposition_rule
-def Rule_ry_to_rz_rx(phi, wires: WiresLike, **__):
+def _ry_to_rz_rx(phi, wires: WiresLike, **__):
     """Decomposition of RY gate using RZ and RX gates."""
     qml.RZ(-np.pi / 2, wires=wires)
     qml.RX(phi, wires=wires)
@@ -31,7 +31,7 @@ def Rule_ry_to_rz_rx(phi, wires: WiresLike, **__):
 
 
 @decomposition_rule
-def Rule_rot_to_rz_ry_rz(phi, theta, omega, wires: WiresLike, **__):
+def _rot_to_rz_ry_rz(phi, theta, omega, wires: WiresLike, **__):
     """Decomposition of Rot gate using RZ and RY gates."""
     qml.RZ(phi, wires=wires)
     qml.RY(theta, wires=wires)
@@ -39,7 +39,7 @@ def Rule_rot_to_rz_ry_rz(phi, theta, omega, wires: WiresLike, **__):
 
 
 @decomposition_rule
-def Rule_u2_phaseshift_rot(phi, delta, wires, **__):
+def _u2_phaseshift_rot(phi, delta, wires, **__):
     """Decomposition of U2 gate using Rot and PhaseShift gates."""
     pi_half = qml.math.ones_like(delta) * (np.pi / 2)
     qml.Rot(delta, pi_half, -delta, wires=wires)
@@ -48,7 +48,7 @@ def Rule_u2_phaseshift_rot(phi, delta, wires, **__):
 
 
 @decomposition_rule
-def Rule_xzx_decompose(phi, theta, omega, wires, **__):
+def _xzx_decompose(phi, theta, omega, wires, **__):
     """Decomposition of Rot gate using RX and RZ gates in XZX format."""
     qml.RX(phi, wires=wires)
     qml.RZ(theta, wires=wires)
@@ -65,10 +65,10 @@ def circuit():
     qml.U2(0.4, 0.5, wires=2)
     RotXZX(0.6, 0.7, 0.8, wires=0)
 
-    Rule_ry_to_rz_rx(0, 0)
-    Rule_rot_to_rz_ry_rz(0, 0, 0, 1)
-    Rule_u2_phaseshift_rot(0, 0, 2)
-    Rule_xzx_decompose(0, 0, 0, 0)
+    _ry_to_rz_rx(0, 0)
+    _rot_to_rz_ry_rz(0, 0, 0, 1)
+    _u2_phaseshift_rot(0, 0, 2)
+    _xzx_decompose(0, 0, 0, 0)
 
     return qml.expval(qml.Z(0))
 
@@ -86,7 +86,7 @@ qml.capture.enable()
 
 @qml.register_resources({qml.ftqc.RotXZX: 1})
 @decomposition_rule
-def Rule_rot_to_xzx(phi, theta, omega, wires, **__):
+def _rot_to_xzx(phi, theta, omega, wires, **__):
     """Decomposition of Rot gate using RotXZX gate."""
     mat = qml.Rot.compute_matrix(phi, theta, omega)
     lam, theta, phi = qml.math.decomposition.xzx_rotation_angles(mat)
@@ -98,7 +98,7 @@ def Rule_rot_to_xzx(phi, theta, omega, wires, **__):
 @partial(
     qml.transforms.decompose,
     gate_set={"X", "Y", "Z", "S", "H", "CNOT", "RZ", "RotXZX", "GlobalPhase"},
-    fixed_decomps={qml.Rot: Rule_rot_to_xzx},
+    fixed_decomps={qml.Rot: _rot_to_xzx},
 )
 @qml.qnode(qml.device("null.qubit", wires=3))
 def mbqc_circ(x: float, y: float):
@@ -106,9 +106,9 @@ def mbqc_circ(x: float, y: float):
     qml.RX(x, 0)
     qml.RY(y, 1)
 
-    Rule_rot_to_xzx(float, float, float, int)
-    Rule_ry_to_rz_rx(float, int)
-    Rule_xzx_decompose(float, float, float, int)
+    _rot_to_xzx(float, float, float, int)
+    _ry_to_rz_rx(float, int)
+    _xzx_decompose(float, float, float, int)
 
     return qml.expval(qml.Z(0)), qml.expval(qml.Z(1))
 
