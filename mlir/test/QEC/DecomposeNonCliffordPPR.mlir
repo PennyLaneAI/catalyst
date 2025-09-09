@@ -14,6 +14,7 @@
 
 // RUN: quantum-opt --pass-pipeline="builtin.module(decompose-non-clifford-ppr{decompose-method=clifford-corrected})" --split-input-file -verify-diagnostics %s | FileCheck %s --check-prefix=CHECK-INJECT
 // RUN: quantum-opt --pass-pipeline="builtin.module(decompose-non-clifford-ppr{decompose-method=auto-corrected})" --split-input-file -verify-diagnostics %s | FileCheck %s --check-prefix=CHECK-AUTO
+// RUN: quantum-opt --pass-pipeline="builtin.module(decompose-non-clifford-ppr{decompose-method=pauli-corrected})" --split-input-file -verify-diagnostics %s | FileCheck %s --check-prefix=CHECK-PAULI
 
 func.func @test_ppr_to_ppm(%q1 : !quantum.bit) {
     %0 = qec.ppr ["Z"](8) %q1 : !quantum.bit
@@ -78,6 +79,30 @@ func.func @test_ppr_to_ppm(%q1 : !quantum.bit) {
 
 // // PPR P(π/2) on Q if cond(m3) is true
 // CHECK-AUTO: [[qubit:%.+]] = qec.ppr ["Z"](2) [[out_0]]#0 cond([[cond]]) : !quantum.bit
+
+// Decompose via pauli-corrected method
+// PPR[P](8) on Q
+// into
+// prepare |m⟩
+// PPM P⊗Z on Q and |m⟩ => m0
+// PPM X on |m⟩ if cond(m0) is true else PPM Y on |m⟩ if cond(m0) is false => m1
+// PPR[P](2) on Q if cond(m1) is true
+
+// // prepare |m⟩
+// CHECK-PAULI: [[magic:%.+]] = qec.fabricate  magic
+
+// // PPM P⊗Z on Q and |m⟩ => m0
+// CHECK-PAULI: [[m_0:%.+]], [[out_0:%.+]]:2 = qec.ppm ["Z", "Z"] %arg0, [[magic]] : !quantum.bit, !quantum.bit
+
+// // PPR[Z](4) on Q if cond(m0) is true
+// CHECK-PAULI: [[q0:%.+]] = qec.ppr ["Z"](4) [[out_0]]#0 cond([[m_0]]) : !quantum.bit
+
+// // PPM X on |m⟩ => m1
+// CHECK-PAULI: [[m_1:%.+]], [[out_1:%.+]] = qec.ppm ["X"] [[out_0]]#1 : !quantum.bit
+
+// // PPR[Z](2) on Q if cond(m1) is true
+// CHECK-PAULI: [[q0_1:%.+]]  = qec.ppr ["Z"](2) [[q0]] cond([[m_1]]) : !quantum.bit
+
 
 // -----
 

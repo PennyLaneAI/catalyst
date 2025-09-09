@@ -12,8 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <llvm/ADT/SmallVector.h>
+#include <llvm/ADT/StringRef.h>
 #define DEBUG_TYPE "decompose-non-clifford-ppr"
-
+#include "llvm/Support/Debug.h"
+#include "llvm/Support/Errc.h"
 #include <mlir/Dialect/Arith/IR/Arith.h> // for arith::XOrIOp and arith::ConstantOp
 #include <mlir/IR/Builders.h>
 
@@ -41,6 +44,28 @@ LogicalInitKind getMagicState(QECOpInterface op)
 }
 
 /// Decompose the Non-Clifford (pi/8) PPR into PPR and PPMs operations via pauli corrected method
+/// as described in Figure 13 in the paper: https://arxiv.org/pdf/2211.15465
+///
+/// ─────┌───┐───────
+/// ─────│ P │(π/8)──
+/// ─────└───┘───────
+///
+/// into
+///
+/// ─────┌───┐────────┌───────┐
+/// ─────| P |────────| P(π/2)|
+/// ─────|   |────────└───╦───┘
+///      |   |            ║
+///      |   |        ┌───╩───┐
+/// |m⟩──| Z |────────| X / Y |
+///      └───┘        └───────┘
+/// All the operations in second diagram are PPM except for the last PPR P(π/2)
+/// For P(-π/8) we need to use complex conjugate|m̅⟩ as the magic state.
+///
+/// Details:
+/// - If P⊗Z measurement yields -1 then apply Y measurement, otherwise apply X measurement
+///   * The measurement results are stored as i1 values, -1 is true and 1 is false
+/// - If the X or Y measurement yields -1, apply P(π/2) on the input qubits
 void decompose_pauli_corrected_pi_over_eight(PPRotationOp op, PatternRewriter &rewriter)
 {
     auto loc = op.getLoc();
@@ -55,19 +80,18 @@ void decompose_pauli_corrected_pi_over_eight(PPRotationOp op, PatternRewriter &r
     inQubits.emplace_back(magic.getOutQubits()[0]); // [input qubits, |m⟩]
     auto ppmPZ = rewriter.create<PPMeasurementOp>(loc, extendedPauliP, inQubits);
 
-    auto ppmPZResults = ppmPZ.getMres();
-    SmallVector<StringRef> pauliStr = {"X"};
-    if (ppmPZResults) {
-        pauliStr = {"Y"};
-    }
-    auto ppmPauli = rewriter.create<PPMeasurementOp>(loc, pauliStr, ppmPZ.getOutQubits().back());
+    auto ppmPZRes = ppmPZ.getMres();
+    SmallVector<StringRef> pauliX = {"X"};
+    SmallVector<StringRef> pauliY = {"Y"};
+    auto ppmXY = rewriter.create<SelectPPMeasurementOp>(loc, ppmPZRes, pauliY, pauliX,
+                                                        ppmPZ.getOutQubits().back());
 
     // PPR P(π/2) on input qubits if PPM (X or Y) yields -1
     SmallVector<Value> outPZQubits = ppmPZ.getOutQubits(); // [input qubits, |m⟩]
     outPZQubits.pop_back();                                // [input qubits]
     const uint16_t PI_DENOMINATOR = 2;                     // For rotation of P(PI/2)
     auto pprPI2 =
-        rewriter.create<PPRotationOp>(loc, pauliP, PI_DENOMINATOR, outPZQubits, ppmPauli.getMres());
+        rewriter.create<PPRotationOp>(loc, pauliP, PI_DENOMINATOR, outPZQubits, ppmXY.getMres());
 
     // Deallocate the axillary qubit
     rewriter.create<DeallocQubitOp>(loc, ppmPZ.getOutQubits().back());
