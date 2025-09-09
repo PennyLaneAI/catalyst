@@ -12,8 +12,12 @@ from catalyst.from_plxpr import from_plxpr
 from catalyst.jax_primitives import decomposition_rule
 
 qml.capture.enable()
-
 qml.decomposition.enable_graph()
+
+
+######################################
+# Custom decomposition rules
+######################################
 
 
 @decomposition_rule
@@ -64,3 +68,42 @@ def circuit():
 
 
 print(circuit.mlir)
+
+
+###################################################
+# MBQC Example with custom decomposition to RotXZX
+###################################################
+
+qml.decomposition.enable_graph()
+qml.capture.enable()
+
+
+@qml.register_resources({qml.ftqc.RotXZX: 1})
+@decomposition_rule
+def _rot_to_xzx(phi, theta, omega, wires, **__):
+    mat = qml.Rot.compute_matrix(phi, theta, omega)
+    lam, theta, phi = qml.math.decomposition.xzx_rotation_angles(mat)
+    qml.ftqc.RotXZX(lam, theta, phi, wires)
+
+
+@qml.qjit()
+@partial(
+    qml.transforms.decompose,
+    gate_set={"X", "Y", "Z", "S", "H", "CNOT", "RZ", "RotXZX", "GlobalPhase"},
+    fixed_decomps={qml.Rot: _rot_to_xzx},
+)
+@qml.qnode(qml.device("null.qubit", wires=3))
+def mbqc_circ(x: float, y: float):
+    qml.RX(x, 0)
+    qml.RY(y, 1)
+
+    _rot_to_xzx(
+        float, float, float, int
+    )  # this needs to be here to include the custom decomposition in the graph
+    _ry_to_rz_rx(float, int)
+    _xzx_decompose(float, float, float, int)
+
+    return qml.expval(qml.Z(0)), qml.expval(qml.Z(1))
+
+
+print(mbqc_circ.mlir)

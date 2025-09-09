@@ -347,9 +347,10 @@ def test_pass_application():
 
     qml.capture.enable()
 
+    # TODO: is there an ordering issue here?
     @qml.qjit(target="mlir")
-    @qml.transforms.cancel_inverses
     @qml.transforms.merge_rotations
+    @qml.transforms.cancel_inverses
     @qml.qnode(dev)
     def circuit():
         return qml.probs()

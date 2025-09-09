@@ -541,5 +541,4 @@ def _solve_decomposition_graph(operations, gate_set, fixed_decomps, alt_decomps)
             d_node_idx = solutions._visitor.predecessors[op_node_idx]
             decomp_graph_solution[op_node] = solutions._graph[d_node_idx].rule._impl
 
-    print("[DEBUG PRINT] Decomposition graph solution:", decomp_graph_solution)
     return decomp_graph_solution

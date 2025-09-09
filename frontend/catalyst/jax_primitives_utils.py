@@ -26,6 +26,8 @@ from jaxlib.mlir.dialects.func import CallOp
 from mlir_quantum.dialects._transform_ops_gen import ApplyRegisteredPassOp, NamedSequenceOp, YieldOp
 from mlir_quantum.dialects.catalyst import LaunchKernelOp
 
+from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
+
 
 def get_call_jaxpr(jaxpr):
     """Extracts the `call_jaxpr` from a JAXPR if it exists.""" ""
@@ -134,6 +136,9 @@ def lower_callable_to_funcop(ctx, callable_, call_jaxpr):
                 diff_method = "parameter-shift"
 
         func_op.attributes["diff_method"] = ir.StringAttr.get(diff_method)
+
+        if gateset := getattr(callable_, "decomp_gateset", []):
+            func_op.attributes["decomp_gateset"] = get_mlir_attribute_from_pyval(gateset)
 
     return func_op
 

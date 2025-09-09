@@ -3,6 +3,7 @@ import os
 import pathlib
 import platform
 from copy import deepcopy
+from functools import partial
 
 import jax
 import pennylane as qml
@@ -508,3 +509,69 @@ def test_decomposition_rule_caller():
 
 
 test_decomposition_rule_caller()
+
+
+def test_decompose_gateset_without_graph():
+    """Test the decompose transform to a target gate set without the graph decomposition."""
+
+    qml.capture.enable()
+
+    @qml.qjit(target="mlir")
+    @partial(qml.transforms.decompose, gate_set={"RX", "RZ"})
+    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    # CHECK: public @circuit_8() -> tensor<f64> attributes {diff_method = "adjoint", llvm.linkage = #llvm.linkage<internal>, qnode}
+    def circuit_8():
+        return qml.expval(qml.Z(0))
+
+    print(circuit_8.mlir)
+
+    qml.capture.disable()
+
+
+test_decompose_gateset_without_graph()
+
+
+def test_decompose_gateset_with_graph():
+    """Test the decompose transform to a target gate set with the graph decomposition."""
+
+    qml.capture.enable()
+    qml.decomposition.enable_graph()
+
+    @qml.qjit(target="mlir")
+    @partial(qml.transforms.decompose, gate_set={"RX", "RZ"})
+    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    # CHECK: public @circuit_9() -> tensor<f64> attributes {decomp_gateset
+    def circuit_9():
+        return qml.expval(qml.Z(0))
+
+    print(circuit_9.mlir)
+
+    qml.decomposition.disable_graph()
+    qml.capture.disable()
+
+
+test_decompose_gateset_with_graph()
+
+
+def test_decompose_gateset_operator_with_graph():
+    """Test the decompose transform to a target gate set with the graph decomposition."""
+
+    qml.capture.enable()
+    qml.decomposition.enable_graph()
+
+    @qml.qjit(target="mlir")
+    @partial(
+        qml.transforms.decompose, gate_set={qml.RX, qml.RZ, "PauliZ", qml.PauliX, qml.Hadamard}
+    )
+    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    # CHECK: public @circuit_10() -> tensor<f64> attributes {decomp_gateset
+    def circuit_10():
+        return qml.expval(qml.Z(0))
+
+    print(circuit_10.mlir)
+
+    qml.decomposition.disable_graph()
+    qml.capture.disable()
+
+
+test_decompose_gateset_operator_with_graph()

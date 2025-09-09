@@ -35,6 +35,7 @@ from pennylane.capture.primitives import ctrl_transform_prim as plxpr_ctrl_trans
 from pennylane.capture.primitives import measure_prim as plxpr_measure_prim
 from pennylane.decomposition.collect_resource_ops import CollectResourceOps
 from pennylane.ftqc.primitives import measure_in_basis_prim as plxpr_measure_in_basis_prim
+from pennylane.ops import Adjoint, Controlled, ControlledOp
 from pennylane.ops.functions.map_wires import _map_wires_transform as pl_map_wires
 from pennylane.transforms import cancel_inverses as pl_cancel_inverses
 from pennylane.transforms import commute_controlled as pl_commute_controlled
@@ -187,7 +188,7 @@ class WorkflowInterpreter(PlxprInterpreter):
     def __init__(self):
         self._pass_pipeline = []
         self.qubit_handler = None
-        self.compiler_decompose = False
+        self.decomp_gateset = []
         super().__init__()
 
 
@@ -258,6 +259,9 @@ def handle_qnode(
         qdealloc_p.bind(self.qubit_handler.get())
         device_release_p.bind()
         return retvals
+
+    # Add gate_set attribute to the quantum kernel primitive
+    setattr(qnode, "decomp_gateset", self.decomp_gateset)
 
     return quantum_kernel_p.bind(
         wrap_init(calling_convention, debug_info=qfunc_jaxpr.debug_info),
@@ -333,19 +337,34 @@ def register_transform(pl_transform, pass_name, decomposition):
         non_const_args = args[args_slice]
         targs = args[targs_slice]
 
-        # Check if the transform is a decomposition transform
-        #
-        # Note:
-        # - The list of target gateset is always taken from the transform's attributes
-        #   and passed down to the MLIR lowering as a quantum function attribute.
+        # If the transform is a decomposition transform
+        # and the graph-based decomposition is enabled
         if (
             hasattr(pl_plxpr_transform, "__name__")
             and pl_plxpr_transform.__name__ == "decompose_plxpr_to_plxpr"
             and qml.decomposition.enabled_graph()
         ):
-            self.compiler_decompose = True
+            # Update the decomp_gateset to be used by the quantum kernel primitive
+            self.decomp_gateset = tkwargs.get("gate_set", [])
 
-        if self.compiler_decompose:
+            # A helper function to get the name of a pennylane operator
+            def get_operator_name(op):
+                """Get the name of a pennylane operator, handling wrapped operators.
+
+                Note: Controlled and Adjoint ops aren't supported in `gate_set`
+                    by PennyLane's DecompositionGraph; unit tests were added in PennyLane.
+                """
+                if isinstance(op, str):
+                    return op
+
+                return getattr(op._primitive, "name", "UnsupportedGate")
+
+            self.decomp_gateset = [get_operator_name(op) for op in self.decomp_gateset]
+
+            # First decompose to the compiler gateset.
+            # Then, construct and solve the graph-based decomposition
+            # to get the optimized rules and lower them to PLxPR
+            # to Catalyst JAXPR to MLIR.
             final_jaxpr = handle_graph_decomposition(
                 *args,
                 inner_jaxpr=inner_jaxpr,
@@ -375,10 +394,10 @@ def register_transform(pl_transform, pass_name, decomposition):
                 )
 
             return self.eval(final_jaxpr.jaxpr, final_jaxpr.consts, *non_const_args)
-        else:
-            # Apply the corresponding Catalyst pass counterpart
-            self._pass_pipeline.insert(0, Pass(catalyst_pass_name))
-            return self.eval(inner_jaxpr, consts, *non_const_args)
+
+        # Apply the corresponding Catalyst pass counterpart
+        self._pass_pipeline.append(Pass(catalyst_pass_name))
+        return self.eval(inner_jaxpr, consts, *non_const_args)
 
 
 # This is our registration factory for PL transforms. The loop below iterates
@@ -404,7 +423,7 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         # TODO: we assume the qreg value passed into a scope is the unique qreg in the scope
         # In other words, we assume no new qreg will be allocated in the scope
         self.qubit_handler = qubit_handler
-        self.compiler_decompose = False
+        self.decomp_gateset = []
         self.subroutine_cache = cache
         self.control_wires = control_wires
         """Any control wires used for a subroutine."""
