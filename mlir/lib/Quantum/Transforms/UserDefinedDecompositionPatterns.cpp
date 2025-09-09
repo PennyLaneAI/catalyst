@@ -154,7 +154,7 @@ class OpSignatureAnalyzer {
     // Prepare the results for the call operation
     SmallVector<Value> prepareCallResultForQreg(func::CallOp callOp, PatternRewriter &rewriter)
     {
-        assert(callOp.getNumResults() == 1 && "only allow to have one qreg result for qreg mode");
+        assert(callOp.getNumResults() == 1 && "only one qreg result for qreg mode is allowed");
 
         auto qreg = callOp.getResult(0);
         assert(isa<quantum::QuregType>(qreg.getType()) && "only allow to have qreg result");
