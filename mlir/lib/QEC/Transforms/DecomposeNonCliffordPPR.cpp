@@ -58,7 +58,6 @@ void decompose_pauli_corrected_pi_over_eight(PPRotationOp op, PatternRewriter &r
     auto ppmPZResults = ppmPZ.getMres();
     SmallVector<StringRef> pauliStr = {"X"};
     if (ppmPZResults) {
-        // TODO: Make sure this is the correct behaviour.
         pauliStr = {"Y"};
     }
     auto ppmPauli = rewriter.create<PPMeasurementOp>(loc, pauliStr, ppmPZ.getOutQubits().back());
@@ -67,7 +66,6 @@ void decompose_pauli_corrected_pi_over_eight(PPRotationOp op, PatternRewriter &r
     SmallVector<Value> outPZQubits = ppmPZ.getOutQubits(); // [input qubits, |m⟩]
     outPZQubits.pop_back();                                // [input qubits]
     const uint16_t PI_DENOMINATOR = 2;                     // For rotation of P(PI/2)
-    // TODO: Make sure this is the correct behaviour.
     auto pprPI2 =
         rewriter.create<PPRotationOp>(loc, pauliP, PI_DENOMINATOR, outPZQubits, ppmPauli.getMres());
 
