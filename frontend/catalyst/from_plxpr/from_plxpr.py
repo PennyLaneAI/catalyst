@@ -35,6 +35,7 @@ from pennylane.capture.primitives import ctrl_transform_prim as plxpr_ctrl_trans
 from pennylane.capture.primitives import measure_prim as plxpr_measure_prim
 from pennylane.ftqc.primitives import measure_in_basis_prim as plxpr_measure_in_basis_prim
 from pennylane.ops.functions.map_wires import _map_wires_transform as pl_map_wires
+from pennylane.measurements import CountsMP
 from pennylane.transforms import cancel_inverses as pl_cancel_inverses
 from pennylane.transforms import commute_controlled as pl_commute_controlled
 from pennylane.transforms import decompose as pl_decompose
@@ -448,6 +449,15 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         and no **kwargs) and the results is a sequence of values
         """
         return self.eval(jaxpr.jaxpr, jaxpr.consts, *args)
+
+
+@PLxPRToQuantumJaxprInterpreter.register_primitive(CountsMP._wires_primitive)
+def _(self, *wires, all_outcomes):
+    obs = self._compbasis_obs(*wires)
+    num_wires = len(wires) if wires else len(self.device.wires)
+    keys, vals = counts_p.bind(obs, static_shape=(2**num_wires, ))
+    keys = jax.lax.convert_element_type(keys, int)
+    return keys, vals
 
 
 @PLxPRToQuantumJaxprInterpreter.register_primitive(quantum_subroutine_p)
