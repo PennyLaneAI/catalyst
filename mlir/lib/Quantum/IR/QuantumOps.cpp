@@ -150,9 +150,8 @@ LogicalResult ExtractOp::canonicalize(ExtractOp extract, mlir::PatternRewriter &
             return isa<InsertOp>(op) || op == extract.getOperation();
         });
         if ((staticallyEqual || dynamicallyEqual) && valid) {
-            Value originalReg = insert.getInQreg();
             rewriter.replaceOp(extract, insert.getQubit());
-            rewriter.replaceOp(insert, originalReg);
+            rewriter.replaceOp(insert, insert.getInQreg());
             return success();
         }
     }
