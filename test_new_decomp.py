@@ -7,7 +7,6 @@ TODO: remove the file after testing
 from functools import partial
 
 import jax
-
 import numpy as np
 import pennylane as qml
 from pennylane.ftqc import RotXZX

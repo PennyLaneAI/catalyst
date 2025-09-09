@@ -187,8 +187,11 @@ class WorkflowInterpreter(PlxprInterpreter):
     def __init__(self):
         self._pass_pipeline = []
         self.qubit_handler = None
+
+        # Compiler options for the new decomposition system
         self.compiler_decompose = False
         self.decomp_gateset = []
+
         super().__init__()
 
 
@@ -215,9 +218,7 @@ def handle_qnode(
             **_get_device_kwargs(device),
         )
         qreg = qalloc_p.bind(len(device.wires))
-        self.qubit_handler = QubitHandler(
-            qreg, disable_wire_caching=self.compiler_decompose
-        )
+        self.qubit_handler = QubitHandler(qreg, disable_wire_caching=self.compiler_decompose)
         converter = PLxPRToQuantumJaxprInterpreter(device, shots, self.qubit_handler, {})
         retvals = converter(closed_jaxpr, *args)
         self.qubit_handler.insert_all_dangling_qubits()
@@ -364,7 +365,7 @@ def register_transform(pl_transform, pass_name, decomposition):
             return self.eval(final_jaxpr.jaxpr, final_jaxpr.consts, *non_const_args)
 
         # Apply the corresponding Catalyst pass counterpart
-        self._pass_pipeline.append(Pass(catalyst_pass_name))
+        self._pass_pipeline.insert(0, Pass(catalyst_pass_name))
         return self.eval(inner_jaxpr, consts, *non_const_args)
 
 
@@ -376,6 +377,7 @@ for pl_transform, (pass_name, decomposition) in transforms_to_passes.items():
     register_transform(pl_transform, pass_name, decomposition)
 
 
+# pylint: disable=too-many-instance-attributes
 class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
     """
     Unlike the previous interpreters which modified the getattr and setattr
@@ -391,13 +393,15 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         # TODO: we assume the qreg value passed into a scope is the unique qreg in the scope
         # In other words, we assume no new qreg will be allocated in the scope
         self.qubit_handler = qubit_handler
-        self.compiler_decompose = False
-        self.decomp_gateset = []
         self.subroutine_cache = cache
         self.control_wires = control_wires
         """Any control wires used for a subroutine."""
         self.control_values = control_values
         """Any control values for executing a subroutine."""
+
+        # Compiler options for the new decomposition system
+        self.compiler_decompose = False
+        self.decomp_gateset = []
 
         super().__init__()
 

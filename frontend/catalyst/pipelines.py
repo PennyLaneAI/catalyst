@@ -230,6 +230,7 @@ def get_decomposition_stage(_options: CompileOptions) -> List[str]:
     ]
     return decomposition
 
+
 def get_hlo_lowering_stage(_options: CompileOptions) -> List[str]:
     """Returns the list of passes to lower StableHLO to upstream MLIR dialects."""
     hlo_lowering = [
