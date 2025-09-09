@@ -23,7 +23,7 @@
 namespace catalyst {
 namespace quantum {
 
-void populateQIRConversionPatterns(mlir::TypeConverter &, mlir::RewritePatternSet &);
+void populateQIRConversionPatterns(mlir::TypeConverter &, mlir::RewritePatternSet &, bool);
 void populateAdjointPatterns(mlir::RewritePatternSet &);
 void populateSelfInversePatterns(mlir::RewritePatternSet &);
 void populateMergeRotationsPatterns(mlir::RewritePatternSet &);
