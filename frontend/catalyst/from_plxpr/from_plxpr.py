@@ -414,9 +414,6 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         )
 
         prim = measurement_map[type(measurement)]
-        assert (
-            prim is not counts_p
-        ), "CountsMP returns a dictionary, which is not compatible with capture"
         if prim is sample_p:
             num_qubits = len(measurement.wires) or len(self.device.wires)
             sample_shape = (self.shots, num_qubits)

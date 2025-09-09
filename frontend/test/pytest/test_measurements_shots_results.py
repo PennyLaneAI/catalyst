@@ -612,9 +612,6 @@ class TestOtherMeasurements:
     def test_missing_shots_value(self, backend, meas_fun):
         """Test error for missing shots value."""
 
-        if qml.capture.enabled() and meas_fun == qml.counts:
-            pytest.xfail("counts not yet supported with program capture.")
-
         dev = qml.device(backend, wires=1)
 
         @qml.qnode(dev)
@@ -632,9 +629,6 @@ class TestOtherMeasurements:
     def test_multiple_return_values(self, backend, tol_stochastic):
         """Test multiple return values."""
 
-        if qml.capture.enabled():
-            pytest.xfail("counts not yet supported with program capture.")
-
         @qjit
         @qml.set_shots(shots=10000)
         @qml.qnode(qml.device(backend, wires=2))
@@ -650,19 +644,20 @@ class TestOtherMeasurements:
 
         @qml.set_shots(shots=10000)
         @qml.qnode(qml.device("lightning.qubit", wires=2))
-        def expected(x, measurement):
+        def expected(x, measurement_fn):
             qml.RY(x, wires=0)
-            return qml.apply(measurement)
+            return measurement_fn()
 
         x = 0.7
         result = all_measurements(x)
 
         # qml.sample
-        assert result[0].shape == expected(x, qml.sample(wires=[0, 1])).shape
+        assert result[0].shape == expected(x, measurement_fn = lambda: qml.sample(wires=[0, 1])).shape
         assert result[0].dtype == np.int64
 
         # qml.counts
-        for r, e in zip(result[1][0], expected(x, qml.counts(all_outcomes=True)).keys()):
+        qml.capture.disable() # cant execute with counts with program capture
+        for r, e in zip(result[1][0], expected(x,  measurement_fn = lambda: qml.counts(all_outcomes=True))):
             assert format(int(r), "02b") == e
         assert sum(result[1][1]) == 10000
         assert result[1][0].dtype == np.int64
@@ -670,20 +665,20 @@ class TestOtherMeasurements:
         # qml.expval
         assert np.allclose(
             result[2],
-            expected(x, qml.expval(qml.PauliZ(0))),
+            expected(x,  measurement_fn = lambda: qml.expval(qml.PauliZ(0))),
             atol=tol_stochastic,
             rtol=tol_stochastic,
         )
 
         # qml.var
         assert np.allclose(
-            result[3], expected(x, qml.var(qml.PauliZ(0))), atol=tol_stochastic, rtol=tol_stochastic
+            result[3], expected(x,  measurement_fn = lambda: qml.var(qml.PauliZ(0))), atol=tol_stochastic, rtol=tol_stochastic
         )
 
         # qml.probs
         assert np.allclose(
             result[4],
-            expected(x, qml.probs(wires=[0, 1])),
+            expected(x,  measurement_fn = lambda: qml.probs(wires=[0, 1])),
             atol=tol_stochastic,
             rtol=tol_stochastic,
         )
