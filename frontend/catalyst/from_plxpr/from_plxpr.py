@@ -342,6 +342,8 @@ def register_transform(pl_transform, pass_name, decomposition):
                 tkwargs=tkwargs,
                 compiler_gateset=COMPILER_OPERATIONS + self.decomp_gateset,
             )
+
+            self._pass_pipeline.insert(0, Pass("decompose-lowering"))
             return self.eval(final_jaxpr.jaxpr, final_jaxpr.consts, *non_const_args)
 
         if catalyst_pass_name is None:
