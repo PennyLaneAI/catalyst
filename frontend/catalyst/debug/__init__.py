@@ -22,6 +22,7 @@ from catalyst.debug.compiler_functions import (
     get_compilation_stages_groups,
     replace_ir,
 )
+
 from catalyst.debug.instruments import instrumentation
 from catalyst.debug.printing import print, print_memref  # pylint: disable=redefined-builtin
 from catalyst.debug.debugger import is_debugger_active
