@@ -94,15 +94,11 @@ func.func @test_ppr_to_ppm(%q1 : !quantum.bit) {
 // // PPM P⊗Z on Q and |m⟩ => m0
 // CHECK-PAULI: [[m_0:%.+]], [[out_0:%.+]]:2 = qec.ppm ["Z", "Z"] %arg0, [[magic]] : !quantum.bit, !quantum.bit
 
-// // PPR[Z](4) on Q if cond(m0) is true
-// CHECK-PAULI: [[q0:%.+]] = qec.ppr ["Z"](4) [[out_0]]#0 cond([[m_0]]) : !quantum.bit
-
-// // PPM X on |m⟩ => m1
-// CHECK-PAULI: [[m_1:%.+]], [[out_1:%.+]] = qec.ppm ["X"] [[out_0]]#1 : !quantum.bit
+// // PPM X or Y on |m⟩ => m1
+// CHECK-PAULI: [[m_1:%.+]], [[out_1:%.+]] = qec.select.ppm([[m_0]], ["Y"], ["X"]) [[out_0]]#1 : !quantum.bit
 
 // // PPR[Z](2) on Q if cond(m1) is true
-// CHECK-PAULI: [[q0_1:%.+]]  = qec.ppr ["Z"](2) [[q0]] cond([[m_1]]) : !quantum.bit
-
+// CHECK-PAULI: [[q0_1:%.+]]  = qec.ppr ["Z"](2) [[out_0]]#0 cond([[m_1]]) : !quantum.bit
 
 // -----
 
