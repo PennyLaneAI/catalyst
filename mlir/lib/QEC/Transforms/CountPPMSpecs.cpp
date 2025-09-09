@@ -29,7 +29,7 @@
 #include "Catalyst/Utils/SCFUtils.h"
 #include "QEC/IR/QECDialect.h"
 #include "QEC/IR/QECOpInterfaces.h"
-//#include "QEC/Utils/PauliStringWrapper.h"
+// #include "QEC/Utils/PauliStringWrapper.h"
 #include "QEC/Utils/QECLayer.h"
 #include "QEC/Utils/QECOpUtils.h"
 #include "Quantum/IR/QuantumOps.h"
