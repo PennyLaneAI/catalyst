@@ -906,7 +906,7 @@ TEST_CASE("Test NullQubit device resource tracking integration", "[NullQubit]")
 
     std::unique_ptr<NullQubit> sim =
         std::make_unique<NullQubit>("{'track_resources':True, 'resources_fname':'" +
-                                    std::string(RESOURCES_FNAME) + ", 'compute_depth':True'}");
+                                    std::string(RESOURCES_FNAME) + "', 'compute_depth':True}");
     CHECK(sim->IsTrackingResources() == true);
 
     // Ensure data will be written to the correct place

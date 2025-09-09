@@ -36,18 +36,18 @@
 namespace Catalyst::Runtime::Devices {
 
 /**
- * @brief A null quantum device implementation for testing and resource tracking purposes
+ * @brief A null backend quantum device.
  *
  * This device API provides a complete null backend implementation that:
  * - Manages qubit allocations and deallocations without actual quantum state
  * - Supports device shot configuration
  * - Implements all Quantum Runtime (QR) and Quantum Instruction Set (QIS) methods as no-ops
  * - Optionally tracks resource usage including gate counts, wire usage, and circuit depth
- * - Returns deterministic "ground state" results for all measurements and observations
+ * - Returns mock results for all measurements and observations
  *
  * The null device is particularly useful for:
  * - Testing quantum program compilation and execution without quantum simulation overhead
- * - Resource estimation and circuit analysis
+ * - Resource estimation
  * - Validating quantum program structure and control flow
  */
 struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
@@ -57,13 +57,13 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      * @brief Constructs a NullQubit device with optional configuration parameters
      *
      * Parses device configuration from JSON-like string format and sets up
-     * resource tracking options if specified. Supported parameters:
+     * resource tracking options if specified. By default, resource tracking is turned off. Supported parameters:
      * - "track_resources": Enable/disable resource tracking ("True"/"False")
      * - "resources_fname": Static filename for resource output [requires resource tracking]
      * - "compute_depth": Enable/disable circuit depth computation ("True"/"False") [requires
      * resource tracking]
      *
-     * @param kwargs JSON-like string containing device configuration parameters
+     * @param kwargs non-nested JSON-like string containing device configuration parameters
      */
     NullQubit(const std::string &kwargs = "{}")
     {
@@ -93,9 +93,9 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     std::unordered_map<std::string, std::string> GetDeviceKwargs() { return this->device_kwargs; }
 
     /**
-     * @brief Allocates a new "null" qubit and returns its identifier
+     * @brief Allocates a new "null" qubit and returns its qubit ID
      *
-     * @return QubitIdType The identifier of the newly allocated qubit
+     * @return QubitIdType The qubit ID of the newly allocated qubit
      */
     auto AllocateQubit() -> QubitIdType
     {
@@ -107,7 +107,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     }
 
     /**
-     * @brief Allocates a vector of "null" qubits and returns their identifiers
+     * @brief Allocates a vector of "null" qubits and returns their qubit IDs
      *
      * @param num_qubits The number of qubits to allocate
      * @return std::vector<QubitIdType> Vector containing identifiers of the newly allocated qubits
@@ -178,8 +178,6 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      *
      * The null device doesn't perform any quantum simulation, so PRNG configuration
      * is not required. This method exists to satisfy the QuantumDevice interface.
-     * In real devices, this would configure the pseudo-random number generator used
-     * for sampling and measurements to enable reproducible results.
      *
      * @param gen Pointer to the random number generator (ignored in null device)
      */
@@ -226,11 +224,10 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     void SetBasisState(DataView<int8_t, 1> &, std::vector<QubitIdType> &) {}
 
     /**
-     * @brief Records a named quantum operation for resource tracking (no-op for execution)
+     * @brief No-op implementation for a named quantum operation
      *
      * If resource tracking is enabled, records the operation details including name,
-     * parameters, and wire usage. The actual quantum operation is not performed since
-     * this is a null device.
+     * parameters, and wire usage.
      *
      * @param name The name of the quantum operation (e.g., "PauliX", "CNOT", "RZ")
      * @param params Parameters for parametric gates (ignored)
@@ -427,7 +424,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      * The eigenvalues array is filled with integers 0, 1, ..., 2^num_qubits - 1,
      * while the counts array has all shots in the first position (state 0) and zeros elsewhere.
      *
-     * @param eigvals Array to fill with possible measurement outcomes (0 to 2^n - 1)
+     * @param eigvals Array to fill with possible computational basis measurement outcomes (0 to 2^n - 1, inclusive)
      * @param counts Array to fill with count statistics (all shots in position 0)
      */
     void Counts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts)
