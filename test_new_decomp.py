@@ -1,3 +1,9 @@
+"""
+This file contains a few tests for the end-to-end custom decomposition rules
+
+TODO: remove the file after testing
+"""
+
 from functools import partial
 
 import numpy as np
