@@ -35,7 +35,7 @@ struct ResourceTracker final {
     std::unordered_map<std::string, std::size_t> gate_types_;
     std::unordered_map<std::size_t, std::size_t> gate_sizes_;
     std::unordered_map<QubitIdType, std::size_t> wire_depths;
-    size_t max_num_wires_;
+    std::size_t max_num_wires_;
     bool static_fname_;
     bool compute_depth_;
     std::string resources_fname_;
@@ -54,13 +54,13 @@ struct ResourceTracker final {
                    const std::vector<QubitIdType> &controlled_wires)
     {
         // Sanity check that wire numbers make sense
-        size_t total_wires = wires.size() + controlled_wires.size();
+        std::size_t total_wires = wires.size() + controlled_wires.size();
         std::vector<QubitIdType> combined_wires = {};
         combined_wires.insert(combined_wires.end(), wires.begin(), wires.end());
         combined_wires.insert(combined_wires.end(), controlled_wires.begin(),
                               controlled_wires.end());
         for (const auto &i : combined_wires) {
-            RT_FAIL_IF(i >= max_num_wires_,
+            RT_FAIL_IF(static_cast<std::size_t>(i) >= max_num_wires_,
                        ("Wire index " + std::to_string(i) + " exceeds allocated wires").c_str());
         }
 
@@ -122,7 +122,7 @@ struct ResourceTracker final {
             return gate_types_[gate_name];
         }
 
-        size_t num_gates = 0;
+        std::size_t num_gates = 0;
         for (const auto &[gate_type, count] : gate_types_) {
             num_gates += count;
         }
@@ -199,7 +199,10 @@ struct ResourceTracker final {
      *
      * @param max_wires The current number of allocated wires
      */
-    void SetMaxWires(size_t num_wires) { max_num_wires_ = std::max(num_wires, max_num_wires_); }
+    void SetMaxWires(std::size_t num_wires)
+    {
+        max_num_wires_ = std::max(num_wires, max_num_wires_);
+    }
 
     /**
      * @brief Enables or disables circuit depth computation

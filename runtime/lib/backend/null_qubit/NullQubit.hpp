@@ -102,7 +102,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     {
         num_qubits_++; // next_id
         if (this->track_resources_) {
-            this->resource_tracker_.SetMaxWires(static_cast<size_t>(num_qubits_));
+            this->resource_tracker_.SetMaxWires(static_cast<std::size_t>(num_qubits_));
         }
         return this->qubit_manager.Allocate(num_qubits_);
     }
@@ -113,7 +113,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      * @param num_qubits The number of qubits to allocate
      * @return std::vector<QubitIdType> Vector containing qubit IDs of the newly allocated qubits
      */
-    auto AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType>
+    auto AllocateQubits(std::size_t num_qubits) -> std::vector<QubitIdType>
     {
         if (!num_qubits) {
             return {};
@@ -158,21 +158,21 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      *
      * @return size_t The number of currently allocated qubits
      */
-    [[nodiscard]] auto GetNumQubits() const -> size_t { return num_qubits_; }
+    [[nodiscard]] auto GetNumQubits() const -> std::size_t { return num_qubits_; }
 
     /**
      * @brief Sets the number of shots for measurement sampling
      *
      * @param shots The number of measurement shots to configure
      */
-    void SetDeviceShots(size_t shots) { device_shots_ = shots; }
+    void SetDeviceShots(std::size_t shots) { device_shots_ = shots; }
 
     /**
      * @brief Returns the current number of configured device shots
      *
      * @return size_t The number of shots configured for measurements
      */
-    [[nodiscard]] auto GetDeviceShots() const -> size_t { return device_shots_; }
+    [[nodiscard]] auto GetDeviceShots() const -> std::size_t { return device_shots_; }
 
     /**
      * @brief No-op implementation for setting device PRNG state
@@ -485,7 +485,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      * @param gradients Vector of gradient data views (not modified)
      * @param trainable_params Indices of trainable parameters (ignored)
      */
-    void Gradient(std::vector<DataView<double, 1>> &, const std::vector<size_t> &) {}
+    void Gradient(std::vector<DataView<double, 1>> &, const std::vector<std::size_t> &) {}
 
     /**
      * @brief Returns dummy cache manager information
@@ -494,8 +494,8 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      *
      * @return Tuple containing cache statistics (all zeros/empty)
      */
-    auto CacheManagerInfo()
-        -> std::tuple<size_t, size_t, size_t, std::vector<std::string>, std::vector<ObsIdType>>
+    auto CacheManagerInfo() -> std::tuple<std::size_t, std::size_t, std::size_t,
+                                          std::vector<std::string>, std::vector<ObsIdType>>
     {
         return {0, 0, 0, {}, {}};
     }
@@ -525,7 +525,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     ResourceTracker resource_tracker_;
     std::size_t num_qubits_{0};
     std::size_t device_shots_{0};
-    Catalyst::Runtime::QubitManager<QubitIdType, size_t> qubit_manager{};
+    Catalyst::Runtime::QubitManager<QubitIdType, std::size_t> qubit_manager{};
 
     // static constants for RESULT values
     static constexpr bool GLOBAL_RESULT_FALSE_CONST = false;
