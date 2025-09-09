@@ -123,6 +123,16 @@ struct UserDefinedDecompositionPass
         });
     }
 
+    void removeDecompositionFunctions(ModuleOp module,
+                                      llvm::StringMap<func::FuncOp> &decompositionRegistry)
+    {
+        module.walk([&](func::FuncOp func) {
+            if (DecompositionUtils::isDecompositionFunction(func)) {
+                func.erase();
+            }
+        });
+    }
+
   public:
     void runOnOperation() final
     {
@@ -160,6 +170,19 @@ struct UserDefinedDecompositionPass
         pm.addPass(createCanonicalizerPass());
         pm.addPass(createCSEPass());
         if (failed(pm.run(module))) {
+            return signalPassFailure();
+        }
+
+        // Step 5. Remove redundant decomposition functions
+        removeDecompositionFunctions(module, decompositionRegistry);
+
+        // Step 6. Canonicalize the extract/insert pair
+        RewritePatternSet patternsInsertExtract(&getContext());
+        catalyst::quantum::InsertOp::getCanonicalizationPatterns(patternsInsertExtract,
+                                                                 &getContext());
+        catalyst::quantum::ExtractOp::getCanonicalizationPatterns(patternsInsertExtract,
+                                                                  &getContext());
+        if (failed(applyPatternsGreedily(module, std::move(patternsInsertExtract)))) {
             return signalPassFailure();
         }
     }

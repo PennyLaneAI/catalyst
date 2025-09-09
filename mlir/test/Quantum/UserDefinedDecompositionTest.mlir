@@ -248,10 +248,8 @@ module @qreg_base_circuit {
       // CHECK:   [[EXTRACTED_4:%.+]] = tensor.extract [[RESHAPE2]][] : tensor<i64>
       // CHECK:   [[EXTRACT1:%.+]] = quantum.extract [[REG1]][[[EXTRACTED_4]]] : !quantum.reg -> !quantum.bit
       // CHECK:   [[RZ1:%.+]] = quantum.custom "RZ"([[CST]]) [[EXTRACT1]] : !quantum.bit
-      // CHECK:   [[INSERT1:%.+]] = quantum.insert [[REG1]][[[EXTRACTED_4]]], [[RZ1]] : !quantum.reg, !quantum.bit
-      // CHECK:   [[EXTRACT2:%.+]] = quantum.extract [[INSERT1]][[[EXTRACTED_4]]] : !quantum.reg -> !quantum.bit
-      // CHECK:   [[RZ2:%.+]] = quantum.custom "RZ"([[CST]]) [[EXTRACT2]] : !quantum.bit
-      // CHECK:   [[INSERT2:%.+]] = quantum.insert [[INSERT1]][[[EXTRACTED_4]]], [[RZ2]] : !quantum.reg, !quantum.bit
+      // CHECK:   [[RZ2:%.+]] = quantum.custom "RZ"([[CST]]) [[RZ1]] : !quantum.bit
+      // CHECK:   [[INSERT2:%.+]] = quantum.insert [[REG1]][[[EXTRACTED_4]]], [[RZ2]] : !quantum.reg, !quantum.bit
       // CHECK:   scf.yield [[INSERT2]] : !quantum.reg
       // CHECK: } else {
       // CHECK:   scf.yield [[REG1]] : !quantum.reg

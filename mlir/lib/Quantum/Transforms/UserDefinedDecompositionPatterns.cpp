@@ -103,49 +103,49 @@ class OpSignatureAnalyzer {
 
         SmallVector<Value> operands(funcInputs.size());
 
-        int funcIndex = 0;
+        int operandIdx = 0;
         if (isa<quantum::QuregType>(funcInputs[0])) {
-            operands[funcIndex++] = signature.sourceQreg;
+            operands[operandIdx++] = signature.sourceQreg;
             if (!signature.params.empty()) {
-                operands[funcIndex] =
-                    fromTensorOrAsIs(signature.params, funcInputs[funcIndex], rewriter, loc);
-                funcIndex++;
+                operands[operandIdx] =
+                    fromTensorOrAsIs(signature.params, funcInputs[operandIdx], rewriter, loc);
+                operandIdx++;
             }
             if (!signature.inWireIndices.empty()) {
-                operands[funcIndex] =
-                    fromTensorOrAsIs(signature.inWireIndices, funcInputs[funcIndex], rewriter, loc);
-                funcIndex++;
+                operands[operandIdx] = fromTensorOrAsIs(signature.inWireIndices,
+                                                        funcInputs[operandIdx], rewriter, loc);
+                operandIdx++;
             }
             if (!signature.inCtrlWireIndices.empty()) {
-                operands[funcIndex] = fromTensorOrAsIs(signature.inCtrlWireIndices,
-                                                       funcInputs[funcIndex], rewriter, loc);
-                funcIndex++;
+                operands[operandIdx] = fromTensorOrAsIs(signature.inCtrlWireIndices,
+                                                        funcInputs[operandIdx], rewriter, loc);
+                operandIdx++;
             }
         }
         else {
             if (!signature.params.empty()) {
-                operands[funcIndex] =
-                    fromTensorOrAsIs(signature.params, funcInputs[funcIndex], rewriter, loc);
-                funcIndex++;
+                operands[operandIdx] =
+                    fromTensorOrAsIs(signature.params, funcInputs[operandIdx], rewriter, loc);
+                operandIdx++;
             }
 
             for (auto inQubit : signature.inQubits) {
-                operands[funcIndex] =
-                    fromTensorOrAsIs(inQubit, funcInputs[funcIndex], rewriter, loc);
-                funcIndex++;
+                operands[operandIdx] =
+                    fromTensorOrAsIs(inQubit, funcInputs[operandIdx], rewriter, loc);
+                operandIdx++;
             }
 
             for (auto inCtrlQubit : signature.inCtrlQubits) {
-                operands[funcIndex] =
-                    fromTensorOrAsIs(inCtrlQubit, funcInputs[funcIndex], rewriter, loc);
-                funcIndex++;
+                operands[operandIdx] =
+                    fromTensorOrAsIs(inCtrlQubit, funcInputs[operandIdx], rewriter, loc);
+                operandIdx++;
             }
         }
 
         if (!signature.inCtrlValues.empty()) {
-            operands[funcIndex] =
-                fromTensorOrAsIs(signature.inCtrlValues, funcInputs[funcIndex], rewriter, loc);
-            funcIndex++;
+            operands[operandIdx] =
+                fromTensorOrAsIs(signature.inCtrlValues, funcInputs[operandIdx], rewriter, loc);
+            operandIdx++;
         }
 
         return operands;
@@ -171,23 +171,16 @@ class OpSignatureAnalyzer {
     }
 
     // Update the insert ops of the output qubits to use the new qreg
-    void updateInsertOpsQreg(Value newQreg, PatternRewriter &rewriter)
+    void replaceInsertOpsQreg(Value newQreg, PatternRewriter &rewriter)
     {
-        Value oldQreg = signature.sourceQreg;
         SmallVector<quantum::InsertOp> insertOpsToUpdate;
 
         for (Value outQubit : signature.outQubits) {
             for (Operation *user : outQubit.getUsers()) {
                 if (auto insertOp = dyn_cast<quantum::InsertOp>(user)) {
-                    if (insertOp.getInQreg() == oldQreg) {
-                        insertOpsToUpdate.emplace_back(insertOp);
-                    }
+                    rewriter.replaceOp(insertOp, newQreg);
                 }
             }
-        }
-
-        for (auto insertOp : insertOpsToUpdate) {
-            insertOp.getInQregMutable().assign(newQreg);
         }
     }
 
@@ -323,8 +316,8 @@ struct UserDefinedDecompositionRewritePattern : public OpRewritePattern<CustomOp
             // Since the call op is a qreg mode function, we need to extract the qubits from the
             // qreg to fit the original op's output qubits
             auto results = analyzer.prepareCallResultForQreg(callOp, rewriter);
-            analyzer.updateInsertOpsQreg(newQreg, rewriter);
-            rewriter.replaceOp(op, results);
+            analyzer.replaceInsertOpsQreg(newQreg, rewriter);
+            rewriter.eraseOp(op);
         }
         else {
             rewriter.replaceOp(op, callOp->getResults());

@@ -136,6 +136,29 @@ OpFoldResult ExtractOp::fold(FoldAdaptor adaptor)
     return nullptr;
 }
 
+LogicalResult ExtractOp::canonicalize(ExtractOp extract, mlir::PatternRewriter &rewriter)
+{
+    // Handle the pattern: %reg2 = insert %reg1[idx], %qubit -> %q = extract %reg2[idx]
+    // Convert to: %q = %qubit, and replace other uses of %reg2 with %reg1
+    if (auto insert = dyn_cast_if_present<InsertOp>(extract.getQreg().getDefiningOp())) {
+        bool bothStatic = extract.getIdxAttr().has_value() && insert.getIdxAttr().has_value();
+        bool bothDynamic = !extract.getIdxAttr().has_value() && !insert.getIdxAttr().has_value();
+        bool staticallyEqual = bothStatic && extract.getIdxAttrAttr() == insert.getIdxAttrAttr();
+        bool dynamicallyEqual = bothDynamic && extract.getIdx() == insert.getIdx();
+        // if other users of insert are also `insert`, we are good to go
+        bool valid = llvm::all_of(insert.getResult().getUsers(), [&](Operation *op) {
+            return isa<InsertOp>(op) || op == extract.getOperation();
+        });
+        if ((staticallyEqual || dynamicallyEqual) && valid) {
+            Value originalReg = insert.getInQreg();
+            rewriter.replaceOp(extract, insert.getQubit());
+            rewriter.replaceOp(insert, originalReg);
+            return success();
+        }
+    }
+    return failure();
+}
+
 LogicalResult InsertOp::canonicalize(InsertOp insert, mlir::PatternRewriter &rewriter)
 {
     if (auto extract = dyn_cast_if_present<ExtractOp>(insert.getQubit().getDefiningOp())) {

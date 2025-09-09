@@ -43,6 +43,10 @@ void createEnforceRuntimeInvariantsPipeline(OpPassManager &pm)
     pm.addNestedPass<ModuleOp>(catalyst::createApplyTransformSequencePass());
     pm.addPass(catalyst::createInlineNestedModulePass());
 }
+void createDecompositionPipeline(OpPassManager &pm)
+{
+    pm.addPass(catalyst::createUserDefinedDecompositionPass());
+}
 void createHloLoweringPipeline(OpPassManager &pm)
 {
     pm.addPass(mlir::createCanonicalizerPass());
@@ -135,6 +139,7 @@ void createLLVMDialectLoweringPipeline(OpPassManager &pm)
 void createDefaultCatalystPipeline(OpPassManager &pm)
 {
     createEnforceRuntimeInvariantsPipeline(pm);
+    createDecompositionPipeline(pm);
     createHloLoweringPipeline(pm);
     createQuantumCompilationPipeline(pm);
     createBufferizationPipeline(pm);
@@ -146,6 +151,12 @@ void registerEnforceRuntimeInvariantsPipeline()
     PassPipelineRegistration<>("enforce-runtime-invariants-pipeline",
                                "Register enforce runtime invariants pipeline as a pass.",
                                createEnforceRuntimeInvariantsPipeline);
+}
+void registerDecompositionPipeline()
+{
+    PassPipelineRegistration<>("decomposition-pipeline",
+                               "Register decomposition pipeline as a pass.",
+                               createDecompositionPipeline);
 }
 void registerHloLoweringPipeline()
 {
@@ -181,6 +192,7 @@ void registerDefaultCatalystPipeline()
 void registerAllCatalystPipelines()
 {
     registerEnforceRuntimeInvariantsPipeline();
+    registerDecompositionPipeline();
     registerHloLoweringPipeline();
     registerQuantumCompilationPipeline();
     registerBufferizationPipeline();
