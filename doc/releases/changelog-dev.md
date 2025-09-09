@@ -31,6 +31,9 @@
 * Significantly improved resource tracking with `null.qubit`, allowing integration of `qml.specs()` with `qjit`'d code.
   [[#2033]](https://github.com/PennyLaneAI/catalyst/pull/2033)
 
+* Improve the pass `--ppm-specs` to count the depth of PPRs and PPMs in the circuit.
+  [(#2014)](https://github.com/PennyLaneAI/catalyst/pull/2014)
+
 * The default mid-circuit measurement method in catalyst has been changed from `"single-branch-statistics"` to `"one-shot"`.
   [[#2017]](https://github.com/PennyLaneAI/catalyst/pull/2017)
 
@@ -145,6 +148,11 @@
   program capture is enabled.
   [(#2027)](https://github.com/PennyLaneAI/catalyst/pull/2027)
 
+* Fix usage of OQC device, including:
+   - fix object file system extension on macOS
+   - fix wrong type signature of `Counts` API function
+  [(#2032)](https://github.com/PennyLaneAI/catalyst/pull/2032)
+
 <h3>Internal changes ⚙️</h3>
 
 * Updates use of `qml.transforms.dynamic_one_shot.parse_native_mid_circuit_measurements` to improved signature.
@@ -248,6 +256,10 @@
   ```console
   $ catalyst --tool=opt --pass-pipeline="builtin.module(convert-quantum-to-llvm{use-array-backed-registers=true})" <input file>
   ```
+
+* Fix auxiliary qubit deallocation in `decompose-non-clifford-ppr` pass 
+  in the `clifford-corrected` method.
+  [(#2039)](https://github.com/PennyLaneAI/catalyst/pull/2039)
 
 <h3>Documentation 📝</h3>
 

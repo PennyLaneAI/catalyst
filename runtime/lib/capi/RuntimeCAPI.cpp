@@ -16,7 +16,6 @@
 #include <cstdarg>
 #include <cstdlib>
 #include <ctime>
-#include <format>
 #include <memory>
 #include <ostream>
 #include <stdexcept>
