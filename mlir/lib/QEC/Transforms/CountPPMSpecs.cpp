@@ -19,6 +19,9 @@
 
 #include <nlohmann/json.hpp>
 
+// #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/FileSystem.h"
+
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
@@ -26,6 +29,7 @@
 #include "Catalyst/Utils/SCFUtils.h"
 #include "QEC/IR/QECDialect.h"
 #include "QEC/IR/QECOpInterfaces.h"
+//#include "QEC/Utils/PauliStringWrapper.h"
 #include "QEC/Utils/QECLayer.h"
 #include "QEC/Utils/QECOpUtils.h"
 #include "Quantum/IR/QuantumOps.h"
@@ -218,13 +222,6 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
             }
         });
 
-        // Add the last layer if it is not empty.
-        if (!currentLayer.empty()) {
-            layers.emplace_back(std::move(currentLayer));
-        }
-
-        countDepths(layers, &PPMSpecs, &stringAllocator);
-
         if (wr.wasInterrupted()) {
             return failure();
         }
@@ -236,9 +233,18 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
 
         countDepths(layers, PPMSpecs, stringAllocator);
 
+        std::error_code EC;
+        llvm::raw_fd_ostream fileOutputStream("test.txt", EC, llvm::sys::fs::OF_Append);
+        if (EC) {
+            llvm::errs() << "Error opening file: " << EC.message() << "\n";
+            return failure(); // Handle error
+        }
         json PPMSpecsJson = PPMSpecs;
         llvm::outs() << PPMSpecsJson.dump(4)
                      << "\n"; // dump(4) makes an indent with 4 spaces when printing JSON
+        fileOutputStream << PPMSpecsJson.dump(4)
+                         << "\n"; // dump(4) makes an indent with 4 spaces when printing JSON
+        fileOutputStream.flush();
         return success();
     }
 
