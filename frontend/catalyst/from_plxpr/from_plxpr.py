@@ -187,7 +187,11 @@ class WorkflowInterpreter(PlxprInterpreter):
     def __init__(self):
         self._pass_pipeline = []
         self.qubit_handler = None
+
+        # Compiler options for the new decomposition system
+        self.compiler_decompose = False
         self.decomp_gateset = []
+
         super().__init__()
 
 
@@ -304,6 +308,8 @@ def register_transform(pl_transform, pass_name, decomposition):
             and pl_plxpr_transform.__name__ == "decompose_plxpr_to_plxpr"
             and qml.decomposition.enabled_graph()
         ):
+            self.compiler_decompose = True
+
             # Update the decomp_gateset to be used by the quantum kernel primitive
             self.decomp_gateset = tkwargs.get("gate_set", [])
 
@@ -359,7 +365,7 @@ def register_transform(pl_transform, pass_name, decomposition):
             return self.eval(final_jaxpr.jaxpr, final_jaxpr.consts, *non_const_args)
 
         # Apply the corresponding Catalyst pass counterpart
-        self._pass_pipeline.append(Pass(catalyst_pass_name))
+        self._pass_pipeline.insert(0, Pass(catalyst_pass_name))
         return self.eval(inner_jaxpr, consts, *non_const_args)
 
 
@@ -386,12 +392,15 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         # TODO: we assume the qreg value passed into a scope is the unique qreg in the scope
         # In other words, we assume no new qreg will be allocated in the scope
         self.qubit_handler = qubit_handler
-        self.decomp_gateset = []
         self.subroutine_cache = cache
         self.control_wires = control_wires
         """Any control wires used for a subroutine."""
         self.control_values = control_values
         """Any control values for executing a subroutine."""
+
+        # Compiler options for the new decomposition system
+        self.compiler_decompose = False
+        self.decomp_gateset = []
 
         super().__init__()
 
