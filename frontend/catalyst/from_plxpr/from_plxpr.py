@@ -35,7 +35,6 @@ from pennylane.capture.primitives import ctrl_transform_prim as plxpr_ctrl_trans
 from pennylane.capture.primitives import measure_prim as plxpr_measure_prim
 from pennylane.decomposition.collect_resource_ops import CollectResourceOps
 from pennylane.ftqc.primitives import measure_in_basis_prim as plxpr_measure_in_basis_prim
-from pennylane.ops import Adjoint, Controlled, ControlledOp
 from pennylane.ops.functions.map_wires import _map_wires_transform as pl_map_wires
 from pennylane.transforms import cancel_inverses as pl_cancel_inverses
 from pennylane.transforms import commute_controlled as pl_commute_controlled
@@ -183,50 +182,13 @@ def from_plxpr(plxpr: ClosedJaxpr) -> Callable[..., Jaxpr]:
 
 
 class WorkflowInterpreter(PlxprInterpreter):
-    """An interpreter that converts a qnode primitive from a plxpr variant to a catalyst variant."""
+    """An interpreter that converts a qnode primitive from a plxpr variant to a catalyst jaxpr variant."""
 
     def __init__(self):
         self._pass_pipeline = []
         self.qubit_handler = None
         self.decomp_gateset = []
         super().__init__()
-
-
-def _decompose_to_compiler_gateset(qfunc_jaxpr, consts, non_const_args):
-    """First stage decomposition to compiler gate set.
-
-    Currently, the compiler can only handle a limited set of gates and
-    may not support all generic gates and templates of the original circuit.
-    We perform a first stage decomposition to the compiler gate set, which includes
-    only a subset of the original gates that can be represented in MLIR using the
-    `quantum.custom` primitive.
-    """
-
-    # TODO: The compiler should be able to handle all gate
-    # adhering to quantum.custom primitive.This includes
-    # all the gates with parameters of type `TensorLike`
-    # and wires of type `WiresLike` with no hyperparams.
-    # Update `gate_set` to use this as the stopping condition
-    # of the decomposition transform.
-    gate_set = COMPILER_OPERATIONS
-
-    decomp_args = ()
-    decomp_kwargs = {"gate_set": gate_set}
-
-    # disable the graph decomposition optimization
-    graph_decomp_status = False
-    if qml.decomposition.enabled_graph():
-        graph_decomp_status = True
-        qml.decomposition.disable_graph()
-
-    new_jaxpr = qml.transforms.decompose.plxpr_transform(
-        qfunc_jaxpr, consts, decomp_args, decomp_kwargs, *non_const_args
-    )
-
-    if graph_decomp_status:
-        qml.decomposition.enable_graph()
-
-    return new_jaxpr
 
 
 # pylint: disable=unused-argument, too-many-arguments
@@ -288,12 +250,10 @@ transforms_to_passes = {
 
 
 # pylint: disable=too-many-arguments
-def handle_graph_decomposition(*args, inner_jaxpr, consts, non_const_args, targs, tkwargs):
+def handle_graph_decomposition(*args, inner_jaxpr, consts, targs, tkwargs, compiler_gateset):
     """Handle the graph decomposition for a given JAXPR."""
 
-    gate_set = COMPILER_OPERATIONS
-    decomp_kwargs = {"gate_set": gate_set}
-
+    decomp_kwargs = {"gate_set": compiler_gateset}
     pmd_interpreter = PreMlirDecomposeInterpreter(*targs, **decomp_kwargs)
 
     def pmd_wrapper(*args):
@@ -357,7 +317,10 @@ def register_transform(pl_transform, pass_name, decomposition):
                 if isinstance(op, str):
                     return op
 
-                return getattr(op._primitive, "name", "UnsupportedGate")
+                # Return NoNameOp if the operator has no _primitive.name attribute.
+                # This is to avoid errors when we capture the program
+                # as we deal with such ops later in the decomposition graph.
+                return getattr(op._primitive, "name", "NoNameOp")
 
             self.decomp_gateset = [get_operator_name(op) for op in self.decomp_gateset]
 
@@ -365,14 +328,13 @@ def register_transform(pl_transform, pass_name, decomposition):
             # Then, construct and solve the graph-based decomposition
             # to get the optimized rules and lower them to PLxPR
             # to Catalyst JAXPR to MLIR.
-
             final_jaxpr = handle_graph_decomposition(
                 *args,
                 inner_jaxpr=inner_jaxpr,
                 consts=consts,
-                non_const_args=non_const_args,
                 targs=targs,
                 tkwargs=tkwargs,
+                compiler_gateset=COMPILER_OPERATIONS + self.decomp_gateset,
             )
             return self.eval(final_jaxpr.jaxpr, final_jaxpr.consts, *non_const_args)
 

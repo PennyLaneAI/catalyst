@@ -347,7 +347,7 @@ def test_pass_application():
 
     qml.capture.enable()
 
-    # TODO: is there an ordering issue here?
+    # TODO: was there an ordering issue here?
     @qml.qjit(target="mlir")
     @qml.transforms.merge_rotations
     @qml.transforms.cancel_inverses

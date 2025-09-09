@@ -65,7 +65,7 @@ def lower_jaxpr(ctx, jaxpr, context=None):
     return lower_callable(ctx, callable_, call_jaxpr, pipeline=pipeline, context=context)
 
 
-# pylint: disable=too-many-arguments
+# pylint: disable=too-many-arguments, too-many-positional-arguments
 def lower_callable(ctx, callable_, call_jaxpr, pipeline=None, context=None, public=False):
     """Lowers _callable to MLIR.
 
@@ -94,7 +94,7 @@ def lower_callable(ctx, callable_, call_jaxpr, pipeline=None, context=None, publ
     return get_or_create_qnode_funcop(ctx, callable_, call_jaxpr, pipeline, context=context)
 
 
-# pylint: disable=too-many-arguments
+# pylint: disable=too-many-arguments, too-many-positional-arguments
 def get_or_create_funcop(ctx, callable_, call_jaxpr, pipeline, context=None, public=False):
     """Get funcOp from cache, or create it from scratch
 
