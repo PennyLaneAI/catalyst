@@ -83,7 +83,6 @@ RUNTIME_OPERATIONS = [
     "PSWAP",
     "QubitUnitary",
     "Rot",
-    "RotXZX",
     "RX",
     "RY",
     "RZ",

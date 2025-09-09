@@ -127,7 +127,7 @@ struct UserDefinedDecompositionPass
     void findTargetGateSet(ModuleOp module, llvm::StringSet<llvm::MallocAllocator> &targetGateSet)
     {
         WalkResult walkResult = module.walk([&](func::FuncOp func) {
-            if (auto gate_set_attr = func->getAttrOfType<ArrayAttr>("gate_set")) {
+            if (auto gate_set_attr = func->getAttrOfType<ArrayAttr>("decomp_gateset")) {
                 for (auto gate : gate_set_attr.getValue()) {
                     StringRef gate_name = cast<StringAttr>(gate).getValue();
                     targetGateSet.insert(gate_name);
