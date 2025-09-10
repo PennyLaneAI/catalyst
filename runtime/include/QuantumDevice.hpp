@@ -90,8 +90,9 @@ struct QuantumDevice {
     /**
      * @brief Release an array of qubits.
      *
-     * Devices without dynamic allocation support must ensure that there will only be
-     * exactly one matching `AllocateQubits` - `ReleaseQubits` pair in their accepted programs.
+     * For devices without dynamic allocation support it is expected that this function
+     * only succeed if the ID array contains the same values as those produced by the
+     * initial `AllocateQubits` call, otherwise the device is encouraged to raise an error.
      *
      * Note that the interface does not require the qubit to be in a particular state. The behaviour
      * for releasing an entangled qubit is left up to the device, and could include:
