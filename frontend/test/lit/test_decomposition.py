@@ -540,7 +540,7 @@ def test_decompose_gateset_with_graph():
     @qml.qjit(target="mlir")
     @partial(qml.transforms.decompose, gate_set={"RX"})
     @qml.qnode(qml.device("lightning.qubit", wires=1))
-    # CHECK: public @simple_circuit_9() -> tensor<f64> attributes {decomp_gateset = ["RX"]
+    # CHECK: public @simple_circuit_9() -> tensor<f64> attributes {decompose_gatesets
     def simple_circuit_9():
         return qml.expval(qml.Z(0))
 
@@ -549,7 +549,7 @@ def test_decompose_gateset_with_graph():
     @qml.qjit(target="mlir")
     @partial(qml.transforms.decompose, gate_set={"RX", "RZ"})
     @qml.qnode(qml.device("lightning.qubit", wires=1))
-    # CHECK: public @circuit_9() -> tensor<f64> attributes {decomp_gateset
+    # CHECK: public @circuit_9() -> tensor<f64> attributes {decompose_gatesets
     def circuit_9():
         return qml.expval(qml.Z(0))
 
@@ -571,7 +571,7 @@ def test_decompose_gateset_operator_with_graph():
     @qml.qjit(target="mlir")
     @partial(qml.transforms.decompose, gate_set={qml.RX})
     @qml.qnode(qml.device("lightning.qubit", wires=1))
-    # CHECK: public @simple_circuit_10() -> tensor<f64> attributes {decomp_gateset = ["RX"]
+    # CHECK: public @simple_circuit_10() -> tensor<f64> attributes {decompose_gatesets
     def simple_circuit_10():
         return qml.expval(qml.Z(0))
 
@@ -582,7 +582,7 @@ def test_decompose_gateset_operator_with_graph():
         qml.transforms.decompose, gate_set={qml.RX, qml.RZ, "PauliZ", qml.PauliX, qml.Hadamard}
     )
     @qml.qnode(qml.device("lightning.qubit", wires=1))
-    # CHECK: public @circuit_10() -> tensor<f64> attributes {decomp_gateset
+    # CHECK: public @circuit_10() -> tensor<f64> attributes {decompose_gatesets
     def circuit_10():
         return qml.expval(qml.Z(0))
 
@@ -593,7 +593,7 @@ def test_decompose_gateset_operator_with_graph():
         qml.transforms.decompose, gate_set={qml.RX, qml.RZ, qml.PauliZ, qml.PauliX, qml.Hadamard}
     )
     @qml.qnode(qml.device("lightning.qubit", wires=1))
-    # CHECK: public @circuit_11() -> tensor<f64> attributes {decomp_gateset
+    # CHECK: public @circuit_11() -> tensor<f64> attributes {decompose_gatesets
     def circuit_11():
         return qml.expval(qml.Z(0))
 
@@ -615,7 +615,7 @@ def test_decompose_gateset_with_rotxzx():
     @qml.qjit(target="mlir")
     @partial(qml.transforms.decompose, gate_set={"RotXZX"})
     @qml.qnode(qml.device("lightning.qubit", wires=1))
-    # CHECK: public @simple_circuit_12() -> tensor<f64> attributes {decomp_gateset = ["RotXZX"]
+    # CHECK: public @simple_circuit_12() -> tensor<f64> attributes {decompose_gatesets
     def simple_circuit_12():
         return qml.expval(qml.Z(0))
 
@@ -624,7 +624,7 @@ def test_decompose_gateset_with_rotxzx():
     @qml.qjit(target="mlir")
     @partial(qml.transforms.decompose, gate_set={qml.ftqc.RotXZX})
     @qml.qnode(qml.device("lightning.qubit", wires=1))
-    # CHECK: public @circuit_12() -> tensor<f64> attributes {decomp_gateset = ["RotXZX"]
+    # CHECK: public @circuit_12() -> tensor<f64> attributes {decompose_gatesets
     def circuit_12():
         return qml.expval(qml.Z(0))
 
@@ -675,7 +675,7 @@ def test_decomposition_rule_name_update():
     @qml.qjit(target="mlir")
     @partial(qml.transforms.decompose, gate_set={"RX", "RZ", "PhaseShift"})
     @qml.qnode(qml.device("lightning.qubit", wires=3))
-    # CHECK: public @circuit_13() -> tensor<f64> attributes {decomp_gateset
+    # CHECK: public @circuit_13() -> tensor<f64> attributes {decompose_gatesets
     def circuit_13():
         _ry_to_rz_rx(float, int)
         _rot_to_rz_ry_rz(float, float, float, int)

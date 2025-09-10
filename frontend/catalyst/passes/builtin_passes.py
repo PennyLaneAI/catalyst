@@ -394,6 +394,25 @@ def merge_rotations(qnode):
     return PassPipelineWrapper(qnode, "merge-rotations")
 
 
+def decompose_lowering(qnode):
+    """
+    Specify that the ``-decompose-lowering`` MLIR compiler pass
+    for applying the compiled decomposition rules to the QNode
+    recursively.
+
+    Args:
+        fn (QNode): the QNode to apply the cancel inverses compiler pass to
+
+    Returns:
+        ~.QNode:
+
+    **Example**
+        // TODO: add example here
+
+    """
+    return PassPipelineWrapper(qnode, "decompose-lowering")
+
+
 def ions_decomposition(qnode):  # pragma: nocover
     """
     Specify that the ``--ions-decomposition`` MLIR compiler pass should be
