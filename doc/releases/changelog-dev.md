@@ -65,8 +65,10 @@
 * Displays Catalyst version in `quantum-opt --version` output.
   [(#1922)](https://github.com/PennyLaneAI/catalyst/pull/1922)
 
-* Snakecased keyword arguments to :func:`catalyst.passes.apply_pass()` are now correctly parsed
-  to kebab-case pass options [(#1954)](https://github.com/PennyLaneAI/catalyst/pull/1954).
+* Snakecased keyword arguments to :func:`catalyst.passes.apply_pass()` are
+  now correctly parsed to kebab-case pass options.
+  [(#1954)](https://github.com/PennyLaneAI/catalyst/pull/1954).
+
   For example:
 
   ```python
@@ -99,6 +101,19 @@
   [(#2031)](https://github.com/PennyLaneAI/catalyst/pull/2031)
 
 <h3>Breaking changes 💔</h3>
+
+* (Device implementers only) The `ReleaseAllQubits` device interface function
+  has been replaced with `ReleaseQubits`.
+  [(#1996)](https://github.com/PennyLaneAI/catalyst/pull/1996)
+
+  Instead of releasing all currently active qubits, the new interface
+  function `ReleaseQubits` explicitly takes in an array of qubit IDs to be
+  released.
+
+  For devices without dynamic allocation support it is expected that this
+  function only succeed if the ID array contains the same values as those
+  produced by the initial `AllocateQubits` call, otherwise the device is
+  encouraged to raise an error.
 
 * The `shots` property has been removed from `OQDDevice`. The number of shots for a qnode execution is now set directly on the qnode via `qml.set_shots`,
   either used as decorator `@qml.set_shots(num_shots)` or directly on the qnode `qml.set_shots(qnode, shots=num_shots)`.
