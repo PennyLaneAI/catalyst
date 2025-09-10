@@ -185,9 +185,9 @@ def lower_callable_to_funcop(ctx, callable_, call_jaxpr, public=False):
 
         func_op.attributes["diff_method"] = ir.StringAttr.get(diff_method)
 
-        gateset = getattr(callable_, "decomp_gateset", [])
+        gateset = getattr(callable_, "decompose_gatesets", [])
         if gateset:
-            func_op.attributes["decomp_gateset"] = get_mlir_attribute_from_pyval(gateset)
+            func_op.attributes["decompose_gatesets"] = get_mlir_attribute_from_pyval(gateset)
 
     return func_op
 

@@ -94,12 +94,25 @@ def _rot_to_xzx(phi, theta, omega, wires, **__):
 
 
 @qml.qjit()
+@partial(
+    qml.transforms.decompose,
+    gate_set={"X", "Y", "Z", "S", "H", "CNOT", "RZ", "RotXZX", "GlobalPhase"},
+    fixed_decomps={qml.Rot: _rot_to_xzx},
+)
+@qml.transforms.cancel_inverses
 @qml.transforms.merge_rotations
 @partial(
     qml.transforms.decompose,
     gate_set={"X", "Y", "Z", "S", "H", "CNOT", "RZ", "RotXZX", "GlobalPhase"},
     fixed_decomps={qml.Rot: _rot_to_xzx},
 )
+@qml.transforms.merge_rotations
+@partial(
+    qml.transforms.decompose,
+    gate_set={"X", "Y", "Z", "S", "H", "CNOT", "RZ", "RotXZX", "GlobalPhase"},
+    fixed_decomps={qml.Rot: _rot_to_xzx},
+)
+@qml.transforms.merge_rotations
 @qml.qnode(qml.device("null.qubit", wires=3))
 def mbqc_circ(x: float, y: float):
     """MBQC example to test custom decomposition to RotXZX."""
