@@ -38,8 +38,7 @@
     auto AllocateQubit() -> QubitIdType override;                                                  \
     auto AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType> override;                   \
     void ReleaseQubit(QubitIdType q) override;                                                     \
-    void ReleaseAllQubits() override;                                                              \
-    void ReleaseQubits(const std::vector<QubitIdType> &) override;                                 \
+    void ReleaseQubits(std::vector<QubitIdType> &) override;                                       \
     [[nodiscard]] auto GetNumQubits() const -> size_t override;                                    \
     void StartTapeRecording() override;                                                            \
     void StopTapeRecording() override;                                                             \

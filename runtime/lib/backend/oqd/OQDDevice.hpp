@@ -34,6 +34,7 @@ class OQDDevice final : public Catalyst::Runtime::QuantumDevice {
     std::string openapl_file_name;
     std::vector<std::string> phonon_specs;
 
+    bool only_one_pair_of_allocation;
     std::unordered_map<std::string, std::string> device_kwargs;
 
     inline auto getDeviceWires(const std::vector<QubitIdType> &wires) -> std::vector<size_t>
@@ -48,6 +49,7 @@ class OQDDevice final : public Catalyst::Runtime::QuantumDevice {
   public:
     explicit OQDDevice(const std::string &kwargs = "{device_type : oqd, backend : default}")
     {
+        only_one_pair_of_allocation = true;
         __catalyst__oqd__rt__initialize();
 
         // The OQD kwarg string format is:
@@ -85,7 +87,7 @@ class OQDDevice final : public Catalyst::Runtime::QuantumDevice {
     ~OQDDevice() { __catalyst__oqd__rt__finalize(openapl_file_name); };
 
     auto AllocateQubits(size_t) -> std::vector<QubitIdType> override;
-    void ReleaseAllQubits() override;
+    void ReleaseQubits(std::vector<QubitIdType> &) override;
     auto GetNumQubits() const -> size_t override;
     void SetDeviceShots(size_t) override;
     auto GetDeviceShots() const -> size_t override;

@@ -35,7 +35,7 @@ have been stubbed out. For a complete description of the interface check out the
                 device_nqubits = num_qubits;
                 return ids
             }
-            void ReleaseAllQubits() override {}
+            void ReleaseQubits() override {}
 
             // Here we don't do anything yet.
             void NamedOperation(const std::string &name, const std::vector<double> &params,

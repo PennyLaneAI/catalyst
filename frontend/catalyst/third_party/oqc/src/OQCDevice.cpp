@@ -31,7 +31,14 @@ auto OQCDevice::AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType>
     return qubit_manager.AllocateRange(0, num_qubits);
 }
 
-void OQCDevice::ReleaseAllQubits() { builder = std::make_unique<OpenQASM2Builder>(); }
+void OQCDevice::ReleaseQubits([[maybe_unused]] std::vector<QubitIdType> &qubits)
+{
+    RT_FAIL_IF(!this->only_one_pair_of_allocation,
+               "OQC device does not support dynamic qubit allocation. Please ensure there is only "
+               "one pair of `AllocateQubits` - `ReleaseQubits`")
+    builder = std::make_unique<OpenQASM2Builder>();
+    this->only_one_pair_of_allocation = false;
+}
 
 auto OQCDevice::GetNumQubits() const -> size_t { return builder->getNumQubits(); }
 

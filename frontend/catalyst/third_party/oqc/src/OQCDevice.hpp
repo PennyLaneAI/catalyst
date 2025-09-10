@@ -39,6 +39,7 @@ class OQCDevice final : public Catalyst::Runtime::QuantumDevice {
 
     size_t device_shots;
 
+    bool only_one_pair_of_allocation;
     std::unordered_map<std::string, std::string> device_kwargs;
 
     inline auto getDeviceWires(const std::vector<QubitIdType> &wires) -> std::vector<size_t>
@@ -53,6 +54,7 @@ class OQCDevice final : public Catalyst::Runtime::QuantumDevice {
   public:
     explicit OQCDevice(const std::string &kwargs = "{device_type : oqc, backend : default}")
     {
+        only_one_pair_of_allocation = true;
         device_kwargs = Catalyst::Runtime::parse_kwargs(kwargs);
         device_shots = device_kwargs.contains("shots")
                            ? static_cast<size_t>(std::stoll(device_kwargs["shots"]))
@@ -63,7 +65,7 @@ class OQCDevice final : public Catalyst::Runtime::QuantumDevice {
     ~OQCDevice() = default;
 
     auto AllocateQubits(size_t) -> std::vector<QubitIdType> override;
-    void ReleaseAllQubits() override;
+    void ReleaseQubits(std::vector<QubitIdType> &) override;
     auto GetNumQubits() const -> size_t override;
     void SetDeviceShots(size_t) override;
     auto GetDeviceShots() const -> size_t override;

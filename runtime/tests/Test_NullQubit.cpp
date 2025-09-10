@@ -993,7 +993,7 @@ TEST_CASE("Test NullQubit device resource tracking", "[NullQubit]")
     }
 
     // Check that releasing resets
-    sim->ReleaseAllQubits();
+    sim->ReleaseQubits(Qs);
     std::remove(RESOURCES_FNAME); // Remove the file automatically created by the device
 
     CHECK(sim->ResourcesGetNumGates() == 0);
@@ -1006,7 +1006,8 @@ TEST_CASE("Test resource tracking filename", "[NullQubit]")
     // Check automatic filename creation
     std::unique_ptr<NullQubit> dummy = std::make_unique<NullQubit>("{'track_resources':True}");
     CHECK(dummy->IsTrackingResources() == true);
-    dummy->ReleaseAllQubits();
+    std::vector<QubitIdType> Qs = dummy->AllocateQubits(1);
+    dummy->ReleaseQubits(Qs);
 
     const std::string dummy_resources_fname = dummy->ResourcesGetFilename();
 

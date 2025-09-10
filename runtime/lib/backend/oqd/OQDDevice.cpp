@@ -33,11 +33,16 @@ auto OQDDevice::AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType>
     return result;
 }
 
-void OQDDevice::ReleaseAllQubits()
+void OQDDevice::ReleaseQubits([[maybe_unused]] std::vector<QubitIdType> &qubits)
 {
+    RT_FAIL_IF(!this->only_one_pair_of_allocation,
+               "OQD device does not support dynamic qubit allocation. Please ensure there is only "
+               "one pair of `AllocateQubits` - `ReleaseQubits`")
     this->ion_specs = "";
     this->phonon_specs.clear();
     this->qubit_manager.ReleaseAll();
+
+    this->only_one_pair_of_allocation = false;
 }
 
 auto OQDDevice::GetNumQubits() const -> size_t { RT_FAIL("GetNumQubits unsupported by device"); }

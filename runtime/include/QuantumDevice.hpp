@@ -88,24 +88,10 @@ struct QuantumDevice {
     virtual auto AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType> = 0;
 
     /**
-     * @brief Release all qubits and reset device state.
+     * @brief Release an array of qubits.
      *
-     * This operation can be considered a device-wide quantum resource release, regardless of how
-     * many allocation calls have been run (although on devices with static allocation there would
-     * only be one matching `AllocateQubits` - `ReleaseAllQubits` pair).
-     * After executing this call, a device should be in a state ready to allocate new qubits and
-     * execute another quantum program. Configurable execution parameters, whether explicit in
-     * the interface (like shots) or internal via the constructor kwargs, should be maintained
-     * in the same state as when entering this method.
-     */
-    virtual void ReleaseAllQubits() = 0;
-
-    /**
-     * @brief (Optional) Release an array of qubits.
-     *
-     * Release the qubits in the provided array. This method is only needed for devices with
-     * dynamic qubit allocation (on devices with static allocation there would only be one matching
-     * `AllocateQubits` - `ReleaseAllQubits` pair).
+     * Devices without dynamic allocation support must ensure that there will only be
+     * exactly one matching `AllocateQubits` - `ReleaseQubits` pair in their accepted programs.
      *
      * Note that the interface does not require the qubit to be in a particular state. The behaviour
      * for releasing an entangled qubit is left up to the device, and could include:
@@ -117,10 +103,7 @@ struct QuantumDevice {
      *
      * @param qubits array of IDs of the qubits to release.
      */
-    virtual void ReleaseQubits(const std::vector<QubitIdType> &qubits)
-    {
-        RT_FAIL("Dynamic qubit release is unsupported by device");
-    }
+    virtual void ReleaseQubits(std::vector<QubitIdType> &qubits) = 0;
 
     /**
      * @brief Get the number of currently allocated qubits.

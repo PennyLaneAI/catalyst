@@ -37,8 +37,11 @@ auto OpenQasmDevice::AllocateQubits(size_t num_qubits) -> std::vector<QubitIdTyp
     return qubit_manager.AllocateRange(cur_num_qubits, num_qubits);
 }
 
-void OpenQasmDevice::ReleaseAllQubits()
+void OpenQasmDevice::ReleaseQubits([[maybe_unused]] std::vector<QubitIdType> &qubits)
 {
+    RT_FAIL_IF(!this->only_one_pair_of_allocation,
+               "OpenQASM device does not support dynamic qubit allocation. Please ensure there is "
+               "only one pair of `AllocateQubits` - `ReleaseQubits`")
     // refresh the builder for device re-use.
     if (builder_type != OpenQasm::BuilderType::Common) {
         builder = std::make_unique<OpenQasm::BraketBuilder>();
@@ -46,6 +49,7 @@ void OpenQasmDevice::ReleaseAllQubits()
     else {
         builder = std::make_unique<OpenQasm::OpenQasmBuilder>();
     }
+    this->only_one_pair_of_allocation = false;
 }
 
 auto OpenQasmDevice::GetNumQubits() const -> size_t { return builder->getNumQubits(); }

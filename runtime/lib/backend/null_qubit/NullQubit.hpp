@@ -140,9 +140,9 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     }
 
     /**
-     * @brief Release all qubits.
+     * @brief Release qubits.
      */
-    void ReleaseAllQubits()
+    void ReleaseQubits([[maybe_unused]] std::vector<QubitIdType> &qubits)
     {
         num_qubits_ = 0;
         this->qubit_manager.ReleaseAll();

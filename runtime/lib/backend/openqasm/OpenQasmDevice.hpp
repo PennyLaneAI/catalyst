@@ -42,6 +42,8 @@ class OpenQasmDevice final : public Catalyst::Runtime::QuantumDevice {
 
     OpenQasm::OpenQasmObsManager obs_manager{};
     OpenQasm::BuilderType builder_type;
+
+    bool only_one_pair_of_allocation;
     std::unordered_map<std::string, std::string> device_kwargs;
 
     inline auto getDeviceWires(const std::vector<QubitIdType> &wires) -> std::vector<size_t>
@@ -63,6 +65,7 @@ class OpenQasmDevice final : public Catalyst::Runtime::QuantumDevice {
     explicit OpenQasmDevice(
         const std::string &kwargs = "{device_type : braket.local.qubit, backend : default}")
     {
+        only_one_pair_of_allocation = true;
         device_kwargs = Catalyst::Runtime::parse_kwargs(kwargs);
 
         if (device_kwargs.contains("device_type")) {
@@ -97,7 +100,7 @@ class OpenQasmDevice final : public Catalyst::Runtime::QuantumDevice {
     ~OpenQasmDevice() = default;
 
     auto AllocateQubits(size_t) -> std::vector<QubitIdType> override;
-    void ReleaseAllQubits() override;
+    void ReleaseQubits(std::vector<QubitIdType> &) override;
     auto GetNumQubits() const -> size_t override;
     void SetDeviceShots(size_t) override;
     auto GetDeviceShots() const -> size_t override;
