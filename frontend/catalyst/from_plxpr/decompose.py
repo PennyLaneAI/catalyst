@@ -43,7 +43,7 @@ class GraphSolutionInterpreter(qml.capture.PlxprInterpreter):
     def __init__(
         self,
         *,
-        operations=[],
+        operations=None,
         gate_set=None,
         fixed_decomps=None,
         alt_decomps=None,
@@ -55,7 +55,7 @@ class GraphSolutionInterpreter(qml.capture.PlxprInterpreter):
                 "graph-based decomposition is enabled."
             )
 
-        self._operations = operations
+        self._operations = [] if operations is None else operations
         self._decomp_graph_solution = {}
         self._target_gate_names = None
         self._fixed_decomps, self._alt_decomps = fixed_decomps, alt_decomps
