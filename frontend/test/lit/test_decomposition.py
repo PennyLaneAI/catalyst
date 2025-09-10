@@ -7,10 +7,13 @@ from copy import deepcopy
 import jax
 import pennylane as qml
 from pennylane.devices.capabilities import OperatorProperties
+from pennylane.typing import TensorLike
+from pennylane.wires import WiresLike
 
 from catalyst import measure, qjit
 from catalyst.compiler import get_lib_path
 from catalyst.device import get_device_capabilities
+from catalyst.jax_primitives import decomposition_rule
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -43,8 +46,8 @@ def get_custom_device_without(num_wires, discards=frozenset(), force_matrix=froz
 
         _to_matrix_ops = {}
 
-        def __init__(self, shots=None, wires=None):
-            super().__init__(wires=wires, shots=shots)
+        def __init__(self, wires=None):
+            super().__init__(wires=wires)
             self.qjit_capabilities = deepcopy(get_device_capabilities(self))
             for gate in discards:
                 self.qjit_capabilities.operations.pop(gate, None)
@@ -265,3 +268,243 @@ def test_decompose_to_matrix():
 
 
 test_decompose_to_matrix()
+
+
+def test_decomposition_rule_wire_param():
+    """Test decomposition rule with passing a parameter that is a wire/integer"""
+
+    @decomposition_rule
+    def Hadamard0(wire: WiresLike):
+        qml.Hadamard(wire)
+
+    qml.capture.enable()
+
+    @qml.qjit
+    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    # CHECK: module @circuit
+    def circuit(_: float):
+        # CHECK: func.func public @circuit([[ARG0:%.+]]
+        # CHECK: [[QREG:%.+]] = quantum.alloc
+        Hadamard0(int)
+        return qml.probs()
+
+    # CHECK: func.func private @Hadamard0([[QBIT:%.+]]: !quantum.bit) -> !quantum.bit
+    # CHECK-NEXT: [[QUBIT_OUT:%.+]] = quantum.custom "Hadamard"() [[QBIT]] : !quantum.bit
+    # CHECK-NEXT: return [[QUBIT_OUT]] : !quantum.bit
+
+    print(circuit.mlir)
+
+    qml.capture.disable()
+
+
+test_decomposition_rule_wire_param()
+
+
+def test_decomposition_rule_gate_param_param():
+    """Test decomposition rule with passing a regular parameter"""
+
+    @decomposition_rule(num_params=1)
+    def RX_on_wire_0(param: TensorLike, w0: WiresLike):
+        qml.RX(param, wires=w0)
+
+    qml.capture.enable()
+
+    @qml.qjit
+    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    # CHECK: module @circuit_2
+    def circuit_2(_: float):
+        RX_on_wire_0(float, int)
+        return qml.probs()
+
+    # CHECK: func.func private @RX_on_wire_0([[PARAM_TENSOR:%.+]]: tensor<f64>, [[QUBIT:%.+]]: !quantum.bit) -> !quantum.bit
+    # CHECK-NEXT: [[PARAM:%.+]] = tensor.extract [[PARAM_TENSOR]][] : tensor<f64>
+    # CHECK-NEXT: [[QUBIT_1:%.+]] = quantum.custom "RX"([[PARAM]]) [[QUBIT]] : !quantum.bit
+    # CHECK-NEXT: return [[QUBIT_1]] : !quantum.bit
+    print(circuit_2.mlir)
+
+    qml.capture.disable()
+
+
+test_decomposition_rule_gate_param_param()
+
+
+def test_multiple_decomposition_rules():
+    """Test with multiple decomposition rules"""
+
+    qml.capture.enable()
+
+    @decomposition_rule
+    def identity(): ...
+
+    @decomposition_rule(num_params=1)
+    def all_wires_rx(param: TensorLike, w0: WiresLike, w1: WiresLike, w2: WiresLike):
+        qml.RX(param, wires=w0)
+        qml.RX(param, wires=w1)
+        qml.RX(param, wires=w2)
+
+    @qml.qjit
+    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    def circuit_3(_: float):
+        # CHECK: [[QREG:%.+]] = quantum.alloc
+        # CHECK-NEXT: [[QUBIT:%.+]] = quantum.extract [[QREG]][ 0] : !quantum.reg -> !quantum.bit
+        # CHECK-NEXT: [[QUBIT_1:%.+]] = quantum.custom "Hadamard"() [[QUBIT]] : !quantum.bit
+        # CHECK-NEXT: [[QREG_1:%.+]] = quantum.insert [[QREG]][ 0], [[QUBIT_1]] : !quantum.reg, !quantum.bit
+        # CHECK-NEXT: quantum.compbasis qreg [[QREG_1]] : !quantum.obs
+        identity()
+        all_wires_rx(float, int, int, int)
+        qml.Hadamard(0)
+        return qml.probs()
+
+    # CHECK: func.func private @identity
+    # CHECK: func.func private @all_wires_rx
+
+    print(circuit_3.mlir)
+    qml.capture.disable()
+
+
+test_multiple_decomposition_rules()
+
+
+def test_decomposition_rule_shaped_wires():
+    """Test decomposition rule with passing a shaped array of wires"""
+
+    qml.capture.enable()
+
+    @decomposition_rule(is_qreg=True)
+    def shaped_wires_rule(param: TensorLike, wires: WiresLike):
+        qml.RX(param, wires=wires[0])
+        qml.RX(param, wires=wires[1])
+        qml.RX(param, wires=wires[2])
+
+    @qml.qjit
+    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    def circuit_4(_: float):
+        # CHECK: module @circuit_4
+        shaped_wires_rule(float, jax.core.ShapedArray((3,), int))
+        qml.Hadamard(0)
+        return qml.probs()
+
+    # CHECK: func.func private @shaped_wires_rule([[QREG:%.+]]: !quantum.reg, [[PARAM_TENSOR:%.+]]: tensor<f64>, [[QUBITS:%.+]]: tensor<3xi64>) -> !quantum.reg
+    # CHECK-NEXT: [[IDX_0:%.+]] = stablehlo.slice [[QUBITS]] [0:1] : (tensor<3xi64>) -> tensor<1xi64>
+    # CHECK-NEXT: [[RIDX_0:%.+]] = stablehlo.reshape [[IDX_0]] : (tensor<1xi64>) -> tensor<i64>
+    # CHECK-NEXT: [[EXTRACTED:%.+]] = tensor.extract [[RIDX_0]][] : tensor<i64>
+    # CHECK-NEXT: [[QUBIT:%.+]] = quantum.extract [[QREG]][[[EXTRACTED]]] : !quantum.reg -> !quantum.bit
+    # CHECK-NEXT: [[EXTRACTED_0:%.+]] = tensor.extract [[PARAM_TENSOR]][] : tensor<f64>
+    # CHECK-NEXT: [[OUT_QUBITS:%.+]] = quantum.custom "RX"([[EXTRACTED_0]]) [[QUBIT]] : !quantum.bit
+
+    print(circuit_4.mlir)
+    qml.capture.disable()
+
+
+test_decomposition_rule_shaped_wires()
+
+
+def test_decomposition_rule_expanded_wires():
+    """Test decomposition rule with passing expanding wires as a Python list"""
+
+    qml.capture.enable()
+
+    def shaped_wires_rule(param: TensorLike, wires: WiresLike):
+        qml.RX(param, wires=wires[0])
+        qml.RX(param, wires=wires[1])
+        qml.RX(param, wires=wires[2])
+
+    @decomposition_rule(num_params=1, is_qreg=False)
+    def expanded_wires_rule(param: TensorLike, w1, w2, w3):
+        shaped_wires_rule(param, [w1, w2, w3])
+
+    @qml.qjit
+    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    def circuit_5(_: float):
+        # CHECK: module @circuit_5
+        expanded_wires_rule(float, int, int, int)
+        qml.Hadamard(0)
+        return qml.probs()
+
+    # CHECK: func.func private @expanded_wires_rule(%arg0: tensor<f64>, %arg1: !quantum.bit, %arg2: !quantum.bit, %arg3: !quantum.bit) -> (!quantum.bit, !quantum.bit, !quantum.bit)
+
+    print(circuit_5.mlir)
+    qml.capture.disable()
+
+
+test_decomposition_rule_expanded_wires()
+
+
+def test_decomposition_rule_with_cond():
+    """Test decomposition rule with a conditional path"""
+
+    qml.capture.enable()
+
+    @decomposition_rule(is_qreg=True)
+    def cond_RX(param: TensorLike, w0: WiresLike):
+
+        def true_path():
+            qml.RX(param, wires=w0)
+
+        def false_path(): ...
+
+        qml.cond(param != 0.0, true_path, false_path)()
+
+    @qml.qjit(autograph=False)
+    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    def circuit_6():
+        # CHECK: module @circuit_6
+        cond_RX(float, jax.core.ShapedArray((1,), int))
+        return qml.probs()
+
+    # CHECK: func.func private @cond_RX([[QREG:%.+]]: !quantum.reg, [[PARAM_TENSOR:%.+]]: tensor<f64>, [[QUBITS:%.+]]: tensor<1xi64>) -> !quantum.reg
+    # CHECK-NEXT: [[ZERO:%.+]] = stablehlo.constant dense<0.000000e+00> : tensor<f64>
+    # CHECK-NEXT: [[COND_TENSOR:%.+]] = stablehlo.compare  NE, [[PARAM_TENSOR]], [[ZERO]],  FLOAT : (tensor<f64>, tensor<f64>) -> tensor<i1>
+    # CHECK-NEXT: [[COND:%.+]] = tensor.extract [[COND_TENSOR]][] : tensor<i1>
+    # CHECK-NEXT: [[RETVAL:%.+]] = scf.if [[COND]]
+    # CHECK-DAG:        [[QUBIT:%.+]] = quantum.extract [[QREG]][%extracted_0] : !quantum.reg -> !quantum.bit
+    # CHECK-DAG:        [[PARAM:%.+]] = tensor.extract [[PARAM_TENSOR]][] : tensor<f64>
+    # CHECK:            [[QUBIT_0:%.+]] = quantum.custom "RX"([[PARAM]]) [[QUBIT]] : !quantum.bit
+    # CHECK:            [[QREG_0:%.+]] = quantum.insert [[QREG]][%extracted_2], [[QUBIT_0]] : !quantum.reg, !quantum.bit
+    # CHECK-NEXT:       scf.yield [[QREG_0]] : !quantum.reg
+    # CHECK-NEXT: else
+    # CHECK:            scf.yield [[QREG]] : !quantum.reg
+    # CHECK:      return [[RETVAL]]
+
+    print(circuit_6.mlir)
+    qml.capture.disable()
+
+
+test_decomposition_rule_with_cond()
+
+
+def test_decomposition_rule_caller():
+    """Test decomposition rules with a caller"""
+
+    qml.capture.enable()
+
+    @decomposition_rule(is_qreg=True)
+    def Op1_decomp(_: TensorLike, wires: WiresLike):
+        qml.Hadamard(wires=wires[0])
+        qml.Hadamard(wires=[1])
+
+    @decomposition_rule(is_qreg=True)
+    def Op2_decomp(param: TensorLike, wires: WiresLike):
+        qml.RX(param, wires=wires[0])
+
+    def decomps_caller(param: TensorLike, wires: WiresLike):
+        Op1_decomp(param, wires)
+        Op2_decomp(param, wires)
+
+    @qml.qjit(autograph=False)
+    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    # CHECK: module @circuit_7
+    def circuit_7():
+        # CHECK: [[QREG:%.+]] = quantum.alloc
+        # CHECK: quantum.compbasis qreg [[QREG]] : !quantum.obs
+        decomps_caller(float, jax.core.ShapedArray((2,), int))
+        return qml.probs()
+
+    # CHECK: func.func private @Op1_decomp(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<2xi64>) -> !quantum.reg
+    # CHECK: func.func private @Op2_decomp(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<2xi64>) -> !quantum.reg
+
+    print(circuit_7.mlir)
+    qml.capture.disable()
+
+
+test_decomposition_rule_caller()
