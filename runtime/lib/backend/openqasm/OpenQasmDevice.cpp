@@ -42,7 +42,7 @@ auto OpenQasmDevice::AllocateQubits(size_t num_qubits) -> std::vector<QubitIdTyp
     return result;
 }
 
-void OpenQasmDevice::ReleaseQubits(std::vector<QubitIdType> &qubits)
+void OpenQasmDevice::ReleaseQubits(const std::vector<QubitIdType> &qubits)
 {
     std::set<QubitIdType> dealloc_Ids(qubits.begin(), qubits.end());
     RT_FAIL_IF(this->initial_allocated_QubitIds != dealloc_Ids,

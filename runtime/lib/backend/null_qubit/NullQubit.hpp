@@ -142,7 +142,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     /**
      * @brief Release qubits.
      */
-    void ReleaseQubits(std::vector<QubitIdType> &qubits)
+    void ReleaseQubits(const std::vector<QubitIdType> &qubits)
     {
         for (auto q : qubits) {
             this->ReleaseQubit(q);

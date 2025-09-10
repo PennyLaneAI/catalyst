@@ -36,7 +36,7 @@ auto OQCDevice::AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType>
     return result;
 }
 
-void OQCDevice::ReleaseQubits(std::vector<QubitIdType> &qubits)
+void OQCDevice::ReleaseQubits(const std::vector<QubitIdType> &qubits)
 {
     std::set<QubitIdType> dealloc_Ids(qubits.begin(), qubits.end());
     RT_FAIL_IF(this->initial_allocated_QubitIds != dealloc_Ids,

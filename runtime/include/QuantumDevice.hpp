@@ -104,7 +104,7 @@ struct QuantumDevice {
      *
      * @param qubits array of IDs of the qubits to release.
      */
-    virtual void ReleaseQubits(std::vector<QubitIdType> &qubits) = 0;
+    virtual void ReleaseQubits(const std::vector<QubitIdType> &qubits) = 0;
 
     /**
      * @brief Get the number of currently allocated qubits.
