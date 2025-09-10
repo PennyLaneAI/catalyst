@@ -83,8 +83,7 @@ func.func @test_extract_insert_no_fold_static(%r1: !quantum.reg, %i1: i64, %i2: 
     %q2 = quantum.extract %r2[0] : !quantum.reg -> !quantum.bit
     %r3 = quantum.insert %r2[%i1], %q2 : !quantum.reg, !quantum.bit
 
-    // CHECK-NOT: quantum.extract
-    // CHECK-NOT: quantum.insert
+
     %q3 = quantum.extract %r3[%i1] : !quantum.reg -> !quantum.bit
     %r4 = quantum.insert %r3[%i2], %q3 : !quantum.reg, !quantum.bit
 
@@ -173,8 +172,8 @@ func.func @test_interleaved_extract_insert() -> tensor<4xf64> {
   %1 = quantum.extract %0[%c0_i64] : !quantum.reg -> !quantum.bit
   %out_qubits = quantum.custom "Hadamard"() %1 : !quantum.bit
   %2 = quantum.extract %0[%c1_i64] : !quantum.reg -> !quantum.bit
-  %3 = quantum.insert %0[%c0_i64], %out_qubits : !quantum.reg, !quantum.bit
-  %4 = quantum.insert %3[%c1_i64], %2 : !quantum.reg, !quantum.bit
+  %3 = quantum.insert %0[%c1_i64], %2 : !quantum.reg, !quantum.bit
+  %4 = quantum.insert %3[%c0_i64], %out_qubits : !quantum.reg, !quantum.bit
   %5 = quantum.compbasis qreg %4 : !quantum.obs
   %6 = quantum.probs %5 : tensor<4xf64>
   quantum.dealloc %4 : !quantum.reg

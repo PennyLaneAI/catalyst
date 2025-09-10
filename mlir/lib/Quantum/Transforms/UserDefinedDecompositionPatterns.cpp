@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <llvm/Support/LogicalResult.h>
 #define DEBUG_TYPE "user-defined-decomposition"
 
 #include <variant>
@@ -60,30 +61,47 @@ class OpSignatureAnalyzer {
               .inCtrlQubits = op.getInCtrlQubits(),
               .inCtrlValues = op.getInCtrlValues(),
               .outQubits = op.getOutQubits(),
+              .outCtrlQubits = op.getOutCtrlQubits(),
           })
     {
         if (!enableQregMode)
             return;
 
         signature.sourceQreg = getSourceQreg(signature.inQubits.front());
+        if (!signature.sourceQreg) {
+            op.emitError("Cannot get source qreg");
+            isValid = false;
+            return;
+        }
+
+        // input wire indices
         for (Value qubit : signature.inQubits) {
             const QubitIndex index = getExtractIndex(qubit);
-            assert(index && "Cannot get index for input qubit");
+            if (!index) {
+                op.emitError("Cannot get index for input qubit");
+                isValid = false;
+                return;
+            }
             signature.inWireIndices.emplace_back(index);
         }
 
+        // input ctrl wire indices
         for (Value ctrlQubit : signature.inCtrlQubits) {
             const QubitIndex index = getExtractIndex(ctrlQubit);
-            assert(index && "Cannot get index for ctrl qubit");
+            if (!index) {
+                op.emitError("Cannot get index for ctrl qubit");
+                isValid = false;
+                return;
+            }
             signature.inCtrlWireIndices.emplace_back(index);
         }
 
-        for (Value outQubit : signature.outQubits) {
-            const QubitIndex insertIndex = getInsertIndex(outQubit);
-            assert(insertIndex && "Cannot find insert index for result qubit");
-            signature.outQubitIndices.emplace_back(insertIndex);
-        }
+        // Output qubit indices are the same as input qubit indices
+        signature.outQubitIndices = signature.inWireIndices;
+        signature.outCtrlQubitIndices = signature.inCtrlWireIndices;
     }
+
+    operator bool() const { return isValid; }
 
     // Prepare the operands for calling the decomposition function
     // There are two cases:
@@ -105,7 +123,16 @@ class OpSignatureAnalyzer {
 
         int operandIdx = 0;
         if (isa<quantum::QuregType>(funcInputs[0])) {
-            operands[operandIdx++] = signature.sourceQreg;
+            Value updatedQreg = signature.sourceQreg;
+            for (size_t i = 0; i < signature.inQubits.size(); ++i) {
+                Value qubit = signature.inQubits[i];
+                const QubitIndex &index = signature.inWireIndices[i];
+                updatedQreg =
+                    rewriter.create<quantum::InsertOp>(loc, updatedQreg.getType(), updatedQreg,
+                                                       index.getValue(), index.getAttr(), qubit);
+            }
+
+            operands[operandIdx++] = updatedQreg;
             if (!signature.params.empty()) {
                 operands[operandIdx] =
                     fromTensorOrAsIs(signature.params, funcInputs[operandIdx], rewriter, loc);
@@ -167,36 +194,32 @@ class OpSignatureAnalyzer {
                 index.getAttr());
             newResults.emplace_back(extractOp.getResult());
         }
+        for (const QubitIndex &index : signature.outCtrlQubitIndices) {
+            auto extractOp = rewriter.create<quantum::ExtractOp>(
+                callOp.getLoc(), rewriter.getType<quantum::QubitType>(), qreg, index.getValue(),
+                index.getAttr());
+            newResults.emplace_back(extractOp.getResult());
+        }
         return newResults;
     }
 
-    // Update the insert ops of the output qubits to use the new qreg
-    void replaceInsertOpsQreg(Value newQreg, PatternRewriter &rewriter)
-    {
-        SmallVector<quantum::InsertOp> insertOpsToUpdate;
-
-        for (Value outQubit : signature.outQubits) {
-            for (Operation *user : outQubit.getUsers()) {
-                if (auto insertOp = dyn_cast<quantum::InsertOp>(user)) {
-                    rewriter.replaceOp(insertOp, newQreg);
-                }
-            }
-        }
-    }
-
   private:
+    bool isValid = true;
+
     struct OpSignature {
         ValueRange params;
         ValueRange inQubits;
         ValueRange inCtrlQubits;
         ValueRange inCtrlValues;
         ValueRange outQubits;
+        ValueRange outCtrlQubits;
 
         // Qreg mode specific information
         Value sourceQreg = nullptr;
         SmallVector<QubitIndex> inWireIndices;
         SmallVector<QubitIndex> inCtrlWireIndices;
         SmallVector<QubitIndex> outQubitIndices;
+        SmallVector<QubitIndex> outCtrlQubitIndices;
     } signature;
 
     Value fromTensorOrAsIs(ValueRange values, Type type, PatternRewriter &rewriter, Location loc)
@@ -232,37 +255,52 @@ class OpSignatureAnalyzer {
 
     Value getSourceQreg(Value qubit)
     {
-        if (auto extractOp = qubit.getDefiningOp<quantum::ExtractOp>()) {
-            return extractOp.getQreg();
+        while (qubit) {
+            if (auto extractOp = qubit.getDefiningOp<quantum::ExtractOp>()) {
+                return extractOp.getQreg();
+            }
+
+            if (auto customOp = dyn_cast_or_null<quantum::CustomOp>(qubit.getDefiningOp())) {
+                if (customOp.getQubitOperands().empty()) {
+                    break;
+                }
+                qubit = customOp.getQubitOperands()[0];
+            }
         }
+
         return nullptr;
     }
 
     QubitIndex getExtractIndex(Value qubit)
     {
-        if (auto extractOp = qubit.getDefiningOp<quantum::ExtractOp>()) {
-            if (Value idx = extractOp.getIdx()) {
-                return QubitIndex(idx);
-            }
-            if (IntegerAttr idxAttr = extractOp.getIdxAttrAttr()) {
-                return QubitIndex(idxAttr);
-            }
-        }
-        return QubitIndex();
-    }
-
-    QubitIndex getInsertIndex(Value qubit)
-    {
-        for (Operation *user : qubit.getUsers()) {
-            if (auto insertOp = dyn_cast<quantum::InsertOp>(user)) {
-                if (Value idx = insertOp.getIdx()) {
+        while (qubit) {
+            if (auto extractOp = qubit.getDefiningOp<quantum::ExtractOp>()) {
+                if (Value idx = extractOp.getIdx()) {
                     return QubitIndex(idx);
                 }
-                if (IntegerAttr idxAttr = insertOp.getIdxAttrAttr()) {
+                if (IntegerAttr idxAttr = extractOp.getIdxAttrAttr()) {
                     return QubitIndex(idxAttr);
                 }
             }
+
+            if (auto customOp = dyn_cast_or_null<quantum::CustomOp>(qubit.getDefiningOp())) {
+                auto qubitOperands = customOp.getQubitOperands();
+                auto qubitResults = customOp.getQubitResults();
+                auto it =
+                    llvm::find_if(qubitResults, [&](Value result) { return result == qubit; });
+
+                if (it != qubitResults.end()) {
+                    size_t resultIndex = std::distance(qubitResults.begin(), it);
+                    if (resultIndex < qubitOperands.size()) {
+                        qubit = qubitOperands[resultIndex];
+                        continue;
+                    }
+                }
+            }
+
+            break;
         }
+
         return QubitIndex();
     }
 };
@@ -305,6 +343,9 @@ struct UserDefinedDecompositionRewritePattern : public OpRewritePattern<CustomOp
 
         auto enableQreg = isa<quantum::QuregType>(decompFunc.getFunctionType().getInput(0));
         auto analyzer = OpSignatureAnalyzer(op, enableQreg);
+        assert(analyzer && "Analyzer should be valid");
+
+        rewriter.setInsertionPointAfter(op);
         auto callOperands = analyzer.prepareCallOperands(decompFunc, rewriter, op.getLoc());
         auto callOp =
             rewriter.create<func::CallOp>(op.getLoc(), decompFunc.getFunctionType().getResults(),
@@ -312,12 +353,8 @@ struct UserDefinedDecompositionRewritePattern : public OpRewritePattern<CustomOp
 
         // Replace the op with the call op and adjust the insert ops for the qreg mode
         if (callOp.getNumResults() == 1 && isa<quantum::QuregType>(callOp.getResult(0).getType())) {
-            Value newQreg = callOp.getResult(0);
-            // Since the call op is a qreg mode function, we need to extract the qubits from the
-            // qreg to fit the original op's output qubits
             auto results = analyzer.prepareCallResultForQreg(callOp, rewriter);
-            analyzer.replaceInsertOpsQreg(newQreg, rewriter);
-            rewriter.eraseOp(op);
+            rewriter.replaceOp(op, results);
         }
         else {
             rewriter.replaceOp(op, callOp->getResults());

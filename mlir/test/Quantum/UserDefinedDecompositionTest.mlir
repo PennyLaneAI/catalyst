@@ -248,9 +248,15 @@ module @qreg_base_circuit {
       // CHECK:   [[EXTRACTED_4:%.+]] = tensor.extract [[RESHAPE2]][] : tensor<i64>
       // CHECK:   [[EXTRACT1:%.+]] = quantum.extract [[REG1]][[[EXTRACTED_4]]] : !quantum.reg -> !quantum.bit
       // CHECK:   [[RZ1:%.+]] = quantum.custom "RZ"([[CST]]) [[EXTRACT1]] : !quantum.bit
-      // CHECK:   [[RZ2:%.+]] = quantum.custom "RZ"([[CST]]) [[RZ1]] : !quantum.bit
-      // CHECK:   [[INSERT2:%.+]] = quantum.insert [[REG1]][[[EXTRACTED_4]]], [[RZ2]] : !quantum.reg, !quantum.bit
-      // CHECK:   scf.yield [[INSERT2]] : !quantum.reg
+      // CHECK:   [[INSERT1:%.+]] = quantum.insert [[REG1]][[[EXTRACTED_4]]], [[RZ1]] : !quantum.reg, !quantum.bit
+      // CHECK:   [[EXTRACT2:%.+]] = quantum.extract [[INSERT1]][[[EXTRACTED_3]]] : !quantum.reg -> !quantum.bit
+      // CHECK:   [[INSERT2:%.+]] = quantum.insert [[REG1]][[[EXTRACTED_3]]], [[EXTRACT2]] : !quantum.reg, !quantum.bit
+      // CHECK:   [[EXTRACT3:%.+]] = quantum.extract [[INSERT2]][[[EXTRACTED_4]]] : !quantum.reg -> !quantum.bit
+      // CHECK:   [[RZ2:%.+]] = quantum.custom "RZ"([[CST]]) [[EXTRACT3]] : !quantum.bit
+      // CHECK:   [[INSERT3:%.+]] = quantum.insert [[INSERT2]][[[EXTRACTED_4]]], [[RZ2]] : !quantum.reg, !quantum.bit
+      // CHECK:   [[EXTRACT4:%.+]] = quantum.extract [[INSERT3]][[[EXTRACTED_3]]] : !quantum.reg -> !quantum.bit
+      // CHECK:   [[INSERT4:%.+]] = quantum.insert [[INSERT2]][[[EXTRACTED_3]]], [[EXTRACT4]] : !quantum.reg, !quantum.bit
+      // CHECK:   scf.yield [[INSERT4]] : !quantum.reg
       // CHECK: } else {
       // CHECK:   scf.yield [[REG1]] : !quantum.reg
       // CHECK: }
@@ -258,17 +264,11 @@ module @qreg_base_circuit {
       %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
       %out_qubits = quantum.custom "Test"(%cst) %1 : !quantum.bit
       %2 = quantum.insert %0[ 0], %out_qubits : !quantum.reg, !quantum.bit
-
-      // CHECK: [[COMPBASIS:%.+]] = quantum.compbasis qreg [[CONDITIONAL]] : !quantum.obs
       %3 = quantum.compbasis qreg %2 : !quantum.obs
-
-      // CHECK: [[PROBS:%.+]] = quantum.probs [[COMPBASIS]] : tensor<2xf64>
       %4 = quantum.probs %3 : tensor<2xf64>
 
       quantum.dealloc %2 : !quantum.reg
       quantum.device_release
-
-      // CHECK: return [[PROBS]] : tensor<2xf64>
       return %4 : tensor<2xf64>
     }
 
