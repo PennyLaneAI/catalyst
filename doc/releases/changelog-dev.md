@@ -28,7 +28,7 @@
 
 <h3>Improvements 🛠</h3>
 
-* Significantly improved resource tracking with `null.qubit`, allowing integration of `qml.specs()` with `qjit`'d code.
+* Significantly improved resource tracking with `null.qubit`.
   [[#2033]](https://github.com/PennyLaneAI/catalyst/pull/2033)
 
 * Improve the pass `--ppm-specs` to count the depth of PPRs and PPMs in the circuit.
