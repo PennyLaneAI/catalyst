@@ -109,6 +109,7 @@ func.func @test_ppr_to_ppm_1(%q1 : !quantum.bit) {
 
     // CHECK-INJECT: qec.fabricate  magic_conj
     // CHECK-AUTO: qec.fabricate  magic_conj
+    // CHECK-PAULI: qec.fabricate  magic_conj
 }
 
 // -----
@@ -135,6 +136,12 @@ func.func @test_ppr_to_ppm_2(%q1 : !quantum.bit, %q2 : !quantum.bit, %q3 : !quan
 
     // // PPR P(π/2) on Q if cond(m3) is true
     // CHECK-AUTO: qec.ppr ["X", "Y", "Z", "Y"](2) {{.*}} cond({{.*}})
+
+    // // P = ["X", "Y", "Z", "Y"]
+    // // PPM P⊗Z on Q and |m⟩   => m0
+    // CHECK-PAULI: qec.ppm ["X", "Y", "Z", "Y", "Z"]
+    // CHECK-PAULI: qec.select.ppm([[m_0]], ["Y"], ["X"])
+    // CHECK-PAULI: qec.ppr ["X", "Y", "Z", "Y"](2) {{.*}} cond({{.*}})
 }
 
 // -----
@@ -148,6 +155,8 @@ func.func @test_ppr_to_ppm_3(%q1 : !quantum.bit, %i1 : i1) {
     // CHECK-INJECT: return
     // CHECK-AUTO: qec.ppr ["Z"](-8) {{.*}} cond({{.*}})
     // CHECK-AUTO: return
+    // CHECK-PAULI: qec.ppr ["Z"](-8) {{.*}} cond({{.*}})
+    // CHECK-PAULI: return
 }
 
 // -----
@@ -312,4 +321,47 @@ func.func public @game_of_surface_code(%arg0: !quantum.bit, %arg1: !quantum.bit,
     // CHECK-AUTO: [[M_34:%.+]], [[OUT_35:%.+]] = qec.ppm ["Z"](-1) [[OUT_31]]#0 : !quantum.bit
     // CHECK-AUTO: [[M_36:%.+]], [[OUT_37:%.+]]:2 = qec.ppm ["X", "X"] [[OUT_33]]#1, [[OUT_31]]#3 : !quantum.bit, !quantum.bit
 
+
+    /////// Pauli-Corrected Method ///////
+
+
+    // // Q0 -> %arg0, Q1 -> %arg1, Q2 -> %arg2, Q3 -> %arg3
+
+    // // PPR ["Z"](8) Q0 
+    
+    // CHECK-PAULI: [[Q0:%.+]]: !quantum.bit, [[Q1:%.+]]: !quantum.bit, [[Q2:%.+]]: !quantum.bit, [[Q3:%.+]]: !quantum.bit) {
+    // CHECK-PAULI: [[Q4:%.+]]     = qec.fabricate  magic
+    // CHECK-PAULI: [[M:%.+]], [[out:%.+]]:2 = qec.ppm ["Z", "Z"] [[Q0]], [[Q4]] : !quantum.bit, !quantum.bit
+    // CHECK-PAULI: [[M1:%.+]], [[out_0:%.+]] = qec.select.ppm([[M]], ["Y"], ["X"]) [[out]]#1 : !quantum.bit
+    // CHECK-PAULI: [[Q5:%.+]]  = qec.ppr ["Z"](2) [[out]]#0 cond([[M1]]) : !quantum.bit
+
+    // // PPR ["Y"](-8) Q3
+    // CHECK-PAULI: [[Q6:%.+]]     = qec.fabricate  magic_conj
+    // CHECK-PAULI: [[M2:%.+]], [[out_2:%.+]]:2 = qec.ppm ["Y", "Z"] [[Q3]], [[Q6]] : !quantum.bit, !quantum.bit
+    // CHECK-PAULI: [[M3:%.+]], [[out_3:%.+]] = qec.select.ppm([[M2]], ["Y"], ["X"]) [[out_2]]#1 : !quantum.bit
+    // CHECK-PAULI: [[Q7:%.+]]  = qec.ppr ["Y"](2) [[out_2]]#0 cond([[M3]]) : !quantum.bit
+
+    // // PPR ["Y", "X"](8) Q2, Q1
+    // CHECK-PAULI: [[Q8:%.+]]     = qec.fabricate  magic
+    // CHECK-PAULI: [[M4:%.+]], [[out_4:%.+]]:3 = qec.ppm ["Y", "X", "Z"] [[Q2]], [[Q1]], [[Q8]] : !quantum.bit, !quantum.bit, !quantum.bit
+    // CHECK-PAULI: [[M5:%.+]], [[out_5:%.+]] = qec.select.ppm([[M4]], ["Y"], ["X"]) [[out_4]]#2 : !quantum.bit
+    // CHECK-PAULI: [[Q9:%.+]]:2  = qec.ppr ["Y", "X"](2) [[out_4]]#0, [[out_4]]#1 cond([[M5]]) : !quantum.bit, !quantum.bit
+
+    // // PPR ["Z", "Z", "Y", "Z"](-8) Q2, Q1, Q3, Q0
+    // CHECK-PAULI: [[Q10:%.+]] = qec.fabricate  magic_conj
+    // CHECK-PAULI: [[M6:%.+]], [[out_6:%.+]]:5 = qec.ppm ["Z", "Z", "Y", "Z", "Z"] [[Q9]]#0, [[Q9]]#1, [[Q7]], [[Q5]], [[Q10]] : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    // CHECK-PAULI: [[M7:%.+]], [[out_7:%.+]] = qec.select.ppm([[M6]], ["Y"], ["X"]) [[out_6]]#4 : !quantum.bit
+    // CHECK-PAULI: [[Q11:%.+]]:4  = qec.ppr ["Z", "Z", "Y", "Z"](2) [[out_6]]#0, [[out_6]]#1, [[out_6]]#2, [[out_6]]#3 cond([[M7]]) : !quantum.bit, !quantum.bit, !quantum.bit
+
+    // // PPM Z, Z, Y, Y -> Q2, Q1, Q0, Q3
+    // CHECK-PAULI: [[M8:%.+]], [[out_8:%.+]]:4 = qec.ppm ["Z", "Z", "Y", "Y"] [[Q11]]#0, [[Q11]]#1, [[Q11]]#3, [[Q11]]#2 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+
+    // // PPM X, X -> Q1, Q0
+    // CHECK-PAULI: [[M9:%.+]], [[out_9:%.+]]:2 = qec.ppm ["X", "X"] [[out_8]]#1, [[out_8]]#2 : !quantum.bit, !quantum.bit
+
+    // // PPM Z(-1) -> Q2
+    // CHECK-PAULI: [[M10:%.+]], [[out_10:%.+]] = qec.ppm ["Z"](-1) [[out_8]]#0 : !quantum.bit
+
+    // // PPM X, X -> Q0, Q3
+    // CHECK-PAULI: [[M11:%.+]], [[out_11:%.+]]:2 = qec.ppm ["X", "X"] [[out_9]]#1, [[out_8]]#3 : !quantum.bit, !quantum.bit
 }
