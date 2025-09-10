@@ -64,7 +64,6 @@ from catalyst.jax_primitives import (
     probs_p,
     qalloc_p,
     qdealloc_p,
-    qdealloc_qb_p,
     qinst_p,
     quantum_kernel_p,
     quantum_subroutine_p,

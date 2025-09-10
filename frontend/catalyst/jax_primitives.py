@@ -76,7 +76,6 @@ from mlir_quantum.dialects.quantum import (
     CountsOp,
     CustomOp,
     DeallocOp,
-    DeallocQubitOp,
     DeviceInitOp,
     DeviceReleaseOp,
     ExpvalOp,
@@ -260,8 +259,6 @@ num_qubits_p = Primitive("num_qubits")
 qalloc_p = Primitive("qalloc")
 qdealloc_p = Primitive("qdealloc")
 qdealloc_p.multiple_results = True
-qdealloc_qb_p = Primitive("qdealloc_qb")
-qdealloc_qb_p.multiple_results = True
 qextract_p = Primitive("qextract")
 qinsert_p = Primitive("qinsert")
 gphase_p = Primitive("gphase")
@@ -1009,21 +1006,6 @@ def _qdealloc_lowering(jax_ctx: mlir.LoweringRuleContext, qreg):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
     DeallocOp(qreg)
-    return ()
-
-
-#
-# qdealloc_qb
-#
-@qdealloc_qb_p.def_abstract_eval
-def _qdealloc_qb_abstract_eval(qubit):
-    return ()
-
-
-def _qdealloc_qb_lowering(jax_ctx: mlir.LoweringRuleContext, qubit):
-    ctx = jax_ctx.module_context.context
-    ctx.allow_unregistered_dialects = True
-    DeallocQubitOp(qubit)
     return ()
 
 
@@ -2478,7 +2460,6 @@ CUSTOM_LOWERING_RULES = (
     (device_release_p, _device_release_lowering),
     (qalloc_p, _qalloc_lowering),
     (qdealloc_p, _qdealloc_lowering),
-    (qdealloc_qb_p, _qdealloc_qb_lowering),
     (qextract_p, _qextract_lowering),
     (qinsert_p, _qinsert_lowering),
     (qinst_p, _qinst_lowering),
