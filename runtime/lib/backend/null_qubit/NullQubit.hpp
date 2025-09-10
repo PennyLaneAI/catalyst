@@ -142,11 +142,12 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     /**
      * @brief Release qubits.
      */
-    void ReleaseQubits([[maybe_unused]] std::vector<QubitIdType> &qubits)
+    void ReleaseQubits(std::vector<QubitIdType> &qubits)
     {
-        num_qubits_ = 0;
-        this->qubit_manager.ReleaseAll();
-        if (this->track_resources_) {
+        for (auto q : qubits) {
+            this->ReleaseQubit(q);
+        }
+        if ((num_qubits_ == 0) && (this->track_resources_)) {
             if (this->resources_fname_ == "") {
                 auto time = std::chrono::high_resolution_clock::now();
                 auto timestamp =
