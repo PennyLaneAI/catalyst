@@ -123,6 +123,7 @@ class TT_ctrl_flow_for_loop(pattern_rewriter.RewritePattern):
         # Create a list to hold the operations in the loop body
         fop_list_section_A = []
         fop_list_section_B = []
+        fop_split = None
         
         record_section = "A"
         
@@ -131,6 +132,7 @@ class TT_ctrl_flow_for_loop(pattern_rewriter.RewritePattern):
 
             if isinstance(fop, quantum.CustomOp) and fop.gate_name.data == "PauliY":
                 record_section = "B"
+                fop_split = fop
                 continue
 
             if isinstance(fop, quantum.CustomOp):
@@ -158,6 +160,10 @@ class TT_ctrl_flow_for_loop(pattern_rewriter.RewritePattern):
             print_module(funcOp, "replace_if")
 
 
+        # Insert the loop split operation
+        
+        fop_list_section_B.insert(0, fop_split)
+
         # Add the operation after the loop body
 
         for for_op_B in fop_list_section_B:
@@ -176,14 +182,15 @@ class TT_ctrl_flow_for_loop(pattern_rewriter.RewritePattern):
             input_first_op_after_loop.replace_by_if(clone_for_op_B.out_qubits[0], lambda use: use.operation == first_quantum_op_after_loop)
 
             print_module(funcOp, "replace if after loop")
+            
 
         # For loop step
         step = for_loop.step
         
         # Increment the loop by one step
-        lower_bound = for_loop.lb
-        incremented_lower_bound = arith.AddiOp(lower_bound, step)
-        rewriter.insert_op(incremented_lower_bound, InsertPoint.before(for_loop))
+        # lower_bound = for_loop.lb
+        # incremented_lower_bound = arith.AddiOp(lower_bound, step)
+        # rewriter.insert_op(incremented_lower_bound, InsertPoint.before(for_loop))
         
         # Decrement the upper bound by one step
         upper_bound = for_loop.ub
@@ -197,24 +204,35 @@ class TT_ctrl_flow_for_loop(pattern_rewriter.RewritePattern):
         #     if isinstance(fop, quantum.CustomOp):
         #         test = fop
 
-        last_last = fop_list_section_B[-1]
-        first_first = fop_list_section_A[0]
-        first_first.detach()
-        rewriter.insert_op(first_first, InsertPoint.after(last_last))
+        # Rearrange the operations to put Y at top and move S to last
+        print_module(for_loop, "For Loop before rearrange")
+        
+        
+        last_B = fop_list_section_B[-1]
+        first_A = fop_list_section_A[0]
 
-        print_module(funcOp, "rearrange")
+        fop_split.in_qubits[0].replace_by_if(first_A.in_qubits[0], lambda use: use.operation == fop_split)
+
+        first_A.in_qubits[0].replace_by_if(last_B.out_qubits[0], lambda use: use.operation == first_A)
+        last_B.out_qubits[0].replace_by_if(first_A.out_qubits[0], lambda use: use.operation != first_A)
+
+        first_A.detach()
+        rewriter.insert_op(first_A, InsertPoint.after(last_B))
+
 
 
 
         # Create a new for loop with the new bounds
         
         new_for_loop = ForOp(
-            incremented_lower_bound.result,  # new lower bound
+            # incremented_lower_bound.result,  # new lower bound
+            for_loop.lb,  # new lower bound
             decremented_upper_bound.result,  # new upper bound
             step,                            # same step
             iter_args=for_loop.iter_args,    # same iteration arguments
             body=for_loop_block              # the same body block
         )
+        print_module(new_for_loop, "For Loop rearrange")
 
         # Replace the old for loop with the new one
         rewriter.replace_op(for_loop, new_for_loop)
@@ -711,12 +729,14 @@ if __name__ == "__main__":
             def captured_circuit(x: float):
 
                 # -------------------------------------------------
-                # Example 03 
-                qml.H(0); qml.H(1)
+                # Example 04
+                # qml.H(0); qml.H(1)
                 qml.X(0)
                 for i in range(5):
                     qml.S(0)
+                    qml.H(0)
                     qml.Y(0)
+                    qml.H(0)
                     qml.T(0)
                 qml.Z(0)        
                 return qml.state()
@@ -732,22 +752,24 @@ if __name__ == "__main__":
 
             @qml.qnode(qml.device("lightning.qubit", wires=2))
             def text_01():
-                qml.H(0); qml.H(1)
-                qml.X(0); qml.S(0)
+                # qml.H(0); qml.H(1)
+                qml.X(0); qml.S(0); qml.H(0)
 
                 for i in range(0,4):
                     qml.Y(0)                    
+                    qml.H(0)
                     qml.T(0)
                     qml.S(0)
+                    qml.H(0)
 
-                qml.Y(0); qml.T(0); qml.Z(0)
+                qml.Y(0); qml.H(0);  qml.T(0); qml.Z(0)
                 return qml.state()
             
             print(text_01())
             
             @qml.qnode(qml.device("lightning.qubit", wires=2))
             def text_01():
-                qml.H(0); qml.H(1)
+                # qml.H(0); qml.H(1)
                 qml.X(0)
                 for i in range(5):
                     qml.S(0)
