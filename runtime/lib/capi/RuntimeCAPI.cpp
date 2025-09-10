@@ -391,9 +391,7 @@ static int __catalyst__rt__qubit_release_array__impl(QirArray *qubit_array)
 {
     std::vector<QubitIdType> *qubit_array_ptr =
         reinterpret_cast<std::vector<QubitIdType> *>(qubit_array);
-    for (QubitIdType q : *qubit_array_ptr) {
-        getQuantumDevicePtr()->ReleaseQubit(q);
-    }
+    getQuantumDevicePtr()->ReleaseQubits(*qubit_array_ptr);
     delete qubit_array_ptr;
     return 0;
 }
