@@ -100,7 +100,7 @@ class OpenQasmDevice final : public Catalyst::Runtime::QuantumDevice {
     ~OpenQasmDevice() = default;
 
     auto AllocateQubits(size_t) -> std::vector<QubitIdType> override;
-    void ReleaseQubits(std::vector<QubitIdType> &) override;
+    void ReleaseQubits(const std::vector<QubitIdType> &) override;
     auto GetNumQubits() const -> size_t override;
     void SetDeviceShots(size_t) override;
     auto GetDeviceShots() const -> size_t override;
