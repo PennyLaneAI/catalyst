@@ -336,14 +336,14 @@ def test_merge_ppr_ppm():
     assert ppm_specs_output["f_0"]["logical_qubits"] == 2
 
 
-def test_ppr_to_ppm():
+def test_ppr_to_ppm_auto_corrected():
 
     pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
 
     @qjit(pipelines=pipe, target="mlir")
     def test_ppr_to_ppm_workflow():
 
-        @ppr_to_ppm
+        @ppr_to_ppm(decompose_method="auto-corrected")
         @to_ppr
         @qml.qnode(qml.device("lightning.qubit", wires=2))
         def f():
@@ -412,6 +412,45 @@ def test_ppr_to_ppm_inject_magic_state():
     assert ppm_specs_output["f_0"]["logical_qubits"] == 2
     assert ppm_specs_output["f_0"]["pi2_ppr"] == 9
     assert ppm_specs_output["f_0"]["max_weight_pi2"] == 2
+
+
+def test_ppr_to_ppm_pauli_corrected():
+
+    pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+
+    @qjit(pipelines=pipe, target="mlir")
+    def test_ppr_to_ppm_workflow():
+
+        @ppr_to_ppm(decompose_method="pauli-corrected")
+        @to_ppr
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def f():
+            qml.H(0)
+            qml.S(1)
+            qml.T(0)
+            qml.CNOT([0, 1])
+            return measure(0), measure(1)
+
+        return f()
+
+    assert (
+        'transform.apply_registered_pass "decompose-non-clifford-ppr"'
+        in test_ppr_to_ppm_workflow.mlir
+    )
+    assert (
+        'transform.apply_registered_pass "decompose-clifford-ppr"' in test_ppr_to_ppm_workflow.mlir
+    )
+    optimized_ir = test_ppr_to_ppm_workflow.mlir_opt
+    assert 'transform.apply_registered_pass "decompose-non-clifford-ppr"' not in optimized_ir
+    assert 'transform.apply_registered_pass "decompose-clifford-ppr"' not in optimized_ir
+    assert "qec.select.ppm" in optimized_ir # Make sure we use the select PPM to implement the reactive measurement
+
+    ppm_specs_output = ppm_specs(test_ppr_to_ppm_workflow)
+    assert ppm_specs_output["f_0"]["num_of_ppm"] == 17
+    assert ppm_specs_output["f_0"]["logical_qubits"] == 2
+    assert ppm_specs_output["f_0"]["pi2_ppr"] == 8
+    assert ppm_specs_output["f_0"]["max_weight_pi2"] == 2
+
 
 
 def test_commute_ppr_and_merge_ppr_ppm_with_max_pauli_size():
