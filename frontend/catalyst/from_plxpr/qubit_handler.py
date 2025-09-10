@@ -88,10 +88,7 @@ class QubitHandler:
 
     wire_map: dict[int, AbstractQbit]  # Note: No dynamic wire indices for now in from_plxpr.
 
-    def __init__(
-        self,
-        qubit_or_qreg_ref: AbstractQreg | list[AbstractQbit] | tuple[AbstractQbit]
-    ):
+    def __init__(self, qubit_or_qreg_ref: AbstractQreg | list[AbstractQbit] | tuple[AbstractQbit]):
         if isinstance(qubit_or_qreg_ref, (list, tuple)):
             self.abstract_qreg_val = None
             self.qubit_indices = qubit_or_qreg_ref
@@ -145,6 +142,7 @@ class QubitHandler:
                 " Consider setting a qreg value first."
             )
 
+        # else, extract must be fresh
         assert index not in self.wire_map
         extracted_qubit = qextract_p.bind(self.abstract_qreg_val, index)
         self.wire_map[index] = extracted_qubit
