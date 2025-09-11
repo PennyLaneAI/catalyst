@@ -210,7 +210,9 @@ def handle_qnode(
         )
         qreg = qalloc_p.bind(len(device.wires))
         self.qubit_handler = QubitHandler(qreg, self.qubit_index_recorder, absolute_addressing=True)
-        converter = PLxPRToQuantumJaxprInterpreter(device, shots, self.qubit_handler, {}, self.qubit_index_recorder)
+        converter = PLxPRToQuantumJaxprInterpreter(
+            device, shots, self.qubit_handler, {}, self.qubit_index_recorder
+        )
         retvals = converter(closed_jaxpr, *args)
         self.qubit_handler.insert_all_dangling_qubits()
         qdealloc_p.bind(self.qubit_handler.get())
@@ -482,12 +484,12 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
 
 
 @PLxPRToQuantumJaxprInterpreter.register_primitive(qml.allocation.allocate_prim)
-def handle_qml_alloc(self, *, num_wires, require_zeros=True, restored=False):
+def handle_qml_alloc(self, *, num_wires, state=None, restored=False):
     """Handle the conversion from plxpr to Catalyst jaxpr for the qml.allocate primitive"""
     # breakpoint()
     new_qreg = qalloc_p.bind(num_wires)
 
-    self.qregs[new_qreg] = QregManager(new_qreg, self.qubit_index_recorder)
+    self.qregs[new_qreg] = QubitHandler(new_qreg, self.qubit_index_recorder)
 
     # The plxpr alloc primitive returns the list of all indices available in the new qreg
     # So let's extract all qubits and return them
