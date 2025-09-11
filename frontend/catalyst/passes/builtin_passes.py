@@ -871,7 +871,7 @@ def ppr_to_ppm(qnode=None, *, decompose_method="pauli-corrected", avoid_y_measur
 
 
 def ppm_compilation(
-    qnode=None, *, decompose_method="auto-corrected", avoid_y_measure=False, max_pauli_size=0
+    qnode=None, *, decompose_method="pauli-corrected", avoid_y_measure=False, max_pauli_size=0
 ):
     R"""
     Specify that the MLIR compiler pass for transforming
@@ -892,8 +892,9 @@ def ppm_compilation(
     Args:
         qnode (QNode, optional): QNode to apply the pass to. If None, returns a decorator.
         decompose_method (str, optional): The method to use for decomposing non-Clifford PPRs.
-            Options are ``"auto-corrected"`` and ``"clifford-corrected"``. Defaults to
-            ``"auto-corrected"``.
+            Options are ``"pauli-corrected"``, ``"auto-corrected"`` and ``"clifford-corrected"``. Defaults to
+            ``"pauli-corrected"``.
+            ``"pauli-corrected"`` uses a reactive measurement for correction.
             ``"auto-corrected"`` uses an additional measurement for correction.
             ``"clifford-corrected"`` uses a Clifford rotation for correction.
         avoid_y_measure (bool): Rather than performing a Pauli-Y measurement for Clifford rotations
