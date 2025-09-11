@@ -66,18 +66,16 @@ struct GradientLoweringPass : impl::GradientLoweringPassBase<GradientLoweringPas
         }
 
         // Guarantee that functions intended to be free of quantum ops are indeed so after folding.
-        for (Region &region : getOperation()->getRegions()) {
-            for (Operation &op : region.getOps()) {
-                if (isa<func::FuncOp>(op) && op.hasAttr("QuantumFree")) {
-                    if (failed(quantum::verifyQuantumFree(cast<func::FuncOp>(op)))) {
-                        op.emitOpError() << "cloned during the gradient pass is not free of "
-                                            "quantum ops:\n"
-                                         << op;
-                        return signalPassFailure();
-                    }
+        getOperation()->walk([&](func::FuncOp f) {
+            if (f->hasAttr("QuantumFree")) {
+                if (failed(quantum::verifyQuantumFree(f))) {
+                    f->emitOpError() << "cloned during the gradient pass is not free of "
+                                        "quantum ops:\n"
+                                     << *f;
+                    return signalPassFailure();
                 }
             }
-        }
+        });
     }
 };
 
