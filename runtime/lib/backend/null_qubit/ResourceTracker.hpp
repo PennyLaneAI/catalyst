@@ -34,11 +34,11 @@ struct ResourceTracker final {
   private:
     std::unordered_map<std::string, std::size_t> gate_types_;
     std::unordered_map<std::size_t, std::size_t> gate_sizes_;
-    std::unordered_map<QubitIdType, std::size_t> wire_depths;
+    std::unordered_map<QubitIdType, std::size_t> wire_depths_;
     std::size_t max_num_wires_;
-    bool static_fname_;
+    bool static_filename_;
     bool compute_depth_;
-    std::string resources_fname_;
+    std::string resources_filename_;
 
     /**
      * @brief Internal method to record an operation being applied to the device
@@ -69,12 +69,12 @@ struct ResourceTracker final {
         if (compute_depth_) {
             std::size_t max_depth = 0;
             for (const auto &i : combined_wires) {
-                max_depth = std::max(max_depth, wire_depths[i]);
+                max_depth = std::max(max_depth, wire_depths_[i]);
             }
             // All wires used in this operation must now have their depth set based on this max
             max_depth++;
             for (const auto &i : wires) {
-                wire_depths[i] = max_depth;
+                wire_depths_[i] = max_depth;
             }
         }
     }
@@ -90,7 +90,7 @@ struct ResourceTracker final {
     {
         Reset();
         compute_depth_ = false;
-        static_fname_ = false;
+        static_filename_ = false;
     }
 
     /**
@@ -104,7 +104,7 @@ struct ResourceTracker final {
     {
         gate_types_.clear();
         gate_sizes_.clear();
-        wire_depths.clear();
+        wire_depths_.clear();
         max_num_wires_ = 0;
     }
 
@@ -152,7 +152,7 @@ struct ResourceTracker final {
      *
      * @return The current filename that will be used for writing resource data
      */
-    auto GetFilename() const -> std::string { return resources_fname_; }
+    auto GetFilename() const -> std::string { return resources_filename_; }
 
     /**
      * @brief Returns whether circuit depth computation is currently enabled
@@ -168,8 +168,8 @@ struct ResourceTracker final {
      */
     auto GetDepth() const -> std::size_t
     {
-        if (compute_depth_ && !wire_depths.empty()) {
-            auto max_pair = std::max_element(wire_depths.begin(), wire_depths.end(),
+        if (compute_depth_ && !wire_depths_.empty()) {
+            auto max_pair = std::max_element(wire_depths_.begin(), wire_depths_.end(),
                                              [](const std::pair<QubitIdType, std::size_t> &p1,
                                                 const std::pair<QubitIdType, std::size_t> &p2) {
                                                  return p1.second < p2.second;
@@ -183,12 +183,12 @@ struct ResourceTracker final {
      * @brief Sets a static filename for resource data output.
      *
      * Once this function has been called, dynamic filenames will no longer be generated
-     * @param fname The filename to use for writing resource tracking data
+     * @param filename The filename to use for writing resource tracking data
      */
-    void SetResourcesFname(const std::string &fname)
+    void SetResourcesFilename(const std::string &filename)
     {
-        resources_fname_ = fname;
-        static_fname_ = true;
+        resources_filename_ = filename;
+        static_filename_ = true;
     }
 
     /**
@@ -334,24 +334,24 @@ struct ResourceTracker final {
      */
     void WriteOut()
     {
-        if (!static_fname_) {
+        if (!static_filename_) {
             auto time = std::chrono::high_resolution_clock::now();
             auto timestamp =
                 std::chrono::duration_cast<std::chrono::nanoseconds>(time.time_since_epoch())
                     .count();
-            std::stringstream new_resources_fname;
-            new_resources_fname << "__pennylane_resources_data_" << timestamp << ".json";
+            std::stringstream new_resources_filename;
+            new_resources_filename << "__pennylane_resources_data_" << timestamp << ".json";
 
-            this->resources_fname_ = new_resources_fname.str(); // Update written location
+            this->resources_filename_ = new_resources_filename.str(); // Update written location
         }
 
         // Need to use FILE* instead of ofstream since ofstream has no way to atomically open a
         // file only if it does not already exist
-        FILE *resources_file = fopen(this->resources_fname_.c_str(), "wx");
+        FILE *resources_file = fopen(this->resources_filename_.c_str(), "wx");
         if (resources_file == nullptr) {
             std::string err_msg =
-                "Error opening file '" + this->resources_fname_ + "'."; // LCOV_EXCL_LINE
-            RT_FAIL(err_msg.c_str());                                   // LCOV_EXCL_LINE
+                "Error opening file '" + this->resources_filename_ + "'."; // LCOV_EXCL_LINE
+            RT_FAIL(err_msg.c_str());                                      // LCOV_EXCL_LINE
         }
         else {
             PrintResourceUsage(resources_file);

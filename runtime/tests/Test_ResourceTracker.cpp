@@ -77,7 +77,7 @@ TEST_CASE("Test Resource Tracker Reset", "[resourcetracking]")
     CHECK(tracker->GetDepth() == 0);
     CHECK(tracker->GetComputeDepth() == false);
 
-    tracker->SetResourcesFname("foo.json");
+    tracker->SetResourcesFilename("foo.json");
     tracker->SetComputeDepth(true);
     tracker->SetMaxWires(10);
     tracker->NamedOperation("PauliX", false, {0}, {});
@@ -217,10 +217,10 @@ TEST_CASE("Test Resource Tracker Depth", "[resourcetracking]")
 TEST_CASE("Test Resource Tracker Printing", "[resourcetracking]")
 {
     // The name of the file where the resource usage data is stored
-    constexpr char RESOURCES_FNAME[] = "__pennylane_resources_data.json";
+    constexpr char RESOURCES_FILENAME[] = "__pennylane_resources_data.json";
 
     // Open a file for writing the resources JSON
-    FILE *resource_file_w = fopen(RESOURCES_FNAME, "wx");
+    FILE *resource_file_w = fopen(RESOURCES_FILENAME, "wx");
     if (resource_file_w == nullptr) {                            // LCOV_EXCL_LINE
         FAIL("Failed to open resource usage file for writing."); // LCOV_EXCL_LINE
     }
@@ -244,7 +244,7 @@ TEST_CASE("Test Resource Tracker Printing", "[resourcetracking]")
     fclose(resource_file_w);
 
     // Open the file of resource data
-    std::ifstream resource_file_r(RESOURCES_FNAME);
+    std::ifstream resource_file_r(RESOURCES_FILENAME);
     CHECK(resource_file_r.is_open()); // fail-fast if file failed to create
 
     std::string full_json;
@@ -273,7 +273,7 @@ TEST_CASE("Test Resource Tracker Printing", "[resourcetracking]")
         }
     }
     resource_file_r.close();
-    std::remove(RESOURCES_FNAME);
+    std::remove(RESOURCES_FILENAME);
 
     // Ensure all expected fields were present
     CHECK(full_json.find("num_wires") != std::string::npos);
@@ -307,13 +307,13 @@ TEST_CASE("Test Resource Tracker WriteOut", "[resourcetracking]")
     CHECK(tracker->GetNumGates() == 0);
     CHECK(tracker->GetNumWires() == 0);
 
-    std::string fname = tracker->GetFilename();
-    CHECK(fname != "");
-    CHECK(fname.find("__pennylane_resources_data_") != std::string::npos);
-    CHECK(fname.find(".json") != std::string::npos);
+    std::string filename = tracker->GetFilename();
+    CHECK(filename != "");
+    CHECK(filename.find("__pennylane_resources_data_") != std::string::npos);
+    CHECK(filename.find(".json") != std::string::npos);
 
     // Open the file of resource data
-    std::ifstream resource_file_r(fname);
+    std::ifstream resource_file_r(filename);
     CHECK(resource_file_r.is_open()); // fail-fast if file failed to create
 
     std::string full_json;
@@ -343,7 +343,7 @@ TEST_CASE("Test Resource Tracker WriteOut", "[resourcetracking]")
     }
 
     resource_file_r.close();
-    std::remove(fname.c_str());
+    std::remove(filename.c_str());
 
     // Ensure all expected fields were present
     CHECK(full_json.find("num_wires") != std::string::npos);

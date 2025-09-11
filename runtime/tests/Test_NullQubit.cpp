@@ -899,18 +899,18 @@ TEST_CASE("Test NullQubit device shots methods", "[NullQubit]")
 TEST_CASE("Test NullQubit device resource tracking integration", "[NullQubit]")
 {
     // The name of the file where the resource usage data is stored
-    constexpr char RESOURCES_FNAME[] = "__pennylane_resources_data.json";
+    constexpr char RESOURCES_FILENAME[] = "__pennylane_resources_data.json";
 
     std::unique_ptr<NullQubit> dummy = std::make_unique<NullQubit>();
     CHECK(dummy->IsTrackingResources() == false);
 
     std::unique_ptr<NullQubit> sim =
-        std::make_unique<NullQubit>("{'track_resources':True, 'resources_fname':'" +
-                                    std::string(RESOURCES_FNAME) + "', 'compute_depth':True}");
+        std::make_unique<NullQubit>("{'track_resources':True, 'resources_filename':'" +
+                                    std::string(RESOURCES_FILENAME) + "', 'compute_depth':True}");
     CHECK(sim->IsTrackingResources() == true);
 
     // Ensure data will be written to the correct place
-    CHECK(sim->GetResourcesFilename() == RESOURCES_FNAME);
+    CHECK(sim->GetResourcesFilename() == RESOURCES_FILENAME);
 
     std::vector<QubitIdType> Qs = sim->AllocateQubits(4);
 
@@ -932,7 +932,7 @@ TEST_CASE("Test NullQubit device resource tracking integration", "[NullQubit]")
     sim->ReleaseAllQubits();
 
     // Open the file of resource data
-    std::ifstream resource_file_r(RESOURCES_FNAME);
+    std::ifstream resource_file_r(RESOURCES_FILENAME);
     CHECK(resource_file_r.is_open()); // fail-fast if file failed to create
 
     std::vector<std::string> resource_names = {"PauliX",
@@ -973,5 +973,5 @@ TEST_CASE("Test NullQubit device resource tracking integration", "[NullQubit]")
         CHECK(full_json.find(name) != std::string::npos);
     }
 
-    std::remove(RESOURCES_FNAME); // Remove the file automatically created by the device
+    std::remove(RESOURCES_FILENAME); // Remove the file automatically created by the device
 }

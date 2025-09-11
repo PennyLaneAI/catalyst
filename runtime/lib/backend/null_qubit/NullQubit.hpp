@@ -60,7 +60,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      * resource tracking options if specified. By default, resource tracking is turned off.
      * Supported parameters:
      * - "track_resources": Enable/disable resource tracking ("True"/"False")
-     * - "resources_fname": Static filename for resource output [requires resource tracking]
+     * - "resources_filename": Static filename for resource output [requires resource tracking]
      * - "compute_depth": Enable/disable circuit depth computation ("True"/"False") [requires
      * resource tracking]
      *
@@ -72,8 +72,8 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
         if (device_kwargs.contains("track_resources")) {
             this->track_resources_ = device_kwargs["track_resources"] == "True";
         }
-        if (device_kwargs.contains("resources_fname")) {
-            this->resource_tracker_.SetResourcesFname(device_kwargs["resources_fname"]);
+        if (device_kwargs.contains("resources_filename")) {
+            this->resource_tracker_.SetResourcesFilename(device_kwargs["resources_filename"]);
         }
         if (device_kwargs.contains("compute_depth")) {
             this->resource_tracker_.SetComputeDepth(device_kwargs["compute_depth"] == "True");
