@@ -106,22 +106,9 @@ def _is_one_shot_compatible_device(qnode):
     if device_name in exclude_devices:
         return False
 
-    # Additional check for OQDDevice class to ensure proper detection
-    # Check both the class name and if it has the OQD-specific get_c_interface method
+    # Additional check for OQDDevice class
     device_class_name = qnode.device.__class__.__name__
-    if device_class_name == "OQDDevice":
-        return False
-
-    # Check if device has get_c_interface method returning "oqd"
-    if hasattr(qnode.device, "get_c_interface"):
-        try:
-            c_interface_name, _ = qnode.device.get_c_interface()
-            if c_interface_name == "oqd":
-                return False
-        except (AttributeError, TypeError, ValueError):
-            pass
-
-    return True
+    return device_class_name != "OQDDevice"
 
 
 def configure_mcm_and_try_one_shot(qnode, args, kwargs):
@@ -183,6 +170,7 @@ def configure_mcm_and_try_one_shot(qnode, args, kwargs):
                         "Native mid-circuit measurement mode does not support",
                         "qml.var(obs) cannot be returned when `mcm_method='one-shot'`",
                         "empty wires is not supported with dynamic wires in one-shot mode",
+                        "No need to run one-shot mode",
                     ]
                 )
 
@@ -376,10 +364,11 @@ def _process_terminal_measurements(mcm_method, cpy_tape, out, snapshots, shot_ve
     return (snapshots, tuple(new_out)) if snapshots else tuple(new_out)
 
 
-def _validate_one_shot_measurements(mcm_method, tape: qml.tape.QuantumTape, qnode) -> None:
+def _validate_one_shot_measurements(mcm_config, tape: qml.tape.QuantumTape, qnode) -> None:
     """Validate measurements for one-shot mode.
 
     Args:
+        mcm_config: The mid-circuit measurement configuration
         tape: The quantum tape containing measurements to validate
         qnode: The quantum node being transformed
 
@@ -387,12 +376,22 @@ def _validate_one_shot_measurements(mcm_method, tape: qml.tape.QuantumTape, qnod
         TypeError: If unsupported measurement types are used
         NotImplementedError: If measurement configuration is not supported
     """
+    mcm_method = mcm_config.mcm_method
+    user_specified_mcm_method = qnode.execute_kwargs["mcm_method"]
     assert mcm_method == "one-shot"
 
     # Check if using shot vector with non-SampleMP measurements
     shot_vector = qnode._shots.shot_vector if qnode._shots else []
     has_shot_vector = len(shot_vector) > 1 or any(copies > 1 for _, copies in shot_vector)
     has_wires = qnode.device.wires is not None and not is_dynamic_wires(qnode.device.wires)
+
+    # Raise an error if there are no mid-circuit measurements, it will fallback to
+    # single-branch-statistics
+    if (
+        not any(isinstance(op, MidCircuitMeasure) for op in tape.operations)
+        and user_specified_mcm_method is None
+    ):
+        raise ValueError("No need to run one-shot mode when there are no mid-circuit measurements.")
 
     for m in tape.measurements:
         # Check if measurement type is supported
@@ -483,7 +482,7 @@ def dynamic_one_shot(qnode, **kwargs):
             cpy_tape = tape
             nonlocal aux_tapes
 
-            _validate_one_shot_measurements(mcm_config.mcm_method, tape, qnode)
+            _validate_one_shot_measurements(mcm_config, tape, qnode)
 
             if tape.batch_size is not None:
                 raise ValueError("mcm_method='one-shot' is not compatible with broadcasting")

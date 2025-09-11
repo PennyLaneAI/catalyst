@@ -941,38 +941,29 @@ class TestTransform:
         assert counts[0].shape == (8,)
         assert counts[1].shape == (8,)
 
-    def test_measurements_from_samples_raises_error_with_one_shot(self):
+    @pytest.mark.parametrize(
+        "transform_measurement", (measurements_from_samples, measurements_from_counts)
+    )
+    @pytest.mark.parametrize("mcm_method", ("one-shot", "single-branch-statistics"))
+    def test_measurements_from_samples_raises_error_with_one_shot(
+        self, mcm_method, transform_measurement
+    ):
         """Test raise an error when measurements_from_samples is used with one-shot."""
-        device = qml.device("lightning.qubit", wires=2, shots=1000)
+        device = qml.device("lightning.qubit", wires=2)
 
-        with pytest.raises(
-            CompileError, match="measurements_from_samples is not supported with one-shot"
-        ):
+        @partial(transform_measurement, device_wires=device.wires)
+        @qml.set_shots(1000)
+        @qml.qnode(device=device, mcm_method=mcm_method)
+        def circuit():
+            qml.X(0)
+            qml.X(1)
+            return (qml.expval(qml.PauliX(wires=0) @ qml.PauliX(wires=1)),)
 
-            @qjit
-            @partial(measurements_from_samples, device_wires=device.wires)
-            @qml.qnode(device=device, mcm_method="one-shot")
-            def circuit():
-                qml.X(0)
-                qml.X(1)
-                return (qml.expval(qml.PauliX(wires=0) @ qml.PauliX(wires=1)),)
-
-            circuit()
-
-    def test_measurements_from_counts_raises_error_with_one_shot(self):
-        """Test raise an error when measurements_from_samples is used with one-shot."""
-        device = qml.device("lightning.qubit", wires=2, shots=1000)
-
-        with pytest.raises(
-            CompileError, match="measurements_from_counts is not supported with one-shot"
-        ):
-
-            @qjit
-            @partial(measurements_from_counts, device_wires=device.wires)
-            @qml.qnode(device=device, mcm_method="one-shot")
-            def circuit():
-                qml.X(0)
-                qml.X(1)
-                return (qml.expval(qml.PauliX(wires=0) @ qml.PauliX(wires=1)),)
-
-            circuit()
+        if mcm_method == "one-shot":
+            with pytest.raises(
+                CompileError,
+                match=f"{transform_measurement.__name__} is not supported with one-shot",
+            ):
+                qjit(circuit)()
+        else:
+            qjit(circuit)()
