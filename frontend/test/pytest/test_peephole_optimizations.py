@@ -543,14 +543,14 @@ def test_clifford_to_ppm():
 
         @ppm_compilation(decompose_method="pauli-corrected", max_pauli_size=2)
         @qml.qnode(qml.device("lightning.qubit", wires=2))
-        def g():
+        def h():
             for idx in range(5):
                 qml.H(idx)
                 qml.CNOT(wires=[idx, idx + 1])
                 qml.T(idx)
                 qml.T(idx + 1)
 
-        return f(), g()
+        return f(), g(), h()
 
     assert 'transform.apply_registered_pass "ppm-compilation"' in test_clifford_to_ppm_workflow.mlir
     optimized_ir = test_clifford_to_ppm_workflow.mlir_opt
