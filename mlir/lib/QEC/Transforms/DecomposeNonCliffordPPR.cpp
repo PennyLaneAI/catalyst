@@ -116,8 +116,8 @@ void decomposePauliCorrectedPiOverEight(bool avoidPauliYMeasure, PPRotationOp op
             outPZQubits.pop_back();                                // [input qubits]
             auto pprPI2 =
                 rewriter.create<PPRotationOp>(loc, pauliP, 2, outPZQubits, ppmXX.getMres());
-            rewriter.create<DeallocQubitOp>(
-                loc, ppmXX.getOutQubits()); // TODO: Make sure multi qubit dealloc works
+            for (auto q : axillaryQubits)
+                rewriter.create<DeallocQubitOp>(loc, q);
             rewriter.create<scf::YieldOp>(loc, pprPI2.getOutQubits());
             // rewriter.replaceOp(op, pprPI2.getOutQubits());
         };
