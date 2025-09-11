@@ -44,174 +44,174 @@ static const std::string RESOURCE_NAMES[] = {"PauliX",
                                              "Adjoint(QubitUnitary)",
                                              "QubitUnitary"};
 
-static void ApplyGates(std::unique_ptr<ResourceTracker> &tracker)
+static void ApplyGates(ResourceTracker &tracker)
 {
-    if (tracker->GetNumWires() < 3) {
+    if (tracker.GetNumWires() < 3) {
         FAIL_CHECK("ApplyGates requires at least 3 wires to operate");
     }
 
     // Apply named gates to test all possible name modifiers (adj, controlled, etc.)
-    tracker->NamedOperation("PauliX", false, {0});
-    tracker->NamedOperation("T", true, {0});
-    tracker->NamedOperation("S", false, {0}, {2});
-    tracker->NamedOperation("S", false, {0}, {1, 2});
-    tracker->NamedOperation("T", true, {0}, {2});
-    tracker->NamedOperation("CNOT", false, {0, 1});
+    tracker.NamedOperation("PauliX", false, {0});
+    tracker.NamedOperation("T", true, {0});
+    tracker.NamedOperation("S", false, {0}, {2});
+    tracker.NamedOperation("S", false, {0}, {1, 2});
+    tracker.NamedOperation("T", true, {0}, {2});
+    tracker.NamedOperation("CNOT", false, {0, 1});
 
     // Apply matrix gates
-    tracker->MatrixOperation(false, {0});
-    tracker->MatrixOperation(false, {0}, {1});
-    tracker->MatrixOperation(true, {0});
-    tracker->MatrixOperation(true, {0}, {1, 2});
+    tracker.MatrixOperation(false, {0});
+    tracker.MatrixOperation(false, {0}, {1});
+    tracker.MatrixOperation(true, {0});
+    tracker.MatrixOperation(true, {0}, {1, 2});
 }
 } // namespace
 
 TEST_CASE("Test Resource Tracker Reset", "[resourcetracking]")
 {
     // Constructor should call Reset
-    std::unique_ptr<ResourceTracker> tracker = std::make_unique<ResourceTracker>();
+    ResourceTracker tracker;
 
-    CHECK(tracker->GetFilename() == "");
-    CHECK(tracker->GetNumGates() == 0);
-    CHECK(tracker->GetNumWires() == 0);
-    CHECK(tracker->GetDepth() == 0);
-    CHECK(tracker->GetComputeDepth() == false);
+    CHECK(tracker.GetFilename() == "");
+    CHECK(tracker.GetNumGates() == 0);
+    CHECK(tracker.GetNumWires() == 0);
+    CHECK(tracker.GetDepth() == 0);
+    CHECK(tracker.GetComputeDepth() == false);
 
-    tracker->SetResourcesFilename("foo.json");
-    tracker->SetComputeDepth(true);
-    tracker->SetMaxWires(10);
-    tracker->NamedOperation("PauliX", false, {0}, {});
-    tracker->NamedOperation("CNOT", false, {0, 1}, {});
+    tracker.SetResourcesFilename("foo.json");
+    tracker.SetComputeDepth(true);
+    tracker.SetMaxWires(10);
+    tracker.NamedOperation("PauliX", false, {0}, {});
+    tracker.NamedOperation("CNOT", false, {0, 1}, {});
 
     // Check that values are truly dirty
-    CHECK(tracker->GetFilename() == "foo.json");
-    CHECK(tracker->GetNumGates() != 0);
-    CHECK(tracker->GetNumWires() != 0);
-    CHECK(tracker->GetDepth() != 0);
-    CHECK(tracker->GetComputeDepth() == true);
+    CHECK(tracker.GetFilename() == "foo.json");
+    CHECK(tracker.GetNumGates() != 0);
+    CHECK(tracker.GetNumWires() != 0);
+    CHECK(tracker.GetDepth() != 0);
+    CHECK(tracker.GetComputeDepth() == true);
 
-    tracker->Reset();
+    tracker.Reset();
 
     // Ensure reset cleans values back to original
-    CHECK(tracker->GetNumGates() == 0);
-    CHECK(tracker->GetNumWires() == 0);
-    CHECK(tracker->GetDepth() == 0);
+    CHECK(tracker.GetNumGates() == 0);
+    CHECK(tracker.GetNumWires() == 0);
+    CHECK(tracker.GetDepth() == 0);
     // Filename and whether to compute depth should not be reset
-    CHECK(tracker->GetFilename() == "foo.json");
-    CHECK(tracker->GetComputeDepth() == true);
+    CHECK(tracker.GetFilename() == "foo.json");
+    CHECK(tracker.GetComputeDepth() == true);
 }
 
 TEST_CASE("Test Resource Tracker Wires", "[resourcetracking]")
 {
-    std::unique_ptr<ResourceTracker> tracker = std::make_unique<ResourceTracker>();
-    CHECK(tracker->GetNumWires() == 0);
+    ResourceTracker tracker;
+    CHECK(tracker.GetNumWires() == 0);
 
     // Call SetMaxWires with various different values
-    tracker->SetMaxWires(0);
-    CHECK(tracker->GetNumWires() == 0);
-    tracker->SetMaxWires(5);
-    CHECK(tracker->GetNumWires() == 5);
-    tracker->SetMaxWires(3);
-    CHECK(tracker->GetNumWires() == 5);
-    tracker->SetMaxWires(10);
-    CHECK(tracker->GetNumWires() == 10);
+    tracker.SetMaxWires(0);
+    CHECK(tracker.GetNumWires() == 0);
+    tracker.SetMaxWires(5);
+    CHECK(tracker.GetNumWires() == 5);
+    tracker.SetMaxWires(3);
+    CHECK(tracker.GetNumWires() == 5);
+    tracker.SetMaxWires(10);
+    CHECK(tracker.GetNumWires() == 10);
 }
 
 TEST_CASE("Test Resource Tracker Gate Types", "[resourcetracking]")
 {
-    std::unique_ptr<ResourceTracker> tracker = std::make_unique<ResourceTracker>();
-    tracker->SetMaxWires(5);
-    CHECK(tracker->GetNumGates() == 0);
+    ResourceTracker tracker;
+    tracker.SetMaxWires(5);
+    CHECK(tracker.GetNumGates() == 0);
     for (const auto &name : RESOURCE_NAMES) {
-        CHECK(tracker->GetNumGates(name) == 0);
+        CHECK(tracker.GetNumGates(name) == 0);
     }
 
     ApplyGates(tracker);
-    CHECK(tracker->GetNumGates() == 10);
+    CHECK(tracker.GetNumGates() == 10);
     for (const auto &name : RESOURCE_NAMES) {
-        CHECK(tracker->GetNumGates(name) == 1);
+        CHECK(tracker.GetNumGates(name) == 1);
     }
 
     // Apply the same gates again, should double the count
     ApplyGates(tracker);
-    CHECK(tracker->GetNumGates() == 20);
+    CHECK(tracker.GetNumGates() == 20);
     for (const auto &name : RESOURCE_NAMES) {
-        CHECK(tracker->GetNumGates(name) == 2);
+        CHECK(tracker.GetNumGates(name) == 2);
     }
 
-    CHECK(tracker->GetNumGates("NonExistentGate") == 0); // should not exist
+    CHECK(tracker.GetNumGates("NonExistentGate") == 0); // should not exist
 }
 
 TEST_CASE("Test Resource Tracker Gate Sizes", "[resourcetracking]")
 {
-    std::unique_ptr<ResourceTracker> tracker = std::make_unique<ResourceTracker>();
-    CHECK(tracker->GetNumGates() == 0);
+    ResourceTracker tracker;
+    CHECK(tracker.GetNumGates() == 0);
 
-    CHECK_THROWS(tracker->NamedOperation("PauliX", false, {10})); // Exceeds max wires of 0
-    tracker->SetMaxWires(5);
+    CHECK_THROWS(tracker.NamedOperation("PauliX", false, {10})); // Exceeds max wires of 0
+    tracker.SetMaxWires(5);
 
-    CHECK(tracker->GetNumGatesBySize(0) == 0);
-    CHECK(tracker->GetNumGatesBySize(1) == 0);
-    CHECK(tracker->GetNumGatesBySize(2) == 0);
-    CHECK(tracker->GetNumGatesBySize(3) == 0);
-    CHECK(tracker->GetNumGatesBySize(4) == 0);
+    CHECK(tracker.GetNumGatesBySize(0) == 0);
+    CHECK(tracker.GetNumGatesBySize(1) == 0);
+    CHECK(tracker.GetNumGatesBySize(2) == 0);
+    CHECK(tracker.GetNumGatesBySize(3) == 0);
+    CHECK(tracker.GetNumGatesBySize(4) == 0);
 
     ApplyGates(tracker);
-    CHECK(tracker->GetNumGates() == 10);
+    CHECK(tracker.GetNumGates() == 10);
 
-    CHECK(tracker->GetNumGatesBySize(0) == 0);
-    CHECK(tracker->GetNumGatesBySize(1) == 4);
-    CHECK(tracker->GetNumGatesBySize(2) == 4);
-    CHECK(tracker->GetNumGatesBySize(3) == 2);
-    CHECK(tracker->GetNumGatesBySize(4) == 0);
+    CHECK(tracker.GetNumGatesBySize(0) == 0);
+    CHECK(tracker.GetNumGatesBySize(1) == 4);
+    CHECK(tracker.GetNumGatesBySize(2) == 4);
+    CHECK(tracker.GetNumGatesBySize(3) == 2);
+    CHECK(tracker.GetNumGatesBySize(4) == 0);
 }
 
 TEST_CASE("Test Resource Tracker Depth", "[resourcetracking]")
 {
-    std::unique_ptr<ResourceTracker> tracker = std::make_unique<ResourceTracker>();
-    tracker->SetMaxWires(5);
-    CHECK(tracker->GetComputeDepth() == false);
-    CHECK(tracker->GetDepth() == 0);
+    ResourceTracker tracker;
+    tracker.SetMaxWires(5);
+    CHECK(tracker.GetComputeDepth() == false);
+    CHECK(tracker.GetDepth() == 0);
 
-    tracker->NamedOperation("PauliX", false, {0});
-    CHECK(tracker->GetDepth() == 0); // Should not change if depth tracking disabled
+    tracker.NamedOperation("PauliX", false, {0});
+    CHECK(tracker.GetDepth() == 0); // Should not change if depth tracking disabled
 
     // Enable depth tracking and test
-    tracker->Reset();
-    tracker->SetComputeDepth(true);
-    tracker->SetMaxWires(5);
-    CHECK(tracker->GetComputeDepth() == true);
-    CHECK(tracker->GetDepth() == 0);
+    tracker.Reset();
+    tracker.SetComputeDepth(true);
+    tracker.SetMaxWires(5);
+    CHECK(tracker.GetComputeDepth() == true);
+    CHECK(tracker.GetDepth() == 0);
 
-    tracker->NamedOperation("PauliX", false, {0});
-    CHECK(tracker->GetDepth() == 1);
+    tracker.NamedOperation("PauliX", false, {0});
+    CHECK(tracker.GetDepth() == 1);
 
-    tracker->NamedOperation("CNOT", false, {0, 1});
-    tracker->NamedOperation("CNOT", false, {1, 2});
-    CHECK(tracker->GetDepth() == 3);
+    tracker.NamedOperation("CNOT", false, {0, 1});
+    tracker.NamedOperation("CNOT", false, {1, 2});
+    CHECK(tracker.GetDepth() == 3);
 
     for (size_t i = 0; i < 5; i++) {
-        tracker->NamedOperation("PauliX", false, {3});
+        tracker.NamedOperation("PauliX", false, {3});
     }
-    CHECK(tracker->GetDepth() == 5);
+    CHECK(tracker.GetDepth() == 5);
 
-    tracker->NamedOperation("CNOT", false, {0, 1});
-    CHECK(tracker->GetDepth() == 5);
+    tracker.NamedOperation("CNOT", false, {0, 1});
+    CHECK(tracker.GetDepth() == 5);
 
-    tracker->NamedOperation("CNOT", false, {2, 3});
-    CHECK(tracker->GetDepth() == 6);
-    tracker->NamedOperation("CNOT", false, {1, 2});
-    CHECK(tracker->GetDepth() == 7);
+    tracker.NamedOperation("CNOT", false, {2, 3});
+    CHECK(tracker.GetDepth() == 6);
+    tracker.NamedOperation("CNOT", false, {1, 2});
+    CHECK(tracker.GetDepth() == 7);
 
     // Check that reset works as expected
-    tracker->Reset();
-    CHECK(tracker->GetDepth() == 0); // Should be reset
+    tracker.Reset();
+    CHECK(tracker.GetDepth() == 0); // Should be reset
 
-    tracker->SetComputeDepth(false);
-    tracker->SetMaxWires(5);
+    tracker.SetComputeDepth(false);
+    tracker.SetMaxWires(5);
 
-    tracker->NamedOperation("PauliX", false, {0});
-    CHECK(tracker->GetDepth() == 0); // Should not change if depth tracking disabled
+    tracker.NamedOperation("PauliX", false, {0});
+    CHECK(tracker.GetDepth() == 0); // Should not change if depth tracking disabled
 }
 
 TEST_CASE("Test Resource Tracker Printing", "[resourcetracking]")
@@ -225,22 +225,22 @@ TEST_CASE("Test Resource Tracker Printing", "[resourcetracking]")
         FAIL("Failed to open resource usage file for writing."); // LCOV_EXCL_LINE
     }
 
-    std::unique_ptr<ResourceTracker> tracker = std::make_unique<ResourceTracker>();
-    tracker->SetComputeDepth(true);
-    CHECK(tracker->GetFilename() == "");
-    CHECK(tracker->GetNumGates() == 0);
-    CHECK(tracker->GetNumWires() == 0);
+    ResourceTracker tracker;
+    tracker.SetComputeDepth(true);
+    CHECK(tracker.GetFilename() == "");
+    CHECK(tracker.GetNumGates() == 0);
+    CHECK(tracker.GetNumWires() == 0);
 
-    tracker->SetMaxWires(4);
-    CHECK(tracker->GetNumWires() == 4);
+    tracker.SetMaxWires(4);
+    CHECK(tracker.GetNumWires() == 4);
 
     ApplyGates(tracker);
 
-    CHECK(tracker->GetNumGates() == 10);
-    CHECK(tracker->GetNumWires() == 4);
+    CHECK(tracker.GetNumGates() == 10);
+    CHECK(tracker.GetNumWires() == 4);
 
     // Capture resources usage
-    tracker->PrintResourceUsageToFile(resource_file_w);
+    tracker.PrintResourceUsageToFile(resource_file_w);
     fclose(resource_file_w);
 
     // Open the file of resource data
@@ -288,26 +288,26 @@ TEST_CASE("Test Resource Tracker Printing", "[resourcetracking]")
 
 TEST_CASE("Test Resource Tracker WriteOut", "[resourcetracking]")
 {
-    std::unique_ptr<ResourceTracker> tracker = std::make_unique<ResourceTracker>();
-    CHECK(tracker->GetFilename() == "");
-    CHECK(tracker->GetNumGates() == 0);
-    CHECK(tracker->GetNumWires() == 0);
+    ResourceTracker tracker;
+    CHECK(tracker.GetFilename() == "");
+    CHECK(tracker.GetNumGates() == 0);
+    CHECK(tracker.GetNumWires() == 0);
 
-    tracker->SetMaxWires(4);
-    CHECK(tracker->GetNumWires() == 4);
+    tracker.SetMaxWires(4);
+    CHECK(tracker.GetNumWires() == 4);
 
     ApplyGates(tracker);
 
-    CHECK(tracker->GetNumGates() == 10);
-    CHECK(tracker->GetNumWires() == 4);
+    CHECK(tracker.GetNumGates() == 10);
+    CHECK(tracker.GetNumWires() == 4);
 
     // Check that writing out the normal way resets
-    tracker->WriteOut();
+    tracker.WriteOut();
 
-    CHECK(tracker->GetNumGates() == 0);
-    CHECK(tracker->GetNumWires() == 0);
+    CHECK(tracker.GetNumGates() == 0);
+    CHECK(tracker.GetNumWires() == 0);
 
-    std::string filename = tracker->GetFilename();
+    std::string filename = tracker.GetFilename();
     CHECK(filename != "");
     CHECK(filename.find("__pennylane_resources_data_") != std::string::npos);
     CHECK(filename.find(".json") != std::string::npos);
