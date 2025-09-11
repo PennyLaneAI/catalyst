@@ -48,6 +48,13 @@
   print(circuit_2())
   ```
 
+  which produces either 42 or 43 with equal probability (approximately 50% each)
+
+  ```pycon
+  [43 42 42 42 43 42 43 42 43 42]
+  ```
+
+
 * Improve the pass `--ppm-specs` to count the depth of PPRs and PPMs in the circuit.
   [(#2014)](https://github.com/PennyLaneAI/catalyst/pull/2014)
 
