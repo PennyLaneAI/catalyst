@@ -411,7 +411,7 @@ def _validate_one_shot_measurements(mcm_config, tape: qml.tape.QuantumTape, qnod
         # Check if the measurement is supported with shot-vector
         if has_shot_vector and not isinstance(m, SampleMP):
             raise NotImplementedError(
-                f"Measurement {type(m).__name__} is not supported a shot-vector. "
+                f"Measurement {type(m).__name__} does not support shot-vectors. "
                 "Use qml.sample() instead."
             )
 
