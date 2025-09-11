@@ -419,7 +419,7 @@ def _validate_one_shot_measurements(mcm_config, tape: qml.tape.QuantumTape, qnod
         if not has_wires and isinstance(m, (SampleMP, CountsMP)) and (m.wires.tolist() == []):
             raise NotImplementedError(
                 f"Measurement {type(m).__name__} with empty wires is not supported with "
-                "dynamic wires in one-shot mode. Please specify constant wires on device."
+                "dynamic wires in one-shot mode. Please specify a constant number of wires on the device."
             )
 
 
