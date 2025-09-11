@@ -245,7 +245,7 @@ def test_ppr_to_ppm():
 # FOR T gate
 # CHECK: qec.fabricate  magic
 # CHECK: qec.ppm ["Z", "Z"] {{.+}}, {{.+}}
-# CHECK: qec.select.ppm({{.+}}, ["Y"], ["X"]) 
+# CHECK: qec.select.ppm({{.+}}, ["Y"], ["X"])
 # CHECK: qec.ppr ["Z"](2) {{.+}} cond({{.+}})
 
 # FOR CNOT gate
@@ -269,9 +269,7 @@ def test_clifford_to_ppm():
     @qjit(pipelines=pipe, target="mlir")
     def test_clifford_to_ppm_workflow():
 
-        @ppm_compilation(
-            decompose_method="auto-corrected"
-        )
+        @ppm_compilation(decompose_method="auto-corrected")
         @qml.qnode(qml.device("null.qubit", wires=2))
         def cir_clifford_to_ppm():
             qml.H(0)

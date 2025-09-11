@@ -443,14 +443,15 @@ def test_ppr_to_ppm_pauli_corrected():
     optimized_ir = test_ppr_to_ppm_workflow.mlir_opt
     assert 'transform.apply_registered_pass "decompose-non-clifford-ppr"' not in optimized_ir
     assert 'transform.apply_registered_pass "decompose-clifford-ppr"' not in optimized_ir
-    assert "qec.select.ppm" in optimized_ir # Make sure we use the select PPM to implement the reactive measurement
+    assert (
+        "qec.select.ppm" in optimized_ir
+    )  # Make sure we use the select PPM to implement the reactive measurement
 
     ppm_specs_output = ppm_specs(test_ppr_to_ppm_workflow)
     assert ppm_specs_output["f_0"]["num_of_ppm"] == 17
     assert ppm_specs_output["f_0"]["logical_qubits"] == 2
     assert ppm_specs_output["f_0"]["pi2_ppr"] == 8
     assert ppm_specs_output["f_0"]["max_weight_pi2"] == 2
-
 
 
 def test_commute_ppr_and_merge_ppr_ppm_with_max_pauli_size():
@@ -540,9 +541,7 @@ def test_clifford_to_ppm():
                 qml.T(idx)
                 qml.T(idx + 1)
 
-        @ppm_compilation(
-            decompose_method="pauli-corrected", max_pauli_size=2
-        )
+        @ppm_compilation(decompose_method="pauli-corrected", max_pauli_size=2)
         @qml.qnode(qml.device("lightning.qubit", wires=2))
         def g():
             for idx in range(5):
@@ -556,7 +555,7 @@ def test_clifford_to_ppm():
     assert 'transform.apply_registered_pass "ppm-compilation"' in test_clifford_to_ppm_workflow.mlir
     optimized_ir = test_clifford_to_ppm_workflow.mlir_opt
     assert 'transform.apply_registered_pass "ppm-compilation"' not in optimized_ir
-    assert 'qec.select.ppm' in optimized_ir
+    assert "qec.select.ppm" in optimized_ir
     assert 'qec.ppm ["X", "Z", "Z"]' in optimized_ir
     assert 'qec.ppm ["Z", "Y"]' in optimized_ir
     assert 'qec.ppr ["X", "Z"](2)' in optimized_ir
