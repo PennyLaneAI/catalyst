@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <memory>
+#include <utility> // std::move
 #include <vector>
 
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -63,16 +64,20 @@ struct GradientLoweringPass : impl::GradientLoweringPassBase<GradientLoweringPas
             return signalPassFailure();
         }
 
+        // Need to remove unused allocs left during cloning.
+        quantum::removeUnunsedAllocs(getOperation());
+
         // Guarantee that functions intended to be free of quantum ops are indeed so after folding.
         for (Region &region : getOperation()->getRegions()) {
             for (Operation &op : region.getOps()) {
-                if (isa<func::FuncOp>(op) && op.hasAttr("QuantumFree"))
+                if (isa<func::FuncOp>(op) && op.hasAttr("QuantumFree")) {
                     if (failed(quantum::verifyQuantumFree(cast<func::FuncOp>(op)))) {
                         op.emitOpError() << "cloned during the gradient pass is not free of "
                                             "quantum ops:\n"
                                          << op;
                         return signalPassFailure();
                     }
+                }
             }
         }
     }

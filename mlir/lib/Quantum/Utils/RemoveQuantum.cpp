@@ -13,12 +13,14 @@
 // limitations under the License.
 
 #include <deque>
+#include <utility> // std::move
 
 #include "llvm/ADT/SmallPtrSet.h"
 
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
@@ -28,6 +30,19 @@ using namespace mlir;
 
 namespace catalyst {
 namespace quantum {
+
+void removeUnunsedAllocs(Operation *op)
+{
+    // Remove all unused quantum.alloc operations.
+
+    MLIRContext *ctx = op->getContext();
+    RewritePatternSet removeUnunsedAllocPatterns(ctx);
+    AllocOp::getCanonicalizationPatterns(removeUnunsedAllocPatterns, ctx);
+
+    if (failed(applyPatternsGreedily(op, std::move(removeUnunsedAllocPatterns)))) {
+        op->emitOpError("Failed to canonicalize quantum.alloc operation.");
+    }
+}
 
 void removeQuantumMeasurements(func::FuncOp &function, PatternRewriter &rewriter)
 {
