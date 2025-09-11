@@ -828,7 +828,7 @@ def ppr_to_ppm(qnode=None, *, decompose_method="pauli-corrected", avoid_y_measur
         @to_ppr
         @commute_ppr
         @merge_ppr_ppm
-        @ppr_to_ppm(default_method="auto-corrected")
+        @ppr_to_ppm(decompose_method="auto-corrected")
         @qml.qnode(qml.device("null.qubit", wires=2))
         def circuit():
             qml.H(0)

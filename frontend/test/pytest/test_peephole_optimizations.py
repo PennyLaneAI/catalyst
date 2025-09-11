@@ -555,7 +555,7 @@ def test_clifford_to_ppm():
     assert 'transform.apply_registered_pass "ppm-compilation"' in test_clifford_to_ppm_workflow.mlir
     optimized_ir = test_clifford_to_ppm_workflow.mlir_opt
     assert 'transform.apply_registered_pass "ppm-compilation"' not in optimized_ir
-    assert "qec.select.ppm" in optimized_ir
+    assert 'qec.select.ppm' in optimized_ir
     assert 'qec.ppm ["X", "Z", "Z"]' in optimized_ir
     assert 'qec.ppm ["Z", "Y"]' in optimized_ir
     assert 'qec.ppr ["X", "Z"](2)' in optimized_ir

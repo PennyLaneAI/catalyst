@@ -12,13 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <llvm/ADT/SmallVector.h>
-#include <llvm/ADT/StringRef.h>
 #define DEBUG_TYPE "decompose-non-clifford-ppr"
-#include "llvm/Support/Debug.h"
-#include "llvm/Support/Errc.h"
-#include <mlir/Dialect/Arith/IR/Arith.h> // for arith::XOrIOp and arith::ConstantOp
-#include <mlir/IR/Builders.h>
+#include "mlir/Dialect/Arith/IR/Arith.h" // for arith::XOrIOp and arith::ConstantOp
+#include "mlir/IR/Builders.h"
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/StringRef.h"
 
 #include "Quantum/IR/QuantumOps.h"
 
@@ -66,7 +64,7 @@ LogicalInitKind getMagicState(QECOpInterface op)
 /// - If P⊗Z measurement yields -1 then apply Y measurement, otherwise apply X measurement
 ///   * The measurement results are stored as i1 values, -1 is true and 1 is false
 /// - If the X or Y measurement yields -1, apply P(π/2) on the input qubits
-void decompose_pauli_corrected_pi_over_eight(PPRotationOp op, PatternRewriter &rewriter)
+void decomposePauliCorrectedPiOverEight(PPRotationOp op, PatternRewriter &rewriter)
 {
     auto loc = op.getLoc();
     // We always initialize the magic state here, not the conjugate.
@@ -131,8 +129,8 @@ void decompose_pauli_corrected_pi_over_eight(PPRotationOp op, PatternRewriter &r
 /// - If P⊗Z measurement yields -1 then apply X, otherwise apply Z
 ///   * The measurement results are stored as i1 values, -1 is true and 1 is false
 /// - If Z⊗Y and X measurement yield different result, then apply P(π/2) on the input qubits
-void decompose_auto_corrected_pi_over_eight(bool avoidPauliYMeasure, PPRotationOp op,
-                                            PatternRewriter &rewriter)
+void decomposeAutoCorrectedPiOverEight(bool avoidPauliYMeasure, PPRotationOp op,
+                                       PatternRewriter &rewriter)
 {
     auto loc = op.getLoc();
 
@@ -206,7 +204,7 @@ void decompose_auto_corrected_pi_over_eight(bool avoidPauliYMeasure, PPRotationO
 /// - If P⊗Z measurement yields -1 then apply P(π/4)
 ///   * The measurement results are stored as i1 values, -1 is true and 1 is false
 /// - If X measurement yields -1 then apply P(π/2)
-void decompose_inject_magic_state_pi_over_eight(PPRotationOp op, PatternRewriter &rewriter)
+void decomposeInjectMagicStatePiOverEight(PPRotationOp op, PatternRewriter &rewriter)
 {
     auto loc = op.getLoc();
 
@@ -260,13 +258,13 @@ struct DecomposeNonCliffordPPR : public OpRewritePattern<PPRotationOp> {
         if (op.isNonClifford() && !op.getCondition()) {
             switch (method) {
             case DecomposeMethod::AutoCorrected:
-                decompose_auto_corrected_pi_over_eight(avoidPauliYMeasure, op, rewriter);
+                decomposeAutoCorrectedPiOverEight(avoidPauliYMeasure, op, rewriter);
                 break;
             case DecomposeMethod::CliffordCorrected:
-                decompose_inject_magic_state_pi_over_eight(op, rewriter);
+                decomposeInjectMagicStatePiOverEight(op, rewriter);
                 break;
             case DecomposeMethod::PauliCorrected:
-                decompose_pauli_corrected_pi_over_eight(op, rewriter);
+                decomposePauliCorrectedPiOverEight(op, rewriter);
                 break;
             }
             return success();
