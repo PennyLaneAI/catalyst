@@ -117,4 +117,12 @@ def CountPPMSpecsPass : Pass<"ppm-specs"> {
     let summary = "Count specs in Pauli Product Measurement operations.";
 }
 
+def PartitionLayersPass : Pass<"partition-layers"> {
+    let summary = "Partition layers of Pauli Product Measurement operations.";
+}
+
+def TLayerReductionPass : Pass<"t-layer-reduction"> {
+    let summary = "Reduce T layers to PPR operations.";
+}
+
 #endif // QEC_PASSES

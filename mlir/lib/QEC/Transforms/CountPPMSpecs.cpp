@@ -25,6 +25,9 @@
 
 #include "Catalyst/Utils/SCFUtils.h"
 #include "QEC/IR/QECDialect.h"
+#include "QEC/IR/QECOpInterfaces.h"
+#include "QEC/Utils/QECLayer.h"
+#include "QEC/Utils/QECOpUtils.h"
 #include "Quantum/IR/QuantumOps.h"
 
 using namespace llvm;
@@ -44,7 +47,7 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
 
     LogicalResult
     countLogicalQubit(Operation *op,
-                      llvm::DenseMap<StringRef, llvm::DenseMap<StringRef, int>> *PPMSpecs)
+                      llvm::DenseMap<StringRef, llvm::DenseMap<StringRef, int>> &PPMSpecs)
     {
         uint64_t numQubits = cast<quantum::AllocOp>(op).getNqubitsAttr().value_or(0);
 
@@ -53,12 +56,12 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
         }
 
         auto parentFuncOp = op->getParentOfType<func::FuncOp>();
-        (*PPMSpecs)[parentFuncOp.getName()]["num_logical_qubits"] = numQubits;
+        PPMSpecs[parentFuncOp.getName()]["logical_qubits"] = numQubits;
         return success();
     }
 
     LogicalResult countPPM(qec::PPMeasurementOp op,
-                           llvm::DenseMap<StringRef, llvm::DenseMap<StringRef, int>> *PPMSpecs)
+                           llvm::DenseMap<StringRef, llvm::DenseMap<StringRef, int>> &PPMSpecs)
     {
         if (isOpInIfOp(op) || isOpInWhileOp(op)) {
             return op->emitOpError(
@@ -76,13 +79,13 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
             return op->emitOpError(
                 "PPM statistics is not available when there are dynamically sized for loops.");
         }
-        (*PPMSpecs)[parentFuncOp.getName()]["num_of_ppm"] += forLoopMultiplier;
+        PPMSpecs[parentFuncOp.getName()]["num_of_ppm"] += forLoopMultiplier;
         return success();
     }
 
     LogicalResult countPPR(qec::PPRotationOp op,
-                           llvm::DenseMap<StringRef, llvm::DenseMap<StringRef, int>> *PPMSpecs,
-                           llvm::BumpPtrAllocator *stringAllocator)
+                           llvm::DenseMap<StringRef, llvm::DenseMap<StringRef, int>> &PPMSpecs,
+                           llvm::BumpPtrAllocator &stringAllocator)
     {
         if (isOpInIfOp(op) || isOpInWhileOp(op)) {
             return op->emitOpError(
@@ -93,9 +96,9 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
         auto PauliProductAttr = op.getPauliProductAttr();
         auto parentFuncOp = op->getParentOfType<func::FuncOp>();
         StringRef funcName = parentFuncOp.getName();
-        llvm::StringSaver saver(*stringAllocator);
+        llvm::StringSaver saver(stringAllocator);
         StringRef numRotationKindKey =
-            saver.save("num_pi" + std::to_string(abs(rotationKind)) + "_gates");
+            saver.save("pi" + std::to_string(abs(rotationKind)) + "_ppr");
         StringRef maxWeightRotationKindKey =
             saver.save("max_weight_pi" + std::to_string(abs(rotationKind)));
 
@@ -108,48 +111,122 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
             return op->emitOpError(
                 "PPM statistics is not available when there are dynamically sized for loops.");
         }
-        (*PPMSpecs)[funcName][numRotationKindKey] += forLoopMultiplier;
+        PPMSpecs[funcName][numRotationKindKey] += forLoopMultiplier;
 
-        (*PPMSpecs)[funcName][maxWeightRotationKindKey] =
-            std::max((*PPMSpecs)[funcName][maxWeightRotationKindKey],
+        PPMSpecs[funcName][maxWeightRotationKindKey] =
+            std::max(PPMSpecs[funcName][maxWeightRotationKindKey],
                      static_cast<int>(PauliProductAttr.size()));
         return success();
+    }
+
+    bool commuteToLayer(QECOpInterface rhsOp, QECLayer &lhsLayer)
+    {
+        for (auto lhsOp : lhsLayer.getOps()) {
+            if (!commutes(rhsOp, lhsOp)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    bool isPPR(QECOpInterface op) { return isa<qec::PPRotationOp>(op); }
+    bool isPPM(QECOpInterface op) { return isa<qec::PPMeasurementOp>(op); }
+
+    // Check if two ops have the same rotation kind.
+    bool equalTypes(QECOpInterface lhsOp, QECOpInterface rhsOp)
+    {
+        return (isPPR(lhsOp) == isPPR(rhsOp) || isPPM(lhsOp) == isPPM(rhsOp));
+    }
+
+    // Add op to current layer if it commutes with the last op in the layer and has the same type.
+    bool canAddToCurrentLayer(QECOpInterface op, QECLayer &currentLayer)
+    {
+        if (currentLayer.empty())
+            return true;
+
+        auto lastOp = currentLayer.getOps().back();
+        return equalTypes(lastOp, op) && commuteToLayer(op, currentLayer);
+    }
+
+    void countDepths(std::vector<QECLayer> &layers,
+                     llvm::DenseMap<StringRef, llvm::DenseMap<StringRef, int>> &PPMSpecs,
+                     llvm::BumpPtrAllocator &stringAllocator)
+    {
+        for (auto &layer : layers) {
+            assert(!layer.empty() && "Layer is empty");
+
+            auto op = layer.getOps().back();
+            int16_t absRk = std::abs(static_cast<int16_t>(op.getRotationKind()));
+            auto parentFuncOp = op->getParentOfType<func::FuncOp>();
+            StringRef funcName = parentFuncOp.getName();
+            llvm::StringSaver saver(stringAllocator);
+            StringRef key = isPPR(op) ? saver.save("depth_pi" + std::to_string(absRk) + "_ppr")
+                                      : saver.save("depth_ppm");
+
+            PPMSpecs[funcName][key]++;
+        }
     }
 
     LogicalResult printSpecs()
     {
         llvm::BumpPtrAllocator stringAllocator;
         llvm::DenseMap<StringRef, llvm::DenseMap<StringRef, int>> PPMSpecs;
+
+        QECLayerContext layerContext;
+        QECLayer currentLayer(&layerContext);
+        std::vector<QECLayer> layers;
+
         // Walk over all operations in the IR (could be ModuleOp or FuncOp)
         WalkResult wr = getOperation()->walk([&](Operation *op) {
+            // Count Depth
+            if (auto qecOp = dyn_cast<QECOpInterface>(op)) {
+                if (!canAddToCurrentLayer(qecOp, currentLayer)) {
+                    layers.emplace_back(std::move(currentLayer));
+                    currentLayer = QECLayer(&layerContext);
+                }
+                currentLayer.insertToLayer(qecOp);
+            }
+
+            // Count Logical Qubit
             if (isa<quantum::AllocOp>(op)) {
-                if (failed(countLogicalQubit(op, &PPMSpecs))) {
+                if (failed(countLogicalQubit(op, PPMSpecs))) {
                     return WalkResult::interrupt();
                 }
                 return WalkResult::advance();
             }
 
+            // Count PPMs
             else if (isa<qec::PPMeasurementOp>(op)) {
-                if (failed(countPPM(cast<qec::PPMeasurementOp>(op), &PPMSpecs))) {
+                if (failed(countPPM(cast<qec::PPMeasurementOp>(op), PPMSpecs))) {
                     return WalkResult::interrupt();
                 }
                 return WalkResult::advance();
             }
 
+            // Count PPRs
             else if (isa<qec::PPRotationOp>(op)) {
-                if (failed(countPPR(cast<qec::PPRotationOp>(op), &PPMSpecs, &stringAllocator))) {
+                if (failed(countPPR(cast<qec::PPRotationOp>(op), PPMSpecs, stringAllocator))) {
                     return WalkResult::interrupt();
                 }
                 return WalkResult::advance();
             }
+
+            // Skip other ops
             else {
-                return WalkResult::skip();
+                return WalkResult::advance();
             }
         });
 
         if (wr.wasInterrupted()) {
             return failure();
         }
+
+        // Add the last layer if it is not empty.
+        if (!currentLayer.empty()) {
+            layers.emplace_back(std::move(currentLayer));
+        }
+
+        countDepths(layers, PPMSpecs, stringAllocator);
 
         json PPMSpecsJson = PPMSpecs;
         llvm::outs() << PPMSpecsJson.dump(4)

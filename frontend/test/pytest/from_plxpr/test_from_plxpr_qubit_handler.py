@@ -13,36 +13,37 @@
 # limitations under the License.
 
 """
-This module tests the from_plxpr QregManager object.
+This module tests the from_plxpr QubitHandler.
 
 Quoted from the object's docstring:
 
-    With the above in mind, this `QregManager` class promises the following:
+    With the above in mind, this `QubitHandler` class promises the following:
     1. An instance of this class will always be tied to one root qreg value.
     2. At any moment during the from_plxpr conversion:
-       - `QregManager.get()` returns the current catalyst qreg SSA value for the managed
+       - `QubitHandler.get()` returns the current catalyst qreg SSA value for the managed
           root register on that instance;
-       - `QregManager[i]` returns the current catalyst qubit SSA value for the i-th index
+       - `QubitHandler[i]` returns the current catalyst qubit SSA value for the i-th index
           on the managed root register on that instance. If none exists, a new qubit will be
           extracted.
 
     To achieve the above, users of this class are expected to:
     1. Initialize an instance with the qreg SSA value from a new allocation or a new block argument;
     2. Whenever a new meta-op/op is bind-ed, update the current qreg/qubit SSA value with:
-       - `QubitManager.set(new_qreg_value)`
-       - `QubitManager[i] = new_qubit_value`
+       - `QubitHandler.set(new_qreg_value)`
+       - `QubitHandler[i] = new_qubit_value`
 """
 # pylint: disable=use-implicit-booleaness-not-comparison
 import textwrap
 
 import pytest
 from jax._src.core import Literal
+from jax._src.interpreters.partial_eval import DynamicJaxprTracer
 from jax.api_util import debug_info as jdb
 from jax.core import set_current_trace, take_current_trace
 from jax.extend.core import Primitive
 from jax.interpreters.partial_eval import DynamicJaxprTrace
 
-from catalyst.from_plxpr.qreg_manager import QregManager
+from catalyst.from_plxpr.qubit_handler import QubitHandler
 from catalyst.jax_primitives import AbstractQbit, AbstractQreg, qalloc_p, qextract_p
 from catalyst.utils.exceptions import CompileError
 
@@ -55,7 +56,7 @@ def launch_empty_jaxpr_interpreter():
     """
     # Note that DynamicJaxprTrace requires a `debug_info` object
     # We just pass an empty one
-    trace = DynamicJaxprTrace(debug_info=jdb("qreg_manager_from_plxpr_test", None, [], {}))
+    trace = DynamicJaxprTrace(debug_info=jdb("qubit_handler_from_plxpr_test", None, [], {}))
     with set_current_trace(trace):
         yield
     del trace
@@ -84,71 +85,151 @@ def _qubit_mock_op_abstract_eval(*qubits):
     return [AbstractQbit()] * len(qubits)
 
 
-def _interpret_operation(wires, qreg_manager):
+def _interpret_operation(wires, qubit_handler):
     """
     Convenience helper for binding a mock gate.
     Note that this helper follows plxpr semantics, so gate targets are only specified
     by a global wire index.
     """
-    in_qubits = [qreg_manager[w] for w in wires]
+    in_qubits = [qubit_handler[w] for w in wires]
     out_qubits = qubit_mock_op_p.bind(*in_qubits)
 
     # Update the qubit values.
     # This is user code. This is point 2 of the "users are expected to" in the
-    # QregManager specs.
+    # QubitHandler specs.
     for wire, out_qubit in zip(wires, out_qubits):
-        qreg_manager[wire] = out_qubit
+        qubit_handler[wire] = out_qubit
 
     return out_qubits
 
 
-class TestQregGetSet:
-    """Unit test for getter and setter for the managed qreg"""
+class TestExtractInsertWithNoQreg:
+    """Test that the correct CompileErrors are raised when no qreg is set"""
+
+    def test_errors_noqreg(self):
+        """Test that extracting a qubit from a QubitHandler raises NotImplementedError"""
+        qbits = [AbstractQbit(), AbstractQbit()]
+        qubit_handler = QubitHandler(qbits)
+        assert qubit_handler.abstract_qreg_val is None
+
+        with pytest.raises(CompileError, match="Cannot extract a qubit at index 0"):
+            qubit_handler.extract(0)
+
+        with pytest.raises(CompileError, match="Cannot insert a qubit at index 100"):
+            qubit_handler.insert(100, "monkey_mock_qubit")
+
+        with pytest.raises(CompileError, match="Cannot insert qubits back into a qreg"):
+            qubit_handler.insert_all_dangling_qubits()
+
+        with pytest.raises(CompileError, match="Cannot insert dynamic qubits back into a qreg"):
+            qubit_handler.insert_dynamic_qubits(0)
+
+
+class TestQubitHandlerInitGetSet:
+    """Unit test for getter and setter for QubitHandler"""
 
     def test_getter_setter(self):
-        """Test getter and setter"""
-        qreg_manager = QregManager(None)
-        qreg_manager.set("monkey_mock_qreg")
-        assert qreg_manager.get() == "monkey_mock_qreg"
-        assert qreg_manager.get() == "monkey_mock_qreg"  # test that getter does not set
+        """Test getter and setter with a qreg"""
+        qreg = qalloc_p.bind(42)
+        qubit_handler = QubitHandler(qreg)
+        qubit_handler.set("monkey_mock_qreg")
+        assert qubit_handler.get() == "monkey_mock_qreg"
+        assert qubit_handler.get() == "monkey_mock_qreg"  # test that getter does not set
 
-        qreg_manager.set("donkey_mock_qreg")
-        assert qreg_manager.get() == "donkey_mock_qreg"
+        qubit_handler.set("donkey_mock_qreg")
+        assert qubit_handler.get() == "donkey_mock_qreg"
+
+    def test_getter_setter_no_qreg(self):
+        """Test getter and setter when no qreg is set"""
+        qubit_handler = QubitHandler([AbstractQbit(), AbstractQbit()])
+
+        assert isinstance(qubit_handler.get(), list)
+        assert all(isinstance(q, AbstractQbit) for q in qubit_handler.get())
+        assert len(qubit_handler.get()) == 2
+
+        qubit_handler.set("monkey_mock_qubit")
+        assert qubit_handler.get() == []
+
+    def test_getitem_setitem(self):
+        """Test getting and setting items"""
+
+        q0 = AbstractQbit()
+        qubit_handler = QubitHandler([q0])
+
+        assert qubit_handler[q0] == q0
+
+        q1 = AbstractQbit()
+        qubit_handler[q1] = q1
+        assert qubit_handler[q1] == q1
+
+        qubit_handler[0] = q1
+        assert qubit_handler[0] == q1
 
 
-class TestQregManagerInitialization:
-    """Test initialization of QregManager objects."""
+class TestQubitHandlerInitialization:
+    """Test initialization of QubitHandler objects."""
+
+    def test_init_with_qreg(self):
+        """Test initialization of QubitHandler with a qreg"""
+        qreg = qalloc_p.bind(42)
+        qubit_handler = QubitHandler(qreg)
+
+        assert qubit_handler.get() is qreg
+        assert qubit_handler.wire_map == {}
+
+        # Check that the qreg SSA value is correctly set
+        assert isinstance(qubit_handler.get(), DynamicJaxprTracer)
+
+    def test_init_with_qubits(self):
+        """Test initialization of QubitHandler with a list of qubits"""
+        qubits = [AbstractQbit() for _ in range(3)]
+        qubit_handler = QubitHandler(qubits)
+
+        assert isinstance(qubit_handler.get(), list)
+        assert all(isinstance(q, AbstractQbit) for q in qubit_handler.get())
+
+        assert qubit_handler.get() == qubits
+
+    def test_init_with_empty(self):
+        """Test initialization of QubitHandler with an empty list"""
+        qubit_handler = QubitHandler([])
+
+        assert qubit_handler.get() == []
+        assert qubit_handler.wire_map == {}
+
+        # Check that the qreg SSA value is None
+        assert qubit_handler.abstract_qreg_val == None
 
     def test_new_alloc(self):
         """Test qregs from new alloc"""
         qreg = qalloc_p.bind(42)
-        qreg_manager = QregManager(qreg)
-        assert qreg_manager.get() is qreg
-        assert qreg_manager.wire_map == {}
+        qubit_handler = QubitHandler(qreg)
+        assert qubit_handler.get() is qreg
+        assert qubit_handler.wire_map == {}
 
     def test_scope_arg(self):
         """Test qregs from a scope argument"""
 
         def f(qreg):
-            qreg_manager = QregManager(qreg)
-            assert qreg_manager.get() is qreg
-            assert qreg_manager.wire_map == {}
+            qubit_handler = QubitHandler(qreg)
+            assert qubit_handler.get() is qreg
+            assert qubit_handler.wire_map == {}
 
         outer_scope_qreg = qalloc_p.bind(42)
         f(outer_scope_qreg)
 
 
 class TestQubitValues:
-    """Test QregManager correctly updates qubit SSA values."""
+    """Test QubitHandler correctly updates qubit SSA values."""
 
     def test_auto_extract(self):
         """Test that a new qubit is extracted when indexing into a new wire"""
         qreg = qalloc_p.bind(42)
-        qreg_manager = QregManager(qreg)
-        new_qubit = qreg_manager[0]
+        qubit_handler = QubitHandler(qreg)
+        new_qubit = qubit_handler[0]
 
-        assert list(qreg_manager.wire_map.keys()) == [0]
-        assert qreg_manager[0] is new_qubit
+        assert list(qubit_handler.wire_map.keys()) == [0]
+        assert qubit_handler[0] is new_qubit
         with take_current_trace() as trace:
             # Check that an extract primitive is added
             assert trace.frame.eqns[-1].primitive is qextract_p
@@ -162,65 +243,74 @@ class TestQubitValues:
     def test_no_overwriting_extract(self):
         """Test that no new qubit is extracted when indexing into an existing wire"""
         qreg = qalloc_p.bind(42)
-        qreg_manager = QregManager(qreg)
-        new_qubit = qreg_manager[0]
-        not_a_new_qubit = qreg_manager[0]
+        qubit_handler = QubitHandler(qreg)
+        new_qubit = qubit_handler[0]
+        not_a_new_qubit = qubit_handler[0]
 
         assert not_a_new_qubit is new_qubit
 
     def test_simple_gate(self):
         """Test a simple qubit opertaion"""
         qreg = qalloc_p.bind(42)
-        qreg_manager = QregManager(qreg)
+        qubit_handler = QubitHandler(qreg)
 
         wires = [0, 1]
-        out_qubits = _interpret_operation(wires, qreg_manager)
+        out_qubits = _interpret_operation(wires, qubit_handler)
 
         # Check that qubit-level ops do not affect the managed qreg
-        assert qreg_manager.get() is qreg
+        assert qubit_handler.get() is qreg
 
         # First check with python handle variables
-        assert qreg_manager[0] is out_qubits[0]
-        assert qreg_manager[1] is out_qubits[1]
+        assert qubit_handler[0] is out_qubits[0]
+        assert qubit_handler[1] is out_qubits[1]
 
         # Also check with actual jaxpr variables
         with take_current_trace() as trace:
             gate_out_qubits = trace.frame.eqns[-1].outvars
-            assert trace.frame.tracer_to_var[id(qreg_manager[0])] == gate_out_qubits[0]
-            assert trace.frame.tracer_to_var[id(qreg_manager[1])] == gate_out_qubits[1]
+            assert trace.frame.tracer_to_var[id(qubit_handler[0])] == gate_out_qubits[0]
+            assert trace.frame.tracer_to_var[id(qubit_handler[1])] == gate_out_qubits[1]
 
     def test_iter(self):
         """Test __iter__ in the qreg manager"""
         qreg = qalloc_p.bind(42)
-        qreg_manager = QregManager(qreg)
+        qubit_handler = QubitHandler(qreg)
 
         target_dictionary = {}
         for x in range(3):
-            target_dictionary[x] = qreg_manager[x]
+            target_dictionary[x] = qubit_handler[x]
 
-        assert dict(qreg_manager) == target_dictionary
+        assert dict(qubit_handler) == target_dictionary
+
+    def test_iter_noqreg(self):
+        """Test that iterating over a QubitHandler works as expected"""
+        q0 = AbstractQbit()
+        q1 = AbstractQbit()
+        qubit_handler = QubitHandler([q0, q1])
+
+        target_dictionary = {q0: q0, q1: q1}
+        assert dict(qubit_handler) == target_dictionary
 
     def test_chained_gate(self):
         """Test two chained qubit opertaions"""
         qreg = qalloc_p.bind(42)
-        qreg_manager = QregManager(qreg)
+        qubit_handler = QubitHandler(qreg)
 
         wires = [0, 1]
-        _ = _interpret_operation(wires, qreg_manager)
-        out_qubits = _interpret_operation(wires, qreg_manager)
+        _ = _interpret_operation(wires, qubit_handler)
+        out_qubits = _interpret_operation(wires, qubit_handler)
 
         # Check that qubit-level ops do not affect the managed qreg
-        assert qreg_manager.get() is qreg
+        assert qubit_handler.get() is qreg
 
         # First check with python handle variables
-        assert qreg_manager[0] is out_qubits[0]
-        assert qreg_manager[1] is out_qubits[1]
+        assert qubit_handler[0] is out_qubits[0]
+        assert qubit_handler[1] is out_qubits[1]
 
         # Also check with actual jaxpr variables
         with take_current_trace() as trace:
             gate_out_qubits = trace.frame.eqns[-1].outvars
-            assert trace.frame.tracer_to_var[id(qreg_manager[0])] == gate_out_qubits[0]
-            assert trace.frame.tracer_to_var[id(qreg_manager[1])] == gate_out_qubits[1]
+            assert trace.frame.tracer_to_var[id(qubit_handler[0])] == gate_out_qubits[0]
+            assert trace.frame.tracer_to_var[id(qubit_handler[1])] == gate_out_qubits[1]
 
     def test_insert_all_dangling_qubits(self):
         """
@@ -229,15 +319,15 @@ class TestQubitValues:
         QregPromise object.
         """
         qreg = qalloc_p.bind(42)
-        qreg_manager = QregManager(qreg)
+        qubit_handler = QubitHandler(qreg)
 
         # Extract some qubits
-        _ = [qreg_manager[i] for i in range(3)]
-        assert list(qreg_manager.wire_map.keys()) == [0, 1, 2]
+        _ = [qubit_handler[i] for i in range(3)]
+        assert list(qubit_handler.wire_map.keys()) == [0, 1, 2]
 
-        qreg_manager.insert_all_dangling_qubits()
-        assert qreg_manager.wire_map == {}
-        assert qreg_manager.get() is not qreg  # test that inserts update the qreg SSA value
+        qubit_handler.insert_all_dangling_qubits()
+        assert qubit_handler.wire_map == {}
+        assert qubit_handler.get() is not qreg  # test that inserts update the qreg SSA value
 
         with take_current_trace() as trace:
             # Checking via jaxpr internals is a bit tedious here
@@ -258,73 +348,73 @@ class TestQubitValues:
 
 
 class TestQregValues:
-    """Test QregManager correctly updates qreg SSA values."""
+    """Test QubitHandler correctly updates qreg SSA values."""
 
     def test_qreg_op(self):
         """Test that a qreg operation correctly updates the managed qreg SSA value."""
         qreg = qalloc_p.bind(42)
-        qreg_manager = QregManager(qreg)
+        qubit_handler = QubitHandler(qreg)
         new_qreg = qreg_mock_op_p.bind(qreg)
 
         # Update the qreg values.
         # This is user code. This is point 1 of the "users are expected to" in the
-        # QregManager specs.
-        qreg_manager.set(new_qreg)
+        # QubitHandler specs.
+        qubit_handler.set(new_qreg)
 
         # Check that managed qreg value is updated
-        assert qreg_manager.get() is new_qreg
+        assert qubit_handler.get() is new_qreg
 
     def test_qreg_op_with_dangling_qubits(self):
         """Test that dangling qubits are correctly disallowed when new qreg values appear."""
         qreg = qalloc_p.bind(42)
-        qreg_manager = QregManager(qreg)
-        _ = qreg_manager[0]  # extract something
-        assert 0 in qreg_manager.wire_map
+        qubit_handler = QubitHandler(qreg)
+        _ = qubit_handler[0]  # extract something
+        assert 0 in qubit_handler.wire_map
         new_qreg = qreg_mock_op_p.bind(qreg)  # a qreg op when the qreg still has dangling qubits
 
         with pytest.raises(
             CompileError,
             match="Setting new qreg value, but the previous one still has dangling qubits.",
         ):
-            qreg_manager.set(new_qreg)
+            qubit_handler.set(new_qreg)
 
 
 class TestQregAndQubit:
-    """Test QregManager behaves correctly in full circuits with both qubit and qreg ops."""
+    """Test QubitHandler behaves correctly in full circuits with both qubit and qreg ops."""
 
     def test_qreg_and_qubit(self):
         """
-        Test QregManager behaves correctly in full circuits with both qubit and qreg ops.
-        This is the end-to-end system test for the QregManager.
+        Test QubitHandler behaves correctly in full circuits with both qubit and qreg ops.
+        This is the end-to-end system test for the QubitHandler.
         """
 
         qreg = qalloc_p.bind(42)
-        qreg_manager = QregManager(qreg)
-        assert qreg_manager.get() is qreg
-        assert qreg_manager.wire_map == {}
+        qubit_handler = QubitHandler(qreg)
+        assert qubit_handler.get() is qreg
+        assert qubit_handler.wire_map == {}
 
         wires = [0, 1]
-        out_qubits = _interpret_operation(wires, qreg_manager)
-        assert qreg_manager.get() is qreg
-        assert list(qreg_manager.wire_map.keys()) == [0, 1]
-        assert qreg_manager[0] is out_qubits[0]
-        assert qreg_manager[1] is out_qubits[1]
+        out_qubits = _interpret_operation(wires, qubit_handler)
+        assert qubit_handler.get() is qreg
+        assert list(qubit_handler.wire_map.keys()) == [0, 1]
+        assert qubit_handler[0] is out_qubits[0]
+        assert qubit_handler[1] is out_qubits[1]
 
         # Must actualize before expiring an old qreg value as an operand
-        qreg_manager.insert_all_dangling_qubits()
-        assert qreg_manager.get() is not qreg  # insert creates new qreg result values
-        assert qreg_manager.wire_map == {}
+        qubit_handler.insert_all_dangling_qubits()
+        assert qubit_handler.get() is not qreg  # insert creates new qreg result values
+        assert qubit_handler.wire_map == {}
 
-        new_qreg = qreg_mock_op_p.bind(qreg_manager.get())
-        qreg_manager.set(new_qreg)
-        assert qreg_manager.get() is new_qreg
-        assert qreg_manager.wire_map == {}
+        new_qreg = qreg_mock_op_p.bind(qubit_handler.get())
+        qubit_handler.set(new_qreg)
+        assert qubit_handler.get() is new_qreg
+        assert qubit_handler.wire_map == {}
 
         wires = [0]
-        other_out_qubits = _interpret_operation(wires, qreg_manager)
-        assert qreg_manager.get() is new_qreg
-        assert list(qreg_manager.wire_map.keys()) == [0]
-        assert qreg_manager[0] is other_out_qubits[0]
+        other_out_qubits = _interpret_operation(wires, qubit_handler)
+        assert qubit_handler.get() is new_qreg
+        assert list(qubit_handler.wire_map.keys()) == [0]
+        assert qubit_handler[0] is other_out_qubits[0]
 
         with take_current_trace() as trace:
             # Check full jaxpr

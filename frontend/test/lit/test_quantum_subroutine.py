@@ -196,7 +196,7 @@ def test_quantum_subroutine_with_control_flow():
         qml.cond(param != 0.0, true_path, false_path)()
 
     @qml.qjit(autograph=False)
-    @qml.qnode(qml.device("lightning.qubit", wires=1), autograph=False)
+    @qml.qnode(qml.device("lightning.qubit", wires=1))
     # CHECK: module @subroutine_test_3
     def subroutine_test_3():
         # CHECK-DAG: [[CST:%.+]] = stablehlo.constant dense<3.140000e+00>
@@ -240,7 +240,7 @@ def test_nested_subroutine_call():
         Hadamard_subroutine()
 
     @qml.qjit(autograph=False)
-    @qml.qnode(qml.device("lightning.qubit", wires=1), autograph=False)
+    @qml.qnode(qml.device("lightning.qubit", wires=1))
     # CHECK: module @subroutine_test_4
     def subroutine_test_4():
         # CHECK: [[QREG:%.+]] = quantum.alloc
@@ -298,7 +298,7 @@ def test_two_callsites_quantum():
     def identity(): ...
 
     @qml.qjit(autograph=False)
-    @qml.qnode(qml.device("lightning.qubit", wires=1), autograph=False)
+    @qml.qnode(qml.device("lightning.qubit", wires=1))
     # CHECK: module @subroutine_test_6
     def subroutine_test_6():
         # CHECK: [[QREG:%.+]] = quantum.alloc
@@ -326,7 +326,7 @@ def test_two_qnodes_one_subroutine():
 
     # CHECK: module @main
 
-    @qml.qnode(qml.device("lightning.qubit", wires=1), autograph=False)
+    @qml.qnode(qml.device("lightning.qubit", wires=1))
     def subroutine_test_7():
         # CHECK: [[QREG:%.+]] = quantum.alloc
         # CHECK: [[QREG_1:%.+]] = call @identity([[QREG]]) : (!quantum.reg) -> !quantum.reg
@@ -336,7 +336,7 @@ def test_two_qnodes_one_subroutine():
 
         # CHECK: func.func private @identity
 
-    @qml.qnode(qml.device("null.qubit", wires=1), autograph=False)
+    @qml.qnode(qml.device("null.qubit", wires=1))
     def subroutine_test_8():
         # CHECK: [[QREG:%.+]] = quantum.alloc
         # CHECK: [[QREG_1:%.+]] = call @identity_0([[QREG]]) : (!quantum.reg) -> !quantum.reg
@@ -372,7 +372,7 @@ def test_with_constant():
     qml.capture.enable()
 
     @qml.qjit(autograph=False)
-    @qml.qnode(qml.device("null.qubit", wires=2), autograph=False)
+    @qml.qnode(qml.device("null.qubit", wires=2))
     def circ():
         Hadamard_plus_1(0)
         return qml.probs()

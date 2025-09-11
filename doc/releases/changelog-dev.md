@@ -2,6 +2,11 @@
 
 <h3>New features since last release</h3>
 
+* A new pass `--t-layer-reduction` has been added to reduce the depth and number of non-Clifford PPR
+  operations by commuting adjacent PPRs and finding possible PPRs that can be merged.
+  For more details, see the Figure 6 in [A Game of Surface Code](https://arXiv:1808.02892v3) paper.
+  [(#1975)](https://github.com/PennyLaneAI/catalyst/pull/1975)
+
 * Catalyst now provides native support for `SingleExcitation`, `DoubleExcitation`,
   and `PCPhase` on compatible devices like Lightning simulators.
   This enhancement avoids unnecessary gate decomposition,
@@ -22,6 +27,31 @@
   ```
 
 <h3>Improvements 🛠</h3>
+
+* Improve the pass `--ppm-specs` to count the depth of PPRs and PPMs in the circuit.
+  [(#2014)](https://github.com/PennyLaneAI/catalyst/pull/2014)
+
+* The default mid-circuit measurement method in catalyst has been changed from `"single-branch-statistics"` to `"one-shot"`.
+  [[#2017]](https://github.com/PennyLaneAI/catalyst/pull/2017)
+
+* A new pass `--partition-layers` has been added to group PPR/PPM operations into `qec.layer`
+  operations based on qubit interactive and commutativity, enabling circuit analysis and
+  potentially to support parallel execution.
+  [(#1951)](https://github.com/PennyLaneAI/catalyst/pull/1951)
+
+* Added a new JAX primitive to capture and compile the decomposition rule
+  definitions to MLIR. `decomposition_rule` is the decorator integrated
+  with this primitive for development purposes.
+  [(#1820)](https://github.com/PennyLaneAI/catalyst/pull/1820)
+
+* Renamed `QregManager` to `QubitHandler` and extended the class to manage
+  converting PLxPR wire indices into Catalyst JAXPR qubits.
+  This is especially useful for lowering subroutines that take
+  in qubits as arguments, for example decomposition rules.
+  [(#1820)](https://github.com/PennyLaneAI/catalyst/pull/1820)
+
+* Fix resource tracking unit test polluting the environment with output files
+  [(#1861)](https://github.com/PennyLaneAI/catalyst/pull/1861)
 
 * Adjoint differentiation is used by default when executing on lightning devices, significantly reduces gradient computation time.
   [(#1961)](https://github.com/PennyLaneAI/catalyst/pull/1961)
@@ -53,8 +83,20 @@
   %0 = transform.apply_registered_pass "some-pass" with options = {"an-option" = true, "maxValue" = 1 : i64, "multi-word-option" = 1 : i64}
   ```
 
-*  `Commuting Clifford Pauli Product Rotation (PPR) operations, past non-Clifford PPRs, now supports P(π/2) Cliffords in addition to P(π/4)`
-   [(#1966)](https://github.com/PennyLaneAI/catalyst/pull/1966)
+* Added checks to raise an error when the input qubits to the multi-qubit gates in the runtime CAPI are not all distinct.
+  [(#2006)](https://github.com/PennyLaneAI/catalyst/pull/2006).
+
+* Commuting Clifford Pauli Product Rotation (PPR) operations, past non-Clifford PPRs, now supports P(π/2) Cliffords in addition to P(π/4)
+  [(#1966)](https://github.com/PennyLaneAI/catalyst/pull/1966)
+
+* A new jax primitive `qdealloc_qb_p` is available for single qubit deallocations.
+  [(#2005)](https://github.com/PennyLaneAI/catalyst/pull/2005)
+
+* Changed the attribute of `number_original_arg` in `CustomCallOp` from dense array to integer.
+  [(#2022)](https://github.com/PennyLaneAI/catalyst/pull/2022)
+
+* Renaming `get_ppm_specs` to `ppm_specs` and the corresponding results' properties.
+  [(#2031)](https://github.com/PennyLaneAI/catalyst/pull/2031)
 
 <h3>Breaking changes 💔</h3>
 
@@ -99,6 +141,15 @@
   qubits on the `"null.qubit"` device has been fixed.
   [(#1926)](https://github.com/PennyLaneAI/catalyst/pull/1926)
 
+* Stacked Python decorators for built-in Catalyst passes are now applied in the correct order when
+  program capture is enabled.
+  [(#2027)](https://github.com/PennyLaneAI/catalyst/pull/2027)
+
+* Fix usage of OQC device, including:
+   - fix object file system extension on macOS
+   - fix wrong type signature of `Counts` API function
+  [(#2032)](https://github.com/PennyLaneAI/catalyst/pull/2032)
+
 <h3>Internal changes ⚙️</h3>
 
 * Updates use of `qml.transforms.dynamic_one_shot.parse_native_mid_circuit_measurements` to improved signature.
@@ -106,6 +157,9 @@
 
 * When capture is enabled, `qjit(autograph=True)` will use capture autograph instead of catalyst autograph.
   [(#1960)](https://github.com/PennyLaneAI/catalyst/pull/1960)
+
+* `from_plxpr` can now handle dynamic shots and overridden device shots.
+  [(#1983)](https://github.com/PennyLaneAI/catalyst/pull/1983/)
 
 * QJitDevice helper `extract_backend_info` removed its redundant `capabilities` argument.
   [(#1956)](https://github.com/PennyLaneAI/catalyst/pull/1956)
@@ -115,6 +169,7 @@
 
 * Update imports for noise transforms from `pennylane.transforms` to `pennylane.noise`.
   [(#1918)](https://github.com/PennyLaneAI/catalyst/pull/1918)
+  [(#2020)](https://github.com/PennyLaneAI/catalyst/pull/2020)
 
 * Improve error message for quantum subroutines when used outside a quantum context.
   [(#1932)](https://github.com/PennyLaneAI/catalyst/pull/1932)
@@ -188,7 +243,29 @@
   `qml.Rot` and `qml.CRot`.
   [(#1955)](https://github.com/PennyLaneAI/catalyst/pull/1955)
 
+* Catalyst now supports *array-backed registers*, meaning that `quantum.insert` operations can be
+  configured to allow for the insertion of a qubit into an arbitrary position within a register.
+  [(#2000)](https://github.com/PennyLaneAI/catalyst/pull/2000)
+
+  This feature is disabled by default. To enable it, configure the pass pipeline to set the
+  `use-array-backed-registers` option of the `convert-quantum-to-llvm` pass to `true`. For example,
+
+  ```console
+  $ catalyst --tool=opt --pass-pipeline="builtin.module(convert-quantum-to-llvm{use-array-backed-registers=true})" <input file>
+  ```
+
+* Fix auxiliary qubit deallocation in `decompose-non-clifford-ppr` pass 
+  in the `clifford-corrected` method.
+  [(#2039)](https://github.com/PennyLaneAI/catalyst/pull/2039)
+
 <h3>Documentation 📝</h3>
+
+* The Catalyst Command Line Interface documentation incorrectly stated that the `catalyst`
+  executable is available in the `catalyst/bin/` directory relative to the environment's
+  installation directory when installed via pip. The documentation has been updated to point to the
+  correct location, which is the `bin/` directory relative to the environment's installation
+  directory.
+  [(#2030)](https://github.com/PennyLaneAI/catalyst/pull/2030)
 
 <h3>Contributors ✍️</h3>
 
@@ -199,8 +276,12 @@ Joey Carter,
 Yushao Chen,
 Sengthai Heng,
 David Ittah,
+Jeffrey Kam,
 Christina Lee,
 Joseph Lee,
 Andrija Paurevic,
+Ritu Thombre,
 Roberto Turrado,
-Paul Haochen Wang.
+Paul Haochen Wang,
+Jake Zaia,
+Hongsheng Zheng
