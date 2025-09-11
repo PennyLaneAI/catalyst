@@ -190,13 +190,15 @@ endif
 endif
 
 test-demos:
+    # Some demos fail with optax dependency pulling in latest jax
+    # We skip them for now. These demos should be properly moved to the qml repo.
 ifeq ($(ENABLE_ASAN) $(PLATFORM),ON Darwin)
 	@echo "Cannot run Jupyter Notebooks with ASAN on macOS, likely due to subprocess invocation."
 	@exit 1
 endif
 	@echo "check the Catalyst demos"
 	MDD_BENCHMARK_PRECISION=1 \
-	$(ASAN_COMMAND) $(PYTHON) -m pytest demos --nbmake $(PYTEST_FLAGS)
+	$(ASAN_COMMAND) $(PYTHON) -m pytest demos -k "tutorial_qft_arithmetics.ipynb" --nbmake $(PYTEST_FLAGS)
 
 wheel:
 	echo "INSTALLED = True" > $(MK_DIR)/frontend/catalyst/_configuration.py
@@ -308,7 +310,7 @@ coverage: coverage-frontend coverage-runtime
 
 lit-coverage:
 	@echo "Running lit tests with coverage"
-	ENABLE_LIT_COVERAGE=1 COVERAGE_FILE=$(MK_DIR)/.coverage.lit $(LLVM_BUILD_DIR)/bin/llvm-lit -sv frontend/test/lit -j$(shell nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 1)
+	ENABLE_LIT_COVERAGE=1 COVERAGE_FILE=$(MK_DIR)/.coverage.lit $(PYTHON) $(LLVM_BUILD_DIR)/bin/llvm-lit -sv frontend/test/lit -j$(shell nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 1)
 
 coverage-frontend:
 ifeq ($(ENABLE_ASAN),ON)

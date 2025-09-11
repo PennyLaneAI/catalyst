@@ -80,55 +80,85 @@ class QubitIndexRecorder:
     Since plxpr indices are global, there should be one instance of the class per plxpr.
 
     This class promises the following:
-    - `QubitIndexRecorder[i]` (i = global index in plxpr) returns the `QRegManager` instance
+    - `QubitIndexRecorder[i]` (i = global index in plxpr) returns the `QubitHandler` instance
        for the logical register that this wire belongs to.
 
     Users of this class are expected to:
     - Create an instance of this class per plxpr
-    - Pass that instance to all `QregManager` instances created when tracing that plxpr
+    - Pass that instance to all `QubitHandler` instances created when tracing that plxpr
     """
 
     def __init__(self):
         self.map = {}
 
-    def __getitem__(self, index: int):  # -> QregManager
+    def __getitem__(self, index: int):  # -> QubitHandler
         assert index in self.map
         return self.map[index]
 
     def __setitem__(self, index: int, qreg):
-        # `qreg` is of type `QregManager`
+        # `qreg` is of type `QubitHandler`
         self.map[index] = qreg
 
 
-class QregManager:
+class QubitHandler:
     """
-    A manager that handles converting plxpr wire indices into catalyst jaxpr qreg.
+    A Qubit handler that manages converting plxpr wire indices into catalyst jaxpr qreg or qubits,
+    depending on the context.
 
-    This manager answers the second question, i.e. given a logical catalyst register,
+    Args:
+        qubit_or_qreg_ref: An `AbstractQreg` value, or a list/tuple of `AbstractQbit` values.
+
+    If `qubit_or_qreg_ref` is an `AbstractQreg`, this handler manages converting the qubits in qreg.
+
+    However, if `qubit_or_qreg_ref` is a list/tuple of `AbstractQbit` values, this handler
+    manages converting the qubits in the list/tuple. This is useful when the qubits
+    are passed in as arguments to the function being converted. This feature is mainly
+    useful for lowering decomposition rules that take in qubits as arguments.
+
+    In qreg mode, this manager answers the second question, i.e. given a logical catalyst register,
     what is its current qreg SSA value, and what are its current qubit SSA values on its wires?
 
-    This `QregManager` class promises the following:
+    This `QubitHandler` class promises the following in qreg mode:
     1. An instance of this class will always be tied to one root qreg value.
     2. At any moment during the from_plxpr conversion:
-       - `QregManager.get()` returns the current catalyst qreg SSA value for the managed
-          root register on that instance;
-       - `QregManager[i]` (i=0,1,2....) returns the current catalyst qubit SSA value for the i-th
+       - `QubitHandler[i]` (i=0,1,2....) returns the current catalyst qubit SSA value for the i-th
           index on the managed root register on that instance. If none exists, a new qubit will be
           extracted.
+       - `QubitHandler.get()` returns the current catalyst qreg SSA value for the managed
+          root register on that instance;
 
     To achieve the above, users of this class are expected to:
     1. Initialize an instance with the qreg SSA value from a new allocation or a new block argument;
     2. Whenever a new meta-op/op is bind-ed, update the current qreg/qubit SSA value with:
-       - `QubitManager.set(new_qreg_value)`
-       - `QubitManager[i] = new_qubit_value` (i=0,1,2....)
+       - `QubitHandler.set(new_qreg_value)`
+       - `QubitHandler[i] = new_qubit_value` (i=0,1,2....)
     """
 
     wire_map: dict[int, AbstractQbit]  # Note: No dynamic wire indices for now in from_plxpr.
 
     def __init__(
-        self, root_qreg_value: AbstractQreg, recorder: QubitIndexRecorder, absolute_addressing=False
+        self,
+        qubit_or_qreg_ref: AbstractQreg | list[AbstractQbit] | tuple[AbstractQbit],
+        recorder: QubitIndexRecorder,
+        absolute_addressing=False,
     ):
-        self.current_qreg_value = root_qreg_value
+
+        # Qubit mode
+        if isinstance(qubit_or_qreg_ref, (list, tuple)):
+            self.abstract_qreg_val = None
+            self.qubit_indices = qubit_or_qreg_ref
+            # oddly enough we want to map the refs to themselves initially,
+            # because when we interpret the plxpr it is done with the argument
+            # types we want for the catalyst jaxpr (i.e. AbstractQbits),
+            # so the original int[] invars are mapped to qubit tracers during the eval,
+            # and each gate using the integer wires originally is interpreted with qubit
+            # wires instead
+            self.wire_map = dict(zip(self.qubit_indices, self.qubit_indices))
+            return
+
+        # If this is an AbstractQreg, DynamicJaxprTracer, or None (for unit tests),
+        self.qubit_indices = []
+        self.abstract_qreg_val = qubit_or_qreg_ref
         self.recorder = recorder
 
         # A map from plxpr's *global* indices to the current catalyst SSA qubit values
@@ -140,11 +170,14 @@ class QregManager:
         # i.e. extracting and inserting with every new catalyst qreg use indices 0,1,2,...
         # To distinguish between different registers, we require that each one has a hash.
         # For the first qreg of a scope, absolute addressing is required (why???)
-        self.root_hash = hash(root_qreg_value) if not absolute_addressing else 0
+        self.root_hash = hash(qubit_or_qreg_ref) if not absolute_addressing else 0
 
-    def get(self):
-        """Return the current AbstractQreg value."""
-        return self.current_qreg_value
+    def get(self) -> AbstractQreg | list[AbstractQbit]:
+        """Return the current AbstractQreg value or final AbstractQbit values
+        depending on whichever is used to create the instance."""
+        if self.abstract_qreg_val is not None:
+            return self.abstract_qreg_val
+        return [self.wire_map[idx] for idx in self.qubit_indices]
 
     def set(self, qreg: AbstractQreg):
         """
@@ -154,11 +187,18 @@ class QregManager:
         # The old qreg SSA value is no longer usable since a new one has appeared
         # Therefore all dangling qubits from the old one also all expire
         # These dangling qubit values will be dead, so there must be none.
-        if len(self.wire_map) != 0:
-            raise CompileError(
-                "Setting new qreg value, but the previous one still has dangling qubits."
-            )
-        self.current_qreg_value = qreg
+        if self.abstract_qreg_val is not None:
+            # qreg mode
+            if len(self.wire_map) != 0:
+                raise CompileError(
+                    "Setting new qreg value, but the previous one still has dangling qubits."
+                )
+            self.abstract_qreg_val = qreg
+        else:
+            # qubits mode
+            # Devalidate the old qubit values if user wants to set a qreg
+            self.wire_map = {}
+            self.qubit_indices = []
 
     def __getitem__(self, index: int) -> AbstractQbit:
         """
@@ -176,7 +216,6 @@ class QregManager:
         Update the wire_map when a new qubit value for a wire index is produced,
         for example by gates.
         """
-
         global_index = self.local_index_to_global_index(index)
         self.wire_map[global_index] = qubit
 
@@ -186,17 +225,21 @@ class QregManager:
 
     def extract(self, index: int) -> AbstractQbit:
         """Create the extract primitive that produces an AbstractQbit value."""
+        if self.abstract_qreg_val is None:
+            raise CompileError(
+                f"Cannot extract a qubit at index {index} as there is no qreg."
+                " Consider setting a qreg value first."
+            )
 
+        # else, extract must be fresh
         global_index = self.local_index_to_global_index(index)
-
-        # extract must be fresh
         assert global_index not in self.wire_map
 
         # record that this global wire index is on this register
         self.recorder[global_index] = self
 
         # extract and update current qubit value
-        extracted_qubit = qextract_p.bind(self.current_qreg_value, index)
+        extracted_qubit = qextract_p.bind(self.abstract_qreg_val, index)
         self.wire_map[global_index] = extracted_qubit
 
         return extracted_qubit
@@ -205,8 +248,14 @@ class QregManager:
         """
         Create the insert primitive.
         """
+        if self.abstract_qreg_val is None:
+            raise CompileError(
+                f"Cannot insert a qubit at index {index} as there is no qreg."
+                " Consider setting a qreg value first."
+            )
+
         global_index = self.local_index_to_global_index(index)
-        self.current_qreg_value = qinsert_p.bind(self.current_qreg_value, index, qubit)
+        self.abstract_qreg_val = qinsert_p.bind(self.abstract_qreg_val, index, qubit)
         self.wire_map.pop(global_index)
 
     def insert_all_dangling_qubits(self):
@@ -216,10 +265,14 @@ class QregManager:
         This is necessary, for example, at the end of the qreg lifetime before deallocing,
         or when passing qregs into and out of scopes like control flow.
         """
+        if self.abstract_qreg_val is None:
+            raise CompileError("Cannot insert qubits back into a qreg as there is no qreg.")
+
         for global_index, qubit in self.wire_map.items():
-            self.current_qreg_value = qinsert_p.bind(
-                self.current_qreg_value, global_index - self.root_hash, qubit
+            self.abstract_qreg_val = qinsert_p.bind(
+                self.abstract_qreg_val, global_index - self.root_hash, qubit
             )
+
         self.wire_map.clear()
 
     def get_all_current_global_indices(self):
@@ -253,6 +306,8 @@ class QregManager:
         as the second X gate's qubit operand directly.
         To do this, for the dynamic wire gate we insert back to the register.
         """
+        if self.abstract_qreg_val is None:
+            raise CompileError("Cannot insert dynamic qubits back into a qreg as there is no qreg.")
 
         # Cancel-inverses style passes only work on gates with same number of qubits
         same_number_of_wires = len(wires) == len(self.wire_map)

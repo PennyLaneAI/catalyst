@@ -26,7 +26,7 @@ from pennylane.capture.primitives import for_loop_prim as plxpr_for_loop_prim
 from pennylane.capture.primitives import while_loop_prim as plxpr_while_loop_prim
 
 from catalyst.from_plxpr.from_plxpr import PLxPRToQuantumJaxprInterpreter, WorkflowInterpreter
-from catalyst.from_plxpr.qreg_manager import QregManager
+from catalyst.from_plxpr.qubit_handler import QubitHandler
 from catalyst.jax_extras import jaxpr_pad_consts
 from catalyst.jax_primitives import cond_p, for_p, while_p
 
@@ -34,14 +34,13 @@ from catalyst.jax_primitives import cond_p, for_p, while_p
 def _calling_convention(interpreter, closed_jaxpr, *args_plus_qreg):
     *args, qreg = args_plus_qreg
     # `qreg` is the scope argument for the body jaxpr
-    #qreg_manager = QregManager(qreg)
-    qreg_manager = QregManager(qreg, interpreter.qubit_index_recorder, absolute_addressing=True)
+    qreg_manager = QubitHandler(qreg, interpreter.qubit_index_recorder, absolute_addressing=True)
     converter = copy(interpreter)
-    converter.qreg_manager = qreg_manager
+    converter.qubit_handler = qubit_handler
     # pylint: disable-next=cell-var-from-loop
     retvals = converter(closed_jaxpr, *args)
-    qreg_manager.insert_all_dangling_qubits()
-    return *retvals, converter.qreg_manager.get()
+    qubit_handler.insert_all_dangling_qubits()
+    return *retvals, converter.qubit_handler.get()
 
 
 def _to_bool_if_not(arg):
@@ -85,8 +84,8 @@ def workflow_cond(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice
 def handle_cond(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
     """Handle the conversion from plxpr to Catalyst jaxpr for the cond primitive"""
     args = plxpr_invals[args_slice]
-    self.qreg_manager.insert_all_dangling_qubits()
-    args_plus_qreg = [*args, self.qreg_manager.get()]  # Add the qreg to the args
+    self.qubit_handler.insert_all_dangling_qubits()
+    args_plus_qreg = [*args, self.qubit_handler.get()]  # Add the qreg to the args
     converted_jaxpr_branches = []
     all_consts = []
 
@@ -119,7 +118,7 @@ def handle_cond(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
 
     # We assume the last output value is the returned qreg.
     # Update the current qreg and remove it from the output values.
-    self.qreg_manager.set(outvals.pop())
+    self.qubit_handler.set(outvals.pop())
 
     # Return only the output values that match the plxpr output values
     return outvals
@@ -186,11 +185,11 @@ def handle_for_loop(
     args = plxpr_invals[args_slice]
 
     # Add the iteration start and the qreg to the args
-    self.qreg_manager.insert_all_dangling_qubits()
+    self.qubit_handler.insert_all_dangling_qubits()
     start_plus_args_plus_qreg = [
         start,
         *args,
-        self.qreg_manager.get(),
+        self.qubit_handler.get(),
     ]
 
     consts = plxpr_invals[consts_slice]
@@ -220,7 +219,7 @@ def handle_for_loop(
 
     # We assume the last output value is the returned qreg.
     # Update the current qreg and remove it from the output values.
-    self.qreg_manager.set(outvals.pop())
+    self.qubit_handler.set(outvals.pop())
 
     # Return only the output values that match the plxpr output values
     return outvals
@@ -279,11 +278,11 @@ def handle_while_loop(
     args_slice,
 ):
     """Handle the conversion from plxpr to Catalyst jaxpr for the while loop primitive"""
-    self.qreg_manager.insert_all_dangling_qubits()
+    self.qubit_handler.insert_all_dangling_qubits()
     consts_body = plxpr_invals[body_slice]
     consts_cond = plxpr_invals[cond_slice]
     args = plxpr_invals[args_slice]
-    args_plus_qreg = [*args, self.qreg_manager.get()]  # Add the qreg to the args
+    args_plus_qreg = [*args, self.qubit_handler.get()]  # Add the qreg to the args
 
     jaxpr = ClosedJaxpr(jaxpr_body_fn, consts_body)
 
@@ -306,9 +305,9 @@ def handle_while_loop(
     def remove_qreg(*args_plus_qreg):
         *args, qreg = args_plus_qreg
         # `qreg` is the scope argument for the body jaxpr
-        qreg_manager = QregManager(qreg, self.qubit_index_recorder, absolute_addressing=True)
+        qreg_manager = QubitHandler(qreg, self.qubit_index_recorder, absolute_addressing=True)
         converter = copy(self)
-        converter.qreg_manager = qreg_manager
+        converter.qubit_handler = qubit_handler
 
         return converter(jaxpr, *args)
 
@@ -333,7 +332,7 @@ def handle_while_loop(
 
     # We assume the last output value is the returned qreg.
     # Update the current qreg and remove it from the output values.
-    self.qreg_manager.set(outvals.pop())
+    self.qubit_handler.set(outvals.pop())
 
     # Return only the output values that match the plxpr output values
     return outvals
