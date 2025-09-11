@@ -405,7 +405,7 @@ def _validate_one_shot_measurements(mcm_config, tape: qml.tape.QuantumTape, qnod
         if isinstance(m, VarianceMP) and m.obs:
             raise TypeError(
                 "qml.var(obs) cannot be returned when `mcm_method='one-shot'` because "
-                "the Catalyst compiler does not handle qml.sample(obs)."
+                "the Catalyst compiler does not support qml.sample(obs)."
             )
 
         # Check if the measurement is supported with shot-vector
