@@ -1660,7 +1660,7 @@ def trace_quantum_function(
         )
 
         # (2) - Quantum tracing
-        transformed_results, classical_return_indices, num_mcm = _trace_quantum_phase(
+        transformed_results, classical_return_indices, num_mcm = _trace_quantum_step(
             device, qnode, ctx, cls_result, debug_info
         )
 
