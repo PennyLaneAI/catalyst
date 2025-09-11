@@ -1490,7 +1490,7 @@ def _trace_classical_phase(
         )
 
 
-def _trace_quantum_phase(
+def _trace_quantum_step(
     device: QubitDevice,
     qnode,
     ctx,
