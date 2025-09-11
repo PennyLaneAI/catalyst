@@ -141,9 +141,7 @@ def NumQubitsOp : Quantum_Op<"num_qubits"> {
 
 class Memory_Op<string mnemonic, list<Trait> traits = []> : Quantum_Op<mnemonic, traits>;
 
-// The operation has no memory effect and is pure, therefore two similar alloc would be removed
-// by a CSE pass. This needs to be changed in the future.
-def AllocOp : Memory_Op<"alloc", [NoMemoryEffect]> {
+def AllocOp : Memory_Op<"alloc"> {
     let summary = "Allocate n qubits into a quantum register.";
     let description = [{
     }];
@@ -160,6 +158,8 @@ def AllocOp : Memory_Op<"alloc", [NoMemoryEffect]> {
     let assemblyFormat = [{
         `(` ($nqubits^):($nqubits_attr)? `)` attr-dict `:` type(results)
     }];
+
+    let hasCanonicalizeMethod = 1;
 }
 
 def AllocQubitOp : Memory_Op<"alloc_qb"> {
