@@ -34,7 +34,6 @@
   [(#2001)](https://github.com/PennyLaneAI/catalyst/pull/2001)
 
   ```python
-  import pennylane as qml
   from catalyst import qjit, measure
   @qjit(autograph=True)
   @qml.set_shots(10)
