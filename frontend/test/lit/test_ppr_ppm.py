@@ -220,7 +220,7 @@ def test_ppr_to_ppm():
 # CHECK-NOT: qec.ppr ["Z"](4)
 # CHECK: quantum.alloc( 2)
 # CHECK: quantum.alloc_qb
-# CHECK: qec.ppm ["Z", "Y"] {{.+}}, {{.+}} : !quantum.bit, !quantum.bit
+# CHECK: qec.ppm ["Z", "Y"](-1) {{.+}}, {{.+}} : !quantum.bit, !quantum.bit
 # CHECK: qec.ppm ["X"] {{.+}} : !quantum.bit
 # CHECK: arith.xori
 # CHECK: qec.ppr ["Z"](2) {{.+}} cond({{.+}})
@@ -229,13 +229,13 @@ def test_ppr_to_ppm():
 
 # FOR T gate
 # CHECK: qec.fabricate  magic
-# CHECK: qec.ppm ["Z", "Z"](-1) {{.+}}, {{.+}} cond({{.+}})
+# CHECK: qec.ppm ["Z", "Z"] {{.+}}, {{.+}} cond({{.+}})
 # CHECK: qec.ppm ["X"] {{.+}} cond({{.+}})
 
 # FOR CNOT gate
 # CHECK: qec.fabricate  plus_i
 # Avoid Y-measurement, so Z-measurement should be used
-# CHECK: ["Z", "X", "Z"](-1) {{.+}}, {{.+}}, {{.+}}
+# CHECK: ["Z", "X", "Z"] {{.+}}, {{.+}}, {{.+}}
 # CHECK: qec.ppm ["X"] {{.+}} : !quantum.bit
 # CHECK: arith.xori
 # CHECK: qec.ppr ["Z", "X"](2) {{.+}},{{.+}} cond({{.+}})
@@ -249,7 +249,7 @@ def test_ppr_to_ppm():
 # CHECK: qec.ppr ["Z"](2) {{.+}} cond({{.+}})
 
 # FOR CNOT gate
-# CHECK: ["Z", "X", "Y"] {{.+}}, {{.+}}, {{.+}}
+# CHECK: ["Z", "X", "Y"](-1) {{.+}}, {{.+}}, {{.+}}
 # CHECK: qec.ppm ["X"] {{.+}}
 # CHECK: arith.xori
 # CHECK: qec.ppr ["Z", "X"](2) {{.+}},{{.+}} cond({{.+}})
@@ -300,7 +300,7 @@ def test_clifford_to_ppm():
 # decompose Clifford to PPM
 # CHECK: qec.select.ppm({{.+}}, ["X"], ["Z"])
 # CHECK: qec.ppm ["X", "Z", "Z"]
-# CHECK: qec.ppm ["Z", "Y"]
+# CHECK: qec.ppm ["Z", "Y"](-1)
 # CHECK: qec.ppm ["X"]
 # CEHCK: qec.select.ppm({{.+}}, ["X"], ["Z"])
 

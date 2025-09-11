@@ -846,7 +846,7 @@ def ppr_to_ppm(qnode=None, *, decompose_method="pauli-corrected", avoid_y_measur
         %5 = qec.fabricate  zero : !quantum.bit
         %6 = qec.fabricate  magic : !quantum.bit
         %mres, %out_qubits:2 = qec.ppm ["X", "Z"] %1, %6 : !quantum.bit, !quantum.bit
-        %mres_0, %out_qubits_1:2 = qec.ppm ["Z", "Y"] %5, %out_qubits#1 : !quantum.bit, !quantum.bit
+        %mres_0, %out_qubits_1:2 = qec.ppm ["Z", "Y"](-1) %5, %out_qubits#1 : !quantum.bit, !quantum.bit
         %mres_2, %out_qubits_3 = qec.ppm ["X"] %out_qubits_1#1 : !quantum.bit
         %mres_4, %out_qubits_5 = qec.select.ppm(%mres, ["X"], ["Z"]) %out_qubits_1#0 : !quantum.bit
         %7 = arith.xori %mres_0, %mres_2 : i1
@@ -924,7 +924,7 @@ def ppm_compilation(
         method = "clifford-corrected"
 
         @qjit(pipelines=pipeline, target="mlir")
-        @ppm_compilation(decompose_method=method, avoid_y_measure=True, max_pauli_size=2)
+        @ppm_compilation(decompose_method=method, max_pauli_size=2)
         @qml.qnode(qml.device("null.qubit", wires=2))
         def circuit():
             qml.CNOT([0, 1])

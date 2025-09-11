@@ -55,12 +55,12 @@ LogicalInitKind getMagicState(QECOpInterface op)
 /// ─────┌───┐────────┌───────┐
 /// ─────| P |────────| P(π/2)|
 /// ─────|   |────────└───╦───┘
-///      |   |            ║
-///      |   |        ┌───╩───┐
-/// |m⟩──| Z |────────| X / Y |
+///      |   ╠═════╗      ║
+///      |   |     ║  ┌───╩───┐
+/// |m⟩──| Z |─────╚══╣ X / Y |
 ///      └───┘        └───────┘
 /// All the operations in second diagram are PPM except for the last PPR P(π/2)
-/// For P(-π/8) we need to use complex conjugate|m̅⟩ as the magic state.
+/// For P(-π/8) we need to use flip the ordering in which the X and Y measurements are applied.
 ///
 /// Details:
 /// - If P⊗Z measurement yields -1 then apply Y measurement, otherwise apply X measurement
@@ -69,7 +69,8 @@ LogicalInitKind getMagicState(QECOpInterface op)
 void decompose_pauli_corrected_pi_over_eight(PPRotationOp op, PatternRewriter &rewriter)
 {
     auto loc = op.getLoc();
-    auto magic = rewriter.create<FabricateOp>(loc, getMagicState(op));
+    // We always initialize the magic state here, not the conjugate.
+    auto magic = rewriter.create<FabricateOp>(loc, LogicalInitKind::magic);
 
     SmallVector<StringRef> pauliP = extractPauliString(op); // [P]
     SmallVector<Value> inQubits = op.getInQubits();         // [input qubits]
@@ -83,9 +84,10 @@ void decompose_pauli_corrected_pi_over_eight(PPRotationOp op, PatternRewriter &r
     auto ppmPZRes = ppmPZ.getMres();
     SmallVector<StringRef> pauliX = {"X"};
     SmallVector<StringRef> pauliY = {"Y"};
-    auto ppmXY = rewriter.create<SelectPPMeasurementOp>(loc, ppmPZRes, pauliY, pauliX,
-                                                        ppmPZ.getOutQubits().back());
-
+    int16_t rotationKind = static_cast<int16_t>(op.getRotationKind());
+    auto ppmXY = rewriter.create<SelectPPMeasurementOp>(
+        loc, ppmPZRes, rotationKind > 0 ? pauliY : pauliX, rotationKind > 0 ? pauliX : pauliY,
+        ppmPZ.getOutQubits().back());
     // PPR P(π/2) on input qubits if PPM (X or Y) yields -1
     SmallVector<Value> outPZQubits = ppmPZ.getOutQubits(); // [input qubits, |m⟩]
     outPZQubits.pop_back();                                // [input qubits]

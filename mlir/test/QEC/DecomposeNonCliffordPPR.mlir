@@ -66,7 +66,7 @@ func.func @test_ppr_to_ppm(%q1 : !quantum.bit) {
 // CHECK-AUTO: [[m_0:%.+]], [[out_0:%.+]]:2 = qec.ppm ["Z", "Z"] %arg0, [[magic_1]] : !quantum.bit, !quantum.bit
 
 // // PPM Z⊗Y on |m⟩ and |0⟩ => m1
-// CHECK-AUTO: [[m_1:%.+]], [[out_1:%.+]]:2 = qec.ppm ["Z", "Y"] [[out_0]]#1, [[zero_1]] : !quantum.bit, !quantum.bit
+// CHECK-AUTO: [[m_1:%.+]], [[out_1:%.+]]:2 = qec.ppm ["Z", "Y"](-1) [[out_0]]#1, [[zero_1]] : !quantum.bit, !quantum.bit
 
 // // PPM X on |m⟩ => m2
 // CHECK-AUTO: [[m_2:%.+]], [[out_2:%.+]] = qec.ppm ["X"] [[out_1]]#0 : !quantum.bit
@@ -109,7 +109,7 @@ func.func @test_ppr_to_ppm_1(%q1 : !quantum.bit) {
 
     // CHECK-INJECT: qec.fabricate  magic_conj
     // CHECK-AUTO: qec.fabricate  magic_conj
-    // CHECK-PAULI: qec.fabricate  magic_conj
+    // CHECK-PAULI: qec.fabricate  magic
 }
 
 // -----
@@ -259,7 +259,7 @@ func.func public @game_of_surface_code(%arg0: !quantum.bit, %arg1: !quantum.bit,
     // CHECK-AUTO: [[Q_3:%.+]] = quantum.alloc_qb : !quantum.bit
     // CHECK-AUTO: [[Q_4:%.+]] = qec.fabricate  magic
     // CHECK-AUTO: [[M:%.+]], [[OUT:%.+]]:2 = qec.ppm ["Z", "Z"] [[Q0]], [[Q_4]] : !quantum.bit, !quantum.bit
-    // CHECK-AUTO: [[M_0:%.+]], [[OUT_1:%.+]]:2 = qec.ppm ["Z", "Y"] [[OUT]]#1, [[Q_3]] : !quantum.bit, !quantum.bit
+    // CHECK-AUTO: [[M_0:%.+]], [[OUT_1:%.+]]:2 = qec.ppm ["Z", "Y"](-1) [[OUT]]#1, [[Q_3]] : !quantum.bit, !quantum.bit
     // CHECK-AUTO: [[M_2:%.+]], [[OUT_3:%.+]] = qec.ppm ["X"] [[OUT_1]]#0 : !quantum.bit
     // CHECK-AUTO: [[M_4:%.+]], [[OUT_5:%.+]] = qec.select.ppm([[M]], ["X"], ["Z"]) [[OUT_1]]#1 : !quantum.bit
     // CHECK-AUTO: [[Q_5:%.+]] = arith.xori [[M_0]], [[M_2]] : i1
@@ -272,7 +272,7 @@ func.func public @game_of_surface_code(%arg0: !quantum.bit, %arg1: !quantum.bit,
     // CHECK-AUTO: [[Q_10:%.+]] = quantum.alloc_qb : !quantum.bit
     // CHECK-AUTO: [[Q_11:%.+]] = qec.fabricate  magic_conj
     // CHECK-AUTO: [[M_6:%.+]], [[OUT_7:%.+]]:2 = qec.ppm ["Y", "Z"] [[Q3]], [[Q_11]] : !quantum.bit, !quantum.bit
-    // CHECK-AUTO: [[M_8:%.+]], [[OUT_9:%.+]]:2 = qec.ppm ["Z", "Y"] [[OUT_7]]#1, [[Q_10]] : !quantum.bit, !quantum.bit
+    // CHECK-AUTO: [[M_8:%.+]], [[OUT_9:%.+]]:2 = qec.ppm ["Z", "Y"](-1) [[OUT_7]]#1, [[Q_10]] : !quantum.bit, !quantum.bit
     // CHECK-AUTO: [[M_10:%.+]], [[OUT_11:%.+]] = qec.ppm ["X"] [[OUT_9]]#0 : !quantum.bit
     // CHECK-AUTO: [[M_12:%.+]], [[OUT_13:%.+]] = qec.select.ppm([[M_6]], ["X"], ["Z"]) [[OUT_9]]#1 : !quantum.bit
     // CHECK-AUTO: [[Q_12:%.+]] = arith.xori [[M_8]], [[M_10]] : i1
@@ -286,7 +286,7 @@ func.func public @game_of_surface_code(%arg0: !quantum.bit, %arg1: !quantum.bit,
     // CHECK-AUTO: [[Q_18:%.+]] = qec.fabricate  magic
     ///// PPM ["Y", "X", "Z"] Q2, Q1, conj |m⟩
     // CHECK-AUTO: [[M_14:%.+]], [[OUT_15:%.+]]:3 = qec.ppm ["Y", "X", "Z"] [[Q2]], [[Q1]], [[Q_18]]
-    // CHECK-AUTO: [[M_16:%.+]], [[OUT_17:%.+]]:2 = qec.ppm ["Z", "Y"] [[OUT_15]]#2, [[Q_17]] : !quantum.bit, !quantum.bit
+    // CHECK-AUTO: [[M_16:%.+]], [[OUT_17:%.+]]:2 = qec.ppm ["Z", "Y"](-1) [[OUT_15]]#2, [[Q_17]] : !quantum.bit, !quantum.bit
     // CHECK-AUTO: [[M_18:%.+]], [[OUT_19:%.+]] = qec.ppm ["X"] [[OUT_17]]#0 : !quantum.bit
     // CHECK-AUTO: [[M_20:%.+]], [[OUT_21:%.+]] = qec.select.ppm([[M_14]], ["X"], ["Z"]) [[OUT_17]]#1 : !quantum.bit
     // CHECK-AUTO: [[Q_19:%.+]] = arith.xori [[M_16]], [[M_18]] : i1
@@ -302,7 +302,7 @@ func.func public @game_of_surface_code(%arg0: !quantum.bit, %arg1: !quantum.bit,
     // CHECK-AUTO: [[Q_25:%.+]] = qec.fabricate  magic_conj
     ///// PPM ["Z", "Z", "Y", "Z", "Z"] Q2, Q1, Q3, Q0, conj |m⟩
     // CHECK-AUTO: [[M_22:%.+]], [[OUT_23:%.+]]:5 = qec.ppm ["Z", "Z", "Y", "Z", "Z"] [[Q_20]]#0, [[Q_20]]#1, [[Q_13]], [[Q_6]], [[Q_25]]
-    // CHECK-AUTO: [[M_24:%.+]], [[OUT_25:%.+]]:2 = qec.ppm ["Z", "Y"] [[OUT_23]]#4, [[Q_24]] : !quantum.bit, !quantum.bit
+    // CHECK-AUTO: [[M_24:%.+]], [[OUT_25:%.+]]:2 = qec.ppm ["Z", "Y"](-1) [[OUT_23]]#4, [[Q_24]] : !quantum.bit, !quantum.bit
     // CHECK-AUTO: [[M_26:%.+]], [[OUT_27:%.+]] = qec.ppm ["X"] [[OUT_25]]#0 : !quantum.bit
     // CHECK-AUTO: [[M_28:%.+]], [[OUT_29:%.+]] = qec.select.ppm([[M_22]], ["X"], ["Z"]) [[OUT_25]]#1 : !quantum.bit
     // CHECK-AUTO: [[Q_26:%.+]] = arith.xori [[M_24]], [[M_26]] : i1
@@ -336,9 +336,9 @@ func.func public @game_of_surface_code(%arg0: !quantum.bit, %arg1: !quantum.bit,
     // CHECK-PAULI: [[Q5:%.+]]  = qec.ppr ["Z"](2) [[out]]#0 cond([[M1]]) : !quantum.bit
 
     // // PPR ["Y"](-8) Q3
-    // CHECK-PAULI: [[Q6:%.+]]     = qec.fabricate  magic_conj
+    // CHECK-PAULI: [[Q6:%.+]]     = qec.fabricate  magic
     // CHECK-PAULI: [[M2:%.+]], [[out_2:%.+]]:2 = qec.ppm ["Y", "Z"] [[Q3]], [[Q6]] : !quantum.bit, !quantum.bit
-    // CHECK-PAULI: [[M3:%.+]], [[out_3:%.+]] = qec.select.ppm([[M2]], ["Y"], ["X"]) [[out_2]]#1 : !quantum.bit
+    // CHECK-PAULI: [[M3:%.+]], [[out_3:%.+]] = qec.select.ppm([[M2]], ["X"], ["Y"]) [[out_2]]#1 : !quantum.bit
     // CHECK-PAULI: [[Q7:%.+]]  = qec.ppr ["Y"](2) [[out_2]]#0 cond([[M3]]) : !quantum.bit
 
     // // PPR ["Y", "X"](8) Q2, Q1
@@ -348,9 +348,9 @@ func.func public @game_of_surface_code(%arg0: !quantum.bit, %arg1: !quantum.bit,
     // CHECK-PAULI: [[Q9:%.+]]:2  = qec.ppr ["Y", "X"](2) [[out_4]]#0, [[out_4]]#1 cond([[M5]]) : !quantum.bit, !quantum.bit
 
     // // PPR ["Z", "Z", "Y", "Z"](-8) Q2, Q1, Q3, Q0
-    // CHECK-PAULI: [[Q10:%.+]] = qec.fabricate  magic_conj
+    // CHECK-PAULI: [[Q10:%.+]] = qec.fabricate  magic
     // CHECK-PAULI: [[M6:%.+]], [[out_6:%.+]]:5 = qec.ppm ["Z", "Z", "Y", "Z", "Z"] [[Q9]]#0, [[Q9]]#1, [[Q7]], [[Q5]], [[Q10]] : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
-    // CHECK-PAULI: [[M7:%.+]], [[out_7:%.+]] = qec.select.ppm([[M6]], ["Y"], ["X"]) [[out_6]]#4 : !quantum.bit
+    // CHECK-PAULI: [[M7:%.+]], [[out_7:%.+]] = qec.select.ppm([[M6]], ["X"], ["Y"]) [[out_6]]#4 : !quantum.bit
     // CHECK-PAULI: [[Q11:%.+]]:4  = qec.ppr ["Z", "Z", "Y", "Z"](2) [[out_6]]#0, [[out_6]]#1, [[out_6]]#2, [[out_6]]#3 cond([[M7]]) : !quantum.bit, !quantum.bit, !quantum.bit
 
     // // PPM Z, Z, Y, Y -> Q2, Q1, Q0, Q3
