@@ -31,19 +31,6 @@ using namespace mlir;
 namespace catalyst {
 namespace quantum {
 
-void removeUnusedAllocs(Operation *op)
-{
-    // Remove all unused quantum.alloc operations.
-
-    MLIRContext *ctx = op->getContext();
-    RewritePatternSet removeUnunsedAllocPatterns(ctx);
-    AllocOp::getCanonicalizationPatterns(removeUnunsedAllocPatterns, ctx);
-
-    if (failed(applyPatternsGreedily(op, std::move(removeUnunsedAllocPatterns)))) {
-        op->emitOpError("Failed to canonicalize quantum.alloc operation.");
-    }
-}
-
 void removeQuantumMeasurements(func::FuncOp &function, PatternRewriter &rewriter)
 {
     // Delete measurement operations.

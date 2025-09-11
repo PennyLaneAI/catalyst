@@ -59,13 +59,11 @@ struct GradientLoweringPass : impl::GradientLoweringPassBase<GradientLoweringPas
         scf::ForOp::getCanonicalizationPatterns(gradientPatterns, &getContext());
         catalyst::quantum::InsertOp::getCanonicalizationPatterns(gradientPatterns, &getContext());
         catalyst::quantum::DeallocOp::getCanonicalizationPatterns(gradientPatterns, &getContext());
+        catalyst::quantum::AllocOp::getCanonicalizationPatterns(gradientPatterns, &getContext());
 
         if (failed(applyPatternsGreedily(getOperation(), std::move(gradientPatterns)))) {
             return signalPassFailure();
         }
-
-        // Need to remove unused allocs left during cloning.
-        quantum::removeUnusedAllocs(getOperation());
 
         // Guarantee that functions intended to be free of quantum ops are indeed so after folding.
         for (Region &region : getOperation()->getRegions()) {

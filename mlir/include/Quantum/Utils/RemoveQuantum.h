@@ -20,7 +20,6 @@
 namespace catalyst {
 namespace quantum {
 
-void removeUnusedAllocs(mlir::Operation *op);
 void removeQuantumMeasurements(mlir::func::FuncOp &function, mlir::PatternRewriter &rewriter);
 void replaceQuantumMeasurements(mlir::func::FuncOp &function, mlir::PatternRewriter &rewriter);
 mlir::LogicalResult verifyQuantumFree(mlir::func::FuncOp function);
