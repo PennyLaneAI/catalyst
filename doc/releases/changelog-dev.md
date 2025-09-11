@@ -154,6 +154,9 @@
    - fix wrong type signature of `Counts` API function
   [(#2032)](https://github.com/PennyLaneAI/catalyst/pull/2032)
 
+* Fixed the Clifford PPR decomposition rule where using the Y measurement should be take the inverse.
+  [(#2043)](https://github.com/PennyLaneAI/catalyst/pull/2043)
+
 <h3>Internal changes ⚙️</h3>
 
 * Updates use of `qml.transforms.dynamic_one_shot.parse_native_mid_circuit_measurements` to improved signature.
