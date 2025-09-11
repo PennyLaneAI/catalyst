@@ -28,7 +28,7 @@
 
 <h3>Improvements 🛠</h3>
 
-* Catalyst now supporting classical return values with one-shot mode.
+* Catalyst now supports classical return values with one-shot mode.
   For example, the code below will generate 10 values, with an equal probability of 42 and 43
   appearing. You can also return `measure(0)` as well.
   [(#2001)](https://github.com/PennyLaneAI/catalyst/pull/2001)
