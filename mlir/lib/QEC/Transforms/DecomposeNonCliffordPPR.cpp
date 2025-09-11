@@ -119,7 +119,6 @@ void decomposePauliCorrectedPiOverEight(bool avoidPauliYMeasure, PPRotationOp op
             for (auto q : axillaryQubits)
                 rewriter.create<DeallocQubitOp>(loc, q);
             rewriter.create<scf::YieldOp>(loc, pprPI2.getOutQubits());
-            // rewriter.replaceOp(op, pprPI2.getOutQubits());
         };
 
         auto XBuilder = [&](OpBuilder &builder, Location loc) {
@@ -133,7 +132,6 @@ void decomposePauliCorrectedPiOverEight(bool avoidPauliYMeasure, PPRotationOp op
             rewriter.create<DeallocQubitOp>(loc,
                                             ppmX.getOutQubits().back()); // Deallocate |m⟩ qubit
             rewriter.create<scf::YieldOp>(loc, pprPI2.getOutQubits());
-            // rewriter.replaceOp(op, pprPI2.getOutQubits());
         };
         auto ifOp = rewriter.create<scf::IfOp>(loc, ifCondition, YBuilder, XBuilder);
         rewriter.replaceOp(op, ifOp);
