@@ -519,7 +519,7 @@ def test_clifford_to_ppm():
     @qjit(pipelines=pipe, target="mlir")
     def test_clifford_to_ppm_workflow():
 
-        @ppm_compilation
+        @ppm_compilation(decompose_method="auto-corrected")
         @qml.qnode(qml.device("lightning.qubit", wires=2))
         def f():
             for idx in range(5):
@@ -540,11 +540,23 @@ def test_clifford_to_ppm():
                 qml.T(idx)
                 qml.T(idx + 1)
 
+        @ppm_compilation(
+            decompose_method="pauli-corrected", max_pauli_size=2
+        )
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def g():
+            for idx in range(5):
+                qml.H(idx)
+                qml.CNOT(wires=[idx, idx + 1])
+                qml.T(idx)
+                qml.T(idx + 1)
+
         return f(), g()
 
     assert 'transform.apply_registered_pass "ppm-compilation"' in test_clifford_to_ppm_workflow.mlir
     optimized_ir = test_clifford_to_ppm_workflow.mlir_opt
     assert 'transform.apply_registered_pass "ppm-compilation"' not in optimized_ir
+    assert 'qec.select.ppm' in optimized_ir
     assert 'qec.ppm ["X", "Z", "Z"]' in optimized_ir
     assert 'qec.ppm ["Z", "Y"]' in optimized_ir
     assert 'qec.ppr ["X", "Z"](2)' in optimized_ir

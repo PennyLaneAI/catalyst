@@ -57,7 +57,7 @@ def DecomposeMethodOption : Option<
                     "Decompose by injecting magic states method."),
         clEnumValN(::catalyst::qec::DecomposeMethod::PauliCorrected,
                     "pauli-corrected",
-                    "Decompose by injecting Pauli states method.")
+                    "Decompose by using the pauli-corrected method.")
     )}]>;
 
 def AvoidYMeasureOption : Option<
