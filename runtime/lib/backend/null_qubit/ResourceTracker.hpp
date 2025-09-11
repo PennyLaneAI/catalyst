@@ -50,8 +50,8 @@ struct ResourceTracker final {
      * @param wires The wires the operation is being applied to
      * @param controlled_wires The control wires the operation is being applied to
      */
-    void Operation(const std::string &name, const std::vector<QubitIdType> &wires,
-                   const std::vector<QubitIdType> &controlled_wires)
+    void RecordOperation(const std::string &name, const std::vector<QubitIdType> &wires,
+                         const std::vector<QubitIdType> &controlled_wires)
     {
         // Sanity check that wire numbers make sense
         std::size_t total_wires = wires.size() + controlled_wires.size();
@@ -86,12 +86,7 @@ struct ResourceTracker final {
      * Initializes the tracker with depth computation disabled and no static filename set.
      * Calls Reset() to ensure all tracking data structures are properly initialized.
      */
-    ResourceTracker() : compute_depth (false), static_filename_(false)
-    {
-        Reset();
-        compute_depth_ = false;
-        static_filename_ = false;
-    }
+    ResourceTracker() : static_filename_(false), compute_depth_(false) { Reset(); }
 
     /**
      * @brief Resets all tracked resource data to initial state
@@ -250,7 +245,7 @@ struct ResourceTracker final {
             prefix += "Adjoint(";
             suffix += ")";
         }
-        Operation(prefix + name + suffix, wires, controlled_wires);
+        RecordOperation(prefix + name + suffix, wires, controlled_wires);
     }
 
     /**
@@ -276,7 +271,7 @@ struct ResourceTracker final {
         if (inverse) {
             op_name = "Adjoint(" + op_name + ")";
         }
-        Operation(op_name, wires, controlled_wires);
+        RecordOperation(op_name, wires, controlled_wires);
     }
 
     /**
@@ -289,7 +284,7 @@ struct ResourceTracker final {
      * @param resources_file File pointer where JSON data will be written
      * @throws Runtime error if file writing fails
      */
-    void PrintResourceUsage(FILE *resources_file)
+    void PrintResourceUsageToFile(FILE *resources_file)
     {
         std::stringstream resources;
 
@@ -354,7 +349,7 @@ struct ResourceTracker final {
             RT_FAIL(err_msg.c_str());                                      // LCOV_EXCL_LINE
         }
         else {
-            PrintResourceUsage(resources_file);
+            PrintResourceUsageToFile(resources_file);
             fclose(resources_file);
         }
 

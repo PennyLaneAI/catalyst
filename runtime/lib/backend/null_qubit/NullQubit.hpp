@@ -273,68 +273,68 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      * @brief Creates a null observable and returns a dummy identifier
      *
      * The null device doesn't perform actual observable construction or measurement.
-     * This method always returns 0.0 to satisfy the interface requirements.
+     * This method always returns 0 to satisfy the interface requirements.
      *
      * @param obs_id The type of observable (Identity, PauliX, PauliY, PauliZ, Hadamard, or
      * Hermitian)
      * @param matrix The matrix representation for Hermitian observables (ignored)
      * @param wires The qubits the observable acts on (ignored)
-     * @return ObsIdType Always returns 0.0
+     * @return ObsIdType Always returns 0
      */
     auto Observable(ObsId, const std::vector<std::complex<double>> &,
                     const std::vector<QubitIdType> &) -> ObsIdType
     {
-        return 0.0;
+        return 0;
     }
 
     /**
      * @brief Creates a null tensor product observable and returns a dummy identifier
      *
      * The null device doesn't perform actual tensor product construction.
-     * This method always returns 0.0 to satisfy the interface requirements.
+     * This method always returns 0 to satisfy the interface requirements.
      *
      * @param obs_ids Vector of observable identifiers to combine (ignored)
-     * @return ObsIdType Always returns 0.0
+     * @return ObsIdType Always returns 0
      */
-    auto TensorObservable(const std::vector<ObsIdType> &) -> ObsIdType { return 0.0; }
+    auto TensorObservable(const std::vector<ObsIdType> &) -> ObsIdType { return 0; }
 
     /**
      * @brief Creates a null Hamiltonian observable and returns a dummy identifier
      *
      * The null device doesn't perform actual Hamiltonian construction.
-     * This method always returns 0.0 to satisfy the interface requirements.
+     * This method always returns 0 to satisfy the interface requirements.
      *
      * @param coeffs Coefficients for the Hamiltonian terms (ignored)
      * @param obs_ids Observable identifiers for the Hamiltonian terms (ignored)
-     * @return ObsIdType Always returns 0.0
+     * @return ObsIdType Always returns 0
      */
     auto HamiltonianObservable(const std::vector<double> &, const std::vector<ObsIdType> &)
         -> ObsIdType
     {
-        return 0.0;
+        return 0;
     }
 
     /**
-     * @brief Returns a dummy expectation value (always 0.0)
+     * @brief Returns a dummy expectation value (always 0)
      *
      * The null device doesn't compute actual expectation values since it maintains
-     * no quantum state. Always returns 0.0 for consistency.
+     * no quantum state. Always returns 0 for consistency.
      *
      * @param obs_id The observable identifier (ignored)
-     * @return double Always returns 0.0
+     * @return double Always returns 0
      */
-    auto Expval(ObsIdType) -> double { return 0.0; }
+    auto Expval(ObsIdType) -> double { return 0; }
 
     /**
-     * @brief Returns a dummy variance value (always 0.0)
+     * @brief Returns a dummy variance value (always 0)
      *
      * The null device doesn't compute actual variances since it maintains
-     * no quantum state. Always returns 0.0 for consistency.
+     * no quantum state. Always returns 0 for consistency.
      *
      * @param obs_id The observable identifier (ignored)
-     * @return double Always returns 0.0
+     * @return double Always returns 0
      */
-    auto Var(ObsIdType) -> double { return 0.0; }
+    auto Var(ObsIdType) -> double { return 0; }
 
     /**
      * @brief Fills the state vector with the computational ground state

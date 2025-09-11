@@ -240,7 +240,7 @@ TEST_CASE("Test Resource Tracker Printing", "[resourcetracking]")
     CHECK(tracker->GetNumWires() == 4);
 
     // Capture resources usage
-    tracker->PrintResourceUsage(resource_file_w);
+    tracker->PrintResourceUsageToFile(resource_file_w);
     fclose(resource_file_w);
 
     // Open the file of resource data
