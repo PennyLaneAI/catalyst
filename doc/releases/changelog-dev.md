@@ -49,6 +49,12 @@
   print(circuit_2())
   ```
 
+* Improve the pass `--ppm-specs` to count the depth of PPRs and PPMs in the circuit.
+  [(#2014)](https://github.com/PennyLaneAI/catalyst/pull/2014)
+
+* The default mid-circuit measurement method in catalyst has been changed from `"single-branch-statistics"` to `"one-shot"`.
+  [[#2017]](https://github.com/PennyLaneAI/catalyst/pull/2017)
+
 * A new pass `--partition-layers` has been added to group PPR/PPM operations into `qec.layer`
   operations based on qubit interactive and commutativity, enabling circuit analysis and
   potentially to support parallel execution.
@@ -107,6 +113,11 @@
 * A new jax primitive `qdealloc_qb_p` is available for single qubit deallocations.
   [(#2005)](https://github.com/PennyLaneAI/catalyst/pull/2005)
 
+* Changed the attribute of `number_original_arg` in `CustomCallOp` from dense array to integer.
+  [(#2022)](https://github.com/PennyLaneAI/catalyst/pull/2022)
+
+* Renaming `get_ppm_specs` to `ppm_specs` and the corresponding results' properties.
+  [(#2031)](https://github.com/PennyLaneAI/catalyst/pull/2031)
 
 <h3>Breaking changes 💔</h3>
 
@@ -151,6 +162,15 @@
   qubits on the `"null.qubit"` device has been fixed.
   [(#1926)](https://github.com/PennyLaneAI/catalyst/pull/1926)
 
+* Stacked Python decorators for built-in Catalyst passes are now applied in the correct order when
+  program capture is enabled.
+  [(#2027)](https://github.com/PennyLaneAI/catalyst/pull/2027)
+
+* Fix usage of OQC device, including:
+   - fix object file system extension on macOS
+   - fix wrong type signature of `Counts` API function
+  [(#2032)](https://github.com/PennyLaneAI/catalyst/pull/2032)
+
 <h3>Internal changes ⚙️</h3>
 
 * Updates use of `qml.transforms.dynamic_one_shot.parse_native_mid_circuit_measurements` to improved signature.
@@ -170,6 +190,7 @@
 
 * Update imports for noise transforms from `pennylane.transforms` to `pennylane.noise`.
   [(#1918)](https://github.com/PennyLaneAI/catalyst/pull/1918)
+  [(#2020)](https://github.com/PennyLaneAI/catalyst/pull/2020)
 
 * Improve error message for quantum subroutines when used outside a quantum context.
   [(#1932)](https://github.com/PennyLaneAI/catalyst/pull/1932)
@@ -243,7 +264,29 @@
   `qml.Rot` and `qml.CRot`.
   [(#1955)](https://github.com/PennyLaneAI/catalyst/pull/1955)
 
+* Catalyst now supports *array-backed registers*, meaning that `quantum.insert` operations can be
+  configured to allow for the insertion of a qubit into an arbitrary position within a register.
+  [(#2000)](https://github.com/PennyLaneAI/catalyst/pull/2000)
+
+  This feature is disabled by default. To enable it, configure the pass pipeline to set the
+  `use-array-backed-registers` option of the `convert-quantum-to-llvm` pass to `true`. For example,
+
+  ```console
+  $ catalyst --tool=opt --pass-pipeline="builtin.module(convert-quantum-to-llvm{use-array-backed-registers=true})" <input file>
+  ```
+
+* Fix auxiliary qubit deallocation in `decompose-non-clifford-ppr` pass
+  in the `clifford-corrected` method.
+  [(#2039)](https://github.com/PennyLaneAI/catalyst/pull/2039)
+
 <h3>Documentation 📝</h3>
+
+* The Catalyst Command Line Interface documentation incorrectly stated that the `catalyst`
+  executable is available in the `catalyst/bin/` directory relative to the environment's
+  installation directory when installed via pip. The documentation has been updated to point to the
+  correct location, which is the `bin/` directory relative to the environment's installation
+  directory.
+  [(#2030)](https://github.com/PennyLaneAI/catalyst/pull/2030)
 
 <h3>Contributors ✍️</h3>
 
@@ -254,6 +297,7 @@ Joey Carter,
 Yushao Chen,
 Sengthai Heng,
 David Ittah,
+Jeffrey Kam,
 Christina Lee,
 Joseph Lee,
 Andrija Paurevic,
@@ -261,4 +305,4 @@ Ritu Thombre,
 Roberto Turrado,
 Paul Haochen Wang,
 Jake Zaia,
-Hongsheng Zheng.
+Hongsheng Zheng

@@ -1259,7 +1259,6 @@ def apply_transforms(
         # TODO: Ideally we should allow qnode transforms that don't modify the measurements to
         # operate in the permissive tracing mode, but that currently leads to a small number of
         # test failures due to the different result format produced in trace_quantum_function.
-
         only_with_dynamic_one_shot = all(
             "dynamic_one_shot_partial" in str(getattr(qnode, "transform", ""))
             for qnode in qnode_program
@@ -1602,8 +1601,7 @@ def _trace_quantum_phase(
             meas_results = tree_unflatten(meas_trees, meas_tracers)
 
             # TODO: Allow the user to return whatever types they specify.
-            if cls_result.tracing_mode == TracingMode.TRANSFORM:
-                assert isinstance(meas_results, list)
+            if cls_result.tracing_mode == TracingMode.TRANSFORM and isinstance(meas_results, list):
                 if len(meas_results) == 1:
                     transformed_results.append(meas_results[0])
                 else:
