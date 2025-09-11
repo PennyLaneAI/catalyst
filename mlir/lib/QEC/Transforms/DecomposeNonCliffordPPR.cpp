@@ -19,6 +19,7 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
+#include <llvm/Support/Debug.h>
 
 #include "Quantum/IR/QuantumOps.h"
 
@@ -89,18 +90,18 @@ void decomposePauliCorrectedPiOverEight(bool avoidPauliYMeasure, PPRotationOp op
     auto ppmPZRes = ppmPZ.getMres();
     int16_t rotationKind = static_cast<int16_t>(op.getRotationKind());
     if (avoidPauliYMeasure) {
-        auto constNegOne = rewriter.create<arith::ConstantOp>(
-            loc, rewriter.getIntegerAttr(ppmPZRes.getType(), -1));
-        auto constPosOne =
+        auto constFalse =
+            rewriter.create<arith::ConstantOp>(loc, rewriter.getIntegerAttr(ppmPZRes.getType(), 0));
+        auto constTrue =
             rewriter.create<arith::ConstantOp>(loc, rewriter.getIntegerAttr(ppmPZRes.getType(), 1));
         auto ifCondition = rewriter.create<arith::XOrIOp>(
-            loc, ppmPZRes, rotationKind < 0 ? constNegOne.getResult() : constPosOne.getResult());
+            loc, ppmPZRes, rotationKind > 0 ? constTrue.getResult() : constFalse.getResult());
 
-        /// rotationKind > 0 and meas = -1 -> xor -1 +1 -> ifCondition = True  and do Y meas
-        /// rotationKind > 0 and meas = +1 -> xor +1 +1 -> ifCondition = False and do X meas
-        /// rotationKind < 0 and meas = -1 -> xor -1 -1 -> ifCondition = False and do X meas
-        /// rotationKind < 0 and meas = +1 -> xor -1 +1 -> ifCondition = True  and do Y meas
-        /// This means, we do Y meas when True and X meas when False
+        // rotationKind > 0 and meas = -1 -> xor -1 +1 -> ifCondition = True  and do Y meas
+        // rotationKind > 0 and meas = +1 -> xor +1 +1 -> ifCondition = False and do X meas
+        // rotationKind < 0 and meas = -1 -> xor -1 -1 -> ifCondition = False and do X meas
+        // rotationKind < 0 and meas = +1 -> xor -1 +1 -> ifCondition = True  and do Y meas
+        // This means, we measure in Y basis when True and X basis when False
 
         auto YBuilder = [&](OpBuilder &builder, Location loc) {
             // Initialize |Y⟩ state
@@ -133,7 +134,7 @@ void decomposePauliCorrectedPiOverEight(bool avoidPauliYMeasure, PPRotationOp op
                                             ppmX.getOutQubits().back()); // Deallocate |m⟩ qubit
             rewriter.create<scf::YieldOp>(loc, pprPI2.getOutQubits());
         };
-        auto ifOp = rewriter.create<scf::IfOp>(loc, ifCondition, YBuilder, XBuilder);
+        auto ifOp = rewriter.create<scf::IfOp>(loc, ifCondition.getResult(), YBuilder, XBuilder);
         rewriter.replaceOp(op, ifOp);
     }
     else {
