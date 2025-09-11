@@ -31,7 +31,7 @@ using namespace mlir;
 namespace catalyst {
 namespace quantum {
 
-void removeUnunsedAllocs(Operation *op)
+void removeUnusedAllocs(Operation *op)
 {
     // Remove all unused quantum.alloc operations.
 

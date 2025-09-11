@@ -65,7 +65,7 @@ struct GradientLoweringPass : impl::GradientLoweringPassBase<GradientLoweringPas
         }
 
         // Need to remove unused allocs left during cloning.
-        quantum::removeUnunsedAllocs(getOperation());
+        quantum::removeUnusedAllocs(getOperation());
 
         // Guarantee that functions intended to be free of quantum ops are indeed so after folding.
         for (Region &region : getOperation()->getRegions()) {
