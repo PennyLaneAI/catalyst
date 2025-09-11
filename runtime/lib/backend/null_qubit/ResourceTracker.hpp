@@ -73,7 +73,7 @@ struct ResourceTracker final {
             }
             // All wires used in this operation must now have their depth set based on this max
             max_depth++;
-            for (const auto &i : wires) {
+            for (const auto &i : combined_wires) {
                 wire_depths_[i] = max_depth;
             }
         }
@@ -86,7 +86,7 @@ struct ResourceTracker final {
      * Initializes the tracker with depth computation disabled and no static filename set.
      * Calls Reset() to ensure all tracking data structures are properly initialized.
      */
-    ResourceTracker()
+    ResourceTracker() : compute_depth (false), static_filename_(false)
     {
         Reset();
         compute_depth_ = false;

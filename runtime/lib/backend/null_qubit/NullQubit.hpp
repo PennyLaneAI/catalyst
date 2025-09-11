@@ -237,7 +237,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      * @param controlled_wires Control qubits for controlled operations
      * @param controlled_values Control values for multi-controlled operations
      */
-    void NamedOperation(const std::string &name, const std::vector<double> &params,
+    void NamedOperation(const std::string &name, [[maybe_unused]] const std::vector<double> &params,
                         const std::vector<QubitIdType> &wires, bool inverse,
                         const std::vector<QubitIdType> &controlled_wires = {},
                         const std::vector<bool> &controlled_values = {})
