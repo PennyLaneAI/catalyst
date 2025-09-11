@@ -127,12 +127,6 @@ def DisentangleCNOTPass : Pass<"disentangle-CNOT"> {
     ];
 }
 
-def UserDefinedDecompositionPass : Pass<"user-defined-decomposition", "mlir::ModuleOp"> {
-    let summary = "Replace target quantum operation with user-defined quantum gate decompositions";
-
-    let constructor = "catalyst::createUserDefinedDecompositionPass()";
-}
-
 def DisentangleSWAPPass : Pass<"disentangle-SWAP"> {
     let summary = "Replace a SWAP gate with single qubit gates and a shorter SWAPZ gates whenever possible.";
 

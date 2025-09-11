@@ -15,12 +15,11 @@ file(GLOB SRC
     merge_rotation.cpp
     MergeRotationsPatterns.cpp
     decompose_lowering.cpp
+    DecomposeLoweringPatterns.cpp
     DisentangleSWAP.cpp
     DisentangleCNOT.cpp
     ions_decompositions.cpp
     IonsDecompositionPatterns.cpp
-    UserDefinedDecompositionPass.cpp
-    UserDefinedDecompositionPatterns.cpp
     loop_boundary_optimization.cpp
     LoopBoundaryOptimizationPatterns.cpp
 )

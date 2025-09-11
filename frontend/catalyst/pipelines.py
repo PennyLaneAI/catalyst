@@ -193,7 +193,6 @@ class CompileOptions:
         # Dictionaries in python are ordered
         stages = {}
         stages["EnforceRuntimeInvariantsPass"] = get_enforce_runtime_invariants_stage(self)
-        stages["DecompositionPass"] = get_decomposition_stage(self)
         stages["HLOLoweringPass"] = get_hlo_lowering_stage(self)
         stages["QuantumCompilationPass"] = get_quantum_compilation_stage(self)
         stages["BufferizationPass"] = get_bufferization_stage(self)
@@ -221,14 +220,6 @@ def get_enforce_runtime_invariants_stage(_options: CompileOptions) -> List[str]:
         "inline-nested-module",
     ]
     return enforce_runtime_invariants
-
-
-def get_decomposition_stage(_options: CompileOptions) -> List[str]:
-    """Returns the list of passes in the decomposition stage."""
-    decomposition = [
-        "user-defined-decomposition",
-    ]
-    return decomposition
 
 
 def get_hlo_lowering_stage(_options: CompileOptions) -> List[str]:

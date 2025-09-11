@@ -34,7 +34,6 @@ std::unique_ptr<mlir::Pass> createDecomposeLoweringPass();
 std::unique_ptr<mlir::Pass> createDisentangleCNOTPass();
 std::unique_ptr<mlir::Pass> createDisentangleSWAPPass();
 std::unique_ptr<mlir::Pass> createIonsDecompositionPass();
-std::unique_ptr<mlir::Pass> createUserDefinedDecompositionPass();
 std::unique_ptr<mlir::Pass> createLoopBoundaryOptimizationPass();
 
 } // namespace catalyst
