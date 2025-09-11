@@ -99,7 +99,7 @@ Catalyst
    :hidden:
 
     Magic State Distillation <https://pennylane.ai/qml/demos/tutorial_magic_state_distillation>
-    Variational Quantum Eigensolver <https://pennylane.ai/qml/demos/tutorial_vqe>
+    Variational Quantum Eigensolver <https://pennylane.ai/qml/demos/tutorial_how_to_quantum_just_in_time_compile_vqe_catalyst>
     QML Optimization with Optax <https://pennylane.ai/qml/demos/tutorial_How_to_optimize_QML_model_using_JAX_catalyst_and_Optax>
     
 
