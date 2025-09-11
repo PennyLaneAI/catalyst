@@ -15,6 +15,7 @@
 // RUN: quantum-opt --pass-pipeline="builtin.module(decompose-non-clifford-ppr{decompose-method=clifford-corrected})" --split-input-file -verify-diagnostics %s | FileCheck %s --check-prefix=CHECK-INJECT
 // RUN: quantum-opt --pass-pipeline="builtin.module(decompose-non-clifford-ppr{decompose-method=auto-corrected})" --split-input-file -verify-diagnostics %s | FileCheck %s --check-prefix=CHECK-AUTO
 // RUN: quantum-opt --pass-pipeline="builtin.module(decompose-non-clifford-ppr{decompose-method=pauli-corrected})" --split-input-file -verify-diagnostics %s | FileCheck %s --check-prefix=CHECK-PAULI
+// RUN: quantum-opt --pass-pipeline="builtin.module(decompose-non-clifford-ppr{decompose-method=pauli-corrected,avoid-y-measure=true})" --split-input-file -verify-diagnostics %s | FileCheck %s --check-prefix=CHECK-PAULI_NO_Y
 
 func.func @test_ppr_to_ppm(%q1 : !quantum.bit) {
     %0 = qec.ppr ["Z"](8) %q1 : !quantum.bit
