@@ -16,8 +16,9 @@ from typing import Type, TypeVar
 
 import jax
 import pennylane as qml
-import pennylane.compiler.python_compiler.quantum_dialect as quantum
-from pennylane.compiler.python_compiler.transforms import xdsl_transform
+import pennylane.compiler.python_compiler.dialects.quantum as quantum
+# import pennylane.compiler.python_compiler.quantum_dialect as quantum
+from pennylane.compiler.python_compiler.transforms.api import compiler_transform
 from xdsl import ir, passes
 from xdsl.context import Context
 from xdsl.dialects import arith, builtin, func, memref, scf, tensor
@@ -265,9 +266,6 @@ class TT_ctrl_flow_for_loop(RewritePattern):
             # print(module)
 
 
-                
-                
-                
     def copy_op_after_target(self, target_op: Type[ir.Operation], op_list: list[ir.Operation], rewriter: PatternRewriter):
         """Copy the operations in the list after the target operation."""
         if not op_list:
@@ -1109,7 +1107,8 @@ class TreeTraversal(RewritePattern):
         return casted_sum
 
 
-@xdsl_transform
+# @xdsl_transform
+@compiler_transform 
 class TTPass(passes.ModulePass):
     name = "tree-traversal"
 
@@ -1123,7 +1122,7 @@ class TTPass(passes.ModulePass):
 
 
         print("%"*120)
-        print("Before*"*10)
+        print("Before--"*10)
         print("")
         print(module)
         print("*"*120)
@@ -1131,11 +1130,12 @@ class TTPass(passes.ModulePass):
 
 
         # self.apply_on_qnode(module, TreeTraversal())
+        # breakpoint()
         self.apply_on_qnode(module, TT_ctrl_flow_for_loop())
         
         # Why do we not use ctx here?
 
-        module.verify()
+        # module.verify()
         print("%"*120)
         print("*"*120)
         print(module)

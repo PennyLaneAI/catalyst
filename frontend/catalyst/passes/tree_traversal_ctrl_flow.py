@@ -14,8 +14,13 @@
 
 from typing import Type, TypeVar
 
+import numpy as np
+np.set_printoptions(linewidth=200, precision=6, suppress=True, formatter={'float': '{:14.4f}'.format, 'complexfloat': '{:12.4f}'.format})
+
 import jax
 import pennylane as qml
+from catalyst import qjit
+import catalyst
 
 import pennylane.compiler.python_compiler.dialects.quantum as quantum
 from pennylane.compiler.python_compiler.transforms.api import compiler_transform
@@ -28,20 +33,39 @@ from xdsl.printer import Printer
 
 from catalyst.passes.xdsl_plugin import getXDSLPluginAbsolutePath
 
-def print_module(module: builtin.ModuleOp, section: str = ""):
+def print_module(module: ir.Operation | ir.Block, section: str = ""):
 
     length_line = 100
 
+    printer = Printer()
+
     if True:
-        # printer = Printer()
         print("%"*length_line)
         print("")
         print(f"---{section}---"*4)
         print("")
-        Printer().print_op(module)
+        # if isinstance(module, ir.Module):
+        #     printer.print(module)
+        if isinstance(module, ir.Operation):
+            printer.print_op(module)
+        elif isinstance(module, ir.Block):
+            printer.print_block(module)
+        elif isinstance(module, ir.Region):
+            printer.print_region(module)
         print("")
-        # print("%"*length_line)
-        # print("")
+
+def print_block(block: ir.Block, section: str = ""):
+
+    length_line = 100
+
+    if True:
+        print("%"*length_line)
+        print("")
+        print(f"---{section}---"*4)
+        print("")
+        Printer().print_block(block)
+        print("")
+
 
 T = TypeVar("T")
 
@@ -130,7 +154,7 @@ class TT_ctrl_flow_for_loop(pattern_rewriter.RewritePattern):
         for_loop_op_iter = for_loop_block.walk()
         for fop in for_loop_op_iter:
 
-            if isinstance(fop, quantum.CustomOp) and fop.gate_name.data == "PauliY":
+            if isinstance(fop, quantum.MeasureOp):
                 record_section = "B"
                 fop_split = fop
                 continue
@@ -163,14 +187,21 @@ class TT_ctrl_flow_for_loop(pattern_rewriter.RewritePattern):
         # Insert the loop split operation
         
         fop_list_section_B.insert(0, fop_split)
+        
 
         # Add the operation after the loop body
 
         for for_op_B in fop_list_section_B:
 
-            value_mapper = {
-                for_op_B.in_qubits[0]: first_quantum_op_after_loop.in_qubits[0]
-            }
+            if for_op_B == fop_split:
+                value_mapper = {
+                    for_op_B.in_qubit: first_quantum_op_after_loop.in_qubits[0]
+                }
+            else: 
+                value_mapper = {
+                    for_op_B.in_qubits[0]: first_quantum_op_after_loop.in_qubits[0]
+                }
+
             clone_for_op_B = for_op_B.clone(value_mapper=value_mapper)
             clone_for_op_B.attributes["FDX_id"] = builtin.StringAttr("op_AFTER_LOOP")
 
@@ -179,7 +210,10 @@ class TT_ctrl_flow_for_loop(pattern_rewriter.RewritePattern):
             print_module(funcOp, "insert first op after loop")
             
             input_first_op_after_loop = first_quantum_op_after_loop.in_qubits[0]
-            input_first_op_after_loop.replace_by_if(clone_for_op_B.out_qubits[0], lambda use: use.operation == first_quantum_op_after_loop)
+            if for_op_B == fop_split:
+                input_first_op_after_loop.replace_by_if(clone_for_op_B.out_qubit, lambda use: use.operation == first_quantum_op_after_loop)
+            else:
+                input_first_op_after_loop.replace_by_if(clone_for_op_B.out_qubits[0], lambda use: use.operation == first_quantum_op_after_loop)
 
             print_module(funcOp, "replace if after loop")
             
@@ -205,19 +239,37 @@ class TT_ctrl_flow_for_loop(pattern_rewriter.RewritePattern):
         #         test = fop
 
         # Rearrange the operations to put Y at top and move S to last
-        print_module(for_loop, "For Loop before rearrange")
+        print_module(for_loop.body, "For Loop before rearrange")
         
         
         last_B = fop_list_section_B[-1]
-        first_A = fop_list_section_A[0]
+        op_A = fop_list_section_A[0]
 
-        fop_split.in_qubits[0].replace_by_if(first_A.in_qubits[0], lambda use: use.operation == fop_split)
+        for op_A in fop_list_section_A:
 
-        first_A.in_qubits[0].replace_by_if(last_B.out_qubits[0], lambda use: use.operation == first_A)
-        last_B.out_qubits[0].replace_by_if(first_A.out_qubits[0], lambda use: use.operation != first_A)
+            # fop_split.in_qubits[0].replace_by_if(first_A.in_qubits[0], lambda use: use.operation == fop_split)
+            
+            if op_A == fop_split:
+                continue
+            
+            next_op_A = op_A.next_op
+            
+            if next_op_A == fop_split:
+                next_op_A.in_qubit.replace_by_if(op_A.in_qubits[0], lambda use: use.operation != op_A)
+            else: 
+                next_op_A.in_qubits[0].replace_by_if(op_A.in_qubits[0], lambda use: use.operation != op_A)
 
-        first_A.detach()
-        rewriter.insert_op(first_A, InsertPoint.after(last_B))
+            op_A.in_qubits[0].replace_by_if(last_B.out_qubits[0], lambda use: use.operation == op_A)
+            # op_A.out_qubits[0].replace_by_if(op_A.in_qubits[0], lambda use: use.operation == op_A)
+            
+            last_B.out_qubits[0].replace_by_if(op_A.out_qubits[0], lambda use: use.operation != op_A)
+
+            op_A.detach()
+            rewriter.insert_op(op_A, InsertPoint.after(last_B))
+            last_B = op_A
+            
+            print_block(op_A.parent_block(), "For Loop rearrange step")
+
 
 
 
@@ -724,19 +776,22 @@ if __name__ == "__main__":
             print(text_01())
             
         case "example_04": 
+            
+            wires = 5
             @TT_for_loop_Pass
-            @qml.qnode(qml.device("lightning.qubit", wires=2))
+            @qml.qnode(qml.device("lightning.qubit", wires=wires))
             def captured_circuit(x: float):
 
                 # -------------------------------------------------
                 # Example 04
                 # qml.H(0); qml.H(1)
                 qml.X(0)
-                for i in range(5):
+                for i in range(3):
                     qml.S(0)
                     qml.H(0)
                     qml.Y(0)
-                    qml.H(0)
+                    qml.measure(0)
+                    # qml.H(0)
                     qml.T(0)
                 qml.Z(0)        
                 return qml.state()
@@ -746,37 +801,67 @@ if __name__ == "__main__":
             def main(x: float):
                 return captured_circuit(x)
 
-            print(main(1.0))
+            res = []
+            res.append(main(1.0))
 
             # After transform 
 
-            @qml.qnode(qml.device("lightning.qubit", wires=2))
+            @qml.qnode(qml.device("lightning.qubit", wires=wires))
             def text_01():
                 # qml.H(0); qml.H(1)
-                qml.X(0); qml.S(0); qml.H(0)
+                qml.X(0); qml.S(0); qml.H(0); qml.Y(0)
 
-                for i in range(0,4):
-                    qml.Y(0)                    
-                    qml.H(0)
+                for i in range(0,2):
+                    qml.measure(0)
+                    # qml.H(0)
                     qml.T(0)
                     qml.S(0)
                     qml.H(0)
+                    qml.Y(0)                    
 
-                qml.Y(0); qml.H(0);  qml.T(0); qml.Z(0)
+                qml.measure(0);  qml.T(0); 
+                qml.Z(0)
                 return qml.state()
             
-            print(text_01())
+            res.append(text_01())
             
-            @qml.qnode(qml.device("lightning.qubit", wires=2))
+            @qml.qnode(qml.device("default.qubit", wires=wires))
             def text_01():
                 # qml.H(0); qml.H(1)
                 qml.X(0)
-                for i in range(5):
-                    qml.S(0)
-                    qml.Y(0)
+                for i in range(4):
+                    # qml.S(0)
+                    qml.H(0)
+                    # qml.Y(0)
+                    qml.measure(0, reset=True)
+                    # qml.H(0)
                     qml.T(0)
                 qml.Z(0)        
                 return qml.state()
             
-            print(text_01())
+            res.append(text_01())
+
+            reset = True
+            # unroll loop
+            @qml.qnode(qml.device("default.qubit", wires=wires))
+            def text_01():
+                # qml.H(0); qml.H(1)
+                qml.X(0); 
+
+                qml.H(0); qml.measure(0,reset=reset); qml.T(0)
+                qml.H(0); qml.measure(0,reset=reset); qml.T(0)
+                qml.H(0); qml.measure(0,reset=reset); qml.T(0)
+                qml.H(0); qml.measure(0,reset=reset); qml.T(0)
+
+                qml.Z(0)
+                return qml.state()
+            
+            res.append(text_01())
+
+            
+            res = np.array(res).T
+            
+            for r in res:
+                print(r)
+
 
