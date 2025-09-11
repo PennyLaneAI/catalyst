@@ -94,11 +94,7 @@ struct QuantumDevice {
      * only succeed if the ID array contains the same values as those produced by the
      * initial `AllocateQubits` call, otherwise the device is encouraged to raise an error.
      *
-     * Note that the interface does not require the qubit to be in a particular state. The behaviour
-     * for releasing an entangled qubit is left up to the device, and could include:
-     *  - raising a runtime error (assuming the device can detect impure states)
-     *  - continuing execution with an entangled but inaccessible qubit
-     *  - resetting the qubit with or without measuring its state
+     * See `ReleaseQubit` for caveats around releasing / resetting entangled qubits.
      *
      * Opposite of `AllocateQubits`.
      *
@@ -139,6 +135,8 @@ struct QuantumDevice {
      *  - raising a runtime error (assuming the device can detect impure states)
      *  - continuing execution with an entangled but inaccessible qubit
      *  - resetting the qubit with or without measuring its state
+     * In any case, the deallocated qubit must not be accessible by any future instructions or its
+     * state considered in any future results.
      *
      * Opposite of `AllocateQubit`.
      *
