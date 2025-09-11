@@ -13,14 +13,12 @@
 // limitations under the License.
 
 #include <deque>
-#include <utility> // std::move
 
 #include "llvm/ADT/SmallPtrSet.h"
 
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/PatternMatch.h"
-#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
