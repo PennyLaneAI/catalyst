@@ -97,11 +97,12 @@ void decomposePauliCorrectedPiOverEight(bool avoidPauliYMeasure, PPRotationOp op
         auto ifCondition = rewriter.create<arith::XOrIOp>(
             loc, ppmPZRes, rotationKind > 0 ? constTrue.getResult() : constFalse.getResult());
 
-        // rotationKind > 0 and meas = -1 -> xor -1 +1 -> ifCondition = True  and do Y meas
-        // rotationKind > 0 and meas = +1 -> xor +1 +1 -> ifCondition = False and do X meas
-        // rotationKind < 0 and meas = -1 -> xor -1 -1 -> ifCondition = False and do X meas
-        // rotationKind < 0 and meas = +1 -> xor -1 +1 -> ifCondition = True  and do Y meas
-        // This means, we measure in Y basis when True and X basis when False
+        // Truth table for ifCondition:
+        // rotationKind > 0 and meas = 1 -> xor 1 1 -> ifCondition = False and do Y measurement
+        // rotationKind > 0 and meas = 0 -> xor 1 0 -> ifCondition = True and do X measurement
+        // rotationKind < 0 and meas = 1 -> xor 0 1 -> ifCondition = True and do X measurement
+        // rotationKind < 0 and meas = 0 -> xor 0 0 -> ifCondition = False and do Y measurement
+        // This means, we measure in the Y basis when False and the X basis when True
 
         auto YBuilder = [&](OpBuilder &builder, Location loc) {
             // Initialize |Y⟩ state
@@ -134,7 +135,7 @@ void decomposePauliCorrectedPiOverEight(bool avoidPauliYMeasure, PPRotationOp op
                                             ppmX.getOutQubits().back()); // Deallocate |m⟩ qubit
             rewriter.create<scf::YieldOp>(loc, pprPI2.getOutQubits());
         };
-        auto ifOp = rewriter.create<scf::IfOp>(loc, ifCondition.getResult(), YBuilder, XBuilder);
+        auto ifOp = rewriter.create<scf::IfOp>(loc, ifCondition.getResult(), XBuilder, YBuilder);
         rewriter.replaceOp(op, ifOp);
     }
     else {
