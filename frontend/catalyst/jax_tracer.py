@@ -988,7 +988,7 @@ def trace_quantum_measurements(
                 output, qml.measurements.SampleMP
             ):
                 raise NotImplementedError(
-                    f"Measurement {type(output).__name__} is not supported a shot-vector. "
+                    f"Measurement {type(output).__name__} does not support shot-vectors. "
                     "Use qml.sample() instead."
                 )
 
