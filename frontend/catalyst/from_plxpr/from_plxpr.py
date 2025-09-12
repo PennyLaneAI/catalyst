@@ -452,7 +452,7 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
 def _(self, *wires, all_outcomes):
     obs = self._compbasis_obs(*wires)
     num_wires = len(wires) if wires else len(self.device.wires)
-    keys, vals = counts_p.bind(obs, static_shape=(2**num_wires, ))
+    keys, vals = counts_p.bind(obs, static_shape=(2**num_wires,))
     keys = jax.lax.convert_element_type(keys, int)
     return keys, vals
 

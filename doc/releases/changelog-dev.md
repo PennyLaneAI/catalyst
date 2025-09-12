@@ -161,6 +161,9 @@
 * `from_plxpr` can now handle dynamic shots and overridden device shots.
   [(#1983)](https://github.com/PennyLaneAI/catalyst/pull/1983/)
 
+* `from_plxpr` can now translate `counts`. 
+  [(#2041)](https://github.com/PennyLaneAI/catalyst/pull/2041)
+
 * QJitDevice helper `extract_backend_info` removed its redundant `capabilities` argument.
   [(#1956)](https://github.com/PennyLaneAI/catalyst/pull/1956)
 

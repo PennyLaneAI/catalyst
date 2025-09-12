@@ -425,8 +425,8 @@ class TestCatalystCompareJaxpr:
 
         catalyst_res = catalyst_execute_jaxpr(converted)()
         assert len(catalyst_res) == 2
-        expected_keys = np.array([0,1,2,3])
-        expected_values = np.array([0,0,50, 0])
+        expected_keys = np.array([0, 1, 2, 3])
+        expected_values = np.array([0, 0, 50, 0])
         assert qml.math.allclose(catalyst_res[0], expected_keys)
         assert qml.math.allclose(catalyst_res[1], expected_values)
 
