@@ -829,29 +829,30 @@ if __name__ == "__main__":
             def text_01():
                 # qml.H(0); qml.H(1)
                 qml.X(0)
-                for i in range(4):
-                    # qml.S(0)
+                for i in range(3):
+                    qml.S(0)
                     qml.H(0)
-                    # qml.Y(0)
-                    qml.measure(0, reset=True)
+                    qml.Y(0)
+                    qml.measure(0)
                     # qml.H(0)
                     qml.T(0)
                 qml.Z(0)        
                 return qml.state()
+
             
             res.append(text_01())
 
-            reset = True
+            reset = False
             # unroll loop
             @qml.qnode(qml.device("default.qubit", wires=wires))
             def text_01():
                 # qml.H(0); qml.H(1)
                 qml.X(0); 
 
-                qml.H(0); qml.measure(0,reset=reset); qml.T(0)
-                qml.H(0); qml.measure(0,reset=reset); qml.T(0)
-                qml.H(0); qml.measure(0,reset=reset); qml.T(0)
-                qml.H(0); qml.measure(0,reset=reset); qml.T(0)
+                qml.S(0); qml.H(0); qml.Y(0); qml.measure(0,reset=reset); qml.T(0)
+                qml.S(0); qml.H(0); qml.Y(0); qml.measure(0,reset=reset); qml.T(0)
+                qml.S(0); qml.H(0); qml.Y(0); qml.measure(0,reset=reset); qml.T(0)
+                qml.S(0); qml.H(0); qml.Y(0); qml.measure(0,reset=reset); qml.T(0)
 
                 qml.Z(0)
                 return qml.state()
