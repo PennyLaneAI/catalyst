@@ -1529,31 +1529,48 @@ def _trace_quantum_step(
     return_values_tree = cls_result.return_values_tree
     is_leaf = cls_result.is_leaf
 
+    def get_qreg_in(qnode, device):
+        total_shots = _get_total_shots(qnode)
+        device_init_p.bind(
+            total_shots,
+            auto_qubit_management=(device.wires is None),
+            rtd_lib=device.backend_lib,
+            rtd_name=device.backend_name,
+            rtd_kwargs=str(device.backend_kwargs),
+        )
+        if device.wires is None:
+            # Automatic qubit management mode
+            # We start with 0 wires and allocate new wires in runtime as we encounter them.
+            qreg_in = qalloc_p.bind(0)
+        elif catalyst.device.qjit_device.is_dynamic_wires(device.wires):
+            # When device has dynamic wires, the device.wires iterable object
+            # has a single value, which is the tracer for the number of wires
+            qreg_in = qalloc_p.bind(device.wires[0])
+        else:
+            qreg_in = qalloc_p.bind(len(device.wires))
+        return qreg_in
+
+    def get_meas_results(meas, meas_trees, snapshot_results):
+        meas_tracers = check_full_raise(
+            meas,
+            partial(trace.to_jaxpr_tracer, source_info=current_source_info()),
+        )
+        if len(snapshot_results) > 0:
+            # redefine meas_trees PyTree to have same PyTreeRegistry as Snapshot PyTree
+            meas_trees = jax.tree_util.tree_structure(
+                jax.tree_util.tree_unflatten(meas_trees, meas_tracers)
+            )
+            meas_trees = jax.tree_util.treedef_tuple([tree_structure(snapshot_results), meas_trees])
+            meas_tracers = snapshot_results + meas_tracers
+        return tree_unflatten(meas_trees, meas_tracers)
+
     with EvaluationContext.frame_tracing_context(trace):
         for tape in tapes:
             # Set up quantum register for the current tape.
             # We just need to ensure there is a tape cut in between each.
             # Each tape will be outlined into its own function with mlir passㄍ
             # -split-multiple-tapes
-
-            total_shots = _get_total_shots(qnode)
-            device_init_p.bind(
-                total_shots,
-                auto_qubit_management=(device.wires is None),
-                rtd_lib=device.backend_lib,
-                rtd_name=device.backend_name,
-                rtd_kwargs=str(device.backend_kwargs),
-            )
-            if device.wires is None:
-                # Automatic qubit management mode
-                # We start with 0 wires and allocate new wires in runtime as we encounter them.
-                qreg_in = qalloc_p.bind(0)
-            elif catalyst.device.qjit_device.is_dynamic_wires(device.wires):
-                # When device has dynamic wires, the device.wires iterable object
-                # has a single value, which is the tracer for the number of wires
-                qreg_in = qalloc_p.bind(device.wires[0])
-            else:
-                qreg_in = qalloc_p.bind(len(device.wires))
+            qreg_in = get_qreg_in(qnode, device)
 
             # If the program is batched, that means that it was transformed.
             # If it was transformed, that means that the program might have
@@ -1592,20 +1609,7 @@ def _trace_quantum_step(
                 else:
                     return func(arr)
 
-            meas_tracers = check_full_raise(
-                meas,
-                partial(trace.to_jaxpr_tracer, source_info=current_source_info()),
-            )
-            if len(snapshot_results) > 0:
-                # redefine meas_trees PyTree to have same PyTreeRegistry as Snapshot PyTree
-                meas_trees = jax.tree_util.tree_structure(
-                    jax.tree_util.tree_unflatten(meas_trees, meas_tracers)
-                )
-                meas_trees = jax.tree_util.treedef_tuple(
-                    [tree_structure(snapshot_results), meas_trees]
-                )
-                meas_tracers = snapshot_results + meas_tracers
-            meas_results = tree_unflatten(meas_trees, meas_tracers)
+            meas_results = get_meas_results(meas, meas_trees, snapshot_results)
 
             # TODO: Allow the user to return whatever types they specify.
             if tracing_mode == TracingMode.TRANSFORM and isinstance(meas_results, list):
