@@ -55,7 +55,7 @@ LogicalInitKind getMagicState(QECOpInterface op)
 /// ─────|   |────────└───╦───┘
 ///      |   ╠═════╗      ║
 ///      |   |     ║  ┌───╩───┐
-/// |m⟩──| Z |─────╚══╣ X / Y |
+/// |m⟩──| Z |─────╚══╣ Y / X |
 ///      └───┘        └───────┘
 /// All the operations in second diagram are PPM except for the last PPR P(π/2)
 /// For P(-π/8) we need to use flip the ordering in which the X and Y measurements are applied.
