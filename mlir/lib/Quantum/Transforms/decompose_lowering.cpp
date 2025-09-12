@@ -45,11 +45,10 @@ namespace quantum {
 namespace DecompositionUtils {
 
 // Check if a function is a decomposition function
-// It's expected that the decomposition function would have these two attributes:
-// `catalyst.decomposition` and `catalyst.decomposition.target_op`
-// And these are set by the `markDecompositionAttributes` functionq
-// The decomposition attributes are used to determine if a function is a decomposition function,
-// and target_op is that the decomposition function want to replace
+// It's expected that the decomposition function would have this attribute:
+// `catalyst.decomposition.target_op` And this attribute is set by the `markDecompositionAttributes`
+// functionq The decomposition attribute are used to determine if a function is a decomposition
+// function, and target_op is that the decomposition function want to replace
 bool isDecompositionFunction(func::FuncOp func)
 {
     return func->hasAttr("catalyst.decomposition.target_op");
@@ -122,6 +121,7 @@ struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLowering
         });
     }
 
+    // Find the target gate set from the module
     void findTargetGateSet(ModuleOp module, llvm::StringSet<llvm::MallocAllocator> &targetGateSet)
     {
         WalkResult walkResult = module.walk([&](func::FuncOp func) {

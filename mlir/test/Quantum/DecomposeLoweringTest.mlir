@@ -211,7 +211,7 @@ module @param_rxry {
   // Decomposition function expects tensor<f64> while operation provides f64
   // CHECK-NOT: func.func private @ParametrizedRX_decomp
   func.func private @ParametrizedRXRY_decomp(%arg0: tensor<f64>, %arg1: !quantum.bit) -> !quantum.bit
-      attributes {catalyst.decomposition, catalyst.decomposition.target_op = "ParametrizedRXRY", llvm.linkage = #llvm.linkage<internal>} {
+      attributes {catalyst.decomposition.target_op = "ParametrizedRXRY", llvm.linkage = #llvm.linkage<internal>} {
     %extracted = tensor.extract %arg0[] : tensor<f64>
     %out_qubits = quantum.custom "RX"(%extracted) %arg1 : !quantum.bit
     %extracted_0 = tensor.extract %arg0[] : tensor<f64>
