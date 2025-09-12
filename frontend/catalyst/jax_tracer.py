@@ -1490,7 +1490,7 @@ def _trace_classical_phase(
         )
 
 
-# pylint: disable=too-complex
+# pylint: disable=too-many-locals
 def _trace_quantum_step(
     device: QubitDevice,
     qnode,
