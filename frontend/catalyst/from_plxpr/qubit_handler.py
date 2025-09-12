@@ -74,7 +74,7 @@ from catalyst.utils.exceptions import CompileError
 
 class QubitIndexRecorder:
     """
-    A manager that records what wire index belongs to what logical register.
+    A manager that records what global plxpr wire index belongs to what logical register.
 
     This manager answers the first question.
     Since plxpr indices are global, there should be one instance of the class per plxpr.
@@ -91,13 +91,24 @@ class QubitIndexRecorder:
     def __init__(self):
         self.map = {}
 
-    def __getitem__(self, index: int):  # -> QubitHandler
-        assert index in self.map
-        return self.map[index]
+    def __getitem__(self, global_index):
+        """
+        Returns the `QubitHandler` instance that contains the requested global wire index.
+        """
+        assert global_index in self.map
+        return self.map[global_index]
 
-    def __setitem__(self, index: int, qreg):
-        # `qreg` is of type `QubitHandler`
-        self.map[index] = qreg
+    def __setitem__(self, global_index, qreg_QubitHandler):
+        """
+        Set the corresponding quantum register `QubitHandler` for the provided global wire index.
+        """
+        self.map[global_index] = qreg_QubitHandler
+
+    def contains(self, global_index):
+        """
+        Check if a global index is contained in any of the recorded qreg `QubitHanlder`s.
+        """
+        return global_index in self.map
 
 
 class QubitHandler:
@@ -140,7 +151,7 @@ class QubitHandler:
         self,
         qubit_or_qreg_ref: AbstractQreg | list[AbstractQbit] | tuple[AbstractQbit],
         recorder: QubitIndexRecorder,
-        absolute_addressing=False,
+        dynamically_alloced=False,
     ):
 
         # Qubit mode
@@ -156,60 +167,70 @@ class QubitHandler:
             self.wire_map = dict(zip(self.qubit_indices, self.qubit_indices))
             return
 
-        # If this is an AbstractQreg, DynamicJaxprTracer, or None (for unit tests),
-        self.qubit_indices = []
-        self.abstract_qreg_val = qubit_or_qreg_ref
-        self.recorder = recorder
+        # Qreg mode
+        else:
+            # If this is an AbstractQreg, DynamicJaxprTracer, or None (for unit tests),
+            self.qubit_indices = []
+            self.abstract_qreg_val = qubit_or_qreg_ref
+            self.recorder = recorder
 
-        # A map from plxpr's *global* indices to the current catalyst SSA qubit values
-        # for the wires on this qreg.
-        self.wire_map = {}
+            # A map from plxpr's *global* indices to the current catalyst SSA qubit values
+            # for the wires on this qreg.
+            self.wire_map = {}
 
-        # Plxpr works with absolute indices, i.e. all unique, even across registers
-        # However, catalyst qreg work with relative indices
-        # i.e. extracting and inserting with every new catalyst qreg use indices 0,1,2,...
-        # To distinguish between different registers, we require that each one has a hash.
-        # For the first qreg of a scope, absolute addressing is required (why???)
-        self.root_hash = hash(qubit_or_qreg_ref) if not absolute_addressing else 0
+            # Plxpr works with absolute indices, i.e. all unique, even across registers
+            # However, catalyst qreg work with relative indices
+            # i.e. extracting and inserting with every new catalyst qreg use indices 0,1,2,...
+            # To distinguish between different registers, we require that each one has a hash.
+            # For the static inital qreg, all the global indices in plxpr are 0, 1, 2... already
+            # So for these non dynamically alloced registers, the root has is just zero, and
+            # their local and global indices are the same.
+            self.root_hash = hash(qubit_or_qreg_ref) if dynamically_alloced else 0
+
+    def is_qubit_mode(self):
+        return self.abstract_qreg_val is None
 
     def get(self) -> AbstractQreg | list[AbstractQbit]:
-        """Return the current AbstractQreg value or final AbstractQbit values
-        depending on whichever is used to create the instance."""
-        if self.abstract_qreg_val is not None:
+        """
+        Return the current AbstractQreg value or final AbstractQbit values
+        depending on whichever is used to create the instance.
+        """
+        if self.is_qubit_mode():
+            return [self.wire_map[idx] for idx in self.qubit_indices]
+        else:
             return self.abstract_qreg_val
-        return [self.wire_map[idx] for idx in self.qubit_indices]
 
     def set(self, qreg: AbstractQreg):
         """
         Set the current AbstractQreg value.
         This is needed, for example, when existing regions, like submodules and control flow.
         """
-        # The old qreg SSA value is no longer usable since a new one has appeared
-        # Therefore all dangling qubits from the old one also all expire
-        # These dangling qubit values will be dead, so there must be none.
-        if self.abstract_qreg_val is not None:
-            # qreg mode
+
+        if self.is_qubit_mode():
+            # Devalidate the old qubit values if user wants to set a qreg
+            self.wire_map = {}
+            self.qubit_indices = []
+
+        else:
+            # The old qreg SSA value is no longer usable since a new one has appeared
+            # Therefore all dangling qubits from the old one also all expire
+            # These dangling qubit values will be dead, so there must be none.
             if len(self.wire_map) != 0:
                 raise CompileError(
                     "Setting new qreg value, but the previous one still has dangling qubits."
                 )
             self.abstract_qreg_val = qreg
-        else:
-            # qubits mode
-            # Devalidate the old qubit values if user wants to set a qreg
-            self.wire_map = {}
-            self.qubit_indices = []
 
-    def __getitem__(self, index: int) -> AbstractQbit:
+    def __getitem__(self, local_index: int) -> AbstractQbit:
         """
-        Get the newest ``AbstractQbit`` corresponding to a wire index.
+        Get the newest ``AbstractQbit`` corresponding to a wire index, index = 0, 1, 2, ...
         If the qubit value does not exist yet at this index, extract the fresh qubit.
         """
-        global_index = self.local_index_to_global_index(index)
+        global_index = self.local_index_to_global_index(local_index)
         if global_index in self.wire_map:
             return self.wire_map[global_index]
 
-        return self.extract(index)
+        return self.extract(local_index)
 
     def __setitem__(self, index: int, qubit: AbstractQbit):
         """
@@ -225,38 +246,40 @@ class QubitHandler:
 
     def extract(self, index: int) -> AbstractQbit:
         """Create the extract primitive that produces an AbstractQbit value."""
-        if self.abstract_qreg_val is None:
+        if self.is_qubit_mode():
             raise CompileError(
                 f"Cannot extract a qubit at index {index} as there is no qreg."
                 " Consider setting a qreg value first."
             )
 
-        # else, extract must be fresh
-        global_index = self.local_index_to_global_index(index)
-        assert global_index not in self.wire_map
+        else:
+            # Extract must be fresh
+            global_index = self.local_index_to_global_index(index)
+            assert global_index not in self.wire_map
 
-        # record that this global wire index is on this register
-        self.recorder[global_index] = self
+            # record that this global wire index is on this register
+            self.recorder[global_index] = self
 
-        # extract and update current qubit value
-        extracted_qubit = qextract_p.bind(self.abstract_qreg_val, index)
-        self.wire_map[global_index] = extracted_qubit
+            # extract and update current qubit value
+            extracted_qubit = qextract_p.bind(self.abstract_qreg_val, index)
+            self.wire_map[global_index] = extracted_qubit
 
-        return extracted_qubit
+            return extracted_qubit
 
     def insert(self, index: int, qubit: AbstractQbit):
         """
         Create the insert primitive.
         """
-        if self.abstract_qreg_val is None:
+        if self.is_qubit_mode():
             raise CompileError(
                 f"Cannot insert a qubit at index {index} as there is no qreg."
                 " Consider setting a qreg value first."
             )
 
-        global_index = self.local_index_to_global_index(index)
-        self.abstract_qreg_val = qinsert_p.bind(self.abstract_qreg_val, index, qubit)
-        self.wire_map.pop(global_index)
+        else:
+            global_index = self.local_index_to_global_index(index)
+            self.abstract_qreg_val = qinsert_p.bind(self.abstract_qreg_val, index, qubit)
+            self.wire_map.pop(global_index)
 
     def insert_all_dangling_qubits(self):
         """
@@ -265,15 +288,16 @@ class QubitHandler:
         This is necessary, for example, at the end of the qreg lifetime before deallocing,
         or when passing qregs into and out of scopes like control flow.
         """
-        if self.abstract_qreg_val is None:
+        if self.is_qubit_mode():
             raise CompileError("Cannot insert qubits back into a qreg as there is no qreg.")
 
-        for global_index, qubit in self.wire_map.items():
-            self.abstract_qreg_val = qinsert_p.bind(
-                self.abstract_qreg_val, global_index - self.root_hash, qubit
-            )
+        else:
+            for global_index, qubit in self.wire_map.items():
+                self.abstract_qreg_val = qinsert_p.bind(
+                    self.abstract_qreg_val, global_index - self.root_hash, qubit
+                )
 
-        self.wire_map.clear()
+            self.wire_map.clear()
 
     def get_all_current_global_indices(self):
         """
@@ -306,32 +330,33 @@ class QubitHandler:
         as the second X gate's qubit operand directly.
         To do this, for the dynamic wire gate we insert back to the register.
         """
-        if self.abstract_qreg_val is None:
+        if self.is_qubit_mode():
             raise CompileError("Cannot insert dynamic qubits back into a qreg as there is no qreg.")
 
-        # Cancel-inverses style passes only work on gates with same number of qubits
-        same_number_of_wires = len(wires) == len(self.wire_map)
+        else:
+            # Cancel-inverses style passes only work on gates with same number of qubits
+            same_number_of_wires = len(wires) == len(self.wire_map)
 
-        all_static_requested = all(isinstance(wire, int) for wire in wires)
-        all_static_cached = all(isinstance(wire, int) for wire in self.wire_map.keys())
-        all_static = all_static_requested and all_static_cached
+            all_static_requested = all(isinstance(wire, int) for wire in wires)
+            all_static_cached = all(isinstance(wire, int) for wire in self.wire_map.keys())
+            all_static = all_static_requested and all_static_cached
 
-        if all_static:
-            # no need to insert back anything if nothing is dynamic
-            return
+            if all_static:
+                # no need to insert back anything if nothing is dynamic
+                return
 
-        all_dynamic = False
-        keep_cache = False
-        if same_number_of_wires:
-            # Notice that we can keep using the current qubit value in the wire_map (if one exists
-            # there) even for dynamic case if they are the same dynamic wire, i.e.
-            #   qml.gate(wires=[w0,w1])
-            #   qml.gate(wires=[w0,w1])
-            # these cases do not need to insert back
+            all_dynamic = False
+            keep_cache = False
+            if same_number_of_wires:
+                # Notice that we can keep using the current qubit value in the wire_map (if one exists
+                # there) even for dynamic case if they are the same dynamic wire, i.e.
+                #   qml.gate(wires=[w0,w1])
+                #   qml.gate(wires=[w0,w1])
+                # these cases do not need to insert back
 
-            wires_all_in_cache = all(wire in self.wire_map.keys() for wire in wires)
-            all_dynamic = all(not isinstance(wire, int) for wire in wires)
-            keep_cache = wires_all_in_cache and all_dynamic
+                wires_all_in_cache = all(wire in self.wire_map.keys() for wire in wires)
+                all_dynamic = all(not isinstance(wire, int) for wire in wires)
+                keep_cache = wires_all_in_cache and all_dynamic
 
-        if not keep_cache:
-            self.insert_all_dangling_qubits()
+            if not keep_cache:
+                self.insert_all_dangling_qubits()

@@ -209,7 +209,7 @@ def handle_qnode(
             **_get_device_kwargs(device),
         )
         qreg = qalloc_p.bind(len(device.wires))
-        self.qubit_handler = QubitHandler(qreg, self.qubit_index_recorder, absolute_addressing=True)
+        self.qubit_handler = QubitHandler(qreg, self.qubit_index_recorder)
         converter = PLxPRToQuantumJaxprInterpreter(
             device, shots, self.qubit_handler, {}, self.qubit_index_recorder
         )
@@ -360,12 +360,12 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
 
         in_qubits = []
         in_qregs = []
+
         for w in op.wires:
             # Note: `w` is the plxpr global wire index
-
-            # Special: first gate on a wire on the global register do not have pre-extracted
-            # qubit SSA values
-            if w not in self.qubit_index_recorder.map:
+            if not self.qubit_index_recorder.contains(w):
+                # First time the global wire index w is encountered
+                # Need to extract
                 in_qubits.append(
                     self.qubit_handler[self.qubit_handler.global_index_to_local_index(w)]
                 )
@@ -486,10 +486,11 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
 @PLxPRToQuantumJaxprInterpreter.register_primitive(qml.allocation.allocate_prim)
 def handle_qml_alloc(self, *, num_wires, state=None, restored=False):
     """Handle the conversion from plxpr to Catalyst jaxpr for the qml.allocate primitive"""
-    # breakpoint()
     new_qreg = qalloc_p.bind(num_wires)
 
-    self.qregs[new_qreg] = QubitHandler(new_qreg, self.qubit_index_recorder)
+    self.qregs[new_qreg] = QubitHandler(
+        new_qreg, self.qubit_index_recorder, dynamically_alloced=True
+    )
 
     # The plxpr alloc primitive returns the list of all indices available in the new qreg
     # So let's extract all qubits and return them
@@ -817,7 +818,6 @@ def trace_from_pennylane(
             fn.static_argnums = static_argnums
 
         plxpr, out_type, out_treedef = make_jaxpr2(fn, **make_jaxpr_kwargs)(*args, **kwargs)
-        # breakpoint()
         jaxpr = from_plxpr(plxpr)(*dynamic_args, **kwargs)
 
     return jaxpr, out_type, out_treedef, sig
