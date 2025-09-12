@@ -137,6 +137,7 @@ void decomposePauliCorrectedPiOverEight(bool avoidPauliYMeasure, PPRotationOp op
                                             ppmX.getOutQubits().back()); // Deallocate |m⟩ qubit
             rewriter.create<scf::YieldOp>(loc, pprPI2.getOutQubits());
         };
+
         auto ifOp = rewriter.create<scf::IfOp>(loc, ifCondition.getResult(), XBuilder, YBuilder);
         rewriter.replaceOp(op, ifOp);
     }
