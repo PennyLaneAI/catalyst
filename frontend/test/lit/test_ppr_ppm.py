@@ -278,9 +278,7 @@ def test_clifford_T_to_ppm():
             qml.T(1)
             return [measure(0), measure(1)]
 
-        @ppm_compilation(
-            decompose_method="clifford-corrected", max_pauli_size=2
-        )
+        @ppm_compilation(decompose_method="clifford-corrected", max_pauli_size=2)
         @qml.qnode(qml.device("null.qubit", wires=5))
         def cir_clifford_T_to_ppm_with_params():
             for idx in range(5):
