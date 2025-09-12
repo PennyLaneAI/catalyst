@@ -52,8 +52,7 @@ namespace DecompositionUtils {
 // and target_op is that the decomposition function want to replace
 bool isDecompositionFunction(func::FuncOp func)
 {
-    return func->hasAttr("catalyst.decomposition") &&
-           func->hasAttr("catalyst.decomposition.target_op");
+    return func->hasAttr("catalyst.decomposition.target_op");
 }
 
 // Update decomposition attributes if function name begins with <Gate>_rule
@@ -72,7 +71,6 @@ void markDecompositionAttributes(func::FuncOp func, MLIRContext *context)
     if ((afterFirstUnderscore.size() >= 4) && (afterFirstUnderscore.substr(0, 4) == "rule")) {
         if (StringRef gateName = funcName.substr(0, firstUnderscore); !gateName.empty()) {
             // Set the decomposition attributes
-            func->setAttr("catalyst.decomposition", UnitAttr::get(context));
             func->setAttr("catalyst.decomposition.target_op", StringAttr::get(context, gateName));
             return;
         }

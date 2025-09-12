@@ -43,7 +43,7 @@ module @two_hadamards {
 
   // Decomposition function should be applied and removed from the module
   // CHECK-NOT: func.func private @Hadamard_to_RY_decomp
-  func.func private @Hadamard_to_RY_decomp(%arg0: !quantum.bit) -> !quantum.bit attributes {catalyst.decomposition, catalyst.decomposition.target_op = "Hadamard", llvm.linkage = #llvm.linkage<internal>} {
+  func.func private @Hadamard_to_RY_decomp(%arg0: !quantum.bit) -> !quantum.bit attributes {catalyst.decomposition.target_op = "Hadamard", llvm.linkage = #llvm.linkage<internal>} {
     %cst = arith.constant 3.1415926535897931 : f64
     %cst_0 = arith.constant 1.5707963267948966 : f64
     %out_qubits = quantum.custom "RZ"(%cst) %arg0 : !quantum.bit
@@ -75,7 +75,7 @@ module @single_hadamard {
 
   // Decomposition function should be applied and removed from the module
   // CHECK-NOT: func.func private @Hadamard_to_RY_decomp
-  func.func private @Hadamard_to_RY_decomp(%arg0: !quantum.bit) -> !quantum.bit attributes {catalyst.decomposition, catalyst.decomposition.target_op = "Hadamard", llvm.linkage = #llvm.linkage<internal>} {
+  func.func private @Hadamard_to_RY_decomp(%arg0: !quantum.bit) -> !quantum.bit attributes {catalyst.decomposition.target_op = "Hadamard", llvm.linkage = #llvm.linkage<internal>} {
       %cst = arith.constant 3.1415926535897931 : f64
       %cst_0 = arith.constant 1.5707963267948966 : f64
       %out_qubits = quantum.custom "RZ"(%cst) %arg0 : !quantum.bit
@@ -114,14 +114,14 @@ module @recursive {
 
   // Decomposition function should be applied and removed from the module
   // CHECK-NOT: func.func private @Hadamard_to_RY_decomp
-  func.func private @Hadamard_to_RY_decomp(%arg0: !quantum.bit) -> !quantum.bit attributes {catalyst.decomposition, catalyst.decomposition.target_op = "Hadamard", llvm.linkage = #llvm.linkage<internal>} {
+  func.func private @Hadamard_to_RY_decomp(%arg0: !quantum.bit) -> !quantum.bit attributes {catalyst.decomposition.target_op = "Hadamard", llvm.linkage = #llvm.linkage<internal>} {
     %out_qubits_0 = quantum.custom "RZRY"() %arg0 : !quantum.bit
     return %out_qubits_0 : !quantum.bit
   }
 
   // Decomposition function should be applied and removed from the module
   // CHECK-NOT: func.func private @RZRY_decomp
-  func.func private @RZRY_decomp(%arg0: !quantum.bit) -> !quantum.bit attributes {catalyst.decomposition, catalyst.decomposition.target_op = "RZRY", llvm.linkage = #llvm.linkage<internal>} {
+  func.func private @RZRY_decomp(%arg0: !quantum.bit) -> !quantum.bit attributes {catalyst.decomposition.target_op = "RZRY", llvm.linkage = #llvm.linkage<internal>} {
     %cst = arith.constant 3.1415926535897931 : f64
     %cst_0 = arith.constant 1.5707963267948966 : f64
     %out_qubits_1 = quantum.custom "RZ"(%cst) %arg0 : !quantum.bit
@@ -160,14 +160,14 @@ module @recursive {
 
   // Decomposition function should be applied and removed from the module
   // CHECK-NOT: func.func private @Hadamard_to_RY_decomp
-  func.func private @Hadamard_to_RY_decomp(%arg0: !quantum.bit) -> !quantum.bit attributes {catalyst.decomposition, catalyst.decomposition.target_op = "Hadamard", llvm.linkage = #llvm.linkage<internal>} {
+  func.func private @Hadamard_to_RY_decomp(%arg0: !quantum.bit) -> !quantum.bit attributes {catalyst.decomposition.target_op = "Hadamard", llvm.linkage = #llvm.linkage<internal>} {
     %out_qubits_0 = quantum.custom "RZRY"() %arg0 : !quantum.bit
     return %out_qubits_0 : !quantum.bit
   }
 
   // Decomposition function should be applied and removed from the module
   // CHECK-NOT: func.func private @RZRY_decomp
-  func.func private @RZRY_decomp(%arg0: !quantum.bit) -> !quantum.bit attributes {catalyst.decomposition, catalyst.decomposition.target_op = "RZRY", llvm.linkage = #llvm.linkage<internal>} {
+  func.func private @RZRY_decomp(%arg0: !quantum.bit) -> !quantum.bit attributes {catalyst.decomposition.target_op = "RZRY", llvm.linkage = #llvm.linkage<internal>} {
     %cst = arith.constant 3.1415926535897931 : f64
     %cst_0 = arith.constant 1.5707963267948966 : f64
     %out_qubits_1 = quantum.custom "RZ"(%cst) %arg0 : !quantum.bit
