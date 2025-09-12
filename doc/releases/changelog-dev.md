@@ -269,6 +269,9 @@
 * The `NoMemoryEffect` trait has been removed from the `quantum.alloc` operation.
   [(#2044)](https://github.com/PennyLaneAI/catalyst/pull/2044)
 
+* Added support for avoid Y basis measurement for `pauli-corrected` PPR decomposition.
+  [(#2047)](https://github.com/PennyLaneAI/catalyst/pull/2047)
+
 <h3>Documentation 📝</h3>
 
 * The Catalyst Command Line Interface documentation incorrectly stated that the `catalyst`
