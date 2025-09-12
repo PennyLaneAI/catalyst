@@ -71,13 +71,11 @@ except CompileError:
     ...
 
 
-# CHECK-LABEL: public @jit_sample3(
-# CHECK: func.func private @one_shot_wrapper({{%.+}}) -> tensor<1000x2xi64>
 # CHECK-LABEL: public @sample3(
 @qjit(target="mlir")
 @qml.set_shots(1000)
 @qml.qnode(qml.device("lightning.qubit", wires=2))
-# CHECK: [[shots:%.+]] = arith.constant 1 : i64
+# CHECK: [[shots:%.+]] = arith.constant 1000 : i64
 # CHECK: quantum.device shots([[shots]]) [{{.+}}]
 def sample3(x: float, y: float):
     # CHECK: [[reg:%.+]] = quantum.alloc( 2) : !quantum.reg
@@ -92,7 +90,7 @@ def sample3(x: float, y: float):
     # CHECK: [[regObs:%.+]] = quantum.insert [[reg0]][ 1], [[q1]] : !quantum.reg, !quantum.bit
 
     # CHECK: [[obs:%.+]] = quantum.compbasis qreg [[regObs]]
-    # CHECK: quantum.sample [[obs]] : tensor<1x2xf64>
+    # CHECK: quantum.sample [[obs]] : tensor<1000x2xf64>
     return qml.sample()
 
 
@@ -207,13 +205,11 @@ except:
     ...
 
 
-# CHECK-LABEL: public @jit_counts3(
-# CHECK: func.func private @one_shot_wrapper({{%.+}}) -> (tensor<4xi64>, tensor<4xi64>)
 # CHECK-LABEL: public @counts3(
 @qjit(target="mlir")
 @qml.set_shots(1000)
 @qml.qnode(qml.device("lightning.qubit", wires=2))
-# CHECK: [[shots:%.+]] = arith.constant 1 : i64
+# CHECK: [[shots:%.+]] = arith.constant 1000 : i64
 # CHECK: quantum.device shots([[shots]]) [{{.+}}]
 def counts3(x: float, y: float):
     # CHECK: [[reg:%.+]] = quantum.alloc( 2) : !quantum.reg
