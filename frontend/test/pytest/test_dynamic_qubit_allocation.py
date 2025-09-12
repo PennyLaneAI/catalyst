@@ -53,7 +53,7 @@ def test_dynamic_wire_alloc_cond(cond, expected):
 
     qml.capture.enable()
 
-    @qjit
+    @qjit(autograph=True)
     @qml.qnode(qml.device("lightning.qubit", wires=2))
     def circuit(c):
         if c:
@@ -82,7 +82,7 @@ def test_dynamic_wire_alloc_forloop(num_iter, expected):
 
     qml.capture.enable()
 
-    @qjit
+    @qjit(autograph=True)
     @qml.qnode(qml.device("lightning.qubit", wires=3))
     def circuit(N):
         for i in range(N):
@@ -106,7 +106,7 @@ def test_dynamic_wire_alloc_whileloop(num_iter, expected):
 
     qml.capture.enable()
 
-    @qjit
+    @qjit(autograph=True)
     @qml.qnode(qml.device("lightning.qubit", wires=3))
     def circuit(N):
         i = 0

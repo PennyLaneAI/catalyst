@@ -34,7 +34,7 @@ from catalyst.jax_primitives import cond_p, for_p, while_p
 def _calling_convention(interpreter, closed_jaxpr, *args_plus_qreg):
     *args, qreg = args_plus_qreg
     # `qreg` is the scope argument for the body jaxpr
-    qreg_manager = QubitHandler(qreg, interpreter.qubit_index_recorder, absolute_addressing=True)
+    qubit_handler = QubitHandler(qreg, interpreter.qubit_index_recorder, absolute_addressing=True)
     converter = copy(interpreter)
     converter.qubit_handler = qubit_handler
     # pylint: disable-next=cell-var-from-loop
@@ -305,7 +305,7 @@ def handle_while_loop(
     def remove_qreg(*args_plus_qreg):
         *args, qreg = args_plus_qreg
         # `qreg` is the scope argument for the body jaxpr
-        qreg_manager = QubitHandler(qreg, self.qubit_index_recorder, absolute_addressing=True)
+        qubit_handler = QubitHandler(qreg, self.qubit_index_recorder, absolute_addressing=True)
         converter = copy(self)
         converter.qubit_handler = qubit_handler
 
