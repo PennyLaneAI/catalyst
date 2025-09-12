@@ -34,13 +34,15 @@ namespace {
 struct QuantumInlinerInterface : public DialectInlinerInterface {
     using DialectInlinerInterface::DialectInlinerInterface;
 
+    static constexpr StringRef decompAttr = "catalyst.decomposition.target_op";
+
     /// Returns true if the given operation 'callable' can be inlined into the
     /// position given by the 'call'. Currently, we always inline quantum
     /// decomposition functions.
     bool isLegalToInline(Operation *call, Operation *callable, bool wouldBeCloned) const final
     {
         if (auto funcOp = dyn_cast<func::FuncOp>(callable)) {
-            return funcOp->hasAttr("catalyst.decomposition");
+            return funcOp->hasAttr(decompAttr);
         }
         return false;
     }
@@ -51,7 +53,7 @@ struct QuantumInlinerInterface : public DialectInlinerInterface {
                          IRMapping &valueMapping) const final
     {
         if (auto funcOp = src->getParentOfType<func::FuncOp>()) {
-            return funcOp->hasAttr("catalyst.decomposition");
+            return funcOp->hasAttr(decompAttr);
         }
         return false;
     }
@@ -61,7 +63,7 @@ struct QuantumInlinerInterface : public DialectInlinerInterface {
                          IRMapping &valueMapping) const final
     {
         if (auto funcOp = op->getParentOfType<func::FuncOp>()) {
-            return funcOp->hasAttr("catalyst.decomposition");
+            return funcOp->hasAttr(decompAttr);
         }
         return false;
     }
