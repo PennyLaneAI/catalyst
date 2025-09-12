@@ -1490,6 +1490,7 @@ def _trace_classical_phase(
         )
 
 
+# pylint: disable=too-many-branches,too-many-statements
 def _trace_quantum_step(
     device: QubitDevice,
     qnode,
