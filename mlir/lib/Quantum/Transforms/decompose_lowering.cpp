@@ -14,6 +14,7 @@
 
 #define DEBUG_TYPE "decompose-lowering"
 
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/AllocatorBase.h"
@@ -142,11 +143,29 @@ struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLowering
     void removeDecompositionFunctions(ModuleOp module,
                                       llvm::StringMap<func::FuncOp> &decompositionRegistry)
     {
-        module.walk([&](func::FuncOp func) {
-            if (DecompositionUtils::isDecompositionFunction(func)) {
-                func.erase();
+        llvm::DenseSet<func::FuncOp> usedDecompositionFunctions;
+
+        module.walk([&](func::CallOp callOp) {
+            if (auto targetFunc = module.lookupSymbol<func::FuncOp>(callOp.getCallee())) {
+                if (DecompositionUtils::isDecompositionFunction(targetFunc)) {
+                    usedDecompositionFunctions.insert(targetFunc);
+                }
             }
         });
+
+        // Remove unused decomposition functions
+        for (auto &[_, func] : decompositionRegistry) {
+            // Check if the function still exists (hasn't been inlined and deleted)
+            // if deleted, `removeNodeFromList` will set the block to nullptr
+            if (!func || !func->getBlock()) {
+                continue;
+            }
+
+            // Check if the function is unused
+            if (!usedDecompositionFunctions.contains(func)) {
+                func.erase();
+            }
+        }
     }
 
   public:

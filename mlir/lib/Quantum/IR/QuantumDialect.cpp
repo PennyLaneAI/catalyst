@@ -34,17 +34,6 @@ namespace {
 struct QuantumInlinerInterface : public DialectInlinerInterface {
     using DialectInlinerInterface::DialectInlinerInterface;
 
-    /// Returns true if the given operation 'callable' can be inlined into the
-    /// position given by the 'call'. Currently, we always inline quantum
-    /// decomposition functions.
-    bool isLegalToInline(Operation *call, Operation *callable, bool wouldBeCloned) const final
-    {
-        if (auto funcOp = dyn_cast<func::FuncOp>(callable)) {
-            return funcOp->hasAttr("catalyst.decomposition");
-        }
-        return false;
-    }
-
     /// Returns true if the given region 'src' can be inlined into the region
     /// 'dest'. Only allow for decomposition functions.
     bool isLegalToInline(Region *dest, Region *src, bool wouldBeCloned,
