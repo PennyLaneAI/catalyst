@@ -38,14 +38,14 @@
   @qjit(autograph=True)
   @qml.set_shots(10)
   @qml.qnode(qml.device("lightning.qubit", wires=1), mcm_method="one-shot")
-  def circuit_2():
+  def circuit():
       qml.Hadamard(wires=0)
       if measure(0):
           return 42
       else:
           return 43
 
-  print(circuit_2())
+  print(circuit())
   ```
 
   which produces either 42 or 43 with equal probability (approximately 50% each)
