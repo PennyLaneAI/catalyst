@@ -1490,7 +1490,6 @@ def _trace_classical_phase(
         )
 
 
-# pylint: disable=too-many-locals
 def _trace_quantum_step(
     device: QubitDevice,
     qnode,
@@ -1523,8 +1522,15 @@ def _trace_quantum_step(
     classical_return_indices = []
     num_mcm = 0
 
-    with EvaluationContext.frame_tracing_context(cls_result.trace):
-        for tape in cls_result.tapes:
+    trace = cls_result.trace
+    tapes = cls_result.tapes
+    tracing_mode = cls_result.tracing_mode
+    return_values_flat = cls_result.return_values_flat
+    return_values_tree = cls_result.return_values_tree
+    is_leaf = cls_result.is_leaf
+
+    with EvaluationContext.frame_tracing_context(trace):
+        for tape in tapes:
             # Set up quantum register for the current tape.
             # We just need to ensure there is a tape cut in between each.
             # Each tape will be outlined into its own function with mlir passㄍ
@@ -1552,20 +1558,20 @@ def _trace_quantum_step(
             # If the program is batched, that means that it was transformed.
             # If it was transformed, that means that the program might have
             # changed the output. See `split_non_commuting`
-            if cls_result.tracing_mode == TracingMode.TRANSFORM:
+            if tracing_mode == TracingMode.TRANSFORM:
                 # TODO: In the future support arbitrary output from the user function.
                 if uses_transform(qnode, "dynamic_one_shot_partial"):
                     output, cls_ret_indices, num_mcm = _construct_output_with_classical_values(
-                        tape, cls_result.return_values_flat
+                        tape, return_values_flat
                     )
                     classical_return_indices.extend(cls_ret_indices)
                 else:
                     output = tape.measurements
 
-                _, trees = jax.tree_util.tree_flatten(output, is_leaf=cls_result.is_leaf)
+                _, trees = jax.tree_util.tree_flatten(output, is_leaf=is_leaf)
             else:
-                output = cls_result.return_values_flat
-                trees = cls_result.return_values_tree
+                output = return_values_flat
+                trees = return_values_tree
 
             mcm_config = qml.devices.MCMConfig(
                 postselect_mode=qnode.execute_kwargs["postselect_mode"],
@@ -1573,7 +1579,7 @@ def _trace_quantum_step(
             )
             snapshot_results = []
             qrp_out = trace_quantum_operations(
-                tape, device, qreg_in, ctx, cls_result.trace, mcm_config, snapshot_results
+                tape, device, qreg_in, ctx, trace, mcm_config, snapshot_results
             )
             shots = qnode._shots  # pylint: disable=protected-access
             meas, meas_trees = trace_quantum_measurements(shots, device, qrp_out, output, trees)
@@ -1588,7 +1594,7 @@ def _trace_quantum_step(
 
             meas_tracers = check_full_raise(
                 meas,
-                partial(cls_result.trace.to_jaxpr_tracer, source_info=current_source_info()),
+                partial(trace.to_jaxpr_tracer, source_info=current_source_info()),
             )
             if len(snapshot_results) > 0:
                 # redefine meas_trees PyTree to have same PyTreeRegistry as Snapshot PyTree
@@ -1602,7 +1608,7 @@ def _trace_quantum_step(
             meas_results = tree_unflatten(meas_trees, meas_tracers)
 
             # TODO: Allow the user to return whatever types they specify.
-            if cls_result.tracing_mode == TracingMode.TRANSFORM and isinstance(meas_results, list):
+            if tracing_mode == TracingMode.TRANSFORM and isinstance(meas_results, list):
                 if len(meas_results) == 1:
                     transformed_results.append(meas_results[0])
                 else:
