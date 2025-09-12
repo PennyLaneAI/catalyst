@@ -154,7 +154,8 @@
    - fix wrong type signature of `Counts` API function
   [(#2032)](https://github.com/PennyLaneAI/catalyst/pull/2032)
 
-* Fixed the Clifford PPR decomposition rule where using the Y measurement should be take the inverse.
+
+* Fixed the Clifford PPR decomposition rule where using the Y measurement should take the inverse.
   [(#2043)](https://github.com/PennyLaneAI/catalyst/pull/2043)
 
 <h3>Internal changes ⚙️</h3>
@@ -264,6 +265,9 @@
 * Fix auxiliary qubit deallocation in `decompose-non-clifford-ppr` pass 
   in the `clifford-corrected` method.
   [(#2039)](https://github.com/PennyLaneAI/catalyst/pull/2039)
+
+* The `NoMemoryEffect` trait has been removed from the `quantum.alloc` operation.
+  [(#2044)](https://github.com/PennyLaneAI/catalyst/pull/2044)
 
 <h3>Documentation 📝</h3>
 

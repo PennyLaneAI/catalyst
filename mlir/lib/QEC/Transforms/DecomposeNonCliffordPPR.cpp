@@ -21,6 +21,7 @@
 #include "llvm/ADT/StringRef.h"
 #include <llvm/Support/Debug.h>
 
+
 #include "Quantum/IR/QuantumOps.h"
 
 #include "QEC/IR/QECDialect.h"
@@ -58,7 +59,7 @@ LogicalInitKind getMagicState(QECOpInterface op)
 /// ─────|   |────────└───╦───┘
 ///      |   ╠═════╗      ║
 ///      |   |     ║  ┌───╩───┐
-/// |m⟩──| Z |─────╚══╣ X / Y |
+/// |m⟩──| Z |─────╚══╣ Y / X |
 ///      └───┘        └───────┘
 /// All the operations in second diagram are PPM except for the last PPR P(π/2)
 /// For P(-π/8) we need to use flip the ordering in which the X and Y measurements are applied.
@@ -69,8 +70,9 @@ LogicalInitKind getMagicState(QECOpInterface op)
 ///
 /// Details:
 /// - If P⊗Z measurement yields -1 then apply Y measurement, otherwise apply X measurement
-///   * The measurement results are stored as i1 values, -1 is true and 1 is false
-/// - If the X or Y measurement yields -1, apply P(π/2) on the input qubits
+///   * The measurement results are stored as i1 values.
+///   * Measuring -1 corresponds to storing `true = 1` and 1 corresponds to storing `false = 0`.
+///   - If the X or Y measurement yields -1, apply P(π/2) on the input qubits
 void decomposePauliCorrectedPiOverEight(bool avoidPauliYMeasure, PPRotationOp op,
                                         PatternRewriter &rewriter)
 {
@@ -181,8 +183,9 @@ void decomposePauliCorrectedPiOverEight(bool avoidPauliYMeasure, PPRotationOp op
 ///
 /// Details:
 /// - If P⊗Z measurement yields -1 then apply X, otherwise apply Z
-///   * The measurement results are stored as i1 values, -1 is true and 1 is false
-/// - If Z⊗Y and X measurement yield different result, then apply P(π/2) on the input qubits
+///   * The measurement results are stored as i1 values.
+///   * Measuring -1 corresponds to storing `true = 1` and 1 corresponds to storing `false = 0`.
+///   - If Z⊗Y and X measurement yield different result, then apply P(π/2) on the input qubits
 void decomposeAutoCorrectedPiOverEight(bool avoidPauliYMeasure, PPRotationOp op,
                                        PatternRewriter &rewriter)
 {
@@ -256,7 +259,8 @@ void decomposeAutoCorrectedPiOverEight(bool avoidPauliYMeasure, PPRotationOp op,
 ///
 /// Details:
 /// - If P⊗Z measurement yields -1 then apply P(π/4)
-///   * The measurement results are stored as i1 values, -1 is true and 1 is false
+///   * The measurement results are stored as i1 values.
+///   * Measuring -1 corresponds to storing `true = 1` and 1 corresponds to storing `false = 0`.
 /// - If X measurement yields -1 then apply P(π/2)
 void decomposeInjectMagicStatePiOverEight(PPRotationOp op, PatternRewriter &rewriter)
 {
