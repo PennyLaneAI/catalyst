@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <llvm/DebugInfo/LogicalView/Core/LVScope.h>
 #define DEBUG_TYPE "decompose-lowering"
 
 #include "llvm/ADT/DenseSet.h"
@@ -153,19 +154,14 @@ struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLowering
             }
         });
 
-        // Remove unused decomposition functions
-        for (auto &[_, func] : decompositionRegistry) {
-            // Check if the function still exists (hasn't been inlined and deleted)
-            // if deleted, `removeNodeFromList` will set the block to nullptr
-            if (!func || !func->getBlock()) {
-                continue;
-            }
-
-            // Check if the function is unused
-            if (!usedDecompositionFunctions.contains(func)) {
+        // remove unused decomposition functions
+        module.walk([&](func::FuncOp func) {
+            if (DecompositionUtils::isDecompositionFunction(func) &&
+                !usedDecompositionFunctions.contains(func)) {
                 func.erase();
             }
-        }
+            return WalkResult::skip();
+        });
     }
 
   public:
