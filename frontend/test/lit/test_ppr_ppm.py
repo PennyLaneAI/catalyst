@@ -195,7 +195,7 @@ def test_ppr_to_ppm():
         def cir_default():
             qml.S(0)
 
-        @ppr_to_ppm(decompose_method="clifford-corrected")
+        @ppr_to_ppm(decompose_method="clifford-corrected", avoid_y_measure=True)
         @to_ppr
         @qml.qnode(device)
         def cir_inject_magic_state():
@@ -256,7 +256,7 @@ def test_ppr_to_ppm():
 test_ppr_to_ppm()
 
 
-def test_clifford_T_to_ppm():
+def test_clifford_to_ppm():
     """
     Test the pipeline `to_ppm` pass.
     Check whole pipeline of PPM's sub-passes.
@@ -267,20 +267,22 @@ def test_clifford_T_to_ppm():
     pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
 
     @qjit(pipelines=pipe, target="mlir")
-    def test_clifford_T_to_ppm_workflow():
+    def test_clifford_to_ppm_workflow():
 
         @ppm_compilation(decompose_method="auto-corrected")
         @qml.qnode(qml.device("null.qubit", wires=2))
-        def cir_clifford_T_to_ppm():
+        def cir_clifford_to_ppm():
             qml.H(0)
             qml.CNOT(wires=[0, 1])
             qml.T(0)
             qml.T(1)
             return [measure(0), measure(1)]
 
-        @ppm_compilation(decompose_method="clifford-corrected", max_pauli_size=2)
+        @ppm_compilation(
+            decompose_method="clifford-corrected", avoid_y_measure=True, max_pauli_size=2
+        )
         @qml.qnode(qml.device("null.qubit", wires=5))
-        def cir_clifford_T_to_ppm_with_params():
+        def cir_clifford_to_ppm_with_params():
             for idx in range(5):
                 qml.H(idx)
                 qml.CNOT(wires=[idx, idx + 1])
@@ -289,12 +291,12 @@ def test_clifford_T_to_ppm():
                 qml.T(idx + 1)
             return [measure(idx) for idx in range(5)]
 
-        return cir_clifford_T_to_ppm(), cir_clifford_T_to_ppm_with_params()
+        return cir_clifford_to_ppm(), cir_clifford_to_ppm_with_params()
 
-    print(test_clifford_T_to_ppm_workflow.mlir_opt)
+    print(test_clifford_to_ppm_workflow.mlir_opt)
 
 
-# CHECK-LABEL: public @cir_clifford_T_to_ppm
+# CHECK-LABEL: public @cir_clifford_to_ppm
 # decompose Clifford to PPM
 # CHECK: qec.select.ppm({{.+}}, ["X"], ["Z"])
 # CHECK: qec.ppm ["X", "Z", "Z"]
@@ -302,13 +304,13 @@ def test_clifford_T_to_ppm():
 # CHECK: qec.ppm ["X"]
 # CEHCK: qec.select.ppm({{.+}}, ["X"], ["Z"])
 
-# CHECK-LABEL: public @cir_clifford_T_to_ppm_with_params
+# CHECK-LABEL: public @cir_clifford_to_ppm_with_params
 # decompose Clifford to PPM with params
 # CHECK-NOT: qec.ppm [{{.+}}, {{.+}}, {{.+}}, {{.+}}, {{.+}}, {{.+}}]
 # CHECK-NOT: qec.ppm [{{.+}}, {{.+}}, {{.+}}, {{.+}}]
 # It can be decomposed to three pauli strings in decomposing ppr to ppm
 # CHECK: qec.ppm [{{.+}}, {{.+}}, {{.+}}]
-test_clifford_T_to_ppm()
+test_clifford_to_ppm()
 
 
 def test_t_layer_reduction():
