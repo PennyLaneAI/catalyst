@@ -781,28 +781,33 @@ def merge_ppr_ppm(qnode=None, *, max_pauli_size=0):
     return PassPipelineWrapper(qnode, merge_ppr_ppm_pass)
 
 
-def ppr_to_ppm(qnode=None, *, decompose_method="auto-corrected", avoid_y_measure=False):
+def ppr_to_ppm(qnode=None, *, decompose_method="pauli-corrected", avoid_y_measure=False):
     R"""Specify that the MLIR compiler passes for decomposing Pauli Product rotations (PPR)
     , :math:`\exp(-iP\theta)`, into Pauli Pauli measurements (PPM) will be applied.
 
     This pass is used to decompose both non-Clifford and Clifford PPRs into PPMs. The non-Clifford
     PPRs (:math:`\theta = \tfrac{\pi}{8}`) are decomposed first, and then Clifford PPRs
     (:math:`\theta = \tfrac{\pi}{4}`) are decomposed.
-    Non-Clifford decomposition can be performed in one of two ways:
-    ``"clifford-corrected"`` or ``"auto-corrected"``, by default the latter is used.
-    Both methods are based on `A Game of Surface Codes <https://arxiv.org/abs/1808.02892>`__,
+    Non-Clifford decomposition can be performed in one of three ways:
+    ``"pauli-corrected"``, ``"clifford-corrected"`` or ``"auto-corrected"``, by default the first one is used.
+    The first method ``"pauli-corrected"`` is based on Figure 13 in the paper: https://arxiv.org/pdf/2211.15465.
+    The latter two methods are based on `A Game of Surface Codes <https://arxiv.org/abs/1808.02892>`__,
     figures 7 and 17(b) respectively.
 
     Args:
         qnode (QNode, optional): QNode to apply the pass to. If None, returns a decorator.
         decompose_method (str, optional): The method to use for decomposing non-Clifford PPRs.
-            Options are ``"auto-corrected"`` and ``"clifford-corrected"``.
-            Defaults to ``"auto-corrected"``.
+            Options are ``"pauli-corrected"``, ``"auto-corrected"``, and ``"clifford-corrected"``.
+            Defaults to ``"pauli-corrected"``.
+            ``"pauli-corrected"`` uses a reactive measurement for correction.
             ``"auto-corrected"`` uses an additional measurement for correction.
             ``"clifford-corrected"`` uses a Clifford rotation for correction.
+
         avoid_y_measure (bool): Rather than performing a Pauli-Y measurement for Clifford rotations
             (sometimes more costly), a :math:`Y` state (:math:`Y\vert 0 \rangle`) is used instead
-            (requires :math:`Y` state preparation). Defaults to ``False``.
+            (requires :math:`Y` state preparation).
+            This is currently only supported when using the ``"clifford-corrected"`` decomposition method.
+            Defaults to ``False``.
 
     Returns:
         ~.QNode or callable: Returns decorated QNode if qnode is provided,
@@ -825,7 +830,7 @@ def ppr_to_ppm(qnode=None, *, decompose_method="auto-corrected", avoid_y_measure
         @to_ppr
         @commute_ppr
         @merge_ppr_ppm
-        @ppr_to_ppm
+        @ppr_to_ppm(decompose_method="auto-corrected")
         @qml.qnode(qml.device("null.qubit", wires=2))
         def circuit():
             qml.H(0)
@@ -843,7 +848,7 @@ def ppr_to_ppm(qnode=None, *, decompose_method="auto-corrected", avoid_y_measure
         %5 = qec.fabricate  zero : !quantum.bit
         %6 = qec.fabricate  magic : !quantum.bit
         %mres, %out_qubits:2 = qec.ppm ["X", "Z"] %1, %6 : !quantum.bit, !quantum.bit
-        %mres_0, %out_qubits_1:2 = qec.ppm ["Z", "Y"] %5, %out_qubits#1 : !quantum.bit, !quantum.bit
+        %mres_0, %out_qubits_1:2 = qec.ppm ["Z", "Y"](-1) %5, %out_qubits#1 : !quantum.bit, !quantum.bit
         %mres_2, %out_qubits_3 = qec.ppm ["X"] %out_qubits_1#1 : !quantum.bit
         %mres_4, %out_qubits_5 = qec.select.ppm(%mres, ["X"], ["Z"]) %out_qubits_1#0 : !quantum.bit
         %7 = arith.xori %mres_0, %mres_2 : i1
@@ -868,7 +873,7 @@ def ppr_to_ppm(qnode=None, *, decompose_method="auto-corrected", avoid_y_measure
 
 
 def ppm_compilation(
-    qnode=None, *, decompose_method="auto-corrected", avoid_y_measure=False, max_pauli_size=0
+    qnode=None, *, decompose_method="pauli-corrected", avoid_y_measure=False, max_pauli_size=0
 ):
     R"""
     Specify that the MLIR compiler pass for transforming
@@ -889,8 +894,9 @@ def ppm_compilation(
     Args:
         qnode (QNode, optional): QNode to apply the pass to. If None, returns a decorator.
         decompose_method (str, optional): The method to use for decomposing non-Clifford PPRs.
-            Options are ``"auto-corrected"`` and ``"clifford-corrected"``. Defaults to
-            ``"auto-corrected"``.
+            Options are ``"pauli-corrected"``, ``"auto-corrected"`` and ``"clifford-corrected"``. Defaults to
+            ``"pauli-corrected"``.
+            ``"pauli-corrected"`` uses a reactive measurement for correction.
             ``"auto-corrected"`` uses an additional measurement for correction.
             ``"clifford-corrected"`` uses a Clifford rotation for correction.
         avoid_y_measure (bool): Rather than performing a Pauli-Y measurement for Clifford rotations
@@ -920,7 +926,7 @@ def ppm_compilation(
         method = "clifford-corrected"
 
         @qjit(pipelines=pipeline, target="mlir")
-        @ppm_compilation(decompose_method=method, avoid_y_measure=True, max_pauli_size=2)
+        @ppm_compilation(decompose_method=method, max_pauli_size=2)
         @qml.qnode(qml.device("null.qubit", wires=2))
         def circuit():
             qml.CNOT([0, 1])
