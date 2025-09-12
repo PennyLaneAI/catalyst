@@ -33,6 +33,26 @@ using namespace catalyst::quantum;
 namespace catalyst {
 namespace quantum {
 
+/// A struct to represent qubit indices in quantum operations.
+///
+/// This struct provides a way to handle qubit indices that can be either:
+/// - A runtime Value (for dynamic indices computed at runtime)
+/// - An IntegerAttr (for compile-time constant indices)
+/// - Invalid/uninitialized (represented by std::monostate)
+///
+/// The struct uses std::variant to ensure only one type is active at a time,
+/// preventing invalid states.
+///
+/// Example usage:
+///   QubitIndex dynamicIdx(operandValue);     // Runtime qubit index
+///   QubitIndex staticIdx(IntegerAttr::get(...)); // Compile-time constant
+///   QubitIndex invalidIdx;                   // Uninitialized state
+///
+///   if (dynamicIdx) {                        // Check if valid
+///     if (dynamicIdx.isValue()) {            // Check if runtime value
+///       Value idx = dynamicIdx.getValue();   // Get the Value
+///     }
+///   }
 struct QubitIndex {
     // use monostate to represent the invalid index
     std::variant<std::monostate, Value, IntegerAttr> index;
@@ -124,8 +144,7 @@ class OpSignatureAnalyzer {
         int operandIdx = 0;
         if (isa<quantum::QuregType>(funcInputs[0])) {
             Value updatedQreg = signature.sourceQreg;
-            for (size_t i = 0; i < signature.inQubits.size(); ++i) {
-                Value qubit = signature.inQubits[i];
+            for (auto [i, qubit] : llvm::enumerate(signature.inQubits)) {
                 const QubitIndex &index = signature.inWireIndices[i];
                 updatedQreg =
                     rewriter.create<quantum::InsertOp>(loc, updatedQreg.getType(), updatedQreg,

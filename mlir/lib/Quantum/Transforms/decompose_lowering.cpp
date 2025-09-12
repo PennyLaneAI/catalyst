@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <llvm/DebugInfo/LogicalView/Core/LVScope.h>
 #define DEBUG_TYPE "decompose-lowering"
 
 #include "llvm/ADT/DenseSet.h"
@@ -48,7 +47,7 @@ namespace DecompositionUtils {
 // Check if a function is a decomposition function
 // It's expected that the decomposition function would have these two attributes:
 // `catalyst.decomposition` and `catalyst.decomposition.target_op`
-// And these are set by the `updateDecompositionAttributes` function
+// And these are set by the `markDecompositionAttributes` functionq
 // The decomposition attributes are used to determine if a function is a decomposition function,
 // and target_op is that the decomposition function want to replace
 bool isDecompositionFunction(func::FuncOp func)
