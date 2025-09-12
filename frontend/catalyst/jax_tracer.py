@@ -1490,7 +1490,6 @@ def _trace_classical_phase(
         )
 
 
-# pylint: disable=too-many-branches,too-many-statements
 def _trace_quantum_step(
     device: QubitDevice,
     qnode,
@@ -1565,6 +1564,25 @@ def _trace_quantum_step(
             meas_tracers = snapshot_results + meas_tracers
         return tree_unflatten(meas_trees, meas_tracers)
 
+    def process_tape_output(tape, return_values_flat, return_values_tree):
+        cls_ret_indices = []
+        num_mcm = 0
+        if tracing_mode == TracingMode.TRANSFORM:
+            # TODO: In the future support arbitrary output from the user function.
+            if uses_transform(qnode, "dynamic_one_shot_partial"):
+                output, cls_ret_indices, num_mcm = _construct_output_with_classical_values(
+                    tape, return_values_flat
+                )
+            else:
+                output = tape.measurements
+
+            _, trees = jax.tree_util.tree_flatten(output, is_leaf=is_leaf)
+        else:
+            output = return_values_flat
+            trees = return_values_tree
+
+        return output, trees, cls_ret_indices, num_mcm
+
     with EvaluationContext.frame_tracing_context(trace):
         for tape in tapes:
             # Set up quantum register for the current tape.
@@ -1576,20 +1594,10 @@ def _trace_quantum_step(
             # If the program is batched, that means that it was transformed.
             # If it was transformed, that means that the program might have
             # changed the output. See `split_non_commuting`
-            if tracing_mode == TracingMode.TRANSFORM:
-                # TODO: In the future support arbitrary output from the user function.
-                if uses_transform(qnode, "dynamic_one_shot_partial"):
-                    output, cls_ret_indices, num_mcm = _construct_output_with_classical_values(
-                        tape, return_values_flat
-                    )
-                    classical_return_indices.extend(cls_ret_indices)
-                else:
-                    output = tape.measurements
-
-                _, trees = jax.tree_util.tree_flatten(output, is_leaf=is_leaf)
-            else:
-                output = return_values_flat
-                trees = return_values_tree
+            output, trees, cls_ret_indices, num_mcm = process_tape_output(
+                tape, return_values_flat, return_values_tree
+            )
+            classical_return_indices.extend(cls_ret_indices)
 
             mcm_config = qml.devices.MCMConfig(
                 postselect_mode=qnode.execute_kwargs["postselect_mode"],
