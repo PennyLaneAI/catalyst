@@ -106,6 +106,7 @@ struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLowering
     llvm::StringSet<llvm::MallocAllocator> targetGateSet;
 
     // Function to discover and register decomposition functions from a module
+    // It's bookkeeping the targetOp and the decomposition function that can decompose the targetOp
     void discoverAndRegisterDecompositions(ModuleOp module,
                                            llvm::StringMap<func::FuncOp> &decompositionRegistry)
     {
@@ -121,7 +122,11 @@ struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLowering
         });
     }
 
-    // Find the target gate set from the module
+    // Find the target gate set from the module.It's expected that the decomposition function would
+    // have this attribute: `decomp_gateset` And this attribute is set by the frontend, it contains
+    // the target gate set that the circuit function want to finally decompose into. Since each
+    // module only contains one circuit function, we can just find the target gate set from the
+    // function with the `decomp_gateset` attribute
     void findTargetGateSet(ModuleOp module, llvm::StringSet<llvm::MallocAllocator> &targetGateSet)
     {
         WalkResult walkResult = module.walk([&](func::FuncOp func) {
@@ -132,12 +137,13 @@ struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLowering
                 }
                 return WalkResult::interrupt();
             }
-            return WalkResult::advance();
+            return WalkResult::skip();
         });
         if (!walkResult.wasInterrupted()) {
         }
     }
 
+    // Remove unused decomposition functions
     void removeDecompositionFunctions(ModuleOp module,
                                       llvm::StringMap<func::FuncOp> &decompositionRegistry)
     {
