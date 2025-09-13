@@ -358,8 +358,8 @@ struct DecomposeLoweringRewritePattern : public OpRewritePattern<CustomOp> {
         // one result
         assert(decompFunc.getFunctionType().getNumInputs() > 0 &&
                "Decomposition function must have at least one input");
-        assert(decompFunc.getFunctionType().getNumResults() == 1 &&
-               "Decomposition function must have exactly one result");
+        assert(decompFunc.getFunctionType().getNumResults() >= 1 &&
+               "Decomposition function must have at least one result");
 
         auto enableQreg = isa<quantum::QuregType>(decompFunc.getFunctionType().getInput(0));
         auto analyzer = OpSignatureAnalyzer(op, enableQreg);

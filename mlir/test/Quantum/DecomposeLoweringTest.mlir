@@ -407,3 +407,56 @@ module @multi_wire_cnot_decomposition {
     return %11 : !quantum.reg
   }
 }
+
+// -----
+
+module @cnot_alternative_decomposition {
+  func.func public @test_cnot_alternative_decomposition() -> tensor<4xf64> {
+    %0 = quantum.alloc( 2) : !quantum.reg
+    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+
+    // CHECK: [[CST_PI:%.+]] = arith.constant 3.1415926535897931 : f64
+    // CHECK: [[CST_PI2:%.+]] = arith.constant 1.5707963267948966 : f64
+    // CHECK: [[REG:%.+]] = quantum.alloc( 2) : !quantum.reg
+    // CHECK: [[QUBIT0:%.+]] = quantum.extract [[REG]][ 0] : !quantum.reg -> !quantum.bit
+    // CHECK: [[QUBIT1:%.+]] = quantum.extract [[REG]][ 1] : !quantum.reg -> !quantum.bit
+    // CHECK: [[RZ1:%.+]] = quantum.custom "RZ"([[CST_PI]]) [[QUBIT1]] : !quantum.bit
+    // CHECK: [[RY1:%.+]] = quantum.custom "RY"([[CST_PI2]]) [[RZ1]] : !quantum.bit
+    // CHECK: [[CZ_RESULT:%.+]]:2 = quantum.custom "CZ"() [[QUBIT0]], [[RY1]] : !quantum.bit, !quantum.bit
+    // CHECK: [[RZ2:%.+]] = quantum.custom "RZ"([[CST_PI]]) [[CZ_RESULT]]#1 : !quantum.bit
+    // CHECK: [[RY2:%.+]] = quantum.custom "RY"([[CST_PI2]]) [[RZ2]] : !quantum.bit
+    // CHECK-NOT: quantum.custom "CNOT"
+    %3, %4 = quantum.custom "CNOT"() %1, %2 : !quantum.bit, !quantum.bit
+
+    // CHECK: [[FINAL_INSERT1:%.+]] = quantum.insert [[REG]][ 0], [[CZ_RESULT]]#0 : !quantum.reg, !quantum.bit
+    // CHECK: [[FINAL_INSERT2:%.+]] = quantum.insert [[FINAL_INSERT1]][ 1], [[RY2]] : !quantum.reg, !quantum.bit
+    %5 = quantum.insert %0[ 0], %3 : !quantum.reg, !quantum.bit
+    %6 = quantum.insert %5[ 1], %4 : !quantum.reg, !quantum.bit
+    %7 = quantum.compbasis qreg %6 : !quantum.obs
+    %8 = quantum.probs %7 : tensor<4xf64>
+    quantum.dealloc %6 : !quantum.reg
+    return %8 : tensor<4xf64>
+  }
+
+  // Decomposition function should be applied and removed from the module
+  // CHECK-NOT: func.func private @CNOT_rule_h_cnot_h
+  func.func private @CNOT_rule_h_cnot_h(%arg0: !quantum.bit, %arg1: !quantum.bit) -> (!quantum.bit, !quantum.bit) attributes {catalyst.decomposition.target_op = "CNOT", llvm.linkage = #llvm.linkage<internal>} {
+    // CNOT decomposition: CNOT = (I ⊗ H) * CZ * (I ⊗ H)
+    %cst = arith.constant 1.5707963267948966 : f64
+    %cst_0 = arith.constant 3.1415926535897931 : f64
+
+    // Step 1: Apply H to target qubit (H = RZ(π) * RY(π/2))
+    %out_qubits = quantum.custom "RZ"(%cst_0) %arg1 : !quantum.bit
+    %out_qubits_1 = quantum.custom "RY"(%cst) %out_qubits : !quantum.bit
+
+    // Step 2: Apply CZ gate
+    %out_qubits_2:2 = quantum.custom "CZ"() %arg0, %out_qubits_1 : !quantum.bit, !quantum.bit
+
+    // Step 3: Apply H to target qubit again
+    %out_qubits_3 = quantum.custom "RZ"(%cst_0) %out_qubits_2#1 : !quantum.bit
+    %out_qubits_4 = quantum.custom "RY"(%cst) %out_qubits_3 : !quantum.bit
+
+    return %out_qubits_2#0, %out_qubits_4 : !quantum.bit, !quantum.bit
+  }
+}
