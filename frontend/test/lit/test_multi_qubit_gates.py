@@ -43,6 +43,10 @@ def circuit(x: float):
     # pylint: disable=line-too-long
     # CHECK: {{%.+}} = quantum.multirz({{%.+}}) {{%.+}}, {{%.+}}, {{%.+}}, {{%.+}}, {{%.+}} : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
     qml.MultiRZ(x, wires=[0, 1, 2, 3, 4])
+
+    # CHECK: {{%.+}} = quantum.pcphase({{%.+}}, {{%.+}}) {{%.+}}, {{%.+}}, {{%.+}} : !quantum.bit, !quantum.bit, !quantum.bit
+    qml.PCPhase(x, dim=0, wires=[0, 1, 2])
+
     return measure(wires=0)
 
 
@@ -83,8 +87,8 @@ def get_custom_qjit_device(num_wires, discards, additions):
         name = "lightning.qubit"
         config_filepath = CONFIG_CUSTOM_DEVICE
 
-        def __init__(self, shots=None, wires=None):
-            super().__init__(wires=wires, shots=shots)
+        def __init__(self, wires=None):
+            super().__init__(wires=wires)
             self.qjit_capabilities = get_device_capabilities(self)
             for gate in discards:
                 self.qjit_capabilities.operations.pop(gate, None)

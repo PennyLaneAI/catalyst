@@ -44,8 +44,10 @@ class TestExpval:
             qml.CNOT(wires=[0, 1])
             return qml.expval(qml.Identity(wires=0)), qml.expval(qml.Identity(wires=1))
 
-        expected = circuit()
         result = qjit(circuit, seed=37)()
+        qml.capture.disable()  # capture execution unmaintained
+        expected = circuit()
+
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
     @pytest.mark.usefixtures("use_both_frontend")
@@ -66,8 +68,9 @@ class TestExpval:
             qml.CNOT(wires=[0, 1])
             return qml.expval(qml.PauliZ(wires=0)), qml.expval(qml.PauliZ(wires=1))
 
-        expected = circuit()
         result = qjit(circuit, seed=37)()
+        qml.capture.disable()  # capture execution unmaintained
+        expected = circuit()
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
     @pytest.mark.usefixtures("use_both_frontend")
@@ -88,8 +91,9 @@ class TestExpval:
             qml.CNOT(wires=[0, 1])
             return qml.expval(qml.PauliX(wires=0)), qml.expval(qml.PauliX(wires=1))
 
-        expected = circuit()
         result = qjit(circuit, seed=37)()
+        qml.capture.disable()  # capture execution unmaintained
+        expected = circuit()
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
     @pytest.mark.usefixtures("use_both_frontend")
@@ -110,8 +114,9 @@ class TestExpval:
             qml.CNOT(wires=[0, 1])
             return qml.expval(qml.PauliY(wires=0)), qml.expval(qml.PauliY(wires=1))
 
-        expected = circuit()
         result = qjit(circuit, seed=37)()
+        qml.capture.disable()  # capture execution unmaintained
+        expected = circuit()
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
     @pytest.mark.usefixtures("use_both_frontend")
@@ -132,8 +137,10 @@ class TestExpval:
             qml.CNOT(wires=[0, 1])
             return qml.expval(qml.Hadamard(wires=0)), qml.expval(qml.Hadamard(wires=1))
 
-        expected = circuit()
         result = qjit(circuit, seed=37)()
+        qml.capture.disable()  # capture execution unmaintained
+        expected = circuit()
+
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
     @pytest.mark.usefixtures("use_both_frontend")
@@ -154,8 +161,9 @@ class TestExpval:
             )
             return qml.expval(qml.Hermitian(A, wires=2))
 
-        expected = circuit(np.pi / 4, np.pi / 4)
         result = qjit(circuit, seed=37)(np.pi / 4, np.pi / 4)
+        qml.capture.disable()  # capture execution unmaintained
+        expected = circuit(np.pi / 4, np.pi / 4)
 
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
@@ -179,8 +187,9 @@ class TestExpval:
             qml.CNOT(wires=[1, 2])
             return qml.expval(qml.PauliX(wires=0) @ qml.PauliY(wires=2))
 
-        expected = circuit()
         result = qjit(circuit, seed=37)()
+        qml.capture.disable()  # capture execution unmaintained
+        expected = circuit()
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
     def test_pauliz_pauliy_prod(self, backend, tol_stochastic):
@@ -199,8 +208,10 @@ class TestExpval:
             qml.CNOT(wires=[1, 2])
             return qml.expval(qml.PauliX(2) @ qml.PauliY(1) @ qml.PauliZ(0))
 
-        expected = circuit(0.432, 0.123, -0.543)
         result = qjit(circuit, seed=37)(0.432, 0.123, -0.543)
+        qml.capture.disable()  # capture execution unmaintained
+        expected = circuit(0.432, 0.123, -0.543)
+
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
     def test_pauliz_hamiltonian(self, backend, tol_stochastic):
@@ -221,8 +232,10 @@ class TestExpval:
                 0.2 * qml.PauliZ(wires=0) + 0.5 * qml.Hadamard(wires=1) + qml.PauliY(wires=2)
             )
 
-        expected = circuit(0.432, 0.123, -0.543)
         result = qjit(circuit, seed=37)(0.432, 0.123, -0.543)
+        qml.capture.disable()  # capture execution unmaintained
+        expected = circuit(0.432, 0.123, -0.543)
+
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
     def test_prod_hamiltonian(self, backend, tol_stochastic):
@@ -243,8 +256,10 @@ class TestExpval:
                 0.2 * qml.PauliZ(wires=0) + 0.5 * qml.Hadamard(wires=1) @ qml.PauliX(2)
             )
 
-        expected = circuit(0.432, 0.123, -0.543)
         result = qjit(circuit, seed=37)(0.432, 0.123, -0.543)
+        qml.capture.disable()  # capture execution unmaintained
+        expected = circuit(0.432, 0.123, -0.543)
+
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
 
@@ -269,8 +284,9 @@ class TestVar:
             qml.CNOT(wires=[0, 1])
             return qml.var(qml.Identity(wires=0)), qml.var(qml.Identity(wires=1))
 
-        expected = circuit()
         result = qjit(circuit, seed=37)()
+        qml.capture.disable()  # capture execution unmaintained
+        expected = circuit()
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
     @pytest.mark.usefixtures("use_both_frontend")
@@ -291,8 +307,10 @@ class TestVar:
             qml.CNOT(wires=[0, 1])
             return qml.var(qml.PauliZ(wires=0)), qml.var(qml.PauliZ(wires=1))
 
-        expected = circuit()
         result = qjit(circuit, seed=37)()
+        qml.capture.disable()  # capture execution unmaintained
+        expected = circuit()
+
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
     @pytest.mark.usefixtures("use_both_frontend")
@@ -313,8 +331,9 @@ class TestVar:
             qml.CNOT(wires=[0, 1])
             return qml.var(qml.PauliX(wires=0)), qml.var(qml.PauliX(wires=1))
 
-        expected = circuit()
         result = qjit(circuit, seed=37)()
+        qml.capture.disable()  # capture execution unmaintained
+        expected = circuit()
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
     @pytest.mark.usefixtures("use_both_frontend")
@@ -335,8 +354,10 @@ class TestVar:
             qml.CNOT(wires=[0, 1])
             return qml.var(qml.PauliY(wires=0)), qml.var(qml.PauliY(wires=1))
 
-        expected = circuit()
         result = qjit(circuit, seed=37)()
+        qml.capture.disable()  # capture execution unmaintained
+        expected = circuit()
+
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
     @pytest.mark.usefixtures("use_both_frontend")
@@ -357,8 +378,9 @@ class TestVar:
             qml.CNOT(wires=[0, 1])
             return qml.var(qml.Hadamard(wires=0)), qml.var(qml.Hadamard(wires=1))
 
-        expected = circuit()
         result = qjit(circuit, seed=37)()
+        qml.capture.disable()  # capture execution unmaintained
+        expected = circuit()
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
     @pytest.mark.usefixtures("use_both_frontend")
@@ -380,8 +402,9 @@ class TestVar:
             )
             return qml.var(qml.Hermitian(A, wires=2))
 
-        expected = circuit(np.pi / 4, np.pi / 4)
         result = qjit(circuit, seed=37)(np.pi / 4, np.pi / 4)
+        qml.capture.disable()  # capture execution unmaintained
+        expected = circuit(np.pi / 4, np.pi / 4)
 
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
@@ -405,8 +428,10 @@ class TestVar:
             qml.CNOT(wires=[1, 2])
             return qml.var(qml.PauliX(wires=0) @ qml.PauliY(wires=2))
 
-        expected = circuit()
         result = qjit(circuit, seed=37)()
+        qml.capture.disable()  # capture execution unmaintained
+        expected = circuit()
+
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
     def test_hadamard_pauliy_prod(self, backend, tol_stochastic):
@@ -425,8 +450,10 @@ class TestVar:
             qml.CNOT(wires=[1, 2])
             return qml.var(qml.Hadamard(wires=1) @ qml.PauliY(wires=2))
 
-        expected = circuit(0.432, 0.123, -0.543)
         result = qjit(circuit, seed=37)(0.432, 0.123, -0.543)
+        qml.capture.disable()  # capture execution unmaintained
+        expected = circuit(0.432, 0.123, -0.543)
+
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
     def test_pauliz_pauliy_prod(self, backend, tol_stochastic):
@@ -445,8 +472,10 @@ class TestVar:
             qml.CNOT(wires=[1, 2])
             return qml.var(qml.PauliX(2) @ qml.PauliY(1) @ qml.PauliZ(0))
 
-        expected = circuit(0.432, 0.123, -0.543)
         result = qjit(circuit, seed=37)(0.432, 0.123, -0.543)
+        qml.capture.disable()  # capture execution unmaintained
+        expected = circuit(0.432, 0.123, -0.543)
+
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
     @pytest.mark.xfail(
@@ -502,8 +531,10 @@ class TestProbs:
             qml.Hadamard(wires=[1])
             return qml.probs()
 
-        expected = circuit(0.432)
         result = qjit(circuit, seed=37)(0.432)
+        qml.capture.disable()  # capture execution unmaintained
+        expected = circuit(0.432)
+
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
     def test_probs_wire(self, backend, tol_stochastic):
@@ -520,8 +551,10 @@ class TestProbs:
             qml.Hadamard(wires=[1])
             return qml.probs(wires=[0])
 
-        expected = circuit(0.432)
         result = qjit(circuit, seed=37)(0.432)
+        qml.capture.disable()  # capture execution unmaintained
+        expected = circuit(0.432)
+
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
 

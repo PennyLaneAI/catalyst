@@ -16,6 +16,7 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
+#include <cstdint>
 #include <cstdio>
 
 #include "ExecutionContext.hpp"
@@ -31,6 +32,42 @@ using namespace Catch::Matchers;
 
 using namespace Catalyst::Runtime;
 using namespace Catalyst::Runtime::Devices;
+
+/**
+ * @brief A test fixture that initializes the Catalyst Runtime and sets up a null.qubit runtime
+ *        device with shots=0 and auto_qubit_management=false. The teardown operation releases the
+ *        device and terminates the Catalyst Runtime.
+ */
+struct NullQubitRuntimeFixture {
+    /**
+     * Setup
+     *
+     * Initialize the Catalyst runtime before each test case.
+     */
+    NullQubitRuntimeFixture()
+    {
+        __catalyst__rt__initialize(nullptr);
+
+        const auto [rtd_lib, rtd_name, rtd_kwargs] =
+            std::array<std::string, 3>{"null.qubit", "null_qubit", ""};
+
+        __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
+                                    (int8_t *)rtd_kwargs.c_str(), 0, /* shots */
+                                    false                            /* auto_qubit_management */
+        );
+    }
+
+    /**
+     * Teardown
+     *
+     * Release the device and finalize the runtime after each test case.
+     */
+    ~NullQubitRuntimeFixture()
+    {
+        __catalyst__rt__device_release();
+        __catalyst__rt__finalize();
+    }
+};
 
 TEST_CASE("Test success of loading a device", "[NullQubit]")
 {
@@ -353,7 +390,7 @@ TEST_CASE("Test NullQubit state vector after AllocateQubits", "[NullQubit]")
 
     CHECK(sim->AllocateQubits(0).size() == 0);
 
-    auto &&q = sim->AllocateQubits(2);
+    sim->AllocateQubits(2);
 
     CHECK(sim->GetNumQubits() == 2);
 
@@ -415,6 +452,100 @@ TEST_CASE("test AllocateQubits generates a proper std::vector<QubitIdType>", "[N
     }
 }
 
+TEST_CASE("Test allocation of multiple registers", "[NullQubit]")
+{
+    std::unique_ptr<NullQubit> sim = std::make_unique<NullQubit>();
+
+    auto &&reg1 = sim->AllocateQubits(1);
+    auto &&reg2 = sim->AllocateQubits(2);
+
+    CHECK(reg1.size() == 1);
+    CHECK(reg2.size() == 2);
+    CHECK(sim->GetNumQubits() == 3);
+}
+
+TEST_CASE_METHOD(NullQubitRuntimeFixture, "Test insertion of qubit into register", "[NullQubit]")
+{
+    // Allocate register with three qubits, [0, 1, 2]
+    QirArray *reg = __catalyst__rt__qubit_allocate_array(3);
+
+    auto reg_vec_before = *reinterpret_cast<std::vector<QubitIdType> *>(reg);
+
+    CHECK(reg_vec_before[0] == 0);
+    CHECK(reg_vec_before[1] == 1);
+    CHECK(reg_vec_before[2] == 2);
+
+    // Release qubit 1; note that array `reg` is still [0, 1, 2]
+    __catalyst__rt__qubit_release(reinterpret_cast<QUBIT *>(reg_vec_before[1]));
+
+    // Allocate an individual qubit; internally it has ID 3
+    QUBIT *q = __catalyst__rt__qubit_allocate();
+
+    CHECK(reinterpret_cast<QubitIdType>(q) == 3);
+
+    // Insert the individual qubit (ID: 3) into `reg` at position 1
+    // Afterwards, `reg` should be [0, 3, 2]
+    __catalyst__rt__array_update_element_1d(reg, 1, reinterpret_cast<QUBIT *>(q));
+
+    auto reg_vec_after = *reinterpret_cast<std::vector<QubitIdType> *>(reg);
+
+    CHECK(reg_vec_after[0] == 0);
+    CHECK(reg_vec_after[1] == 3);
+    CHECK(reg_vec_after[2] == 2);
+}
+
+TEST_CASE_METHOD(NullQubitRuntimeFixture,
+                 "Test insertion of qubit from a register into another register", "[NullQubit]")
+{
+    // Allocate two registers
+    QirArray *reg1 = __catalyst__rt__qubit_allocate_array(1); // [0]
+    QirArray *reg2 = __catalyst__rt__qubit_allocate_array(2); // [1, 2]
+
+    auto reg1_vec = *reinterpret_cast<std::vector<QubitIdType> *>(reg1);
+
+    CHECK(reg1_vec[0] == 0);
+
+    auto reg2_vec = *reinterpret_cast<std::vector<QubitIdType> *>(reg2);
+
+    CHECK(reg2_vec[0] == 1);
+    CHECK(reg2_vec[1] == 2);
+
+    // Release qubit 0 (from reg1) and qubit 1 (from reg2)
+    __catalyst__rt__qubit_release(reinterpret_cast<QUBIT *>(reg1_vec[0]));
+    __catalyst__rt__qubit_release(reinterpret_cast<QUBIT *>(reg2_vec[0]));
+
+    // Extract qubit 2 from position 1 in reg2
+    QUBIT **q2 = reinterpret_cast<QUBIT **>(__catalyst__rt__array_get_element_ptr_1d(reg2, 1));
+
+    CHECK(reinterpret_cast<QubitIdType>(*q2) == 2);
+
+    // Insert qubit 2 into position 0 of reg1
+    __catalyst__rt__array_update_element_1d(reg1, 0, *q2);
+
+    auto reg1_vec_after = *reinterpret_cast<std::vector<QubitIdType> *>(reg1);
+
+    CHECK(reg1_vec_after[0] == 2);
+}
+
+TEST_CASE_METHOD(
+    NullQubitRuntimeFixture,
+    "Test insertion of qubit into register at position beyond its size throws an exception",
+    "[NullQubit]")
+{
+    // Allocate register with three qubits, [0, 1, 2]
+    QirArray *reg = __catalyst__rt__qubit_allocate_array(3);
+
+    auto reg_vec_before = *reinterpret_cast<std::vector<QubitIdType> *>(reg);
+
+    // Allocate an individual qubit; internally it has ID 3
+    QUBIT *q = __catalyst__rt__qubit_allocate();
+
+    // Insert the individual qubit (ID: 3) into `reg` at position 3
+    // This should raise an exception position 3 is beyond the size of the register
+    CHECK_THROWS_WITH(__catalyst__rt__array_update_element_1d(reg, 3, reinterpret_cast<QUBIT *>(q)),
+                      ContainsSubstring("qubit register does not contain the requested wire"));
+}
+
 TEST_CASE("Mix Gate test R(X,Y,Z) num_qubits=4", "[NullQubit]")
 {
     std::unique_ptr<NullQubit> sim = std::make_unique<NullQubit>();
@@ -432,6 +563,24 @@ TEST_CASE("Mix Gate test R(X,Y,Z) num_qubits=4", "[NullQubit]")
     sim->State(view);
 
     CHECK(view.size() == 16);
+    CHECK(view(0).real() == Catch::Approx(1.0).epsilon(1e-5));
+    CHECK(view(0).imag() == Catch::Approx(0.0).epsilon(1e-5));
+}
+
+TEST_CASE("Gate PCPhase num_qubits=3", "[NullQubit]")
+{
+    std::unique_ptr<NullQubit> sim = std::make_unique<NullQubit>();
+
+    std::vector<QubitIdType> Qs = sim->AllocateQubits(3);
+
+    sim->NamedOperation("PCPhase", {0.123, 1}, {Qs[0], Qs[1], Qs[2]}, false);
+    sim->NamedOperation("PCPhase", {0.123, 2}, {Qs[1], Qs[2]}, true);
+
+    std::vector<std::complex<double>> state(1U << sim->GetNumQubits());
+    DataView<std::complex<double>, 1> view(state);
+    sim->State(view);
+
+    CHECK(view.size() == 8);
     CHECK(view(0).real() == Catch::Approx(1.0).epsilon(1e-5));
     CHECK(view(0).imag() == Catch::Approx(0.0).epsilon(1e-5));
 }
@@ -762,7 +911,8 @@ TEST_CASE("Test NullQubit device resource tracking", "[NullQubit]")
     std::unique_ptr<NullQubit> dummy = std::make_unique<NullQubit>();
     CHECK(dummy->IsTrackingResources() == false);
 
-    std::unique_ptr<NullQubit> sim = std::make_unique<NullQubit>("{'track_resources':True}");
+    std::unique_ptr<NullQubit> sim =
+        std::make_unique<NullQubit>("{'track_resources':True}", RESOURCES_FNAME);
     CHECK(sim->IsTrackingResources() == true);
     CHECK(sim->ResourcesGetNumGates() == 0);
     CHECK(sim->ResourcesGetNumQubits() == 0);
@@ -844,7 +994,27 @@ TEST_CASE("Test NullQubit device resource tracking", "[NullQubit]")
 
     // Check that releasing resets
     sim->ReleaseAllQubits();
+    std::remove(RESOURCES_FNAME); // Remove the file automatically created by the device
 
     CHECK(sim->ResourcesGetNumGates() == 0);
     CHECK(sim->ResourcesGetNumQubits() == 0);
+    CHECK(sim->ResourcesGetFilename() == RESOURCES_FNAME);
+}
+
+TEST_CASE("Test resource tracking filename", "[NullQubit]")
+{
+    // Check automatic filename creation
+    std::unique_ptr<NullQubit> dummy = std::make_unique<NullQubit>("{'track_resources':True}");
+    CHECK(dummy->IsTrackingResources() == true);
+    dummy->ReleaseAllQubits();
+
+    const std::string dummy_resources_fname = dummy->ResourcesGetFilename();
+
+    std::cout << "Auto-created resources filename: " << dummy_resources_fname << std::endl;
+
+    CHECK(dummy_resources_fname.rfind("__pennylane_resources_data_") == 0);
+    CHECK(dummy_resources_fname.find(".json") != std::string::npos);
+
+    std::remove(
+        dummy_resources_fname.c_str()); // Remove the file automatically created by the device
 }

@@ -45,10 +45,7 @@ from pennylane.transforms import merge_rotations
 
 from catalyst import measure, qjit
 from catalyst.device import QJITDevice
-from catalyst.device.decomposition import (
-    measurements_from_counts,
-    measurements_from_samples,
-)
+from catalyst.device.decomposition import measurements_from_counts, measurements_from_samples
 from catalyst.utils.exceptions import CompileError
 
 # pylint: disable=too-many-lines,line-too-long
@@ -613,7 +610,7 @@ class TestMitigate:
         def qnode_builder(device_name):
             """Builder"""
 
-            @partial(qml.transforms.fold_global, scale_factor=2)
+            @partial(qml.noise.fold_global, scale_factor=2)
             @qml.qnode(qml.device(device_name, wires=3), interface="jax")
             def qfunc(x):
                 qml.RX(x[0], wires=0)

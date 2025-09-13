@@ -33,7 +33,7 @@ from catalyst import vjp as C_vjp
 
 # TODO: add tests with other measurement processes (e.g. qml.sample, qml.probs, ...)
 
-# pylint: disable=too-many-public-methods
+# pylint: disable=too-many-lines,too-many-public-methods
 
 
 class TestMidCircuitMeasurement:
@@ -432,9 +432,19 @@ class TestDynamicOneShotIntegration:
             (None, False, (1, 1)),
             (0, False, (0, 0)),
             (1, False, (1, 1)),
-            (None, True, (1, 0)),
+            pytest.param(
+                None,
+                True,
+                (1, 0),
+                marks=pytest.mark.xfail(reason="waiting for PennyLane squeeze issue fix"),
+            ),
             (0, True, (0, 0)),
-            (1, True, (1, 0)),
+            pytest.param(
+                1,
+                True,
+                (1, 0),
+                marks=pytest.mark.xfail(reason="waiting for PennyLane squeeze issue fix"),
+            ),
         ],
     )
     @pytest.mark.parametrize("postselect_mode", ["hw-like", "fill-shots"])
@@ -799,8 +809,12 @@ class TestDynamicOneShotIntegration:
 
         assert np.allclose(grad_f(1.0), grad_g(1.0))
 
-    @pytest.mark.xfail(
-        reason="value_and_grad with dynamic one-shot is not yet supported.",
+    # value_and_grad now will be supported, but jax has an issue with the current version we use
+    # as it results in a random memory error. https://github.com/tensorflow/tensorflow/pull/97681
+    # It will be fixed in the next jax release. we will re-enable this test when the jax
+    # release is available and tested on our end.
+    @pytest.mark.skip(
+        reason="https://github.com/tensorflow/tensorflow/pull/97681",
     )
     def test_mcm_method_with_value_and_grad(self):
         """Test that the dynamic_one_shot works with value_and_grad."""
