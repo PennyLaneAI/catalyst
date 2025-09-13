@@ -101,6 +101,8 @@
 * A new decomposition rule for non-Clifford PPRs into two PPMs based on the Active Volume paper.
   [(#2043)](https://github.com/PennyLaneAI/catalyst/pull/2043)
 
+* Added support for avoid Y basis measurement for `pauli-corrected` PPR decomposition.
+  [(#2047)](https://github.com/PennyLaneAI/catalyst/pull/2047)
 
 <h3>Breaking changes 💔</h3>
 
@@ -153,7 +155,6 @@
    - fix object file system extension on macOS
    - fix wrong type signature of `Counts` API function
   [(#2032)](https://github.com/PennyLaneAI/catalyst/pull/2032)
-
 
 * Fixed the Clifford PPR decomposition rule where using the Y measurement should take the inverse.
   [(#2043)](https://github.com/PennyLaneAI/catalyst/pull/2043)
@@ -268,9 +269,6 @@
 
 * The `NoMemoryEffect` trait has been removed from the `quantum.alloc` operation.
   [(#2044)](https://github.com/PennyLaneAI/catalyst/pull/2044)
-
-* Added support for avoid Y basis measurement for `pauli-corrected` PPR decomposition.
-  [(#2047)](https://github.com/PennyLaneAI/catalyst/pull/2047)
 
 <h3>Documentation 📝</h3>
 
