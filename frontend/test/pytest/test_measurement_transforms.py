@@ -945,9 +945,7 @@ class TestTransform:
         "transform_measurement", (measurements_from_samples, measurements_from_counts)
     )
     @pytest.mark.parametrize("mcm_method", ("one-shot", "single-branch-statistics"))
-    def test_measurements_transform(
-        self, mcm_method, transform_measurement
-    ):
+    def test_measurements_transform(self, mcm_method, transform_measurement):
         """Test raise an error when measurements_from_samples is used with one-shot."""
         device = qml.device("lightning.qubit", wires=2)
 
