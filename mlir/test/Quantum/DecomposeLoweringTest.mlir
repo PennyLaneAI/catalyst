@@ -221,6 +221,52 @@ module @param_rxry {
 }
 // -----
 
+// Test parametric gates and wires
+module @param_rxry_2 {
+  func.func public @test_param_rxry_2(%arg0: tensor<f64>, %arg1: tensor<f64>, %arg2: tensor<i64>) -> tensor<2xf64> {
+    %c0_i64 = arith.constant 0 : i64
+
+    // CHECK: [[REG:%.+]] = quantum.alloc( 1) : !quantum.reg
+    %0 = quantum.alloc( 1) : !quantum.reg
+
+    // CHECK: [[WIRE:%.+]] = tensor.extract %arg2[] : tensor<i64>
+    %extracted = tensor.extract %arg2[] : tensor<i64>
+
+    // CHECK: [[QUBIT:%.+]] = quantum.extract [[REG]][[[WIRE]]] : !quantum.reg -> !quantum.bit
+    %1 = quantum.extract %0[%extracted] : !quantum.reg -> !quantum.bit
+
+    // CHECK: [[PARAM_0:%.+]] = tensor.extract %arg0[] : tensor<f64>
+    %param_0 = tensor.extract %arg0[] : tensor<f64>
+
+    // CHECK: [[PARAM_1:%.+]] = tensor.extract %arg1[] : tensor<f64>
+    %param_1 = tensor.extract %arg1[] : tensor<f64>
+
+    // CHECK: [[QUBIT1:%.+]] = quantum.custom "RX"([[PARAM_0]]) [[QUBIT]] : !quantum.bit
+    // CHECK: [[QUBIT2:%.+]] = quantum.custom "RY"([[PARAM_1]]) [[QUBIT1]] : !quantum.bit
+    // CHECK-NOT: quantum.custom "ParametrizedRXRY"
+    %out_qubits = quantum.custom "ParametrizedRXRY"(%param_0, %param_1) %1 : !quantum.bit
+
+    // CHECK: [[UPDATED_REG:%.+]] = quantum.insert [[REG]][ 0], [[QUBIT2]] : !quantum.reg, !quantum.bit
+    %2 = quantum.insert %0[ 0], %out_qubits : !quantum.reg, !quantum.bit
+    %3 = quantum.compbasis qreg %2 : !quantum.obs
+    %4 = quantum.probs %3 : tensor<2xf64>
+    quantum.dealloc %2 : !quantum.reg
+    return %4 : tensor<2xf64>
+  }
+
+  // Decomposition function expects tensor<f64> while operation provides f64
+  // CHECK-NOT: func.func private @ParametrizedRX_decomp
+  func.func private @ParametrizedRXRY_decomp(%arg0: tensor<f64>, %arg1: tensor<f64>, %arg2: !quantum.bit) -> !quantum.bit
+      attributes {catalyst.decomposition.target_op = "ParametrizedRXRY", llvm.linkage = #llvm.linkage<internal>} {
+    %extracted_param_0 = tensor.extract %arg0[] : tensor<f64>
+    %out_qubits = quantum.custom "RX"(%extracted_param_0) %arg2 : !quantum.bit
+    %extracted_param_1 = tensor.extract %arg1[] : tensor<f64>
+    %out_qubits_1 = quantum.custom "RY"(%extracted_param_1) %out_qubits : !quantum.bit
+    return %out_qubits_1 : !quantum.bit
+  }
+}
+// -----
+
 // Test recursive and qreg-based gate decomposition
 module @qreg_base_circuit {
   func.func public @test_qreg_base_circuit() -> tensor<2xf64> {

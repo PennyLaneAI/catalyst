@@ -154,15 +154,21 @@ class OpSignatureAnalyzer {
 
             operands[operandIdx++] = updatedQreg;
             if (!signature.params.empty()) {
-                operands[operandIdx] =
-                    fromTensorOrAsIs(signature.params, funcInputs[operandIdx], rewriter, loc);
-                operandIdx++;
+                auto [startIdx, endIdx] =
+                    findParamTypeRange(funcInputs, signature.params.size(), operandIdx);
+                ArrayRef<Type> paramsTypes = funcInputs.slice(startIdx, endIdx - startIdx);
+                auto updatedParams = generateParams(signature.params, paramsTypes, rewriter, loc);
+                for (Value param : updatedParams) {
+                    operands[operandIdx++] = param;
+                }
             }
+
             if (!signature.inWireIndices.empty()) {
                 operands[operandIdx] = fromTensorOrAsIs(signature.inWireIndices,
                                                         funcInputs[operandIdx], rewriter, loc);
                 operandIdx++;
             }
+
             if (!signature.inCtrlWireIndices.empty()) {
                 operands[operandIdx] = fromTensorOrAsIs(signature.inCtrlWireIndices,
                                                         funcInputs[operandIdx], rewriter, loc);
@@ -171,9 +177,13 @@ class OpSignatureAnalyzer {
         }
         else {
             if (!signature.params.empty()) {
-                operands[operandIdx] =
-                    fromTensorOrAsIs(signature.params, funcInputs[operandIdx], rewriter, loc);
-                operandIdx++;
+                auto [startIdx, endIdx] =
+                    findParamTypeRange(funcInputs, signature.params.size(), operandIdx);
+                ArrayRef<Type> paramsTypes = funcInputs.slice(startIdx, endIdx - startIdx);
+                auto updatedParams = generateParams(signature.params, paramsTypes, rewriter, loc);
+                for (Value param : updatedParams) {
+                    operands[operandIdx++] = param;
+                }
             }
 
             for (auto inQubit : signature.inQubits) {
@@ -248,6 +258,56 @@ class OpSignatureAnalyzer {
             return rewriter.create<tensor::FromElementsOp>(loc, type, values);
         }
         return values.front();
+    }
+
+    static size_t getElementsCount(Type type)
+    {
+        if (isa<RankedTensorType>(type)) {
+            auto tensorType = cast<RankedTensorType>(type);
+            return tensorType.getNumElements() > 0 ? tensorType.getNumElements() : 1;
+        }
+        return 1;
+    }
+
+    // Helper function to find the range of function input types that correspond to params
+    static std::pair<size_t, size_t> findParamTypeRange(ArrayRef<Type> funcInputs,
+                                                        size_t sigParamCount, size_t startIdx = 0)
+    {
+        size_t paramTypeCount = 0;
+        size_t paramTypeEnd = startIdx;
+
+        while (paramTypeCount < sigParamCount) {
+            assert(paramTypeEnd < funcInputs.size() &&
+                   "param type end should be less than function input size");
+            paramTypeCount += getElementsCount(funcInputs[paramTypeEnd]);
+            paramTypeEnd++;
+        }
+
+        assert(paramTypeCount == sigParamCount &&
+               "param type count should be equal to signature param count");
+
+        return {startIdx, paramTypeEnd};
+    }
+
+    // generate params for calling the decomposition function based on function type requirements
+    SmallVector<Value> generateParams(ValueRange signatureParams, ArrayRef<Type> funcParamTypes,
+                                      PatternRewriter &rewriter, Location loc)
+    {
+        SmallVector<Value> operands;
+        size_t sigParamIdx = 0;
+
+        for (Type funcParamType : funcParamTypes) {
+            const size_t numElements = getElementsCount(funcParamType);
+
+            // collect numElements of signature params
+            SmallVector<Value> tensorElements;
+            for (size_t i = 0; i < numElements && sigParamIdx < signatureParams.size(); i++) {
+                tensorElements.push_back(signatureParams[sigParamIdx++]);
+            }
+            operands.push_back(fromTensorOrAsIs(tensorElements, funcParamType, rewriter, loc));
+        }
+
+        return operands;
     }
 
     Value fromTensorOrAsIs(ArrayRef<QubitIndex> indices, Type type, PatternRewriter &rewriter,
