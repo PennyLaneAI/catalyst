@@ -28,6 +28,36 @@
 
 <h3>Improvements 🛠</h3>
 
+* Catalyst now supports returning classical and MCM values with the dynamic one-shot MCM method.
+  [(#2001)](https://github.com/PennyLaneAI/catalyst/pull/2001)
+  
+  For example, the code below will generate 10 values, with an equal probability of 42 and 43
+  appearing. 
+
+  ```python
+  import pennylane as qml
+  from catalyst import qjit, measure
+  
+  @qjit(autograph=True)
+  @qml.set_shots(10)
+  @qml.qnode(qml.device("lightning.qubit", wires=1), mcm_method="one-shot")
+  def circuit():
+      qml.Hadamard(wires=0)
+      m = measure(0)
+      if m:
+          return 42, m
+      else:
+          return 43, m
+  ```
+
+  ```pycon
+  >>>  print(circuit())
+  (Array([42, 43, 42, 42, 43, 42, 42, 43, 42, 42], dtype=int64),
+   Array([ True, False,  True,  True, False,  True,  True, False,  True,
+           True], dtype=bool))
+  ```
+
+
 * Improve the pass `--ppm-specs` to count the depth of PPRs and PPMs in the circuit.
   [(#2014)](https://github.com/PennyLaneAI/catalyst/pull/2014)
 
@@ -260,7 +290,7 @@
   $ catalyst --tool=opt --pass-pipeline="builtin.module(convert-quantum-to-llvm{use-array-backed-registers=true})" <input file>
   ```
 
-* Fix auxiliary qubit deallocation in `decompose-non-clifford-ppr` pass 
+* Fix auxiliary qubit deallocation in `decompose-non-clifford-ppr` pass
   in the `clifford-corrected` method.
   [(#2039)](https://github.com/PennyLaneAI/catalyst/pull/2039)
 
