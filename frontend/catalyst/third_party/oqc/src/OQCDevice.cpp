@@ -73,7 +73,6 @@ void OQCDevice::PartialCounts(DataView<double, 1> &eigvals, DataView<int64_t, 1>
     std::iota(eigvals.begin(), eigvals.end(), 0);
 
     auto &&results = runner->Counts(builder->toOpenQASM2(), "", device_shots, GetNumQubits());
-
     int i = 0;
     for (auto r : results) {
         counts(i) = r;
