@@ -47,7 +47,7 @@ namespace Catalyst::Runtime::Devices {
  *
  * The null device is particularly useful for:
  * - Testing quantum program compilation and execution without quantum simulation overhead
- * - Resource estimation
+ * - Resource tracking & resource estimation
  * - Validating quantum program structure and control flow
  */
 struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
