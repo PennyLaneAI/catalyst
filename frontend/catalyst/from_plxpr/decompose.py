@@ -34,7 +34,7 @@ from pennylane.wires import WiresLike
 from catalyst.jax_primitives import decomposition_rule
 
 
-def create_decomposition_rule(func: Callable, num_wires: int = 1):
+def create_decomposition_rule(func: Callable, op_name: str, num_wires: int):
     """Create a decomposition rule from a function."""
 
     sig_func = inspect.signature(func)
@@ -58,6 +58,10 @@ def create_decomposition_rule(func: Callable, num_wires: int = 1):
             raise ValueError(
                 f"Unsupported type annotation {typ} for parameter {name} in func {func}."
             )
+
+    # Update the name of decomposition rule
+    rule_name = "_rule" if func.__name__[0] == "_" else "_rule_"
+    func.__name__ = op_name + rule_name + func.__name__
 
     return decomposition_rule(func)(**args)
 
@@ -126,8 +130,11 @@ class GraphSolutionInterpreter(qml.capture.PlxprInterpreter):
         if not self._captured and not isinstance(measurement, MidMeasureMP):
             self._captured = True
             if self._fixed_decomps:
-                for rule in self._fixed_decomps.values():
-                    create_decomposition_rule(rule._impl)
+                for op, rule in self._fixed_decomps.items():
+                    # TODO: number of wires for multi-wires custom gates
+                    create_decomposition_rule(
+                        rule._impl, op if isinstance(op, str) else op.__name__, num_wires=1
+                    )
 
             self._decomp_graph_solution = _solve_decomposition_graph(
                 self._operations,
@@ -140,12 +147,12 @@ class GraphSolutionInterpreter(qml.capture.PlxprInterpreter):
             for op, rule in self._decomp_graph_solution.items():
                 for o in captured_ops:
                     if o.name == op.op.name:
-                        create_decomposition_rule(rule, num_wires=len(o.wires))
+                        create_decomposition_rule(rule, op_name=op.op.name, num_wires=len(o.wires))
                         captured_ops.remove(o)
                         break
                 else:
                     # else query the number of wires by name
-                    create_decomposition_rule(rule, num_wires=1)
+                    create_decomposition_rule(rule, op_name=op.op.name, num_wires=1)
 
         data, struct = jax.tree_util.tree_flatten(measurement)
         return jax.tree_util.tree_unflatten(struct, data)
