@@ -450,6 +450,7 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
 
 @PLxPRToQuantumJaxprInterpreter.register_primitive(CountsMP._wires_primitive)
 def interpret_counts(self, *wires, all_outcomes):
+    """Interpret a CountsMP primitive as the catalyst version."""
     obs = self._compbasis_obs(*wires)
     num_wires = len(wires) if wires else len(self.device.wires)
     keys, vals = counts_p.bind(obs, static_shape=(2**num_wires,))
