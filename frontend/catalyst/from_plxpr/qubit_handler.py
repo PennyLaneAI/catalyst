@@ -77,7 +77,8 @@ class QubitIndexRecorder:
     A manager that records what global plxpr wire index belongs to what logical register.
 
     This manager answers the first question.
-    Since plxpr indices are global, there should be one instance of the class per plxpr.
+    Since plxpr indices are global, there should be one instance of the class per
+    PLxPRToQuantumJaxprInterpreter.
 
     This class promises the following:
     - `QubitIndexRecorder[i]` (i = global index in plxpr) returns the `QubitHandler` instance

@@ -180,7 +180,7 @@ class WorkflowInterpreter(PlxprInterpreter):
 
     def __init__(self):
         self._pass_pipeline = []
-        self.qubit_handler = None
+        self.init_qreg = None
         super().__init__()
 
 
@@ -209,13 +209,13 @@ def handle_qnode(
             **_get_device_kwargs(device),
         )
         qreg = qalloc_p.bind(len(device.wires))
-        self.qubit_handler = QubitHandler(qreg, self.qubit_index_recorder)
+        self.init_qreg = QubitHandler(qreg, self.qubit_index_recorder)
         converter = PLxPRToQuantumJaxprInterpreter(
-            device, shots, self.qubit_handler, {}, self.qubit_index_recorder
+            device, shots, self.init_qreg, {}, self.qubit_index_recorder
         )
         retvals = converter(closed_jaxpr, *args)
-        self.qubit_handler.insert_all_dangling_qubits()
-        qdealloc_p.bind(self.qubit_handler.get())
+        self.init_qreg.insert_all_dangling_qubits()
+        qdealloc_p.bind(self.init_qreg.get())
         device_release_p.bind()
         return retvals
 
@@ -313,7 +313,7 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         self,
         device,
         shots,
-        qubit_handler,
+        init_qreg,
         cache,
         qubit_index_recorder,
         *,
@@ -322,9 +322,7 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
     ):
         self.device = device
         self.shots = shots
-        self.qregs = {"init_alloc": qubit_handler}
-        # TODO: port all uses to track qregs, instead of just acting on the initial qreg
-        self.qubit_handler = self.qregs["init_alloc"]
+        self.init_qreg = init_qreg
         self.qubit_index_recorder = qubit_index_recorder
         self.subroutine_cache = cache
         self.control_wires = control_wires
@@ -355,8 +353,8 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         control_values = control_values + self.control_values
 
         # Insert dynamic qubits if a qreg is available
-        if self.qubit_handler.abstract_qreg_val is not None:
-            self.qubit_handler.insert_dynamic_qubits(op.wires + control_wires)
+        if not self.init_qreg.is_qubit_mode():
+            self.init_qreg.insert_dynamic_qubits(op.wires + control_wires)
 
         in_qubits = []
         in_qregs = []
@@ -365,11 +363,11 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
             # Note: `w` is the plxpr global wire index
             if not self.qubit_index_recorder.contains(w):
                 # First time the global wire index w is encountered
-                # Need to extract
-                in_qubits.append(
-                    self.qubit_handler[self.qubit_handler.global_index_to_local_index(w)]
-                )
-                in_qregs.append(self.qubit_handler)
+                # Need to extract from init qreg
+                # This won't be a dynamically allocated qreg, since these have all
+                # wires extracted after binding their alloc primitives immediately.
+                in_qubits.append(self.init_qreg[self.init_qreg.global_index_to_local_index(w)])
+                in_qregs.append(self.init_qreg)
 
             else:
                 in_qreg = self.qubit_index_recorder[w]
@@ -377,7 +375,7 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
                 in_qubits.append(in_qreg[in_qreg.global_index_to_local_index(w)])
 
         # TODO: do control qubits as well
-        control_qubits = [self.qubit_handler[w] for w in control_wires]
+        control_qubits = [self.init_qreg[w] for w in control_wires]
 
         out_qubits = qinst_p.bind(
             *[*in_qubits, *op.data, *control_qubits, *control_values],
@@ -402,7 +400,7 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
                 coeffs, terms = obs.terms()
             terms = [self._obs(t) for t in terms]
             return hamiltonian_p.bind(jnp.stack(coeffs), *terms)
-        wires = [self.qubit_handler[w] for w in obs.wires]
+        wires = [self.init_qreg[w] for w in obs.wires]
         if obs.name == "Hermitian":
             return hermitian_p.bind(obs.data[0], *wires)
         return namedobs_p.bind(*wires, *obs.data, kind=obs.name)
@@ -410,11 +408,11 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
     def _compbasis_obs(self, *wires):
         """Add a computational basis sampling observable."""
         if wires:
-            qubits = [self.qubit_handler[w] for w in wires]
+            qubits = [self.init_qreg[w] for w in wires]
             return compbasis_p.bind(*qubits)
         else:
-            self.qubit_handler.insert_all_dangling_qubits()
-            return compbasis_p.bind(self.qubit_handler.get(), qreg_available=True)
+            self.init_qreg.insert_all_dangling_qubits()
+            return compbasis_p.bind(self.init_qreg.get(), qreg_available=True)
 
     def interpret_measurement(self, measurement):
         """Rebind a measurement as a catalyst instruction."""
@@ -486,18 +484,17 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
 @PLxPRToQuantumJaxprInterpreter.register_primitive(qml.allocation.allocate_prim)
 def handle_qml_alloc(self, *, num_wires, state=None, restored=False):
     """Handle the conversion from plxpr to Catalyst jaxpr for the qml.allocate primitive"""
-    new_qreg = qalloc_p.bind(num_wires)
 
-    self.qregs[new_qreg] = QubitHandler(
-        new_qreg, self.qubit_index_recorder, dynamically_alloced=True
+    new_qreg = QubitHandler(
+        qalloc_p.bind(num_wires), self.qubit_index_recorder, dynamically_alloced=True
     )
 
     # The plxpr alloc primitive returns the list of all indices available in the new qreg
     # So let's extract all qubits and return them
     for i in range(num_wires):
-        self.qregs[new_qreg].extract(i)
+        new_qreg.extract(i)
 
-    return self.qregs[new_qreg].get_all_current_global_indices()
+    return new_qreg.get_all_current_global_indices()
 
 
 @PLxPRToQuantumJaxprInterpreter.register_primitive(qml.allocation.deallocate_prim)
@@ -511,6 +508,8 @@ def handle_qml_dealloc(self, *wires):
     # This means we cannot deallocate until the very end
     # For now we just treat the dynamically allocated qubits in the same way as the
     # initial ones, and deallocate at the end.
+    # Blocked by https://github.com/PennyLaneAI/catalyst/pull/1996
+    # which is blocked by https://github.com/PennyLaneAI/pennylane-lightning/pull/1254
     # qdealloc_p.bind(qreg.get())
 
     return []
@@ -521,8 +520,8 @@ def handle_subroutine(self, *args, **kwargs):
     """
     Transform the subroutine from PLxPR into JAXPR with quantum primitives.
     """
-    backup = dict(self.qubit_handler)
-    self.qubit_handler.insert_all_dangling_qubits()
+    backup = dict(self.init_qreg)
+    self.init_qreg.insert_all_dangling_qubits()
 
     # Make sure the quantum register is updated
     plxpr = kwargs["jaxpr"]
@@ -537,7 +536,7 @@ def handle_subroutine(self, *args, **kwargs):
         return converter.qubit_handler.get(), *retvals
 
     if not transformed:
-        converted_closed_jaxpr_branch = jax.make_jaxpr(wrapper)(self.qubit_handler.get(), *args)
+        converted_closed_jaxpr_branch = jax.make_jaxpr(wrapper)(self.init_qreg.get(), *args)
         self.subroutine_cache[plxpr] = converted_closed_jaxpr_branch
     else:
         converted_closed_jaxpr_branch = transformed
@@ -545,7 +544,7 @@ def handle_subroutine(self, *args, **kwargs):
     # quantum_subroutine_p.bind
     # is just pjit_p with a different name.
     vals_out = quantum_subroutine_p.bind(
-        self.qubit_handler.get(),
+        self.init_qreg.get(),
         *args,
         jaxpr=converted_closed_jaxpr_branch,
         in_shardings=(UNSPECIFIED, *kwargs["in_shardings"]),
@@ -560,11 +559,11 @@ def handle_subroutine(self, *args, **kwargs):
         compiler_options_kvs=kwargs["compiler_options_kvs"],
     )
 
-    self.qubit_handler.set(vals_out[0])
+    self.init_qreg.set(vals_out[0])
     vals_out = vals_out[1:]
 
     for orig_wire in backup.keys():
-        self.qubit_handler.extract(orig_wire)
+        self.init_qreg.extract(orig_wire)
 
     return vals_out
 
@@ -576,7 +575,7 @@ def handle_decomposition_rule(self, *, pyfun, func_jaxpr, is_qreg, num_params):
     """
 
     if is_qreg:
-        self.qubit_handler.insert_all_dangling_qubits()
+        self.init_qreg.insert_all_dangling_qubits()
 
         def wrapper(qreg, *args):
             qubit_handler = QubitHandler(qreg)
@@ -587,7 +586,7 @@ def handle_decomposition_rule(self, *, pyfun, func_jaxpr, is_qreg, num_params):
             return converter.qubit_handler.get()
 
         converted_closed_jaxpr_branch = jax.make_jaxpr(wrapper)(
-            self.qubit_handler.get(), *func_jaxpr.in_avals
+            self.init_qreg.get(), *func_jaxpr.in_avals
         )
     else:
 
@@ -611,10 +610,10 @@ def handle_decomposition_rule(self, *, pyfun, func_jaxpr, is_qreg, num_params):
 @PLxPRToQuantumJaxprInterpreter.register_primitive(qml.QubitUnitary._primitive)
 def handle_qubit_unitary(self, *invals, n_wires):
     """Handle the conversion from plxpr to Catalyst jaxpr for the QubitUnitary primitive"""
-    wires = [self.qubit_handler[w] for w in invals[1:]]
+    wires = [self.init_qreg[w] for w in invals[1:]]
     outvals = unitary_p.bind(invals[0], *wires, qubits_len=n_wires, ctrl_len=0, adjoint=False)
     for wire_values, new_wire in zip(invals[1:], outvals):
-        self.qubit_handler[wire_values] = new_wire
+        self.init_qreg[wire_values] = new_wire
 
 
 # pylint: disable=unused-argument
@@ -631,11 +630,11 @@ def handle_basis_state(self, *invals, n_wires):
     wires_inval = invals[1:]
 
     state = jax.lax.convert_element_type(state_inval, jnp.dtype(jnp.bool))
-    wires = [self.qubit_handler[w] for w in wires_inval]
+    wires = [self.init_qreg[w] for w in wires_inval]
     out_wires = set_basis_state_p.bind(*wires, state)
 
     for wire_values, new_wire in zip(wires_inval, out_wires):
-        self.qubit_handler[wire_values] = new_wire
+        self.init_qreg[wire_values] = new_wire
 
 
 # pylint: disable=unused-argument
@@ -648,18 +647,18 @@ def handle_state_prep(self, *invals, n_wires, **kwargs):
     # jnp.complex128 is the top element in the type promotion lattice so it is ok to do this:
     # https://jax.readthedocs.io/en/latest/type_promotion.html
     state = jax.lax.convert_element_type(state_inval, jnp.dtype(jnp.complex128))
-    wires = [self.qubit_handler[w] for w in wires_inval]
+    wires = [self.init_qreg[w] for w in wires_inval]
     out_wires = set_state_p.bind(*wires, state)
 
     for wire_values, new_wire in zip(wires_inval, out_wires):
-        self.qubit_handler[wire_values] = new_wire
+        self.init_qreg[wire_values] = new_wire
 
 
 @PLxPRToQuantumJaxprInterpreter.register_primitive(plxpr_measure_prim)
 def handle_measure(self, wire, reset, postselect):
     """Handle the conversion from plxpr to Catalyst jaxpr for the mid-circuit measure primitive."""
 
-    in_wire = self.qubit_handler[wire]
+    in_wire = self.init_qreg[wire]
 
     result, out_wire = measure_p.bind(in_wire, postselect=postselect)
 
@@ -675,7 +674,7 @@ def handle_measure(self, wire, reset, postselect):
             result, in_wire, out_wire, branch_jaxprs=correction, nimplicit_outputs=None
         )[0]
 
-    self.qubit_handler[wire] = out_wire
+    self.init_qreg[wire] = out_wire
     return result
 
 
@@ -692,10 +691,10 @@ def handle_measure_in_basis(self, angle, wire, plane, reset, postselect):
             f"Measurement plane must be one of {[plane.value for plane in MeasurementPlane]}"
         ) from e
 
-    in_wire = self.qubit_handler[wire]
+    in_wire = self.init_qreg[wire]
     result, out_wire = measure_in_basis_p.bind(_angle, in_wire, plane=_plane, postselect=postselect)
 
-    self.qubit_handler[wire] = out_wire
+    self.init_qreg[wire] = out_wire
 
     return result
 
@@ -730,8 +729,8 @@ def handle_adjoint_transform(
     args = plxpr_invals[n_consts:]
 
     # Add the iteration start and the qreg to the args
-    self.qubit_handler.insert_all_dangling_qubits()
-    qreg = self.qubit_handler.get()
+    self.init_qreg.insert_all_dangling_qubits()
+    qreg = self.init_qreg.get()
 
     jaxpr = ClosedJaxpr(jaxpr, consts)
 
@@ -761,7 +760,7 @@ def handle_adjoint_transform(
 
     # We assume the last output value is the returned qreg.
     # Update the current qreg and remove it from the output values.
-    self.qubit_handler.set(outvals.pop())
+    self.init_qreg.set(outvals.pop())
 
     # Return only the output values that match the plxpr output values
     return outvals
