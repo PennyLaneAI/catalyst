@@ -98,6 +98,16 @@ LogicalResult PCPhaseOp::canonicalize(PCPhaseOp op, mlir::PatternRewriter &rewri
     return failure();
 }
 
+LogicalResult AllocOp::canonicalize(AllocOp alloc, mlir::PatternRewriter &rewriter)
+{
+    if (alloc->use_empty()) {
+        rewriter.eraseOp(alloc);
+        return success();
+    }
+
+    return failure();
+}
+
 LogicalResult DeallocOp::canonicalize(DeallocOp dealloc, mlir::PatternRewriter &rewriter)
 {
     if (auto alloc = dyn_cast_if_present<AllocOp>(dealloc.getQreg().getDefiningOp())) {

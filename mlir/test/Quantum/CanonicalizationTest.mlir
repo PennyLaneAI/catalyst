@@ -21,10 +21,10 @@ func.func @test_alloc_dce() {
     return
 }
 
-// CHECK-LABEL: test_alloc_cse
-func.func @test_alloc_cse() -> (!quantum.reg, !quantum.reg){
+// CHECK-LABEL: test_alloc_no_cse
+func.func @test_alloc_no_cse() -> (!quantum.reg, !quantum.reg){
     // CHECK: quantum.alloc
-    // CHECK-NOT: quantum.alloc
+    // CHECK-NEXT: quantum.alloc
     %r1 = quantum.alloc(4) : !quantum.reg
     %r2 = quantum.alloc(4) : !quantum.reg
     return %r1, %r2 : !quantum.reg, !quantum.reg

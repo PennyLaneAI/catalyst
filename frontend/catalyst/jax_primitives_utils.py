@@ -140,13 +140,7 @@ def lower_callable_to_funcop(ctx, callable_, call_jaxpr, public=False):
     else:
         name = callable_.func.__name__ + ".partial"
 
-    # Make the function name more descriptive if it is a decomposition rule.
-    # This is expected by the MLIR decomposition pass.
-    kwargs["name"] = (
-        "rule" + name
-        if public and name[0] == "_" and ("_to_" in name or "decompos" in name)
-        else name
-    )
+    kwargs["name"] = name
     kwargs["jaxpr"] = call_jaxpr
     kwargs["effects"] = []
     kwargs["name_stack"] = ctx.name_stack

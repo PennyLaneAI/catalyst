@@ -779,6 +779,58 @@ class TestDynamicOneShotIntegration:
         result = cost()
         assert jnp.array(result).shape == (qubits,)
 
+    def test_dynamic_one_shot_mcm_result(self):
+        """Test mcm result with one-shot"""
+        dev = qml.device("lightning.qubit", wires=1)
+
+        @qjit
+        @qml.set_shots(10)
+        @qml.qnode(dev, mcm_method="one-shot")
+        def circuit():
+            qml.Hadamard(0)
+            return measure(0)
+
+        result = circuit()
+        assert result.shape == (10,)
+
+    def test_dynamic_one_shot_classical_return_values_with_mcm(self):
+        """Test classical return value with one-shot"""
+
+        @qjit(autograph=True)
+        @qml.set_shots(10)
+        @qml.qnode(qml.device("lightning.qubit", wires=1), mcm_method="one-shot")
+        def circuit():
+            qml.Hadamard(wires=0)
+            if measure(0):
+                return 42
+            else:
+                return 43
+
+        result = circuit()
+        assert result.shape == (10,)
+
+    def test_dynamic_one_shot_with_classical_return_values(self):
+        """Test classical return values with one-shot"""
+        dev = qml.device("lightning.qubit", wires=1, shots=12)
+
+        @qjit
+        @qml.qnode(dev, mcm_method="one-shot")
+        def circuit():
+            qml.Hadamard(0)
+            return {
+                "first": qml.sample(),
+                "second": [100, qml.sample()],
+                "third": (qml.sample(), qml.sample()),
+            }
+
+        result = circuit()
+
+        assert list(result.keys()) == ["first", "second", "third"]
+        assert jnp.array(result["first"]).shape == (12, 1)
+        assert jnp.allclose(result["second"][0], jnp.full(12, 100))
+        assert jnp.array(result["second"][1]).shape == (12, 1)
+        assert jnp.array(result["third"]).shape == (2, 12, 1)
+
     @pytest.mark.skip(
         reason="grad with dynamic one-shot is not yet supported.",
     )

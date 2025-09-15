@@ -13,9 +13,10 @@
 // limitations under the License.
 
 #define DEBUG_TYPE "decompose-non-clifford-ppr"
-
-#include <mlir/Dialect/Arith/IR/Arith.h> // for arith::XOrIOp and arith::ConstantOp
-#include <mlir/IR/Builders.h>
+#include "mlir/Dialect/Arith/IR/Arith.h" // for arith::XOrIOp and arith::ConstantOp
+#include "mlir/IR/Builders.h"
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/StringRef.h"
 
 #include "Quantum/IR/QuantumOps.h"
 
@@ -38,6 +39,65 @@ LogicalInitKind getMagicState(QECOpInterface op)
         return LogicalInitKind::magic;
     }
     return LogicalInitKind::magic_conj;
+}
+
+/// Decompose the Non-Clifford (pi/8) PPR into PPR and PPMs operations via pauli corrected method
+/// as described in Figure 13 in the paper: https://arxiv.org/pdf/2211.15465
+///
+/// ─────┌───┐───────
+/// ─────│ P │(π/8)──
+/// ─────└───┘───────
+///
+/// into
+///
+/// ─────┌───┐────────┌───────┐
+/// ─────| P |────────| P(π/2)|
+/// ─────|   |────────└───╦───┘
+///      |   ╠═════╗      ║
+///      |   |     ║  ┌───╩───┐
+/// |m⟩──| Z |─────╚══╣ Y / X |
+///      └───┘        └───────┘
+/// All the operations in second diagram are PPM except for the last PPR P(π/2)
+/// For P(-π/8) we need to use flip the ordering in which the X and Y measurements are applied.
+///
+/// Details:
+/// - If P⊗Z measurement yields -1 then apply Y measurement, otherwise apply X measurement
+///   * The measurement results are stored as i1 values.
+///   * Measuring -1 corresponds to storing `true = 1` and 1 corresponds to storing `false = 0`.
+///   - If the X or Y measurement yields -1, apply P(π/2) on the input qubits
+void decomposePauliCorrectedPiOverEight(PPRotationOp op, PatternRewriter &rewriter)
+{
+    auto loc = op.getLoc();
+    // We always initialize the magic state here, not the conjugate.
+    auto magic = rewriter.create<FabricateOp>(loc, LogicalInitKind::magic);
+
+    SmallVector<StringRef> pauliP = extractPauliString(op); // [P]
+    SmallVector<Value> inQubits = op.getInQubits();         // [input qubits]
+
+    // PPM (P⊗Z) on input qubits and |m⟩
+    SmallVector<StringRef> extendedPauliP = pauliP;
+    extendedPauliP.emplace_back("Z");               // extend Z for the axillary qubit -> [P, Z]
+    inQubits.emplace_back(magic.getOutQubits()[0]); // [input qubits, |m⟩]
+    auto ppmPZ = rewriter.create<PPMeasurementOp>(loc, extendedPauliP, inQubits);
+
+    auto ppmPZRes = ppmPZ.getMres();
+    SmallVector<StringRef> pauliX = {"X"};
+    SmallVector<StringRef> pauliY = {"Y"};
+    int16_t rotationKind = static_cast<int16_t>(op.getRotationKind());
+    auto ppmXY = rewriter.create<SelectPPMeasurementOp>(
+        loc, ppmPZRes, rotationKind > 0 ? pauliY : pauliX, rotationKind > 0 ? pauliX : pauliY,
+        ppmPZ.getOutQubits().back());
+    // PPR P(π/2) on input qubits if PPM (X or Y) yields -1
+    SmallVector<Value> outPZQubits = ppmPZ.getOutQubits(); // [input qubits, |m⟩]
+    outPZQubits.pop_back();                                // [input qubits]
+    const uint16_t PI_DENOMINATOR = 2;                     // For rotation of P(PI/2)
+    auto pprPI2 =
+        rewriter.create<PPRotationOp>(loc, pauliP, PI_DENOMINATOR, outPZQubits, ppmXY.getMres());
+
+    // Deallocate the axillary qubit
+    rewriter.create<DeallocQubitOp>(loc, ppmPZ.getOutQubits().back());
+
+    rewriter.replaceOp(op, pprPI2.getOutQubits());
 }
 
 /// Decompose the Non-Clifford (pi/8) PPR into PPR and PPMs operations via auto corrected method
@@ -68,10 +128,11 @@ LogicalInitKind getMagicState(QECOpInterface op)
 ///
 /// Details:
 /// - If P⊗Z measurement yields -1 then apply X, otherwise apply Z
-///   * The measurement results are stored as i1 values, -1 is true and 1 is false
-/// - If Z⊗Y and X measurement yield different result, then apply P(π/2) on the input qubits
-void decompose_auto_corrected_pi_over_eight(bool avoidPauliYMeasure, PPRotationOp op,
-                                            PatternRewriter &rewriter)
+///   * The measurement results are stored as i1 values.
+///   * Measuring -1 corresponds to storing `true = 1` and 1 corresponds to storing `false = 0`.
+///   - If Z⊗Y and X measurement yield different result, then apply P(π/2) on the input qubits
+void decomposeAutoCorrectedPiOverEight(bool avoidPauliYMeasure, PPRotationOp op,
+                                       PatternRewriter &rewriter)
 {
     auto loc = op.getLoc();
 
@@ -143,16 +204,17 @@ void decompose_auto_corrected_pi_over_eight(bool avoidPauliYMeasure, PPRotationO
 ///
 /// Details:
 /// - If P⊗Z measurement yields -1 then apply P(π/4)
-///   * The measurement results are stored as i1 values, -1 is true and 1 is false
+///   * The measurement results are stored as i1 values.
+///   * Measuring -1 corresponds to storing `true = 1` and 1 corresponds to storing `false = 0`.
 /// - If X measurement yields -1 then apply P(π/2)
-void decompose_inject_magic_state_pi_over_eight(PPRotationOp op, PatternRewriter &rewriter)
+void decomposeInjectMagicStatePiOverEight(PPRotationOp op, PatternRewriter &rewriter)
 {
     auto loc = op.getLoc();
 
     // Fabricate the magic state |m⟩
     auto magic = rewriter.create<FabricateOp>(loc, getMagicState(op));
 
-    SmallVector<StringRef> pauliP = extractPauliString(op); // [P]
+    SmallVector<StringRef> pauliP = extractPauliString(op); // [P = n qubit]
     SmallVector<Value> inQubits = op.getInQubits();         // [input qubits]
 
     // PPM (P⊗Z) on input qubits and |m⟩
@@ -199,10 +261,13 @@ struct DecomposeNonCliffordPPR : public OpRewritePattern<PPRotationOp> {
         if (op.isNonClifford() && !op.getCondition()) {
             switch (method) {
             case DecomposeMethod::AutoCorrected:
-                decompose_auto_corrected_pi_over_eight(avoidPauliYMeasure, op, rewriter);
+                decomposeAutoCorrectedPiOverEight(avoidPauliYMeasure, op, rewriter);
                 break;
             case DecomposeMethod::CliffordCorrected:
-                decompose_inject_magic_state_pi_over_eight(op, rewriter);
+                decomposeInjectMagicStatePiOverEight(op, rewriter);
+                break;
+            case DecomposeMethod::PauliCorrected:
+                decomposePauliCorrectedPiOverEight(op, rewriter);
                 break;
             }
             return success();
