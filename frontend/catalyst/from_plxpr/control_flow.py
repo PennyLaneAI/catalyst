@@ -33,6 +33,7 @@ from catalyst.jax_primitives import cond_p, for_p, while_p
 
 def _calling_convention(interpreter, closed_jaxpr, *args_plus_qreg):
     *args, qreg = args_plus_qreg
+    breakpoint()
     # `qreg` is the scope argument for the body jaxpr
     init_qreg = QubitHandler(qreg, interpreter.qubit_index_recorder)
     converter = copy(interpreter)

@@ -68,6 +68,7 @@ Therefore, the two central questions we wish to answer is:
    qubit SSA values on its wires?
 """
 
+from catalyst.jax_extras import DynamicJaxprTracer
 from catalyst.jax_primitives import AbstractQbit, AbstractQreg, qextract_p, qinsert_p
 from catalyst.utils.exceptions import CompileError
 
@@ -146,7 +147,7 @@ class QubitHandler:
        - `QubitHandler[i] = new_qubit_value` (i=0,1,2....)
     """
 
-    wire_map: dict[int, AbstractQbit]  # Note: No dynamic wire indices for now in from_plxpr.
+    wire_map: dict[int | DynamicJaxprTracer, AbstractQbit]
 
     def __init__(
         self,
@@ -302,8 +303,14 @@ class QubitHandler:
 
         else:
             for global_index, qubit in self.wire_map.items():
+                if isinstance(global_index, DynamicJaxprTracer):
+                    # If tracer, user directly provides value during function their call
+                    # so no need to do anything
+                    idx = global_index
+                else:
+                    idx = global_index - self.root_hash
                 self.abstract_qreg_val = qinsert_p.bind(
-                    self.abstract_qreg_val, global_index - self.root_hash, qubit
+                    self.abstract_qreg_val, idx, qubit
                 )
 
             self.wire_map.clear()
@@ -314,17 +321,25 @@ class QubitHandler:
         """
         return list(self.wire_map.keys())
 
-    def global_index_to_local_index(self, global_index: int):
+    def global_index_to_local_index(self, global_index: int | DynamicJaxprTracer):
         """
         Convert a plxpr global index to the local index of this qreg.
         """
+        if isinstance(global_index, DynamicJaxprTracer):
+            # If tracer, user directly provides value during function their call
+            # so no need to do anything
+            return global_index
         return global_index - self.root_hash
 
-    def local_index_to_global_index(self, index: int):
+    def local_index_to_global_index(self, local_index: int | DynamicJaxprTracer):
         """
         Convert a local index of this qreg to the plxpr global index.
         """
-        return index + self.root_hash
+        if isinstance(local_index, DynamicJaxprTracer):
+            # If tracer, user directly provides value during function their call
+            # so no need to do anything
+            return local_index
+        return local_index + self.root_hash
 
     def insert_dynamic_qubits(self, wires):
         """
