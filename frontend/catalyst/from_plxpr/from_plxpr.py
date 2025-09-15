@@ -549,12 +549,16 @@ def handle_subroutine(self, *args, **kwargs):
     transformed = self.subroutine_cache.get(plxpr)
 
     def wrapper(qreg, *args):
-        qubit_handler = QubitHandler(qreg)
+        # Launch a new interpreter for the new subroutine region
+        # A new interpreter's root qreg value needs a new recorder
         converter = copy(self)
-        converter.qubit_handler = qubit_handler
+        converter.qubit_index_recorder = QubitIndexRecorder()
+        init_qreg = QubitHandler(qreg, converter.qubit_index_recorder)
+        converter.init_qreg = init_qreg
+
         retvals = converter(plxpr, *args)
-        converter.qubit_handler.insert_all_dangling_qubits()
-        return converter.qubit_handler.get(), *retvals
+        converter.init_qreg.insert_all_dangling_qubits()
+        return converter.init_qreg.get(), *retvals
 
     if not transformed:
         converted_closed_jaxpr_branch = jax.make_jaxpr(wrapper)(self.init_qreg.get(), *args)
@@ -599,12 +603,16 @@ def handle_decomposition_rule(self, *, pyfun, func_jaxpr, is_qreg, num_params):
         self.init_qreg.insert_all_dangling_qubits()
 
         def wrapper(qreg, *args):
-            qubit_handler = QubitHandler(qreg)
+            # Launch a new interpreter for the new subroutine region
+            # A new interpreter's root qreg value needs a new recorder
             converter = copy(self)
-            converter.qubit_handler = qubit_handler
+            converter.qubit_index_recorder = QubitIndexRecorder()
+            init_qreg = QubitHandler(qreg, converter.qubit_index_recorder)
+            converter.init_qreg = init_qreg
+
             converter(func_jaxpr, *args)
-            converter.qubit_handler.insert_all_dangling_qubits()
-            return converter.qubit_handler.get()
+            converter.init_qreg.insert_all_dangling_qubits()
+            return converter.init_qreg.get()
 
         converted_closed_jaxpr_branch = jax.make_jaxpr(wrapper)(
             self.init_qreg.get(), *func_jaxpr.in_avals
@@ -612,11 +620,26 @@ def handle_decomposition_rule(self, *, pyfun, func_jaxpr, is_qreg, num_params):
     else:
 
         def wrapper(*args):
-            qubit_handler = QubitHandler(args[num_params:])
+            # Launch a new interpreter for the new subroutine region
+            # A new interpreter's root qreg value needs a new recorder
+
+            # TODO: it is a bit messy that the qubit mode of decompositions,
+            # which just needs to keep track of a list of explicit qubit's latest SSA values,
+            # is going through the entire qreg value mapping infra.
+            # Two bitter things here are that:
+            #   - qubit lists do not need a recorder (they don't need to remember which qubits
+            #     belong to which qregs)
+            #   - the qubit list object needs to piggy-back off the `init_qreg` attribute of the
+            #     interpreter, which is a wrong name for this case
+            # We should refactor the QubitHandler object into a qubit mode object and a qreg
+            # mode object.
+
             converter = copy(self)
-            converter.qubit_handler = qubit_handler
+            qubit_handler = QubitHandler(args[num_params:], recorder=None)
+            converter.init_qreg = qubit_handler
+
             converter(func_jaxpr, *args)
-            return converter.qubit_handler.get()
+            return converter.init_qreg.get()
 
         new_in_avals = func_jaxpr.in_avals[:num_params] + [
             AbstractQbit() for _ in func_jaxpr.in_avals[num_params:]
@@ -761,8 +784,9 @@ def handle_adjoint_transform(
 
         # Launch a new interpreter for the body region
         # A new interpreter's root qreg value needs a new recorder
-        init_qreg = QubitHandler(qreg, QubitIndexRecorder())
         converter = copy(self)
+        converter.qubit_index_recorder = QubitIndexRecorder()
+        init_qreg = QubitHandler(qreg, converter.qubit_index_recorder)
         converter.init_qreg = init_qreg
 
         retvals = converter(jaxpr, *args)
@@ -773,7 +797,6 @@ def handle_adjoint_transform(
     converted_jaxpr_branch = jax.make_jaxpr(calling_convention)(*consts, *args, qreg).jaxpr
 
     converted_closed_jaxpr_branch = ClosedJaxpr(convert_constvars_jaxpr(converted_jaxpr_branch), ())
-    breakpoint()
     # Perform the binding
     outvals = adjoint_p.bind(
         *consts,

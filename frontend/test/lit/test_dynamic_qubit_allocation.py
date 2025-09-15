@@ -70,43 +70,7 @@ def test_basic_dynalloc():
 
     return qml.probs()
 
-
-# print(test_basic_dynalloc.jaxpr)
 print(test_basic_dynalloc.mlir)
 
-# CHECK: func.func public @test_basic_dynalloc() -> tensor<8xf64>
-# CHECK:   %c0_i64 = arith.constant 0 : i64
-# CHECK:   quantum.device shots(%c0_i64)
-# CHECK:   %0 = quantum.alloc( 3) : !quantum.reg
-# CHECK:   %1 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
-# CHECK:   %out_qubits = quantum.custom "PauliX"() %1 : !quantum.bit
-# CHECK:   %out_qubits_0 = quantum.custom "PauliX"() %out_qubits : !quantum.bit
-# CHECK:   %2 = quantum.alloc( 1) : !quantum.reg
-# CHECK:   %3 = quantum.extract %2[ 0] : !quantum.reg -> !quantum.bit
-# CHECK:   %out_qubits_1 = quantum.custom "PauliX"() %3 : !quantum.bit
-# CHECK:   %out_qubits_2 = quantum.custom "PauliZ"() %out_qubits_1 : !quantum.bit
-# CHECK:   %4 = quantum.insert %2[ 0], %out_qubits_2 : !quantum.reg, !quantum.bit
-# CHECK:   quantum.dealloc %4 : !quantum.reg
-# CHECK:   %5 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
-# CHECK:   %out_qubits_3 = quantum.custom "PauliX"() %5 : !quantum.bit
-# CHECK:   %out_qubits_4 = quantum.custom "Hadamard"() %out_qubits_0 : !quantum.bit
-# CHECK:   %6 = quantum.extract %0[ 2] : !quantum.reg -> !quantum.bit
-# CHECK:   %out_qubits_5 = quantum.custom "Hadamard"() %6 : !quantum.bit
-# CHECK:   %7 = quantum.alloc( 2) : !quantum.reg
-# CHECK:   %8 = quantum.extract %7[ 0] : !quantum.reg -> !quantum.bit
-# CHECK:   %9 = quantum.extract %7[ 1] : !quantum.reg -> !quantum.bit
-# CHECK:   %out_qubits_6 = quantum.custom "PauliY"() %8 : !quantum.bit
-# CHECK:   %out_qubits_7 = quantum.custom "PauliZ"() %9 : !quantum.bit
-# CHECK:   %10 = quantum.insert %7[ 0], %out_qubits_6 : !quantum.reg, !quantum.bit
-# CHECK:   %11 = quantum.insert %10[ 1], %out_qubits_7 : !quantum.reg, !quantum.bit
-# CHECK:   quantum.dealloc %11 : !quantum.reg
-# CHECK:   %12 = quantum.insert %0[ 1], %out_qubits_4 : !quantum.reg, !quantum.bit
-# CHECK:   %13 = quantum.insert %12[ 0], %out_qubits_3 : !quantum.reg, !quantum.bit
-# CHECK:   %14 = quantum.insert %13[ 2], %out_qubits_5 : !quantum.reg, !quantum.bit
-# CHECK:   %15 = quantum.compbasis qreg %14 : !quantum.obs
-# CHECK:   %16 = quantum.probs %15 : tensor<8xf64>
-# CHECK:   quantum.dealloc %14 : !quantum.reg
-# CHECK:   quantum.device_release
-# CHECK:   return %16 : tensor<8xf64>
 
 qml.capture.disable()

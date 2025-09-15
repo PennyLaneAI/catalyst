@@ -37,8 +37,9 @@ def _calling_convention(interpreter, closed_jaxpr, *args_plus_qreg):
 
     # Launch a new interpreter for the body region
     # A new interpreter's root qreg value needs a new recorder
-    init_qreg = QubitHandler(qreg, QubitIndexRecorder())
     converter = copy(interpreter)
+    converter.qubit_index_recorder = QubitIndexRecorder()
+    init_qreg = QubitHandler(qreg, converter.qubit_index_recorder)
     converter.init_qreg = init_qreg
 
     # pylint: disable-next=cell-var-from-loop
@@ -307,11 +308,15 @@ def handle_while_loop(
     jaxpr = ClosedJaxpr(jaxpr_cond_fn, consts_cond)
 
     def remove_qreg(*args_plus_qreg):
+        # The last arg is the scope argument for the body jaxpr
         *args, qreg = args_plus_qreg
-        # `qreg` is the scope argument for the body jaxpr
-        qubit_handler = QubitHandler(qreg, self.qubit_index_recorder)
+
+        # Launch a new interpreter for the body region
+        # A new interpreter's root qreg value needs a new recorder
         converter = copy(self)
-        converter.qubit_handler = qubit_handler
+        converter.qubit_index_recorder = QubitIndexRecorder()
+        init_qreg = QubitHandler(qreg, converter.qubit_index_recorder)
+        converter.init_qreg = init_qreg
 
         return converter(jaxpr, *args)
 
