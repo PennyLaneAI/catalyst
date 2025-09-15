@@ -98,6 +98,9 @@
 * Renaming `get_ppm_specs` to `ppm_specs` and the corresponding results' properties.
   [(#2031)](https://github.com/PennyLaneAI/catalyst/pull/2031)
 
+* A new decomposition rule for non-Clifford PPRs into two PPMs based on the Active Volume paper.
+  [(#2043)](https://github.com/PennyLaneAI/catalyst/pull/2043)
+
 <h3>Breaking changes 💔</h3>
 
 * The `shots` property has been removed from `OQDDevice`. The number of shots for a qnode execution is now set directly on the qnode via `qml.set_shots`,
@@ -149,6 +152,9 @@
    - fix object file system extension on macOS
    - fix wrong type signature of `Counts` API function
   [(#2032)](https://github.com/PennyLaneAI/catalyst/pull/2032)
+
+* Fixed the Clifford PPR decomposition rule where using the Y measurement should take the inverse.
+  [(#2043)](https://github.com/PennyLaneAI/catalyst/pull/2043)
 
 <h3>Internal changes ⚙️</h3>
 
@@ -261,6 +267,9 @@
   in the `clifford-corrected` method.
   [(#2039)](https://github.com/PennyLaneAI/catalyst/pull/2039)
 
+* The `NoMemoryEffect` trait has been removed from the `quantum.alloc` operation.
+  [(#2044)](https://github.com/PennyLaneAI/catalyst/pull/2044)
+
 <h3>Documentation 📝</h3>
 
 * The Catalyst Command Line Interface documentation incorrectly stated that the `catalyst`
@@ -269,6 +278,9 @@
   correct location, which is the `bin/` directory relative to the environment's installation
   directory.
   [(#2030)](https://github.com/PennyLaneAI/catalyst/pull/2030)
+
+* Fixing a few typos in the Catalyst documentation.
+  [(#2046)](https://github.com/PennyLaneAI/catalyst/pull/2046)
 
 <h3>Contributors ✍️</h3>
 
