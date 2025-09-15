@@ -26,18 +26,21 @@ from pennylane.capture.primitives import for_loop_prim as plxpr_for_loop_prim
 from pennylane.capture.primitives import while_loop_prim as plxpr_while_loop_prim
 
 from catalyst.from_plxpr.from_plxpr import PLxPRToQuantumJaxprInterpreter, WorkflowInterpreter
-from catalyst.from_plxpr.qubit_handler import QubitHandler
+from catalyst.from_plxpr.qubit_handler import QubitHandler, QubitIndexRecorder
 from catalyst.jax_extras import jaxpr_pad_consts
 from catalyst.jax_primitives import cond_p, for_p, while_p
 
 
 def _calling_convention(interpreter, closed_jaxpr, *args_plus_qreg):
+    # The last arg is the scope argument for the body jaxpr
     *args, qreg = args_plus_qreg
-    breakpoint()
-    # `qreg` is the scope argument for the body jaxpr
-    init_qreg = QubitHandler(qreg, interpreter.qubit_index_recorder)
+
+    # Launch a new interpreter for the body region
+    # A new interpreter's root qreg value needs a new recorder
+    init_qreg = QubitHandler(qreg, QubitIndexRecorder())
     converter = copy(interpreter)
     converter.init_qreg = init_qreg
+
     # pylint: disable-next=cell-var-from-loop
     retvals = converter(closed_jaxpr, *args)
     init_qreg.insert_all_dangling_qubits()
