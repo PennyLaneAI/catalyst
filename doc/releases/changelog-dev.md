@@ -55,7 +55,6 @@
   (Array([42, 43, 42, 42, 43, 42, 42, 43, 42, 42], dtype=int64),
    Array([ True, False,  True,  True, False,  True,  True, False,  True,
            True], dtype=bool))
-
   ```
 
 
