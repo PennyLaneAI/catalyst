@@ -756,20 +756,24 @@ def handle_adjoint_transform(
     jaxpr = ClosedJaxpr(jaxpr, consts)
 
     def calling_convention(*args_plus_qreg):
+        # The last arg is the scope argument for the body jaxpr
         *args, qreg = args_plus_qreg
-        # `qreg` is the scope argument for the body jaxpr
-        qubit_handler = QubitHandler(qreg)
+
+        # Launch a new interpreter for the body region
+        # A new interpreter's root qreg value needs a new recorder
+        init_qreg = QubitHandler(qreg, QubitIndexRecorder())
         converter = copy(self)
-        converter.qubit_handler = qubit_handler
+        converter.init_qreg = init_qreg
+
         retvals = converter(jaxpr, *args)
-        qubit_handler.insert_all_dangling_qubits()
-        return *retvals, converter.qubit_handler.get()
+        init_qreg.insert_all_dangling_qubits()
+        return *retvals, converter.init_qreg.get()
 
     _, args_tree = tree_flatten((consts, args, [qreg]))
     converted_jaxpr_branch = jax.make_jaxpr(calling_convention)(*consts, *args, qreg).jaxpr
 
     converted_closed_jaxpr_branch = ClosedJaxpr(convert_constvars_jaxpr(converted_jaxpr_branch), ())
-
+    breakpoint()
     # Perform the binding
     outvals = adjoint_p.bind(
         *consts,
