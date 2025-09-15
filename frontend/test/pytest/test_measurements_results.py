@@ -98,6 +98,7 @@ class TestSample:
         assert np.array_equal(observed, expected)
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 class TestCounts:
     """Test counts."""
 
