@@ -167,7 +167,7 @@ func.func @test_ppr_to_ppm_2(%q1 : !quantum.bit, %q2 : !quantum.bit, %q3 : !quan
 
     // // P = ["X", "Y", "Z", "Y"]
     // // PPM P⊗Z on Q and |m⟩   => m0
-    // CHECK-PAULI: qec.ppm ["X", "Y", "Z", "Y", "Z"]
+    // CHECK-PAULI-AVOID-Y: qec.ppm ["X", "Y", "Z", "Y", "Z"]
     // CHECK-PAULI-AVOID-Y: scf.if
     // CHECK-PAULI-AVOID-Y: qec.fabricate  plus_i
     // CHECK-PAULI-AVOID-Y: qec.ppm ["Z", "Z"]
