@@ -227,14 +227,22 @@ class TestCounts:
             qml.Hadamard(wires=1)
             return qml.counts()
 
-        if mcm_method == "one-shot":
+        if qml.capture.enabled():
             with pytest.raises(
                 NotImplementedError,
-                match="Measurement CountsMP with empty wires is not supported with dynamic wires",
+                match="devices must specify wires for integration with program capture",
             ):
                 qjit(counts_dynamic_wires)()
         else:
-            qjit(counts_dynamic_wires)()
+            if mcm_method == "one-shot":
+                with pytest.raises(
+                    NotImplementedError,
+                    match="Measurement CountsMP with empty wires is not supported with dynamic "
+                    "wires",
+                ):
+                    qjit(counts_dynamic_wires)()
+            else:
+                qjit(counts_dynamic_wires)()
 
 
 @pytest.mark.usefixtures("use_both_frontend")
