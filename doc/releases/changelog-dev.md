@@ -29,7 +29,38 @@
 <h3>Improvements 🛠</h3>
 
 * Significantly improved resource tracking with `null.qubit`.
+  The new tracking has better integration with PennyLane (e.g. for passing the filename to write out), cleaner documentation, and its own wrapper class.
+  It also now tracks circuit depth, as well as gate counts by number of wires.
   [[#2033]](https://github.com/PennyLaneAI/catalyst/pull/2033)
+
+* Catalyst now supports returning classical and MCM values with the dynamic one-shot MCM method.
+  [(#2001)](https://github.com/PennyLaneAI/catalyst/pull/2001)
+  
+  For example, the code below will generate 10 values, with an equal probability of 42 and 43
+  appearing. 
+
+  ```python
+  import pennylane as qml
+  from catalyst import qjit, measure
+  
+  @qjit(autograph=True)
+  @qml.set_shots(10)
+  @qml.qnode(qml.device("lightning.qubit", wires=1), mcm_method="one-shot")
+  def circuit():
+      qml.Hadamard(wires=0)
+      m = measure(0)
+      if m:
+          return 42, m
+      else:
+          return 43, m
+  ```
+
+  ```pycon
+  >>>  print(circuit())
+  (Array([42, 43, 42, 42, 43, 42, 42, 43, 42, 42], dtype=int64),
+   Array([ True, False,  True,  True, False,  True,  True, False,  True,
+           True], dtype=bool))
+  ```
 
 * Improve the pass `--ppm-specs` to count the depth of PPRs and PPMs in the circuit.
   [(#2014)](https://github.com/PennyLaneAI/catalyst/pull/2014)
@@ -101,6 +132,9 @@
 * Renaming `get_ppm_specs` to `ppm_specs` and the corresponding results' properties.
   [(#2031)](https://github.com/PennyLaneAI/catalyst/pull/2031)
 
+* A new decomposition rule for non-Clifford PPRs into two PPMs based on the Active Volume paper.
+  [(#2043)](https://github.com/PennyLaneAI/catalyst/pull/2043)
+
 <h3>Breaking changes 💔</h3>
 
 * The `shots` property has been removed from `OQDDevice`. The number of shots for a qnode execution is now set directly on the qnode via `qml.set_shots`,
@@ -153,6 +187,9 @@
    - fix wrong type signature of `Counts` API function
   [(#2032)](https://github.com/PennyLaneAI/catalyst/pull/2032)
 
+* Fixed the Clifford PPR decomposition rule where using the Y measurement should take the inverse.
+  [(#2043)](https://github.com/PennyLaneAI/catalyst/pull/2043)
+
 <h3>Internal changes ⚙️</h3>
 
 * Updates use of `qml.transforms.dynamic_one_shot.parse_native_mid_circuit_measurements` to improved signature.
@@ -163,6 +200,9 @@
 
 * `from_plxpr` can now handle dynamic shots and overridden device shots.
   [(#1983)](https://github.com/PennyLaneAI/catalyst/pull/1983/)
+
+* `from_plxpr` can now translate `counts`. 
+  [(#2041)](https://github.com/PennyLaneAI/catalyst/pull/2041)
 
 * QJitDevice helper `extract_backend_info` removed its redundant `capabilities` argument.
   [(#1956)](https://github.com/PennyLaneAI/catalyst/pull/1956)
@@ -257,7 +297,7 @@
   $ catalyst --tool=opt --pass-pipeline="builtin.module(convert-quantum-to-llvm{use-array-backed-registers=true})" <input file>
   ```
 
-* Fix auxiliary qubit deallocation in `decompose-non-clifford-ppr` pass 
+* Fix auxiliary qubit deallocation in `decompose-non-clifford-ppr` pass
   in the `clifford-corrected` method.
   [(#2039)](https://github.com/PennyLaneAI/catalyst/pull/2039)
 
@@ -272,6 +312,9 @@
   correct location, which is the `bin/` directory relative to the environment's installation
   directory.
   [(#2030)](https://github.com/PennyLaneAI/catalyst/pull/2030)
+
+* Fixing a few typos in the Catalyst documentation.
+  [(#2046)](https://github.com/PennyLaneAI/catalyst/pull/2046)
 
 <h3>Contributors ✍️</h3>
 
