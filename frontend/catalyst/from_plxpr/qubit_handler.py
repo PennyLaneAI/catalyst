@@ -227,19 +227,27 @@ class QubitHandler:
         Get the newest ``AbstractQbit`` corresponding to a wire index, index = 0, 1, 2, ...
         If the qubit value does not exist yet at this index, extract the fresh qubit.
         """
-        global_index = self.local_index_to_global_index(local_index)
-        if global_index in self.wire_map:
-            return self.wire_map[global_index]
+        if self.is_qubit_mode():
+            index = local_index
+        else:
+            index = self.local_index_to_global_index(local_index)
+
+        if index in self.wire_map:
+            return self.wire_map[index]
 
         return self.extract(local_index)
 
-    def __setitem__(self, index: int, qubit: AbstractQbit):
+    def __setitem__(self, local_index: int, qubit: AbstractQbit):
         """
         Update the wire_map when a new qubit value for a wire index is produced,
         for example by gates.
         """
-        global_index = self.local_index_to_global_index(index)
-        self.wire_map[global_index] = qubit
+        if self.is_qubit_mode():
+            index = local_index
+        else:
+            index = self.local_index_to_global_index(local_index)
+
+        self.wire_map[index] = qubit
 
     def __iter__(self):
         """Iterate over wires map dictionary"""

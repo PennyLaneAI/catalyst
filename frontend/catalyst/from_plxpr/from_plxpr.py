@@ -374,19 +374,40 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
                 in_qregs.append(in_qreg)
                 in_qubits.append(in_qreg[in_qreg.global_index_to_local_index(w)])
 
-        # TODO: do control qubits as well
-        control_qubits = [self.init_qreg[w] for w in control_wires]
+        in_ctrl_qubits = []
+        in_ctrl_qregs = []
+        for w in control_wires:
+            # Note: `w` is the plxpr global wire index
+            if not self.qubit_index_recorder.contains(w):
+                # First time the global wire index w is encountered
+                # Need to extract from init qreg
+                # This won't be a dynamically allocated qreg, since these have all
+                # wires extracted after binding their alloc primitives immediately.
+                in_ctrl_qubits.append(self.init_qreg[self.init_qreg.global_index_to_local_index(w)])
+                in_ctrl_qregs.append(self.init_qreg)
+
+            else:
+                in_ctrl_qreg = self.qubit_index_recorder[w]
+                in_ctrl_qregs.append(in_ctrl_qreg)
+                in_ctrl_qubits.append(in_ctrl_qreg[in_ctrl_qreg.global_index_to_local_index(w)])
 
         out_qubits = qinst_p.bind(
-            *[*in_qubits, *op.data, *control_qubits, *control_values],
+            *[*in_qubits, *op.data, *in_ctrl_qubits, *control_values],
             op=op.name,
             qubits_len=len(op.wires),
             params_len=len(op.data),
             ctrl_len=len(control_wires),
             adjoint=is_adjoint,
         )
-        for in_qreg, w, new_wire in zip(in_qregs, op.wires, out_qubits):
+
+        out_non_ctrl_qubits = out_qubits[: len(out_qubits) - len(control_wires)]
+        out_ctrl_qubits = out_qubits[-len(control_wires) :]
+
+        for in_qreg, w, new_wire in zip(in_qregs, op.wires, out_non_ctrl_qubits):
             in_qreg[in_qreg.global_index_to_local_index(w)] = new_wire
+
+        for in_ctrl_qreg, w, new_ctrl_wire in zip(in_ctrl_qregs, control_wires, out_ctrl_qubits):
+            in_ctrl_qreg[in_ctrl_qreg.global_index_to_local_index(w)] = new_ctrl_wire
 
         return out_qubits
 
