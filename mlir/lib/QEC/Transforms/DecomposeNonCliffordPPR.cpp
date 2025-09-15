@@ -21,7 +21,6 @@
 #include "llvm/ADT/StringRef.h"
 #include <llvm/Support/Debug.h>
 
-
 #include "Quantum/IR/QuantumOps.h"
 
 #include "QEC/IR/QECDialect.h"

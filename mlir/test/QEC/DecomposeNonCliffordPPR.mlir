@@ -101,7 +101,7 @@ func.func @test_ppr_to_ppm(%q1 : !quantum.bit) {
 // // PPR[Z](2) on Q if cond(m1) is true
 // CHECK-PAULI: [[q0_1:%.+]]  = qec.ppr ["Z"](2) [[out_0]]#0 cond([[m_1]]) : !quantum.bit
 
-// Decompose via the pauli-corrected method but avoid Y measurements
+// Decompose via the pauli-corrected method but avoids Y measurements
 // CHECK-PAULI-AVOID-Y: [[magic:%.+]] = qec.fabricate  magic
 // CHECK-PAULI-AVOID-Y: [[m_0:%.+]], [[out_0:%.+]]:2 = qec.ppm ["Z", "Z"] %arg0, [[magic]] : !quantum.bit, !quantum.bit
 // CHECK-PAULI-AVOID-Y: [[q_0:%.+]] = scf.if [[m_0]] -> (!quantum.bit) {

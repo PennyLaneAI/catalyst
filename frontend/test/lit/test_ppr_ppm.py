@@ -209,7 +209,15 @@ def test_ppr_to_ppm():
             qml.T(0)
             qml.CNOT([0, 1])
 
-        return cir_default(), cir_inject_magic_state(), cir_pauli_corrected()
+
+        @ppr_to_ppm(decompose_method="pauli-corrected", avoid_y_measure=True)
+        @to_ppr
+        @qml.qnode(device)
+        def cir_pauli_corrected_avoid_y():
+            qml.T(0)
+            qml.CNOT([0, 1])
+
+        return cir_default(), cir_inject_magic_state(), cir_pauli_corrected(), cir_pauli_corrected_avoid_y()
 
     print(circuit_ppr_to_ppm.mlir_opt)
 
@@ -251,6 +259,33 @@ def test_ppr_to_ppm():
 # FOR CNOT gate
 # CHECK: ["Z", "X", "Y"](-1) {{.+}}, {{.+}}, {{.+}}
 # CHECK: qec.ppm ["X"] {{.+}}
+# CHECK: arith.xori
+# CHECK: qec.ppr ["Z", "X"](2) {{.+}},{{.+}} cond({{.+}})
+
+# CHECK-LABEL: public @cir_pauli_corrected_avoid_y_0
+
+# FOR T gate
+# CHECK: qec.fabricate  magic
+# CHECK: qec.ppm ["Z", "Z"] {{.+}}, {{.+}}
+# CHECK: scf.if {{.+}}
+# CHECK: qec.fabricate  plus_i
+# CHECK: qec.ppm ["Z", "Z"]
+# CHECK: qec.ppm ["X", "X"]
+# CHECK: qec.ppr ["Z"](2) {{.+}} cond({{.+}})
+# CHECK: quantum.dealloc_qb {{.+}}
+# CHECK: quantum.dealloc_qb {{.+}}
+# CHECK: scf.yield {{.+}}
+# CHECK: else
+# CHECK: qec.ppm ["X"]
+# CHECK: qec.ppr ["Z"](2)
+# CHECK: quantum.dealloc_qb {{.+}}
+# CHECK: scf.yield {{.+}}
+
+# FOR CNOT gate
+# CHECK: qec.fabricate  plus_i
+# Avoid Y-measurement, so Z-measurement should be used
+# CHECK: ["Z", "X", "Z"] {{.+}}, {{.+}}, {{.+}}
+# CHECK: qec.ppm ["X"] {{.+}} : !quantum.bit
 # CHECK: arith.xori
 # CHECK: qec.ppr ["Z", "X"](2) {{.+}},{{.+}} cond({{.+}})
 test_ppr_to_ppm()
