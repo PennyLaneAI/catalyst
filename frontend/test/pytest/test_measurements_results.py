@@ -122,6 +122,7 @@ class TestSample:
             qjit(sample_dynamic_wires)()
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 class TestCounts:
     """Test counts."""
 
