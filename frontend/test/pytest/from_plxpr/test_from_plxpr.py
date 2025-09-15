@@ -404,7 +404,6 @@ class TestCatalystCompareJaxpr:
 
         compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c)
 
-    @pytest.mark.xfail(reason="CountsMP returns a dictionary, which is not compatible with capture")
     def test_counts(self):
         """Test comparison and execution of a jaxpr returning counts."""
 
@@ -425,15 +424,17 @@ class TestCatalystCompareJaxpr:
         assert converted.eqns[0].params["qnode"] is circuit
 
         catalyst_res = catalyst_execute_jaxpr(converted)()
-        assert len(catalyst_res) == 1
-        expected = np.transpose(np.vstack([np.ones(50), np.zeros(50)]))
-        assert qml.math.allclose(catalyst_res[0], expected)
+        assert len(catalyst_res) == 2
+        expected_keys = np.array([0, 1, 2, 3])
+        expected_values = np.array([0, 0, 50, 0])
+        assert qml.math.allclose(catalyst_res[0], expected_keys)
+        assert qml.math.allclose(catalyst_res[1], expected_values)
 
         qjit_obj = qjit(circuit)
         qjit_obj()
         catalxpr = qjit_obj.jaxpr
         call_jaxpr_pl = converted.eqns[0].params["call_jaxpr"]
-        call_jaxpr_c = catalxpr.eqns[1].params["call_jaxpr"]
+        call_jaxpr_c = catalxpr.eqns[0].params["call_jaxpr"]
 
         compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c)
 
