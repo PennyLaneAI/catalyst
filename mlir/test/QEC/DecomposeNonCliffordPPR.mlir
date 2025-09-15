@@ -131,6 +131,7 @@ func.func @test_ppr_to_ppm_1(%q1 : !quantum.bit) {
     // CHECK-INJECT: qec.fabricate  magic_conj
     // CHECK-AUTO: qec.fabricate  magic_conj
     // CHECK-PAULI: qec.fabricate  magic
+    // CHECK-PAULI-AVOID-Y: qec.fabricate  magic
 }
 
 // -----
@@ -163,6 +164,23 @@ func.func @test_ppr_to_ppm_2(%q1 : !quantum.bit, %q2 : !quantum.bit, %q3 : !quan
     // CHECK-PAULI: qec.ppm ["X", "Y", "Z", "Y", "Z"]
     // CHECK-PAULI: qec.select.ppm([[m_0]], ["Y"], ["X"])
     // CHECK-PAULI: qec.ppr ["X", "Y", "Z", "Y"](2) {{.*}} cond({{.*}})
+
+    // // P = ["X", "Y", "Z", "Y"]
+    // // PPM P⊗Z on Q and |m⟩   => m0
+    // CHECK-PAULI: qec.ppm ["X", "Y", "Z", "Y", "Z"]
+    // CHECK-PAULI-AVOID-Y: scf.if
+    // CHECK-PAULI-AVOID-Y: qec.fabricate  plus_i
+    // CHECK-PAULI-AVOID-Y: qec.ppm ["Z", "Z"]
+    // CHECK-PAULI-AVOID-Y: qec.ppm ["X", "X"]
+    // CHECK-PAULI-AVOID-Y: qec.ppr ["X", "Y", "Z", "Y"](2) {{.*}} {{.*}} {{.*}} {{.*}} cond({{.*}})
+    // CHECK-PAULI-AVOID-Y: quantum.dealloc_qb {{.*}}
+    // CHECK-PAULI-AVOID-Y: quantum.dealloc_qb {{.*}}
+    // CHECK-PAULI-AVOID-Y: scf.yield {{.*}} {{.*}} {{.*}} {{.*}}
+    // CHECK-PAULI-AVOID-Y: else
+    // CHECK-PAULI-AVOID-Y: qec.ppm ["X"]
+    // CHECK-PAULI-AVOID-Y: qec.ppr ["X", "Y", "Z", "Y"](2) {{.*}} {{.*}} {{.*}} {{.*}} cond({{.*}})
+    // CHECK-PAULI-AVOID-Y: quantum.dealloc_qb {{.*}}
+    // CHECK-PAULI-AVOID-Y: scf.yield {{.*}} {{.*}} {{.*}} {{.*}}
 }
 
 // -----
