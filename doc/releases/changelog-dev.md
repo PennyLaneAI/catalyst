@@ -29,7 +29,7 @@
 <h3>Improvements 🛠</h3>
 
 * Catalyst now supports returning classical and MCM values with the dynamic one-shot MCM method.
-  [(#2001)](https://github.com/PennyLaneAI/catalyst/pull/2001)
+  [(#2004)](https://github.com/PennyLaneAI/catalyst/pull/2004)
 
   For example, the code below will generate 10 values, with an equal probability of 42 and 43
   appearing.
