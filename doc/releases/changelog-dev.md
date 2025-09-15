@@ -307,6 +307,9 @@
   directory.
   [(#2030)](https://github.com/PennyLaneAI/catalyst/pull/2030)
 
+* Fixing a few typos in the Catalyst documentation.
+  [(#2046)](https://github.com/PennyLaneAI/catalyst/pull/2046)
+
 <h3>Contributors ✍️</h3>
 
 This release contains contributions from (in alphabetical order):
