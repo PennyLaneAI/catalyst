@@ -20,7 +20,6 @@ from functools import partial
 from typing import Callable
 
 import jax
-import jax.core
 import jax.numpy as jnp
 import pennylane as qml
 from jax._src.sharding_impls import UNSPECIFIED
@@ -607,7 +606,6 @@ def handle_decomposition_rule(self, *, pyfun, func_jaxpr, is_qreg, num_params):
     """
     Transform a quantum decomposition rule from PLxPR into JAXPR with quantum primitives.
     """
-
     if is_qreg:
         self.qubit_handler.insert_all_dangling_qubits()
 
