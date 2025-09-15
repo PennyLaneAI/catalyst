@@ -209,7 +209,6 @@ def test_ppr_to_ppm():
             qml.T(0)
             qml.CNOT([0, 1])
 
-
         @ppr_to_ppm(decompose_method="pauli-corrected", avoid_y_measure=True)
         @to_ppr
         @qml.qnode(device)
@@ -217,7 +216,12 @@ def test_ppr_to_ppm():
             qml.T(0)
             qml.CNOT([0, 1])
 
-        return cir_default(), cir_inject_magic_state(), cir_pauli_corrected(), cir_pauli_corrected_avoid_y()
+        return (
+            cir_default(),
+            cir_inject_magic_state(),
+            cir_pauli_corrected(),
+            cir_pauli_corrected_avoid_y(),
+        )
 
     print(circuit_ppr_to_ppm.mlir_opt)
 
