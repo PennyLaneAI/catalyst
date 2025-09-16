@@ -131,6 +131,9 @@
 * A new decomposition rule for non-Clifford PPRs into two PPMs based on the Active Volume paper.
   [(#2043)](https://github.com/PennyLaneAI/catalyst/pull/2043)
 
+* Added support to avoid Y-basis measurements in `pauli-corrected` PPR decomposition.
+  [(#2047)](https://github.com/PennyLaneAI/catalyst/pull/2047)
+
 <h3>Breaking changes 💔</h3>
 
 * The `shots` property has been removed from `OQDDevice`. The number of shots for a qnode execution is now set directly on the qnode via `qml.set_shots`,
