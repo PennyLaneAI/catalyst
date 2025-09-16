@@ -886,7 +886,7 @@ def ppm_compilation(
 ):
     R"""
     Specify that the MLIR compiler pass for transforming
-    clifford+T gates into Pauli Product Measurements (PPM) will be applied.
+    Clifford+T gates into Pauli product measurements (PPMs) will be applied.
 
     This pass combines multiple sub-passes:
 
@@ -899,6 +899,11 @@ def ppm_compilation(
     to the :func:`~.passes.ppr_to_ppm` pass.
     The ``max_pauli_size`` argument is passed to the :func:`~.passes.commute_ppr`
     and :func:`~.passes.merge_ppr_ppm` passes.
+
+    .. see-also::
+
+        For more information on PPRs and PPMs, check out
+        the `Compilation Hub <https://pennylane.ai/compilation/pauli-product-measurement>`_.
 
     Args:
         qnode (QNode, optional): QNode to apply the pass to. If None, returns a decorator.
