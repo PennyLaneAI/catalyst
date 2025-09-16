@@ -18,10 +18,10 @@ Note that this feature is only available under the plxpr pipeline.
 """
 
 import numpy as np
-import pytest
-
 import pennylane as qml
+import pytest
 from pennylane.allocation import allocate, deallocate
+
 from catalyst import qjit
 
 
