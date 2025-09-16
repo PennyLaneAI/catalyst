@@ -41,7 +41,7 @@ from catalyst.device.qjit_device import is_dynamic_wires
 from catalyst.jax_extras import deduce_avals, get_implicit_and_explicit_flat_args, unzip2
 from catalyst.jax_extras.tracing import uses_transform
 from catalyst.jax_primitives import quantum_kernel_p
-from catalyst.jax_tracer import DynamicJaxprTracer, Function, trace_quantum_function
+from catalyst.jax_tracer import Function, trace_quantum_function
 from catalyst.logging import debug_logger
 from catalyst.passes.pass_api import dictionary_to_list_of_passes
 from catalyst.tracing.contexts import EvaluationContext
