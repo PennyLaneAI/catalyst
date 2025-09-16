@@ -2,11 +2,68 @@
 
 <h3>New features since last release</h3>
 
-* A new pass `--t-layer-reduction` has been added to reduce the depth and number of non-Clifford PPR
-  operations by commuting adjacent PPRs and finding possible PPRs that can be merged.
-  For more details, see the Figure 6 in [A Game of Surface Code](https://arXiv:1808.02892v3) paper.
+* A new quantum compilation pass that reduces the depth and count of non-Clifford Pauli product 
+  rotations (PPRs) in circuits is now available. This compilation pass works by commuting 
+  non-Clifford PPRs (:math:`\exp{iX\tfrac{\pi}{8}}`, often referred to as `T` gates) in adjacent 
+  layers and merging compatible ones. More details can be found in Figure 6 of 
+  [A Game of Surface Codes](https://arXiv:1808.02892v3).
   [(#1975)](https://github.com/PennyLaneAI/catalyst/pull/1975)
-  [(#2048)(https://github.com/PennyLaneAI/catalyst/pull/2048)]
+  [(#2048)](https://github.com/PennyLaneAI/catalyst/pull/2048)]
+
+  Consider the following circuit:
+
+  ```python
+  import pennylane as qml
+  from catalyst import qjit, measure
+  from catalyst.passes import to_ppr, commute_ppr, t_layer_reduction, merge_ppr_ppm
+
+  pips = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+
+
+  @qjit(pipelines=pips, target="mlir")
+  @t_layer_reduction
+  @merge_ppr_ppm
+  @commute_ppr
+  @to_ppr
+  @qml.qnode(qml.device("null.qubit", wires=3))
+  def circuit():
+      for i in range(3):
+          qml.H(wires=i)
+          qml.S(wires=i)
+          qml.CNOT(wires=[i, (i + 1) % n])
+          qml.T(wires=i)
+          qml.H(wires=i)
+          qml.T(wires=i)
+
+      return [measure(wires=i) for i in range(n)]
+  ```
+
+  After performing the :func:`catalyst.passes.to_ppr` and :func:`catalyst.passes.merge_ppr_ppm` 
+  passes, the circuit contains a depth of four of non-Clifford PPRs. Subsequently applying the 
+  `t_layer_reduction` pass will move PPRs around via commutation, resulting in a circuit with a 
+  smaller PPR depth of three.
+
+  .. code-block:: python
+
+  ```pycon
+  >>> print(circuit.mlir_opt)
+  . . .
+  %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+  %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+  // layer 1
+  %3 = qec.ppr ["X"](8) %1 : !quantum.bit
+  %4 = qec.ppr ["X"](8) %2 : !quantum.bit
+
+  // layer 2
+  %5 = quantum.extract %0[ 2] : !quantum.reg -> !quantum.bit
+  %6:2 = qec.ppr ["Y", "X"](8) %3, %4 : !quantum.bit, !quantum.bit
+  %7 = qec.ppr ["X"](8) %5 : !quantum.bit
+  %8:3 = qec.ppr ["X", "Y", "X"](8) %6#0, %6#1, %7:!quantum.bit, !quantum.bit, !quantum.bit
+
+  // layer 3
+  %9:3 = qec.ppr ["X", "X", "Y"](8) %8#0, %8#1, %8#2:!quantum.bit, !quantum.bit, !quantum.bit
+  . . .
+  ```
 
 * Catalyst now provides native support for `SingleExcitation`, `DoubleExcitation`,
   and `PCPhase` on compatible devices like Lightning simulators.
