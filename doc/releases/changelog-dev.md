@@ -32,7 +32,7 @@
   [(#2001)](https://github.com/PennyLaneAI/catalyst/pull/2001)
   
   For example, the code below will generate 10 values, with an equal probability of 42 and 43
-  appearing. 
+  appearing.
 
   ```python
   import pennylane as qml
@@ -56,7 +56,6 @@
    Array([ True, False,  True,  True, False,  True,  True, False,  True,
            True], dtype=bool))
   ```
-
 
 * Improve the pass `--ppm-specs` to count the depth of PPRs and PPMs in the circuit.
   [(#2014)](https://github.com/PennyLaneAI/catalyst/pull/2014)
@@ -179,8 +178,8 @@
   [(#2027)](https://github.com/PennyLaneAI/catalyst/pull/2027)
 
 * Fix usage of OQC device, including:
-   - fix object file system extension on macOS
-   - fix wrong type signature of `Counts` API function
+  * fix object file system extension on macOS
+  * fix wrong type signature of `Counts` API function
   [(#2032)](https://github.com/PennyLaneAI/catalyst/pull/2032)
 
 * Fixed the Clifford PPR decomposition rule where using the Y measurement should take the inverse.
@@ -287,7 +286,7 @@
   `use-array-backed-registers` option of the `convert-quantum-to-llvm` pass to `true`. For example,
 
   ```console
-  $ catalyst --tool=opt --pass-pipeline="builtin.module(convert-quantum-to-llvm{use-array-backed-registers=true})" <input file>
+  catalyst --tool=opt --pass-pipeline="builtin.module(convert-quantum-to-llvm{use-array-backed-registers=true})" <input file>
   ```
 
 * Fix auxiliary qubit deallocation in `decompose-non-clifford-ppr` pass
@@ -296,6 +295,9 @@
 
 * The `NoMemoryEffect` trait has been removed from the `quantum.alloc` operation.
   [(#2044)](https://github.com/PennyLaneAI/catalyst/pull/2044)
+
+* Enhance `ppm_specs` function to prevent duplicate pass addition.
+  [(#2049)](https://github.com/PennyLaneAI/catalyst/pull/2049)
 
 <h3>Documentation 📝</h3>
 
