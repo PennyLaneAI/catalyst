@@ -829,4 +829,34 @@ def test_decomposition_rule_name_adjoint():
     qml.decomposition.disable_graph()
     qml.capture.disable()
 
+
 test_decomposition_rule_name_adjoint()
+
+
+def test_decomposition_rule_name_ctrl():
+    """Test decomposition rule with qml.ctrl."""
+
+    qml.capture.enable()
+    qml.decomposition.enable_graph()
+
+    @qml.qjit(target="mlir")
+    @partial(
+        qml.transforms.decompose,
+        gate_set={"RX", "RZ"},
+    )
+    @qml.qnode(qml.device("lightning.qubit", wires=5))
+    # CHECK: public @circuit_17() -> tensor<f64> attributes {decompose_gatesets
+    def circuit_17():
+        # CHECK: %out_qubits:2 = quantum.custom "CRY"(%cst) %1, %2 : !quantum.bit, !quantum.bit
+        qml.ctrl(qml.RY, control=0)(0.5, 1)
+        qml.ctrl(qml.PauliX, control=0)(1)
+        return qml.expval(qml.Z(0))
+
+    # CHECK-DAG: func.func public @RY_rule_ry_to_rz_rx_wires_1(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<1xi64>) -> !quantum.reg
+    print(circuit_17.mlir)
+
+    qml.decomposition.disable_graph()
+    qml.capture.disable()
+
+
+test_decomposition_rule_name_ctrl()

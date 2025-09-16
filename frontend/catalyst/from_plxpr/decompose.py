@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """
-A transform for the new MLIT-based Catalyst decomposition system.
+A transform for the new MLIR-based Catalyst decomposition system.
 """
 
 
@@ -175,7 +175,6 @@ class GraphSolutionInterpreter(qml.capture.PlxprInterpreter):
 
             captured_ops = copy(self._operations)
             for op, rule in self._decomp_graph_solution.items():
-
                 if (o := next((o for o in captured_ops if o.name == op.op.name), None)) is not None:
                     create_decomposition_rule(rule, op_name=op.op.name, num_wires=len(o.wires))
                 elif op.op.name in COMPILER_OPERATIONS_NUM_WIRES:
@@ -211,11 +210,7 @@ def _solve_decomposition_graph(operations, gate_set, fixed_decomps, alt_decomps)
             and solutions._all_op_indices[op] in solutions._visitor.distances
         )
 
-    for (
-        op_node,
-        op_node_idx,
-    ) in solutions._all_op_indices.items():
-
+    for op_node, op_node_idx in solutions._all_op_indices.items():
         if is_solved_for(op_node) and op_node_idx in solutions._visitor.predecessors:
             d_node_idx = solutions._visitor.predecessors[op_node_idx]
             decomp_graph_solution[op_node] = solutions._graph[d_node_idx].rule._impl
