@@ -551,7 +551,7 @@ def to_ppr(qnode):
         fn (QNode): QNode to apply the pass to
 
     Returns:
-        ~.QNode
+        :class:`~.QNode`
 
     **Example**
 
@@ -598,13 +598,15 @@ def to_ppr(qnode):
 
 def commute_ppr(qnode=None, *, max_pauli_size=0):
     R"""
-    Specify that the MLIR compiler pass for commuting
-    Clifford Pauli Product Rotation (PPR) gates, :math:`\exp({iP\tfrac{\pi}{4}})`,
-    past non-Clifford PPRs gates, :math:`\exp({iP\tfrac{\pi}{8}})` will be applied,
+    Applies a quantum compilation pass that commutes
+    Clifford Pauli product rotation (PPR) gates, :math:`\exp({iP\tfrac{\pi}{4}})`,
+    past non-Clifford PPRs gates, :math:`\exp({iP\tfrac{\pi}{8}})`,
     where :math:`P` is a Pauli word.
 
-    For more information regarding to PPM,
-    see here <https://pennylane.ai/compilation/pauli-product-measurement>
+    .. see-also::
+
+        For more information on PPRs, check out
+        the `Compilation Hub <https://pennylane.ai/compilation/pauli-product-measurement>`_.
 
     .. note::
 
@@ -615,7 +617,7 @@ def commute_ppr(qnode=None, *, max_pauli_size=0):
         max_pauli_size (int): The maximum size of the Pauli strings after commuting.
 
     Returns:
-        ~.QNode
+        :class:`~.QNode`
 
     **Example**
 
@@ -696,19 +698,21 @@ def commute_ppr(qnode=None, *, max_pauli_size=0):
 
 def merge_ppr_ppm(qnode=None, *, max_pauli_size=0):
     R"""
-    Specify that the MLIR compiler pass for absorbing Clifford Pauli
-    Product Rotation (PPR) operations, :math:`\exp{iP\tfrac{\pi}{4}}`,
-    into the final Pauli Product Measurement (PPM) will be applied.
+    Applies a quantum compilation pass that absorbs Clifford Pauli
+    product rotation (PPR) operations, :math:`\exp{iP\tfrac{\pi}{4}}`,
+    into the final Pauli product measurements (PPMs).
 
-    For more information regarding to PPM,
-    check out the `compilation hub <https://pennylane.ai/compilation/pauli-product-measurement>`__.
+    .. see-also::
+
+        For more information on PPRs, check out
+        the `Compilation Hub <https://pennylane.ai/compilation/pauli-product-measurement>`_.
 
     Args:
         fn (QNode): QNode to apply the pass to
         max_pauli_size (int): The maximum size of the Pauli strings after merging.
 
     Returns:
-        ~.QNode
+        :class:`~.QNode`
 
     **Example**
 
@@ -782,8 +786,8 @@ def merge_ppr_ppm(qnode=None, *, max_pauli_size=0):
 
 
 def ppr_to_ppm(qnode=None, *, decompose_method="pauli-corrected", avoid_y_measure=False):
-    R"""Specify that the MLIR compiler passes for decomposing Pauli Product rotations (PPR)
-    , :math:`\exp(-iP\theta)`, into Pauli Pauli measurements (PPM) will be applied.
+    R"""Applies a quantum compilation pass that decomposes Pauli product rotations (PPRs), 
+    :math:`\exp(-iP\theta)`, into Pauli Pauli measurements (PPMs).
 
     This pass is used to decompose both non-Clifford and Clifford PPRs into PPMs. The non-Clifford
     PPRs (:math:`\theta = \tfrac{\pi}{8}`) are decomposed first, and then Clifford PPRs
@@ -793,6 +797,11 @@ def ppr_to_ppm(qnode=None, *, decompose_method="pauli-corrected", avoid_y_measur
     The first method ``"pauli-corrected"`` is based on Figure 13 in the paper: https://arxiv.org/pdf/2211.15465.
     The latter two methods are based on `A Game of Surface Codes <https://arxiv.org/abs/1808.02892>`__,
     figures 7 and 17(b) respectively.
+
+    .. see-also::
+
+        For more information on PPRs and PPMs, check out
+        the `Compilation Hub <https://pennylane.ai/compilation/pauli-product-measurement>`_.
 
     Args:
         qnode (QNode, optional): QNode to apply the pass to. If None, returns a decorator.
@@ -810,7 +819,7 @@ def ppr_to_ppm(qnode=None, *, decompose_method="pauli-corrected", avoid_y_measur
             Defaults to ``False``.
 
     Returns:
-        ~.QNode or callable: Returns decorated QNode if qnode is provided,
+        :class:`~.QNode` or callable: Returns decorated QNode if qnode is provided,
             otherwise returns a decorator.
 
     **Example**
