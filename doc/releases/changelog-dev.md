@@ -305,7 +305,7 @@
 
 <h3>Documentation 📝</h3>
 
-* Typos were fixed and information supplemental information was added to the 
+* Typos were fixed and supplemental information was added to the 
   docstrings for ``ppm_compilaion``, ``to_ppr``, ``commute_ppr``, 
   ``ppr_to_ppm``, and ``merge_ppr_ppm``.
   [(#2050)](https://github.com/PennyLaneAI/catalyst/pull/2050)
