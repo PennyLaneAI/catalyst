@@ -140,18 +140,22 @@ def configure_mcm_and_try_one_shot(qnode, args, kwargs):
         has_finite_shots = isinstance(total_shots, int) and total_shots > 0
 
         # For cases that user are not tend to executed with one-shot, and facing
-        # 1. measurement transform, 2. non-finite shots, 3. non-one-shot compatible device,
+        # 1. non-one-shot compatible device,
+        # 2. non-finite shots,
+        # 3. measurement transform,
         # fallback to single-branch-statistics
-        if (
-            (
-                uses_measurements_from_samples
-                or uses_measurements_from_counts
-                or not _is_one_shot_compatible_device(qnode)
-                or not has_finite_shots
-            )
+        one_shot_compatible = _is_one_shot_compatible_device(qnode)
+        one_shot_compatible &= has_finite_shots
+        one_shot_compatible &= not uses_measurements_from_samples
+        one_shot_compatible &= not uses_measurements_from_counts
+
+        should_fallback = (
+            not one_shot_compatible
             and user_specified_mcm_method is None
             and mcm_config.mcm_method == "one-shot"
-        ):
+        )
+
+        if should_fallback:
             mcm_config = replace(mcm_config, mcm_method="single-branch-statistics")
 
         if mcm_config.mcm_method == "one-shot":
