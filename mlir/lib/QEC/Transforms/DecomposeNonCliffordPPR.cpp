@@ -90,20 +90,6 @@ void decomposePauliCorrectedPiOverEight(bool avoidPauliYMeasure, PPRotationOp op
     auto ppmPZRes = ppmPZ.getMres();
     int16_t rotationKind = static_cast<int16_t>(op.getRotationKind());
     if (avoidPauliYMeasure) {
-        auto constFalse =
-            rewriter.create<arith::ConstantOp>(loc, rewriter.getIntegerAttr(ppmPZRes.getType(), 0));
-        auto constTrue =
-            rewriter.create<arith::ConstantOp>(loc, rewriter.getIntegerAttr(ppmPZRes.getType(), 1));
-        auto ifCondition = rewriter.create<arith::XOrIOp>(
-            loc, ppmPZRes, rotationKind > 0 ? constTrue.getResult() : constFalse.getResult());
-
-        // Truth table for ifCondition:
-        // rotationKind > 0 and meas = 1 -> xor 1 1 -> ifCondition = False and do Y measurement
-        // rotationKind > 0 and meas = 0 -> xor 1 0 -> ifCondition = True and do X measurement
-        // rotationKind < 0 and meas = 1 -> xor 0 1 -> ifCondition = True and do X measurement
-        // rotationKind < 0 and meas = 0 -> xor 0 0 -> ifCondition = False and do Y measurement
-        // This means, we measure in the Y basis when False and the X basis when True
-
         auto YBuilder = [&](OpBuilder &builder, Location loc) {
             // Initialize |Y⟩ state
             auto yQubit = rewriter.create<FabricateOp>(loc, LogicalInitKind::plus_i);
@@ -136,7 +122,13 @@ void decomposePauliCorrectedPiOverEight(bool avoidPauliYMeasure, PPRotationOp op
             rewriter.create<scf::YieldOp>(loc, pprPI2.getOutQubits());
         };
 
-        auto ifOp = rewriter.create<scf::IfOp>(loc, ifCondition.getResult(), XBuilder, YBuilder);
+        scf::IfOp ifOp;
+        if (rotationKind > 0) {
+            ifOp = rewriter.create<scf::IfOp>(loc, ppmPZRes, YBuilder, XBuilder);
+        }
+        else {
+            ifOp = rewriter.create<scf::IfOp>(loc, ppmPZRes, XBuilder, YBuilder);
+        }
         rewriter.replaceOp(op, ifOp);
     }
     else {
