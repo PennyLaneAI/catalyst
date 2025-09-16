@@ -806,7 +806,7 @@ def ppr_to_ppm(qnode=None, *, decompose_method="pauli-corrected", avoid_y_measur
         avoid_y_measure (bool): Rather than performing a Pauli-Y measurement for Clifford rotations
             (sometimes more costly), a :math:`Y` state (:math:`Y\vert 0 \rangle`) is used instead
             (requires :math:`Y` state preparation).
-            This is currently only supported when using the ``"clifford-corrected"`` decomposition method.
+            This is currently only supported when using the ``"clifford-corrected"`` and `"pauli-corrected"` decomposition method.
             Defaults to ``False``.
 
     Returns:

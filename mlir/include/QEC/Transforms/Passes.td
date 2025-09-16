@@ -102,7 +102,7 @@ def MergePPRIntoPPMPass : Pass<"merge-ppr-ppm"> {
 def DecomposeNonCliffordPPRPass : Pass<"decompose-non-clifford-ppr"> {
     let summary = "Decompose non-Clifford PPRotation operations to set of Pauli Product Measurement operations.";
     
-    let dependentDialects = [ "catalyst::qec::QECDialect" ];
+    let dependentDialects = [ "catalyst::qec::QECDialect", "scf::SCFDialect" ];
 
     let constructor = "catalyst::createDecomposeNonCliffordPPRPass()";
 
