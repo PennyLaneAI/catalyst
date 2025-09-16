@@ -52,6 +52,9 @@ qml.capture.enable()
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=3))
 def test_basic_dynalloc():
+    """
+    Test basic qml.allocate and qml.deallocate.
+    """
     qml.X(1)
     qml.X(1)
     wires = allocate(1)

@@ -26,6 +26,9 @@ from catalyst import qjit
 
 
 def test_basic_dynamic_wire_alloc():
+    """
+    Test basic qml.allocate and qml.deallocate.
+    """
 
     qml.capture.enable()
 
@@ -50,6 +53,9 @@ def test_basic_dynamic_wire_alloc():
 
 @pytest.mark.parametrize("cond, expected", [(True, [0, 0, 1, 0]), (False, [0, 1, 0, 0])])
 def test_dynamic_wire_alloc_cond(cond, expected):
+    """
+    Test qml.allocate and qml.deallocate inside cond.
+    """
 
     qml.capture.enable()
 
@@ -79,13 +85,16 @@ def test_dynamic_wire_alloc_cond(cond, expected):
     "num_iter, expected", [(3, [0, 0, 1, 0, 0, 0, 0, 0]), (4, [1, 0, 0, 0, 0, 0, 0, 0])]
 )
 def test_dynamic_wire_alloc_forloop(num_iter, expected):
+    """
+    Test qml.allocate and qml.deallocate inside for loop.
+    """
 
     qml.capture.enable()
 
     @qjit(autograph=True)
     @qml.qnode(qml.device("lightning.qubit", wires=3))
     def circuit(N):
-        for i in range(N):
+        for _ in range(N):
             q = allocate(1)[0]
             qml.X(wires=q)
             qml.CNOT(wires=[q, 1])
@@ -103,7 +112,9 @@ def test_dynamic_wire_alloc_forloop(num_iter, expected):
     "num_iter, expected", [(3, [0, 0, 1, 0, 0, 0, 0, 0]), (4, [1, 0, 0, 0, 0, 0, 0, 0])]
 )
 def test_dynamic_wire_alloc_whileloop(num_iter, expected):
-
+    """
+    Test qml.allocate and qml.deallocate inside while loop.
+    """
     qml.capture.enable()
 
     @qjit(autograph=True)
