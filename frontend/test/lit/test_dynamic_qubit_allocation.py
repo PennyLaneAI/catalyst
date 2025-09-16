@@ -54,22 +54,42 @@ qml.capture.enable()
 def test_basic_dynalloc():
     """
     Test basic qml.allocate and qml.deallocate.
+
+    Test both the explicit call API and the context manager API.
     """
-    qml.X(1)
-    qml.X(1)
-    wires = allocate(1)
-    qml.X(wires[0])
-    qml.Z(wires[0])
-    deallocate(wires[0])
 
-    qml.X(wires=0)
-    qml.Hadamard(wires=1)
-    qml.Hadamard(wires=2)
+    # CHECK: [[device_init_qreg:%.+]] = quantum.alloc( 3)
 
-    wires = allocate(2)
-    qml.Y(wires[0])
-    qml.Z(wires[1])
-    deallocate(wires[:])
+    # CHECK: [[dyn_qreg:%.+]] = quantum.alloc( 2)
+    # CHECK: [[dyn_bit0:%.+]] = quantum.extract [[dyn_qreg]][ 0]
+    # CHECK: [[dyn_bit1:%.+]] = quantum.extract [[dyn_qreg]][ 1]
+    # CHECK: [[Xout:%.+]] = quantum.custom "PauliX"() [[dyn_bit0]]
+    # CHECK: [[dev_bit2:%.+]] = quantum.extract [[device_init_qreg]][ 2]
+    # CHECK: [[CNOTout:%.+]]:2 = quantum.custom "CNOT"() [[dyn_bit1]], [[dev_bit2]]
+    # COM: dealloc blocked by https://github.com/PennyLaneAI/catalyst/pull/1996
+    # COM: CHECK: [[insert0:%.+]] = quantum.insert [[dyn_qreg]][ 0], [[Xout]]
+    # COM: CHECK: [[insert1:%.+]] = quantum.insert [[insert0]][ 1], [[CNOTout]]#0
+    # COM: CHECK: quantum.dealloc [[insert1]]
+
+    qs = allocate(2)
+    qml.X(qs[0])
+    qml.CNOT(wires=[qs[1], 2])
+    deallocate(qs[:])
+
+    # CHECK: [[dyn_qreg:%.+]] = quantum.alloc( 4)
+    # CHECK: [[dyn_bit1:%.+]] = quantum.extract [[dyn_qreg]][ 1]
+    # CHECK: [[dyn_bit2:%.+]] = quantum.extract [[dyn_qreg]][ 2]
+    # CHECK: [[Xout:%.+]] = quantum.custom "PauliX"() [[dyn_bit1]]
+    # CHECK: [[dev_bit1:%.+]] = quantum.extract [[device_init_qreg]][ 1]
+    # CHECK: [[CNOTout:%.+]]:2 = quantum.custom "CNOT"() [[dyn_bit2]], [[dev_bit1]]
+    # COM: dealloc blocked by https://github.com/PennyLaneAI/catalyst/pull/1996
+    # COM: CHECK: [[insert0:%.+]] = quantum.insert [[dyn_qreg]][ 1], [[Xout]]
+    # COM: CHECK: [[insert1:%.+]] = quantum.insert [[insert0]][ 2], [[CNOTout]]#0
+    # COM: CHECK: quantum.dealloc [[insert1]]
+
+    with allocate(4) as qs1:
+        qml.X(qs1[1])
+        qml.CNOT(wires=[qs1[2], 1])
 
     return qml.probs()
 
