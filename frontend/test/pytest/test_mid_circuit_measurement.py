@@ -321,8 +321,7 @@ class TestMidCircuitMeasurement:
 
         spy = mocker.spy(catalyst.qfunc, "dynamic_one_shot")
         _ = circuit(1.8)
-        expected_call_count = 1 if postselect_mode == "hw-like" else 0
-        assert spy.call_count == expected_call_count
+        assert spy.call_count == 1
 
     @pytest.mark.xfail(
         reason="Midcircuit measurements with sampling is unseeded and hence this test is flaky"

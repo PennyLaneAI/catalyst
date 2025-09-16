@@ -29,15 +29,15 @@
 <h3>Improvements 🛠</h3>
 
 * Catalyst now supports returning classical and MCM values with the dynamic one-shot MCM method.
-  [(#2001)](https://github.com/PennyLaneAI/catalyst/pull/2001)
-  
+  [(#2004)](https://github.com/PennyLaneAI/catalyst/pull/2004)
+
   For example, the code below will generate 10 values, with an equal probability of 42 and 43
-  appearing. 
+  appearing.
 
   ```python
   import pennylane as qml
   from catalyst import qjit, measure
-  
+
   @qjit(autograph=True)
   @qml.set_shots(10)
   @qml.qnode(qml.device("lightning.qubit", wires=1), mcm_method="one-shot")
@@ -57,12 +57,12 @@
            True], dtype=bool))
   ```
 
-
 * Improve the pass `--ppm-specs` to count the depth of PPRs and PPMs in the circuit.
   [(#2014)](https://github.com/PennyLaneAI/catalyst/pull/2014)
 
 * The default mid-circuit measurement method in catalyst has been changed from `"single-branch-statistics"` to `"one-shot"`.
   [[#2017]](https://github.com/PennyLaneAI/catalyst/pull/2017)
+  [[#2019]](https://github.com/PennyLaneAI/catalyst/pull/2019)
 
 * A new pass `--partition-layers` has been added to group PPR/PPM operations into `qec.layer`
   operations based on qubit interactive and commutativity, enabling circuit analysis and
