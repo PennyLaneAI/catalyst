@@ -6,7 +6,7 @@
   operations by commuting adjacent PPRs and finding possible PPRs that can be merged.
   For more details, see the Figure 6 in [A Game of Surface Code](https://arXiv:1808.02892v3) paper.
   [(#1975)](https://github.com/PennyLaneAI/catalyst/pull/1975)
-  [(#XXXX)(...)]
+  [(#2048)(https://github.com/PennyLaneAI/catalyst/pull/2048)]
 
 * Catalyst now provides native support for `SingleExcitation`, `DoubleExcitation`,
   and `PCPhase` on compatible devices like Lightning simulators.
