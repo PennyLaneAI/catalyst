@@ -14,6 +14,8 @@
 """
 This submodule defines a utility for converting plxpr into Catalyst jaxpr.
 """
+import textwrap
+
 # pylint: disable=protected-access
 from copy import copy
 from functools import partial
@@ -45,7 +47,7 @@ from pennylane.transforms import single_qubit_fusion as pl_single_qubit_fusion
 from pennylane.transforms import unitary_to_rot as pl_unitary_to_rot
 
 from catalyst.device import extract_backend_info
-from catalyst.from_plxpr.qubit_handler import QubitHandler, QubitIndexRecorder
+from catalyst.from_plxpr.qubit_handler import QREG_MIN_HASH, QubitHandler, QubitIndexRecorder
 from catalyst.jax_extras import jaxpr_pad_consts, make_jaxpr2, transient_jax_config
 from catalyst.jax_primitives import (
     AbstractQbit,
@@ -366,8 +368,21 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
             if not self.qubit_index_recorder.contains(w):
                 # First time the global wire index w is encountered
                 # Need to extract from init qreg
-                # This won't be a dynamically allocated qreg, since these have all
-                # wires extracted after binding their alloc primitives immediately.
+                # TODO: this can now only be from the global qreg, because right now in from_plxpr
+                # conversion, subscopes (control flow, adjoint, ...) can only take in the global
+                # qreg as the final scope argument. They cannot take an arbitrary number of qreg
+                # values yet.
+                # Supporting multiple registers requires refactoring the from_plxpr conversion's
+                # implementation.
+                if isinstance(w, int) and w > QREG_MIN_HASH:
+                    raise NotImplementedError(
+                        textwrap.dedent(
+                            """
+                        Dynamically allocated wires in a parent scope cannot be used in a child
+                        scope yet. Please consider dynamical allocation inside the child scope.
+                        """
+                        )
+                    )
                 in_qubits.append(self.init_qreg[self.init_qreg.global_index_to_local_index(w)])
                 in_qregs.append(self.init_qreg)
 

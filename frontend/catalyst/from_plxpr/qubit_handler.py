@@ -72,6 +72,8 @@ from catalyst.jax_extras import DynamicJaxprTracer
 from catalyst.jax_primitives import AbstractQbit, AbstractQreg, qextract_p, qinsert_p
 from catalyst.utils.exceptions import CompileError
 
+QREG_MIN_HASH = 1e12
+
 
 class QubitIndexRecorder:
     """
@@ -187,7 +189,9 @@ class QubitHandler:
             # For the static inital qreg, all the global indices in plxpr are 0, 1, 2... already
             # So for these non dynamically alloced registers, the root has is just zero, and
             # their local and global indices are the same.
-            self.root_hash = hash(qubit_or_qreg_ref) if dynamically_alloced else 0
+            self.root_hash = (
+                int(hash(qubit_or_qreg_ref) + QREG_MIN_HASH) if dynamically_alloced else 0
+            )
 
     def is_qubit_mode(self):
         """

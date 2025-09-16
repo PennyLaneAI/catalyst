@@ -17,6 +17,8 @@ Unit tests for the dynamic work wire allocation.
 Note that this feature is only available under the plxpr pipeline.
 """
 
+import textwrap
+
 import numpy as np
 import pennylane as qml
 import pytest
@@ -134,6 +136,38 @@ def test_dynamic_wire_alloc_whileloop(num_iter, expected):
     qml.capture.disable()
 
     assert np.allclose(expected, observed)
+
+
+def test_unsupported_cross_scope_registers():
+    """
+    Scope jaxprs in Catalyst cannot take multiple registers yet.
+    Test that an error is raised when a dynamically allocated register in an outside scope
+    is being used from an inside scope.
+    """
+
+    qml.capture.enable()
+
+    with pytest.raises(
+        NotImplementedError,
+        match=textwrap.dedent(
+            """
+            Dynamically allocated wires in a parent scope cannot be used in a child
+            scope yet. Please consider dynamical allocation inside the child scope.
+            """
+        ),
+    ):
+
+        @qjit(autograph=True)
+        @qml.qnode(qml.device("lightning.qubit", wires=3))
+        def circuit():
+            wires = allocate(3)
+
+            for _ in range(3):
+                qml.X(wires=wires[0])
+
+            return qml.probs(wires=[0, 1, 2])
+
+    qml.capture.disable()
 
 
 if __name__ == "__main__":
