@@ -315,6 +315,9 @@
 * Fixing a few typos in the Catalyst documentation.
   [(#2046)](https://github.com/PennyLaneAI/catalyst/pull/2046)
 
+* Updated `Examples` links to point to relevant, up-to-date demos and removed outdated entries.
+  [(#2042)](https://github.com/PennyLaneAI/catalyst/pull/2042)
+
 <h3>Contributors ✍️</h3>
 
 This release contains contributions from (in alphabetical order):
@@ -328,6 +331,7 @@ Jeffrey Kam,
 Christina Lee,
 Joseph Lee,
 Andrija Paurevic,
+Justin Pickering,
 Ritu Thombre,
 Roberto Turrado,
 Paul Haochen Wang,
