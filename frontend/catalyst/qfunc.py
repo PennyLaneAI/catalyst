@@ -41,7 +41,7 @@ from catalyst.device.qjit_device import is_dynamic_wires
 from catalyst.jax_extras import deduce_avals, get_implicit_and_explicit_flat_args, unzip2
 from catalyst.jax_extras.tracing import uses_transform
 from catalyst.jax_primitives import quantum_kernel_p
-from catalyst.jax_tracer import Function, trace_quantum_function
+from catalyst.jax_tracer import DynamicJaxprTracer, Function, trace_quantum_function
 from catalyst.logging import debug_logger
 from catalyst.passes.pass_api import dictionary_to_list_of_passes
 from catalyst.tracing.contexts import EvaluationContext
@@ -73,11 +73,7 @@ def _resolve_mcm_config(mcm_config, shots):
         None if isinstance(shots, int) and shots == 0 else mcm_config.postselect_mode
     )
     if mcm_config.mcm_method is None:
-        updated_values["mcm_method"] = (
-            "one-shot"
-            if mcm_config.postselect_mode == "hw-like" or (isinstance(shots, int) and shots > 0)
-            else "single-branch-statistics"
-        )
+        updated_values["mcm_method"] = "one-shot"
     if mcm_config.mcm_method == "deferred":
         raise ValueError("mcm_method='deferred' is not supported with Catalyst.")
     if (
@@ -141,14 +137,17 @@ def configure_mcm_and_try_one_shot(qnode, args, kwargs):
         # Check if measurements_from_{samples/counts} is being used
         uses_measurements_from_samples = uses_transform(qnode, "measurements_from_samples")
         uses_measurements_from_counts = uses_transform(qnode, "measurements_from_counts")
+        has_finite_shots = isinstance(total_shots, int) and total_shots > 0
 
-        # For cases that user are not tend to executed with one-shot, and facing measurement
-        # transform, fallback to single-branch-statistics
+        # For cases that user are not tend to executed with one-shot, and facing
+        # 1. measurement transform, 2. non-finite shots, 3. non-one-shot compatible device,
+        # fallback to single-branch-statistics
         if (
             (
                 uses_measurements_from_samples
                 or uses_measurements_from_counts
                 or not _is_one_shot_compatible_device(qnode)
+                or not has_finite_shots
             )
             and user_specified_mcm_method is None
             and mcm_config.mcm_method == "one-shot"
