@@ -210,7 +210,7 @@ def handle_qnode(
     closed_jaxpr = (
         ClosedJaxpr(qfunc_jaxpr, consts)
         if not self.requires_compiler_decompose
-        else handle_compiler_decompose(
+        else apply_compiler_decompose_to_plxpr(
             inner_jaxpr=qfunc_jaxpr,
             consts=consts,
             ncargs=non_const_args,
@@ -233,8 +233,9 @@ def handle_qnode(
         device_release_p.bind()
         return retvals
 
-    # Add gate_set attribute to the quantum kernel primitive
-    setattr(qnode, "decompose_gatesets", self.decompose_gatesets)
+    if self.requires_compiler_decompose:
+        # Add gate_set attribute to the quantum kernel primitive
+        setattr(qnode, "decompose_gatesets", self.decompose_gatesets)
 
     return quantum_kernel_p.bind(
         wrap_init(calling_convention, debug_info=qfunc_jaxpr.debug_info),
@@ -260,8 +261,8 @@ transforms_to_passes = {
 }
 
 
-def handle_compiler_decompose(inner_jaxpr, consts, tgatesets, ncargs):
-    """Handle the compiler-specific decomposition for a given JAXPR."""
+def apply_compiler_decompose_to_plxpr(inner_jaxpr, consts, tgatesets, ncargs):
+    """Apply the compiler-specific decomposition for a given JAXPR."""
 
     # disable the graph decomposition optimization
     is_graph = qml.decomposition.enabled_graph()
