@@ -786,7 +786,7 @@ def merge_ppr_ppm(qnode=None, *, max_pauli_size=0):
 
 
 def ppr_to_ppm(qnode=None, *, decompose_method="pauli-corrected", avoid_y_measure=False):
-    R"""Applies a quantum compilation pass that decomposes Pauli product rotations (PPRs), 
+    R"""Applies a quantum compilation pass that decomposes Pauli product rotations (PPRs),
     :math:`\exp(-iP\theta)`, into Pauli Pauli measurements (PPMs).
 
     This pass is used to decompose both non-Clifford and Clifford PPRs into PPMs. The non-Clifford
