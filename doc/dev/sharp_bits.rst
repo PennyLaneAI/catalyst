@@ -997,7 +997,7 @@ Dynamically-shaped arrays
 -------------------------
 
 Catalyst provides experimental support for compiling functions that accept
-or contain tensors whose dimensions are not know at compile time, without
+or contain tensors whose dimensions are not known at compile time, without
 needing to recompile the function when tensor shapes change.
 
 For example, one might consider a case where a dynamic variable specifies the shape
