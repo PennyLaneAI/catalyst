@@ -92,58 +92,38 @@ class TestShotVector:
         assert jnp.array(circuit()[6]).shape == (101, 1)
         assert jnp.array(circuit()[7]).shape == (101, 1)
 
-    def test_shot_vector_with_different_measurement(self):
+    @pytest.mark.parametrize(
+        "measurement",
+        [
+            (lambda wires: qml.expval(qml.Z(wires)), "ExpectationMP"),
+            (lambda wires: qml.var(qml.Z(wires)), "VarianceMP"),
+            (lambda wires: qml.probs(wires=wires), "ProbabilityMP"),
+        ],
+    )
+    @pytest.mark.parametrize("mcm_method", ["single-branch-statistics", "one-shot"])
+    def test_shot_vector_with_different_measurement(self, measurement, mcm_method):
         """Test a NotImplementedError is raised when using a shot-vector with a measurement that is not qml.sample()"""
 
         dev = qml.device("lightning.qubit", wires=1)
 
-        with pytest.raises(
-            NotImplementedError,
-            match=re.escape(
-                "Measurement ExpectationMP is not supported a shot-vector. Use qml.sample() instead."
-            ),
-        ):
+        @qml.set_shots(((3, 4)))
+        @qml.qnode(dev, mcm_method=mcm_method)
+        def circuit():
+            qml.Hadamard(0)
+            return measurement[0](0)
 
-            @qjit
-            @qml.set_shots(((3, 4)))
-            @qml.qnode(dev)
-            def circuit():
-                qml.Hadamard(0)
-                return qml.expval(qml.Z(0))
-
-            circuit()
-
-        with pytest.raises(
-            NotImplementedError,
-            match=re.escape(
-                "Measurement VarianceMP is not supported a shot-vector. Use qml.sample() instead."
-            ),
-        ):
-
-            @qjit
-            @qml.set_shots(((3, 4)))
-            @qml.qnode(dev)
-            def circuit():
-                qml.Hadamard(0)
-                return qml.var(qml.Z(0))
-
-            circuit()
-
-        with pytest.raises(
-            NotImplementedError,
-            match=re.escape(
-                "Measurement ProbabilityMP is not supported a shot-vector. Use qml.sample() instead."
-            ),
-        ):
-
-            @qjit
-            @qml.set_shots(((3, 4)))
-            @qml.qnode(dev)
-            def circuit():
-                qml.Hadamard(0)
-                return qml.probs(wires=[0])
-
-            circuit()
+        if measurement[1] == "VarianceMP" and mcm_method == "one-shot":
+            with pytest.raises(
+                TypeError,
+                match=re.escape("qml.var(obs) cannot be returned when `mcm_method='one-shot'`"),
+            ):
+                qjit(circuit)()
+        else:
+            with pytest.raises(
+                NotImplementedError,
+                match=re.compile(f"Measurement {measurement[1]} does not support shot-vectors"),
+            ):
+                qjit(circuit)()
 
     def test_shot_vector_with_complex_container_sample(self):
         """Test shot-vector with complex container sample"""
