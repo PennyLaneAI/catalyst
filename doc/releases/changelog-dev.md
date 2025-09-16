@@ -305,6 +305,11 @@
 
 <h3>Documentation 📝</h3>
 
+* Typos were fixed and information supplemental information was added to the 
+  docstrings for ``ppm_compilaion``, ``to_ppr``, ``commute_ppr``, 
+  ``ppr_to_ppm``, and ``merge_ppr_ppm``.
+  [(#2050)](https://github.com/PennyLaneAI/catalyst/pull/2050)
+
 * The Catalyst Command Line Interface documentation incorrectly stated that the `catalyst`
   executable is available in the `catalyst/bin/` directory relative to the environment's
   installation directory when installed via pip. The documentation has been updated to point to the
