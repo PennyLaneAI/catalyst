@@ -43,8 +43,6 @@
   ``t_layer_reduction`` pass will move PPRs around via commutation, resulting in a circuit with a 
   smaller PPR depth of three.
 
-  .. code-block:: python
-
   ```pycon
   >>> print(circuit.mlir_opt)
   . . .
