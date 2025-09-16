@@ -309,9 +309,7 @@ class QubitHandler:
                     idx = global_index
                 else:
                     idx = global_index - self.root_hash
-                self.abstract_qreg_val = qinsert_p.bind(
-                    self.abstract_qreg_val, idx, qubit
-                )
+                self.abstract_qreg_val = qinsert_p.bind(self.abstract_qreg_val, idx, qubit)
 
             self.wire_map.clear()
 
