@@ -4,7 +4,7 @@
 
 * A new quantum compilation pass that reduces the depth and count of non-Clifford Pauli product 
   rotations (PPRs) in circuits is now available. This compilation pass works by commuting 
-  non-Clifford PPRs (:math:`\exp(iX\tfrac{\pi}{8})`, often referred to as ``T`` gates) in adjacent 
+  non-Clifford PPRs (:math:`\exp(iX\tfrac{\pi}{8})`, often referred to as `T` gates) in adjacent 
   layers and merging compatible ones. More details can be found in Figure 6 of 
   [A Game of Surface Codes](https://arXiv:1808.02892v3).
   [(#1975)](https://github.com/PennyLaneAI/catalyst/pull/1975)
@@ -40,12 +40,12 @@
 
   After performing the :func:`catalyst.passes.to_ppr` and :func:`catalyst.passes.merge_ppr_ppm` 
   passes, the circuit contains a depth of four of non-Clifford PPRs. Subsequently applying the 
-  ``t_layer_reduction`` pass will move PPRs around via commutation, resulting in a circuit with a 
+  `t_layer_reduction` pass will move PPRs around via commutation, resulting in a circuit with a 
   smaller PPR depth of three.
 
   ```pycon
   >>> print(circuit.mlir_opt)
-  . . .
+  ...
   %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
   %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
   // layer 1
@@ -60,7 +60,7 @@
 
   // layer 3
   %9:3 = qec.ppr ["X", "X", "Y"](8) %8#0, %8#1, %8#2:!quantum.bit, !quantum.bit, !quantum.bit
-  . . .
+  ...
   ```
 
 * Catalyst now provides native support for `SingleExcitation`, `DoubleExcitation`,
