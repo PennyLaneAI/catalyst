@@ -77,7 +77,7 @@ print(single_qubit_circuit.mlir)
 # CHECK-LABEL: public @jit_two_qubit_circuit
 @qjit(target="mlir")
 @qml.set_shots(5)
-@qml.qnode(qml.device("lightning.qubit", wires=2))
+@qml.qnode(qml.device("lightning.qubit", wires=2), mcm_method="single-branch-statistics")
 def two_qubit_circuit():
     """Test MLIR output of qml.Snapshot on two qubits with shots"""
 
