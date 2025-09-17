@@ -21,6 +21,13 @@ class traversalState:
     def __repr__(self):
         return f"Name: {self.name}, tree_depth: {self.tree_depth},\n\t visited: {self.visited},\n\t special: {self.special},\n\t probs: {self.probs}, \n\t segment_table: {self.segment_table}"
 
+class traversalStateForLoop(traversalState):
+    for_loop_visited: int = 0
+    last_computed_depth: int = 1
+    
+    def __repr__(self):
+        return f"{super().__repr__()}, \n\t for_loop_visited: {self.for_loop_visited}, last_computed_depth: {self.last_computed_depth}"
+
 
 # The depth is mcm * iterations + 1
 # The plus 1 is for the initial segment function before the mcms
@@ -40,7 +47,7 @@ main_state = traversalState(
 for_loop_mcm = 2
 for_loop_iterations = 2
 
-for_loop_state = traversalState(
+for_loop_state = traversalStateForLoop(
     name="for_loop_state",
     tree_depth = for_loop_mcm*for_loop_iterations + 1,
     visited = [0 for _ in range(for_loop_mcm*for_loop_iterations + 1)],
@@ -146,28 +153,24 @@ def store_state(depth):
 def restore_state(depth):
     indent_print(f"restoring state at depth: {depth}", indent=depth)
 
-for_loop_visited = [0]
-last_computed_depth = [1]
-
-
-def for_loop_simulation(global_depth, for_loop_visited, tt_state):
-    indent_print(f"[before] {status_print(tt_state, global_depth)}, for_loop_visited: {for_loop_visited}", indent=global_depth)
+def for_loop_simulation(global_depth, for_loop_state, tt_state):
+    indent_print(f"[before] {status_print(tt_state, global_depth)}, for_loop_visited: {for_loop_state.for_loop_visited}", indent=global_depth)
 
     indent_print(f"entering for_loop at depth: {global_depth}", indent=global_depth)
     
 
-    if for_loop_visited[0] == 2**(for_loop_state.tree_depth-1):
-        for_loop_visited[0] = 0  # Reset for future traversals
-        last_computed_depth[0] = 1  # Reset for future traversals
+    if for_loop_state.for_loop_visited == 2**(for_loop_state.tree_depth-1):
+        for_loop_state.for_loop_visited = 0  # Reset for future traversals
+        for_loop_state.last_computed_depth = 1  # Reset for future traversals
         # Reset the for_loop state visited for future traversals
         for_loop_state.visited = [0 for _ in for_loop_state.visited]
         return 2  # Mark the for_loop as fully processed
 
     tree_traversal_one_way(for_loop_state)
 
-    for_loop_visited[0] += 1
+    for_loop_state.for_loop_visited += 1
 
-    if for_loop_visited[0] <= 2**(for_loop_state.tree_depth-1):
+    if for_loop_state.for_loop_visited <= 2**(for_loop_state.tree_depth-1):
         return 1  # Mark the for_loop as left visited
 
 
@@ -177,7 +180,7 @@ def tree_traversal_one_way(tt_state):
         # Just run the first segment function, no mcm
         simulation(0, 0, tt_state)
     
-    depth = last_computed_depth[0]
+    depth = tt_state.last_computed_depth
 
     # Main loop
     while depth >= 0:
@@ -192,7 +195,7 @@ def tree_traversal_one_way(tt_state):
         
         if depth_type == "for_loop":
             # special handling for for_loop
-            special_status = for_loop_simulation(depth, for_loop_visited, tt_state)
+            special_status = for_loop_simulation(depth, tt_state.for_loop_visited, tt_state)
             tt_state.visited[depth] = special_status
 
             indent_print(f"[update] visited: {tt_state.visited}, depth: {depth}", indent=depth)
@@ -209,14 +212,14 @@ def tree_traversal_one_way(tt_state):
 
         if status == 0:
             simulation(status, depth, tt_state)
-            last_computed_depth[0] = depth
+            tt_state.last_computed_depth = depth
             depth += 1
             continue
 
 
         if status == 1: 
             simulation(status, depth, tt_state)
-            last_computed_depth[0] = depth
+            tt_state.last_computed_depth = depth
             depth += 1
             continue
         
@@ -251,7 +254,7 @@ def tree_traversal(tt_state):
             print("-"*20+" Start SPECIAL for_loop"+"-"*20)
             
             # special handling for for_loop
-            special_status = for_loop_simulation(depth, for_loop_visited, tt_state)
+            special_status = for_loop_simulation(depth, for_loop_state, tt_state)
             tt_state.visited[depth] = special_status
 
             indent_print(f"[update] |  {status_print(tt_state, depth)},", indent=depth)
