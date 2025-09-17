@@ -110,7 +110,7 @@ class QubitIndexRecorder:
 
     def contains(self, global_index):
         """
-        Check if a global index is contained in any of the recorded qreg `QubitHanlder`s.
+        Check if a global index is contained in any of the recorded qreg `QubitHandler`s.
         """
         return global_index in self.map
 
@@ -186,11 +186,11 @@ class QubitHandler:
             # However, catalyst qreg work with relative indices
             # i.e. extracting and inserting with every new catalyst qreg use indices 0,1,2,...
             # To distinguish between different registers, we require that each one has a hash.
-            # For the static inital qreg, all the global indices in plxpr are 0, 1, 2... already
-            # So for these non dynamically alloced registers, the root has is just zero, and
+            # For the static initial qreg, all the global indices in plxpr are 0, 1, 2... already
+            # So for these non-dynamically allocated registers, the root hash is just zero, and
             # their local and global indices are the same.
             self.root_hash = (
-                int(hash(qubit_or_qreg_ref) + QREG_MIN_HASH) if dynamically_alloced else 0
+                int(id(qubit_or_qreg_ref) + QREG_MIN_HASH) if dynamically_alloced else 0
             )
 
     def is_qubit_mode(self):
@@ -212,7 +212,7 @@ class QubitHandler:
     def set(self, qreg: AbstractQreg):
         """
         Set the current AbstractQreg value.
-        This is needed, for example, when existing regions, like submodules and control flow.
+        This is needed, for example, when exiting regions, like submodules and control flow.
         """
 
         if self.is_qubit_mode():
