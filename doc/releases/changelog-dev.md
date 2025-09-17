@@ -303,6 +303,9 @@
 * The `NoMemoryEffect` trait has been removed from the `quantum.alloc` operation.
   [(#2044)](https://github.com/PennyLaneAI/catalyst/pull/2044)
 
+* Enhance `ppm_specs` function to prevent duplicate pass addition
+  [(#2049)](https://github.com/PennyLaneAI/catalyst/pull/2049)
+
 <h3>Documentation 📝</h3>
 
 * The Catalyst Command Line Interface documentation incorrectly stated that the `catalyst`
