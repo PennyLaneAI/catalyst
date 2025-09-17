@@ -30,6 +30,7 @@ import pennylane as qml
 from pennylane.decomposition import DecompositionGraph
 from pennylane.measurements import MidMeasureMP
 from pennylane.wires import WiresLike
+import functools
 
 from catalyst.jax_primitives import decomposition_rule
 
@@ -78,6 +79,7 @@ def create_decomposition_rule(func: Callable, op_name: str, num_wires: int):
     type_hints = get_type_hints(func)
 
     args = {}
+    op = None
     for name in sig_func.parameters.keys():
         typ = type_hints.get(name, None)
 
@@ -90,7 +92,10 @@ def create_decomposition_rule(func: Callable, op_name: str, num_wires: int):
         elif typ is int:
             args[name] = int
         elif typ is WiresLike or name == "wires":
-            args[name] = qml.math.array([0] * num_wires, like="jax")
+            args[name] = qml.math.array([0] * num_wires, like="jax") # How come wires here are preserved?
+        elif name == "base":
+            with qml.capture.pause():
+                op = qml.adjoint(qml.RZ(float, [0])) # How do i get this from the name?
         else:
             raise ValueError(
                 f"Unsupported type annotation {typ} for parameter {name} in func {func}."
@@ -99,12 +104,12 @@ def create_decomposition_rule(func: Callable, op_name: str, num_wires: int):
     # Update the name of decomposition rule
     rule_name = "_rule" if func.__name__[0] == "_" else "_rule_"
     func.__name__ = op_name + rule_name + func.__name__ + "_wires_" + str(num_wires)
-
-    return decomposition_rule(func)(**args)
+    return decomposition_rule(func, op=op)(**args)
 
 
 # pylint: disable=too-few-public-methods
 class GraphSolutionInterpreter(qml.capture.PlxprInterpreter):
+    
     """Interpreter for getting the decomposition graph solution
     from a jaxpr when program capture is enabled.
     """

@@ -395,7 +395,7 @@ def subroutine(func):
     return wrapper
 
 
-def decomposition_rule(func=None, *, is_qreg=True, num_params=0):
+def decomposition_rule(func=None, *, is_qreg=True, num_params=0, op: qml.operation.Operator = None):
     """
     Denotes the creation of a quantum definition in the intermediate representation.
     """
@@ -409,7 +409,11 @@ def decomposition_rule(func=None, *, is_qreg=True, num_params=0):
 
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
-        jaxpr = jax.make_jaxpr(func)(*args, **kwargs)
+        if op is not None:
+            new_func = functools.partial(func,wires=op.wires, **op.hyperparameters)
+            jaxpr = jax.make_jaxpr(new_func)(*args, **kwargs)
+        else:
+            jaxpr = jax.make_jaxpr(func)(*args, **kwargs)        
         decomprule_p.bind(pyfun=func, func_jaxpr=jaxpr, is_qreg=is_qreg, num_params=num_params)
 
     return wrapper
