@@ -95,8 +95,10 @@
 * Displays Catalyst version in `quantum-opt --version` output.
   [(#1922)](https://github.com/PennyLaneAI/catalyst/pull/1922)
 
-* Snakecased keyword arguments to :func:`catalyst.passes.apply_pass()` are now correctly parsed
-  to kebab-case pass options [(#1954)](https://github.com/PennyLaneAI/catalyst/pull/1954).
+* Snakecased keyword arguments to :func:`catalyst.passes.apply_pass()` are
+  now correctly parsed to kebab-case pass options.
+  [(#1954)](https://github.com/PennyLaneAI/catalyst/pull/1954).
+
   For example:
 
   ```python
@@ -131,7 +133,23 @@
 * A new decomposition rule for non-Clifford PPRs into two PPMs based on the Active Volume paper.
   [(#2043)](https://github.com/PennyLaneAI/catalyst/pull/2043)
 
+* Added support to avoid Y-basis measurements in `pauli-corrected` PPR decomposition.
+  [(#2047)](https://github.com/PennyLaneAI/catalyst/pull/2047)
+
 <h3>Breaking changes 💔</h3>
+
+* (Device implementers only) The `ReleaseAllQubits` device interface function
+  has been replaced with `ReleaseQubits`.
+  [(#1996)](https://github.com/PennyLaneAI/catalyst/pull/1996)
+
+  Instead of releasing all currently active qubits, the new interface
+  function `ReleaseQubits` explicitly takes in an array of qubit IDs to be
+  released.
+
+  For devices without dynamic allocation support it is expected that this
+  function only succeed if the ID array contains the same values as those
+  produced by the initial `AllocateQubits` call, otherwise the device is
+  encouraged to raise an error.
 
 * The `shots` property has been removed from `OQDDevice`. The number of shots for a qnode execution is now set directly on the qnode via `qml.set_shots`,
   either used as decorator `@qml.set_shots(num_shots)` or directly on the qnode `qml.set_shots(qnode, shots=num_shots)`.
@@ -300,6 +318,9 @@
 * The `NoMemoryEffect` trait has been removed from the `quantum.alloc` operation.
   [(#2044)](https://github.com/PennyLaneAI/catalyst/pull/2044)
 
+* Enhance `ppm_specs` function to prevent duplicate pass addition
+  [(#2049)](https://github.com/PennyLaneAI/catalyst/pull/2049)
+
 <h3>Documentation 📝</h3>
 
 * The Catalyst Command Line Interface documentation incorrectly stated that the `catalyst`
@@ -311,6 +332,9 @@
 
 * Fixing a few typos in the Catalyst documentation.
   [(#2046)](https://github.com/PennyLaneAI/catalyst/pull/2046)
+
+* Updated `Examples` links to point to relevant, up-to-date demos and removed outdated entries.
+  [(#2042)](https://github.com/PennyLaneAI/catalyst/pull/2042)
 
 <h3>Contributors ✍️</h3>
 
@@ -325,6 +349,7 @@ Jeffrey Kam,
 Christina Lee,
 Joseph Lee,
 Andrija Paurevic,
+Justin Pickering,
 Ritu Thombre,
 Roberto Turrado,
 Paul Haochen Wang,
