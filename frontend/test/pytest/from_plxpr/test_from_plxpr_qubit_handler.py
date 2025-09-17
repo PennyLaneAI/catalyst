@@ -64,7 +64,7 @@ def launch_empty_jaxpr_interpreter():
 
 # A mock qubit index recorder.
 # Tests in this file generally do not need it.
-# Tests that actually need
+# Tests that actually need a meaning recorder should create their own.
 mock_recorder = QubitIndexRecorder()
 
 # A mock primitive that takes in a qreg and returns a qreg
@@ -179,6 +179,7 @@ class TestQubitHandlerInitialization:
         qreg = qalloc_p.bind(42)
         qubit_handler = QubitHandler(qreg, mock_recorder)
 
+        assert not qubit_handler.is_qubit_mode()
         assert qubit_handler.get() is qreg
         assert qubit_handler.wire_map == {}
 
@@ -190,6 +191,7 @@ class TestQubitHandlerInitialization:
         qubits = [AbstractQbit() for _ in range(3)]
         qubit_handler = QubitHandler(qubits, mock_recorder)
 
+        assert qubit_handler.is_qubit_mode()
         assert isinstance(qubit_handler.get(), list)
         assert all(isinstance(q, AbstractQbit) for q in qubit_handler.get())
 
@@ -203,7 +205,7 @@ class TestQubitHandlerInitialization:
         assert qubit_handler.wire_map == {}
 
         # Check that the qreg SSA value is None
-        assert qubit_handler.abstract_qreg_val == None
+        assert qubit_handler.abstract_qreg_val is None
 
     def test_new_alloc(self):
         """Test qregs from new alloc"""
@@ -438,6 +440,44 @@ class TestQregAndQubit:
               in () }"""
             expected = textwrap.dedent(expected)
             assert observed_jaxpr == expected
+
+
+class TestQubitIndexRecorder:
+    """Test behavior of QubitIndexRecorder."""
+
+    def test_standalone_behavior(self):
+        """
+        Test that methods in QubitIndexRecorder behave correctly with mock values.
+        """
+        recorder = QubitIndexRecorder()
+        assert recorder.map == {}
+
+        recorder["mock"] = "mockmock"
+        assert recorder.contains("mock")
+        assert not recorder.contains("not mock")
+        assert recorder["mock"] == "mockmock"
+
+    def test_qubit_extract_recording(self):
+        """
+        Test that extracting a qubit value from `QubitHandler` correctly updates the recorder.
+        """
+        recorder = QubitIndexRecorder()
+
+        qreg = qalloc_p.bind(42)
+        qubit_handler = QubitHandler(qreg, recorder)
+        other_qreg = qalloc_p.bind(42)
+        other_qubit_handler = QubitHandler(other_qreg, recorder)
+
+        wires = [0, 1]
+        _ = _interpret_operation(wires, qubit_handler)
+        other_wires = [10, 20]
+        _ = _interpret_operation(other_wires, other_qubit_handler)
+
+        assert list(recorder.map.keys()) == [0, 1, 10, 20]
+        assert recorder[0] is qubit_handler
+        assert recorder[1] is qubit_handler
+        assert recorder[10] is other_qubit_handler
+        assert recorder[20] is other_qubit_handler
 
 
 if __name__ == "__main__":
