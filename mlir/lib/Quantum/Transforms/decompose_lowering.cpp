@@ -42,50 +42,27 @@ namespace quantum {
 #define GEN_PASS_DECL_DECOMPOSELOWERINGPASS
 #include "Quantum/Transforms/Passes.h.inc"
 
-namespace DecompositionUtils {
+namespace DecompUtils {
+
+static constexpr StringRef target_gate_attr_name = "target_gate";
+static constexpr StringRef decomp_gateset_attr_name = "decomp_gateset";
 
 // Check if a function is a decomposition function
 // It's expected that the decomposition function would have this attribute:
 // `catalyst.decomposition.target_op` And this attribute is set by the `markDecompositionAttributes`
 // functionq The decomposition attribute are used to determine if a function is a decomposition
 // function, and target_op is that the decomposition function want to replace
-bool isDecompositionFunction(func::FuncOp func)
+bool isDecompositionFunction(func::FuncOp func) { return func->hasAttr(target_gate_attr_name); }
+
+StringRef getTargetGateName(func::FuncOp func)
 {
-    return func->hasAttr("catalyst.decomposition.target_op");
-}
-
-// Update decomposition attributes if function name begins with <Gate>_rule
-// It's name sensitive, will not work if the function name is not following <Gate>_rule pattern
-void markDecompositionAttributes(func::FuncOp func, MLIRContext *context)
-{
-    StringRef funcName = func.getSymName();
-
-    // Check if function name follows <Gate>_rule pattern
-    size_t firstUnderscore = funcName.find('_');
-    if (firstUnderscore == StringRef::npos) {
-        return;
-    }
-
-    StringRef afterFirstUnderscore = funcName.substr(firstUnderscore + 1);
-    if ((afterFirstUnderscore.size() >= 4) && (afterFirstUnderscore.substr(0, 4) == "rule")) {
-        if (StringRef gateName = funcName.substr(0, firstUnderscore); !gateName.empty()) {
-            // Set the decomposition attributes
-            func->setAttr("catalyst.decomposition.target_op", StringAttr::get(context, gateName));
-            return;
-        }
-    }
-    return;
-}
-
-StringRef getTargetOp(func::FuncOp func)
-{
-    if (auto target_op_attr = func->getAttrOfType<StringAttr>("catalyst.decomposition.target_op")) {
+    if (auto target_op_attr = func->getAttrOfType<StringAttr>(target_gate_attr_name)) {
         return target_op_attr.getValue();
     }
     return StringRef{};
 }
 
-} // namespace DecompositionUtils
+} // namespace DecompUtils
 
 /// A module pass that work through a module, register all decomposition functions, and apply the
 /// decomposition patterns
@@ -111,14 +88,12 @@ struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLowering
                                            llvm::StringMap<func::FuncOp> &decompositionRegistry)
     {
         module.walk([&](func::FuncOp func) {
-            DecompositionUtils::markDecompositionAttributes(func, &getContext());
-            if (!DecompositionUtils::isDecompositionFunction(func)) {
-                return;
-            }
-
-            if (StringRef targetOp = DecompositionUtils::getTargetOp(func); !targetOp.empty()) {
+            if (StringRef targetOp = DecompUtils::getTargetGateName(func); !targetOp.empty()) {
+                llvm::outs() << "targetOp: " << targetOp << " is found\n";
                 decompositionRegistry[targetOp] = func;
             }
+            // No need to walk into the function body
+            return WalkResult::skip();
         });
     }
 
@@ -129,21 +104,24 @@ struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLowering
     // function with the `decomp_gateset` attribute
     void findTargetGateSet(ModuleOp module, llvm::StringSet<llvm::MallocAllocator> &targetGateSet)
     {
-        WalkResult walkResult = module.walk([&](func::FuncOp func) {
-            if (auto gate_set_attr = func->getAttrOfType<ArrayAttr>("decomp_gateset")) {
+        module.walk([&](func::FuncOp func) {
+            if (auto gate_set_attr =
+                    func->getAttrOfType<ArrayAttr>(DecompUtils::decomp_gateset_attr_name)) {
                 for (auto gate : gate_set_attr.getValue()) {
                     StringRef gate_name = cast<StringAttr>(gate).getValue();
                     targetGateSet.insert(gate_name);
                 }
                 return WalkResult::interrupt();
             }
+            // No need to walk into the function body
             return WalkResult::skip();
         });
-        if (!walkResult.wasInterrupted()) {
-        }
     }
 
-    // Remove unused decomposition functions
+    // Remove unused decomposition functions:
+    // Since the decomposition functions are marked as public from the frontend,
+    // there is no way to remove them with any DCE pass automatically.
+    // So we need to manually remove them from the module
     void removeDecompositionFunctions(ModuleOp module,
                                       llvm::StringMap<func::FuncOp> &decompositionRegistry)
     {
@@ -151,7 +129,7 @@ struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLowering
 
         module.walk([&](func::CallOp callOp) {
             if (auto targetFunc = module.lookupSymbol<func::FuncOp>(callOp.getCallee())) {
-                if (DecompositionUtils::isDecompositionFunction(targetFunc)) {
+                if (DecompUtils::isDecompositionFunction(targetFunc)) {
                     usedDecompositionFunctions.insert(targetFunc);
                 }
             }
@@ -159,7 +137,7 @@ struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLowering
 
         // remove unused decomposition functions
         module.walk([&](func::FuncOp func) {
-            if (DecompositionUtils::isDecompositionFunction(func) &&
+            if (DecompUtils::isDecompositionFunction(func) &&
                 !usedDecompositionFunctions.contains(func)) {
                 func.erase();
             }

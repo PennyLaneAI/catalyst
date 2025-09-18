@@ -43,7 +43,7 @@ module @two_hadamards {
 
   // Decomposition function should be applied and removed from the module
   // CHECK-NOT: func.func private @Hadamard_to_RY_decomp
-  func.func private @Hadamard_to_RY_decomp(%arg0: !quantum.bit) -> !quantum.bit attributes {catalyst.decomposition.target_op = "Hadamard", llvm.linkage = #llvm.linkage<internal>} {
+  func.func private @Hadamard_to_RY_decomp(%arg0: !quantum.bit) -> !quantum.bit attributes {target_gate = "Hadamard", llvm.linkage = #llvm.linkage<internal>} {
     %cst = arith.constant 3.1415926535897931 : f64
     %cst_0 = arith.constant 1.5707963267948966 : f64
     %out_qubits = quantum.custom "RZ"(%cst) %arg0 : !quantum.bit
@@ -75,7 +75,7 @@ module @single_hadamard {
 
   // Decomposition function should be applied and removed from the module
   // CHECK-NOT: func.func private @Hadamard_to_RY_decomp
-  func.func private @Hadamard_to_RY_decomp(%arg0: !quantum.bit) -> !quantum.bit attributes {catalyst.decomposition.target_op = "Hadamard", llvm.linkage = #llvm.linkage<internal>} {
+  func.func private @Hadamard_to_RY_decomp(%arg0: !quantum.bit) -> !quantum.bit attributes {target_gate = "Hadamard", llvm.linkage = #llvm.linkage<internal>} {
       %cst = arith.constant 3.1415926535897931 : f64
       %cst_0 = arith.constant 1.5707963267948966 : f64
       %out_qubits = quantum.custom "RZ"(%cst) %arg0 : !quantum.bit
@@ -114,14 +114,14 @@ module @recursive {
 
   // Decomposition function should be applied and removed from the module
   // CHECK-NOT: func.func private @Hadamard_to_RY_decomp
-  func.func private @Hadamard_to_RY_decomp(%arg0: !quantum.bit) -> !quantum.bit attributes {catalyst.decomposition.target_op = "Hadamard", llvm.linkage = #llvm.linkage<internal>} {
+  func.func private @Hadamard_to_RY_decomp(%arg0: !quantum.bit) -> !quantum.bit attributes {target_gate = "Hadamard", llvm.linkage = #llvm.linkage<internal>} {
     %out_qubits_0 = quantum.custom "RZRY"() %arg0 : !quantum.bit
     return %out_qubits_0 : !quantum.bit
   }
 
   // Decomposition function should be applied and removed from the module
   // CHECK-NOT: func.func private @RZRY_decomp
-  func.func private @RZRY_decomp(%arg0: !quantum.bit) -> !quantum.bit attributes {catalyst.decomposition.target_op = "RZRY", llvm.linkage = #llvm.linkage<internal>} {
+  func.func private @RZRY_decomp(%arg0: !quantum.bit) -> !quantum.bit attributes {target_gate = "RZRY", llvm.linkage = #llvm.linkage<internal>} {
     %cst = arith.constant 3.1415926535897931 : f64
     %cst_0 = arith.constant 1.5707963267948966 : f64
     %out_qubits_1 = quantum.custom "RZ"(%cst) %arg0 : !quantum.bit
@@ -160,14 +160,14 @@ module @recursive {
 
   // Decomposition function should be applied and removed from the module
   // CHECK-NOT: func.func private @Hadamard_to_RY_decomp
-  func.func private @Hadamard_to_RY_decomp(%arg0: !quantum.bit) -> !quantum.bit attributes {catalyst.decomposition.target_op = "Hadamard", llvm.linkage = #llvm.linkage<internal>} {
+  func.func private @Hadamard_to_RY_decomp(%arg0: !quantum.bit) -> !quantum.bit attributes {target_gate = "Hadamard", llvm.linkage = #llvm.linkage<internal>} {
     %out_qubits_0 = quantum.custom "RZRY"() %arg0 : !quantum.bit
     return %out_qubits_0 : !quantum.bit
   }
 
   // Decomposition function should be applied and removed from the module
   // CHECK-NOT: func.func private @RZRY_decomp
-  func.func private @RZRY_decomp(%arg0: !quantum.bit) -> !quantum.bit attributes {catalyst.decomposition.target_op = "RZRY", llvm.linkage = #llvm.linkage<internal>} {
+  func.func private @RZRY_decomp(%arg0: !quantum.bit) -> !quantum.bit attributes {target_gate = "RZRY", llvm.linkage = #llvm.linkage<internal>} {
     %cst = arith.constant 3.1415926535897931 : f64
     %cst_0 = arith.constant 1.5707963267948966 : f64
     %out_qubits_1 = quantum.custom "RZ"(%cst) %arg0 : !quantum.bit
@@ -211,7 +211,7 @@ module @param_rxry {
   // Decomposition function expects tensor<f64> while operation provides f64
   // CHECK-NOT: func.func private @ParametrizedRX_decomp
   func.func private @ParametrizedRXRY_decomp(%arg0: tensor<f64>, %arg1: !quantum.bit) -> !quantum.bit
-      attributes {catalyst.decomposition.target_op = "ParametrizedRXRY", llvm.linkage = #llvm.linkage<internal>} {
+      attributes {target_gate = "ParametrizedRXRY", llvm.linkage = #llvm.linkage<internal>} {
     %extracted = tensor.extract %arg0[] : tensor<f64>
     %out_qubits = quantum.custom "RX"(%extracted) %arg1 : !quantum.bit
     %extracted_0 = tensor.extract %arg0[] : tensor<f64>
@@ -257,7 +257,7 @@ module @param_rxry_2 {
   // Decomposition function expects tensor<f64> while operation provides f64
   // CHECK-NOT: func.func private @ParametrizedRX_decomp
   func.func private @ParametrizedRXRY_decomp(%arg0: tensor<f64>, %arg1: tensor<f64>, %arg2: !quantum.bit) -> !quantum.bit
-      attributes {catalyst.decomposition.target_op = "ParametrizedRXRY", llvm.linkage = #llvm.linkage<internal>} {
+      attributes {target_gate = "ParametrizedRXRY", llvm.linkage = #llvm.linkage<internal>} {
     %extracted_param_0 = tensor.extract %arg0[] : tensor<f64>
     %out_qubits = quantum.custom "RX"(%extracted_param_0) %arg2 : !quantum.bit
     %extracted_param_1 = tensor.extract %arg1[] : tensor<f64>
@@ -320,7 +320,8 @@ module @qreg_base_circuit {
 
     // Decomposition function should be applied and removed from the module
     // CHECK-NOT: func.func private @Test_rule_1
-    func.func private @Test_rule_1(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<1xi64>) -> !quantum.reg {
+    func.func private @Test_rule_1(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<1xi64>) -> !quantum.reg
+        attributes {target_gate = "Test", llvm.linkage = #llvm.linkage<internal>} {
       %cst = stablehlo.constant dense<0.000000e+00> : tensor<f64>
       %10 = quantum.extract %arg0[ 0] : !quantum.reg -> !quantum.bit
       %mres, %out_qubit = quantum.measure %10 : i1, !quantum.bit
@@ -353,7 +354,8 @@ module @qreg_base_circuit {
 
     // Decomposition function should be applied and removed from the module
     // CHECK-NOT: func.func private @RzDecomp_rule_1
-    func.func private @RzDecomp_rule_1(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<1xi64>) -> !quantum.reg {
+    func.func private @RzDecomp_rule_1(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<1xi64>) -> !quantum.reg
+        attributes {target_gate = "RzDecomp", llvm.linkage = #llvm.linkage<internal>} {
       %0 = stablehlo.slice %arg2 [0:1] : (tensor<1xi64>) -> tensor<1xi64>
       %1 = stablehlo.reshape %0 : (tensor<1xi64>) -> tensor<i64>
       %extracted = tensor.extract %1[] : tensor<i64>
@@ -412,7 +414,7 @@ module @multi_wire_cnot_decomposition {
 
   // Decomposition function should be applied and removed from the module
   // CHECK-NOT: func.func private @CNOT_rule_cz_rz_ry
-  func.func private @CNOT_rule_cz_rz_ry(%arg0: !quantum.reg, %arg1: tensor<2xi64>) -> !quantum.reg attributes {catalyst.decomposition.target_op = "CNOT", llvm.linkage = #llvm.linkage<internal>} {
+  func.func private @CNOT_rule_cz_rz_ry(%arg0: !quantum.reg, %arg1: tensor<2xi64>) -> !quantum.reg attributes {target_gate = "CNOT", llvm.linkage = #llvm.linkage<internal>} {
     // CNOT decomposition: CNOT = (I ⊗ H) * CZ * (I ⊗ H)
     %cst = arith.constant 1.5707963267948966 : f64
     %cst_0 = arith.constant 3.1415926535897931 : f64
@@ -487,7 +489,7 @@ module @cnot_alternative_decomposition {
 
   // Decomposition function should be applied and removed from the module
   // CHECK-NOT: func.func private @CNOT_rule_h_cnot_h
-  func.func private @CNOT_rule_h_cnot_h(%arg0: !quantum.bit, %arg1: !quantum.bit) -> (!quantum.bit, !quantum.bit) attributes {catalyst.decomposition.target_op = "CNOT", llvm.linkage = #llvm.linkage<internal>} {
+  func.func private @CNOT_rule_h_cnot_h(%arg0: !quantum.bit, %arg1: !quantum.bit) -> (!quantum.bit, !quantum.bit) attributes {target_gate = "CNOT", llvm.linkage = #llvm.linkage<internal>} {
     // CNOT decomposition: CNOT = (I ⊗ H) * CZ * (I ⊗ H)
     %cst = arith.constant 1.5707963267948966 : f64
     %cst_0 = arith.constant 3.1415926535897931 : f64

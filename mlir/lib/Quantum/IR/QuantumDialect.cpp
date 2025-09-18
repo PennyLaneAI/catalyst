@@ -34,7 +34,7 @@ namespace {
 struct QuantumInlinerInterface : public DialectInlinerInterface {
     using DialectInlinerInterface::DialectInlinerInterface;
 
-    static constexpr StringRef decompAttr = "catalyst.decomposition.target_op";
+    static constexpr StringRef decompAttr = "target_gate";
 
     /// Returns true if the given operation 'callable' can be inlined into the
     /// position given by the 'call'. Currently, we always inline quantum
