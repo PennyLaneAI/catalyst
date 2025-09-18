@@ -178,6 +178,10 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Fixes an issue with program capture and static argnums on the qnode. The lowering to MLIR is no longer cached
+  if there are static argnums.
+  [(#2053)](https://github.com/PennyLaneAI/catalyst/pull/2053)
+
 * Fix type promotion on conditional branches, where the return values from `cond` should be the promoted one.
   [(#1977)](https://github.com/PennyLaneAI/catalyst/pull/1977)
 
