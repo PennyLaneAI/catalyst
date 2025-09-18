@@ -970,7 +970,8 @@ int QuantumDriverMainFromCL(int argc, char **argv)
     cl::opt<bool> DumpPassPipeline("dump-catalyst-pipeline",
                                    cl::desc("Print the pipeline that will be run"), cl::init(false),
                                    cl::cat(CatalystCat));
-    cl::opt<bool> DumpModuleScope("dump-module-scope", cl::desc("Print the whole module in intermediate files"),
+    cl::opt<bool> DumpModuleScope("dump-module-scope",
+                                  cl::desc("Print the whole module in intermediate files"),
                                   cl::init(true), cl::cat(CatalystCat));
 
     // Create dialect registry
