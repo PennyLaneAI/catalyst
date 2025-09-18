@@ -1668,11 +1668,11 @@ def test_different_static_argnums():
 
     qml.capture.enable()
 
-    @qml.qnode(qml.device('lightning.qubit', wires=1), static_argnums=1)
+    @qml.qnode(qml.device("lightning.qubit", wires=1), static_argnums=1)
     def c(x, pauli):
-        if pauli=="X":
+        if pauli == "X":
             qml.RX(x, 0)
-        elif pauli=="Y":
+        elif pauli == "Y":
             qml.RY(x, 0)
         else:
             qml.RZ(x, 0)
@@ -1684,8 +1684,8 @@ def test_different_static_argnums():
 
     resx, resy, resz = w(0.5)
 
-    a = jnp.cos(0.5/2)
-    b = jnp.sin(0.5/2)
-    assert qml.math.allclose(resx, jnp.array([a, -b*1j]))
+    a = jnp.cos(0.5 / 2)
+    b = jnp.sin(0.5 / 2)
+    assert qml.math.allclose(resx, jnp.array([a, -b * 1j]))
     assert qml.math.allclose(resy, jnp.array([a, b]))
-    assert qml.math.allclose(resz, jnp.array([a-b*1j, 0]))
+    assert qml.math.allclose(resz, jnp.array([a - b * 1j, 0]))
