@@ -15,6 +15,7 @@
 // RUN: quantum-opt --pass-pipeline="builtin.module(decompose-non-clifford-ppr{decompose-method=clifford-corrected})" --split-input-file -verify-diagnostics %s | FileCheck %s --check-prefix=CHECK-INJECT
 // RUN: quantum-opt --pass-pipeline="builtin.module(decompose-non-clifford-ppr{decompose-method=auto-corrected})" --split-input-file -verify-diagnostics %s | FileCheck %s --check-prefix=CHECK-AUTO
 // RUN: quantum-opt --pass-pipeline="builtin.module(decompose-non-clifford-ppr{decompose-method=pauli-corrected})" --split-input-file -verify-diagnostics %s | FileCheck %s --check-prefix=CHECK-PAULI
+// RUN: quantum-opt --pass-pipeline="builtin.module(decompose-non-clifford-ppr{decompose-method=pauli-corrected avoid-y-measure=true})" --split-input-file -verify-diagnostics %s | FileCheck %s --check-prefix=CHECK-PAULI-AVOID-Y
 
 func.func @test_ppr_to_ppm(%q1 : !quantum.bit) {
     %0 = qec.ppr ["Z"](8) %q1 : !quantum.bit
@@ -100,6 +101,26 @@ func.func @test_ppr_to_ppm(%q1 : !quantum.bit) {
 // // PPR[Z](2) on Q if cond(m1) is true
 // CHECK-PAULI: [[q0_1:%.+]]  = qec.ppr ["Z"](2) [[out_0]]#0 cond([[m_1]]) : !quantum.bit
 
+// Decompose via the pauli-corrected method but avoids Y measurements
+// CHECK-PAULI-AVOID-Y: [[magic:%.+]] = qec.fabricate  magic
+// CHECK-PAULI-AVOID-Y: [[m_0:%.+]], [[out_0:%.+]]:2 = qec.ppm ["Z", "Z"] %arg0, [[magic]] : !quantum.bit, !quantum.bit
+// CHECK-PAULI-AVOID-Y: [[q_0:%.+]] = scf.if [[m_0]] -> (!quantum.bit) {
+// // Decompose Y measurement on |m⟩ when ZZ measurement returns true
+// CHECK-PAULI-AVOID-Y:   [[plus_i:%.+]]  = qec.fabricate  plus_i : !quantum.bit
+// CHECK-PAULI-AVOID-Y:   [[m_1:%.+]], [[out_1:%.+]]:2 = qec.ppm ["Z", "Z"] [[out_0]]#1, [[plus_i]] : !quantum.bit, !quantum.bit
+// CHECK-PAULI-AVOID-Y:   [[m_2:%.+]], [[out_2:%.+]]:2 = qec.ppm ["X", "X"] [[out_1]]#0, [[out_1]]#1 : !quantum.bit, !quantum.bit
+// CHECK-PAULI-AVOID-Y:   [[q_1:%.+]] = qec.ppr ["Z"](2) [[out_0]]#0 cond([[m_2]]) : !quantum.bit
+// CHECK-PAULI-AVOID-Y:   quantum.dealloc_qb [[out_0]]#1 : !quantum.bit
+// CHECK-PAULI-AVOID-Y:   quantum.dealloc_qb [[plus_i]] : !quantum.bit
+// CHECK-PAULI-AVOID-Y:   scf.yield [[q_1]] : !quantum.bit
+// CHECK-PAULI-AVOID-Y: } else {
+// // Use the usual X measurement on |m⟩ when ZZ measurement returns false
+// CHECK-PAULI-AVOID-Y:   [[m_3:%.+]], [[out_3:%.+]] = qec.ppm ["X"] [[out_0]]#1 : !quantum.bit
+// CHECK-PAULI-AVOID-Y:   [[q_2:%.+]] = qec.ppr ["Z"](2) [[out_0]]#0 cond([[m_3]]) : !quantum.bit
+// CHECK-PAULI-AVOID-Y:   quantum.dealloc_qb [[out_3]] : !quantum.bit
+// CHECK-PAULI-AVOID-Y:   scf.yield [[q_2]] : !quantum.bit
+// CHECK-PAULI-AVOID-Y: }
+
 // -----
 
 // Check if the PPR is negative. If so, it will prepare conjugate magic state
@@ -110,6 +131,7 @@ func.func @test_ppr_to_ppm_1(%q1 : !quantum.bit) {
     // CHECK-INJECT: qec.fabricate  magic_conj
     // CHECK-AUTO: qec.fabricate  magic_conj
     // CHECK-PAULI: qec.fabricate  magic
+    // CHECK-PAULI-AVOID-Y: qec.fabricate  magic
 }
 
 // -----
@@ -142,6 +164,23 @@ func.func @test_ppr_to_ppm_2(%q1 : !quantum.bit, %q2 : !quantum.bit, %q3 : !quan
     // CHECK-PAULI: qec.ppm ["X", "Y", "Z", "Y", "Z"]
     // CHECK-PAULI: qec.select.ppm([[m_0]], ["Y"], ["X"])
     // CHECK-PAULI: qec.ppr ["X", "Y", "Z", "Y"](2) {{.*}} cond({{.*}})
+
+    // // P = ["X", "Y", "Z", "Y"]
+    // // PPM P⊗Z on Q and |m⟩   => m0
+    // CHECK-PAULI-AVOID-Y: qec.ppm ["X", "Y", "Z", "Y", "Z"]
+    // CHECK-PAULI-AVOID-Y: scf.if
+    // CHECK-PAULI-AVOID-Y: qec.fabricate  plus_i
+    // CHECK-PAULI-AVOID-Y: qec.ppm ["Z", "Z"]
+    // CHECK-PAULI-AVOID-Y: qec.ppm ["X", "X"]
+    // CHECK-PAULI-AVOID-Y: qec.ppr ["X", "Y", "Z", "Y"](2) {{.*}} {{.*}} {{.*}} {{.*}} cond({{.*}})
+    // CHECK-PAULI-AVOID-Y: quantum.dealloc_qb {{.*}}
+    // CHECK-PAULI-AVOID-Y: quantum.dealloc_qb {{.*}}
+    // CHECK-PAULI-AVOID-Y: scf.yield {{.*}} {{.*}} {{.*}} {{.*}}
+    // CHECK-PAULI-AVOID-Y: else
+    // CHECK-PAULI-AVOID-Y: qec.ppm ["X"]
+    // CHECK-PAULI-AVOID-Y: qec.ppr ["X", "Y", "Z", "Y"](2) {{.*}} {{.*}} {{.*}} {{.*}} cond({{.*}})
+    // CHECK-PAULI-AVOID-Y: quantum.dealloc_qb {{.*}}
+    // CHECK-PAULI-AVOID-Y: scf.yield {{.*}} {{.*}} {{.*}} {{.*}}
 }
 
 // -----

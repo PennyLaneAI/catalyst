@@ -394,6 +394,7 @@ def merge_rotations(qnode):
     return PassPipelineWrapper(qnode, "merge-rotations")
 
 
+# pragma: no cover
 def decompose_lowering(qnode):
     """
     Specify that the ``-decompose-lowering`` MLIR compiler pass
@@ -825,7 +826,7 @@ def ppr_to_ppm(qnode=None, *, decompose_method="pauli-corrected", avoid_y_measur
         avoid_y_measure (bool): Rather than performing a Pauli-Y measurement for Clifford rotations
             (sometimes more costly), a :math:`Y` state (:math:`Y\vert 0 \rangle`) is used instead
             (requires :math:`Y` state preparation).
-            This is currently only supported when using the ``"clifford-corrected"`` decomposition method.
+            This is currently only supported when using the ``"clifford-corrected"`` and `"pauli-corrected"` decomposition method.
             Defaults to ``False``.
 
     Returns:
@@ -1079,7 +1080,9 @@ def ppm_specs(fn):
 
         # add ppm-spec pass at the end to existing pipeline
         _, pass_list = new_options.pipelines[0]  # first pipeline runs the user passes
-        pass_list.append("ppm-specs")
+        # check if ppm-specs is already in the pass list
+        if "ppm-specs" not in pass_list:  # pragma: nocover
+            pass_list.append("ppm-specs")
 
         new_options = _options_to_cli_flags(new_options)
         raw_result = _quantum_opt(*new_options, [], stdin=str(fn.mlir_module))
@@ -1091,7 +1094,7 @@ def ppm_specs(fn):
         except Exception as e:  # pragma: nocover
             raise CompileError(
                 "Invalid json format encountered in ppm_specs. "
-                f" but got {raw_result[: raw_result.index('module')]}"
+                f"Expected valid JSON but got {raw_result[: raw_result.index('module')]}"
             ) from e
 
     else:

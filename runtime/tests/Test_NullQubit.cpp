@@ -147,6 +147,16 @@ TEST_CASE("Test NullQubit qubit allocation is successful.", "[NullQubit]")
     sim->AllocateQubit();
 }
 
+TEST_CASE("Test ReleaseQubits", "[NullQubit]")
+{
+    std::unique_ptr<NullQubit> sim = std::make_unique<NullQubit>();
+    auto qubits = sim->AllocateQubits(3);
+    CHECK(sim->GetNumQubits() == 3);
+    std::vector<QubitIdType> qubits_to_release = {qubits[0], qubits[2]};
+    sim->ReleaseQubits(qubits_to_release);
+    CHECK(sim->GetNumQubits() == 1);
+}
+
 TEST_CASE("Test a NullQubit circuit with num_qubits=2 ", "[NullQubit]")
 {
     std::unique_ptr<NullQubit> sim = std::make_unique<NullQubit>();
@@ -993,7 +1003,7 @@ TEST_CASE("Test NullQubit device resource tracking", "[NullQubit]")
     }
 
     // Check that releasing resets
-    sim->ReleaseAllQubits();
+    sim->ReleaseQubits(Qs);
     std::remove(RESOURCES_FNAME); // Remove the file automatically created by the device
 
     CHECK(sim->ResourcesGetNumGates() == 0);
@@ -1006,7 +1016,8 @@ TEST_CASE("Test resource tracking filename", "[NullQubit]")
     // Check automatic filename creation
     std::unique_ptr<NullQubit> dummy = std::make_unique<NullQubit>("{'track_resources':True}");
     CHECK(dummy->IsTrackingResources() == true);
-    dummy->ReleaseAllQubits();
+    std::vector<QubitIdType> Qs = dummy->AllocateQubits(1);
+    dummy->ReleaseQubits(Qs);
 
     const std::string dummy_resources_fname = dummy->ResourcesGetFilename();
 

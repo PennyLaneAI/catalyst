@@ -56,7 +56,7 @@ TEST_CASE("Test the bell pair circuit", "[openqasm]")
 
     CHECK(device->Circuit() == toqasm);
 
-    device->ReleaseAllQubits();
+    device->ReleaseQubits(wires);
     auto wiresnew = device->AllocateQubits(4);
     device->NamedOperation("CNOT", {}, {wiresnew[2], wiresnew[3]}, false);
     device->NamedOperation("Hadamard", {}, {wiresnew[2]}, false);
