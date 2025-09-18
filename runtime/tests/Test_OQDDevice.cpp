@@ -51,7 +51,7 @@ TEST_CASE("Test the OQDDevice qubit allocation and release", "[oqd]")
     CHECK(allocaedQubits[1] == 1);
     CHECK(allocaedQubits[2] == 2);
 
-    device.ReleaseAllQubits();
+    device.ReleaseQubits(allocaedQubits);
     CHECK(device.getIonSpecs() == "");
     CHECK(device.getPhononSpecs().empty());
 
