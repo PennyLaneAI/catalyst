@@ -139,16 +139,17 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     }
 
     /**
-     * @brief Releases all allocated qubits and optionally writes resource tracking data
+     * @brief Releases qubits and optionally writes resource tracking data
      *
-     * Resets the qubit counter to zero, releases all qubits through the qubit manager,
+     * Releases the specified qubits through the qubit manager,
      * and if resource tracking is enabled, writes the collected resource data to file.
      */
-    void ReleaseAllQubits()
+    void ReleaseQubits(const std::vector<QubitIdType> &qubits)
     {
-        num_qubits_ = 0;
-        this->qubit_manager.ReleaseAll();
-        if (this->track_resources_) {
+        for (auto q : qubits) {
+            this->ReleaseQubit(q);
+        }
+        if ((num_qubits_ == 0) && (this->track_resources_)) {
             this->resource_tracker_.WriteOut();
         }
     }

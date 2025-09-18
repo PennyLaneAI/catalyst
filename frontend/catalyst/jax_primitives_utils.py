@@ -150,6 +150,8 @@ def get_or_create_qnode_funcop(ctx, callable_, call_jaxpr, pipeline, context):
     """
     if context is None:
         context = tuple()
+    if callable_.static_argnums:
+        return lower_qnode_to_funcop(ctx, callable_, call_jaxpr, pipeline)
     key = (callable_, *context, *pipeline)
     if func_op := get_cached(ctx, key):
         return func_op

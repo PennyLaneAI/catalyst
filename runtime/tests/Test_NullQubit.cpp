@@ -146,6 +146,16 @@ TEST_CASE("Test NullQubit qubit allocation is successful.", "[NullQubit]")
     sim->AllocateQubit();
 }
 
+TEST_CASE("Test ReleaseQubits", "[NullQubit]")
+{
+    std::unique_ptr<NullQubit> sim = std::make_unique<NullQubit>();
+    auto qubits = sim->AllocateQubits(3);
+    CHECK(sim->GetNumQubits() == 3);
+    std::vector<QubitIdType> qubits_to_release = {qubits[0], qubits[2]};
+    sim->ReleaseQubits(qubits_to_release);
+    CHECK(sim->GetNumQubits() == 1);
+}
+
 TEST_CASE("Test a NullQubit circuit with num_qubits=2 ", "[NullQubit]")
 {
     std::unique_ptr<NullQubit> sim = std::make_unique<NullQubit>();
