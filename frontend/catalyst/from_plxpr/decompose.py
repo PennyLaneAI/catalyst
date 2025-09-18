@@ -64,7 +64,7 @@ class GraphSolutionInterpreter(qml.capture.PlxprInterpreter):
     # A mapping from operation names to the number of wires they act on.
     # This is used when the operation is not in the captured operations
     # but we still need to create a decomposition rule for it.
-    COMPILER_OPERATIONS_NUM_WIRES: dict[str, int] = {
+    compiler_ops_num_wires: dict[str, int] = {
         "CNOT": 2,
         "ControlledPhaseShift": 2,
         "CRot": 2,
@@ -81,7 +81,11 @@ class GraphSolutionInterpreter(qml.capture.PlxprInterpreter):
         "IsingYY": 2,
         "IsingZZ": 2,
         "SingleExcitation": 2,
+        "SingleExcitationPlus": 2,
+        "SingleExcitationMinus": 2,
         "DoubleExcitation": 4,
+        "DoubleExcitationPlus": 4,
+        "DoubleExcitationMinus": 4,
         "ISWAP": 2,
         "PauliX": 1,
         "PauliY": 1,
@@ -99,6 +103,8 @@ class GraphSolutionInterpreter(qml.capture.PlxprInterpreter):
         "U1": 1,
         "U2": 1,
         "U3": 1,
+        "MultiRZ": -1,  # variable number of wires
+        "GlobalPhase": -1,  # variable number of wires
     }
 
     def __init__(
@@ -123,6 +129,29 @@ class GraphSolutionInterpreter(qml.capture.PlxprInterpreter):
         self._operations = set()
         self._decomp_graph_solution = {}
 
+    def update_operations(self, operations):
+        """Update the set of captured operations.
+
+        Args:
+            operations (set): a set of pennylane operator instances
+        """
+        for op in operations:
+            # TODO: Although we deal with those ops not in compiler_ops_num_wires in the
+            # compiler-specific decomposition step, we should ideally have a way to specify
+            # the list of ops in the structured rule and their corresponding number of wires
+            # to solve the graph for them.
+            if op.name in self.compiler_ops_num_wires.keys():
+                self._operations.add(op)
+            else:
+                try:
+                    with qml.capture.pause():
+                        ops = op.decomposition()
+                        self.update_operations(ops)
+                except:  # pylint: disable=bare-except
+                    # the compiler-specific decomposition step will handle those ops
+                    # that we can't decompose here; also related to the TODO above.
+                    pass  # do nothing if we can't decompose it to the list of ops.
+
     def interpret_operation(self, op: "qml.operation.Operator"):
         """Interpret a PennyLane operation instance.
 
@@ -142,7 +171,7 @@ class GraphSolutionInterpreter(qml.capture.PlxprInterpreter):
 
         """
 
-        self._operations.add(op)
+        self.update_operations({op})
         data, struct = jax.tree_util.tree_flatten(op)
         return jax.tree_util.tree_unflatten(struct, data)
 
@@ -186,14 +215,14 @@ class GraphSolutionInterpreter(qml.capture.PlxprInterpreter):
                     self._create_decomposition_rule(
                         rule, op_name=op.op.name, num_wires=len(o.wires)
                     )
-                elif op.op.name in self.COMPILER_OPERATIONS_NUM_WIRES:
+                elif op.op.name in self.compiler_ops_num_wires:
                     # In this part, we need to handle the case where an operation in
                     # the decomposition graph solution is not in the captured operations.
                     # This can happen if the operation is not directly called
                     # in the circuit, but is used inside a decomposition rule.
-                    # In this case, we fall back to using the COMPILER_OPERATIONS_NUM_WIRES
+                    # In this case, we fall back to using the compiler_ops_num_wires
                     # dictionary to get the number of wires.
-                    num_wires = self.COMPILER_OPERATIONS_NUM_WIRES[op.op.name]
+                    num_wires = self.compiler_ops_num_wires[op.op.name]
                     self._create_decomposition_rule(rule, op_name=op.op.name, num_wires=num_wires)
                 else:  # pragma: no cover
                     raise ValueError(f"Could not capture {op} without the number of wires.")
