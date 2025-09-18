@@ -704,7 +704,7 @@ def merge_ppr_ppm(qnode=None, *, max_pauli_size=0):
 
     .. see-also::
 
-        For more information on PPRs, check out
+        For more information on PPRs and PPMs, check out
         the `Compilation Hub <https://pennylane.ai/compilation/pauli-product-measurement>`_.
 
     Args:
