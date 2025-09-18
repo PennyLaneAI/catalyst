@@ -6,8 +6,6 @@
   `qml.deallocate()` when program capture is enabled.
   [(#2002)](https://github.com/PennyLaneAI/catalyst/pull/2002)
 
-  - shapr bits: 1.capacity, 2. multiple reg for region
-
   Two new functions, `qml.allocate()` and `qml.deallocate()`, [have been added to
   PennyLane](I want to put a link to core PL here, but I'm not sure which one... probably the documentation page?) to support
   dynamic qubit allocation on devices that support it. Currently,
