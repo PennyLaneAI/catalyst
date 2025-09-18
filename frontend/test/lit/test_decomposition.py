@@ -745,9 +745,9 @@ def test_decomposition_rule_name_update():
         qml.PauliY(wires=2)
         return qml.expval(qml.Z(0))
 
-    # CHECK-DAG: func.func public @Rot_rule_rz_ry_rz_wires_1(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<f64>, %arg3: tensor<f64>, %arg4: tensor<1xi64>) -> !quantum.reg
-    # CHECK-DAG: func.func public @RY_rule_rz_rx_wires_1(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<1xi64>) -> !quantum.reg
-    # CHECK-DAG: func.func public @PauliY_rule_ry_gp_wires_1(%arg0: !quantum.reg, %arg1: tensor<1xi64>) -> !quantum.reg
+    # CHECK-DAG: func.func public @rz_ry_rz(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<f64>, %arg3: tensor<f64>, %arg4: tensor<1xi64>) -> !quantum.reg
+    # CHECK-DAG: func.func public @rz_rx(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<1xi64>) -> !quantum.reg
+    # CHECK-DAG: func.func public @ry_gp(%arg0: !quantum.reg, %arg1: tensor<1xi64>) -> !quantum.reg
     print(circuit_14.mlir)
 
     qml.decomposition.disable_graph()
@@ -778,16 +778,16 @@ def test_decomposition_rule_name_update_multi_qubits():
         qml.DoubleExcitation(0.5, wires=[0, 1, 2, 3])
         return qml.expval(qml.Z(0))
 
-    # CHECK-DAG: func.func public @SingleExcitationPlus_rule_single_excitation_plus_decomp_wires_2(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<2xi64>) -> !quantum.reg
-    # CHECK-DAG: func.func public @CY_rule_cy_wires_2(%arg0: !quantum.reg, %arg1: tensor<2xi64>) -> !quantum.reg
-    # CHECK-DAG: func.func public @CRY_rule_cry_wires_2(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<2xi64>) -> !quantum.reg
-    # CHECK-DAG: func.func public @S_rule_s_phaseshift_wires_1(%arg0: !quantum.reg, %arg1: tensor<1xi64>) -> !quantum.reg
-    # CHECK-DAG: func.func public @PhaseShift_rule_phaseshift_to_rz_gp_wires_1(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<1xi64>) -> !quantum.reg
-    # CHECK-DAG: func.func public @RZ_rule_rz_to_ry_rx_wires_1(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<1xi64>) -> !quantum.reg
-    # CHECK-DAG: func.func public @Rot_rule_rot_to_rz_ry_rz_wires_1(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<f64>, %arg3: tensor<f64>, %arg4: tensor<1xi64>) -> !quantum.reg
-    # CHECK-DAG: func.func public @DoubleExcitation_rule_doublexcit_wires_4(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<4xi64>) -> !quantum.reg
-    # CHECK-DAG: func.func public @SingleExcitationMinus_rule_single_excitation_minus_decomp_wires_2(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<2xi64>) -> !quantum.reg
-    # CHECK-DAG: func.func public @SingleExcitation_rule_single_excitation_decomp_wires_2(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<2xi64>) -> !quantum.reg
+    # CHECK-DAG: func.func public @_single_excitation_plus_decomp(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<2xi64>) -> !quantum.reg
+    # CHECK-DAG: func.func public @_cy(%arg0: !quantum.reg, %arg1: tensor<2xi64>) -> !quantum.reg
+    # CHECK-DAG: func.func public @_cry(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<2xi64>) -> !quantum.reg
+    # CHECK-DAG: func.func public @_s_phaseshift(%arg0: !quantum.reg, %arg1: tensor<1xi64>) -> !quantum.reg
+    # CHECK-DAG: func.func public @_phaseshift_to_rz_gp(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<1xi64>) -> !quantum.reg
+    # CHECK-DAG: func.func public @_rz_to_ry_rx(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<1xi64>) -> !quantum.reg
+    # CHECK-DAG: func.func public @_rot_to_rz_ry_rz(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<f64>, %arg3: tensor<f64>, %arg4: tensor<1xi64>) -> !quantum.reg
+    # CHECK-DAG: func.func public @_doublexcit(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<4xi64>) -> !quantum.reg
+    # CHECK-DAG: func.func public @_single_excitation_minus_decomp(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<2xi64>) -> !quantum.reg
+    # CHECK-DAG: func.func public @_single_excitation_decomp(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<2xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 2 : i64, target_gate = "SingleExcitation"}
     print(circuit_15.mlir)
 
     qml.decomposition.disable_graph()
@@ -821,9 +821,9 @@ def test_decomposition_rule_name_adjoint():
         qml.adjoint(qml.SingleExcitation)(0.1, wires=[0, 1])
         return qml.expval(qml.Z(0))
 
-    # CHECK-DAG: func.func public @CNOT_rule_cnot_to_cz_h_wires_2(%arg0: !quantum.reg, %arg1: tensor<2xi64>) -> !quantum.reg
-    # CHECK-DAG: func.func public @Hadamard_rule_hadamard_to_rz_ry_wires_1(%arg0: !quantum.reg, %arg1: tensor<1xi64>) -> !quantum.reg
-    # CHECK-DAG: func.func public @SingleExcitation_rule_SingleExcitation_rule_single_excitation_decomp_wires_2_wires_2(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<2xi64>) -> !quantum.reg
+    # CHECK-DAG: func.func public @_cnot_to_cz_h(%arg0: !quantum.reg, %arg1: tensor<2xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 2 : i64, target_gate = "CNOT"}
+    # CHECK-DAG: func.func public @_hadamard_to_rz_ry(%arg0: !quantum.reg, %arg1: tensor<1xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "Hadamard"}
+    # CHECK-DAG: func.func public @_single_excitation_decomp(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<2xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 2 : i64, target_gate = "SingleExcitation"}
     print(circuit_16.mlir)
 
     qml.decomposition.disable_graph()
@@ -852,7 +852,7 @@ def test_decomposition_rule_name_ctrl():
         qml.ctrl(qml.PauliX, control=0)(1)
         return qml.expval(qml.Z(0))
 
-    # CHECK-DAG: func.func public @RY_rule_ry_to_rz_rx_wires_1(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<1xi64>) -> !quantum.reg
+    # CHECK-DAG: func.func public @_ry_to_rz_rx(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<1xi64>) -> !quantum.reg
     print(circuit_17.mlir)
 
     qml.decomposition.disable_graph()

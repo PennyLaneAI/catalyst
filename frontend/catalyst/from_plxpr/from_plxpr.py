@@ -45,9 +45,7 @@ from pennylane.transforms import unitary_to_rot as pl_unitary_to_rot
 
 from catalyst.device import extract_backend_info
 from catalyst.device.qjit_device import COMPILER_OPERATIONS
-from catalyst.from_plxpr.decompose import (
-    GraphSolutionInterpreter,
-)
+from catalyst.from_plxpr.decompose import GraphSolutionInterpreter
 from catalyst.from_plxpr.qubit_handler import QubitHandler
 from catalyst.jax_extras import jaxpr_pad_consts, make_jaxpr2, transient_jax_config
 from catalyst.jax_primitives import (
@@ -265,9 +263,14 @@ def apply_compiler_decompose_to_plxpr(inner_jaxpr, consts, tgatesets, ncargs):
     """Apply the compiler-specific decomposition for a given JAXPR."""
 
     # disable the graph decomposition optimization
-    is_graph = qml.decomposition.enabled_graph()
-    if is_graph:
-        qml.decomposition.disable_graph()
+    # Why? Because for the compiler-specific decomposition we want to
+    # only decompose higher-level gates and templates that only have
+    # a single decomposition, and not do any further optimization
+    # based on the graph solution.
+    # Besides, the graph-based decomposition is not supported
+    # yet in from_plxpr for most gates and templates.
+    # TODO: Enable the graph-based decomposition
+    qml.decomposition.disable_graph()
 
     # First perform the pre-mlir decomposition to simplify the jaxpr
     # by decomposing high-level gates and templates
@@ -277,8 +280,7 @@ def apply_compiler_decompose_to_plxpr(inner_jaxpr, consts, tgatesets, ncargs):
         inner_jaxpr, consts, (), {"gate_set": gate_set}, *ncargs
     )
 
-    if is_graph:
-        qml.decomposition.enable_graph()
+    qml.decomposition.enable_graph()
 
     return final_jaxpr
 
