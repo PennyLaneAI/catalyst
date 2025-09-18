@@ -34,6 +34,7 @@ from catalyst.compiler import get_lib_path
 from catalyst.device import QJITDevice, get_device_capabilities
 from catalyst.device.decomposition import measurements_from_counts, measurements_from_samples
 from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
+from catalyst.utils.exceptions import CompileError
 
 # pylint: disable=attribute-defined-outside-init
 
@@ -939,3 +940,28 @@ class TestTransform:
         assert len(counts) == 2
         assert counts[0].shape == (8,)
         assert counts[1].shape == (8,)
+
+    @pytest.mark.parametrize(
+        "transform_measurement", (measurements_from_samples, measurements_from_counts)
+    )
+    @pytest.mark.parametrize("mcm_method", ("one-shot", "single-branch-statistics"))
+    def test_measurements_transform(self, mcm_method, transform_measurement):
+        """Test raise an error when measurements_from_samples is used with one-shot."""
+        device = qml.device("lightning.qubit", wires=2)
+
+        @partial(transform_measurement, device_wires=device.wires)
+        @qml.set_shots(1000)
+        @qml.qnode(device=device, mcm_method=mcm_method)
+        def circuit():
+            qml.X(0)
+            qml.X(1)
+            return (qml.expval(qml.PauliX(wires=0) @ qml.PauliX(wires=1)),)
+
+        if mcm_method == "one-shot":
+            with pytest.raises(
+                CompileError,
+                match=f"{transform_measurement.__name__} is not supported with one-shot",
+            ):
+                qjit(circuit)()
+        else:
+            qjit(circuit)()

@@ -97,7 +97,32 @@ class TestSample:
         observed = sample_2qbits(np.pi)
         assert np.array_equal(observed, expected)
 
+    @pytest.mark.parametrize("mcm_method", ["single-branch-statistics", "one-shot"])
+    def test_sample_on_empty_wires(self, mcm_method):
+        """Test sample on dynamic wires."""
 
+        # Devices must specify wires for integration with program capture
+        # Since this test is used to test dynamic wires, we skip it if capture is enabled
+        if qml.capture.enabled():
+            return
+
+        @qml.set_shots(10)
+        @qml.qnode(qml.device("lightning.qubit"), mcm_method=mcm_method)
+        def sample_dynamic_wires():
+            qml.Hadamard(wires=1)
+            return qml.sample()
+
+        if mcm_method == "one-shot":
+            with pytest.raises(
+                NotImplementedError,
+                match="Measurement SampleMP with empty wires is not supported with dynamic wires",
+            ):
+                qjit(sample_dynamic_wires)()
+        else:
+            qjit(sample_dynamic_wires)()
+
+
+@pytest.mark.usefixtures("use_both_frontend")
 class TestCounts:
     """Test counts."""
 
@@ -191,6 +216,33 @@ class TestCounts:
         expected = {"00": 0, "01": 0, "10": 0, "11": 1000}
         observed = counts_2qbit(np.pi)
         assert np.array_equal(observed, expected)
+
+    @pytest.mark.parametrize("mcm_method", ["single-branch-statistics", "one-shot"])
+    def test_counts_on_empty_wires(self, mcm_method):
+        """Test counts on dynamic wires."""
+
+        @qml.set_shots(10)
+        @qml.qnode(qml.device("lightning.qubit"), mcm_method=mcm_method)
+        def counts_dynamic_wires():
+            qml.Hadamard(wires=1)
+            return qml.counts()
+
+        if qml.capture.enabled():
+            with pytest.raises(
+                NotImplementedError,
+                match="devices must specify wires for integration with program capture",
+            ):
+                qjit(counts_dynamic_wires)()
+        else:
+            if mcm_method == "one-shot":
+                with pytest.raises(
+                    NotImplementedError,
+                    match="Measurement CountsMP with empty wires is not supported with dynamic "
+                    "wires",
+                ):
+                    qjit(counts_dynamic_wires)()
+            else:
+                qjit(counts_dynamic_wires)()
 
 
 @pytest.mark.usefixtures("use_both_frontend")
