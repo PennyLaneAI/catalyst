@@ -84,7 +84,8 @@ class CompileOptions:
             - ``False`` or ``0`` or ``"none"`` (default): No intermediate files are kept.
             - ``True`` or ``1`` or ``"pipeline"``: Intermediate files are saved after each pipeline.
             - ``2`` or ``"pass"``: Intermediate files are saved after each pass.
-        use_nameloc (Optional[bool]): If ``True``, add function parameter names to the IR as name locations.
+        use_nameloc (Optional[bool]): If ``True``, add function parameter names to the IR as name
+            locations.
         pipelines (Optional[List[Tuple[str,List[str]]]]): A list of tuples. The first entry of the
             tuple corresponds to the name of a pipeline. The second entry of the tuple corresponds
             to a list of MLIR passes.

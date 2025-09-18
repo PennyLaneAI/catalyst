@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Unit tests for get_arg_names function."""
+
 import jax.numpy as jnp
 import pennylane as qml
 from catalyst import qjit

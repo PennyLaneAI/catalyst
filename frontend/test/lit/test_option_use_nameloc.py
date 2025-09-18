@@ -23,6 +23,9 @@ from utils import print_mlir
 # CHECK-LABEL: @jit_f
 @qjit(use_nameloc=True)
 def f(x: float, y: float):
+    """Check that MLIR module contains name location information, and MLIR code uses that name
+    location information.
+    """
     # CHECK: %x: tensor<f64>, %y: tensor<f64>
     return x * y
 

@@ -123,7 +123,8 @@ def qjit(
             - :attr:`~.QJIT.mlir`: MLIR representation after canonicalization
             - :attr:`~.QJIT.mlir_opt`: MLIR representation after optimization
             - :attr:`~.QJIT.qir`: QIR in LLVM IR form
-        use_nameloc (bool): If ``True``, function parameter names are added to the IR as name locations.
+        use_nameloc (bool): If ``True``, function parameter names are added to the IR as name
+            locations.
         verbose (bool): If ``True``, the tools and flags used by Catalyst behind the scenes are
             printed out.
         logfile (Optional[TextIOWrapper]): File object to write verbose messages to (default -
@@ -520,7 +521,6 @@ class QJIT(CatalystCallable):
     :ivar jaxpr: This attribute stores the Jaxpr compiled from the function as a string.
     :ivar mlir: This attribute stores the MLIR compiled from the function as a string.
     :ivar qir: This attribute stores the QIR in LLVM IR form compiled from the function as a string.
-
     """
 
     @debug_logger_init
@@ -570,11 +570,10 @@ class QJIT(CatalystCallable):
         if not self.mlir_module:
             return None
 
-        stdin = (
-            self.mlir_module.operation.get_asm(enable_debug_info=True)
-            if self.compile_options.use_nameloc
-            else str(self.mlir_module)
-        )
+        if self.compile_options.use_nameloc:
+            stdin = self.mlir_module.operation.get_asm(enable_debug_info=True)
+        else:
+            stdin = str(self.mlir_module)
         return canonicalize(stdin=stdin, options=self.compile_options)
 
     @property
@@ -583,11 +582,10 @@ class QJIT(CatalystCallable):
         if not self.mlir_module:
             return None
 
-        stdin = (
-            self.mlir_module.operation.get_asm(enable_debug_info=True)
-            if self.compile_options.use_nameloc
-            else str(self.mlir_module)
-        )
+        if self.compile_options.use_nameloc:
+            stdin = self.mlir_module.operation.get_asm(enable_debug_info=True)
+        else:
+            stdin = str(self.mlir_module)
         return to_mlir_opt(stdin=stdin, options=self.compile_options)
 
     @debug_logger
@@ -617,7 +615,6 @@ class QJIT(CatalystCallable):
     @debug_logger
     def aot_compile(self):
         """Compile Python function on initialization using the type hint signature."""
-
         self.workspace = self._get_workspace()
 
         # TODO: awkward, refactor or redesign the target feature
@@ -656,7 +653,6 @@ class QJIT(CatalystCallable):
             bool: whether the provided arguments will require promotion to be used with the compiled
                   function
         """
-
         cached_fn, requires_promotion = self.fn_cache.lookup(args)
 
         if cached_fn is None:
@@ -778,16 +774,17 @@ class QJIT(CatalystCallable):
         return jaxpr, out_type, treedef, dynamic_sig
 
     def get_arg_names(self):
-        """Construct a list of argument names, with the size of jaxpr.in_avals, and fill it with the
-        names of the parameters of the original function signature.
-        The number of parameters of the original function could be different to the number of elements
-        in jaxpr.in_avals. For example, if a function with one parameter is invoked with a dynamic
-        argument, jaxpr.in_avals will contain two elements (a dynamically-shaped array, and its type).
+        """Construct a list of argument names, with the size of jaxpr.in_avals, and fill it with
+        the names of the parameters of the original function signature.
+        The number of parameters of the original function could be different to the number of
+        elements in jaxpr.in_avals. For example, if a function with one parameter is invoked with a
+        dynamic argument, jaxpr.in_avals will contain two elements (a dynamically-shaped array, and
+        its type).
 
         Returns:
             A list of argument names with the same number of elements than jaxpr.in_avals.
-            The argument names are assigned from the list of parameters of the original function, in
-            order, and until that list is empty. Then left to empty strings.
+            The argument names are assigned from the list of parameters of the original function,
+            in order, and until that list is empty. Then left to empty strings.
         """
         arg_names = [""] * len(self.jaxpr.in_avals)
         param_values = [
@@ -821,7 +818,6 @@ class QJIT(CatalystCallable):
         Returns:
             Tuple[CompiledFunction, str]: the compilation result and LLVMIR
         """
-
         # WARNING: assumption is that the first function is the entry point to the compiled program.
         entry_point_func = self.mlir_module.body.operations[0]
         restype = entry_point_func.type.results
@@ -864,7 +860,6 @@ class QJIT(CatalystCallable):
         Returns:
             Any: results of the execution arranged into the original function's output PyTrees
         """
-
         results = self.compiled_function(*args, **kwargs)
 
         # TODO: Move this to the compiled function object.
@@ -884,7 +879,6 @@ class QJIT(CatalystCallable):
 
     def _get_workspace(self):
         """Get or create a workspace to use for compilation."""
-
         workspace_name = self.__name__
         preferred_workspace_dir = os.getcwd() if self.use_cwd_for_workspace else None
 
