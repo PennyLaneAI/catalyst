@@ -3,35 +3,22 @@ from dataclasses import dataclass
 class traversalState:
     
     name: str 
-    
     tree_depth: int
-    
     # 0=unvisited, 1=left_visited, 2=both_visited, "for_loop"=special marker
     visited: list
-    
     # 0=normal, "for_loop"=special marker
     special: list
-    
     # 0=normal, state = new nested state
     state_to_special: list
-    
     # probs for each
     probs: list
-    
     # segment table name
     segment_table: str
-    
-    def __repr__(self):
-        state_to_special_str = [s.name if s != 0 else s for s in self.state_to_special]
-        return f"Name: {self.name}, tree_depth: {self.tree_depth},\n\t visited: {self.visited},\n\t special: {self.special},\n\t probs: {self.probs}, \n\t segment_table: {self.segment_table} \n\t state_to_special: {state_to_special_str}"
-
-class traversalStateForLoop(traversalState):
-    for_loop_visited: int = 0
     last_computed_depth: int = 1
     
     def __repr__(self):
-        return f"{super().__repr__()}, \n\t for_loop_visited: {self.for_loop_visited}, last_computed_depth: {self.last_computed_depth}"
-
+        state_to_special_str = [s.name if s != 0 else s for s in self.state_to_special]
+        return f"Name: {self.name}, tree_depth: {self.tree_depth},\n\t visited: {self.visited},\n\t special: {self.special},\n\t probs: {self.probs}, \n\t segment_table: {self.segment_table} \n\t state_to_special: {state_to_special_str} \n\t last_computed_depth: {self.last_computed_depth}"
 
 # The depth is mcm * iterations + 1
 # The plus 1 is for the initial segment function before the mcms
@@ -132,92 +119,13 @@ def store_state(depth):
 def restore_state(depth):
     indent_print(f"restoring state at depth: {depth}", indent=depth)
 
-def for_loop_simulation(global_depth, for_loop_state, tt_state):
-    
-    indent_print(f"F_SIM | {status_print(for_loop_state, global_depth)},", indent=global_depth, real_print=True)
-    
-    # if all elements are 2 in visited
-    if all(v == 2 for v in for_loop_state.visited):
-        
-        # Reset for future traversals
-        for_loop_state.last_computed_depth = 1  
-        for_loop_state.visited = [0 for _ in for_loop_state.visited]
+def tree_traversal(tt_state, global_depth=0, one_way=False):
 
-
-    tree_traversal_one_way(global_depth, for_loop_state)
-
-    indent_print(f"F_SIM over | {status_print(for_loop_state, global_depth)}, return 1", indent=global_depth, real_print=True)
-
-    return 1  # Mark the for_loop as left visited
-    
-
-
-def tree_traversal_one_way(global_depth, tt_state):
-    
     if tt_state.visited[0] == 0:
         # Just run the first segment function, no mcm
         simulation(0, 0, tt_state)
-    
+
     depth = tt_state.last_computed_depth
-
-    special_state = None
-
-    # Main loop
-    while depth >= 0:
-        indent_print(f"OW [before] |  {status_print(tt_state, depth) } | g_depth: {global_depth+depth}", indent=global_depth+depth, real_print=True)
-
-        # Before region: check if hit leaf
-        if depth == tt_state.tree_depth:
-            break
-
-        # Body region: process current node
-        status = tt_state.visited[depth]
-        depth_type = tt_state.special[depth]
-        
-        if depth_type == "for_loop" and status < 2:
-            
-            if tt_state.visited[depth] == 0:
-                print("Start a new for loop traversal")
-                tt_state.visited[depth] += 1            
-
-            special_state = tt_state.state_to_special[depth]
-            
-            special_status = for_loop_simulation(global_depth+depth, special_state, tt_state)
-            
-            if all(v == 2 for v in special_state.visited):
-                tt_state.visited[depth] = 2
-                            
-            if special_status < 2:
-                tt_state.last_computed_depth = depth
-                depth += 1
-
-            if special_status == 2:
-                print("Update a new for loop traversal")
-                tt_state.visited[depth] = 2
-                
-            indent_print(f"OW [after loop] |  {status_print(tt_state, depth)},special status: {special_status}", indent=global_depth+depth, real_print=True)
-            continue
-
-        if status < 2:  # Case 0: unvisited or left visited
-            simulation(status, depth, tt_state)
-            tt_state.last_computed_depth = depth
-            depth += 1
-        
-        elif status == 2:  # Case 2: both visited -> backtrack
-            tt_state.visited[depth] = 0
-            depth = depth - 1
-
-        else:  # Error case
-            depth = -1
-            
-        indent_print(f"OW [after] |  {status_print(tt_state, depth)},", indent=global_depth+depth, real_print=True)
-
-
-def tree_traversal(tt_state):
-    depth = 1
-
-    # Just run the first segment function, no mcm
-    simulation(0, 0, tt_state)
 
     # Main loop
     while depth >= 0:
@@ -225,43 +133,57 @@ def tree_traversal(tt_state):
         # Before region: check if hit leaf
         # Measure point
         if depth == tt_state.tree_depth:
-            print("#"*100)            
-            print(f"{main_state.name} |  {for_loop_state.name} | {for_loop_state_nested.name}")
-            print(f"{main_state.visited}  | {for_loop_state.visited} | {for_loop_state_nested.visited}")
+            
+            if one_way:
+                break
+            else:            
+                print("#"*100)            
+                print(f"{main_state.name} |  {for_loop_state_fdx.name} | {for_loop_state_fdx_nested.name}")
+                print(f"{main_state.visited}  | {for_loop_state_fdx.visited} | {for_loop_state_fdx_nested.visited}")
 
-            indent_print(f"*** MEASURE *** {depth}", indent=depth)
-            print("#"*100)
-            depth = depth - 1
+                indent_print(f"*** MEASURE *** {depth}", indent=depth)
+                print("#"*100)
+                depth = depth - 1
 
-        indent_print(f"TT [before] |  {status_print(tt_state, depth)},", indent=depth, real_print=True)
+        indent_print(f"TT [before] |  {status_print(tt_state, depth) } | g_depth: {global_depth+depth}", indent=global_depth+depth, real_print=True)
 
         # Body region: process current node
         status = tt_state.visited[depth]
         depth_type = tt_state.special[depth]
         
-        if depth_type == "for_loop" and status < 2:
+        if depth_type == "for_loop" and status < 2:  # Special for loop handling
             
+            # First time visit the for loop node
             if tt_state.visited[depth] == 0:
-                print("Start a new for loop traversal")
-                tt_state.visited[depth] += 1            
+                tt_state.visited[depth] = 1            
 
+            # Get the special TT state
             special_state = tt_state.state_to_special[depth]
 
-            special_status = for_loop_simulation(depth, special_state, tt_state)
-     
+            # If the special state has completed a full traversal, reset it
+            if all(v == 2 for v in special_state.visited):
+                # Reset for future traversals
+                special_state.last_computed_depth = 1
+                special_state.visited = [0 for _ in special_state.visited]
+
+            # Run the special state traversal
+            tree_traversal(special_state, global_depth=depth, one_way=True)
+
+            # After return from the special state, check if it has fully visited
             if all(v == 2 for v in special_state.visited):
                 tt_state.visited[depth] = 2
-     
-            if special_status < 2:
-                depth += 1
-            elif special_status == 2:
-                tt_state.visited[depth] = 2
+
+            # Update the last computed depth
+            tt_state.last_computed_depth = depth
+            depth += 1
                 
-            indent_print(f"TT [iter loop] |  {status_print(tt_state, depth)}, special status: {special_status}", indent=depth, real_print=True)
+            indent_print(f"TT [after loop] |  {status_print(tt_state, depth)}", indent=global_depth+depth, real_print=True)
+            
             continue
 
         if status < 2:  # Case 0: unvisited or left visited
             simulation(status, depth, tt_state)
+            tt_state.last_computed_depth = depth
             depth += 1
 
         elif status == 2:  # Case 2: both visited -> backtrack
@@ -271,17 +193,35 @@ def tree_traversal(tt_state):
         else:  # Error case
             depth = -1
 
-
-        indent_print(f"TT [iter] |  {status_print(tt_state, depth)},", indent=depth, real_print=True)
+        indent_print(f"TT [iter] |  {status_print(tt_state, depth)},", indent=global_depth+depth, real_print=True)
 
 
 # if True:
 if __name__ == "__main__":
+
+
+    # Nested_2 for loop state
+    for_loop_mcm = 2
+    for_loop_iterations = 2
+
+    for_loop_state_fdx_nested_02 = traversalState(
+        name="for_loop_state_nested_02",
+        tree_depth = for_loop_mcm*for_loop_iterations + 1,
+        visited = [0 for _ in range(for_loop_mcm*for_loop_iterations + 1)],
+
+        # Repeat the special for each iteration
+        special=[ 0 for _ in range(for_loop_mcm*for_loop_iterations + 1)],
+        state_to_special=[ 0 for _ in range(for_loop_mcm*for_loop_iterations + 1)],
+        probs=[[0.5, 0.5] for _ in range(for_loop_mcm*for_loop_iterations + 1)],
+        segment_table="for_loop_segment_table_nested"
+    )    
+
+    
     # Nested for loop state
     for_loop_mcm = 2
     for_loop_iterations = 2
 
-    for_loop_state_nested = traversalStateForLoop(
+    for_loop_state_fdx_nested = traversalState(
         name="for_loop_state_nested",
         tree_depth = for_loop_mcm*for_loop_iterations + 1,
         visited = [0 for _ in range(for_loop_mcm*for_loop_iterations + 1)],
@@ -293,12 +233,15 @@ if __name__ == "__main__":
         segment_table="for_loop_segment_table_nested"
     )    
 
+    for_loop_state_fdx_nested.special[-2] = "for_loop"
+    for_loop_state_fdx_nested.state_to_special[-2] = for_loop_state_fdx_nested_02
+
 
     # First for loop state
     for_loop_mcm = 2
     for_loop_iterations = 2
 
-    for_loop_state = traversalStateForLoop(
+    for_loop_state_fdx = traversalState(
         name="for_loop_state_top",
         tree_depth = for_loop_mcm*for_loop_iterations + 1,
         visited = [0 for _ in range(for_loop_mcm*for_loop_iterations + 1)],
@@ -310,8 +253,8 @@ if __name__ == "__main__":
         segment_table="for_loop_segment_table"
     )    
 
-    for_loop_state.special[-2] = "for_loop"
-    for_loop_state.state_to_special[-2] = for_loop_state_nested
+    for_loop_state_fdx.special[-2] = "for_loop"
+    for_loop_state_fdx.state_to_special[-2] = for_loop_state_fdx_nested
 
     # Main traversal state
     main_mcm = 2
@@ -327,7 +270,7 @@ if __name__ == "__main__":
     )    
 
     main_state.special[-2] = "for_loop"
-    main_state.state_to_special[-2] = for_loop_state
+    main_state.state_to_special[-2] = for_loop_state_fdx
 
     
 
@@ -336,8 +279,9 @@ if __name__ == "__main__":
 # if __name__ == "__main__":
 
     print(main_state)
-    print(for_loop_state)
-    print(for_loop_state_nested)
+    print(for_loop_state_fdx)
+    print(for_loop_state_fdx_nested)
+    print(for_loop_state_fdx_nested_02)
     print("-"*100)
     print("-"*100)
     # exit(0)
