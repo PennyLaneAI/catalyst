@@ -347,6 +347,7 @@ def _options_to_cli_flags(options):
 
     if options.keep_intermediate >= KeepIntermediateLevel.PASS:
         extra_args += ["--save-ir-after-each=pass"]
+        extra_args += ["--dump-module-scope"]
 
     if options.verbose:
         extra_args += ["--verbose"]
