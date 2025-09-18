@@ -22,12 +22,11 @@ import textwrap
 import numpy as np
 import pennylane as qml
 import pytest
-from pennylane.allocation import allocate, deallocate
 
 from catalyst import qjit
 
 
-def test_basic_dynamic_wire_alloc():
+def test_basic_dynamic_wire_alloc_plain_API():
     """
     Test basic qml.allocate and qml.deallocate.
     """
@@ -39,10 +38,35 @@ def test_basic_dynamic_wire_alloc():
     def circuit():
         qml.X(1)  # |010>
 
-        q = allocate(1)  # |010> and |0>
+        q = qml.allocate(1)  # |010> and |0>
         qml.X(q[0])  # |010> and |1>
         qml.CNOT(wires=[q[0], 2])  # |011> and |1>
-        deallocate(q[0])  # |011>
+        qml.deallocate(q[0])  # |011>
+
+        return qml.probs(wires=[0, 1, 2])
+
+    observed = circuit()
+    qml.capture.disable()
+
+    expected = [0, 0, 0, 1, 0, 0, 0, 0]
+    assert np.allclose(expected, observed)
+
+
+def test_basic_dynamic_wire_alloc_ctx_API():
+    """
+    Test basic qml.allocate with context manager API.
+    """
+
+    qml.capture.enable()
+
+    @qjit
+    @qml.qnode(qml.device("lightning.qubit", wires=3))
+    def circuit():
+        qml.X(1)
+
+        with qml.allocate(1) as q:
+            qml.X(q[0])
+            qml.CNOT(wires=[q[0], 2])
 
         return qml.probs(wires=[0, 1, 2])
 
@@ -65,15 +89,15 @@ def test_dynamic_wire_alloc_cond(cond, expected):
     @qml.qnode(qml.device("lightning.qubit", wires=2))
     def circuit(c):
         if c:
-            q = allocate(1)[0]
+            q = qml.allocate(1)[0]
             qml.X(wires=q)
             qml.CNOT(wires=[q, 0])
-            deallocate(q)
+            qml.deallocate(q)
         else:
-            q = allocate(1)[0]
+            q = qml.allocate(1)[0]
             qml.X(wires=q)
             qml.CNOT(wires=[q, 1])
-            deallocate(q)
+            qml.deallocate(q)
 
         return qml.probs(wires=[0, 1])
 
@@ -97,10 +121,10 @@ def test_dynamic_wire_alloc_forloop(num_iter, expected):
     @qml.qnode(qml.device("lightning.qubit", wires=3))
     def circuit(N):
         for _ in range(N):
-            q = allocate(1)[0]
+            q = qml.allocate(1)[0]
             qml.X(wires=q)
             qml.CNOT(wires=[q, 1])
-            deallocate(q)
+            qml.deallocate(q)
 
         return qml.probs(wires=[0, 1, 2])
 
@@ -124,10 +148,10 @@ def test_dynamic_wire_alloc_whileloop(num_iter, expected):
     def circuit(N):
         i = 0
         while i < N:
-            q = allocate(1)[0]
+            q = qml.allocate(1)[0]
             qml.X(wires=q)
             qml.CNOT(wires=[q, 1])
-            deallocate(q)
+            qml.deallocate(q)
             i += 1
 
         return qml.probs(wires=[0, 1, 2])
@@ -160,7 +184,7 @@ def test_unsupported_cross_scope_registers():
         @qjit(autograph=True)
         @qml.qnode(qml.device("lightning.qubit", wires=3))
         def circuit():
-            wires = allocate(3)
+            wires = qml.allocate(3)
 
             for _ in range(3):
                 qml.X(wires=wires[0])

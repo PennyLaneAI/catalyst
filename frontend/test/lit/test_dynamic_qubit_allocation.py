@@ -19,7 +19,6 @@ Unit tests for the dynamic qubit allocation.
 # RUN: %PYTHON %s | FileCheck %s
 
 import pennylane as qml
-from pennylane.allocation import allocate, deallocate
 
 from catalyst import qjit
 from catalyst.jax_primitives import qalloc_p, qdealloc_qb_p, qextract_p
@@ -71,10 +70,10 @@ def test_basic_dynalloc():
     # COM: CHECK: [[insert1:%.+]] = quantum.insert [[insert0]][ 1], [[CNOTout]]#0
     # COM: CHECK: quantum.dealloc [[insert1]]
 
-    qs = allocate(2)
+    qs = qml.allocate(2)
     qml.X(qs[0])
     qml.CNOT(wires=[qs[1], 2])
-    deallocate(qs[:])
+    qml.deallocate(qs[:])
 
     # CHECK: [[dyn_qreg:%.+]] = quantum.alloc( 4)
     # CHECK: [[dyn_bit1:%.+]] = quantum.extract [[dyn_qreg]][ 1]
@@ -87,7 +86,7 @@ def test_basic_dynalloc():
     # COM: CHECK: [[insert1:%.+]] = quantum.insert [[insert0]][ 2], [[CNOTout]]#0
     # COM: CHECK: quantum.dealloc [[insert1]]
 
-    with allocate(4) as qs1:
+    with qml.allocate(4) as qs1:
         qml.X(qs1[1])
         qml.CNOT(wires=[qs1[2], 1])
 
