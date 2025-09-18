@@ -939,7 +939,7 @@ TEST_CASE("Test NullQubit device resource tracking integration", "[NullQubit]")
     sim->MatrixOperation({}, {Qs[0]}, true, {Qs[1], Qs[2]});
 
     // Releasing all qubits should write out all tracked information
-    sim->ReleaseAllQubits();
+    sim->ReleaseQubits(Qs);
 
     // Open the file of resource data
     std::ifstream resource_file_r(RESOURCES_FILENAME);
