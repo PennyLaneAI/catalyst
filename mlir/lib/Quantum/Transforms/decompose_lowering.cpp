@@ -89,7 +89,6 @@ struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLowering
     {
         module.walk([&](func::FuncOp func) {
             if (StringRef targetOp = DecompUtils::getTargetGateName(func); !targetOp.empty()) {
-                llvm::outs() << "targetOp: " << targetOp << " is found\n";
                 decompositionRegistry[targetOp] = func;
             }
             // No need to walk into the function body
