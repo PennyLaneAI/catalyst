@@ -94,7 +94,7 @@
   ```
 
   There are a couple sharp bits regarding this feature for now:
-  1. The full signature of `qml.allocate()` in PennyLane is
+  - The full signature of `qml.allocate()` in PennyLane is
   ```python
     qml.allocate(
         num_wires: int,
@@ -111,7 +111,7 @@
   qubit in the clean |0> state, so there is no need to request qubits in the |0> state, or
   keep track of whether qubits were released in the |0> state.
 
-  2. Qubits allocated outside a MLIR region cannot be used inside the region yet. This
+  - Qubits allocated outside a MLIR region cannot be used inside the region yet. This
   includes control flows (if statements, for loops and while loops), `qml.adjoint()`, and subroutines:
 
   ```python
@@ -135,8 +135,8 @@
 
   ```pycon
   NotImplementedError:
-Dynamically allocated wires in a parent scope cannot be used in a child
-scope yet. Please consider dynamical allocation inside the child scope.
+    Dynamically allocated wires in a parent scope cannot be used in a child
+    scope yet. Please consider dynamical allocation inside the child scope.
   ```
   We will be implementing this soon. In the meantime, a workaround is to move the
   allocations into the regions:
@@ -165,7 +165,7 @@ scope yet. Please consider dynamical allocation inside the child scope.
   [1. 0. 0. 0. 0. 0. 0. 0.]
   ```
 
-  3. In PennyLane, dynamic qubit allocations do not increase the total number of qubits used in the circuit. This is because PennyLane treats the number of wires during device
+  - In PennyLane, dynamic qubit allocations do not increase the total number of qubits used in the circuit. This is because PennyLane treats the number of wires during device
   initialization (the `qml.device("...", wires=N)`) as the device capacity.
   When `qml.allocate()` is encountered, PennyLane just looks into the pool of existing
   wires and chooses a suitable set of wires that is currently unused as the result of the
