@@ -20,7 +20,6 @@ from __future__ import annotations
 
 import inspect
 from collections.abc import Callable
-from copy import copy
 from typing import get_type_hints
 
 import jax
@@ -28,7 +27,6 @@ import pennylane as qml
 
 # GraphSolutionInterpreter:
 from pennylane.decomposition import DecompositionGraph
-from pennylane.measurements import MidMeasureMP
 from pennylane.wires import WiresLike
 
 from catalyst.jax_primitives import decomposition_rule
@@ -183,16 +181,18 @@ class GraphSolutionInterpreter(qml.capture.PlxprInterpreter):
                     o := next((o for o in self._operations if o.name == op.op.name), None)
                 ) is not None:
                     # TODO: This assumes that the operation names are unique in the circuit.
-                    # If there are multiple operations with the same name but different number of wires,
-                    # this will only capture the first one.
+                    # If there are multiple operations with the same name but different number
+                    # of wires, this will only capture the first one.
                     self._create_decomposition_rule(
                         rule, op_name=op.op.name, num_wires=len(o.wires)
                     )
                 elif op.op.name in self.COMPILER_OPERATIONS_NUM_WIRES:
-                    # In this part, we need to handle the case where an operation in the decomposition graph solution
-                    # is not in the captured operations. This can happen if the operation is not directly called
-                    # in the circuit, but is used inside a decomposition rule. In this case, we
-                    # fall back to using the COMPILER_OPERATIONS_NUM_WIRES dictionary to get the number of wires.
+                    # In this part, we need to handle the case where an operation in
+                    # the decomposition graph solution is not in the captured operations.
+                    # This can happen if the operation is not directly called
+                    # in the circuit, but is used inside a decomposition rule.
+                    # In this case, we fall back to using the COMPILER_OPERATIONS_NUM_WIRES
+                    # dictionary to get the number of wires.
                     num_wires = self.COMPILER_OPERATIONS_NUM_WIRES[op.op.name]
                     self._create_decomposition_rule(rule, op_name=op.op.name, num_wires=num_wires)
                 else:  # pragma: no cover
