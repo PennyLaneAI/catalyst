@@ -559,7 +559,7 @@ class TestOptionsToCliFlags:
 
         options = CompileOptions(use_nameloc=True)
         flags = _options_to_cli_flags(options)
-        assert "-mlir-use-nameloc-as-prefix" in flags
+        assert "--use-nameloc-as-prefix" in flags
 
     def test_option_not_lower_to_llvm(self):
         """Test not lower to llvm"""

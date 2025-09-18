@@ -26,6 +26,7 @@ import warnings
 import jax
 import jax.numpy as jnp
 import pennylane as qml
+from jax._src.core import DShapedArray
 from jax.api_util import debug_info
 from jax.interpreters import mlir
 from jax.tree_util import tree_flatten, tree_unflatten
@@ -564,20 +565,30 @@ class QJIT(CatalystCallable):
 
     @property
     def mlir(self):
-        """obtain the MLIR representation after canonicalization"""
+        """Obtain the MLIR representation after canonicalization"""
         # Canonicalize the MLIR since there can be a lot of redundancy coming from JAX.
         if not self.mlir_module:
             return None
 
-        return canonicalize(stdin=str(self.mlir_module))
+        stdin = (
+            self.mlir_module.operation.get_asm(enable_debug_info=True)
+            if self.compile_options.use_nameloc
+            else str(self.mlir_module)
+        )
+        return canonicalize(stdin=stdin, options=self.compile_options)
 
     @property
     def mlir_opt(self):
-        """obtain the MLIR representation after optimization"""
+        """Obtain the MLIR representation after optimization"""
         if not self.mlir_module:
             return None
 
-        return to_mlir_opt(stdin=str(self.mlir_module), options=self.compile_options)
+        stdin = (
+            self.mlir_module.operation.get_asm(enable_debug_info=True)
+            if self.compile_options.use_nameloc
+            else str(self.mlir_module)
+        )
+        return to_mlir_opt(stdin=stdin, options=self.compile_options)
 
     @debug_logger
     def __call__(self, *args, **kwargs):
@@ -766,6 +777,27 @@ class QJIT(CatalystCallable):
 
         return jaxpr, out_type, treedef, dynamic_sig
 
+    def get_arg_names(self):
+        """Construct a list of argument names, with the size of jaxpr.in_avals, and fill it with the
+        names of the parameters of the original function signature.
+        The number of parameters of the original function could be different to the number of elements
+        in jaxpr.in_avals. For example, if a function with one parameter is invoked with a dynamic
+        argument, jaxpr.in_avals will contain two elements (a dynamically-shaped array, and its type).
+
+        Returns:
+            A list of argument names with the same number of elements than jaxpr.in_avals.
+            The argument names are assigned from the list of parameters of the original function, in
+            order, and until that list is empty. Then left to empty strings.
+        """
+        arg_names = [""] * len(self.jaxpr.in_avals)
+        param_values = [
+            p.name for p in inspect.signature(self.original_function).parameters.values()
+        ]
+        for in_aval_index, in_aval in enumerate(self.jaxpr.in_avals):
+            if len(param_values) > 0 and type(in_aval) != DShapedArray:
+                arg_names[in_aval_index] = param_values.pop(0)
+        return arg_names
+
     @instrument(size_from=0, has_finegrained=True)
     @debug_logger
     def generate_ir(self):
@@ -774,9 +806,7 @@ class QJIT(CatalystCallable):
         Returns:
             Tuple[ir.Module, str]: the in-memory MLIR module and its string representation
         """
-
-        arg_names = [p.name for p in inspect.signature(self.original_function).parameters.values()]
-        mlir_module, ctx = lower_jaxpr_to_mlir(self.jaxpr, self.__name__, arg_names)
+        mlir_module, ctx = lower_jaxpr_to_mlir(self.jaxpr, self.__name__, self.get_arg_names())
 
         # Inject Runtime Library-specific functions (e.g. setup/teardown).
         inject_functions(mlir_module, ctx, self.compile_options.seed)

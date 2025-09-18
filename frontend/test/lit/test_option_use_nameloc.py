@@ -17,14 +17,19 @@
 # RUN: %PYTHON %s | FileCheck %s
 
 from catalyst import qjit
-from catalyst.compiler import _options_to_cli_flags, _quantum_opt
+from utils import print_mlir
 
-# CHECK-LABEL: public @jit_f
+
+# CHECK-LABEL: @jit_f
 @qjit(use_nameloc=True)
 def f(x: float, y: float):
+    # CHECK: loc("x")
+    # CHECK: loc("y")
     return x * y
+
 
 assert str(f.mlir_module.body.operations[0].arguments[0].location) == 'loc("x")'
 assert str(f.mlir_module.body.operations[0].arguments[1].location) == 'loc("y")'
-output = _quantum_opt(_options_to_cli_flags(f.compile_options), stdin=f.mlir)
-print(output)
+assert "%x: tensor<f64>" in f.mlir
+assert "%y: tensor<f64>" in f.mlir
+print_mlir(f, 0.3, 0.4)

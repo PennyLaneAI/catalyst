@@ -98,6 +98,11 @@ intermediate files are saved.
 Keep intermediate files after each pipeline in the compilation. By default, no intermediate files
 are saved. Using ``--keep-intermediate`` is equivalent to using ``--save-ir-after-each=pipeline``.
 
+``--use-nameloc-as-prefix[=<true|false>]``
+""""""""""""""""""""""""""""""""""""""""""
+
+Print SSA IDs using their name location, if provided, as prefix. By default, name location information is not used.
+
 ``--{passname}``
 """""""""""""""
 
