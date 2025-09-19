@@ -50,7 +50,7 @@ from catalyst.utils.exceptions import CompileError
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
-
+logging.basicConfig(filename='mylog.log', level=logging.DEBUG)
 
 @dataclass
 class OutputContext:
@@ -179,6 +179,7 @@ def configure_mcm_and_try_one_shot(qnode, args, kwargs):
 
                 # Fallback only if mcm was auto-determined
                 error_msg = str(e)
+                # TODO: handle the underlying reasons for the unsupported errors
                 unsupported_measurement_error = any(
                     pattern in error_msg
                     for pattern in [
@@ -192,7 +193,7 @@ def configure_mcm_and_try_one_shot(qnode, args, kwargs):
 
                 # Fallback if error is related to unsupported measurements
                 if unsupported_measurement_error:
-                    logger.debug("Fallback to single-branch-statistics: %s", e)
+                    logger.warning("Fallback to single-branch-statistics: %s", e)
                     mcm_config = replace(mcm_config, mcm_method="single-branch-statistics")
                 else:
                     raise
