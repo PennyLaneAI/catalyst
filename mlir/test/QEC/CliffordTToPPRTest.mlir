@@ -79,7 +79,7 @@ func.func public @test_clifford_t_to_ppr_1() -> (tensor<i1>, tensor<i1>) {
 
 func.func @test_clifford_t_to_ppr_2(%q1 : !quantum.bit, %q2 : !quantum.bit) {
     // expected-error @+1 {{failed to legalize operation 'quantum.custom' that was explicitly marked illegal}}
-    %0 = quantum.custom "SOME_UNKNOWN_GATE"() %q1 : !quantum.bit // expected-error @+0 {{Unsupported gate. Supported gates: H, S, T, X, Y, Z, S†, T†, and CNOT}}
+    %0 = quantum.custom "SOME_UNKNOWN_GATE"() %q1 : !quantum.bit // expected-error @+0 {{Unsupported gate. Supported gates: H, S, T, X, Y, Z, S†, T†, I, and CNOT}}
     %1 = quantum.custom "S"() %0 : !quantum.bit
     %2 = quantum.custom "T"() %1 : !quantum.bit
     %3:2 = quantum.custom "CNOT"() %2, %q2 : !quantum.bit, !quantum.bit
