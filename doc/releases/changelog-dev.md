@@ -27,9 +27,9 @@
   ```
 
 * Added ``--ppr-to-mbqc`` to lower ``qec.ppr``/``qec.ppm`` into an MBQC-style quantum circuit.
-  This pass is part of a bottom-of-stack MBQC execution pathway, with a
-  thin shim between the PPR/PPM layer and MBQC to enable end-to-end execution on a mocked backend.
-  [(#?)](https://github.com/PennyLaneAI/catalyst/pull/?)
+  This pass is part of a bottom-of-stack MBQC execution pathway, with a thin shim between the
+  PPR/PPM layer and MBQC to enable end-to-end execution on a mocked backend.
+  [(#2057)](https://github.com/PennyLaneAI/catalyst/pull/2057)
 
 <h3>Improvements 🛠</h3>
 
