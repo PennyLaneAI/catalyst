@@ -4,7 +4,7 @@
 
 * A new quantum compilation pass that reduces the depth and count of non-Clifford Pauli product 
   rotations (PPRs) in circuits is now available. This compilation pass works by commuting 
-  non-Clifford PPRs (:math:`\exp(iX\tfrac{\pi}{8})`, often referred to as ``T`` gates) in adjacent 
+  non-Clifford PPRs (often referred to as ``T`` gates) in adjacent 
   layers and merging compatible ones. More details can be found in Figure 6 of 
   [A Game of Surface Codes](https://arXiv:1808.02892v3).
   [(#1975)](https://github.com/PennyLaneAI/catalyst/pull/1975)
