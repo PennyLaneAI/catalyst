@@ -535,23 +535,23 @@ def to_ppr(qnode):
         and potential future execution when a suitable backend is available.
 
 
-    The full list of supported gates are as follows:
-    :class:`qml.H <pennylane.H>`,
-    :class:`qml.S <pennylane.S>`,
-    :class:`qml.T <pennylane.T>`,
-    :class:`qml.X <pennylane.X>`,
-    :class:`qml.Y <pennylane.Y>`,
-    :class:`qml.Z <pennylane.Z>`,
-    :class:`qml.adjoint(qml.S) <pennylane.adjoint(pennylane.S)>`,
-    :class:`qml.adjoint(qml.T) <pennylane.adjoint(pennylane.T)>`,
-    :class:`qml.CNOT <pennylane.CNOT>`,
-    :class:`qml.measure() <pennylane.measure>`
+    The full list of supported gates and operations are:
+    :class:`qml.H`,
+    :class:`qml.S, 
+    :class:`qml.T,
+    :class:`qml.X,
+    :class:`qml.Y,
+    :class:`qml.Z,
+    :class:`qml.adjoint(qml.S)`,
+    :class:`qml.adjoint(qml.T)`,
+    :class:`qml.CNOT`,
+    :class:`qml.measure()`
 
     Args:
         fn (QNode): QNode to apply the pass to
 
     Returns:
-        :class:`~.QNode`
+        :class:`pennylane.QNode`
 
     **Example**
 
