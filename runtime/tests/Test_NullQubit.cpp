@@ -1,4 +1,3 @@
-
 // Copyright 2023-2025 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -145,6 +144,16 @@ TEST_CASE("Test NullQubit qubit allocation is successful.", "[NullQubit]")
 {
     std::unique_ptr<NullQubit> sim = std::make_unique<NullQubit>();
     sim->AllocateQubit();
+}
+
+TEST_CASE("Test ReleaseQubits", "[NullQubit]")
+{
+    std::unique_ptr<NullQubit> sim = std::make_unique<NullQubit>();
+    auto qubits = sim->AllocateQubits(3);
+    CHECK(sim->GetNumQubits() == 3);
+    std::vector<QubitIdType> qubits_to_release = {qubits[0], qubits[2]};
+    sim->ReleaseQubits(qubits_to_release);
+    CHECK(sim->GetNumQubits() == 1);
 }
 
 TEST_CASE("Test a NullQubit circuit with num_qubits=2 ", "[NullQubit]")
@@ -897,30 +906,23 @@ TEST_CASE("Test NullQubit device shots methods", "[NullQubit]")
     }
 }
 
-TEST_CASE("Test NullQubit device resource tracking", "[NullQubit]")
+TEST_CASE("Test NullQubit device resource tracking integration", "[NullQubit]")
 {
     // The name of the file where the resource usage data is stored
-    constexpr char RESOURCES_FNAME[] = "__pennylane_resources_data.json";
-
-    // Open a file for writing the resources JSON
-    FILE *resource_file_w = fopen(RESOURCES_FNAME, "wx");
-    if (resource_file_w == nullptr) {                            // LCOV_EXCL_LINE
-        FAIL("Failed to open resource usage file for writing."); // LCOV_EXCL_LINE
-    }
+    const std::string RESOURCES_FILENAME = "__pennylane_resources_data.json";
 
     std::unique_ptr<NullQubit> dummy = std::make_unique<NullQubit>();
     CHECK(dummy->IsTrackingResources() == false);
 
     std::unique_ptr<NullQubit> sim =
-        std::make_unique<NullQubit>("{'track_resources':True}", RESOURCES_FNAME);
+        std::make_unique<NullQubit>("{'track_resources':True, 'resources_filename':'" +
+                                    RESOURCES_FILENAME + "', 'compute_depth':True}");
     CHECK(sim->IsTrackingResources() == true);
-    CHECK(sim->ResourcesGetNumGates() == 0);
-    CHECK(sim->ResourcesGetNumQubits() == 0);
+
+    // Ensure data will be written to the correct place
+    CHECK(sim->GetResourcesFilename() == RESOURCES_FILENAME);
 
     std::vector<QubitIdType> Qs = sim->AllocateQubits(4);
-
-    CHECK(sim->ResourcesGetNumGates() == 0);
-    CHECK(sim->ResourcesGetNumQubits() == 4);
 
     // Apply named gates to test all possible name modifiers
     sim->NamedOperation("PauliX", {}, {Qs[0]}, false);
@@ -930,91 +932,56 @@ TEST_CASE("Test NullQubit device resource tracking", "[NullQubit]")
     sim->NamedOperation("T", {}, {Qs[0]}, true, {Qs[2]});
     sim->NamedOperation("CNOT", {}, {Qs[0], Qs[1]}, false);
 
-    CHECK(sim->ResourcesGetNumGates() == 6);
-    CHECK(sim->ResourcesGetNumQubits() == 4);
-
     // Applying an empty matrix is fine for NullQubit
     sim->MatrixOperation({}, {Qs[0]}, false);
     sim->MatrixOperation({}, {Qs[0]}, false, {Qs[1]});
     sim->MatrixOperation({}, {Qs[0]}, true);
     sim->MatrixOperation({}, {Qs[0]}, true, {Qs[1], Qs[2]});
 
-    CHECK(sim->ResourcesGetNumGates() == 10);
-    CHECK(sim->ResourcesGetNumQubits() == 4);
-
-    // Capture resources usage
-    sim->PrintResourceUsage(resource_file_w);
-    fclose(resource_file_w);
+    // Releasing all qubits should write out all tracked information
+    sim->ReleaseQubits(Qs);
 
     // Open the file of resource data
-    std::ifstream resource_file_r(RESOURCES_FNAME);
+    std::ifstream resource_file_r(RESOURCES_FILENAME);
     CHECK(resource_file_r.is_open()); // fail-fast if file failed to create
 
     std::vector<std::string> resource_names = {"PauliX",
-                                               "C(Adj(T))",
-                                               "Adj(T)",
+                                               "C(Adjoint(T))",
+                                               "Adjoint(T)",
                                                "C(S)",
                                                "2C(S)",
-                                               "S",
                                                "CNOT",
-                                               "Adj(ControlledQubitUnitary)",
+                                               "Adjoint(ControlledQubitUnitary)",
                                                "ControlledQubitUnitary",
-                                               "Adj(QubitUnitary)",
+                                               "Adjoint(QubitUnitary)",
                                                "QubitUnitary"};
 
-    // Check all fields have the correct value
+    // Read full Json, check if num_wires and num_gates are correct
     std::string full_json;
     while (resource_file_r) {
         std::string line;
         std::getline(resource_file_r, line);
-        if (line.find("num_qubits") != std::string::npos) {
+        if (line.find("num_wires") != std::string::npos) {
             CHECK(line.find("4") != std::string::npos);
         }
         if (line.find("num_gates") != std::string::npos) {
             CHECK(line.find("10") != std::string::npos);
         }
-        // If one of the resource names is in the line, check that there is precisely 1
-        for (const auto &name : resource_names) {
-            if (line.find(name) != std::string::npos) {
-                CHECK(line.find("1") != std::string::npos);
-                break;
-            }
+        if (line.find("depth") != std::string::npos) {
+            CHECK(line.find("10") != std::string::npos);
         }
         full_json += line + "\n";
     }
     resource_file_r.close();
-    std::remove(RESOURCES_FNAME);
 
     // Ensure all expected fields are present
-    CHECK(full_json.find("num_qubits") != std::string::npos);
+    CHECK(full_json.find("num_wires") != std::string::npos);
     CHECK(full_json.find("num_gates") != std::string::npos);
+    CHECK(full_json.find("depth") != std::string::npos);
     for (const auto &name : resource_names) {
+        // Check that all operations applied are present in the data
         CHECK(full_json.find(name) != std::string::npos);
     }
 
-    // Check that releasing resets
-    sim->ReleaseAllQubits();
-    std::remove(RESOURCES_FNAME); // Remove the file automatically created by the device
-
-    CHECK(sim->ResourcesGetNumGates() == 0);
-    CHECK(sim->ResourcesGetNumQubits() == 0);
-    CHECK(sim->ResourcesGetFilename() == RESOURCES_FNAME);
-}
-
-TEST_CASE("Test resource tracking filename", "[NullQubit]")
-{
-    // Check automatic filename creation
-    std::unique_ptr<NullQubit> dummy = std::make_unique<NullQubit>("{'track_resources':True}");
-    CHECK(dummy->IsTrackingResources() == true);
-    dummy->ReleaseAllQubits();
-
-    const std::string dummy_resources_fname = dummy->ResourcesGetFilename();
-
-    std::cout << "Auto-created resources filename: " << dummy_resources_fname << std::endl;
-
-    CHECK(dummy_resources_fname.rfind("__pennylane_resources_data_") == 0);
-    CHECK(dummy_resources_fname.find(".json") != std::string::npos);
-
-    std::remove(
-        dummy_resources_fname.c_str()); // Remove the file automatically created by the device
+    std::remove(RESOURCES_FILENAME.c_str()); // Remove the file automatically created by the device
 }
