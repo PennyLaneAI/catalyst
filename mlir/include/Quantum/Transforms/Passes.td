@@ -110,6 +110,12 @@ def MergeRotationsPass : Pass<"merge-rotations"> {
     let constructor = "catalyst::createMergeRotationsPass()";
 }
 
+def DecomposeLoweringPass : Pass<"decompose-lowering"> {
+    let summary = "Replace quantum operations with compiled decomposition rules.";
+
+    let constructor = "catalyst::createDecomposeLoweringPass()";
+}
+
 def DisentangleCNOTPass : Pass<"disentangle-CNOT"> {
     let summary = "Replace a CNOT gate with two single qubit gates whenever possible.";
 

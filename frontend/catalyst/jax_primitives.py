@@ -395,7 +395,7 @@ def subroutine(func):
     return wrapper
 
 
-def decomposition_rule(func=None, *, is_qreg=False, num_params=0):
+def decomposition_rule(func=None, *, is_qreg=True, num_params=0):
     """
     Denotes the creation of a quantum definition in the intermediate representation.
     """
@@ -590,7 +590,10 @@ def _decomposition_rule_lowering(ctx, *, pyfun, func_jaxpr, **_):
     """Lower a quantum decomposition rule into MLIR in a single step process.
     The step is the compilation of the definition of the function fn.
     """
-    lower_callable(ctx, pyfun, func_jaxpr)
+
+    # Set the visibility of the decomposition rule to public
+    # to avoid the elimination by the compiler
+    lower_callable(ctx, pyfun, func_jaxpr, public=True)
     return ()
 
 
