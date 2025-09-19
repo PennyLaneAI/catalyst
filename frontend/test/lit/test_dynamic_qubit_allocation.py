@@ -65,10 +65,9 @@ def test_basic_dynalloc():
     # CHECK: [[Xout:%.+]] = quantum.custom "PauliX"() [[dyn_bit0]]
     # CHECK: [[dev_bit2:%.+]] = quantum.extract [[device_init_qreg]][ 2]
     # CHECK: [[CNOTout:%.+]]:2 = quantum.custom "CNOT"() [[dyn_bit1]], [[dev_bit2]]
-    # COM: dealloc blocked by https://github.com/PennyLaneAI/catalyst/pull/1996
-    # COM: CHECK: [[insert0:%.+]] = quantum.insert [[dyn_qreg]][ 0], [[Xout]]
-    # COM: CHECK: [[insert1:%.+]] = quantum.insert [[insert0]][ 1], [[CNOTout]]#0
-    # COM: CHECK: quantum.dealloc [[insert1]]
+    # CHECK: [[insert0:%.+]] = quantum.insert [[dyn_qreg]][ 0], [[Xout]]
+    # CHECK: [[insert1:%.+]] = quantum.insert [[insert0]][ 1], [[CNOTout]]#0
+    # CHECK: quantum.dealloc [[insert1]]
 
     qs = qml.allocate(2)
     qml.X(qs[0])
@@ -81,10 +80,9 @@ def test_basic_dynalloc():
     # CHECK: [[Xout:%.+]] = quantum.custom "PauliX"() [[dyn_bit1]]
     # CHECK: [[dev_bit1:%.+]] = quantum.extract [[device_init_qreg]][ 1]
     # CHECK: [[CNOTout:%.+]]:2 = quantum.custom "CNOT"() [[dyn_bit2]], [[dev_bit1]]
-    # COM: dealloc blocked by https://github.com/PennyLaneAI/catalyst/pull/1996
-    # COM: CHECK: [[insert0:%.+]] = quantum.insert [[dyn_qreg]][ 1], [[Xout]]
-    # COM: CHECK: [[insert1:%.+]] = quantum.insert [[insert0]][ 2], [[CNOTout]]#0
-    # COM: CHECK: quantum.dealloc [[insert1]]
+    # CHECK: [[insert0:%.+]] = quantum.insert [[dyn_qreg]][ 1], [[Xout]]
+    # CHECK: [[insert1:%.+]] = quantum.insert [[insert0]][ 2], [[CNOTout]]#0
+    # CHECK: quantum.dealloc [[insert1]]
 
     with qml.allocate(4) as qs1:
         qml.X(qs1[1])
