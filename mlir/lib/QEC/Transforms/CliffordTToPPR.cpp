@@ -30,7 +30,7 @@ namespace {
 //                       Helper functions
 //===----------------------------------------------------------------------===//
 
-enum class GateEnum { H, S, T, CNOT, X, Y, Z, Unknown };
+enum class GateEnum { H, S, T, CNOT, X, Y, Z, I, Unknown };
 
 // Hash gate name to GateEnum
 GateEnum hashGate(CustomOp op)
@@ -50,6 +50,8 @@ GateEnum hashGate(CustomOp op)
         return GateEnum::Y;
     else if (gateName == "PauliZ" || gateName == "Z")
         return GateEnum::Z;
+    else if (gateName == "Identity" || gateName == "I")
+        return GateEnum::I;
     else
         return GateEnum::Unknown;
 }
@@ -199,6 +201,14 @@ LogicalResult convertZGate(CustomOp op, ConversionPatternRewriter &rewriter)
     return success();
 }
 
+// I = I
+LogicalResult convertIGate(CustomOp op, ConversionPatternRewriter &rewriter)
+{
+    auto gate = GateConversion({"I"}, 0);
+    applySingleQubitConversion(op, {gate}, rewriter);
+    return success();
+}
+
 LogicalResult convertCNOTGate(CustomOp op, ConversionPatternRewriter &rewriter)
 {
     return controlledConversion(op, "Z", "X", rewriter);
@@ -260,9 +270,11 @@ struct QECOpLowering : public ConversionPattern {
                 return convertZGate(originOp, rewriter);
             case GateEnum::CNOT:
                 return convertCNOTGate(originOp, rewriter);
+            case GateEnum::I:
+                return convertIGate(originOp, rewriter);
             case GateEnum::Unknown: {
                 op->emitError(
-                    "Unsupported gate. Supported gates: H, S, T, X, Y, Z, S†, T†, and CNOT");
+                    "Unsupported gate. Supported gates: H, S, T, X, Y, Z, S†, T†, I, and CNOT");
                 return failure();
             }
             }
