@@ -89,7 +89,6 @@ class QubitHandler:
     wire_map: dict[int, AbstractQbit]  # Note: No dynamic wire indices for now in from_plxpr.
 
     def __init__(self, qubit_or_qreg_ref: AbstractQreg | list[AbstractQbit] | tuple[AbstractQbit]):
-
         if isinstance(qubit_or_qreg_ref, (list, tuple)):
             self.abstract_qreg_val = None
             self.qubit_indices = qubit_or_qreg_ref

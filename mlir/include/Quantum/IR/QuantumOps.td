@@ -241,6 +241,7 @@ def ExtractOp : Memory_Op<"extract", [NoMemoryEffect]> {
         $qreg `[` ($idx^):($idx_attr)? `]` attr-dict `:` type($qreg) `->` type(results)
     }];
 
+    let hasCanonicalizeMethod = 1;
     let hasVerifier = 1;
     let hasFolder = 1;
 }
