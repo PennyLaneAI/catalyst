@@ -25,6 +25,7 @@ from catalyst.passes import (
     commute_ppr,
     merge_ppr_ppm,
     ppm_compilation,
+    ppr_to_mbqc,
     ppr_to_ppm,
     t_layer_reduction,
     to_ppr,
@@ -387,3 +388,39 @@ def test_t_layer_reduction():
 # CHECK: qec.ppr ["X", "Y", "X"](8)
 # CHECK: qec.ppr ["X", "X", "Y"](8)
 test_t_layer_reduction()
+
+
+def test_ppr_to_mbqc():
+    """
+    Test the `ppr_to_mbqc` pass.
+    """
+
+    pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+
+    @qjit(pipelines=pipe, target="mlir")
+    @ppr_to_mbqc
+    @to_ppr
+    @qml.qnode(qml.device("null.qubit", wires=2))
+    def test_ppr_to_mbqc_workflow():
+        qml.H(0)
+        qml.CNOT([0, 1])
+        return measure(1)
+
+    print(test_ppr_to_mbqc_workflow.mlir_opt)
+
+
+# CHECK-NOT: qec.ppr
+# CHECK-NOT: qec.ppm
+# CHECK: quantum.custom "H"
+# CHECK: quantum.custom "RZ"
+# CHECK: quantum.custom "H"
+# CHECK: quantum.custom "RZ"
+
+# CHECK: quantum.custom "H"
+# CHECK: quantum.custom "CNOT"
+# CHECK: quantum.custom "RZ"
+# CHECK: quantum.custom "CNOT"
+# CHECK: quantum.custom "H"
+# CHECK-NOT: qec.ppr
+# CHECK-NOT: qec.ppm
+test_ppr_to_mbqc()

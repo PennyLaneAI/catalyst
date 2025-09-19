@@ -26,6 +26,11 @@
       return qml.probs()
   ```
 
+* Added ``--ppr-to-mbqc`` to lower ``qec.ppr``/``qec.ppm`` into an MBQC-style quantum circuit.
+  This pass is part of a bottom-of-stack MBQC execution pathway, with a
+  thin shim between the PPR/PPM layer and MBQC to enable end-to-end execution on a mocked backend.
+  [(#?)](https://github.com/PennyLaneAI/catalyst/pull/?)
+
 <h3>Improvements 🛠</h3>
 
 * Catalyst now supports returning classical and MCM values with the dynamic one-shot MCM method.
@@ -197,8 +202,8 @@
   [(#2027)](https://github.com/PennyLaneAI/catalyst/pull/2027)
 
 * Fix usage of OQC device, including:
-   - fix object file system extension on macOS
-   - fix wrong type signature of `Counts` API function
+  * fix object file system extension on macOS
+  * fix wrong type signature of `Counts` API function
   [(#2032)](https://github.com/PennyLaneAI/catalyst/pull/2032)
 
 * Fixed the Clifford PPR decomposition rule where using the Y measurement should take the inverse.
@@ -215,7 +220,7 @@
 * `from_plxpr` can now handle dynamic shots and overridden device shots.
   [(#1983)](https://github.com/PennyLaneAI/catalyst/pull/1983/)
 
-* `from_plxpr` can now translate `counts`. 
+* `from_plxpr` can now translate `counts`.
   [(#2041)](https://github.com/PennyLaneAI/catalyst/pull/2041)
 
 * QJitDevice helper `extract_backend_info` removed its redundant `capabilities` argument.
@@ -308,7 +313,7 @@
   `use-array-backed-registers` option of the `convert-quantum-to-llvm` pass to `true`. For example,
 
   ```console
-  $ catalyst --tool=opt --pass-pipeline="builtin.module(convert-quantum-to-llvm{use-array-backed-registers=true})" <input file>
+  catalyst --tool=opt --pass-pipeline="builtin.module(convert-quantum-to-llvm{use-array-backed-registers=true})" <input file>
   ```
 
 * Fix auxiliary qubit deallocation in `decompose-non-clifford-ppr` pass
