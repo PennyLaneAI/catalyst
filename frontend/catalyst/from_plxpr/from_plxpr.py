@@ -545,7 +545,7 @@ def handle_qml_dealloc(self, *wires):
     # initial ones, and deallocate at the end.
     # Blocked by https://github.com/PennyLaneAI/catalyst/pull/1996
     # which is blocked by https://github.com/PennyLaneAI/pennylane-lightning/pull/1254
-    # qdealloc_p.bind(qreg.get())
+    qdealloc_p.bind(qreg.get())
 
     return []
 
