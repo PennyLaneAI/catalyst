@@ -8,7 +8,8 @@
 
   Two new functions, `qml.allocate()` and `qml.deallocate()`, [have been added to
   PennyLane](https://docs.pennylane.ai/en/stable/development/release_notes.html#release-0-43-0) to support
-  dynamic wire allocation. With Catalyst, these features can be accessed on `lightning.qubit`, `lightning.kokkos`, and `lightning.gpu`.
+  dynamic wire allocation. With Catalyst, these features can be accessed on
+   `lightning.qubit`, `lightning.kokkos`, and `lightning.gpu`.
 
   Dynamic wire allocation refers to the allocation of wires in the middle of a circuit, as opposed to the static allocation during device initialization. For example:
 
@@ -18,12 +19,11 @@
   @qjit
   @qml.qnode(qml.device("lightning.qubit", wires=3))  # 3 initial qubits
   def circuit():
-      qml.X(1)                   # |010>
+      qml.X(1)                        # |010>
 
-      q = qml.allocate(1)        # |010> and |0>, 1 dynamically allocted qubit
-      qml.X(q[0])                # |010> and |1>
-      qml.CNOT(wires=[q[0], 2])  # |011> and |1>
-      qml.deallocate(q[0])       # |011>
+      with qml.allocate(1) as q:      # |010> and |0>, 1 dynamically allocted qubit
+          qml.X(q[0])                 # |010> and |1>
+          qml.CNOT(wires=[q[0], 2])   # |011> and |1>
 
       return qml.probs(wires=[0, 1, 2])
 
@@ -37,9 +37,10 @@
 
   In the above program, 3 qubits are allocated during device initialization, and 1
   additional qubit is allocated inside the circuit with `qml.allocate(1)`. This is clear
-  when we inspect the compiled MLIR (with `print(circuit.mlir)`):
+  when we inspect the compiled MLIR:
 
   ```
+  >>> print(circuit.mlir)
   func.func public @circuit() -> tensor<8xf64> attributes {qnode} {
     %c0_i64 = arith.constant 0 : i64
     quantum.device shots(%c0_i64) ["/path/to/liblightning_qubit_catalyst.so", "LightningSimulator", "{'mcmc': False, 'num_burnin': 0, 'kernel_name': None}"]
@@ -70,28 +71,11 @@
   device, and the quantum register value `%2` corresponds to the dynamically allocated
   wire.
 
-  The above circuit can also be written as the context manager qubit allocation API. Compared to the plain `qml.allocate()` and `qml.deallocate()` function call API,
-  the context manager API automatically deallocates when exiting the context's scope,
-  and no manual call to `qml.deallocate()` is necessary:
+  For more information on what `qml.allocate` and `qml.deallocate` do, please consult the
+  [PennyLane v0.43 release notes](https://docs.pennylane.ai/en/stable/development/release_notes.html#release-0-43-0).
 
-  ```python
-  qml.capture.enable()
-
-  @qjit
-  @qml.qnode(qml.device("lightning.qubit", wires=3))
-  def circuit():
-      qml.X(1)
-
-      with qml.allocate(1) as q:
-          qml.X(q[0])
-          qml.CNOT(wires=[q[0], 2])
-
-      return qml.probs(wires=[0, 1, 2])
-
-  qml.capture.disable()
-  ```
-
-  There are a couple of sharp bits regarding this feature for now. For details, please see
+  However, there are some notable differences between the behaviour of these features
+  with `qjit` versus without. For details, please see
   [the relevant sections on the Catalyst sharp bits page](https://docs.pennylane.ai/projects/catalyst/en/stable/dev/sharp_bits.html#functionality-differences-from-pennylane).
 
 * A new pass `--t-layer-reduction` has been added to reduce the depth and number of non-Clifford PPR
