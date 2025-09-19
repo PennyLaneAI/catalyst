@@ -168,7 +168,7 @@
   future allocations will request additional wires on top of the initial ones.
 
   This will cause a performance difference, specifically in memory usage, when using
-  dynamic qubit allocation feature with and without Catalyst.
+  dynamic wire allocation feature with and without Catalyst.
 
 * A new pass `--t-layer-reduction` has been added to reduce the depth and number of non-Clifford PPR
   operations by commuting adjacent PPRs and finding possible PPRs that can be merged.
