@@ -17,10 +17,10 @@
 func.func @test_ppr_to_mbqc_0(%q1 : !quantum.bit) -> (i1, i1, i1) {
 
     // CHECK: func.func @test_ppr_to_mbqc_0([[q1:%.+]]: !quantum.bit)
-    // CHECK: [[q1_0:%.+]] = quantum.custom "H"() [[q1]]
+    // CHECK: [[q1_0:%.+]] = quantum.custom "Hadamard"() [[q1]]
     // CHECK: [[pi:%.+]] = arith.constant 3.14
     // CHECK: [[q1_1:%.+]] = quantum.custom "RZ"([[pi]]) [[q1_0]]
-    // CHECK: [[q1_2:%.+]] = quantum.custom "H"() [[q1_1]]
+    // CHECK: [[q1_2:%.+]] = quantum.custom "Hadamard"() [[q1_1]]
     %0 = qec.ppr ["X"] (2) %q1 : !quantum.bit
 
     // CHECK: [[q1_3:%.+]] = quantum.custom "RZ"([[pi]]) [[q1_2]]
@@ -36,10 +36,10 @@ func.func @test_ppr_to_mbqc_0(%q1 : !quantum.bit) -> (i1, i1, i1) {
     // CHECK: [[q1_6:%.+]] = quantum.custom "RotXZX"([[a4]], [[a2]], [[a5]]) [[q1_5]]
     %2 = qec.ppr ["Y"] (2) %1 : !quantum.bit
 
-    // CHECK: [[q1_7:%.+]] = quantum.custom "H"() [[q1_6]]
+    // CHECK: [[q1_7:%.+]] = quantum.custom "Hadamard"() [[q1_6]]
     // CHECK: [[pi2:%.+]] = arith.constant 1.57
     // CHECK: [[q1_8:%.+]] = quantum.custom "RZ"([[pi2]]) [[q1_7]]
-    // CHECK: [[q1_9:%.+]] = quantum.custom "H"() [[q1_8]]
+    // CHECK: [[q1_9:%.+]] = quantum.custom "Hadamard"() [[q1_8]]
     %3 = qec.ppr ["X"] (4) %2 : !quantum.bit
 
     // CHECK: [[q1_10:%.+]] = quantum.custom "RZ"([[pi2]]) [[q1_9]]
@@ -50,10 +50,10 @@ func.func @test_ppr_to_mbqc_0(%q1 : !quantum.bit) -> (i1, i1, i1) {
     // CHECK: [[q1_13:%.+]] = quantum.custom "RotXZX"([[a4]], [[a2]], [[a5]]) [[q1_12]]
     %5 = qec.ppr ["Y"] (4) %4 : !quantum.bit
 
-    // CHECK: [[q1_14:%.+]] = quantum.custom "H"() [[q1_13]]
+    // CHECK: [[q1_14:%.+]] = quantum.custom "Hadamard"() [[q1_13]]
     // CHECK: [[pi4:%.+]] = arith.constant 0.785
     // CHECK: [[q1_15:%.+]] = quantum.custom "RZ"([[pi4]]) [[q1_14]]
-    // CHECK: [[q1_16:%.+]] = quantum.custom "H"() [[q1_15]]
+    // CHECK: [[q1_16:%.+]] = quantum.custom "Hadamard"() [[q1_15]]
     %6 = qec.ppr ["X"] (8) %5 : !quantum.bit
 
     // CHECK: [[q1_17:%.+]] = quantum.custom "RZ"([[pi4]]) [[q1_16]]
@@ -64,9 +64,9 @@ func.func @test_ppr_to_mbqc_0(%q1 : !quantum.bit) -> (i1, i1, i1) {
     // CHECK: [[q1_20:%.+]] = quantum.custom "RotXZX"([[a4]], [[a2]], [[a5]]) [[q1_19]]
     %8 = qec.ppr ["Y"] (8) %7 : !quantum.bit
 
-    // CHECK: [[q1_21:%.+]] = quantum.custom "H"() [[q1_20]]
+    // CHECK: [[q1_21:%.+]] = quantum.custom "Hadamard"() [[q1_20]]
     // CHECK: [[m1:%.+]], [[q1_22:%.+]] = quantum.measure [[q1_21]]
-    // CHECK: [[q1_23:%.+]] = quantum.custom "H"() [[q1_22]]
+    // CHECK: [[q1_23:%.+]] = quantum.custom "Hadamard"() [[q1_22]]
     %m1, %9 = qec.ppm ["X"] %8 : !quantum.bit
 
     // CHECK: [[m2:%.+]], [[q1_23:%.+]] = quantum.measure [[q1_22]]
@@ -84,7 +84,7 @@ func.func @test_ppr_to_mbqc_0(%q1 : !quantum.bit) -> (i1, i1, i1) {
 func.func @test_ppr_to_mbqc_2(%q0: !quantum.bit, %q1: !quantum.bit) -> (i1, !quantum.bit, !quantum.bit) {
 
     // CHECK: func.func @test_ppr_to_mbqc_2([[q0:%.+]]: !quantum.bit, [[q1:%.+]]: !quantum.bit)
-    // CHECK: [[q0_0:%.+]] = quantum.custom "H"() [[q0]]
+    // CHECK: [[q0_0:%.+]] = quantum.custom "Hadamard"() [[q0]]
 
     // CNOT(1, 0)
     // CHECK: [[q0_1:%.+]]:2 = quantum.custom "CNOT"() [[q1]], [[q0_0]] : !quantum.bit, !quantum.bit
@@ -96,7 +96,7 @@ func.func @test_ppr_to_mbqc_2(%q0: !quantum.bit, %q1: !quantum.bit) -> (i1, !qua
     // CNOT(1, 0)
     // CHECK: [[q0_3:%.+]]:2 = quantum.custom "CNOT"() [[q0_1]]#0, [[q0_2]] : !quantum.bit, !quantum.bit
     // H (qubit 0)
-    // CHECK: [[q0_4:%.+]] = quantum.custom "H"() [[q0_3]]#1
+    // CHECK: [[q0_4:%.+]] = quantum.custom "Hadamard"() [[q0_3]]#1
     %0, %1 = qec.ppr ["X", "Z"](8) %q0, %q1 : !quantum.bit, !quantum.bit
 
     // H (qubit 0)
@@ -106,13 +106,13 @@ func.func @test_ppr_to_mbqc_2(%q0: !quantum.bit, %q1: !quantum.bit) -> (i1, !qua
     // CNOT(1, 0)
     // H (qubit 0)
     // H (qubit 1)
-    // CHECK: [[q0_5:%.+]] = quantum.custom "H"() [[q0_4]]
-    // CHECK: [[q0_6:%.+]] = quantum.custom "H"() [[q0_3]]#0
+    // CHECK: [[q0_5:%.+]] = quantum.custom "Hadamard"() [[q0_4]]
+    // CHECK: [[q0_6:%.+]] = quantum.custom "Hadamard"() [[q0_3]]#0
     // CHECK: [[q0_7:%.+]]:2 = quantum.custom "CNOT"() [[q0_6]], [[q0_5]] : !quantum.bit, !quantum.bit
     // CHECK: [[m:%.+]], [[q0_8:%.+]] = quantum.measure [[q0_7]]#1
     // CHECK: [[q0_9:%.+]]:2 = quantum.custom "CNOT"() [[q0_7]]#0, [[q0_8]] : !quantum.bit, !quantum.bit
-    // CHECK: [[q0_10:%.+]] = quantum.custom "H"() [[q0_9]]#1
-    // CHECK: [[q0_11:%.+]] = quantum.custom "H"() [[q0_9]]#0
+    // CHECK: [[q0_10:%.+]] = quantum.custom "Hadamard"() [[q0_9]]#1
+    // CHECK: [[q0_11:%.+]] = quantum.custom "Hadamard"() [[q0_9]]#0
     %m, %2, %3 = qec.ppm ["X", "X"](8) %0, %1 : !quantum.bit, !quantum.bit
 
     func.return %m, %2, %3 : i1, !quantum.bit, !quantum.bit
@@ -128,12 +128,12 @@ func.func @test_ppr_to_mbqc_3(%q0: !quantum.bit, %q1: !quantum.bit, %q2: !quantu
     // RotXZX (qubit 2)
     // H (qubit 3)
 
-    // CHECK: [[q0_0:%.+]] = quantum.custom "H"() [[q0]]
+    // CHECK: [[q0_0:%.+]] = quantum.custom "Hadamard"() [[q0]]
     // CHECK: [[a1:%.+]] = arith.constant 1.13
     // CHECK: [[a2:%.+]] = arith.constant 0.00
     // CHECK: [[a3:%.+]] = arith.constant 2.80
     // CHECK: [[q0_1:%.+]] = quantum.custom "RotXZX"([[a1]], [[a2]], [[a3]]) [[q2]]
-    // CHECK: [[q0_2:%.+]] = quantum.custom "H"() [[q3]]
+    // CHECK: [[q0_2:%.+]] = quantum.custom "Hadamard"() [[q3]]
 
     // CNOT(3, 2)
     // CNOT(2, 1)
@@ -160,11 +160,11 @@ func.func @test_ppr_to_mbqc_3(%q0: !quantum.bit, %q1: !quantum.bit, %q2: !quantu
     // RotXZX (qubit 2)
     // H (qubit 3)
 
-    // CHECK: [[q0_10:%.+]] = quantum.custom "H"() [[q0_7]]#1
+    // CHECK: [[q0_10:%.+]] = quantum.custom "Hadamard"() [[q0_7]]#1
     // CHECK: [[a5:%.+]] = arith.constant 1.23
     // CHECK: [[a6:%.+]] = arith.constant 9.75
     // CHECK: [[q0_11:%.+]] = quantum.custom "RotXZX"([[a5]], [[a2]], [[a6]]) [[q0_9]]#1
-    // CHECK: [[q0_12:%.+]] = quantum.custom "H"() [[q0_9]]#0
+    // CHECK: [[q0_12:%.+]] = quantum.custom "Hadamard"() [[q0_9]]#0
     %0, %1, %2, %3 = qec.ppr ["X", "Z", "Y", "X"](4) %q0, %q1, %q2, %q3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
 
     func.return %0, %1, %2, %3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
@@ -194,11 +194,11 @@ func.func @test_ppr_to_mbqc_4(%q0: !quantum.bit, %q1: !quantum.bit, %q2: !quantu
     // RotXZX (qubit 2)
     // H (qubit 3)
 
-    // CHECK: "H"
-    // CHECK: "H"
-    // CHECK: "H"
-    // CHECK: "H"
-    // CHECK-NOT: "H"
+    // CHECK: "Hadamard"
+    // CHECK: "Hadamard"
+    // CHECK: "Hadamard"
+    // CHECK: "Hadamard"
+    // CHECK-NOT: "Hadamard"
 
     // CHECK: "CNOT"
     // CHECK: "CNOT"
@@ -212,11 +212,11 @@ func.func @test_ppr_to_mbqc_4(%q0: !quantum.bit, %q1: !quantum.bit, %q2: !quantu
     // CHECK: "CNOT"
     // CHECK-NOT: "CNOT"
 
-    // CHECK: "H"
-    // CHECK: "H"
-    // CHECK: "H"
-    // CHECK: "H"
-    // CHECK-NOT: "H"
+    // CHECK: "Hadamard"
+    // CHECK: "Hadamard"
+    // CHECK: "Hadamard"
+    // CHECK: "Hadamard"
+    // CHECK-NOT: "Hadamard"
 
     %m, %0, %1, %2, %3 = qec.ppm ["X", "X", "X", "X"](16) %q0, %q1, %q2, %q3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
 

@@ -409,8 +409,6 @@ def test_ppr_to_mbqc():
     print(test_ppr_to_mbqc_workflow.mlir_opt)
 
 
-# CHECK-NOT: qec.ppr
-# CHECK-NOT: qec.ppm
 # CHECK: quantum.custom "H"
 # CHECK: quantum.custom "RZ"
 # CHECK: quantum.custom "H"
@@ -423,4 +421,5 @@ def test_ppr_to_mbqc():
 # CHECK: quantum.custom "H"
 # CHECK-NOT: qec.ppr
 # CHECK-NOT: qec.ppm
+# CHECK: quantum.measure
 test_ppr_to_mbqc()

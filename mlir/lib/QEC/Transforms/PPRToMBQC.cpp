@@ -84,7 +84,7 @@ void constructPauliConjugationLayer(SmallVector<Value> &qubits, SmallVector<Stri
         switch (pauliString[idx].front()) {
         case 'X': {
             qubits[idx] =
-                buildSingleQubitGate(qubits[idx], "H", {}, rewriter).getOutQubits().front();
+                buildSingleQubitGate(qubits[idx], "Hadamard", {}, rewriter).getOutQubits().front();
             break;
         }
         case 'Y': {
