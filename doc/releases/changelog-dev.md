@@ -165,7 +165,7 @@
 
   - In PennyLane, dynamic wire allocation does not increase the total number of wires used in the circuit. This is due to PennyLane treating the number of wires during device
   initialization (`qml.device("...", wires=N)`) as the total device capacity. However, Catalyst treats this number as the initial number of wires requested, and
-  future allocations will request additional qubits on top of the initial ones.
+  future allocations will request additional wires on top of the initial ones.
 
   This will cause a performance difference, specifically in memory usage, when using
   dynamic qubit allocation feature with and without Catalyst.
