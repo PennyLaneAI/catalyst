@@ -172,7 +172,6 @@ def configure_mcm_and_try_one_shot(qnode, args, kwargs):
             try:
                 return Function(dynamic_one_shot(qnode, mcm_config=mcm_config))(*args, **kwargs)
             except (TypeError, ValueError, CompileError, NotImplementedError) as e:
-
                 # If user specified mcm_method, we can't fallback to single-branch-statistics,
                 # reraise the original error
                 if user_specified_mcm_method is not None:
@@ -187,6 +186,7 @@ def configure_mcm_and_try_one_shot(qnode, args, kwargs):
                         "qml.var(obs) cannot be returned when `mcm_method='one-shot'`",
                         "empty wires is not supported with dynamic wires in one-shot mode",
                         "No need to run one-shot mode",
+                        "must be an int or convertable to atuple of ints",
                     ]
                 )
 
