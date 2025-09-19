@@ -7,12 +7,10 @@
   [(#2002)](https://github.com/PennyLaneAI/catalyst/pull/2002)
 
   Two new functions, `qml.allocate()` and `qml.deallocate()`, [have been added to
-  PennyLane](I want to put a link to core PL here, but I'm not sure which one... probably the documentation page?) to support
-  dynamic qubit allocation on devices that support it. Currently,
-  on the Catalyst-compatible devices, the devices that support dynamic qubit allocation
-  are `lightning.qubit`, `lightning.kokkos` and `lightning.gpu`.
+  PennyLane](https://docs.pennylane.ai/en/stable/development/release_notes.html#release-0-43-0) to support
+  dynamic wire allocation. With Catalyst, these features can be accessed on `lightning.qubit`, `lightning.kokkos`, and `lightning.gpu`.
 
-  Dynamic qubit allocation refers to allocation of qubits in the middle of a circuit, as opposed to the static allocation during device initialization. For example:
+  Dynamic wire allocation refers to the allocation of wires in the middle of a circuit, as opposed to the static allocation during device initialization. For example:
 
   ```python
     qml.capture.enable()
@@ -68,9 +66,9 @@
   ```
 
   We can see that there are now 2 pairs of `quantum.alloc` and `quantum.dealloc`
-  operations. The quantum register value `%0` corresponds to the initial qubits on the
+  operations. The quantum register value `%0` corresponds to the initial wires on the
   device, and the quantum register value `%2` corresponds to the dynamically allocated
-  qubit.
+  wire.
 
   The above circuit can also be written as the context manager qubit allocation API. Compared to the plain `qml.allocate()` and `qml.deallocate()` function call API,
   the context manager API automatically deallocates when exiting the context's scope,
@@ -165,17 +163,12 @@
   [1. 0. 0. 0. 0. 0. 0. 0.]
   ```
 
-  - In PennyLane, dynamic qubit allocations do not increase the total number of qubits used in the circuit. This is because PennyLane treats the number of wires during device
-  initialization (the `qml.device("...", wires=N)`) as the device capacity.
-  When `qml.allocate()` is encountered, PennyLane just looks into the pool of existing
-  wires and chooses a suitable set of wires that is currently unused as the result of the
-  allocation, instead of requesting additional qubits from the device.
-
-  However, Catalyst treats this number as the initial number of qubits requested, and
-  future allocations will request additional qubits on top of the initial ones.
+  - In PennyLane, dynamic wire allocation does not increase the total number of wires used in the circuit. This is due to PennyLane treating the number of wires during device
+  initialization (`qml.device("...", wires=N)`) as the total device capacity. However, Catalyst treats this number as the initial number of wires requested, and
+  future allocations will request additional wires on top of the initial ones.
 
   This will cause a performance difference, specifically in memory usage, when using
-  dynamic qubit allocation feature with and without Catalyst.
+  dynamic wire allocation feature with and without Catalyst.
 
 * A new pass `--t-layer-reduction` has been added to reduce the depth and number of non-Clifford PPR
   operations by commuting adjacent PPRs and finding possible PPRs that can be merged.
