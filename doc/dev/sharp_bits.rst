@@ -1268,7 +1268,7 @@ in Python with PennyLane, and easily scale up prototypes by simply adding ``@qji
 This will require that all PennyLane functionality behaves identically whether or not
 the ``@qjit`` decorator is applied.
 
-Currently, however, this is not the case for measurements.
+Currently, however, this is not the case for the following functionalities.
 
 - **Measurement behaviour**: :func:`catalyst.measure` currently behaves
   differently from its PennyLane counterpart :func:`pennylane.measure`.

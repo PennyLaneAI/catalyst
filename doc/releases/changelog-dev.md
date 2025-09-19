@@ -2,7 +2,7 @@
 
 <h3>New features since last release</h3>
 
-* Catalyst now supports dynamic qubit allocation with `qml.allocate()` and
+* Catalyst now supports dynamic wire allocation with `qml.allocate()` and
   `qml.deallocate()` when program capture is enabled.
   [(#2002)](https://github.com/PennyLaneAI/catalyst/pull/2002)
 
@@ -13,21 +13,21 @@
   Dynamic wire allocation refers to the allocation of wires in the middle of a circuit, as opposed to the static allocation during device initialization. For example:
 
   ```python
-    qml.capture.enable()
+  qml.capture.enable()
 
-    @qjit
-    @qml.qnode(qml.device("lightning.qubit", wires=3))  # 3 initial qubits
-    def circuit():
-        qml.X(1)                   # |010>
+  @qjit
+  @qml.qnode(qml.device("lightning.qubit", wires=3))  # 3 initial qubits
+  def circuit():
+      qml.X(1)                   # |010>
 
-        q = qml.allocate(1)        # |010> and |0>, 1 dynamically allocted qubit
-        qml.X(q[0])                # |010> and |1>
-        qml.CNOT(wires=[q[0], 2])  # |011> and |1>
-        qml.deallocate(q[0])       # |011>
+      q = qml.allocate(1)        # |010> and |0>, 1 dynamically allocted qubit
+      qml.X(q[0])                # |010> and |1>
+      qml.CNOT(wires=[q[0], 2])  # |011> and |1>
+      qml.deallocate(q[0])       # |011>
 
-        return qml.probs(wires=[0, 1, 2])
+      return qml.probs(wires=[0, 1, 2])
 
-    qml.capture.disable()
+  qml.capture.disable()
   ```
 
   ```pycon
@@ -40,29 +40,29 @@
   when we inspect the compiled MLIR (with `print(circuit.mlir)`):
 
   ```
-    func.func public @circuit() -> tensor<8xf64> attributes {qnode} {
-      %c0_i64 = arith.constant 0 : i64
-      quantum.device shots(%c0_i64) ["/path/to/liblightning_qubit_catalyst.so", "LightningSimulator", "{'mcmc': False, 'num_burnin': 0, 'kernel_name': None}"]
-      %0 = quantum.alloc( 3) : !quantum.reg
-      %1 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
-      %out_qubits = quantum.custom "PauliX"() %1 : !quantum.bit
-      %2 = quantum.alloc( 1) : !quantum.reg
-      %3 = quantum.extract %2[ 0] : !quantum.reg -> !quantum.bit
-      %out_qubits_0 = quantum.custom "PauliX"() %3 : !quantum.bit
-      %4 = quantum.extract %0[ 2] : !quantum.reg -> !quantum.bit
-      %out_qubits_1:2 = quantum.custom "CNOT"() %out_qubits_0, %4 : !quantum.bit, !quantum.bit
-      %5 = quantum.insert %2[ 0], %out_qubits_1#0 : !quantum.reg, !quantum.bit
-      quantum.dealloc %5 : !quantum.reg
-      %6 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
-      %7 = quantum.compbasis qubits %6, %out_qubits, %out_qubits_1#1 : !quantum.obs
-      %8 = quantum.probs %7 : tensor<8xf64>
-      %9 = quantum.insert %0[ 1], %out_qubits : !quantum.reg, !quantum.bit
-      %10 = quantum.insert %9[ 2], %out_qubits_1#1 : !quantum.reg, !quantum.bit
-      %11 = quantum.insert %10[ 0], %6 : !quantum.reg, !quantum.bit
-      quantum.dealloc %11 : !quantum.reg
-      quantum.device_release
-      return %8 : tensor<8xf64>
-    }
+  func.func public @circuit() -> tensor<8xf64> attributes {qnode} {
+    %c0_i64 = arith.constant 0 : i64
+    quantum.device shots(%c0_i64) ["/path/to/liblightning_qubit_catalyst.so", "LightningSimulator", "{'mcmc': False, 'num_burnin': 0, 'kernel_name': None}"]
+    %0 = quantum.alloc( 3) : !quantum.reg
+    %1 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+    %out_qubits = quantum.custom "PauliX"() %1 : !quantum.bit
+    %2 = quantum.alloc( 1) : !quantum.reg
+    %3 = quantum.extract %2[ 0] : !quantum.reg -> !quantum.bit
+    %out_qubits_0 = quantum.custom "PauliX"() %3 : !quantum.bit
+    %4 = quantum.extract %0[ 2] : !quantum.reg -> !quantum.bit
+    %out_qubits_1:2 = quantum.custom "CNOT"() %out_qubits_0, %4 : !quantum.bit, !quantum.bit
+    %5 = quantum.insert %2[ 0], %out_qubits_1#0 : !quantum.reg, !quantum.bit
+    quantum.dealloc %5 : !quantum.reg
+    %6 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    %7 = quantum.compbasis qubits %6, %out_qubits, %out_qubits_1#1 : !quantum.obs
+    %8 = quantum.probs %7 : tensor<8xf64>
+    %9 = quantum.insert %0[ 1], %out_qubits : !quantum.reg, !quantum.bit
+    %10 = quantum.insert %9[ 2], %out_qubits_1#1 : !quantum.reg, !quantum.bit
+    %11 = quantum.insert %10[ 0], %6 : !quantum.reg, !quantum.bit
+    quantum.dealloc %11 : !quantum.reg
+    quantum.device_release
+    return %8 : tensor<8xf64>
+  }
   ```
 
   We can see that there are now 2 pairs of `quantum.alloc` and `quantum.dealloc`
@@ -75,100 +75,24 @@
   and no manual call to `qml.deallocate()` is necessary:
 
   ```python
-    qml.capture.enable()
-
-    @qjit
-    @qml.qnode(qml.device("lightning.qubit", wires=3))
-    def circuit():
-        qml.X(1)
-
-        with qml.allocate(1) as q:
-            qml.X(q[0])
-            qml.CNOT(wires=[q[0], 2])
-
-        return qml.probs(wires=[0, 1, 2])
-
-    qml.capture.disable()
-  ```
-
-  There are a couple sharp bits regarding this feature for now:
-  - The full signature of `qml.allocate()` in PennyLane is
-  ```python
-    qml.allocate(
-        num_wires: int,
-        state: Literal["zero", "any"],
-        restored: bool = False,
-    )
-  ```
-  where the `state` keyword argument controls whether the qubit is allocated in |0> or
-  an arbitrary state, and the `restored` keyword argument controls whether the user has
-  restored the qubit back to its original state it was allocated in.
-
-  When used with Catalyst, the `state` and `restored` keyword arguments are ignored. This
-  is because Catalyst's `quantum.alloc` operation always asks the device to allocate a
-  qubit in the clean |0> state, so there is no need to request qubits in the |0> state, or
-  keep track of whether qubits were released in the |0> state.
-
-  - Qubits allocated outside a MLIR region cannot be used inside the region yet. This
-  includes control flows (if statements, for loops and while loops), `qml.adjoint()`, and subroutines:
-
-  ```python
   qml.capture.enable()
 
-  @qjit(autograph=True)
+  @qjit
   @qml.qnode(qml.device("lightning.qubit", wires=3))
-  def circuit(c):
+  def circuit():
+      qml.X(1)
 
       with qml.allocate(1) as q:
-          if c:
-              qml.X(q[0])
-          else:
-              qml.Z(q[0])
+          qml.X(q[0])
+          qml.CNOT(wires=[q[0], 2])
 
       return qml.probs(wires=[0, 1, 2])
 
-  print(circuit(True))
   qml.capture.disable()
   ```
 
-  ```pycon
-  NotImplementedError:
-    Dynamically allocated wires in a parent scope cannot be used in a child
-    scope yet. Please consider dynamical allocation inside the child scope.
-  ```
-  We will be implementing this soon. In the meantime, a workaround is to move the
-  allocations into the regions:
-
-  ```python
-  qml.capture.enable()
-
-  @qjit(autograph=True)
-  @qml.qnode(qml.device("lightning.qubit", wires=3))
-  def circuit(c):
-
-      if c:
-          with qml.allocate(1) as q:
-              qml.X(q[0])
-      else:
-          with qml.allocate(1) as q:
-              qml.Z(q[0])
-
-      return qml.probs(wires=[0, 1, 2])
-
-  print(circuit(True))
-  qml.capture.disable()
-  ```
-
-  ```pycon
-  [1. 0. 0. 0. 0. 0. 0. 0.]
-  ```
-
-  - In PennyLane, dynamic wire allocation does not increase the total number of wires used in the circuit. This is due to PennyLane treating the number of wires during device
-  initialization (`qml.device("...", wires=N)`) as the total device capacity. However, Catalyst treats this number as the initial number of wires requested, and
-  future allocations will request additional wires on top of the initial ones.
-
-  This will cause a performance difference, specifically in memory usage, when using
-  dynamic wire allocation feature with and without Catalyst.
+  There are a couple of sharp bits regarding this feature for now. For details, please see
+  [the relevant sections on the Catalyst sharp bits page](https://docs.pennylane.ai/projects/catalyst/en/stable/dev/sharp_bits.html#functionality-differences-from-pennylane).
 
 * A new pass `--t-layer-reduction` has been added to reduce the depth and number of non-Clifford PPR
   operations by commuting adjacent PPRs and finding possible PPRs that can be merged.
@@ -511,6 +435,7 @@ This release contains contributions from (in alphabetical order):
 Ali Asadi,
 Joey Carter,
 Yushao Chen,
+Isaac De Vlugt,
 Sengthai Heng,
 David Ittah,
 Jeffrey Kam,
@@ -522,4 +447,4 @@ Ritu Thombre,
 Roberto Turrado,
 Paul Haochen Wang,
 Jake Zaia,
-Hongsheng Zheng
+Hongsheng Zheng.
