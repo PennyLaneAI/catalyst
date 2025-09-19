@@ -109,7 +109,7 @@ class CompileOptions:
             Default is None.
         pass_plugins (Optional[Iterable[Path]]): List of paths to pass plugins.
         dialect_plugins (Optional[Iterable[Path]]): List of paths to dialect plugins.
-	debug_compiler (Optional[bool]): Enable external debugger attachment to the compiler
+	    debug_compiler (Optional[bool]): Enable external debugger attachment to the compiler
             driver when launching from an active Python debugging environment.
     """
 
