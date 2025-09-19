@@ -45,7 +45,7 @@ from pennylane.transforms import unitary_to_rot as pl_unitary_to_rot
 
 from catalyst.device import extract_backend_info
 from catalyst.device.qjit_device import COMPILER_OPERATIONS
-from catalyst.from_plxpr.decompose import GraphSolutionInterpreter
+from catalyst.from_plxpr.decompose import DecompRuleInterpreter
 from catalyst.from_plxpr.qubit_handler import QubitHandler
 from catalyst.jax_extras import jaxpr_pad_consts, make_jaxpr2, transient_jax_config
 from catalyst.jax_primitives import (
@@ -315,7 +315,7 @@ def apply_compiler_decompose_to_plxpr(inner_jaxpr, consts, tgateset, ncargs):
 def collect_and_compile_graph_solutions(inner_jaxpr, consts, tkwargs, ncargs):
     """Collect and compile graph solutions for a given JAXPR.
 
-    This function uses the GraphSolutionInterpreter to evaluate
+    This function uses the DecompRuleInterpreter to evaluate
     the input JAXPR and obtain a new JAXPR that incorporates
     the graph-based decomposition solutions.
 
@@ -331,7 +331,7 @@ def collect_and_compile_graph_solutions(inner_jaxpr, consts, tkwargs, ncargs):
     Returns:
         ClosedJaxpr: The decomposed JAXPR.
     """
-    gds_interpreter = GraphSolutionInterpreter(**tkwargs)
+    gds_interpreter = DecompRuleInterpreter(**tkwargs)
 
     def gds_wrapper(*args):
         return gds_interpreter.eval(inner_jaxpr, consts, *args)
@@ -401,7 +401,7 @@ def register_transform(pl_transform, pass_name, decomposition):
             # the current jaxpr based on the current gateset
             # but we don't rewrite the jaxpr at this stage.
 
-            # gds_interpreter = GraphSolutionInterpreter(*targs, **tkwargs)
+            # gds_interpreter = DecompRuleInterpreter(*targs, **tkwargs)
 
             # def gds_wrapper(*args):
             #     return gds_interpreter.eval(inner_jaxpr, consts, *args)
