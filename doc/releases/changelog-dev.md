@@ -66,9 +66,9 @@
   ```
 
   We can see that there are now 2 pairs of `quantum.alloc` and `quantum.dealloc`
-  operations. The quantum register value `%0` corresponds to the initial qubits on the
+  operations. The quantum register value `%0` corresponds to the initial wires on the
   device, and the quantum register value `%2` corresponds to the dynamically allocated
-  qubit.
+  wire.
 
   The above circuit can also be written as the context manager qubit allocation API. Compared to the plain `qml.allocate()` and `qml.deallocate()` function call API,
   the context manager API automatically deallocates when exiting the context's scope,
