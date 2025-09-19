@@ -47,7 +47,7 @@ from pennylane.transforms import single_qubit_fusion as pl_single_qubit_fusion
 from pennylane.transforms import unitary_to_rot as pl_unitary_to_rot
 
 from catalyst.device import extract_backend_info
-from catalyst.from_plxpr.qubit_handler import QREG_MIN_HASH, QubitHandler, QubitIndexRecorder
+from catalyst.from_plxpr.qubit_handler import QubitHandler, QubitIndexRecorder, get_in_qubit_values
 from catalyst.jax_extras import jaxpr_pad_consts, make_jaxpr2, transient_jax_config
 from catalyst.jax_primitives import (
     AbstractQbit,
@@ -360,53 +360,12 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         if not self.init_qreg.is_qubit_mode():
             self.init_qreg.insert_dynamic_qubits(op.wires + control_wires)
 
-        in_qubits = []
-        in_qregs = []
-
-        for w in op.wires:
-            # Note: `w` is the plxpr global wire index
-            if not self.qubit_index_recorder.contains(w):
-                # First time the global wire index w is encountered
-                # Need to extract from init qreg
-                # TODO: this can now only be from the global qreg, because right now in from_plxpr
-                # conversion, subscopes (control flow, adjoint, ...) can only take in the global
-                # qreg as the final scope argument. They cannot take an arbitrary number of qreg
-                # values yet.
-                # Supporting multiple registers requires refactoring the from_plxpr conversion's
-                # implementation.
-                if isinstance(w, int) and w > QREG_MIN_HASH:
-                    raise NotImplementedError(
-                        textwrap.dedent(
-                            """
-                        Dynamically allocated wires in a parent scope cannot be used in a child
-                        scope yet. Please consider dynamical allocation inside the child scope.
-                        """
-                        )
-                    )
-                in_qubits.append(self.init_qreg[self.init_qreg.global_index_to_local_index(w)])
-                in_qregs.append(self.init_qreg)
-
-            else:
-                in_qreg = self.qubit_index_recorder[w]
-                in_qregs.append(in_qreg)
-                in_qubits.append(in_qreg[in_qreg.global_index_to_local_index(w)])
-
-        in_ctrl_qubits = []
-        in_ctrl_qregs = []
-        for w in control_wires:
-            # Note: `w` is the plxpr global wire index
-            if not self.qubit_index_recorder.contains(w):
-                # First time the global wire index w is encountered
-                # Need to extract from init qreg
-                # This won't be a dynamically allocated qreg, since these have all
-                # wires extracted after binding their alloc primitives immediately.
-                in_ctrl_qubits.append(self.init_qreg[self.init_qreg.global_index_to_local_index(w)])
-                in_ctrl_qregs.append(self.init_qreg)
-
-            else:
-                in_ctrl_qreg = self.qubit_index_recorder[w]
-                in_ctrl_qregs.append(in_ctrl_qreg)
-                in_ctrl_qubits.append(in_ctrl_qreg[in_ctrl_qreg.global_index_to_local_index(w)])
+        in_qregs, in_qubits = get_in_qubit_values(
+            op.wires, self.qubit_index_recorder, self.init_qreg
+        )
+        in_ctrl_qregs, in_ctrl_qubits = get_in_qubit_values(
+            control_wires, self.qubit_index_recorder, self.init_qreg
+        )
 
         out_qubits = qinst_p.bind(
             *[*in_qubits, *op.data, *in_ctrl_qubits, *control_values],
@@ -536,17 +495,9 @@ def handle_qml_alloc(self, *, num_wires, state=None, restored=False):
 def handle_qml_dealloc(self, *wires):
     """Handle the conversion from plxpr to Catalyst jaxpr for the qml.deallocate primitive"""
     qreg = self.qubit_index_recorder[wires[0]]
+    assert all(self.qubit_index_recorder[w] is qreg for w in wires)
     qreg.insert_all_dangling_qubits()
-
-    # TODO: currently __catalyst__rt__qubit_release_array() in runtime would
-    # call ReleaseAllQubits() on the device
-    # This means we cannot deallocate until the very end
-    # For now we just treat the dynamically allocated qubits in the same way as the
-    # initial ones, and deallocate at the end.
-    # Blocked by https://github.com/PennyLaneAI/catalyst/pull/1996
-    # which is blocked by https://github.com/PennyLaneAI/pennylane-lightning/pull/1254
     qdealloc_p.bind(qreg.get())
-
     return []
 
 
@@ -678,10 +629,10 @@ def handle_decomposition_rule(self, *, pyfun, func_jaxpr, is_qreg, num_params):
 @PLxPRToQuantumJaxprInterpreter.register_primitive(qml.QubitUnitary._primitive)
 def handle_qubit_unitary(self, *invals, n_wires):
     """Handle the conversion from plxpr to Catalyst jaxpr for the QubitUnitary primitive"""
-    wires = [self.init_qreg[w] for w in invals[1:]]
-    outvals = unitary_p.bind(invals[0], *wires, qubits_len=n_wires, ctrl_len=0, adjoint=False)
-    for wire_values, new_wire in zip(invals[1:], outvals):
-        self.init_qreg[wire_values] = new_wire
+    in_qregs, in_qubits = get_in_qubit_values(invals[1:], self.qubit_index_recorder, self.init_qreg)
+    outvals = unitary_p.bind(invals[0], *in_qubits, qubits_len=n_wires, ctrl_len=0, adjoint=False)
+    for in_qreg, w, new_wire in zip(in_qregs, invals[1:], outvals):
+        in_qreg[in_qreg.global_index_to_local_index(w)] = new_wire
 
 
 # pylint: disable=unused-argument
@@ -698,11 +649,13 @@ def handle_basis_state(self, *invals, n_wires):
     wires_inval = invals[1:]
 
     state = jax.lax.convert_element_type(state_inval, jnp.dtype(jnp.bool))
-    wires = [self.init_qreg[w] for w in wires_inval]
-    out_wires = set_basis_state_p.bind(*wires, state)
+    in_qregs, in_qubits = get_in_qubit_values(
+        wires_inval, self.qubit_index_recorder, self.init_qreg
+    )
+    out_wires = set_basis_state_p.bind(*in_qubits, state)
 
-    for wire_values, new_wire in zip(wires_inval, out_wires):
-        self.init_qreg[wire_values] = new_wire
+    for in_qreg, w, new_wire in zip(in_qregs, wires_inval, out_wires):
+        in_qreg[in_qreg.global_index_to_local_index(w)] = new_wire
 
 
 # pylint: disable=unused-argument
@@ -715,34 +668,37 @@ def handle_state_prep(self, *invals, n_wires, **kwargs):
     # jnp.complex128 is the top element in the type promotion lattice so it is ok to do this:
     # https://jax.readthedocs.io/en/latest/type_promotion.html
     state = jax.lax.convert_element_type(state_inval, jnp.dtype(jnp.complex128))
-    wires = [self.init_qreg[w] for w in wires_inval]
-    out_wires = set_state_p.bind(*wires, state)
+    in_qregs, in_qubits = get_in_qubit_values(
+        wires_inval, self.qubit_index_recorder, self.init_qreg
+    )
+    out_wires = set_state_p.bind(*in_qubits, state)
 
-    for wire_values, new_wire in zip(wires_inval, out_wires):
-        self.init_qreg[wire_values] = new_wire
+    for in_qreg, w, new_wire in zip(in_qregs, wires_inval, out_wires):
+        in_qreg[in_qreg.global_index_to_local_index(w)] = new_wire
 
 
 @PLxPRToQuantumJaxprInterpreter.register_primitive(plxpr_measure_prim)
 def handle_measure(self, wire, reset, postselect):
     """Handle the conversion from plxpr to Catalyst jaxpr for the mid-circuit measure primitive."""
 
-    in_wire = self.init_qreg[wire]
-
+    in_qreg, in_wire = (
+        _[0] for _ in get_in_qubit_values([wire], self.qubit_index_recorder, self.init_qreg)
+    )
     result, out_wire = measure_p.bind(in_wire, postselect=postselect)
 
     if reset:
         # Constants need to be passed as input values for some reason I forgot about.
         correction = jaxpr_pad_consts(
             [
-                jax.make_jaxpr(lambda: qinst_p.bind(in_wire, op="PauliX", qubits_len=1))().jaxpr,
+                jax.make_jaxpr(lambda: qinst_p.bind(out_wire, op="PauliX", qubits_len=1))().jaxpr,
                 jax.make_jaxpr(lambda: out_wire)().jaxpr,
             ]
         )
         out_wire = cond_p.bind(
-            result, in_wire, out_wire, branch_jaxprs=correction, nimplicit_outputs=None
+            result, out_wire, out_wire, branch_jaxprs=correction, nimplicit_outputs=None
         )[0]
 
-    self.init_qreg[wire] = out_wire
+    in_qreg[in_qreg.global_index_to_local_index(wire)] = out_wire
     return result
 
 
@@ -759,10 +715,12 @@ def handle_measure_in_basis(self, angle, wire, plane, reset, postselect):
             f"Measurement plane must be one of {[plane.value for plane in MeasurementPlane]}"
         ) from e
 
-    in_wire = self.init_qreg[wire]
+    in_qreg, in_wire = (
+        _[0] for _ in get_in_qubit_values([wire], self.qubit_index_recorder, self.init_qreg)
+    )
     result, out_wire = measure_in_basis_p.bind(_angle, in_wire, plane=_plane, postselect=postselect)
 
-    self.init_qreg[wire] = out_wire
+    in_qreg[in_qreg.global_index_to_local_index(wire)] = out_wire
 
     return result
 

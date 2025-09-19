@@ -68,6 +68,8 @@ Therefore, the two central questions we wish to answer is:
    qubit SSA values on its wires?
 """
 
+import textwrap
+
 from catalyst.jax_extras import DynamicJaxprTracer
 from catalyst.jax_primitives import AbstractQbit, AbstractQreg, qextract_p, qinsert_p
 from catalyst.utils.exceptions import CompileError
@@ -385,3 +387,54 @@ class QubitHandler:
 
         if not keep_cache:
             self.insert_all_dangling_qubits()
+
+
+def get_in_qubit_values(
+    wires, qubit_index_recorder: QubitIndexRecorder, fallback_qreg: QubitHandler
+):
+    """
+    Return the current SSA qreg and qubit values corresponding to the plxpr global indices `wires`.
+
+    Args:
+        wires (Iterable): the global plxpr indices to be queried.
+        qubit_index_recorder (QubitIndexRecorder): the recorder of the current interpreter.
+        fallback_qreg (QubitHandler): the qreg to extract qubits from if the requested plxpr wire
+        indices have not been recorded on the recorder.
+
+    Returns:
+        in_qregs (List): the i-th entry of this result is the current qreg SSA value for the
+        register containing the i-th wire in the argument.
+        in_qubits (List): the i-th entry of this result is the current qubit SSA value for the
+        i-th wire in the argument.
+    """
+    in_qregs = []
+    in_qubits = []
+
+    for w in wires:
+        if not qubit_index_recorder.contains(w):
+            # First time the global wire index w is encountered
+            # Need to extract from fallback qreg
+            # TODO: this can now only be from the global qreg, because right now in from_plxpr
+            # conversion, subscopes (control flow, adjoint, ...) can only take in the global
+            # qreg as the final scope argument. They cannot take an arbitrary number of qreg
+            # values yet.
+            # Supporting multiple registers requires refactoring the from_plxpr conversion's
+            # implementation.
+            if isinstance(w, int) and w > QREG_MIN_HASH:
+                raise NotImplementedError(
+                    textwrap.dedent(
+                        """
+                    Dynamically allocated wires in a parent scope cannot be used in a child
+                    scope yet. Please consider dynamical allocation inside the child scope.
+                    """
+                    )
+                )
+            in_qubits.append(fallback_qreg[fallback_qreg.global_index_to_local_index(w)])
+            in_qregs.append(fallback_qreg)
+
+        else:
+            in_qreg = qubit_index_recorder[w]
+            in_qregs.append(in_qreg)
+            in_qubits.append(in_qreg[in_qreg.global_index_to_local_index(w)])
+
+    return in_qregs, in_qubits

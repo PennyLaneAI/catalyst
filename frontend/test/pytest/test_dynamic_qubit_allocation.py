@@ -19,9 +19,11 @@ Note that this feature is only available under the plxpr pipeline.
 
 import textwrap
 
+import jax
 import numpy as np
 import pennylane as qml
 import pytest
+from jax import numpy as jnp
 
 from catalyst import qjit
 
@@ -74,6 +76,142 @@ def test_basic_dynamic_wire_alloc_ctx_API():
     qml.capture.disable()
 
     expected = [0, 0, 0, 1, 0, 0, 0, 0]
+    assert np.allclose(expected, observed)
+
+
+def test_measure():
+    """
+    Test qml.allocate with qml.Measure ops.
+    """
+    qml.capture.enable()
+
+    @qjit(autograph=True)
+    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    def circuit():
+        with qml.allocate(1) as q:
+            qml.Hadamard(q[0])
+            m = qml.measure(wires=q[0], postselect=1)
+
+        if m:
+            qml.X(0)
+
+        return qml.probs(wires=[0])  # |1>
+
+    observed = circuit()
+    qml.capture.disable()
+
+    expected = [0, 1]
+    assert np.allclose(expected, observed)
+
+
+def test_measure_with_reset():
+    """
+    Test qml.allocate with qml.Measure ops with resetting.
+    """
+    qml.capture.enable()
+
+    @qjit(autograph=True)
+    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    def circuit():
+        with qml.allocate(1) as q:
+            qml.Hadamard(q[0])
+            # measure 1 and reset q[0] to |0>
+            m1 = qml.measure(wires=q[0], reset=True, postselect=1)
+            # measure 0
+            m0 = qml.measure(wires=q[0])
+
+        if m0:  # should not be hit
+            qml.RX(37.42, wires=[0])
+
+        if m1:  # should be hit
+            qml.X(wires=[0])
+
+        return qml.probs(wires=[0])
+
+    observed = circuit()
+    qml.capture.disable()
+
+    expected = [0, 1]
+    assert np.allclose(expected, observed)
+
+
+@pytest.mark.parametrize("ctrl_val, expected", [(False, [0, 1]), (True, [1, 0])])
+def test_qml_ctrl(ctrl_val, expected):
+    """
+    Test qml.allocate with qml.ctrl ops.
+    """
+    qml.capture.enable()
+
+    @qjit
+    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    def circuit():
+        with qml.allocate(1) as q:
+            qml.ctrl(qml.X, (q), control_values=(ctrl_val))(wires=0)
+        return qml.probs(wires=[0])
+
+    observed = circuit()
+    qml.capture.disable()
+
+    assert np.allclose(expected, observed)
+
+
+def test_QubitUnitary():
+    """
+    Test qml.allocate with qml.QubitUnitary ops.
+    """
+    qml.capture.enable()
+
+    @qjit
+    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    def circuit():
+        with qml.allocate(2) as qs:
+            qml.QubitUnitary(jnp.identity(8), wires=[0, qs[0], qs[1]])
+        return qml.probs(wires=[0])
+
+    observed = circuit()
+    qml.capture.disable()
+
+    expected = [1, 0]
+    assert np.allclose(expected, observed)
+
+
+def test_StatePrep():
+    """
+    Test qml.allocate with qml.StatePrep ops.
+    """
+    qml.capture.enable()
+
+    @qjit
+    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    def circuit():
+        with qml.allocate(1) as q:
+            qml.StatePrep(jnp.array([0, 0, 0, 1]), wires=[0, q[0]])  # |11>
+        return qml.probs(wires=[0])  # |1>
+
+    observed = circuit()
+    qml.capture.disable()
+
+    expected = [0, 1]
+    assert np.allclose(expected, observed)
+
+
+def test_BasisState():
+    """
+    Test qml.allocate with qml.BasisState ops.
+    """
+    qml.capture.enable()
+
+    @qjit
+    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    def circuit():
+        with qml.allocate(1) as q:
+            qml.BasisState(jnp.array([1, 0]), wires=[q[0], 0])  # |10>
+        return qml.probs(wires=[0])  # |0>
+
+    observed = circuit()
+    qml.capture.disable()
+
+    expected = [1, 0]
     assert np.allclose(expected, observed)
 
 
