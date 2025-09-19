@@ -186,7 +186,7 @@ def configure_mcm_and_try_one_shot(qnode, args, kwargs):
                         "qml.var(obs) cannot be returned when `mcm_method='one-shot'`",
                         "empty wires is not supported with dynamic wires in one-shot mode",
                         "No need to run one-shot mode",
-                        "must be an int or convertable to atuple of ints",
+                        "The `static_argnums` argument to `qjit` must be an int",
                     ]
                 )
 
