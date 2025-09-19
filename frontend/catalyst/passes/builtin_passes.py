@@ -536,16 +536,16 @@ def to_ppr(qnode):
 
 
     The full list of supported gates and operations are
-    :class:`qml.H`,
-    :class:`qml.S`,
-    :class:`qml.T`,
-    :class:`qml.X`,
-    :class:`qml.Y`,
-    :class:`qml.Z`,
-    :class:`qml.adjoint(qml.S)`,
-    :class:`qml.adjoint(qml.T)`,
-    :class:`qml.CNOT`, and
-    :class:`qml.measure()`
+    ``qml.H``,
+    ``qml.S``,
+    ``qml.T``,
+    ``qml.X``,
+    ``qml.Y``,
+    ``qml.Z``,
+    ``qml.adjoint(qml.S)``,
+    ``qml.adjoint(qml.T)``,
+    ``qml.CNOT``, and
+    ``catalyst.measure``
 
     Args:
         fn (QNode): QNode to apply the pass to
