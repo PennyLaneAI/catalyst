@@ -2,6 +2,12 @@
 
 <h3>New features since last release</h3>
 
+* A new experimental decomposition system is introduced in Catalyst enabling the
+  PennyLane's graph-based decomposition and MLIR-based lowering of decomposition rules.
+  This feature is integrated with PennyLane program capture and graph-based decomposition
+  including support for custom decomposition rules and operators.
+  [(#2029)](https://github.com/PennyLaneAI/catalyst/pull/2029)
+
 * A new pass `--t-layer-reduction` has been added to reduce the depth and number of non-Clifford PPR
   operations by commuting adjacent PPRs and finding possible PPRs that can be merged.
   For more details, see the Figure 6 in [A Game of Surface Code](https://arXiv:1808.02892v3) paper.
@@ -25,6 +31,7 @@
       qml.ctrl(qml.PCPhase(0.5, dim=1, wires=[0, 2]), control=[1])
       return qml.probs()
   ```
+
 
 <h3>Improvements 🛠</h3>
 
