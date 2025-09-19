@@ -7,10 +7,8 @@
   [(#2002)](https://github.com/PennyLaneAI/catalyst/pull/2002)
 
   Two new functions, `qml.allocate()` and `qml.deallocate()`, [have been added to
-  PennyLane](I want to put a link to core PL here, but I'm not sure which one... probably the documentation page?) to support
-  dynamic qubit allocation on devices that support it. Currently,
-  on the Catalyst-compatible devices, the devices that support dynamic qubit allocation
-  are `lightning.qubit`, `lightning.kokkos` and `lightning.gpu`.
+  PennyLane](https://docs.pennylane.ai/en/stable/development/release_notes.html#release-0-43-0) to support
+  dynamic wire allocation. With Catalyst, these features can be accessed on `lightning.qubit`, `lightning.kokkos`, and `lightning.gpu`.
 
   Dynamic qubit allocation refers to allocation of qubits in the middle of a circuit, as opposed to the static allocation during device initialization. For example:
 
