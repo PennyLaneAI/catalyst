@@ -19,7 +19,6 @@ Note that this feature is only available under the plxpr pipeline.
 
 import textwrap
 
-import jax
 import numpy as np
 import pennylane as qml
 import pytest
@@ -146,7 +145,7 @@ def test_qml_ctrl(ctrl_val, expected):
     @qml.qnode(qml.device("lightning.qubit", wires=1))
     def circuit():
         with qml.allocate(1) as q:
-            qml.ctrl(qml.X, (q), control_values=(ctrl_val))(wires=0)
+            qml.ctrl(qml.X, (q), control_values=ctrl_val)(wires=0)
         return qml.probs(wires=[0])
 
     observed = circuit()

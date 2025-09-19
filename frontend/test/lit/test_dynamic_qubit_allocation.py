@@ -116,7 +116,7 @@ def test_measure_with_reset():
     # CHECK:  quantum.dealloc [[dealloc_qreg]]
 
     with qml.allocate(1) as q:
-        m1 = qml.measure(wires=q[0], reset=True, postselect=1)
+        qml.measure(wires=q[0], reset=True, postselect=1)
 
     return qml.probs(wires=[0, 1, 2])
 
