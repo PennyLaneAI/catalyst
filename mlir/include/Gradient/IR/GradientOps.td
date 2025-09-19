@@ -18,6 +18,7 @@
 include "mlir/Interfaces/FunctionInterfaces.td"
 include "mlir/Interfaces/CallInterfaces.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
+include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/SymbolInterfaces.td"
 include "mlir/IR/BuiltinAttributes.td"
 include "mlir/IR/OpBase.td"
@@ -36,7 +37,7 @@ def GradOp : Gradient_Op<"grad", [
         using the finite difference method.
 
         This operation acts much like the `func.call` operation, taking a
-        symbol reference and arguments to the original functionan as input.
+        symbol reference and arguments to the original function as input.
         However, instead of the function result, the gradient of the function
         is returned.
 
@@ -58,7 +59,9 @@ def GradOp : Gradient_Op<"grad", [
         SymbolRefAttr:$callee,
         Variadic<AnyType>:$operands,
         OptionalAttr<AnyIntElementsAttr>:$diffArgIndices,
-        OptionalAttr<Builtin_FloatAttr>:$finiteDiffParam
+        OptionalAttr<Builtin_FloatAttr>:$finiteDiffParam,
+        OptionalAttr<DictArrayAttr>:$arg_attrs,
+        OptionalAttr<DictArrayAttr>:$res_attrs
     );
     let results = (outs Variadic<AnyTypeOf<[AnyFloat, RankedTensorOf<[AnyFloat]>]>>);
 
@@ -82,7 +85,9 @@ def ValueAndGradOp : Gradient_Op<"value_and_grad", [
         SymbolRefAttr:$callee,
         Variadic<AnyType>:$operands,
         OptionalAttr<AnyIntElementsAttr>:$diffArgIndices,
-        OptionalAttr<Builtin_FloatAttr>:$finiteDiffParam
+        OptionalAttr<Builtin_FloatAttr>:$finiteDiffParam,
+        OptionalAttr<DictArrayAttr>:$arg_attrs,
+        OptionalAttr<DictArrayAttr>:$res_attrs
     );
 
     let results = (outs
@@ -184,7 +189,9 @@ def JVPOp : Gradient_Op<"jvp", [
         Variadic<AnyType>:$params,
         Variadic<AnyType>:$tangents,
         OptionalAttr<AnyIntElementsAttr>:$diffArgIndices,
-        OptionalAttr<Builtin_FloatAttr>:$finiteDiffParam
+        OptionalAttr<Builtin_FloatAttr>:$finiteDiffParam,
+        OptionalAttr<DictArrayAttr>:$arg_attrs,
+        OptionalAttr<DictArrayAttr>:$res_attrs
     );
 
     let results = (outs
@@ -217,7 +224,9 @@ def VJPOp : Gradient_Op<"vjp", [
         Variadic<AnyType>:$params,
         Variadic<AnyType>:$cotangents,
         OptionalAttr<AnyIntElementsAttr>:$diffArgIndices,
-        OptionalAttr<Builtin_FloatAttr>:$finiteDiffParam
+        OptionalAttr<Builtin_FloatAttr>:$finiteDiffParam,
+        OptionalAttr<DictArrayAttr>:$arg_attrs,
+        OptionalAttr<DictArrayAttr>:$res_attrs
     );
 
     let results = (outs
@@ -236,7 +245,7 @@ def VJPOp : Gradient_Op<"vjp", [
 def ForwardOp : Gradient_Op<"forward",
     [FunctionOpInterface, IsolatedFromAbove]> {
 
-  let summary = "Operation denoting the forwrad pass that is registered with Enzyme.";
+  let summary = "Operation denoting the forward pass that is registered with Enzyme.";
 
   let description = [{
     Wrapper around the concrete function. This wrapper ensures calling convention.

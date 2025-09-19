@@ -168,13 +168,15 @@ class AdjointGenerator {
             ValueRange params = parametrizedGate.getAllParams();
             size_t numParams = params.size();
             SmallVector<Value> cachedParams(numParams);
+            size_t idx = 0;
             // popping gives the parameters in reverse
-            for (auto [idx, param] : llvm::enumerate(llvm::reverse(params))) {
+            for (Value param : llvm::reverse(params)) {
                 Type paramType = param.getType();
                 verifyTypeIsCacheable(paramType, operation);
                 if (paramType.isF64()) {
                     cachedParams[numParams - 1 - idx] =
                         builder.create<ListPopOp>(parametrizedGate.getLoc(), cache.paramVector);
+                    idx++;
                     continue;
                 }
 
@@ -259,6 +261,7 @@ class AdjointGenerator {
 
                 Value recreatedTensor = iForLoop.getResult(0);
                 cachedParams[numParams - 1 - idx] = recreatedTensor;
+                idx++;
             }
             MutableOperandRange(clone, parametrizedGate.getParamOperandIdx(), params.size())
                 .assign(cachedParams);

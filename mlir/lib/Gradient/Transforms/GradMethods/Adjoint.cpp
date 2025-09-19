@@ -12,32 +12,29 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "Adjoint.hpp"
-
 #include <algorithm>
 #include <sstream>
 #include <vector>
 
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/IR/IRMapping.h"
 
 #include "Gradient/IR/GradientOps.h"
 #include "Gradient/Utils/DifferentialQNode.h"
 #include "Gradient/Utils/GradientShape.h"
 #include "Quantum/IR/QuantumOps.h"
 
+#include "Adjoint.hpp"
+
 namespace catalyst {
 namespace gradient {
 
-LogicalResult AdjointLowering::match(func::FuncOp op) const
+LogicalResult AdjointLowering::matchAndRewrite(func::FuncOp op, PatternRewriter &rewriter) const
 {
-    if (getQNodeDiffMethod(op) == "adjoint" && requiresCustomGradient(op))
-        return success();
+    if (!(getQNodeDiffMethod(op) == "adjoint" && requiresCustomGradient(op))) {
+        return failure();
+    }
 
-    return failure();
-}
-
-void AdjointLowering::rewrite(func::FuncOp op, PatternRewriter &rewriter) const
-{
     Location loc = op.getLoc();
     rewriter.setInsertionPointAfter(op);
 
@@ -47,15 +44,45 @@ void AdjointLowering::rewrite(func::FuncOp op, PatternRewriter &rewriter) const
 
     // Register the quantum gradient on the quantum-only split-out QNode.
     registerCustomGradient(op, FlatSymbolRefAttr::get(qGradFn));
+    return success();
 }
 
 func::FuncOp AdjointLowering::discardAndReturnReg(PatternRewriter &rewriter, Location loc,
                                                   func::FuncOp callee)
 {
+    // TODO: we do not support multiple return statements (which can happen for unstructured
+    // control flow), i.e. our gradient functions will have just one block.
+    assert(callee.getBody().hasOneBlock() &&
+           "Gradients with unstructured control flow are not supported");
+
+    // Since the return value is guaranteed to be discarded, then let's change the return type
+    // to be only the quantum register and the expval.
+    //
+    // We also need to return the expval to avoid dead code elimination downstream from
+    // removing the expval op in the body.
+    // TODO: we only support grad on expval op for now
     SmallVector<quantum::DeallocOp> deallocs;
-    for (auto op : callee.getOps<quantum::DeallocOp>()) {
-        deallocs.push_back(op);
-    };
+    SmallVector<quantum::ExpvalOp> expvalOps;
+    SmallVector<quantum::DeviceReleaseOp> deviceReleaseOps;
+    for (Operation &op : callee.getBody().getOps()) {
+        if (isa<quantum::DeallocOp>(op)) {
+            deallocs.push_back(cast<quantum::DeallocOp>(op));
+            continue;
+        }
+        else if (isa<quantum::MeasurementProcess>(op)) {
+            if (isa<quantum::ExpvalOp>(op)) {
+                expvalOps.push_back(cast<quantum::ExpvalOp>(op));
+                continue;
+            }
+            else {
+                callee.emitOpError() << "Adjoint gradient is only supported on expval measurements";
+                return callee;
+            }
+        }
+        else if (isa<quantum::DeviceReleaseOp>(op)) {
+            deviceReleaseOps.push_back(cast<quantum::DeviceReleaseOp>(op));
+        }
+    }
 
     // If there are no deallocs leave early then this transformation
     // is invalid. This is because the caller will expect a quantum register
@@ -67,11 +94,20 @@ func::FuncOp AdjointLowering::discardAndReturnReg(PatternRewriter &rewriter, Loc
         return callee;
     }
 
-    // Since the return value is guaranteed to be discarded, then let's change the return type
-    // to be only the quantum register.
+    size_t numDeviceReleases = deviceReleaseOps.size();
+    if (numDeviceReleases > 1) {
+        callee.emitOpError() << "Invalid number of device release ops: " << numDeviceReleases;
+        return callee;
+    }
+
+    // Create clone, return type is qreg and float for the expvals
     std::string fnName = callee.getName().str() + ".nodealloc";
     Type qregType = quantum::QuregType::get(rewriter.getContext());
-    FunctionType fnType = rewriter.getFunctionType(callee.getArgumentTypes(), qregType);
+    Type f64Type = rewriter.getF64Type();
+    SmallVector<Type> retTypes{qregType};
+    std::for_each(expvalOps.begin(), expvalOps.end(),
+                  [&](const quantum::ExpvalOp &) { retTypes.push_back(f64Type); });
+    FunctionType fnType = rewriter.getFunctionType(callee.getArgumentTypes(), retTypes);
     StringAttr visibility = rewriter.getStringAttr("private");
 
     func::FuncOp unallocFn =
@@ -82,25 +118,32 @@ func::FuncOp AdjointLowering::discardAndReturnReg(PatternRewriter &rewriter, Loc
         rewriter.setInsertionPointAfter(callee);
         unallocFn =
             rewriter.create<func::FuncOp>(loc, fnName, fnType, visibility, nullptr, nullptr);
-        // clone the body.
-        rewriter.cloneRegionBefore(callee.getBody(), unallocFn.getBody(), unallocFn.end());
+
+        // Clone the body.
+        IRMapping mapper;
+        rewriter.cloneRegionBefore(callee.getBody(), unallocFn.getBody(), unallocFn.end(), mapper);
         rewriter.setInsertionPointToStart(&unallocFn.getBody().front());
 
-        // Let's capture the qreg.
-        quantum::DeallocOp localDealloc = *unallocFn.getOps<quantum::DeallocOp>().begin();
-
-        // Let's return the qreg and erase the device release.
-        unallocFn.walk([&](Operation *op) {
-            if (isa<quantum::DeviceReleaseOp>(op)) {
-                rewriter.eraseOp(op);
-            }
-            else if (isa<func::ReturnOp>(op)) {
-                op->setOperands(localDealloc.getOperand());
-            }
+        // Let's return the qreg+expval and erase the device release.
+        // Fine for now: only one block in body so only one dealloc and one expval
+        SmallVector<Value> returnVals{mapper.lookup(deallocs[0])->getOperand(0)};
+        std::for_each(expvalOps.begin(), expvalOps.end(), [&](const quantum::ExpvalOp &expval) {
+            returnVals.push_back(mapper.lookup(expval));
         });
 
+        // Create the return
+        // Again, assume just one block for now
+        Operation *returnOp = unallocFn.getBody().front().getTerminator();
+        assert(isa<func::ReturnOp>(returnOp) && "adjoint block must terminate with return op");
+        returnOp->setOperands(returnVals);
+
+        // Erase the device release.
+        for (auto op : deviceReleaseOps) {
+            rewriter.eraseOp(mapper.lookup(op));
+        }
+
         // Let's erase the deallocation.
-        rewriter.eraseOp(localDealloc);
+        rewriter.eraseOp(mapper.lookup(deallocs[0]));
     }
 
     return unallocFn;

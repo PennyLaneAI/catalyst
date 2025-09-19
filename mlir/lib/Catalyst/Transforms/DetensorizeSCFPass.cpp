@@ -1,4 +1,4 @@
-#define DEBUG_TYPE "myhelloworld"
+#define DEBUG_TYPE "detensorize-scf"
 
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -352,7 +352,7 @@ struct DetensorizeSCFPass : public impl::DetensorizeSCFPassBase<DetensorizeSCFPa
         patterns.add<DetensorizeForOp>(context);
         patterns.add<DetensorizeIfOp>(context);
         patterns.add<DetensorizeWhileOp>(context);
-        if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns))))
+        if (failed(applyPatternsGreedily(getOperation(), std::move(patterns))))
             signalPassFailure();
     }
 };

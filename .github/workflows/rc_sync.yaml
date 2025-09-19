@@ -19,7 +19,7 @@ jobs:
   # This workflow contains a single job to sync the main branch with changes from the rc
   sync:
     # The type of runner that the job will run on
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
@@ -61,6 +61,7 @@ jobs:
           # Exclude some files known to be divergent during the release process from the PR
           git checkout origin/main -- frontend/catalyst/_version.py
           git checkout origin/main -- doc/dev/release_notes.rst
+          git checkout origin/main -- .github/workflows/check-catalyst.yaml
           git config user.name "GitHub Actions Bot"
           git config user.email "<>"
           git commit -m "exclude files from pr"

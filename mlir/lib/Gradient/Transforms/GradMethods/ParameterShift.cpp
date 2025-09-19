@@ -23,16 +23,13 @@
 namespace catalyst {
 namespace gradient {
 
-LogicalResult ParameterShiftLowering::match(func::FuncOp op) const
+LogicalResult ParameterShiftLowering::matchAndRewrite(func::FuncOp op,
+                                                      PatternRewriter &rewriter) const
 {
-    if (getQNodeDiffMethod(op) == "parameter-shift" && requiresCustomGradient(op)) {
-        return success();
+    if (!(getQNodeDiffMethod(op) == "parameter-shift" && requiresCustomGradient(op))) {
+        return failure();
     }
-    return failure();
-}
 
-void ParameterShiftLowering::rewrite(func::FuncOp op, PatternRewriter &rewriter) const
-{
     Location loc = op.getLoc();
     rewriter.setInsertionPointAfter(op);
 
@@ -51,6 +48,7 @@ void ParameterShiftLowering::rewrite(func::FuncOp op, PatternRewriter &rewriter)
 
     // Register the quantum gradient on the quantum-only split-out QNode.
     registerCustomGradient(op, FlatSymbolRefAttr::get(qGradFn));
+    return success();
 }
 
 std::pair<int64_t, int64_t> ParameterShiftLowering::analyzeFunction(func::FuncOp callee)

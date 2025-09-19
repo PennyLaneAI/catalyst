@@ -108,7 +108,9 @@ struct PostprocessForwardOp : public OpRewritePattern<ForwardOp> {
             // Insert new argIn in an interleaving way.
             size_t idx = 0;
             for (auto ty : newArgInTypes) {
-                op.insertArgument(2 * idx + 1, ty, {}, op.getLoc());
+                if (failed(op.insertArgument(2 * idx + 1, ty, {}, op.getLoc()))) {
+                    return failure();
+                }
                 idx++;
             }
             // Append newArgRes.
@@ -117,8 +119,11 @@ struct PostprocessForwardOp : public OpRewritePattern<ForwardOp> {
                                              /*values=*/op.getNumArguments());
             SmallVector<DictionaryAttr> argAttrs{appendingSize};
             SmallVector<Location> argLocs{appendingSize, op.getLoc()};
-            op.insertArguments(argIndices, newArgResTypes, argAttrs, argLocs);
+            if (failed(op.insertArguments(argIndices, newArgResTypes, argAttrs, argLocs))) {
+                return failure();
+            }
             op.setFunctionType(forwardTy);
+            return success();
         });
 
         op.walk([&](ReturnOp returnOp) {
@@ -195,7 +200,9 @@ struct PostprocessReverseOp : public OpRewritePattern<ReverseOp> {
             // Insert new argIn in an interleaving way.
             size_t idx = 0;
             for (auto ty : newArgInTypes) {
-                op.insertArgument(2 * idx, ty, {}, op.getLoc());
+                if (failed(op.insertArgument(2 * idx, ty, {}, op.getLoc()))) {
+                    return failure();
+                }
                 idx++;
             }
             // Append newArgRes.
@@ -204,8 +211,11 @@ struct PostprocessReverseOp : public OpRewritePattern<ReverseOp> {
                                              /*values=*/0);
             SmallVector<DictionaryAttr> argAttrs{appendingSize};
             SmallVector<Location> argLocs{appendingSize, op.getLoc()};
-            op.insertArguments(argIndices, newArgResTypes, argAttrs, argLocs);
+            if (failed(op.insertArguments(argIndices, newArgResTypes, argAttrs, argLocs))) {
+                return failure();
+            }
             op.setFunctionType(reverseTy);
+            return success();
         });
 
         op.walk([&](ReturnOp returnOp) {

@@ -22,6 +22,7 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 
 #include "Gradient/Utils/DifferentialQNode.h"
@@ -30,17 +31,12 @@
 namespace catalyst {
 namespace gradient {
 
-LogicalResult FiniteDiffLowering::match(GradOp op) const
+LogicalResult FiniteDiffLowering::matchAndRewrite(GradOp op, PatternRewriter &rewriter) const
 {
-    if (op.getMethod() == "fd") {
-        return success();
+    if (op.getMethod() != "fd") {
+        return failure();
     }
 
-    return failure();
-}
-
-void FiniteDiffLowering::rewrite(GradOp op, PatternRewriter &rewriter) const
-{
     Location loc = op.getLoc();
     const std::vector<size_t> &diffArgIndices = computeDiffArgIndices(op.getDiffArgIndices());
     std::stringstream uniquer;
@@ -67,6 +63,7 @@ void FiniteDiffLowering::rewrite(GradOp op, PatternRewriter &rewriter) const
     }
 
     rewriter.replaceOpWithNewOp<func::CallOp>(op, gradFn, op.getArgOperands());
+    return success();
 }
 
 void FiniteDiffLowering::computeFiniteDiff(PatternRewriter &rewriter, Location loc,
@@ -167,13 +164,14 @@ void FiniteDiffLowering::computeFiniteDiff(PatternRewriter &rewriter, Location l
                     auto tensorTy = diffArg.getType();
                     auto memrefTy = bufferization::getMemRefTypeWithStaticIdentityLayout(
                         cast<TensorType>(tensorTy));
-                    auto toMemrefOp =
-                        rewriter.create<bufferization::ToMemrefOp>(loc, memrefTy, diffArg);
+                    auto toBufferOp =
+                        rewriter.create<bufferization::ToBufferOp>(loc, memrefTy, diffArg);
 
-                    auto cloneOp = rewriter.create<bufferization::CloneOp>(loc, toMemrefOp);
+                    auto cloneOp = rewriter.create<bufferization::CloneOp>(loc, toBufferOp);
 
-                    auto toTensorOp =
-                        rewriter.create<bufferization::ToTensorOp>(loc, cloneOp, true);
+                    auto toTensorOp = rewriter.create<bufferization::ToTensorOp>(
+                        loc, memref::getTensorTypeFromMemRefType(cloneOp.getOutput().getType()),
+                        cloneOp, true);
 
                     auto diffArgCopy = toTensorOp.getResult();
 

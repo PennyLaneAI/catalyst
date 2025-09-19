@@ -20,6 +20,7 @@
 #include <bitset>
 #include <memory>
 #include <numeric>
+#include <set>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -42,6 +43,8 @@ class OpenQasmDevice final : public Catalyst::Runtime::QuantumDevice {
 
     OpenQasm::OpenQasmObsManager obs_manager{};
     OpenQasm::BuilderType builder_type;
+
+    std::set<QubitIdType> initial_allocated_QubitIds;
     std::unordered_map<std::string, std::string> device_kwargs;
 
     inline auto getDeviceWires(const std::vector<QubitIdType> &wires) -> std::vector<size_t>
@@ -97,7 +100,7 @@ class OpenQasmDevice final : public Catalyst::Runtime::QuantumDevice {
     ~OpenQasmDevice() = default;
 
     auto AllocateQubits(size_t) -> std::vector<QubitIdType> override;
-    void ReleaseAllQubits() override;
+    void ReleaseQubits(const std::vector<QubitIdType> &) override;
     auto GetNumQubits() const -> size_t override;
     void SetDeviceShots(size_t) override;
     auto GetDeviceShots() const -> size_t override;

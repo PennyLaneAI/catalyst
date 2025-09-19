@@ -28,16 +28,24 @@ from catalyst.utils.runtime_environment import get_lib_path
 # pylint: disable=too-many-lines
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 class TestSample:
     """Test sample."""
 
     def test_sample_on_0qbits(self):
         """Test sample on 0 qubits."""
 
-        @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=0, shots=10))
-        def sample_0qbit():
-            return qml.sample()
+        # TODO: try set_shots after capture work is completed
+        with pytest.warns(
+            qml.exceptions.PennyLaneDeprecationWarning, match="shots on device is deprecated"
+        ):
+            device = qml.device("lightning.qubit", wires=0, shots=10)
+
+            @qjit
+            @qml.set_shots(10)
+            @qml.qnode(device)
+            def sample_0qbit():
+                return qml.sample()
 
         expected = np.empty(shape=(10, 0), dtype=int)
         observed = sample_0qbit()
@@ -46,11 +54,17 @@ class TestSample:
     def test_sample_on_1qbit(self, backend):
         """Test sample on 1 qubit."""
 
-        @qjit
-        @qml.qnode(qml.device(backend, wires=1, shots=1000))
-        def sample_1qbit(x: float):
-            qml.RX(x, wires=0)
-            return qml.sample()
+        # TODO: try set_shots after capture work is completed
+        with pytest.warns(
+            qml.exceptions.PennyLaneDeprecationWarning, match="shots on device is deprecated"
+        ):
+            device = qml.device(backend, wires=1, shots=1000)
+
+            @qjit
+            @qml.qnode(device)
+            def sample_1qbit(x: float):
+                qml.RX(x, wires=0)
+                return qml.sample()
 
         expected = np.array([[0]] * 1000)
         observed = sample_1qbit(0.0)
@@ -63,12 +77,18 @@ class TestSample:
     def test_sample_on_2qbits(self, backend):
         """Test sample on 2 qubits."""
 
-        @qjit
-        @qml.qnode(qml.device(backend, wires=2, shots=1000))
-        def sample_2qbits(x: float):
-            qml.RX(x, wires=0)
-            qml.RY(x, wires=1)
-            return qml.sample()
+        # TODO: try set_shots after capture work is completed
+        with pytest.warns(
+            qml.exceptions.PennyLaneDeprecationWarning, match="shots on device is deprecated"
+        ):
+            device = qml.device(backend, wires=2, shots=1000)
+
+            @qjit
+            @qml.qnode(device)
+            def sample_2qbits(x: float):
+                qml.RX(x, wires=0)
+                qml.RY(x, wires=1)
+                return qml.sample()
 
         expected = np.array([[0, 0]] * 1000)
         observed = sample_2qbits(0.0)
@@ -77,7 +97,32 @@ class TestSample:
         observed = sample_2qbits(np.pi)
         assert np.array_equal(observed, expected)
 
+    @pytest.mark.parametrize("mcm_method", ["single-branch-statistics", "one-shot"])
+    def test_sample_on_empty_wires(self, mcm_method):
+        """Test sample on dynamic wires."""
 
+        # Devices must specify wires for integration with program capture
+        # Since this test is used to test dynamic wires, we skip it if capture is enabled
+        if qml.capture.enabled():
+            return
+
+        @qml.set_shots(10)
+        @qml.qnode(qml.device("lightning.qubit"), mcm_method=mcm_method)
+        def sample_dynamic_wires():
+            qml.Hadamard(wires=1)
+            return qml.sample()
+
+        if mcm_method == "one-shot":
+            with pytest.raises(
+                NotImplementedError,
+                match="Measurement SampleMP with empty wires is not supported with dynamic wires",
+            ):
+                qjit(sample_dynamic_wires)()
+        else:
+            qjit(sample_dynamic_wires)()
+
+
+@pytest.mark.usefixtures("use_both_frontend")
 class TestCounts:
     """Test counts."""
 
@@ -85,7 +130,8 @@ class TestCounts:
         """Test counts on 0 qubits."""
 
         @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=0, shots=10))
+        @qml.set_shots(10)
+        @qml.qnode(qml.device("lightning.qubit", wires=0))
         def counts_0qbit():
             return qml.counts()
 
@@ -93,11 +139,13 @@ class TestCounts:
         observed = counts_0qbit()
         assert np.array_equal(observed, expected)
 
-    def test_count_on_1qbit(self, backend):
+    @pytest.mark.parametrize("mcm_method", ["single-branch-statistics", "one-shot"])
+    def test_count_on_1qbit(self, backend, mcm_method):
         """Test counts on 1 qubits."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=1, shots=1000))
+        @qml.set_shots(1000)
+        @qml.qnode(qml.device(backend, wires=1), mcm_method=mcm_method)
         def counts_1qbit(x: float):
             qml.RX(x, wires=0)
             return qml.counts()
@@ -110,11 +158,13 @@ class TestCounts:
         observed = counts_1qbit(np.pi)
         assert np.array_equal(observed, expected)
 
-    def test_count_on_2qbits(self, backend):
+    @pytest.mark.parametrize("mcm_method", ["single-branch-statistics", "one-shot"])
+    def test_count_on_2qbits(self, backend, mcm_method):
         """Test counts on 2 qubits."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=2, shots=1000))
+        @qml.set_shots(1000)
+        @qml.qnode(qml.device(backend, wires=2), mcm_method=mcm_method)
         def counts_2qbit(x: float):
             qml.RX(x, wires=0)
             qml.RY(x, wires=1)
@@ -132,7 +182,8 @@ class TestCounts:
         """Test counts on 2 qubits with check for endianness."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=2, shots=1000))
+        @qml.set_shots(1000)
+        @qml.qnode(qml.device(backend, wires=2))
         def counts_2qbit(x: float, y: float):
             qml.RX(x, wires=0)
             qml.RX(y, wires=1)
@@ -151,7 +202,8 @@ class TestCounts:
         """Test counts with all_outcomes=True."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=2, shots=1000))
+        @qml.set_shots(1000)
+        @qml.qnode(qml.device(backend, wires=2))
         def counts_2qbit(x: float):
             qml.RX(x, wires=0)
             qml.RY(x, wires=1)
@@ -165,8 +217,37 @@ class TestCounts:
         observed = counts_2qbit(np.pi)
         assert np.array_equal(observed, expected)
 
+    @pytest.mark.parametrize("mcm_method", ["single-branch-statistics", "one-shot"])
+    def test_counts_on_empty_wires(self, mcm_method):
+        """Test counts on dynamic wires."""
 
+        @qml.set_shots(10)
+        @qml.qnode(qml.device("lightning.qubit"), mcm_method=mcm_method)
+        def counts_dynamic_wires():
+            qml.Hadamard(wires=1)
+            return qml.counts()
+
+        if qml.capture.enabled():
+            with pytest.raises(
+                NotImplementedError,
+                match="devices must specify wires for integration with program capture",
+            ):
+                qjit(counts_dynamic_wires)()
+        else:
+            if mcm_method == "one-shot":
+                with pytest.raises(
+                    NotImplementedError,
+                    match="Measurement CountsMP with empty wires is not supported with dynamic "
+                    "wires",
+                ):
+                    qjit(counts_dynamic_wires)()
+            else:
+                qjit(counts_dynamic_wires)()
+
+
+@pytest.mark.usefixtures("use_both_frontend")
 class TestExpval:
+
     def test_named(self, backend):
         """Test expval for named observables."""
 
@@ -392,7 +473,9 @@ class TestExpval:
         assert np.isclose(observed, expected)
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 class TestVar:
+
     def test_rx(self, backend):
         """Test var with RX."""
 
@@ -676,11 +759,15 @@ class TestVar:
         )
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 class TestState:
     """Test state measurement processes."""
 
     def test_state_on_0qbits(self):
         """Test state on 0 qubits."""
+
+        if qml.capture.enabled():
+            pytest.xfail("capture doesn't currently support 0 wires.")
 
         @qjit
         @qml.qnode(qml.device("lightning.qubit", wires=0))
@@ -705,11 +792,15 @@ class TestState:
         assert np.allclose(observed, expected)
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 class TestProbs:
     """Test probabilities measurement processes."""
 
     def test_probs_on_0qbits(self):
         """Test probs on 0 qubits."""
+
+        if qml.capture.enabled():
+            pytest.xfail("capture doesn't currently support 0 wires.")
 
         @qjit
         @qml.qnode(qml.device("lightning.qubit", wires=0))
@@ -734,6 +825,7 @@ class TestProbs:
         assert np.allclose(observed, expected)
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 class TestNewArithmeticOps:
     "Test PennyLane new arithmetic operators"
 
@@ -761,10 +853,10 @@ class TestNewArithmeticOps:
         assert np.allclose(expected, result)
 
     @pytest.mark.parametrize(
-        "meas, expected",
+        "meas_fn, expected",
         [
             [
-                qml.expval(
+                lambda: qml.expval(
                     qml.ops.op_math.Sum(
                         qml.PauliX(wires=0), qml.PauliY(wires=1), qml.PauliZ(wires=2)
                     )
@@ -772,7 +864,7 @@ class TestNewArithmeticOps:
                 np.array(-1.41421356),
             ],
             [
-                qml.var(
+                lambda: qml.var(
                     qml.ops.op_math.Sum(
                         qml.PauliX(wires=0), qml.PauliY(wires=1), qml.PauliZ(wires=2)
                     )
@@ -780,16 +872,16 @@ class TestNewArithmeticOps:
                 np.array(2.0),
             ],
             [
-                qml.expval(qml.PauliX(wires=0) + qml.PauliY(wires=1) + qml.PauliZ(wires=2)),
+                lambda: qml.expval(qml.PauliX(wires=0) + qml.PauliY(wires=1) + qml.PauliZ(wires=2)),
                 np.array(-1.41421356),
             ],
             [
-                qml.var(qml.PauliX(wires=0) + qml.PauliY(wires=1) + qml.PauliZ(wires=2)),
+                lambda: qml.var(qml.PauliX(wires=0) + qml.PauliY(wires=1) + qml.PauliZ(wires=2)),
                 np.array(2.0),
             ],
         ],
     )
-    def test_sum_xyz(self, meas, expected, backend):
+    def test_sum_xyz(self, meas_fn, expected, backend):
         """Test ``qml.ops.op_math.Sum`` and ``+`` converting to HamiltonianObs.
         with integer coefficients."""
 
@@ -800,16 +892,16 @@ class TestNewArithmeticOps:
             qml.RX(y, wires=1)
             qml.RX(x + y, wires=2)
             qml.CNOT(wires=[0, 1])
-            return meas
+            return meas_fn()
 
         result = circuit(np.pi / 4, np.pi / 2)
         assert np.allclose(expected, result)
 
     @pytest.mark.parametrize(
-        "meas, expected",
+        "meas_fn, expected",
         [
             [
-                qml.expval(
+                lambda: qml.expval(
                     qml.ops.op_math.Sum(
                         qml.PauliX(wires=0),
                         qml.PauliY(wires=1),
@@ -819,7 +911,7 @@ class TestNewArithmeticOps:
                 np.array(-1.06066017),
             ],
             [
-                qml.var(
+                lambda: qml.var(
                     qml.ops.op_math.Sum(
                         qml.ops.op_math.SProd(0.2, qml.PauliX(wires=0)),
                         qml.ops.op_math.SProd(0.4, qml.PauliY(wires=1)),
@@ -829,11 +921,13 @@ class TestNewArithmeticOps:
                 np.array(0.245),
             ],
             [
-                qml.expval(qml.PauliX(wires=0) + qml.PauliY(wires=1) + 0.5 * qml.PauliZ(wires=2)),
+                lambda: qml.expval(
+                    qml.PauliX(wires=0) + qml.PauliY(wires=1) + 0.5 * qml.PauliZ(wires=2)
+                ),
                 np.array(-1.06066017),
             ],
             [
-                qml.var(
+                lambda: qml.var(
                     0.2 * qml.PauliX(wires=0)
                     + 0.4 * qml.PauliY(wires=1)
                     + 0.5 * qml.PauliZ(wires=2)
@@ -842,7 +936,7 @@ class TestNewArithmeticOps:
             ],
         ],
     )
-    def test_sum_sprod_xyz(self, meas, expected, backend):
+    def test_sum_sprod_xyz(self, meas_fn, expected, backend):
         """Test ``qml.ops.op_math.Sum`` (``+``) and ``qml.ops.op_math.SProd`` (``*``)."""
 
         @qjit
@@ -852,7 +946,7 @@ class TestNewArithmeticOps:
             qml.RX(y, wires=1)
             qml.RX(x + y, wires=2)
             qml.CNOT(wires=[0, 1])
-            return meas
+            return meas_fn()
 
         result = circuit(np.pi / 4, np.pi / 2)
         assert np.allclose(expected, result)
@@ -1054,6 +1148,7 @@ class TestDensityMatrixMP:
                 return qml.density_matrix([0])
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 class TestVnEntropy:
     """Test vnentropy."""
 
@@ -1073,6 +1168,7 @@ class TestVnEntropy:
         assert circuit_entropy(np.pi / 2) == expected
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 class TestMutualInfo:
     """Test mutualinfo."""
 
@@ -1094,6 +1190,7 @@ class TestMutualInfo:
         assert mutual_info_circuit() == expected
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 class TestShadow:
     """Test shadow."""
 
@@ -1117,6 +1214,7 @@ class TestShadow:
         assert expected_recipes == actual_recipes
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 class TestShadowExpval:
     """Test shadowexpval."""
 
@@ -1139,6 +1237,7 @@ class TestShadowExpval:
         assert shadow_expval_circuit(0, H) == expected
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 class TestPurity:
     """Test purity."""
 
@@ -1167,7 +1266,8 @@ class TestNullQubitMeasurements:
         """Test qml.sample() on null.qubit device."""
 
         @qjit
-        @qml.qnode(qml.device("null.qubit", wires=n_qubits, shots=self.n_shots))
+        @qml.set_shots(self.n_shots)
+        @qml.qnode(qml.device("null.qubit", wires=n_qubits))
         def circuit_sample():
             for i in range(n_qubits):
                 qml.Hadamard(wires=i)
@@ -1183,7 +1283,8 @@ class TestNullQubitMeasurements:
         """Test qml.sample() on null.qubit device, returning results per wire."""
 
         @qjit
-        @qml.qnode(qml.device("null.qubit", wires=2, shots=self.n_shots))
+        @qml.set_shots(self.n_shots)
+        @qml.qnode(qml.device("null.qubit", wires=2))
         def circuit_sample():
             qml.Hadamard(wires=0)
             qml.Hadamard(wires=1)
@@ -1201,7 +1302,8 @@ class TestNullQubitMeasurements:
         """Test qml.counts() on null.qubit device."""
 
         @qjit
-        @qml.qnode(qml.device("null.qubit", wires=n_qubits, shots=self.n_shots))
+        @qml.set_shots(self.n_shots)
+        @qml.qnode(qml.device("null.qubit", wires=n_qubits))
         def circuit_counts():
             for i in range(n_qubits):
                 qml.Hadamard(wires=i)
@@ -1221,7 +1323,8 @@ class TestNullQubitMeasurements:
         """Test qml.counts() on null.qubit device, returning results per wire."""
 
         @qjit
-        @qml.qnode(qml.device("null.qubit", wires=2, shots=self.n_shots))
+        @qml.set_shots(self.n_shots)
+        @qml.qnode(qml.device("null.qubit", wires=2))
         def circuit_counts():
             qml.Hadamard(wires=0)
             qml.Hadamard(wires=1)
@@ -1242,7 +1345,8 @@ class TestNullQubitMeasurements:
     def test_nullq_probs(self, n_qubits):
         """Test qml.probs() on null.qubit device."""
 
-        @qml.qnode(qml.device("null.qubit", wires=n_qubits, shots=self.n_shots))
+        @qml.set_shots(self.n_shots)
+        @qml.qnode(qml.device("null.qubit", wires=n_qubits))
         def circuit_probs():
             for i in range(n_qubits):
                 qml.Hadamard(wires=i)
@@ -1255,7 +1359,8 @@ class TestNullQubitMeasurements:
     def test_nullq_probs_per_wire(self):
         """Test qml.probs() on null.qubit device, returning results per wire."""
 
-        @qml.qnode(qml.device("null.qubit", wires=2, shots=self.n_shots))
+        @qml.set_shots(self.n_shots)
+        @qml.qnode(qml.device("null.qubit", wires=2))
         def circuit_probs():
             qml.Hadamard(wires=0)
             qml.Hadamard(wires=1)
@@ -1269,7 +1374,8 @@ class TestNullQubitMeasurements:
     def test_nullq_state(self, n_qubits):
         """Test qml.state() on null.qubit device."""
 
-        @qml.qnode(qml.device("null.qubit", wires=n_qubits, shots=None))
+        @qml.set_shots(None)
+        @qml.qnode(qml.device("null.qubit", wires=n_qubits))
         def circuit_state():
             for i in range(n_qubits):
                 qml.Hadamard(wires=i)
@@ -1283,7 +1389,8 @@ class TestNullQubitMeasurements:
     def test_nullq_expval(self, n_qubits):
         """Test qml.expval() on null.qubit device."""
 
-        @qml.qnode(qml.device("null.qubit", wires=n_qubits, shots=self.n_shots))
+        @qml.set_shots(self.n_shots)
+        @qml.qnode(qml.device("null.qubit", wires=n_qubits))
         def circuit_expval():
             for i in range(n_qubits):
                 qml.Hadamard(wires=i)
@@ -1298,7 +1405,8 @@ class TestNullQubitMeasurements:
     def test_nullq_var(self, n_qubits):
         """Test qml.var() on null.qubit device."""
 
-        @qml.qnode(qml.device("null.qubit", wires=n_qubits, shots=self.n_shots))
+        @qml.set_shots(self.n_shots)
+        @qml.qnode(qml.device("null.qubit", wires=n_qubits))
         def circuit_var():
             for i in range(n_qubits):
                 qml.Hadamard(wires=i)

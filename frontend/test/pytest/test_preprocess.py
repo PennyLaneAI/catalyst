@@ -87,7 +87,6 @@ class CustomDevice(Device):
 
     def __init__(self, wires, shots=1024):
         super().__init__(wires=wires, shots=shots)
-        self.capabilities.operations.pop("BlockEncode")
         self.qjit_capabilities = self.capabilities
 
     @staticmethod
@@ -106,6 +105,9 @@ class CustomDevice(Device):
         raise NotImplementedError
 
 
+CustomDevice.capabilities.operations.pop("BlockEncode")
+
+
 class TestDecomposition:
     """Test the preprocessing transforms implemented in Catalyst."""
 
@@ -113,16 +115,15 @@ class TestDecomposition:
         """Test the decompose transform as part of the Catalyst pipeline."""
         dev = NullQubit(wires=4, shots=None)
 
-        @qjit
         @qml.qnode(dev)
         def circuit(theta: float):
             qml.SingleExcitationPlus(theta, wires=[0, 1])
             return qml.state()
 
         mlir = qjit(circuit, target="mlir").mlir
-        assert "PauliX" in mlir
+        assert "Hadamard" in mlir
         assert "CNOT" in mlir
-        assert "ControlledPhaseShift" in mlir
+        assert "RY" in mlir
         assert "SingleExcitationPlus" not in mlir
 
     def test_decompose_ops_to_unitary(self):
@@ -140,7 +141,6 @@ class TestDecomposition:
         """Test the decompose ops to unitary transform as part of the Catalyst pipeline."""
         dev = CustomDevice(wires=4, shots=None)
 
-        @qjit
         @qml.qnode(dev)
         def circuit():
             qml.BlockEncode(np.array([[1, 1, 1], [0, 1, 0]]), wires=[0, 1, 2])
@@ -269,7 +269,6 @@ class TestPreprocessHybridOp:
 
         dev = qml.device("lightning.qubit", wires=1)
 
-        @qjit
         @qml.qnode(dev)
         def circuit(x: float, y: float):
             qml.RY(y, 0)
@@ -291,7 +290,6 @@ class TestPreprocessHybridOp:
 
         dev = qml.device("lightning.qubit", wires=[0, 1])
 
-        @qjit
         @qml.qnode(dev)
         def circuit(phi: float):
             OtherHadamard(wires=0)

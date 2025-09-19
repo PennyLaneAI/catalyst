@@ -35,7 +35,8 @@ from catalyst.jax_primitives import compbasis_p, counts_p, sample_p
 try:
     # COM: CHECK-LABEL: public @sample1(
     @qjit(target="mlir")
-    @qml.qnode(qml.device("lightning.qubit", wires=2, shots=1000))
+    @qml.set_shots(1000)
+    @qml.qnode(qml.device("lightning.qubit", wires=2))
     def sample1(x: float, y: float):
         qml.RX(x, wires=0)
         qml.RY(y, wires=1)
@@ -50,7 +51,8 @@ try:
 
     # COM: CHECK-LABEL: public @sample2(
     @qjit(target="mlir")
-    @qml.qnode(qml.device("lightning.qubit", wires=2, shots=1000))
+    @qml.set_shots(1000)
+    @qml.qnode(qml.device("lightning.qubit", wires=2))
     def sample2(x: float, y: float):
         qml.RX(x, wires=0)
         # COM: CHECK: [[q1:%.+]] = quantum.custom "RY"
@@ -71,7 +73,8 @@ except CompileError:
 
 # CHECK-LABEL: public @sample3(
 @qjit(target="mlir")
-@qml.qnode(qml.device("lightning.qubit", wires=2, shots=1000))
+@qml.set_shots(1000)
+@qml.qnode(qml.device("lightning.qubit", wires=2))
 # CHECK: [[shots:%.+]] = arith.constant 1000 : i64
 # CHECK: quantum.device shots([[shots]]) [{{.+}}]
 def sample3(x: float, y: float):
@@ -111,18 +114,19 @@ def test_sample_static():
 print(test_sample_static.mlir)
 
 
-# TODO: convert the device to have a dynamic shots value when core PennyLane device supports it
-# CHECK-LABEL: public @test_sample_dynamic(
 @qjit
-@qml.qnode(
-    qml.device("null.qubit", wires=1)
-)  # SampleOp is only legal if there is a device in the same scope
 def test_sample_dynamic(shots: int):
     """Test that the sample primitive with dynamic shape can be correctly compiled to mlir."""
-    obs = compbasis_p.bind()
-    x = shots + 1
-    sample = sample_p.bind(obs, x, static_shape=(None, 0))
-    return sample + jax.numpy.zeros((x, 0))
+
+    @qml.set_shots(shots)
+    @qml.qnode(qml.device("null.qubit", wires=1))
+    def circ():
+        obs = compbasis_p.bind()
+        x = shots + 1
+        sample = sample_p.bind(obs, x, static_shape=(None, 0))
+        return sample + jax.numpy.zeros((x, 0))
+
+    circ()
 
 
 # CHECK: [[one:%.+]] = stablehlo.constant dense<1> : tensor<i64>
@@ -139,11 +143,12 @@ print(test_sample_dynamic.mlir)
 # CHECK-LABEL: @sample_dynamic_qubits
 @qjit(target="mlir")
 def sample_dynamic_qubits(num_qubits):
-    @qml.qnode(qml.device("lightning.qubit", wires=num_qubits, shots=37))
+    @qml.set_shots(37)
+    @qml.qnode(qml.device("lightning.qubit", wires=num_qubits))
     def circ():
+        # CHECK: [[nqubits:%.+]] = quantum.num_qubits : i64
         # CHECK: quantum.compbasis
-        # CHECK: [[deTen:%.+]] = tensor.extract %arg0[] : tensor<i64>
-        # CHECK: {{%.+}} = quantum.sample {{%.+}} shape [[deTen]] : tensor<37x?xf64>
+        # CHECK: {{%.+}} = quantum.sample {{%.+}} shape [[nqubits]] : tensor<37x?xf64>
         return qml.sample()
 
     return circ()
@@ -165,7 +170,8 @@ try:
 
     # COM: CHECK-LABEL: public @counts1(
     @qjit(target="mlir")
-    @qml.qnode(qml.device("lightning.qubit", wires=2, shots=1000))
+    @qml.set_shots(1000)
+    @qml.qnode(qml.device("lightning.qubit", wires=2))
     def counts1(x: float, y: float):
         qml.RX(x, wires=0)
         qml.RY(y, wires=1)
@@ -179,7 +185,8 @@ try:
     print(counts1.mlir)
 
     @qjit(target="mlir")
-    @qml.qnode(qml.device("lightning.qubit", wires=2, shots=1000))
+    @qml.set_shots(1000)
+    @qml.qnode(qml.device("lightning.qubit", wires=2))
     def counts2(x: float, y: float):
         qml.RX(x, wires=0)
         # COM: CHECK: [[q1:%.+]] = "quantum.custom"({{%.+}}, {{%.+}}) {gate_name = "RY"
@@ -200,7 +207,8 @@ except:
 
 # CHECK-LABEL: public @counts3(
 @qjit(target="mlir")
-@qml.qnode(qml.device("lightning.qubit", wires=2, shots=1000))
+@qml.set_shots(1000)
+@qml.qnode(qml.device("lightning.qubit", wires=2))
 # CHECK: [[shots:%.+]] = arith.constant 1000 : i64
 # CHECK: quantum.device shots([[shots]]) [{{.+}}]
 def counts3(x: float, y: float):
@@ -240,10 +248,13 @@ print(test_counts_static.mlir)
 # CHECK-LABEL: @counts_dynamic_qubits
 @qjit(target="mlir")
 def counts_dynamic_qubits(num_qubits):
-    @qml.qnode(qml.device("lightning.qubit", wires=num_qubits, shots=37))
+    @qml.set_shots(37)
+    @qml.qnode(qml.device("lightning.qubit", wires=num_qubits))
     def circ():
         # CHECK: [[one:%.+]] = stablehlo.constant dense<1> : tensor<i64>
-        # CHECK: [[shape:%.+]] = stablehlo.shift_left [[one]], %arg0 : tensor<i64>
+        # CHECK: [[nqubits:%.+]] = quantum.num_qubits : i64
+        # CHECK: [[toTen:%.+]] = tensor.from_elements [[nqubits]] : tensor<i64>
+        # CHECK: [[shape:%.+]] = stablehlo.shift_left [[one]], [[toTen]] : tensor<i64>
         # CHECK: [[deTen:%.+]] = tensor.extract [[shape]][] : tensor<i64>
         # CHECK: {{%.+}}, {{%.+}} = quantum.counts {{%.+}} shape [[deTen]] : tensor<?xf64>, tensor<?xi64>
         return qml.counts()
@@ -619,7 +630,9 @@ def probs_dynamic_without_wires(num_qubits):
     @qml.qnode(qml.device("lightning.qubit", wires=num_qubits))
     def circ():
         # CHECK: [[one:%.+]] = stablehlo.constant dense<1> : tensor<i64>
-        # CHECK: [[shape:%.+]] = stablehlo.shift_left [[one]], %arg0 : tensor<i64>
+        # CHECK: [[nqubits:%.+]] = quantum.num_qubits : i64
+        # CHECK: [[toTen:%.+]] = tensor.from_elements [[nqubits]] : tensor<i64>
+        # CHECK: [[shape:%.+]] = stablehlo.shift_left [[one]], [[toTen]] : tensor<i64>
         # CHECK: [[deTen:%.+]] = tensor.extract [[shape]][] : tensor<i64>
         # CHECK: {{%.+}} = quantum.probs {{%.+}} shape [[deTen]] : tensor<?xf64>
         return qml.probs()
@@ -662,7 +675,9 @@ def state_dynamic(num_qubits):
     @qml.qnode(qml.device("lightning.qubit", wires=num_qubits))
     def circ():
         # CHECK: [[one:%.+]] = stablehlo.constant dense<1> : tensor<i64>
-        # CHECK: [[shape:%.+]] = stablehlo.shift_left [[one]], %arg0 : tensor<i64>
+        # CHECK: [[nqubits:%.+]] = quantum.num_qubits : i64
+        # CHECK: [[toTen:%.+]] = tensor.from_elements [[nqubits]] : tensor<i64>
+        # CHECK: [[shape:%.+]] = stablehlo.shift_left [[one]], [[toTen]] : tensor<i64>
         # CHECK: [[deTen:%.+]] = tensor.extract [[shape]][] : tensor<i64>
         # CHECK: {{%.+}} = quantum.state {{%.+}} shape [[deTen]] : tensor<?xcomplex<f64>>
         return qml.state()
@@ -672,3 +687,26 @@ def state_dynamic(num_qubits):
 
 state_dynamic(10)
 print(state_dynamic.mlir)
+
+
+# CHECK-LABEL: @automatic_qubit_management
+@qjit(target="mlir")
+def automatic_qubit_management():
+    @qml.qnode(qml.device("lightning.qubit"))
+    def circ():
+        # CHECK: [[qreg:%.+]] = quantum.alloc( 0) : !quantum.reg
+        # CHECK: [[in_qubit:%.+]] = quantum.extract [[qreg]][ 2] : !quantum.reg -> !quantum.bit
+        # CHECK: [[out_qubit:%.+]] = quantum.custom "Hadamard"() [[in_qubit]] : !quantum.bit
+        qml.Hadamard(wires=2)
+
+        # CHECK: [[nqubits:%.+]] = quantum.num_qubits : i64
+        # CHECK: [[toTensor:%.+]] = tensor.from_elements [[nqubits]] : tensor<i64>
+        # CHECK: [[probs_shape:%.+]] = stablehlo.shift_left {{%.+}}, [[toTensor]] : tensor<i64>
+        # CHECK: [[deTensor:%.+]] = tensor.extract [[probs_shape]][] : tensor<i64>
+        # CHECK: {{%.+}} = quantum.probs {{%.+}} shape [[deTensor]] : tensor<?xf64>
+        return qml.probs()
+
+    return circ()
+
+
+print(automatic_qubit_management.mlir)

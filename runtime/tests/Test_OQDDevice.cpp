@@ -42,6 +42,7 @@ TEST_CASE("Test the OQDDevice qubit allocation and release", "[oqd]")
 {
     auto device = OQDDevice(R"({shots : 100}ION:{"name":"Yb171"}PHONON:{"class_":"Phonon"})");
 
+    CHECK(device.getOutputFile() == "__openapl__output.json");
     CHECK(device.getIonSpecs() == "{\"name\":\"Yb171\"}");
     CHECK(device.getPhononSpecs()[0] == "{\"class_\":\"Phonon\"}");
 
@@ -50,7 +51,7 @@ TEST_CASE("Test the OQDDevice qubit allocation and release", "[oqd]")
     CHECK(allocaedQubits[1] == 1);
     CHECK(allocaedQubits[2] == 2);
 
-    device.ReleaseAllQubits();
+    device.ReleaseQubits(allocaedQubits);
     CHECK(device.getIonSpecs() == "");
     CHECK(device.getPhononSpecs().empty());
 
@@ -927,7 +928,7 @@ TEST_CASE("Test OpenAPL Program generation", "[oqd]")
 
     __catalyst__rt__initialize(nullptr);
     __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
-                                (int8_t *)rtd_kwargs.c_str(), 1000);
+                                (int8_t *)rtd_kwargs.c_str(), 1000, false);
 
     QirArray *qs = __catalyst__rt__qubit_allocate_array(num_qubits);
 

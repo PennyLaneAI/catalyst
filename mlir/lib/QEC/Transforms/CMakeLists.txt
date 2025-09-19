@@ -4,16 +4,19 @@ set(LIBRARY_NAME qec-transforms)
 file(GLOB SRC
     CliffordTToPPR.cpp
     clifford_t_to_ppr.cpp
-    CommuteCliffordTPPR.cpp
-    commute_clifford_t_ppr.cpp
-    CommuteCliffordPastPPM.cpp
-    commute_clifford_past_ppm.cpp
+    CommutePPR.cpp
+    commute_ppr.cpp
+    MergePPRIntoPPM.cpp
+    merge_ppr_into_ppm.cpp
+    CountPPMSpecs.cpp
     decompose_non_clifford_ppr.cpp
     DecomposeNonCliffordPPR.cpp
     decompose_clifford_ppr.cpp
     DecomposeCliffordPPR.cpp
     PPRDecomposeUtils.cpp
-    clifford_t_to_ppm.cpp
+    ppm_compilation.cpp
+    PartitionLayers.cpp
+    TLayerReduction.cpp
 )
 
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)
@@ -31,6 +34,19 @@ set(DEPENDS
 
 add_mlir_library(${LIBRARY_NAME} STATIC ${SRC} LINK_LIBS PRIVATE ${LIBS} DEPENDS ${DEPENDS})
 target_compile_features(${LIBRARY_NAME} PUBLIC cxx_std_20)
+
+target_link_libraries(${LIBRARY_NAME} 
+    PRIVATE nlohmann_json::nlohmann_json
+)
+
+# Disable warning from json library
+if(CMAKE_CXX_COMPILER_ID MATCHES ".*Clang")
+set_source_files_properties(
+    CountPPMSpecs.cpp
+    COMPILE_FLAGS "-Wno-covered-switch-default"
+)
+endif()
+
 target_include_directories(${LIBRARY_NAME} PUBLIC
                            .
                            ${PROJECT_SOURCE_DIR}/include

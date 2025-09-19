@@ -112,7 +112,7 @@ func.func @custom_call(%arg0: memref<3x3xf64>, %arg1: memref<3x3xf64>) -> () {
     // CHECK: [[alloca3:%.+]] = llvm.alloca [[c1]] x !llvm.struct<(i64, ptr, i8)>
 
     // CHECK: llvm.call @lapack_dgesdd([[alloca2]], [[alloca0]])
-    catalyst.custom_call fn("lapack_dgesdd") (%arg0, %arg1) {number_original_arg = array<i32: 1>} : (memref<3x3xf64>, memref<3x3xf64>) -> ()
+    catalyst.custom_call fn("lapack_dgesdd") (%arg0, %arg1) {number_original_arg = 1 : i32} : (memref<3x3xf64>, memref<3x3xf64>) -> ()
     return 
 }
 
@@ -146,13 +146,13 @@ module @test1 {
   // CHECK-SAME: [[arg0:%.+]]: tensor<f64>
   // CHECK-SAME:)
   func.func private @foo(%arg0: tensor<f64>) -> tensor<f64> {
-    // CHECK: [[memref0:%.+]] = bufferization.to_memref [[arg0]]
+    // CHECK: [[memref0:%.+]] = bufferization.to_buffer [[arg0]]
     // CHECK: [[ptr0:%.+]] = llvm.alloca {{.*}}
     // CHECK: [[ptr1:%.+]] = llvm.alloca {{.*}}
     // CHECK: [[struct0:%.+]] = builtin.unrealized_conversion_cast [[memref0]]
 
     // CHECK: [[tensor1:%.+]] = bufferization.alloc_tensor()
-    // CHECK: [[memref1:%.+]] = bufferization.to_memref [[tensor1]]
+    // CHECK: [[memref1:%.+]] = bufferization.to_buffer [[tensor1]]
     // CHECK: [[struct1:%.+]] = builtin.unrealized_conversion_cast [[memref1]]
 
     // CHECK: llvm.store [[struct0]], [[ptr1]]
@@ -160,13 +160,13 @@ module @test1 {
 
     // call @callback_1([[ptr0]], [[ptr1]])
 
-    %0 = bufferization.to_memref %arg0 : memref<f64>
+    %0 = bufferization.to_buffer %arg0 : tensor<f64> to memref<f64>
     %1 = bufferization.alloc_tensor() {memory_space = 0 : i64} : tensor<f64>
-    %2 = bufferization.to_memref %1 : memref<f64>
+    %2 = bufferization.to_buffer %1 : tensor<f64> to memref<f64>
 
 
     catalyst.callback_call @callback_1(%0, %2) : (memref<f64>, memref<f64>) -> ()
-    %3 = bufferization.to_tensor %2 : memref<f64>
+    %3 = bufferization.to_tensor %2 : memref<f64> to tensor<f64>
     return %3 : tensor<f64>
   }
 }

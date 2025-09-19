@@ -24,23 +24,75 @@ import pytest
 from catalyst import qjit
 from catalyst.third_party.oqd import OQDDevice, OQDDevicePipeline
 
+MODULE_TEST_PATH = os.path.dirname(__file__)
+OQD_PIPELINES = OQDDevicePipeline(
+    os.path.join(MODULE_TEST_PATH, "calibration_data/device.toml"),
+    os.path.join(MODULE_TEST_PATH, "calibration_data/qubit.toml"),
+    os.path.join(MODULE_TEST_PATH, "calibration_data/gate.toml"),
+)
 
-class TestOpenAPL:
-    """Test that the OQD device correctly generates an OpenAPL program."""
 
-    test_path = os.path.dirname(__file__)
-    toml_path = os.path.join(test_path, "calibration_data/")
-    oqd_pipelines = OQDDevicePipeline(
-        toml_path + "device.toml", toml_path + "qubit.toml", toml_path + "gate.toml"
-    )
+def profile_openapl(file_path):
+    """Parses an OpenAPL JSON file and extracts statistics."""
+    with open(file_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
 
-    output_f = "__openapl__output.json"
+    num_parallel_protocols = 0
+    num_beams = 0
+    num_transitions = 0
+    num_levels = 0
+    num_ions = 0
+    if "system" in data and "ions" in data["system"]:
+        for ion in data["system"]["ions"]:
+            if "levels" in ion:
+                for _ in ion["levels"]:
+                    num_levels += 1
+            if "transitions" in ion:
+                for _ in ion["transitions"]:
+                    num_transitions += 1
+            num_ions += 1
+    if "protocol" in data and "sequence" in data["protocol"]:
+        for item in data["protocol"]["sequence"]:
+            if item.get("class_") == "ParallelProtocol":
+                num_parallel_protocols += 1
+                if "sequence" in item:
+                    for sub_item in item["sequence"]:
+                        if "beam" in sub_item and sub_item["beam"].get("class_") == "Beam":
+                            num_beams += 1
+    stats = {
+        "num_parallel_protocols": num_parallel_protocols,
+        "num_beams": num_beams,
+        "num_transitions": num_transitions,
+        "num_levels": num_levels,
+        "num_ions": num_ions,
+    }
+    return stats
 
-    def test_RX_gate(self):
+
+def verify_json(correct_file_name, expected_file_name):
+    """Verify the two JSON files are identical."""
+    if not os.path.exists(correct_file_name):
+        raise FileNotFoundError(f"File {correct_file_name} does not exist")
+    if not os.path.exists(expected_file_name):
+        raise FileNotFoundError(f"File {expected_file_name} does not exist")
+
+    with open(correct_file_name, "r", encoding="utf-8") as f:
+        correct_json = json.load(f)
+    with open(expected_file_name, "r", encoding="utf-8") as f:
+        expected_json = json.load(f)
+
+    return correct_json == expected_json
+
+
+class TestTargetGates:
+    """Test OQD device OpenAPL generation for target gates ({'RX', 'RY', 'MS'})."""
+
+    def test_RX_gate(self, tmp_openapl_file_name):
         """Test OpenAPL generation for a circuit with a single RX Gate."""
-        oqd_dev = OQDDevice(backend="default", shots=4, wires=1)
+        oqd_dev = OQDDevice(backend="default", wires=1, openapl_file_name=tmp_openapl_file_name)
 
-        @qjit(pipelines=self.oqd_pipelines)
+        @qjit(pipelines=OQD_PIPELINES)
+        @qml.set_shots(4)
         @qml.qnode(oqd_dev)
         def circuit(x):
             qml.RX(x, wires=0)
@@ -48,25 +100,70 @@ class TestOpenAPL:
 
         circuit(np.pi / 2)
 
-        expected_f = os.path.join(self.test_path, "test_single_RX.json")
-        with open(self.output_f, "r", encoding="utf-8") as f:
-            catalyst_json = json.load(f)
+        expected_f = os.path.join(MODULE_TEST_PATH, "test_single_RX.json")
+        assert verify_json(expected_f, oqd_dev.openapl_file_name)
 
-        with open(
-            expected_f,
-            "r",
-            encoding="utf-8",
-        ) as f:
-            expected_json = json.load(f)
+    def test_RY_gate(self, tmp_openapl_file_name):
+        """Test OpenAPL generation for a circuit with a single RY Gate."""
+        oqd_dev = OQDDevice(backend="default", wires=1, openapl_file_name=tmp_openapl_file_name)
 
-        assert sorted(catalyst_json.items()) == sorted(expected_json.items())
-        os.remove(self.output_f)
+        @qjit(pipelines=OQD_PIPELINES)
+        @qml.set_shots(4)
+        @qml.qnode(oqd_dev)
+        def circuit(x):
+            qml.RY(x, wires=0)
+            return qml.counts(wires=0)
 
-    def test_CNOT_gate(self):
+        circuit(np.pi / 2)
+
+        stats = profile_openapl(oqd_dev.openapl_file_name)
+        assert stats["num_ions"] == 1
+        assert stats["num_parallel_protocols"] == 1
+        assert stats["num_beams"] == 2
+        assert stats["num_transitions"] == 4
+        assert stats["num_levels"] == 4
+        with open(oqd_dev.openapl_file_name, "r", encoding="utf-8") as f:
+            result_json = json.load(f)
+        assert (
+            result_json["protocol"]["sequence"][0]["sequence"][0]["beam"]["phase"]["value"]
+            == 1.5707963267948966
+        )
+
+
+class TestChainedGates:
+    """Test that the OQD device correctly generates an OpenAPL program for chained gates."""
+
+    def test_RX_RY_gate(self, tmp_openapl_file_name):
+        """Test OpenAPL generation for a circuit with a single RX and RY Gate."""
+        oqd_dev = OQDDevice(backend="default", wires=1, openapl_file_name=tmp_openapl_file_name)
+
+        @qjit(pipelines=OQD_PIPELINES)
+        @qml.set_shots(4)
+        @qml.qnode(oqd_dev)
+        def circuit():
+            qml.RX(np.pi / 2, wires=0)
+            qml.RY(np.pi / 2, wires=0)
+            return qml.counts(wires=0)
+
+        circuit()
+
+        stats = profile_openapl(oqd_dev.openapl_file_name)
+        assert stats["num_ions"] == 1
+        assert stats["num_parallel_protocols"] == 2
+        assert stats["num_beams"] == 4
+        assert stats["num_transitions"] == 4
+        assert stats["num_levels"] == 4
+
+
+class TestDecomposableGates:
+    """Test OQD device OpenAPL generation for gates decomposable into target gates."""
+
+    def test_CNOT_gate(self, tmp_openapl_file_name):
         """Test OpenAPL generation for a circuit with a single CNOT circuit."""
-        oqd_dev = OQDDevice(backend="default", shots=4, wires=2)
+        oqd_dev = OQDDevice(backend="default", wires=2, openapl_file_name=tmp_openapl_file_name)
 
-        @qjit(pipelines=self.oqd_pipelines)
+        @qjit(pipelines=OQD_PIPELINES)
+        @qml.set_shots(4)
         @qml.qnode(oqd_dev)
         def circuit():
             qml.CNOT(wires=[0, 1])
@@ -74,15 +171,154 @@ class TestOpenAPL:
 
         circuit()
 
-        with open(self.output_f, "r", encoding="utf-8") as f:
-            catalyst_json = json.load(f)
+        expected_f = os.path.join(MODULE_TEST_PATH, "test_single_CNOT.json")
+        assert verify_json(expected_f, oqd_dev.openapl_file_name)
 
-        expected_f = os.path.join(self.test_path, "test_single_CNOT.json")
-        with open(expected_f, "r", encoding="utf-8") as f:
-            expected_json = json.load(f)
+    def test_Hadamard_gate(self, tmp_openapl_file_name):
+        """Test OpenAPL generation for a circuit with a single Hadamard gate."""
+        oqd_dev = OQDDevice(backend="default", wires=1, openapl_file_name=tmp_openapl_file_name)
 
-        assert sorted(catalyst_json.items()) == sorted(expected_json.items())
-        os.remove("__openapl__output.json")
+        @qjit(pipelines=OQD_PIPELINES)
+        @qml.set_shots(4)
+        @qml.qnode(oqd_dev)
+        def circuit():
+            qml.Hadamard(wires=0)
+            return qml.counts(wires=0)
+
+        circuit()
+
+        stats = profile_openapl(oqd_dev.openapl_file_name)
+        assert stats["num_ions"] == 1
+        assert stats["num_parallel_protocols"] == 3
+        assert stats["num_beams"] == 6
+        assert stats["num_transitions"] == 4
+        assert stats["num_levels"] == 4
+
+    def test_PauliZ_gate(self, tmp_openapl_file_name):
+        """Test OpenAPL generation for a circuit with a single PauliZ gate."""
+        oqd_dev = OQDDevice(backend="default", wires=1, openapl_file_name=tmp_openapl_file_name)
+
+        @qjit(pipelines=OQD_PIPELINES)
+        @qml.set_shots(4)
+        @qml.qnode(oqd_dev)
+        def circuit():
+            qml.PauliZ(wires=0)
+            return qml.counts(wires=0)
+
+        circuit()
+
+        stats = profile_openapl(oqd_dev.openapl_file_name)
+        assert stats["num_ions"] == 1
+        assert stats["num_parallel_protocols"] == 3
+        assert stats["num_beams"] == 6
+        assert stats["num_transitions"] == 4
+        assert stats["num_levels"] == 4
+
+    def test_PhaseShift_gate(self, tmp_openapl_file_name):
+        """Test OpenAPL generation for a circuit with a single PhaseShift gate."""
+        oqd_dev = OQDDevice(backend="default", wires=1, openapl_file_name=tmp_openapl_file_name)
+
+        @qjit(pipelines=OQD_PIPELINES)
+        @qml.set_shots(4)
+        @qml.qnode(oqd_dev)
+        def circuit():
+            qml.PhaseShift(np.pi / 4, wires=0)
+            return qml.counts(wires=0)
+
+        circuit()
+
+        stats = profile_openapl(oqd_dev.openapl_file_name)
+        assert stats["num_ions"] == 1
+        assert stats["num_parallel_protocols"] == 3
+        assert stats["num_beams"] == 6
+        assert stats["num_transitions"] == 4
+        assert stats["num_levels"] == 4
+
+    def test_RZ_gate(self, tmp_openapl_file_name):
+        """Test OpenAPL generation for a circuit with a single RZ gate."""
+        oqd_dev = OQDDevice(backend="default", wires=1, openapl_file_name=tmp_openapl_file_name)
+
+        @qjit(pipelines=OQD_PIPELINES)
+        @qml.set_shots(4)
+        @qml.qnode(oqd_dev)
+        def circuit():
+            qml.RZ(np.pi / 4, wires=0)
+            return qml.counts(wires=0)
+
+        circuit()
+
+        stats = profile_openapl(oqd_dev.openapl_file_name)
+        assert stats["num_ions"] == 1
+        assert stats["num_parallel_protocols"] == 3
+        assert stats["num_beams"] == 6
+        assert stats["num_transitions"] == 4
+        assert stats["num_levels"] == 4
+
+    def test_T_gate(self, tmp_openapl_file_name):
+        """Test OpenAPL generation for a circuit with a single T gate."""
+        oqd_dev = OQDDevice(backend="default", wires=1, openapl_file_name=tmp_openapl_file_name)
+
+        @qjit(pipelines=OQD_PIPELINES)
+        @qml.set_shots(4)
+        @qml.qnode(oqd_dev)
+        def circuit():
+            qml.T(wires=0)
+            return qml.counts(wires=0)
+
+        circuit()
+
+        stats = profile_openapl(oqd_dev.openapl_file_name)
+        assert stats["num_ions"] == 1
+        assert stats["num_parallel_protocols"] == 3
+        assert stats["num_beams"] == 6
+        assert stats["num_transitions"] == 4
+        assert stats["num_levels"] == 4
+
+    def test_S_gate(self, tmp_openapl_file_name):
+        """Test OpenAPL generation for a circuit with a single S gate."""
+        oqd_dev = OQDDevice(backend="default", wires=1, openapl_file_name=tmp_openapl_file_name)
+
+        @qjit(pipelines=OQD_PIPELINES)
+        @qml.set_shots(4)
+        @qml.qnode(oqd_dev)
+        def circuit():
+            qml.S(wires=0)
+            return qml.counts(wires=0)
+
+        circuit()
+
+        stats = profile_openapl(oqd_dev.openapl_file_name)
+        assert stats["num_ions"] == 1
+        assert stats["num_parallel_protocols"] == 3
+        assert stats["num_beams"] == 6
+        assert stats["num_transitions"] == 4
+        assert stats["num_levels"] == 4
+
+
+class TestComplexCircuits:
+    """Test OQD device OpenAPL generation for more complex quantum circuits."""
+
+    def test_2qubit_QFT(self, tmp_openapl_file_name):
+        """Test OpenAPL generation for a 2-qubit Quantum Fourier Transform circuit."""
+        wires = 2
+        oqd_dev = OQDDevice(backend="default", wires=wires, openapl_file_name=tmp_openapl_file_name)
+
+        @qjit(pipelines=OQD_PIPELINES)
+        @qml.set_shots(4)
+        @qml.qnode(oqd_dev)
+        def circuit(basis_state):
+            qml.BasisState(basis_state, wires=range(wires))
+            qml.QFT(wires=range(wires))
+            return qml.counts(wires=0)
+
+        circuit(np.array([0, 1]))
+
+        stats = profile_openapl(oqd_dev.openapl_file_name)
+        assert stats["num_ions"] == 2
+        assert stats["num_parallel_protocols"] == 54
+        assert stats["num_beams"] == 128
+        assert stats["num_transitions"] == 8
+        assert stats["num_levels"] == 8
 
 
 if __name__ == "__main__":

@@ -187,7 +187,7 @@ struct LowerListInit : public OpConversionPattern<ListInitOp> {
 struct LowerListDealloc : public OpConversionPattern<ListDeallocOp> {
     using OpConversionPattern<ListDeallocOp>::OpConversionPattern;
 
-    LogicalResult matchAndRewrite(ListDeallocOp op, OpAdaptor adaptor,
+    LogicalResult matchAndRewrite(ListDeallocOp op, OneToNOpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
         auto typeConverter = getTypeConverter();
@@ -210,7 +210,7 @@ struct LowerListDealloc : public OpConversionPattern<ListDeallocOp> {
 struct LowerListPush : public OpConversionPattern<ListPushOp> {
     using OpConversionPattern<ListPushOp>::OpConversionPattern;
 
-    LogicalResult matchAndRewrite(ListPushOp op, OpAdaptor adaptor,
+    LogicalResult matchAndRewrite(ListPushOp op, OneToNOpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
         auto typeConverter = getTypeConverter();
@@ -231,7 +231,7 @@ struct LowerListPush : public OpConversionPattern<ListPushOp> {
 struct LowerListPop : public OpConversionPattern<ListPopOp> {
     using OpConversionPattern<ListPopOp>::OpConversionPattern;
 
-    LogicalResult matchAndRewrite(ListPopOp op, OpAdaptor adaptor,
+    LogicalResult matchAndRewrite(ListPopOp op, OneToNOpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
         auto typeConverter = getTypeConverter();
@@ -252,7 +252,7 @@ struct LowerListPop : public OpConversionPattern<ListPopOp> {
 struct LowerListLoadData : public OpConversionPattern<ListLoadDataOp> {
     using OpConversionPattern<ListLoadDataOp>::OpConversionPattern;
 
-    LogicalResult matchAndRewrite(ListLoadDataOp op, OpAdaptor adaptor,
+    LogicalResult matchAndRewrite(ListLoadDataOp op, OneToNOpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
         auto typeConverter = getTypeConverter();

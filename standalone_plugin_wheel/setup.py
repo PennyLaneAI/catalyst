@@ -29,11 +29,11 @@ setup(
     packages=["standalone_plugin"],
     entry_points=entry_points,
     include_package_data=True,
-    install_requires=["PennyLane", "PennyLane-Catalyst"],
+    install_requires=["pennylane", "pennylane_catalyst"],
     classifiers=[
         "Development Status :: 1 - Planning",
         "Intended Audience :: Science/Research",
         "Operating System :: POSIX :: Linux",
-        "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
     ],
 )

@@ -46,12 +46,12 @@ struct IonsDecompositionPass : impl::IonsDecompositionPassBase<IonsDecomposition
         RewritePatternSet patternsCanonicalization(&getContext());
         catalyst::quantum::CustomOp::getCanonicalizationPatterns(patternsCanonicalization,
                                                                  &getContext());
-        if (failed(applyPatternsAndFoldGreedily(module, std::move(patternsCanonicalization)))) {
+        if (failed(applyPatternsGreedily(module, std::move(patternsCanonicalization)))) {
             return signalPassFailure();
         }
         RewritePatternSet patterns(&getContext());
         populateIonsDecompositionPatterns(patterns);
-        if (failed(applyPatternsAndFoldGreedily(module, std::move(patterns)))) {
+        if (failed(applyPatternsGreedily(module, std::move(patterns)))) {
             return signalPassFailure();
         }
     }

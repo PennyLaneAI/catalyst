@@ -31,6 +31,7 @@ using namespace catalyst::quantum;
 namespace catalyst {
 namespace quantum {
 
+#define GEN_PASS_DECL_QUANTUMCONVERSIONPASS
 #define GEN_PASS_DEF_QUANTUMCONVERSIONPASS
 #include "Quantum/Transforms/Passes.h.inc"
 
@@ -80,7 +81,8 @@ struct QuantumConversionPass : impl::QuantumConversionPassBase<QuantumConversion
         RewritePatternSet patterns(context);
         cf::populateControlFlowToLLVMConversionPatterns(typeConverter, patterns);
         populateFuncToLLVMConversionPatterns(typeConverter, patterns);
-        populateQIRConversionPatterns(typeConverter, patterns);
+        cf::populateAssertToLLVMConversionPattern(typeConverter, patterns);
+        populateQIRConversionPatterns(typeConverter, patterns, useArrayBackedRegisters);
 
         LLVMConversionTarget target(*context);
         target.addLegalOp<ModuleOp>();

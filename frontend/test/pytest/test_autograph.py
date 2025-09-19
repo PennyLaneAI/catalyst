@@ -26,6 +26,7 @@ import pennylane as qml
 import pytest
 from jax.errors import TracerBoolConversionError
 from numpy.testing import assert_allclose
+from pennylane.capture.autograph.transformer import TRANSFORMER as capture_TRANSFORMER
 
 from catalyst import AutoGraphError, debug, passes, qjit
 from catalyst.api_extensions import (
@@ -46,7 +47,13 @@ from catalyst.autograph.transformer import TRANSFORMER
 from catalyst.utils.dummy import dummy_func
 from catalyst.utils.exceptions import CompileError
 
-check_cache = TRANSFORMER.has_cache
+
+def check_cache(*args):
+    """Dispatches between the two transform has cache calls."""
+    if qml.capture.enabled():
+        return capture_TRANSFORMER.has_cache(*args)
+    return TRANSFORMER.has_cache(*args)
+
 
 # pylint: disable=import-outside-toplevel
 # pylint: disable=unnecessary-lambda-assignment
@@ -55,7 +62,34 @@ check_cache = TRANSFORMER.has_cache
 
 
 class Failing:
-    """Test class that emulates failures in user-code"""
+    """
+    Test class that emulates failures in user-code.
+
+    When autograph fails to convert, it will fall back to native python control flow execution.
+    In such cases autograph would raise a warning.
+
+    We want to test that this warning is properly raised, but if we use an actual error to trigger
+    the autograph fallback, the fallback would also fail. Therefore, we raise an exception in a
+    controlled fashion.
+
+    This Failing class has a class-level dictionary to keep track of what labels it has already
+    seen. When it sees a new label for the first time, it raises an exception. In all other cases,
+    it just silently lets the input value flow through.
+
+    For example, consider this code
+        @qjit(autograph=True)
+        def f1():
+            acc = 0
+            while acc < 5:
+                acc = Failing(acc, "while").val + 1
+            return acc
+
+    When tracing, the first Failing instance will encounter an unseen label "while".
+    This raises an exception and fails autograph, causing it to fallback.
+    Then in the actual python while loop, future Failing instances will encounter the same "while"
+    label. Since the label is not new, no new exception is raised, and the test finishes without
+    errors.
+    """
 
     triggered = defaultdict(bool)
 
@@ -71,6 +105,13 @@ class Failing:
             Failing.triggered[self.label] = True
             raise Exception(f"Emulated failure with label {self.label}")
         return self.ref
+
+
+@pytest.fixture(autouse=True)
+def reset_Failing():
+    """Reset class variable on `Failing` class before each test"""
+    Failing.triggered = defaultdict(bool)
+    yield
 
 
 class TestSourceCodeInfo:
@@ -465,9 +506,10 @@ class TestIntegration:
 
     def test_mcm_one_shot(self):
         """Test if mcm one-shot miss transforms."""
-        dev = qml.device("lightning.qubit", wires=5, shots=20)
+        dev = qml.device("lightning.qubit", wires=5)
 
         @qjit(autograph=True)
+        @qml.set_shots(20)
         @qml.qnode(dev, mcm_method="one-shot", postselect_mode="hw-like")
         def func(x):
             qml.RX(x, wires=0)
@@ -663,36 +705,42 @@ class TestConditionals:
         assert circuit(3) == False
         assert circuit(6) == True
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_branch_return_mismatch(self, backend):
         """Test that an exception is raised when the true branch returns a value without an else
         branch.
         """
         # pylint: disable=using-constant-test
 
+        m = qml.measure if qml.capture.enabled() else measure
+
         def circuit():
             if True:
-                res = measure(wires=0)
+                res = m(wires=0)
 
             return res
 
+        err_type = qml.exceptions.AutoGraphError if qml.capture.enabled() else AutoGraphError
+
         with pytest.raises(
-            AutoGraphError, match="Some branches did not define a value for variable 'res'"
+            err_type, match="Some branches did not define a value for variable 'res'"
         ):
             qjit(autograph=True)(qml.qnode(qml.device(backend, wires=1))(circuit))
 
     def test_branch_no_multi_return_mismatch(self, backend):
         """Test that case when the return types of all branches do not match."""
         # pylint: disable=using-constant-test
+        m = qml.measure if qml.capture.enabled() else measure
 
         @qjit(autograph=True)
         @qml.qnode(qml.device(backend, wires=1))
         def circuit():
             if True:
-                res = measure(wires=0)
+                res = m(wires=0)
             elif False:
                 res = 0.0
             else:
-                res = measure(wires=0)
+                res = m(wires=0)
 
             return res
 
@@ -714,12 +762,14 @@ class TestConditionals:
     def test_multiple_return_early(self, backend, capfd):
         """Test that returning early is possible."""
 
+        _measure = qml.measure if qml.capture.enabled() else measure
+
         @qjit(autograph=True)
         @qml.qnode(qml.device(backend, wires=1))
         def f(x: float):
             qml.RY(x, wires=0)
 
-            m = measure(0)
+            m = _measure(0)
             if not m:
                 return 0
 
@@ -766,6 +816,7 @@ class TestForLoops:
         assert isinstance(c_range._py_range, range)
         assert c_range[2] == 2
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_for_in_array(self):
         """Test for loop over JAX array."""
 
@@ -779,6 +830,7 @@ class TestForLoops:
         result = f(jnp.array([0.0, 1 / 4 * jnp.pi, 2 / 4 * jnp.pi]))
         assert np.allclose(result, -jnp.sqrt(2) / 2)
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_for_in_array_unpack(self):
         """Test for loop over a 2D JAX array unpacking the inner dimension."""
 
@@ -793,6 +845,7 @@ class TestForLoops:
         result = f(jnp.array([[0.0, 1 / 4 * jnp.pi], [2 / 4 * jnp.pi, jnp.pi]]))
         assert np.allclose(result, jnp.sqrt(2) / 2)
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_for_in_numeric_list(self):
         """Test for loop over a Python list that is convertible to an array."""
 
@@ -807,6 +860,7 @@ class TestForLoops:
         result = f()
         assert np.allclose(result, -jnp.sqrt(2) / 2)
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_for_in_numeric_list_of_list(self):
         """Test for loop over a nested Python list that is convertible to an array."""
 
@@ -837,6 +891,7 @@ class TestForLoops:
         result = f()
         assert np.allclose(result, -jnp.sqrt(2) / 2)
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_for_in_object_list_strict(self, monkeypatch):
         """Check the error raised in strict mode when a for loop iterates over a Python list that
         is *not* convertible to an array."""
@@ -849,9 +904,11 @@ class TestForLoops:
                 qml.RY(int(x) / 4 * jnp.pi, wires=0)
             return qml.expval(qml.PauliZ(0))
 
-        with pytest.raises(AutoGraphError, match="Could not convert the iteration target"):
+        err_type = qml.exceptions.AutoGraphError if qml.capture.enabled() else AutoGraphError
+        with pytest.raises(err_type, match="Could not convert the iteration target"):
             qjit(autograph=True)(f)
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_for_in_static_range(self):
         """Test for loop over a Python range with static bounds."""
 
@@ -865,6 +922,7 @@ class TestForLoops:
         result = f()
         assert np.allclose(result, [1 / 8] * 8)
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_for_in_static_range_indexing_array(self):
         """Test for loop over a Python range with static bounds that is used to index an array."""
 
@@ -916,6 +974,7 @@ class TestForLoops:
         ):
             qjit(autograph=True)(f)
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_for_in_dynamic_range(self):
         """Test for loop over a Python range with dynamic bounds."""
 
@@ -929,9 +988,11 @@ class TestForLoops:
         result = f(3)
         assert np.allclose(result, [1 / 8] * 8)
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_for_in_dynamic_range_indexing_array(self):
         """Test for loop over a Python range with dynamic bounds that is used to index an array."""
 
+        @qjit(autograph=True)
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def f(n: int):
             params = jnp.array([0.0, 1 / 4 * jnp.pi, 2 / 4 * jnp.pi])
@@ -984,6 +1045,7 @@ class TestForLoops:
             with pytest.raises(jax.errors.TracerIntegerConversionError, match="__index__"):
                 qjit(autograph=True)(f)
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_for_in_enumerate_array(self):
         """Test for loop over a Python enumeration on an array."""
 
@@ -997,6 +1059,7 @@ class TestForLoops:
         result = f(jnp.array([0.0, 1 / 4 * jnp.pi, 2 / 4 * jnp.pi]))
         assert np.allclose(result, [1.0, jnp.sqrt(2) / 2, 0.0])
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_for_in_enumerate_array_no_unpack(self):
         """Test for loop over a Python enumeration with delayed unpacking."""
 
@@ -1010,6 +1073,7 @@ class TestForLoops:
         result = f(jnp.array([0.0, 1 / 4 * jnp.pi, 2 / 4 * jnp.pi]))
         assert np.allclose(result, [1.0, jnp.sqrt(2) / 2, 0.0])
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_for_in_enumerate_nested_unpack(self):
         """Test for loop over a Python enumeration with nested unpacking."""
 
@@ -1028,6 +1092,7 @@ class TestForLoops:
         )
         assert np.allclose(result, [jnp.sqrt(2) / 2, -jnp.sqrt(2) / 2, -1.0])
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_for_in_enumerate_start(self):
         """Test for loop over a Python enumeration with offset indices."""
 
@@ -1041,6 +1106,7 @@ class TestForLoops:
         result = f(jnp.array([0.0, 1 / 4 * jnp.pi, 2 / 4 * jnp.pi]))
         assert np.allclose(result, [1.0, 1.0, 1.0, jnp.sqrt(2) / 2, 0.0])
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_for_in_enumerate_numeric_list(self):
         """Test for loop over a Python enumeration on a list that is convertible to an array."""
 
@@ -1086,6 +1152,7 @@ class TestForLoops:
         result = f()
         assert np.allclose(result, -jnp.sqrt(2) / 2)
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_loop_carried_value(self, monkeypatch):
         """Test a loop which updates a value each iteration."""
         monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
@@ -1119,6 +1186,7 @@ class TestForLoops:
 
         assert f3() == 9
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_iteration_element_access(self, monkeypatch):
         """Test that access to the iteration index/elements is possible after the loop executed
         (assuming initialization)."""
@@ -1255,6 +1323,7 @@ class TestForLoops:
         with pytest.raises(AutoGraphError, match="'c' is potentially uninitialized"):
             qjit(autograph=True)(f3)
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_init_with_invalid_jax_type(self, monkeypatch):
         """Test loop carried values initialized with an invalid JAX type."""
         monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
@@ -1267,7 +1336,8 @@ class TestForLoops:
 
             return x
 
-        with pytest.raises(AutoGraphError, match="'x' was initialized with type <class 'str'>"):
+        err_type = qml.exceptions.AutoGraphError if qml.capture.enabled() else AutoGraphError
+        with pytest.raises(err_type, match="'x' was initialized with type <class 'str'>"):
             qjit(autograph=True)(f)
 
     def test_init_with_mismatched_type(self, monkeypatch):
@@ -1283,7 +1353,8 @@ class TestForLoops:
 
             return x
 
-        with pytest.raises(AutoGraphError, match="'x' was initialized with the wrong type"):
+        err_type = qml.exceptions.AutoGraphError if qml.capture.enabled() else AutoGraphError
+        with pytest.raises(err_type, match="'x' was initialized with the wrong type"):
             qjit(autograph=True)(f)
 
     @pytest.mark.filterwarnings("error::UserWarning")
@@ -1320,6 +1391,7 @@ class TestForLoops:
 class TestWhileLoops:
     """Test that the autograph transformations produce correct results on while loops."""
 
+    @pytest.mark.usefixtures("use_both_frontend")
     @pytest.mark.parametrize(
         "init,inc,expected", [(0, 1, 3), (0.0, 1.0, 3.0), (0.0 + 0j, 1.0 + 0j, 3.0 + 0j)]
     )
@@ -1337,6 +1409,7 @@ class TestWhileLoops:
         result = f(expected)
         assert result == expected
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_whileloop_multiple_variables(self, monkeypatch):
         """Test while-loop with a multiple state variables"""
         monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
@@ -1353,6 +1426,7 @@ class TestWhileLoops:
         result = f(3)
         assert result == 3
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_whileloop_qjit(self, monkeypatch):
         """Test while-loop used with qml calls"""
         monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
@@ -1380,6 +1454,7 @@ class TestWhileLoops:
         )
         assert_allclose(result, expected, rtol=1e-6, atol=1e-6)
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_whileloop_temporary_variable(self, monkeypatch):
         """Test that temporary (local) variables can be initialized inside a while loop."""
         monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
@@ -1395,6 +1470,7 @@ class TestWhileLoops:
 
         assert f1() == 4
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_whileloop_forloop_interop(self, monkeypatch):
         """Test for-loop co-existing with while loop."""
         monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
@@ -1426,21 +1502,7 @@ class TestWhileLoops:
 
         assert f1() == sum([1, 1, 2, 2])
 
-    @pytest.mark.xfail(reason="this won't run warning-free until we fix the resource warning issue")
-    @pytest.mark.filterwarnings("error")
-    def test_whileloop_no_warning(self, monkeypatch):
-        """Test the absence of warnings if fallbacks are ignored."""
-        monkeypatch.setattr("catalyst.autograph_ignore_fallbacks", True)
-
-        @qjit(autograph=True)
-        def f():
-            acc = 0
-            while Failing(acc).val < 5:
-                acc = acc + 1
-            return acc
-
-        assert f() == 5
-
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_whileloop_exception(self, monkeypatch):
         """Test for-loop error if strict-conversion is enabled."""
         monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
@@ -1454,6 +1516,7 @@ class TestWhileLoops:
         with pytest.raises(RuntimeError):
             qjit(autograph=True)(f1)()
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_uninitialized_variables(self, monkeypatch):
         """Verify errors for (potentially) uninitialized loop variables."""
         monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
@@ -1464,9 +1527,12 @@ class TestWhileLoops:
 
             return x
 
-        with pytest.raises(AutoGraphError, match="'x' is potentially uninitialized"):
+        err_type = qml.exceptions.AutoGraphError if qml.capture.enabled() else AutoGraphError
+
+        with pytest.raises(err_type, match="'x' is potentially uninitialized"):
             qjit(autograph=True)(f)
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_init_with_invalid_jax_type(self, monkeypatch):
         """Test loop carried values initialized with an invalid JAX type."""
         monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
@@ -1479,7 +1545,9 @@ class TestWhileLoops:
 
             return x
 
-        with pytest.raises(AutoGraphError, match="'x' was initialized with type <class 'str'>"):
+        err_type = qml.exceptions.AutoGraphError if qml.capture.enabled() else AutoGraphError
+
+        with pytest.raises(err_type, match="'x' was initialized with type <class 'str'>"):
             qjit(autograph=True)(f)
 
     def test_init_with_mismatched_type(self, monkeypatch):
@@ -1492,11 +1560,14 @@ class TestWhileLoops:
 
             while pred:
                 x = 3
+                pred = False
 
             return x
 
-        with pytest.raises(AutoGraphError, match="'x' was initialized with the wrong type"):
-            qjit(autograph=True)(f)
+        err_type = qml.exceptions.AutoGraphError if qml.capture.enabled() else AutoGraphError
+
+        with pytest.raises(err_type, match="'x' was initialized with the wrong type"):
+            qjit(autograph=True)(f)(True)
 
 
 @pytest.mark.parametrize(
@@ -1701,12 +1772,15 @@ class TestMixed:
 
             assert f1() == 0 + 1 + sum([1, 2, 3])
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_no_python_loops(self):
         """Test AutoGraph behaviour on function with Catalyst loops."""
 
+        loop_fn = qml.for_loop if qml.capture.enabled() else for_loop
+
         @qjit(autograph=True)
         def f():
-            @for_loop(0, 3, 1)
+            @loop_fn(0, 3, 1)
             def loop(i, acc):
                 return acc + i
 
@@ -1720,12 +1794,15 @@ class TestMixed:
 
         # pylint: disable=cell-var-from-loop
 
+        loop_fn = qml.for_loop if qml.capture.enabled() else for_loop
+        cond_fn = qml.cond if qml.capture.enabled() else cond
+
         @qjit(autograph=True)
         def f(x):
             acc = 0
             if x < 3:
 
-                @for_loop(0, 3, 1)
+                @loop_fn(0, 3, 1)
                 def loop(_, acc):
                     # Oddly enough, AutoGraph treats 'i' as an iter_arg even though it's not
                     # accessed after the for loop. Maybe because it is captured in the nested
@@ -1734,7 +1811,7 @@ class TestMixed:
                     i = 0
                     for i in range(5):
 
-                        @cond(i % 2 == 0)
+                        @cond_fn(i % 2 == 0)
                         def even():
                             return i
 
@@ -1839,6 +1916,20 @@ class TestAutographInclude:
 
         assert dummy_func(6) == 36
         assert dummy_func(4) == 64
+
+    @pytest.mark.usefixtures("disable_capture")
+    def test_error_if_capture_and_autograph_include(self):
+        """Test that an error is raised if autograph include is set."""
+
+        qml.capture.enable()
+
+        with pytest.raises(NotImplementedError, match="autograph_include"):
+
+            @qjit(autograph=True, autograph_include=["catalyst.utils.dummy"])
+            def included(x: float, n: int):
+                for _ in range(n):
+                    x = x + dummy_func(6)
+                return x
 
     def test_autograph_included_module(self):
         """Test autograph included module."""
@@ -2077,6 +2168,23 @@ class TestDecorators:
             return i + 1
 
         assert qjit(loop, autograph=True)(0) == n
+
+    def test_prod(self):
+        """Test that AutoGraph doesn't fail in the presence of the qml.prod operator within
+        functional wrappers."""
+
+        @qml.prod
+        def template():
+            qml.H(0)
+            qml.X(0)
+
+        @qjit(autograph=True, target="jaxpr")
+        @qml.qnode(qml.device("null.qubit", wires=0))
+        def circuit():
+            qml.adjoint(template())
+            return qml.state()
+
+        assert circuit.jaxpr is not None
 
 
 class TestJaxIndexOperatorUpdate:

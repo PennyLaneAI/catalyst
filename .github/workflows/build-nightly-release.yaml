@@ -15,7 +15,7 @@ on:
 jobs:
   setup:
     name: Setup the release
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
@@ -56,7 +56,7 @@ jobs:
     name: Prepare & Upload wheels to TestPyPI
     if: ${{ !failure() && !cancelled() }}  # needed in case linux-aarch is skipped
     needs: [linux-x86, macos-arm, linux-aarch]
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     permissions:
       id-token: write  # IMPORTANT: mandatory for trusted publishing
 
@@ -73,11 +73,8 @@ jobs:
 
     - name: Prepare wheels
       run: |
-        rename "s/linux/manylinux_2_28/" dist/PennyLane_Catalyst-*
         rename "s/linux/manylinux_2_28/" dist/pennylane_catalyst-*
-        rename "s/macosx_14_0_universal2/macosx_13_0_arm64/" dist/PennyLane_Catalyst-*
         rename "s/macosx_14_0_universal2/macosx_13_0_arm64/" dist/pennylane_catalyst-*
-        rename "s/macosx_14/macosx_13/" dist/PennyLane_Catalyst-*
         rename "s/macosx_14/macosx_13/" dist/pennylane_catalyst-*
 
     - name: Upload wheels

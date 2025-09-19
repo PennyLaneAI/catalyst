@@ -35,11 +35,19 @@ from jax._src.lax.slicing import (
 from jax.core import AbstractValue, Tracer
 
 __all__ = (
+    "_drop_unused_vars2",
     "get_aval2",
     "_no_clean_up_dead_vars",
     "_gather_shape_rule_dynamic",
     "gather2_p",
 )
+
+
+def _drop_unused_vars2(jaxpr, constvals):
+    """
+    A patch to not drop unused vars during classical tracing of control flow.
+    """
+    return jaxpr, list(constvals)
 
 
 def get_aval2(x):

@@ -16,6 +16,7 @@
 
 #include <algorithm>
 #include <memory>
+#include <set>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -31,8 +32,10 @@ class OQDDevice final : public Catalyst::Runtime::QuantumDevice {
 
     size_t device_shots;
     std::string ion_specs;
+    std::string openapl_file_name;
     std::vector<std::string> phonon_specs;
 
+    std::set<QubitIdType> initial_allocated_QubitIds;
     std::unordered_map<std::string, std::string> device_kwargs;
 
     inline auto getDeviceWires(const std::vector<QubitIdType> &wires) -> std::vector<size_t>
@@ -77,11 +80,14 @@ class OQDDevice final : public Catalyst::Runtime::QuantumDevice {
         device_shots = device_kwargs.contains("shots")
                            ? static_cast<size_t>(std::stoll(device_kwargs["shots"]))
                            : 0;
+        openapl_file_name = device_kwargs.contains("openapl_file_name")
+                                ? device_kwargs["openapl_file_name"]
+                                : "__openapl__output.json";
     }
-    ~OQDDevice() { __catalyst__oqd__rt__finalize(); };
+    ~OQDDevice() { __catalyst__oqd__rt__finalize(openapl_file_name); };
 
     auto AllocateQubits(size_t) -> std::vector<QubitIdType> override;
-    void ReleaseAllQubits() override;
+    void ReleaseQubits(const std::vector<QubitIdType> &) override;
     auto GetNumQubits() const -> size_t override;
     void SetDeviceShots(size_t) override;
     auto GetDeviceShots() const -> size_t override;
@@ -97,5 +103,6 @@ class OQDDevice final : public Catalyst::Runtime::QuantumDevice {
 
     const std::string &getIonSpecs() { return ion_specs; }
     const std::vector<std::string> &getPhononSpecs() { return phonon_specs; }
+    const std::string &getOutputFile() { return openapl_file_name; }
 };
 } // namespace Catalyst::Runtime::Device

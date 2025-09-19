@@ -173,17 +173,16 @@ void wrapResultsAndArgsInTwoStructs(LLVM::LLVMFuncOp op, PatternRewriter &rewrit
 struct EmitCatalystPyInterfaceTransform : public OpRewritePattern<LLVM::LLVMFuncOp> {
     using OpRewritePattern<LLVM::LLVMFuncOp>::OpRewritePattern;
 
-    LogicalResult match(LLVM::LLVMFuncOp op) const override;
-    void rewrite(LLVM::LLVMFuncOp op, PatternRewriter &rewriter) const override;
+    LogicalResult matchAndRewrite(LLVM::LLVMFuncOp op, PatternRewriter &rewriter) const override;
 };
 
-LogicalResult EmitCatalystPyInterfaceTransform::match(LLVM::LLVMFuncOp op) const
+LogicalResult EmitCatalystPyInterfaceTransform::matchAndRewrite(LLVM::LLVMFuncOp op,
+                                                                PatternRewriter &rewriter) const
 {
-    return isFunctionMLIRCWrapper(op) ? success() : failure();
-}
+    if (!isFunctionMLIRCWrapper(op)) {
+        return failure();
+    }
 
-void EmitCatalystPyInterfaceTransform::rewrite(LLVM::LLVMFuncOp op, PatternRewriter &rewriter) const
-{
     // Find substr after _mlir_ciface_
     std::string _mlir_ciface = "_mlir_ciface_";
     size_t _mlir_ciface_len = _mlir_ciface.length();
@@ -194,6 +193,7 @@ void EmitCatalystPyInterfaceTransform::rewrite(LLVM::LLVMFuncOp op, PatternRewri
 
     rewriter.modifyOpInPlace(op, [&] { op.setSymName(newName); });
     wrapResultsAndArgsInTwoStructs(op, rewriter, functionNameWithoutPrefix);
+    return success();
 }
 
 } // namespace
@@ -212,16 +212,17 @@ struct EmitCatalystPyInterfacePass
         MLIRContext *context = &getContext();
         RewritePatternSet patterns(context);
         patterns.add<EmitCatalystPyInterfaceTransform>(context);
+
         GreedyRewriteConfig config;
-        config.strictMode = GreedyRewriteStrictness::ExistingOps;
-        config.enableRegionSimplification = mlir::GreedySimplifyRegionLevel::Disabled;
-        config.maxIterations = 1;
+        config.setStrictness(GreedyRewriteStrictness::ExistingOps);
+        config.setRegionSimplificationLevel(mlir::GreedySimplifyRegionLevel::Disabled);
+        config.setMaxIterations(1);
 
         auto op = getOperation();
         SmallVector<Operation *> targets;
         op->walk([&](LLVM::LLVMFuncOp func) { targets.push_back(func); });
 
-        if (failed(applyOpPatternsAndFold(targets, std::move(patterns), config))) {
+        if (failed(applyOpPatternsGreedily(targets, std::move(patterns), config))) {
             signalPassFailure();
         }
     }

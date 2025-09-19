@@ -12,10 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#define DEBUG_TYPE "decompose_non_clifford_ppr"
+#define DEBUG_TYPE "decompose-non-clifford-ppr"
 
-#include "llvm/Support/Debug.h"
-
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -44,7 +43,7 @@ struct DecomposeNonCliffordPPRPass
 
         populateDecomposeNonCliffordPPRPatterns(patterns, decomposeMethod, avoidYMeasure);
 
-        if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
+        if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
             return signalPassFailure();
         }
     }

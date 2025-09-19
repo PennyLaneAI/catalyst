@@ -58,6 +58,7 @@ S                      = { properties = [ "invertible", "controllable", "differe
 SWAP                   = { properties = [ "invertible", "controllable", "differentiable" ] }
 Toffoli                = { properties = [ "invertible",                 "differentiable" ] }
 T                      = { properties = [ "invertible", "controllable", "differentiable" ] }
+PCPhase                = { properties = [ "invertible", "controllable",                  ] }
 
 # Observables supported by the device
 [operators.observables]

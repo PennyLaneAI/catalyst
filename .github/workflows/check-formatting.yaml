@@ -2,7 +2,6 @@ name: Check Code Formatting
 
 on:
   pull_request:
-    branches: [ main ]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -11,7 +10,7 @@ concurrency:
 jobs:
   format-python:
     name: Python Formatting & Linting
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Install dependencies
@@ -31,7 +30,7 @@ jobs:
 
   format-cpp:
     name: C++ Formatting
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout code

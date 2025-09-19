@@ -24,10 +24,7 @@ from catalyst.debug.compiler_functions import (
 )
 from catalyst.debug.debugger import is_debugger_active
 from catalyst.debug.instruments import instrumentation
-from catalyst.debug.printing import (  # pylint: disable=redefined-builtin
-    print,
-    print_memref,
-)
+from catalyst.debug.printing import print, print_memref  # pylint: disable=redefined-builtin
 
 __all__ = (
     "callback",

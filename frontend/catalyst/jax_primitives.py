@@ -15,6 +15,8 @@
 of quantum operations, measurements, and observables to JAXPR.
 """
 
+import copy
+import functools
 import sys
 from dataclasses import dataclass
 from enum import Enum
@@ -30,7 +32,9 @@ from jax._src.interpreters import partial_eval as pe
 from jax._src.lax.lax import _merge_dyn_shape, _nary_lower_hlo, cos_p, sin_p
 from jax._src.lib.mlir import ir
 from jax._src.lib.mlir.dialects import hlo
+from jax._src.pjit import _pjit_lowering
 from jax.core import AbstractValue
+from jax.experimental.pjit import pjit_p
 from jax.extend.core import Primitive
 from jax.interpreters import mlir
 from jax.tree_util import PyTreeDef, tree_unflatten
@@ -72,6 +76,7 @@ from mlir_quantum.dialects.quantum import (
     CountsOp,
     CustomOp,
     DeallocOp,
+    DeallocQubitOp,
     DeviceInitOp,
     DeviceReleaseOp,
     ExpvalOp,
@@ -83,6 +88,8 @@ from mlir_quantum.dialects.quantum import (
     MeasureOp,
     MultiRZOp,
     NamedObsOp,
+    NumQubitsOp,
+    PCPhaseOp,
     ProbsOp,
     QubitUnitaryOp,
     SampleOp,
@@ -113,7 +120,9 @@ from catalyst.jax_primitives_utils import (
     lower_jaxpr,
 )
 from catalyst.utils.calculate_grad_shape import Signature, calculate_grad_shape
+from catalyst.utils.exceptions import CompileError
 from catalyst.utils.extra_bindings import FromElementsOp, TensorExtractOp
+from catalyst.utils.patching import Patcher
 from catalyst.utils.types import convert_shaped_arrays_to_tensors
 
 # pylint: disable=unused-argument,too-many-lines,too-many-statements,protected-access
@@ -138,13 +147,13 @@ class AbstractQbit(AbstractValue):
         return self.hash_value
 
 
-class ConcreteQbit(AbstractQbit):
+class ConcreteQbit:
     """Concrete Qbit."""
 
 
 def _qbit_lowering(aval):
     assert isinstance(aval, AbstractQbit)
-    return (ir.OpaqueType.get("quantum", "bit"),)
+    return ir.OpaqueType.get("quantum", "bit")
 
 
 #
@@ -162,13 +171,13 @@ class AbstractQreg(AbstractValue):
         return self.hash_value
 
 
-class ConcreteQreg(AbstractQreg):
+class ConcreteQreg:
     """Concrete quantum register."""
 
 
 def _qreg_lowering(aval):
     assert isinstance(aval, AbstractQreg)
-    return (ir.OpaqueType.get("quantum", "reg"),)
+    return ir.OpaqueType.get("quantum", "reg")
 
 
 #
@@ -247,9 +256,12 @@ device_init_p = Primitive("device_init")
 device_init_p.multiple_results = True
 device_release_p = Primitive("device_release")
 device_release_p.multiple_results = True
+num_qubits_p = Primitive("num_qubits")
 qalloc_p = Primitive("qalloc")
 qdealloc_p = Primitive("qdealloc")
 qdealloc_p.multiple_results = True
+qdealloc_qb_p = Primitive("qdealloc_qb")
+qdealloc_qb_p.multiple_results = True
 qextract_p = Primitive("qextract")
 qinsert_p = Primitive("qinsert")
 gphase_p = Primitive("gphase")
@@ -304,6 +316,103 @@ quantum_kernel_p = core.CallPrimitive("quantum_kernel")
 quantum_kernel_p.multiple_results = True
 measure_in_basis_p = Primitive("measure_in_basis")
 measure_in_basis_p.multiple_results = True
+decomprule_p = core.Primitive("decomposition_rule")
+decomprule_p.multiple_results = True
+
+quantum_subroutine_p = copy.deepcopy(pjit_p)
+quantum_subroutine_p.name = "quantum_subroutine_p"
+subroutine_cache: dict[callable, callable] = {}
+
+
+def subroutine(func):
+    """
+    Denotes the creation of a function in the intermediate representation.
+
+    May be used to reduce compilation times. Instead of repeatedly compiling
+    inlined versions of the function passed as a parameter, when functions
+    are annotated with a subroutine, a single version of the function
+    will be compiled and called from potentially multiple callsites.
+
+    .. note::
+
+        Subroutines are only available when using the PLxPR program capture
+        interface.
+
+
+    **Example**
+
+    .. code-block:: python
+
+        @subroutine
+        def Hadamard_on_wire_0():
+            qml.Hadamard(0)
+
+        qml.capture.enable()
+
+        @qjit
+        @qml.qnode(dev)
+        def main():
+            Hadamard_on_wire_0()
+            Hadamard_on_wire_0()
+            return qml.state()
+
+        print(main.mlir)
+        qml.capture.disable()
+    """
+
+    # pylint: disable-next=import-outside-toplevel
+    from catalyst.api_extensions.callbacks import WRAPPER_ASSIGNMENTS
+
+    old_pjit = jax._src.pjit.pjit_p
+
+    @functools.wraps(func, assigned=WRAPPER_ASSIGNMENTS)
+    def inside(*args, **kwargs):
+        with Patcher(
+            (
+                jax._src.pjit,
+                "pjit_p",
+                old_pjit,
+            ),
+        ):
+            return func(*args, **kwargs)
+
+    @functools.wraps(inside, assigned=WRAPPER_ASSIGNMENTS)
+    def wrapper(*args, **kwargs):
+
+        if not qml.capture.enabled():
+            msg = "Subroutine is only available with capture enabled."
+            raise CompileError(msg)
+
+        with Patcher(
+            (
+                jax._src.pjit,
+                "pjit_p",
+                quantum_subroutine_p,
+            ),
+        ):
+            return jax.jit(inside)(*args, **kwargs)
+
+    return wrapper
+
+
+def decomposition_rule(func=None, *, is_qreg=False, num_params=0):
+    """
+    Denotes the creation of a quantum definition in the intermediate representation.
+    """
+
+    assert not is_qreg or (
+        is_qreg and num_params == 0
+    ), "Decomposition rules with `qreg` do not require `num_params`."
+
+    if func is None:
+        return functools.partial(decomposition_rule, is_qreg=is_qreg, num_params=num_params)
+
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        jaxpr = jax.make_jaxpr(func)(*args, **kwargs)
+        decomprule_p.bind(pyfun=func, func_jaxpr=jaxpr, is_qreg=is_qreg, num_params=num_params)
+
+    return wrapper
 
 
 def _assert_jaxpr_without_constants(jaxpr: ClosedJaxpr):
@@ -410,7 +519,8 @@ def _print_abstract_eval(*args, string=None, memref=False):
 
 @print_p.def_impl
 def _print_def_impl(*args, string=None, memref=False):  # pragma: no cover
-    raise NotImplementedError()
+    print(*args)
+    return ()
 
 
 def _print_lowering(jax_ctx: mlir.LoweringRuleContext, *args, string=None, memref=False):
@@ -466,6 +576,22 @@ def _func_lowering(ctx, *args, call_jaxpr, fn):
     func_op = lower_callable(ctx, fn, call_jaxpr)
     call_op = create_call_op(ctx, func_op, *args)
     return call_op.results
+
+
+#
+# Decomp rule
+#
+@decomprule_p.def_abstract_eval
+def _decomposition_rule_abstract(*, pyfun, func_jaxpr, is_qreg=False, num_params=None):
+    return ()
+
+
+def _decomposition_rule_lowering(ctx, *, pyfun, func_jaxpr, **_):
+    """Lower a quantum decomposition rule into MLIR in a single step process.
+    The step is the compilation of the definition of the function fn.
+    """
+    lower_callable(ctx, pyfun, func_jaxpr)
+    return ()
 
 
 #
@@ -811,12 +937,18 @@ def _zne_lowering(ctx, *args, folding, jaxpr, fn):
 # device_init
 #
 @device_init_p.def_abstract_eval
-def _device_init_abstract_eval(shots, rtd_lib, rtd_name, rtd_kwargs):
+def _device_init_abstract_eval(shots, auto_qubit_management, rtd_lib, rtd_name, rtd_kwargs):
     return ()
 
 
+# pylint: disable=too-many-arguments, too-many-positional-arguments
 def _device_init_lowering(
-    jax_ctx: mlir.LoweringRuleContext, shots: ir.Value, rtd_lib, rtd_name, rtd_kwargs
+    jax_ctx: mlir.LoweringRuleContext,
+    shots: ir.Value,
+    auto_qubit_management,
+    rtd_lib,
+    rtd_name,
+    rtd_kwargs,
 ):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
@@ -827,6 +959,7 @@ def _device_init_lowering(
         ir.StringAttr.get(rtd_name),
         ir.StringAttr.get(rtd_kwargs),
         shots=shots_value,
+        auto_qubit_management=auto_qubit_management,
     )
 
     return ()
@@ -843,6 +976,26 @@ def _device_release_abstract_eval():
 def _device_release_lowering(jax_ctx: mlir.LoweringRuleContext):
     DeviceReleaseOp()  # end of qnode
     return ()
+
+
+#
+# num_qubits_p
+#
+@num_qubits_p.def_abstract_eval
+def _num_qubits_abstract_eval():
+    return core.ShapedArray((), jax.numpy.int64)
+
+
+def _num_qubits_lowering(jax_ctx: mlir.LoweringRuleContext):
+    ctx = jax_ctx.module_context.context
+    ctx.allow_unregistered_dialects = True
+
+    result_type = ir.IntegerType.get_signless(64, ctx)
+    nqubits = NumQubitsOp(result_type).result
+
+    result_from_elements_op = ir.RankedTensorType.get((), result_type)
+    from_elements_op = FromElementsOp(result_from_elements_op, nqubits)
+    return from_elements_op.results
 
 
 #
@@ -894,6 +1047,21 @@ def _qdealloc_lowering(jax_ctx: mlir.LoweringRuleContext, qreg):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
     DeallocOp(qreg)
+    return ()
+
+
+#
+# qdealloc_qb
+#
+@qdealloc_qb_p.def_abstract_eval
+def _qdealloc_qb_abstract_eval(qubit):
+    return ()
+
+
+def _qdealloc_qb_lowering(jax_ctx: mlir.LoweringRuleContext, qubit):
+    ctx = jax_ctx.module_context.context
+    ctx.allow_unregistered_dialects = True
+    DeallocQubitOp(qubit)
     return ()
 
 
@@ -1100,6 +1268,21 @@ def _qinst_lowering(
             out_qubits=[qubit.type for qubit in qubits],
             out_ctrl_qubits=[qubit.type for qubit in ctrl_qubits],
             theta=float_param,
+            in_qubits=qubits,
+            in_ctrl_qubits=ctrl_qubits,
+            in_ctrl_values=ctrl_values_i1,
+            adjoint=adjoint,
+        ).results
+
+    if name_str == "PCPhase":
+        assert len(float_params) == 2, "PCPhase takes two float parameters"
+        float_param = float_params[0]
+        dim_param = float_params[1]
+        return PCPhaseOp(
+            out_qubits=[qubit.type for qubit in qubits],
+            out_ctrl_qubits=[qubit.type for qubit in ctrl_qubits],
+            theta=float_param,
+            dim=dim_param,
             in_qubits=qubits,
             in_ctrl_qubits=ctrl_qubits,
             in_ctrl_values=ctrl_values_i1,
@@ -1523,7 +1706,7 @@ def custom_measurement_staging_rule(
 #
 # sample measurement
 #
-def sample_staging_rule(jaxpr_trace, obs, *dynamic_shape, static_shape):
+def sample_staging_rule(jaxpr_trace, _src, obs, *dynamic_shape, static_shape):
     """
     The result shape of `sample_p` is (shots, num_qubits).
     """
@@ -1575,7 +1758,7 @@ def _sample_lowering(
 #
 # counts measurement
 #
-def counts_staging_rule(jaxpr_trace, obs, *dynamic_shape, static_shape):
+def counts_staging_rule(jaxpr_trace, _src, obs, *dynamic_shape, static_shape):
     """
     The result shape of `counts_p` is (tensor<Nxf64>, tensor<Nxi64>)
     where N = 2**number_of_qubits.
@@ -1697,7 +1880,7 @@ def _var_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shape=None):
 #
 # probs measurement
 #
-def probs_staging_rule(jaxpr_trace, obs, *dynamic_shape, static_shape):
+def probs_staging_rule(jaxpr_trace, _src, obs, *dynamic_shape, static_shape):
     """
     The result shape of probs_p is (2^num_qubits,).
     """
@@ -1741,7 +1924,7 @@ def _probs_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, *dynamic_s
 #
 # state measurement
 #
-def state_staging_rule(jaxpr_trace, obs, *dynamic_shape, static_shape):
+def state_staging_rule(jaxpr_trace, _src, obs, *dynamic_shape, static_shape):
     """
     The result shape of state_p is (2^num_qubits,).
     """
@@ -2304,15 +2487,40 @@ def _cos_lowering2(ctx, x, accuracy):
     return _nary_lower_hlo(hlo.cosine, ctx, x, accuracy=accuracy)
 
 
+def subroutine_lowering(*args, **kwargs):
+    """This is just a method that forwards arguments to _pjit_lowering
+
+    Even though we could register the `pjit_p` lowering directly, this makes the code origin
+    apparent in stack traces and similar use cases.
+    """
+    try:
+        retval = _pjit_lowering(*args, **kwargs)
+    except NotImplementedError as e:
+        if "MLIR translation rule for primitive" in str(e):
+            msg = (
+                str(e)
+                + """
+                This error sometimes occurs when using quantum operations
+                inside subroutines but calling them outside a qnode
+            """
+            )
+            raise NotImplementedError(msg) from e
+        raise e
+
+    return retval
+
+
 CUSTOM_LOWERING_RULES = (
     (zne_p, _zne_lowering),
     (device_init_p, _device_init_lowering),
     (device_release_p, _device_release_lowering),
     (qalloc_p, _qalloc_lowering),
     (qdealloc_p, _qdealloc_lowering),
+    (qdealloc_qb_p, _qdealloc_qb_lowering),
     (qextract_p, _qextract_lowering),
     (qinsert_p, _qinsert_lowering),
     (qinst_p, _qinst_lowering),
+    (num_qubits_p, _num_qubits_lowering),
     (gphase_p, _gphase_lowering),
     (unitary_p, _unitary_lowering),
     (measure_p, _measure_lowering),
@@ -2344,7 +2552,9 @@ CUSTOM_LOWERING_RULES = (
     (sin_p, _sin_lowering2),
     (cos_p, _cos_lowering2),
     (quantum_kernel_p, _quantum_kernel_lowering),
+    (quantum_subroutine_p, subroutine_lowering),
     (measure_in_basis_p, _measure_in_basis_lowering),
+    (decomprule_p, _decomposition_rule_lowering),
 )
 
 
@@ -2357,3 +2567,5 @@ def _scalar_abstractify(t):
 
 pytype_aval_mappings[type] = _scalar_abstractify
 pytype_aval_mappings[jax._src.numpy.scalar_types._ScalarMeta] = _scalar_abstractify
+pytype_aval_mappings[ConcreteQbit] = lambda _: AbstractQbit()
+pytype_aval_mappings[ConcreteQreg] = lambda _: AbstractQreg()

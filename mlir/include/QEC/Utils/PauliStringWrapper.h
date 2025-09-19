@@ -14,9 +14,13 @@
 
 #pragma once
 
-#include "QEC/IR/QECDialect.h"
-#include "QEC/Transforms/Patterns.h"
 #include "llvm/ADT/SetVector.h"
+
+#include "mlir/IR/PatternMatch.h"
+
+#include "QEC/IR/QECDialect.h"
+#include "QEC/IR/QECOpInterfaces.h"
+#include "QEC/Transforms/Patterns.h"
 
 using namespace mlir;
 
@@ -69,7 +73,15 @@ struct PauliStringWrapper {
     PauliStringWrapper &operator=(const PauliStringWrapper &data) = delete;
     PauliStringWrapper &operator=(PauliStringWrapper &&data) = delete;
 
+    bool operator==(const PauliStringWrapper &rhs) const
+    {
+        return (this->get_pauli_word() == rhs.get_pauli_word()) &&
+               (this->isNegative() == rhs.isNegative());
+    }
+    bool operator!=(const PauliStringWrapper &rhs) const { return !(*this == rhs); }
+
     static PauliStringWrapper from_pauli_word(const PauliWord &pauliWord);
+    static PauliStringWrapper from_qec_op(QECOpInterface op);
 
     bool isNegative() const;
     bool isImaginary() const;
@@ -82,8 +94,11 @@ struct PauliStringWrapper {
 
     // Commutation Rules
     // P is Clifford, P' is non-Clifford
+    //   P can have a π/2 or π/4 rotation
     // if P commutes with P' then PP' = P'P
-    // if P anti-commutes with P' then PP' = -iPP' P
+    // if P anti-commutes with P' then
+    //   if P has a π/2 rotation then PP' = -P'P
+    //   if P has a π/4 rotation then PP' = -iPP'P
     // In here, P and P' are lhs and rhs, respectively.
     PauliStringWrapper computeCommutationRulesWith(const PauliStringWrapper &rhs) const;
 };
@@ -95,7 +110,7 @@ struct PauliStringWrapper {
 using PauliWordPair = std::pair<PauliStringWrapper, PauliStringWrapper>;
 
 /**
- * @brief Expland the op's operands to the set of operands.
+ * @brief Expand the op's operands to the set of operands.
  *        - Initialize the new pauliWord with "I" for each qubit.
  *        - Find location of inOutOperands in set of operands
  *        - Assign the inOutOperands' pauli word to new pauliWord in that location
@@ -103,15 +118,17 @@ using PauliWordPair = std::pair<PauliStringWrapper, PauliStringWrapper>;
  *        -> ["I", "X", "Y"]
  *
  * @tparam T either mlir::Operation::operand_range or mlir::Operation::result_range
- * @param qubits set of combination of qubit operands
+ * @param operands set of combination of qubit operands
  * @param inOutOperands either value from.inQubits or .outQubits from op
  * @param op QECOpInterface
  * @return PauliWord of the expanded pauliWord
  */
-template <typename T>
-PauliWord expandPauliWord(const llvm::SetVector<Value> &operands, const T &inOutOperands,
-                          QECOpInterface op);
+template <typename T, typename U>
+PauliWord expandPauliWord(const T &operands, const U &inOutOperands, QECOpInterface op);
 
+// Explicit extern to ensure a single instantiation is emitted in the .cpp
+extern template PauliWord expandPauliWord<llvm::SetVector<mlir::Value>, std::vector<mlir::Value>>(
+    const llvm::SetVector<mlir::Value> &, const std::vector<mlir::Value> &, QECOpInterface);
 /**
  * @brief Normalize the qubits of the two operations.
  *        The goal is to normalize the operations of the two operations to the same order and
@@ -130,6 +147,8 @@ PauliWord expandPauliWord(const llvm::SetVector<Value> &operands, const T &inOut
  * @return PauliWordPair of the normalized pair of PauliStringWrapper
  */
 PauliWordPair normalizePPROps(QECOpInterface lhs, QECOpInterface rhs);
+PauliWordPair normalizePPROps(QECOpInterface lhs, QECOpInterface rhs, ValueRange lhsQubits,
+                              ValueRange rhsQubits);
 
 // Remove Identity from the op's Pauli product and corresponding qubits from the list/
 // The size of op.pauliProduct and qubits is assumed to be the same.
@@ -151,7 +170,7 @@ SmallVector<Value> replaceValueWithOperands(const PauliStringWrapper &lhsPauliWr
 /**
  * @brief Update the pauliWord of the right hand side operation.
  *
- * @param rhsOp QECOpInterface of the right hand side
+ * @param op QECOpInterface of the right hand side
  * @param newPauliWord PauliWord of the new pauliWord
  * @param rewriter PatternRewriter
  */
@@ -168,6 +187,10 @@ bool isNoSizeLimit(size_t MaxPauliSize);
 
 // Combine the size check logic in one place
 bool exceedPauliSizeLimit(size_t pauliSize, size_t MaxPauliSize);
+
+// Check if the two Pauli string are the same
+bool operator==(const PauliWord &lhs, const PauliWord &rhs);
+bool operator!=(const PauliWord &lhs, const PauliWord &rhs);
 
 } // namespace qec
 } // namespace catalyst
