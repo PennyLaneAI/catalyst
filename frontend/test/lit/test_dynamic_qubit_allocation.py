@@ -94,4 +94,34 @@ def test_basic_dynalloc():
 print(test_basic_dynalloc.mlir)
 
 
+@qjit(autograph=True)
+@qml.qnode(qml.device("lightning.qubit", wires=3))
+def test_measure_with_reset():
+    """
+    Test qml.allocate with qml.measure with a reset.
+    """
+
+    # CHECK: [[device_init_qreg:%.+]] = quantum.alloc( 3)
+
+    # CHECK: [[dyn_qreg:%.+]] = quantum.alloc( 1)
+    # CHECK: [[dyn_qubit:%.+]] = quantum.extract [[dyn_qreg]][ 0]
+    # CHECK: [[mres:%.+]], [[mout_qubit:%.+]] = quantum.measure [[dyn_qubit]] postselect 1
+    # CHECK: [[reset_qubit:%.+]] = scf.if [[mres]] -> (!quantum.bit) {
+    # CHECK:    [[x_out_qubit:%.+]] = quantum.custom "PauliX"() [[mout_qubit]]
+    # CHECK:    scf.yield [[x_out_qubit]] : !quantum.bit
+    # CHECK:  } else {
+    # CHECK:    scf.yield [[mout_qubit]] : !quantum.bit
+    # CHECK:  }
+    # CHECK:  [[dealloc_qreg:%.+]] = quantum.insert [[dyn_qreg]][ 0], [[reset_qubit]]
+    # CHECK:  quantum.dealloc [[dealloc_qreg]]
+
+    with qml.allocate(1) as q:
+        m1 = qml.measure(wires=q[0], reset=True, postselect=1)
+
+    return qml.probs(wires=[0, 1, 2])
+
+
+print(test_measure_with_reset.mlir)
+
+
 qml.capture.disable()
