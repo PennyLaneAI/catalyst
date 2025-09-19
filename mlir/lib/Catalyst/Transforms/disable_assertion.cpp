@@ -44,9 +44,4 @@ struct DisableAssertionPass : impl::DisableAssertionPassBase<DisableAssertionPas
     }
 };
 
-std::unique_ptr<Pass> createDisableAssertionPass()
-{
-    return std::make_unique<DisableAssertionPass>();
-}
-
 } // namespace catalyst

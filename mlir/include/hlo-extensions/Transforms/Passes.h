@@ -19,9 +19,11 @@
 #include "mlir/Pass/Pass.h"
 
 namespace catalyst {
-std::unique_ptr<mlir::Pass> createHloCustomCallLoweringPass();
-std::unique_ptr<mlir::Pass> createScatterLoweringPass();
-std::unique_ptr<mlir::Pass> createStablehloLegalizeSortPass();
-std::unique_ptr<mlir::Pass> createStablehloLegalizeToStdPass();
-std::unique_ptr<mlir::Pass> createStablehloLegalizeControlFlowPass();
+namespace hlo {
+
+#define GEN_PASS_DECL
+#define GEN_PASS_REGISTRATION
+#include "hlo-extensions/Transforms/Passes.h.inc"
+
+} // namespace hlo
 } // namespace catalyst

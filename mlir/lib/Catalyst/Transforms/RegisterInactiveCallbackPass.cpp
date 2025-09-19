@@ -13,9 +13,9 @@
 // limitations under the License.
 
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-#include "Catalyst/Transforms/Passes.h"
 #include "Catalyst/Transforms/Patterns.h"
 #include "Gradient/Transforms/EnzymeConstants.h"
 
@@ -24,7 +24,6 @@ using namespace mlir;
 namespace catalyst {
 
 #define GEN_PASS_DEF_REGISTERINACTIVECALLBACKPASS
-#define GEN_PASS_DECL_REGISTERINACTIVECALLBACKPASS
 #include "Catalyst/Transforms/Passes.h.inc"
 
 struct RegisterInactiveCallbackPass
@@ -60,8 +59,4 @@ struct RegisterInactiveCallbackPass
     }
 };
 
-std::unique_ptr<Pass> createRegisterInactiveCallbackPass()
-{
-    return std::make_unique<RegisterInactiveCallbackPass>();
-}
 } // namespace catalyst
