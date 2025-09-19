@@ -1270,7 +1270,7 @@ the ``@qjit`` decorator is applied.
 
 Currently, however, this is not the case for measurements.
 
-- **Measurement behaviour**. :func:`catalyst.measure` currently behaves
+- **Measurement behaviour**: :func:`catalyst.measure` currently behaves
   differently from its PennyLane counterpart :func:`pennylane.measure`.
   In particular:
 
@@ -1281,3 +1281,5 @@ Currently, however, this is not the case for measurements.
   - Final measurement statistics occurring after :func:`catalyst.measure` will
     be post-selected on the outcome that was measured. The post-selected
     measurement will change with every execution.
+
+- **Dynamic wire allocation behaviour**: TODO
