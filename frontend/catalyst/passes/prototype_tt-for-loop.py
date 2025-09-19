@@ -14,7 +14,7 @@ class traversalState:
     probs: list
     # segment table name
     segment_table: str
-    last_computed_depth: int = 1
+    last_computed_depth: int = 0
     
     def __repr__(self):
         state_to_special_str = [s.name if s != 0 else s for s in self.state_to_special]
@@ -47,14 +47,14 @@ def segment_table(depth, segment_table, postselect=None):
         indent_print(f"... mcm postselect = {postselect}", indent=depth)
         indent_print(f"... ops in table [[{segment_table}]]", indent=depth)
 
-def do_prob(probs,depth):
+def do_prob(probs,depth, mcm_qbit):
     # assume mcm_qbit is always 0
 
     # call probs function to get the prob
     # prob = qml.probs(mcm_qubit)
     # For demo, we use a fixed prob based on the depth
     prob = probs[depth]
-    # indent_print(f"probs(0) = {prob}", indent=depth)
+    indent_print(f"probs({mcm_qbit}) = {prob}", indent=depth)
 
     if prob[0] == 1.0:
         postselect = 0
@@ -75,29 +75,34 @@ def do_prob(probs,depth):
 def simulation(case, depth, tt_state):
     # indent_print(f"[before] | {status_print(tt_state, depth)}/{tt_state.tree_depth-1}", indent=depth)
 
-    # only need to run the first segment function, no mcm
-    if depth == 0:
-        # generate call.segment_table(depth, ...)
-        # and adjust visited state
-        segment_table(depth, tt_state.segment_table)
-        tt_state.visited[depth] = 2
-        # indent_print(f"[update] | {status_print(tt_state, depth)}", indent=depth)
-        return
 
     # otherwise
     if case == 0:
         # not visited before
-        postselect, visited_state = do_prob(tt_state.probs, depth)
+    # only need to run the first segment function, no mcm
+        if depth == 0:
+            # generate call.segment_table(depth, ...)
+            # and adjust visited state
+            segment_table(depth, tt_state.segment_table)
+            tt_state.visited[depth] = 2
+            # indent_print(f"[update] | {status_print(tt_state, depth)}", indent=depth)
+            return depth + 1
+        else:
+            mcm_qbit = 0
+            postselect, visited_state = do_prob(tt_state.probs, depth, mcm_qbit)
 
-        # update visited state, it could be 1, or 2 just based on the prob
-        # if it transfer to 2, then it mean it only have 1 branch to go, we mark it completed at
-        # the point
-        tt_state.visited[depth] = visited_state
-        # need to store the state if it is 1, since it is expected to have right branch
-        if visited_state == 1:
-            store_state(depth)
+            # update visited state, it could be 1, or 2 just based on the prob
+            # if it transfer to 2, then it mean it only have 1 branch to go, we mark it completed at
+            # the point
+            tt_state.visited[depth] = visited_state
+            # need to store the state if it is 1, since it is expected to have right branch
+            if visited_state == 1:
+                store_state(depth)
 
-        segment_table(depth, tt_state.segment_table, postselect=postselect)
+            segment_table(depth, tt_state.segment_table, postselect=postselect)
+            depth += 1
+        return depth
+
     elif case == 1:
         tt_state.visited[depth] = 2 # go from 1 to 2 to mark it completed
 
@@ -107,9 +112,15 @@ def simulation(case, depth, tt_state):
 
         # we mark the postselect as 1, since it is always the right branch
         segment_table(depth, tt_state.segment_table, postselect=1)
+        depth += 1
+        return depth
+    elif case == 2:
+        tt_state.visited[depth] = 0
+        depth -= 1
+        return depth
+
     else:
-        indent_print("error case")
-        exit(1)
+        assert False, "error case"
 
     # indent_print(f"[update] | {status_print(tt_state, depth)}", indent=depth)
 
@@ -119,14 +130,13 @@ def store_state(depth):
 def restore_state(depth):
     indent_print(f"restoring state at depth: {depth}", indent=depth)
 
-def tree_traversal(tt_state, global_depth=0, one_way=False):
+debug_stop = [0]
 
-    if tt_state.visited[0] == 0:
-        # Just run the first segment function, no mcm
-        simulation(0, 0, tt_state)
+def tree_traversal(tt_state, global_depth=0, one_way=False):
 
     depth = tt_state.last_computed_depth
 
+    # print(f"FDX: Start traversal of {tt_state.name} from depth {depth} with visited {tt_state.visited}")
     # Main loop
     while depth >= 0:
         
@@ -135,6 +145,7 @@ def tree_traversal(tt_state, global_depth=0, one_way=False):
         if depth == tt_state.tree_depth:
             
             if one_way:
+                tt_state.last_computed_depth = depth - 1 
                 break
             else:            
                 print("#"*100)            
@@ -151,6 +162,8 @@ def tree_traversal(tt_state, global_depth=0, one_way=False):
         status = tt_state.visited[depth]
         depth_type = tt_state.special[depth]
         
+        # print(f"depth_type: {depth_type}, status: {status}, depth: {depth}, global_depth: {global_depth}")
+        
         if depth_type == "for_loop" and status < 2:  # Special for loop handling
             
             # First time visit the for loop node
@@ -163,7 +176,7 @@ def tree_traversal(tt_state, global_depth=0, one_way=False):
             # If the special state has completed a full traversal, reset it
             if all(v == 2 for v in special_state.visited):
                 # Reset for future traversals
-                special_state.last_computed_depth = 1
+                special_state.last_computed_depth = 0
                 special_state.visited = [0 for _ in special_state.visited]
 
             # Run the special state traversal
@@ -181,17 +194,29 @@ def tree_traversal(tt_state, global_depth=0, one_way=False):
             
             continue
 
-        if status < 2:  # Case 0: unvisited or left visited
-            simulation(status, depth, tt_state)
-            tt_state.last_computed_depth = depth
-            depth += 1
+        depth = simulation(status, depth, tt_state)
+        tt_state.last_computed_depth = depth
 
-        elif status == 2:  # Case 2: both visited -> backtrack
-            tt_state.visited[depth] = 0
-            depth -= 1
+        # if status == 0:
+        #     # Just run the first segment function, no mcm
+        #     # depth = simulation(0, 0, tt_state)
+        #     print(f"FDX: status: {status}, depth: {depth}")
+        #     depth = simulation(status, depth, tt_state)
+        #     print(f"FDX: after sim: status: {status}, depth: {depth}")
 
-        else:  # Error case
-            depth = -1
+
+        # if status < 2:  # Case 0: unvisited or left visited
+        #     # depth = simulation(status, depth, tt_state)
+        #     simulation(status, depth, tt_state)
+        #     tt_state.last_computed_depth = depth
+        #     depth += 1
+
+        # elif status == 2:  # Case 2: both visited -> backtrack
+        #     tt_state.visited[depth] = 0
+        #     depth -= 1
+
+        # else:  # Error case
+        #     depth = -1
 
         indent_print(f"TT [iter] |  {status_print(tt_state, depth)},", indent=global_depth+depth, real_print=True)
 
@@ -233,8 +258,8 @@ if __name__ == "__main__":
         segment_table="for_loop_segment_table_nested"
     )    
 
-    for_loop_state_fdx_nested.special[-2] = "for_loop"
-    for_loop_state_fdx_nested.state_to_special[-2] = for_loop_state_fdx_nested_02
+    for_loop_state_fdx_nested.special[-1] = "for_loop"
+    for_loop_state_fdx_nested.state_to_special[-1] = for_loop_state_fdx_nested_02
 
 
     # First for loop state
@@ -253,8 +278,8 @@ if __name__ == "__main__":
         segment_table="for_loop_segment_table"
     )    
 
-    for_loop_state_fdx.special[-2] = "for_loop"
-    for_loop_state_fdx.state_to_special[-2] = for_loop_state_fdx_nested
+    for_loop_state_fdx.special[-1] = "for_loop"
+    for_loop_state_fdx.state_to_special[-1] = for_loop_state_fdx_nested
 
     # Main traversal state
     main_mcm = 2
@@ -269,8 +294,8 @@ if __name__ == "__main__":
         segment_table="main_segment_table"
     )    
 
-    main_state.special[-2] = "for_loop"
-    main_state.state_to_special[-2] = for_loop_state_fdx
+    main_state.special[-1] = "for_loop"
+    main_state.state_to_special[-1] = for_loop_state_fdx
 
     
 
