@@ -537,7 +537,7 @@ def to_ppr(qnode):
 
     The full list of supported gates and operations are
     :class:`qml.H`,
-    :class:`qml.S`, 
+    :class:`qml.S`,
     :class:`qml.T`,
     :class:`qml.X`,
     :class:`qml.Y`,
@@ -999,7 +999,7 @@ def ppm_compilation(
 def ppm_specs(fn):
     R"""
     This function returns following PPM specs in a dictionary:
-    
+
     - Pi/4 PPR (count the number of clifford PPRs)
     - Pi/8 PPR (count the number of non-clifford PPRs)
     - Pi/2 PPR (count the number of classical PPRs)
