@@ -38,7 +38,7 @@
       return [measure(wires=i) for i in range(n)]
   ```
 
-  After performing the :func:`catalyst.passes.to_ppr` and :func:`catalyst.passes.merge_ppr_ppm` 
+  After performing the ``catalyst.passes.to_ppr`` and ``catalyst.passes.merge_ppr_ppm``
   passes, the circuit contains a depth of four of non-Clifford PPRs. Subsequently applying the 
   ``t_layer_reduction`` pass will move PPRs around via commutation, resulting in a circuit with a 
   smaller PPR depth of three.
