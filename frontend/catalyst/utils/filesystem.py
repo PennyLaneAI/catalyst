@@ -121,12 +121,12 @@ class WorkspaceManager:
         preferred_name = name.name
 
         # TODO: Maybe just look for the last one?
-        while curr_preferred_abspath.exists():
+        while curr_preferred_abspath.exists() and False:
             curr_preferred_name_str = preferred_name + "_" + str(count)
             curr_preferred_name = pathlib.Path(curr_preferred_name_str)
             curr_preferred_abspath = path / curr_preferred_name
             count += 1
 
         free_preferred_abspath = pathlib.Path(curr_preferred_abspath)
-        free_preferred_abspath.mkdir()
+        free_preferred_abspath.mkdir(exist_ok=True)
         return free_preferred_abspath
