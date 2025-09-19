@@ -2,14 +2,14 @@
 
 <h3>New features since last release</h3>
 
-* Catalyst now supports dynamic wire allocation with `qml.allocate()` and
-  `qml.deallocate()` when program capture is enabled.
+* Catalyst now supports dynamic wire allocation with ``qml.allocate()`` and
+  ``qml.deallocate()`` when program capture is enabled.
   [(#2002)](https://github.com/PennyLaneAI/catalyst/pull/2002)
 
-  Two new functions, `qml.allocate()` and `qml.deallocate()`, [have been added to
+  Two new functions, ``qml.allocate()`` and ``qml.deallocate()``, [have been added to
   PennyLane](https://docs.pennylane.ai/en/stable/development/release_notes.html#release-0-43-0) to support
   dynamic wire allocation. With Catalyst, these features can be accessed on
-   `lightning.qubit`, `lightning.kokkos`, and `lightning.gpu`.
+   ``lightning.qubit``, ``lightning.kokkos``, and ``lightning.gpu``.
 
   Dynamic wire allocation refers to the allocation of wires in the middle of a circuit, as opposed to the static allocation during device initialization. For example:
 
@@ -36,7 +36,7 @@
   ```
 
   In the above program, 3 qubits are allocated during device initialization, and 1
-  additional qubit is allocated inside the circuit with `qml.allocate(1)`. This is clear
+  additional qubit is allocated inside the circuit with ``qml.allocate(1)``. This is clear
   when we inspect the compiled MLIR:
 
   ```
@@ -66,16 +66,16 @@
   }
   ```
 
-  We can see that there are now 2 pairs of `quantum.alloc` and `quantum.dealloc`
-  operations. The quantum register value `%0` corresponds to the initial wires on the
-  device, and the quantum register value `%2` corresponds to the dynamically allocated
+  We can see that there are now 2 pairs of ``quantum.alloc`` and ``quantum.dealloc``
+  operations. The quantum register value ``%0`` corresponds to the initial wires on the
+  device, and the quantum register value ``%2`` corresponds to the dynamically allocated
   wire.
 
-  For more information on what `qml.allocate` and `qml.deallocate` do, please consult the
+  For more information on what ``qml.allocate`` and ``qml.deallocate`` do, please consult the
   [PennyLane v0.43 release notes](https://docs.pennylane.ai/en/stable/development/release_notes.html#release-0-43-0).
 
   However, there are some notable differences between the behaviour of these features
-  with `qjit` versus without. For details, please see
+  with ``qjit`` versus without. For details, please see
   [the relevant sections on the Catalyst sharp bits page](https://docs.pennylane.ai/projects/catalyst/en/stable/dev/sharp_bits.html#functionality-differences-from-pennylane).
 
 * A new pass `--t-layer-reduction` has been added to reduce the depth and number of non-Clifford PPR
