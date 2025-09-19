@@ -81,11 +81,7 @@ class GraphSolutionInterpreter(qml.capture.PlxprInterpreter):
         "IsingYY": 2,
         "IsingZZ": 2,
         "SingleExcitation": 2,
-        "SingleExcitationPlus": 2,
-        "SingleExcitationMinus": 2,
         "DoubleExcitation": 4,
-        "DoubleExcitationPlus": 4,
-        "DoubleExcitationMinus": 4,
         "ISWAP": 2,
         "PauliX": 1,
         "PauliY": 1,
@@ -129,29 +125,6 @@ class GraphSolutionInterpreter(qml.capture.PlxprInterpreter):
         self._operations = set()
         self._decomp_graph_solution = {}
 
-    def update_operations(self, operations):
-        """Update the set of captured operations.
-
-        Args:
-            operations (set): a set of pennylane operator instances
-        """
-        for op in operations:
-            # TODO: Although we deal with those ops not in compiler_ops_num_wires in the
-            # compiler-specific decomposition step, we should ideally have a way to specify
-            # the list of ops in the structured rule and their corresponding number of wires
-            # to solve the graph for them.
-            if op.name in self.compiler_ops_num_wires.keys():
-                self._operations.add(op)
-            else:
-                try:
-                    with qml.capture.pause():
-                        ops = op.decomposition()
-                        self.update_operations(ops)
-                except:  # pylint: disable=bare-except
-                    # the compiler-specific decomposition step will handle those ops
-                    # that we can't decompose here; also related to the TODO above.
-                    pass  # do nothing if we can't decompose it to the list of ops.
-
     def interpret_operation(self, op: "qml.operation.Operator"):
         """Interpret a PennyLane operation instance.
 
@@ -171,7 +144,7 @@ class GraphSolutionInterpreter(qml.capture.PlxprInterpreter):
 
         """
 
-        self.update_operations({op})
+        self._operations.add(op)
         data, struct = jax.tree_util.tree_flatten(op)
         return jax.tree_util.tree_unflatten(struct, data)
 
@@ -259,7 +232,9 @@ class GraphSolutionInterpreter(qml.capture.PlxprInterpreter):
                 "weights",
                 "weight",
             }
-            possible_names_for_wires = {"wires", "wire"}
+
+            # TODO: Support work-wires when it's supported in Catalyst.
+            possible_names_for_wires = {"wires", "wire", "control_wires", "target_wires"}
 
             if typ is float or name in possible_names_for_params:
                 # TensorLike is a Union of float, int, array-like, so we use float here
