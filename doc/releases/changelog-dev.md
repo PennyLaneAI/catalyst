@@ -307,7 +307,7 @@
 
 * Typos were fixed and supplemental information was added to the 
   docstrings for ``ppm_compilaion``, ``to_ppr``, ``commute_ppr``, 
-  ``ppr_to_ppm``, and ``merge_ppr_ppm``.
+  ``ppr_to_ppm``, ``merge_ppr_ppm``, and ``ppm_specs``.
   [(#2050)](https://github.com/PennyLaneAI/catalyst/pull/2050)
 
 * The Catalyst Command Line Interface documentation incorrectly stated that the `catalyst`
