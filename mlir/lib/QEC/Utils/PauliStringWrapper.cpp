@@ -16,8 +16,8 @@
 #include <stim/stabilizers/flex_pauli_string.h>
 #include <stim/stabilizers/pauli_string.h>
 
+#include "QEC/IR/QECDialect.h"
 #include "QEC/Utils/PauliStringWrapper.h"
-#include "Quantum/IR/QuantumOps.h" // for quantum::AllocQubitOp
 
 namespace catalyst {
 namespace qec {
