@@ -66,7 +66,6 @@ Catalyst
 
 .. toctree::
    :maxdepth: 2
-   :titlesonly:
    :hidden:
 
    dev/installation
@@ -99,10 +98,14 @@ Catalyst
    :caption: Examples
    :hidden:
 
-   demos/magic_distillation_demo
-   demos/adaptive_circuits_demo
-   demos/qml/tutorial_qubit_rotation
-   QML Optimization with Optax <demos/qml_optimization>
+    Magic State Distillation <https://pennylane.ai/qml/demos/tutorial_magic_state_distillation>
+    Variational Quantum Eigensolver <https://pennylane.ai/qml/demos/tutorial_how_to_quantum_just_in_time_compile_vqe_catalyst>
+    QML Optimization with Optax <https://pennylane.ai/qml/demos/tutorial_How_to_optimize_QML_model_using_JAX_catalyst_and_Optax>
+    Shor's Algorithm <https://pennylane.ai/qml/demos/tutorial_shors_algorithm_catalyst>
+    Catalyst and Lightning GPU <https://pennylane.ai/qml/demos/how_to_catalyst_lightning_gpu>
+    Grover's Algorithm <https://pennylane.ai/qml/demos/tutorial_qjit_compile_grovers_algorithm_with_catalyst>
+    
+
 
 .. toctree::
    :maxdepth: 1

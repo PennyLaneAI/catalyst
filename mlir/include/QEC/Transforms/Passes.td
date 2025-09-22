@@ -25,7 +25,8 @@ include "mlir/IR/EnumAttr.td"
 def DecomposeMethod : I32EnumAttr<"DecomposeMethod", "Decomposition method", 
     [
         I32EnumAttrCase<"AutoCorrected", 0, "auto-corrected">,
-        I32EnumAttrCase<"CliffordCorrected", 1, "clifford-corrected">
+        I32EnumAttrCase<"CliffordCorrected", 1, "clifford-corrected">,
+        I32EnumAttrCase<"PauliCorrected", 2, "pauli-corrected">,
     ]> { 
     let cppNamespace = "catalyst::qec";
     let genSpecializedAttr = 0; 
@@ -53,7 +54,10 @@ def DecomposeMethodOption : Option<
                     "auto-corrected", "Decompose using auto-corrected method."),
         clEnumValN(::catalyst::qec::DecomposeMethod::CliffordCorrected,
                     "clifford-corrected",
-                    "Decompose by injecting magic states method.")
+                    "Decompose by injecting magic states method."),
+        clEnumValN(::catalyst::qec::DecomposeMethod::PauliCorrected,
+                    "pauli-corrected",
+                    "Decompose by using the pauli-corrected method.")
     )}]>;
 
 def AvoidYMeasureOption : Option<
@@ -98,7 +102,7 @@ def MergePPRIntoPPMPass : Pass<"merge-ppr-ppm"> {
 def DecomposeNonCliffordPPRPass : Pass<"decompose-non-clifford-ppr"> {
     let summary = "Decompose non-Clifford PPRotation operations to set of Pauli Product Measurement operations.";
     
-    let dependentDialects = [ "catalyst::qec::QECDialect" ];
+    let dependentDialects = [ "catalyst::qec::QECDialect", "scf::SCFDialect" ];
 
     let constructor = "catalyst::createDecomposeNonCliffordPPRPass()";
 
@@ -129,6 +133,18 @@ def CountPPMSpecsPass : Pass<"ppm-specs"> {
     let summary = "Count specs in Pauli Product Measurement operations.";
     
     let constructor = "catalyst::createCountPPMSpecsPass()";
+}
+
+def PartitionLayersPass : Pass<"partition-layers"> {
+    let summary = "Partition layers of Pauli Product Measurement operations.";
+    
+    let constructor = "catalyst::createPartitionLayersPass()";
+}
+
+def TLayerReductionPass : Pass<"t-layer-reduction"> {
+    let summary = "Reduce T layers to PPR operations.";
+    
+    let constructor = "catalyst::createTLayerReductionPass()";
 }
 
 #endif // QEC_PASSES

@@ -25,12 +25,7 @@ from pennylane import for_loop
 
 from catalyst import debug, qjit, value_and_grad
 from catalyst.compiler import _options_to_cli_flags, to_llvmir, to_mlir_opt
-from catalyst.debug import (
-    compile_executable,
-    get_cmain,
-    get_compilation_stage,
-    replace_ir,
-)
+from catalyst.debug import compile_executable, get_cmain, get_compilation_stage, replace_ir
 from catalyst.pipelines import CompileOptions
 from catalyst.utils.exceptions import CompileError
 

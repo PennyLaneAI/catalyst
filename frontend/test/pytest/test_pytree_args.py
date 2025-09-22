@@ -116,7 +116,8 @@ class TestPyTreesReturnValues:
         assert result[0][0][0] + result[0][0][1] == result[0][1]
         assert result[0][0][0] * result[0][0][1] == result[1]
 
-        @qml.qnode(qml.device(backend, wires=2, shots=1000))
+        @qml.set_shots(1000)
+        @qml.qnode(qml.device(backend, wires=2))
         def circuit3(params):
             qml.RX(params[0], wires=0)
             qml.RX(params[1], wires=1)
@@ -134,7 +135,8 @@ class TestPyTreesReturnValues:
         assert isinstance(result[0], tuple)
         assert jnp.allclose(result[1], expected_expval, atol=tol_stochastic, rtol=tol_stochastic)
 
-        @qml.qnode(qml.device(backend, wires=2, shots=None))
+        @qml.set_shots(None)
+        @qml.qnode(qml.device(backend, wires=2))
         def circuit4(params):
             qml.RX(params[0], wires=0)
             qml.RX(params[1], wires=1)
@@ -233,7 +235,8 @@ class TestPyTreesReturnValues:
         assert res5["cond"][1] == (125, 625)
         assert res5["const"] == 5
 
-    def test_return_value_dict(self, backend, tol_stochastic):
+    @pytest.mark.parametrize("mcm_method", ["single-branch-statistics", "one-shot"])
+    def test_return_value_dict(self, backend, tol_stochastic, mcm_method):
         """Test dictionaries."""
 
         @qml.qnode(qml.device(backend, wires=2))
@@ -254,7 +257,8 @@ class TestPyTreesReturnValues:
         assert jnp.allclose(result["w0"], expected["w0"])
         assert jnp.allclose(result["w1"], expected["w1"])
 
-        @qml.qnode(qml.device(backend, wires=2, shots=1000))
+        @qml.set_shots(1000)
+        @qml.qnode(qml.device(backend, wires=2), mcm_method=mcm_method)
         def circuit2(params):
             qml.RX(params[0], wires=0)
             qml.RX(params[1], wires=1)
@@ -276,7 +280,8 @@ class TestPyTreesReturnValues:
             result["expval"]["z0"], expected_expval, atol=tol_stochastic, rtol=tol_stochastic
         )
 
-        @qml.qnode(qml.device(backend, wires=2, shots=1000))
+        @qml.set_shots(1000)
+        @qml.qnode(qml.device(backend, wires=2), mcm_method=mcm_method)
         def circuit2_snapshot(params):
             qml.Snapshot()
             qml.RX(params[0], wires=0)
@@ -311,7 +316,8 @@ class TestPyTreesReturnValues:
             result[1]["expval"]["z0"], expected_expval, atol=tol_stochastic, rtol=tol_stochastic
         )
 
-        @qml.qnode(qml.device(backend, wires=2, shots=None))
+        @qml.set_shots(None)
+        @qml.qnode(qml.device(backend, wires=2))
         def circuit3(params):
             qml.RX(params[0], wires=0)
             qml.RX(params[1], wires=1)

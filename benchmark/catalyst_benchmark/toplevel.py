@@ -32,11 +32,7 @@ import altair as alt
 import pandas as pd
 import vl_convert as vlc
 from altair import Chart
-from catalyst_benchmark.types import (
-    BenchmarkResult,
-    BenchmarkResultV1,
-    Sysinfo,
-)
+from catalyst_benchmark.types import BenchmarkResult, BenchmarkResultV1, Sysinfo
 from pandas import DataFrame
 
 # fmt:off
