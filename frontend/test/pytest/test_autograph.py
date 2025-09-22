@@ -506,9 +506,10 @@ class TestIntegration:
 
     def test_mcm_one_shot(self):
         """Test if mcm one-shot miss transforms."""
-        dev = qml.device("lightning.qubit", wires=5, shots=20)
+        dev = qml.device("lightning.qubit", wires=5)
 
         @qjit(autograph=True)
+        @qml.set_shots(20)
         @qml.qnode(dev, mcm_method="one-shot", postselect_mode="hw-like")
         def func(x):
             qml.RX(x, wires=0)
@@ -991,6 +992,7 @@ class TestForLoops:
     def test_for_in_dynamic_range_indexing_array(self):
         """Test for loop over a Python range with dynamic bounds that is used to index an array."""
 
+        @qjit(autograph=True)
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def f(n: int):
             params = jnp.array([0.0, 1 / 4 * jnp.pi, 2 / 4 * jnp.pi])
