@@ -82,7 +82,6 @@ void QECDialect::initialize()
 
 LogicalResult PPRotationOp::verify()
 {
-
     size_t numPauliProduct = getPauliProduct().size();
 
     if (numPauliProduct == 0) {
