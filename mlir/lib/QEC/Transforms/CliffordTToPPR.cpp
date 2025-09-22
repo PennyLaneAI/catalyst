@@ -81,7 +81,7 @@ void applyAdjointIfNeeded(GateConversion &gateConversion, CustomOp op)
 //===----------------------------------------------------------------------===//
 
 // C(P) = G(Angle)
-void applySingleQubitConversion(CustomOp op, SmallVector<GateConversion> gateConversions,
+void applySingleQubitConversion(CustomOp op, const SmallVector<GateConversion> &gateConversions,
                                 ConversionPatternRewriter &rewriter)
 {
     auto loc = op->getLoc();
