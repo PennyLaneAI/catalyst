@@ -172,7 +172,16 @@ void constructKernelOperation(SmallVector<Value> &qubits, Value &measResult, QEC
 //
 // Returns success after replacing `op` with the produced SSA values.
 //
+// Circuit example: (PPR/PPM to list of gates lowering)
+//  - PPR XX(π/4) [0, 1]: H(0) • H(1) • CNOT(1, 0) • RZ(π/2)   • CNOT(1, 0) • H(0) • H(1)
+//  - PPR ZZ(π/8) [0, 1]:               CNOT(1, 0) • RZ(π/4)   • CNOT(1, 0)
+//  - PPR YZ(π/8) [0, 1]: RotXZX(0)   • CNOT(1, 0) • RZ(π/4)   • CNOT(1, 0) • RotXZX(0)†
+//  - PPM XX      [0, 1]: H(0) • H(1) • CNOT(1, 0) • Measure(0)• CNOT(1, 0) • H(0) • H(1)
+//  - PPM ZZ      [0, 1]:               CNOT(1, 0) • Measure(0)• CNOT(1, 0)
+//  - PPM YZ      [0, 1]: RotXZX(0)   • CNOT(1, 0) • Measure(0)• CNOT(1, 0) • RotXZX(0)†
+//
 // LLVM_ATTRIBUTE_USED is used to suppress the warning about the function being unused.
+//
 LLVM_ATTRIBUTE_USED LogicalResult convertToMBQC(QECOpInterface op,
                                                 ConversionPatternRewriter &rewriter)
 {

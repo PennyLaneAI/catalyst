@@ -1168,8 +1168,11 @@ def ppr_to_mbqc(qnode):
     (MBQC) style circuit will be applied.
 
     This pass replaces QEC operations (``qec.ppr`` and ``qec.ppm``) with a
-    gate-based sequence in the Quantum dialect using standard gates and
-    measurements. Conceptually, each Pauli product is handled by:
+    gate-based sequence in the Quantum dialect using universal gates and
+    measurements that supported as MBQC gate set.
+    For details, see the Figure 2 of [Measurement-based Quantum Computation on cluster states](https://arxiv.org/abs/quant-ph/0301052).
+
+    Conceptually, each Pauli product is handled by:
 
     - Mapping its Pauli string to the Z basis via per-qubit conjugations
       (e.g., ``H`` for ``X``; specialized ``RotXZX`` sequences for ``Y``).
