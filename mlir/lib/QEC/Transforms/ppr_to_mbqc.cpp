@@ -59,7 +59,7 @@ struct PPRToMBQCPass : public impl::PPRToMBQCPassBase<PPRToMBQCPass> {
         }
 
         // Run CSE to deduplicate constants and trivial common constants
-        PassManager pm(&getContext());
+        PassManager pm(ctx);
         pm.addPass(createCSEPass());
         if (failed(pm.run(getOperation()))) {
             return signalPassFailure();

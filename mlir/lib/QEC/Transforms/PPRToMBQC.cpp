@@ -73,7 +73,7 @@ MeasureOp buildMeasurementOp(Value qubit, ConversionPatternRewriter &rewriter)
 
 // Applies per-qubit conjugations that map the provided Pauli string to the Z
 // basis. If `isReverse` is true, applies the inverse mapping.
-void constructPauliConjugationLayer(SmallVector<Value> &qubits, SmallVector<StringRef> pauliString,
+void constructPauliConjugationLayer(SmallVector<Value> &qubits, ArrayRef<StringRef> pauliString,
                                     bool isReverse, ConversionPatternRewriter &rewriter)
 {
     // Apply the conjugation gate on the corresponding qubit index.
