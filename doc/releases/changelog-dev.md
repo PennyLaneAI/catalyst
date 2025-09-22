@@ -2,6 +2,82 @@
 
 <h3>New features since last release</h3>
 
+* Catalyst now supports dynamic wire allocation with ``qml.allocate()`` and
+  ``qml.deallocate()`` when program capture is enabled.
+  [(#2002)](https://github.com/PennyLaneAI/catalyst/pull/2002)
+
+  Two new functions, ``qml.allocate()`` and ``qml.deallocate()``, [have been added to
+  PennyLane](https://docs.pennylane.ai/en/stable/development/release_notes.html#release-0-43-0) to support
+  dynamic wire allocation. With Catalyst, these features can be accessed on
+   ``lightning.qubit``, ``lightning.kokkos``, and ``lightning.gpu``.
+
+  Dynamic wire allocation refers to the allocation of wires in the middle of a circuit, as opposed to the static allocation during device initialization. For example:
+
+  ```python
+  qml.capture.enable()
+
+  @qjit
+  @qml.qnode(qml.device("lightning.qubit", wires=3))  # 3 initial qubits
+  def circuit():
+      qml.X(1)                        # |010>
+
+      with qml.allocate(1) as q:      # |010> and |0>, 1 dynamically allocted qubit
+          qml.X(q[0])                 # |010> and |1>
+          qml.CNOT(wires=[q[0], 2])   # |011> and |1>
+
+      return qml.probs(wires=[0, 1, 2])
+
+  qml.capture.disable()
+  ```
+
+  ```pycon
+  >>>  print(circuit())
+  [0. 0. 0. 1. 0. 0. 0. 0.]
+  ```
+
+  In the above program, 3 qubits are allocated during device initialization, and 1
+  additional qubit is allocated inside the circuit with ``qml.allocate(1)``. This is clear
+  when we inspect the compiled MLIR:
+
+  ```
+  >>> print(circuit.mlir)
+  func.func public @circuit() -> tensor<8xf64> attributes {qnode} {
+    %c0_i64 = arith.constant 0 : i64
+    quantum.device shots(%c0_i64) ["/path/to/liblightning_qubit_catalyst.so", "LightningSimulator", "{'mcmc': False, 'num_burnin': 0, 'kernel_name': None}"]
+    %0 = quantum.alloc( 3) : !quantum.reg
+    %1 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+    %out_qubits = quantum.custom "PauliX"() %1 : !quantum.bit
+    %2 = quantum.alloc( 1) : !quantum.reg
+    %3 = quantum.extract %2[ 0] : !quantum.reg -> !quantum.bit
+    %out_qubits_0 = quantum.custom "PauliX"() %3 : !quantum.bit
+    %4 = quantum.extract %0[ 2] : !quantum.reg -> !quantum.bit
+    %out_qubits_1:2 = quantum.custom "CNOT"() %out_qubits_0, %4 : !quantum.bit, !quantum.bit
+    %5 = quantum.insert %2[ 0], %out_qubits_1#0 : !quantum.reg, !quantum.bit
+    quantum.dealloc %5 : !quantum.reg
+    %6 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    %7 = quantum.compbasis qubits %6, %out_qubits, %out_qubits_1#1 : !quantum.obs
+    %8 = quantum.probs %7 : tensor<8xf64>
+    %9 = quantum.insert %0[ 1], %out_qubits : !quantum.reg, !quantum.bit
+    %10 = quantum.insert %9[ 2], %out_qubits_1#1 : !quantum.reg, !quantum.bit
+    %11 = quantum.insert %10[ 0], %6 : !quantum.reg, !quantum.bit
+    quantum.dealloc %11 : !quantum.reg
+    quantum.device_release
+    return %8 : tensor<8xf64>
+  }
+  ```
+
+  We can see that there are now 2 pairs of ``quantum.alloc`` and ``quantum.dealloc``
+  operations. The quantum register value ``%0`` corresponds to the initial wires on the
+  device, and the quantum register value ``%2`` corresponds to the dynamically allocated
+  wire.
+
+  For more information on what ``qml.allocate`` and ``qml.deallocate`` do, please consult the
+  [PennyLane v0.43 release notes](https://docs.pennylane.ai/en/stable/development/release_notes.html#release-0-43-0).
+
+  However, there are some notable differences between the behaviour of these features
+  with ``qjit`` versus without. For details, please see
+  [the relevant sections on the Catalyst sharp bits page](https://docs.pennylane.ai/projects/catalyst/en/stable/dev/sharp_bits.html#functionality-differences-from-pennylane).
+
 * A new quantum compilation pass that reduces the depth and count of non-Clifford Pauli product 
   rotations (PPRs) in circuits is now available. This compilation pass works by commuting 
   non-Clifford PPRs (often referred to as ``T`` gates) in adjacent 
@@ -408,6 +484,7 @@ This release contains contributions from (in alphabetical order):
 Ali Asadi,
 Joey Carter,
 Yushao Chen,
+Isaac De Vlugt,
 Sengthai Heng,
 David Ittah,
 Jeffrey Kam,
@@ -419,4 +496,4 @@ Ritu Thombre,
 Roberto Turrado,
 Paul Haochen Wang,
 Jake Zaia,
-Hongsheng Zheng
+Hongsheng Zheng.
