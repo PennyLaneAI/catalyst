@@ -178,6 +178,14 @@ OpFoldResult InsertOp::fold(FoldAdaptor adaptor)
 // Quantum op verifiers.
 //===----------------------------------------------------------------------===//
 
+LogicalResult CustomOp::verify()
+{
+    if (getInQubits().size() == 0) {
+        return emitOpError("expected op to have at least one qubit");
+    }
+    return success();
+}
+
 LogicalResult ExtractOp::verify()
 {
     if (!(getIdx() || getIdxAttr().has_value())) {
