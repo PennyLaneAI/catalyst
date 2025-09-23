@@ -18,14 +18,16 @@ A transform for the new MLIR-based Catalyst decomposition system.
 
 from __future__ import annotations
 
+import functools
 import inspect
+import types
 from collections.abc import Callable
 from typing import get_type_hints
 
 import jax
 import pennylane as qml
 
-# GraphSolutionInterpreter:
+# DecompRuleInterpreter:
 from pennylane.decomposition import DecompositionGraph
 from pennylane.wires import WiresLike
 
@@ -33,7 +35,7 @@ from catalyst.jax_primitives import decomposition_rule
 
 
 # pylint: disable=too-few-public-methods
-class GraphSolutionInterpreter(qml.capture.PlxprInterpreter):
+class DecompRuleInterpreter(qml.capture.PlxprInterpreter):
     """Interpreter for getting the decomposition graph solution
     from a jaxpr when program capture is enabled.
 
@@ -64,7 +66,15 @@ class GraphSolutionInterpreter(qml.capture.PlxprInterpreter):
     # A mapping from operation names to the number of wires they act on.
     # This is used when the operation is not in the captured operations
     # but we still need to create a decomposition rule for it.
-    COMPILER_OPERATIONS_NUM_WIRES: dict[str, int] = {
+    #
+    # Note that some operations have a variable number of wires,
+    # e.g., MultiRZ, GlobalPhase. For these, we set the number
+    # of wires to -1 to indicate a variable number.
+    #
+    # This will require a copy of the function to be made
+    # when creating the decomposition rule to avoid mutating
+    # the original function with attributes like num_wires.
+    compiler_ops_num_wires: dict[str, int] = {
         "CNOT": 2,
         "ControlledPhaseShift": 2,
         "CRot": 2,
@@ -99,6 +109,8 @@ class GraphSolutionInterpreter(qml.capture.PlxprInterpreter):
         "U1": 1,
         "U2": 1,
         "U3": 1,
+        "MultiRZ": -1,  # variable number of wires
+        "GlobalPhase": -1,  # variable number of wires
     }
 
     def __init__(
@@ -111,7 +123,7 @@ class GraphSolutionInterpreter(qml.capture.PlxprInterpreter):
 
         if not qml.decomposition.enabled_graph():  # pragma: no cover
             raise TypeError(
-                "The GraphSolutionInterpreter can only be used when"
+                "The DecompRuleInterpreter can only be used when"
                 "graph-based decomposition is enabled."
             )
 
@@ -167,7 +179,7 @@ class GraphSolutionInterpreter(qml.capture.PlxprInterpreter):
             # place where we can be sure that we have seen all operations
             # in the circuit before the measurement.
             # TODO: Find a better way to do this.
-            self._decomp_graph_solution = self._solve_decomposition_graph(
+            self._decomp_graph_solution = _solve_decomposition_graph(
                 self._operations,
                 self._gate_set,
                 fixed_decomps=self._fixed_decomps,
@@ -177,120 +189,201 @@ class GraphSolutionInterpreter(qml.capture.PlxprInterpreter):
             # Create decomposition rules for each operation in the solution
             # and compile them to Catalyst JAXPR decomposition rules
             for op, rule in self._decomp_graph_solution.items():
+                # Get number of wires if exists
+                op_num_wires = (
+                    op.op.params.get("num_wires", None) if hasattr(op.op, "params") else None
+                )
+
                 if (
-                    o := next((o for o in self._operations if o.name == op.op.name), None)
-                ) is not None:
-                    # TODO: This assumes that the operation names are unique in the circuit.
-                    # If there are multiple operations with the same name but different number
-                    # of wires, this will only capture the first one.
-                    self._create_decomposition_rule(
-                        rule, op_name=op.op.name, num_wires=len(o.wires)
+                    o := next(
+                        (
+                            o
+                            for o in self._operations
+                            if o.name == op.op.name and len(o.wires) == op_num_wires
+                        ),
+                        None,
                     )
-                elif op.op.name in self.COMPILER_OPERATIONS_NUM_WIRES:
+                ) is not None:
+                    _create_decomposition_rule(
+                        rule,
+                        op_name=op.op.name,
+                        num_wires=len(o.wires),
+                        requires_copy=self.compiler_ops_num_wires[op.op.name] == -1,
+                    )
+                elif op.op.name in self.compiler_ops_num_wires:
                     # In this part, we need to handle the case where an operation in
                     # the decomposition graph solution is not in the captured operations.
                     # This can happen if the operation is not directly called
                     # in the circuit, but is used inside a decomposition rule.
-                    # In this case, we fall back to using the COMPILER_OPERATIONS_NUM_WIRES
+                    # In this case, we fall back to using the compiler_ops_num_wires
                     # dictionary to get the number of wires.
-                    num_wires = self.COMPILER_OPERATIONS_NUM_WIRES[op.op.name]
-                    self._create_decomposition_rule(rule, op_name=op.op.name, num_wires=num_wires)
+                    num_wires = self.compiler_ops_num_wires[op.op.name]
+                    _create_decomposition_rule(
+                        rule,
+                        op_name=op.op.name,
+                        num_wires=num_wires,
+                        requires_copy=self.compiler_ops_num_wires[op.op.name] == -1,
+                    )
                 else:  # pragma: no cover
                     raise ValueError(f"Could not capture {op} without the number of wires.")
 
         data, struct = jax.tree_util.tree_flatten(measurement)
         return jax.tree_util.tree_unflatten(struct, data)
 
-    def _create_decomposition_rule(self, func: Callable, op_name: str, num_wires: int):
-        """Create a decomposition rule from a callable."""
 
-        sig_func = inspect.signature(func)
-        type_hints = get_type_hints(func)
+def _create_decomposition_rule(
+    func: Callable, op_name: str, num_wires: int, requires_copy: bool = False
+):
+    """Create a decomposition rule from a callable.
 
-        args = {}
-        for name in sig_func.parameters.keys():
-            typ = type_hints.get(name, None)
+    See also: :func:`~.decomposition_rule`.
 
-            # Skip tailing args or kwargs in the rules
-            if name in ("__", "_"):
-                continue
+    Args:
+        func (Callable): The decomposition function.
+        op_name (str): The name of the operation to decompose.
+        num_wires (int): The number of wires the operation acts on.
 
-            # TODO: This is a temporary solution until all rules have proper type annotations.
-            # Why? Because we need to pass the correct types to the decomposition_rule
-            # function to capture the rule correctly with JAX.
-            possible_names_for_params = {
-                "params",
-                "param",
-                "parameters",
-                "angles",
-                "angle",
-                "phi",
-                "omega",
-                "theta",
-                "weights",
-                "weight",
-            }
-            possible_names_for_wires = {"wires", "wire"}
+    Returns:
+        None: The function is decorated in place.
+    """
 
-            if typ is float or name in possible_names_for_params:
-                # TensorLike is a Union of float, int, array-like, so we use float here
-                # to cover the most common case as the JAX tracer doesn't like Union types
-                # and we don't have the actual values at this point.
-                args[name] = float
-            elif typ is WiresLike or name in possible_names_for_wires:
-                # Pass a dummy array of zeros with the correct number of wires
-                # This is required for the decomposition_rule to work correctly
-                # as it expects an array-like input for wires
-                args[name] = qml.math.array([0] * num_wires, like="jax")
-            elif typ is int:  # pragma: no cover
-                # This is only for cases where the rule has an int parameter
-                # e.g., dimension in some gates. Not that common though!
-                # We cover this when adding end-to-end tests for rules
-                # in the MLIR PR.
-                args[name] = int
-            else:  # pragma: no cover
-                raise ValueError(
-                    f"Unsupported type annotation {typ} for parameter {name} in func {func}."
-                )
+    sig_func = inspect.signature(func)
+    type_hints = get_type_hints(func)
 
-        # Set custom attributes for the decomposition rule
-        # These attributes are used in the MLIR decomposition pass
-        # to identify the target gate and the number of wires
-        setattr(func, "target_gate", op_name)
-        setattr(func, "num_wires", num_wires)
+    args = {}
+    for name in sig_func.parameters.keys():
+        typ = type_hints.get(name, None)
 
-        return decomposition_rule(func)(**args)
+        # Skip tailing args or kwargs in the rules
+        if name in ("__", "_"):
+            continue
 
-    # pylint: disable=protected-access
-    def _solve_decomposition_graph(self, operations, gate_set, fixed_decomps, alt_decomps):
-        """Get the decomposition graph solution for the given operations and gate set.
+        # TODO: This is a temporary solution until all rules have proper type annotations.
+        # Why? Because we need to pass the correct types to the decomposition_rule
+        # function to capture the rule correctly with JAX.
+        possible_names_for_params = {
+            "params",
+            "param",
+            "parameters",
+            "angles",
+            "angle",
+            "phi",
+            "omega",
+            "theta",
+            "weights",
+            "weight",
+        }
 
-        TODO: Extend `DecompGraphSolution` API and avoid accessing protected members
-        directly in this function.
-        """
+        # TODO: Support work-wires when it's supported in Catalyst.
+        possible_names_for_wires = {"wires", "wire", "control_wires", "target_wires"}
 
-        # decomp_graph_solution
-        decomp_graph_solution = {}
-
-        decomp_graph = DecompositionGraph(
-            operations,
-            gate_set,
-            fixed_decomps=fixed_decomps,
-            alt_decomps=alt_decomps,
-        )
-
-        # Find the efficient pathways to the target gate set
-        solutions = decomp_graph.solve()
-
-        def is_solved_for(op):
-            return (
-                op in solutions._all_op_indices
-                and solutions._all_op_indices[op] in solutions._visitor.distances
+        if typ is float or name in possible_names_for_params:
+            # TensorLike is a Union of float, int, array-like, so we use float here
+            # to cover the most common case as the JAX tracer doesn't like Union types
+            # and we don't have the actual values at this point.
+            args[name] = float
+        elif typ is WiresLike or name in possible_names_for_wires:
+            # Pass a dummy array of zeros with the correct number of wires
+            # This is required for the decomposition_rule to work correctly
+            # as it expects an array-like input for wires
+            args[name] = qml.math.array([0] * num_wires, like="jax")
+        elif typ is int:  # pragma: no cover
+            # This is only for cases where the rule has an int parameter
+            # e.g., dimension in some gates. Not that common though!
+            # We cover this when adding end-to-end tests for rules
+            # in the MLIR PR.
+            args[name] = int
+        else:  # pragma: no cover
+            raise ValueError(
+                f"Unsupported type annotation {typ} for parameter {name} in func {func}."
             )
 
-        for op_node, op_node_idx in solutions._all_op_indices.items():
-            if is_solved_for(op_node) and op_node_idx in solutions._visitor.predecessors:
-                d_node_idx = solutions._visitor.predecessors[op_node_idx]
-                decomp_graph_solution[op_node] = solutions._graph[d_node_idx].rule._impl
+    func_cp = make_def_copy(func) if requires_copy else func
 
-        return decomp_graph_solution
+    # Set custom attributes for the decomposition rule
+    # These attributes are used in the MLIR decomposition pass
+    # to identify the target gate and the number of wires
+    setattr(func_cp, "target_gate", op_name)
+    setattr(func_cp, "num_wires", num_wires)
+
+    if requires_copy:
+        # Include number of wires in the function name to avoid name clashes
+        # when the same rule is compiled multiple times with different number of wires
+        # (e.g., MultiRZ, GlobalPhase)
+        func_cp.__name__ += f"_wires_{num_wires}"  # pylint: disable=protected-access
+
+    return decomposition_rule(func_cp)(**args)
+
+
+# pylint: disable=protected-access
+def _solve_decomposition_graph(operations, gate_set, fixed_decomps, alt_decomps):
+    """Get the decomposition graph solution for the given operations and gate set.
+
+    TODO: Extend `DecompGraphSolution` API and avoid accessing protected members
+    directly in this function.
+
+    Args:
+        operations (set[Operator]): The set of operations to decompose.
+        gate_set (set[Operator]): The target gate set to decompose to.
+        fixed_decomps (dict or None): A dictionary of fixed decomposition rules
+            to use in the decomposition graph.
+        alt_decomps (dict or None): A dictionary of alternative decomposition rules
+            to use in the decomposition graph.
+
+    Returns:
+        dict: A dictionary mapping operations to their decomposition rules.
+    """
+
+    # decomp_graph_solution
+    decomp_graph_solution = {}
+
+    decomp_graph = DecompositionGraph(
+        operations,
+        gate_set,
+        fixed_decomps=fixed_decomps,
+        alt_decomps=alt_decomps,
+    )
+
+    # Find the efficient pathways to the target gate set
+    solutions = decomp_graph.solve()
+
+    def is_solved_for(op):
+        return (
+            op in solutions._all_op_indices
+            and solutions._all_op_indices[op] in solutions._visitor.distances
+        )
+
+    for op_node, op_node_idx in solutions._all_op_indices.items():
+        if is_solved_for(op_node) and op_node_idx in solutions._visitor.predecessors:
+            d_node_idx = solutions._visitor.predecessors[op_node_idx]
+            decomp_graph_solution[op_node] = solutions._graph[d_node_idx].rule._impl
+
+    return decomp_graph_solution
+
+
+# pylint: disable=protected-access
+def make_def_copy(func):
+    """Create a copy of a Python definition to avoid mutating the original.
+
+    This is especially useful when compiling decomposition rules with
+    parametric number of wires (e.g., MultiRZ, GlobalPhase) multiple times,
+    as the compilation process may add attributes to the function that
+    can interfere with subsequent compilations.
+
+    Args:
+        func (Callable): The function to copy.
+
+    Returns:
+        Callable: A copy of the original function with the same attributes.
+    """
+    # Create a new function object with the same code, globals, name, defaults, and closure
+    func_copy = types.FunctionType(
+        func.__code__,
+        func.__globals__,
+        name=func.__name__,
+        argdefs=func.__defaults__,
+        closure=func.__closure__,
+    )
+
+    # Now, we create and update the wrapper to copy over attributes like docstring, module, etc.
+    return functools.update_wrapper(func_copy, func)

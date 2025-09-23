@@ -2,6 +2,12 @@
 
 <h3>New features since last release</h3>
 
+* A new experimental decomposition system is introduced in Catalyst enabling the
+  PennyLane's graph-based decomposition and MLIR-based lowering of decomposition rules.
+  This feature is integrated with PennyLane program capture and graph-based decomposition
+  including support for custom decomposition rules and operators.
+  [(#2029)](https://github.com/PennyLaneAI/catalyst/pull/2029)
+
 * A new pass `--t-layer-reduction` has been added to reduce the depth and number of non-Clifford PPR
   operations by commuting adjacent PPRs and finding possible PPRs that can be merged.
   For more details, see the Figure 6 in [A Game of Surface Code](https://arXiv:1808.02892v3) paper.
@@ -26,7 +32,13 @@
       return qml.probs()
   ```
 
+
 <h3>Improvements 🛠</h3>
+
+* Significantly improved resource tracking with `null.qubit`.
+  The new tracking has better integration with PennyLane (e.g. for passing the filename to write out), cleaner documentation, and its own wrapper class.
+  It also now tracks circuit depth, as well as gate counts by number of wires.
+  [[#2033]](https://github.com/PennyLaneAI/catalyst/pull/2033)
 
 * Catalyst now supports returning classical and MCM values with the dynamic one-shot MCM method.
   [(#2004)](https://github.com/PennyLaneAI/catalyst/pull/2004)
@@ -177,6 +189,10 @@
   [(#1952)](https://github.com/PennyLaneAI/catalyst/pull/1952)
 
 <h3>Bug fixes 🐛</h3>
+
+* Fixes an issue with program capture and static argnums on the qnode. The lowering to MLIR is no longer cached
+  if there are static argnums.
+  [(#2053)](https://github.com/PennyLaneAI/catalyst/pull/2053)
 
 * Fix type promotion on conditional branches, where the return values from `cond` should be the promoted one.
   [(#1977)](https://github.com/PennyLaneAI/catalyst/pull/1977)

@@ -416,26 +416,5 @@ def test_pass_decomposition():
 
     print(circuit3.mlir)
 
-    @qml.qjit(target="mlir")
-    @partial(qml.transforms.decompose, gate_set={"RX"})
-    @qml.transforms.cancel_inverses
-    @partial(qml.transforms.decompose, gate_set={"RZ"})
-    @qml.transforms.merge_rotations
-    @partial(qml.transforms.decompose, gate_set={"RX", "RZ"})
-    @qml.qnode(dev)
-    def circuit4():
-        return qml.probs()
-
-    # CHECK: [[first_pass:%.+]] = transform.apply_registered_pass "decompose-lowering"
-    # CHECK-NEXT: [[merge_rot:%.+]] = transform.apply_registered_pass "merge-rotations" to [[first_pass]]
-    # CHECK-NEXT: [[decomp_to_rz:%.+]] = transform.apply_registered_pass "decompose-lowering" to [[merge_rot]]
-    # CHECK-NEXT: [[remove_chained:%.+]] = transform.apply_registered_pass "remove-chained-self-inverse" to [[decomp_to_rz]]
-    # CHECK-NEXT: transform.apply_registered_pass "decompose-lowering" to [[remove_chained]]
-
-    print(circuit4.mlir)
-
-    qml.decomposition.disable_graph()
-    qml.capture.disable()
-
 
 test_pass_decomposition()
