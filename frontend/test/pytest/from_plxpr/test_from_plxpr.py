@@ -15,6 +15,8 @@
 This module tests the from_plxpr conversion function.
 """
 
+from functools import partial
+
 import jax
 import numpy as np
 import pennylane as qml
@@ -963,6 +965,35 @@ class TestHybridPrograms:
         expected = -np.sin(0.5) + np.cos(1.2)
 
         assert qml.math.allclose(results, expected)
+
+
+class TestGraphDecomposition:
+    """Test the new graph-based decomposition integration with from_plxpr."""
+
+    def test_with_multiple_decomps_transforms(self):
+        """Test that a circuit with multiple decompositions and transforms can be converted."""
+
+        qml.capture.enable()
+        qml.decomposition.enable_graph()
+
+        @qml.qjit(target="mlir")
+        @partial(
+            qml.transforms.decompose,
+            gate_set={"RX", "RY"},
+        )
+        @partial(
+            qml.transforms.decompose,
+            gate_set={"NOT", "GlobalPhase"},
+        )
+        @qml.qnode(qml.device("lightning.qubit", wires=0))
+        def circuit(x):
+            qml.GlobalPhase(x)
+            return qml.expval(qml.PauliX(0))
+
+        with pytest.raises(
+            NotImplementedError, match="Multiple decomposition transforms are not yet supported."
+        ):
+            circuit(0.2)
 
 
 if __name__ == "__main__":

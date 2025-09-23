@@ -394,7 +394,6 @@ def merge_rotations(qnode):
     return PassPipelineWrapper(qnode, "merge-rotations")
 
 
-# pragma: no cover
 def decompose_lowering(qnode):
     """
     Specify that the ``-decompose-lowering`` MLIR compiler pass
@@ -411,7 +410,7 @@ def decompose_lowering(qnode):
         // TODO: add example here
 
     """
-    return PassPipelineWrapper(qnode, "decompose-lowering")
+    return PassPipelineWrapper(qnode, "decompose-lowering")  # pragma: no cover
 
 
 def ions_decomposition(qnode):  # pragma: nocover

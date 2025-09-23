@@ -208,7 +208,7 @@ def handle_qnode(
     closed_jaxpr = (
         ClosedJaxpr(qfunc_jaxpr, consts)
         if not self.requires_decompose_lowering
-        else apply_compiler_decompose_to_plxpr(
+        else _apply_compiler_decompose_to_plxpr(
             inner_jaxpr=qfunc_jaxpr,
             consts=consts,
             ncargs=non_const_args,
@@ -217,7 +217,7 @@ def handle_qnode(
     )
 
     if self.requires_decompose_lowering:
-        closed_jaxpr = collect_and_compile_graph_solutions(
+        closed_jaxpr = _collect_and_compile_graph_solutions(
             inner_jaxpr=closed_jaxpr.jaxpr,
             consts=closed_jaxpr.consts,
             tkwargs=self.decompose_tkwargs,
@@ -271,74 +271,6 @@ transforms_to_passes = {
     pl_single_qubit_fusion: (None, False),
     pl_unitary_to_rot: (None, False),
 }
-
-
-def apply_compiler_decompose_to_plxpr(inner_jaxpr, consts, tgateset, ncargs):
-    """Apply the compiler-specific decomposition for a given JAXPR.
-
-    Args:
-        inner_jaxpr (Jaxpr): The input JAXPR to be decomposed.
-        consts (list): The constants used in the JAXPR.
-        tgateset (list): A list of target gateset for decomposition.
-        ncargs (list): Non-constant arguments for the JAXPR.
-        qargs (list): All arguments including constants and non-constants.
-
-    Returns:
-        ClosedJaxpr: The decomposed JAXPR.
-    """
-
-    # Disable the graph decomposition optimization
-
-    # Why? Because for the compiler-specific decomposition we want to
-    # only decompose higher-level gates and templates that only have
-    # a single decomposition, and not do any further optimization
-    # based on the graph solution.
-    # Besides, the graph-based decomposition is not supported
-    # yet in from_plxpr for most gates and templates.
-
-    # TODO: Enable the graph-based decomposition
-    qml.decomposition.disable_graph()
-
-    # First perform the pre-mlir decomposition to simplify the jaxpr
-    # by decomposing high-level gates and templates
-    gate_set = COMPILER_OPERATIONS + tgateset
-
-    final_jaxpr = qml.transforms.decompose.plxpr_transform(
-        inner_jaxpr, consts, (), {"gate_set": gate_set}, *ncargs
-    )
-
-    qml.decomposition.enable_graph()
-
-    return final_jaxpr
-
-
-def collect_and_compile_graph_solutions(inner_jaxpr, consts, tkwargs, ncargs):
-    """Collect and compile graph solutions for a given JAXPR.
-
-    This function uses the DecompRuleInterpreter to evaluate
-    the input JAXPR and obtain a new JAXPR that incorporates
-    the graph-based decomposition solutions.
-
-    This function doesn't modify the underlying quantum function
-    but rather constructs a new JAXPR with decomposition rules.
-
-    Args:
-        inner_jaxpr (Jaxpr): The input JAXPR to be decomposed.
-        consts (list): The constants used in the JAXPR.
-        tkwargs (list): The keyword arguments of the decompose transform.
-        ncargs (list): Non-constant arguments for the JAXPR.
-
-    Returns:
-        ClosedJaxpr: The decomposed JAXPR.
-    """
-    gds_interpreter = DecompRuleInterpreter(**tkwargs)
-
-    def gds_wrapper(*args):
-        return gds_interpreter.eval(inner_jaxpr, consts, *args)
-
-    final_jaxpr = jax.make_jaxpr(gds_wrapper)(*ncargs)
-
-    return final_jaxpr
 
 
 # pylint: disable-next=redefined-outer-name
@@ -909,6 +841,74 @@ def trace_from_pennylane(
         jaxpr = from_plxpr(plxpr)(*dynamic_args, **kwargs)
 
     return jaxpr, out_type, out_treedef, sig
+
+
+def _apply_compiler_decompose_to_plxpr(inner_jaxpr, consts, tgateset, ncargs):
+    """Apply the compiler-specific decomposition for a given JAXPR.
+
+    Args:
+        inner_jaxpr (Jaxpr): The input JAXPR to be decomposed.
+        consts (list): The constants used in the JAXPR.
+        tgateset (list): A list of target gateset for decomposition.
+        ncargs (list): Non-constant arguments for the JAXPR.
+        qargs (list): All arguments including constants and non-constants.
+
+    Returns:
+        ClosedJaxpr: The decomposed JAXPR.
+    """
+
+    # Disable the graph decomposition optimization
+
+    # Why? Because for the compiler-specific decomposition we want to
+    # only decompose higher-level gates and templates that only have
+    # a single decomposition, and not do any further optimization
+    # based on the graph solution.
+    # Besides, the graph-based decomposition is not supported
+    # yet in from_plxpr for most gates and templates.
+
+    # TODO: Enable the graph-based decomposition
+    qml.decomposition.disable_graph()
+
+    # First perform the pre-mlir decomposition to simplify the jaxpr
+    # by decomposing high-level gates and templates
+    gate_set = set(COMPILER_OPERATIONS + tgateset)
+
+    final_jaxpr = qml.transforms.decompose.plxpr_transform(
+        inner_jaxpr, consts, (), {"gate_set": gate_set}, *ncargs
+    )
+
+    qml.decomposition.enable_graph()
+
+    return final_jaxpr
+
+
+def _collect_and_compile_graph_solutions(inner_jaxpr, consts, tkwargs, ncargs):
+    """Collect and compile graph solutions for a given JAXPR.
+
+    This function uses the DecompRuleInterpreter to evaluate
+    the input JAXPR and obtain a new JAXPR that incorporates
+    the graph-based decomposition solutions.
+
+    This function doesn't modify the underlying quantum function
+    but rather constructs a new JAXPR with decomposition rules.
+
+    Args:
+        inner_jaxpr (Jaxpr): The input JAXPR to be decomposed.
+        consts (list): The constants used in the JAXPR.
+        tkwargs (list): The keyword arguments of the decompose transform.
+        ncargs (list): Non-constant arguments for the JAXPR.
+
+    Returns:
+        ClosedJaxpr: The decomposed JAXPR.
+    """
+    gds_interpreter = DecompRuleInterpreter(**tkwargs)
+
+    def gds_wrapper(*args):
+        return gds_interpreter.eval(inner_jaxpr, consts, *args)
+
+    final_jaxpr = jax.make_jaxpr(gds_wrapper)(*ncargs)
+
+    return final_jaxpr
 
 
 def _get_operator_name(op):
