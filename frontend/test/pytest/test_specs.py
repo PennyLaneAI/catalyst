@@ -21,6 +21,24 @@ from catalyst import qjit
 # pylint:disable = protected-access,attribute-defined-outside-init
 
 
+def check_specs_same(specs1, specs2):
+    """Check that two specs dictionaries are the same."""
+    assert specs1["device_name"] == specs2["device_name"]
+    assert specs1["resources"].num_wires == specs2["resources"].num_wires
+    assert specs1["resources"].num_gates == specs2["resources"].num_gates
+    assert specs1["resources"].depth == specs2["resources"].depth
+
+    assert len(specs1["resources"].gate_types) == len(specs2["resources"].gate_types)
+    for gate, count in specs1["resources"].gate_types.items():
+        assert gate in specs2["resources"].gate_types
+        assert count == specs2["resources"].gate_types[gate]
+
+    assert len(specs1["resources"].gate_sizes) == len(specs2["resources"].gate_sizes)
+    for gate, count in specs1["resources"].gate_sizes.items():
+        assert gate in specs2["resources"].gate_sizes
+        assert count == specs2["resources"].gate_sizes[gate]
+
+
 @pytest.mark.parametrize("level", ["device"])
 def test_simple(level):
     """Test a simple case of qml.specs() against PennyLane"""
@@ -35,20 +53,8 @@ def test_simple(level):
     pl_specs = qml.specs(circuit, level=level)()
     cat_specs = qml.specs(qjit(circuit), level=level)()
 
-    assert pl_specs["resources"].num_wires == cat_specs["resources"].num_wires
-    assert pl_specs["resources"].num_gates == cat_specs["resources"].num_gates
-    assert pl_specs["resources"].depth == cat_specs["resources"].depth
-    assert pl_specs["device_name"] == cat_specs["device_name"]
-
-    assert len(cat_specs["resources"].gate_types) == len(pl_specs["resources"].gate_types)
-    for gate, count in pl_specs["resources"].gate_types.items():
-        assert gate in cat_specs["resources"].gate_types
-        assert count == cat_specs["resources"].gate_types[gate]
-
-    assert len(cat_specs["resources"].gate_sizes) == len(pl_specs["resources"].gate_sizes)
-    for gate, count in pl_specs["resources"].gate_sizes.items():
-        assert gate in cat_specs["resources"].gate_sizes
-        assert count == cat_specs["resources"].gate_sizes[gate]
+    assert cat_specs["device_name"] == "lightning.qubit"
+    check_specs_same(pl_specs, cat_specs)
 
 
 @pytest.mark.parametrize("level", ["device"])
@@ -78,9 +84,6 @@ def test_complex(level):
     cat_specs = qml.specs(qjit(circuit), level=level)()
 
     assert cat_specs["device_name"] == "lightning.qubit"
-    assert pl_specs["resources"].num_wires == cat_specs["resources"].num_wires
-    assert pl_specs["resources"].num_gates == cat_specs["resources"].num_gates
-    assert pl_specs["resources"].depth == cat_specs["resources"].depth
 
     # Catalyst level specs should report the number of controls for multi-controlled gates
     assert "2C(S)" in cat_specs["resources"].gate_types
@@ -94,15 +97,7 @@ def test_complex(level):
     ]
     del cat_specs["resources"].gate_types["CY"]
 
-    assert len(cat_specs["resources"].gate_types) == len(pl_specs["resources"].gate_types)
-    for gate, count in pl_specs["resources"].gate_types.items():
-        assert gate in cat_specs["resources"].gate_types
-        assert count == cat_specs["resources"].gate_types[gate]
-
-    assert len(cat_specs["resources"].gate_sizes) == len(pl_specs["resources"].gate_sizes)
-    for gate, count in pl_specs["resources"].gate_sizes.items():
-        assert gate in cat_specs["resources"].gate_sizes
-        assert count == cat_specs["resources"].gate_sizes[gate]
+    check_specs_same(pl_specs, cat_specs)
 
 
 if __name__ == "__main__":
