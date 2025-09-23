@@ -374,10 +374,10 @@ def dictionary_to_list_of_passes(pass_pipeline: PipelineDict | str, *flags, **va
 def _API_name_to_pass_name():
     return {
         "cancel_inverses": "remove-chained-self-inverse",
+        "decompose_lowering": "decompose-lowering",
         "disentangle_cnot": "disentangle-CNOT",
         "disentangle_swap": "disentangle-SWAP",
         "merge_rotations": "merge-rotations",
-        "decompose_lowering": "decompose-lowering",
         "ions_decomposition": "ions-decomposition",
         "to_ppr": "to-ppr",
         "commute_ppr": "commute-ppr",

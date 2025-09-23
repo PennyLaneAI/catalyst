@@ -190,9 +190,7 @@ class DecompRuleInterpreter(qml.capture.PlxprInterpreter):
             # and compile them to Catalyst JAXPR decomposition rules
             for op, rule in self._decomp_graph_solution.items():
                 # Get number of wires if exists
-                op_num_wires = (
-                    op.op.params.get("num_wires", None) if hasattr(op.op, "params") else None
-                )
+                op_num_wires = op.op.params.get("num_wires", None)
 
                 if (
                     o := next(

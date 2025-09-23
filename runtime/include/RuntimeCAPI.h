@@ -63,7 +63,6 @@ void __catalyst__qis__RX(double, QUBIT *, const Modifiers *);
 void __catalyst__qis__RY(double, QUBIT *, const Modifiers *);
 void __catalyst__qis__RZ(double, QUBIT *, const Modifiers *);
 void __catalyst__qis__Rot(double, double, double, QUBIT *, const Modifiers *);
-void __catalyst__qis__RotXZX(double, double, double, QUBIT *, const Modifiers *);
 void __catalyst__qis__CNOT(QUBIT *, QUBIT *, const Modifiers *);
 void __catalyst__qis__CY(QUBIT *, QUBIT *, const Modifiers *);
 void __catalyst__qis__CZ(QUBIT *, QUBIT *, const Modifiers *);

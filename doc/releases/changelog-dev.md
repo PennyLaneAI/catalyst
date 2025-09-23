@@ -165,7 +165,6 @@
       return qml.probs()
   ```
 
-
 <h3>Improvements 🛠</h3>
 
 * Significantly improved resource tracking with `null.qubit`.

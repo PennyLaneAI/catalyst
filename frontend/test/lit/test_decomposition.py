@@ -31,6 +31,7 @@ from catalyst.jax_primitives import decomposition_rule
 
 # RUN: %PYTHON %s | FileCheck %s
 # pylint: disable=line-too-long
+# pylint: disable=too-many-lines
 
 
 TEST_PATH = os.path.dirname(__file__)
@@ -895,6 +896,9 @@ def test_qft_decomposition():
     # CHECK-DAG: func.func public @_hadamard_to_rz_ry(%arg0: !quantum.reg, %arg1: tensor<1xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "Hadamard"}
     print(circuit_18.mlir)
 
+    qml.decomposition.disable_graph()
+    qml.capture.disable()
+
 
 test_qft_decomposition()
 
@@ -936,6 +940,9 @@ def test_decompose_lowering_with_other_passes():
     # CHECK-DAG: func.func public @_rx_to_rz_ry(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<1xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "RX"}
     print(circuit_19.mlir)
 
+    qml.decomposition.disable_graph()
+    qml.capture.disable()
+
 
 test_decompose_lowering_with_other_passes()
 
@@ -973,6 +980,9 @@ def test_decompose_lowering_multirz():
     # CHECK-DAG: %0 = scf.for %arg3 = %c0 to %c2 step %c1 iter_args(%arg4 = %arg0) -> (!quantum.reg)
     # CHECK-DAG:   %5 = scf.for %arg3 = %c1 to %c3 step %c1 iter_args(%arg4 = %4) -> (!quantum.reg)
     print(circuit_20.mlir)
+
+    qml.decomposition.disable_graph()
+    qml.capture.disable()
 
 
 test_decompose_lowering_multirz()
@@ -1018,6 +1028,9 @@ def test_decompose_lowering_with_ordered_passes():
     # CHECK-DAG: func.func public @_rot_to_rz_ry_rz(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<f64>, %arg3: tensor<f64>, %arg4: tensor<1xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "Rot"}
     print(circuit_21.mlir)
 
+    qml.decomposition.disable_graph()
+    qml.capture.disable()
+
 
 test_decompose_lowering_with_ordered_passes()
 
@@ -1048,6 +1061,9 @@ def test_decompose_lowering_with_gphase():
     # CHECK-DAG: func.func public @_phaseshift_to_rz_gp(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<1xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "PhaseShift"}
     # CHECK-DAG: func.func public @_rz_to_ry_rx(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<1xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "RZ"}
     print(circuit_22.mlir)
+
+    qml.decomposition.disable_graph()
+    qml.capture.disable()
 
 
 test_decompose_lowering_with_gphase()

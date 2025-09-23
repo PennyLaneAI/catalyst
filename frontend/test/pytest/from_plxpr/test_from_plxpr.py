@@ -995,6 +995,9 @@ class TestGraphDecomposition:
         ):
             circuit(0.2)
 
+    qml.decomposition.disable_graph()
+    qml.capture.disable()
+
 
 if __name__ == "__main__":
     pytest.main(["-x", __file__])

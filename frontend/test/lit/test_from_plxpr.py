@@ -47,7 +47,7 @@ def test_conditional_capture():
 
     print(main.mlir)
 
-    qml.capture.enable()
+    qml.capture.disable()
 
 
 test_conditional_capture()
@@ -415,6 +415,9 @@ def test_pass_decomposition():
     # CHECK-NEXT: transform.apply_registered_pass "decompose-lowering" to [[second_pass]]
 
     print(circuit3.mlir)
+
+    qml.decomposition.disable_graph()
+    qml.capture.disable()
 
 
 test_pass_decomposition()
