@@ -81,12 +81,12 @@ void applyAdjointIfNeeded(GateConversion &gateConversion, CustomOp op)
 //===----------------------------------------------------------------------===//
 
 // C(P) = G(Angle)
-void applySingleQubitConversion(CustomOp op, const SmallVector<GateConversion> &gateConversions,
+void applySingleQubitConversion(CustomOp op, const ArrayRef<GateConversion> &gateConversions,
                                 ConversionPatternRewriter &rewriter)
 {
     auto loc = op->getLoc();
     auto types = op.getOutQubits().getType();
-    SmallVector<Value> inQubits = op.getInQubits();
+    ValueRange inQubits = op.getInQubits();
     PPRotationOp pprOp;
 
     for (auto gateConversion : gateConversions) {
@@ -156,7 +156,6 @@ LogicalResult convertHGate(CustomOp op, ConversionPatternRewriter &rewriter)
     auto Z0 = GateConversion({"Z"}, 4);
     auto X1 = GateConversion({"X"}, 4);
     auto Z2 = GateConversion({"Z"}, 4);
-
     applySingleQubitConversion(op, {Z0, X1, Z2}, rewriter);
     return success();
 }
