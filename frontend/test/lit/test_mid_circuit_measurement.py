@@ -29,3 +29,34 @@ def circuit(x: float):
 
 
 print(circuit.mlir)
+
+
+@qjit(static_argnums=(0))
+def test_one_shot_with_static_argnums(N):
+    # CHECK: func.func public @jit_test_one_shot_with_static_argnums() -> tensor<1024xf64>
+    # CHECK: {{%.+}} = call @one_shot_wrapper() : () -> tensor<1024xf64>
+
+    # CHECK: func.func private @one_shot_wrapper() -> tensor<1024xf64>
+    # CHECK-DAG: [[one:%.+]] = arith.constant 1 : index
+    # CHECK-DAG: [[eleven:%.+]] = arith.constant 11 : index
+    # CHECK-DAG: [[zero:%.+]] = arith.constant 0 : index
+    # CHECK: scf.for %arg0 = [[zero]] to [[eleven]] step [[one]]
+    # CHECK: {{%.+}} = catalyst.launch_kernel @module_circ::@circ() : () -> tensor<1024xf64>
+
+    # CHECK: func.func public @circ() -> tensor<1024xf64>
+    # CHECK: [[one:%.+]] = arith.constant 1 : i64
+    # CHECK: quantum.device shots([[one]])
+    # CHECK: quantum.alloc( 10)
+
+    dev = qml.device("lightning.qubit", wires=N)
+
+    @qml.set_shots(N + 1)
+    @qml.qnode(dev, mcm_method="one-shot")
+    def circ():
+        return qml.probs()
+
+    return circ()
+
+
+test_one_shot_with_static_argnums(10)
+print(test_one_shot_with_static_argnums.mlir)
