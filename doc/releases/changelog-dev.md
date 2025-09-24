@@ -346,7 +346,8 @@
 * Fixed the Clifford PPR decomposition rule where using the Y measurement should take the inverse.
   [(#2043)](https://github.com/PennyLaneAI/catalyst/pull/2043)
 
-* Added new error handling to resolve a build failure in the QML repo due to the new Catalyst one-shot implementation.
+* `static_argnums` is now correctly passed to internally transformed kernel functions,
+for example the one-shot mid circuit measurement transform.
   [(#2056)](https://github.com/PennyLaneAI/catalyst/pull/2056)
 
 <h3>Internal changes ⚙️</h3>
