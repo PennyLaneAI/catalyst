@@ -139,6 +139,18 @@ def test_track_resources():
     dev = NullQubit(wires=2, track_resources=True)
     assert "track_resources" in QJITDevice.extract_backend_info(dev).kwargs
     assert QJITDevice.extract_backend_info(dev).kwargs["track_resources"] is True
+    assert "resources_filename" not in QJITDevice.extract_backend_info(dev).kwargs
+    assert "compute_depth" not in QJITDevice.extract_backend_info(dev).kwargs
+
+    dev = NullQubit(
+        wires=2, track_resources=True, resources_filename="my_resources.txt", compute_depth=True
+    )
+    assert "track_resources" in QJITDevice.extract_backend_info(dev).kwargs
+    assert QJITDevice.extract_backend_info(dev).kwargs["track_resources"] is True
+    assert "resources_filename" in QJITDevice.extract_backend_info(dev).kwargs
+    assert QJITDevice.extract_backend_info(dev).kwargs["resources_filename"] == "my_resources.txt"
+    assert "compute_depth" in QJITDevice.extract_backend_info(dev).kwargs
+    assert QJITDevice.extract_backend_info(dev).kwargs["compute_depth"] is True
 
 
 if __name__ == "__main__":

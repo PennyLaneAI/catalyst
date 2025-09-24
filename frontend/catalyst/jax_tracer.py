@@ -227,6 +227,7 @@ class Function:
     def __call__(self, *args, **kwargs):
         jaxpr, _, out_tree = make_jaxpr2(
             self.fn,
+            static_argnums=kwargs.pop("static_argnums", ()),
             debug_info=kwargs.pop("debug_info", jdb("Function", self.fn, args, kwargs)),
         )(*args, **kwargs)
 
