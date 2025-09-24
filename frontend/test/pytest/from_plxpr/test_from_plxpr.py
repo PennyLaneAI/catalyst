@@ -995,8 +995,10 @@ class TestGraphDecomposition:
         ):
             circuit(0.2)
 
-    qml.decomposition.disable_graph()
-    qml.capture.disable()
+        qml.decomposition.disable_graph()
+        qml.capture.disable()
+
+        assert qml.decomposition.enabled_graph() is False
 
 
 if __name__ == "__main__":

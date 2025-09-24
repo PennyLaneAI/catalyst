@@ -29,6 +29,7 @@ import pennylane as qml
 
 # DecompRuleInterpreter:
 from pennylane.decomposition import DecompositionGraph
+from pennylane.typing import TensorLike
 from pennylane.wires import WiresLike
 
 from catalyst.jax_primitives import decomposition_rule
@@ -63,7 +64,8 @@ class DecompRuleInterpreter(qml.capture.PlxprInterpreter):
         TypeError: if graph-based decomposition is not enabled.
     """
 
-    # A mapping from operation names to the number of wires they act on.
+    # A mapping from operation names to the number of wires they act on
+    # and the number of parameters they have.
     # This is used when the operation is not in the captured operations
     # but we still need to create a decomposition rule for it.
     #
@@ -74,43 +76,43 @@ class DecompRuleInterpreter(qml.capture.PlxprInterpreter):
     # This will require a copy of the function to be made
     # when creating the decomposition rule to avoid mutating
     # the original function with attributes like num_wires.
-    compiler_ops_num_wires: dict[str, int] = {
-        "CNOT": 2,
-        "ControlledPhaseShift": 2,
-        "CRot": 2,
-        "CRX": 2,
-        "CRY": 2,
-        "CRZ": 2,
-        "CSWAP": 3,
-        "CY": 2,
-        "CZ": 2,
-        "Hadamard": 1,
-        "Identity": 1,
-        "IsingXX": 2,
-        "IsingXY": 2,
-        "IsingYY": 2,
-        "IsingZZ": 2,
-        "SingleExcitation": 2,
-        "DoubleExcitation": 4,
-        "ISWAP": 2,
-        "PauliX": 1,
-        "PauliY": 1,
-        "PauliZ": 1,
-        "PhaseShift": 1,
-        "PSWAP": 2,
-        "Rot": 1,
-        "RX": 1,
-        "RY": 1,
-        "RZ": 1,
-        "S": 1,
-        "SWAP": 2,
-        "T": 1,
-        "Toffoli": 3,
-        "U1": 1,
-        "U2": 1,
-        "U3": 1,
-        "MultiRZ": -1,  # variable number of wires
-        "GlobalPhase": -1,  # variable number of wires
+    compiler_ops_num_wires: dict[str, tuple[int, int]] = {
+        "CNOT": (2, 0),
+        "ControlledPhaseShift": (2, 1),
+        "CRot": (2, 3),
+        "CRX": (2, 1),
+        "CRY": (2, 1),
+        "CRZ": (2, 1),
+        "CSWAP": (3, 0),
+        "CY": (2, 0),
+        "CZ": (2, 0),
+        "Hadamard": (1, 0),
+        "Identity": (1, 0),
+        "IsingXX": (2, 1),
+        "IsingXY": (2, 1),
+        "IsingYY": (2, 1),
+        "IsingZZ": (2, 1),
+        "SingleExcitation": (2, 1),
+        "DoubleExcitation": (4, 1),
+        "ISWAP": (2, 0),
+        "PauliX": (1, 0),
+        "PauliY": (1, 0),
+        "PauliZ": (1, 0),
+        "PhaseShift": (1, 1),
+        "PSWAP": (2, 1),
+        "Rot": (1, 3),
+        "RX": (1, 1),
+        "RY": (1, 1),
+        "RZ": (1, 1),
+        "S": (1, 0),
+        "SWAP": (2, 0),
+        "T": (1, 0),
+        "Toffoli": (3, 0),
+        "U1": (1, 1),
+        "U2": (1, 2),
+        "U3": (1, 3),
+        "MultiRZ": (-1, 1),
+        "GlobalPhase": (-1, 1),
     }
 
     def __init__(
@@ -191,7 +193,6 @@ class DecompRuleInterpreter(qml.capture.PlxprInterpreter):
             for op, rule in self._decomp_graph_solution.items():
                 # Get number of wires if exists
                 op_num_wires = op.op.params.get("num_wires", None)
-
                 if (
                     o := next(
                         (
@@ -202,11 +203,13 @@ class DecompRuleInterpreter(qml.capture.PlxprInterpreter):
                         None,
                     )
                 ) is not None:
+                    num_wires, num_params = self.compiler_ops_num_wires[op.op.name]
                     _create_decomposition_rule(
                         rule,
                         op_name=op.op.name,
                         num_wires=len(o.wires),
-                        requires_copy=self.compiler_ops_num_wires[op.op.name] == -1,
+                        num_params=num_params,
+                        requires_copy=num_wires == -1,
                     )
                 elif op.op.name in self.compiler_ops_num_wires:
                     # In this part, we need to handle the case where an operation in
@@ -215,12 +218,13 @@ class DecompRuleInterpreter(qml.capture.PlxprInterpreter):
                     # in the circuit, but is used inside a decomposition rule.
                     # In this case, we fall back to using the compiler_ops_num_wires
                     # dictionary to get the number of wires.
-                    num_wires = self.compiler_ops_num_wires[op.op.name]
+                    num_wires, num_params = self.compiler_ops_num_wires[op.op.name]
                     _create_decomposition_rule(
                         rule,
                         op_name=op.op.name,
                         num_wires=num_wires,
-                        requires_copy=self.compiler_ops_num_wires[op.op.name] == -1,
+                        num_params=num_params,
+                        requires_copy=num_wires == -1,
                     )
                 else:  # pragma: no cover
                     raise ValueError(f"Could not capture {op} without the number of wires.")
@@ -230,7 +234,7 @@ class DecompRuleInterpreter(qml.capture.PlxprInterpreter):
 
 
 def _create_decomposition_rule(
-    func: Callable, op_name: str, num_wires: int, requires_copy: bool = False
+    func: Callable, op_name: str, num_wires: int, num_params: int, requires_copy: bool = False
 ):
     """Create a decomposition rule from a callable.
 
@@ -240,9 +244,10 @@ def _create_decomposition_rule(
         func (Callable): The decomposition function.
         op_name (str): The name of the operation to decompose.
         num_wires (int): The number of wires the operation acts on.
-
-    Returns:
-        None: The function is decorated in place.
+        num_params (int): The number of parameters the operation takes.
+        requires_copy (bool): Whether to create a copy of the function
+            to avoid mutating the original. This is required for operations
+            with a variable number of wires (e.g., MultiRZ, GlobalPhase).
     """
 
     sig_func = inspect.signature(func)
@@ -259,23 +264,26 @@ def _create_decomposition_rule(
         # TODO: This is a temporary solution until all rules have proper type annotations.
         # Why? Because we need to pass the correct types to the decomposition_rule
         # function to capture the rule correctly with JAX.
-        possible_names_for_params = {
-            "params",
+        possible_names_for_single_param = {
             "param",
-            "parameters",
-            "angles",
             "angle",
             "phi",
             "omega",
             "theta",
-            "weights",
             "weight",
+        }
+        possible_names_for_multi_params = {
+            "params",
+            "angles",
+            "weights",
         }
 
         # TODO: Support work-wires when it's supported in Catalyst.
         possible_names_for_wires = {"wires", "wire", "control_wires", "target_wires"}
 
-        if typ is float or name in possible_names_for_params:
+        if typ is TensorLike or name in possible_names_for_multi_params:
+            args[name] = qml.math.array([0.0] * num_params, like="jax", dtype=float)
+        elif typ is float or name in possible_names_for_single_param:
             # TensorLike is a Union of float, int, array-like, so we use float here
             # to cover the most common case as the JAX tracer doesn't like Union types
             # and we don't have the actual values at this point.
