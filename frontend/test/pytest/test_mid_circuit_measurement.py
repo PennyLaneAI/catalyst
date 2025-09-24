@@ -429,7 +429,7 @@ class TestDynamicOneShotIntegration:
         Test static argnums is passed correctly to the one shot qnodes.
         """
 
-        @qjit(static_argnums=(0))
+        @qjit(static_argnums=0)
         def workflow(N):
             dev = qml.device(backend, wires=N)
 

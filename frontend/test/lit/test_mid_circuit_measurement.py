@@ -31,8 +31,11 @@ def circuit(x: float):
 print(circuit.mlir)
 
 
-@qjit(static_argnums=(0))
+@qjit(static_argnums=0)
 def test_one_shot_with_static_argnums(N):
+    """
+    Test static argnums is passed correctly to the one shot qnodes.
+    """
     # CHECK: func.func public @jit_test_one_shot_with_static_argnums() -> tensor<1024xf64>
     # CHECK: {{%.+}} = call @one_shot_wrapper() : () -> tensor<1024xf64>
 

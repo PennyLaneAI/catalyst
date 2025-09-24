@@ -51,6 +51,7 @@ from catalyst.utils.exceptions import CompileError
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
+
 @dataclass
 class OutputContext:
     """Context containing parameters needed for finalizing quantum function output."""
