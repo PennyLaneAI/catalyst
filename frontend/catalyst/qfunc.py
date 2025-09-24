@@ -50,7 +50,6 @@ from catalyst.utils.exceptions import CompileError
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
-logging.basicConfig(filename='mylog.log', level=logging.DEBUG)
 
 @dataclass
 class OutputContext:
@@ -179,7 +178,6 @@ def configure_mcm_and_try_one_shot(qnode, args, kwargs):
 
                 # Fallback only if mcm was auto-determined
                 error_msg = str(e)
-                # TODO: handle the underlying reasons for the unsupported errors
                 unsupported_measurement_error = any(
                     pattern in error_msg
                     for pattern in [
@@ -187,7 +185,6 @@ def configure_mcm_and_try_one_shot(qnode, args, kwargs):
                         "qml.var(obs) cannot be returned when `mcm_method='one-shot'`",
                         "empty wires is not supported with dynamic wires in one-shot mode",
                         "No need to run one-shot mode",
-                        "The `static_argnums` argument to `qjit` must be an int",
                     ]
                 )
 
