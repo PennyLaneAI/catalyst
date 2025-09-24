@@ -1067,3 +1067,79 @@ def test_decompose_lowering_with_gphase():
 
 
 test_decompose_lowering_with_gphase()
+
+
+def test_decompose_lowering_alt_decomps():
+    """Test the decompose lowering pass with alternative decompositions."""
+
+    qml.capture.enable()
+    qml.decomposition.enable_graph()
+
+    @qml.register_resources({qml.RY: 1})
+    def custom_rot_cheap(params, wires: WiresLike):
+        qml.RY(params[1], wires=wires)
+
+    @qml.qjit(target="mlir")
+    @partial(
+        qml.transforms.decompose,
+        gate_set={"RY", "RZ"},
+        alt_decomps={qml.Rot: [custom_rot_cheap]},
+    )
+    @qml.qnode(qml.device("lightning.qubit", wires=3), shots=1000)
+    def circ(x: float, y: float):
+        qml.Rot(x, y, x + y, wires=1)
+        return qml.expval(qml.PauliZ(0))
+
+    # CHECK-DAG: func.func public @custom_rot_cheap(%arg0: !quantum.reg, %arg1: tensor<3xf64>, %arg2: tensor<1xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "Rot"}
+    print(circ.mlir)
+
+    qml.decomposition.disable_graph()
+    qml.capture.disable()
+
+
+test_decompose_lowering_alt_decomps()
+
+
+def test_decompose_lowering_with_tensorlike():
+    """Test the decompose lowering pass with fixed decompositions
+    using TensorLike parameters."""
+
+    qml.capture.enable()
+    qml.decomposition.enable_graph()
+
+    @qml.register_resources({qml.RZ: 2, qml.RY: 1})
+    def custom_rot(params: TensorLike, wires: WiresLike):
+        qml.RZ(params[0], wires=wires)
+        qml.RY(params[1], wires=wires)
+        qml.RZ(params[2], wires=wires)
+
+    @qml.register_resources({qml.RZ: 1, qml.CNOT: 4})
+    def custom_multirz(params: TensorLike, wires: WiresLike):
+        qml.CNOT(wires=(wires[2], wires[1]))
+        qml.CNOT(wires=(wires[1], wires[0]))
+        qml.RZ(params[0], wires=wires[0])
+        qml.CNOT(wires=(wires[1], wires[0]))
+        qml.CNOT(wires=(wires[2], wires[1]))
+
+    @qml.qjit(target="mlir")
+    @partial(
+        qml.transforms.decompose,
+        gate_set={"RY", "RX", qml.CNOT},
+        fixed_decomps={qml.Rot: custom_rot, qml.MultiRZ: custom_multirz},
+    )
+    @qml.qnode(qml.device("lightning.qubit", wires=3), shots=1000)
+    def circ(x: float, y: float):
+        qml.Rot(x, y, x + y, wires=1)
+        qml.MultiRZ(x + y, wires=[0, 1, 2])
+        return qml.expval(qml.PauliZ(0))
+
+    # CHECK-DAG: func.func public @custom_multirz_wires_3(%arg0: !quantum.reg, %arg1: tensor<1xf64>, %arg2: tensor<3xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 3 : i64, target_gate = "MultiRZ"}
+    # CHECK-DAG: func.func public @_rz_to_ry_rx(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<1xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "RZ"}
+    # CHECK-DAG: func.func public @custom_rot(%arg0: !quantum.reg, %arg1: tensor<3xf64>, %arg2: tensor<1xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "Rot"}
+    print(circ.mlir)
+
+    qml.decomposition.disable_graph()
+    qml.capture.disable()
+
+
+test_decompose_lowering_with_tensorlike()
