@@ -415,7 +415,10 @@ def decompose_lowering(qnode=None, *, rules_path=None):
     if qnode is None:
         return functools.partial(decompose_lowering, rules_path=rules_path)
 
-    decompose_lowering_pass = {"decompose-lowering": {"rules-path": rules_path}}
+    if rules_path is None:
+        decompose_lowering_pass = "decompose-lowering"
+    else:
+        decompose_lowering_pass = {"decompose-lowering": {"rules-path": rules_path}}
     return PassPipelineWrapper(qnode, decompose_lowering_pass)  # pragma: no cover
 
 
