@@ -82,7 +82,8 @@ def test_basic_dynalloc():
     # CHECK: [[CNOTout:%.+]]:2 = quantum.custom "CNOT"() [[dyn_bit2]], [[dev_bit1]]
     # CHECK: [[insert0:%.+]] = quantum.insert [[dyn_qreg]][ 1], [[Xout]]
     # CHECK: [[insert1:%.+]] = quantum.insert [[insert0]][ 2], [[CNOTout]]#0
-    # CHECK: quantum.dealloc [[insert1]]
+    # CHECK: [[insert2:%.+]] = quantum.insert [[insert1]][ 3]
+    # CHECK: quantum.dealloc [[insert2]]
 
     with qml.allocate(4) as qs1:
         qml.X(qs1[1])
