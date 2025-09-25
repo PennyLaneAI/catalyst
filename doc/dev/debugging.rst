@@ -388,3 +388,85 @@ corresponding arguments.
     $ /path/to/executable
     MemRef: base@ = 0x64fc9dd5ffc0 rank = 0 offset = 0 sizes = [] strides = [] data =
     25
+
+Mixed-mode debugging of Python and C++
+======================================
+
+Catalyst supports mixed-mode debugging of Python and/or C++ code when providing the ``debug_compiler=True`` flag to 
+the ``@qjit`` decorator. Enabling this option signals to the compiler to wait for an appropriate user-provided signal
+after launching the compiler process. Some notes about use of this support:
+
+* This functionality requires building Catalyst with debug symbols. This can be achieved via
+  ``make all BUILD_TYPE="RelWithDebInfo"``. The debug symbols are only available
+  within the Catalyst-owned targets. 
+To enable debugging of LLVM and other associated external libraries and binaries, ensure the 
+  ``BUILD_TYPE_EXT="RelWithDebInfo"`` option is also set when building Catalyst.
+* Launching the C++ debugger requires attaching to a running process. This often requires ``sudo`` privileges on the 
+  running system.
+* The spawned compiler subprocess immediately issues a ``SIGSTOP`` signal to avoid execution of the compiler. To 
+  continue execution requires receipt of a ``SIGCONT`` signal after the C++ debugger has attached.
+* To validate if running within an active (Python) debugger session, the function :func:`~.debug.debugger.is_debugger_active`
+  can be used.
+
+The signalling steps can be provided via an active terminal session as
+
+.. code-block:: shell
+
+    $ kill -s SIGCONT <PID>
+
+where ``<PID>`` is the process-ID. This can also be issued from an active Python debugger session, such as through VSCode's 
+debug terminal as
+
+.. code-block:: python
+
+    import os, signal
+    os.kill(<PID>, signal.SIGCONT)
+
+To enable support from VSCode, the following configuration files can be used to add debugger configurations for Python, and 
+C++.
+
+.. code-block:: json
+    :caption: Filename ``.vscode/launch.json``
+
+    {
+        "version": "0.2.0",
+        "configurations": [
+            {
+                "name": "(Python): Debug Current Python File",
+                "type": "debugpy",
+                "request": "launch",
+                "program": "${file}",
+                "console": "integratedTerminal",
+                "justMyCode": false 
+            },
+            {
+                "name": "(C++): Attach To Executing Python Process",
+                "type": "cppdbg",
+                "request": "attach",
+                "program": "${command:python.interpreterPath}",
+                "processId": "${command:pickProcess}",
+                "MIMode": "gdb",
+                "setupCommands": [
+                    {
+                        "description": "Enable pretty-printing",
+                        "text": "-enable-pretty-printing",
+                        "ignoreFailures": true,
+                    }
+                ]
+            },
+        ]
+    }
+
+
+.. code-block:: json
+    :caption: Filename ``.vscode/settings.json``
+
+    {
+        "python.defaultInterpreterPath": "${env:VIRTUAL_ENV}",
+        "python.terminal.launchArgs": [],
+    }
+
+
+Note that on MacOS ``gdb`` will alias ``lldb``, and will continue to function identically
+to ``gdb`` on Linux using the editor's debugging interface. To explicitly use ``lldb`` on Linux, it may be necessary to also
+the `machine-interface driver <https://github.com/lldb-tools/lldb-mi>`_.
