@@ -7,6 +7,9 @@
 #include <limits>
 #include <queue>
 #include <algorithm>
+#include <regex>
+#include <unordered_set>
+
 
 // Operator
 // ______________________________
@@ -291,6 +294,22 @@ public:
     }
 };
 
+
+auto parse_quantum_custom_ops(const std::string& mlir_code) {
+    std::unordered_set<Operator> ops;
+
+    std::regex pattern(R"(quantum\.custom\s+\"([A-Za-z0-9_\.]+)\")");
+
+    std::smatch matches;
+    std::string::const_iterator search_start(mlir_code.cbegin());
+    while (std::regex_search(search_start, mlir_code.cend(), matches, pattern)) {
+        ops.emplace(matches[1].str());
+        search_start = matches.suffix().first;
+    }
+
+    return ops;
+}
+
 // ----------------------------
 // Simple Tests
 // ----------------------------
@@ -491,6 +510,155 @@ void test_solver3() {
     std::cout << "[PASS] Solver tests (3)" << std::endl;
 }
 
+void test_solver4() {
+    std::string mlir_code = R"(
+        func.func public @circuit_15() -> tensor<f64> attributes {decompose_gatesets = [["GlobalPhase", "RY", "Hadamard", "CNOT", "RX"]], diff_method = "adjoint", llvm.linkage = #llvm.linkage<internal>, qnode} {
+              %cst = arith.constant 1.250000e-01 : f64
+              %cst_0 = arith.constant -1.250000e-01 : f64
+              %cst_1 = arith.constant -2.500000e-01 : f64
+              %cst_2 = arith.constant 2.500000e-01 : f64
+              %cst_3 = arith.constant 5.000000e-01 : f64
+              %c0_i64 = arith.constant 0 : i64
+              quantum.device shots(%c0_i64) ["/home/ali/miniforge3/envs/decomp/lib/python3.12/site-packages/pennylane_lightning/liblightning_qubit_catalyst.so", "LightningSimulator", "{'mcmc': False, 'num_burnin': 0, 'kernel_name': None}"]
+              %0 = quantum.alloc( 4) : !quantum.reg
+              %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+              %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+              %out_qubits:2 = quantum.custom "SingleExcitation"(%cst_3) %1, %2 : !quantum.bit, !quantum.bit
+              %out_qubits_4 = quantum.custom "Hadamard"() %out_qubits#1 : !quantum.bit
+              %out_qubits_5:2 = quantum.custom "CNOT"() %out_qubits_4, %out_qubits#0 : !quantum.bit, !quantum.bit
+              %out_qubits_6 = quantum.custom "RY"(%cst_2) %out_qubits_5#1 : !quantum.bit
+              %out_qubits_7 = quantum.custom "RY"(%cst_2) %out_qubits_5#0 : !quantum.bit
+              %out_qubits_8:2 = quantum.custom "CY"() %out_qubits_7, %out_qubits_6 : !quantum.bit, !quantum.bit
+              %out_qubits_9 = quantum.custom "S"() %out_qubits_8#0 : !quantum.bit
+              %out_qubits_10 = quantum.custom "Hadamard"() %out_qubits_9 : !quantum.bit
+              %out_qubits_11 = quantum.custom "RZ"(%cst_1) %out_qubits_10 : !quantum.bit
+              %out_qubits_12:2 = quantum.custom "CNOT"() %out_qubits_8#1, %out_qubits_11 : !quantum.bit, !quantum.bit
+              quantum.gphase(%cst_0) :
+              %out_qubits_13 = quantum.custom "Hadamard"() %out_qubits_12#1 : !quantum.bit
+              %out_qubits_14:2 = quantum.custom "CNOT"() %out_qubits_13, %out_qubits_12#0 : !quantum.bit, !quantum.bit
+              %out_qubits_15 = quantum.custom "RY"(%cst_2) %out_qubits_14#1 : !quantum.bit
+              %out_qubits_16 = quantum.custom "RY"(%cst_2) %out_qubits_14#0 : !quantum.bit
+              %out_qubits_17:2 = quantum.custom "CY"() %out_qubits_16, %out_qubits_15 : !quantum.bit, !quantum.bit
+              %out_qubits_18 = quantum.custom "S"() %out_qubits_17#0 : !quantum.bit
+              %out_qubits_19 = quantum.custom "Hadamard"() %out_qubits_18 : !quantum.bit
+              %out_qubits_20 = quantum.custom "RZ"(%cst_2) %out_qubits_19 : !quantum.bit
+              %out_qubits_21:2 = quantum.custom "CNOT"() %out_qubits_17#1, %out_qubits_20 : !quantum.bit, !quantum.bit
+              quantum.gphase(%cst) :
+              %3 = quantum.extract %0[ 2] : !quantum.reg -> !quantum.bit
+              %4 = quantum.extract %0[ 3] : !quantum.reg -> !quantum.bit
+              %out_qubits_22:4 = quantum.custom "DoubleExcitation"(%cst_3) %out_qubits_21#0, %out_qubits_21#1, %3, %4 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+              %5 = quantum.insert %0[ 0], %out_qubits_22#0 : !quantum.reg, !quantum.bit
+              %6 = quantum.insert %5[ 1], %out_qubits_22#1 : !quantum.reg, !quantum.bit
+              %7 = quantum.insert %6[ 2], %out_qubits_22#2 : !quantum.reg, !quantum.bit
+              %8 = quantum.insert %7[ 3], %out_qubits_22#3 : !quantum.reg, !quantum.bit
+              %9 = quantum.extract %8[ 0] : !quantum.reg -> !quantum.bit
+              %10 = quantum.namedobs %9[ PauliZ] : !quantum.obs
+              %11 = quantum.expval %10 : f64
+              %from_elements = tensor.from_elements %11 : tensor<f64>
+              %12 = quantum.insert %8[ 0], %9 : !quantum.reg, !quantum.bit
+              quantum.dealloc %12 : !quantum.reg
+              quantum.device_release
+              return %from_elements : tensor<f64>
+            }
+    )";
+
+    auto parsed_ops = parse_quantum_custom_ops(mlir_code);
+
+    // std::cout << "Parsed quantum.custom operations:" << std::endl;
+    // for (const auto& op : parsed_ops) {
+    //     std::cout << op.getName() << std::endl;
+    // }
+
+    // Define Operators
+    Operator single_exc("SingleExcitation");
+    Operator single_exc_plus("SingleExcitationPlus");
+    Operator double_exc("DoubleExcitation");
+    Operator cry("CRY");
+    Operator s("S");
+    Operator phase("PhaseShift");
+    Operator rz("RZ");
+    Operator rx("RX");
+    Operator ry("RY");
+    Operator rot("Rot");
+    Operator hadamard("Hadamard");
+    Operator cnot("CNOT");
+    Operator cy("CY");
+    Operator t("T");
+    Operator global_phase("GlobalPhase");
+    Operator phaseshift("PhaseShift");
+
+    // ('SingleExcitation', {H:2, CNOT:2, RY:2}, _single_excitation_decomp)
+    ResourceOp res_single_exc({{hadamard, 2}, {cnot, 2}, {ry, 2}});
+    RuleRefOp rule_single_exc(single_exc, res_single_exc, "_single_excitation_decomp");
+
+    // ('SingleExcitationPlus', {H:2, CY:1, CNOT:2, RY:2, S:1, RZ:1, GlobalPhase:1}, _single_excitation_plus_decomp)
+    ResourceOp res_single_exc_plus({
+        {hadamard, 2}, {cy, 1}, {cnot, 2}, {ry, 2},
+        {s, 1}, {rz, 1}, {global_phase, 1}});
+    RuleRefOp rule_single_exc_plus(single_exc_plus, res_single_exc_plus, "_single_excitation_plus_decomp");
+
+    // ('DoubleExcitation', {CNOT:14, H:6, RY:8}, _doublexcit)
+    ResourceOp res_double_exc1({{cnot, 14}, {hadamard, 6}, {ry, 8}});
+    RuleRefOp rule_double_exc1(double_exc, res_double_exc1, "_doublexcit");
+
+    // ('CRY', {RY:2, CNOT:2}, _cry)
+    ResourceOp res_cry({{ry, 2}, {cnot, 2}});
+    RuleRefOp rule_cry(cry, res_cry, "_cry");
+
+    // ('S', {PhaseShift:1}, _s_phaseshift)
+    ResourceOp res_s1({{phase, 1}});
+    RuleRefOp rule_s1(s, res_s1, "_s_phaseshift");
+
+    // ('S', {T:1}, _s_to_t)
+    ResourceOp res_s2({{t, 1}});
+    RuleRefOp rule_s2(s, res_s2, "_s_to_t");
+
+    // ('PhaseShift', {RZ:1, GlobalPhase:1}, _phaseshift_to_rz_gp)
+    ResourceOp res_phase({{rz, 1}, {global_phase, 1}});
+    RuleRefOp rule_phase(phase, res_phase, "_phaseshift_to_rz_gp");
+
+    // ('RZ', {Rot:1}, _rz_to_rot)
+    ResourceOp res_rz1({{rot, 1}});
+    RuleRefOp rule_rz1(rz, res_rz1, "_rz_to_rot");
+
+    // ('RZ', {RY:2, RX:1}, _rz_to_ry_rx)
+    ResourceOp res_rz2({{ry, 2}, {rx, 1}});
+    RuleRefOp rule_rz2(rz, res_rz2, "_rz_to_ry_rx");
+
+    // ('Rot', {RZ:2, RY:1}, _rot_to_rz_ry_rz)
+    ResourceOp res_rot({{rz, 2}, {ry, 1}});
+    RuleRefOp rule_rot(rot, res_rot, "_rot_to_rz_ry_rz");
+
+
+    std::vector<Operator> ops(parsed_ops.begin(), parsed_ops.end());
+    std::vector<Operator> gateset = {ry, rx, cnot, hadamard, global_phase};
+    std::vector<RuleRefOp> rules = {
+        rule_single_exc, rule_single_exc_plus,
+        rule_double_exc1,
+        rule_cry, rule_s1, rule_s2,
+        rule_phase, rule_rz1, rule_rz2,
+        rule_rot
+    };
+
+    Solver solver(ops, gateset, rules);
+    auto solutions = solver.solve();
+    // solver.show();
+
+    assert(solutions.size() == 9);
+    assert(solutions[single_exc] == "_single_excitation_decomp");
+    assert(solutions[double_exc] == "_doublexcit");
+    assert(solutions[rz] == "_rz_to_rot");
+    assert(solutions[s] == "_s_phaseshift");
+    assert(solutions[global_phase] == "base_op");
+    assert(solutions[hadamard] == "base_op");
+    assert(solutions[ry] == "base_op");
+    assert(solutions[rx] == "base_op");
+    assert(solutions[cnot] == "base_op");
+
+    std::cout << "[PASS] Solver tests (4)" << std::endl;
+
+}
+
 
 int main() {
     test_operator();
@@ -499,6 +667,7 @@ int main() {
     test_solver1();
     test_solver2();
     test_solver3();
+    test_solver4();
 
     std::cout << "All tests passed!" << std::endl;
     return 0;
