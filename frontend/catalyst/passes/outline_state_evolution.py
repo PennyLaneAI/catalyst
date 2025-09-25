@@ -197,7 +197,9 @@ class OutlineStateEvolution(RewritePattern):
         output_types = [val.type for val in ordered_outputs]
         fun_type = builtin.FunctionType.from_lists(input_types, output_types)
 
-        state_evolution_func = func.FuncOp("state_evolution", fun_type)
+        state_evolution_func = func.FuncOp(
+            self.original_func_op.sym_name.data + ".state_evolution", fun_type
+        )
         rewriter.insert_op(state_evolution_func, InsertPoint.at_end(self.module.body.block))
 
         block = state_evolution_func.regions[0].block
