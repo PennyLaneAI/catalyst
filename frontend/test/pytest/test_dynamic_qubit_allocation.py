@@ -27,7 +27,7 @@ from jax import numpy as jnp
 from catalyst import qjit
 
 
-def test_basic_dynamic_wire_alloc_plain_API():
+def test_basic_dynamic_wire_alloc_plain_API(backend):
     """
     Test basic qml.allocate and qml.deallocate.
     """
@@ -35,7 +35,7 @@ def test_basic_dynamic_wire_alloc_plain_API():
     qml.capture.enable()
 
     @qjit
-    @qml.qnode(qml.device("lightning.qubit", wires=3))
+    @qml.qnode(qml.device(backend, wires=3))
     def circuit():
         qml.X(1)  # |010>
 
@@ -53,7 +53,7 @@ def test_basic_dynamic_wire_alloc_plain_API():
     assert np.allclose(expected, observed)
 
 
-def test_basic_dynamic_wire_alloc_ctx_API():
+def test_basic_dynamic_wire_alloc_ctx_API(backend):
     """
     Test basic qml.allocate with context manager API.
     """
@@ -61,7 +61,7 @@ def test_basic_dynamic_wire_alloc_ctx_API():
     qml.capture.enable()
 
     @qjit
-    @qml.qnode(qml.device("lightning.qubit", wires=3))
+    @qml.qnode(qml.device(backend, wires=3))
     def circuit():
         qml.X(1)
 
@@ -78,14 +78,14 @@ def test_basic_dynamic_wire_alloc_ctx_API():
     assert np.allclose(expected, observed)
 
 
-def test_measure():
+def test_measure(backend):
     """
     Test qml.allocate with qml.Measure ops.
     """
     qml.capture.enable()
 
     @qjit(autograph=True)
-    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    @qml.qnode(qml.device(backend, wires=1))
     def circuit():
         with qml.allocate(1) as q:
             qml.Hadamard(q[0])
@@ -103,14 +103,14 @@ def test_measure():
     assert np.allclose(expected, observed)
 
 
-def test_measure_with_reset():
+def test_measure_with_reset(backend):
     """
     Test qml.allocate with qml.Measure ops with resetting.
     """
     qml.capture.enable()
 
     @qjit(autograph=True)
-    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    @qml.qnode(qml.device(backend, wires=1))
     def circuit():
         with qml.allocate(1) as q:
             qml.Hadamard(q[0])
@@ -135,14 +135,14 @@ def test_measure_with_reset():
 
 
 @pytest.mark.parametrize("ctrl_val, expected", [(False, [0, 1]), (True, [1, 0])])
-def test_qml_ctrl(ctrl_val, expected):
+def test_qml_ctrl(ctrl_val, expected, backend):
     """
     Test qml.allocate with qml.ctrl ops.
     """
     qml.capture.enable()
 
     @qjit
-    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    @qml.qnode(qml.device(backend, wires=1))
     def circuit():
         with qml.allocate(1) as q:
             qml.ctrl(qml.X, (q), control_values=ctrl_val)(wires=0)
@@ -154,14 +154,14 @@ def test_qml_ctrl(ctrl_val, expected):
     assert np.allclose(expected, observed)
 
 
-def test_QubitUnitary():
+def test_QubitUnitary(backend):
     """
     Test qml.allocate with qml.QubitUnitary ops.
     """
     qml.capture.enable()
 
     @qjit
-    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    @qml.qnode(qml.device(backend, wires=1))
     def circuit():
         with qml.allocate(2) as qs:
             qml.QubitUnitary(jnp.identity(8), wires=[0, qs[0], qs[1]])
@@ -174,14 +174,14 @@ def test_QubitUnitary():
     assert np.allclose(expected, observed)
 
 
-def test_StatePrep():
+def test_StatePrep(backend):
     """
     Test qml.allocate with qml.StatePrep ops.
     """
     qml.capture.enable()
 
     @qjit
-    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    @qml.qnode(qml.device(backend, wires=1))
     def circuit():
         with qml.allocate(1) as q:
             qml.StatePrep(jnp.array([0, 0, 0, 1]), wires=[0, q[0]])  # |11>
@@ -194,14 +194,14 @@ def test_StatePrep():
     assert np.allclose(expected, observed)
 
 
-def test_BasisState():
+def test_BasisState(backend):
     """
     Test qml.allocate with qml.BasisState ops.
     """
     qml.capture.enable()
 
     @qjit
-    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    @qml.qnode(qml.device(backend, wires=1))
     def circuit():
         with qml.allocate(1) as q:
             qml.BasisState(jnp.array([1, 0]), wires=[q[0], 0])  # |10>
@@ -215,7 +215,7 @@ def test_BasisState():
 
 
 @pytest.mark.parametrize("cond, expected", [(True, [0, 0, 1, 0]), (False, [0, 1, 0, 0])])
-def test_dynamic_wire_alloc_cond(cond, expected):
+def test_dynamic_wire_alloc_cond(cond, expected, backend):
     """
     Test qml.allocate and qml.deallocate inside cond.
     """
@@ -223,7 +223,7 @@ def test_dynamic_wire_alloc_cond(cond, expected):
     qml.capture.enable()
 
     @qjit(autograph=True)
-    @qml.qnode(qml.device("lightning.qubit", wires=2))
+    @qml.qnode(qml.device(backend, wires=2))
     def circuit(c):
         if c:
             q = qml.allocate(1)[0]
@@ -247,7 +247,7 @@ def test_dynamic_wire_alloc_cond(cond, expected):
 @pytest.mark.parametrize(
     "num_iter, expected", [(3, [0, 0, 1, 0, 0, 0, 0, 0]), (4, [1, 0, 0, 0, 0, 0, 0, 0])]
 )
-def test_dynamic_wire_alloc_forloop(num_iter, expected):
+def test_dynamic_wire_alloc_forloop(num_iter, expected, backend):
     """
     Test qml.allocate and qml.deallocate inside for loop.
     """
@@ -255,7 +255,7 @@ def test_dynamic_wire_alloc_forloop(num_iter, expected):
     qml.capture.enable()
 
     @qjit(autograph=True)
-    @qml.qnode(qml.device("lightning.qubit", wires=3))
+    @qml.qnode(qml.device(backend, wires=3))
     def circuit(N):
         for _ in range(N):
             q = qml.allocate(1)[0]
@@ -274,14 +274,14 @@ def test_dynamic_wire_alloc_forloop(num_iter, expected):
 @pytest.mark.parametrize(
     "num_iter, expected", [(3, [0, 0, 1, 0, 0, 0, 0, 0]), (4, [1, 0, 0, 0, 0, 0, 0, 0])]
 )
-def test_dynamic_wire_alloc_whileloop(num_iter, expected):
+def test_dynamic_wire_alloc_whileloop(num_iter, expected, backend):
     """
     Test qml.allocate and qml.deallocate inside while loop.
     """
     qml.capture.enable()
 
     @qjit(autograph=True)
-    @qml.qnode(qml.device("lightning.qubit", wires=3))
+    @qml.qnode(qml.device(backend, wires=3))
     def circuit(N):
         i = 0
         while i < N:
@@ -299,7 +299,7 @@ def test_dynamic_wire_alloc_whileloop(num_iter, expected):
     assert np.allclose(expected, observed)
 
 
-def test_unsupported_cross_scope_registers():
+def test_unsupported_cross_scope_registers(backend):
     """
     Scope jaxprs in Catalyst cannot take multiple registers yet.
     Test that an error is raised when a dynamically allocated register in an outside scope
@@ -319,7 +319,7 @@ def test_unsupported_cross_scope_registers():
     ):
 
         @qjit(autograph=True)
-        @qml.qnode(qml.device("lightning.qubit", wires=3))
+        @qml.qnode(qml.device(backend, wires=3))
         def circuit():
             wires = qml.allocate(3)
 
