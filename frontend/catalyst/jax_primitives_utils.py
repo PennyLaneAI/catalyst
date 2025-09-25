@@ -78,19 +78,19 @@ def lower_callable(ctx, callable_, call_jaxpr, pipeline=None, context=None):
     return get_or_create_qnode_funcop(ctx, callable_, call_jaxpr, pipeline, context=context)
 
 
-def get_or_create_funcop(ctx, callable_, call_jaxpr, pipeline, context=None):
+def get_or_create_funcop(ctx, callable_, call_jaxpr, pipeline, context=None, api_name="jit"):
     """Get funcOp from cache, or create it from scratch"""
     if context is None:
         context = tuple()
     key = (callable_, *context, *pipeline)
     if func_op := get_cached(ctx, key):
         return func_op
-    func_op = lower_callable_to_funcop(ctx, callable_, call_jaxpr)
+    func_op = lower_callable_to_funcop(ctx, callable_, call_jaxpr, api_name)
     cache(ctx, key, func_op)
     return func_op
 
 
-def lower_callable_to_funcop(ctx, callable_, call_jaxpr):
+def lower_callable_to_funcop(ctx, callable_, call_jaxpr, api_name="jit"):
     """Lower callable to either a FuncOp"""
     if isinstance(call_jaxpr, core.Jaxpr):
         call_jaxpr = core.ClosedJaxpr(call_jaxpr, ())
@@ -105,6 +105,7 @@ def lower_callable_to_funcop(ctx, callable_, call_jaxpr):
     kwargs["jaxpr"] = call_jaxpr
     kwargs["effects"] = []
     kwargs["name_stack"] = ctx.name_stack
+    kwargs["api_name"] = api_name
     func_op = mlir.lower_jaxpr_to_fun(**kwargs)
 
     if isinstance(callable_, qml.QNode):
@@ -181,7 +182,8 @@ def lower_qnode_to_funcop(ctx, callable_, call_jaxpr, pipeline):
     with NestedModule(ctx, name) as module, ir.InsertionPoint(module.regions[0].blocks[0]) as ip:
         transform_named_sequence_lowering(ctx, pipeline)
         ctx.module_context.ip = ip
-        func_op = get_or_create_funcop(ctx, callable_, call_jaxpr, pipeline)
+        # TODO: pass along the api name (in this case "qnode"), but can do for all HOP (grad, ...)
+        func_op = get_or_create_funcop(ctx, callable_, call_jaxpr, pipeline, api_name="qnode")
         func_op.sym_visibility = ir.StringAttr.get("public")
 
     return func_op

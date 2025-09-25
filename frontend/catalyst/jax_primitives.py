@@ -251,6 +251,33 @@ class MeasurementPlane(Enum):
 # Primitives #
 ##############
 
+
+class CatPrimitive(Primitive):
+    """A Catalyst JAXPR primitive.
+
+    Not much different from the upstream primitive, but it allows customizing the bind function.
+    In particular, we'd like to handle traceback's more accurately.
+    """
+
+    def bind(self, *args, **kwargs):
+        """Bind a primitive to the current trace."""
+
+        traceback = None
+        if "traceback" in kwargs:
+            traceback = kwargs.pop("traceback")
+
+        result = super().bind(*args, **kwargs)
+
+        assert isinstance(core.trace_ctx.trace, pe.DynamicJaxprTrace), "quick & dirty"
+        eqn = core.trace_ctx.trace.frame.eqns[-1]
+        assert eqn.primitive is self
+
+        if traceback:
+            eqn.source_info.traceback = traceback
+
+        return result
+
+
 zne_p = Primitive("zne")
 device_init_p = Primitive("device_init")
 device_init_p.multiple_results = True
@@ -266,7 +293,7 @@ qextract_p = Primitive("qextract")
 qinsert_p = Primitive("qinsert")
 gphase_p = Primitive("gphase")
 gphase_p.multiple_results = True
-qinst_p = Primitive("qinst")
+qinst_p = CatPrimitive("qinst")
 qinst_p.multiple_results = True
 unitary_p = Primitive("unitary")
 unitary_p.multiple_results = True

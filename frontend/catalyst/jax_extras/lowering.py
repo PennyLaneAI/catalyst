@@ -152,7 +152,11 @@ def custom_lower_jaxpr_to_module(
             arg_shardings=arg_shardings,
             result_shardings=result_shardings,
             name_stack=name_stack,
+            api_name="qjit",
         )
+        # TODO: we're missing argument names in the debug info
+        # TODO: name stack starts with jit(ok), not the most meaningful
+        # TODO: toplevel function in name stack for jax is "main", for us "jit_<fun name>"
 
         worklist = [*ctx.module.body.operations]
         while worklist:
