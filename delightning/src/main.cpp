@@ -6,6 +6,7 @@
 #include <cassert>
 #include <limits>
 #include <queue>
+#include <algorithm>
 
 // Operator
 // ______________________________
@@ -110,28 +111,116 @@ public:
 // Solver
 // _________________________________________
 // * Ops<vector<Operator>>: Operators
-// * Gateset<vector<string>>: Operators
+// * Gateset<vector<Operator>>: Operators
 // * Rules<vector<RuleRefOp>>: Rules
 // + graph(): void
 // + show(): stdout
 // + solve(): map<Operator, RuleRef>
 
 class Solver {
+private:
     std::vector<Operator> ops;
-    std::vector<std::string> gateset;
+    std::vector<Operator> gateset;
     std::vector<RuleRefOp> rules;
 
-    // Cached solutions map
+    // Cached solutions and distances maps
     std::unordered_map<Operator, std::string> solutions;
+    std::unordered_map<Operator, size_t> distances;
+
+    size_t computeCost(const RuleRefOp& rule) const {
+        size_t total = 0;
+        // std::cerr << "[DEBUG]     Computing cost for rule: " << rule.getRuleRef() << "\n";
+        for (const auto& [dep, count] : rule.getResources().getResources()) {
+            auto it = distances.find(dep);
+            // std::cerr << "[DEBUG]       Dependency: " << dep.getName()
+            //           << " with count: " << count
+            //           << " and cost: " << it->second << "\n";
+            if (it == distances.end() || it->second == std::numeric_limits<size_t>::max()) {
+                // Dependency not found or unreachable yet :(
+                return std::numeric_limits<size_t>::max();
+            }
+            total += count * it->second;
+        }
+        return total;
+    }
+
+    auto initGraph() {
+        using NodeOp = std::pair<size_t, Operator>;
+        auto cmp = [](const NodeOp& left, const NodeOp& right) {
+            return left.first > right.first;
+        };
+        std::priority_queue<NodeOp, std::vector<NodeOp>, decltype(cmp)> queue(cmp);
+
+        for (const auto& op : ops) {
+            distances[op] = std::numeric_limits<size_t>::max();
+            queue.push({distances[op], op});
+        }
+
+        for (const auto& g : gateset) {
+            distances[g] = 1;
+            queue.push({1, g});
+            solutions[g] = "base_op";
+        }
+        return queue;
+    }
 
 public:
     Solver(const std::vector<Operator>& ops,
-                const std::vector<std::string>& gateset,
+                const std::vector<Operator>& gateset,
                 const std::vector<RuleRefOp>& rules)
         : ops(ops), gateset(gateset), rules(rules) {}
 
+    bool isBasisGate(const Operator& op) const {
+        return std::find(gateset.begin(), gateset.end(), op) != gateset.end();
+    }
 
     std::unordered_map<Operator, std::string> solve() {
+        auto queue = initGraph();
+
+        while (!queue.empty()) {
+            auto [current_distance, current_op] = queue.top();
+            queue.pop();
+
+            // If we found a better path, skip processing
+            if (current_distance > distances[current_op]) {
+                continue;
+            }
+
+            // std::cerr << "[DEBUG] Exploring neighbors of operator: "
+            //     << current_op.getName() << "\n";
+
+            // Explore neighbors :)
+            for (const auto& rule : rules) {
+                // std::cerr << "[DEBUG] Considering rule: " << rule.getRuleRef()
+                //           << " for operator: " << rule.getOperator().getName()
+                //           << " with total cost: " << rule.getResources().total_cost()
+                //           << "\n";
+                if (rule.getOperator() != current_op) {
+                    continue;
+                }
+                
+                // std::cerr << "[DEBUG] Found applicable rule: " << rule.getRuleRef()
+                //           << " for operator: " << current_op.getName() << "\n";
+                size_t new_distance = computeCost(rule);
+
+                // std::cerr << "[DEBUG] New computed distance for operator: "
+                //           << current_op.getName() << " is " << new_distance << "\n";
+
+                if (new_distance < distances[current_op]) {
+                    distances[current_op] = new_distance;
+                    queue.push({new_distance, current_op});
+                    solutions[current_op] = rule.getRuleRef();
+                    // std::cerr << "[DEBUG] Updating distance for operator: "
+                    //           << current_op.getName() << " to " << new_distance << "\n";
+                }
+            }
+        }
+
+        return solutions;
+    }
+
+    // For testing purposes (my first try)
+    std::unordered_map<Operator, std::string> simple_solver() {
         if (!solutions.empty()) {
             return solutions;
         }
@@ -192,6 +281,7 @@ public:
 
         return solutions;
     }
+
 
     void show() {
         for (const auto& [op, rule] : solutions) {
@@ -262,15 +352,15 @@ void test_solver1() {
     RuleRefOp rule2(h, h_self, "h_rule");
 
     std::vector<Operator> ops = {cz, h};
-    std::vector<std::string> gateset = {"CNOT", "H"};
+    std::vector<Operator> gateset = {cnot, h};
     std::vector<RuleRefOp> rules = {rule1, rule2};
 
     Solver solver(ops, gateset, rules);
     auto solutions = solver.solve();
-    assert(solutions.size() == 2);
+    // solver.show();
+    assert(solutions.size() == 3);
     assert(solutions[cz] == "cz_decomp_rule");
     assert(solutions[h] == "h_rule");
-    // solver.show();
 
     std::cout << "[PASS] Solver tests (1)" << std::endl;
 }
@@ -289,34 +379,116 @@ void test_solver2() {
     ResourceOp cz_to_rx_rz_cnot({{rx, 1}, {rz, 1}, {cnot, 1}});
     RuleRefOp rule2(cz, cz_to_rx_rz_cnot, "cz_rx_rz_cnot_rule");
 
-    ResourceOp h_to_rz_rx_rz({{rz, 2}, {rx, 1}});
-    RuleRefOp rule3(h, h_to_rz_rx_rz, "h_rz_rx_rz_rule");
-
     ResourceOp h_to_rz_rz({{rz, 2}});
-    RuleRefOp rule4(h, h_to_rz_rz, "h_rz_rz_rule");
+    RuleRefOp rule3(h, h_to_rz_rz, "h_rz_rz_rule");
 
-    ResourceOp rz_self({{rz, 1}});
-    RuleRefOp rule5(rz, rz_self, "rz_rule");
+    ResourceOp h_to_rz_rx_rz({{rz, 2}, {rx, 1}});
+    RuleRefOp rule4(h, h_to_rz_rx_rz, "h_rz_rx_rz_rule");
 
-    ResourceOp rx_self({{rx, 1}});
-    RuleRefOp rule6(rx, rx_self, "rx_rule");
-
-    ResourceOp cnot_self({{cnot, 1}});
-    RuleRefOp rule7(cnot, cnot_self, "cnot_rule");
-
-    std::vector<Operator> ops = {cz, h};
-    std::vector<std::string> gateset = {"CNOT", "RZ", "RX"};
-    std::vector<RuleRefOp> rules = {rule1, rule2, rule3, rule4, rule5, rule6, rule7};
+    std::vector<Operator> ops = {h, cz};
+    std::vector<Operator> gateset = {cnot, rz, rx};
+    std::vector<RuleRefOp> rules = {rule1, rule2, rule3, rule4};
 
     Solver solver(ops, gateset, rules);
-
     auto solutions = solver.solve();
-    assert(solutions.size() == 2);
+    // solver.show();
+    assert(solutions.size() == 5);
     assert(solutions[cz] == "cz_h_cnot_rule");
     assert(solutions[h] == "h_rz_rz_rule");
-    // solver.show();
+    assert(solutions[rz] == "base_op");
+    assert(solutions[rx] == "base_op");
+    assert(solutions[cnot] == "base_op");
 
     std::cout << "[PASS] Solver tests (2)" << std::endl;
+}
+
+
+void test_solver3() {
+    // Define Operators
+    Operator single_exc("SingleExcitation");
+    Operator single_exc_plus("SingleExcitationPlus");
+    Operator double_exc("DoubleExcitation");
+    Operator cry("CRY");
+    Operator s("S");
+    Operator phase("PhaseShift");
+    Operator rz("RZ");
+    Operator rx("RX");
+    Operator ry("RY");
+    Operator rot("Rot");
+    Operator hadamard("Hadamard");
+    Operator cnot("CNOT");
+    Operator cy("CY");
+    Operator t("T");
+    Operator global_phase("GlobalPhase");
+    Operator phaseshift("PhaseShift");
+
+    // ('SingleExcitation', {H:2, CNOT:2, RY:2}, _single_excitation_decomp)
+    ResourceOp res_single_exc({{hadamard, 2}, {cnot, 2}, {ry, 2}});
+    RuleRefOp rule_single_exc(single_exc, res_single_exc, "_single_excitation_decomp");
+
+    // ('SingleExcitationPlus', {H:2, CY:1, CNOT:2, RY:2, S:1, RZ:1, GlobalPhase:1}, _single_excitation_plus_decomp)
+    ResourceOp res_single_exc_plus({
+        {hadamard, 2}, {cy, 1}, {cnot, 2}, {ry, 2},
+        {s, 1}, {rz, 1}, {global_phase, 1}});
+    RuleRefOp rule_single_exc_plus(single_exc_plus, res_single_exc_plus, "_single_excitation_plus_decomp");
+
+    // ('DoubleExcitation', {CNOT:14, H:6, RY:8}, _doublexcit)
+    ResourceOp res_double_exc1({{cnot, 14}, {hadamard, 6}, {ry, 8}});
+    RuleRefOp rule_double_exc1(double_exc, res_double_exc1, "_doublexcit");
+
+    // ('CRY', {RY:2, CNOT:2}, _cry)
+    ResourceOp res_cry({{ry, 2}, {cnot, 2}});
+    RuleRefOp rule_cry(cry, res_cry, "_cry");
+
+    // ('S', {PhaseShift:1}, _s_phaseshift)
+    ResourceOp res_s1({{phase, 1}});
+    RuleRefOp rule_s1(s, res_s1, "_s_phaseshift");
+
+    // ('S', {T:1}, _s_to_t)
+    ResourceOp res_s2({{t, 1}});
+    RuleRefOp rule_s2(s, res_s2, "_s_to_t");
+
+    // ('PhaseShift', {RZ:1, GlobalPhase:1}, _phaseshift_to_rz_gp)
+    ResourceOp res_phase({{rz, 1}, {global_phase, 1}});
+    RuleRefOp rule_phase(phase, res_phase, "_phaseshift_to_rz_gp");
+
+    // ('RZ', {Rot:1}, _rz_to_rot)
+    ResourceOp res_rz1({{rot, 1}});
+    RuleRefOp rule_rz1(rz, res_rz1, "_rz_to_rot");
+
+    // ('RZ', {RY:2, RX:1}, _rz_to_ry_rx)
+    ResourceOp res_rz2({{ry, 2}, {rx, 1}});
+    RuleRefOp rule_rz2(rz, res_rz2, "_rz_to_ry_rx");
+
+    // ('Rot', {RZ:2, RY:1}, _rot_to_rz_ry_rz)
+    ResourceOp res_rot({{rz, 2}, {ry, 1}});
+    RuleRefOp rule_rot(rot, res_rot, "_rot_to_rz_ry_rz");
+
+
+    std::vector<Operator> ops = {single_exc, single_exc_plus, double_exc};
+    std::vector<Operator> gateset = {ry, rx, cnot, hadamard, global_phase};
+    std::vector<RuleRefOp> rules = {
+        rule_single_exc, rule_single_exc_plus,
+        rule_double_exc1,
+        rule_cry, rule_s1, rule_s2,
+        rule_phase, rule_rz1, rule_rz2,
+        rule_rot
+    };
+
+    Solver solver(ops, gateset, rules);
+    auto solutions = solver.solve();
+    // solver.show();
+    assert(solutions.size() == 8);
+    assert(solutions[single_exc] == "_single_excitation_decomp");
+    assert(solutions[single_exc_plus] == "_single_excitation_plus_decomp");
+    assert(solutions[double_exc] == "_doublexcit");
+    assert(solutions[ry] == "base_op");
+    assert(solutions[rx] == "base_op");
+    assert(solutions[cnot] == "base_op");
+    assert(solutions[hadamard] == "base_op");
+    assert(solutions[global_phase] == "base_op");
+
+    std::cout << "[PASS] Solver tests (3)" << std::endl;
 }
 
 
@@ -326,6 +498,7 @@ int main() {
     test_rulerefop();
     test_solver1();
     test_solver2();
+    test_solver3();
 
     std::cout << "All tests passed!" << std::endl;
     return 0;
