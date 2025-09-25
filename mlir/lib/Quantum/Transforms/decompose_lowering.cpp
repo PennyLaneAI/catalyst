@@ -14,6 +14,10 @@
 
 #define DEBUG_TYPE "decompose-lowering"
 
+// When we read the decomposition rules module from file,
+// StablehloDialect may not be registered from start.
+#include "stablehlo/dialect/StablehloOps.h"
+
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringSet.h"
@@ -89,6 +93,7 @@ struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLowering
         registry.insert<arith::ArithDialect>();
         registry.insert<func::FuncDialect>();
         registry.insert<quantum::QuantumDialect>();
+        registry.insert<mlir::stablehlo::StablehloDialect>();
         registry.insert<tensor::TensorDialect>();
         registry.insert<ub::UBDialect>();
     }
