@@ -19,8 +19,6 @@ include "mlir/Pass/PassBase.td"
 
 def TestPass : Pass<"test"> {
     let summary = "Test pass able to emit errors or warnings.";
-
-    let constructor = "catalyst::createTestPass()";
 }
 
 #endif // TEST_PASSES

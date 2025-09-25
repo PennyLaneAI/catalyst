@@ -2,10 +2,10 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 #include "Catalyst/IR/CatalystOps.h"
-#include "Catalyst/Transforms/Passes.h"
 
 using namespace mlir;
 using namespace catalyst;
@@ -16,6 +16,7 @@ namespace catalyst {
 } // namespace catalyst
 
 namespace {
+
 /**
  * A utility builder that aids in lowering dynamically-resizable array lists.
  *
@@ -323,9 +324,5 @@ struct ArrayListToMemRefPass : catalyst::impl::ArrayListToMemRefPassBase<ArrayLi
         }
     }
 };
-} // namespace
 
-std::unique_ptr<Pass> catalyst::createArrayListToMemRefPass()
-{
-    return std::make_unique<ArrayListToMemRefPass>();
-}
+} // namespace

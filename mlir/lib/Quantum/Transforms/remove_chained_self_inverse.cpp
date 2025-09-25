@@ -41,7 +41,6 @@ namespace catalyst {
 namespace quantum {
 
 #define GEN_PASS_DEF_REMOVECHAINEDSELFINVERSEPASS
-#define GEN_PASS_DECL_REMOVECHAINEDSELFINVERSEPASS
 #include "Quantum/Transforms/Passes.h.inc"
 
 struct RemoveChainedSelfInversePass
@@ -76,10 +75,4 @@ struct RemoveChainedSelfInversePass
 };
 
 } // namespace quantum
-
-std::unique_ptr<Pass> createRemoveChainedSelfInversePass()
-{
-    return std::make_unique<quantum::RemoveChainedSelfInversePass>();
-}
-
 } // namespace catalyst
