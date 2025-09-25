@@ -108,16 +108,6 @@ RUNTIME_OBSERVABLES = [
 
 RUNTIME_MPS = ["ExpectationMP", "SampleMP", "VarianceMP", "CountsMP", "StateMP", "ProbabilityMP"]
 
-# A list of operations that can be represented
-# in the Catalyst compiler. This will be a superset of
-# the operations supported by the runtime.
-# FIXME: ops with OpName(params, wires) signatures can be
-# represented in the Catalyst compiler. Unfortunately,
-# the signature info is not sufficient as there are
-# templates with the same signature that should be
-# disambiguated.
-COMPILER_OPERATIONS = RUNTIME_OPERATIONS
-
 # The runtime interface does not care about specific gate properties, so set them all to True.
 RUNTIME_OPERATIONS = {
     op: OperatorProperties(invertible=True, controllable=True, differentiable=True)

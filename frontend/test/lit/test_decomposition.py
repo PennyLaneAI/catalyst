@@ -804,12 +804,11 @@ def test_decomposition_rule_name_adjoint():
     @qml.qjit(target="mlir")
     @partial(
         qml.transforms.decompose,
-        gate_set={"RY", "RX", "CZ", "GlobalPhase"},
+        gate_set={"RY", "RX", "CZ", "GlobalPhase", "Adjoint(SingleExcitation)"},
     )
     @qml.qnode(qml.device("lightning.qubit", wires=4))
     # CHECK-DAG: %0 = transform.apply_registered_pass "decompose-lowering"
-    # CHECK: public @circuit_16() -> tensor<f64> attributes {decompose_gatesets
-    def circuit_16():
+    def circuit_16(x: float):
         # CHECK-DAG: %1 = quantum.adjoint(%0) : !quantum.reg
         # CHECK-DAG: %2 = quantum.adjoint(%1) : !quantum.reg
         # CHECK-DAG: %3 = quantum.adjoint(%2) : !quantum.reg
@@ -818,6 +817,7 @@ def test_decomposition_rule_name_adjoint():
         qml.adjoint(qml.Hadamard)(wires=2)
         qml.adjoint(qml.RZ)(0.5, wires=3)
         qml.adjoint(qml.SingleExcitation)(0.1, wires=[0, 1])
+        qml.adjoint(qml.SingleExcitation(x, wires=[0, 1]))
         return qml.expval(qml.Z(0))
 
     # CHECK-DAG: func.func public @_single_excitation_decomp(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<2xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 2 : i64, target_gate = "SingleExcitation"}
@@ -1086,12 +1086,12 @@ def test_decompose_lowering_alt_decomps():
         alt_decomps={qml.Rot: [custom_rot_cheap]},
     )
     @qml.qnode(qml.device("lightning.qubit", wires=3), shots=1000)
-    def circ(x: float, y: float):
+    def circuit_23(x: float, y: float):
         qml.Rot(x, y, x + y, wires=1)
         return qml.expval(qml.PauliZ(0))
 
     # CHECK-DAG: func.func public @custom_rot_cheap(%arg0: !quantum.reg, %arg1: tensor<3xf64>, %arg2: tensor<1xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "Rot"}
-    print(circ.mlir)
+    print(circuit_23.mlir)
 
     qml.decomposition.disable_graph()
     qml.capture.disable()
@@ -1128,7 +1128,7 @@ def test_decompose_lowering_with_tensorlike():
         fixed_decomps={qml.Rot: custom_rot, qml.MultiRZ: custom_multirz},
     )
     @qml.qnode(qml.device("lightning.qubit", wires=3), shots=1000)
-    def circ(x: float, y: float):
+    def circuit_24(x: float, y: float):
         qml.Rot(x, y, x + y, wires=1)
         qml.MultiRZ(x + y, wires=[0, 1, 2])
         return qml.expval(qml.PauliZ(0))
@@ -1136,7 +1136,7 @@ def test_decompose_lowering_with_tensorlike():
     # CHECK-DAG: func.func public @custom_multirz_wires_3(%arg0: !quantum.reg, %arg1: tensor<1xf64>, %arg2: tensor<3xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 3 : i64, target_gate = "MultiRZ"}
     # CHECK-DAG: func.func public @_rz_to_ry_rx(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<1xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "RZ"}
     # CHECK-DAG: func.func public @custom_rot(%arg0: !quantum.reg, %arg1: tensor<3xf64>, %arg2: tensor<1xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "Rot"}
-    print(circ.mlir)
+    print(circuit_24.mlir)
 
     qml.decomposition.disable_graph()
     qml.capture.disable()

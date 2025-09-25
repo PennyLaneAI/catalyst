@@ -46,8 +46,7 @@ from pennylane.transforms import single_qubit_fusion as pl_single_qubit_fusion
 from pennylane.transforms import unitary_to_rot as pl_unitary_to_rot
 
 from catalyst.device import extract_backend_info
-from catalyst.device.qjit_device import COMPILER_OPERATIONS
-from catalyst.from_plxpr.decompose import DecompRuleInterpreter
+from catalyst.from_plxpr.decompose import COMPILER_OPS_FOR_DECOMPOSITION, DecompRuleInterpreter
 from catalyst.from_plxpr.qubit_handler import QubitHandler, QubitIndexRecorder, get_in_qubit_values
 from catalyst.jax_extras import jaxpr_pad_consts, make_jaxpr2, transient_jax_config
 from catalyst.jax_primitives import (
@@ -958,7 +957,7 @@ def _apply_compiler_decompose_to_plxpr(inner_jaxpr, consts, tgateset, ncargs):
 
     # First perform the pre-mlir decomposition to simplify the jaxpr
     # by decomposing high-level gates and templates
-    gate_set = set(COMPILER_OPERATIONS + tgateset)
+    gate_set = set(COMPILER_OPS_FOR_DECOMPOSITION.keys()).union(tgateset)
 
     final_jaxpr = qml.transforms.decompose.plxpr_transform(
         inner_jaxpr, consts, (), {"gate_set": gate_set}, *ncargs
