@@ -23,7 +23,7 @@ from xdsl.context import Context
 from xdsl.dialects import builtin, func
 from xdsl.ir import Operation, SSAValue
 from xdsl.passes import ModulePass
-from xdsl.pattern_rewriter import PatternRewriter, RewritePattern, op_type_rewrite_pattern
+from xdsl.pattern_rewriter import PatternRewriter, RewritePattern
 from xdsl.rewriter import InsertPoint
 
 T = TypeVar("T")
@@ -441,9 +441,11 @@ if __name__ == "__main__":
         qml.Hadamard(0)
         qml.Hadamard(1)
         m = qml.measure(0)
+
         @qml.cond(m)
         def true_fn():
             qml.RX(p, wires=0)
+
         true_fn()
         return qml.expval(qml.X(0))
 
