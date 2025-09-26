@@ -111,7 +111,8 @@ public:
 
 
 
-// Solver
+// BasicSolver <- experimental!
+// Check PLSolver following PL's implementation
 // _________________________________________
 // * Ops<vector<Operator>>: Operators
 // * Gateset<vector<Operator>>: Operators
@@ -120,7 +121,7 @@ public:
 // + show(): stdout
 // + solve(): map<Operator, RuleRef>
 
-class Solver {
+class BasicSolver {
 private:
     std::vector<Operator> ops;
     std::vector<Operator> gateset;
@@ -168,7 +169,7 @@ private:
     }
 
 public:
-    Solver(const std::vector<Operator>& ops,
+    BasicSolver(const std::vector<Operator>& ops,
                 const std::vector<Operator>& gateset,
                 const std::vector<RuleRefOp>& rules)
         : ops(ops), gateset(gateset), rules(rules) {}
@@ -294,6 +295,165 @@ public:
     }
 };
 
+
+// PLSolver w/ Operator and Rule Nodes 
+
+enum class NodeType {
+    OPERATOR,
+    RULE
+};
+
+struct Node {
+    NodeType type;
+    Operator op;
+    RuleRefOp rule;
+    size_t index;
+};
+
+struct Edge {
+    size_t target;
+    size_t weight;
+};
+
+class Graph {
+private:
+    std::vector<Node> nodes;
+    std::vector<std::vector<Edge>> adjList;
+
+public:
+    Graph() = default;
+
+    size_t addNode(const Node& node) {
+        const size_t idx = nodes.size();
+        nodes.push_back(node);
+        adjList.emplace_back();
+        return idx;
+    }
+
+    void addEdge(size_t from, size_t to, size_t weight) {
+        adjList[from].push_back({to, weight});
+    }
+
+    const Node& getNode(size_t index) const {
+        return nodes[index];
+    }
+
+    size_t size() const {
+        return nodes.size();
+    }
+
+    const std::vector<Edge>& getNeighbors(size_t index) const {
+        return adjList[index];
+    }
+};
+
+
+Graph buildGraph(
+    const std::vector<Operator>& ops,
+    const std::vector<Operator>& gateset,
+    const std::vector<RuleRefOp>& rules)
+{
+    Graph graph;
+    std::unordered_map<Operator, size_t> opNodes;
+
+    // Create Operator nodes
+    for (const auto& op: ops) {
+        size_t idx = graph.addNode({NodeType::OPERATOR, op, RuleRefOp(op, {}, ""), 0});
+        opNodes[op] = idx;
+    }
+
+    for (const auto &op: gateset) {
+        size_t idx = graph.addNode({NodeType::OPERATOR, op, RuleRefOp(op, {}, ""), 0});
+        opNodes[op] = idx;
+    }
+
+    // Create Rule nodes and edges
+    for (const auto& rule: rules) {
+        size_t ruleIdx = graph.addNode({NodeType::RULE, {}, rule, 0});
+        auto op = rule.getOperator();
+        size_t opIdx = opNodes[op];
+
+        // Op -> Rule edge
+        graph.addEdge(opIdx, ruleIdx, 0);
+
+        // Rule -> deps edges
+        for (const auto &[dep, count] : rule.getResources().getResources()) {
+            if (!opNodes.count(dep)) {
+                size_t depIdx = graph.addNode({NodeType::OPERATOR, dep, RuleRefOp(dep, {}, ""), 0});
+                opNodes[dep] = depIdx;
+            }
+            graph.addEdge(ruleIdx, opNodes[dep], count);
+        }
+
+    }
+
+    return graph;
+}
+
+
+std::unordered_map<Operator, std::string>
+solveGraph(Graph& graph) {
+    using ElemPair = std::pair<size_t, size_t>; // (distance, nodeIndex)
+    auto cmp = [](const ElemPair& a, const ElemPair& b) { return a.first > b.first; };
+    std::priority_queue<ElemPair, std::vector<ElemPair>, decltype(cmp)> queue(cmp);
+
+    std::vector<size_t> dist(graph.size(), std::numeric_limits<size_t>::max());
+    std::unordered_map<Operator, std::string> solutions;
+
+    // Start with gateset operators = cost 0
+    for (size_t i = 0; i < graph.size(); i++) {
+        auto& node = graph.getNode(i);
+        if (node.type == NodeType::OPERATOR && dist[i] == std::numeric_limits<size_t>::max()) {
+            // Basis gate → distance 0
+            if (solutions.count(node.op) == 0) {
+                dist[i] = 0;
+                queue.push({0, i});
+            }
+        }
+    }
+
+    while (!queue.empty()) {
+        auto [curDist, u] = queue.top();
+        queue.pop();
+
+        if (curDist > dist[u]) continue;
+
+        auto& uNode = graph.getNode(u);
+
+        // Explore neighbors
+        for (auto& edge : graph.getNeighbors(u)) {
+            auto& vNode = graph.getNode(edge.target);
+
+            size_t newDist = 0;
+            if (uNode.type == NodeType::OPERATOR && vNode.type == NodeType::RULE) {
+                // Operator → Rule: defer cost to expansion
+                newDist = curDist;
+            } else if (uNode.type == NodeType::RULE && vNode.type == NodeType::OPERATOR) {
+                // Rule → Operator: accumulate resource counts
+                size_t count = uNode.rule.getResources().op_cost(vNode.op);
+                newDist = curDist + count * dist[edge.target];
+            } else {
+                continue;
+            }
+
+            if (newDist < dist[edge.target]) {
+                dist[edge.target] = newDist;
+                queue.push({newDist, edge.target});
+
+                // If we reached an operator from a rule, record the chosen rule
+                if (vNode.type == NodeType::OPERATOR && uNode.type == NodeType::RULE) {
+                    solutions[vNode.op] = uNode.rule.getRuleRef();
+                }
+            }
+        }
+    }
+
+    return solutions;
+}
+
+// ----------------------------
+// MLIR Parser for quantum.custom ops
+// ----------------------------
 
 auto parse_quantum_custom_ops(const std::string& mlir_code) {
     std::unordered_set<Operator> ops;
