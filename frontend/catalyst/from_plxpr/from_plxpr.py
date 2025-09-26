@@ -15,12 +15,13 @@
 This submodule defines a utility for converting plxpr into Catalyst jaxpr.
 """
 # pylint: disable=protected-access
+# pylint: disable=too-many-lines
+
 from copy import copy
 from functools import partial
 from typing import Callable
 
 import jax
-import jax.core
 import jax.numpy as jnp
 import pennylane as qml
 from jax._src.sharding_impls import UNSPECIFIED
@@ -45,6 +46,7 @@ from pennylane.transforms import single_qubit_fusion as pl_single_qubit_fusion
 from pennylane.transforms import unitary_to_rot as pl_unitary_to_rot
 
 from catalyst.device import extract_backend_info
+from catalyst.from_plxpr.decompose import COMPILER_OPS_FOR_DECOMPOSITION, DecompRuleInterpreter
 from catalyst.from_plxpr.qubit_handler import QubitHandler, QubitIndexRecorder, get_in_qubit_values
 from catalyst.jax_extras import jaxpr_pad_consts, make_jaxpr2, transient_jax_config
 from catalyst.jax_primitives import (
@@ -177,11 +179,16 @@ def from_plxpr(plxpr: ClosedJaxpr) -> Callable[..., Jaxpr]:
 
 
 class WorkflowInterpreter(PlxprInterpreter):
-    """An interpreter that converts a qnode primitive from a plxpr variant to a catalxpr variant."""
+    """An interpreter that converts a qnode primitive from a plxpr variant to a catalyst jaxpr variant."""
 
     def __init__(self):
         self._pass_pipeline = []
         self.init_qreg = None
+
+        # Compiler options for the new decomposition system
+        self.requires_decompose_lowering = False
+        self.decompose_tkwargs = {}  # target gateset
+
         super().__init__()
 
 
@@ -201,7 +208,24 @@ def handle_qnode(
     consts = args[shots_len : n_consts + shots_len]
     non_const_args = args[shots_len + n_consts :]
 
-    closed_jaxpr = ClosedJaxpr(qfunc_jaxpr, consts)
+    closed_jaxpr = (
+        ClosedJaxpr(qfunc_jaxpr, consts)
+        if not self.requires_decompose_lowering
+        else _apply_compiler_decompose_to_plxpr(
+            inner_jaxpr=qfunc_jaxpr,
+            consts=consts,
+            ncargs=non_const_args,
+            tgateset=list(self.decompose_tkwargs.get("gate_set", [])),
+        )
+    )
+
+    if self.requires_decompose_lowering:
+        closed_jaxpr = _collect_and_compile_graph_solutions(
+            inner_jaxpr=closed_jaxpr.jaxpr,
+            consts=closed_jaxpr.consts,
+            tkwargs=self.decompose_tkwargs,
+            ncargs=non_const_args,
+        )
 
     def calling_convention(*args):
         device_init_p.bind(
@@ -219,6 +243,16 @@ def handle_qnode(
         qdealloc_p.bind(self.init_qreg.get())
         device_release_p.bind()
         return retvals
+
+    if self.requires_decompose_lowering:
+        # Add gate_set attribute to the quantum kernel primitive
+        # decompose_gatesets is treated as a queue of gatesets to be used
+        # but we only support a single gateset for now in from_plxpr
+        # as supporting multiple gatesets requires an MLIR/C++ graph-decomposition
+        # implementation. The current Python implementation cannot be mixed
+        # with other transforms in between.
+        gateset = [_get_operator_name(op) for op in self.decompose_tkwargs.get("gate_set", [])]
+        setattr(qnode, "decompose_gatesets", [gateset])
 
     return quantum_kernel_p.bind(
         wrap_init(calling_convention, debug_info=qfunc_jaxpr.debug_info),
@@ -268,6 +302,51 @@ def register_transform(pl_transform, pass_name, decomposition):
         non_const_args = args[args_slice]
         targs = args[targs_slice]
 
+        # If the transform is a decomposition transform
+        # and the graph-based decomposition is enabled
+        if (
+            hasattr(pl_plxpr_transform, "__name__")
+            and pl_plxpr_transform.__name__ == "decompose_plxpr_to_plxpr"
+            and qml.decomposition.enabled_graph()
+        ):
+            if not self.requires_decompose_lowering:
+                self.requires_decompose_lowering = True
+            else:
+                raise NotImplementedError(
+                    "Multiple decomposition transforms are not yet supported."
+                )
+
+            # Update the decompose_gateset to be used by the quantum kernel primitive
+            # TODO: we originally wanted to treat decompose_gateset as a queue of
+            # gatesets to be used by the decompose-lowering pass at MLIR
+            # but this requires a C++ implementation of the graph-based decomposition
+            # which doesn't exist yet.
+            self.decompose_tkwargs = tkwargs
+
+            # Note. We don't perform the compiler-specific decomposition here
+            # to be able to support multiple decomposition transforms
+            # and collect all the required gatesets
+            # as well as being able to support other transforms in between.
+
+            # The compiler specific transformation will be performed
+            # in the qnode handler.
+
+            # Add the decompose-lowering pass to the start of the pipeline
+            self._pass_pipeline.insert(0, Pass("decompose-lowering"))
+
+            # We still need to construct and solve the graph based on
+            # the current jaxpr based on the current gateset
+            # but we don't rewrite the jaxpr at this stage.
+
+            # gds_interpreter = DecompRuleInterpreter(*targs, **tkwargs)
+
+            # def gds_wrapper(*args):
+            #     return gds_interpreter.eval(inner_jaxpr, consts, *args)
+
+            # final_jaxpr = jax.make_jaxpr(gds_wrapper)(*args)
+            # return self.eval(final_jaxpr.jaxpr, consts, *non_const_args)
+            return self.eval(inner_jaxpr, consts, *non_const_args)
+
         if catalyst_pass_name is None:
             # Use PL's ExpandTransformsInterpreter to expand this and any embedded
             # transform according to PL rules. It works by overriding the primitive
@@ -287,10 +366,10 @@ def register_transform(pl_transform, pass_name, decomposition):
                 )
 
             return self.eval(final_jaxpr.jaxpr, final_jaxpr.consts, *non_const_args)
-        else:
-            # Apply the corresponding Catalyst pass counterpart
-            self._pass_pipeline.insert(0, Pass(catalyst_pass_name))
-            return self.eval(inner_jaxpr, consts, *non_const_args)
+
+        # Apply the corresponding Catalyst pass counterpart
+        self._pass_pipeline.insert(0, Pass(catalyst_pass_name))
+        return self.eval(inner_jaxpr, consts, *non_const_args)
 
 
 # This is our registration factory for PL transforms. The loop below iterates
@@ -301,6 +380,7 @@ for pl_transform, (pass_name, decomposition) in transforms_to_passes.items():
     register_transform(pl_transform, pass_name, decomposition)
 
 
+# pylint: disable=too-many-instance-attributes
 class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
     """
     Unlike the previous interpreters which modified the getattr and setattr
@@ -571,7 +651,6 @@ def handle_decomposition_rule(self, *, pyfun, func_jaxpr, is_qreg, num_params):
     """
     Transform a quantum decomposition rule from PLxPR into JAXPR with quantum primitives.
     """
-
     if is_qreg:
         self.init_qreg.insert_all_dangling_qubits()
 
@@ -848,3 +927,86 @@ def trace_from_pennylane(
         jaxpr = from_plxpr(plxpr)(*dynamic_args, **kwargs)
 
     return jaxpr, out_type, out_treedef, sig
+
+
+def _apply_compiler_decompose_to_plxpr(inner_jaxpr, consts, tgateset, ncargs):
+    """Apply the compiler-specific decomposition for a given JAXPR.
+
+    Args:
+        inner_jaxpr (Jaxpr): The input JAXPR to be decomposed.
+        consts (list): The constants used in the JAXPR.
+        tgateset (list): A list of target gateset for decomposition.
+        ncargs (list): Non-constant arguments for the JAXPR.
+        qargs (list): All arguments including constants and non-constants.
+
+    Returns:
+        ClosedJaxpr: The decomposed JAXPR.
+    """
+
+    # Disable the graph decomposition optimization
+
+    # Why? Because for the compiler-specific decomposition we want to
+    # only decompose higher-level gates and templates that only have
+    # a single decomposition, and not do any further optimization
+    # based on the graph solution.
+    # Besides, the graph-based decomposition is not supported
+    # yet in from_plxpr for most gates and templates.
+
+    # TODO: Enable the graph-based decomposition
+    qml.decomposition.disable_graph()
+
+    # First perform the pre-mlir decomposition to simplify the jaxpr
+    # by decomposing high-level gates and templates
+    gate_set = set(COMPILER_OPS_FOR_DECOMPOSITION.keys()).union(tgateset)
+
+    final_jaxpr = qml.transforms.decompose.plxpr_transform(
+        inner_jaxpr, consts, (), {"gate_set": gate_set}, *ncargs
+    )
+
+    qml.decomposition.enable_graph()
+
+    return final_jaxpr
+
+
+def _collect_and_compile_graph_solutions(inner_jaxpr, consts, tkwargs, ncargs):
+    """Collect and compile graph solutions for a given JAXPR.
+
+    This function uses the DecompRuleInterpreter to evaluate
+    the input JAXPR and obtain a new JAXPR that incorporates
+    the graph-based decomposition solutions.
+
+    This function doesn't modify the underlying quantum function
+    but rather constructs a new JAXPR with decomposition rules.
+
+    Args:
+        inner_jaxpr (Jaxpr): The input JAXPR to be decomposed.
+        consts (list): The constants used in the JAXPR.
+        tkwargs (list): The keyword arguments of the decompose transform.
+        ncargs (list): Non-constant arguments for the JAXPR.
+
+    Returns:
+        ClosedJaxpr: The decomposed JAXPR.
+    """
+    gds_interpreter = DecompRuleInterpreter(**tkwargs)
+
+    def gds_wrapper(*args):
+        return gds_interpreter.eval(inner_jaxpr, consts, *args)
+
+    final_jaxpr = jax.make_jaxpr(gds_wrapper)(*ncargs)
+
+    return final_jaxpr
+
+
+def _get_operator_name(op):
+    """Get the name of a pennylane operator, handling wrapped operators.
+
+    Note: Controlled and Adjoint ops aren't supported in `gate_set`
+    by PennyLane's DecompositionGraph; unit tests were added in PennyLane.
+    """
+    if isinstance(op, str):
+        return op
+
+    # Return NoNameOp if the operator has no _primitive.name attribute.
+    # This is to avoid errors when we capture the program
+    # as we deal with such ops later in the decomposition graph.
+    return getattr(op._primitive, "name", "NoNameOp")

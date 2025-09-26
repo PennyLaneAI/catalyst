@@ -14,6 +14,8 @@ file(GLOB SRC
     SplitMultipleTapes.cpp
     merge_rotation.cpp
     MergeRotationsPatterns.cpp
+    decompose_lowering.cpp
+    DecomposeLoweringPatterns.cpp
     DisentangleSWAP.cpp
     DisentangleCNOT.cpp
     ions_decompositions.cpp
@@ -28,6 +30,7 @@ set(LIBS
     ${dialect_libs}
     ${conversion_libs}
     MLIRQuantum
+    ExternalStablehloLib
 )
 
 set(DEPENDS
