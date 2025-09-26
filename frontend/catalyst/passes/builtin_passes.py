@@ -394,6 +394,25 @@ def merge_rotations(qnode):
     return PassPipelineWrapper(qnode, "merge-rotations")
 
 
+def decompose_lowering(qnode):
+    """
+    Specify that the ``-decompose-lowering`` MLIR compiler pass
+    for applying the compiled decomposition rules to the QNode
+    recursively.
+
+    Args:
+        fn (QNode): the QNode to apply the cancel inverses compiler pass to
+
+    Returns:
+        ~.QNode:
+
+    **Example**
+        // TODO: add example here
+
+    """
+    return PassPipelineWrapper(qnode, "decompose-lowering")  # pragma: no cover
+
+
 def ions_decomposition(qnode):  # pragma: nocover
     """
     Specify that the ``--ions-decomposition`` MLIR compiler pass should be
@@ -806,7 +825,7 @@ def ppr_to_ppm(qnode=None, *, decompose_method="pauli-corrected", avoid_y_measur
         avoid_y_measure (bool): Rather than performing a Pauli-Y measurement for Clifford rotations
             (sometimes more costly), a :math:`Y` state (:math:`Y\vert 0 \rangle`) is used instead
             (requires :math:`Y` state preparation).
-            This is currently only supported when using the ``"clifford-corrected"`` decomposition method.
+            This is currently only supported when using the ``"clifford-corrected"`` and `"pauli-corrected"` decomposition method.
             Defaults to ``False``.
 
     Returns:
@@ -1060,7 +1079,9 @@ def ppm_specs(fn):
 
         # add ppm-spec pass at the end to existing pipeline
         _, pass_list = new_options.pipelines[0]  # first pipeline runs the user passes
-        pass_list.append("ppm-specs")
+        # check if ppm-specs is already in the pass list
+        if "ppm-specs" not in pass_list:  # pragma: nocover
+            pass_list.append("ppm-specs")
 
         new_options = _options_to_cli_flags(new_options)
         raw_result = _quantum_opt(*new_options, [], stdin=str(fn.mlir_module))
@@ -1072,7 +1093,7 @@ def ppm_specs(fn):
         except Exception as e:  # pragma: nocover
             raise CompileError(
                 "Invalid json format encountered in ppm_specs. "
-                f" but got {raw_result[: raw_result.index('module')]}"
+                f"Expected valid JSON but got {raw_result[: raw_result.index('module')]}"
             ) from e
 
     else:
@@ -1081,28 +1102,25 @@ def ppm_specs(fn):
 
 def t_layer_reduction(qnode):
     R"""
-    Specify that the``--t-layer-reduction`` MLIR compiler pass, which reduces the depth and count of
-    non-Clifford PPRs by commuting adjacent PPRs and merging compatible ones.
-    For details, see the Figure 6 of [A Game of Surface Code](https://arXiv:1808.02892v3) paper.
-
-    A layer is a set of PPRs that mutually commute or act on disjoint qubits.
+    An MLIR compiler pass that reduces the depth and count of non-Clifford PPRs (e.g., ``T`` gates) by
+    commuting PPRs in adjacent layers and merging compatible ones (a layer comprises a set of PPRs
+    that mutually commute). For more details, see the Figure 6 of
+    `A Game of Surface Codes <https://arXiv:1808.02892v3>`_.
 
     Args:
-        fn (QNode): QNode to apply the pass to.
+        qnode (QNode): QNode to apply the pass to.
 
     Returns:
         ~.QNode: Returns decorated QNode.
 
     **Example**
 
-    In example below, after performing the `to_ppr` to `merge_ppr_ppm` passes, the circuit contains
-    a four depth of Non-Clifford PPRs. The `t_layer_reduction` pass move the PPR("X") on qubit Q1
-    to first layer, which results in a three depth of Non-Clifford PPRs.
-
-    In the example below, after applying the `to_ppr`, `commute_ppr`, and `merge_ppr_ppm` passes,
-    the circuit has four layers of non-Clifford PPRs. The `t_layer_reduction` pass moves the
-    PPR("X") on qubit 1 into the first layer, reducing the non-Clifford depth from four to three.
-
+    In the example below, after performing the :func:`catalyst.passes.to_ppr` and
+    :func:`catalyst.passes.merge_ppr_ppm` passes, the circuit contains a depth of four of
+    non-Clifford PPRs. Subsequently applying the ``t_layer_reduction`` pass will move PPRs around via
+    commutation, resulting in a circuit with a smaller PPR depth. Specifically, in the circuit
+    below, the Pauli-:math:`X` PPR (:math:`\exp(iX\tfrac{\pi}{8})`) on qubit Q1 will be moved to the
+    first layer, which results in a depth of three non-Clifford PPRs.
 
     .. code-block:: python
 
@@ -1137,6 +1155,7 @@ def t_layer_reduction(qnode):
     Example MLIR Representation:
 
     .. code-block:: mlir
+
         . . .
         %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
         %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit

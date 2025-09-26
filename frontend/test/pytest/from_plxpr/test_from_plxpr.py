@@ -15,6 +15,8 @@
 This module tests the from_plxpr conversion function.
 """
 
+from functools import partial
+
 import jax
 import numpy as np
 import pennylane as qml
@@ -377,7 +379,41 @@ class TestCatalystCompareJaxpr:
         dev = qml.device("lightning.qubit", wires=2)
 
         @qml.set_shots(50)
-        @qml.qnode(dev)
+        @qml.qnode(dev, mcm_method="single-branch-statistics")
+        def circuit():
+            qml.X(0)
+            return qml.sample()
+
+        qml.capture.enable()
+        plxpr = jax.make_jaxpr(circuit)()
+
+        converted = from_plxpr(plxpr)()
+        qml.capture.disable()
+
+        assert converted.eqns[0].primitive == catalyst.jax_primitives.quantum_kernel_p
+        assert converted.eqns[0].params["qnode"] is circuit
+
+        catalyst_res = catalyst_execute_jaxpr(converted)()
+        assert len(catalyst_res) == 1
+        expected = np.transpose(np.vstack([np.ones(50), np.zeros(50)]))
+        assert qml.math.allclose(catalyst_res[0], expected)
+
+        qjit_obj = qjit(circuit)
+        qjit_obj()
+        catalxpr = qjit_obj.jaxpr
+        call_jaxpr_pl = get_call_jaxpr(converted)
+        call_jaxpr_c = get_call_jaxpr(catalxpr)
+
+        compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c)
+
+    @pytest.mark.xfail(reason="from_plxpr does not support dynamic shot transform now")
+    def test_sample_one_shot(self):
+        """Test comparison and execution of a jaxpr returning samples."""
+
+        dev = qml.device("lightning.qubit", wires=2)
+
+        @qml.set_shots(50)
+        @qml.qnode(dev, mcm_method="one-shot")
         def circuit():
             qml.X(0)
             return qml.sample()
@@ -929,6 +965,40 @@ class TestHybridPrograms:
         expected = -np.sin(0.5) + np.cos(1.2)
 
         assert qml.math.allclose(results, expected)
+
+
+class TestGraphDecomposition:
+    """Test the new graph-based decomposition integration with from_plxpr."""
+
+    def test_with_multiple_decomps_transforms(self):
+        """Test that a circuit with multiple decompositions and transforms can be converted."""
+
+        qml.capture.enable()
+        qml.decomposition.enable_graph()
+
+        @qml.qjit(target="mlir")
+        @partial(
+            qml.transforms.decompose,
+            gate_set={"RX", "RY"},
+        )
+        @partial(
+            qml.transforms.decompose,
+            gate_set={"NOT", "GlobalPhase"},
+        )
+        @qml.qnode(qml.device("lightning.qubit", wires=0))
+        def circuit(x):
+            qml.GlobalPhase(x)
+            return qml.expval(qml.PauliX(0))
+
+        with pytest.raises(
+            NotImplementedError, match="Multiple decomposition transforms are not yet supported."
+        ):
+            circuit(0.2)
+
+        qml.decomposition.disable_graph()
+        qml.capture.disable()
+
+        assert qml.decomposition.enabled_graph() is False
 
 
 if __name__ == "__main__":

@@ -37,7 +37,9 @@ from pennylane.transforms.dynamic_one_shot import (
 import catalyst
 from catalyst.api_extensions import MidCircuitMeasure
 from catalyst.device import QJITDevice
+from catalyst.device.qjit_device import is_dynamic_wires
 from catalyst.jax_extras import deduce_avals, get_implicit_and_explicit_flat_args, unzip2
+from catalyst.jax_extras.tracing import uses_transform
 from catalyst.jax_primitives import quantum_kernel_p
 from catalyst.jax_tracer import Function, trace_quantum_function
 from catalyst.logging import debug_logger
@@ -71,9 +73,7 @@ def _resolve_mcm_config(mcm_config, shots):
         None if isinstance(shots, int) and shots == 0 else mcm_config.postselect_mode
     )
     if mcm_config.mcm_method is None:
-        updated_values["mcm_method"] = (
-            "one-shot" if mcm_config.postselect_mode == "hw-like" else "single-branch-statistics"
-        )
+        updated_values["mcm_method"] = "one-shot"
     if mcm_config.mcm_method == "deferred":
         raise ValueError("mcm_method='deferred' is not supported with Catalyst.")
     if (
@@ -105,6 +105,97 @@ def _get_total_shots(qnode):
     else:
         shots = shots_value
     return shots
+
+
+def _is_one_shot_compatible_device(qnode):
+    device_name = qnode.device.name
+    exclude_devices = {"softwareq.qpp", "nvidia.custatevec", "nvidia.cutensornet"}
+
+    # Check device name against exclude list
+    if device_name in exclude_devices:
+        return False
+
+    # Additional check for OQDDevice class
+    device_class_name = qnode.device.__class__.__name__
+    return device_class_name != "OQDDevice"
+
+
+def configure_mcm_and_try_one_shot(qnode, args, kwargs):
+    """Configure mid-circuit measurement settings and handle one-shot execution."""
+    dynamic_one_shot_called = getattr(qnode, "_dynamic_one_shot_called", False)
+    if not dynamic_one_shot_called:
+        mcm_config = copy(
+            qml.devices.MCMConfig(
+                postselect_mode=qnode.execute_kwargs["postselect_mode"],
+                mcm_method=qnode.execute_kwargs["mcm_method"],
+            )
+        )
+        total_shots = _get_total_shots(qnode)
+        user_specified_mcm_method = mcm_config.mcm_method
+        mcm_config = _resolve_mcm_config(mcm_config, total_shots)
+
+        # Check if measurements_from_{samples/counts} is being used
+        uses_measurements_from_samples = uses_transform(qnode, "measurements_from_samples")
+        uses_measurements_from_counts = uses_transform(qnode, "measurements_from_counts")
+        has_finite_shots = isinstance(total_shots, int) and total_shots > 0
+
+        # For cases that user are not tend to executed with one-shot, and facing
+        # 1. non-one-shot compatible device,
+        # 2. non-finite shots,
+        # 3. measurement transform,
+        # fallback to single-branch-statistics
+        one_shot_compatible = _is_one_shot_compatible_device(qnode)
+        one_shot_compatible &= has_finite_shots
+        one_shot_compatible &= not uses_measurements_from_samples
+        one_shot_compatible &= not uses_measurements_from_counts
+
+        should_fallback = (
+            not one_shot_compatible
+            and user_specified_mcm_method is None
+            and mcm_config.mcm_method == "one-shot"
+        )
+
+        if should_fallback:
+            mcm_config = replace(mcm_config, mcm_method="single-branch-statistics")
+
+        if mcm_config.mcm_method == "one-shot":
+            # If measurements_from_samples/counts while one-shot is used, raise an error
+            if uses_measurements_from_samples:
+                raise CompileError("measurements_from_samples is not supported with one-shot")
+            if uses_measurements_from_counts:
+                raise CompileError("measurements_from_counts is not supported with one-shot")
+
+            mcm_config = replace(
+                mcm_config, postselect_mode=mcm_config.postselect_mode or "hw-like"
+            )
+
+            try:
+                return Function(dynamic_one_shot(qnode, mcm_config=mcm_config))(*args, **kwargs)
+            except (TypeError, ValueError, CompileError, NotImplementedError) as e:
+                # If user specified mcm_method, we can't fallback to single-branch-statistics,
+                # reraise the original error
+                if user_specified_mcm_method is not None:
+                    raise
+
+                # Fallback only if mcm was auto-determined
+                error_msg = str(e)
+                unsupported_measurement_error = any(
+                    pattern in error_msg
+                    for pattern in [
+                        "Native mid-circuit measurement mode does not support",
+                        "qml.var(obs) cannot be returned when `mcm_method='one-shot'`",
+                        "empty wires is not supported with dynamic wires in one-shot mode",
+                        "No need to run one-shot mode",
+                    ]
+                )
+
+                # Fallback if error is related to unsupported measurements
+                if unsupported_measurement_error:
+                    logger.warning("Fallback to single-branch-statistics: %s", e)
+                    mcm_config = replace(mcm_config, mcm_method="single-branch-statistics")
+                else:
+                    raise
+    return None
 
 
 def _reconstruct_output_with_classical_values(
@@ -197,22 +288,11 @@ class QFunc:
         pass_pipeline = dictionary_to_list_of_passes(pass_pipeline)
 
         # Mid-circuit measurement configuration/execution
-        dynamic_one_shot_called = getattr(self, "_dynamic_one_shot_called", False)
-        if not dynamic_one_shot_called:
-            mcm_config = copy(
-                qml.devices.MCMConfig(
-                    postselect_mode=self.execute_kwargs["postselect_mode"],
-                    mcm_method=self.execute_kwargs["mcm_method"],
-                )
-            )
-            total_shots = _get_total_shots(self)
-            mcm_config = _resolve_mcm_config(mcm_config, total_shots)
+        fn_result = configure_mcm_and_try_one_shot(self, args, kwargs)
 
-            if mcm_config.mcm_method == "one-shot":
-                mcm_config = replace(
-                    mcm_config, postselect_mode=mcm_config.postselect_mode or "hw-like"
-                )
-                return Function(dynamic_one_shot(self, mcm_config=mcm_config))(*args, **kwargs)
+        # If the qnode is failed to execute as one-shot, fn_result will be None
+        if fn_result is not None:
+            return fn_result
 
         new_device = copy(self.device)
         qjit_device = QJITDevice(new_device)
@@ -370,6 +450,66 @@ def _process_terminal_measurements(mcm_method, cpy_tape, out, snapshots, shot_ve
     return (snapshots, tuple(new_out)) if snapshots else tuple(new_out)
 
 
+def _validate_one_shot_measurements(mcm_config, tape: qml.tape.QuantumTape, qnode) -> None:
+    """Validate measurements for one-shot mode.
+
+    Args:
+        mcm_config: The mid-circuit measurement configuration
+        tape: The quantum tape containing measurements to validate
+        qnode: The quantum node being transformed
+
+    Raises:
+        TypeError: If unsupported measurement types are used
+        NotImplementedError: If measurement configuration is not supported
+    """
+    mcm_method = mcm_config.mcm_method
+    user_specified_mcm_method = qnode.execute_kwargs["mcm_method"]
+    assert mcm_method == "one-shot"
+
+    # Check if using shot vector with non-SampleMP measurements
+    shot_vector = qnode._shots.shot_vector if qnode._shots else []
+    has_shot_vector = len(shot_vector) > 1 or any(copies > 1 for _, copies in shot_vector)
+    has_wires = qnode.device.wires is not None and not is_dynamic_wires(qnode.device.wires)
+
+    # Raise an error if there are no mid-circuit measurements, it will fallback to
+    # single-branch-statistics
+    if (
+        not any(isinstance(op, MidCircuitMeasure) for op in tape.operations)
+        and user_specified_mcm_method is None
+    ):
+        raise ValueError("No need to run one-shot mode when there are no mid-circuit measurements.")
+
+    for m in tape.measurements:
+        # Check if measurement type is supported
+        if not isinstance(m, (CountsMP, ExpectationMP, ProbabilityMP, SampleMP, VarianceMP)):
+            raise TypeError(
+                f"Native mid-circuit measurement mode does not support {type(m).__name__} "
+                "measurements."
+            )
+
+        # Check variance with observable
+        if isinstance(m, VarianceMP) and m.obs:
+            raise TypeError(
+                "qml.var(obs) cannot be returned when `mcm_method='one-shot'` because "
+                "the Catalyst compiler does not support qml.sample(obs)."
+            )
+
+        # Check if the measurement is supported with shot-vector
+        if has_shot_vector and not isinstance(m, SampleMP):
+            raise NotImplementedError(
+                f"Measurement {type(m).__name__} does not support shot-vectors. "
+                "Use qml.sample() instead."
+            )
+
+        # Check dynamic wires with empty wires
+        if not has_wires and isinstance(m, (SampleMP, CountsMP)) and (m.wires.tolist() == []):
+            raise NotImplementedError(
+                f"Measurement {type(m).__name__} with empty wires is not supported with "
+                "dynamic wires in one-shot mode. Please specify a constant number of wires on "
+                "the device."
+            )
+
+
 # pylint: disable=protected-access,no-member,not-callable
 def dynamic_one_shot(qnode, **kwargs):
     """Transform a QNode to into several one-shot tapes to support dynamic circuit execution.
@@ -429,19 +569,7 @@ def dynamic_one_shot(qnode, **kwargs):
             cpy_tape = tape
             nonlocal aux_tapes
 
-            for m in tape.measurements:
-                if not isinstance(
-                    m, (CountsMP, ExpectationMP, ProbabilityMP, SampleMP, VarianceMP)
-                ):
-                    raise TypeError(
-                        f"Native mid-circuit measurement mode does not support {type(m).__name__} "
-                        "measurements."
-                    )
-                if isinstance(m, VarianceMP) and m.obs:
-                    raise TypeError(
-                        "qml.var(obs) cannot be returned when `mcm_method='one-shot'` because "
-                        "the Catalyst compiler does not handle qml.sample(obs)."
-                    )
+            _validate_one_shot_measurements(mcm_config, tape, qnode)
 
             if tape.batch_size is not None:
                 raise ValueError("mcm_method='one-shot' is not compatible with broadcasting")
