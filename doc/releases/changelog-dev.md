@@ -85,10 +85,10 @@
   with ``qjit`` versus without. For details, please see
   [the relevant sections on the Catalyst sharp bits page](https://docs.pennylane.ai/projects/catalyst/en/stable/dev/sharp_bits.html#functionality-differences-from-pennylane).
 
-* A new quantum compilation pass that reduces the depth and count of non-Clifford Pauli product 
-  rotations (PPRs) in circuits is now available. This compilation pass works by commuting 
-  non-Clifford PPRs (often referred to as ``T`` gates) in adjacent 
-  layers and merging compatible ones. More details can be found in Figure 6 of 
+* A new quantum compilation pass that reduces the depth and count of non-Clifford Pauli product
+  rotations (PPRs) in circuits is now available. This compilation pass works by commuting
+  non-Clifford PPRs (often referred to as ``T`` gates) in adjacent
+  layers and merging compatible ones. More details can be found in Figure 6 of
   [A Game of Surface Codes](https://arXiv:1808.02892v3).
   [(#1975)](https://github.com/PennyLaneAI/catalyst/pull/1975)
   [(#2048)](https://github.com/PennyLaneAI/catalyst/pull/2048)
@@ -122,8 +122,8 @@
   ```
 
   After performing the ``catalyst.passes.to_ppr`` and ``catalyst.passes.merge_ppr_ppm``
-  passes, the circuit contains a depth of four of non-Clifford PPRs. Subsequently applying the 
-  ``t_layer_reduction`` pass will move PPRs around via commutation, resulting in a circuit with a 
+  passes, the circuit contains a depth of four of non-Clifford PPRs. Subsequently applying the
+  ``t_layer_reduction`` pass will move PPRs around via commutation, resulting in a circuit with a
   smaller PPR depth of three.
 
   ```pycon
@@ -280,6 +280,10 @@
 
 * Added support to avoid Y-basis measurements in `pauli-corrected` PPR decomposition.
   [(#2047)](https://github.com/PennyLaneAI/catalyst/pull/2047)
+
+* Using `keep_intermediate='pass'` option now prints the whole module scope of program to the
+  intermediate files instead of just the pass scope.
+  [(#2051)](https://github.com/PennyLaneAI/catalyst/pull/2051)
 
 <h3>Breaking changes 💔</h3>
 
