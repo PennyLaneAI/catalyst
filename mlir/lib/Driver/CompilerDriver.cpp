@@ -506,15 +506,10 @@ LogicalResult preparePassManager(PassManager &pm, const CompilerOptions &options
             std::string tmp;
             llvm::raw_string_ostream s{tmp};
             if (options.dumpModuleScope) {
-                if (auto mod = dyn_cast<mlir::ModuleOp>(op)) {
-                    s << mod;
-                }
-                else if (auto parentMod = op->getParentOfType<mlir::ModuleOp>()) {
-                    s << parentMod;
-                }
-                else {
-                    s << *op;
-                }
+                mlir::ModuleOp mod = isa<mlir::ModuleOp>(op)
+                                         ? cast<mlir::ModuleOp>(op)
+                                         : op->getParentOfType<mlir::ModuleOp>();
+                s << mod;
             }
             else {
                 s << *op;
