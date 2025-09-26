@@ -172,7 +172,6 @@ def configure_mcm_and_try_one_shot(qnode, args, kwargs):
             try:
                 return Function(dynamic_one_shot(qnode, mcm_config=mcm_config))(*args, **kwargs)
             except (TypeError, ValueError, CompileError, NotImplementedError) as e:
-
                 # If user specified mcm_method, we can't fallback to single-branch-statistics,
                 # reraise the original error
                 if user_specified_mcm_method is not None:
@@ -192,7 +191,7 @@ def configure_mcm_and_try_one_shot(qnode, args, kwargs):
 
                 # Fallback if error is related to unsupported measurements
                 if unsupported_measurement_error:
-                    logger.debug("Fallback to single-branch-statistics: %s", e)
+                    logger.warning("Fallback to single-branch-statistics: %s", e)
                     mcm_config = replace(mcm_config, mcm_method="single-branch-statistics")
                 else:
                     raise
