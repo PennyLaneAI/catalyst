@@ -281,6 +281,9 @@
 * Added support to avoid Y-basis measurements in `pauli-corrected` PPR decomposition.
   [(#2047)](https://github.com/PennyLaneAI/catalyst/pull/2047)
 
+* Update conversion targets and refactor `to_ppr` and `ppm_compilation` passes and handle gate `I`.
+  [(#2058)](https://github.com/PennyLaneAI/catalyst/pull/2058)
+
 * Using `keep_intermediate='pass'` option now prints the whole module scope of program to the
   intermediate files instead of just the pass scope.
   [(#2051)](https://github.com/PennyLaneAI/catalyst/pull/2051)
