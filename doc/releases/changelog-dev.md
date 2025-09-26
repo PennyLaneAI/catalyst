@@ -26,31 +26,6 @@
       return qml.probs()
   ```
 
-* Added ``--ppr-to-mbqc`` to lower ``qec.ppr``/``qec.ppm`` into an MBQC-style quantum circuit.
-  [(#2057)](https://github.com/PennyLaneAI/catalyst/pull/2057)
-
-  This pass is part of a bottom-of-stack MBQC execution pathway, with a thin shim between the
-  PPR/PPM layer and MBQC to enable end-to-end execution on a mocked backend.
-
-  ```python
-  import pennylane as qml
-  from catalyst import qjit, measure
-  from catalyst.passes import ppr_to_mbqc, to_ppr
-
-  pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]
-
-  @qjit(target="mlir", pipelines=pipeline)
-  @ppr_to_mbqc
-  @to_ppr
-  @qml.qnode(qml.device("lightning.qubit", wires=2))
-  def circuit():
-      qml.CNOT(wires=[0, 1])
-      qml.T(0)
-      return measure(0)
-
-  print(circuit.mlir_opt)
-  ```
-
 <h3>Improvements 🛠</h3>
 
 * Catalyst now supports returning classical and MCM values with the dynamic one-shot MCM method.
@@ -345,6 +320,32 @@
 
 * Enhance `ppm_specs` function to prevent duplicate pass addition
   [(#2049)](https://github.com/PennyLaneAI/catalyst/pull/2049)
+
+* Added ``--ppr-to-mbqc`` to lower ``qec.ppr``/``qec.ppm`` into an MBQC-style quantum circuit.
+  [(#2057)](https://github.com/PennyLaneAI/catalyst/pull/2057)
+
+  This pass is part of a bottom-of-stack MBQC execution pathway, with a thin shim between the
+  PPR/PPM layer and MBQC to enable end-to-end compilation on a mocked backend.  Also, in MBQC gate 
+  set, one of the gate `RotXZX` cannot yet be executed on available backends.
+
+  ```python
+  import pennylane as qml
+  from catalyst import qjit, measure
+  from catalyst.passes import ppr_to_mbqc, to_ppr
+
+  pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+
+  @qjit(target="mlir", pipelines=pipeline)
+  @ppr_to_mbqc
+  @to_ppr
+  @qml.qnode(qml.device("lightning.qubit", wires=2))
+  def circuit():
+      qml.CNOT(wires=[0, 1])
+      qml.T(0)
+      return measure(0)
+
+  print(circuit.mlir_opt)
+  ```
 
 <h3>Documentation 📝</h3>
 

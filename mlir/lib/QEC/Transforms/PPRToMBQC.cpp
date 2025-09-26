@@ -100,6 +100,7 @@ void constructPauliConjugationLayer(SmallVector<Value> &qubits, ArrayRef<StringR
             break;
         }
         case 'I':
+            [[fallthrough]];
         case 'Z': {
             // No action needed for I/Z when mapping to Z-basis.
             break;
@@ -123,7 +124,7 @@ void constructCNOTLadder(SmallVector<Value> &qubits, ConversionPatternRewriter &
 void constructReverseCNOTLadder(SmallVector<Value> &qubits, ConversionPatternRewriter &rewriter)
 {
     size_t numQubits = qubits.size();
-    for (size_t i = 0; i + 1 < numQubits; i++) {
+    for (size_t i = 0; i < numQubits - 1; i++) {
         auto outQubits = buildCNOTGate(qubits[i + 1], qubits[i], rewriter).getOutQubits();
         qubits[i] = outQubits[1];
         qubits[i + 1] = outQubits[0];
@@ -180,10 +181,10 @@ void constructKernelOperation(SmallVector<Value> &qubits, Value &measResult, QEC
 //  - PPM ZZ      [0, 1]:               CNOT(1, 0) • Measure(0)• CNOT(1, 0)
 //  - PPM YZ      [0, 1]: RotXZX(0)   • CNOT(1, 0) • Measure(0)• CNOT(1, 0) • RotXZX(0)†
 //
-// LLVM_ATTRIBUTE_USED is used to suppress the warning about the function being unused.
+// [[maybe_unused]] is used to suppress the warning about the function being unused.
 //
-LLVM_ATTRIBUTE_USED LogicalResult convertToMBQC(QECOpInterface op,
-                                                ConversionPatternRewriter &rewriter)
+[[maybe_unused]]
+LogicalResult convertToMBQC(QECOpInterface op, ConversionPatternRewriter &rewriter)
 {
     Value measResult;
     auto pauliString = extractPauliString(op);
