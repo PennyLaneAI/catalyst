@@ -394,7 +394,7 @@ def merge_rotations(qnode):
     return PassPipelineWrapper(qnode, "merge-rotations")
 
 
-def decompose_lowering(qnode):
+def decompose_lowering(qnode=None, *, rules_path=None):
     """
     Specify that the ``-decompose-lowering`` MLIR compiler pass
     for applying the compiled decomposition rules to the QNode
@@ -402,6 +402,8 @@ def decompose_lowering(qnode):
 
     Args:
         fn (QNode): the QNode to apply the cancel inverses compiler pass to
+        rules_path (str): the path to the decomposition rules MLIR file; if not provided,
+            the decomposition rules will be applied from the main module
 
     Returns:
         ~.QNode:
@@ -410,7 +412,14 @@ def decompose_lowering(qnode):
         // TODO: add example here
 
     """
-    return PassPipelineWrapper(qnode, "decompose-lowering")  # pragma: no cover
+    if qnode is None:
+        return functools.partial(decompose_lowering, rules_path=rules_path)
+
+    if rules_path is None:
+        decompose_lowering_pass = "decompose-lowering"
+    else:
+        decompose_lowering_pass = {"decompose-lowering": {"rules-path": rules_path}}
+    return PassPipelineWrapper(qnode, decompose_lowering_pass)  # pragma: no cover
 
 
 def ions_decomposition(qnode):  # pragma: nocover

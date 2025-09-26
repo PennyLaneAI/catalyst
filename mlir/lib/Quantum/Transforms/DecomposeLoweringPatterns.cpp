@@ -414,6 +414,24 @@ struct DecomposeLoweringRewritePattern : public OpRewritePattern<CustomOp> {
         }
         func::FuncOp decompFunc = it->second;
 
+
+        ModuleOp parentModule = op->getParentOfType<ModuleOp>();
+        assert(parentModule && "expected parent module for custom op");
+
+        // If the decomposition function is already in the parent module, use the local clone
+        // otherwise, clone the function and insert it into the parent module
+        if (func::FuncOp localClone =
+                parentModule.lookupSymbol<func::FuncOp>(decompFunc.getSymNameAttr().getValue())) {
+            decompFunc = localClone;
+        }
+        else {
+            PatternRewriter::InsertionGuard guard(rewriter);
+            rewriter.setInsertionPointToEnd(parentModule.getBody());
+            func::FuncOp clonedFunc = decompFunc.clone();
+            rewriter.insert(clonedFunc);
+            decompFunc = clonedFunc;
+        }
+
         // Here is the assumption that the decomposition function must have at least one input and
         // one result
         assert(decompFunc.getFunctionType().getNumInputs() > 0 &&

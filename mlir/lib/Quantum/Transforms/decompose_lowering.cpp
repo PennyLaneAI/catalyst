@@ -27,10 +27,13 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/UB/IR/UBOps.h"
+#include "mlir/IR/Builders.h"
 #include "mlir/IR/DialectRegistry.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/Parser/Parser.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
+#include "mlir/Support/FileUtilities.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
 
@@ -50,6 +53,18 @@ namespace DecompUtils {
 
 static constexpr StringRef target_gate_attr_name = "target_gate";
 static constexpr StringRef decomp_gateset_attr_name = "decomp_gateset";
+
+// Helper function to load MLIR module from file path
+OwningOpRef<ModuleOp> loadMLIRModule(StringRef filePath, MLIRContext *context)
+{
+    // Parse MLIR file directly
+    OwningOpRef<ModuleOp> module = parseSourceFile<ModuleOp>(filePath, context);
+    if (!module) {
+        llvm::errs() << "Failed to parse MLIR file: " << filePath << "\n";
+        return nullptr;
+    }
+    return module;
+}
 
 // Check if a function is a decomposition function
 // It's expected that the decomposition function would have this attribute:
@@ -154,8 +169,19 @@ struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLowering
     {
         ModuleOp module = cast<ModuleOp>(getOperation());
 
-        // Step 1: Discover and register all decomposition functions in the module
-        discoverAndRegisterDecompositions(module, decompositionRegistry);
+        ModuleOp decompRuleModule = module;
+        OwningOpRef<ModuleOp> parsedModule;
+        if (!rulesPath.empty()) {
+            parsedModule = DecompUtils::loadMLIRModule(rulesPath, &getContext());
+            if (!parsedModule) {
+                return signalPassFailure();
+            }
+            decompRuleModule = parsedModule.get();
+        }
+
+        // Step 1: Discover and register all decomposition functions from the rules module if
+        // the rules path is provided; otherwise, we use the main module as the rules module
+        discoverAndRegisterDecompositions(decompRuleModule, decompositionRegistry);
         if (decompositionRegistry.empty()) {
             return;
         }

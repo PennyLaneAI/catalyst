@@ -46,12 +46,14 @@ from catalyst.passes.builtin_passes import (
     ppr_to_ppm,
     t_layer_reduction,
     to_ppr,
+    decompose_lowering,
 )
 from catalyst.passes.pass_api import Pass, PassPlugin, apply_pass, apply_pass_plugin
 
 __all__ = (
     "to_ppr",
     "commute_ppr",
+    "decompose_lowering",
     "cancel_inverses",
     "disentangle_cnot",
     "disentangle_swap",

@@ -113,6 +113,11 @@ def MergeRotationsPass : Pass<"merge-rotations"> {
 def DecomposeLoweringPass : Pass<"decompose-lowering"> {
     let summary = "Replace quantum operations with compiled decomposition rules.";
 
+    let options = [
+        Option<"rulesPath", "rules-path", "std::string", /*default=*/"",
+               "Path to the MLIR module containing gate decomposition rules.">
+    ];
+
     let constructor = "catalyst::createDecomposeLoweringPass()";
 }
 
