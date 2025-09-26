@@ -52,11 +52,14 @@ class OutlineStateEvolution(RewritePattern):
     def __init__(self):
         self.module: builtin.ModuleOp = None
         self.original_func_op: func.FuncOp = None
-        self.state_evolution_segment: StateEvolutionSegment = None
         self.alloc_op: quantum.AllocOp = None
-        self.remaining_ops: list[Operation] = None
 
-    @op_type_rewrite_pattern
+        # state evolution region
+        self.missing_inputs: list[SSAValue] = None
+        self.required_outputs: list[SSAValue] = None
+        self.terminal_boundary_op: Operation = None
+        self.state_evolution_func: func.FuncOp = None
+
     def match_and_rewrite(self, func_op: func.FuncOp, rewriter: PatternRewriter):
         """Transform a quantum function (qnode) to outline state evolution regions."""
         self.original_func_op = func_op
@@ -437,8 +440,11 @@ if __name__ == "__main__":
     def main(p: float):
         qml.Hadamard(0)
         qml.Hadamard(1)
-        qml.measure(0)
-        qml.RX(p, wires=0)
+        m = qml.measure(0)
+        @qml.cond(m)
+        def true_fn():
+            qml.RX(p, wires=0)
+        true_fn()
         return qml.expval(qml.X(0))
 
     main(np.pi / 2)
