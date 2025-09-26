@@ -30,6 +30,7 @@ set(LIBS
     ${dialect_libs}
     ${conversion_libs}
     MLIRQuantum
+    ExternalStablehloLib
 )
 
 set(DEPENDS
