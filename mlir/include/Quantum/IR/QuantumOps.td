@@ -561,6 +561,7 @@ def CustomOp : UnitaryGate_Op<"custom", [DifferentiableGate, NoMemoryEffect,
         }
     }];
     let hasCanonicalizeMethod = 1;
+    let hasVerifier = 1;
 }
 
 def GlobalPhaseOp : UnitaryGate_Op<"gphase", [DifferentiableGate, AttrSizedOperandSegments]> {

@@ -43,6 +43,7 @@ from catalyst.passes.builtin_passes import (
     merge_rotations,
     ppm_compilation,
     ppm_specs,
+    ppr_to_mbqc,
     ppr_to_ppm,
     t_layer_reduction,
     to_ppr,
@@ -66,4 +67,5 @@ __all__ = (
     "ppr_to_ppm",
     "ppm_compilation",
     "t_layer_reduction",
+    "ppr_to_mbqc",
 )
