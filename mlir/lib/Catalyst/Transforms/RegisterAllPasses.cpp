@@ -76,4 +76,5 @@ void catalyst::registerAllCatalystPasses()
     mlir::registerPass(catalyst::createSplitMultipleTapesPass);
     mlir::registerPass(catalyst::createTestPass);
     mlir::registerPass(catalyst::createTLayerReductionPass);
+    mlir::registerPass(catalyst::createQuantumSpecsInfoPass);
 }

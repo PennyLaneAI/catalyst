@@ -109,10 +109,12 @@ class CompileOptions:
             Default is None.
         pass_plugins (Optional[Iterable[Path]]): List of paths to pass plugins.
         dialect_plugins (Optional[Iterable[Path]]): List of paths to dialect plugins.
+        debug_compiler (Optional[bool]): Enable external debugger attachment to the compiler
+            driver when launching from an active Python debugging environment.
     """
 
     verbose: Optional[bool] = False
-    logfile: Optional[TextIOWrapper] = sys.stderr
+    logfile: Optional[TextIOWrapper] = "test1.txt"  # sys.stderr
     target: Optional[str] = "binary"
     keep_intermediate: Optional[Union[str, int, bool, KeepIntermediateLevel]] = False
     pipelines: Optional[List[Any]] = None
@@ -122,13 +124,14 @@ class CompileOptions:
     static_argnums: Optional[Union[int, Iterable[int]]] = None
     static_argnames: Optional[Union[str, Iterable[str]]] = None
     abstracted_axes: Optional[Union[Iterable[Iterable[str]], Dict[int, str]]] = None
-    lower_to_llvm: Optional[bool] = True
+    lower_to_llvm: Optional[bool] = False  # "True"
     checkpoint_stage: Optional[str] = ""
-    disable_assertions: Optional[bool] = False
+    disable_assertions: Optional[bool] = True
     seed: Optional[int] = None
     circuit_transform_pipeline: Optional[dict[str, dict[str, str]]] = None
     pass_plugins: Optional[Set[Path]] = None
     dialect_plugins: Optional[Set[Path]] = None
+    debug_compiler: Optional[bool] = False
 
     def __post_init__(self):
         # Convert keep_intermediate to Enum

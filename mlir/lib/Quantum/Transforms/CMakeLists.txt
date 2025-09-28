@@ -22,6 +22,7 @@ file(GLOB SRC
     IonsDecompositionPatterns.cpp
     loop_boundary_optimization.cpp
     LoopBoundaryOptimizationPatterns.cpp
+    QuantumSpecsInfo.cpp
 )
 
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)
@@ -39,6 +40,19 @@ set(DEPENDS
 
 add_mlir_library(${LIBRARY_NAME} STATIC ${SRC} LINK_LIBS PRIVATE ${LIBS} DEPENDS ${DEPENDS})
 target_compile_features(${LIBRARY_NAME} PUBLIC cxx_std_20)
+
+target_link_libraries(${LIBRARY_NAME} 
+    PRIVATE nlohmann_json::nlohmann_json
+    )
+
+# Disable warning from json library
+if(CMAKE_CXX_COMPILER_ID MATCHES ".*Clang")
+set_source_files_properties(
+    QuantumSpecsInfo.cpp
+    COMPILE_FLAGS "-Wno-covered-switch-default"
+)
+endif()
+
 target_include_directories(${LIBRARY_NAME} PUBLIC
                            .
                            ${PROJECT_SOURCE_DIR}/include

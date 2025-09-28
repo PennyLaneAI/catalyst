@@ -145,4 +145,11 @@ def LoopBoundaryOptimizationPass : Pass<"loop-boundary"> {
 }
 // ----- Quantum circuit transformation passes end ----- //
 
+
+def QuantumSpecsInfoPass : Pass<"quantum-specs-info"> {
+    let summary = "Informative pass to provide quantum specs, like gate counts.";
+    
+    let constructor = "catalyst::createQuantumSpecsInfoPass()";
+}
+
 #endif // QUANTUM_PASSES
