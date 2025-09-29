@@ -353,8 +353,8 @@
   [(#2027)](https://github.com/PennyLaneAI/catalyst/pull/2027)
 
 * Fix usage of OQC device, including:
-   - fix object file system extension on macOS
-   - fix wrong type signature of `Counts` API function
+  * fix object file system extension on macOS
+  * fix wrong type signature of `Counts` API function
   [(#2032)](https://github.com/PennyLaneAI/catalyst/pull/2032)
 
 * Fixed the Clifford PPR decomposition rule where using the Y measurement should take the inverse.
@@ -375,7 +375,7 @@ for example the one-shot mid circuit measurement transform.
 * `from_plxpr` can now handle dynamic shots and overridden device shots.
   [(#1983)](https://github.com/PennyLaneAI/catalyst/pull/1983/)
 
-* `from_plxpr` can now translate `counts`. 
+* `from_plxpr` can now translate `counts`.
   [(#2041)](https://github.com/PennyLaneAI/catalyst/pull/2041)
 
 * QJitDevice helper `extract_backend_info` removed its redundant `capabilities` argument.
@@ -468,7 +468,7 @@ for example the one-shot mid circuit measurement transform.
   `use-array-backed-registers` option of the `convert-quantum-to-llvm` pass to `true`. For example,
 
   ```console
-  $ catalyst --tool=opt --pass-pipeline="builtin.module(convert-quantum-to-llvm{use-array-backed-registers=true})" <input file>
+  catalyst --tool=opt --pass-pipeline="builtin.module(convert-quantum-to-llvm{use-array-backed-registers=true})" <input file>
   ```
 
 * Fix auxiliary qubit deallocation in `decompose-non-clifford-ppr` pass
@@ -480,6 +480,32 @@ for example the one-shot mid circuit measurement transform.
 
 * Enhance `ppm_specs` function to prevent duplicate pass addition
   [(#2049)](https://github.com/PennyLaneAI/catalyst/pull/2049)
+
+* Added ``--ppr-to-mbqc`` to lower ``qec.ppr``/``qec.ppm`` into an MBQC-style quantum circuit.
+  [(#2057)](https://github.com/PennyLaneAI/catalyst/pull/2057)
+
+  This pass is part of a bottom-of-stack MBQC execution pathway, with a thin shim between the
+  PPR/PPM layer and MBQC to enable end-to-end compilation on a mocked backend.  Also, in MBQC gate 
+  set, one of the gate `RotXZX` cannot yet be executed on available backends.
+
+  ```python
+  import pennylane as qml
+  from catalyst import qjit, measure
+  from catalyst.passes import ppr_to_mbqc, to_ppr
+
+  pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+
+  @qjit(target="mlir", pipelines=pipeline)
+  @ppr_to_mbqc
+  @to_ppr
+  @qml.qnode(qml.device("lightning.qubit", wires=2))
+  def circuit():
+      qml.CNOT(wires=[0, 1])
+      qml.T(0)
+      return measure(0)
+
+  print(circuit.mlir_opt)
+  ```
 
 <h3>Documentation 📝</h3>
 

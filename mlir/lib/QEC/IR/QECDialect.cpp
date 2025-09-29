@@ -82,7 +82,13 @@ void QECDialect::initialize()
 
 LogicalResult PPRotationOp::verify()
 {
-    if (getInQubits().size() != getPauliProduct().size()) {
+    size_t numPauliProduct = getPauliProduct().size();
+
+    if (numPauliProduct == 0) {
+        return emitOpError("Pauli string must be non-empty");
+    }
+
+    if (numPauliProduct != getInQubits().size()) {
         return emitOpError("Number of qubits must match number of pauli operators");
     }
     return mlir::success();

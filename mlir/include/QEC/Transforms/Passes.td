@@ -147,4 +147,10 @@ def TLayerReductionPass : Pass<"t-layer-reduction"> {
     let constructor = "catalyst::createTLayerReductionPass()";
 }
 
+def PPRToMBQCPass : Pass<"ppr-to-mbqc"> {
+    let summary = "Convert PPR/PPM operations to MBQC operations.";
+
+    let constructor = "catalyst::createPPRToMBQCPass()";
+}
+
 #endif // QEC_PASSES
