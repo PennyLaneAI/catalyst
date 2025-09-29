@@ -554,23 +554,23 @@ def to_ppr(qnode):
         and potential future execution when a suitable backend is available.
 
 
-    The full list of supported gates are as follows:
-    :class:`qml.H <pennylane.H>`,
-    :class:`qml.S <pennylane.S>`,
-    :class:`qml.T <pennylane.T>`,
-    :class:`qml.X <pennylane.X>`,
-    :class:`qml.Y <pennylane.Y>`,
-    :class:`qml.Z <pennylane.Z>`,
-    :class:`qml.adjoint(qml.S) <pennylane.adjoint(pennylane.S)>`,
-    :class:`qml.adjoint(qml.T) <pennylane.adjoint(pennylane.T)>`,
-    :class:`qml.CNOT <pennylane.CNOT>`,
-    :class:`qml.measure() <pennylane.measure>`
+    The full list of supported gates and operations are
+    ``qml.H``,
+    ``qml.S``,
+    ``qml.T``,
+    ``qml.X``,
+    ``qml.Y``,
+    ``qml.Z``,
+    ``qml.adjoint(qml.S)``,
+    ``qml.adjoint(qml.T)``,
+    ``qml.CNOT``, and
+    ``catalyst.measure``
 
     Args:
         fn (QNode): QNode to apply the pass to
 
     Returns:
-        ~.QNode
+        :class:`QNode <pennylane.QNode>`
 
     **Example**
 
@@ -617,24 +617,26 @@ def to_ppr(qnode):
 
 def commute_ppr(qnode=None, *, max_pauli_size=0):
     R"""
-    Specify that the MLIR compiler pass for commuting
-    Clifford Pauli Product Rotation (PPR) gates, :math:`\exp({iP\tfrac{\pi}{4}})`,
-    past non-Clifford PPRs gates, :math:`\exp({iP\tfrac{\pi}{8}})` will be applied,
+    Applies a quantum compilation pass that commutes
+    Clifford Pauli product rotation (PPR) gates, :math:`\exp({iP\tfrac{\pi}{4}})`,
+    past non-Clifford PPRs gates, :math:`\exp({iP\tfrac{\pi}{8}})`,
     where :math:`P` is a Pauli word.
 
-    For more information regarding to PPM,
-    see here <https://pennylane.ai/compilation/pauli-product-measurement>
+    .. seealso::
+
+        For more information on PPRs, check out
+        the `Compilation Hub <https://pennylane.ai/compilation/pauli-product-measurement>`_.
 
     .. note::
 
-        The `commute_ppr` compilation pass requires that :func:`~.passes.to_ppr` be applied first.
+        The ``commute_ppr`` compilation pass requires that :func:`~.passes.to_ppr` be applied first.
 
     Args:
         fn (QNode): QNode to apply the pass to.
         max_pauli_size (int): The maximum size of the Pauli strings after commuting.
 
     Returns:
-        ~.QNode
+        :class:`QNode <pennylane.QNode>`
 
     **Example**
 
@@ -672,7 +674,7 @@ def commute_ppr(qnode=None, *, max_pauli_size=0):
         . . .
 
     If a commutation resulted in a PPR acting on more than
-    `max_pauli_size` qubits (here, `max_pauli_size = 2`), that commutation would be skipped.
+    ``max_pauli_size`` qubits (here, ``max_pauli_size = 2``), that commutation would be skipped.
 
     .. code-block:: python
 
@@ -715,19 +717,21 @@ def commute_ppr(qnode=None, *, max_pauli_size=0):
 
 def merge_ppr_ppm(qnode=None, *, max_pauli_size=0):
     R"""
-    Specify that the MLIR compiler pass for absorbing Clifford Pauli
-    Product Rotation (PPR) operations, :math:`\exp{iP\tfrac{\pi}{4}}`,
-    into the final Pauli Product Measurement (PPM) will be applied.
+    Applies a quantum compilation pass that absorbs Clifford Pauli
+    product rotation (PPR) operations, :math:`\exp{iP\tfrac{\pi}{4}}`,
+    into the final Pauli product measurements (PPMs).
 
-    For more information regarding to PPM,
-    check out the `compilation hub <https://pennylane.ai/compilation/pauli-product-measurement>`__.
+    .. seealso::
+
+        For more information on PPRs and PPMs, check out
+        the `Compilation Hub <https://pennylane.ai/compilation/pauli-product-measurement>`_.
 
     Args:
         fn (QNode): QNode to apply the pass to
         max_pauli_size (int): The maximum size of the Pauli strings after merging.
 
     Returns:
-        ~.QNode
+        :class:`QNode <pennylane.QNode>`
 
     **Example**
 
@@ -801,20 +805,24 @@ def merge_ppr_ppm(qnode=None, *, max_pauli_size=0):
 
 
 def ppr_to_ppm(qnode=None, *, decompose_method="pauli-corrected", avoid_y_measure=False):
-    R"""Specify that the MLIR compiler passes for decomposing Pauli Product rotations (PPR)
-    , :math:`\exp(-iP\theta)`, into Pauli Pauli measurements (PPM) will be applied.
+    R"""Applies a quantum compilation pass that decomposes Pauli product rotations (PPRs),
+    :math:`\exp(-iP\theta)`, into Pauli product measurements (PPMs).
 
     This pass is used to decompose both non-Clifford and Clifford PPRs into PPMs. The non-Clifford
     PPRs (:math:`\theta = \tfrac{\pi}{8}`) are decomposed first, and then Clifford PPRs
     (:math:`\theta = \tfrac{\pi}{4}`) are decomposed.
     Non-Clifford decomposition can be performed in one of three ways:
-    ``"pauli-corrected"``, ``"clifford-corrected"`` or ``"auto-corrected"``, by default the first one is used.
-    The first method ``"pauli-corrected"`` is based on Figure 13 in the paper: https://arxiv.org/pdf/2211.15465.
-    The latter two methods are based on `A Game of Surface Codes <https://arxiv.org/abs/1808.02892>`__,
-    figures 7 and 17(b) respectively.
+    ``"pauli-corrected"`` (default), ``"clifford-corrected"`` or ``"auto-corrected"``.
+    The ``"pauli-corrected"`` method is based on Figure 13 in `arXiv:2211.15465 <https://arxiv.org/pdf/2211.15465>`_.
+    The latter two methods are based on `A Game of Surface Codes <https://arxiv.org/abs/1808.02892>`__ (figures 7 and 17(b), respectively).
+
+    .. seealso::
+
+        For more information on PPRs and PPMs, check out
+        the `Compilation Hub <https://pennylane.ai/compilation/pauli-product-measurement>`_.
 
     Args:
-        qnode (QNode, optional): QNode to apply the pass to. If None, returns a decorator.
+        qnode (QNode): QNode to apply the pass to.
         decompose_method (str, optional): The method to use for decomposing non-Clifford PPRs.
             Options are ``"pauli-corrected"``, ``"auto-corrected"``, and ``"clifford-corrected"``.
             Defaults to ``"pauli-corrected"``.
@@ -825,12 +833,11 @@ def ppr_to_ppm(qnode=None, *, decompose_method="pauli-corrected", avoid_y_measur
         avoid_y_measure (bool): Rather than performing a Pauli-Y measurement for Clifford rotations
             (sometimes more costly), a :math:`Y` state (:math:`Y\vert 0 \rangle`) is used instead
             (requires :math:`Y` state preparation).
-            This is currently only supported when using the ``"clifford-corrected"`` and `"pauli-corrected"` decomposition method.
+            This is currently only supported when using the ``"clifford-corrected"`` and ``"pauli-corrected"`` decomposition method.
             Defaults to ``False``.
 
     Returns:
-        ~.QNode or callable: Returns decorated QNode if qnode is provided,
-            otherwise returns a decorator.
+        :class:`QNode <pennylane.QNode>`
 
     **Example**
 
@@ -896,7 +903,7 @@ def ppm_compilation(
 ):
     R"""
     Specify that the MLIR compiler pass for transforming
-    clifford+T gates into Pauli Product Measurements (PPM) will be applied.
+    Clifford+T gates into Pauli product measurements (PPMs) will be applied.
 
     This pass combines multiple sub-passes:
 
@@ -909,6 +916,11 @@ def ppm_compilation(
     to the :func:`~.passes.ppr_to_ppm` pass.
     The ``max_pauli_size`` argument is passed to the :func:`~.passes.commute_ppr`
     and :func:`~.passes.merge_ppr_ppm` passes.
+
+    .. seealso::
+
+        For more information on PPRs and PPMs, check out
+        the `Compilation Hub <https://pennylane.ai/compilation/pauli-product-measurement>`_.
 
     Args:
         qnode (QNode, optional): QNode to apply the pass to. If None, returns a decorator.
@@ -925,8 +937,7 @@ def ppm_compilation(
             Defaults to 0 (no limit).
 
     Returns:
-        ~.QNode or callable: Returns decorated QNode if qnode is provided,
-        otherwise returns a decorator.
+        :class:`QNode <pennylane.QNode>`
 
     **Example**
 
@@ -1007,26 +1018,27 @@ def ppm_compilation(
 def ppm_specs(fn):
     R"""
     This function returns following PPM specs in a dictionary:
-        - Pi/4 PPR (count the number of clifford PPRs)
-        - Pi/8 PPR (count the number of non-clifford PPRs)
-        - Pi/2 PPR (count the number of classical PPRs)
-        - Max weight for pi/8 PPRs
-        - Max weight for pi/4 PPRs
-        - Max weight for pi/2 PPRs
-        - Number of logical qubits
-        - Number of PPMs
 
-    PPM Specs are returned after the last PPM compilation pass is run.
+    - Pi/4 PPR (count the number of clifford PPRs)
+    - Pi/8 PPR (count the number of non-clifford PPRs)
+    - Pi/2 PPR (count the number of classical PPRs)
+    - Max weight for pi/8 PPRs
+    - Max weight for pi/4 PPRs
+    - Max weight for pi/2 PPRs
+    - Number of logical qubits
+    - Number of PPMs
+
+    PPM specs are returned after the last PPM compilation pass is run.
 
     When there is control flow, this function can count the above statistics inside for loops with
     a statically known number of iterations. For all other cases, including dynamically sized for
     loops, and any conditionals and while loops, this pass exits with failure.
 
     Args:
-        fn (QJIT): qjit-decorated function for which ppm_specs need to be printed
+        fn (QJIT): qjit-decorated function for which ``ppm_specs`` need to be printed.
 
     Returns:
-        dict : Returns a Python dictionary containing PPM specs of all functions in QJIT
+        dict: A Python dictionary containing PPM specs of all functions in ``fn``.
 
     **Example**
 
