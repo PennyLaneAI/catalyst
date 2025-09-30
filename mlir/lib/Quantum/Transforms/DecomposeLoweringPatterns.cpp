@@ -382,6 +382,7 @@ class OpSignatureAnalyzer {
             }
             else if (auto measureOp = dyn_cast_or_null<quantum::MeasureOp>(qubit.getDefiningOp())) {
                 qubit = measureOp.getInQubit();
+                continue;
             }
 
             break;
