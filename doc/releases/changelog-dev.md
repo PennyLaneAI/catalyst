@@ -33,8 +33,6 @@
           qml.CNOT(wires=[q[0], 2])   # |011> and |1>
 
       return qml.probs(wires=[0, 1, 2])
-
-  qml.capture.disable()
   ```
 
   ```pycon
