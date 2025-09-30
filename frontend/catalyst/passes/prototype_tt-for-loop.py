@@ -1,27 +1,35 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 @dataclass
 class traversalState:
     
     name: str 
-    tree_depth: int
     # 0=unvisited, 1=left_visited, 2=both_visited, "for_loop"=special marker
-    visited: list
+    visited: list = field(default_factory=lambda: [0])
     # 0=normal, "for_loop"=special marker
-    special: list
+    special: list = field(default_factory=lambda: [0])
     # 0=normal, state = new nested state
-    state_to_special: list
+    state_to_special: list = field(default_factory=lambda: [0])
     # probs for each
-    probs: list
+    probs: list = field(default_factory=lambda: [[1.0,0.0]])
     # segment table name
-    segment_table: str
+    segment_table: list = field(default_factory=lambda: ["seg_A"])
+    tree_depth: int = 1
     last_computed_depth: int = 0
+    tree_section: str = "main"
+    tree_repetition: int = 1
     
     def __repr__(self):
         state_to_special_str = [s.name if s != 0 else s for s in self.state_to_special]
-        return f"Name: {self.name}, tree_depth: {self.tree_depth},\n\t visited: {self.visited},\n\t special: {self.special},\n\t probs: {self.probs}, \n\t segment_table: {self.segment_table} \n\t state_to_special: {state_to_special_str} \n\t last_computed_depth: {self.last_computed_depth}"
-
-# The depth is mcm * iterations + 1
-# The plus 1 is for the initial segment function before the mcms
+        output = f"Name: {self.name}, tree_depth: {self.tree_depth}\n\t"
+        output += f"tree_section: {self.tree_section}\n\t"
+        output += f"tree_repetition: {self.tree_repetition}\n\t"
+        output += f"visited: {self.visited},\n\t"
+        output += f"special: {self.special},\n\t"
+        output += f"probs: {self.probs}, \n\t"
+        output += f"segment_table: {self.segment_table} \n\t"
+        output += f"state_to_special: {state_to_special_str} \n\t"
+        output += f"last_computed_depth: {self.last_computed_depth}"
+        return output
 
 
 whitespace = " " * 4
@@ -29,11 +37,9 @@ whitespace = " " * 4
 def indent_print(text, indent=0, real_print=False):
     if real_print:
         print(whitespace * indent + text)
-    # print if text contins "*** MEASURE ***
     if "*** MEASURE ***" in text:
         print(whitespace * indent + text)
-    # else:
-    #     print(whitespace * indent + ".")
+
 def status_print(tt_state, depth):
     return f"[{tt_state.name}]: visited = {tt_state.visited} at depth {depth}"
 
@@ -132,6 +138,13 @@ def restore_state(depth):
 
 debug_stop = [0]
 
+def print_visited_state(tt_state):
+    print(f"Visited state of {tt_state.name}: {tt_state.visited}")
+    print(f"Special state of {tt_state.name}: {tt_state.special}")
+    for i in tt_state.state_to_special:
+        if i != 0:
+            print_visited_state(i)
+
 def tree_traversal(tt_state, global_depth=0, one_way=False):
 
     depth = tt_state.last_computed_depth
@@ -149,8 +162,9 @@ def tree_traversal(tt_state, global_depth=0, one_way=False):
                 break
             else:            
                 print("#"*100)            
-                print(f"{main_state.name} |  {for_loop_state_fdx.name} | {for_loop_state_fdx_nested.name}")
-                print(f"{main_state.visited}  | {for_loop_state_fdx.visited} | {for_loop_state_fdx_nested.visited}")
+                print_visited_state(tt_state)
+                # print(f"{main_state.name} |  {for_loop_state_fdx.name} | {for_loop_state_fdx_nested.name}")
+                # print(f"{main_state.visited}  | {for_loop_state_fdx.visited} | {for_loop_state_fdx_nested.visited}")
 
                 indent_print(f"*** MEASURE *** {depth}", indent=depth)
                 print("#"*100)
@@ -161,8 +175,6 @@ def tree_traversal(tt_state, global_depth=0, one_way=False):
         # Body region: process current node
         status = tt_state.visited[depth]
         depth_type = tt_state.special[depth]
-        
-        # print(f"depth_type: {depth_type}, status: {status}, depth: {depth}, global_depth: {global_depth}")
         
         if depth_type == "for_loop" and status < 2:  # Special for loop handling
             
@@ -197,34 +209,10 @@ def tree_traversal(tt_state, global_depth=0, one_way=False):
         depth = simulation(status, depth, tt_state)
         tt_state.last_computed_depth = depth
 
-        # if status == 0:
-        #     # Just run the first segment function, no mcm
-        #     # depth = simulation(0, 0, tt_state)
-        #     print(f"FDX: status: {status}, depth: {depth}")
-        #     depth = simulation(status, depth, tt_state)
-        #     print(f"FDX: after sim: status: {status}, depth: {depth}")
-
-
-        # if status < 2:  # Case 0: unvisited or left visited
-        #     # depth = simulation(status, depth, tt_state)
-        #     simulation(status, depth, tt_state)
-        #     tt_state.last_computed_depth = depth
-        #     depth += 1
-
-        # elif status == 2:  # Case 2: both visited -> backtrack
-        #     tt_state.visited[depth] = 0
-        #     depth -= 1
-
-        # else:  # Error case
-        #     depth = -1
-
         indent_print(f"TT [iter] |  {status_print(tt_state, depth)},", indent=global_depth+depth, real_print=True)
 
 
-# if True:
-if __name__ == "__main__":
-
-
+def test_for_loop_traversal():
     # Nested_2 for loop state
     for_loop_mcm = 2
     for_loop_iterations = 2
@@ -245,44 +233,53 @@ if __name__ == "__main__":
     # Nested for loop state
     for_loop_mcm = 2
     for_loop_iterations = 2
-
+    name="for_loop_state_nested"
+    
     for_loop_state_fdx_nested = traversalState(
-        name="for_loop_state_nested",
-        tree_depth = for_loop_mcm*for_loop_iterations + 1,
-        visited = [0 for _ in range(for_loop_mcm*for_loop_iterations + 1)],
+        name=name,
+        tree_depth = for_loop_mcm + 1,
+        visited = [0 for _ in range(for_loop_mcm + 1)],
 
         # Repeat the special for each iteration
-        special=[ 0 for _ in range(for_loop_mcm*for_loop_iterations + 1)],
-        state_to_special=[ 0 for _ in range(for_loop_mcm*for_loop_iterations + 1)],
-        probs=[[0.5, 0.5] for _ in range(for_loop_mcm*for_loop_iterations + 1)],
-        segment_table="for_loop_segment_table_nested"
+        special=[ 0 for _ in range(for_loop_mcm + 1)],
+        state_to_special=[ 0 for _ in range(for_loop_mcm + 1)],
+        probs=[[0.5, 0.5] for _ in range(for_loop_mcm + 1)],
+        segment_table=[name+"_"+chr(ord('A') + i) for i in range(for_loop_mcm + 1)],
+        tree_section = "for_loop",
+        tree_repetition = for_loop_iterations
     )    
+    for_loop_state_fdx_nested.probs[0] = [1.0, 0.0]  # always go left first
 
-    for_loop_state_fdx_nested.special[-1] = "for_loop"
-    for_loop_state_fdx_nested.state_to_special[-1] = for_loop_state_fdx_nested_02
+    # for_loop_state_fdx_nested.special[-1] = "for_loop"
+    # for_loop_state_fdx_nested.state_to_special[-1] = for_loop_state_fdx_nested_02
 
 
     # First for loop state
-    for_loop_mcm = 2
-    for_loop_iterations = 2
+    for_loop_mcm = 1
+    for_loop_iterations = 3
+    name = "for_loop_top"
 
     for_loop_state_fdx = traversalState(
-        name="for_loop_state_top",
-        tree_depth = for_loop_mcm*for_loop_iterations + 1,
-        visited = [0 for _ in range(for_loop_mcm*for_loop_iterations + 1)],
+        name=name,
+        tree_depth = for_loop_mcm + 1,
+        visited = [0 for _ in range(for_loop_mcm + 1)],
 
         # Repeat the special for each iteration
-        special=[ 0 for _ in range(for_loop_mcm*for_loop_iterations + 1)],
-        state_to_special=[ 0 for _ in range(for_loop_mcm*for_loop_iterations + 1)],
-        probs=[[0.5, 0.5] for _ in range(for_loop_mcm*for_loop_iterations + 1)],
-        segment_table="for_loop_segment_table"
+        special=[ 0 for _ in range(for_loop_mcm + 1)],
+        state_to_special=[ 0 for _ in range(for_loop_mcm + 1)],
+        probs=[[0.5, 0.5] for _ in range(for_loop_mcm + 1)],
+        segment_table=[name+"_"+chr(ord('A') + i) for i in range(for_loop_mcm + 1)],
+        tree_section = "for_loop",
+        tree_repetition = for_loop_iterations
     )    
 
-    for_loop_state_fdx.special[-1] = "for_loop"
-    for_loop_state_fdx.state_to_special[-1] = for_loop_state_fdx_nested
+    for_loop_state_fdx.probs[0] = [1.0, 0.0]  # always go left first
+    # for_loop_state_fdx.special[-1] = "for_loop"
+    # for_loop_state_fdx.state_to_special[-1] = for_loop_state_fdx_nested
 
     # Main traversal state
-    main_mcm = 2
+    main_mcm = 1
+    main_mcm += 1 # Add one for the for statement
     main_state = traversalState(
         name="main_state",
         tree_depth= main_mcm + 1,
@@ -290,25 +287,244 @@ if __name__ == "__main__":
         special=[0 for i in range(main_mcm + 1)],
         state_to_special=[0 for i in range(main_mcm + 1)],
         # special=[0 for _ in range(main_mcm + 1)],
-        probs=[[0.5, 0.5], [0.1, 0.9], [0.3, 0.7], [0.1, 0.9], [0.4, 0.6]],
-        segment_table="main_segment_table"
+        probs=[[0.5, 0.5] for _ in range(main_mcm + 1)],
+        segment_table=["main_" + chr(ord('A') + i) for i in range(main_mcm + 1)]
     )    
 
-    main_state.special[-1] = "for_loop"
-    main_state.state_to_special[-1] = for_loop_state_fdx
+    main_state.probs[0] = [1.0, 0.0]
 
+    for_loop_position = -2
+    main_state.special[for_loop_position] = "for_loop"
+    main_state.state_to_special[for_loop_position] = for_loop_state_fdx
+    for deep in range(main_state.tree_depth):
+        if main_state.special[deep] == "for_loop":
+            main_state.segment_table[deep] = main_state.state_to_special[deep].name
+            
+
+
+    print(main_state)
+    print("-"*100)
+    
+    def expand_tree_for_loop(state):
+        for i in range(state.tree_depth):
+            if state.special[i] == "for_loop":
+                state.tree_depth += 2
+                state.visited.insert(i, 0)
+                state.visited.insert(i+2, 0)
+                state.special.insert(i, 0)
+                state.special.insert(i+2, 0)
+                state.probs.insert(i, [0.5, 0.5])
+                state.probs.insert(i+2, [1.0, 0.0])
+                state.segment_table.insert(i, state.state_to_special[i].name+"_expanded_A")
+                state.segment_table.insert(i+2, state.state_to_special[i].name+"_expanded_B")
+
+    # expand_tree_for_loop(main_state)
+
+    
+    print(main_state)
+    print("-"*100)
+    print(for_loop_state_fdx)
+    print("-"*100)
+    print(for_loop_state_fdx_nested)
+    print("-"*100)
+    # print(for_loop_state_fdx_nested_02)
+    # print("-"*100)
+                
+    global_visited = []
+    global_special = []
+    global_probs = []
+    global_segment_table = []
+    global_state_to_special = []
+
+    def add_tree_to_global(state):
+        
+        for i in range(state.tree_repetition):
+            for i in range(state.tree_depth):                
+                if state.special[i] == "for_loop":
+                    add_tree_to_global(state.state_to_special[i])
+                    continue
+                
+                global_visited.append(state.visited[i])
+                global_special.append(state.special[i])
+                global_probs.append(state.probs[i])
+                global_segment_table.append(state.segment_table[i])
+
+    add_tree_to_global(main_state)
+
+    assert len(global_visited) == len(global_special) == len(global_probs) == len(global_segment_table)
+    
+    for i in range(len(global_visited)):
+        print(f"Depth {i:>4}: visited={global_visited[i]}, special={global_special[i]}, probs={global_probs[i]}, segment_table={global_segment_table[i]:>30}")
+
+def push_mcm_2_structure(state, mcm_count, position=None, op_type="mcm", new_state=None):
+    
+    position = position if position is not None else state.tree_depth
+    
+    if op_type == "for_loop":
+        assert mcm_count == 1, "for_loop only support 1 mcm for now"
+        assert new_state is not None, "for_loop need a new_state"
+        
+    if op_type == "for_loop":
+        # Adding the for loop structure
+        state.tree_depth += 1
+        state.visited.insert(position, 0)
+        state.special.insert(position, "for_loop")
+        state.probs.insert(position, [1.0, 0.0])  # always go left first
+        state.segment_table.insert(position, "for_loop")
+        state.state_to_special.insert(position, new_state)
+
+
+        state.tree_depth += 1
+        state.visited.insert(position+1, 0)
+        state.special.insert(position+1, 0)
+        state.probs.insert(position+1, [1.0, 0.0])  # always go left first
+        state.segment_table.insert(position+1, state.name + "_added_mcm")
+        state.state_to_special.insert(position+1, 0)
+
+    if op_type == "mcm":
+
+        state.tree_depth += mcm_count
+        for _ in range(mcm_count):
+            state.visited.insert(position, 0)
+            state.special.insert(position, 0)
+            state.probs.insert(position, [0.5, 0.5])
+            state.segment_table.insert(position, state.name + "_added_mcm")
+            state.state_to_special.insert(position, 0)
+        
+    # rename segment tables
+    for i in range(state.tree_depth):
+        if state.special[i] != "for_loop":
+            state.segment_table[i] = state.name + "_" + chr(ord('A') + i)
+
+def expand_repetition(state):
+
+    for i in state.state_to_special:
+        if i != 0:
+            expand_repetition(i)
+
+    repetitions = state.tree_repetition
+    
+    state.tree_repetition = 1
+    state.tree_depth = state.tree_depth * repetitions     
+    
+    state.visited = state.visited * repetitions
+    state.special = state.special * repetitions
+    state.probs = state.probs * repetitions
+    state.segment_table = state.segment_table * repetitions
+    state.state_to_special = state.state_to_special * repetitions
     
 
 
+if __name__ == "__main__":
 
-# if __name__ == "__main__":
+    print("-"*100)
 
+
+    
+    # Circuit Example
+    
+    #    Segment main_A
+    #    mcm
+    #    Segment main_B
+    #   
+    #    for loop start
+    #      Segment FL_1_A
+    #      mcm
+    #      Segment FL_1_B
+    #      mcm
+    #      Segment FL_1_C
+    #
+    #    Segment main_D
+    #    Segment main_E
+    #    Segment main_F
+    
+
+    # Initialize the TraversalState | Segment A
+    main_state = traversalState(
+        name="main",
+    )
+    # Adding a mcm to main | Segment B
+    push_mcm_2_structure(main_state, mcm_count=1)
+
+
+    # Adding a for loop to main | for loop start | Segment FL_1_A and Segment main_D
+    for_state_1 = traversalState(
+        name="FL_1",
+        tree_section="for_loop",
+    )
+    # Define iterations in the for loop state
+    for_state_1.tree_repetition = 3
+    push_mcm_2_structure(main_state, mcm_count=1, op_type="for_loop", new_state=for_state_1)
+    # Adding mcm to for loop state | Segment FL_1_B
+    push_mcm_2_structure(for_state_1, mcm_count=1)
+    # Adding mcm to for loop state | Segment FL_1_C
+    push_mcm_2_structure(for_state_1, mcm_count=1)
+        
+    # Adding another mcm to main
+    push_mcm_2_structure(main_state, mcm_count=1) # Segment main_E
+    push_mcm_2_structure(main_state, mcm_count=1) # Segment main_F
+
+    # Final state
     print(main_state)
-    print(for_loop_state_fdx)
-    print(for_loop_state_fdx_nested)
-    print(for_loop_state_fdx_nested_02)
     print("-"*100)
+    
+    print(for_state_1)
     print("-"*100)
+
+
+    global_visited = []
+    global_special = []
+    global_probs = []
+    global_segment_table = []
+    global_state_to_special = []
+
+    def add_tree_to_global(state):
+        
+        for i in range(state.tree_repetition):
+            for i in range(state.tree_depth):                
+                if state.special[i] == "for_loop":
+                    add_tree_to_global(state.state_to_special[i])
+                    continue
+                
+                global_visited.append(state.visited[i])
+                global_special.append(state.special[i])
+                global_probs.append(state.probs[i])
+                global_segment_table.append(state.segment_table[i])
+
+    add_tree_to_global(main_state)
+
+    assert len(global_visited) == len(global_special) == len(global_probs) == len(global_segment_table)
+    
+
+    global_state = traversalState(
+        name="global",
+        tree_depth=len(global_visited),
+        visited=global_visited,
+        special=global_special,
+        state_to_special=[0 for _ in range(len(global_visited))],
+        probs=global_probs,
+        segment_table=global_segment_table
+    )
+    
+    print(global_state)
+    print("-"*100)
+
+    for i in range(len(global_visited)):
+        print(f"Depth {i:>4}: visited={global_visited[i]}, special={global_special[i]}, probs={global_probs[i]}, segment_table={global_segment_table[i]:>30}")
+
+
+
     # exit(0)
 
-    tree_traversal(main_state)
+    # Case 1 : using single traversal though global state
+    # tree_traversal(global_state)
+    
+    # Case 2 : using nested traversal
+    expand_repetition(main_state)
+    print(main_state)
+    print("-"*100)
+    expand_repetition(for_state_1)
+    print(for_state_1)
+    print("-"*100)
+    
+    # tree_traversal(main_state)
