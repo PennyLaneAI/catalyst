@@ -346,6 +346,9 @@ class OpSignatureAnalyzer {
                 }
                 qubit = customOp.getQubitOperands()[0];
             }
+            else if (auto measureOp = dyn_cast_or_null<quantum::MeasureOp>(qubit.getDefiningOp())) {
+                qubit = measureOp.getInQubit();
+            }
         }
 
         return nullptr;
@@ -376,6 +379,9 @@ class OpSignatureAnalyzer {
                         continue;
                     }
                 }
+            }
+            else if (auto measureOp = dyn_cast_or_null<quantum::MeasureOp>(qubit.getDefiningOp())) {
+                qubit = measureOp.getInQubit();
             }
 
             break;
