@@ -87,64 +87,62 @@
 
 * A new quantum compilation pass that reduces the depth and count of non-Clifford Pauli product
   rotations (PPRs) in circuits is now available. This compilation pass works by commuting
-  non-Clifford PPRs (often referred to as ``T`` gates) in adjacent
+  non-Clifford PPRs (often just referred to as ``T`` gates) in adjacent
   layers and merging compatible ones. More details can be found in Figure 6 of
   [A Game of Surface Codes](https://arXiv:1808.02892v3).
   [(#1975)](https://github.com/PennyLaneAI/catalyst/pull/1975)
   [(#2048)](https://github.com/PennyLaneAI/catalyst/pull/2048)
 
-  Consider the following circuit.
+  Consider the following circuit:
 
   ```python
   import pennylane as qml
   from catalyst import qjit, measure
-  from catalyst.passes import to_ppr, commute_ppr, t_layer_reduction, merge_ppr_ppm
+  from catalyst.passes import to_ppr, commute_ppr, t_layer_reduction, merge_ppr_ppm, ppm_specs
 
   pips = [("pipe", ["enforce-runtime-invariants-pipeline"])]
 
+  no_reduce_T = {
+      "to_ppr": {},
+      "commute_ppr": {},
+      "merge_ppr_ppm": {},
+  }
 
-  @qjit(pipelines=pips, target="mlir")
-  @t_layer_reduction
-  @merge_ppr_ppm
-  @commute_ppr
-  @to_ppr
-  @qml.qnode(qml.device("null.qubit", wires=3))
-  def circuit():
-      for i in range(3):
-          qml.H(wires=i)
-          qml.S(wires=i)
-          qml.CNOT(wires=[i, (i + 1) % n])
-          qml.T(wires=i)
-          qml.H(wires=i)
-          qml.T(wires=i)
+  reduce_T = {
+      "to_ppr": {},
+      "commute_ppr": {},
+      "merge_ppr_ppm": {},
+      "t_layer_reduction": {}
+  }
 
-      return [measure(wires=i) for i in range(n)]
+  for pipeline in [reduce_T, no_reduce_T]:
+
+      @qjit(pipelines=pips, target="mlir", circuit_transform_pipeline=pipeline)
+      @qml.qnode(qml.device("null.qubit", wires=3))
+      def circuit():
+          n = 3
+          for i in range(n):
+              qml.H(wires=i)
+              qml.S(wires=i)
+              qml.CNOT(wires=[i, (i + 1) % n])
+              qml.T(wires=i)
+              qml.H(wires=i)
+              qml.T(wires=i)
+
+          return [measure(wires=i) for i in range(n)] 
+
+      print(ppm_specs(circuit))
   ```
-
-  After performing the ``catalyst.passes.to_ppr`` and ``catalyst.passes.merge_ppr_ppm``
-  passes, the circuit contains a depth of four of non-Clifford PPRs. Subsequently applying the
-  ``t_layer_reduction`` pass will move PPRs around via commutation, resulting in a circuit with a
-  smaller PPR depth of three.
 
   ```pycon
-  >>> print(circuit.mlir_opt)
-  ...
-  %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
-  %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
-  // layer 1
-  %3 = qec.ppr ["X"](8) %1 : !quantum.bit
-  %4 = qec.ppr ["X"](8) %2 : !quantum.bit
-
-  // layer 2
-  %5 = quantum.extract %0[ 2] : !quantum.reg -> !quantum.bit
-  %6:2 = qec.ppr ["Y", "X"](8) %3, %4 : !quantum.bit, !quantum.bit
-  %7 = qec.ppr ["X"](8) %5 : !quantum.bit
-  %8:3 = qec.ppr ["X", "Y", "X"](8) %6#0, %6#1, %7:!quantum.bit, !quantum.bit, !quantum.bit
-
-  // layer 3
-  %9:3 = qec.ppr ["X", "X", "Y"](8) %8#0, %8#1, %8#2:!quantum.bit, !quantum.bit, !quantum.bit
-  ...
+  {'circuit_0': {'depth_pi8_ppr': 3, 'depth_ppm': 1, 'logical_qubits': 3, 'max_weight_pi8': 3, 'num_of_ppm': 3, 'pi8_ppr': 6}}
+  {'circuit_0': {'depth_pi8_ppr': 4, 'depth_ppm': 1, 'logical_qubits': 3, 'max_weight_pi8': 3, 'num_of_ppm': 3, 'pi8_ppr': 6}}
   ```
+
+  After performing the :func:`~.passes.to_ppr`, :func:`~.passes.commute_ppr`, and :func:`~.passes.merge_ppr_ppm`, 
+  passes, the circuit contains a depth of four of non-Clifford PPRs (`depth_pi8_ppr`). Subsequently applying the
+  :func:`~.passes.t_layer_reduction` pass will move PPRs around via commutation, resulting in a circuit with a
+  smaller PPR depth of three.
 
 * Catalyst now provides native support for `SingleExcitation`, `DoubleExcitation`,
   and `PCPhase` on compatible devices like Lightning simulators.
@@ -164,14 +162,6 @@
       qml.ctrl(qml.PCPhase(0.5, dim=1, wires=[0, 2]), control=[1])
       return qml.probs()
   ```
-
-<h3>Improvements 🛠</h3>
-
-* Significantly improved resource tracking with `null.qubit`.
-  The new tracking has better integration with PennyLane (e.g. for passing the filename to write out), cleaner documentation, and its own wrapper class.
-  It also now tracks circuit depth, as well as gate counts by number of wires.
-  [(#2033)](https://github.com/PennyLaneAI/catalyst/pull/2033)
-  [(#2055)](https://github.com/PennyLaneAI/catalyst/pull/2055)
 
 * Catalyst now supports returning classical and MCM values with the dynamic one-shot MCM method.
   [(#2004)](https://github.com/PennyLaneAI/catalyst/pull/2004)
@@ -202,12 +192,20 @@
            True], dtype=bool))
   ```
 
-* Improve the pass `--ppm-specs` to count the depth of PPRs and PPMs in the circuit.
-  [(#2014)](https://github.com/PennyLaneAI/catalyst/pull/2014)
-
 * The default mid-circuit measurement method in catalyst has been changed from `"single-branch-statistics"` to `"one-shot"`.
   [[#2017]](https://github.com/PennyLaneAI/catalyst/pull/2017)
   [[#2019]](https://github.com/PennyLaneAI/catalyst/pull/2019)
+
+<h3>Improvements 🛠</h3>
+
+* Significantly improved resource tracking with `null.qubit`.
+  The new tracking has better integration with PennyLane (e.g. for passing the filename to write out), cleaner documentation, and its own wrapper class.
+  It also now tracks circuit depth, as well as gate counts by number of wires.
+  [(#2033)](https://github.com/PennyLaneAI/catalyst/pull/2033)
+  [(#2055)](https://github.com/PennyLaneAI/catalyst/pull/2055)
+
+* Improve the pass `--ppm-specs` to count the depth of PPRs and PPMs in the circuit.
+  [(#2014)](https://github.com/PennyLaneAI/catalyst/pull/2014)
 
 * A new pass `--partition-layers` has been added to group PPR/PPM operations into `qec.layer`
   operations based on qubit interactive and commutativity, enabling circuit analysis and
@@ -324,8 +322,9 @@
 
 <h3>Deprecations 👋</h3>
 
-* Deprecated usages of `Device.shots` along with setting `device(..., shots=...)`.
+* Deprecated usages of ``Device.shots`` along with setting ``device(..., shots=...)``.
   Heavily adjusted frontend pipelines within qfunc, tracer, verification and QJITDevice to account for this change.
+  Please use ``qml.set_shots(shots=...)`` or set shots at the QNode level (i.e., ``qml.QNode(..., shots=...)``).
   [(#1952)](https://github.com/PennyLaneAI/catalyst/pull/1952)
 
 <h3>Bug fixes 🐛</h3>
