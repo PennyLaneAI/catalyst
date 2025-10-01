@@ -80,7 +80,7 @@ def lower_jaxpr(ctx, jaxpr, metadata=None, fn=None):
         FuncOp
     """
 
-    if fn is None:
+    if fn is None or isinstance(fn, qml.QNode):
         equation = get_call_equation(jaxpr)
         call_jaxpr = equation.params["call_jaxpr"]
         pipeline = equation.params.get("pipeline")

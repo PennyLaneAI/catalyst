@@ -646,9 +646,14 @@ def _grad_lowering(ctx, *args, jaxpr, fn, grad_params):
     consts = []
     offset = len(args) - len(jaxpr.consts)
     for i, jax_array_or_tracer in enumerate(jaxpr.consts):
-        if not isinstance(
+        if isinstance(
             jax_array_or_tracer, jax._src.interpreters.partial_eval.DynamicJaxprTracer
         ):
+            # There are some cases where this value cannot be converted into
+            # a jax.numpy.array.
+            # in that case we get it from the arguments.
+            consts.append(args[offset + i])
+        else:
             # ``ir.DenseElementsAttr.get()`` constructs a dense elements attribute from an array of
             # element values. This doesn't support ``jaxlib.xla_extension.Array``, so we have to
             # cast such constants to numpy array types.
@@ -658,11 +663,6 @@ def _grad_lowering(ctx, *args, jaxpr, fn, grad_params):
             attr = ir.DenseElementsAttr.get(nparray, type=const_type)
             constval = StableHLOConstantOp(attr).results
             consts.append(constval)
-        else:
-            # There are some cases where this value cannot be converted into
-            # a jax.numpy.array.
-            # in that case we get it from the arguments.
-            consts.append(args[offset + i])
 
     method, h, argnums = grad_params.method, grad_params.h, grad_params.expanded_argnums
     mlir_ctx = ctx.module_context.context
@@ -675,7 +675,6 @@ def _grad_lowering(ctx, *args, jaxpr, fn, grad_params):
     argnum_numpy = np.array(new_argnums)
     diffArgIndices = ir.DenseIntElementsAttr.get(argnum_numpy)
     func_op = lower_jaxpr(ctx, jaxpr, (method, h, *argnums))
-
     symbol_ref = get_symbolref(ctx, func_op)
     output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
     flat_output_types = util.flatten(output_types)
@@ -694,8 +693,7 @@ def _grad_lowering(ctx, *args, jaxpr, fn, grad_params):
     ).results
 
 
-def _capture_grad_lowering(ctx, *args, argnum, jaxpr, n_consts, method, h, fn):
-    
+def _capture_grad_lowering(ctx, *args, argnum, jaxpr, n_consts, method, h, fn, scalar_out):
     mlir_ctx = ctx.module_context.context
     if h:
         f64 = ir.F64Type.get(mlir_ctx)
@@ -705,9 +703,7 @@ def _capture_grad_lowering(ctx, *args, argnum, jaxpr, n_consts, method, h, fn):
 
     argnum_numpy = np.array(argnum)
     diffArgIndices = ir.DenseIntElementsAttr.get(argnum_numpy)
-
     func_op = lower_jaxpr(ctx, jaxpr, (method, h, *argnum), fn=fn)
-
     symbol_ref = get_symbolref(ctx, func_op)
     output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
     flat_output_types = util.flatten(output_types)
