@@ -374,6 +374,7 @@ def dictionary_to_list_of_passes(pass_pipeline: PipelineDict | str, *flags, **va
 def _API_name_to_pass_name():
     return {
         "cancel_inverses": "remove-chained-self-inverse",
+        "decompose_lowering": "decompose-lowering",
         "disentangle_cnot": "disentangle-CNOT",
         "disentangle_swap": "disentangle-SWAP",
         "merge_rotations": "merge-rotations",
@@ -384,4 +385,6 @@ def _API_name_to_pass_name():
         "decompose_non_clifford_ppr": "decompose-non-clifford-ppr",
         "decompose_clifford_ppr": "decompose-clifford-ppr",
         "ppm_compilation": "ppm-compilation",
+        "t_layer_reduction": "t-layer-reduction",
+        "ppr_to_mbqc": "ppr-to-mbqc",
     }

@@ -120,6 +120,7 @@ __all__ = (
     "tree_unflatten",
     "trace_to_jaxpr",
     "unzip2",
+    "uses_transform",
     "wrap_init",
 )
 
@@ -954,3 +955,21 @@ def get_replacement_value(tree_def):
     size = len(tree_def.children())
     mock_vals = [0] if size == 0 else (0,) * size
     return jax.tree_util.tree_unflatten(tree_def, mock_vals)
+
+
+def uses_transform(qnode, transform_name):
+    """
+    Detect if a QNode uses specific transform that is specified by `transform_name`.
+    Args:
+        qnode: The quantum node to check
+        transform_name: Name of the transform to look for
+        mode: If "only_one", returns True only if transform_name is the ONLY transform
+                 in the program. If "any", returns True if transform_name is present in the program.
+    Returns:
+        bool: True if `transform_name` is detected (and is only one if only_one=True),
+              False otherwise
+    """
+    transform_program = getattr(qnode, "transform_program", [])
+    transform_funcs = [transform_container.transform for transform_container in transform_program]
+
+    return any(transform_name in func.__name__ for func in transform_funcs)

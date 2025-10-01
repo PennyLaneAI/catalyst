@@ -997,7 +997,7 @@ Dynamically-shaped arrays
 -------------------------
 
 Catalyst provides experimental support for compiling functions that accept
-or contain tensors whose dimensions are not know at compile time, without
+or contain tensors whose dimensions are not known at compile time, without
 needing to recompile the function when tensor shapes change.
 
 For example, one might consider a case where a dynamic variable specifies the shape
@@ -1268,9 +1268,9 @@ in Python with PennyLane, and easily scale up prototypes by simply adding ``@qji
 This will require that all PennyLane functionality behaves identically whether or not
 the ``@qjit`` decorator is applied.
 
-Currently, however, this is not the case for measurements.
+Currently, however, this is not the case for the following functionalities.
 
-- **Measurement behaviour**. :func:`catalyst.measure` currently behaves
+- **Measurement behaviour**: :func:`catalyst.measure` currently behaves
   differently from its PennyLane counterpart :func:`pennylane.measure`.
   In particular:
 
@@ -1281,3 +1281,71 @@ Currently, however, this is not the case for measurements.
   - Final measurement statistics occurring after :func:`catalyst.measure` will
     be post-selected on the outcome that was measured. The post-selected
     measurement will change with every execution.
+
+- **Dynamic wire allocation behaviour**: The ``qml.allocate()`` function currently
+  behaves differently when Catalyst is present or not. In particular:
+
+  - The ``state`` and ``restored`` keyword arguments of ``qml.allocate()`` are
+    ignored in Catalyst. This is because Catalyst's ``quantum.alloc`` operation
+    always asks the device to allocate a wire in the zero state. Therefore, there
+    is no need to request wires in the zero state, nor is there a need to keep
+    track of whether wires were restored in the zero state or not.
+
+  - Related to the above point, in PennyLane, dynamic wire allocations do not 
+    increase the total number of wires used in the circuit. This is because
+    PennyLane treats the number of wires during device
+    initialization (the ``qml.device("...", wires=N)``) as the device capacity.
+    Briefly, when ``qml.allocate()`` is encountered, PennyLane looks into the pool
+    of existing wires and chooses a suitable set of wires that is currently unused
+    as the result of the allocation, instead of requesting additional wires from
+    the device. However, Catalyst treats this number as the initial number of
+    wires requested, and future allocations will request additional wires on top
+    of the initial ones. This will cause a performance difference, specifically in
+    memory usage, when using dynamic wire allocations with and without Catalyst.
+
+  - Wires allocated outside of an MLIR region cannot be used inside the region. 
+    This includes control flow (``if`` statements, ``for`` loops and ``while`` loops),
+    ``qml.adjoint()``, and subroutines. For example,
+
+  .. code-block:: python
+
+    qml.capture.enable()
+
+    @qjit(autograph=True)
+    @qml.qnode(qml.device("lightning.qubit", wires=3))
+    def circuit(c):
+
+        with qml.allocate(1) as q:
+            if c:
+                qml.X(q[0])
+            else:
+                qml.Z(q[0])
+
+        return qml.probs(wires=[0, 1, 2])
+
+  >>> print(circuit(True))
+  NotImplementedError: Dynamically allocated wires in a parent scope cannot be 
+  used in a child scope yet. Please consider dynamical allocation inside the 
+  child scope.
+
+  A workaround is to move the allocations into the regions themselves:
+
+  .. code-block:: python
+
+    qml.capture.enable()
+
+    @qjit(autograph=True)
+    @qml.qnode(qml.device("lightning.qubit", wires=3))
+    def circuit(c):
+
+        if c:
+            with qml.allocate(1) as q:
+                qml.X(q[0])
+        else:
+            with qml.allocate(1) as q:
+                qml.Z(q[0])
+
+        return qml.probs(wires=[0, 1, 2])
+
+  >>> print(circuit(True))
+  [1. 0. 0. 0. 0. 0. 0. 0.]

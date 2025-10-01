@@ -20,6 +20,16 @@ include "mlir/Pass/PassBase.td"
 def QuantumConversionPass : Pass<"convert-quantum-to-llvm"> {
     let summary = "Perform a dialect conversion from Quantum to LLVM (QIR).";
 
+    let options = [
+        Option<
+            "useArrayBackedRegisters",
+            "use-array-backed-registers",
+            "bool",
+            default="false",
+            desc="Use the array-backed-registers conversion pattern for quantum.insert ops."
+        >
+    ];
+
     let dependentDialects = ["LLVM::LLVMDialect"];
 
     let constructor = "catalyst::createQuantumConversionPass()";
@@ -98,6 +108,12 @@ def MergeRotationsPass : Pass<"merge-rotations"> {
     let dependentDialects = ["math::MathDialect"];
 
     let constructor = "catalyst::createMergeRotationsPass()";
+}
+
+def DecomposeLoweringPass : Pass<"decompose-lowering"> {
+    let summary = "Replace quantum operations with compiled decomposition rules.";
+
+    let constructor = "catalyst::createDecomposeLoweringPass()";
 }
 
 def DisentangleCNOTPass : Pass<"disentangle-CNOT"> {

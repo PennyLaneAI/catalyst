@@ -76,6 +76,7 @@ from mlir_quantum.dialects.quantum import (
     CountsOp,
     CustomOp,
     DeallocOp,
+    DeallocQubitOp,
     DeviceInitOp,
     DeviceReleaseOp,
     ExpvalOp,
@@ -259,6 +260,8 @@ num_qubits_p = Primitive("num_qubits")
 qalloc_p = Primitive("qalloc")
 qdealloc_p = Primitive("qdealloc")
 qdealloc_p.multiple_results = True
+qdealloc_qb_p = Primitive("qdealloc_qb")
+qdealloc_qb_p.multiple_results = True
 qextract_p = Primitive("qextract")
 qinsert_p = Primitive("qinsert")
 gphase_p = Primitive("gphase")
@@ -313,9 +316,11 @@ quantum_kernel_p = core.CallPrimitive("quantum_kernel")
 quantum_kernel_p.multiple_results = True
 measure_in_basis_p = Primitive("measure_in_basis")
 measure_in_basis_p.multiple_results = True
+decomprule_p = core.Primitive("decomposition_rule")
+decomprule_p.multiple_results = True
+
 quantum_subroutine_p = copy.deepcopy(pjit_p)
 quantum_subroutine_p.name = "quantum_subroutine_p"
-
 subroutine_cache: dict[callable, callable] = {}
 
 
@@ -386,6 +391,26 @@ def subroutine(func):
             ),
         ):
             return jax.jit(inside)(*args, **kwargs)
+
+    return wrapper
+
+
+def decomposition_rule(func=None, *, is_qreg=True, num_params=0):
+    """
+    Denotes the creation of a quantum definition in the intermediate representation.
+    """
+
+    assert not is_qreg or (
+        is_qreg and num_params == 0
+    ), "Decomposition rules with `qreg` do not require `num_params`."
+
+    if func is None:
+        return functools.partial(decomposition_rule, is_qreg=is_qreg, num_params=num_params)
+
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        jaxpr = jax.make_jaxpr(func)(*args, **kwargs)
+        decomprule_p.bind(pyfun=func, func_jaxpr=jaxpr, is_qreg=is_qreg, num_params=num_params)
 
     return wrapper
 
@@ -551,6 +576,25 @@ def _func_lowering(ctx, *args, call_jaxpr, fn):
     func_op = lower_callable(ctx, fn, call_jaxpr)
     call_op = create_call_op(ctx, func_op, *args)
     return call_op.results
+
+
+#
+# Decomp rule
+#
+@decomprule_p.def_abstract_eval
+def _decomposition_rule_abstract(*, pyfun, func_jaxpr, is_qreg=False, num_params=None):
+    return ()
+
+
+def _decomposition_rule_lowering(ctx, *, pyfun, func_jaxpr, **_):
+    """Lower a quantum decomposition rule into MLIR in a single step process.
+    The step is the compilation of the definition of the function fn.
+    """
+
+    # Set the visibility of the decomposition rule to public
+    # to avoid the elimination by the compiler
+    lower_callable(ctx, pyfun, func_jaxpr, public=True)
+    return ()
 
 
 #
@@ -1006,6 +1050,21 @@ def _qdealloc_lowering(jax_ctx: mlir.LoweringRuleContext, qreg):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
     DeallocOp(qreg)
+    return ()
+
+
+#
+# qdealloc_qb
+#
+@qdealloc_qb_p.def_abstract_eval
+def _qdealloc_qb_abstract_eval(qubit):
+    return ()
+
+
+def _qdealloc_qb_lowering(jax_ctx: mlir.LoweringRuleContext, qubit):
+    ctx = jax_ctx.module_context.context
+    ctx.allow_unregistered_dialects = True
+    DeallocQubitOp(qubit)
     return ()
 
 
@@ -2460,6 +2519,7 @@ CUSTOM_LOWERING_RULES = (
     (device_release_p, _device_release_lowering),
     (qalloc_p, _qalloc_lowering),
     (qdealloc_p, _qdealloc_lowering),
+    (qdealloc_qb_p, _qdealloc_qb_lowering),
     (qextract_p, _qextract_lowering),
     (qinsert_p, _qinsert_lowering),
     (qinst_p, _qinst_lowering),
@@ -2497,6 +2557,7 @@ CUSTOM_LOWERING_RULES = (
     (quantum_kernel_p, _quantum_kernel_lowering),
     (quantum_subroutine_p, subroutine_lowering),
     (measure_in_basis_p, _measure_in_basis_lowering),
+    (decomprule_p, _decomposition_rule_lowering),
 )
 
 

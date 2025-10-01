@@ -30,11 +30,22 @@ auto OQDDevice::AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType>
     std::vector<QubitIdType> result(num_qubits);
     std::generate_n(result.begin(), num_qubits,
                     [&]() { return this->qubit_manager.Allocate(num_qubits); });
+
+    RT_FAIL_IF(!this->initial_allocated_QubitIds.empty(),
+               "OQD device does not support dynamic qubit allocation")
+    this->initial_allocated_QubitIds.insert(result.begin(), result.end());
     return result;
 }
 
-void OQDDevice::ReleaseAllQubits()
+void OQDDevice::ReleaseQubits(const std::vector<QubitIdType> &qubits)
 {
+    std::set<QubitIdType> dealloc_Ids(qubits.begin(), qubits.end());
+    RT_FAIL_IF(this->initial_allocated_QubitIds != dealloc_Ids,
+               "OQD device does not support dynamic qubit allocation. Please ensure the "
+               "deallocation qubit ID array contains the same values as those produced by the "
+               "initial `AllocateQubits` call")
+    this->initial_allocated_QubitIds.clear();
+
     this->ion_specs = "";
     this->phonon_specs.clear();
     this->qubit_manager.ReleaseAll();

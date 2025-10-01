@@ -38,6 +38,7 @@ void catalyst::registerAllCatalystPasses()
     mlir::registerPass(catalyst::createCliffordTToPPRPass);
     mlir::registerPass(catalyst::createMergePPRIntoPPMPass);
     mlir::registerPass(catalyst::createPPMCompilationPass);
+    mlir::registerPass(catalyst::createDecomposeLoweringPass);
     mlir::registerPass(catalyst::createDecomposeNonCliffordPPRPass);
     mlir::registerPass(catalyst::createDecomposeCliffordPPRPass);
     mlir::registerPass(catalyst::createCountPPMSpecsPass);
@@ -62,6 +63,7 @@ void catalyst::registerAllCatalystPasses()
     mlir::registerPass(catalyst::createMemrefCopyToLinalgCopyPass);
     mlir::registerPass(catalyst::createMemrefToLLVMWithTBAAPass);
     mlir::registerPass(catalyst::createMitigationLoweringPass);
+    mlir::registerPass(catalyst::createPartitionLayersPass);
     mlir::registerPass(catalyst::createQnodeToAsyncLoweringPass);
     mlir::registerPass(catalyst::createQuantumConversionPass);
     mlir::registerPass(catalyst::createRegisterInactiveCallbackPass);
@@ -73,4 +75,6 @@ void catalyst::registerAllCatalystPasses()
     mlir::registerPass(catalyst::createStablehloLegalizeToStdPass);
     mlir::registerPass(catalyst::createSplitMultipleTapesPass);
     mlir::registerPass(catalyst::createTestPass);
+    mlir::registerPass(catalyst::createTLayerReductionPass);
+    mlir::registerPass(catalyst::createPPRToMBQCPass);
 }
