@@ -101,6 +101,8 @@ from mlir_quantum.dialects.quantum import (
 )
 from mlir_quantum.dialects.quantum import YieldOp as QYieldOp
 
+from pennylane.capture.primitives import grad_prim as pl_grad_prim
+
 from catalyst.compiler import get_lib_path
 from catalyst.jax_extras import (
     ClosedJaxpr,
@@ -690,6 +692,35 @@ def _grad_lowering(ctx, *args, jaxpr, fn, grad_params):
         diffArgIndices=diffArgIndices,
         finiteDiffParam=finiteDiffParam,
     ).results
+
+
+def _capture_grad_lowering(ctx, *args, argnum, jaxpr, n_consts, method, h, fn):
+    
+    mlir_ctx = ctx.module_context.context
+    if h:
+        f64 = ir.F64Type.get(mlir_ctx)
+        finiteDiffParam = ir.FloatAttr.get(f64, h)
+    else:
+        finiteDiffParam = None
+
+    argnum_numpy = np.array(argnum)
+    diffArgIndices = ir.DenseIntElementsAttr.get(argnum_numpy)
+
+    func_op = lower_jaxpr(ctx, jaxpr, (method, h, *argnum), fn=fn)
+
+    symbol_ref = get_symbolref(ctx, func_op)
+    output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
+    flat_output_types = util.flatten(output_types)
+    
+    return GradOp(
+        flat_output_types,
+        ir.StringAttr.get(method),
+        symbol_ref,
+        mlir.flatten_lowering_ir_args(args),
+        diffArgIndices=diffArgIndices,
+        finiteDiffParam=finiteDiffParam,
+    ).results
+
 
 
 # value_and_grad
@@ -2542,6 +2573,7 @@ CUSTOM_LOWERING_RULES = (
     (while_p, _while_loop_lowering),
     (for_p, _for_loop_lowering),
     (grad_p, _grad_lowering),
+    (pl_grad_prim, _capture_grad_lowering),
     (func_p, _func_lowering),
     (jvp_p, _jvp_lowering),
     (vjp_p, _vjp_lowering),
