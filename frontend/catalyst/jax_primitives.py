@@ -690,6 +690,7 @@ def _grad_lowering(ctx, *args, jaxpr, fn, grad_params):
     ).results
 
 
+# pylint: disable=too-many-arguments
 def _capture_grad_lowering(ctx, *args, argnum, jaxpr, n_consts, method, h, fn, scalar_out):
     mlir_ctx = ctx.module_context.context
     if h:

@@ -28,7 +28,6 @@ import catalyst.utils.calculate_grad_shape as infer
 from catalyst import (
     CompileError,
     DifferentiableCompileError,
-    cond,
     for_loop,
     grad,
     jacobian,
