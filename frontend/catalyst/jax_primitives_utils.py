@@ -107,7 +107,7 @@ def lower_callable(ctx, callable_, call_jaxpr, pipeline=(), metadata=None, publi
     add more than one FuncOps. This depends on the contents of call_jaxpr.
 
     Args:
-      ctx: LoweringRulemetadata
+      ctx: LoweringRuleContext
       callable_: python function
       call_jaxpr: jaxpr representing callable_
       public: whether the visibility should be marked public
