@@ -205,6 +205,10 @@ def handle_qnode(
 ):
     """Handle the conversion from plxpr to Catalyst jaxpr for the qnode primitive"""
 
+    shots = args[0] if shots_len else 0
+    consts = args[shots_len : n_consts + shots_len]
+    non_const_args = args[shots_len + n_consts :]
+
     # hopefully this patch stays patchy and doesn't become permanent
     closed_jaxpr = _decompose_jaxpr_to_gateset(qfunc_jaxpr, consts, device)
 
