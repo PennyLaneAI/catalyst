@@ -14,6 +14,7 @@ RT_BUILD_DIR ?= $(MK_DIR)/../runtime/build
 ENABLE_ASAN ?= OFF
 STRICT_WARNINGS ?= ON
 BUILD_TYPE ?= Release
+BUILD_TYPE_EXT ?= Release
 LLVM_EXTERNAL_LIT ?= $(LLVM_BUILD_DIR)/bin/llvm-lit
 
 ifeq ($(shell uname), Darwin)
@@ -66,9 +67,8 @@ llvm:
 	@if cd llvm-project; git apply --check $(MK_DIR)/patches/llvm-bufferization-segfault.patch; then \
 		git apply $(MK_DIR)/patches/llvm-bufferization-segfault.patch; \
 	fi
-
 	cmake -G Ninja -S llvm-project/llvm -B $(LLVM_BUILD_DIR) \
-		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
+		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE_EXT) \
 		-DLLVM_BUILD_EXAMPLES=OFF \
 		-DLLVM_TARGETS_TO_BUILD="host" \
 		-DLLVM_ENABLE_PROJECTS="$(LLVM_PROJECTS)" \
@@ -100,7 +100,7 @@ stablehlo:
 
 	cmake -G Ninja -S stablehlo -B $(STABLEHLO_BUILD_DIR) \
 		-DSTABLEHLO_ENABLE_LLD=$(ENABLE_LLD) \
-		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
+		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE_EXT) \
 		-DMLIR_DIR=$(LLVM_BUILD_DIR)/lib/cmake/mlir \
 		-DLLVM_ENABLE_ASSERTIONS=ON \
 		-DLLVM_ENABLE_LLD=$(ENABLE_LLD) \
@@ -113,6 +113,9 @@ stablehlo:
 		-DCMAKE_C_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
 		-DCMAKE_CXX_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
 		-DCMAKE_EXE_LINKER_FLAGS=$(USE_SANITIZER_FLAGS) \
+		-DLLVM_ENABLE_LLD=$(ENABLE_LLD) \
+		-DLLVM_ENABLE_ZLIB=$(ENABLE_ZLIB) \
+		-DLLVM_ENABLE_ZSTD=$(ENABLE_ZSTD) \
 		-DCMAKE_CXX_VISIBILITY_PRESET=$(SYMBOL_VISIBILITY)
 
 	cmake --build $(STABLEHLO_BUILD_DIR)
@@ -128,7 +131,7 @@ enzyme:
 	fi
 	cmake -G Ninja -S Enzyme/enzyme -B $(ENZYME_BUILD_DIR) \
 		-DENZYME_STATIC_LIB=ON \
-		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
+		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE_EXT) \
 		-DLLVM_DIR=$(LLVM_BUILD_DIR)/lib/cmake/llvm \
 		-DCMAKE_C_COMPILER=$(C_COMPILER) \
 		-DCMAKE_CXX_COMPILER=$(CXX_COMPILER) \
@@ -149,6 +152,7 @@ plugin:
 	cmake -B standalone/build -G Ninja \
 		-DCMAKE_C_COMPILER=$(C_COMPILER) \
 		-DCMAKE_CXX_COMPILER=$(CXX_COMPILER) \
+		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE_EXT) \
 		-DCMAKE_C_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
 		-DCMAKE_CXX_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
 		-DMLIR_DIR=$(LLVM_BUILD_DIR)/lib/cmake/mlir \

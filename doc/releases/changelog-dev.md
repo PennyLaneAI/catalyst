@@ -366,6 +366,10 @@ for example the one-shot mid circuit measurement transform.
 
 <h3>Internal changes ⚙️</h3>
 
+* `qjit` now supports a `debug_compiler` argument, which signals that the compiler driver should stop and wait
+  for a user-provided `SIGNCONT`. This allows developer to attach a debugger session to the driver before processing its input.
+  [(#1712)](https://github.com/PennyLaneAI/catalyst/pull/1712)
+
 * Updates use of `qml.transforms.dynamic_one_shot.parse_native_mid_circuit_measurements` to improved signature.
   [(#1953)](https://github.com/PennyLaneAI/catalyst/pull/1953)
 
