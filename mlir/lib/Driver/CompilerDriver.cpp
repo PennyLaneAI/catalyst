@@ -17,12 +17,10 @@
 #include <algorithm>
 #include <filesystem>
 #include <iostream>
-#include <list>
 #include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
-#include <unordered_map>
 
 #include "stablehlo/dialect/Register.h"
 #include "stablehlo/integrations/c/StablehloPasses.h"
@@ -43,7 +41,6 @@
 #include "llvm/IRReader/IRReader.h"
 #include "llvm/MC/TargetRegistry.h"
 #include "llvm/Passes/PassBuilder.h"
-#include "llvm/Support/FileSystem.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/TargetSelect.h"
@@ -67,15 +64,12 @@
 #include "Gradient/IR/GradientDialect.h"
 #include "Gradient/IR/GradientInterfaces.h"
 #include "Gradient/Transforms/BufferizableOpInterfaceImpl.h"
-#include "Gradient/Transforms/Passes.h"
 #include "Ion/IR/IonDialect.h"
 #include "MBQC/IR/MBQCDialect.h"
 #include "Mitigation/IR/MitigationDialect.h"
-#include "Mitigation/Transforms/Passes.h"
 #include "QEC/IR/QECDialect.h"
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/Transforms/BufferizableOpInterfaceImpl.h"
-#include "Quantum/Transforms/Passes.h"
 
 #include "Enzyme.h"
 #include "Timer.hpp"
@@ -100,19 +94,19 @@ namespace catalyst::utils {
  */
 class LinesCount {
   private:
-    inline static void print(const std::string &opStrBuf, const std::string &name)
+    inline static void print(std::string_view opStrBuf, std::string_view name)
     {
-        const auto num_lines = std::count(opStrBuf.cbegin(), opStrBuf.cend(), '\n');
+        const auto num_lines = std::ranges::count(opStrBuf, '\n');
         if (!name.empty()) {
             std::cerr << "[DIAGNOSTICS] After " << std::setw(25) << std::left << name;
         }
         std::cerr << "\t" << std::fixed << "programsize: " << num_lines << std::fixed << " lines\n";
     }
 
-    inline static void store(const std::string &opStrBuf, const std::string &name,
+    inline static void store(std::string_view opStrBuf, std::string_view name,
                              const std::filesystem::path &file_path)
     {
-        const auto num_lines = std::count(opStrBuf.cbegin(), opStrBuf.cend(), '\n');
+        const auto num_lines = std::ranges::count(opStrBuf, '\n');
 
         const std::string_view key_padding = "          ";
         const std::string_view val_padding = "              ";
@@ -139,7 +133,7 @@ class LinesCount {
         ofile.close();
     }
 
-    inline static void dump(const std::string &opStrBuf, const std::string &name = {})
+    inline static void dump(std::string_view opStrBuf, std::string_view name = {})
     {
         char *file = getenv("DIAGNOSTICS_RESULTS_PATH");
         if (!file) {
@@ -153,11 +147,11 @@ class LinesCount {
   public:
     [[nodiscard]] inline static bool is_diagnostics_enabled()
     {
-        char *value = getenv("ENABLE_DIAGNOSTICS");
+        const char *const value = getenv("ENABLE_DIAGNOSTICS");
         return value && std::string(value) == "ON";
     }
 
-    static void Operation(Operation *op, const std::string &name = {})
+    static void Operation(const Operation *op, const std::string &name = {})
     {
         if (!is_diagnostics_enabled()) {
             return;
@@ -210,11 +204,11 @@ std::string joinPasses(const llvm::SmallVector<std::string> &passes)
 }
 
 struct CatalystIRPrinterConfig : public PassManager::IRPrinterConfig {
-    typedef std::function<LogicalResult(Pass *, PrintCallbackFn print)> PrintHandler;
+    using PrintHandler = std::function<LogicalResult(Pass *, PrintCallbackFn print)>;
     PrintHandler printHandler;
 
-    CatalystIRPrinterConfig(PrintHandler printHandler)
-        : IRPrinterConfig(/*printModuleScope=*/true), printHandler(printHandler)
+    explicit CatalystIRPrinterConfig(PrintHandler printHandler)
+        : IRPrinterConfig(/*printModuleScope=*/true), printHandler(std::move(printHandler))
     {
     }
 
@@ -227,15 +221,16 @@ struct CatalystIRPrinterConfig : public PassManager::IRPrinterConfig {
 };
 
 struct CatalystPassInstrumentation : public PassInstrumentation {
-    typedef std::function<void(Pass *pass, Operation *operation)> PassCallback;
+    using PassCallback = std::function<void(Pass *pass, Operation *operation)>;
     PassCallback beforePassCallback;
     PassCallback afterPassCallback;
     PassCallback afterPassFailedCallback;
 
     CatalystPassInstrumentation(PassCallback beforePassCallback, PassCallback afterPassCallback,
                                 PassCallback afterPassFailedCallback)
-        : beforePassCallback(beforePassCallback), afterPassCallback(afterPassCallback),
-          afterPassFailedCallback(afterPassFailedCallback)
+        : beforePassCallback(std::move(beforePassCallback)),
+          afterPassCallback(std::move(afterPassCallback)),
+          afterPassFailedCallback(std::move(afterPassFailedCallback))
     {
     }
 
@@ -272,7 +267,7 @@ OwningOpRef<ModuleOp> parseMLIRSource(MLIRContext *ctx, const llvm::SourceMgr &s
 bool containsGradients(mlir::ModuleOp moduleOp)
 {
     bool contain = false;
-    moduleOp.walk([&](catalyst::gradient::GradientOpInterface op) {
+    moduleOp.walk([&]([[maybe_unused]] catalyst::gradient::GradientOpInterface op) {
         contain = true;
         return WalkResult::interrupt();
     });
@@ -311,7 +306,7 @@ void registerAllCatalystDialects(DialectRegistry &registry)
 
 // Determines if the compilation stage should be executed if a checkpointStage is given
 bool shouldRunStage(const CompilerOptions &options, CompilerOutput &output,
-                    const std::string &stageName)
+                    std::string_view stageName)
 {
     if (options.checkpointStage.empty()) {
         return true;
@@ -355,7 +350,7 @@ LogicalResult runCoroLLVMPasses(const CompilerOptions &options,
     // Optimize the IR!
     CoroPM.run(*llvmModule.get(), MAM);
 
-    if (options.keepIntermediate) {
+    if (options.keepIntermediate != SaveTemps::None) {
         std::string tmp;
         llvm::raw_string_ostream rawStringOstream{tmp};
         llvmModule->print(rawStringOstream, nullptr);
@@ -407,7 +402,7 @@ LogicalResult runO2LLVMPasses(const CompilerOptions &options,
     // Optimize the IR!
     MPM.run(*llvmModule.get(), MAM);
 
-    if (options.keepIntermediate) {
+    if (options.keepIntermediate != SaveTemps::None) {
         std::string tmp;
         llvm::raw_string_ostream rawStringOstream{tmp};
         llvmModule->print(rawStringOstream, nullptr);
@@ -455,7 +450,7 @@ LogicalResult runEnzymePasses(const CompilerOptions &options,
     // Optimize the IR!
     MPM.run(*llvmModule.get(), MAM);
 
-    if (options.keepIntermediate) {
+    if (options.keepIntermediate != SaveTemps::None) {
         std::string tmp;
         llvm::raw_string_ostream rawStringOstream{tmp};
         llvmModule->print(rawStringOstream, nullptr);
@@ -470,7 +465,8 @@ std::string readInputFile(const std::string &filename)
 {
     if (filename == "-") {
         std::stringstream buffer;
-        std::istreambuf_iterator<char> begin(std::cin), end;
+        std::istreambuf_iterator<char> begin(std::cin);
+        std::istreambuf_iterator<char> end;
         buffer << std::string(begin, end);
         return buffer.str();
     }
@@ -487,7 +483,8 @@ LogicalResult preparePassManager(PassManager &pm, const CompilerOptions &options
                                  CompilerOutput &output, catalyst::utils::Timer &timer,
                                  TimingScope &timing)
 {
-    auto beforePassCallback = [&](Pass *pass, Operation *op) {
+    auto beforePassCallback = [&]([[maybe_unused]] const Pass *const pass,
+                                  [[maybe_unused]] const Operation *const op) {
         if (options.verbosity >= Verbosity::Debug && !timer.is_active()) {
             timer.start();
         }
@@ -495,7 +492,7 @@ LogicalResult preparePassManager(PassManager &pm, const CompilerOptions &options
 
     // For each pipeline-terminating pass, print the IR into the corresponding dump file and
     // into a diagnostic output buffer. Note that one pass can terminate multiple pipelines.
-    auto afterPassCallback = [&](Pass *pass, Operation *op) {
+    auto afterPassCallback = [&](const Pass *const pass, const Operation *const op) {
         auto pipelineName = pass->getName();
         if (options.verbosity >= Verbosity::Debug) {
             timer.dump(pipelineName.str(), /*add_endl */ false);
@@ -523,12 +520,12 @@ LogicalResult preparePassManager(PassManager &pm, const CompilerOptions &options
     };
 
     // For each failed pass, print the owner pipeline name into a diagnostic stream.
-    auto afterPassFailedCallback = [&](Pass *pass, Operation *op) {
+    auto afterPassFailedCallback = [&](const Pass *const pass, const Operation *const op) {
         options.diagnosticStream << "While processing '" << pass->getName().str() << "' pass ";
         std::string tmp;
         llvm::raw_string_ostream s{tmp};
         s << *op;
-        if (options.keepIntermediate) {
+        if (options.keepIntermediate != SaveTemps::None) {
             dumpToFile(options, output.nextPipelineDumpFilename(pass->getName().str() + "_FAILED"),
                        tmp);
         }
@@ -541,8 +538,8 @@ LogicalResult preparePassManager(PassManager &pm, const CompilerOptions &options
     if (failed(config.setupPassPipeline(pm)))
         return failure();
     pm.enableTiming(timing);
-    pm.addInstrumentation(std::unique_ptr<PassInstrumentation>(new CatalystPassInstrumentation(
-        beforePassCallback, afterPassCallback, afterPassFailedCallback)));
+    pm.addInstrumentation(std::make_unique<CatalystPassInstrumentation>(
+        beforePassCallback, afterPassCallback, afterPassFailedCallback));
     return success();
 }
 
@@ -568,7 +565,7 @@ LogicalResult configurePipeline(PassManager &pm, const CompilerOptions &options,
 LogicalResult runPipeline(PassManager &pm, const CompilerOptions &options, CompilerOutput &output,
                           Pipeline &pipeline, bool clHasManualPipeline, ModuleOp moduleOp)
 {
-    if (!shouldRunStage(options, output, pipeline.getName()) || pipeline.getPasses().size() == 0) {
+    if (!shouldRunStage(options, output, pipeline.getName()) || pipeline.getPasses().empty()) {
         return success();
     }
     if (failed(configurePipeline(pm, options, pipeline, clHasManualPipeline))) {
@@ -579,7 +576,8 @@ LogicalResult runPipeline(PassManager &pm, const CompilerOptions &options, Compi
         llvm::errs() << "Failed to run pipeline: " << pipeline.getName() << "\n";
         return failure();
     }
-    if (options.keepIntermediate && (options.checkpointStage.empty() || output.isCheckpointFound)) {
+    if ((options.keepIntermediate != SaveTemps::None) &&
+        (options.checkpointStage.empty() || output.isCheckpointFound)) {
         std::string tmp;
         llvm::raw_string_ostream s{tmp};
         s << moduleOp;
@@ -592,7 +590,8 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
                           CompilerOutput &output, TimingScope &timing)
 
 {
-    if (options.keepIntermediate && (options.checkpointStage.empty() || output.isCheckpointFound)) {
+    if ((options.keepIntermediate != SaveTemps::None) &&
+        (options.checkpointStage.empty() || output.isCheckpointFound)) {
         std::string tmp;
         llvm::raw_string_ostream s{tmp};
         s << moduleOp;
@@ -608,7 +607,7 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
         return failure();
     }
 
-    bool clHasIndividualPass = pm.size() > 0;
+    bool clHasIndividualPass = !pm.empty();
     bool clHasManualPipeline = !options.pipelinesCfg.empty();
     if (clHasIndividualPass && clHasManualPipeline) {
         llvm::errs() << "--catalyst-pipeline option can't be used with individual pass options "
@@ -657,7 +656,7 @@ LogicalResult verifyInputType(const CompilerOptions &options, InputType inType)
 }
 
 LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &output,
-                                DialectRegistry &registry)
+                                const DialectRegistry &registry)
 {
     using timer = catalyst::utils::Timer;
 
@@ -672,7 +671,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
     ctx.loadAllAvailableDialects();
 
     ScopedDiagnosticHandler scopedHandler(
-        &ctx, [&](Diagnostic &diag) { diag.print(options.diagnosticStream); });
+        &ctx, [&](const Diagnostic &diag) { diag.print(options.diagnosticStream); });
 
     llvm::LLVMContext llvmContext;
     std::shared_ptr<llvm::Module> llvmModule;
@@ -737,7 +736,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
             return failure();
         }
         output.outIR.clear();
-        if (options.keepIntermediate) {
+        if (options.keepIntermediate != SaveTemps::None) {
             outIRStream << *mlirModule;
         }
         optTiming.stop();
@@ -757,7 +756,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         inType = InputType::LLVMIR;
         catalyst::utils::LinesCount::Module(*llvmModule);
 
-        if (options.keepIntermediate) {
+        if (options.keepIntermediate != SaveTemps::None) {
             std::string tmp;
             llvm::raw_string_ostream rawStringOstream{tmp};
             llvmModule->print(rawStringOstream, nullptr);
@@ -765,7 +764,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
             dumpToFile(options, outFile, tmp);
         }
         output.outIR.clear();
-        if (options.keepIntermediate) {
+        if (options.keepIntermediate != SaveTemps::None) {
             outIRStream << *llvmModule;
         }
         translateTiming.stop();
@@ -833,7 +832,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
 
         TimingScope outputTiming = llcTiming.nest("compileObject");
         output.outIR.clear();
-        if (options.keepIntermediate) {
+        if (options.keepIntermediate != SaveTemps::None) {
             outIRStream << *llvmModule;
         }
 
@@ -859,7 +858,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         outfile->keep();
     }
 
-    if (options.keepIntermediate and output.outputFilename != "-") {
+    if ((options.keepIntermediate != SaveTemps::None) && output.outputFilename != "-") {
         outfile->os() << output.outIR;
         outfile->keep();
     }
@@ -909,7 +908,7 @@ std::vector<Pipeline> parsePipelines(const cl::list<std::string> &catalystPipeli
         passesStr.split(passList, ';', /*MaxSplit=*/-1, /*KeepEmpty=*/false);
 
         llvm::SmallVector<std::string> passes;
-        for (auto &pass : passList) {
+        for (const auto &pass : passList) {
             passes.push_back(pass.trim().str());
         }
 
@@ -985,7 +984,8 @@ int QuantumDriverMainFromCL(int argc, char **argv)
     catalyst::quantum::registerBufferizableOpInterfaceExternalModels(registry);
 
     // Register and parse command line options.
-    std::string inputFilename, outputFilename;
+    std::string inputFilename;
+    std::string outputFilename;
     std::string helpStr = "Catalyst Command Line Interface options. \n"
                           "Below, there is a complete list of options for the Catalyst CLI tool"
                           "In the first section, you can find the options that are used to"
@@ -1003,7 +1003,7 @@ int QuantumDriverMainFromCL(int argc, char **argv)
         return 1;
     }
 
-    std::unique_ptr<CompilerOutput> output(new CompilerOutput());
+    auto output = std::make_unique<CompilerOutput>();
     assert(output);
     output->outputFilename = outputFilename;
     llvm::raw_string_ostream errStream{output->diagnosticMessages};
