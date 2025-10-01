@@ -389,6 +389,13 @@ class QubitHandler:
             self.insert_all_dangling_qubits()
 
 
+def is_dynamically_allocated_wire(wire):
+    """
+    Return whether a given global wire index comes from a dynamical allocation.
+    """
+    return isinstance(wire, int) and wire > QREG_MIN_HASH
+
+
 def get_in_qubit_values(
     wires, qubit_index_recorder: QubitIndexRecorder, fallback_qreg: QubitHandler
 ):
@@ -420,7 +427,7 @@ def get_in_qubit_values(
             # values yet.
             # Supporting multiple registers requires refactoring the from_plxpr conversion's
             # implementation.
-            if isinstance(w, int) and w > QREG_MIN_HASH:
+            if is_dynamically_allocated_wire(w):
                 raise NotImplementedError(
                     textwrap.dedent(
                         """

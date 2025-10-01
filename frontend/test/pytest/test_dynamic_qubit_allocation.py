@@ -313,8 +313,58 @@ def test_no_capture(backend):
         @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def circuit():
-            wires = qml.allocate(1)
+            with qml.allocate(1) as q:
+                pass
             return qml.probs(wires=[0])
+
+
+def test_terminal_MP_all_wires(backend):
+    """
+    Test error message when used with terminal measurements on all wires.
+    """
+    qml.capture.enable()
+    with pytest.raises(
+        CompileError,
+        match=textwrap.dedent(
+            """
+            Terminal measurements must take in an explicit list of wires when
+            dynamically allocated wires are present in the program.
+            """
+        ),
+    ):
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=1))
+        def circuit():
+            with qml.allocate(1) as q:
+                pass
+            return qml.probs()
+
+    qml.capture.disable()
+
+
+def test_terminal_MP_dynamic_wires(backend):
+    """
+    Test error message when used with terminal measurements on dynamic wires.
+    """
+    qml.capture.enable()
+    with pytest.raises(
+        CompileError,
+        match=textwrap.dedent(
+            """
+            Terminal measurements cannot take in dynamically allocated wires
+            since they must be temporary.
+            """
+        ),
+    ):
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=1))
+        def circuit():
+            q = qml.allocate(1)
+            return qml.probs(q)
+
+    qml.capture.disable()
 
 
 def test_unsupported_cross_scope_registers(backend):

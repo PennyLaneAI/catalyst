@@ -17,6 +17,7 @@ This submodule defines a utility for converting plxpr into Catalyst jaxpr.
 # pylint: disable=protected-access
 # pylint: disable=too-many-lines
 
+import textwrap
 from copy import copy
 from functools import partial
 from typing import Callable
@@ -47,7 +48,12 @@ from pennylane.transforms import unitary_to_rot as pl_unitary_to_rot
 
 from catalyst.device import extract_backend_info
 from catalyst.from_plxpr.decompose import COMPILER_OPS_FOR_DECOMPOSITION, DecompRuleInterpreter
-from catalyst.from_plxpr.qubit_handler import QubitHandler, QubitIndexRecorder, get_in_qubit_values
+from catalyst.from_plxpr.qubit_handler import (
+    QubitHandler,
+    QubitIndexRecorder,
+    get_in_qubit_values,
+    is_dynamically_allocated_wire,
+)
 from catalyst.jax_extras import jaxpr_pad_consts, make_jaxpr2, transient_jax_config
 from catalyst.jax_primitives import (
     AbstractQbit,
@@ -81,6 +87,7 @@ from catalyst.jax_primitives import (
     var_p,
 )
 from catalyst.passes.pass_api import Pass
+from catalyst.utils.exceptions import CompileError
 
 measurement_map = {
     qml.measurements.SampleMP: sample_p,
@@ -411,6 +418,7 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         """Any control wires used for a subroutine."""
         self.control_values = control_values
         """Any control values for executing a subroutine."""
+        self.has_dynamic_allocattion = False
 
         super().__init__()
 
@@ -491,6 +499,26 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
 
     def interpret_measurement(self, measurement):
         """Rebind a measurement as a catalyst instruction."""
+        if self.has_dynamic_allocattion:
+            if len(measurement.wires) == 0:
+                raise CompileError(
+                    textwrap.dedent(
+                        """
+                        Terminal measurements must take in an explicit list of wires when
+                        dynamically allocated wires are present in the program.
+                        """
+                    )
+                )
+            if any(is_dynamically_allocated_wire(w) for w in measurement.wires):
+                raise CompileError(
+                    textwrap.dedent(
+                        """
+                        Terminal measurements cannot take in dynamically allocated wires
+                        since they must be temporary.
+                        """
+                    )
+                )
+
         if type(measurement) not in measurement_map:
             raise NotImplementedError(
                 f"measurement {measurement} not yet supported for conversion."
@@ -556,6 +584,8 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
 @PLxPRToQuantumJaxprInterpreter.register_primitive(qml.allocation.allocate_prim)
 def handle_qml_alloc(self, *, num_wires, state=None, restored=False):
     """Handle the conversion from plxpr to Catalyst jaxpr for the qml.allocate primitive"""
+
+    self.has_dynamic_allocattion = True
 
     new_qreg = QubitHandler(
         qalloc_p.bind(num_wires), self.qubit_index_recorder, dynamically_alloced=True
