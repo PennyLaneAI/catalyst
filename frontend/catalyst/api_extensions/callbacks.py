@@ -28,13 +28,7 @@ from typing import Any, Callable
 import jax
 import jax.numpy as jnp
 from jax._src.core import shaped_abstractify
-from jax._src.tree_util import (
-    Partial,
-    tree_flatten,
-    tree_leaves,
-    tree_map,
-    tree_unflatten,
-)
+from jax._src.tree_util import Partial, tree_flatten, tree_leaves, tree_map, tree_unflatten
 from pennylane.capture import enabled as capture_enabled
 
 from catalyst.jax_extras import transient_jax_config

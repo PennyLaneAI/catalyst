@@ -177,11 +177,11 @@ struct CustomCallOpInterface
 
         // Add the initial number of arguments
         int32_t numArguments = static_cast<int32_t>(customCallOp.getNumOperands());
-        DenseI32ArrayAttr numArgumentsDenseAttr = rewriter.getDenseI32ArrayAttr({numArguments});
+        IntegerAttr numArgumentsAttr = rewriter.getI32IntegerAttr(numArguments);
 
         // Create an updated custom call operation
         rewriter.create<CustomCallOp>(op->getLoc(), TypeRange{}, bufferArgs,
-                                      customCallOp.getCallTargetName(), numArgumentsDenseAttr);
+                                      customCallOp.getCallTargetName(), numArgumentsAttr);
         size_t startIndex = bufferArgs.size() - customCallOp.getNumResults();
         SmallVector<Value> bufferResults(bufferArgs.begin() + startIndex, bufferArgs.end());
         bufferization::replaceOpWithBufferizedValues(rewriter, op, bufferResults);

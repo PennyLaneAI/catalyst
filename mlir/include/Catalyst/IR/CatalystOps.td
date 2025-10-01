@@ -100,12 +100,11 @@ def CustomCallOp: Catalyst_Op<"custom_call",
     A custom call invokes code external to Catalyst. The `inputs` are passed to the
     external code, and the external code is expected to produce a result of the
     given type.
-    ```
   }];
   let arguments = (ins
     Variadic<AnyType>:$inputs,
     StrAttr:$call_target_name,
-    OptionalAttr<DenseI32ArrayAttr>: $number_original_arg
+    OptionalAttr<I32Attr>: $number_original_arg
   );
   let results = (outs Variadic<AnyType>);
 

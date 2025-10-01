@@ -56,7 +56,7 @@ func.func @dbprint_str() {
 func.func @custom_call(%arg0: tensor<3x3xf64>) -> tensor<3x3xf64> {
     // CHECK: [[sourceAlloc:%.+]] = bufferization.to_buffer %arg0
     // CHECK: [[destAlloc:%.+]] = memref.alloc() {{.*}}: memref<3x3xf64>
-    // CHECK: catalyst.custom_call fn("lapack_dgesdd") ([[sourceAlloc]], [[destAlloc]]) {number_original_arg = array<i32: 1>} :
+    // CHECK: catalyst.custom_call fn("lapack_dgesdd") ([[sourceAlloc]], [[destAlloc]]) {number_original_arg = 1 : i32} :
     // CHECK-SAME: (memref<3x3xf64>, memref<3x3xf64>) -> ()
     // CHECK: [[res:%.+]] = bufferization.to_tensor [[destAlloc]] : memref<3x3xf64>
     // CHECK: return [[res]] : tensor<3x3xf64>
@@ -79,7 +79,7 @@ func.func @custom_call_copy(%arg0: tensor<2x3xf64>) -> tensor<2x2xf64> {
     // CHECK: memref.copy [[subview]], [[copyAlloc]]
     // CHECK-SAME: memref<2x2xf64, strided<[3, 1]>> to memref<2x2xf64>
     // CHECK: [[destAlloc:%.+]] = memref.alloc() {{.*}}: memref<2x2xf64>
-    // CHECK: catalyst.custom_call fn("lapack_dgesdd") ([[copyAlloc]], [[destAlloc]]) {number_original_arg = array<i32: 1>} :
+    // CHECK: catalyst.custom_call fn("lapack_dgesdd") ([[copyAlloc]], [[destAlloc]]) {number_original_arg = 1 : i32} :
     // CHECK-SAME: (memref<2x2xf64>, memref<2x2xf64>) -> ()
     // CHECK: [[res:%.+]] = bufferization.to_tensor [[destAlloc]] : memref<2x2xf64>
     // CHECK: return [[res]] : tensor<2x2xf64>

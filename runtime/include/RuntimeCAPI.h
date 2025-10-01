@@ -35,6 +35,7 @@ void __catalyst__rt__print_string(char *);
 void __catalyst__rt__assert_bool(bool, char *);
 int64_t __catalyst__rt__array_get_size_1d(QirArray *);
 int8_t *__catalyst__rt__array_get_element_ptr_1d(QirArray *, int64_t);
+void __catalyst__rt__array_update_element_1d(QirArray *, int64_t, QUBIT *);
 
 QUBIT *__catalyst__rt__qubit_allocate();
 QirArray *__catalyst__rt__qubit_allocate_array(int64_t);
@@ -70,6 +71,9 @@ void __catalyst__qis__IsingXX(double, QUBIT *, QUBIT *, const Modifiers *);
 void __catalyst__qis__IsingYY(double, QUBIT *, QUBIT *, const Modifiers *);
 void __catalyst__qis__IsingXY(double, QUBIT *, QUBIT *, const Modifiers *);
 void __catalyst__qis__IsingZZ(double, QUBIT *, QUBIT *, const Modifiers *);
+void __catalyst__qis__SingleExcitation(double, QUBIT *, QUBIT *, const Modifiers *);
+void __catalyst__qis__DoubleExcitation(double, QUBIT *, QUBIT *, QUBIT *, QUBIT *,
+                                       const Modifiers *);
 void __catalyst__qis__ControlledPhaseShift(double, QUBIT *, QUBIT *, const Modifiers *);
 void __catalyst__qis__CRX(double, QUBIT *, QUBIT *, const Modifiers *);
 void __catalyst__qis__CRY(double, QUBIT *, QUBIT *, const Modifiers *);
@@ -80,6 +84,7 @@ void __catalyst__qis__CSWAP(QUBIT *, QUBIT *, QUBIT *, const Modifiers *);
 void __catalyst__qis__Toffoli(QUBIT *, QUBIT *, QUBIT *, const Modifiers *);
 void __catalyst__qis__MultiRZ(double, const Modifiers *, int64_t, /*qubits*/...);
 void __catalyst__qis__GlobalPhase(double, const Modifiers *);
+void __catalyst__qis__PCPhase(double, double, const Modifiers *, int64_t, /*qubits*/...);
 void __catalyst__qis__ISWAP(QUBIT *, QUBIT *, const Modifiers *);
 void __catalyst__qis__PSWAP(double, QUBIT *, QUBIT *, const Modifiers *);
 

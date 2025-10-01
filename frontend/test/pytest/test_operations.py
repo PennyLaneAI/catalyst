@@ -124,6 +124,12 @@ def test_param(backend):
         qml.IsingZZ(x, wires=[0, 1])
         qml.IsingZZ(y, wires=[1, 2])
 
+        qml.SingleExcitation(x, wires=[0, 1])
+        qml.SingleExcitation(y, wires=[1, 2])
+
+        qml.DoubleExcitation(x, wires=[0, 1, 2, 3])
+        qml.DoubleExcitation(y, wires=[2, 3, 0, 1])
+
         qml.CRX(x, wires=[0, 1])
         qml.CRY(x, wires=[0, 1])
         qml.CRZ(x, wires=[0, 1])
@@ -135,6 +141,8 @@ def test_param(backend):
         qml.PSWAP(x, wires=[0, 1])
 
         qml.MultiRZ(x, wires=[0, 1, 2, 3])
+
+        qml.PCPhase(x, dim=2, wires=[0, 1, 2, 3])
 
         # Unsupported:
         # qml.PauliRot(x, 'IXYZ', wires=[0,1,2,3])

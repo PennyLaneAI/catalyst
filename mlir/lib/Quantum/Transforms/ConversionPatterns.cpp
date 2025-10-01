@@ -409,7 +409,7 @@ struct ExtractOpPattern : public OpConversionPattern<ExtractOp> {
     }
 };
 
-struct InsertOpPattern : public OpConversionPattern<InsertOp> {
+struct InsertOpDefaultPattern : public OpConversionPattern<InsertOp> {
     using OpConversionPattern::OpConversionPattern;
 
     LogicalResult matchAndRewrite(InsertOp op, InsertOpAdaptor adaptor,
@@ -417,6 +417,40 @@ struct InsertOpPattern : public OpConversionPattern<InsertOp> {
     {
         // Unravel use-def chain of quantum register values, converting back to reference semantics.
         rewriter.replaceOp(op, adaptor.getInQreg());
+        return success();
+    }
+};
+
+struct InsertOpArrayBackedPattern : public OpConversionPattern<InsertOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(InsertOp op, InsertOpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+        Location loc = op.getLoc();
+        MLIRContext *ctx = getContext();
+        const TypeConverter *conv = getTypeConverter();
+
+        StringRef qirName = "__catalyst__rt__array_update_element_1d";
+        Type qirSignature = LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx),
+                                                        {conv->convertType(QuregType::get(ctx)),
+                                                         IntegerType::get(ctx, 64),
+                                                         conv->convertType(QubitType::get(ctx))});
+
+        LLVM::LLVMFuncOp fnDecl =
+            catalyst::ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+
+        Value index = adaptor.getIdx();
+        if (!index) {
+            index = rewriter.create<LLVM::ConstantOp>(loc, op.getIdxAttrAttr());
+        }
+        SmallVector<Value> operands = {adaptor.getInQreg(), index, adaptor.getQubit()};
+
+        rewriter.create<LLVM::CallOp>(loc, fnDecl, operands);
+
+        SmallVector<Value> values = {adaptor.getInQreg()};
+        rewriter.replaceOp(op, values);
+
         return success();
     }
 };
@@ -542,6 +576,48 @@ struct MultiRZOpPattern : public OpConversionPattern<MultiRZOp> {
         int64_t numQubits = op.getOutQubits().size();
         SmallVector<Value> args;
         args.insert(args.end(), adaptor.getTheta());
+        args.insert(args.end(), modifiersPtr);
+        args.insert(args.end(),
+                    rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(numQubits)));
+        args.insert(args.end(), adaptor.getInQubits().begin(), adaptor.getInQubits().end());
+        rewriter.create<LLVM::CallOp>(loc, fnDecl, args);
+
+        SmallVector<Value> values;
+        values.insert(values.end(), adaptor.getInQubits().begin(), adaptor.getInQubits().end());
+        values.insert(values.end(), adaptor.getInCtrlQubits().begin(),
+                      adaptor.getInCtrlQubits().end());
+        rewriter.replaceOp(op, values);
+
+        return success();
+    }
+};
+
+struct PCPhaseOpPattern : public OpConversionPattern<PCPhaseOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(PCPhaseOp op, PCPhaseOpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+        Location loc = op.getLoc();
+        MLIRContext *ctx = getContext();
+        const TypeConverter *conv = getTypeConverter();
+        auto modifiersPtr = getModifiersPtr(loc, rewriter, conv, op.getAdjointFlag(),
+                                            adaptor.getInCtrlQubits(), adaptor.getInCtrlValues());
+
+        std::string qirName = "__catalyst__qis__PCPhase";
+        Type qirSignature =
+            LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx),
+                                        {Float64Type::get(ctx), Float64Type::get(ctx),
+                                         modifiersPtr.getType(), IntegerType::get(ctx, 64)},
+                                        /*isVarArg=*/true);
+
+        LLVM::LLVMFuncOp fnDecl =
+            catalyst::ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+
+        int64_t numQubits = op.getOutQubits().size();
+        SmallVector<Value> args;
+        args.insert(args.end(), adaptor.getTheta());
+        args.insert(args.end(), adaptor.getDim());
         args.insert(args.end(), modifiersPtr);
         args.insert(args.end(),
                     rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(numQubits)));
@@ -1093,7 +1169,8 @@ struct SetBasisStateOpPattern : public OpConversionPattern<SetBasisStateOp> {
 namespace catalyst {
 namespace quantum {
 
-void populateQIRConversionPatterns(TypeConverter &typeConverter, RewritePatternSet &patterns)
+void populateQIRConversionPatterns(TypeConverter &typeConverter, RewritePatternSet &patterns,
+                                   bool useArrayBackedRegisters)
 {
     patterns.add<RTBasedPattern<InitializeOp>>(typeConverter, patterns.getContext());
     patterns.add<RTBasedPattern<FinalizeOp>>(typeConverter, patterns.getContext());
@@ -1105,9 +1182,15 @@ void populateQIRConversionPatterns(TypeConverter &typeConverter, RewritePatternS
     patterns.add<DeallocOpPattern>(typeConverter, patterns.getContext());
     patterns.add<DeallocQubitOpPattern>(typeConverter, patterns.getContext());
     patterns.add<ExtractOpPattern>(typeConverter, patterns.getContext());
-    patterns.add<InsertOpPattern>(typeConverter, patterns.getContext());
+    if (useArrayBackedRegisters) {
+        patterns.add<InsertOpArrayBackedPattern>(typeConverter, patterns.getContext());
+    }
+    else {
+        patterns.add<InsertOpDefaultPattern>(typeConverter, patterns.getContext());
+    }
     patterns.add<CustomOpPattern>(typeConverter, patterns.getContext());
     patterns.add<MultiRZOpPattern>(typeConverter, patterns.getContext());
+    patterns.add<PCPhaseOpPattern>(typeConverter, patterns.getContext());
     patterns.add<GlobalPhaseOpPattern>(typeConverter, patterns.getContext());
     patterns.add<QubitUnitaryOpPattern>(typeConverter, patterns.getContext());
     patterns.add<MeasureOpPattern>(typeConverter, patterns.getContext());

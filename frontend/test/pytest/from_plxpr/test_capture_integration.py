@@ -1468,27 +1468,31 @@ class TestCapture:
 
         qml.capture.enable()
 
-        @qjit(target="mlir")
-        @qml.qnode(qml.device(backend, wires=2, shots=10))
-        def captured_circuit():
-            @qml.for_loop(0, 2, 1)
-            def loop_0(i):
-                qml.RX(0, wires=i)
+        # TODO: try set_shots after capture work is completed
+        with pytest.warns(
+            qml.exceptions.PennyLaneDeprecationWarning, match="shots on device is deprecated"
+        ):
 
-            loop_0()
+            @qjit(target="mlir")
+            @qml.qnode(qml.device(backend, wires=2, shots=10))
+            def captured_circuit():
+                @qml.for_loop(0, 2, 1)
+                def loop_0(i):
+                    qml.RX(0, wires=i)
 
-            qml.RX(0, wires=0)
-            return qml.sample()
+                loop_0()
 
-        capture_result = captured_circuit()
+                qml.RX(0, wires=0)
+                return qml.sample()
+
+            capture_result = captured_circuit()
         assert "shots(%" in captured_circuit.mlir
 
         qml.capture.disable()
 
-        # Capture disabled
-
         @qjit
-        @qml.qnode(qml.device(backend, wires=2, shots=10))
+        @qml.set_shots(10)
+        @qml.qnode(qml.device(backend, wires=2))
         def circuit():
             @qml.for_loop(0, 2, 1)
             def loop_0(i):
@@ -1643,7 +1647,7 @@ def test_ctrl_transform_integration(separate_funcs):
         qml.RX(2 * x, wires=3)
 
     @qml.qjit
-    @qml.qnode(qml.device("lightning.qubit", wires=4), autograph=False)
+    @qml.qnode(qml.device("lightning.qubit", wires=4))
     def c(x, y):
         qml.X(1)
         if separate_funcs:
@@ -1657,3 +1661,31 @@ def test_ctrl_transform_integration(separate_funcs):
     res = c(x, y)
     expected = jnp.cos(2 * x) * jnp.cos(3 * y)
     assert qml.math.allclose(res, expected)
+
+
+def test_different_static_argnums():
+    """Test that the same qnode can be called different times with different static argnums."""
+
+    qml.capture.enable()
+
+    @qml.qnode(qml.device("lightning.qubit", wires=1), static_argnums=1)
+    def c(x, pauli):
+        if pauli == "X":
+            qml.RX(x, 0)
+        elif pauli == "Y":
+            qml.RY(x, 0)
+        else:
+            qml.RZ(x, 0)
+        return qml.state()
+
+    @qml.qjit
+    def w(x):
+        return c(x, "X"), c(x, "Y"), c(x, "Z")
+
+    resx, resy, resz = w(0.5)
+
+    a = jnp.cos(0.5 / 2)
+    b = jnp.sin(0.5 / 2)
+    assert qml.math.allclose(resx, jnp.array([a, -b * 1j]))
+    assert qml.math.allclose(resy, jnp.array([a, b]))
+    assert qml.math.allclose(resz, jnp.array([a - b * 1j, 0]))

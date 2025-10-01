@@ -33,13 +33,7 @@ from jax.tree_util import tree_flatten, tree_unflatten
 import catalyst
 from catalyst.autograph import run_autograph
 from catalyst.compiled_functions import CompilationCache, CompiledFunction
-from catalyst.compiler import (
-    CompileOptions,
-    Compiler,
-    canonicalize,
-    to_llvmir,
-    to_mlir_opt,
-)
+from catalyst.compiler import CompileOptions, Compiler, canonicalize, to_llvmir, to_mlir_opt
 from catalyst.debug.instruments import instrument
 from catalyst.from_plxpr import trace_from_pennylane
 from catalyst.jax_extras.patches import get_aval2
@@ -692,6 +686,12 @@ class QJIT(CatalystCallable):
     def pre_compilation(self):
         """Perform pre-processing tasks on the Python function, such as AST transformations."""
         if self.compile_options.autograph:
+            if qml.capture.enabled():
+                if self.compile_options.autograph_include:
+                    raise NotImplementedError(
+                        "capture autograph does not yet support autograph_include."
+                    )
+                return qml.capture.run_autograph(self.original_function)
             return run_autograph(self.original_function, *self.compile_options.autograph_include)
 
         return self.original_function
@@ -741,6 +741,8 @@ class QJIT(CatalystCallable):
             params = {}
             params["static_argnums"] = kwargs.pop("static_argnums", static_argnums)
             params["_out_tree_expected"] = []
+            params["_classical_return_indices"] = []
+            params["_num_mcm_expected"] = []
             default_pass_pipeline = self.compile_options.circuit_transform_pipeline
             pass_pipeline = params.get("pass_pipeline", default_pass_pipeline)
             params["pass_pipeline"] = pass_pipeline

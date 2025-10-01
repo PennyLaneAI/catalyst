@@ -26,20 +26,20 @@ from catalyst import mitigate_with_zne, qjit
 @qjit(target="mlir")
 def mcm_method_with_zne():
     """Test that the dynamic_one_shot works with ZNE."""
-    dev = qml.device("lightning.qubit", wires=1, shots=5)
+    dev = qml.device("lightning.qubit", wires=1)
 
     def circuit():
         return qml.expval(qml.PauliZ(0))
 
     s = [1, 3]
-    g = qml.QNode(circuit, dev, mcm_method="one-shot")
+    g = qml.set_shots(qml.QNode(circuit, dev, mcm_method="one-shot"), shots=5)
     return mitigate_with_zne(g, scale_factors=s)()
 
 
 # CHECK: func.func public @jit_mcm_method_with_zne() -> tensor<f64>
-# CHECK: mitigation.zne @one_shot_wrapper(%c) folding( global) numFolds(%2 : tensor<2xi64>) : (tensor<5xi1>) -> tensor<2xf64>
+# CHECK: mitigation.zne @one_shot_wrapper() folding( global) numFolds(%2 : tensor<2xi64>) : () -> tensor<2xf64>
 
-# CHECK: func.func private @one_shot_wrapper(%arg0: tensor<5xi1>) -> tensor<f64>
+# CHECK: func.func private @one_shot_wrapper() -> tensor<f64>
 # CHECK: scf.for
 # CHECK: catalyst.launch_kernel @module_circuit::@circuit() : () -> tensor<f64>
 print(mcm_method_with_zne.mlir)

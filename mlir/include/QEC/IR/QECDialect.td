@@ -323,13 +323,24 @@ def PPRotationOp : QEC_Op<"ppr", [QECOpInterface, AttrSizedOperandSegments]> {
     let hasVerifier = 1;
 
     code extraBaseClassDeclaration = [{
-        bool isNonClifford(){
+        bool hasPiOverTwoRotation(){
             int16_t rotationKind = static_cast<int16_t>(getRotationKind());
-            return rotationKind == 8 || rotationKind == -8;  // π/8 rotations are non-Clifford
+            return rotationKind == 2 || rotationKind == -2;
+        };
+        bool hasPiOverFourRotation(){
+            int16_t rotationKind = static_cast<int16_t>(getRotationKind());
+            return rotationKind == 4 || rotationKind == -4;
+        };
+        bool hasPiOverEightRotation(){
+            int16_t rotationKind = static_cast<int16_t>(getRotationKind());
+            return rotationKind == 8 || rotationKind == -8;
+        };
+
+        bool isNonClifford(){
+            return hasPiOverEightRotation();  // π/8 rotations are non-Clifford
         };
         bool isClifford(){
-            int16_t rotationKind = static_cast<int16_t>(getRotationKind());
-            return rotationKind == 4 || rotationKind == -4;  // π/4 rotations are Clifford
+            return hasPiOverTwoRotation() || hasPiOverFourRotation();  // π/2 and π/4 rotations are Clifford
         };
     }];
     let extraClassDeclaration = extraBaseClassDeclaration;
@@ -582,13 +593,14 @@ def LayerOp : QEC_Op<"layer", [SingleBlockImplicitTerminator<"YieldOp">]> {
     let builders = [
       OpBuilder<(ins
         CArg<"mlir::ValueRange", "std::nullopt">:$initArgs,
-        CArg<"llvm::function_ref<void(mlir::OpBuilder &, mlir::Location, mlir::ValueRange)>",
+        CArg<"mlir::ValueRange", "std::nullopt">:$outArgs,
+        CArg<"llvm::function_ref<void(mlir::OpBuilder &, mlir::Location, mlir::ValueRange, mlir::ValueRange)>",
             "nullptr">)>
     ];
 
     let extraClassDeclaration = [{
       using BodyBuilderFn =
-          llvm::function_ref<void(mlir::OpBuilder &, mlir::Location, mlir::ValueRange)>;
+          llvm::function_ref<void(mlir::OpBuilder &, mlir::Location, mlir::ValueRange, mlir::ValueRange)>;
 
     }];
 

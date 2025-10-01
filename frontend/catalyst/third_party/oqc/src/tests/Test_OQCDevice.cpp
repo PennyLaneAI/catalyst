@@ -56,7 +56,7 @@ TEST_CASE("Test the bell pair circuit", "[openqasm]")
 
     CHECK(device->Circuit() == toqasm);
 
-    device->ReleaseAllQubits();
+    device->ReleaseQubits(wires);
     auto wiresnew = device->AllocateQubits(4);
     device->NamedOperation("CNOT", {}, {wiresnew[2], wiresnew[3]}, false);
     device->NamedOperation("Hadamard", {}, {wiresnew[2]}, false);
@@ -68,4 +68,20 @@ TEST_CASE("Test the bell pair circuit", "[openqasm]")
                               "h qubits[2];\n";
 
     CHECK(device->Circuit() == toqasmempty);
+}
+
+TEST_CASE("Test counts", "[openqasm][counts]")
+{
+    std::unique_ptr<OQCDevice> device = std::make_unique<OQCDevice>("{shots : 100}");
+    auto wires = device->AllocateQubits(2);
+
+    device->NamedOperation("Hadamard", {}, {wires[0]}, false);
+
+    std::vector<double> eigvals(4);
+    std::vector<int64_t> counts(4);
+    DataView<double, 1> eigvals_view(eigvals);
+    DataView<int64_t, 1> counts_view(counts);
+
+    REQUIRE_THROWS_WITH(device->PartialCounts(eigvals_view, counts_view, {wires[0], wires[1]}),
+                        Catch::Contains("OQC credentials not found in environment variables"));
 }

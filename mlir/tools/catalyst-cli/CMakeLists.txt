@@ -23,10 +23,11 @@ set(LIBS
     ${dialect_libs}
     ${conversion_libs}
     ${extension_libs}
+    ExternalStablehloLib
     MLIROptLib
     MLIRCatalyst
     catalyst-transforms
-    catalyst-mhlo-transforms
+    catalyst-stablehlo-transforms
     MLIRQuantum
     quantum-transforms
     MLIRQEC
@@ -39,10 +40,7 @@ set(LIBS
     mitigation-transforms
     MLIRIon
     ion-transforms
-    MhloRegisterDialects
-    StablehloRegister
     MLIRCatalystTest
-    ${ALL_MHLO_PASSES}
     ${ENZYME_LIB}
     CatalystCompilerDriver
 )

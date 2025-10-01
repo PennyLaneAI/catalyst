@@ -28,10 +28,25 @@ auto OQCDevice::AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType>
 
     builder->AddRegisters("qubits", num_qubits, "cbits", num_qubits);
 
-    return qubit_manager.AllocateRange(0, num_qubits);
+    std::vector<QubitIdType> result = qubit_manager.AllocateRange(0, num_qubits);
+
+    RT_FAIL_IF(!this->initial_allocated_QubitIds.empty(),
+               "OQC device does not support dynamic qubit allocation")
+    this->initial_allocated_QubitIds.insert(result.begin(), result.end());
+    return result;
 }
 
-void OQCDevice::ReleaseAllQubits() { builder = std::make_unique<OpenQASM2Builder>(); }
+void OQCDevice::ReleaseQubits(const std::vector<QubitIdType> &qubits)
+{
+    std::set<QubitIdType> dealloc_Ids(qubits.begin(), qubits.end());
+    RT_FAIL_IF(this->initial_allocated_QubitIds != dealloc_Ids,
+               "OQC device does not support dynamic qubit allocation. Please ensure the "
+               "deallocation qubit ID array contains the same values as those produced by the "
+               "initial `AllocateQubits` call")
+    this->initial_allocated_QubitIds.clear();
+
+    builder = std::make_unique<OpenQASM2Builder>();
+}
 
 auto OQCDevice::GetNumQubits() const -> size_t { return builder->getNumQubits(); }
 
@@ -73,7 +88,6 @@ void OQCDevice::PartialCounts(DataView<double, 1> &eigvals, DataView<int64_t, 1>
     std::iota(eigvals.begin(), eigvals.end(), 0);
 
     auto &&results = runner->Counts(builder->toOpenQASM2(), "", device_shots, GetNumQubits());
-
     int i = 0;
     for (auto r : results) {
         counts(i) = r;
