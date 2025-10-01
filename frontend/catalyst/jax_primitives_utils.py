@@ -29,7 +29,7 @@ from mlir_quantum.dialects.catalyst import LaunchKernelOp
 from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
 
 
-def _only_single_expval(call_jaxpr : core.ClosedJaxpr) -> bool:
+def _only_single_expval(call_jaxpr: core.ClosedJaxpr) -> bool:
     found_expval = False
     for eqn in call_jaxpr.eqns:
         name = eqn.primitive.name
@@ -41,16 +41,18 @@ def _only_single_expval(call_jaxpr : core.ClosedJaxpr) -> bool:
             found_expval = True
     return True
 
+
 def _calculate_diff_method(qn: qml.QNode, call_jaxpr: core.ClosedJaxpr):
     diff_method = str(qn.diff_method)
     if diff_method != "best":
         return diff_method
-    
+
     device_name = getattr(getattr(qn, "device", None), "name", None)
 
     if device_name and "lightning" in device_name and _only_single_expval(call_jaxpr):
         return "adjoint"
     return "parameter-shift"
+
 
 def get_call_jaxpr(jaxpr):
     """Extracts the `call_jaxpr` from a JAXPR if it exists.""" ""
@@ -91,7 +93,7 @@ def lower_jaxpr(ctx, jaxpr, metadata=None, fn=None):
         call_jaxpr = jaxpr
         pipeline = ()
         callable_ = fn
-    
+
     return lower_callable(ctx, callable_, call_jaxpr, pipeline=pipeline, metadata=metadata)
 
 

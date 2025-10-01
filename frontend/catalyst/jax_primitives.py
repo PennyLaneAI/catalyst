@@ -100,7 +100,6 @@ from mlir_quantum.dialects.quantum import (
     VarianceOp,
 )
 from mlir_quantum.dialects.quantum import YieldOp as QYieldOp
-
 from pennylane.capture.primitives import grad_prim as pl_grad_prim
 
 from catalyst.compiler import get_lib_path
@@ -646,9 +645,7 @@ def _grad_lowering(ctx, *args, jaxpr, fn, grad_params):
     consts = []
     offset = len(args) - len(jaxpr.consts)
     for i, jax_array_or_tracer in enumerate(jaxpr.consts):
-        if isinstance(
-            jax_array_or_tracer, jax._src.interpreters.partial_eval.DynamicJaxprTracer
-        ):
+        if isinstance(jax_array_or_tracer, jax._src.interpreters.partial_eval.DynamicJaxprTracer):
             # There are some cases where this value cannot be converted into
             # a jax.numpy.array.
             # in that case we get it from the arguments.
@@ -701,9 +698,10 @@ def _capture_grad_lowering(ctx, *args, argnum, jaxpr, n_consts, method, h, fn, s
     else:
         finiteDiffParam = None
 
-    argnum_numpy = np.array(argnum)
+    new_argnums = [num+n_consts for num in argnum]
+    argnum_numpy = np.array(new_argnums)
     diffArgIndices = ir.DenseIntElementsAttr.get(argnum_numpy)
-    func_op = lower_jaxpr(ctx, jaxpr, (method, h, *argnum), fn=fn)
+    func_op = lower_jaxpr(ctx, jaxpr, (method, h, *new_argnums), fn=fn)
     symbol_ref = get_symbolref(ctx, func_op)
     output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
     flat_output_types = util.flatten(output_types)
@@ -716,8 +714,6 @@ def _capture_grad_lowering(ctx, *args, argnum, jaxpr, n_consts, method, h, fn, s
         diffArgIndices=diffArgIndices,
         finiteDiffParam=finiteDiffParam,
     ).results
-
-
 
 # value_and_grad
 #
