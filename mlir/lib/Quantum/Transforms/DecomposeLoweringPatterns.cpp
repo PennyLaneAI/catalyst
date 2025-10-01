@@ -281,9 +281,10 @@ class OpSignatureAnalyzer {
             newResults.emplace_back(extractOp.getResult());
         }
 
-        if (signature.needAllocQreg) {
-            rewriter.create<quantum::DeallocOp>(callOp.getLoc(), qreg);
-        }
+        // FIXME: Dealloc should be fine, but it will cause the error in lightning now
+        // if (signature.needAllocQreg) {
+        //     rewriter.create<quantum::DeallocOp>(callOp.getLoc(), qreg);
+        // }
 
         return newResults;
     }
