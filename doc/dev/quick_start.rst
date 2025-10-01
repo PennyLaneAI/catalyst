@@ -8,8 +8,8 @@ ultimately leverages modern compilation tools to speed up quantum applications.
 You can imagine compiling a function once in advance and then benefit from faster
 execution on all subsequent calls of the function, similar to the ``jax.jit`` functionality.
 However, compared to JAX we are also able to compile the quantum code natively without having
-to rely on callbacks to any Python-based PennyLane devices. We can thus compile/execute entire workflows
-(such as variational algorithms) as a single program or unit, without having to go back and forth between
+to rely on callbacks to any Python-based PennyLane devices. We can thus compile/execute entire workflows 
+as a single program or unit, without having to go back and forth between
 device execution and the Python interpreter.
 
 .. raw:: html
