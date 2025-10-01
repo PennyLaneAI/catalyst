@@ -12,10 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <llvm/ADT/STLExtras.h>
 #define DEBUG_TYPE "decompose-lowering"
 
-#include <numeric>
 #include <variant>
 
 #include "llvm/ADT/StringMap.h"
@@ -82,7 +80,7 @@ class QubitIndex {
 class OpSignatureAnalyzer {
   public:
     OpSignatureAnalyzer() = delete;
-    OpSignatureAnalyzer(CustomOp op, bool enableQregMode)
+    OpSignatureAnalyzer(CustomOp op, bool enableQregMode, PatternRewriter &rewriter)
         : signature(OpSignature{
               .params = op.getParams(),
               .inQubits = op.getInQubits(),
@@ -90,6 +88,7 @@ class OpSignatureAnalyzer {
               .inCtrlValues = op.getInCtrlValues(),
               .outQubits = op.getOutQubits(),
               .outCtrlQubits = op.getOutCtrlQubits(),
+              .rewriter = rewriter,
           })
     {
         if (!enableQregMode)
@@ -117,10 +116,6 @@ class OpSignatureAnalyzer {
             signature.inCtrlWireIndices.emplace_back(index);
         }
 
-        // Output qubit indices are the same as input qubit indices
-        signature.outQubitIndices = signature.inWireIndices;
-        signature.outCtrlQubitIndices = signature.inCtrlWireIndices;
-
         assert((signature.inWireIndices.size() + signature.inCtrlWireIndices.size()) > 0 &&
                "inWireIndices or inCtrlWireIndices should not be empty");
 
@@ -134,22 +129,39 @@ class OpSignatureAnalyzer {
                         [refQreg](const QubitIndex &idx) { return idx.getReg() != refQreg; }) ||
             std::any_of(signature.inCtrlWireIndices.begin(), signature.inCtrlWireIndices.end(),
                         [refQreg](const QubitIndex &idx) { return idx.getReg() != refQreg; });
+
+        // If needAllocQreg, the indices should be updated to from 0 to nqubits - 1
+        // Since we will use the new qreg for the indices
+        if (signature.needAllocQreg) {
+            for (auto [i, index] : llvm::enumerate(signature.inWireIndices)) {
+                auto attr = IntegerAttr::get(rewriter.getI64Type(), i);
+                signature.inWireIndices[i] = QubitIndex(attr, index.getReg());
+            }
+            for (auto [i, index] : llvm::enumerate(signature.inCtrlWireIndices)) {
+                auto attr =
+                    IntegerAttr::get(rewriter.getI64Type(), i + signature.inWireIndices.size());
+                signature.inCtrlWireIndices[i] = QubitIndex(attr, index.getReg());
+            }
+        }
+
+        // Output qubit indices are the same as input qubit indices
+        signature.outQubitIndices = signature.inWireIndices;
+        signature.outCtrlQubitIndices = signature.inCtrlWireIndices;
     }
 
     operator bool() const { return isValid; }
 
     Value getUpdatedQreg(PatternRewriter &rewriter, Location loc)
     {
-        Value updatedQreg = signature.inWireIndices[0].getReg();
         if (signature.needAllocQreg) {
             // allocate a new qreg with the number of qubits
             auto nqubits = signature.inWireIndices.size() + signature.inCtrlWireIndices.size();
             IntegerAttr nqubitsAttr = IntegerAttr::get(rewriter.getI64Type(), nqubits);
             auto allocOp = rewriter.create<quantum::AllocOp>(
                 loc, quantum::QuregType::get(rewriter.getContext()), nullptr, nqubitsAttr);
-            updatedQreg = allocOp.getQreg();
+            return allocOp.getQreg();
         }
-        return updatedQreg;
+        return signature.inWireIndices[0].getReg();
     }
 
     // Prepare the operands for calling the decomposition function
@@ -177,17 +189,16 @@ class OpSignatureAnalyzer {
 
             for (auto [i, qubit] : llvm::enumerate(signature.inQubits)) {
                 const QubitIndex &index = signature.inWireIndices[i];
+                updatedQreg =
+                    rewriter.create<quantum::InsertOp>(loc, updatedQreg.getType(), updatedQreg,
+                                                       index.getValue(), index.getAttr(), qubit);
+            }
 
-                if (signature.needAllocQreg) {
-                    auto attr = IntegerAttr::get(rewriter.getI64Type(), i);
-                    updatedQreg = rewriter.create<quantum::InsertOp>(
-                        loc, updatedQreg.getType(), updatedQreg, nullptr, attr, qubit);
-                }
-                else {
-                    updatedQreg = rewriter.create<quantum::InsertOp>(loc, updatedQreg.getType(),
-                                                                     updatedQreg, index.getValue(),
-                                                                     index.getAttr(), qubit);
-                }
+            for (auto [i, qubit] : llvm::enumerate(signature.inCtrlQubits)) {
+                const QubitIndex &index = signature.inCtrlWireIndices[i];
+                updatedQreg =
+                    rewriter.create<quantum::InsertOp>(loc, updatedQreg.getType(), updatedQreg,
+                                                       index.getValue(), index.getAttr(), qubit);
             }
 
             operands[operandIdx++] = updatedQreg;
@@ -201,32 +212,15 @@ class OpSignatureAnalyzer {
                 }
             }
 
-            // preprocessing indices
-            // If needAllocQreg, the indices should be updated to from 0 to nqubits - 1
-            // instead of the original indices, since we will use the new qreg for the indices
-            auto inWireIndices = signature.inWireIndices;
-            auto ctrlWireIndices = signature.inCtrlWireIndices;
-            if (signature.needAllocQreg) {
-                for (auto [i, index] : llvm::enumerate(inWireIndices)) {
-                    auto attr = IntegerAttr::get(rewriter.getI64Type(), i);
-                    inWireIndices[i] = QubitIndex(attr, index.getReg());
-                }
-                auto inWireIndicesSize = inWireIndices.size();
-                for (auto [i, index] : llvm::enumerate(ctrlWireIndices)) {
-                    auto attr = IntegerAttr::get(rewriter.getI64Type(), i + inWireIndicesSize);
-                    ctrlWireIndices[i] = QubitIndex(attr, index.getReg());
-                }
-            }
-
-            if (!inWireIndices.empty()) {
-                operands[operandIdx] =
-                    fromTensorOrAsIs(inWireIndices, funcInputs[operandIdx], rewriter, loc);
+            if (!signature.inWireIndices.empty()) {
+                operands[operandIdx] = fromTensorOrAsIs(signature.inWireIndices,
+                                                        funcInputs[operandIdx], rewriter, loc);
                 operandIdx++;
             }
 
-            if (!ctrlWireIndices.empty()) {
-                operands[operandIdx] =
-                    fromTensorOrAsIs(ctrlWireIndices, funcInputs[operandIdx], rewriter, loc);
+            if (!signature.inCtrlWireIndices.empty()) {
+                operands[operandIdx] = fromTensorOrAsIs(signature.inCtrlWireIndices,
+                                                        funcInputs[operandIdx], rewriter, loc);
                 operandIdx++;
             }
         }
@@ -274,26 +268,13 @@ class OpSignatureAnalyzer {
         SmallVector<Value> newResults;
         rewriter.setInsertionPointAfter(callOp);
 
-        auto outQubitIndices = signature.outQubitIndices;
-        auto outCtrlQubitIndices = signature.outCtrlQubitIndices;
-        if (signature.needAllocQreg) {
-            for (auto [i, index] : llvm::enumerate(outQubitIndices)) {
-                auto attr = IntegerAttr::get(rewriter.getI64Type(), i);
-                outQubitIndices[i] = QubitIndex(attr, index.getReg());
-            }
-            for (auto [i, index] : llvm::enumerate(outCtrlQubitIndices)) {
-                auto attr = IntegerAttr::get(rewriter.getI64Type(), i + outQubitIndices.size());
-                outCtrlQubitIndices[i] = QubitIndex(attr, index.getReg());
-            }
-        }
-
-        for (const QubitIndex &index : outQubitIndices) {
+        for (const QubitIndex &index : signature.outQubitIndices) {
             auto extractOp = rewriter.create<quantum::ExtractOp>(
                 callOp.getLoc(), rewriter.getType<quantum::QubitType>(), qreg, index.getValue(),
                 index.getAttr());
             newResults.emplace_back(extractOp.getResult());
         }
-        for (const QubitIndex &index : outCtrlQubitIndices) {
+        for (const QubitIndex &index : signature.outCtrlQubitIndices) {
             auto extractOp = rewriter.create<quantum::ExtractOp>(
                 callOp.getLoc(), rewriter.getType<quantum::QubitType>(), qreg, index.getValue(),
                 index.getAttr());
@@ -327,6 +308,9 @@ class OpSignatureAnalyzer {
         // Qreg mode specific information, if true, a new qreg should be allocated before function
         // call and deallocated after function call
         bool needAllocQreg = false;
+
+        // Rewriter
+        PatternRewriter &rewriter;
     } signature;
 
     Value fromTensorOrAsIs(ValueRange values, Type type, PatternRewriter &rewriter, Location loc)
@@ -499,10 +483,11 @@ struct DecomposeLoweringRewritePattern : public OpRewritePattern<CustomOp> {
                "Decomposition function must have at least one result");
 
         auto enableQreg = isa<quantum::QuregType>(decompFunc.getFunctionType().getInput(0));
-        auto analyzer = OpSignatureAnalyzer(op, enableQreg);
-        assert(analyzer && "Analyzer should be valid");
 
         rewriter.setInsertionPointAfter(op);
+        auto analyzer = OpSignatureAnalyzer(op, enableQreg, rewriter);
+        assert(analyzer && "Analyzer should be valid");
+
         auto callOperands = analyzer.prepareCallOperands(decompFunc, rewriter, op.getLoc());
         auto callOp =
             rewriter.create<func::CallOp>(op.getLoc(), decompFunc.getFunctionType().getResults(),
