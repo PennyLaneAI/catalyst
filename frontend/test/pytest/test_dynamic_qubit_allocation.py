@@ -17,6 +17,7 @@ Unit tests for the dynamic work wire allocation.
 Note that this feature is only available under the plxpr pipeline.
 """
 
+import re
 import textwrap
 
 import numpy as np
@@ -25,6 +26,7 @@ import pytest
 from jax import numpy as jnp
 
 from catalyst import qjit
+from catalyst.utils.exceptions import CompileError
 
 
 def test_basic_dynamic_wire_alloc_plain_API(backend):
@@ -297,6 +299,22 @@ def test_dynamic_wire_alloc_whileloop(num_iter, expected, backend):
     qml.capture.disable()
 
     assert np.allclose(expected, observed)
+
+
+def test_no_capture(backend):
+    """
+    Test error message when used without capture.
+    """
+    with pytest.raises(
+        CompileError,
+        match=re.escape("qml.allocate() is only supported with program capture enabled."),
+    ):
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=1))
+        def circuit():
+            wires = qml.allocate(1)
+            return qml.probs(wires=[0])
 
 
 def test_unsupported_cross_scope_registers(backend):
