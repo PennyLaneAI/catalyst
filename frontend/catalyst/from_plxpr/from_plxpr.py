@@ -218,11 +218,11 @@ def handle_qnode(
         raise NotImplementedError("shot vectors are not yet supported for catalyst conversion.")
 
     closed_jaxpr = (
-        ClosedJaxpr(qfunc_jaxpr, consts)
+        closed_jaxpr
         if not self.requires_decompose_lowering
         else _apply_compiler_decompose_to_plxpr(
-            inner_jaxpr=qfunc_jaxpr,
-            consts=consts,
+            inner_jaxpr=closed_jaxpr.jaxpr,
+            consts=closed_jaxpr.consts,
             ncargs=non_const_args,
             tgateset=list(self.decompose_tkwargs.get("gate_set", [])),
         )
