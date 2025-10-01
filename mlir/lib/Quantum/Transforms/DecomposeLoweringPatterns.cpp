@@ -138,6 +138,20 @@ class OpSignatureAnalyzer {
 
     operator bool() const { return isValid; }
 
+    Value getUpdatedQreg(PatternRewriter &rewriter, Location loc)
+    {
+        Value updatedQreg = signature.inWireIndices[0].getReg();
+        if (signature.needAllocQreg) {
+            // allocate a new qreg with the number of qubits
+            auto nqubits = signature.inWireIndices.size() + signature.inCtrlWireIndices.size();
+            IntegerAttr nqubitsAttr = IntegerAttr::get(rewriter.getI64Type(), nqubits);
+            auto allocOp = rewriter.create<quantum::AllocOp>(
+                loc, quantum::QuregType::get(rewriter.getContext()), nullptr, nqubitsAttr);
+            updatedQreg = allocOp.getQreg();
+        }
+        return updatedQreg;
+    }
+
     // Prepare the operands for calling the decomposition function
     // There are two cases:
     // 1. The first input is a qreg, which means the decomposition function is a qreg mode function
@@ -159,15 +173,7 @@ class OpSignatureAnalyzer {
         int operandIdx = 0;
         if (isa<quantum::QuregType>(funcInputs[0])) {
             // Allocate a new qreg if needed
-            Value updatedQreg = signature.inWireIndices[0].getReg();
-            if (signature.needAllocQreg) {
-                // allocate a new qreg with the number of qubits
-                auto nqubits = signature.inWireIndices.size() + signature.inCtrlWireIndices.size();
-                IntegerAttr nqubitsAttr = IntegerAttr::get(rewriter.getI64Type(), nqubits);
-                auto allocOp = rewriter.create<quantum::AllocOp>(
-                    loc, quantum::QuregType::get(rewriter.getContext()), nullptr, nqubitsAttr);
-                updatedQreg = allocOp.getQreg();
-            }
+            Value updatedQreg = getUpdatedQreg(rewriter, loc);
 
             for (auto [i, qubit] : llvm::enumerate(signature.inQubits)) {
                 const QubitIndex &index = signature.inWireIndices[i];
@@ -198,23 +204,23 @@ class OpSignatureAnalyzer {
             // preprocessing indices
             // If needAllocQreg, the indices should be updated to from 0 to nqubits - 1
             // instead of the original indices, since we will use the new qreg for the indices
-            auto wireIndices = signature.inWireIndices;
+            auto inWireIndices = signature.inWireIndices;
             auto ctrlWireIndices = signature.inCtrlWireIndices;
             if (signature.needAllocQreg) {
-                for (auto [i, index] : llvm::enumerate(wireIndices)) {
+                for (auto [i, index] : llvm::enumerate(inWireIndices)) {
                     auto attr = IntegerAttr::get(rewriter.getI64Type(), i);
-                    wireIndices[i] = QubitIndex(attr, index.getReg());
+                    inWireIndices[i] = QubitIndex(attr, index.getReg());
                 }
-                auto inWireIndicesSize = wireIndices.size();
+                auto inWireIndicesSize = inWireIndices.size();
                 for (auto [i, index] : llvm::enumerate(ctrlWireIndices)) {
                     auto attr = IntegerAttr::get(rewriter.getI64Type(), i + inWireIndicesSize);
                     ctrlWireIndices[i] = QubitIndex(attr, index.getReg());
                 }
             }
 
-            if (!wireIndices.empty()) {
+            if (!inWireIndices.empty()) {
                 operands[operandIdx] =
-                    fromTensorOrAsIs(wireIndices, funcInputs[operandIdx], rewriter, loc);
+                    fromTensorOrAsIs(inWireIndices, funcInputs[operandIdx], rewriter, loc);
                 operandIdx++;
             }
 
