@@ -580,23 +580,6 @@ def converted_call(fn, args, kwargs, caller_fn_scope=None, options=None):
                 **(kwargs if kwargs is not None else {}),
             )
 
-        # HOTFIX: Handle calls to functions that were decorated with qml.prod, qml.adjoint, etc.
-        # These decorators return wrapper functions that call the original function without
-        # autograph conversion. We detect these wrappers and unwrap them to convert the
-        # original function with autograph.
-        if hasattr(fn, "__wrapped__") and hasattr(fn, "__module__"):
-            if decorator := decorator_map.get(fn.__module__):
-                original_fn = fn.__wrapped__
-
-                # Convert the original function with autograph
-                def converted_inner(*inner_args, **inner_kwargs):
-                    return converted_call(
-                        original_fn, inner_args, inner_kwargs, caller_fn_scope, options
-                    )
-
-                # Apply the decorator to the converted function and call it
-                return decorator(converted_inner)(*args, **(kwargs if kwargs is not None else {}))
-
         # Catalyst decorators / transforms generate a callable class instance. When we invoke
         # these instances from autograph code, we want to transform the wrapped function as well
         # but not the __call__ method itself or other class code.
@@ -625,6 +608,23 @@ def converted_call(fn, args, kwargs, caller_fn_scope=None, options=None):
             new_qnode = copy.copy(fn)
             new_qnode.func = qnode_call_wrapper
             return new_qnode(**new_kwargs)
+
+        # HOTFIX: Handle calls to functions that were decorated with qml.prod, qml.adjoint, etc.
+        # These decorators return wrapper functions that call the original function without
+        # autograph conversion. We detect these wrappers and unwrap them to convert the
+        # original function with autograph.
+        if hasattr(fn, "__wrapped__") and hasattr(fn, "__module__"):
+            if decorator := decorator_map.get(fn.__module__):
+                original_fn = fn.__wrapped__
+
+                # Convert the original function with autograph
+                def converted_inner(*inner_args, **inner_kwargs):
+                    return converted_call(
+                        original_fn, inner_args, inner_kwargs, caller_fn_scope, options
+                    )
+
+                # Apply the decorator to the converted function and call it
+                return decorator(converted_inner)(*args, **(kwargs if kwargs is not None else {}))
 
         return ag_converted_call(fn, args, kwargs, caller_fn_scope, options)
 
