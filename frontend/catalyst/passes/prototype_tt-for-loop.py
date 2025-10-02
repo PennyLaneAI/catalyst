@@ -22,7 +22,14 @@ def print_visited_state(tt_state):
     for i in tt_state.state_to_special:
         if i != 0:
             print_visited_state(i)
-
+            
+def print_state(state):
+    print(state)
+    print("~"*100)
+    for s in state.state_to_special:
+        if s != 0:
+            print_state(s)
+            
 # --------------------------------------------------------------------------------------------------
 # Tree Traversal Logic
 # --------------------------------------------------------------------------------------------------
@@ -61,30 +68,38 @@ def traversal_handling_func(qubit, depth, branch, tt_state):
     indent_print(f"[update] visited: {tt_state.visited}, depth: {depth}", indent=depth)
     return postelect
 
-def segment_compute(depth, branch, tt_state):
+def select_segment(segment_name, segment_list):
+    # substract hash_ from the begining of the segment name
+    segment_name_real = segment_name.replace("hash_", "", 1)
+    assert segment_name_real in segment_list, f"Segment {segment_name_real} not found in segment list"
+    return segment_name_real
+
+def segment_compute(depth, branch, segment_list, tt_state):
     if depth == 0 :
         tt_state.visited[depth] = 2
-        indent_print(f"... ops at depth {depth}", indent=depth)
+        segment_name = select_segment(tt_state.segment_table[depth], segment_list)
+        indent_print(f"... ops {segment_name} at depth {depth}", indent=depth)
     else:
         qubit = 0
         postselect = traversal_handling_func(qubit, depth, branch, tt_state)
         indent_print(f"... mcm postselect = {postselect} at depth {depth}", indent=depth)
-        indent_print(f"... ops at depth {depth}", indent=depth)
+        segment_name = select_segment(tt_state.segment_table[depth], segment_list)
+        indent_print(f"... ops {segment_name} at depth {depth}", indent=depth)
 
-def segment_table(depth, branch, tt_state):
+def segment_table(depth, branch, segment_list, tt_state):
     reg = 0 
     exp = 0.5
     
     if depth == 0:
         # call segment table
-        segment_compute(0, branch, tt_state)
+        segment_compute(0, branch, segment_list, tt_state)
     else:
-        segment_compute(depth, branch, tt_state)
+        segment_compute(depth, branch, segment_list, tt_state)
 
 
-def  simulation(case, depth, tt_state):
+def  simulation(case, depth, segment_list, tt_state):
     if case < 2:
-        segment_table(depth, case, tt_state)
+        segment_table(depth, case, segment_list, tt_state)
         return depth + 1
     elif case == 2:
         tt_state.visited[depth] = 0
@@ -99,7 +114,7 @@ def store_state(depth):
 def restore_state(depth):
     indent_print(f"restoring state at depth: {depth}", indent=depth)
 
-def tree_traversal(tt_state, global_depth=0, one_way=False):
+def tree_traversal(tt_state, segment_list, global_depth=0, one_way=False):
 
     depth = tt_state.last_computed_depth
 
@@ -142,7 +157,7 @@ def tree_traversal(tt_state, global_depth=0, one_way=False):
                 special_state.visited = [0 for _ in special_state.visited]
 
             # Run the special state traversal
-            tree_traversal(special_state, global_depth=depth, one_way=True)
+            tree_traversal(special_state, segment_list, global_depth=depth, one_way=True)
 
             # After return from the special state, check if it has fully visited
             if all(v == 2 for v in special_state.visited):
@@ -156,7 +171,7 @@ def tree_traversal(tt_state, global_depth=0, one_way=False):
             
             continue
 
-        depth = simulation(status, depth, tt_state)
+        depth = simulation(status, depth, segment_list, tt_state)
         tt_state.last_computed_depth = depth
 
         indent_print(f"TT [iter] |  {status_print(tt_state, depth)},", indent=global_depth+depth, real_print=True)
@@ -300,11 +315,25 @@ def add_tree_to_global(state, global_visited, global_special, global_probs, glob
             global_segment_table.append(state.segment_table[i])
             global_nested_states.append(depth)
 
-def print_state(state):
-    print(state)
+def extract_segments(state, segment_list):
+    for i in state.segment_table:
+        
+        if i == "for_loop":
+            continue
+        
+        if i not in segment_list:
+            segment_list.append(i)
+            # for s in state.state_to_special:
+            #     if s != 0:
+            #         extract_segments(s, segment_list)
+                    
+        # add hash_ to the begining of the segment name in the state list 
+        state.segment_table[state.segment_table.index(i)] = "hash_" + i
+                    
     for s in state.state_to_special:
         if s != 0:
-            print_state(s)
+            extract_segments(s, segment_list)
+
             
 
 if __name__ == "__main__":
@@ -316,14 +345,16 @@ if __name__ == "__main__":
     #    Segment main_B
     #   
     #    for loop start range (2)
-    #      Segment FL_1_A
-    #      mcm
-    #      Segment FL_1_B
-    
-    #      for loop start range (2)
-    #        Segment FL_2_A
+    #        Segment FL_1_A
     #        mcm
-    #        Segment FL_2_B
+    #        Segment FL_1_B
+    # 
+    #        for loop start range (2)
+    #            Segment FL_2_A
+    #            mcm
+    #            Segment FL_2_B
+    #
+    #        Segment FL_1_D
     #
     #    Segment main_D
     #    mcm
@@ -368,6 +399,24 @@ if __name__ == "__main__":
     print("-"*100)
     print("-"*100)
     print("-"*100)
+    
+    # ----------------------------------------------------------------------------------------------
+    # ----------------------------------------------------------------------------------------------
+    
+    # Extract all segments in the circuit
+    
+    segment_list = []
+        
+    extract_segments(main_state, segment_list)
+    print("Segments in the circuit:")
+    for seg in segment_list:
+        print(f" - {seg}")
+    print("-"*100)
+    print("-"*100)
+    print("-"*100)
+    
+    # ----------------------------------------------------------------------------------------------
+    # ----------------------------------------------------------------------------------------------
 
     TT_CASE = "global"  # "global" or "nested"
     # TT_CASE = "nested"  # "global" or "nested"
@@ -403,7 +452,7 @@ if __name__ == "__main__":
                 print(f"Depth {i:>4}: visited={global_visited[i]}, special={global_special[i]}, probs={global_probs[i]}, segment_table={global_segment_table[i]+whitespace * global_nested_states[i]:>30}")
 
             # Case 1 : using single traversal though global state
-            # tree_traversal(global_state)
+            # tree_traversal(global_state, segment_list)
 
         case "nested":
             print("Using nested traversal states")
@@ -413,4 +462,4 @@ if __name__ == "__main__":
             print("-"*100)
             
             # Case 2 : using nested traversal
-            # tree_traversal(main_state)
+            # tree_traversal(main_state, segment_list)
