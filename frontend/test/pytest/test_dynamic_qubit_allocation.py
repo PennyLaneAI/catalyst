@@ -442,11 +442,11 @@ def test_unsupported_subroutine(backend):
     ):
 
         @subroutine
-        def sub(q):
+        def sub(_):
             pass
 
         @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        @qml.qnode(qml.device(backend, wires=2))
         def circuit():
             with qml.allocate(1) as q:
                 sub(q[0])
