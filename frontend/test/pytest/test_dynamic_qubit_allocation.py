@@ -26,6 +26,7 @@ import pytest
 from jax import numpy as jnp
 
 from catalyst import qjit
+from catalyst.jax_primitives import subroutine
 from catalyst.utils.exceptions import CompileError
 
 
@@ -419,6 +420,37 @@ def test_unsupported_cross_scope_registers(backend):
                 qml.X(wires=wires[0])
 
             return qml.probs(wires=[0, 1, 2])
+
+    qml.capture.disable()
+
+
+def test_unsupported_subroutine(backend):
+    """
+    Test that an error is raised when a dynamically allocated wire is passed into a subroutine.
+    """
+
+    qml.capture.enable()
+
+    with pytest.raises(
+        NotImplementedError,
+        match=textwrap.dedent(
+            """
+            Dynamically allocated wires in a parent scope cannot be used in a child
+            scope yet. Please consider dynamical allocation inside the child scope.
+            """
+        ),
+    ):
+
+        @subroutine
+        def sub(q):
+            pass
+
+        @qjit
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def circuit():
+            with qml.allocate(1) as q:
+                sub(q[0])
+            return qml.probs(wires=[0, 1])
 
     qml.capture.disable()
 

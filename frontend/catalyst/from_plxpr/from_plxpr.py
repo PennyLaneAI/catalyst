@@ -628,6 +628,17 @@ def handle_subroutine(self, *args, **kwargs):
     """
     Transform the subroutine from PLxPR into JAXPR with quantum primitives.
     """
+
+    if any(is_dynamically_allocated_wire(arg) for arg in args):
+        raise NotImplementedError(
+            textwrap.dedent(
+                """
+            Dynamically allocated wires in a parent scope cannot be used in a child
+            scope yet. Please consider dynamical allocation inside the child scope.
+            """
+            )
+        )
+
     backup = dict(self.init_qreg)
     self.init_qreg.insert_all_dangling_qubits()
 
