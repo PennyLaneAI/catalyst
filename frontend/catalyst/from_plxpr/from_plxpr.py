@@ -418,7 +418,7 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         """Any control wires used for a subroutine."""
         self.control_values = control_values
         """Any control values for executing a subroutine."""
-        self.has_dynamic_allocattion = False
+        self.has_dynamic_allocation = False
 
         super().__init__()
 
@@ -499,7 +499,7 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
 
     def interpret_measurement(self, measurement):
         """Rebind a measurement as a catalyst instruction."""
-        if self.has_dynamic_allocattion:
+        if self.has_dynamic_allocation:
             if len(measurement.wires) == 0:
                 raise CompileError(
                     textwrap.dedent(
@@ -585,7 +585,7 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
 def handle_qml_alloc(self, *, num_wires, state=None, restored=False):
     """Handle the conversion from plxpr to Catalyst jaxpr for the qml.allocate primitive"""
 
-    self.has_dynamic_allocattion = True
+    self.has_dynamic_allocation = True
 
     new_qreg = QubitHandler(
         qalloc_p.bind(num_wires), self.qubit_index_recorder, dynamically_alloced=True
