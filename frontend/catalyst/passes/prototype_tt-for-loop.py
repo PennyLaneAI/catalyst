@@ -315,18 +315,19 @@ if __name__ == "__main__":
     #    mcm
     #    Segment main_B
     #   
-    #    for loop start
+    #    for loop start range (2)
     #      Segment FL_1_A
     #      mcm
     #      Segment FL_1_B
-    #      mcm
-    #      Segment FL_1_C
+    
+    #      for loop start range (2)
+    #        Segment FL_2_A
+    #        mcm
+    #        Segment FL_2_B
     #
     #    Segment main_D
     #    mcm
     #    Segment main_E
-    #    mcm
-    #    Segment main_F
     
 
     # Initialize the TraversalState | Segment A
@@ -346,26 +347,20 @@ if __name__ == "__main__":
     push_mcm_2_structure(main_state, mcm_count=1, op_type="for_loop", new_state=for_state_1)
     # Adding mcm to for loop state | Segment FL_1_B
     push_mcm_2_structure(for_state_1, mcm_count=1)
-    
-    # Adding a for loop to main | for loop start | Segment FL_1_A and Segment main_D
+
+    # Adding a nested for loop to FL_1 | for loop start | Segment FL_2_A and Segment FL_1_C
     for_state_2 = traversalState(
         name="FL_2",
         tree_type="for_loop",
     )
-    # Define iterations in the for loop state
+    # Define iterations in the nested for loop state
     for_state_2.tree_repetition = 2
     push_mcm_2_structure(for_state_1, mcm_count=1, op_type="for_loop", new_state=for_state_2)
     
     push_mcm_2_structure(for_state_2, mcm_count=1) # Segment FL_2_B
-    # push_mcm_2_structure(for_state_2, mcm_count=1) # Segment FL_2_C
-    
-
-    
-    # # Adding mcm to for loop state | Segment FL_1_C
-    # push_mcm_2_structure(for_state_1, mcm_count=1)
-        
-    # # Adding another mcm to main
-    # push_mcm_2_structure(main_state, mcm_count=1) # Segment main_E
+            
+    # Adding another mcm to main
+    push_mcm_2_structure(main_state, mcm_count=1) # Segment main_E
     # push_mcm_2_structure(main_state, mcm_count=1) # Segment main_F
 
     # Final state
@@ -375,7 +370,7 @@ if __name__ == "__main__":
     print("-"*100)
 
     TT_CASE = "global"  # "global" or "nested"
-    TT_CASE = "nested"  # "global" or "nested"
+    # TT_CASE = "nested"  # "global" or "nested"
 
     match TT_CASE:
         case "global":
