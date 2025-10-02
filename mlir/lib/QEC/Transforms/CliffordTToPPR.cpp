@@ -30,7 +30,7 @@ namespace {
 //                       Helper functions
 //===----------------------------------------------------------------------===//
 
-enum class GateEnum { H, S, T, CNOT, X, Y, Z, Unknown };
+enum class GateEnum { H, S, T, CNOT, X, Y, Z, I, Unknown };
 
 // Hash gate name to GateEnum
 GateEnum hashGate(CustomOp op)
@@ -50,6 +50,8 @@ GateEnum hashGate(CustomOp op)
         return GateEnum::Y;
     else if (gateName == "PauliZ" || gateName == "Z")
         return GateEnum::Z;
+    else if (gateName == "Identity" || gateName == "I")
+        return GateEnum::I;
     else
         return GateEnum::Unknown;
 }
@@ -79,12 +81,12 @@ void applyAdjointIfNeeded(GateConversion &gateConversion, CustomOp op)
 //===----------------------------------------------------------------------===//
 
 // C(P) = G(Angle)
-void applySingleQubitConversion(CustomOp op, SmallVector<GateConversion> gateConversions,
+void applySingleQubitConversion(CustomOp op, const ArrayRef<GateConversion> &gateConversions,
                                 ConversionPatternRewriter &rewriter)
 {
     auto loc = op->getLoc();
     auto types = op.getOutQubits().getType();
-    SmallVector<Value> inQubits = op.getInQubits();
+    ValueRange inQubits = op.getInQubits();
     PPRotationOp pprOp;
 
     for (auto gateConversion : gateConversions) {
@@ -154,7 +156,6 @@ LogicalResult convertHGate(CustomOp op, ConversionPatternRewriter &rewriter)
     auto Z0 = GateConversion({"Z"}, 4);
     auto X1 = GateConversion({"X"}, 4);
     auto Z2 = GateConversion({"Z"}, 4);
-
     applySingleQubitConversion(op, {Z0, X1, Z2}, rewriter);
     return success();
 }
@@ -195,6 +196,14 @@ LogicalResult convertYGate(CustomOp op, ConversionPatternRewriter &rewriter)
 LogicalResult convertZGate(CustomOp op, ConversionPatternRewriter &rewriter)
 {
     auto gate = GateConversion({"Z"}, 2);
+    applySingleQubitConversion(op, {gate}, rewriter);
+    return success();
+}
+
+// I = I
+LogicalResult convertIGate(CustomOp op, ConversionPatternRewriter &rewriter)
+{
+    auto gate = GateConversion({"I"}, 0);
     applySingleQubitConversion(op, {gate}, rewriter);
     return success();
 }
@@ -260,9 +269,11 @@ struct QECOpLowering : public ConversionPattern {
                 return convertZGate(originOp, rewriter);
             case GateEnum::CNOT:
                 return convertCNOTGate(originOp, rewriter);
+            case GateEnum::I:
+                return convertIGate(originOp, rewriter);
             case GateEnum::Unknown: {
                 op->emitError(
-                    "Unsupported gate. Supported gates: H, S, T, X, Y, Z, S†, T†, and CNOT");
+                    "Unsupported gate. Supported gates: H, S, T, X, Y, Z, S†, T†, I, and CNOT");
                 return failure();
             }
             }

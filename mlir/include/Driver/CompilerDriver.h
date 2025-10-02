@@ -59,8 +59,10 @@ struct CompilerOptions {
     mlir::StringRef moduleName;
     /// The stream to output any error messages from MLIR/LLVM passes and translation.
     llvm::raw_ostream &diagnosticStream;
-    /// If specified, the driver will output the module after each pipeline or each pass.
+    /// If specified, the driver will output the IR after each pipeline or each pass.
     SaveTemps keepIntermediate;
+    /// If true, the compiler will dump the module scope when saving intermediate files.
+    bool dumpModuleScope;
     /// Print SSA IDs using their name location, if provided, as prefix.
     bool useNameLocAsPrefix;
     /// If true, the llvm.coroutine will be lowered.

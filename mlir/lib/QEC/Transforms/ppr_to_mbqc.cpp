@@ -12,45 +12,56 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#define DEBUG_TYPE "to-ppr"
+#define DEBUG_TYPE "ppr-to-mbqc"
 
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Pass/PassManager.h"  // for PassManager
+#include "mlir/Transforms/Passes.h" // for createCSEPass
 
 #include "QEC/IR/QECDialect.h"
 #include "QEC/Transforms/Patterns.h"
-#include "Quantum/IR/QuantumOps.h"
+#include "Quantum/IR/QuantumDialect.h"
 
+using namespace llvm;
 using namespace mlir;
-using namespace catalyst::quantum;
+using namespace catalyst;
 using namespace catalyst::qec;
 
 namespace catalyst {
 namespace qec {
 
-#define GEN_PASS_DEF_CLIFFORDTTOPPRPASS
-#define GEN_PASS_DECL_CLIFFORDTTOPPRPASS
+#define GEN_PASS_DEF_PPRTOMBQCPASS
+#define GEN_PASS_DECL_PPRTOMBQCPASS
 #include "QEC/Transforms/Passes.h.inc"
 
-struct CliffordTToPPRPass : impl::CliffordTToPPRPassBase<CliffordTToPPRPass> {
-    using CliffordTToPPRPassBase::CliffordTToPPRPassBase;
+struct PPRToMBQCPass : public impl::PPRToMBQCPassBase<PPRToMBQCPass> {
+    using PPRToMBQCPassBase::PPRToMBQCPassBase;
 
     void runOnOperation() final
     {
         auto ctx = &getContext();
         ConversionTarget target(*ctx);
 
-        // Convert MeasureOp and CustomOp
-        target.addIllegalOp<quantum::MeasureOp>();
-        target.addIllegalOp<quantum::CustomOp>();
+        target.addIllegalOp<qec::PPRotationOp>();
+        target.addIllegalOp<qec::PPMeasurementOp>();
 
-        // Conversion target is QECDialect
-        target.addLegalDialect<qec::QECDialect>();
+        // The Dialects that we want to convert to
+        target.addLegalDialect<catalyst::quantum::QuantumDialect>();
+        target.addLegalDialect<mlir::arith::ArithDialect>();
 
         RewritePatternSet patterns(ctx);
-        populateCliffordTToPPRPatterns(patterns);
+        populatePPRToMBQCPatterns(patterns);
 
         if (failed(applyPartialConversion(getOperation(), target, std::move(patterns)))) {
+            return signalPassFailure();
+        }
+
+        // Run CSE to deduplicate constants and trivial common constants
+        PassManager pm(ctx);
+        pm.addPass(createCSEPass());
+        if (failed(pm.run(getOperation()))) {
             return signalPassFailure();
         }
     }
@@ -58,10 +69,6 @@ struct CliffordTToPPRPass : impl::CliffordTToPPRPassBase<CliffordTToPPRPass> {
 
 } // namespace qec
 
-/// Create a pass for lowering operations in the `QECDialect`.
-std::unique_ptr<mlir::Pass> createCliffordTToPPRPass()
-{
-    return std::make_unique<qec::CliffordTToPPRPass>();
-}
+std::unique_ptr<mlir::Pass> createPPRToMBQCPass() { return std::make_unique<PPRToMBQCPass>(); }
 
 } // namespace catalyst
