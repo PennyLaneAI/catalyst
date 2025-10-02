@@ -503,7 +503,15 @@ LogicalResult preparePassManager(PassManager &pm, const CompilerOptions &options
         if (options.keepIntermediate >= SaveTemps::AfterPass) {
             std::string tmp;
             llvm::raw_string_ostream s{tmp};
-            s << *op;
+            if (options.dumpModuleScope) {
+                mlir::ModuleOp mod = isa<mlir::ModuleOp>(op)
+                                         ? cast<mlir::ModuleOp>(op)
+                                         : op->getParentOfType<mlir::ModuleOp>();
+                s << mod;
+            }
+            else {
+                s << *op;
+            }
             std::string fileName = pipelineName.str();
             if (auto funcOp = dyn_cast<mlir::func::FuncOp>(op)) {
                 fileName += std::string("_") + funcOp.getName().str();
@@ -955,6 +963,9 @@ int QuantumDriverMainFromCL(int argc, char **argv)
     cl::opt<bool> DumpPassPipeline("dump-catalyst-pipeline",
                                    cl::desc("Print the pipeline that will be run"), cl::init(false),
                                    cl::cat(CatalystCat));
+    cl::opt<bool> DumpModuleScope("dump-module-scope",
+                                  cl::desc("Print the whole module in intermediate files"),
+                                  cl::init(true), cl::cat(CatalystCat));
 
     // Create dialect registry
     DialectRegistry registry;
@@ -1000,6 +1011,7 @@ int QuantumDriverMainFromCL(int argc, char **argv)
                             .moduleName = ModuleName,
                             .diagnosticStream = errStream,
                             .keepIntermediate = SaveAfterEach,
+                            .dumpModuleScope = DumpModuleScope,
                             .asyncQnodes = AsyncQNodes,
                             .verbosity = Verbose ? Verbosity::All : Verbosity::Urgent,
                             .pipelinesCfg = parsePipelines(CatalystPipeline),

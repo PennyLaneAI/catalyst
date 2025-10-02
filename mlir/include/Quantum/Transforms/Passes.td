@@ -92,6 +92,10 @@ def MergeRotationsPass : Pass<"merge-rotations"> {
     let dependentDialects = ["math::MathDialect"];
 }
 
+def DecomposeLoweringPass : Pass<"decompose-lowering"> {
+    let summary = "Replace quantum operations with compiled decomposition rules.";
+}
+
 def DisentangleCNOTPass : Pass<"disentangle-CNOT"> {
     let summary = "Replace a CNOT gate with two single qubit gates whenever possible.";
 

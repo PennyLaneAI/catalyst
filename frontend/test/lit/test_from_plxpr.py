@@ -18,6 +18,8 @@
 
 """Lit tests for the PLxPR to JAXPR with quantum primitives pipeline"""
 
+from functools import partial
+
 import pennylane as qml
 
 
@@ -45,7 +47,7 @@ def test_conditional_capture():
 
     print(main.mlir)
 
-    qml.capture.enable()
+    qml.capture.disable()
 
 
 test_conditional_capture()
@@ -362,3 +364,60 @@ def test_pass_application():
 
 
 test_pass_application()
+
+
+def test_pass_decomposition():
+    """Application of pass decorator with decomposition."""
+
+    dev = qml.device("null.qubit", wires=1)
+
+    qml.capture.enable()
+    qml.decomposition.enable_graph()
+
+    @qml.qjit(target="mlir")
+    @qml.transforms.cancel_inverses
+    @qml.transforms.merge_rotations
+    @partial(qml.transforms.decompose, gate_set={"RX", "RZ"})
+    @qml.qnode(dev)
+    def circuit1():
+        return qml.probs()
+
+    # CHECK: [[first_pass:%.+]] = transform.apply_registered_pass "decompose-lowering"
+    # CHECK-NEXT: [[second_pass:%.+]] = transform.apply_registered_pass "merge-rotations"
+    # CHECK-NEXT: transform.apply_registered_pass "remove-chained-self-inverse" to [[second_pass]]
+
+    print(circuit1.mlir)
+
+    @qml.qjit(target="mlir")
+    @qml.transforms.cancel_inverses
+    @partial(qml.transforms.decompose, gate_set={"RX", "RZ"})
+    @qml.transforms.merge_rotations
+    @qml.qnode(dev)
+    def circuit2():
+        return qml.probs()
+
+    # CHECK: [[first_pass:%.+]] = transform.apply_registered_pass "merge-rotations"
+    # CHECK-NEXT: [[second_pass:%.+]] = transform.apply_registered_pass "decompose-lowering"
+    # CHECK-NEXT: transform.apply_registered_pass "remove-chained-self-inverse" to [[second_pass]]
+
+    print(circuit2.mlir)
+
+    @qml.qjit(target="mlir")
+    @partial(qml.transforms.decompose, gate_set={"RX", "RZ"})
+    @qml.transforms.cancel_inverses
+    @qml.transforms.merge_rotations
+    @qml.qnode(dev)
+    def circuit3():
+        return qml.probs()
+
+    # CHECK: [[first_pass:%.+]] = transform.apply_registered_pass "merge-rotations"
+    # CHECK-NEXT: [[second_pass:%.+]] = transform.apply_registered_pass "remove-chained-self-inverse"
+    # CHECK-NEXT: transform.apply_registered_pass "decompose-lowering" to [[second_pass]]
+
+    print(circuit3.mlir)
+
+    qml.decomposition.disable_graph()
+    qml.capture.disable()
+
+
+test_pass_decomposition()

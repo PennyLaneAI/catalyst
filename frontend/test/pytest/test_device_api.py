@@ -43,8 +43,8 @@ def test_qjit_device():
         transform_program, _ = device_qjit.preprocess(ctx)
     assert transform_program
     assert len(transform_program) == 3
-    assert transform_program[-2]._transform.__name__ == "verify_operations"
-    assert transform_program[-1]._transform.__name__ == "validate_measurements"
+    assert transform_program[-2].transform.__name__ == "verify_operations"
+    assert transform_program[-1].transform.__name__ == "validate_measurements"
 
     # TODO: readd when we do not discard device preprocessing
     # t = transform_program[0].transform.__name__
@@ -139,6 +139,18 @@ def test_track_resources():
     dev = NullQubit(wires=2, track_resources=True)
     assert "track_resources" in QJITDevice.extract_backend_info(dev).kwargs
     assert QJITDevice.extract_backend_info(dev).kwargs["track_resources"] is True
+    assert "resources_filename" not in QJITDevice.extract_backend_info(dev).kwargs
+    assert "compute_depth" not in QJITDevice.extract_backend_info(dev).kwargs
+
+    dev = NullQubit(
+        wires=2, track_resources=True, resources_filename="my_resources.txt", compute_depth=True
+    )
+    assert "track_resources" in QJITDevice.extract_backend_info(dev).kwargs
+    assert QJITDevice.extract_backend_info(dev).kwargs["track_resources"] is True
+    assert "resources_filename" in QJITDevice.extract_backend_info(dev).kwargs
+    assert QJITDevice.extract_backend_info(dev).kwargs["resources_filename"] == "my_resources.txt"
+    assert "compute_depth" in QJITDevice.extract_backend_info(dev).kwargs
+    assert QJITDevice.extract_backend_info(dev).kwargs["compute_depth"] is True
 
 
 if __name__ == "__main__":

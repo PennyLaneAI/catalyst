@@ -129,4 +129,8 @@ def TLayerReductionPass : Pass<"t-layer-reduction"> {
     let summary = "Reduce T layers to PPR operations.";
 }
 
+def PPRToMBQCPass : Pass<"ppr-to-mbqc"> {
+    let summary = "Convert PPR/PPM operations to MBQC operations.";
+}
+
 #endif // QEC_PASSES
