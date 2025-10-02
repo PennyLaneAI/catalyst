@@ -463,7 +463,7 @@ changes (also called the insertion point). Let's have a look at some of these el
   Operation arguments and `attributes <https://mlir.llvm.org/docs/LangRef/#attributes>`_ can also
   be modified in-place (without creating a new operation). We use this to replace the matrix
   argument of our operation with the result of the multiplication. Since this mechanism doesn't
-  go through the rewriter, he have to notify it explicitly that we are making changes to an
+  go through the rewriter, we have to notify it explicitly that we are making changes to an
   operation:
 
   .. code-block:: cpp
@@ -472,7 +472,7 @@ changes (also called the insertion point). Let's have a look at some of these el
             parentOp->setOperand(0, res);
         });
 
-  Note that in order to change to results on an operation you will need to create a copy of it
+  Note that in order to change the results on an operation you will need to create a copy of it
   and erase the existing operation, they cannot be modified in-place.
 
 Invoking transformation patterns
