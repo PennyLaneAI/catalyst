@@ -59,7 +59,6 @@
 
 #include "Catalyst/IR/CatalystDialect.h"
 #include "Catalyst/Transforms/BufferizableOpInterfaceImpl.h"
-#include "Catalyst/Transforms/Passes.h"
 #include "Driver/CatalystLLVMTarget.h"
 #include "Driver/CompilerDriver.h"
 #include "Driver/Pipelines.h"
@@ -71,11 +70,10 @@
 #include "Ion/IR/IonDialect.h"
 #include "MBQC/IR/MBQCDialect.h"
 #include "Mitigation/IR/MitigationDialect.h"
-#include "Mitigation/Transforms/Passes.h"
 #include "QEC/IR/QECDialect.h"
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/Transforms/BufferizableOpInterfaceImpl.h"
-#include "Quantum/Transforms/Passes.h"
+#include "RegisterAllPasses.h"
 
 #include "Enzyme.h"
 #include "Timer.hpp"
@@ -971,8 +969,8 @@ int QuantumDriverMainFromCL(int argc, char **argv)
 
     // Create dialect registry
     DialectRegistry registry;
-    registerAllPasses();
-    registerAllCatalystPasses();
+    mlir::registerAllPasses();
+    catalyst::registerAllPasses();
     registerAllCatalystPipelines();
     mlirRegisterAllStablehloPasses();
     mlir::stablehlo::registerOptimizationPasses();

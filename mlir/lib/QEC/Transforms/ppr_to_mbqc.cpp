@@ -68,7 +68,4 @@ struct PPRToMBQCPass : public impl::PPRToMBQCPassBase<PPRToMBQCPass> {
 };
 
 } // namespace qec
-
-std::unique_ptr<mlir::Pass> createPPRToMBQCPass() { return std::make_unique<PPRToMBQCPass>(); }
-
 } // namespace catalyst

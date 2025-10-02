@@ -30,7 +30,6 @@
 
 #include "Catalyst/IR/CatalystDialect.h"
 #include "Gradient/IR/GradientOps.h"
-#include "Gradient/Transforms/Passes.h"
 #include "Gradient/Transforms/Patterns.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Utils/RemoveQuantum.h"
@@ -41,7 +40,6 @@ using namespace catalyst::gradient;
 namespace catalyst {
 namespace gradient {
 
-#define GEN_PASS_DECL_GRADIENTLOWERINGPASS
 #define GEN_PASS_DEF_GRADIENTLOWERINGPASS
 #include "Gradient/Transforms/Passes.h.inc"
 
@@ -80,10 +78,4 @@ struct GradientLoweringPass : impl::GradientLoweringPassBase<GradientLoweringPas
 };
 
 } // namespace gradient
-
-std::unique_ptr<Pass> createGradientLoweringPass()
-{
-    return std::make_unique<gradient::GradientLoweringPass>();
-}
-
 } // namespace catalyst

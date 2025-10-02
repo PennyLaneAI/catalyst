@@ -25,16 +25,17 @@
 #include "llvm/Support/Debug.h"
 
 #include "Catalyst/IR/CatalystDialect.h"
-#include "hlo-extensions/Passes.h"
-#include "hlo-extensions/Patterns.h"
+#include "hlo-extensions/Transforms/Patterns.h"
 
 using namespace llvm;
 using namespace mlir;
 using namespace catalyst;
 
 namespace catalyst {
+namespace hlo {
+
 #define GEN_PASS_DEF_HLOCUSTOMCALLLOWERINGPASS
-#include "hlo-extensions/Passes.h.inc"
+#include "hlo-extensions/Transforms/Passes.h.inc"
 
 struct HloCustomCallLoweringPass : impl::HloCustomCallLoweringPassBase<HloCustomCallLoweringPass> {
     using HloCustomCallLoweringPassBase::HloCustomCallLoweringPassBase;
@@ -52,8 +53,5 @@ struct HloCustomCallLoweringPass : impl::HloCustomCallLoweringPassBase<HloCustom
     }
 };
 
-std::unique_ptr<Pass> createHloCustomCallLoweringPass()
-{
-    return std::make_unique<HloCustomCallLoweringPass>();
-}
+} // namespace hlo
 } // namespace catalyst
