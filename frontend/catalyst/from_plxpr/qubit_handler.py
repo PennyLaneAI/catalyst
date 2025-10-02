@@ -179,6 +179,7 @@ class QubitHandler:
             self.qubit_indices = []
             self.abstract_qreg_val = qubit_or_qreg_ref
             self.recorder = recorder
+            self.expired = False
 
             # A map from plxpr's *global* indices to the current catalyst SSA qubit values
             # for the wires on this qreg.

@@ -313,9 +313,31 @@ def test_no_capture(backend):
         @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def circuit():
-            with qml.allocate(1) as q:
+            with qml.allocate(1) as _:
                 pass
             return qml.probs(wires=[0])
+
+
+def test_use_after_free(backend):
+    """
+    Test error message when used after free.
+    """
+    qml.capture.enable()
+
+    with pytest.raises(
+        CompileError,
+        match="Deallocated qubits cannot be used, but used in Hadamard.",
+    ):
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=1))
+        def circuit():
+            with qml.allocate(1) as q:
+                qml.X(q[0])
+            qml.Hadamard(q[0])
+            return qml.probs(wires=[0])
+
+    qml.capture.disable()
 
 
 def test_terminal_MP_all_wires(backend):
@@ -323,6 +345,7 @@ def test_terminal_MP_all_wires(backend):
     Test error message when used with terminal measurements on all wires.
     """
     qml.capture.enable()
+
     with pytest.raises(
         CompileError,
         match=textwrap.dedent(
@@ -336,7 +359,7 @@ def test_terminal_MP_all_wires(backend):
         @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def circuit():
-            with qml.allocate(1) as q:
+            with qml.allocate(1) as _:
                 pass
             return qml.probs()
 
@@ -348,6 +371,7 @@ def test_terminal_MP_dynamic_wires(backend):
     Test error message when used with terminal measurements on dynamic wires.
     """
     qml.capture.enable()
+
     with pytest.raises(
         CompileError,
         match=textwrap.dedent(

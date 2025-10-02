@@ -453,6 +453,9 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
             control_wires, self.qubit_index_recorder, self.init_qreg
         )
 
+        if any(qreg.expired for qreg in in_qregs + in_ctrl_qregs):
+            raise CompileError(f"Deallocated qubits cannot be used, but used in {op.name}.")
+
         out_qubits = qinst_p.bind(
             *[*in_qubits, *op.data, *in_ctrl_qubits, *control_values],
             op=op.name,
@@ -605,6 +608,7 @@ def handle_qml_dealloc(self, *wires):
     qreg = self.qubit_index_recorder[wires[0]]
     assert all(self.qubit_index_recorder[w] is qreg for w in wires)
     qreg.insert_all_dangling_qubits()
+    qreg.expired = True
     qdealloc_p.bind(qreg.get())
     return []
 
