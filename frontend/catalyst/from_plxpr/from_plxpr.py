@@ -453,7 +453,7 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
             control_wires, self.qubit_index_recorder, self.init_qreg
         )
 
-        if any(qreg.expired for qreg in in_qregs + in_ctrl_qregs):
+        if any(not qreg.is_qubit_mode() and qreg.expired for qreg in in_qregs + in_ctrl_qregs):
             raise CompileError(f"Deallocated qubits cannot be used, but used in {op.name}.")
 
         out_qubits = qinst_p.bind(
