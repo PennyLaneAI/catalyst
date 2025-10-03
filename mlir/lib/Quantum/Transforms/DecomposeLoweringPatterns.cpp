@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "Quantum/IR/QuantumInterfaces.h"
 #define DEBUG_TYPE "decompose-lowering"
 
 #include <variant>
@@ -26,6 +25,7 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/ValueRange.h"
 
+#include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Transforms/Patterns.h"
 
