@@ -17,6 +17,7 @@ Unit tests for the dynamic work wire allocation.
 Note that this feature is only available under the plxpr pipeline.
 """
 
+import re
 import textwrap
 
 import numpy as np
@@ -25,6 +26,8 @@ import pytest
 from jax import numpy as jnp
 
 from catalyst import qjit
+from catalyst.jax_primitives import subroutine
+from catalyst.utils.exceptions import CompileError
 
 
 def test_basic_dynamic_wire_alloc_plain_API(backend):
@@ -299,6 +302,96 @@ def test_dynamic_wire_alloc_whileloop(num_iter, expected, backend):
     assert np.allclose(expected, observed)
 
 
+def test_no_capture(backend):
+    """
+    Test error message when used without capture.
+    """
+    with pytest.raises(
+        CompileError,
+        match=re.escape("qml.allocate() is only supported with program capture enabled."),
+    ):
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=1))
+        def circuit():
+            with qml.allocate(1) as _:
+                pass
+            return qml.probs(wires=[0])
+
+
+def test_use_after_free(backend):
+    """
+    Test error message when used after free.
+    """
+    qml.capture.enable()
+
+    with pytest.raises(
+        CompileError,
+        match="Deallocated qubits cannot be used, but used in Hadamard.",
+    ):
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=1))
+        def circuit():
+            with qml.allocate(1) as q:
+                qml.X(q[0])
+            qml.Hadamard(q[0])
+            return qml.probs(wires=[0])
+
+    qml.capture.disable()
+
+
+def test_terminal_MP_all_wires(backend):
+    """
+    Test error message when used with terminal measurements on all wires.
+    """
+    qml.capture.enable()
+
+    with pytest.raises(
+        CompileError,
+        match=textwrap.dedent(
+            """
+            Terminal measurements must take in an explicit list of wires when
+            dynamically allocated wires are present in the program.
+            """
+        ),
+    ):
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=1))
+        def circuit():
+            with qml.allocate(1) as _:
+                pass
+            return qml.probs()
+
+    qml.capture.disable()
+
+
+def test_terminal_MP_dynamic_wires(backend):
+    """
+    Test error message when used with terminal measurements on dynamic wires.
+    """
+    qml.capture.enable()
+
+    with pytest.raises(
+        CompileError,
+        match=textwrap.dedent(
+            """
+            Terminal measurements cannot take in dynamically allocated wires
+            since they must be temporary.
+            """
+        ),
+    ):
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=1))
+        def circuit():
+            q = qml.allocate(1)
+            return qml.probs(q)
+
+    qml.capture.disable()
+
+
 def test_unsupported_cross_scope_registers(backend):
     """
     Scope jaxprs in Catalyst cannot take multiple registers yet.
@@ -327,6 +420,37 @@ def test_unsupported_cross_scope_registers(backend):
                 qml.X(wires=wires[0])
 
             return qml.probs(wires=[0, 1, 2])
+
+    qml.capture.disable()
+
+
+def test_unsupported_subroutine(backend):
+    """
+    Test that an error is raised when a dynamically allocated wire is passed into a subroutine.
+    """
+
+    qml.capture.enable()
+
+    with pytest.raises(
+        NotImplementedError,
+        match=textwrap.dedent(
+            """
+            Dynamically allocated wires in a parent scope cannot be used in a child
+            scope yet. Please consider dynamical allocation inside the child scope.
+            """
+        ),
+    ):
+
+        @subroutine
+        def sub(_):
+            pass
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=2))
+        def circuit():
+            with qml.allocate(1) as q:
+                sub(q[0])
+            return qml.probs(wires=[0, 1])
 
     qml.capture.disable()
 
