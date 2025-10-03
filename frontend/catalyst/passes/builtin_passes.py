@@ -1112,7 +1112,7 @@ def ppm_specs(fn):
         raise NotImplementedError("PPM passes only support AOT (Ahead-Of-Time) compilation mode.")
 
 
-def t_layer_reduction(qnode):
+def reduce_t_depth(qnode):
     R"""
     An MLIR compiler pass that reduces the depth and count of non-Clifford PPRs (e.g., ``T`` gates) by
     commuting PPRs in adjacent layers and merging compatible ones (a layer comprises a set of PPRs
@@ -1129,7 +1129,7 @@ def t_layer_reduction(qnode):
 
     In the example below, after performing the :func:`catalyst.passes.to_ppr` and
     :func:`catalyst.passes.merge_ppr_ppm` passes, the circuit contains a depth of four of
-    non-Clifford PPRs. Subsequently applying the ``t_layer_reduction`` pass will move PPRs around via
+    non-Clifford PPRs. Subsequently applying the ``reduce_t_depth`` pass will move PPRs around via
     commutation, resulting in a circuit with a smaller PPR depth. Specifically, in the circuit
     below, the Pauli-:math:`X` PPR (:math:`\exp(iX\tfrac{\pi}{8})`) on qubit Q1 will be moved to the
     first layer, which results in a depth of three non-Clifford PPRs.
@@ -1138,13 +1138,13 @@ def t_layer_reduction(qnode):
 
         import pennylane as qml
         from catalyst import qjit, measure
-        from catalyst.passes import to_ppr, commute_ppr, t_layer_reduction, merge_ppr_ppm
+        from catalyst.passes import to_ppr, commute_ppr, reduce_t_depth, merge_ppr_ppm
 
         pips = [("pipe", ["enforce-runtime-invariants-pipeline"])]
 
 
         @qjit(pipelines=pips, target="mlir")
-        @t_layer_reduction
+        @reduce_t_depth
         @merge_ppr_ppm
         @commute_ppr
         @to_ppr
@@ -1187,7 +1187,7 @@ def t_layer_reduction(qnode):
 
     """
 
-    return PassPipelineWrapper(qnode, "t-layer-reduction")
+    return PassPipelineWrapper(qnode, "reduce-t-depth")
 
 
 def ppr_to_mbqc(qnode):

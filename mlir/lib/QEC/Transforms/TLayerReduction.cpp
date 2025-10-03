@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#define DEBUG_TYPE "t-layer-reduction"
+#define DEBUG_TYPE "reduce-t-depth"
 
 #include <vector>
 
