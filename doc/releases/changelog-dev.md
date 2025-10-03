@@ -92,7 +92,7 @@
   [A Game of Surface Codes](https://arXiv:1808.02892v3).
   [(#1975)](https://github.com/PennyLaneAI/catalyst/pull/1975)
   [(#2048)](https://github.com/PennyLaneAI/catalyst/pull/2048)
-  [(#2084)](https://github.com/PennyLaneAI/catalyst/pull/2084)
+  [(#2085)](https://github.com/PennyLaneAI/catalyst/pull/2085)
 
   Consider the following circuit.
 
