@@ -609,7 +609,7 @@ def converted_call(fn, args, kwargs, caller_fn_scope=None, options=None):
         if hasattr(fn, "__wrapped__") and hasattr(fn, "__module__"):
             # Find the decorator function
             if decorator := next(
-                (f for f in _known_wrapper_functions if hasattr(f, "__module__")), None
+                (f for f in _known_wrapper_functions if f.__module__ == fn.__module__), None
             ):
                 original_fn = fn.__wrapped__
 
