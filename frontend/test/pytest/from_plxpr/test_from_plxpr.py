@@ -1000,6 +1000,27 @@ class TestGraphDecomposition:
 
         assert qml.decomposition.enabled_graph() is False
 
+    def test_decompose_fallback_warnings(self):
+        """Test the fallback to legacy decomposition system with warnings."""
+        qml.capture.enable()
+        qml.decomposition.enable_graph()
+
+        @qml.qjit
+        @partial(qml.transforms.decompose, gate_set={qml.RX, qml.RZ})
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def circuit(x):
+            qml.Hadamard(x)
+            return qml.state()
+
+        with pytest.warns(
+            UserWarning,
+            match="The graph-based decomposition system is unable to find a decomposition for",
+        ):
+            circuit(0)
+
+        qml.decomposition.disable_graph()
+        qml.capture.disable()
+
 
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
