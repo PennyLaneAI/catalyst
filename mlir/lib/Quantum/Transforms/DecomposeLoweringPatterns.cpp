@@ -83,13 +83,12 @@ class OpSignatureAnalyzer {
   public:
     OpSignatureAnalyzer() = delete;
     OpSignatureAnalyzer(CustomOp op, bool enableQregMode)
-        : signature(
-              OpSignature{.params = op.getParams(),
-                          .inQubits = op.getNonCtrlQubitOperands(),
-                          .inCtrlQubits = op.getCtrlQubitOperands(),
-                          .inCtrlValues = op.getCtrlValueOperands(),
-                          .outQubits = op.getNonCtrlQubitResults(),
-                          .outCtrlQubits = op.getCtrlQubitResults()})
+        : signature(OpSignature{.params = op.getParams(),
+                                .inQubits = op.getNonCtrlQubitOperands(),
+                                .inCtrlQubits = op.getCtrlQubitOperands(),
+                                .inCtrlValues = op.getCtrlValueOperands(),
+                                .outQubits = op.getNonCtrlQubitResults(),
+                                .outCtrlQubits = op.getCtrlQubitResults()})
     {
         if (!enableQregMode)
             return;
