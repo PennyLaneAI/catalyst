@@ -37,7 +37,7 @@
 
   ```pycon
   >>>  print(circuit())
-  [0. 0. 0. 1. 0. 0. 0. 0.]
+  [0. 0. 0. 1.]
   ```
 
   In the above program, 2 qubits are allocated during device initialization, and 1
