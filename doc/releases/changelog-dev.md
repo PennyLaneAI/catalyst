@@ -92,19 +92,20 @@
   [A Game of Surface Codes](https://arXiv:1808.02892v3).
   [(#1975)](https://github.com/PennyLaneAI/catalyst/pull/1975)
   [(#2048)](https://github.com/PennyLaneAI/catalyst/pull/2048)
+  [(#2084)](https://github.com/PennyLaneAI/catalyst/pull/2084)
 
   Consider the following circuit.
 
   ```python
   import pennylane as qml
   from catalyst import qjit, measure
-  from catalyst.passes import to_ppr, commute_ppr, t_layer_reduction, merge_ppr_ppm
+  from catalyst.passes import to_ppr, commute_ppr, reduce_t_depth, merge_ppr_ppm
 
   pips = [("pipe", ["enforce-runtime-invariants-pipeline"])]
 
 
   @qjit(pipelines=pips, target="mlir")
-  @t_layer_reduction
+  @reduce_t_depth
   @merge_ppr_ppm
   @commute_ppr
   @to_ppr
@@ -123,7 +124,7 @@
 
   After performing the ``catalyst.passes.to_ppr`` and ``catalyst.passes.merge_ppr_ppm``
   passes, the circuit contains a depth of four of non-Clifford PPRs. Subsequently applying the
-  ``t_layer_reduction`` pass will move PPRs around via commutation, resulting in a circuit with a
+  ``reduce_t_depth`` pass will move PPRs around via commutation, resulting in a circuit with a
   smaller PPR depth of three.
 
   ```pycon
