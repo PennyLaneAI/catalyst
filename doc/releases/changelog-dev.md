@@ -364,6 +364,9 @@
 for example the one-shot mid circuit measurement transform.
   [(#2056)](https://github.com/PennyLaneAI/catalyst/pull/2056)
 
+* Dynamic one-shot no longer crashes or output incorrect results when setting `shots=1`.
+  [(#2090)](https://github.com/PennyLaneAI/catalyst/pull/2090)
+
 <h3>Internal changes ⚙️</h3>
 
 * Updates use of `qml.transforms.dynamic_one_shot.parse_native_mid_circuit_measurements` to improved signature.
