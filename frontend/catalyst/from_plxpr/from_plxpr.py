@@ -1025,7 +1025,7 @@ def _collect_and_compile_graph_solutions(inner_jaxpr, consts, tkwargs, ncargs):
         warnings.showwarning(w.message, w.category, w.filename, w.lineno)
         # TODO: use a custom warning class for this in PennyLane to remove this
         # string matching and make it more robust.
-        if "The graph-based decomposition system is unable" in str(w.message):
+        if "The graph-based decomposition system is unable" in str(w.message): # pragma: no cover
             graph_succeeded = False
             warnings.warn(
                 "Falling back to the legacy decomposition system.",

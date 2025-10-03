@@ -374,7 +374,7 @@ def _solve_decomposition_graph(operations, gate_set, fixed_decomps, alt_decomps)
 
         # TODO: use a custom warning class for this in PennyLane to remove this
         # string matching and make it more robust.
-        if "The graph-based decomposition system is unable" in str(wi.message):
+        if "The graph-based decomposition system is unable" in str(wi.message): # pragma: no cover
             graph_failed = True
 
     if graph_failed:
