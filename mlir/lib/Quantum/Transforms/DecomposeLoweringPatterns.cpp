@@ -75,10 +75,9 @@ class QubitIndex {
     IntegerAttr getAttr() const { return isAttr() ? std::get<IntegerAttr>(index) : nullptr; }
 };
 
-// The goal of this class is to analyze the signature of a quantum gate operation to get the enough
+// The goal of this class is to analyze the signature of a custom operation to get the enough
 // information to prepare the call operands and results for replacing the op to calling the
 // decomposition function.
-// GateType can be QuantumGate or ParametrizedGate
 class OpSignatureAnalyzer {
   public:
     OpSignatureAnalyzer() = delete;
