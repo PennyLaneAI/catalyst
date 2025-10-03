@@ -1006,7 +1006,7 @@ class TestGraphDecomposition:
         qml.decomposition.enable_graph()
 
         @qml.qjit
-        @partial(qml.transforms.decompose, gate_set={qml.RX, qml.RZ})
+        @partial(qml.transforms.decompose, gate_set={qml.GlobalPhase})
         @qml.qnode(qml.device("lightning.qubit", wires=2))
         def circuit(x):
             qml.Hadamard(x)
@@ -1014,7 +1014,8 @@ class TestGraphDecomposition:
 
         with pytest.warns(
             UserWarning,
-            match="The graph-based decomposition system is unable to find a decomposition for",
+            match="The graph-based decomposition system is unable to find a decomposition"
+            " for {'Hadamard'} to the target gate set {'GlobalPhase'}.",
         ):
             circuit(0)
 
