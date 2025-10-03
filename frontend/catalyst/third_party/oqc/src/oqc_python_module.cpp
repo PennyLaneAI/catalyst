@@ -33,16 +33,21 @@ try:
     password = os.environ.get("OQC_PASSWORD")
     url = os.environ.get("OQC_URL")
     if not all([email, password, url]):
-        raise ValueError("OQC credentials not found in environment variables. Please set the environment variables `OQC_EMAIL`, `OQC_PASSWORD` and `OQC_URL`.")
-    from qcaas_client.client import OQCClient, QPUTask, CompilerConfig
-    from qcaas_client.config import QuantumResultsFormat, Tket, TketOptimizations
-    optimisations = Tket()
-    optimisations.tket_optimizations = TketOptimizations.DefaultMappingPass
+        raise ValueError(
+            """
+            OQC credentials not found in environment variables.
+            Please set the environment variables `OQC_EMAIL`, `OQC_PASSWORD` and `OQC_URL`.
+            """
+        )
+    import qcaas_client
+    from qcaas_client.client import OQCClient, QPUTask, CompilerConfig, QuantumResultsFormat
+    optimisations = qcaas_client._externalized_compiler_config.Tket()
+    optimisations.tket_optimizations = qcaas_client._externalized_compiler_config.TketOptimizations.DefaultMappingPass
     RES_FORMAT = QuantumResultsFormat().binary_count()
     client = OQCClient(url=url, email=email, password=password)
     client.authenticate()
     oqc_config = CompilerConfig(repeats=shots, results_format=RES_FORMAT, optimizations=optimisations)
-    oqc_task = QPUTask(circuit, oqc_config)
+    oqc_task = QPUTask(program=circuit, config=oqc_config, qpu_id="temp; ask from user if these ids are private in oqc")
     res = client.execute_tasks(oqc_task)
     counts = res[0].result["cbits"]
 except Exception as e:
