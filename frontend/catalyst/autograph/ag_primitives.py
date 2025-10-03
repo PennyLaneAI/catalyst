@@ -548,13 +548,6 @@ def converted_call(fn, args, kwargs, caller_fn_scope=None, options=None):
             catalyst.mitigate_with_zne,
         )
 
-        # Build a map from module paths to decorator functions by inspecting the known wrappers
-        decorator_map = {
-            wrapper_fn.__module__: wrapper_fn
-            for wrapper_fn in _known_wrapper_functions
-            if hasattr(wrapper_fn, "__module__")
-        }
-
         # HOTFIX: pass through calls of known Catalyst wrapper functions
         if fn in _known_wrapper_functions:
             if not args:
@@ -614,7 +607,10 @@ def converted_call(fn, args, kwargs, caller_fn_scope=None, options=None):
         # autograph conversion. We detect these wrappers and unwrap them to convert the
         # original function with autograph.
         if hasattr(fn, "__wrapped__") and hasattr(fn, "__module__"):
-            if decorator := decorator_map.get(fn.__module__):
+            # Find the decorator function
+            if decorator := next(
+                (f for f in _known_wrapper_functions if hasattr(f, "__module__")), None
+            ):
                 original_fn = fn.__wrapped__
 
                 # Convert the original function with autograph
