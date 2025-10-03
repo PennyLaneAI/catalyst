@@ -166,8 +166,9 @@ class OpSignatureAnalyzer {
 
             for (const auto &indices : {signature.inWireIndices, signature.inCtrlWireIndices}) {
                 if (!indices.empty()) {
-                    operands[operandIdx++] =
+                    operands[operandIdx] =
                         fromTensorOrAsIs(indices, funcInputs[operandIdx], rewriter, loc);
+                    operandIdx++;
                 }
             }
         }
