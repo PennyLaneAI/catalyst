@@ -92,4 +92,9 @@ def _check_envvar():
     email = os.getenv("OQC_EMAIL")
     password = os.getenv("OQC_PASSWORD")
     if not all((url, email, password)):
-        raise ValueError("You must set url, email and password as environment variables.")
+        raise ValueError(
+            """
+            OQC credentials not found in environment variables.
+            Please set the environment variables `OQC_EMAIL`, `OQC_PASSWORD` and `OQC_URL`.
+            """
+        )
