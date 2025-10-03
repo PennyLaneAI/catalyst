@@ -91,9 +91,7 @@ class TestOQCDevice:
         """Test the device get_c_interface method."""
         from catalyst.third_party.oqc import OQCDevice
 
-        with pytest.raises(
-            ValueError, match="You must set url, email and password as environment variables."
-        ):
+        with pytest.raises(ValueError, match="OQC credentials not found in environment variables."):
             OQCDevice(backend="lucy", shots=1000, wires=8)
 
 
