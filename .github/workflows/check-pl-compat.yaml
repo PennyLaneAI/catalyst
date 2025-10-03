@@ -41,7 +41,7 @@ jobs:
       run: |
         git checkout v0.12.0-rc
 
-    - name: Set up Python # Ensure python3.10 is used
+    - name: Set up Python
       uses: actions/setup-python@v5
       with:
         python-version: ${{ needs.constants.outputs.primary_python_version }}
