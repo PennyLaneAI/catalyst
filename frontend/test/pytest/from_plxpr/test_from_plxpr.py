@@ -15,6 +15,8 @@
 This module tests the from_plxpr conversion function.
 """
 
+# pylint: disable=too-many-lines
+
 from functools import partial
 
 import jax
