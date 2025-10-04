@@ -12,11 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <catch2/catch.hpp>
+#include <pybind11/embed.h>
+
 #include "OQCDevice.cpp"
 #include "OQCRunner.hpp"
 #include "RuntimeCAPI.h"
-
-#include <catch2/catch.hpp>
 
 using namespace Catalyst::Runtime::Device;
 
@@ -72,6 +73,12 @@ TEST_CASE("Test the bell pair circuit", "[openqasm]")
 
 TEST_CASE("Test counts", "[openqasm][counts]")
 {
+    // This test needs a python interpreter to execute the OQC python script
+    // inside the `OQCDevice`'s `PartialCounts' method.
+    if (!Py_IsInitialized()) {
+        pybind11::initialize_interpreter();
+    }
+
     std::unique_ptr<OQCDevice> device = std::make_unique<OQCDevice>("{shots : 100}");
     auto wires = device->AllocateQubits(2);
 
