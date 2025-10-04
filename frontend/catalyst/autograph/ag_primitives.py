@@ -532,10 +532,11 @@ def converted_call(fn, args, kwargs, caller_fn_scope=None, options=None):
         (ag_config, "CONVERSION_RULES", module_allowlist),
         (ag_py_builtins, "BUILTIN_FUNCTIONS_MAP", py_builtins_map),
     ):
-        # HOTFIX: pass through calls of known Catalyst wrapper functions
-        if fn in (
+        # List of known wrapper functions that should be handled specially
+        _known_wrapper_functions = (
             catalyst.adjoint,
             qml.adjoint,
+            qml.prod,
             catalyst.ctrl,
             qml.ctrl,
             catalyst.grad,
@@ -545,7 +546,10 @@ def converted_call(fn, args, kwargs, caller_fn_scope=None, options=None):
             catalyst.jvp,
             catalyst.vmap,
             catalyst.mitigate_with_zne,
-        ):
+        )
+
+        # HOTFIX: pass through calls of known Catalyst wrapper functions
+        if fn in _known_wrapper_functions:
             if not args:
                 raise ValueError(f"{fn.__name__} requires at least one argument")
 
@@ -597,6 +601,26 @@ def converted_call(fn, args, kwargs, caller_fn_scope=None, options=None):
             new_qnode = copy.copy(fn)
             new_qnode.func = qnode_call_wrapper
             return new_qnode(**new_kwargs)
+
+        # HOTFIX: Handle calls to functions that were decorated with qml.prod, qml.adjoint, etc.
+        # These decorators return wrapper functions that call the original function without
+        # autograph conversion. We detect these wrappers and unwrap them to convert the
+        # original function with autograph.
+        if hasattr(fn, "__wrapped__") and hasattr(fn, "__module__"):
+            # Find the decorator function
+            if decorator := next(
+                (f for f in _known_wrapper_functions if f.__module__ == fn.__module__), None
+            ):
+                original_fn = fn.__wrapped__
+
+                # Convert the original function with autograph
+                def converted_inner(*inner_args, **inner_kwargs):
+                    return converted_call(
+                        original_fn, inner_args, inner_kwargs, caller_fn_scope, options
+                    )
+
+                # Apply the decorator to the converted function and call it
+                return decorator(converted_inner)(*args, **(kwargs if kwargs is not None else {}))
 
         return ag_converted_call(fn, args, kwargs, caller_fn_scope, options)
 
