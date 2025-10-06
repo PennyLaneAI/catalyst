@@ -483,15 +483,7 @@ jobs:
     - name: Install PennyLane-Lightning release candidate
       if: github.event.pull_request.base.ref == 'v0.13.0-rc'
       run: |
-        LIGHTNING_RC_VER=$( \
-        pip index versions --extra-index-url https://test.pypi.org/simple/ PennyLane-Lightning --pre | \
-        grep "Available versions:" | \
-        sed 's/Available versions: //g' | \
-        tr ',' '\n' | \
-        grep "0.43.0rc" | \
-        head -n 1 | \
-        tr -d '[:space:]' )
-        pip install --no-deps --pre -U --extra-index-url https://test.pypi.org/simple/ pennylane-lightning==$LIGHTNING_RC_VER
+        pip install --extra-index-url https://test.pypi.org/simple/ --no-deps --pre -U pennylane-lightning'<=0.43.0'
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
@@ -584,15 +576,7 @@ jobs:
     - name: Install PennyLane-Lightning-Kokkos release candidate
       if: github.event.pull_request.base.ref == 'v0.13.0-rc'
       run: |
-        LIGHTNING_KOKKOS_RC_VER=$( \
-        pip index versions --extra-index-url https://test.pypi.org/simple/ pennylane-lightning-kokkos --pre | \
-        grep "Available versions:" | \
-        sed 's/Available versions: //g' | \
-        tr ',' '\n' | \
-        grep "0.43.0rc" | \
-        head -n 1 | \
-        tr -d '[:space:]' )
-        pip install --no-deps --pre -U --extra-index-url https://test.pypi.org/simple/ pennylane-lightning-kokkos==$LIGHTNING_KOKKOS_RC_VER
+        pip install --extra-index-url https://test.pypi.org/simple/ --no-deps --pre -U pennylane-lightning-kokkos'<=0.43.0'
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
