@@ -606,7 +606,7 @@ def converted_call(fn, args, kwargs, caller_fn_scope=None, options=None):
         # These decorators return wrapper functions that call the original function without
         # autograph conversion. We detect these wrappers and unwrap them to convert the
         # original function with autograph.
-        if hasattr(fn, "__wrapped__") and hasattr(fn, "__module__"):
+        if hasattr(fn, "__wrapped__"):
             # Find the decorator function
             if decorator := next(
                 (f for f in _known_wrapper_functions if f.__module__ == fn.__module__), None
