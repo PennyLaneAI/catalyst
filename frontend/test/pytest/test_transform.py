@@ -1117,6 +1117,7 @@ class TestTransformValidity:
             qml.X(0)
             measurements = [measure(i) for i in range(2)]
             return measurements, qml.expval(qml.PauliZ(0))
+
         if transform == measurements_from_counts:
             with pytest.raises(
                 CompileError,
