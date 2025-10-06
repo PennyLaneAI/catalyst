@@ -423,6 +423,7 @@ class TestMidCircuitMeasurement:
 
 class TestDynamicOneShotIntegration:
     """Integration tests for QNodes using mcm_method="one-shot"/dynamic_one_shot."""
+
     @pytest.mark.parametrize("shots", [1, 2])
     def test_dynamic_one_shot_static_argnums(self, backend, shots):
         """
@@ -440,7 +441,7 @@ class TestDynamicOneShotIntegration:
 
             return circ()
 
-        assert np.allclose(workflow(shots), [1 if i == 0 else 0 for i in range(2 ** shots)])
+        assert np.allclose(workflow(shots), [1 if i == 0 else 0 for i in range(2**shots)])
 
     # pylint: disable=too-many-arguments
     @pytest.mark.parametrize(
