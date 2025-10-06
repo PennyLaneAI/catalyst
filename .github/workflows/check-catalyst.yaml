@@ -478,13 +478,13 @@ jobs:
     - name: Install PennyLane release candidate
       if: github.event.pull_request.base.ref == 'v0.13.0-rc'
       run: |
-        pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@0.43.0-rc0
+        pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@v0.43.0-rc0
     - name: Checkout PennyLane-Lightning release branch
       if: github.event.pull_request.base.ref == 'v0.13.0-rc'
       uses: actions/checkout@v4
       with:
         repository: PennyLaneAI/pennylane-lightning
-        ref: 0.43.0_rc
+        ref: v0.43.0_rc
         path: lightning_build
         fetch-depth: 0
 
@@ -581,13 +581,13 @@ jobs:
     - name: Install PennyLane release candidate
       if: github.event.pull_request.base.ref == 'v0.13.0-rc'
       run: |
-        pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@0.43.0-rc0
+        pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@v0.43.0-rc0
     - name: Checkout PennyLane-Lightning release branch
       if: github.event.pull_request.base.ref == 'v0.13.0-rc'
       uses: actions/checkout@v4
       with:
         repository: PennyLaneAI/pennylane-lightning
-        ref: 0.43.0_rc
+        ref: v0.43.0_rc
         path: lightning_build
         fetch-depth: 0
 
@@ -665,7 +665,7 @@ jobs:
     - name: Install PennyLane release candidate
       if: github.event.pull_request.base.ref == 'v0.13.0-rc'
       run: |
-        pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@0.43.0-rc0
+        pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@v0.43.0-rc0
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
