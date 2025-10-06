@@ -18,6 +18,7 @@ functions. The purpose is to convert imperative style code to functional or grap
 """
 import copy
 import functools
+import inspect
 import operator
 import warnings
 from typing import Any, Callable, Iterator, SupportsIndex, Tuple, Union
@@ -613,14 +614,24 @@ def converted_call(fn, args, kwargs, caller_fn_scope=None, options=None):
             ):
                 original_fn = fn.__wrapped__
 
+                # Extract decorator arguments from the closure
+                closure_vars = inspect.getclosurevars(fn)
+                decorator_kwargs = {
+                    k: v
+                    for k, v in closure_vars.nonlocals.items()
+                    if v is not original_fn  # Exclude the wrapped function itself
+                }
+
                 # Convert the original function with autograph
                 def converted_inner(*inner_args, **inner_kwargs):
                     return converted_call(
                         original_fn, inner_args, inner_kwargs, caller_fn_scope, options
                     )
 
-                # Apply the decorator to the converted function and call it
-                return decorator(converted_inner)(*args, **(kwargs if kwargs is not None else {}))
+                # Apply the decorator to the converted function and call it with the original kwargs
+                return decorator(converted_inner, **decorator_kwargs)(
+                    *args, **(kwargs if kwargs is not None else {})
+                )
 
         return ag_converted_call(fn, args, kwargs, caller_fn_scope, options)
 
