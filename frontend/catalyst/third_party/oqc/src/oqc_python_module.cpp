@@ -46,8 +46,8 @@ try:
     client = OQCClient(url=url, email=email, password=password)
     client.authenticate()
     oqc_config = CompilerConfig(repeats=shots, results_format=RES_FORMAT, optimizations=optimisations)
-    oqc_task = QPUTask(program=circuit, config=oqc_config, qpu_id="temp; ask from user if these ids are private in oqc")
-    res = client.execute_tasks(oqc_task)
+    oqc_task = QPUTask(program=circuit, config=oqc_config, qpu_id="qpu:uk:2:d865b5a184")
+    res = client.execute_tasks(oqc_task, qpu_id="qpu:uk:2:d865b5a184")
     counts = res[0].result["cbits"]
 except Exception as e:
     print(f"circuit: {circuit}")
