@@ -478,22 +478,12 @@ jobs:
     - name: Install PennyLane release candidate
       if: github.event.pull_request.base.ref == 'v0.13.0-rc'
       run: |
-        pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@v0.43.0-rc0
-    - name: Checkout PennyLane-Lightning release branch
-      if: github.event.pull_request.base.ref == 'v0.13.0-rc'
-      uses: actions/checkout@v4
-      with:
-        repository: PennyLaneAI/pennylane-lightning
-        ref: v0.43.0_rc
-        path: lightning_build
-        fetch-depth: 0
+        pip install --no-deps --pre -U --extra-index-url https://test.pypi.org/simple/ pennylane
 
     - name: Install PennyLane-Lightning release candidate
       if: github.event.pull_request.base.ref == 'v0.13.0-rc'
       run: |
-        cd lightning_build
-        pip install -r requirements.txt
-        pip install --no-deps --force .
+        pip install --no-deps --pre -U --extra-index-url https://test.pypi.org/simple/ pennylane-lightning
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
@@ -581,24 +571,12 @@ jobs:
     - name: Install PennyLane release candidate
       if: github.event.pull_request.base.ref == 'v0.13.0-rc'
       run: |
-        pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@v0.43.0-rc0
-    - name: Checkout PennyLane-Lightning release branch
-      if: github.event.pull_request.base.ref == 'v0.13.0-rc'
-      uses: actions/checkout@v4
-      with:
-        repository: PennyLaneAI/pennylane-lightning
-        ref: v0.43.0_rc
-        path: lightning_build
-        fetch-depth: 0
+        pip install --no-deps --pre -U --extra-index-url https://test.pypi.org/simple/ pennylane
 
-    - name: Install PennyLane-Lightning release candidate
+    - name: Install PennyLane-Lightning-Kokkos release candidate
       if: github.event.pull_request.base.ref == 'v0.13.0-rc'
       run: |
-        # Lightning-Kokkos can no longer be installed with pip from git
-        cd lightning_build
-        pip install -r requirements.txt
-        PL_BACKEND=lightning_kokkos python scripts/configure_pyproject_toml.py
-        pip install --no-deps --force .
+        pip install --no-deps --pre -U --extra-index-url https://test.pypi.org/simple/ pennylane-lightning-kokkos
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
@@ -665,7 +643,7 @@ jobs:
     - name: Install PennyLane release candidate
       if: github.event.pull_request.base.ref == 'v0.13.0-rc'
       run: |
-        pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@v0.43.0-rc0
+        pip install --no-deps --pre -U --extra-index-url https://test.pypi.org/simple/ pennylane
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
