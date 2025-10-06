@@ -2,7 +2,7 @@ name: Build Release Branch Nightly for TestPyPI
 
 on:
   schedule:
-    # Run from October 7th to July 12th at 02:00 UTC (10:00 PM EDT)
+    # Run from October 7th to October 12th at 02:00 UTC (10:00 PM EDT)
     - cron: "0 2 7-12 10 *"
   workflow_dispatch:
     inputs:
