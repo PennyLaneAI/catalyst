@@ -810,9 +810,9 @@ class CondCallable:
             # use this familiar PL pattern, e.g. `qml.cond(p, qml.RY)(0.1, 0)`.
             if isinstance(fn, type) and issubclass(fn, qml.operation.Operation):
                 fn(*args, **kwargs)
-                # swallow return value to avoid mismatched pytrees across branches
-            else:
-                return fn(*args, **kwargs)
+                return None  # swallow return value to avoid mismatched pytrees across branches
+
+            return fn(*args, **kwargs)
 
         return argless_fn
 
