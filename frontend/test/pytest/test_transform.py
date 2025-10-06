@@ -1092,6 +1092,45 @@ class TestTransformValidity:
     """Test validity of transforms."""
 
     @pytest.mark.parametrize("transform", (measurements_from_counts, measurements_from_samples))
+    def test_invalid_modify_measurements_classical_return(self, backend, transform, monkeypatch):
+        """Test verification for transforms that are non-batching but modify tape measurements
+        while returning classical values."""
+
+        def inject_device_transforms(self, ctx, execution_config=None, shots=None):
+            program, config = original_preprocess(self, ctx, execution_config, shots=shots)
+
+            program.add_transform(transform, self.wires)
+
+            return program, config
+
+        # Simulate a Qrack-like device that requires measurement process transforms.
+        # Qnode transforms raise this error anyway so we cannot use them directly.
+        original_preprocess = QJITDevice.preprocess
+        monkeypatch.setattr(QJITDevice, "preprocess", inject_device_transforms)
+
+        dev = qml.device(backend, wires=2)
+
+        @partial(transform, device_wires=dev.wires)
+        @qml.set_shots(5)
+        @qml.qnode(dev, mcm_method="one-shot")
+        def qfunc():
+            qml.X(0)
+            measurements = [measure(i) for i in range(2)]
+            return measurements, qml.expval(qml.PauliZ(0))
+        if transform == measurements_from_counts:
+            with pytest.raises(
+                CompileError,
+                match="measurements_from_counts is not supported with one-shot",
+            ):
+                qjit(qfunc)
+        else:
+            with pytest.raises(
+                CompileError,
+                match="measurements_from_samples is not supported with one-shot",
+            ):
+                qjit(qfunc)
+
+    @pytest.mark.parametrize("transform", (measurements_from_counts, measurements_from_samples))
     def test_valid_modify_measurements_no_measurements(self, backend, transform, monkeypatch):
         """Test verification for transforms that are non-batching and in-principle can modify tape
         measurements but don't, while returning classical values."""
