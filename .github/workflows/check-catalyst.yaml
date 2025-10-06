@@ -475,6 +475,26 @@ jobs:
         python3 -m pip install oqc-qcaas-client
         make frontend
 
+    - name: Install PennyLane release candidate
+      if: github.event.pull_request.base.ref == '0.13.0-rc'
+      run: |
+        pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@0.43.0-rc0
+    - name: Checkout PennyLane-Lightning release branch
+      if: github.event.pull_request.base.ref == '0.13.0-rc'
+      uses: actions/checkout@v4
+      with:
+        repository: PennyLaneAI/pennylane-lightning
+        ref: 0.43.0_rc
+        path: lightning_build
+        fetch-depth: 0
+
+    - name: Install PennyLane-Lightning release candidate
+      if: github.event.pull_request.base.ref == '0.13.0-rc'
+      run: |
+        cd lightning_build
+        pip install -r requirements.txt
+        pip install --no-deps --force .
+
     - name: Get Cached LLVM Build
       id: cache-llvm-build
       uses: actions/cache@v4
@@ -558,6 +578,28 @@ jobs:
         python3 -m pip install -r requirements.txt
         make frontend
 
+    - name: Install PennyLane release candidate
+      if: github.event.pull_request.base.ref == '0.13.0-rc'
+      run: |
+        pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@0.43.0-rc0
+    - name: Checkout PennyLane-Lightning release branch
+      if: github.event.pull_request.base.ref == '0.13.0-rc'
+      uses: actions/checkout@v4
+      with:
+        repository: PennyLaneAI/pennylane-lightning
+        ref: 0.43.0_rc
+        path: lightning_build
+        fetch-depth: 0
+
+    - name: Install PennyLane-Lightning release candidate
+      if: github.event.pull_request.base.ref == '0.13.0-rc'
+      run: |
+        # Lightning-Kokkos can no longer be installed with pip from git
+        cd lightning_build
+        pip install -r requirements.txt
+        PL_BACKEND=lightning_kokkos python scripts/configure_pyproject_toml.py
+        pip install --no-deps --force .
+
     - name: Get Cached LLVM Build
       id: cache-llvm-build
       uses: actions/cache@v4
@@ -619,6 +661,11 @@ jobs:
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
         make frontend
+
+    - name: Install PennyLane release candidate
+      if: github.event.pull_request.base.ref == '0.13.0-rc'
+      run: |
+        pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@0.43.0-rc0
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
