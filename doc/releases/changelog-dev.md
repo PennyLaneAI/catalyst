@@ -94,6 +94,12 @@
   [(#2048)](https://github.com/PennyLaneAI/catalyst/pull/2048)
   [(#2085)](https://github.com/PennyLaneAI/catalyst/pull/2085)
 
+  The impact of the ``reduce_t_depth`` pass can be measured using ``catalyst.passes.ppm_specs``
+  to compare the circuit depth before and after applying the pass. The ``ppm_specs`` function
+  provides detailed statistics including ``depth_pi8_ppr`` (non-Clifford PPR depth) and
+  ``pi8_ppr`` (number of non-Clifford PPRs), allowing users to quantify the optimization
+  achieved by the pass.
+
   Consider the following circuit.
 
   ```python

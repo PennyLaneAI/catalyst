@@ -1118,6 +1118,11 @@ def reduce_t_depth(qnode):
     commuting PPRs in adjacent layers and merging compatible ones (a layer comprises a set of PPRs
     that mutually commute). For more details, see the Figure 6 of
     `A Game of Surface Codes <https://arXiv:1808.02892v3>`_.
+    
+    The impact can be measured using ``catalyst.passes.ppm_specs`` to compare the circuit depth 
+    before and after applying the pass. The ``ppm_specs`` function provides detailed statistics 
+    including ``depth_pi8_ppr`` (non-Clifford PPR depth) and ``pi8_ppr`` (number of non-Clifford 
+    PPRs), allowing users to quantify the optimization achieved by the pass.
 
     Args:
         qnode (QNode): QNode to apply the pass to.
