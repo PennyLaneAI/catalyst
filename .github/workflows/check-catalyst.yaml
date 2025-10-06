@@ -476,11 +476,11 @@ jobs:
         make frontend
 
     - name: Install PennyLane release candidate
-      if: github.event.pull_request.base.ref == '0.13.0-rc'
+      if: github.event.pull_request.base.ref == 'v0.13.0-rc'
       run: |
         pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@0.43.0-rc0
     - name: Checkout PennyLane-Lightning release branch
-      if: github.event.pull_request.base.ref == '0.13.0-rc'
+      if: github.event.pull_request.base.ref == 'v0.13.0-rc'
       uses: actions/checkout@v4
       with:
         repository: PennyLaneAI/pennylane-lightning
@@ -489,7 +489,7 @@ jobs:
         fetch-depth: 0
 
     - name: Install PennyLane-Lightning release candidate
-      if: github.event.pull_request.base.ref == '0.13.0-rc'
+      if: github.event.pull_request.base.ref == 'v0.13.0-rc'
       run: |
         cd lightning_build
         pip install -r requirements.txt
@@ -579,11 +579,11 @@ jobs:
         make frontend
 
     - name: Install PennyLane release candidate
-      if: github.event.pull_request.base.ref == '0.13.0-rc'
+      if: github.event.pull_request.base.ref == 'v0.13.0-rc'
       run: |
         pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@0.43.0-rc0
     - name: Checkout PennyLane-Lightning release branch
-      if: github.event.pull_request.base.ref == '0.13.0-rc'
+      if: github.event.pull_request.base.ref == 'v0.13.0-rc'
       uses: actions/checkout@v4
       with:
         repository: PennyLaneAI/pennylane-lightning
@@ -592,7 +592,7 @@ jobs:
         fetch-depth: 0
 
     - name: Install PennyLane-Lightning release candidate
-      if: github.event.pull_request.base.ref == '0.13.0-rc'
+      if: github.event.pull_request.base.ref == 'v0.13.0-rc'
       run: |
         # Lightning-Kokkos can no longer be installed with pip from git
         cd lightning_build
@@ -663,7 +663,7 @@ jobs:
         make frontend
 
     - name: Install PennyLane release candidate
-      if: github.event.pull_request.base.ref == '0.13.0-rc'
+      if: github.event.pull_request.base.ref == 'v0.13.0-rc'
       run: |
         pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@0.43.0-rc0
 
