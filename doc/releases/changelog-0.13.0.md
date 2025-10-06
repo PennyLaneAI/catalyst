@@ -18,7 +18,7 @@
   [(#2002)](https://github.com/PennyLaneAI/catalyst/pull/2002)
 
   Two new functions, ``qml.allocate()`` and ``qml.deallocate()``, [have been added to
-  PennyLane](https://docs.pennylane.ai/en/stable/development/release_notes.html#release-0-43-0) 
+  PennyLane](https://docs.pennylane.ai/en/stable/development/release_notes.html#release-0-43-0)
   to support dynamic wire allocation. With Catalyst, these features can be accessed on
    ``lightning.qubit``, ``lightning.kokkos``, and ``lightning.gpu``.
 
@@ -45,13 +45,13 @@
   ```
 
   In the above program, 2 qubits are allocated during device initialization, and 1
-  additional qubit is allocated inside the circuit with ``qml.allocate(1)``. 
+  additional qubit is allocated inside the circuit with ``qml.allocate(1)``.
 
   For more information on what ``qml.allocate`` and ``qml.deallocate`` do, please consult the
   [PennyLane v0.43 release notes](https://docs.pennylane.ai/en/stable/development/release_notes.html#release-0-43-0).
 
   However, there are some notable differences between the behaviour of these features
-  with ``qjit`` versus without. For details, please see the relevant sections in the 
+  with ``qjit`` versus without. For details, please see the relevant sections in the
   [Catalyst sharp bits page](https://docs.pennylane.ai/projects/catalyst/en/stable/dev/sharp_bits.html#functionality-differences-from-pennylane).
 
 * A new quantum compilation pass that reduces the depth and count of non-Clifford Pauli product
@@ -98,7 +98,7 @@
               qml.H(wires=i)
               qml.T(wires=i)
 
-          return [measure(wires=i) for i in range(n)] 
+          return [measure(wires=i) for i in range(n)]
 
       print(ppm_specs(circuit))
   ```
@@ -108,7 +108,7 @@
   {'circuit_0': {'depth_pi8_ppr': 4, 'depth_ppm': 1, 'logical_qubits': 3, 'max_weight_pi8': 3, 'num_of_ppm': 3, 'pi8_ppr': 6}}
   ```
 
-  After performing the :func:`~.passes.to_ppr`, :func:`~.passes.commute_ppr`, and :func:`~.passes.merge_ppr_ppm`, 
+  After performing the :func:`~.passes.to_ppr`, :func:`~.passes.commute_ppr`, and :func:`~.passes.merge_ppr_ppm`,
   passes, the circuit contains a depth of four of non-Clifford PPRs (`depth_pi8_ppr`). Subsequently applying the
   :func:`~.passes.t_layer_reduction` pass will move PPRs around via commutation, resulting in a circuit with a
   smaller PPR depth of three.
@@ -166,6 +166,11 @@
   [[#2019]](https://github.com/PennyLaneAI/catalyst/pull/2019)
 
 <h3>Improvements 🛠</h3>
+
+* Catalyst conditional operators, such as :func:`~.cond` or :func:`pennylane.cond`, now allow the
+  target / branch functions to use arguments in their call signature. Previously, one had to supply
+  all values via closure, but this is now done automatically under the hood.
+  [(#2096)](https://github.com/PennyLaneAI/catalyst/pull/2096)
 
 * Significantly improved resource tracking with `null.qubit`.
   The new tracking has better integration with PennyLane (e.g. for passing the filename to write out), cleaner documentation, and its own wrapper class.
@@ -453,7 +458,7 @@ for example the one-shot mid circuit measurement transform.
   [(#2057)](https://github.com/PennyLaneAI/catalyst/pull/2057)
 
   This pass is part of a bottom-of-stack MBQC execution pathway, with a thin shim between the
-  PPR/PPM layer and MBQC to enable end-to-end compilation on a mocked backend.  Also, in an MBQC gate 
+  PPR/PPM layer and MBQC to enable end-to-end compilation on a mocked backend.  Also, in an MBQC gate
   set, one of the gate `RotXZX` cannot yet be executed on available backends.
 
   ```python
@@ -477,8 +482,8 @@ for example the one-shot mid circuit measurement transform.
 
 <h3>Documentation 📝</h3>
 
-* Typos were fixed and supplemental information was added to the 
-  docstrings for ``ppm_compilaion``, ``to_ppr``, ``commute_ppr``, 
+* Typos were fixed and supplemental information was added to the
+  docstrings for ``ppm_compilaion``, ``to_ppr``, ``commute_ppr``,
   ``ppr_to_ppm``, ``merge_ppr_ppm``, and ``ppm_specs``.
   [(#2050)](https://github.com/PennyLaneAI/catalyst/pull/2050)
 
