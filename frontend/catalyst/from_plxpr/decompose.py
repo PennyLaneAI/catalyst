@@ -21,6 +21,7 @@ from __future__ import annotations
 import functools
 import inspect
 import types
+import warnings
 from collections.abc import Callable
 from typing import get_type_hints
 
@@ -358,8 +359,34 @@ def _solve_decomposition_graph(operations, gate_set, fixed_decomps, alt_decomps)
         alt_decomps=alt_decomps,
     )
 
-    # Find the efficient pathways to the target gate set
-    solutions = decomp_graph.solve()
+    with warnings.catch_warnings(record=True) as captured_warnings:
+        warnings.simplefilter("always", UserWarning)
+        solutions = decomp_graph.solve()
+
+    # Check if the graph-based decomposition failed for any operation
+    # We shall do the check after the context manager of warnings.catch_warnings
+    # to be able to check and re-emit the warnings to the user.
+    graph_failed = False
+
+    for wi in captured_warnings:
+        # Re-emit all captured warnings to the user
+        warnings.showwarning(wi.message, wi.category, wi.filename, wi.lineno)
+
+        # TODO: use a custom warning class for this in PennyLane to remove this
+        # string matching and make it more robust.
+        if "The graph-based decomposition system is unable" in str(wi.message):  # pragma: no cover
+            graph_failed = True
+
+    if graph_failed:
+        # Note that this warning is already issued in the DecompositionGraph.solve()
+        # method, but we capture it here to make it more visible to the user
+        # that we are falling back to the standard PennyLane decomposition.
+        # This is important because we cannot use `op.decomposition()` in the
+        # Catalyst MLIR decomposition pass, as it may introduce new unsupported ops
+        # so we need to inform the user that if some operations could not be
+        # decomposed to the target gate set using the graph-based approach,
+        # we need to fallback to the legacy approach without MLIR decomposition.
+        return {}
 
     def is_solved_for(op):
         return (
