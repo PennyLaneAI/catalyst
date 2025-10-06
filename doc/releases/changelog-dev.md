@@ -174,7 +174,7 @@
   [(#2055)](https://github.com/PennyLaneAI/catalyst/pull/2055)
 
 * Catalyst now supports returning classical and MCM values with the dynamic one-shot MCM method.
-  [(#2004)](https://github.com/PennyLaneAI/catalyst/pull/2004)
+  [(#2004)](https://github.com/PennyLaneAI/catalyst/pull/2004) [(#2090)](https://github.com/PennyLaneAI/catalyst/pull/2090)
 
   For example, the code below will generate 10 values, with an equal probability of 42 and 43
   appearing.
@@ -363,9 +363,6 @@
 * `static_argnums` is now correctly passed to internally transformed kernel functions,
 for example the one-shot mid circuit measurement transform.
   [(#2056)](https://github.com/PennyLaneAI/catalyst/pull/2056)
-
-* Dynamic one-shot no longer crashes or output incorrect results when setting `shots=1`.
-  [(#2090)](https://github.com/PennyLaneAI/catalyst/pull/2090)
 
 <h3>Internal changes ⚙️</h3>
 
