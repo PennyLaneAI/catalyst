@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Test for the device preprocessing."""
+
 import platform
 from dataclasses import replace
 
@@ -476,22 +477,18 @@ class TestPreprocessHybridOp:
 
     @pytest.mark.usefixtures("create_temporary_toml_file")
     @pytest.mark.parametrize("create_temporary_toml_file", [TEST_DEVICE_CONFIG_TEXT], indirect=True)
-    def test_controlled_decomposes_to_unitary_controlled(self, request):
-        """Test that a PennyLane controlled operation is decomposed to a QubitUnitary"""
+    def test_controlled_decomposes_to_gate_sequence(self, request):
+        """Test that a PennyLane controlled operation is decomposed to a gate sequence."""
 
         tape = qml.tape.QuantumScript([qml.ctrl(qml.RX(1.23, 0), 1)])
 
         capabilities = DeviceCapabilities.from_toml_file(request.node.toml_file)
-        setattr(capabilities, "to_matrix_ops", {"S": OperatorProperties()})
 
         with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
             (new_tape,), _ = catalyst_decompose(tape, ctx, capabilities)
 
-        assert len(new_tape.operations) == 1
-        new_op = new_tape.operations[0]
-
-        assert isinstance(new_op, qml.QubitUnitary)
-        assert np.allclose(new_op.matrix(), tape.operations[0].matrix())
+        assert len(new_tape.operations) == 6
+        assert np.allclose(qml.matrix(new_tape, wire_order=[1, 0]), tape.operations[0].matrix())
 
     @pytest.mark.usefixtures("create_temporary_toml_file")
     @pytest.mark.parametrize("create_temporary_toml_file", [TEST_DEVICE_CONFIG_TEXT], indirect=True)
@@ -578,7 +575,10 @@ class TestPreprocessHybridOp:
         capabilities = DeviceCapabilities.from_toml_file(request.node.toml_file)
         setattr(capabilities, "to_matrix_ops", {"S": OperatorProperties()})
 
-        with pytest.raises(CompileError, match="could not be decomposed, it might be unsupported"):
+        with pytest.raises(
+            CompileError,
+            match="not supported with catalyst on this device and does not provide a decomposition",
+        ):
             with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
                 _ = catalyst_decompose(
                     tape,

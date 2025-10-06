@@ -16,6 +16,7 @@
 This module contains the decomposition functions to pre-process tapes for
 compilation & execution on devices.
 """
+
 import copy
 import logging
 from functools import partial
@@ -79,11 +80,9 @@ def catalyst_decomposer(op, capabilities: DeviceCapabilities):
     if op.name in getattr(capabilities, "to_matrix_ops", {}):
         return _decompose_to_matrix(op)
 
-    if op.has_matrix and isinstance(op, qml.ops.Controlled):
-
+    if not op.has_decomposition and op.has_matrix and "QubitUnitary" in capabilities.operations:
         # If the device supports unitary matrices, apply the fallback.
-        if "QubitUnitary" in capabilities.operations:
-            return _decompose_to_matrix(op)
+        return _decompose_to_matrix(op)
 
     return op.decomposition()
 
