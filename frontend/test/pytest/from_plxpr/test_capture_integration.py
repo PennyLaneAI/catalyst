@@ -1313,6 +1313,38 @@ class TestCapture:
 
         assert jnp.allclose(circuit(1.5, 2.5, 3.5), capture_result)
 
+    def test_transform_graph_decompose_workflow(self, backend):
+        """Test the integration for a circuit with a 'decompose' graph transform."""
+
+        # Capture enabled
+
+        qml.capture.enable()
+        qml.decomposition.enable_graph()
+
+        @qjit(target="mlir")
+        @partial(qml.transforms.decompose, gate_set=[qml.RX, qml.RY, qml.RZ])
+        @qml.qnode(qml.device(backend, wires=2))
+        def captured_circuit(x: float, y: float, z: float):
+            qml.measure(0)
+            qml.Rot(x, y, z, 0)
+            return qml.expval(qml.PauliZ(0))
+
+        capture_result = captured_circuit(1.5, 2.5, 3.5)
+
+        qml.decomposition.disable_graph()
+        qml.capture.disable()
+
+        # Capture disabled
+        @qjit
+        @partial(qml.transforms.decompose, gate_set=[qml.RX, qml.RY, qml.RZ])
+        @qml.qnode(qml.device(backend, wires=2))
+        def circuit(x: float, y: float, z: float):
+            catalyst.measure(0)
+            qml.Rot(x, y, z, 0)
+            return qml.expval(qml.PauliZ(0))
+
+        assert jnp.allclose(circuit(1.5, 2.5, 3.5), capture_result)
+
     def test_transform_map_wires_workflow(self, backend):
         """Test the integration for a circuit with a 'map_wires' transform."""
 
