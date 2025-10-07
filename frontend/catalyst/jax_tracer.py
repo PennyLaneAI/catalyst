@@ -1256,7 +1256,7 @@ def apply_transforms(
             )
             raise CompileError(msg)
         tracing_mode = TracingMode.TRANSFORM
-    elif have_measurements_changed(tape, tapes[0]):
+    elif len(qnode_program) or have_measurements_changed(tape, tapes[0]):
         with_measurement_from_counts_or_samples = any(
             "measurements_from_counts" in str(getattr(qnode, "transform", ""))
             or "measurements_from_samples" in str(getattr(qnode, "transform", ""))
