@@ -262,7 +262,7 @@ def _create_decomposition_rule(
     sig_func = inspect.signature(func)
     type_hints = get_type_hints(func)
 
-    args = {}
+    args = []
     for name in sig_func.parameters.keys():
         typ = type_hints.get(name, None)
 
@@ -291,23 +291,23 @@ def _create_decomposition_rule(
         possible_names_for_wires = {"wires", "wire", "control_wires", "target_wires"}
 
         if typ is TensorLike or name in possible_names_for_multi_params:
-            args[name] = qml.math.array([0.0] * num_params, like="jax", dtype=float)
+            args.append(qml.math.array([0.0] * num_params, like="jax", dtype=float))
         elif typ is float or name in possible_names_for_single_param:
             # TensorLike is a Union of float, int, array-like, so we use float here
             # to cover the most common case as the JAX tracer doesn't like Union types
             # and we don't have the actual values at this point.
-            args[name] = float
+            args.append(float)
         elif typ is WiresLike or name in possible_names_for_wires:
             # Pass a dummy array of zeros with the correct number of wires
             # This is required for the decomposition_rule to work correctly
             # as it expects an array-like input for wires
-            args[name] = qml.math.array([0] * num_wires, like="jax")
+            args.append(qml.math.array([0] * num_wires, like="jax"))
         elif typ is int:  # pragma: no cover
             # This is only for cases where the rule has an int parameter
             # e.g., dimension in some gates. Not that common though!
             # We cover this when adding end-to-end tests for rules
             # in the MLIR PR.
-            args[name] = int
+            args.append(int)
         else:  # pragma: no cover
             raise ValueError(
                 f"Unsupported type annotation {typ} for parameter {name} in func {func}."
@@ -327,7 +327,9 @@ def _create_decomposition_rule(
         # (e.g., MultiRZ, GlobalPhase)
         func_cp.__name__ += f"_wires_{num_wires}"  # pylint: disable=protected-access
 
-    return decomposition_rule(func_cp)(**args)
+    # Note that we shouldn't pass args as kwargs to decomposition_rule
+    # JAX doesn't like it and it may fail to preserve the order of args.
+    return decomposition_rule(func_cp)(*args)
 
 
 # pylint: disable=protected-access

@@ -9,6 +9,7 @@
   Similar to PennyLane's behaviour, this experimental feature will fall back to the old system
   whenever the graph cannot find decomposition rules for all unsupported operators in the program,
   and a ``UserWarning`` is raised.
+  [(#2099)](https://github.com/PennyLaneAI/catalyst/pull/2099)
   [(#2091)](https://github.com/PennyLaneAI/catalyst/pull/2091)
   [(#2029)](https://github.com/PennyLaneAI/catalyst/pull/2029)
   [(#2001)](https://github.com/PennyLaneAI/catalyst/pull/2001)
