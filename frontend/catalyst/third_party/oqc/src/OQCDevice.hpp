@@ -56,6 +56,9 @@ class OQCDevice final : public Catalyst::Runtime::QuantumDevice {
     explicit OQCDevice(const std::string &kwargs = "{device_type : oqc, backend : default}")
     {
         device_kwargs = Catalyst::Runtime::parse_kwargs(kwargs);
+        device_shots = device_kwargs.contains("shots")
+                           ? static_cast<size_t>(std::stoll(device_kwargs["shots"]))
+                           : 0;
         builder = std::make_unique<OpenQASM2Builder>();
         runner = std::make_unique<OQCRunner>();
     }
