@@ -1179,18 +1179,18 @@ def test_decompose_lowering_params_ordering():
     @qjit(target="mlir")
     @partial(qml.transforms.decompose, gate_set=[qml.RX, qml.RY, qml.RZ])
     @qml.qnode(qml.device("lightning.qubit", wires=2))
-    # CHECK: func.func public @circuit_26()
+    # CHECK: func.func public @circuit_26(%arg0: tensor<f64>, %arg1: tensor<f64>, %arg2: tensor<f64>)
     def circuit_26(x: float, y: float, z: float):
         qml.Rot(x, y, z, wires=0)
         return qml.expval(qml.PauliZ(0))
 
     # CHECK: func.func public @_rot_to_rz_ry_rz(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<f64>, %arg3: tensor<f64>, %arg4: tensor<1xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "Rot"}
     # CHECK:  [[EXTRACTED_0:%.+]] = tensor.extract %arg1[] : tensor<f64>
-    # CHECK:  [[OUT_QUBITS:%.+]] = quantum.custom "RZ"([[EXTRACTED_0]]) {{%.+}} : !quantum.bit
+    # CHECK-NEXT:  [[OUT_QUBITS:%.+]] = quantum.custom "RZ"([[EXTRACTED_0]]) {{%.+}} : !quantum.bit
     # CHECK:  [[EXTRACTED_3:%.+]] = tensor.extract %arg2[] : tensor<f64>
-    # CHECK:  [[OUT_QUBITS_4:%.+]] = quantum.custom "RY"([[EXTRACTED_3]]) {{%.+}} : !quantum.bit
+    # CHECK-NEXT:  [[OUT_QUBITS_4:%.+]] = quantum.custom "RY"([[EXTRACTED_3]]) {{%.+}} : !quantum.bit
     # CHECK:  [[EXTRACTED_7:%.+]] = tensor.extract %arg3[] : tensor<f64>
-    # CHECK:  [[OUT_QUBITS_8:%.+]] = quantum.custom "RZ"([[EXTRACTED_7]]) {{%.+}} : !quantum.bit
+    # CHECK-NEXT:  [[OUT_QUBITS_8:%.+]] = quantum.custom "RZ"([[EXTRACTED_7]]) {{%.+}} : !quantum.bit
     # CHECK:  return {{%.+}} : !quantum.reg
     print(circuit_26.mlir)
 
