@@ -390,31 +390,34 @@
 
 <h3>Bug fixes 🐛</h3>
 
-* Fixes an issue with program capture and static argnums on the qnode. The lowering to MLIR is no longer cached
-  if there are static argnums.
+* Fixed an issue with PennyLane program capture and static argnums on the QNode where the same 
+  lowering was being used no matter if the static arguments changed. The lowering to MLIR is no 
+  longer cached if there are static argnums.
   [(#2053)](https://github.com/PennyLaneAI/catalyst/pull/2053)
 
-* Fix type promotion on conditional branches, where the return values from `cond` should be the promoted one.
+* Fixed a bug with incorrect type promotion on conditional branches, which was giving inconsistent
+  output types from qjit'd QNodes.
   [(#1977)](https://github.com/PennyLaneAI/catalyst/pull/1977)
 
-* Fix wrong handling of partitioned shots in the decomposition pass of `measurements_from_samples`.
+* Fixed incorrect handling of partitioned shots in the decomposition pass of 
+  ``measurements_from_samples``.
   [(#1981)](https://github.com/PennyLaneAI/catalyst/pull/1981)
 
-* Fix errors in AutoGraph transformed functions when `qml.prod` is used together with other operator
-  transforms (e.g. `qml.adjoint`).
+* Fixed a compiler error that occurred when ``qml.prod`` was used together with other operator 
+  transforms (e.g., ``qml.adjoint``) when Autograph was enabled.
   [(#1910)](https://github.com/PennyLaneAI/catalyst/pull/1910)
 
-* A bug in the `NullQubit::ReleaseQubit()` method that prevented the deallocation of individual
-  qubits on the `"null.qubit"` device has been fixed.
+* A bug in the ``NullQubit::ReleaseQubit()`` method that prevented the deallocation of individual
+  qubits on the ``"null.qubit"`` device has been fixed.
   [(#1926)](https://github.com/PennyLaneAI/catalyst/pull/1926)
 
 * Stacked Python decorators for built-in Catalyst passes are now applied in the correct order when
-  program capture is enabled.
+  PennyLane program capture is enabled.
   [(#2027)](https://github.com/PennyLaneAI/catalyst/pull/2027)
 
-* Fix usage of OQC device, including:
-  * fix object file system extension on macOS
-  * fix wrong type signature of `Counts` API function
+* Various usages of the OQC device have been fixed, including:
+  - the object file system extension on macOS
+  - an incorrect type signature of the ``Counts`` API function
   [(#2032)](https://github.com/PennyLaneAI/catalyst/pull/2032)
 
 * Fixed the Clifford PPR decomposition rule where using the Y measurement should take the inverse.
