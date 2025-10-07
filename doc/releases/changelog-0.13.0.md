@@ -2,81 +2,20 @@
 
 <h3>New features since last release</h3>
 
-* Catalyst now supports ``qml.specs`` with ``level="device"``.
-  [(#2033)](https://github.com/PennyLaneAI/catalyst/pull/2033)
-  [(#2055)](https://github.com/PennyLaneAI/catalyst/pull/2055)
-
-  This is made possible by leveraging resource-tracking capabilities in the ``null.qubit`` device.
-
-  ```python
-  @qml.qjit
-  @qml.qnode(qml.device("lightning.qubit", wires=2))
-  def circuit():
-      qml.Hadamard(wires=0)
-      qml.CNOT(wires=[0, 1])
-      return qml.expval(qml.Z(0) @ qml.Z(1))
-  ```
-
-  ```pycon
-  >>> print(qml.specs(circuit, level="device")()["resources"])
-  Resources(num_wires=2,
-            num_gates=2,
-            gate_types=defaultdict(<class 'int'>, {'CNOT': 1, 'Hadamard': 1}),
-            gate_sizes=defaultdict(<class 'int'>, {2: 1, 1: 1}),
-            depth=2,
-            shots=Shots(total_shots=None, shot_vector=()))
-  ```
-
-* The 
-  [graph-based decomposition system](https://docs.pennylane.ai/en/stable/code/qml_decomposition.html), 
-  enabled with the global toggle ``qml.decomposition.enable_graph()``, is now supported with 
-  Catalyst with PennyLane program capture enabled (``qml.capture.enable()``). This provides ``qjit`` 
-  compatibility to defining custom decomposition rules and access to the many decomposition rules 
-  for templates and operators in PennyLane that have been added over the past few release cycles.
+* A new experimental decomposition system is introduced in Catalyst enabling the
+  PennyLane's graph-based decomposition and MLIR-based lowering of decomposition rules.
+  This feature is integrated with PennyLane program capture and graph-based decomposition
+  including support for custom decomposition rules and operators via ``qml.transforms.decompose``.
+  Similar to PennyLane's behaviour, this experimental feature will fall back to the old system
+  whenever the graph cannot find decomposition rules for all unsupported operators in the program,
+  and a ``UserWarning`` is raised.
   [(#2099)](https://github.com/PennyLaneAI/catalyst/pull/2099)
   [(#2091)](https://github.com/PennyLaneAI/catalyst/pull/2091)
   [(#2029)](https://github.com/PennyLaneAI/catalyst/pull/2029)
   [(#2001)](https://github.com/PennyLaneAI/catalyst/pull/2001)
-  
-  ```python
-  import pennylane as qml
 
-  qml.decomposition.enable_graph()
-  qml.capture.enable()
-
-  @qml.register_resources({qml.H: 2, qml.CZ: 1})
-  def my_cnot1(wires):
-      qml.H(wires=wires[1])
-      qml.CZ(wires=wires)
-      qml.H(wires=wires[1])
-
-  @qml.qjit
-  @partial(
-      qml.transforms.decompose,
-      gate_set={"H", "CZ", "GlobalPhase"},
-      alt_decomps={qml.CNOT: [my_cnot1]},
-  )
-  @qml.qnode(qml.device("lightning.qubit", wires=2))
-  def circuit():
-      qml.H(0)
-      qml.CNOT(wires=[0, 1])
-      return qml.state()
-  ```
-
-  ```pycon
-  >>> circuit()
-  Array([0.70710678+0.j, 0.        +0.j, 0.        +0.j, 0.70710678+0.j],      dtype=complex128)
-  ```
-
-  Similar to PennyLane's behaviour, this feature will fall back to the old system whenever the graph 
-  cannot find decomposition rules for all unsupported operators in the program, and a 
-  ``UserWarning`` is raised. 
-
-  For more information, please consult the 
-  [PennyLane decomposition module](https://docs.pennylane.ai/en/stable/code/qml_decomposition.html).
-
-* Catalyst now supports dynamic wire allocation with ``qml.allocate()`` and ``qml.deallocate()`` 
-  when program capture is enabled.
+* Catalyst now supports dynamic wire allocation with ``qml.allocate()`` and
+  ``qml.deallocate()`` when program capture is enabled.
   [(#2002)](https://github.com/PennyLaneAI/catalyst/pull/2002)
 
   Two new functions, ``qml.allocate()`` and ``qml.deallocate()``, [have been added to
@@ -84,8 +23,7 @@
   to support dynamic wire allocation. With Catalyst, these features can be accessed on
    ``lightning.qubit``, ``lightning.kokkos``, and ``lightning.gpu``.
 
-  Dynamic wire allocation refers to the allocation of wires in the middle of a circuit, as opposed 
-  to the static allocation during device initialization. For example:
+  Dynamic wire allocation refers to the allocation of wires in the middle of a circuit, as opposed to the static allocation during device initialization. For example:
 
   ```python
   qml.capture.enable()
@@ -113,21 +51,26 @@
   For more information on what ``qml.allocate`` and ``qml.deallocate`` do, please consult the
   [PennyLane v0.43 release notes](https://docs.pennylane.ai/en/stable/development/release_notes.html#release-0-43-0).
 
-  However, there are some notable differences between the behaviour of these features with ``qjit`` 
-  versus without. For details, please see the relevant sections in the 
+  However, there are some notable differences between the behaviour of these features
+  with ``qjit`` versus without. For details, please see the relevant sections in the 
   [Catalyst sharp bits page](https://docs.pennylane.ai/projects/catalyst/en/stable/dev/sharp_bits.html#functionality-differences-from-pennylane).
 
 * A new quantum compilation pass that reduces the depth and count of non-Clifford Pauli product
   rotations (PPRs) in circuits is now available. This compilation pass works by commuting
-  non-Clifford PPRs (often just referred to as ``T`` gates) in adjacent layers and merging 
-  compatible ones. More details can be found in Figure 6 of
+  non-Clifford PPRs (often just referred to as ``T`` gates) in adjacent
+  layers and merging compatible ones. More details can be found in Figure 6 of
   [A Game of Surface Codes](https://arXiv:1808.02892v3).
   [(#1975)](https://github.com/PennyLaneAI/catalyst/pull/1975)
   [(#2048)](https://github.com/PennyLaneAI/catalyst/pull/2048)
   [(#2085)](https://github.com/PennyLaneAI/catalyst/pull/2085)
 
   The impact of the ``reduce_t_depth`` pass can be measured using :func:`~.passes.ppm_specs`
-  to compare the circuit depth before and after applying the pass. Consider the following circuit:
+  to compare the circuit depth before and after applying the pass. The ``ppm_specs`` function
+  provides detailed statistics including ``depth_pi8_ppr`` (non-Clifford PPR depth) and
+  ``pi8_ppr`` (number of non-Clifford PPRs), allowing users to quantify the optimization
+  achieved by the pass.
+
+  Consider the following circuit:
 
   ```python
   import pennylane as qml
@@ -173,14 +116,32 @@
   {'circuit_0': {'depth_pi8_ppr': 4, 'depth_ppm': 1, 'logical_qubits': 3, 'max_weight_pi8': 3, 'num_of_ppm': 3, 'pi8_ppr': 6}}
   ```
 
-  After performing the :func:`~.passes.to_ppr`, :func:`~.passes.commute_ppr`, and 
-  :func:`~.passes.merge_ppr_ppm` passes, the circuit contains a depth of four of non-Clifford PPRs
-  (``depth_pi8_ppr``). Subsequently applying the :func:`~.passes.t_layer_reduction` pass will move 
-  PPRs around via commutation, resulting in a circuit with a smaller PPR depth of three.
+  After performing the :func:`~.passes.to_ppr`, :func:`~.passes.commute_ppr`, and :func:`~.passes.merge_ppr_ppm`, 
+  passes, the circuit contains a depth of four of non-Clifford PPRs (`depth_pi8_ppr`). Subsequently applying the
+  :func:`~.passes.t_layer_reduction` pass will move PPRs around via commutation, resulting in a circuit with a
+  smaller PPR depth of three.
+
+* Catalyst now provides native support for `SingleExcitation`, `DoubleExcitation`,
+  and `PCPhase` on compatible devices like Lightning simulators.
+  This enhancement avoids unnecessary gate decomposition,
+  leading to reduced compilation time and improved overall performance.
+  [(#1980)](https://github.com/PennyLaneAI/catalyst/pull/1980)
+  [(#1987)](https://github.com/PennyLaneAI/catalyst/pull/1987)
+
+  For example, the code below is captured with `PCPhase` avoiding the
+  decomposition to many `MultiControlledX` and `PhaseShift` gates:
+
+  ```python
+  dev = qml.device("lightning.qubit", wires=3)
+
+  @qml.qnode(dev)
+  def circuit():
+      qml.ctrl(qml.PCPhase(0.5, dim=1, wires=[0, 2]), control=[1])
+      return qml.probs()
+  ```
 
 * Catalyst now supports returning classical and MCM values with the dynamic one-shot MCM method.
-  [(#2004)](https://github.com/PennyLaneAI/catalyst/pull/2004) 
-  [(#2090)](https://github.com/PennyLaneAI/catalyst/pull/2090)
+  [(#2004)](https://github.com/PennyLaneAI/catalyst/pull/2004) [(#2090)](https://github.com/PennyLaneAI/catalyst/pull/2090)
 
   For example, the code below will generate 10 values, with an equal probability of 42 and 43
   appearing.
@@ -208,66 +169,29 @@
            True], dtype=bool))
   ```
 
-* The default mid-circuit measurement method in catalyst has been changed from 
-  ``"single-branch-statistics"`` to ``"one-shot"``.
+* The default mid-circuit measurement method in catalyst has been changed from `"single-branch-statistics"` to `"one-shot"`.
   [[#2017]](https://github.com/PennyLaneAI/catalyst/pull/2017)
   [[#2019]](https://github.com/PennyLaneAI/catalyst/pull/2019)
 
-* Catalyst now provides native support for ``SingleExcitation``, ``DoubleExcitation``, and 
-  ``PCPhase`` on compatible devices (e.g., Lightning simulators). This enhancement avoids 
-  unnecessary gate decomposition, leading to reduced compilation time and improved overall 
-  performance.
-  [(#1980)](https://github.com/PennyLaneAI/catalyst/pull/1980)
-  [(#1987)](https://github.com/PennyLaneAI/catalyst/pull/1987)
-
 <h3>Improvements 🛠</h3>
 
-* The :func:`~.passes.ppm_specs` function now tracks the non-Clifford and Clifford PPR depth and the
-  overall PPM depth.
+* Significantly improved resource tracking with `null.qubit`.
+  The new tracking has better integration with PennyLane (e.g. for passing the filename to write out), cleaner documentation, and its own wrapper class.
+  It also now tracks circuit depth, as well as gate counts by number of wires.
+  [(#2033)](https://github.com/PennyLaneAI/catalyst/pull/2033)
+  [(#2055)](https://github.com/PennyLaneAI/catalyst/pull/2055)
+
+* Improve the pass `--ppm-specs` to count the depth of PPRs and PPMs in the circuit.
   [(#2014)](https://github.com/PennyLaneAI/catalyst/pull/2014)
 
-  For example:
-
-  ```python
-  from catalyst import qjit, measure
-  from catalyst.passes import to_ppr, commute_ppr, reduce_t_depth, merge_ppr_ppm
-
-  pips = [("pipe", ["enforce-runtime-invariants-pipeline"])]
-
-  circuit_transforms = {
-      "to_ppr": {},
-      "commute_ppr": {},
-      "merge_ppr_ppm": {},
-  }
-
-  @qjit(pipelines=pips, target="mlir", circuit_transform_pipeline=circuit_transforms)
-  @qml.qnode(qml.device("null.qubit", wires=3))
-  def circuit():
-      n = 3
-
-      for i in range(n):
-          qml.H(wires=i)
-          qml.S(wires=i)
-          qml.CNOT(wires=[i, (i + 1) % n])
-          qml.T(wires=i)
-          qml.H(wires=i)
-          qml.T(wires=i)
-
-      return [measure(wires=i) for i in range(n)] 
-  ```
-
-  ```pycon
-  >>> print(ppm_specs(circuit))
-  {'circuit_0': {'depth_pi8_ppr': 3, 'depth_ppm': 1, 'logical_qubits': 3, 'max_weight_pi8': 3, 'num_of_ppm': 3, 'pi8_ppr': 6}}
-  ```
-
-* A new pass, accessible with ``--partition-layers`` in the ``catalyst-cli`` has been added to group 
-  PPR and PPM operations into ``qec.layer`` operations based on qubit interactivity and 
-  commutativity, enabling circuit analysis and potential support for parallel execution.
+* A new pass `--partition-layers` has been added to group PPR/PPM operations into `qec.layer`
+  operations based on qubit interactive and commutativity, enabling circuit analysis and
+  potentially to support parallel execution.
   [(#1951)](https://github.com/PennyLaneAI/catalyst/pull/1951)
 
-* A new JAX primitive has been added to capture and compile decomposition rule definitions in MLIR.     
-  For developer purposes, `decomposition_rule` is the decorator integrated with this primitive.
+* Added a new JAX primitive to capture and compile the decomposition rule
+  definitions to MLIR. `decomposition_rule` is the decorator integrated
+  with this primitive for development purposes.
   [(#1820)](https://github.com/PennyLaneAI/catalyst/pull/1820)
 
 * Renamed `QregManager` to `QubitHandler` and extended the class to manage
