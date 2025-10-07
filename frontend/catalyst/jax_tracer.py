@@ -1257,6 +1257,19 @@ def apply_transforms(
             raise CompileError(msg)
         tracing_mode = TracingMode.TRANSFORM
     elif have_measurements_changed(tape, tapes[0]):
+        with_measurement_from_counts_or_samples = any(
+            "measurements_from_counts" in str(getattr(qnode, "transform", ""))
+            or "measurements_from_samples" in str(getattr(qnode, "transform", ""))
+            for qnode in qnode_program
+        )
+
+        if has_classical_outputs(flat_results) and with_measurement_from_counts_or_samples:
+            msg = (
+                "Transforming MeasurementProcesses is unsupported with non-MeasurementProcess "
+                "QNode outputs. The selected device, options, or applied QNode transforms, may be "
+                "attempting to transform MeasurementProcesses from the tape."
+            )
+            raise CompileError(msg)
         tracing_mode = TracingMode.TRANSFORM
     else:
         tracing_mode = TracingMode.DEFAULT

@@ -1112,24 +1112,17 @@ class TestTransformValidity:
 
         @partial(transform, device_wires=dev.wires)
         @qml.set_shots(5)
-        @qml.qnode(dev, mcm_method="one-shot")
+        @qml.qnode(dev)
         def qfunc():
             qml.X(0)
             measurements = [measure(i) for i in range(2)]
             return measurements, qml.expval(qml.PauliZ(0))
 
-        if transform == measurements_from_counts:
-            with pytest.raises(
-                CompileError,
-                match="measurements_from_counts is not supported with one-shot",
-            ):
-                qjit(qfunc)
-        else:
-            with pytest.raises(
-                CompileError,
-                match="measurements_from_samples is not supported with one-shot",
-            ):
-                qjit(qfunc)
+        with pytest.raises(
+            CompileError,
+            match="Transforming MeasurementProcesses is unsupported with non-MeasurementProcess",
+        ):
+            qjit(qfunc)
 
     @pytest.mark.parametrize("transform", (measurements_from_counts, measurements_from_samples))
     def test_valid_modify_measurements_no_measurements(self, backend, transform, monkeypatch):
