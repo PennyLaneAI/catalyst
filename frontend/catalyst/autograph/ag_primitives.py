@@ -615,7 +615,10 @@ def converted_call(fn, args, kwargs, caller_fn_scope=None, options=None):
             # There is an assumption that the closure variables are
             # the same as the decorator arguments
             closure_vars = inspect.getclosurevars(fn)
-            decorator_kwargs = {"id": closure_vars.nonlocals["id"], "lazy": closure_vars.nonlocals["lazy"]}
+            decorator_kwargs = {
+                "id": closure_vars.nonlocals["id"],
+                "lazy": closure_vars.nonlocals["lazy"],
+            }
 
             # Convert the original function with autograph
             def converted_inner(*inner_args, **inner_kwargs):
