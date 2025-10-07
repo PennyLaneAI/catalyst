@@ -221,6 +221,10 @@
 
 <h3>Improvements 🛠</h3>
 
+* Adjoint differentiation is used by default when executing on lightning devices, significantly 
+  reducing gradient computation time.
+  [(#1961)](https://github.com/PennyLaneAI/catalyst/pull/1961)
+
 * The :func:`~.passes.ppm_specs` function now tracks the non-Clifford and Clifford PPR depth and the
   overall PPM depth.
   [(#2014)](https://github.com/PennyLaneAI/catalyst/pull/2014)
@@ -269,29 +273,31 @@
   For developer purposes, `decomposition_rule` is the decorator integrated with this primitive.
   [(#1820)](https://github.com/PennyLaneAI/catalyst/pull/1820)
 
-* Renamed `QregManager` to `QubitHandler` and extended the class to manage
-  converting PLxPR wire indices into Catalyst JAXPR qubits.
-  This is especially useful for lowering subroutines that take
-  in qubits as arguments, for example decomposition rules.
+* ``QregManager`` has been renamed to ``QubitHandler`` and has been extended to manage converting 
+  PLxPR wire indices into Catalyst JAXPR qubits. This is especially useful for lowering subroutines 
+  that take in qubits as arguments, like in decomposition rules.
   [(#1820)](https://github.com/PennyLaneAI/catalyst/pull/1820)
 
-* Fix resource tracking unit test polluting the environment with output files
+* Resource-tracking unit tests that pollute luting the environment with output files have been 
+  fixed.
   [(#1861)](https://github.com/PennyLaneAI/catalyst/pull/1861)
 
-* Adjoint differentiation is used by default when executing on lightning devices, significantly reduces gradient computation time.
-  [(#1961)](https://github.com/PennyLaneAI/catalyst/pull/1961)
-
-* Added `detensorizefunctionboundary` pass to remove scalar tensors across function boundaries and enabled `symbol-dce` pass to remove dead functions, reducing the number of instructions for compilation.
+* A new pass called ``detensorizefunctionboundary`` has been added, which removes scalar tensors 
+  across function boundaries and enables the ``symbol-dce`` pass to remove dead functions, reducing 
+  the number of instructions for compilation.
   [(#1904)](https://github.com/PennyLaneAI/catalyst/pull/1904)
 
-* Workflows `for_loop`, `while_loop` and `cond` now error out if `qml.capture` is enabled.
+* Catalyst's native control flow functions (:func:`~.for_loop`, :func:`~.while_loop` and 
+  :func:`~.cond`) now raise an error if used with PennyLane program capture (i.e., 
+  `qml.capture.enable()` is present).
   [(#1945)](https://github.com/PennyLaneAI/catalyst/pull/1945)
 
-* Displays Catalyst version in `quantum-opt --version` output.
+* functionality has been added to the `catalyst-cli` that prints the Catalyst version with 
+  `quantum-opt --version`.
   [(#1922)](https://github.com/PennyLaneAI/catalyst/pull/1922)
 
-* Snakecased keyword arguments to :func:`catalyst.passes.apply_pass()` are
-  now correctly parsed to kebab-case pass options.
+* Snakecased keyword arguments to :func:`~.passes.apply_pass` are now correctly parsed to kebab-case 
+  pass options.
   [(#1954)](https://github.com/PennyLaneAI/catalyst/pull/1954).
 
   For example:
@@ -304,19 +310,21 @@
       return qml.state()
   ```
 
-  which looks like the following line in the MLIR:
+  The pass application instruction will look like the following in MLIR:
 
   ```pycon
   %0 = transform.apply_registered_pass "some-pass" with options = {"an-option" = true, "maxValue" = 1 : i64, "multi-word-option" = 1 : i64}
   ```
 
-* Added checks to raise an error when the input qubits to the multi-qubit gates in the runtime CAPI are not all distinct.
+* An error is now raised when the input qubits to the multi-qubit gates in the runtime CAPI are not 
+  all distinct.
   [(#2006)](https://github.com/PennyLaneAI/catalyst/pull/2006).
 
-* Commuting Clifford Pauli Product Rotation (PPR) operations, past non-Clifford PPRs, now supports P(π/2) Cliffords in addition to P(π/4)
+* Commuting Clifford PPRs past non-Clifford PPRs now supports PPRs with angles of 
+  :math:`\frac{\pi}{2}` and :math:`\frac{\pi}{4}`.
   [(#1966)](https://github.com/PennyLaneAI/catalyst/pull/1966)
 
-* A new jax primitive `qdealloc_qb_p` is available for single qubit deallocations.
+* A new jax primitive ``qdealloc_qb_p`` is available for single qubit deallocations.
   [(#2005)](https://github.com/PennyLaneAI/catalyst/pull/2005)
 
 * Changed the attribute of `number_original_arg` in `CustomCallOp` from dense array to integer.
