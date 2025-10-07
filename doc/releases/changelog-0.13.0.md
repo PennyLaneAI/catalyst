@@ -331,13 +331,15 @@
   dense array to an integer.
   [(#2022)](https://github.com/PennyLaneAI/catalyst/pull/2022)
 
-* A new decomposition rule for non-Clifford PPRs into two PPMs based on the Active Volume paper.
+* The default value for ``decompose_method`` in the ``ppr_to_ppm`` compilation pass is now 
+  ``"pauli-corrected"``, which decomposes non-Clifford PPRs into two PPMs by consuming a ``T`` 
+  state. This decomposition is based on Figure 13(a) in 
+  [arXiv:2211.15465](https://arxiv.org/pdf/2211.15465).
   [(#2043)](https://github.com/PennyLaneAI/catalyst/pull/2043)
-
-* Added support to avoid Y-basis measurements in `pauli-corrected` PPR decomposition.
   [(#2047)](https://github.com/PennyLaneAI/catalyst/pull/2047)
 
-* Update conversion targets and refactor `to_ppr` and `ppm_compilation` passes and handle gate `I`.
+* The PPM/PPR compilation passes now correctly handle identity operations (``I``). Additionally, 
+  internal validation was improved in the PPM/PPR compilation passes.
   [(#2058)](https://github.com/PennyLaneAI/catalyst/pull/2058)
 
 * Using `keep_intermediate='pass'` option now prints the whole module scope of program to the
@@ -420,7 +422,7 @@
   - an incorrect type signature of the ``Counts`` API function
   [(#2032)](https://github.com/PennyLaneAI/catalyst/pull/2032)
 
-* Fixed the Clifford PPR decomposition rule where using the Y measurement should take the inverse.
+* Fixed a bug in the ``ppr_to_ppm`` compilation pass when ``decompose_method="auto-corrected"``.the Clifford PPR decomposition rule where using the Y measurement should take the inverse.
   [(#2043)](https://github.com/PennyLaneAI/catalyst/pull/2043)
 
 * `static_argnums` is now correctly passed to internally transformed kernel functions,
