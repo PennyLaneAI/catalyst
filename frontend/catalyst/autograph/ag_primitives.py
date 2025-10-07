@@ -603,36 +603,34 @@ def converted_call(fn, args, kwargs, caller_fn_scope=None, options=None):
             new_qnode.func = qnode_call_wrapper
             return new_qnode(**new_kwargs)
 
-        # HOTFIX: Handle calls to functions that were decorated with qml.prod, qml.adjoint, etc.
+        # HOTFIX: Handle calls to functions that were decorated with "qml.prod"
         # These decorators return wrapper functions that call the original function without
         # autograph conversion. We detect these wrappers and unwrap them to convert the
         # original function with autograph.
         # TODO: remove once PL has dedicated way to propagate autograph through decorators
-        if hasattr(fn, "__wrapped__"):
-            # Find the decorator function
-            if decorator := next(
-                (f for f in _known_wrapper_functions if f.__module__ == fn.__module__), None
-            ):
-                original_fn = fn.__wrapped__
+        if hasattr(fn, "__wrapped__") and qml.prod.__module__ == fn.__module__:
+            original_fn = fn.__wrapped__
 
-                # Extract decorator arguments from the closure
-                closure_vars = inspect.getclosurevars(fn)
-                decorator_kwargs = {
-                    k: v
-                    for k, v in closure_vars.nonlocals.items()
-                    if v is not original_fn  # Exclude the wrapped function itself
-                }
+            # Extract decorator arguments from the closure
+            # There is an assumption that the closure variables are
+            # the same as the decorator arguments
+            closure_vars = inspect.getclosurevars(fn)
+            decorator_kwargs = {
+                k: v
+                for k, v in closure_vars.nonlocals.items()
+                if v is not original_fn  # Exclude the wrapped function itself
+            }
 
-                # Convert the original function with autograph
-                def converted_inner(*inner_args, **inner_kwargs):
-                    return converted_call(
-                        original_fn, inner_args, inner_kwargs, caller_fn_scope, options
-                    )
-
-                # Apply the decorator to the converted function and call it with the original kwargs
-                return decorator(converted_inner, **decorator_kwargs)(
-                    *args, **(kwargs if kwargs is not None else {})
+            # Convert the original function with autograph
+            def converted_inner(*inner_args, **inner_kwargs):
+                return converted_call(
+                    original_fn, inner_args, inner_kwargs, caller_fn_scope, options
                 )
+
+            # Apply the decorator to the converted function and call it with the original kwargs
+            return qml.prod(converted_inner, **decorator_kwargs)(
+                *args, **(kwargs if kwargs is not None else {})
+            )
 
         return ag_converted_call(fn, args, kwargs, caller_fn_scope, options)
 
