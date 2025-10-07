@@ -141,7 +141,8 @@
   ```
 
 * Catalyst now supports returning classical and MCM values with the dynamic one-shot MCM method.
-  [(#2004)](https://github.com/PennyLaneAI/catalyst/pull/2004) [(#2090)](https://github.com/PennyLaneAI/catalyst/pull/2090)
+  [(#2004)](https://github.com/PennyLaneAI/catalyst/pull/2004)
+  [(#2090)](https://github.com/PennyLaneAI/catalyst/pull/2090)
 
   For example, the code below will generate 10 values, with an equal probability of 42 and 43
   appearing.
@@ -331,7 +332,9 @@
 * Fix usage of OQC device, including:
   * fix object file system extension on macOS
   * fix wrong type signature of `Counts` API function
+  * various updates to OQC internal APIs
   [(#2032)](https://github.com/PennyLaneAI/catalyst/pull/2032)
+  [(#2089)](https://github.com/PennyLaneAI/catalyst/pull/2089)
 
 * Fixed the Clifford PPR decomposition rule where using the Y measurement should take the inverse.
   [(#2043)](https://github.com/PennyLaneAI/catalyst/pull/2043)

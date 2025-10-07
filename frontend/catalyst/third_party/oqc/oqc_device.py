@@ -49,11 +49,11 @@ class OQCDevice(Device):
         lib_path = get_lib_path("oqc_runtime", "OQC_LIB_DIR") + "/librtd_oqc" + system_extension
         return "oqc", lib_path
 
-    def __init__(self, wires, backend, shots=1024, **kwargs):
+    def __init__(self, wires, backend, **kwargs):
         self._backend = backend
         _check_backend(backend=backend)
         _check_envvar()
-        super().__init__(wires=wires, shots=shots, **kwargs)
+        super().__init__(wires=wires, **kwargs)
 
     @property
     def backend(self):

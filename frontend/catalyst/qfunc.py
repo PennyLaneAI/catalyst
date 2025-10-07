@@ -18,6 +18,7 @@ what happens when a QNode object is called during tracing. Mostly this involves 
 the default behaviour and replacing it with a function-like "QNode" primitive.
 """
 import logging
+import textwrap
 from copy import copy
 from dataclasses import dataclass, replace
 from typing import Callable, Sequence
@@ -44,6 +45,7 @@ from catalyst.jax_primitives import quantum_kernel_p
 from catalyst.jax_tracer import Function, trace_quantum_function
 from catalyst.logging import debug_logger
 from catalyst.passes.pass_api import dictionary_to_list_of_passes
+from catalyst.third_party.oqc import OQCDevice
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.tracing.type_signatures import filter_static_args
 from catalyst.utils.exceptions import CompileError
@@ -101,6 +103,15 @@ def _get_total_shots(qnode):
     # due to possibility of tracer, we cannot use a simple `or` here to simplify
     shots_value = qnode._shots.total_shots  # pylint: disable=protected-access
     if shots_value is None:
+        if isinstance(qnode.device, OQCDevice):
+            raise CompileError(
+                textwrap.dedent(
+                    """
+                OQC device does not support analytical simulation.
+                Please supply the number of shots on the qnode.
+                """
+                )
+            )
         shots = 0
     else:
         shots = shots_value
