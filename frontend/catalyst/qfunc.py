@@ -404,6 +404,8 @@ def _process_terminal_measurements(mcm_method, cpy_tape, out, snapshots, shot_ve
     """Process measurements when there are no mid-circuit measurements."""
     assert mcm_method == "one-shot"
 
+    # Walk through and flatten the outs structure
+    out, _ = tree_flatten(out)
     new_out = []
     idx = 0
 

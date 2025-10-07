@@ -1256,7 +1256,7 @@ def apply_transforms(
             )
             raise CompileError(msg)
         tracing_mode = TracingMode.TRANSFORM
-    elif len(qnode_program) or have_measurements_changed(tape, tapes[0]):
+    elif have_measurements_changed(tape, tapes[0]):
         tracing_mode = TracingMode.TRANSFORM
     else:
         tracing_mode = TracingMode.DEFAULT
