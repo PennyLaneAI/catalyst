@@ -117,10 +117,9 @@
   versus without. For details, please see the relevant sections in the 
   [Catalyst sharp bits page](https://docs.pennylane.ai/projects/catalyst/en/stable/dev/sharp_bits.html#functionality-differences-from-pennylane).
 
-* A new quantum compilation pass that reduces the depth and count of non-Clifford Pauli product
-  rotations (PPRs) in circuits is now available. This compilation pass works by commuting
-  non-Clifford PPRs (often just referred to as ``T`` gates) in adjacent layers and merging 
-  compatible ones. More details can be found in Figure 6 of
+* A new quantum compilation pass called :func:`~.passes.reduce_t_depth` has been added, which 
+  reduces the depth and count of non-Clifford Pauli product rotations (PPRs) in circuits. This 
+  compilation pass works by commuting non-Clifford PPRs (often just referred to as ``T`` gates) in adjacent layers and merging compatible ones. More details can be found in Figure 6 of
   [A Game of Surface Codes](https://arXiv:1808.02892v3).
   [(#1975)](https://github.com/PennyLaneAI/catalyst/pull/1975)
   [(#2048)](https://github.com/PennyLaneAI/catalyst/pull/2048)
