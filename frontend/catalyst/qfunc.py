@@ -45,7 +45,6 @@ from catalyst.jax_primitives import quantum_kernel_p
 from catalyst.jax_tracer import Function, trace_quantum_function
 from catalyst.logging import debug_logger
 from catalyst.passes.pass_api import dictionary_to_list_of_passes
-from catalyst.third_party.oqc import OQCDevice
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.tracing.type_signatures import filter_static_args
 from catalyst.utils.exceptions import CompileError
@@ -103,7 +102,7 @@ def _get_total_shots(qnode):
     # due to possibility of tracer, we cannot use a simple `or` here to simplify
     shots_value = qnode._shots.total_shots  # pylint: disable=protected-access
     if shots_value is None:
-        if isinstance(qnode.device, OQCDevice):
+        if qnode.device.name == "OQCDevice":
             raise CompileError(
                 textwrap.dedent(
                     """
