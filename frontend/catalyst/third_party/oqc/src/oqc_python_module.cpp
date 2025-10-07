@@ -46,8 +46,8 @@ try:
     client = OQCClient(url=url, email=email, password=password)
     client.authenticate()
     oqc_config = CompilerConfig(repeats=shots, results_format=RES_FORMAT, optimizations=optimisations)
-    oqc_task = QPUTask(program=circuit, config=oqc_config, qpu_id="qpu:uk:2:d865b5a184")
-    res = client.execute_tasks(oqc_task, qpu_id="qpu:uk:2:d865b5a184")
+    oqc_task = QPUTask(program=circuit, config=oqc_config, qpu_id=qpu_id)
+    res = client.execute_tasks(oqc_task, qpu_id=qpu_id)
     counts = res[0].result["cbits"]
 except Exception as e:
     print(f"circuit: {circuit}")
@@ -55,7 +55,7 @@ except Exception as e:
 )";
 
 extern "C" {
-[[gnu::visibility("default")]] int counts(const char *_circuit, const char *_device, size_t shots,
+[[gnu::visibility("default")]] int counts(const char *_circuit, const char *_qpu_id, size_t shots,
                                           size_t num_qubits, const char *_kwargs, void *_vector,
                                           char *error_msg, size_t error_msg_size)
 {
@@ -66,7 +66,7 @@ extern "C" {
 
     py::dict locals;
     locals["circuit"] = _circuit;
-    locals["device"] = _device;
+    locals["qpu_id"] = _qpu_id;
     locals["kwargs"] = _kwargs;
     locals["shots"] = shots;
     locals["num_qubits"] = num_qubits;

@@ -188,6 +188,8 @@ def extract_backend_info(device: qml.devices.QubitDevice) -> BackendInfo:
             device_kwargs["s3_destination_folder"] = str(
                 device.target_device._s3_folder  # pylint: disable=protected-access
             )
+    elif dname == "OQCDevice":
+        device_kwargs["backend"] = device.backend
 
     for k, v in getattr(device, "device_kwargs", {}).items():
         if k not in device_kwargs:  # pragma: no branch
