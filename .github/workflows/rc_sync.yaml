@@ -83,4 +83,4 @@ jobs:
           pr_body: "Automatic sync from the release candidate to main during a feature freeze."
           pr_allow_empty: false
           pr_draft: false
-          pr_reviewer: "dime10,mehrdad2m"
+          pr_reviewer: "dime10,paul0403"
