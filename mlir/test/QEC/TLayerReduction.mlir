@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt --t-layer-reduction --split-input-file --verify-diagnostics %s | FileCheck %s
+// RUN: quantum-opt --reduce-t-depth --split-input-file --verify-diagnostics %s | FileCheck %s
 
 // From example in GoSC paper
 func.func @test_t_layer_opt_GoSC(%qr0 : !quantum.bit, %qr1 : !quantum.bit, %qr2 : !quantum.bit, %qr3 : !quantum.bit) {

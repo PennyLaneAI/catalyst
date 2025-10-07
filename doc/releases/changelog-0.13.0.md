@@ -9,6 +9,7 @@
   Similar to PennyLane's behaviour, this experimental feature will fall back to the old system
   whenever the graph cannot find decomposition rules for all unsupported operators in the program,
   and a ``UserWarning`` is raised.
+  [(#2099)](https://github.com/PennyLaneAI/catalyst/pull/2099)
   [(#2091)](https://github.com/PennyLaneAI/catalyst/pull/2091)
   [(#2029)](https://github.com/PennyLaneAI/catalyst/pull/2029)
   [(#2001)](https://github.com/PennyLaneAI/catalyst/pull/2001)
@@ -61,13 +62,20 @@
   [A Game of Surface Codes](https://arXiv:1808.02892v3).
   [(#1975)](https://github.com/PennyLaneAI/catalyst/pull/1975)
   [(#2048)](https://github.com/PennyLaneAI/catalyst/pull/2048)
+  [(#2085)](https://github.com/PennyLaneAI/catalyst/pull/2085)
+
+  The impact of the ``reduce_t_depth`` pass can be measured using :func:`~.passes.ppm_specs`
+  to compare the circuit depth before and after applying the pass. The ``ppm_specs`` function
+  provides detailed statistics including ``depth_pi8_ppr`` (non-Clifford PPR depth) and
+  ``pi8_ppr`` (number of non-Clifford PPRs), allowing users to quantify the optimization
+  achieved by the pass.
 
   Consider the following circuit:
 
   ```python
   import pennylane as qml
   from catalyst import qjit, measure
-  from catalyst.passes import to_ppr, commute_ppr, t_layer_reduction, merge_ppr_ppm, ppm_specs
+  from catalyst.passes import to_ppr, commute_ppr, reduce_t_depth, merge_ppr_ppm
 
   pips = [("pipe", ["enforce-runtime-invariants-pipeline"])]
 
