@@ -1325,8 +1325,13 @@ class TestCapture:
         @partial(qml.transforms.decompose, gate_set=[qml.RX, qml.RY, qml.RZ])
         @qml.qnode(qml.device(backend, wires=2))
         def captured_circuit(x: float, y: float, z: float):
-            qml.measure(0)
-            qml.Rot(x, y, z, 0)
+            m = qml.measure(0)
+
+            @qml.cond(m)
+            def cond_fn():
+                qml.Rot(x, y, z, 0)
+
+            cond_fn()
             return qml.expval(qml.PauliZ(0))
 
         capture_result = captured_circuit(1.5, 2.5, 3.5)
@@ -1339,8 +1344,13 @@ class TestCapture:
         @partial(qml.transforms.decompose, gate_set=[qml.RX, qml.RY, qml.RZ])
         @qml.qnode(qml.device(backend, wires=2))
         def circuit(x: float, y: float, z: float):
-            catalyst.measure(0)
-            qml.Rot(x, y, z, 0)
+            m = catalyst.measure(0)
+
+            @catalyst.cond(m)
+            def cond_fn():
+                qml.Rot(x, y, z, 0)
+
+            cond_fn()
             return qml.expval(qml.PauliZ(0))
 
         assert jnp.allclose(circuit(1.5, 2.5, 3.5), capture_result)
