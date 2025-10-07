@@ -574,22 +574,21 @@ for example the one-shot mid circuit measurement transform.
 
 <h3>Documentation 📝</h3>
 
-* Typos were fixed and supplemental information was added to the 
-  docstrings for ``ppm_compilaion``, ``to_ppr``, ``commute_ppr``, 
-  ``ppr_to_ppm``, ``merge_ppr_ppm``, and ``ppm_specs``.
+* Typos were fixed and supplemental information was added to the docstrings for ``ppm_compilaion``,
+  ``to_ppr``, ``commute_ppr``, ``ppr_to_ppm``, ``merge_ppr_ppm``, and ``ppm_specs``.
   [(#2050)](https://github.com/PennyLaneAI/catalyst/pull/2050)
 
-* The Catalyst Command Line Interface documentation incorrectly stated that the `catalyst`
-  executable is available in the `catalyst/bin/` directory relative to the environment's
-  installation directory when installed via pip. The documentation has been updated to point to the
-  correct location, which is the `bin/` directory relative to the environment's installation
+* The Catalyst Command Line Interface documentation incorrectly stated that the ``catalyst``
+  executable is available in the ``catalyst/bin/`` directory relative to the environment's
+  installation directory when installed via ``pip``. The documentation has been updated to point to 
+  the correct location, which is the ``bin/`` directory relative to the environment's installation
   directory.
   [(#2030)](https://github.com/PennyLaneAI/catalyst/pull/2030)
 
-* Fixing a few typos in the Catalyst documentation.
+* A handful of typos were fixed in the sharp bits page and transforms API.
   [(#2046)](https://github.com/PennyLaneAI/catalyst/pull/2046)
 
-* Updated `Examples` links to point to relevant, up-to-date demos and removed outdated entries.
+* Links to demos were updated and corrected to point to relevant, up-to-date demos.
   [(#2042)](https://github.com/PennyLaneAI/catalyst/pull/2042)
 
 <h3>Contributors ✍️</h3>
