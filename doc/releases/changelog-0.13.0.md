@@ -545,19 +545,20 @@ for example the one-shot mid circuit measurement transform.
   catalyst --tool=opt --pass-pipeline="builtin.module(convert-quantum-to-llvm{use-array-backed-registers=true})" <input file>
   ```
 
-* The `NoMemoryEffect` trait has been removed from the `quantum.alloc` operation.
+* The ``NoMemoryEffect`` trait has been removed from the ``quantum.alloc`` operation, which allowed
+  for supporting the dynamic wire allocation feature.
   [(#2044)](https://github.com/PennyLaneAI/catalyst/pull/2044)
 
-* Enhance `ppm_specs` function to prevent duplicate pass addition
+* Validation in the ``ppm_specs`` function has been improved to prevent duplicate unnecessary 
+  duplication in the pipeline configuration.
   [(#2049)](https://github.com/PennyLaneAI/catalyst/pull/2049)
 
-* Added ``--ppr-to-mbqc`` to lower ``qec.ppr``/``qec.ppm`` into an MBQC-style quantum circuit.
+* A new compilation pass called :func:`~.passes.ppr_to_mbqc` has been added to lower ``qec.ppr`` and 
+  ``qec.ppm`` instructions into MBQC-style instructions.
   [(#2057)](https://github.com/PennyLaneAI/catalyst/pull/2057)
 
-  This pass is part of a bottom-of-stack MBQC execution pathway, with a thin shim between the
-  PPR/PPM layer and MBQC to enable end-to-end compilation on a mocked backend.  Also, in an MBQC gate 
-  set, one of the gate `RotXZX` cannot yet be executed on available backends.
-
+  This pass is part of a bottom-of-stack MBQC execution pathway, with a small separation between the
+  PPR/PPM and MBQC layers to enable end-to-end compilation on a mocked backend. 
   ```python
   import pennylane as qml
   from catalyst import qjit, measure
@@ -576,6 +577,24 @@ for example the one-shot mid circuit measurement transform.
 
   print(circuit.mlir_opt)
   ```
+
+  ```pycon
+  ...
+  %out_qubits = quantum.custom "Hadamard"() %2 : !quantum.bit
+  %out_qubits_2:2 = quantum.custom "CNOT"() %out_qubits, %1 : !quantum.bit, !quantum.bit
+  %out_qubits_3 = quantum.custom "RZ"(%cst_1) %out_qubits_2#1 : !quantum.bit
+  %out_qubits_4:2 = quantum.custom "CNOT"() %out_qubits_2#0, %out_qubits_3 : !quantum.bit, !quantum.bit
+  %out_qubits_5 = quantum.custom "Hadamard"() %out_qubits_4#0 : !quantum.bit
+  %out_qubits_6 = quantum.custom "RZ"(%cst_0) %out_qubits_4#1 : !quantum.bit
+  %out_qubits_7 = quantum.custom "Hadamard"() %out_qubits_5 : !quantum.bit
+  %out_qubits_8 = quantum.custom "RZ"(%cst_0) %out_qubits_7 : !quantum.bit
+  %out_qubits_9 = quantum.custom "Hadamard"() %out_qubits_8 : !quantum.bit
+  %out_qubits_10 = quantum.custom "RZ"(%cst) %out_qubits_6 : !quantum.bit
+  %mres, %out_qubit = quantum.measure %out_qubits_10 : i1, !quantum.bit
+  ...
+  ```
+
+  Note that in an MBQC gate set, the ``RotXZX`` gate cannot yet be executed on available backends.
 
 <h3>Documentation 📝</h3>
 
