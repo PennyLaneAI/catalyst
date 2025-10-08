@@ -900,8 +900,7 @@ def trace_observables(
     obs: Optional[Operator],
     qrp: QRegPromise,
     m_wires: Optional[qml.wires.Wires],
-    contains_compbasis: bool = False,
-) -> Tuple[List[DynamicJaxprTracer], Optional[int], bool]:
+) -> Tuple[List[DynamicJaxprTracer], Optional[int]]:
     """Trace observables.
 
     Args:
@@ -916,7 +915,6 @@ def trace_observables(
     wires = obs.wires if (obs and len(obs.wires) > 0) else m_wires
     qubits = None
     if obs is None:
-        contains_compbasis |= True
         if wires is None:
             # If measuring all wires on the device, pass in the qreg to compbasis op
             # TODO: "all wires on the device" is None when number of wires is static,
@@ -934,38 +932,28 @@ def trace_observables(
         qubits = qrp.extract(wires, allow_reuse=True)
         obs_tracers = hermitian_p.bind(jax.numpy.asarray(*obs.parameters), *qubits)
     elif isinstance(obs, qml.ops.op_math.Prod):
-        nested_obs, _, comp_bases = zip(
-            *[trace_observables(o, qrp, m_wires, contains_compbasis) for o in obs]
-        )
-        contains_compbasis |= any(comp_bases)
+        nested_obs = [trace_observables(o, qrp, m_wires) for o in obs]
         obs_tracers = tensorobs_p.bind(*nested_obs)
     elif isinstance(obs, qml.ops.LinearCombination):
         coeffs, observables = obs.terms()
-        nested_obs, _, comp_bases = zip(
-            *[trace_observables(o, qrp, m_wires, contains_compbasis) for o in observables]
-        )
-        contains_compbasis |= any(comp_bases)
+        nested_obs = [trace_observables(o, qrp, m_wires) for o in observables]
         obs_tracers = hamiltonian_p.bind(jax.numpy.asarray(coeffs), *nested_obs)
     elif isinstance(obs, qml.ops.op_math.Sum):
-        nested_obs, _, comp_bases = zip(
-            *[trace_observables(o, qrp, m_wires, contains_compbasis) for o in obs]
-        )
-        contains_compbasis |= any(comp_bases)
+        nested_obs = [trace_observables(o, qrp, m_wires) for o in obs]
         obs_tracers = hamiltonian_p.bind(jax.numpy.asarray(jnp.ones(len(obs))), *nested_obs)
     elif isinstance(obs, qml.ops.op_math.SProd):
         coeffs, terms = obs.terms()
         coeffs = jax.numpy.array(coeffs)
         nested_obs = []
         for term in terms:
-            obs, _, has_cb = trace_observables(term, qrp, m_wires, contains_compbasis)
-            contains_compbasis |= has_cb
+            obs = trace_observables(term, qrp, m_wires)
             nested_obs.append(obs)
         obs_tracers = hamiltonian_p.bind(coeffs, *nested_obs)
     else:
         raise NotImplementedError(
             f"Observable {obs} (of type {type(obs)}) is not implemented"
         )  # pragma: no cover
-    return obs_tracers, (len(qubits) if qubits else None), contains_compbasis
+    return obs_tracers, (len(qubits) if qubits else None)
 
 
 @debug_logger
@@ -1063,16 +1051,20 @@ def trace_quantum_measurements(
                 d_wires = len(device.wires)
 
             m_wires = output.wires if output.wires else None
-            obs_tracers, nqubits, contains_compbasis = trace_observables(output.obs, qrp, m_wires)
+            obs_tracers, nqubits = trace_observables(output.obs, qrp, m_wires)
             nqubits = d_wires if nqubits is None else nqubits
 
-            if contains_compbasis and mcm_config.mcm_method == "single-branch-statistics":
+            using_compbasis = obs_tracers.primitive == compbasis_p
+
+            if (
+                mcm_config.mcm_method == "single-branch-statistics"
+                and output.mv is not None
+                and type(output) in [ExpectationMP, VarianceMP, ProbabilityMP, CountsMP]
+            ):
                 raise NotImplementedError(
-                    "single-branch-statistics does not support measurement process "
+                    "single-branch-statistics does not support measurement processes (expval, var, probs, counts) "
                     "on mid circuit measurements."
                 )
-
-            using_compbasis = obs_tracers.primitive == compbasis_p
 
             if isinstance(output, qml.measurements.SampleMP):
 
