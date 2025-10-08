@@ -21,6 +21,7 @@ import os
 import pathlib
 import platform
 import re
+import textwrap
 from copy import deepcopy
 from dataclasses import dataclass, replace
 from typing import Any, Dict, Optional
@@ -368,7 +369,17 @@ class QJITDevice(qml.devices.Device):
         _, config = self.original_device.preprocess(execution_config)
 
         program = TransformProgram()
-        if shots is None:
+
+        if not shots:
+            if _requires_shots(_load_device_capabilities(self.original_device)):
+                raise CompileError(
+                    textwrap.dedent(
+                        f"""
+                    {self.original_device.name} does not support analytical simulation.
+                    Please supply the number of shots on the qnode.
+                    """
+                    )
+                )
             capabilities = self.capabilities
         else:
             # recompute device capabilities if shots were provided through set_shots
@@ -589,3 +600,20 @@ def check_device_wires(wires):
         assert wires[0].shape in ((), (1,))
         if not wires[0].dtype == "int64":
             raise AttributeError("Number of wires on the device should be a scalar integer.")
+
+
+def _requires_shots(capabilities):
+    """
+    Checks if a device capabilities requires shots.
+
+    A device requires shots if all of its MPs are finite shots only.
+    If any of the MPs support modes other than finite shots, shots is not absolutely required.
+    """
+    for _, MP_condition_list in capabilities.measurement_processes.items():
+        if len(MP_condition_list) == 0:
+            # This device has an MP that has no constraints
+            # so shots is not required
+            return False
+        if any(not hasattr(condition, "FINITE_SHOTS_ONLY") for condition in MP_condition_list):
+            return False
+    return True
