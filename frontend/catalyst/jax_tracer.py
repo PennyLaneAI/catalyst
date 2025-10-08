@@ -1062,8 +1062,8 @@ def trace_quantum_measurements(
                 and type(output) in [ExpectationMP, VarianceMP, ProbabilityMP, CountsMP]
             ):
                 raise NotImplementedError(
-                    "single-branch-statistics does not support measurement processes (expval, var, probs, counts) "
-                    "on mid circuit measurements."
+                    "single-branch-statistics does not support measurement processes "
+                    "(expval, var, probs, counts) on mid circuit measurements."
                 )
 
             if isinstance(output, qml.measurements.SampleMP):
