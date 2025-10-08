@@ -16,14 +16,16 @@
 
 import jax.numpy as jnp
 import pennylane as qml
-from catalyst import qjit
 from jax.core import ShapedArray
+
+from catalyst import qjit
 
 
 @qjit
 def f_of_empty():
     """Check empty list of arguments"""
     return True
+
 
 f_of_empty.jit_compile([])
 assert f_of_empty.get_arg_names() == []
@@ -34,6 +36,7 @@ def f_of_a_b(a: float, b: float):
     """Check two float arguments"""
     return a * b
 
+
 f_of_a_b.jit_compile([0.3, 0.4])
 assert f_of_a_b.get_arg_names() == ["a", "b"]
 
@@ -42,6 +45,7 @@ assert f_of_a_b.get_arg_names() == ["a", "b"]
 def f_of_dynamic_argument(a):
     """Check dynamic argument"""
     return a
+
 
 f_of_dynamic_argument.jit_compile([jnp.array([1, 2, 3])])
 assert f_of_dynamic_argument.get_arg_names() == ["a", ""]
@@ -57,6 +61,7 @@ def f_of_qnode_with_dynamic_argument(a):
 
     return _circuit(a)
 
+
 f_of_qnode_with_dynamic_argument.jit_compile([jnp.array([1, 2, 3])])
 assert f_of_dynamic_argument.get_arg_names() == ["a", ""]
 
@@ -66,6 +71,7 @@ def f_of_a_with_dynamic_result(a):
     """Check dynamic result"""
     return jnp.ones((a + 1,), dtype=float)
 
+
 f_of_a_with_dynamic_result.jit_compile([3])
 assert f_of_a_with_dynamic_result.get_arg_names() == ["a"]
 
@@ -74,6 +80,7 @@ assert f_of_a_with_dynamic_result.get_arg_names() == ["a"]
 def f_of_shaped_array(a: ShapedArray([1, 3, 1], dtype=float)):
     """Check ShapedArray argument"""
     return a
+
 
 f_of_shaped_array.aot_compile()
 assert f_of_shaped_array.get_arg_names() == ["a", "", ""]

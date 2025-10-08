@@ -16,8 +16,9 @@
 
 # RUN: %PYTHON %s | FileCheck %s
 
-from catalyst import qjit
 from utils import print_mlir
+
+from catalyst import qjit
 
 
 # CHECK-LABEL: @jit_f
@@ -28,6 +29,7 @@ def f(x: float, y: float):
     """
     # CHECK: %x: tensor<f64>, %y: tensor<f64>
     return x * y
+
 
 assert str(f.mlir_module.body.operations[0].arguments[0].location) == 'loc("x")'
 assert str(f.mlir_module.body.operations[0].arguments[1].location) == 'loc("y")'
