@@ -932,21 +932,21 @@ def trace_observables(
         qubits = qrp.extract(wires, allow_reuse=True)
         obs_tracers = hermitian_p.bind(jax.numpy.asarray(*obs.parameters), *qubits)
     elif isinstance(obs, qml.ops.op_math.Prod):
-        nested_obs = [trace_observables(o, qrp, m_wires) for o in obs]
+        nested_obs = [trace_observables(o, qrp, m_wires)[0] for o in obs]
         obs_tracers = tensorobs_p.bind(*nested_obs)
     elif isinstance(obs, qml.ops.LinearCombination):
         coeffs, observables = obs.terms()
-        nested_obs = [trace_observables(o, qrp, m_wires) for o in observables]
+        nested_obs = [trace_observables(o, qrp, m_wires)[0] for o in observables]
         obs_tracers = hamiltonian_p.bind(jax.numpy.asarray(coeffs), *nested_obs)
     elif isinstance(obs, qml.ops.op_math.Sum):
-        nested_obs = [trace_observables(o, qrp, m_wires) for o in obs]
+        nested_obs = [trace_observables(o, qrp, m_wires)[0] for o in obs]
         obs_tracers = hamiltonian_p.bind(jax.numpy.asarray(jnp.ones(len(obs))), *nested_obs)
     elif isinstance(obs, qml.ops.op_math.SProd):
         coeffs, terms = obs.terms()
         coeffs = jax.numpy.array(coeffs)
         nested_obs = []
         for term in terms:
-            obs = trace_observables(term, qrp, m_wires)
+            obs = trace_observables(term, qrp, m_wires)[0]
             nested_obs.append(obs)
         obs_tracers = hamiltonian_p.bind(coeffs, *nested_obs)
     else:
