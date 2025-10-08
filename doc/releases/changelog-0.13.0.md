@@ -431,30 +431,35 @@ for example the one-shot mid circuit measurement transform.
 
 <h3>Internal changes ⚙️</h3>
 
-* Updates use of `qml.transforms.dynamic_one_shot.parse_native_mid_circuit_measurements` to improved signature.
+* The usage of ``qml.transforms.dynamic_one_shot.parse_native_mid_circuit_measurements`` in 
+  Catalyst's ``dynamic_one_shot`` implementation was updated to use its new call signature.
   [(#1953)](https://github.com/PennyLaneAI/catalyst/pull/1953)
 
-* When capture is enabled, `qjit(autograph=True)` will use capture autograph instead of catalyst autograph.
+* When capture is enabled with ``qml.capture.enable()``, ``@qml.qjit(autograph=True)`` will use 
+  PennyLane's autograph implementation instead of Catalyst's.
   [(#1960)](https://github.com/PennyLaneAI/catalyst/pull/1960)
 
-* `from_plxpr` can now handle dynamic shots and overridden device shots.
+* ``catalyst.from_plxpr`` can now handle dynamic shots, overridden device shots, and translating 
+  ``counts`` properly to Catalyst jaxpr.
   [(#1983)](https://github.com/PennyLaneAI/catalyst/pull/1983/)
-
-* `from_plxpr` can now translate `counts`.
   [(#2041)](https://github.com/PennyLaneAI/catalyst/pull/2041)
 
-* QJitDevice helper `extract_backend_info` removed its redundant `capabilities` argument.
+* The ``extract_backend_info`` helper function for the ``QJITDevice`` no longer has a redundant
+  ``capabilities`` argument.
   [(#1956)](https://github.com/PennyLaneAI/catalyst/pull/1956)
 
-* Raise warning when subroutines are used without capture enabled.
+* A warning is now raised when subroutines are used without PennyLane program capture enabled 
+  (``qml.capture.enable()``).
   [(#1930)](https://github.com/PennyLaneAI/catalyst/pull/1930)
 
-* Update imports for noise transforms from `pennylane.transforms` to `pennylane.noise`.
+* The error message for using a quantum subroutine that was defined outside of a QNode or ``qjit`` 
+  scope has been improved.
+  [(#1932)](https://github.com/PennyLaneAI/catalyst/pull/1932)
+
+* Import paths for noise transforms have been updated from ``pennylane.transforms`` to 
+  ``pennylane.noise``.
   [(#1918)](https://github.com/PennyLaneAI/catalyst/pull/1918)
   [(#2020)](https://github.com/PennyLaneAI/catalyst/pull/2020)
-
-* Improve error message for quantum subroutines when used outside a quantum context.
-  [(#1932)](https://github.com/PennyLaneAI/catalyst/pull/1932)
 
 * `from_plxpr` now supports adjoint and ctrl operations and transforms, operator
   arithmetic observables, `Hermitian` observables, `for_loop` outside qnodes, `cond` outside qnodes,
