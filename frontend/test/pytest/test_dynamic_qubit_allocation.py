@@ -30,12 +30,11 @@ from catalyst.jax_primitives import subroutine
 from catalyst.utils.exceptions import CompileError
 
 
+@pytest.mark.usefixtures("use_capture")
 def test_basic_dynamic_wire_alloc_plain_API(backend):
     """
     Test basic qml.allocate and qml.deallocate.
     """
-
-    qml.capture.enable()
 
     @qjit
     @qml.qnode(qml.device(backend, wires=3))
@@ -50,18 +49,16 @@ def test_basic_dynamic_wire_alloc_plain_API(backend):
         return qml.probs(wires=[0, 1, 2])
 
     observed = circuit()
-    qml.capture.disable()
 
     expected = [0, 0, 0, 1, 0, 0, 0, 0]
     assert np.allclose(expected, observed)
 
 
+@pytest.mark.usefixtures("use_capture")
 def test_basic_dynamic_wire_alloc_ctx_API(backend):
     """
     Test basic qml.allocate with context manager API.
     """
-
-    qml.capture.enable()
 
     @qjit
     @qml.qnode(qml.device(backend, wires=3))
@@ -75,17 +72,16 @@ def test_basic_dynamic_wire_alloc_ctx_API(backend):
         return qml.probs(wires=[0, 1, 2])
 
     observed = circuit()
-    qml.capture.disable()
 
     expected = [0, 0, 0, 1, 0, 0, 0, 0]
     assert np.allclose(expected, observed)
 
 
+@pytest.mark.usefixtures("use_capture")
 def test_measure(backend):
     """
     Test qml.allocate with qml.Measure ops.
     """
-    qml.capture.enable()
 
     @qjit(autograph=True)
     @qml.qnode(qml.device(backend, wires=1))
@@ -100,17 +96,16 @@ def test_measure(backend):
         return qml.probs(wires=[0])  # |1>
 
     observed = circuit()
-    qml.capture.disable()
 
     expected = [0, 1]
     assert np.allclose(expected, observed)
 
 
+@pytest.mark.usefixtures("use_capture")
 def test_measure_with_reset(backend):
     """
     Test qml.allocate with qml.Measure ops with resetting.
     """
-    qml.capture.enable()
 
     @qjit(autograph=True)
     @qml.qnode(qml.device(backend, wires=1))
@@ -131,18 +126,17 @@ def test_measure_with_reset(backend):
         return qml.probs(wires=[0])
 
     observed = circuit()
-    qml.capture.disable()
 
     expected = [0, 1]
     assert np.allclose(expected, observed)
 
 
+@pytest.mark.usefixtures("use_capture")
 @pytest.mark.parametrize("ctrl_val, expected", [(False, [0, 1]), (True, [1, 0])])
 def test_qml_ctrl(ctrl_val, expected, backend):
     """
     Test qml.allocate with qml.ctrl ops.
     """
-    qml.capture.enable()
 
     @qjit
     @qml.qnode(qml.device(backend, wires=1))
@@ -152,16 +146,15 @@ def test_qml_ctrl(ctrl_val, expected, backend):
         return qml.probs(wires=[0])
 
     observed = circuit()
-    qml.capture.disable()
 
     assert np.allclose(expected, observed)
 
 
+@pytest.mark.usefixtures("use_capture")
 def test_QubitUnitary(backend):
     """
     Test qml.allocate with qml.QubitUnitary ops.
     """
-    qml.capture.enable()
 
     @qjit
     @qml.qnode(qml.device(backend, wires=1))
@@ -171,17 +164,16 @@ def test_QubitUnitary(backend):
         return qml.probs(wires=[0])
 
     observed = circuit()
-    qml.capture.disable()
 
     expected = [1, 0]
     assert np.allclose(expected, observed)
 
 
+@pytest.mark.usefixtures("use_capture")
 def test_StatePrep(backend):
     """
     Test qml.allocate with qml.StatePrep ops.
     """
-    qml.capture.enable()
 
     @qjit
     @qml.qnode(qml.device(backend, wires=1))
@@ -191,17 +183,16 @@ def test_StatePrep(backend):
         return qml.probs(wires=[0])  # |1>
 
     observed = circuit()
-    qml.capture.disable()
 
     expected = [0, 1]
     assert np.allclose(expected, observed)
 
 
+@pytest.mark.usefixtures("use_capture")
 def test_BasisState(backend):
     """
     Test qml.allocate with qml.BasisState ops.
     """
-    qml.capture.enable()
 
     @qjit
     @qml.qnode(qml.device(backend, wires=1))
@@ -211,19 +202,17 @@ def test_BasisState(backend):
         return qml.probs(wires=[0])  # |0>
 
     observed = circuit()
-    qml.capture.disable()
 
     expected = [1, 0]
     assert np.allclose(expected, observed)
 
 
+@pytest.mark.usefixtures("use_capture")
 @pytest.mark.parametrize("cond, expected", [(True, [0, 0, 1, 0]), (False, [0, 1, 0, 0])])
 def test_dynamic_wire_alloc_cond(cond, expected, backend):
     """
     Test qml.allocate and qml.deallocate inside cond.
     """
-
-    qml.capture.enable()
 
     @qjit(autograph=True)
     @qml.qnode(qml.device(backend, wires=2))
@@ -242,11 +231,11 @@ def test_dynamic_wire_alloc_cond(cond, expected, backend):
         return qml.probs(wires=[0, 1])
 
     observed = circuit(cond)
-    qml.capture.disable()
 
     assert np.allclose(expected, observed)
 
 
+@pytest.mark.usefixtures("use_capture")
 @pytest.mark.parametrize(
     "num_iter, expected", [(3, [0, 0, 1, 0, 0, 0, 0, 0]), (4, [1, 0, 0, 0, 0, 0, 0, 0])]
 )
@@ -254,8 +243,6 @@ def test_dynamic_wire_alloc_forloop(num_iter, expected, backend):
     """
     Test qml.allocate and qml.deallocate inside for loop.
     """
-
-    qml.capture.enable()
 
     @qjit(autograph=True)
     @qml.qnode(qml.device(backend, wires=3))
@@ -269,11 +256,11 @@ def test_dynamic_wire_alloc_forloop(num_iter, expected, backend):
         return qml.probs(wires=[0, 1, 2])
 
     observed = circuit(num_iter)
-    qml.capture.disable()
 
     assert np.allclose(expected, observed)
 
 
+@pytest.mark.usefixtures("use_capture")
 @pytest.mark.parametrize(
     "num_iter, expected", [(3, [0, 0, 1, 0, 0, 0, 0, 0]), (4, [1, 0, 0, 0, 0, 0, 0, 0])]
 )
@@ -281,7 +268,6 @@ def test_dynamic_wire_alloc_whileloop(num_iter, expected, backend):
     """
     Test qml.allocate and qml.deallocate inside while loop.
     """
-    qml.capture.enable()
 
     @qjit(autograph=True)
     @qml.qnode(qml.device(backend, wires=3))
@@ -297,7 +283,6 @@ def test_dynamic_wire_alloc_whileloop(num_iter, expected, backend):
         return qml.probs(wires=[0, 1, 2])
 
     observed = circuit(num_iter)
-    qml.capture.disable()
 
     assert np.allclose(expected, observed)
 
@@ -319,11 +304,11 @@ def test_no_capture(backend):
             return qml.probs(wires=[0])
 
 
+@pytest.mark.usefixtures("use_capture")
 def test_use_after_free(backend):
     """
     Test error message when used after free.
     """
-    qml.capture.enable()
 
     with pytest.raises(
         CompileError,
@@ -338,14 +323,12 @@ def test_use_after_free(backend):
             qml.Hadamard(q[0])
             return qml.probs(wires=[0])
 
-    qml.capture.disable()
 
-
+@pytest.mark.usefixtures("use_capture")
 def test_terminal_MP_all_wires(backend):
     """
     Test error message when used with terminal measurements on all wires.
     """
-    qml.capture.enable()
 
     with pytest.raises(
         CompileError,
@@ -364,14 +347,12 @@ def test_terminal_MP_all_wires(backend):
                 pass
             return qml.probs()
 
-    qml.capture.disable()
 
-
+@pytest.mark.usefixtures("use_capture")
 def test_terminal_MP_dynamic_wires(backend):
     """
     Test error message when used with terminal measurements on dynamic wires.
     """
-    qml.capture.enable()
 
     with pytest.raises(
         CompileError,
@@ -389,17 +370,14 @@ def test_terminal_MP_dynamic_wires(backend):
             q = qml.allocate(1)
             return qml.probs(q)
 
-    qml.capture.disable()
 
-
+@pytest.mark.usefixtures("use_capture")
 def test_unsupported_cross_scope_registers(backend):
     """
     Scope jaxprs in Catalyst cannot take multiple registers yet.
     Test that an error is raised when a dynamically allocated register in an outside scope
     is being used from an inside scope.
     """
-
-    qml.capture.enable()
 
     with pytest.raises(
         NotImplementedError,
@@ -421,15 +399,12 @@ def test_unsupported_cross_scope_registers(backend):
 
             return qml.probs(wires=[0, 1, 2])
 
-    qml.capture.disable()
 
-
+@pytest.mark.usefixtures("use_capture")
 def test_unsupported_subroutine(backend):
     """
     Test that an error is raised when a dynamically allocated wire is passed into a subroutine.
     """
-
-    qml.capture.enable()
 
     with pytest.raises(
         NotImplementedError,
@@ -451,8 +426,6 @@ def test_unsupported_subroutine(backend):
             with qml.allocate(1) as q:
                 sub(q[0])
             return qml.probs(wires=[0, 1])
-
-    qml.capture.disable()
 
 
 if __name__ == "__main__":
