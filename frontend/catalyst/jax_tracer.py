@@ -1014,7 +1014,7 @@ def pauli_word_to_tensor_obs(obs, qrp: QRegPromise) -> List[DynamicJaxprTracer]:
     return tensorobs_p.bind(*nested_obs)
 
 
-# pylint: disable=too-many-statements,too-many-branches
+# pylint: disable=too-many-statements,too-many-branches, too-many-positional-arguments
 @debug_logger
 def trace_quantum_measurements(
     shots_obj,
@@ -1068,7 +1068,8 @@ def trace_quantum_measurements(
 
             if contains_compbasis and mcm_config.mcm_method == "single-branch-statistics":
                 raise NotImplementedError(
-                    "single-branch-statistics does not support measurement process on mid circuit measurements."
+                    "single-branch-statistics does not support measurement process "
+                    "on mid circuit measurements."
                 )
 
             using_compbasis = obs_tracers.primitive == compbasis_p
