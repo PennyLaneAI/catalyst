@@ -332,7 +332,9 @@
 for example the one-shot mid circuit measurement transform.
   [(#2056)](https://github.com/PennyLaneAI/catalyst/pull/2056)
 
-* Fixed a bug where when applying a quantum transform after qnode.
+* Fixed a bug where applying a quantum transform after a QNode could produce incorrect results or 
+  errors in certain cases. This resolves issues related to transforms operating on QNodes with 
+  classical outputs and improves compatibility with measurement transforms.
   [(#2081)](https://github.com/PennyLaneAI/catalyst/pull/2081)
 
 <h3>Internal changes ⚙️</h3>
