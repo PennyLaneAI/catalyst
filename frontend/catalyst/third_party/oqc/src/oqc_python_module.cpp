@@ -40,8 +40,9 @@ try:
         )
     import qcaas_client
     from qcaas_client.client import OQCClient, QPUTask, CompilerConfig, QuantumResultsFormat
-    optimisations = qcaas_client._externalized_compiler_config.Tket()
-    optimisations.tket_optimizations = qcaas_client._externalized_compiler_config.TketOptimizations.DefaultMappingPass
+    from qcaas_client.compiler_config import Tket, TketOptimizations
+    optimisations = Tket()
+    optimisations.tket_optimizations = TketOptimizations.DefaultMappingPass
     RES_FORMAT = QuantumResultsFormat().binary_count()
     client = OQCClient(url=url, email=email, password=password)
     client.authenticate()

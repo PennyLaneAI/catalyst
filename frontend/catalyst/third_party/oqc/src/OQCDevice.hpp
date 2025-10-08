@@ -44,7 +44,8 @@ class OQCDevice final : public Catalyst::Runtime::QuantumDevice {
     std::unordered_map<std::string, std::string> device_kwargs;
 
     std::string qpu_id;
-    static const std::unordered_map<std::string, std::string> qpu_map;
+    inline static const std::unordered_map<std::string, std::string> qpu_map = {
+        {"lucy", "qpu:uk:2:d865b5a184"}, {"toshiko", "qpu:jp:3:673b1ad43c"}};
 
     inline auto getDeviceWires(const std::vector<QubitIdType> &wires) -> std::vector<size_t>
     {
@@ -94,6 +95,4 @@ class OQCDevice final : public Catalyst::Runtime::QuantumDevice {
     [[nodiscard]] auto Circuit() const -> std::string { return builder->toOpenQASM2(); }
 };
 
-const std::unordered_map<std::string, std::string> OQCDevice::qpu_map = {
-    {"lucy", "qpu:uk:2:d865b5a184"}, {"toshiko", "qpu:jp:3:673b1ad43c"}};
 } // namespace Catalyst::Runtime::Device
