@@ -17,6 +17,7 @@
 * Catalyst now supports dynamic wire allocation with ``qml.allocate()`` and
   ``qml.deallocate()`` when program capture is enabled.
   [(#2002)](https://github.com/PennyLaneAI/catalyst/pull/2002)
+  [(#2075)](https://github.com/PennyLaneAI/catalyst/pull/2075)
 
   Two new functions, ``qml.allocate()`` and ``qml.deallocate()``, [have been added to
   PennyLane](https://docs.pennylane.ai/en/stable/development/release_notes.html#release-0-43-0)
