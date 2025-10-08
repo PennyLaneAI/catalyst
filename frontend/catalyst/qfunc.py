@@ -18,7 +18,6 @@ what happens when a QNode object is called during tracing. Mostly this involves 
 the default behaviour and replacing it with a function-like "QNode" primitive.
 """
 import logging
-import textwrap
 from copy import copy
 from dataclasses import dataclass, replace
 from typing import Callable, Sequence
