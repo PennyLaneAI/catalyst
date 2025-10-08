@@ -80,9 +80,9 @@ def catalyst_decomposer(op, capabilities: DeviceCapabilities):
     if op.name in getattr(capabilities, "to_matrix_ops", {}):
         return _decompose_to_matrix(op)
 
-    if not op.has_decomposition and op.has_matrix and "QubitUnitary" in capabilities.operations:
-        # If the device supports unitary matrices, apply the fallback.
-        return _decompose_to_matrix(op)
+    if isinstance(op, qml.ops.Controlled) and not op.has_decomposition:
+        if op.has_matrix and "QubitUnitary" in capabilities.operations:
+            return _decompose_to_matrix(op)
 
     return op.decomposition()
 
