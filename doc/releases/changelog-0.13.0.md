@@ -429,6 +429,10 @@
 for example the one-shot mid circuit measurement transform.
   [(#2056)](https://github.com/PennyLaneAI/catalyst/pull/2056)
 
+* Fixed a bug where deallocating the auxiliary qubit in ``ppr_to_ppm`` with
+  ``decompose_method="clifford-corrected"`` was deallocating the wrong auxiliary qubit.
+  [(#2039)](https://github.com/PennyLaneAI/catalyst/pull/2039)
+
 <h3>Internal changes ⚙️</h3>
 
 * The usage of ``qml.transforms.dynamic_one_shot.parse_native_mid_circuit_measurements`` in 
@@ -474,23 +478,22 @@ for example the one-shot mid circuit measurement transform.
   group of QEC operations. The main use case is to analyze the depth of a circuit. Also, this is a preliminary step towards supporting parallel execution of QEC layers.
   [(#1917)](https://github.com/PennyLaneAI/catalyst/pull/1917)
 
-* Conversion patterns for the single-qubit `quantum.alloc_qb` and `quantum.dealloc_qb` operations
-  have been added for lowering to the LLVM dialect. These conversion patterns allow for execution of
-  programs containing these operations.
+* Conversion patterns for the single-qubit ``quantum.alloc_qb`` and ``quantum.dealloc_qb`` 
+  operations have been added for lowering to the LLVM dialect. These conversion patterns allow for execution of programs containing these operations.
   [(#1920)](https://github.com/PennyLaneAI/catalyst/pull/1920)
 
-* The default compilation pipeline is now available as `catalyst.pipelines.default_pipeline()`. The
-  function `catalyst.pipelines.get_stages()` has also been removed as it was not used and duplicated
-  the `CompileOptions.get_stages()` method.
+* The default compilation pipeline is now available as ``catalyst.pipelines.default_pipeline()``. 
+  The function ``catalyst.pipelines.get_stages()`` has also been removed, as it was not used and 
+  duplicated the ``CompileOptions.get_stages()`` method.
   [(#1941)](https://github.com/PennyLaneAI/catalyst/pull/1941)
 
 * Utility functions for modifying an existing compilation pipeline have been added to the
-  `catalyst.pipelines` module.
+  ``catalyst.pipelines`` module.
   [(#1941)](https://github.com/PennyLaneAI/catalyst/pull/1941)
 
   These functions provide a simple interface to insert passes and stages into a compilation
-  pipeline. The available functions are `insert_pass_after`, `insert_pass_before`,
-  `insert_stage_after`, and `insert_stage_before`. For example,
+  pipeline. The available functions are ``insert_pass_after``, ``insert_pass_before``,
+  ``insert_stage_after``, and ``insert_stage_before``. For example,
 
   ```pycon
   >>> from catalyst.pipelines import insert_pass_after
@@ -500,12 +503,12 @@ for example the one-shot mid circuit measurement transform.
   ['pass1', 'new_pass', 'pass2']
   ```
 
-* A new built-in compilation pipeline for experimental MBQC workloads has been added, available as
-  `catalyst.ftqc.mbqc_pipeline()`.
+* A new built-in compilation pipeline for experimental MBQC workloads called 
+  ``catalyst.ftqc.mbqc_pipeline()`` has been added.
   [(#1942)](https://github.com/PennyLaneAI/catalyst/pull/1942)
 
-  The output of this function can be used directly as input to the `pipelines` argument of
-  :func:`~.qjit`, for example,
+  The output of this function can be used directly as input to the ``pipelines`` argument of
+  :func:`~.qjit`. For example:
 
   ```python
   from catalyst.ftqc import mbqc_pipeline
@@ -516,32 +519,31 @@ for example the one-shot mid circuit measurement transform.
       ...
   ```
 
-* The `mbqc.graph_state_prep` operation has been added to the MBQC dialect. This operation prepares
-  a graph state with arbitrary qubit connectivity, specified by an input adjacency-matrix operand,
-  for use in MBQC workloads.
+* The ``mbqc.graph_state_prep`` operation has been added to the MBQC dialect. This operation 
+  prepares a graph state with arbitrary qubit connectivity, specified by an input adjacency-matrix 
+  operand, for use in MBQC workloads.
   [(#1965)](https://github.com/PennyLaneAI/catalyst/pull/1965)
 
-* `catalyst.accelerate`, `catalyst.debug.callback`, and `catalyst.pure_callback`, `catalyst.debug.print`, and `catalyst.debug.print_memref` now work when capture is enabled.
+* ``catalyst.accelerate``, ``catalyst.debug.callback``, and ``catalyst.pure_callback``, 
+  ``catalyst.debug.print``, and ``catalyst.debug.print_memref`` now work when PennyLane program 
+  capture is enabled with ``qml.capture.enable()``.
   [(#1902)](https://github.com/PennyLaneAI/catalyst/pull/1902)
 
 * The merge rotation pass in Catalyst (:func:`~.passes.merge_rotations`) now also considers
   `qml.Rot` and `qml.CRot`.
   [(#1955)](https://github.com/PennyLaneAI/catalyst/pull/1955)
 
-* Catalyst now supports *array-backed registers*, meaning that `quantum.insert` operations can be
+* Catalyst now supports *array-backed registers*, meaning that ``quantum.insert`` operations can be
   configured to allow for the insertion of a qubit into an arbitrary position within a register.
   [(#2000)](https://github.com/PennyLaneAI/catalyst/pull/2000)
 
   This feature is disabled by default. To enable it, configure the pass pipeline to set the
-  `use-array-backed-registers` option of the `convert-quantum-to-llvm` pass to `true`. For example,
+  ``use-array-backed-registers`` option of the ``convert-quantum-to-llvm`` pass to ``true``. For 
+  example:
 
   ```console
   catalyst --tool=opt --pass-pipeline="builtin.module(convert-quantum-to-llvm{use-array-backed-registers=true})" <input file>
   ```
-
-* Fix auxiliary qubit deallocation in `decompose-non-clifford-ppr` pass
-  in the `clifford-corrected` method.
-  [(#2039)](https://github.com/PennyLaneAI/catalyst/pull/2039)
 
 * The `NoMemoryEffect` trait has been removed from the `quantum.alloc` operation.
   [(#2044)](https://github.com/PennyLaneAI/catalyst/pull/2044)
