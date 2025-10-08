@@ -11,9 +11,9 @@
   and a ``UserWarning`` is raised.
   [(#2099)](https://github.com/PennyLaneAI/catalyst/pull/2099)
   [(#2091)](https://github.com/PennyLaneAI/catalyst/pull/2091)
+  [(#2068)](https://github.com/PennyLaneAI/catalyst/pull/2068)
   [(#2029)](https://github.com/PennyLaneAI/catalyst/pull/2029)
   [(#2001)](https://github.com/PennyLaneAI/catalyst/pull/2001)
-  [(#2068)](https://github.com/PennyLaneAI/catalyst/pull/2068)
 
 * Catalyst now supports dynamic wire allocation with ``qml.allocate()`` and
   ``qml.deallocate()`` when program capture is enabled.
