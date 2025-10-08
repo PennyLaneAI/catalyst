@@ -461,9 +461,8 @@ for example the one-shot mid circuit measurement transform.
   [(#1918)](https://github.com/PennyLaneAI/catalyst/pull/1918)
   [(#2020)](https://github.com/PennyLaneAI/catalyst/pull/2020)
 
-* `from_plxpr` now supports adjoint and ctrl operations and transforms, operator
-  arithmetic observables, `Hermitian` observables, `for_loop` outside qnodes, `cond` outside qnodes,
-  `while_loop` outside QNode's, and `cond` with elif branches.
+* ``catalyst.from_plxpr`` now supports ``adjoint`` and ``ctrl`` operations and transforms, operator
+  arithmetic observables, ``Hermitian`` observables, ``for_loop``, ``cond`` and ``while_loop`` outside of QNodes, and ``cond`` with ``elif`` branches.
   [(#1844)](https://github.com/PennyLaneAI/catalyst/pull/1844)
   [(#1850)](https://github.com/PennyLaneAI/catalyst/pull/1850)
   [(#1903)](https://github.com/PennyLaneAI/catalyst/pull/1903)
