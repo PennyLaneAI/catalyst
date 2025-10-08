@@ -80,7 +80,7 @@
   [(#2002)](https://github.com/PennyLaneAI/catalyst/pull/2002)
 
   Two new functions, ``qml.allocate()`` and ``qml.deallocate()``, [have been added to
-  PennyLane](https://docs.pennylane.ai/en/stable/development/release_notes.html#release-0-43-0) 
+  PennyLane](https://docs.pennylane.ai/en/stable/development/release_notes.html#release-0-43-0)
   to support dynamic wire allocation. With Catalyst, these features can be accessed on
    ``lightning.qubit``, ``lightning.kokkos``, and ``lightning.gpu``.
 
@@ -108,13 +108,18 @@
   ```
 
   In the above program, 2 qubits are allocated during device initialization, and 1
-  additional qubit is allocated inside the circuit with ``qml.allocate(1)``. 
+  additional qubit is allocated inside the circuit with ``qml.allocate(1)``.
 
   For more information on what ``qml.allocate`` and ``qml.deallocate`` do, please consult the
   [PennyLane v0.43 release notes](https://docs.pennylane.ai/en/stable/development/release_notes.html#release-0-43-0).
 
+<<<<<<< HEAD
   However, there are some notable differences between the behaviour of these features with ``qjit`` 
   versus without. For details, please see the relevant sections in the 
+=======
+  However, there are some notable differences between the behaviour of these features
+  with ``qjit`` versus without. For details, please see the relevant sections in the
+>>>>>>> v0.13.0-rc
   [Catalyst sharp bits page](https://docs.pennylane.ai/projects/catalyst/en/stable/dev/sharp_bits.html#functionality-differences-from-pennylane).
 
 * A new quantum compilation pass called :func:`~.passes.reduce_t_depth` has been added, which 
@@ -162,7 +167,7 @@
               qml.H(wires=i)
               qml.T(wires=i)
 
-          return [measure(wires=i) for i in range(n)] 
+          return [measure(wires=i) for i in range(n)]
 
       print(ppm_specs(circuit))
   ```
@@ -405,9 +410,16 @@
   ``measurements_from_samples``.
   [(#1981)](https://github.com/PennyLaneAI/catalyst/pull/1981)
 
+<<<<<<< HEAD
 * Fixed a compiler error that occurred when ``qml.prod`` was used together with other operator 
   transforms (e.g., ``qml.adjoint``) when Autograph was enabled.
+=======
+* Fix errors in AutoGraph transformed functions when `qml.prod` is used together with other operator
+  transforms (e.g. `qml.adjoint`). Additionally, fix AutoGraph conversion when `qml.prod` are
+  applied outside the `@qjit` scope.
+>>>>>>> v0.13.0-rc
   [(#1910)](https://github.com/PennyLaneAI/catalyst/pull/1910)
+  [(#2083)](https://github.com/PennyLaneAI/catalyst/pull/2083)
 
 * A bug in the ``NullQubit::ReleaseQubit()`` method that prevented the deallocation of individual
   qubits on the ``"null.qubit"`` device has been fixed.
@@ -557,8 +569,15 @@ for example the one-shot mid circuit measurement transform.
   ``qec.ppm`` instructions into MBQC-style instructions.
   [(#2057)](https://github.com/PennyLaneAI/catalyst/pull/2057)
 
+<<<<<<< HEAD
   This pass is part of a bottom-of-stack MBQC execution pathway, with a small separation between the
   PPR/PPM and MBQC layers to enable end-to-end compilation on a mocked backend. 
+=======
+  This pass is part of a bottom-of-stack MBQC execution pathway, with a thin shim between the
+  PPR/PPM layer and MBQC to enable end-to-end compilation on a mocked backend.  Also, in an MBQC gate
+  set, one of the gate `RotXZX` cannot yet be executed on available backends.
+
+>>>>>>> v0.13.0-rc
   ```python
   import pennylane as qml
   from catalyst import qjit, measure
@@ -598,8 +617,14 @@ for example the one-shot mid circuit measurement transform.
 
 <h3>Documentation 📝</h3>
 
+<<<<<<< HEAD
 * Typos were fixed and supplemental information was added to the docstrings for ``ppm_compilaion``,
   ``to_ppr``, ``commute_ppr``, ``ppr_to_ppm``, ``merge_ppr_ppm``, and ``ppm_specs``.
+=======
+* Typos were fixed and supplemental information was added to the
+  docstrings for ``ppm_compilaion``, ``to_ppr``, ``commute_ppr``,
+  ``ppr_to_ppm``, ``merge_ppr_ppm``, and ``ppm_specs``.
+>>>>>>> v0.13.0-rc
   [(#2050)](https://github.com/PennyLaneAI/catalyst/pull/2050)
 
 * The Catalyst Command Line Interface documentation incorrectly stated that the ``catalyst``
