@@ -102,6 +102,15 @@ def _get_total_shots(qnode):
     # due to possibility of tracer, we cannot use a simple `or` here to simplify
     shots_value = qnode._shots.total_shots  # pylint: disable=protected-access
     if shots_value is None:
+        if qnode.device.name == "OQCDevice":
+            raise CompileError(
+                textwrap.dedent(
+                    """
+                OQC device does not support analytical simulation.
+                Please supply the number of shots on the qnode.
+                """
+                )
+            )
         shots = 0
     else:
         shots = shots_value

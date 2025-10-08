@@ -16,7 +16,6 @@
 
 import os
 import platform
-import textwrap
 from typing import Optional
 
 from pennylane.devices import Device, ExecutionConfig
@@ -30,7 +29,6 @@ except ImportError as e:  # pragma: no cover
     ) from e
 
 from catalyst.compiler import get_lib_path
-from catalyst.utils.exceptions import CompileError
 
 BACKENDS = ["lucy", "toshiko"]
 
@@ -62,18 +60,12 @@ class OQCDevice(Device):
         """Backend property of the device."""
         return self._backend
 
-    def preprocess(self, execution_config: Optional[ExecutionConfig] = None, shots=None):
+    def preprocess(
+        self,
+        execution_config: Optional[ExecutionConfig] = None,
+    ):
         """This function defines the device transform program to be applied and an
         updated device configuration."""
-        if not shots:
-            raise CompileError(
-                textwrap.dedent(
-                    """
-                OQC device does not support analytical simulation.
-                Please supply the number of shots on the qnode.
-                """
-                )
-            )
         if execution_config is None:
             execution_config = ExecutionConfig()
 

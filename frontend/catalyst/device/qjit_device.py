@@ -327,6 +327,7 @@ class QJITDevice(qml.devices.Device):
 
         # Capability loading
         device_capabilities = get_device_capabilities(original_device, self.original_device.shots)
+
         backend = QJITDevice.extract_backend_info(original_device)
 
         self.backend_name = backend.c_interface_name
@@ -364,7 +365,7 @@ class QJITDevice(qml.devices.Device):
 
         if execution_config is None:
             execution_config = qml.devices.ExecutionConfig()
-        _, config = self.original_device.preprocess(execution_config, shots)
+        _, config = self.original_device.preprocess(execution_config)
 
         program = TransformProgram()
         if shots is None:
