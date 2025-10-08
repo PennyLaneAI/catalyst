@@ -176,6 +176,11 @@
 
 <h3>Improvements 🛠</h3>
 
+* Catalyst conditional operators, such as :func:`~.cond` or :func:`pennylane.cond`, now allow the
+  target / branch functions to use arguments in their call signature. Previously, one had to supply
+  all values via closure, but this is now done automatically under the hood.
+  [(#2096)](https://github.com/PennyLaneAI/catalyst/pull/2096)
+
 * Significantly improved resource tracking with `null.qubit`.
   The new tracking has better integration with PennyLane (e.g. for passing the filename to write out), cleaner documentation, and its own wrapper class.
   It also now tracks circuit depth, as well as gate counts by number of wires.
@@ -318,8 +323,10 @@
   [(#1981)](https://github.com/PennyLaneAI/catalyst/pull/1981)
 
 * Fix errors in AutoGraph transformed functions when `qml.prod` is used together with other operator
-  transforms (e.g. `qml.adjoint`).
+  transforms (e.g. `qml.adjoint`). Additionally, fix AutoGraph conversion when `qml.prod` are
+  applied outside the `@qjit` scope.
   [(#1910)](https://github.com/PennyLaneAI/catalyst/pull/1910)
+  [(#2083)](https://github.com/PennyLaneAI/catalyst/pull/2083)
 
 * A bug in the `NullQubit::ReleaseQubit()` method that prevented the deallocation of individual
   qubits on the `"null.qubit"` device has been fixed.
