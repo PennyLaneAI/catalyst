@@ -897,7 +897,10 @@ def trace_quantum_operations(
 
 @debug_logger
 def trace_observables(
-    obs: Optional[Operator], qrp: QRegPromise, m_wires: Optional[qml.wires.Wires], contains_compbasis: bool = False
+    obs: Optional[Operator],
+    qrp: QRegPromise,
+    m_wires: Optional[qml.wires.Wires],
+    contains_compbasis: bool = False,
 ) -> Tuple[List[DynamicJaxprTracer], Optional[int], bool]:
     """Trace observables.
 
@@ -931,16 +934,22 @@ def trace_observables(
         qubits = qrp.extract(wires, allow_reuse=True)
         obs_tracers = hermitian_p.bind(jax.numpy.asarray(*obs.parameters), *qubits)
     elif isinstance(obs, qml.ops.op_math.Prod):
-        nested_obs, _, comp_bases = zip(*[trace_observables(o, qrp, m_wires, contains_compbasis) for o in obs])
+        nested_obs, _, comp_bases = zip(
+            *[trace_observables(o, qrp, m_wires, contains_compbasis) for o in obs]
+        )
         contains_compbasis |= any(comp_bases)
         obs_tracers = tensorobs_p.bind(*nested_obs)
     elif isinstance(obs, qml.ops.LinearCombination):
         coeffs, observables = obs.terms()
-        nested_obs, _, comp_bases = zip(*[trace_observables(o, qrp, m_wires, contains_compbasis) for o in observables])
+        nested_obs, _, comp_bases = zip(
+            *[trace_observables(o, qrp, m_wires, contains_compbasis) for o in observables]
+        )
         contains_compbasis |= any(comp_bases)
         obs_tracers = hamiltonian_p.bind(jax.numpy.asarray(coeffs), *nested_obs)
     elif isinstance(obs, qml.ops.op_math.Sum):
-        nested_obs, _, comp_bases = zip(*[trace_observables(o, qrp, m_wires, contains_compbasis) for o in obs])
+        nested_obs, _, comp_bases = zip(
+            *[trace_observables(o, qrp, m_wires, contains_compbasis) for o in obs]
+        )
         contains_compbasis |= any(comp_bases)
         obs_tracers = hamiltonian_p.bind(jax.numpy.asarray(jnp.ones(len(obs))), *nested_obs)
     elif isinstance(obs, qml.ops.op_math.SProd):
@@ -1633,7 +1642,9 @@ def _trace_quantum_step(
                 tape, device, qreg_in, ctx, trace, mcm_config, snapshot_results
             )
             shots = qnode._shots  # pylint: disable=protected-access
-            meas, meas_trees = trace_quantum_measurements(shots, device, qrp_out, output, trees, mcm_config)
+            meas, meas_trees = trace_quantum_measurements(
+                shots, device, qrp_out, output, trees, mcm_config
+            )
             qreg_out = qrp_out.actualize()
 
             # Get the measurement results
