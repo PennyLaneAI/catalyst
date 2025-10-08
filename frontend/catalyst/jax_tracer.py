@@ -1258,12 +1258,9 @@ def apply_transforms(
         tracing_mode = TracingMode.TRANSFORM
     elif len(qnode_program) or have_measurements_changed(tape, tapes[0]):
         with_measurement_from_counts_or_samples = any(
-            (
-                transform_str := str(getattr(qnode_item, "transform", "")),
-                "measurements_from_counts" in transform_str
-                or "measurements_from_samples" in transform_str,
-            )
-            for qnode_item in qnode_program
+            "measurements_from_counts" in (transform_str := str(getattr(qnode, "transform", "")))
+            or "measurements_from_samples" in transform_str
+            for qnode in qnode_program
         )
 
         if has_classical_outputs(flat_results) and with_measurement_from_counts_or_samples:
