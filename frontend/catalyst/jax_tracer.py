@@ -1454,6 +1454,10 @@ def _trace_classical_phase(
         # Therefore we need to compute the tree with measurements as leaves and it comes
         # with an extra computational cost
 
+        if any(isinstance(wire, qml.wires.DynamicWire) for wire in quantum_tape.wires):
+            msg = "qml.allocate() is only supported with program capture enabled."
+            raise CompileError(msg)
+
         # 1. Recompute the original return
         with QueuingManager.stop_recording():
             return_values = tree_unflatten(out_tree_promise(), return_values_flat)
