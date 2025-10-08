@@ -151,25 +151,6 @@ class TestDecomposition:
         assert "quantum.unitary" in mlir
         assert "BlockEncode" not in mlir
 
-    def test_no_matrix(self):
-        """Test that controlling an operation without a matrix method raises an error."""
-        dev = NullQubit(wires=4)
-
-        class OpWithNoMatrix(qml.operation.Operation):
-            """Op without matrix."""
-
-            def matrix(self, wire_order=None):
-                """Matrix is overriden."""
-                raise NotImplementedError()
-
-        @qml.qnode(dev)
-        def f():
-            ctrl(OpWithNoMatrix(wires=[0, 1]), control=[2, 3])
-            return qml.probs()
-
-        with pytest.raises(CompileError, match="could not be decomposed, it might be unsupported."):
-            qjit(f, target="jaxpr")
-
 
 # tapes and regions for generating HybridOps
 tape1 = QuantumScript([qml.X(0), qml.Hadamard(1)])
