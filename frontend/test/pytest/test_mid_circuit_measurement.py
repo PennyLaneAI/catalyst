@@ -420,6 +420,58 @@ class TestMidCircuitMeasurement:
         with pytest.raises(TypeError, match="postselect must be '0' or '1'"):
             _ = circuit(1.8)
 
+    def test_single_branch_statistics_not_implemented_error(self, backend):
+        """Test that NotImplementedError is raised when using mid-circuit measurements inside measurement processes with single-branch-statistics."""
+
+        err = "single-branch-statistics does not support measurement processes"
+        with pytest.raises(NotImplementedError, match=err):
+
+            @qjit
+            @qml.set_shots(5)
+            @qml.qnode(qml.device(backend, wires=2), mcm_method="single-branch-statistics")
+            def counts():
+                qml.Hadamard(0)
+                m = measure(0)
+                return qml.counts(op=m)
+
+            counts()
+
+        with pytest.raises(NotImplementedError, match=err):
+
+            @qjit
+            @qml.set_shots(5)
+            @qml.qnode(qml.device(backend, wires=2), mcm_method="single-branch-statistics")
+            def var():
+                qml.Hadamard(0)
+                m = measure(0)
+                return qml.var(op=m)
+
+            var()
+
+        with pytest.raises(NotImplementedError, match=err):
+
+            @qjit
+            @qml.set_shots(5)
+            @qml.qnode(qml.device(backend, wires=2), mcm_method="single-branch-statistics")
+            def expval():
+                qml.Hadamard(0)
+                m = measure(0)
+                return qml.expval(op=m)
+
+            expval()
+
+        with pytest.raises(NotImplementedError, match=err):
+
+            @qjit
+            @qml.set_shots(5)
+            @qml.qnode(qml.device(backend, wires=2), mcm_method="single-branch-statistics")
+            def probs():
+                qml.Hadamard(0)
+                m = measure(0)
+                return qml.probs(op=m)
+
+            probs()
+
 
 class TestDynamicOneShotIntegration:
     """Integration tests for QNodes using mcm_method="one-shot"/dynamic_one_shot."""
