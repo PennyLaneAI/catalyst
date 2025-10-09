@@ -128,7 +128,15 @@ class OpSignatureAnalyzer {
     {
         // FIXME: This will cause an issue when the decomposition function has cross-qreg
         // inputs and outputs. Now, we just assume has only one qreg input, the global one exists.
-        return signature.inWireIndices[0].getReg();
+        // raise an error if the qreg is not the same
+        Value qreg = signature.inWireIndices[0].getReg();
+
+        bool sameQreg = llvm::any_of(
+            llvm::concat<QubitIndex>(signature.inWireIndices, signature.inCtrlWireIndices),
+            [qreg](const auto &index) { return index.getReg() != qreg; });
+
+        assert(sameQreg && "The qreg of the input wires should be the same");
+        return qreg;
     }
 
     // Prepare the operands for calling the decomposition function
