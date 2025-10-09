@@ -303,9 +303,6 @@ def for_stmt(
             fallback = True
 
     if catalyst.autograph_strict_conversion and fallback:
-        # pylint: disable=import-outside-toplevel
-        import inspect
-
         for_loop_info = get_source_code_info(inspect.stack()[1])
 
         raise AutoGraphError(
@@ -339,8 +336,6 @@ def for_stmt(
             fallback = True
             reset_program_to_length(reference_tracers, *num_instructions)
 
-            # pylint: disable=import-outside-toplevel
-            import inspect
             import textwrap
 
             for_loop_info = get_source_code_info(inspect.stack()[1])
@@ -469,8 +464,6 @@ def get_source_code_info(tb_frame):
     Uses introspection on the call stack to extract the source map record from within AutoGraph
     statements. However, it is not guaranteed to find the source map and may return nothing.
     """
-    import inspect  # pylint: disable=import-outside-toplevel
-
     ag_source_map = None
 
     # Traverse frames in reverse to find caller with `ag_source_map` property:
