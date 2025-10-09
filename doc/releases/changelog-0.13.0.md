@@ -17,6 +17,7 @@
 * Catalyst now supports dynamic wire allocation with ``qml.allocate()`` and
   ``qml.deallocate()`` when program capture is enabled.
   [(#2002)](https://github.com/PennyLaneAI/catalyst/pull/2002)
+  [(#2075)](https://github.com/PennyLaneAI/catalyst/pull/2075)
 
   Two new functions, ``qml.allocate()`` and ``qml.deallocate()``, [have been added to
   PennyLane](https://docs.pennylane.ai/en/stable/development/release_notes.html#release-0-43-0)
@@ -323,8 +324,10 @@
   [(#1981)](https://github.com/PennyLaneAI/catalyst/pull/1981)
 
 * Fix errors in AutoGraph transformed functions when `qml.prod` is used together with other operator
-  transforms (e.g. `qml.adjoint`).
+  transforms (e.g. `qml.adjoint`). Additionally, fix AutoGraph conversion when `qml.prod` are
+  applied outside the `@qjit` scope.
   [(#1910)](https://github.com/PennyLaneAI/catalyst/pull/1910)
+  [(#2083)](https://github.com/PennyLaneAI/catalyst/pull/2083)
 
 * A bug in the `NullQubit::ReleaseQubit()` method that prevented the deallocation of individual
   qubits on the `"null.qubit"` device has been fixed.
