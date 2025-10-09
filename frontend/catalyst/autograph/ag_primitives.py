@@ -20,6 +20,7 @@ import copy
 import functools
 import inspect
 import operator
+import textwrap
 import warnings
 from typing import Any, Callable, Iterator, SupportsIndex, Tuple, Union
 
@@ -335,8 +336,6 @@ def for_stmt(
 
             fallback = True
             reset_program_to_length(reference_tracers, *num_instructions)
-
-            import textwrap
 
             for_loop_info = get_source_code_info(inspect.stack()[1])
 
