@@ -206,14 +206,14 @@ class Function:
         AssertionError: Invalid function type.
     """
 
-    CACHE = {}
+    # CACHE = {}
 
-    def __new__(cls, fn):
-        if cached_instance := cls.CACHE.get(fn):
-            return cached_instance
-        new_instance = super().__new__(cls)
-        cls.CACHE[fn] = new_instance
-        return new_instance
+    # def __new__(cls, fn):
+    #     if cached_instance := cls.CACHE.get(fn):
+    #         return cached_instance
+    #     new_instance = super().__new__(cls)
+    #     cls.CACHE[fn] = new_instance
+    #     return new_instance
 
     @debug_logger_init
     def __init__(self, fn):
