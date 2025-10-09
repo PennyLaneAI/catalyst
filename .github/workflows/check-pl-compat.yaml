@@ -131,7 +131,8 @@ jobs:
       run: |
         # This is the first for the three rc installs
         # Thus this one shouldn't have no-deps: it needs to pull in all PL dependencies
-        pip install jax==0.6.2
+        jax_version=$(grep jax .dep-versions | awk -F '=' '{ print $2 }')
+        pip install jax==$jax_version
         pip install --pre -U --index-url https://test.pypi.org/simple/ pennylane-catalyst'<=0.13.0'
 
     - name: Install PennyLane-Lightning (stable)
