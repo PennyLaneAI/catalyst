@@ -714,12 +714,8 @@ class TestMeasurementTransforms:
         del config.observables["Hadamard"]
         config.non_commuting_observables = non_commuting_flag
 
-        # with patch(
-        #     "catalyst.device.qjit_device.get_device_capabilities", Mock(return_value=config)
-        # ):
         qjit_dev = QJITDevice(dev)
         qjit_dev.capabilities = config
-        # breakpoint()
         assert qjit_dev.capabilities.non_commuting_observables is non_commuting_flag
 
         # Check the preprocess
@@ -743,9 +739,6 @@ class TestMeasurementTransforms:
         config.observables = {}
         config.non_commuting_observables = non_commuting_flag
 
-        # with patch(
-        #     "catalyst.device.qjit_device.get_device_capabilities", Mock(return_value=config)
-        # ):
         qjit_dev = QJITDevice(dev)
         qjit_dev.capabilities = config
 

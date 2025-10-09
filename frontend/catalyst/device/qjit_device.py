@@ -328,9 +328,7 @@ class QJITDevice(qml.devices.Device):
 
         # Capability loading
         # During initilization of QJITDevice, we just load the static toml device specs
-        self.toml_capabilities = get_qjit_device_capabilities(
-            _load_device_capabilities(original_device)
-        )
+        self.capabilities = get_qjit_device_capabilities(_load_device_capabilities(original_device))
 
         backend = QJITDevice.extract_backend_info(original_device)
 
@@ -377,7 +375,7 @@ class QJITDevice(qml.devices.Device):
         # Note that this new set of capabilities are only temporarily needed for the computation
         # of the preprocessing transform program.
         if not shots:
-            if _requires_shots(self.toml_capabilities):
+            if _requires_shots(self.capabilities):
                 raise CompileError(
                     textwrap.dedent(
                         f"""
@@ -387,13 +385,12 @@ class QJITDevice(qml.devices.Device):
                     )
                 )
             device_caps = get_device_capabilities(
-                self.original_device, shots=False, old_capabilities=self.toml_capabilities
+                self.original_device, shots=False, capabilities=self.capabilities
             )
             capabilities = get_qjit_device_capabilities(device_caps)
         else:
-            # #device_caps = get_device_capabilities(self.original_device, shots)
             device_caps = get_device_capabilities(
-                self.original_device, shots=True, old_capabilities=self.toml_capabilities
+                self.original_device, shots=True, capabilities=self.capabilities
             )
             capabilities = get_qjit_device_capabilities(device_caps)
 
