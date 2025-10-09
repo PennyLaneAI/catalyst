@@ -131,9 +131,13 @@ class OpSignatureAnalyzer {
         // raise an error if the qreg is not the same
         Value qreg = signature.inWireIndices[0].getReg();
 
-        bool sameQreg = llvm::any_of(
-            llvm::concat<QubitIndex>(signature.inWireIndices, signature.inCtrlWireIndices),
-            [qreg](const auto &index) { return index.getReg() != qreg; });
+        bool sameQreg = true;
+        for (const auto &index : signature.inWireIndices) {
+            sameQreg &= index.getReg() == qreg;
+        }
+        for (const auto &index : signature.inCtrlWireIndices) {
+            sameQreg &= index.getReg() == qreg;
+        }
 
         assert(sameQreg && "The qreg of the input wires should be the same");
         return qreg;
