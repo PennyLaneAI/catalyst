@@ -9,11 +9,12 @@
   Similar to PennyLane's behaviour, this experimental feature will fall back to the old system
   whenever the graph cannot find decomposition rules for all unsupported operators in the program,
   and a ``UserWarning`` is raised.
-  [(#2099)](https://github.com/PennyLaneAI/catalyst/pull/2099)
-  [(#2091)](https://github.com/PennyLaneAI/catalyst/pull/2091)
-  [(#2068)](https://github.com/PennyLaneAI/catalyst/pull/2068)
-  [(#2029)](https://github.com/PennyLaneAI/catalyst/pull/2029)
   [(#2001)](https://github.com/PennyLaneAI/catalyst/pull/2001)
+  [(#2029)](https://github.com/PennyLaneAI/catalyst/pull/2029)
+  [(#2068)](https://github.com/PennyLaneAI/catalyst/pull/2068)
+  [(#2091)](https://github.com/PennyLaneAI/catalyst/pull/2091)
+  [(#2099)](https://github.com/PennyLaneAI/catalyst/pull/2099)
+
 
 * Catalyst now supports dynamic wire allocation with ``qml.allocate()`` and
   ``qml.deallocate()`` when program capture is enabled.
