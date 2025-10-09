@@ -897,7 +897,9 @@ def trace_quantum_operations(
 
 @debug_logger
 def trace_observables(
-    obs: Operator, qrp: QRegPromise, m_wires: Optional[qml.wires.Wires]
+    obs: Optional[Operator],
+    qrp: QRegPromise,
+    m_wires: Optional[qml.wires.Wires],
 ) -> Tuple[List[DynamicJaxprTracer], Optional[int]]:
     """Trace observables.
 
@@ -1000,7 +1002,7 @@ def pauli_word_to_tensor_obs(obs, qrp: QRegPromise) -> List[DynamicJaxprTracer]:
     return tensorobs_p.bind(*nested_obs)
 
 
-# pylint: disable=too-many-statements,too-many-branches
+# pylint: disable=too-many-statements,too-many-branches, too-many-positional-arguments
 @debug_logger
 def trace_quantum_measurements(
     shots_obj,
@@ -1008,6 +1010,7 @@ def trace_quantum_measurements(
     qrp: QRegPromise,
     outputs: List[Union[MeasurementProcess, DynamicJaxprTracer, Any]],
     out_tree: PyTreeDef,
+    mcm_config: qml.devices.MCMConfig,
 ) -> Tuple[List[DynamicJaxprTracer], PyTreeDef]:
     """Trace quantum measurements. Accept a list of QNode ouptputs and its Pytree-shape. Process
     the quantum measurement outputs, leave other outputs as-is.
@@ -1052,6 +1055,16 @@ def trace_quantum_measurements(
             nqubits = d_wires if nqubits is None else nqubits
 
             using_compbasis = obs_tracers.primitive == compbasis_p
+
+            if (
+                mcm_config.mcm_method == "single-branch-statistics"
+                and output.mv is not None
+                and type(output) in [ExpectationMP, VarianceMP, ProbabilityMP, CountsMP]
+            ):
+                raise NotImplementedError(
+                    "single-branch-statistics does not support measurement processes "
+                    "(expval, var, probs, counts) on mid circuit measurements."
+                )
 
             if isinstance(output, qml.measurements.SampleMP):
 
@@ -1620,7 +1633,9 @@ def _trace_quantum_step(
                 tape, device, qreg_in, ctx, trace, mcm_config, snapshot_results
             )
             shots = qnode._shots  # pylint: disable=protected-access
-            meas, meas_trees = trace_quantum_measurements(shots, device, qrp_out, output, trees)
+            meas, meas_trees = trace_quantum_measurements(
+                shots, device, qrp_out, output, trees, mcm_config
+            )
             qreg_out = qrp_out.actualize()
 
             # Get the measurement results
