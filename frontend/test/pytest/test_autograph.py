@@ -2174,14 +2174,15 @@ class TestDecorators:
         functional wrappers."""
 
         @qml.prod
-        def template():
-            qml.H(0)
-            qml.X(0)
+        def template(b: bool):
+            if b:
+                qml.H(0)
+                qml.X(0)
 
         @qjit(autograph=True, target="jaxpr")
         @qml.qnode(qml.device("null.qubit", wires=0))
         def circuit():
-            qml.adjoint(template())
+            qml.adjoint(template)(True)
             return qml.state()
 
         assert circuit.jaxpr is not None
