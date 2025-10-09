@@ -39,7 +39,13 @@ jobs:
         git checkout $(git tag | sort -V | tail -1)
     - if: ${{ inputs.catalyst == 'release-candidate' }}
       run: |
+        # For rc, we install all packages from TestPyPI.
+        # The purpose of checkout here is to locate the commit where the previous rc Catalyst
+        # was built and uploaded to TestPyPI, so that the tests are the compatible ones
+        # to be run with the latest rc/rc/rc packges on TestPyPI.
+        # This would be the last autobump-and-upload commit made on the rc branch.
         git checkout v0.13.0-rc
+        git checkout "$(git log -1 --author="ringo-but-quantum" --pretty=format:%H)"
 
     - name: Set up Python
       uses: actions/setup-python@v5
