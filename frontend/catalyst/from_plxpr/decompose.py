@@ -21,6 +21,7 @@ from __future__ import annotations
 import functools
 import inspect
 import types
+import warnings
 from collections.abc import Callable
 from typing import get_type_hints
 
@@ -261,7 +262,7 @@ def _create_decomposition_rule(
     sig_func = inspect.signature(func)
     type_hints = get_type_hints(func)
 
-    args = {}
+    args = []
     for name in sig_func.parameters.keys():
         typ = type_hints.get(name, None)
 
@@ -290,23 +291,23 @@ def _create_decomposition_rule(
         possible_names_for_wires = {"wires", "wire", "control_wires", "target_wires"}
 
         if typ is TensorLike or name in possible_names_for_multi_params:
-            args[name] = qml.math.array([0.0] * num_params, like="jax", dtype=float)
+            args.append(qml.math.array([0.0] * num_params, like="jax", dtype=float))
         elif typ is float or name in possible_names_for_single_param:
             # TensorLike is a Union of float, int, array-like, so we use float here
             # to cover the most common case as the JAX tracer doesn't like Union types
             # and we don't have the actual values at this point.
-            args[name] = float
+            args.append(float)
         elif typ is WiresLike or name in possible_names_for_wires:
             # Pass a dummy array of zeros with the correct number of wires
             # This is required for the decomposition_rule to work correctly
             # as it expects an array-like input for wires
-            args[name] = qml.math.array([0] * num_wires, like="jax")
+            args.append(qml.math.array([0] * num_wires, like="jax"))
         elif typ is int:  # pragma: no cover
             # This is only for cases where the rule has an int parameter
             # e.g., dimension in some gates. Not that common though!
             # We cover this when adding end-to-end tests for rules
             # in the MLIR PR.
-            args[name] = int
+            args.append(int)
         else:  # pragma: no cover
             raise ValueError(
                 f"Unsupported type annotation {typ} for parameter {name} in func {func}."
@@ -326,7 +327,9 @@ def _create_decomposition_rule(
         # (e.g., MultiRZ, GlobalPhase)
         func_cp.__name__ += f"_wires_{num_wires}"  # pylint: disable=protected-access
 
-    return decomposition_rule(func_cp)(**args)
+    # Note that we shouldn't pass args as kwargs to decomposition_rule
+    # JAX doesn't like it and it may fail to preserve the order of args.
+    return decomposition_rule(func_cp)(*args)
 
 
 # pylint: disable=protected-access
@@ -358,8 +361,34 @@ def _solve_decomposition_graph(operations, gate_set, fixed_decomps, alt_decomps)
         alt_decomps=alt_decomps,
     )
 
-    # Find the efficient pathways to the target gate set
-    solutions = decomp_graph.solve()
+    with warnings.catch_warnings(record=True) as captured_warnings:
+        warnings.simplefilter("always", UserWarning)
+        solutions = decomp_graph.solve()
+
+    # Check if the graph-based decomposition failed for any operation
+    # We shall do the check after the context manager of warnings.catch_warnings
+    # to be able to check and re-emit the warnings to the user.
+    graph_failed = False
+
+    for wi in captured_warnings:
+        # Re-emit all captured warnings to the user
+        warnings.showwarning(wi.message, wi.category, wi.filename, wi.lineno)
+
+        # TODO: use a custom warning class for this in PennyLane to remove this
+        # string matching and make it more robust.
+        if "The graph-based decomposition system is unable" in str(wi.message):  # pragma: no cover
+            graph_failed = True
+
+    if graph_failed:
+        # Note that this warning is already issued in the DecompositionGraph.solve()
+        # method, but we capture it here to make it more visible to the user
+        # that we are falling back to the standard PennyLane decomposition.
+        # This is important because we cannot use `op.decomposition()` in the
+        # Catalyst MLIR decomposition pass, as it may introduce new unsupported ops
+        # so we need to inform the user that if some operations could not be
+        # decomposed to the target gate set using the graph-based approach,
+        # we need to fallback to the legacy approach without MLIR decomposition.
+        return {}
 
     def is_solved_for(op):
         return (

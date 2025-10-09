@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # pylint: disable=too-many-lines
+
 from textwrap import dedent
 
 import jax
@@ -257,7 +258,6 @@ class TestCond:
             ):
                 qjit(qml.qnode(qml.device(backend, wires=1))(circuit))
         else:
-
             with pytest.raises(
                 TypeError,
                 match="Conditional requires a consistent return structure across all branches",
@@ -286,7 +286,6 @@ class TestCond:
             ):
                 qjit(circuit)
         else:
-
             m = "Conditional requires a consistent array shape per result across all branches"
             with pytest.raises(
                 TypeError,
@@ -486,13 +485,12 @@ class TestCond:
             ):
                 f(True, 3)
 
-    @pytest.mark.xfail(
-        reason="Inability to apply Jax transformations before the quantum traing is complete"
-    )
     def test_branch_multi_return_type_unification_qnode_2(self, backend):
-        """Test that unification happens before the results of the cond primitve is available.
+        """Test that unification happens before the results of the cond primitive is available.
         See the FIXME in the ``CondCallable._call_with_quantum_ctx`` function.
         """
+        if qml.capture.enabled():
+            pytest.xfail(reason="unification not working with capture")
 
         @qjit
         @qml.qnode(qml.device(backend, wires=1))
@@ -557,57 +555,31 @@ class TestCond:
 
         assert 1.0 == qjit(circuit)()
 
-    def test_branch_with_arg(self):
-        """Test that an exception is raised when an 'else if' branch function contains an arg"""
-
-        if qml.capture.enabled():
-            pytest.xfail("capture does not allow returning mcms")
-
-        def circuit(pred: bool):
-            @cond(pred)
-            def cond_fn():
-                qml.PauliX(0)
-
-            @cond_fn.else_if(pred)
-            def cond_elif(x):
-                qml.PauliX(x)
-
-            return measure(wires=0)
-
-        with pytest.raises(
-            TypeError, match="Conditional 'else if' function is not allowed to have any arguments"
-        ):
-            qjit(qml.qnode(qml.device("lightning.qubit", wires=1))(circuit))
-
-    def test_identical_branch_names(self, backend):
-        """Test that branches of the conditional can carry the same function name."""
-
-        if qml.capture.enabled():
-            pytest.xfail("capture does not allow returning mcms")
+    def test_branch_with_arg(self, backend):
+        """Test that we support conditional functions with arguments."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=1))
-        def circuit(pred: bool):
+        @qml.qnode(qml.device(backend, wires=2))
+        def circuit(pred: bool, phi: float):
             @cond(pred)
-            def conditional_flip():
-                qml.PauliX(0)
+            def conditional(x):
+                qml.RY(x, 0)
 
-            @conditional_flip.otherwise
-            def conditional_flip():
-                qml.Identity(0)
+            @conditional.otherwise
+            def conditional(x):
+                qml.RY(x, 1)
 
-            conditional_flip()
+            conditional(phi)
 
-            return measure(wires=0)
+            return qml.expval(qml.Z(0)), qml.expval(qml.Z(1))
 
-        assert circuit(False) == 0
-        assert circuit(True) == 1
+        assert circuit(True, np.pi) == (-1.0, 1.0)
+        assert circuit(False, np.pi) == (1.0, -1.0)
 
-    def test_argument_error_with_callables(self):
-        """Test for the error when arguments are supplied and the target is not a function."""
+    def test_return_type_errors_with_callables(self):
+        """Test for errors when branches have mismatched return behaviour."""
 
         def f(x: int):
-
             res = qml.cond(x < 5, lambda z: z + 1)(0)
 
             return res
@@ -616,11 +588,10 @@ class TestCond:
             with pytest.raises(ValueError, match="false branch must be provided"):
                 qjit(f)
         else:
-            with pytest.raises(TypeError, match="not allowed to have any arguments"):
+            with pytest.raises(TypeError, match="Please specify an else branch"):
                 qjit(f)
 
         def g(x: int):
-
             res = qml.cond(x < 5, qml.Hadamard, lambda z: z + 1)(0)
 
             return res
@@ -629,15 +600,12 @@ class TestCond:
             with pytest.raises(ValueError, match="Mismatch in output abstract values"):
                 qjit(g)
         else:
-            m = "Conditional 'False' function can have arguments only if it is a PennyLane gate."
             with pytest.raises(
-                TypeError,
-                match=m,
+                TypeError, match="requires a consistent return structure across all branches"
             ):
                 qjit(g)
 
         def h(x: int):
-
             res = qml.cond(x < 5, qml.Hadamard, qml.Hadamard, ((x < 6, lambda z: z + 1),))(0)
 
             return res
@@ -647,8 +615,7 @@ class TestCond:
                 qjit(h)
         else:
             with pytest.raises(
-                TypeError,
-                match="Conditional 'else if' function can have arguments only if it is a PennyLane gate.",  # pylint:disable=line-too-long
+                TypeError, match="requires a consistent return structure across all branches"
             ):
                 qjit(h)
 
@@ -829,12 +796,7 @@ class TestClassicalCompilation:
 
             return branch()
 
-        match = (
-            "missing 1 required positional argument"
-            if qml.capture.enabled()
-            else "Conditional 'True'"
-        )
-        with pytest.raises(TypeError, match=match):
+        with pytest.raises(TypeError, match="missing 1 required positional argument"):
             qjit(arithc2)
 
         def arithc1():
@@ -848,12 +810,7 @@ class TestClassicalCompilation:
 
             return branch()  # pylint: disable=no-value-for-parameter
 
-        match = (
-            "missing 1 required positional argument"
-            if qml.capture.enabled()
-            else "Conditional 'False'"
-        )
-        with pytest.raises(TypeError, match=match):
+        with pytest.raises(TypeError, match="missing 1 required positional argument"):
             qjit(arithc1)
 
 

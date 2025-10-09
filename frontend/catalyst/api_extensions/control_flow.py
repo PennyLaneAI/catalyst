@@ -19,7 +19,6 @@ with control flow, including conditionals, for loops, and while loops.
 
 # pylint: disable=too-many-lines
 
-import inspect
 from functools import partial
 from typing import Any, Callable, List
 
@@ -101,9 +100,6 @@ def cond(pred: DynamicJaxprTracer):
     Returns:
         A callable decorator that wraps the first 'if' branch of the conditional.
 
-    Raises:
-        AssertionError: Branch functions cannot have arguments.
-
     **Example**
 
     .. code-block:: python
@@ -181,7 +177,7 @@ def cond(pred: DynamicJaxprTracer):
         :title: Usage details
         :href: usage-details
 
-        There are various constraints and restrictions that should be kept in mind
+        There are some constraints and restrictions that should be kept in mind
         when working with conditionals in Catalyst.
 
         The return values of all branches of :func:`~.cond` must be the same shape.
@@ -256,17 +252,6 @@ def cond(pred: DynamicJaxprTracer):
         raise PlxprCaptureCFCompatibilityError("cond")
 
     def _decorator(true_fn: Callable):
-
-        if len(inspect.signature(true_fn).parameters):
-            if isinstance(true_fn, type) and issubclass(true_fn, qml.operation.Operation):
-                # Special treatment if conditional function body is a single pennylane gate
-                # The qml.operation.Operation base class represents things that
-                # can reasonably be considered as a gate,
-                # e.g. qml.Hadamard, qml.RX, etc.
-                return CondCallableSingleGateHandler(pred, true_fn)
-            else:
-                raise TypeError("Conditional 'True' function is not allowed to have any arguments")
-
         return CondCallable(pred, true_fn)
 
     return _decorator
@@ -576,14 +561,14 @@ def while_loop(cond_fn, allow_array_resizing: bool = False):
 
 ## IMPL ##
 class CondCallable:
-    """User-facing wrapper provoding "else_if" and "otherwise" public methods.
+    """User-facing wrapper providing "else_if" and "otherwise" public methods.
     Some code in this class has been adapted from the cond implementation in the JAX project at
     https://github.com/google/jax/blob/jax-v0.4.1/jax/_src/lax/control_flow/conditionals.py
     released under the Apache License, Version 2.0, with the following copyright notice:
 
     Copyright 2021 The JAX Authors.
 
-    Also provides access to the underlying "Cond" operation object.
+    Also provides access to the underlying "Cond" pennylane.Operation object.
 
     **Example**
 
@@ -630,18 +615,9 @@ class CondCallable:
     def __init__(self, pred, true_fn):
         self.preds = [self._convert_predicate_to_bool(pred)]
         self.branch_fns = [true_fn]
-        self.otherwise_fn = lambda: None
+        self.otherwise_fn = lambda *args, **kwargs: None
         self._operation = None
         self.expansion_strategy = cond_expansion_strategy()
-
-    def set_otherwise_fn(self, otherwise_fn):  # pylint:disable=missing-function-docstring
-        self.otherwise_fn = otherwise_fn
-
-    def add_pred(self, _pred):  # pylint:disable=missing-function-docstring
-        self.preds.append(self._convert_predicate_to_bool(_pred))
-
-    def add_branch_fn(self, _branch_fn):  # pylint:disable=missing-function-docstring
-        self.branch_fns.append(_branch_fn)
 
     @property
     def operation(self):
@@ -671,10 +647,6 @@ class CondCallable:
         """
 
         def decorator(branch_fn):
-            if len(inspect.signature(branch_fn).parameters):
-                raise TypeError(
-                    "Conditional 'else if' function is not allowed to have any arguments"
-                )
             self.preds.append(self._convert_predicate_to_bool(pred))
             self.branch_fns.append(branch_fn)
             return self
@@ -690,8 +662,6 @@ class CondCallable:
         Returns:
             self
         """
-        if len(inspect.signature(otherwise_fn).parameters):
-            raise TypeError("Conditional 'False' function is not allowed to have any arguments")
         self.otherwise_fn = otherwise_fn
         return self
 
@@ -830,7 +800,26 @@ class CondCallable:
                 return branch_fn()
         return self.otherwise_fn()
 
-    def __call__(self):
+    @staticmethod
+    def _make_argless_function(fn, args, kwargs):
+        """Wrap a user function into a function without arguments to satisfy the IR representation
+        of conditionals, which always accesses values via closure (besides the predicate)."""
+
+        def argless_fn():
+            # Special case for single gates supplied to cond. We'd would like users to be able to
+            # use this familiar PL pattern, e.g. `qml.cond(p, qml.RY)(0.1, 0)`.
+            if isinstance(fn, type) and issubclass(fn, qml.operation.Operation):
+                fn(*args, **kwargs)
+                return None  # swallow return value to avoid mismatched pytrees across branches
+
+            return fn(*args, **kwargs)
+
+        return argless_fn
+
+    def __call__(self, *args, **kwargs):
+        self.branch_fns = [self._make_argless_function(fn, args, kwargs) for fn in self.branch_fns]
+        self.otherwise_fn = self._make_argless_function(self.otherwise_fn, args, kwargs)
+
         mode = EvaluationContext.get_evaluation_mode()
         if mode == EvaluationMode.QUANTUM_COMPILATION:
             return self._call_with_quantum_ctx()
@@ -839,78 +828,6 @@ class CondCallable:
         else:
             assert mode == EvaluationMode.INTERPRETATION, f"Unsupported evaluation mode {mode}"
             return self._call_during_interpretation()
-
-
-class CondCallableSingleGateHandler(CondCallable):
-    """
-    Special CondCallable when the conditional body function is a single pennylane gate.
-
-    A usual pennylane conditional call for a gate looks like
-    `qml.cond(x == 42, qml.RX)(theta, wires=0)`
-
-    Since gates are guaranteed to take in arguments (at the very least the wire argument),
-    the usual CondCallable class, which expects the conditional body function to have no arguments,
-    cannot be used.
-    This class inherits from base CondCallable, but wraps the gate in a function with no arguments,
-    and sends that function to CondCallable.
-    This allows us to perform the conditional branch gate function with arguments.
-    """
-
-    def __init__(self, pred, true_fn):  # pylint:disable=super-init-not-called
-        self.sgh_preds = [pred]
-        self.sgh_branch_fns = [true_fn]
-        self.sgh_otherwise_fn = None
-
-    def __call__(self, *args, **kwargs):
-        def argless_true_fn():
-            self.sgh_branch_fns[0](*args, **kwargs)
-
-        super().__init__(self.sgh_preds[0], argless_true_fn)
-
-        if self.sgh_otherwise_fn is not None:
-
-            def argless_otherwise_fn():
-                self.sgh_otherwise_fn(*args, **kwargs)
-
-            super().set_otherwise_fn(argless_otherwise_fn)
-
-        for i in range(1, len(self.sgh_branch_fns)):
-
-            def argless_elseif_fn(i=i):  # i=i to work around late binding
-                self.sgh_branch_fns[i](*args, **kwargs)
-
-            super().add_pred(self.sgh_preds[i])
-            super().add_branch_fn(argless_elseif_fn)
-
-        return super().__call__()
-
-    def else_if(self, _pred):
-        """
-        Override the "can't have arguments" check in the original CondCallable's `else_if`
-        """
-
-        def decorator(branch_fn):
-            if isinstance(branch_fn, type) and issubclass(branch_fn, qml.operation.Operation):
-                self.sgh_preds.append(_pred)
-                self.sgh_branch_fns.append(branch_fn)
-                return self
-            else:  # pylint:disable=line-too-long
-                raise TypeError(
-                    "Conditional 'else if' function can have arguments only if it is a PennyLane gate."
-                )
-
-        return decorator
-
-    def otherwise(self, otherwise_fn):
-        """
-        Override the "can't have arguments" check in the original CondCallable's `otherwise`
-        """
-        if isinstance(otherwise_fn, type) and issubclass(otherwise_fn, qml.operation.Operation):
-            self.sgh_otherwise_fn = otherwise_fn
-        else:
-            raise TypeError(
-                "Conditional 'False' function can have arguments only if it is a PennyLane gate."
-            )
 
 
 class ForLoopCallable:
