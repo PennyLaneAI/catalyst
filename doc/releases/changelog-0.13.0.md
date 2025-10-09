@@ -78,6 +78,7 @@
 * Catalyst now supports dynamic wire allocation with ``qml.allocate()`` and ``qml.deallocate()`` 
   when program capture is enabled.
   [(#2002)](https://github.com/PennyLaneAI/catalyst/pull/2002)
+  [(#2075)](https://github.com/PennyLaneAI/catalyst/pull/2075)
 
   Two new functions, ``qml.allocate()`` and ``qml.deallocate()``, [have been added to
   PennyLane](https://docs.pennylane.ai/en/stable/development/release_notes.html#release-0-43-0)
@@ -263,8 +264,21 @@
   >>> print(ppm_specs(circuit))
   {'circuit_0': {'depth_pi8_ppr': 3, 'depth_ppm': 1, 'logical_qubits': 3, 'max_weight_pi8': 3, 'num_of_ppm': 3, 'pi8_ppr': 6}}
   ```
+  
+* ``qml.QubitUnitary`` is no longer favoured in the decomposition of controlled operators when the
+  operator is not natively supported by the device, but the device supports ``QubitUnitary``. 
+  Instead, conversion to ``QubitUnitary`` only happens if the operator does not define another 
+  decomposition. The previous behaviour was the cause of performance issues when dealing with large 
+  controlled operators, as their matrix representation could be embedded as dense constant data into 
+  the program. The performance difference can span multiple orders of magnitude.
+  [(#2100)](https://github.com/PennyLaneAI/catalyst/pull/2100)
 
-* A new pass, accessible with ``--partition-layers`` in the ``catalyst-cli`` has been added to group 
+* Catalyst conditional operators, such as :func:`~.cond` or :func:`pennylane.cond`, now allow the
+  target and branch functions to use arguments in their call signature. Previously, one had to 
+  supply all values via closure, but this is now done automatically under the hood.
+  [(#2096)](https://github.com/PennyLaneAI/catalyst/pull/2096)
+
+* A new pass, accessible with ``--partition-layers`` in the ``catalyst-cli``, has been added to group 
   PPR and PPM operations into ``qec.layer`` operations based on qubit interactivity and 
   commutativity, enabling circuit analysis and potential support for parallel execution.
   [(#1951)](https://github.com/PennyLaneAI/catalyst/pull/1951)
