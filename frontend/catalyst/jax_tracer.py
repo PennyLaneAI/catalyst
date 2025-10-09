@@ -1257,15 +1257,13 @@ def apply_transforms(
             raise CompileError(msg)
         tracing_mode = TracingMode.TRANSFORM
     elif len(qnode_program) or have_measurements_changed(tape, tapes[0]):
-        # TODO: Ideally we should allow qnode transforms that don't modify the measurements to
-        # operate in the permissive tracing mode, but that currently leads to a small number of
-        # test failures due to the different result format produced in trace_quantum_function.
-        only_with_dynamic_one_shot = all(
-            "dynamic_one_shot_partial" in str(getattr(qnode, "transform", ""))
+        with_measurement_from_counts_or_samples = any(
+            "measurements_from_counts" in (transform_str := str(getattr(qnode, "transform", "")))
+            or "measurements_from_samples" in transform_str
             for qnode in qnode_program
         )
 
-        if has_classical_outputs(flat_results) and not only_with_dynamic_one_shot:
+        if has_classical_outputs(flat_results) and with_measurement_from_counts_or_samples:
             msg = (
                 "Transforming MeasurementProcesses is unsupported with non-MeasurementProcess "
                 "QNode outputs. The selected device, options, or applied QNode transforms, may be "
