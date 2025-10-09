@@ -83,6 +83,11 @@ class OpSignatureAnalyzer {
               .inCtrlValues = op.getInCtrlValues(),
               .outQubits = op.getOutQubits(),
               .outCtrlQubits = op.getOutCtrlQubits(),
+              .sourceQreg = nullptr,
+              .inWireIndices = {},
+              .inCtrlWireIndices = {},
+              .outQubitIndices = {},
+              .outCtrlQubitIndices = {}
           })
     {
         if (!enableQregMode)
