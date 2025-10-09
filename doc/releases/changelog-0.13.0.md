@@ -17,6 +17,7 @@
 * Catalyst now supports dynamic wire allocation with ``qml.allocate()`` and
   ``qml.deallocate()`` when program capture is enabled.
   [(#2002)](https://github.com/PennyLaneAI/catalyst/pull/2002)
+  [(#2075)](https://github.com/PennyLaneAI/catalyst/pull/2075)
 
   Two new functions, ``qml.allocate()`` and ``qml.deallocate()``, [have been added to
   PennyLane](https://docs.pennylane.ai/en/stable/development/release_notes.html#release-0-43-0)
@@ -174,6 +175,14 @@
   [[#2019]](https://github.com/PennyLaneAI/catalyst/pull/2019)
 
 <h3>Improvements 🛠</h3>
+
+* `QubitUnitary` is no longer favoured in the decomposition of controlled operators when the
+  operator is not natively supported by the device, and the device supports `QubitUnitary`. Instead,
+  conversion to `QubitUnitary` only happens if the operator does not define another decomposition.
+  The previous behaviour was the cause of performance issues when dealing with large controlled
+  operators, as their matrix representation could be embedded as dense constant data into the
+  program. The performance difference can span multiple orders of magnitude depending on regime.
+  [(#2100)](https://github.com/PennyLaneAI/catalyst/pull/2100)
 
 * Catalyst conditional operators, such as :func:`~.cond` or :func:`pennylane.cond`, now allow the
   target / branch functions to use arguments in their call signature. Previously, one had to supply
