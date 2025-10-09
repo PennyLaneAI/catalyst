@@ -327,14 +327,16 @@ class QJITDevice(qml.devices.Device):
         super().__init__(wires=original_device.wires)
 
         # Capability loading
-        device_capabilities = get_device_capabilities(original_device, self.original_device.shots)
+        # During initilization of QJITDevice, we just load the static toml device specs
+        self.toml_capabilities = get_qjit_device_capabilities(
+            _load_device_capabilities(original_device)
+        )
 
         backend = QJITDevice.extract_backend_info(original_device)
 
         self.backend_name = backend.c_interface_name
         self.backend_lib = backend.lpath
         self.backend_kwargs = backend.kwargs
-        self.capabilities = get_qjit_device_capabilities(device_capabilities)
 
     @debug_logger
     def preprocess(
@@ -370,8 +372,12 @@ class QJITDevice(qml.devices.Device):
 
         program = TransformProgram()
 
+        # During preprocessing, we now have info on whether the user is requesting execution
+        # with shots.
+        # Note that this new set of capabilities are only temporarily needed for the computation
+        # of the preprocessing transform program.
         if not shots:
-            if _requires_shots(_load_device_capabilities(self.original_device)):
+            if _requires_shots(self.toml_capabilities):
                 raise CompileError(
                     textwrap.dedent(
                         f"""
@@ -380,10 +386,15 @@ class QJITDevice(qml.devices.Device):
                     """
                     )
                 )
-            capabilities = self.capabilities
+            device_caps = get_device_capabilities(
+                self.original_device, shots=False, old_capabilities=self.toml_capabilities
+            )
+            capabilities = get_qjit_device_capabilities(device_caps)
         else:
-            # recompute device capabilities if shots were provided through set_shots
-            device_caps = get_device_capabilities(self.original_device, shots)
+            # #device_caps = get_device_capabilities(self.original_device, shots)
+            device_caps = get_device_capabilities(
+                self.original_device, shots=True, old_capabilities=self.toml_capabilities
+            )
             capabilities = get_qjit_device_capabilities(device_caps)
 
         # measurement transforms may change operations on the tape to accommodate
@@ -420,14 +431,12 @@ class QJITDevice(qml.devices.Device):
 
         return program, config
 
-    def _measurement_transform_program(self, capabilities=None):
-        capabilities = capabilities or self.capabilities
+    def _measurement_transform_program(self, capabilities):
         measurement_program = TransformProgram()
         if isinstance(self.original_device, SoftwareQQPP):
             return measurement_program
 
         supports_sum_observables = "Sum" in capabilities.observables
-
         if capabilities.non_commuting_observables is False:
             measurement_program.add_transform(split_non_commuting)
         elif not supports_sum_observables:
@@ -544,13 +553,22 @@ def _load_device_capabilities(device) -> DeviceCapabilities:
     return capabilities
 
 
-def get_device_capabilities(device, shots=None) -> DeviceCapabilities:
-    """Get or load the original DeviceCapabilities from device"""
+def get_device_capabilities(device, shots=None, capabilities=None) -> DeviceCapabilities:
+    """
+    Process the device capabilities depending on whether shots are present in the user program.
+
+    This function can take in either just the device, in which case it will read from toml again
+    and then filter based on shots, or an existing set of capabilities and filter shots directly
+    on that.
+    """
 
     assert not isinstance(device, QJITDevice)
 
     shots_present = bool(shots)
-    device_capabilities = _load_device_capabilities(device).filter(finite_shots=shots_present)
+    if capabilities:
+        device_capabilities = capabilities.filter(finite_shots=shots_present)
+    else:
+        device_capabilities = _load_device_capabilities(device).filter(finite_shots=shots_present)
 
     # TODO: This is a temporary measure to ensure consistency of behaviour. Remove this
     #       when customizable multi-pathway decomposition is implemented. (Epic 74474)

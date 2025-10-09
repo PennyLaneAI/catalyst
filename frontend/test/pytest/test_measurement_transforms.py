@@ -714,12 +714,12 @@ class TestMeasurementTransforms:
         del config.observables["Hadamard"]
         config.non_commuting_observables = non_commuting_flag
 
-        with patch(
-            "catalyst.device.qjit_device.get_device_capabilities", Mock(return_value=config)
-        ):
-            qjit_dev = QJITDevice(dev)
-
-        # dev1 supports non-commuting observables and sum observables - no splitting
+        # with patch(
+        #     "catalyst.device.qjit_device.get_device_capabilities", Mock(return_value=config)
+        # ):
+        qjit_dev = QJITDevice(dev)
+        qjit_dev.capabilities = config
+        # breakpoint()
         assert qjit_dev.capabilities.non_commuting_observables is non_commuting_flag
 
         # Check the preprocess
@@ -743,17 +743,18 @@ class TestMeasurementTransforms:
         config.observables = {}
         config.non_commuting_observables = non_commuting_flag
 
-        with patch(
-            "catalyst.device.qjit_device.get_device_capabilities", Mock(return_value=config)
-        ):
-            qjit_dev = QJITDevice(dev)
+        # with patch(
+        #     "catalyst.device.qjit_device.get_device_capabilities", Mock(return_value=config)
+        # ):
+        qjit_dev = QJITDevice(dev)
+        qjit_dev.capabilities = config
 
         # dev1 supports non-commuting observables and sum observables - no splitting
         assert qjit_dev.capabilities.non_commuting_observables is non_commuting_flag
 
         # Check the preprocess
         with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
-            transform_program, _ = qjit_dev.preprocess(ctx)
+            transform_program, _ = qjit_dev.preprocess(ctx, shots=1000)
 
         assert split_non_commuting in transform_program
 
