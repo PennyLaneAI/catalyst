@@ -16,7 +16,7 @@
 
 # RUN: %PYTHON %s | FileCheck %s
 
-from utils import print_mlir
+from utils import print_mlir, print_mlir_opt
 
 from catalyst import qjit
 
@@ -35,3 +35,4 @@ assert str(f.mlir_module.body.operations[0].arguments[0].location) == 'loc("x")'
 assert str(f.mlir_module.body.operations[0].arguments[1].location) == 'loc("y")'
 
 print_mlir(f, 0.3, 0.4)
+print_mlir_opt(f, 0.3, 0.4)
