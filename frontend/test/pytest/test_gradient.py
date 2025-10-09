@@ -1405,6 +1405,8 @@ def test_pytrees_return_classical_function(backend, diff_method):
 
     if diff_method == "adjoint":
         # Adjoint method does not support multiple return values
+        # TODO: specify error message and/or fix, currently MLIR Assertion error
+        #       "invalid qfunc symbol in adjoint op" which doesn't seem right
         with pytest.raises(CompileError):
             qjit(jacobian(circuit, argnums=[0, 1]))(psi, phi)
     else:
@@ -2158,7 +2160,7 @@ class TestParameterShiftVerificationIntegrationTests:
                 c = 0.5 / jnp.sin(x)
                 return ([[c, 0.0, 2 * x], [-c, 0.0, 0.0]],)
 
-        with pytest.raises(CompileError):
+        with pytest.raises(CompileError, match="not supported with catalyst on this device"):
 
             @qjit
             @grad
@@ -2176,7 +2178,7 @@ class TestParameterShiftVerificationIntegrationTests:
             def grad_recipe(self):
                 return ([[0.0, 0.0, 0.0], [0.0, 0.0, 0.0]],)
 
-        with pytest.raises(CompileError):
+        with pytest.raises(CompileError, match="not supported with catalyst on this device"):
 
             @qjit
             @grad
@@ -2195,7 +2197,7 @@ class TestParameterShiftVerificationIntegrationTests:
                 # Only one parameter but two frequencies is an error
                 return (1.0, 1.0)
 
-        with pytest.raises(CompileError):
+        with pytest.raises(CompileError, match="not supported with catalyst on this device"):
 
             @qjit
             @grad
@@ -2214,7 +2216,7 @@ class TestParameterShiftVerificationIntegrationTests:
                 # Only one parameter but two frequencies is an error
                 return [(2.0,)]
 
-        with pytest.raises(CompileError):
+        with pytest.raises(CompileError, match="not supported with catalyst on this device"):
 
             @qjit
             @grad
