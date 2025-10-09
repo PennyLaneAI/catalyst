@@ -171,7 +171,7 @@ jobs:
         pip install --no-deps --pre -U --index-url https://test.pypi.org/simple/ pennylane'<=0.43.0'
 
     - name: Add Frontend Dependencies to PATH
-      if: ${{ inputs.catalyst != 'stable' }}
+      if: ${{ inputs.catalyst == 'latest' }}
       run: |
         echo "PYTHONPATH=$PYTHONPATH:$(pwd)/quantum-build/python_packages/quantum" >> $GITHUB_ENV
         echo "RUNTIME_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
