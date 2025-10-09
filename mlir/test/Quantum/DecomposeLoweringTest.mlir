@@ -508,3 +508,49 @@ module @cnot_alternative_decomposition {
     return %out_qubits_2#0, %out_qubits_4 : !quantum.bit, !quantum.bit
   }
 }
+
+// -----
+
+module @mcm_example {
+  func.func public @test_mcm_hadamard() -> tensor<2xf64> {
+    %0 = quantum.alloc( 1) : !quantum.reg
+    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    %mres, %out_qubit = quantum.measure %1 : i1, !quantum.bit
+    %2 = quantum.insert %0[ 0], %out_qubit : !quantum.reg, !quantum.bit
+
+    // CHECK: [[RZ_QUBIT:%.+]] = quantum.custom "RZ"([[CST_0:%.+]])
+    // CHECK: [[RY_QUBIT:%.+]] = quantum.custom "RY"([[CST_1:%.+]]) [[RZ_QUBIT]] : !quantum.bit
+    // CHECK: [[REG_1:%.+]] = quantum.insert [[REG:%.+]][[[EXTRACTED:%.+]]], [[RY_QUBIT]] : !quantum.reg, !quantum.bit
+    // CHECK-NOT: quantum.custom "Hadamard"
+    %3 = quantum.extract %2[ 0] : !quantum.reg -> !quantum.bit
+    %out_qubits = quantum.custom "Hadamard"() %3 : !quantum.bit
+    %4 = quantum.insert %2[ 0], %out_qubits : !quantum.reg, !quantum.bit
+
+    %5 = quantum.compbasis qreg %4 : !quantum.obs
+    %6 = quantum.probs %5 : tensor<2xf64>
+    quantum.dealloc %4 : !quantum.reg
+    return %6 : tensor<2xf64>
+  }
+
+  // Decomposition function should be applied and removed from the module
+  // CHECK-NOT: func.func public @rz_ry
+  func.func public @rz_ry(%arg0: !quantum.reg, %arg1: tensor<1xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "Hadamard"} {
+    %cst = arith.constant 3.1415926535897931 : f64
+    %cst_0 = arith.constant 1.5707963267948966 : f64
+    %0 = stablehlo.slice %arg1 [0:1] : (tensor<1xi64>) -> tensor<1xi64>
+    %1 = stablehlo.reshape %0 : (tensor<1xi64>) -> tensor<i64>
+    %extracted = tensor.extract %1[] : tensor<i64>
+    %2 = quantum.extract %arg0[%extracted] : !quantum.reg -> !quantum.bit
+    %out_qubits = quantum.custom "RZ"(%cst_0) %2 : !quantum.bit
+    %3 = stablehlo.slice %arg1 [0:1] : (tensor<1xi64>) -> tensor<1xi64>
+    %4 = stablehlo.reshape %3 : (tensor<1xi64>) -> tensor<i64>
+    %extracted_1 = tensor.extract %1[] : tensor<i64>
+    %5 = quantum.insert %arg0[%extracted_1], %out_qubits : !quantum.reg, !quantum.bit
+    %extracted_2 = tensor.extract %4[] : tensor<i64>
+    %6 = quantum.extract %5[%extracted_2] : !quantum.reg -> !quantum.bit
+    %out_qubits_3 = quantum.custom "RY"(%cst) %6 : !quantum.bit
+    %extracted_4 = tensor.extract %4[] : tensor<i64>
+    %7 = quantum.insert %5[%extracted_4], %out_qubits_3 : !quantum.reg, !quantum.bit
+    return %7 : !quantum.reg
+  }
+}
