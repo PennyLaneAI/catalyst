@@ -422,7 +422,10 @@ class TestMidCircuitMeasurement:
 
     @pytest.mark.parametrize("measurement_process", [qml.counts, qml.var, qml.expval, qml.probs])
     def test_single_branch_statistics_not_implemented_error(self, backend, measurement_process):
-        """Test that NotImplementedError is raised when using mid-circuit measurements inside measurement processes with single-branch-statistics."""
+        """
+        Test that NotImplementedError is raised when using mid-circuit
+        measurements inside measurement processes with single-branch-statistics.
+        """
 
         err = "single-branch-statistics does not support measurement processes"
         with pytest.raises(NotImplementedError, match=err):
