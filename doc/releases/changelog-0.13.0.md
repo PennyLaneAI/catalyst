@@ -6,7 +6,7 @@
   [(#2033)](https://github.com/PennyLaneAI/catalyst/pull/2033)
   [(#2055)](https://github.com/PennyLaneAI/catalyst/pull/2055)
 
-  This is made possible by leveraging resource-tracking capabilities in the ``null.qubit`` device.
+  This is made possible by leveraging resource-tracking capabilities in the ``null.qubit`` device, which gathers circuit information via dummy execution.
 
   ```python
   import pennylane as qml
