@@ -348,7 +348,7 @@
     [(#1917)](https://github.com/PennyLaneAI/catalyst/pull/1917)
 
 * Utility functions for modifying an existing compilation pipeline have been added to the
-  :mod:`~.pipelines` module.
+  ``pipelines`` module.
   [(#1941)](https://github.com/PennyLaneAI/catalyst/pull/1941)
 
   These functions provide a simple interface to insert passes and stages into a compilation
