@@ -374,25 +374,21 @@ class QJITDevice(qml.devices.Device):
         # with shots.
         # Note that this new set of capabilities are only temporarily needed for the computation
         # of the preprocessing transform program.
-        if not shots:
-            if _requires_shots(self.capabilities):
-                raise CompileError(
-                    textwrap.dedent(
-                        f"""
-                    {self.original_device.name} does not support analytical simulation.
-                    Please supply the number of shots on the qnode.
-                    """
-                    )
+        if not shots and _requires_shots(self.capabilities):
+            raise CompileError(
+                textwrap.dedent(
+                    f"""
+                {self.original_device.name} does not support analytical simulation.
+                Please supply the number of shots on the qnode.
+                """
                 )
-            device_caps = get_device_capabilities(
-                self.original_device, shots=False, capabilities=self.capabilities
             )
-            capabilities = get_qjit_device_capabilities(device_caps)
-        else:
-            device_caps = get_device_capabilities(
-                self.original_device, shots=True, capabilities=self.capabilities
-            )
-            capabilities = get_qjit_device_capabilities(device_caps)
+        device_caps = filter_device_capabilities_with_shots(
+            capabilities=self.capabilities,
+            shots_present=bool(shots),
+            unitary_support=getattr(self.original_device, "_to_matrix_ops", None),
+        )
+        capabilities = get_qjit_device_capabilities(device_caps)
 
         # measurement transforms may change operations on the tape to accommodate
         # measurement transformations, so must occur before decomposition
@@ -518,7 +514,7 @@ def filter_out_modifiers(operations):
 
 
 def _load_device_capabilities(device) -> DeviceCapabilities:
-    """Get the contents of the device config file."""
+    """Get the contents of the device config toml file."""
 
     # TODO: This code exists purely for testing. Find another way to customize device Find a
     #       better way for a device to customize its capabilities as seen by Catalyst.
@@ -550,32 +546,47 @@ def _load_device_capabilities(device) -> DeviceCapabilities:
     return capabilities
 
 
-def get_device_capabilities(device, shots=None, capabilities=None) -> DeviceCapabilities:
+def filter_device_capabilities_with_shots(
+    capabilities, shots_present, unitary_support=None
+) -> DeviceCapabilities:
     """
-    Process the device capabilities depending on whether shots are present in the user program.
-
-    This function can take in either just the device, in which case it will read from toml again
-    and then filter based on shots, or an existing set of capabilities and filter shots directly
-    on that.
+    Process the device capabilities depending on whether shots are present in the user program,
+    and whether device supports QubitUnitary ops.
     """
 
-    assert not isinstance(device, QJITDevice)
-
-    shots_present = bool(shots)
-    if capabilities:
-        device_capabilities = capabilities.filter(finite_shots=shots_present)
-    else:
-        device_capabilities = _load_device_capabilities(device).filter(finite_shots=shots_present)
+    device_capabilities = capabilities.filter(finite_shots=shots_present)
 
     # TODO: This is a temporary measure to ensure consistency of behaviour. Remove this
     #       when customizable multi-pathway decomposition is implemented. (Epic 74474)
-    if hasattr(device, "_to_matrix_ops"):
-        _to_matrix_ops = getattr(device, "_to_matrix_ops")
+    if unitary_support is not None:
+        _to_matrix_ops = unitary_support
         setattr(device_capabilities, "to_matrix_ops", _to_matrix_ops)
         if _to_matrix_ops and not device_capabilities.supports_operation("QubitUnitary"):
             raise CompileError("The device that specifies to_matrix_ops must support QubitUnitary.")
 
     return device_capabilities
+
+
+def get_device_capabilities(device, shots=False) -> DeviceCapabilities:
+    """
+    Get the capabilities from the device.
+
+    TODO: this function is not actually used in the codebase, but is just used by the
+    tests that want custom device capabilities.
+
+    These tests piggy-back off the lightning device (which has "full capabilities") by
+    calling this get_device_capabilities() on lightning, and manually delete some capabilities.
+
+    We leave this function in for now, just for the tests.
+    However, these tests should construct their capabilities properly, instead of piggy-back off
+    lightning.
+    """
+
+    assert not isinstance(device, QJITDevice)
+
+    return filter_device_capabilities_with_shots(
+        _load_device_capabilities(device), bool(shots), getattr(device, "_to_matrix_ops", None)
+    )
 
 
 def is_dynamic_wires(wires: qml.wires.Wires):
