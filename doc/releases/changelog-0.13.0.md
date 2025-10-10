@@ -242,7 +242,7 @@
   [[#2017]](https://github.com/PennyLaneAI/catalyst/pull/2017)
   [[#2019]](https://github.com/PennyLaneAI/catalyst/pull/2019)
 
-  The main differentiator is that "one-shot" explores all branches of the decision tree when
+  The main differentiator is that ``"one-shot"`` explores all branches of the decision tree when
   probabilistic elements are present in the program, such as mid-circuit measurements, device noise,
   or other sources of randomness. The cost is that simulation / device execution is repeated
   ``shots`` number of times.
