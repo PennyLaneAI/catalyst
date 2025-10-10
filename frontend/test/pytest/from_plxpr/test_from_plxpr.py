@@ -1027,8 +1027,8 @@ class TestGraphDecomposition:
     def test_decompose_with_custom(self):
         """Test the conversion of a circuit with a custom decomposition."""
 
-        qml.decomposition.enable_graph()
         qml.capture.enable()
+        qml.decomposition.enable_graph()
 
         @qml.register_resources({qml.H: 2, qml.CZ: 1})
         def my_cnot(wires):
@@ -1050,6 +1050,9 @@ class TestGraphDecomposition:
 
         expected = np.array([1, 0, 0, 1]) / np.sqrt(2)
         assert qml.math.allclose(circuit(), expected)
+
+        qml.decomposition.disable_graph()
+        qml.capture.disable()
 
 
 if __name__ == "__main__":
