@@ -374,7 +374,10 @@ class QJITDevice(qml.devices.Device):
         # with shots.
         # Note that this new set of capabilities are only temporarily needed for the computation
         # of the preprocessing transform program.
-        if not shots and _requires_shots(self.capabilities):
+        shots_not_provided = (shots is None) or (
+            isinstance(shots, qml.measurements.shots.Shots) and shots.total_shots is None
+        )
+        if shots_not_provided and _requires_shots(self.capabilities):
             raise CompileError(
                 textwrap.dedent(
                     f"""
