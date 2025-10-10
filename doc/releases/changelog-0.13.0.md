@@ -301,9 +301,9 @@
   {'circuit_0': {'depth_pi8_ppr': 3, 'depth_ppm': 1, 'logical_qubits': 3, 'max_weight_pi8': 3, 'num_of_ppm': 3, 'pi8_ppr': 6}}
   ```
 
-* ``qml.QubitUnitary`` is no longer favoured in the decomposition of controlled operators when the
-  operator is not natively supported by the device, but the device supports ``qml.QubitUnitary``.
-  Instead, conversion to ``qml.QubitUnitary`` only happens if the operator does not define another
+* :class:`pennylane.QubitUnitary` is no longer favoured in the decomposition of controlled operators when the
+  operator is not natively supported by the device, but the device supports :class:`pennylane.QubitUnitary`.
+  Instead, conversion to :class:`pennylane.QubitUnitary` only happens if the operator does not define another
   decomposition. The previous behaviour was the cause of performance issues when dealing with large
   controlled operators, as their matrix representation could be embedded as dense constant data into
   the program. The performance difference can span multiple orders of magnitude.
