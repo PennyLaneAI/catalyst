@@ -9,10 +9,12 @@
   Similar to PennyLane's behaviour, this experimental feature will fall back to the old system
   whenever the graph cannot find decomposition rules for all unsupported operators in the program,
   and a ``UserWarning`` is raised.
-  [(#2099)](https://github.com/PennyLaneAI/catalyst/pull/2099)
-  [(#2091)](https://github.com/PennyLaneAI/catalyst/pull/2091)
-  [(#2029)](https://github.com/PennyLaneAI/catalyst/pull/2029)
   [(#2001)](https://github.com/PennyLaneAI/catalyst/pull/2001)
+  [(#2029)](https://github.com/PennyLaneAI/catalyst/pull/2029)
+  [(#2068)](https://github.com/PennyLaneAI/catalyst/pull/2068)
+  [(#2091)](https://github.com/PennyLaneAI/catalyst/pull/2091)
+  [(#2099)](https://github.com/PennyLaneAI/catalyst/pull/2099)
+
 
 * Catalyst now supports dynamic wire allocation with ``qml.allocate()`` and
   ``qml.deallocate()`` when program capture is enabled.
@@ -142,7 +144,8 @@
   ```
 
 * Catalyst now supports returning classical and MCM values with the dynamic one-shot MCM method.
-  [(#2004)](https://github.com/PennyLaneAI/catalyst/pull/2004) [(#2090)](https://github.com/PennyLaneAI/catalyst/pull/2090)
+  [(#2004)](https://github.com/PennyLaneAI/catalyst/pull/2004)
+  [(#2090)](https://github.com/PennyLaneAI/catalyst/pull/2090)
 
   For example, the code below will generate 10 values, with an equal probability of 42 and 43
   appearing.
@@ -355,6 +358,11 @@
 * `static_argnums` is now correctly passed to internally transformed kernel functions,
 for example the one-shot mid circuit measurement transform.
   [(#2056)](https://github.com/PennyLaneAI/catalyst/pull/2056)
+
+* Fixed a bug where applying a quantum transform after a QNode could produce incorrect results or 
+  errors in certain cases. This resolves issues related to transforms operating on QNodes with 
+  classical outputs and improves compatibility with measurement transforms.
+  [(#2081)](https://github.com/PennyLaneAI/catalyst/pull/2081)
 
 <h3>Internal changes ⚙️</h3>
 
