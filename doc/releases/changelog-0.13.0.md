@@ -118,7 +118,7 @@
   qml.capture.enable()
 
   @qjit
-  @qml.qnode(qml.device("lightning.qubit", wires=3))  # 3 initial qubits
+  @qml.qnode(qml.device("lightning.qubit", wires=2))  # 2 initial qubits
   def circuit():
       qml.X(0)                        # |10>
 
@@ -126,7 +126,7 @@
           qml.X(q[0])                 # |10> and |1>
           qml.CNOT(wires=[q[0], 1])   # |11> and |1>
 
-      return qml.probs(wires=[0, 1, 2])
+      return qml.probs(wires=[0, 1])
   ```
 
   ```pycon
@@ -141,14 +141,14 @@
   :func:`qml.deallocate() <pennylane.allocation.deallocate>` do, please consult the
   [PennyLane v0.43 release notes](https://docs.pennylane.ai/en/stable/development/release_notes.html#release-0-43-0).
 
-  here are some notable differences between the behaviour of these features with ``qjit`` versus
+  There are some notable differences between the behaviour of these features with ``qjit`` versus
   without. For details, please see the relevant sections in the
   [Catalyst sharp bits page](https://docs.pennylane.ai/projects/catalyst/en/stable/dev/sharp_bits.html#functionality-differences-from-pennylane).
 
 * A new quantum compilation pass called :func:`~.passes.reduce_t_depth` has been added, which
   reduces the depth and count of non-Clifford Pauli product rotations (PPRs) in circuits. This
-  compilation pass works by commuting non-Clifford PPRs (often just referred to as ``T`` gates) in
-  adjacent layers and merging compatible ones. More details can be found in Figure 6 of
+  compilation pass works by commuting non-Clifford PPRs (those requiring a ``T``-state to implement)
+  in adjacent layers and merging compatible ones. More details can be found in Figure 6 of
   [A Game of Surface Codes](https://arXiv:1808.02892v3).
   [(#1975)](https://github.com/PennyLaneAI/catalyst/pull/1975)
   [(#2048)](https://github.com/PennyLaneAI/catalyst/pull/2048)
@@ -161,7 +161,6 @@
   ```python
   import pennylane as qml
   from catalyst import qjit, measure
-  from catalyst.passes import to_ppr, commute_ppr, reduce_t_depth, merge_ppr_ppm
 
   pips = [("pipe", ["enforce-runtime-invariants-pipeline"])]
 
@@ -175,7 +174,7 @@
       "to_ppr": {},
       "commute_ppr": {},
       "merge_ppr_ppm": {},
-      "t_layer_reduction": {}
+      "reduce_t_depth": {}
   }
 
   for pipeline in [reduce_T, no_reduce_T]:
@@ -204,7 +203,7 @@
 
   After performing the :func:`~.passes.to_ppr`, :func:`~.passes.commute_ppr`, and
   :func:`~.passes.merge_ppr_ppm` passes, the circuit contains a depth of four of non-Clifford PPRs
-  (``depth_pi8_ppr``). Subsequently applying the :func:`~.passes.t_layer_reduction` pass will move
+  (``depth_pi8_ppr``). Subsequently applying the :func:`~.passes.reduce_t_depth` pass will move
   PPRs around via commutation, resulting in a circuit with a smaller PPR depth of three.
 
 * Catalyst now handles more types of hybrid workflows by supporting returning classical and MCM
