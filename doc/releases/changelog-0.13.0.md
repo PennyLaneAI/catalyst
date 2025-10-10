@@ -6,7 +6,7 @@
   [(#2033)](https://github.com/PennyLaneAI/catalyst/pull/2033)
   [(#2055)](https://github.com/PennyLaneAI/catalyst/pull/2055)
 
-  This is made possible by leveraging resource-tracking capabilities in the ``null.qubit`` device.
+  This is made possible by leveraging resource-tracking capabilities in the ``null.qubit`` device, which gathers circuit information via dummy execution.
 
   ```python
   import pennylane as qml
@@ -28,6 +28,8 @@
             depth=2,
             shots=Shots(total_shots=None, shot_vector=()))
   ```
+  
+  Note that there are certain limitations to ``specs`` support. For example, ``while`` loops will not terminate when executing on the ``null.qubit`` device.
 
 * The 
   [graph-based decomposition system](https://docs.pennylane.ai/en/stable/code/qml_decomposition.html), 
