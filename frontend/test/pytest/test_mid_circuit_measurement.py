@@ -420,6 +420,26 @@ class TestMidCircuitMeasurement:
         with pytest.raises(TypeError, match="postselect must be '0' or '1'"):
             _ = circuit(1.8)
 
+    @pytest.mark.parametrize("measurement_process", [qml.counts, qml.var, qml.expval, qml.probs])
+    def test_single_branch_statistics_not_implemented_error(self, backend, measurement_process):
+        """
+        Test that NotImplementedError is raised when using mid-circuit
+        measurements inside measurement processes with single-branch-statistics.
+        """
+
+        err = "single-branch-statistics does not support measurement processes"
+        with pytest.raises(NotImplementedError, match=err):
+
+            @qjit
+            @qml.set_shots(5)
+            @qml.qnode(qml.device(backend, wires=2), mcm_method="single-branch-statistics")
+            def measurement():
+                qml.Hadamard(0)
+                m = measure(0)
+                return measurement_process(op=m)
+
+            measurement()
+
 
 class TestDynamicOneShotIntegration:
     """Integration tests for QNodes using mcm_method="one-shot"/dynamic_one_shot."""
