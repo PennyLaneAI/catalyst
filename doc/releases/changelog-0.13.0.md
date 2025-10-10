@@ -86,7 +86,7 @@
   Two new functions, ``qml.allocate()`` and ``qml.deallocate()``, [have been added to
   PennyLane](https://docs.pennylane.ai/en/stable/development/release_notes.html#release-0-43-0)
   to support dynamic wire allocation. With Catalyst, these features can be accessed on
-   ``lightning.qubit``, ``lightning.kokkos``, and ``lightning.gpu``.
+  ``lightning.qubit``, ``lightning.kokkos``, and ``lightning.gpu``.
 
   Dynamic wire allocation refers to the allocation of wires in the middle of a circuit, as opposed 
   to the static allocation during device initialization. For example:
