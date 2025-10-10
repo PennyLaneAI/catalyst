@@ -17,6 +17,7 @@ This submodule defines a utility for converting plxpr into Catalyst jaxpr.
 # pylint: disable=protected-access
 # pylint: disable=too-many-lines
 
+import textwrap
 import warnings
 from copy import copy
 from functools import partial
@@ -48,7 +49,12 @@ from pennylane.transforms import unitary_to_rot as pl_unitary_to_rot
 
 from catalyst.device import extract_backend_info
 from catalyst.from_plxpr.decompose import COMPILER_OPS_FOR_DECOMPOSITION, DecompRuleInterpreter
-from catalyst.from_plxpr.qubit_handler import QubitHandler, QubitIndexRecorder, get_in_qubit_values
+from catalyst.from_plxpr.qubit_handler import (
+    QubitHandler,
+    QubitIndexRecorder,
+    get_in_qubit_values,
+    is_dynamically_allocated_wire,
+)
 from catalyst.jax_extras import jaxpr_pad_consts, make_jaxpr2, transient_jax_config
 from catalyst.jax_primitives import (
     AbstractQbit,
@@ -82,6 +88,7 @@ from catalyst.jax_primitives import (
     var_p,
 )
 from catalyst.passes.pass_api import Pass
+from catalyst.utils.exceptions import CompileError
 
 measurement_map = {
     qml.measurements.SampleMP: sample_p,
@@ -424,6 +431,7 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         """Any control wires used for a subroutine."""
         self.control_values = control_values
         """Any control values for executing a subroutine."""
+        self.has_dynamic_allocation = False
 
         super().__init__()
 
@@ -457,6 +465,9 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         in_ctrl_qregs, in_ctrl_qubits = get_in_qubit_values(
             control_wires, self.qubit_index_recorder, self.init_qreg
         )
+
+        if any(not qreg.is_qubit_mode() and qreg.expired for qreg in in_qregs + in_ctrl_qregs):
+            raise CompileError(f"Deallocated qubits cannot be used, but used in {op.name}.")
 
         out_qubits = qinst_p.bind(
             *[*in_qubits, *op.data, *in_ctrl_qubits, *control_values],
@@ -504,6 +515,26 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
 
     def interpret_measurement(self, measurement):
         """Rebind a measurement as a catalyst instruction."""
+        if self.has_dynamic_allocation:
+            if len(measurement.wires) == 0:
+                raise CompileError(
+                    textwrap.dedent(
+                        """
+                        Terminal measurements must take in an explicit list of wires when
+                        dynamically allocated wires are present in the program.
+                        """
+                    )
+                )
+            if any(is_dynamically_allocated_wire(w) for w in measurement.wires):
+                raise CompileError(
+                    textwrap.dedent(
+                        """
+                        Terminal measurements cannot take in dynamically allocated wires
+                        since they must be temporary.
+                        """
+                    )
+                )
+
         if type(measurement) not in measurement_map:
             raise NotImplementedError(
                 f"measurement {measurement} not yet supported for conversion."
@@ -570,6 +601,8 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
 def handle_qml_alloc(self, *, num_wires, state=None, restored=False):
     """Handle the conversion from plxpr to Catalyst jaxpr for the qml.allocate primitive"""
 
+    self.has_dynamic_allocation = True
+
     new_qreg = QubitHandler(
         qalloc_p.bind(num_wires), self.qubit_index_recorder, dynamically_alloced=True
     )
@@ -588,6 +621,7 @@ def handle_qml_dealloc(self, *wires):
     qreg = self.qubit_index_recorder[wires[0]]
     assert all(self.qubit_index_recorder[w] is qreg for w in wires)
     qreg.insert_all_dangling_qubits()
+    qreg.expired = True
     qdealloc_p.bind(qreg.get())
     return []
 
@@ -607,6 +641,17 @@ def handle_subroutine(self, *args, **kwargs):
     """
     Transform the subroutine from PLxPR into JAXPR with quantum primitives.
     """
+
+    if any(is_dynamically_allocated_wire(arg) for arg in args):
+        raise NotImplementedError(
+            textwrap.dedent(
+                """
+            Dynamically allocated wires in a parent scope cannot be used in a child
+            scope yet. Please consider dynamical allocation inside the child scope.
+            """
+            )
+        )
+
     backup = dict(self.init_qreg)
     self.init_qreg.insert_all_dangling_qubits()
 

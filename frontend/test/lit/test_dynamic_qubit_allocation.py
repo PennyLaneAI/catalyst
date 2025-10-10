@@ -89,7 +89,7 @@ def test_basic_dynalloc():
         qml.X(qs1[1])
         qml.CNOT(wires=[qs1[2], 1])
 
-    return qml.probs()
+    return qml.probs(wires=[0])
 
 
 print(test_basic_dynalloc.mlir)
