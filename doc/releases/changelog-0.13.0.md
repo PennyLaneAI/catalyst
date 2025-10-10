@@ -28,6 +28,8 @@
             depth=2,
             shots=Shots(total_shots=None, shot_vector=()))
   ```
+  
+  Note that there are certain limitations to ``specs`` support. For example, ``while`` loops will not terminate when executing on the ``null.qubit`` device.
 
 * The 
   [graph-based decomposition system](https://docs.pennylane.ai/en/stable/code/qml_decomposition.html), 
