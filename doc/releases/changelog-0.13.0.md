@@ -329,7 +329,7 @@
 
   Two change were made as part of this overall improvement to the IR:
 
-  * A new pass, accessible with ``--partition-layers`` in the ``catalyst-cli``, has been added to 
+  * A new pass, accessible with ``--partition-layers`` in the Catalyst CLI, has been added to 
     group PPR and PPM operations into ``qec.layer`` operations based on qubit interactivity and 
     commutativity, enabling circuit analysis and potential support for parallel execution.
     [(#1951)](https://github.com/PennyLaneAI/catalyst/pull/1951)
