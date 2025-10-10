@@ -386,12 +386,11 @@ class QJITDevice(qml.devices.Device):
                 """
                 )
             )
-        device_caps = filter_device_capabilities_with_shots(
+        capabilities = filter_device_capabilities_with_shots(
             capabilities=self.capabilities,
             shots_present=bool(shots),
             unitary_support=getattr(self.original_device, "_to_matrix_ops", None),
         )
-        capabilities = get_qjit_device_capabilities(device_caps)
 
         # measurement transforms may change operations on the tape to accommodate
         # measurement transformations, so must occur before decomposition
