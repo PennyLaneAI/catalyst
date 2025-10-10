@@ -9,10 +9,12 @@
   Similar to PennyLane's behaviour, this experimental feature will fall back to the old system
   whenever the graph cannot find decomposition rules for all unsupported operators in the program,
   and a ``UserWarning`` is raised.
-  [(#2099)](https://github.com/PennyLaneAI/catalyst/pull/2099)
-  [(#2091)](https://github.com/PennyLaneAI/catalyst/pull/2091)
-  [(#2029)](https://github.com/PennyLaneAI/catalyst/pull/2029)
   [(#2001)](https://github.com/PennyLaneAI/catalyst/pull/2001)
+  [(#2029)](https://github.com/PennyLaneAI/catalyst/pull/2029)
+  [(#2068)](https://github.com/PennyLaneAI/catalyst/pull/2068)
+  [(#2091)](https://github.com/PennyLaneAI/catalyst/pull/2091)
+  [(#2099)](https://github.com/PennyLaneAI/catalyst/pull/2099)
+
 
 * Catalyst now supports dynamic wire allocation with ``qml.allocate()`` and
   ``qml.deallocate()`` when program capture is enabled.
@@ -176,6 +178,14 @@
   [[#2019]](https://github.com/PennyLaneAI/catalyst/pull/2019)
 
 <h3>Improvements 🛠</h3>
+
+* `QubitUnitary` is no longer favoured in the decomposition of controlled operators when the
+  operator is not natively supported by the device, and the device supports `QubitUnitary`. Instead,
+  conversion to `QubitUnitary` only happens if the operator does not define another decomposition.
+  The previous behaviour was the cause of performance issues when dealing with large controlled
+  operators, as their matrix representation could be embedded as dense constant data into the
+  program. The performance difference can span multiple orders of magnitude depending on regime.
+  [(#2100)](https://github.com/PennyLaneAI/catalyst/pull/2100)
 
 * Catalyst conditional operators, such as :func:`~.cond` or :func:`pennylane.cond`, now allow the
   target / branch functions to use arguments in their call signature. Previously, one had to supply
@@ -348,6 +358,11 @@
 * `static_argnums` is now correctly passed to internally transformed kernel functions,
 for example the one-shot mid circuit measurement transform.
   [(#2056)](https://github.com/PennyLaneAI/catalyst/pull/2056)
+
+* Fixed a bug where applying a quantum transform after a QNode could produce incorrect results or
+  errors in certain cases. This resolves issues related to transforms operating on QNodes with
+  classical outputs and improves compatibility with measurement transforms.
+  [(#2081)](https://github.com/PennyLaneAI/catalyst/pull/2081)
 
 <h3>Internal changes ⚙️</h3>
 
