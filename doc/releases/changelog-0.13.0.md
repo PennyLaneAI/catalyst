@@ -2,15 +2,14 @@
 
 <h3>New features since last release</h3>
 
-* Catalyst now supports ``qml.specs``, meaning that
-  users can now use the :func:`~.specs` function to track the exact resources of programs compiled 
-  with :func:`~.qjit`!  
-  This new feature is currently only supported when using ``level="device"``.
+* Catalyst now supports :func:`qml.specs <pennylane.specs>`, meaning that users can now use the 
+  :func:`qml.specs <pennylane.specs>` function to track the exact resources of programs compiled 
+  with :func:`~.qjit`! This new feature is currently only supported when using ``level="device"``.
   [(#2033)](https://github.com/PennyLaneAI/catalyst/pull/2033)
   [(#2055)](https://github.com/PennyLaneAI/catalyst/pull/2055)
 
-  This is made possible by leveraging resource-tracking capabilities using the ``null.qubit`` device under the hood,
-  which gathers circuit information via mock execution.
+  This is made possible by leveraging resource-tracking capabilities using the ``null.qubit`` device 
+  under the hood, which gathers circuit information via mock execution.
 
   ```python
   from functools import partial
@@ -50,8 +49,10 @@
 
 * The 
   [graph-based decomposition system](https://docs.pennylane.ai/en/stable/code/qml_decomposition.html), 
-  enabled with the global toggle ``qml.decomposition.enable_graph()``, is now supported with 
-  Catalyst with PennyLane program capture enabled (``qml.capture.enable()``). This provides ``qjit`` 
+  enabled with the global toggle 
+  :func:`qml.decomposition.enable_graph() <pennylane.decomposition.enable_graph>`, is now supported 
+  with Catalyst with PennyLane program capture enabled 
+  (:func:`qml.capture.enable() <pennylane.capture.enable>`). This provides :func:`~.qjit`
   compatibility to defining custom decomposition rules and access to the many decomposition rules 
   for templates and operators in PennyLane that have been added over the past few release cycles.
   [(#1820)](https://github.com/PennyLaneAI/catalyst/pull/1820)
@@ -95,12 +96,15 @@
   For more information, please consult the 
   [PennyLane decomposition module](https://docs.pennylane.ai/en/stable/code/qml_decomposition.html).
 
-* Catalyst now supports dynamic wire allocation with ``qml.allocate()`` and ``qml.deallocate()`` 
-  when program capture is enabled.
+* Catalyst now supports dynamic wire allocation with :func:`qml.allocate() <pennylane.allocate>` and 
+  :func:`qml.deallocate() <pennylane.deallocate>` when program capture is enabled, unlocking 
+  `qjit`-able applications like decompositions of gates that require temporary auxiliary wires and 
+  logical patterns in subroutines that benefit from having dynamic wire management.
   [(#2002)](https://github.com/PennyLaneAI/catalyst/pull/2002)
   [(#2075)](https://github.com/PennyLaneAI/catalyst/pull/2075)
 
-  Two new functions, ``qml.allocate()`` and ``qml.deallocate()``, [have been added to
+  Two new functions, :func:`qml.allocate() <pennylane.allocate>` and 
+  :func:`qml.deallocate() <pennylane.deallocate>`, [have been added to
   PennyLane](https://docs.pennylane.ai/en/stable/development/release_notes.html#release-0-43-0)
   to support dynamic wire allocation. With Catalyst, these features can be accessed on
   ``lightning.qubit``, ``lightning.kokkos``, and ``lightning.gpu``.
@@ -128,19 +132,21 @@
   [0. 0. 0. 1.]
   ```
 
-  In the above program, 2 qubits are allocated during device initialization, and 1
-  additional qubit is allocated inside the circuit with ``qml.allocate(1)``.
+  In the above program, 2 qubits are allocated during device initialization, and 1 additional qubit 
+  is allocated inside the circuit with ``qml.allocate(1)``.
 
-  For more information on what ``qml.allocate`` and ``qml.deallocate`` do, please consult the
+  For more information on what :func:`qml.allocate() <pennylane.allocate>` and 
+  :func:`qml.deallocate() <pennylane.deallocate>` do, please consult the
   [PennyLane v0.43 release notes](https://docs.pennylane.ai/en/stable/development/release_notes.html#release-0-43-0).
 
-  However, there are some notable differences between the behaviour of these features with ``qjit`` 
-  versus without. For details, please see the relevant sections in the 
+  here are some notable differences between the behaviour of these features with ``qjit`` versus 
+  without. For details, please see the relevant sections in the 
   [Catalyst sharp bits page](https://docs.pennylane.ai/projects/catalyst/en/stable/dev/sharp_bits.html#functionality-differences-from-pennylane).
 
 * A new quantum compilation pass called :func:`~.passes.reduce_t_depth` has been added, which 
   reduces the depth and count of non-Clifford Pauli product rotations (PPRs) in circuits. This 
-  compilation pass works by commuting non-Clifford PPRs (often just referred to as ``T`` gates) in adjacent layers and merging compatible ones. More details can be found in Figure 6 of
+  compilation pass works by commuting non-Clifford PPRs (often just referred to as ``T`` gates) in 
+  adjacent layers and merging compatible ones. More details can be found in Figure 6 of
   [A Game of Surface Codes](https://arXiv:1808.02892v3).
   [(#1975)](https://github.com/PennyLaneAI/catalyst/pull/1975)
   [(#2048)](https://github.com/PennyLaneAI/catalyst/pull/2048)
@@ -198,7 +204,8 @@
   (``depth_pi8_ppr``). Subsequently applying the :func:`~.passes.t_layer_reduction` pass will move 
   PPRs around via commutation, resulting in a circuit with a smaller PPR depth of three.
 
-* Catalyst now supports returning classical and MCM values with the dynamic one-shot MCM method.
+* Catalyst now handles more types of hybrid workflows by supporting returning classical and MCM 
+  values with the dynamic one-shot MCM method.
   [(#2004)](https://github.com/PennyLaneAI/catalyst/pull/2004) 
   [(#2090)](https://github.com/PennyLaneAI/catalyst/pull/2090)
 
@@ -229,21 +236,24 @@
   ```
 
 * The default mid-circuit measurement method in catalyst has been changed from 
-  ``"single-branch-statistics"`` to ``"one-shot"``.
+  ``"single-branch-statistics"`` to ``"one-shot"``, which provides a better, more sensible 
+  experience overall when using finite shots.
   [[#2017]](https://github.com/PennyLaneAI/catalyst/pull/2017)
   [[#2019]](https://github.com/PennyLaneAI/catalyst/pull/2019)
 
-* Catalyst now provides native support for ``SingleExcitation``, ``DoubleExcitation``, and 
-  ``PCPhase`` on compatible devices (e.g., Lightning simulators). This enhancement avoids 
-  unnecessary gate decomposition, leading to reduced compilation time and improved overall 
-  performance.
+* Catalyst now provides native support for 
+  :class:`qml.SingleExcitation <pennylane.SingleExcitation>`, 
+  :class:`qml.DoubleExcitation <pennylane.SingleExcitation>`, and 
+  :class:`qml.PCPhase <pennylane.PCPhase>` on compatible devices (e.g., Lightning simulators). This 
+  enhancement avoids unnecessary gate decomposition, leading to reduced compilation time and 
+  improved overall performance.
   [(#1980)](https://github.com/PennyLaneAI/catalyst/pull/1980)
   [(#1987)](https://github.com/PennyLaneAI/catalyst/pull/1987)
 
 <h3>Improvements 🛠</h3>
 
-* Adjoint differentiation is used by default when executing on lightning devices, significantly 
-  reducing gradient computation time.
+* Adjoint differentiation is used by default when executing on lightning devices, which 
+  significantly reduces gradient computation time.
   [(#1961)](https://github.com/PennyLaneAI/catalyst/pull/1961)
 
 * The :func:`~.passes.ppm_specs` function now tracks the non-Clifford and Clifford PPR depth and the
@@ -286,20 +296,21 @@
   ```
   
 * ``qml.QubitUnitary`` is no longer favoured in the decomposition of controlled operators when the
-  operator is not natively supported by the device, but the device supports ``QubitUnitary``. 
-  Instead, conversion to ``QubitUnitary`` only happens if the operator does not define another 
+  operator is not natively supported by the device, but the device supports ``qml.QubitUnitary``. 
+  Instead, conversion to ``qml.QubitUnitary`` only happens if the operator does not define another 
   decomposition. The previous behaviour was the cause of performance issues when dealing with large 
   controlled operators, as their matrix representation could be embedded as dense constant data into 
   the program. The performance difference can span multiple orders of magnitude.
   [(#2100)](https://github.com/PennyLaneAI/catalyst/pull/2100)
 
-* Catalyst conditional operators, such as :func:`~.cond` or :func:`pennylane.cond`, now allow the
-  target and branch functions to use arguments in their call signature. Previously, one had to 
-  supply all values via closure, but this is now done automatically under the hood.
+* Conditional operators, such as :func:`~.cond` or :func:`pennylane.cond`, now allow the target and 
+  branch functions to use arguments in their call signature. Previously, one had to supply all 
+  values via closure, but this is now done automatically under the hood.
   [(#2096)](https://github.com/PennyLaneAI/catalyst/pull/2096)
 
-* ``catalyst.from_plxpr`` now supports ``adjoint`` and ``ctrl`` operations and transforms, operator
-  arithmetic observables, ``Hermitian`` observables, ``for_loop``, ``cond`` and ``while_loop`` outside of QNodes, and ``cond`` with ``elif`` branches.
+* :func:`~.from_plxpr` now supports ``adjoint`` and ``ctrl`` operations and transforms, operator
+  arithmetic observables, ``Hermitian`` observables, ``for_loop``, ``cond`` and ``while_loop`` 
+  outside of QNodes, and ``cond`` with ``elif`` branches.
   [(#1844)](https://github.com/PennyLaneAI/catalyst/pull/1844)
   [(#1850)](https://github.com/PennyLaneAI/catalyst/pull/1850)
   [(#1903)](https://github.com/PennyLaneAI/catalyst/pull/1903)
@@ -307,27 +318,27 @@
   [(#1889)](https://github.com/PennyLaneAI/catalyst/pull/1889)
   [(#1973)](https://github.com/PennyLaneAI/catalyst/pull/1973)
 
+* :func:`~.from_plxpr` can now handle dynamic shots, overridden device shots, and translating 
+  ``counts`` properly to Catalyst jaxpr.
+  [(#1983)](https://github.com/PennyLaneAI/catalyst/pull/1983)
+  [(#2041)](https://github.com/PennyLaneAI/catalyst/pull/2041)
+
 * A new pass, accessible with ``--partition-layers`` in the ``catalyst-cli``, has been added to group 
   PPR and PPM operations into ``qec.layer`` operations based on qubit interactivity and 
   commutativity, enabling circuit analysis and potential support for parallel execution.
   [(#1951)](https://github.com/PennyLaneAI/catalyst/pull/1951)
 
-* Resource-tracking unit tests that pollute the environment with output files have been 
-  fixed.
+* Resource-tracking unit tests that pollute the environment with output files have been fixed.
   [(#1861)](https://github.com/PennyLaneAI/catalyst/pull/1861)
 
-* ``catalyst.from_plxpr`` can now handle dynamic shots, overridden device shots, and translating 
-  ``counts`` properly to Catalyst jaxpr.
-  [(#1983)](https://github.com/PennyLaneAI/catalyst/pull/1983)
-  [(#2041)](https://github.com/PennyLaneAI/catalyst/pull/2041)
-
 * Utility functions for modifying an existing compilation pipeline have been added to the
-  ``catalyst.pipelines`` module.
+  :mod:`~.pipelines` module.
   [(#1941)](https://github.com/PennyLaneAI/catalyst/pull/1941)
 
   These functions provide a simple interface to insert passes and stages into a compilation
-  pipeline. The available functions are ``insert_pass_after``, ``insert_pass_before``,
-  ``insert_stage_after``, and ``insert_stage_before``. For example,
+  pipeline. The available functions are :func:`~.passes.insert_pass_after`, 
+  :func:`~.passes.insert_pass_before`, :func:`~.passes.insert_stage_after`, and 
+  :func:`~.passes.insert_stage_before`. For example,
 
   ```pycon
   >>> from catalyst.pipelines import insert_pass_after
@@ -348,7 +359,7 @@
 
 * Catalyst's native control flow functions (:func:`~.for_loop`, :func:`~.while_loop` and 
   :func:`~.cond`) now raise an error if used with PennyLane program capture (i.e., 
-  `qml.capture.enable()` is present).
+  :func:`qml.capture.enable() <pennylane.capture.enable>` is present).
   [(#1945)](https://github.com/PennyLaneAI/catalyst/pull/1945)
 
 * functionality has been added to the `catalyst-cli` that prints the Catalyst version with 
@@ -410,15 +421,16 @@
   with ``ReleaseQubits``.
   [(#1996)](https://github.com/PennyLaneAI/catalyst/pull/1996)
 
-  Instead of releasing all currently active qubits, the new interface function ``ReleaseQubits`` explicitly takes in an array of qubit IDs to be released.
+  Instead of releasing all currently active qubits, the new interface function ``ReleaseQubits`` 
+  explicitly takes in an array of qubit IDs to be released.
 
   For devices without dynamic allocation support it is expected that this function only succeed if 
   the ID array contains the same values as those produced by the initial `AllocateQubits` call, 
   otherwise the device is encouraged to raise an error.
 
 * The ``shots`` property has been removed from ``OQDDevice``. The number of shots for a qnode 
-  execution is now set directly on the qnode via ``qml.set_shots``, either used as a decorator, 
-  ``@qml.set_shots(num_shots)``, or directly on the qnode, 
+  execution is now set directly on the qnode via `qml.set_shots <pennylane.set_shots>`, either used 
+  as a decorator, ``@qml.set_shots(num_shots)``, or directly on the qnode, 
   ``qml.set_shots(qnode, shots=num_shots)``.
   [(#1988)](https://github.com/PennyLaneAI/catalyst/pull/1988)
 
@@ -439,7 +451,8 @@
 
 <h3>Deprecations 👋</h3>
 
-* Deprecated usages of ``Device.shots`` along with setting ``device(..., shots=...)``. Please use ``qml.set_shots(shots=...)`` or set shots at the QNode level 
+* Deprecated usages of ``Device.shots`` along with setting ``device(..., shots=...)``. Please use 
+  `qml.set_shots <pennylane.set_shots>` or set shots at the QNode level 
   (i.e., ``qml.QNode(..., shots=...)``).
   [(#1952)](https://github.com/PennyLaneAI/catalyst/pull/1952)
 
