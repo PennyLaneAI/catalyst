@@ -9,6 +9,8 @@
   This is made possible by leveraging resource-tracking capabilities in the ``null.qubit`` device.
 
   ```python
+  import pennylane as qml
+  
   @qml.qjit
   @qml.qnode(qml.device("lightning.qubit", wires=2))
   def circuit():
@@ -39,8 +41,6 @@
   [(#2001)](https://github.com/PennyLaneAI/catalyst/pull/2001)
   
   ```python
-  import pennylane as qml
-
   qml.decomposition.enable_graph()
   qml.capture.enable()
 
@@ -292,7 +292,7 @@
   that take in qubits as arguments, like in decomposition rules.
   [(#1820)](https://github.com/PennyLaneAI/catalyst/pull/1820)
 
-* Resource-tracking unit tests that pollute luting the environment with output files have been 
+* Resource-tracking unit tests that pollute the environment with output files have been 
   fixed.
   [(#1861)](https://github.com/PennyLaneAI/catalyst/pull/1861)
 
@@ -398,9 +398,7 @@
 
 <h3>Deprecations 👋</h3>
 
-* Deprecated usages of ``Device.shots`` along with setting ``device(..., shots=...)``. Heavy 
-  adjustments to frontend pipelines within qfunc, tracer, verification and QJITDevice were made to 
-  account for this change. Please use ``qml.set_shots(shots=...)`` or set shots at the QNode level 
+* Deprecated usages of ``Device.shots`` along with setting ``device(..., shots=...)``. Please use ``qml.set_shots(shots=...)`` or set shots at the QNode level 
   (i.e., ``qml.QNode(..., shots=...)``).
   [(#1952)](https://github.com/PennyLaneAI/catalyst/pull/1952)
 
