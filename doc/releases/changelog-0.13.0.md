@@ -377,26 +377,6 @@
   `quantum-opt --version`.
   [(#1922)](https://github.com/PennyLaneAI/catalyst/pull/1922)
 
-* Snakecased keyword arguments to :func:`~.passes.apply_pass` are now correctly parsed to kebab-case 
-  pass options.
-  [(#1954)](https://github.com/PennyLaneAI/catalyst/pull/1954).
-
-  For example:
-
-  ```python
-  @qjit(target="mlir")
-  @catalyst.passes.apply_pass("some-pass", "an-option", maxValue=1, multi_word_option=1)
-  @qml.qnode(qml.device("null.qubit", wires=1))
-  def example():
-      return qml.state()
-  ```
-
-  The pass application instruction will look like the following in MLIR:
-
-  ```pycon
-  %0 = transform.apply_registered_pass "some-pass" with options = {"an-option" = true, "maxValue" = 1 : i64, "multi-word-option" = 1 : i64}
-  ```
-
 * An error is now raised when the input qubits to the multi-qubit gates in the runtime CAPI are not 
   all distinct.
   [(#2006)](https://github.com/PennyLaneAI/catalyst/pull/2006).
@@ -482,6 +462,26 @@
 * Fixed a bug with incorrect type promotion on conditional branches, which was giving inconsistent
   output types from qjit'd QNodes.
   [(#1977)](https://github.com/PennyLaneAI/catalyst/pull/1977)
+
+* Snakecased keyword arguments to :func:`~.passes.apply_pass` are now correctly parsed to kebab-case 
+  pass options.
+  [(#1954)](https://github.com/PennyLaneAI/catalyst/pull/1954).
+
+  For example:
+
+  ```python
+  @qjit(target="mlir")
+  @catalyst.passes.apply_pass("some-pass", "an-option", maxValue=1, multi_word_option=1)
+  @qml.qnode(qml.device("null.qubit", wires=1))
+  def example():
+      return qml.state()
+  ```
+
+  The pass application instruction will look like the following in MLIR:
+
+  ```pycon
+  %0 = transform.apply_registered_pass "some-pass" with options = {"an-option" = true, "maxValue" = 1 : i64, "multi-word-option" = 1 : i64}
+  ```
 
 * Fixed incorrect handling of partitioned shots in the decomposition pass of 
   ``measurements_from_samples``.
