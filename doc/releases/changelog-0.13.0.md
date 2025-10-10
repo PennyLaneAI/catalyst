@@ -60,6 +60,7 @@
   [(#2091)](https://github.com/PennyLaneAI/catalyst/pull/2091)
   [(#2029)](https://github.com/PennyLaneAI/catalyst/pull/2029)
   [(#2001)](https://github.com/PennyLaneAI/catalyst/pull/2001)
+  [(#2115)](https://github.com/PennyLaneAI/catalyst/pull/2115)
 
   ```python
   qml.decomposition.enable_graph()
@@ -521,6 +522,7 @@
 * Fixed a bug where deallocating the auxiliary qubit in ``ppr_to_ppm`` with
   ``decompose_method="clifford-corrected"`` was deallocating the wrong auxiliary qubit.
   [(#2039)](https://github.com/PennyLaneAI/catalyst/pull/2039)
+
 <h3>Internal changes ⚙️</h3>
 
 * The NullQubit device now provides the resource-tracking filename to allow for cleanup.

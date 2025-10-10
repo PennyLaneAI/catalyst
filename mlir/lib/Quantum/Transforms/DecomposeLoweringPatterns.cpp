@@ -167,7 +167,14 @@ class OpSignatureAnalyzer {
 
         int operandIdx = 0;
         if (isa<quantum::QuregType>(funcInputs[0])) {
-            operands[operandIdx++] = getUpdatedQreg(rewriter, loc);
+            Value updatedQreg = getUpdatedQreg(rewriter, loc);
+            for (auto [i, qubit] : llvm::enumerate(signature.inQubits)) {
+                const QubitIndex &index = signature.inWireIndices[i];
+                updatedQreg =
+                    rewriter.create<quantum::InsertOp>(loc, updatedQreg.getType(), updatedQreg,
+                                                       index.getValue(), index.getAttr(), qubit);
+            }
+            operands[operandIdx++] = updatedQreg;
 
             if (!signature.params.empty()) {
                 auto [startIdx, endIdx] =
