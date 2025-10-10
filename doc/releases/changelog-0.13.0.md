@@ -23,11 +23,7 @@
       qml.QFT(wires=range(100))
       qml.Hadamard(wires=0)
       qml.CNOT(wires=[0, 1])
-      qml.OutAdder(
-                  x_wires=range(10),
-                  y_wires=range(10,20),
-                  output_wires=range(20,31)
-                  )
+      qml.OutAdder(x_wires=range(10), y_wires=range(10, 20), output_wires=range(20, 31))
       return qml.expval(qml.Z(0) @ qml.Z(1))
 
   circ_specs = qml.specs(circuit, level="device")()
