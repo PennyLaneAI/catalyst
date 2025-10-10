@@ -1024,6 +1024,33 @@ class TestGraphDecomposition:
         qml.decomposition.disable_graph()
         qml.capture.disable()
 
+    def test_decompose_with_custom(self):
+        """Test the conversion of a circuit with a custom decomposition."""
+
+        qml.decomposition.enable_graph()
+        qml.capture.enable()
+
+        @qml.register_resources({qml.H: 2, qml.CZ: 1})
+        def my_cnot(wires):
+            qml.H(wires=wires[1])
+            qml.CZ(wires=wires)
+            qml.H(wires=wires[1])
+
+        @qml.qjit
+        @partial(
+            qml.transforms.decompose,
+            gate_set={"H", "CZ", "GlobalPhase"},
+            alt_decomps={qml.CNOT: [my_cnot]},
+        )
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def circuit():
+            qml.H(0)
+            qml.CNOT(wires=[0, 1])
+            return qml.state()
+
+        expected = np.array([1, 0, 0, 1]) / np.sqrt(2)
+        assert qml.math.allclose(circuit(), expected)
+
 
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
