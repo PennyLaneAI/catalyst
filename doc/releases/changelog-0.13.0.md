@@ -2,31 +2,48 @@
 
 <h3>New features since last release</h3>
 
-* Catalyst now supports ``qml.specs`` with ``level="device"``.
+* Catalyst now supports ``qml.specs``, meaning that
+  users can now use the :func:`~.specs` function to track the exact resources of programs compiled 
+  with :func:`~.qjit`!  
+  This new feature is currently only supported when using ``level="device"``.
   [(#2033)](https://github.com/PennyLaneAI/catalyst/pull/2033)
   [(#2055)](https://github.com/PennyLaneAI/catalyst/pull/2055)
 
-  This is made possible by leveraging resource-tracking capabilities in the ``null.qubit`` device, which gathers circuit information via dummy execution.
+  This is made possible by leveraging resource-tracking capabilities using the ``null.qubit`` device under the hood,
+  which gathers circuit information via mock execution.
 
   ```python
-  import pennylane as qml
-  
+  from functools import partial
+
+  gateset = {qml.H, qml.S, qml.CNOT, qml.T, qml.RX, qml.RY, qml.RZ}
+
   @qml.qjit
-  @qml.qnode(qml.device("lightning.qubit", wires=2))
+  @partial(qml.transforms.decompose, gate_set=gateset)
+  @qml.qnode(qml.device("null.qubit", wires=100))
   def circuit():
+      qml.QFT(wires=range(100))
       qml.Hadamard(wires=0)
       qml.CNOT(wires=[0, 1])
+      qml.OutAdder(
+                  x_wires=range(10),
+                  y_wires=range(10,20),
+                  output_wires=range(20,31)
+                  )
       return qml.expval(qml.Z(0) @ qml.Z(1))
+
+  circ_specs = qml.specs(circuit, level="device")()
   ```
 
   ```pycon
-  >>> print(qml.specs(circuit, level="device")()["resources"])
-  Resources(num_wires=2,
-            num_gates=2,
-            gate_types=defaultdict(<class 'int'>, {'CNOT': 1, 'Hadamard': 1}),
-            gate_sizes=defaultdict(<class 'int'>, {2: 1, 1: 1}),
-            depth=2,
-            shots=Shots(total_shots=None, shot_vector=()))
+  >>> print(circ_specs['resources'])
+  num_wires: 100
+  num_gates: 138134
+  depth: 90142
+  shots: Shots(total=None)
+  gate_types:
+  {'CNOT': 55313, 'RZ': 82698, 'Hadamard': 123}
+  gate_sizes:
+  {2: 55313, 1: 82821}
   ```
   
   Note that there are certain limitations to ``specs`` support. For example, ``while`` loops will not terminate when executing on the ``null.qubit`` device.
