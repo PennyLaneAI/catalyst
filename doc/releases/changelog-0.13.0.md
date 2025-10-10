@@ -352,9 +352,9 @@
   [(#1941)](https://github.com/PennyLaneAI/catalyst/pull/1941)
 
   These functions provide a simple interface to insert passes and stages into a compilation
-  pipeline. The available functions are :func:`~.pipelines.insert_pass_after`,
-  :func:`~.pipelines.insert_pass_before`, :func:`~.pipelines.insert_stage_after`, and
-  :func:`~.pipelines.insert_stage_before`. For example,
+  pipeline. The available functions are ``insert_pass_after``,
+  ``insert_pass_before``, ``insert_stage_after``, and
+  ``insert_stage_before``. For example,
 
   ```pycon
   >>> from catalyst.pipelines import insert_pass_after
@@ -391,14 +391,14 @@
   angles.
   [(#1966)](https://github.com/PennyLaneAI/catalyst/pull/1966)
 
-* The default value for the ``decompose_method`` parameter in the ``ppr_to_ppm`` compilation pass
+* The default value for the ``decompose_method`` parameter in the :func:`~.passes.ppr_to_ppm` compilation pass
   is now ``"pauli-corrected"``, an improved decomposition of non-Clifford PPRs into two PPMs,
   instead of two PPMs, and a Clifford correction. This decomposition is based on Figure 13(a) in
   [arXiv:2211.15465](https://arxiv.org/pdf/2211.15465).
   [(#2043)](https://github.com/PennyLaneAI/catalyst/pull/2043)
   [(#2047)](https://github.com/PennyLaneAI/catalyst/pull/2047)
 
-* In the Pauli-based compilation pipeline, identity operations (``I``) are now accepted in the input
+* In the Pauli-based compilation pipeline, identity operations (:class:`qml.Identity <pennylane.Identity>`) are now accepted in the input
   program converted to a corresponding PPR gate. Additionally, internal validation was improved
   across PPR/PPM passes.
   [(#2058)](https://github.com/PennyLaneAI/catalyst/pull/2058)
@@ -414,7 +414,7 @@
 
 * The ``shots`` property has been removed from ``OQDDevice``. The number of shots for a QNode
   execution is now set directly on the QNode via ``qml.qnode(..., shots=N)``, or via the decorator
-  `qml.set_shots <pennylane.set_shots>`.
+  :func:`qml.set_shots <pennylane.set_shots>`.
   [(#1988)](https://github.com/PennyLaneAI/catalyst/pull/1988)
 
 * The JAX version used by Catalyst has been updated to 0.6.2.
@@ -447,7 +447,7 @@
 
 * Usage of the ``Device.shots`` property, along with setting ``device(..., shots=...)``, has been
   deprecated. Please set the shots at the QNode level with ``qml.qnode(..., shots=...)`` or using
-  the decorator `qml.set_shots <pennylane.set_shots>`.
+  the decorator :func:`qml.set_shots <pennylane.set_shots>`.
   [(#1952)](https://github.com/PennyLaneAI/catalyst/pull/1952)
 
 <h3>Bug fixes 🐛</h3>
