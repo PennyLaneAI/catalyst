@@ -9,8 +9,9 @@
   [(#2055)](https://github.com/PennyLaneAI/catalyst/pull/2055)
 
   This is made possible by leveraging resource-tracking capabilities using the ``null.qubit`` device 
-  under the hood, which gathers circuit information via mock execution. This makes getting exact resources from large circuits
-  *extremely* performant. For example, the circuit below has 100 qubits and its device-level resources can be calculated in around 1 minute!
+  under the hood, which gathers circuit information via mock execution. This makes getting exact 
+  resources from large circuits *extremely* performant. For example, the circuit below has 100 
+  qubits and its device-level resources can be calculated in around 1 minute!
 
   ```python
   from functools import partial
@@ -42,7 +43,8 @@
   {2: 55313, 1: 82821}
   ```
   
-  Note that there are certain limitations to ``specs`` support. For example, ``while`` loops will not terminate when executing on the ``null.qubit`` device.
+  Note that there are certain limitations to ``specs`` support. For example, ``while`` loops will 
+  not terminate when executing on the ``null.qubit`` device.
 
 * The 
   [graph-based decomposition system](https://docs.pennylane.ai/en/stable/code/qml_decomposition.html), 
@@ -322,10 +324,20 @@
   [(#1983)](https://github.com/PennyLaneAI/catalyst/pull/1983)
   [(#2041)](https://github.com/PennyLaneAI/catalyst/pull/2041)
 
-* A new pass, accessible with ``--partition-layers`` in the ``catalyst-cli``, has been added to group 
-  PPR and PPM operations into ``qec.layer`` operations based on qubit interactivity and 
-  commutativity, enabling circuit analysis and potential support for parallel execution.
-  [(#1951)](https://github.com/PennyLaneAI/catalyst/pull/1951)
+* Parallelization is now considered in the IR. As part of that, Catalyst can represent parallel 
+  layers, compute depth, and optimize depth.
+
+  Two change were made as part of this overall improvement to the IR:
+
+  * A new pass, accessible with ``--partition-layers`` in the ``catalyst-cli``, has been added to 
+    group PPR and PPM operations into ``qec.layer`` operations based on qubit interactivity and 
+    commutativity, enabling circuit analysis and potential support for parallel execution.
+    [(#1951)](https://github.com/PennyLaneAI/catalyst/pull/1951)
+
+  * The ``qec.layer`` and ``qec.yield`` operations have been added to the QEC dialect to represent a 
+    group of QEC operations. The main use case is to analyze the depth of a circuit. Also, this is a 
+    preliminary step towards supporting parallel execution of QEC layers.
+    [(#1917)](https://github.com/PennyLaneAI/catalyst/pull/1917)
 
 * Resource-tracking unit tests that pollute the environment with output files have been fixed.
   [(#1861)](https://github.com/PennyLaneAI/catalyst/pull/1861)
@@ -427,9 +439,9 @@
   the ID array contains the same values as those produced by the initial `AllocateQubits` call, 
   otherwise the device is encouraged to raise an error.
 
-* The ``shots`` property has been removed from ``OQDDevice``. The number of shots for a qnode 
-  execution is now set directly on the qnode via `qml.set_shots <pennylane.set_shots>`, either used 
-  as a decorator, ``@qml.set_shots(num_shots)``, or directly on the qnode, 
+* The ``shots`` property has been removed from ``OQDDevice``. The number of shots for a QNode 
+  execution is now set directly on the QNode via `qml.set_shots <pennylane.set_shots>`, either used 
+  as a decorator, ``@qml.set_shots(num_shots)``, or directly on the QNode, 
   ``qml.set_shots(qnode, shots=num_shots)``.
   [(#1988)](https://github.com/PennyLaneAI/catalyst/pull/1988)
 
@@ -450,8 +462,8 @@
 
 <h3>Deprecations 👋</h3>
 
-* Deprecated usages of ``Device.shots`` along with setting ``device(..., shots=...)``. Please use 
-  `qml.set_shots <pennylane.set_shots>` or set shots at the QNode level 
+* Usages of ``Device.shots`` along with setting ``device(..., shots=...)`` have been deprecated. 
+  Please use `qml.set_shots <pennylane.set_shots>` or set shots at the QNode level 
   (i.e., ``qml.QNode(..., shots=...)``).
   [(#1952)](https://github.com/PennyLaneAI/catalyst/pull/1952)
 
@@ -488,7 +500,8 @@
   - an incorrect type signature of the ``Counts`` API function
   [(#2032)](https://github.com/PennyLaneAI/catalyst/pull/2032)
 
-* Fixed a bug in the ``ppr_to_ppm`` compilation pass when ``decompose_method="auto-corrected"``.the Clifford PPR decomposition rule where using the Y measurement should take the inverse.
+* Fixed a bug in the ``ppr_to_ppm`` compilation pass when ``decompose_method="auto-corrected"``, 
+  where the Clifford PPR decomposition rule where using the Y measurement should take the inverse.
   [(#2043)](https://github.com/PennyLaneAI/catalyst/pull/2043)
 
 * `static_argnums` is now correctly passed to internally transformed kernel functions,
@@ -534,10 +547,6 @@ for example the one-shot mid circuit measurement transform.
   ``pennylane.noise``.
   [(#1918)](https://github.com/PennyLaneAI/catalyst/pull/1918)
   [(#2020)](https://github.com/PennyLaneAI/catalyst/pull/2020)
-
-* The ``qec.layer`` and ``qec.yield`` operations have been added to the QEC dialect to represent a 
-  group of QEC operations. The main use case is to analyze the depth of a circuit. Also, this is a preliminary step towards supporting parallel execution of QEC layers.
-  [(#1917)](https://github.com/PennyLaneAI/catalyst/pull/1917)
 
 * Conversion patterns for the single-qubit ``quantum.alloc_qb`` and ``quantum.dealloc_qb`` 
   operations have been added for lowering to the LLVM dialect. These conversion patterns allow for execution of programs containing these operations.
