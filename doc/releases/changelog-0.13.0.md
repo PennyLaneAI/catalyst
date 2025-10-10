@@ -314,7 +314,7 @@
   values via closure, but this is now done automatically under the hood.
   [(#2096)](https://github.com/PennyLaneAI/catalyst/pull/2096)
 
-* Improvements have been made to the :func:`catalyst.from_plxpr.from_plxpr` feature set.
+* Improvements have been made to the ``catalyst.from_plxpr.from_plxpr`` feature set.
   [(#1844)](https://github.com/PennyLaneAI/catalyst/pull/1844)
   [(#1850)](https://github.com/PennyLaneAI/catalyst/pull/1850)
   [(#1903)](https://github.com/PennyLaneAI/catalyst/pull/1903)
