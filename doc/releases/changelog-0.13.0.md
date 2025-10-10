@@ -35,6 +35,7 @@
   Catalyst with PennyLane program capture enabled (``qml.capture.enable()``). This provides ``qjit`` 
   compatibility to defining custom decomposition rules and access to the many decomposition rules 
   for templates and operators in PennyLane that have been added over the past few release cycles.
+  [(#1820)](https://github.com/PennyLaneAI/catalyst/pull/1820)
   [(#2099)](https://github.com/PennyLaneAI/catalyst/pull/2099)
   [(#2091)](https://github.com/PennyLaneAI/catalyst/pull/2091)
   [(#2029)](https://github.com/PennyLaneAI/catalyst/pull/2029)
@@ -278,28 +279,53 @@
   supply all values via closure, but this is now done automatically under the hood.
   [(#2096)](https://github.com/PennyLaneAI/catalyst/pull/2096)
 
+* ``catalyst.from_plxpr`` now supports ``adjoint`` and ``ctrl`` operations and transforms, operator
+  arithmetic observables, ``Hermitian`` observables, ``for_loop``, ``cond`` and ``while_loop`` outside of QNodes, and ``cond`` with ``elif`` branches.
+  [(#1844)](https://github.com/PennyLaneAI/catalyst/pull/1844)
+  [(#1850)](https://github.com/PennyLaneAI/catalyst/pull/1850)
+  [(#1903)](https://github.com/PennyLaneAI/catalyst/pull/1903)
+  [(#1896)](https://github.com/PennyLaneAI/catalyst/pull/1896)
+  [(#1889)](https://github.com/PennyLaneAI/catalyst/pull/1889)
+  [(#1973)](https://github.com/PennyLaneAI/catalyst/pull/1973)
+
 * A new pass, accessible with ``--partition-layers`` in the ``catalyst-cli``, has been added to group 
   PPR and PPM operations into ``qec.layer`` operations based on qubit interactivity and 
   commutativity, enabling circuit analysis and potential support for parallel execution.
   [(#1951)](https://github.com/PennyLaneAI/catalyst/pull/1951)
 
-* A new JAX primitive has been added to capture and compile decomposition rule definitions in MLIR.     
-  For developer purposes, `decomposition_rule` is the decorator integrated with this primitive.
-  [(#1820)](https://github.com/PennyLaneAI/catalyst/pull/1820)
-
-* ``QregManager`` has been renamed to ``QubitHandler`` and has been extended to manage converting 
-  PLxPR wire indices into Catalyst JAXPR qubits. This is especially useful for lowering subroutines 
-  that take in qubits as arguments, like in decomposition rules.
-  [(#1820)](https://github.com/PennyLaneAI/catalyst/pull/1820)
-
 * Resource-tracking unit tests that pollute the environment with output files have been 
   fixed.
   [(#1861)](https://github.com/PennyLaneAI/catalyst/pull/1861)
+
+* ``catalyst.from_plxpr`` can now handle dynamic shots, overridden device shots, and translating 
+  ``counts`` properly to Catalyst jaxpr.
+  [(#1983)](https://github.com/PennyLaneAI/catalyst/pull/1983)
+  [(#2041)](https://github.com/PennyLaneAI/catalyst/pull/2041)
+
+* Utility functions for modifying an existing compilation pipeline have been added to the
+  ``catalyst.pipelines`` module.
+  [(#1941)](https://github.com/PennyLaneAI/catalyst/pull/1941)
+
+  These functions provide a simple interface to insert passes and stages into a compilation
+  pipeline. The available functions are ``insert_pass_after``, ``insert_pass_before``,
+  ``insert_stage_after``, and ``insert_stage_before``. For example,
+
+  ```pycon
+  >>> from catalyst.pipelines import insert_pass_after
+  >>> pipeline = ["pass1", "pass2"]
+  >>> insert_pass_after(pipeline, "new_pass", ref_pass="pass1")
+  >>> pipeline
+  ['pass1', 'new_pass', 'pass2']
+  ```
 
 * A new pass called ``detensorizefunctionboundary`` has been added, which removes scalar tensors 
   across function boundaries and enables the ``symbol-dce`` pass to remove dead functions, reducing 
   the number of instructions for compilation.
   [(#1904)](https://github.com/PennyLaneAI/catalyst/pull/1904)
+
+* The error message for unsupported mid-circuit measurements in measurement processes when using    
+  ``mcm_method="single-branch-statistics"`` has been improved.
+  [(#2105)](https://github.com/PennyLaneAI/catalyst/pull/2105)
 
 * Catalyst's native control flow functions (:func:`~.for_loop`, :func:`~.while_loop` and 
   :func:`~.cond`) now raise an error if used with PennyLane program capture (i.e., 
@@ -341,10 +367,6 @@
 * A new jax primitive ``qdealloc_qb_p`` is available for single qubit deallocations.
   [(#2005)](https://github.com/PennyLaneAI/catalyst/pull/2005)
 
-* The type of the ``number_original_arg`` attribute in ``CustomCallOp`` has been changed from a 
-  dense array to an integer.
-  [(#2022)](https://github.com/PennyLaneAI/catalyst/pull/2022)
-
 * The default value for ``decompose_method`` in the ``ppr_to_ppm`` compilation pass is now 
   ``"pauli-corrected"``, which decomposes non-Clifford PPRs into two PPMs by consuming a ``T`` 
   state. This decomposition is based on Figure 13(a) in 
@@ -352,8 +374,8 @@
   [(#2043)](https://github.com/PennyLaneAI/catalyst/pull/2043)
   [(#2047)](https://github.com/PennyLaneAI/catalyst/pull/2047)
 
-* The PPM/PPR compilation passes now correctly handle identity operations (``I``). Additionally, 
-  internal validation was improved in the PPM/PPR compilation passes.
+* In PPM/PPR compilation passes, identity operations (``I``) are now converted to PPRs properly. 
+  Additionally, internal validation was improved in the PPM/PPR compilation passes.
   [(#2058)](https://github.com/PennyLaneAI/catalyst/pull/2058)
 
 * Using `keep_intermediate='pass'` option now prints the whole module scope of program to the
@@ -430,7 +452,7 @@
   PennyLane program capture is enabled.
   [(#2027)](https://github.com/PennyLaneAI/catalyst/pull/2027)
 
-* Various usages of the OQC device have been fixed, including:
+* Various issues in the OQC device plugin have been fixed:
   - the object file system extension on macOS
   - an incorrect type signature of the ``Counts`` API function
   [(#2032)](https://github.com/PennyLaneAI/catalyst/pull/2032)
@@ -448,6 +470,19 @@ for example the one-shot mid circuit measurement transform.
 
 <h3>Internal changes ⚙️</h3>
 
+* The type of the ``number_original_arg`` attribute in ``CustomCallOp`` has been changed from a 
+  dense array to an integer.
+  [(#2022)](https://github.com/PennyLaneAI/catalyst/pull/2022)
+
+* ``QregManager`` has been renamed to ``QubitHandler`` and has been extended to manage converting 
+  PLxPR wire indices into Catalyst JAXPR qubits. This is especially useful for lowering subroutines 
+  that take in qubits as arguments, like in decomposition rules.
+  [(#1820)](https://github.com/PennyLaneAI/catalyst/pull/1820)
+
+* The error message for using a quantum subroutine that was defined outside of a QNode scope has 
+  been improved.
+  [(#1932)](https://github.com/PennyLaneAI/catalyst/pull/1932)
+
 * The usage of ``qml.transforms.dynamic_one_shot.parse_native_mid_circuit_measurements`` in 
   Catalyst's ``dynamic_one_shot`` implementation was updated to use its new call signature.
   [(#1953)](https://github.com/PennyLaneAI/catalyst/pull/1953)
@@ -455,11 +490,6 @@ for example the one-shot mid circuit measurement transform.
 * When capture is enabled with ``qml.capture.enable()``, ``@qml.qjit(autograph=True)`` will use 
   PennyLane's autograph implementation instead of Catalyst's.
   [(#1960)](https://github.com/PennyLaneAI/catalyst/pull/1960)
-
-* ``catalyst.from_plxpr`` can now handle dynamic shots, overridden device shots, and translating 
-  ``counts`` properly to Catalyst jaxpr.
-  [(#1983)](https://github.com/PennyLaneAI/catalyst/pull/1983)
-  [(#2041)](https://github.com/PennyLaneAI/catalyst/pull/2041)
 
 * The ``extract_backend_info`` helper function for the ``QJITDevice`` no longer has a redundant
   ``capabilities`` argument.
@@ -469,23 +499,10 @@ for example the one-shot mid circuit measurement transform.
   (``qml.capture.enable()``).
   [(#1930)](https://github.com/PennyLaneAI/catalyst/pull/1930)
 
-* The error message for using a quantum subroutine that was defined outside of a QNode or ``qjit`` 
-  scope has been improved.
-  [(#1932)](https://github.com/PennyLaneAI/catalyst/pull/1932)
-
 * Import paths for noise transforms have been updated from ``pennylane.transforms`` to 
   ``pennylane.noise``.
   [(#1918)](https://github.com/PennyLaneAI/catalyst/pull/1918)
   [(#2020)](https://github.com/PennyLaneAI/catalyst/pull/2020)
-
-* ``catalyst.from_plxpr`` now supports ``adjoint`` and ``ctrl`` operations and transforms, operator
-  arithmetic observables, ``Hermitian`` observables, ``for_loop``, ``cond`` and ``while_loop`` outside of QNodes, and ``cond`` with ``elif`` branches.
-  [(#1844)](https://github.com/PennyLaneAI/catalyst/pull/1844)
-  [(#1850)](https://github.com/PennyLaneAI/catalyst/pull/1850)
-  [(#1903)](https://github.com/PennyLaneAI/catalyst/pull/1903)
-  [(#1896)](https://github.com/PennyLaneAI/catalyst/pull/1896)
-  [(#1889)](https://github.com/PennyLaneAI/catalyst/pull/1889)
-  [(#1973)](https://github.com/PennyLaneAI/catalyst/pull/1973)
 
 * The ``qec.layer`` and ``qec.yield`` operations have been added to the QEC dialect to represent a 
   group of QEC operations. The main use case is to analyze the depth of a circuit. Also, this is a preliminary step towards supporting parallel execution of QEC layers.
@@ -499,22 +516,6 @@ for example the one-shot mid circuit measurement transform.
   The function ``catalyst.pipelines.get_stages()`` has also been removed, as it was not used and 
   duplicated the ``CompileOptions.get_stages()`` method.
   [(#1941)](https://github.com/PennyLaneAI/catalyst/pull/1941)
-
-* Utility functions for modifying an existing compilation pipeline have been added to the
-  ``catalyst.pipelines`` module.
-  [(#1941)](https://github.com/PennyLaneAI/catalyst/pull/1941)
-
-  These functions provide a simple interface to insert passes and stages into a compilation
-  pipeline. The available functions are ``insert_pass_after``, ``insert_pass_before``,
-  ``insert_stage_after``, and ``insert_stage_before``. For example,
-
-  ```pycon
-  >>> from catalyst.pipelines import insert_pass_after
-  >>> pipeline = ["pass1", "pass2"]
-  >>> insert_pass_after(pipeline, "new_pass", ref_pass="pass1")
-  >>> pipeline
-  ['pass1', 'new_pass', 'pass2']
-  ```
 
 * A new built-in compilation pipeline for experimental MBQC workloads called 
   ``catalyst.ftqc.mbqc_pipeline()`` has been added.
