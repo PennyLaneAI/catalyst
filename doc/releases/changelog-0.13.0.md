@@ -9,7 +9,8 @@
   [(#2055)](https://github.com/PennyLaneAI/catalyst/pull/2055)
 
   This is made possible by leveraging resource-tracking capabilities using the ``null.qubit`` device 
-  under the hood, which gathers circuit information via mock execution.
+  under the hood, which gathers circuit information via mock execution. This makes getting exact resources from large circuits
+  *extremely* performant. For example, the circuit below has 100 qubits and its device-level resources can be calculated in around 1 minute!
 
   ```python
   from functools import partial
