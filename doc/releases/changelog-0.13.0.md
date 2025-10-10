@@ -96,15 +96,16 @@
   For more information, please consult the 
   [PennyLane decomposition module](https://docs.pennylane.ai/en/stable/code/qml_decomposition.html).
 
-* Catalyst now supports dynamic wire allocation with :func:`qml.allocate() <pennylane.allocate>` and 
-  :func:`qml.deallocate() <pennylane.deallocate>` when program capture is enabled, unlocking 
-  `qjit`-able applications like decompositions of gates that require temporary auxiliary wires and 
-  logical patterns in subroutines that benefit from having dynamic wire management.
+* Catalyst now supports dynamic wire allocation with 
+  :func:`qml.allocate() <pennylane.allocation.allocate>` and 
+  :func:`qml.deallocate() <pennylane.allocation.deallocate>` when program capture is enabled, 
+  unlocking ``qjit``-able applications like decompositions of gates that require temporary auxiliary 
+  wires and logical patterns in subroutines that benefit from having dynamic wire management.
   [(#2002)](https://github.com/PennyLaneAI/catalyst/pull/2002)
   [(#2075)](https://github.com/PennyLaneAI/catalyst/pull/2075)
 
-  Two new functions, :func:`qml.allocate() <pennylane.allocate>` and 
-  :func:`qml.deallocate() <pennylane.deallocate>`, [have been added to
+  Two new functions, :func:`qml.allocate() <pennylane.allocation.allocate>` and 
+  :func:`qml.deallocate() <pennylane.allocation.deallocate>`, [have been added to
   PennyLane](https://docs.pennylane.ai/en/stable/development/release_notes.html#release-0-43-0)
   to support dynamic wire allocation. With Catalyst, these features can be accessed on
   ``lightning.qubit``, ``lightning.kokkos``, and ``lightning.gpu``.
@@ -135,8 +136,8 @@
   In the above program, 2 qubits are allocated during device initialization, and 1 additional qubit 
   is allocated inside the circuit with ``qml.allocate(1)``.
 
-  For more information on what :func:`qml.allocate() <pennylane.allocate>` and 
-  :func:`qml.deallocate() <pennylane.deallocate>` do, please consult the
+  For more information on what :func:`qml.allocate() <pennylane.allocation.allocate>` and 
+  :func:`qml.deallocate() <pennylane.allocation.deallocate>` do, please consult the
   [PennyLane v0.43 release notes](https://docs.pennylane.ai/en/stable/development/release_notes.html#release-0-43-0).
 
   here are some notable differences between the behaviour of these features with ``qjit`` versus 
@@ -152,8 +153,9 @@
   [(#2048)](https://github.com/PennyLaneAI/catalyst/pull/2048)
   [(#2085)](https://github.com/PennyLaneAI/catalyst/pull/2085)
 
-  The impact of the ``reduce_t_depth`` pass can be measured using :func:`~.passes.ppm_specs`
-  to compare the circuit depth before and after applying the pass. Consider the following circuit:
+  The impact of the :func:`~.passes.reduce_t_depth` pass can be measured using 
+  :func:`~.passes.ppm_specs` to compare the circuit depth before and after applying the pass. 
+  Consider the following circuit:
 
   ```python
   import pennylane as qml
@@ -308,7 +310,7 @@
   values via closure, but this is now done automatically under the hood.
   [(#2096)](https://github.com/PennyLaneAI/catalyst/pull/2096)
 
-* :func:`~.from_plxpr` now supports ``adjoint`` and ``ctrl`` operations and transforms, operator
+* ``catalyst.from_plxpr`` now supports ``adjoint`` and ``ctrl`` operations and transforms, operator
   arithmetic observables, ``Hermitian`` observables, ``for_loop``, ``cond`` and ``while_loop`` 
   outside of QNodes, and ``cond`` with ``elif`` branches.
   [(#1844)](https://github.com/PennyLaneAI/catalyst/pull/1844)
@@ -318,7 +320,7 @@
   [(#1889)](https://github.com/PennyLaneAI/catalyst/pull/1889)
   [(#1973)](https://github.com/PennyLaneAI/catalyst/pull/1973)
 
-* :func:`~.from_plxpr` can now handle dynamic shots, overridden device shots, and translating 
+* ``catalyst.from_plxpr`` can now handle dynamic shots, overridden device shots, and translating 
   ``counts`` properly to Catalyst jaxpr.
   [(#1983)](https://github.com/PennyLaneAI/catalyst/pull/1983)
   [(#2041)](https://github.com/PennyLaneAI/catalyst/pull/2041)
@@ -336,9 +338,9 @@
   [(#1941)](https://github.com/PennyLaneAI/catalyst/pull/1941)
 
   These functions provide a simple interface to insert passes and stages into a compilation
-  pipeline. The available functions are :func:`~.passes.insert_pass_after`, 
-  :func:`~.passes.insert_pass_before`, :func:`~.passes.insert_stage_after`, and 
-  :func:`~.passes.insert_stage_before`. For example,
+  pipeline. The available functions are :func:`~.pipelines.insert_pass_after`, 
+  :func:`~.pipelines.insert_pass_before`, :func:`~.pipelines.insert_stage_after`, and 
+  :func:`~.pipelines.insert_stage_before`. For example,
 
   ```pycon
   >>> from catalyst.pipelines import insert_pass_after
