@@ -14,8 +14,12 @@
 """Test for the OQC device."""
 # pylint: disable=unused-argument,import-outside-toplevel,unused-import
 
+import os
+
 import pennylane as qml
 import pytest
+
+from catalyst.utils.exceptions import CompileError
 
 
 class TestOQCDevice:
@@ -91,10 +95,30 @@ class TestOQCDevice:
         """Test the device get_c_interface method."""
         from catalyst.third_party.oqc import OQCDevice
 
-        with pytest.raises(
-            ValueError, match="You must set url, email and password as environment variables."
-        ):
+        with pytest.raises(ValueError, match="OQC credentials not found in environment variables."):
             OQCDevice(backend="lucy", shots=1000, wires=8)
+
+
+class TestOQCCircuit:
+    """Test using OQC device in a circuit"""
+
+    def test_no_shots(self):
+        """Test an error is raised when OQC device used without shots"""
+
+        os.environ["OQC_PASSWORD"] = "password"
+        os.environ["OQC_EMAIL"] = "email"
+        os.environ["OQC_URL"] = "url"
+
+        with pytest.raises(CompileError, match="Please supply the number of shots on the qnode."):
+
+            @qml.qjit
+            @qml.qnode(qml.device("oqc.cloud", backend="lucy", wires=8))
+            def circuit():
+                return qml.probs()
+
+        del os.environ["OQC_PASSWORD"]
+        del os.environ["OQC_EMAIL"]
+        del os.environ["OQC_URL"]
 
 
 if __name__ == "__main__":

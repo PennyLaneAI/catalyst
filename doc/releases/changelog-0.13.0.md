@@ -350,7 +350,9 @@
 * Fix usage of OQC device, including:
   * fix object file system extension on macOS
   * fix wrong type signature of `Counts` API function
+  * various updates to OQC internal APIs
   [(#2032)](https://github.com/PennyLaneAI/catalyst/pull/2032)
+  [(#2089)](https://github.com/PennyLaneAI/catalyst/pull/2089)
 
 * Fixed the Clifford PPR decomposition rule where using the Y measurement should take the inverse.
   [(#2043)](https://github.com/PennyLaneAI/catalyst/pull/2043)
