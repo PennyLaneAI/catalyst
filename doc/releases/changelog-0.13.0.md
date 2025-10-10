@@ -98,15 +98,15 @@
   [PennyLane decomposition module](https://docs.pennylane.ai/en/stable/code/qml_decomposition.html).
 
 * Catalyst now supports dynamic wire allocation with
-  :func:`qml.allocate() <pennylane.allocation.allocate>` and
-  :func:`qml.deallocate() <pennylane.allocation.deallocate>` when program capture is enabled,
+  :func:`qml.allocate() <pennylane.allocate>` and
+  :func:`qml.deallocate() <pennylane.deallocate>` when program capture is enabled,
   unlocking ``qjit``-able applications like decompositions of gates that require temporary auxiliary
   wires and logical patterns in subroutines that benefit from having dynamic wire management.
   [(#2002)](https://github.com/PennyLaneAI/catalyst/pull/2002)
   [(#2075)](https://github.com/PennyLaneAI/catalyst/pull/2075)
 
-  Two new functions, :func:`qml.allocate() <pennylane.allocation.allocate>` and
-  :func:`qml.deallocate() <pennylane.allocation.deallocate>`, [have been added to
+  Two new functions, :func:`qml.allocate() <pennylane.allocate>` and
+  :func:`qml.deallocate() <pennylane.deallocate>`, [have been added to
   PennyLane](https://docs.pennylane.ai/en/stable/development/release_notes.html#release-0-43-0)
   to support dynamic wire allocation. With Catalyst, these features can be accessed on
   ``lightning.qubit``, ``lightning.kokkos``, and ``lightning.gpu``.
@@ -137,8 +137,8 @@
   In the above program, 2 qubits are allocated during device initialization, and 1 additional qubit
   is allocated inside the circuit with ``qml.allocate(1)``.
 
-  For more information on what :func:`qml.allocate() <pennylane.allocation.allocate>` and
-  :func:`qml.deallocate() <pennylane.allocation.deallocate>` do, please consult the
+  For more information on what :func:`qml.allocate() <pennylane.allocate>` and
+  :func:`qml.deallocate() <pennylane.deallocate>` do, please consult the
   [PennyLane v0.43 release notes](https://docs.pennylane.ai/en/stable/development/release_notes.html#release-0-43-0).
 
   There are some notable differences between the behaviour of these features with ``qjit`` versus
