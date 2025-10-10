@@ -14,6 +14,7 @@
   [(#2068)](https://github.com/PennyLaneAI/catalyst/pull/2068)
   [(#2091)](https://github.com/PennyLaneAI/catalyst/pull/2091)
   [(#2099)](https://github.com/PennyLaneAI/catalyst/pull/2099)
+  [(#2115)](https://github.com/PennyLaneAI/catalyst/pull/2115)
 
 
 * Catalyst now supports dynamic wire allocation with ``qml.allocate()`` and
@@ -361,8 +362,8 @@
 for example the one-shot mid circuit measurement transform.
   [(#2056)](https://github.com/PennyLaneAI/catalyst/pull/2056)
 
-* Fixed a bug where applying a quantum transform after a QNode could produce incorrect results or 
-  errors in certain cases. This resolves issues related to transforms operating on QNodes with 
+* Fixed a bug where applying a quantum transform after a QNode could produce incorrect results or
+  errors in certain cases. This resolves issues related to transforms operating on QNodes with
   classical outputs and improves compatibility with measurement transforms.
   [(#2081)](https://github.com/PennyLaneAI/catalyst/pull/2081)
 
