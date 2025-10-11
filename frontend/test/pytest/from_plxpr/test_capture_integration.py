@@ -1313,6 +1313,48 @@ class TestCapture:
 
         assert jnp.allclose(circuit(1.5, 2.5, 3.5), capture_result)
 
+    def test_transform_graph_decompose_workflow(self, backend):
+        """Test the integration for a circuit with a 'decompose' graph transform."""
+
+        # Capture enabled
+
+        qml.capture.enable()
+        qml.decomposition.enable_graph()
+
+        @qjit(target="mlir")
+        @partial(qml.transforms.decompose, gate_set=[qml.RX, qml.RY, qml.RZ])
+        @qml.qnode(qml.device(backend, wires=2))
+        def captured_circuit(x: float, y: float, z: float):
+            m = qml.measure(0)
+
+            @qml.cond(m)
+            def cond_fn():
+                qml.Rot(x, y, z, 0)
+
+            cond_fn()
+            return qml.expval(qml.PauliZ(0))
+
+        capture_result = captured_circuit(1.5, 2.5, 3.5)
+
+        qml.decomposition.disable_graph()
+        qml.capture.disable()
+
+        # Capture disabled
+        @qjit
+        @partial(qml.transforms.decompose, gate_set=[qml.RX, qml.RY, qml.RZ])
+        @qml.qnode(qml.device(backend, wires=2))
+        def circuit(x: float, y: float, z: float):
+            m = catalyst.measure(0)
+
+            @catalyst.cond(m)
+            def cond_fn():
+                qml.Rot(x, y, z, 0)
+
+            cond_fn()
+            return qml.expval(qml.PauliZ(0))
+
+        assert jnp.allclose(circuit(1.5, 2.5, 3.5), capture_result)
+
     def test_transform_map_wires_workflow(self, backend):
         """Test the integration for a circuit with a 'map_wires' transform."""
 
@@ -1647,7 +1689,7 @@ def test_ctrl_transform_integration(separate_funcs):
         qml.RX(2 * x, wires=3)
 
     @qml.qjit
-    @qml.qnode(qml.device("lightning.qubit", wires=4), autograph=False)
+    @qml.qnode(qml.device("lightning.qubit", wires=4))
     def c(x, y):
         qml.X(1)
         if separate_funcs:
@@ -1661,3 +1703,31 @@ def test_ctrl_transform_integration(separate_funcs):
     res = c(x, y)
     expected = jnp.cos(2 * x) * jnp.cos(3 * y)
     assert qml.math.allclose(res, expected)
+
+
+def test_different_static_argnums():
+    """Test that the same qnode can be called different times with different static argnums."""
+
+    qml.capture.enable()
+
+    @qml.qnode(qml.device("lightning.qubit", wires=1), static_argnums=1)
+    def c(x, pauli):
+        if pauli == "X":
+            qml.RX(x, 0)
+        elif pauli == "Y":
+            qml.RY(x, 0)
+        else:
+            qml.RZ(x, 0)
+        return qml.state()
+
+    @qml.qjit
+    def w(x):
+        return c(x, "X"), c(x, "Y"), c(x, "Z")
+
+    resx, resy, resz = w(0.5)
+
+    a = jnp.cos(0.5 / 2)
+    b = jnp.sin(0.5 / 2)
+    assert qml.math.allclose(resx, jnp.array([a, -b * 1j]))
+    assert qml.math.allclose(resy, jnp.array([a, b]))
+    assert qml.math.allclose(resz, jnp.array([a - b * 1j, 0]))

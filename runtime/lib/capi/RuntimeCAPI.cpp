@@ -29,6 +29,7 @@
 #include "MemRefUtils.hpp"
 #include "QuantumDevice.hpp"
 #include "Timer.hpp"
+#include "Types.h"
 
 #include "RuntimeCAPI.h"
 
@@ -406,9 +407,9 @@ void __catalyst__rt__qubit_release(QUBIT *qubit)
 
 static int __catalyst__rt__qubit_release_array__impl(QirArray *qubit_array)
 {
-    getQuantumDevicePtr()->ReleaseAllQubits();
     std::vector<QubitIdType> *qubit_array_ptr =
         reinterpret_cast<std::vector<QubitIdType> *>(qubit_array);
+    getQuantumDevicePtr()->ReleaseQubits(*qubit_array_ptr);
     delete qubit_array_ptr;
     return 0;
 }
@@ -1554,6 +1555,40 @@ int8_t *__catalyst__rt__array_get_element_ptr_1d(QirArray *ptr, int64_t idx)
 
     QubitIdType *data = qubit_vector_ptr->data();
     return (int8_t *)&data[idx];
+}
+
+void __catalyst__rt__array_update_element_1d(QirArray *ptr, int64_t idx, QUBIT *qubit)
+{
+    RT_ASSERT(getQuantumDevicePtr() != nullptr);
+    RT_ASSERT(CTX->getMemoryManager() != nullptr);
+    std::vector<QubitIdType> *qubit_vector_ptr = reinterpret_cast<std::vector<QubitIdType> *>(ptr);
+
+    RT_ASSERT(idx >= 0);
+
+    if (static_cast<size_t>(idx) >= qubit_vector_ptr->size()) {
+        std::string error_msg = "The qubit register does not contain the requested wire: ";
+        error_msg += std::to_string(idx);
+        RT_FAIL(error_msg.c_str());
+    }
+
+    QubitIdType *data = qubit_vector_ptr->data();
+    const QubitIdType qubit_id = reinterpret_cast<QubitIdType>(qubit);
+    const QubitIdType current_qubit_id = data[idx];
+
+    // If the ID of the qubit to insert is equal to the ID currently at the requested position in
+    // the register, there is nothing to do, and we return the unmodified array.
+    if (current_qubit_id == qubit_id) {
+        return;
+    }
+
+    // TODO
+    // CAUTION: There is a risk here that we overwrite the ID of an active qubit contained in the
+    // register (one that has not been deallocated). Ideally we should be able to query whether a
+    // qubit is active given its ID, but we do not have a general, device-agnostic way to do this
+    // yet. For NullQubit, for example, we can query its `qubit_manager` object to determine if a
+    // given qubit is active, but not all devices implement a qubit manager.
+    data[idx] = qubit_id;
+    return;
 }
 
 // -------------------------------------------------------------------------- //

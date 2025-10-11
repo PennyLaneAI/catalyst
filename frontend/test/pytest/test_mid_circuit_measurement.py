@@ -321,8 +321,7 @@ class TestMidCircuitMeasurement:
 
         spy = mocker.spy(catalyst.qfunc, "dynamic_one_shot")
         _ = circuit(1.8)
-        expected_call_count = 1 if postselect_mode == "hw-like" else 0
-        assert spy.call_count == expected_call_count
+        assert spy.call_count == 1
 
     @pytest.mark.xfail(
         reason="Midcircuit measurements with sampling is unseeded and hence this test is flaky"
@@ -421,9 +420,48 @@ class TestMidCircuitMeasurement:
         with pytest.raises(TypeError, match="postselect must be '0' or '1'"):
             _ = circuit(1.8)
 
+    @pytest.mark.parametrize("measurement_process", [qml.counts, qml.var, qml.expval, qml.probs])
+    def test_single_branch_statistics_not_implemented_error(self, backend, measurement_process):
+        """
+        Test that NotImplementedError is raised when using mid-circuit
+        measurements inside measurement processes with single-branch-statistics.
+        """
+
+        err = "single-branch-statistics does not support measurement processes"
+        with pytest.raises(NotImplementedError, match=err):
+
+            @qjit
+            @qml.set_shots(5)
+            @qml.qnode(qml.device(backend, wires=2), mcm_method="single-branch-statistics")
+            def measurement():
+                qml.Hadamard(0)
+                m = measure(0)
+                return measurement_process(op=m)
+
+            measurement()
+
 
 class TestDynamicOneShotIntegration:
     """Integration tests for QNodes using mcm_method="one-shot"/dynamic_one_shot."""
+
+    @pytest.mark.parametrize("shots", [1, 2])
+    def test_dynamic_one_shot_static_argnums(self, backend, shots):
+        """
+        Test static argnums is passed correctly to the one shot qnodes.
+        """
+
+        @qjit(static_argnums=0)
+        def workflow(N):
+            dev = qml.device(backend, wires=N)
+
+            @qml.set_shots(N)
+            @qml.qnode(dev, mcm_method="one-shot")
+            def circ():
+                return qml.probs()
+
+            return circ()
+
+        assert np.allclose(workflow(shots), [1 if i == 0 else 0 for i in range(2**shots)])
 
     # pylint: disable=too-many-arguments
     @pytest.mark.parametrize(
@@ -779,6 +817,58 @@ class TestDynamicOneShotIntegration:
         result = cost()
         assert jnp.array(result).shape == (qubits,)
 
+    def test_dynamic_one_shot_mcm_result(self):
+        """Test mcm result with one-shot"""
+        dev = qml.device("lightning.qubit", wires=1)
+
+        @qjit
+        @qml.set_shots(10)
+        @qml.qnode(dev, mcm_method="one-shot")
+        def circuit():
+            qml.Hadamard(0)
+            return measure(0)
+
+        result = circuit()
+        assert result.shape == (10,)
+
+    def test_dynamic_one_shot_classical_return_values_with_mcm(self):
+        """Test classical return value with one-shot"""
+
+        @qjit(autograph=True)
+        @qml.set_shots(10)
+        @qml.qnode(qml.device("lightning.qubit", wires=1), mcm_method="one-shot")
+        def circuit():
+            qml.Hadamard(wires=0)
+            if measure(0):
+                return 42
+            else:
+                return 43
+
+        result = circuit()
+        assert result.shape == (10,)
+
+    def test_dynamic_one_shot_with_classical_return_values(self):
+        """Test classical return values with one-shot"""
+        dev = qml.device("lightning.qubit", wires=1, shots=12)
+
+        @qjit
+        @qml.qnode(dev, mcm_method="one-shot")
+        def circuit():
+            qml.Hadamard(0)
+            return {
+                "first": qml.sample(),
+                "second": [100, qml.sample()],
+                "third": (qml.sample(), qml.sample()),
+            }
+
+        result = circuit()
+
+        assert list(result.keys()) == ["first", "second", "third"]
+        assert jnp.array(result["first"]).shape == (12, 1)
+        assert jnp.allclose(result["second"][0], jnp.full(12, 100))
+        assert jnp.array(result["second"][1]).shape == (12, 1)
+        assert jnp.array(result["third"]).shape == (2, 12, 1)
+
     @pytest.mark.skip(
         reason="grad with dynamic one-shot is not yet supported.",
     )
@@ -809,8 +899,12 @@ class TestDynamicOneShotIntegration:
 
         assert np.allclose(grad_f(1.0), grad_g(1.0))
 
-    @pytest.mark.xfail(
-        reason="value_and_grad with dynamic one-shot is not yet supported.",
+    # value_and_grad now will be supported, but jax has an issue with the current version we use
+    # as it results in a random memory error. https://github.com/tensorflow/tensorflow/pull/97681
+    # It will be fixed in the next jax release. we will re-enable this test when the jax
+    # release is available and tested on our end.
+    @pytest.mark.skip(
+        reason="https://github.com/tensorflow/tensorflow/pull/97681",
     )
     def test_mcm_method_with_value_and_grad(self):
         """Test that the dynamic_one_shot works with value_and_grad."""

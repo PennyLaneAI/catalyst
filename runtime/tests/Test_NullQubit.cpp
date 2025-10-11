@@ -1,4 +1,3 @@
-
 // Copyright 2023-2025 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,6 +15,8 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
+#include <cstdint>
+#include <cstdio>
 
 #include "ExecutionContext.hpp"
 #include "QuantumDevice.hpp"
@@ -30,6 +31,42 @@ using namespace Catch::Matchers;
 
 using namespace Catalyst::Runtime;
 using namespace Catalyst::Runtime::Devices;
+
+/**
+ * @brief A test fixture that initializes the Catalyst Runtime and sets up a null.qubit runtime
+ *        device with shots=0 and auto_qubit_management=false. The teardown operation releases the
+ *        device and terminates the Catalyst Runtime.
+ */
+struct NullQubitRuntimeFixture {
+    /**
+     * Setup
+     *
+     * Initialize the Catalyst runtime before each test case.
+     */
+    NullQubitRuntimeFixture()
+    {
+        __catalyst__rt__initialize(nullptr);
+
+        const auto [rtd_lib, rtd_name, rtd_kwargs] =
+            std::array<std::string, 3>{"null.qubit", "null_qubit", ""};
+
+        __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
+                                    (int8_t *)rtd_kwargs.c_str(), 0, /* shots */
+                                    false                            /* auto_qubit_management */
+        );
+    }
+
+    /**
+     * Teardown
+     *
+     * Release the device and finalize the runtime after each test case.
+     */
+    ~NullQubitRuntimeFixture()
+    {
+        __catalyst__rt__device_release();
+        __catalyst__rt__finalize();
+    }
+};
 
 TEST_CASE("Test success of loading a device", "[NullQubit]")
 {
@@ -107,6 +144,16 @@ TEST_CASE("Test NullQubit qubit allocation is successful.", "[NullQubit]")
 {
     std::unique_ptr<NullQubit> sim = std::make_unique<NullQubit>();
     sim->AllocateQubit();
+}
+
+TEST_CASE("Test ReleaseQubits", "[NullQubit]")
+{
+    std::unique_ptr<NullQubit> sim = std::make_unique<NullQubit>();
+    auto qubits = sim->AllocateQubits(3);
+    CHECK(sim->GetNumQubits() == 3);
+    std::vector<QubitIdType> qubits_to_release = {qubits[0], qubits[2]};
+    sim->ReleaseQubits(qubits_to_release);
+    CHECK(sim->GetNumQubits() == 1);
 }
 
 TEST_CASE("Test a NullQubit circuit with num_qubits=2 ", "[NullQubit]")
@@ -412,6 +459,100 @@ TEST_CASE("test AllocateQubits generates a proper std::vector<QubitIdType>", "[N
     for (std::size_t nn = 0; nn < num_qubits; nn++) {
         CHECK(q_vec[nn] == result[nn]);
     }
+}
+
+TEST_CASE("Test allocation of multiple registers", "[NullQubit]")
+{
+    std::unique_ptr<NullQubit> sim = std::make_unique<NullQubit>();
+
+    auto &&reg1 = sim->AllocateQubits(1);
+    auto &&reg2 = sim->AllocateQubits(2);
+
+    CHECK(reg1.size() == 1);
+    CHECK(reg2.size() == 2);
+    CHECK(sim->GetNumQubits() == 3);
+}
+
+TEST_CASE_METHOD(NullQubitRuntimeFixture, "Test insertion of qubit into register", "[NullQubit]")
+{
+    // Allocate register with three qubits, [0, 1, 2]
+    QirArray *reg = __catalyst__rt__qubit_allocate_array(3);
+
+    auto reg_vec_before = *reinterpret_cast<std::vector<QubitIdType> *>(reg);
+
+    CHECK(reg_vec_before[0] == 0);
+    CHECK(reg_vec_before[1] == 1);
+    CHECK(reg_vec_before[2] == 2);
+
+    // Release qubit 1; note that array `reg` is still [0, 1, 2]
+    __catalyst__rt__qubit_release(reinterpret_cast<QUBIT *>(reg_vec_before[1]));
+
+    // Allocate an individual qubit; internally it has ID 3
+    QUBIT *q = __catalyst__rt__qubit_allocate();
+
+    CHECK(reinterpret_cast<QubitIdType>(q) == 3);
+
+    // Insert the individual qubit (ID: 3) into `reg` at position 1
+    // Afterwards, `reg` should be [0, 3, 2]
+    __catalyst__rt__array_update_element_1d(reg, 1, reinterpret_cast<QUBIT *>(q));
+
+    auto reg_vec_after = *reinterpret_cast<std::vector<QubitIdType> *>(reg);
+
+    CHECK(reg_vec_after[0] == 0);
+    CHECK(reg_vec_after[1] == 3);
+    CHECK(reg_vec_after[2] == 2);
+}
+
+TEST_CASE_METHOD(NullQubitRuntimeFixture,
+                 "Test insertion of qubit from a register into another register", "[NullQubit]")
+{
+    // Allocate two registers
+    QirArray *reg1 = __catalyst__rt__qubit_allocate_array(1); // [0]
+    QirArray *reg2 = __catalyst__rt__qubit_allocate_array(2); // [1, 2]
+
+    auto reg1_vec = *reinterpret_cast<std::vector<QubitIdType> *>(reg1);
+
+    CHECK(reg1_vec[0] == 0);
+
+    auto reg2_vec = *reinterpret_cast<std::vector<QubitIdType> *>(reg2);
+
+    CHECK(reg2_vec[0] == 1);
+    CHECK(reg2_vec[1] == 2);
+
+    // Release qubit 0 (from reg1) and qubit 1 (from reg2)
+    __catalyst__rt__qubit_release(reinterpret_cast<QUBIT *>(reg1_vec[0]));
+    __catalyst__rt__qubit_release(reinterpret_cast<QUBIT *>(reg2_vec[0]));
+
+    // Extract qubit 2 from position 1 in reg2
+    QUBIT **q2 = reinterpret_cast<QUBIT **>(__catalyst__rt__array_get_element_ptr_1d(reg2, 1));
+
+    CHECK(reinterpret_cast<QubitIdType>(*q2) == 2);
+
+    // Insert qubit 2 into position 0 of reg1
+    __catalyst__rt__array_update_element_1d(reg1, 0, *q2);
+
+    auto reg1_vec_after = *reinterpret_cast<std::vector<QubitIdType> *>(reg1);
+
+    CHECK(reg1_vec_after[0] == 2);
+}
+
+TEST_CASE_METHOD(
+    NullQubitRuntimeFixture,
+    "Test insertion of qubit into register at position beyond its size throws an exception",
+    "[NullQubit]")
+{
+    // Allocate register with three qubits, [0, 1, 2]
+    QirArray *reg = __catalyst__rt__qubit_allocate_array(3);
+
+    auto reg_vec_before = *reinterpret_cast<std::vector<QubitIdType> *>(reg);
+
+    // Allocate an individual qubit; internally it has ID 3
+    QUBIT *q = __catalyst__rt__qubit_allocate();
+
+    // Insert the individual qubit (ID: 3) into `reg` at position 3
+    // This should raise an exception position 3 is beyond the size of the register
+    CHECK_THROWS_WITH(__catalyst__rt__array_update_element_1d(reg, 3, reinterpret_cast<QUBIT *>(q)),
+                      ContainsSubstring("qubit register does not contain the requested wire"));
 }
 
 TEST_CASE("Mix Gate test R(X,Y,Z) num_qubits=4", "[NullQubit]")
@@ -765,30 +906,23 @@ TEST_CASE("Test NullQubit device shots methods", "[NullQubit]")
     }
 }
 
-TEST_CASE("Test NullQubit device resource tracking", "[NullQubit]")
+TEST_CASE("Test NullQubit device resource tracking integration", "[NullQubit]")
 {
     // The name of the file where the resource usage data is stored
-    constexpr char RESOURCES_FNAME[] = "__pennylane_resources_data.json";
-
-    // Open a file for writing the resources JSON
-    FILE *resource_file_w = fopen(RESOURCES_FNAME, "wx");
-    if (resource_file_w == nullptr) {                            // LCOV_EXCL_LINE
-        FAIL("Failed to open resource usage file for writing."); // LCOV_EXCL_LINE
-    }
+    const std::string RESOURCES_FILENAME = "__pennylane_resources_data.json";
 
     std::unique_ptr<NullQubit> dummy = std::make_unique<NullQubit>();
     CHECK(dummy->IsTrackingResources() == false);
 
     std::unique_ptr<NullQubit> sim =
-        std::make_unique<NullQubit>("{'track_resources':True}", RESOURCES_FNAME);
+        std::make_unique<NullQubit>("{'track_resources':True, 'resources_filename':'" +
+                                    RESOURCES_FILENAME + "', 'compute_depth':True}");
     CHECK(sim->IsTrackingResources() == true);
-    CHECK(sim->ResourcesGetNumGates() == 0);
-    CHECK(sim->ResourcesGetNumQubits() == 0);
+
+    // Ensure data will be written to the correct place
+    CHECK(sim->GetResourcesFilename() == RESOURCES_FILENAME);
 
     std::vector<QubitIdType> Qs = sim->AllocateQubits(4);
-
-    CHECK(sim->ResourcesGetNumGates() == 0);
-    CHECK(sim->ResourcesGetNumQubits() == 4);
 
     // Apply named gates to test all possible name modifiers
     sim->NamedOperation("PauliX", {}, {Qs[0]}, false);
@@ -798,91 +932,56 @@ TEST_CASE("Test NullQubit device resource tracking", "[NullQubit]")
     sim->NamedOperation("T", {}, {Qs[0]}, true, {Qs[2]});
     sim->NamedOperation("CNOT", {}, {Qs[0], Qs[1]}, false);
 
-    CHECK(sim->ResourcesGetNumGates() == 6);
-    CHECK(sim->ResourcesGetNumQubits() == 4);
-
     // Applying an empty matrix is fine for NullQubit
     sim->MatrixOperation({}, {Qs[0]}, false);
     sim->MatrixOperation({}, {Qs[0]}, false, {Qs[1]});
     sim->MatrixOperation({}, {Qs[0]}, true);
     sim->MatrixOperation({}, {Qs[0]}, true, {Qs[1], Qs[2]});
 
-    CHECK(sim->ResourcesGetNumGates() == 10);
-    CHECK(sim->ResourcesGetNumQubits() == 4);
-
-    // Capture resources usage
-    sim->PrintResourceUsage(resource_file_w);
-    fclose(resource_file_w);
+    // Releasing all qubits should write out all tracked information
+    sim->ReleaseQubits(Qs);
 
     // Open the file of resource data
-    std::ifstream resource_file_r(RESOURCES_FNAME);
+    std::ifstream resource_file_r(RESOURCES_FILENAME);
     CHECK(resource_file_r.is_open()); // fail-fast if file failed to create
 
     std::vector<std::string> resource_names = {"PauliX",
-                                               "C(Adj(T))",
-                                               "Adj(T)",
+                                               "C(Adjoint(T))",
+                                               "Adjoint(T)",
                                                "C(S)",
                                                "2C(S)",
-                                               "S",
                                                "CNOT",
-                                               "Adj(ControlledQubitUnitary)",
+                                               "Adjoint(ControlledQubitUnitary)",
                                                "ControlledQubitUnitary",
-                                               "Adj(QubitUnitary)",
+                                               "Adjoint(QubitUnitary)",
                                                "QubitUnitary"};
 
-    // Check all fields have the correct value
+    // Read full Json, check if num_wires and num_gates are correct
     std::string full_json;
     while (resource_file_r) {
         std::string line;
         std::getline(resource_file_r, line);
-        if (line.find("num_qubits") != std::string::npos) {
+        if (line.find("num_wires") != std::string::npos) {
             CHECK(line.find("4") != std::string::npos);
         }
         if (line.find("num_gates") != std::string::npos) {
             CHECK(line.find("10") != std::string::npos);
         }
-        // If one of the resource names is in the line, check that there is precisely 1
-        for (const auto &name : resource_names) {
-            if (line.find(name) != std::string::npos) {
-                CHECK(line.find("1") != std::string::npos);
-                break;
-            }
+        if (line.find("depth") != std::string::npos) {
+            CHECK(line.find("10") != std::string::npos);
         }
         full_json += line + "\n";
     }
     resource_file_r.close();
-    std::remove(RESOURCES_FNAME);
 
     // Ensure all expected fields are present
-    CHECK(full_json.find("num_qubits") != std::string::npos);
+    CHECK(full_json.find("num_wires") != std::string::npos);
     CHECK(full_json.find("num_gates") != std::string::npos);
+    CHECK(full_json.find("depth") != std::string::npos);
     for (const auto &name : resource_names) {
+        // Check that all operations applied are present in the data
         CHECK(full_json.find(name) != std::string::npos);
     }
 
-    // Check that releasing resets
-    sim->ReleaseAllQubits();
-    std::remove(RESOURCES_FNAME); // Remove the file automatically created by the device
-
-    CHECK(sim->ResourcesGetNumGates() == 0);
-    CHECK(sim->ResourcesGetNumQubits() == 0);
-    CHECK(sim->ResourcesGetFilename() == RESOURCES_FNAME);
-}
-
-TEST_CASE("Test resource tracking filename", "[NullQubit]")
-{
-    // Check automatic filename creation
-    std::unique_ptr<NullQubit> dummy = std::make_unique<NullQubit>("{'track_resources':True}");
-    CHECK(dummy->IsTrackingResources() == true);
-    dummy->ReleaseAllQubits();
-
-    const std::string dummy_resources_fname = dummy->ResourcesGetFilename();
-
-    std::cout << "Auto-created resources filename: " << dummy_resources_fname << std::endl;
-
-    CHECK(dummy_resources_fname.rfind("__pennylane_resources_data_") == 0);
-    CHECK(dummy_resources_fname.find(".json") != std::string::npos);
-
-    std::remove(
-        dummy_resources_fname.c_str()); // Remove the file automatically created by the device
+    std::remove(RESOURCES_FILENAME.c_str()); // Remove the file automatically created by the device
 }

@@ -15,6 +15,10 @@ file(GLOB SRC
     DecomposeCliffordPPR.cpp
     PPRDecomposeUtils.cpp
     ppm_compilation.cpp
+    PartitionLayers.cpp
+    TLayerReduction.cpp
+    ppr_to_mbqc.cpp
+    PPRToMBQC.cpp
 )
 
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)

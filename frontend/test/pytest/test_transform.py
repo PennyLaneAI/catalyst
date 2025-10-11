@@ -610,7 +610,7 @@ class TestMitigate:
         def qnode_builder(device_name):
             """Builder"""
 
-            @partial(qml.transforms.fold_global, scale_factor=2)
+            @partial(qml.noise.fold_global, scale_factor=2)
             @qml.qnode(qml.device(device_name, wires=3), interface="jax")
             def qfunc(x):
                 qml.RX(x[0], wires=0)
@@ -1103,7 +1103,7 @@ class TestTransformValidity:
 
             return program, config
 
-        # Simulate a Qrack-like device that requires meassurement process transforms.
+        # Simulate a Qrack-like device that requires measurement process transforms.
         # Qnode transforms raise this error anyway so we cannot use them directly.
         original_preprocess = QJITDevice.preprocess
         monkeypatch.setattr(QJITDevice, "preprocess", inject_device_transforms)

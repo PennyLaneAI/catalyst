@@ -38,12 +38,14 @@ from catalyst.passes.builtin_passes import (
     commute_ppr,
     disentangle_cnot,
     disentangle_swap,
-    get_ppm_specs,
     ions_decomposition,
     merge_ppr_ppm,
     merge_rotations,
     ppm_compilation,
+    ppm_specs,
+    ppr_to_mbqc,
     ppr_to_ppm,
+    reduce_t_depth,
     to_ppr,
 )
 from catalyst.passes.pass_api import Pass, PassPlugin, apply_pass, apply_pass_plugin
@@ -54,7 +56,7 @@ __all__ = (
     "cancel_inverses",
     "disentangle_cnot",
     "disentangle_swap",
-    "get_ppm_specs",
+    "ppm_specs",
     "ions_decomposition",
     "merge_rotations",
     "Pass",
@@ -64,4 +66,6 @@ __all__ = (
     "merge_ppr_ppm",
     "ppr_to_ppm",
     "ppm_compilation",
+    "reduce_t_depth",
+    "ppr_to_mbqc",
 )

@@ -167,9 +167,9 @@ jobs:
         steps.cache-enzyme-build.outputs.cache-hit != 'true'
       run: |
         cat /etc/dnf.conf | sed "s/\[main\]/\[main\]\ntimeout=5/g" > /etc/dnf.conf
-        dnf update -y && dnf install -y libzstd-devel gcc-toolset-12
+        dnf update -y && dnf install -y libzstd-devel gcc-toolset-13
         # Update env vars valid for all tasks of this job
-        echo '/opt/rh/gcc-toolset-12/root/usr/bin' >> $GITHUB_PATH
+        echo '/opt/rh/gcc-toolset-13/root/usr/bin' >> $GITHUB_PATH
 
     - name: Install Dependencies (Python)
       run: |
@@ -263,9 +263,9 @@ jobs:
       run: |
         # Reduce wait time for repos not responding
         cat /etc/dnf.conf | sed "s/\[main\]/\[main\]\ntimeout=5/g" > /etc/dnf.conf
-        dnf update -y && dnf install -y openmpi-devel libzstd-devel gcc-toolset-12
+        dnf update -y && dnf install -y openmpi-devel libzstd-devel gcc-toolset-13
         # Update env vars valid for all tasks of this job
-        echo '/opt/rh/gcc-toolset-12/root/usr/bin' >> $GITHUB_PATH
+        echo '/opt/rh/gcc-toolset-13/root/usr/bin' >> $GITHUB_PATH
 
     - name: Install Dependencies (Python)
       run: |

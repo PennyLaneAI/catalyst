@@ -992,6 +992,7 @@ class TestForLoops:
     def test_for_in_dynamic_range_indexing_array(self):
         """Test for loop over a Python range with dynamic bounds that is used to index an array."""
 
+        @qjit(autograph=True)
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def f(n: int):
             params = jnp.array([0.0, 1 / 4 * jnp.pi, 2 / 4 * jnp.pi])
@@ -2173,14 +2174,15 @@ class TestDecorators:
         functional wrappers."""
 
         @qml.prod
-        def template():
-            qml.H(0)
-            qml.X(0)
+        def template(b: bool):
+            if b:
+                qml.H(0)
+                qml.X(0)
 
         @qjit(autograph=True, target="jaxpr")
         @qml.qnode(qml.device("null.qubit", wires=0))
         def circuit():
-            qml.adjoint(template())
+            qml.adjoint(template)(True)
             return qml.state()
 
         assert circuit.jaxpr is not None

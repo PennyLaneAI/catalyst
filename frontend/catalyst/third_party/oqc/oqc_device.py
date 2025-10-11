@@ -15,6 +15,7 @@
 """This module contains the OQC device."""
 
 import os
+import platform
 from typing import Optional
 
 from pennylane.devices import Device, ExecutionConfig
@@ -44,8 +45,9 @@ class OQCDevice(Device):
         the location to the shared object with the C/C++ device implementation.
         """
 
-        # TODO: Replace with the oqc shared library
-        return "oqc", get_lib_path("oqc_runtime", "OQC_LIB_DIR") + "/librtd_oqc.so"
+        system_extension = ".dylib" if platform.system() == "Darwin" else ".so"
+        lib_path = get_lib_path("oqc_runtime", "OQC_LIB_DIR") + "/librtd_oqc" + system_extension
+        return "oqc", lib_path
 
     def __init__(self, wires, backend, shots=1024, **kwargs):
         self._backend = backend

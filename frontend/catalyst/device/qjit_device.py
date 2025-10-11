@@ -231,6 +231,18 @@ def get_qjit_device_capabilities(target_capabilities: DeviceCapabilities) -> Dev
         target_capabilities.measurement_processes, RUNTIME_MPS
     )
 
+    # Enable dynamic qubit allocation with qml.allocate and qml.deallocate
+    qjit_capabilities.operations.update(
+        {
+            "allocate": OperatorProperties(
+                invertible=False, controllable=False, differentiable=False
+            ),
+            "deallocate": OperatorProperties(
+                invertible=False, controllable=False, differentiable=False
+            ),
+        }
+    )
+
     # Control-flow gates to be lowered down to the LLVM control-flow instructions
     qjit_capabilities.operations.update(
         {

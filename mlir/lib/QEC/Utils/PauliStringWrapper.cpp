@@ -16,8 +16,8 @@
 #include <stim/stabilizers/flex_pauli_string.h>
 #include <stim/stabilizers/pauli_string.h>
 
+#include "QEC/IR/QECDialect.h"
 #include "QEC/Utils/PauliStringWrapper.h"
-#include "Quantum/IR/QuantumOps.h" // for quantum::AllocQubitOp
 
 namespace catalyst {
 namespace qec {
@@ -44,6 +44,16 @@ PauliStringWrapper PauliStringWrapper::from_pauli_word(const PauliWord &pauliWor
     std::string pauliStringStr;
     for (auto pauli : pauliWord) {
         pauliStringStr += pauli;
+    }
+    return PauliStringWrapper(stim::FlexPauliString::from_text(pauliStringStr));
+}
+
+PauliStringWrapper PauliStringWrapper::from_qec_op(QECOpInterface op)
+{
+    std::string pauliStringStr;
+    for (auto pauli : op.getPauliProduct()) {
+        auto pauliStr = mlir::cast<mlir::StringAttr>(pauli).getValue();
+        pauliStringStr += pauliStr;
     }
     return PauliStringWrapper(stim::FlexPauliString::from_text(pauliStringStr));
 }
@@ -96,9 +106,8 @@ PauliStringWrapper::computeCommutationRulesWith(const PauliStringWrapper &rhs) c
     return PauliStringWrapper(std::move(result));
 }
 
-template <typename T>
-PauliWord expandPauliWord(const llvm::SetVector<Value> &operands, const T &inOutOperands,
-                          QECOpInterface op)
+template <typename T, typename U>
+PauliWord expandPauliWord(const T &operands, const U &inOutOperands, QECOpInterface op)
 {
     PauliWord pauliWord(operands.size(), "I");
     for (auto [qubit, pauli] : llvm::zip(inOutOperands, op.getPauliProduct())) {
@@ -113,11 +122,18 @@ PauliWord expandPauliWord(const llvm::SetVector<Value> &operands, const T &inOut
     return pauliWord;
 }
 
+// Emit explicit instantiation for the Value-based specialization used by QECLayer
+template PauliWord expandPauliWord<llvm::SetVector<Value>, std::vector<Value>>(
+    const llvm::SetVector<Value> &, const std::vector<Value> &, QECOpInterface);
+
 PauliWordPair normalizePPROps(QECOpInterface lhs, QECOpInterface rhs)
 {
-    auto lhsQubits = lhs.getOutQubits();
-    auto rhsQubits = rhs.getInQubits();
+    return normalizePPROps(lhs, rhs, lhs.getOutQubits(), rhs.getInQubits());
+}
 
+PauliWordPair normalizePPROps(QECOpInterface lhs, QECOpInterface rhs, ValueRange lhsQubits,
+                              ValueRange rhsQubits)
+{
     llvm::SetVector<Value> qubits;
     qubits.insert(lhsQubits.begin(), lhsQubits.end());
     qubits.insert(rhsQubits.begin(), rhsQubits.end());
@@ -219,6 +235,9 @@ bool exceedPauliSizeLimit(size_t pauliSize, size_t MaxPauliSize)
     }
     return pauliSize > MaxPauliSize;
 }
+
+bool operator==(const PauliWord &lhs, const PauliWord &rhs) { return llvm::equal(lhs, rhs); }
+bool operator!=(const PauliWord &lhs, const PauliWord &rhs) { return !(lhs == rhs); }
 
 } // namespace qec
 } // namespace catalyst

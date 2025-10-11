@@ -30,4 +30,7 @@ std::unique_ptr<mlir::Pass> createDecomposeNonCliffordPPRPass();
 std::unique_ptr<mlir::Pass> createDecomposeCliffordPPRPass();
 std::unique_ptr<mlir::Pass> createPPMCompilationPass();
 std::unique_ptr<mlir::Pass> createCountPPMSpecsPass();
+std::unique_ptr<mlir::Pass> createPartitionLayersPass();
+std::unique_ptr<mlir::Pass> createTLayerReductionPass();
+std::unique_ptr<mlir::Pass> createPPRToMBQCPass();
 } // namespace catalyst
