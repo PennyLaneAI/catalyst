@@ -310,7 +310,6 @@ class ExecutionContext final {
 
     // PRNG
     uint32_t *seed;
-    bool enable_routing{false};
     std::mt19937 gen;
 
   public:

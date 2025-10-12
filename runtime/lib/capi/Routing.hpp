@@ -104,6 +104,8 @@ class RoutingPass final {
         }
     }
 
+    QubitIdType getMappedWire(QubitIdType wire) { return this->wireMap[wire]; }
+
     std::vector<QubitIdType> getShortestPath(QubitIdType source, QubitIdType target)
     {
         std::vector<QubitIdType> path;
@@ -125,64 +127,15 @@ class RoutingPass final {
         return path;
     }
 
-    QubitIdType getMappedWire(QubitIdType wire, int64_t num_elements)
-    {
-        QubitIdType numQubits = std::log2(num_elements);
-        std::vector<QubitIdType> binaryVector;
-        if (wire == 0)
-            binaryVector.push_back(0);
-        while (wire > 0) {
-            binaryVector.push_back(wire % 2);
-            wire /= 2;
-        }
-        while (binaryVector.size() < numQubits)
-            binaryVector.push_back(0);
-        std::reverse(binaryVector.begin(), binaryVector.end());
-        std::vector<QubitIdType> binaryVectorCopy;
-        for (auto i = 0; i < binaryVector.size(); i++)
-            binaryVectorCopy.push_back(binaryVector[i]);
-
-        for (auto i = 0; i < binaryVector.size(); i++) {
-            // for (auto& pair : this->wireMap) {
-            //     if (pair.second == i)
-            //     {
-            //         binaryVector[i] = binaryVectorCopy[pair.first];
-            //         break;
-            //     }
-            // }
-            binaryVector[i] = binaryVectorCopy[this->wireMap[i]];
-        }
-
-        QubitIdType mapped_wire = 0;
-        int power = 0;
-        for (int i = binaryVector.size() - 1; i >= 0; --i) {
-            if (binaryVector[i] == 1) {
-                mapped_wire += std::pow(2, power);
-            }
-            power++;
-        }
-        return mapped_wire;
-    }
-
     std::tuple<QubitIdType, QubitIdType, std::vector<QubitIdType>> getRoutedQubits(QUBIT *control,
                                                                                    QUBIT *target)
     {
-        // Similar to qml.transpile implementation
-        // https://docs.pennylane.ai/en/stable/_modules/pennylane/transforms/transpile.html
-
-        QubitIdType firstQubit = reinterpret_cast<QubitIdType>(control);
-        QubitIdType secondQubit = reinterpret_cast<QubitIdType>(target);
+        QubitIdType firstQubitMapping = this->wireMap[reinterpret_cast<QubitIdType>(control)];
+        QubitIdType secondQubitMapping = this->wireMap[reinterpret_cast<QubitIdType>(target)];
         std::vector<QubitIdType> swapPath = {};
 
-        if (this->couplingMap[std::make_pair(firstQubit, secondQubit)]) {
-            // since in each iteration, we adjust indices of each op,
-            // we reset logical -> phyiscal mapping
-            for (auto it = this->wireMap.begin(); it != this->wireMap.end(); ++it) {
-                this->wireMap[it->second] = it->second;
-            }
-        }
-        else {
-            swapPath = this->getShortestPath(firstQubit, secondQubit);
+        if (!this->couplingMap[std::make_pair(firstQubitMapping, secondQubitMapping)]) {
+            swapPath = this->getShortestPath(firstQubitMapping, secondQubitMapping);
             //  i<swapPath.size()-1 since last qubit is already our target
             for (auto i = 1; i < swapPath.size() - 1; i++) {
                 QubitIdType u = swapPath[i - 1];
@@ -195,10 +148,37 @@ class RoutingPass final {
                         this->wireMap[it->first] = u;
                 }
             }
-            firstQubit = this->wireMap[firstQubit];
-            secondQubit = this->wireMap[secondQubit];
+            firstQubitMapping = this->wireMap[reinterpret_cast<QubitIdType>(control)];
+            secondQubitMapping = this->wireMap[reinterpret_cast<QubitIdType>(target)];
         }
-        return std::make_tuple(firstQubit, secondQubit, swapPath);
+        return std::make_tuple(firstQubitMapping, secondQubitMapping, swapPath);
+    }
+
+    void findFinalSwaps(QubitIdType currWireIndex, std::vector<std::tuple<QubitIdType, QubitIdType>> *finalSwaps)
+    {
+        if(currWireIndex == this->wireMap[currWireIndex])
+            return;
+        QubitIdType nextWireIndex = this->wireMap[currWireIndex];
+        QubitIdType temp  = this->wireMap[currWireIndex];
+        this->wireMap[currWireIndex] = this->wireMap[nextWireIndex];
+        this->wireMap[nextWireIndex] = temp;
+        (*finalSwaps).push_back({this->wireMap[currWireIndex], this->wireMap[nextWireIndex] });
+        findFinalSwaps(nextWireIndex,finalSwaps);
+        return;
+    }
+    std::vector<std::tuple<QubitIdType, QubitIdType>> getFinalPermuteSwaps()
+    {
+        std::vector<std::tuple<QubitIdType, QubitIdType>> finalSwaps;
+        for (auto it = this->wireMap.begin(); it != this->wireMap.end(); ++it)
+        {
+            while(true)
+            {
+                findFinalSwaps(this->wireMap[it->first], &finalSwaps);
+                if (this->wireMap[it->first] == this->wireMap[it->second] )
+                    break;
+            }
+        }
+        return finalSwaps; 
     }
 
     ~RoutingPass() = default;
