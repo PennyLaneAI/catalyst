@@ -124,7 +124,7 @@ void TensorType2MemrefType(const TypeRange &inTypes, SmallVector<Type> &converte
     }
 }
 
-static BaseMemRefType
+static bufferization::BufferLikeType
 getBufferizedFunctionArgType(FunctionOpInterface funcOp, int64_t index,
                              const bufferization::BufferizationOptions &options)
 {
@@ -134,7 +134,7 @@ getBufferizedFunctionArgType(FunctionOpInterface funcOp, int64_t index,
     BaseMemRefType memrefType = options.functionArgTypeConverterFn(
         tensorType, *options.defaultMemorySpaceFn(tensorType), nullptr, options);
 
-    return memrefType;
+    return cast<bufferization::BufferLikeType>(memrefType);
 }
 
 static ReturnOp getAssumedUniqueReturnOp(FunctionOpInterface funcOp)
@@ -402,7 +402,7 @@ struct ForwardOpInterface
         return {};
     }
 
-    FailureOr<BaseMemRefType> getBufferType(Operation *op, Value value,
+    FailureOr<bufferization::BufferLikeType> getBufferType(Operation *op, Value value,
                                             const bufferization::BufferizationOptions &options,
                                             const bufferization::BufferizationState &state,
                                             SmallVector<Value> &invocationStack) const
@@ -526,10 +526,10 @@ struct ReverseOpInterface
         return {};
     }
 
-    FailureOr<BaseMemRefType> getBufferType(Operation *op, Value value,
-                                            const bufferization::BufferizationOptions &options,
-                                            const bufferization::BufferizationState &state,
-                                            SmallVector<Value> &invocationStack) const
+    FailureOr<bufferization::BufferLikeType>
+    getBufferType(Operation *op, Value value, const bufferization::BufferizationOptions &options,
+                  const bufferization::BufferizationState &state,
+                  SmallVector<Value> &invocationStack) const
     {
         // See comment on the getBufferType() method on forward op.
         auto reverseOp = cast<ReverseOp>(op);
