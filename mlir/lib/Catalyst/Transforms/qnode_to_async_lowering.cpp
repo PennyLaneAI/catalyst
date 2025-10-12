@@ -52,9 +52,4 @@ struct QnodeToAsyncLoweringPass : impl::QnodeToAsyncLoweringPassBase<QnodeToAsyn
     }
 };
 
-std::unique_ptr<Pass> createQnodeToAsyncLoweringPass()
-{
-    return std::make_unique<QnodeToAsyncLoweringPass>();
-}
-
 } // namespace catalyst

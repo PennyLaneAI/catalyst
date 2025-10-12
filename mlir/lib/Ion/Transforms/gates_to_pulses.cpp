@@ -23,7 +23,6 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include "Ion/IR/IonOps.h"
-#include "Ion/Transforms/Passes.h"
 #include "Ion/Transforms/Patterns.h"
 #include "Ion/Transforms/oqd_database_managers.hpp"
 #include "Ion/Transforms/oqd_database_types.hpp"
@@ -131,10 +130,4 @@ struct GatesToPulsesPass : impl::GatesToPulsesPassBase<GatesToPulsesPass> {
 };
 
 } // namespace ion
-
-std::unique_ptr<Pass> createGatesToPulsesPass()
-{
-    return std::make_unique<ion::GatesToPulsesPass>();
-}
-
 } // namespace catalyst

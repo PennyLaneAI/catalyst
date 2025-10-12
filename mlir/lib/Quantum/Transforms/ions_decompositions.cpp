@@ -30,7 +30,6 @@ namespace catalyst {
 namespace quantum {
 
 #define GEN_PASS_DEF_IONSDECOMPOSITIONPASS
-#define GEN_PASS_DECL_IONSDECOMPOSITIONPASS
 #include "Quantum/Transforms/Passes.h.inc"
 
 struct IonsDecompositionPass : impl::IonsDecompositionPassBase<IonsDecompositionPass> {
@@ -58,10 +57,4 @@ struct IonsDecompositionPass : impl::IonsDecompositionPassBase<IonsDecomposition
 };
 
 } // namespace quantum
-
-std::unique_ptr<Pass> createIonsDecompositionPass()
-{
-    return std::make_unique<quantum::IonsDecompositionPass>();
-}
-
 } // namespace catalyst

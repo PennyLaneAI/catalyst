@@ -48,6 +48,4 @@ struct GEPInboundsPass : impl::GEPInboundsPassBase<GEPInboundsPass> {
     }
 };
 
-std::unique_ptr<Pass> createGEPInboundsPass() { return std::make_unique<GEPInboundsPass>(); }
-
 } // namespace catalyst
