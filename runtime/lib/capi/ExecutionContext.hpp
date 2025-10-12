@@ -29,6 +29,7 @@
 
 #include "Exception.hpp"
 #include "QuantumDevice.hpp"
+#include "Routing.hpp"
 #include "Types.h"
 
 namespace Catalyst::Runtime {
@@ -170,6 +171,8 @@ class RTDevice {
 
     std::unique_ptr<SharedLibraryManager> rtd_dylib{nullptr};
     std::unique_ptr<QuantumDevice> rtd_qdevice{nullptr};
+    // device specific routing pass pointer.
+    std::unique_ptr<RoutingPass> RUNTIME_ROUTER{nullptr};
 
     RTDeviceStatus status{RTDeviceStatus::Inactive};
 
@@ -224,6 +227,20 @@ class RTDevice {
         _pl2runtime_device_info(rtd_lib, rtd_name);
     }
 
+    explicit RTDevice(std::string_view _rtd_lib, std::string_view _rtd_name,
+                      std::string_view _rtd_kwargs, bool _auto_qubit_management,
+                      std::string_view coupling_map_str)
+        : rtd_lib(_rtd_lib), rtd_name(_rtd_name), rtd_kwargs(_rtd_kwargs),
+          auto_qubit_management(_auto_qubit_management)
+    {
+        // Extract coupling map from the kwargs passed
+        // If coupling map is provided then it takes in the form {...,'couplingMap' ((a,b),(b,c))}
+        // else {...,'couplingMap' (a,b,c)}
+        if (coupling_map_str.find("((") != std::string::npos)
+            RUNTIME_ROUTER = std::make_unique<RoutingPass>(coupling_map_str);
+        _pl2runtime_device_info(rtd_lib, rtd_name);
+    }
+
     ~RTDevice() = default;
     RTDevice(const RTDevice &other) = delete;
     RTDevice &operator=(const RTDevice &other) = delete;
@@ -264,6 +281,10 @@ class RTDevice {
     void setDeviceStatus(RTDeviceStatus new_status) noexcept { status = new_status; }
 
     bool getQubitManagementMode() { return auto_qubit_management; }
+    [[nodiscard]] auto getRuntimeRouter() -> std::unique_ptr<RoutingPass> &
+    {
+        return RUNTIME_ROUTER;
+    }
 
     [[nodiscard]] auto getDeviceStatus() const -> RTDeviceStatus { return status; }
 
@@ -289,6 +310,7 @@ class ExecutionContext final {
 
     // PRNG
     uint32_t *seed;
+    bool enable_routing{false};
     std::mt19937 gen;
 
   public:
@@ -320,13 +342,14 @@ class ExecutionContext final {
     }
 
     [[nodiscard]] auto getOrCreateDevice(std::string_view rtd_lib, std::string_view rtd_name,
-                                         std::string_view rtd_kwargs, bool auto_qubit_management)
+                                         std::string_view rtd_kwargs, bool auto_qubit_management,
+                                         std::string_view coupling_map_str = {})
         -> const std::shared_ptr<RTDevice> &
     {
         std::lock_guard<std::mutex> lock(pool_mu);
 
-        auto device =
-            std::make_shared<RTDevice>(rtd_lib, rtd_name, rtd_kwargs, auto_qubit_management);
+        auto device = std::make_shared<RTDevice>(rtd_lib, rtd_name, rtd_kwargs,
+                                                 auto_qubit_management, coupling_map_str);
 
         const size_t key = device_pool.size();
         for (size_t i = 0; i < key; i++) {
