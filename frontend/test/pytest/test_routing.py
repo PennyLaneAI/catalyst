@@ -46,6 +46,7 @@ class TestRouting:
 
     @pytest.mark.parametrize("all_to__all_device, linear_device", input_devices)
     def test_state_invariance_under_routing(self, all_to__all_device, linear_device):
+        """test that transpile does not alter output for state measurement"""
         def circuit(wires, x, y, z):
             qfunc_ops(wires, x, y, z)
             return qml.state()
@@ -59,6 +60,7 @@ class TestRouting:
 
     @pytest.mark.parametrize("all_to__all_device, linear_device", input_devices)
     def test_probs_invariance_under_routing(self, all_to__all_device, linear_device):
+        """test that transpile does not alter output for probs measurement"""
         def circuit(wires, x, y, z):
             qfunc_ops(wires, x, y, z)
             return qml.probs()
@@ -72,6 +74,7 @@ class TestRouting:
 
     @pytest.mark.parametrize("all_to__all_device, linear_device", input_devices)
     def test_sample_invariance_under_routing(self, all_to__all_device, linear_device):
+        """test that transpile does not alter output for sample measurement"""
         def circuit(wires, x, y, z):
             qfunc_ops(wires, x, y, z)
             return qml.sample()
@@ -88,6 +91,7 @@ class TestRouting:
 
     @pytest.mark.parametrize("all_to__all_device, linear_device", input_devices)
     def test_counts_invariance_under_routing(self, all_to__all_device, linear_device):
+        """test that transpile does not alter output for counts measurement"""
         def circuit(wires, x, y, z):
             qfunc_ops(wires, x, y, z)
             return qml.counts()
@@ -104,6 +108,7 @@ class TestRouting:
 
     @pytest.mark.parametrize("all_to__all_device, linear_device", input_devices)
     def test_expvals_invariance_under_routing(self, all_to__all_device, linear_device):
+        """test that transpile does not alter output for expectation value measurement"""
         def circuit(wires, x, y, z):
             qfunc_ops(wires, x, y, z)
             return qml.expval(qml.X(0) @ qml.Y(1)), qml.var(qml.Z(2))
