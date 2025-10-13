@@ -536,11 +536,9 @@ void __catalyst__qis__PCPhase(double theta, double dim, const Modifiers *modifie
         wires[i] = va_arg(args, QubitIdType);
     }
     va_end(args);
-    if (RTD_PTR != nullptr && RTD_PTR->getRuntimeRouter() != nullptr)
-    {
-        for (int64_t i = 0; i < numQubits; i++)
-            wires[i] = RTD_PTR->getRuntimeRouter()->getMappedWire(wires[i]);
-    }
+    RT_FAIL_IF(RTD_PTR != nullptr && RTD_PTR->getRuntimeRouter() != nullptr,
+               "Only single and two-qubit gates are supported when compiling to a given hardware "
+               "coupling map.");
     getQuantumDevicePtr()->NamedOperation("PCPhase", {theta, dim}, wires,
                                           /* modifiers */ MODIFIERS_ARGS(modifiers));
 }
@@ -576,8 +574,7 @@ void __catalyst__qis__Identity(const Modifiers *modifiers, int64_t numQubits, ..
         wires[i] = va_arg(args, QubitIdType);
     }
     va_end(args);
-    if (RTD_PTR != nullptr && RTD_PTR->getRuntimeRouter() != nullptr)
-    {
+    if (RTD_PTR != nullptr && RTD_PTR->getRuntimeRouter() != nullptr) {
         for (int64_t i = 0; i < numQubits; i++)
             wires[i] = RTD_PTR->getRuntimeRouter()->getMappedWire(wires[i]);
     }
@@ -587,156 +584,156 @@ void __catalyst__qis__Identity(const Modifiers *modifiers, int64_t numQubits, ..
 
 void __catalyst__qis__PauliX(QUBIT *qubit, const Modifiers *modifiers)
 {
-    if (RTD_PTR != nullptr && RTD_PTR->getRuntimeRouter() != nullptr)
-    {
-        QubitIdType mapped_wire = RTD_PTR->getRuntimeRouter()->getMappedWire(reinterpret_cast<QubitIdType>(qubit));
+    if (RTD_PTR != nullptr && RTD_PTR->getRuntimeRouter() != nullptr) {
+        QubitIdType mapped_wire =
+            RTD_PTR->getRuntimeRouter()->getMappedWire(reinterpret_cast<QubitIdType>(qubit));
         getQuantumDevicePtr()->NamedOperation("PauliX", {}, {mapped_wire},
-                                          MODIFIERS_ARGS(modifiers));
+                                              MODIFIERS_ARGS(modifiers));
     }
     else {
         getQuantumDevicePtr()->NamedOperation("PauliX", {}, {reinterpret_cast<QubitIdType>(qubit)},
-                                            MODIFIERS_ARGS(modifiers));
+                                              MODIFIERS_ARGS(modifiers));
     }
 }
 
 void __catalyst__qis__PauliY(QUBIT *qubit, const Modifiers *modifiers)
 {
-    if (RTD_PTR != nullptr && RTD_PTR->getRuntimeRouter() != nullptr)
-    {
-        QubitIdType mapped_wire = RTD_PTR->getRuntimeRouter()->getMappedWire(reinterpret_cast<QubitIdType>(qubit));
+    if (RTD_PTR != nullptr && RTD_PTR->getRuntimeRouter() != nullptr) {
+        QubitIdType mapped_wire =
+            RTD_PTR->getRuntimeRouter()->getMappedWire(reinterpret_cast<QubitIdType>(qubit));
         getQuantumDevicePtr()->NamedOperation("PauliY", {}, {mapped_wire},
-                                          MODIFIERS_ARGS(modifiers));
+                                              MODIFIERS_ARGS(modifiers));
     }
     else {
         getQuantumDevicePtr()->NamedOperation("PauliY", {}, {reinterpret_cast<QubitIdType>(qubit)},
-                                            MODIFIERS_ARGS(modifiers));
+                                              MODIFIERS_ARGS(modifiers));
     }
 }
 
 void __catalyst__qis__PauliZ(QUBIT *qubit, const Modifiers *modifiers)
 {
-    if (RTD_PTR != nullptr && RTD_PTR->getRuntimeRouter() != nullptr)
-    {
-        QubitIdType mapped_wire = RTD_PTR->getRuntimeRouter()->getMappedWire(reinterpret_cast<QubitIdType>(qubit));
+    if (RTD_PTR != nullptr && RTD_PTR->getRuntimeRouter() != nullptr) {
+        QubitIdType mapped_wire =
+            RTD_PTR->getRuntimeRouter()->getMappedWire(reinterpret_cast<QubitIdType>(qubit));
         getQuantumDevicePtr()->NamedOperation("PauliZ", {}, {mapped_wire},
-                                          MODIFIERS_ARGS(modifiers));
+                                              MODIFIERS_ARGS(modifiers));
     }
     else {
         getQuantumDevicePtr()->NamedOperation("PauliZ", {}, {reinterpret_cast<QubitIdType>(qubit)},
-                                            MODIFIERS_ARGS(modifiers));
+                                              MODIFIERS_ARGS(modifiers));
     }
 }
 
 void __catalyst__qis__Hadamard(QUBIT *qubit, const Modifiers *modifiers)
 {
-    if (RTD_PTR != nullptr && RTD_PTR->getRuntimeRouter() != nullptr)
-    {
-        QubitIdType mapped_wire = RTD_PTR->getRuntimeRouter()->getMappedWire(reinterpret_cast<QubitIdType>(qubit));
+    if (RTD_PTR != nullptr && RTD_PTR->getRuntimeRouter() != nullptr) {
+        QubitIdType mapped_wire =
+            RTD_PTR->getRuntimeRouter()->getMappedWire(reinterpret_cast<QubitIdType>(qubit));
         getQuantumDevicePtr()->NamedOperation("Hadamard", {}, {mapped_wire},
-                                          MODIFIERS_ARGS(modifiers));
+                                              MODIFIERS_ARGS(modifiers));
     }
     else {
-        getQuantumDevicePtr()->NamedOperation("Hadamard", {}, {reinterpret_cast<QubitIdType>(qubit)},
-                                            MODIFIERS_ARGS(modifiers));
+        getQuantumDevicePtr()->NamedOperation(
+            "Hadamard", {}, {reinterpret_cast<QubitIdType>(qubit)}, MODIFIERS_ARGS(modifiers));
     }
 }
 
 void __catalyst__qis__S(QUBIT *qubit, const Modifiers *modifiers)
 {
-    if (RTD_PTR != nullptr && RTD_PTR->getRuntimeRouter() != nullptr)
-    {
-        QubitIdType mapped_wire = RTD_PTR->getRuntimeRouter()->getMappedWire(reinterpret_cast<QubitIdType>(qubit));
-        getQuantumDevicePtr()->NamedOperation("S", {}, {mapped_wire},
-                                          MODIFIERS_ARGS(modifiers));
+    if (RTD_PTR != nullptr && RTD_PTR->getRuntimeRouter() != nullptr) {
+        QubitIdType mapped_wire =
+            RTD_PTR->getRuntimeRouter()->getMappedWire(reinterpret_cast<QubitIdType>(qubit));
+        getQuantumDevicePtr()->NamedOperation("S", {}, {mapped_wire}, MODIFIERS_ARGS(modifiers));
     }
     else {
         getQuantumDevicePtr()->NamedOperation("S", {}, {reinterpret_cast<QubitIdType>(qubit)},
-                                            MODIFIERS_ARGS(modifiers));
+                                              MODIFIERS_ARGS(modifiers));
     }
 }
 
 void __catalyst__qis__T(QUBIT *qubit, const Modifiers *modifiers)
 {
-    if (RTD_PTR != nullptr && RTD_PTR->getRuntimeRouter() != nullptr)
-    {
-        QubitIdType mapped_wire = RTD_PTR->getRuntimeRouter()->getMappedWire(reinterpret_cast<QubitIdType>(qubit));
-        getQuantumDevicePtr()->NamedOperation("T", {}, {mapped_wire},
-                                          MODIFIERS_ARGS(modifiers));
+    if (RTD_PTR != nullptr && RTD_PTR->getRuntimeRouter() != nullptr) {
+        QubitIdType mapped_wire =
+            RTD_PTR->getRuntimeRouter()->getMappedWire(reinterpret_cast<QubitIdType>(qubit));
+        getQuantumDevicePtr()->NamedOperation("T", {}, {mapped_wire}, MODIFIERS_ARGS(modifiers));
     }
     else {
         getQuantumDevicePtr()->NamedOperation("T", {}, {reinterpret_cast<QubitIdType>(qubit)},
-                                            MODIFIERS_ARGS(modifiers));
+                                              MODIFIERS_ARGS(modifiers));
     }
 }
 
 void __catalyst__qis__PhaseShift(double theta, QUBIT *qubit, const Modifiers *modifiers)
 {
-    if (RTD_PTR != nullptr && RTD_PTR->getRuntimeRouter() != nullptr)
-    {
-        QubitIdType mapped_wire = RTD_PTR->getRuntimeRouter()->getMappedWire(reinterpret_cast<QubitIdType>(qubit));
+    if (RTD_PTR != nullptr && RTD_PTR->getRuntimeRouter() != nullptr) {
+        QubitIdType mapped_wire =
+            RTD_PTR->getRuntimeRouter()->getMappedWire(reinterpret_cast<QubitIdType>(qubit));
         getQuantumDevicePtr()->NamedOperation("PhaseShift", {theta}, {mapped_wire},
-                                          MODIFIERS_ARGS(modifiers));
+                                              MODIFIERS_ARGS(modifiers));
     }
     else {
-        getQuantumDevicePtr()->NamedOperation("PhaseShift", {theta}, {reinterpret_cast<QubitIdType>(qubit)},
-                                            MODIFIERS_ARGS(modifiers));
+        getQuantumDevicePtr()->NamedOperation("PhaseShift", {theta},
+                                              {reinterpret_cast<QubitIdType>(qubit)},
+                                              MODIFIERS_ARGS(modifiers));
     }
 }
 
 void __catalyst__qis__RX(double theta, QUBIT *qubit, const Modifiers *modifiers)
 {
-    if (RTD_PTR != nullptr && RTD_PTR->getRuntimeRouter() != nullptr)
-    {
-        QubitIdType mapped_wire = RTD_PTR->getRuntimeRouter()->getMappedWire(reinterpret_cast<QubitIdType>(qubit));
+    if (RTD_PTR != nullptr && RTD_PTR->getRuntimeRouter() != nullptr) {
+        QubitIdType mapped_wire =
+            RTD_PTR->getRuntimeRouter()->getMappedWire(reinterpret_cast<QubitIdType>(qubit));
         getQuantumDevicePtr()->NamedOperation("RX", {theta}, {mapped_wire},
-                                          MODIFIERS_ARGS(modifiers));
+                                              MODIFIERS_ARGS(modifiers));
     }
     else {
         getQuantumDevicePtr()->NamedOperation("RX", {theta}, {reinterpret_cast<QubitIdType>(qubit)},
-                                            MODIFIERS_ARGS(modifiers));
+                                              MODIFIERS_ARGS(modifiers));
     }
 }
 
 void __catalyst__qis__RY(double theta, QUBIT *qubit, const Modifiers *modifiers)
 {
-    if (RTD_PTR != nullptr && RTD_PTR->getRuntimeRouter() != nullptr)
-    {
-        QubitIdType mapped_wire = RTD_PTR->getRuntimeRouter()->getMappedWire(reinterpret_cast<QubitIdType>(qubit));
+    if (RTD_PTR != nullptr && RTD_PTR->getRuntimeRouter() != nullptr) {
+        QubitIdType mapped_wire =
+            RTD_PTR->getRuntimeRouter()->getMappedWire(reinterpret_cast<QubitIdType>(qubit));
         getQuantumDevicePtr()->NamedOperation("RY", {theta}, {mapped_wire},
-                                          MODIFIERS_ARGS(modifiers));
+                                              MODIFIERS_ARGS(modifiers));
     }
     else {
         getQuantumDevicePtr()->NamedOperation("RY", {theta}, {reinterpret_cast<QubitIdType>(qubit)},
-                                            MODIFIERS_ARGS(modifiers));
+                                              MODIFIERS_ARGS(modifiers));
     }
 }
 
 void __catalyst__qis__RZ(double theta, QUBIT *qubit, const Modifiers *modifiers)
 {
-    if (RTD_PTR != nullptr && RTD_PTR->getRuntimeRouter() != nullptr)
-    {
-        QubitIdType mapped_wire = RTD_PTR->getRuntimeRouter()->getMappedWire(reinterpret_cast<QubitIdType>(qubit));
+    if (RTD_PTR != nullptr && RTD_PTR->getRuntimeRouter() != nullptr) {
+        QubitIdType mapped_wire =
+            RTD_PTR->getRuntimeRouter()->getMappedWire(reinterpret_cast<QubitIdType>(qubit));
         getQuantumDevicePtr()->NamedOperation("RZ", {theta}, {mapped_wire},
-                                          MODIFIERS_ARGS(modifiers));
+                                              MODIFIERS_ARGS(modifiers));
     }
     else {
         getQuantumDevicePtr()->NamedOperation("RZ", {theta}, {reinterpret_cast<QubitIdType>(qubit)},
-                                            MODIFIERS_ARGS(modifiers));
+                                              MODIFIERS_ARGS(modifiers));
     }
 }
 
 void __catalyst__qis__Rot(double phi, double theta, double omega, QUBIT *qubit,
                           const Modifiers *modifiers)
 {
-    if (RTD_PTR != nullptr && RTD_PTR->getRuntimeRouter() != nullptr)
-    {
-        QubitIdType mapped_wire = RTD_PTR->getRuntimeRouter()->getMappedWire(reinterpret_cast<QubitIdType>(qubit));
+    if (RTD_PTR != nullptr && RTD_PTR->getRuntimeRouter() != nullptr) {
+        QubitIdType mapped_wire =
+            RTD_PTR->getRuntimeRouter()->getMappedWire(reinterpret_cast<QubitIdType>(qubit));
         getQuantumDevicePtr()->NamedOperation("Rot", {phi, theta, omega}, {mapped_wire},
-                                          MODIFIERS_ARGS(modifiers));
+                                              MODIFIERS_ARGS(modifiers));
     }
     else {
-        getQuantumDevicePtr()->NamedOperation("Rot", {phi, theta, omega}, {reinterpret_cast<QubitIdType>(qubit)},
-                                            MODIFIERS_ARGS(modifiers));
+        getQuantumDevicePtr()->NamedOperation("Rot", {phi, theta, omega},
+                                              {reinterpret_cast<QubitIdType>(qubit)},
+                                              MODIFIERS_ARGS(modifiers));
     }
 }
 
@@ -1014,10 +1011,31 @@ void __catalyst__qis__SingleExcitation(double phi, QUBIT *wire0, QUBIT *wire1,
 {
     RT_FAIL_IF(wire0 == wire1,
                "Invalid input for SingleExcitation gate. All two qubit operands must be distinct.");
-    getQuantumDevicePtr()->NamedOperation(
-        "SingleExcitation", {phi},
-        {reinterpret_cast<QubitIdType>(wire0), reinterpret_cast<QubitIdType>(wire1)},
-        MODIFIERS_ARGS(modifiers));
+    if (RTD_PTR != nullptr && RTD_PTR->getRuntimeRouter() != nullptr) {
+        std::tuple<QubitIdType, QubitIdType, std::vector<QubitIdType>> resultTuple =
+            RTD_PTR->getRuntimeRouter()->getRoutedQubits(wire0, wire1);
+        QubitIdType routedQubitFirst = std::get<0>(resultTuple);
+        QubitIdType routedQubitSecond = std::get<1>(resultTuple);
+        std::vector<QubitIdType> swapPath = std::get<2>(resultTuple);
+
+        if (swapPath.size() > 0) {
+            for (auto i = 1; i < swapPath.size() - 1; i++) {
+                QubitIdType u = swapPath[i - 1];
+                QubitIdType v = swapPath[i];
+                RTD_PTR->getQuantumDevicePtr()->NamedOperation("SWAP", {}, {u, v},
+                                                               MODIFIERS_ARGS(modifiers));
+            }
+        }
+        getQuantumDevicePtr()->NamedOperation("SingleExcitation", {phi},
+                                              {routedQubitFirst, routedQubitSecond},
+                                              MODIFIERS_ARGS(modifiers));
+    }
+    else {
+        getQuantumDevicePtr()->NamedOperation(
+            "SingleExcitation", {phi},
+            {reinterpret_cast<QubitIdType>(wire0), reinterpret_cast<QubitIdType>(wire1)},
+            MODIFIERS_ARGS(modifiers));
+    }
 }
 
 void __catalyst__qis__DoubleExcitation(double phi, QUBIT *wire0, QUBIT *wire1, QUBIT *wire2,
@@ -1027,6 +1045,9 @@ void __catalyst__qis__DoubleExcitation(double phi, QUBIT *wire0, QUBIT *wire1, Q
         (wire0 == wire1 || wire0 == wire2 || wire0 == wire3 || wire1 == wire2 || wire1 == wire3 ||
          wire2 == wire3),
         "Invalid input for DoubleExcitation gate. All four qubit operands must be distinct.");
+    RT_FAIL_IF(RTD_PTR != nullptr && RTD_PTR->getRuntimeRouter() != nullptr,
+               "Only single and two-qubit gates are supported when compiling to a given hardware "
+               "coupling map.");
     getQuantumDevicePtr()->NamedOperation(
         "DoubleExcitation", {phi},
         {reinterpret_cast<QubitIdType>(wire0), reinterpret_cast<QubitIdType>(wire1),
@@ -1238,8 +1259,9 @@ void __catalyst__qis__CSWAP(QUBIT *control, QUBIT *aswap, QUBIT *bswap, const Mo
 {
     RT_FAIL_IF((control == aswap || aswap == bswap || control == bswap),
                "Invalid input for CSWAP gate. Control and target qubit operands must be distinct.");
-    RT_FAIL_IF((control == aswap || aswap == bswap || control == bswap),
-               "Invalid input for CSWAP gate. Control and target qubit operands must be distinct.");
+    RT_FAIL_IF(RTD_PTR != nullptr && RTD_PTR->getRuntimeRouter() != nullptr,
+               "Only single and two-qubit gates are supported when compiling to a given hardware "
+               "coupling map.");
     getQuantumDevicePtr()->NamedOperation("CSWAP", {},
                                           {reinterpret_cast<QubitIdType>(control),
                                            reinterpret_cast<QubitIdType>(aswap),
@@ -1251,8 +1273,9 @@ void __catalyst__qis__Toffoli(QUBIT *wire0, QUBIT *wire1, QUBIT *wire2, const Mo
 {
     RT_FAIL_IF((wire0 == wire1 || wire1 == wire2 || wire0 == wire2),
                "Invalid input for Toffoli gate. All three qubit operands must be distinct.");
-    RT_FAIL_IF((wire0 == wire1 || wire1 == wire2 || wire0 == wire2),
-               "Invalid input for Toffoli gate. All three qubit operands must be distinct.");
+    RT_FAIL_IF(RTD_PTR != nullptr && RTD_PTR->getRuntimeRouter() != nullptr,
+               "Only single and two-qubit gates are supported when compiling to a given hardware "
+               "coupling map.");
     getQuantumDevicePtr()->NamedOperation("Toffoli", {},
                                           {reinterpret_cast<QubitIdType>(wire0),
                                            reinterpret_cast<QubitIdType>(wire1),
@@ -1263,6 +1286,9 @@ void __catalyst__qis__Toffoli(QUBIT *wire0, QUBIT *wire1, QUBIT *wire2, const Mo
 void __catalyst__qis__MultiRZ(double theta, const Modifiers *modifiers, int64_t numQubits, ...)
 {
     RT_ASSERT(numQubits >= 0);
+    RT_FAIL_IF(RTD_PTR != nullptr && RTD_PTR->getRuntimeRouter() != nullptr,
+               "Only single and two-qubit gates are supported when compiling to a given hardware "
+               "coupling map.");
 
     va_list args;
     va_start(args, numQubits);
@@ -1378,6 +1404,10 @@ void __catalyst__qis__QubitUnitary(MemRefT_CplxT_double_2d *matrix, const Modifi
         RT_FAIL("Invalid number of wires");
     }
 
+    RT_FAIL_IF(RTD_PTR != nullptr && RTD_PTR->getRuntimeRouter() != nullptr,
+               "Only single and two-qubit gates are supported when compiling to a given hardware "
+               "coupling map.");
+
     va_list args;
     std::vector<std::complex<double>> coeffs;
     std::vector<QubitIdType> wires;
@@ -1400,6 +1430,10 @@ ObsIdType __catalyst__qis__HermitianObs(MemRefT_CplxT_double_2d *matrix, int64_t
     if (matrix == nullptr) {
         RT_FAIL("The Hermitian matrix must be initialized");
     }
+
+    RT_FAIL_IF(RTD_PTR != nullptr && RTD_PTR->getRuntimeRouter() != nullptr,
+               "Only single and two-qubit gates are supported when compiling to a given hardware "
+               "coupling map.");
 
     const size_t num_rows = matrix->sizes[0];
     const size_t num_col = matrix->sizes[1];
@@ -1460,6 +1494,10 @@ ObsIdType __catalyst__qis__HamiltonianObs(MemRefT_double_1d *coeffs, int64_t num
                 "The coefficients list must be initialized.");
     }
 
+    RT_FAIL_IF(RTD_PTR != nullptr && RTD_PTR->getRuntimeRouter() != nullptr,
+               "Only single and two-qubit gates are supported when compiling to a given hardware "
+               "coupling map.");
+
     const size_t coeffs_size = coeffs->sizes[0];
 
     if (static_cast<size_t>(numObs) != coeffs_size) {
@@ -1514,9 +1552,11 @@ void __catalyst__qis__State(MemRefT_CplxT_double_1d *result, int64_t numQubits, 
 
     if (wires.empty()) {
         if (RTD_PTR != nullptr && RTD_PTR->getRuntimeRouter() != nullptr) {
-            std::vector<std::tuple<QubitIdType, QubitIdType>> finalSwaps = RTD_PTR->getRuntimeRouter()->getFinalPermuteSwaps();
+            std::vector<std::tuple<QubitIdType, QubitIdType>> finalSwaps =
+                RTD_PTR->getRuntimeRouter()->getFinalPermuteSwaps();
             for (auto i = 0; i < finalSwaps.size(); i++) {
-                RTD_PTR->getQuantumDevicePtr()->NamedOperation("SWAP", {}, {std::get<0>(finalSwaps[i]), std::get<1>(finalSwaps[i])});
+                RTD_PTR->getQuantumDevicePtr()->NamedOperation(
+                    "SWAP", {}, {std::get<0>(finalSwaps[i]), std::get<1>(finalSwaps[i])});
             }
         }
         getQuantumDevicePtr()->State(view);

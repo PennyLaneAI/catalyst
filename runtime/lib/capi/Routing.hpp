@@ -154,31 +154,30 @@ class RoutingPass final {
         return std::make_tuple(firstQubitMapping, secondQubitMapping, swapPath);
     }
 
-    void findFinalSwaps(QubitIdType currWireIndex, std::vector<std::tuple<QubitIdType, QubitIdType>> *finalSwaps)
+    void findFinalSwaps(QubitIdType currWireIndex,
+                        std::vector<std::tuple<QubitIdType, QubitIdType>> *finalSwaps)
     {
-        if(currWireIndex == this->wireMap[currWireIndex])
+        if (currWireIndex == this->wireMap[currWireIndex])
             return;
         QubitIdType nextWireIndex = this->wireMap[currWireIndex];
-        QubitIdType temp  = this->wireMap[currWireIndex];
+        QubitIdType temp = this->wireMap[currWireIndex];
         this->wireMap[currWireIndex] = this->wireMap[nextWireIndex];
         this->wireMap[nextWireIndex] = temp;
-        (*finalSwaps).push_back({this->wireMap[currWireIndex], this->wireMap[nextWireIndex] });
-        findFinalSwaps(nextWireIndex,finalSwaps);
+        (*finalSwaps).push_back({this->wireMap[currWireIndex], this->wireMap[nextWireIndex]});
+        findFinalSwaps(nextWireIndex, finalSwaps);
         return;
     }
     std::vector<std::tuple<QubitIdType, QubitIdType>> getFinalPermuteSwaps()
     {
         std::vector<std::tuple<QubitIdType, QubitIdType>> finalSwaps;
-        for (auto it = this->wireMap.begin(); it != this->wireMap.end(); ++it)
-        {
-            while(true)
-            {
+        for (auto it = this->wireMap.begin(); it != this->wireMap.end(); ++it) {
+            while (true) {
                 findFinalSwaps(this->wireMap[it->first], &finalSwaps);
-                if (this->wireMap[it->first] == this->wireMap[it->second] )
+                if (this->wireMap[it->first] == this->wireMap[it->second])
                     break;
             }
         }
-        return finalSwaps; 
+        return finalSwaps;
     }
 
     ~RoutingPass() = default;
