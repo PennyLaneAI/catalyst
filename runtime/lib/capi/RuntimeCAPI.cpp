@@ -1528,13 +1528,13 @@ RESULT *__catalyst__qis__Measure(QUBIT *wire, int32_t postselect)
         postselectOpt = std::nullopt;
     }
     QubitIdType mappedWire = reinterpret_cast<QubitIdType>(wire);
-    if (RTD_PTR != nullptr && RTD_PTR->getRuntimeRouter() != nullptr) 
+    if (RTD_PTR != nullptr && RTD_PTR->getRuntimeRouter() != nullptr)
         mappedWire = RTD_PTR->getRuntimeRouter()->getMappedWire(mappedWire);
     return getQuantumDevicePtr()->Measure(mappedWire, postselectOpt);
 }
 
-double __catalyst__qis__Expval(ObsIdType obsKey) 
-{ 
+double __catalyst__qis__Expval(ObsIdType obsKey)
+{
     if (RTD_PTR != nullptr && RTD_PTR->getRuntimeRouter() != nullptr) {
         std::vector<std::tuple<QubitIdType, QubitIdType>> finalSwaps =
             RTD_PTR->getRuntimeRouter()->getFinalPermuteSwaps();
@@ -1543,11 +1543,11 @@ double __catalyst__qis__Expval(ObsIdType obsKey)
                 "SWAP", {}, {std::get<0>(finalSwaps[i]), std::get<1>(finalSwaps[i])});
         }
     }
-    return getQuantumDevicePtr()->Expval(obsKey); 
+    return getQuantumDevicePtr()->Expval(obsKey);
 }
 
-double __catalyst__qis__Variance(ObsIdType obsKey) 
-{ 
+double __catalyst__qis__Variance(ObsIdType obsKey)
+{
     if (RTD_PTR != nullptr && RTD_PTR->getRuntimeRouter() != nullptr) {
         std::vector<std::tuple<QubitIdType, QubitIdType>> finalSwaps =
             RTD_PTR->getRuntimeRouter()->getFinalPermuteSwaps();
@@ -1556,7 +1556,7 @@ double __catalyst__qis__Variance(ObsIdType obsKey)
                 "SWAP", {}, {std::get<0>(finalSwaps[i]), std::get<1>(finalSwaps[i])});
         }
     }
-    return getQuantumDevicePtr()->Var(obsKey); 
+    return getQuantumDevicePtr()->Var(obsKey);
 }
 
 void __catalyst__qis__State(MemRefT_CplxT_double_1d *result, int64_t numQubits, ...)
