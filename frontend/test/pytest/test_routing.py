@@ -16,9 +16,8 @@
 
 from functools import partial
 
-import pytest
-
 import pennylane as qml
+import pytest
 from pennylane import numpy as np
 from pennylane.transforms.transpile import transpile
 
@@ -39,75 +38,78 @@ def qfunc_ops(wires, x, y, z):
 # pylint: disable=too-many-public-methods
 class TestRouting:
     """Unit tests for testing routing function at runtime"""
-    
-    all_to__all_device = qml.device("lightning.qubit")
-    linear_device = qml.device("lightning.qubit", wires = [(0,1),(1,2)])
 
-    input_devices = (
-        (all_to__all_device, linear_device),
-    )
+    all_to__all_device = qml.device("lightning.qubit")
+    linear_device = qml.device("lightning.qubit", wires=[(0, 1), (1, 2)])
+
+    input_devices = ((all_to__all_device, linear_device),)
+
     @pytest.mark.parametrize("all_to__all_device, linear_device", input_devices)
-    def test_state_invariance_under_routing(self,all_to__all_device, linear_device):
+    def test_state_invariance_under_routing(self, all_to__all_device, linear_device):
         def circuit(wires, x, y, z):
             qfunc_ops(wires, x, y, z)
             return qml.state()
-        
+
         all_to_all_qnode = qml.qjit(qml.QNode(circuit, all_to__all_device))
         linear_qnode = qml.qjit(qml.QNode(circuit, linear_device))
 
-        assert np.allclose(all_to_all_qnode([0,1,2], 0.1, 0.2, 0.3), linear_qnode([0,1,2], 0.1, 0.2, 0.3))
+        assert np.allclose(
+            all_to_all_qnode([0, 1, 2], 0.1, 0.2, 0.3), linear_qnode([0, 1, 2], 0.1, 0.2, 0.3)
+        )
 
     @pytest.mark.parametrize("all_to__all_device, linear_device", input_devices)
-    def test_probs_invariance_under_routing(self,all_to__all_device, linear_device):
+    def test_probs_invariance_under_routing(self, all_to__all_device, linear_device):
         def circuit(wires, x, y, z):
             qfunc_ops(wires, x, y, z)
             return qml.probs()
-        
+
         all_to_all_qnode = qml.qjit(qml.QNode(circuit, all_to__all_device))
         linear_qnode = qml.qjit(qml.QNode(circuit, linear_device))
 
-        assert np.allclose(all_to_all_qnode([0,1,2], 0.1, 0.2, 0.3), linear_qnode([0,1,2], 0.1, 0.2, 0.3))
+        assert np.allclose(
+            all_to_all_qnode([0, 1, 2], 0.1, 0.2, 0.3), linear_qnode([0, 1, 2], 0.1, 0.2, 0.3)
+        )
 
     @pytest.mark.parametrize("all_to__all_device, linear_device", input_devices)
-    def test_sample_invariance_under_routing(self,all_to__all_device, linear_device):
+    def test_sample_invariance_under_routing(self, all_to__all_device, linear_device):
         def circuit(wires, x, y, z):
             qfunc_ops(wires, x, y, z)
             return qml.sample()
-        
+
         all_to_all_qnode = qml.qjit(
-                partial(qml.set_shots, shots=10)(qml.QNode(circuit, all_to__all_device)),
-                seed=37
-            )
+            partial(qml.set_shots, shots=10)(qml.QNode(circuit, all_to__all_device)), seed=37
+        )
         linear_qnode = qml.qjit(
-                partial(qml.set_shots, shots=10)(qml.QNode(circuit, linear_device)),
-                seed=37
-            )
-        assert np.allclose(all_to_all_qnode([0,1,2], 0.1, 0.2, 0.3), linear_qnode([0,1,2], 0.1, 0.2, 0.3))
+            partial(qml.set_shots, shots=10)(qml.QNode(circuit, linear_device)), seed=37
+        )
+        assert np.allclose(
+            all_to_all_qnode([0, 1, 2], 0.1, 0.2, 0.3), linear_qnode([0, 1, 2], 0.1, 0.2, 0.3)
+        )
 
     @pytest.mark.parametrize("all_to__all_device, linear_device", input_devices)
-    def test_counts_invariance_under_routing(self,all_to__all_device, linear_device):
+    def test_counts_invariance_under_routing(self, all_to__all_device, linear_device):
         def circuit(wires, x, y, z):
             qfunc_ops(wires, x, y, z)
             return qml.counts()
-        
+
         all_to_all_qnode = qml.qjit(
-                partial(qml.set_shots, shots=10)(qml.QNode(circuit, all_to__all_device)),
-                seed=37
-            )
+            partial(qml.set_shots, shots=10)(qml.QNode(circuit, all_to__all_device)), seed=37
+        )
         linear_qnode = qml.qjit(
-                partial(qml.set_shots, shots=10)(qml.QNode(circuit, linear_device)),
-                seed=37
-            )
-        assert np.allclose(all_to_all_qnode([0,1,2], 0.1, 0.2, 0.3), linear_qnode([0,1,2], 0.1, 0.2, 0.3))
-    
+            partial(qml.set_shots, shots=10)(qml.QNode(circuit, linear_device)), seed=37
+        )
+        assert np.allclose(
+            all_to_all_qnode([0, 1, 2], 0.1, 0.2, 0.3), linear_qnode([0, 1, 2], 0.1, 0.2, 0.3)
+        )
+
     @pytest.mark.parametrize("all_to__all_device, linear_device", input_devices)
-    def test_expvals_invariance_under_routing(self,all_to__all_device, linear_device):
+    def test_expvals_invariance_under_routing(self, all_to__all_device, linear_device):
         def circuit(wires, x, y, z):
             qfunc_ops(wires, x, y, z)
             return qml.expval(qml.X(0) @ qml.Y(1)), qml.var(qml.Z(2))
-        
+
         all_to_all_qnode = qml.qjit(qml.QNode(circuit, all_to__all_device))
         linear_qnode = qml.qjit(qml.QNode(circuit, linear_device))
-        assert np.allclose(all_to_all_qnode([0,1,2], 0.1, 0.2, 0.3), linear_qnode([0,1,2], 0.1, 0.2, 0.3))
-
-    
+        assert np.allclose(
+            all_to_all_qnode([0, 1, 2], 0.1, 0.2, 0.3), linear_qnode([0, 1, 2], 0.1, 0.2, 0.3)
+        )
