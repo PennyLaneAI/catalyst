@@ -1527,12 +1527,37 @@ RESULT *__catalyst__qis__Measure(QUBIT *wire, int32_t postselect)
     if (postselect != 0 && postselect != 1) {
         postselectOpt = std::nullopt;
     }
-    return getQuantumDevicePtr()->Measure(reinterpret_cast<QubitIdType>(wire), postselectOpt);
+    QubitIdType mappedWire = reinterpret_cast<QubitIdType>(wire);
+    if (RTD_PTR != nullptr && RTD_PTR->getRuntimeRouter() != nullptr) 
+        mappedWire = RTD_PTR->getRuntimeRouter()->getMappedWire(mappedWire);
+    return getQuantumDevicePtr()->Measure(mappedWire, postselectOpt);
 }
 
-double __catalyst__qis__Expval(ObsIdType obsKey) { return getQuantumDevicePtr()->Expval(obsKey); }
+double __catalyst__qis__Expval(ObsIdType obsKey) 
+{ 
+    if (RTD_PTR != nullptr && RTD_PTR->getRuntimeRouter() != nullptr) {
+        std::vector<std::tuple<QubitIdType, QubitIdType>> finalSwaps =
+            RTD_PTR->getRuntimeRouter()->getFinalPermuteSwaps();
+        for (auto i = 0; i < finalSwaps.size(); i++) {
+            RTD_PTR->getQuantumDevicePtr()->NamedOperation(
+                "SWAP", {}, {std::get<0>(finalSwaps[i]), std::get<1>(finalSwaps[i])});
+        }
+    }
+    return getQuantumDevicePtr()->Expval(obsKey); 
+}
 
-double __catalyst__qis__Variance(ObsIdType obsKey) { return getQuantumDevicePtr()->Var(obsKey); }
+double __catalyst__qis__Variance(ObsIdType obsKey) 
+{ 
+    if (RTD_PTR != nullptr && RTD_PTR->getRuntimeRouter() != nullptr) {
+        std::vector<std::tuple<QubitIdType, QubitIdType>> finalSwaps =
+            RTD_PTR->getRuntimeRouter()->getFinalPermuteSwaps();
+        for (auto i = 0; i < finalSwaps.size(); i++) {
+            RTD_PTR->getQuantumDevicePtr()->NamedOperation(
+                "SWAP", {}, {std::get<0>(finalSwaps[i]), std::get<1>(finalSwaps[i])});
+        }
+    }
+    return getQuantumDevicePtr()->Var(obsKey); 
+}
 
 void __catalyst__qis__State(MemRefT_CplxT_double_1d *result, int64_t numQubits, ...)
 {
@@ -1588,6 +1613,14 @@ void __catalyst__qis__Probs(MemRefT_double_1d *result, int64_t numQubits, ...)
                              result_p->strides);
 
     if (wires.empty()) {
+        if (RTD_PTR != nullptr && RTD_PTR->getRuntimeRouter() != nullptr) {
+            std::vector<std::tuple<QubitIdType, QubitIdType>> finalSwaps =
+                RTD_PTR->getRuntimeRouter()->getFinalPermuteSwaps();
+            for (auto i = 0; i < finalSwaps.size(); i++) {
+                RTD_PTR->getQuantumDevicePtr()->NamedOperation(
+                    "SWAP", {}, {std::get<0>(finalSwaps[i]), std::get<1>(finalSwaps[i])});
+            }
+        }
         getQuantumDevicePtr()->Probs(view);
     }
     else {
@@ -1619,6 +1652,14 @@ void __catalyst__qis__Sample(MemRefT_double_2d *result, int64_t numQubits, ...)
                              result_p->strides);
 
     if (wires.empty()) {
+        if (RTD_PTR != nullptr && RTD_PTR->getRuntimeRouter() != nullptr) {
+            std::vector<std::tuple<QubitIdType, QubitIdType>> finalSwaps =
+                RTD_PTR->getRuntimeRouter()->getFinalPermuteSwaps();
+            for (auto i = 0; i < finalSwaps.size(); i++) {
+                RTD_PTR->getQuantumDevicePtr()->NamedOperation(
+                    "SWAP", {}, {std::get<0>(finalSwaps[i]), std::get<1>(finalSwaps[i])});
+            }
+        }
         getQuantumDevicePtr()->Sample(view);
     }
     else {
@@ -1652,6 +1693,14 @@ void __catalyst__qis__Counts(PairT_MemRefT_double_int64_1d *result, int64_t numQ
                                      result_counts_p->sizes, result_counts_p->strides);
 
     if (wires.empty()) {
+        if (RTD_PTR != nullptr && RTD_PTR->getRuntimeRouter() != nullptr) {
+            std::vector<std::tuple<QubitIdType, QubitIdType>> finalSwaps =
+                RTD_PTR->getRuntimeRouter()->getFinalPermuteSwaps();
+            for (auto i = 0; i < finalSwaps.size(); i++) {
+                RTD_PTR->getQuantumDevicePtr()->NamedOperation(
+                    "SWAP", {}, {std::get<0>(finalSwaps[i]), std::get<1>(finalSwaps[i])});
+            }
+        }
         getQuantumDevicePtr()->Counts(eigvals_view, counts_view);
     }
     else {
