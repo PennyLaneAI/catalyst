@@ -243,12 +243,6 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
                         const std::vector<QubitIdType> &controlled_wires = {},
                         const std::vector<bool> &controlled_values = {})
     {
-        // Print to see what naive router does on Null qubits
-        std::cout << "Name: " << name << "\n";
-        std::cout << "Wires : ";
-        for (auto i : wires)
-            std::cout << i << ",";
-        std::cout << "\n";
         if (this->track_resources_) {
             this->resource_tracker_.NamedOperation(name, inverse, wires, controlled_wires);
         }
