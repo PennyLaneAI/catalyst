@@ -404,6 +404,8 @@ def _process_terminal_measurements(mcm_method, cpy_tape, out, snapshots, shot_ve
     """Process measurements when there are no mid-circuit measurements."""
     assert mcm_method == "one-shot"
 
+    # flatten the outs structure
+    out, _ = tree_flatten(out)
     new_out = []
     idx = 0
 
@@ -431,6 +433,10 @@ def _process_terminal_measurements(mcm_method, cpy_tape, out, snapshots, shot_ve
 
         result = jnp.squeeze(out[idx])
         max_ndim = min(len(out[idx].shape), 2)
+        if out[idx].shape[0] == 1:
+            # Adding the first axis back when the first axis in the original
+            # array is 1, since it corresponds to the shot's dimension.
+            result = jnp.expand_dims(result, axis=0)
         if result.ndim == 1 and max_ndim == 2:
             result = jnp.expand_dims(result, axis=1)
 

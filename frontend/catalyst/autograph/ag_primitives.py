@@ -18,7 +18,9 @@ functions. The purpose is to convert imperative style code to functional or grap
 """
 import copy
 import functools
+import inspect
 import operator
+import textwrap
 import warnings
 from typing import Any, Callable, Iterator, SupportsIndex, Tuple, Union
 
@@ -302,9 +304,6 @@ def for_stmt(
             fallback = True
 
     if catalyst.autograph_strict_conversion and fallback:
-        # pylint: disable=import-outside-toplevel
-        import inspect
-
         for_loop_info = get_source_code_info(inspect.stack()[1])
 
         raise AutoGraphError(
@@ -337,10 +336,6 @@ def for_stmt(
 
             fallback = True
             reset_program_to_length(reference_tracers, *num_instructions)
-
-            # pylint: disable=import-outside-toplevel
-            import inspect
-            import textwrap
 
             for_loop_info = get_source_code_info(inspect.stack()[1])
 
@@ -468,8 +463,6 @@ def get_source_code_info(tb_frame):
     Uses introspection on the call stack to extract the source map record from within AutoGraph
     statements. However, it is not guaranteed to find the source map and may return nothing.
     """
-    import inspect  # pylint: disable=import-outside-toplevel
-
     ag_source_map = None
 
     # Traverse frames in reverse to find caller with `ag_source_map` property:
@@ -532,10 +525,11 @@ def converted_call(fn, args, kwargs, caller_fn_scope=None, options=None):
         (ag_config, "CONVERSION_RULES", module_allowlist),
         (ag_py_builtins, "BUILTIN_FUNCTIONS_MAP", py_builtins_map),
     ):
-        # HOTFIX: pass through calls of known Catalyst wrapper functions
-        if fn in (
+        # List of known wrapper functions that should be handled specially
+        _known_wrapper_functions = (
             catalyst.adjoint,
             qml.adjoint,
+            qml.prod,
             catalyst.ctrl,
             qml.ctrl,
             catalyst.grad,
@@ -545,7 +539,10 @@ def converted_call(fn, args, kwargs, caller_fn_scope=None, options=None):
             catalyst.jvp,
             catalyst.vmap,
             catalyst.mitigate_with_zne,
-        ):
+        )
+
+        # HOTFIX: pass through calls of known Catalyst wrapper functions
+        if fn in _known_wrapper_functions:
             if not args:
                 raise ValueError(f"{fn.__name__} requires at least one argument")
 
@@ -597,6 +594,34 @@ def converted_call(fn, args, kwargs, caller_fn_scope=None, options=None):
             new_qnode = copy.copy(fn)
             new_qnode.func = qnode_call_wrapper
             return new_qnode(**new_kwargs)
+
+        # HOTFIX: Handle calls to functions that were decorated with "qml.prod"
+        # These decorators return wrapper functions that call the original function without
+        # autograph conversion. We detect these wrappers and unwrap them to convert the
+        # original function with autograph.
+        # TODO: remove once PL has dedicated way to propagate autograph through decorators
+        if hasattr(fn, "__wrapped__") and qml.prod.__module__ == fn.__module__:
+            original_fn = fn.__wrapped__
+
+            # Extract decorator arguments from the closure
+            # There is an assumption that the closure variables are
+            # the same as the decorator arguments
+            closure_vars = inspect.getclosurevars(fn)
+            decorator_kwargs = {
+                "id": closure_vars.nonlocals["id"],
+                "lazy": closure_vars.nonlocals["lazy"],
+            }
+
+            # Convert the original function with autograph
+            def converted_inner(*inner_args, **inner_kwargs):
+                return converted_call(
+                    original_fn, inner_args, inner_kwargs, caller_fn_scope, options
+                )
+
+            # Apply the decorator to the converted function and call it with the original kwargs
+            return qml.prod(converted_inner, **decorator_kwargs)(
+                *args, **(kwargs if kwargs is not None else {})
+            )
 
         return ag_converted_call(fn, args, kwargs, caller_fn_scope, options)
 

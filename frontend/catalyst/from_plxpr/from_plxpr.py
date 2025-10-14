@@ -17,6 +17,8 @@ This submodule defines a utility for converting plxpr into Catalyst jaxpr.
 # pylint: disable=protected-access
 # pylint: disable=too-many-lines
 
+import textwrap
+import warnings
 from copy import copy
 from functools import partial
 from typing import Callable
@@ -48,7 +50,12 @@ from pennylane.transforms import unitary_to_rot as pl_unitary_to_rot
 
 from catalyst.device import extract_backend_info
 from catalyst.from_plxpr.decompose import COMPILER_OPS_FOR_DECOMPOSITION, DecompRuleInterpreter
-from catalyst.from_plxpr.qubit_handler import QubitHandler, QubitIndexRecorder, get_in_qubit_values
+from catalyst.from_plxpr.qubit_handler import (
+    QubitHandler,
+    QubitIndexRecorder,
+    get_in_qubit_values,
+    is_dynamically_allocated_wire,
+)
 from catalyst.jax_extras import jaxpr_pad_consts, make_jaxpr2, transient_jax_config
 from catalyst.jax_primitives import (
     AbstractQbit,
@@ -82,6 +89,7 @@ from catalyst.jax_primitives import (
     var_p,
 )
 from catalyst.passes.pass_api import Pass
+from catalyst.utils.exceptions import CompileError
 
 measurement_map = {
     qml.measurements.SampleMP: sample_p,
@@ -229,13 +237,25 @@ def handle_qnode(
         )
     )
 
+    graph_succeeded = False
     if self.requires_decompose_lowering:
-        closed_jaxpr = _collect_and_compile_graph_solutions(
+        closed_jaxpr, graph_succeeded = _collect_and_compile_graph_solutions(
             inner_jaxpr=closed_jaxpr.jaxpr,
             consts=closed_jaxpr.consts,
             tkwargs=self.decompose_tkwargs,
             ncargs=non_const_args,
         )
+
+        # Fallback to the legacy decomposition if the graph-based decomposition failed
+        if not graph_succeeded:
+            # Remove the decompose-lowering pass from the pipeline
+            self._pass_pipeline = [p for p in self._pass_pipeline if p.name != "decompose-lowering"]
+            closed_jaxpr = _apply_compiler_decompose_to_plxpr(
+                inner_jaxpr=closed_jaxpr.jaxpr,
+                consts=closed_jaxpr.consts,
+                ncargs=non_const_args,
+                tkwargs=self.decompose_tkwargs,
+            )
 
     def calling_convention(*args):
         device_init_p.bind(
@@ -254,7 +274,7 @@ def handle_qnode(
         device_release_p.bind()
         return retvals
 
-    if self.requires_decompose_lowering:
+    if self.requires_decompose_lowering and graph_succeeded:
         # Add gate_set attribute to the quantum kernel primitive
         # decompose_gatesets is treated as a queue of gatesets to be used
         # but we only support a single gateset for now in from_plxpr
@@ -421,6 +441,7 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         """Any control wires used for a subroutine."""
         self.control_values = control_values
         """Any control values for executing a subroutine."""
+        self.has_dynamic_allocation = False
 
         super().__init__()
 
@@ -454,6 +475,9 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         in_ctrl_qregs, in_ctrl_qubits = get_in_qubit_values(
             control_wires, self.qubit_index_recorder, self.init_qreg
         )
+
+        if any(not qreg.is_qubit_mode() and qreg.expired for qreg in in_qregs + in_ctrl_qregs):
+            raise CompileError(f"Deallocated qubits cannot be used, but used in {op.name}.")
 
         out_qubits = qinst_p.bind(
             *[*in_qubits, *op.data, *in_ctrl_qubits, *control_values],
@@ -501,6 +525,26 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
 
     def interpret_measurement(self, measurement):
         """Rebind a measurement as a catalyst instruction."""
+        if self.has_dynamic_allocation:
+            if len(measurement.wires) == 0:
+                raise CompileError(
+                    textwrap.dedent(
+                        """
+                        Terminal measurements must take in an explicit list of wires when
+                        dynamically allocated wires are present in the program.
+                        """
+                    )
+                )
+            if any(is_dynamically_allocated_wire(w) for w in measurement.wires):
+                raise CompileError(
+                    textwrap.dedent(
+                        """
+                        Terminal measurements cannot take in dynamically allocated wires
+                        since they must be temporary.
+                        """
+                    )
+                )
+
         if type(measurement) not in measurement_map:
             raise NotImplementedError(
                 f"measurement {measurement} not yet supported for conversion."
@@ -567,6 +611,8 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
 def handle_qml_alloc(self, *, num_wires, state=None, restored=False):
     """Handle the conversion from plxpr to Catalyst jaxpr for the qml.allocate primitive"""
 
+    self.has_dynamic_allocation = True
+
     new_qreg = QubitHandler(
         qalloc_p.bind(num_wires), self.qubit_index_recorder, dynamically_alloced=True
     )
@@ -585,6 +631,7 @@ def handle_qml_dealloc(self, *wires):
     qreg = self.qubit_index_recorder[wires[0]]
     assert all(self.qubit_index_recorder[w] is qreg for w in wires)
     qreg.insert_all_dangling_qubits()
+    qreg.expired = True
     qdealloc_p.bind(qreg.get())
     return []
 
@@ -604,6 +651,17 @@ def handle_subroutine(self, *args, **kwargs):
     """
     Transform the subroutine from PLxPR into JAXPR with quantum primitives.
     """
+
+    if any(is_dynamically_allocated_wire(arg) for arg in args):
+        raise NotImplementedError(
+            textwrap.dedent(
+                """
+            Dynamically allocated wires in a parent scope cannot be used in a child
+            scope yet. Please consider dynamical allocation inside the child scope.
+            """
+            )
+        )
+
     backup = dict(self.init_qreg)
     self.init_qreg.insert_all_dangling_qubits()
 
@@ -939,15 +997,26 @@ def trace_from_pennylane(
     return jaxpr, out_type, out_treedef, sig
 
 
-def _apply_compiler_decompose_to_plxpr(inner_jaxpr, consts, tgateset, ncargs):
+def _apply_compiler_decompose_to_plxpr(inner_jaxpr, consts, ncargs, tgateset=None, tkwargs=None):
     """Apply the compiler-specific decomposition for a given JAXPR.
+
+    This function first disables the graph-based decomposition optimization
+    to ensure that only high-level gates and templates with a single decomposition
+    are decomposed. It then performs the pre-mlir decomposition using PennyLane's
+    `plxpr_transform` function.
+
+    `tgateset` is a list of target gateset for decomposition.
+    If provided, it will be combined with the default compiler ops for decomposition.
+    If not provided, `tkwargs` will be used as the keyword arguments for the
+    decomposition transform. This is to ensure compatibility with the existing
+    PennyLane decomposition transform as well as providing a fallback mechanism.
 
     Args:
         inner_jaxpr (Jaxpr): The input JAXPR to be decomposed.
         consts (list): The constants used in the JAXPR.
-        tgateset (list): A list of target gateset for decomposition.
         ncargs (list): Non-constant arguments for the JAXPR.
-        qargs (list): All arguments including constants and non-constants.
+        tgateset (list): A list of target gateset for decomposition. Defaults to None.
+        tkwargs (list): The keyword arguments of the decompose transform. Defaults to None.
 
     Returns:
         ClosedJaxpr: The decomposed JAXPR.
@@ -961,17 +1030,15 @@ def _apply_compiler_decompose_to_plxpr(inner_jaxpr, consts, tgateset, ncargs):
     # based on the graph solution.
     # Besides, the graph-based decomposition is not supported
     # yet in from_plxpr for most gates and templates.
-
     # TODO: Enable the graph-based decomposition
     qml.decomposition.disable_graph()
 
-    # First perform the pre-mlir decomposition to simplify the jaxpr
-    # by decomposing high-level gates and templates
-    gate_set = set(COMPILER_OPS_FOR_DECOMPOSITION.keys()).union(tgateset)
-
-    final_jaxpr = qml.transforms.decompose.plxpr_transform(
-        inner_jaxpr, consts, (), {"gate_set": gate_set}, *ncargs
+    kwargs = (
+        {"gate_set": set(COMPILER_OPS_FOR_DECOMPOSITION.keys()).union(tgateset)}
+        if tgateset
+        else tkwargs
     )
+    final_jaxpr = qml.transforms.decompose.plxpr_transform(inner_jaxpr, consts, (), kwargs, *ncargs)
 
     qml.decomposition.enable_graph()
 
@@ -996,15 +1063,31 @@ def _collect_and_compile_graph_solutions(inner_jaxpr, consts, tkwargs, ncargs):
 
     Returns:
         ClosedJaxpr: The decomposed JAXPR.
+        bool: A flag indicating whether the graph-based decomposition was successful.
     """
     gds_interpreter = DecompRuleInterpreter(**tkwargs)
 
     def gds_wrapper(*args):
         return gds_interpreter.eval(inner_jaxpr, consts, *args)
 
-    final_jaxpr = jax.make_jaxpr(gds_wrapper)(*ncargs)
+    graph_succeeded = True
 
-    return final_jaxpr
+    with warnings.catch_warnings(record=True) as captured_warnings:
+        warnings.simplefilter("always", UserWarning)
+        final_jaxpr = jax.make_jaxpr(gds_wrapper)(*ncargs)
+
+    for w in captured_warnings:
+        warnings.showwarning(w.message, w.category, w.filename, w.lineno)
+        # TODO: use a custom warning class for this in PennyLane to remove this
+        # string matching and make it more robust.
+        if "The graph-based decomposition system is unable" in str(w.message):  # pragma: no cover
+            graph_succeeded = False
+            warnings.warn(
+                "Falling back to the legacy decomposition system.",
+                UserWarning,
+            )
+
+    return final_jaxpr, graph_succeeded
 
 
 def _get_operator_name(op):
