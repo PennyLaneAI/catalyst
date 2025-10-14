@@ -142,7 +142,7 @@ class BackendInfo:
 
 # pylint: disable=too-many-branches
 @debug_logger
-def extract_backend_info(device: qml.devices.QubitDevice) -> BackendInfo:
+def extract_backend_info(device: qml.devices.QubitDevice, device_capabilities=None) -> BackendInfo:
     """Extract the backend info from a quantum device. The device is expected to carry a reference
     to a valid TOML config file."""
 
@@ -192,6 +192,7 @@ def extract_backend_info(device: qml.devices.QubitDevice) -> BackendInfo:
     for k, v in getattr(device, "device_kwargs", {}).items():
         if k not in device_kwargs:  # pragma: no branch
             device_kwargs[k] = v
+    device_kwargs["coupling_map"] = getattr(device_capabilities, "coupling_map")
 
     return BackendInfo(dname, device_name, device_lpath, device_kwargs)
 
@@ -308,9 +309,9 @@ class QJITDevice(qml.devices.Device):
 
     @staticmethod
     @debug_logger
-    def extract_backend_info(device) -> BackendInfo:
+    def extract_backend_info(device, device_capabilities=None) -> BackendInfo:
         """Wrapper around extract_backend_info in the runtime module."""
-        return extract_backend_info(device)
+        return extract_backend_info(device, device_capabilities)
 
     @debug_logger_init
     def __init__(self, original_device):
@@ -319,14 +320,40 @@ class QJITDevice(qml.devices.Device):
         for key, value in original_device.__dict__.items():
             self.__setattr__(key, value)
 
-        check_device_wires(original_device.wires)
-
-        super().__init__(wires=original_device.wires)
+        if (original_device.wires is not None) and any(
+            isinstance(wire_label, tuple) and (len(wire_label) >= 2)
+            for wire_label in original_device.wires.labels
+        ):
+            wires_from_cmap = set()
+            for wire_label in original_device.wires.labels:
+                wires_from_cmap.add(wire_label[0])
+                wires_from_cmap.add(wire_label[1])
+            wires_from_cmap = qml.wires.Wires(list(wires_from_cmap))
+            # check_device_wires(wires_from_cmap) not called
+            # since automatic qubit management
+            super().__init__(wires=wires_from_cmap, shots=original_device.shots)
+        else:
+            check_device_wires(original_device.wires)
+            super().__init__(wires=original_device.wires, shots=original_device.shots)
 
         # Capability loading
-        device_capabilities = get_device_capabilities(original_device, self.original_device.shots)
+        device_capabilities = get_device_capabilities(original_device)
 
-        backend = QJITDevice.extract_backend_info(original_device)
+        # TODO: This is a temporary measure to ensure consistency of behaviour. Remove this
+        #       when customizable multi-pathway decomposition is implemented. (Epic 74474)
+        if hasattr(original_device, "_to_matrix_ops"):
+            _to_matrix_ops = getattr(original_device, "_to_matrix_ops")
+            setattr(device_capabilities, "to_matrix_ops", _to_matrix_ops)
+            if _to_matrix_ops and not device_capabilities.supports_operation("QubitUnitary"):
+                raise CompileError(
+                    "The device that specifies to_matrix_ops must support QubitUnitary."
+                )
+        if original_device.wires is not None:
+            setattr(device_capabilities, "coupling_map", original_device.wires.labels)
+        else:
+            setattr(device_capabilities, "coupling_map", None)
+
+        backend = QJITDevice.extract_backend_info(original_device, device_capabilities)
 
         self.backend_name = backend.c_interface_name
         self.backend_lib = backend.lpath
