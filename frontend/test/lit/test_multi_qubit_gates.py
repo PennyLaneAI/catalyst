@@ -53,10 +53,10 @@ def circuit(x: float):
 print(circuit.mlir)
 
 
-# CHECK-LABEL: public @jit_circuit
+# CHECK-LABEL: public @jit_circuit_unitary
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=3))
-def circuit():
+def circuit_unitary():
     U1 = 1 / np.sqrt(2) * np.array([[1.0, 1.0], [1.0, -1.0]], dtype=complex)
     # CHECK: {{%.+}} = quantum.unitary({{%.+}} : tensor<2x2xcomplex<f64>>) {{%.+}} : !quantum.bit
     qml.QubitUnitary(U1, wires=0)
@@ -75,7 +75,7 @@ def circuit():
     return measure(wires=0), measure(wires=1)
 
 
-print(circuit.mlir)
+print(circuit_unitary.mlir)
 
 
 def get_custom_qjit_device(num_wires, discards, additions):
@@ -114,12 +114,12 @@ def get_custom_qjit_device(num_wires, discards, additions):
     return CustomDevice(wires=num_wires)
 
 
-# CHECK-LABEL: public @jit_circuit
+# CHECK-LABEL: public @jit_circuit_iswap_pswap
 @qjit(target="mlir")
 @qml.qnode(
     get_custom_qjit_device(2, (), {"ISWAP": OperatorProperties(), "PSWAP": OperatorProperties()})
 )
-def circuit(x: float):
+def circuit_iswap_pswap(x: float):
     # CHECK: {{%.+}} = quantum.custom "ISWAP"() {{.+}} : !quantum.bit, !quantum.bit
     qml.ISWAP(wires=[0, 1])
     # CHECK: {{%.+}} = quantum.custom "PSWAP"({{%.+}}) {{.+}} : !quantum.bit, !quantum.bit
@@ -127,7 +127,7 @@ def circuit(x: float):
     return qml.probs()
 
 
-print(circuit.mlir)
+print(circuit_iswap_pswap.mlir)
 
 
 # CHECK-LABEL: public @jit_isingZZ_circuit
