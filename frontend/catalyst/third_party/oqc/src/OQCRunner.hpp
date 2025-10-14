@@ -29,7 +29,7 @@ namespace Catalyst::Runtime::Device {
  */
 struct OQCRunner {
 
-    [[nodiscard]] auto Counts(const std::string &circuit, const std::string &device, size_t shots,
+    [[nodiscard]] auto Counts(const std::string &circuit, const std::string &qpu_id, size_t shots,
                               size_t num_qubits, const std::string &kwargs = "") const
         -> std::vector<size_t>
     {
@@ -42,7 +42,7 @@ struct OQCRunner {
         std::vector<size_t> results;
         char error_msg[256] = {0};
 
-        int result_code = countsImpl(circuit.c_str(), device.c_str(), shots, num_qubits,
+        int result_code = countsImpl(circuit.c_str(), qpu_id.c_str(), shots, num_qubits,
                                      kwargs.c_str(), &results, error_msg, sizeof(error_msg));
 
         RT_FAIL_IF(result_code, error_msg);

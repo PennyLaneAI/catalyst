@@ -18,7 +18,6 @@
 #include <string>
 #include <vector>
 
-#include <pybind11/embed.h>
 #include <pybind11/eval.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -33,17 +32,23 @@ try:
     password = os.environ.get("OQC_PASSWORD")
     url = os.environ.get("OQC_URL")
     if not all([email, password, url]):
-        raise ValueError("OQC credentials not found in environment variables. Please set the environment variables `OQC_EMAIL`, `OQC_PASSWORD` and `OQC_URL`.")
-    from qcaas_client.client import OQCClient, QPUTask, CompilerConfig
-    from qcaas_client.config import QuantumResultsFormat, Tket, TketOptimizations
+        raise ValueError(
+            """
+            OQC credentials not found in environment variables.
+            Please set the environment variables `OQC_EMAIL`, `OQC_PASSWORD` and `OQC_URL`.
+            """
+        )
+    import qcaas_client
+    from qcaas_client.client import OQCClient, QPUTask, CompilerConfig, QuantumResultsFormat
+    from qcaas_client.compiler_config import Tket, TketOptimizations
     optimisations = Tket()
     optimisations.tket_optimizations = TketOptimizations.DefaultMappingPass
     RES_FORMAT = QuantumResultsFormat().binary_count()
     client = OQCClient(url=url, email=email, password=password)
     client.authenticate()
     oqc_config = CompilerConfig(repeats=shots, results_format=RES_FORMAT, optimizations=optimisations)
-    oqc_task = QPUTask(circuit, oqc_config)
-    res = client.execute_tasks(oqc_task)
+    oqc_task = QPUTask(program=circuit, config=oqc_config, qpu_id=qpu_id)
+    res = client.execute_tasks(oqc_task, qpu_id=qpu_id)
     counts = res[0].result["cbits"]
 except Exception as e:
     print(f"circuit: {circuit}")
@@ -51,20 +56,18 @@ except Exception as e:
 )";
 
 extern "C" {
-[[gnu::visibility("default")]] int counts(const char *_circuit, const char *_device, size_t shots,
+[[gnu::visibility("default")]] int counts(const char *_circuit, const char *_qpu_id, size_t shots,
                                           size_t num_qubits, const char *_kwargs, void *_vector,
                                           char *error_msg, size_t error_msg_size)
 {
     namespace py = pybind11;
     using namespace py::literals;
 
-    py::scoped_interpreter guard{}; // start the interpreter and keep it alive
-
     py::gil_scoped_acquire lock;
 
     py::dict locals;
     locals["circuit"] = _circuit;
-    locals["device"] = _device;
+    locals["qpu_id"] = _qpu_id;
     locals["kwargs"] = _kwargs;
     locals["shots"] = shots;
     locals["num_qubits"] = num_qubits;
