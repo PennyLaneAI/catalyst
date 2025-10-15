@@ -612,6 +612,8 @@ def handle_qml_alloc(self, *, num_wires, state=None, restored=False):
     for i in range(num_wires):
         new_qreg.extract(i)
 
+    #breakpoint()
+
     return new_qreg.get_all_current_global_indices()
 
 
@@ -982,7 +984,9 @@ def trace_from_pennylane(
             fn.static_argnums = static_argnums
 
         plxpr, out_type, out_treedef = make_jaxpr2(fn, **make_jaxpr_kwargs)(*args, **kwargs)
+        breakpoint()
         jaxpr = from_plxpr(plxpr)(*dynamic_args, **kwargs)
+        breakpoint()
 
     return jaxpr, out_type, out_treedef, sig
 

@@ -428,15 +428,15 @@ def get_in_qubit_values(
             # values yet.
             # Supporting multiple registers requires refactoring the from_plxpr conversion's
             # implementation.
-            if is_dynamically_allocated_wire(w):
-                raise NotImplementedError(
-                    textwrap.dedent(
-                        """
-                    Dynamically allocated wires in a parent scope cannot be used in a child
-                    scope yet. Please consider dynamical allocation inside the child scope.
-                    """
-                    )
-                )
+            # if is_dynamically_allocated_wire(w):
+            #     raise NotImplementedError(
+            #         textwrap.dedent(
+            #             """
+            #         Dynamically allocated wires in a parent scope cannot be used in a child
+            #         scope yet. Please consider dynamical allocation inside the child scope.
+            #         """
+            #         )
+            #     )
             in_qubits.append(fallback_qreg[fallback_qreg.global_index_to_local_index(w)])
             in_qregs.append(fallback_qreg)
 

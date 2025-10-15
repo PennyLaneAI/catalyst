@@ -33,7 +33,7 @@ from catalyst.jax_primitives import cond_p, for_p, while_p
 
 def _calling_convention(interpreter, closed_jaxpr, *args_plus_qreg):
     # The last arg is the scope argument for the body jaxpr
-    *args, qreg = args_plus_qreg
+    *argss, qreg = args_plus_qreg
 
     # Launch a new interpreter for the body region
     # A new interpreter's root qreg value needs a new recorder
@@ -43,7 +43,8 @@ def _calling_convention(interpreter, closed_jaxpr, *args_plus_qreg):
     converter.init_qreg = init_qreg
 
     # pylint: disable-next=cell-var-from-loop
-    retvals = converter(closed_jaxpr, *args)
+    breakpoint()
+    retvals = converter(closed_jaxpr, *argss)
     init_qreg.insert_all_dangling_qubits()
     return *retvals, converter.init_qreg.get()
 
@@ -191,19 +192,35 @@ def handle_for_loop(
 
     # Add the iteration start and the qreg to the args
     self.init_qreg.insert_all_dangling_qubits()
+
+    # Add any potential dynamically allocated register values to the args
+    dyn_regs = set()
+    consts_pop = []
+    for inval in plxpr_invals:
+        if self.qubit_index_recorder.contains(inval) and self.qubit_index_recorder[inval] is not self.init_qreg:
+            #self.qubit_index_recorder[inval].insert_all_dangling_qubits()
+            dyn_regs.add(self.qubit_index_recorder[inval])
+            consts_pop.append(inval)
+
+    # for dyn_reg in dyn_regs:
+    #     dyn_reg.insert_all_dangling_qubits()
+
+    # breakpoint()
+
     start_plus_args_plus_qreg = [
         start,
         *args,
+        *[dyn_reg.get() for dyn_reg in dyn_regs],
         self.init_qreg.get(),
     ]
 
     consts = plxpr_invals[consts_slice]
-
+    breakpoint()
     jaxpr = ClosedJaxpr(jaxpr_body_fn, consts)
 
     f = partial(_calling_convention, self, jaxpr)
     converted_jaxpr_branch = jax.make_jaxpr(f)(*start_plus_args_plus_qreg).jaxpr
-
+    breakpoint()
     converted_closed_jaxpr_branch = ClosedJaxpr(convert_constvars_jaxpr(converted_jaxpr_branch), ())
 
     # Build Catalyst compatible input values
