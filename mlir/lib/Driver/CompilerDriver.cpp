@@ -85,6 +85,14 @@ using namespace catalyst;
 using namespace catalyst::driver;
 namespace cl = llvm::cl;
 
+namespace mlir {
+
+namespace test {
+    void registerTestLoopUnrollingPass();
+}
+
+}
+
 namespace catalyst::utils {
 
 /**
@@ -971,6 +979,7 @@ int QuantumDriverMainFromCL(int argc, char **argv)
 
     // Create dialect registry
     DialectRegistry registry;
+    mlir::test::registerTestLoopUnrollingPass();
     registerAllPasses();
     registerAllCatalystPasses();
     registerAllCatalystPipelines();
