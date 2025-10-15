@@ -118,7 +118,7 @@ frontend:
 	# TODO: --- enable the following line before merging to main ------------- #
 	# $(PYTHON) -m pip uninstall -y pennylane
 	# ------------------------------------------------------------------------ #
-	$(PYTHON) -m pip install --no-deps -e . --extra-index-url https://test.pypi.org/simple $(PIP_VERBOSE_FLAG)
+	$(PYTHON) -m pip install -e . --extra-index-url https://test.pypi.org/simple $(PIP_VERBOSE_FLAG)
 	rm -r frontend/pennylane_catalyst.egg-info
 
 .PHONY: mlir llvm stablehlo enzyme dialects runtime oqc
