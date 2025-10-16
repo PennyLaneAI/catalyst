@@ -402,10 +402,10 @@ struct ForwardOpInterface
         return {};
     }
 
-    FailureOr<bufferization::BufferLikeType> getBufferType(Operation *op, Value value,
-                                            const bufferization::BufferizationOptions &options,
-                                            const bufferization::BufferizationState &state,
-                                            SmallVector<Value> &invocationStack) const
+    FailureOr<bufferization::BufferLikeType>
+    getBufferType(Operation *op, Value value, const bufferization::BufferizationOptions &options,
+                  const bufferization::BufferizationState &state,
+                  SmallVector<Value> &invocationStack) const
     {
         // The getBufferType() method is called on either BlockArguments or OpResults.
         // https://github.com/llvm/llvm-project/blob/main/mlir/include/mlir/Dialect/Bufferization/IR/BufferizableOpInterface.td#L506
