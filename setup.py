@@ -102,6 +102,15 @@ def parse_dep_versions():
     return results
 
 
+def is_git_commit_hash(version_string):
+    """Check if a version string is a git commit hash (40 character hex string)."""
+    if version_string is None:
+        return False
+    return len(version_string) == 40 and all(
+        c in "0123456789abcdef" for c in version_string.lower()
+    )
+
+
 dep_versions = parse_dep_versions()
 jax_version = dep_versions.get("jax")
 pl_version = dep_versions.get("pennylane")
@@ -110,27 +119,78 @@ lq_version = dep_versions.get("lightning")
 pl_min_release = "0.43.0"
 lq_min_release = pl_min_release
 
+# Handle PennyLane version - support both release versions and git commit hashes
 if pl_version is not None:
-    pennylane_dep = f"pennylane=={pl_version}"  # use TestPyPI wheels, git is not allowed on PyPI
+    if is_git_commit_hash(pl_version):
+        # For git commits, install from git source
+        pennylane_dep = f"pennylane @ git+https://github.com/PennyLaneAI/pennylane.git@{pl_version}"
+        print("=" * 80)
+        print("WARNING: PennyLane is being installed from a git commit.")
+        print(f"Commit: {pl_version}")
+        print("=" * 80)
+    else:
+        # For release versions, use standard version specifier
+        pennylane_dep = (
+            f"pennylane=={pl_version}"  # use TestPyPI wheels, git is not allowed on PyPI
+        )
 else:
     pennylane_dep = f"pennylane>={pl_min_release}"
+
+# Handle Lightning version - support both release versions and git commit hashes
 if lq_version is not None:
-    lightning_dep = f"pennylane-lightning=={lq_version}"  # use TestPyPI wheels to avoid rebuild
-    kokkos_dep = f"pennylane-lightning-kokkos=={lq_version}"
+    if is_git_commit_hash(lq_version):
+        # For git commits, install from git source
+        lightning_dep = f"pennylane-lightning @ git+https://github.com/PennyLaneAI/pennylane-lightning.git@{lq_version}"
+        kokkos_dep = ""  # Kokkos not available from git
+        print("=" * 80)
+        print("WARNING: PennyLane-Lightning is being installed from a git commit.")
+        print(f"Commit: {lq_version}")
+        print("Note: pennylane-lightning-kokkos is not available when installing from git.")
+        print("=" * 80)
+    else:
+        # For release versions, use standard version specifier
+        lightning_dep = f"pennylane-lightning=={lq_version}"  # use TestPyPI wheels to avoid rebuild
+        kokkos_dep = f"pennylane-lightning-kokkos=={lq_version}"
 else:
     lightning_dep = f"pennylane-lightning>={lq_min_release}"
     kokkos_dep = ""
+
+# Handle JAX version - support both release versions and git commit hashes
+if jax_version is not None:
+    if is_git_commit_hash(jax_version):
+        # For git commits, only specify jax from git source
+        # Note: When installing from git, jaxlib must be installed separately
+        jax_dep = f"jax @ git+https://github.com/google/jax.git@{jax_version}"
+        # Don't add jaxlib to requirements when using git - it needs to be installed separately
+        jaxlib_dep = None
+        print("=" * 80)
+        print("WARNING: JAX is being installed from a git commit.")
+        print("You may need to install a compatible jaxlib version separately:")
+        print("  pip install jaxlib==...")
+        print("Or build jaxlib from the same commit if needed.")
+        print("=" * 80)
+    else:
+        # For release versions, use standard version specifier
+        jax_dep = f"jax=={jax_version}"
+        jaxlib_dep = f"jaxlib=={jax_version}"
+else:
+    # Fallback if no JAX version is specified
+    jax_dep = "jax"
+    jaxlib_dep = "jaxlib"
 
 requirements = [
     pennylane_dep,
     lightning_dep,
     kokkos_dep,
-    f"jax=={jax_version}",
-    f"jaxlib=={jax_version}",
+    jax_dep,
     "numpy!=2.0.0",
     "scipy-openblas32>=0.3.26",  # symbol and library name
     "diastatic-malt>=2.15.2",
 ]
+
+# Add jaxlib only if it's not None (i.e., not using git commit)
+if jaxlib_dep is not None:
+    requirements.insert(4, jaxlib_dep)
 
 entry_points = {
     "pennylane.plugins": [
