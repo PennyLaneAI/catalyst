@@ -124,18 +124,14 @@ class TestControlledDecomposition:
         dev = qml.device(backend, wires=4)
 
         class OpWithNoMatrix(qml.operation.Operation):
-            """Op without a matrix"""
-
-            def matrix(self):
-                """matrix undefined"""
-                raise NotImplementedError()
+            """Op without a matrix or decomp"""
 
         @qml.qnode(dev)
         def f():
             ctrl(OpWithNoMatrix(wires=[0, 1]), control=[2, 3])
             return qml.probs()
 
-        with pytest.raises(CompileError, match="could not be decomposed, it might be unsupported."):
+        with pytest.raises(CompileError, match="not supported with catalyst on this device"):
             qjit(f, target="jaxpr")
 
     def test_no_unitary_support(self):

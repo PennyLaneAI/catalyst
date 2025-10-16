@@ -28,7 +28,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      
+
       # Import Numpy/Pybind11 because it is imported in setup.py
       - name: Install Numpy and Pybind11
         run: |
