@@ -152,7 +152,9 @@ def workflow_for_loop(
     evaluator = partial(converter.eval, jaxpr_body_fn, consts)
 
     converted_jaxpr_branch = jax.make_jaxpr(evaluator)(start, *args)
-    converted_closed_jaxpr_branch = ClosedJaxpr(convert_constvars_jaxpr(converted_jaxpr_branch.jaxpr), ())
+    converted_closed_jaxpr_branch = ClosedJaxpr(
+        convert_constvars_jaxpr(converted_jaxpr_branch.jaxpr), ()
+    )
 
     # Config additional for loop settings
     apply_reverse_transform = isinstance(step, int) and step < 0
@@ -204,7 +206,9 @@ def handle_for_loop(
     f = partial(_calling_convention, self, jaxpr)
     converted_jaxpr_branch = jax.make_jaxpr(f)(*start_plus_args_plus_qreg)
 
-    converted_closed_jaxpr_branch = ClosedJaxpr(convert_constvars_jaxpr(converted_jaxpr_branch.jaxpr), ())
+    converted_closed_jaxpr_branch = ClosedJaxpr(
+        convert_constvars_jaxpr(converted_jaxpr_branch.jaxpr), ()
+    )
 
     # Build Catalyst compatible input values
     new_consts = converted_jaxpr_branch.consts
