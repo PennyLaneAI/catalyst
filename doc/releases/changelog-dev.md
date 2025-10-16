@@ -10,6 +10,9 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Fixes the translation of plxpr control flow for edge cases where the `consts` were being
+  reordered.
+
 <h3>Internal changes ⚙️</h3>
 
 <h3>Documentation 📝</h3>

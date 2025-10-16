@@ -1656,6 +1656,52 @@ class TestControlFlow:
         expected = 1.0 + jnp.cos(0) + jnp.cos(1) + jnp.cos(2)
         assert qml.math.allclose(res, expected)
 
+    def test_for_loop_consts(self):
+        """This tests for kinda a weird edge case bug where the consts where getting
+        reordered when translating the inner jaxpr."""
+
+        qml.capture.enable()
+
+        @qml.qjit
+        @qml.qnode(qml.device('lightning.qubit', wires=3))
+        def circuit(x, n):
+            @qml.for_loop(3)
+            def outer(i):
+
+                @qml.for_loop(n)
+                def inner(j):
+                    qml.RY(x, wires=j)
+
+                inner()
+
+            outer()
+
+            # Expected output: |100...>
+            return [qml.expval(qml.PauliZ(i)) for i in range(3)]
+        res1, res2, res3 = circuit(0.2, 2)
+        
+        assert qml.math.allclose(res1, jnp.cos(0.2 * 3))
+        assert qml.math.allclose(res2, jnp.cos(0.2 * 3))
+        assert qml.math.allclose(res3, 1)
+
+    def test_for_loop_consts_outside_qnode(self):
+        """Similar test as above for weird edge case, but not using a qnode."""
+
+        qml.capture.enable()
+
+        @qml.qjit
+        def f(x, n):
+            @qml.for_loop(3)
+            def outer(i, a):
+
+                @qml.for_loop(n)
+                def inner(j, b):
+                    return b + x
+                return inner(a)
+
+            return outer(0.0)
+        res = f(0.2, 2)
+        assert qml.math.allclose(res, 0.2 * 2 * 3)
 
 def test_adjoint_transform_integration():
     """Test that adjoint transforms can be used with capture enabled."""
