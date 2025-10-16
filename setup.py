@@ -116,7 +116,7 @@ jax_version = dep_versions.get("jax")
 pl_version = dep_versions.get("pennylane")
 lq_version = dep_versions.get("lightning")
 
-pl_min_release = "0.42.0"
+pl_min_release = "0.43.0"
 lq_min_release = pl_min_release
 
 # Handle PennyLane version - support both release versions and git commit hashes
