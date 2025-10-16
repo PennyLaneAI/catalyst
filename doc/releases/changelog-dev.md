@@ -12,6 +12,7 @@
 
 * Fixes the translation of plxpr control flow for edge cases where the `consts` were being
   reordered.
+  [(#2128)](https://github.com/PennyLaneAI/catalyst/pull/2128)
 
 <h3>Internal changes ⚙️</h3>
 
