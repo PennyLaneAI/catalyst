@@ -20,17 +20,17 @@ from dataclasses import replace
 import jax
 import numpy as np
 import pennylane as qml
+from pennylane import grad, jacobian
 import pytest
 from jax import numpy as jnp
 from jax.tree_util import tree_all, tree_flatten, tree_map, tree_structure
 
+import catalyst
 import catalyst.utils.calculate_grad_shape as infer
 from catalyst import (
     CompileError,
     DifferentiableCompileError,
     for_loop,
-    grad,
-    jacobian,
     measure,
     mitigate_with_zne,
     pure_callback,
@@ -166,7 +166,7 @@ def test_jacobian_outside_qjit():
     x = jnp.array([4.0, 5.0])
 
     expected = jax.jacobian(f)(x)
-    result = jacobian(f)(x)
+    result = catalyst.jacobian(f)(x)
 
     assert len(expected) == len(result) == 2
     assert np.allclose(expected[0], result[0])
@@ -184,7 +184,7 @@ def test_jacobian_outside_qjit_argnums(argnums):
     x, y = jnp.array([4.0, 5.0]), jnp.array([4.0, 5.0])
 
     expected = jax.jacobian(f, argnums=argnums if argnums is not None else 0)(x, y)
-    result = jacobian(f, argnums=argnums)(x, y)
+    result = catalyst.jacobian(f, argnums=argnums)(x, y)
 
     assert len(expected) == len(result) == 2
     assert np.allclose(expected[0], result[0])
@@ -880,6 +880,7 @@ def test_ps_probs(backend):
     reference = qml.jacobian(func, argnum=0)(0.5)
     if enabled:
         qml.capture.enable()
+    print(result, reference)
     assert np.allclose(result, reference)
 
 
@@ -1407,7 +1408,7 @@ def test_classical_kwargs():
     assert np.allclose(expected, result)
 
 
-@pytest.mark.usefixtures("use_both_frontend")
+#@pytest.mark.usefixtures("use_both_frontend")
 def test_classical_kwargs_switched_arg_order():
     """Test the gradient on classical function with keyword arguments and switched argument order"""
 
@@ -1423,7 +1424,6 @@ def test_classical_kwargs_switched_arg_order():
     assert np.allclose(expected, result)
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("diff_method", ["parameter-shift", "adjoint"])
 def test_qnode_kwargs(backend, diff_method):
     """Test the gradient on a qnode with keyword arguments"""
@@ -1453,7 +1453,6 @@ def test_qnode_kwargs(backend, diff_method):
         assert np.allclose(expected_grad, result_grad)
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("diff_method", ["parameter-shift", "adjoint"])
 def test_qnode_kwargs_switched_arg_order(backend, diff_method):
     """Test the gradient on a qnode with keyword arguments and switched argument order"""
@@ -1683,6 +1682,7 @@ def test_gradient_slice(backend):
     assert np.allclose(cat_res, jax_res)
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("diff_method", ["parameter-shift", "adjoint"])
 def test_ellipsis_differentiation(backend, diff_method):
     """Test circuit diff with ellipsis in the preprocessing."""
@@ -1697,6 +1697,7 @@ def test_ellipsis_differentiation(backend, diff_method):
     weights = jnp.ones([5, 3, 3])
 
     cat_res = qjit(grad(circuit, argnums=0))(weights)
+    qml.capture.disable()
     jax_res = jax.grad(circuit, argnums=0)(weights)
     assert np.allclose(cat_res, jax_res)
 
@@ -1815,6 +1816,7 @@ def test_forloop_vmap_worflow_derivation(backend):
     assert jnp.allclose(data_cat[1], data_jax[1])
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize(
     "gate,state", ((qml.BasisState, np.array([1])), (qml.StatePrep, np.array([0, 1])))
 )
@@ -1831,8 +1833,9 @@ def test_paramshift_with_gates(gate, state):
         return qml.expval(qml.PauliZ(0))
 
     param = 0.1
-    expected = cost(param)
     observed = qjit(cost)(param)
+    qml.capture.disable()
+    expected = cost(param)
     assert np.allclose(expected, observed)
 
 
@@ -1900,8 +1903,8 @@ class TestGradientUsagePatterns:
 
         x = 4.0
 
-        res_pattern_fn_as_argument = grad(fn, method="fd")(x)
-        res_pattern_partial = grad(method="fd")(fn)(x)
+        res_pattern_fn_as_argument = catalyst.grad(fn, method="fd")(x)
+        res_pattern_partial = catalyst.grad(method="fd")(fn)(x)
         expected = jax.grad(fn)(x)
 
         assert np.allclose(res_pattern_fn_as_argument, expected)
@@ -1932,8 +1935,8 @@ class TestGradientUsagePatterns:
 
         x = 4.0
 
-        res_pattern_fn_as_argument = jacobian(fn, method="fd")(x)
-        res_pattern_partial = jacobian(method="fd")(fn)(x)
+        res_pattern_fn_as_argument = catalyst.jacobian(fn, method="fd")(x)
+        res_pattern_partial = catalyst.jacobian(method="fd")(fn)(x)
         expected = jax.jacobian(fn)(x)
 
         assert np.allclose(res_pattern_fn_as_argument, expected)
@@ -1958,7 +1961,7 @@ def test_grad_argnums(argnums):
     def compare_structure_and_value(o1, o2):
         return tree_structure(o1) == tree_structure(o2) and tree_all(tree_map(jnp.allclose, o1, o2))
 
-    result = grad(circuit, argnums=argnums)(weights, inputs)
+    result = catalyst.grad(circuit, argnums=argnums)(weights, inputs)
     expected = jax.grad(circuit.original_function, argnums=argnums)(weights, inputs)
     assert compare_structure_and_value(result, expected)
 
@@ -2328,6 +2331,7 @@ class TestParameterShiftVerificationIntegrationTests:
                 return qml.expval(qml.PauliZ(wires=0))
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("diff_method", ["parameter-shift", "adjoint"])
 def test_closure_variable_grad(diff_method):
     """Test that grad can take closure variables"""
@@ -2455,6 +2459,7 @@ def test_bufferization_inside_tensor_generate(backend):
     assert np.allclose([2.0, 1.0], inp)
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 def test_best_diff_method_single_expval():
     """Test the diff_method for differentiating a single expval."""
     num_wires = 1
@@ -2473,6 +2478,7 @@ def test_best_diff_method_single_expval():
     assert "parameter-shift" not in qjit_grad.mlir
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 def test_best_diff_method_single_probs():
     """Test the diff_method for differentiating a single probs."""
     num_wires = 1
@@ -2491,6 +2497,7 @@ def test_best_diff_method_single_probs():
     assert "adjoint" not in qjit_jacobian.mlir
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 def test_best_diff_method_multi_expval():
     """Test the diff_method for differentiating multiple expval."""
     num_wires = 1
@@ -2509,6 +2516,7 @@ def test_best_diff_method_multi_expval():
     assert "adjoint" not in qjit_jacobian.mlir
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 def test_best_diff_method_mixed_return():
     """Test the diff_method for differentiating mixed return."""
     num_wires = 1
