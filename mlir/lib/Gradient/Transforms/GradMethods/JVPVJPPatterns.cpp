@@ -23,6 +23,7 @@
 
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/SymbolTable.h"
 
 #include "Gradient/Utils/EinsumLinalgGeneric.h"
@@ -60,8 +61,6 @@ template <class T> std::vector<int64_t> _tovec(const T &x)
 
 LogicalResult JVPLoweringPattern::matchAndRewrite(JVPOp op, PatternRewriter &rewriter) const
 {
-    MLIRContext *ctx = getContext();
-
     Location loc = op.getLoc();
 
     auto func_diff_operand_indices = computeDiffArgIndices(op.getDiffArgIndices());
@@ -159,12 +158,9 @@ LogicalResult JVPLoweringPattern::matchAndRewrite(JVPOp op, PatternRewriter &rew
             }
             else {
                 assert(acc.value().getType() == res.getType());
-
-                auto add_op = rewriter.create<linalg::ElemwiseBinaryOp>(
-                    loc, res.getType(), ValueRange({acc.value(), res}), acc.value(),
-                    linalg::BinaryFnAttr::get(ctx, linalg::BinaryFn::add),
-                    linalg::TypeFnAttr::get(ctx, linalg::TypeFn::cast_signed));
-                acc = add_op.getResultTensors()[0];
+                auto addOp = rewriter.create<linalg::AddOp>(
+                    loc, res.getType(), ValueRange{acc.value(), res}, ValueRange{acc.value()});
+                acc = addOp.getResultTensors()[0];
             }
         }
         assert(acc.has_value());
@@ -181,8 +177,6 @@ LogicalResult JVPLoweringPattern::matchAndRewrite(JVPOp op, PatternRewriter &rew
 
 LogicalResult VJPLoweringPattern::matchAndRewrite(VJPOp op, PatternRewriter &rewriter) const
 {
-    MLIRContext *ctx = getContext();
-
     Location loc = op.getLoc();
 
     auto func_diff_operand_indices = computeDiffArgIndices(op.getDiffArgIndices());
@@ -278,11 +272,9 @@ LogicalResult VJPLoweringPattern::matchAndRewrite(VJPOp op, PatternRewriter &rew
             else {
                 assert(acc.value().getType() == res.getType());
 
-                auto add_op = rewriter.create<linalg::ElemwiseBinaryOp>(
-                    loc, res.getType(), ValueRange({acc.value(), res}), acc.value(),
-                    linalg::BinaryFnAttr::get(ctx, linalg::BinaryFn::add),
-                    linalg::TypeFnAttr::get(ctx, linalg::TypeFn::cast_signed));
-                acc = add_op.getResultTensors()[0];
+                auto addOp = rewriter.create<linalg::AddOp>(
+                    loc, res.getType(), ValueRange{acc.value(), res}, ValueRange{acc.value()});
+                acc = addOp.getResultTensors()[0];
             }
         }
         assert(acc.has_value());

@@ -138,8 +138,17 @@ def CallbackOp : Catalyst_Op<"callback",
 
   let builders = [OpBuilder<(ins
     "mlir::StringRef":$name, "mlir::FunctionType":$type,
-    CArg<"mlir::ArrayRef<mlir::NamedAttribute>", "{}">:$attrs)
-  >];
+    CArg<"mlir::ArrayRef<mlir::NamedAttribute>", "{}">:$attrs), [{
+      $_state.addAttribute(mlir::SymbolTable::getSymbolAttrName(),
+                           $_builder.getStringAttr(name));
+      $_state.addAttribute("function_type", mlir::TypeAttr::get(type));
+      $_state.addAttribute("id", $_builder.getI64IntegerAttr(0));
+      $_state.addAttribute("argc", $_builder.getI64IntegerAttr(type.getNumInputs()));
+      $_state.addAttribute("resc", $_builder.getI64IntegerAttr(type.getNumResults()));
+      $_state.attributes.append(attrs.begin(), attrs.end());
+      $_state.addRegion();
+    }]>
+  ];
 
   let extraClassDeclaration = [{
     //===------------------------------------------------------------------===//
