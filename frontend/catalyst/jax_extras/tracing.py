@@ -906,7 +906,7 @@ class DynshapePrimitive(JaxprPrimitive):
             # `abstract_eval` returned `out_type` calculated for empty constants.
             [],
             tracers,
-            maker=lambda aval: new_inner_tracer(trace, aval)
+            maker=lambda aval: new_inner_tracer(trace, aval),
         )
 
         invars = map(lambda t: t.val, tracers)
