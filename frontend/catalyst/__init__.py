@@ -68,6 +68,9 @@ if not INSTALLED:
 sys.modules["mlir_quantum.ir"] = __import__("jaxlib.mlir.ir").mlir.ir
 sys.modules["mlir_quantum._mlir_libs"] = __import__("jaxlib.mlir._mlir_libs").mlir._mlir_libs
 
+from catalyst.jax_extras.patches import patch_primitives
+patch_primitives()
+
 from catalyst import debug, logging, passes
 from catalyst.api_extensions import *
 from catalyst.api_extensions import __all__ as _api_extension_list

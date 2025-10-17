@@ -274,8 +274,8 @@ class TestQubitValues:
         # Also check with actual jaxpr variables
         with take_current_trace() as trace:
             gate_out_qubits = trace.frame.eqns[-1].outvars
-            assert trace.frame.tracer_to_var[id(qubit_handler[0])] == gate_out_qubits[0]
-            assert trace.frame.tracer_to_var[id(qubit_handler[1])] == gate_out_qubits[1]
+            assert qubit_handler[0].val == gate_out_qubits[0]
+            assert qubit_handler[1].val == gate_out_qubits[1]
 
     def test_iter(self):
         """Test __iter__ in the qreg manager"""
@@ -316,8 +316,8 @@ class TestQubitValues:
         # Also check with actual jaxpr variables
         with take_current_trace() as trace:
             gate_out_qubits = trace.frame.eqns[-1].outvars
-            assert trace.frame.tracer_to_var[id(qubit_handler[0])] == gate_out_qubits[0]
-            assert trace.frame.tracer_to_var[id(qubit_handler[1])] == gate_out_qubits[1]
+            assert qubit_handler[0].val == gate_out_qubits[0]
+            assert qubit_handler[1].val == gate_out_qubits[1]
 
     def test_insert_all_dangling_qubits(self):
         """

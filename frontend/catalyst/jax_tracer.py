@@ -554,7 +554,7 @@ class HybridOp(Operator):
         for i, t in enumerate(out_expanded_tracers):
             # We look for what were the previous output tracers.
             # If they haven't changed, then we leave them unchanged.
-            if trace.getvar(t) in jaxpr_variables:
+            if t.val in jaxpr_variables:
                 continue
 
             # If the variable cannot be found in the current frame
@@ -596,7 +596,7 @@ class HybridOp(Operator):
             #            qrp2 = op.trace_quantum(ctx, device, trace, qrp, **kwargs)
             #
             # So it should be safe to cache the tracers as we are doing it.
-            eqn.outvars[i] = trace.getvar(t)
+            eqn.outvars[i] = t.val
 
         # Now, the output variables can be considered as part of the current frame.
         # This allows us to avoid importing all equations again next time.

@@ -427,9 +427,8 @@ def trace_to_jaxpr(
 def new_inner_tracer(trace: DynamicJaxprTrace, aval) -> DynamicJaxprTracer:
     """Create a JAX tracer tracing an abstract value ``aval`, without specifying its source
     primitive."""
-    dt = DynamicJaxprTracer(trace, aval, current_source_info())
-    trace.frame.tracers.append(dt)
-    trace.frame.tracer_to_var[id(dt)] = trace.frame.newvar(aval)
+    atom = trace.frame.newvar(aval)
+    dt = DynamicJaxprTracer(trace, aval, atom, line_info=current_source_info())
     return dt
 
 
@@ -907,12 +906,11 @@ class DynshapePrimitive(JaxprPrimitive):
             # `abstract_eval` returned `out_type` calculated for empty constants.
             [],
             tracers,
-            maker=lambda a: DynamicJaxprTracer(trace, a, source_info),
+            maker=lambda aval: new_inner_tracer(trace, aval)
         )
 
-        invars = map(trace.getvar, tracers)
-        outvars = map(trace.makevar, out_tracers)
-
+        invars = map(lambda t: t.val, tracers)
+        outvars = map(lambda t: t.val, out_tracers)
         eqn = new_jaxpr_eqn(invars, outvars, self, params, [], source_info)
         trace.frame.add_eqn(eqn)
         return out_tracers if self.multiple_results else out_tracers.pop()

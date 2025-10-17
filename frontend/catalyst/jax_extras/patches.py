@@ -40,6 +40,7 @@ __all__ = (
     "_no_clean_up_dead_vars",
     "_gather_shape_rule_dynamic",
     "gather2_p",
+    "patch_primitives",
 )
 
 
@@ -208,3 +209,75 @@ gather2_p = standard_primitive(
     sharding_rule=_gather_sharding_rule,
     vma_rule=partial(standard_vma_rule, "gather"),
 )
+
+
+# TODO: Remove this patch when JAX/PennyLane are updated to use the new JAX 0.7+ API.
+def patch_primitives():
+    """Patch PennyLane/JAX primitives to make them compatible with JAX 0.7+.
+
+    JAX 0.7+ requires all primitive parameters to be hashable, but PennyLane
+    passes **lists** for some parameters like control_values, jaxpr_branches, etc.
+    This patch wraps the bind method to convert lists to tuples to make them hashable.
+    """
+
+    def make_hashable(value):
+        """Recursively convert lists to tuples to make them hashable."""
+        if isinstance(value, list):
+            return tuple(make_hashable(item) for item in value)
+        return value
+
+    try:
+        from pennylane.capture.primitives import ctrl_transform_prim
+        from pennylane.capture.primitives import cond_prim
+        from pennylane.ops.op_math.controlled import Controlled
+
+        original_ctrl_bind = ctrl_transform_prim.bind
+        original_cond_bind = cond_prim.bind
+        original_controlled_bind = Controlled._primitive.bind
+
+        def patched_ctrl_bind(*args, **kwargs):
+            # Convert control_values from list to tuple if present
+            if "control_values" in kwargs:
+                kwargs["control_values"] = make_hashable(kwargs["control_values"])
+            return original_ctrl_bind(*args, **kwargs)
+
+        def patched_cond_bind(*args, **kwargs):
+            # Convert list parameters to tuples
+            if "jaxpr_branches" in kwargs:
+                kwargs["jaxpr_branches"] = make_hashable(kwargs["jaxpr_branches"])
+            if "consts_slices" in kwargs:
+                kwargs["consts_slices"] = make_hashable(kwargs["consts_slices"])
+            return original_cond_bind(*args, **kwargs)
+
+        def patched_controlled_bind(*args, **kwargs):
+            # Convert control_values from list to tuple if present
+            if "control_values" in kwargs:
+                kwargs["control_values"] = make_hashable(kwargs["control_values"])
+            return original_controlled_bind(*args, **kwargs)
+
+        # Replace the bind method
+        ctrl_transform_prim.bind = patched_ctrl_bind
+        cond_prim.bind = patched_cond_bind
+        Controlled._primitive.bind = patched_controlled_bind
+
+    except ImportError:
+        pass
+
+    # patch DynamicJaxprTrace members: makevar and getvar
+    try:
+        from jax._src.interpreters import partial_eval as pe
+
+        def patched_makevar(self, tracer):
+            assert tracer.val is None, "a jaxpr variable must be created only once per tracer"
+            tracer.val = self.frame.newvar(tracer.aval)
+            return tracer.val
+
+        def patched_getvar(self, tracer):  # pylint: disable=unused-argument
+            if var := tracer.val:
+                return var
+            raise jax.core.escaped_tracer_error(tracer)
+
+        pe.DynamicJaxprTrace.makevar = patched_makevar
+        pe.DynamicJaxprTrace.getvar = patched_getvar
+    except ImportError:
+        pass
