@@ -255,7 +255,8 @@ class TestMeasurementTransforms:
             del config.measurement_processes[unsupported_measurement]
 
         with patch(
-            "catalyst.device.qjit_device.get_device_capabilities", Mock(return_value=config)
+            "catalyst.device.qjit_device.filter_device_capabilities_with_shots",
+            Mock(return_value=config),
         ):
             # transform is added to transform program
             qjit_dev = QJITDevice(dev)
@@ -357,7 +358,8 @@ class TestMeasurementTransforms:
         config.observables = {}
 
         with patch(
-            "catalyst.device.qjit_device.get_device_capabilities", Mock(return_value=config)
+            "catalyst.device.qjit_device.filter_device_capabilities_with_shots",
+            Mock(return_value=config),
         ):
             with pytest.raises(
                 RuntimeError, match="The device does not support observables or sample/counts"
@@ -648,7 +650,8 @@ class TestMeasurementTransforms:
 
         # mock TOML file output to indicate some observables are not supported
         with patch(
-            "catalyst.device.qjit_device.get_device_capabilities", Mock(return_value=config)
+            "catalyst.device.qjit_device.filter_device_capabilities_with_shots",
+            Mock(return_value=config),
         ):
             jitted_circuit = qjit(circuit)
 
@@ -692,7 +695,8 @@ class TestMeasurementTransforms:
 
         # mock TOML file output to indicate some observables are not supported
         with patch(
-            "catalyst.device.qjit_device.get_device_capabilities", Mock(return_value=config)
+            "catalyst.device.qjit_device.filter_device_capabilities_with_shots",
+            Mock(return_value=config),
         ):
             mlir = qjit(circuit, target="mlir").mlir
 
@@ -714,12 +718,8 @@ class TestMeasurementTransforms:
         del config.observables["Hadamard"]
         config.non_commuting_observables = non_commuting_flag
 
-        with patch(
-            "catalyst.device.qjit_device.get_device_capabilities", Mock(return_value=config)
-        ):
-            qjit_dev = QJITDevice(dev)
-
-        # dev1 supports non-commuting observables and sum observables - no splitting
+        qjit_dev = QJITDevice(dev)
+        qjit_dev.capabilities = config
         assert qjit_dev.capabilities.non_commuting_observables is non_commuting_flag
 
         # Check the preprocess
@@ -743,17 +743,15 @@ class TestMeasurementTransforms:
         config.observables = {}
         config.non_commuting_observables = non_commuting_flag
 
-        with patch(
-            "catalyst.device.qjit_device.get_device_capabilities", Mock(return_value=config)
-        ):
-            qjit_dev = QJITDevice(dev)
+        qjit_dev = QJITDevice(dev)
+        qjit_dev.capabilities = config
 
         # dev1 supports non-commuting observables and sum observables - no splitting
         assert qjit_dev.capabilities.non_commuting_observables is non_commuting_flag
 
         # Check the preprocess
         with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
-            transform_program, _ = qjit_dev.preprocess(ctx)
+            transform_program, _ = qjit_dev.preprocess(ctx, shots=1000)
 
         assert split_non_commuting in transform_program
 
@@ -833,7 +831,8 @@ class TestMeasurementTransforms:
         # mock TOML file output to indicate non-commuting observables are supported
         config.non_commuting_observables = True
         with patch(
-            "catalyst.device.qjit_device.get_device_capabilities", Mock(return_value=config)
+            "catalyst.device.qjit_device.filter_device_capabilities_with_shots",
+            Mock(return_value=config),
         ):
             jitted_circuit = qjit(unjitted_circuit)
             assert len(jitted_circuit(1.2)) == len(expected_result) == 2
@@ -845,7 +844,8 @@ class TestMeasurementTransforms:
         # mock TOML file output to indicate non-commuting observables are NOT supported
         config.non_commuting_observables = False
         with patch(
-            "catalyst.device.qjit_device.get_device_capabilities", Mock(return_value=config)
+            "catalyst.device.qjit_device.filter_device_capabilities_with_shots",
+            Mock(return_value=config),
         ):
             jitted_circuit = qjit(unjitted_circuit)
             assert len(jitted_circuit(1.2)) == len(expected_result) == 2
@@ -889,7 +889,8 @@ class TestMeasurementTransforms:
         # mock TOML file output to indicate non-commuting observables are NOT supported
         del config.observables["Sum"]
         with patch(
-            "catalyst.device.qjit_device.get_device_capabilities", Mock(return_value=config)
+            "catalyst.device.qjit_device.filter_device_capabilities_with_shots",
+            Mock(return_value=config),
         ):
             jitted_circuit = qjit(unjitted_circuit)
             assert len(jitted_circuit(1.2)) == len(expected_result) == 2
