@@ -1213,12 +1213,6 @@ def _qinst_abstract_eval(
     for idx in range(qubits_len + ctrl_len):
         qubit = all_qubits[idx]
         assert isinstance(qubit, AbstractQbit)
-    print("qubit", qubits)
-    print("ctrl_qubits", ctrl_qubits)
-    print("all_qubits", all_qubits)
-    print("op", op)
-    print("op type", type(op))
-    print("qubits or params", qubits_or_params)
     return (AbstractQbit(),) * (qubits_len + ctrl_len)
 
 

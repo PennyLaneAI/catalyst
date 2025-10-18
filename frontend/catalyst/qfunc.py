@@ -304,7 +304,6 @@ class QFunc:
         debug_info = kwargs.pop("debug_info", None)
 
         def _eval_quantum(*args, **kwargs):
-            print("evaluating quantum function", args, kwargs)
             trace_result = trace_quantum_function(
                 self.func,
                 qjit_device,
