@@ -246,6 +246,12 @@ PAULI_NAMED_MAP = {
     "Z": "PauliZ",
 }
 
+PAULI_WORD_INDEX_MAP = {
+    "I": 0,
+    "X": 1,
+    "Y": 2,
+    "Z": 3,
+}
 
 @debug_logger
 def retrace_with_result_types(jaxpr: ClosedJaxpr, target_types: List[ShapedArray]) -> ClosedJaxpr:
@@ -790,9 +796,11 @@ def trace_quantum_operations(
     #       equations in a wrong order. The set of variables are always complete though, so we sort
     #       the equations to restore their correct order.
 
+    print("tracing quantum operations", quantum_tape)
     def bind_native_operation(qrp, op, controlled_wires, controlled_values, adjoint=False):
         # For named-controlled operations (e.g. CNOT, CY, CZ) - bind directly by name. For
         # Controlled(OP) bind OP with native quantum control syntax, and similarly for Adjoint(OP).
+        print("binding op", op)
         if type(op) in (Controlled, ControlledOp):
             return bind_native_operation(
                 qrp,
@@ -838,11 +846,25 @@ def trace_quantum_operations(
             # which does not follow the same pattern as `qinst_p`.
             # We will revisit this once we have a better solution for
             # supporting general PL operations in Catalyst.
-            params = (
-                op.parameters + [op.hyperparameters["dimension"][0]]
-                if isinstance(op, qml.PCPhase)
-                else op.parameters
-            )
+            match type(op):
+                case qml.PCPhase:
+                    params = (
+                        op.parameters + [op.hyperparameters["dimension"][0]]
+                    )
+                case qml.PauliRot:
+                    params = (
+                        op.parameters + [op.hyperparameters["pauli_word"]]
+                    )
+                case _:
+                    params = op.parameters
+
+            # params = (
+            #     op.parameters + [op.hyperparameters["dimension"][0]]
+            #     if isinstance(op, qml.PCPhase)
+            #     else op.parameters
+            # )
+
+
 
             qubits2 = qinst_p.bind(
                 *[*qubits, *params, *controlled_qubits, *controlled_values],
@@ -865,9 +887,11 @@ def trace_quantum_operations(
     else:
         ops = quantum_tape.operations
 
+    print("tracing ops", ops)
     for op in ops:
         qrp2 = None
         if isinstance(op, HybridOp):
+            print("tracing hybrid op", op)
             kwargs = (
                 {"postselect_mode": mcm_config.postselect_mode}
                 if isinstance(op, catalyst.api_extensions.quantum_operators.MidCircuitMeasure)
@@ -875,8 +899,10 @@ def trace_quantum_operations(
             )
             qrp2 = op.trace_quantum(ctx, device, trace, qrp, **kwargs)
         elif isinstance(op, MeasurementProcess):
+            print("tracing measurement process", op)
             qrp2 = qrp
         else:
+            print("tracing native op", op)
             qrp2 = bind_native_operation(qrp, op, [], [])
 
         assert qrp2 is not None
@@ -1580,6 +1606,7 @@ def _trace_quantum_step(
     return_values_tree = cls_result.return_values_tree
     is_leaf = cls_result.is_leaf
 
+    print("tracing quantum step", tapes)
     def process_tape_output(tape, return_values_flat, return_values_tree):
         cls_ret_indices = []
         num_mcm = 0
@@ -1691,6 +1718,7 @@ def trace_quantum_function(
             ctx=ctx,
         )
 
+        print("tracing quantum function", cls_result)
         # (2) - Quantum tracing
         transformed_results, classical_return_indices, num_mcm = _trace_quantum_step(
             device, qnode, ctx, cls_result, debug_info

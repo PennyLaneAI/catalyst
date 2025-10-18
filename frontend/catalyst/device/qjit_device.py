@@ -79,6 +79,7 @@ RUNTIME_OPERATIONS = [
     "PauliX",
     "PauliY",
     "PauliZ",
+    "PauliRot",
     "PCPhase",
     "PhaseShift",
     "PSWAP",
