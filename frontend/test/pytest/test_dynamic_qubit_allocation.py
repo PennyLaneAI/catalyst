@@ -261,6 +261,28 @@ def test_dynamic_wire_alloc_forloop(num_iter, expected, backend):
 
 
 @pytest.mark.usefixtures("use_capture")
+def test_dynamic_wire_alloc_forloop_outside(backend):
+    """
+    Test qml.allocate and qml.deallocate outside for loop.
+    """
+
+    @qjit(autograph=True)
+    @qml.qnode(qml.device(backend, wires=1))
+    def circuit():
+        with qml.allocate(1) as q:
+            qml.X(wires=q[0])
+            for _ in range(3):
+                qml.CNOT(wires=[q[0], 0])
+
+        return qml.probs(wires=[0])
+
+    observed = circuit()
+    expected = [0, 1]
+
+    assert np.allclose(expected, observed)
+
+
+@pytest.mark.usefixtures("use_capture")
 @pytest.mark.parametrize(
     "num_iter, expected", [(3, [0, 0, 1, 0, 0, 0, 0, 0]), (4, [1, 0, 0, 0, 0, 0, 0, 0])]
 )
@@ -371,33 +393,33 @@ def test_terminal_MP_dynamic_wires(backend):
             return qml.probs(q)
 
 
-@pytest.mark.usefixtures("use_capture")
-def test_unsupported_cross_scope_registers(backend):
-    """
-    Scope jaxprs in Catalyst cannot take multiple registers yet.
-    Test that an error is raised when a dynamically allocated register in an outside scope
-    is being used from an inside scope.
-    """
+# @pytest.mark.usefixtures("use_capture")
+# def test_unsupported_cross_scope_registers(backend):
+#     """
+#     Scope jaxprs in Catalyst cannot take multiple registers yet.
+#     Test that an error is raised when a dynamically allocated register in an outside scope
+#     is being used from an inside scope.
+#     """
 
-    with pytest.raises(
-        NotImplementedError,
-        match=textwrap.dedent(
-            """
-            Dynamically allocated wires in a parent scope cannot be used in a child
-            scope yet. Please consider dynamical allocation inside the child scope.
-            """
-        ),
-    ):
+#     with pytest.raises(
+#         NotImplementedError,
+#         match=textwrap.dedent(
+#             """
+#             Dynamically allocated wires in a parent scope cannot be used in a child
+#             scope yet. Please consider dynamical allocation inside the child scope.
+#             """
+#         ),
+#     ):
 
-        @qjit(autograph=True)
-        @qml.qnode(qml.device(backend, wires=3))
-        def circuit():
-            wires = qml.allocate(3)
+#         @qjit(autograph=True)
+#         @qml.qnode(qml.device(backend, wires=3))
+#         def circuit():
+#             wires = qml.allocate(3)
 
-            for _ in range(3):
-                qml.X(wires=wires[0])
+#             for _ in range(3):
+#                 qml.X(wires=wires[0])
 
-            return qml.probs(wires=[0, 1, 2])
+#             return qml.probs(wires=[0, 1, 2])
 
 
 @pytest.mark.usefixtures("use_capture")

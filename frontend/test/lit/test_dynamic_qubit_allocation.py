@@ -142,7 +142,7 @@ def test_pass_reg_into_forloop():
     # CHECK: quantum.dealloc [[for_out]]#0 : !quantum.reg
 
     with qml.allocate(1) as q:
-        for i in range(3):
+        for _ in range(3):
             qml.X(wires=q[0])
             qml.CNOT(wires=[q[0], 0])
 
