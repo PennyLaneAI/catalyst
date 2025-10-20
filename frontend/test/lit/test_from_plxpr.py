@@ -71,7 +71,7 @@ def test_loop_capture():
         def loop_fn(_):
             qml.Hadamard(0)
 
-        loop_fn()
+        loop_fn() # pylint: disable=no-value-for-parameter
 
         return qml.state()
 
