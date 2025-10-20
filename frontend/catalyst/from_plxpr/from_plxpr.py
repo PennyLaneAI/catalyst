@@ -262,7 +262,6 @@ def handle_qnode(
         self.init_qreg.insert_all_dangling_qubits()
         qdealloc_p.bind(self.init_qreg.get())
         device_release_p.bind()
-
         return retvals
 
     if self.requires_decompose_lowering and graph_succeeded:
@@ -983,7 +982,6 @@ def trace_from_pennylane(
             fn.static_argnums = static_argnums
 
         plxpr, out_type, out_treedef = make_jaxpr2(fn, **make_jaxpr_kwargs)(*args, **kwargs)
-
         jaxpr = from_plxpr(plxpr)(*dynamic_args, **kwargs)
 
     return jaxpr, out_type, out_treedef, sig

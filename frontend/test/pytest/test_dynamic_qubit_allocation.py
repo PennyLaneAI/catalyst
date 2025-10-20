@@ -393,35 +393,6 @@ def test_terminal_MP_dynamic_wires(backend):
             return qml.probs(q)
 
 
-# @pytest.mark.usefixtures("use_capture")
-# def test_unsupported_cross_scope_registers(backend):
-#     """
-#     Scope jaxprs in Catalyst cannot take multiple registers yet.
-#     Test that an error is raised when a dynamically allocated register in an outside scope
-#     is being used from an inside scope.
-#     """
-
-#     with pytest.raises(
-#         NotImplementedError,
-#         match=textwrap.dedent(
-#             """
-#             Dynamically allocated wires in a parent scope cannot be used in a child
-#             scope yet. Please consider dynamical allocation inside the child scope.
-#             """
-#         ),
-#     ):
-
-#         @qjit(autograph=True)
-#         @qml.qnode(qml.device(backend, wires=3))
-#         def circuit():
-#             wires = qml.allocate(3)
-
-#             for _ in range(3):
-#                 qml.X(wires=wires[0])
-
-#             return qml.probs(wires=[0, 1, 2])
-
-
 @pytest.mark.usefixtures("use_capture")
 def test_unsupported_subroutine(backend):
     """

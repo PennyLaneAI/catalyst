@@ -68,8 +68,6 @@ Therefore, the two central questions we wish to answer is:
    qubit SSA values on its wires?
 """
 
-import textwrap
-
 from catalyst.jax_extras import DynamicJaxprTracer
 from catalyst.jax_primitives import AbstractQbit, AbstractQreg, qextract_p, qinsert_p
 from catalyst.utils.exceptions import CompileError
@@ -422,21 +420,6 @@ def get_in_qubit_values(
         if not qubit_index_recorder.contains(w):
             # First time the global wire index w is encountered
             # Need to extract from fallback qreg
-            # TODO: this can now only be from the global qreg, because right now in from_plxpr
-            # conversion, subscopes (control flow, adjoint, ...) can only take in the global
-            # qreg as the final scope argument. They cannot take an arbitrary number of qreg
-            # values yet.
-            # Supporting multiple registers requires refactoring the from_plxpr conversion's
-            # implementation.
-            # if is_dynamically_allocated_wire(w):
-            #     raise NotImplementedError(
-            #         textwrap.dedent(
-            #             """
-            #         Dynamically allocated wires in a parent scope cannot be used in a child
-            #         scope yet. Please consider dynamical allocation inside the child scope.
-            #         """
-            #         )
-            #     )
             in_qubits.append(fallback_qreg[fallback_qreg.global_index_to_local_index(w)])
             in_qregs.append(fallback_qreg)
 

@@ -128,10 +128,14 @@ print(test_measure_with_reset.mlir)
 @qjit(autograph=True, target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2))
 def test_pass_reg_into_forloop():
+    """
+    Test using a dynamically allocated resgister from inside a subscope.
+    """
 
     # CHECK: [[global_reg:%.+]] = quantum.alloc( 2)
     # CHECK: [[dyn_reg:%.+]] = quantum.alloc( 1)
-    # CHECK: [[for_out:%.+]]:2 = scf.for %arg0 = {{.+}} to {{.+}} step {{.+}} iter_args(%arg1 = [[dyn_reg]], %arg2 = [[global_reg]]) -> (!quantum.reg, !quantum.reg) {
+    # CHECK: [[for_out:%.+]]:2 = scf.for %arg0 = {{.+}} to {{.+}} step {{.+}} iter_args
+    # CHECK-SAME: (%arg1 = [[dyn_reg]], %arg2 = [[global_reg]]) -> (!quantum.reg, !quantum.reg) {
     # CHECK:    [[x_in:%.+]] = quantum.extract %arg1[ 0]
     # CHECK:    [[x_out:%.+]] = quantum.custom "PauliX"() [[x_in]]
     # CHECK:    [[cnot_in:%.+]] = quantum.extract %arg2[ 0]
