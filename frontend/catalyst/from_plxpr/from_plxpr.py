@@ -262,6 +262,7 @@ def handle_qnode(
         self.init_qreg.insert_all_dangling_qubits()
         qdealloc_p.bind(self.init_qreg.get())
         device_release_p.bind()
+        # breakpoint()
         return retvals
 
     if self.requires_decompose_lowering and graph_succeeded:
@@ -468,7 +469,7 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
 
         if any(not qreg.is_qubit_mode() and qreg.expired for qreg in in_qregs + in_ctrl_qregs):
             raise CompileError(f"Deallocated qubits cannot be used, but used in {op.name}.")
-
+        # breakpoint()
         out_qubits = qinst_p.bind(
             *[*in_qubits, *op.data, *in_ctrl_qubits, *control_values],
             op=op.name,
@@ -612,7 +613,7 @@ def handle_qml_alloc(self, *, num_wires, state=None, restored=False):
     for i in range(num_wires):
         new_qreg.extract(i)
 
-    #breakpoint()
+    # breakpoint()
 
     return new_qreg.get_all_current_global_indices()
 
@@ -984,9 +985,9 @@ def trace_from_pennylane(
             fn.static_argnums = static_argnums
 
         plxpr, out_type, out_treedef = make_jaxpr2(fn, **make_jaxpr_kwargs)(*args, **kwargs)
-        breakpoint()
+        # breakpoint()
         jaxpr = from_plxpr(plxpr)(*dynamic_args, **kwargs)
-        breakpoint()
+        # breakpoint()
 
     return jaxpr, out_type, out_treedef, sig
 

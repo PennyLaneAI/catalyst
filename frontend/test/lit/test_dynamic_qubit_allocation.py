@@ -24,7 +24,7 @@ from catalyst import qjit
 from catalyst.jax_primitives import qalloc_p, qdealloc_qb_p, qextract_p
 
 
-@qjit
+@qjit(target="mlir")
 def test_single_qubit_dealloc():
     """
     Unit test for the single qubit dealloc primitive's lowerings.
@@ -95,7 +95,7 @@ def test_basic_dynalloc():
 print(test_basic_dynalloc.mlir)
 
 
-@qjit(autograph=True)
+@qjit(autograph=True, target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=3))
 def test_measure_with_reset():
     """
@@ -124,5 +124,35 @@ def test_measure_with_reset():
 
 print(test_measure_with_reset.mlir)
 
+
+@qjit(autograph=True, target="mlir")
+@qml.qnode(qml.device("lightning.qubit", wires=2))
+def test_pass_reg_into_forloop():
+
+    # CHECK: [[global_reg:%.+]] = quantum.alloc( 2)
+    # CHECK: [[dyn_reg:%.+]] = quantum.alloc( 1)
+    # CHECK: [[for_out:%.+]]:2 = scf.for %arg0 = {{.+}} to {{.+}} step {{.+}} iter_args(%arg1 = [[dyn_reg]], %arg2 = [[global_reg]]) -> (!quantum.reg, !quantum.reg) {
+    # CHECK:    [[x_in:%.+]] = quantum.extract %arg1[ 0]
+    # CHECK:    [[x_out:%.+]] = quantum.custom "PauliX"() [[x_in]]
+    # CHECK:    [[cnot_in:%.+]] = quantum.extract %arg2[ 0]
+    # CHECK:    [[cnot_out:%.+]]:2 = quantum.custom "CNOT"() [[x_out]], [[cnot_in]]
+    # CHECK:    [[global_reg_yield:%.+]] = quantum.insert %arg2[ 0], [[cnot_out]]#1
+    # CHECK:    [[dyn_reg_yield:%.+]] = quantum.insert %arg1[ 0], [[cnot_out]]#0
+    # CHECK:    scf.yield [[dyn_reg_yield]], [[global_reg_yield]] : !quantum.reg, !quantum.reg
+    # CHECK: quantum.dealloc [[for_out]]#0 : !quantum.reg
+
+    with qml.allocate(1) as q:
+        for i in range(3):
+            qml.X(wires=q[0])
+            qml.CNOT(wires=[q[0], 0])
+
+    # CHECK: [[global_bit0:%.+]] = quantum.extract [[for_out]]#1[ 0]
+    # CHECK: [[global_bit1:%.+]] = quantum.extract [[for_out]]#1[ 1]
+    # CHECK: [[obs:%.+]] = quantum.compbasis qubits [[global_bit0]], [[global_bit1]] : !quantum.obs
+    # CHECK: {{.+}} = quantum.probs [[obs]] : tensor<4xf64>
+    return qml.probs(wires=[0, 1])
+
+
+print(test_pass_reg_into_forloop.mlir)
 
 qml.capture.disable()
