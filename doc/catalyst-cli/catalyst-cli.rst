@@ -102,6 +102,7 @@ are saved. Using ``--keep-intermediate`` is equivalent to using ``--save-ir-afte
 """"""""""""""""""""""""""""""""""""""""""
 
 Print SSA IDs using their name location, if provided, as prefix. By default, name location information is not used.
+Name location, or named source location, is a type of source location information that allows attaching a name to a child location.
 
 ``--{passname}``
 """""""""""""""

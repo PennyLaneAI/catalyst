@@ -1,4 +1,4 @@
-// RUN: quantum-opt %s -mlir-use-nameloc-as-prefix -split-input-file | FileCheck %s
+// RUN: quantum-opt %s --use-nameloc-as-prefix -split-input-file | FileCheck %s
 
 func.func @test_alice_qubit() {
     %0 = quantum.alloc( 1) : !quantum.reg
