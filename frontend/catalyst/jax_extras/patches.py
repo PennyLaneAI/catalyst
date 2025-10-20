@@ -44,11 +44,16 @@ __all__ = (
 )
 
 
-def _drop_unused_vars2(jaxpr, constvals):
+def _drop_unused_vars2(
+    constvars, constvals, eqns=None, outvars=None
+):  # pylint: disable=unused-argument
     """
     A patch to not drop unused vars during classical tracing of control flow.
+
+    This function matches the JAX 0.7 signature but doesn't actually drop any vars.
+    Returns the constvars and constvals unchanged (except converting constvals to list).
     """
-    return jaxpr, list(constvals)
+    return constvars, list(constvals)
 
 
 def get_aval2(x):
@@ -212,6 +217,7 @@ gather2_p = standard_primitive(
 
 
 # TODO: Remove this patch when JAX/PennyLane are updated to use the new JAX 0.7+ API.
+# pylint: disable=protected-access
 def patch_primitives():
     """Patch PennyLane/JAX primitives to make them compatible with JAX 0.7+.
 
@@ -230,10 +236,12 @@ def patch_primitives():
         from pennylane.capture.primitives import ctrl_transform_prim
         from pennylane.capture.primitives import cond_prim
         from pennylane.ops.op_math.controlled import Controlled
+        from jax._src.interpreters import partial_eval as pe
 
         original_ctrl_bind = ctrl_transform_prim.bind
         original_cond_bind = cond_prim.bind
         original_controlled_bind = Controlled._primitive.bind
+        original_drop_unused_vars = pe._drop_unused_vars
 
         def patched_ctrl_bind(*args, **kwargs):
             # Convert control_values from list to tuple if present
@@ -255,10 +263,17 @@ def patch_primitives():
                 kwargs["control_values"] = make_hashable(kwargs["control_values"])
             return original_controlled_bind(*args, **kwargs)
 
+        def patched_drop_unused_vars(
+            constvars, constvals, eqns=None, outvars=None
+        ):  # pylint: disable=unused-argument
+            constvars, constvals = original_drop_unused_vars(constvars, constvals, eqns, outvars)
+            return constvars, list(constvals)
+
         # Replace the bind method
         ctrl_transform_prim.bind = patched_ctrl_bind
         cond_prim.bind = patched_cond_bind
         Controlled._primitive.bind = patched_controlled_bind
+        pe._drop_unused_vars = patched_drop_unused_vars
 
     except ImportError:
         pass
@@ -279,5 +294,105 @@ def patch_primitives():
 
         pe.DynamicJaxprTrace.makevar = patched_makevar
         pe.DynamicJaxprTrace.getvar = patched_getvar
+
+        # Patch make_eqn to handle both single aval and list of avals
+        # original_make_eqn = pe.DynamicJaxprTrace.make_eqn
+
+        import jax._src.source_info_util as source_info_util
+        from jax._src.core import JaxprEqnContext, Var
+        from jax._src.interpreters.partial_eval import DynamicJaxprTracer
+        from jax._src.interpreters.partial_eval import TracingEqn
+        from jax._src.interpreters.partial_eval import compute_on
+        from jax._src import config
+        from jax._src.interpreters.partial_eval import xla_metadata_lib
+
+        def internal_make_eqn(self, in_tracers, out_avals, primitive, params,
+               effects, source_info=None, ctx = None, out_tracers=None):
+            source_info = source_info or source_info_util.new_source_info()
+            ctx = ctx or JaxprEqnContext(
+                compute_on.current_compute_type(),
+                config.threefry_partitionable.value,
+                xla_metadata_lib.current_xla_metadata())
+
+            if out_tracers is not None:
+                outvars = [tracer.val for tracer in out_tracers]
+                if config.enable_checks.value:
+                    assert all(isinstance(x, DynamicJaxprTracer) for x in in_tracers)
+                    assert all(isinstance(v,  Var)               for v in outvars)
+                eqn = TracingEqn(in_tracers, outvars, primitive, params, effects, source_info, ctx)
+                return eqn, out_tracers
+            else:
+                outvars = list(map(lambda aval: self.frame.newvar(aval), out_avals))
+                if config.enable_checks.value:
+                    assert all(isinstance(x, DynamicJaxprTracer) for x in in_tracers)
+                    assert all(isinstance(v,  Var)               for v in outvars)
+                eqn = TracingEqn(in_tracers, outvars, primitive, params, effects, source_info, ctx)
+                out_tracers = [DynamicJaxprTracer(self, aval, v, source_info, eqn) for aval, v in zip(out_avals, outvars)]
+                return eqn, out_tracers
+
+        pe.DynamicJaxprTrace.make_eqn_internal = internal_make_eqn
+
+        def patched_make_eqn(
+            self,
+            in_tracers,
+            out_avals,
+            primitive,
+            params,
+            effects,
+            source_info=None,
+            ctx=None,
+            out_tracers=None,
+        ):
+            # Normalize out_avals to a list if it's a single AbstractValue
+            if not isinstance(out_avals, (list, tuple)):
+                # It's a single aval, wrap it in a list
+                out_avals = [out_avals]
+                eqn, out_tracers = self.make_eqn_internal(
+                    in_tracers,
+                    out_avals,
+                    primitive,
+                    params,
+                    effects,
+                    source_info,
+                    ctx,
+                    out_tracers,
+                )
+                # Return single tracer instead of list
+                return eqn, out_tracers[0] if len(out_tracers) == 1 else out_tracers
+            else:
+                return self.make_eqn_internal(
+                    in_tracers,
+                    out_avals,
+                    primitive,
+                    params,
+                    effects,
+                    source_info,
+                    ctx,
+                    out_tracers,
+                )
+
+        pe.DynamicJaxprTrace.make_eqn = patched_make_eqn
+
+        # Patch eqns property
+        def patched_eqns_getter(self):
+            return self.tracing_eqns
+
+        def patched_eqns_setter(self, value):
+            self.tracing_eqns = value
+
+        pe.JaxprStackFrame.eqns = property(patched_eqns_getter, patched_eqns_setter)
+
+
+        import jax._src.lax.lax as lax
+        import jax._src.core as core
+
+        def patched_dyn_shape_staging_rule(trace, source_info, prim, out_aval, *args,
+                            **params):
+            eqn, out_tracer = trace.make_eqn(args, out_aval, prim, params, core.no_effects, source_info)
+            trace.frame.add_eqn(eqn)
+            return out_tracer
+
+        lax._dyn_shape_staging_rule = patched_dyn_shape_staging_rule
+
     except ImportError:
         pass
