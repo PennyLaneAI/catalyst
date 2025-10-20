@@ -44,6 +44,23 @@ __all__ = (
 )
 
 
+def mock_attribute(obj, mock_attribute_name, mock_attribute_value):
+    """Mock the attribute of an object by returning a wrapper."""
+
+    class MockAttributeWrapper:
+        """Wrapper to mock the attribute of an object."""
+
+        def __init__(self, original):
+            self.original = original
+
+        def __getattr__(self, name):
+            if name == mock_attribute_name:
+                return mock_attribute_value
+            return getattr(self.original, name)
+
+    return MockAttributeWrapper(obj)
+
+
 def _drop_unused_vars2(
     constvars, constvals, eqns=None, outvars=None
 ):  # pylint: disable=unused-argument
@@ -306,28 +323,41 @@ def patch_primitives():
         from jax._src import config
         from jax._src.interpreters.partial_eval import xla_metadata_lib
 
-        def internal_make_eqn(self, in_tracers, out_avals, primitive, params,
-               effects, source_info=None, ctx = None, out_tracers=None):
+        def internal_make_eqn(
+            self,
+            in_tracers,
+            out_avals,
+            primitive,
+            params,
+            effects,
+            source_info=None,
+            ctx=None,
+            out_tracers=None,
+        ):
             source_info = source_info or source_info_util.new_source_info()
             ctx = ctx or JaxprEqnContext(
                 compute_on.current_compute_type(),
                 config.threefry_partitionable.value,
-                xla_metadata_lib.current_xla_metadata())
+                xla_metadata_lib.current_xla_metadata(),
+            )
 
             if out_tracers is not None:
                 outvars = [tracer.val for tracer in out_tracers]
                 if config.enable_checks.value:
                     assert all(isinstance(x, DynamicJaxprTracer) for x in in_tracers)
-                    assert all(isinstance(v,  Var)               for v in outvars)
+                    assert all(isinstance(v, Var) for v in outvars)
                 eqn = TracingEqn(in_tracers, outvars, primitive, params, effects, source_info, ctx)
                 return eqn, out_tracers
             else:
                 outvars = list(map(lambda aval: self.frame.newvar(aval), out_avals))
                 if config.enable_checks.value:
                     assert all(isinstance(x, DynamicJaxprTracer) for x in in_tracers)
-                    assert all(isinstance(v,  Var)               for v in outvars)
+                    assert all(isinstance(v, Var) for v in outvars)
                 eqn = TracingEqn(in_tracers, outvars, primitive, params, effects, source_info, ctx)
-                out_tracers = [DynamicJaxprTracer(self, aval, v, source_info, eqn) for aval, v in zip(out_avals, outvars)]
+                out_tracers = [
+                    DynamicJaxprTracer(self, aval, v, source_info, eqn)
+                    for aval, v in zip(out_avals, outvars)
+                ]
                 return eqn, out_tracers
 
         pe.DynamicJaxprTrace.make_eqn_internal = internal_make_eqn
@@ -382,13 +412,13 @@ def patch_primitives():
 
         pe.JaxprStackFrame.eqns = property(patched_eqns_getter, patched_eqns_setter)
 
-
         import jax._src.lax.lax as lax
         import jax._src.core as core
 
-        def patched_dyn_shape_staging_rule(trace, source_info, prim, out_aval, *args,
-                            **params):
-            eqn, out_tracer = trace.make_eqn(args, out_aval, prim, params, core.no_effects, source_info)
+        def patched_dyn_shape_staging_rule(trace, source_info, prim, out_aval, *args, **params):
+            eqn, out_tracer = trace.make_eqn(
+                args, out_aval, prim, params, core.no_effects, source_info
+            )
             trace.frame.add_eqn(eqn)
             return out_tracer
 

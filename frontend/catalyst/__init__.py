@@ -71,41 +71,14 @@ if not INSTALLED:
 sys.modules["mlir_quantum.ir"] = __import__("jaxlib.mlir.ir").mlir.ir
 sys.modules["mlir_quantum._mlir_libs"] = __import__("jaxlib.mlir._mlir_libs").mlir._mlir_libs
 
+from jaxlib.mlir._mlir_libs import _mlir as _ods_cext
 from catalyst.jax_extras.patches import patch_primitives
+from catalyst.jax_extras.patches import mock_attribute
 
 patch_primitives()
-
-def patch_mlir_ops_gen_files():
-    """Patch the MLIR ops gen files to integrate with JAX."""
-    mlir_root = os.path.join(os.path.dirname(__file__), "../../mlir")
-    ops_gen_paths = [
-        mlir_root + "/build/python/dialects/*_ops_gen.py",
-        mlir_root + "/llvm-project/build/tools/mlir/python/dialects/*_ops_gen.py",
-    ]
-
-
-    def fix_ops_gen_file(filepath):
-        """Comment out the problematic line in a single file."""
-        with open(filepath, "r", encoding="utf-8") as f:
-            content = f.read()
-
-        old_line = "_ods_cext.globals.register_traceback_file_exclusion(__file__)"
-        # comment out for jaxlib API incompatibility
-        new_line = "# _ods_cext.globals.register_traceback_file_exclusion(__file__)"
-
-        if old_line in content and new_line not in content:
-            content = content.replace(old_line, new_line)
-            with open(filepath, "w", encoding="utf-8") as f:
-                f.write(content)
-
-
-    for pattern in ops_gen_paths:
-        for filepath in glob.glob(pattern):
-            if os.path.islink(filepath):
-                continue
-            fix_ops_gen_file(filepath)
-
-patch_mlir_ops_gen_files()
+_ods_cext.globals = mock_attribute(
+    _ods_cext.globals, "register_traceback_file_exclusion", lambda x: None
+)
 
 # Disable JAX's Shardy partitioner for JAX 0.7+ compatibility
 # Shardy adds 'sdy' dialect attributes that Catalyst doesn't support yet
@@ -233,6 +206,7 @@ def find_package_root(package_name):
     # resolve package name to package
     package = importlib.import_module(package_name)
     return os.path.dirname(package.__file__)
+
 
 pennylane_root = find_package_root("pennylane")
 jax_root = find_package_root("jax")
