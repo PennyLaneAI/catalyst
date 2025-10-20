@@ -51,8 +51,7 @@ def _calling_convention(interpreter, closed_jaxpr, *args_plus_qreg):
     converter.qubit_index_recorder[global_index] = dyn_qreg_handler
 
     # pylint: disable-next=cell-var-from-loop
-    # breakpoint()
-    # argsss.pop()  # pop the consts for global wire indices
+
     retvals = converter(closed_jaxpr, *argsss)
     init_qreg.insert_all_dangling_qubits()
     dyn_qreg_handler.insert_all_dangling_qubits()
@@ -216,18 +215,6 @@ def handle_for_loop(
             dyn_regs.append(self.qubit_index_recorder[inval])
             consts_pop.append(inval)
 
-    # _plxpr_invals = ()
-    # for plxpr_inval in plxpr_invals:
-    #     if plxpr_inval not in consts_pop:
-    #         _plxpr_invals += (plxpr_inval,)
-    # plxpr_invals = _plxpr_invals
-
-    # breakpoint()
-    # for dyn_reg in dyn_regs:
-    #     dyn_reg.insert_all_dangling_qubits()
-
-    # breakpoint()
-
     start_plus_args_plus_qreg = [
         start,
         *args,
@@ -236,18 +223,12 @@ def handle_for_loop(
     ]
 
     consts = plxpr_invals[consts_slice]
-    # breakpoint()
-    # _consts = ()
-    # for const in consts:
-    #     if const not in consts_pop:
-    #         _consts += (const,)
-    # consts = _consts
-    # breakpoint()
+
     jaxpr = ClosedJaxpr(jaxpr_body_fn, consts)
 
     f = partial(_calling_convention, self, jaxpr)
     converted_jaxpr_branch = jax.make_jaxpr(f)(*start_plus_args_plus_qreg).jaxpr
-    # breakpoint()
+
     converted_closed_jaxpr_branch = ClosedJaxpr(convert_constvars_jaxpr(converted_jaxpr_branch), ())
 
     # Build Catalyst compatible input values
@@ -271,7 +252,6 @@ def handle_for_loop(
         nimplicit=0,
         preserve_dimensions=True,
     )
-    # breakpoint()
 
     # We assume the last output value is the returned qreg.
     # Update the current qreg and remove it from the output values.
