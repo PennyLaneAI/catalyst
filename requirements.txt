@@ -16,11 +16,11 @@ cmake>=3.26
 ninja
 
 # formatting/linting
-black
+black==25.9.0
 clang-format~=20.1
 clang-tidy~=20.1
-pylint==3.3.9
-isort
+pylint==4.0.2
+isort==7.0.0
 
 # testing
 flaky
