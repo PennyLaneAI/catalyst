@@ -32,7 +32,7 @@ from catalyst.jax_primitives import cond_p, for_p, while_p
 
 
 def _calling_convention(
-    interpreter, closed_jaxpr, *args_plus_qreg, num_dynamic_alloced_qregs=0, root_hashes=[]
+    interpreter, closed_jaxpr, *args_plus_qreg, num_dynamic_alloced_qregs=0, root_hashes=()
 ):
     # Arg structure (all args are tracers, since this function is to be `make_jaxpr`'d):
     # Regular args, then dynamically allocated qregs, then global qreg
@@ -62,8 +62,6 @@ def _calling_convention(
         # qreg tracers outside
         dyn_qreg_handler.root_hash = root_hash
         converter.qubit_index_recorder[root_hash] = dyn_qreg_handler
-
-    # pylint: disable-next=cell-var-from-loop
 
     retvals = converter(closed_jaxpr, *args)
     init_qreg.insert_all_dangling_qubits()
