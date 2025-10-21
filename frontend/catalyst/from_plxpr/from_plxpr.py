@@ -46,6 +46,11 @@ from pennylane.transforms import merge_amplitude_embedding as pl_merge_amplitude
 from pennylane.transforms import merge_rotations as pl_merge_rotations
 from pennylane.transforms import single_qubit_fusion as pl_single_qubit_fusion
 from pennylane.transforms import unitary_to_rot as pl_unitary_to_rot
+from pennylane.ftqc.catalyst_passes import to_ppr as pl_to_ppr
+from pennylane.ftqc.catalyst_passes import commute_ppr as pl_commute_ppr
+from pennylane.ftqc.catalyst_passes import merge_ppr_ppm as pl_merge_ppr_ppm
+from pennylane.ftqc.catalyst_passes import pprm_to_mbqc as pl_pprm_to_mbqc
+from pennylane.ftqc.catalyst_passes import reduce_t_depth as pl_reduce_t_depth
 
 from catalyst.device import extract_backend_info
 from catalyst.from_plxpr.decompose import COMPILER_OPS_FOR_DECOMPOSITION, DecompRuleInterpreter
@@ -289,11 +294,16 @@ def handle_qnode(
 transforms_to_passes = {
     pl_cancel_inverses: ("remove-chained-self-inverse", False),
     pl_commute_controlled: (None, False),
+    pl_commute_ppr: ("commute-ppr", False),
     pl_decompose: (None, False),
     pl_map_wires: (None, False),
     pl_merge_amplitude_embedding: (None, True),
+    pl_merge_ppr_ppm: ("merge-ppr-ppm", False),
     pl_merge_rotations: ("merge-rotations", False),
+    pl_pprm_to_mbqc: ("pprm-to-mbqc", False),
+    pl_reduce_t_depth: ("reduce-t-depth", False),
     pl_single_qubit_fusion: (None, False),
+    pl_to_ppr: ("to-ppr", False),
     pl_unitary_to_rot: (None, False),
 }
 

@@ -24,6 +24,14 @@ import pennylane as qml
 import pennylane.ftqc as plft
 import pytest
 
+from pennylane.ftqc.catalyst_passes import (
+    commute_ppr,
+    merge_ppr_ppm,
+    pprm_to_mbqc,
+    reduce_t_depth,
+    to_ppr,
+)
+
 from catalyst import qjit
 from catalyst.ftqc import mbqc_pipeline as catalyst_mbqc_pipeline
 from catalyst.utils.exceptions import CompileError
@@ -386,6 +394,39 @@ def test_cnot_in_mbqc_representation(mbqc_pipeline):
 
     assert -1.0 <= expval_z_0 <= 1.0
     assert -1.0 <= expval_z_1 <= 1.0
+
+
+# ---------------------------------------------------------------------------- #
+# Accessing PPR/PPM catalyst passes with the unified compiler for MBQC conversion
+# ---------------------------------------------------------------------------- #
+
+
+@pytest.mark.usefixtures("use_capture")
+@pytest.mark.parametrize(
+    "pass_fn, pass_name",
+    [
+        (to_ppr, "to-ppr"),
+        (commute_ppr, "commute-ppr"),
+        (merge_ppr_ppm, "merge-ppr-ppm"),
+        (pprm_to_mbqc, "pprm-to-mbqc"),
+        (reduce_t_depth, "reduce-t-depth"),
+    ],
+)
+def test_pass_converts_to_mlir(pass_fn, pass_name):
+    """Test that the wrappers to allow using the PRR/PPM transforms with
+    capture enabled add the transforms to the MLIR as expected"""
+
+    @qml.qjit(target="mlir")
+    @pass_fn
+    @qml.qnode(qml.device("lightning.qubit", wires=3), shots=1000)
+    def circ():
+        qml.H(0)
+        qml.S(0)
+        qml.T(1)
+        qml.CNOT([0, 1])
+        return qml.sample()
+
+    assert pass_name in circ.mlir
 
 
 if __name__ == "__main__":
