@@ -228,7 +228,8 @@ def handle_for_loop(
     dynalloced_wire_global_indices = []
     for inval in plxpr_invals:
         if (
-            self.qubit_index_recorder.contains(inval)
+            isinstance(inval, int)
+            and self.qubit_index_recorder.contains(inval)
             and self.qubit_index_recorder[inval] is not self.init_qreg
         ):
             dyn_qreg = self.qubit_index_recorder[inval]
