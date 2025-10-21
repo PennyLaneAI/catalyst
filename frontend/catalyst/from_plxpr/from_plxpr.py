@@ -40,6 +40,7 @@ from pennylane.ftqc.primitives import measure_in_basis_prim as plxpr_measure_in_
 from pennylane.measurements import CountsMP
 from pennylane.ops.functions.map_wires import _map_wires_transform as pl_map_wires
 from pennylane.transforms import cancel_inverses as pl_cancel_inverses
+from pennylane.transforms import clifford_t_decomposition as pl_clifford_t_decomposition
 from pennylane.transforms import commute_controlled as pl_commute_controlled
 from pennylane.transforms import decompose as pl_decompose
 from pennylane.transforms import merge_amplitude_embedding as pl_merge_amplitude_embedding
@@ -295,6 +296,7 @@ transforms_to_passes = {
     pl_merge_rotations: ("merge-rotations", False),
     pl_single_qubit_fusion: (None, False),
     pl_unitary_to_rot: (None, False),
+    pl_clifford_t_decomposition: ("rs-decomposition", False),
 }
 
 

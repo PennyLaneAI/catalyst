@@ -27,6 +27,7 @@ std::unique_ptr<mlir::Pass> createEmitCatalystPyInterfacePass();
 std::unique_ptr<mlir::Pass> createCopyGlobalMemRefPass();
 std::unique_ptr<mlir::Pass> createAdjointLoweringPass();
 std::unique_ptr<mlir::Pass> createRemoveChainedSelfInversePass();
+std::unique_ptr<mlir::Pass> createRSDecompositionPass();
 std::unique_ptr<mlir::Pass> createAnnotateFunctionPass();
 std::unique_ptr<mlir::Pass> createSplitMultipleTapesPass();
 std::unique_ptr<mlir::Pass> createMergeRotationsPass();

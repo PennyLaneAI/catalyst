@@ -102,6 +102,12 @@ def RemoveChainedSelfInversePass : Pass<"remove-chained-self-inverse"> {
     let constructor = "catalyst::createRemoveChainedSelfInversePass()";
 }
 
+def RSDecompositionPass : Pass<"rs-decomposition"> {
+    let summary = "Perform RS decomposition.";
+
+    let constructor = "catalyst::createRSDecompositionPass()";
+}
+
 def MergeRotationsPass : Pass<"merge-rotations"> {
     let summary = "Perform merging of chained rotation gates about the same axis.";
 
