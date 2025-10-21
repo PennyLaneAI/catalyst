@@ -19,7 +19,8 @@ import logging
 import textwrap
 
 import jax
-from jax._src.dispatch import jaxpr_replicas
+from jax._src import core
+from jax._src.interpreters.pxla import _jaxpr_replicas as jaxpr_replicas
 from jax._src.effects import ordered_effects as jax_ordered_effects
 from jax._src.interpreters.mlir import _module_name_regex
 from jax._src.sharding_impls import AxisEnv, ReplicaAxisContext
@@ -138,6 +139,11 @@ def custom_lower_jaxpr_to_module(
         module_name = _module_name_regex.sub("_", module_name)
         ctx.module.operation.attributes["sym_name"] = ir.StringAttr.get(module_name)
 
+        const_args = core.jaxpr_const_args(jaxpr.jaxpr)
+        const_arg_avals = [core.shaped_abstractify(c) for c in const_args]
+        num_const_args = len(const_arg_avals)
+        in_avals = const_arg_avals + jaxpr.in_avals
+
         # Use main_function=False to preserve the function name (e.g., "jit_func")
         # instead of renaming it to "main"
         lower_jaxpr_to_fun(
@@ -145,6 +151,8 @@ def custom_lower_jaxpr_to_module(
             func_name,
             jaxpr,
             effects,
+            num_const_args=num_const_args,
+            in_avals=in_avals,
             main_function=False,
             replicated_args=replicated_args,
             arg_shardings=arg_shardings,
