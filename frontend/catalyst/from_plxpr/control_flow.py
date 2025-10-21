@@ -52,6 +52,7 @@ def _calling_convention(interpreter, closed_jaxpr, *args_plus_qregs, outer_dynqr
     converter.init_qreg = init_qreg
 
     # add dynamic qregs to recorder
+    qreg_map = {}
     dyn_qreg_handlers = []
     for dyn_qreg, outer_dynqreg_handler in zip(
         dynalloced_qregs, outer_dynqreg_handlers, strict=True
@@ -64,11 +65,7 @@ def _calling_convention(interpreter, closed_jaxpr, *args_plus_qregs, outer_dynqr
         # qreg tracers outside
         dyn_qreg_handler.root_hash = outer_dynqreg_handler.root_hash
 
-    # Each qreg argument of the subscope corresponds to a qreg from the outer scope
-    qreg_map = {}
-    for dyn_qreg_handler, outer_dynqreg_handler in zip(
-        dyn_qreg_handlers, outer_dynqreg_handlers, strict=True
-    ):
+        # Each qreg argument of the subscope corresponds to a qreg from the outer scope
         qreg_map[outer_dynqreg_handler] = dyn_qreg_handler
 
     # The new interpreter's recorder needs to be updated to include the qreg args
