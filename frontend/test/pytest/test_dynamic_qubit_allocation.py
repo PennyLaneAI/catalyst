@@ -30,430 +30,418 @@ from catalyst.jax_primitives import subroutine
 from catalyst.utils.exceptions import CompileError
 
 
-class TestBasicFunctionality:
+@pytest.mark.usefixtures("use_capture")
+def test_basic_dynamic_wire_alloc_plain_API(backend):
     """
-    Test basic functionality regarding dynamic wire allocation.
+    Test basic qml.allocate and qml.deallocate.
     """
 
-    @pytest.mark.usefixtures("use_capture")
-    def test_basic_dynamic_wire_alloc_plain_API(self, backend):
-        """
-        Test basic qml.allocate and qml.deallocate.
-        """
+    @qjit
+    @qml.qnode(qml.device(backend, wires=3))
+    def circuit():
+        qml.X(1)  # |010>
+
+        q = qml.allocate(1)  # |010> and |0>
+        qml.X(q[0])  # |010> and |1>
+        qml.CNOT(wires=[q[0], 2])  # |011> and |1>
+        qml.deallocate(q[0])  # |011>
+
+        return qml.probs(wires=[0, 1, 2])
+
+    observed = circuit()
+
+    expected = [0, 0, 0, 1, 0, 0, 0, 0]
+    assert np.allclose(expected, observed)
+
+
+@pytest.mark.usefixtures("use_capture")
+def test_basic_dynamic_wire_alloc_ctx_API(backend):
+    """
+    Test basic qml.allocate with context manager API.
+    """
+
+    @qjit
+    @qml.qnode(qml.device(backend, wires=3))
+    def circuit():
+        qml.X(1)
+
+        with qml.allocate(1) as q:
+            qml.X(q[0])
+            qml.CNOT(wires=[q[0], 2])
+
+        return qml.probs(wires=[0, 1, 2])
+
+    observed = circuit()
+
+    expected = [0, 0, 0, 1, 0, 0, 0, 0]
+    assert np.allclose(expected, observed)
+
+
+@pytest.mark.usefixtures("use_capture")
+def test_measure(backend):
+    """
+    Test qml.allocate with qml.Measure ops.
+    """
+
+    @qjit(autograph=True)
+    @qml.qnode(qml.device(backend, wires=1))
+    def circuit():
+        with qml.allocate(1) as q:
+            qml.Hadamard(q[0])
+            m = qml.measure(wires=q[0], postselect=1)
+
+        if m:
+            qml.X(0)
+
+        return qml.probs(wires=[0])  # |1>
+
+    observed = circuit()
+
+    expected = [0, 1]
+    assert np.allclose(expected, observed)
+
+
+@pytest.mark.usefixtures("use_capture")
+def test_measure_with_reset(backend):
+    """
+    Test qml.allocate with qml.Measure ops with resetting.
+    """
+
+    @qjit(autograph=True)
+    @qml.qnode(qml.device(backend, wires=1))
+    def circuit():
+        with qml.allocate(1) as q:
+            qml.Hadamard(q[0])
+            # measure 1 and reset q[0] to |0>
+            m1 = qml.measure(wires=q[0], reset=True, postselect=1)
+            # measure 0
+            m0 = qml.measure(wires=q[0])
+
+        if m0:  # should not be hit
+            qml.RX(37.42, wires=[0])
+
+        if m1:  # should be hit
+            qml.X(wires=[0])
+
+        return qml.probs(wires=[0])
+
+    observed = circuit()
+
+    expected = [0, 1]
+    assert np.allclose(expected, observed)
+
+
+@pytest.mark.usefixtures("use_capture")
+@pytest.mark.parametrize("ctrl_val, expected", [(False, [0, 1]), (True, [1, 0])])
+def test_qml_ctrl(ctrl_val, expected, backend):
+    """
+    Test qml.allocate with qml.ctrl ops.
+    """
+
+    @qjit
+    @qml.qnode(qml.device(backend, wires=1))
+    def circuit():
+        with qml.allocate(1) as q:
+            qml.ctrl(qml.X, (q), control_values=ctrl_val)(wires=0)
+        return qml.probs(wires=[0])
+
+    observed = circuit()
+
+    assert np.allclose(expected, observed)
+
+
+@pytest.mark.usefixtures("use_capture")
+def test_QubitUnitary(backend):
+    """
+    Test qml.allocate with qml.QubitUnitary ops.
+    """
+
+    @qjit
+    @qml.qnode(qml.device(backend, wires=1))
+    def circuit():
+        with qml.allocate(2) as qs:
+            qml.QubitUnitary(jnp.identity(8), wires=[0, qs[0], qs[1]])
+        return qml.probs(wires=[0])
+
+    observed = circuit()
+
+    expected = [1, 0]
+    assert np.allclose(expected, observed)
+
+
+@pytest.mark.usefixtures("use_capture")
+def test_StatePrep(backend):
+    """
+    Test qml.allocate with qml.StatePrep ops.
+    """
+
+    @qjit
+    @qml.qnode(qml.device(backend, wires=1))
+    def circuit():
+        with qml.allocate(1) as q:
+            qml.StatePrep(jnp.array([0, 0, 0, 1]), wires=[0, q[0]])  # |11>
+        return qml.probs(wires=[0])  # |1>
+
+    observed = circuit()
+
+    expected = [0, 1]
+    assert np.allclose(expected, observed)
+
+
+@pytest.mark.usefixtures("use_capture")
+def test_BasisState(backend):
+    """
+    Test qml.allocate with qml.BasisState ops.
+    """
+
+    @qjit
+    @qml.qnode(qml.device(backend, wires=1))
+    def circuit():
+        with qml.allocate(1) as q:
+            qml.BasisState(jnp.array([1, 0]), wires=[q[0], 0])  # |10>
+        return qml.probs(wires=[0])  # |0>
+
+    observed = circuit()
+
+    expected = [1, 0]
+    assert np.allclose(expected, observed)
+
+
+@pytest.mark.usefixtures("use_capture")
+@pytest.mark.parametrize("cond, expected", [(True, [0, 0, 1, 0]), (False, [0, 1, 0, 0])])
+def test_dynamic_wire_alloc_cond(cond, expected, backend):
+    """
+    Test qml.allocate and qml.deallocate inside cond.
+    """
+
+    @qjit(autograph=True)
+    @qml.qnode(qml.device(backend, wires=2))
+    def circuit(c):
+        if c:
+            q = qml.allocate(1)[0]
+            qml.X(wires=q)
+            qml.CNOT(wires=[q, 0])
+            qml.deallocate(q)
+        else:
+            q = qml.allocate(1)[0]
+            qml.X(wires=q)
+            qml.CNOT(wires=[q, 1])
+            qml.deallocate(q)
+
+        return qml.probs(wires=[0, 1])
+
+    observed = circuit(cond)
+
+    assert np.allclose(expected, observed)
+
+
+@pytest.mark.usefixtures("use_capture")
+@pytest.mark.parametrize(
+    "num_iter, expected", [(3, [0, 0, 1, 0, 0, 0, 0, 0]), (4, [1, 0, 0, 0, 0, 0, 0, 0])]
+)
+def test_dynamic_wire_alloc_forloop(num_iter, expected, backend):
+    """
+    Test qml.allocate and qml.deallocate inside for loop.
+    """
+
+    @qjit(autograph=True)
+    @qml.qnode(qml.device(backend, wires=3))
+    def circuit(N):
+        for _ in range(N):
+            q = qml.allocate(1)[0]
+            qml.X(wires=q)
+            qml.CNOT(wires=[q, 1])
+            qml.deallocate(q)
+
+        return qml.probs(wires=[0, 1, 2])
+
+    observed = circuit(num_iter)
+
+    assert np.allclose(expected, observed)
+
+
+@pytest.mark.usefixtures("use_capture")
+def test_dynamic_wire_alloc_forloop_outside(backend):
+    """
+    Test qml.allocate and qml.deallocate outside for loop.
+    """
+
+    @qjit(autograph=True)
+    @qml.qnode(qml.device(backend, wires=1))
+    def circuit():
+        with qml.allocate(1) as q:
+            qml.X(wires=q[0])
+            for _ in range(3):
+                qml.CNOT(wires=[q[0], 0])
+
+        return qml.probs(wires=[0])
+
+    observed = circuit()
+    expected = [0, 1]
+
+    assert np.allclose(expected, observed)
+
+
+@pytest.mark.usefixtures("use_capture")
+def test_dynamic_wire_alloc_forloop_outside_multiple_regs(backend):
+    """
+    Test using multiple dynamically allocated registers from inside for loop.
+    """
+
+    @qjit(autograph=True)
+    @qml.qnode(qml.device(backend, wires=1))
+    def circuit():
+        with qml.allocate(1) as q1:
+            with qml.allocate(1) as q2:
+                for _ in range(3):
+                    qml.CNOT(wires=[q1[0], 0])
+                    qml.CNOT(wires=[q2[0], 0])
+
+        return qml.probs(wires=[0])
+
+    observed = circuit()
+    expected = [1, 0]
+
+    assert np.allclose(expected, observed)
+
+
+@pytest.mark.usefixtures("use_capture")
+@pytest.mark.parametrize(
+    "num_iter, expected", [(3, [0, 0, 1, 0, 0, 0, 0, 0]), (4, [1, 0, 0, 0, 0, 0, 0, 0])]
+)
+def test_dynamic_wire_alloc_whileloop(num_iter, expected, backend):
+    """
+    Test qml.allocate and qml.deallocate inside while loop.
+    """
+
+    @qjit(autograph=True)
+    @qml.qnode(qml.device(backend, wires=3))
+    def circuit(N):
+        i = 0
+        while i < N:
+            q = qml.allocate(1)[0]
+            qml.X(wires=q)
+            qml.CNOT(wires=[q, 1])
+            qml.deallocate(q)
+            i += 1
+
+        return qml.probs(wires=[0, 1, 2])
+
+    observed = circuit(num_iter)
+
+    assert np.allclose(expected, observed)
+
+
+def test_no_capture(backend):
+    """
+    Test error message when used without capture.
+    """
+    with pytest.raises(
+        CompileError,
+        match=re.escape("qml.allocate() is only supported with program capture enabled."),
+    ):
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=3))
+        @qml.qnode(qml.device(backend, wires=1))
         def circuit():
-            qml.X(1)  # |010>
+            with qml.allocate(1) as _:
+                pass
+            return qml.probs(wires=[0])
 
-            q = qml.allocate(1)  # |010> and |0>
-            qml.X(q[0])  # |010> and |1>
-            qml.CNOT(wires=[q[0], 2])  # |011> and |1>
-            qml.deallocate(q[0])  # |011>
 
-            return qml.probs(wires=[0, 1, 2])
+@pytest.mark.usefixtures("use_capture")
+def test_use_after_free(backend):
+    """
+    Test error message when used after free.
+    """
 
-        observed = circuit()
-
-        expected = [0, 0, 0, 1, 0, 0, 0, 0]
-        assert np.allclose(expected, observed)
-
-    @pytest.mark.usefixtures("use_capture")
-    def test_basic_dynamic_wire_alloc_ctx_API(self, backend):
-        """
-        Test basic qml.allocate with context manager API.
-        """
+    with pytest.raises(
+        CompileError,
+        match="Deallocated qubits cannot be used, but used in Hadamard.",
+    ):
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=3))
+        @qml.qnode(qml.device(backend, wires=1))
         def circuit():
-            qml.X(1)
-
             with qml.allocate(1) as q:
                 qml.X(q[0])
-                qml.CNOT(wires=[q[0], 2])
-
-            return qml.probs(wires=[0, 1, 2])
-
-        observed = circuit()
-
-        expected = [0, 0, 0, 1, 0, 0, 0, 0]
-        assert np.allclose(expected, observed)
-
-    @pytest.mark.usefixtures("use_capture")
-    def test_measure(self, backend):
-        """
-        Test qml.allocate with qml.Measure ops.
-        """
-
-        @qjit(autograph=True)
-        @qml.qnode(qml.device(backend, wires=1))
-        def circuit():
-            with qml.allocate(1) as q:
-                qml.Hadamard(q[0])
-                m = qml.measure(wires=q[0], postselect=1)
-
-            if m:
-                qml.X(0)
-
-            return qml.probs(wires=[0])  # |1>
-
-        observed = circuit()
-
-        expected = [0, 1]
-        assert np.allclose(expected, observed)
-
-    @pytest.mark.usefixtures("use_capture")
-    def test_measure_with_reset(self, backend):
-        """
-        Test qml.allocate with qml.Measure ops with resetting.
-        """
-
-        @qjit(autograph=True)
-        @qml.qnode(qml.device(backend, wires=1))
-        def circuit():
-            with qml.allocate(1) as q:
-                qml.Hadamard(q[0])
-                # measure 1 and reset q[0] to |0>
-                m1 = qml.measure(wires=q[0], reset=True, postselect=1)
-                # measure 0
-                m0 = qml.measure(wires=q[0])
-
-            if m0:  # should not be hit
-                qml.RX(37.42, wires=[0])
-
-            if m1:  # should be hit
-                qml.X(wires=[0])
-
+            qml.Hadamard(q[0])
             return qml.probs(wires=[0])
 
-        observed = circuit()
 
-        expected = [0, 1]
-        assert np.allclose(expected, observed)
+@pytest.mark.usefixtures("use_capture")
+def test_terminal_MP_all_wires(backend):
+    """
+    Test error message when used with terminal measurements on all wires.
+    """
 
-    @pytest.mark.usefixtures("use_capture")
-    @pytest.mark.parametrize("ctrl_val, expected", [(False, [0, 1]), (True, [1, 0])])
-    def test_qml_ctrl(self, ctrl_val, expected, backend):
-        """
-        Test qml.allocate with qml.ctrl ops.
-        """
+    with pytest.raises(
+        CompileError,
+        match=textwrap.dedent(
+            """
+            Terminal measurements must take in an explicit list of wires when
+            dynamically allocated wires are present in the program.
+            """
+        ),
+    ):
 
         @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def circuit():
-            with qml.allocate(1) as q:
-                qml.ctrl(qml.X, (q), control_values=ctrl_val)(wires=0)
-            return qml.probs(wires=[0])
-
-        observed = circuit()
-
-        assert np.allclose(expected, observed)
-
-    @pytest.mark.usefixtures("use_capture")
-    def test_QubitUnitary(self, backend):
-        """
-        Test qml.allocate with qml.QubitUnitary ops.
-        """
-
-        @qjit
-        @qml.qnode(qml.device(backend, wires=1))
-        def circuit():
-            with qml.allocate(2) as qs:
-                qml.QubitUnitary(jnp.identity(8), wires=[0, qs[0], qs[1]])
-            return qml.probs(wires=[0])
-
-        observed = circuit()
-
-        expected = [1, 0]
-        assert np.allclose(expected, observed)
-
-    @pytest.mark.usefixtures("use_capture")
-    def test_StatePrep(self, backend):
-        """
-        Test qml.allocate with qml.StatePrep ops.
-        """
-
-        @qjit
-        @qml.qnode(qml.device(backend, wires=1))
-        def circuit():
-            with qml.allocate(1) as q:
-                qml.StatePrep(jnp.array([0, 0, 0, 1]), wires=[0, q[0]])  # |11>
-            return qml.probs(wires=[0])  # |1>
-
-        observed = circuit()
-
-        expected = [0, 1]
-        assert np.allclose(expected, observed)
-
-    @pytest.mark.usefixtures("use_capture")
-    def test_BasisState(self, backend):
-        """
-        Test qml.allocate with qml.BasisState ops.
-        """
-
-        @qjit
-        @qml.qnode(qml.device(backend, wires=1))
-        def circuit():
-            with qml.allocate(1) as q:
-                qml.BasisState(jnp.array([1, 0]), wires=[q[0], 0])  # |10>
-            return qml.probs(wires=[0])  # |0>
-
-        observed = circuit()
-
-        expected = [1, 0]
-        assert np.allclose(expected, observed)
-
-
-class TestCond:
-    """
-    Test dynamic wire allocation with conditionals.
-    """
-
-    @pytest.mark.usefixtures("use_capture")
-    @pytest.mark.parametrize("cond, expected", [(True, [0, 0, 1, 0]), (False, [0, 1, 0, 0])])
-    def test_dynamic_wire_alloc_cond(self, cond, expected, backend):
-        """
-        Test qml.allocate and qml.deallocate inside cond.
-        """
-
-        @qjit(autograph=True)
-        @qml.qnode(qml.device(backend, wires=2))
-        def circuit(c):
-            if c:
-                q = qml.allocate(1)[0]
-                qml.X(wires=q)
-                qml.CNOT(wires=[q, 0])
-                qml.deallocate(q)
-            else:
-                q = qml.allocate(1)[0]
-                qml.X(wires=q)
-                qml.CNOT(wires=[q, 1])
-                qml.deallocate(q)
-
-            return qml.probs(wires=[0, 1])
-
-        observed = circuit(cond)
-
-        assert np.allclose(expected, observed)
-
-
-class TestForLoop:
-    """
-    Test dynamic wire allocation with for loops.
-    """
-
-    @pytest.mark.usefixtures("use_capture")
-    @pytest.mark.parametrize(
-        "num_iter, expected", [(3, [0, 0, 1, 0, 0, 0, 0, 0]), (4, [1, 0, 0, 0, 0, 0, 0, 0])]
-    )
-    def test_dynamic_wire_alloc_forloop(self, num_iter, expected, backend):
-        """
-        Test qml.allocate and qml.deallocate inside for loop.
-        """
-
-        @qjit(autograph=True)
-        @qml.qnode(qml.device(backend, wires=3))
-        def circuit(N):
-            for _ in range(N):
-                q = qml.allocate(1)[0]
-                qml.X(wires=q)
-                qml.CNOT(wires=[q, 1])
-                qml.deallocate(q)
-
-            return qml.probs(wires=[0, 1, 2])
-
-        observed = circuit(num_iter)
-
-        assert np.allclose(expected, observed)
-
-    @pytest.mark.usefixtures("use_capture")
-    def test_dynamic_wire_alloc_forloop_outside(self, backend):
-        """
-        Test qml.allocate and qml.deallocate outside for loop.
-        """
-
-        @qjit(autograph=True)
-        @qml.qnode(qml.device(backend, wires=1))
-        def circuit():
-            with qml.allocate(1) as q:
-                qml.X(wires=q[0])
-                for _ in range(3):
-                    qml.CNOT(wires=[q[0], 0])
-
-            return qml.probs(wires=[0])
-
-        observed = circuit()
-        expected = [0, 1]
-
-        assert np.allclose(expected, observed)
-
-    @pytest.mark.usefixtures("use_capture")
-    def test_dynamic_wire_alloc_forloop_outside_multiple_regs(self, backend):
-        """
-        Test using multiple dynamically allocated registers from inside for loop.
-        """
-
-        @qjit(autograph=True)
-        @qml.qnode(qml.device(backend, wires=1))
-        def circuit():
-            with qml.allocate(1) as q1:
-                with qml.allocate(1) as q2:
-                    for _ in range(3):
-                        qml.CNOT(wires=[q1[0], 0])
-                        qml.CNOT(wires=[q2[0], 0])
-
-            return qml.probs(wires=[0])
-
-        observed = circuit()
-        expected = [1, 0]
-
-        assert np.allclose(expected, observed)
-
-
-class TestWhileLoop:
-    """
-    Test dynamic wire allocation with while loops.
-    """
-
-    @pytest.mark.usefixtures("use_capture")
-    @pytest.mark.parametrize(
-        "num_iter, expected", [(3, [0, 0, 1, 0, 0, 0, 0, 0]), (4, [1, 0, 0, 0, 0, 0, 0, 0])]
-    )
-    def test_dynamic_wire_alloc_whileloop(self, num_iter, expected, backend):
-        """
-        Test qml.allocate and qml.deallocate inside while loop.
-        """
-
-        @qjit(autograph=True)
-        @qml.qnode(qml.device(backend, wires=3))
-        def circuit(N):
-            i = 0
-            while i < N:
-                q = qml.allocate(1)[0]
-                qml.X(wires=q)
-                qml.CNOT(wires=[q, 1])
-                qml.deallocate(q)
-                i += 1
-
-            return qml.probs(wires=[0, 1, 2])
-
-        observed = circuit(num_iter)
-
-        assert np.allclose(expected, observed)
-
-
-class TestErrorCases:
-    """
-    Test errors are correctly raised in corresponding cases.
-    """
-
-    def test_no_capture(self, backend):
-        """
-        Test error message when used without capture.
-        """
-        with pytest.raises(
-            CompileError,
-            match=re.escape("qml.allocate() is only supported with program capture enabled."),
-        ):
-
-            @qjit
-            @qml.qnode(qml.device(backend, wires=1))
-            def circuit():
-                with qml.allocate(1) as _:
-                    pass
-                return qml.probs(wires=[0])
-
-    @pytest.mark.usefixtures("use_capture")
-    def test_use_after_free(self, backend):
-        """
-        Test error message when used after free.
-        """
-
-        with pytest.raises(
-            CompileError,
-            match="Deallocated qubits cannot be used, but used in Hadamard.",
-        ):
-
-            @qjit
-            @qml.qnode(qml.device(backend, wires=1))
-            def circuit():
-                with qml.allocate(1) as q:
-                    qml.X(q[0])
-                qml.Hadamard(q[0])
-                return qml.probs(wires=[0])
-
-    @pytest.mark.usefixtures("use_capture")
-    def test_terminal_MP_all_wires(self, backend):
-        """
-        Test error message when used with terminal measurements on all wires.
-        """
-
-        with pytest.raises(
-            CompileError,
-            match=textwrap.dedent(
-                """
-                Terminal measurements must take in an explicit list of wires when
-                dynamically allocated wires are present in the program.
-                """
-            ),
-        ):
-
-            @qjit
-            @qml.qnode(qml.device(backend, wires=1))
-            def circuit():
-                with qml.allocate(1) as _:
-                    pass
-                return qml.probs()
-
-    @pytest.mark.usefixtures("use_capture")
-    def test_terminal_MP_dynamic_wires(self, backend):
-        """
-        Test error message when used with terminal measurements on dynamic wires.
-        """
-
-        with pytest.raises(
-            CompileError,
-            match=textwrap.dedent(
-                """
-                Terminal measurements cannot take in dynamically allocated wires
-                since they must be temporary.
-                """
-            ),
-        ):
-
-            @qjit
-            @qml.qnode(qml.device(backend, wires=1))
-            def circuit():
-                q = qml.allocate(1)
-                return qml.probs(q)
-
-    @pytest.mark.usefixtures("use_capture")
-    def test_unsupported_subroutine(self, backend):
-        """
-        Test that an error is raised when a dynamically allocated wire is passed into a subroutine.
-        """
-
-        with pytest.raises(
-            NotImplementedError,
-            match=textwrap.dedent(
-                """
-                Dynamically allocated wires in a parent scope cannot be used in a child
-                scope yet. Please consider dynamical allocation inside the child scope.
-                """
-            ),
-        ):
-
-            @subroutine
-            def sub(_):
+            with qml.allocate(1) as _:
                 pass
+            return qml.probs()
 
-            @qjit
-            @qml.qnode(qml.device(backend, wires=2))
-            def circuit():
-                with qml.allocate(1) as q:
-                    sub(q[0])
-                return qml.probs(wires=[0, 1])
+
+@pytest.mark.usefixtures("use_capture")
+def test_terminal_MP_dynamic_wires(backend):
+    """
+    Test error message when used with terminal measurements on dynamic wires.
+    """
+
+    with pytest.raises(
+        CompileError,
+        match=textwrap.dedent(
+            """
+            Terminal measurements cannot take in dynamically allocated wires
+            since they must be temporary.
+            """
+        ),
+    ):
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=1))
+        def circuit():
+            q = qml.allocate(1)
+            return qml.probs(q)
+
+
+@pytest.mark.usefixtures("use_capture")
+def test_unsupported_subroutine(backend):
+    """
+    Test that an error is raised when a dynamically allocated wire is passed into a subroutine.
+    """
+
+    with pytest.raises(
+        NotImplementedError,
+        match=textwrap.dedent(
+            """
+            Dynamically allocated wires in a parent scope cannot be used in a child
+            scope yet. Please consider dynamical allocation inside the child scope.
+            """
+        ),
+    ):
+
+        @subroutine
+        def sub(_):
+            pass
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=2))
+        def circuit():
+            with qml.allocate(1) as q:
+                sub(q[0])
+            return qml.probs(wires=[0, 1])
 
 
 if __name__ == "__main__":
