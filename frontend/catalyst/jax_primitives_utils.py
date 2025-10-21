@@ -148,6 +148,13 @@ def lower_callable_to_funcop(ctx, callable_, call_jaxpr, public=False):
     # to avoid elimination by the compiler
     kwargs["main_function"] = public
 
+    const_args = core.jaxpr_const_args(call_jaxpr.jaxpr)
+    const_arg_avals = [core.shaped_abstractify(c) for c in const_args]
+    num_const_args = len(const_arg_avals)
+
+    kwargs["in_avals"] = const_arg_avals + call_jaxpr.in_avals
+    kwargs["num_const_args"] = num_const_args
+
     func_op = mlir.lower_jaxpr_to_fun(**kwargs)
 
     if isinstance(callable_, qml.QNode):
