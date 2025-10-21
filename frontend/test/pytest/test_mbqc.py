@@ -22,8 +22,6 @@ import networkx as nx
 import numpy as np
 import pennylane as qml
 import pennylane.ftqc as plft
-import pytest
-
 from pennylane.ftqc.catalyst_passes import (
     commute_ppr,
     merge_ppr_ppm,
@@ -31,6 +29,7 @@ from pennylane.ftqc.catalyst_passes import (
     reduce_t_depth,
     to_ppr,
 )
+import pytest
 
 from catalyst import qjit
 from catalyst.ftqc import mbqc_pipeline as catalyst_mbqc_pipeline
