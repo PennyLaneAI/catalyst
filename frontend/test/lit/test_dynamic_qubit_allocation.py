@@ -171,7 +171,8 @@ def test_pass_multiple_regs_into_forloop():
     # CHECK: [[q1:%.+]] = quantum.alloc( 1)
     # CHECK: [[q2:%.+]] = quantum.alloc( 2)
     # CHECK: [[for_out:%.+]]:3 = scf.for %arg0 = {{.+}} to {{.+}} step {{.+}} iter_args
-    # CHECK-SAME: (%arg1 = [[q1]], %arg2 = [[q2]], %arg3 = [[global_reg]]) -> (!quantum.reg, !quantum.reg, !quantum.reg) {
+    # CHECK-SAME: (%arg1 = [[q1]], %arg2 = [[q2]], %arg3 = [[global_reg]])
+    # CHECK-SAME: -> (!quantum.reg, !quantum.reg, !quantum.reg) {
     # CHECK:    [[q1_0:%.+]] = quantum.extract %arg1[ 0]
     # CHECK:    [[glob_0:%.+]] = quantum.extract %arg3[ 0]
     # CHECK:    [[cnot_out0:%.+]]:2 = quantum.custom "CNOT"() [[q1_0]], [[glob_0]]
@@ -182,7 +183,8 @@ def test_pass_multiple_regs_into_forloop():
     # CHECK:    [[glob_yield:%.+]] = quantum.insert [[glob_ins]][ 1], [[cnot_out1]]#1
     # CHECK:    [[q1_yield:%.+]] = quantum.insert %arg1[ 0], [[cnot_out0]]#0
     # CHECK:    [[q2_yield:%.+]] = quantum.insert %arg2[ 1], [[cnot_out1]]#0
-    # CHECK:    scf.yield [[q1_yield]], [[q2_yield]], [[glob_yield]] : !quantum.reg, !quantum.reg, !quantum.reg
+    # CHECK:    scf.yield [[q1_yield]], [[q2_yield]], [[glob_yield]]
+    # CHECK-SAME: : !quantum.reg, !quantum.reg, !quantum.reg
     # CHECK:  quantum.dealloc [[for_out]]#1 : !quantum.reg
     # CHECK:  quantum.dealloc [[for_out]]#0 : !quantum.reg
 
