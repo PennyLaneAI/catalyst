@@ -101,7 +101,7 @@ def test_qjit_device_measurements(shots, mocker):
         assert finite_shot_measurements.issubset(expected_measurements)
         assert state_measurements.intersection(expected_measurements) == set()
 
-    spy = mocker.spy(qjit_device, "get_qjit_device_capabilities")
+    spy = mocker.spy(qjit_device, "filter_device_capabilities_with_shots")
 
     @qjit
     @qml.set_shots(shots)

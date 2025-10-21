@@ -49,11 +49,11 @@ class OQCDevice(Device):
         lib_path = get_lib_path("oqc_runtime", "OQC_LIB_DIR") + "/librtd_oqc" + system_extension
         return "oqc", lib_path
 
-    def __init__(self, wires, backend, shots=1024, **kwargs):
+    def __init__(self, wires, backend, **kwargs):
         self._backend = backend
         _check_backend(backend=backend)
         _check_envvar()
-        super().__init__(wires=wires, shots=shots, **kwargs)
+        super().__init__(wires=wires, **kwargs)
 
     @property
     def backend(self):
@@ -92,4 +92,9 @@ def _check_envvar():
     email = os.getenv("OQC_EMAIL")
     password = os.getenv("OQC_PASSWORD")
     if not all((url, email, password)):
-        raise ValueError("You must set url, email and password as environment variables.")
+        raise ValueError(
+            """
+            OQC credentials not found in environment variables.
+            Please set the environment variables `OQC_EMAIL`, `OQC_PASSWORD` and `OQC_URL`.
+            """
+        )
