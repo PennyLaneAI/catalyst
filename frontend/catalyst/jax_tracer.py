@@ -136,6 +136,17 @@ def mark_gradient_tracing(method: str):
         TRACING_GRADIENTS.pop()
 
 
+def _get_eqn_from_tracing_eqn(eqn_or_callable):
+    """Helper function to extract the actual equation from JAX 0.7's TracingEqn wrapper."""
+    if callable(eqn_or_callable):
+        actual_eqn = eqn_or_callable()
+        if actual_eqn is None:
+            raise RuntimeError("TracingEqn weakref was garbage collected")
+        return actual_eqn
+    else:
+        return eqn_or_callable
+
+
 def _make_execution_config(qnode):
     """Updates the execution_config object with information about execution. This is
     used in preprocess to determine what decomposition and validation is needed."""
@@ -525,13 +536,21 @@ class HybridOp(Operator):
         as-is.
         """
         assert self.binder is not None, "HybridOp should set a binder"
+
+        # JAX 0.7 FIX: For measure_p, pass pre-created tracers to the staging rule
+        from catalyst.jax_primitives import measure_p
+
+        if self.binder == measure_p.bind:
+            kwargs["_catalyst_init_tracers"] = out_expanded_tracers
+
         # Here, we are binding any of the possible hybrid ops.
         # which includes: for_loop, while_loop, cond, measure.
         # This will place an equation at the very end of the current list of equations.
         out_quantum_tracer = self.binder(*in_expanded_tracers, **kwargs)[-1]
 
         trace = EvaluationContext.get_current_trace()
-        eqn = trace.frame.eqns[-1]
+        # JAX 0.7: Need to call the lambda to get the actual TracingEqn
+        eqn = _get_eqn_from_tracing_eqn(trace.frame.eqns[-1])
         frame = trace.frame
 
         assert len(eqn.outvars[:-1]) == len(
@@ -541,13 +560,18 @@ class HybridOp(Operator):
         jaxpr_variables = cached_vars.get(frame, set())
         if not jaxpr_variables:
             # We get all variables in the current frame
-            outvars = itertools.chain.from_iterable([e.outvars for e in frame.eqns])
+            # JAX 0.7: Need to call each lambda to get actual TracingEqns
+            outvars = itertools.chain.from_iterable(
+                [_get_eqn_from_tracing_eqn(e).outvars for e in frame.eqns]
+            )
             jaxpr_variables = set(outvars)
             jaxpr_variables.update(frame.invars)
             jaxpr_variables.update(frame.constvar_to_val.keys())
             cached_vars[frame] = jaxpr_variables
 
-        for outvar in frame.eqns[-1].outvars:
+        # JAX 0.7: Need to call the lambda to get the actual TracingEqn
+        last_eqn = _get_eqn_from_tracing_eqn(frame.eqns[-1])
+        for outvar in last_eqn.outvars:
             # With the exception of the output variables from the current equation.
             jaxpr_variables.discard(outvar)
 
@@ -557,6 +581,13 @@ class HybridOp(Operator):
             if t.val in jaxpr_variables:
                 continue
 
+            from catalyst.jax_primitives import measure_p
+
+            if self.binder == measure_p.bind:
+                # For measure, the outvars are already correct from the staging rule
+                continue
+
+            # For other hybrid ops, use the original logic
             # If the variable cannot be found in the current frame
             # it is because we have created it via new_inner_tracer
             # which uses JAX internals to create a tracer without associating
@@ -891,7 +922,7 @@ def trace_quantum_operations(
         assert qrp2 is not None
         qrp = qrp2
     trace = EvaluationContext.get_current_trace()
-    trace.frame.eqns = sort_eqns(trace.frame.eqns, FORCED_ORDER_PRIMITIVES)  # [1]
+    trace.frame.tracing_eqns = sort_eqns(trace.frame.tracing_eqns, FORCED_ORDER_PRIMITIVES)  # [1]
     return qrp
 
 

@@ -32,9 +32,8 @@ from jax._src.interpreters import partial_eval as pe
 from jax._src.lax.lax import _merge_dyn_shape, _nary_lower_hlo, cos_p, sin_p
 from jax._src.lib.mlir import ir
 from jax._src.lib.mlir.dialects import hlo
-from jax._src.pjit import _pjit_lowering
+from jax._src.pjit import _pjit_lowering, jit_p
 from jax.core import AbstractValue
-from jax.experimental.pjit import pjit_p
 from jax.extend.core import Primitive
 from jax.interpreters import mlir
 from jax.tree_util import PyTreeDef, tree_unflatten
@@ -319,7 +318,7 @@ measure_in_basis_p.multiple_results = True
 decomprule_p = core.Primitive("decomposition_rule")
 decomprule_p.multiple_results = True
 
-quantum_subroutine_p = copy.deepcopy(pjit_p)
+quantum_subroutine_p = copy.deepcopy(jit_p)
 quantum_subroutine_p.name = "quantum_subroutine_p"
 subroutine_cache: dict[callable, callable] = {}
 
@@ -363,15 +362,15 @@ def subroutine(func):
     # pylint: disable-next=import-outside-toplevel
     from catalyst.api_extensions.callbacks import WRAPPER_ASSIGNMENTS
 
-    old_pjit = jax._src.pjit.pjit_p
+    old_jit_p = jax._src.pjit.jit_p
 
     @functools.wraps(func, assigned=WRAPPER_ASSIGNMENTS)
     def inside(*args, **kwargs):
         with Patcher(
             (
                 jax._src.pjit,
-                "pjit_p",
-                old_pjit,
+                "jit_p",
+                old_jit_p,
             ),
         ):
             return func(*args, **kwargs)
@@ -386,7 +385,7 @@ def subroutine(func):
         with Patcher(
             (
                 jax._src.pjit,
-                "pjit_p",
+                "jit_p",
                 quantum_subroutine_p,
             ),
         ):
@@ -1388,6 +1387,60 @@ def _measure_abstract_eval(qubit, postselect: int = None):
     return core.ShapedArray((), bool), qubit
 
 
+def measure_staging_rule(
+    jaxpr_trace, _src, qubit, postselect: int = None, _catalyst_init_tracers=None
+):
+    """
+    Custom staging rule for measure_p to ensure that pre-created tracers
+    from new_inner_tracer are properly used.
+
+    This is necessary in JAX 0.7 where the binding process creates new tracers,
+    but we need to use the tracers that were created during classical tracing
+    (in the measure() function via new_inner_tracer).
+
+    Args:
+        jaxpr_trace: The current DynamicJaxprTrace
+        _src: Source info
+        qubit: The qubit tracer to measure
+        postselect: Optional postselection value
+        _catalyst_init_tracers: Pre-created tracers from classical tracing (Catalyst-specific)
+                               Note: This only contains the boolean measurement result,
+                               not the qubit output
+    """
+    from catalyst.jax_extras.tracing import new_inner_tracer
+
+    # Define output shapes
+    out_shapes = (core.ShapedArray((), bool), qubit.aval)
+
+    # Input tracers
+    in_tracers = [qubit]
+
+    # Parameters (exclude _catalyst_init_tracers as it's not a primitive parameter)
+    params = {"postselect": postselect}
+
+    # JAX 0.7 FIX: measure_p has 2 outputs (bool, qubit), but _catalyst_init_tracers
+    # only contains 1 (the bool result). We need to create the qubit tracer and combine them
+    if _catalyst_init_tracers is not None and len(_catalyst_init_tracers) > 0:
+        # Create a tracer for the qubit output
+        qubit_out_tracer = new_inner_tracer(jaxpr_trace, qubit.aval)
+        # Combine: pre-created bool tracer + newly created qubit tracer
+        init_tracers = [_catalyst_init_tracers[0], qubit_out_tracer]
+
+        eqn, out_tracers = jaxpr_trace.make_eqn(
+            in_tracers, out_shapes, measure_p, params, [], None, out_tracers=init_tracers
+        )
+    else:
+        # Fallback to default behavior
+        eqn, out_tracers = jaxpr_trace.make_eqn(in_tracers, out_shapes, measure_p, params, [], None)
+
+    jaxpr_trace.frame.add_eqn(eqn)
+
+    return out_tracers
+
+
+pe.custom_staging_rules[measure_p] = measure_staging_rule
+
+
 @measure_p.def_impl
 def _measure_def_impl(ctx, qubit, postselect: int = None):  # pragma: no cover
     raise NotImplementedError()
@@ -1686,22 +1739,11 @@ def custom_measurement_staging_rule(
     else:
         out_shapes = tuple(core.DShapedArray(shape, dtype) for dtype in dtypes)
 
-    invars = [obs.val] + [t.val for t in dynamic_shape]
+    in_tracers = [obs] + list(dynamic_shape)
 
     params = {"static_shape": static_shape}
 
-    out_tracers = tuple(
-        pe.DynamicJaxprTracer(jaxpr_trace, out_shape, jaxpr_trace.frame.newvar(out_shape))
-        for out_shape in out_shapes
-    )
-
-    eqn = pe.new_jaxpr_eqn(
-        invars,
-        [out_tracer.val for out_tracer in out_tracers],
-        primitive,
-        params,
-        jax.core.no_effects,
-    )
+    eqn, out_tracers = jaxpr_trace.make_eqn(in_tracers, out_shapes, primitive, params, [])
 
     jaxpr_trace.frame.add_eqn(eqn)
     return out_tracers if len(out_tracers) > 1 else out_tracers[0]
