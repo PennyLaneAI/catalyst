@@ -236,6 +236,31 @@ def test_dynamic_wire_alloc_cond(cond, expected, backend):
 
 
 @pytest.mark.usefixtures("use_capture")
+@pytest.mark.parametrize("cond, expected", [(True, [0, 1, 0, 0]), (False, [1, 0, 0, 0])])
+def test_dynamic_wire_alloc_cond_outside(cond, expected, backend):
+    """
+    Test passing dynamically allocated wires into a cond.
+    """
+
+    @qjit(autograph=True)
+    @qml.qnode(qml.device("lightning.qubit", wires=2))
+    def circuit(c):
+        with qml.allocate(1) as q1:
+            with qml.allocate(1) as q2:
+                qml.X(q1[0])
+                if c:
+                    qml.CNOT(wires=[q1[0], 1])  # |01>
+                else:
+                    qml.CNOT(wires=[q2[0], 1])  # |00>
+
+        return qml.probs(wires=[0, 1])
+
+    observed = circuit(cond)
+
+    assert np.allclose(expected, observed)
+
+
+@pytest.mark.usefixtures("use_capture")
 @pytest.mark.parametrize(
     "num_iter, expected", [(3, [0, 0, 1, 0, 0, 0, 0, 0]), (4, [1, 0, 0, 0, 0, 0, 0, 0])]
 )
@@ -263,7 +288,7 @@ def test_dynamic_wire_alloc_forloop(num_iter, expected, backend):
 @pytest.mark.usefixtures("use_capture")
 def test_dynamic_wire_alloc_forloop_outside(backend):
     """
-    Test qml.allocate and qml.deallocate outside for loop.
+    Test passing dynamically allocated wires into a for loop.
     """
 
     @qjit(autograph=True)
