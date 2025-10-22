@@ -90,6 +90,31 @@ def _to_bool_if_not(arg):
     return jax.numpy.bool(arg)
 
 
+def _get_dynamically_allocated_qregs(plxpr_invals, qubit_index_recorder, init_qreg):
+    """
+    Get the potential dynamically allocated register values that are visible to a jaxpr.
+
+    Note that dynamically allocated wires have their qreg tracer's id as the global wire index
+    so the sub jaxpr takes that id in as a "const", since it is clousure from the target wire
+    of gates/measurements/...
+    We need to remove that const, so we also let this util return these global indices.
+    """
+    dynalloced_qregs = []
+    dynalloced_wire_global_indices = []
+    for inval in plxpr_invals:
+        if (
+            isinstance(inval, int)
+            and qubit_index_recorder.contains(inval)
+            and qubit_index_recorder[inval] is not init_qreg
+        ):
+            dyn_qreg = qubit_index_recorder[inval]
+            dyn_qreg.insert_all_dangling_qubits()
+            dynalloced_qregs.append(dyn_qreg)
+            dynalloced_wire_global_indices.append(inval)
+
+    return dynalloced_qregs, dynalloced_wire_global_indices
+
+
 @WorkflowInterpreter.register_primitive(plxpr_cond_prim)
 def workflow_cond(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
     """Handle the conversion from plxpr to Catalyst jaxpr for the cond primitive"""
@@ -230,23 +255,9 @@ def handle_for_loop(
     # Add the iteration start and the qreg to the args
     self.init_qreg.insert_all_dangling_qubits()
 
-    # Add any potential dynamically allocated register values to the args.
-    # Note that dynamically allocated wires have their qreg tracer's id as the global wire index
-    # so the sub jaxpr takes that id in as a "const", since it is clousure from the target wire
-    # of gates/measurements/...
-    # We need to remove that const.
-    dynalloced_qregs = []
-    dynalloced_wire_global_indices = []
-    for inval in plxpr_invals:
-        if (
-            isinstance(inval, int)
-            and self.qubit_index_recorder.contains(inval)
-            and self.qubit_index_recorder[inval] is not self.init_qreg
-        ):
-            dyn_qreg = self.qubit_index_recorder[inval]
-            dyn_qreg.insert_all_dangling_qubits()
-            dynalloced_qregs.append(dyn_qreg)
-            dynalloced_wire_global_indices.append(inval)
+    dynalloced_qregs, dynalloced_wire_global_indices = _get_dynamically_allocated_qregs(
+        plxpr_invals, self.qubit_index_recorder, self.init_qreg
+    )
 
     start_plus_args_plus_qreg = [
         start,
