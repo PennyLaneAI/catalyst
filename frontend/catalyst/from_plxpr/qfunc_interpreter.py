@@ -266,15 +266,6 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
             return jax.lax.convert_element_type(mval, dtype)
         return mval
 
-    def _extract_shots_value(self, shots: qml.measurements.Shots | int):
-        """Extract the shots value according to the type"""
-        if isinstance(shots, int):
-            return shots
-
-        assert isinstance(shots, qml.measurements.Shots)
-
-        return shots.total_shots if shots else 0
-
     def __call__(self, jaxpr, *args):
         """
         Execute this interpreter with this arguments.
