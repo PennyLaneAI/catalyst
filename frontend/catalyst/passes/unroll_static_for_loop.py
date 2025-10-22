@@ -51,15 +51,20 @@ def get_parent_of_type(op: Operation, kind: Type[T]) -> T | None:
 def print_mlir(op, msg=""):
     printer = Printer()
     print("-"*100)
-    print(f"Start {msg}")
+    print(f"// Start {msg}")
     if isinstance(op, Region):
         printer.print_region(op)
     elif isinstance(op, Block):
         printer.print_block(op)
     elif isinstance(op, Operation):
         printer.print_op(op)
-    print(f"End {msg}")
+    print(f"\n// End {msg}")
     print("-"*100)
+
+def print_ssa_values(values, msg="SSA Values"):
+    print(f"// {msg}")
+    for val in values:
+        print(f"  - {val}")
 
 ##############################################################################
 # xDSL Transform If Operator Partitioning
@@ -83,88 +88,145 @@ class IfOperatorPartitioningPass(RewritePattern):
     def split_if_op(self, op: func.FuncOp, rewriter: PatternRewriter) -> None:
         # Find scf.IfOp
 
-        self.original_func_op
-
         op_walk = op.walk()
         for current_op in op_walk:
             if isinstance(current_op, scf.IfOp):
+
                 print_mlir(current_op, "Processing scf.IfOp:")
 
-                # Here you can implement the partitioning logic
-                true_region = current_op.true_region
-                false_region = current_op.false_region
-
-                print("Block Args True Region:", true_region.blocks[0].arg_types)
-                print_mlir(true_region, "True Region:")
-                print("Block Args False Region:", false_region.blocks[0].arg_types)
-                print_mlir(false_region, "False Region:")
-
-                # You can add your partitioning logic here
-
+                # Analyze missing values for the IfOp
                 missing_values = self.analyze_missing_values_for_ops([current_op])
-                print(f"Missing values for IfOp: {missing_values}")
+                print_ssa_values(missing_values, "Missing values for IfOp:")
 
                 # Get outputs required by operations after the IfOp
                 required_outputs = self.analyze_required_outputs(
                     [current_op], current_op.next_op
                 )
-                print(f"Required outputs after IfOp: {required_outputs}")
+                print_ssa_values(required_outputs, "Required outputs after IfOp:")
 
+                # Get quantum register from missing values
                 qreg_if_op = [mv for mv in missing_values if isinstance(mv.type, quantum.QuregType)]
-                return_vals_if_op = [ro for ro in required_outputs if ro in current_op.results]
+                print_ssa_values(qreg_if_op, "Quantum register for IfOp:")
 
-                print(f"Quantum register for IfOp: {qreg_if_op}")
-                print(f"Return values for IfOp: {return_vals_if_op}")
+                return_vals_if_op = [ro for ro in required_outputs if ro in current_op.results]
+                print_ssa_values(return_vals_if_op, "Return values for IfOp:")
+
+                # True and False regions
+                true_region = current_op.true_region
+                false_region = current_op.false_region
+
+                print_mlir(true_region, "True Region:")
+                print("Block Args True Region:", true_region.blocks[0].arg_types)
+                print_mlir(false_region, "False Region:")
+                print("Block Args False Region:", false_region.blocks[0].arg_types)
+
 
                 # --------------------------------------------------------------------------
-                # Create a new empty block for true region
-
-                true_ops = list(chain(*[op.walk() for op in true_region.blocks]))
-
-                new_true_block = Block()
-
-                print_mlir(new_true_block, "Cloned True Block before cloning ops:")
+                # New partitioning logic for True region
+                # --------------------------------------------------------------------------
 
                 value_mapper = {qreg_if_op[0]: current_op.results[0]}
-                self.clone_operations_to_block(
-                    true_ops,
-                    new_true_block,
-                    value_mapper
-                )
-                print_mlir(new_true_block, "Cloned True Block after cloning ops:")
 
+                attr_dict = {"partition": builtin.StringAttr("true_branch")}
+
+                new_if_op_4_true = self.create_if_op_partition(
+                    rewriter,
+                    true_region,
+                    current_op,
+                    value_mapper,
+                    current_op,
+                    attr_dict=attr_dict
+                )
 
                 # --------------------------------------------------------------------------
-                # Create a new empty block for false region
-                new_false_block = Block()
-
-                # Create a yield operation for false region using the same return types as the original IfOp
-                yield_false = scf.YieldOp(current_op.results[0])
-
-                # Create a new empty block for false region
-                new_false_block.add_op(yield_false)
-
+                # New partitioning logic for False region
                 # --------------------------------------------------------------------------
-                # Create new IfOp with cloned regions
-                # scf.IfOp (
-                # cond: SSAValue | Operation,
-                # return_types: Sequence[Attribute],
-                # true_region: Region | Sequence[Block] | Sequence[Operation],
-                # false_region: Region | Sequence[Block] | Sequence[Operation] | None = None,
-                # attr_dict: dict[str, Attribute] | None = None,
-                # )
-                new_if_op = scf.IfOp(
-                    current_op.cond,
-                    current_op.result_types,
-                    [new_true_block], # cloned_true_region,
-                    [new_false_block], # false_region,
-                    current_op.attributes
+                # Add the negation of the condition to the false branch if needed
+
+                true_op = arith.ConstantOp(builtin.IntegerAttr(1, builtin.IntegerType(1)))
+                not_op = arith.XOrIOp(current_op.cond, true_op.result)
+
+                # Insert not_op after new_if_op
+                for new_op in [not_op, true_op]:
+                    rewriter.insert_op(new_op, InsertPoint.after(new_if_op_4_true))
+
+                value_mapper = {qreg_if_op[0]: new_if_op_4_true.results[0]}
+
+                attr_dict = {"partition": builtin.StringAttr("false_branch")}
+
+                new_if_op_4_false = self.create_if_op_partition(
+                    rewriter,
+                    false_region,
+                    new_if_op_4_true,
+                    value_mapper,
+                    not_op,
+                    conditional=not_op.result,
+                    attr_dict=attr_dict
                 )
-                rewriter.insert_op(new_if_op, InsertPoint.after(current_op))
 
-                new_if_op_ops = list(chain(*[op.walk() for op in [new_if_op]]))
+    def create_if_op_partition(self,
+                               rewriter: PatternRewriter,
+                               if_region: Region,
+                               previous_IfOp: scf.IfOp,
+                               value_mapper: dict[SSAValue, SSAValue],
+                               op_where_insert_after: Operation,
+                               conditional: SSAValue = None,
+                               attr_dict: dict[str, builtin.Attribute] = None
+                               ) -> scf.IfOp:
 
-                current_op.results[0].replace_by_if(new_if_op.results[0], lambda use: use.operation not in new_if_op_ops)
+        true_ops = list(chain(*[op.walk() for op in if_region.blocks]))
+
+        new_true_block = Block()
+
+        self.clone_operations_to_block(
+            true_ops,
+            new_true_block,
+            value_mapper
+        )
+        print_mlir(new_true_block, "Cloned True Block after cloning ops:")
+
+
+        # --------------------------------------------------------------------------
+        # Create a new empty block for false region
+        new_false_block = Block()
+
+        # Create a yield operation for false region using the same return types as the original IfOp
+        yield_false = scf.YieldOp(previous_IfOp.results[0])
+
+        # Create a new empty block for false region
+        new_false_block.add_op(yield_false)
+
+        new_if_op_attrs = previous_IfOp.attributes.copy()
+        new_if_op_attrs.update(attr_dict or {})
+        # --------------------------------------------------------------------------
+        # Create new IfOp with cloned regions
+        # scf.IfOp (
+        # cond: SSAValue | Operation,
+        # return_types: Sequence[Attribute],
+        # true_region: Region | Sequence[Block] | Sequence[Operation],
+        # false_region: Region | Sequence[Block] | Sequence[Operation] | None = None,
+        # attr_dict: dict[str, Attribute] | None = None,
+        # )
+
+        if conditional is None:
+            conditional = previous_IfOp.cond
+
+
+        new_if_op_4_true = scf.IfOp(
+            conditional,
+            previous_IfOp.result_types,
+            [new_true_block], # cloned_true_region,
+            [new_false_block], # false_region,
+            new_if_op_attrs
+        )
+        rewriter.insert_op(new_if_op_4_true, InsertPoint.after(op_where_insert_after))
+
+        new_if_op_4_true_ops = list(chain(*[op.walk() for op in [new_if_op_4_true]]))
+
+        previous_IfOp.results[0].replace_by_if(new_if_op_4_true.results[0], lambda use: use.operation not in new_if_op_4_true_ops)
+
+        return new_if_op_4_true
+
 
 
     def duplicate_if_op(self, op: func.FuncOp, rewriter: PatternRewriter) -> None:
@@ -476,7 +538,8 @@ if __name__ == "__main__":
             # qml.Y(0)
             # qml.measure(index)
             # qml.RY(y,0)
-            qml.Z(0)
+            qml.H(1)
+            qml.Y(0)
 
         qml.cond(x > 1.4, ansatz_true, ansatz_false)(y)
         # qml.cond(x > 1.4, ansatz_true)(y)
@@ -487,4 +550,4 @@ if __name__ == "__main__":
         return qml.state()
         # return qml.expval(qml.PauliZ(0))
 
-    print(captured_circuit_1(1.5, 0.3))
+    print(captured_circuit_1(1.3, 0.3))
