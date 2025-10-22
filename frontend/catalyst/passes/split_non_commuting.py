@@ -1,9 +1,5 @@
-from dataclasses import dataclass, field
-from itertools import chain
 from typing import Type, TypeVar
 
-import logging
-import numpy as np
 import pennylane as qml
 
 from catalyst.passes.xdsl_plugin import getXDSLPluginAbsolutePath
@@ -19,16 +15,6 @@ from xdsl.pattern_rewriter import PatternRewriter, RewritePattern
 from xdsl.rewriter import InsertPoint
 
 T = TypeVar("T")
-
-logger = logging.getLogger(__name__)
-logger.disabled = True
-
-if not logger.handlers:
-    handler = logging.StreamHandler()
-    handler.setLevel(logging.DEBUG)
-    formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
 
 
 def get_parent_of_type(op: Operation, kind: Type[T]) -> T | None:
@@ -52,8 +38,6 @@ class SplitNonCommutingRegion(RewritePattern):
 
     def create_dup_function(self, func_op: func.FuncOp, i: int, rewriter: PatternRewriter):
         """Create a new function for the dup region by fully cloning the original function."""
-        print(f"create_dup_function for commuting region {i}")
-
         # Use the same signature as the original function
         original_func_type = func_op.function_type
         input_types = list(original_func_type.inputs.data)
@@ -91,15 +75,10 @@ class SplitNonCommutingRegion(RewritePattern):
         # Remove expvals from other groups and update return statement
         self.remove_group(dup_func, i)
 
-        print("create_dup_function successfully")
-
         return dup_func
 
     def remove_group(self, dup_func: func.FuncOp, target_group: int):
         """Remove measurement operations from other groups and update return statement."""
-
-        print(f"remove_group: keeping only group {target_group}")
-
         # Find the return operation in the dup function
         return_op = list(dup_func.body.ops)[-1]
 
@@ -130,7 +109,6 @@ class SplitNonCommutingRegion(RewritePattern):
                     if operand not in remove_ops:
                         remove_ops.append(operand.owner)
 
-            print(f"Removing: {op.__class__.__name__}")
             op.detach()
             op.erase()
 
@@ -163,10 +141,6 @@ class SplitNonCommutingRegion(RewritePattern):
         new_fun_type = builtin.FunctionType.from_lists(input_types, new_output_types)
         func_op.function_type = new_fun_type
 
-        print(
-            f"Updated return statement: removed {len(values_to_remove)} values, kept {len(new_return_values)} values"
-        )
-
     def is_measurement_op(self, op: Operation) -> bool:
         """Check if an operation is a measurement operation."""
         # TODO: support more measurement operations
@@ -190,7 +164,6 @@ class SplitNonCommutingRegion(RewritePattern):
 
         for op, qubits in op_to_acted_qubits.items():
             # TODO: handle multiple qubits
-            print(f"Operation {op.__class__.__name__} acts on qubit {qubits}")
             assert len(qubits) == 1, "operation should act on exactly one qubit"
 
         # Group measurement operations by their qubits
@@ -244,8 +217,6 @@ class SplitNonCommutingRegion(RewritePattern):
         Example: {0: [0, 2], 1: [1]} for
         return qml.expval(qml.X(0)), qml.expval(qml.X(1)), qml.expval(qml.Y(0))
         """
-        print(f"Analyzing return positions for {num_groups} groups")
-
         # Find the return operation
         return_op = list(func_op.body.ops)[-1]
 
@@ -257,7 +228,6 @@ class SplitNonCommutingRegion(RewritePattern):
             group_id = self.find_group_for_return_value(return_value)
             if group_id is not None:
                 group_positions[group_id].append(position)
-                print(f"  Return position {position} belongs to group {group_id}")
 
         return group_positions
 
@@ -298,8 +268,6 @@ class SplitNonCommutingRegion(RewritePattern):
             dup_functions: List of duplicate functions (one per group)
             group_return_positions: Dict mapping group_id -> list of return positions
         """
-        print("Replacing original function with calls to dup functions")
-
         original_block = func_op.body.block
 
         for op in reversed(func_op.body.ops):
@@ -314,8 +282,6 @@ class SplitNonCommutingRegion(RewritePattern):
         group_results = dict[int, list[SSAValue]]()  # group_id -> list of result values
 
         for group_id, dup_func in enumerate(dup_functions):
-            print(f"  Creating call to {dup_func.sym_name.data}")
-
             # Get the function signature to determine result types
             func_type = dup_func.function_type
             result_types = list(func_type.outputs.data)
@@ -326,7 +292,6 @@ class SplitNonCommutingRegion(RewritePattern):
 
             # Store results for this group
             group_results[group_id] = list(call_op.results)
-            print(f"    Group {group_id} returns {len(call_op.results)} values")
 
         # Reconstruct the return statement in the original order
         # Calculate total number of return values
@@ -341,7 +306,6 @@ class SplitNonCommutingRegion(RewritePattern):
 
             for i, position in enumerate(positions):
                 final_return_values[position] = group_vals[i]
-                print(f"    Position {position} <- group {group_id} result {i}")
 
         # Filter out None values (in case something went wrong)
         final_return_values = [v for v in final_return_values if v is not None]
@@ -349,7 +313,6 @@ class SplitNonCommutingRegion(RewritePattern):
         # Create new return operation
         return_op = func.ReturnOp(*final_return_values)
         original_block.add_op(return_op)
-        print(f"  Created return with {len(final_return_values)} values")
 
     def match_and_rewrite(self, func_op: func.FuncOp, rewriter: PatternRewriter):
         """Split non-commuting region into multiple functions"""
