@@ -49,7 +49,7 @@ from pennylane.transforms import unitary_to_rot as pl_unitary_to_rot
 from pennylane.ftqc.catalyst_passes import to_ppr as pl_to_ppr
 from pennylane.ftqc.catalyst_passes import commute_ppr as pl_commute_ppr
 from pennylane.ftqc.catalyst_passes import merge_ppr_ppm as pl_merge_ppr_ppm
-from pennylane.ftqc.catalyst_passes import pprm_to_mbqc as pl_pprm_to_mbqc
+from pennylane.ftqc.catalyst_passes import ppm_to_mbqc as pl_ppm_to_mbqc
 from pennylane.ftqc.catalyst_passes import reduce_t_depth as pl_reduce_t_depth
 
 from catalyst.device import extract_backend_info
@@ -300,7 +300,7 @@ transforms_to_passes = {
     pl_merge_amplitude_embedding: (None, True),
     pl_merge_ppr_ppm: ("merge-ppr-ppm", False),
     pl_merge_rotations: ("merge-rotations", False),
-    pl_pprm_to_mbqc: ("pprm-to-mbqc", False),
+    pl_ppm_to_mbqc: ("ppm-to-mbqc", False),
     pl_reduce_t_depth: ("reduce-t-depth", False),
     pl_single_qubit_fusion: (None, False),
     pl_to_ppr: ("to-ppr", False),

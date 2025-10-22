@@ -17,7 +17,7 @@
 
 <h3>Internal changes ⚙️</h3>
 
-* Several MLIR passes (`to-ppr`, `commute-ppr`, `merge-ppr-ppm`, `pprm-to-mbqc` and `reduce-t-depth`)
+* Several MLIR passes (`to-ppr`, `commute-ppr`, `merge-ppr-ppm`, `ppm-to-mbqc` and `reduce-t-depth`)
   are mapped to corresponding primitive names in PLxPR so that they can be included in programs generated
   with `qml.capture` enabled.
   [(#2139)](https://github.com/PennyLaneAI/catalyst/pull/2139)
