@@ -125,7 +125,8 @@ class IfOperatorPartitioningPass(RewritePattern):
                 # New partitioning logic for True region
                 # --------------------------------------------------------------------------
 
-                value_mapper = {qreg_if_op[0]: current_op.results[0]}
+                # value_mapper = {qreg_if_op[0]: current_op.results[0]}
+                value_mapper = {}
 
                 attr_dict = {"partition": builtin.StringAttr("true_branch")}
 
@@ -137,6 +138,8 @@ class IfOperatorPartitioningPass(RewritePattern):
                     current_op,
                     attr_dict=attr_dict
                 )
+
+                print_mlir(new_if_op_4_true, "New IfOp for True Branch:")
 
                 # --------------------------------------------------------------------------
                 # New partitioning logic for False region
@@ -163,6 +166,22 @@ class IfOperatorPartitioningPass(RewritePattern):
                     conditional=not_op.result,
                     attr_dict=attr_dict
                 )
+                print_mlir(new_if_op_4_false, "New IfOp for False Branch:")
+
+                # --------------------------------------------------------------------------
+
+                print_mlir(op, "Function after IfOp Partitioning:")
+
+                original_if_op_results = current_op.results[0]
+                original_if_op_results.replace_by(qreg_if_op[0])
+
+                list_op_if = [curr_op for curr_op in current_op.walk()]
+                # Remove the ops in the original IfOp
+                for op in list_op_if[::-1]:
+                    print_mlir(op, "Erasing original IfOp ops:")
+                    op.detach()
+                    op.erase()
+
 
     def create_if_op_partition(self,
                                rewriter: PatternRewriter,
@@ -530,7 +549,7 @@ if __name__ == "__main__":
             # qml.measure(index)
 
             # qml.ctrl(qml.RX(y,0),1)
-            # qml.H(1)
+            qml.H(1)
             qml.H(2)
 
         def ansatz_false(y: float):
@@ -550,4 +569,4 @@ if __name__ == "__main__":
         return qml.state()
         # return qml.expval(qml.PauliZ(0))
 
-    print(captured_circuit_1(1.3, 0.3))
+    print(captured_circuit_1(1.5, 0.3))
