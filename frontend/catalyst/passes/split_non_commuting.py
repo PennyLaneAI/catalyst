@@ -1,4 +1,3 @@
-# State Evolution Outlining Implementation
 from dataclasses import dataclass, field
 from itertools import chain
 from typing import Type, TypeVar
@@ -45,52 +44,28 @@ class SplitNonCommutingRegion(RewritePattern):
     def __init__(self):
         self.module: builtin.ModuleOp = None
 
-    def find_begin_and_end_op(self):
-        """return the first and last operation in the function"""
-        ops = list(self.original_func_op.body.ops)
-        return ops[0], ops[-2]
-
     def clone_operations_to_block(self, ops_to_clone, target_block, value_mapper):
         """Clone operations to target block, use value_mapper to update references"""
         for op in ops_to_clone:
             cloned_op = op.clone(value_mapper)
             target_block.add_op(cloned_op)
 
-            self.update_value_mapper_recursively(op, cloned_op, value_mapper)
-
-    def update_value_mapper_recursively(self, orig_op, cloned_op, value_mapper):
-        """update value_mapper for all operations in operation"""
-        for orig_result, new_result in zip(orig_op.results, cloned_op.results):
-            value_mapper[orig_result] = new_result
-
-        for orig_region, cloned_region in zip(orig_op.regions, cloned_op.regions):
-            self.update_region_value_mapper(orig_region, cloned_region, value_mapper)
-
-    def update_region_value_mapper(self, orig_region, cloned_region, value_mapper):
-        """update value_mapper for all operations in region"""
-        for orig_block, cloned_block in zip(orig_region.blocks, cloned_region.blocks):
-            for orig_arg, cloned_arg in zip(orig_block.args, cloned_block.args):
-                value_mapper[orig_arg] = cloned_arg
-
-            for orig_nested_op, cloned_nested_op in zip(orig_block.ops, cloned_block.ops):
-                self.update_value_mapper_recursively(orig_nested_op, cloned_nested_op, value_mapper)
-
-    def create_dup_function(self, rewriter: PatternRewriter, i: int):
+    def create_dup_function(self, func_op: func.FuncOp, i: int, rewriter: PatternRewriter):
         """Create a new function for the dup region by fully cloning the original function."""
         print(f"create_dup_function for commuting region {i}")
 
         # Use the same signature as the original function
-        original_func_type = self.original_func_op.function_type
+        original_func_type = func_op.function_type
         input_types = list(original_func_type.inputs.data)
         output_types = list(original_func_type.outputs.data)
         fun_type = builtin.FunctionType.from_lists(input_types, output_types)
 
-        dup_func = func.FuncOp(self.original_func_op.sym_name.data + ".dup." + str(i), fun_type)
+        dup_func = func.FuncOp(func_op.sym_name.data + ".dup." + str(i), fun_type)
         rewriter.insert_op(dup_func, InsertPoint.at_end(self.module.body.block))
 
         # Map original function arguments to dup function arguments
         dup_block = dup_func.regions[0].block
-        orig_block = self.original_func_op.body.block
+        orig_block = func_op.body.block
         value_mapper = {}
         for orig_arg, dup_arg in zip(orig_block.args, dup_block.args):
             value_mapper[orig_arg] = dup_arg
@@ -114,171 +89,50 @@ class SplitNonCommutingRegion(RewritePattern):
             dup_block.add_op(new_return_op)
 
         # Remove expvals from other groups and update return statement
-        self.removeGroup(dup_func, i)
+        self.remove_group(dup_func, i)
 
         print("create_dup_function successfully")
 
         return dup_func
 
-    def removeGroup(self, dup_func: func.FuncOp, target_group: int):
-        """Remove expvals from other groups and update return statement.
+    def remove_group(self, dup_func: func.FuncOp, target_group: int):
+        """Remove measurement operations from other groups and update return statement."""
 
-        For the dup function of group i, this removes all expval operations that
-        belong to other groups, traces their results to the return statement,
-        and removes those return values.
-        """
-        print(f"removeGroup: keeping only group {target_group}")
+        print(f"remove_group: keeping only group {target_group}")
 
-        # Find all expval operations in the dup function
-        expval_ops_to_remove = []
-        for op in dup_func.body.walk():
-            if isinstance(op, quantum.ExpvalOp):
-                # Check if this expval has a group attribute
-                if "group" in op.attributes:
-                    group_attr = op.attributes["group"]
-                    group_id = group_attr.value.data
+        # Find the return operation in the dup function
+        return_op = list(dup_func.body.ops)[-1]
 
-                    # If it's not the target group, mark for removal
-                    if group_id != target_group:
-                        expval_ops_to_remove.append(op)
+        return_values_to_remove = set[SSAValue]()
+        for operand in return_op.operands:
+            group_id = self.find_group_for_return_value(operand)
+            if group_id != target_group:
+                return_values_to_remove.add(operand)
 
-        if not expval_ops_to_remove:
-            print(f"No expvals to remove for group {target_group}")
-            return
+        # collect all operations to remove
+        remove_ops = list[Operation]([value.owner for value in return_values_to_remove])
 
-        # Collect all operations in the chain from expval to return
-        ops_to_remove = set()
-        values_to_remove_from_return = set()
+        # update return statement
+        self.update_return_statement(dup_func, return_values_to_remove)
 
-        for expval_op in expval_ops_to_remove:
-            expval_result = expval_op.results[0]
+        # remove operations
+        while remove_ops:
+            op = remove_ops.pop(0)
+            users = [use.operation for result in list(op.results) for use in list(result.uses)]
 
-            # Trace and collect all operations from expval to return
-            chain_ops, return_values = self.trace_and_collect_chain(expval_result, dup_func)
-            ops_to_remove.update(chain_ops)
-            values_to_remove_from_return.update(return_values)
-
-            # Include the expval operation itself
-            ops_to_remove.add(expval_op)
-
-            # And the observable operation that feeds the expval
-            assert len(expval_op.operands) > 0, "expval_op should have at least one operand"
-            obs_value = expval_op.operands[0]
-            obs_op = obs_value.owner
-            if isinstance(
-                obs_op,
-                (
-                    quantum.NamedObsOp,
-                    quantum.ComputationalBasisOp,
-                    quantum.HamiltonianOp,
-                    quantum.TensorOp,
-                ),
-            ):
-                ops_to_remove.add(obs_op)
-
-        # Update the return statement first
-        self.update_return_statement(dup_func, values_to_remove_from_return)
-
-        # Now delete operations in the correct order (from users to producers)
-        print(f"Removing {len(ops_to_remove)} operations in the chain")
-        self.delete_operations_in_order(ops_to_remove)
-
-        print(f"removeGroup completed for group {target_group}")
-
-    def delete_operations_in_order(self, ops_to_remove: set[Operation]):
-        """Delete operations in the correct order (from users to producers)"""
-        remaining = set(ops_to_remove)
-
-        while remaining:
-            can_delete = []
-
-            for op in remaining:
-                can_delete_op = True
-                for result in op.results:
-                    for use in result.uses:
-                        user_op = use.operation
-                        if user_op in remaining:
-                            can_delete_op = False
-                            break
-                    if not can_delete_op:
-                        break
-
-                if can_delete_op:
-                    can_delete.append(op)
-
-            if not can_delete:
-                print(f"  WARNING: Cannot delete remaining {len(remaining)} operations")
-                for op in remaining:
-                    print(f"    Stuck operation: {op.__class__.__name__}")
-                    for result in op.results:
-                        for use in result.uses:
-                            if use.operation in remaining:
-                                print(
-                                    f"      Still used by remaining: {use.operation.__class__.__name__}"
-                                )
-                break
-
-            # Delete the operations that can be safely deleted
-            for op in can_delete:
-                print(f"  Removing: {op.__class__.__name__}")
-                op.detach()
-                op.erase()
-                remaining.remove(op)
-
-    def trace_and_collect_chain(
-        self, value: SSAValue, func_op: func.FuncOp
-    ) -> tuple[set[Operation], set[SSAValue]]:
-        """Trace a value forward and collect all operations in the chain to return.
-
-        Returns:
-            - Set of operations in the chain (e.g., tensor.from_elements)
-            - Set of values that reach the return statement
-        """
-        # Find the return operation
-        return_op = None
-        for op in func_op.body.ops:
-            if isinstance(op, func.ReturnOp):
-                return_op = op
-                break
-
-        if not return_op:
-            return set(), set()
-
-        ops_in_chain = set()
-        return_values = set()
-
-        # BFS to trace forward from the value
-        to_trace = {value}
-        traced = set()
-
-        while to_trace:
-            current_val = to_trace.pop()
-            if current_val in traced:
+            # if the operation has users, skip it
+            if len(users) > 0:
                 continue
-            traced.add(current_val)
 
-            # Check if this value reaches the return
-            if current_val in return_op.operands:
-                return_values.add(current_val)
+            if not self.is_measurement_op(op):
+                # keep walking up the chain
+                for operand in op.operands:
+                    if operand not in remove_ops:
+                        remove_ops.append(operand.owner)
 
-            # Follow all uses of this value
-            for use in current_val.uses:
-                user_op = use.operation
-
-                # Don't follow into return operation
-                if user_op == return_op:
-                    continue
-
-                # Add this operation to the chain if it's removable
-                if self.is_removable_op(user_op):
-                    ops_in_chain.add(user_op)
-
-                # Add all results to trace
-                for result in user_op.results:
-                    if result not in traced:
-                        to_trace.add(result)
-
-        return ops_in_chain, return_values
+            print(f"Removing: {op.__class__.__name__}")
+            op.detach()
+            op.erase()
 
     def update_return_statement(self, func_op: func.FuncOp, values_to_remove: set[SSAValue]):
         """Update the return statement to remove specified values."""
@@ -313,120 +167,87 @@ class SplitNonCommutingRegion(RewritePattern):
             f"Updated return statement: removed {len(values_to_remove)} values, kept {len(new_return_values)} values"
         )
 
-    def is_removable_op(self, op: Operation) -> bool:
-        """Check if an operation can be safely removed."""
-        # Quantum operations that are safe to remove if unused
-        if isinstance(
-            op,
-            (
-                quantum.ExpvalOp,
-                quantum.NamedObsOp,
-                quantum.ComputationalBasisOp,
-                quantum.HamiltonianOp,
-                quantum.TensorOp,
-            ),
-        ):
+    def is_measurement_op(self, op: Operation) -> bool:
+        """Check if an operation is a measurement operation."""
+        # TODO: support more measurement operations
+        if isinstance(op, quantum.ExpvalOp):
             return True
-
-        # Check operation name for tensor/stablehlo operations
-        if hasattr(op, "name"):
-            op_name = str(op.name)
-            # Tensor operations
-            if "tensor.from_elements" in op_name:
-                return True
-            if "tensor.extract" in op_name:
-                return True
-            # StableHLO operations (constants, etc.)
-            if "stablehlo.constant" in op_name:
-                return True
-
-        # Check by operation class name as fallback
-        class_name = op.__class__.__name__
-        if "FromElements" in class_name or "Extract" in class_name or "Constant" in class_name:
-            return True
-
         return False
 
-    def calculate_num_commuting_region(self):
+    def calculate_num_commuting_region(self, func_op: func.FuncOp):
         """calculate the number of commuting region"""
-        # Find all expval operations in the original function
-        expval_ops = []
-        for op in self.original_func_op.body.walk():
-            if isinstance(op, quantum.ExpvalOp):
-                expval_ops.append(op)
+        # Find all measurement operations in the current function
+        measurement_ops = [op for op in func_op.body.ops if self.is_measurement_op(op)]
 
-        if not expval_ops:
-            return 0
+        # For each measurement operation, find the qubits the operation acts on
+        op_to_acted_qubits: dict[Operation, set[SSAValue]] = {
+            measurement_op: set() for measurement_op in measurement_ops
+        }
 
-        # For each expval, find the qubit it uses
-        expval_to_qubit = {}
-        for expval_op in expval_ops:
-            # The expval operation takes an observable as input
-            observable = expval_op.operands[0]
+        for measurement_op in measurement_ops:
+            observable = measurement_op.operands[0]
+            op_to_acted_qubits[measurement_op].update(self.get_qubits_from_observable(observable))
 
-            # Trace back to find the qubit used by this observable
-            qubit = self.get_qubit_from_observable(observable)
-            if qubit is not None:
-                expval_to_qubit[expval_op] = qubit
+        for op, qubits in op_to_acted_qubits.items():
+            # TODO: handle multiple qubits
+            print(f"Operation {op.__class__.__name__} acts on qubit {qubits}")
+            assert len(qubits) == 1, "operation should act on exactly one qubit"
 
-        # Group expvals by their qubits
-        qubit_to_group = {}
+        # Group measurement operations by their qubits
+        qubit_to_group = dict[SSAValue, int]()
         group_counter = 0
 
-        for expval_op, qubit in expval_to_qubit.items():
-            if qubit not in qubit_to_group:
-                qubit_to_group[qubit] = group_counter
-                group_counter += 1
+        # Incrementally assign group IDs to operations that act on the same qubits
+        for measurement_op, qubits in op_to_acted_qubits.items():
+            for qubit in qubits:
+                if qubit not in qubit_to_group:
+                    qubit_to_group[qubit] = group_counter
+                    group_counter += 1
 
-            # Tag the expval operation with the group attribute
-            group_id = qubit_to_group[qubit]
-            expval_op.attributes["group"] = builtin.IntegerAttr(group_id, builtin.IntegerType(64))
+                # Tag the measurement operation with the group attribute
+                group_id = qubit_to_group[qubit]
+                measurement_op.attributes["group"] = builtin.IntegerAttr(
+                    group_id, builtin.IntegerType(64)
+                )
 
         return group_counter
 
-    def get_qubit_from_observable(self, observable: SSAValue) -> SSAValue | None:
+    def get_qubits_from_observable(self, observable: SSAValue) -> set[SSAValue] | None:
         """Get the qubit used by an observable operation.
 
         Traces back from an observable to find the qubit it operates on.
         Handles NamedObsOp, ComputationalBasisOp, HamiltonianOp, and TensorOp.
         """
-        if not hasattr(observable, "owner") or observable.owner is None:
-            return None
+        assert observable.owner is not None, "observable should have an owner"
+
+        acted_qubits = set[SSAValue]()
 
         obs_op = observable.owner
 
         # For NamedObsOp and ComputationalBasisOp, the first operand is the qubit
         if isinstance(obs_op, (quantum.NamedObsOp, quantum.ComputationalBasisOp)):
-            if len(obs_op.operands) > 0:
-                return obs_op.operands[0]
+            acted_qubits.add(obs_op.operands[0])
 
         # For HamiltonianOp and TensorOp, we need to handle multiple qubits
-        # For simplicity, we'll use the first qubit
         elif isinstance(obs_op, (quantum.HamiltonianOp, quantum.TensorOp)):
-            if len(obs_op.operands) > 0:
-                # For these, operands might be other observables
-                # We need to recursively find the qubit
-                return self.get_qubit_from_observable(obs_op.operands[0])
+            for operand in obs_op.operands:
+                acted_qubits.update(self.get_qubits_from_observable(operand))
 
-        return None
+        return acted_qubits
 
-    def analyze_group_return_positions(self, num_groups: int) -> dict[int, list[int]]:
+    def analyze_group_return_positions(
+        self, func_op: func.FuncOp, num_groups: int
+    ) -> dict[int, list[int]]:
         """Analyze which return value positions belong to each group.
 
-        Returns a dict mapping group_id -> list of return value positions
-        Example: {0: [0, 1, 3, 5], 1: [2, 6], 2: [4, 7]}
+        Returns a dict mapping group_id -> list of final return value positions
+        Example: {0: [0, 2], 1: [1]} for
+        return qml.expval(qml.X(0)), qml.expval(qml.X(1)), qml.expval(qml.Y(0))
         """
         print(f"Analyzing return positions for {num_groups} groups")
 
         # Find the return operation
-        return_op = None
-        for op in self.original_func_op.body.ops:
-            if isinstance(op, func.ReturnOp):
-                return_op = op
-                break
-
-        if not return_op:
-            return {}
+        return_op = list(func_op.body.ops)[-1]
 
         # For each return value, trace back to find its group
         group_positions = {i: [] for i in range(num_groups)}
@@ -455,23 +276,21 @@ class SplitNonCommutingRegion(RewritePattern):
             op = val.owner
 
             # If we found an expval, check its group
-            if isinstance(op, quantum.ExpvalOp):
-                if "group" in op.attributes:
-                    group_attr = op.attributes["group"]
-                    return group_attr.value.data
+            if self.is_measurement_op(op) and "group" in op.attributes:
+                group_attr = op.attributes["group"]
+                return group_attr.value.data
 
             # Otherwise, check operands
-            for operand in op.operands:
-                if operand not in checked:
-                    to_check.append(operand)
+            to_check.extend([operand for operand in op.operands if operand not in checked])
 
         return None
 
     def replace_original_with_calls(
         self,
-        rewriter: PatternRewriter,
+        func_op: func.FuncOp,
         dup_functions: list[func.FuncOp],
         group_return_positions: dict[int, list[int]],
+        rewriter: PatternRewriter,
     ):
         """Replace original function body with calls to dup functions.
 
@@ -481,18 +300,18 @@ class SplitNonCommutingRegion(RewritePattern):
         """
         print("Replacing original function with calls to dup functions")
 
-        original_block = self.original_func_op.body.block
+        original_block = func_op.body.block
 
-        for op in reversed(self.original_func_op.body.ops):
+        for op in reversed(func_op.body.ops):
             op.detach()
             op.erase()
 
         # Collect parameters needed for dup function calls
         # Dup functions take the same parameters as the original begin/end region
-        # Look at what state_evolution_call was using and find corresponding values
+        # Look at what original function was using and find corresponding values
         call_args = list(original_block.args)  # Use function arguments as base
 
-        group_results = {}  # group_id -> list of result values
+        group_results = dict[int, list[SSAValue]]()  # group_id -> list of result values
 
         for group_id, dup_func in enumerate(dup_functions):
             print(f"  Creating call to {dup_func.sym_name.data}")
@@ -516,10 +335,13 @@ class SplitNonCommutingRegion(RewritePattern):
 
         for group_id, positions in group_return_positions.items():
             group_vals = group_results[group_id]
+            assert len(group_vals) == len(
+                positions
+            ), "number of group values and positions must match"
+
             for i, position in enumerate(positions):
-                if i < len(group_vals):
-                    final_return_values[position] = group_vals[i]
-                    print(f"    Position {position} <- group {group_id} result {i}")
+                final_return_values[position] = group_vals[i]
+                print(f"    Position {position} <- group {group_id} result {i}")
 
         # Filter out None values (in case something went wrong)
         final_return_values = [v for v in final_return_values if v is not None]
@@ -527,41 +349,27 @@ class SplitNonCommutingRegion(RewritePattern):
         # Create new return operation
         return_op = func.ReturnOp(*final_return_values)
         original_block.add_op(return_op)
-
         print(f"  Created return with {len(final_return_values)} values")
 
-    def split_commuting_region(self, rewriter: PatternRewriter):
-        """split commuting region into multiple regions"""
+    def match_and_rewrite(self, func_op: func.FuncOp, rewriter: PatternRewriter):
+        """Split non-commuting region into multiple functions"""
+        self.module = get_parent_of_type(func_op, builtin.ModuleOp)
+        assert self.module is not None, "got orphaned qnode function"
 
         # Calculate the number of commuting region
-        num_commuting_region = self.calculate_num_commuting_region()
+        num_commuting_region = self.calculate_num_commuting_region(func_op)
 
         # Analyze return value positions for each group
-        group_return_positions = self.analyze_group_return_positions(num_commuting_region)
+        group_return_positions = self.analyze_group_return_positions(func_op, num_commuting_region)
 
         # Create dup function for each commuting region
-        print(f"split commuting region into {num_commuting_region} regions")
         dup_functions = []
         for i in range(num_commuting_region):
-            dup_func = self.create_dup_function(rewriter, i)
+            dup_func = self.create_dup_function(func_op, i, rewriter)
             dup_functions.append(dup_func)
 
         # Replace original function body with calls to dup functions
-        self.replace_original_with_calls(rewriter, dup_functions, group_return_positions)
-
-        print("after split commuting region")
-        print(self.module)
-
-    def match_and_rewrite(self, func_op: func.FuncOp, rewriter: PatternRewriter):
-        """Split commuting region into multiple regions"""
-        self.module = get_parent_of_type(func_op, builtin.ModuleOp)
-        assert self.module is not None, "got orphaned qnode function"
-        self.original_func_op = func_op
-
-        # Split commuting region into multiple regions
-        self.split_commuting_region(rewriter)
-        print("after split non-commuting region")
-        print(self.module)
+        self.replace_original_with_calls(func_op, dup_functions, group_return_positions, rewriter)
 
 
 @compiler_transform
@@ -571,19 +379,12 @@ class SplitNonCommutingRegionPass(ModulePass):
     def apply(self, ctx: Context, op: builtin.ModuleOp) -> None:
         self.apply_on_qnode(op, SplitNonCommutingRegion())
 
-        print("after split non-commuting region")
-        print(op)
-
     def apply_on_qnode(self, module: builtin.ModuleOp, pattern: RewritePattern):
         """Apply given pattern once to the QNode function in this module."""
         rewriter = PatternRewriter(module)
-        qnode = None
         for op in module.ops:
             if isinstance(op, func.FuncOp) and "qnode" in op.attributes:
-                qnode = op
-                break
-        assert qnode is not None, "expected QNode in module"
-        pattern.match_and_rewrite(qnode, rewriter)
+                pattern.match_and_rewrite(op, rewriter)
 
 
 if __name__ == "__main__":
@@ -591,7 +392,7 @@ if __name__ == "__main__":
 
     dev = qml.device("lightning.qubit", wires=2)
 
-    @qml.qjit(pass_plugins=[getXDSLPluginAbsolutePath()])
+    @qml.qjit(pass_plugins=[getXDSLPluginAbsolutePath()], keep_intermediate="pass")
     @SplitNonCommutingRegionPass
     @qml.qnode(dev, shots=1000)
     def circ(x: int):
