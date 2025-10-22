@@ -42,7 +42,6 @@ def _calling_convention(interpreter, closed_jaxpr, *args_plus_qreg):
     init_qreg = QubitHandler(qreg, converter.qubit_index_recorder)
     converter.init_qreg = init_qreg
 
-    # pylint: disable-next=cell-var-from-loop
     retvals = converter(closed_jaxpr, *args)
     init_qreg.insert_all_dangling_qubits()
     return *retvals, converter.init_qreg.get()
