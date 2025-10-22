@@ -383,6 +383,57 @@ def test_dynamic_wire_alloc_whileloop_outside(num_iter, expected, backend):
     assert np.allclose(expected, observed)
 
 
+@pytest.mark.usefixtures("use_capture")
+@pytest.mark.parametrize("flip_again, expected", [(True, [1, 0]), (False, [0, 1])])
+def test_subroutine(flip_again, expected, backend):
+    """
+    Test passing dynamically allocated wires into a subroutine.
+    """
+
+    @subroutine
+    def flip(w):
+        qml.X(w)
+        qml.CNOT(wires=[w, 0])
+
+    @qjit
+    @qml.qnode(qml.device(backend, wires=1))
+    def circuit():
+        with qml.allocate(1) as q1:
+            with qml.allocate(1) as q2:
+                flip(q1[0])
+                if flip_again:
+                    flip(q2[0])
+        return qml.probs(wires=[0])
+
+    observed = circuit()
+    assert np.allclose(expected, observed)
+
+
+@pytest.mark.usefixtures("use_capture")
+def test_subroutine_multiple_args(backend):
+    """
+    Test passing dynamically allocated wires into a subroutine with multiple arguments.
+    """
+
+    @subroutine
+    def flip(w1, w2, theta):
+        qml.X(w1)
+        qml.X(w2)
+        qml.ctrl(qml.RX, (w1, w2))(theta, wires=0)
+
+    @qjit
+    @qml.qnode(qml.device(backend, wires=1))
+    def circuit():
+        with qml.allocate(1) as q1:
+            with qml.allocate(2) as q2:
+                flip(q1[0], q2[1], jnp.pi)
+        return qml.probs(wires=[0])
+
+    observed = circuit()
+    expected = [0, 1]
+    assert np.allclose(expected, observed)
+
+
 def test_no_capture(backend):
     """
     Test error message when used without capture.
@@ -465,34 +516,6 @@ def test_terminal_MP_dynamic_wires(backend):
         def circuit():
             q = qml.allocate(1)
             return qml.probs(q)
-
-
-@pytest.mark.usefixtures("use_capture")
-def test_unsupported_subroutine(backend):
-    """
-    Test that an error is raised when a dynamically allocated wire is passed into a subroutine.
-    """
-
-    with pytest.raises(
-        NotImplementedError,
-        match=textwrap.dedent(
-            """
-            Dynamically allocated wires in a parent scope cannot be used in a child
-            scope yet. Please consider dynamical allocation inside the child scope.
-            """
-        ),
-    ):
-
-        @subroutine
-        def sub(_):
-            pass
-
-        @qjit
-        @qml.qnode(qml.device(backend, wires=2))
-        def circuit():
-            with qml.allocate(1) as q:
-                sub(q[0])
-            return qml.probs(wires=[0, 1])
 
 
 if __name__ == "__main__":

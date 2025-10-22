@@ -21,7 +21,7 @@ Unit tests for the dynamic qubit allocation.
 import pennylane as qml
 
 from catalyst import qjit
-from catalyst.jax_primitives import qalloc_p, qdealloc_qb_p, qextract_p
+from catalyst.jax_primitives import qalloc_p, qdealloc_qb_p, qextract_p, subroutine
 
 
 @qjit(target="mlir")
@@ -243,6 +243,57 @@ def test_pass_multiple_regs_into_whileloop(N: int):
 
 
 print(test_pass_multiple_regs_into_whileloop.mlir)
+
+
+def test_quantum_subroutine():
+    """
+    Test passing dynamically allocated wires into a quantum subroutine.
+    """
+
+    @subroutine
+    def flip(w1, w2, theta):
+        qml.X(w1)
+        qml.X(w2)
+        qml.ctrl(qml.RX, (w1, w2))(theta, wires=0)
+
+    # CHECK:  [[angle:%.+]] = stablehlo.constant dense<1.230000e+00>
+    # CHECK:  [[one:%.+]] = stablehlo.constant dense<1>
+    # CHECK:  [[zero:%.+]] = stablehlo.constant dense<0>
+    # CHECK:  [[global_qreg:%.+]] = quantum.alloc( 1)
+    # CHECK:  [[q1:%.+]] = quantum.alloc( 2)
+    # CHECK:  [[q2:%.+]] = quantum.alloc( 3)
+    # CHECK:  {{%.+}}:3 = call @flip([[global_qreg]], [[q1]], [[q2]], [[zero]], [[one]], [[angle]])
+    # CHECK-SAME: (!quantum.reg, !quantum.reg, !quantum.reg, tensor<i64>, tensor<i64>, tensor<f64>)
+    # CHECK-SAME: -> (!quantum.reg, !quantum.reg, !quantum.reg)
+
+    @qjit(target="mlir")
+    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    def circuit():
+        with qml.allocate(2) as q1:
+            with qml.allocate(3) as q2:
+                flip(q1[0], q2[1], 1.23)
+        return qml.probs(wires=[0])
+
+    # CHECK: func.func private @flip(
+    # CHECK:   [[zero:%.+]] = tensor.extract %arg3[]
+    # CHECK:   [[q1_0:%.+]] = quantum.extract %arg1[[[zero]]]
+    # CHECK:   [[x1_out:%.+]] = quantum.custom "PauliX"() [[q1_0]]
+    # CHECK:   [[one:%.+]] = tensor.extract %arg4[]
+    # CHECK:   [[q2_1:%.+]] = quantum.extract %arg2[[[one]]]
+    # CHECK:   [[x2_out:%.+]] = quantum.custom "PauliX"() [[q2_1]]
+    # CHECK:   [[glob_0:%.+]] = quantum.extract %arg0[ 0]
+    # CHECK:   [[angle:%.+]] = tensor.extract %arg5[]
+    # CHECK:   [[rx_out:%.+]], [[rx_ctrl_out:%.+]]:2 = quantum.custom "RX"([[angle]]) [[glob_0]]
+    # CHECK-SAME: ctrls([[x1_out]], [[x2_out]])
+    # CHECK:   [[glob_ret:%.+]] = quantum.insert %arg0[ 0], [[rx_out]]
+    # CHECK:   [[q2_ret:%.+]] = quantum.insert %arg2[{{%.+}}], [[rx_ctrl_out]]#1
+    # CHECK:   [[q1_ret:%.+]] = quantum.insert %arg1[{{%.+}}], [[rx_ctrl_out]]#0
+    # CHECK:   return [[glob_ret]], [[q1_ret]], [[q2_ret]] : !quantum.reg, !quantum.reg, !quantum.reg
+
+    print(circuit.mlir)
+
+
+test_quantum_subroutine()
 
 
 qml.capture.disable()

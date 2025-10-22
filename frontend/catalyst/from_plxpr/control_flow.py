@@ -26,7 +26,11 @@ from pennylane.capture.primitives import for_loop_prim as plxpr_for_loop_prim
 from pennylane.capture.primitives import while_loop_prim as plxpr_while_loop_prim
 
 from catalyst.from_plxpr.from_plxpr import PLxPRToQuantumJaxprInterpreter, WorkflowInterpreter
-from catalyst.from_plxpr.qubit_handler import QubitHandler, QubitIndexRecorder
+from catalyst.from_plxpr.qubit_handler import (
+    QubitHandler,
+    QubitIndexRecorder,
+    _get_dynamically_allocated_qregs,
+)
 from catalyst.jax_extras import jaxpr_pad_consts
 from catalyst.jax_primitives import cond_p, for_p, while_p
 
@@ -93,31 +97,6 @@ def _to_bool_if_not(arg):
     if getattr(arg, "dtype", None) == jax.numpy.bool:
         return arg
     return jax.numpy.bool(arg)
-
-
-def _get_dynamically_allocated_qregs(plxpr_invals, qubit_index_recorder, init_qreg):
-    """
-    Get the potential dynamically allocated register values that are visible to a jaxpr.
-
-    Note that dynamically allocated wires have their qreg tracer's id as the global wire index
-    so the sub jaxpr takes that id in as a "const", since it is clousure from the target wire
-    of gates/measurements/...
-    We need to remove that const, so we also let this util return these global indices.
-    """
-    dynalloced_qregs = []
-    dynalloced_wire_global_indices = []
-    for inval in plxpr_invals:
-        if (
-            isinstance(inval, int)
-            and qubit_index_recorder.contains(inval)
-            and qubit_index_recorder[inval] is not init_qreg
-        ):
-            dyn_qreg = qubit_index_recorder[inval]
-            dyn_qreg.insert_all_dangling_qubits()
-            dynalloced_qregs.append(dyn_qreg)
-            dynalloced_wire_global_indices.append(inval)
-
-    return dynalloced_qregs, dynalloced_wire_global_indices
 
 
 @WorkflowInterpreter.register_primitive(plxpr_cond_prim)
