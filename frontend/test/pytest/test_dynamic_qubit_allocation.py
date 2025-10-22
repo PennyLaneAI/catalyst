@@ -243,7 +243,7 @@ def test_dynamic_wire_alloc_cond_outside(cond, expected, backend):
     """
 
     @qjit(autograph=True)
-    @qml.qnode(qml.device("lightning.qubit", wires=2))
+    @qml.qnode(qml.device(backend, wires=2))
     def circuit(c):
         with qml.allocate(1) as q1:
             with qml.allocate(1) as q2:
