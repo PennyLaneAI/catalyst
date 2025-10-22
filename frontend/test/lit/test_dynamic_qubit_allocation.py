@@ -200,4 +200,49 @@ def test_pass_multiple_regs_into_forloop():
 print(test_pass_multiple_regs_into_forloop.mlir)
 
 
+@qjit(autograph=True, target="mlir")
+@qml.qnode(qml.device("lightning.qubit", wires=2))
+def test_pass_multiple_regs_into_whileloop(N: int):
+    """
+    Test using multiple dynamically allocated resgisters from inside a while loop.
+    """
+
+    # CHECK:  [[global_reg:%.+]] = quantum.alloc( 2)
+    # CHECK:  [[q1:%.+]] = quantum.alloc( 1)
+    # CHECK:  [[q2:%.+]] = quantum.alloc( 4)
+    # CHECK:  [[while_out:%.+]]:4 = scf.while (%arg1 = {{%.+}}, %arg2 = [[q1]], %arg3 = [[q2]],
+    # CHECK-SAME:  %arg4 = [[global_reg]]) : (tensor<i64>, !quantum.reg, !quantum.reg, !quantum.reg)
+    # CHECK-SAME:  -> (tensor<i64>, !quantum.reg, !quantum.reg, !quantum.reg) {
+    # CHECK:    stablehlo.compare  LT, %arg1, %arg0
+    # CHECK:    scf.condition({{%.+}}) %arg1, %arg2, %arg3, %arg4
+    # CHECK:  } do {
+    # CHECK:  ^bb0(%arg1: tensor<i64>, %arg2: !quantum.reg, %arg3: !quantum.reg, %arg4: !quantum.reg
+    # CHECK:    [[q1_0:%.+]] = quantum.extract %arg2[ 0]
+    # CHECK:    [[glob_1:%.+]] = quantum.extract %arg4[ 1]
+    # CHECK:    [[cnot_out0:%.+]]:2 = quantum.custom "CNOT"() [[q1_0]], [[glob_1]]
+    # CHECK:    [[q2_0:%.+]] = quantum.extract %arg3[ 0]
+    # CHECK:    [[cnot_out1:%.+]]:2 = quantum.custom "CNOT"() [[q2_0]], [[cnot_out0]]#1
+    # CHECK:    [[i:%.+]] = stablehlo.add %arg1, {{%.+}}
+    # CHECK:    [[glob_yield:%.+]] = quantum.insert %arg4[ 1], [[cnot_out1]]#1
+    # CHECK:    [[q1_yield:%.+]] = quantum.insert %arg2[ 0], [[cnot_out0]]#0
+    # CHECK:    [[q2_yield:%.+]] = quantum.insert %arg3[ 0], [[cnot_out1]]#0
+    # CHECK:    scf.yield [[i]], [[q1_yield]], [[q2_yield]], [[glob_yield]]
+    # CHECK:  }
+    # CHECK:  quantum.dealloc [[while_out]]#2
+    # CHECK:  quantum.dealloc [[while_out]]#1
+
+    i = 0
+    with qml.allocate(1) as q1:
+        with qml.allocate(4) as q2:
+            while i < N:
+                qml.CNOT(wires=[q1[0], 1])
+                qml.CNOT(wires=[q2[0], 1])
+                i += 1
+
+    return qml.probs(wires=[0, 1])
+
+
+print(test_pass_multiple_regs_into_whileloop.mlir)
+
+
 qml.capture.disable()

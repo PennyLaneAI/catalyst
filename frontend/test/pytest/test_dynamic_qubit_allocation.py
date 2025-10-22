@@ -357,6 +357,32 @@ def test_dynamic_wire_alloc_whileloop(num_iter, expected, backend):
     assert np.allclose(expected, observed)
 
 
+@pytest.mark.usefixtures("use_capture")
+@pytest.mark.parametrize("num_iter, expected", [(3, [0, 1, 0, 0]), (4, [1, 0, 0, 0])])
+def test_dynamic_wire_alloc_whileloop_outside(num_iter, expected, backend):
+    """
+    Test passing dynamically allocated wires into a while loop.
+    """
+
+    @qjit(autograph=True)
+    @qml.qnode(qml.device(backend, wires=2))
+    def circuit(N):
+        i = 0
+        with qml.allocate(1) as q1:
+            with qml.allocate(1) as q2:
+                qml.X(q1[0])
+                while i < N:
+                    qml.CNOT(wires=[q1[0], 1])
+                    qml.CNOT(wires=[q2[0], 1])
+                    i += 1
+
+        return qml.probs(wires=[0, 1])
+
+    observed = circuit(num_iter)
+
+    assert np.allclose(expected, observed)
+
+
 def test_no_capture(backend):
     """
     Test error message when used without capture.
