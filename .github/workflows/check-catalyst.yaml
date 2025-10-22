@@ -476,7 +476,7 @@ jobs:
         make frontend
 
     - name: Install PennyLane branch
-        run: |
+      run: |
         pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@add-fn-to-grad-prim
 
     - name: Get Cached LLVM Build
@@ -563,7 +563,7 @@ jobs:
         make frontend
 
     - name: Install PennyLane branch
-        run: |
+      run: |
         pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@add-fn-to-grad-prim
 
 
@@ -630,7 +630,7 @@ jobs:
         make frontend
 
     - name: Install PennyLane branch
-        run: |
+      run: |
         pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@add-fn-to-grad-prim
 
     - name: Get Cached LLVM Build

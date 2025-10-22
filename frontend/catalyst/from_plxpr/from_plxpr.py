@@ -16,7 +16,7 @@ This submodule defines a utility for converting plxpr into Catalyst jaxpr.
 """
 # pylint: disable=protected-access
 
-
+from copy import copy
 import warnings
 from functools import partial
 from typing import Callable
@@ -409,7 +409,7 @@ def trace_from_pennylane(
             fn.static_argnums = static_argnums
 
         plxpr, out_type, out_treedef = make_jaxpr2(fn, **make_jaxpr_kwargs)(*args, **kwargs)
-        jaxpr = from_plxpr(plxpr)(*dynamic_args, **kwargs)
+        jaxpr = from_plxpr(plxpr)(*plxpr.in_avals)
 
     return jaxpr, out_type, out_treedef, sig
 

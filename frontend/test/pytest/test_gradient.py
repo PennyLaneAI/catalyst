@@ -20,21 +20,19 @@ from dataclasses import replace
 import jax
 import numpy as np
 import pennylane as qml
-from pennylane import grad, jacobian
 import pytest
 from jax import numpy as jnp
 from jax.tree_util import tree_all, tree_flatten, tree_map, tree_structure
+from pennylane import grad, jacobian, qjit, for_loop
 
 import catalyst
 import catalyst.utils.calculate_grad_shape as infer
 from catalyst import (
     CompileError,
     DifferentiableCompileError,
-    for_loop,
     measure,
     mitigate_with_zne,
     pure_callback,
-    qjit,
     value_and_grad,
     vmap,
 )
@@ -489,7 +487,7 @@ def test_finite_diff(inp, backend):
     def interpretted_grad_default(x):
         device = qml.device("default.qubit", wires=1)
         g = qml.QNode(f, device, diff_method="finite-diff")
-        h = qml.grad(g, argnum=0)
+        h = qml.grad(g, argnums=0)
         return h(x)
 
     assert np.allclose(compiled_grad_default(inp), interpretted_grad_default(inp))
@@ -513,7 +511,7 @@ def test_finite_diff_mul(inp, backend):
     def interpretted_grad_default(x):
         device = qml.device("default.qubit", wires=1)
         g = qml.QNode(f, device, diff_method="finite-diff")
-        h = qml.grad(g, argnum=0)
+        h = qml.grad(g, argnums=0)
         return h(x)
 
     assert np.allclose(compiled_grad_default(inp), interpretted_grad_default(inp))
@@ -531,7 +529,7 @@ def test_finite_diff_in_loop(inp, backend):
 
     @qjit
     def compiled_grad_default(params, ntrials):
-        diff = qml.grad(f, argnum=0, method="fd")
+        diff = qml.grad(f, argnums=0, method="fd")
 
         def fn(i, g):
             return diff(params)
@@ -541,7 +539,7 @@ def test_finite_diff_in_loop(inp, backend):
     def interpretted_grad_default(x):
         device = qml.device("default.qubit", wires=1)
         g = qml.QNode(f, device, diff_method="finite-diff")
-        h = qml.grad(g, argnum=0)
+        h = qml.grad(g, argnums=0)
         return h(x)
 
     enabled = qml.capture.enabled()
@@ -571,7 +569,7 @@ def test_adj(inp, backend):
     def interpreted(x):
         device = qml.device("default.qubit", wires=1)
         g = qml.QNode(f, device, diff_method="backprop")
-        h = qml.grad(g, argnum=0)
+        h = qml.grad(g, argnums=0)
         return h(x)
 
     assert np.allclose(compiled(inp), interpreted(inp))
@@ -595,7 +593,7 @@ def test_adj_mult(inp, backend):
     def interpreted(x):
         device = qml.device("default.qubit", wires=1)
         g = qml.QNode(f, device, diff_method="backprop")
-        h = qml.grad(g, argnum=0)
+        h = qml.grad(g, argnums=0)
         return h(x)
 
     assert np.allclose(compiled(inp), interpreted(inp))
@@ -613,7 +611,7 @@ def test_adj_in_loop(inp, backend):
 
     @qjit
     def compiled_grad_default(params, ntrials):
-        diff = qml.grad(f, argnum=0, method="auto")
+        diff = qml.grad(f, argnums=0, method="auto")
 
         def fn(i, g):
             return diff(params)
@@ -623,7 +621,7 @@ def test_adj_in_loop(inp, backend):
     def interpretted_grad_default(x):
         device = qml.device("default.qubit", wires=1)
         g = qml.QNode(f, device, diff_method="backprop")
-        h = qml.grad(g, argnum=0)
+        h = qml.grad(g, argnums=0)
         return h(x)
 
     enabled = qml.capture.enabled()
@@ -652,7 +650,7 @@ def test_ps(inp, backend):
     def interpreted(x):
         device = qml.device("default.qubit", wires=1)
         g = qml.QNode(f, device, diff_method="backprop")
-        h = qml.grad(g, argnum=0)
+        h = qml.grad(g, argnums=0)
         return h(x)
 
     assert np.allclose(compiled(inp), interpreted(inp))
@@ -685,13 +683,13 @@ def test_ps_conditionals(inp, backend):
     @qjit
     def compiled(x: float, y: float):
         g = qml.qnode(qml.device(backend, wires=1), diff_method="parameter-shift")(f_compiled)
-        h = qml.grad(g, method="auto", argnum=0)
+        h = qml.grad(g, method="auto", argnums=0)
         return h(x, y)
 
     def interpreted(x, y):
         device = qml.device("default.qubit", wires=1)
         g = qml.QNode(f_interpreted, device, diff_method="backprop")
-        h = qml.grad(g, argnum=0)
+        h = qml.grad(g, argnums=0)
         return h(x, y)
 
     enabled = qml.capture.enabled()
@@ -726,13 +724,13 @@ def test_ps_for_loops(inp, backend):
     @qjit
     def compiled(x: float, y: int):
         g = qml.qnode(qml.device(backend, wires=1), diff_method="parameter-shift")(f_compiled)
-        h = qml.grad(g, method="auto", argnum=0)
+        h = qml.grad(g, method="auto", argnums=0)
         return h(x, y)
 
     def interpreted(x, y):
         device = qml.device("default.qubit", wires=1)
         g = qml.QNode(f_interpreted, device, diff_method="backprop")
-        h = qml.grad(g, argnum=0)
+        h = qml.grad(g, argnums=0)
         return h(x, y)
 
     enabled = qml.capture.enabled()
@@ -778,13 +776,13 @@ def test_ps_for_loops_entangled(inp, backend):
     @qjit
     def compiled(x: float, y: int, z: int):
         g = qml.qnode(qml.device(backend, wires=3), diff_method="parameter-shift")(f_compiled)
-        h = qml.grad(g, method="auto", argnum=0)
+        h = qml.grad(g, method="auto", argnums=0)
         return h(x, y, z)
 
     def interpreted(x, y, z):
         device = qml.device("default.qubit", wires=3)
         g = qml.QNode(f_interpreted, device, diff_method="backprop")
-        h = qml.grad(g, argnum=0)
+        h = qml.grad(g, argnums=0)
         return h(x, y, z)
 
     qml.capture.disable()
@@ -841,13 +839,13 @@ def test_ps_qft(inp, backend):
     @qjit
     def compiled(x: float, y: int, z: int):
         g = qml.qnode(qml.device(backend, wires=3), diff_method="parameter-shift")(qft_compiled)
-        h = qml.grad(g, method="auto", argnum=0)
+        h = qml.grad(g, method="auto", argnums=0)
         return h(x, y, z)
 
     def interpreted(x, y, z):
         device = qml.device("default.qubit", wires=3)
         g = qml.QNode(qft_interpreted, device, diff_method="backprop")
-        h = qml.grad(g, argnum=0)
+        h = qml.grad(g, argnums=0)
         return h(x, y, z)
 
     enabled = qml.capture.enabled()
@@ -877,7 +875,7 @@ def test_ps_probs(backend):
     result = workflow(0.5)
     enabled = qml.capture.enabled()
     qml.capture.disable()
-    reference = qml.jacobian(func, argnum=0)(0.5)
+    reference = qml.jacobian(func, argnums=0)(0.5)
     if enabled:
         qml.capture.enable()
     print(result, reference)
@@ -924,7 +922,7 @@ def test_finite_diff_h(inp, backend):
     def interpretted_grad_h(x):
         device = qml.device("default.qubit", wires=1)
         g = qml.QNode(f, device, diff_method="finite-diff", gradient_kwargs={"h": 0.1})
-        h = qml.grad(g, argnum=0)
+        h = qml.grad(g, argnums=0)
         return h(x)
 
     assert np.allclose(compiled_grad_h(inp), interpretted_grad_h(inp))
@@ -942,13 +940,13 @@ def test_finite_diff_argnum(inp, backend):
     @qjit
     def compiled_grad_argnum(x: float):
         g = qml.qnode(qml.device(backend, wires=1))(f2)
-        h = qml.grad(g, method="fd", argnum=1)
+        h = qml.grad(g, method="fd", argnums=1)
         return h(x, 2.0)
 
     def interpretted_grad_argnum(x):
         device = qml.device("default.qubit", wires=1)
         g = qml.QNode(f2, device, diff_method="finite-diff")
-        h = qml.grad(g, argnum=1)
+        h = qml.grad(g, argnums=1)
         return h(x, 2.0)
 
     assert np.allclose(compiled_grad_argnum(inp), interpretted_grad_argnum(inp))
@@ -966,13 +964,13 @@ def test_finite_diff_argnum_list(inp, backend):
     @qjit
     def compiled_grad_argnum_list(x: float):
         g = qml.qnode(qml.device(backend, wires=1))(f2)
-        h = qml.grad(g, method="fd", argnum=[1])
+        h = qml.grad(g, method="fd", argnums=[1])
         return h(x, 2.0)
 
     def interpretted_grad_argnum_list(x):
         device = qml.device("default.qubit", wires=1)
         g = qml.QNode(f2, device, diff_method="finite-diff")
-        h = qml.grad(g, argnum=[1])
+        h = qml.grad(g, argnums=[1])
         # Slightly different behaviour. If argnums is a list
         # it doesn't matter if it is a single number,
         # the return value will be a n-tuple of size of the
@@ -994,13 +992,13 @@ def test_finite_grad_range_change(inp, backend):
     @qjit
     def compiled_grad_range_change(x: float):
         g = qml.qnode(qml.device(backend, wires=1))(f2)
-        h = qml.grad(g, method="fd", argnum=[0, 1])
+        h = qml.grad(g, method="fd", argnums=[0, 1])
         return h(x, 2.0)
 
     def interpretted_grad_range_change(x):
         device = qml.device("default.qubit", wires=1)
         g = qml.QNode(f2, device, diff_method="finite-diff")
-        h = qml.grad(g, argnum=[0, 1])
+        h = qml.grad(g, argnums=[0, 1])
         return h(x, 2.0)
 
     assert np.allclose(compiled_grad_range_change(inp), interpretted_grad_range_change(inp))
@@ -1018,13 +1016,13 @@ def test_ps_grad_range_change(inp, backend):
     @qjit
     def compiled_grad_range_change(x: float):
         g = qml.qnode(qml.device(backend, wires=1), diff_method="parameter-shift")(f2)
-        h = qml.grad(g, method="auto", argnum=[0, 1])
+        h = qml.grad(g, method="auto", argnums=[0, 1])
         return h(x, 2.0)
 
     def interpretted_grad_range_change(x):
         device = qml.device("default.qubit", wires=1)
         g = qml.QNode(f2, device, diff_method="backprop")
-        h = qml.grad(g, argnum=[0, 1])
+        h = qml.grad(g, argnums=[0, 1])
         return h(x, 2.0)
 
     assert np.allclose(compiled_grad_range_change(inp), interpretted_grad_range_change(inp))
@@ -1042,13 +1040,13 @@ def test_ps_tensorinp(inp, backend):
     @qjit
     def compiled(x: jax.core.ShapedArray([1], float)):
         g = qml.qnode(qml.device(backend, wires=1), diff_method="parameter-shift")(f2)
-        h = qml.grad(g, method="auto", argnum=[0, 1])
+        h = qml.grad(g, method="auto", argnums=[0, 1])
         return h(x, 2.0)
 
     def interpretted(x):
         device = qml.device("default.qubit", wires=1)
         g = qml.QNode(f2, device, diff_method="backprop")
-        h = qml.grad(g, argnum=[0, 1])
+        h = qml.grad(g, argnums=[0, 1])
         return h(x, 2.0)
 
     for dydx_c, dydx_i in zip(compiled(jnp.array([inp])), interpretted(np.array([inp]))):
@@ -1067,13 +1065,13 @@ def test_adjoint_grad_range_change(inp, backend):
     @qjit
     def compiled_grad_range_change(x: float):
         g = qml.qnode(qml.device(backend, wires=1), diff_method="adjoint")(f2)
-        h = qml.grad(g, method="auto", argnum=[0, 1])
+        h = qml.grad(g, method="auto", argnums=[0, 1])
         return h(x, 2.0)
 
     def interpretted_grad_range_change(x):
         device = qml.device("default.qubit", wires=1)
         g = qml.QNode(f2, device, diff_method="backprop")
-        h = qml.grad(g, argnum=[0, 1])
+        h = qml.grad(g, argnums=[0, 1])
         return h(x, 2.0)
 
     assert np.allclose(compiled_grad_range_change(inp), interpretted_grad_range_change(inp))
@@ -1089,11 +1087,12 @@ def test_assert_no_higher_order_without_fd(method, backend):
 
     with pytest.raises(DifferentiableCompileError, match="higher order derivatives"):
 
+        # not sure how to get this working with qml.grad TODO
         @qjit
         def workflow(x: float):
             g = qml.qnode(qml.device(backend, wires=1), diff_method=method)(f)
-            h = qml.grad(g, method="auto")
-            i = qml.grad(h, method="auto")
+            h = catalyst.grad(g, method="auto")
+            i = catalyst.grad(h, method="auto")
             return i(x)
 
 
@@ -1173,8 +1172,8 @@ def test_finite_diff_higher_order(inp, backend):
     def interpretted_grad2_default(x):
         device = qml.device("default.qubit", wires=1)
         g = qml.QNode(f, device, diff_method="backprop", max_diff=2)
-        h = qml.grad(g, argnum=0)
-        i = qml.grad(h, argnum=0)
+        h = qml.grad(g, argnums=0)
+        i = qml.grad(h, argnums=0)
         return i(x)
 
     enabled = qml.capture.enabled()
@@ -1284,12 +1283,12 @@ def test_finite_diff_multiple_devices(inp, diff_method, backend):
 
     @qjit
     def compiled_grad_default(params, ntrials):
-        d_f = qml.grad(f, argnum=0, method=diff_method)
+        d_f = qml.grad(f, argnums=0, method=diff_method)
 
         def fn_f(_i, _g):
             return d_f(params)
 
-        d_g = qml.grad(g, argnum=0, method=diff_method)
+        d_g = qml.grad(g, argnums=0, method=diff_method)
 
         def fn_g(_i, _g):
             return d_g(params)
@@ -1347,8 +1346,8 @@ def test_multiple_grad_invocations(backend, diff_method):
 
     @qjit
     def compiled(x: float, y: float):
-        g1 = qml.grad(f, argnum=0, method="auto")(x, y)
-        g2 = qml.grad(f, argnum=1, method="auto")(x, y)
+        g1 = qml.grad(f, argnums=0, method="auto")(x, y)
+        g2 = qml.grad(f, argnums=1, method="auto")(x, y)
         return jnp.array([g1, g2])
 
     actual = compiled(0.1, 0.2)
@@ -1388,7 +1387,7 @@ def test_loop_with_dyn_wires(backend, diff_method):
     arg = 0.75
     result = qjit(qml.grad(cat))(arg)
     qml.capture.disable()
-    expected = qml.grad(pl, argnum=0)(arg)
+    expected = qml.grad(pl, argnums=0)(arg)
 
     assert np.allclose(result, expected)
 
@@ -1401,14 +1400,14 @@ def test_classical_kwargs():
         return x * (y - z)
 
     def g(*args, **kwargs):
-        return qml.grad(f1, argnum=0)(*args, **kwargs)
+        return qml.grad(f1, argnums=0)(*args, **kwargs)
 
     result = qjit(g)(3.0, y=1.0, z=2.0)
     expected = qjit(g)(3.0, 1.0, 2.0)
     assert np.allclose(expected, result)
 
 
-#@pytest.mark.usefixtures("use_both_frontend")
+# @pytest.mark.usefixtures("use_both_frontend")
 def test_classical_kwargs_switched_arg_order():
     """Test the gradient on classical function with keyword arguments and switched argument order"""
 
@@ -1417,7 +1416,7 @@ def test_classical_kwargs_switched_arg_order():
         return x * (y - z)
 
     def g(*args, **kwargs):
-        return qml.grad(f1, argnum=0)(*args, **kwargs)
+        return qml.grad(f1, argnums=0)(*args, **kwargs)
 
     result = qjit(g)(3.0, z=2.0, y=1.0)
     expected = qjit(g)(3.0, 1.0, 2.0)
@@ -1437,17 +1436,17 @@ def test_qnode_kwargs(backend, diff_method):
         qml.RX(z, wires=0)
         return qml.expval(qml.PauliZ(0))
 
-    result = qjit(qml.jacobian(circuit, argnum=[0]))(0.1, y=0.2, z=0.3)
-    expected = qjit(qml.jacobian(circuit, argnum=[0]))(0.1, 0.2, 0.3)
+    result = qjit(qml.jacobian(circuit, argnums=[0]))(0.1, y=0.2, z=0.3)
+    expected = qjit(qml.jacobian(circuit, argnums=[0]))(0.1, 0.2, 0.3)
     assert np.allclose(expected, result)
-    result = qjit(qml.grad(circuit, argnum=[0]))(0.1, y=0.2, z=0.3)
-    expected = qjit(qml.grad(circuit, argnum=[0]))(0.1, 0.2, 0.3)
+    result = qjit(qml.grad(circuit, argnums=[0]))(0.1, y=0.2, z=0.3)
+    expected = qjit(qml.grad(circuit, argnums=[0]))(0.1, 0.2, 0.3)
     assert np.allclose(expected, result)
 
     if not qml.capture.enabled():
         result_val, result_grad = qjit(value_and_grad(circuit, argnums=[0]))(0.1, y=0.2, z=0.3)
         expected_val = qjit(circuit)(0.1, 0.2, 0.3)
-        expected_grad = qjit(qml.grad(circuit, argnum=[0]))(0.1, 0.2, 0.3)
+        expected_grad = qjit(qml.grad(circuit, argnums=[0]))(0.1, 0.2, 0.3)
 
         assert np.allclose(expected_val, result_val)
         assert np.allclose(expected_grad, result_grad)
@@ -1466,11 +1465,11 @@ def test_qnode_kwargs_switched_arg_order(backend, diff_method):
         qml.RX(z, wires=0)
         return qml.expval(qml.PauliZ(0))
 
-    switched_order = qjit(qml.jacobian(circuit, argnum=[0]))(0.1, z=0.3, y=0.2)
-    expected = qjit(qml.jacobian(circuit, argnum=[0]))(0.1, 0.2, 0.3)
+    switched_order = qjit(qml.jacobian(circuit, argnums=[0]))(0.1, z=0.3, y=0.2)
+    expected = qjit(qml.jacobian(circuit, argnums=[0]))(0.1, 0.2, 0.3)
     assert np.allclose(expected[0], switched_order[0])
-    switched_order = qjit(qml.grad(circuit, argnum=[0]))(0.1, z=0.3, y=0.2)
-    expected = qjit(qml.grad(circuit, argnum=[0]))(0.1, 0.2, 0.3)
+    switched_order = qjit(qml.grad(circuit, argnums=[0]))(0.1, z=0.3, y=0.2)
+    expected = qjit(qml.grad(circuit, argnums=[0]))(0.1, 0.2, 0.3)
     assert np.allclose(expected[0], switched_order[0])
     if not qml.capture.enabled():
         switched_order_val, switched_order_grad = qjit(value_and_grad(circuit, argnums=[0]))(
@@ -1505,9 +1504,9 @@ def test_pytrees_return_classical_function(backend, diff_method):
         # TODO: specify error message and/or fix, currently MLIR Assertion error
         #       "invalid qfunc symbol in adjoint op" which doesn't seem right
         with pytest.raises(CompileError):
-            qjit(qml.jacobian(circuit, argnum=[0, 1]))(psi, phi)
+            qjit(qml.jacobian(circuit, argnums=[0, 1]))(psi, phi)
     else:
-        result = qjit(qml.jacobian(circuit, argnum=[0, 1]))(psi, phi)
+        result = qjit(qml.jacobian(circuit, argnums=[0, 1]))(psi, phi)
 
         assert isinstance(result, list)
         assert len(result) == 2
@@ -1529,7 +1528,7 @@ def test_pytrees_return_classical():
     y = 0.2
 
     jax_expected_results = jax.jit(jax.jacobian(f, argnums=[0, 1]))(x, y)
-    catalyst_results = qjit(qml.jacobian(f, argnum=[0, 1]))(x, y)
+    catalyst_results = qjit(qml.jacobian(f, argnums=[0, 1]))(x, y)
 
     flatten_res_jax, tree_jax = tree_flatten(jax_expected_results)
     flatten_res_catalyst, tree_catalyst = tree_flatten(catalyst_results)
@@ -1549,7 +1548,7 @@ def test_pytrees_args_classical():
     y = 0.2
 
     jax_expected_results = jax.jit(jax.jacobian(f, argnums=[0, 1]))(x, y)
-    catalyst_results = qjit(qml.jacobian(f, argnum=[0, 1]))(x, y)
+    catalyst_results = qjit(qml.jacobian(f, argnums=[0, 1]))(x, y)
 
     flatten_res_jax, tree_jax = tree_flatten(jax_expected_results)
     flatten_res_catalyst, tree_catalyst = tree_flatten(catalyst_results)
@@ -1569,7 +1568,7 @@ def test_pytrees_args_return_classical():
     y = 0.2
 
     jax_expected_results = jax.jit(jax.jacobian(f, argnums=[0, 1]))(x, y)
-    catalyst_results = qjit(qml.jacobian(f, argnum=[0, 1]))(x, y)
+    catalyst_results = qjit(qml.jacobian(f, argnums=[0, 1]))(x, y)
 
     flatten_res_jax, tree_jax = tree_flatten(jax_expected_results)
     flatten_res_catalyst, tree_catalyst = tree_flatten(catalyst_results)
@@ -1615,7 +1614,7 @@ def test_adj_qubitunitary(inp, backend):
     def interpreted(x):
         device = qml.device("default.qubit", wires=1)
         g = qml.QNode(f, device, diff_method="backprop")
-        h = qml.grad(g, argnum=0)
+        h = qml.grad(g, argnums=0)
         return h(x)
 
     assert np.allclose(compiled(inp), interpreted(inp))
@@ -2025,7 +2024,7 @@ class TestGradientMethodErrors:
         with pytest.raises(
             ValueError, match="The device does not provide a catalyst compatible gradient method"
         ):
-            qjit(grad(f))
+            qjit(grad(f))(0.5)
 
     def test_finite_diff_grad_method_error(self):
         """Test that using 'finite-diff' grad method raises appropriate error."""
@@ -2038,7 +2037,7 @@ class TestGradientMethodErrors:
         with pytest.raises(
             ValueError, match="Finite differences at the QNode level is not supported"
         ):
-            qjit(grad(f))
+            qjit(grad(f))(0.5)
 
     def test_invalid_grad_method_error(self):
         """Test that using an invalid grad method raises appropriate error."""
@@ -2049,7 +2048,7 @@ class TestGradientMethodErrors:
             return qml.expval(qml.PauliY(0))
 
         with pytest.raises(ValueError, match="Invalid gradient method: invalid_method"):
-            qjit(grad(f))
+            qjit(grad(f))(0.5)
 
 
 class TestParameterShiftVerificationUnitTests:
@@ -2239,6 +2238,8 @@ class TestParameterShiftVerificationIntegrationTests:
             def circuit(_: float):
                 measure(0)
                 return qml.expval(qml.PauliZ(wires=0))
+            
+            circuit(0.5)
 
     def test_all_arguments_are_constant(self, backend):
         """When all arguments are constant they do not contribute to the gradient"""
@@ -2310,6 +2311,8 @@ class TestParameterShiftVerificationIntegrationTests:
             def circuit(x: float):
                 RX(x, wires=[0])
                 return qml.expval(qml.PauliZ(wires=0))
+            
+            circuit(0.5)
 
     def test_parameter_frequencies_not_one(self, backend):
         """When there is an op without parameter_frequencies, ps gradient should fail"""
