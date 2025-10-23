@@ -44,7 +44,7 @@ def f_opt(x: float, y: float):
     location information.
     Same test as before, but now we exercise mlir_opt property.
     """
-    # CHECK: %x: tensor<f64>, %y: tensor<f64>
+    # CHECK: %x: !llvm.ptr, {{.*}} %y: !llvm.ptr
     return x * y
 
 
