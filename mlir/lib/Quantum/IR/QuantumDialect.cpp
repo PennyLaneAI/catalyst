@@ -39,7 +39,8 @@ struct QuantumInlinerInterface : public DialectInlinerInterface {
     /// Returns true if the given operation 'callable' can be inlined into the
     /// position given by the 'call'. Currently, we always inline quantum
     /// decomposition functions.
-    bool isLegalToInline(Operation *call, Operation *callable, bool wouldBeCloned) const final
+    bool isLegalToInline([[maybe_unused]] Operation *call, Operation *callable,
+                         [[maybe_unused]] bool wouldBeCloned) const final
     {
         if (auto funcOp = dyn_cast<func::FuncOp>(callable)) {
             return funcOp->hasAttr(decompAttr);
@@ -49,8 +50,9 @@ struct QuantumInlinerInterface : public DialectInlinerInterface {
 
     /// Returns true if the given region 'src' can be inlined into the region
     /// 'dest'. Only allow for decomposition functions.
-    bool isLegalToInline(Region *dest, Region *src, bool wouldBeCloned,
-                         IRMapping &valueMapping) const final
+    bool isLegalToInline([[maybe_unused]] Region *dest, Region *src,
+                         [[maybe_unused]] bool wouldBeCloned,
+                         [[maybe_unused]] IRMapping &valueMapping) const final
     {
         if (auto funcOp = src->getParentOfType<func::FuncOp>()) {
             return funcOp->hasAttr(decompAttr);
@@ -59,8 +61,9 @@ struct QuantumInlinerInterface : public DialectInlinerInterface {
     }
 
     // Allow to inline operations from decomposition functions.
-    bool isLegalToInline(Operation *op, Region *dest, bool wouldBeCloned,
-                         IRMapping &valueMapping) const final
+    bool isLegalToInline(Operation *op, [[maybe_unused]] Region *dest,
+                         [[maybe_unused]] bool wouldBeCloned,
+                         [[maybe_unused]] IRMapping &valueMapping) const final
     {
         if (auto funcOp = op->getParentOfType<func::FuncOp>()) {
             return funcOp->hasAttr(decompAttr);

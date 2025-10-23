@@ -101,11 +101,11 @@ struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLowering
         });
     }
 
-    // Find the target gate set from the module.It's expected that the decomposition function would
-    // have this attribute: `decomp_gateset` And this attribute is set by the frontend, it contains
-    // the target gate set that the circuit function want to finally decompose into. Since each
-    // module only contains one circuit function, we can just find the target gate set from the
-    // function with the `decomp_gateset` attribute
+    // Find the target gate set from the module. It's expected that the decomposition function
+    // would have this attribute: `decomp_gateset` And this attribute is set by the frontend,
+    // it contains the target gate set that the circuit function want to finally decompose into.
+    // Since each module only contains one circuit function, we can just find the target gateset
+    // from the function with the `decomp_gateset` attribute.
     void findTargetGateSet(ModuleOp module, llvm::StringSet<llvm::MallocAllocator> &targetGateSet)
     {
         module.walk([&](func::FuncOp func) {

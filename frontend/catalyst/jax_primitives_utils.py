@@ -182,8 +182,8 @@ def lower_callable_to_funcop(ctx, callable_, call_jaxpr, public=False):
         # Register the decomposition gatesets to the QNode FuncOp
         # This will set a queue of gatesets that enables support for multiple
         # levels of decomposition in the MLIR decomposition pass
-        if gateset := getattr(callable_, "decompose_gatesets", []):
-            func_op.attributes["decompose_gatesets"] = get_mlir_attribute_from_pyval(gateset)
+        if gateset := getattr(callable_, "decomp_gateset", []):
+            func_op.attributes["decomp_gateset"] = get_mlir_attribute_from_pyval(gateset)
 
     # Extract the target gate and number of wires from decomposition rules
     # and set them as attributes on the FuncOp for use in the MLIR decomposition pass

@@ -266,13 +266,13 @@ def handle_qnode(
 
     if self.requires_decompose_lowering and graph_succeeded:
         # Add gate_set attribute to the quantum kernel primitive
-        # decompose_gatesets is treated as a queue of gatesets to be used
+        # decomp_gateset is treated as a queue of gatesets to be used
         # but we only support a single gateset for now in from_plxpr
         # as supporting multiple gatesets requires an MLIR/C++ graph-decomposition
         # implementation. The current Python implementation cannot be mixed
         # with other transforms in between.
         gateset = [_get_operator_name(op) for op in self.decompose_tkwargs.get("gate_set", [])]
-        setattr(qnode, "decompose_gatesets", [gateset])
+        setattr(qnode, "decomp_gateset", gateset)
 
     return quantum_kernel_p.bind(
         wrap_init(calling_convention, debug_info=qfunc_jaxpr.debug_info),
