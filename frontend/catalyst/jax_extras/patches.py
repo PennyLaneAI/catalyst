@@ -20,7 +20,7 @@ from __future__ import annotations
 from functools import partial
 
 import jax
-from jax._src.core import abstractify, standard_vma_rule
+from jax._src.core import abstractify, standard_vma_rule, typeof, set_current_trace
 from jax._src.lax.slicing import (
     _argnum_weak_type,
     _gather_dtype_rule,
@@ -243,6 +243,21 @@ def patch_primitives():
     This patch wraps the bind method to convert lists to tuples to make them hashable.
     """
 
+    import numpy as np
+
+    def patched_literal_int(_cls, value: int, _dtype: np.dtype):
+        return int.__new__(int, value)
+
+    def patched_literal_float(_cls, value: float, _dtype: np.dtype):
+        return float.__new__(float, value)
+
+    def patched_literal_complex(_cls, value: complex, _dtype: np.dtype):
+        return complex.__new__(complex, value)
+
+    jax._src.literals.LiteralInt.__new__ = patched_literal_int
+    jax._src.literals.LiteralFloat.__new__ = patched_literal_float
+    jax._src.literals.LiteralComplex.__new__ = patched_literal_complex
+
     def make_hashable(value):
         """Recursively convert lists to tuples to make them hashable."""
         if isinstance(value, list):
@@ -461,6 +476,19 @@ def patch_primitives():
             return out
 
         mlir.multi_broadcast_in_dim = patched_multi_broadcast_in_dim
+
+        def patched_bind_with_trace(self, trace, args, params):
+            try:
+                in_type = list(map(typeof, args))
+            except Exception:  # pylint: disable=broad-exception-caught
+                return trace.process_primitive(self, args, params)
+            else:
+                if self.is_high(*in_type, **params) and trace.requires_low:
+                    with set_current_trace(trace):
+                        return self.to_lojax(*args, **params)
+                return trace.process_primitive(self, args, params)
+
+        core.Primitive.bind_with_trace = patched_bind_with_trace
 
     except ImportError:
         pass

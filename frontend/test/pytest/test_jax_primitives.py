@@ -21,7 +21,7 @@ from collections import namedtuple
 
 import jax
 import pytest
-from jax import make_jaxpr
+from jax import make_jaxpr, core
 from jax._src.lib.mlir import ir
 from jax.interpreters.mlir import ir_constant, make_ir_context
 
@@ -50,7 +50,9 @@ class TestLowering:
         ctx = make_ir_context()
         jax_ctx = JAXCTX(MODCTX(ctx))
         with ir.Location.unknown(ctx):
-            index_value = ir_constant(test_input)
+            dtype = jax.numpy.dtype(type(test_input))
+            aval = core.ShapedArray([], dtype)
+            index_value = ir_constant(test_input, aval=aval)
             qreg_value = VALUE(ir.OpaqueType.get("quantum", "reg"))
             with pytest.raises(TypeError, match="Operator wires expected to be integers"):
                 _qextract_lowering(jax_ctx, qreg_value, index_value)
@@ -62,7 +64,9 @@ class TestLowering:
         ctx = make_ir_context()
         jax_ctx = JAXCTX(MODCTX(ctx))
         with ir.Location.unknown(ctx):
-            index_value = ir_constant(test_input)
+            dtype = jax.numpy.dtype(type(test_input))
+            aval = core.ShapedArray([], dtype)
+            index_value = ir_constant(test_input, aval=aval)
             qreg_value = VALUE(ir.OpaqueType.get("quantum", "reg"))
             qbit_value = VALUE(ir.OpaqueType.get("quantum", "bit"))
             with pytest.raises(TypeError, match="Operator wires expected to be integers"):
