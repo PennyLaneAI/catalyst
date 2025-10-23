@@ -273,8 +273,8 @@ unitary_p = Primitive("unitary")
 unitary_p.multiple_results = True
 pauli_rot_p = Primitive("pauli_rot")
 pauli_rot_p.multiple_results = True
-pauli_meas_p = Primitive("pauli_meas")
-pauli_meas_p.multiple_results = True
+pauli_measure_p = Primitive("pauli_measure")
+pauli_measure_p.multiple_results = True
 measure_p = Primitive("measure")
 measure_p.multiple_results = True
 compbasis_p = Primitive("compbasis")
@@ -1398,7 +1398,7 @@ def _pauli_rot_abstract_eval(
         assert isinstance(qubit, AbstractQbit)
     return (AbstractQbit(),) * (qubits_len)
 
-@qinst_p.def_impl
+@pauli_rot_p.def_impl
 def _pauli_rot_def_impl(*args, **kwargs):  # pragma: no cover
     raise NotImplementedError()
 
@@ -1443,6 +1443,68 @@ def _pauli_rot_lowering(
         rotation_kind=rotation_kind,
         in_qubits=qubits
     ).results
+
+#
+# pauli measure operation
+#
+@pauli_measure_p.def_abstract_eval
+def _pauli_measure_abstract_eval(
+    *qubits_or_params, pauli_word=None, qubits_len=0, adjoint=False
+):
+    # The signature here is: (using * to denote zero or more)
+    # qubits*, params*
+    qubits = qubits_or_params[:qubits_len]
+    for idx in range(qubits_len):
+        qubit = qubits[idx]
+        assert isinstance(qubit, AbstractQbit)
+    result = (core.ShapedArray((), bool),) +  (AbstractQbit(),) * (qubits_len)
+    print(f"result: {result}")
+    print(f"type(result): {type(result)}")
+    # print(f"shape(result): {result.shape}")
+    return result
+
+@pauli_measure_p.def_impl
+def _pauli_measure_def_impl(*args, **kwargs):  # pragma: no cover
+    raise NotImplementedError()
+
+def _pauli_measure_lowering(
+    jax_ctx: mlir.LoweringRuleContext,
+    *qubits_or_params: tuple,
+    pauli_word=None,
+    qubits_len=0,
+):
+    ctx = jax_ctx.module_context.context
+    ctx.allow_unregistered_dialects = True
+
+    qubits = qubits_or_params[:qubits_len]
+    for q in qubits:
+        assert ir.OpaqueType.isinstance(q.type)
+        assert ir.OpaqueType(q.type).dialect_namespace == "quantum"
+        assert ir.OpaqueType(q.type).data == "bit"
+
+    assert pauli_word is not None
+    
+    pauli_word = ir.ArrayAttr.get([ir.StringAttr.get(p) for p in pauli_word])
+
+    result, new_qubits = PPMeasurementOp(
+        out_qubits=[q.type for q in qubits],
+        mres=ir.IntegerType.get_signless(1, ctx),
+        pauli_product=pauli_word,
+        in_qubits=qubits
+    ).results
+    
+    print(f"result: {result}")
+    print(f"new_qubits: {new_qubits}")
+    print(f"type(result): {type(result)}")
+    print(f"type(new_qubits): {type(new_qubits)}")
+
+    result_from_elements_op = ir.RankedTensorType.get((), result.type)
+    from_elements_op = FromElementsOp(result_from_elements_op, result)
+
+    return (
+        from_elements_op.results[0],
+        new_qubits,
+    )
 
 #
 # measure
@@ -2592,6 +2654,7 @@ CUSTOM_LOWERING_RULES = (
     (gphase_p, _gphase_lowering),
     (unitary_p, _unitary_lowering),
     (pauli_rot_p, _pauli_rot_lowering),
+    (pauli_measure_p, _pauli_measure_lowering),
     (measure_p, _measure_lowering),
     (compbasis_p, _compbasis_lowering),
     (namedobs_p, _named_obs_lowering),

@@ -31,7 +31,8 @@ CY                     = { properties = [ "invertible",                 "differe
 CZ                     = { properties = [ "invertible",                 "differentiable" ] }
 Hadamard               = { properties = [ "invertible", "controllable", "differentiable" ] }
 Identity               = { properties = [ "invertible",                 "differentiable" ] }
-PauliRot               = { properties = [ "invertible", "controllable", "differentiable" ] }
+PauliRot               = { properties = [ "invertible", "differentiable" ] }
+PauliMeasure           = { properties = [ "invertible", "differentiable" ] }
 PauliX                 = { properties = [ "invertible", "controllable", "differentiable" ] }
 PauliY                 = { properties = [ "invertible", "controllable", "differentiable" ] }
 PauliZ                 = { properties = [ "invertible", "controllable", "differentiable" ] }

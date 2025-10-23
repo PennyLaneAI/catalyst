@@ -41,6 +41,7 @@ from pennylane.measurements import (
     ProbabilityMP,
     StateMP,
     VarianceMP,
+    PauliMeasure
 )
 from pennylane.operation import Operation, Operator, Wires
 from pennylane.ops import Adjoint, Controlled, ControlledOp
@@ -90,7 +91,7 @@ from catalyst.jax_primitives import (
     namedobs_p,
     num_qubits_p,
     pauli_rot_p,
-    pauli_meas_p,
+    pauli_measure_p,
     probs_p,
     qalloc_p,
     qdealloc_p,
@@ -842,7 +843,17 @@ def trace_quantum_operations(
                 adjoint=adjoint,
             )
             qrp.insert(op.wires, qubits2[: len(qubits)])
+        elif isinstance(op, PauliMeasure):
+            qubits = qrp.extract(op.wires)
+            qubits2 = pauli_measure_p.bind(
+                *qubits,
+                pauli_word=op.hyperparameters["pauli_word"],
+                qubits_len=len(qubits),
+            )
+            qrp.insert(op.wires, qubits2[: len(qubits)])
         else:
+            print(f"op: {op}")
+            print(f"type: {type(op)}")
             qubits = qrp.extract(op.wires)
             controlled_qubits = qrp.extract(controlled_wires)
 

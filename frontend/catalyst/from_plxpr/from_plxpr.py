@@ -36,6 +36,7 @@ from pennylane.capture.expand_transforms import ExpandTransformsInterpreter
 from pennylane.capture.primitives import adjoint_transform_prim as plxpr_adjoint_transform_prim
 from pennylane.capture.primitives import ctrl_transform_prim as plxpr_ctrl_transform_prim
 from pennylane.capture.primitives import measure_prim as plxpr_measure_prim
+from pennylane.capture.primitives import pauli_measure_prim as plxpr_pauli_measure_prim
 from pennylane.ftqc.primitives import measure_in_basis_prim as plxpr_measure_in_basis_prim
 from pennylane.measurements import CountsMP
 from pennylane.ops.functions.map_wires import _map_wires_transform as pl_map_wires
@@ -74,7 +75,7 @@ from catalyst.jax_primitives import (
     measure_p,
     namedobs_p,
     pauli_rot_p,
-    pauli_meas_p,
+    pauli_measure_p,
     probs_p,
     qalloc_p,
     qdealloc_p,
@@ -768,6 +769,15 @@ def handle_pauli_rot(self, *invals, n_wires, pauli_word, **params):
     """Handle the conversion from plxpr to Catalyst jaxpr for the PauliRot primitive"""
     in_qregs, in_qubits = get_in_qubit_values(invals[1:], self.qubit_index_recorder, self.init_qreg)
     outvals = pauli_rot_p.bind(*in_qubits, theta=invals[0], pauli_word=pauli_word, qubits_len=n_wires, adjoint=False)
+    for in_qreg, w, new_wire in zip(in_qregs, invals[1:], outvals):
+        in_qreg[in_qreg.global_index_to_local_index(w)] = new_wire
+
+
+@PLxPRToQuantumJaxprInterpreter.register_primitive(plxpr_pauli_measure_prim)
+def handle_pauli_measure(self, *invals, n_wires, pauli_word, **params):
+    """Handle the conversion from plxpr to Catalyst jaxpr for the PauliMeasure primitive"""
+    in_qregs, in_qubits = get_in_qubit_values(invals[1:], self.qubit_index_recorder, self.init_qreg)
+    outvals = pauli_measure_p.bind(*in_qubits, theta=invals[0], pauli_word=pauli_word, qubits_len=n_wires, adjoint=False)
     for in_qreg, w, new_wire in zip(in_qregs, invals[1:], outvals):
         in_qreg[in_qreg.global_index_to_local_index(w)] = new_wire
 
