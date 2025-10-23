@@ -89,6 +89,8 @@ from catalyst.jax_primitives import (
     hermitian_p,
     namedobs_p,
     num_qubits_p,
+    pauli_rot_p,
+    pauli_meas_p,
     probs_p,
     qalloc_p,
     qdealloc_p,
@@ -830,6 +832,16 @@ def trace_quantum_operations(
             trace_basis_state(op, qrp)
         elif isinstance(op, qml.Snapshot):
             trace_snapshot_op(op, device, qrp, out_snapshot_tracer)
+        elif isinstance(op, qml.PauliRot):
+            qubits = qrp.extract(op.wires)
+            qubits2 = pauli_rot_p.bind(
+                *qubits,
+                theta=op.parameters[0],
+                pauli_word=op.hyperparameters["pauli_word"],
+                qubits_len=len(qubits),
+                adjoint=adjoint,
+            )
+            qrp.insert(op.wires, qubits2[: len(qubits)])
         else:
             qubits = qrp.extract(op.wires)
             controlled_qubits = qrp.extract(controlled_wires)

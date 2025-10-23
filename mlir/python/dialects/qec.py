@@ -1,4 +1,4 @@
-# Copyright 2025 Xanadu Quantum Technologies Inc.
+# Copyright 2022-2023 Xanadu Quantum Technologies Inc.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,12 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-This module provides access to compilation tools for experimental fault-tolerant quantum-computing
-(FTQC) workloads in Catalyst.
-"""
+"""MLIR Dialect for QEC dialect."""
 
-from .pipelines import mbqc_pipeline
-from .ftqc_device import FTQCDevice
-
-__all__ = ("mbqc_pipeline",)
+from ._qec_ops_gen import *  # noqa: F401

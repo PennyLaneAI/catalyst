@@ -76,6 +76,8 @@ RUNTIME_OPERATIONS = [
     "DoubleExcitation",
     "ISWAP",
     "MultiRZ",
+    "PauliRot",
+    "PauliMeasurement",
     "PauliX",
     "PauliY",
     "PauliZ",
