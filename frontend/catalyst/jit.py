@@ -743,9 +743,7 @@ class QJIT(CatalystCallable):
             params["_out_tree_expected"] = []
             params["_classical_return_indices"] = []
             params["_num_mcm_expected"] = []
-            default_pass_pipeline = self.compile_options.circuit_transform_pipeline
-            pass_pipeline = params.get("pass_pipeline", default_pass_pipeline)
-            params["pass_pipeline"] = pass_pipeline
+            params["pass_pipeline"] = self.compile_options.circuit_transform_pipeline
             params["debug_info"] = dbg
 
             return QFunc.__call__(
