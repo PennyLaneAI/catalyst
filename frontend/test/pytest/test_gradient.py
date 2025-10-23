@@ -23,7 +23,7 @@ import pennylane as qml
 import pytest
 from jax import numpy as jnp
 from jax.tree_util import tree_all, tree_flatten, tree_map, tree_structure
-from pennylane import grad, jacobian, qjit, for_loop
+from pennylane import for_loop, grad, jacobian, qjit
 
 import catalyst
 import catalyst.utils.calculate_grad_shape as infer
@@ -471,8 +471,12 @@ def test_value_and_grad_on_qjit_quantum_variant_tree(diff_method):
 
 @pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
-def test_finite_diff(inp, backend):
+@pytest.mark.parametrize("grad_fn", (grad, catalyst.grad))
+def test_finite_diff(inp, backend, grad_fn):
     """Test finite diff."""
+
+    if qml.capture.enabled() and grad_fn is catalyst.grad:
+        pytest.skip("catalyst.grad does not work with capture.")
 
     def f(x):
         qml.RX(x, wires=0)
@@ -481,7 +485,7 @@ def test_finite_diff(inp, backend):
     @qjit
     def compiled_grad_default(x: float):
         g = qml.qnode(qml.device(backend, wires=1))(f)
-        h = qml.grad(g, method="fd")
+        h = grad_fn(g, method="fd")
         return h(x)
 
     def interpretted_grad_default(x):
@@ -2238,7 +2242,7 @@ class TestParameterShiftVerificationIntegrationTests:
             def circuit(_: float):
                 measure(0)
                 return qml.expval(qml.PauliZ(wires=0))
-            
+
             circuit(0.5)
 
     def test_all_arguments_are_constant(self, backend):
@@ -2311,7 +2315,7 @@ class TestParameterShiftVerificationIntegrationTests:
             def circuit(x: float):
                 RX(x, wires=[0])
                 return qml.expval(qml.PauliZ(wires=0))
-            
+
             circuit(0.5)
 
     def test_parameter_frequencies_not_one(self, backend):
