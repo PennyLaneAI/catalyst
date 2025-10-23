@@ -176,6 +176,8 @@ class LinkerDriver:
         if os.path.isfile(os.path.join(rt_lib_path, "librt_OQD_capi" + file_extension)):
             default_flags.append("-lrt_OQD_capi")
 
+        default_flags.append("/home/ubuntu/work/rs-decomp/testing/test-func.o")
+
         return default_flags
 
     @staticmethod

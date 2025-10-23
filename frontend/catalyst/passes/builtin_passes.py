@@ -143,7 +143,6 @@ def clifford_t_decomposition(qnode):
     return PassPipelineWrapper(qnode, "rs-decomposition")
 
 
-
 def disentangle_cnot(qnode):
     """
     Specify that the ``-disentangle-CNOT`` MLIR compiler pass
