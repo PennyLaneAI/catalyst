@@ -90,8 +90,8 @@ COMPILER_OPS_FOR_DECOMPOSITION: dict[str, tuple[int, int]] = {
     "U1": (1, 1),
     "U2": (1, 2),
     "U3": (1, 3),
-    "MultiRZ": (-1, 1),
-    "GlobalPhase": (-1, 1),
+    # "MultiRZ": (-1, 1),
+    # "GlobalPhase": (-1, 1),
 }
 
 
