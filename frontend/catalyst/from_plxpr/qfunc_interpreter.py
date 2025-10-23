@@ -619,6 +619,60 @@ def handle_ctrl_transform(self, *invals, jaxpr, n_control, control_values, work_
     return []
 
 
+def _calling_convention(interpreter, closed_jaxpr, *args_plus_qregs, outer_dynqreg_handlers=()):
+    # Arg structure (all args are tracers, since this function is to be `make_jaxpr`'d):
+    # Regular args, then dynamically allocated qregs, then global qreg
+    # TODO: merge dynamically allocaed qregs into regular args?
+    # But this is tricky, since qreg arguments need all the SSA value semantics conversion infra
+    # and are different from the regular plain arguments.
+    *args_plus_dynqregs, global_qreg = args_plus_qregs
+    num_dynamic_alloced_qregs = len(outer_dynqreg_handlers)
+    args, dynalloced_qregs = (
+        args_plus_dynqregs[: len(args_plus_dynqregs) - num_dynamic_alloced_qregs],
+        args_plus_dynqregs[len(args_plus_dynqregs) - num_dynamic_alloced_qregs :],
+    )
+
+    # Launch a new interpreter for the body region
+    # A new interpreter's root qreg value needs a new recorder
+    converter = copy(interpreter)
+    converter.qubit_index_recorder = QubitIndexRecorder()
+    init_qreg = QubitHandler(global_qreg, converter.qubit_index_recorder)
+    converter.init_qreg = init_qreg
+
+    # add dynamic qregs to recorder
+    qreg_map = {}
+    dyn_qreg_handlers = []
+    for dyn_qreg, outer_dynqreg_handler in zip(
+        dynalloced_qregs, outer_dynqreg_handlers, strict=True
+    ):
+        dyn_qreg_handler = QubitHandler(dyn_qreg, converter.qubit_index_recorder)
+        dyn_qreg_handlers.append(dyn_qreg_handler)
+
+        # plxpr global wire index does not change across scopes
+        # So scope arg dynamic qregs need to have the same root hash as their corresponding
+        # qreg tracers outside
+        dyn_qreg_handler.root_hash = outer_dynqreg_handler.root_hash
+
+        # Each qreg argument of the subscope corresponds to a qreg from the outer scope
+        qreg_map[outer_dynqreg_handler] = dyn_qreg_handler
+
+    # The new interpreter's recorder needs to be updated to include the qreg args
+    # of this scope, instead of the outer qregs
+    if qreg_map:
+        for k, outer_dynqreg_handler in interpreter.qubit_index_recorder.map.items():
+            converter.qubit_index_recorder[k] = qreg_map[outer_dynqreg_handler]
+    retvals = converter(closed_jaxpr, *args)
+
+    init_qreg.insert_all_dangling_qubits()
+
+    # Return all registers
+    for dyn_qreg_handler in dyn_qreg_handlers:
+        dyn_qreg_handler.insert_all_dangling_qubits()
+        retvals.append(dyn_qreg_handler.get())
+
+    return *retvals, converter.init_qreg.get()
+
+
 # pylint: disable=unused-argument
 @PLxPRToQuantumJaxprInterpreter.register_primitive(plxpr_adjoint_transform_prim)
 def handle_adjoint_transform(
@@ -637,39 +691,41 @@ def handle_adjoint_transform(
     self.init_qreg.insert_all_dangling_qubits()
     qreg = self.init_qreg.get()
 
+    dynalloced_qregs, dynalloced_wire_global_indices = _get_dynamically_allocated_qregs(
+        plxpr_invals, self.qubit_index_recorder, self.init_qreg
+    )
+
+    # Add the qregs to the args
+    # Note: closed jaxprs are called without consts
+    args_plus_qreg = [
+        *args,
+        *[dyn_qreg.get() for dyn_qreg in dynalloced_qregs],
+        self.init_qreg.get(),
+    ]
     jaxpr = ClosedJaxpr(jaxpr, consts)
-
-    def calling_convention(*args_plus_qreg):
-        # The last arg is the scope argument for the body jaxpr
-        *args, qreg = args_plus_qreg
-
-        # Launch a new interpreter for the body region
-        # A new interpreter's root qreg value needs a new recorder
-        converter = copy(self)
-        converter.qubit_index_recorder = QubitIndexRecorder()
-        init_qreg = QubitHandler(qreg, converter.qubit_index_recorder)
-        converter.init_qreg = init_qreg
-
-        retvals = converter(jaxpr, *args)
-        init_qreg.insert_all_dangling_qubits()
-        return *retvals, converter.init_qreg.get()
-
-    _, args_tree = tree_flatten((consts, args, [qreg]))
-    converted_jaxpr_branch = jax.make_jaxpr(calling_convention)(*consts, *args, qreg).jaxpr
-
+    f = partial(_calling_convention, self, jaxpr, outer_dynqreg_handlers=dynalloced_qregs)
+    converted_jaxpr_branch = jax.make_jaxpr(f)(*args_plus_qreg).jaxpr
     converted_closed_jaxpr_branch = ClosedJaxpr(convert_constvars_jaxpr(converted_jaxpr_branch), ())
+
     # Perform the binding
+    # strip global wire indices of dynamic wires
+    consts = tuple(const for const in consts if const not in dynalloced_wire_global_indices)
+    _, args_tree = tree_flatten(
+        (consts, args, [dyn_qreg.get() for dyn_qreg in dynalloced_qregs] + [qreg])
+    )
     outvals = adjoint_p.bind(
         *consts,
-        *args,
-        qreg,
+        *args_plus_qreg,
         jaxpr=converted_closed_jaxpr_branch,
         args_tree=args_tree,
+        num_dynamic_alloced_qregs=len(dynalloced_qregs),
     )
 
     # We assume the last output value is the returned qreg.
     # Update the current qreg and remove it from the output values.
     self.init_qreg.set(outvals.pop())
+    for dyn_qreg in reversed(dynalloced_qregs):
+        dyn_qreg.set(outvals.pop())
 
     # Return only the output values that match the plxpr output values
     return outvals
