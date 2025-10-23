@@ -15,6 +15,8 @@
 This module tests the from_plxpr conversion function.
 """
 
+# pylint: disable=too-many-lines
+
 from functools import partial
 
 import jax
@@ -999,6 +1001,58 @@ class TestGraphDecomposition:
         qml.capture.disable()
 
         assert qml.decomposition.enabled_graph() is False
+
+    def test_decompose_fallback_warnings(self):
+        """Test the fallback to legacy decomposition system with warnings."""
+        qml.capture.enable()
+        qml.decomposition.enable_graph()
+
+        @qml.qjit
+        @partial(qml.transforms.decompose, gate_set={qml.GlobalPhase})
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def circuit(x):
+            qml.Hadamard(x)
+            return qml.state()
+
+        with pytest.warns(
+            UserWarning,
+            match="The graph-based decomposition system is unable to find a decomposition"
+            " for {'Hadamard'} to the target gate set {'GlobalPhase'}.",
+        ):
+            circuit(0)
+
+        qml.decomposition.disable_graph()
+        qml.capture.disable()
+
+    def test_decompose_with_custom(self):
+        """Test the conversion of a circuit with a custom decomposition."""
+
+        qml.capture.enable()
+        qml.decomposition.enable_graph()
+
+        @qml.register_resources({qml.H: 2, qml.CZ: 1})
+        def my_cnot(wires):
+            qml.H(wires=wires[1])
+            qml.CZ(wires=wires)
+            qml.H(wires=wires[1])
+
+        @qml.qjit
+        @partial(
+            qml.transforms.decompose,
+            gate_set={"H", "CZ", "GlobalPhase"},
+            alt_decomps={qml.CNOT: [my_cnot]},
+        )
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def circuit():
+            qml.H(0)
+            qml.CNOT(wires=[0, 1])
+            return qml.state()
+
+        expected = np.array([1, 0, 0, 1]) / np.sqrt(2)
+        assert qml.math.allclose(circuit(), expected)
+
+        qml.decomposition.disable_graph()
+        qml.capture.disable()
 
 
 if __name__ == "__main__":

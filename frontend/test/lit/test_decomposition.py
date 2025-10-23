@@ -512,26 +512,6 @@ def test_decomposition_rule_caller():
 test_decomposition_rule_caller()
 
 
-def test_decompose_gateset_without_graph():
-    """Test the decompose transform to a target gate set without the graph decomposition."""
-
-    qml.capture.enable()
-
-    @qml.qjit(target="mlir")
-    @partial(qml.transforms.decompose, gate_set={"RX", "RZ"})
-    @qml.qnode(qml.device("lightning.qubit", wires=1))
-    # CHECK: public @circuit_8() -> tensor<f64> attributes {diff_method = "adjoint", llvm.linkage = #llvm.linkage<internal>, qnode}
-    def circuit_8():
-        return qml.expval(qml.Z(0))
-
-    print(circuit_8.mlir)
-
-    qml.capture.disable()
-
-
-test_decompose_gateset_without_graph()
-
-
 def test_decompose_gateset_with_graph():
     """Test the decompose transform to a target gate set with the graph decomposition."""
 
@@ -562,6 +542,25 @@ def test_decompose_gateset_with_graph():
 
 
 test_decompose_gateset_with_graph()
+
+
+def test_decompose_gateset_without_graph():
+    """Test the decompose transform to a target gate set without the graph decomposition."""
+
+    qml.capture.enable()
+
+    @qml.qjit(target="mlir")
+    @partial(qml.transforms.decompose, gate_set={"RX", "RZ"})
+    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    # CHECK: func.func public @circuit_8() -> tensor<f64> attributes {diff_method = "adjoint", llvm.linkage = #llvm.linkage<internal>, qnode}
+    def circuit_8():
+        return qml.expval(qml.Z(0))
+
+    print(circuit_8.mlir)
+    qml.capture.disable()
+
+
+test_decompose_gateset_without_graph()
 
 
 def test_decompose_gateset_operator_with_graph():
@@ -1143,3 +1142,60 @@ def test_decompose_lowering_with_tensorlike():
 
 
 test_decompose_lowering_with_tensorlike()
+
+
+def test_decompose_lowering_fallback():
+    """Test the decompose lowering pass when the graph is failed."""
+
+    qml.capture.enable()
+    qml.decomposition.enable_graph()
+
+    @qml.qjit(target="mlir")
+    @partial(qml.transforms.decompose, gate_set={qml.RX, qml.RZ})
+    @qml.qnode(qml.device("lightning.qubit", wires=2))
+    # CHECK: func.func public @circuit_25() -> tensor<4xcomplex<f64>> attributes {diff_method = "adjoint", llvm.linkage = #llvm.linkage<internal>, qnode}
+    def circuit_25():
+        # CHECK: [[OUT_QUBIT:%.+]] = quantum.custom "RZ"(%cst) {{%.+}} : !quantum.bit
+        # CHECK-NEXT: [[OUT_QUBIT_0:%.+]] = quantum.custom "RX"(%cst) [[OUT_QUBIT]] : !quantum.bit
+        # CHECK-NEXT: [[OUT_QUBIT_1:%.+]] = quantum.custom "RZ"(%cst) [[OUT_QUBIT_0]] : !quantum.bit
+        qml.Hadamard(0)
+        return qml.state()
+
+    print(circuit_25.mlir)
+
+    qml.decomposition.disable_graph()
+    qml.capture.disable()
+
+
+test_decompose_lowering_fallback()
+
+
+def test_decompose_lowering_params_ordering():
+    """Test the order of params and wires in the captured decomposition rule."""
+
+    qml.capture.enable()
+    qml.decomposition.enable_graph()
+
+    @qjit(target="mlir")
+    @partial(qml.transforms.decompose, gate_set=[qml.RX, qml.RY, qml.RZ])
+    @qml.qnode(qml.device("lightning.qubit", wires=2))
+    # CHECK: func.func public @circuit_26(%arg0: tensor<f64>, %arg1: tensor<f64>, %arg2: tensor<f64>)
+    def circuit_26(x: float, y: float, z: float):
+        qml.Rot(x, y, z, wires=0)
+        return qml.expval(qml.PauliZ(0))
+
+    # CHECK: func.func public @_rot_to_rz_ry_rz(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<f64>, %arg3: tensor<f64>, %arg4: tensor<1xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "Rot"}
+    # CHECK:  [[EXTRACTED_0:%.+]] = tensor.extract %arg1[] : tensor<f64>
+    # CHECK-NEXT:  [[OUT_QUBITS:%.+]] = quantum.custom "RZ"([[EXTRACTED_0]]) {{%.+}} : !quantum.bit
+    # CHECK:  [[EXTRACTED_3:%.+]] = tensor.extract %arg2[] : tensor<f64>
+    # CHECK-NEXT:  [[OUT_QUBITS_4:%.+]] = quantum.custom "RY"([[EXTRACTED_3]]) {{%.+}} : !quantum.bit
+    # CHECK:  [[EXTRACTED_7:%.+]] = tensor.extract %arg3[] : tensor<f64>
+    # CHECK-NEXT:  [[OUT_QUBITS_8:%.+]] = quantum.custom "RZ"([[EXTRACTED_7]]) {{%.+}} : !quantum.bit
+    # CHECK:  return {{%.+}} : !quantum.reg
+    print(circuit_26.mlir)
+
+    qml.decomposition.disable_graph()
+    qml.capture.disable()
+
+
+test_decompose_lowering_params_ordering()

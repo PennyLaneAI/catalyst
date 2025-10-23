@@ -125,7 +125,7 @@ def PartitionLayersPass : Pass<"partition-layers"> {
     let summary = "Partition layers of Pauli Product Measurement operations.";
 }
 
-def TLayerReductionPass : Pass<"t-layer-reduction"> {
+def TLayerReductionPass : Pass<"reduce-t-depth"> {
     let summary = "Reduce T layers to PPR operations.";
 }
 

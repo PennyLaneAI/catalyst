@@ -385,6 +385,6 @@ def _API_name_to_pass_name():
         "decompose_non_clifford_ppr": "decompose-non-clifford-ppr",
         "decompose_clifford_ppr": "decompose-clifford-ppr",
         "ppm_compilation": "ppm-compilation",
-        "t_layer_reduction": "t-layer-reduction",
+        "reduce_t_depth": "reduce-t-depth",
         "ppr_to_mbqc": "ppr-to-mbqc",
     }
