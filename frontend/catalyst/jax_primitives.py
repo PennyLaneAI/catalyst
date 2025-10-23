@@ -1457,11 +1457,8 @@ def _pauli_measure_abstract_eval(
     for idx in range(qubits_len):
         qubit = qubits[idx]
         assert isinstance(qubit, AbstractQbit)
-    result = (core.ShapedArray((), bool),) +  (AbstractQbit(),) * (qubits_len)
-    print(f"result: {result}")
-    print(f"type(result): {type(result)}")
-    # print(f"shape(result): {result.shape}")
-    return result
+    # This corresponds to the measurement value and the qubits after the measurements
+    return (core.ShapedArray((), bool),) + (AbstractQbit(),) * (qubits_len)
 
 @pauli_measure_p.def_impl
 def _pauli_measure_def_impl(*args, **kwargs):  # pragma: no cover
@@ -1486,25 +1483,12 @@ def _pauli_measure_lowering(
     
     pauli_word = ir.ArrayAttr.get([ir.StringAttr.get(p) for p in pauli_word])
 
-    result, new_qubits = PPMeasurementOp(
+    return PPMeasurementOp(
         out_qubits=[q.type for q in qubits],
         mres=ir.IntegerType.get_signless(1, ctx),
         pauli_product=pauli_word,
         in_qubits=qubits
     ).results
-    
-    print(f"result: {result}")
-    print(f"new_qubits: {new_qubits}")
-    print(f"type(result): {type(result)}")
-    print(f"type(new_qubits): {type(new_qubits)}")
-
-    result_from_elements_op = ir.RankedTensorType.get((), result.type)
-    from_elements_op = FromElementsOp(result_from_elements_op, result)
-
-    return (
-        from_elements_op.results[0],
-        new_qubits,
-    )
 
 #
 # measure

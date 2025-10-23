@@ -842,18 +842,18 @@ def trace_quantum_operations(
                 qubits_len=len(qubits),
                 adjoint=adjoint,
             )
-            qrp.insert(op.wires, qubits2[: len(qubits)])
+            qrp.insert(op.wires, qubits2[:len(qubits)])
         elif isinstance(op, PauliMeasure):
             qubits = qrp.extract(op.wires)
-            qubits2 = pauli_measure_p.bind(
+            results = pauli_measure_p.bind(
                 *qubits,
                 pauli_word=op.hyperparameters["pauli_word"],
                 qubits_len=len(qubits),
             )
-            qrp.insert(op.wires, qubits2[: len(qubits)])
+            # First element is the measurement result
+            out_qubits = results[1:1+len(qubits)]
+            qrp.insert(op.wires, out_qubits)
         else:
-            print(f"op: {op}")
-            print(f"type: {type(op)}")
             qubits = qrp.extract(op.wires)
             controlled_qubits = qrp.extract(controlled_wires)
 
