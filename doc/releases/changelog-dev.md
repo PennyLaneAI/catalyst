@@ -19,6 +19,9 @@
 
 * Split `from_plxpr.py` into two files.
   [(#2142)](https://github.com/PennyLaneAI/catalyst/pull/2142)
+* Refactor Catalyst pass registering so that it's no longer necessary to manually add new
+  passes at `registerAllCatalystPasses`. 
+  [(#1684)](https://github.com/PennyLaneAI/catalyst/pull/1684)
 
 <h3>Documentation 📝</h3>
 
@@ -30,4 +33,5 @@
 This release contains contributions from (in alphabetical order):
 
 Christina Lee,
-Paul Haochen Wang.
+Paul Haochen Wang,
+Roberto Turrado Camblor.
