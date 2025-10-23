@@ -1054,6 +1054,32 @@ class TestGraphDecomposition:
         qml.decomposition.disable_graph()
         qml.capture.disable()
 
+    def test_multirz(self):
+        """Test that multirz decomposition works with from_plxpr."""
+
+        qml.capture.enable()
+        qml.decomposition.enable_graph()
+
+
+        @partial(
+            qml.transforms.decompose, gate_set={"X", "Y", "Z", "S", "H", "CNOT", "RZ", "Rot", "GlobalPhase"}
+        )
+        @qml.qnode(qml.device("lightning.qubit", wires=3))
+        def circuit():
+            qml.Hadamard(0)
+            qml.ctrl(qml.MultiRZ(0.345, wires=[1, 2]), control=0)
+            qml.adjoint(qml.MultiRZ(0.25, wires=[1, 2]))
+            qml.MultiRZ(0.5, wires=[0, 1])
+            return qml.expval(qml.X(0))
+
+        # expected = 0.94684949
+        without_qjit = circuit()
+        with_qjit = qml.qjit(circuit)()
+        assert qml.math.allclose(without_qjit, with_qjit)
+
+        qml.decomposition.disable_graph()
+        qml.capture.disable()
+
 
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
