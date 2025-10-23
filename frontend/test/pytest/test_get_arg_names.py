@@ -19,7 +19,7 @@ import pennylane as qml
 from jax.core import ShapedArray
 
 from catalyst import qjit
-from type_signatures import get_arg_names
+from catalyst.tracing.type_signatures import get_arg_names
 
 
 @qjit
@@ -39,7 +39,9 @@ def f_of_a_b(a: float, b: float):
 
 
 f_of_a_b.jit_compile([0.3, 0.4])
-assert get_arg_names(f_of_a_b.jaxpr.in_avals, f_of_a_b.original_function) == ["a", "b"]
+jaxpr_in_avals = f_of_a_b.jaxpr.in_avals
+original_function = f_of_a_b.original_function
+assert get_arg_names(jaxpr_in_avals, original_function) == ["a", "b"]
 
 
 @qjit(abstracted_axes={0: "n"})
@@ -49,7 +51,9 @@ def f_of_dynamic_argument(a):
 
 
 f_of_dynamic_argument.jit_compile([jnp.array([1, 2, 3])])
-assert get_arg_names(f_of_dynamic_argument.jaxpr.in_avals, f_of_dynamic_argument.original_function) == ["a", ""]
+jaxpr_in_avals = f_of_dynamic_argument.jaxpr.in_avals
+original_function = f_of_dynamic_argument.original_function
+assert get_arg_names(jaxpr_in_avals, original_function) == ["a", ""]
 
 
 @qjit(abstracted_axes={0: "n"})
@@ -64,7 +68,9 @@ def f_of_qnode_with_dynamic_argument(a):
 
 
 f_of_qnode_with_dynamic_argument.jit_compile([jnp.array([1, 2, 3])])
-assert get_arg_names(f_of_dynamic_argument.jaxpr.in_avals, f_of_dynamic_argument.original_function) == ["a", ""]
+jaxpr_in_avals = f_of_qnode_with_dynamic_argument.jaxpr.in_avals
+original_function = f_of_qnode_with_dynamic_argument.original_function
+assert get_arg_names(jaxpr_in_avals, original_function) == ["a", ""]
 
 
 @qjit
@@ -74,7 +80,9 @@ def f_of_a_with_dynamic_result(a):
 
 
 f_of_a_with_dynamic_result.jit_compile([3])
-assert get_arg_names(f_of_a_with_dynamic_result.jaxpr.in_avals, f_of_a_with_dynamic_result.original_function) == ["a"]
+jaxpr_in_avals = f_of_a_with_dynamic_result.jaxpr.in_avals
+original_function = f_of_a_with_dynamic_result.original_function
+assert get_arg_names(jaxpr_in_avals, original_function) == ["a"]
 
 
 @qjit(abstracted_axes={0: "n", 2: "m"})
@@ -84,4 +92,6 @@ def f_of_shaped_array(a: ShapedArray([1, 3, 1], dtype=float)):
 
 
 f_of_shaped_array.aot_compile()
-assert get_arg_names(f_of_shaped_array.jaxpr.in_avals, f_of_shaped_array.original_function) == ["a", "", ""]
+jaxpr_in_avals = f_of_shaped_array.jaxpr.in_avals
+original_function = f_of_shaped_array.original_function
+assert get_arg_names(jaxpr_in_avals, original_function) == ["a", "", ""]
