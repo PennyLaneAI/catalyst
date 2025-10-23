@@ -38,10 +38,6 @@ from pennylane.transforms import unitary_to_rot as pl_unitary_to_rot
 
 from catalyst.device import extract_backend_info
 from catalyst.from_plxpr.decompose import COMPILER_OPS_FOR_DECOMPOSITION, DecompRuleInterpreter
-from catalyst.from_plxpr.qubit_handler import (
-    QubitHandler,
-    QubitIndexRecorder,
-)
 from catalyst.jax_extras import make_jaxpr2, transient_jax_config
 from catalyst.jax_primitives import (
     device_init_p,

@@ -17,6 +17,7 @@ Sets up the PLxPRToQuantumJaxprInterpreter for converting plxpr to catalyst jaxp
 # pylint: disable=protected-access
 import textwrap
 from copy import copy
+from functools import partial
 
 import jax
 import jax.numpy as jnp
@@ -317,6 +318,63 @@ def interpret_counts(self, *wires, all_outcomes):
     return keys, vals
 
 
+def _subroutine_kernel(
+    interpreter,
+    jaxpr,
+    *qregs_plus_args,
+    outer_dynqreg_handlers=(),
+    dynalloced_wire_global_indices=(),
+    wire_label_arg_to_tracer_arg_index=(),
+):
+    global_qreg, *dynqregs_plus_args = qregs_plus_args
+    num_dynamic_alloced_qregs = len(outer_dynqreg_handlers)
+    dynalloced_qregs, args = (
+        dynqregs_plus_args[:num_dynamic_alloced_qregs],
+        dynqregs_plus_args[num_dynamic_alloced_qregs:],
+    )
+
+    # Launch a new interpreter for the body region
+    # A new interpreter's root qreg value needs a new recorder
+    converter = copy(interpreter)
+    converter.qubit_index_recorder = QubitIndexRecorder()
+    init_qreg = QubitHandler(global_qreg, converter.qubit_index_recorder)
+    converter.init_qreg = init_qreg
+
+    # add dynamic qregs to recorder
+    qreg_map = {}
+    dyn_qreg_handlers = []
+    for dyn_qreg, outer_dynqreg_handler, global_wire_index in zip(
+        dynalloced_qregs, outer_dynqreg_handlers, dynalloced_wire_global_indices, strict=True
+    ):
+        dyn_qreg_handler = QubitHandler(dyn_qreg, converter.qubit_index_recorder)
+        dyn_qreg_handlers.append(dyn_qreg_handler)
+
+        # plxpr global wire index does not change across scopes
+        # So scope arg dynamic qregs need to have the same root hash as their corresponding
+        # qreg tracers outside
+        dyn_qreg_handler.root_hash = outer_dynqreg_handler.root_hash
+
+        # Each qreg argument of the subscope corresponds to a qreg from the outer scope
+        qreg_map[args[wire_label_arg_to_tracer_arg_index[global_wire_index]]] = dyn_qreg_handler
+
+    # The new interpreter's recorder needs to be updated to include the qreg args
+    # of this scope, instead of the outer qregs
+    for arg in args:
+        if arg in qreg_map:
+            converter.qubit_index_recorder[arg] = qreg_map[arg]
+
+    retvals = converter(jaxpr, *args)
+
+    init_qreg.insert_all_dangling_qubits()
+
+    # Return all registers
+    for dyn_qreg_handler in reversed(dyn_qreg_handlers):
+        dyn_qreg_handler.insert_all_dangling_qubits()
+        retvals.insert(0, dyn_qreg_handler.get())
+
+    return converter.init_qreg.get(), *retvals
+
+
 @PLxPRToQuantumJaxprInterpreter.register_primitive(quantum_subroutine_p)
 def handle_subroutine(self, *args, **kwargs):
     """
@@ -344,57 +402,16 @@ def handle_subroutine(self, *args, **kwargs):
         else:
             new_args += (arg,)
 
-    def wrapper(*qregs_plus_args):
-        global_qreg, *dynqregs_plus_args = qregs_plus_args
-        num_dynamic_alloced_qregs = len(dynalloced_qregs)
-        _dynalloced_qregs, args = (
-            dynqregs_plus_args[:num_dynamic_alloced_qregs],
-            dynqregs_plus_args[num_dynamic_alloced_qregs:],
-        )
-
-        # Launch a new interpreter for the body region
-        # A new interpreter's root qreg value needs a new recorder
-        converter = copy(self)
-        converter.qubit_index_recorder = QubitIndexRecorder()
-        init_qreg = QubitHandler(global_qreg, converter.qubit_index_recorder)
-        converter.init_qreg = init_qreg
-
-        # add dynamic qregs to recorder
-        qreg_map = {}
-        dyn_qreg_handlers = []
-        for dyn_qreg, outer_dynqreg_handler, global_wire_index in zip(
-            _dynalloced_qregs, dynalloced_qregs, dynalloced_wire_global_indices, strict=True
-        ):
-            dyn_qreg_handler = QubitHandler(dyn_qreg, converter.qubit_index_recorder)
-            dyn_qreg_handlers.append(dyn_qreg_handler)
-
-            # plxpr global wire index does not change across scopes
-            # So scope arg dynamic qregs need to have the same root hash as their corresponding
-            # qreg tracers outside
-            dyn_qreg_handler.root_hash = outer_dynqreg_handler.root_hash
-
-            # Each qreg argument of the subscope corresponds to a qreg from the outer scope
-            qreg_map[args[wire_label_arg_to_tracer_arg_index[global_wire_index]]] = dyn_qreg_handler
-
-        # The new interpreter's recorder needs to be updated to include the qreg args
-        # of this scope, instead of the outer qregs
-        for arg in args:
-            if arg in qreg_map:
-                converter.qubit_index_recorder[arg] = qreg_map[arg]
-
-        retvals = converter(plxpr, *args)
-
-        init_qreg.insert_all_dangling_qubits()
-
-        # Return all registers
-        for dyn_qreg_handler in reversed(dyn_qreg_handlers):
-            dyn_qreg_handler.insert_all_dangling_qubits()
-            retvals.insert(0, dyn_qreg_handler.get())
-
-        return converter.init_qreg.get(), *retvals
-
     if not transformed:
-        converted_closed_jaxpr_branch = jax.make_jaxpr(wrapper)(
+        f = partial(
+            _subroutine_kernel,
+            self,
+            plxpr,
+            outer_dynqreg_handlers=dynalloced_qregs,
+            dynalloced_wire_global_indices=dynalloced_wire_global_indices,
+            wire_label_arg_to_tracer_arg_index=wire_label_arg_to_tracer_arg_index,
+        )
+        converted_closed_jaxpr_branch = jax.make_jaxpr(f)(
             self.init_qreg.get(), *[dyn_qreg.get() for dyn_qreg in dynalloced_qregs], *args
         )
         self.subroutine_cache[plxpr] = converted_closed_jaxpr_branch
