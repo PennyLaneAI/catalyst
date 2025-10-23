@@ -19,7 +19,7 @@ ninja
 black==25.9.0
 clang-format~=20.1
 clang-tidy~=20.1
-pylint==4.0.2
+pylint~=4.0.0
 isort==7.0.0
 
 # testing
