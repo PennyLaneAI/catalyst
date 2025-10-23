@@ -41,7 +41,7 @@ from pennylane.measurements import (
     ProbabilityMP,
     StateMP,
     VarianceMP,
-    PauliMeasure
+    PauliMeasure,
 )
 from pennylane.operation import Operation, Operator, Wires
 from pennylane.ops import Adjoint, Controlled, ControlledOp
@@ -842,7 +842,7 @@ def trace_quantum_operations(
                 qubits_len=len(qubits),
                 adjoint=adjoint,
             )
-            qrp.insert(op.wires, qubits2[:len(qubits)])
+            qrp.insert(op.wires, qubits2[: len(qubits)])
         elif isinstance(op, PauliMeasure):
             qubits = qrp.extract(op.wires)
             results = pauli_measure_p.bind(
@@ -851,7 +851,7 @@ def trace_quantum_operations(
                 qubits_len=len(qubits),
             )
             # First element is the measurement result
-            out_qubits = results[1:1+len(qubits)]
+            out_qubits = results[1 : 1 + len(qubits)]
             qrp.insert(op.wires, out_qubits)
         else:
             qubits = qrp.extract(op.wires)

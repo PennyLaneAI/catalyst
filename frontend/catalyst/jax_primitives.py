@@ -1383,6 +1383,7 @@ def _unitary_lowering(
         adjoint=adjoint,
     ).results
 
+
 #
 # pauli rot operation
 #
@@ -1398,9 +1399,11 @@ def _pauli_rot_abstract_eval(
         assert isinstance(qubit, AbstractQbit)
     return (AbstractQbit(),) * (qubits_len)
 
+
 @pauli_rot_p.def_impl
 def _pauli_rot_def_impl(*args, **kwargs):  # pragma: no cover
     raise NotImplementedError()
+
 
 def _pauli_rot_lowering(
     jax_ctx: mlir.LoweringRuleContext,
@@ -1422,17 +1425,19 @@ def _pauli_rot_lowering(
 
     assert theta is not None
     assert pauli_word is not None
-    
+
     pauli_word = ir.ArrayAttr.get([ir.StringAttr.get(p) for p in pauli_word])
 
     i16_type = ir.IntegerType.get_signless(16, ctx)
-    allowed_angles = [np.pi/4, np.pi/2, np.pi]
+    allowed_angles = [np.pi / 4, np.pi / 2, np.pi]
     allowed_angles = allowed_angles + -1 * allowed_angles
-    
+
     if not any(np.isclose(theta, angle) for angle in allowed_angles):
-        raise ValueError(f"The angle supplied to PPR must be a multiple of pi/4, pi/2, or pi (or its negative).")
-    
-    angle = int(np.round(2*np.pi/theta))
+        raise ValueError(
+            f"The angle supplied to PPR must be a multiple of pi/4, pi/2, or pi (or its negative)."
+        )
+
+    angle = int(np.round(2 * np.pi / theta))
     if adjoint:
         angle = -angle
     rotation_kind = ir.IntegerAttr.get(i16_type, angle)
@@ -1441,16 +1446,15 @@ def _pauli_rot_lowering(
         out_qubits=[q.type for q in qubits],
         pauli_product=pauli_word,
         rotation_kind=rotation_kind,
-        in_qubits=qubits
+        in_qubits=qubits,
     ).results
+
 
 #
 # pauli measure operation
 #
 @pauli_measure_p.def_abstract_eval
-def _pauli_measure_abstract_eval(
-    *qubits_or_params, pauli_word=None, qubits_len=0, adjoint=False
-):
+def _pauli_measure_abstract_eval(*qubits_or_params, pauli_word=None, qubits_len=0, adjoint=False):
     # The signature here is: (using * to denote zero or more)
     # qubits*, params*
     qubits = qubits_or_params[:qubits_len]
@@ -1460,9 +1464,11 @@ def _pauli_measure_abstract_eval(
     # This corresponds to the measurement value and the qubits after the measurements
     return (core.ShapedArray((), bool),) + (AbstractQbit(),) * (qubits_len)
 
+
 @pauli_measure_p.def_impl
 def _pauli_measure_def_impl(*args, **kwargs):  # pragma: no cover
     raise NotImplementedError()
+
 
 def _pauli_measure_lowering(
     jax_ctx: mlir.LoweringRuleContext,
@@ -1480,15 +1486,16 @@ def _pauli_measure_lowering(
         assert ir.OpaqueType(q.type).data == "bit"
 
     assert pauli_word is not None
-    
+
     pauli_word = ir.ArrayAttr.get([ir.StringAttr.get(p) for p in pauli_word])
 
     return PPMeasurementOp(
         out_qubits=[q.type for q in qubits],
         mres=ir.IntegerType.get_signless(1, ctx),
         pauli_product=pauli_word,
-        in_qubits=qubits
+        in_qubits=qubits,
     ).results
+
 
 #
 # measure

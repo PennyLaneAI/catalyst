@@ -767,9 +767,13 @@ def handle_decomposition_rule(self, *, pyfun, func_jaxpr, is_qreg, num_params):
 @PLxPRToQuantumJaxprInterpreter.register_primitive(qml.PauliRot._primitive)
 def handle_pauli_rot(self, *invals, n_wires, pauli_word, **params):
     """Handle the conversion from plxpr to Catalyst jaxpr for the PauliRot primitive"""
-    input_wires = invals[1:] # First element is the theta
-    in_qregs, in_qubits = get_in_qubit_values(input_wires, self.qubit_index_recorder, self.init_qreg)
-    outvals = pauli_rot_p.bind(*in_qubits, theta=invals[0], pauli_word=pauli_word, qubits_len=n_wires, adjoint=False)
+    input_wires = invals[1:]  # First element is the theta
+    in_qregs, in_qubits = get_in_qubit_values(
+        input_wires, self.qubit_index_recorder, self.init_qreg
+    )
+    outvals = pauli_rot_p.bind(
+        *in_qubits, theta=invals[0], pauli_word=pauli_word, qubits_len=n_wires, adjoint=False
+    )
     for in_qreg, w, new_wire in zip(in_qregs, invals[1:], outvals):
         in_qreg[in_qreg.global_index_to_local_index(w)] = new_wire
 
@@ -780,7 +784,7 @@ def handle_pauli_measure(self, *invals, pauli_word, **params):
     # invals are the input wires
     in_qregs, in_qubits = get_in_qubit_values(invals, self.qubit_index_recorder, self.init_qreg)
     outvals = pauli_measure_p.bind(*in_qubits, pauli_word=pauli_word, qubits_len=len(in_qubits))
-    out_qubits = outvals[1:] # First element is the measurement result
+    out_qubits = outvals[1:]  # First element is the measurement result
     for in_qreg, w, new_wire in zip(in_qregs, invals, out_qubits):
         in_qreg[in_qreg.global_index_to_local_index(w)] = new_wire
 
