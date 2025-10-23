@@ -14,4 +14,5 @@
 
 """MLIR Dialect for QEC dialect."""
 
+# pylint: disable=relative-beyond-top-level
 from ._qec_ops_gen import *  # noqa: F401

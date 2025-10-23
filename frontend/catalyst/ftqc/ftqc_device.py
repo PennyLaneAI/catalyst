@@ -14,12 +14,9 @@
 
 """This module contains the dummy FTQC device."""
 
-import os
 import platform
-from typing import Optional
 
-from pennylane.devices import Device, ExecutionConfig
-from pennylane.transforms.core import TransformProgram
+from pennylane.devices import Device
 
 from catalyst.compiler import get_lib_path
 

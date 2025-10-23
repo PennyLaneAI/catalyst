@@ -757,7 +757,7 @@ def trace_snapshot_op(
         )
 
 
-# pylint: disable=too-many-arguments,too-many-statements
+# pylint: disable=too-many-arguments,too-many-statements,complex-method
 @debug_logger
 def trace_quantum_operations(
     quantum_tape: QuantumTape,
