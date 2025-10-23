@@ -254,9 +254,16 @@ def patch_primitives():
     def patched_literal_complex(_cls, value: complex, _dtype: np.dtype):
         return complex.__new__(complex, value)
 
+    def patched_literal_array(
+        _cls, val: np.ndarray, weak_type: bool = False
+    ):  # pylint: disable=unused-argument
+        arr = np.asarray(val)
+        return arr.view(np.ndarray)
+
     jax._src.literals.LiteralInt.__new__ = patched_literal_int
     jax._src.literals.LiteralFloat.__new__ = patched_literal_float
     jax._src.literals.LiteralComplex.__new__ = patched_literal_complex
+    jax._src.literals.LiteralArray.__new__ = patched_literal_array
 
     def make_hashable(value):
         """Recursively convert lists to tuples to make them hashable."""
