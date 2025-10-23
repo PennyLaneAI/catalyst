@@ -41,9 +41,6 @@ from catalyst.from_plxpr.decompose import COMPILER_OPS_FOR_DECOMPOSITION, Decomp
 from catalyst.from_plxpr.qubit_handler import (
     QubitHandler,
     QubitIndexRecorder,
-    _get_dynamically_allocated_qregs,
-    get_in_qubit_values,
-    is_dynamically_allocated_wire,
 )
 from catalyst.jax_extras import make_jaxpr2, transient_jax_config
 from catalyst.jax_primitives import (
@@ -353,7 +350,6 @@ def register_transform(pl_transform, pass_name, decomposition):
 # Catalyst pass as arguments whose default values are set by the loop.
 for pl_transform, (pass_name, decomposition) in transforms_to_passes.items():
     register_transform(pl_transform, pass_name, decomposition)
-
 
 
 # pylint: disable=too-many-positional-arguments

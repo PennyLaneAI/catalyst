@@ -285,10 +285,10 @@ def test_quantum_subroutine():
     # CHECK:   [[angle:%.+]] = tensor.extract %arg5[]
     # CHECK:   [[rx_out:%.+]], [[rx_ctrl_out:%.+]]:2 = quantum.custom "RX"([[angle]]) [[glob_0]]
     # CHECK-SAME: ctrls([[x1_out]], [[x2_out]])
-    # CHECK:   [[glob_ret:%.+]] = quantum.insert %arg0[ 0], [[rx_out]]
-    # CHECK:   [[q2_ret:%.+]] = quantum.insert %arg2[{{%.+}}], [[rx_ctrl_out]]#1
-    # CHECK:   [[q1_ret:%.+]] = quantum.insert %arg1[{{%.+}}], [[rx_ctrl_out]]#0
-    # CHECK:   return [[glob_ret]], [[q1_ret]], [[q2_ret]] : !quantum.reg, !quantum.reg, !quantum.reg
+    # CHECK:   [[glob_re:%.+]] = quantum.insert %arg0[ 0], [[rx_out]]
+    # CHECK:   [[q2_re:%.+]] = quantum.insert %arg2[{{%.+}}], [[rx_ctrl_out]]#1
+    # CHECK:   [[q1_re:%.+]] = quantum.insert %arg1[{{%.+}}], [[rx_ctrl_out]]#0
+    # CHECK:   return [[glob_re]], [[q1_re]], [[q2_re]] : !quantum.reg, !quantum.reg, !quantum.reg
 
     print(circuit.mlir)
 

@@ -431,7 +431,6 @@ def handle_subroutine(self, *args, **kwargs):
     return vals_out
 
 
-
 @PLxPRToQuantumJaxprInterpreter.register_primitive(decomprule_p)
 def handle_decomposition_rule(self, *, pyfun, func_jaxpr, is_qreg, num_params):
     """
