@@ -17,7 +17,13 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Split `from_plxpr.py` into two files.
+  [(#2142)](https://github.com/PennyLaneAI/catalyst/pull/2142)
+
 <h3>Documentation 📝</h3>
+
+* A typo in the code example for :func:`~.passes.ppr_to_ppm` has been corrected.
+  [(#2136)](https://github.com/PennyLaneAI/catalyst/pull/2136)
 
 <h3>Contributors ✍️</h3>
 
