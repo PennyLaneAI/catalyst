@@ -235,7 +235,11 @@ class DecompRuleInterpreter(qml.capture.PlxprInterpreter):
                         num_params=num_params,
                         requires_copy=num_wires == -1,
                     )
-                else:  # pragma: no cover
+                elif not any(
+                    keyword in getattr(op.op, "name", "") for keyword in ("Adjoint", "Controlled")
+                ):  # pragma: no cover
+                    # Note that we don't need to handle Adjoint and Controlled here
+                    # as they are handled using MLIR AdjointOp and ControlledOp primitives.
                     raise ValueError(f"Could not capture {op} without the number of wires.")
 
         data, struct = jax.tree_util.tree_flatten(measurement)
