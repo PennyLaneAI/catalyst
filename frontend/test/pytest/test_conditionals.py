@@ -365,7 +365,7 @@ class TestCond:
                 return True
 
             r = cond_fn()
-            assert r.dtype is jnp.dtype("int")
+            assert r.dtype is jnp.dtype("int")  # pylint: disable=no-member
             return r
 
         assert 0 == circuit()
@@ -391,7 +391,7 @@ class TestCond:
                 return False
 
             r = cond_fn()
-            assert r.dtype is jnp.dtype(
+            assert r.dtype is jnp.dtype(  # pylint: disable=no-member
                 "float64" if jax.config.values["jax_enable_x64"] else "float32"
             )
             return r
@@ -419,7 +419,7 @@ class TestCond:
                 return 0.5
 
             r = cond_fn()
-            assert r.dtype is jnp.dtype(
+            assert r.dtype is jnp.dtype(  # pylint: disable=no-member
                 "float64" if jax.config.values["jax_enable_x64"] else "float32"
             )
             return r
@@ -450,7 +450,7 @@ class TestCond:
             expected_dtype = jnp.dtype(
                 "float64" if jax.config.values["jax_enable_x64"] else "float32"
             )
-            assert all(v.dtype is expected_dtype for _, v in r.items())
+            assert all(v.dtype is expected_dtype for _, v in r.items())  # pylint: disable=no-member
             return r
 
         assert {0: 0.7, 1: 1.0} == circuit(False, True)
@@ -504,7 +504,7 @@ class TestCond:
                 return True
 
             r = cond_fn()
-            assert r.dtype is jnp.dtype("int")
+            assert r.dtype is jnp.dtype("int")  # pylint: disable=no-member
             return r
 
         assert 0 == circuit()
@@ -652,7 +652,7 @@ class TestCond:
                 def loop(n):
                     qml.X(n)
 
-                loop()
+                loop()  # pylint: disable=no-value-for-parameter
 
             test(4)
 

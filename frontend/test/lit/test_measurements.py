@@ -370,10 +370,10 @@ def expval5(x: float, y: float):
 print(expval5.mlir)
 
 
-# CHECK-LABEL: public @expval5(
+# CHECK-LABEL: public @expval6(
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=3))
-def expval5(x: float, y: float):
+def expval6(x: float, y: float):
     # CHECK: [[q0:%.+]] = quantum.custom "RX"
     qml.RX(x, wires=0)
     # CHECK: [[q1:%.+]] = quantum.custom "RY"
@@ -395,13 +395,13 @@ def expval5(x: float, y: float):
     return qml.expval(qml.Hamiltonian(coeffs, obs))
 
 
-print(expval5.mlir)
+print(expval6.mlir)
 
 
-# CHECK-LABEL: public @expval6(
+# CHECK-LABEL: public @expval7(
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2))
-def expval6(x: float):
+def expval7(x: float):
     # CHECK: [[q0:%.+]] = quantum.custom "RX"
     qml.RX(x, wires=0)
 
@@ -424,20 +424,6 @@ def expval6(x: float):
     return qml.expval(qml.Hamiltonian(coeff, [obs, qml.PauliX(0)]))
 
 
-print(expval6.mlir)
-
-
-# CHECK-LABEL: public @expval7(
-@qjit(target="mlir")
-@qml.qnode(qml.device("lightning.qubit", wires=2))
-def expval7():
-    A = np.array([[complex(1.0, 0.0), complex(2.0, 0.0)], [complex(2.0, 0.0), complex(1.0, 0.0)]])
-
-    # CHECK: [[obs:%.+]] = quantum.hermitian
-    # CHECK: quantum.expval [[obs]] : f64
-    return qml.expval(qml.Hermitian(A, wires=0))
-
-
 print(expval7.mlir)
 
 
@@ -445,6 +431,20 @@ print(expval7.mlir)
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2))
 def expval8():
+    A = np.array([[complex(1.0, 0.0), complex(2.0, 0.0)], [complex(2.0, 0.0), complex(1.0, 0.0)]])
+
+    # CHECK: [[obs:%.+]] = quantum.hermitian
+    # CHECK: quantum.expval [[obs]] : f64
+    return qml.expval(qml.Hermitian(A, wires=0))
+
+
+print(expval8.mlir)
+
+
+# CHECK-LABEL: public @expval9(
+@qjit(target="mlir")
+@qml.qnode(qml.device("lightning.qubit", wires=2))
+def expval9():
     B = np.array(
         [
             [complex(1.0, 0.0), complex(2.0, 0.0), complex(1.0, 0.0), complex(2.0, 0.0)],
@@ -459,13 +459,13 @@ def expval8():
     return qml.expval(qml.Hermitian(B, wires=[0, 1]))
 
 
-print(expval8.mlir)
+print(expval9.mlir)
 
 
-# CHECK-LABEL: public @expval9(
+# CHECK-LABEL: public @expval10(
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=3))
-def expval9(x: float, y: float):
+def expval10(x: float, y: float):
     # CHECK: [[q0:%.+]] = quantum.custom "RX"
     qml.RX(x, wires=0)
     # CHECK: [[q1:%.+]] = quantum.custom "RY"
@@ -481,13 +481,13 @@ def expval9(x: float, y: float):
     return qml.expval(qml.PauliX(0) @ qml.PauliZ(1) @ qml.Hadamard(2))
 
 
-print(expval9.mlir)
+print(expval10.mlir)
 
 
-# CHECK-LABEL: public @expval10(
+# CHECK-LABEL: public @expval11(
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=3))
-def expval10(x: float, y: float):
+def expval11(x: float, y: float):
     # CHECK: [[q0:%.+]] = quantum.custom "RX"
     qml.RX(x, wires=0)
     # CHECK: [[q1:%.+]] = quantum.custom "RY"
@@ -511,12 +511,12 @@ def expval10(x: float, y: float):
     return qml.expval(qml.PauliX(1) @ qml.Hermitian(B, wires=[0, 2]))
 
 
-print(expval10.mlir)
+print(expval11.mlir)
 
 
-# CHECK-LABEL: @expval11
+# CHECK-LABEL: @expval12
 @qjit(target="mlir")
-def expval11(num_qubits):
+def expval12(num_qubits):
     # CHECK: func.func public @circ(%arg0: tensor<i64>) -> tensor<f64>
     @qml.qnode(qml.device("lightning.qubit", wires=num_qubits))
     def circ():
@@ -542,8 +542,8 @@ def expval11(num_qubits):
     return circ()
 
 
-_ = expval11(10)
-print(expval11.mlir)
+_ = expval12(10)
+print(expval12.mlir)
 
 
 # CHECK-LABEL: public @var1(

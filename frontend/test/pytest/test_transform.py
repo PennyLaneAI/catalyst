@@ -1072,7 +1072,7 @@ class TestQFuncTransforms:
             @qml.qnode(qml.device(device_name, wires=3))
             def circuit():
                 """Example."""
-                unroll_ccrz(sub_circuit)()
+                unroll_ccrz(sub_circuit)()  # pylint: disable=not-callable
                 return qml.state()
 
             return circuit

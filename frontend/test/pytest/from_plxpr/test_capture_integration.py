@@ -419,7 +419,7 @@ class TestCapture:
                 qml.CNOT(wires=[0, i])
                 qml.RX(x, wires=i)
 
-            loop()
+            loop()  # pylint: disable=no-value-for-parameter
 
             return qml.expval(qml.Z(2))
 
@@ -457,7 +457,7 @@ class TestCapture:
                 return jnp.sin(x)
 
             # apply the for loop
-            loop_rx(x)
+            loop_rx(x)  # pylint: disable=no-value-for-parameter
 
             return qml.expval(qml.Z(0))
 
@@ -477,7 +477,7 @@ class TestCapture:
                 return jnp.sin(x)
 
             # apply the for loop
-            loop_rx(x)
+            loop_rx(x)  # pylint: disable=no-value-for-parameter
 
             return qml.expval(qml.Z(0))
 
@@ -507,10 +507,10 @@ class TestCapture:
                 def inner(j):
                     qml.ControlledPhaseShift(jnp.pi / 2 ** (n - j + 1), [i, j])
 
-                inner()
+                inner()  # pylint: disable=no-value-for-parameter
 
-            init()
-            qft()
+            init()  # pylint: disable=no-value-for-parameter
+            qft()  # pylint: disable=no-value-for-parameter
 
             # Expected output: |100...>
             return qml.state()
@@ -538,10 +538,10 @@ class TestCapture:
                 def inner(j):
                     qml.ControlledPhaseShift(jnp.pi / 2 ** (n - j + 1), [i, j])
 
-                inner()
+                inner()  # pylint: disable=no-value-for-parameter
 
-            init()
-            qft()
+            init()  # pylint: disable=no-value-for-parameter
+            qft()  # pylint: disable=no-value-for-parameter
 
             # Expected output: |100...>
             return qml.state()
@@ -1522,7 +1522,7 @@ class TestCapture:
                 def loop_0(i):
                     qml.RX(0, wires=i)
 
-                loop_0()
+                loop_0()  # pylint: disable=no-value-for-parameter
 
                 qml.RX(0, wires=0)
                 return qml.sample()
@@ -1540,7 +1540,7 @@ class TestCapture:
             def loop_0(i):
                 qml.RX(0, wires=i)
 
-            loop_0()
+            loop_0()  # pylint: disable=no-value-for-parameter
 
             qml.RX(0, wires=0)
             return qml.sample()
@@ -1626,7 +1626,7 @@ class TestControlFlow:
             def g(i, x):
                 return c(i) + x
 
-            return g(i0)
+            return g(i0)  # pylint: disable=no-value-for-parameter
 
         out = f(3.0)
         assert qml.math.allclose(out, 3 + jnp.cos(2) + jnp.cos(4) + jnp.cos(6))
@@ -1673,9 +1673,9 @@ class TestControlFlow:
                 def inner(j):
                     qml.RY(x, wires=j)
 
-                inner()
+                inner()  # pylint: disable=no-value-for-parameter
 
-            outer()
+            outer()  # pylint: disable=no-value-for-parameter
 
             # Expected output: |100...>
             return [qml.expval(qml.PauliZ(i)) for i in range(3)]
@@ -1701,9 +1701,9 @@ class TestControlFlow:
                 def inner(j, b):
                     return b + x
 
-                return inner(a)
+                return inner(a)  # pylint: disable=no-value-for-parameter
 
-            return outer(0.0)
+            return outer(0.0)  # pylint: disable=no-value-for-parameter
 
         res = f(0.2, 2)
         assert qml.math.allclose(res, 0.2 * 2 * 3)
