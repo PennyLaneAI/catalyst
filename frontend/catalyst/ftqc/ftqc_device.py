@@ -33,7 +33,7 @@ class FTQCDevice(Device):
         the location to the shared object with the C/C++ device implementation.
         """
         system_extension = ".dylib" if platform.system() == "Darwin" else ".so"
-        lib_path = get_lib_path("oqc_runtime", "OQC_LIB_DIR") + "/librtd_oqc" + system_extension
+        lib_path = get_lib_path("ftqc_runtime", "FTQC_LIB_DIR") + "/librtd_ftqc" + system_extension
 
         return "ftqc", lib_path
 
