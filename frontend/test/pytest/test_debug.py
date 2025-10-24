@@ -132,7 +132,7 @@ class TestDebugPrint:
             def loop(i):
                 debug.print(i)
 
-            loop()
+            loop()  # pylint: disable=no-value-for-parameter
 
         out, err = capfd.readouterr()
         assert err == ""
@@ -587,7 +587,7 @@ class TestOptionsToCliFlags:
         module {
             func.func @foo() {
                 %c = stablehlo.constant dense<0> : tensor<i64>
-                return 
+                return
             }
         }
         """

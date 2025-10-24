@@ -492,7 +492,7 @@ class TestShots:
             wires = random.randint(1, max_wires)
             expected_shape = (shots, wires)
             f_aot = fsample_aot_builder(backend, wires=wires)
-            observed_val = f_aot(0.0, shots=shots)
+            observed_val = f_aot(0.0, shots=shots)  # pylint: disable=unexpected-keyword-arg
             observed_shape = jnp.shape(observed_val)
             # We are failing this test because of the type system.
             # If shots is specified AOT, we would need to recompile
@@ -845,18 +845,18 @@ class TestTracingQJITAnnotatedFunctions:
             return qml.expval(qml.PauliZ(0))
 
         @qjit
-        def workflow(phi: float):
+        def workflow1(phi: float):
             g = grad(circuit)
             return g(phi)
 
-        mlir_v1 = workflow.mlir
+        mlir_v1 = workflow1.mlir
 
         @qjit
-        def workflow(phi: float):
+        def workflow2(phi: float):
             g = grad(qjit(circuit))
             return g(phi)
 
-        mlir_v2 = workflow.mlir
+        mlir_v2 = workflow2.mlir
 
         assert mlir_v1 == mlir_v2
 

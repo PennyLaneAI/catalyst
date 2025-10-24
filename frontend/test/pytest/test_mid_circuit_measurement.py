@@ -845,7 +845,7 @@ class TestDynamicOneShotIntegration:
                 return 43
 
         result = circuit()
-        assert result.shape == (10,)
+        assert result.shape == (10,)  # pylint: disable=no-member
 
     def test_dynamic_one_shot_with_classical_return_values(self):
         """Test classical return values with one-shot"""
@@ -956,12 +956,12 @@ class TestDynamicOneShotIntegration:
         @qjit
         def C_workflow():
             f = qml.set_shots(qml.QNode(circuit_rx, device=dev, mcm_method="one-shot"), shots=5)
-            return C_jvp(f, x, t, method=diff_method, argnum=list(range(len(x))))
+            return C_jvp(f, x, t, method=diff_method, argnums=list(range(len(x))))
 
         @qjit
         def J_workflow():
             f = qml.set_shots(qml.QNode(circuit_rx, device=dev), shots=5)
-            return C_jvp(f, x, t, method=diff_method, argnum=list(range(len(x))))
+            return C_jvp(f, x, t, method=diff_method, argnums=list(range(len(x))))
 
         r1 = C_workflow()
         r2 = J_workflow()
@@ -974,7 +974,7 @@ class TestDynamicOneShotIntegration:
     @pytest.mark.xfail(
         reason="vjp with dynamic one-shot is not yet supported.",
     )
-    def test_mcm_method_with_jvp(self, backend, diff_method):
+    def test_mcm_method_with_vjp(self, backend, diff_method):
         """Test that the dynamic_one_shot works with vjp."""
         dev = qml.device(backend, wires=1)
 
@@ -992,12 +992,12 @@ class TestDynamicOneShotIntegration:
         @qjit
         def C_workflow():
             f = qml.set_shots(qml.QNode(circuit_rx, device=dev, mcm_method="one-shot"), shots=5)
-            return C_vjp(f, x, ct, method=diff_method, argnum=list(range(len(x))))
+            return C_vjp(f, x, ct, method=diff_method, argnums=list(range(len(x))))
 
         @qjit
         def J_workflow():
             f = qml.set_shots(qml.QNode(circuit_rx, device=dev), shots=5)
-            return C_vjp(f, x, ct, method=diff_method, argnum=list(range(len(x))))
+            return C_vjp(f, x, ct, method=diff_method, argnums=list(range(len(x))))
 
         r1 = C_workflow()
         r2 = J_workflow()
