@@ -49,13 +49,16 @@ void createHloLoweringPipeline(OpPassManager &pm)
 {
     pm.addPass(mlir::createCanonicalizerPass());
     pm.addNestedPass<mlir::func::FuncOp>(stablehlo::createChloLegalizeToStablehloPass());
-    pm.addNestedPass<mlir::func::FuncOp>(catalyst::hlo_extensions::createStablehloLegalizeControlFlowPass());
+    pm.addNestedPass<mlir::func::FuncOp>(
+        catalyst::hlo_extensions::createStablehloLegalizeControlFlowPass());
     stablehlo::StablehloAggressiveSimplificationPassOptions ASoptions;
     pm.addNestedPass<mlir::func::FuncOp>(
         stablehlo::createStablehloAggressiveSimplificationPass(ASoptions));
     pm.addNestedPass<mlir::func::FuncOp>(stablehlo::createStablehloLegalizeToLinalgPass());
-    pm.addNestedPass<mlir::func::FuncOp>(catalyst::hlo_extensions::createStablehloLegalizeToStandardPass());
-    pm.addNestedPass<mlir::func::FuncOp>(catalyst::hlo_extensions::createStablehloLegalizeSortPass());
+    pm.addNestedPass<mlir::func::FuncOp>(
+        catalyst::hlo_extensions::createStablehloLegalizeToStandardPass());
+    pm.addNestedPass<mlir::func::FuncOp>(
+        catalyst::hlo_extensions::createStablehloLegalizeSortPass());
     pm.addPass(stablehlo::createStablehloConvertToSignlessPass());
     pm.addPass(mlir::createCanonicalizerPass());
     pm.addPass(catalyst::hlo_extensions::createScatterLoweringPass());

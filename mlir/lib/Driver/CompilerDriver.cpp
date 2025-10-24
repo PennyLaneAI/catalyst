@@ -24,19 +24,6 @@
 #include <string_view>
 #include <unordered_map>
 
-#include "stablehlo/dialect/Register.h"
-#include "stablehlo/integrations/c/StablehloPasses.h"
-#include "stablehlo/transforms/Passes.h"
-#include "stablehlo/transforms/optimization/Passes.h"
-
-#include "mlir/IR/DialectRegistry.h"
-#include "mlir/InitAllDialects.h"
-#include "mlir/InitAllExtensions.h"
-#include "mlir/InitAllPasses.h"
-#include "mlir/Parser/Parser.h"
-#include "mlir/Pass/PassManager.h"
-#include "mlir/Support/FileUtilities.h"
-#include "mlir/Target/LLVMIR/Export.h"
 #include "llvm/Analysis/CGSCCPassManager.h"
 #include "llvm/Analysis/LoopAnalysisManager.h"
 #include "llvm/IR/LegacyPassManager.h"
@@ -56,6 +43,20 @@
 #include "llvm/Transforms/Coroutines/CoroEarly.h"
 #include "llvm/Transforms/Coroutines/CoroSplit.h"
 #include "llvm/Transforms/IPO/GlobalDCE.h"
+
+#include "mlir/IR/DialectRegistry.h"
+#include "mlir/InitAllDialects.h"
+#include "mlir/InitAllExtensions.h"
+#include "mlir/InitAllPasses.h"
+#include "mlir/Parser/Parser.h"
+#include "mlir/Pass/PassManager.h"
+#include "mlir/Support/FileUtilities.h"
+#include "mlir/Target/LLVMIR/Export.h"
+
+#include "stablehlo/dialect/Register.h"
+#include "stablehlo/integrations/c/StablehloPasses.h"
+#include "stablehlo/transforms/Passes.h"
+#include "stablehlo/transforms/optimization/Passes.h"
 
 #include "Catalyst/IR/CatalystDialect.h"
 #include "Catalyst/Transforms/BufferizableOpInterfaceImpl.h"

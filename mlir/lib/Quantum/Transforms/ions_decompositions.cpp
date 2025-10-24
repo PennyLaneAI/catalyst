@@ -14,13 +14,15 @@
 
 #define DEBUG_TYPE "ions-decomposition"
 
-#include "Catalyst/IR/CatalystDialect.h"
-#include "Quantum/IR/QuantumOps.h"
-#include "Quantum/Transforms/Patterns.h"
+#include "llvm/Support/Debug.h"
+
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-#include "llvm/Support/Debug.h"
+
+#include "Catalyst/IR/CatalystDialect.h"
+#include "Quantum/IR/QuantumOps.h"
+#include "Quantum/Transforms/Patterns.h"
 
 using namespace llvm;
 using namespace mlir;

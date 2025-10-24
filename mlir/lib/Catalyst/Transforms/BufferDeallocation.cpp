@@ -74,6 +74,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "llvm/ADT/SetOperations.h"
+
 #include "mlir/Dialect/Bufferization/IR/AllocationOpInterface.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Bufferization/Transforms/BufferUtils.h"
@@ -84,7 +86,6 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-#include "llvm/ADT/SetOperations.h"
 
 #include "Catalyst/IR/CatalystDialect.h"
 

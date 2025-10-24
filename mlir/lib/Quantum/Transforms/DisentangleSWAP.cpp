@@ -17,16 +17,16 @@
 
 #define DEBUG_TYPE "disentangleswap"
 
-#include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/IR/BuiltinOps.h"
-#include "mlir/Pass/Pass.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/Support/Debug.h"
 
-#include "Catalyst/IR/CatalystDialect.h"
-#include "Quantum/IR/QuantumOps.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/IR/BuiltinOps.h"
+#include "mlir/Pass/Pass.h"
 
+#include "Catalyst/IR/CatalystDialect.h"
 #include "PropagateSimpleStatesAnalysis.hpp"
+#include "Quantum/IR/QuantumOps.h"
 
 using namespace mlir;
 using namespace catalyst;
